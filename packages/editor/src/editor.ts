@@ -675,19 +675,39 @@ function live(
     return { fills, index, fill, image, size, box, rect: imageRect(crop, size, box), around: [...containersOf(frame, node.parentId, from), box] }
   }
   type CropTarget = NonNullable<ReturnType<typeof cropTarget>>
-  /** Each layer's preview for the effect tiles, by the scene layer it was drawn from. */
-  const thumbnails = new Map<string, { layer: SceneLayer; url: string }>()
+  /**
+   * Each layer's preview for the effect tiles, with what it was drawn from: its scene layer and the
+   * fonts and images there were then, so one that arrives later draws it again.
+   */
+  const thumbnails = new Map<string, { layer: SceneLayer; resources: Resources; url: string }>()
+  /**
+   * Text's preview: "Aa" in the layer's font, weight and colour, as wide as it is; `outlined` draws
+   * its outline in its colour with no fill, as the Outline tile shows it.
+   */
+  function textSample(layer: Extract<SceneLayer, { type: 'text' }>, outlined: boolean): SceneLayer {
+    const { style } = layer.props
+    const sample = {
+      ...layer.props, x: 0, y: 0, rotation: 0, text: 'Aa', runs: [], boxMode: 'autoWidth' as const, align: 'start' as const, verticalAlign: 'top' as const,
+      list: undefined, maxLines: undefined, shrinkToFit: undefined, effects: [],
+      style: { ...style, fontSize: 96, outline: outlined ? { width: 4, color: style.color } : undefined, color: outlined ? '#00000000' : style.color },
+    }
+    const size = measureText()(sample, null)
+    return { ...layer, props: { ...sample, width: size.width, height: size.height } }
+  }
   /**
    * A small picture of one layer as a frame shows it, without its own effects (the tiles show
-   * those), drawn by the renderer on the CPU surface and kept until the layer changes: a PNG as an
-   * object URL, `size` pixels square, the layer fitted inside with a margin. Null when the layer
-   * isn't in the frame or draws nothing there.
+   * those), drawn by the renderer on the CPU surface and kept until the layer, or the fonts and
+   * images it is drawn with, change: a PNG as an object URL, `size` pixels square, the layer fitted
+   * inside with a margin. Text is "Aa" in its look. Null when the layer isn't in the frame or draws
+   * nothing there.
    */
-  function layerThumbnail(frame: Frame, id: string, size: number): string | null {
-    const layer = find(cached(frame).scene.layers, id)
-    if (!layer || layer.props.mask) return null
-    const kept = thumbnails.get(id)
-    if (kept?.layer === layer) return kept.url
+  function layerThumbnail(frame: Frame, id: string, size: number, outlined: boolean): string | null {
+    const found = find(cached(frame).scene.layers, id)
+    if (!found || found.props.mask) return null
+    const key = outlined ? `${id}/outlined` : id
+    const kept = thumbnails.get(key)
+    if (kept?.layer === found && kept.resources === resources) return kept.url
+    const layer = found.type === 'text' ? textSample(found, outlined) : found
     const bounds = boundsOf([layer.props])
     if (bounds.width <= 0 && bounds.height <= 0) return null
     const margin = size * 0.12
@@ -707,7 +727,7 @@ function live(
       if (!png) return null
       if (kept) URL.revokeObjectURL(kept.url)
       const url = URL.createObjectURL(new Blob([png.slice()], { type: 'image/png' }))
-      thumbnails.set(id, { layer, url })
+      thumbnails.set(key, { layer: found, resources, url })
       return url
     } finally {
       surface.delete()
@@ -3355,13 +3375,14 @@ function live(
       return ok
     },
     /**
-     * A small picture of a layer for the effect tiles (#227): drawn by the renderer without the
-     * layer's own effects, in the frame the selection is in (the first page in the primary format
-     * otherwise), and kept until the layer changes. A PNG object URL, or null.
+     * A small picture of a layer for the effect tiles: drawn by the renderer without the layer's own
+     * effects, in the frame the selection is in (the first page in the primary format otherwise),
+     * and kept until the layer or what it is drawn with changes. Text is "Aa" in its look, outlined
+     * with no fill when asked. A PNG object URL, or null.
      */
-    layerThumbnail(id: string, size = 96): string | null {
+    layerThumbnail(id: string, size = 96, outlined = false): string | null {
       const frame = frameOf(selection?.frame) ?? frameOf(`${firstPage()}/${design.meta.primaryFormatId}`)
-      return frame ? layerThumbnail(frame, id, size) : null
+      return frame ? layerThumbnail(frame, id, size, outlined) : null
     },
     synced: () => provider.synced && provider.unsyncedChanges === 0,
     destroy() {

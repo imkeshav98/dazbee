@@ -1,7 +1,7 @@
 // The Effects card's tiles preview each effect on the selected layer: a star shows the star, a photo
-// the photo, a group a render of itself, text its Aa in its own colour, and several layers Aa. The
-// pictures are drawn by the editor's renderer, follow a fill change, and dragging with the card
-// open stays within a frame.
+// the photo, a group or a frame a render of itself, text "Aa" in its own font and colour (its
+// Outline tile outlined), and several layers Aa. The pictures are drawn by the editor's renderer,
+// follow a fill change, and dragging with the card open stays within a frame.
 import { expect, test, type Page } from '../support/test.ts'
 import type { DesignInput } from '@dazbee/schema'
 import { photo, upload } from '../support/assets.ts'
@@ -24,12 +24,23 @@ const design = (assetId: string): DesignInput => ({
     headline: { type: 'text', parentId: 'p1', index: 'a2', name: 'Headline', props: { x: 120, y: 520, width: 400, height: 80, text: 'Run lighter', boxMode: 'autoWidth', style: { fontFamily: 'Noto Sans', fontSize: 64, fontWeight: 800, color: '#2F6BFFFF' } } },
     pair: { type: 'group', parentId: 'p1', index: 'a3', name: 'Pair', props: { x: 600, y: 600, width: 400, height: 260 } },
     left: shape('Left', 'a0', 'pair', 600, 600, 'ellipse', '#00A88AFF'),
+    card: { type: 'frame', parentId: 'p1', index: 'a4', name: 'Card', props: { x: 120, y: 760, width: 300, height: 200, fills: [{ type: 'solid', color: '#14213DFF' }] } },
     right: { ...shape('Right', 'a1', 'pair', 740, 600, 'rect', '#FFB020FF'), props: { ...shape('Right', 'a1', 'pair', 740, 600, 'rect', '#FFB020FF').props, width: 260 } } as Node,
   },
   overrides: {},
 })
 
 const tiles = (page: Page) => page.getByTestId('effects-card').locator('[data-tile]')
+/** Whether a tile's picture has a pixel of a colour, within a few levels. */
+const hasColour = (page: Page, tile: string, rgb: number[]) => page.getByTestId('effects-card').locator(`[data-tile="${tile}"] img`).evaluate(async (img: HTMLImageElement, rgb) => {
+  await img.decode()
+  const canvas = new OffscreenCanvas(img.naturalWidth, img.naturalHeight)
+  const context = canvas.getContext('2d')
+  context?.drawImage(img, 0, 0)
+  const data = context?.getImageData(0, 0, img.naturalWidth, img.naturalHeight).data ?? new Uint8ClampedArray()
+  for (let i = 0; i < data.length; i += 4) if ((data[i + 3] ?? 0) > 200 && rgb.every((c, j) => Math.abs((data[i + j] ?? 0) - c) <= 4)) return true
+  return false
+}, rgb)
 /** The colour at the middle of the None tile's picture, read from the picture itself. */
 const middleOf = (page: Page) => page.getByTestId('effects-card').locator('[data-tile="none"] img').evaluate(async (img: HTMLImageElement) => {
   await img.decode()
@@ -71,10 +82,17 @@ test('each layer previews the effects on itself; a fill change follows; several 
   expect((await middleOf(page))[3]).toBeGreaterThan(0)
   writeOutput('effect-tiles-3-group.png', await page.getByTestId('effects-card').screenshot())
 
-  // Text keeps Aa, in its own colour.
+  // A frame shows a render of itself.
+  await click(page, 270, 860)
+  await expect(tiles(page).locator('img[data-thumbnail]')).toHaveCount(4)
+  expect((await middleOf(page)).slice(0, 3)).toEqual([20, 33, 61])
+
+  // Text is Aa, drawn in its own font and colour; its Outline tile is the same Aa outlined.
   await click(page, 200, 560)
-  await expect(tiles(page).locator('img')).toHaveCount(0)
-  await expect(tiles(page).first().locator('span[aria-hidden]')).toHaveCSS('color', 'rgb(47, 107, 255)')
+  await expect(tiles(page).locator('img[data-thumbnail]')).toHaveCount(4)
+  expect(await hasColour(page, 'none', [47, 107, 255])).toBe(true)
+  const outlined = await page.getByTestId('effects-card').locator('[data-tile="outline"] img').getAttribute('src')
+  expect(outlined).not.toBe(await tiles(page).first().locator('img').getAttribute('src'))
   writeOutput('effect-tiles-4-text.png', await page.getByTestId('effects-card').screenshot())
 
   // Several layers: Aa as before.
@@ -89,6 +107,9 @@ test('dragging a layer with its tiles showing stays within a frame, and redraws 
   const { page, errors } = await openStage(browser, design(asset.id))
   await click(page, 250, 260)
   await expect(tiles(page).locator('img[data-thumbnail]')).toHaveCount(4)
+  // Every font and image is here, and the tiles have drawn with them.
+  await page.evaluate(() => window.dazbee?.exportFiles({ pageIds: ['p1'], formatIds: ['sq'], type: 'png' }))
+  await page.waitForTimeout(400)
   // Every picture the None tile shows, as it changes.
   await page.evaluate(() => {
     const seen: string[] = []
