@@ -823,7 +823,7 @@ function OwnChanges({ design, ids, formatId, editor, p }: { design: Design; ids:
     const group = OWN_GROUP[path] ?? 'other'
     groups.set(group, [...groups.get(group) ?? [], path])
   }
-  const reset = (only?: string[]) => editor.session.run('override.reset', { ids, scope, ...(only ? { paths: only } : {}) })
+  const reset = (only?: string[]) => editor.resetOwn(ids, scope, only)
   const name = design.formats[formatId]?.name ?? ''
   return (
     <div data-testid="own-changes" className="flex flex-col gap-1">
