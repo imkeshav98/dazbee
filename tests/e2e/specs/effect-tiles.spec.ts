@@ -52,7 +52,6 @@ test('each layer previews the effects on itself; a fill change follows; several 
 
   // A fill change redraws them, once the change settles.
   const fill = page.getByTestId('fill-card')
-  await fill.locator('[data-fold]').click()
   await fill.getByRole('textbox', { name: 'Colour 1 hex' }).fill('2F6BFF')
   await fill.getByRole('textbox', { name: 'Colour 1 hex' }).press('Enter')
   await expect.poll(async () => (await middleOf(page)).slice(0, 3)).toEqual([47, 107, 255])
