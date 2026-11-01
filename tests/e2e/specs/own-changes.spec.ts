@@ -44,7 +44,7 @@ test('the scope card lists what this format has of its own and resets it', async
   writeOutput('own-changes.png', await page.screenshot())
 
   // One group back to the base, then all of it; one undo brings the group back.
-  await own.getByRole('button', { name: 'Reset Fill to follow the other formats' }).click()
+  await own.getByRole('button', { name: 'Reset Fill to follow the other sizes' }).click()
   await expect.poll(async () => Object.keys(await squareOwn(page)).sort()).toEqual(['width', 'x'])
   await page.evaluate(() => window.dazbee?.perform('undo'))
   await expect.poll(async () => Object.keys(await squareOwn(page)).sort()).toEqual(['fills', 'width', 'x'])

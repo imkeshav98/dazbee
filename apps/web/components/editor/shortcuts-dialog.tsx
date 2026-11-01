@@ -36,7 +36,7 @@ function keysOf(spec: string, mac: boolean) {
 const typing = (target: EventTarget | null) =>
   target instanceof HTMLElement && (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName))
 
-export function ShortcutsButton({ className = 'grid size-8 shrink-0 cursor-pointer place-items-center rounded-row border border-line text-muted transition-colors duration-[var(--chrome-fast)] hover:border-line-strong hover:text-text' }: { className?: string }) {
+export function ShortcutsButton({ className }: { className: string }) {
   const t = useMessages().editor.shortcuts
   const dialog = useRef<HTMLDialogElement>(null)
   const [mac, setMac] = useState(false)

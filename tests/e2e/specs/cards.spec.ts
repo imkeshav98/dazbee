@@ -40,7 +40,8 @@ test('the cards float over a full-width canvas and the ads fit between the capsu
   // The brand's own colours, when its kit has any, add a row of their own above the fixed set.
   const brandRow = pageCard.getByTestId('page-brand-colors')
   const brandRowHeight = (await brandRow.count()) > 0 ? (await brandRow.boundingBox())?.height ?? 0 : 0
-  expect((await box(page, 'page-card')).height).toBeLessThan(140 + brandRowHeight)
+  // Its colours, its hex and its one background layer, open.
+  expect((await box(page, 'page-card')).height).toBeLessThan(270 + brandRowHeight)
   expect(await pageCard.evaluate((el) => getComputedStyle(el).backdropFilter)).toContain('blur(18px)')
 
   // The square, fitted, sits wholly between the capsule and the cards, centred in that gap: as

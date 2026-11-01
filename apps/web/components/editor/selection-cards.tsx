@@ -15,8 +15,8 @@ import { cn } from '../../lib/cn.ts'
 import { useMessages } from '../../lib/i18n/client.tsx'
 import { format, type Messages } from '../../lib/i18n/index.ts'
 import { Select } from '../ui/select.tsx'
-import { CARD, CardHeader, PICKED_RING, SWATCHES } from './card.tsx'
-import { CHIP, DASHED_BUTTON, FIELD, FOCUS_RING, KNOBS, KNOBS_FOUR, POPOVER, SEGMENT, SEGMENTS, SWATCH } from './styles.ts'
+import { CARD, CARD_LOWER, CardHeader, PICKED_RING, SWATCHES } from './card.tsx'
+import { CHIP, CHIP_ACCENT, DASHED_BUTTON, FIELD, FOCUS_RING, KNOBS, KNOBS_FOUR, LINK_BUTTON, POPOVER, SEGMENT, SEGMENTS, SWATCH } from './styles.ts'
 import { ImagePickerButton } from './image-tool.tsx'
 import { useBrandKit } from './use-brand-kit.ts'
 import { useLiveDesign } from './use-live-design.ts'
@@ -104,10 +104,10 @@ function HeaderCard({ target, p, scope }: { target: Target; p: P; scope: ReactNo
   ] as const
   // A group's box follows what it holds; its size and turn come from them.
   const sized = target.types.every((type) => type !== 'group' && type !== 'boolean')
-  const title = target.ids.length > 1 ? format(p.layers, { n: target.ids.length }) : target.names[0] ?? ''
+  const title = target.ids.length > 1 ? format(p.layers, { n: target.ids.length }) : target.names[0] || p.layer
   return (
     <Card id="layout-card" title={title} action={scope}>
-      <div className={KNOBS_FOUR}>
+      <div className={sized ? KNOBS_FOUR : KNOBS}>
         {fields.map((f) => (
           (f.key === 'width' || f.key === 'height') && !sized
             ? null
@@ -678,7 +678,7 @@ function ImageCard({ target, p, brandId, index, paint }: { target: Target; p: P;
         </div>
         <Choice name={p.fit} value={paint.fit} options={['fill', 'fit', 'crop', 'tile'] as const} labels={p.fits} onSet={(fit) => setPaint(() => ({ fit }))} />
       </div>
-      <div className={cn(KNOBS, 'border-t border-line px-[18px] pt-3 pb-4')}>
+      <div className={cn(KNOBS, CARD_LOWER)}>
           <NumberField
             label={p.opacity}
             unit="%"
@@ -836,7 +836,7 @@ function OwnChanges({ design, ids, formatId, editor, p }: { design: Design; ids:
               type="button"
               onClick={() => reset(groupPaths)}
               aria-label={format(p.resetOwn, { name: p.ownGroups[group] })}
-              className={cn('shrink-0 cursor-pointer rounded-row px-1.5 text-[12px] font-semibold text-accent-text hover:bg-hover', FOCUS_RING)}
+              className={LINK_BUTTON}
             >
               {p.reset}
             </button>
@@ -1001,7 +1001,7 @@ function EffectsCard({ target, p }: { target: Target; p: P }) {
           </button>
         ))}
       </div>
-      <div className="flex flex-col gap-2.5 border-t border-line px-[18px] pt-3 pb-4">
+      <div className={cn('flex flex-col gap-2.5', CARD_LOWER)}>
           <Select
             name="add-effect"
             label={p.addEffect}
@@ -1035,7 +1035,7 @@ function ScopeMenu({ everyFormat, onChange, size, p, children }: { everyFormat: 
   return (
     <Popover.Root>
       <Popover.Trigger asChild>
-        <button type="button" data-testid="scope-chip" className={cn(CHIP, 'shrink-0 border-transparent bg-accent-soft text-accent-text hover:border-transparent hover:text-accent-text', FOCUS_RING)}>
+        <button type="button" data-testid="scope-chip" className={cn(CHIP_ACCENT, 'shrink-0', FOCUS_RING)}>
           {everyFormat ? p.forAllSizes : format(p.onlySize, { size })}
           <CaretDownIcon size={10} weight="bold" aria-hidden />
         </button>

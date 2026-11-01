@@ -12,7 +12,7 @@ import { cn } from '../../lib/cn.ts'
 import { useLocale, useMessages } from '../../lib/i18n/client.tsx'
 import { Tooltip } from '../ui/tooltip.tsx'
 import { ShortcutsButton } from './shortcuts-dialog.tsx'
-import { MENU_ITEM, MENU_KEY, POPOVER, SWITCH } from './styles.ts'
+import { MENU_DIVIDER, MENU_ITEM, MENU_KEY, POPOVER, SWITCH } from './styles.ts'
 
 const BUTTON = 'grid h-8 min-w-8 cursor-pointer place-items-center rounded-row px-1.5 text-muted transition-colors duration-[var(--chrome-fast)] hover:bg-hover hover:text-text disabled:cursor-default disabled:opacity-40'
 
@@ -48,8 +48,8 @@ export function ZoomControl({ zoom, editor }: { zoom: number | null; editor: Edi
   ]
   const toggles = [
     { label: t.editor.view.rulers, key: t.editor.view.rulersKey, on: view.rulers, flip: () => editor?.perform('toggleRulers') },
-    { label: t.editor.view.snap, key: '', on: view.snapping, flip: () => editor?.setSnapping(!view.snapping) },
-  ]
+    { label: t.editor.view.snap, on: view.snapping, flip: () => editor?.setSnapping(!view.snapping) },
+  ] satisfies { label: string; key?: string; on: boolean; flip: () => void }[]
   return (
     <div role="group" aria-label={t.editor.zoom} data-zoom className="absolute end-4 bottom-4 z-10 flex max-sm:top-20 max-sm:bottom-auto items-center gap-0.5 rounded-card surface-frost p-1">
       <Tooltip label={`${t.editor.zoomOut} · ${t.editor.zoomOutKey}`}>
@@ -58,17 +58,19 @@ export function ZoomControl({ zoom, editor }: { zoom: number | null; editor: Edi
         </button>
       </Tooltip>
       <Popover.Root open={open} onOpenChange={setOpen}>
-        <Popover.Trigger asChild>
-          <button
-            type="button"
-            aria-label={t.editor.zoomMenu}
-            disabled={off}
-            data-testid="zoom"
-            className={`${BUTTON} w-14 font-mono text-xs tabular-nums text-text`}
-          >
-            {zoom === null ? '' : percent.format(zoom)}
-          </button>
-        </Popover.Trigger>
+        <Tooltip label={t.editor.zoomMenu}>
+          <Popover.Trigger asChild>
+            <button
+              type="button"
+              aria-label={t.editor.zoomMenu}
+              disabled={off}
+              data-testid="zoom"
+              className={`${BUTTON} w-14 font-mono text-xs tabular-nums text-text`}
+            >
+              {zoom === null ? '' : percent.format(zoom)}
+            </button>
+          </Popover.Trigger>
+        </Tooltip>
         <Popover.Portal>
           <Popover.Content side="top" align="end" sideOffset={10} collisionPadding={12} aria-label={t.editor.zoomMenu} data-testid="zoom-menu" className={cn(POPOVER, 'flex w-60 flex-col p-1.5')}>
             {zooms.map((z) => (
@@ -85,11 +87,11 @@ export function ZoomControl({ zoom, editor }: { zoom: number | null; editor: Edi
                 <kbd className={MENU_KEY}>{z.key}</kbd>
               </button>
             ))}
-            <div className="mx-1.5 my-1 border-t border-line" />
+            <div className={MENU_DIVIDER} />
             {toggles.map((toggle) => (
-              <button key={toggle.label} type="button" aria-pressed={toggle.on} onClick={toggle.flip} className={MENU_ITEM}>
+              <button key={toggle.label} type="button" role="switch" aria-checked={toggle.on} onClick={toggle.flip} className={MENU_ITEM}>
                 {toggle.label}
-                {toggle.key && <kbd className={cn(MENU_KEY, 'ms-auto me-2')}>{toggle.key}</kbd>}
+                {'key' in toggle && <kbd className={cn(MENU_KEY, 'ms-auto me-2')}>{toggle.key}</kbd>}
                 <span aria-hidden className={SWITCH} />
               </button>
             ))}

@@ -17,6 +17,8 @@ export const CARD = 'card-rise shrink-0 overflow-hidden rounded-[16px] surface-f
 
 /** A card's content under its title row. */
 export const CARD_BODY = 'px-[18px] pb-4'
+/** A card's second part, under a hairline: the numbers under a card's look. */
+export const CARD_LOWER = 'border-t border-line px-[18px] pt-3 pb-4'
 
 /**
  * A card's title row: the name at the start; at the end a small grey note (the layer or page it

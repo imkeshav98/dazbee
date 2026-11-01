@@ -202,7 +202,7 @@ test.describe('every selection', () => {
     const own = (await scopeMenu(page)).getByTestId('own-changes')
     await expect(own.getByRole('listitem').locator('span')).toHaveText(['Position and size', 'Fill'])
     const sq = async () => Object.keys((await doc(page)).overrides['format:sq']?.box ?? {}).sort()
-    await step(page, () => own.getByRole('button', { name: 'Reset Fill to follow the other formats' }).click(), async () => {
+    await step(page, () => own.getByRole('button', { name: 'Reset Fill to follow the other sizes' }).click(), async () => {
       await expect.poll(sq).toEqual(['x'])
     })
     await step(page, () => own.getByRole('button', { name: 'Reset all' }).click(), async () => {
@@ -1259,14 +1259,14 @@ test.describe('nothing selected', () => {
     await page.getByTestId('zoom').click()
     const view = page.getByTestId('zoom-menu')
     for (const name of ['Snap', 'Rulers']) {
-      const button = view.getByRole('button', { name })
-      const was = await button.getAttribute('aria-pressed')
+      const button = view.getByRole('switch', { name })
+      const was = await button.getAttribute('aria-checked')
       await button.click()
-      await expect(button).not.toHaveAttribute('aria-pressed', was ?? '')
+      await expect(button).not.toHaveAttribute('aria-checked', was ?? '')
     }
-    await expect(page.locator('.stage-overlay .ruler[data-axis="x"]')).toHaveCount(await view.getByRole('button', { name: 'Rulers' }).getAttribute('aria-pressed') === 'true' ? 1 : 0)
+    await expect(page.locator('.stage-overlay .ruler[data-axis="x"]')).toHaveCount(await view.getByRole('switch', { name: 'Rulers' }).getAttribute('aria-checked') === 'true' ? 1 : 0)
     expect(await page.evaluate(() => [window.dazbee?.snapping(), window.dazbee?.rulers()])).toEqual(
-      [await view.getByRole('button', { name: 'Snap' }).getAttribute('aria-pressed') === 'true', await view.getByRole('button', { name: 'Rulers' }).getAttribute('aria-pressed') === 'true'],
+      [await view.getByRole('switch', { name: 'Snap' }).getAttribute('aria-checked') === 'true', await view.getByRole('switch', { name: 'Rulers' }).getAttribute('aria-checked') === 'true'],
     )
   })
 })

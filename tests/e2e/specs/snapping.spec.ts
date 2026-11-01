@@ -57,9 +57,9 @@ test('a drag snaps to another layer with a guide, and not with Ctrl held or Snap
   expect(await props(page, 'dot')).toMatchObject({ y: 83 })
 
   // Snap off in the zoom menu: no drag snaps until it is back on.
-  const snap = async () => (await zoomMenu(page)).getByRole('button', { name: 'Snap' })
+  const snap = async () => (await zoomMenu(page)).getByRole('switch', { name: 'Snap' })
   await (await snap()).click()
-  await expect(await snap()).toHaveAttribute('aria-pressed', 'false')
+  await expect(await snap()).toHaveAttribute('aria-checked', 'false')
   await page.keyboard.press('Escape')
   // 2 px up from 83 would snap to the box's top at 80; with Snap off it stops at 81.
   await hold(page, { x: 820, y: 203 }, { x: 820, y: 201 })
@@ -67,7 +67,7 @@ test('a drag snaps to another layer with a guide, and not with Ctrl held or Snap
   await release(page)
   expect(await props(page, 'dot')).toMatchObject({ y: 81 })
   await (await snap()).click()
-  await expect(await snap()).toHaveAttribute('aria-pressed', 'true')
+  await expect(await snap()).toHaveAttribute('aria-checked', 'true')
   await page.keyboard.press('Escape')
 
   // Equal spacing: the tag between the box (right edge 380) and the dot (left edge 700), 3 px
@@ -120,10 +120,10 @@ test('rulers are off until asked for, count design pixels from the frame, mark t
   const top = page.locator('.stage-overlay .ruler[data-axis="x"]')
   // Off as the editor opens, as in the final mock; Rulers in the zoom menu turns them on.
   await expect(top).toHaveCount(0)
-  const chip = (await zoomMenu(page)).getByRole('button', { name: 'Rulers' })
-  await expect(chip).toHaveAttribute('aria-pressed', 'false')
+  const chip = (await zoomMenu(page)).getByRole('switch', { name: 'Rulers' })
+  await expect(chip).toHaveAttribute('aria-checked', 'false')
   await chip.click()
-  await expect(chip).toHaveAttribute('aria-pressed', 'true')
+  await expect(chip).toHaveAttribute('aria-checked', 'true')
   await page.keyboard.press('Escape')
   await expect(top).toBeVisible()
   // At 80% numbered ticks are 100 design pixels apart.
@@ -136,7 +136,7 @@ test('rulers are off until asked for, count design pixels from the frame, mark t
   await press(page, 'toggleRulers')
   await expect(top).toHaveCount(0)
   // The menu follows the shortcut.
-  await expect((await zoomMenu(page)).getByRole('button', { name: 'Rulers' })).toHaveAttribute('aria-pressed', 'false')
+  await expect((await zoomMenu(page)).getByRole('switch', { name: 'Rulers' })).toHaveAttribute('aria-checked', 'false')
   expect(errors).toEqual([])
 })
 

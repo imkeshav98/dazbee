@@ -12,7 +12,7 @@ import { cn } from '../../lib/cn.ts'
 import { useMessages } from '../../lib/i18n/client.tsx'
 import { format } from '../../lib/i18n/index.ts'
 import { ArrangePanel, useSelection } from './arrange-panel.tsx'
-import { CARD, CardHeader, PICKED_RING, SWATCHES } from './card.tsx'
+import { CARD, CARD_LOWER, CardHeader, PICKED_RING, SWATCHES } from './card.tsx'
 import { FontPanel } from './font-panel.tsx'
 import { FormatsPanel, useEditorDesign } from './formats-panel.tsx'
 import { PagesPanel } from './pages-panel.tsx'
@@ -82,7 +82,7 @@ function PageCard({ editor, brandId, pageId }: { editor: Editor; brandId: string
       <div role="group" aria-label={t.editor.page.background} className="flex items-center justify-between gap-1 px-[18px] pt-0.5 pb-3.5">
         {SWATCHES.map((hex) => <Swatch key={hex} hex={hex} label={hex} on={current === hex} onPick={() => paint(hex)} />)}
       </div>
-      <div className="flex flex-col gap-2.5 border-t border-line px-[18px] pt-3 pb-4">
+      <div className={cn('flex flex-col gap-2.5', CARD_LOWER)}>
         <label className="flex items-center gap-2 text-xs text-muted">
           {t.editor.page.hex}
           <input
