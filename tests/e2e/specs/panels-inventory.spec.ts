@@ -12,7 +12,7 @@ import { designOf, placed, synced, writeOutput } from '../support/editor.ts'
 import { importGoogleFonts } from '../support/fonts.ts'
 import { API_URL, DEV_BRAND } from '../support/seed.ts'
 import { choose } from '../support/select.ts'
-import { drag, openStage, unfoldAll } from '../support/stage.ts'
+import { drag, openStage, scopeMenu } from '../support/stage.ts'
 
 // Each row opens its own design, so CI spreads the rows over its shards.
 test.describe.configure({ mode: 'parallel', timeout: 180_000 })
@@ -143,7 +143,6 @@ async function reloads(page: Page) {
 const select = async (page: Page, ids: string[]) => {
   await page.evaluate((ids) => window.dazbee?.select(ids), ids)
   await expect(page.getByTestId('layout-card')).toBeVisible()
-  await unfoldAll(page)
 }
 
 /**
@@ -173,14 +172,15 @@ test.describe('every selection', () => {
   row(1, 'apply changes to this format or all formats', async (open) => {
     const page = await open(true)
     await select(page, ['box'])
-    const scope = page.getByTestId('scope-card')
     const x = page.getByTestId('layout-card').getByRole('spinbutton', { name: 'X position' })
-    await expect(scope.getByRole('radio', { name: 'This format' })).toHaveAttribute('aria-checked', 'true')
+    await expect((await scopeMenu(page)).getByRole('radio', { name: 'Only Square' })).toHaveAttribute('aria-checked', 'true')
+    await page.keyboard.press('Escape')
     await step(page, () => enter(x, '500'), async () => {
       await expect.poll(async () => (await doc(page)).overrides['format:sq']?.box?.x).toBe(500)
       expect((await doc(page)).nodes.box?.props.x).toBe(80)
     })
-    await scope.getByRole('radio', { name: 'All formats' }).click()
+    await (await scopeMenu(page)).getByRole('radio', { name: 'All sizes' }).click()
+    await page.keyboard.press('Escape')
     await step(page, () => enter(x, '200'), async () => {
       await expect.poll(async () => (await doc(page)).nodes.box?.props.x).toBe(200)
       expect((await doc(page)).overrides['format:sq']?.box ?? {}).not.toHaveProperty('x')
@@ -193,8 +193,8 @@ test.describe('every selection', () => {
     await select(page, ['box'])
     await enter(page.getByTestId('layout-card').getByRole('spinbutton', { name: 'X position' }), '200')
     await enter(page.getByTestId('fill-card').getByRole('textbox', { name: 'Colour 1 hex' }), '14213d')
-    const own = page.getByTestId('own-changes')
-    await expect(own.getByRole('listitem')).toHaveText(['Position and size', 'Fill'])
+    const own = (await scopeMenu(page)).getByTestId('own-changes')
+    await expect(own.getByRole('listitem').locator('span')).toHaveText(['Position and size', 'Fill'])
     const sq = async () => Object.keys((await doc(page)).overrides['format:sq']?.box ?? {}).sort()
     await step(page, () => own.getByRole('button', { name: 'Reset Fill to follow the other formats' }).click(), async () => {
       await expect.poll(sq).toEqual(['x'])
@@ -939,7 +939,6 @@ test.describe('photos', () => {
     const page = await open()
     await select(page, ['photo'])
     const card = page.getByTestId('image-card')
-    await card.getByRole('button', { name: 'Fine-tune' }).click()
     for (const [name, key] of [['Exposure', 'exposure'], ['Contrast', 'contrast'], ['Saturation', 'saturation'], ['Temperature', 'temperature'], ['Tint', 'tint']] as const) {
       await step(page, () => enter(card.getByRole('spinbutton', { name }), '40'), async () => {
         await expect.poll(async () => ((await image(page)).adjust as Record<string, number> | undefined)?.[key]).toBe(40)
@@ -952,7 +951,6 @@ test.describe('photos', () => {
     const page = await open()
     await select(page, ['photo'])
     const card = page.getByTestId('image-card')
-    await card.getByRole('button', { name: 'Fine-tune' }).click()
     await step(page, () => enter(card.getByRole('spinbutton', { name: 'Image opacity' }), '50'), async () => {
       await expect.poll(async () => (await image(page)).opacity).toBe(0.5)
     })
@@ -1097,7 +1095,6 @@ test.describe('nothing selected', () => {
     await step(page, () => page.getByTestId('page-brand-colors').getByRole('button', { name: 'Berry #FF3D6E' }).click(), async () => {
       await expect.poll(() => background(page)).toEqual(solid('#FF3D6EFF'))
     })
-    await card.getByRole('button', { name: 'Fine-tune' }).click()
     await step(page, () => enter(card.getByRole('textbox', { name: 'Hex', exact: true }), '14213d'), async () => {
       await expect.poll(() => background(page)).toEqual(solid('#14213DFF'))
     })
@@ -1106,8 +1103,6 @@ test.describe('nothing selected', () => {
 
   row(60, 'background layers: add, remove, each paint', async (open) => {
     const page = await open()
-    const card = page.getByTestId('page-card')
-    await card.getByRole('button', { name: 'Fine-tune' }).click()
     const layers = page.getByTestId('page-fills')
     await step(page, () => layers.getByRole('button', { name: 'Add a background layer' }).click(), async () => {
       await expect.poll(async () => (await background(page)).length).toBe(2)
@@ -1228,7 +1223,8 @@ test.describe('nothing selected', () => {
   row(64, 'snap and rulers', async (open) => {
     // Snap and rulers are how this tab shows the design, not part of it: no undo, nothing to reload.
     const page = await open()
-    const view = page.getByTestId('view-card')
+    await page.getByTestId('zoom').click()
+    const view = page.getByTestId('zoom-menu')
     for (const name of ['Snap', 'Rulers']) {
       const button = view.getByRole('button', { name })
       const was = await button.getAttribute('aria-pressed')

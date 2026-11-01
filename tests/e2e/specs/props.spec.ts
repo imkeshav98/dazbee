@@ -4,7 +4,7 @@
 import { expect, test, type Locator, type Page } from '../support/test.ts'
 import type { DesignInput } from '@dazbee/schema'
 import { writeOutput } from '../support/editor.ts'
-import { openStage, unfoldAll } from '../support/stage.ts'
+import { openStage, scopeMenu } from '../support/stage.ts'
 import { choose } from '../support/select.ts'
 
 test.describe.configure({ timeout: 120_000 })
@@ -45,7 +45,6 @@ const props = async (page: Page, id: string) => ({ ...await base(page, id), ...(
 const select = async (page: Page, ids: string[]) => {
   await page.evaluate((ids) => window.dazbee?.select(ids), ids)
   await expect(page.getByTestId('layout-card')).toBeVisible()
-  await unfoldAll(page)
 }
 /** Types a value into a field and presses Enter. */
 const enter = async (field: Locator, value: string) => {
@@ -174,9 +173,10 @@ test('several layers: mixed values, set together or each from its own; text and 
 test('a change goes to the format shown, like a drag; all formats writes the base and clears it', async ({ browser }) => {
   const { page, errors } = await openStage(browser, design())
   await select(page, ['box'])
-  const scope = page.getByTestId('scope-card')
-  await expect(scope.getByRole('radio', { name: 'This format' })).toHaveAttribute('aria-checked', 'true')
-  await expect(scope).not.toContainText('Changes go to every format')
+  const chip = page.getByTestId('scope-chip')
+  await expect(chip).toHaveText('Only Square')
+  await expect((await scopeMenu(page)).getByRole('radio', { name: 'Only Square' })).toHaveAttribute('aria-checked', 'true')
+  await page.keyboard.press('Escape')
   const x = page.getByTestId('layout-card').getByRole('spinbutton', { name: 'X position' })
   await enter(x, '500')
   await enter(page.getByTestId('fill-card').getByRole('textbox', { name: 'Colour 1 hex' }), '00A889')
@@ -189,8 +189,9 @@ test('a change goes to the format shown, like a drag; all formats writes the bas
   writeOutput('props-4-this-format.png', await page.screenshot())
 
   // All formats: the value goes to the base and this format's override of it goes.
-  await scope.getByRole('radio', { name: 'All formats' }).click()
-  await expect(scope).toContainText('Changes go to every format')
+  await (await scopeMenu(page)).getByRole('radio', { name: 'All sizes' }).click()
+  await page.keyboard.press('Escape')
+  await expect(chip).toHaveText('For all sizes')
   await enter(x, '200')
   await expect.poll(async () => (await base(page, 'box')).x).toBe(200)
   const after = (await overrides(page))['format:sq']?.box ?? {}

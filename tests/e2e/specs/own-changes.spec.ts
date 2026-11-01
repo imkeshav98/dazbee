@@ -4,7 +4,7 @@
 import { expect, test, type Locator, type Page } from '../support/test.ts'
 import type { DesignInput } from '@dazbee/schema'
 import { writeOutput } from '../support/editor.ts'
-import { openStage, unfoldAll } from '../support/stage.ts'
+import { openStage, scopeMenu } from '../support/stage.ts'
 
 test.describe.configure({ timeout: 120_000 })
 
@@ -30,18 +30,17 @@ const enter = async (field: Locator, value: string) => {
 test('the scope card lists what this format has of its own and resets it', async ({ browser }) => {
   const { page, errors } = await openStage(browser, design())
   await page.evaluate(() => window.dazbee?.select(['box']))
-  await unfoldAll(page)
-  const scope = page.getByTestId('scope-card')
-  await expect(scope.getByTestId('own-changes')).toHaveCount(0)
+  await expect((await scopeMenu(page)).getByTestId('own-changes')).toHaveCount(0)
+  await page.keyboard.press('Escape')
 
   // Changes made to this format only show up, grouped as the cards are.
   await enter(page.getByTestId('layout-card').getByRole('spinbutton', { name: 'X position' }), '200')
   await enter(page.getByTestId('layout-card').getByRole('spinbutton', { name: 'Width' }), '400')
   await enter(page.getByTestId('fill-card').getByRole('textbox', { name: 'Colour 1 hex' }), '14213d')
   await expect.poll(() => squareOwn(page)).toMatchObject({ x: 200, width: 400 })
-  const own = scope.getByTestId('own-changes')
+  const own = (await scopeMenu(page)).getByTestId('own-changes')
   await expect(own).toContainText('Square has its own')
-  await expect(own.getByRole('listitem')).toHaveText(['Position and size', 'Fill'])
+  await expect(own.getByRole('listitem').locator('span')).toHaveText(['Position and size', 'Fill'])
   writeOutput('own-changes.png', await page.screenshot())
 
   // One group back to the base, then all of it; one undo brings the group back.
@@ -51,7 +50,7 @@ test('the scope card lists what this format has of its own and resets it', async
   await expect.poll(async () => Object.keys(await squareOwn(page)).sort()).toEqual(['fills', 'width', 'x'])
   await own.getByRole('button', { name: 'Reset all' }).click()
   await expect.poll(() => squareOwn(page)).toEqual({})
-  await expect(scope.getByTestId('own-changes')).toHaveCount(0)
+  await expect(page.getByTestId('own-changes')).toHaveCount(0)
   await expect(page.getByTestId('layout-card').getByRole('spinbutton', { name: 'X position' })).toHaveValue('80')
   expect(errors).toEqual([])
 })

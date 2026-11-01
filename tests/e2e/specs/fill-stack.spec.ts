@@ -60,7 +60,6 @@ test('a gradient over a photo: added on top, a stop edited, the two reordered, o
   const { page, errors } = await openStage(browser, design(asset.id))
   await click(page, 760, 360)
   const card = page.getByTestId('fill-card')
-  await card.locator('[data-fold]').click()
 
   // + puts a see-through colour on top; the list shows it first.
   await card.getByRole('button', { name: 'Add fill' }).click()
@@ -105,6 +104,7 @@ test('a gradient over a photo: added on top, a stop edited, the two reordered, o
   writeOutput('fill-stack-2-gradient-over-photo.png', await page.screenshot({ animations: 'disabled' }))
 
   // A drag of the photo's row onto the gradient's puts the photo on top.
+  await card.scrollIntoViewIfNeeded()
   const from = await card.locator('[data-row="2"]').getByTestId('row-grip').boundingBox()
   const to = await card.locator('[data-row="1"]').boundingBox()
   if (!from || !to) throw new Error('no rows')
@@ -150,7 +150,6 @@ test('a stroke and the page background take the same paint editor: an angular st
   const { page, errors } = await openStage(browser, design(asset.id))
   await click(page, 760, 360)
   const stroke = page.getByTestId('stroke-card')
-  await stroke.locator('[data-fold]').click()
   await stroke.getByRole('button', { name: 'Add stroke' }).click()
   await stroke.locator('[data-row="1"]').getByTestId('paint-swatch').click()
   const editor = page.getByTestId('paint-editor')
@@ -161,10 +160,9 @@ test('a stroke and the page background take the same paint editor: an angular st
   await expect.poll(async () => ((await read(page)).nodes.card?.props.strokes as { paint: { angle?: number } }[])[0]?.paint.angle).toBe(45)
   await page.keyboard.press('Escape')
 
-  // With nothing selected, the Page card's Fine-tune holds the page's background as a stack too.
+  // With nothing selected, the Page card holds the page's background as a stack too.
   await press(page, 'deselect')
   const pageCard = page.getByTestId('page-card')
-  await pageCard.getByRole('button', { name: 'Fine-tune' }).click()
   const layers = pageCard.getByTestId('page-fills')
   await layers.locator('[data-row="1"]').getByTestId('paint-swatch').click()
   await editor.getByRole('radio', { name: 'Radial gradient' }).click()

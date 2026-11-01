@@ -1,49 +1,107 @@
 'use client'
 
-// The zoom pill at the stage's bottom corner (#36): out, the zoom (which fits every frame when
-// pressed), in. The same zooms are on Ctrl/Cmd+=, Ctrl/Cmd+- and Shift+1. On phones it moves to
-// the top corner, since the capsule takes the bottom (#82).
+// The zoom pill at the stage's bottom corner (#36): out, the zoom, in, and the keyboard shortcuts.
+// The zoom opens a menu with every zoom and how the stage is shown: rulers and snapping. The same
+// zooms are on Ctrl/Cmd+=, Ctrl/Cmd+-, Shift+1, Shift+2 and Ctrl/Cmd+0, the rulers on Shift+R. On
+// phones it moves to the top corner, since the capsule takes the bottom (#82).
+import * as Popover from '@radix-ui/react-popover'
 import { MinusIcon, PlusIcon } from '@phosphor-icons/react'
-import { useMemo } from 'react'
+import type { Editor } from '@dazbee/editor'
+import { useEffect, useMemo, useState } from 'react'
+import { cn } from '../../lib/cn.ts'
 import { useLocale, useMessages } from '../../lib/i18n/client.tsx'
 import { Tooltip } from '../ui/tooltip.tsx'
+import { ShortcutsButton } from './shortcuts-dialog.tsx'
+import { MENU_ITEM, MENU_KEY, POPOVER, SWITCH } from './styles.ts'
 
 const BUTTON = 'grid h-8 min-w-8 cursor-pointer place-items-center rounded-row px-1.5 text-muted transition-colors duration-[var(--chrome-fast)] hover:bg-hover hover:text-text disabled:cursor-default disabled:opacity-40'
 
-export function ZoomControl({ zoom, onZoomIn, onZoomOut, onFit }: {
-  zoom: number | null
-  onZoomIn: () => void
-  onZoomOut: () => void
-  onFit: () => void
-}) {
+const viewOf = (editor: Editor | null) => ({ rulers: editor?.rulers() ?? false, snapping: editor?.snapping() ?? true })
+
+/** Whether the rulers and snapping are on, following Shift+R and the menu. */
+function useView(editor: Editor | null) {
+  const [view, setView] = useState(() => viewOf(editor))
+  useEffect(() => {
+    setView(viewOf(editor))
+    if (!editor) return
+    const stop = editor.onView(() => setView(viewOf(editor)))
+    return () => {
+      stop()
+    }
+  }, [editor])
+  return view
+}
+
+export function ZoomControl({ zoom, editor }: { zoom: number | null; editor: Editor | null }) {
   const t = useMessages()
   const locale = useLocale()
   const percent = useMemo(() => new Intl.NumberFormat(locale, { style: 'percent', maximumFractionDigits: 0 }), [locale])
-  const off = zoom === null
+  const [open, setOpen] = useState(false)
+  const view = useView(editor)
+  const off = zoom === null || editor === null
+  const zooms = [
+    { label: t.editor.zoomIn, key: t.editor.zoomInKey, run: () => editor?.zoomIn() },
+    { label: t.editor.zoomOut, key: t.editor.zoomOutKey, run: () => editor?.zoomOut() },
+    { label: t.editor.zoomFit, key: t.editor.zoomFitKey, run: () => editor?.fitAll() },
+    { label: t.editor.zoomSelection, key: t.editor.zoomSelectionKey, run: () => editor?.fitSelection() },
+    { label: t.editor.zoom100, key: t.editor.zoom100Key, run: () => editor?.zoomTo(1) },
+  ]
+  const toggles = [
+    { label: t.editor.view.rulers, key: t.editor.view.rulersKey, on: view.rulers, flip: () => editor?.perform('toggleRulers') },
+    { label: t.editor.view.snap, key: '', on: view.snapping, flip: () => editor?.setSnapping(!view.snapping) },
+  ]
   return (
     <div role="group" aria-label={t.editor.zoom} data-zoom className="absolute end-4 bottom-4 z-10 flex max-sm:top-20 max-sm:bottom-auto items-center gap-0.5 rounded-card surface-frost p-1">
       <Tooltip label={`${t.editor.zoomOut} · ${t.editor.zoomOutKey}`}>
-        <button type="button" aria-label={t.editor.zoomOut} disabled={off} onClick={onZoomOut} className={BUTTON}>
+        <button type="button" aria-label={t.editor.zoomOut} disabled={off} onClick={() => editor?.zoomOut()} className={BUTTON}>
           <MinusIcon size={16} aria-hidden />
         </button>
       </Tooltip>
-      <Tooltip label={`${t.editor.zoomFit} · ${t.editor.zoomFitKey}`}>
-        <button
-          type="button"
-          aria-label={t.editor.zoomFit}
-          disabled={off}
-          onClick={onFit}
-          data-testid="zoom"
-          className={`${BUTTON} w-14 font-mono text-xs tabular-nums text-text`}
-        >
-          {off ? '' : percent.format(zoom)}
-        </button>
-      </Tooltip>
+      <Popover.Root open={open} onOpenChange={setOpen}>
+        <Popover.Trigger asChild>
+          <button
+            type="button"
+            aria-label={t.editor.zoomMenu}
+            disabled={off}
+            data-testid="zoom"
+            className={`${BUTTON} w-14 font-mono text-xs tabular-nums text-text`}
+          >
+            {zoom === null ? '' : percent.format(zoom)}
+          </button>
+        </Popover.Trigger>
+        <Popover.Portal>
+          <Popover.Content side="top" align="end" sideOffset={10} collisionPadding={12} aria-label={t.editor.zoomMenu} data-testid="zoom-menu" className={cn(POPOVER, 'flex w-60 flex-col p-1.5')}>
+            {zooms.map((z) => (
+              <button
+                key={z.label}
+                type="button"
+                onClick={() => {
+                  z.run()
+                  setOpen(false)
+                }}
+                className={MENU_ITEM}
+              >
+                {z.label}
+                <kbd className={MENU_KEY}>{z.key}</kbd>
+              </button>
+            ))}
+            <div className="mx-1.5 my-1 border-t border-line" />
+            {toggles.map((toggle) => (
+              <button key={toggle.label} type="button" aria-pressed={toggle.on} onClick={toggle.flip} className={MENU_ITEM}>
+                {toggle.label}
+                {toggle.key && <kbd className={cn(MENU_KEY, 'ms-auto me-2')}>{toggle.key}</kbd>}
+                <span aria-hidden className={SWITCH} />
+              </button>
+            ))}
+          </Popover.Content>
+        </Popover.Portal>
+      </Popover.Root>
       <Tooltip label={`${t.editor.zoomIn} · ${t.editor.zoomInKey}`}>
-        <button type="button" aria-label={t.editor.zoomIn} disabled={off} onClick={onZoomIn} className={BUTTON}>
+        <button type="button" aria-label={t.editor.zoomIn} disabled={off} onClick={() => editor?.zoomIn()} className={BUTTON}>
           <PlusIcon size={16} aria-hidden />
         </button>
       </Tooltip>
+      <ShortcutsButton className={BUTTON} />
     </div>
   )
 }

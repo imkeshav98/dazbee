@@ -71,11 +71,16 @@ export async function handle(page: Page, which: string) {
 }
 export const zoomOf = (page: Page) => page.evaluate(() => window.dazbee?.camera().zoom ?? 1)
 
-/**
- * Opens every folded row of the Details card and the effects' Fine-tune, as a person clicks them,
- * so a check can reach every number.
- */
-export async function unfoldAll(page: Page) {
-  const closed = page.locator('[data-testid="details-card"] [data-fold][aria-expanded="false"], [data-testid="effects-card"] button[aria-expanded="false"]:not([role="combobox"])')
-  while (await closed.count() > 0) await closed.first().click()
+/** Opens the header card's scope menu, unless it is open: all sizes or only this one, and its own changes. */
+export async function scopeMenu(page: Page) {
+  const menu = page.getByTestId('scope-menu')
+  if (!(await menu.isVisible())) await page.getByTestId('scope-chip').click()
+  return menu
+}
+
+/** Opens the zoom pill's menu: the zooms, the rulers and snapping. */
+export async function zoomMenu(page: Page) {
+  const menu = page.getByTestId('zoom-menu')
+  if (!(await menu.isVisible())) await page.getByTestId('zoom').click()
+  return menu
 }

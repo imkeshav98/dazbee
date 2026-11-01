@@ -1,6 +1,5 @@
 // The floating property cards' shared look (#83), as in the final mock: a frosted card with roomy
 // padding, its title at the start and a small grey note at the end (what it acts on, or a count).
-import { CaretRightIcon } from '@phosphor-icons/react'
 import type { ReactNode } from 'react'
 import { cn } from '../../lib/cn.ts'
 
@@ -30,23 +29,6 @@ export function CardHeader({ id, title, note, count, children }: { id: string; t
       {note && <span className="min-w-0 max-w-[60%] truncate text-[11px] font-medium text-muted">{note}</span>}
       {count !== undefined && <span className="shrink-0 font-mono text-[11px] text-muted tabular-nums">{count}</span>}
       {children}
-    </div>
-  )
-}
-
-/** "Fine-tune" as the mock draws it: a row under a hairline, its chevron turning down while open. */
-export function FineTune({ open, onToggle, label }: { open: boolean; onToggle: () => void; label: string }) {
-  return (
-    <div className="px-[18px]">
-      <button
-        type="button"
-        aria-expanded={open}
-        onClick={onToggle}
-        className="flex h-10 w-full cursor-pointer items-center justify-between border-t border-line text-xs font-semibold text-muted transition-colors duration-[var(--chrome-fast)] hover:text-text"
-      >
-        {label}
-        <CaretRightIcon size={12} weight="bold" aria-hidden className={cn('transition-transform duration-[var(--chrome-fast)] rtl:-scale-x-100', open && 'rotate-90 rtl:-rotate-90')} />
-      </button>
     </div>
   )
 }

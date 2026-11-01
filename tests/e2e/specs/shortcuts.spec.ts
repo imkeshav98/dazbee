@@ -33,7 +33,6 @@ test('? and the keyboard button list every shortcut', async ({ browser }) => {
 
   // Typing ? into a field types it.
   const card = page.getByTestId('page-card')
-  await card.getByRole('button', { name: 'Fine-tune' }).click()
   const hex = card.getByRole('textbox', { name: 'Hex', exact: true })
   await hex.fill('')
   await hex.press('Shift+Slash')
@@ -41,7 +40,7 @@ test('? and the keyboard button list every shortcut', async ({ browser }) => {
   await expect(list).toBeHidden()
   await hex.press('Escape')
 
-  await page.getByTestId('view-card').getByRole('button', { name: 'Keyboard shortcuts' }).click()
+  await page.getByRole('group', { name: 'Zoom' }).getByRole('button', { name: 'Keyboard shortcuts' }).click()
   await expect(list).toBeVisible()
   await list.getByRole('button', { name: 'Close' }).click()
   await expect(list).toBeHidden()

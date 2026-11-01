@@ -43,6 +43,19 @@ export const SELECT = 'h-8 w-full bg-surface px-1.5 text-[12px]'
 export const KNOB = `relative flex h-8 min-w-0 cursor-ew-resize touch-pan-y select-none items-center gap-2 overflow-hidden rounded-row border border-line bg-surface px-2.5 text-[12px] font-semibold text-muted transition-colors duration-[var(--chrome-fast)] hover:border-line-strong focus-within:border-accent before:pointer-events-none before:absolute before:inset-y-0 before:start-0 before:w-[var(--fill,0%)] before:bg-accent-soft before:transition-[width] before:duration-75`
 /** Knobs two to a row; a lone last one takes the whole row. */
 export const KNOBS = 'grid grid-cols-2 gap-1.5 [&>:last-child:nth-child(odd)]:col-span-2'
+/** Four small knobs on one line, as a box's X, Y, W and H. */
+export const KNOBS_FOUR = 'grid grid-cols-4 gap-1 [&>*]:gap-1 [&>*]:px-[7px]'
+/** A row of choices that look as one control, one of them on. */
+export const SEGMENTS = 'grid auto-cols-fr grid-flow-col gap-0.5 rounded-[10px] bg-hover p-[3px]'
+/** One choice of SEGMENTS, aria-checked while it is the one. */
+export const SEGMENT = `h-7 min-w-0 cursor-pointer truncate rounded-[7px] px-2 text-[12px] font-semibold text-muted transition-colors duration-[var(--chrome-fast)] hover:text-text aria-checked:bg-accent-solid aria-checked:text-on-accent ${FOCUS_RING}`
+
+/** A row of a menu: its words at the start, a shortcut or a switch at the end. */
+export const MENU_ITEM = `group flex h-9 w-full shrink-0 cursor-pointer items-center justify-between gap-3 rounded-row px-2.5 text-start text-[13px] font-medium text-text transition-colors duration-[var(--chrome-fast)] hover:bg-hover ${FOCUS_RING}`
+/** A shortcut shown in a menu row. */
+export const MENU_KEY = 'font-mono text-[11px] font-normal text-subtle'
+/** A switch drawn in a menu row whose button is aria-pressed: on, its knob slides to the end. */
+export const SWITCH = 'relative h-5 w-[34px] shrink-0 rounded-full bg-line-strong transition-colors duration-[var(--chrome-fast)] group-aria-pressed:bg-accent-solid after:absolute after:start-0.5 after:top-0.5 after:size-4 after:rounded-full after:bg-white after:transition-transform after:duration-[var(--chrome-fast)] group-aria-pressed:after:translate-x-3.5 rtl:group-aria-pressed:after:-translate-x-3.5'
 
 /** A small message floating at the stage's start corner: a layer removed, something auto layout decides. */
 export const TOAST = 'toast-in pointer-events-auto flex h-10 items-center gap-2 rounded-card surface-frost ps-3.5 pe-1.5 text-[13px]'

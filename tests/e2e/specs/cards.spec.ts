@@ -55,12 +55,13 @@ test('the cards float over a full-width canvas and the ads fit between the capsu
   }
   await between()
   await page.evaluate(() => window.dazbee?.setCamera({ x: 0, y: 0, zoom: 1 }))
-  await page.getByRole('button', { name: 'Zoom to fit' }).click()
+  await page.getByTestId('zoom').click()
+  await page.getByTestId('zoom-menu').getByRole('button', { name: 'Zoom to fit' }).click()
   await between()
   await shoot(page, 'design')
 })
 
-test('the Page card paints the page, and Fine-tune takes any colour', async ({ page }) => {
+test('the Page card paints the page, and its hex takes any colour', async ({ page }) => {
   await open(page)
   const card = page.getByTestId('page-card')
   expect(await pageFill(page)).toBe('#FFF8F0FF')
@@ -73,7 +74,6 @@ test('the Page card paints the page, and Fine-tune takes any colour', async ({ p
   await expect.poll(() => pageFill(page)).toBe('#FFF8F0FF')
   await expect(card.getByRole('button', { name: '#FF48B0' })).toHaveAttribute('aria-pressed', 'false')
 
-  await card.getByRole('button', { name: 'Fine-tune' }).click()
   const hex = card.getByRole('textbox', { name: 'Hex', exact: true })
   await expect(hex).toHaveValue('#FFF8F0')
   await hex.fill('3d6bff')
