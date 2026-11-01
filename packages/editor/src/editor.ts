@@ -675,6 +675,45 @@ function live(
     return { fills, index, fill, image, size, box, rect: imageRect(crop, size, box), around: [...containersOf(frame, node.parentId, from), box] }
   }
   type CropTarget = NonNullable<ReturnType<typeof cropTarget>>
+  /** Each layer's preview for the effect tiles, by the scene layer it was drawn from. */
+  const thumbnails = new Map<string, { layer: SceneLayer; url: string }>()
+  /**
+   * A small picture of one layer as a frame shows it, without its own effects (the tiles show
+   * those), drawn by the renderer on the CPU surface and kept until the layer changes: a PNG as an
+   * object URL, `size` pixels square, the layer fitted inside with a margin. Null when the layer
+   * isn't in the frame or draws nothing there.
+   */
+  function layerThumbnail(frame: Frame, id: string, size: number): string | null {
+    const layer = find(cached(frame).scene.layers, id)
+    if (!layer || layer.props.mask) return null
+    const kept = thumbnails.get(id)
+    if (kept?.layer === layer) return kept.url
+    const bounds = boundsOf([layer.props])
+    if (bounds.width <= 0 && bounds.height <= 0) return null
+    const margin = size * 0.12
+    const scale = (size - 2 * margin) / Math.max(bounds.width, bounds.height, 1)
+    const surface = ck.MakeSurface(size, size)
+    if (!surface) return null
+    try {
+      const canvas = surface.getCanvas()
+      canvas.clear(ck.TRANSPARENT)
+      canvas.translate(size / 2 - (bounds.x + bounds.width / 2) * scale, size / 2 - (bounds.y + bounds.height / 2) * scale)
+      canvas.scale(scale, scale)
+      const alone = { ...layer, props: { ...layer.props, effects: [] } } as SceneLayer
+      drawPage(ck, canvas, { pageId: frame.pageId, formatId: frame.formatId, width: frame.width, height: frame.height, fills: [], layers: [alone] }, resources)
+      const image = surface.makeImageSnapshot()
+      const png = image.encodeToBytes()
+      image.delete()
+      if (!png) return null
+      if (kept) URL.revokeObjectURL(kept.url)
+      const url = URL.createObjectURL(new Blob([png.slice()], { type: 'image/png' }))
+      thumbnails.set(id, { layer, url })
+      return url
+    } finally {
+      surface.delete()
+    }
+  }
+
   /** Each image as a URL for the crop's faint whole image, made once from the decoded image. */
   const ghosts = new WeakMap<Image, string>()
   function ghostOf(image: Image) {
@@ -3315,6 +3354,15 @@ function live(
       drawOverlay()
       return ok
     },
+    /**
+     * A small picture of a layer for the effect tiles (#227): drawn by the renderer without the
+     * layer's own effects, in the frame the selection is in (the first page in the primary format
+     * otherwise), and kept until the layer changes. A PNG object URL, or null.
+     */
+    layerThumbnail(id: string, size = 96): string | null {
+      const frame = frameOf(selection?.frame) ?? frameOf(`${firstPage()}/${design.meta.primaryFormatId}`)
+      return frame ? layerThumbnail(frame, id, size) : null
+    },
     synced: () => provider.synced && provider.unsyncedChanges === 0,
     destroy() {
       listening.abort()
@@ -3342,6 +3390,8 @@ function live(
       backing.delete()
       edge.delete()
       surface?.delete()
+      for (const { url } of thumbnails.values()) URL.revokeObjectURL(url)
+      thumbnails.clear()
       gl.delete()
     },
   }
