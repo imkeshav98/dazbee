@@ -1,5 +1,5 @@
 // The Image card (#154) in Chromium, with real input: a filter picked from tiles of the picture
-// itself, how the image fits the layer, and behind Fine-tune its opacity and adjustments.
+// itself, how the image fits the layer, and under them its opacity and adjustments.
 import { expect, test, type Locator, type Page } from '../support/test.ts'
 import type { DesignInput } from '@dazbee/schema'
 import { photo, upload } from '../support/assets.ts'
@@ -54,7 +54,6 @@ test('the Image card sets the filter, the fit, the opacity and the adjustments',
   await choose(card.getByRole('combobox', { name: 'Fit' }), 'fit')
   await expect.poll(() => imageOf(page)).toMatchObject({ filter: 'warm', fit: 'fit' })
 
-  await card.getByRole('button', { name: 'Fine-tune' }).click()
   await enter(card.getByRole('spinbutton', { name: 'Image opacity' }), '80')
   await enter(card.getByRole('spinbutton', { name: 'Contrast' }), '30')
   await enter(card.getByRole('spinbutton', { name: 'Saturation' }), '-250')

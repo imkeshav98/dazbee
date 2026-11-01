@@ -4,7 +4,7 @@
 // design: the Page card (its background), then Formats and Pages. With a selection they show the
 // font when text is selected, then the selection's look and Arrange, with the numbers last (#60):
 // as in the final mock, what changes how it looks comes first. Several layers show Arrange first. Each card is only as tall as what it
-// holds, and controls are visual first, with numbers behind "Fine-tune".
+// holds, every card is open, and controls are visual first.
 import type { Editor } from '@dazbee/editor'
 import type { Design, Paint } from '@dazbee/schema'
 import { useState } from 'react'
@@ -12,7 +12,7 @@ import { cn } from '../../lib/cn.ts'
 import { useMessages } from '../../lib/i18n/client.tsx'
 import { format } from '../../lib/i18n/index.ts'
 import { ArrangePanel, useSelection } from './arrange-panel.tsx'
-import { CARD, CardHeader, FineTune, PICKED_RING, SWATCHES } from './card.tsx'
+import { CARD, CARD_LOWER, CardHeader, PICKED_RING, SWATCHES } from './card.tsx'
 import { FontPanel } from './font-panel.tsx'
 import { FormatsPanel, useEditorDesign } from './formats-panel.tsx'
 import { PagesPanel } from './pages-panel.tsx'
@@ -20,7 +20,6 @@ import { AddButton, PaintRow, Stack } from './paint-stack.tsx'
 import { SelectionCards } from './selection-cards.tsx'
 import { useBrandKit } from './use-brand-kit.ts'
 import { SWATCH } from './styles.ts'
-import { ViewCard } from './view-card.tsx'
 
 
 /** Where a page's base colour is: its bottom solid that shows, the one its swatches change. */
@@ -54,7 +53,6 @@ function PageCard({ editor, brandId, pageId }: { editor: Editor; brandId: string
   const t = useMessages()
   const { design } = useEditorDesign(editor)
   const brandColors = useBrandKit(brandId)?.colors ?? []
-  const [fine, setFine] = useState(false)
   const current = solidOf(design, pageId)
   const name = design.pages[pageId]?.name ?? ''
   const fills = design.pages[pageId]?.fills ?? []
@@ -84,41 +82,38 @@ function PageCard({ editor, brandId, pageId }: { editor: Editor; brandId: string
       <div role="group" aria-label={t.editor.page.background} className="flex items-center justify-between gap-1 px-[18px] pt-0.5 pb-3.5">
         {SWATCHES.map((hex) => <Swatch key={hex} hex={hex} label={hex} on={current === hex} onPick={() => paint(hex)} />)}
       </div>
-      <FineTune open={fine} onToggle={() => setFine(!fine)} label={t.editor.page.fineTune} />
-      {fine && (
-        <div className="flex flex-col gap-2.5 px-[18px] pb-4">
-          <label className="flex items-center gap-2 text-xs text-muted">
-            {t.editor.page.hex}
-            <input
-              name="page-colour"
-              key={current ?? ''}
-              defaultValue={current ?? ''}
-              placeholder="#FFFFFF"
-              spellCheck={false}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') paint(e.currentTarget.value.startsWith('#') ? e.currentTarget.value : `#${e.currentTarget.value}`)
-              }}
-              onBlur={(e) => paint(e.currentTarget.value.startsWith('#') ? e.currentTarget.value : `#${e.currentTarget.value}`)}
-              className="h-8 min-w-0 flex-1 rounded-row border border-line bg-surface px-2 font-mono text-[13px] text-text uppercase outline-none focus:border-accent"
-            />
-          </label>
-          {/* The page's background as a stack of paints, as a layer's fill: colours, gradients, images. */}
-          <div className="flex flex-col gap-2 border-t border-line pt-2.5" data-testid="page-fills">
-            <div className="flex items-center justify-between text-xs text-muted">
-              {t.editor.page.layers}
-              <AddButton label={t.editor.page.addLayer} onClick={() => writeFills((now) => [...now, now.length === 0 ? { type: 'solid', color: '#FFFFFFFF' } : { type: 'solid', color: '#00000033' }])} />
-            </div>
-            <Stack
-              items={fills}
-              field="fills"
-              topFirst
-              removeLabel={(n) => format(t.editor.props.remove, { name: t.editor.page.layer, n })}
-              onWrite={writeFills}
-              render={(item, n, change) => <PaintRow paint={item} name={format(t.editor.page.layerName, { n })} brandId={brandId} editor={editor} p={t.editor.props} onSet={change} />}
-            />
+      <div className={cn('flex flex-col gap-2.5', CARD_LOWER)}>
+        <label className="flex items-center gap-2 text-xs text-muted">
+          {t.editor.page.hex}
+          <input
+            name="page-colour"
+            key={current ?? ''}
+            defaultValue={current ?? ''}
+            placeholder="#FFFFFF"
+            spellCheck={false}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') paint(e.currentTarget.value.startsWith('#') ? e.currentTarget.value : `#${e.currentTarget.value}`)
+            }}
+            onBlur={(e) => paint(e.currentTarget.value.startsWith('#') ? e.currentTarget.value : `#${e.currentTarget.value}`)}
+            className="h-8 min-w-0 flex-1 rounded-row border border-line bg-surface px-2 font-mono text-[13px] text-text uppercase outline-none focus:border-accent"
+          />
+        </label>
+        {/* The page's background as a stack of paints, as a layer's fill: colours, gradients, images. */}
+        <div className="flex flex-col gap-2 border-t border-line pt-2.5" data-testid="page-fills">
+          <div className="flex items-center justify-between text-xs text-muted">
+            {t.editor.page.layers}
+            <AddButton label={t.editor.page.addLayer} onClick={() => writeFills((now) => [...now, now.length === 0 ? { type: 'solid', color: '#FFFFFFFF' } : { type: 'solid', color: '#00000033' }])} />
           </div>
+          <Stack
+            items={fills}
+            field="fills"
+            topFirst
+            removeLabel={(n) => format(t.editor.props.remove, { name: t.editor.page.layer, n })}
+            onWrite={writeFills}
+            render={(item, n, change) => <PaintRow paint={item} name={format(t.editor.page.layerName, { n })} brandId={brandId} editor={editor} p={t.editor.props} onSet={change} />}
+          />
         </div>
-      )}
+      </div>
     </section>
   )
 }
@@ -134,7 +129,6 @@ export function PropertyCards({ editor, brandId, onRemoved }: { editor: Editor; 
       <>
         <FontPanel editor={editor} brandId={brandId} />
         <SelectionCards editor={editor} brandId={brandId} ids={selected} arrange={<ArrangePanel editor={editor} />} />
-        <ViewCard editor={editor} />
       </>
     )
   }
@@ -143,7 +137,6 @@ export function PropertyCards({ editor, brandId, onRemoved }: { editor: Editor; 
       {pageId && <PageCard editor={editor} brandId={brandId} pageId={pageId} />}
       <FormatsPanel editor={editor} onRemoved={onRemoved} />
       <PagesPanel editor={editor} onRemoved={onRemoved} onShow={setShown} />
-      <ViewCard editor={editor} />
     </>
   )
 }

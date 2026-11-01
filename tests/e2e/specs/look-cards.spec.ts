@@ -1,6 +1,6 @@
-// The visual-first property cards (layout A, as in the final mock) in Chromium: text's size on a
-// slider and its colour from the brand kit, the effects as tiles, and the numbers folded into the
-// Details card's rows, each showing its values until it opens.
+// The visual-first property cards (as in the final mock) in Chromium: text's size and its colour
+// from the brand kit, the effects as tiles with their numbers under them, and the header card that
+// names the layer and holds its box.
 import { expect, test, type Page } from '../support/test.ts'
 import { EMPTY_BRAND_KIT, type DesignInput } from '@dazbee/schema'
 import { writeOutput } from '../support/editor.ts'
@@ -29,7 +29,7 @@ const design = (): DesignInput => ({
 type Node = { bindings?: Record<string, string>; props: Record<string, unknown> & { style?: Record<string, unknown> } }
 const node = (page: Page, id: string) => page.evaluate((id) => window.dazbee?.design().nodes[id], id) as Promise<Node>
 
-test('the look comes first: size and brand colour, effect tiles, and the numbers folded', async ({ browser }) => {
+test('the look comes first: size and brand colour, effect tiles, and the header card', async ({ browser }) => {
   const kit = { ...EMPTY_BRAND_KIT, colors: [{ token: 'berry', name: 'Berry', value: '#FF3D6EFF' }, { token: 'roast', name: 'Roast', value: '#2A140AFF' }] }
   expect((await fetch(`${API_URL}/brands/${DEV_BRAND}/kit`, { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(kit) })).ok).toBe(true)
   const { page, errors } = await openStage(browser, design())
@@ -59,8 +59,7 @@ test('the look comes first: size and brand colour, effect tiles, and the numbers
   await expect(effects.locator('[data-tile="none"]')).toHaveAttribute('aria-pressed', 'false')
   await page.evaluate(() => window.dazbee?.drawn())
   writeOutput('look-cards-text.png', await page.screenshot())
-  // Fine-tune opens the picked effect's numbers.
-  await effects.getByRole('button', { name: 'Fine-tune' }).click()
+  // The picked effect's numbers are under the tiles.
   await expect(effects.getByRole('spinbutton', { name: 'Drop shadow 1 Blur' })).toBeVisible()
   await effects.locator('[data-tile="none"]').click()
   await expect.poll(async () => {
@@ -68,22 +67,17 @@ test('the look comes first: size and brand colour, effect tiles, and the numbers
     return [(props.effects as unknown[]).length, props.style?.outline]
   }).toEqual([0, undefined])
 
-  // The numbers sit folded in Details, each row saying its values, and open in place.
-  const details = page.getByTestId('details-card')
-  const position = details.getByTestId('layout-card')
-  await expect(position.locator('[data-fold]')).toHaveAttribute('aria-expanded', 'false')
-  // The headline's box grows to its words: at size 64 it is one line tall.
-  await expect(position).toContainText('76, 162 · 610×87')
-  await expect(position.getByRole('spinbutton', { name: 'X position' })).toHaveCount(0)
-  await position.locator('[data-fold]').click()
-  await expect(position.getByRole('spinbutton', { name: 'X position' })).toHaveValue('76')
+  // The header card names the layer and holds its box, open.
+  const header = page.getByTestId('layout-card')
+  await expect(header.getByRole('heading')).toHaveText('Headline')
+  await expect(header.getByRole('spinbutton', { name: 'X position' })).toHaveValue('76')
 
-  // A shape: its fill from the same colours, and Blur in place of Outline; the open row stays open.
+  // A shape: its fill from the same colours, and Blur in place of Outline; the header follows it.
   await page.evaluate(() => window.dazbee?.select(['badge']))
   await expect(page.getByTestId('effects-card').locator('[data-tile="blur"]')).toBeVisible()
   await page.getByTestId('fill-look').getByRole('button', { name: 'Roast' }).click()
   await expect.poll(async () => (await node(page, 'badge')).bindings).toMatchObject({ fill: 'brand:roast' })
-  await expect(details.getByTestId('layout-card').locator('[data-fold]')).toHaveAttribute('aria-expanded', 'true')
+  await expect(header.getByRole('heading')).toHaveText('Badge')
   writeOutput('look-cards-shape.png', await page.screenshot())
   expect(errors).toEqual([])
 })

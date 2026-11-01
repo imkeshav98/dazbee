@@ -277,10 +277,11 @@ test('zooming keeps the point under the cursor still, panning follows the wheel 
     expect(bottomRight.y).toBeLessThanOrEqual(stage.y + stage.height)
     await expect(page.locator(`.frame-label[data-frame="p1/${formatId}"]`)).toBeVisible()
   }
-  // Shift+0 is 100%; the zoom pill fits everything again.
+  // Shift+0 is 100%; Zoom to fit in the zoom pill's menu fits everything again.
   await page.keyboard.press('Shift+0')
   await expect(page.getByTestId('zoom')).toHaveText('100%')
   await page.getByTestId('zoom').click()
+  await page.getByTestId('zoom-menu').getByRole('button', { name: 'Zoom to fit' }).click()
   await nextDraw(page)
   expect((await camera()).zoom).toBeLessThan(1)
   expect(errors).toEqual([])

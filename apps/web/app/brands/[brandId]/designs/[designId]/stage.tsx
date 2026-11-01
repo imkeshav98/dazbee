@@ -77,12 +77,7 @@ async function keepForOffline() {
 function StageZoom({ editor, store }: { editor: Editor | null; store: ValueStore<number | null> }) {
   const zoom = useValue(store)
   return (
-    <ZoomControl
-      zoom={editor ? zoom : null}
-      onZoomIn={() => editor?.zoomIn()}
-      onZoomOut={() => editor?.zoomOut()}
-      onFit={() => editor?.fitAll()}
-    />
+    <ZoomControl zoom={editor ? zoom : null} editor={editor} />
   )
 }
 
