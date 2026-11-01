@@ -628,8 +628,8 @@ const FILTER_LOOK: Record<ImageFilter, string> = {
 
 /**
  * An image fill's own settings (#154): its filter as tiles of the picture itself, how it fits the
- * layer, and behind Fine-tune its opacity and adjustments (exposure, contrast, saturation,
- * temperature, tint). It acts on the first image fill the selected layers share.
+ * layer, and under them its opacity and adjustments (exposure, contrast, saturation, temperature,
+ * tint). It acts on the first image fill the selected layers share.
  */
 function ImageCard({ target, p, brandId, index, paint }: { target: Target; p: P; brandId: string; index: number; paint: ImageFill }) {
   const setPaint = (change: (now: ImageFill) => Partial<ImageFill>) => set(target, (now) => {
@@ -952,8 +952,8 @@ const TILE_LOOK: Record<Tile, string> = {
 
 /**
  * The effects as tiles, as in the mock: none, a shadow, a glow, and an outline for text or a blur for
- * the rest. A tile turns its effect on or off; Fine-tune opens every effect's numbers, and adds the
- * ones without a tile.
+ * the rest. A tile turns its effect on or off; under the tiles are every effect's numbers, and a
+ * menu adds the ones without a tile.
  */
 function EffectsCard({ target, p }: { target: Target; p: P }) {
   const lists = target.props.map((pr) => (pr.effects ?? []) as Effect[])

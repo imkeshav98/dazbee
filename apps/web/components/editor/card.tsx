@@ -3,7 +3,7 @@
 import type { ReactNode } from 'react'
 import { cn } from '../../lib/cn.ts'
 
-/** Colours a click away when the brand's kit has none; the Fine-tune rows take any colour. */
+/** Colours a click away when the brand's kit has none; the hex fields take any colour. */
 export const SWATCHES = ['#FFFFFF', '#FBF7F2', '#1A1420', '#FF48B0', '#3D6BFF', '#FFD23F', '#3DD68C', '#FF6B3D'] as const
 
 /**
