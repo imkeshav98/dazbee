@@ -1,7 +1,8 @@
 // The live editing checks of the phase 0 spike (#8): two tabs on one design through the sync
 // server, edited by commands and by a real mouse and keyboard. Needs the sync server running:
-// `docker compose up -d --wait` from the repo root. The tests in this file run one at a time,
-// which the restart test relies on: it restarts the server under no other test.
+// `docker compose up -d --wait` from the repo root. The restart test drops every tab connected to
+// the sync server, whichever spec opened it, so it is tagged @sync-restart and CI runs it on its own
+// once a job's other tests are done; run it with `--workers=1` or alone.
 import { expect, test, type Page } from '../support/test.ts'
 import { designOf, exportHashOf, openTabs, placed, restartSyncServer, screenPoint, stageShot, storedAfter, settle, writeOutput } from '../support/editor.ts'
 
@@ -269,7 +270,7 @@ test('latency from a command in tab A to the redraw in tab B', async ({ browser 
   expect(errors).toEqual([])
 })
 
-test('a design survives the sync server restarting, from Postgres', async ({ browser }) => {
+test('a design survives the sync server restarting, from Postgres', { tag: '@sync-restart' }, async ({ browser }) => {
   const { designId, tabs, errors } = await openTabs(browser, 1)
   const [a] = tabs as [Page]
   const startedAt = new Date()

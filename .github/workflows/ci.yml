@@ -50,7 +50,9 @@ jobs:
   # The browser suite runs in jobs side by side, each against its own API and sync server: twelve
   # shards of every spec but the canvas gesture matrix, the slowest spec, and three jobs per format of
   # it. With the check job that is 19 of the 20 jobs GitHub runs at once, leaving one for on-demand runs.
-  # The speed report's tests (@perf) run in the perf job below, on main only.
+  # The speed report's tests (@perf) run in the perf job below, on main only. The sync server restart
+  # test (@sync-restart) drops every tab connected to the server, so it runs on its own at the end of
+  # shard 11's job, once that job's other tests are done.
   e2e:
     name: e2e (${{ matrix.part }})
     runs-on: ubuntu-24.04
@@ -59,18 +61,18 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { part: '1', args: '--shard=1/12 --grep-invert "@gesture-matrix|@perf"' }
-          - { part: '2', args: '--shard=2/12 --grep-invert "@gesture-matrix|@perf"' }
-          - { part: '3', args: '--shard=3/12 --grep-invert "@gesture-matrix|@perf"' }
-          - { part: '4', args: '--shard=4/12 --grep-invert "@gesture-matrix|@perf"' }
-          - { part: '5', args: '--shard=5/12 --grep-invert "@gesture-matrix|@perf"' }
-          - { part: '6', args: '--shard=6/12 --grep-invert "@gesture-matrix|@perf"' }
-          - { part: '7', args: '--shard=7/12 --grep-invert "@gesture-matrix|@perf"' }
-          - { part: '8', args: '--shard=8/12 --grep-invert "@gesture-matrix|@perf"' }
-          - { part: '9', args: '--shard=9/12 --grep-invert "@gesture-matrix|@perf"' }
-          - { part: '10', args: '--shard=10/12 --grep-invert "@gesture-matrix|@perf"' }
-          - { part: '11', args: '--shard=11/12 --grep-invert "@gesture-matrix|@perf"' }
-          - { part: '12', args: '--shard=12/12 --grep-invert "@gesture-matrix|@perf"' }
+          - { part: '1', args: '--shard=1/12 --grep-invert "@gesture-matrix|@perf|@sync-restart"' }
+          - { part: '2', args: '--shard=2/12 --grep-invert "@gesture-matrix|@perf|@sync-restart"' }
+          - { part: '3', args: '--shard=3/12 --grep-invert "@gesture-matrix|@perf|@sync-restart"' }
+          - { part: '4', args: '--shard=4/12 --grep-invert "@gesture-matrix|@perf|@sync-restart"' }
+          - { part: '5', args: '--shard=5/12 --grep-invert "@gesture-matrix|@perf|@sync-restart"' }
+          - { part: '6', args: '--shard=6/12 --grep-invert "@gesture-matrix|@perf|@sync-restart"' }
+          - { part: '7', args: '--shard=7/12 --grep-invert "@gesture-matrix|@perf|@sync-restart"' }
+          - { part: '8', args: '--shard=8/12 --grep-invert "@gesture-matrix|@perf|@sync-restart"' }
+          - { part: '9', args: '--shard=9/12 --grep-invert "@gesture-matrix|@perf|@sync-restart"' }
+          - { part: '10', args: '--shard=10/12 --grep-invert "@gesture-matrix|@perf|@sync-restart"' }
+          - { part: '11', args: '--shard=11/12 --grep-invert "@gesture-matrix|@perf|@sync-restart"', alone: '--grep @sync-restart' }
+          - { part: '12', args: '--shard=12/12 --grep-invert "@gesture-matrix|@perf|@sync-restart"' }
           - { part: 'matrix-square-1', args: '--grep @gesture-matrix-sq --shard=1/3' }
           - { part: 'matrix-square-2', args: '--grep @gesture-matrix-sq --shard=2/3' }
           - { part: 'matrix-square-3', args: '--grep @gesture-matrix-sq --shard=3/3' }
@@ -89,6 +91,8 @@ jobs:
       - run: pnpm --filter @dazbee/e2e exec playwright install --with-deps chromium
       - run: pnpm turbo run build --filter=@dazbee/web
       - run: pnpm --filter @dazbee/e2e exec playwright test ${{ matrix.args }}
+      - if: matrix.alone
+        run: pnpm --filter @dazbee/e2e exec playwright test ${{ matrix.alone }}
       - if: failure()
         run: docker compose logs api sync
       - if: failure()
