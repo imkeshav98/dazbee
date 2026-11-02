@@ -232,14 +232,16 @@ function ShapeCard({ target, p, kind }: { target: Target; p: P; kind: ShapeKind 
         ? (
           <div className="grid grid-cols-2 gap-x-3">
             {(['start', 'end'] as const).map((end) => (
-              <Choice
-                key={end}
+              <label key={end} className="flex min-w-0 flex-col gap-1 text-xs font-semibold text-muted">
+                {p.lineEndShort[end]}
+                <Choice
                 name={p.lineEnd[end]}
                 value={value(end) as LineEnd | 'mixed' | undefined}
                 options={LineEnd.options}
                 labels={p.lineEnds}
                 onSet={(v) => setShape(() => ({ [end]: v }))}
               />
+              </label>
             ))}
           </div>
         )
@@ -504,7 +506,8 @@ function textStyle(target: Target) {
 /** A row that turns something on or off: its name, then a switch. */
 function SwitchRow({ name, on, onSet }: { name: string; on: boolean | 'mixed'; onSet: (on: boolean) => void }) {
   return (
-    <button type="button" role="switch" aria-checked={on === 'mixed' ? 'mixed' : on} onClick={() => onSet(on !== true)} className={SWITCH_ROW}>
+    // A switch has no mixed state: while the layers differ it is a checkbox that says so.
+    <button type="button" role={on === 'mixed' ? 'checkbox' : 'switch'} aria-checked={on} onClick={() => onSet(on !== true)} className={SWITCH_ROW}>
       {name}
       <span aria-hidden className={SWITCH} />
     </button>
@@ -683,7 +686,7 @@ function TextBoxCard({ target, p }: { target: Target; p: P }) {
           name={p.maxLines}
           value={value('maxLines') as number | 'mixed' | undefined}
           min={0}
-          placeholder={p.noLimit}
+          placeholder={p.none}
           editor={target.editor}
           // 0 lifts the limit.
           onSet={(v) => set(target, () => ({ maxLines: Math.round(v) >= 1 ? Math.round(v) : undefined }))}
@@ -781,7 +784,7 @@ function AdjustCard({ target, p, index, paint }: { target: Target; p: P; index: 
           />
         ))}
         <NumberField
-          label={p.imageShort}
+          label={p.image}
           unit="%"
           name={p.imageOpacity}
           value={paint.opacity}

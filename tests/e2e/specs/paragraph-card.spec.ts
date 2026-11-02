@@ -1,6 +1,6 @@
-// The Box and paragraphs card (#153) in Chromium, with real input: box mode, lines at most and
-// lifting the limit, paragraph spacing, lists, underline and strikethrough, shrinking to fit with
-// its sizes, and an outline with its width and colour.
+// The Text box and Spacing cards and the bar's text popovers in Chromium, with real input: box mode,
+// max lines and lifting the limit, paragraph spacing, lists, underline and strikethrough, shrinking
+// to fit with its sizes, and an outline with its width and colour.
 import { expect, test, type Locator, type Page } from '../support/test.ts'
 import type { DesignInput } from '@dazbee/schema'
 import { writeOutput } from '../support/editor.ts'
@@ -32,7 +32,7 @@ const enter = async (field: Locator, value: string) => {
   await field.press('Enter')
 }
 
-test('the Box and paragraphs card sets the box, lines and fit; the bar sets lists, decoration and the outline', async ({ browser }) => {
+test('the Text box card sets the box, lines and fit; the bar sets lists, decoration and the outline', async ({ browser }) => {
   const { page, errors } = await openStage(browser, design())
   await page.evaluate(() => window.dazbee?.select(['copy']))
   const card = page.getByTestId('text-box-card')

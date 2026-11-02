@@ -362,7 +362,6 @@ export const ar: Messages = {
       list: 'قائمة',
       lists: { none: 'بلا قائمة', bullet: 'نقاط', number: 'أرقام' },
       maxLines: 'أقصى الأسطر',
-      noLimit: 'لا شيء',
       paragraphSpacing: 'تباعد الفقرات',
       underline: 'تسطير',
       strikethrough: 'يتوسطه خط',
@@ -377,7 +376,6 @@ export const ar: Messages = {
       fit: 'الملاءمة',
       fits: { fill: 'ملء', fit: 'داخل الطبقة', crop: 'قص', tile: 'تكرار' },
       imageOpacity: 'شفافية الصورة',
-      imageShort: 'الصورة',
       adjustTitle: 'ضبط',
       replaceImage: 'استبدال',
       replaceImageTitle: 'استبدل الصورة',
@@ -415,6 +413,7 @@ export const ar: Messages = {
       points: 'الرؤوس',
       innerRadius: 'الداخل',
       lineEnd: { start: 'بداية الخط', end: 'نهاية الخط' },
+      lineEndShort: { start: 'البداية', end: 'النهاية' },
       lineEnds: { none: 'بلا', arrow: 'سهم', triangle: 'مثلث', circle: 'دائرة' },
     },
     layersPanel: {

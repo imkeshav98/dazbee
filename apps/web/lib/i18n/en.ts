@@ -371,7 +371,6 @@ export const en = {
       list: 'List',
       lists: { none: 'No list', bullet: 'Bullets', number: 'Numbers' },
       maxLines: 'Max lines',
-      noLimit: 'None',
       paragraphSpacing: 'Paragraph spacing',
       underline: 'Underline',
       strikethrough: 'Strikethrough',
@@ -386,7 +385,6 @@ export const en = {
       fit: 'Fit',
       fits: { fill: 'Fill', fit: 'Fit inside', crop: 'Crop', tile: 'Tile' },
       imageOpacity: 'Image opacity',
-      imageShort: 'Image',
       adjustTitle: 'Adjust',
       replaceImage: 'Replace',
       replaceImageTitle: 'Replace the image',
@@ -424,6 +422,7 @@ export const en = {
       points: 'Points',
       innerRadius: 'Inner',
       lineEnd: { start: 'Line start', end: 'Line end' },
+      lineEndShort: { start: 'Start', end: 'End' },
       lineEnds: { none: 'None', arrow: 'Arrow', triangle: 'Triangle', circle: 'Circle' },
     },
     layersPanel: {

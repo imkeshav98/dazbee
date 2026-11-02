@@ -92,7 +92,7 @@ const props = async (page: Page, id: string) => placed(await doc(page), id, 'sq'
 const byOrder = <T extends { order: string }>(a: T, b: T) => (a.order < b.order ? -1 : 1)
 const style = async (page: Page, id: string) => (await props(page, id)).style ?? {}
 const boxOf = async (page: Page, id: string) => { const p = await props(page, id); return { width: Number(p.width), height: Number(p.height) } }
-/** Makes the headline size itself to its words, as the Box menu does. */
+/** Makes the headline size itself to its words, as the Text box card's tiles do. */
 const autoBox = async (page: Page, mode: 'autoWidth' | 'autoHeight') => {
   await page.getByTestId('text-box-card').getByRole('radiogroup', { name: 'Box' }).locator(`[data-value="${mode}"]`).click()
   await expect.poll(async () => (await props(page, 'headline')).boxMode).toBe(mode)

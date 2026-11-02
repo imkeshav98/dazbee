@@ -66,7 +66,7 @@ export const MENU_ITEM = `group flex h-9 w-full shrink-0 cursor-pointer items-ce
 export const MENU_DIVIDER = 'mx-1.5 my-1 border-t border-line'
 /** A shortcut shown in a menu row. */
 export const MENU_KEY = 'font-mono text-[11px] font-normal text-subtle'
-/** A switch drawn in a menu row that is role="switch": checked, its knob slides to the end. */
+/** A switch drawn in a menu row or a card's row that is role="switch": checked, its knob slides to the end. */
 export const SWITCH = 'relative h-5 w-[34px] shrink-0 rounded-full bg-line-strong transition-colors duration-[var(--chrome-fast)] group-aria-checked:bg-accent-solid after:absolute after:start-0.5 after:top-0.5 after:size-4 after:rounded-full after:bg-white after:transition-transform after:duration-[var(--chrome-fast)] group-aria-checked:after:translate-x-3.5 rtl:group-aria-checked:after:-translate-x-3.5'
 
 /** A tile to pick, as the effects and the box modes are: its picture, its name under it, lit while it is on. */
