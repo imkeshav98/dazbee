@@ -188,7 +188,9 @@ export function LayersPanel({ editor }: { editor: Editor }) {
   // The row keyboard focus is on: the one the arrows move from. Tab lands on it.
   const [active, setActive] = useState<string | null>(null)
   const current = active && indexOf.has(active) ? active : selection.ids.find((id) => indexOf.has(id)) ?? rows[0]?.id ?? null
-  const focusing = useRef(false)
+  // The row to focus once it is rendered, by id: the next effect to run focuses this row, even one
+  // still waiting from an earlier render that had another row current.
+  const focusing = useRef<string | null>(null)
   const [renaming, setRenaming] = useState<string | null>(null)
   const [drop, setDrop] = useState<{ id: string; where: Where } | null>(null)
   const dragged = useRef<string | null>(null)
@@ -203,13 +205,15 @@ export function LayersPanel({ editor }: { editor: Editor }) {
     else if (top + LAYER_ROW > el.scrollTop + el.clientHeight) el.scrollTop = top + LAYER_ROW - el.clientHeight
     follow(el)
     setActive(id)
-    focusing.current = true
+    focusing.current = id
   }, [indexOf, follow])
   useEffect(() => {
-    if (!focusing.current || !current) return
-    const row = scroller.current?.querySelector<HTMLElement>(`[data-layer="${CSS.escape(current)}"]`)
-    if (row && document.activeElement !== row) row.focus({ preventScroll: true })
-    if (row) focusing.current = false
+    const id = focusing.current
+    if (!id) return
+    const row = scroller.current?.querySelector<HTMLElement>(`[data-layer="${CSS.escape(id)}"]`)
+    if (!row) return
+    if (document.activeElement !== row) row.focus({ preventScroll: true })
+    focusing.current = null
   })
 
   const select = (id: string, add = false) => {
