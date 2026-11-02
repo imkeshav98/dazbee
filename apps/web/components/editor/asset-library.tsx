@@ -1,19 +1,19 @@
 'use client'
 
-// The brand's asset library (#52), in the Assets flyout: upload several images at once and watch
-// each one's progress, name and tag them, find them by either, and place one on the design by
-// dragging it onto a format or by clicking it. Thumbnails are small copies the API made and stored;
+// The brand's asset library, in the Assets flyout: upload several images at once and watch each
+// one's progress, name and tag them, find them by either, place one on the design by dragging it
+// onto a format or by clicking it, and delete one nothing uses. Thumbnails are small copies the API made and stored;
 // the design itself draws the original, decoded by CanvasKit.
-import { MagnifyingGlassIcon, PencilSimpleIcon, UploadSimpleIcon, XIcon } from '@phosphor-icons/react'
+import { MagnifyingGlassIcon, PencilSimpleIcon, TrashIcon, UploadSimpleIcon, XIcon } from '@phosphor-icons/react'
 import type { Editor } from '@dazbee/editor'
-import { AssetSummary, type UpdateAsset } from '@dazbee/schema'
+import { AssetInUse, AssetSummary, AssetUse, imageAssetIds, type UpdateAsset } from '@dazbee/schema'
 import { useCallback, useEffect, useRef, useState, type DragEvent, type KeyboardEvent } from 'react'
 import { cn } from '../../lib/cn.ts'
 import { useMessages } from '../../lib/i18n/client.tsx'
 import { format } from '../../lib/i18n/index.ts'
 import { ASSET_ACCEPT as ACCEPT, sendAsset as send } from '../../lib/upload-asset.ts'
 import { overlayScroll } from '../ui/overlay-scroll.ts'
-import { ASSET_TILE, DASHED_BUTTON } from './styles.ts'
+import { ASSET_TILE, DASHED_BUTTON, QUIET_BUTTON } from './styles.ts'
 
 /** What an asset dragged from the library carries, for the stage to place it. */
 export const ASSET_DRAG_TYPE = 'application/x-dazbee-asset'
@@ -43,12 +43,32 @@ async function save(brandId: string, id: string, update: UpdateAsset): Promise<A
   return AssetSummary.parse(body)
 }
 
+/** What of the brand shows the asset. */
+async function usesOf(brandId: string, id: string): Promise<AssetUse[]> {
+  const response = await fetch(`${base(brandId)}/${encodeURIComponent(id)}/uses`)
+  const body: unknown = await response.json().catch(() => null)
+  if (!response.ok) throw new Error(body && typeof body === 'object' && 'error' in body && typeof body.error === 'string' ? body.error : `${response.status}`)
+  return AssetUse.array().parse(body)
+}
+
+/** Deletes the brand's asset; what still uses it when the API refuses. */
+async function remove(brandId: string, id: string): Promise<AssetUse[] | null> {
+  const response = await fetch(`${base(brandId)}/${encodeURIComponent(id)}`, { method: 'DELETE' })
+  if (response.status === 204) return null
+  const body: unknown = await response.json().catch(() => null)
+  const used = AssetInUse.safeParse(body)
+  if (response.status === 409 && used.success) return used.data.usedIn
+  throw new Error(body && typeof body === 'object' && 'error' in body && typeof body.error === 'string' ? body.error : `${response.status}`)
+}
+
 export function AssetLibrary({ editor, brandId }: { editor: Editor; brandId: string }) {
   const t = useMessages().editor.assetLibrary
   const [query, setQuery] = useState('')
   const [assets, setAssets] = useState<AssetSummary[] | null>(null)
   const [uploads, setUploads] = useState<Upload[]>([])
   const [editing, setEditing] = useState<string | null>(null)
+  // Whether the details were opened by the tile's Delete, which asks at once.
+  const [deletingFromTile, setDeletingFromTile] = useState(false)
   const [dropping, setDropping] = useState(false)
   const [version, setVersion] = useState(0)
   const refresh = useCallback(() => setVersion((v) => v + 1), [])
@@ -172,7 +192,14 @@ export function AssetLibrary({ editor, brandId }: { editor: Editor; brandId: str
           key={edited.id}
           asset={edited}
           brandId={brandId}
+          usedHere={() => imageAssetIds(editor.session.design()).includes(edited.id)}
+          openDesign={editor.session.design().meta.designId}
+          askNow={deletingFromTile}
           onSaved={replace}
+          onDeleted={() => {
+            setEditing(null)
+            setAssets((now) => now && now.filter((a) => a.id !== edited.id))
+          }}
           onDone={() => {
             setEditing(null)
             refresh()
@@ -212,10 +239,25 @@ export function AssetLibrary({ editor, brandId }: { editor: Editor; brandId: str
                     type="button"
                     aria-label={`${t.edit}: ${name}`}
                     aria-pressed={editing === asset.id}
-                    onClick={() => setEditing(editing === asset.id ? null : asset.id)}
+                    onClick={() => {
+                      setDeletingFromTile(false)
+                      setEditing(editing === asset.id ? null : asset.id)
+                    }}
                     className="absolute end-1 top-1 grid size-6 cursor-pointer place-items-center rounded-full surface-frost text-muted opacity-0 transition-opacity duration-[var(--chrome-fast)] group-hover:opacity-100 hover:text-text focus-visible:opacity-100 aria-pressed:text-accent-text aria-pressed:opacity-100"
                   >
                     <PencilSimpleIcon size={12} aria-hidden />
+                  </button>
+                  <button
+                    type="button"
+                    aria-label={`${t.delete}: ${name}`}
+                    data-testid="asset-tile-delete"
+                    onClick={() => {
+                      setDeletingFromTile(true)
+                      setEditing(asset.id)
+                    }}
+                    className="absolute start-1 top-1 grid size-6 cursor-pointer place-items-center rounded-full surface-frost text-muted opacity-0 transition-opacity duration-[var(--chrome-fast)] group-hover:opacity-100 hover:text-danger focus-visible:opacity-100"
+                  >
+                    <TrashIcon size={12} aria-hidden />
                   </button>
                   <span className={cn('min-w-0 truncate text-[11px] font-medium', asset.name ? 'text-muted' : 'text-subtle')} title={name}>{name}</span>
                   {asset.tags.length > 0 && <p className="-mt-0.5 truncate text-[10px] text-subtle">{asset.tags.join(' · ')}</p>}
@@ -229,14 +271,69 @@ export function AssetLibrary({ editor, brandId }: { editor: Editor; brandId: str
   )
 }
 
-/** An asset's name and tags, saved as they change: the name on Enter or leaving the field, each tag as it is added or removed. */
-function AssetDetails({ asset, brandId, onSaved, onDone }: { asset: AssetSummary; brandId: string; onSaved: (asset: AssetSummary) => void; onDone: () => void }) {
+/**
+ * An asset's name and tags, saved as they change: the name on Enter or leaving the field, each tag
+ * as it is added or removed. Delete asks first; an image the open design, another design, a
+ * template or the logo uses stays, and the panel says where it is used.
+ */
+function AssetDetails({ asset, brandId, usedHere, openDesign, askNow, onSaved, onDeleted, onDone }: {
+  asset: AssetSummary
+  brandId: string
+  usedHere: () => boolean
+  /** The open design's id, which the panel calls "this design". */
+  openDesign: string
+  /** Asks to delete as it opens. */
+  askNow: boolean
+  onSaved: (asset: AssetSummary) => void
+  onDeleted: () => void
+  onDone: () => void
+}) {
   const t = useMessages().editor.assetLibrary
+  const [error, setError] = useState<string | null>(null)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
+  const [asking, setAsking] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [usedIn, setUsedIn] = useState<string[] | null>(null)
+  const deleteButton = useRef<HTMLButtonElement>(null)
+  const where = (use: AssetUse) =>
+    use.kind === 'logo' ? t.logo : use.kind === 'design' && use.id === openDesign ? t.thisDesign : use.name || (use.kind === 'template' ? t.untitledTemplate : t.untitledDesign)
+  /** Shows where the asset is used, the open design first and once. */
+  const showUses = (uses: AssetUse[]) => {
+    const places = [...new Set([...(usedHere() ? [t.thisDesign] : []), ...uses.map(where)])]
+    setUsedIn(places.length > 0 ? places : null)
+    return places.length > 0
+  }
+  /** Asks the API what uses the asset (and the open design, whose latest edits the API may not have yet); confirms only when nothing does. */
+  const askToDelete = () => {
+    setDeleteError(null)
+    setUsedIn(null)
+    setBusy(true)
+    usesOf(brandId, asset.id)
+      .then((uses) => setAsking(!showUses(uses)))
+      .catch((e: unknown) => setDeleteError(e instanceof Error ? e.message : String(e)))
+      .finally(() => setBusy(false))
+  }
+  const confirmDelete = () => {
+    setAsking(false)
+    setBusy(true)
+    remove(brandId, asset.id)
+      .then((uses) => (uses ? showUses(uses) : onDeleted()))
+      .catch((e: unknown) => setDeleteError(e instanceof Error ? e.message : String(e)))
+      .finally(() => {
+        setBusy(false)
+        deleteButton.current?.focus()
+      })
+  }
+  useEffect(() => {
+    if (askNow) askToDelete()
+    // Only as the details open.
+  }, [])
   const [name, setName] = useState(asset.name)
   const [tag, setTag] = useState('')
-  const [error, setError] = useState<string | null>(null)
   const nameField = useRef<HTMLInputElement>(null)
-  useEffect(() => nameField.current?.focus(), [])
+  useEffect(() => {
+    if (!askNow) nameField.current?.focus()
+  }, [askNow])
 
   const commit = (update: UpdateAsset) => {
     setError(null)
@@ -299,9 +396,37 @@ function AssetDetails({ asset, brandId, onSaved, onDone }: { asset: AssetSummary
         />
       </div>
       {error && <p role="alert" className="text-xs text-danger">{format(t.saveFailed, { reason: error })}</p>}
-      <button type="button" onClick={onDone} className="h-8 cursor-pointer self-end rounded-row px-3 text-[13px] font-medium text-muted hover:bg-hover hover:text-text">
-        {t.done}
-      </button>
+      {deleteError && <p role="alert" className="text-xs text-danger">{format(t.deleteFailed, { reason: deleteError })}</p>}
+      {usedIn && <p role="alert" data-testid="asset-in-use" className="text-xs text-danger">{format(usedIn.length === 1 ? t.inUseOnce : t.inUse, { n: usedIn.length, places: usedIn.join(', ') })}</p>}
+      <div className="flex items-center justify-between gap-2">
+        {asking
+          ? (
+            <span className="flex items-center gap-1">
+              <button type="button" autoFocus onClick={confirmDelete} data-testid="asset-delete-confirm" className={cn(QUIET_BUTTON, 'bg-danger/10 text-danger hover:bg-danger/20')}>
+                {format(t.deleteNamed, { name: asset.name || t.untitled })}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setAsking(false)
+                  setTimeout(() => deleteButton.current?.focus())
+                }}
+                className={QUIET_BUTTON}
+              >
+                {t.keep}
+              </button>
+            </span>
+          )
+          : (
+            <button type="button" ref={deleteButton} disabled={busy} aria-busy={busy} onClick={askToDelete} data-testid="asset-delete" className={cn(QUIET_BUTTON, 'hover:text-danger')}>
+              <TrashIcon size={13} aria-hidden />
+              {t.delete}
+            </button>
+          )}
+        <button type="button" onClick={onDone} className={QUIET_BUTTON}>
+          {t.done}
+        </button>
+      </div>
     </section>
   )
 }

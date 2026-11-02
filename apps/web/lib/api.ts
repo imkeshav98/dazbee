@@ -2,16 +2,19 @@
 import 'server-only'
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
-import { ApiError, AssetLink, AssetSummary, BrandKit, BrandSummary, DesignCover, DesignSummary, DesignThumbnail, FontFace, FontFamily, FontLink, FontUploadTicket, SignedIn, SignedLink, SignedOut, SignInLink, SyncToken, TemplateSummary, UploadTicket, WorkspaceSummary, type FontType, type ImageType, type SaveTemplate, type UpdateAsset, type UpdateWorkspace } from '@dazbee/schema'
+import { ApiError, AssetInUse, AssetLink, AssetSummary, AssetUse, BrandKit, BrandSummary, DesignCover, DesignSummary, DesignThumbnail, FontFace, FontFamily, FontLink, FontUploadTicket, SignedIn, SignedLink, SignedOut, SignInLink, SyncToken, TemplateSummary, UploadTicket, WorkspaceSummary, type FontType, type ImageType, type SaveTemplate, type UpdateAsset, type UpdateWorkspace } from '@dazbee/schema'
 import { z } from 'zod'
 
 const API_URL = process.env.API_URL ?? 'http://localhost:8787'
 
 export class ApiFailure extends Error {
   readonly status: number
-  constructor(status: number, message: string) {
+  /** The answer's body, for refusals that say more than their message. */
+  readonly body: unknown
+  constructor(status: number, message: string, body: unknown = null) {
     super(message)
     this.status = status
+    this.body = body
   }
 }
 
@@ -34,7 +37,7 @@ async function call<T extends z.ZodType>(schema: T, path: string, init?: { metho
   })
   if (response.status === 401 && signIn) redirect('/login')
   const json: unknown = response.status === 204 ? null : await response.json()
-  if (!response.ok) throw new ApiFailure(response.status, ApiError.safeParse(json).data?.error ?? `The API answered ${response.status}`)
+  if (!response.ok) throw new ApiFailure(response.status, ApiError.safeParse(json).data?.error ?? `The API answered ${response.status}`, json)
   return schema.parse(json)
 }
 
@@ -169,6 +172,23 @@ export const listAssets = (brandId: string, query = '') =>
 /** Renames an asset or sets its tags (#52). */
 export const updateAsset = (brandId: string, assetId: string, update: UpdateAsset) =>
   call(AssetSummary, `/brands/${encodeURIComponent(brandId)}/assets/${encodeURIComponent(assetId)}`, { method: 'PATCH', body: update })
+
+/** What of the brand shows its asset. */
+export const assetUses = (brandId: string, assetId: string) =>
+  call(AssetUse.array(), `/brands/${encodeURIComponent(brandId)}/assets/${encodeURIComponent(assetId)}/uses`)
+
+/** Deletes the brand's asset: null once it is gone, or what still uses it when the API refuses. */
+export async function deleteAsset(brandId: string, assetId: string): Promise<AssetInUse | null> {
+  try {
+    return await call(z.null(), `/brands/${encodeURIComponent(brandId)}/assets/${encodeURIComponent(assetId)}`, { method: 'DELETE' })
+  } catch (e) {
+    if (e instanceof ApiFailure && e.status === 409 && e.body) {
+      const used = AssetInUse.safeParse(e.body)
+      if (used.success) return used.data
+    }
+    throw e
+  }
+}
 
 /** A signed URL to the asset's thumbnail, or null when the API has no such asset for this session (#52). */
 export async function thumbnailLink(brandId: string, assetId: string) {
