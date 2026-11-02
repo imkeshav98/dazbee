@@ -6,11 +6,11 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { expect, test, type Browser, type Locator, type Page } from '../support/test.ts'
-import { EMPTY_BRAND_KIT, type DesignInput } from '@dazbee/schema'
+import type { DesignInput } from '@dazbee/schema'
 import { photo, upload } from '../support/assets.ts'
 import { designOf, placed, synced, writeOutput } from '../support/editor.ts'
 import { importGoogleFonts } from '../support/fonts.ts'
-import { API_URL, DEV_BRAND } from '../support/seed.ts'
+import { newBrand, putKit } from '../support/seed.ts'
 import { choose } from '../support/select.ts'
 import { barMenu, drag, fillList, moreAction, moreMenu, openStage, scopeMenu, strokeList } from '../support/stage.ts'
 
@@ -25,15 +25,16 @@ const KNOWN: Record<number, number> = {}
 const righteous = new Uint8Array(readFileSync(join(import.meta.dirname, '..', 'assets', 'fonts', 'Righteous-Regular.ttf')))
 const tile = new Uint8Array(readFileSync(join(import.meta.dirname, '..', '..', 'pixels', 'assets', 'tile.jpg')))
 const KIT = {
-  ...EMPTY_BRAND_KIT,
   colors: [{ token: 'berry', name: 'Berry', value: '#FF3D6EFF' }, { token: 'roast', name: 'Roast', value: '#2A140AFF' }],
   fonts: [{ token: 'body', name: 'Body', family: 'Noto Sans' }],
 }
 
+let brandId: string
 let assets: { photo: string; tile: string }
 test.beforeAll(async () => {
-  assets = { photo: (await upload(photo)).id, tile: (await upload(tile)).id }
-  expect((await fetch(`${API_URL}/brands/${DEV_BRAND}/kit`, { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(KIT) })).ok).toBe(true)
+  brandId = await newBrand('e2e panels-inventory')
+  assets = { photo: (await upload(photo, { brandId })).id, tile: (await upload(tile, { brandId })).id }
+  await putKit(brandId, KIT)
 })
 
 const solid = (color: string) => [{ type: 'solid' as const, color }]
@@ -162,7 +163,7 @@ function row(n: number, title: string, body: (open: (withStory?: boolean) => Pro
     let page: Page | undefined
     try {
       await body(async (withStory = false) => {
-        page = (await openStage(browser, design(withStory))).page
+        page = (await openStage(browser, design(withStory), { brandId })).page
         return page
       })
     } catch (error) {
