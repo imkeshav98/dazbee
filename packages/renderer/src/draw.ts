@@ -212,9 +212,11 @@ function drawContent(ck: CanvasKit, canvas: Canvas, layer: SceneLayer, resources
       for (const fill of props.fills) fillPath(ck, canvas, path, fill, props, resources)
       canvas.save()
       if (props.clip) canvas.clipPath(path, ck.ClipOp.Intersect, true)
-      path.delete()
       drawLayers(ck, canvas, layer.children, resources)
       canvas.restore()
+      // Over what is inside, and never cut by the clip, so an outside stroke shows whole.
+      strokePath(ck, canvas, path, props, resources, null, true)
+      path.delete()
       return
     }
     case 'group':
@@ -277,7 +279,7 @@ const union = (a: Box, b: Box): Box => {
   const y = Math.min(a.y, b.y)
   return { x, y, width: Math.max(a.x + a.width, b.x + b.width) - x, height: Math.max(a.y + a.height, b.y + b.height) - y }
 }
-const outset = (box: Box, by: number): Box => ({ x: box.x - by, y: box.y - by, width: box.width + 2 * by, height: box.height + 2 * by })
+export const outset = (box: Box, by: number): Box => ({ x: box.x - by, y: box.y - by, width: box.width + 2 * by, height: box.height + 2 * by })
 
 /** The box after turning it about its own centre, as the axis-aligned box around the result. */
 function rotated(box: Box, about: Box, degrees: number): Box {
@@ -305,9 +307,10 @@ function drawnBounds(ck: CanvasKit, layer: SceneLayer, resources: Resources): Bo
     }
     case 'text':
       return textBounds(ck, layer, resources)
-    case 'frame':
-      if (layer.props.clip) return layer.props
-      return childrenBounds(ck, layer, resources, layer.props)
+    case 'frame': {
+      const own = outset(layer.props, strokeReach(layer.props.strokes, false))
+      return layer.props.clip ? own : childrenBounds(ck, layer, resources, own)
+    }
     case 'group':
       return childrenBounds(ck, layer, resources, { x: layer.props.x, y: layer.props.y, width: 0, height: 0 })
   }
@@ -317,7 +320,7 @@ function drawnBounds(ck: CanvasKit, layer: SceneLayer, resources: Resources): Bo
  * How far strokes reach past the outline: a mitred corner up to the miter limit × half the
  * width, a square cap √2 × half; a line's ends reach END_SIZE widths.
  */
-function strokeReach(strokes: readonly Stroke[], line: boolean) {
+export function strokeReach(strokes: readonly Stroke[], line: boolean) {
   return Math.max(0, ...strokes.map((s) => {
     if (line) return s.width * END_SIZE
     const half = s.align === 'inside' ? 0 : s.align === 'center' ? s.width / 2 : s.width
@@ -526,6 +529,15 @@ type LineShape = Extract<GraphicLayer['props']['shape'], { kind: 'line' }>
 /** Fills and strokes an outline; a line's strokes are always centred, and draw its ends. */
 function drawShape(ck: CanvasKit, canvas: Canvas, path: Path, props: GraphicLayer['props'] | BooleanLayer['props'], resources: Resources, line: LineShape | null) {
   if (!line) for (const fill of props.fills) fillPath(ck, canvas, path, fill, props, resources)
+  strokePath(ck, canvas, path, props, resources, line, false)
+}
+
+/**
+ * A shape's or a frame's strokes along `path`, inside, centred on or outside it; a line's along it,
+ * with its ends. With `evenOdd`, an outside stroke is clipped to everywhere but the outline as one
+ * even-odd path, which an SVG can hold where it can't hold a difference.
+ */
+export function strokePath(ck: CanvasKit, canvas: Canvas, path: Path, props: Box & { strokes: readonly Stroke[] }, resources: Resources, line: LineShape | null, evenOdd: boolean) {
   for (const stroke of props.strokes) {
     const paint = paintFor(ck, stroke.paint, props, resources)
     if (!paint) continue
@@ -552,7 +564,16 @@ function drawShape(ck: CanvasKit, canvas: Canvas, path: Path, props: GraphicLaye
     } else {
       // Half of a doubled stroke falls on each side of the outline; the clip keeps the wanted half.
       paint.setStrokeWidth(stroke.width * 2)
-      canvas.clipPath(path, stroke.align === 'inside' ? ck.ClipOp.Intersect : ck.ClipOp.Difference, true)
+      if (stroke.align === 'inside') canvas.clipPath(path, ck.ClipOp.Intersect, true)
+      else if (!evenOdd) canvas.clipPath(path, ck.ClipOp.Difference, true)
+      else {
+        const beyond = new ck.PathBuilder().addRect(EVERYWHERE)
+        beyond.addPath(path)
+        beyond.setFillType(ck.FillType.EvenOdd)
+        const outside = beyond.detachAndDelete()
+        canvas.clipPath(outside, ck.ClipOp.Intersect, true)
+        outside.delete()
+      }
     }
     canvas.drawPath(path, paint)
     canvas.restore()

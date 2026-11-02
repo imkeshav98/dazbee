@@ -121,6 +121,8 @@ export const FrameProps = z.object({
    */
   cornerRadius: z.union([Radius, z.tuple([Radius, Radius, Radius, Radius])]).default(0),
   fills: Paint.array().default([]),
+  /** Strokes along the frame's edge, drawn over what is inside it and never cut by its clip. */
+  strokes: Stroke.array().default([]),
   /** Lays out the frame's children (#46); left out, they stay where they are put. */
   layout: AutoLayout.optional(),
 })

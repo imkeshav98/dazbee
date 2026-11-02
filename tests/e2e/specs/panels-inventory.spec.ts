@@ -42,7 +42,7 @@ const rect = (x: number, y: number, width: number, height: number, color: string
 
 /** One of each kind of layer the panels have cards for, in a Square format, and a Story with `withStory`. */
 const design = (withStory = false): DesignInput => ({
-  meta: { schemaVersion: 4, designId: 'replaced-by-the-api', name: 'Panels inventory', kind: 'single', primaryFormatId: 'sq' },
+  meta: { schemaVersion: 5, designId: 'replaced-by-the-api', name: 'Panels inventory', kind: 'single', primaryFormatId: 'sq' },
   formats: {
     sq: { name: 'Square', width: 1080, height: 1080, order: 'a0' },
     ...(withStory ? { story: { name: 'Story', width: 1080, height: 1920, order: 'a1' } } : {}),
@@ -809,7 +809,7 @@ test.describe('shapes and frames', () => {
     await reloads(page)
   })
 
-  row(35, 'stroke list: add, remove, reorder, several', async (open) => {
+  row(35, 'stroke list: add, remove, reorder, several, on a shape and a box', async (open) => {
     const page = await open()
     await select(page, ['box'])
     const card = await strokeList(page)
@@ -830,10 +830,19 @@ test.describe('shapes and frames', () => {
       await expect.poll(async () => (await strokes()).map((s) => s.width)).toEqual([12, 2])
     })
     await step(page, () => card.getByRole('button', { name: 'Remove stroke 1' }).click(), async () => { await expect.poll(async () => (await strokes()).length).toBe(1) })
+    // A box's stroke list works the same.
+    await page.keyboard.press('Escape')
+    await select(page, ['plain'])
+    const boxList = await strokeList(page)
+    const boxStrokes = async () => (await props(page, 'plain')).strokes ?? []
+    await step(page, () => boxList.getByRole('button', { name: 'Add stroke' }).click(), async () => { await expect.poll(async () => (await boxStrokes()).length).toBe(1) })
+    // The second stroke is the same as the first, so the box draws the same with one or two.
+    await step(page, () => boxList.getByRole('button', { name: 'Add stroke' }).click(), async () => { await expect.poll(async () => (await boxStrokes()).length).toBe(2) }, { draws: false })
+    await step(page, () => boxList.getByRole('button', { name: 'Remove stroke 1' }).click(), async () => { await expect.poll(async () => (await boxStrokes()).length).toBe(1) }, { draws: false })
     await reloads(page)
   })
 
-  row(36, 'stroke paint, width, position', async (open) => {
+  row(36, 'stroke paint, width, position, on a shape and a box', async (open) => {
     const page = await open()
     await select(page, ['box'])
     const card = await strokeList(page)
@@ -846,10 +855,20 @@ test.describe('shapes and frames', () => {
     for (const align of ['inside', 'outside', 'center']) {
       await step(page, () => choose(card.getByRole('combobox', { name: 'Stroke 1 position' }), align), async () => { await expect.poll(stroke).toMatchObject({ align }) })
     }
+    // A box takes strokes too, from its bar's Outline.
+    await page.keyboard.press('Escape')
+    await select(page, ['plain'])
+    const outline = await strokeList(page)
+    const boxStroke = async () => (await props(page, 'plain')).strokes?.[0] ?? {}
+    await step(page, () => outline.getByRole('button', { name: 'Add stroke' }).click(), async () => { await expect.poll(async () => (await props(page, 'plain')).strokes ?? []).toHaveLength(1) })
+    await step(page, () => enter(outline.getByRole('spinbutton', { name: 'Stroke 1 width' }), '12'), async () => { await expect.poll(boxStroke).toMatchObject({ width: 12 }) })
+    for (const align of ['outside', 'inside']) {
+      await step(page, () => choose(outline.getByRole('combobox', { name: 'Stroke 1 position' }), align), async () => { await expect.poll(boxStroke).toMatchObject({ align }) })
+    }
     await reloads(page)
   })
 
-  row(37, 'dashes, dash offset, ends, corners', async (open) => {
+  row(37, 'dashes, dash offset, ends, corners, on a shape and a box', async (open) => {
     const page = await open()
     await select(page, ['poly'])
     const card = await strokeList(page)
@@ -864,6 +883,14 @@ test.describe('shapes and frames', () => {
     for (const cap of ['round', 'square', 'butt']) {
       await step(page, () => choose(card.getByRole('combobox', { name: 'Stroke 1 ends' }), cap), async () => { await expect.poll(stroke).toMatchObject({ cap }) })
     }
+    // A box's stroke takes dashes and corners the same.
+    await page.keyboard.press('Escape')
+    await select(page, ['plain'])
+    const boxList = await strokeList(page)
+    await boxList.getByRole('button', { name: 'Add stroke' }).click()
+    const boxStroke = async () => (await props(page, 'plain')).strokes?.[0] ?? {}
+    await step(page, () => enter(boxList.getByRole('textbox', { name: 'Stroke 1 dashes' }), '20, 10'), async () => { await expect.poll(boxStroke).toMatchObject({ dashes: [20, 10] }) })
+    await step(page, () => choose(boxList.getByRole('combobox', { name: 'Stroke 1 corners' }), 'round'), async () => { await expect.poll(boxStroke).toMatchObject({ join: 'round' }) })
     await reloads(page)
   })
 

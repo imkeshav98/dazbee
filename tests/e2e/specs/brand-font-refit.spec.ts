@@ -14,7 +14,7 @@ test.describe.configure({ timeout: 180_000 })
 const heading = { fontFamily: 'brand:heading' as const }
 const style = { fontFamily: 'Noto Sans', fontSize: 72, fontWeight: 400, color: '#111111FF' }
 const design = (): DesignInput => ({
-  meta: { schemaVersion: 4, designId: 'replaced-by-the-api', name: 'Brand font', kind: 'single', primaryFormatId: 'sq' },
+  meta: { schemaVersion: 5, designId: 'replaced-by-the-api', name: 'Brand font', kind: 'single', primaryFormatId: 'sq' },
   formats: { sq: { name: 'Square', width: 1080, height: 1080, order: 'a0' }, story: { name: 'Story', width: 1080, height: 1920, order: 'a1' } },
   pages: { p1: { name: 'Page 1', order: 'a0', fills: [{ type: 'solid', color: '#FFFFFFFF' }] } },
   nodes: {
