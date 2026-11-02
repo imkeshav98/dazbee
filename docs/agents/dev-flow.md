@@ -28,7 +28,8 @@ Before Keshav sees a mock:
 1. Logic goes test-first (`/tdd`): the test is red before the code changes.
 2. A rule that must hold after every change (a text layer in auto width or auto height fits its words; an export matches the canvas) lives in one shared check that the area's tests import and run after each command, so every path that changes the document is covered. The first ticket that needs a rule writes its check.
 3. A UI change starts with a thin slice in the real app: the new piece working for one layer type. Send Keshav screenshots at the three screen sizes and wait for his OK before building the rest, so a layout that works only in the mock shows up after one PR.
-4. Before every push, run lint, typecheck, the unit tests of the touched packages, and the e2e specs for the touched area. With docker compose up and the app built (`pnpm build`), `pnpm --filter @dazbee/e2e exec playwright test specs/<area>.spec.ts` runs against the suite's own servers. The unit tests of `apps/api` and `apps/sync` write to the local database, so they run in CI only. CI is the second net.
+4. Before every push, run lint, typecheck and the unit tests of the touched packages; these are light enough for Keshav's PC. The unit tests of `apps/api` and `apps/sync` write to the local database, so they run in CI only.
+5. Browser tests run on GitHub, so Keshav's PC stays free: push the branch and run the `e2e on demand` workflow on it with the touched area's specs as its `args` (for example `specs/<area>.spec.ts`), before the PR goes up. To debug one failing spec locally, run that spec alone with `--workers=1`: with docker compose up and the app built (`pnpm build`), `pnpm --filter @dazbee/e2e exec playwright test specs/<area>.spec.ts --workers=1` runs against the suite's own servers. CI is the second net.
 
 ## Merging a PR
 

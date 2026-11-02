@@ -24,7 +24,7 @@ This repo keeps its tests: commit them, and every bug fix adds a test that fails
 
 ## Pull requests
 
-One ticket, one PR, closing its issue. Keshav's standing rule: merge your own PR (merge commit, not squash) as soon as CI is green on its head and the merge steps in `docs/agents/dev-flow.md` are done; he reviews after merge. GitHub auto-merge needs branch protection, which this private repo can't have on the Free plan (checked via the API on 2026-10-30).
+One ticket, one PR, closing its issue. Keshav's standing rule: once the merge steps in `docs/agents/dev-flow.md` are done, turn on the PR's auto-merge with a merge commit (not squash); GitHub merges it when every required CI check on its head is green, and he reviews after merge. `main` is protected: nothing merges while a required check is red.
 
 Test every user-facing feature in a real browser (Playwright on Chromium) and put the evidence in the PR: screenshots, numbers, the test cases run. Only ask Keshav when a decision is needed.
 
