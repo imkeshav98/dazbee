@@ -13,8 +13,8 @@ const SVG_TYPE = 'image/svg+xml'
 const CASCADE = 24
 /** How often placing checks again whether a drag, scrub, pen path or typing has ended. */
 const IDLE_CHECK_MS = 50
-/** How long placing waits for them before it ends a pen path and steps around a drag or scrub. */
-const IDLE_LIMIT_MS = 3000
+/** How long placing waits for a pen path, which only a key or a click ends, before it ends it. */
+const PEN_LIMIT_MS = 3000
 
 /** Whether a drag carries files from the computer. */
 export const carriesFiles = (transfer: DataTransfer) => transfer.types.includes('Files')
@@ -62,20 +62,17 @@ export interface DropResult {
 }
 
 /**
- * Resolves once no drag, scrub, pen path or typing is open on the editor, ending any typing. After
- * IDLE_LIMIT_MS it ends a pen path, as Enter does, and resolves even with a drag or scrub still
- * open. False once the editor is destroyed.
+ * Resolves once no gesture is open on the editor, ending any typing. A drag or scrub ends when its
+ * pointer is let go or its capture is lost; a pen path still open after PEN_LIMIT_MS is ended as
+ * Enter ends it. False once the editor is destroyed.
  */
 async function settled(editor: Editor): Promise<boolean> {
-  const until = Date.now() + IDLE_LIMIT_MS
+  const penUntil = Date.now() + PEN_LIMIT_MS
   for (;;) {
     if (editor.destroyed()) return false
     editor.stopEditing()
+    if (Date.now() >= penUntil) editor.settle()
     if (!editor.gesturing()) return true
-    if (Date.now() >= until) {
-      editor.settle()
-      return true
-    }
     await new Promise((resolve) => setTimeout(resolve, IDLE_CHECK_MS))
   }
 }
@@ -83,8 +80,8 @@ async function settled(editor: Editor): Promise<boolean> {
 /**
  * Uploads the files and places what uploaded where `drop` says: one image dropped on a layer that
  * takes an image fills it, otherwise each goes on as a new layer, the first centred on the drop
- * point and the rest cascading from it. Placing waits a little for what is open on the editor to
- * end, and ends typing, so everything placed is one undo step of its own, and selected.
+ * point and the rest cascading from it. Placing waits for any gesture open on the editor to end,
+ * and ends typing, so everything placed is one undo step of its own, and selected.
  */
 export async function placeDroppedFiles(editor: Editor, brandId: string, files: File[], drop: Drop): Promise<DropResult> {
   const sent = await Promise.allSettled(files.map(async (file) => {
@@ -107,8 +104,9 @@ export async function placeDroppedFiles(editor: Editor, brandId: string, files: 
   const ids: string[] = []
   let unplaced = 0
   const [only] = done
-  const filled = editor.apart(() => {
-    if (into && only && done.length === 1 && !only.svg && editor.fillWithImage(into, only.asset, spot.frame)) return true
+  const end = editor.beginGesture()
+  try {
+    if (into && only && done.length === 1 && !only.svg && editor.fillWithImage(into, only.asset, spot.frame)) return { failed, unplaced }
     done.forEach(({ asset, svg }, i) => {
       const next = { frame: spot.frame, x: spot.x + i * step, y: spot.y + i * step }
       const at = next.x <= frame.width && next.y <= frame.height ? next : spot
@@ -117,9 +115,10 @@ export async function placeDroppedFiles(editor: Editor, brandId: string, files: 
       if (id) ids.push(id)
       else if (svg === null) unplaced++
     })
-    return false
-  })
+  } finally {
+    end()
+  }
   const [pageId, formatId] = spot.frame.split('/')
-  if (!filled && ids.length > 1) editor.select(ids, pageId, formatId)
+  if (ids.length > 1) editor.select(ids, pageId, formatId)
   return { failed, unplaced }
 }

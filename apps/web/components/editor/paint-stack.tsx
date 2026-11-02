@@ -133,7 +133,7 @@ function GradientBar({ paint, picked, onPick, editor, p, onSet }: {
   onSet: (to: (now: Gradient) => Gradient) => void
 }) {
   const bar = useRef<HTMLDivElement>(null)
-  const drag = useRef<{ i: number; end: () => void } | null>(null)
+  const drag = useRef<{ i: number; count: number; end: () => void } | null>(null)
   const at = (clientX: number) => {
     const box = bar.current?.getBoundingClientRect()
     return box ? tidy(clamp((clientX - box.left) / box.width, 0, 1)) : 0
@@ -156,19 +156,20 @@ function GradientBar({ paint, picked, onPick, editor, p, onSet }: {
     at.end()
     drag.current = null
   }
-  // A drag whose stop goes, removed while dragged, or whose bar closes, ends its undo step there.
-  useEffect(() => {
-    if (drag.current && drag.current.i >= paint.stops.length) {
-      drag.current.end()
-      drag.current = null
-    }
-  })
-  useEffect(() => () => {
+  /** Ends a drag's undo step where it is, the stops left as they are. */
+  const dropDrag = () => {
     drag.current?.end()
     drag.current = null
-  }, [])
+  }
+  // A drag ends when a stop comes or goes while it is held, since the stop it holds may have moved
+  // to another place in the list, and when the bar closes.
+  useEffect(() => {
+    if (drag.current && drag.current.count !== paint.stops.length) dropDrag()
+  })
+  useEffect(() => dropDrag, [])
   const remove = (i: number) => {
     if (paint.stops.length <= 2) return
+    dropDrag()
     onSet((now) => ({ ...now, stops: now.stops.filter((_, j) => j !== i) }))
     onPick(Math.max(0, i - 1))
   }
@@ -200,7 +201,7 @@ function GradientBar({ paint, picked, onPick, editor, p, onSet }: {
               e.stopPropagation()
               onPick(i)
               e.currentTarget.setPointerCapture(e.pointerId)
-              drag.current = { i, end: editor.beginGesture() }
+              drag.current = { i, count: paint.stops.length, end: editor.beginGesture() }
             }}
             onPointerMove={(e) => {
               if (drag.current?.i === i) move(i, at(e.clientX))

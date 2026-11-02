@@ -136,20 +136,6 @@ export function openSession(doc: DesignDoc) {
   }
 
   /**
-   * Runs `steps` as one undo step of their own, even while a gesture is open: what the gesture did
-   * before them and what it does after are then two undo steps apart from theirs.
-   */
-  function apart<T>(steps: () => T): T {
-    if (!inGesture) return gesture(steps)
-    undoManager.stopCapturing()
-    try {
-      return steps()
-    } finally {
-      undoManager.stopCapturing()
-    }
-  }
-
-  /**
    * Runs the commands in `steps` as one change to the document: other tabs, the sync server and
    * the copy kept on this device get one update instead of one per command. Every command in it
    * still checks and reads the design as it was before the batch.
@@ -178,7 +164,6 @@ export function openSession(doc: DesignDoc) {
     /** Whether a gesture is open: its commands are still being gathered into one undo step. */
     inGesture: () => inGesture,
     gesture,
-    apart,
     undo: () => stepThen(undoManager.undoStack, () => undoManager.undo()),
     redo: () => stepThen(undoManager.redoStack, () => undoManager.redo()),
     canUndo: () => undoManager.canUndo(),

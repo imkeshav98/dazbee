@@ -1876,7 +1876,10 @@ function live(
     showCursor()
   }
 
+  /** Whether a press on the stage is held, from its pointerdown until it ends. */
+  let pressing = false
   canvas.addEventListener('pointerdown', (e) => {
+    pressing = true
     // Middle button, space or the hand tool pan; nothing else does.
     if (e.button === 1 || (e.button === 0 && panning())) {
       e.preventDefault()
@@ -2448,6 +2451,7 @@ function live(
   }
 
   const endDrag = () => {
+    pressing = false
     snapped = null
     if (pen && !pan) {
       penUp()
@@ -2489,11 +2493,17 @@ function live(
     showCursor()
     drawOverlay()
   }
-  canvas.addEventListener('pointerup', endDrag, on)
-  canvas.addEventListener('pointercancel', () => {
+  const cancelDrag = () => {
     // A drag the browser took away drops nothing into a flow.
     if (gesture?.kind === 'reorder') gesture.moved = false
     endDrag()
+  }
+  canvas.addEventListener('pointerup', endDrag, on)
+  canvas.addEventListener('pointercancel', cancelDrag, on)
+  // A press whose pointer capture goes without a pointerup or pointercancel, as when another
+  // element takes the pointer, ends as a cancelled one does; after either, nothing is held.
+  canvas.addEventListener('lostpointercapture', () => {
+    if (pressing) cancelDrag()
   }, on)
   canvas.addEventListener('pointerleave', () => {
     pointer = null
@@ -3703,6 +3713,7 @@ function live(
     },
     /** Ends typing into a text layer, if one is being typed into, closing its undo step. */
     stopEditing: () => {
+      if (!editing) return
       stopEditing()
       drawOverlay()
     },
@@ -3711,15 +3722,11 @@ function live(
      * pen path, which keeps the anchors placed so far, as Enter does.
      */
     settle() {
+      if (!editing && !pen) return
       stopEditing()
       finishPen()
       drawOverlay()
     },
-    /**
-     * Runs `steps` as one undo step of their own, even while a gesture is open, such as a drag on
-     * the stage or a scrub in the panels: that gesture's steps before and after are apart from it.
-     */
-    apart: <T>(steps: () => T): T => session.apart(steps),
     /** Whether the editor has been destroyed. */
     destroyed: () => listening.signal.aborted,
     /**
