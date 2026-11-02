@@ -164,7 +164,8 @@ test('I opens the image picker; the image uploaded there lands where the stage i
 
   await click(page, 540, 800)
   const [placed] = await selection(page)
-  const node = (await read(page)).nodes[placed ?? ''] as unknown as { props: { x: number; y: number; width: number; height: number; fills: { type: string }[] } }
+  const node = (await read(page)).nodes[placed ?? ''] as unknown as { props: { x: number; y: number; width: number; height: number; fills: { type: string; assetId?: string }[] } }
+  const uploaded = node.props.fills[0]?.assetId ?? ''
   expect(node.props.fills[0]?.type).toBe('image')
   // Centred on the click, at most half the format across.
   expect(Math.abs(node.props.x + node.props.width / 2 - 540)).toBeLessThanOrEqual(1)
@@ -178,10 +179,10 @@ test('I opens the image picker; the image uploaded there lands where the stage i
   expect((await read(page)).nodes[placed ?? '']).toBeUndefined()
   expect(Object.keys((await read(page)).nodes).length).toBe(layers)
 
-  // A brand image picked in the picker covers the box dragged on the stage.
+  // The image uploaded, picked in the picker, covers the box dragged on the stage.
   await press(page, 'toolImage')
   await expect(picker).toBeVisible()
-  await picker.locator('[data-asset] button').first().click()
+  await picker.locator(`[data-asset="${uploaded}"] button`).click()
   await expect(picker).toBeHidden()
   await drag(page, { x: 100, y: 850 }, { x: 400, y: 1000 })
   const [dragged] = await selection(page)

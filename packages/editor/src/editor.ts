@@ -1495,6 +1495,30 @@ function live(
       }
     })
   }
+  /**
+   * Where layers inside a frame that has auto layout in any format are drawn, in every format of
+   * their page (shown or not), for a command that wraps them; none for layers in no flow.
+   */
+  function drawnInFlow(ids: string[], pageId: string): Record<string, Record<string, Omit<Box, 'rotation'>>> | undefined {
+    const now = session.design()
+    const parentId = now.nodes[ids[0] ?? '']?.parentId ?? ''
+    const parent = now.nodes[parentId]
+    const laidOut = parent?.type === 'frame' && Object.keys(now.formats).some((f) => ({ ...parent.props, ...now.overrides[`format:${f}`]?.[parentId] }).layout)
+    if (!laidOut) return undefined
+    const drawn: Record<string, Record<string, Omit<Box, 'rotation'>>> = {}
+    for (const formatId of Object.keys(now.formats)) {
+      const boxes: Record<string, Omit<Box, 'rotation'>> = {}
+      const walk = (layers: SceneLayer[]) => {
+        for (const l of layers) {
+          if (ids.includes(l.id)) boxes[l.id] = { x: l.props.x, y: l.props.y, width: l.props.width, height: l.props.height }
+          walk(l.children)
+        }
+      }
+      walk(render(now, pageId, formatId, undefined, measureText(), resourceBytes.variables).layers)
+      drawn[`format:${formatId}`] = boxes
+    }
+    return drawn
+  }
   /** Every layer under `id` in the document, nearest first. */
   const under = (id: string, from: Design): string[] => childrenOf(from, id).flatMap(([child]) => [child, ...under(child, from)])
 
@@ -2552,7 +2576,7 @@ function live(
     const frame = selection && frameOf(selection.frame)
     if (!frame) return
     let id = ''
-    if (runQuietly(() => { id = session.run('node.boolean', { ids: roots(), op }) })) select([id], frame.key)
+    if (runQuietly(() => { id = session.run('node.boolean', { ids: roots(), op, drawn: drawnInFlow(roots(), frame.pageId) }) })) select([id], frame.key)
   }
 
   /**
@@ -2738,7 +2762,7 @@ function live(
       }
       case 'group': {
         let group = ''
-        if (runQuietly(() => { group = session.run('node.group', { ids }) })) select([group], frame.key)
+        if (runQuietly(() => { group = session.run('node.group', { ids, drawn: drawnInFlow(ids, frame.pageId) }) })) select([group], frame.key)
         break
       }
       case 'alignLeft': alignTo('left')
@@ -2776,7 +2800,7 @@ function live(
         }
         let group = ''
         if (runQuietly(() => session.gesture(() => {
-          group = session.run('node.group', { ids })
+          group = session.run('node.group', { ids, drawn: drawnInFlow(ids, frame.pageId) })
           const [[bottom] = []] = childrenOf(session.design(), group)
           if (bottom) session.run('node.mask', { ids: [bottom], mask: 'alpha' })
         }))) select([group], frame.key)
@@ -2784,7 +2808,7 @@ function live(
       }
       case 'frameSelection': {
         let framed = ''
-        if (runQuietly(() => { framed = session.run('node.frame', { ids }) })) select([framed], frame.key)
+        if (runQuietly(() => { framed = session.run('node.frame', { ids, drawn: drawnInFlow(ids, frame.pageId) }) })) select([framed], frame.key)
         break
       }
       case 'autoLayout': {
@@ -2805,7 +2829,7 @@ function live(
         // where they are: layers already in an even row or column don't move.
         let framed = ''
         if (runQuietly(() => session.gesture(() => {
-          framed = session.run('node.frame', { ids })
+          framed = session.run('node.frame', { ids, drawn: drawnInFlow(ids, frame.pageId) })
           session.run('node.autoLayout', { id: framed, on: true })
           session.run('node.update', { ids: [framed], patch: { sizing: { width: 'hug', height: 'hug' } } })
         }))) select([framed], frame.key)

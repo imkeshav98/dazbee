@@ -508,24 +508,50 @@ function wrapProblem(ctx: CommandContext, ids: string[], id: string | undefined,
 }
 
 /**
- * Puts layers that share a parent inside a new layer of `type` where the topmost of them was,
- * without moving anything on screen: its box hugs them in each format.
+ * Where layers are drawn, by scope, as the caller sees them: inside an auto layout frame the flow
+ * places them, not their stored boxes, and only the renderer lays the flow out.
  */
-function wrap({ r, design }: CommandContext, ids: string[], id: string, layer: { type: 'group' | 'frame' | 'boolean'; name: string; props?: Record<string, unknown> }) {
+const DrawnBoxes = z.record(z.string().refine((s) => formatIdOf(s) !== undefined, 'drawn boxes are by format:<id>'), z.record(NodeId, z.object({ x: z.number(), y: z.number(), width: z.number().min(0), height: z.number().min(0) })))
+type DrawnBoxes = z.infer<typeof DrawnBoxes>
+
+/**
+ * Puts layers that share a parent inside a new layer of `type` where the topmost of them was,
+ * without moving anything on screen: its box hugs them in each format. Layers with `drawn` boxes
+ * are first stored where they are drawn, what they hold moved with them, so the new layer hugs them
+ * as drawn and takes the room they took in a flow. In a format where they all keep where they are
+ * in a flow, the new layer keeps where it is there too.
+ */
+function wrap({ r, design }: CommandContext, ids: string[], id: string, layer: { type: 'group' | 'frame' | 'boolean'; name: string; props?: Record<string, unknown> }, drawn: DrawnBoxes = {}) {
   const parentId = design.nodes[ids[0] as string]?.parentId as string
   const inside = childrenOf(design, parentId).filter(([child]) => ids.includes(child))
   const top = inside.at(-1)?.[1] as LayerT
   const place = new Placement(design)
+  for (const scope of place.scopes) {
+    for (const [child, box] of Object.entries(drawn[scope] ?? {})) {
+      if (!ids.includes(child)) continue
+      const was = place.get(scope, child)
+      place.set(scope, child, box)
+      // What it holds is drawn where the flow put it too: it moves by as much.
+      for (const inner of descendants(design, child)) {
+        const at = place.get(scope, inner)
+        place.set(scope, inner, { x: at.x + box.x - was.x, y: at.y + box.y - was.y })
+      }
+    }
+  }
+  place.write(r)
+  const keptIn = (scope: string) => inside.every(([child, node]) => ({ ...node.props, ...(scope === 'base' ? {} : design.overrides[scope]?.[child]) } as { absolute?: boolean }).absolute)
+  const absolute = keptIn('base')
   const boxIn = (scope: Parameters<Placement['get']>[0]) => boundsOf(inside.map(([child]) => place.get(scope, child)))
   const base = boxIn('base')
   const box = { x: round(base.x), y: round(base.y), width: round(base.width), height: round(base.height) }
-  r.nodes.set(id, toYNode(Layer.parse({ type: layer.type, name: layer.name, parentId, index: top.index, props: { ...layer.props, ...box } })))
+  r.nodes.set(id, toYNode(Layer.parse({ type: layer.type, name: layer.name, parentId, index: top.index, props: { ...layer.props, ...box, ...(absolute ? { absolute } : {}) } })))
   for (const scope of place.scopes) {
     if (scope === 'base') continue
     const b = boxIn(scope)
     for (const [path, value] of Object.entries({ x: b.x, y: b.y, width: b.width, height: b.height })) {
       if (Math.abs(round(value) - box[path as keyof typeof box]) >= 0.005) r.overrides.set(overrideKey(scope, id, path), round(value))
     }
+    if (keptIn(scope) !== absolute) r.overrides.set(overrideKey(scope, id, 'absolute'), keptIn(scope))
   }
   // Their indexes already order them; they only change parent.
   for (const [child] of inside) r.nodes.get(child)?.set('parentId', id)
@@ -538,9 +564,9 @@ function wrap({ r, design }: CommandContext, ids: string[], id: string, layer: {
  */
 export const nodeGroup = defineCommand({
   name: 'node.group',
-  input: z.object({ ids: NodeId.array().min(1), id: NodeId.optional(), name: z.string().default('Group') }),
+  input: z.object({ ids: NodeId.array().min(1), id: NodeId.optional(), name: z.string().default('Group'), drawn: DrawnBoxes.optional() }),
   check: (ctx, { ids, id }) => wrapProblem(ctx, ids, id, 'group'),
-  apply: (ctx, { ids, id = nanoid(), name }) => wrap(ctx, ids, id, { type: 'group', name }),
+  apply: (ctx, { ids, id = nanoid(), name, drawn }) => wrap(ctx, ids, id, { type: 'group', name }, drawn),
 })
 
 /**
@@ -550,9 +576,9 @@ export const nodeGroup = defineCommand({
  */
 export const nodeFrame = defineCommand({
   name: 'node.frame',
-  input: z.object({ ids: NodeId.array().min(1), id: NodeId.optional(), name: z.string().default('Frame') }),
+  input: z.object({ ids: NodeId.array().min(1), id: NodeId.optional(), name: z.string().default('Frame'), drawn: DrawnBoxes.optional() }),
   check: (ctx, { ids, id }) => wrapProblem(ctx, ids, id, 'frame'),
-  apply: (ctx, { ids, id = nanoid(), name }) => wrap(ctx, ids, id, { type: 'frame', name, props: { clip: false } }),
+  apply: (ctx, { ids, id = nanoid(), name, drawn }) => wrap(ctx, ids, id, { type: 'frame', name, props: { clip: false } }, drawn),
 })
 
 /**
@@ -603,7 +629,7 @@ export const nodeEnclose = defineCommand({
  */
 export const nodeBoolean = defineCommand({
   name: 'node.boolean',
-  input: z.object({ ids: NodeId.array().min(2), op: BooleanOp, id: NodeId.optional(), name: z.string().optional() }),
+  input: z.object({ ids: NodeId.array().min(2), op: BooleanOp, id: NodeId.optional(), name: z.string().optional(), drawn: DrawnBoxes.optional() }),
   check: (ctx, { ids, id }) => {
     for (const layer of ids) {
       const type = ctx.design.nodes[layer]?.type
@@ -611,12 +637,12 @@ export const nodeBoolean = defineCommand({
     }
     return wrapProblem(ctx, ids, id, 'boolean')
   },
-  apply: (ctx, { ids, op, id = nanoid(), name }) => {
+  apply: (ctx, { ids, op, id = nanoid(), name, drawn }) => {
     const parentId = ctx.design.nodes[ids[0] as string]?.parentId as string
     const bottom = childrenOf(ctx.design, parentId).find(([child]) => ids.includes(child))?.[1]
     const paint = bottom && (bottom.type === 'graphic' || bottom.type === 'boolean') ? { fills: bottom.props.fills, strokes: bottom.props.strokes } : {}
     const names = { union: 'Union', subtract: 'Subtract', intersect: 'Intersect', exclude: 'Exclude' } as const
-    return wrap(ctx, ids, id, { type: 'boolean', name: name ?? names[op], props: { op, ...paint } })
+    return wrap(ctx, ids, id, { type: 'boolean', name: name ?? names[op], props: { op, ...paint } }, drawn)
   },
 })
 
