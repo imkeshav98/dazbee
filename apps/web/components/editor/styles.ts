@@ -26,6 +26,8 @@ export const ASSET_TILE = 'grid aspect-square place-items-center overflow-hidden
 
 /** A popover's frosted panel, as the cards are: the shape menu, the image picker, Add format. */
 export const POPOVER = 'pop-in z-50 rounded-card surface-frost'
+/** A menu of rows: ⋯ More, the right-click menu, and the menus beside their rows. */
+export const MENU = `${POPOVER} flex flex-col p-1.5`
 
 /** A tool dock button's shape; its width is the caller's. */
 export const DOCK_BUTTON = `grid h-10 cursor-pointer place-items-center rounded-[12px] transition-colors duration-[var(--chrome-fast)] ${FOCUS_RING}`

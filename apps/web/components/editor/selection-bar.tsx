@@ -14,7 +14,7 @@ import { dirOf, format } from '../../lib/i18n/index.ts'
 import { ALIGN, COMBINE, DISTRIBUTE, keyOf, useSelection } from './arrange-panel.tsx'
 import { BarPopover, keepFocus } from './bar-popover.tsx'
 import { RotationField, useTarget } from './selection-cards.tsx'
-import { BAR, BAR_BUTTON, BAR_DIVIDER, ICON_BUTTON, MENU_DIVIDER, MENU_ITEM, MENU_KEY, POPOVER } from './styles.ts'
+import { BAR, BAR_BUTTON, BAR_DIVIDER, ICON_BUTTON, MENU, MENU_DIVIDER, MENU_ITEM, MENU_KEY } from './styles.ts'
 import { ShapeBar } from './shape-bar.tsx'
 import { TextBar } from './text-bar.tsx'
 
@@ -102,7 +102,7 @@ function SubMenu({ label, testId, children }: { label: string; testId: string; c
       <Popover.Trigger asChild>
         <button
           type="button"
-          aria-haspopup="true"
+          aria-haspopup="dialog"
           data-testid={`more-${testId}`}
           onKeyDown={(event) => {
             if (event.key !== toward) return
@@ -128,7 +128,7 @@ function SubMenu({ label, testId, children }: { label: string; testId: string; c
             event.preventDefault()
             setOpen(false)
           }}
-          className={cn(POPOVER, 'flex min-w-52 flex-col p-1.5')}
+          className={cn(MENU, 'min-w-52')}
         >
           {children}
         </Popover.Content>
@@ -289,7 +289,7 @@ export function SelectionBar({ editor, brandId }: { editor: Editor; brandId: str
           </button>
         </Popover.Trigger>
         <Popover.Portal>
-          <Popover.Content side="bottom" align="end" sideOffset={8} collisionPadding={12} onCloseAutoFocus={(event) => keepFocus(event, open, 'more')} aria-label={b.more} data-testid="bar-more-menu" className={cn(POPOVER, 'flex w-60 flex-col p-1.5')}>
+          <Popover.Content side="bottom" align="end" sideOffset={8} collisionPadding={12} onCloseAutoFocus={(event) => keepFocus(event, open, 'more')} aria-label={b.more} data-testid="bar-more-menu" className={cn(MENU, 'w-60')}>
             <LayerActions editor={editor} ids={ids} onDone={() => setOpen(null)} />
           </Popover.Content>
         </Popover.Portal>
@@ -320,7 +320,7 @@ export function StageMenu({ editor, at, onClose }: { editor: Editor; at: { x: nu
           // A click elsewhere or Esc closes it; focus given back to a button that just closed does not.
           onFocusOutside={(event) => event.preventDefault()}
           aria-label={t.editor.bar.actions}
-          data-testid="stage-menu" className={cn(POPOVER, 'flex w-60 flex-col p-1.5')}>
+          data-testid="stage-menu" className={cn(MENU, 'w-60')}>
           <LayerActions editor={editor} ids={ids} onDone={onClose} />
         </Popover.Content>
       </Popover.Portal>
