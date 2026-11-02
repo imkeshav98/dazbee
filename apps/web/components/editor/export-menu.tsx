@@ -52,7 +52,7 @@ export function ExportForm({ id, editor, design }: { id: string; editor: Editor;
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null)
   const [error, setError] = useState<string | null>(null)
 
-  const pageIds = allPages ? pages.map(([pageId]) => pageId) : [thisPage]
+  const pageIds = allPages ? pages.map(() => thisPage) : [thisPage]
   const formatIds = formats.map(([formatId]) => formatId).filter((formatId) => picked.has(formatId))
   const count = pageIds.length * formatIds.length
   const allPicked = formatIds.length === formats.length

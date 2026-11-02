@@ -5,7 +5,7 @@
 
 export const SHORTCUTS = [
   { action: 'undo', keys: ['Mod+Z'] },
-  { action: 'redo', keys: ['Mod+Shift+Z', 'Mod+Y'] },
+  { action: 'redo', keys: ['Mod+Shift+Z'] },
   { action: 'selectAll', keys: ['Mod+A'] },
   { action: 'deselect', keys: ['Escape'] },
   { action: 'delete', keys: ['Delete', 'Backspace'] },

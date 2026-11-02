@@ -6,7 +6,7 @@
 import type { BrandKit } from '@dazbee/schema'
 import { useEffect } from 'react'
 import { KitEditor, useKitSaver } from './editor/kit-editor.tsx'
-import { loadKit, useBrandKit } from './editor/use-brand-kit.ts'
+import { loadKit, showKit, useBrandKit } from './editor/use-brand-kit.ts'
 
 export function HomeKit({ brandId, kit: first }: {
   brandId: string
@@ -14,7 +14,8 @@ export function HomeKit({ brandId, kit: first }: {
   kit: BrandKit
 }) {
   const kit = useBrandKit(brandId, first) ?? first
-  const { change, error } = useKitSaver(brandId)
+  const { error } = useKitSaver(brandId)
+  const change = (next: BrandKit) => showKit(brandId, next)
   // Fetched again as the panel opens, for a change made in another tab since the page came.
   useEffect(() => {
     void loadKit(brandId)
