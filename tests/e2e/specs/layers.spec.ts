@@ -92,9 +92,9 @@ test('the panel and the stage select together; drag into a group, rename, lock a
   await expect.poll(async () => (await node(page, 'dot')).parentId).toBe('p1')
   expect(await page.evaluate(() => window.dazbee?.boxOf('card'))).toEqual(before)
   await page.evaluate(() => window.dazbee?.perform('redo'))
-  await expect.poll(async () => (await node(page, 'dot')).parentId).toBe('card')
-  await expect.poll(() => listed(page)).toEqual(['Box', 'Card', '  Dot', '  Card stripe', '  Card back', 'Backdrop'])
-  expect(await page.evaluate(() => window.dazbee?.boxOf('card'))).toEqual(after)
+  await expect.soft.poll(async () => (await node(page, 'dot')).parentId).toBe('card')
+  await expect.soft.poll(() => listed(page)).toEqual(['Box', 'Card', '  Dot', '  Card stripe', '  Card back', 'Backdrop'])
+  expect.soft(await page.evaluate(() => window.dazbee?.boxOf('card'))).toEqual(after)
   await page.evaluate(() => window.dazbee?.perform('undo'))
   await expect.poll(async () => (await node(page, 'dot')).parentId).toBe('p1')
 
@@ -109,8 +109,8 @@ test('the panel and the stage select together; drag into a group, rename, lock a
   await expect.poll(() => listed(page)).toEqual(['Dot', 'Box', 'Card', '  Card stripe', '  Card back', 'Backdrop'])
   // Redo puts the backdrop above the box again.
   await page.evaluate(() => window.dazbee?.perform('redo'))
-  await expect.poll(() => listed(page)).toEqual(['Dot', 'Backdrop', 'Box', 'Card', '  Card stripe', '  Card back'])
-  expect(await colourAt(page, 300, 200)).toEqual([244, 237, 228])
+  await expect.soft.poll(() => listed(page)).toEqual(['Dot', 'Backdrop', 'Box', 'Card', '  Card stripe', '  Card back'])
+  expect.soft(await colourAt(page, 300, 200)).toEqual([244, 237, 228])
   await page.evaluate(() => window.dazbee?.perform('undo'))
   await expect.poll(() => listed(page)).toEqual(['Dot', 'Box', 'Card', '  Card stripe', '  Card back', 'Backdrop'])
 

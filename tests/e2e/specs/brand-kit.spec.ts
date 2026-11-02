@@ -128,8 +128,8 @@ test('the picker applies a colour tile and a font row, and the Page card shows t
   await expect.poll(() => storedFill(page)).toEqual({ bindings: undefined, color: navy })
   await expect(picker.getByRole('button', { name: 'Apply Sun to the selection' })).toHaveAttribute('aria-pressed', 'false')
   await page.evaluate(() => window.dazbee?.perform('redo'))
-  await expect.poll(() => storedFill(page)).toEqual({ bindings: { fill: 'brand:sun' }, color: '#FF8A3DFF' })
-  await expect(picker.getByRole('button', { name: 'Stop following Sun' })).toHaveAttribute('aria-pressed', 'true')
+  await expect.soft.poll(() => storedFill(page)).toEqual({ bindings: { fill: 'brand:sun' }, color: '#FF8A3DFF' })
+  await expect.soft(picker.getByRole('button', { name: 'Stop following Sun' })).toHaveAttribute('aria-pressed', 'true')
   // The font rows need text selected.
   await expect(picker.getByRole('button', { name: 'Apply Body to the selection' })).toBeDisabled()
   await page.evaluate(() => window.dazbee?.select(['title']))

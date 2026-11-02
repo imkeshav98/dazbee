@@ -87,8 +87,8 @@ test('an image dragged onto a star goes into it, the Image card replaces it, and
   expect(await wideFillsOf(page, 'star')).toEqual([{ type: 'solid', color: '#00A88AFF' }])
   // Redo puts the photo into the star again, in both formats.
   await press(page, 'redo')
-  expect(await fillsOf(page, 'star')).toEqual([{ type: 'solid', color: '#FF2E7EFF' }, { type: 'image', assetId: sneaker.id, fit: 'fill', opacity: 1 }])
-  expect(await wideFillsOf(page, 'star')).toEqual([{ type: 'solid', color: '#00A88AFF' }, { type: 'image', assetId: sneaker.id, fit: 'fill', opacity: 1 }])
+  expect.soft(await fillsOf(page, 'star')).toEqual([{ type: 'solid', color: '#FF2E7EFF' }, { type: 'image', assetId: sneaker.id, fit: 'fill', opacity: 1 }])
+  expect.soft(await wideFillsOf(page, 'star')).toEqual([{ type: 'solid', color: '#00A88AFF' }, { type: 'image', assetId: sneaker.id, fit: 'fill', opacity: 1 }])
   await undo(page)
   expect(await fillsOf(page, 'star')).toEqual([{ type: 'solid', color: '#FF2E7EFF' }])
 
