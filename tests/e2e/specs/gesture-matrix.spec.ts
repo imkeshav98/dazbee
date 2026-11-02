@@ -1,6 +1,6 @@
 // The canvas gesture matrix in both formats: every canvas gesture against every kind of container,
 // checked against what it should do (support/gesture-matrix.ts). Each test runs every gesture on a
-// share of the layers. CI runs the tests tagged @gesture-matrix in jobs of their own, one per
+// share of the layers. CI runs the tests tagged @gesture-matrix in jobs of their own, three per
 // format tag. Each test writes its table of results to output/gesture-matrix-<format>-<part>.md.
 import { expect, test } from '../support/test.ts'
 import { writeOutput } from '../support/editor.ts'
@@ -8,7 +8,7 @@ import { runMatrix, SUBJECTS } from '../support/gesture-matrix.ts'
 
 test.describe.configure({ mode: 'parallel', timeout: 360_000 })
 
-const PARTS = 5
+const PARTS = 6
 const FORMATS = [
   ['sq', 'square'],
   ['wide', 'wide'],
