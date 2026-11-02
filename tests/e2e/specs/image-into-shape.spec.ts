@@ -1,13 +1,14 @@
 // An image into any shape, with real input: an image dragged from the asset library onto a star
 // lights the star and goes into it as its fill, while one dropped on empty space still makes a new
 // layer; the Image card's Replace swaps the picture, keeping its filter; a shape's Add image puts a
-// picture into a plain rectangle. Each is one undo step.
+// picture into a plain rectangle. Each is one undo step; redo brings a placed image back, and it is
+// there after a reload.
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { expect, test, type Page } from '../support/test.ts'
 import type { DesignInput } from '@dazbee/schema'
 import { photo, upload } from '../support/assets.ts'
-import { placed, screenPoint, writeOutput } from '../support/editor.ts'
+import { placed, reloads, screenPoint, writeOutput } from '../support/editor.ts'
 import { barMenu, click, openStage, press, read, selection } from '../support/stage.ts'
 
 test.describe.configure({ timeout: 120_000 })
@@ -84,6 +85,12 @@ test('an image dragged onto a star goes into it, the Image card replaces it, and
   await undo(page)
   expect(await fillsOf(page, 'star')).toEqual([{ type: 'solid', color: '#FF2E7EFF' }])
   expect(await wideFillsOf(page, 'star')).toEqual([{ type: 'solid', color: '#00A88AFF' }])
+  // Redo puts the photo into the star again, in both formats.
+  await press(page, 'redo')
+  expect(await fillsOf(page, 'star')).toEqual([{ type: 'solid', color: '#FF2E7EFF' }, { type: 'image', assetId: sneaker.id, fit: 'fill', opacity: 1 }])
+  expect(await wideFillsOf(page, 'star')).toEqual([{ type: 'solid', color: '#00A88AFF' }, { type: 'image', assetId: sneaker.id, fit: 'fill', opacity: 1 }])
+  await undo(page)
+  expect(await fillsOf(page, 'star')).toEqual([{ type: 'solid', color: '#FF2E7EFF' }])
 
   // On empty space, a new layer as before.
   await dragTile(page, sneaker.id, { x: 800, y: 980 })
@@ -94,6 +101,10 @@ test('an image dragged onto a star goes into it, the Image card replaces it, and
   expect((after[made ?? '']?.props.fills as Fill[])[0]).toMatchObject({ type: 'image', assetId: sneaker.id })
   await undo(page)
   expect(Object.keys((await read(page)).nodes)).toHaveLength(layers)
+  // Redo brings the new layer back, and after a reload it is still there.
+  await press(page, 'redo')
+  expect((await read(page)).nodes[made ?? '']).toEqual(after[made ?? ''])
+  await reloads(page)
   expect(errors).toEqual([])
 })
 

@@ -3,14 +3,16 @@
 // four more formats and moves the headline in one of them, then exports every format as PNG, JPG,
 // PDF and SVG through the Export menu. Each file is byte for byte what Node exports from the same
 // design and files; PNG and JPG are pixel for pixel Node's render, and PDF and SVG, drawn by pdfium
-// and resvg, stay within EXIT_VECTOR_LIMIT of it. The numbers go to output/exit-check.json.
+// and resvg, stay within EXIT_VECTOR_LIMIT of it, as does the SVG drawn by Chromium's own decoder.
+// The numbers go to output/exit-check.json.
 import { readFileSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { PDFiumLibrary } from '@hyzyla/pdfium'
 import { exportDesign, readZip } from '@dazbee/export'
 import { FALLBACK_FAMILIES } from '@dazbee/fonts'
 import { loadFontFiles } from '@dazbee/fonts/node'
-import { encodePng } from '@dazbee/pixels/pixels'
+import type { CanvasKit } from '@dazbee/canvaskit'
+import { decodePng, encodePng, type Pixels } from '@dazbee/pixels/pixels'
 import { overWhite, rasterisePdf, rasteriseSvg, vectorDifference } from '@dazbee/pixels/vector'
 import { renderDesign } from '@dazbee/renderer'
 import { loadCanvasKit } from '@dazbee/renderer/node'
@@ -38,6 +40,31 @@ interface Stored {
 const stored = async (page: Page) => JSON.parse(await designOf(page)) as Stored
 const drawn = (page: Page) => page.evaluate(() => window.dazbee?.drawn())
 const shot = async (page: Page, name: string) => writeOutput(`exit-check-${name}.png`, await page.screenshot())
+
+/** An SVG file as Chromium's own SVG decoder draws it in the page, at the format's size over white. */
+async function drawnByChromium(page: Page, ck: CanvasKit, file: Uint8Array, width: number, height: number): Promise<Pixels> {
+  const png = await page.evaluate(async ({ text, width, height }) => {
+    const url = URL.createObjectURL(new Blob([text], { type: 'image/svg+xml' }))
+    try {
+      const image = new Image()
+      image.src = url
+      await image.decode()
+      const canvas = new OffscreenCanvas(width, height)
+      const context = canvas.getContext('2d')
+      if (!context) throw new Error('no 2d context')
+      context.fillStyle = '#FFFFFF'
+      context.fillRect(0, 0, width, height)
+      context.drawImage(image, 0, 0, width, height)
+      const bytes = new Uint8Array(await (await canvas.convertToBlob({ type: 'image/png' })).arrayBuffer())
+      let binary = ''
+      for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000))
+      return btoa(binary)
+    } finally {
+      URL.revokeObjectURL(url)
+    }
+  }, { text: new TextDecoder().decode(file), width, height })
+  return decodePng(ck, new Uint8Array(Buffer.from(png, 'base64')))
+}
 
 test('an ad set rebuilt in 5 formats through real input exports PNG, JPG, PDF and SVG that match Node', async ({ browser }) => {
   const brandId = await newBrand('e2e exit-check')
@@ -207,11 +234,19 @@ test('an ad set rebuilt in 5 formats through real input exports PNG, JPG, PDF an
     }
     const cpu = overWhite(renderDesign(ck, json, 'p1', formatId, bytes))
     const pdf = await rasterisePdf(pdfium, files.pdf?.get([...files.pdf.keys()].find((p) => p.startsWith(`${format.name}/`)) ?? '') ?? new Uint8Array())
-    const svg = rasteriseSvg(files.svg?.get([...files.svg.keys()].find((p) => p.startsWith(`${format.name}/`)) ?? '') ?? new Uint8Array())
-    const vector = { pdf: Number(vectorDifference(cpu, pdf).toFixed(3)), svg: Number(vectorDifference(cpu, svg).toFixed(3)) }
+    const svgFile = files.svg?.get([...files.svg.keys()].find((p) => p.startsWith(`${format.name}/`)) ?? '') ?? new Uint8Array()
+    const svg = rasteriseSvg(svgFile)
+    const chromium = await drawnByChromium(page, ck, svgFile, format.width, format.height)
+    const vector = {
+      pdf: Number(vectorDifference(cpu, pdf).toFixed(3)),
+      svg: Number(vectorDifference(cpu, svg).toFixed(3)),
+      svgInChromium: Number(vectorDifference(cpu, chromium).toFixed(3)),
+    }
     result.vectorPercentDiffering = vector
     writeOutput(`exit-check-4-${formatId}-pdf.png`, Buffer.from(encodePng(ck, pdf)))
     writeOutput(`exit-check-4-${formatId}-svg.png`, Buffer.from(encodePng(ck, svg)))
+    writeOutput(`exit-check-4-${formatId}-svg-chromium.png`, Buffer.from(encodePng(ck, chromium)))
+    expect(vector.svgInChromium, `${format.name} SVG drawn by Chromium, % of pixels differing`).toBeLessThanOrEqual(EXIT_VECTOR_LIMIT)
     expect(vector.pdf, `${format.name} PDF, % of pixels differing`).toBeLessThanOrEqual(EXIT_VECTOR_LIMIT)
     expect(vector.svg, `${format.name} SVG, % of pixels differing`).toBeLessThanOrEqual(EXIT_VECTOR_LIMIT)
     results.push(result)

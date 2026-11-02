@@ -63,6 +63,15 @@ export const exportHashOf = (page: Page) =>
 
 export const synced = (page: Page) => page.evaluate(() => window.dazbee?.synced() ?? false)
 
+/** Waits for the sync server to have every change, reloads, and checks the design came back the same. */
+export async function reloads(page: Page) {
+  const final = await designOf(page)
+  await expect.poll(() => synced(page), { timeout: 15_000 }).toBe(true)
+  await page.reload()
+  await expect(page.getByTestId('status')).toHaveAttribute('data-ready', '', { timeout: 30_000 })
+  await expect.poll(() => designOf(page), { message: 'the design is the same after a reload' }).toBe(final)
+}
+
 /** Waits until every tab has sent all its changes and all tabs hold the same design. */
 export async function settle(tabs: Page[]) {
   await expect.poll(async () => {

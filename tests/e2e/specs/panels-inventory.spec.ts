@@ -10,7 +10,7 @@ import { join } from 'node:path'
 import { expect, test, type Browser, type Locator, type Page } from '../support/test.ts'
 import type { DesignInput } from '@dazbee/schema'
 import { photo, upload } from '../support/assets.ts'
-import { designOf, placed, synced, writeOutput } from '../support/editor.ts'
+import { designOf, openTabs, placed, reloads, settle, writeOutput } from '../support/editor.ts'
 import { importGoogleFonts } from '../support/fonts.ts'
 import { newBrand, putKit } from '../support/seed.ts'
 import { choose } from '../support/select.ts'
@@ -138,15 +138,6 @@ async function step(page: Page, act: () => Promise<unknown>, check: () => Promis
   await expect.poll(() => designOf(page), { message: 'redo brings it again' }).toBe(after)
   // The panels draw the redone design before the next control is used.
   await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))))
-}
-
-/** Waits for the sync server to have every change, reloads, and checks the design came back the same. */
-async function reloads(page: Page) {
-  const final = await designOf(page)
-  await expect.poll(() => synced(page), { timeout: 15_000 }).toBe(true)
-  await page.reload()
-  await expect(page.getByTestId('status')).toHaveAttribute('data-ready', '', { timeout: 30_000 })
-  await expect.poll(() => designOf(page), { message: 'the design is the same after a reload' }).toBe(final)
 }
 
 const select = async (page: Page, ids: string[]) => {
@@ -905,6 +896,7 @@ test.describe('shapes and frames', () => {
     const page = await open()
     await select(page, ['box'])
     const card = page.getByTestId('shape-card')
+    await expect.soft(card.getByRole('heading')).toHaveText('Rectangle')
     const shape = async () => (await props(page, 'box')).shape as Record<string, unknown>
     await step(page, () => enter(card.getByRole('spinbutton', { name: 'Corners' }), '60'), async () => { await expect.poll(shape).toMatchObject({ cornerRadius: 60 }) })
     // Each corner starts at the radius all four had.
@@ -916,6 +908,13 @@ test.describe('shapes and frames', () => {
         await expect.poll(async () => ((await shape()).corners as number[])[i]).toBe(radius)
       })
     }
+    // Back to one radius: the top left's, and the corners go.
+    await step(page, () => enter(card.getByRole('spinbutton', { name: 'Top left radius' }), '30'), async () => {
+      await expect.poll(async () => ((await shape()).corners as number[])[0]).toBe(30)
+    })
+    await step(page, () => card.getByRole('switch', { name: 'Each corner its own' }).click(), async () => {
+      await expect.poll(shape).toEqual({ kind: 'rect', cornerRadius: 30 })
+    })
     // A box has the same corners, in its Box card.
     await select(page, ['plain'])
     const box = page.getByTestId('frame-card')
@@ -939,8 +938,11 @@ test.describe('shapes and frames', () => {
     const page = await open()
     await select(page, ['poly'])
     const card = page.getByTestId('shape-card')
+    await expect.soft(card.getByRole('heading')).toHaveText('Polygon')
     const shape = async () => (await props(page, 'poly')).shape
     await step(page, () => enter(card.getByRole('spinbutton', { name: 'Sides' }), '8'), async () => { await expect.poll(shape).toMatchObject({ sides: 8 }) })
+    // Sides are at least three: Home takes them there.
+    await step(page, () => card.getByRole('spinbutton', { name: 'Sides' }).press('Home'), async () => { await expect.poll(shape).toMatchObject({ sides: 3 }) })
     await step(page, () => enter(card.getByRole('spinbutton', { name: 'Corners' }), '20'), async () => { await expect.poll(shape).toMatchObject({ cornerRadius: 20 }) })
     await reloads(page)
   })
@@ -952,7 +954,13 @@ test.describe('shapes and frames', () => {
     const shape = async () => (await props(page, 'star')).shape
     await step(page, () => enter(card.getByRole('spinbutton', { name: 'Points' }), '8'), async () => { await expect.poll(shape).toMatchObject({ points: 8 }) })
     await step(page, () => enter(card.getByRole('spinbutton', { name: 'Inner' }), '70'), async () => { await expect.poll(shape).toMatchObject({ innerRadius: 0.7 }) })
+    // The arrow keys step the points by one and the inner radius by a percent, as it shows.
+    await step(page, () => card.getByRole('spinbutton', { name: 'Points' }).press('ArrowUp'), async () => { await expect.soft.poll(shape).toMatchObject({ points: 9 }) })
+    await step(page, () => card.getByRole('spinbutton', { name: 'Inner' }).press('ArrowUp'), async () => { await expect.soft.poll(shape).toMatchObject({ innerRadius: 0.71 }) })
     await step(page, () => enter(card.getByRole('spinbutton', { name: 'Corners' }), '10'), async () => { await expect.poll(shape).toMatchObject({ cornerRadius: 10 }) })
+    // A rectangle and a star selected together have no Shape card.
+    await select(page, ['box', 'star'])
+    await expect.soft(card).toHaveCount(0)
     await reloads(page)
   })
 
@@ -1228,13 +1236,18 @@ test.describe('nothing selected', () => {
   row(61, 'formats: add a preset, a custom size, with checks', async (open) => {
     const page = await open()
     const count = async () => Object.keys((await doc(page)).formats).length
-    // A new format adds a frame; the Square, the picture checked, stays the same.
-    await step(page, async () => {
-      await page.getByRole('button', { name: 'Add format' }).click()
-      await page.getByRole('dialog', { name: 'Add format' }).locator('[data-preset=story]').click()
-    }, async () => { await expect.poll(count).toBe(2) }, { draws: false })
     await page.getByRole('button', { name: 'Add format' }).click()
     const dialog = page.getByRole('dialog', { name: 'Add format' })
+    // The presets are grouped by shape.
+    for (const shape of ['Square', 'Portrait', 'Tall', 'Landscape', 'Wide']) await expect.soft(dialog.getByRole('group', { name: shape })).toBeVisible()
+    // A new format adds a frame, labelled with its name; the Square, the picture checked, stays the same.
+    await step(page, () => dialog.locator('[data-preset=story]').click(), async () => {
+      await expect.poll(count).toBe(2)
+      const [story, size] = Object.entries((await doc(page)).formats).find(([, f]) => f.name === 'Story') ?? []
+      expect.soft(size).toMatchObject({ width: 1080, height: 1920 })
+      await expect.soft(page.locator(`.frame-label[data-frame="p1/${story}"]`)).toContainText('Story')
+    }, { draws: false })
+    await page.getByRole('button', { name: 'Add format' }).click()
     await dialog.getByLabel('Width').fill('1600')
     await dialog.getByLabel('Height').fill('500')
     await expect(dialog.getByRole('alert')).toHaveText('Sizes run from 1:3 to 3:1.')
@@ -1250,17 +1263,26 @@ test.describe('nothing selected', () => {
     const page = await open(true)
     const formats = page.getByTestId('formats')
     const row = formats.locator('[data-format="story"]')
-    // A format's name isn't drawn.
+    const square = formats.locator('[data-format="sq"]')
+    // A format's name isn't drawn; the stage's label of its frame shows it.
     await step(page, async () => {
       await row.getByRole('button', { name: 'Rename: Story' }).dblclick()
       await row.getByRole('textbox', { name: 'Rename' }).fill('Reel')
       await row.getByRole('textbox', { name: 'Rename' }).press('Enter')
-    }, async () => { await expect.poll(async () => (await doc(page)).formats.story?.name).toBe('Reel') }, { draws: false })
+    }, async () => {
+      await expect.poll(async () => (await doc(page)).formats.story?.name).toBe('Reel')
+      await expect.soft(page.locator('.frame-label[data-frame="p1/story"]')).toContainText('Reel')
+    }, { draws: false })
+    // The primary format can't be removed.
+    await square.hover()
+    await expect.soft(square.getByRole('button', { name: 'Remove format' })).toBeDisabled()
     // Which format is primary changes no format's picture.
     await step(page, async () => {
       await row.hover()
       await row.getByRole('button', { name: 'Make primary' }).click()
     }, async () => { await expect.poll(async () => (await doc(page)).meta.primaryFormatId).toBe('story') }, { draws: false })
+    await row.hover()
+    await expect.soft(row.getByRole('button', { name: 'Remove format' })).toBeDisabled()
     // The order of formats is the order of the list, not of the picture.
     const order = async () => Object.entries((await doc(page)).formats).sort(([, a], [, b]) => byOrder(a, b)).map(([id]) => id)
     await step(page, async () => {
@@ -1271,56 +1293,90 @@ test.describe('nothing selected', () => {
       await row.hover()
       await row.getByRole('button', { name: 'Move down' }).click()
     }, async () => { await expect.poll(order).toEqual(['sq', 'story']) }, { draws: false })
-    const square = formats.locator('[data-format="sq"]')
     const kept = await designOf(page)
     await square.hover()
     await square.getByRole('button', { name: 'Remove format' }).click()
     await expect.poll(async () => (await doc(page)).formats.sq).toBeUndefined()
+    await expect.soft(page.getByTestId('removed-toast')).toContainText('Square removed')
     await page.getByTestId('removed-toast').getByRole('button', { name: 'Undo' }).click()
     await expect.poll(() => designOf(page), { message: 'the toast\'s Undo brings the format back whole' }).toBe(kept)
     await square.hover()
     await square.getByRole('button', { name: 'Show alone' }).click()
     await expect(page.getByTestId('focus-chip')).toBeVisible()
+    await expect.soft(page.getByTestId('focus-chip')).toContainText('Showing Square alone')
     expect(await page.evaluate(() => window.dazbee?.frames().map((f) => f.formatId))).toEqual(['sq'])
+    // Show all brings both frames back.
     await page.getByTestId('focus-chip').getByRole('button', { name: 'Show all formats' }).click()
+    await expect.soft(page.getByTestId('focus-chip')).toBeHidden()
+    await expect.soft.poll(() => page.evaluate(() => window.dazbee?.frames().map((f) => f.formatId).sort())).toEqual(['sq', 'story'])
     await reloads(page)
   })
 
   row(63, 'pages: add, duplicate, rename, move, delete with undo, show', async (open) => {
     const page = await open()
-    const pages = page.getByTestId('pages')
-    const names = async () => Object.values((await doc(page)).pages).sort(byOrder).map((p) => p.name)
-    // The picture checked is the first page's; these steps change the other pages or their names.
-    await step(page, () => page.getByRole('button', { name: 'Add page' }).click(), async () => { await expect.poll(names).toEqual(['Page 1', 'Page 2']) }, { draws: false })
-    const p1 = pages.locator('[data-page="p1"]')
-    await step(page, async () => {
-      await p1.hover()
-      await p1.getByRole('button', { name: 'Duplicate page' }).click()
-    }, async () => { await expect.poll(async () => (await names()).length).toBe(3) }, { draws: false })
-    const second = pages.getByRole('listitem').nth(1)
-    await step(page, async () => {
-      await second.getByRole('button', { name: /^Show / }).dblclick()
-      await second.getByRole('textbox', { name: 'Rename' }).fill('Offer')
-      await second.getByRole('textbox', { name: 'Rename' }).press('Enter')
-    }, async () => { await expect.poll(async () => (await names())[1]).toBe('Offer') }, { draws: false })
-    const offer = pages.getByRole('listitem').filter({ hasText: 'Offer' })
-    await step(page, async () => {
+    // A second tab on the same design follows every step.
+    const browser = page.context().browser()
+    const designId = new URL(page.url()).pathname.split('/').at(-1)
+    if (!browser || !designId) throw new Error('no browser or design')
+    const { tabs: [other] } = await openTabs(browser, 1, designId, { brandId })
+    if (!other) throw new Error('no second tab')
+    try {
+      const pages = page.getByTestId('pages')
+      const names = async () => Object.values((await doc(page)).pages).sort(byOrder).map((p) => p.name)
+      const idOf = async (name: string) => Object.entries((await doc(page)).pages).find(([, p]) => p.name === name)?.[0]
+      /** The pages of the stage's rows, top to bottom. */
+      const rows = () => page.evaluate(() => [...new Set(window.dazbee?.frames().sort((a, b) => a.y - b.y).map((f) => f.pageId))])
+      const p1 = pages.locator('[data-page="p1"]')
+      // The last page can't be deleted: its Delete, shown while its row is hovered, is off.
+      await expect.soft(p1.getByRole('button', { name: 'Delete page', includeHidden: true })).toBeDisabled()
+      // The picture checked is the first page's; these steps change the other pages or their names.
+      await step(page, () => page.getByRole('button', { name: 'Add page' }).click(), async () => { await expect.poll(names).toEqual(['Page 1', 'Page 2']) }, { draws: false })
+      // The copy is the page shown, and the stage has a row for it.
+      await step(page, async () => {
+        await p1.hover()
+        await p1.getByRole('button', { name: 'Duplicate page' }).click()
+      }, async () => {
+        await expect.poll(async () => (await names()).length).toBe(3)
+        await expect.soft(pages.locator(`[data-page="${await idOf('Page 1 copy')}"]`)).toHaveAttribute('aria-current', 'page')
+        await expect.soft.poll(async () => (await rows()).length).toBe(3)
+      }, { draws: false })
+      const second = pages.getByRole('listitem').nth(1)
+      await step(page, async () => {
+        await second.getByRole('button', { name: /^Show / }).dblclick()
+        await second.getByRole('textbox', { name: 'Rename' }).fill('Offer')
+        await second.getByRole('textbox', { name: 'Rename' }).press('Enter')
+      }, async () => { await expect.poll(async () => (await names())[1]).toBe('Offer') }, { draws: false })
+      const offer = pages.getByRole('listitem').filter({ hasText: 'Offer' })
+      // Moved up, its row on the stage goes on top.
+      await step(page, async () => {
+        await offer.hover()
+        await offer.getByRole('button', { name: 'Move up' }).click()
+      }, async () => {
+        await expect.poll(async () => (await names())[0]).toBe('Offer')
+        await expect.soft.poll(async () => (await rows())[0]).toBe(await idOf('Offer'))
+      }, { draws: false })
+      await step(page, async () => {
+        await offer.hover()
+        await offer.getByRole('button', { name: 'Move down' }).click()
+      }, async () => { await expect.poll(async () => (await names())[1]).toBe('Offer') }, { draws: false })
+      const kept = await designOf(page)
       await offer.hover()
-      await offer.getByRole('button', { name: 'Move up' }).click()
-    }, async () => { await expect.poll(async () => (await names())[0]).toBe('Offer') }, { draws: false })
-    await step(page, async () => {
-      await offer.hover()
-      await offer.getByRole('button', { name: 'Move down' }).click()
-    }, async () => { await expect.poll(async () => (await names())[1]).toBe('Offer') }, { draws: false })
-    const kept = await designOf(page)
-    await offer.hover()
-    await offer.getByRole('button', { name: 'Delete page' }).click()
-    await expect.poll(async () => (await names()).length).toBe(2)
-    await page.getByTestId('removed-toast').getByRole('button', { name: 'Undo' }).click()
-    await expect.poll(() => designOf(page), { message: 'the toast\'s Undo brings the page back whole' }).toBe(kept)
-    await expect(p1).not.toHaveAttribute('aria-current', 'page')
-    await p1.getByRole('button', { name: 'Show Page 1' }).click()
-    await expect(p1).toHaveAttribute('aria-current', 'page')
-    await reloads(page)
+      await offer.getByRole('button', { name: 'Delete page' }).click()
+      await expect.poll(async () => (await names()).length).toBe(2)
+      await expect.soft(page.getByTestId('removed-toast')).toContainText('Offer deleted')
+      await page.getByTestId('removed-toast').getByRole('button', { name: 'Undo' }).click()
+      await expect.poll(() => designOf(page), { message: 'the toast\'s Undo brings the page back whole' }).toBe(kept)
+      await expect(p1).not.toHaveAttribute('aria-current', 'page')
+      await p1.getByRole('button', { name: 'Show Page 1' }).click()
+      await expect(p1).toHaveAttribute('aria-current', 'page')
+      // A new page takes the next free name: one more than there are pages.
+      await step(page, () => page.getByRole('button', { name: 'Add page' }).click(), async () => {
+        await expect.soft.poll(names).toEqual(['Page 1', 'Offer', 'Page 2', 'Page 4'])
+      }, { draws: false })
+      await settle([page, other])
+      await reloads(page)
+    } finally {
+      await other.context().close()
+    }
   })
 })

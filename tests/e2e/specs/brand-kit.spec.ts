@@ -1,10 +1,11 @@
 // Brand kits (#53) in Chromium: set up a kit with a colour, apply it to a layer, change the colour
 // and see the layer change, with the design itself untouched; another design bound to the same
 // colour opens in the new one, and one undo lets the layer go of the brand again. The flyout opens
-// as a picker: its colour tiles and font rows apply the kit, and the Page card shows the colours.
+// as a picker: its colour tiles and font rows apply the kit, each one undo step that redo brings
+// back and there after a reload, and the Page card shows the colours.
 import { expect, test, type Page } from '../support/test.ts'
 import type { DesignInput } from '@dazbee/schema'
-import { editorPath, writeOutput } from '../support/editor.ts'
+import { editorPath, reloads, writeOutput } from '../support/editor.ts'
 import { getKit, newBrand, putKit, seed } from '../support/seed.ts'
 import { openStage, read } from '../support/stage.ts'
 
@@ -122,13 +123,27 @@ test('the picker applies a colour tile and a font row, and the Page card shows t
   await sun.click()
   await expect.poll(() => storedFill(page)).toEqual({ bindings: { fill: 'brand:sun' }, color: '#FF8A3DFF' })
   await expect(picker.getByRole('button', { name: 'Stop following Sun' })).toHaveAttribute('aria-pressed', 'true')
+  // One undo lets the box go of the brand, and redo binds it again; the tile follows both.
+  await page.evaluate(() => window.dazbee?.perform('undo'))
+  await expect.poll(() => storedFill(page)).toEqual({ bindings: undefined, color: navy })
+  await expect(picker.getByRole('button', { name: 'Apply Sun to the selection' })).toHaveAttribute('aria-pressed', 'false')
+  await page.evaluate(() => window.dazbee?.perform('redo'))
+  await expect.poll(() => storedFill(page)).toEqual({ bindings: { fill: 'brand:sun' }, color: '#FF8A3DFF' })
+  await expect(picker.getByRole('button', { name: 'Stop following Sun' })).toHaveAttribute('aria-pressed', 'true')
   // The font rows need text selected.
   await expect(picker.getByRole('button', { name: 'Apply Body to the selection' })).toBeDisabled()
   await page.evaluate(() => window.dazbee?.select(['title']))
   await picker.getByRole('button', { name: 'Apply Body to the selection' }).click()
-  await expect.poll(async () => ((await read(page)).nodes.title as unknown as { bindings?: Record<string, string> }).bindings).toMatchObject({ fontFamily: 'brand:body' })
+  const titleBindings = async () => ((await read(page)).nodes.title as unknown as { bindings?: Record<string, string> }).bindings
+  await expect.poll(titleBindings).toMatchObject({ fontFamily: 'brand:body' })
+  await page.evaluate(() => window.dazbee?.perform('undo'))
+  await expect.poll(titleBindings).toBeUndefined()
+  await page.evaluate(() => window.dazbee?.perform('redo'))
+  await expect.poll(titleBindings).toMatchObject({ fontFamily: 'brand:body' })
   await page.evaluate(() => window.dazbee?.drawn())
   writeOutput('brand-kit-3-picker.png', await page.screenshot())
+  // After a reload both still follow the brand.
+  await reloads(page)
   expect(errors).toEqual([])
 })
 

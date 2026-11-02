@@ -1,7 +1,8 @@
 // SVG files as layers (#225) in Chromium, with real input: an SVG uploaded to the library places as
 // a group of path layers in one undo step, says what it left out, and one of its shapes takes a new
-// colour like any other layer; SVG markup pasted on the stage places the same way; an SVG set as
-// the brand logo places from the Brand panel as layers too.
+// colour like any other layer; SVG markup pasted on the stage places the same way, in the middle of
+// the frame at its own size or scaled down to fit; an SVG set as the brand logo places from the
+// Brand panel as layers too.
 import { randomUUID } from 'node:crypto'
 import { expect, test, type Page } from '../support/test.ts'
 import type { DesignInput } from '@dazbee/schema'
@@ -36,6 +37,12 @@ type Node = Design['nodes'][string] & { type: string; name: string }
 const nodes = async (page: Page) => Object.entries((await read(page)).nodes) as [string, Node][]
 const named = async (page: Page, name: string) => (await nodes(page)).find(([, n]) => n.name === name)
 const fillColor = async (page: Page, name: string) => ((await named(page, name))?.[1].props.fills as { color?: string }[] | undefined)?.[0]?.color
+/** The colour the export draws at a design pixel of the square. */
+const exported = (page: Page, x: number, y: number) => page.evaluate(({ x, y }) => {
+  const pixels = window.dazbee?.exportPixels()
+  const at = (y * 1080 + x) * 4
+  return pixels ? [pixels[at], pixels[at + 1], pixels[at + 2]] : null
+}, { x, y })
 
 /** Checks the placed logo: one group on the page holding the four shapes as path layers, the badge keeping its gradient. */
 async function expectPlacedLogo(page: Page, groupName: string) {
@@ -99,7 +106,7 @@ test('an SVG uploaded to the library places as layers in one step, and a shape i
   expect(errors).toEqual([])
 })
 
-test('SVG markup pasted on the stage places as layers', async ({ browser }) => {
+test('SVG markup pasted on the stage places as layers in the middle of the frame, at its own size or scaled down to fit', async ({ browser }) => {
   const { page, errors } = await openStage(browser, design)
   await page.context().grantPermissions(['clipboard-read', 'clipboard-write'])
   await page.evaluate((text) => navigator.clipboard.writeText(text), logo('paste'))
@@ -107,9 +114,27 @@ test('SVG markup pasted on the stage places as layers', async ({ browser }) => {
   await page.mouse.click(middle.x, middle.y)
   await page.keyboard.press('Control+v')
   await expect.poll(async () => (await nodes(page)).length).toBe(5)
-  await expectPlacedLogo(page, 'SVG')
+  const groupId = await expectPlacedLogo(page, 'SVG')
+  // At its own size, centred on the square's middle: its shapes reach from 10,10 to 290,196 in the
+  // file, so 280 × 186 from 400,447. Each shape keeps its place in it: the bar is drawn where it is.
+  expect(await selection(page)).toEqual([groupId])
+  /** Each layer's box, by its name. */
+  const boxes = async () => Object.fromEntries((await nodes(page)).map(([, n]) => {
+    const { x, y, width, height } = n.props
+    return [n.name, { x, y, width, height }]
+  }))
+  expect.soft(await boxes()).toMatchObject({ SVG: { x: 400, y: 447, width: 280, height: 186 }, Bar: { x: 600, y: 477, width: 80, height: 120 } })
+  expect.soft(await exported(page, 640, 537)).toEqual([0x07, 0x3B, 0x4C])
   await page.evaluate(() => window.dazbee?.drawn())
   writeOutput('svg-layers-4-pasted.png', await page.screenshot())
+
+  // A file wider than 60% of the square is scaled down to that, 648 wide, and centred the same way.
+  await press(page, 'undo')
+  await expect.poll(async () => (await nodes(page)).length).toBe(0)
+  await page.evaluate((text) => navigator.clipboard.writeText(text), `<svg xmlns="http://www.w3.org/2000/svg" width="2000" height="1000"><rect id="Wide" width="2000" height="1000" fill="#073B4C"/></svg>`)
+  await page.keyboard.press('Control+v')
+  await expect.poll(async () => (await nodes(page)).length).toBe(2)
+  expect(await boxes()).toMatchObject({ SVG: { x: 216, y: 378, width: 648, height: 324 }, Wide: { x: 216, y: 378, width: 648, height: 324 } })
   expect(errors).toEqual([])
 })
 

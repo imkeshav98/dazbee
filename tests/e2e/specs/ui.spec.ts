@@ -253,12 +253,11 @@ test('the panels live in a capsule floating over the canvas', async ({ page }) =
   await shoot(page, 'capsule-layers')
   const { landing, frames: path } = await blobPath(page, 'Brand')
   const brand = centre(await page.getByRole('button', { name: 'Brand', exact: true }).boundingBox())
-  // A slide, not a jump: once the blob is on Brand, it is drawn back where Layers was and travels
-  // from there. (How many steps between a busy machine draws depends on its frame rate.) It lands
-  // stretched and settles on Brand.
-  const arrived = path.findIndex((p) => Math.abs(p.y - brand.y) < 4)
-  expect(arrived).toBeGreaterThanOrEqual(0)
-  expect(path.slice(arrived).some((p) => p.y < brand.y - 4)).toBe(true)
+  // A slide, not a jump: the blob is seen on its way, between the two buttons. A jump is never
+  // there, though it may draw a frame back on Layers. (How many steps between a busy machine draws
+  // depends on its frame rate.) It lands stretched and settles on Brand.
+  const between = path.filter((p) => p.y > layers.y + 4 && p.y < brand.y - 4)
+  expect(between.length, `the blob's centre on each step: ${path.map((p) => Math.round(p.y)).join(', ')}`).toBeGreaterThan(0)
   expect(landing).toBeGreaterThan(1.05)
   await expect.poll(async () => Math.abs(centre(await page.getByTestId('rail-blob').boundingBox()).y - brand.y)).toBeLessThan(1)
   await expect(page.getByRole('button', { name: 'Brand', exact: true })).toHaveAttribute('aria-expanded', 'true')

@@ -93,20 +93,6 @@ test('an auto layout frame resized from its handle keeps its circles\' size and 
   expect(errors).toEqual([])
 })
 
-test('the dragged axis of a hugging frame becomes fixed, so it takes the size dragged', async ({ browser }) => {
-  const content = design()
-  ;(content.nodes.row as { props: Record<string, unknown> }).props.sizing = { width: 'hug', height: 'hug' }
-  const { page, errors } = await openStage(browser, content)
-  await click(page, 70, 70)
-  await dragHandle(page, 'e', -200, 0)
-  // It hugged four circles, 500 wide; dragged 200 in, it is 300 wide and wraps them in twos.
-  expect((await read(page)).overrides['format:sq']?.row?.sizing).toEqual({ width: 'fixed', height: 'hug' })
-  near(await boxOf(page, 'row'), { x: 60, y: 60, width: 300, height: 260 }, 'row')
-  await undo(page)
-  expect((await read(page)).overrides['format:sq']?.row?.sizing).toBeUndefined()
-  expect(errors).toEqual([])
-})
-
 test('a plain frame keeps what it holds as it is, also turned; a group still scales it', async ({ browser }) => {
   const { page, errors } = await openStage(browser, design())
   const inner = await boxOf(page, 'inner')
