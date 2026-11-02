@@ -47,15 +47,22 @@ jobs:
           if-no-files-found: ignore
           retention-days: 30
 
-  # The editor's browser suite took 40 minutes on one 2-core runner and grows with each ticket, so it
-  # runs in shards side by side, each against its own API and sync server (#100).
+  # The browser suite runs in jobs side by side, each against its own API and sync server: four
+  # shards of every spec but the canvas gesture matrix, and two halves of the matrix, the slowest spec.
   e2e:
+    name: e2e (${{ matrix.part }})
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4]
+        include:
+          - { part: '1', args: '--shard=1/4 --grep-invert "every canvas gesture in the"' }
+          - { part: '2', args: '--shard=2/4 --grep-invert "every canvas gesture in the"' }
+          - { part: '3', args: '--shard=3/4 --grep-invert "every canvas gesture in the"' }
+          - { part: '4', args: '--shard=4/4 --grep-invert "every canvas gesture in the"' }
+          - { part: 'matrix-1', args: 'specs/gesture-matrix.spec.ts --shard=1/2' }
+          - { part: 'matrix-2', args: 'specs/gesture-matrix.spec.ts --shard=2/2' }
     steps:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
@@ -67,19 +74,19 @@ jobs:
       - run: docker compose up -d --wait
       - run: pnpm --filter @dazbee/e2e exec playwright install --with-deps chromium
       - run: pnpm turbo run build --filter=@dazbee/web
-      - run: pnpm --filter @dazbee/e2e exec playwright test --shard=${{ matrix.shard }}/4
+      - run: pnpm --filter @dazbee/e2e exec playwright test ${{ matrix.args }}
       - if: failure()
         run: docker compose logs api sync
       - if: failure()
         uses: actions/upload-artifact@v7
         with:
-          name: playwright-report-${{ matrix.shard }}
+          name: playwright-report-${{ matrix.part }}
           path: tests/e2e/playwright-report
           retention-days: 7
       - if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: live-editing-${{ matrix.shard }}
+          name: live-editing-${{ matrix.part }}
           path: tests/e2e/output
           if-no-files-found: ignore
           retention-days: 30

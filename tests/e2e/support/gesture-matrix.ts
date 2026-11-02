@@ -320,8 +320,12 @@ async function run(page: Page, subject: Subject, gesture: string, formatId: stri
   return problems.length > 0 ? problems.join('; ') : null
 }
 
-/** Runs the matrix in one format; returns the table's rows and what failed without a ticket. */
-export async function runMatrix(browser: Browser, formatId: 'sq' | 'wide') {
+/**
+ * Runs the matrix in one format for the given layers (every subject by default); returns the
+ * table's rows and what failed without a ticket. Each case puts the design back with one undo, so
+ * any set of subjects runs on its own.
+ */
+export async function runMatrix(browser: Browser, formatId: 'sq' | 'wide', subjects: readonly Subject[] = SUBJECTS) {
   const other = formatId === 'sq' ? 'wide' : 'sq'
   const asset = await upload(photo)
   const opened = await openStage(browser, matrixDesign(asset.id))
@@ -341,7 +345,7 @@ export async function runMatrix(browser: Browser, formatId: 'sq' | 'wide') {
   await drawn(page)
   const rows: { key: string; result: string }[] = []
   const unexpected: string[] = []
-  for (const subject of SUBJECTS) {
+  for (const subject of subjects) {
     for (const gesture of GESTURES) {
       await page.evaluate(({ subject, formatId }) => window.dazbee?.select([subject], 'p1', formatId), { subject, formatId })
       await drawn(page)
