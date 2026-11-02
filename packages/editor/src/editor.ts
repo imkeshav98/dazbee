@@ -16,7 +16,7 @@ import { WASM_FILE } from '@dazbee/canvaskit/wasm'
 import { SvgError, svgMarkup, svgToLayers, SVG_TYPE, type Skipped } from '@dazbee/svg'
 import { IndexeddbPersistence } from 'y-indexeddb'
 import * as Y from 'yjs'
-import { fit, NO_INSETS, toScreen, toWorld, visibleRect, zoomAt, type Camera, type Insets, type Viewport } from './camera.ts'
+import { fit, framesInView, NO_INSETS, toScreen, toWorld, zoomAt, type Camera, type Insets, type Viewport } from './camera.ts'
 import { frameAt, frameGrid, intersects, type Frame, type Rect } from './grid.ts'
 import { hitTest, type Point } from './hit-test.ts'
 import { align, distribute, type Alignment, type Distribution, type Offset } from './arrange.ts'
@@ -111,7 +111,7 @@ type SizingOf = NonNullable<Layer['props']['sizing']>
 export type SaveState = 'Saved' | 'Saving' | 'Offline'
 export const SAVE_STATES: readonly string[] = ['Saved', 'Saving', 'Offline'] satisfies SaveState[]
 
-/** What one redraw did, for the frame budget checks. */
+/** What one redraw did, for the checks that count a redraw's work. */
 export interface DrawInfo {
   /** Time spent drawing, from reading the design to submitting the frame. */
   ms: number
@@ -323,6 +323,11 @@ function live(
   let entered: string | null = null
   /** What the drag in progress snapped to, shown as guides and equal gaps (#42). */
   let snapped: { frame: Frame; guides: Guide[]; gaps: Gap[] } | null = null
+  /**
+   * Snapping's work since the editor opened: how often a drag gathered what it can snap to, the
+   * pointer moves of a drag that snapped, and how many boxes the last drag gathered to snap to.
+   */
+  const snapWork = { gathered: 0, moves: 0, targets: 0 }
   /** The rulers are off until asked for (Shift+R or the View card): the stage is for the ads. */
   let rulers = false
   /** Snapping to layers and the frame while dragging; Ctrl (⌘) still turns it off for a drag. */
@@ -1227,8 +1232,7 @@ function live(
       frames.delete(key)
     }
 
-    const view = visibleRect(camera, viewport)
-    drawnFrames = grid.frames.filter((frame) => intersects(frame, view))
+    drawnFrames = framesInView(grid.frames, camera, viewport)
     let recorded = 0
     const c = surface.getCanvas()
     c.clear(ck.TRANSPARENT)
@@ -1536,6 +1540,7 @@ function live(
     snapped = null
     const moving = g.roots.map((id) => g.boxes.get(id)).filter((b): b is Box => b !== undefined)
     if (snap && g.targets && moving.length > 0) {
+      snapWork.moves++
       const from = boundsOf(moving)
       const s = snapMove({ ...from, x: Math.round(from.x + dx), y: Math.round(from.y + dy) }, g.targets, SNAP_DISTANCE / camera.zoom, { x: axisLock && dx === 0, y: axisLock && dy === 0 })
       if (s.dx !== 0) {
@@ -1576,7 +1581,10 @@ function live(
         if (sibling) others.push(boundsOf([sibling]))
       }
     }
-    return snapTargets(others, { x: 0, y: 0, width: format.width, height: format.height })
+    const targets = snapTargets(others, { x: 0, y: 0, width: format.width, height: format.height })
+    snapWork.gathered++
+    snapWork.targets = targets.boxes.length
+    return targets
   }
 
   function resizeTo(g: Extract<Gesture, { kind: 'resize' }>, p: Point, keepRatio: boolean, fromCentre: boolean, snap: boolean) {
@@ -3465,6 +3473,12 @@ function live(
     rulers: () => rulers,
     /** Whether a drag snaps to layers and the frame. */
     snapping: () => snapping,
+    /**
+     * Snapping's work since the editor opened, for the checks that count it: `gathered` drags
+     * worked out what they can snap to, `moves` pointer moves of a drag snapped, and the last
+     * drag gathered `targets` boxes, each move measured against all of them.
+     */
+    snapWork: () => ({ ...snapWork }),
     /** Turns snapping on or off for every drag. */
     setSnapping(on: boolean) {
       if (on === snapping) return
@@ -3539,6 +3553,11 @@ function live(
       const box = drawnBoxOf(defaultFrame(pageId, formatId), id)
       return box && { x: box.x, y: box.y, width: box.width, height: box.height }
     },
+    /**
+     * Resolves once the fonts and images the design has asked for so far are here or failed to
+     * come. One arriving drops every frame's picture, so the next redraw records them again.
+     */
+    loaded: () => Promise.all([fontsLoading, imagesLoading]).then(() => undefined),
     /** Resolves once what the screen shows is up to date: after the pending redraw, if there is one. */
     drawn: () => new Promise<void>((resolve) => {
       if (!pending) return resolve()

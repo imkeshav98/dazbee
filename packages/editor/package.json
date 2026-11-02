@@ -4,6 +4,7 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
+    "./camera": "./src/camera.ts",
     "./shortcuts": "./src/shortcuts.ts",
     "./path": "./src/path.ts"
   },

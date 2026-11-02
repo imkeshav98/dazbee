@@ -12,6 +12,27 @@ async function setCookies(page: Page, cookies: Record<string, string>) {
 
 test.use({ viewport: { width: 1440, height: 900 } })
 
+/** How long chrome moves, in ms (--chrome in globals.css, CHROME in components/editor/shell.tsx). */
+const CHROME_MS = 180
+
+/**
+ * Records every animation the page asks an element for from now on, as Motion does to run a fade
+ * on the browser's clock: the element's test id, the properties it animates and how long it lasts.
+ */
+const watchAnimations = (page: Page) => page.evaluate(() => {
+  const started: { on: string | null; properties: string[]; ms: number }[] = []
+  const animate = Element.prototype.animate
+  Element.prototype.animate = function (this: Element, keyframes: Keyframe[] | PropertyIndexedKeyframes | null, options?: number | KeyframeAnimationOptions) {
+    const animation = animate.call(this, keyframes, options)
+    const frames = Array.isArray(keyframes) ? keyframes : keyframes ? [keyframes] : []
+    const properties = [...new Set(frames.flatMap((frame) => Object.keys(frame)))].filter((key) => !['offset', 'easing', 'composite'].includes(key))
+    started.push({ on: this.getAttribute('data-testid'), properties, ms: Number(animation.effect?.getTiming().duration ?? 0) })
+    return animation
+  }
+  ;(window as unknown as { animations: typeof started }).animations = started
+})
+const animations = (page: Page) => page.evaluate(() => (window as unknown as { animations: { on: string | null; properties: string[]; ms: number }[] }).animations)
+
 test('dark and light change only the tokens', async ({ page }) => {
   test.setTimeout(90_000)
   const designId = await seed(liveDesign())
@@ -78,30 +99,18 @@ test('reduced motion turns chrome animation off', async ({ browser }) => {
     const page = await context.newPage()
     await page.goto(editorPath(designId))
     await expect(page.getByTestId('status')).toHaveAttribute('data-ready', '', { timeout: 30_000 })
-    // The flyout's opacity on every frame for half a second from the click: a fade passes through
-    // values between 0 and 1, appearing outright doesn't. Every frame rather than one sample at a
-    // fixed delay, which a slow CI runner can land before the first frame or after the fade.
-    const opacities = page.evaluate(() => new Promise<number[]>((resolve) => {
-      const seen: number[] = []
-      const start = performance.now()
-      const tick = () => {
-        const flyout = document.querySelector('[data-testid=flyout]')
-        if (flyout) seen.push(Number(getComputedStyle(flyout).opacity))
-        if (performance.now() - start < 500) requestAnimationFrame(tick)
-        else resolve(seen)
-      }
-      requestAnimationFrame(tick)
-    }))
+    // The animations the flyout is given from the click on: a fade is an opacity animation that
+    // lasts the chrome's duration, appearing outright is none.
+    await watchAnimations(page)
     await page.getByRole('button', { name: 'Layers', exact: true }).click()
-    const seen = await opacities
-    expect(seen.at(-1)).toBe(1)
-    const fading = seen.filter((o) => o > 0 && o < 1)
+    await expect(page.getByTestId('flyout')).toHaveCSS('opacity', '1')
+    const onFlyout = (await animations(page)).filter((a) => a.on === 'flyout')
     const tooltipTransition = await page.locator('.rise, [role=toolbar] button').first().evaluate((el) => getComputedStyle(el).transitionDuration)
     if (reducedMotion === 'reduce') {
-      expect(fading).toEqual([])
+      expect(onFlyout.filter((a) => a.ms > 0)).toEqual([])
       expect(Number.parseFloat(tooltipTransition)).toBeLessThan(0.001)
     } else {
-      expect(fading.length).toBeGreaterThan(0)
+      expect(onFlyout.filter((a) => a.properties.includes('opacity')).map((a) => a.ms)).toEqual([CHROME_MS])
     }
     await context.close()
   }
@@ -142,42 +151,61 @@ const centre = (box: { x: number; y: number; width: number; height: number } | n
 }
 
 /**
- * The blob's centre and vertical scale on every frame and style change for 900 ms from clicking
- * the named panel button, and the vertical scale the blob starts from when it lands (read as it
- * mounts, since a slow machine may draw no frame before it settles).
+ * The blob's centre and vertical scale on every frame and style change from clicking the named
+ * panel button until the blob rests on it, round, and the vertical scale the blob starts from when
+ * it lands (read as it mounts, since a slow machine may draw no frame before it settles). The slide
+ * is a spring Motion runs frame by frame, with no duration to read, so the watch lasts until it
+ * ends however slow the machine is; 10 s without resting ends it too, for the checks to report.
  */
 async function blobPath(page: Page, name: string) {
-  const path = page.evaluate(() => new Promise<{ landing: number; frames: { y: number; scaleY: number }[] }>((resolve) => {
+  const path = page.evaluate((name) => new Promise<{ landing: number; frames: { y: number; scaleY: number }[] }>((resolve) => {
     const seen: { y: number; scaleY: number }[] = []
     let landing = 1
     const rail = document.querySelector('[data-testid=rail]')
+    const button = rail?.querySelector(`button[aria-label="${name}"]`)
+    if (!rail || !button) throw new Error(`no ${name} button in the capsule`)
+    const target = button.getBoundingClientRect()
+    /** Where the blob is now and how stretched, recorded; null with no blob. */
+    const look = () => {
+      const blob = document.querySelector('[data-testid=rail-blob]')
+      const squish = blob?.firstElementChild
+      if (!blob || !(squish instanceof HTMLElement)) return null
+      const box = blob.getBoundingClientRect()
+      const at = { y: box.y + box.height / 2, scaleY: new DOMMatrix(getComputedStyle(squish).transform).d, on: blob.closest('button') === button }
+      seen.push({ y: at.y, scaleY: at.scaleY })
+      return at
+    }
     // Motion writes the blob's style on each step of the slide, so this also sees the steps a busy
     // machine draws no frame for.
+    let moved = true
     const watch = new MutationObserver(() => {
-      const blob = document.querySelector('[data-testid=rail-blob]')
-      const squish = blob?.firstElementChild
-      if (!blob || !(squish instanceof HTMLElement)) return
-      landing = Math.max(landing, new DOMMatrix(squish.style.transform || 'none').d)
-      const box = blob.getBoundingClientRect()
-      seen.push({ y: box.y + box.height / 2, scaleY: new DOMMatrix(getComputedStyle(squish).transform).d })
+      moved = true
+      const squish = document.querySelector('[data-testid=rail-blob]')?.firstElementChild
+      if (squish instanceof HTMLElement) landing = Math.max(landing, new DOMMatrix(squish.style.transform || 'none').d)
+      look()
     })
-    if (rail) watch.observe(rail, { childList: true, subtree: true, attributes: true, attributeFilter: ['style'] })
-    const start = performance.now()
+    watch.observe(rail, { childList: true, subtree: true, attributes: true, attributeFilter: ['style'] })
+    let finished = false
+    const finish = () => {
+      finished = true
+      watch.disconnect()
+      resolve({ landing, frames: seen })
+    }
+    const giveUp = setTimeout(finish, 10_000)
+    // At rest: on the button, round, and not moved since the last frame, which a spring passing
+    // through its end on the way back would be.
     const tick = () => {
-      const blob = document.querySelector('[data-testid=rail-blob]')
-      const squish = blob?.firstElementChild
-      if (blob && squish) {
-        const box = blob.getBoundingClientRect()
-        seen.push({ y: box.y + box.height / 2, scaleY: new DOMMatrix(getComputedStyle(squish).transform).d })
-      }
-      if (performance.now() - start < 900) requestAnimationFrame(tick)
-      else {
-        watch.disconnect()
-        resolve({ landing, frames: seen })
-      }
+      if (finished) return
+      const at = look()
+      const still = !moved
+      moved = false
+      if (still && at?.on && Math.abs(at.y - (target.y + target.height / 2)) < 1 && Math.abs(at.scaleY - 1) < 0.001) {
+        clearTimeout(giveUp)
+        finish()
+      } else requestAnimationFrame(tick)
     }
     requestAnimationFrame(tick)
-  }))
+  }), name)
   await page.getByRole('button', { name }).click()
   return path
 }

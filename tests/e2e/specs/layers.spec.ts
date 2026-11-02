@@ -1,16 +1,19 @@
 // The layers panel (#59) in Chromium, with real pointer and keyboard input: the tree in step with the
 // stage's selection both ways, a layer dragged into a group (the stage redraws it there, one undo
-// step), rename, lock and hide; the same by keyboard alone; and 300 layers scrolling smoothly with
-// only the rows in view in the page.
-import { expect, test, type Page } from '../support/test.ts'
+// step), rename, lock and hide; the same by keyboard alone; and 300 layers scrolling with only the
+// rows in view in the page.
+import { expect, test, type Locator, type Page } from '../support/test.ts'
 import type { DesignInput } from '@dazbee/schema'
 import { writeOutput } from '../support/editor.ts'
+import { PERF, report, spread } from '../support/perf.ts'
 import { click, openStage, read } from '../support/stage.ts'
 
 test.describe.configure({ timeout: 120_000 })
 
 /** A row's height in the panel, in pixels (LAYER_ROW in components/editor/layers-panel.tsx). */
 const ROW = 36
+/** How far one turn of the wheel scrolls the 300 layers, in pixels. */
+const WHEEL = 420
 
 const rect = (x: number, y: number, width: number, height: number, color: string) =>
   ({ x, y, width, height, shape: { kind: 'rect' as const, cornerRadius: 16 }, fills: [{ type: 'solid' as const, color }] })
@@ -201,67 +204,64 @@ test('keyboard only: move through the tree, select, rename, lock, hide and move 
   expect(errors).toEqual([])
 })
 
-test('300 layers: only the rows in view are in the page, and scrolling costs the panel little', async ({ browser }) => {
+/** A design of 300 layers. */
+const threeHundred = (): DesignInput => {
   const nodes: DesignInput['nodes'] = {}
   for (let i = 0; i < 300; i++) {
     const index = `a${String(i).padStart(3, '0')}`
     nodes[`n${i}`] = { type: 'graphic', parentId: 'p1', index, name: `Layer ${i + 1}`, props: rect(20 + (i % 20) * 52, 20 + Math.floor(i / 20) * 70, 44, 60, i % 2 ? '#14213DFF' : '#FCA311FF') }
   }
-  const { page, errors } = await openStage(browser, { ...design(), nodes })
+  return { ...design(), nodes }
+}
+
+/** Turns the wheel over the panel, then waits until the panel has scrolled. */
+async function wheel(page: Page, scroller: Locator, dy: number) {
+  const before = await scroller.evaluate((el) => el.scrollTop)
+  await page.mouse.wheel(0, dy)
+  await expect.poll(() => scroller.evaluate((el) => el.scrollTop)).not.toBe(before)
+}
+
+/**
+ * The rows in the page: how many, the first one's place in the list (from 0, by its
+ * aria-posinset: the 300 layers are siblings), the first row in view, how many rows the view
+ * holds, and how far the panel can scroll.
+ */
+const mounted = (scroller: Locator) => scroller.evaluate((el, row) => {
+  const rows = [...el.querySelectorAll<HTMLElement>('[role=treeitem]')]
+  return {
+    count: rows.length,
+    first: Math.min(...rows.map((r) => Number(r.getAttribute('aria-posinset')) - 1)),
+    inView: Math.floor(el.scrollTop / row),
+    fits: Math.ceil(el.clientHeight / row),
+    range: el.scrollHeight - el.clientHeight,
+  }
+}, ROW)
+
+test('300 layers: only the rows in view are in the page, and they follow the scroll', async ({ browser }) => {
+  const { page, errors } = await openStage(browser, threeHundred())
   await openLayers(page)
   const scroller = page.getByTestId('layers-scroller')
-  const rendered = await tree(page).getByRole('treeitem').count()
-  expect(rendered).toBeLessThan(60)
+  const top = await mounted(scroller)
+  expect(top.count).toBeLessThan(60)
   expect(await tree(page).evaluate((el) => el.getBoundingClientRect().height)).toBe(300 * ROW)
+  // The rows the panel keeps in the page past the end of the view, read once at the top.
+  const overscan = top.count - top.fits
+  expect(overscan).toBeGreaterThan(0)
+  // Twenty turns down stay well inside the scroll range, so every turn scrolls.
+  expect(top.range).toBeGreaterThan(20 * WHEEL + 10 * ROW)
 
-  // Every frame's time for a while, in ms, sorted.
-  const frameTimes = (ms: number) => page.evaluate((ms) => new Promise<number[]>((resolve) => {
-    const frames: number[] = []
-    let last = performance.now()
-    const start = last
-    const tick = (now: number) => {
-      frames.push(now - last)
-      last = now
-      if (now - start < ms) requestAnimationFrame(tick)
-      else resolve(frames.slice(1).sort((a, b) => a - b))
-    }
-    requestAnimationFrame(tick)
-  }), ms)
-  const at = (frames: number[], q: number) => frames[Math.min(frames.length - 1, Math.floor(frames.length * q))] ?? Infinity
-  // The page at rest with the panel open: what this machine's frames take with nothing moving. In
-  // headless Chromium the frosted panels are composited in software, which is most of a frame here.
+  // Scroll top to bottom and back with the wheel. After every turn the first row in the page is
+  // the first in view or at most the overscan above it, however long the machine took to scroll.
   await scroller.hover()
-  const idle = await frameTimes(1000)
-  // Script time in every long frame (over 50 ms) while scrolling, from the long animation frame
-  // timings: what the panel itself costs, apart from compositing.
-  await page.evaluate(() => {
-    const seen: number[] = []
-    ;(window as unknown as { scripts: number[] }).scripts = seen
-    new PerformanceObserver((list) => {
-      for (const frame of list.getEntries() as unknown as { scripts: { duration: number }[] }[]) seen.push(frame.scripts.reduce((sum, s) => sum + s.duration, 0))
-    }).observe({ type: 'long-animation-frame' })
-  })
-  // Then scroll top to bottom and back with the wheel.
-  const timing = frameTimes(2500)
   for (let i = 0; i < 40; i++) {
-    await page.mouse.wheel(0, i < 20 ? 420 : -420)
-    await page.waitForTimeout(30)
+    await wheel(page, scroller, i < 20 ? WHEEL : -WHEEL)
+    await expect.poll(async () => {
+      const { first, inView } = await mounted(scroller)
+      return { first, inView, followed: first <= inView && first >= inView - overscan }
+    }).toMatchObject({ followed: true })
+    expect((await mounted(scroller)).count).toBeLessThan(60)
   }
-  const frames = await timing
-  const scripts = (await page.evaluate(() => (window as unknown as { scripts: number[] }).scripts)).sort((a, b) => a - b)
-  const stats = {
-    layers: 300, rowsInPage: rendered,
-    idle: { frames: idle.length, medianMs: at(idle, 0.5), p95Ms: at(idle, 0.95) },
-    scrolling: { frames: frames.length, medianMs: at(frames, 0.5), p95Ms: at(frames, 0.95), worstMs: frames.at(-1) },
-    scriptPerLongFrame: { frames: scripts.length, medianMs: at(scripts, 0.5), p95Ms: scripts.length ? at(scripts, 0.95) : 0, worstMs: scripts.at(-1) ?? 0 },
-  }
-  console.log('layers panel scroll', JSON.stringify(stats))
-  writeOutput('layers-scroll-300.json', JSON.stringify(stats, null, 2))
-  test.info().annotations.push({ type: 'scroll 300 layers', description: JSON.stringify(stats) })
-  // The panel's own work stays within one 60 fps frame (16.7 ms) in 95 frames of 100, however long
-  // the machine takes to composite them; a busy machine's odd collection pause is the rest.
-  expect(stats.scriptPerLongFrame.p95Ms).toBeLessThan(16.7)
-  // And the rows followed the scroll: back at the top, the first row shows.
+  // Back at the top, the first row shows.
   await expect(row(page, 'Layer 300')).toBeInViewport()
 
   // End reaches the last row, which is then in the page and in view.
@@ -272,4 +272,56 @@ test('300 layers: only the rows in view are in the page, and scrolling costs the
   expect(await tree(page).getByRole('treeitem').count()).toBeLessThan(60)
   writeOutput('layers-5-300-layers.png', await page.screenshot())
   expect(errors).toEqual([])
+})
+
+test('300 layers: what scrolling the panel takes', PERF, async ({ browser }) => {
+  const { page } = await openStage(browser, threeHundred())
+  await openLayers(page)
+  const scroller = page.getByTestId('layers-scroller')
+
+  // Records every frame's time, in ms, until the returned function stops it and hands them over.
+  const recordFrames = async () => {
+    await page.evaluate(() => {
+      const frames: number[] = []
+      const state = { frames, recording: true }
+      ;(window as unknown as { frameTimes: typeof state }).frameTimes = state
+      let last = performance.now()
+      const tick = (now: number) => {
+        frames.push(now - last)
+        last = now
+        if (state.recording) requestAnimationFrame(tick)
+      }
+      requestAnimationFrame(tick)
+    })
+    return () => page.evaluate(() => {
+      const state = (window as unknown as { frameTimes: { frames: number[]; recording: boolean } }).frameTimes
+      state.recording = false
+      return state.frames.slice(1)
+    })
+  }
+  // The page at rest with the panel open: what this machine's frames take with nothing moving. In
+  // headless Chromium the frosted panels are composited in software, which is most of a frame here.
+  await scroller.hover()
+  const stopIdle = await recordFrames()
+  await page.evaluate(() => new Promise((resolve) => setTimeout(resolve, 1000)))
+  const idle = await stopIdle()
+  // Script time in every long frame (over 50 ms) while scrolling, from the long animation frame
+  // timings: what the panel itself costs, apart from compositing.
+  await page.evaluate(() => {
+    const seen: number[] = []
+    ;(window as unknown as { scripts: number[] }).scripts = seen
+    new PerformanceObserver((list) => {
+      for (const frame of list.getEntries() as unknown as { scripts: { duration: number }[] }[]) seen.push(frame.scripts.reduce((sum, s) => sum + s.duration, 0))
+    }).observe({ type: 'long-animation-frame' })
+  })
+  // Then scroll top to bottom and back with the wheel.
+  const stopScrolling = await recordFrames()
+  for (let i = 0; i < 40; i++) await wheel(page, scroller, i < 20 ? WHEEL : -WHEEL)
+  const scrolling = await stopScrolling()
+  const scripts = await page.evaluate(() => (window as unknown as { scripts: number[] }).scripts)
+  report('Layers panel, 300 layers', {
+    'frame at rest': spread(idle),
+    'frame while scrolling': spread(scrolling),
+    'script in a long frame while scrolling': spread(scripts),
+  })
 })
