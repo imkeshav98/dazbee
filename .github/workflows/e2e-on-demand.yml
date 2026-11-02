@@ -3,12 +3,12 @@ name: Browser tests on demand
 # Runs chosen browser tests on a pushed branch on GitHub's machines, the same way CI's e2e jobs do.
 # `args` are Playwright's: spec files such as specs/layers.spec.ts, or a filter such as
 # --grep @gesture-matrix-sq. They are split at spaces and quotes are not honoured, so a --grep with a
-# space writes it as s.
+# space writes it as \s.
 on:
   workflow_dispatch:
     inputs:
       args:
-        description: Playwright arguments split at spaces, such as specs/layers.spec.ts or --grep @gesture-matrix-sq (no quotes; s for a space)
+        description: Playwright arguments split at spaces, such as specs/layers.spec.ts or --grep @gesture-matrix-sq (no quotes; \s for a space)
         required: true
         type: string
 
