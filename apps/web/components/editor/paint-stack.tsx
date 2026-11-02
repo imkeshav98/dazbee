@@ -9,7 +9,7 @@ import { DotsSixVerticalIcon, EyeIcon, EyeSlashIcon, ImageIcon, MinusIcon, PlusI
 import * as Popover from '@radix-ui/react-popover'
 import type { Editor } from '@dazbee/editor'
 import type { Paint } from '@dazbee/schema'
-import { useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from 'react'
 import { cn } from '../../lib/cn.ts'
 import { useLocale, useMessages } from '../../lib/i18n/client.tsx'
 import { dirOf, format, type Messages } from '../../lib/i18n/index.ts'
@@ -156,6 +156,17 @@ function GradientBar({ paint, picked, onPick, editor, p, onSet }: {
     at.end()
     drag.current = null
   }
+  // A drag whose stop goes, removed while dragged, or whose bar closes, ends its undo step there.
+  useEffect(() => {
+    if (drag.current && drag.current.i >= paint.stops.length) {
+      drag.current.end()
+      drag.current = null
+    }
+  })
+  useEffect(() => () => {
+    drag.current?.end()
+    drag.current = null
+  }, [])
   const remove = (i: number) => {
     if (paint.stops.length <= 2) return
     onSet((now) => ({ ...now, stops: now.stops.filter((_, j) => j !== i) }))
@@ -196,6 +207,7 @@ function GradientBar({ paint, picked, onPick, editor, p, onSet }: {
             }}
             onPointerUp={endDrag}
             onPointerCancel={endDrag}
+            onLostPointerCapture={endDrag}
             onKeyDown={(e: KeyboardEvent) => {
               const step = e.shiftKey ? 0.1 : 0.01
               if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {

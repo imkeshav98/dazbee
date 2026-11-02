@@ -162,7 +162,7 @@ export function EditorStage({ designId, designName, brandId, brandName, everyBra
     }
     const uploading = take.length === 1 ? format(dropped.uploading, { name: take[0].name }) : format(dropped.uploadingMany, { n: take.length })
     setNotice({ text: [leftOut, uploading].filter(Boolean).join(' '), at, lasting: true })
-    void placeDroppedFiles(editor, brandId, take, dropAt(editor, client, take)).then(({ failed, unplaced }) => {
+    void placeDroppedFiles(editor, brandId, take, dropAt(editor, client, files)).then(({ failed, unplaced }) => {
       setUploaded((n) => n + 1)
       const didntUpload = failed.length > 0 ? format(dropped.failed, { files: list(failed.map((file) => format(dropped.failedFile, file))) }) : ''
       const text = [leftOut, didntUpload, unplaced > 0 ? dropped.offPage : ''].filter(Boolean).join(' ')

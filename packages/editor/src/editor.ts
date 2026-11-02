@@ -3707,6 +3707,22 @@ function live(
       drawOverlay()
     },
     /**
+     * Ends what stays open on the stage until a key ends it, closing its undo step: typing, and a
+     * pen path, which keeps the anchors placed so far, as Enter does.
+     */
+    settle() {
+      stopEditing()
+      finishPen()
+      drawOverlay()
+    },
+    /**
+     * Runs `steps` as one undo step of their own, even while a gesture is open, such as a drag on
+     * the stage or a scrub in the panels: that gesture's steps before and after are apart from it.
+     */
+    apart: <T>(steps: () => T): T => session.apart(steps),
+    /** Whether the editor has been destroyed. */
+    destroyed: () => listening.signal.aborted,
+    /**
      * Outlines the layer an image dragged over the stage at `client` would go into, or clears the
      * outline with null. Returns that layer's id, or null where a drop makes a new layer.
      */
