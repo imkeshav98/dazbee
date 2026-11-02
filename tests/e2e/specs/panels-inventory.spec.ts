@@ -1382,9 +1382,10 @@ test.describe('nothing selected', () => {
       await expect(p1).toHaveAttribute('aria-current', 'page')
       // A new page takes the next free name: one more than there are pages, past a name taken.
       // The last row, found by place: while it is renamed its name is in a text box, not its text.
+      // F2 opens the rename from the keyboard, the other way in besides the double click above.
       const last = pages.getByRole('listitem').last()
       await step(page, async () => {
-        await last.getByRole('button', { name: /^Show / }).dblclick()
+        await last.getByRole('button', { name: /^Show / }).press('F2')
         await last.getByRole('textbox', { name: 'Rename' }).fill('Page 4')
         await last.getByRole('textbox', { name: 'Rename' }).press('Enter')
       }, async () => { await expect.poll(names).toEqual(['Page 1', 'Offer', 'Page 4']) }, { draws: false })
