@@ -18,6 +18,9 @@ type Replaced = { map: Y.Map<unknown>; key: string; oldValue: unknown; restore: 
  */
 export function openSession(doc: DesignDoc) {
   const origin = { session: Symbol('session') }
+  /** Changes this tab makes that no one undoes, as another tab's: what the brand kit's change brings. */
+  const untrackedOrigin = { session: Symbol('untracked') }
+  let writing = origin
   const r = root(doc)
   const roots = [r.meta, r.formats, r.pages, r.nodes, r.overrides]
   migrateDoc(doc)
@@ -84,7 +87,7 @@ export function openSession(doc: DesignDoc) {
     pending = []
     doc.transact(() => {
       result = command.apply(ctx, parsed.data as never)
-    }, origin)
+    }, writing)
     if (!inGesture) undoManager.stopCapturing()
     return result as ResultOf<N>
   }
@@ -104,6 +107,21 @@ export function openSession(doc: DesignDoc) {
       inGesture = false
       undoManager.captureTimeout = 0
       undoManager.stopCapturing()
+    }
+  }
+
+  /**
+   * Runs the commands in `steps` as a change no one undoes, like one from another tab: it never
+   * lands on the undo stack, and undo and redo leave it as it is. For changes that follow something
+   * outside the design, such as the brand kit, which undo could not put back with them.
+   */
+  function untracked<T>(steps: () => T): T {
+    const was = writing
+    writing = untrackedOrigin
+    try {
+      return steps()
+    } finally {
+      writing = was
     }
   }
 
@@ -131,7 +149,7 @@ export function openSession(doc: DesignDoc) {
       let result: T | undefined
       doc.transact(() => {
         result = steps()
-      }, origin)
+      }, writing)
       return result as T
     } finally {
       batched = null
@@ -142,6 +160,7 @@ export function openSession(doc: DesignDoc) {
     run,
     batch,
     beginGesture,
+    untracked,
     /** Whether a gesture is open: its commands are still being gathered into one undo step. */
     inGesture: () => inGesture,
     gesture,
