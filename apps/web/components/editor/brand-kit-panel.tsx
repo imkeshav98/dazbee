@@ -7,11 +7,12 @@
 // as it is made.
 import { CheckIcon, PencilSimpleIcon } from '@phosphor-icons/react'
 import type { Editor } from '@dazbee/editor'
-import { brandRef, brandVariables, type Design } from '@dazbee/schema'
+import { AssetSummary, brandRef, brandVariables, type Design } from '@dazbee/schema'
 import { useEffect, useState } from 'react'
 import { cn } from '../../lib/cn.ts'
 import { useMessages } from '../../lib/i18n/client.tsx'
 import { format } from '../../lib/i18n/index.ts'
+import { placeAsset } from '../../lib/place-asset.ts'
 import { overlayScroll } from '../ui/overlay-scroll.ts'
 import { FontPreview, useFontCatalog } from './font-panel.tsx'
 import { useEditorDesign } from './formats-panel.tsx'
@@ -65,6 +66,17 @@ export function BrandKitPanel({ editor, brandId }: { editor: Editor; brandId: st
   const modeButton = 'flex h-8 shrink-0 cursor-pointer items-center gap-1.5 rounded-full border border-line px-3 text-xs font-semibold text-muted hover:border-line-strong hover:text-text'
   const textSelected = selection.some((id) => design.nodes[id]?.type === 'text')
 
+  /** Puts the kit's logo on the design: an SVG file as layers, an image as a graphic filled with it. */
+  const placeLogo = () => {
+    const id = kit.logoAssetId
+    if (!id) return
+    fetch(`/brands/${encodeURIComponent(brandId)}/assets`)
+      .then(async (response) => (response.ok ? AssetSummary.array().parse(await response.json()).find((asset) => asset.id === id) : undefined))
+      .then((asset) => {
+        if (asset) placeAsset(editor, brandId, asset)
+      }, () => undefined)
+  }
+
   if (!editing) {
     const logo = kit.logoAssetId ? `/brands/${encodeURIComponent(brandId)}/assets/${encodeURIComponent(kit.logoAssetId)}/thumbnail` : null
     return (
@@ -79,12 +91,20 @@ export function BrandKitPanel({ editor, brandId }: { editor: Editor; brandId: st
         {logo && (
           <section aria-labelledby="kit-logo" className="flex flex-col gap-2.5 border-t border-line px-[18px] py-4">
             <h3 id="kit-logo" className={heading}>{t.logo}</h3>
-            {/* The one logo on a light and a dark ground, to see how it reads on each. */}
+            {/* The one logo on a light and a dark ground, to see how it reads on each; either places it. */}
             <div className="grid grid-cols-2 gap-2">
               {['bg-white', 'bg-[#1A1420]'].map((ground) => (
-                <div key={ground} className={cn('grid aspect-[1.3] place-items-center overflow-hidden rounded-[10px] border border-line p-3', ground)}>
+                <button
+                  key={ground}
+                  type="button"
+                  aria-label={t.placeLogo}
+                  title={t.placeLogo}
+                  data-testid="kit-logo-place"
+                  onClick={() => placeLogo()}
+                  className={cn('grid aspect-[1.3] cursor-pointer place-items-center overflow-hidden rounded-[10px] border border-line p-3 hover:border-accent', ground)}
+                >
                   <img src={logo} alt="" className="size-full object-contain" />
-                </div>
+                </button>
               ))}
             </div>
           </section>

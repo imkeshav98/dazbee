@@ -157,6 +157,20 @@ export const en = {
     notices: {
       placedByLayout: 'Auto layout places this layer. Drag it along the row or column, or set it to keep where it is to move it freely.',
       flowEnd: 'This layer is already at that end of its row or column.',
+      svgLeftOut: 'Placed as layers. Left out, since no layer can show them: {parts}.',
+      svgUnreadable: 'This SVG file can’t be read, so nothing was placed.',
+    },
+    /** What an SVG file had that no layer shows, for the notice after placing it. */
+    svgParts: {
+      filter: 'filters',
+      image: 'pictures inside it',
+      'embedded-font': 'its own fonts',
+      'foreign-object': 'web content',
+      pattern: 'pattern fills',
+      marker: 'line-end markers',
+      script: 'scripts',
+      'text-path': 'text along a path',
+      'external-reference': 'links to other files',
     },
     imageTool: {
       title: 'Place an image',
@@ -167,6 +181,7 @@ export const en = {
       pick: 'Place {name}',
       uploading: 'Uploading {name}',
       failed: 'Couldn’t upload {name}: {reason}',
+      svgNotFill: '{name} is an SVG file, which can’t fill a shape. It’s in the library, to place as layers.',
     },
     arrange: {
       align: 'Align',
@@ -261,6 +276,7 @@ export const en = {
       colors: 'Colours',
       fonts: 'Fonts',
       logo: 'Logo',
+      placeLogo: 'Place the logo on the design',
       voice: 'Tone of voice',
       voiceHint: 'How this brand talks, for writing its copy.',
       addColor: 'Add colour',

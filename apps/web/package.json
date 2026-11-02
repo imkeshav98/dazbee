@@ -22,6 +22,7 @@
     "@dazbee/canvaskit": "workspace:*",
     "@dazbee/doc": "workspace:*",
     "@dazbee/editor": "workspace:*",
+    "@dazbee/svg": "workspace:*",
     "@dazbee/fonts": "workspace:*",
     "@dazbee/schema": "workspace:*",
     "@tailwindcss/postcss": "^4.3.3",

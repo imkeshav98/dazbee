@@ -8,6 +8,7 @@ import type { Storage } from '@dazbee/storage'
 import { and, desc, eq, isNull, sql, type SQL } from 'drizzle-orm'
 import { storedDesign } from './design-thumbnails.ts'
 import { readImageHeader } from './images.ts'
+import { readSvgHeader } from './svg-assets.ts'
 import { makeThumbnail } from './thumbnails.ts'
 
 /** How long a signed upload or read URL works. */
@@ -138,7 +139,7 @@ export class InvalidUpload extends Error {}
 
 /**
  * Records the original stored under `sha256` as an asset of the brand, named `name`, after checking
- * the bytes hash to it, are an image and CanvasKit decodes them, and makes its thumbnail. Recording
+ * the bytes hash to it, are an image CanvasKit decodes or an SVG file read as layers, and makes its thumbnail. Recording
  * the same bytes again gives back the same asset, under the name it has.
  */
 export async function recordAsset(db: Db, storage: Storage, workspaceId: string, brandId: string, sha256: string, name = ''): Promise<AssetSummary> {
@@ -153,8 +154,8 @@ export async function recordAsset(db: Db, storage: Storage, workspaceId: string,
     return new InvalidUpload(message)
   }
   if (createHash('sha256').update(bytes).digest('hex') !== sha256) throw await refuse('The uploaded bytes do not match their SHA-256')
-  const header = readImageHeader(bytes)
-  if (!header) throw await refuse('The upload is not a PNG, JPEG or WebP image')
+  const header = readImageHeader(bytes) ?? await readSvgHeader(bytes)
+  if (!header) throw await refuse('The upload is not a PNG, JPEG or WebP image, or an SVG file we can read')
   const thumbnail = thumbnailKey(workspaceId, sha256)
   if (!(await storage.exists(thumbnail))) {
     let made: Awaited<ReturnType<typeof makeThumbnail>>

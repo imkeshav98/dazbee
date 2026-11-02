@@ -72,12 +72,20 @@ export const SyncToken = z.object({
 })
 export type SyncToken = z.infer<typeof SyncToken>
 
-/** The image types we accept and decode with CanvasKit (ADR-0006: images are fills). */
-export const ImageType = z.enum(['image/png', 'image/jpeg', 'image/webp'])
+/**
+ * The image types we accept: PNG, JPEG and WebP, decoded with CanvasKit (ADR-0006: images are
+ * fills), and SVG, which is never decoded as an image but placed as layers.
+ */
+export const ImageType = z.enum(['image/png', 'image/jpeg', 'image/webp', 'image/svg+xml'])
 export type ImageType = z.infer<typeof ImageType>
+
+/** Whether an asset is an SVG file, placed as layers rather than as an image fill. */
+export const isVectorAsset = (asset: { contentType: ImageType }) => asset.contentType === 'image/svg+xml'
 
 /** Largest original we accept, in bytes. */
 export const MAX_UPLOAD_BYTES = 30 * 1024 * 1024
+/** Largest SVG file we accept, in bytes: more is more than a logo or an icon needs. */
+export const MAX_SVG_BYTES = 5_000_000
 
 const Sha256 = z.string().regex(/^[0-9a-f]{64}$/, 'a SHA-256 is 64 lowercase hex digits')
 
@@ -114,7 +122,7 @@ export const StartUpload = z.object({
   contentType: ImageType,
   /** The asset's name, used when the API records it straight away. */
   name: z.string().trim().min(1).max(120).optional(),
-})
+}).refine((u) => u.contentType !== 'image/svg+xml' || u.byteSize <= MAX_SVG_BYTES, { message: `An SVG file is at most ${MAX_SVG_BYTES / 1_000_000} MB`, path: ['byteSize'] })
 export type StartUpload = z.infer<typeof StartUpload>
 
 export const UploadTicket = z.union([

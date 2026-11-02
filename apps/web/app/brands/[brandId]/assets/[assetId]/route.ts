@@ -2,7 +2,7 @@
 // back a short-lived signed URL; the bytes pass through here, so the browser needs no storage
 // address or credentials. PATCH renames it or sets its tags; DELETE deletes it unless something
 // still uses it, and then answers 409 with what does.
-import { UpdateAsset } from '@dazbee/schema'
+import { isVectorAsset, UpdateAsset } from '@dazbee/schema'
 import { ApiFailure, assetLink, deleteAsset, updateAsset } from '../../../../../lib/api.ts'
 
 export async function GET(_request: Request, { params }: { params: Promise<{ brandId: string; assetId: string }> }) {
@@ -11,9 +11,13 @@ export async function GET(_request: Request, { params }: { params: Promise<{ bra
   if (!link) return new Response('No such asset', { status: 404 })
   const stored = await fetch(link.url, { cache: 'no-store' })
   if (!stored.ok) return new Response('Storage did not answer', { status: 502 })
+  // An SVG file is sent as text, never as a page or image the browser runs or decodes: the editor
+  // reads it as layers.
+  const svg = isVectorAsset(link.asset)
   return new Response(stored.body, {
     headers: {
-      'content-type': link.asset.contentType,
+      'content-type': svg ? 'text/plain; charset=utf-8' : link.asset.contentType,
+      ...(svg ? { 'content-security-policy': "default-src 'none'; sandbox", 'x-content-type-options': 'nosniff', 'content-disposition': 'attachment' } : {}),
       // An asset's bytes never change, but whether this viewer may see them can.
       'cache-control': 'private, max-age=3600',
     },

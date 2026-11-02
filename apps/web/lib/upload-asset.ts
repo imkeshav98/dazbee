@@ -2,8 +2,10 @@
 // storage and records it, telling how much has gone. Used by the editor's library and the brief.
 import { AssetSummary } from '@dazbee/schema'
 
-/** The image types the library takes; the web app checks the bytes again. */
-export const ASSET_ACCEPT = 'image/png,image/jpeg,image/webp'
+/** The image types a fill takes; the web app checks the bytes again. */
+export const IMAGE_ACCEPT = 'image/png,image/jpeg,image/webp'
+/** What the library takes: those images and SVG files, which are placed as layers. */
+export const ASSET_ACCEPT = `${IMAGE_ACCEPT},image/svg+xml,.svg`
 
 const base = (brandId: string) => `/brands/${encodeURIComponent(brandId)}/assets`
 

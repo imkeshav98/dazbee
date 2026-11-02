@@ -16,7 +16,7 @@ import { BRIEF_FORMATS, type BriefFormat } from '../lib/brief.ts'
 import { cn } from '../lib/cn.ts'
 import { useMessages } from '../lib/i18n/client.tsx'
 import { format } from '../lib/i18n/index.ts'
-import { ASSET_ACCEPT, sendAsset } from '../lib/upload-asset.ts'
+import { IMAGE_ACCEPT, sendAsset } from '../lib/upload-asset.ts'
 import { useBrandKit } from './editor/use-brand-kit.ts'
 import { buttonStyles } from './ui/button.tsx'
 import { overlayScroll } from './ui/overlay-scroll.ts'
@@ -287,7 +287,7 @@ export function BriefForm({ brandId, brandName, kit: first, references, action }
           id="brief-images"
           ref={files}
           type="file"
-          accept={ASSET_ACCEPT}
+          accept={IMAGE_ACCEPT}
           multiple
           hidden
           data-testid="brief-upload"
