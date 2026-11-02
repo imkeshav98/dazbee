@@ -7,9 +7,12 @@ import { designOf, exportHashOf, openTabs, placed, restartSyncServer, screenPoin
 
 test.describe.configure({ timeout: 120_000 })
 
-/** Runs `count` random commands in a tab, each against the document as the tab holds it then. */
-const randomEdits = (page: Page, seed: number, count: number) =>
-  page.evaluate(({ seed, count }) => {
+/**
+ * Runs `count` random commands in a tab, each against the document as the tab holds it then. With
+ * `interleave` it yields to the page after each one, so the other tab's edits can arrive in between.
+ */
+const randomEdits = (page: Page, seed: number, count: number, interleave = false) =>
+  page.evaluate(async ({ seed, count, interleave }) => {
     const editor = window.dazbee
     if (!editor) throw new Error('no editor')
     let state = seed
@@ -58,15 +61,33 @@ const randomEdits = (page: Page, seed: number, count: number) =>
         if (!(error instanceof Error) || error.name !== 'CommandError') throw error
         refused++
       }
+      if (interleave) await new Promise((resolve) => setTimeout(resolve))
     }
     return { ran, refused }
-  }, { seed, count })
+  }, { seed, count, interleave })
+
+/** Waits for both tabs to settle, then checks they hold the same document, export the same pixels and show the same stage. */
+async function expectSame(a: Page, b: Page) {
+  await settle([a, b])
+  const [designA, designB] = await Promise.all([designOf(a), designOf(b)])
+  expect(designA).toBe(designB)
+  // The export render of each tab's document, and what each tab's WebGL stage shows after its last redraw.
+  const [hashA, hashB] = await Promise.all([exportHashOf(a), exportHashOf(b)])
+  expect(hashA).toBe(hashB)
+  for (const tab of [a, b]) await tab.keyboard.press('Escape')
+  await expect.poll(async () => {
+    const [stageA, stageB] = await Promise.all([stageShot(a), stageShot(b)])
+    return stageA.equals(stageB)
+  }, { timeout: 10_000 }).toBe(true)
+  return { design: designA, hash: hashA }
+}
 
 test('two tabs make 200 random edits each and end with the same document and the same pixels', async ({ browser }) => {
+  test.setTimeout(180_000)
   const { tabs, errors } = await openTabs(browser, 2)
   const [a, b] = tabs as [Page, Page]
   // Both tabs edit offline, so each makes the same edits on every run and they meet once both are
-  // back online. Edits arriving between a tab's own are covered by packages/doc's collaboration test.
+  // back online.
   for (const tab of tabs) {
     await tab.context().setOffline(true)
     await expect(tab.getByTestId('status')).toHaveAttribute('data-status', 'Offline', { timeout: 30_000 })
@@ -74,22 +95,39 @@ test('two tabs make 200 random edits each and end with the same document and the
   const [ranA, ranB] = await Promise.all([randomEdits(a, 2026, 200), randomEdits(b, 31337, 200)])
   test.info().annotations.push({ type: 'tab A', description: JSON.stringify(ranA) }, { type: 'tab B', description: JSON.stringify(ranB) })
   for (const tab of tabs) await tab.context().setOffline(false)
+  await expectSame(a, b)
 
+  // Then both online at once: each tab's edits reach the other while it is still editing, and its
+  // stage draws them as they come.
+  const [liveA, liveB] = await Promise.all([randomEdits(a, 7, 50, true), randomEdits(b, 8, 50, true)])
+  test.info().annotations.push({ type: 'tab A online', description: JSON.stringify(liveA) }, { type: 'tab B online', description: JSON.stringify(liveB) })
+  const { design, hash } = await expectSame(a, b)
+
+  // A command on a layer the other tab deleted is refused whole, and neither document changes.
+  await a.evaluate(() => window.dazbee?.session.run('node.create', {
+    id: 'gone', parentId: 'p1',
+    layer: { type: 'graphic', name: 'Gone', props: { x: 40, y: 40, width: 60, height: 60, shape: { kind: 'rect' }, fills: [{ type: 'solid', color: '#7E57C2FF' }] } },
+  }))
   await settle(tabs)
-  const [designA, designB] = await Promise.all([designOf(a), designOf(b)])
-  expect(designA).toBe(designB)
-  // The export render of each tab's document, and what each tab's WebGL stage shows after its last redraw.
-  const [hashA, hashB] = await Promise.all([exportHashOf(a), exportHashOf(b)])
-  expect(hashA).toBe(hashB)
-  for (const tab of tabs) await tab.keyboard.press('Escape')
-  await expect.poll(async () => {
-    const [stageA, stageB] = await Promise.all([stageShot(a), stageShot(b)])
-    return stageA.equals(stageB)
-  }, { timeout: 10_000 }).toBe(true)
+  await a.evaluate(() => window.dazbee?.session.run('node.delete', { ids: ['gone'] }))
+  await settle(tabs)
+  const before = await designOf(b)
+  const refused = await b.evaluate(() => {
+    try {
+      window.dazbee?.session.run('node.update', { ids: ['gone'], patch: { x: 400 } })
+      return null
+    } catch (error) {
+      return error instanceof Error ? `${error.name}: ${error.message}` : String(error)
+    }
+  })
+  expect(refused).toMatch(/^CommandError: node\.update: .*"gone"/)
+  await settle(tabs)
+  expect(await designOf(b)).toBe(before)
+  expect(await designOf(a)).toBe(before)
 
   writeOutput('two-tabs-a.png', await a.getByTestId('stage').screenshot())
   writeOutput('two-tabs-b.png', await b.getByTestId('stage').screenshot())
-  writeOutput('two-tabs.json', JSON.stringify({ tabA: ranA, tabB: ranB, exportSha256: hashA, layers: Object.keys(JSON.parse(designA).nodes).length }, null, 2))
+  writeOutput('two-tabs.json', JSON.stringify({ tabA: ranA, tabB: ranB, tabAOnline: liveA, tabBOnline: liveB, exportSha256: hash, layers: Object.keys(JSON.parse(design).nodes).length }, null, 2))
   expect(errors).toEqual([])
 })
 

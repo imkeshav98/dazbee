@@ -507,6 +507,7 @@ test.describe('text', () => {
     await moreAction(page, 'Duplicate')
     const copy = (await page.evaluate(() => window.dazbee?.selection() ?? []))[0] ?? ''
     await select(page, [copy])
+    await expect(field).toHaveValue('1.6')
     await enter(field, '')
     await select(page, ['headline', copy])
     await expect(field).toHaveAttribute('placeholder', 'Mixed')

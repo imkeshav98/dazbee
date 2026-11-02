@@ -3,7 +3,7 @@
 import { expect, test, type Page } from '../support/test.ts'
 import type { DesignInput } from '@dazbee/schema'
 import { screenPoint, writeOutput } from '../support/editor.ts'
-import { moreAction, moreMenu, moreSubmenu, openStage } from '../support/stage.ts'
+import { closeBarMenu, moreAction, moreMenu, moreSubmenu, openStage } from '../support/stage.ts'
 
 test.describe.configure({ timeout: 120_000 })
 
@@ -36,12 +36,9 @@ test('one layer has its actions in ⋯ More and the right-click menu; several la
   await expect((await moreSubmenu(page, 'order')).getByRole('button', { name: 'Bring forward' })).toContainText('Ctrl+]')
   await page.evaluate(() => window.dazbee?.drawn())
   writeOutput('arrange-actions-more.png', await page.screenshot())
-  // Esc closes the menu beside, which gives the focus back to its row a moment later; once it is
-  // back in ⋯ More, Esc closes that too. (An Esc with the focus outside a menu clears the selection.)
-  await page.keyboard.press('Escape')
-  await expect(page.getByTestId('more-order-menu')).toBeHidden()
-  await expect.poll(() => page.evaluate(() => document.activeElement?.closest('[data-testid="bar-more-menu"]') !== null)).toBe(true)
-  await page.keyboard.press('Escape')
+  // Esc closes the menu beside, then ⋯ More.
+  await closeBarMenu(page, 'more-order')
+  await closeBarMenu(page, 'bar-more')
   await expect(menu).toBeHidden()
 
   await more('Bring to front')

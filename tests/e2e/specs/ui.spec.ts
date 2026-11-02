@@ -230,8 +230,8 @@ test('the panels live in a capsule floating over the canvas', async ({ page }) =
   await page.keyboard.press('Enter')
   await expect(ai).toHaveAttribute('aria-expanded', 'true')
   await expect(ai).toBeFocused()
-  // A flyout is only as tall as what it holds: the AI one, still empty, is short. (Brand holds the
-  // brand kit since #53.) Brand's flyout leaves first, then AI's settles at its height.
+  // A flyout is only as tall as what it holds: the AI one, still empty, is short, where Brand's holds
+  // the brand kit. Brand's flyout leaves first, then AI's settles at its height.
   await expect(page.getByTestId('flyout')).toHaveCount(1)
   await expect.poll(async () => (await page.getByTestId('flyout').boundingBox())?.height).toBeLessThan(stage.height / 2)
   await shoot(page, 'capsule-ai')
