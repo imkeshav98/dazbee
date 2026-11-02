@@ -17,7 +17,7 @@ import { useMessages } from '../../lib/i18n/client.tsx'
 import { format, type Messages } from '../../lib/i18n/index.ts'
 import { Select } from '../ui/select.tsx'
 import { CARD, CARD_LOWER, CardHeader, PICKED_RING, SWATCHES } from './card.tsx'
-import { CHIP, CHIP_ACCENT, DASHED_BUTTON, FIELD, FOCUS_RING, KNOBS, KNOBS_FOUR, LINK_BUTTON, POPOVER, SEGMENT, SEGMENTS, SWATCH, SWITCH, SWITCH_ROW, TILE, TILE_FACE, TILE_FACE_WIDE } from './styles.ts'
+import { CHIP, CHIP_ACCENT, DASHED_BUTTON, FIELD, FIELD_LABEL, FOCUS_RING, KNOBS, KNOBS_FOUR, LINK_BUTTON, POPOVER, SEGMENT, SEGMENTS, SWATCH, SWITCH, SWITCH_ROW, TILE, TILE_FACE, TILE_FACE_WIDE } from './styles.ts'
 import { ImagePickerButton } from './image-tool.tsx'
 import { useBrandKit } from './use-brand-kit.ts'
 import { useLiveDesign } from './use-live-design.ts'
@@ -60,28 +60,8 @@ export function shared<T>(values: T[]): T | 'mixed' {
   return same ? first as T : 'mixed'
 }
 
-/**
- * A checkbox for a value in the document. The cards see the document's change at the redraw after it,
- * so a press shows at once and holds until the document's value changes.
- */
-function DocCheckbox({ name, checked, onSet }: { name: string; checked: boolean; onSet: (checked: boolean) => void }) {
-  const [pressed, setPressed] = useState<boolean | null>(null)
-  useEffect(() => setPressed(null), [checked])
-  return (
-    <input
-      type="checkbox"
-      name={name}
-      checked={pressed ?? checked}
-      onChange={(event) => {
-        setPressed(event.target.checked)
-        onSet(event.target.checked)
-      }}
-    />
-  )
-}
-
 /** A card of the selection's settings, open, as every card is: its title, an action at the end, its controls. */
-function Card({ id, title, note, action, children }: { id: string; title: string; note?: string; action?: ReactNode; children: ReactNode }) {
+function Card({ id, title, note, action, children }: { id: string; title: string; note?: string; action?: ReactNode; children?: ReactNode }) {
   return (
     <section aria-labelledby={`${id}-title`} className={CARD} data-testid={id}>
       <CardHeader id={`${id}-title`} title={title} note={note}>{action}</CardHeader>
@@ -89,7 +69,6 @@ function Card({ id, title, note, action, children }: { id: string; title: string
     </section>
   )
 }
-
 
 const num = (props: Props, key: string) => props[key] as number
 
@@ -232,7 +211,7 @@ function ShapeCard({ target, p, kind }: { target: Target; p: P; kind: ShapeKind 
         ? (
           <div className="grid grid-cols-2 gap-x-3">
             {(['start', 'end'] as const).map((end) => (
-              <label key={end} className="flex min-w-0 flex-col gap-1 text-xs font-semibold text-muted">
+              <label key={end} className={cn('flex min-w-0 flex-col gap-1', FIELD_LABEL)}>
                 {p.lineEndShort[end]}
                 <Choice
                 name={p.lineEnd[end]}
@@ -306,7 +285,7 @@ function ListBody<T>({ title, p, target, field, fresh, onTop = fresh, topFirst =
   return (
     <div className="flex flex-col gap-2" data-testid={testId}>
       {header && (
-        <div className="flex items-center justify-between text-xs font-semibold text-muted">
+        <div className={cn('flex items-center justify-between', FIELD_LABEL)}>
           {title}
           <AddButton label={format(p.add, { name: title.toLowerCase() })} onClick={add} />
         </div>
@@ -506,9 +485,18 @@ function textStyle(target: Target) {
 /** A row that turns something on or off: its name, then a switch. */
 function SwitchRow({ name, on, onSet }: { name: string; on: boolean | 'mixed'; onSet: (on: boolean) => void }) {
   return (
-    // A switch has no mixed state: while the layers differ it is a checkbox that says so.
-    <button type="button" role={on === 'mixed' ? 'checkbox' : 'switch'} aria-checked={on} onClick={() => onSet(on !== true)} className={SWITCH_ROW}>
+    <Switch on={on} onSet={onSet} className={SWITCH_ROW}>
       {name}
+    </Switch>
+  )
+}
+
+/** A switch on its own, named by `label`, or with its name beside it as `children`. */
+function Switch({ on, onSet, label, className, children }: { on: boolean | 'mixed'; onSet: (on: boolean) => void; label?: string; className: string; children?: ReactNode }) {
+  return (
+    // A switch has no mixed state: while the layers differ it is a checkbox that says so.
+    <button type="button" role={on === 'mixed' ? 'checkbox' : 'switch'} aria-checked={on} aria-label={label} onClick={() => onSet(on !== true)} className={className}>
+      {children}
       <span aria-hidden className={SWITCH} />
     </button>
   )
@@ -833,28 +821,78 @@ function ColourCard({ target, brandId, p, b, swatches }: { target: Target; brand
 }
 
 type Layout = { direction: 'row' | 'column'; gap: number; padding: Record<'top' | 'right' | 'bottom' | 'left', number>; justify: string; align: string; wrap: boolean; lineGap: number }
+type Place = 'start' | 'center' | 'end'
+const PLACES: Place[] = ['start', 'center', 'end']
 
-function AutoLayoutCard({ target, p }: { target: Target; p: P }) {
+/** A frame: whether what is inside shows past its edges. */
+function FrameCard({ target, p }: { target: Target; p: P }) {
+  return (
+    <Card id="frame-card" title={p.frame}>
+      <SwitchRow name={p.clip} on={shared(target.props.map((pr) => pr.clip !== false))} onSet={(clip) => set(target, () => ({ clip }))} />
+    </Card>
+  )
+}
+
+/**
+ * A frame's auto layout, turned on and off from its title: row or column, wrapping, a 3×3 pad that
+ * lines up what is inside along both axes at once, the room between and around, spreading out,
+ * each side's padding, and, when `ownSizing`, how the frame sizes.
+ */
+function AutoLayoutCard({ target, p, ownSizing }: { target: Target; p: P; ownSizing: boolean }) {
   const layouts = target.props.map((pr) => pr.layout as Layout | undefined)
-  if (layouts.some((l) => !l)) {
-    return (
-      <Card id="auto-layout-card" title={p.autoLayout}>
-        <button type="button" onClick={() => target.editor.perform('autoLayout')} className="h-8 cursor-pointer rounded-row border border-line text-[12px] font-medium hover:bg-hover">
-          {p.addAutoLayout}
-        </button>
-      </Card>
-    )
-  }
+  const on = shared(layouts.map(Boolean))
+  const toggle = <Switch on={on} label={p.autoLayout} onSet={() => target.editor.perform('autoLayout')} className={cn('group flex cursor-pointer rounded-full', FOCUS_RING)} />
+  if (on !== true) return <Card id="auto-layout-card" title={p.autoLayout} action={toggle} />
   const value = (key: keyof Layout) => shared(layouts.map((l) => l?.[key]))
   const setLayout = (change: (l: Layout) => Partial<Layout>) => set(target, (now) => {
     const l = now.layout as Layout
     return { layout: { ...l, ...change(l) } }
   })
+  const direction = value('direction') as Layout['direction'] | 'mixed'
+  const justify = value('justify') as string
+  const align = value('align') as string
+  const around = shared(layouts.flatMap((l) => (l ? [l.padding.top, l.padding.right, l.padding.bottom, l.padding.left] : [])))
   return (
-    <Card id="auto-layout-card" title={p.autoLayout}>
-      <div className={KNOBS}>
-        <Choice name={p.direction} value={value('direction') as Layout['direction'] | 'mixed'} options={['row', 'column'] as const} labels={p.directions} onSet={(direction) => setLayout(() => ({ direction }))} />
-        <NumberField label="↔" name={p.gap} value={value('gap') as number | 'mixed'} editor={target.editor} onSet={(gap) => setLayout(() => ({ gap }))} onShift={(by) => setLayout((l) => ({ gap: tidy(l.gap + by) }))} />
+    <Card id="auto-layout-card" title={p.autoLayout} action={toggle}>
+      <Segments name={p.direction} value={direction} options={['row', 'column'] as const} labels={p.directions} onSet={(to) => setLayout(() => ({ direction: to }))} />
+      <SwitchRow name={p.wrap} on={value('wrap') === 'mixed' ? 'mixed' : value('wrap') === true} onSet={(wrap) => setLayout(() => ({ wrap }))} />
+      <div className="flex gap-3">
+        {/* Across the pad is along a row's line (or down a column's), so each cell sets both axes. */}
+        <div role="group" aria-label={p.lineUp} dir="ltr" className="grid size-[84px] shrink-0 grid-cols-3 gap-[3px] rounded-[10px] bg-hover p-[5px]">
+          {PLACES.map((y) => PLACES.map((x) => {
+            const [along, across] = direction === 'column' ? [y, x] : [x, y]
+            const pressed = align === across && (justify === along || justify === 'space-between')
+            return (
+              <button
+                key={`${y}-${x}`}
+                type="button"
+                aria-label={p.padCells[`${y}-${x}`]}
+                aria-pressed={pressed}
+                data-justify={along}
+                data-align={across}
+                onClick={() => setLayout((l) => {
+                  const own = l.direction === 'column' ? { justify: y, align: x } : { justify: x, align: y }
+                  return { justify: l.justify === 'space-between' ? 'space-between' : own.justify, align: own.align }
+                })}
+                className={cn('grid cursor-pointer place-items-center rounded-[5px] hover:bg-surface after:size-1 after:rounded-full after:bg-subtle aria-pressed:after:h-1.5 aria-pressed:after:w-4 aria-pressed:after:rounded-[2px] aria-pressed:after:bg-accent', FOCUS_RING)}
+              />
+            )
+          }))}
+        </div>
+        <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+          <NumberField label={p.between} name={p.gap} value={value('gap') as number | 'mixed'} editor={target.editor} onSet={(gap) => setLayout(() => ({ gap }))} onShift={(by) => setLayout((l) => ({ gap: tidy(l.gap + by) }))} />
+          <NumberField
+            label={p.around}
+            name={p.paddingAll}
+            value={around}
+            editor={target.editor}
+            onSet={(v) => setLayout(() => ({ padding: { top: v, right: v, bottom: v, left: v } }))}
+            onShift={(by) => setLayout((l) => ({ padding: { top: tidy(l.padding.top + by), right: tidy(l.padding.right + by), bottom: tidy(l.padding.bottom + by), left: tidy(l.padding.left + by) } }))}
+          />
+          <Choice name={p.spreadOut} value={justify === 'mixed' ? 'mixed' : justify === 'space-between' ? 'between' : 'packed'} options={['packed', 'between'] as const} labels={p.spreads} onSet={(to) => setLayout((l) => ({ justify: to === 'between' ? 'space-between' : l.justify === 'space-between' ? 'start' : l.justify }))} />
+        </div>
+      </div>
+      <div className={KNOBS_FOUR}>
         {(['top', 'right', 'bottom', 'left'] as const).map((side) => (
           <NumberField
             key={side}
@@ -866,13 +904,8 @@ function AutoLayoutCard({ target, p }: { target: Target; p: P }) {
             onShift={(by) => setLayout((l) => ({ padding: { ...l.padding, [side]: tidy(l.padding[side] + by) } }))}
           />
         ))}
-        <Choice name={p.justify} value={value('justify') as string} options={['start', 'center', 'end', 'space-between']} labels={p.justifies} onSet={(justify) => setLayout(() => ({ justify }))} />
-        <Choice name={p.alignItems} value={value('align') as string} options={['start', 'center', 'end']} labels={p.alignItemsOptions} onSet={(align) => setLayout(() => ({ align }))} />
       </div>
-      <label className="flex items-center gap-2 text-[12px]">
-        <DocCheckbox name="wrap" checked={value('wrap') === true} onSet={(wrap) => setLayout(() => ({ wrap }))} />
-        {p.wrap}
-      </label>
+      {ownSizing && <SizingFields target={target} p={p} options={['hug', 'fill', 'fixed']} labels={p.sizings} />}
     </Card>
   )
 }
@@ -887,37 +920,33 @@ function sizingOf(type: string, props: Props): { width: Sizing; height: Sizing }
   return { width: 'fixed', height: 'fixed' }
 }
 
-/**
- * How layers size and sit in an auto layout (#155): fixed, hugging what they hold or filling the
- * room on each axis, and, for children of an auto layout frame, kept out of the flow where they
- * are put.
- */
-function FlowCard({ target, p, inFlow }: { target: Target; p: P; inFlow: boolean }) {
+/** How the layers size on each axis: a menu each, under the axis's name. */
+function SizingFields({ target, p, options, labels }: { target: Target; p: P; options: readonly Sizing[]; labels: Record<Sizing, string> }) {
   const sizings = target.props.map((pr, i) => sizingOf(target.types[i] ?? '', pr))
   return (
-    <Card id="flow-card" title={inFlow ? p.inAutoLayout : p.sizing}>
-      <div className="grid grid-cols-2 gap-x-3">
-        {(['width', 'height'] as const).map((axis) => (
+    <div className="grid grid-cols-2 gap-x-3">
+      {(['width', 'height'] as const).map((axis) => (
+        <div key={axis} className="flex min-w-0 flex-col gap-1">
+          <span className={FIELD_LABEL}>{p.axes[axis]}</span>
           <Choice
-            key={axis}
             name={p.sizingAxis[axis]}
-            value={shared(sizings.map((s) => s[axis]))}
-            options={['fixed', 'hug', 'fill'] as const}
-            labels={p.sizings}
+            value={shared(sizings.map((sz) => sz[axis]))}
+            options={options}
+            labels={labels}
             onSet={(to) => set(target, (now, i) => ({ sizing: { ...sizingOf(target.types[i] ?? '', now), [axis]: to } }))}
           />
-        ))}
-      </div>
-      {inFlow && (
-        <label className="flex items-center gap-2 text-[12px]">
-          <DocCheckbox
-            name="absolute"
-            checked={target.props.every((pr) => pr.absolute === true)}
-            onSet={(absolute) => set(target, () => ({ absolute: absolute ? true : undefined }))}
-          />
-          {p.absolute}
-        </label>
-      )}
+        </div>
+      ))}
+    </div>
+  )
+}
+
+/** A layer in an auto layout: on each axis its own size, fitting its content or filling the room, and kept where it is put, out of the flow. */
+function FlowCard({ target, p }: { target: Target; p: P }) {
+  return (
+    <Card id="flow-card" title={p.inAutoLayout}>
+      <SizingFields target={target} p={p} options={['fixed', 'hug', 'fill']} labels={p.childSizings} />
+      <SwitchRow name={p.absolute} on={shared(target.props.map((pr) => pr.absolute === true))} onSet={(absolute) => set(target, () => ({ absolute: absolute ? true : undefined }))} />
     </Card>
   )
 }
@@ -1303,8 +1332,9 @@ export function SelectionCards({ editor, brandId, ids }: { editor: Editor; brand
       {several && !all('text') && <EffectsCard target={target} p={p} />}
       {all('text') && <TextBoxCard target={target} p={p} />}
       {all('text') && <SpacingCard target={target} p={p} />}
-      {all('frame') && <AutoLayoutCard target={target} p={p} />}
-      {(inFlow || all('frame') && target.props.every((pr) => pr.layout)) && <FlowCard target={target} p={p} inFlow={inFlow} />}
+      {all('frame') && <FrameCard target={target} p={p} />}
+      {all('frame') && <AutoLayoutCard target={target} p={p} ownSizing={!inFlow} />}
+      {inFlow && <FlowCard target={target} p={p} />}
       <SeeThroughCard target={target} p={p} />
     </>
   )

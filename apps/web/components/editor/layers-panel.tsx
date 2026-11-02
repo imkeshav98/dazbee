@@ -17,6 +17,7 @@ import { useLocale, useMessages } from '../../lib/i18n/client.tsx'
 import { dirOf, format } from '../../lib/i18n/index.ts'
 import { useOverlayScroll } from '../ui/overlay-scroll.ts'
 import { useFlyoutNote } from './shell.tsx'
+import { DROP_LINE } from './styles.ts'
 import { useLiveDesign } from './use-live-design.ts'
 
 /** A row's height in pixels: every row is the same, which is what lets only the rows in view render. */
@@ -411,8 +412,8 @@ const LayerRow = memo(function LayerRow({ row, i, selected, focusable, renaming,
         hidden && 'text-subtle',
       )}
     >
-      {drop === 'above' && <span aria-hidden className="pointer-events-none absolute inset-x-0 -top-px h-0.5 rounded-full bg-accent" />}
-      {drop === 'below' && <span aria-hidden className="pointer-events-none absolute inset-x-0 -bottom-px h-0.5 rounded-full bg-accent" />}
+      {drop === 'above' && <span aria-hidden className={cn(DROP_LINE, '-top-px')} />}
+      {drop === 'below' && <span aria-hidden className={cn(DROP_LINE, '-bottom-px')} />}
       {row.hasChildren
         ? (
           <button

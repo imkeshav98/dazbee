@@ -739,6 +739,45 @@ function live(
     }
   }
 
+  const pageThumbnails = new Map<string, { pageId: string; scene: Scene; resources: Resources; url: string }>()
+  /**
+   * A small picture of a page in one format, as the stage draws it, `size` pixels on its longer side:
+   * a PNG as an object URL, drawn on the CPU surface and kept until the page or what it is drawn
+   * with changes.
+   */
+  function pageThumbnail(frame: Frame, size: number): string | null {
+    const { scene } = cached(frame)
+    const drawWith = screenResources(session.design())
+    const key = `${frame.key}@${size}`
+    const kept = pageThumbnails.get(key)
+    if (kept?.scene === scene && kept.resources === drawWith) return kept.url
+    const scale = size / Math.max(frame.width, frame.height, 1)
+    const surface = ck.MakeSurface(Math.max(1, Math.round(frame.width * scale)), Math.max(1, Math.round(frame.height * scale)))
+    if (!surface) return null
+    try {
+      const canvas = surface.getCanvas()
+      canvas.clear(ck.TRANSPARENT)
+      canvas.scale(scale, scale)
+      drawPage(ck, canvas, scene, drawWith)
+      const image = surface.makeImageSnapshot()
+      const png = image.encodeToBytes()
+      image.delete()
+      if (!png) return null
+      if (kept) URL.revokeObjectURL(kept.url)
+      const url = URL.createObjectURL(new Blob([png.slice()], { type: 'image/png' }))
+      pageThumbnails.set(key, { pageId: frame.pageId, scene, resources: drawWith, url })
+      // A deleted page's pictures go with it.
+      for (const [other, { pageId, url: old }] of pageThumbnails) {
+        if (design.pages[pageId]) continue
+        URL.revokeObjectURL(old)
+        pageThumbnails.delete(other)
+      }
+      return url
+    } finally {
+      surface.delete()
+    }
+  }
+
   /** Each image as a URL for the crop's faint whole image, made once from the decoded image. */
   const ghosts = new WeakMap<Image, string>()
   function ghostOf(image: Image) {
@@ -3467,6 +3506,11 @@ function live(
       drawOverlay()
       return ok
     },
+    /** A page's picture in its main format, `size` pixels on its longer side, for the Pages card. Null when it has none. */
+    pageThumbnail(pageId: string, size = 72): string | null {
+      const frame = frameOf(`${pageId}/${design.meta.primaryFormatId}`)
+      return frame ? pageThumbnail(frame, size) : null
+    },
     /**
      * A small picture of a layer for the effect tiles: drawn by the renderer without the layer's own
      * effects, in the frame the selection is in (the first page in the primary format otherwise),
@@ -3506,6 +3550,8 @@ function live(
       surface?.delete()
       for (const { url } of thumbnails.values()) URL.revokeObjectURL(url)
       thumbnails.clear()
+      for (const { url } of pageThumbnails.values()) URL.revokeObjectURL(url)
+      pageThumbnails.clear()
       gl.delete()
     },
   }

@@ -59,7 +59,8 @@ _Avoid_: Template, layout
 
 **Format**:
 One delivered size of a design, such as 1080×1080 or 320×50. Formats share content and keep their own layout.
-_Avoid_: Size, artboard, variant, ratio
+Shown as: Sizes (the card), size
+_Avoid_ (in code and docs): Size, artboard, variant, ratio
 
 **Primary format**:
 The format whose layout seeds any format that has no stored value yet.
@@ -75,6 +76,11 @@ _Avoid_: Outline, layer list
 **Property cards**:
 The cards at the stage's top end that edit the selection, or the design when nothing is selected. A value the selected layers don't share shows as mixed. With more than one format, a change goes to the format shown only (an override), as a drag on the canvas does, unless every format is picked (the base, with that property's overrides cleared).
 _Avoid_: Inspector (in code), properties panel
+
+**Frame**:
+A layer that holds other layers in a box of its own: it paints fills and strokes behind them, hides what reaches past its edges unless told not to, and can carry auto layout.
+Shown as: Box
+_Avoid_ (in code and docs): Container, board, box
 
 **Graphic**:
 A layer made of a shape plus fills, strokes and effects. Photos and video are fills on a graphic, not layers of their own.
@@ -94,7 +100,8 @@ _Avoid_: Node (a node is a layer), vertex
 
 **Auto layout**:
 A frame setting that places the frame's children in a row or a column, a gap apart inside its padding, lined up along and across the flow, and optionally wrapping onto more lines. It is solved when a scene is built, per format, so the editor and every export lay out alike. A child marked absolute keeps its own place.
-_Avoid_: Flexbox, stack, auto frame
+Shown as: Stack
+_Avoid_ (in code and docs): Flexbox, stack, auto frame
 
 **Sizing**:
 How a layer in an auto layout frame takes its width and its height: fixed keeps its own size, hug fits what it holds (a text's words, a frame's children), and fill takes the room the frame has left.
@@ -122,7 +129,13 @@ _Avoid_: Font (when one file is meant), variant (see Variant)
 
 **Fill**:
 One paint on a layer: solid, gradient (linear, radial or angular), image or video. A crop is the fill's transform.
-_Avoid_: Background, colour (when a paint is meant)
+Shown as: Colour
+_Avoid_ (in code and docs): Background, colour (when a paint is meant)
+
+**Stroke**:
+One paint drawn along a layer's outline, with its own width, inside, centred on or outside the edge, solid or dashed.
+Shown as: Outline
+_Avoid_ (in code and docs): Border, outline
 
 **Adjustment**:
 A change to an image fill's colours, pushed either way from none: exposure, contrast, saturation, temperature or tint. A filter (mono, sepia, vivid, fade, warm, cool) is a look laid on after them.

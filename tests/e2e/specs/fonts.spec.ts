@@ -58,6 +58,8 @@ function fontRequests(page: Page) {
   const elsewhere: string[] = []
   const listen = (request: Request) => {
     const url = new URL(request.url())
+    // Bytes the page made itself (a thumbnail's object URL) come from nowhere.
+    if (url.protocol === 'blob:' || url.protocol === 'data:') return
     if (!['localhost', '127.0.0.1'].includes(url.hostname)) elsewhere.push(url.href)
     const face = new RegExp(`^/brands/${DEV_BRAND}/fonts/([^/]+)$`).exec(url.pathname)?.[1]
     if (face) seen.push(decodeURIComponent(face))
