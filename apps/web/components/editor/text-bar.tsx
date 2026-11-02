@@ -8,7 +8,7 @@ import { useMessages } from '../../lib/i18n/client.tsx'
 import { BarPopover } from './bar-popover.tsx'
 import { FontChooser, nearest, useFontCatalog, weightsOf } from './font-panel.tsx'
 import { EffectsBody, set, shared, TextAlignBody, TextColourBody, TextSizeField, type Style, type Target } from './selection-cards.tsx'
-import { BAR_DIVIDER, BAR_TOGGLE } from './styles.ts'
+import { BAR_DIVIDER, BAR_TOGGLE, MIXED_COLOUR } from './styles.ts'
 
 /** Bold from this weight up, as type designers name their weights. */
 const BOLD = 600
@@ -53,7 +53,7 @@ export function TextBar({ target, brandId, open, onOpen }: { target: Target; bra
       <BarPopover id="size" open={open} onOpen={onOpen} label={p.fontSize} face={<span className="tabular-nums">{size === 'mixed' ? t.editor.fonts.mixed : Math.round(size * 10) / 10}</span>} testId="size" className="w-48">
         <TextSizeField target={target} p={p} />
       </BarPopover>
-      <BarPopover id="colour" open={open} onOpen={onOpen} label={p.textColour} face={<span aria-hidden className="size-4 rounded-full border border-line-strong" style={{ background: color === 'mixed' ? 'conic-gradient(red, yellow, lime, aqua, blue, magenta, red)' : color.slice(0, 7) }} />} testId="colour" className="w-auto">
+      <BarPopover id="colour" open={open} onOpen={onOpen} label={p.textColour} face={<span aria-hidden className="size-4 rounded-full border border-line-strong" style={{ background: color === 'mixed' ? MIXED_COLOUR : color.slice(0, 7) }} />} testId="colour" className="w-auto">
         <TextColourBody target={target} brandId={brandId} p={p} />
       </BarPopover>
       <span aria-hidden className={BAR_DIVIDER} />

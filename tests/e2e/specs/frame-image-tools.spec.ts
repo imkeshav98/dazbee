@@ -114,10 +114,10 @@ test('Mod+Alt+G and the Arrange card frame the selection; Shift+A wraps shapes i
   await undo(page)
   expect((await read(page)).nodes.c?.parentId).toBe('p1')
 
-  // The same from the Arrange card's button.
+  // The same from the bar's Box.
   await click(page, 660, 160)
   await click(page, 860, 210, ['Shift'])
-  await page.locator('[data-testid="arrange"] [data-action="frameSelection"]').click()
+  await page.getByTestId('selection-bar').locator('[data-action="frameSelection"]').click()
   const [carded] = await selection(page)
   expect(await childrenOf(page, carded ?? '')).toEqual(['c', 'd'])
   await undo(page)

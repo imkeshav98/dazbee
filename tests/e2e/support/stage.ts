@@ -98,3 +98,15 @@ export async function barMenu(page: Page, id: string) {
   if (!(await menu.isVisible())) await page.getByTestId(`bar-${id}`).click()
   return menu
 }
+
+/** The fill list: in the Colour card (a photo, several layers), or else in the bar's Colour popover, opened. */
+export const fillList = async (page: Page) => {
+  const card = page.getByTestId('fill-card')
+  return ((await card.isVisible()) ? card : await barMenu(page, 'colour')).getByTestId('fill-list')
+}
+
+/** The stroke list: in the Colour card (a photo, several layers), or else in the bar's Outline popover, opened. */
+export const strokeList = async (page: Page) => {
+  const card = page.getByTestId('fill-card')
+  return ((await card.isVisible()) ? card : await barMenu(page, 'outline')).getByTestId('stroke-list')
+}

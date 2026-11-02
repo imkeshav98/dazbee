@@ -161,8 +161,13 @@ export function ImageTool({ brandId, active, open, onPress, onPick, onClose }: {
 }
 
 /** A button in a card that opens the picker beside it; the image picked goes to `onPick` and the picker closes. */
-export function ImagePickerButton({ brandId, title, testId, className, children, onPick }: {
+export function ImagePickerButton({ brandId, title, testId, className, children, onPick, below = false, open: shown, onOpen }: {
   brandId: string
+  /** Opens under the button and is one of the bar's buttons, for the bar by the selection. */
+  below?: boolean
+  /** Whether it is open, when its owner keeps that, as the bar does for its popovers. */
+  open?: boolean
+  onOpen?: (open: boolean) => void
   /** The picker's heading, and the button's name. */
   title: string
   testId: string
@@ -170,13 +175,16 @@ export function ImagePickerButton({ brandId, title, testId, className, children,
   children: ReactNode
   onPick: (asset: PlacedAsset) => void
 }) {
-  const [open, setOpen] = useState(false)
+  const [own, setOwn] = useState(false)
+  const open = shown ?? own
+  const setOpen = (to: boolean) => (onOpen ? onOpen(to) : setOwn(to))
   // The cards sit at the stage's end, so the picker opens towards its middle.
-  const side = dirOf(useLocale()) === 'rtl' ? 'right' : 'left'
+  const toward = dirOf(useLocale()) === 'rtl' ? 'right' : 'left'
+  const side = below ? 'bottom' : toward
   return (
     <Popover.Root open={open} onOpenChange={setOpen}>
       <Popover.Trigger asChild>
-        <button type="button" aria-label={title} data-testid={testId} className={className}>{children}</button>
+        <button type="button" aria-label={title} data-testid={testId} data-bar-item={below || undefined} className={className}>{children}</button>
       </Popover.Trigger>
       <Popover.Portal>
         <Popover.Content side={side} align="start" sideOffset={12} collisionPadding={12} aria-label={title} data-testid={`${testId}-picker`} onKeyDown={(e) => e.stopPropagation()} className={PANEL}>

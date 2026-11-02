@@ -26,14 +26,12 @@ const nodes = (page: Page) => page.evaluate(() => window.dazbee?.design().nodes)
 const order = async (page: Page) => Object.values(await nodes(page)).filter((n) => n.parentId === 'p1').sort((x, y) => (x.index < y.index ? -1 : 1)).map((n) => n.name)
 const select = (page: Page, ids: string[]) => page.evaluate((ids) => window.dazbee?.select(ids), ids)
 
-test('one layer has its actions in ⋯ More and the right-click menu; several layers group in the Arrange card', async ({ browser }) => {
+test('one layer has its actions in ⋯ More and the right-click menu; several layers group from the bar', async ({ browser }) => {
   const { page, errors } = await openStage(browser, design())
-  const arrange = page.getByTestId('arrange')
   const more = async (name: string) => (await moreMenu(page)).getByRole('button', { name }).click()
 
-  // One layer has no Arrange card: its actions are in ⋯ More, each with its shortcut.
+  // One layer's actions are in ⋯ More, each with its shortcut.
   await select(page, ['a'])
-  await expect(arrange).toHaveCount(0)
   const menu = await moreMenu(page)
   await expect(menu.getByRole('button', { name: 'Bring forward' })).toContainText('Ctrl+]')
   await page.evaluate(() => window.dazbee?.drawn())
@@ -53,9 +51,9 @@ test('one layer has its actions in ⋯ More and the right-click menu; several la
   await expect.poll(async () => (await order(page)).length).toBe(4)
   await page.evaluate(() => window.dazbee?.perform('undo'))
 
-  // Group two in the Arrange card, then ungroup them from ⋯ More.
+  // Group two from the bar, then ungroup them from ⋯ More.
   await select(page, ['b', 'c'])
-  await arrange.getByRole('button', { name: 'Group', exact: true }).click()
+  await page.getByTestId('selection-bar').locator('[data-action="group"]').click()
   await expect.poll(async () => Object.values(await nodes(page)).some((n) => n.type === 'group')).toBe(true)
   const group = Object.entries(await nodes(page)).find(([, n]) => n.type === 'group')?.[0] ?? ''
   await select(page, [group])

@@ -11,7 +11,7 @@ import { loadCanvasKit } from '@dazbee/renderer/node'
 import { AssetLink, type DesignInput } from '@dazbee/schema'
 import { api, photo, upload } from '../support/assets.ts'
 import { designOf, exportHashOf, screenPoint, writeOutput } from '../support/editor.ts'
-import { click, openStage, press, read } from '../support/stage.ts'
+import { click, fillList, openStage, press, read, strokeList } from '../support/stage.ts'
 
 test.describe.configure({ timeout: 120_000 })
 
@@ -59,10 +59,11 @@ test('a gradient over a photo: added on top, a stop edited, the two reordered, o
   const asset = await upload(photo)
   const { page, errors } = await openStage(browser, design(asset.id))
   await click(page, 760, 360)
-  const card = page.getByTestId('fill-card')
+  const card = await fillList(page)
 
   // + puts a see-through colour on top; the list shows it first.
-  await card.getByRole('button', { name: 'Add fill' }).click()
+  // A photo's fills are in its Colour card, + in the card's header.
+  await page.getByTestId('fill-card').getByRole('button', { name: 'Add fill' }).click()
   await expect.poll(async () => (await fillsOf(page)).map((f) => f.type)).toEqual(['image', 'solid'])
   await expect(card.locator('[data-row="1"]')).toHaveAttribute('data-item', 'fills-1')
   await expect(card.locator('[data-row="1"] [data-paint]')).toHaveAttribute('data-paint', 'solid')
@@ -149,8 +150,9 @@ test('a stroke and the page background take the same paint editor: an angular st
   const asset = await upload(photo)
   const { page, errors } = await openStage(browser, design(asset.id))
   await click(page, 760, 360)
-  const stroke = page.getByTestId('stroke-card')
-  await stroke.getByRole('button', { name: 'Add stroke' }).click()
+  const stroke = await strokeList(page)
+  // Under the photo's fills, its strokes have an Outline heading with its +.
+  await stroke.getByRole('button', { name: 'Add outline' }).click()
   await stroke.locator('[data-row="1"]').getByTestId('paint-swatch').click()
   const editor = page.getByTestId('paint-editor')
   await editor.getByRole('radio', { name: 'Angular gradient' }).click()
@@ -158,6 +160,8 @@ test('a stroke and the page background take the same paint editor: an angular st
   await editor.getByRole('spinbutton', { name: 'Gradient angle' }).fill('45')
   await editor.getByRole('spinbutton', { name: 'Gradient angle' }).press('Enter')
   await expect.poll(async () => ((await read(page)).nodes.card?.props.strokes as { paint: { angle?: number } }[])[0]?.paint.angle).toBe(45)
+  // Esc closes the paint editor, then the Outline popover.
+  await page.keyboard.press('Escape')
   await page.keyboard.press('Escape')
 
   // With nothing selected, the Page card holds the page's background as a stack too.

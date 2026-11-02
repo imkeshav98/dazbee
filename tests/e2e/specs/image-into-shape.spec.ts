@@ -8,7 +8,7 @@ import { expect, test, type Page } from '../support/test.ts'
 import type { DesignInput } from '@dazbee/schema'
 import { photo, upload } from '../support/assets.ts'
 import { placed, screenPoint, writeOutput } from '../support/editor.ts'
-import { click, openStage, press, read, selection } from '../support/stage.ts'
+import { barMenu, click, openStage, press, read, selection } from '../support/stage.ts'
 
 test.describe.configure({ timeout: 120_000 })
 
@@ -71,9 +71,9 @@ test('an image dragged onto a star goes into it, the Image card replaces it, and
   await expect(page.locator('.stage-overlay .drop-target')).toHaveCount(0)
   writeOutput('into-shape-2-star-photo.png', await page.screenshot({ animations: 'disabled' }))
 
-  // Replace from the Image card: the other picture, in the star the drag filled.
-  await page.getByTestId('image-card').getByTestId('replace-image').click()
-  const picker = page.getByTestId('replace-image-picker')
+  // Replace from the bar: the other picture, in the star the drag filled.
+  await page.getByTestId('bar-replace').click()
+  const picker = page.getByTestId('bar-replace-picker')
   await expect(picker.locator(`li[data-asset="${other.id}"]`)).toBeVisible({ timeout: 30_000 })
   await picker.locator(`li[data-asset="${other.id}"] button`).click()
   await page.evaluate(() => window.dazbee?.drawn())
@@ -97,7 +97,7 @@ test('an image dragged onto a star goes into it, the Image card replaces it, and
   expect(errors).toEqual([])
 })
 
-test('the Image card replaces the picture, keeping its filter; Add image puts one into a plain shape', async ({ browser }) => {
+test('the bar replaces the picture, keeping its filter; Add image puts one into a plain shape', async ({ browser }) => {
   const sneaker = await upload(photo)
   const other = await upload(card)
   const { page, errors } = await openStage(browser, design())
@@ -105,12 +105,14 @@ test('the Image card replaces the picture, keeping its filter; Add image puts on
   await page.evaluate(() => window.dazbee?.drawn())
 
   // Mono, then Replace with another brand image: the new picture, still mono, no old crop.
-  const imageCard = page.getByTestId('image-card')
+  const imageCard = page.getByTestId('adjust-card')
   await expect(imageCard).toBeVisible()
-  await imageCard.getByRole('radio', { name: 'Mono' }).click()
-  await imageCard.getByTestId('replace-image').click()
-  const picker = page.getByTestId('replace-image-picker')
+  await (await barMenu(page, 'look')).getByRole('radio', { name: 'Mono' }).click()
+  await page.getByTestId('bar-replace').click()
+  const picker = page.getByTestId('bar-replace-picker')
   await expect(picker).toBeVisible()
+  // One of the bar's popovers at a time: Replace closes Look.
+  await expect(page.getByTestId('bar-look-menu')).toBeHidden()
   await expect(picker.locator(`li[data-asset="${other.id}"]`)).toBeVisible({ timeout: 30_000 })
   await expect.poll(() => picker.locator('img').evaluateAll((imgs) => imgs.every((img) => (img as HTMLImageElement).complete && (img as HTMLImageElement).naturalWidth > 0))).toBe(true)
   writeOutput('into-shape-3-replace-picker.png', await page.screenshot({ animations: 'disabled' }))
@@ -125,16 +127,16 @@ test('the Image card replaces the picture, keeping its filter; Add image puts on
   await undo(page)
   expect((await fillsOf(page, 'star')).find((f) => f.type === 'image')).toMatchObject({ assetId: sneaker.id, filter: 'mono' })
 
-  // The box has no picture: its fill look offers one.
+  // The box has no picture: its Colour offers one.
   await click(page, 800, 760)
   expect(await selection(page)).toEqual(['box'])
-  await page.getByTestId('add-image').click()
+  await (await barMenu(page, 'colour')).getByTestId('add-image').click()
   const adding = page.getByTestId('add-image-picker')
   await expect(adding.locator(`li[data-asset="${sneaker.id}"]`)).toBeVisible({ timeout: 30_000 })
   await adding.locator(`li[data-asset="${sneaker.id}"] button`).click()
   await page.evaluate(() => window.dazbee?.drawn())
   expect(await fillsOf(page, 'box')).toEqual([{ type: 'solid', color: '#2F6BFFFF' }, { type: 'image', assetId: sneaker.id, fit: 'fill', opacity: 1 }])
-  await expect(page.getByTestId('image-card')).toBeVisible()
+  await expect(page.getByTestId('adjust-card')).toBeVisible()
   writeOutput('into-shape-5-added.png', await page.screenshot({ animations: 'disabled' }))
   await undo(page)
   expect(await fillsOf(page, 'box')).toEqual([{ type: 'solid', color: '#2F6BFFFF' }])

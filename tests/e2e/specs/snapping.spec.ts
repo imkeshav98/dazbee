@@ -6,7 +6,7 @@ import type { DesignInput } from '@dazbee/schema'
 import { expect, test, type Page } from '../support/test.ts'
 import { screenPoint, writeOutput } from '../support/editor.ts'
 import { liveDesign } from '../support/seed.ts'
-import { click, openStage, press, props, selection, zoomMenu } from '../support/stage.ts'
+import { barMenu, click, openStage, press, props, selection, zoomMenu } from '../support/stage.ts'
 
 test.describe.configure({ timeout: 120_000 })
 
@@ -81,16 +81,15 @@ test('a drag snaps to another layer with a guide, and not with Ctrl held or Snap
   expect(errors).toEqual([])
 })
 
-test('the inspector aligns and distributes three layers, one undo step each', async ({ browser }) => {
+test('the bar\'s Line up aligns and distributes three layers, one undo step each', async ({ browser }) => {
   const { page, errors } = await openStage(browser, design())
-  const arrange = page.getByTestId('arrange')
-  // The Arrange card shows only once something is selected (#83).
-  await expect(arrange).toHaveCount(0)
+  const arrange = page.getByTestId('bar-line-up-menu')
 
   await click(page, 230, 180)
   await click(page, 530, 180, ['Shift'])
   await click(page, 820, 240, ['Shift'])
   expect(await selection(page)).toEqual(['box', 'tag', 'dot'])
+  await barMenu(page, 'line-up')
   await expect(arrange.locator('[data-action="distributeHorizontal"]')).toBeEnabled()
 
   await arrange.locator('[data-action="alignTop"]').click()
