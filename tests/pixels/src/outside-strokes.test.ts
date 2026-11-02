@@ -47,6 +47,23 @@ describe('outside strokes', () => {
     }
   }
 
+  it('keeps out of a path that crosses itself, filled by the nonzero rule, on the CPU and in SVG and PDF', async () => {
+    // A star drawn as one crossing line: its middle winds twice, and is filled.
+    const star = 'M100 0 L159 181 L4 69 L196 69 L41 181 Z'
+    const json = {
+      ...design('outside', 'shape'),
+      nodes: { star: { type: 'graphic', parentId: 'p1', index: 'a0', name: 'Star', props: { x: 50, y: 50, width: 200, height: 190, shape: { kind: 'path', d: star }, fills: [{ type: 'solid', color: '#2050E0FF' }], strokes: stroke('outside') } } },
+    }
+    const cpu = renderDesign(ck, json, 'p1', 'f', bytes)
+    // Just inside the star's middle, which winds twice, 5 px below a line crossing it: the fill shows.
+    expect(at(cpu, 150, 124)).toEqual([32, 80, 224])
+    const svg = rasteriseSvg(renderVector(ck, json, 'p1', 'f', bytes, 'svg'))
+    const pdf = await rasterisePdf(pdfium, renderVector(ck, json, 'p1', 'f', bytes, 'pdf'))
+    expect(at(svg, 150, 124)).toEqual([32, 80, 224])
+    expect(vectorDifference(cpu, svg)).toBeLessThan(1)
+    expect(vectorDifference(cpu, pdf)).toBeLessThan(1)
+  })
+
   it('lies outside the edge only: inside it the fill shows, past it the stroke', () => {
     const r = renderDesign(ck, design('outside', 'shape'), 'p1', 'f', bytes)
     // The left edge is at x 50; the stroke runs from 40 to 50.

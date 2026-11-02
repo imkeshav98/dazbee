@@ -534,10 +534,11 @@ function drawShape(ck: CanvasKit, canvas: Canvas, path: Path, props: GraphicLaye
 
 /**
  * A shape's or a frame's strokes along `path`, inside, centred on or outside it; a line's along it,
- * with its ends. An outside stroke is clipped to everywhere but the outline as one even-odd path,
- * which an SVG can hold where it can't hold a difference.
+ * with its ends. An outside stroke is clipped to everywhere but the outline, worked out as one path
+ * with the outline's own fill rule kept, which an SVG can hold where it can't hold a difference.
  */
 export function strokePath(ck: CanvasKit, canvas: Canvas, path: Path, props: Box & { strokes: readonly Stroke[] }, resources: Resources, line: LineShape | null) {
+  let outside: Path | null = null
   for (const stroke of props.strokes) {
     const paint = paintFor(ck, stroke.paint, props, resources)
     if (!paint) continue
@@ -566,18 +567,19 @@ export function strokePath(ck: CanvasKit, canvas: Canvas, path: Path, props: Box
       paint.setStrokeWidth(stroke.width * 2)
       if (stroke.align === 'inside') canvas.clipPath(path, ck.ClipOp.Intersect, true)
       else {
-        const beyond = new ck.PathBuilder().addRect(EVERYWHERE)
-        beyond.addPath(path)
-        beyond.setFillType(ck.FillType.EvenOdd)
-        const outside = beyond.detachAndDelete()
-        canvas.clipPath(outside, ck.ClipOp.Intersect, true)
-        outside.delete()
+        if (!outside) {
+          const everywhere = new ck.PathBuilder().addRect(EVERYWHERE).detachAndDelete()
+          outside = ck.Path.MakeFromOp(everywhere, path, ck.PathOp.Difference)
+          everywhere.delete()
+        }
+        if (outside) canvas.clipPath(outside, ck.ClipOp.Intersect, true)
       }
     }
     canvas.drawPath(path, paint)
     canvas.restore()
     paint.delete()
   }
+  outside?.delete()
 }
 
 /**
