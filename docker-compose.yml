@@ -38,7 +38,7 @@ services:
       retries: 30
 
   api:
-    image: node:22.22.0-slim
+    image: node:26.13.0-slim
     working_dir: /repo
     command: ["node", "apps/api/src/main.ts"]
     environment:
@@ -79,7 +79,7 @@ services:
       retries: 30
 
   sync:
-    image: node:22.22.0-slim
+    image: node:26.13.0-slim
     working_dir: /repo
     command: ["node", "apps/sync/src/main.ts"]
     environment:
