@@ -3070,6 +3070,46 @@ function live(
       noticeListeners.add(listener)
       return () => noticeListeners.delete(listener)
     },
+    /**
+     * Where the selection is drawn on the stage, in pixels from the stage's top start corner: the
+     * upright box round it, turned or not. Null with nothing selected.
+     */
+    selectionRect(): Rect | null {
+      const outer = selectionBox()
+      if (!outer) return null
+      const { frame, drawn } = outer
+      const turn = ((drawn.rotation ?? 0) * Math.PI) / 180
+      const centre = { x: frame.x + drawn.x + drawn.width / 2, y: frame.y + drawn.y + drawn.height / 2 }
+      const corners = [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([sx = 0, sy = 0]) => {
+        const dx = (sx * drawn.width) / 2
+        const dy = (sy * drawn.height) / 2
+        return toScreen(camera, { x: centre.x + dx * Math.cos(turn) - dy * Math.sin(turn), y: centre.y + dx * Math.sin(turn) + dy * Math.cos(turn) })
+      })
+      const xs = corners.map((c) => c.x)
+      const ys = corners.map((c) => c.y)
+      return { x: Math.min(...xs), y: Math.min(...ys), width: Math.max(...xs) - Math.min(...xs), height: Math.max(...ys) - Math.min(...ys) }
+    },
+    /**
+     * Picks what a right-click at `client` (client coordinates) acts on, as a press picks it: the
+     * selection when the point is on it, else the layer there, selected. Returns the selected layers,
+     * none when the point is on no layer.
+     */
+    selectAt(client: Point): string[] {
+      const rect = canvas.getBoundingClientRect()
+      const world = toWorld(camera, { x: client.x - rect.left, y: client.y - rect.top })
+      const frame = frameAt(grid.frames, world)
+      if (!frame) return []
+      const deepest = hitTest(cached(frame).scene.layers, { x: world.x - frame.x, y: world.y - frame.y }, pickable)
+      if (!deepest) return []
+      const id = target(deepest.id, frame.key)
+      if (!(selection?.frame === frame.key && selection.ids.includes(id))) select([id], frame.key)
+      return [...(selection?.ids ?? [])]
+    },
+    /** Whether a gesture is running, or a range of text is being edited: when the bar by the selection keeps out of the way. */
+    busy() {
+      const range = textRange()
+      return gesture !== null || (range !== null && range.end > range.start)
+    },
     /** Calls back with the selected layers whenever the selection changes. */
     onSelection(listener: (ids: string[]) => void) {
       selectionListeners.add(listener)

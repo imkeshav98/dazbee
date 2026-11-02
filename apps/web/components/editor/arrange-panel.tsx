@@ -19,8 +19,8 @@ import { CARD, CardHeader } from './card.tsx'
 import { useEditorDesign } from './formats-panel.tsx'
 import { CHIP, ICON_BUTTON } from './styles.ts'
 
-type Action = Extract<ShortcutAction, `align${string}` | `distribute${string}` | `boolean${string}` | 'group' | 'frameSelection' | 'ungroup' | 'duplicate' | 'mask' | 'bringToFront' | 'bringForward' | 'sendBackward' | 'sendToBack'>
-const ALIGN: { action: Action; icon: Icon }[] = [
+export type Action = Extract<ShortcutAction, `align${string}` | `distribute${string}` | `boolean${string}` | 'group' | 'frameSelection' | 'ungroup' | 'duplicate' | 'mask' | 'bringToFront' | 'bringForward' | 'sendBackward' | 'sendToBack'>
+export const ALIGN: { action: Action; icon: Icon }[] = [
   { action: 'alignLeft', icon: AlignLeftIcon },
   { action: 'alignCentre', icon: AlignCenterHorizontalIcon },
   { action: 'alignRight', icon: AlignRightIcon },
@@ -28,12 +28,12 @@ const ALIGN: { action: Action; icon: Icon }[] = [
   { action: 'alignMiddle', icon: AlignCenterVerticalIcon },
   { action: 'alignBottom', icon: AlignBottomIcon },
 ]
-const DISTRIBUTE: { action: Action; icon: Icon }[] = [
+export const DISTRIBUTE: { action: Action; icon: Icon }[] = [
   { action: 'distributeHorizontal', icon: ArrowsHorizontalIcon },
   { action: 'distributeVertical', icon: ArrowsVerticalIcon },
 ]
 
-const COMBINE: { action: Action; icon: Icon }[] = [
+export const COMBINE: { action: Action; icon: Icon }[] = [
   { action: 'booleanUnion', icon: UniteSquareIcon },
   { action: 'booleanSubtract', icon: SubtractSquareIcon },
   { action: 'booleanIntersect', icon: IntersectSquareIcon },
@@ -41,7 +41,7 @@ const COMBINE: { action: Action; icon: Icon }[] = [
 ]
 
 /** What the layers' own order and make-up change to: duplicate, the four order moves, ungroup and mask. */
-const LAYER: { action: Action; icon: Icon }[] = [
+export const LAYER: { action: Action; icon: Icon }[] = [
   { action: 'duplicate', icon: CopyIcon },
   { action: 'bringToFront', icon: ArrowLineUpIcon },
   { action: 'bringForward', icon: ArrowUpIcon },
@@ -55,7 +55,7 @@ const specOf = (action: ShortcutAction): string => SHORTCUTS.find((s) => s.actio
 const brackets = (spec: string) => spec.replace('BracketRight', ']').replace('BracketLeft', '[')
 
 /** A shortcut as the tooltip shows it: Ctrl for Mod, or ⌘ and ⌥ on a Mac, and the bracket keys as [ and ]. */
-function keyOf(action: ShortcutAction) {
+export function keyOf(action: ShortcutAction) {
   const spec = specOf(action)
   const mac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform)
   return brackets(spec.replace('Mod', mac ? '⌘' : 'Ctrl').replace('Alt', mac ? '⌥' : 'Alt'))

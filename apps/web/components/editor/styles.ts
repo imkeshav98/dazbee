@@ -64,5 +64,10 @@ export const MENU_KEY = 'font-mono text-[11px] font-normal text-subtle'
 /** A switch drawn in a menu row that is role="switch": checked, its knob slides to the end. */
 export const SWITCH = 'relative h-5 w-[34px] shrink-0 rounded-full bg-line-strong transition-colors duration-[var(--chrome-fast)] group-aria-checked:bg-accent-solid after:absolute after:start-0.5 after:top-0.5 after:size-4 after:rounded-full after:bg-white after:transition-transform after:duration-[var(--chrome-fast)] group-aria-checked:after:translate-x-3.5 rtl:group-aria-checked:after:-translate-x-3.5'
 
+/** The bar by the selection: a frosted pill of buttons on the stage. */
+export const BAR = 'absolute z-20 flex items-center gap-0.5 rounded-[14px] surface-frost p-1'
+/** One button of the bar: words or an icon, lit while its popover is open. */
+export const BAR_BUTTON = `flex h-[30px] min-w-[30px] shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-row px-2 text-[12px] font-semibold whitespace-nowrap text-text transition-colors duration-[var(--chrome-fast)] hover:bg-hover aria-expanded:bg-hover ${FOCUS_RING}`
+
 /** A small message floating at the stage's start corner: a layer removed, something auto layout decides. */
 export const TOAST = 'toast-in pointer-events-auto flex h-10 items-center gap-2 rounded-card surface-frost ps-3.5 pe-1.5 text-[13px]'
