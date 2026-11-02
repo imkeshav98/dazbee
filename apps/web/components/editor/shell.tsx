@@ -358,7 +358,7 @@ export function EditorShell({ brandId, brandName, designName, onRename, status, 
                       )}
                     >
                       {open && (
-                        <motion.span layoutId="rail-blob" transition={reduced ? { duration: 0 } : BLOB} aria-hidden data-testid="rail-blob" className="absolute inset-0">
+                        <motion.span layoutId="rail-blob" transition={{ duration: 0 }} aria-hidden data-testid="rail-blob" className="absolute inset-0">
                           <motion.span
                             key={id}
                             initial={reduced ? false : phone ? 'wide' : 'tall'}

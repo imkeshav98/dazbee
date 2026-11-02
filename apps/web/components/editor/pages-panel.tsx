@@ -64,7 +64,7 @@ export function PagesPanel({ editor, onRemoved, onShow }: { editor: Editor; onRe
   const add = () => {
     // "Page N" after the last, skipping a name a page already has.
     const names = new Set(pages.map(([, p]) => p.name))
-    let n = pages.length + 1
+    let n = pages.length
     while (names.has(format(t.editor.pages.newName, { n }))) n++
     show(run('page.add', { name: format(t.editor.pages.newName, { n }) }))
   }
@@ -155,7 +155,7 @@ export function PagesPanel({ editor, onRemoved, onShow }: { editor: Editor; onRe
                   <button
                     type="button"
                     aria-label={t.editor.pages.duplicate}
-                    onClick={() => show(run('page.duplicate', { id, name: format(t.editor.pages.copyName, { name: page.name }) }))}
+                    onClick={() => run('page.duplicate', { id, name: format(t.editor.pages.copyName, { name: page.name }) })}
                     className={ICON_BUTTON}
                   >
                     <CopyIcon size={14} aria-hidden />
@@ -175,7 +175,7 @@ export function PagesPanel({ editor, onRemoved, onShow }: { editor: Editor; onRe
                   <button
                     type="button"
                     aria-label={t.editor.pages.remove}
-                    disabled={pages.length === 1}
+                    disabled={false}
                     onClick={() => {
                       run('page.delete', { id })
                       if (current === id) setCurrent(null)

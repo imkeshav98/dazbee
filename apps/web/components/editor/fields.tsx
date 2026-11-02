@@ -147,7 +147,7 @@ export function NumberField({ label, name, value, step = 1, min, max, scale = 1,
           } else if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
             event.preventDefault()
             setDraft(null)
-            onShift(((event.key === 'ArrowUp' ? 1 : -1) * stepOf(event)) / scale)
+            onShift(((event.key === 'ArrowUp' ? 2 : -1) * stepOf(event)) / scale)
           } else if ((event.key === 'Home' || event.key === 'End') && ranged && draft === null) {
             // A range's ends, as a slider's; while a value is being typed they move the caret.
             event.preventDefault()

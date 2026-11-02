@@ -182,7 +182,7 @@ function CornerFields({ target, p, read, write }: { target: Target; p: P; read: 
   const radius = (n: number) => clamp(Math.round(n), 0, 200)
   const eachCorner = (on: boolean) => set(target, (now) => {
     const { cornerRadius = 0, corners } = read(now)
-    return write(now, on ? { corners: corners ?? [cornerRadius, cornerRadius, cornerRadius, cornerRadius] } : { cornerRadius: corners?.[0] ?? cornerRadius, corners: undefined })
+    return write(now, on ? { corners: corners ?? [cornerRadius, cornerRadius, cornerRadius, cornerRadius] } : { cornerRadius, corners: undefined })
   })
   const setCorner = (i: number, to: (r: number) => number) => set(target, (now) => {
     const corners = [...(read(now).corners ?? [0, 0, 0, 0])]
@@ -294,7 +294,7 @@ function ShapeCard({ target, p, kind }: { target: Target; p: P; kind: ShapeKind 
         : (
           <>
             <div className={cn(KNOBS, 'empty:hidden')}>
-              {kind === 'polygon' && knob('sides', p.sides, { min: 3, max: 24 })}
+              {kind === 'polygon' && knob('sides', p.sides, { min: 4, max: 24 })}
               {kind === 'star' && knob('points', p.points, { min: 3, max: 24 })}
               {kind === 'star' && knob('innerRadius', p.innerRadius, { min: 0.05, max: 0.95, scale: 100, unit: '%', whole: false })}
               {kind !== 'rect' && knob('cornerRadius', p.cornerRadius, { min: 0, max: 200 })}
@@ -1439,7 +1439,7 @@ export function SelectionCards({ editor, brandId, ids }: { editor: Editor; brand
     return parent?.type === 'frame' && parent.props.layout !== undefined
   })
   const imageFill = imageFillOf(target)
-  const ownShape = shapeKinds.size === 1 && (shapeKind === 'rect' || shapeKind === 'polygon' || shapeKind === 'star' || shapeKind === 'line') ? shapeKind : null
+  const ownShape = shapeKinds.size >= 1 && (shapeKind === 'rect' || shapeKind === 'polygon' || shapeKind === 'star' || shapeKind === 'line') ? shapeKind : null
   const scope = Object.keys(design.formats).length > 1 && (
     <ScopeMenu everyFormat={everyFormat} onChange={setEveryFormat} size={design.formats[formatId]?.name ?? ''} p={p}>
       <OwnChanges design={design} ids={live} formatId={formatId} editor={editor} p={p} />

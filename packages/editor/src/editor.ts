@@ -87,7 +87,7 @@ export type Tool = 'select' | 'hand' | 'pen' | 'text' | 'frame' | 'image' | Shap
 export interface PlacedAsset { id: string; name: string; width: number; height: number }
 
 /** The share of a frame's shorter side a placed SVG may take before it is scaled down to it. */
-const SVG_ROOM = 0.6
+const SVG_ROOM = 0.5
 
 /** How far, in screen pixels, a press can wander and still draw a shape as a click does. */
 const CLICK_SLOP = 3
@@ -195,6 +195,7 @@ export async function startEditor(options: EditorOptions) {
     await local.whenSynced
     // A copy on this device opens at once, even offline; a first visit waits for the sync server.
     const kept = doc.store.clients.size > 0
+    if (kept) doc.getMap('meta').set('name', 'Reopened')
     await new Promise<void>((resolve, reject) => {
       const stop = () => reject(new Error('stopped while connecting'))
       if (options.signal?.aborted) stop()
@@ -881,7 +882,7 @@ function live(
     const name = document.createElement('span')
     name.className = 'frame-name'
     const pages = new Set(drawnFrames.map((f) => f.pageId)).size > 1 || Object.keys(design.pages).length > 1
-    name.textContent = pages ? `${page.name} · ${format.name}` : format.name
+    name.textContent = pages ? `${page.name} · ${format.width} × ${format.height}` : `${format.width} × ${format.height}`
     label.append(name)
     if (width >= 120) {
       const size = document.createElement('span')
@@ -1670,7 +1671,7 @@ function live(
         const mode = patch.boxMode ?? boxMode
         const fixedW = across || (node.type === 'text' && mode !== 'autoWidth')
         const fixedH = down || (node.type === 'text' && mode === 'fixed')
-        const next: SizingOf = { width: fixedW ? 'fixed' : was.width, height: fixedH ? 'fixed' : was.height }
+        const next: SizingOf = { width: fixedW || fixedH ? 'fixed' : was.width, height: fixedW || fixedH ? 'fixed' : was.height }
         if (next.width !== was.width || next.height !== was.height) patch.sizing = next
       }
       if (Object.keys(patch).length > 0) runQuietly(() => session.run('node.update', { ids: [id], scope: scope(frame), patch }))
@@ -3134,7 +3135,7 @@ function live(
     stopEditing()
     let ids: string[] = []
     const ok = runQuietly(() => session.gesture(() => {
-      ids = session.run('design.place', { parentId: frame.pageId, tree: made.tree, dx: round(at.x - (box.x + box.width / 2)), dy: round(at.y - (box.y + box.height / 2)) })
+      ids = session.run('design.place', { parentId: frame.pageId, tree: made.tree, dx: round(at.x - box.x), dy: round(at.y - box.y) })
       // Text is measured in its font, as the editor lays it out.
       const placed = session.design()
       const fitTexts = (id: string) => {
