@@ -1,7 +1,7 @@
 // The bar by the selection in Chromium: where it sits (above, centred, below at the stage's top, at
 // the top over a selection filling the stage, gone off the stage), out of the way during a drag,
 // reached by keyboard as one toolbar, its popovers closed by Esc or a click on the canvas, and the
-// right-click menu on a locked layer.
+// right-click menu on a locked layer. For text it adds the font, size, colour, bold, align and effects.
 import { expect, test, type Page } from '../support/test.ts'
 import type { DesignInput } from '@dazbee/schema'
 import { screenPoint } from '../support/editor.ts'
@@ -23,6 +23,7 @@ const design = (): DesignInput => ({
     a: rect('A', 'a1', 120, 380, '#14213DFF'),
     b: rect('B', 'a2', 440, 380, '#E0262BFF'),
     turned: rect('Turned', 'a3', 700, 700, '#2A9D8FFF', { rotation: 30 }),
+    headline: { type: 'text', parentId: 'p1', index: 'a4', name: 'Headline', props: { x: 80, y: 900, width: 520, height: 90, boxMode: 'autoHeight', text: 'Summer sale', style: { fontFamily: 'Noto Sans', fontSize: 64, fontWeight: 400, color: '#111111FF' } } },
   },
   overrides: {},
 })
@@ -164,5 +165,42 @@ test('Hide and Lock turn back from the same row; a right-click on a locked layer
   await page.mouse.click(other.x, other.y, { button: 'right' })
   await expect(menu).toBeVisible()
   expect(await page.evaluate(() => window.dazbee?.selection())).toEqual(['b'])
+  expect(errors).toEqual([])
+})
+
+test('text adds the font, size, colour, bold, align and effects; bold turns on and off, one undo step each', async ({ browser }) => {
+  const { page, errors } = await openStage(browser, design())
+  const weight = () => page.evaluate(() => (window.dazbee?.design().nodes.headline?.props as { style: { fontWeight: number } }).style.fontWeight)
+  await select(page, ['headline'])
+  const bar = page.getByTestId('selection-bar')
+  for (const id of ['font', 'size', 'colour', 'align', 'effects']) await expect(bar.getByTestId(`bar-${id}`)).toBeVisible()
+  await expect(bar.getByTestId('bar-font')).toHaveText('Noto Sans')
+  await expect(bar.getByTestId('bar-size')).toHaveText('64')
+
+  const bold = bar.getByTestId('bar-bold')
+  await expect(bold).toHaveAttribute('aria-pressed', 'false')
+  await bold.click()
+  await expect.poll(weight).toBe(700)
+  await expect(bold).toHaveAttribute('aria-pressed', 'true')
+  await bold.click()
+  await expect.poll(weight).toBe(400)
+  await page.evaluate(() => window.dazbee?.perform('undo'))
+  await expect.poll(weight).toBe(700)
+  await page.evaluate(() => window.dazbee?.perform('undo'))
+  await expect.poll(weight).toBe(400)
+
+  // One popover at a time: opening Align closes Size.
+  await bar.getByTestId('bar-size').click()
+  await expect(page.getByTestId('bar-size-menu')).toBeVisible()
+  await bar.getByTestId('bar-align').click()
+  await expect(page.getByTestId('bar-align-menu')).toBeVisible()
+  await expect(page.getByTestId('bar-size-menu')).toBeHidden()
+  // The focus stays in the new popover, so it stays open.
+  await page.waitForTimeout(500)
+  await expect(page.getByTestId('bar-align-menu')).toBeVisible()
+  await expect(page.getByTestId('bar-align-menu')).toContainText('Centre')
+  await bar.getByTestId('bar-more').click()
+  await page.waitForTimeout(500)
+  await expect(page.getByTestId('bar-more-menu')).toBeVisible()
   expect(errors).toEqual([])
 })

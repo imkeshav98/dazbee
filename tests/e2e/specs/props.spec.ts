@@ -4,7 +4,7 @@
 import { expect, test, type Locator, type Page } from '../support/test.ts'
 import type { DesignInput } from '@dazbee/schema'
 import { writeOutput } from '../support/editor.ts'
-import { moreMenu, openStage, scopeMenu } from '../support/stage.ts'
+import { barMenu, moreMenu, openStage, scopeMenu } from '../support/stage.ts'
 import { choose } from '../support/select.ts'
 
 test.describe.configure({ timeout: 120_000 })
@@ -146,12 +146,15 @@ test('several layers: mixed values, set together or each from its own; text and 
   // Text.
   await select(page, ['headline'])
   const text = page.getByTestId('text-card')
-  await enter(page.getByTestId('text-look').getByRole('spinbutton', { name: 'Size' }), '120')
+  await enter((await barMenu(page, 'size')).getByRole('spinbutton', { name: 'Size' }), '120')
+  await page.keyboard.press('Escape')
   await enter(text.getByRole('spinbutton', { name: 'Letter spacing' }), '2')
   await enter(text.getByRole('spinbutton', { name: 'Line height' }), '1.1')
-  await enter(text.getByRole('textbox', { name: 'Text colour hex' }), '1f9d55')
-  await choose(text.getByRole('combobox', { name: 'Alignment', exact: true }), 'center')
-  await choose(text.getByRole('combobox', { name: 'Case' }), 'upper')
+  await enter((await barMenu(page, 'colour')).getByRole('textbox', { name: 'Text colour hex' }), '1f9d55')
+  await page.keyboard.press('Escape')
+  await (await barMenu(page, 'align')).getByRole('group', { name: 'Alignment', exact: true }).locator('[data-value="center"]').click()
+  await (await barMenu(page, 'align')).getByRole('group', { name: 'Case' }).locator('[data-value="upper"]').click()
+  await page.keyboard.press('Escape')
   await expect.poll(async () => {
     const p = await props(page, 'headline')
     return { style: p.style, align: p.align }

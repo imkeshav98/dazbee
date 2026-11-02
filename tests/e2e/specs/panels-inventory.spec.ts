@@ -12,7 +12,7 @@ import { designOf, placed, synced, writeOutput } from '../support/editor.ts'
 import { importGoogleFonts } from '../support/fonts.ts'
 import { API_URL, DEV_BRAND } from '../support/seed.ts'
 import { choose } from '../support/select.ts'
-import { drag, moreMenu, openStage, scopeMenu } from '../support/stage.ts'
+import { barMenu, drag, moreMenu, openStage, scopeMenu } from '../support/stage.ts'
 
 // Each row opens its own design, so CI spreads the rows over its shards.
 test.describe.configure({ mode: 'parallel', timeout: 180_000 })
@@ -20,7 +20,7 @@ test.describe.configure({ mode: 'parallel', timeout: 180_000 })
 test.use({ actionTimeout: 15_000 })
 
 /** Rows that fail today, with the bug filed for each. */
-const KNOWN: Record<number, number> = { 12: 243 }
+const KNOWN: Record<number, number> = {}
 
 const righteous = new Uint8Array(readFileSync(join(import.meta.dirname, '..', 'assets', 'fonts', 'Righteous-Regular.ttf')))
 const tile = new Uint8Array(readFileSync(join(import.meta.dirname, '..', '..', 'pixels', 'assets', 'tile.jpg')))
@@ -292,8 +292,9 @@ test.describe('every selection', () => {
     await step(page, () => tiles.locator('[data-tile="glow"]').click(), async () => { await expect.poll(types).toEqual(['dropShadow', 'glow']) })
     await step(page, () => tiles.locator('[data-tile="blur"]').click(), async () => { await expect.poll(types).toEqual(['dropShadow', 'glow', 'layerBlur']) })
     await step(page, () => tiles.locator('[data-tile="none"]').click(), async () => { await expect.poll(types).toEqual([]) })
+    // Text has its tiles in the bar's Effects.
     await select(page, ['headline'])
-    await step(page, () => tiles.locator('[data-tile="outline"]').click(), async () => {
+    await step(page, async () => (await barMenu(page, 'effects')).locator('[data-tile="outline"]').click(), async () => {
       await expect.poll(async () => (await style(page, 'headline')).outline).toMatchObject({ width: 2 })
     })
     await reloads(page)
@@ -395,22 +396,22 @@ test.describe('text', () => {
     await select(page, ['headline'])
     const family = async () => (await style(page, 'headline')).fontFamily
     await step(page, async () => {
-      await page.getByTestId('font-open').click()
+      await barMenu(page, 'font')
       await page.getByTestId('font-search').fill('playf')
       await page.getByTestId('font-search').press('Enter')
     }, async () => { await expect.poll(family).toBe('Playfair Display') })
     await step(page, async () => {
-      await page.getByTestId('font-open').click()
+      await barMenu(page, 'font')
       await page.getByTestId('font-search').fill('')
       await page.getByRole('listbox', { name: 'Font' }).getByRole('group', { name: 'Built in' }).getByRole('option', { name: 'Noto Sans', exact: true }).click()
     }, async () => { await expect.poll(family).toBe('Noto Sans') })
     await step(page, async () => {
-      await page.getByTestId('font-open').click()
+      await barMenu(page, 'font')
       await page.getByTestId('font-upload').setInputFiles({ name: 'Righteous-Regular.ttf', mimeType: 'font/ttf', buffer: Buffer.from(righteous) })
     }, async () => { await expect.poll(family).toBe('Righteous') })
     await perform(page, 'undo')
     await step(page, async () => {
-      await page.getByTestId('font-open').click()
+      await barMenu(page, 'font')
       await page.getByTestId('font-search').fill('')
       await page.getByRole('listbox', { name: 'Font' }).getByRole('group', { name: 'Brand fonts' }).getByRole('option', { name: 'Righteous' }).click()
     }, async () => { await expect.poll(family).toBe('Righteous') })
@@ -421,17 +422,18 @@ test.describe('text', () => {
     const page = await open()
     await select(page, ['headline'])
     // The family's lightest and heaviest weights, and back to regular.
-    const field = page.getByTestId('font-weight')
+    const weight = async () => (await barMenu(page, 'font')).getByTestId('font-weight')
+    const field = await weight()
     await field.click()
-    const offered = (await page.locator('[role="listbox"] [role="option"]').evaluateAll((options) => options.map((o) => Number(o.getAttribute('data-value')))))
+    const offered = (await page.locator('[role="listbox"] [role="option"][data-value]').evaluateAll((options) => options.map((o) => Number(o.getAttribute('data-value')))))
     await page.keyboard.press('Escape')
     expect(offered.length).toBeGreaterThan(2)
     // The box sizes itself to its words, so each weight gives it a width of its own.
     await autoBox(page, 'autoWidth')
-    for (const weight of [offered[0] ?? 400, offered.at(-1) ?? 400, 400]) {
+    for (const to of [offered[0] ?? 400, offered.at(-1) ?? 400, 400]) {
       const was = (await boxOf(page, 'headline')).width
-      await step(page, () => choose(field, String(weight)), async () => {
-        await expect.poll(async () => (await style(page, 'headline')).fontWeight).toBe(weight)
+      await step(page, async () => choose(await weight(), String(to)), async () => {
+        await expect.poll(async () => (await style(page, 'headline')).fontWeight).toBe(to)
         await expect.poll(async () => (await boxOf(page, 'headline')).width).not.toBe(was)
       })
     }
@@ -441,16 +443,17 @@ test.describe('text', () => {
   row(14, 'size', async (open) => {
     const page = await open()
     await select(page, ['headline'])
-    await step(page, () => enter(page.getByTestId('text-look').getByRole('spinbutton', { name: 'Size' }), '64'), async () => {
+    const size = async () => (await barMenu(page, 'size')).getByRole('spinbutton', { name: 'Size' })
+    await step(page, async () => enter(await size(), '64'), async () => {
       await expect.poll(async () => (await style(page, 'headline')).fontSize).toBe(64)
     })
-    await step(page, () => enter(page.getByTestId('text-card').getByRole('spinbutton', { name: 'Size' }), '90'), async () => {
+    await step(page, async () => enter(await size(), '90'), async () => {
       await expect.poll(async () => (await style(page, 'headline')).fontSize).toBe(90)
     })
     // A box that grows with its words follows the size.
     await autoBox(page, 'autoHeight')
     const tall = (await boxOf(page, 'headline')).height
-    await step(page, () => enter(page.getByTestId('text-card').getByRole('spinbutton', { name: 'Size' }), '140'), async () => {
+    await step(page, async () => enter(await size(), '140'), async () => {
       await expect.poll(async () => (await boxOf(page, 'headline')).height).toBeGreaterThan(tall)
     })
     await reloads(page)
@@ -459,10 +462,10 @@ test.describe('text', () => {
   row(15, 'text colour: brand colours and hex', async (open) => {
     const page = await open()
     await select(page, ['headline'])
-    await step(page, () => page.getByTestId('text-look').getByRole('group', { name: 'Brand colours' }).getByRole('button', { name: 'Berry' }).click(), async () => {
+    await step(page, async () => (await barMenu(page, 'colour')).getByRole('group', { name: 'Brand colours' }).getByRole('button', { name: 'Berry' }).click(), async () => {
       await expect.poll(async () => (await doc(page)).nodes.headline?.bindings).toMatchObject({ textColor: 'brand:berry' })
     })
-    await step(page, () => enter(page.getByTestId('text-card').getByRole('textbox', { name: 'Text colour hex' }), '1f9d55'), async () => {
+    await step(page, async () => enter((await barMenu(page, 'colour')).getByRole('textbox', { name: 'Text colour hex' }), '1f9d55'), async () => {
       await expect.poll(async () => (await style(page, 'headline')).color).toBe('#1F9D55FF')
     })
     await reloads(page)
@@ -542,10 +545,10 @@ test.describe('text', () => {
   row(19, 'alignment: start, centre, end, justify', async (open) => {
     const page = await open()
     await select(page, ['headline'])
-    const field = page.getByTestId('text-card').getByRole('combobox', { name: 'Alignment', exact: true })
+    const pick = async (align: string) => (await barMenu(page, 'align')).getByRole('group', { name: 'Alignment', exact: true }).locator(`[data-value="${align}"]`).click()
     // Each line is a paragraph's last, which justify leaves at the start: those two draw alike.
     for (const align of ['center', 'end', 'justify', 'start']) {
-      await step(page, () => choose(field, align), async () => {
+      await step(page, () => pick(align), async () => {
         await expect.poll(async () => (await props(page, 'headline')).align).toBe(align)
       }, { draws: align === 'center' || align === 'end' })
     }
@@ -568,9 +571,9 @@ test.describe('text', () => {
   row(21, 'case: as typed, upper, lower, title', async (open) => {
     const page = await open()
     await select(page, ['headline'])
-    const field = page.getByTestId('text-card').getByRole('combobox', { name: 'Case' })
+    const pick = async (textCase: string) => (await barMenu(page, 'align')).getByRole('group', { name: 'Case' }).locator(`[data-value="${textCase}"]`).click()
     for (const textCase of ['upper', 'lower', 'title', 'none']) {
-      await step(page, () => choose(field, textCase), async () => {
+      await step(page, () => pick(textCase), async () => {
         await expect.poll(async () => (await style(page, 'headline')).textCase ?? 'none').toBe(textCase)
       })
     }
@@ -580,11 +583,11 @@ test.describe('text', () => {
   row(22, 'underline, strikethrough', async (open) => {
     const page = await open()
     await select(page, ['headline'])
-    const card = page.getByTestId('paragraph-card')
-    await step(page, () => card.getByRole('button', { name: 'Underline' }).click(), async () => {
+    const toggle = async (name: string) => (await barMenu(page, 'align')).getByRole('button', { name }).click()
+    await step(page, () => toggle('Underline'), async () => {
       await expect.poll(async () => (await style(page, 'headline')).underline).toBe(true)
     })
-    await step(page, () => card.getByRole('button', { name: 'Strikethrough' }).click(), async () => {
+    await step(page, () => toggle('Strikethrough'), async () => {
       await expect.poll(async () => (await style(page, 'headline')).strikethrough).toBe(true)
     })
     await reloads(page)
@@ -593,9 +596,9 @@ test.describe('text', () => {
   row(23, 'list: none, bullets, numbers', async (open) => {
     const page = await open()
     await select(page, ['headline'])
-    const field = page.getByTestId('paragraph-card').getByRole('combobox', { name: 'List' })
+    const pick = async (list: string) => (await barMenu(page, 'align')).getByRole('group', { name: 'List' }).locator(`[data-value="${list}"]`).click()
     for (const list of ['bullet', 'number', 'none']) {
-      await step(page, () => choose(field, list), async () => {
+      await step(page, () => pick(list), async () => {
         await expect.poll(async () => (await props(page, 'headline')).list ?? 'none').toBe(list)
       })
     }
@@ -605,14 +608,14 @@ test.describe('text', () => {
   row(24, 'outline on and off, width', async (open) => {
     const page = await open()
     await select(page, ['headline'])
-    const card = page.getByTestId('paragraph-card')
-    await step(page, () => card.getByRole('button', { name: 'Outline', exact: true }).click(), async () => {
+    const effects = () => barMenu(page, 'effects')
+    await step(page, async () => (await effects()).locator('[data-tile="outline"]').click(), async () => {
       await expect.poll(async () => (await style(page, 'headline')).outline).toBeTruthy()
     })
-    await step(page, () => enter(card.getByRole('spinbutton', { name: 'Outline width' }), '6'), async () => {
+    await step(page, async () => enter((await effects()).getByRole('spinbutton', { name: 'Outline width' }), '6'), async () => {
       await expect.poll(async () => (await style(page, 'headline')).outline).toMatchObject({ width: 6 })
     })
-    await step(page, () => card.getByRole('button', { name: 'Outline', exact: true }).click(), async () => {
+    await step(page, async () => (await effects()).locator('[data-tile="outline"]').click(), async () => {
       await expect.poll(async () => (await style(page, 'headline')).outline).toBeFalsy()
     })
     await reloads(page)

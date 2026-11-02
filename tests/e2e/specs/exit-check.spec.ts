@@ -18,7 +18,7 @@ import type { ExportType } from '@dazbee/schema'
 import { expect, test, type Page } from '../support/test.ts'
 import { photo } from '../support/assets.ts'
 import { designOf, OUTPUT, screenPoint, writeOutput } from '../support/editor.ts'
-import { press } from '../support/stage.ts'
+import { barMenu, press } from '../support/stage.ts'
 
 test.describe.configure({ timeout: 600_000 })
 
@@ -118,15 +118,15 @@ test('an ad set rebuilt in 5 formats through real input exports PNG, JPG, PDF an
   const headline = Object.entries((await stored(page)).nodes).find(([, n]) => n.type === 'text')?.[0] ?? ''
   expect(headline).not.toBe('')
   expect(await page.evaluate(() => window.dazbee?.selection())).toEqual([headline])
-  await page.getByTestId('font-open').click()
+  await barMenu(page, 'font')
   // An upload from the list joins the brand's fonts and is set at once.
   await page.getByTestId('font-upload').setInputFiles({ name: 'Righteous-Regular.ttf', mimeType: 'font/ttf', buffer: Buffer.from(righteous) })
   await expect.poll(async () => ((await stored(page)).nodes[headline]?.props.style as { fontFamily: string }).fontFamily).toBe('Righteous')
-  // The size is a number to drag or type: 140, typed.
-  await page.getByTestId('text-look').getByRole('spinbutton', { name: 'Size' }).click()
+  // The size is a number to drag or type: the bar's size opens on it, ready to type over; 140, typed.
+  await expect((await barMenu(page, 'size')).getByRole('spinbutton', { name: 'Size' })).toBeFocused()
   await page.keyboard.type('140')
   await page.keyboard.press('Enter')
-  await expect.poll(async () => ((await stored(page)).nodes[headline]?.props.style as { fontSize: number }).fontSize).toBeGreaterThan(120)
+  await expect.poll(async () => ((await stored(page)).nodes[headline]?.props.style as { fontSize: number }).fontSize).toBe(140)
   await page.mouse.click(40, 900)
   await page.locator('[data-panel="brand"]').click()
   await expect(kit).toBeHidden()
@@ -146,6 +146,8 @@ test('an ad set rebuilt in 5 formats through real input exports PNG, JPG, PDF an
 
   // The headline moves down in the story only, into the tall format's lower third.
   const before = { ...design.nodes[headline]?.props, ...design.overrides[`format:${story}`]?.[headline] } as { x: number; y: number; width: number; height: number }
+  // Nothing selected, so no bar by a selection floats over the story's headline.
+  await page.keyboard.press('Escape')
   await press(page, 'toolSelect')
   const grab = await screenPoint(page, before.x + before.width / 2, before.y + before.height / 2, { pageId: 'p1', formatId: story })
   const lift = await screenPoint(page, before.x + before.width / 2, before.y + before.height / 2 + 600, { pageId: 'p1', formatId: story })

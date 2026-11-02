@@ -15,7 +15,7 @@ import { api } from '../support/assets.ts'
 import { designOf, editorPath, writeOutput } from '../support/editor.ts'
 import { importGoogleFonts } from '../support/fonts.ts'
 import { API_URL, DEV_BRAND, seed } from '../support/seed.ts'
-import { openStage } from '../support/stage.ts'
+import { barMenu, openStage } from '../support/stage.ts'
 import { choose } from '../support/select.ts'
 
 test.describe.configure({ timeout: 180_000 })
@@ -119,16 +119,15 @@ test('a design with a Google font and an uploaded font loads only those files, a
 
 const style = async (page: Page, id: string) => (JSON.parse(await designOf(page)) as { nodes: Record<string, { props: { style: { fontFamily: string; fontWeight: number } } }> }).nodes[id]?.props.style
 
-test('the font picker shows families as pictures of their names, searches, picks, sets the weight and uploads', async ({ browser }) => {
+test('the font picker on the bar shows families as pictures of their names, searches, picks, sets the weight and uploads', async ({ browser }) => {
   const { page, errors } = await openStage(browser, design())
   const families = await catalog()
   await page.evaluate(() => window.dazbee?.select(['body']))
-  const panel = page.getByTestId('font-panel')
-  await expect(page.getByTestId('font-open')).toHaveAttribute('data-family', 'Noto Sans')
-  writeOutput('fonts-1-panel.png', await panel.screenshot())
+  await expect(page.getByTestId('bar-font')).toHaveText('Noto Sans')
+  writeOutput('fonts-1-bar.png', await page.getByTestId('selection-bar').screenshot())
 
   const requests = fontRequests(page)
-  await page.getByTestId('font-open').click()
+  await barMenu(page, 'font')
   const list = page.getByTestId('font-list')
   await expect(list).toBeVisible()
   // Previews are pictures drawn by the API in each family; Inter's has loaded and has a size.
@@ -146,7 +145,7 @@ test('the font picker shows families as pictures of their names, searches, picks
 
   await page.getByTestId('font-search').fill('playf')
   await expect(list.locator('[role="option"]')).toHaveCount(1)
-  writeOutput('fonts-3-search.png', await page.screenshot({ clip: { x: 1100, y: 0, width: 340, height: 700 } }))
+  writeOutput('fonts-3-search.png', await page.screenshot())
   await page.getByTestId('font-search').press('Enter')
   await expect(list).toBeHidden()
   // Noto Sans 400 becomes Playfair Display 400 once its files are here.
@@ -154,7 +153,8 @@ test('the font picker shows families as pictures of their names, searches, picks
   await expect.poll(() => [...requests.seen].sort()).toEqual(faceIds(families, 'Playfair Display'))
   await expect.poll(() => page.evaluate(() => window.dazbee?.loadedFamilies().includes('Playfair Display'))).toBe(true)
 
-  await choose(page.getByTestId('font-weight'), '900')
+  await choose((await barMenu(page, 'font')).getByTestId('font-weight'), '900')
+  await page.keyboard.press('Escape')
   await expect.poll(() => style(page, 'body')).toMatchObject({ fontFamily: 'Playfair Display', fontWeight: 900 })
   await page.evaluate(() => window.dazbee?.drawn())
   writeOutput('fonts-4-picked.png', await page.screenshot())
@@ -166,17 +166,17 @@ test('the font picker shows families as pictures of their names, searches, picks
   expect(await style(page, 'body')).toMatchObject({ fontFamily: 'Noto Sans', fontWeight: 400 })
 
   // An upload from the list joins the brand's fonts and is set at once.
-  await page.getByTestId('font-open').click()
+  await barMenu(page, 'font')
   await page.getByTestId('font-upload').setInputFiles({ name: 'Righteous-Regular.ttf', mimeType: 'font/ttf', buffer: Buffer.from(righteous) })
   await expect(list).toBeHidden()
   await expect.poll(async () => (await style(page, 'body'))?.fontFamily).toBe('Righteous')
-  await page.getByTestId('font-open').click()
+  await barMenu(page, 'font')
   await expect(list.locator('[data-family="Righteous"]')).toHaveAttribute('aria-selected', 'true')
-  writeOutput('fonts-5-uploaded.png', await page.screenshot({ clip: { x: 1100, y: 0, width: 340, height: 700 } }))
+  writeOutput('fonts-5-uploaded.png', await page.screenshot())
   await page.keyboard.press('Escape')
 
   // A file that isn't a font is refused with a reason.
-  await page.getByTestId('font-open').click()
+  await barMenu(page, 'font')
   await page.getByTestId('font-upload').setInputFiles({ name: 'notes.ttf', mimeType: 'font/ttf', buffer: Buffer.from('not a font') })
   await expect(list.getByRole('alert')).toContainText('not a TrueType or OpenType font')
   expect(errors).toEqual([])
