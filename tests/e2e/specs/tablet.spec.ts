@@ -78,7 +78,6 @@ test('on a tablet the home and the editor, with a layer selected, show everythin
 })
 
 test('on a tablet the design\'s name in the editor shows whole, neither cut off nor cut short', async ({ page }) => {
-  test.fixme(true, 'The design\'s name in the start island is always cut short, even with room for it')
   test.setTimeout(90_000)
   await openEditor(page)
   await expect(page.locator(NAME)).toHaveText('Live editing')
