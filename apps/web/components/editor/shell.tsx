@@ -187,12 +187,14 @@ function DesignName({ name, onRename }: { name: string; onRename?: ((name: strin
   const t = useMessages()
   const [editing, setEditing] = useState(false)
   const done = useRef(false)
-  const title = 'truncate font-display text-sm font-semibold tracking-tight'
-  if (!onRename) return <h1 className={title}>{name}</h1>
+  const title = 'font-display text-sm font-semibold tracking-tight'
+  if (!onRename) return <h1 className={cn(title, 'truncate')}>{name}</h1>
   if (!editing) {
+    // The button's hover fill reaches past the words on both sides, so the heading is pulled out by
+    // as much; the button, not the heading, ends the name in "…" when the crumb has no room for it.
     return (
-      <h1 className={cn(title, 'min-w-0')}>
-        <button type="button" title={format(t.library.renameDesign, { name })} onClick={() => setEditing(true)} className="max-w-full cursor-text truncate rounded-[6px] px-1 -mx-1 hover:bg-hover">
+      <h1 className={cn(title, '-mx-1 min-w-0')}>
+        <button type="button" title={format(t.library.renameDesign, { name })} onClick={() => setEditing(true)} className="max-w-full cursor-text truncate rounded-[6px] px-1 hover:bg-hover">
           {name}
         </button>
       </h1>
