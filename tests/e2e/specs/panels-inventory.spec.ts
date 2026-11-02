@@ -1314,7 +1314,8 @@ test.describe('nothing selected', () => {
 
   row(63, 'pages: add, duplicate, rename, move, delete with undo, show', async (open) => {
     const page = await open()
-    // A second tab on the same design follows every step.
+    // A second tab on the same design holds the same design after the rename, after the toast's
+    // Undo and at the end.
     const browser = page.context().browser()
     const designId = new URL(page.url()).pathname.split('/').at(-1)
     if (!browser || !designId) throw new Error('no browser or design')
@@ -1331,6 +1332,14 @@ test.describe('nothing selected', () => {
       await expect.soft(p1.getByRole('button', { name: 'Delete page', includeHidden: true })).toBeDisabled()
       // The picture checked is the first page's; these steps change the other pages or their names.
       await step(page, () => page.getByRole('button', { name: 'Add page' }).click(), async () => { await expect.poll(names).toEqual(['Page 1', 'Page 2']) }, { draws: false })
+      // Deleted back to one page, its Delete is off again; the toast's Undo brings the other back.
+      const page2 = pages.getByRole('listitem').filter({ hasText: 'Page 2' })
+      await page2.hover()
+      await page2.getByRole('button', { name: 'Delete page' }).click()
+      await expect.poll(names).toEqual(['Page 1'])
+      await expect.soft(p1.getByRole('button', { name: 'Delete page', includeHidden: true })).toBeDisabled()
+      await page.getByTestId('removed-toast').getByRole('button', { name: 'Undo' }).click()
+      await expect.poll(names).toEqual(['Page 1', 'Page 2'])
       // The copy is the page shown, and the stage has a row for it.
       await step(page, async () => {
         await p1.hover()
@@ -1346,6 +1355,7 @@ test.describe('nothing selected', () => {
         await second.getByRole('textbox', { name: 'Rename' }).fill('Offer')
         await second.getByRole('textbox', { name: 'Rename' }).press('Enter')
       }, async () => { await expect.poll(async () => (await names())[1]).toBe('Offer') }, { draws: false })
+      await settle([page, other])
       const offer = pages.getByRole('listitem').filter({ hasText: 'Offer' })
       // Moved up, its row on the stage goes on top.
       await step(page, async () => {
@@ -1366,12 +1376,19 @@ test.describe('nothing selected', () => {
       await expect.soft(page.getByTestId('removed-toast')).toContainText('Offer deleted')
       await page.getByTestId('removed-toast').getByRole('button', { name: 'Undo' }).click()
       await expect.poll(() => designOf(page), { message: 'the toast\'s Undo brings the page back whole' }).toBe(kept)
+      await settle([page, other])
       await expect(p1).not.toHaveAttribute('aria-current', 'page')
       await p1.getByRole('button', { name: 'Show Page 1' }).click()
       await expect(p1).toHaveAttribute('aria-current', 'page')
-      // A new page takes the next free name: one more than there are pages.
+      // A new page takes the next free name: one more than there are pages, past a name taken.
+      const last = pages.getByRole('listitem').filter({ hasText: 'Page 2' })
+      await step(page, async () => {
+        await last.getByRole('button', { name: /^Show / }).dblclick()
+        await last.getByRole('textbox', { name: 'Rename' }).fill('Page 4')
+        await last.getByRole('textbox', { name: 'Rename' }).press('Enter')
+      }, async () => { await expect.poll(names).toEqual(['Page 1', 'Offer', 'Page 4']) }, { draws: false })
       await step(page, () => page.getByRole('button', { name: 'Add page' }).click(), async () => {
-        await expect.soft.poll(names).toEqual(['Page 1', 'Offer', 'Page 2', 'Page 4'])
+        await expect.soft.poll(names).toEqual(['Page 1', 'Offer', 'Page 4', 'Page 5'])
       }, { draws: false })
       await settle([page, other])
       await reloads(page)

@@ -2,10 +2,10 @@
 // format of a design that has two, with real pointer and keyboard input. Each gesture is checked
 // against what it should do: a move moves the layer by the drag, a resize sizes it from the handle
 // dragged (scaling a group's or boolean's layers, never a frame's) and a path's drawing with its
-// box, and fixes the sizing of the axes it drags while the other keeps its own, a turn turns it, align lines it up, the other format stays as it was, auto layout keeps
-// placing its flow (a drag or an arrow moves a layer along it, and what it decides is said), the
-// gesture is one undo step, and nothing logs an error. Failures that have a ticket of their own
-// are listed in KNOWN.
+// box, and fixes the sizing of the axes it drags while the other keeps its own, a turn turns it,
+// align lines it up, the other format stays as it was, auto layout keeps placing its flow (a drag
+// or an arrow moves a layer along it, and what it decides is said), the gesture is one undo step,
+// and nothing logs an error. Failures that have a ticket of their own are listed in KNOWN.
 import { pressFor, type ShortcutAction } from '@dazbee/editor/shortcuts'
 import type { DesignInput } from '@dazbee/schema'
 import type { Browser, Page } from '@playwright/test'
