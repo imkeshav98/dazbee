@@ -154,7 +154,8 @@ const isInside = (design: Design, id: string, maybeAncestor: string) => {
 
 export const nodeMove = defineCommand({
   name: 'node.move',
-  input: z.object({ id: NodeId, parentId: z.union([PageId, NodeId]), before: NodeId.optional() }),
+  /** `keepDrawn` false leaves the layer's box as stored, for a caller that places it itself. */
+  input: z.object({ id: NodeId, parentId: z.union([PageId, NodeId]), before: NodeId.optional(), keepDrawn: z.boolean().default(true) }),
   check: ({ design }, { id, parentId, before }) => {
     const node = design.nodes[id]
     if (!node) return `no layer "${id}"`
@@ -165,11 +166,11 @@ export const nodeMove = defineCommand({
     if (before && design.nodes[before]?.parentId !== parentId) return `"${before}" is not under "${parentId}"`
     return undefined
   },
-  apply: ({ r, design }, { id, parentId, before }) => {
+  apply: ({ r, design }, { id, parentId, before, keepDrawn }) => {
     const siblings = childrenOf(design, parentId).filter(([sibling]) => sibling !== id)
     const at = before ? siblings.findIndex(([sibling]) => sibling === before) : siblings.length
     const index = indexBetween(siblings[at - 1]?.[1].index ?? null, siblings[at]?.[1].index ?? null)
-    keepDrawnPlace(r, design, id, parentId)
+    if (keepDrawn) keepDrawnPlace(r, design, id, parentId)
     const node = r.nodes.get(id)
     node?.set('parentId', parentId)
     node?.set('index', index)
@@ -191,6 +192,10 @@ const ancestorsOf = (design: Design, parentId: string): string[] => {
 function keepDrawnPlace(r: CommandContext['r'], design: Design, id: string, parentId: string) {
   const node = design.nodes[id]
   if (!node || node.parentId === parentId) return
+  // A layer an auto layout places is drawn where the layout puts it, not where it is stored, and is
+  // placed again by the one it enters: there is nothing to keep.
+  const flows = (container: string) => (design.nodes[container]?.props as { layout?: unknown } | undefined)?.layout !== undefined && !node.props.absolute
+  if (flows(node.parentId) || flows(parentId)) return
   const leaving = ancestorsOf(design, node.parentId)
   const entering = ancestorsOf(design, parentId)
   const place = new Placement(design)

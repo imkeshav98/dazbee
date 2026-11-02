@@ -50,6 +50,17 @@ function marks(design: Design, formatId: string) {
   }))
 }
 
+/** How much of a format's picture differs between two designs: the share of pixels with a channel more than 24 apart. */
+function differing(a: Design, b: Design, formatId: string) {
+  const x = renderDesign(ck, a, 'p1', formatId, bytes).pixels
+  const y = renderDesign(ck, b, 'p1', formatId, bytes).pixels
+  let n = 0
+  for (let i = 0; i < x.length; i += 4) {
+    if ([0, 1, 2].some((c) => Math.abs((x[i + c] ?? 0) - (y[i + c] ?? 0)) > 24)) n++
+  }
+  return n / (x.length / 4)
+}
+
 /** A tab on the design, its groups fitting what they hold, as the editor keeps them. */
 function opened() {
   const parsed = parseDesign(json)
@@ -89,14 +100,18 @@ describe('a layer moved in or out of turned groups', () => {
   ] as const) {
     it(`stays where it is drawn, ${what}, in every format`, () => {
       const { doc, tab } = opened()
-      const before = { sq: marks(readDesign(doc), 'sq'), wide: marks(readDesign(doc), 'wide') }
+      const was = readDesign(doc)
+      const before = { sq: marks(was, 'sq'), wide: marks(was, 'wide') }
       move(tab, doc, id, parentId)
       expect(readDesign(doc).nodes[id]?.parentId).toBe(parentId)
       expectDrawnTheSame(before.sq, marks(readDesign(doc), 'sq'), `${what}, square`)
       expectDrawnTheSame(before.wide, marks(readDesign(doc), 'wide'), `${what}, wide`)
-      // One undo step takes it back where it was.
+      // The whole picture, turns included: only anti-aliased edges may differ.
+      for (const formatId of ['sq', 'wide']) expect(differing(was, readDesign(doc), formatId), `${what}, ${formatId}: picture`).toBeLessThan(0.002)
+      // One undo step takes it back where it was, drawn the same.
       tab.undo()
       expect(readDesign(doc).nodes[id]?.parentId).not.toBe(parentId)
+      expect(differing(was, readDesign(doc), 'sq')).toBeLessThan(0.002)
     })
   }
 })
