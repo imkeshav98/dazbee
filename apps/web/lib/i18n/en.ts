@@ -206,6 +206,7 @@ export const en = {
       actions: 'Actions',
       font: 'Font',
       bold: 'Bold',
+      italic: 'Italic',
       align: 'Align',
       fill: 'Colour',
       outline: 'Outline',

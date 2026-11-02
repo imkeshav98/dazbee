@@ -27,7 +27,7 @@ import {
   type Anchor, type AnchorRef, type PenPath, type Side,
 } from './path.ts'
 import { rulerParts } from './rulers.ts'
-import { paragraphAt, step, toggled, wordAt, type StyleToggle, type TextRange } from './text-edit.ts'
+import { paragraphAt, step, stylesIn, toggled, wordAt, type RunStyle, type StyleToggle, type TextRange } from './text-edit.ts'
 import { NUDGE, NUDGE_FAR, shortcutFor, type ShortcutAction } from './shortcuts.ts'
 import { SNAP_DISTANCE, snapMove, snapResize, snapTargets, type Gap, type Guide, type Targets } from './snap.ts'
 import {
@@ -329,6 +329,11 @@ function live(
   }
   /** Told when the selection changes, so panels can follow it. */
   const selectionListeners = new Set<(ids: string[]) => void>()
+  /** Told when the text being edited, or its selected range, changes. */
+  const textSelectionListeners = new Set<() => void>()
+  const textSelectionChanged = () => {
+    for (const listener of textSelectionListeners) listener()
+  }
   /** Told when a gesture has nothing to do because auto layout decides it, so the page can say why. */
   const noticeListeners = new Set<(notice: Notice) => void>()
   const notify = (notice: Notice) => {
@@ -462,6 +467,7 @@ function live(
     if (!editing) return
     editing.caret = textAnchor(doc, editing.id, offset)
     if (!extend) editing.anchor = editing.caret
+    textSelectionChanged()
   }
   /**
    * Keeps the box of text that grows the size of its words in every format (#47), or in `only` that
@@ -491,6 +497,36 @@ function live(
     if (!editing) return
     editing.anchor = textAnchor(doc, editing.id, range.start)
     editing.caret = textAnchor(doc, editing.id, range.end)
+    textSelectionChanged()
+  }
+  /** The selected range of the text being edited, when it holds a character or more. */
+  function selectedText(): { id: string; range: TextRange } | null {
+    const range = textRange()
+    return editing && range && range.end > range.start ? { id: editing.id, range } : null
+  }
+  /**
+   * Styles a range of a text layer with `style`, as one undo step of its own: while the layer is
+   * being edited, between the typing before and after it. A key left undefined changes nothing,
+   * since a run can't say "as the layer".
+   */
+  function styleRange({ id, range }: { id: string; range: TextRange }, style: RunStyle) {
+    const keys = Object.fromEntries(Object.entries(style).filter(([, value]) => value !== undefined)) as RunStyle
+    if (Object.keys(keys).length === 0) return
+    const typing = editing?.id === id ? editing : null
+    typing?.endGesture()
+    session.gesture(() => {
+      runQuietly(() => session.run('text.edit', { id, op: { kind: 'style', at: range.start, length: range.end - range.start, style: keys } }))
+      fitText(id)
+    })
+    if (typing) typing.endGesture = session.beginGesture()
+    drawOverlay()
+  }
+  /** Styles the selected range of the text being edited; false when no range is selected. */
+  function styleSelectedText(style: RunStyle): boolean {
+    const selected = selectedText()
+    if (!selected) return false
+    styleRange(selected, style)
+    return true
   }
 
   /**
@@ -1358,11 +1394,13 @@ function live(
     if (node?.type === 'text' && node.props.text === '' && editing.created) runQuietly(() => session.run('node.delete', { ids: [id] }))
     editing.endGesture()
     editing = null
+    textSelectionChanged()
   }
   /** Starts typing into a text layer in a frame, in one undo step until typing stops. */
   function startEditing(id: string, frame: string, offset: number, endGesture = session.beginGesture(), created = false) {
     const at = textAnchor(doc, id, offset)
     editing = { id, frame, caret: at, anchor: at, endGesture, created }
+    textSelectionChanged()
   }
 
   function caretFromPoint(p: Point) {
@@ -3261,10 +3299,25 @@ function live(
       if (!(selection?.frame === frame.key && selection.ids.includes(id))) select([id], frame.key)
       return [...(selection?.ids ?? [])]
     },
-    /** Whether a gesture is running, or a range of text is being edited: when the bar by the selection keeps out of the way. */
-    busy() {
-      const range = textRange()
-      return gesture !== null || (range !== null && range.end > range.start)
+    /** Whether a gesture is running: when the bar by the selection keeps out of the way. */
+    busy: () => gesture !== null,
+    /** The text layer being edited and its selected range, when one is selected; what the bar and cards then style. */
+    textSelection: () => selectedText(),
+    /** Each character's style in the selected range of the text being edited, or null with no range. */
+    textSelectionStyles() {
+      const selected = selectedText()
+      const now = session.design()
+      const node = selected && now.nodes[selected.id]
+      if (!selected || !editing || node?.type !== 'text') return null
+      const own = now.overrides[`format:${frameOf(editing.frame)?.formatId}`]?.[selected.id]?.style as Partial<typeof node.props.style> | undefined
+      return stylesIn({ ...node.props, style: { ...node.props.style, ...own } }, selected.range)
+    },
+    /** Styles the selected range of the text being edited, as one undo step; false with no range. */
+    styleTextSelection: (style: RunStyle) => styleSelectedText(style),
+    /** Calls back when the text being edited, or its selected range, changes. */
+    onTextSelection(listener: () => void) {
+      textSelectionListeners.add(listener)
+      return () => textSelectionListeners.delete(listener)
     },
     /** Calls back with the selected layers whenever the selection changes. */
     onSelection(listener: (ids: string[]) => void) {
@@ -3391,16 +3444,22 @@ function live(
     /** The families whose files the editor has, shipped ones included (#50). */
     loadedFamilies: () => [...new Set(resourceBytes.fonts.map((f) => f.family))],
     /**
-     * Sets the font of the selected text layers, as one undo step (#50): the family, and the weight
-     * when one is given. It waits for the family's files first, so text that grows the size of its
-     * words is measured in it and fits its box in the same step.
+     * Sets the font of the selected text layers, or of the selected range of the text being edited,
+     * as one undo step: the family, and the weight when one is given. It waits for the family's files
+     * first, so text that grows the size of its words is measured in it and fits its box in the same step.
      */
     async setFont(fontFamily: string, fontWeight?: number) {
       const ids = (selection?.ids ?? []).filter((id) => session.design().nodes[id]?.type === 'text')
-      if (ids.length === 0) return
+      const range = selectedText()
+      if (ids.length === 0 && !range) return
       loadFamilies([fontFamily])
       await familyLoads.get(fontFamily)
       if (listening.signal.aborted) return
+      if (range) {
+        const node = session.design().nodes[range.id]
+        if (node?.type === 'text' && range.range.end <= node.props.text.length) styleRange(range, { fontFamily, ...(fontWeight === undefined ? {} : { fontWeight }) })
+        return
+      }
       const current = session.design()
       session.gesture(() => {
         for (const id of ids) {
