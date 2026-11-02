@@ -90,7 +90,7 @@ export const assets = pgTable('assets', {
   workspaceId: text('workspace_id').notNull().references(() => workspaces.id),
   brandId: text('brand_id').notNull(),
   sha256: text().notNull(),
-  contentType: text('content_type', { enum: ['image/png', 'image/jpeg', 'image/webp'] }).notNull(),
+  contentType: text('content_type', { enum: ['image/png', 'image/jpeg', 'image/webp', 'image/svg+xml'] }).notNull(),
   byteSize: integer('byte_size').notNull(),
   width: integer().notNull(),
   height: integer().notNull(),

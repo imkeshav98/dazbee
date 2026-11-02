@@ -17,6 +17,7 @@
     "@dazbee/renderer": "workspace:*",
     "@dazbee/schema": "workspace:*",
     "@dazbee/storage": "workspace:*",
+    "@dazbee/svg": "workspace:*",
     "@dazbee/sync-token": "workspace:*",
     "@workos-inc/node": "11.0.0",
     "drizzle-orm": "^0.45.0",

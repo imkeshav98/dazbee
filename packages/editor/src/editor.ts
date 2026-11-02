@@ -13,6 +13,7 @@ import {
 import type { CanvasKit, GrDirectContext, Image, SkPicture, Surface } from '@dazbee/canvaskit'
 import canvasKitModule from '@dazbee/canvaskit'
 import { WASM_FILE } from '@dazbee/canvaskit/wasm'
+import { SvgError, svgToLayers, type Skipped } from '@dazbee/svg'
 import { IndexeddbPersistence } from 'y-indexeddb'
 import * as Y from 'yjs'
 import { fit, NO_INSETS, toScreen, toWorld, visibleRect, zoomAt, type Camera, type Insets, type Viewport } from './camera.ts'
@@ -85,6 +86,17 @@ export type Tool = 'select' | 'hand' | 'pen' | 'text' | 'frame' | 'image' | Shap
 /** An image asset as the editor places it. */
 export interface PlacedAsset { id: string; name: string; width: number; height: number }
 
+/** An SVG file's media type, as clipboards and uploads name it. */
+export const SVG_TYPE = 'image/svg+xml'
+/** The share of a frame's shorter side a placed SVG may take before it is scaled down to it. */
+const SVG_ROOM = 0.6
+
+/** Text that is an SVG file, trimmed, or null: markup opening with <svg after any declaration, comment or doctype. */
+export function svgMarkup(text: string | undefined): string | null {
+  const trimmed = text?.trim() ?? ''
+  return /^(?:<?xml[^>]*>s*|<!--[sS]*?-->s*|<!DOCTYPE[^>[]*(?:[[sS]*?])?s*>s*)*<svg[s>]/i.test(trimmed) ? trimmed : null
+}
+
 /** How far, in screen pixels, a press can wander and still draw a shape as a click does. */
 const CLICK_SLOP = 3
 /** How near, in screen pixels, a press picks a path's point, handle or segment (#45). */
@@ -96,7 +108,8 @@ const PEN_STROKE = { paint: { type: 'solid', color: '#1F2329FF' }, width: 2, cap
 interface Reshaping { id: string; start: Box; applied: Point }
 
 /** Something the editor tells the person, for the page to show: a gesture that auto layout decides instead. */
-export type Notice = 'placedByLayout' | 'flowEnd'
+/** Something the page should say: why a gesture did nothing, or how placing an SVG went. */
+export type Notice = 'placedByLayout' | 'flowEnd' | 'svgLeftOut' | 'svgUnreadable'
 
 /** A frame's auto layout and a layer's sizing, as the schema has them. */
 type AutoLayoutOf = NonNullable<Extract<Layer, { type: 'frame' }>['props']['layout']>
@@ -334,10 +347,13 @@ function live(
   const textSelectionChanged = () => {
     for (const listener of textSelectionListeners) listener()
   }
-  /** Told when a gesture has nothing to do because auto layout decides it, so the page can say why. */
-  const noticeListeners = new Set<(notice: Notice) => void>()
-  const notify = (notice: Notice) => {
-    for (const listener of noticeListeners) listener(notice)
+  /**
+   * Told when a gesture has nothing to do because auto layout decides it, so the page can say why,
+   * and when an SVG can't be read or had parts no layer shows, which come as `parts`.
+   */
+  const noticeListeners = new Set<(notice: Notice, parts: readonly Skipped[]) => void>()
+  const notify = (notice: Notice, parts: readonly Skipped[] = []) => {
+    for (const listener of noticeListeners) listener(notice, parts)
   }
   /** Told when the tool changes, by a key or after drawing a shape, so the tool dock follows. */
   const toolListeners = new Set<(tool: Tool) => void>()
@@ -3034,6 +3050,59 @@ function live(
     }))) select(pasted, frame.key)
   }
 
+  /**
+   * Places an SVG file as layers (#225): a group of path, text and mask layers drawn as the file
+   * is, in one undo step. It goes centred at `client`, in client coordinates, or at the pointer when
+   * `atPointer`, or else in the middle of the frame in view; a file larger than SVG_ROOM of the
+   * frame's shorter side is scaled down to it. Returns the group's id and what the file had that no
+   * layer shows, or null when it placed nothing: there is no frame to put it in, or the file can't
+   * be read, which the notices say.
+   */
+  function placeSvg(text: string, name: string, where: { client?: Point; atPointer?: boolean }): { id: string; skipped: Skipped[] } | null {
+    const rect = canvas.getBoundingClientRect()
+    const client = where.client ?? (where.atPointer && pointer ? { x: pointer.clientX, y: pointer.clientY } : undefined)
+    const screen = client ? { x: client.x - rect.left, y: client.y - rect.top } : centre()
+    const world = toWorld(camera, screen)
+    const under = frameAt(grid.frames, world)
+    const frame = client ? under ?? frameOf(selection?.frame) : under ?? frameOf(selection?.frame) ?? grid.frames[0]
+    if (!frame) return null
+    const inside = client && under?.key === frame.key
+    const at = inside ? { x: world.x - frame.x, y: world.y - frame.y } : { x: frame.width / 2, y: frame.height / 2 }
+    let made: ReturnType<typeof svgToLayers>
+    try {
+      const natural = svgToLayers(ck, text, { name })
+      const room = Math.min(frame.width, frame.height) * SVG_ROOM
+      made = Math.max(natural.width, natural.height) > room ? svgToLayers(ck, text, { name, fit: room }) : natural
+    } catch (error) {
+      if (!(error instanceof SvgError)) throw error
+      notify('svgUnreadable')
+      return null
+    }
+    const box = made.tree.nodes[made.root]?.props
+    if (!box) return null
+    stopEditing()
+    let ids: string[] = []
+    const ok = runQuietly(() => session.gesture(() => {
+      ids = session.run('design.place', { parentId: frame.pageId, tree: made.tree, dx: round(at.x - (box.x + box.width / 2)), dy: round(at.y - (box.y + box.height / 2)) })
+      // Text is measured in its font, as the editor lays it out.
+      const placed = session.design()
+      for (const id of Object.keys(placed.nodes)) {
+        if (placed.nodes[id]?.type === 'text' && ids.some((root) => id === root || ancestorsIn(placed, id).includes(root))) fitText(id)
+      }
+    }))
+    const id = ids[0]
+    if (!ok || !id) return null
+    setTool('select')
+    select([id], frame.key)
+    if (made.skipped.length > 0) notify('svgLeftOut', made.skipped)
+    return { id, skipped: made.skipped }
+  }
+  const ancestorsIn = (now: Design, id: string) => {
+    const out: string[] = []
+    for (let up = now.nodes[id]?.parentId; up && now.nodes[up]; up = now.nodes[up]?.parentId) out.push(up)
+    return out
+  }
+
   // Copy, cut and paste plain text while typing (#47), and layers otherwise (#49). Pasted line
   // breaks become paragraphs.
   window.addEventListener('copy', (e) => {
@@ -3071,9 +3140,24 @@ function live(
   window.addEventListener('paste', (e) => {
     if (inField(e.target)) return
     if (!editing) {
-      // Layers copied in this or another design; anything else on the clipboard isn't ours to paste.
+      // Layers copied in this or another design, or an SVG file or its markup; anything else on the
+      // clipboard isn't ours to paste.
       const tree = layersOnClipboard(e.clipboardData)
-      if (!tree) return
+      if (!tree) {
+        const atPointer = pasteAtPointer
+        pasteAtPointer = false
+        const file = Array.from(e.clipboardData?.files ?? []).find((f) => f.type === SVG_TYPE)
+        const markup = svgMarkup(e.clipboardData?.getData(SVG_TYPE) || e.clipboardData?.getData('text/plain'))
+        if (!file && !markup) return
+        e.preventDefault()
+        if (markup) placeSvg(markup, 'SVG', { atPointer })
+        else if (file) {
+          void file.text().then((text) => {
+            if (!listening.signal.aborted) placeSvg(text, file.name.replace(/.svg$/i, '') || 'SVG', { atPointer })
+          })
+        }
+        return
+      }
       e.preventDefault()
       pasteLayers(tree, pasteAtPointer)
       pasteAtPointer = false
@@ -3268,7 +3352,7 @@ function live(
       return runQuietly(() => session.run('node.update', { ids, scope: scope(frame), patch: { visible: !hidden } }))
     },
     /** Calls back with what the editor tells the person, such as a nudge auto layout decides. */
-    onNotice(listener: (notice: Notice) => void) {
+    onNotice(listener: (notice: Notice, parts: readonly Skipped[]) => void) {
       noticeListeners.add(listener)
       return () => noticeListeners.delete(listener)
     },
@@ -3546,6 +3630,7 @@ function live(
       select([id], frame.key)
       return id
     },
+    placeSvg: (text: string, name: string, client?: Point) => placeSvg(text, name, client ? { client } : {}),
     /**
      * Outlines the layer an image dragged over the stage at `client` would go into, or clears the
      * outline with null. Returns that layer's id, or null where a drop makes a new layer.

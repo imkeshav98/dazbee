@@ -4,7 +4,7 @@
 // file without a transform of their own. What has no layer to become is left out and named.
 
 import type { CanvasKit, Path } from '@dazbee/canvaskit'
-import { LayerTree, type Paint } from '@dazbee/schema'
+import { LayerTree, MAX_SVG_BYTES, type Paint } from '@dazbee/schema'
 import { generateKeyBetween } from 'fractional-indexing'
 import { parseColor, parsePaint, withOpacity } from './color.ts'
 import { readSheets, styleOf, type Style } from './style.ts'
@@ -43,8 +43,7 @@ export class SvgError extends Error {
   }
 }
 
-/** Larger files, or more layers than this, are refused, so a hostile file can't run away with the page. */
-export const MAX_SVG_BYTES = 5_000_000
+/** More layers than this, or a file larger than MAX_SVG_BYTES, is refused, so a hostile file can't run away with the page. */
 const MAX_LAYERS = 5_000
 
 type LayerInput = { type: string; parentId: string; index: string; name: string; props: Record<string, unknown> }
