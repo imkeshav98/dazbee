@@ -490,7 +490,7 @@ test.describe('text', () => {
     })
     // Two texts, one at 1.6 and its copy at Auto: emptied, both are Auto.
     await enter(field, '1.6')
-    await page.getByTestId('arrange').getByRole('group', { name: 'Layer' }).getByRole('button', { name: 'Duplicate' }).click()
+    await (await moreMenu(page)).getByRole('button', { name: 'Duplicate' }).click()
     const copy = (await page.evaluate(() => window.dazbee?.selection() ?? []))[0] ?? ''
     await select(page, [copy])
     await enter(field, '')

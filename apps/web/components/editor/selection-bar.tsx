@@ -16,8 +16,8 @@ import { Choice } from './fields.tsx'
 import { RotationField, set, useTarget } from './selection-cards.tsx'
 import { BAR, BAR_BUTTON, BAR_DIVIDER, ICON_BUTTON, MENU_DIVIDER, MENU_ITEM, MENU_KEY, POPOVER } from './styles.ts'
 
-/** Pixels between the selection and the bar, and kept clear at the stage's edges. */
-const GAP = 12
+/** Pixels between the selection and the bar, clear of the turn handles round its corners, and kept clear at the stage's edges. */
+const GAP = 28
 const EDGE = 8
 /** Room kept at the stage's top for the islands that float there, and at its bottom for the tool dock. */
 const TOP = 64

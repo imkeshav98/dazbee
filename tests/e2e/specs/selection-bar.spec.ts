@@ -27,6 +27,9 @@ const design = (): DesignInput => ({
   overrides: {},
 })
 
+/** Pixels between the selection and the bar. */
+const GAP = 28
+
 const select = (page: Page, ids: string[]) => page.evaluate((ids) => window.dazbee?.select(ids), ids)
 const frames = (page: Page) => page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))))
 /** The selection's upright box and the bar, both in the stage's pixels. */
@@ -49,7 +52,7 @@ test('the bar sits centred above the selection, below it at the stage top, over 
     const g = await geometry(page)
     expect(g.shown).toBe(true)
     expect(Math.abs(g.left + g.width / 2 - (g.box.x + g.box.width / 2))).toBeLessThanOrEqual(1)
-    expect(Math.abs(g.top + g.height + 12 - g.box.y)).toBeLessThanOrEqual(1)
+    expect(Math.abs(g.top + g.height + GAP - g.box.y)).toBeLessThanOrEqual(1)
   }
   // Several layers add Combine, Group, Box and Stack: the bar grows and stays centred.
   await select(page, ['a'])
@@ -62,7 +65,7 @@ test('the bar sits centred above the selection, below it at the stage top, over 
   await page.evaluate(() => window.dazbee?.setCamera({ x: 100, y: 0, zoom: 0.8 }))
   await select(page, ['top'])
   const below = await geometry(page)
-  expect(Math.abs(below.top - (below.box.y + below.box.height + 12))).toBeLessThanOrEqual(1)
+  expect(Math.abs(below.top - (below.box.y + below.box.height + GAP))).toBeLessThanOrEqual(1)
 
   // A selection filling the stage leaves no room above or below: the bar sits at the stage's top, over it.
   await select(page, ['a'])
