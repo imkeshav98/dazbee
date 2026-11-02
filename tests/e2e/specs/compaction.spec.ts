@@ -49,11 +49,14 @@ test('undo of a delete still works with another tab connected; once both leave t
   const design = await designWithoutEmptyScopes(a)
   const hash = await exportHashOf(a)
   await expect.poll(() => storedSize(designId), { timeout: 30_000 }).toBeGreaterThan(0)
-  // Stored with the deleted layers still in it, while anyone is connected.
+  // Stored with the deleted layers still in it, while anyone is connected. The size holding for
+  // 1.5 s of real time, three times the sync server's 500 ms store debounce, means no store is due.
   await expect.poll(async () => { const s = storedSize(designId); await new Promise((r) => setTimeout(r, 1500)); return s === storedSize(designId) }, { timeout: 30_000 }).toBe(true)
   const before = storedSize(designId)
 
   await a.context().close()
+  // 1.5 s of real time, three times the store debounce: a store or a compaction on A leaving would
+  // have landed by now, and with B still connected neither does.
   await new Promise((r) => setTimeout(r, 1500))
   expect(storedSize(designId)).toBe(before)
   await b.context().close()

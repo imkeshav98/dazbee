@@ -59,14 +59,15 @@ test('a page is duplicated with its layers, reordered, renamed, deleted and brou
   // Delete, then undo from the toast: the page and every layer on it come back.
   await row.hover()
   await row.getByRole('button', { name: 'Delete page' }).click()
+  // The toast goes after 8 s unless the pointer is on it, so it is held as soon as it shows.
+  const toast = page.getByTestId('removed-toast')
+  await toast.hover()
+  await expect(toast).toContainText('Offer deleted')
   await expect(pages.getByRole('listitem')).toHaveCount(1)
   design = await designIn(page)
   expect(design.pages[copy]).toBeUndefined()
   expect(layersOf(design, copy)).toHaveLength(0)
   await expect(pages.locator('[data-page="p1"]').getByRole('button', { name: 'Delete page' })).toBeDisabled()
-  const toast = page.getByTestId('removed-toast')
-  await expect(toast).toContainText('Offer deleted')
-  await toast.hover()
   writeOutput('pages-2-deleted.png', await page.screenshot())
   await toast.getByRole('button', { name: 'Undo' }).click()
   await expect(pages.getByRole('listitem')).toHaveCount(2)

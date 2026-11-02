@@ -33,9 +33,14 @@ export const editorPath = (designId: string) => `/brands/${DEV_BRAND}/designs/${
  * button's glow is always moving, so two shots of the same design would otherwise differ there.
  */
 export const stageShot = (page: Page) =>
-  // The canvas alone: the capsule and the islands floating over it (#110) are masked. The cards'
-  // entrance (they rise in a short stagger) is taken at its end, so a shot never catches it halfway.
-  page.getByTestId('stage').screenshot({ animations: 'disabled', mask: [page.getByTestId('rail'), page.getByTestId('island-start'), page.getByTestId('island-end')] })
+  // The canvas alone: the capsule and the islands floating over it (#110) are masked, and the
+  // property cards are hidden. The cards show the brand kit's colours, which other specs change on
+  // the shared brand while this one runs, so two tabs opened moments apart can differ in them.
+  page.getByTestId('stage').screenshot({
+    animations: 'disabled',
+    mask: [page.getByTestId('rail'), page.getByTestId('island-start'), page.getByTestId('island-end')],
+    style: '[data-testid="cards"] { visibility: hidden; }',
+  })
 
 /** The design as the tab's document holds it now, as JSON with sorted keys so two tabs compare equal. */
 export const designOf = (page: Page) =>
@@ -86,6 +91,13 @@ export function writeOutput(name: string, content: string | Buffer) {
   mkdirSync(OUTPUT, { recursive: true })
   writeFileSync(join(OUTPUT, name), content)
 }
+
+/**
+ * Waits until no animation or transition with an end is running, so a screenshot shows the page at
+ * rest. Ones that never end, such as the AI button's glow, are left running.
+ */
+export const atRest = (page: Page) =>
+  page.waitForFunction(() => document.getAnimations().every((a) => a.playState !== 'running' || a.effect?.getComputedTiming().endTime === Infinity), undefined, { timeout: 10_000 })
 
 /** Restarts the sync server container and waits until it is healthy again. */
 export function restartSyncServer() {

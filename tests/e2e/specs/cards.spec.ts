@@ -3,7 +3,7 @@
 // and the cards. With nothing selected the Page card paints the page; a selection shows Arrange.
 // On phones the cards are a bottom sheet opened from the tab bar.
 import { expect, test, type Page } from '../support/test.ts'
-import { designOf, editorPath, screenPoint, writeOutput } from '../support/editor.ts'
+import { atRest, designOf, editorPath, screenPoint, writeOutput } from '../support/editor.ts'
 import { liveDesign, seed } from '../support/seed.ts'
 import { barMenu, moreSubmenu } from '../support/stage.ts'
 
@@ -132,7 +132,7 @@ test('on a phone the cards are a bottom sheet opened from the tab bar', async ({
   expect(cards.width).toBeGreaterThan(360)
   expect(cards.y + cards.height).toBeLessThanOrEqual(rail.y)
   await expect(page.getByTestId('flyout')).toHaveCount(0)
-  await page.waitForTimeout(300)
+  await atRest(page)
   await shoot(page, 'phone-sheet')
   await page.getByRole('button', { name: 'Inspector' }).tap()
   await expect(page.getByTestId('cards')).toBeHidden()

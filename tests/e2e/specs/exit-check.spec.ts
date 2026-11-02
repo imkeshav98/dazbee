@@ -127,18 +127,23 @@ test('an ad set rebuilt in 5 formats through real input exports PNG, JPG, PDF an
   await page.keyboard.type('140')
   await page.keyboard.press('Enter')
   await expect.poll(async () => ((await stored(page)).nodes[headline]?.props.style as { fontSize: number }).fontSize).toBe(140)
+  // A click on the empty canvas leaves nothing selected, so the cards show the Sizes card.
   await page.mouse.click(40, 900)
+  await expect.poll(() => page.evaluate(() => window.dazbee?.selection())).toEqual([])
   await page.locator('[data-panel="brand"]').click()
   await expect(kit).toBeHidden()
   await drawn(page)
   await shot(page, '1-square')
 
-  // Four more formats from presets, each starting from the square's layout scaled to fit.
-  for (const preset of ['feed-portrait', 'story', 'link-image', 'medium-rectangle']) {
+  // Four more formats from presets, each starting from the square's layout scaled to fit; each is in
+  // the design and its menu closed before the next is added.
+  const presets = page.getByRole('dialog', { name: 'Add format' })
+  for (const [i, preset] of ['feed-portrait', 'story', 'link-image', 'medium-rectangle'].entries()) {
     await page.getByRole('button', { name: 'Add format' }).click()
-    await page.getByRole('dialog', { name: 'Add format' }).locator(`[data-preset=${preset}]`).click()
+    await presets.locator(`[data-preset=${preset}]`).click()
+    await expect(presets).toBeHidden()
+    await expect.poll(async () => Object.keys((await stored(page)).formats).length).toBe(i + 2)
   }
-  await expect.poll(async () => Object.keys((await stored(page)).formats).length).toBe(5)
   const design = await stored(page)
   const story = Object.entries(design.formats).find(([, f]) => f.height === 1920)?.[0] ?? ''
   await page.evaluate(() => window.dazbee?.fitAll())

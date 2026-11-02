@@ -7,9 +7,9 @@ import { designOf, exportHashOf, openTabs, placed, restartSyncServer, screenPoin
 
 test.describe.configure({ timeout: 120_000 })
 
-/** Runs `count` random commands in a tab, yielding after each so the two tabs' edits interleave on the wire. */
+/** Runs `count` random commands in a tab, each against the document as the tab holds it then. */
 const randomEdits = (page: Page, seed: number, count: number) =>
-  page.evaluate(async ({ seed, count }) => {
+  page.evaluate(({ seed, count }) => {
     const editor = window.dazbee
     if (!editor) throw new Error('no editor')
     let state = seed
@@ -23,12 +23,6 @@ const randomEdits = (page: Page, seed: number, count: number) =>
     const pick = <T,>(xs: T[]) => xs[Math.floor(random() * xs.length)] as T
     const ran: Record<string, number> = {}
     let refused = 0
-    // Updates from the other tab that arrive while this tab is still making its own edits.
-    let arrived = 0
-    const countArrival = (_update: Uint8Array, _origin: unknown, _doc: unknown, transaction: { local: boolean }) => {
-      if (!transaction.local) arrived++
-    }
-    editor.doc.on('update', countArrival)
     for (let i = 0; i < count; i++) {
       const design = editor.design()
       const ids = Object.keys(design.nodes)
@@ -60,26 +54,26 @@ const randomEdits = (page: Page, seed: number, count: number) =>
             : { id, op: { kind: 'delete', at: Math.floor(random() * (length - 1)), length: 1 } })
         }
       } catch (error) {
-        // A command the other tab's edits made impossible (a deleted layer, say) is refused whole.
+        // A command the document as it is doesn't allow is refused whole.
         if (!(error instanceof Error) || error.name !== 'CommandError') throw error
         refused++
       }
-      // Yield after every edit so the other tab's updates arrive between this tab's commands.
-      await new Promise((resolve) => setTimeout(resolve, random() * 4))
     }
-    editor.doc.off('update', countArrival)
-    return { ran, refused, arrived }
+    return { ran, refused }
   }, { seed, count })
 
 test('two tabs make 200 random edits each and end with the same document and the same pixels', async ({ browser }) => {
   const { tabs, errors } = await openTabs(browser, 2)
   const [a, b] = tabs as [Page, Page]
+  // Both tabs edit offline, so each makes the same edits on every run and they meet once both are
+  // back online. Edits arriving between a tab's own are covered by packages/doc's collaboration test.
+  for (const tab of tabs) {
+    await tab.context().setOffline(true)
+    await expect(tab.getByTestId('status')).toHaveAttribute('data-status', 'Offline', { timeout: 30_000 })
+  }
   const [ranA, ranB] = await Promise.all([randomEdits(a, 2026, 200), randomEdits(b, 31337, 200)])
   test.info().annotations.push({ type: 'tab A', description: JSON.stringify(ranA) }, { type: 'tab B', description: JSON.stringify(ranB) })
-
-  // Both tabs saw the other's edits while still editing, so the edits really interleaved.
-  expect(ranA.arrived).toBeGreaterThan(20)
-  expect(ranB.arrived).toBeGreaterThan(20)
+  for (const tab of tabs) await tab.context().setOffline(false)
 
   await settle(tabs)
   const [designA, designB] = await Promise.all([designOf(a), designOf(b)])

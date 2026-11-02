@@ -46,6 +46,7 @@ test('one layer has its actions in ⋯ More and the right-click menu; several la
   await more('Send backward')
   await expect.poll(() => order(page)).toEqual(['B', 'A', 'C'])
   await more('Send to back')
+  await expect.poll(() => order(page)).toEqual(['A', 'B', 'C'])
   await more('Bring forward')
   await expect.poll(() => order(page)).toEqual(['B', 'A', 'C'])
 

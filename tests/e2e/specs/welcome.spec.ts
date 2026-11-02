@@ -1,6 +1,6 @@
 // Onboarding (#109, ADR-0013): "Paste your website" names the first brand and opens its home.
 import { expect, test, type Page } from '../support/test.ts'
-import { writeOutput } from '../support/editor.ts'
+import { atRest, writeOutput } from '../support/editor.ts'
 
 const shoot = async (page: Page, name: string) => writeOutput(`welcome-${name}.png`, await page.screenshot())
 
@@ -34,7 +34,7 @@ test('on a phone the website field fits', async ({ browser }) => {
   const open = await page.getByRole('button', { name: 'Open it' }).boundingBox()
   expect((open?.x ?? 0) + (open?.width ?? 0)).toBeLessThanOrEqual(390)
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390)
-  await page.waitForTimeout(400)
+  await atRest(page)
   await writeOutput('welcome-phone.png', await page.screenshot({ fullPage: true }))
   await context.close()
 })

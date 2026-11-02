@@ -176,8 +176,9 @@ test('a stroke and the page background take the same paint editor: an angular st
   await page.keyboard.press('Escape')
   await page.evaluate(() => window.dazbee?.drawn())
   writeOutput('fill-stack-5-stroke-and-page.png', await page.screenshot({ animations: 'disabled' }))
-  // A second background layer, an image, goes on top of the gradient.
+  // A second background layer, an image, goes on top of the gradient: once the list shows it, it is row 1.
   await layers.getByRole('button', { name: 'Add a background layer' }).click()
+  await expect(layers.locator('[data-row]')).toHaveCount(2)
   await layers.locator('[data-row="1"]').getByTestId('paint-swatch').click()
   await editor.getByTestId('paint-image').click()
   const picker = page.getByTestId('paint-image-picker')
