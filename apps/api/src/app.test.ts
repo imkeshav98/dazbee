@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { brands, fontFaces, memberships, users, openDatabase, workspaces, readDesignState, writeDesignState } from '@dazbee/db'
 import { loadDesign, readDesign } from '@dazbee/doc'
-import { ApiError, AssetLink, AssetSummary, BrandKit, brandVariables, SignedLink, BrandSummary, DesignSummary, DesignThumbnail, FontFace, FontFamily, FontLink, FontUploadTicket, SyncToken, TemplateSummary, UploadTicket, WorkspaceSummary, parseDesign } from '@dazbee/schema'
+import { ApiError, AssetInUse, AssetLink, AssetSummary, BrandKit, brandVariables, SignedLink, BrandSummary, DesignSummary, DesignThumbnail, FontFace, FontFamily, FontLink, FontUploadTicket, SyncToken, TemplateSummary, UploadTicket, WorkspaceSummary, parseDesign } from '@dazbee/schema'
 import { openStorage, storageSettings } from '@dazbee/storage'
 import { verifySyncToken } from '@dazbee/sync-token'
 import { FONT_FILES_DIR } from '@dazbee/fonts/node'
@@ -648,5 +648,53 @@ describe('fonts', { timeout: 30_000 }, () => {
     expect((await call('a', 'POST', `/brands/${brand.id}/fonts`, { sha256: sha256(text) })).json).toEqual({ error: 'The upload is not a TrueType or OpenType font' })
     expect((await call('a', 'POST', `/brands/${brand.id}/fonts`, { sha256: 'e'.repeat(64) })).json).toEqual({ error: 'Nothing was uploaded for that SHA-256' })
     expect((await call('a', 'POST', `/brands/${brand.id}/fonts/uploads`, { sha256: 'a'.repeat(64), byteSize: 10, contentType: 'font/woff2' })).status).toBe(400)
+  })
+})
+
+describe('deleting images', { timeout: 60_000 }, () => {
+  const sha256 = (bytes: Uint8Array) => createHash('sha256').update(bytes).digest('hex')
+  async function image(bytes: Uint8Array) {
+    const ticket = UploadTicket.parse((await call('a', 'POST', `/brands/${brand.id}/assets/uploads`, { sha256: sha256(bytes), byteSize: bytes.length, contentType: 'image/png' })).json)
+    if (ticket.asset) return ticket.asset
+    await fetch(ticket.upload.url, { method: 'PUT', body: bytes, headers: ticket.upload.headers })
+    return AssetSummary.parse((await call('a', 'POST', `/brands/${brand.id}/assets`, { sha256: sha256(bytes) })).json)
+  }
+  const withPhoto = (assetId: string) => ({
+    meta: { schemaVersion: 5, designId: 'any', name: 'Any', kind: 'single', primaryFormatId: 'sq' },
+    formats: { sq: { name: 'Square', width: 400, height: 400, order: 'a0' } },
+    pages: { p1: { name: 'Page 1', order: 'a0' } },
+    nodes: { photo: { type: 'graphic', parentId: 'p1', index: 'a0', name: 'Photo', props: { x: 0, y: 0, width: 200, height: 200, shape: { kind: 'rect' }, fills: [{ type: 'image', assetId, fit: 'fill' }] } } },
+    overrides: {},
+  })
+
+  it('deletes an image nothing uses, and only the brand\'s own', async () => {
+    const unused = await image(png(10, 10, `${run}-unused`))
+    expect((await call('b', 'DELETE', `/brands/${brand.id}/assets/${unused.id}`)).status).toBe(404)
+    expect((await call('a', 'DELETE', `/brands/${sibling.id}/assets/${unused.id}`)).status).toBe(404)
+    expect((await call('a', 'DELETE', `/brands/${brand.id}/assets/${unused.id}`)).status).toBe(204)
+    expect((await call('a', 'GET', `/brands/${brand.id}/assets/${unused.id}`)).status).toBe(404)
+    expect((await call('a', 'DELETE', `/brands/${brand.id}/assets/${unused.id}`)).status).toBe(404)
+  })
+
+  it('refuses to delete an image a design, a template or the logo shows, naming them; it goes once none does', async () => {
+    const used = await image(png(11, 11, `${run}-used`))
+    const design = DesignSummary.parse((await call('a', 'POST', `/brands/${brand.id}/designs`, { name: `Shop window ${run}`, content: withPhoto(used.id) })).json)
+    const template = TemplateSummary.parse((await call('a', 'POST', `/brands/${brand.id}/templates`, { name: `Shop template ${run}`, scope: 'brand', content: withPhoto(used.id) })).json)
+    const refused = await call('a', 'DELETE', `/brands/${brand.id}/assets/${used.id}`)
+    expect(refused.status).toBe(409)
+    expect(AssetInUse.parse(refused.json).usedIn).toEqual([
+      { kind: 'design', id: design.id, name: `Shop window ${run}` },
+      { kind: 'template', id: template.id, name: `Shop template ${run}` },
+    ])
+    expect((await call('a', 'GET', `/brands/${brand.id}/assets/${used.id}`)).status).toBe(200)
+
+    // Once the design and the template are gone, the logo still holds it.
+    expect((await call('a', 'DELETE', `/brands/${brand.id}/designs/${design.id}`)).status).toBe(204)
+    expect((await call('a', 'DELETE', `/brands/${brand.id}/templates/${template.id}`)).status).toBe(204)
+    const kit = BrandKit.parse((await call('a', 'GET', `/brands/${brand.id}/kit`)).json)
+    expect((await call('a', 'PUT', `/brands/${brand.id}/kit`, { ...kit, logoAssetId: used.id })).status).toBe(200)
+    expect(AssetInUse.parse((await call('a', 'DELETE', `/brands/${brand.id}/assets/${used.id}`)).json).usedIn).toEqual([{ kind: 'logo', id: brand.id, name: '' }])
+    expect((await call('a', 'PUT', `/brands/${brand.id}/kit`, { ...kit, logoAssetId: null })).status).toBe(200)
+    expect((await call('a', 'DELETE', `/brands/${brand.id}/assets/${used.id}`)).status).toBe(204)
   })
 })

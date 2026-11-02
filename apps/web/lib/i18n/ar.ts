@@ -474,6 +474,13 @@ export const ar: Messages = {
       failed: 'تعذّر حفظ القالب: {reason}',
     },
     assetLibrary: {
+      delete: 'حذف',
+      deleteNamed: 'حذف {name}',
+      keep: 'إبقاء',
+      inUse: 'مستخدمة في: {places}',
+      thisDesign: 'هذا التصميم',
+      logo: 'الشعار',
+      untitledDesign: 'تصميم بلا اسم',
       search: 'ابحث بالاسم أو الوسم',
       images: 'الصور',
       untitled: 'صورة بلا اسم',

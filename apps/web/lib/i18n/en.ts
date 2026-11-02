@@ -483,6 +483,13 @@ export const en = {
       failed: 'Couldn’t save the template: {reason}',
     },
     assetLibrary: {
+      delete: 'Delete',
+      deleteNamed: 'Delete {name}',
+      keep: 'Keep',
+      inUse: 'In use: {places}',
+      thisDesign: 'this design',
+      logo: 'the logo',
+      untitledDesign: 'Untitled design',
       search: 'Search by name or tag',
       images: 'Images',
       untitled: 'Untitled image',

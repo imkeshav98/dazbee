@@ -2,10 +2,11 @@
 // the same bytes gets its own asset, so a brand never sees another brand's assets. Each brand names
 // and tags its own, and finds them by those (#52).
 import { createHash, randomUUID } from 'node:crypto'
-import { assets, type Db } from '@dazbee/db'
-import type { AssetSummary, ImageType, UpdateAsset, UploadTicket } from '@dazbee/schema'
+import { assets, brandKits, designs, designStates, templates, type Db } from '@dazbee/db'
+import { imageAssetIds, parseDesign, type AssetSummary, type AssetUse, type ImageType, type UpdateAsset, type UploadTicket } from '@dazbee/schema'
 import type { Storage } from '@dazbee/storage'
 import { and, desc, eq, sql, type SQL } from 'drizzle-orm'
+import { storedDesign } from './design-thumbnails.ts'
 import { readImageHeader } from './images.ts'
 import { makeThumbnail } from './thumbnails.ts'
 
@@ -44,6 +45,48 @@ export async function listAssets(db: Db, workspaceId: string, brandId: string, q
     .where(and(eq(assets.workspaceId, workspaceId), eq(assets.brandId, brandId), ...words.map(matches)))
     .orderBy(desc(assets.createdAt), desc(assets.id))
   return rows.map(toSummary)
+}
+
+/**
+ * What of the brand shows the asset: its designs as they are stored, the templates saved from it
+ * (whose images are its assets), and its logo. Only the brand's own, since an asset is one brand's.
+ */
+export async function assetUses(db: Db, workspaceId: string, brandId: string, id: string): Promise<AssetUse[]> {
+  const uses: AssetUse[] = []
+  // Only designs whose stored state holds the id's bytes can show it; each of those is read to be sure.
+  const brandDesigns = await db.select({ id: designs.id, name: designs.name }).from(designs)
+    .innerJoin(designStates, eq(designStates.designId, designs.id))
+    .where(and(eq(designs.workspaceId, workspaceId), eq(designs.brandId, brandId), sql`position(${Buffer.from(id, 'utf8')} in ${designStates.state}) > 0`))
+    .orderBy(designs.name, designs.id)
+  for (const design of brandDesigns) {
+    const content = await storedDesign(db, design.id)
+    if (content && imageAssetIds(content).includes(id)) uses.push({ kind: 'design', id: design.id, name: design.name })
+  }
+  const saved = await db.select({ id: templates.id, name: templates.name, content: templates.content }).from(templates)
+    .where(and(eq(templates.workspaceId, workspaceId), eq(templates.fromBrandId, brandId)))
+    .orderBy(templates.name, templates.id)
+  for (const template of saved) {
+    const parsed = parseDesign(template.content)
+    if (parsed.success && imageAssetIds(parsed.design).includes(id)) uses.push({ kind: 'template', id: template.id, name: template.name })
+  }
+  const [kit] = await db.select({ logo: brandKits.logoAssetId }).from(brandKits)
+    .where(and(eq(brandKits.workspaceId, workspaceId), eq(brandKits.brandId, brandId)))
+  if (kit?.logo === id) uses.push({ kind: 'logo', id: brandId, name: '' })
+  return uses
+}
+
+/**
+ * Deletes the brand's asset unless something of the brand still shows it: then nothing is deleted
+ * and the answer is what uses it. Null when the brand has no such asset. The original stays in
+ * storage, since other brands of the workspace may have assets of the same bytes.
+ */
+export async function deleteAsset(db: Db, workspaceId: string, brandId: string, id: string): Promise<{ deleted: true } | { usedIn: AssetUse[] } | null> {
+  const asset = await findAsset(db, workspaceId, brandId, { id })
+  if (!asset) return null
+  const usedIn = await assetUses(db, workspaceId, brandId, id)
+  if (usedIn.length > 0) return { usedIn }
+  await db.delete(assets).where(and(eq(assets.id, id), eq(assets.workspaceId, workspaceId), eq(assets.brandId, brandId)))
+  return { deleted: true }
 }
 
 /** Renames the brand's asset or sets its tags; null when the brand has no such asset. */

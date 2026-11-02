@@ -1,8 +1,9 @@
 // An image asset's original bytes, for the editor (#35). The API checks workspace and brand and hands
 // back a short-lived signed URL; the bytes pass through here, so the browser needs no storage
-// address or credentials. PATCH renames it or sets its tags (#52).
+// address or credentials. PATCH renames it or sets its tags; DELETE deletes it unless something
+// still uses it, and then answers 409 with what does.
 import { UpdateAsset } from '@dazbee/schema'
-import { ApiFailure, assetLink, updateAsset } from '../../../../../lib/api.ts'
+import { ApiFailure, assetLink, deleteAsset, updateAsset } from '../../../../../lib/api.ts'
 
 export async function GET(_request: Request, { params }: { params: Promise<{ brandId: string; assetId: string }> }) {
   const { brandId, assetId } = await params
@@ -27,6 +28,17 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ br
     return Response.json(await updateAsset(brandId, assetId, update.data))
   } catch (e) {
     if (e instanceof ApiFailure && (e.status === 400 || e.status === 404)) return Response.json({ error: e.message }, { status: e.status })
+    throw e
+  }
+}
+
+export async function DELETE(_request: Request, { params }: { params: Promise<{ brandId: string; assetId: string }> }) {
+  const { brandId, assetId } = await params
+  try {
+    const used = await deleteAsset(brandId, assetId)
+    return used ? Response.json(used, { status: 409 }) : new Response(null, { status: 204 })
+  } catch (e) {
+    if (e instanceof ApiFailure && e.status === 404) return Response.json({ error: e.message }, { status: 404 })
     throw e
   }
 }

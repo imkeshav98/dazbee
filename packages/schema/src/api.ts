@@ -95,6 +95,18 @@ export const AssetSummary = z.object({
 })
 export type AssetSummary = z.infer<typeof AssetSummary>
 
+/** Something of the brand's that shows an asset: a design or a template by its images, or the brand's logo. */
+export const AssetUse = z.object({
+  kind: z.enum(['design', 'template', 'logo']),
+  id: z.string().min(1),
+  name: z.string(),
+})
+export type AssetUse = z.infer<typeof AssetUse>
+
+/** The answer to deleting an asset something still uses: nothing is deleted. */
+export const AssetInUse = ApiError.extend({ usedIn: AssetUse.array().min(1) })
+export type AssetInUse = z.infer<typeof AssetInUse>
+
 /** Asks to upload an original; the API answers with the asset when it already has those bytes. */
 export const StartUpload = z.object({
   sha256: Sha256,

@@ -1,19 +1,19 @@
 'use client'
 
-// The brand's asset library (#52), in the Assets flyout: upload several images at once and watch
-// each one's progress, name and tag them, find them by either, and place one on the design by
-// dragging it onto a format or by clicking it. Thumbnails are small copies the API made and stored;
+// The brand's asset library, in the Assets flyout: upload several images at once and watch each
+// one's progress, name and tag them, find them by either, place one on the design by dragging it
+// onto a format or by clicking it, and delete one nothing uses. Thumbnails are small copies the API made and stored;
 // the design itself draws the original, decoded by CanvasKit.
-import { MagnifyingGlassIcon, PencilSimpleIcon, UploadSimpleIcon, XIcon } from '@phosphor-icons/react'
+import { MagnifyingGlassIcon, PencilSimpleIcon, TrashIcon, UploadSimpleIcon, XIcon } from '@phosphor-icons/react'
 import type { Editor } from '@dazbee/editor'
-import { AssetSummary, type UpdateAsset } from '@dazbee/schema'
+import { AssetInUse, AssetSummary, imageAssetIds, type AssetUse, type UpdateAsset } from '@dazbee/schema'
 import { useCallback, useEffect, useRef, useState, type DragEvent, type KeyboardEvent } from 'react'
 import { cn } from '../../lib/cn.ts'
 import { useMessages } from '../../lib/i18n/client.tsx'
 import { format } from '../../lib/i18n/index.ts'
 import { ASSET_ACCEPT as ACCEPT, sendAsset as send } from '../../lib/upload-asset.ts'
 import { overlayScroll } from '../ui/overlay-scroll.ts'
-import { ASSET_TILE, DASHED_BUTTON } from './styles.ts'
+import { ASSET_TILE, DASHED_BUTTON, QUIET_BUTTON } from './styles.ts'
 
 /** What an asset dragged from the library carries, for the stage to place it. */
 export const ASSET_DRAG_TYPE = 'application/x-dazbee-asset'
@@ -41,6 +41,16 @@ async function save(brandId: string, id: string, update: UpdateAsset): Promise<A
   const body: unknown = await response.json().catch(() => null)
   if (!response.ok) throw new Error(body && typeof body === 'object' && 'error' in body && typeof body.error === 'string' ? body.error : `${response.status}`)
   return AssetSummary.parse(body)
+}
+
+/** Deletes the brand's asset; what still uses it when the API refuses. */
+async function remove(brandId: string, id: string): Promise<AssetUse[] | null> {
+  const response = await fetch(`${base(brandId)}/${encodeURIComponent(id)}`, { method: 'DELETE' })
+  if (response.status === 204) return null
+  const body: unknown = await response.json().catch(() => null)
+  const used = AssetInUse.safeParse(body)
+  if (response.status === 409 && used.success) return used.data.usedIn
+  throw new Error(body && typeof body === 'object' && 'error' in body && typeof body.error === 'string' ? body.error : `${response.status}`)
 }
 
 export function AssetLibrary({ editor, brandId }: { editor: Editor; brandId: string }) {
@@ -172,7 +182,12 @@ export function AssetLibrary({ editor, brandId }: { editor: Editor; brandId: str
           key={edited.id}
           asset={edited}
           brandId={brandId}
+          usedHere={() => imageAssetIds(editor.session.design()).includes(edited.id)}
           onSaved={replace}
+          onDeleted={() => {
+            setEditing(null)
+            setAssets((now) => now && now.filter((a) => a.id !== edited.id))
+          }}
           onDone={() => {
             setEditing(null)
             refresh()
@@ -229,12 +244,38 @@ export function AssetLibrary({ editor, brandId }: { editor: Editor; brandId: str
   )
 }
 
-/** An asset's name and tags, saved as they change: the name on Enter or leaving the field, each tag as it is added or removed. */
-function AssetDetails({ asset, brandId, onSaved, onDone }: { asset: AssetSummary; brandId: string; onSaved: (asset: AssetSummary) => void; onDone: () => void }) {
+/**
+ * An asset's name and tags, saved as they change: the name on Enter or leaving the field, each tag
+ * as it is added or removed. Delete asks first; an image the open design, another design, a
+ * template or the logo uses stays, and the panel says where it is used.
+ */
+function AssetDetails({ asset, brandId, usedHere, onSaved, onDeleted, onDone }: {
+  asset: AssetSummary
+  brandId: string
+  usedHere: () => boolean
+  onSaved: (asset: AssetSummary) => void
+  onDeleted: () => void
+  onDone: () => void
+}) {
   const t = useMessages().editor.assetLibrary
+  const [error, setError] = useState<string | null>(null)
+  const [asking, setAsking] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [usedIn, setUsedIn] = useState<string[] | null>(null)
+  const where = (use: AssetUse) => (use.kind === 'logo' ? t.logo : use.name || t.untitledDesign)
+  const confirmDelete = () => {
+    setAsking(false)
+    setError(null)
+    // The open design may use it before the server has its latest state.
+    if (usedHere()) return setUsedIn([t.thisDesign])
+    setDeleting(true)
+    remove(brandId, asset.id)
+      .then((uses) => (uses ? setUsedIn(uses.map(where)) : onDeleted()))
+      .catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)))
+      .finally(() => setDeleting(false))
+  }
   const [name, setName] = useState(asset.name)
   const [tag, setTag] = useState('')
-  const [error, setError] = useState<string | null>(null)
   const nameField = useRef<HTMLInputElement>(null)
   useEffect(() => nameField.current?.focus(), [])
 
@@ -299,9 +340,27 @@ function AssetDetails({ asset, brandId, onSaved, onDone }: { asset: AssetSummary
         />
       </div>
       {error && <p role="alert" className="text-xs text-danger">{format(t.saveFailed, { reason: error })}</p>}
-      <button type="button" onClick={onDone} className="h-8 cursor-pointer self-end rounded-row px-3 text-[13px] font-medium text-muted hover:bg-hover hover:text-text">
-        {t.done}
-      </button>
+      {usedIn && <p role="alert" data-testid="asset-in-use" className="text-xs text-danger">{format(t.inUse, { places: usedIn.join(', ') })}</p>}
+      <div className="flex items-center justify-between gap-2">
+        {asking
+          ? (
+            <span className="flex items-center gap-1">
+              <button type="button" onClick={confirmDelete} data-testid="asset-delete-confirm" className={cn(QUIET_BUTTON, 'bg-danger/10 text-danger hover:bg-danger/20')}>
+                {format(t.deleteNamed, { name: asset.name || t.untitled })}
+              </button>
+              <button type="button" onClick={() => setAsking(false)} className={QUIET_BUTTON}>{t.keep}</button>
+            </span>
+          )
+          : (
+            <button type="button" disabled={deleting} onClick={() => setAsking(true)} data-testid="asset-delete" className={cn(QUIET_BUTTON, 'hover:text-danger')}>
+              <TrashIcon size={13} aria-hidden />
+              {t.delete}
+            </button>
+          )}
+        <button type="button" onClick={onDone} className={QUIET_BUTTON}>
+          {t.done}
+        </button>
+      </div>
     </section>
   )
 }

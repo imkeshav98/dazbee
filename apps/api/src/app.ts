@@ -1,14 +1,14 @@
 // The API's routes. /workspace and every route below /brands need a session, and reads and writes only that
 // session's workspace; a brand or design of another workspace is answered as if it didn't exist.
 import type { Db } from '@dazbee/db'
-import { BrandKit, CompleteSignIn, CreateBrand, CreateDesign, DuplicateDesign, Rename, SaveTemplate, StartFromTemplate, RecordAsset, RecordFont, StartFontUpload, StartUpload, UpdateAsset, UpdateWorkspace, type ApiError, type AssetLink, type DesignCover, type DesignThumbnail, type SignedIn, type SignedLink, type SignedOut, type SignInLink, type SyncToken } from '@dazbee/schema'
+import { BrandKit, CompleteSignIn, CreateBrand, CreateDesign, DuplicateDesign, Rename, SaveTemplate, StartFromTemplate, RecordAsset, RecordFont, StartFontUpload, StartUpload, UpdateAsset, UpdateWorkspace, type ApiError, type AssetInUse, type AssetLink, type DesignCover, type DesignThumbnail, type SignedIn, type SignedLink, type SignedOut, type SignInLink, type SyncToken } from '@dazbee/schema'
 import type { Storage } from '@dazbee/storage'
 import { signSyncToken } from '@dazbee/sync-token'
 import { Hono, type MiddlewareHandler } from 'hono'
 import type { z } from 'zod'
 import { getBrandKit, InvalidKit, saveBrandKit } from './brand-kits.ts'
 import { deleteTemplate, findTemplate, listTemplates, renameTemplate, saveTemplate, startFromTemplate, templateThumbnailKey } from './templates.ts'
-import { ensureThumbnail, findAsset, InvalidUpload, listAssets, originalKey, recordAsset, SIGNED_URL_SECONDS, startUpload, updateAsset } from './assets.ts'
+import { deleteAsset, ensureThumbnail, findAsset, InvalidUpload, listAssets, originalKey, recordAsset, SIGNED_URL_SECONDS, startUpload, updateAsset } from './assets.ts'
 import { designCover, ensureDesignThumbnail, storedDesign } from './design-thumbnails.ts'
 import { fontLink, InvalidFont, listFonts, recordFont, startFontUpload } from './fonts.ts'
 import { createBrand, createDesign, deleteDesign, findBrand, findDesign, findWorkspace, InvalidContent, listBrands, listDesigns, renameDesign, updateWorkspace } from './designs.ts'
@@ -231,6 +231,15 @@ export function createApp({ db, storage, sessionOf, syncSecret, signIn = null }:
     const asset = await updateAsset(db, workspaceId, c.req.param('brandId'), c.req.param('assetId'), input)
     if (!asset) return c.json(error('No such asset'), 404)
     return c.json(asset)
+  })
+
+  // Deleting an image a design, a template or the logo still shows is refused, saying which (#222).
+  app.delete('/brands/:brandId/assets/:assetId', async (c) => {
+    const { workspaceId } = c.var.session
+    const result = await deleteAsset(db, workspaceId, c.req.param('brandId'), c.req.param('assetId'))
+    if (!result) return c.json(error('No such asset'), 404)
+    if ('usedIn' in result) return c.json({ ...error('The image is in use'), usedIn: result.usedIn } satisfies AssetInUse, 409)
+    return c.body(null, 204)
   })
 
   app.get('/brands/:brandId/assets/:assetId/thumbnail', async (c) => {
