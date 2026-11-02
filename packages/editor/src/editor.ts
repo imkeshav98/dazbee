@@ -1702,7 +1702,8 @@ function live(
     for (const id of g.roots) {
       const box = g.boxes.get(id)
       if (!box) continue
-      runQuietly(() => session.run('node.move', { id, parentId: target, ...(before ? { before } : {}) }))
+      // Placed below as it is drawn, in every format.
+      runQuietly(() => session.run('node.move', { id, parentId: target, keepDrawn: false, ...(before ? { before } : {}) }))
       const drawn = drawnFrom({ ...box, x: box.x + dx, y: box.y + dy }, g.around)
       runQuietly(() => session.run('node.update', { ids: [id], scope: scope(g.frame), patch: { ...undrawn(drawn, containersOf(g.frame, target, now)) } }))
       for (const [f, boxes] of placed) {
