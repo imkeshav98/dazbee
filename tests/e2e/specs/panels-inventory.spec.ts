@@ -1381,7 +1381,8 @@ test.describe('nothing selected', () => {
       await p1.getByRole('button', { name: 'Show Page 1' }).click()
       await expect(p1).toHaveAttribute('aria-current', 'page')
       // A new page takes the next free name: one more than there are pages, past a name taken.
-      const last = pages.getByRole('listitem').filter({ hasText: 'Page 2' })
+      // The last row, found by place: while it is renamed its name is in a text box, not its text.
+      const last = pages.getByRole('listitem').last()
       await step(page, async () => {
         await last.getByRole('button', { name: /^Show / }).dblclick()
         await last.getByRole('textbox', { name: 'Rename' }).fill('Page 4')
