@@ -115,7 +115,6 @@ export const GESTURES = [
 /** Failures that have their own ticket: `subject gesture format` → issue number. */
 const KNOWN: Record<string, number> = Object.fromEntries([
   ...['aFill', 'aHug', 'aAbs'].flatMap((s) => ['group', 'frame-selection'].flatMap((g) => ['sq', 'wide'].map((f) => [`${s} ${g} ${f}`, 233]))),
-  ...['sq', 'wide'].map((f) => [`mask move ${f}`, 234]),
 ])
 
 type Box = { x: number; y: number; width: number; height: number }

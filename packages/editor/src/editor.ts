@@ -1442,8 +1442,14 @@ function live(
       drag: { anchors: AnchorRef[] } | { ref: AnchorRef; side: Side; from: Point; mirror: boolean }
     }
   let gesture: Gesture | null = null
-  /** A click on one of several selected layers selects it alone, unless the pointer moves first. */
+  /**
+   * What a click selects alone when the pointer doesn't move first: one of several selected
+   * layers, or a layer pressed inside the selection's box, which a drag moves instead; '' for a
+   * press there on nothing, which a click deselects.
+   */
   let clickedAlone: string | null = null
+  /** Where a press that may still be a click went down, on screen: it drags only once it has gone CLICK_SLOP from there. */
+  let pressedAt: Point | null = null
   let pan: { from: Point; camera: Camera } | null = null
   let spaceHeld = false
   const panning = () => tool === 'hand' || spaceHeld
@@ -1886,6 +1892,7 @@ function live(
     }
     stopEditing()
     clickedAlone = null
+    pressedAt = screen
     const grabbed = handleUnder(screen)
     const outer = selectionBox()
     if (grabbed && outer && selection) {
@@ -1902,9 +1909,12 @@ function live(
       return
     }
     const inSelection = (id: string) => selection?.frame === at?.frame.key && selection?.ids.includes(id)
-    // Inside the box around several selected layers, a press moves them all, gaps included.
+    // Inside the selection's box, a press moves the selection, gaps and layers over it included:
+    // a mask, which isn't drawn, or a layer under others, is dragged where it is.
     const inner = at && outer && localTo(at.p, outer.around)
-    const inOuter = inner && outer && selection && selection.ids.length > 1 && outer.frame.key === at.frame.key
+    // A selection that can't move leaves the press to what is under it.
+    const movable = selection && !selection.ids.some((id) => design.nodes[id]?.lock?.move)
+    const inOuter = inner && outer && selection && movable && selection.ids.length > 0 && outer.frame.key === at.frame.key
       && inner.x >= outer.box.x && inner.x <= outer.box.x + outer.box.width && inner.y >= outer.box.y && inner.y <= outer.box.y + outer.box.height
     // A press outside the group or frame double-clicked into leaves it.
     if (entered && !inOuter && !(deepest && insideEntered(deepest.id))) entered = null
@@ -1919,6 +1929,8 @@ function live(
         select(selection?.frame === at.frame.key ? [...selection.ids, hit.id] : [hit.id], at.frame.key)
       } else if (inSelection(hit.id)) {
         if ((selection?.ids.length ?? 0) > 1) clickedAlone = hit.id
+      } else if (inOuter) {
+        clickedAlone = hit.id
       } else {
         select([hit.id], at.frame.key)
       }
@@ -1933,6 +1945,8 @@ function live(
       gesture = { kind: 'marquee', from, to: from, base, baseFrame }
       drawOverlay()
       return
+    } else if (!e.shiftKey) {
+      clickedAlone = ''
     }
     const frame = at && frameOf(selection?.frame)
     const around = selectionBox()?.around ?? []
@@ -2011,6 +2025,8 @@ function live(
       drawOverlay()
       return
     }
+    // A press that may be a click waits until the pointer has really moved, so a shaking tap still clicks.
+    if (clickedAlone !== null && pressedAt && Math.hypot(screen.x - pressedAt.x, screen.y - pressedAt.y) < CLICK_SLOP) return
     clickedAlone = null
     const p = localTo({ x: world.x - gesture.frame.x, y: world.y - gesture.frame.y }, gesture.around)
     if (gesture.kind === 'textSelect') {
@@ -2427,8 +2443,13 @@ function live(
       hug(gesture.roots)
       gesture.end()
     }
-    if (clickedAlone && selection) select([clickedAlone], selection.frame)
+    if (clickedAlone !== null && selection) {
+      // A click that picks a layer outside the group gone into, or nothing, leaves it.
+      if (entered && (!clickedAlone || !insideEntered(clickedAlone))) entered = null
+      select(clickedAlone ? [clickedAlone] : [], selection.frame)
+    }
     clickedAlone = null
+    pressedAt = null
     gesture = null
     pan = null
     showCursor()
