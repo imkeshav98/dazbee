@@ -43,7 +43,7 @@ export function paragraphAt(text: string, offset: number): TextRange {
 }
 
 /** Each character's style in a range: the base, then every run over it, later runs winning. */
-function stylesIn(props: TextNode['props'], range: TextRange): Style[] {
+export function stylesIn(props: TextNode['props'], range: TextRange): Style[] {
   const out: Style[] = []
   for (let i = range.start; i < range.end; i++) {
     const style = { ...props.style }

@@ -197,6 +197,7 @@ export const ar: Messages = {
       actions: 'الإجراءات',
       font: 'الخط',
       bold: 'عريض',
+      italic: 'مائل',
       align: 'المحاذاة',
       fill: 'اللون',
       outline: 'الحدّ',

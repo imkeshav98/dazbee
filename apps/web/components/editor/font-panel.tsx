@@ -55,13 +55,15 @@ function useSelection(editor: Editor) {
  * The base style of the selected text layers: their family and weight, or null where they differ;
  * and the size they are shown at in the format shown, for the card's note.
  */
+/** The one value every entry has, or null. */
+const same = <T,>(values: T[]) => (values.every((v) => v === values[0]) ? values[0] ?? null : null)
+
 function selectedFont(design: Design, ids: string[], formatId: string) {
   const texts = ids.flatMap((id) => {
     const node = design.nodes[id]
     return node?.type === 'text' ? [{ id, style: node.props.style }] : []
   })
   if (texts.length === 0) return null
-  const same = <T,>(values: T[]) => (values.every((v) => v === values[0]) ? values[0] ?? null : null)
   const sizes = texts.map(({ id, style }) => (design.overrides[`format:${formatId}`]?.[id]?.style as Partial<typeof style> | undefined)?.fontSize ?? style.fontSize)
   return { family: same(texts.map(({ style }) => style.fontFamily)), weight: same(texts.map(({ style }) => style.fontWeight)), size: same(sizes) }
 }
@@ -109,7 +111,11 @@ export function FontChooser({ editor, brandId, catalog, refresh, onDone }: { edi
   }, [refresh])
   const listId = useId()
   const [, frameFormat] = editor.selectedFrame()?.split('/') ?? []
-  const current = selectedFont(design, selected, frameFormat && design.formats[frameFormat] ? frameFormat : design.meta.primaryFormatId)
+  // With a range of the text being edited selected, its font is the range's.
+  const range = editor.textSelectionStyles()
+  const current = range
+    ? { family: same(range.map((s) => s.fontFamily)), weight: same(range.map((s) => s.fontWeight)) }
+    : selectedFont(design, selected, frameFormat && design.formats[frameFormat] ? frameFormat : design.meta.primaryFormatId)
   if (!current) return null
   const weights = weightsOf(catalog.find((f) => f.family === current.family))
   const pick = (picked: FontFamily) => {

@@ -46,6 +46,8 @@ export interface Target {
   types: string[]
   /** The layers' names, for a card's note. */
   names: string[]
+  /** Each character's style in the selected range while that one text layer is being edited: what text styling then changes. */
+  range?: Style[] | undefined
 }
 
 export const set = (target: Target, to: (now: Props, i: number) => Patch | null) => {
@@ -516,16 +518,26 @@ function EffectRow({ effect, i, target, p, write }: { effect: Effect; i: number;
 export type Style = Record<string, unknown> & { fontFamily: string; fontWeight: number; fontSize: number; color: string; letterSpacing?: number; lineHeight?: number; textCase?: string }
 
 /** The text's style as one setter per key, and a nudge for its numbers. */
-function textStyle(target: Target) {
-  const styles = target.props.map((pr) => pr.style as Style)
+/**
+ * The text's style, read and set: of the selected range while one text layer is being edited, so
+ * only those characters change, else of the selected layers. A range shifted from mixed values
+ * starts from its first character's.
+ */
+export function textStyle(target: Target) {
+  const { range } = target
+  const styles = range ?? target.props.map((pr) => pr.style as Style)
   return {
+    styles,
     style: (key: string) => shared(styles.map((s) => s[key])),
-    setStyle: (key: string, value: unknown) => set(target, (now) => ({ style: { ...(now.style as Style), [key]: value } })),
+    setStyle: (key: string, value: unknown) =>
+      range ? target.editor.styleTextSelection({ [key]: value }) : set(target, (now) => ({ style: { ...(now.style as Style), [key]: value } })),
     shiftStyle: (key: string, by: number, min?: number, from = 0) =>
-      set(target, (now) => {
-        const s = now.style as Style
-        return { style: { ...s, [key]: tidy(clamp(((s[key] as number | undefined) ?? from) + by, min)) } }
-      }),
+      range
+        ? target.editor.styleTextSelection({ [key]: tidy(clamp(((range[0]?.[key] as number | undefined) ?? from) + by, min)) })
+        : set(target, (now) => {
+          const s = now.style as Style
+          return { style: { ...s, [key]: tidy(clamp(((s[key] as number | undefined) ?? from) + by, min)) } }
+        }),
   }
 }
 
@@ -590,12 +602,21 @@ export function TextSizeField({ target, p }: { target: Target; p: P }) {
 
 /** The bar's colour popover for text: the brand's colours, then any colour by its hex. */
 export function TextColourBody({ target, brandId, p }: { target: Target; brandId: string; p: P }) {
-  const { style } = textStyle(target)
+  const { style, setStyle } = textStyle(target)
   const color = style('color') as string | 'mixed'
+  // A range's colour builds on its first character's, as a layer's on its own.
+  const first = (target.range?.[0]?.color as string | undefined) ?? ''
+  const paint = (hex: string) => (target.range
+    ? setStyle('color', `${hex}${first.slice(7, 9) || 'FF'}`)
+    : set(target, (now) => ({ style: { ...(now.style as Style), color: `${hex}${((now.style as Style).color ?? '').slice(7, 9) || 'FF'}` } })))
   return (
     <div className="flex w-60 flex-col gap-3 p-1">
-      <Swatches target={target} brandId={brandId} p={p} current={color} paint={(hex) => set(target, (now) => ({ style: { ...(now.style as Style), color: `${hex}${((now.style as Style).color ?? '').slice(7, 9) || 'FF'}` } }))} />
-      <ColorField name={p.textColour} value={color} onSet={(to) => set(target, (now) => ({ style: { ...(now.style as Style), color: to((now.style as Style).color) } }))} />
+      <Swatches target={target} brandId={brandId} p={p} current={color} paint={paint} />
+      <ColorField
+        name={p.textColour}
+        value={color}
+        onSet={(to) => (target.range ? setStyle('color', to(first)) : set(target, (now) => ({ style: { ...(now.style as Style), color: to((now.style as Style).color) } })))}
+      />
     </div>
   )
 }
@@ -1078,7 +1099,13 @@ function Swatches({ target, brandId, p, current, paint }: { target: Target; bran
       {now && !offered.includes(now) && <Swatch color={now} label={format(p.currentColour, { hex: now })} on onPick={() => undefined} />}
       {colors.length > 0
         ? colors.map((c) => (
-          <Swatch key={c.token} color={c.value.slice(0, 7)} label={c.name} on={now === c.value.slice(0, 7).toUpperCase()} onPick={() => target.editor.bindSelection('color', brandRef(c.token))} />
+          <Swatch
+            key={c.token}
+            color={c.value.slice(0, 7)}
+            label={c.name}
+            on={now === c.value.slice(0, 7).toUpperCase()}
+            onPick={() => (target.range ? paint(c.value.slice(0, 7)) : target.editor.bindSelection('color', brandRef(c.token)))}
+          />
         ))
         : SWATCHES.map((hex) => <Swatch key={hex} color={hex} label={hex} on={now === hex} onPick={() => paint(hex)} />)}
     </div>
@@ -1309,8 +1336,21 @@ function EffectsCard({ target, p }: { target: Target; p: P }) {
  * drag on the canvas, a change goes to the format shown unless every format is asked for. Null when
  * none of them is in the design.
  */
+/** Renders again whenever the text being edited, or its selected range, changes. */
+function useTextSelection(editor: Editor) {
+  const [, setVersion] = useState(0)
+  useEffect(() => {
+    const stop = editor.onTextSelection(() => setVersion((v) => v + 1))
+    return () => {
+      stop()
+    }
+  }, [editor])
+  return editor.textSelection()
+}
+
 export function useTarget(editor: Editor, ids: string[]): { target: Target; design: Design } | null {
   const { design } = useLiveDesign(editor)
+  const editing = useTextSelection(editor)
   const everyFormat = useEveryFormat()
   const [framePage, frameFormat] = editor.selectedFrame()?.split('/') ?? []
   const formatId = frameFormat && design.formats[frameFormat] ? frameFormat : design.meta.primaryFormatId
@@ -1322,6 +1362,7 @@ export function useTarget(editor: Editor, ids: string[]): { target: Target; desi
     target: {
       editor, ids: live, pageId: framePage ?? '', formatId, everyFormat: everyFormat || Object.keys(design.formats).length === 1,
       props: live.map(placedIn), types: live.map((id) => design.nodes[id]?.type ?? ''), names: live.map((id) => design.nodes[id]?.name ?? ''),
+      range: editing && live.length === 1 && live[0] === editing.id ? (editor.textSelectionStyles() as Style[] | null) ?? undefined : undefined,
     },
   }
 }
