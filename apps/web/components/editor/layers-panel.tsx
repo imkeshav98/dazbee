@@ -5,7 +5,7 @@
 // change is an editor call, so each is one undo step. Only the rows in view are in the page, so a
 // page of hundreds of layers scrolls as smoothly as one of ten.
 import {
-  CaretRightIcon, CircleIcon, EyeIcon, EyeSlashIcon, FolderSimpleIcon, FrameCornersIcon, ImageIcon, LockSimpleIcon,
+  CaretRightIcon, CircleIcon, EyeClosedIcon, EyeIcon, EyeSlashIcon, FolderSimpleIcon, FrameCornersIcon, ImageIcon, LockSimpleIcon,
   LockSimpleOpenIcon, PenNibIcon, SquareIcon, TextTIcon, UniteIcon, type Icon,
 } from '@phosphor-icons/react'
 import { childrenOf } from '@dazbee/doc'
@@ -322,7 +322,7 @@ export function LayersPanel({ editor }: { editor: Editor }) {
     },
     toggle: (id) => toggle(id),
     lock: (id, locked) => editor.setLocked([id], locked),
-    hide: (id, hidden) => editor.setHidden([id], hidden, pageId, formatId),
+    hide: (id, hidden, everyFormat) => editor.setHidden([id], hidden, pageId, formatId, everyFormat),
     dragStart: (id) => {
       dragged.current = id
     },
@@ -357,6 +357,11 @@ export function LayersPanel({ editor }: { editor: Editor }) {
     }
   }, [])
 
+  /** Hidden in some formats and shown in others. */
+  const partlyHidden = (id: string) => {
+    const visible = Object.keys(design.formats).map((f) => (design.overrides[`format:${f}`]?.[id]?.visible ?? design.nodes[id]?.props.visible) !== false)
+    return visible.some(Boolean) && !visible.every(Boolean)
+  }
   const shown = rows.slice(first, last)
   const pictures = useLayerPictures(editor, `${pageId}/${formatId}`, shown.map((row) => row.id), scrolledAt)
   return (
@@ -390,6 +395,7 @@ export function LayersPanel({ editor }: { editor: Editor }) {
                   renaming={renaming === row.id}
                   open={expanded.has(row.id)}
                   hidden={(design.overrides[`format:${formatId}`]?.[row.id]?.visible ?? row.node.props.visible) === false}
+                  partlyHidden={partlyHidden(row.id)}
                   drop={drop?.id === row.id ? drop.where : null}
                   picture={pictures[row.id] ?? null}
                   api={api}
@@ -410,7 +416,7 @@ interface RowApi {
   renamed: (id: string, name: string | null, before: string) => void
   toggle: (id: string) => void
   lock: (id: string, locked: boolean) => void
-  hide: (id: string, hidden: boolean) => void
+  hide: (id: string, hidden: boolean, everyFormat: boolean) => void
   dragStart: (id: string) => void
   dragEnd: () => void
   dragOver: (event: DragEvent<HTMLElement>, row: Row) => boolean
@@ -419,7 +425,7 @@ interface RowApi {
 }
 
 /** One row of the tree. Rendered again only when something it shows changes. */
-const LayerRow = memo(function LayerRow({ row, i, selected, focusable, renaming, open, hidden, drop, picture, api }: {
+const LayerRow = memo(function LayerRow({ row, i, selected, focusable, renaming, open, hidden, partlyHidden, drop, picture, api }: {
   row: Row
   i: number
   selected: boolean
@@ -427,6 +433,7 @@ const LayerRow = memo(function LayerRow({ row, i, selected, focusable, renaming,
   renaming: boolean
   open: boolean
   hidden: boolean
+  partlyHidden: boolean
   drop: Where | null
   picture: string | null
   api: RowApi
@@ -519,11 +526,14 @@ const LayerRow = memo(function LayerRow({ row, i, selected, focusable, renaming,
         )
         : <span data-testid="layer-name" className={cn('min-w-0 flex-1 truncate', hidden && 'line-through decoration-subtle/60')}>{node.name}</span>}
       {kind && !renaming && <span data-testid="layer-kind" className="shrink-0 font-mono text-[11px] text-subtle">{kind}</span>}
+      {/* In this format; with Alt, in every format. A layer hidden only in some shows a half-closed eye. */}
       <RowToggle
-        on={hidden}
+        on={hidden || partlyHidden}
         label={format(hidden ? t.editor.layersPanel.show : t.editor.layersPanel.hide, { name: node.name })}
-        onToggle={() => api.hide(id, !hidden)}
-        icon={hidden ? EyeSlashIcon : EyeIcon}
+        title={`${partlyHidden ? `${t.editor.layersPanel.partlyHidden} · ` : ''}${t.editor.layersPanel.altEvery}`}
+        state={partlyHidden ? 'some' : hidden ? 'hidden' : 'shown'}
+        onToggle={(every) => api.hide(id, every ? !(hidden && !partlyHidden) : !hidden, every)}
+        icon={partlyHidden ? EyeClosedIcon : hidden ? EyeSlashIcon : EyeIcon}
         testId="layer-hide"
       />
       <RowToggle
@@ -537,18 +547,20 @@ const LayerRow = memo(function LayerRow({ row, i, selected, focusable, renaming,
   )
 })
 
-/** Lock or hide on a row: shown while the row is hovered or focused, and always while it is on. */
-function RowToggle({ on, label, onToggle, icon: ToggleIcon, testId }: { on: boolean; label: string; onToggle: () => void; icon: Icon; testId: string }) {
+/** Lock or hide on a row: shown while the row is hovered or focused, and always while it is on. `onToggle` hears whether Alt was held. */
+function RowToggle({ on, label, title, state, onToggle, icon: ToggleIcon, testId }: { on: boolean; label: string; title?: string; state?: string; onToggle: (alt: boolean) => void; icon: Icon; testId: string }) {
   return (
     <button
       type="button"
       tabIndex={-1}
       aria-label={label}
       aria-pressed={on}
+      title={title}
+      data-state={state}
       data-testid={testId}
       onClick={(event) => {
         event.stopPropagation()
-        onToggle()
+        onToggle(event.altKey)
       }}
       className={cn(
         'grid size-6 shrink-0 cursor-pointer place-items-center rounded-[6px] text-subtle hover:bg-hover hover:text-text',

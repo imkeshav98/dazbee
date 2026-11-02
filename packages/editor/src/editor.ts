@@ -2508,6 +2508,11 @@ function live(
     if (live.length > 0) runQuietly(() => session.run('node.hug', { ids: live }))
   }
 
+  /** Hides layers in every format, or shows them in every one: the base, with each format's own visibility gone. One undo step. */
+  function hideInEveryFormat(ids: string[], hidden: boolean) {
+    return runQuietly(() => session.run('node.visibleEverywhere', { ids, visible: !hidden }))
+  }
+
   /** Combines the selected shapes into a live boolean (#44) and selects it. One undo step. */
   function combine(op: 'union' | 'subtract' | 'intersect' | 'exclude') {
     const frame = selection && frameOf(selection.frame)
@@ -2813,6 +2818,12 @@ function live(
         // Hidden in this format only, like a move; the layer stays selected so it can be shown again.
         const shown = selection.ids.some((id) => visibleIn(frame, id))
         runQuietly(() => session.run('node.update', { ids: selection?.ids ?? [], scope: scope(frame), patch: { visible: !shown } }))
+        break
+      }
+      case 'hideEverywhere': {
+        // As the format shown has them: shown anywhere there, hidden in every format; else shown in every one.
+        const shown = selection.ids.some((id) => visibleIn(frame, id))
+        hideInEveryFormat(selection.ids, shown)
         break
       }
       case 'nudgeLeft': case 'nudgeLeftFar': nudge(-far, 0)
@@ -3251,7 +3262,8 @@ function live(
      * Hides layers in one frame's format, or shows them (#59), as one undo step: like the Hide
      * shortcut, in that format only. The first page in the primary format by default.
      */
-    setHidden(ids: string[], hidden: boolean, pageId?: string, formatId?: string) {
+    setHidden(ids: string[], hidden: boolean, pageId?: string, formatId?: string, everyFormat = false) {
+      if (everyFormat) return hideInEveryFormat(ids, hidden)
       const frame = defaultFrame(pageId, formatId)
       return runQuietly(() => session.run('node.update', { ids, scope: scope(frame), patch: { visible: !hidden } }))
     },
