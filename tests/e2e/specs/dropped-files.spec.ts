@@ -16,6 +16,7 @@ test.describe.configure({ timeout: 120_000 })
 const card = readFileSync(join(import.meta.dirname, '..', '..', 'pixels', 'assets', 'card-1.jpg'))
 
 const second = readFileSync(join(import.meta.dirname, '..', '..', 'pixels', 'assets', 'card-2.jpg'))
+const third = readFileSync(join(import.meta.dirname, '..', '..', 'pixels', 'assets', 'card-3.jpg'))
 const notes = Buffer.from('Not a picture.\n')
 
 const design = (nodes: DesignInput['nodes'] = {}): DesignInput => ({
@@ -157,9 +158,10 @@ test('an image dropped on a frame fills it, as one undo step', async ({ browser 
   const name = `Dropped ${randomUUID().slice(0, 8)}`
   expect(await dropFiles(page, await screenPoint(page, 300, 300), [{ name: `${name}.jpg`, type: 'image/jpeg', bytes: card }])).toBe(true)
   const fills = async () => ((await read(page)).nodes as unknown as Record<string, { props: { fills: { type: string; assetId?: string }[] } }>).box?.props.fills
-  await expect.poll(async () => (await fills())?.[0]?.type, { timeout: 30_000 }).toBe('image')
+  // The image goes on top of the frame's colour.
+  await expect.poll(async () => (await fills())?.map((f) => f.type), { timeout: 30_000 }).toEqual(['solid', 'image'])
   const [asset] = await assetsOf(brandId)
-  expect((await fills())?.[0]?.assetId).toBe(asset?.id)
+  expect((await fills())?.[1]?.assetId).toBe(asset?.id)
   // No new layer: the frame took the image, and it is selected.
   expect(Object.keys((await read(page)).nodes)).toEqual(['box'])
   expect(await selection(page)).toEqual(['box'])
@@ -177,13 +179,14 @@ test('a file that is not an image is left out with a notice, while the image dro
   const { page, errors } = await openStage(browser, design(), { brandId })
   const uploads = watchUploads(page, brandId)
 
+  // A photo of its own at each size: the library keeps one asset for the same bytes.
   let count = 0
-  for (const size of [{ width: 1280, height: 760 }, { width: 820, height: 1180 }, { width: 390, height: 844 }]) {
+  for (const [size, bytes] of [[{ width: 1280, height: 760 }, card], [{ width: 820, height: 1180 }, second], [{ width: 390, height: 844 }, third]] as const) {
     await page.setViewportSize(size)
     await page.evaluate(() => window.dazbee?.fitAll())
     await page.evaluate(() => window.dazbee?.drawn())
     const name = `Dropped ${randomUUID().slice(0, 8)}`
-    const files = [{ name: `${name}.jpg`, type: 'image/jpeg', bytes: card }, { name: 'notes.txt', type: 'text/plain', bytes: notes }]
+    const files = [{ name: `${name}.jpg`, type: 'image/jpeg', bytes }, { name: 'notes.txt', type: 'text/plain', bytes: notes }]
     expect(await dropFiles(page, await screenPoint(page, 540, 540), files)).toBe(true)
     await expect(page.getByTestId('notice-toast')).toContainText('notes.txt')
     count++
