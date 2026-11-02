@@ -115,6 +115,11 @@ export const FrameProps = z.object({
   ...commonProps,
   blendMode: ContainerBlendMode.default('pass-through'),
   clip: z.boolean().default(true),
+  /**
+   * The box's corners: one radius for all, or each corner's own from the top left clockwise. One
+   * value, so a format that has its own corners replaces both forms.
+   */
+  cornerRadius: z.union([Radius, z.tuple([Radius, Radius, Radius, Radius])]).default(0),
   fills: Paint.array().default([]),
   /** Lays out the frame's children (#46); left out, they stay where they are put. */
   layout: AutoLayout.optional(),

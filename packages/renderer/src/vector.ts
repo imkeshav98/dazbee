@@ -1,6 +1,6 @@
 import type { Paint } from '@dazbee/schema'
 import type { Canvas, CanvasKit } from '@dazbee/canvaskit'
-import { drawLayers, drawScene, fillPath, layerReach, rectPath, type Box, type Resources } from './draw.ts'
+import { drawLayers, drawScene, fillPath, layerReach, framePath, rectPath, type Box, type Resources } from './draw.ts'
 import type { Scene, SceneLayer } from './scene.ts'
 
 /** The vector file a page is drawn into. */
@@ -81,7 +81,7 @@ function drawContainer(ck: CanvasKit, canvas: Canvas, layer: SceneLayer, vector:
   canvas.save()
   if (props.rotation !== 0) canvas.rotate(props.rotation, props.x + props.width / 2, props.y + props.height / 2)
   if (layer.type === 'frame') {
-    const path = rectPath(ck, props)
+    const path = framePath(ck, layer.props)
     const fills = layer.props.fills
     if (fills.every(svgPaint)) for (const fill of fills) fillPath(ck, canvas, path, fill, props, vector)
     else drawImage(ck, canvas, props, scale, (into) => { for (const fill of fills) fillPath(ck, into, path, fill, props, raster) })

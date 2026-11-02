@@ -42,7 +42,7 @@ const rect = (x: number, y: number, width: number, height: number, color: string
 
 /** One of each kind of layer the panels have cards for, in a Square format, and a Story with `withStory`. */
 const design = (withStory = false): DesignInput => ({
-  meta: { schemaVersion: 3, designId: 'replaced-by-the-api', name: 'Panels inventory', kind: 'single', primaryFormatId: 'sq' },
+  meta: { schemaVersion: 4, designId: 'replaced-by-the-api', name: 'Panels inventory', kind: 'single', primaryFormatId: 'sq' },
   formats: {
     sq: { name: 'Square', width: 1080, height: 1080, order: 'a0' },
     ...(withStory ? { story: { name: 'Story', width: 1080, height: 1920, order: 'a1' } } : {}),
@@ -867,7 +867,7 @@ test.describe('shapes and frames', () => {
     await reloads(page)
   })
 
-  row(38, 'rectangle corners, each corner its own', async (open) => {
+  row(38, 'rectangle and box corners, each corner its own', async (open) => {
     const page = await open()
     await select(page, ['box'])
     const card = page.getByTestId('shape-card')
@@ -882,6 +882,22 @@ test.describe('shapes and frames', () => {
         await expect.poll(async () => ((await shape()).corners as number[])[i]).toBe(radius)
       })
     }
+    // A box has the same corners, in its Box card.
+    await select(page, ['plain'])
+    const box = page.getByTestId('frame-card')
+    await step(page, () => enter(box.getByRole('spinbutton', { name: 'Corners' }), '50'), async () => {
+      await expect.poll(async () => (await props(page, 'plain')).cornerRadius).toBe(50)
+    })
+    await step(page, () => box.getByRole('switch', { name: 'Each corner its own' }).click(), async () => {
+      await expect.poll(async () => (await props(page, 'plain')).cornerRadius).toEqual([50, 50, 50, 50])
+    }, { draws: false })
+    await step(page, () => enter(box.getByRole('spinbutton', { name: 'Top right radius' }), '0'), async () => {
+      await expect.poll(async () => (await props(page, 'plain')).cornerRadius).toEqual([50, 0, 50, 50])
+    })
+    // Back to one radius: the top left's.
+    await step(page, () => box.getByRole('switch', { name: 'Each corner its own' }).click(), async () => {
+      await expect.poll(async () => (await props(page, 'plain')).cornerRadius).toBe(50)
+    })
     await reloads(page)
   })
 

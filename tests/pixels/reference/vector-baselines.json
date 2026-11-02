@@ -99,6 +99,16 @@
       "limit": 0.05
     }
   },
+  "frame-corners p1.square": {
+    "pdf": {
+      "percent": 0.115,
+      "limit": 0.194
+    },
+    "svg": {
+      "percent": 0.033,
+      "limit": 0.092
+    }
+  },
   "groups-and-frames p1.sq": {
     "pdf": {
       "percent": 0.025,

@@ -3,7 +3,7 @@
 // before validation, and never change what they are given.
 
 /** The version every design is written at. */
-export const SCHEMA_VERSION = 3
+export const SCHEMA_VERSION = 4
 
 type Json = Record<string, unknown>
 const isRecord = (v: unknown): v is Json => typeof v === 'object' && v !== null && !Array.isArray(v)
@@ -43,8 +43,14 @@ function toVersion2(design: Json): Json {
  */
 const toVersion3 = (design: Json): Json => design
 
+/**
+ * Version 4 gives frames rounded corners. A version 3 frame has none, and without them a frame's
+ * corners are square, so a version 3 design comes up as it is.
+ */
+const toVersion4 = (design: Json): Json => design
+
 /** Each step takes a design from the version it is listed under to the next one. */
-const STEPS: Record<number, (design: Json) => Json> = { 1: toVersion2, 2: toVersion3 }
+const STEPS: Record<number, (design: Json) => Json> = { 1: toVersion2, 2: toVersion3, 3: toVersion4 }
 
 /** The version a design says it was saved at, if it says one. */
 export const versionOf = (input: unknown) => {

@@ -19,7 +19,7 @@ const row = (direction: 'row' | 'column', gap = 20, pad = 20) => ({ direction, g
 
 /** One page holding a layer of each kind, spread out so each can be pressed on its own. */
 export const matrixDesign = (assetId: string): DesignInput => ({
-  meta: { schemaVersion: 3, designId: 'replaced-by-the-api', name: 'Gesture matrix', kind: 'single', primaryFormatId: 'sq' },
+  meta: { schemaVersion: 4, designId: 'replaced-by-the-api', name: 'Gesture matrix', kind: 'single', primaryFormatId: 'sq' },
   formats: { sq: { name: 'Square', width: 1080, height: 1080, order: 'a0' }, wide: { name: 'Wide', width: 1920, height: 1080, order: 'a1' } },
   pages: { p1: { name: 'Page 1', order: 'a0', fills: [{ type: 'solid', color: '#FFFFFFFF' }] } },
   nodes: {
