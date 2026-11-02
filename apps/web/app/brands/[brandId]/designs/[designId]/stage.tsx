@@ -8,7 +8,7 @@ import { FocusChip, NoticeToast, UndoToast } from '../../../../../components/edi
 import { useLocale, useMessages } from '../../../../../lib/i18n/client.tsx'
 import { format } from '../../../../../lib/i18n/index.ts'
 import { placeAsset } from '../../../../../lib/place-asset.ts'
-import { carriesFiles, isAssetFile, oneFillImage, placeDroppedFiles } from '../../../../../lib/drop-files.ts'
+import { carriesFiles, dragFills, dropAt, isAssetFile, placeDroppedFiles } from '../../../../../lib/drop-files.ts'
 import { PropertyCards } from '../../../../../components/editor/property-cards.tsx'
 import { ZoomControl } from '../../../../../components/editor/zoom-control.tsx'
 import { SelectionBar, StageMenu } from '../../../../../components/editor/selection-bar.tsx'
@@ -111,7 +111,7 @@ export function EditorStage({ designId, designName, brandId, brandName, everyBra
   const notices = useMessages().editor.notices
   const svgParts = useMessages().editor.svgParts
   const locale = useLocale()
-  const [notice, setNotice] = useState<{ text: string; at: number } | null>(null)
+  const [notice, setNotice] = useState<{ text: string; at: number; lasting?: boolean } | null>(null)
   // A right-click on a layer: where, for the menu of its actions, and a count so each right-click opens its own.
   const [menuAt, setMenuAt] = useState<{ x: number; y: number; n: number } | null>(null)
   const dismissNotice = useCallback(() => setNotice(null), [])
@@ -145,21 +145,28 @@ export function EditorStage({ designId, designName, brandId, brandName, everyBra
   const dismissRemoved = useCallback(() => setRemoved(null), [])
 
   // Files dropped from the computer: the images upload into the library and go where they were
-  // dropped; the notice says what is uploading, what was left out and what didn't upload.
+  // dropped. The notice says what was left out and stays while the rest upload, then says what was
+  // left out, what didn't upload and what wasn't placed. The library, if open, shows the uploads.
   const dropped = useMessages().editor.droppedFiles
+  const [uploaded, setUploaded] = useState(0)
   const dropFiles = (files: File[], client: { x: number; y: number }) => {
     if (!editor) return
+    const list = (items: string[]) => new Intl.ListFormat(locale, { type: 'conjunction' }).format(items)
     const take = files.filter(isAssetFile)
     const left = files.filter((file) => !isAssetFile(file))
+    const leftOut = left.length > 0 ? format(dropped.notImages, { names: list(left.map((file) => file.name)) }) : ''
     const at = Date.now()
-    const say = (text: string) => setNotice({ text, at })
-    if (left.length > 0) say(format(dropped.notImages, { names: new Intl.ListFormat(locale, { type: 'conjunction' }).format(left.map((file) => file.name)) }))
-    else if (take[0]) say(take.length === 1 ? format(dropped.uploading, { name: take[0].name }) : format(dropped.uploadingMany, { n: take.length }))
-    if (take.length === 0) return
-    void placeDroppedFiles(editor, brandId, take, client).then(({ failed: [failed], unplaced }) => {
-      if (failed) say(format(dropped.failed, failed))
-      else if (unplaced > 0) say(dropped.offPage)
-      else if (left.length === 0) setNotice((now) => (now?.at === at ? null : now))
+    if (!take[0]) {
+      if (leftOut) setNotice({ text: leftOut, at })
+      return
+    }
+    const uploading = take.length === 1 ? format(dropped.uploading, { name: take[0].name }) : format(dropped.uploadingMany, { n: take.length })
+    setNotice({ text: [leftOut, uploading].filter(Boolean).join(' '), at, lasting: true })
+    void placeDroppedFiles(editor, brandId, take, dropAt(editor, client, take)).then(({ failed, unplaced }) => {
+      setUploaded((n) => n + 1)
+      const didntUpload = failed.length > 0 ? format(dropped.failed, { files: list(failed.map((file) => format(dropped.failedFile, file))) }) : ''
+      const text = [leftOut, didntUpload, unplaced > 0 ? dropped.offPage : ''].filter(Boolean).join(' ')
+      setNotice((now) => (text ? { text, at } : now?.at === at ? null : now))
     })
   }
 
@@ -260,7 +267,7 @@ export function EditorStage({ designId, designName, brandId, brandName, everyBra
       fitted={editor !== null && fittedTo === editor}
       actions={editor ? <ShareMenu editor={editor} brandId={brandId} brandName={brandName} designName={name} everyBrand={everyBrand} /> : undefined}
       account={account}
-      panels={editor ? { layers: <LayersPanel editor={editor} />, assets: <AssetLibrary editor={editor} brandId={brandId} />, brand: <BrandKitPanel editor={editor} brandId={brandId} /> } : {}}
+      panels={editor ? { layers: <LayersPanel editor={editor} />, assets: <AssetLibrary editor={editor} brandId={brandId} changed={uploaded} />, brand: <BrandKitPanel editor={editor} brandId={brandId} /> } : {}}
       inspector={editor ? <PropertyCards editor={editor} brandId={brandId} onRemoved={setRemoved} /> : undefined}
     >
       {/* The design is a picture, so it never mirrors: the stage stays left to right in Arabic too. */}
@@ -282,7 +289,7 @@ export function EditorStage({ designId, designName, brandId, brandName, everyBra
           if (!e.dataTransfer.types.includes(ASSET_DRAG_TYPE) && carriesFiles(e.dataTransfer)) {
             e.preventDefault()
             e.dataTransfer.dropEffect = 'copy'
-            editor.imageTarget(oneFillImage(e.dataTransfer) ? { x: e.clientX, y: e.clientY } : null)
+            editor.imageTarget(dragFills(e.dataTransfer) ? { x: e.clientX, y: e.clientY } : null)
             return
           }
           if (!e.dataTransfer.types.includes(ASSET_DRAG_TYPE)) return
@@ -319,7 +326,7 @@ export function EditorStage({ designId, designName, brandId, brandName, everyBra
         </div>
         <div className="pointer-events-none absolute start-4 bottom-4 z-10">
           {editor && removed && <UndoToast key={removed} editor={editor} message={removed} onDone={dismissRemoved} />}
-          {!removed && notice && <NoticeToast key={notice.at} message={notice.text} onDone={dismissNotice} />}
+          {!removed && notice && <NoticeToast key={notice.at} message={notice.text} onDone={dismissNotice} lasting={notice.lasting ?? false} />}
         </div>
       </div>
       <StageZoom editor={editor} store={zoom} />

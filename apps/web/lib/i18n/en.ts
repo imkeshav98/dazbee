@@ -177,7 +177,8 @@ export const en = {
       uploading: 'Uploading {name}',
       uploadingMany: 'Uploading {n} images',
       notImages: 'Left out, as only PNG, JPEG, WebP and SVG files go on the design: {names}.',
-      failed: '{name} didn’t upload: {reason}',
+      failed: 'Didn’t upload: {files}.',
+      failedFile: '{name} ({reason})',
       offPage: 'Uploaded to the library. Drop an image on a page to place it there.',
     },
     imageTool: {

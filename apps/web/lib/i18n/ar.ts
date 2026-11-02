@@ -166,7 +166,8 @@ export const ar: Messages = {
       uploading: 'جارٍ رفع {name}',
       uploadingMany: 'جارٍ رفع الصور ({n})',
       notImages: 'لم يوضع ما يلي، إذ لا يوضع على التصميم إلا ملفات PNG وJPEG وWebP وSVG: {names}.',
-      failed: 'تعذّر رفع {name}: {reason}',
+      failed: 'تعذّر رفع: {files}.',
+      failedFile: '{name} ({reason})',
       offPage: 'رُفعت إلى المكتبة. أفلت الصورة على صفحة لوضعها فيها.',
     },
     imageTool: {
