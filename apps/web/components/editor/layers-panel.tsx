@@ -17,7 +17,8 @@ import { useLocale, useMessages } from '../../lib/i18n/client.tsx'
 import { dirOf, format } from '../../lib/i18n/index.ts'
 import { useOverlayScroll } from '../ui/overlay-scroll.ts'
 import { useFlyoutNote } from './shell.tsx'
-import { DROP_LINE } from './styles.ts'
+import { afterDraws, sameUrls } from './after-draws.ts'
+import { DROP_LINE, LAYER_PICTURE, LAYER_PICTURE_PICKED } from './styles.ts'
 import { useLiveDesign } from './use-live-design.ts'
 
 /** A row's height in pixels: every row is the same, which is what lets only the rows in view render. */
@@ -75,6 +76,64 @@ function useSelection(editor: Editor) {
   return state
 }
 
+/** How long the list must be still before pictures are drawn, and a slice's budget where the browser can't say, in ms. */
+const PICTURES_AFTER_SCROLL = 300
+const PICTURES_SLICE = 6
+
+/** Runs `work` when the browser is idle, with how many ms it may take; returns the cancel. */
+function whenIdle(work: (left: () => number) => void): () => void {
+  if (typeof requestIdleCallback === 'function') {
+    const id = requestIdleCallback((deadline) => work(() => deadline.timeRemaining()), { timeout: 1000 })
+    return () => cancelIdleCallback(id)
+  }
+  const id = setTimeout(() => {
+    const end = performance.now() + PICTURES_SLICE
+    work(() => end - performance.now())
+  }, 0)
+  return () => clearTimeout(id)
+}
+
+/**
+ * Each listed layer's picture in the frame the panel shows, drawn once the stage has settled and
+ * the list has been still a moment (so a drag or a scroll draws none) and again once fonts and
+ * images arrive, a few at a time in the browser's idle time so no frame waits on them.
+ * `scrolledAt` is when the list last scrolled.
+ */
+function useLayerPictures(editor: Editor, frameKey: string, ids: readonly string[], scrolledAt: { current: number }): Record<string, string | null> {
+  const [pictures, setPictures] = useState<{ frameKey: string; urls: Record<string, string | null> }>({ frameKey, urls: {} })
+  const wanted = ids.join(' ')
+  useEffect(() => {
+    let cancel = () => {}
+    const stop = afterDraws(editor, () => {
+      cancel()
+      const list = wanted.split(' ').filter(Boolean)
+      const next: Record<string, string | null> = {}
+      let i = 0
+      const slice = (left: () => number) => {
+        const still = performance.now() - scrolledAt.current
+        if (still < PICTURES_AFTER_SCROLL) {
+          const id = setTimeout(() => (cancel = whenIdle(slice)), PICTURES_AFTER_SCROLL - still)
+          cancel = () => clearTimeout(id)
+          return
+        }
+        while (i < list.length && left() > 1) {
+          const id = list[i++] ?? ''
+          next[id] = editor.layerThumbnail(id, 44, false, frameKey)
+        }
+        if (i < list.length) cancel = whenIdle(slice)
+        else setPictures((now) => (now.frameKey === frameKey && sameUrls(now.urls, next) ? now : { frameKey, urls: next }))
+      }
+      cancel = whenIdle(slice)
+    })
+    return () => {
+      cancel()
+      stop()
+    }
+  }, [editor, frameKey, wanted, scrolledAt])
+  // Another frame's pictures are not this one's.
+  return pictures.frameKey === frameKey ? pictures.urls : {}
+}
+
 export function LayersPanel({ editor }: { editor: Editor }) {
   const t = useMessages()
   const rtl = dirOf(useLocale()) === 'rtl'
@@ -109,6 +168,7 @@ export function LayersPanel({ editor }: { editor: Editor }) {
   const scrollerRef = useOverlayScroll(scroller)
   // Kept in rows, not pixels: a scroll that shows no new row renders nothing.
   const [view, setView] = useState({ from: 0, to: Math.ceil(400 / LAYER_ROW) + OVERSCAN })
+  const scrolledAt = useRef(0)
   const follow = useCallback((el: HTMLElement) => {
     const from = Math.max(0, Math.floor(el.scrollTop / LAYER_ROW) - OVERSCAN)
     const to = Math.ceil((el.scrollTop + el.clientHeight) / LAYER_ROW) + OVERSCAN
@@ -297,6 +357,8 @@ export function LayersPanel({ editor }: { editor: Editor }) {
     }
   }, [])
 
+  const shown = rows.slice(first, last)
+  const pictures = useLayerPictures(editor, `${pageId}/${formatId}`, shown.map((row) => row.id), scrolledAt)
   return (
     <div className="flex min-h-0 flex-1 flex-col" data-testid="layers">
       {rows.length === 0
@@ -304,7 +366,10 @@ export function LayersPanel({ editor }: { editor: Editor }) {
         : (
           <div
             ref={scrollerRef}
-            onScroll={(event) => follow(event.currentTarget)}
+            onScroll={(event) => {
+              scrolledAt.current = performance.now()
+              follow(event.currentTarget)
+            }}
             className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-1.5 pb-2"
             data-testid="layers-scroller"
           >
@@ -315,7 +380,7 @@ export function LayersPanel({ editor }: { editor: Editor }) {
               className="relative"
               style={{ height: rows.length * LAYER_ROW }}
             >
-              {rows.slice(first, last).map((row, offset) => (
+              {shown.map((row, offset) => (
                 <LayerRow
                   key={row.id}
                   row={row}
@@ -326,13 +391,13 @@ export function LayersPanel({ editor }: { editor: Editor }) {
                   open={expanded.has(row.id)}
                   hidden={(design.overrides[`format:${formatId}`]?.[row.id]?.visible ?? row.node.props.visible) === false}
                   drop={drop?.id === row.id ? drop.where : null}
+                  picture={pictures[row.id] ?? null}
                   api={api}
                 />
               ))}
             </div>
           </div>
         )}
-      <p className="shrink-0 border-t border-line px-[18px] py-2.5 text-[11px] leading-snug text-subtle">{t.editor.layersPanel.hint}</p>
     </div>
   )
 }
@@ -354,7 +419,7 @@ interface RowApi {
 }
 
 /** One row of the tree. Rendered again only when something it shows changes. */
-const LayerRow = memo(function LayerRow({ row, i, selected, focusable, renaming, open, hidden, drop, api }: {
+const LayerRow = memo(function LayerRow({ row, i, selected, focusable, renaming, open, hidden, drop, picture, api }: {
   row: Row
   i: number
   selected: boolean
@@ -363,12 +428,15 @@ const LayerRow = memo(function LayerRow({ row, i, selected, focusable, renaming,
   open: boolean
   hidden: boolean
   drop: Where | null
+  picture: string | null
   api: RowApi
 }) {
   const t = useMessages()
   const { id, node, depth } = row
   const locked = isLocked(node)
   const LayerIcon = iconOf(node)
+  // A frame says whether it is a plain box or stacks what it holds.
+  const kind = node.type === 'frame' ? ((node.props as { layout?: unknown }).layout ? t.editor.layersPanel.stack : t.editor.layersPanel.box) : null
   return (
     <div
       key={id}
@@ -430,8 +498,16 @@ const LayerRow = memo(function LayerRow({ row, i, selected, focusable, renaming,
           </button>
         )
         : <span aria-hidden className="size-4 shrink-0" />}
-      <span aria-hidden className={cn('grid size-[22px] shrink-0 place-items-center rounded-[5px] transition-colors duration-[var(--chrome-fast)]', selected ? 'bg-accent-solid text-on-accent' : 'bg-text/10 text-muted')}>
-        <LayerIcon size={13} weight={selected ? 'bold' : 'regular'} />
+      <span
+        aria-hidden
+        data-testid="layer-picture"
+        className={cn(
+          'grid size-[22px] shrink-0 place-items-center overflow-hidden rounded-[5px] transition-colors duration-[var(--chrome-fast)]',
+          picture ? LAYER_PICTURE : selected ? 'bg-accent-solid text-on-accent' : 'bg-text/10 text-muted',
+          picture && selected && LAYER_PICTURE_PICKED,
+        )}
+      >
+        {picture ? <img src={picture} alt="" draggable={false} className="size-full object-contain" /> : <LayerIcon size={13} weight={selected ? 'bold' : 'regular'} />}
       </span>
       {renaming
         ? (
@@ -441,7 +517,8 @@ const LayerRow = memo(function LayerRow({ row, i, selected, focusable, renaming,
             onDone={(name) => api.renamed(id, name, node.name)}
           />
         )
-        : <span className={cn('min-w-0 flex-1 truncate', hidden && 'line-through decoration-subtle/60')}>{node.name}</span>}
+        : <span data-testid="layer-name" className={cn('min-w-0 flex-1 truncate', hidden && 'line-through decoration-subtle/60')}>{node.name}</span>}
+      {kind && !renaming && <span data-testid="layer-kind" className="shrink-0 font-mono text-[11px] text-subtle">{kind}</span>}
       <RowToggle
         on={hidden}
         label={format(hidden ? t.editor.layersPanel.show : t.editor.layersPanel.hide, { name: node.name })}

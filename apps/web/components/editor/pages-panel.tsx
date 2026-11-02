@@ -11,34 +11,20 @@ import { useMessages } from '../../lib/i18n/client.tsx'
 import { format } from '../../lib/i18n/index.ts'
 import { Tooltip } from '../ui/tooltip.tsx'
 import { CARD, CardHeader } from './card.tsx'
+import { afterDraws, sameUrls } from './after-draws.ts'
 import { useEditorDesign } from './formats-panel.tsx'
 import { CHIP, DROP_LINE, ICON_BUTTON } from './styles.ts'
 
 const ordered = (design: Design) =>
   Object.entries(design.pages).sort(([a, x], [b, y]) => (x.order < y.order ? -1 : x.order > y.order ? 1 : a < b ? -1 : 1))
 
-/**
- * Each page's picture in the primary format, drawn a moment after the stage settles (so a drag
- * doesn't redraw it on every move) and again once its fonts and images have arrived.
- */
+/** Each page's picture in the primary format, drawn once the stage settles and again once its fonts and images arrive. */
 function usePagePictures(editor: Editor): Record<string, string | null> {
   const [pictures, setPictures] = useState<Record<string, string | null>>({})
-  useEffect(() => {
-    let timer: ReturnType<typeof setTimeout> | undefined
-    const draw = () => {
-      const next = Object.fromEntries(Object.keys(editor.session.design().pages).map((id) => [id, editor.pageThumbnail(id, 72)]))
-      setPictures((now) => (Object.keys(next).length === Object.keys(now).length && Object.entries(next).every(([id, url]) => now[id] === url) ? now : next))
-    }
-    const stop = editor.onDraw(() => {
-      clearTimeout(timer)
-      timer = setTimeout(draw, 200)
-    })
-    draw()
-    return () => {
-      clearTimeout(timer)
-      stop()
-    }
-  }, [editor])
+  useEffect(() => afterDraws(editor, () => {
+    const next = Object.fromEntries(Object.keys(editor.session.design().pages).map((id) => [id, editor.pageThumbnail(id, 72)]))
+    setPictures((now) => (sameUrls(now, next) ? now : next))
+  }), [editor])
   return pictures
 }
 

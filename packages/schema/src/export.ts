@@ -5,9 +5,10 @@ import { FormatId, PageId } from './primitives.ts'
 export const ExportType = z.enum(['png', 'jpg', 'pdf', 'svg'])
 export type ExportType = z.infer<typeof ExportType>
 
-/** The tokens a file name is built from. */
-export const EXPORT_NAME_TOKENS = ['design', 'page', 'format'] as const
-export const DEFAULT_EXPORT_NAME = '{design} - {page} - {format}'
+/** The tokens a file name is built from. `{size}` is the format's name as the screen says it; `{format}` is the same. */
+export const EXPORT_NAME_TOKENS = ['design', 'page', 'size', 'format'] as const
+export type ExportNameToken = (typeof EXPORT_NAME_TOKENS)[number]
+export const DEFAULT_EXPORT_NAME = '{design} - {page} - {size}'
 
 /**
  * What to export from a design: some pages in some formats, as one file type. The same request
@@ -20,7 +21,7 @@ export const ExportRequest = z.object({
   type: ExportType,
   /** JPG quality, 1 to 100. */
   quality: z.number().int().min(1).max(100).default(90),
-  /** The file name, from `{design}`, `{page}` and `{format}`; the extension is added. */
+  /** The file name, from `{design}`, `{page}` and `{size}` (or `{format}`); the extension is added. */
   name: z.string().min(1).max(200).default(DEFAULT_EXPORT_NAME),
 })
 export type ExportRequest = z.infer<typeof ExportRequest>

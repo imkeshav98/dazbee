@@ -31,7 +31,7 @@ const design = (): DesignInput => ({
 })
 
 const tree = (page: Page) => page.getByRole('tree')
-const row = (page: Page, name: string) => tree(page).getByRole('treeitem').filter({ has: page.locator(`text="${name}"`) })
+const row = (page: Page, name: string) => tree(page).getByRole('treeitem').filter({ has: page.locator(`[data-testid="layer-name"]:text-is("${name}")`) })
 /** The rows' names as the panel lists them, top to bottom. */
 const listed = (page: Page) => tree(page).getByRole('treeitem').evaluateAll((rows) => rows
   .sort((a, b) => Number.parseFloat((a as HTMLElement).style.top) - Number.parseFloat((b as HTMLElement).style.top))

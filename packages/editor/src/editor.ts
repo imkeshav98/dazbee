@@ -682,7 +682,7 @@ function live(
    * Each layer's preview for the effect tiles, with what it was drawn from: its scene layer and the
    * fonts and images there were then, so one that arrives later draws it again.
    */
-  const thumbnails = new Map<string, { layer: SceneLayer; resources: Resources; url: string }>()
+  const thumbnails = new Map<string, { id: string; layer: SceneLayer; resources: Resources; url: string }>()
   /**
    * Text's preview: "Aa" in the layer's font, weight and colour, as wide as it is; `outlined` draws
    * its outline in its colour with no fill, as the Outline tile shows it.
@@ -707,7 +707,7 @@ function live(
   function layerThumbnail(frame: Frame, id: string, size: number, outlined: boolean): string | null {
     const found = find(cached(frame).scene.layers, id)
     if (!found || found.props.mask) return null
-    const key = outlined ? `${id}/outlined` : id
+    const key = `${frame.key}/${id}${outlined ? '/outlined' : ''}@${size}`
     const kept = thumbnails.get(key)
     // Drawn with what the stage draws with: an image whose bytes are still coming is a placeholder.
     const drawWith = screenResources(session.design())
@@ -732,7 +732,15 @@ function live(
       if (!png) return null
       if (kept) URL.revokeObjectURL(kept.url)
       const url = URL.createObjectURL(new Blob([png.slice()], { type: 'image/png' }))
-      thumbnails.set(key, { layer: found, resources: drawWith, url })
+      thumbnails.set(key, { id, layer: found, resources: drawWith, url })
+      // Deleted layers' pictures go, once there are more pictures than the design could show.
+      if (thumbnails.size > 4 * Object.keys(design.nodes).length + 16) {
+        for (const [other, { id: was, url: old }] of thumbnails) {
+          if (design.nodes[was]) continue
+          URL.revokeObjectURL(old)
+          thumbnails.delete(other)
+        }
+      }
       return url
     } finally {
       surface.delete()
@@ -3512,13 +3520,13 @@ function live(
       return frame ? pageThumbnail(frame, size) : null
     },
     /**
-     * A small picture of a layer for the effect tiles: drawn by the renderer without the layer's own
-     * effects, in the frame the selection is in (the first page in the primary format otherwise),
-     * and kept until the layer or what it is drawn with changes. Text is "Aa" in its look, outlined
-     * with no fill when asked. A PNG object URL, or null.
+     * A small picture of a layer for the effect tiles and the layers panel: drawn by the renderer
+     * without the layer's own effects, in `frameKey` (the frame the selection is in, else the first
+     * page in the primary format), and kept until the layer or what it is drawn with changes. Text
+     * is "Aa" in its look, outlined with no fill when asked. A PNG object URL, or null.
      */
-    layerThumbnail(id: string, size = 96, outlined = false): string | null {
-      const frame = frameOf(selection?.frame) ?? frameOf(`${firstPage()}/${design.meta.primaryFormatId}`)
+    layerThumbnail(id: string, size = 96, outlined = false, frameKey?: string): string | null {
+      const frame = frameOf(frameKey ?? selection?.frame) ?? frameOf(`${firstPage()}/${design.meta.primaryFormatId}`)
       return frame ? layerThumbnail(frame, id, size, outlined) : null
     },
     synced: () => provider.synced && provider.unsyncedChanges === 0,

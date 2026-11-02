@@ -69,8 +69,7 @@ export function BrandKitPanel({ editor, brandId }: { editor: Editor; brandId: st
     const logo = kit.logoAssetId ? `/brands/${encodeURIComponent(brandId)}/assets/${encodeURIComponent(kit.logoAssetId)}/thumbnail` : null
     return (
       <div ref={overlayScroll} data-testid="brand-kit" data-mode="pick" className="flex min-h-0 flex-1 flex-col overflow-y-auto">
-        <div className="flex items-start gap-3 px-[18px] pb-3">
-          <p className="min-w-0 flex-1 text-xs leading-snug text-muted">{t.pickHint}</p>
+        <div className="flex justify-end px-[18px] pb-3">
           <button type="button" onClick={() => setEditing(true)} className={modeButton}>
             <PencilSimpleIcon size={13} aria-hidden />
             {t.edit}
@@ -165,8 +164,7 @@ export function BrandKitPanel({ editor, brandId }: { editor: Editor; brandId: st
 
   return (
     <div ref={overlayScroll} data-testid="brand-kit" data-mode="edit" className="flex min-h-0 flex-1 flex-col overflow-y-auto">
-      <div className="flex items-start gap-3 px-[18px] pb-3">
-        <p className="min-w-0 flex-1 text-xs leading-snug text-muted">{t.applyHint}</p>
+      <div className="flex justify-end px-[18px] pb-3">
         <button type="button" onClick={() => setEditing(false)} className={modeButton}>
           <CheckIcon size={13} aria-hidden />
           {t.done}

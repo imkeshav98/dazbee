@@ -47,6 +47,10 @@ export const FIELD = `h-8 min-w-0 w-full rounded-row border border-line bg-surfa
 /** Where a dragged row would land in a list: a line across it, placed by the row above or below. */
 export const DROP_LINE = 'pointer-events-none absolute inset-x-0 h-0.5 rounded-full bg-accent'
 
+/** A layer's picture in a list row, and the ring it has while the layer is selected. */
+export const LAYER_PICTURE = 'border border-line bg-surface'
+export const LAYER_PICTURE_PICKED = 'border-accent ring-1 ring-accent'
+
 /** A small name over or beside a card's field. */
 export const FIELD_LABEL = 'text-xs font-semibold text-muted'
 
