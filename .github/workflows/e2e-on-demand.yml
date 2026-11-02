@@ -1,18 +1,20 @@
 name: Browser tests on demand
 
 # Runs chosen browser tests on a pushed branch on GitHub's machines, the same way CI's e2e jobs do.
-# `args` are Playwright's: a spec file such as specs/layers.spec.ts, or a filter such as
-# --grep @gesture-matrix-sq.
+# `args` are Playwright's: spec files such as specs/layers.spec.ts, or a filter such as
+# --grep @gesture-matrix-sq. They are split at spaces and quotes are not honoured, so a --grep with a
+# space writes it as s.
 on:
   workflow_dispatch:
     inputs:
       args:
-        description: Playwright arguments, such as specs/layers.spec.ts or --grep @gesture-matrix-sq
+        description: Playwright arguments split at spaces, such as specs/layers.spec.ts or --grep @gesture-matrix-sq (no quotes; s for a space)
         required: true
         type: string
 
 jobs:
-  e2e:
+  on-demand:
+    name: browser tests on demand
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
@@ -26,8 +28,9 @@ jobs:
       - run: docker compose up -d --wait
       - run: pnpm --filter @dazbee/e2e exec playwright install --with-deps chromium
       - run: pnpm turbo run build --filter=@dazbee/web
-      # The arguments reach the shell through the environment, so they are split into words but never run as code.
-      - run: pnpm --filter @dazbee/e2e exec playwright test $ARGS
+      # The arguments reach the shell through the environment, so they are split into words but never
+      # run as code; set -f keeps a * or ? in them from matching file names.
+      - run: set -f; pnpm --filter @dazbee/e2e exec playwright test $ARGS
         env:
           ARGS: ${{ inputs.args }}
       - if: failure()
