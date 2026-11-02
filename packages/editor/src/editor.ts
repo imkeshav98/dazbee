@@ -505,20 +505,27 @@ function live(
     return editing && range && range.end > range.start ? { id: editing.id, range } : null
   }
   /**
-   * Styles the selected range of the text being edited with `style`, as one undo step of its own
-   * between the typing before and after it. False when no range is selected.
+   * Styles a range of a text layer with `style`, as one undo step of its own: while the layer is
+   * being edited, between the typing before and after it. A key left undefined changes nothing,
+   * since a run can't say "as the layer".
    */
-  function styleSelectedText(style: RunStyle): boolean {
-    const selected = selectedText()
-    if (!editing || !selected) return false
-    const { id, range } = selected
-    editing.endGesture()
+  function styleRange({ id, range }: { id: string; range: TextRange }, style: RunStyle) {
+    const keys = Object.fromEntries(Object.entries(style).filter(([, value]) => value !== undefined)) as RunStyle
+    if (Object.keys(keys).length === 0) return
+    const typing = editing?.id === id ? editing : null
+    typing?.endGesture()
     session.gesture(() => {
-      runQuietly(() => session.run('text.edit', { id, op: { kind: 'style', at: range.start, length: range.end - range.start, style } }))
+      runQuietly(() => session.run('text.edit', { id, op: { kind: 'style', at: range.start, length: range.end - range.start, style: keys } }))
       fitText(id)
     })
-    editing.endGesture = session.beginGesture()
+    if (typing) typing.endGesture = session.beginGesture()
     drawOverlay()
+  }
+  /** Styles the selected range of the text being edited; false when no range is selected. */
+  function styleSelectedText(style: RunStyle): boolean {
+    const selected = selectedText()
+    if (!selected) return false
+    styleRange(selected, style)
     return true
   }
 
@@ -3299,8 +3306,11 @@ function live(
     /** Each character's style in the selected range of the text being edited, or null with no range. */
     textSelectionStyles() {
       const selected = selectedText()
-      const node = selected && session.design().nodes[selected.id]
-      return selected && node?.type === 'text' ? stylesIn(node.props, selected.range) : null
+      const now = session.design()
+      const node = selected && now.nodes[selected.id]
+      if (!selected || !editing || node?.type !== 'text') return null
+      const own = now.overrides[`format:${frameOf(editing.frame)?.formatId}`]?.[selected.id]?.style as Partial<typeof node.props.style> | undefined
+      return stylesIn({ ...node.props, style: { ...node.props.style, ...own } }, selected.range)
     },
     /** Styles the selected range of the text being edited, as one undo step; false with no range. */
     styleTextSelection: (style: RunStyle) => styleSelectedText(style),
@@ -3440,11 +3450,16 @@ function live(
      */
     async setFont(fontFamily: string, fontWeight?: number) {
       const ids = (selection?.ids ?? []).filter((id) => session.design().nodes[id]?.type === 'text')
-      if (ids.length === 0) return
+      const range = selectedText()
+      if (ids.length === 0 && !range) return
       loadFamilies([fontFamily])
       await familyLoads.get(fontFamily)
       if (listening.signal.aborted) return
-      if (styleSelectedText({ fontFamily, ...(fontWeight === undefined ? {} : { fontWeight }) })) return
+      if (range) {
+        const node = session.design().nodes[range.id]
+        if (node?.type === 'text' && range.range.end <= node.props.text.length) styleRange(range, { fontFamily, ...(fontWeight === undefined ? {} : { fontWeight }) })
+        return
+      }
       const current = session.design()
       session.gesture(() => {
         for (const id of ids) {

@@ -51,12 +51,13 @@ function useSelection(editor: Editor) {
   return ids
 }
 
+/** The one value every entry has, or null. */
+const same = <T,>(values: T[]) => (values.every((v) => v === values[0]) ? values[0] ?? null : null)
+
 /**
  * The base style of the selected text layers: their family and weight, or null where they differ;
  * and the size they are shown at in the format shown, for the card's note.
  */
-/** The one value every entry has, or null. */
-const same = <T,>(values: T[]) => (values.every((v) => v === values[0]) ? values[0] ?? null : null)
 
 function selectedFont(design: Design, ids: string[], formatId: string) {
   const texts = ids.flatMap((id) => {

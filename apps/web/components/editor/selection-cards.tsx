@@ -517,7 +517,6 @@ function EffectRow({ effect, i, target, p, write }: { effect: Effect; i: number;
 
 export type Style = Record<string, unknown> & { fontFamily: string; fontWeight: number; fontSize: number; color: string; letterSpacing?: number; lineHeight?: number; textCase?: string }
 
-/** The text's style as one setter per key, and a nudge for its numbers. */
 /**
  * The text's style, read and set: of the selected range while one text layer is being edited, so
  * only those characters change, else of the selected layers. A range shifted from mixed values
@@ -1331,11 +1330,6 @@ function EffectsCard({ target, p }: { target: Target; p: P }) {
   )
 }
 
-/**
- * The selected layers as the cards and the bar act on them, in the frame they are selected in: like a
- * drag on the canvas, a change goes to the format shown unless every format is asked for. Null when
- * none of them is in the design.
- */
 /** Renders again whenever the text being edited, or its selected range, changes. */
 function useTextSelection(editor: Editor) {
   const [, setVersion] = useState(0)
@@ -1348,6 +1342,11 @@ function useTextSelection(editor: Editor) {
   return editor.textSelection()
 }
 
+/**
+ * The selected layers as the cards and the bar act on them, in the frame they are selected in: like a
+ * drag on the canvas, a change goes to the format shown unless every format is asked for. Null when
+ * none of them is in the design.
+ */
 export function useTarget(editor: Editor, ids: string[]): { target: Target; design: Design } | null {
   const { design } = useLiveDesign(editor)
   const editing = useTextSelection(editor)
