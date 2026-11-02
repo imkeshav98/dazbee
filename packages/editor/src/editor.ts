@@ -706,7 +706,9 @@ function live(
     if (!found || found.props.mask) return null
     const key = outlined ? `${id}/outlined` : id
     const kept = thumbnails.get(key)
-    if (kept?.layer === found && kept.resources === resources) return kept.url
+    // Drawn with what the stage draws with: an image whose bytes are still coming is a placeholder.
+    const drawWith = screenResources(session.design())
+    if (kept?.layer === found && kept.resources === drawWith) return kept.url
     const layer = found.type === 'text' ? textSample(found, outlined) : found
     const bounds = boundsOf([layer.props])
     if (bounds.width <= 0 && bounds.height <= 0) return null
@@ -720,14 +722,14 @@ function live(
       canvas.translate(size / 2 - (bounds.x + bounds.width / 2) * scale, size / 2 - (bounds.y + bounds.height / 2) * scale)
       canvas.scale(scale, scale)
       const alone = { ...layer, props: { ...layer.props, effects: [] } } as SceneLayer
-      drawPage(ck, canvas, { pageId: frame.pageId, formatId: frame.formatId, width: frame.width, height: frame.height, fills: [], layers: [alone] }, resources)
+      drawPage(ck, canvas, { pageId: frame.pageId, formatId: frame.formatId, width: frame.width, height: frame.height, fills: [], layers: [alone] }, drawWith)
       const image = surface.makeImageSnapshot()
       const png = image.encodeToBytes()
       image.delete()
       if (!png) return null
       if (kept) URL.revokeObjectURL(kept.url)
       const url = URL.createObjectURL(new Blob([png.slice()], { type: 'image/png' }))
-      thumbnails.set(key, { layer: found, resources, url })
+      thumbnails.set(key, { layer: found, resources: drawWith, url })
       return url
     } finally {
       surface.delete()
