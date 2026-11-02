@@ -5,7 +5,7 @@
 import { expect, test, type Page } from '../support/test.ts'
 import { designOf, editorPath, screenPoint, writeOutput } from '../support/editor.ts'
 import { liveDesign, seed } from '../support/seed.ts'
-import { barMenu } from '../support/stage.ts'
+import { barMenu, moreSubmenu } from '../support/stage.ts'
 
 const shoot = async (page: Page, name: string) => writeOutput(`cards-${name}.png`, await page.screenshot())
 const box = async (page: Page, testId: string) => {
@@ -95,8 +95,8 @@ test('a selection swaps the design cards for its own; several layers line up, sp
   // One layer lines up with its format from ⋯ More on the bar by it.
   await expect(arrange).toHaveCount(0)
   await expect(page.getByTestId('bar-line-up')).toHaveCount(0)
-  await page.getByTestId('bar-more').click()
-  await expect(page.getByTestId('bar-more-menu').getByRole('button', { name: 'Align left' })).toBeEnabled()
+  await expect((await moreSubmenu(page, 'line-up')).getByRole('button', { name: 'Align left' })).toBeEnabled()
+  await page.keyboard.press('Escape')
   await page.keyboard.press('Escape')
 
   // Several layers: Line up with the spread outs, Group and the rest on the bar; no Arrange card.

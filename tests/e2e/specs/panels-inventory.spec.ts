@@ -12,7 +12,7 @@ import { designOf, placed, synced, writeOutput } from '../support/editor.ts'
 import { importGoogleFonts } from '../support/fonts.ts'
 import { API_URL, DEV_BRAND } from '../support/seed.ts'
 import { choose } from '../support/select.ts'
-import { barMenu, drag, fillList, moreMenu, openStage, scopeMenu, strokeList } from '../support/stage.ts'
+import { barMenu, drag, fillList, moreAction, moreMenu, openStage, scopeMenu, strokeList } from '../support/stage.ts'
 
 // Each row opens its own design, so CI spreads the rows over its shards.
 test.describe.configure({ mode: 'parallel', timeout: 180_000 })
@@ -357,7 +357,7 @@ test.describe('every selection', () => {
     // Several layers group and go in a box from the bar by them.
     const bar = page.getByTestId('selection-bar')
     // One layer's actions are in ⋯ More on the bar by it.
-    const more = async (name: string) => (await moreMenu(page)).getByRole('button', { name }).click()
+    const more = (name: string) => moreAction(page, name)
     await step(page, () => more('Duplicate'), async () => {
       await expect.poll(async () => (await children(page, 'p1')).length).toBe(10)
     })
@@ -565,10 +565,10 @@ test.describe('text', () => {
   row(20, 'vertical alignment: top, middle, bottom', async (open) => {
     const page = await open()
     await select(page, ['headline'])
-    // Up and down in the box is in ⋯ More on the bar by the text.
-    const field = async () => (await moreMenu(page)).getByRole('combobox', { name: 'Up and down in the box' })
+    // Up and down in the box is in the bar's Align, under the alignment.
+    const pick = async (to: string) => (await barMenu(page, 'align')).getByRole('radiogroup', { name: 'Up and down in the box' }).locator(`[data-value="${to}"]`).click()
     for (const align of ['bottom', 'middle', 'top']) {
-      await step(page, async () => choose(await field(), align), async () => {
+      await step(page, () => pick(align), async () => {
         await expect.poll(async () => (await props(page, 'headline')).verticalAlign).toBe(align)
       })
     }
@@ -1007,7 +1007,7 @@ test.describe('photos', () => {
   row(49, 'use as mask', async (open) => {
     const page = await open()
     await select(page, ['photo'])
-    const mask = async () => (await moreMenu(page)).getByRole('button', { name: 'Use as mask' }).click()
+    const mask = () => moreAction(page, 'Use as mask')
     await step(page, mask, async () => { await expect.poll(async () => (await props(page, 'photo')).mask).toBe('alpha') })
     await step(page, mask, async () => { await expect.poll(async () => (await props(page, 'photo')).mask).toBeFalsy() })
     await reloads(page)

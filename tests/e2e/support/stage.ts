@@ -3,7 +3,7 @@
 // table, and reading layers back from the document.
 import { pressFor, type ShortcutAction } from '@dazbee/editor/shortcuts'
 import type { DesignInput } from '@dazbee/schema'
-import type { Browser, Page } from '@playwright/test'
+import type { Browser, Locator, Page } from '@playwright/test'
 import { designOf, openTabs, placed, screenPoint } from './editor.ts'
 import { seed } from './seed.ts'
 
@@ -109,4 +109,33 @@ export const fillList = async (page: Page) => {
 export const strokeList = async (page: Page) => {
   const card = page.getByTestId('fill-card')
   return ((await card.isVisible()) ? card : await barMenu(page, 'outline')).getByTestId('stroke-list')
+}
+
+/** The menus beside ⋯ More's rows, by their test ids. */
+const SUBMENUS = ['line-up', 'order', 'group']
+
+/**
+ * Clicks an action of ⋯ More, or of the right-click menu when `menu` is it, by the start of its name:
+ * at the top of the menu, or in the menu beside a row (Line up ▸, Order ▸, Group ▸).
+ */
+export async function moreAction(page: Page, name: string, menu?: Locator) {
+  const root = menu ?? (await moreMenu(page))
+  const named = (within: Locator) => within.getByRole('button', { name: new RegExp(`^${name}`) })
+  if ((await named(root).count()) > 0) return named(root).click()
+  for (const id of SUBMENUS) {
+    const row = root.getByTestId(`more-${id}`)
+    if ((await row.count()) === 0) continue
+    await row.click()
+    const items = named(page.getByTestId(`more-${id}-menu`))
+    if ((await items.count()) > 0) return items.click()
+    await page.keyboard.press('Escape')
+  }
+  throw new Error(`no ${name} in the menu`)
+}
+
+/** Opens the menu beside one of ⋯ More's rows, `more-<id>`, and gives it. */
+export async function moreSubmenu(page: Page, id: string) {
+  const sub = page.getByTestId(`more-${id}-menu`)
+  if (!(await sub.isVisible())) await (await moreMenu(page)).getByTestId(`more-${id}`).click()
+  return sub
 }

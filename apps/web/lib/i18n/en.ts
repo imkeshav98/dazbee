@@ -196,6 +196,9 @@ export const en = {
     bar: {
       label: 'Selection',
       lineUp: 'Line up',
+      order: 'Order',
+      grouping: 'Group',
+      putInBox: 'Put in a box',
       combine: 'Combine',
       box: 'Box',
       autoLayout: 'Stack',

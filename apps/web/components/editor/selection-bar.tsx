@@ -5,16 +5,15 @@
 // gesture runs or they are off the stage. It holds what people change most; ⋯ More, and a
 // right-click on a layer, hold the layers' own actions.
 import * as Popover from '@radix-ui/react-popover'
-import { BoundingBoxIcon, DotsThreeIcon, RowsIcon, SelectionPlusIcon } from '@phosphor-icons/react'
+import { BoundingBoxIcon, CaretRightIcon, DotsThreeIcon, RowsIcon, SelectionPlusIcon } from '@phosphor-icons/react'
 import type { Editor, ShortcutAction } from '@dazbee/editor'
-import { useEffect, useState, type FocusEvent, type KeyboardEvent } from 'react'
+import { useEffect, useState, type FocusEvent, type KeyboardEvent, type ReactNode } from 'react'
 import { cn } from '../../lib/cn.ts'
-import { useMessages } from '../../lib/i18n/client.tsx'
-import { format } from '../../lib/i18n/index.ts'
+import { useLocale, useMessages } from '../../lib/i18n/client.tsx'
+import { dirOf, format } from '../../lib/i18n/index.ts'
 import { ALIGN, COMBINE, DISTRIBUTE, keyOf, useSelection } from './arrange-panel.tsx'
 import { BarPopover, keepFocus } from './bar-popover.tsx'
-import { Choice } from './fields.tsx'
-import { RotationField, set, useTarget } from './selection-cards.tsx'
+import { RotationField, useTarget } from './selection-cards.tsx'
 import { BAR, BAR_BUTTON, BAR_DIVIDER, ICON_BUTTON, MENU_DIVIDER, MENU_ITEM, MENU_KEY, POPOVER } from './styles.ts'
 import { ShapeBar } from './shape-bar.tsx'
 import { TextBar } from './text-bar.tsx'
@@ -93,10 +92,54 @@ function AlignRow({ editor }: { editor: Editor }) {
   )
 }
 
+/** A row of ⋯ More that opens a short menu beside it: Enter or the arrow towards it opens it, the arrow back or Esc closes it. */
+function SubMenu({ label, testId, children }: { label: string; testId: string; children: ReactNode }) {
+  const [open, setOpen] = useState(false)
+  const rtl = dirOf(useLocale()) === 'rtl'
+  const [toward, back] = rtl ? ['ArrowLeft', 'ArrowRight'] : ['ArrowRight', 'ArrowLeft']
+  return (
+    <Popover.Root open={open} onOpenChange={setOpen}>
+      <Popover.Trigger asChild>
+        <button
+          type="button"
+          aria-haspopup="true"
+          data-testid={`more-${testId}`}
+          onKeyDown={(event) => {
+            if (event.key !== toward) return
+            event.preventDefault()
+            setOpen(true)
+          }}
+          className={MENU_ITEM}
+        >
+          {label}
+          <CaretRightIcon size={12} weight="bold" aria-hidden className="text-subtle rtl:-scale-x-100" />
+        </button>
+      </Popover.Trigger>
+      <Popover.Portal>
+        <Popover.Content
+          side={rtl ? 'left' : 'right'}
+          align="start"
+          sideOffset={8}
+          collisionPadding={12}
+          aria-label={label}
+          data-testid={`more-${testId}-menu`}
+          onKeyDown={(event) => {
+            if (event.key !== back) return
+            event.preventDefault()
+            setOpen(false)
+          }}
+          className={cn(POPOVER, 'flex min-w-52 flex-col p-1.5')}
+        >
+          {children}
+        </Popover.Content>
+      </Popover.Portal>
+    </Popover.Root>
+  )
+}
+
 /**
- * The layers' own actions, for ⋯ More and the right-click menu: for one layer its line up, then
- * duplicate, order, group and ungroup, put in a box, lock, hide, use as mask, the turn,
- * and for text where it sits up and down in its box.
+ * The layers' own actions, for ⋯ More and the right-click menu, in three short groups with only what
+ * applies: duplicate, lock and hide; line up (one layer), order and group as menus beside; the turn.
  */
 export function LayerActions({ editor, ids, onDone }: { editor: Editor; ids: string[]; onDone: () => void }) {
   const t = useMessages()
@@ -120,42 +163,31 @@ export function LayerActions({ editor, ids, onDone }: { editor: Editor; ids: str
   const hidden = target.props.every((pr) => pr.visible === false)
   const masks = target.props.every((pr) => Boolean(pr.mask))
   const sized = target.types.every((type) => type !== 'group' && type !== 'boolean')
-  const text = target.types.every((type) => type === 'text')
-  const aligns = new Set(target.props.map((pr) => (pr.verticalAlign ?? 'top') as 'top' | 'middle' | 'bottom'))
   return (
     <>
-      {ids.length === 1 && (
-        <>
-          <div className="px-1 pb-1"><AlignRow editor={editor} /></div>
-          <div className={MENU_DIVIDER} />
-        </>
-      )}
       {row('duplicate', t.editor.arrange.duplicate)}
-      <div className={MENU_DIVIDER} />
-      {(['bringToFront', 'bringForward', 'sendBackward', 'sendToBack'] as const).map((action) => row(action, t.editor.arrange[action]))}
-      <div className={MENU_DIVIDER} />
-      {ids.length > 1 && row('group', t.editor.arrange.group)}
-      {target.types.some((type) => type === 'group') && row('ungroup', t.editor.arrange.ungroup)}
-      {row('frameSelection', b.box)}
       <button type="button" onClick={() => { editor.setLocked(target.ids, !locked); onDone() }} className={MENU_ITEM}>{locked ? b.unlock : b.lock}</button>
       <button type="button" onClick={() => { editor.setHidden(target.ids, !hidden, target.pageId, target.formatId); onDone() }} className={MENU_ITEM}>{hidden ? b.show : b.hide}</button>
-      {row('mask', t.editor.arrange.mask, masks)}
+      <div className={MENU_DIVIDER} />
+      {ids.length === 1 && (
+        <SubMenu label={b.lineUp} testId="line-up">
+          <AlignRow editor={editor} />
+        </SubMenu>
+      )}
+      <SubMenu label={b.order} testId="order">
+        {(['bringToFront', 'bringForward', 'sendBackward', 'sendToBack'] as const).map((action) => row(action, t.editor.arrange[action]))}
+      </SubMenu>
+      <SubMenu label={b.grouping} testId="group">
+        {ids.length > 1 && row('group', t.editor.arrange.group)}
+        {row('frameSelection', b.putInBox)}
+        {row('mask', t.editor.arrange.mask, masks)}
+        {target.types.some((type) => type === 'group') && row('ungroup', t.editor.arrange.ungroup)}
+      </SubMenu>
       {sized && (
         <>
           <div className={MENU_DIVIDER} />
           <div className="px-1.5 py-1"><RotationField target={target} p={p} /></div>
         </>
-      )}
-      {text && (
-        <div className="px-1.5 pt-1 pb-1">
-          <Choice
-            name={b.upDown}
-            value={aligns.size === 1 ? [...aligns][0] : 'mixed'}
-            options={['top', 'middle', 'bottom']}
-            labels={p.verticalAligns}
-            onSet={(verticalAlign) => set(target, () => ({ verticalAlign }))}
-          />
-        </div>
       )}
     </>
   )
