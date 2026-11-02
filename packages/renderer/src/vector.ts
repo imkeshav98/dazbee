@@ -92,8 +92,8 @@ function drawContainer(ck: CanvasKit, canvas: Canvas, layer: SceneLayer, vector:
     // The strokes over what is inside, outside the clip, as drawContent draws them. The canvas is
     // turned already, so a picture of them covers the frame's own box and their reach.
     const { strokes } = layer.props
-    if (strokes.every((s) => svgPaint(s.paint))) strokePath(ck, canvas, path, layer.props, vector, null, true)
-    else drawImage(ck, canvas, outset(layer.props, strokeReach(strokes, false)), scale, (into) => strokePath(ck, into, path, layer.props, raster, null, true))
+    if (strokes.every((s) => svgPaint(s.paint))) strokePath(ck, canvas, path, layer.props, vector, null)
+    else drawImage(ck, canvas, outset(layer.props, strokeReach(strokes, false)), scale, (into) => strokePath(ck, into, path, layer.props, raster, null))
     path.delete()
   } else {
     for (const unit of maskUnits(layer.children)) drawUnit(ck, canvas, unit, 'svg', vector, raster, scale)
