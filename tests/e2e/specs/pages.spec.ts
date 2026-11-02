@@ -67,7 +67,8 @@ test('a page is duplicated with its layers, reordered, renamed, deleted and brou
   design = await designIn(page)
   expect(design.pages[copy]).toBeUndefined()
   expect(layersOf(design, copy)).toHaveLength(0)
-  await expect(pages.locator('[data-page="p1"]').getByRole('button', { name: 'Delete page' })).toBeDisabled()
+  // The last page's Delete, shown while its row is hovered, is off.
+  await expect(pages.locator('[data-page="p1"]').getByRole('button', { name: 'Delete page', includeHidden: true })).toBeDisabled()
   writeOutput('pages-2-deleted.png', await page.screenshot())
   await toast.getByRole('button', { name: 'Undo' }).click()
   await expect(pages.getByRole('listitem')).toHaveCount(2)

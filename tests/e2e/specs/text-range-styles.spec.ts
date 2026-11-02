@@ -38,6 +38,15 @@ async function dblclick(page: Page, x: number, y: number) {
   await drawn(page)
 }
 const undo = (page: Page) => page.evaluate(() => window.dazbee?.perform('undo'))
+/**
+ * Closes the bar's popover `bar-<id>` with Esc and waits for the focus to be back on its button,
+ * which happens a moment after it closes: a popover opened before then would lose the focus and close.
+ */
+async function closeMenu(page: Page, id: string) {
+  await page.keyboard.press('Escape')
+  await expect(page.getByTestId(`bar-${id}-menu`)).toBeHidden()
+  await expect(page.getByTestId(`bar-${id}`)).toBeFocused()
+}
 
 test('one word made pink, larger and another font from the bar; the rest keeps its style; each one undo step', async ({ browser }) => {
   const { page, errors } = await openStage(browser, design())
@@ -53,13 +62,13 @@ test('one word made pink, larger and another font from the bar; the rest keeps i
   await colour.getByRole('textbox', { name: 'Text colour hex' }).fill('ff48b0')
   await colour.getByRole('textbox', { name: 'Text colour hex' }).press('Enter')
   await expect.poll(() => runOver(page, 'body', 6, 11)).toMatchObject({ color: '#FF48B0FF' })
-  await page.keyboard.press('Escape')
+  await closeMenu(page, 'colour')
 
   const size = await barMenu(page, 'size')
   await size.getByRole('spinbutton', { name: 'Size' }).fill('96')
   await size.getByRole('spinbutton', { name: 'Size' }).press('Enter')
   await expect.poll(() => runOver(page, 'body', 6, 11)).toMatchObject({ color: '#FF48B0FF', fontSize: 96 })
-  await page.keyboard.press('Escape')
+  await closeMenu(page, 'size')
 
   // A built-in family, whose files the editor has already.
   await barMenu(page, 'font')

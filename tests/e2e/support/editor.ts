@@ -92,13 +92,6 @@ export function writeOutput(name: string, content: string | Buffer) {
   writeFileSync(join(OUTPUT, name), content)
 }
 
-/**
- * Waits until no animation or transition with an end is running, so a screenshot shows the page at
- * rest. Ones that never end, such as the AI button's glow, are left running.
- */
-export const atRest = (page: Page) =>
-  page.waitForFunction(() => document.getAnimations().every((a) => a.playState !== 'running' || a.effect?.getComputedTiming().endTime === Infinity), undefined, { timeout: 10_000 })
-
 /** Restarts the sync server container and waits until it is healthy again. */
 export function restartSyncServer() {
   const root = join(import.meta.dirname, '..', '..', '..')
