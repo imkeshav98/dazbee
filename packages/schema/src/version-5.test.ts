@@ -1,5 +1,5 @@
-// Schema version 5: frames have outlines, the same stroke list shapes have, and a version 4 design
-// comes up as it is.
+// Schema version 5: frames have the stroke list shapes have, and a version 4 design comes up as
+// it is.
 import { describe, expect, it } from 'vitest'
 import { migrateDesign, parseDesign, SCHEMA_VERSION } from './index.ts'
 
@@ -12,7 +12,7 @@ const designWith = (frame: Record<string, unknown>, version = SCHEMA_VERSION) =>
 })
 const outline = { paint: { type: 'solid', color: '#1A1420FF' }, width: 6, align: 'outside', dashes: [12, 6] }
 
-describe('frame outlines', () => {
+describe('frame strokes', () => {
   it('keeps a frame\'s strokes, filled in as a shape\'s are, in format overrides too', () => {
     const result = parseDesign({ ...designWith({ strokes: [outline] }), overrides: { 'format:sq': { f: { strokes: [] } } } })
     if (!result.success) throw new Error(result.errors.join('\n'))
@@ -20,7 +20,7 @@ describe('frame outlines', () => {
     expect(result.design.overrides['format:sq']?.f?.strokes).toEqual([])
   })
 
-  it('gives a frame without them no outline', () => {
+  it('gives a frame without them no strokes', () => {
     const result = parseDesign(designWith({}))
     if (!result.success) throw new Error(result.errors.join('\n'))
     expect(result.design.nodes.f?.props).toMatchObject({ strokes: [] })

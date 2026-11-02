@@ -1,8 +1,8 @@
 {
   "meta": {
     "schemaVersion": 5,
-    "designId": "fixture-frame-outlines",
-    "name": "Frame outlines",
+    "designId": "fixture-frame-strokes",
+    "name": "Frame strokes",
     "kind": "single",
     "primaryFormatId": "square"
   },

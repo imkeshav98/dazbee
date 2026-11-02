@@ -1,6 +1,6 @@
 import type { Paint } from '@dazbee/schema'
 import type { Canvas, CanvasKit } from '@dazbee/canvaskit'
-import { drawLayers, drawScene, fillPath, framePath, layerReach, rectPath, strokePath, type Box, type Resources } from './draw.ts'
+import { drawLayers, drawScene, fillPath, framePath, layerReach, outset, rectPath, strokePath, strokeReach, type Box, type Resources } from './draw.ts'
 import type { Scene, SceneLayer } from './scene.ts'
 
 /** The vector file a page is drawn into. */
@@ -89,10 +89,11 @@ function drawContainer(ck: CanvasKit, canvas: Canvas, layer: SceneLayer, vector:
     if (layer.props.clip) canvas.clipPath(path, ck.ClipOp.Intersect, true)
     for (const unit of maskUnits(layer.children)) drawUnit(ck, canvas, unit, 'svg', vector, raster, scale)
     canvas.restore()
-    // The outline over what is inside, outside the clip, as drawLayer draws it.
+    // The strokes over what is inside, outside the clip, as drawContent draws them. The canvas is
+    // turned already, so a picture of them covers the frame's own box and their reach.
     const { strokes } = layer.props
     if (strokes.every((s) => svgPaint(s.paint))) strokePath(ck, canvas, path, layer.props, vector, null, true)
-    else drawImage(ck, canvas, layerReach(ck, layer, raster), scale, (into) => strokePath(ck, into, path, layer.props, raster, null, true))
+    else drawImage(ck, canvas, outset(layer.props, strokeReach(strokes, false)), scale, (into) => strokePath(ck, into, path, layer.props, raster, null, true))
     path.delete()
   } else {
     for (const unit of maskUnits(layer.children)) drawUnit(ck, canvas, unit, 'svg', vector, raster, scale)

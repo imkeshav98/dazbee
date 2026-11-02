@@ -78,7 +78,7 @@ The cards at the stage's top end that edit the selection, or the design when not
 _Avoid_: Inspector (in code), properties panel
 
 **Frame**:
-A layer that holds other layers in a box of its own: it paints fills and strokes behind them, hides what reaches past its edges unless told not to, and can carry auto layout.
+A layer that holds other layers in a box of its own: it paints fills behind them and strokes over them, hides what reaches past its edges (never its own strokes) unless told not to, and can carry auto layout.
 Shown as: Box
 _Avoid_ (in code and docs): Container, board, box
 

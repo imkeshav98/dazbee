@@ -1,5 +1,5 @@
-// Box outlines: a frame's strokes follow its corners, sit inside, on or outside its edge, go over
-// what is inside it and are never cut by its clip, on the CPU surface and in the PDF and SVG.
+// Frame strokes: they follow the frame's corners, sit inside, on or outside its edge, go over what
+// is inside it and are never cut by its clip, on the CPU surface and in the PDF and SVG.
 import { PDFiumLibrary } from '@hyzyla/pdfium'
 import { renderDesign, renderVector } from '@dazbee/renderer'
 import { loadCanvasKit } from '@dazbee/renderer/node'
@@ -13,7 +13,7 @@ const pdfium = await PDFiumLibrary.init()
 afterAll(() => pdfium.destroy())
 
 const solid = (color: string) => [{ type: 'solid', color }]
-/** A 300 square page: a blue box at 50,50, 200 square, clipping a red square that fills it and more, outlined in black. */
+/** A 300 square page: a blue frame at 50,50, 200 square, clipping a red square that fills it and more, stroked in black. */
 const design = (align: 'inside' | 'center' | 'outside', frame: Record<string, unknown> = {}) => ({
   meta: { schemaVersion: 5, designId: 'd', name: 'Outlines', kind: 'single', primaryFormatId: 'f' },
   formats: { f: { name: 'F', width: 300, height: 300, order: 'a0' } },
@@ -32,7 +32,7 @@ const WHITE = [255, 255, 255]
 const RED = [224, 32, 32]
 const BLACK = [0, 0, 0]
 
-describe('box outlines', () => {
+describe('frame strokes', () => {
   it('sit inside, on or outside the edge, over what is inside and past the clip', () => {
     const inside = renderDesign(ck, design('inside'), 'p1', 'f', bytes)
     expect(at(inside, 52, 150)).toEqual(BLACK)
@@ -43,7 +43,7 @@ describe('box outlines', () => {
     expect(at(center, 46, 150)).toEqual(BLACK)
     expect(at(center, 53, 150)).toEqual(BLACK)
     expect(at(center, 57, 150)).toEqual(RED)
-    // Outside the clip, the outline shows whole.
+    // Outside the clip, the stroke shows whole.
     const outside = renderDesign(ck, design('outside'), 'p1', 'f', bytes)
     expect(at(outside, 42, 150)).toEqual(BLACK)
     expect(at(outside, 47, 150)).toEqual(BLACK)
@@ -51,9 +51,9 @@ describe('box outlines', () => {
     expect(at(outside, 38, 150)).toEqual(WHITE)
   })
 
-  it('follow the box\'s corners', () => {
+  it('follow the frame\'s corners', () => {
     const r = renderDesign(ck, design('inside', { cornerRadius: 60 }), 'p1', 'f', bytes)
-    // The square corner's spot is outside the rounded box; along the curve the outline shows.
+    // The square corner's spot is outside the rounded frame; along the curve the stroke shows.
     expect(at(r, 53, 53)).toEqual(WHITE)
     expect(at(r, 150, 53)).toEqual(BLACK)
     const each = renderDesign(ck, design('outside', { cornerRadius: [0, 80, 0, 80] }), 'p1', 'f', bytes)
@@ -62,13 +62,22 @@ describe('box outlines', () => {
   })
 
   it('draw the same in the PDF and the SVG as on the CPU', async () => {
-    for (const [align, frame] of [['inside', { cornerRadius: 40 }], ['center', { cornerRadius: [0, 60, 10, 80] }], ['outside', { cornerRadius: 40, clip: false }]] as const) {
+    const angular = { paint: { type: 'angular', center: { x: 0.5, y: 0.5 }, angle: 0, stops: [{ offset: 0, color: '#E0157FFF' }, { offset: 1, color: '#3D6BFFFF' }] }, width: 12, align: 'outside' }
+    const cases = [
+      ['inside', { cornerRadius: 40 }],
+      ['center', { cornerRadius: [0, 60, 10, 80] }],
+      ['outside', { cornerRadius: 40 }],
+      ['outside', { cornerRadius: 40, clip: false }],
+      // A paint SVG can't hold is drawn as a picture, on a turned frame too.
+      ['outside', { cornerRadius: 20, rotation: 90, height: 100, strokes: [angular] }],
+    ] as const
+    for (const [align, frame] of cases) {
       const json = design(align, frame)
       const cpu = overWhite(renderDesign(ck, json, 'p1', 'f', bytes))
       const pdf = await rasterisePdf(pdfium, renderVector(ck, json, 'p1', 'f', bytes, 'pdf'))
       const svg = rasteriseSvg(renderVector(ck, json, 'p1', 'f', bytes, 'svg'))
-      expect(vectorDifference(cpu, pdf), `PDF ${align}`).toBeLessThan(1)
-      expect(vectorDifference(cpu, svg), `SVG ${align}`).toBeLessThan(1)
+      expect(vectorDifference(cpu, pdf), `PDF ${align} ${JSON.stringify(frame)}`).toBeLessThan(1)
+      expect(vectorDifference(cpu, svg), `SVG ${align} ${JSON.stringify(frame)}`).toBeLessThan(1)
     }
   })
 })

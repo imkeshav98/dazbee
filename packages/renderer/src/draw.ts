@@ -279,7 +279,7 @@ const union = (a: Box, b: Box): Box => {
   const y = Math.min(a.y, b.y)
   return { x, y, width: Math.max(a.x + a.width, b.x + b.width) - x, height: Math.max(a.y + a.height, b.y + b.height) - y }
 }
-const outset = (box: Box, by: number): Box => ({ x: box.x - by, y: box.y - by, width: box.width + 2 * by, height: box.height + 2 * by })
+export const outset = (box: Box, by: number): Box => ({ x: box.x - by, y: box.y - by, width: box.width + 2 * by, height: box.height + 2 * by })
 
 /** The box after turning it about its own centre, as the axis-aligned box around the result. */
 function rotated(box: Box, about: Box, degrees: number): Box {
@@ -320,7 +320,7 @@ function drawnBounds(ck: CanvasKit, layer: SceneLayer, resources: Resources): Bo
  * How far strokes reach past the outline: a mitred corner up to the miter limit × half the
  * width, a square cap √2 × half; a line's ends reach END_SIZE widths.
  */
-function strokeReach(strokes: readonly Stroke[], line: boolean) {
+export function strokeReach(strokes: readonly Stroke[], line: boolean) {
   return Math.max(0, ...strokes.map((s) => {
     if (line) return s.width * END_SIZE
     const half = s.align === 'inside' ? 0 : s.align === 'center' ? s.width / 2 : s.width

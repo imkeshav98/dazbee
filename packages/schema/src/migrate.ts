@@ -50,8 +50,8 @@ const toVersion3 = (design: Json): Json => design
 const toVersion4 = (design: Json): Json => design
 
 /**
- * Version 5 gives frames outlines. A version 4 frame has none, and without them a frame draws no
- * outline, so a version 4 design comes up as it is.
+ * Version 5 gives frames strokes. A version 4 frame has none, and without them a frame draws no
+ * stroke, so a version 4 design comes up as it is.
  */
 const toVersion5 = (design: Json): Json => design
 
