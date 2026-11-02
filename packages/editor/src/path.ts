@@ -478,6 +478,15 @@ export function constrain(from: Point, to: Point): Point {
   return { x: from.x + Math.cos(angle) * length, y: from.y + Math.sin(angle) * length }
 }
 
+/** The whole path scaled about the origin, its handles with it. */
+export function scalePath(path: PenPath, sx: number, sy: number): PenPath {
+  const at = (p: Point) => ({ x: p.x * sx, y: p.y * sy })
+  return path.map((c) => ({
+    ...c,
+    anchors: c.anchors.map((a) => ({ ...at(a), ...(a.in ? { in: at(a.in) } : {}), ...(a.out ? { out: at(a.out) } : {}) })),
+  }))
+}
+
 /** The whole path moved by an offset. */
 export function offsetPath(path: PenPath, dx: number, dy: number): PenPath {
   return moveAnchors(path, path.flatMap((c, contour) => c.anchors.map((_, index) => ({ contour, index }))), dx, dy)

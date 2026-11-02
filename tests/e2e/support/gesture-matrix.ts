@@ -1,10 +1,11 @@
 // The canvas gesture matrix (#232): every canvas gesture against every kind of container, in one
 // format of a design that has two, with real pointer and keyboard input. Each gesture is checked
 // against what it should do: a move moves the layer by the drag, a resize sizes it from the handle
-// dragged (scaling a group's or boolean's layers, never a frame's), a turn turns it, align lines it
-// up, the other format stays as it was, auto layout keeps placing its flow (a drag or an arrow
-// moves a layer along it, and what it decides is said), the gesture is one undo step, and nothing
-// logs an error. Failures that have a ticket of their own are listed in KNOWN.
+// dragged (scaling a group's or boolean's layers, never a frame's) and a path's drawing with its
+// box, a turn turns it, align lines it up, the other format stays as it was, auto layout keeps
+// placing its flow (a drag or an arrow moves a layer along it, and what it decides is said), the
+// gesture is one undo step, and nothing logs an error. Failures that have a ticket of their own
+// are listed in KNOWN.
 import { pressFor, type ShortcutAction } from '@dazbee/editor/shortcuts'
 import type { DesignInput } from '@dazbee/schema'
 import type { Browser, Page } from '@playwright/test'
@@ -15,6 +16,9 @@ import { openStage } from './stage.ts'
 type Node = DesignInput['nodes'][string]
 const rect = (name: string, parentId: string, index: string, x: number, y: number, width: number, height: number, color: string, extra: Record<string, unknown> = {}): Node =>
   ({ type: 'graphic', parentId, index, name, props: { x, y, width, height, shape: { kind: 'rect' }, fills: [{ type: 'solid', color }], ...extra } }) as Node
+/** A box with a notch cut into its bottom, drawn in that box, so its drawing reaches each edge. */
+const path = (name: string, parentId: string, index: string, x: number, y: number, width: number, height: number, color: string): Node =>
+  ({ type: 'graphic', parentId, index, name, props: { x, y, width, height, shape: { kind: 'path', d: `M0 0 L${width} 0 L${width} ${height} L${width / 2} ${height * 0.7} L0 ${height} Z`, drawnIn: { width, height } }, fills: [{ type: 'solid', color }] } }) as Node
 const row = (direction: 'row' | 'column', gap = 20, pad = 20) => ({ direction, gap, padding: { top: pad, right: pad, bottom: pad, left: pad } })
 
 /** One page holding a layer of each kind, spread out so each can be pressed on its own. */
@@ -65,6 +69,10 @@ export const matrixDesign = (assetId: string): DesignInput => ({
     },
     atA: rect('Turned flow A', 'autoTurned', 'a0', 0, 0, 80, 80, '#FF2E7EFF'),
     atB: rect('Turned flow B', 'autoTurned', 'a1', 0, 0, 80, 80, '#2F6BFFFF'),
+    pen: path('Pen path', 'p1', 'b3', 40, 860, 120, 100, '#13C4A3FF'),
+    paths: { type: 'group', parentId: 'p1', index: 'b4', name: 'Paths', props: { x: 200, y: 860, width: 200, height: 100 } },
+    pA: path('Path A', 'paths', 'a0', 200, 860, 90, 100, '#C41390FF'),
+    pB: path('Path B', 'paths', 'a1', 310, 860, 90, 100, '#7A13C4FF'),
   },
   overrides: {},
 })
@@ -72,14 +80,16 @@ export const matrixDesign = (assetId: string): DesignInput => ({
 /** The layers the matrix acts on, each selected alone (or with two beside it, to distribute). */
 export const SUBJECTS = [
   'shape', 'group', 'gA', 'frame', 'fInner', 'auto', 'aFixed', 'aFill', 'aHug', 'aAbs', 'col', 'colA', 'bool', 'mask', 'masked',
-  'tWide', 'tTall', 'tFixed', 'photo', 'turned', 'tInner', 'autoTurned', 'atA',
+  'tWide', 'tTall', 'tFixed', 'photo', 'turned', 'tInner', 'autoTurned', 'atA', 'pen', 'paths',
 ] as const
 type Subject = (typeof SUBJECTS)[number]
 /** What each container holds. */
 const HOLDS: Record<string, readonly string[]> = {
   group: ['gA', 'gB'], bool: ['bA', 'bB'], maskGroup: ['mask', 'masked'], frame: ['fInner'], auto: ['aFixed', 'aFill', 'aHug', 'aAbs'], aHug: ['aHugIn'],
-  turned: ['tInner'], col: ['colA', 'colB'], autoTurned: ['atA', 'atB'],
+  turned: ['tInner'], col: ['colA', 'colB'], autoTurned: ['atA', 'atB'], paths: ['pA', 'pB'],
 }
+/** Each path's colour, to find where its drawing is in an export. */
+const PATH_INK: Record<string, [number, number, number]> = { pen: [0x13, 0xC4, 0xA3], pA: [0xC4, 0x13, 0x90], pB: [0x7A, 0x13, 0xC4] }
 /** Each layer auto layout places, by the frame whose flow it is in. */
 const FLOW: Record<string, string> = { aFixed: 'auto', aFill: 'auto', aHug: 'auto', colA: 'col', colB: 'col', atA: 'autoTurned', atB: 'autoTurned' }
 const AUTO = new Set(['auto', 'aHug', 'col', 'autoTurned'])
@@ -91,7 +101,7 @@ const BESIDE: Record<string, [string, string]> = {
   shape: ['group', 'frame'], group: ['shape', 'frame'], frame: ['shape', 'group'], bool: ['shape', 'group'], photo: ['shape', 'group'],
   aFixed: ['aFill', 'aHug'], aFill: ['aFixed', 'aHug'], aHug: ['aFixed', 'aFill'],
 }
-const LEAVES = ['shape', 'gA', 'gB', 'fInner', 'aFixed', 'aFill', 'aHugIn', 'aAbs', 'colA', 'colB', 'bA', 'bB', 'mask', 'masked', 'tWide', 'tTall', 'tFixed', 'photo', 'tInner', 'atA', 'atB']
+const LEAVES = ['shape', 'gA', 'gB', 'fInner', 'aFixed', 'aFill', 'aHugIn', 'aAbs', 'colA', 'colB', 'bA', 'bB', 'mask', 'masked', 'tWide', 'tTall', 'tFixed', 'photo', 'tInner', 'atA', 'atB', 'pen', 'pA', 'pB']
 const ALL = [...LEAVES, ...Object.keys(HOLDS)]
 
 const HANDLES: Record<string, { dx: number; dy: number; w: number; h: number }> = {
@@ -117,6 +127,23 @@ const boxesIn = (page: Page, formatId: string): Promise<Boxes> =>
 const point = (page: Page, x: number, y: number, formatId: string) =>
   page.evaluate(({ x, y, formatId }) => window.dazbee?.screenPoint(x, y, 'p1', formatId), { x, y, formatId }) as Promise<{ x: number; y: number }>
 const drawn = (page: Page) => page.evaluate(() => window.dazbee?.drawn())
+/** Where a colour is drawn in a format's export: the box around its pixels, in design pixels, or null. */
+const inkOf = (page: Page, formatId: string, rgb: [number, number, number]) => page.evaluate(({ formatId, rgb }) => {
+  const pixels = window.dazbee?.exportPixels('p1', formatId)
+  if (!pixels) return null
+  const width = formatId === 'wide' ? 1920 : 1080
+  let [left, top, right, bottom] = [Infinity, Infinity, -Infinity, -Infinity]
+  for (let i = 0; i < pixels.length; i += 4) {
+    if (Math.abs((pixels[i] ?? 0) - rgb[0]) > 8 || Math.abs((pixels[i + 1] ?? 0) - rgb[1]) > 8 || Math.abs((pixels[i + 2] ?? 0) - rgb[2]) > 8) continue
+    const x = (i / 4) % width
+    const y = Math.floor(i / 4 / width)
+    left = Math.min(left, x)
+    top = Math.min(top, y)
+    right = Math.max(right, x + 1)
+    bottom = Math.max(bottom, y + 1)
+  }
+  return left === Infinity ? null : { x: left, y: top, width: right - left, height: bottom - top }
+}, { formatId, rgb })
 const press = async (page: Page, action: ShortcutAction) => {
   await page.keyboard.press(pressFor(action))
   await drawn(page)
@@ -150,7 +177,7 @@ async function run(page: Page, subject: Subject, gesture: string, formatId: stri
   if (!box) return 'no box before'
   const zoom = await page.evaluate(() => window.dazbee?.camera().zoom ?? 1)
   // A group's middle may be a gap between its layers: it is pressed on its first one.
-  const grip = subject === 'group' || subject === 'bool' ? before[HOLDS[subject]?.[0] ?? ''] ?? box : box
+  const grip = subject === 'group' || subject === 'bool' || subject === 'paths' ? before[HOLDS[subject]?.[0] ?? ''] ?? box : box
   const centre = await point(page, grip.x + grip.width / 2, grip.y + grip.height / 2, formatId)
   const turnBy = ((TURNED[subject] ?? 0) * Math.PI) / 180
   const flowParent = FLOW[subject]
@@ -238,7 +265,7 @@ async function run(page: Page, subject: Subject, gesture: string, formatId: stri
     if (h.w && !close(b.width, wantW, 1.5)) problems.push(`width ${b.width}, not ${wantW}`)
     if (h.h && !TEXT.has(subject) && !turnBy && !close(b.height, box.height + h.h, 1.5)) problems.push(`height ${b.height}, not ${box.height + h.h}`)
     // A frame's layers keep their size; a group's or boolean's scale with it; a flow fills what it is given.
-    const scaled = subject === 'group' || subject === 'bool'
+    const scaled = subject === 'group' || subject === 'bool' || subject === 'paths'
     if (!scaled) {
       for (const id of inside(subject).filter((id) => id !== 'aFill')) if (before[id] && after[id] && (!close((before[id] as Box).width, (after[id] as Box).width) || !close((before[id] as Box).height, (after[id] as Box).height))) problems.push(`${id} resized inside a frame`)
     }
@@ -249,6 +276,14 @@ async function run(page: Page, subject: Subject, gesture: string, formatId: stri
       }
     }
     if (subject === 'photo' && JSON.stringify(now.nodes.photo?.props.fills) !== JSON.stringify(doc.nodes.photo?.props.fills)) problems.push('crop changed')
+    // A path draws to its new box, in the export too.
+    for (const id of [subject, ...inside(subject)].filter((id) => PATH_INK[id])) {
+      const ink = await inkOf(page, formatId, PATH_INK[id] as [number, number, number])
+      const want = after[id]
+      if (want && (!ink || !close(ink.x, want.x, 2) || !close(ink.y, want.y, 2) || !close(ink.width, want.width, 2) || !close(ink.height, want.height, 2))) {
+        problems.push(`${id} drawn at ${ink ? `${ink.x},${ink.y} ${ink.width}×${ink.height}` : 'nowhere'}, not its box ${want.x},${want.y} ${want.width}×${want.height}`)
+      }
+    }
   }
   if (gesture === 'rotate') {
     const turn = (d: Doc) => Number({ ...d.nodes[subject]?.props, ...d.overrides[`format:${formatId}`]?.[subject] }.rotation ?? 0)
@@ -271,7 +306,7 @@ async function run(page: Page, subject: Subject, gesture: string, formatId: stri
   if (gesture === 'distribute' && flowParent && !told) problems.push('a flow layer, and nothing said')
   if ((gesture === 'duplicate' || gesture === 'paste') && Object.keys(now.nodes).length <= count) problems.push('no copy')
   if ((gesture === 'group' || gesture === 'frame-selection') && Object.keys(now.nodes).length !== count + 1) problems.push('no new container')
-  if (gesture === 'ungroup' && (subject === 'group' || subject === 'bool') && now.nodes[subject]) problems.push('still there')
+  if (gesture === 'ungroup' && (subject === 'group' || subject === 'bool' || subject === 'paths') && now.nodes[subject]) problems.push('still there')
   if (gesture === 'delete' && now.nodes[subject]) problems.push('not deleted')
   if (['group', 'frame-selection', 'ungroup'].includes(gesture)) for (const id of LEAVES) if (!same(before[id], after[id])) problems.push(`${id} moved`)
   // One undo step puts everything back.

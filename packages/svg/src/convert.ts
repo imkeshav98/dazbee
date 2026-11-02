@@ -387,7 +387,7 @@ export function svgToLayers(ck: CanvasKit, text: string, options: ConvertOptions
       type: 'graphic', parentId: 'root', index: 'a0', name: nameOf(element, DEFAULT_NAMES[element.name] ?? 'Path'),
       props: {
         ...box,
-        shape: { kind: 'path', d, fillRule: style['fill-rule'] === 'evenodd' ? 'evenodd' : 'nonzero' },
+        shape: { kind: 'path', d, fillRule: style['fill-rule'] === 'evenodd' ? 'evenodd' : 'nonzero', drawnIn: { width: box.width, height: box.height } },
         fills, strokes,
         ...(opacity < 1 ? { opacity } : {}),
         ...(blend && BLEND_MODES.has(blend) ? { blendMode: blend } : {}),
@@ -535,7 +535,7 @@ export function svgToLayers(ck: CanvasKit, text: string, options: ConvertOptions
     const maskId = newId()
     nodes[maskId] = {
       type: 'graphic', parentId: 'root', index: 'a0', name: nameOf(clip, 'Clip'),
-      props: { ...box, mask: 'alpha', shape: { kind: 'path', d }, fills: [{ type: 'solid', color: '#000000FF' }] },
+      props: { ...box, mask: 'alpha', shape: { kind: 'path', d, drawnIn: { width: box.width, height: box.height } }, fills: [{ type: 'solid', color: '#000000FF' }] },
     } as LayerInput
     return { id: maskId, box }
   }

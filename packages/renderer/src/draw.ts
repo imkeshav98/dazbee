@@ -1,4 +1,4 @@
-import type { Effect, Paint } from '@dazbee/schema'
+import { pathScale, type Effect, type Paint } from '@dazbee/schema'
 import type {
   Canvas, CanvasKit, FontCollection, Image, ImageFilter, Paint as CkPaint, Path, Shader,
 } from '@dazbee/canvaskit'
@@ -433,14 +433,14 @@ function shapePath(ck: CanvasKit, layer: GraphicLayer): Path {
     case 'line':
       return new ck.PathBuilder().moveTo(x, y + height / 2).lineTo(x + width, y + height / 2).detachAndDelete()
     case 'path': {
-      // Path data is drawn at its own size, placed at x and y. Scaling it with width and height
-      // arrives with adapt, which is the first thing to resize a path per format.
+      // Path data is placed at x and y, scaled from the box it was drawn in to this one.
       const parsed = ck.Path.MakeFromSVGString(shape.d)
       if (!parsed) throw new Error(`layer "${layer.id}" has path data CanvasKit can't read`)
       const builder = new ck.PathBuilder(parsed)
       parsed.delete()
+      const { sx, sy } = pathScale(shape, width, height)
       return builder
-        .transform(ck.Matrix.translated(x, y))
+        .transform(ck.Matrix.multiply(ck.Matrix.translated(x, y), ck.Matrix.scaled(sx, sy)))
         .setFillType(shape.fillRule === 'evenodd' ? ck.FillType.EvenOdd : ck.FillType.Winding)
         .detachAndDelete()
     }
