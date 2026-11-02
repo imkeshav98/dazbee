@@ -6,7 +6,7 @@ import { loadFontFiles } from '@dazbee/fonts/node'
 import { renderDesign } from '@dazbee/renderer'
 import { loadCanvasKit } from '@dazbee/renderer/node'
 import { MAX_SVG_BYTES } from '@dazbee/schema'
-import { SvgError, svgToLayers } from '@dazbee/svg'
+import { SvgError, svgMarkup, svgToLayers } from '@dazbee/svg'
 import type { ImageHeader } from './images.ts'
 
 let shipped: { family: string; bytes: Uint8Array }[] | undefined
@@ -20,7 +20,7 @@ function svgText(bytes: Uint8Array): string | null {
   } catch {
     return null
   }
-  return /^\s*(?:<\?xml[^>]*>\s*|<!--[\s\S]*?-->\s*|<!DOCTYPE[^>[]*(?:\[[\s\S]*?\])?\s*>\s*)*<svg[\s>]/i.test(text) ? text : null
+  return svgMarkup(text)
 }
 
 /** An SVG file's type and size, its sides rounded up to whole pixels; null when it isn't one we can read as layers. */
