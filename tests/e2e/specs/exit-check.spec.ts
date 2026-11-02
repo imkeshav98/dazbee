@@ -18,11 +18,11 @@ import type { ExportType } from '@dazbee/schema'
 import { expect, test, type Page } from '../support/test.ts'
 import { photo } from '../support/assets.ts'
 import { designOf, OUTPUT, screenPoint, writeOutput } from '../support/editor.ts'
+import { newBrand } from '../support/seed.ts'
 import { barMenu, press } from '../support/stage.ts'
 
 test.describe.configure({ timeout: 600_000 })
 
-const BRAND = 'dev-brand-cycles'
 const run = crypto.randomUUID().slice(0, 6)
 const righteous = new Uint8Array(readFileSync(join(import.meta.dirname, '..', 'assets', 'fonts', 'Righteous-Regular.ttf')))
 /** The most a PDF or SVG of this ad may differ from the CPU render, in percent of its pixels. */
@@ -40,6 +40,7 @@ const drawn = (page: Page) => page.evaluate(() => window.dazbee?.drawn())
 const shot = async (page: Page, name: string) => writeOutput(`exit-check-${name}.png`, await page.screenshot())
 
 test('an ad set rebuilt in 5 formats through real input exports PNG, JPG, PDF and SVG that match Node', async ({ browser }) => {
+  const brandId = await newBrand('e2e exit-check')
   const context = await browser.newContext({
     viewport: { width: 1440, height: 1000 }, acceptDownloads: true, recordVideo: { dir: join(OUTPUT, 'exit-check-video'), size: { width: 1440, height: 1000 } },
   })
@@ -48,7 +49,7 @@ test('an ad set rebuilt in 5 formats through real input exports PNG, JPG, PDF an
   page.on('pageerror', (error) => errors.push(error.message))
 
   // The brief opens a blank square.
-  await page.goto(`/brands/${BRAND}`)
+  await page.goto(`/brands/${brandId}`)
   await page.getByLabel('Brief').fill(`Trail days ${run}`)
   await page.getByRole('button', { name: 'Make drafts' }).click()
   await expect(page.getByTestId('status')).toHaveAttribute('data-ready', '', { timeout: 30_000 })
@@ -185,7 +186,7 @@ test('an ad set rebuilt in 5 formats through real input exports PNG, JPG, PDF an
   const final = await stored(page)
   const json = JSON.parse(await designOf(page)) as unknown
   const assetId = Object.values(final.nodes).flatMap((n) => n.props.fills ?? []).find((f) => f.type === 'image')?.assetId ?? ''
-  const image = new Uint8Array(await (await page.request.get(`/brands/${BRAND}/assets/${assetId}`)).body())
+  const image = new Uint8Array(await (await page.request.get(`/brands/${brandId}/assets/${assetId}`)).body())
   const bytes = {
     fonts: [...loadFontFiles().map((f) => ({ family: f.family, bytes: f.bytes })), { family: 'Righteous', bytes: righteous }],
     fallbackFamilies: [...FALLBACK_FAMILIES],
