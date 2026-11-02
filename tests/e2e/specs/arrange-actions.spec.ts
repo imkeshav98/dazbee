@@ -1,4 +1,4 @@
-// The layer actions (#156) in Chromium: duplicate, the four order moves, ungroup and use as mask,
+// The layer actions in Chromium: duplicate, the four order moves, ungroup and use as mask,
 // from ⋯ More on the bar by the selection and from a right-click on a layer, each with its shortcut.
 import { expect, test, type Page } from '../support/test.ts'
 import type { DesignInput } from '@dazbee/schema'

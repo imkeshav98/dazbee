@@ -465,22 +465,13 @@ function TextCard({ target, p }: { target: Target; p: P }) {
         <Choice name={p.textCase} value={(style('textCase') ?? 'none') as string} options={['none', 'upper', 'lower', 'title']} labels={p.textCases} onSet={(v) => setStyle('textCase', v)} />
       </div>
       <ColorField name={p.textColour} value={style('color') as string | 'mixed'} onSet={(to) => set(target, (now) => ({ style: { ...(now.style as Style), color: to((now.style as Style).color) } }))} />
-      <div className="grid grid-cols-2 gap-x-3">
-        <Choice
-          name={p.textAlign}
-          value={shared(target.props.map((pr) => (pr.align ?? 'start') as string))}
-          options={['start', 'center', 'end', 'justify']}
-          labels={p.textAligns}
-          onSet={(align) => set(target, () => ({ align }))}
-        />
-        <Choice
-          name={p.verticalAlign}
-          value={shared(target.props.map((pr) => (pr.verticalAlign ?? 'top') as string))}
-          options={['top', 'middle', 'bottom']}
-          labels={p.verticalAligns}
-          onSet={(verticalAlign) => set(target, () => ({ verticalAlign }))}
-        />
-      </div>
+      <Choice
+        name={p.textAlign}
+        value={shared(target.props.map((pr) => (pr.align ?? 'start') as string))}
+        options={['start', 'center', 'end', 'justify']}
+        labels={p.textAligns}
+        onSet={(align) => set(target, () => ({ align }))}
+      />
     </Card>
   )
 }
@@ -1060,10 +1051,6 @@ function ScopeMenu({ everyFormat, onChange, size, p, children }: { everyFormat: 
 }
 
 /**
- * The selection's cards, after the font: the header card first (Arrange before it for several
- * layers, as the mock's "3 selected"), then the look, the rest open, and See-through last.
- */
-/**
  * The selected layers as the cards and the bar act on them, in the frame they are selected in: like a
  * drag on the canvas, a change goes to the format shown unless every format is asked for. Null when
  * none of them is in the design.
@@ -1085,10 +1072,16 @@ export function useTarget(editor: Editor, ids: string[]): { target: Target; desi
   }
 }
 
+/**
+ * The selection's cards, after the font: the header card first (Arrange before it for several
+ * layers, as the mock's "3 selected"), then the look, the rest open, and See-through last.
+ */
 export function SelectionCards({ editor, brandId, ids, arrange }: { editor: Editor; brandId: string; ids: string[]; arrange: ReactNode }) {
   const t = useMessages()
   const p = t.editor.props
   const everyFormat = useEveryFormat()
+  // Once nothing is selected, changes go to the format shown again.
+  useEffect(() => () => setEveryFormat(false), [])
   const selected = useTarget(editor, ids)
   if (!selected) return arrange
   const { target, design } = selected

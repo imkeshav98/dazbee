@@ -555,9 +555,10 @@ test.describe('text', () => {
   row(20, 'vertical alignment: top, middle, bottom', async (open) => {
     const page = await open()
     await select(page, ['headline'])
-    const field = page.getByTestId('text-card').getByRole('combobox', { name: 'Vertical alignment' })
+    // Up and down in the box is in ⋯ More on the bar by the text.
+    const field = async () => (await moreMenu(page)).getByRole('combobox', { name: 'Up and down in the box' })
     for (const align of ['bottom', 'middle', 'top']) {
-      await step(page, () => choose(field, align), async () => {
+      await step(page, async () => choose(await field(), align), async () => {
         await expect.poll(async () => (await props(page, 'headline')).verticalAlign).toBe(align)
       })
     }

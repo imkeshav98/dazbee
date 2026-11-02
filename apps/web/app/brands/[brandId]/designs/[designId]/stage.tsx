@@ -107,8 +107,8 @@ export function EditorStage({ designId, designName, brandId, brandName, everyBra
   // Why a gesture did nothing: auto layout decides where a layer in its flow goes.
   const notices = useMessages().editor.notices
   const [notice, setNotice] = useState<{ text: string; at: number } | null>(null)
-  // A right-click on a layer: where, for the menu of its actions.
-  const [menuAt, setMenuAt] = useState<{ x: number; y: number } | null>(null)
+  // A right-click on a layer: where, for the menu of its actions, and a count so each right-click opens its own.
+  const [menuAt, setMenuAt] = useState<{ x: number; y: number; n: number } | null>(null)
   const dismissNotice = useCallback(() => setNotice(null), [])
   useEffect(() => {
     if (!editor) return
@@ -242,7 +242,7 @@ export function EditorStage({ designId, designName, brandId, brandName, everyBra
           e.preventDefault()
           const ids = editor.selectAt({ x: e.clientX, y: e.clientY })
           const box = e.currentTarget.getBoundingClientRect()
-          setMenuAt(ids.length > 0 ? { x: e.clientX - box.left, y: e.clientY - box.top } : null)
+          setMenuAt((now) => (ids.length > 0 ? { x: e.clientX - box.left, y: e.clientY - box.top, n: (now?.n ?? 0) + 1 } : null))
         }}
         onDragOver={(e) => {
           if (!editor || !e.dataTransfer.types.includes(ASSET_DRAG_TYPE)) return
@@ -265,7 +265,7 @@ export function EditorStage({ designId, designName, brandId, brandName, everyBra
         <canvas ref={canvas} className="block size-full touch-none" data-testid="stage" />
         <div ref={overlay} className="stage-overlay pointer-events-none absolute inset-0 overflow-hidden" aria-hidden />
         {editor && <SelectionBar editor={editor} />}
-        {editor && menuAt && <StageMenu editor={editor} at={menuAt} onClose={() => setMenuAt(null)} />}
+        {editor && menuAt && <StageMenu key={menuAt.n} editor={editor} at={menuAt} onClose={() => setMenuAt(null)} />}
         <div data-slot="mini-bar" className="pointer-events-none absolute inset-x-0 top-4 flex justify-center">
           {editor && <FocusChip editor={editor} />}
         </div>
