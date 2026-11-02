@@ -3050,6 +3050,8 @@ function live(
      * returned function is called is undone together.
      */
     beginGesture: () => session.beginGesture(),
+    /** Whether a drag, resize, turn or other pointer gesture on the stage is running. */
+    gesturing: () => gesture !== null,
     /**
      * Sets properties of layers as the properties panel does (#60), as one undo step, or as part of
      * the gesture open. `to` gives a layer's patch from the values it has in the frame now (base

@@ -957,7 +957,7 @@ const THUMB_LOOK: Record<Tile, string> = {
   outline: '',
   blur: 'blur-[1.5px]',
 }
-/** How long the layer has to stay as it is before its tiles draw it again: a drag redraws them once, at its end. */
+/** How long the layer has to stay as it is before its tiles draw it again; a drag redraws them once, after it ends. */
 const THUMB_SETTLE_MS = 150
 
 type Thumbnails = { id: string; plain: string | null; outlined: string | null }
@@ -978,10 +978,11 @@ function useLayerThumbnails(editor: Editor, id: string | null, text: boolean): T
     }
     draw()
     let timer: ReturnType<typeof setTimeout> | undefined
-    const stop = editor.onDraw(() => {
+    const later = () => {
       clearTimeout(timer)
-      timer = setTimeout(draw, THUMB_SETTLE_MS)
-    })
+      timer = setTimeout(() => (editor.gesturing() ? later() : draw()), THUMB_SETTLE_MS)
+    }
+    const stop = editor.onDraw(later)
     return () => {
       stop()
       clearTimeout(timer)
