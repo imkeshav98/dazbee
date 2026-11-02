@@ -1,12 +1,13 @@
 // The layers panel (#59) in Chromium, with real pointer and keyboard input: the tree in step with the
 // stage's selection both ways, a layer dragged into a group (the stage redraws it there, one undo
-// step), rename, lock and hide; the same by keyboard alone; and 300 layers scrolling with only the
-// rows in view in the page.
+// step), rename, lock and hide; the same by keyboard alone, with the focus following a key pressed
+// just after the panel redraws and a layer moved past a big open group; and 300 layers scrolling with
+// only the rows in view in the page.
 import { expect, test, type Locator, type Page } from '../support/test.ts'
 import type { DesignInput } from '@dazbee/schema'
-import { writeOutput } from '../support/editor.ts'
+import { screenPoint, writeOutput } from '../support/editor.ts'
 import { PERF, report, spread } from '../support/perf.ts'
-import { click, openStage, read } from '../support/stage.ts'
+import { click, openStage, order, read } from '../support/stage.ts'
 
 test.describe.configure({ timeout: 120_000 })
 
@@ -201,6 +202,87 @@ test('keyboard only: move through the tree, select, rename, lock, hide and move 
   // Delete, from the panel, deletes the selected layer like on the stage.
   await page.keyboard.press('Delete')
   await expect.poll(async () => Object.keys((await read(page)).nodes)).not.toContain('box')
+  expect(errors).toEqual([])
+})
+
+test('keyboard only: a key pressed just after the panel redraws on its own still moves the focus', async ({ browser }) => {
+  const { page, errors } = await openStage(browser, design())
+  await openLayers(page)
+  await page.evaluate(() => window.dazbee?.select(['c2']))
+  await expect(row(page, 'Card stripe')).toHaveAttribute('aria-selected', 'true')
+  await row(page, 'Card stripe').focus()
+  await expect(row(page, 'Card stripe')).toBeFocused()
+
+  // Selecting Card back from outside the panel redraws it at normal priority, as the rows' pictures
+  // do when they arrive. Once that redraw is in the page, before React runs its effects, ArrowLeft is
+  // pressed on Card stripe: it selects Card, and the focus goes with it.
+  const pressedOn = await page.evaluate(() => new Promise<string | null>((resolve) => {
+    const list = document.querySelector('[role=tree]')
+    if (!list) return resolve(null)
+    const redrawn = new MutationObserver(() => {
+      redrawn.disconnect()
+      const on = document.activeElement
+      on?.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', code: 'ArrowLeft', bubbles: true, cancelable: true }))
+      resolve(on?.getAttribute('data-layer') ?? null)
+    })
+    redrawn.observe(list, { attributes: true, attributeFilter: ['aria-selected'], subtree: true })
+    window.dazbee?.select(['c1'])
+  }))
+  expect(pressedOn).toBe('c2')
+  await expect(row(page, 'Card')).toHaveAttribute('aria-selected', 'true')
+  await expect(row(page, 'Card')).toBeFocused()
+  expect(errors).toEqual([])
+})
+
+/** A layer on top of a group of 60 layers, with a text under them all. */
+const crowd = (): DesignInput => {
+  const nodes: DesignInput['nodes'] = {
+    note: {
+      type: 'text', parentId: 'p1', index: 'a0', name: 'Note',
+      props: { x: 560, y: 80, width: 460, height: 90, text: 'Fresh roast', style: { fontFamily: 'Noto Sans', fontSize: 64, color: '#1F2329FF' } },
+    },
+    crowd: { type: 'group', parentId: 'p1', index: 'a1', name: 'Crowd', props: { x: 40, y: 300, width: 990, height: 200 } },
+    mover: { type: 'graphic', parentId: 'p1', index: 'a2', name: 'Mover', props: rect(600, 800, 200, 200, '#1F9D55FF') },
+  }
+  for (let i = 0; i < 60; i++) {
+    nodes[`k${i}`] = { type: 'graphic', parentId: 'crowd', index: `a${String(i).padStart(2, '0')}`, name: `Crowd ${i + 1}`, props: rect(40 + (i % 20) * 50, 300 + Math.floor(i / 20) * 70, 40, 60, '#14213DFF') }
+  }
+  return { ...design(), nodes }
+}
+
+test('keyboard only: a layer moved past a big open group keeps the focus, and typing on the canvas after keeps it there', async ({ browser }) => {
+  const { page, errors } = await openStage(browser, crowd())
+  await openLayers(page)
+  await page.evaluate(() => window.dazbee?.select(['k0']))
+  await expect(row(page, 'Crowd')).toHaveAttribute('aria-expanded', 'true')
+  await row(page, 'Mover').click()
+  await expect(row(page, 'Mover')).toBeFocused()
+
+  // Alt+Down takes Mover below Crowd, past its 60 rows: the list scrolls to where it went, and the
+  // focus is on it there.
+  await page.keyboard.press('Alt+ArrowDown')
+  await expect.poll(() => order(page)).toEqual(['note', 'mover', 'crowd'])
+  await expect(row(page, 'Mover')).toBeFocused()
+  await expect(row(page, 'Mover')).toBeInViewport()
+  await expect(row(page, 'Mover')).toHaveAttribute('aria-posinset', '2')
+
+  // Into the text on the canvas, all of it selected, then typed over: the words go into the text,
+  // and the focus stays out of the panel once the panel has redrawn with them (the text's row gets
+  // a new picture).
+  const picture = row(page, 'Note').getByTestId('layer-picture').locator('img')
+  await expect(picture).toHaveAttribute('src', /^blob:/)
+  const before = await picture.getAttribute('src')
+  const at = await screenPoint(page, 700, 125)
+  await page.mouse.dblclick(at.x, at.y)
+  await page.evaluate(() => window.dazbee?.drawn())
+  await expect(page.locator('.caret')).toBeVisible()
+  await page.keyboard.press('ControlOrMeta+A')
+  await page.keyboard.type('Hello')
+  await expect.poll(async () => ((await read(page)).nodes.note?.props as { text?: string }).text).toBe('Hello')
+  await expect(row(page, 'Note')).toHaveAttribute('aria-selected', 'true')
+  await expect(picture).not.toHaveAttribute('src', before ?? '')
+  expect(await tree(page).evaluate((list) => list.contains(document.activeElement))).toBe(false)
+  writeOutput('layers-6-moved-past-group.png', await page.screenshot())
   expect(errors).toEqual([])
 })
 
