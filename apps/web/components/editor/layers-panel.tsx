@@ -190,10 +190,13 @@ export function LayersPanel({ editor }: { editor: Editor }) {
 
   // The row keyboard focus was last on: the one the arrows move from.
   const [active, setActive] = useState<string | null>(null)
-  // The row Tab lands on: the selected row the focus was last on, else the first selected row,
-  // else the row the focus was last on, else the first row.
+  // Whether the focus is in the tree: from a row taking it until a press or focus outside the tree.
+  const [inTree, setInTree] = useState(false)
+  // The row Tab lands on, the tree's one tab stop: while the focus is in the tree, the row it is on;
+  // from outside, the selected row the focus was last on, else the first selected row, else the row
+  // the focus was last on, else the first row.
   const listedSelection = selection.ids.filter((id) => indexOf.has(id))
-  const current = active && listedSelection.includes(active)
+  const current = active && indexOf.has(active) && (inTree || listedSelection.includes(active))
     ? active
     : listedSelection[0] ?? (active && indexOf.has(active) ? active : rows[0]?.id ?? null)
   // The row to focus once it is rendered, by id.
@@ -201,9 +204,23 @@ export function LayersPanel({ editor }: { editor: Editor }) {
   // The row the focus is on while it is in the tree, and its place in the list at the last commit.
   const held = useRef<string | null>(null)
   const heldAt = useRef(0)
-  // The layer of a row deleted while it had the focus: the focus goes back to its row if it comes
-  // back, as on undo, while the focus is still in the tree.
+  // The layer of a row deleted while it had the focus: its row takes the focus again if it comes
+  // back, as on undo, until a press or focus outside the tree.
   const gone = useRef<string | null>(null)
+  useEffect(() => {
+    const away = (event: Event) => {
+      if (event.target instanceof Node && scroller.current?.contains(event.target)) return
+      held.current = null
+      gone.current = null
+      setInTree(false)
+    }
+    document.addEventListener('pointerdown', away, true)
+    document.addEventListener('focusin', away, true)
+    return () => {
+      document.removeEventListener('pointerdown', away, true)
+      document.removeEventListener('focusin', away, true)
+    }
+  }, [])
   const [renaming, setRenaming] = useState<string | null>(null)
   const [drop, setDrop] = useState<{ id: string; where: Where } | null>(null)
   const dragged = useRef<string | null>(null)
@@ -228,19 +245,25 @@ export function LayersPanel({ editor }: { editor: Editor }) {
   // the panel or from the page itself, never out of a field or control elsewhere; a row no longer in
   // the list is no longer asked for.
   useLayoutEffect(() => {
+    // Focuses a row and selects it unless it is selected, so the focus and the selection agree.
+    const take = (id: string) => {
+      if (!selected.has(id)) editor.select([id], pageId, formatId)
+      reveal(id)
+    }
+    const before = document.activeElement
+    const dropped = !before || before === document.body || !before.isConnected
     const lost = held.current
     if (lost && !indexOf.has(lost)) {
-      // The row the focus was on left the list, as when its layer is deleted: the focus goes to the
-      // row now in its place, or the last row.
+      // The row the focus was on left the list, as when its layer is deleted or grouped: the focus
+      // goes to the selected row, else to the row now in its place or the last row.
       held.current = null
-      const from = document.activeElement
-      const next = rows[Math.min(heldAt.current, rows.length - 1)]
-      if (next && (!from || from === document.body || !from.isConnected)) {
+      if (dropped) {
         gone.current = design.nodes[lost] ? null : lost
-        reveal(next.id)
+        const next = listedSelection[0] ?? rows[Math.min(heldAt.current, rows.length - 1)]?.id
+        if (next) take(next)
       }
-    } else if (gone.current && indexOf.has(gone.current) && scroller.current?.contains(document.activeElement)) {
-      reveal(gone.current)
+    } else if (gone.current && indexOf.has(gone.current) && (dropped || scroller.current?.contains(before))) {
+      take(gone.current)
       gone.current = null
     }
     if (held.current) heldAt.current = indexOf.get(held.current) ?? heldAt.current
@@ -370,7 +393,9 @@ export function LayersPanel({ editor }: { editor: Editor }) {
   latest.current = {
     focus: (id) => {
       setActive(id)
+      setInTree(true)
       held.current = id
+      heldAt.current = indexOf.get(id) ?? 0
     },
     key: onKey,
     click: (id, add) => select(id, add),
@@ -444,16 +469,6 @@ export function LayersPanel({ editor }: { editor: Editor }) {
             onScroll={(event) => {
               scrolledAt.current = performance.now()
               follow(event.currentTarget)
-            }}
-            onBlur={(event) => {
-              if (event.relatedTarget instanceof Node && event.currentTarget.contains(event.relatedTarget)) return
-              // Once the focus has gone elsewhere, no row holds it. A row deleted while focused
-              // leaves the focus nowhere, so the commit that removed it can move it on.
-              queueMicrotask(() => {
-                if (scroller.current?.contains(document.activeElement)) return
-                held.current = null
-                gone.current = null
-              })
             }}
             className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-1.5 pb-2"
             data-testid="layers-scroller"
