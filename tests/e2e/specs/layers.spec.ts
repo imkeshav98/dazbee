@@ -12,8 +12,8 @@ test.describe.configure({ timeout: 120_000 })
 
 /** A row's height in the panel, in pixels (LAYER_ROW in components/editor/layers-panel.tsx). */
 const ROW = 36
-/** The rows the panel keeps in the page past each end of the view (OVERSCAN in layers-panel.tsx). */
-const OVERSCAN = 8
+/** How far one turn of the wheel scrolls the 300 layers, in pixels. */
+const WHEEL = 420
 
 const rect = (x: number, y: number, width: number, height: number, color: string) =>
   ({ x, y, width, height, shape: { kind: 'rect' as const, cornerRadius: 16 }, fills: [{ type: 'solid' as const, color }] })
@@ -221,13 +221,19 @@ async function wheel(page: Page, scroller: Locator, dy: number) {
   await expect.poll(() => scroller.evaluate((el) => el.scrollTop)).not.toBe(before)
 }
 
-/** The rows in the page: how many, the first one's place in the list, and the first row in view. */
+/**
+ * The rows in the page: how many, the first one's place in the list (from 0, by its
+ * aria-posinset: the 300 layers are siblings), the first row in view, how many rows the view
+ * holds, and how far the panel can scroll.
+ */
 const mounted = (scroller: Locator) => scroller.evaluate((el, row) => {
   const rows = [...el.querySelectorAll<HTMLElement>('[role=treeitem]')]
   return {
     count: rows.length,
-    first: Math.min(...rows.map((r) => Math.round((Number.parseFloat(r.style.top) - 1) / row))),
+    first: Math.min(...rows.map((r) => Number(r.getAttribute('aria-posinset')) - 1)),
     inView: Math.floor(el.scrollTop / row),
+    fits: Math.ceil(el.clientHeight / row),
+    range: el.scrollHeight - el.clientHeight,
   }
 }, ROW)
 
@@ -235,18 +241,24 @@ test('300 layers: only the rows in view are in the page, and they follow the scr
   const { page, errors } = await openStage(browser, threeHundred())
   await openLayers(page)
   const scroller = page.getByTestId('layers-scroller')
-  expect(await tree(page).getByRole('treeitem').count()).toBeLessThan(60)
+  const top = await mounted(scroller)
+  expect(top.count).toBeLessThan(60)
   expect(await tree(page).evaluate((el) => el.getBoundingClientRect().height)).toBe(300 * ROW)
+  // The rows the panel keeps in the page past the end of the view, read once at the top.
+  const overscan = top.count - top.fits
+  expect(overscan).toBeGreaterThan(0)
+  // Twenty turns down stay well inside the scroll range, so every turn scrolls.
+  expect(top.range).toBeGreaterThan(20 * WHEEL + 10 * ROW)
 
-  // Scroll top to bottom and back with the wheel. After every turn the rows in the page are the
-  // ones in view and OVERSCAN either side, however long the machine took to scroll.
+  // Scroll top to bottom and back with the wheel. After every turn the first row in the page is
+  // the first in view or at most the overscan above it, however long the machine took to scroll.
   await scroller.hover()
   for (let i = 0; i < 40; i++) {
-    await wheel(page, scroller, i < 20 ? 420 : -420)
+    await wheel(page, scroller, i < 20 ? WHEEL : -WHEEL)
     await expect.poll(async () => {
       const { first, inView } = await mounted(scroller)
-      return first - Math.max(0, inView - OVERSCAN)
-    }, { message: 'rows above the first in view' }).toBe(0)
+      return { first, inView, followed: first <= inView && first >= inView - overscan }
+    }).toMatchObject({ followed: true })
     expect((await mounted(scroller)).count).toBeLessThan(60)
   }
   // Back at the top, the first row shows.
@@ -304,7 +316,7 @@ test('300 layers: what scrolling the panel takes', PERF, async ({ browser }) => 
   })
   // Then scroll top to bottom and back with the wheel.
   const stopScrolling = await recordFrames()
-  for (let i = 0; i < 40; i++) await wheel(page, scroller, i < 20 ? 420 : -420)
+  for (let i = 0; i < 40; i++) await wheel(page, scroller, i < 20 ? WHEEL : -WHEEL)
   const scrolling = await stopScrolling()
   const scripts = await page.evaluate(() => (window as unknown as { scripts: number[] }).scripts)
   report('Layers panel, 300 layers', {

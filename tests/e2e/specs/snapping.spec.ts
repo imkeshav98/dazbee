@@ -181,10 +181,11 @@ test('dragging among 300 layers works out what to snap to once, and each move me
   const moves = await page.evaluate(() => (window as unknown as { moves: { pressed: number } }).moves.pressed)
   if (!before || !after) throw new Error('no editor')
   expect(moves).toBeGreaterThanOrEqual(60)
-  // What a move measures against: every layer on the page but the dot, and the format.
+  // Gathered once at the press, each pointer move snapping once against what was gathered: every
+  // layer on the page but the dot, and the format.
   const boxes = Object.keys(content.nodes).filter((id) => id !== 'dot').length + 1
-  expect({ gathered: after.gathered - before.gathered, moves: after.moves - before.moves, checked: after.checked - before.checked })
-    .toEqual({ gathered: 1, moves, checked: moves * boxes })
+  expect({ gathered: after.gathered - before.gathered, moves: after.moves - before.moves, targets: after.targets })
+    .toEqual({ gathered: 1, moves, targets: boxes })
   expect(errors).toEqual([])
 })
 

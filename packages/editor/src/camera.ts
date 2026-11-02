@@ -1,6 +1,6 @@
 // The view onto the infinite canvas (#36). A screen point, in CSS pixels from the stage's corner,
 // is world × zoom + (x, y); world units are design pixels.
-import type { Rect } from './grid.ts'
+import { intersects, type Rect } from './grid.ts'
 import type { Point } from './hit-test.ts'
 
 export interface Camera { x: number; y: number; zoom: number }
@@ -55,4 +55,10 @@ export function fit(rect: Rect, viewport: Viewport, padding?: number, insets: In
 export function visibleRect(c: Camera, viewport: Viewport): Rect {
   const corner = toWorld(c, { x: 0, y: 0 })
   return { x: corner.x, y: corner.y, width: viewport.width / c.zoom, height: viewport.height / c.zoom }
+}
+
+/** The frames the viewport shows any part of: the ones the screen draws. */
+export function framesInView<F extends Rect>(frames: readonly F[], c: Camera, viewport: Viewport): F[] {
+  const view = visibleRect(c, viewport)
+  return frames.filter((frame) => intersects(frame, view))
 }

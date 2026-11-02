@@ -58,16 +58,6 @@ const design = (assetId: string): DesignInput => ({
   },
 })
 
-/** Records every task that blocks the main thread for more than 50 ms, from now on. */
-const watchLongTasks = (page: Page) => page.evaluate(() => {
-  const seen: number[] = []
-  new PerformanceObserver((list) => {
-    for (const entry of list.getEntries()) seen.push(Math.round(entry.duration))
-  }).observe({ type: 'longtask', buffered: false })
-  ;(window as unknown as { longTasks: number[] }).longTasks = seen
-})
-const longTasks = (page: Page) => page.evaluate(() => (window as unknown as { longTasks: number[] }).longTasks)
-
 /** A reply from the export worker (ExportReply in packages/editor/src/export-client.ts). */
 type Reply =
   | { kind: 'progress'; done: number; total: number }
@@ -120,16 +110,10 @@ test('every format of a page as PNG is one zip whose files are what Node exports
   await expect(page.getByTestId('export-run')).toHaveText('Export 5 files')
   writeOutput('export-0-menu.png', await page.screenshot())
 
-  await watchLongTasks(page)
   await watchWorkers(page)
-  const started = Date.now()
   const [download] = await Promise.all([page.waitForEvent('download'), page.getByTestId('export-run').click()])
   expect(download.suggestedFilename()).toBe('Spring drop.zip')
   const zipped = new Uint8Array(readFileSync(await download.path()))
-  const took = Date.now() - started
-  // The task records arrive a frame after the task ends.
-  await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => setTimeout(resolve, 100))))
-  const blocked = await longTasks(page)
 
   const entries = readZip(zipped)
   expect(entries.map((e) => e.path)).toEqual(Object.values(FORMATS).map((f) => `${f.name.replace(':', '-')}/Spring drop - Hero - ${f.name.replace(':', '-')}.png`))
@@ -139,7 +123,7 @@ test('every format of a page as PNG is one zip whose files are what Node exports
     expect(browserFile, formatId).toBeDefined()
     expect(Buffer.from(browserFile ?? []).equals(Buffer.from(node({ pageIds: ['p1'], formatIds: [formatId], type: 'png' }))), `${formatId} matches Node`).toBe(true)
   }
-  writeOutput('export-1-zip.json', JSON.stringify({ files: entries.map((e) => ({ path: e.path, bytes: e.bytes.length })), zipBytes: zipped.length, ms: took, longTasks: blocked }, null, 2))
+  writeOutput('export-1-zip.json', JSON.stringify({ files: entries.map((e) => ({ path: e.path, bytes: e.bytes.length })), zipBytes: zipped.length }, null, 2))
   writeOutput('export-2-story.png', Buffer.from(entries[2]?.bytes ?? []))
   // The worker drew the files, not the main thread: the page posted it the one request, it reported
   // each of the five as it made it, and the zip that downloaded is the one it handed back.
