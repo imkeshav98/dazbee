@@ -1,14 +1,15 @@
 // The layers panel (#59) in Chromium, with real pointer and keyboard input: the tree in step with the
 // stage's selection both ways, a layer dragged into a group (the stage redraws it there, one undo
-// step), rename, lock and hide; the same by keyboard alone, with the focus following a key pressed
-// just after the panel redraws and a layer moved past a big open group, going to the next row (and
-// selecting it) when the focused one is deleted or grouped and back on undo, Tab landing on the
-// selected row, one tab stop in the tree, and a rename finished or Delete pressed off the tree
-// leaving the focus where it was; and 300 layers scrolling with only the rows in view in the page,
-// the focused row staying focused and reachable by Tab when it scrolls away.
+// step, which redo brings back), rename, lock and hide, all there after a reload; the same by
+// keyboard alone, with the focus following a key pressed just after the panel redraws and a layer
+// moved past a big open group, going to the next row (and selecting it) when the focused one is
+// deleted or grouped and back on undo, Tab landing on the selected row, one tab stop in the tree,
+// and a rename finished or Delete pressed off the tree leaving the focus where it was; and 300
+// layers scrolling with only the rows in view in the page, the focused row staying focused and
+// reachable by Tab when it scrolls away.
 import { expect, test, type Locator, type Page } from '../support/test.ts'
 import type { DesignInput } from '@dazbee/schema'
-import { screenPoint, writeOutput } from '../support/editor.ts'
+import { reloads, screenPoint, writeOutput } from '../support/editor.ts'
 import { PERF, report, spread } from '../support/perf.ts'
 import { click, openStage, order, props, read } from '../support/stage.ts'
 
@@ -91,10 +92,16 @@ test('the panel and the stage select together; drag into a group, rename, lock a
   writeOutput('layers-1-dragged-into-group.png', await page.screenshot())
   // Dot drawn where it was: moving it in changed only where it sits in the tree.
   expect(await colourAt(page, 800, 780)).toEqual([31, 157, 85])
-  // One undo puts it back.
+  // One undo puts it back; redo puts it in again, and the panel follows both.
   await page.evaluate(() => window.dazbee?.perform('undo'))
   await expect.poll(async () => (await node(page, 'dot')).parentId).toBe('p1')
   expect(await page.evaluate(() => window.dazbee?.boxOf('card'))).toEqual(before)
+  await page.evaluate(() => window.dazbee?.perform('redo'))
+  await expect.soft.poll(async () => (await node(page, 'dot')).parentId).toBe('card')
+  await expect.soft.poll(() => listed(page)).toEqual(['Box', 'Card', '  Dot', '  Card stripe', '  Card back', 'Backdrop'])
+  expect.soft(await page.evaluate(() => window.dazbee?.boxOf('card'))).toEqual(after)
+  await page.evaluate(() => window.dazbee?.perform('undo'))
+  await expect.poll(async () => (await node(page, 'dot')).parentId).toBe('p1')
 
   // Drag Backdrop above Box: reordered among its siblings.
   const box = await row(page, 'Box').boundingBox()
@@ -103,6 +110,12 @@ test('the panel and the stage select together; drag into a group, rename, lock a
   expect(box).not.toBeNull()
   // The backdrop now covers the box: the stage draws it on top.
   expect(await colourAt(page, 300, 200)).toEqual([244, 237, 228])
+  await page.evaluate(() => window.dazbee?.perform('undo'))
+  await expect.poll(() => listed(page)).toEqual(['Dot', 'Box', 'Card', '  Card stripe', '  Card back', 'Backdrop'])
+  // Redo puts the backdrop above the box again.
+  await page.evaluate(() => window.dazbee?.perform('redo'))
+  await expect.soft.poll(() => listed(page)).toEqual(['Dot', 'Backdrop', 'Box', 'Card', '  Card stripe', '  Card back'])
+  expect.soft(await colourAt(page, 300, 200)).toEqual([244, 237, 228])
   await page.evaluate(() => window.dazbee?.perform('undo'))
   await expect.poll(() => listed(page)).toEqual(['Dot', 'Box', 'Card', '  Card stripe', '  Card back', 'Backdrop'])
 
@@ -131,6 +144,12 @@ test('the panel and the stage select together; drag into a group, rename, lock a
   writeOutput('layers-3-locked-hidden.png', await page.screenshot())
   await row(page, 'Hero panel').getByRole('button', { name: 'Show Hero panel' }).click()
   await expect.poll(() => colourAt(page, 300, 200)).toEqual([224, 38, 43])
+
+  // After a reload the design is as it was left, and the panel shows the box renamed and locked.
+  await reloads(page)
+  await openLayers(page)
+  await row(page, 'Hero panel').hover()
+  await expect(row(page, 'Hero panel').getByRole('button', { name: 'Unlock Hero panel' })).toHaveAttribute('aria-pressed', 'true')
   expect(errors).toEqual([])
 })
 

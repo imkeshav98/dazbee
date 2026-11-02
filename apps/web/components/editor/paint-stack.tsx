@@ -14,6 +14,7 @@ import { cn } from '../../lib/cn.ts'
 import { useLocale, useMessages } from '../../lib/i18n/client.tsx'
 import { dirOf, format, type Messages } from '../../lib/i18n/index.ts'
 import { SEGMENTED, segment } from '../ui/segmented.tsx'
+import { useMenuFocus } from './bar-popover.tsx'
 import { PICKED_RING } from './card.tsx'
 import { Choice, clamp, ColorField, NumberField, tidy } from './fields.tsx'
 import { ImagePickerButton } from './image-tool.tsx'
@@ -314,16 +315,18 @@ function PaintEditor({ paint, brandId, editor, p, onSet }: { paint: Paint; brand
 export function PaintRow({ paint, name, brandId, editor, p, onSet }: { paint: Paint; name: string; brandId: string; editor: Editor; p: P; onSet: (to: (now: Paint) => Paint) => void }) {
   const side = dirOf(useLocale()) === 'rtl' ? 'right' : 'left'
   const hidden = paint.visible === false
+  const focus = useMenuFocus()
   return (
     <div className={cn('flex min-w-0 flex-1 items-center gap-1', hidden && 'opacity-50')} data-paint={paint.type}>
       <Popover.Root>
         <Popover.Trigger asChild>
-          <button type="button" aria-label={format(p.editPaint, { name })} data-testid="paint-swatch" className={cn('shrink-0 cursor-pointer rounded-[7px]', FOCUS_RING)}>
+          <button ref={focus.button} type="button" aria-label={format(p.editPaint, { name })} data-testid="paint-swatch" className={cn('shrink-0 cursor-pointer rounded-[7px]', FOCUS_RING)}>
             <PaintSwatch paint={paint} brandId={brandId} className="size-7" />
           </button>
         </Popover.Trigger>
         <Popover.Portal>
-          <Popover.Content side={side} align="start" sideOffset={12} collisionPadding={12} aria-label={format(p.editPaint, { name })} className={cn(POPOVER, 'w-80')}>
+          <Popover.Content side={side} align="start" sideOffset={12} collisionPadding={12} aria-label={format(p.editPaint, { name })} {...focus.content} className={cn(POPOVER, 'w-80')}>
+            {focus.back}
             <PaintEditor paint={paint} brandId={brandId} editor={editor} p={p} onSet={onSet} />
           </Popover.Content>
         </Popover.Portal>

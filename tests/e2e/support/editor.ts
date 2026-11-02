@@ -2,6 +2,7 @@ import { execFileSync } from 'node:child_process'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { expect, type Browser, type Page } from '@playwright/test'
+import { DATABASE, LOCAL } from './local-servers.ts'
 import { DEV_BRAND, liveDesign, seed, type InBrand } from './seed.ts'
 
 /** Where the live editing checks leave their screenshots and numbers; CI uploads it. */
@@ -63,6 +64,15 @@ export const exportHashOf = (page: Page) =>
 
 export const synced = (page: Page) => page.evaluate(() => window.dazbee?.synced() ?? false)
 
+/** Waits for the sync server to have every change, reloads, and checks the design came back the same. */
+export async function reloads(page: Page) {
+  const final = await designOf(page)
+  await expect.poll(() => synced(page), { timeout: 15_000 }).toBe(true)
+  await page.reload()
+  await expect(page.getByTestId('status')).toHaveAttribute('data-ready', '', { timeout: 30_000 })
+  await expect.poll(() => designOf(page), { message: 'the design is the same after a reload' }).toBe(final)
+}
+
 /** Waits until every tab has sent all its changes and all tabs hold the same design. */
 export async function settle(tabs: Page[]) {
   await expect.poll(async () => {
@@ -92,25 +102,34 @@ export function writeOutput(name: string, content: string | Buffer) {
   writeFileSync(join(OUTPUT, name), content)
 }
 
-/** Restarts the sync server container and waits until it is healthy again. */
-export function restartSyncServer() {
-  const root = join(import.meta.dirname, '..', '..', '..')
-  execFileSync('docker', ['compose', 'restart', 'sync'], { cwd: root, stdio: 'pipe' })
-  execFileSync('docker', ['compose', 'up', '-d', '--wait', 'sync'], { cwd: root, stdio: 'pipe' })
+const ROOT = join(import.meta.dirname, '..', '..', '..')
+
+/**
+ * Restarts the sync server the specs' tabs talk to and waits until it answers again: on CI docker
+ * compose's container, off CI the suite's own (support/local-servers.ts).
+ */
+export async function restartSyncServer() {
+  if (!process.env.CI) {
+    const response = await fetch(`http://127.0.0.1:${LOCAL.control}/restart-sync`, { method: 'POST' })
+    if (!response.ok) throw new Error(`the suite's sync server did not answer after restarting (${response.status})`)
+    return
+  }
+  execFileSync('docker', ['compose', 'restart', 'sync'], { cwd: ROOT, stdio: 'pipe' })
+  execFileSync('docker', ['compose', 'up', '-d', '--wait', 'sync'], { cwd: ROOT, stdio: 'pipe' })
+}
+
+/** Runs a query in the sync server's database: on CI docker compose's, off CI the suite's own. */
+function query(sql: string) {
+  const database = process.env.CI ? 'razzlr' : DATABASE
+  return execFileSync('docker', ['compose', 'exec', '-T', 'postgres', 'psql', '-U', 'razzlr', '-d', database, '-tAc', sql], { cwd: ROOT, encoding: 'utf8' }).trim()
 }
 
 /** Whether the sync server has stored the design's state since `since` (packages/db's design_states). */
 export function storedAfter(designId: string, since: Date) {
-  const root = join(import.meta.dirname, '..', '..', '..')
-  const sql = `select count(*) from design_states where design_id = '${designId.replace(/'/g, "''")}' and updated_at > '${since.toISOString()}'`
-  const out = execFileSync('docker', ['compose', 'exec', '-T', 'postgres', 'psql', '-U', 'razzlr', '-d', 'razzlr', '-tAc', sql], { cwd: root, encoding: 'utf8' })
-  return out.trim() === '1'
+  return query(`select count(*) from design_states where design_id = '${designId.replace(/'/g, "''")}' and updated_at > '${since.toISOString()}'`) === '1'
 }
 
 /** How many bytes the sync server last stored for the design (packages/db's design_states). */
 export function storedSize(designId: string) {
-  const root = join(import.meta.dirname, '..', '..', '..')
-  const sql = `select octet_length(state) from design_states where design_id = '${designId.replace(/'/g, "''")}'`
-  const out = execFileSync('docker', ['compose', 'exec', '-T', 'postgres', 'psql', '-U', 'razzlr', '-d', 'razzlr', '-tAc', sql], { cwd: root, encoding: 'utf8' })
-  return Number(out.trim())
+  return Number(query(`select octet_length(state) from design_states where design_id = '${designId.replace(/'/g, "''")}'`))
 }

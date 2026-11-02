@@ -3,7 +3,8 @@ name: Browser tests on demand
 # Runs chosen browser tests on a pushed branch on GitHub's machines, the same way CI's e2e jobs do.
 # `args` are Playwright's: spec files such as specs/layers.spec.ts, or a filter such as
 # --grep @gesture-matrix-sq. They are split at spaces and quotes are not honoured, so a --grep with a
-# space writes it as \s.
+# space writes it as \s. When they include specs/live-editing.spec.ts, add --workers=1: its restart
+# test (@sync-restart) restarts the one sync server that every other worker's tabs are connected to.
 on:
   workflow_dispatch:
     inputs:
