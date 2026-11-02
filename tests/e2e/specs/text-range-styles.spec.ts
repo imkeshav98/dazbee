@@ -61,11 +61,10 @@ test('one word made pink, larger and another font from the bar; the rest keeps i
   await expect.poll(() => runOver(page, 'body', 6, 11)).toMatchObject({ color: '#FF48B0FF', fontSize: 96 })
   await page.keyboard.press('Escape')
 
-  // A Google family, found by search as anyone would.
+  // A built-in family, whose files the editor has already.
   await barMenu(page, 'font')
-  await page.getByTestId('font-search').fill('playf')
-  await page.getByTestId('font-search').press('Enter')
-  await expect.poll(() => runOver(page, 'body', 6, 11), { timeout: 20_000 }).toMatchObject({ color: '#FF48B0FF', fontSize: 96, fontFamily: 'Playfair Display' })
+  await page.getByRole('listbox', { name: 'Font' }).getByRole('group', { name: 'Built in' }).getByRole('option', { name: 'Noto Sans Devanagari' }).click()
+  await expect.poll(() => runOver(page, 'body', 6, 11), { timeout: 20_000 }).toMatchObject({ color: '#FF48B0FF', fontSize: 96, fontFamily: 'Noto Sans Devanagari' })
   await drawn(page)
   writeOutput('range-styles-1-word.png', await page.screenshot())
 
