@@ -8,7 +8,7 @@ import { expect, test, type Page } from '../support/test.ts'
 import { AssetSummary, type DesignInput } from '@dazbee/schema'
 import { screenPoint, writeOutput } from '../support/editor.ts'
 import { callApi, newBrand } from '../support/seed.ts'
-import { openStage, read, selection } from '../support/stage.ts'
+import { openStage, props, read, selection } from '../support/stage.ts'
 
 test.describe.configure({ timeout: 120_000 })
 
@@ -413,7 +413,8 @@ test('images that finish uploading while a layer is dragged on the canvas go on 
   const square: DesignInput['nodes'][string] = { type: 'graphic', parentId: 'p1', index: 'a0', name: 'Square', props: { x: 100, y: 100, width: 200, height: 200, shape: { kind: 'rect' }, fills: [{ type: 'solid', color: '#2F6BFFFF' }] } }
   const { page, errors } = await openStage(browser, design({ square }), { brandId })
   const release = await routeUploads(page, brandId, { hold: true })
-  const x = async () => ((await read(page)).nodes as unknown as Record<string, { props: { x: number } }>).square?.props.x
+  // Where the square is in the square format: a drag on the stage writes that format's override.
+  const x = async () => (await props(page, 'square')).x
 
   const files = [{ name: `Dropped ${randomUUID().slice(0, 8)}.jpg`, type: 'image/jpeg', bytes: card }, { name: `Dropped ${randomUUID().slice(0, 8)}.jpg`, type: 'image/jpeg', bytes: second }]
   expect(await dropFiles(page, await screenPoint(page, 540, 800), files)).toBe(true)
