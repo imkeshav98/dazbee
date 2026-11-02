@@ -4,7 +4,7 @@ import { expect, test, type Locator, type Page } from '../support/test.ts'
 import type { DesignInput } from '@dazbee/schema'
 import { photo, upload } from '../support/assets.ts'
 import { writeOutput } from '../support/editor.ts'
-import { openStage } from '../support/stage.ts'
+import { barMenu, openStage } from '../support/stage.ts'
 import { choose } from '../support/select.ts'
 
 test.describe.configure({ timeout: 120_000 })
@@ -33,18 +33,20 @@ const enter = async (field: Locator, value: string) => {
   await field.press('Enter')
 }
 
-test('the Image card sets the filter, the fit, the opacity and the adjustments', async ({ browser }) => {
+test('the bar\'s Look sets the filter; the Image card sets the fit, the opacity and the adjustments', async ({ browser }) => {
   const asset = await upload(photo)
   const { page, errors } = await openStage(browser, design(asset.id))
 
-  // A plain shape has no Image card.
+  // A plain shape has no Image card and no Look.
   await page.evaluate(() => window.dazbee?.select(['box']))
-  await expect(page.getByTestId('fill-card')).toBeVisible()
+  await expect(page.getByTestId('bar-colour')).toBeVisible()
   await expect(page.getByTestId('image-card')).toHaveCount(0)
+  await expect(page.getByTestId('bar-look')).toHaveCount(0)
 
   await page.evaluate(() => window.dazbee?.select(['photo']))
   const card = page.getByTestId('image-card')
-  const filters = card.getByRole('radiogroup', { name: 'Filter' })
+  const look = async () => (await barMenu(page, 'look')).getByRole('radiogroup', { name: 'Filter' })
+  const filters = await look()
   await expect(filters.getByRole('radio')).toHaveCount(7)
   await expect(filters.getByRole('radio', { name: 'Original' })).toHaveAttribute('aria-checked', 'true')
   // Each tile shows the picture itself.
@@ -63,7 +65,7 @@ test('the Image card sets the filter, the fit, the opacity and the adjustments',
   writeOutput('image-card.png', await page.screenshot())
 
   // Original takes the filter off again.
-  await filters.getByRole('radio', { name: 'Original' }).click()
+  await (await look()).getByRole('radio', { name: 'Original' }).click()
   await expect.poll(async () => (await imageOf(page))?.filter).toBeUndefined()
   expect(errors).toEqual([])
 })

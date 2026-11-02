@@ -4,7 +4,7 @@
 import { expect, test, type Locator, type Page } from '../support/test.ts'
 import type { DesignInput } from '@dazbee/schema'
 import { writeOutput } from '../support/editor.ts'
-import { openStage, scopeMenu } from '../support/stage.ts'
+import { fillList, openStage, scopeMenu } from '../support/stage.ts'
 
 test.describe.configure({ timeout: 120_000 })
 
@@ -36,7 +36,7 @@ test('the scope card lists what this format has of its own and resets it', async
   // Changes made to this format only show up, grouped as the cards are.
   await enter(page.getByTestId('layout-card').getByRole('spinbutton', { name: 'X position' }), '200')
   await enter(page.getByTestId('layout-card').getByRole('spinbutton', { name: 'Width' }), '400')
-  await enter(page.getByTestId('fill-card').getByRole('textbox', { name: 'Colour 1 hex' }), '14213d')
+  await enter((await fillList(page)).getByRole('textbox', { name: 'Colour 1 hex' }), '14213d')
   await expect.poll(() => squareOwn(page)).toMatchObject({ x: 200, width: 400 })
   const own = (await scopeMenu(page)).getByTestId('own-changes')
   await expect(own).toContainText('Square has its own')

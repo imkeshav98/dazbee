@@ -1,0 +1,84 @@
+'use client'
+
+// The bar's own buttons for shapes, frames and photos, as in the mock. A photo first gets Replace,
+// Crop, Mask and Look; then Colour (the fills) for anything with fills, Outline (the strokes) for
+// shapes, and ✦ Effects for every selection that is not all text.
+import { ArrowsClockwiseIcon, CropIcon, SparkleIcon } from '@phosphor-icons/react'
+import { withImage } from '@dazbee/editor'
+import { boundFillIndex, type Paint } from '@dazbee/schema'
+import { useMessages } from '../../lib/i18n/client.tsx'
+import { BarPopover } from './bar-popover.tsx'
+import { ImagePickerButton } from './image-tool.tsx'
+import { EffectsBody, FillColourBody, imageFillOf, OutlineBody, PhotoLookBody, set, shared, type Target } from './selection-cards.tsx'
+import { BAR_BUTTON, BAR_DIVIDER, BAR_TOGGLE } from './styles.ts'
+
+export function ShapeBar({ target, brandId, open, onOpen }: { target: Target; brandId: string; open: string | null; onOpen: (id: string | null) => void }) {
+  const t = useMessages()
+  const p = t.editor.props
+  const b = t.editor.bar
+  const filled = target.types.every((type) => type === 'graphic' || type === 'frame' || type === 'boolean')
+  const stroked = target.types.every((type) => type === 'graphic' || type === 'boolean')
+  const photo = filled ? imageFillOf(target) : null
+  const masks = target.props.every((pr) => Boolean(pr.mask))
+  // The colour the brand swatches paint: the topmost solid fill that shows.
+  const colour = shared(target.props.map((pr) => {
+    const fills = (pr.fills ?? []) as Paint[]
+    const fill = fills[boundFillIndex(fills)]
+    return fill?.type === 'solid' ? fill.color.slice(0, 7) : null
+  }))
+  return (
+    <>
+      {photo && (
+        <>
+          <ImagePickerButton
+            brandId={brandId}
+            title={p.replaceImageTitle}
+            testId="bar-replace"
+            below
+            className={BAR_BUTTON}
+            onPick={(asset) => set(target, (now) => ({ fills: withImage((now.fills ?? []) as Paint[], asset.id) }))}
+          >
+            <ArrowsClockwiseIcon size={15} aria-hidden />
+            <span aria-hidden>{p.replaceImage}</span>
+          </ImagePickerButton>
+          {target.ids.length === 1 && (
+            <button type="button" data-bar-item data-testid="bar-crop" onClick={() => target.editor.perform('editPoints')} className={BAR_BUTTON}>
+              <CropIcon size={15} aria-hidden />
+              {b.crop}
+            </button>
+          )}
+          <button type="button" data-bar-item data-testid="bar-mask" aria-pressed={masks} onClick={() => target.editor.perform('mask')} className={BAR_TOGGLE}>
+            {b.mask}
+          </button>
+          <BarPopover id="look" open={open} onOpen={onOpen} label={b.look} testId="look" className="w-auto">
+            <PhotoLookBody target={target} p={p} brandId={brandId} index={photo.index} paint={photo.paint} />
+          </BarPopover>
+          <span aria-hidden className={BAR_DIVIDER} />
+        </>
+      )}
+      {filled && (
+        <BarPopover
+          id="colour"
+          open={open}
+          onOpen={onOpen}
+          label={b.colour}
+          icon={<span aria-hidden className="size-4 rounded-full border border-line-strong" style={{ background: colour === 'mixed' || colour === null ? 'conic-gradient(red, yellow, lime, aqua, blue, magenta, red)' : colour }} />}
+          testId="colour"
+          className="w-auto"
+        >
+          <FillColourBody target={target} brandId={brandId} p={p} />
+        </BarPopover>
+      )}
+      {stroked && (
+        <BarPopover id="outline" open={open} onOpen={onOpen} label={b.outline} testId="outline" className="w-auto">
+          <OutlineBody target={target} brandId={brandId} p={p} />
+        </BarPopover>
+      )}
+      {filled && <span aria-hidden className={BAR_DIVIDER} />}
+      <BarPopover id="effects" open={open} onOpen={onOpen} label={p.effects} icon={<SparkleIcon size={15} aria-hidden />} testId="effects" className="w-80 pt-4">
+        <EffectsBody target={target} p={p} />
+      </BarPopover>
+      <span aria-hidden className={BAR_DIVIDER} />
+    </>
+  )
+}

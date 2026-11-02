@@ -106,7 +106,8 @@ test('Tab reaches the bar once, the arrows move along it, Enter opens a popover 
   await select(page, ['a', 'b'])
   const bar = page.getByTestId('selection-bar')
   const items = bar.locator('[data-bar-item]')
-  await expect(items).toHaveCount(6)
+  // Colour, Outline, Effects, Line up, Combine, Group, Box, Stack and ⋯ More.
+  await expect(items).toHaveCount(9)
   // One stop for Tab: only one button is in the tab order.
   await expect(bar.locator('[data-bar-item][tabindex="0"]')).toHaveCount(1)
   await items.first().focus()
@@ -118,11 +119,11 @@ test('Tab reaches the bar once, the arrows move along it, Enter opens a popover 
   await page.keyboard.press('Home')
   await expect(items.first()).toBeFocused()
 
-  // Enter opens Line up; Esc closes it and leaves the selection as it was.
+  // Enter opens Colour, the first; Esc closes it and leaves the selection as it was.
   await page.keyboard.press('Enter')
-  await expect(page.getByTestId('bar-line-up-menu')).toBeVisible()
+  await expect(page.getByTestId('bar-colour-menu')).toBeVisible()
   await page.keyboard.press('Escape')
-  await expect(page.getByTestId('bar-line-up-menu')).toBeHidden()
+  await expect(page.getByTestId('bar-colour-menu')).toBeHidden()
   expect(await page.evaluate(() => window.dazbee?.selection())).toEqual(['a', 'b'])
 
   // A click on the canvas closes it too.

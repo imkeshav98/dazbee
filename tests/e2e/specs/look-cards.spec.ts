@@ -74,8 +74,8 @@ test('the look comes first: size and brand colour, effect tiles, and the header 
 
   // A shape: its fill from the same colours, and Blur in place of Outline; the header follows it.
   await page.evaluate(() => window.dazbee?.select(['badge']))
-  await expect(page.getByTestId('effects-card').locator('[data-tile="blur"]')).toBeVisible()
-  await page.getByTestId('fill-look').getByRole('button', { name: 'Roast' }).click()
+  await expect((await barMenu(page, 'effects')).locator('[data-tile="blur"]')).toBeVisible()
+  await (await barMenu(page, 'colour')).getByRole('button', { name: 'Roast' }).click()
   await expect.poll(async () => (await node(page, 'badge')).bindings).toMatchObject({ fill: 'brand:roast' })
   await expect(header.getByRole('heading')).toHaveText('Badge')
   writeOutput('look-cards-shape.png', await page.screenshot())

@@ -126,7 +126,7 @@ export function PropertyCards({ editor, brandId, onRemoved }: { editor: Editor; 
   if (selected.length > 0) {
     return (
       <>
-        <SelectionCards editor={editor} brandId={brandId} ids={selected} arrange={<ArrangePanel editor={editor} />} />
+        <SelectionCards editor={editor} ids={selected} arrange={<ArrangePanel editor={editor} />} />
       </>
     )
   }

@@ -6,7 +6,7 @@ import { expect, test, type Page } from '../support/test.ts'
 import type { DesignInput } from '@dazbee/schema'
 import { photo, upload } from '../support/assets.ts'
 import { writeOutput } from '../support/editor.ts'
-import { barMenu, click, openStage } from '../support/stage.ts'
+import { barMenu, click, fillList, openStage } from '../support/stage.ts'
 
 test.describe.configure({ timeout: 120_000 })
 
@@ -30,8 +30,8 @@ const design = (assetId: string): DesignInput => ({
   overrides: {},
 })
 
-/** Where the tiles are: the Effects card, or for text the bar's Effects. */
-const effects = (page: Page) => page.locator('[data-testid="effects-card"], [data-testid="bar-effects-menu"]')
+/** The tiles, in the bar's Effects. */
+const effects = (page: Page) => page.getByTestId('bar-effects-menu')
 const tiles = (page: Page) => effects(page).locator('[data-tile]')
 /** Whether a tile's picture has a pixel of a colour, within a few levels. */
 const hasColour = (page: Page, tile: string, rgb: number[]) => effects(page).locator(`[data-tile="${tile}"] img`).evaluate(async (img: HTMLImageElement, rgb) => {
@@ -58,34 +58,39 @@ test('each layer previews the effects on itself; a fill change follows; several 
 
   // A star: every tile shows the pink star, drawn by the renderer.
   await click(page, 250, 260)
+  await barMenu(page, 'effects')
   await expect(tiles(page).locator('img[data-thumbnail]')).toHaveCount(4)
   expect((await middleOf(page)).slice(0, 3)).toEqual([255, 46, 126])
-  writeOutput('effect-tiles-1-star.png', await page.getByTestId('effects-card').screenshot())
+  writeOutput('effect-tiles-1-star.png', await effects(page).screenshot())
   const starSrc = await tiles(page).first().locator('img').getAttribute('src')
 
   // A fill change redraws them, once the change settles.
-  const fill = page.getByTestId('fill-card')
+  const fill = await fillList(page)
   await fill.getByRole('textbox', { name: 'Colour 1 hex' }).fill('2F6BFF')
   await fill.getByRole('textbox', { name: 'Colour 1 hex' }).press('Enter')
+  await barMenu(page, 'effects')
   await expect.poll(async () => (await middleOf(page)).slice(0, 3)).toEqual([47, 107, 255])
   expect(await tiles(page).first().locator('img').getAttribute('src')).not.toBe(starSrc)
 
   // A photo shows the photo.
   await click(page, 800, 250)
+  await barMenu(page, 'effects')
   await expect.poll(async () => (await middleOf(page)).slice(0, 3)).not.toEqual([47, 107, 255])
   await expect(tiles(page).locator('img[data-thumbnail]')).toHaveCount(4)
-  writeOutput('effect-tiles-2-photo.png', await page.getByTestId('effects-card').screenshot())
+  writeOutput('effect-tiles-2-photo.png', await effects(page).screenshot())
   const photoSrc = await tiles(page).first().locator('img').getAttribute('src')
 
   // A group shows a render of itself: its two shapes.
   await click(page, 680, 730)
+  await barMenu(page, 'effects')
   await expect(tiles(page).locator('img[data-thumbnail]')).toHaveCount(4)
   expect(await tiles(page).first().locator('img').getAttribute('src')).not.toBe(photoSrc)
   expect((await middleOf(page))[3]).toBeGreaterThan(0)
-  writeOutput('effect-tiles-3-group.png', await page.getByTestId('effects-card').screenshot())
+  writeOutput('effect-tiles-3-group.png', await effects(page).screenshot())
 
   // A frame shows a render of itself.
   await click(page, 270, 860)
+  await barMenu(page, 'effects')
   await expect(tiles(page).locator('img[data-thumbnail]')).toHaveCount(4)
   expect((await middleOf(page)).slice(0, 3)).toEqual([20, 33, 61])
 
@@ -100,6 +105,7 @@ test('each layer previews the effects on itself; a fill change follows; several 
 
   // Several layers: Aa as before.
   await click(page, 250, 260, ['Shift'])
+  await barMenu(page, 'effects')
   await expect(tiles(page).locator('img')).toHaveCount(0)
   await expect(tiles(page).first()).toContainText('Aa')
   expect(errors).toEqual([])
@@ -109,6 +115,7 @@ test('dragging a layer with its tiles showing stays within a frame, and redraws 
   const asset = await upload(photo)
   const { page, errors } = await openStage(browser, design(asset.id))
   await click(page, 250, 260)
+  await barMenu(page, 'effects')
   await expect(tiles(page).locator('img[data-thumbnail]')).toHaveCount(4)
   // Every font and image is here, and the tiles have drawn with them.
   await page.evaluate(() => window.dazbee?.exportFiles({ pageIds: ['p1'], formatIds: ['sq'], type: 'png' }))
@@ -117,7 +124,7 @@ test('dragging a layer with its tiles showing stays within a frame, and redraws 
   await page.evaluate(() => {
     const seen: string[] = []
     ;(window as unknown as { seen: string[] }).seen = seen
-    const img = document.querySelector('[data-testid="effects-card"] [data-tile="none"] img')
+    const img = document.querySelector('[data-testid="bar-effects-menu"] [data-tile="none"] img')
     if (img) new MutationObserver(() => seen.push(img.getAttribute('src') ?? '')).observe(img, { attributes: true, attributeFilter: ['src'] })
   })
   const budget = await page.evaluate(async () => {

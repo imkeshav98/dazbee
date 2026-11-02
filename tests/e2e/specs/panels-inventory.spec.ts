@@ -12,7 +12,7 @@ import { designOf, placed, synced, writeOutput } from '../support/editor.ts'
 import { importGoogleFonts } from '../support/fonts.ts'
 import { API_URL, DEV_BRAND } from '../support/seed.ts'
 import { choose } from '../support/select.ts'
-import { barMenu, drag, moreMenu, openStage, scopeMenu } from '../support/stage.ts'
+import { barMenu, drag, fillList, moreMenu, openStage, scopeMenu, strokeList } from '../support/stage.ts'
 
 // Each row opens its own design, so CI spreads the rows over its shards.
 test.describe.configure({ mode: 'parallel', timeout: 180_000 })
@@ -198,7 +198,7 @@ test.describe('every selection', () => {
     const page = await open(true)
     await select(page, ['box'])
     await enter(page.getByTestId('layout-card').getByRole('spinbutton', { name: 'X position' }), '200')
-    await enter(page.getByTestId('fill-card').getByRole('textbox', { name: 'Colour 1 hex' }), '14213d')
+    await enter((await fillList(page)).getByRole('textbox', { name: 'Colour 1 hex' }), '14213d')
     const own = (await scopeMenu(page)).getByTestId('own-changes')
     await expect(own.getByRole('listitem').locator('span')).toHaveText(['Position and size', 'Fill'])
     const sq = async () => Object.keys((await doc(page)).overrides['format:sq']?.box ?? {}).sort()
@@ -273,11 +273,11 @@ test.describe('every selection', () => {
     const x = page.getByTestId('layout-card').getByRole('spinbutton', { name: 'X position' })
     await expect(x).toHaveValue('')
     await expect(x).toHaveAttribute('placeholder', 'Mixed')
-    await expect(page.getByTestId('fill-card')).toContainText('The selected layers differ.')
+    await expect(await fillList(page)).toContainText('The selected layers differ.')
     await step(page, () => x.press('ArrowUp'), async () => {
       await expect.poll(async () => [(await props(page, 'box')).x, (await props(page, 'dot')).x]).toEqual([81, 701])
     })
-    await step(page, () => page.getByTestId('fill-card').getByRole('button', { name: 'Use one for all' }).click(), async () => {
+    await step(page, async () => (await fillList(page)).getByRole('button', { name: 'Use one for all' }).click(), async () => {
       await expect.poll(async () => [await fills(page, 'box'), await fills(page, 'dot')]).toEqual([solid('#D9D9D9FF'), solid('#D9D9D9FF')])
     })
     await reloads(page)
@@ -286,7 +286,7 @@ test.describe('every selection', () => {
   row(8, 'effect tiles: none, shadow, glow, blur, outline', async (open) => {
     const page = await open()
     await select(page, ['box'])
-    const tiles = page.getByTestId('effects-card')
+    const tiles = await barMenu(page, 'effects')
     const types = async () => ((await props(page, 'box')).effects ?? []).map((e) => e.type)
     await step(page, () => tiles.locator('[data-tile="shadow"]').click(), async () => { await expect.poll(types).toEqual(['dropShadow']) })
     await step(page, () => tiles.locator('[data-tile="glow"]').click(), async () => { await expect.poll(types).toEqual(['dropShadow', 'glow']) })
@@ -303,7 +303,7 @@ test.describe('every selection', () => {
   row(9, 'add effect: drop shadow, inner shadow, glow, layer blur, background blur', async (open) => {
     const page = await open()
     await select(page, ['box'])
-    const card = page.getByTestId('effects-card')
+    const card = await barMenu(page, 'effects')
     const added: string[] = []
     for (const type of ['dropShadow', 'innerShadow', 'glow', 'layerBlur', 'backgroundBlur']) {
       added.push(type)
@@ -319,7 +319,7 @@ test.describe('every selection', () => {
   row(10, 'each effect: X, Y, blur, spread, radius, colour, remove, several', async (open) => {
     const page = await open()
     await select(page, ['box'])
-    const card = page.getByTestId('effects-card')
+    const card = await barMenu(page, 'effects')
     const effects = async () => (await props(page, 'box')).effects ?? []
     await choose(card.getByRole('combobox', { name: 'Add effect' }), 'dropShadow')
     await choose(card.getByRole('combobox', { name: 'Add effect' }), 'dropShadow')
@@ -680,11 +680,11 @@ test.describe('shapes and frames', () => {
   row(29, 'fill swatches and brand colours', async (open) => {
     const page = await open()
     await select(page, ['dot'])
-    await step(page, () => page.getByTestId('fill-look').getByRole('group', { name: 'Brand colours' }).getByRole('button', { name: 'Roast' }).click(), async () => {
+    await step(page, async () => (await barMenu(page, 'colour')).getByRole('group', { name: 'Brand colours' }).getByRole('button', { name: 'Roast' }).click(), async () => {
       await expect.poll(async () => (await doc(page)).nodes.dot?.bindings).toMatchObject({ fill: 'brand:roast' })
     })
     await select(page, ['box'])
-    await step(page, () => page.getByTestId('shape-card').getByRole('group', { name: 'Brand colours' }).getByRole('button', { name: 'Berry' }).click(), async () => {
+    await step(page, async () => (await barMenu(page, 'colour')).getByRole('group', { name: 'Brand colours' }).getByRole('button', { name: 'Berry' }).click(), async () => {
       await expect.poll(async () => (await doc(page)).nodes.box?.bindings).toMatchObject({ fill: 'brand:berry' })
     })
     await reloads(page)
@@ -693,7 +693,7 @@ test.describe('shapes and frames', () => {
   row(30, 'fill list: add, remove, reorder, hide and show', async (open) => {
     const page = await open()
     await select(page, ['box'])
-    const card = page.getByTestId('fill-card')
+    const card = await fillList(page)
     await step(page, () => card.getByRole('button', { name: 'Add fill' }).click(), async () => {
       await expect.poll(async () => (await fills(page, 'box')).length).toBe(2)
     })
@@ -719,7 +719,7 @@ test.describe('shapes and frames', () => {
   row(31, 'paint kind: solid, linear, radial, angular, image', async (open) => {
     const page = await open()
     await select(page, ['box'])
-    await page.getByTestId('fill-card').locator('[data-row="1"]').getByTestId('paint-swatch').click()
+    await (await fillList(page)).locator('[data-row="1"]').getByTestId('paint-swatch').click()
     const editor = page.getByTestId('paint-editor')
     for (const [name, type] of [['Linear gradient', 'linear'], ['Radial gradient', 'radial'], ['Angular gradient', 'angular'], ['Solid', 'solid']] as const) {
       await step(page, () => editor.getByRole('radio', { name }).click(), async () => {
@@ -738,7 +738,7 @@ test.describe('shapes and frames', () => {
   row(32, 'gradient stops, angle, centre and size', async (open) => {
     const page = await open()
     await select(page, ['box'])
-    await page.getByTestId('fill-card').locator('[data-row="1"]').getByTestId('paint-swatch').click()
+    await (await fillList(page)).locator('[data-row="1"]').getByTestId('paint-swatch').click()
     const editor = page.getByTestId('paint-editor')
     await editor.getByRole('radio', { name: 'Linear gradient' }).click()
     const stops = async () => ((await fills(page, 'box'))[0]?.stops ?? []) as { offset: number; color: string }[]
@@ -780,7 +780,7 @@ test.describe('shapes and frames', () => {
   row(33, 'colour hex and opacity of each paint', async (open) => {
     const page = await open()
     await select(page, ['box'])
-    const card = page.getByTestId('fill-card')
+    const card = await fillList(page)
     await step(page, () => enter(card.getByRole('textbox', { name: 'Colour 1 hex' }), '00a889'), async () => {
       await expect.poll(async () => (await fills(page, 'box'))[0]?.color).toBe('#00A889FF')
     })
@@ -800,7 +800,7 @@ test.describe('shapes and frames', () => {
     const page = await open()
     await select(page, ['dot'])
     await step(page, async () => {
-      await page.getByTestId('add-image').click()
+      await (await barMenu(page, 'colour')).getByTestId('add-image').click()
       await page.getByTestId('add-image-picker').locator(`li[data-asset="${assets.tile}"] button`).click()
     }, async () => {
       await expect.poll(async () => (await fills(page, 'dot')).at(-1)).toMatchObject({ type: 'image', assetId: assets.tile, fit: 'fill' })
@@ -811,7 +811,7 @@ test.describe('shapes and frames', () => {
   row(35, 'stroke list: add, remove, reorder, several', async (open) => {
     const page = await open()
     await select(page, ['box'])
-    const card = page.getByTestId('stroke-card')
+    const card = await strokeList(page)
     const strokes = async () => (await props(page, 'box')).strokes ?? []
     await step(page, () => card.getByRole('button', { name: 'Add stroke' }).click(), async () => { await expect.poll(async () => (await strokes()).length).toBe(1) })
     await step(page, () => card.getByRole('button', { name: 'Add stroke' }).click(), async () => { await expect.poll(async () => (await strokes()).length).toBe(2) })
@@ -835,7 +835,7 @@ test.describe('shapes and frames', () => {
   row(36, 'stroke paint, width, position', async (open) => {
     const page = await open()
     await select(page, ['box'])
-    const card = page.getByTestId('stroke-card')
+    const card = await strokeList(page)
     await card.getByRole('button', { name: 'Add stroke' }).click()
     const stroke = async () => (await props(page, 'box')).strokes?.[0] ?? {}
     await step(page, () => enter(card.getByRole('textbox', { name: 'Stroke 1 colour hex' }), '2f6bff'), async () => {
@@ -851,7 +851,7 @@ test.describe('shapes and frames', () => {
   row(37, 'dashes, dash offset, ends, corners', async (open) => {
     const page = await open()
     await select(page, ['poly'])
-    const card = page.getByTestId('stroke-card')
+    const card = await strokeList(page)
     await card.getByRole('button', { name: 'Add stroke' }).click()
     await enter(card.getByRole('spinbutton', { name: 'Stroke 1 width' }), '16')
     const stroke = async () => (await props(page, 'poly')).strokes?.[0] ?? {}
@@ -939,8 +939,8 @@ test.describe('photos', () => {
     const page = await open()
     await select(page, ['photo'])
     await step(page, async () => {
-      await page.getByTestId('replace-image').click()
-      await page.getByTestId('replace-image-picker').locator(`li[data-asset="${assets.tile}"] button`).click()
+      await page.getByTestId('bar-replace').click()
+      await page.getByTestId('bar-replace-picker').locator(`li[data-asset="${assets.tile}"] button`).click()
     }, async () => { await expect.poll(() => image(page)).toMatchObject({ assetId: assets.tile }) })
     await reloads(page)
   })
@@ -948,7 +948,7 @@ test.describe('photos', () => {
   row(44, 'crop on the canvas', async (open) => {
     const page = await open()
     await select(page, ['photo'])
-    await page.keyboard.press('Enter')
+    await page.getByTestId('bar-crop').click()
     await expect(page.locator('.crop-image')).toBeVisible()
     await step(page, () => drag(page, { x: 540, y: 350 }, { x: 600, y: 350 }), async () => {
       await expect.poll(() => image(page)).toMatchObject({ fit: 'crop' })
@@ -972,7 +972,7 @@ test.describe('photos', () => {
   row(46, 'filter', async (open) => {
     const page = await open()
     await select(page, ['photo'])
-    const filters = page.getByTestId('image-card').getByRole('radiogroup', { name: 'Filter' })
+    const filters = (await barMenu(page, 'look')).getByRole('radiogroup', { name: 'Filter' })
     for (const [name, filter] of [['Mono', 'mono'], ['Sepia', 'sepia'], ['Vivid', 'vivid'], ['Fade', 'fade'], ['Warm', 'warm'], ['Cool', 'cool'], ['Original', undefined]] as const) {
       await step(page, () => filters.getByRole('radio', { name }).click(), async () => { await expect.poll(async () => (await image(page)).filter).toBe(filter) })
     }
@@ -1005,7 +1005,8 @@ test.describe('photos', () => {
     const page = await open()
     await select(page, ['photo'])
     const mask = async () => (await moreMenu(page)).getByRole('button', { name: 'Use as mask' }).click()
-    await step(page, mask, async () => { await expect.poll(async () => (await props(page, 'photo')).mask).toBe('alpha') })
+    await step(page, () => page.getByTestId('bar-mask').click(), async () => { await expect.poll(async () => (await props(page, 'photo')).mask).toBe('alpha') })
+    await expect(page.getByTestId('bar-mask')).toHaveAttribute('aria-pressed', 'true')
     await step(page, mask, async () => { await expect.poll(async () => (await props(page, 'photo')).mask).toBeFalsy() })
     await reloads(page)
   })

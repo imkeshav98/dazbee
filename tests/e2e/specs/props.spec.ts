@@ -4,7 +4,7 @@
 import { expect, test, type Locator, type Page } from '../support/test.ts'
 import type { DesignInput } from '@dazbee/schema'
 import { writeOutput } from '../support/editor.ts'
-import { barMenu, moreMenu, openStage, scopeMenu } from '../support/stage.ts'
+import { barMenu, fillList, moreMenu, openStage, scopeMenu, strokeList } from '../support/stage.ts'
 import { choose } from '../support/select.ts'
 
 test.describe.configure({ timeout: 120_000 })
@@ -74,7 +74,7 @@ test('one layer: position, size, turn, opacity, blend, fill, stroke and effects'
   await choose(look.getByRole('combobox', { name: 'Blend mode' }), 'multiply')
   await expect.poll(async () => (await props(page, 'box')).blendMode).toBe('multiply')
 
-  const fill = page.getByTestId('fill-card')
+  const fill = await fillList(page)
   await enter(fill.getByRole('textbox', { name: 'Colour 1 hex' }), '00a889')
   await expect.poll(async () => (await props(page, 'box')).fills).toEqual([{ type: 'solid', color: '#00A889FF' }])
   await enter(fill.getByRole('textbox', { name: 'Colour 1 opacity' }), '80')
@@ -84,7 +84,7 @@ test('one layer: position, size, turn, opacity, blend, fill, stroke and effects'
   await fill.getByRole('button', { name: 'Remove fill 2' }).click()
   await expect.poll(async () => ((await props(page, 'box')).fills as unknown[]).length).toBe(1)
 
-  const stroke = page.getByTestId('stroke-card')
+  const stroke = await strokeList(page)
   await stroke.getByRole('button', { name: 'Add stroke' }).click()
   await expect.poll(async () => (await props(page, 'box')).strokes).toMatchObject([{ width: 2, align: 'center' }])
   await enter(stroke.getByRole('spinbutton', { name: 'Stroke 1 width' }), '6')
@@ -104,7 +104,7 @@ test('one layer: position, size, turn, opacity, blend, fill, stroke and effects'
   await enter(stroke.getByRole('textbox', { name: 'Stroke 1 dashes' }), '')
   await expect.poll(async () => (await props(page, 'box')).strokes).toMatchObject([{ dashes: [] }])
 
-  const effects = page.getByTestId('effects-card')
+  const effects = await barMenu(page, 'effects')
   await choose(effects.getByRole('combobox', { name: 'Add effect' }), 'dropShadow')
   await expect.poll(async () => (await props(page, 'box')).effects).toMatchObject([{ type: 'dropShadow', blur: 24 }])
   await enter(effects.getByRole('spinbutton', { name: 'Drop shadow 1 Blur' }), '40')
@@ -127,7 +127,7 @@ test('several layers: mixed values, set together or each from its own; text and 
   const x = layout.getByRole('spinbutton', { name: 'X position' })
   await expect(x).toHaveValue('')
   await expect(x).toHaveAttribute('placeholder', 'Mixed')
-  await expect(page.getByTestId('fill-card')).toContainText('The selected layers differ.')
+  await expect(await fillList(page)).toContainText('The selected layers differ.')
   writeOutput('props-1-mixed.png', await page.screenshot())
 
   // The arrow moves each from its own; Enter gives both the same.
@@ -136,9 +136,9 @@ test('several layers: mixed values, set together or each from its own; text and 
   await enter(layout.getByRole('spinbutton', { name: 'Y position' }), '300')
   await expect.poll(async () => [(await props(page, 'box')).y, (await props(page, 'dot')).y]).toEqual([300, 300])
   await expect(layout.getByRole('spinbutton', { name: 'Y position' })).toHaveValue('300')
-  await page.getByTestId('fill-card').getByRole('button', { name: 'Use one for all' }).click()
+  await (await fillList(page)).getByRole('button', { name: 'Use one for all' }).click()
   await expect.poll(async () => [(await props(page, 'box')).fills, (await props(page, 'dot')).fills]).toEqual([[{ type: 'solid', color: '#D9D9D9FF' }], [{ type: 'solid', color: '#D9D9D9FF' }]])
-  await enter(page.getByTestId('fill-card').getByRole('textbox', { name: 'Colour 1 hex' }), '#FFB020')
+  await enter((await fillList(page)).getByRole('textbox', { name: 'Colour 1 hex' }), '#FFB020')
   await expect.poll(async () => [(await props(page, 'box')).fills, (await props(page, 'dot')).fills]).toEqual([[{ type: 'solid', color: '#FFB020FF' }], [{ type: 'solid', color: '#FFB020FF' }]])
   await enter(page.getByTestId('appearance-card').getByRole('spinbutton', { name: 'Opacity' }), '75')
   await expect.poll(async () => [(await props(page, 'box')).opacity, (await props(page, 'dot')).opacity]).toEqual([0.75, 0.75])
@@ -183,7 +183,7 @@ test('a change goes to the format shown, like a drag; all formats writes the bas
   await page.keyboard.press('Escape')
   const x = page.getByTestId('layout-card').getByRole('spinbutton', { name: 'X position' })
   await enter(x, '500')
-  await enter(page.getByTestId('fill-card').getByRole('textbox', { name: 'Colour 1 hex' }), '00A889')
+  await enter((await fillList(page)).getByRole('textbox', { name: 'Colour 1 hex' }), '00A889')
   await expect.poll(async () => (await overrides(page))['format:sq']?.box).toMatchObject({ x: 500, fills: [{ type: 'solid', color: '#00A889FF' }] })
   // The base and the other format are as they were.
   expect((await base(page, 'box')).x).toBe(80)

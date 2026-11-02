@@ -16,6 +16,7 @@ import { BarPopover, keepFocus } from './bar-popover.tsx'
 import { Choice } from './fields.tsx'
 import { RotationField, set, useTarget } from './selection-cards.tsx'
 import { BAR, BAR_BUTTON, BAR_DIVIDER, ICON_BUTTON, MENU_DIVIDER, MENU_ITEM, MENU_KEY, POPOVER } from './styles.ts'
+import { ShapeBar } from './shape-bar.tsx'
 import { TextBar } from './text-bar.tsx'
 
 /** Pixels between the selection and the bar, clear of the turn handles round its corners, and kept clear at the stage's edges. */
@@ -197,6 +198,7 @@ export function SelectionBar({ editor, brandId }: { editor: Editor; brandId: str
       className={cn(BAR, place ? 'visible' : 'invisible')}
     >
       {selected && selected.target.types.some((type) => type === 'text') && <TextBar target={selected.target} brandId={brandId} open={open} onOpen={setOpen} />}
+      {selected && !selected.target.types.every((type) => type === 'text') && <ShapeBar target={selected.target} brandId={brandId} open={open} onOpen={setOpen} />}
       <BarPopover id="line-up" open={open} onOpen={setOpen} label={b.lineUp} testId="line-up">
         <div dir="ltr" role="group" aria-label={t.editor.arrange.align} className="grid grid-cols-6 gap-0.5">
           {ALIGN.map(({ action, icon: Icon }) => (

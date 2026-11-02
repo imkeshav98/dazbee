@@ -7,7 +7,7 @@
 // arrow keys move each from its own. With more than one format the changes go to every format or to
 // this one only. Each change is one undo step, and a drag on a number, however long, is one too.
 import * as Popover from '@radix-ui/react-popover'
-import { ArrowsClockwiseIcon, CaretDownIcon, ImageSquareIcon } from '@phosphor-icons/react'
+import { CaretDownIcon, ImageSquareIcon } from '@phosphor-icons/react'
 import { withImage, type Editor } from '@dazbee/editor'
 import { BlendMode, boundFillIndex, brandRef, ContainerBlendMode, ImageFilter, LineEnd, type Design, type Effect, type ImageAdjust, type Paint, type Shape } from '@dazbee/schema'
 import { useEffect, useState, type ReactNode } from 'react'
@@ -280,17 +280,17 @@ function ShapeCard({ target, p, kind, look }: { target: Target; p: P; kind: Shap
 }
 
 /** A list of paints, strokes or effects that every selected layer has the same of, or a way to make it so. */
-function ListCard<T>({ id, title, p, target, field, fresh, onTop = fresh, topFirst = false, render }: {
+function ListBody<T>({ title, p, target, field, fresh, onTop = fresh, topFirst = false, testId, render }: {
   /** What + adds over a list that has items already; `fresh` starts an empty one. */
   onTop?: T
   /** The last item, drawn on top, shows first, and rows can be reordered. */
   topFirst?: boolean
-  id: string
   title: string
   p: P
   target: Target
   field: string
   fresh: T
+  testId: string
   /** `n` is the row's place as shown, from 1; `change` takes the item as the document holds it when the change is made, not as last drawn. */
   render: (item: T, n: number, change: (to: (now: T) => T) => void) => ReactNode
 }) {
@@ -298,11 +298,11 @@ function ListCard<T>({ id, title, p, target, field, fresh, onTop = fresh, topFir
   const list = shared(lists)
   const write = (to: (now: T[]) => T[]) => set(target, (now) => ({ [field]: to((now[field] ?? []) as T[]) }))
   return (
-    <Card
-      id={id}
-      title={title}
-      action={<AddButton label={format(p.add, { name: title.toLowerCase() })} onClick={() => write((now) => (list === 'mixed' && !topFirst ? [fresh] : [...now, now.length === 0 ? fresh : onTop]))} />}
-    >
+    <div className="flex flex-col gap-2" data-testid={testId}>
+      <div className="flex items-center justify-between text-xs font-semibold text-muted">
+        {title}
+        <AddButton label={format(p.add, { name: title.toLowerCase() })} onClick={() => write((now) => (list === 'mixed' && !topFirst ? [fresh] : [...now, now.length === 0 ? fresh : onTop]))} />
+      </div>
       {list === 'mixed'
         ? (
           <div className="flex items-center justify-between gap-2 text-xs text-muted">
@@ -311,7 +311,45 @@ function ListCard<T>({ id, title, p, target, field, fresh, onTop = fresh, topFir
           </div>
         )
         : <Stack items={list} field={field} topFirst={topFirst} removeLabel={(n) => format(p.remove, { name: title.toLowerCase(), n })} onWrite={write} render={render} />}
-    </Card>
+    </div>
+  )
+}
+
+/** The bar's Colour popover: the brand's colours, then the fill list with each fill's editor. */
+export function FillColourBody({ target, brandId, p }: { target: Target; brandId: string; p: P }) {
+  return (
+    <div className="flex w-80 flex-col gap-3 p-1.5">
+      <FillLook target={target} brandId={brandId} p={p} />
+      <ListBody<Paint>
+        title={p.fill}
+        p={p}
+        target={target}
+        field="fills"
+        fresh={NEW_FILL}
+        onTop={FILL_ON_TOP}
+        topFirst
+        testId="fill-list"
+        render={(paint, n, change) => <PaintRow paint={paint} name={format(p.colour, { n })} brandId={brandId} editor={target.editor} p={p} onSet={change} />}
+      />
+    </div>
+  )
+}
+
+/** The bar's Outline popover: the stroke list, each stroke's paint, width, place, dashes, ends and corners. */
+export function OutlineBody({ target, brandId, p }: { target: Target; brandId: string; p: P }) {
+  return (
+    <div className="flex w-80 flex-col gap-3 p-1.5">
+      <ListBody<Stroke>
+        title={p.stroke}
+        p={p}
+        target={target}
+        field="strokes"
+        fresh={NEW_STROKE}
+        topFirst
+        testId="stroke-list"
+        render={(stroke, n, change) => <StrokeRow stroke={stroke} place={n} brandId={brandId} p={p} editor={target.editor} onSet={change} />}
+      />
+    </div>
   )
 }
 
@@ -643,51 +681,57 @@ const FILTER_LOOK: Record<ImageFilter, string> = {
  * layer, and under them its opacity and adjustments (exposure, contrast, saturation, temperature,
  * tint). It acts on the first image fill the selected layers share.
  */
-function ImageCard({ target, p, brandId, index, paint }: { target: Target; p: P; brandId: string; index: number; paint: ImageFill }) {
-  const setPaint = (change: (now: ImageFill) => Partial<ImageFill>) => set(target, (now) => {
-    const fills = (now.fills ?? []) as Paint[]
-    const at = fills[index]
-    if (at?.type !== 'image') return null
-    return { fills: fills.map((f, i) => (i === index ? { ...at, ...change(at) } : f)) }
-  })
+/** The topmost image fill, the one showing, when every selected layer has the same fills; null otherwise. */
+export function imageFillOf(target: Target): { index: number; paint: ImageFill } | null {
+  const fills = shared(target.props.map((pr) => (pr.fills ?? []) as Paint[]))
+  const index = fills === 'mixed' ? -1 : fills.findLastIndex((f) => f.type === 'image')
+  return fills !== 'mixed' && index >= 0 ? { index, paint: fills[index] as ImageFill } : null
+}
+
+/** Changes the image fill at `index` of every selected layer. */
+const setImage = (target: Target, index: number, change: (now: ImageFill) => Partial<ImageFill>) => set(target, (now) => {
+  const fills = (now.fills ?? []) as Paint[]
+  const at = fills[index]
+  if (at?.type !== 'image') return null
+  return { fills: fills.map((f, i) => (i === index ? { ...at, ...change(at) } : f)) }
+})
+
+/** The bar's Look popover for a photo: each filter as the photo with it. */
+export function PhotoLookBody({ target, p, brandId, index, paint }: { target: Target; p: P; brandId: string; index: number; paint: ImageFill }) {
+  const picture = `/brands/${encodeURIComponent(brandId)}/assets/${encodeURIComponent(paint.assetId)}/thumbnail`
+  const filter = paint.filter ?? 'none'
+  return (
+    <div role="radiogroup" aria-label={p.filter} className="grid w-72 grid-cols-4 gap-1.5 p-1.5">
+      {ImageFilter.options.map((name) => (
+        <button
+          key={name}
+          type="button"
+          role="radio"
+          aria-checked={filter === name}
+          onClick={() => setImage(target, index, () => ({ filter: name === 'none' ? undefined : name }))}
+          className="group flex min-w-0 cursor-pointer flex-col items-center gap-1 text-[10px] font-semibold text-muted aria-checked:text-text"
+        >
+          <span className="block aspect-square w-full overflow-hidden rounded-[8px] border border-line group-aria-checked:shadow-[0_0_0_2px_var(--surface),0_0_0_4px_var(--accent)]">
+            <img src={picture} alt="" draggable={false} loading="lazy" style={{ filter: FILTER_LOOK[name] }} className="size-full object-cover" />
+          </span>
+          <span className="w-full truncate text-center">{p.filters[name]}</span>
+        </button>
+      ))}
+    </div>
+  )
+}
+
+/** The photo's card: how it fits its layer, its opacity and its adjustments. */
+function ImageCard({ target, p, index, paint }: { target: Target; p: P; index: number; paint: ImageFill }) {
+  const setPaint = (change: (now: ImageFill) => Partial<ImageFill>) => setImage(target, index, change)
   const setAdjust = (key: keyof ImageAdjust, to: (n: number) => number) => setPaint((now) => {
     const adjust = { exposure: 0, contrast: 0, saturation: 0, temperature: 0, tint: 0, ...now.adjust }
     return { adjust: { ...adjust, [key]: Math.round(clamp(to(adjust[key]), -100, 100)) } }
   })
-  const picture = `/brands/${encodeURIComponent(brandId)}/assets/${encodeURIComponent(paint.assetId)}/thumbnail`
-  const filter = paint.filter ?? 'none'
   return (
     <section aria-labelledby="image-card-title" className={CARD} data-testid="image-card">
-      <CardHeader id="image-card-title" title={p.image} note={target.names.join(', ')}>
-        <ImagePickerButton
-          brandId={brandId}
-          title={p.replaceImageTitle}
-          testId="replace-image"
-          className={cn(CHIP, FOCUS_RING, 'shrink-0')}
-          onPick={(asset) => set(target, (now) => ({ fills: withImage((now.fills ?? []) as Paint[], asset.id) }))}
-        >
-          <ArrowsClockwiseIcon size={12} aria-hidden />
-          <span aria-hidden>{p.replaceImage}</span>
-        </ImagePickerButton>
-      </CardHeader>
+      <CardHeader id="image-card-title" title={p.image} note={target.names.join(', ')} />
       <div className="flex flex-col gap-3 px-[18px] pb-3">
-        <div role="radiogroup" aria-label={p.filter} className="grid grid-cols-4 gap-1.5">
-          {ImageFilter.options.map((name) => (
-            <button
-              key={name}
-              type="button"
-              role="radio"
-              aria-checked={filter === name}
-              onClick={() => setPaint(() => ({ filter: name === 'none' ? undefined : name }))}
-              className="group flex min-w-0 cursor-pointer flex-col items-center gap-1 text-[10px] font-semibold text-muted aria-checked:text-text"
-            >
-              <span className="block aspect-square w-full overflow-hidden rounded-[8px] border border-line group-aria-checked:shadow-[0_0_0_2px_var(--surface),0_0_0_4px_var(--accent)]">
-                <img src={picture} alt="" draggable={false} loading="lazy" style={{ filter: FILTER_LOOK[name] }} className="size-full object-cover" />
-              </span>
-              <span className="w-full truncate text-center">{p.filters[name]}</span>
-            </button>
-          ))}
-        </div>
         <Choice name={p.fit} value={paint.fit} options={['fill', 'fit', 'crop', 'tile'] as const} labels={p.fits} onSet={(fit) => setPaint(() => ({ fit }))} />
       </div>
       <div className={cn(KNOBS, CARD_LOWER)}>
@@ -1077,16 +1121,6 @@ export function EffectsBody({ target, p }: { target: Target; p: P }) {
   )
 }
 
-/** The Effects card: the tiles and each effect's numbers in the panel. */
-function EffectsCard({ target, p }: { target: Target; p: P }) {
-  return (
-    <section aria-labelledby="effects-card-title" className={CARD} data-testid="effects-card">
-      <CardHeader id="effects-card-title" title={p.effects} />
-      <EffectsBody target={target} p={p} />
-    </section>
-  )
-}
-
 /**
  * Where changes go when a design has more than one size: a chip in the header card naming them, which
  * opens to choose all sizes or only this one, and to reset what this size has of its own.
@@ -1116,6 +1150,7 @@ function ScopeMenu({ everyFormat, onChange, size, p, children }: { everyFormat: 
   )
 }
 
+
 /**
  * The selected layers as the cards and the bar act on them, in the frame they are selected in: like a
  * drag on the canvas, a change goes to the format shown unless every format is asked for. Null when
@@ -1142,7 +1177,7 @@ export function useTarget(editor: Editor, ids: string[]): { target: Target; desi
  * The selection's cards, after the font: the header card first (Arrange before it for several
  * layers, as the mock's "3 selected"), then the look, the rest open, and See-through last.
  */
-export function SelectionCards({ editor, brandId, ids, arrange }: { editor: Editor; brandId: string; ids: string[]; arrange: ReactNode }) {
+export function SelectionCards({ editor, ids, arrange }: { editor: Editor; ids: string[]; arrange: ReactNode }) {
   const t = useMessages()
   const p = t.editor.props
   const everyFormat = useEveryFormat()
@@ -1164,10 +1199,7 @@ export function SelectionCards({ editor, brandId, ids, arrange }: { editor: Edit
     const parent = design.nodes[design.nodes[id]?.parentId ?? '']
     return parent?.type === 'frame' && parent.props.layout !== undefined
   })
-  // The topmost image fill, the one showing, when every selected layer has the same fills.
-  const fills = shared(target.props.map((pr) => (pr.fills ?? []) as Paint[]))
-  const imageIndex = fills === 'mixed' ? -1 : fills.findLastIndex((f) => f.type === 'image')
-  const imageFill = fills !== 'mixed' && imageIndex >= 0 ? { index: imageIndex, paint: fills[imageIndex] as ImageFill } : null
+  const imageFill = imageFillOf(target)
   const ownShape = shapeKinds.size === 1 && (shapeKind === 'rect' || shapeKind === 'polygon' || shapeKind === 'star' || shapeKind === 'line') ? shapeKind : null
   const scope = Object.keys(design.formats).length > 1 && (
     <ScopeMenu everyFormat={everyFormat} onChange={setEveryFormat} size={design.formats[formatId]?.name ?? ''} p={p}>
@@ -1178,45 +1210,12 @@ export function SelectionCards({ editor, brandId, ids, arrange }: { editor: Edit
     <>
       {several && arrange}
       <HeaderCard target={target} p={p} scope={scope} />
-      {/* The look, as in the mock; text has its look in the bar. */}
+      {/* Each layer's look, outline and effects are in the bar; the panel keeps their numbers. */}
       {imageFill
-        ? <ImageCard target={target} p={p} brandId={brandId} index={imageFill.index} paint={imageFill.paint} />
-        : all('graphic', 'frame', 'boolean') && (ownShape
-          ? <ShapeCard target={target} p={p} kind={ownShape} look={ownShape === 'line' ? null : <FillLook target={target} brandId={brandId} p={p} />} />
-          : (
-            <section aria-labelledby="fill-look-title" className={CARD} data-testid="fill-look">
-              <CardHeader id="fill-look-title" title={p.fill} note={target.names.join(', ')} />
-              <div className="px-[18px] pb-4"><FillLook target={target} brandId={brandId} p={p} /></div>
-            </section>
-          ))}
-      {!all('text') && <EffectsCard target={target} p={p} />}
+        ? <ImageCard target={target} p={p} index={imageFill.index} paint={imageFill.paint} />
+        : all('graphic', 'frame', 'boolean') && ownShape && <ShapeCard target={target} p={p} kind={ownShape} />}
       {all('text') && <TextCard target={target} p={p} />}
       {all('text') && <ParagraphCard target={target} p={p} />}
-      {all('graphic', 'frame', 'boolean') && (
-        <ListCard<Paint>
-          id="fill-card"
-          title={p.fill}
-          p={p}
-          target={target}
-          field="fills"
-          fresh={NEW_FILL}
-          onTop={FILL_ON_TOP}
-          topFirst
-          render={(paint, n, change) => <PaintRow paint={paint} name={format(p.colour, { n })} brandId={brandId} editor={editor} p={p} onSet={change} />}
-        />
-      )}
-      {all('graphic', 'boolean') && (
-        <ListCard<Stroke>
-          id="stroke-card"
-          title={p.stroke}
-          p={p}
-          target={target}
-          field="strokes"
-          fresh={NEW_STROKE}
-          topFirst
-          render={(stroke, n, change) => <StrokeRow stroke={stroke} place={n} brandId={brandId} p={p} editor={editor} onSet={change} />}
-        />
-      )}
       {all('frame') && <AutoLayoutCard target={target} p={p} />}
       {(inFlow || all('frame') && target.props.every((pr) => pr.layout)) && <FlowCard target={target} p={p} inFlow={inFlow} />}
       <SeeThroughCard target={target} p={p} />

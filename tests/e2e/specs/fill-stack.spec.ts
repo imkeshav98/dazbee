@@ -11,7 +11,7 @@ import { loadCanvasKit } from '@dazbee/renderer/node'
 import { AssetLink, type DesignInput } from '@dazbee/schema'
 import { api, photo, upload } from '../support/assets.ts'
 import { designOf, exportHashOf, screenPoint, writeOutput } from '../support/editor.ts'
-import { click, openStage, press, read } from '../support/stage.ts'
+import { click, fillList, openStage, press, read, strokeList } from '../support/stage.ts'
 
 test.describe.configure({ timeout: 120_000 })
 
@@ -59,7 +59,7 @@ test('a gradient over a photo: added on top, a stop edited, the two reordered, o
   const asset = await upload(photo)
   const { page, errors } = await openStage(browser, design(asset.id))
   await click(page, 760, 360)
-  const card = page.getByTestId('fill-card')
+  const card = await fillList(page)
 
   // + puts a see-through colour on top; the list shows it first.
   await card.getByRole('button', { name: 'Add fill' }).click()
@@ -149,7 +149,7 @@ test('a stroke and the page background take the same paint editor: an angular st
   const asset = await upload(photo)
   const { page, errors } = await openStage(browser, design(asset.id))
   await click(page, 760, 360)
-  const stroke = page.getByTestId('stroke-card')
+  const stroke = await strokeList(page)
   await stroke.getByRole('button', { name: 'Add stroke' }).click()
   await stroke.locator('[data-row="1"]').getByTestId('paint-swatch').click()
   const editor = page.getByTestId('paint-editor')
@@ -158,6 +158,8 @@ test('a stroke and the page background take the same paint editor: an angular st
   await editor.getByRole('spinbutton', { name: 'Gradient angle' }).fill('45')
   await editor.getByRole('spinbutton', { name: 'Gradient angle' }).press('Enter')
   await expect.poll(async () => ((await read(page)).nodes.card?.props.strokes as { paint: { angle?: number } }[])[0]?.paint.angle).toBe(45)
+  // Esc closes the paint editor, then the Outline popover.
+  await page.keyboard.press('Escape')
   await page.keyboard.press('Escape')
 
   // With nothing selected, the Page card holds the page's background as a stack too.
