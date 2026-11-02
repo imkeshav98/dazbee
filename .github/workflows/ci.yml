@@ -48,7 +48,7 @@ jobs:
           retention-days: 30
 
   # The browser suite runs in jobs side by side, each against its own API and sync server: four
-  # shards of every spec but the canvas gesture matrix, and two halves of the matrix, the slowest spec.
+  # shards of every spec but the canvas gesture matrix, the slowest spec, and one job per format of it.
   e2e:
     name: e2e (${{ matrix.part }})
     runs-on: ubuntu-24.04
@@ -57,12 +57,12 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { part: '1', args: '--shard=1/4 --grep-invert "every canvas gesture in the"' }
-          - { part: '2', args: '--shard=2/4 --grep-invert "every canvas gesture in the"' }
-          - { part: '3', args: '--shard=3/4 --grep-invert "every canvas gesture in the"' }
-          - { part: '4', args: '--shard=4/4 --grep-invert "every canvas gesture in the"' }
-          - { part: 'matrix-1', args: 'specs/gesture-matrix.spec.ts --shard=1/2' }
-          - { part: 'matrix-2', args: 'specs/gesture-matrix.spec.ts --shard=2/2' }
+          - { part: '1', args: '--shard=1/4 --grep-invert @gesture-matrix' }
+          - { part: '2', args: '--shard=2/4 --grep-invert @gesture-matrix' }
+          - { part: '3', args: '--shard=3/4 --grep-invert @gesture-matrix' }
+          - { part: '4', args: '--shard=4/4 --grep-invert @gesture-matrix' }
+          - { part: 'matrix-square', args: '--grep @gesture-matrix-sq' }
+          - { part: 'matrix-wide', args: '--grep @gesture-matrix-wide' }
     steps:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6

@@ -321,11 +321,11 @@ async function run(page: Page, subject: Subject, gesture: string, formatId: stri
 }
 
 /**
- * Runs the matrix in one format for the given layers (every subject by default); returns the
- * table's rows and what failed without a ticket. Each case puts the design back with one undo, so
- * any set of subjects runs on its own.
+ * Runs the matrix in one format for the given layers; returns the table's rows and what failed
+ * without a ticket. Each case is undone before the next, and a case that one undo doesn't put back
+ * fails, so a share of the subjects gives the same results as the whole matrix.
  */
-export async function runMatrix(browser: Browser, formatId: 'sq' | 'wide', subjects: readonly Subject[] = SUBJECTS) {
+export async function runMatrix(browser: Browser, formatId: 'sq' | 'wide', subjects: readonly Subject[]) {
   const other = formatId === 'sq' ? 'wide' : 'sq'
   const asset = await upload(photo)
   const opened = await openStage(browser, matrixDesign(asset.id))
