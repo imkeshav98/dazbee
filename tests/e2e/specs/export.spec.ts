@@ -163,11 +163,15 @@ test('exporting every format of a page: how long it takes, and the main thread\'
     observer.observe({ type: 'longtask', buffered: false })
     ;(window as unknown as { longTasks: () => number[] }).longTasks = () => [...seen, ...observer.takeRecords().map((entry) => entry.duration)]
   })
-  const took = await page.evaluate(async (formatIds) => {
-    const started = performance.now()
-    await window.dazbee?.exportFiles({ pageIds: ['p1'], formatIds, type: 'png' })
-    return performance.now() - started
-  }, Object.keys(FORMATS))
+  // Started from a timer, as a click would start it: the browser times tasks, and an evaluate is not one.
+  const took = await page.evaluate((formatIds) => new Promise<number>((resolve, reject) => {
+    setTimeout(() => {
+      const editor = window.dazbee
+      if (!editor) return reject(new Error('no editor'))
+      const started = performance.now()
+      editor.exportFiles({ pageIds: ['p1'], formatIds, type: 'png' }).then(() => resolve(performance.now() - started), reject)
+    })
+  }), Object.keys(FORMATS))
   const blocked = await page.evaluate(() => (window as unknown as { longTasks: () => number[] }).longTasks())
   report('Export, five formats of a page as PNG', {
     export: { ms: Math.round(took) },
