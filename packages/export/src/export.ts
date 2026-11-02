@@ -65,9 +65,9 @@ function safe(part: string) {
   return cleaned || 'untitled'
 }
 
-/** A file name from the request's template, its tokens filled in. */
+/** A file name from the request's template, its tokens filled in: `{size}` and `{format}` both name the format. */
 export function fileName(template: string, values: { design: string; page: string; format: string }): string {
-  return safe(template.replace(/\{(design|page|format)\}/g, (_, token: keyof typeof values) => values[token]))
+  return safe(template.replace(/\{(design|page|size|format)\}/g, (_, token: string) => values[token === 'size' ? 'format' : (token as keyof typeof values)]))
 }
 
 /**

@@ -75,6 +75,49 @@ function useSelection(editor: Editor) {
   return state
 }
 
+/** How long the stage or the list must be still before the pictures are drawn, and each slice's budget, in ms. */
+const PICTURES_AFTER = 150
+const PICTURES_SLICE = 6
+
+/**
+ * Each listed layer's picture in the frame the panel shows, drawn once the stage and the list have
+ * been still a moment (so a drag or a scroll draws none) and again once fonts and images arrive, a
+ * few at a time so no frame waits long on them.
+ */
+function useLayerPictures(editor: Editor, frameKey: string, ids: readonly string[]): Record<string, string | null> {
+  const [pictures, setPictures] = useState<Record<string, string | null>>({})
+  const wanted = ids.join(' ')
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const draw = () => {
+      const list = wanted.split(' ').filter(Boolean)
+      const next: Record<string, string | null> = {}
+      let i = 0
+      const slice = () => {
+        const end = performance.now() + PICTURES_SLICE
+        while (i < list.length && performance.now() < end) {
+          const id = list[i++] ?? ''
+          next[id] = editor.layerThumbnail(id, 44, false, frameKey)
+        }
+        if (i < list.length) timer = setTimeout(slice, 0)
+        else setPictures((now) => (Object.keys(next).length === Object.keys(now).length && Object.entries(next).every(([id, url]) => now[id] === url) ? now : next))
+      }
+      slice()
+    }
+    const later = () => {
+      clearTimeout(timer)
+      timer = setTimeout(draw, PICTURES_AFTER)
+    }
+    const stop = editor.onDraw(later)
+    later()
+    return () => {
+      clearTimeout(timer)
+      stop()
+    }
+  }, [editor, frameKey, wanted])
+  return pictures
+}
+
 export function LayersPanel({ editor }: { editor: Editor }) {
   const t = useMessages()
   const rtl = dirOf(useLocale()) === 'rtl'
@@ -297,6 +340,8 @@ export function LayersPanel({ editor }: { editor: Editor }) {
     }
   }, [])
 
+  const shown = rows.slice(first, last)
+  const pictures = useLayerPictures(editor, `${pageId}/${formatId}`, shown.map((row) => row.id))
   return (
     <div className="flex min-h-0 flex-1 flex-col" data-testid="layers">
       {rows.length === 0
@@ -315,7 +360,7 @@ export function LayersPanel({ editor }: { editor: Editor }) {
               className="relative"
               style={{ height: rows.length * LAYER_ROW }}
             >
-              {rows.slice(first, last).map((row, offset) => (
+              {shown.map((row, offset) => (
                 <LayerRow
                   key={row.id}
                   row={row}
@@ -326,13 +371,13 @@ export function LayersPanel({ editor }: { editor: Editor }) {
                   open={expanded.has(row.id)}
                   hidden={(design.overrides[`format:${formatId}`]?.[row.id]?.visible ?? row.node.props.visible) === false}
                   drop={drop?.id === row.id ? drop.where : null}
+                  picture={pictures[row.id] ?? null}
                   api={api}
                 />
               ))}
             </div>
           </div>
         )}
-      <p className="shrink-0 border-t border-line px-[18px] py-2.5 text-[11px] leading-snug text-subtle">{t.editor.layersPanel.hint}</p>
     </div>
   )
 }
@@ -354,7 +399,7 @@ interface RowApi {
 }
 
 /** One row of the tree. Rendered again only when something it shows changes. */
-const LayerRow = memo(function LayerRow({ row, i, selected, focusable, renaming, open, hidden, drop, api }: {
+const LayerRow = memo(function LayerRow({ row, i, selected, focusable, renaming, open, hidden, drop, picture, api }: {
   row: Row
   i: number
   selected: boolean
@@ -363,12 +408,15 @@ const LayerRow = memo(function LayerRow({ row, i, selected, focusable, renaming,
   open: boolean
   hidden: boolean
   drop: Where | null
+  picture: string | null
   api: RowApi
 }) {
   const t = useMessages()
   const { id, node, depth } = row
   const locked = isLocked(node)
   const LayerIcon = iconOf(node)
+  // A frame says whether it is a plain box or stacks what it holds.
+  const kind = node.type === 'frame' ? ((node.props as { layout?: unknown }).layout ? t.editor.layersPanel.stack : t.editor.layersPanel.box) : null
   return (
     <div
       key={id}
@@ -430,8 +478,16 @@ const LayerRow = memo(function LayerRow({ row, i, selected, focusable, renaming,
           </button>
         )
         : <span aria-hidden className="size-4 shrink-0" />}
-      <span aria-hidden className={cn('grid size-[22px] shrink-0 place-items-center rounded-[5px] transition-colors duration-[var(--chrome-fast)]', selected ? 'bg-accent-solid text-on-accent' : 'bg-text/10 text-muted')}>
-        <LayerIcon size={13} weight={selected ? 'bold' : 'regular'} />
+      <span
+        aria-hidden
+        data-testid="layer-picture"
+        className={cn(
+          'grid size-[22px] shrink-0 place-items-center overflow-hidden rounded-[5px] transition-colors duration-[var(--chrome-fast)]',
+          picture ? 'border border-line bg-surface' : selected ? 'bg-accent-solid text-on-accent' : 'bg-text/10 text-muted',
+          picture && selected && 'border-accent ring-1 ring-accent',
+        )}
+      >
+        {picture ? <img src={picture} alt="" draggable={false} className="size-full object-contain" /> : <LayerIcon size={13} weight={selected ? 'bold' : 'regular'} />}
       </span>
       {renaming
         ? (
@@ -441,7 +497,8 @@ const LayerRow = memo(function LayerRow({ row, i, selected, focusable, renaming,
             onDone={(name) => api.renamed(id, name, node.name)}
           />
         )
-        : <span className={cn('min-w-0 flex-1 truncate', hidden && 'line-through decoration-subtle/60')}>{node.name}</span>}
+        : <span data-testid="layer-name" className={cn('min-w-0 flex-1 truncate', hidden && 'line-through decoration-subtle/60')}>{node.name}</span>}
+      {kind && !renaming && <span data-testid="layer-kind" className="shrink-0 font-mono text-[11px] text-subtle">{kind}</span>}
       <RowToggle
         on={hidden}
         label={format(hidden ? t.editor.layersPanel.show : t.editor.layersPanel.hide, { name: node.name })}

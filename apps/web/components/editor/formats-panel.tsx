@@ -42,7 +42,7 @@ const ordered = (design: Design) =>
   Object.entries(design.formats).sort(([a, x], [b, y]) => (x.order < y.order ? -1 : x.order > y.order ? 1 : a < b ? -1 : 1))
 
 /** A small box with the format's own proportions. */
-function Proportion({ width, height, className }: { width: number; height: number; className?: string }) {
+export function Proportion({ width, height, className }: { width: number; height: number; className?: string }) {
   const scale = 14 / Math.max(width, height)
   return (
     <span aria-hidden className={cn('grid size-4 shrink-0 place-items-center', className)}>

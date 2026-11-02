@@ -1,17 +1,20 @@
 'use client'
 
-// Export (#55, #56): pick pages, formats and PNG, JPG, PDF or SVG, and the editor's export worker
-// draws them while the stage stays responsive. One file downloads as itself, more as a zip
-// with a folder per format.
+// Export: pick the pages, the sizes (formats) as tiles, PNG, JPG, PDF or SVG and the file names,
+// and the editor's export worker draws them while the stage stays responsive. One file downloads
+// as itself, more as a zip with a folder per format.
 import type { Editor } from '@dazbee/editor'
-import type { Design, ExportType } from '@dazbee/schema'
+import { DEFAULT_EXPORT_NAME, type Design, type ExportType } from '@dazbee/schema'
 import { useState } from 'react'
 import { cn } from '../../lib/cn.ts'
 import { useMessages } from '../../lib/i18n/client.tsx'
 import { format } from '../../lib/i18n/index.ts'
 import { Button } from '../ui/button.tsx'
 import { Select } from '../ui/select.tsx'
+import { useSelection } from './arrange-panel.tsx'
 import { NumberField } from './fields.tsx'
+import { Proportion } from './formats-panel.tsx'
+import { FIELD, LINK_BUTTON, SEGMENT, SEGMENTS, TILE, TILE_FACE_WIDE } from './styles.ts'
 
 const byOrder = <T extends { order: string }>(items: Record<string, T>) =>
   Object.entries(items).sort(([a, x], [b, y]) => (x.order < y.order ? -1 : x.order > y.order ? 1 : a < b ? -1 : 1))
@@ -26,16 +29,19 @@ function download(name: string, type: string, bytes: Uint8Array<ArrayBuffer>) {
   setTimeout(() => URL.revokeObjectURL(url), 10_000)
 }
 
-const sizeOf = ({ width, height }: { width: number; height: number }) => `${width} × ${height}`
 const LABEL = 'text-xs font-semibold tracking-wide text-muted'
-const CHOICE = 'flex h-8 cursor-pointer items-center gap-2 rounded-row px-2 text-[13px] hover:bg-hover'
 
-/** The export form (#55), opened from the Share menu. */
+/** The export form, opened from the Share menu. */
 export function ExportForm({ id, editor, design }: { id: string; editor: Editor; design: Design }) {
   const t = useMessages()
   const pages = byOrder(design.pages)
   const formats = byOrder(design.formats)
+  // The page the selection is on, else the first.
+  let selectionPage = useSelection(editor)[0]
+  while (selectionPage && design.nodes[selectionPage]) selectionPage = design.nodes[selectionPage]?.parentId
   const [page, setPage] = useState<string>('all')
+  const thisPage = selectionPage && design.pages[selectionPage] ? selectionPage : pages[0]?.[0] ?? ''
+  const [name, setName] = useState(DEFAULT_EXPORT_NAME)
   const [picked, setPicked] = useState<Set<string>>(() => new Set(formats.map(([formatId]) => formatId)))
   const [type, setType] = useState<ExportType>('png')
   const [quality, setQuality] = useState(90)
@@ -52,11 +58,13 @@ export function ExportForm({ id, editor, design }: { id: string; editor: Editor;
     setPicked(next)
   }
 
+  const pickPages = (to: 'all' | 'one') => setPage(to === 'all' ? 'all' : thisPage)
+
   const run = async () => {
     setError(null)
     setProgress({ done: 0, total: count })
     try {
-      const file = await editor.exportFiles({ pageIds, formatIds, type, quality }, (done, total) => setProgress({ done, total }))
+      const file = await editor.exportFiles({ pageIds, formatIds, type, quality, name: name.trim() || DEFAULT_EXPORT_NAME }, (done, total) => setProgress({ done, total }))
       download(file.name, file.type, file.bytes as Uint8Array<ArrayBuffer>)
     } catch (reason) {
       setError(format(t.editor.exports.failed, { reason: reason instanceof Error ? reason.message : String(reason) }))
@@ -73,57 +81,64 @@ export function ExportForm({ id, editor, design }: { id: string; editor: Editor;
       data-testid="export"
       className="modal-in absolute end-0 top-full z-30 mt-2 flex w-72 flex-col gap-3 rounded-card surface-frost p-3"
     >
-      <label className="flex flex-col gap-1.5">
+      <div className="flex flex-col gap-1.5">
         <span className={LABEL}>{t.editor.exports.pages}</span>
-        <Select
-          name="page"
-          label={t.editor.exports.pages}
-          value={page}
-          options={[{ value: 'all', label: t.editor.exports.allPages }, ...pages.map(([pageId, p]) => ({ value: pageId, label: p.name }))]}
-          onChange={setPage}
-          testId="export-page"
-          className="h-8 bg-raised px-2 text-[13px]"
-        />
-      </label>
-
-      <fieldset className="flex flex-col">
-        <legend className={cn(LABEL, 'mb-1.5')}>{t.editor.exports.formats}</legend>
-        <label className={CHOICE}>
-          <input
-            name="all-formats"
-            type="checkbox"
-            checked={allPicked}
-            onChange={() => setPicked(allPicked ? new Set() : new Set(formats.map(([formatId]) => formatId)))}
+        <div role="radiogroup" aria-label={t.editor.exports.pages} className={SEGMENTS}>
+          {(['all', 'one'] as const).map((value) => (
+            <button key={value} type="button" role="radio" aria-checked={(page === 'all') === (value === 'all')} onClick={() => pickPages(value)} data-pages={value} className={SEGMENT}>
+              {value === 'all' ? format(t.editor.exports.allPages, { n: pages.length }) : t.editor.exports.thisPage}
+            </button>
+          ))}
+        </div>
+        {/* Any other page can still be the one. */}
+        {page !== 'all' && pages.length > 1 && (
+          <Select
+            name="page"
+            label={t.editor.exports.page}
+            value={page}
+            options={pages.map(([pageId, p]) => ({ value: pageId, label: p.name }))}
+            onChange={setPage}
+            testId="export-page"
+            className="h-8 bg-raised px-2 text-[13px]"
           />
-          {t.editor.exports.allFormats}
-        </label>
-        {formats.map(([formatId, f]) => (
-          <label key={formatId} className={CHOICE}>
-            <input name="format" type="checkbox" checked={picked.has(formatId)} onChange={() => toggle(formatId)} data-format={formatId} />
-            <span className="min-w-0 flex-1 truncate">{f.name}</span>
-            <span className="font-mono text-xs text-subtle tabular-nums">{sizeOf(f)}</span>
-          </label>
-        ))}
-      </fieldset>
+        )}
+      </div>
 
-      <fieldset className="flex flex-col gap-1.5">
-        <legend className={cn(LABEL, 'mb-1.5')}>{t.editor.exports.type}</legend>
-        <div role="radiogroup" className="grid grid-cols-4 gap-1 rounded-row border border-line p-0.5">
+      <div className="flex flex-col gap-1.5">
+        <div className="flex items-center justify-between">
+          <span className={LABEL}>{t.editor.exports.formats}</span>
+          <button
+            type="button"
+            aria-pressed={allPicked}
+            onClick={() => setPicked(allPicked ? new Set() : new Set(formats.map(([formatId]) => formatId)))}
+            data-testid="export-all-formats"
+            className={LINK_BUTTON}
+          >
+            {t.editor.exports.allFormats}
+          </button>
+        </div>
+        <div role="group" aria-label={t.editor.exports.formats} className="grid grid-cols-3 gap-2">
+          {formats.map(([formatId, f]) => (
+            <button key={formatId} type="button" aria-pressed={picked.has(formatId)} onClick={() => toggle(formatId)} data-format={formatId} className={TILE}>
+              <span className={TILE_FACE_WIDE}>
+                <Proportion width={f.width} height={f.height} />
+              </span>
+              <span className="w-full truncate text-center">{f.name}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-1.5">
+        <span className={LABEL}>{t.editor.exports.type}</span>
+        <div role="radiogroup" aria-label={t.editor.exports.type} className={SEGMENTS}>
           {(['png', 'jpg', 'pdf', 'svg'] as const).map((value) => (
-            <button
-              key={value}
-              type="button"
-              role="radio"
-              aria-checked={type === value}
-              onClick={() => setType(value)}
-              data-type={value}
-              className={cn('h-7 cursor-pointer rounded-row text-[13px] font-medium uppercase', type === value ? 'bg-accent-solid text-on-accent' : 'text-muted hover:bg-hover')}
-            >
+            <button key={value} type="button" role="radio" aria-checked={type === value} onClick={() => setType(value)} data-type={value} className={cn(SEGMENT, 'uppercase')}>
               {value}
             </button>
           ))}
         </div>
-      </fieldset>
+      </div>
 
       {type === 'jpg' && (
         <NumberField
@@ -137,6 +152,21 @@ export function ExportForm({ id, editor, design }: { id: string; editor: Editor;
           onShift={(by) => setQuality((now) => Math.round(Math.min(100, Math.max(1, now + by))))}
         />
       )}
+
+      <label className="flex flex-col gap-1.5">
+        <span className={LABEL}>{t.editor.exports.fileNames}</span>
+        <input
+          name="file-names"
+          value={name}
+          maxLength={200}
+          spellCheck={false}
+          placeholder={DEFAULT_EXPORT_NAME}
+          onChange={(event) => setName(event.target.value)}
+          onKeyDown={(event) => event.stopPropagation()}
+          data-testid="export-name"
+          className={FIELD}
+        />
+      </label>
 
       <Button variant="primary" disabled={count === 0 || progress !== null} onClick={() => void run()} data-testid="export-run">
         {progress

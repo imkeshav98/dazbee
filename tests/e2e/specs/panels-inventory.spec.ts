@@ -1297,7 +1297,7 @@ test.describe('left panels and export', () => {
     const page = await open()
     await page.locator('[data-panel="layers"]').click()
     const tree = page.getByRole('tree')
-    const item = (name: string) => tree.getByRole('treeitem').filter({ has: page.locator(`text="${name}"`) })
+    const item = (name: string) => tree.getByRole('treeitem').filter({ has: page.locator(`[data-testid="layer-name"]:text-is("${name}")`) })
     await step(page, async () => {
       await item('Box').dblclick()
       await tree.getByRole('textbox', { name: 'Name of Box' }).fill('Hero')
@@ -1324,7 +1324,7 @@ test.describe('left panels and export', () => {
     await select(page, ['dot', 'poly'])
     await page.getByTestId('selection-bar').locator('[data-action="group"]').click()
     const group = (await doc(page)).nodes.dot?.parentId ?? ''
-    const groupRow = tree.getByRole('treeitem').filter({ has: page.locator(`text="${(await doc(page)).nodes[group]?.name ?? ''}"`) })
+    const groupRow = tree.getByRole('treeitem').filter({ has: page.locator(`[data-testid="layer-name"]:text-is("${(await doc(page)).nodes[group]?.name ?? ''}")`) })
     const groupBox = await groupRow.boundingBox()
     await step(page, () => item('Rule').dragTo(groupRow, { targetPosition: { x: 60, y: (groupBox?.height ?? 28) / 2 } }), async () => {
       await expect.poll(async () => (await doc(page)).nodes.rule?.parentId).toBe(group)
@@ -1385,24 +1385,27 @@ test.describe('left panels and export', () => {
       await page.getByTestId('export-open').click()
     }
     await opened()
-    await choose(page.getByTestId('export-page'), 'all')
+    await dialog.getByRole('radio', { name: 'All 2' }).click()
     await expect(page.getByTestId('export-run')).toHaveText('Export 4 files')
+    await dialog.getByRole('radio', { name: 'This page' }).click()
     await choose(page.getByTestId('export-page'), 'p1')
     await expect(page.getByTestId('export-run')).toHaveText('Export 2 files')
-    await dialog.locator('[data-format="story"]').uncheck()
+    await dialog.locator('[data-format="story"]').click()
+    await expect(dialog.locator('[data-format="story"]')).toHaveAttribute('aria-pressed', 'false')
     await dialog.locator('[data-type="jpg"]').click()
     await expect(page.getByTestId('export-run')).toHaveText('Export 1 file')
     const jpgAt = async (quality: string) => {
       await opened()
       await enter(page.getByTestId('export-quality'), quality)
       const [jpg] = await Promise.all([page.waitForEvent('download'), page.getByTestId('export-run').click()])
-      expect(jpg.suggestedFilename()).toMatch(/Square\.jpg$/)
+      expect(jpg.suggestedFilename()).toBe('Promo Square.jpg')
       return readFileSync(await jpg.path()).length
     }
+    await page.getByTestId('export-name').fill('Promo {format}')
     expect(await jpgAt('30')).toBeLessThan(await jpgAt('95'))
     await opened()
     await dialog.locator('[data-type="png"]').click()
-    await dialog.locator('[data-format="story"]').check()
+    await dialog.locator('[data-format="story"]').click()
     const [zip] = await Promise.all([page.waitForEvent('download'), page.getByTestId('export-run').click()])
     expect(zip.suggestedFilename()).toMatch(/\.zip$/)
   })

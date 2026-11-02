@@ -5,6 +5,7 @@ import { join } from 'node:path'
 import { FALLBACK_FAMILIES } from '@dazbee/fonts'
 import { loadFontFiles } from '@dazbee/fonts/node'
 import { loadCanvasKit } from '@dazbee/renderer/node'
+import { DEFAULT_EXPORT_NAME } from '@dazbee/schema'
 import { describe, expect, it } from 'vitest'
 import { crc32, exportDesign, fileName, readZip, zip } from './index.ts'
 
@@ -84,6 +85,13 @@ describe('export', () => {
   it('names are safe on every file system', () => {
     expect(fileName('{design}/{page}', { design: 'A:B', page: '..x', format: 'f' })).toBe('A-B-..x')
     expect(fileName('{page}', { design: 'd', page: '   ', format: 'f' })).toBe('untitled')
+  })
+
+  it('fills {size} and {format} alike with the format name, and names by {size} by default', () => {
+    const values = { design: 'Cold brew', page: 'Cover', format: 'Story' }
+    expect(fileName('{design} - {page} - {size}', values)).toBe('Cold brew - Cover - Story')
+    expect(fileName('{design} - {page} - {format}', values)).toBe('Cold brew - Cover - Story')
+    expect(DEFAULT_EXPORT_NAME).toBe('{design} - {page} - {size}')
   })
 })
 
