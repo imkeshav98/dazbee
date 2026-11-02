@@ -943,6 +943,47 @@ const TILE_LOOK: Record<Tile, string> = {
   outline: 'text-transparent [-webkit-text-stroke:1px_var(--text)]',
   blur: 'blur-[1.5px]',
 }
+/** How each tile draws the selected layer's picture, close to what its effect does; Outline is a picture of its own. */
+const THUMB_LOOK: Record<Tile, string> = {
+  none: '',
+  shadow: '[filter:drop-shadow(3px_3px_0_rgb(0_0_0/0.55))]',
+  glow: '[filter:drop-shadow(0_0_4px_var(--accent))_drop-shadow(0_0_8px_var(--accent))]',
+  outline: '',
+  blur: 'blur-[1.5px]',
+}
+/** How long the layer has to stay as it is before its tiles draw it again; a drag redraws them once, after it ends. */
+const THUMB_SETTLE_MS = 150
+
+type Thumbnails = { id: string; plain: string | null; outlined: string | null }
+
+/**
+ * One layer's pictures for the effect tiles, drawn by the editor's renderer: as soon as the layer is
+ * selected, and again a moment after the stage last drew (an edit, or a font or image arriving),
+ * so a drag draws them once, at its end. For text, also its outlined "Aa". Null while there are
+ * none (several layers, nothing drawn).
+ */
+function useLayerThumbnails(editor: Editor, id: string | null, text: boolean): Thumbnails | null {
+  const [shown, setShown] = useState<Thumbnails | null>(null)
+  useEffect(() => {
+    if (!id) return
+    const draw = () => {
+      const next = { id, plain: editor.layerThumbnail(id), outlined: text ? editor.layerThumbnail(id, 96, true) : null }
+      setShown((now) => (now?.id === next.id && now.plain === next.plain && now.outlined === next.outlined ? now : next))
+    }
+    draw()
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const later = () => {
+      clearTimeout(timer)
+      timer = setTimeout(() => (editor.gesturing() ? later() : draw()), THUMB_SETTLE_MS)
+    }
+    const stop = editor.onDraw(later)
+    return () => {
+      stop()
+      clearTimeout(timer)
+    }
+  }, [editor, id, text])
+  return shown?.id === id ? shown : null
+}
 
 /**
  * The effects as tiles, as in the mock: none, a shadow, a glow, and an outline for text or a blur for
@@ -950,6 +991,9 @@ const TILE_LOOK: Record<Tile, string> = {
  * menu adds the ones without a tile.
  */
 function EffectsCard({ target, p }: { target: Target; p: P }) {
+  // One layer previews each effect on itself: its picture, or for text "Aa" in its look.
+  const one = target.ids.length === 1 ? target.ids[0] ?? null : null
+  const thumbnails = useLayerThumbnails(target.editor, one, target.types[0] === 'text')
   const lists = target.props.map((pr) => (pr.effects ?? []) as Effect[])
   const list = shared(lists)
   const write = (to: (now: Effect[]) => Effect[]) => set(target, (now) => ({ effects: to((now.effects ?? []) as Effect[]) }))
@@ -989,7 +1033,9 @@ function EffectsCard({ target, p }: { target: Target; p: P }) {
             className="group flex min-w-0 cursor-pointer flex-col items-center gap-1 text-[11px] font-semibold text-muted aria-pressed:text-text"
           >
             <span className="grid aspect-square w-full place-items-center rounded-[10px] border border-line bg-bg/60 transition-colors duration-[var(--chrome-fast)] group-hover:border-line-strong group-aria-pressed:border-accent">
-              <span aria-hidden className={cn('font-display text-[19px] font-extrabold text-text', TILE_LOOK[tile])}>{TILE_SAMPLE}</span>
+              {thumbnails?.plain
+                ? <img src={(tile === 'outline' && thumbnails.outlined) || thumbnails.plain} alt="" draggable={false} data-thumbnail className={cn('size-[62%] object-contain', THUMB_LOOK[tile])} />
+                : <span aria-hidden className={cn('font-display text-[19px] font-extrabold text-text', TILE_LOOK[tile])}>{TILE_SAMPLE}</span>}
             </span>
             {p.tiles[tile]}
           </button>

@@ -675,6 +675,67 @@ function live(
     return { fills, index, fill, image, size, box, rect: imageRect(crop, size, box), around: [...containersOf(frame, node.parentId, from), box] }
   }
   type CropTarget = NonNullable<ReturnType<typeof cropTarget>>
+  /**
+   * Each layer's preview for the effect tiles, with what it was drawn from: its scene layer and the
+   * fonts and images there were then, so one that arrives later draws it again.
+   */
+  const thumbnails = new Map<string, { layer: SceneLayer; resources: Resources; url: string }>()
+  /**
+   * Text's preview: "Aa" in the layer's font, weight and colour, as wide as it is; `outlined` draws
+   * its outline in its colour with no fill, as the Outline tile shows it.
+   */
+  function textSample(layer: Extract<SceneLayer, { type: 'text' }>, outlined: boolean): SceneLayer {
+    const { style } = layer.props
+    const sample = {
+      ...layer.props, x: 0, y: 0, rotation: 0, text: 'Aa', runs: [], boxMode: 'autoWidth' as const, align: 'start' as const, verticalAlign: 'top' as const,
+      list: undefined, maxLines: undefined, shrinkToFit: undefined, effects: [],
+      style: { ...style, fontSize: 96, outline: outlined ? { width: 4, color: style.color } : undefined, color: outlined ? '#00000000' : style.color },
+    }
+    const size = measureText()(sample, null)
+    return { ...layer, props: { ...sample, width: size.width, height: size.height } }
+  }
+  /**
+   * A small picture of one layer as a frame shows it, without its own effects (the tiles show
+   * those), drawn by the renderer on the CPU surface and kept until the layer, or the fonts and
+   * images it is drawn with, change: a PNG as an object URL, `size` pixels square, the layer fitted
+   * inside with a margin. Text is "Aa" in its look. Null when the layer isn't in the frame or draws
+   * nothing there.
+   */
+  function layerThumbnail(frame: Frame, id: string, size: number, outlined: boolean): string | null {
+    const found = find(cached(frame).scene.layers, id)
+    if (!found || found.props.mask) return null
+    const key = outlined ? `${id}/outlined` : id
+    const kept = thumbnails.get(key)
+    // Drawn with what the stage draws with: an image whose bytes are still coming is a placeholder.
+    const drawWith = screenResources(session.design())
+    if (kept?.layer === found && kept.resources === drawWith) return kept.url
+    const layer = found.type === 'text' ? textSample(found, outlined) : found
+    const bounds = boundsOf([layer.props])
+    if (bounds.width <= 0 && bounds.height <= 0) return null
+    const margin = size * 0.12
+    const scale = (size - 2 * margin) / Math.max(bounds.width, bounds.height, 1)
+    const surface = ck.MakeSurface(size, size)
+    if (!surface) return null
+    try {
+      const canvas = surface.getCanvas()
+      canvas.clear(ck.TRANSPARENT)
+      canvas.translate(size / 2 - (bounds.x + bounds.width / 2) * scale, size / 2 - (bounds.y + bounds.height / 2) * scale)
+      canvas.scale(scale, scale)
+      const alone = { ...layer, props: { ...layer.props, effects: [] } } as SceneLayer
+      drawPage(ck, canvas, { pageId: frame.pageId, formatId: frame.formatId, width: frame.width, height: frame.height, fills: [], layers: [alone] }, drawWith)
+      const image = surface.makeImageSnapshot()
+      const png = image.encodeToBytes()
+      image.delete()
+      if (!png) return null
+      if (kept) URL.revokeObjectURL(kept.url)
+      const url = URL.createObjectURL(new Blob([png.slice()], { type: 'image/png' }))
+      thumbnails.set(key, { layer: found, resources: drawWith, url })
+      return url
+    } finally {
+      surface.delete()
+    }
+  }
+
   /** Each image as a URL for the crop's faint whole image, made once from the decoded image. */
   const ghosts = new WeakMap<Image, string>()
   function ghostOf(image: Image) {
@@ -2994,6 +3055,8 @@ function live(
      * returned function is called is undone together.
      */
     beginGesture: () => session.beginGesture(),
+    /** Whether a gesture is running: a drag, resize or turn on the stage, a scrub in the panels, or text being typed. */
+    gesturing: () => gesture !== null || session.inGesture(),
     /**
      * Sets properties of layers as the properties panel does (#60), as one undo step, or as part of
      * the gesture open. `to` gives a layer's patch from the values it has in the frame now (base
@@ -3365,6 +3428,16 @@ function live(
       drawOverlay()
       return ok
     },
+    /**
+     * A small picture of a layer for the effect tiles: drawn by the renderer without the layer's own
+     * effects, in the frame the selection is in (the first page in the primary format otherwise),
+     * and kept until the layer or what it is drawn with changes. Text is "Aa" in its look, outlined
+     * with no fill when asked. A PNG object URL, or null.
+     */
+    layerThumbnail(id: string, size = 96, outlined = false): string | null {
+      const frame = frameOf(selection?.frame) ?? frameOf(`${firstPage()}/${design.meta.primaryFormatId}`)
+      return frame ? layerThumbnail(frame, id, size, outlined) : null
+    },
     synced: () => provider.synced && provider.unsyncedChanges === 0,
     destroy() {
       listening.abort()
@@ -3392,6 +3465,8 @@ function live(
       backing.delete()
       edge.delete()
       surface?.delete()
+      for (const { url } of thumbnails.values()) URL.revokeObjectURL(url)
+      thumbnails.clear()
       gl.delete()
     },
   }
