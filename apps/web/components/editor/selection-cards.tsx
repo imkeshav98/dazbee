@@ -858,7 +858,7 @@ function PhotosCard({ target, p, brandId, index, paint }: { target: Target; p: P
  */
 function ColourCard({ target, brandId, p, b, swatches }: { target: Target; brandId: string; p: P; b: Messages['editor']['bar']; swatches: boolean }) {
   const { add } = useList<Paint>(target, 'fills', NEW_FILL, FILL_ON_TOP, true)
-  const stroked = target.types.every((type) => type === 'graphic' || type === 'boolean')
+  const stroked = target.types.every((type) => type === 'graphic' || type === 'frame' || type === 'boolean')
   return (
     <Card id="fill-card" title={b.fill} action={<AddButton label={format(p.add, { name: p.fill.toLowerCase() })} onClick={add} />}>
       <FillBody target={target} brandId={brandId} p={p} swatches={swatches} header={false} />

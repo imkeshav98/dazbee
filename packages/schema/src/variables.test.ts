@@ -35,7 +35,7 @@ describe('brand kit bindings (#53)', () => {
 
   it('stores bindings on a layer, and fontFamilies adds the bound brand family', () => {
     const json = {
-      meta: { schemaVersion: 4, designId: 'd', name: 'Kit', kind: 'single', primaryFormatId: 'sq' },
+      meta: { schemaVersion: 5, designId: 'd', name: 'Kit', kind: 'single', primaryFormatId: 'sq' },
       formats: { sq: { name: 'Square', width: 100, height: 100, order: 'a0' } },
       pages: { p1: { name: 'Page 1', order: 'a0' } },
       nodes: {

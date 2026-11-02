@@ -42,7 +42,7 @@ const rect = (x: number, y: number, width: number, height: number, color: string
 
 /** One of each kind of layer the panels have cards for, in a Square format, and a Story with `withStory`. */
 const design = (withStory = false): DesignInput => ({
-  meta: { schemaVersion: 4, designId: 'replaced-by-the-api', name: 'Panels inventory', kind: 'single', primaryFormatId: 'sq' },
+  meta: { schemaVersion: 5, designId: 'replaced-by-the-api', name: 'Panels inventory', kind: 'single', primaryFormatId: 'sq' },
   formats: {
     sq: { name: 'Square', width: 1080, height: 1080, order: 'a0' },
     ...(withStory ? { story: { name: 'Story', width: 1080, height: 1920, order: 'a1' } } : {}),
@@ -833,7 +833,7 @@ test.describe('shapes and frames', () => {
     await reloads(page)
   })
 
-  row(36, 'stroke paint, width, position', async (open) => {
+  row(36, 'stroke paint, width, position, on a shape and a box', async (open) => {
     const page = await open()
     await select(page, ['box'])
     const card = await strokeList(page)
@@ -845,6 +845,16 @@ test.describe('shapes and frames', () => {
     await step(page, () => enter(card.getByRole('spinbutton', { name: 'Stroke 1 width' }), '10'), async () => { await expect.poll(stroke).toMatchObject({ width: 10 }) })
     for (const align of ['inside', 'outside', 'center']) {
       await step(page, () => choose(card.getByRole('combobox', { name: 'Stroke 1 position' }), align), async () => { await expect.poll(stroke).toMatchObject({ align }) })
+    }
+    // A box takes outlines too, from its bar's Outline.
+    await page.keyboard.press('Escape')
+    await select(page, ['plain'])
+    const outline = await strokeList(page)
+    const boxStroke = async () => (await props(page, 'plain')).strokes?.[0] ?? {}
+    await step(page, () => outline.getByRole('button', { name: 'Add stroke' }).click(), async () => { await expect.poll(async () => (await props(page, 'plain')).strokes ?? []).toHaveLength(1) })
+    await step(page, () => enter(outline.getByRole('spinbutton', { name: 'Stroke 1 width' }), '12'), async () => { await expect.poll(boxStroke).toMatchObject({ width: 12 }) })
+    for (const align of ['outside', 'inside']) {
+      await step(page, () => choose(outline.getByRole('combobox', { name: 'Stroke 1 position' }), align), async () => { await expect.poll(boxStroke).toMatchObject({ align }) })
     }
     await reloads(page)
   })

@@ -2,7 +2,7 @@
 
 // The bar's own buttons for everything but text, as in the mock. A photo gets Replace, Crop and Look,
 // its fills and strokes being cards in the panel and Use as mask in ⋯ More; other shapes, frames and booleans get Colour
-// (the fills), shapes and booleans Outline (the strokes); and every selection that is not all text
+// (the fills) and Outline (the strokes); and every selection that is not all text
 // gets ✦ Effects.
 import { ArrowsClockwiseIcon, CropIcon, SparkleIcon } from '@phosphor-icons/react'
 import { withImage } from '@dazbee/editor'
@@ -18,7 +18,6 @@ export function ShapeBar({ target, brandId, open, onOpen }: { target: Target; br
   const p = t.editor.props
   const b = t.editor.bar
   const filled = target.types.every((type) => type === 'graphic' || type === 'frame' || type === 'boolean')
-  const stroked = target.types.every((type) => type === 'graphic' || type === 'boolean')
   const photo = filled ? imageFillOf(target) : null
   const one = target.ids.length === 1
   // A line has no brand swatches: its look is its stroke.
@@ -71,7 +70,7 @@ export function ShapeBar({ target, brandId, open, onOpen }: { target: Target; br
           <div className={BAR_PANEL}><FillBody target={target} brandId={brandId} p={p} swatches={!lines} /></div>
         </BarPopover>
       )}
-      {stroked && !photo && (
+      {filled && !photo && (
         <BarPopover id="outline" open={open} onOpen={onOpen} label={b.outline} testId="outline" className="w-auto">
           <div className={BAR_PANEL}><OutlineBody target={target} brandId={brandId} p={p} /></div>
         </BarPopover>

@@ -98,6 +98,15 @@
       "maxDelta": 78
     }
   },
+  "frame-outlines p1.square": {
+    "differing": 7339,
+    "percent": 0.629,
+    "maxDelta": 58,
+    "limit": {
+      "percent": 0.837,
+      "maxDelta": 74
+    }
+  },
   "groups-and-frames p1.sq": {
     "differing": 5333,
     "percent": 0.457,
