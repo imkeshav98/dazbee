@@ -1,6 +1,6 @@
 // Grouping and framing layers inside an auto layout frame in Chromium, with real input (#233): a
-// layer the flow sizes is clicked and grouped with Mod+G, then framed with Mod+Alt+G, and every
-// layer stays where it is drawn; around a layer that keeps where it is, the group keeps where it is.
+// layer the flow sizes is double-clicked into and grouped with Mod+G, or framed with Mod+Alt+G,
+// and every layer stays where it is drawn; around a layer that keeps where it is, the group does too.
 import { expect, test, type Page } from '../support/test.ts'
 import type { DesignInput } from '@dazbee/schema'
 import { screenPoint, writeOutput } from '../support/editor.ts'
@@ -33,9 +33,10 @@ for (const [name, action] of [['groups', 'group'], ['frames', 'frameSelection']]
   test(`Mod+${action === 'group' ? '' : 'Alt+'}G ${name} the layer the flow fills without moving anything`, async ({ browser }) => {
     const { page, errors } = await openStage(browser, design)
     const before = await boxes(page)
+    // A click picks the auto layout frame; a second goes into it and picks the layer the flow fills.
     const fill = before.fill as { x: number; y: number; width: number; height: number }
     const at = await screenPoint(page, fill.x + fill.width / 2, fill.y + fill.height / 2)
-    await page.mouse.click(at.x, at.y)
+    await page.mouse.dblclick(at.x, at.y)
     await page.evaluate(() => window.dazbee?.drawn())
     expect(await selection(page)).toEqual(['fill'])
     await press(page, action)
