@@ -187,6 +187,9 @@ export const ar: Messages = {
     bar: {
       label: 'التحديد',
       lineUp: 'محاذاة',
+      order: 'الترتيب',
+      grouping: 'تجميع',
+      putInBox: 'ضع في صندوق',
       combine: 'دمج',
       box: 'صندوق',
       autoLayout: 'رصّ',

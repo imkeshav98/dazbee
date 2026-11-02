@@ -5,7 +5,7 @@
 import { expect, test, type Page } from '../support/test.ts'
 import type { DesignInput } from '@dazbee/schema'
 import { screenPoint } from '../support/editor.ts'
-import { moreMenu, openStage } from '../support/stage.ts'
+import { moreMenu, moreSubmenu, openStage } from '../support/stage.ts'
 
 test.describe.configure({ timeout: 120_000 })
 
@@ -223,7 +223,7 @@ test('⋯ More lines up one layer; the bar puts several in a stack', async ({ br
   const { page, errors } = await openStage(browser, design())
   await select(page, ['a'])
   await expect(page.getByTestId('bar-line-up')).toHaveCount(0)
-  await (await moreMenu(page)).getByRole('button', { name: 'Align left' }).click()
+  await (await moreSubmenu(page, 'line-up')).getByRole('button', { name: 'Align left' }).click()
   // Like a drag, it moves the layer in the format shown.
   await expect.poll(() => page.evaluate(() => {
     const d = window.dazbee?.design()
@@ -235,5 +235,30 @@ test('⋯ More lines up one layer; the bar puts several in a stack', async ({ br
   await expect(page.getByTestId('bar-line-up')).toBeVisible()
   await page.getByTestId('selection-bar').locator('[data-action="autoLayout"]').click()
   await expect.poll(() => page.evaluate(() => Object.values(window.dazbee?.design().nodes ?? {}).some((n) => n.type === 'frame' && (n.props as { layout?: unknown }).layout !== undefined))).toBe(true)
+  expect(errors).toEqual([])
+})
+
+test('⋯ More is three short groups; the menus beside open with → or Enter and close with ← or Esc', async ({ browser }) => {
+  const { page, errors } = await openStage(browser, design())
+  await select(page, ['a'])
+  const menu = await moreMenu(page)
+  // Duplicate, Lock, Hide; Line up, Order, Group; the turn.
+  await expect(menu.getByRole('button')).toHaveText([/^Duplicate/, 'Lock', 'Hide', 'Line up', 'Order', 'Group'])
+  await expect(menu.getByRole('spinbutton', { name: 'Rotation in degrees' })).toBeVisible()
+
+  await menu.getByTestId('more-order').focus()
+  await page.keyboard.press('ArrowRight')
+  const order = page.getByTestId('more-order-menu')
+  await expect(order.getByRole('button')).toHaveText([/^Bring to front/, /^Bring forward/, /^Send backward/, /^Send to back/])
+  await page.keyboard.press('ArrowLeft')
+  await expect(order).toBeHidden()
+  await expect(menu).toBeVisible()
+  await menu.getByTestId('more-group').focus()
+  await page.keyboard.press('Enter')
+  // One plain layer: no Group (it needs two) and no Ungroup.
+  await expect(page.getByTestId('more-group-menu').getByRole('button')).toHaveText([/^Put in a box/, /^Use as mask/])
+  await page.keyboard.press('Escape')
+  await expect(page.getByTestId('more-group-menu')).toBeHidden()
+  await expect(menu).toBeVisible()
   expect(errors).toEqual([])
 })

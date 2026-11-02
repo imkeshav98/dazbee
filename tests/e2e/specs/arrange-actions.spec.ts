@@ -3,7 +3,7 @@
 import { expect, test, type Page } from '../support/test.ts'
 import type { DesignInput } from '@dazbee/schema'
 import { screenPoint, writeOutput } from '../support/editor.ts'
-import { moreMenu, openStage } from '../support/stage.ts'
+import { moreAction, moreMenu, moreSubmenu, openStage } from '../support/stage.ts'
 
 test.describe.configure({ timeout: 120_000 })
 
@@ -28,14 +28,16 @@ const select = (page: Page, ids: string[]) => page.evaluate((ids) => window.dazb
 
 test('one layer has its actions in ⋯ More and the right-click menu; several layers group from the bar', async ({ browser }) => {
   const { page, errors } = await openStage(browser, design())
-  const more = async (name: string) => (await moreMenu(page)).getByRole('button', { name }).click()
+  const more = (name: string) => moreAction(page, name)
 
-  // One layer's actions are in ⋯ More, each with its shortcut.
+  // One layer's actions are in ⋯ More, the order in the menu beside Order, each with its shortcut.
   await select(page, ['a'])
   const menu = await moreMenu(page)
-  await expect(menu.getByRole('button', { name: 'Bring forward' })).toContainText('Ctrl+]')
+  await expect((await moreSubmenu(page, 'order')).getByRole('button', { name: 'Bring forward' })).toContainText('Ctrl+]')
   await page.evaluate(() => window.dazbee?.drawn())
   writeOutput('arrange-actions-more.png', await page.screenshot())
+  // Esc closes the menu beside, then ⋯ More.
+  await page.keyboard.press('Escape')
   await page.keyboard.press('Escape')
   await expect(menu).toBeHidden()
 
@@ -69,7 +71,7 @@ test('one layer has its actions in ⋯ More and the right-click menu; several la
   expect(await page.evaluate(() => window.dazbee?.selection())).toEqual(['a'])
   await page.evaluate(() => window.dazbee?.drawn())
   writeOutput('arrange-actions-right-click.png', await page.screenshot())
-  await stageMenu.getByRole('button', { name: 'Use as mask' }).click()
+  await moreAction(page, 'Use as mask', stageMenu)
   await expect.poll(async () => (await nodes(page)).a?.props.mask).toBe('alpha')
   await expect(stageMenu).toBeHidden()
   // A mask is not picked on the stage; ⋯ More, for the selection it still is, makes it plain again.

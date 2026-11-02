@@ -564,8 +564,9 @@ function Segments<T extends string>({ name, value, options, labels, marks, onSet
 /** How each case shows on its button: the same letters in every language, as a font sample is. */
 const CASE_MARKS = { none: 'Ab', upper: 'AB', lower: 'ab', title: 'Aa' }
 
-/** The bar's align popover for text: alignment, case, lists, underline and strikethrough. */
+/** The bar's align popover for text: alignment, up and down in the box, case, lists, underline and strikethrough. */
 export function TextAlignBody({ target, p }: { target: Target; p: P }) {
+  const t = useMessages()
   const { style, setStyle } = textStyle(target)
   const flag = (key: string) => {
     const on = style(key)
@@ -574,6 +575,7 @@ export function TextAlignBody({ target, p }: { target: Target; p: P }) {
   return (
     <div className="flex w-80 flex-col gap-2.5 p-1">
       <Segments name={p.textAlign} value={shared(target.props.map((pr) => (pr.align ?? 'start') as 'start' | 'center' | 'end' | 'justify'))} options={['start', 'center', 'end', 'justify'] as const} labels={p.textAligns} onSet={(align) => set(target, () => ({ align }))} />
+      <Segments name={t.editor.bar.upDown} value={shared(target.props.map((pr) => (pr.verticalAlign ?? 'top') as 'top' | 'middle' | 'bottom'))} options={['top', 'middle', 'bottom'] as const} labels={p.verticalAligns} onSet={(verticalAlign) => set(target, () => ({ verticalAlign }))} />
       <Segments name={p.textCase} value={(style('textCase') ?? 'none') as 'none' | 'upper' | 'lower' | 'title' | 'mixed'} options={['none', 'upper', 'lower', 'title'] as const} labels={p.textCases} marks={CASE_MARKS} onSet={(v) => setStyle('textCase', v)} />
       <Segments name={p.list} value={shared(target.props.map((pr) => (pr.list ?? 'none') as 'none' | 'bullet' | 'number'))} options={['none', 'bullet', 'number'] as const} labels={p.lists} onSet={(list) => set(target, () => ({ list: list === 'none' ? undefined : list }))} />
       <Toggles
