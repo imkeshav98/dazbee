@@ -169,11 +169,57 @@ export const nodeMove = defineCommand({
     const siblings = childrenOf(design, parentId).filter(([sibling]) => sibling !== id)
     const at = before ? siblings.findIndex(([sibling]) => sibling === before) : siblings.length
     const index = indexBetween(siblings[at - 1]?.[1].index ?? null, siblings[at]?.[1].index ?? null)
+    keepDrawnPlace(r, design, id, parentId)
     const node = r.nodes.get(id)
     node?.set('parentId', parentId)
     node?.set('index', index)
   },
 })
+
+/** The layers a layer sits in, its own parent first, up to the page. */
+const ancestorsOf = (design: Design, parentId: string): string[] => {
+  const out: string[] = []
+  for (let up: string | undefined = parentId; up && design.nodes[up]; up = design.nodes[up]?.parentId) out.push(up)
+  return out
+}
+
+/**
+ * Keeps a layer where it is drawn as it moves under `parentId`, in every format: each layer it sits
+ * in turns what it holds around its own centre, so the layer takes the turns it leaves and gives
+ * back the ones it enters, and what it holds moves with it.
+ */
+function keepDrawnPlace(r: CommandContext['r'], design: Design, id: string, parentId: string) {
+  const node = design.nodes[id]
+  if (!node || node.parentId === parentId) return
+  const leaving = ancestorsOf(design, node.parentId)
+  const entering = ancestorsOf(design, parentId)
+  const place = new Placement(design)
+  for (const scope of place.scopes) {
+    const was = place.get(scope, id)
+    const from = centreOf(was)
+    let drawn = from
+    let turned = 0
+    for (const up of leaving) {
+      const outer = place.get(scope, up)
+      drawn = turn(drawn, centreOf(outer), outer.rotation)
+      turned += outer.rotation
+    }
+    for (const up of [...entering].reverse()) {
+      const outer = place.get(scope, up)
+      drawn = turn(drawn, centreOf(outer), -outer.rotation)
+      turned -= outer.rotation
+    }
+    const dx = drawn.x - from.x
+    const dy = drawn.y - from.y
+    if (Math.abs(dx) < 1e-9 && Math.abs(dy) < 1e-9 && normalAngle(turned) === 0) continue
+    place.set(scope, id, { x: was.x + dx, y: was.y + dy, rotation: normalAngle(was.rotation + turned) })
+    for (const inner of descendants(design, id)) {
+      const at = place.get(scope, inner)
+      place.set(scope, inner, { x: at.x + dx, y: at.y + dy })
+    }
+  }
+  place.write(r)
+}
 
 export const nodeDelete = defineCommand({
   name: 'node.delete',
