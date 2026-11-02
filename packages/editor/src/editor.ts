@@ -3024,9 +3024,10 @@ function live(
   }
 
   /**
-   * Text bound to a brand font whose family the kit has changed since: once that family is here, it
-   * takes it and its box fits it in every format, all in one undo step. Run when the kit changes and
-   * when the design opens.
+   * Text bound to a brand font whose family the kit has changed since: once that family's files are
+   * here, it takes it and its box fits it in every format. The kit lives outside the design, so this
+   * is a change no one undoes, as another tab's: undo could not put the kit back with it. Run when the
+   * kit changes and when the design opens.
    */
   async function refitBrandFonts() {
     const kit = resourceBytes.variables ?? {}
@@ -3040,10 +3041,14 @@ function live(
     loadFamilies(families)
     await Promise.all(families.map((family) => familyLoads.get(family)))
     if (listening.signal.aborted) return
-    session.gesture(() => {
+    // Fitted in the fallback fonts, a box would be wrong: only a family whose files came is written.
+    const here = new Set([...SHIPPED_FAMILIES, ...resourceBytes.fonts.map((f) => f.family)])
+    session.untracked(() => {
       for (const { id, ref, family } of stale) {
         const node = session.design().nodes[id]
-        if (node?.type !== 'text' || node.bindings?.fontFamily !== ref) continue
+        // Still bound, the kit still gives this family (not a newer one), and the text has not taken it already.
+        if (node?.type !== 'text' || node.bindings?.fontFamily !== ref || resourceBytes.variables?.[ref] !== family) continue
+        if (node.props.style.fontFamily === family || !here.has(family)) continue
         if (!runQuietly(() => session.run('node.bind', { ids: [id], target: 'fontFamily', ref, value: family }))) continue
         fitText(id)
       }
@@ -3367,8 +3372,8 @@ function live(
     /**
      * Gives bound properties new values, as when the brand kit changes: bound layers redraw with them,
      * the families of brand fonts load, and exports use them. Text bound to a brand font whose family
-     * changed takes the new one and refits, in one undo step, once its files are here; the promise
-     * settles then.
+     * changed takes the new one and refits once its files are here, a change no one undoes; the
+     * promise settles then.
      */
     setVariables(variables: Variables) {
       resourceBytes = { ...resourceBytes, variables }

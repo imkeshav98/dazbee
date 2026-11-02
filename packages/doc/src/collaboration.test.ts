@@ -21,6 +21,25 @@ function twoTabs() {
 /** A fuzz run makes hundreds of commands and full reads; a cold CI runner needs more than vitest's 5 s. */
 const FUZZ_TIMEOUT = 30_000
 
+describe('changes no one undoes', () => {
+  it('a change made untracked stays through undo and redo, and undo reverts the edit before it', () => {
+    const result = parseDesign(testDesign())
+    if (!result.success) throw new Error(result.errors.join('\n'))
+    const session = openSession(loadDesign(result.design))
+    const [id] = Object.keys(session.design().nodes)
+    if (!id) throw new Error('no layer')
+    session.run('node.update', { ids: [id], patch: { x: 11 } })
+    session.untracked(() => session.run('node.update', { ids: [id], patch: { y: 22 } }))
+    expect(session.canUndo()).toBe(true)
+    session.undo()
+    expect(session.design().nodes[id]?.props).toMatchObject({ y: 22 })
+    expect((session.design().nodes[id]?.props as { x: number }).x).not.toBe(11)
+    expect(session.canUndo()).toBe(false)
+    session.redo()
+    expect(session.design().nodes[id]?.props).toMatchObject({ x: 11, y: 22 })
+  })
+})
+
 describe('two tabs', () => {
   it('undo in one tab reverts only its own edits, never the other tab’s', () => {
     const { a, b, tabA, tabB, sync } = twoTabs()
