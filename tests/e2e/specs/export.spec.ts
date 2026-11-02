@@ -1,7 +1,7 @@
 // Export (#55) in Chromium, through the Export menu: every format of a page as PNG downloads as one
 // zip with a folder per format, and every file in it is byte for byte what Node exports from the
 // same design, drawn in the export worker rather than on the main thread, and named by the File
-// names field; every slide of a carousel downloads as one zip of each slide's own file; and one
+// names field; every page of a carousel downloads as one zip of each page's own file; and one
 // format as JPG downloads as itself.
 import { readFileSync } from 'node:fs'
 import { expect, test, type Page } from '../support/test.ts'
@@ -185,7 +185,7 @@ test('exporting every format of a page: how long it takes, and the main thread\'
   })
 })
 
-/** A carousel of three slides in one format, each its own picture: a photo and words, words on dark, a badge on pink. */
+/** A carousel of three pages in one format, each its own picture: a photo and words, words on dark, a badge on pink. */
 const carousel = (assetId: string): DesignInput => ({
   meta: { schemaVersion: 5, designId: 'replaced-by-the-api', name: 'Spring carousel', kind: 'carousel', primaryFormatId: 'pt' },
   formats: { pt: FORMATS.pt },
@@ -219,7 +219,7 @@ const carousel = (assetId: string): DesignInput => ({
   overrides: {},
 })
 
-test('every slide of a carousel as PNG is one zip whose files are each what Node exports of that slide', async ({ browser }) => {
+test('every page of a carousel as PNG is one zip whose files are each what Node exports of that page', async ({ browser }) => {
   const asset = await upload(photo)
   const { page, errors } = await openStage(browser, carousel(asset.id))
   await page.getByTestId('share-open').click()
@@ -234,7 +234,7 @@ test('every slide of a carousel as PNG is one zip whose files are each what Node
   const entries = readZip(new Uint8Array(readFileSync(await download.path())))
   expect(entries).toHaveLength(3)
 
-  // Each file is its own slide, byte for byte what Node exports of that slide alone.
+  // Each file is its own page, byte for byte what Node exports of that page alone.
   const node = await nodeExport(page, asset.id)
   for (const [i, pageId] of ['s1', 's2', 's3'].entries()) {
     const browserFile = Buffer.from(entries[i]?.bytes ?? [])
@@ -242,7 +242,7 @@ test('every slide of a carousel as PNG is one zip whose files are each what Node
     writeOutput(`export-6-carousel-${pageId}.png`, browserFile)
   }
   expect(new Set(entries.map((e) => Buffer.from(e.bytes).toString('base64'))).size).toBe(3)
-  expect(entries.map((e) => e.path)).toEqual(['Slide 1', 'Slide 2', 'Slide 3'].map((slide) => `Portrait 4-5/Spring carousel - ${slide} - Portrait 4-5.png`))
+  expect(entries.map((e) => e.path)).toEqual(['Slide 1', 'Slide 2', 'Slide 3'].map((pageName) => `Portrait 4-5/Spring carousel - ${pageName} - Portrait 4-5.png`))
   expect(errors).toEqual([])
 })
 

@@ -18,6 +18,9 @@ const CHROME = {
   cards: '[data-testid="cards"]',
 }
 
+/** The design's name in the start island, which the next test checks on its own. */
+const NAME = '[data-testid="island-start"] h1'
+
 /** The layers selected in turn, by a click on their middle: a shape, then a text layer, whose bar has the most in it. */
 const LAYERS = [['box', 230, 180], ['headline', 540, 540]] as const
 
@@ -63,24 +66,21 @@ test('on a tablet the home and the editor, with a layer selected, show everythin
   const far = await screenPoint(page, 1080, 1080)
   const ad = { x: corner.x, y: corner.y, width: far.x - corner.x, height: far.y - corner.y }
   expect(ad.width).toBeGreaterThan(200)
-  await expect.poll(() => layoutProblems(page, { pieces: { ...CHROME, ad }, cuts: false })).toEqual([])
+  await expect.poll(() => layoutProblems(page, { pieces: { ...CHROME, ad }, uncut: NAME })).toEqual([])
   writeOutput('tablet-1-editor.png', await page.screenshot({ animations: 'disabled' }))
 
   // The bar by the selection and the selection's cards come, and the layer stays in sight.
   for (const layer of LAYERS) {
     await select(page, layer)
-    await expect.poll(() => layoutProblems(page, { pieces: selected(layer[0]), cuts: false })).toEqual([])
+    await expect.poll(() => layoutProblems(page, { pieces: selected(layer[0]), uncut: NAME })).toEqual([])
     writeOutput(`tablet-2-${layer[0]}-selected.png`, await page.screenshot({ animations: 'disabled' }))
   }
 })
 
-test('on a tablet the editor, as it opens and with a layer selected, cuts no control or words short', async ({ page }) => {
+test('on a tablet the design\'s name in the editor shows whole, neither cut off nor cut short', async ({ page }) => {
   test.fixme(true, 'The design\'s name in the start island is always cut short, even with room for it')
   test.setTimeout(90_000)
   await openEditor(page)
+  await expect(page.locator(NAME)).toHaveText('Live editing')
   await expect.poll(() => layoutProblems(page)).toEqual([])
-  for (const layer of LAYERS) {
-    await select(page, layer)
-    await expect.poll(() => layoutProblems(page, { pieces: selected(layer[0]) })).toEqual([])
-  }
 })

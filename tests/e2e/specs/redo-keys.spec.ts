@@ -22,8 +22,8 @@ const design = (): DesignInput => ({
 
 /** Undoes the change with Mod+Z, then brings it back with each redo key in turn, undoing it again between them. */
 async function undoAndRedo(page: Page, before: string, after: string) {
-  for (const redo of ['Control+Shift+KeyZ', 'Control+KeyY']) {
-    await page.keyboard.press('Control+KeyZ')
+  for (const redo of ['ControlOrMeta+Shift+KeyZ', 'ControlOrMeta+KeyY']) {
+    await page.keyboard.press('ControlOrMeta+KeyZ')
     await expect.poll(() => designOf(page), { message: 'Mod+Z undoes the change' }).toBe(before)
     await page.keyboard.press(redo)
     await expect.poll(() => designOf(page), { message: `${redo} redoes it` }).toBe(after)

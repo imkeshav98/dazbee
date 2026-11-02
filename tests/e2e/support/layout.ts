@@ -12,12 +12,12 @@ export interface Rect { x: number; y: number; width: number; height: number }
  * `pieces` are the parts of the page that must not cover each other, each a CSS selector (every
  * element it matches that shows, none when it matches none) or a box on screen. Every control that
  * shows is also checked against every other control that is not inside it. Pieces and controls must
- * lie inside the window, top to bottom as well unless the page `scrolls`. With `cuts`, a control
- * must also not be cut by an ancestor that clips without scrolling, and words must not be cut short
- * by a box that clips them.
+ * lie inside the window, top to bottom as well unless the page `scrolls`. A control must not be cut
+ * by an ancestor that clips without scrolling, and words must not be cut short by a box that clips
+ * them, except inside the elements `uncut` matches, a CSS selector these two checks leave out.
  */
-export function layoutProblems(page: Page, { pieces = {}, scrolls = false, cuts = true }: { pieces?: Record<string, string | Rect>; scrolls?: boolean; cuts?: boolean } = {}) {
-  return page.evaluate(({ pieces, scrolls, cuts }) => {
+export function layoutProblems(page: Page, { pieces = {}, scrolls = false, uncut = null }: { pieces?: Record<string, string | Rect>; scrolls?: boolean; uncut?: string | null } = {}) {
+  return page.evaluate(({ pieces, scrolls, uncut }) => {
     interface Box { left: number; top: number; right: number; bottom: number }
     const problems: string[] = []
     const width = document.documentElement.clientWidth
@@ -27,6 +27,7 @@ export function layoutProblems(page: Page, { pieces = {}, scrolls = false, cuts 
     const at = (b: Box) => `${Math.round(b.left)},${Math.round(b.top)}–${Math.round(b.right)},${Math.round(b.bottom)}`
     const outside = (b: Box) => b.left < -1 || b.right > width + 1 || (!scrolls && (b.top < -1 || b.bottom > height + 1))
     const shows = (el: Element) => el.checkVisibility({ opacityProperty: true, visibilityProperty: true })
+    const leftOut = (el: Element) => uncut !== null && el.closest(uncut) !== null
     const nameOf = (el: Element) => el.getAttribute('data-testid') || el.getAttribute('aria-label') || (el.textContent ?? '').trim().slice(0, 40) || el.tagName.toLowerCase()
 
     // The pieces: each inside the window, none over another.
@@ -79,7 +80,7 @@ export function layoutProblems(page: Page, { pieces = {}, scrolls = false, cuts 
       }
       if (hidden || box.right - box.left < 1 || box.bottom - box.top < 1) continue
       const name = nameOf(el)
-      if (cut && cuts) problems.push(`${name} (${at(whole)}) is cut off by ${cut}`)
+      if (cut && !leftOut(el)) problems.push(`${name} (${at(whole)}) is cut off by ${cut}`)
       else if (outside(box)) problems.push(`${name} (${at(box)}) reaches past the window (${width} × ${height})`)
       controls.push({ el, name, box })
     }
@@ -92,9 +93,9 @@ export function layoutProblems(page: Page, { pieces = {}, scrolls = false, cuts 
 
     // Words cut short: an element that clips its own text, with the words reaching past its sides.
     const range = document.createRange()
-    for (const el of cuts ? document.body.querySelectorAll('*') : []) {
+    for (const el of document.body.querySelectorAll('*')) {
       if (['INPUT', 'TEXTAREA', 'SELECT', 'OPTION', 'SCRIPT', 'STYLE'].includes(el.tagName) || !(el instanceof HTMLElement)) continue
-      if (el.clientWidth < 4 || getComputedStyle(el).overflowX === 'visible' || !shows(el)) continue
+      if (el.clientWidth < 4 || leftOut(el) || getComputedStyle(el).overflowX === 'visible' || !shows(el)) continue
       const room = el.getBoundingClientRect().left + el.clientLeft
       for (const node of el.childNodes) {
         const words = node.nodeType === Node.TEXT_NODE ? (node.textContent ?? '').trim() : ''
@@ -105,5 +106,5 @@ export function layoutProblems(page: Page, { pieces = {}, scrolls = false, cuts 
       }
     }
     return problems
-  }, { pieces, scrolls, cuts })
+  }, { pieces, scrolls, uncut })
 }
