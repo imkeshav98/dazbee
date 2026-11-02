@@ -4,7 +4,7 @@
 import { expect, test, type Locator, type Page } from '../support/test.ts'
 import type { DesignInput } from '@dazbee/schema'
 import { writeOutput } from '../support/editor.ts'
-import { openStage } from '../support/stage.ts'
+import { barMenu, openStage } from '../support/stage.ts'
 import { choose } from '../support/select.ts'
 
 test.describe.configure({ timeout: 120_000 })
@@ -33,30 +33,36 @@ const enter = async (field: Locator, value: string) => {
   await field.press('Enter')
 }
 
-test('the Box and paragraphs card sets the box, lines, lists, decoration, fit and outline', async ({ browser }) => {
+test('the Box and paragraphs card sets the box, lines and fit; the bar sets lists, decoration and the outline', async ({ browser }) => {
   const { page, errors } = await openStage(browser, design())
   await page.evaluate(() => window.dazbee?.select(['copy']))
   const card = page.getByTestId('paragraph-card')
   await expect(card).toBeVisible()
+  const align = () => barMenu(page, 'align')
+  const effects = () => barMenu(page, 'effects')
+  const list = async (to: string) => (await align()).getByRole('radiogroup', { name: 'List' }).locator(`[data-value="${to}"]`).click()
 
   await choose(card.getByRole('combobox', { name: 'Box' }), 'fixed')
-  await choose(card.getByRole('combobox', { name: 'List' }), 'bullet')
+  await list('bullet')
+  await page.keyboard.press('Escape')
   await enter(card.getByRole('spinbutton', { name: 'Paragraph spacing' }), '24')
   await enter(card.getByRole('spinbutton', { name: 'Lines at most' }), '2')
   await expect.poll(() => copy(page)).toMatchObject({ boxMode: 'fixed', list: 'bullet', paragraphSpacing: 24, maxLines: 2 })
 
-  await card.getByRole('button', { name: 'Underline' }).click()
-  await card.getByRole('button', { name: 'Strikethrough' }).click()
-  await card.getByRole('button', { name: 'Strikethrough' }).click()
-  await expect(card.getByRole('button', { name: 'Underline' })).toHaveAttribute('aria-pressed', 'true')
+  await (await align()).getByRole('button', { name: 'Underline' }).click()
+  await (await align()).getByRole('button', { name: 'Strikethrough' }).click()
+  await (await align()).getByRole('button', { name: 'Strikethrough' }).click()
+  await expect((await align()).getByRole('button', { name: 'Underline' })).toHaveAttribute('aria-pressed', 'true')
+  await page.keyboard.press('Escape')
   await expect.poll(async () => (await copy(page)).style).toMatchObject({ underline: true, strikethrough: false })
 
-  await card.getByRole('button', { name: 'Outline', exact: true }).click()
-  await enter(card.getByRole('spinbutton', { name: 'Outline width' }), '4')
-  await enter(card.getByRole('textbox', { name: 'Outline hex' }), 'ff3d6e')
+  await (await effects()).locator('[data-tile="outline"]').click()
+  await enter((await effects()).getByRole('spinbutton', { name: 'Outline width' }), '4')
+  await enter((await effects()).getByRole('textbox', { name: 'Outline hex' }), 'ff3d6e')
   await expect.poll(async () => (await copy(page)).style.outline).toEqual({ width: 4, color: '#FF3D6EFF' })
   await page.evaluate(() => window.dazbee?.drawn())
   writeOutput('paragraph-card.png', await page.screenshot())
+  await page.keyboard.press('Escape')
 
   // Shrink to fit starts from half the size up to the size; the smallest can't pass the largest.
   await card.getByRole('button', { name: 'Shrink to fit' }).click()
@@ -66,9 +72,11 @@ test('the Box and paragraphs card sets the box, lines, lists, decoration, fit an
 
   // 0 lines lifts the limit; turning things off removes them.
   await enter(card.getByRole('spinbutton', { name: 'Lines at most' }), '0')
-  await choose(card.getByRole('combobox', { name: 'List' }), 'none')
+  await list('none')
+  await page.keyboard.press('Escape')
   await card.getByRole('button', { name: 'Shrink to fit' }).click()
-  await card.getByRole('button', { name: 'Outline', exact: true }).click()
+  await (await effects()).locator('[data-tile="outline"]').click()
+  await page.keyboard.press('Escape')
   await expect.poll(async () => {
     const props = await copy(page)
     return [props.maxLines, props.list, props.shrinkToFit, props.style.outline]

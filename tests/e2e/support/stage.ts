@@ -91,3 +91,10 @@ export async function moreMenu(page: Page) {
   if (!(await menu.isVisible())) await page.getByTestId('bar-more').click()
   return menu
 }
+
+/** Opens the popover of one of the bar's buttons, `bar-<id>`, unless it is open, and gives it. */
+export async function barMenu(page: Page, id: string) {
+  const menu = page.getByTestId(`bar-${id}-menu`)
+  if (!(await menu.isVisible())) await page.getByTestId(`bar-${id}`).click()
+  return menu
+}

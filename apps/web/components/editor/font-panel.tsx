@@ -4,7 +4,7 @@
 // into our storage, or the fonts we ship, and its weight. Each family shows as a picture of its name
 // drawn in it, so the browser never decodes a design font; its files load in the editor only once a
 // layer uses it. A brand can upload a TrueType or OpenType file from the same list.
-import { CaretDownIcon, MagnifyingGlassIcon, UploadSimpleIcon } from '@phosphor-icons/react'
+import { MagnifyingGlassIcon, UploadSimpleIcon } from '@phosphor-icons/react'
 import type { Editor } from '@dazbee/editor'
 import { FONT_FACES } from '@dazbee/fonts'
 import { FontFace, FontFamily, type Design } from '@dazbee/schema'
@@ -14,7 +14,6 @@ import { useMessages } from '../../lib/i18n/client.tsx'
 import { format } from '../../lib/i18n/index.ts'
 import { useOverlayScroll } from '../ui/overlay-scroll.ts'
 import { Select } from '../ui/select.tsx'
-import { CARD, CardHeader } from './card.tsx'
 import { useEditorDesign } from './formats-panel.tsx'
 
 /** The fonts we ship, as catalog families; they have no stored preview. */
@@ -72,13 +71,13 @@ const previewFace = (family: FontFamily) =>
   [...family.faces].sort((a, b) => (a.style === b.style ? Math.abs(a.weight - 400) - Math.abs(b.weight - 400) : a.style === 'normal' ? -1 : 1))[0]
 
 /** The family's upright weights, or every weight when it has no upright face. */
-const weightsOf = (family: FontFamily | undefined) => {
+export const weightsOf = (family: FontFamily | undefined) => {
   const upright = family?.faces.filter((f) => f.style === 'normal') ?? []
   return [...new Set((upright.length > 0 ? upright : family?.faces ?? []).map((f) => f.weight))].sort((a, b) => a - b)
 }
 
 /** The weight a family is set in: the one it had when the family has it, otherwise the nearest. */
-const nearest = (weights: number[], wanted: number) =>
+export const nearest = (weights: number[], wanted: number) =>
   weights.reduce((best, w) => (Math.abs(w - wanted) < Math.abs(best - wanted) ? w : best), weights[0] ?? wanted)
 
 /** A family's name drawn in its own face. */
@@ -97,102 +96,60 @@ export function FontPreview({ brandId, family, className, big = false }: { brand
   )
 }
 
-export function FontPanel({ editor, brandId }: { editor: Editor; brandId: string }) {
+/**
+ * The font of the selected text, for the bar's font popover: the list of families to search and pick
+ * from, and the weight. The catalog is fetched again each time it opens, so a brand's new upload shows.
+ */
+export function FontChooser({ editor, brandId, catalog, refresh, onDone }: { editor: Editor; brandId: string; catalog: FontFamily[]; refresh: () => Promise<void>; onDone: () => void }) {
   const t = useMessages()
   const { design } = useEditorDesign(editor)
   const selected = useSelection(editor)
-  const { catalog, refresh } = useFontCatalog(brandId)
-  const [open, setOpen] = useState(false)
-  const box = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    void refresh()
+  }, [refresh])
   const listId = useId()
   const [, frameFormat] = editor.selectedFrame()?.split('/') ?? []
   const current = selectedFont(design, selected, frameFormat && design.formats[frameFormat] ? frameFormat : design.meta.primaryFormatId)
-  const names = selected.flatMap((id) => {
-    const node = design.nodes[id]
-    return node?.type === 'text' ? [node.name] : []
-  })
-
-  useEffect(() => {
-    if (!open) return
-    const onPress = (event: PointerEvent) => !box.current?.contains(event.target as Node) && setOpen(false)
-    window.addEventListener('pointerdown', onPress)
-    return () => window.removeEventListener('pointerdown', onPress)
-  }, [open])
-
   if (!current) return null
-  const family = catalog.find((f) => f.family === current.family)
-  const weights = weightsOf(family)
-
+  const weights = weightsOf(catalog.find((f) => f.family === current.family))
   const pick = (picked: FontFamily) => {
     const available = weightsOf(picked)
     editor.setFont(picked.family, available.length > 0 ? nearest(available, current.weight ?? 400) : undefined)
-    setOpen(false)
+    onDone()
   }
-
   return (
-    <section aria-labelledby="font-title" className={cn(CARD, 'overflow-visible')} data-testid="font-panel">
-      <CardHeader id="font-title" title={t.editor.fonts.title} note={names.join(', ')} />
-      <div ref={box} className="relative flex flex-col gap-2.5 px-[18px] pb-4">
-        {/* The family's name, large and drawn in it, with its weight and size beside it, as in the mock. */}
-        <button
-          type="button"
-          aria-haspopup="listbox"
-          aria-expanded={open}
-          aria-controls={listId}
-          aria-label={t.editor.fonts.choose}
-          onClick={() => {
-            if (!open) void refresh()
-            setOpen(!open)
-          }}
-          data-testid="font-open"
-          data-family={current.family ?? ''}
-          className="group -mx-2 flex h-11 cursor-pointer items-center gap-2 rounded-[10px] px-2 text-start hover:bg-hover aria-expanded:bg-hover"
-        >
-          <span className="min-w-0 flex-1">
-            {family ? <FontPreview brandId={brandId} family={family} big /> : <span className="block truncate text-[24px] leading-8 font-semibold tracking-tight">{current.family ?? t.editor.fonts.mixed}</span>}
-          </span>
-          <span className="shrink-0 text-xs font-medium text-muted tabular-nums">
-            {[
-              current.weight === null ? t.editor.fonts.mixed : t.editor.fonts.weights[current.weight as keyof typeof t.editor.fonts.weights] ?? String(current.weight),
-              current.size === null ? t.editor.fonts.mixed : String(Math.round(current.size * 10) / 10),
-            ].join(' · ')}
-          </span>
-          <CaretDownIcon size={12} weight="bold" aria-hidden className="shrink-0 text-subtle transition-transform duration-[var(--chrome-fast)] group-aria-expanded:rotate-180" />
-        </button>
-        <label className="flex items-center justify-between gap-3">
-          <span className="text-xs text-muted">{t.editor.fonts.weight}</span>
-          <Select
-            name="font-weight"
-            label={t.editor.fonts.weight}
-            value={current.weight === null ? '' : String(current.weight)}
-            placeholder={t.editor.fonts.mixed}
-            options={(weights.length > 0 ? weights : current.weight === null ? [] : [current.weight]).map((w) => ({
-              value: String(w),
-              label: t.editor.fonts.weights[w as keyof typeof t.editor.fonts.weights] ?? String(w),
-            }))}
-            onChange={(w) => current.family && editor.setFont(current.family, Number(w))}
-            disabled={!current.family || weights.length < 2}
-            testId="font-weight"
-            className="h-8 flex-1 bg-transparent px-2 text-[13px]"
-          />
-        </label>
-        {open && (
-          <FontList
-            id={listId}
-            brandId={brandId}
-            catalog={catalog}
-            current={current.family}
-            onPick={pick}
-            onClose={() => setOpen(false)}
-            onUploaded={async (face) => {
-              await refresh()
-              editor.setFont(face.family, face.weight)
-              setOpen(false)
-            }}
-          />
-        )}
-      </div>
-    </section>
+    <div className="flex w-72 flex-col" data-testid="font-chooser">
+      <FontList
+        id={listId}
+        brandId={brandId}
+        catalog={catalog}
+        current={current.family}
+        onPick={pick}
+        onClose={onDone}
+        onUploaded={async (face) => {
+          await refresh()
+          editor.setFont(face.family, face.weight)
+          onDone()
+        }}
+      />
+      <label className="flex items-center justify-between gap-3 border-t border-line px-2 pt-2 pb-0.5">
+        <span className="text-xs text-muted">{t.editor.fonts.weight}</span>
+        <Select
+          name="font-weight"
+          label={t.editor.fonts.weight}
+          value={current.weight === null ? '' : String(current.weight)}
+          placeholder={t.editor.fonts.mixed}
+          options={(weights.length > 0 ? weights : current.weight === null ? [] : [current.weight]).map((w) => ({
+            value: String(w),
+            label: t.editor.fonts.weights[w as keyof typeof t.editor.fonts.weights] ?? String(w),
+          }))}
+          onChange={(w) => current.family && editor.setFont(current.family, Number(w))}
+          disabled={!current.family || weights.length < 2}
+          testId="font-weight"
+          className="h-8 flex-1 bg-transparent px-2 text-[13px]"
+        />
+      </label>
+    </div>
   )
 }
 
@@ -259,7 +216,7 @@ function FontList({ id, brandId, catalog, current, onPick, onClose, onUploaded }
 
   const label = { upload: t.editor.fonts.brand, google: t.editor.fonts.google, builtin: t.editor.fonts.builtin }
   return (
-    <div className="pop-in absolute inset-x-2 top-full z-30 mt-1 flex max-h-[min(28rem,60vh)] flex-col rounded-card surface-frost" data-testid="font-list">
+    <div className="flex max-h-[min(26rem,55vh)] min-h-0 flex-col" data-testid="font-list">
       <div className="flex items-center gap-2 border-b border-line px-3">
         <MagnifyingGlassIcon size={14} aria-hidden className="shrink-0 text-subtle" />
         <input

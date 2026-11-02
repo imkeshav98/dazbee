@@ -53,7 +53,7 @@ export const set = (target: Target, to: (now: Props, i: number) => Patch | null)
 }
 
 /** The one value every layer has, or 'mixed'. */
-function shared<T>(values: T[]): T | 'mixed' {
+export function shared<T>(values: T[]): T | 'mixed' {
   const [first] = values
   const same = values.every((v) => JSON.stringify(v) === JSON.stringify(first))
   return same ? first as T : 'mixed'
@@ -434,21 +434,28 @@ function EffectRow({ effect, i, target, p, write }: { effect: Effect; i: number;
   )
 }
 
-type Style = Record<string, unknown> & { fontSize: number; color: string; letterSpacing?: number; lineHeight?: number; textCase?: string }
+export type Style = Record<string, unknown> & { fontFamily: string; fontWeight: number; fontSize: number; color: string; letterSpacing?: number; lineHeight?: number; textCase?: string }
 
-function TextCard({ target, p }: { target: Target; p: P }) {
+/** The text's style as one setter per key, and a nudge for its numbers. */
+function textStyle(target: Target) {
   const styles = target.props.map((pr) => pr.style as Style)
-  const style = (key: string) => shared(styles.map((s) => s[key]))
-  const setStyle = (key: string, value: unknown) => set(target, (now) => ({ style: { ...(now.style as Style), [key]: value } }))
-  const shiftStyle = (key: string, by: number, min?: number, from = 0) =>
-    set(target, (now) => {
-      const s = now.style as Style
-      return { style: { ...s, [key]: tidy(clamp(((s[key] as number | undefined) ?? from) + by, min)) } }
-    })
+  return {
+    style: (key: string) => shared(styles.map((s) => s[key])),
+    setStyle: (key: string, value: unknown) => set(target, (now) => ({ style: { ...(now.style as Style), [key]: value } })),
+    shiftStyle: (key: string, by: number, min?: number, from = 0) =>
+      set(target, (now) => {
+        const s = now.style as Style
+        return { style: { ...s, [key]: tidy(clamp(((s[key] as number | undefined) ?? from) + by, min)) } }
+      }),
+  }
+}
+
+/** The lines and letters of the text: line height (Auto when cleared) and letter spacing. */
+function TextCard({ target, p }: { target: Target; p: P }) {
+  const { style, setStyle, shiftStyle } = textStyle(target)
   return (
     <Card id="text-card" title={p.textNumbers}>
       <div className={KNOBS}>
-        <NumberField label="Aa" name={p.fontSize} value={style('fontSize') as number | 'mixed'} min={1} editor={target.editor} onSet={(v) => setStyle('fontSize', v)} onShift={(by) => shiftStyle('fontSize', by, 1)} />
         <NumberField
           label="↕"
           name={p.lineHeight}
@@ -462,17 +469,64 @@ function TextCard({ target, p }: { target: Target; p: P }) {
           onClear={() => setStyle('lineHeight', undefined)}
         />
         <NumberField label="↔" name={p.letterSpacing} value={(style('letterSpacing') ?? 0) as number | 'mixed'} step={0.1} editor={target.editor} onSet={(v) => setStyle('letterSpacing', v)} onShift={(by) => shiftStyle('letterSpacing', by)} />
-        <Choice name={p.textCase} value={(style('textCase') ?? 'none') as string} options={['none', 'upper', 'lower', 'title']} labels={p.textCases} onSet={(v) => setStyle('textCase', v)} />
       </div>
-      <ColorField name={p.textColour} value={style('color') as string | 'mixed'} onSet={(to) => set(target, (now) => ({ style: { ...(now.style as Style), color: to((now.style as Style).color) } }))} />
-      <Choice
-        name={p.textAlign}
-        value={shared(target.props.map((pr) => (pr.align ?? 'start') as string))}
-        options={['start', 'center', 'end', 'justify']}
-        labels={p.textAligns}
-        onSet={(align) => set(target, () => ({ align }))}
-      />
     </Card>
+  )
+}
+
+/** The bar's size popover for text: the size, any size from 1 up. */
+export function TextSizeField({ target, p }: { target: Target; p: P }) {
+  const { style, setStyle, shiftStyle } = textStyle(target)
+  return <NumberField label={p.fontSize} name={p.fontSize} value={style('fontSize') as number | 'mixed'} min={1} editor={target.editor} onSet={(v) => setStyle('fontSize', v)} onShift={(by) => shiftStyle('fontSize', by, 1)} />
+}
+
+/** The bar's colour popover for text: the brand's colours, then any colour by its hex. */
+export function TextColourBody({ target, brandId, p }: { target: Target; brandId: string; p: P }) {
+  const { style } = textStyle(target)
+  const color = style('color') as string | 'mixed'
+  return (
+    <div className="flex w-60 flex-col gap-3 p-1">
+      <Swatches target={target} brandId={brandId} p={p} current={color} paint={(hex) => set(target, (now) => ({ style: { ...(now.style as Style), color: `${hex}${((now.style as Style).color ?? '').slice(7, 9) || 'FF'}` } }))} />
+      <ColorField name={p.textColour} value={color} onSet={(to) => set(target, (now) => ({ style: { ...(now.style as Style), color: to((now.style as Style).color) } }))} />
+    </div>
+  )
+}
+
+/** A row of choices of which one is on; `marks` shows a short mark in place of a choice's name. */
+function Segments<T extends string>({ name, value, options, labels, marks, onSet }: { name: string; value: T | 'mixed'; options: readonly T[]; labels: Record<T, string>; marks?: Record<T, string>; onSet: (to: T) => void }) {
+  return (
+    <div role="radiogroup" aria-label={name} className={SEGMENTS}>
+      {options.map((option) => (
+        <button key={option} type="button" role="radio" aria-checked={value === option} aria-label={marks ? labels[option] : undefined} title={marks ? labels[option] : undefined} data-value={option} onClick={() => onSet(option)} className={SEGMENT}>
+          {marks?.[option] ?? labels[option]}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+/** How each case shows on its button: the same letters in every language, as a font sample is. */
+const CASE_MARKS = { none: 'Ab', upper: 'AB', lower: 'ab', title: 'Aa' }
+
+/** The bar's align popover for text: alignment, case, lists, underline and strikethrough. */
+export function TextAlignBody({ target, p }: { target: Target; p: P }) {
+  const { style, setStyle } = textStyle(target)
+  const flag = (key: string) => {
+    const on = style(key)
+    return on === 'mixed' ? 'mixed' : on === true
+  }
+  return (
+    <div className="flex w-80 flex-col gap-2.5 p-1">
+      <Segments name={p.textAlign} value={shared(target.props.map((pr) => (pr.align ?? 'start') as 'start' | 'center' | 'end' | 'justify'))} options={['start', 'center', 'end', 'justify'] as const} labels={p.textAligns} onSet={(align) => set(target, () => ({ align }))} />
+      <Segments name={p.textCase} value={(style('textCase') ?? 'none') as 'none' | 'upper' | 'lower' | 'title' | 'mixed'} options={['none', 'upper', 'lower', 'title'] as const} labels={p.textCases} marks={CASE_MARKS} onSet={(v) => setStyle('textCase', v)} />
+      <Segments name={p.list} value={shared(target.props.map((pr) => (pr.list ?? 'none') as 'none' | 'bullet' | 'number'))} options={['none', 'bullet', 'number'] as const} labels={p.lists} onSet={(list) => set(target, () => ({ list: list === 'none' ? undefined : list }))} />
+      <Toggles
+        items={[
+          { name: p.underline, label: 'U', on: flag('underline'), onSet: (on) => setStyle('underline', on) },
+          { name: p.strikethrough, label: 'S', on: flag('strikethrough'), onSet: (on) => setStyle('strikethrough', on) },
+        ]}
+      />
+    </div>
   )
 }
 
@@ -499,27 +553,14 @@ function Toggles({ items }: { items: Toggle[] }) {
   )
 }
 
-/**
- * The text's box and paragraphs (#153): how the box sizes, lines shown at most, shrinking to fit,
- * paragraph spacing, lists, underline and strikethrough, and an outline along the glyphs.
- */
+/** The text's box and paragraphs: how the box sizes, lines shown at most, shrinking to fit, and paragraph spacing. */
 function ParagraphCard({ target, p }: { target: Target; p: P }) {
   const value = (key: string) => shared(target.props.map((pr) => pr[key])) as unknown
-  const styles = target.props.map((pr) => pr.style as Style)
-  const style = (key: string) => shared(styles.map((s) => s[key]))
-  const setStyle = (change: (now: Style) => Record<string, unknown>) => set(target, (now) => ({ style: { ...(now.style as Style), ...change(now.style as Style) } }))
-  const flag = (key: string) => {
-    const on = style(key)
-    return on === 'mixed' ? 'mixed' : on === true
-  }
   const shrink = value('shrinkToFit') as { min: number; max: number } | undefined | 'mixed'
-  const outline = style('outline') as { width: number; color: string } | undefined | 'mixed'
-  const outlined = outline === 'mixed' || (outline !== undefined && outline.width > 0)
   return (
     <Card id="paragraph-card" title={p.paragraph}>
       <div className={KNOBS}>
         <Choice name={p.boxMode} value={value('boxMode') as BoxMode | 'mixed' | undefined ?? 'autoHeight'} options={['autoWidth', 'autoHeight', 'fixed'] as const} labels={p.boxModes} onSet={(boxMode) => set(target, () => ({ boxMode }))} />
-        <Choice name={p.list} value={(value('list') ?? 'none') as 'none' | 'bullet' | 'number' | 'mixed'} options={['none', 'bullet', 'number'] as const} labels={p.lists} onSet={(list) => set(target, () => ({ list: list === 'none' ? undefined : list }))} />
         <NumberField
           label="≡"
           name={p.maxLines}
@@ -546,13 +587,10 @@ function ParagraphCard({ target, p }: { target: Target; p: P }) {
       </div>
       <Toggles
         items={[
-          { name: p.underline, label: 'U', on: flag('underline'), onSet: (on) => setStyle(() => ({ underline: on })) },
-          { name: p.strikethrough, label: 'S', on: flag('strikethrough'), onSet: (on) => setStyle(() => ({ strikethrough: on })) },
           { name: p.shrinkToFit, label: p.shrinkToFitShort, on: shrink === 'mixed' ? 'mixed' : shrink !== undefined, onSet: (on) => set(target, (now) => {
             const size = (now.style as Style).fontSize
             return { shrinkToFit: on ? { min: tidy(Math.max(1, size / 2)), max: size } : undefined }
           }) },
-          { name: p.outline, label: p.outlineShort, on: outline === 'mixed' ? 'mixed' : outlined, onSet: (on) => setStyle((now) => ({ outline: on ? { width: 2, color: (now.outline as { color?: string } | undefined)?.color ?? '#000000FF' } : undefined })) },
         ]}
       />
       {shrink !== undefined && shrink !== 'mixed' && (
@@ -579,26 +617,6 @@ function ParagraphCard({ target, p }: { target: Target; p: P }) {
               })}
             />
           ))}
-        </div>
-      )}
-      {outlined && outline !== 'mixed' && outline && (
-        <div className="flex items-center gap-1">
-          <div className="w-20 shrink-0">
-            <NumberField
-              label="W"
-              name={p.outlineWidth}
-              value={outline.width}
-              min={0}
-              step={0.5}
-              editor={target.editor}
-              onSet={(width) => setStyle((now) => ({ outline: { ...(now.outline as object), width } }))}
-              onShift={(by) => setStyle((now) => {
-                const was = now.outline as { width: number; color: string } | undefined
-                return was ? { outline: { ...was, width: tidy(clamp(was.width + by, 0)) } } : {}
-              })}
-            />
-          </div>
-          <ColorField name={p.outline} value={outline.color} onSet={(to) => setStyle((now) => ({ outline: { ...(now.outline as object), color: to((now.outline as { color?: string } | undefined)?.color) } }))} />
         </div>
       )}
     </Card>
@@ -879,27 +897,6 @@ function Swatches({ target, brandId, p, current, paint }: { target: Target; bran
   )
 }
 
-/** Text's look, as in the mock: its size and its colour from the brand. */
-function TextLook({ target, brandId, p }: { target: Target; brandId: string; p: P }) {
-  const styles = target.props.map((pr) => pr.style as Style)
-  const size = shared(styles.map((s) => s.fontSize))
-  return (
-    <Card id="text-look" title={p.text} note={target.names.join(', ')}>
-      <NumberField
-        label={p.fontSize}
-        name={p.fontSize}
-        value={size}
-        min={8}
-        max={240}
-        editor={target.editor}
-        onSet={(fontSize) => set(target, (now) => ({ style: { ...(now.style as Style), fontSize } }))}
-        onShift={(by) => set(target, (now) => ({ style: { ...(now.style as Style), fontSize: tidy(clamp((now.style as Style).fontSize + by, 8, 240)) } }))}
-      />
-      <Swatches target={target} brandId={brandId} p={p} current={shared(styles.map((s) => s.color))} paint={(hex) => set(target, (now) => ({ style: { ...(now.style as Style), color: `${hex}${((now.style as Style).color ?? '').slice(7, 9) || 'FF'}` } }))} />
-    </Card>
-  )
-}
-
 /** A shape's or frame's look: its fill from the brand, painted over its first solid fill. */
 function FillLook({ target, brandId, p }: { target: Target; brandId: string; p: P }) {
   // The fill a brand colour binds: the topmost one that shows.
@@ -987,10 +984,10 @@ function useLayerThumbnails(editor: Editor, id: string | null, text: boolean): T
 
 /**
  * The effects as tiles, as in the mock: none, a shadow, a glow, and an outline for text or a blur for
- * the rest. A tile turns its effect on or off; under the tiles are every effect's numbers, and a
- * menu adds the ones without a tile.
+ * the rest. A tile turns its effect on or off; under the tiles are the outline's width and colour
+ * for outlined text, every effect's numbers, and a menu that adds the ones without a tile.
  */
-function EffectsCard({ target, p }: { target: Target; p: P }) {
+export function EffectsBody({ target, p }: { target: Target; p: P }) {
   // One layer previews each effect on itself: its picture, or for text "Aa" in its look.
   const one = target.ids.length === 1 ? target.ids[0] ?? null : null
   const thumbnails = useLayerThumbnails(target.editor, one, target.types[0] === 'text')
@@ -1019,9 +1016,14 @@ function EffectsCard({ target, p }: { target: Target; p: P }) {
     const off = on(tile)
     write((now) => (off ? now.filter((e) => e.type !== type) : now.some((e) => e.type === type) ? now : [...now, NEW_EFFECT[type]]))
   }
+  const outline = shared(target.props.map((pr) => (pr.style as Style | undefined)?.outline as { width: number; color: string } | undefined))
+  const setOutline = (to: (was: { width: number; color: string }) => { width: number; color: string }) =>
+    set(target, (now) => {
+      const was = (now.style as Style).outline as { width: number; color: string } | undefined
+      return was ? { style: { ...(now.style as Style), outline: to(was) } } : null
+    })
   return (
-    <section aria-labelledby="effects-card-title" className={CARD} data-testid="effects-card">
-      <CardHeader id="effects-card-title" title={p.effects} />
+    <>
       <div role="group" aria-label={p.effects} className="grid grid-cols-4 gap-[7px] px-[18px] pb-3.5">
         {tiles.map((tile) => (
           <button
@@ -1042,6 +1044,14 @@ function EffectsCard({ target, p }: { target: Target; p: P }) {
         ))}
       </div>
       <div className={cn('flex flex-col gap-2.5', CARD_LOWER)}>
+          {text && outline && outline !== 'mixed' && outline.width > 0 && (
+            <div className="flex items-center gap-1">
+              <div className="w-24 shrink-0">
+                <NumberField label="W" name={p.outlineWidth} value={outline.width} min={0} step={0.5} editor={target.editor} onSet={(width) => setOutline((was) => ({ ...was, width }))} onShift={(by) => setOutline((was) => ({ ...was, width: tidy(clamp(was.width + by, 0)) }))} />
+              </div>
+              <ColorField name={p.outline} value={outline.color} onSet={(to) => setOutline((was) => ({ ...was, color: to(was.color) }))} />
+            </div>
+          )}
           <Select
             name="add-effect"
             label={p.addEffect}
@@ -1063,6 +1073,16 @@ function EffectsCard({ target, p }: { target: Target; p: P }) {
             )
             : list.map((effect, i) => <EffectRow key={i} effect={effect} i={i} target={target} p={p} write={write} />)}
         </div>
+    </>
+  )
+}
+
+/** The Effects card: the tiles and each effect's numbers in the panel. */
+function EffectsCard({ target, p }: { target: Target; p: P }) {
+  return (
+    <section aria-labelledby="effects-card-title" className={CARD} data-testid="effects-card">
+      <CardHeader id="effects-card-title" title={p.effects} />
+      <EffectsBody target={target} p={p} />
     </section>
   )
 }
@@ -1158,8 +1178,7 @@ export function SelectionCards({ editor, brandId, ids, arrange }: { editor: Edit
     <>
       {several && arrange}
       <HeaderCard target={target} p={p} scope={scope} />
-      {/* The look, as in the mock. */}
-      {all('text') && <TextLook target={target} brandId={brandId} p={p} />}
+      {/* The look, as in the mock; text has its look in the bar. */}
       {imageFill
         ? <ImageCard target={target} p={p} brandId={brandId} index={imageFill.index} paint={imageFill.paint} />
         : all('graphic', 'frame', 'boolean') && (ownShape
@@ -1170,7 +1189,7 @@ export function SelectionCards({ editor, brandId, ids, arrange }: { editor: Edit
               <div className="px-[18px] pb-4"><FillLook target={target} brandId={brandId} p={p} /></div>
             </section>
           ))}
-      <EffectsCard target={target} p={p} />
+      {!all('text') && <EffectsCard target={target} p={p} />}
       {all('text') && <TextCard target={target} p={p} />}
       {all('text') && <ParagraphCard target={target} p={p} />}
       {all('graphic', 'frame', 'boolean') && (

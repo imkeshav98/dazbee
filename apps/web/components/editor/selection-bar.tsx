@@ -5,16 +5,18 @@
 // gesture runs or they are off the stage. It holds what people change most; ⋯ More, and a
 // right-click on a layer, hold the layers' own actions.
 import * as Popover from '@radix-ui/react-popover'
-import { BoundingBoxIcon, CaretDownIcon, DotsThreeIcon, RowsIcon, SelectionPlusIcon } from '@phosphor-icons/react'
+import { BoundingBoxIcon, DotsThreeIcon, RowsIcon, SelectionPlusIcon } from '@phosphor-icons/react'
 import type { Editor, ShortcutAction } from '@dazbee/editor'
-import { useEffect, useState, type FocusEvent, type KeyboardEvent, type ReactNode } from 'react'
+import { useEffect, useState, type FocusEvent, type KeyboardEvent } from 'react'
 import { cn } from '../../lib/cn.ts'
 import { useMessages } from '../../lib/i18n/client.tsx'
 import { format } from '../../lib/i18n/index.ts'
 import { ALIGN, COMBINE, DISTRIBUTE, keyOf, useSelection, type Action } from './arrange-panel.tsx'
+import { BarPopover, keepFocus } from './bar-popover.tsx'
 import { Choice } from './fields.tsx'
 import { RotationField, set, useTarget } from './selection-cards.tsx'
 import { BAR, BAR_BUTTON, BAR_DIVIDER, ICON_BUTTON, MENU_DIVIDER, MENU_ITEM, MENU_KEY, POPOVER } from './styles.ts'
+import { TextBar } from './text-bar.tsx'
 
 /** Pixels between the selection and the bar, clear of the turn handles round its corners, and kept clear at the stage's edges. */
 const GAP = 28
@@ -74,34 +76,6 @@ function usePlace(editor: Editor, bar: HTMLElement | null): Place | null {
     }
   }, [editor, bar])
   return place
-}
-
-/** One button of the bar that opens its popover; only one is open at a time. */
-function BarPopover({ id, open, onOpen, label, icon, children, testId }: {
-  id: string
-  open: string | null
-  onOpen: (id: string | null) => void
-  label: string
-  icon?: ReactNode
-  children: ReactNode
-  testId: string
-}) {
-  return (
-    <Popover.Root open={open === id} onOpenChange={(to) => onOpen(to ? id : null)}>
-      <Popover.Trigger asChild>
-        <button type="button" data-bar-item data-testid={`bar-${testId}`} className={BAR_BUTTON}>
-          {icon}
-          {label}
-          <CaretDownIcon size={10} weight="bold" aria-hidden className="text-subtle" />
-        </button>
-      </Popover.Trigger>
-      <Popover.Portal>
-        <Popover.Content side="bottom" align="center" sideOffset={8} collisionPadding={12} aria-label={label} data-testid={`bar-${testId}-menu`} className={cn(POPOVER, 'flex min-w-56 flex-col p-1.5')}>
-          {children}
-        </Popover.Content>
-      </Popover.Portal>
-    </Popover.Root>
-  )
 }
 
 /**
@@ -165,8 +139,8 @@ export function LayerActions({ editor, ids, onDone }: { editor: Editor; ids: str
   )
 }
 
-/** The bar's buttons, in order. */
-const itemsOf = (bar: HTMLElement) => [...bar.querySelectorAll<HTMLElement>('[data-bar-item]')]
+/** The bar's buttons that can be used, in order. */
+const itemsOf = (bar: HTMLElement) => [...bar.querySelectorAll<HTMLElement>('[data-bar-item]:not(:disabled)')]
 
 /** Moves focus along the bar's buttons with the arrow keys, as a toolbar does. */
 function arrowAlong(event: KeyboardEvent<HTMLDivElement>) {
@@ -180,10 +154,11 @@ function arrowAlong(event: KeyboardEvent<HTMLDivElement>) {
   items[next]?.focus()
 }
 
-export function SelectionBar({ editor }: { editor: Editor }) {
+export function SelectionBar({ editor, brandId }: { editor: Editor; brandId: string }) {
   const t = useMessages()
   const b = t.editor.bar
   const ids = useSelection(editor)
+  const selected = useTarget(editor, ids)
   const [bar, setBar] = useState<HTMLDivElement | null>(null)
   const place = usePlace(editor, bar)
   const [open, setOpen] = useState<string | null>(null)
@@ -221,6 +196,7 @@ export function SelectionBar({ editor }: { editor: Editor }) {
       style={place ? { left: place.left, top: place.top } : undefined}
       className={cn(BAR, place ? 'visible' : 'invisible')}
     >
+      {selected && selected.target.types.some((type) => type === 'text') && <TextBar target={selected.target} brandId={brandId} open={open} onOpen={setOpen} />}
       <BarPopover id="line-up" open={open} onOpen={setOpen} label={b.lineUp} testId="line-up">
         <div dir="ltr" role="group" aria-label={t.editor.arrange.align} className="grid grid-cols-6 gap-0.5">
           {ALIGN.map(({ action, icon: Icon }) => (
@@ -261,7 +237,7 @@ export function SelectionBar({ editor }: { editor: Editor }) {
           </button>
         </Popover.Trigger>
         <Popover.Portal>
-          <Popover.Content side="bottom" align="end" sideOffset={8} collisionPadding={12} aria-label={b.more} data-testid="bar-more-menu" className={cn(POPOVER, 'flex w-60 flex-col p-1.5')}>
+          <Popover.Content side="bottom" align="end" sideOffset={8} collisionPadding={12} onCloseAutoFocus={(event) => keepFocus(event, open, 'more')} aria-label={b.more} data-testid="bar-more-menu" className={cn(POPOVER, 'flex w-60 flex-col p-1.5')}>
             <LayerActions editor={editor} ids={ids} onDone={() => setOpen(null)} />
           </Popover.Content>
         </Popover.Portal>

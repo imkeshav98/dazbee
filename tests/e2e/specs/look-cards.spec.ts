@@ -5,7 +5,7 @@ import { expect, test, type Page } from '../support/test.ts'
 import { EMPTY_BRAND_KIT, type DesignInput } from '@dazbee/schema'
 import { writeOutput } from '../support/editor.ts'
 import { API_URL, DEV_BRAND } from '../support/seed.ts'
-import { openStage } from '../support/stage.ts'
+import { barMenu, openStage } from '../support/stage.ts'
 
 test.describe.configure({ timeout: 120_000 })
 
@@ -35,20 +35,20 @@ test('the look comes first: size and brand colour, effect tiles, and the header 
   const { page, errors } = await openStage(browser, design())
   await page.evaluate(() => window.dazbee?.select(['headline']))
 
-  // Text: the size slider and the brand's colours, the colour it has now leading them.
-  const look = page.getByTestId('text-look')
-  await look.getByRole('spinbutton', { name: 'Size' }).fill('64')
-  await look.getByRole('spinbutton', { name: 'Size' }).press('Enter')
+  // Text, in the bar: the size, and the brand's colours with the colour it has now leading them.
+  const size = (await barMenu(page, 'size')).getByRole('spinbutton', { name: 'Size' })
+  await size.fill('64')
+  await size.press('Enter')
   await expect.poll(async () => (await node(page, 'headline')).props.style?.fontSize).toBe(64)
-  const colours = look.getByRole('group', { name: 'Brand colours' })
+  const colours = (await barMenu(page, 'colour')).getByRole('group', { name: 'Brand colours' })
   await expect(colours.getByRole('button')).toHaveCount(3)
   await expect(colours.getByRole('button', { name: 'Now #FFFFFF' })).toHaveAttribute('aria-pressed', 'true')
   await colours.getByRole('button', { name: 'Berry' }).click()
   await expect.poll(async () => (await node(page, 'headline')).bindings).toMatchObject({ textColor: 'brand:berry' })
   await expect(colours.getByRole('button', { name: 'Berry' })).toHaveAttribute('aria-pressed', 'true')
 
-  // Effects as tiles: None to start, Shadow and Outline on together, None takes both off.
-  const effects = page.getByTestId('effects-card')
+  // Effects as tiles, in the bar for text: None to start, Shadow and Outline on together, None takes both off.
+  const effects = await barMenu(page, 'effects')
   await expect(effects.locator('[data-tile="none"]')).toHaveAttribute('aria-pressed', 'true')
   await effects.locator('[data-tile="shadow"]').click()
   await effects.locator('[data-tile="outline"]').click()

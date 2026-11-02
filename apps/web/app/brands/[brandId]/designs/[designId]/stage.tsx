@@ -264,7 +264,7 @@ export function EditorStage({ designId, designName, brandId, brandName, everyBra
       >
         <canvas ref={canvas} className="block size-full touch-none" data-testid="stage" />
         <div ref={overlay} className="stage-overlay pointer-events-none absolute inset-0 overflow-hidden" aria-hidden />
-        {editor && <SelectionBar editor={editor} />}
+        {editor && <SelectionBar editor={editor} brandId={brandId} />}
         {editor && menuAt && <StageMenu key={menuAt.n} editor={editor} at={menuAt} onClose={() => setMenuAt(null)} />}
         <div data-slot="mini-bar" className="pointer-events-none absolute inset-x-0 top-4 flex justify-center">
           {editor && <FocusChip editor={editor} />}

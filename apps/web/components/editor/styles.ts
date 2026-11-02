@@ -71,6 +71,8 @@ export const SWITCH = 'relative h-5 w-[34px] shrink-0 rounded-full bg-line-stron
 export const BAR = 'absolute z-20 flex items-center gap-0.5 rounded-[14px] surface-frost p-1'
 /** One button of the bar: words or an icon, lit while its popover is open. */
 export const BAR_BUTTON = `flex h-[30px] min-w-[30px] shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-row px-2 text-[12px] font-semibold whitespace-nowrap text-text transition-colors duration-[var(--chrome-fast)] hover:bg-hover aria-expanded:bg-hover ${FOCUS_RING}`
+/** A button of the bar that turns something on or off, such as bold: lit while it is on. */
+export const BAR_TOGGLE = `${BAR_BUTTON} aria-pressed:bg-accent-soft aria-pressed:text-accent-text ${DISABLED}`
 /** The upright hairline between the bar's groups of buttons. */
 export const BAR_DIVIDER = 'mx-0.5 h-5 w-px bg-line'
 

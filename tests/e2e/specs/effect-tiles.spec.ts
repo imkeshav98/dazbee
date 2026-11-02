@@ -6,7 +6,7 @@ import { expect, test, type Page } from '../support/test.ts'
 import type { DesignInput } from '@dazbee/schema'
 import { photo, upload } from '../support/assets.ts'
 import { writeOutput } from '../support/editor.ts'
-import { click, openStage } from '../support/stage.ts'
+import { barMenu, click, openStage } from '../support/stage.ts'
 
 test.describe.configure({ timeout: 120_000 })
 
@@ -30,9 +30,11 @@ const design = (assetId: string): DesignInput => ({
   overrides: {},
 })
 
-const tiles = (page: Page) => page.getByTestId('effects-card').locator('[data-tile]')
+/** Where the tiles are: the Effects card, or for text the bar's Effects. */
+const effects = (page: Page) => page.locator('[data-testid="effects-card"], [data-testid="bar-effects-menu"]')
+const tiles = (page: Page) => effects(page).locator('[data-tile]')
 /** Whether a tile's picture has a pixel of a colour, within a few levels. */
-const hasColour = (page: Page, tile: string, rgb: number[]) => page.getByTestId('effects-card').locator(`[data-tile="${tile}"] img`).evaluate(async (img: HTMLImageElement, rgb) => {
+const hasColour = (page: Page, tile: string, rgb: number[]) => effects(page).locator(`[data-tile="${tile}"] img`).evaluate(async (img: HTMLImageElement, rgb) => {
   await img.decode()
   const canvas = new OffscreenCanvas(img.naturalWidth, img.naturalHeight)
   const context = canvas.getContext('2d')
@@ -42,7 +44,7 @@ const hasColour = (page: Page, tile: string, rgb: number[]) => page.getByTestId(
   return false
 }, rgb)
 /** The colour at the middle of the None tile's picture, read from the picture itself. */
-const middleOf = (page: Page) => page.getByTestId('effects-card').locator('[data-tile="none"] img').evaluate(async (img: HTMLImageElement) => {
+const middleOf = (page: Page) => effects(page).locator('[data-tile="none"] img').evaluate(async (img: HTMLImageElement) => {
   await img.decode()
   const canvas = new OffscreenCanvas(img.naturalWidth, img.naturalHeight)
   const context = canvas.getContext('2d')
@@ -89,11 +91,12 @@ test('each layer previews the effects on itself; a fill change follows; several 
 
   // Text is Aa, drawn in its own font and colour; its Outline tile is the same Aa outlined.
   await click(page, 200, 560)
+  await barMenu(page, 'effects')
   await expect(tiles(page).locator('img[data-thumbnail]')).toHaveCount(4)
   expect(await hasColour(page, 'none', [47, 107, 255])).toBe(true)
-  const outlined = await page.getByTestId('effects-card').locator('[data-tile="outline"] img').getAttribute('src')
+  const outlined = await effects(page).locator('[data-tile="outline"] img').getAttribute('src')
   expect(outlined).not.toBe(await tiles(page).first().locator('img').getAttribute('src'))
-  writeOutput('effect-tiles-4-text.png', await page.getByTestId('effects-card').screenshot())
+  writeOutput('effect-tiles-4-text.png', await page.getByTestId('bar-effects-menu').screenshot())
 
   // Several layers: Aa as before.
   await click(page, 250, 260, ['Shift'])

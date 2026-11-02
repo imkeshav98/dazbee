@@ -1,8 +1,8 @@
 'use client'
 
-// The property cards floating at the stage's top end (#83). With nothing selected they show the
+// The property cards floating at the stage's top end. With nothing selected they show the
 // design: the Page card (its background), then Formats and Pages. With a selection they show the
-// font when text is selected, then the selection's look and Arrange, with the numbers last (#60):
+// selection's look and Arrange (text has its font and look in the bar by the selection), with the numbers last:
 // as in the final mock, what changes how it looks comes first. Several layers show Arrange first. Each card is only as tall as what it
 // holds, every card is open, and controls are visual first.
 import type { Editor } from '@dazbee/editor'
@@ -13,7 +13,6 @@ import { useMessages } from '../../lib/i18n/client.tsx'
 import { format } from '../../lib/i18n/index.ts'
 import { ArrangePanel, useSelection } from './arrange-panel.tsx'
 import { CARD, CARD_LOWER, CardHeader, PICKED_RING, SWATCHES } from './card.tsx'
-import { FontPanel } from './font-panel.tsx'
 import { FormatsPanel, useEditorDesign } from './formats-panel.tsx'
 import { PagesPanel } from './pages-panel.tsx'
 import { AddButton, PaintRow, Stack } from './paint-stack.tsx'
@@ -127,7 +126,6 @@ export function PropertyCards({ editor, brandId, onRemoved }: { editor: Editor; 
   if (selected.length > 0) {
     return (
       <>
-        <FontPanel editor={editor} brandId={brandId} />
         <SelectionCards editor={editor} brandId={brandId} ids={selected} arrange={<ArrangePanel editor={editor} />} />
       </>
     )
