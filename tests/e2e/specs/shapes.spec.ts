@@ -5,7 +5,7 @@ import type { DesignInput } from '@dazbee/schema'
 import { expect, test, type Page } from '../support/test.ts'
 import { exportHashOf, screenPoint, writeOutput } from '../support/editor.ts'
 import { liveDesign } from '../support/seed.ts'
-import { click, drag, openStage, press, read, selection, type Design } from '../support/stage.ts'
+import { barMenu, click, drag, openStage, press, read, selection, type Design } from '../support/stage.ts'
 
 test.describe.configure({ timeout: 120_000 })
 
@@ -120,10 +120,10 @@ test('two shapes combine into a live boolean that follows a shape dragged inside
   const front = await draw(page, { x: 200, y: 860 }, { x: 320, y: 980 })
   const shapes = await exportHashOf(page)
 
-  // Select both and combine from the inspector: the boolean takes the bottom shape's paint.
+  // Select both and combine from the bar by them: the boolean takes the bottom shape's paint.
   await click(page, 120, 840)
   await click(page, 300, 960, ['Shift'])
-  await page.locator('[data-action="booleanSubtract"]').click()
+  await (await barMenu(page, 'combine')).locator('[data-action="booleanSubtract"]').click()
   await page.evaluate(() => window.dazbee?.drawn())
   let d = await read(page)
   const [cut = ''] = await selection(page)
@@ -169,7 +169,7 @@ test('two shapes combine into a live boolean that follows a shape dragged inside
   await click(page, 500, 540, ['Shift'])
   expect(await selection(page)).toEqual([union, 'headline'])
   const unchanged = await read(page)
-  await page.locator('[data-action="booleanUnion"]').click()
+  await (await barMenu(page, 'combine')).locator('[data-action="booleanUnion"]').click()
   expect(await read(page)).toEqual(unchanged)
   expect(errors).toEqual([])
 })

@@ -280,7 +280,15 @@ export function StageMenu({ editor, at, onClose }: { editor: Editor; at: { x: nu
         <span aria-hidden className="pointer-events-none absolute size-0" style={{ left: at.x, top: at.y }} />
       </Popover.Anchor>
       <Popover.Portal>
-        <Popover.Content side="bottom" align="start" sideOffset={2} collisionPadding={12} aria-label={t.editor.bar.actions} data-testid="stage-menu" className={cn(POPOVER, 'flex w-60 flex-col p-1.5')}>
+        <Popover.Content
+          side="bottom"
+          align="start"
+          sideOffset={2}
+          collisionPadding={12}
+          // A click elsewhere or Esc closes it; focus given back to a button that just closed does not.
+          onFocusOutside={(event) => event.preventDefault()}
+          aria-label={t.editor.bar.actions}
+          data-testid="stage-menu" className={cn(POPOVER, 'flex w-60 flex-col p-1.5')}>
           <LayerActions editor={editor} ids={ids} onDone={onClose} />
         </Popover.Content>
       </Popover.Portal>
