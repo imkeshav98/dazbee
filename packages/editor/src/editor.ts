@@ -1442,7 +1442,10 @@ function live(
       drag: { anchors: AnchorRef[] } | { ref: AnchorRef; side: Side; from: Point; mirror: boolean }
     }
   let gesture: Gesture | null = null
-  /** A click on one of several selected layers selects it alone, unless the pointer moves first. */
+  /**
+   * What a click selects alone when the pointer doesn't move first: one of several selected
+   * layers, or a layer pressed inside the selection's box, which a drag moves instead.
+   */
   let clickedAlone: string | null = null
   let pan: { from: Point; camera: Camera } | null = null
   let spaceHeld = false
@@ -1902,9 +1905,10 @@ function live(
       return
     }
     const inSelection = (id: string) => selection?.frame === at?.frame.key && selection?.ids.includes(id)
-    // Inside the box around several selected layers, a press moves them all, gaps included.
+    // Inside the selection's box, a press moves the selection, gaps and layers over it included:
+    // a mask, which isn't drawn, or a layer under others, is dragged where it is.
     const inner = at && outer && localTo(at.p, outer.around)
-    const inOuter = inner && outer && selection && selection.ids.length > 1 && outer.frame.key === at.frame.key
+    const inOuter = inner && outer && selection && selection.ids.length > 0 && outer.frame.key === at.frame.key
       && inner.x >= outer.box.x && inner.x <= outer.box.x + outer.box.width && inner.y >= outer.box.y && inner.y <= outer.box.y + outer.box.height
     // A press outside the group or frame double-clicked into leaves it.
     if (entered && !inOuter && !(deepest && insideEntered(deepest.id))) entered = null
@@ -1919,6 +1923,8 @@ function live(
         select(selection?.frame === at.frame.key ? [...selection.ids, hit.id] : [hit.id], at.frame.key)
       } else if (inSelection(hit.id)) {
         if ((selection?.ids.length ?? 0) > 1) clickedAlone = hit.id
+      } else if (inOuter) {
+        clickedAlone = hit.id
       } else {
         select([hit.id], at.frame.key)
       }
