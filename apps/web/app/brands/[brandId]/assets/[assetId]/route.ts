@@ -11,9 +11,13 @@ export async function GET(_request: Request, { params }: { params: Promise<{ bra
   if (!link) return new Response('No such asset', { status: 404 })
   const stored = await fetch(link.url, { cache: 'no-store' })
   if (!stored.ok) return new Response('Storage did not answer', { status: 502 })
+  // An SVG file is sent as text, never as a page or image the browser runs or decodes: the editor
+  // reads it as layers.
+  const svg = link.asset.contentType === 'image/svg+xml'
   return new Response(stored.body, {
     headers: {
-      'content-type': link.asset.contentType,
+      'content-type': svg ? 'text/plain; charset=utf-8' : link.asset.contentType,
+      ...(svg ? { 'content-security-policy': "default-src 'none'; sandbox", 'x-content-type-options': 'nosniff', 'content-disposition': 'attachment' } : {}),
       // An asset's bytes never change, but whether this viewer may see them can.
       'cache-control': 'private, max-age=3600',
     },

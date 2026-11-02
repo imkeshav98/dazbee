@@ -6,13 +6,13 @@
 // its picker without a pick goes back to the select tool.
 import { ImageIcon, UploadSimpleIcon } from '@phosphor-icons/react'
 import * as Popover from '@radix-ui/react-popover'
-import type { PlacedAsset } from '@dazbee/editor'
-import { AssetSummary } from '@dazbee/schema'
+import { AssetSummary, isVectorAsset } from '@dazbee/schema'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { cn } from '../../lib/cn.ts'
 import { useLocale, useMessages } from '../../lib/i18n/client.tsx'
 import { dirOf, format } from '../../lib/i18n/index.ts'
-import { ASSET_ACCEPT, sendAsset } from '../../lib/upload-asset.ts'
+import { ASSET_ACCEPT, IMAGE_ACCEPT, sendAsset } from '../../lib/upload-asset.ts'
+import type { Placeable } from '../../lib/place-asset.ts'
 import { overlayScroll } from '../ui/overlay-scroll.ts'
 import { Tooltip } from '../ui/tooltip.tsx'
 import { ASSET_TILE, DASHED_BUTTON, dockTool, FOCUS_RING, POPOVER } from './styles.ts'
@@ -25,7 +25,8 @@ const PANEL = cn(POPOVER, 'flex max-h-[min(26rem,60dvh)] w-72 flex-col')
  * The picker's own content: an upload and the brand's images, fetched while it shows. An upload
  * that ends after the picker closed picks nothing.
  */
-function ImagePickerPanel({ brandId, open, title, hint, onPick }: { brandId: string; open: boolean; title: string; hint?: string; onPick: (asset: PlacedAsset) => void }) {
+/** The brand's images to pick from, and an upload. SVG files are offered only with `vectors`, where they are placed as layers; a fill takes images alone. */
+function ImagePickerPanel({ brandId, open, title, hint, vectors = false, onPick }: { brandId: string; open: boolean; title: string; hint?: string; vectors?: boolean; onPick: (asset: Placeable) => void }) {
   const t = useMessages().editor
   const [assets, setAssets] = useState<AssetSummary[] | null>(null)
   const [upload, setUpload] = useState<{ name: string; progress: number; error?: string } | null>(null)
@@ -42,12 +43,12 @@ function ImagePickerPanel({ brandId, open, title, hint, onPick }: { brandId: str
     const ask = new AbortController()
     fetch(base(brandId), { signal: ask.signal })
       .then(async (response) => {
-        if (response.ok) setAssets(AssetSummary.array().parse(await response.json()))
+        if (response.ok) setAssets(AssetSummary.array().parse(await response.json()).filter((asset) => vectors || !isVectorAsset(asset)))
       })
       // Offline: the picker keeps what it had, and an upload still works once back.
       .catch(() => undefined)
     return () => ask.abort()
-  }, [brandId, open])
+  }, [brandId, open, vectors])
 
   const send = (file: File) => {
     setUpload({ name: file.name, progress: 0 })
@@ -69,7 +70,7 @@ function ImagePickerPanel({ brandId, open, title, hint, onPick }: { brandId: str
           <input
             name="image-picker-upload"
             type="file"
-            accept={ASSET_ACCEPT}
+            accept={vectors ? ASSET_ACCEPT : IMAGE_ACCEPT}
             className="sr-only"
             onChange={(e) => {
               const file = e.target.files?.[0]
@@ -108,7 +109,7 @@ function ImagePickerPanel({ brandId, open, title, hint, onPick }: { brandId: str
                     type="button"
                     aria-label={format(t.imageTool.pick, { name })}
                     title={name}
-                    onClick={() => onPick({ id: asset.id, name: asset.name, width: asset.width, height: asset.height })}
+                    onClick={() => onPick(asset)}
                     className={cn(ASSET_TILE, FOCUS_RING, 'w-full cursor-pointer hover:border-accent')}
                   >
                     <img src={`${base(brandId)}/${encodeURIComponent(asset.id)}/thumbnail`} alt="" width={asset.width} height={asset.height} draggable={false} loading="lazy" className="size-full object-contain" />
@@ -131,7 +132,7 @@ export function ImageTool({ brandId, active, open, onPress, onPick, onClose }: {
   /** The picker shows: the tool is in use and has no image to place yet. */
   open: boolean
   onPress: () => void
-  onPick: (asset: PlacedAsset) => void
+  onPick: (asset: Placeable) => void
   onClose: () => void
 }) {
   const t = useMessages().editor
@@ -153,7 +154,7 @@ export function ImageTool({ brandId, active, open, onPress, onPick, onClose }: {
       </Tooltip>
       <Popover.Portal>
         <Popover.Content side="top" align="center" sideOffset={10} aria-label={t.imageTool.title} data-testid="image-picker" onKeyDown={(e) => e.stopPropagation()} className={PANEL}>
-          <ImagePickerPanel brandId={brandId} open={open} title={t.imageTool.title} hint={t.imageTool.hint} onPick={onPick} />
+          <ImagePickerPanel brandId={brandId} open={open} title={t.imageTool.title} hint={t.imageTool.hint} vectors onPick={onPick} />
         </Popover.Content>
       </Popover.Portal>
     </Popover.Root>
@@ -173,7 +174,7 @@ export function ImagePickerButton({ brandId, title, testId, className, children,
   testId: string
   className: string
   children: ReactNode
-  onPick: (asset: PlacedAsset) => void
+  onPick: (asset: Placeable) => void
 }) {
   const [own, setOwn] = useState(false)
   const open = shown ?? own

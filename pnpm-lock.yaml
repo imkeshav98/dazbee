@@ -133,6 +133,9 @@ importers:
       '@dazbee/schema':
         specifier: workspace:*
         version: link:../../packages/schema
+      '@dazbee/svg':
+        specifier: workspace:*
+        version: link:../../packages/svg
       '@fontsource-variable/bricolage-grotesque':
         specifier: ^5.3.0
         version: 5.3.0

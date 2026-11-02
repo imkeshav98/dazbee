@@ -1,6 +1,7 @@
 // The brand's asset library (#52): its images, found by name and tag, and image uploads. An upload
 // passes through here to the API and storage, so the browser needs no storage address or credentials.
-import { MAX_UPLOAD_BYTES, type ImageType } from '@dazbee/schema'
+import { svgMarkup, SVG_TYPE } from '@dazbee/svg'
+import { MAX_SVG_BYTES, MAX_UPLOAD_BYTES, type ImageType } from '@dazbee/schema'
 import { ApiFailure, listAssets, uploadAsset } from '../../../../lib/api.ts'
 
 export async function GET(request: Request, { params }: { params: Promise<{ brandId: string }> }) {
@@ -13,12 +14,13 @@ export async function GET(request: Request, { params }: { params: Promise<{ bran
   }
 }
 
-/** An image's type by its first bytes: the PNG, JPEG and WebP the editor decodes. */
+/** An image's type by its first bytes: the PNG, JPEG and WebP the editor decodes, or an SVG file's markup. */
 function imageType(bytes: Uint8Array): ImageType | null {
   const ascii = (at: number, length: number) => String.fromCharCode(...bytes.subarray(at, at + length))
   if (ascii(0, 8) === '\x89PNG\r\n\x1a\n') return 'image/png'
   if (bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return 'image/jpeg'
   if (ascii(0, 4) === 'RIFF' && ascii(8, 4) === 'WEBP') return 'image/webp'
+  if (bytes.length <= MAX_SVG_BYTES && svgMarkup(new TextDecoder().decode(bytes))) return SVG_TYPE
   return null
 }
 
@@ -36,7 +38,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ bra
   if (file.size > MAX_UPLOAD_BYTES) return Response.json({ error: 'The image is larger than 30 MB' }, { status: 400 })
   const bytes = new Uint8Array(await file.arrayBuffer())
   const type = imageType(bytes)
-  if (!type) return Response.json({ error: 'The file is not a PNG, JPEG or WebP image' }, { status: 400 })
+  if (!type) return Response.json({ error: 'The file is not a PNG, JPEG or WebP image, or an SVG file of at most 5 MB' }, { status: 400 })
   try {
     return Response.json(await uploadAsset(brandId, bytes, type, assetName(file.name)), { status: 201 })
   } catch (e) {

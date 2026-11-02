@@ -6,27 +6,30 @@
 // the design itself draws the original, decoded by CanvasKit.
 import { MagnifyingGlassIcon, PencilSimpleIcon, TrashIcon, UploadSimpleIcon, XIcon } from '@phosphor-icons/react'
 import type { Editor } from '@dazbee/editor'
-import { AssetInUse, AssetSummary, AssetUse, imageAssetIds, type UpdateAsset } from '@dazbee/schema'
+import { AssetInUse, AssetSummary, AssetUse, imageAssetIds, isVectorAsset, type UpdateAsset } from '@dazbee/schema'
 import { useCallback, useEffect, useRef, useState, type DragEvent, type KeyboardEvent } from 'react'
 import { cn } from '../../lib/cn.ts'
 import { useMessages } from '../../lib/i18n/client.tsx'
 import { format } from '../../lib/i18n/index.ts'
+import { placeAsset } from '../../lib/place-asset.ts'
 import { ASSET_ACCEPT as ACCEPT, sendAsset as send } from '../../lib/upload-asset.ts'
 import { overlayScroll } from '../ui/overlay-scroll.ts'
 import { ASSET_TILE, DASHED_BUTTON, QUIET_BUTTON } from './styles.ts'
 
 /** What an asset dragged from the library carries, for the stage to place it. */
 export const ASSET_DRAG_TYPE = 'application/x-dazbee-asset'
+/** Also on a drag of an SVG asset, so the stage knows before the drop, when only the types can be read. */
+export const VECTOR_DRAG_TYPE = 'application/x-dazbee-vector'
 /** How long typing pauses before the library searches. */
 const SEARCH_DELAY_MS = 150
 
-export type DraggedAsset = Pick<AssetSummary, 'id' | 'name' | 'width' | 'height'>
+export type DraggedAsset = Pick<AssetSummary, 'id' | 'name' | 'width' | 'height' | 'contentType'>
 
 /** The asset a drag from the library carries, or null when it carries none. */
 export function draggedAsset(e: DragEvent): DraggedAsset | null {
   const data = e.dataTransfer.getData(ASSET_DRAG_TYPE)
   if (!data) return null
-  const parsed = AssetSummary.pick({ id: true, name: true, width: true, height: true }).safeParse(JSON.parse(data))
+  const parsed = AssetSummary.pick({ id: true, name: true, width: true, height: true, contentType: true }).safeParse(JSON.parse(data))
   return parsed.success ? parsed.data : null
 }
 
@@ -222,9 +225,10 @@ export function AssetLibrary({ editor, brandId }: { editor: Editor; brandId: str
                     draggable
                     aria-label={format(t.place, { name })}
                     title={t.placeHint}
-                    onClick={() => editor.placeImage(asset)}
+                    onClick={() => placeAsset(editor, brandId, asset)}
                     onDragStart={(e) => {
-                      e.dataTransfer.setData(ASSET_DRAG_TYPE, JSON.stringify({ id: asset.id, name: asset.name, width: asset.width, height: asset.height }))
+                      e.dataTransfer.setData(ASSET_DRAG_TYPE, JSON.stringify({ id: asset.id, name: asset.name, width: asset.width, height: asset.height, contentType: asset.contentType }))
+                      if (isVectorAsset(asset)) e.dataTransfer.setData(VECTOR_DRAG_TYPE, '1')
                       e.dataTransfer.effectAllowed = 'copy'
                     }}
                     className={cn(

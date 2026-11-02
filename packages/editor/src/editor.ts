@@ -13,7 +13,7 @@ import {
 import type { CanvasKit, GrDirectContext, Image, SkPicture, Surface } from '@dazbee/canvaskit'
 import canvasKitModule from '@dazbee/canvaskit'
 import { WASM_FILE } from '@dazbee/canvaskit/wasm'
-import { SvgError, svgToLayers, type Skipped } from '@dazbee/svg'
+import { SvgError, svgMarkup, svgToLayers, SVG_TYPE, type Skipped } from '@dazbee/svg'
 import { IndexeddbPersistence } from 'y-indexeddb'
 import * as Y from 'yjs'
 import { fit, NO_INSETS, toScreen, toWorld, visibleRect, zoomAt, type Camera, type Insets, type Viewport } from './camera.ts'
@@ -86,16 +86,8 @@ export type Tool = 'select' | 'hand' | 'pen' | 'text' | 'frame' | 'image' | Shap
 /** An image asset as the editor places it. */
 export interface PlacedAsset { id: string; name: string; width: number; height: number }
 
-/** An SVG file's media type, as clipboards and uploads name it. */
-export const SVG_TYPE = 'image/svg+xml'
 /** The share of a frame's shorter side a placed SVG may take before it is scaled down to it. */
 const SVG_ROOM = 0.6
-
-/** Text that is an SVG file, trimmed, or null: markup opening with <svg after any declaration, comment or doctype. */
-export function svgMarkup(text: string | undefined): string | null {
-  const trimmed = text?.trim() ?? ''
-  return /^(?:<?xml[^>]*>s*|<!--[sS]*?-->s*|<!DOCTYPE[^>[]*(?:[[sS]*?])?s*>s*)*<svg[s>]/i.test(trimmed) ? trimmed : null
-}
 
 /** How far, in screen pixels, a press can wander and still draw a shape as a click does. */
 const CLICK_SLOP = 3
