@@ -32,7 +32,7 @@ Before Keshav sees a mock:
 
 ## Merging a PR
 
-1. **Goldfish QA.** A subagent gets the ticket, its test grid and the URL of the app running the branch. It tries to break the feature in Chromium: every cell of the grid, odd input, the keyboard, undo and redo, the three screen sizes. It reports each bug with steps and a screenshot. Each bug becomes a test that goes red, then a fix in the same PR.
+1. **Goldfish QA**, for any user-facing change. A subagent gets the ticket, its test grid and the URL of the app running the branch. It tries to break the feature in Chromium: every cell of the grid, odd input, the keyboard, undo and redo, the three screen sizes. It reports each bug with steps and a screenshot. Each bug becomes a test that goes red, then a fix in the same PR.
 2. `/code-review` against the ticket. Fix or answer every finding.
 3. The PR shows the evidence: screenshots, numbers, the tests run, and each QA finding with what happened to it. Merge once CI is green on the head.
 
