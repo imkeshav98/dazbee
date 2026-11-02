@@ -188,11 +188,39 @@ export function LayersPanel({ editor }: { editor: Editor }) {
   const first = view.from
   const last = Math.min(rows.length, view.to)
 
-  // The row keyboard focus is on: the one the arrows move from. Tab lands on it.
+  // The row keyboard focus was last on: the one the arrows move from.
   const [active, setActive] = useState<string | null>(null)
-  const current = active && indexOf.has(active) ? active : selection.ids.find((id) => indexOf.has(id)) ?? rows[0]?.id ?? null
+  // Whether the focus is in the tree: from a row taking it until a press or focus outside the tree.
+  const [inTree, setInTree] = useState(false)
+  // The row Tab lands on, the tree's one tab stop: while the focus is in the tree, the row it is on;
+  // from outside, the selected row the focus was last on, else the first selected row, else the row
+  // the focus was last on, else the first row.
+  const listedSelection = selection.ids.filter((id) => indexOf.has(id))
+  const current = active && indexOf.has(active) && (inTree || listedSelection.includes(active))
+    ? active
+    : listedSelection[0] ?? (active && indexOf.has(active) ? active : rows[0]?.id ?? null)
   // The row to focus once it is rendered, by id.
   const focusing = useRef<string | null>(null)
+  // The row the focus is on while it is in the tree, and its place in the list at the last commit.
+  const held = useRef<string | null>(null)
+  const heldAt = useRef(0)
+  // The layer of a row deleted while it had the focus: its row takes the focus again if it comes
+  // back, as on undo, until a press or focus outside the tree.
+  const gone = useRef<string | null>(null)
+  useEffect(() => {
+    const away = (event: Event) => {
+      if (event.target instanceof Node && scroller.current?.contains(event.target)) return
+      held.current = null
+      gone.current = null
+      setInTree(false)
+    }
+    document.addEventListener('pointerdown', away, true)
+    document.addEventListener('focusin', away, true)
+    return () => {
+      document.removeEventListener('pointerdown', away, true)
+      document.removeEventListener('focusin', away, true)
+    }
+  }, [])
   const [renaming, setRenaming] = useState<string | null>(null)
   const [drop, setDrop] = useState<{ id: string; where: Where } | null>(null)
   const dragged = useRef<string | null>(null)
@@ -211,11 +239,35 @@ export function LayersPanel({ editor }: { editor: Editor }) {
     setActive(id)
     focusing.current = id
   }, [indexOf, follow])
-  // Focuses the row asked for in the commit that renders it, so it reads the rows that commit put in
+  // Moves the focus off a row that left the list and back when it returns, then focuses the row
+  // asked for in the commit that renders it, so it reads the rows that commit put in
   // the page and no effect of an earlier render is left to run after a key. The focus moves only from
   // the panel or from the page itself, never out of a field or control elsewhere; a row no longer in
   // the list is no longer asked for.
   useLayoutEffect(() => {
+    // Focuses a row and selects it unless it is selected, so the focus and the selection agree.
+    const take = (id: string) => {
+      if (!selected.has(id)) editor.select([id], pageId, formatId)
+      reveal(id)
+    }
+    const before = document.activeElement
+    const dropped = !before || before === document.body || !before.isConnected
+    const lost = held.current
+    if (lost && !indexOf.has(lost)) {
+      // The row the focus was on left the list, as when its layer is deleted or grouped: the focus
+      // goes to the selected row, else to the row now in its place or the last row.
+      held.current = null
+      if (dropped) {
+        gone.current = design.nodes[lost] ? null : lost
+        const next = listedSelection[0] ?? rows[Math.min(heldAt.current, rows.length - 1)]?.id
+        if (next) take(next)
+      }
+    } else if (gone.current && indexOf.has(gone.current) && (dropped || scroller.current?.contains(before))) {
+      take(gone.current)
+      gone.current = null
+    }
+    if (held.current) heldAt.current = indexOf.get(held.current) ?? heldAt.current
+
     const id = focusing.current
     if (!id) return
     if (!indexOf.has(id)) {
@@ -339,14 +391,21 @@ export function LayersPanel({ editor }: { editor: Editor }) {
   // isn't rendered again when the view scrolls or another row changes.
   const latest = useRef<RowApi | null>(null)
   latest.current = {
-    focus: (id) => setActive(id),
+    focus: (id) => {
+      setActive(id)
+      setInTree(true)
+      held.current = id
+      heldAt.current = indexOf.get(id) ?? 0
+    },
     key: onKey,
     click: (id, add) => select(id, add),
     rename: (id) => setRenaming(id),
-    renamed: (id, name, before) => {
+    renamed: (id, name, before, byKey) => {
       setRenaming(null)
       if (name !== null && name.trim() && name.trim() !== before) editor.renameLayer(id, name)
-      reveal(id)
+      // Ended from the keyboard, the focus goes back to the row; ended by a click elsewhere, it
+      // stays where the click put it.
+      if (byKey) reveal(id)
     },
     toggle: (id) => toggle(id),
     lock: (id, locked) => editor.setLocked([id], locked),
@@ -390,8 +449,16 @@ export function LayersPanel({ editor }: { editor: Editor }) {
     const visible = Object.keys(design.formats).map((f) => (design.overrides[`format:${f}`]?.[id]?.visible ?? design.nodes[id]?.props.visible) !== false)
     return visible.some(Boolean) && !visible.every(Boolean)
   }
-  const shown = rows.slice(first, last)
-  const pictures = useLayerPictures(editor, `${pageId}/${formatId}`, shown.map((row) => row.id), scrolledAt)
+  // The rows in view, with the row Tab lands on and the row the focus was last on wherever they are,
+  // so the focus stays in the tree when its row scrolls away and Tab always reaches the tree.
+  const places = new Set<number>()
+  for (let i = first; i < last; i++) places.add(i)
+  for (const id of [current, active]) {
+    const at = id === null ? undefined : indexOf.get(id)
+    if (at !== undefined) places.add(at)
+  }
+  const shown = [...places].sort((a, b) => a - b).flatMap((i) => (rows[i] ? [{ row: rows[i], i }] : []))
+  const pictures = useLayerPictures(editor, `${pageId}/${formatId}`, shown.map(({ row }) => row.id), scrolledAt)
   return (
     <div className="flex min-h-0 flex-1 flex-col" data-testid="layers">
       {rows.length === 0
@@ -413,11 +480,11 @@ export function LayersPanel({ editor }: { editor: Editor }) {
               className="relative"
               style={{ height: rows.length * LAYER_ROW }}
             >
-              {shown.map((row, offset) => (
+              {shown.map(({ row, i }) => (
                 <LayerRow
                   key={row.id}
                   row={row}
-                  i={first + offset}
+                  i={i}
                   selected={selected.has(row.id)}
                   focusable={row.id === current}
                   renaming={renaming === row.id}
@@ -441,7 +508,7 @@ interface RowApi {
   key: (event: KeyboardEvent<HTMLElement>, row: Row, i: number) => void
   click: (id: string, add: boolean) => void
   rename: (id: string) => void
-  renamed: (id: string, name: string | null, before: string) => void
+  renamed: (id: string, name: string | null, before: string, byKey: boolean) => void
   toggle: (id: string) => void
   lock: (id: string, locked: boolean) => void
   hide: (id: string, hidden: boolean, everyFormat: boolean) => void
@@ -549,7 +616,7 @@ const LayerRow = memo(function LayerRow({ row, i, selected, focusable, renaming,
           <RenameField
             name={node.name}
             label={format(t.editor.layersPanel.rename, { name: node.name })}
-            onDone={(name) => api.renamed(id, name, node.name)}
+            onDone={(name, byKey) => api.renamed(id, name, node.name, byKey)}
           />
         )
         : <span data-testid="layer-name" className={cn('min-w-0 flex-1 truncate', hidden && 'line-through decoration-subtle/60')}>{node.name}</span>}
@@ -612,14 +679,17 @@ function RowToggle({ on, stay = false, label, title, state, onToggle, icon: Togg
   )
 }
 
-/** The name as a field: Enter or leaving it keeps the new name, Escape keeps the old one. */
-function RenameField({ name, label, onDone }: { name: string; label: string; onDone: (name: string | null) => void }) {
+/**
+ * The name as a field: Enter or leaving it keeps the new name, Escape keeps the old one. `onDone`
+ * hears whether it ended from the keyboard.
+ */
+function RenameField({ name, label, onDone }: { name: string; label: string; onDone: (name: string | null, byKey: boolean) => void }) {
   const [value, setValue] = useState(name)
   const done = useRef(false)
-  const finish = (next: string | null) => {
+  const finish = (next: string | null, byKey: boolean) => {
     if (done.current) return
     done.current = true
-    onDone(next)
+    onDone(next, byKey)
   }
   return (
     <input
@@ -634,10 +704,10 @@ function RenameField({ name, label, onDone }: { name: string; label: string; onD
       onClick={(event) => event.stopPropagation()}
       onKeyDown={(event) => {
         event.stopPropagation()
-        if (event.key === 'Enter') finish(value)
-        else if (event.key === 'Escape') finish(null)
+        if (event.key === 'Enter') finish(value, true)
+        else if (event.key === 'Escape') finish(null, true)
       }}
-      onBlur={() => finish(value)}
+      onBlur={() => finish(value, false)}
       className="h-6 min-w-0 flex-1 rounded-row border border-accent bg-raised px-1.5 text-[13px] outline-none"
     />
   )
