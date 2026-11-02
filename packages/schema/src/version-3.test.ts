@@ -44,10 +44,10 @@ describe('paint opacity and visibility', () => {
 })
 
 describe('migration from version 2', () => {
-  it('brings a version 2 design up as it is, at version 3', () => {
+  it('brings a version 2 design up as it is, at the current version', () => {
     const v2 = designWith([{ type: 'solid', color: '#FF0000FF' }], 2)
     const migrated = migrateDesign(v2) as ReturnType<typeof designWith>
-    expect(migrated.meta.schemaVersion).toBe(3)
+    expect(migrated.meta.schemaVersion).toBe(SCHEMA_VERSION)
     expect({ ...migrated, meta: { ...migrated.meta, schemaVersion: 2 } }).toEqual(v2)
     expect(parseDesign(v2).success).toBe(true)
   })

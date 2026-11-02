@@ -186,6 +186,7 @@ function blurBehind(ck: CanvasKit, canvas: Canvas, layer: SceneLayer, radius: nu
 function outlineOf(ck: CanvasKit, layer: SceneLayer): Path {
   if (layer.type === 'graphic') return shapePath(ck, layer)
   if (layer.type === 'boolean') return booleanPath(ck, layer)
+  if (layer.type === 'frame') return framePath(ck, layer.props)
   return rectPath(ck, layer.props)
 }
 
@@ -207,7 +208,7 @@ function drawContent(ck: CanvasKit, canvas: Canvas, layer: SceneLayer, resources
       return drawText(ck, canvas, layer, resources)
     case 'frame': {
       const { props } = layer
-      const path = rectPath(ck, props)
+      const path = framePath(ck, props)
       for (const fill of props.fills) fillPath(ck, canvas, path, fill, props, resources)
       canvas.save()
       if (props.clip) canvas.clipPath(path, ck.ClipOp.Intersect, true)
@@ -377,18 +378,41 @@ function withEffects(box: Box, effects: readonly Effect[]): Box {
 
 export const rectPath = (ck: CanvasKit, box: Box) => new ck.PathBuilder().addRect(ck.XYWHRect(box.x, box.y, box.width, box.height)).detachAndDelete()
 
+/** A box with rounded corners: each corner's own radius from the top left clockwise when given, else one for all. */
+function roundedRectPath(ck: CanvasKit, { x, y, width, height }: Box, cornerRadius: number, corners?: readonly [number, number, number, number]): Path {
+  if (corners) {
+    // Radii scaled down together where two corners would overlap, as CSS does. Built from arcs, not
+    // as an RRect: Skia's SVG writer clips to an RRect as a <rect> with the first corner's radius.
+    const sides = [[corners[0], corners[1], width], [corners[3], corners[2], width], [corners[0], corners[3], height], [corners[1], corners[2], height]] as const
+    const scale = Math.min(1, ...sides.map(([one, other, side]) => (one + other > 0 ? side / (one + other) : 1)))
+    const [tl, tr, br, bl] = corners.map((r) => r * scale) as [number, number, number, number]
+    const quarter = Math.SQRT1_2
+    const builder = new ck.PathBuilder()
+      .moveTo(x + tl, y)
+      .lineTo(x + width - tr, y)
+      .conicTo(x + width, y, x + width, y + tr, quarter)
+      .lineTo(x + width, y + height - br)
+      .conicTo(x + width, y + height, x + width - br, y + height, quarter)
+      .lineTo(x + bl, y + height)
+      .conicTo(x, y + height, x, y + height - bl, quarter)
+      .lineTo(x, y + tl)
+      .conicTo(x, y, x + tl, y, quarter)
+    builder.close()
+    return builder.detachAndDelete()
+  }
+  const r = Math.min(cornerRadius, width / 2, height / 2)
+  return new ck.PathBuilder().addRRect(ck.RRectXY(ck.XYWHRect(x, y, width, height), r, r)).detachAndDelete()
+}
+
+/** A frame's outline, its fills and its clip: its box with its corners. */
+export const framePath = (ck: CanvasKit, props: Box & { cornerRadius: number; corners?: readonly [number, number, number, number] | undefined }) =>
+  roundedRectPath(ck, props, props.cornerRadius, props.corners)
+
 function shapePath(ck: CanvasKit, layer: GraphicLayer): Path {
   const { x, y, width, height, shape } = layer.props
   switch (shape.kind) {
-    case 'rect': {
-      if (shape.corners) {
-        // Skia scales radii down together when two corners would overlap, as CSS does.
-        const [a, b, c, d] = shape.corners
-        return new ck.PathBuilder().addRRect(Float32Array.of(x, y, x + width, y + height, a, a, b, b, c, c, d, d)).detachAndDelete()
-      }
-      const r = Math.min(shape.cornerRadius, width / 2, height / 2)
-      return new ck.PathBuilder().addRRect(ck.RRectXY(ck.XYWHRect(x, y, width, height), r, r)).detachAndDelete()
-    }
+    case 'rect':
+      return roundedRectPath(ck, { x, y, width, height }, shape.cornerRadius, shape.corners)
     case 'ellipse':
       return new ck.PathBuilder().addOval(ck.XYWHRect(x, y, width, height)).detachAndDelete()
     case 'polygon':

@@ -166,6 +166,76 @@ const CORNERS = ['tl', 'tr', 'br', 'bl'] as const
  */
 const CORNER_FIELDS = [0, 1, 3, 2] as const
 
+/** Corners as a rectangle and a frame keep them: one radius, or each corner's own. */
+type Corners = { cornerRadius?: number | undefined; corners?: readonly number[] | undefined }
+
+/**
+ * A box's corners: one radius for all, or with "Each corner its own" a radius for each, starting at
+ * the one radius they had. `read` finds the corners in a layer's props and `write` puts them back.
+ */
+function CornerFields({ target, p, read, write }: { target: Target; p: P; read: (props: Props) => Corners; write: (now: Props, next: Corners) => Patch }) {
+  const all = target.props.map(read)
+  const each = all.every((c) => c.corners)
+  const radius = (n: number) => clamp(Math.round(n), 0, 200)
+  const eachCorner = (on: boolean) => set(target, (now) => {
+    const { cornerRadius = 0, corners } = read(now)
+    return write(now, on ? { corners: [cornerRadius, cornerRadius, cornerRadius, cornerRadius] } : { cornerRadius: corners?.[0] ?? cornerRadius, corners: undefined })
+  })
+  const setCorner = (i: number, to: (r: number) => number) => set(target, (now) => {
+    const corners = [...(read(now).corners ?? [0, 0, 0, 0])]
+    corners[i] = tidy(Math.max(0, to(corners[i] ?? 0)))
+    return write(now, { corners })
+  })
+  return (
+    <>
+      {!each && (
+        <div className={KNOBS}>
+          <NumberField
+            label={p.cornerRadius}
+            name={p.cornerRadius}
+            value={shared(all.map((c) => c.cornerRadius ?? 0))}
+            min={0}
+            max={200}
+            editor={target.editor}
+            onSet={(n) => set(target, (now) => write(now, { cornerRadius: radius(n) }))}
+            onShift={(by) => set(target, (now) => write(now, { cornerRadius: radius((read(now).cornerRadius ?? 0) + by) }))}
+          />
+        </div>
+      )}
+      <SwitchRow name={p.eachCorner} on={each} onSet={eachCorner} />
+      {each && (
+        <div dir="ltr" className={KNOBS}>
+          {CORNER_FIELDS.map((i) => (
+            <NumberField
+              key={CORNERS[i]}
+              label={p.cornersShort[CORNERS[i]]}
+              name={p.corners[CORNERS[i]]}
+              value={shared(all.map((c) => c.corners?.[i]))}
+              min={0}
+              editor={target.editor}
+              onSet={(v) => setCorner(i, () => v)}
+              onShift={(by) => setCorner(i, (r) => r + by)}
+            />
+          ))}
+        </div>
+      )}
+    </>
+  )
+}
+
+/** A rectangle's corners live in its shape; a key set to undefined leaves the shape. */
+const shapeCorners = {
+  read: (props: Props) => props.shape as Corners,
+  write: (now: Props, next: Corners): Patch => ({
+    shape: Object.fromEntries(Object.entries({ ...(now.shape as Record<string, unknown>), ...next }).filter(([, v]) => v !== undefined)),
+  }),
+}
+/** A frame keeps its corners among its own props. */
+const frameCorners = {
+  read: (props: Props) => ({ cornerRadius: props.cornerRadius as number | undefined, corners: props.corners as readonly number[] | undefined }),
+  write: (_now: Props, next: Corners): Patch => next,
+}
+
 /**
  * A shape's own settings (#151), for layers that are all the same kind: a rectangle's corner radius
  * or each corner's own, a polygon's sides, a star's points and inner radius, a line's ends.
@@ -193,18 +263,6 @@ function ShapeCard({ target, p, kind }: { target: Target; p: P; kind: ShapeKind 
       />
     )
   }
-  // A rectangle with each corner's own radius keeps them in its corners; one radius for all drops them.
-  const each = kind === 'rect' && shapes.every((s) => s.kind === 'rect' && s.corners)
-  const eachCorner = (on: boolean) => set(target, (now) => {
-    const { corners, ...rest } = now.shape as Record<string, unknown>
-    const r = (rest.cornerRadius as number | undefined) ?? 0
-    return { shape: on ? { ...rest, corners: [r, r, r, r] } : { ...rest, cornerRadius: (corners as number[] | undefined)?.[0] ?? r } }
-  })
-  const setCorner = (i: number, to: (r: number) => number) => setShape((now) => {
-    const corners = [...((now.corners as number[] | undefined) ?? [0, 0, 0, 0])]
-    corners[i] = tidy(Math.max(0, to(corners[i] ?? 0)))
-    return { corners }
-  })
   return (
     <Card id="shape-card" title={p.shapeKinds[kind]} note={target.names.join(', ')}>
       {kind === 'line'
@@ -230,26 +288,9 @@ function ShapeCard({ target, p, kind }: { target: Target; p: P; kind: ShapeKind 
               {kind === 'polygon' && knob('sides', p.sides, { min: 3, max: 24 })}
               {kind === 'star' && knob('points', p.points, { min: 3, max: 24 })}
               {kind === 'star' && knob('innerRadius', p.innerRadius, { min: 0.05, max: 0.95, scale: 100, unit: '%', whole: false })}
-              {!each && knob('cornerRadius', p.cornerRadius, { min: 0, max: 200 })}
+              {kind !== 'rect' && knob('cornerRadius', p.cornerRadius, { min: 0, max: 200 })}
             </div>
-            {kind === 'rect' && <SwitchRow name={p.eachCorner} on={each} onSet={eachCorner} />}
-            <div dir="ltr" className={cn(KNOBS, 'empty:hidden')}>
-              {each && CORNER_FIELDS.map((i) => CORNERS[i]).map((corner, n) => {
-                const i = CORNER_FIELDS[n] ?? 0
-                return (
-                  <NumberField
-                    key={corner}
-                    label={p.cornersShort[corner]}
-                    name={p.corners[corner]}
-                    value={shared(shapes.map((s) => (s.kind === 'rect' ? s.corners?.[i] : undefined)))}
-                    min={0}
-                    editor={target.editor}
-                    onSet={(v) => setCorner(i, () => v)}
-                    onShift={(by) => setCorner(i, (r) => r + by)}
-                  />
-                )
-              })}
-            </div>
+            {kind === 'rect' && <CornerFields target={target} p={p} {...shapeCorners} />}
           </>
         )}
     </Card>
@@ -828,6 +869,7 @@ const PLACES: Place[] = ['start', 'center', 'end']
 function FrameCard({ target, p }: { target: Target; p: P }) {
   return (
     <Card id="frame-card" title={p.frame}>
+      <CornerFields target={target} p={p} {...frameCorners} />
       <SwitchRow name={p.clip} on={shared(target.props.map((pr) => pr.clip !== false))} onSet={(clip) => set(target, () => ({ clip }))} />
     </Card>
   )
@@ -956,7 +998,7 @@ type OwnGroup = keyof P['ownGroups']
 const OWN_GROUP: Record<string, OwnGroup> = {
   x: 'layout', y: 'layout', width: 'layout', height: 'layout', rotation: 'layout', sizing: 'layout', absolute: 'layout',
   opacity: 'appearance', blendMode: 'appearance', visible: 'appearance',
-  fills: 'fill', strokes: 'stroke', effects: 'effects', shape: 'shape',
+  fills: 'fill', strokes: 'stroke', effects: 'effects', shape: 'shape', cornerRadius: 'shape', corners: 'shape',
   text: 'text', runs: 'text', style: 'text', align: 'text', verticalAlign: 'text', direction: 'text', boxMode: 'text', list: 'text', paragraphSpacing: 'text', maxLines: 'text', shrinkToFit: 'text',
   layout: 'autoLayout',
 }
