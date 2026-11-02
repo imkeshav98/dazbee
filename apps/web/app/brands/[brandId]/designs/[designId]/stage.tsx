@@ -8,6 +8,7 @@ import { FocusChip, NoticeToast, UndoToast } from '../../../../../components/edi
 import { useLocale, useMessages } from '../../../../../lib/i18n/client.tsx'
 import { format } from '../../../../../lib/i18n/index.ts'
 import { placeAsset } from '../../../../../lib/place-asset.ts'
+import { carriesFiles, dragFills, dropAt, isAssetFile, placeDroppedFiles } from '../../../../../lib/drop-files.ts'
 import { PropertyCards } from '../../../../../components/editor/property-cards.tsx'
 import { ZoomControl } from '../../../../../components/editor/zoom-control.tsx'
 import { SelectionBar, StageMenu } from '../../../../../components/editor/selection-bar.tsx'
@@ -110,7 +111,7 @@ export function EditorStage({ designId, designName, brandId, brandName, everyBra
   const notices = useMessages().editor.notices
   const svgParts = useMessages().editor.svgParts
   const locale = useLocale()
-  const [notice, setNotice] = useState<{ text: string; at: number } | null>(null)
+  const [notice, setNotice] = useState<{ text: string; at: number; lasting?: boolean } | null>(null)
   // A right-click on a layer: where, for the menu of its actions, and a count so each right-click opens its own.
   const [menuAt, setMenuAt] = useState<{ x: number; y: number; n: number } | null>(null)
   const dismissNotice = useCallback(() => setNotice(null), [])
@@ -142,6 +143,32 @@ export function EditorStage({ designId, designName, brandId, brandName, everyBra
   }, [editor])
   const dockTool = isShapeTool(tool) ? 'shape' : tool
   const dismissRemoved = useCallback(() => setRemoved(null), [])
+
+  // Files dropped from the computer: the images upload into the library and go where they were
+  // dropped. The notice says what was left out and stays while the rest upload, then says what was
+  // left out, what didn't upload and what wasn't placed. The library, if open, shows the uploads.
+  const dropped = useMessages().editor.droppedFiles
+  const [uploaded, setUploaded] = useState(0)
+  const dropFiles = (files: File[], client: { x: number; y: number }) => {
+    if (!editor) return
+    const list = (items: string[]) => new Intl.ListFormat(locale, { type: 'conjunction' }).format(items)
+    const take = files.filter(isAssetFile)
+    const left = files.filter((file) => !isAssetFile(file))
+    const leftOut = left.length > 0 ? format(dropped.notImages, { names: list(left.map((file) => file.name)) }) : ''
+    const at = Date.now()
+    if (!take[0]) {
+      if (leftOut) setNotice({ text: leftOut, at })
+      return
+    }
+    const uploading = take.length === 1 ? format(dropped.uploading, { name: take[0].name }) : format(dropped.uploadingMany, { n: take.length })
+    setNotice({ text: [leftOut, uploading].filter(Boolean).join(' '), at, lasting: true })
+    void placeDroppedFiles(editor, brandId, take, dropAt(editor, client, files)).then(({ failed, unplaced }) => {
+      setUploaded((n) => n + 1)
+      const didntUpload = failed.length > 0 ? format(dropped.failed, { files: list(failed.map((file) => format(dropped.failedFile, file))) }) : ''
+      const text = [leftOut, didntUpload, unplaced > 0 ? dropped.offPage : ''].filter(Boolean).join(' ')
+      setNotice((now) => (text ? { text, at } : now?.at === at ? null : now))
+    })
+  }
 
   // The stage's edges the capsule, cards and dock cover (#83): the editor fits the ads between
   // them. The first time they are known the design is fitted again, since it opened fitted to the
@@ -240,12 +267,13 @@ export function EditorStage({ designId, designName, brandId, brandName, everyBra
       fitted={editor !== null && fittedTo === editor}
       actions={editor ? <ShareMenu editor={editor} brandId={brandId} brandName={brandName} designName={name} everyBrand={everyBrand} /> : undefined}
       account={account}
-      panels={editor ? { layers: <LayersPanel editor={editor} />, assets: <AssetLibrary editor={editor} brandId={brandId} />, brand: <BrandKitPanel editor={editor} brandId={brandId} /> } : {}}
+      panels={editor ? { layers: <LayersPanel editor={editor} />, assets: <AssetLibrary editor={editor} brandId={brandId} changed={uploaded} />, brand: <BrandKitPanel editor={editor} brandId={brandId} /> } : {}}
       inspector={editor ? <PropertyCards editor={editor} brandId={brandId} onRemoved={setRemoved} /> : undefined}
     >
       {/* The design is a picture, so it never mirrors: the stage stays left to right in Arabic too. */}
       {/* An asset dragged from the library lands where it is dropped (#52): into the shape it is
-          dropped on, lit while it is over it, or as a new layer. */}
+          dropped on, lit while it is over it, or as a new layer. Image files dropped from the
+          computer upload first, then land the same way. */}
       <div
         dir="ltr"
         className="absolute inset-0"
@@ -257,7 +285,14 @@ export function EditorStage({ designId, designName, brandId, brandName, everyBra
           setMenuAt((now) => (ids.length > 0 ? { x: e.clientX - box.left, y: e.clientY - box.top, n: (now?.n ?? 0) + 1 } : null))
         }}
         onDragOver={(e) => {
-          if (!editor || !e.dataTransfer.types.includes(ASSET_DRAG_TYPE)) return
+          if (!editor) return
+          if (!e.dataTransfer.types.includes(ASSET_DRAG_TYPE) && carriesFiles(e.dataTransfer)) {
+            e.preventDefault()
+            e.dataTransfer.dropEffect = 'copy'
+            editor.imageTarget(dragFills(e.dataTransfer) ? { x: e.clientX, y: e.clientY } : null)
+            return
+          }
+          if (!e.dataTransfer.types.includes(ASSET_DRAG_TYPE)) return
           e.preventDefault()
           e.dataTransfer.dropEffect = 'copy'
           // An SVG file becomes layers of its own, so no shape lights up to take it.
@@ -268,6 +303,12 @@ export function EditorStage({ designId, designName, brandId, brandName, everyBra
         }}
         onDrop={(e) => {
           const asset = editor && draggedAsset(e)
+          if (editor && !asset && carriesFiles(e.dataTransfer)) {
+            e.preventDefault()
+            editor.imageTarget(null)
+            dropFiles([...e.dataTransfer.files], { x: e.clientX, y: e.clientY })
+            return
+          }
           if (!asset) return
           e.preventDefault()
           const at = { x: e.clientX, y: e.clientY }
@@ -285,7 +326,7 @@ export function EditorStage({ designId, designName, brandId, brandName, everyBra
         </div>
         <div className="pointer-events-none absolute start-4 bottom-4 z-10">
           {editor && removed && <UndoToast key={removed} editor={editor} message={removed} onDone={dismissRemoved} />}
-          {!removed && notice && <NoticeToast key={notice.at} message={notice.text} onDone={dismissNotice} />}
+          {!removed && notice && <NoticeToast key={notice.at} message={notice.text} onDone={dismissNotice} lasting={notice.lasting ?? false} />}
         </div>
       </div>
       <StageZoom editor={editor} store={zoom} />

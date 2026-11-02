@@ -85,6 +85,8 @@ interface Editing extends Picked { caret: TextAnchor; anchor: TextAnchor; endGes
 export type Tool = 'select' | 'hand' | 'pen' | 'text' | 'frame' | 'image' | ShapeTool
 /** An image asset as the editor places it. */
 export interface PlacedAsset { id: string; name: string; width: number; height: number }
+/** A point on the design: a frame, as `<pageId>/<formatId>`, and a point in it in design pixels. */
+export interface Spot { frame: string; x: number; y: number }
 
 /** The share of a frame's shorter side a placed SVG may take before it is scaled down to it. */
 const SVG_ROOM = 0.6
@@ -1874,7 +1876,10 @@ function live(
     showCursor()
   }
 
+  /** Whether a press on the stage is held, from its pointerdown until it ends. */
+  let pressing = false
   canvas.addEventListener('pointerdown', (e) => {
+    pressing = true
     // Middle button, space or the hand tool pan; nothing else does.
     if (e.button === 1 || (e.button === 0 && panning())) {
       e.preventDefault()
@@ -2446,6 +2451,7 @@ function live(
   }
 
   const endDrag = () => {
+    pressing = false
     snapped = null
     if (pen && !pan) {
       penUp()
@@ -2487,11 +2493,17 @@ function live(
     showCursor()
     drawOverlay()
   }
-  canvas.addEventListener('pointerup', endDrag, on)
-  canvas.addEventListener('pointercancel', () => {
+  const cancelDrag = () => {
     // A drag the browser took away drops nothing into a flow.
     if (gesture?.kind === 'reorder') gesture.moved = false
     endDrag()
+  }
+  canvas.addEventListener('pointerup', endDrag, on)
+  canvas.addEventListener('pointercancel', cancelDrag, on)
+  // A press whose pointer capture goes without a pointerup or pointercancel, as when another
+  // element takes the pointer, ends as a cancelled one does; after either, nothing is held.
+  canvas.addEventListener('lostpointercapture', () => {
+    if (pressing) cancelDrag()
   }, on)
   canvas.addEventListener('pointerleave', () => {
     pointer = null
@@ -3103,22 +3115,22 @@ function live(
 
   /**
    * Places an SVG file as layers: a group of path, text and mask layers drawn as the file
-   * is, in one undo step. It goes centred at `client`, in client coordinates, or at the pointer when
-   * `atPointer`, or else in the middle of the frame in view; a file larger than SVG_ROOM of the
+   * is, in one undo step. It goes centred on `spot`, or at `client`, in client coordinates, or at the
+   * pointer when `atPointer`, or else in the middle of the frame in view; a file larger than SVG_ROOM of the
    * frame's shorter side is scaled down to it; what the file had that no layer shows is noticed.
    * Returns the group's id, or null when it placed nothing: there is no frame to put it in, or the
    * file can't be read, which is noticed too.
    */
-  function placeSvg(text: string, name: string, where: { client?: Point; atPointer?: boolean }): string | null {
+  function placeSvg(text: string, name: string, where: { client?: Point; atPointer?: boolean; spot?: Spot }): string | null {
     const rect = canvas.getBoundingClientRect()
     const client = where.client ?? (where.atPointer && pointer ? { x: pointer.clientX, y: pointer.clientY } : undefined)
     const screen = client ? { x: client.x - rect.left, y: client.y - rect.top } : centre()
     const world = toWorld(camera, screen)
-    const under = frameAt(grid.frames, world)
-    const frame = client ? under ?? frameOf(selection?.frame) : under ?? frameOf(selection?.frame) ?? grid.frames[0]
+    const under = where.spot ? frameOf(where.spot.frame) : frameAt(grid.frames, world)
+    const frame = where.spot ? under : client ? under ?? frameOf(selection?.frame) : under ?? frameOf(selection?.frame) ?? grid.frames[0]
     if (!frame) return null
     const inside = client && under?.key === frame.key
-    const at = inside ? { x: world.x - frame.x, y: world.y - frame.y } : { x: frame.width / 2, y: frame.height / 2 }
+    const at = where.spot ? { x: where.spot.x, y: where.spot.y } : inside ? { x: world.x - frame.x, y: world.y - frame.y } : { x: frame.width / 2, y: frame.height / 2 }
     let made: ReturnType<typeof svgToLayers>
     try {
       const natural = svgToLayers(ck, text, { name })
@@ -3669,19 +3681,21 @@ function live(
       return changed
     },
     /**
-     * Places an image asset as a graphic filled with it (#52), in one undo step: centred where
-     * `client` is, in client coordinates, or else in the middle of the frame in the middle of the view.
-     * The image's bytes load in the background. Returns the new layer's id, or null when the point
-     * is on no frame.
+     * Places an image asset as a graphic filled with it (#52), in one undo step: centred on `where`,
+     * a spot or a point in client coordinates, or else in the middle of the frame in the middle of
+     * the view. The image's bytes load in the background. Returns the new layer's id, or null when
+     * the point is on no frame.
      */
-    placeImage(asset: { id: string; name: string; width: number; height: number }, client?: Point): string | null {
+    placeImage(asset: { id: string; name: string; width: number; height: number }, where?: Point | Spot): string | null {
+      const spot = where && 'frame' in where ? where : null
+      const client = spot ? undefined : where
       const rect = canvas.getBoundingClientRect()
       const screen = client ? { x: client.x - rect.left, y: client.y - rect.top } : centre()
       const world = toWorld(camera, screen)
-      const under = frameAt(grid.frames, world)
-      const frame = client ? under : under ?? frameOf(selection?.frame) ?? grid.frames[0]
+      const under = spot ? frameOf(spot.frame) : frameAt(grid.frames, world)
+      const frame = spot || client ? under : under ?? frameOf(selection?.frame) ?? grid.frames[0]
       if (!frame) return null
-      const at = client ? { x: world.x - frame.x, y: world.y - frame.y } : { x: frame.width / 2, y: frame.height / 2 }
+      const at = spot ? { x: spot.x, y: spot.y } : client ? { x: world.x - frame.x, y: world.y - frame.y } : { x: frame.width / 2, y: frame.height / 2 }
       stopEditing()
       let id = ''
       if (!runQuietly(() => { id = session.run('node.create', { parentId: frame.pageId, layer: newImage(asset, at, frame) }) })) return null
@@ -3689,7 +3703,32 @@ function live(
       select([id], frame.key)
       return id
     },
-    placeSvg: (text: string, name: string, client?: Point) => placeSvg(text, name, client ? { client } : {}),
+    placeSvg: (text: string, name: string, where?: Point | Spot) => placeSvg(text, name, !where ? {} : 'frame' in where ? { spot: where } : { client: where }),
+    /** The spot under a point on screen, in client coordinates: the frame there and the point in it. Null off every frame. */
+    spotAt(client: Point): Spot | null {
+      const rect = canvas.getBoundingClientRect()
+      const world = toWorld(camera, { x: client.x - rect.left, y: client.y - rect.top })
+      const frame = frameAt(grid.frames, world)
+      return frame ? { frame: frame.key, x: world.x - frame.x, y: world.y - frame.y } : null
+    },
+    /** Ends typing into a text layer, if one is being typed into, closing its undo step. */
+    stopEditing: () => {
+      if (!editing) return
+      stopEditing()
+      drawOverlay()
+    },
+    /**
+     * Ends what stays open on the stage until a key ends it, closing its undo step: typing, and a
+     * pen path, which keeps the anchors placed so far, as Enter does.
+     */
+    settle() {
+      if (!editing && !pen) return
+      stopEditing()
+      finishPen()
+      drawOverlay()
+    },
+    /** Whether the editor has been destroyed. */
+    destroyed: () => listening.signal.aborted,
     /**
      * Outlines the layer an image dragged over the stage at `client` would go into, or clears the
      * outline with null. Returns that layer's id, or null where a drop makes a new layer.
@@ -3706,16 +3745,17 @@ function live(
      * Puts an image into a layer as its fill, in every format, as one undo step: in place of its
      * topmost image fill (keeping its fit, adjustments and filter, the crop reset), or on top of its
      * fills when it has none. A format with fills of its own gets the image in them too, keeping its
-     * colours; a fill bound to a brand colour stays bound. The layer is selected. False when it
-     * can't take one, such as a layer whose style is locked.
+     * colours; a fill bound to a brand colour stays bound. The layer is selected, in `inFrame` when
+     * given, as `<pageId>/<formatId>`. False when it can't take one, such as a layer whose style is
+     * locked.
      */
-    fillWithImage(id: string, asset: PlacedAsset): boolean {
+    fillWithImage(id: string, asset: PlacedAsset, inFrame?: string): boolean {
       const now = session.design()
       const node = now.nodes[id]
       if (!node || !('fills' in node.props) || node.lock?.style) return false
       const fills = node.props.fills as Paint[]
       const page = pageOf(now, id)
-      const near = [dropTarget?.id === id ? dropTarget.frame : undefined, selection?.frame].map(frameOf).find((f) => f?.pageId === page)
+      const near = [inFrame, dropTarget?.id === id ? dropTarget.frame : undefined, selection?.frame].map(frameOf).find((f) => f?.pageId === page)
       const frame = near ?? frameOf(`${page}/${now.meta.primaryFormatId}`)
       dropTarget = null
       stopEditing()

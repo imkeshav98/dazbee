@@ -162,6 +162,14 @@ export const ar: Messages = {
       'text-path': 'النص على مسار',
       'external-reference': 'الروابط إلى ملفات أخرى',
     },
+    droppedFiles: {
+      uploading: 'جارٍ رفع {name}',
+      uploadingMany: 'جارٍ رفع الصور ({n})',
+      notImages: 'لم يوضع ما يلي، إذ لا يوضع على التصميم إلا ملفات PNG وJPEG وWebP وSVG: {names}.',
+      failed: 'تعذّر رفع: {files}.',
+      failedFile: '{name} ({reason})',
+      offPage: 'رُفعت إلى المكتبة. أفلت الصورة على صفحة لوضعها فيها.',
+    },
     imageTool: {
       title: 'ضع صورة',
       upload: 'ارفع من الجهاز',

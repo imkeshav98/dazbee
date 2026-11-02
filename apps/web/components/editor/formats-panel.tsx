@@ -342,12 +342,16 @@ export function UndoToast({ editor, message, onDone }: { editor: Editor; message
   )
 }
 
-/** Says why a gesture did nothing, such as a nudge auto layout decides; it goes after a few seconds. */
-export function NoticeToast({ message, onDone }: { message: string; onDone: () => void }) {
+/**
+ * Says why a gesture did nothing, such as a nudge auto layout decides; it goes after a few seconds.
+ * A `lasting` one, such as files uploading, stays until its message changes or it is taken away.
+ */
+export function NoticeToast({ message, onDone, lasting = false }: { message: string; onDone: () => void; lasting?: boolean }) {
   useEffect(() => {
+    if (lasting) return
     const timer = setTimeout(onDone, TOAST_MS)
     return () => clearTimeout(timer)
-  }, [message, onDone])
+  }, [message, onDone, lasting])
   return (
     <div role="status" data-testid="notice-toast" className={cn(TOAST, 'pe-3.5')}>
       <InfoIcon size={14} aria-hidden className="shrink-0 text-subtle" />

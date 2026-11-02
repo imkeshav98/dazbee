@@ -64,7 +64,8 @@ async function remove(brandId: string, id: string): Promise<AssetUse[] | null> {
   throw new Error(body && typeof body === 'object' && 'error' in body && typeof body.error === 'string' ? body.error : `${response.status}`)
 }
 
-export function AssetLibrary({ editor, brandId }: { editor: Editor; brandId: string }) {
+/** `changed` counts uploads made elsewhere, such as files dropped on the stage; each change lists the assets again. */
+export function AssetLibrary({ editor, brandId, changed = 0 }: { editor: Editor; brandId: string; changed?: number }) {
   const t = useMessages().editor.assetLibrary
   const [query, setQuery] = useState('')
   const [assets, setAssets] = useState<AssetSummary[] | null>(null)
@@ -91,7 +92,7 @@ export function AssetLibrary({ editor, brandId }: { editor: Editor; brandId: str
       clearTimeout(timer)
       ask.abort()
     }
-  }, [brandId, query, version])
+  }, [brandId, query, version, changed])
 
   const upload = useCallback((files: File[]) => {
     for (const file of files) {

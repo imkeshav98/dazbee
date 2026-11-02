@@ -9,7 +9,7 @@ import { DotsSixVerticalIcon, EyeIcon, EyeSlashIcon, ImageIcon, MinusIcon, PlusI
 import * as Popover from '@radix-ui/react-popover'
 import type { Editor } from '@dazbee/editor'
 import type { Paint } from '@dazbee/schema'
-import { useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from 'react'
 import { cn } from '../../lib/cn.ts'
 import { useLocale, useMessages } from '../../lib/i18n/client.tsx'
 import { dirOf, format, type Messages } from '../../lib/i18n/index.ts'
@@ -134,7 +134,7 @@ function GradientBar({ paint, picked, onPick, editor, p, onSet }: {
   onSet: (to: (now: Gradient) => Gradient) => void
 }) {
   const bar = useRef<HTMLDivElement>(null)
-  const drag = useRef<{ i: number; end: () => void } | null>(null)
+  const drag = useRef<{ i: number; count: number; end: () => void } | null>(null)
   const at = (clientX: number) => {
     const box = bar.current?.getBoundingClientRect()
     return box ? tidy(clamp((clientX - box.left) / box.width, 0, 1)) : 0
@@ -157,8 +157,20 @@ function GradientBar({ paint, picked, onPick, editor, p, onSet }: {
     at.end()
     drag.current = null
   }
+  /** Ends a drag's undo step where it is, the stops left as they are. */
+  const dropDrag = () => {
+    drag.current?.end()
+    drag.current = null
+  }
+  // A drag ends when a stop comes or goes while it is held, since the stop it holds may have moved
+  // to another place in the list, and when the bar closes.
+  useEffect(() => {
+    if (drag.current && drag.current.count !== paint.stops.length) dropDrag()
+  })
+  useEffect(() => dropDrag, [])
   const remove = (i: number) => {
     if (paint.stops.length <= 2) return
+    dropDrag()
     onSet((now) => ({ ...now, stops: now.stops.filter((_, j) => j !== i) }))
     onPick(Math.max(0, i - 1))
   }
@@ -190,13 +202,14 @@ function GradientBar({ paint, picked, onPick, editor, p, onSet }: {
               e.stopPropagation()
               onPick(i)
               e.currentTarget.setPointerCapture(e.pointerId)
-              drag.current = { i, end: editor.beginGesture() }
+              drag.current = { i, count: paint.stops.length, end: editor.beginGesture() }
             }}
             onPointerMove={(e) => {
               if (drag.current?.i === i) move(i, at(e.clientX))
             }}
             onPointerUp={endDrag}
             onPointerCancel={endDrag}
+            onLostPointerCapture={endDrag}
             onKeyDown={(e: KeyboardEvent) => {
               const step = e.shiftKey ? 0.1 : 0.01
               if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
