@@ -1,6 +1,6 @@
 // A path in a box of another size than it was drawn in is drawn scaled to fit (#278): the same
 // pixels as its data drawn at that size, in each format, on the CPU surface and in the PDF and SVG.
-// A path with no size of its own is drawn at its own size, as before.
+// A path with no box it was drawn in is drawn at its own size, as before.
 import { PDFiumLibrary } from '@hyzyla/pdfium'
 import { renderDesign, renderVector } from '@dazbee/renderer'
 import { loadCanvasKit } from '@dazbee/renderer/node'
@@ -32,7 +32,7 @@ const design = (shape: Record<string, unknown>, box: { width: number; height: nu
 
 describe('path scale', () => {
   it('draws a path scaled to its box as its data drawn at that size, on the CPU and in PDF and SVG', () => {
-    const scaled = design({ d: D, size: { width: 100, height: 50 } }, { width: 300, height: 100 })
+    const scaled = design({ d: D, drawnIn: { width: 100, height: 50 } }, { width: 300, height: 100 })
     const drawnAtSize = design({ d: D_SCALED }, { width: 300, height: 100 })
     const a = renderDesign(ck, scaled, 'p1', 'f', bytes)
     const b = renderDesign(ck, drawnAtSize, 'p1', 'f', bytes)
@@ -40,7 +40,7 @@ describe('path scale', () => {
   })
 
   it('scales each format by its own box', () => {
-    const json = design({ d: D, size: { width: 100, height: 50 } }, { width: 100, height: 50 }, { width: 300, height: 100 })
+    const json = design({ d: D, drawnIn: { width: 100, height: 50 } }, { width: 100, height: 50 }, { width: 300, height: 100 })
     const base = renderDesign(ck, json, 'p1', 'f', bytes)
     const wide = renderDesign(ck, json, 'p1', 'w', bytes)
     expect(comparePixels(renderDesign(ck, design({ d: D }, { width: 100, height: 50 }), 'p1', 'f', bytes), base).differing).toBe(0)
@@ -48,7 +48,7 @@ describe('path scale', () => {
   })
 
   it('exports a scaled path as it is drawn, in PDF and SVG', async () => {
-    const json = design({ d: D, size: { width: 100, height: 50 } }, { width: 300, height: 100 })
+    const json = design({ d: D, drawnIn: { width: 100, height: 50 } }, { width: 300, height: 100 })
     const cpu = renderDesign(ck, json, 'p1', 'f', bytes)
     const pdf = await rasterisePdf(pdfium, renderVector(ck, json, 'p1', 'f', bytes, 'pdf'))
     const svg = rasteriseSvg(renderVector(ck, json, 'p1', 'f', bytes, 'svg'))
@@ -56,7 +56,7 @@ describe('path scale', () => {
     expect(vectorDifference(cpu, svg)).toBeLessThan(1)
   })
 
-  it('draws a path with no size at its own size, whatever its box', () => {
+  it('draws a path with no box it was drawn in at its own size, whatever its box', () => {
     const unsized = renderDesign(ck, design({ d: D }, { width: 300, height: 100 }), 'p1', 'f', bytes)
     const atOwnSize = renderDesign(ck, design({ d: D }, { width: 100, height: 50 }), 'p1', 'f', bytes)
     // The gradient spans the box, so only the outline is compared: where each draws anything at all.

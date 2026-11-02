@@ -97,7 +97,7 @@ const POINT_REACH = 6
 const PEN_STROKE = { paint: { type: 'solid', color: '#1F2329FF' }, width: 2, cap: 'round', join: 'round' }
 
 /** A path layer being drawn or edited: the box it had when that began, which its points are relative to, and how far the box has moved since. */
-interface Reshaping { id: string; start: Box; applied: Point }
+interface Reshaping { id: string; start: Box; applied: Point; scope: string }
 
 /** Something the editor tells the person, for the page to show: a gesture that auto layout decides instead. */
 /** Something the page should say: why a gesture did nothing, or how placing an SVG went. */
@@ -685,8 +685,11 @@ function live(
     const shape = { ...node.props, ...from.overrides[scope(frame)]?.[id] }.shape
     if (shape.kind !== 'path') return null
     try {
-      // As it is drawn: scaled from the box it was drawn in to this one.
-      const { sx, sy } = pathScale(shape, box.width, box.height)
+      // As it is drawn: scaled from the box it was drawn in to this one. A box squashed flat on an
+      // axis keeps the data's length there, so editing it never loses the points.
+      const scale = pathScale(shape, box.width, box.height)
+      const sx = scale.sx || 1
+      const sy = scale.sy || 1
       return { path: offsetPath(scalePath(parsePath(shape.d), sx, sy), box.x, box.y), box, around: [...containersOf(frame, node.parentId, from), box] }
     } catch {
       return null
@@ -701,7 +704,7 @@ function live(
     if (!b) return
     const corner = { x: round(b.x), y: round(b.y) }
     const moved = { x: round(corner.x - layer.start.x), y: round(corner.y - layer.start.y) }
-    const input = { id: layer.id, d: formatPath(path, corner), dx: round(moved.x - layer.applied.x), dy: round(moved.y - layer.applied.y), width: round(b.width), height: round(b.height) }
+    const input = { id: layer.id, scope: layer.scope, d: formatPath(path, corner), dx: round(moved.x - layer.applied.x), dy: round(moved.y - layer.applied.y), width: round(b.width), height: round(b.height) }
     if (runQuietly(() => session.run('node.reshape', input))) layer.applied = moved
   }
 
@@ -1481,21 +1484,10 @@ function live(
           if ((box[key] !== was?.[key] || wrote.has(`${id}|${key}`)) && box[key] !== current?.[key]) patch[key] = box[key]
         }
         for (const key of Object.keys(patch)) wrote.add(`${id}|${key}`)
-        if ('width' in patch || 'height' in patch) pinPathSize(id, now)
         // Another tab may delete or lock a layer mid-drag; the drag then just leaves it be.
         if (Object.keys(patch).length > 0) runQuietly(() => session.run('node.update', { ids: [id], scope: scope(frame), patch }))
       }
     })
-  }
-  /**
-   * Gives a path that has no size of its own the size it is drawn at, its box in the base, so a new
-   * box scales it from there. Paths drawn before paths had a size get theirs on their first resize.
-   */
-  function pinPathSize(id: string, now: Design) {
-    const node = now.nodes[id]
-    if (node?.type !== 'graphic' || node.props.shape.kind !== 'path' || node.props.shape.size) return
-    const size = { width: node.props.width, height: node.props.height }
-    runQuietly(() => session.run('node.update', { ids: [id], scope: 'base', patch: { shape: { ...node.props.shape, size } } }))
   }
   /** Every layer under `id` in the document, nearest first. */
   const under = (id: string, from: Design): string[] => childrenOf(from, id).flatMap(([child]) => [child, ...under(child, from)])
@@ -2218,7 +2210,7 @@ function live(
       return false
     }
     let path = found.path
-    const layer: Reshaping = { id: editingPath.id, start: found.box, applied: { x: 0, y: 0 } }
+    const layer: Reshaping = { id: editingPath.id, start: found.box, applied: { x: 0, y: 0 }, scope: scope(frame) }
     const end = session.beginGesture()
     let drag: Extract<Gesture, { kind: 'path' }>['drag']
     if (hit.kind === 'control') {
@@ -2272,7 +2264,7 @@ function live(
     const parent = session.design().nodes[editingPath.id]?.parentId ?? ''
     session.gesture(() => {
       if (next.length === 0) runQuietly(() => session.run('node.delete', { ids: [editingPath.id] }))
-      else reshape({ id: editingPath.id, start: found.box, applied: { x: 0, y: 0 } }, next)
+      else reshape({ id: editingPath.id, start: found.box, applied: { x: 0, y: 0 }, scope: scope(frame) }, next)
       hug(session.design().nodes[parent] ? [parent] : next.length > 0 ? [editingPath.id] : [])
     })
     editingPath.selected = []
@@ -2355,9 +2347,9 @@ function live(
     const box = { x: round(b.x), y: round(b.y), width: round(b.width), height: round(b.height), rotation: 0 }
     const { parentId } = pen
     let id = ''
-    const shape = { kind: 'path', d: formatPath(path, box), size: { width: box.width, height: box.height } }
+    const shape = { kind: 'path', d: formatPath(path, box), drawnIn: { width: box.width, height: box.height } }
     const layer = { type: 'graphic' as const, name: 'Path', props: { x: box.x, y: box.y, width: box.width, height: box.height, shape, strokes: [PEN_STROKE] } }
-    if (runQuietly(() => { id = session.run('node.create', { parentId, layer }) })) pen.layer = { id, start: box, applied: { x: 0, y: 0 } }
+    if (runQuietly(() => { id = session.run('node.create', { parentId, layer }) })) pen.layer = { id, start: box, applied: { x: 0, y: 0 }, scope: scope(pen.frame) }
   }
 
   /** Ends the pen's path, closed or open: the undo step ends, the new layer is selected, and the select tool comes back. */
@@ -3323,7 +3315,6 @@ function live(
             ...(node?.bindings?.fontFamily && style && style.fontFamily !== was?.fontFamily ? ['fontFamily' as const] : []),
           ]
           for (const target of unbind) session.run('node.bind', { ids: [id], target, ref: null })
-          if ('width' in patch || 'height' in patch) pinPathSize(id, session.design())
           if (!everyFormat) {
             session.run('node.update', { ids: [id], scope: here, patch })
             continue

@@ -1,5 +1,5 @@
 // Resizing paths in Chromium, with real pointer input (#278): a path dragged by a corner handle,
-// one drawn before paths had a size, and a group of paths (as an SVG places) all scale their
+// one with no box it was drawn in, and a group of paths (as an SVG places) all scale their
 // drawing with their boxes in one undo step, and the export draws what the stage shows.
 import { expect, test, type Page } from '../support/test.ts'
 import type { DesignInput } from '@dazbee/schema'
@@ -11,7 +11,7 @@ test.describe.configure({ timeout: 120_000 })
 const TRIANGLE = 'M0 0 L200 0 L100 160 Z'
 const path = (name: string, parentId: string, index: string, x: number, y: number, color: string, sized: boolean) => ({
   type: 'graphic', parentId, index, name,
-  props: { x, y, width: 200, height: 160, shape: { kind: 'path', d: TRIANGLE, ...(sized ? { size: { width: 200, height: 160 } } : {}) }, fills: [{ type: 'solid', color }] },
+  props: { x, y, width: 200, height: 160, shape: { kind: 'path', d: TRIANGLE, ...(sized ? { drawnIn: { width: 200, height: 160 } } : {}) }, fills: [{ type: 'solid', color }] },
 }) as DesignInput['nodes'][string]
 const design: DesignInput = {
   meta: { schemaVersion: 5, designId: 'replaced-by-the-api', name: 'Path resize', kind: 'single', primaryFormatId: 'sq' },
@@ -34,7 +34,7 @@ const exported = (page: Page, x: number, y: number) => page.evaluate(({ x, y }) 
   return pixels ? [pixels[at], pixels[at + 1], pixels[at + 2]] : null
 }, { x, y })
 /** A layer's props as the square shows them: the base with the square's own. */
-const props = async (page: Page, id: string) => placed(await read(page), id, 'sq') as { width: number; height: number; shape: { size?: { width: number; height: number } } }
+const props = async (page: Page, id: string) => placed(await read(page), id, 'sq') as { width: number; height: number; shape: { drawnIn?: { width: number; height: number } } }
 
 /** Drags the selection's south-east handle by a design offset. */
 async function stretch(page: Page, dx: number, dy: number) {
@@ -48,7 +48,7 @@ test('a path dragged by its corner scales its drawing, in one undo step', async 
   await click(page, 200, 140)
   // Twice as big: the apex goes from y 260 to y 420.
   await stretch(page, 200, 160)
-  expect(await props(page, 'pen')).toMatchObject({ width: 400, height: 320, shape: { size: { width: 200, height: 160 } } })
+  expect(await props(page, 'pen')).toMatchObject({ width: 400, height: 320, shape: { drawnIn: { width: 200, height: 160 } } })
   expect(await exported(page, 300, 400)).toEqual([224, 32, 32])
   expect(await exported(page, 480, 110)).toEqual([224, 32, 32])
   writeOutput('path-resize-1-pen.png', await page.screenshot())
@@ -72,25 +72,25 @@ test('a resized path edits from where its points are drawn', async ({ browser })
   // Dragging one moves it alone: the others stay where they are drawn.
   const zoom = await page.evaluate(() => window.dazbee?.camera().zoom ?? 1)
   await dragScreen(page, want, { x: want.x + 40 * zoom, y: want.y })
-  const pen = await props(page, 'pen') as unknown as { x: number; y: number; width: number; height: number; shape: { d: string; size: { width: number; height: number } } }
-  expect(pen.shape.size).toEqual({ width: pen.width, height: pen.height })
+  const pen = await props(page, 'pen') as unknown as { x: number; y: number; width: number; height: number; shape: { d: string; drawnIn: { width: number; height: number } } }
+  expect(pen.shape.drawnIn).toEqual({ width: pen.width, height: pen.height })
   const points = [...pen.shape.d.matchAll(/(-?[\d.]+)[ ,](-?[\d.]+)/g)].map((m) => [Number(m[1]) + pen.x, Number(m[2]) + pen.y])
   expect(points.slice(0, 3).map(([x, y]) => [Math.round(x ?? 0), Math.round(y ?? 0)])).toEqual([[100, 100], [540, 100], [300, 420]])
   writeOutput('path-resize-4-edited.png', await page.screenshot())
   expect(errors).toEqual([])
 })
 
-test('a path drawn before paths had a size gets one on its first resize, and scales', async ({ browser }) => {
+test('a path with no box it was drawn in takes its box on its first resize, and scales', async ({ browser }) => {
   const { page, errors } = await openStage(browser, design)
   await click(page, 700, 140)
   await stretch(page, 100, 80)
-  expect(await props(page, 'old')).toMatchObject({ width: 300, height: 240, shape: { size: { width: 200, height: 160 } } })
+  expect(await props(page, 'old')).toMatchObject({ width: 300, height: 240, shape: { drawnIn: { width: 200, height: 160 } } })
   // The apex moves from y 260 down to y 340.
   expect(await exported(page, 750, 320)).toEqual([32, 80, 224])
   writeOutput('path-resize-2-old.png', await page.screenshot())
-  // One undo takes the size and the box back together.
+  // One undo takes the box it was drawn in and the new box back together.
   await press(page, 'undo')
-  expect((await props(page, 'old')).shape.size).toBeUndefined()
+  expect((await props(page, 'old')).shape.drawnIn).toBeUndefined()
   expect(await props(page, 'old')).toMatchObject({ width: 200, height: 160 })
   expect(errors).toEqual([])
 })
@@ -113,6 +113,44 @@ test('an SVG placed as layers scales with its group, export included', async ({ 
   writeOutput('path-resize-5-svg.png', await page.screenshot())
   await press(page, 'undo')
   expect(await exported(page, 830, 590)).toEqual([255, 255, 255])
+  expect(errors).toEqual([])
+})
+
+test('Shift keeps the shape, Alt resizes from the middle, and the W field scales it too', async ({ browser }) => {
+  const { page, errors } = await openStage(browser, design)
+  await click(page, 200, 140)
+  // Shift: the drag goes 200 across and 40 down, and the box keeps 200 × 160 at twice the size.
+  const from = await handle(page, 'se')
+  const zoom = await page.evaluate(() => window.dazbee?.camera().zoom ?? 1)
+  await dragScreen(page, from, { x: from.x + 200 * zoom, y: from.y + 40 * zoom }, ['Shift'])
+  const kept = await props(page, 'pen')
+  expect(kept.width / kept.height).toBeCloseTo(200 / 160, 2)
+  expect(kept.width).toBeGreaterThan(200)
+  expect(await exported(page, Math.round(100 + kept.width / 2), Math.round(100 + kept.height - 15))).toEqual([224, 32, 32])
+  await press(page, 'undo')
+
+  // Alt: 50 across and 40 down from the middle, so 300 × 240 about the same centre.
+  const corner = await handle(page, 'se')
+  await dragScreen(page, corner, { x: corner.x + 50 * zoom, y: corner.y + 40 * zoom }, ['Alt'])
+  expect(await props(page, 'pen')).toMatchObject({ x: 50, y: 60, width: 300, height: 240 })
+  // The apex is at 200,300, and the top left corner reaches 50,60.
+  expect(await exported(page, 200, 285)).toEqual([224, 32, 32])
+  expect(await exported(page, 60, 65)).toEqual([224, 32, 32])
+  writeOutput('path-resize-6-alt.png', await page.screenshot())
+  await press(page, 'undo')
+
+  // The W field: twice as wide, the same height; the far corner is drawn at 500,100.
+  const width = page.getByTestId('layout-card').getByRole('spinbutton', { name: 'Width' })
+  await width.fill('400')
+  await width.press('Enter')
+  await page.evaluate(() => window.dazbee?.drawn())
+  expect(await props(page, 'pen')).toMatchObject({ width: 400, height: 160 })
+  expect(await exported(page, 490, 105)).toEqual([224, 32, 32])
+  // Undo is the editor's once the field lets go of the keyboard.
+  await width.blur()
+  await press(page, 'undo')
+  expect(await props(page, 'pen')).toMatchObject({ width: 200 })
+  expect(await exported(page, 490, 105)).toEqual([255, 255, 255])
   expect(errors).toEqual([])
 })
 

@@ -1,10 +1,11 @@
 // The canvas gesture matrix (#232): every canvas gesture against every kind of container, in one
 // format of a design that has two, with real pointer and keyboard input. Each gesture is checked
 // against what it should do: a move moves the layer by the drag, a resize sizes it from the handle
-// dragged (scaling a group's or boolean's layers, never a frame's), a turn turns it, align lines it
-// up, a resized path draws to its new box, the other format stays as it was, auto layout keeps placing its flow (a drag or an arrow
-// moves a layer along it, and what it decides is said), the gesture is one undo step, and nothing
-// logs an error. Failures that have a ticket of their own are listed in KNOWN.
+// dragged (scaling a group's or boolean's layers, never a frame's) and a path's drawing with its
+// box, a turn turns it, align lines it up, the other format stays as it was, auto layout keeps
+// placing its flow (a drag or an arrow moves a layer along it, and what it decides is said), the
+// gesture is one undo step, and nothing logs an error. Failures that have a ticket of their own
+// are listed in KNOWN.
 import { pressFor, type ShortcutAction } from '@dazbee/editor/shortcuts'
 import type { DesignInput } from '@dazbee/schema'
 import type { Browser, Page } from '@playwright/test'
@@ -17,7 +18,7 @@ const rect = (name: string, parentId: string, index: string, x: number, y: numbe
   ({ type: 'graphic', parentId, index, name, props: { x, y, width, height, shape: { kind: 'rect' }, fills: [{ type: 'solid', color }], ...extra } }) as Node
 /** A box with a notch cut into its bottom, drawn in that box, so its drawing reaches each edge. */
 const path = (name: string, parentId: string, index: string, x: number, y: number, width: number, height: number, color: string): Node =>
-  ({ type: 'graphic', parentId, index, name, props: { x, y, width, height, shape: { kind: 'path', d: `M0 0 L${width} 0 L${width} ${height} L${width / 2} ${height * 0.7} L0 ${height} Z`, size: { width, height } }, fills: [{ type: 'solid', color }] } }) as Node
+  ({ type: 'graphic', parentId, index, name, props: { x, y, width, height, shape: { kind: 'path', d: `M0 0 L${width} 0 L${width} ${height} L${width / 2} ${height * 0.7} L0 ${height} Z`, drawnIn: { width, height } }, fills: [{ type: 'solid', color }] } }) as Node
 const row = (direction: 'row' | 'column', gap = 20, pad = 20) => ({ direction, gap, padding: { top: pad, right: pad, bottom: pad, left: pad } })
 
 /** One page holding a layer of each kind, spread out so each can be pressed on its own. */
