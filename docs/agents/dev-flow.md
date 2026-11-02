@@ -26,9 +26,9 @@ Before Keshav sees a mock:
 ## Building a ticket
 
 1. Logic goes test-first (`/tdd`): the test is red before the code changes.
-2. A rule that must hold after every change (an auto-size text box fits its text, an export matches the canvas) lives in one shared check that the tests run after each command. #246 and #249 broke the same rule through two different paths; a per-path test caught neither.
-3. A UI change starts with a thin slice in the real app: the new piece working for one layer type, with screenshots at the three screen sizes sent to Keshav before the rest is built. The layout C panels passed their mock and were replaced after ten PRs, once he used them in the app.
-4. Before every push, run lint, typecheck, the unit tests of the touched packages, and the e2e specs for the touched area (off CI the suite starts its own servers and database). The unit tests of `apps/api` and `apps/sync` need CI's database, so they run in CI only. CI is the second net: of 24 commits that went red there in the first days, 20 needed a new commit.
+2. A rule that must hold after every change (an auto-size text box fits its text, an export matches the canvas) lives in one shared check that the tests run after each command, so every path that changes the document is covered.
+3. A UI change starts with a thin slice in the real app: the new piece working for one layer type, with screenshots at the three screen sizes sent to Keshav before the rest is built. A layout that works only in the mock shows up after one PR.
+4. Before every push, run lint, typecheck, the unit tests of the touched packages, and the e2e specs for the touched area (off CI the suite starts its own servers and database). The unit tests of `apps/api` and `apps/sync` need CI's database, so they run in CI only. CI is the second net.
 
 ## Merging a PR
 
@@ -38,7 +38,7 @@ Before Keshav sees a mock:
 
 ## Closing an epic
 
-When the last ticket of an epic merges, a goldfish auditor gets the epic's spec and the app running main. It walks every decision and control: can a user reach it, and does it behave as the spec says? Each gap becomes an issue. The round 4 audit found six features the editor couldn't reach this way (#217 to #222).
+When the last ticket of an epic merges, a goldfish auditor gets the epic's spec and the app running main. It walks every decision and control: can a user reach it, and does it behave as the spec says? Each gap becomes an issue.
 
 ## Bug issues
 
