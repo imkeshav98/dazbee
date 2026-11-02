@@ -1,13 +1,15 @@
 // The layers panel (#59) in Chromium, with real pointer and keyboard input: the tree in step with the
 // stage's selection both ways, a layer dragged into a group (the stage redraws it there, one undo
 // step), rename, lock and hide; the same by keyboard alone, with the focus following a key pressed
-// just after the panel redraws and a layer moved past a big open group; and 300 layers scrolling with
-// only the rows in view in the page.
+// just after the panel redraws and a layer moved past a big open group, going to the next row when
+// the focused one is deleted, Tab landing on the selected row, and a rename finished with a click
+// leaving the focus where the click put it; and 300 layers scrolling with only the rows in view in
+// the page, the focused row staying focused and reachable by Tab when it scrolls away.
 import { expect, test, type Locator, type Page } from '../support/test.ts'
 import type { DesignInput } from '@dazbee/schema'
 import { screenPoint, writeOutput } from '../support/editor.ts'
 import { PERF, report, spread } from '../support/perf.ts'
-import { click, openStage, order, read } from '../support/stage.ts'
+import { click, openStage, order, props, read } from '../support/stage.ts'
 
 test.describe.configure({ timeout: 120_000 })
 
@@ -281,6 +283,90 @@ test('keyboard only: a layer moved past a big open group keeps the focus, and ty
   expect(errors).toEqual([])
 })
 
+/** Whether the focus is in the layers tree. */
+const focusInTree = (page: Page) => tree(page).evaluate((list) => list.contains(document.activeElement))
+
+/** Tabs from the Layers button until the focus is on a row, at most eight times. */
+async function tabIntoTree(page: Page) {
+  await page.getByRole('button', { name: 'Layers', exact: true }).focus()
+  for (let i = 0; i < 8 && !(await page.evaluate(() => document.activeElement?.getAttribute('role') === 'treeitem')); i++) await page.keyboard.press('Tab')
+}
+
+test('keyboard only: deleting the focused row moves the focus to the row in its place, and undo gives it back', async ({ browser }) => {
+  const { page, errors } = await openStage(browser, design())
+  await openLayers(page)
+  await row(page, 'Box').click()
+  await expect(row(page, 'Box')).toBeFocused()
+
+  // Delete takes Box away; the focus goes to Card, now in its place, and Down goes on from there.
+  await page.keyboard.press('Delete')
+  await expect.poll(async () => Object.keys((await read(page)).nodes)).not.toContain('box')
+  await expect(row(page, 'Card')).toBeFocused()
+  writeOutput('layers-7-deleted-focus.png', await page.screenshot())
+  await page.keyboard.press('ArrowDown')
+  await expect(row(page, 'Backdrop')).toBeFocused()
+  expect(await page.evaluate(() => window.dazbee?.selection())).toEqual(['backdrop'])
+  // Undo brings Box back, and the focus with it.
+  await page.keyboard.press('ControlOrMeta+Z')
+  await expect.poll(async () => Object.keys((await read(page)).nodes)).toContain('box')
+  await expect(row(page, 'Box')).toBeFocused()
+
+  // Backspace on a row inside a group: the focus goes to the row now in its place.
+  await page.evaluate(() => window.dazbee?.select(['c2']))
+  await expect(row(page, 'Card stripe')).toHaveAttribute('aria-selected', 'true')
+  await row(page, 'Card stripe').click()
+  await expect(row(page, 'Card stripe')).toBeFocused()
+  await page.keyboard.press('Backspace')
+  await expect.poll(async () => Object.keys((await read(page)).nodes)).not.toContain('c2')
+  await expect(row(page, 'Card back')).toBeFocused()
+  expect(errors).toEqual([])
+})
+
+test('keyboard: Tab into the tree lands on the layer selected on the canvas, not the row focused before', async ({ browser }) => {
+  const { page, errors } = await openStage(browser, design())
+  await openLayers(page)
+  await row(page, 'Box').click()
+  await expect(row(page, 'Box')).toBeFocused()
+  // Dot picked on the canvas: the focus leaves the panel.
+  await click(page, 800, 780)
+  expect(await page.evaluate(() => window.dazbee?.selection())).toEqual(['dot'])
+  expect(await focusInTree(page)).toBe(false)
+
+  await tabIntoTree(page)
+  await expect(row(page, 'Dot')).toBeFocused()
+  writeOutput('layers-8-tab-to-selected.png', await page.screenshot())
+  // Down goes on from Dot.
+  await page.keyboard.press('ArrowDown')
+  await expect(row(page, 'Box')).toBeFocused()
+  expect(await page.evaluate(() => window.dazbee?.selection())).toEqual(['box'])
+  expect(errors).toEqual([])
+})
+
+test('a rename finished by clicking the canvas keeps the name and leaves the focus where the click put it', async ({ browser }) => {
+  const { page, errors } = await openStage(browser, design())
+  await openLayers(page)
+  await row(page, 'Box').dblclick()
+  const field = tree(page).getByRole('textbox', { name: 'Name of Box' })
+  await expect(field).toBeFocused()
+  await field.fill('Hero panel')
+
+  // An empty part of the page, right of the backdrop: the click lands on the canvas and picks nothing.
+  const at = await screenPoint(page, 1060, 500)
+  expect(await page.evaluate(([x, y]) => document.elementFromPoint(x, y)?.tagName, [at.x, at.y] as const)).toBe('CANVAS')
+  await click(page, 1060, 500)
+  await expect.poll(async () => (await node(page, 'box')).name).toBe('Hero panel')
+  expect(await page.evaluate(() => window.dazbee?.selection())).toEqual([])
+  expect(await focusInTree(page)).toBe(false)
+  writeOutput('layers-9-rename-clicked-away.png', await page.screenshot())
+
+  // Down goes to the stage, which has nothing selected to move: no row is selected.
+  await page.keyboard.press('ArrowDown')
+  await page.evaluate(() => window.dazbee?.drawn())
+  expect(await page.evaluate(() => window.dazbee?.selection())).toEqual([])
+  expect(await focusInTree(page)).toBe(false)
+  expect(errors).toEqual([])
+})
+
 /** A design of 300 layers. */
 const threeHundred = (): DesignInput => {
   const nodes: DesignInput['nodes'] = {}
@@ -301,13 +387,17 @@ async function wheel(page: Page, scroller: Locator, dy: number) {
 /**
  * The rows in the page: how many, the first one's place in the list (from 0, by its
  * aria-posinset: the 300 layers are siblings), the first row in view, how many rows the view
- * holds, and how far the panel can scroll.
+ * holds, and how far the panel can scroll. The row Tab lands on stays in the page wherever the
+ * list is scrolled, so it counts for the first only when it is next to the other rows.
  */
 const mounted = (scroller: Locator) => scroller.evaluate((el, row) => {
   const rows = [...el.querySelectorAll<HTMLElement>('[role=treeitem]')]
+  const places = rows.map((r) => Number(r.getAttribute('aria-posinset')) - 1)
+  const tab = rows.findIndex((r) => r.tabIndex === 0)
+  const run = places.filter((at, i) => i !== tab || places.includes(at - 1) || places.includes(at + 1))
   return {
     count: rows.length,
-    first: Math.min(...rows.map((r) => Number(r.getAttribute('aria-posinset')) - 1)),
+    first: Math.min(...run),
     inView: Math.floor(el.scrollTop / row),
     fits: Math.ceil(el.clientHeight / row),
     range: el.scrollHeight - el.clientHeight,
@@ -348,6 +438,53 @@ test('300 layers: only the rows in view are in the page, and they follow the scr
   await expect(row(page, 'Layer 1')).toBeInViewport()
   expect(await tree(page).getByRole('treeitem').count()).toBeLessThan(60)
   writeOutput('layers-5-300-layers.png', await page.screenshot())
+  expect(errors).toEqual([])
+})
+
+/**
+ * Of 300 layers, clicks Layer 168 (listed 133rd, topmost first), then turns the wheel twice so its
+ * row is well above the view.
+ */
+async function clickThenScrollAway(page: Page) {
+  const scroller = page.getByTestId('layers-scroller')
+  await scroller.evaluate((el, row) => (el.scrollTop = 128 * row), ROW)
+  await expect(row(page, 'Layer 168')).toBeInViewport()
+  await row(page, 'Layer 168').click()
+  await expect(row(page, 'Layer 168')).toBeFocused()
+  expect(await page.evaluate(() => window.dazbee?.selection())).toEqual(['n167'])
+  await scroller.hover()
+  await wheel(page, scroller, WHEEL)
+  await wheel(page, scroller, WHEEL)
+  expect(await scroller.evaluate((el) => el.scrollTop)).toBeGreaterThan(133 * ROW)
+}
+
+test('300 layers: the arrows keep moving through the tree after the focused row scrolls out of view', async ({ browser }) => {
+  const { page, errors } = await openStage(browser, threeHundred())
+  await openLayers(page)
+  await clickThenScrollAway(page)
+  // The focus is still on Layer 168's row, out of view.
+  expect(await page.evaluate(() => document.activeElement?.getAttribute('data-layer'))).toBe('n167')
+
+  // Down selects the next row and scrolls to it; the layer on the canvas stays where it was.
+  const before = await props(page, 'n167')
+  await page.keyboard.press('ArrowDown')
+  await expect(row(page, 'Layer 167')).toBeFocused()
+  await expect(row(page, 'Layer 167')).toBeInViewport()
+  expect(await page.evaluate(() => window.dazbee?.selection())).toEqual(['n166'])
+  expect(await props(page, 'n167')).toMatchObject({ x: before.x, y: before.y })
+  writeOutput('layers-10-arrow-after-scroll.png', await page.screenshot())
+  expect(errors).toEqual([])
+})
+
+test('300 layers: Tab reaches the tree on the selected row when it is scrolled out of view', async ({ browser }) => {
+  const { page, errors } = await openStage(browser, threeHundred())
+  await openLayers(page)
+  await clickThenScrollAway(page)
+
+  await tabIntoTree(page)
+  await expect(row(page, 'Layer 168')).toBeFocused()
+  await expect(row(page, 'Layer 168')).toBeInViewport()
+  writeOutput('layers-11-tab-to-scrolled-row.png', await page.screenshot())
   expect(errors).toEqual([])
 })
 
