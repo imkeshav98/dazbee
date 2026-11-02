@@ -155,9 +155,7 @@ export const nodeVisibleEverywhere = defineCommand({
   apply: ({ r, design }, { ids, visible }) => {
     for (const id of ids) {
       ;(r.nodes.get(id)?.get('props') as Y.Map<unknown> | undefined)?.set('visible', visible)
-      for (const scope of Object.keys(design.overrides)) {
-        if (design.overrides[scope]?.[id] && 'visible' in (design.overrides[scope]?.[id] ?? {})) r.overrides.delete(overrideKey(scope as `format:${string}`, id, 'visible'))
-      }
+      for (const scope of Object.keys(design.overrides)) r.overrides.delete(overrideKey(scope, id, 'visible'))
     }
   },
 })

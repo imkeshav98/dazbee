@@ -526,9 +526,10 @@ const LayerRow = memo(function LayerRow({ row, i, selected, focusable, renaming,
         )
         : <span data-testid="layer-name" className={cn('min-w-0 flex-1 truncate', hidden && 'line-through decoration-subtle/60')}>{node.name}</span>}
       {kind && !renaming && <span data-testid="layer-kind" className="shrink-0 font-mono text-[11px] text-subtle">{kind}</span>}
-      {/* In this format; with Alt, in every format. A layer hidden only in some shows a half-closed eye. */}
+      {/* In this format; with Alt, in every format: hidden in all of them if it shows in any. A layer hidden only in some shows a closed eye. */}
       <RowToggle
-        on={hidden || partlyHidden}
+        on={hidden}
+        stay={partlyHidden}
         label={format(hidden ? t.editor.layersPanel.show : t.editor.layersPanel.hide, { name: node.name })}
         title={`${partlyHidden ? `${t.editor.layersPanel.partlyHidden} · ` : ''}${t.editor.layersPanel.altEvery}`}
         state={partlyHidden ? 'some' : hidden ? 'hidden' : 'shown'}
@@ -548,7 +549,17 @@ const LayerRow = memo(function LayerRow({ row, i, selected, focusable, renaming,
 })
 
 /** Lock or hide on a row: shown while the row is hovered or focused, and always while it is on. `onToggle` hears whether Alt was held. */
-function RowToggle({ on, label, title, state, onToggle, icon: ToggleIcon, testId }: { on: boolean; label: string; title?: string; state?: string; onToggle: (alt: boolean) => void; icon: Icon; testId: string }) {
+function RowToggle({ on, stay = false, label, title, state, onToggle, icon: ToggleIcon, testId }: {
+  on: boolean
+  /** Shown even while off and not hovered. */
+  stay?: boolean
+  label: string
+  title?: string
+  state?: string
+  onToggle: (alt: boolean) => void
+  icon: Icon
+  testId: string
+}) {
   return (
     <button
       type="button"
@@ -556,6 +567,7 @@ function RowToggle({ on, label, title, state, onToggle, icon: ToggleIcon, testId
       aria-label={label}
       aria-pressed={on}
       title={title}
+      aria-description={title}
       data-state={state}
       data-testid={testId}
       onClick={(event) => {
@@ -564,7 +576,7 @@ function RowToggle({ on, label, title, state, onToggle, icon: ToggleIcon, testId
       }}
       className={cn(
         'grid size-6 shrink-0 cursor-pointer place-items-center rounded-[6px] text-subtle hover:bg-hover hover:text-text',
-        !on && 'opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100',
+        !on && !stay && 'opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100',
       )}
     >
       <ToggleIcon size={14} aria-hidden />

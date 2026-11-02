@@ -25,6 +25,13 @@ const visible = async (page: Page, id: string) => {
   return ['sq', 'story'].map((f) => (d.overrides[`format:${f}`]?.[id]?.visible ?? d.nodes[id]?.props.visible) !== false)
 }
 const undo = (page: Page) => page.evaluate(() => window.dazbee?.perform('undo'))
+/** How many of Story's pixels are the badge's pink, as the export draws it. */
+const pinkInStory = (page: Page) => page.evaluate(() => {
+  const p = window.dazbee?.exportPixels('p1', 'story')
+  let n = 0
+  if (p) for (let i = 0; i < p.length; i += 4) if (Math.abs((p[i] ?? 0) - 224) < 8 && Math.abs((p[i + 1] ?? 0) - 21) < 8 && Math.abs((p[i + 2] ?? 0) - 127) < 8) n++
+  return n
+})
 
 test('a plain click hides in the format shown; Alt-click and Alt+Mod+Shift+H hide in every format; one undo step each', async ({ browser }) => {
   const { page, errors } = await openStage(browser, design())
@@ -41,6 +48,9 @@ test('a plain click hides in the format shown; Alt-click and Alt+Mod+Shift+H hid
   await eye('Badge').click()
   await expect.poll(() => visible(page, 'badge')).toEqual([false, true])
   await expect(eye('Badge')).toHaveAttribute('data-state', 'some')
+  // Hidden here: pressed. Still drawn in Story.
+  await expect(eye('Badge')).toHaveAttribute('aria-pressed', 'true')
+  expect(await pinkInStory(page)).toBeGreaterThan(1000)
   await expect(eye('Badge')).toHaveAttribute('title', /Hidden in some sizes/)
   await page.evaluate(() => window.dazbee?.drawn())
   writeOutput('hide-1-some.png', await page.screenshot())
@@ -49,6 +59,7 @@ test('a plain click hides in the format shown; Alt-click and Alt+Mod+Shift+H hid
   await eye('Badge').click({ modifiers: ['Alt'] })
   await expect.poll(() => visible(page, 'badge')).toEqual([false, false])
   await expect(eye('Badge')).toHaveAttribute('data-state', 'hidden')
+  expect(await pinkInStory(page)).toBe(0)
   await page.evaluate(() => window.dazbee?.drawn())
   writeOutput('hide-2-everywhere.png', await page.screenshot())
   await undo(page)
@@ -69,9 +80,11 @@ test('a plain click hides in the format shown; Alt-click and Alt+Mod+Shift+H hid
   await expect.poll(() => visible(page, 'bar')).toEqual([true, true])
   await undo(page)
   await expect.poll(() => visible(page, 'bar')).toEqual([false, false])
-  // Mod+Shift+H still hides in the format shown only.
+  // Mod+Shift+H still hides in the format shown only; then, hidden in some, the shortcut hides it in every one, as Alt-click does.
   await undo(page)
   await page.keyboard.press('Control+Shift+KeyH')
   await expect.poll(() => visible(page, 'bar')).toEqual([false, true])
+  await page.keyboard.press('Alt+Control+Shift+KeyH')
+  await expect.poll(() => visible(page, 'bar')).toEqual([false, false])
   expect(errors).toEqual([])
 })

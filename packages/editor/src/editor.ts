@@ -2821,8 +2821,9 @@ function live(
         break
       }
       case 'hideEverywhere': {
-        // As the format shown has them: shown anywhere there, hidden in every format; else shown in every one.
-        const shown = selection.ids.some((id) => visibleIn(frame, id))
+        // Shown in any format: hidden in every one; hidden in all of them: shown in every one.
+        const now = session.design()
+        const shown = selection.ids.some((id) => Object.keys(now.formats).some((f) => (now.overrides[`format:${f}`]?.[id]?.visible ?? now.nodes[id]?.props.visible) !== false))
         hideInEveryFormat(selection.ids, shown)
         break
       }
