@@ -473,8 +473,11 @@ function live(
     if (node?.type !== 'text') return
     const measure = measureText()
     const sizes: Record<string, { width: number; height: number }> = {}
+    // Text bound to a brand font is drawn, so measured, in the family the kit gives it.
+    const bound = node.bindings?.fontFamily ? resourceBytes.variables?.[node.bindings.fontFamily] : undefined
     for (const formatId of only ? [only] : Object.keys(now.formats)) {
-      const props = { ...node.props, ...now.overrides[`format:${formatId}`]?.[id] } as typeof node.props
+      const own = { ...node.props, ...now.overrides[`format:${formatId}`]?.[id] } as typeof node.props
+      const props = bound ? { ...own, style: { ...own.style, fontFamily: bound } } : own
       if (props.boxMode === 'fixed') continue
       const size = measure(props, props.boxMode === 'autoWidth' ? null : props.width)
       sizes[formatId] = { width: props.boxMode === 'autoWidth' ? size.width : props.width, height: size.height }
@@ -3020,6 +3023,39 @@ function live(
     return found
   }
 
+  /**
+   * Text bound to a brand font whose family the kit has changed since: once that family's files are
+   * here, it takes it and its box fits it in every format. The kit lives outside the design, so this
+   * is a change no one undoes, as another tab's: undo could not put the kit back with it. Run when the
+   * kit changes and when the design opens.
+   */
+  async function refitBrandFonts() {
+    const kit = resourceBytes.variables ?? {}
+    const stale = Object.entries(session.design().nodes).flatMap(([id, node]) => {
+      const ref = node.type === 'text' ? node.bindings?.fontFamily : undefined
+      const family = ref ? kit[ref] : undefined
+      return node.type === 'text' && ref && family && family !== node.props.style.fontFamily ? [{ id, ref, family }] : []
+    })
+    if (stale.length === 0) return
+    const families = [...new Set(stale.map((s) => s.family))]
+    loadFamilies(families)
+    await Promise.all(families.map((family) => familyLoads.get(family)))
+    if (listening.signal.aborted) return
+    // Fitted in the fallback fonts, a box would be wrong: only a family whose files came is written.
+    const here = new Set([...SHIPPED_FAMILIES, ...resourceBytes.fonts.map((f) => f.family)])
+    session.untracked(() => {
+      for (const { id, ref, family } of stale) {
+        const node = session.design().nodes[id]
+        // Still bound, the kit still gives this family (not a newer one), and the text has not taken it already.
+        if (node?.type !== 'text' || node.bindings?.fontFamily !== ref || resourceBytes.variables?.[ref] !== family) continue
+        if (node.props.style.fontFamily === family || !here.has(family)) continue
+        if (!runQuietly(() => session.run('node.bind', { ids: [id], target: 'fontFamily', ref, value: family }))) continue
+        fitText(id)
+      }
+    })
+  }
+  void refitBrandFonts()
+
   return {
     session,
     doc,
@@ -3334,13 +3370,16 @@ function live(
     /** The brand kit's values bound properties take now (#53). */
     variables: () => resourceBytes.variables ?? {},
     /**
-     * Gives bound properties new values, as when the brand kit changes (#53): bound layers redraw
-     * with them, the families of brand fonts load, and exports use them. The design is unchanged.
+     * Gives bound properties new values, as when the brand kit changes: bound layers redraw with them,
+     * the families of brand fonts load, and exports use them. Text bound to a brand font whose family
+     * changed takes the new one and refits once its files are here, a change no one undoes; the
+     * promise settles then.
      */
     setVariables(variables: Variables) {
       resourceBytes = { ...resourceBytes, variables }
       loadNewFonts(session.design())
       redraw()
+      return refitBrandFonts()
     },
     /**
      * Binds the selected layers to a brand colour or font, or unbinds them with null, in one undo
