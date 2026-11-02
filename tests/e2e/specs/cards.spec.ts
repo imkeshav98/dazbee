@@ -5,6 +5,7 @@
 import { expect, test, type Page } from '../support/test.ts'
 import { designOf, editorPath, screenPoint, writeOutput } from '../support/editor.ts'
 import { liveDesign, seed } from '../support/seed.ts'
+import { barMenu } from '../support/stage.ts'
 
 const shoot = async (page: Page, name: string) => writeOutput(`cards-${name}.png`, await page.screenshot())
 const box = async (page: Page, testId: string) => {
@@ -83,7 +84,7 @@ test('the Page card paints the page, and its hex takes any colour', async ({ pag
   await shoot(page, 'page-fine-tune')
 })
 
-test('a selection swaps the design cards for its own; several layers get Arrange, which aligns, distributes and groups', async ({ page }) => {
+test('a selection swaps the design cards for its own; several layers line up, spread out and group from the bar', async ({ page }) => {
   await open(page)
   const at = await screenPoint(page, 200, 180)
   await page.mouse.click(at.x, at.y)
@@ -91,23 +92,23 @@ test('a selection swaps the design cards for its own; several layers get Arrange
   await expect(page.getByTestId('layout-card')).toBeVisible()
   await expect(page.getByTestId('page-card')).toHaveCount(0)
   await expect(page.getByTestId('formats')).toHaveCount(0)
-  // One layer lines up with its format from the bar by it; the Arrange card is for several.
+  // One layer lines up with its format from ⋯ More on the bar by it.
   await expect(arrange).toHaveCount(0)
-  await page.getByTestId('bar-line-up').click()
-  await expect(page.getByTestId('bar-line-up-menu').getByRole('button', { name: 'Align left' })).toBeEnabled()
-  await expect(page.getByTestId('bar-line-up-menu').getByRole('button', { name: 'Distribute horizontally' })).toBeDisabled()
+  await expect(page.getByTestId('bar-line-up')).toHaveCount(0)
+  await page.getByTestId('bar-more').click()
+  await expect(page.getByTestId('bar-more-menu').getByRole('button', { name: 'Align left' })).toBeEnabled()
   await page.keyboard.press('Escape')
 
+  // Several layers: Line up with the spread outs, Group and the rest on the bar; no Arrange card.
   await page.keyboard.press('Control+a')
-  await expect(arrange).toBeVisible()
-  // The align buttons are the big ones.
-  const big = await arrange.getByRole('button', { name: 'Align left' }).boundingBox()
-  const small = await arrange.getByRole('button', { name: 'Distribute horizontally' }).boundingBox()
-  expect(big?.height ?? 0).toBeGreaterThan((small?.height ?? Infinity) * 1.3)
-  await expect(arrange.getByRole('button', { name: 'Distribute horizontally' })).toBeEnabled()
+  await expect(arrange).toHaveCount(0)
+  const lineUp = await barMenu(page, 'line-up')
+  await expect(lineUp.getByRole('button', { name: 'Align left' })).toBeEnabled()
+  await expect(lineUp.getByRole('button', { name: /^Distribute horizontally/ })).toBeEnabled()
   await shoot(page, 'arrange')
+  await page.keyboard.press('Escape')
   const before = Object.keys(JSON.parse(await designOf(page)).nodes).length
-  await arrange.getByRole('button', { name: 'Group', exact: true }).click()
+  await page.getByTestId('selection-bar').locator('[data-action="group"]').click()
   await expect.poll(async () => Object.values(JSON.parse(await designOf(page)).nodes as Record<string, { type: string }>).filter((n) => n.type === 'group').length).toBe(1)
   expect(Object.keys(JSON.parse(await designOf(page)).nodes).length).toBe(before + 1)
 

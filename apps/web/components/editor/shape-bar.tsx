@@ -1,8 +1,9 @@
 'use client'
 
-// The bar's own buttons for everything but text, as in the mock. A photo first gets Replace, Crop,
-// Mask and Look; then Colour (the fills) for shapes, frames and booleans, Outline (the strokes) for
-// shapes and booleans, and ✦ Effects for every selection that is not all text.
+// The bar's own buttons for everything but text, as in the mock. A photo gets Replace, Crop and Look,
+// its fills and strokes being cards in the panel and Use as mask in ⋯ More; other shapes, frames and booleans get Colour
+// (the fills), shapes and booleans Outline (the strokes); and every selection that is not all text
+// gets ✦ Effects.
 import { ArrowsClockwiseIcon, CropIcon, SparkleIcon } from '@phosphor-icons/react'
 import { withImage } from '@dazbee/editor'
 import { boundFillIndex, type Paint } from '@dazbee/schema'
@@ -10,7 +11,7 @@ import { useMessages } from '../../lib/i18n/client.tsx'
 import { BarPopover } from './bar-popover.tsx'
 import { ImagePickerButton } from './image-tool.tsx'
 import { EffectsBody, FillBody, imageFillOf, OutlineBody, PhotoLookBody, set, shared, type Target } from './selection-cards.tsx'
-import { BAR_BUTTON, BAR_DIVIDER, BAR_TOGGLE, MIXED_COLOUR } from './styles.ts'
+import { BAR_BUTTON, BAR_DIVIDER, BAR_PANEL, MIXED_COLOUR } from './styles.ts'
 
 export function ShapeBar({ target, brandId, open, onOpen }: { target: Target; brandId: string; open: string | null; onOpen: (id: string | null) => void }) {
   const t = useMessages()
@@ -20,7 +21,6 @@ export function ShapeBar({ target, brandId, open, onOpen }: { target: Target; br
   const stroked = target.types.every((type) => type === 'graphic' || type === 'boolean')
   const photo = filled ? imageFillOf(target) : null
   const one = target.ids.length === 1
-  const masks = target.props.every((pr) => Boolean(pr.mask))
   // A line has no brand swatches: its look is its stroke.
   const lines = target.props.every((pr) => (pr.shape as { kind?: string } | undefined)?.kind === 'line')
   // The colour the brand swatches paint: the topmost solid fill that shows.
@@ -52,17 +52,13 @@ export function ShapeBar({ target, brandId, open, onOpen }: { target: Target; br
               {b.crop}
             </button>
           )}
-          {/* One layer turns into a mask and back; several become a group masked by the bottom one, as ⋯ More does. */}
-          <button type="button" data-bar-item data-testid="bar-mask" aria-pressed={one ? masks : undefined} onClick={() => target.editor.perform('mask')} className={BAR_TOGGLE}>
-            {b.mask}
-          </button>
           <BarPopover id="look" open={open} onOpen={onOpen} label={b.look} testId="look" className="w-auto">
             <PhotoLookBody target={target} p={p} brandId={brandId} index={photo.index} paint={photo.paint} />
           </BarPopover>
           <span aria-hidden className={BAR_DIVIDER} />
         </>
       )}
-      {filled && (
+      {filled && !photo && (
         <BarPopover
           id="colour"
           open={open}
@@ -72,15 +68,15 @@ export function ShapeBar({ target, brandId, open, onOpen }: { target: Target; br
           testId="colour"
           className="w-auto"
         >
-          <FillBody target={target} brandId={brandId} p={p} swatches={!lines} />
+          <div className={BAR_PANEL}><FillBody target={target} brandId={brandId} p={p} swatches={!lines} /></div>
         </BarPopover>
       )}
-      {stroked && (
+      {stroked && !photo && (
         <BarPopover id="outline" open={open} onOpen={onOpen} label={b.outline} testId="outline" className="w-auto">
-          <OutlineBody target={target} brandId={brandId} p={p} />
+          <div className={BAR_PANEL}><OutlineBody target={target} brandId={brandId} p={p} /></div>
         </BarPopover>
       )}
-      {filled && <span aria-hidden className={BAR_DIVIDER} />}
+      {filled && !photo && <span aria-hidden className={BAR_DIVIDER} />}
       <BarPopover id="effects" open={open} onOpen={onOpen} label={p.effects} icon={<SparkleIcon size={15} aria-hidden />} testId="effects" className="w-80 pt-4">
         <EffectsBody target={target} p={p} />
       </BarPopover>

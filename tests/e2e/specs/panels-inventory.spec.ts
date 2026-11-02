@@ -354,7 +354,8 @@ test.describe('every selection', () => {
   row(11, 'arrange: duplicate, order, group, ungroup, frame selection, use as mask', async (open) => {
     const page = await open()
     await select(page, ['box'])
-    const arrange = page.getByTestId('arrange')
+    // Several layers group and go in a box from the bar by them.
+    const bar = page.getByTestId('selection-bar')
     // One layer's actions are in ⋯ More on the bar by it.
     const more = async (name: string) => (await moreMenu(page)).getByRole('button', { name }).click()
     await step(page, () => more('Duplicate'), async () => {
@@ -373,7 +374,7 @@ test.describe('every selection', () => {
     })
     await perform(page, 'undo')
     await select(page, ['box', 'poly'])
-    await step(page, () => arrange.getByRole('button', { name: 'Group', exact: true }).click(), async () => {
+    await step(page, () => bar.locator('[data-action="group"]').click(), async () => {
       await expect.poll(async () => (await doc(page)).nodes.box?.parentId).not.toBe('p1')
     }, { draws: false })
     const group = (await doc(page)).nodes.box?.parentId ?? ''
@@ -382,7 +383,7 @@ test.describe('every selection', () => {
       await expect.poll(async () => (await doc(page)).nodes.box?.parentId).toBe('p1')
     }, { draws: false })
     await select(page, ['box', 'poly'])
-    await step(page, () => arrange.locator('[data-action="frameSelection"]').click(), async () => {
+    await step(page, () => bar.locator('[data-action="frameSelection"]').click(), async () => {
       await expect.poll(async () => { const d = await doc(page); return d.nodes[d.nodes.box?.parentId ?? '']?.type }).toBe('frame')
     }, { draws: false })
     await reloads(page)
@@ -923,7 +924,8 @@ test.describe('shapes and frames', () => {
     for (const op of ['union', 'subtract', 'intersect', 'exclude']) {
       await select(page, ['box', 'poly'])
       // A union of two shapes that don't overlap draws the same two shapes.
-      await step(page, () => page.getByTestId('arrange').getByRole('button', { name: op[0]?.toUpperCase() + op.slice(1) }).click(), async () => {
+      // Combine is on the bar by several layers.
+      await step(page, async () => (await barMenu(page, 'combine')).locator(`[data-action="boolean${op[0]?.toUpperCase() + op.slice(1)}"]`).click(), async () => {
         await expect.poll(async () => { const d = await doc(page); const parent = d.nodes[d.nodes.box?.parentId ?? '']; return [parent?.type, parent?.props.op] }).toEqual(['boolean', op])
       }, { draws: op !== 'union' })
       if (op !== 'exclude') await perform(page, 'undo')
@@ -961,10 +963,11 @@ test.describe('photos', () => {
   row(45, 'fit: fill, fit inside, crop, tile', async (open) => {
     const page = await open()
     await select(page, ['photo'])
-    const field = page.getByTestId('image-card').getByRole('combobox', { name: 'Fit' })
+    // The fit is a row in the header card.
+    const field = page.getByTestId('layout-card').getByRole('radiogroup', { name: 'Fit' })
     for (const fit of ['fit', 'tile', 'crop', 'fill']) {
       // Crop with no crop box shows what fill shows.
-      await step(page, () => choose(field, fit), async () => { await expect.poll(() => image(page)).toMatchObject({ fit }) }, { draws: fit !== 'crop' && fit !== 'fill' })
+      await step(page, () => field.locator(`[data-value="${fit}"]`).click(), async () => { await expect.poll(() => image(page)).toMatchObject({ fit }) }, { draws: fit !== 'crop' && fit !== 'fill' })
     }
     await reloads(page)
   })
@@ -982,7 +985,7 @@ test.describe('photos', () => {
   row(47, 'adjust: exposure, contrast, saturation, temperature, tint', async (open) => {
     const page = await open()
     await select(page, ['photo'])
-    const card = page.getByTestId('image-card')
+    const card = page.getByTestId('adjust-card')
     for (const [name, key] of [['Exposure', 'exposure'], ['Contrast', 'contrast'], ['Saturation', 'saturation'], ['Temperature', 'temperature'], ['Tint', 'tint']] as const) {
       await step(page, () => enter(card.getByRole('spinbutton', { name }), '40'), async () => {
         await expect.poll(async () => ((await image(page)).adjust as Record<string, number> | undefined)?.[key]).toBe(40)
@@ -994,7 +997,7 @@ test.describe('photos', () => {
   row(48, 'image opacity', async (open) => {
     const page = await open()
     await select(page, ['photo'])
-    const card = page.getByTestId('image-card')
+    const card = page.getByTestId('adjust-card')
     await step(page, () => enter(card.getByRole('spinbutton', { name: 'Image opacity' }), '50'), async () => {
       await expect.poll(async () => (await image(page)).opacity).toBe(0.5)
     })
@@ -1005,8 +1008,7 @@ test.describe('photos', () => {
     const page = await open()
     await select(page, ['photo'])
     const mask = async () => (await moreMenu(page)).getByRole('button', { name: 'Use as mask' }).click()
-    await step(page, () => page.getByTestId('bar-mask').click(), async () => { await expect.poll(async () => (await props(page, 'photo')).mask).toBe('alpha') })
-    await expect(page.getByTestId('bar-mask')).toHaveAttribute('aria-pressed', 'true')
+    await step(page, mask, async () => { await expect.poll(async () => (await props(page, 'photo')).mask).toBe('alpha') })
     await step(page, mask, async () => { await expect.poll(async () => (await props(page, 'photo')).mask).toBeFalsy() })
     await reloads(page)
   })
@@ -1313,7 +1315,7 @@ test.describe('left panels and export', () => {
     })
     // Into a group: the group grows to hold it, and it is drawn where it was.
     await select(page, ['dot', 'poly'])
-    await page.getByTestId('arrange').getByRole('button', { name: 'Group', exact: true }).click()
+    await page.getByTestId('selection-bar').locator('[data-action="group"]').click()
     const group = (await doc(page)).nodes.dot?.parentId ?? ''
     const groupRow = tree.getByRole('treeitem').filter({ has: page.locator(`text="${(await doc(page)).nodes[group]?.name ?? ''}"`) })
     const groupBox = await groupRow.boundingBox()

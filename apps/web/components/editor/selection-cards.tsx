@@ -17,7 +17,7 @@ import { useMessages } from '../../lib/i18n/client.tsx'
 import { format, type Messages } from '../../lib/i18n/index.ts'
 import { Select } from '../ui/select.tsx'
 import { CARD, CARD_LOWER, CardHeader, PICKED_RING, SWATCHES } from './card.tsx'
-import { BAR_PANEL, CHIP, CHIP_ACCENT, DASHED_BUTTON, FIELD, FOCUS_RING, KNOBS, KNOBS_FOUR, LINK_BUTTON, POPOVER, SEGMENT, SEGMENTS, SWATCH } from './styles.ts'
+import { CHIP, CHIP_ACCENT, DASHED_BUTTON, FIELD, FOCUS_RING, KNOBS, KNOBS_FOUR, LINK_BUTTON, POPOVER, SEGMENT, SEGMENTS, SWATCH } from './styles.ts'
 import { ImagePickerButton } from './image-tool.tsx'
 import { useBrandKit } from './use-brand-kit.ts'
 import { useLiveDesign } from './use-live-design.ts'
@@ -97,7 +97,7 @@ const num = (props: Props, key: string) => props[key] as number
  * The first card for every selection: the layer's name (or how many layers), the sizes a change goes
  * to, and its box on one line, the turn under it.
  */
-function HeaderCard({ target, p, scope }: { target: Target; p: P; scope: ReactNode }) {
+function HeaderCard({ target, p, scope, children }: { target: Target; p: P; scope: ReactNode; children?: ReactNode }) {
   const fields = [
     { key: 'x', label: p.x, name: p.xName },
     { key: 'y', label: p.y, name: p.yName },
@@ -127,6 +127,7 @@ function HeaderCard({ target, p, scope }: { target: Target; p: P; scope: ReactNo
             )
         ))}
       </div>
+      {children}
     </Card>
   )
 }
@@ -280,11 +281,21 @@ function ShapeCard({ target, p, kind }: { target: Target; p: P; kind: ShapeKind 
 }
 
 /** A list of paints, strokes or effects that every selected layer has the same of, or a way to make it so. */
-function ListBody<T>({ title, p, target, field, fresh, onTop = fresh, topFirst = false, testId, render }: {
+/** A list of fills or strokes: the rows the selected layers share, and adding one on top. */
+function useList<T>(target: Target, field: string, fresh: T, onTop: T, topFirst: boolean) {
+  const list = shared(target.props.map((pr) => (pr[field] ?? []) as T[]))
+  const write = (to: (now: T[]) => T[]) => set(target, (now) => ({ [field]: to((now[field] ?? []) as T[]) }))
+  const add = () => write((now) => (list === 'mixed' && !topFirst ? [fresh] : [...now, now.length === 0 ? fresh : onTop]))
+  return { list, write, add }
+}
+
+function ListBody<T>({ title, p, target, field, fresh, onTop = fresh, topFirst = false, header = true, testId, render }: {
   /** What + adds over a list that has items already; `fresh` starts an empty one. */
   onTop?: T
   /** The last item, drawn on top, shows first, and rows can be reordered. */
   topFirst?: boolean
+  /** Its name with +; without it, + is in the card's header. */
+  header?: boolean
   title: string
   p: P
   target: Target
@@ -294,15 +305,15 @@ function ListBody<T>({ title, p, target, field, fresh, onTop = fresh, topFirst =
   /** `n` is the row's place as shown, from 1; `change` takes the item as the document holds it when the change is made, not as last drawn. */
   render: (item: T, n: number, change: (to: (now: T) => T) => void) => ReactNode
 }) {
-  const lists = target.props.map((pr) => (pr[field] ?? []) as T[])
-  const list = shared(lists)
-  const write = (to: (now: T[]) => T[]) => set(target, (now) => ({ [field]: to((now[field] ?? []) as T[]) }))
+  const { list, write, add } = useList(target, field, fresh, onTop, topFirst)
   return (
     <div className="flex flex-col gap-2" data-testid={testId}>
-      <div className="flex items-center justify-between text-xs font-semibold text-muted">
-        {title}
-        <AddButton label={format(p.add, { name: title.toLowerCase() })} onClick={() => write((now) => (list === 'mixed' && !topFirst ? [fresh] : [...now, now.length === 0 ? fresh : onTop]))} />
-      </div>
+      {header && (
+        <div className="flex items-center justify-between text-xs font-semibold text-muted">
+          {title}
+          <AddButton label={format(p.add, { name: title.toLowerCase() })} onClick={add} />
+        </div>
+      )}
       {list === 'mixed'
         ? (
           <div className="flex items-center justify-between gap-2 text-xs text-muted">
@@ -315,10 +326,13 @@ function ListBody<T>({ title, p, target, field, fresh, onTop = fresh, topFirst =
   )
 }
 
-/** The bar's fill popover: the brand's colours (not for lines), then the fill list with each fill's editor. */
-export function FillBody({ target, brandId, p, swatches = true }: { target: Target; brandId: string; p: P; swatches?: boolean }) {
+/**
+ * The fills: the brand's colours (not for lines or photos), then the fill list with each fill's
+ * editor. In the bar's Colour popover, and in a photo's Colour card.
+ */
+export function FillBody({ target, brandId, p, swatches = true, header = true }: { target: Target; brandId: string; p: P; swatches?: boolean; header?: boolean }) {
   return (
-    <div className={BAR_PANEL}>
+    <div className="flex flex-col gap-3">
       {swatches && <FillLook target={target} brandId={brandId} p={p} />}
       <ListBody<Paint>
         title={p.fill}
@@ -328,6 +342,7 @@ export function FillBody({ target, brandId, p, swatches = true }: { target: Targ
         fresh={NEW_FILL}
         onTop={FILL_ON_TOP}
         topFirst
+        header={header}
         testId="fill-list"
         render={(paint, n, change) => <PaintRow paint={paint} name={format(p.colour, { n })} brandId={brandId} editor={target.editor} p={p} onSet={change} />}
       />
@@ -335,12 +350,15 @@ export function FillBody({ target, brandId, p, swatches = true }: { target: Targ
   )
 }
 
-/** The bar's Outline popover: the stroke list, each stroke's paint, width, place, dashes, ends and corners. */
-export function OutlineBody({ target, brandId, p }: { target: Target; brandId: string; p: P }) {
+/**
+ * The strokes, each with its paint, width, place, dashes, ends and corners. In the bar's Outline
+ * popover, and in a photo's Outline card.
+ */
+export function OutlineBody({ target, brandId, p, title = p.stroke }: { target: Target; brandId: string; p: P; title?: string }) {
   return (
-    <div className={BAR_PANEL}>
+    <div className="flex flex-col gap-3">
       <ListBody<Stroke>
-        title={p.stroke}
+        title={title}
         p={p}
         target={target}
         field="strokes"
@@ -716,47 +734,80 @@ export function PhotoLookBody({ target, p, brandId, index, paint }: { target: Ta
   )
 }
 
-/** The photo's card: how its topmost image fits the layer, the image's opacity and its adjustments (exposure, contrast, saturation, temperature, tint). */
-function ImageCard({ target, p, index, paint }: { target: Target; p: P; index: number; paint: ImageFill }) {
+/** How the photo fits its layer, as a row under the header card's box: fill it, crop it, fit inside it, or tile it. */
+function FitRow({ target, p, index, paint }: { target: Target; p: P; index: number; paint: ImageFill }) {
+  return <Segments name={p.fit} value={paint.fit} options={['fill', 'crop', 'fit', 'tile'] as const} labels={p.fits} onSet={(fit) => setImage(target, index, () => ({ fit }))} />
+}
+
+/** The photo's adjustments: how much of the image shows, its exposure, contrast, saturation, temperature and tint. */
+function AdjustCard({ target, p, index, paint }: { target: Target; p: P; index: number; paint: ImageFill }) {
   const setPaint = (change: (now: ImageFill) => Partial<ImageFill>) => setImage(target, index, change)
   const setAdjust = (key: keyof ImageAdjust, to: (n: number) => number) => setPaint((now) => {
     const adjust = { exposure: 0, contrast: 0, saturation: 0, temperature: 0, tint: 0, ...now.adjust }
     return { adjust: { ...adjust, [key]: Math.round(clamp(to(adjust[key]), -100, 100)) } }
   })
   return (
-    <section aria-labelledby="image-card-title" className={CARD} data-testid="image-card">
-      <CardHeader id="image-card-title" title={p.image} note={target.names.join(', ')} />
-      <div className="flex flex-col gap-3 px-[18px] pb-3">
-        <Choice name={p.fit} value={paint.fit} options={['fill', 'fit', 'crop', 'tile'] as const} labels={p.fits} onSet={(fit) => setPaint(() => ({ fit }))} />
-      </div>
-      <div className={cn(KNOBS, CARD_LOWER)}>
+    <Card id="adjust-card" title={p.adjustTitle}>
+      <div className={KNOBS}>
+        <NumberField
+          label={p.opacity}
+          unit="%"
+          name={p.imageOpacity}
+          value={paint.opacity}
+          scale={100}
+          min={0}
+          max={1}
+          editor={target.editor}
+          onSet={(v) => setPaint(() => ({ opacity: tidy(v) }))}
+          onShift={(by) => setPaint((now) => ({ opacity: tidy(clamp(now.opacity + by, 0, 1)) }))}
+        />
+        {ADJUSTMENTS.map((key) => (
           <NumberField
-            label={p.opacity}
-            unit="%"
-            name={p.imageOpacity}
-            value={paint.opacity}
-            scale={100}
-            min={0}
-            max={1}
+            key={key}
+            label={p.adjustShort[key]}
+            name={p.adjust[key]}
+            value={paint.adjust?.[key] ?? 0}
+            min={-100}
+            max={100}
             editor={target.editor}
-            onSet={(v) => setPaint(() => ({ opacity: tidy(v) }))}
-            onShift={(by) => setPaint((now) => ({ opacity: tidy(clamp(now.opacity + by, 0, 1)) }))}
+            onSet={(v) => setAdjust(key, () => v)}
+            onShift={(by) => setAdjust(key, (n) => n + by)}
           />
-          {ADJUSTMENTS.map((key) => (
-            <NumberField
-              key={key}
-              label={p.adjustShort[key]}
-              name={p.adjust[key]}
-              value={paint.adjust?.[key] ?? 0}
-              min={-100}
-              max={100}
-              editor={target.editor}
-              onSet={(v) => setAdjust(key, () => v)}
-              onShift={(by) => setAdjust(key, (n) => n + by)}
-            />
-          ))}
-        </div>
-    </section>
+        ))}
+      </div>
+    </Card>
+  )
+}
+
+/** Several photos with the same picture: Replace and the filters, which one photo has on its bar. */
+function PhotosCard({ target, p, brandId, index, paint }: { target: Target; p: P; brandId: string; index: number; paint: ImageFill }) {
+  return (
+    <Card
+      id="photos-card"
+      title={p.image}
+      action={(
+        <ImagePickerButton brandId={brandId} title={p.replaceImageTitle} testId="replace-image" className={cn(CHIP, FOCUS_RING, 'shrink-0')} onPick={(asset) => set(target, (now) => ({ fills: withImage((now.fills ?? []) as Paint[], asset.id) }))}>
+          <span aria-hidden>{p.replaceImage}</span>
+        </ImagePickerButton>
+      )}
+    >
+      <PhotoLookBody target={target} p={p} brandId={brandId} index={index} paint={paint} />
+    </Card>
+  )
+}
+
+/**
+ * The fills, + in the header, then the strokes under an Outline heading with their own +: for a
+ * photo, whose bar holds the photo's own actions, and for several layers.
+ */
+function ColourCard({ target, brandId, p, b, swatches }: { target: Target; brandId: string; p: P; b: Messages['editor']['bar']; swatches: boolean }) {
+  const { add } = useList<Paint>(target, 'fills', NEW_FILL, FILL_ON_TOP, true)
+  const stroked = target.types.every((type) => type === 'graphic' || type === 'boolean')
+  return (
+    <Card id="fill-card" title={b.fill} action={<AddButton label={format(p.add, { name: p.fill.toLowerCase() })} onClick={add} />}>
+      <FillBody target={target} brandId={brandId} p={p} swatches={swatches} header={false} />
+      {stroked && <OutlineBody target={target} brandId={brandId} p={p} title={b.outline} />}
+    </Card>
   )
 }
 
@@ -1145,6 +1196,16 @@ function ScopeMenu({ everyFormat, onChange, size, p, children }: { everyFormat: 
   )
 }
 
+/** The effects of several layers, which have no bar of their own for them. */
+function EffectsCard({ target, p }: { target: Target; p: P }) {
+  return (
+    <section aria-labelledby="effects-card-title" className={CARD} data-testid="effects-card">
+      <CardHeader id="effects-card-title" title={p.effects} />
+      <EffectsBody target={target} p={p} />
+    </section>
+  )
+}
+
 /**
  * The selected layers as the cards and the bar act on them, in the frame they are selected in: like a
  * drag on the canvas, a change goes to the format shown unless every format is asked for. Null when
@@ -1171,14 +1232,14 @@ export function useTarget(editor: Editor, ids: string[]): { target: Target; desi
  * The selection's cards, after the font: the header card first (Arrange before it for several
  * layers, as the mock's "3 selected"), then the look, the rest open, and See-through last.
  */
-export function SelectionCards({ editor, ids, arrange }: { editor: Editor; ids: string[]; arrange: ReactNode }) {
+export function SelectionCards({ editor, brandId, ids }: { editor: Editor; brandId: string; ids: string[] }) {
   const t = useMessages()
   const p = t.editor.props
   const everyFormat = useEveryFormat()
   // Once nothing is selected, changes go to the format shown again.
   useEffect(() => () => setEveryFormat(false), [])
   const selected = useTarget(editor, ids)
-  if (!selected) return arrange
+  if (!selected) return null
   const { target, design } = selected
   const { ids: live, types, formatId } = target
   const all = (...kinds: string[]) => types.every((type) => kinds.includes(type))
@@ -1202,12 +1263,23 @@ export function SelectionCards({ editor, ids, arrange }: { editor: Editor; ids: 
   )
   return (
     <>
-      {several && arrange}
-      <HeaderCard target={target} p={p} scope={scope} />
-      {/* Each layer's look, outline and effects are in the bar; the panel keeps their numbers. */}
+      <HeaderCard target={target} p={p} scope={scope}>
+        {imageFill && <FitRow target={target} p={p} index={imageFill.index} paint={imageFill.paint} />}
+      </HeaderCard>
+      {/* One layer's look, outline and effects are in the bar; the panel keeps their numbers. A photo's
+          fills and strokes, and several layers' look, outline and effects, are cards here. */}
       {imageFill
-        ? <ImageCard target={target} p={p} index={imageFill.index} paint={imageFill.paint} />
-        : all('graphic', 'frame', 'boolean') && ownShape && <ShapeCard target={target} p={p} kind={ownShape} />}
+        ? (
+          <>
+            {several && <PhotosCard target={target} p={p} brandId={brandId} index={imageFill.index} paint={imageFill.paint} />}
+            <AdjustCard target={target} p={p} index={imageFill.index} paint={imageFill.paint} />
+            <ColourCard target={target} brandId={brandId} p={p} b={t.editor.bar} swatches={false} />
+          </>
+        )
+        : all('graphic', 'frame', 'boolean') && (several
+          ? <ColourCard target={target} brandId={brandId} p={p} b={t.editor.bar} swatches />
+          : ownShape && <ShapeCard target={target} p={p} kind={ownShape} />)}
+      {several && !all('text') && <EffectsCard target={target} p={p} />}
       {all('text') && <TextCard target={target} p={p} />}
       {all('text') && <ParagraphCard target={target} p={p} />}
       {all('frame') && <AutoLayoutCard target={target} p={p} />}

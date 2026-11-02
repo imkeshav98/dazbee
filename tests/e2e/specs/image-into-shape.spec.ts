@@ -105,7 +105,7 @@ test('the bar replaces the picture, keeping its filter; Add image puts one into 
   await page.evaluate(() => window.dazbee?.drawn())
 
   // Mono, then Replace with another brand image: the new picture, still mono, no old crop.
-  const imageCard = page.getByTestId('image-card')
+  const imageCard = page.getByTestId('adjust-card')
   await expect(imageCard).toBeVisible()
   await (await barMenu(page, 'look')).getByRole('radio', { name: 'Mono' }).click()
   await page.getByTestId('bar-replace').click()
@@ -136,7 +136,7 @@ test('the bar replaces the picture, keeping its filter; Add image puts one into 
   await adding.locator(`li[data-asset="${sneaker.id}"] button`).click()
   await page.evaluate(() => window.dazbee?.drawn())
   expect(await fillsOf(page, 'box')).toEqual([{ type: 'solid', color: '#2F6BFFFF' }, { type: 'image', assetId: sneaker.id, fit: 'fill', opacity: 1 }])
-  await expect(page.getByTestId('image-card')).toBeVisible()
+  await expect(page.getByTestId('adjust-card')).toBeVisible()
   writeOutput('into-shape-5-added.png', await page.screenshot({ animations: 'disabled' }))
   await undo(page)
   expect(await fillsOf(page, 'box')).toEqual([{ type: 'solid', color: '#2F6BFFFF' }])

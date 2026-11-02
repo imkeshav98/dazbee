@@ -62,7 +62,8 @@ test('a gradient over a photo: added on top, a stop edited, the two reordered, o
   const card = await fillList(page)
 
   // + puts a see-through colour on top; the list shows it first.
-  await card.getByRole('button', { name: 'Add fill' }).click()
+  // A photo's fills are in its Colour card, + in the card's header.
+  await page.getByTestId('fill-card').getByRole('button', { name: 'Add fill' }).click()
   await expect.poll(async () => (await fillsOf(page)).map((f) => f.type)).toEqual(['image', 'solid'])
   await expect(card.locator('[data-row="1"]')).toHaveAttribute('data-item', 'fills-1')
   await expect(card.locator('[data-row="1"] [data-paint]')).toHaveAttribute('data-paint', 'solid')
@@ -150,7 +151,8 @@ test('a stroke and the page background take the same paint editor: an angular st
   const { page, errors } = await openStage(browser, design(asset.id))
   await click(page, 760, 360)
   const stroke = await strokeList(page)
-  await stroke.getByRole('button', { name: 'Add stroke' }).click()
+  // Under the photo's fills, its strokes have an Outline heading with its +.
+  await stroke.getByRole('button', { name: 'Add outline' }).click()
   await stroke.locator('[data-row="1"]').getByTestId('paint-swatch').click()
   const editor = page.getByTestId('paint-editor')
   await editor.getByRole('radio', { name: 'Angular gradient' }).click()

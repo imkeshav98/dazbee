@@ -11,7 +11,7 @@ import { useEffect, useState, type FocusEvent, type KeyboardEvent } from 'react'
 import { cn } from '../../lib/cn.ts'
 import { useMessages } from '../../lib/i18n/client.tsx'
 import { format } from '../../lib/i18n/index.ts'
-import { ALIGN, COMBINE, DISTRIBUTE, keyOf, useSelection, type Action } from './arrange-panel.tsx'
+import { ALIGN, COMBINE, DISTRIBUTE, keyOf, useSelection } from './arrange-panel.tsx'
 import { BarPopover, keepFocus } from './bar-popover.tsx'
 import { Choice } from './fields.tsx'
 import { RotationField, set, useTarget } from './selection-cards.tsx'
@@ -79,9 +79,24 @@ function usePlace(editor: Editor, bar: HTMLElement | null): Place | null {
   return place
 }
 
+/** The six ways to line up the selection, as icons: left, centre, right, top, middle, bottom. */
+function AlignRow({ editor }: { editor: Editor }) {
+  const t = useMessages()
+  return (
+    <div dir="ltr" role="group" aria-label={t.editor.arrange.align} className="grid grid-cols-6 gap-0.5">
+      {ALIGN.map(({ action, icon: Icon }) => (
+        <button key={action} type="button" aria-label={t.editor.arrange[action]} title={format(t.editor.arrange.withKey, { label: t.editor.arrange[action], key: keyOf(action) })} data-action={action} onClick={() => editor.perform(action)} className={ICON_BUTTON}>
+          <Icon size={16} aria-hidden />
+        </button>
+      ))}
+    </div>
+  )
+}
+
 /**
- * The layers' own actions, for ⋯ More and the right-click menu: duplicate, order, group and ungroup,
- * put in a box, lock, hide, use as mask, the turn, and for text where it sits up and down in its box.
+ * The layers' own actions, for ⋯ More and the right-click menu: for one layer its line up, then
+ * duplicate, order, group and ungroup, put in a box, lock, hide, use as mask, the turn,
+ * and for text where it sits up and down in its box.
  */
 export function LayerActions({ editor, ids, onDone }: { editor: Editor; ids: string[]; onDone: () => void }) {
   const t = useMessages()
@@ -90,11 +105,11 @@ export function LayerActions({ editor, ids, onDone }: { editor: Editor; ids: str
   const selected = useTarget(editor, ids)
   if (!selected) return null
   const { target, design } = selected
-  const run = (action: Action) => {
+  const run = (action: ShortcutAction) => {
     editor.perform(action)
     onDone()
   }
-  const row = (action: Action, label = t.editor.arrange[action], pressed?: boolean) => (
+  const row = (action: ShortcutAction, label: string, pressed?: boolean) => (
     <button key={action} type="button" data-action={action} aria-pressed={pressed} onClick={() => run(action)} className={MENU_ITEM}>
       {label}
       <kbd className={MENU_KEY}>{keyOf(action)}</kbd>
@@ -109,16 +124,22 @@ export function LayerActions({ editor, ids, onDone }: { editor: Editor; ids: str
   const aligns = new Set(target.props.map((pr) => (pr.verticalAlign ?? 'top') as 'top' | 'middle' | 'bottom'))
   return (
     <>
-      {row('duplicate')}
+      {ids.length === 1 && (
+        <>
+          <div className="px-1 pb-1"><AlignRow editor={editor} /></div>
+          <div className={MENU_DIVIDER} />
+        </>
+      )}
+      {row('duplicate', t.editor.arrange.duplicate)}
       <div className={MENU_DIVIDER} />
-      {(['bringToFront', 'bringForward', 'sendBackward', 'sendToBack'] as const).map((action) => row(action))}
+      {(['bringToFront', 'bringForward', 'sendBackward', 'sendToBack'] as const).map((action) => row(action, t.editor.arrange[action]))}
       <div className={MENU_DIVIDER} />
-      {ids.length > 1 && row('group')}
-      {target.types.some((type) => type === 'group') && row('ungroup')}
+      {ids.length > 1 && row('group', t.editor.arrange.group)}
+      {target.types.some((type) => type === 'group') && row('ungroup', t.editor.arrange.ungroup)}
       {row('frameSelection', b.box)}
       <button type="button" onClick={() => { editor.setLocked(target.ids, !locked); onDone() }} className={MENU_ITEM}>{locked ? b.unlock : b.lock}</button>
       <button type="button" onClick={() => { editor.setHidden(target.ids, !hidden, target.pageId, target.formatId); onDone() }} className={MENU_ITEM}>{hidden ? b.show : b.hide}</button>
-      {row('mask', undefined, masks)}
+      {row('mask', t.editor.arrange.mask, masks)}
       {sized && (
         <>
           <div className={MENU_DIVIDER} />
@@ -198,15 +219,11 @@ export function SelectionBar({ editor, brandId }: { editor: Editor; brandId: str
       className={cn(BAR, place ? 'visible' : 'invisible')}
     >
       {selected && selected.target.types.some((type) => type === 'text') && <TextBar target={selected.target} brandId={brandId} open={open} onOpen={setOpen} />}
-      {selected && !selected.target.types.every((type) => type === 'text') && <ShapeBar target={selected.target} brandId={brandId} open={open} onOpen={setOpen} />}
+      {/* One layer's own buttons; several layers have the actions that act on them together, and their look in the panel. */}
+      {selected && !several && !selected.target.types.every((type) => type === 'text') && <ShapeBar target={selected.target} brandId={brandId} open={open} onOpen={setOpen} />}
+      {several && (
       <BarPopover id="line-up" open={open} onOpen={setOpen} label={b.lineUp} testId="line-up">
-        <div dir="ltr" role="group" aria-label={t.editor.arrange.align} className="grid grid-cols-6 gap-0.5">
-          {ALIGN.map(({ action, icon: Icon }) => (
-            <button key={action} type="button" aria-label={t.editor.arrange[action]} title={format(t.editor.arrange.withKey, { label: t.editor.arrange[action], key: keyOf(action) })} data-action={action} onClick={() => act(action)} className={ICON_BUTTON}>
-              <Icon size={16} aria-hidden />
-            </button>
-          ))}
-        </div>
+        <AlignRow editor={editor} />
         <div className={MENU_DIVIDER} />
         {DISTRIBUTE.map(({ action }) => (
           <button key={action} type="button" data-action={action} disabled={ids.length < 3} onClick={() => act(action)} className={MENU_ITEM}>
@@ -215,6 +232,7 @@ export function SelectionBar({ editor, brandId }: { editor: Editor; brandId: str
           </button>
         ))}
       </BarPopover>
+      )}
       {several && (
         <>
           <BarPopover id="combine" open={open} onOpen={setOpen} label={b.combine} testId="combine">

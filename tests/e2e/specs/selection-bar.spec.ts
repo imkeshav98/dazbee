@@ -106,8 +106,8 @@ test('Tab reaches the bar once, the arrows move along it, Enter opens a popover 
   await select(page, ['a', 'b'])
   const bar = page.getByTestId('selection-bar')
   const items = bar.locator('[data-bar-item]')
-  // Colour, Outline, Effects, Line up, Combine, Group, Box, Stack and ⋯ More.
-  await expect(items).toHaveCount(9)
+  // Line up, Combine, Group, Box, Stack and ⋯ More.
+  await expect(items).toHaveCount(6)
   // One stop for Tab: only one button is in the tab order.
   await expect(bar.locator('[data-bar-item][tabindex="0"]')).toHaveCount(1)
   await items.first().focus()
@@ -119,11 +119,11 @@ test('Tab reaches the bar once, the arrows move along it, Enter opens a popover 
   await page.keyboard.press('Home')
   await expect(items.first()).toBeFocused()
 
-  // Enter opens Colour, the first; Esc closes it and leaves the selection as it was.
+  // Enter opens Line up, the first; Esc closes it and leaves the selection as it was.
   await page.keyboard.press('Enter')
-  await expect(page.getByTestId('bar-colour-menu')).toBeVisible()
+  await expect(page.getByTestId('bar-line-up-menu')).toBeVisible()
   await page.keyboard.press('Escape')
-  await expect(page.getByTestId('bar-colour-menu')).toBeHidden()
+  await expect(page.getByTestId('bar-line-up-menu')).toBeHidden()
   expect(await page.evaluate(() => window.dazbee?.selection())).toEqual(['a', 'b'])
 
   // A click on the canvas closes it too.
@@ -216,5 +216,24 @@ test('text adds the font, size, colour, bold, align and effects; bold turns on a
   await bold.click()
   await select(page, ['headline', copy])
   await expect(bold).toHaveAttribute('aria-pressed', 'mixed')
+  expect(errors).toEqual([])
+})
+
+test('⋯ More lines up one layer; the bar puts several in a stack', async ({ browser }) => {
+  const { page, errors } = await openStage(browser, design())
+  await select(page, ['a'])
+  await expect(page.getByTestId('bar-line-up')).toHaveCount(0)
+  await (await moreMenu(page)).getByRole('button', { name: 'Align left' }).click()
+  // Like a drag, it moves the layer in the format shown.
+  await expect.poll(() => page.evaluate(() => {
+    const d = window.dazbee?.design()
+    return ({ ...d?.nodes.a?.props, ...d?.overrides['format:sq']?.a } as { x: number }).x
+  })).toBe(0)
+  await page.keyboard.press('Escape')
+
+  await select(page, ['a', 'b'])
+  await expect(page.getByTestId('bar-line-up')).toBeVisible()
+  await page.getByTestId('selection-bar').locator('[data-action="autoLayout"]').click()
+  await expect.poll(() => page.evaluate(() => Object.values(window.dazbee?.design().nodes ?? {}).some((n) => n.type === 'frame' && (n.props as { layout?: unknown }).layout !== undefined))).toBe(true)
   expect(errors).toEqual([])
 })
