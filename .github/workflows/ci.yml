@@ -112,7 +112,7 @@ jobs:
   # takes the job slot they leave free.
   perf:
     needs: e2e
-    if: ${{ !cancelled() && (github.event_name == 'push' || github.head_ref == 'fix/296-speed-checks-count-work') }}
+    if: ${{ !cancelled() && github.event_name == 'push' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     continue-on-error: true
