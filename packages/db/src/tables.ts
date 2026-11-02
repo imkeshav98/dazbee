@@ -99,6 +99,12 @@ export const assets = pgTable('assets', {
   /** Lowercase words the brand searches by, each once. */
   tags: text().array().notNull().default(sql`'{}'::text[]`),
   createdAt: createdAt(),
+  /**
+   * When the brand deleted it from its library. A deleted asset is no longer listed, but a design
+   * that still names it (brought back by undo, or from a tab not yet saved) still draws it, and
+   * uploading the same bytes again brings it back.
+   */
+  deletedAt: timestamp('deleted_at', { withTimezone: true }),
 }, (t) => [
   unique('assets_brand_sha256').on(t.brandId, t.sha256),
   foreignKey({ name: 'assets_brand_in_workspace', columns: [t.brandId, t.workspaceId], foreignColumns: [brands.id, brands.workspaceId] }),

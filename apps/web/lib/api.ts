@@ -2,7 +2,7 @@
 import 'server-only'
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
-import { ApiError, AssetInUse, AssetLink, AssetSummary, BrandKit, BrandSummary, DesignCover, DesignSummary, DesignThumbnail, FontFace, FontFamily, FontLink, FontUploadTicket, SignedIn, SignedLink, SignedOut, SignInLink, SyncToken, TemplateSummary, UploadTicket, WorkspaceSummary, type FontType, type ImageType, type SaveTemplate, type UpdateAsset, type UpdateWorkspace } from '@dazbee/schema'
+import { ApiError, AssetInUse, AssetLink, AssetSummary, AssetUse, BrandKit, BrandSummary, DesignCover, DesignSummary, DesignThumbnail, FontFace, FontFamily, FontLink, FontUploadTicket, SignedIn, SignedLink, SignedOut, SignInLink, SyncToken, TemplateSummary, UploadTicket, WorkspaceSummary, type FontType, type ImageType, type SaveTemplate, type UpdateAsset, type UpdateWorkspace } from '@dazbee/schema'
 import { z } from 'zod'
 
 const API_URL = process.env.API_URL ?? 'http://localhost:8787'
@@ -172,6 +172,10 @@ export const listAssets = (brandId: string, query = '') =>
 /** Renames an asset or sets its tags (#52). */
 export const updateAsset = (brandId: string, assetId: string, update: UpdateAsset) =>
   call(AssetSummary, `/brands/${encodeURIComponent(brandId)}/assets/${encodeURIComponent(assetId)}`, { method: 'PATCH', body: update })
+
+/** What of the brand shows its asset. */
+export const assetUses = (brandId: string, assetId: string) =>
+  call(AssetUse.array(), `/brands/${encodeURIComponent(brandId)}/assets/${encodeURIComponent(assetId)}/uses`)
 
 /** Deletes the brand's asset: null once it is gone, or what still uses it when the API refuses. */
 export async function deleteAsset(brandId: string, assetId: string): Promise<AssetInUse | null> {

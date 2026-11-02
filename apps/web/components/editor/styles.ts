@@ -19,9 +19,9 @@ export const DASHED_BUTTON = `flex h-8 cursor-pointer items-center justify-cente
 /** A chip in pink, for a choice that is set: the header card's sizes. */
 export const CHIP_ACCENT = `${CHIP} border-transparent bg-accent-soft text-accent-text hover:border-transparent hover:text-accent-text`
 /** A word-sized button that acts at once, in pink: a menu row's Reset. */
-/** A button with words and no box until hovered, as a panel's Done or Delete. */
-export const QUIET_BUTTON = `flex h-8 cursor-pointer items-center gap-1.5 rounded-row px-3 text-[13px] font-medium text-muted hover:bg-hover hover:text-text ${FOCUS_RING}`
 export const LINK_BUTTON = `shrink-0 cursor-pointer rounded-row px-1.5 text-[12px] font-semibold text-accent-text hover:bg-hover ${FOCUS_RING}`
+/** A button with words and no box until hovered, as a panel's Done or Delete. */
+export const QUIET_BUTTON = `flex h-8 cursor-pointer items-center gap-1.5 rounded-row px-3 text-[13px] font-medium text-muted hover:bg-hover hover:text-text disabled:pointer-events-none disabled:opacity-50 ${FOCUS_RING}`
 
 /** A square tile showing one image asset's thumbnail, in the asset library and the image picker. */
 export const ASSET_TILE = 'grid aspect-square place-items-center overflow-hidden rounded-[10px] border border-line bg-bg/40 transition-colors duration-[var(--chrome-fast)]'

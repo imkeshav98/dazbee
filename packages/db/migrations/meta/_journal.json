@@ -71,6 +71,13 @@
       "when": 1793532588865,
       "tag": "0009_brand-website",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1793608406390,
+      "tag": "0010_asset-deleted-at",
+      "breakpoints": true
     }
   ]
 }

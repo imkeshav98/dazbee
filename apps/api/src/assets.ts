@@ -5,7 +5,7 @@ import { createHash, randomUUID } from 'node:crypto'
 import { assets, brandKits, designs, designStates, templates, type Db } from '@dazbee/db'
 import { imageAssetIds, parseDesign, type AssetSummary, type AssetUse, type ImageType, type UpdateAsset, type UploadTicket } from '@dazbee/schema'
 import type { Storage } from '@dazbee/storage'
-import { and, desc, eq, sql, type SQL } from 'drizzle-orm'
+import { and, desc, eq, isNull, sql, type SQL } from 'drizzle-orm'
 import { storedDesign } from './design-thumbnails.ts'
 import { readImageHeader } from './images.ts'
 import { makeThumbnail } from './thumbnails.ts'
@@ -42,7 +42,7 @@ function matches(word: string): SQL {
 export async function listAssets(db: Db, workspaceId: string, brandId: string, query = ''): Promise<AssetSummary[]> {
   const words = query.trim().split(/\s+/).filter(Boolean)
   const rows = await db.select(summary).from(assets)
-    .where(and(eq(assets.workspaceId, workspaceId), eq(assets.brandId, brandId), ...words.map(matches)))
+    .where(and(eq(assets.workspaceId, workspaceId), eq(assets.brandId, brandId), isNull(assets.deletedAt), ...words.map(matches)))
     .orderBy(desc(assets.createdAt), desc(assets.id))
   return rows.map(toSummary)
 }
@@ -75,17 +75,30 @@ export async function assetUses(db: Db, workspaceId: string, brandId: string, id
   return uses
 }
 
+/** Whether the brand has the asset in its library: recorded and not deleted. */
+async function listed(db: Db, workspaceId: string, brandId: string, id: string) {
+  const [row] = await db.select({ id: assets.id }).from(assets)
+    .where(and(eq(assets.id, id), eq(assets.workspaceId, workspaceId), eq(assets.brandId, brandId), isNull(assets.deletedAt)))
+  return Boolean(row)
+}
+
+/** What of the brand shows the asset, or null when its library has no such asset. */
+export async function listedAssetUses(db: Db, workspaceId: string, brandId: string, id: string): Promise<AssetUse[] | null> {
+  return (await listed(db, workspaceId, brandId, id)) ? assetUses(db, workspaceId, brandId, id) : null
+}
+
 /**
- * Deletes the brand's asset unless something of the brand still shows it: then nothing is deleted
- * and the answer is what uses it. Null when the brand has no such asset. The original stays in
- * storage, since other brands of the workspace may have assets of the same bytes.
+ * Deletes the brand's asset from its library unless something of the brand still shows it: then
+ * nothing changes and the answer is what uses it. Null when the library has no such asset. The row
+ * is only marked, so a design that names the asset again (undo, a tab not yet saved) still draws
+ * it; the bytes stay in storage, which other brands' assets of them may share.
  */
 export async function deleteAsset(db: Db, workspaceId: string, brandId: string, id: string): Promise<{ deleted: true } | { usedIn: AssetUse[] } | null> {
-  const asset = await findAsset(db, workspaceId, brandId, { id })
-  if (!asset) return null
-  const usedIn = await assetUses(db, workspaceId, brandId, id)
+  const usedIn = await listedAssetUses(db, workspaceId, brandId, id)
+  if (!usedIn) return null
   if (usedIn.length > 0) return { usedIn }
-  await db.delete(assets).where(and(eq(assets.id, id), eq(assets.workspaceId, workspaceId), eq(assets.brandId, brandId)))
+  await db.update(assets).set({ deletedAt: sql`now()` })
+    .where(and(eq(assets.id, id), eq(assets.workspaceId, workspaceId), eq(assets.brandId, brandId), isNull(assets.deletedAt)))
   return { deleted: true }
 }
 
@@ -114,7 +127,10 @@ export async function ensureThumbnail(storage: Storage, workspaceId: string, ass
 
 export async function findAsset(db: Db, workspaceId: string, brandId: string, by: { id: string } | { sha256: string }): Promise<AssetSummary | null> {
   const match = 'id' in by ? eq(assets.id, by.id) : eq(assets.sha256, by.sha256)
-  const [row] = await db.select(summary).from(assets).where(and(match, eq(assets.workspaceId, workspaceId), eq(assets.brandId, brandId)))
+  const where = and(match, eq(assets.workspaceId, workspaceId), eq(assets.brandId, brandId))
+  // Found by its bytes, as an upload or a template's copy finds it, a deleted asset is back in the library.
+  if ('sha256' in by) await db.update(assets).set({ deletedAt: null }).where(and(where, sql`${assets.deletedAt} IS NOT NULL`))
+  const [row] = await db.select(summary).from(assets).where(where)
   return row ? toSummary(row) : null
 }
 

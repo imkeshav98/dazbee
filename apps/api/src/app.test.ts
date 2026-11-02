@@ -667,13 +667,24 @@ describe('deleting images', { timeout: 60_000 }, () => {
     overrides: {},
   })
 
-  it('deletes an image nothing uses, and only the brand\'s own', async () => {
-    const unused = await image(png(10, 10, `${run}-unused`))
+  const listedIds = async () => AssetSummary.array().parse((await call('a', 'GET', `/brands/${brand.id}/assets`)).json).map((a) => a.id)
+
+  it('deletes an image nothing uses from the library, and only the brand\'s own; a design that names it again still draws it', async () => {
+    const bytes = png(10, 10, `${run}-unused`)
+    const unused = await image(bytes)
+    expect((await call('a', 'GET', `/brands/${brand.id}/assets/${unused.id}/uses`)).json).toEqual([])
     expect((await call('b', 'DELETE', `/brands/${brand.id}/assets/${unused.id}`)).status).toBe(404)
+    expect((await call('b', 'GET', `/brands/${brand.id}/assets/${unused.id}/uses`)).status).toBe(404)
     expect((await call('a', 'DELETE', `/brands/${sibling.id}/assets/${unused.id}`)).status).toBe(404)
     expect((await call('a', 'DELETE', `/brands/${brand.id}/assets/${unused.id}`)).status).toBe(204)
-    expect((await call('a', 'GET', `/brands/${brand.id}/assets/${unused.id}`)).status).toBe(404)
+    expect(await listedIds()).not.toContain(unused.id)
     expect((await call('a', 'DELETE', `/brands/${brand.id}/assets/${unused.id}`)).status).toBe(404)
+    expect((await call('a', 'GET', `/brands/${brand.id}/assets/${unused.id}/uses`)).status).toBe(404)
+    // Undo, or a tab not yet saved, can bring a fill of it back: it still draws.
+    expect((await call('a', 'GET', `/brands/${brand.id}/assets/${unused.id}`)).status).toBe(200)
+    // Uploading the same bytes again brings it back to the library, the same asset.
+    expect((await image(bytes)).id).toBe(unused.id)
+    expect(await listedIds()).toContain(unused.id)
   })
 
   it('refuses to delete an image a design, a template or the logo shows, naming them; it goes once none does', async () => {
@@ -682,6 +693,7 @@ describe('deleting images', { timeout: 60_000 }, () => {
     const template = TemplateSummary.parse((await call('a', 'POST', `/brands/${brand.id}/templates`, { name: `Shop template ${run}`, scope: 'brand', content: withPhoto(used.id) })).json)
     const refused = await call('a', 'DELETE', `/brands/${brand.id}/assets/${used.id}`)
     expect(refused.status).toBe(409)
+    expect((await call('a', 'GET', `/brands/${brand.id}/assets/${used.id}/uses`)).json).toEqual(AssetInUse.parse(refused.json).usedIn)
     expect(AssetInUse.parse(refused.json).usedIn).toEqual([
       { kind: 'design', id: design.id, name: `Shop window ${run}` },
       { kind: 'template', id: template.id, name: `Shop template ${run}` },

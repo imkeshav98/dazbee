@@ -8,7 +8,7 @@ import { Hono, type MiddlewareHandler } from 'hono'
 import type { z } from 'zod'
 import { getBrandKit, InvalidKit, saveBrandKit } from './brand-kits.ts'
 import { deleteTemplate, findTemplate, listTemplates, renameTemplate, saveTemplate, startFromTemplate, templateThumbnailKey } from './templates.ts'
-import { deleteAsset, ensureThumbnail, findAsset, InvalidUpload, listAssets, originalKey, recordAsset, SIGNED_URL_SECONDS, startUpload, updateAsset } from './assets.ts'
+import { deleteAsset, ensureThumbnail, listedAssetUses, findAsset, InvalidUpload, listAssets, originalKey, recordAsset, SIGNED_URL_SECONDS, startUpload, updateAsset } from './assets.ts'
 import { designCover, ensureDesignThumbnail, storedDesign } from './design-thumbnails.ts'
 import { fontLink, InvalidFont, listFonts, recordFont, startFontUpload } from './fonts.ts'
 import { createBrand, createDesign, deleteDesign, findBrand, findDesign, findWorkspace, InvalidContent, listBrands, listDesigns, renameDesign, updateWorkspace } from './designs.ts'
@@ -233,7 +233,15 @@ export function createApp({ db, storage, sessionOf, syncSecret, signIn = null }:
     return c.json(asset)
   })
 
-  // Deleting an image a design, a template or the logo still shows is refused, saying which (#222).
+  // What shows an image, asked before deleting it; deleting one a design, a template or the logo
+  // still shows is refused, saying which.
+  app.get('/brands/:brandId/assets/:assetId/uses', async (c) => {
+    const { workspaceId } = c.var.session
+    const uses = await listedAssetUses(db, workspaceId, c.req.param('brandId'), c.req.param('assetId'))
+    if (!uses) return c.json(error('No such asset'), 404)
+    return c.json(uses)
+  })
+
   app.delete('/brands/:brandId/assets/:assetId', async (c) => {
     const { workspaceId } = c.var.session
     const result = await deleteAsset(db, workspaceId, c.req.param('brandId'), c.req.param('assetId'))

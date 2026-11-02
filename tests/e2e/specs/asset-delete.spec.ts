@@ -1,6 +1,6 @@
-// Deleting an image from the asset library in Chromium, with real input: one nothing uses goes
-// after Delete is confirmed; one the open design uses, or another design does, stays and the panel
-// says where it is used.
+// Deleting an image from the asset library in Chromium, with real input: Delete on the tile asks
+// first; one nothing uses goes once confirmed; one the open design uses, or another design does,
+// can't be deleted and the panel says where it is used.
 import { randomUUID } from 'node:crypto'
 import { expect, test, type Page } from '../support/test.ts'
 import type { DesignInput } from '@dazbee/schema'
@@ -23,20 +23,18 @@ const design = (assetId?: string): DesignInput => ({
     : {},
   overrides: {},
 })
-const assetStatus = async (id: string) => (await fetch(`${API_URL}/brands/${DEV_BRAND}/assets/${id}`)).status
+/** Whether the library lists the asset. */
+const listed = async (id: string) => ((await (await fetch(`${API_URL}/brands/${DEV_BRAND}/assets`)).json()) as { id: string }[]).some((a) => a.id === id)
 
-/** Opens the library, then the asset's details, and asks to delete it. */
+/** Opens the library, finds the asset and presses Delete on its tile. */
 async function deleteFromLibrary(page: Page, id: string, name: string) {
   await page.locator('[data-panel="assets"]').click()
   const library = page.getByTestId('asset-library')
   await library.getByRole('searchbox', { name: 'Search by name or tag' }).fill(name)
   const tile = library.locator(`li[data-asset="${id}"]`)
   await tile.hover()
-  await tile.getByRole('button', { name: /^Name and tags/ }).click()
-  const details = page.getByTestId('asset-details')
-  await details.getByTestId('asset-delete').click()
-  await details.getByTestId('asset-delete-confirm').click()
-  return { library, tile, details }
+  await tile.getByRole('button', { name: `Delete: ${name}` }).click()
+  return { library, tile, details: page.getByTestId('asset-details') }
 }
 
 test('an image nothing uses is deleted once Delete is confirmed', async ({ browser }) => {
@@ -44,9 +42,12 @@ test('an image nothing uses is deleted once Delete is confirmed', async ({ brows
   const name = `Unused ${run}`
   await fetch(`${API_URL}/brands/${DEV_BRAND}/assets/${asset.id}`, { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name }) })
   const { page, errors } = await openStage(browser, design())
-  const { tile } = await deleteFromLibrary(page, asset.id, name)
+  const { tile, details } = await deleteFromLibrary(page, asset.id, name)
+  await expect(details.getByTestId('asset-delete-confirm')).toHaveText(`Delete ${name}`)
+  writeOutput('asset-delete-confirm.png', await page.screenshot())
+  await details.getByTestId('asset-delete-confirm').click()
   await expect(tile).toHaveCount(0)
-  expect(await assetStatus(asset.id)).toBe(404)
+  expect(await listed(asset.id)).toBe(false)
   expect(errors).toEqual([])
 })
 
@@ -56,9 +57,10 @@ test('an image the open design uses stays, and the panel says so', async ({ brow
   await fetch(`${API_URL}/brands/${DEV_BRAND}/assets/${asset.id}`, { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name }) })
   const { page, errors } = await openStage(browser, design(asset.id))
   const { tile, details } = await deleteFromLibrary(page, asset.id, name)
-  await expect(details.getByTestId('asset-in-use')).toHaveText('In use: this design')
+  await expect(details.getByTestId('asset-in-use')).toHaveText('Used in this design')
+  await expect(details.getByTestId('asset-delete-confirm')).toHaveCount(0)
   await expect(tile).toHaveCount(1)
-  expect(await assetStatus(asset.id)).toBe(200)
+  expect(await listed(asset.id)).toBe(true)
   writeOutput('asset-delete-in-use.png', await page.screenshot())
   expect(errors).toEqual([])
 })
@@ -70,9 +72,10 @@ test('an image another design uses stays, and the panel names that design', asyn
   await api('/designs', { name: `Shop window ${run}`, content: design(asset.id) })
   const { page, errors } = await openStage(browser, design())
   const { tile, details } = await deleteFromLibrary(page, asset.id, name)
-  await expect(details.getByTestId('asset-in-use')).toHaveText(`In use: Shop window ${run}`)
+  await expect(details.getByTestId('asset-in-use')).toHaveText(`Used in Shop window ${run}`)
+  await expect(details.getByTestId('asset-delete-confirm')).toHaveCount(0)
   await expect(tile).toHaveCount(1)
-  expect(await assetStatus(asset.id)).toBe(200)
+  expect(await listed(asset.id)).toBe(true)
   writeOutput('asset-delete-elsewhere.png', await page.screenshot())
   expect(errors).toEqual([])
 })
