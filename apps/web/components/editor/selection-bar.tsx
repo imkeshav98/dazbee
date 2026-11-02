@@ -13,7 +13,7 @@ import { useLocale, useMessages } from '../../lib/i18n/client.tsx'
 import { dirOf, format } from '../../lib/i18n/index.ts'
 import { ALIGN, COMBINE, DISTRIBUTE, keyOf, useSelection } from './arrange-panel.tsx'
 import { BarPopover, keepFocus } from './bar-popover.tsx'
-import { RotationField, useTarget } from './selection-cards.tsx'
+import { RotationField, set, shared, useTarget } from './selection-cards.tsx'
 import { BAR, BAR_BUTTON, BAR_DIVIDER, ICON_BUTTON, MENU, MENU_DIVIDER, MENU_ITEM, MENU_KEY } from './styles.ts'
 import { ShapeBar } from './shape-bar.tsx'
 import { TextBar } from './text-bar.tsx'
@@ -165,6 +165,8 @@ export function LayerActions({ editor, ids, onDone }: { editor: Editor; ids: str
   const hidden = target.props.every((pr) => pr.visible === false)
   const masks = target.props.every((pr) => Boolean(pr.mask))
   const sized = target.types.every((type) => type !== 'group' && type !== 'boolean')
+  const texts = target.types.every((type) => type === 'text')
+  const direction = shared(target.props.map((pr) => (pr.direction ?? 'auto') as 'auto' | 'ltr' | 'rtl'))
   return (
     <>
       {row('duplicate', t.editor.arrange.duplicate)}
@@ -185,6 +187,15 @@ export function LayerActions({ editor, ids, onDone }: { editor: Editor; ids: str
         {row('mask', t.editor.arrange.mask, masks)}
         {target.types.some((type) => type === 'group') && row('ungroup', t.editor.arrange.ungroup)}
       </SubMenu>
+      {texts && (
+        <SubMenu label={b.textDirection} testId="text-direction">
+          {(['auto', 'ltr', 'rtl'] as const).map((to) => (
+            <button key={to} type="button" aria-pressed={direction === to} data-direction={to} onClick={() => { set({ ...target, everyFormat: true }, () => ({ direction: to })); onDone() }} className={MENU_ITEM}>
+              {b.textDirections[to]}
+            </button>
+          ))}
+        </SubMenu>
+      )}
       {sized && (
         <>
           <div className={MENU_DIVIDER} />

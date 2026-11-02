@@ -10,7 +10,7 @@
 import * as Popover from '@radix-ui/react-popover'
 import { ArrowsHorizontalIcon, ArrowsVerticalIcon, CaretDownIcon, ImageSquareIcon, RectangleIcon } from '@phosphor-icons/react'
 import { withImage, type Editor } from '@dazbee/editor'
-import { BlendMode, boundFillIndex, brandRef, ContainerBlendMode, ImageFilter, LineEnd, type Design, type Effect, type ImageAdjust, type Paint, type Shape } from '@dazbee/schema'
+import { BlendMode, BooleanOp, boundFillIndex, brandRef, ContainerBlendMode, ImageFilter, LineEnd, type Design, type Effect, type ImageAdjust, type Paint, type Shape } from '@dazbee/schema'
 import { useEffect, useState, type ReactNode } from 'react'
 import { cn } from '../../lib/cn.ts'
 import { useMessages } from '../../lib/i18n/client.tsx'
@@ -18,6 +18,7 @@ import { format, type Messages } from '../../lib/i18n/index.ts'
 import { Select } from '../ui/select.tsx'
 import { CARD, CARD_LOWER, CardHeader, PICKED_RING, SWATCHES } from './card.tsx'
 import { CHIP, CHIP_ACCENT, DASHED_BUTTON, FIELD, FIELD_LABEL, FOCUS_RING, KNOBS, KNOBS_FOUR, LINK_BUTTON, POPOVER, SEGMENT, SEGMENTS, SWATCH, SWITCH, SWITCH_ROW, TILE, TILE_FACE, TILE_FACE_WIDE } from './styles.ts'
+import { COMBINE } from './arrange-panel.tsx'
 import { ImagePickerButton } from './image-tool.tsx'
 import { useBrandKit } from './use-brand-kit.ts'
 import { useLiveDesign } from './use-live-design.ts'
@@ -891,6 +892,51 @@ type Layout = { direction: 'row' | 'column'; gap: number; padding: Record<'top' 
 type Place = 'start' | 'center' | 'end'
 const PLACES: Place[] = ['start', 'center', 'end']
 
+/** Each operation's action, which names it and gives its icon. */
+const OPERATIONS = { union: 'booleanUnion', subtract: 'booleanSubtract', intersect: 'booleanIntersect', exclude: 'booleanExclude' } as const
+
+/**
+ * A boolean's operation, changed in place for every format: its shapes added together, the rest
+ * cut from the first, where they overlap, or where they don't.
+ */
+function CombineCard({ target, p, a }: { target: Target; p: P; a: Messages['editor']['arrange'] }) {
+  const value = shared(target.props.map((pr) => pr.op as (typeof BooleanOp.options)[number]))
+  return (
+    <Card id="combine-card" title={p.combine}>
+      <div role="radiogroup" aria-label={p.combine} className={SEGMENTS}>
+        {BooleanOp.options.map((op) => {
+          const action = OPERATIONS[op]
+          const Icon = COMBINE.find((c) => c.action === action)?.icon
+          const name = a[action]
+          return (
+            <button key={op} type="button" role="radio" aria-checked={value === op} aria-label={name} title={name} data-value={op} onClick={() => set({ ...target, everyFormat: true }, () => ({ op }))} className={cn(SEGMENT, 'grid place-items-center')}>
+              {Icon && <Icon size={16} aria-hidden />}
+            </button>
+          )
+        })}
+      </div>
+    </Card>
+  )
+}
+
+/** A mask: by its shape (where it is opaque) or by its brightness. A mask is the same in every format. */
+function MaskCard({ target, p }: { target: Target; p: P }) {
+  return (
+    <Card id="mask-card" title={p.mask}>
+      <div className="flex flex-col gap-1">
+        <span className={FIELD_LABEL}>{p.maskBy}</span>
+        <Segments
+          name={p.maskBy}
+          value={shared(target.props.map((pr) => pr.mask as 'alpha' | 'luminance'))}
+          options={['alpha', 'luminance'] as const}
+          labels={p.maskTypes}
+          onSet={(mask) => target.editor.session.run('node.mask', { ids: target.ids, mask })}
+        />
+      </div>
+    </Card>
+  )
+}
+
 /** A frame: whether what is inside shows past its edges. */
 function FrameCard({ target, p }: { target: Target; p: P }) {
   return (
@@ -1418,6 +1464,8 @@ export function SelectionCards({ editor, brandId, ids }: { editor: Editor; brand
           ? <ColourCard target={target} brandId={brandId} p={p} b={t.editor.bar} swatches />
           : ownShape && <ShapeCard target={target} p={p} kind={ownShape} />)}
       {several && !all('text') && <EffectsCard target={target} p={p} />}
+      {all('boolean') && <CombineCard target={target} p={p} a={t.editor.arrange} />}
+      {target.props.every((pr) => pr.mask) && <MaskCard target={target} p={p} />}
       {all('text') && <TextBoxCard target={target} p={p} />}
       {all('text') && <SpacingCard target={target} p={p} />}
       {all('frame') && <FrameCard target={target} p={p} />}

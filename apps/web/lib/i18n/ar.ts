@@ -185,6 +185,8 @@ export const ar: Messages = {
       withKey: '{label} ({key})',
     },
     bar: {
+      textDirection: 'اتجاه النص',
+      textDirections: { auto: 'تلقائي', ltr: 'من اليسار إلى اليمين', rtl: 'من اليمين إلى اليسار' },
       label: 'التحديد',
       lineUp: 'محاذاة',
       order: 'الترتيب',
@@ -275,6 +277,10 @@ export const ar: Messages = {
       noFonts: 'لا خطوط بعد. أضفها من تعديل.',
     },
     props: {
+      combine: 'الدمج',
+      mask: 'القناع',
+      maskBy: 'القناع حسب',
+      maskTypes: { alpha: 'الشكل', luminance: 'السطوع' },
       applyTo: 'طبّق التغييرات على',
       forAllSizes: 'لكل المقاسات',
       allSizes: 'كل المقاسات',
