@@ -194,6 +194,8 @@ export const en = {
       withKey: '{label} ({key})',
     },
     bar: {
+      textDirection: 'Text direction',
+      textDirections: { auto: 'Auto', ltr: 'Left to right', rtl: 'Right to left' },
       label: 'Selection',
       lineUp: 'Line up',
       order: 'Order',
@@ -284,6 +286,11 @@ export const en = {
       noFonts: 'No fonts yet. Add them with Edit.',
     },
     props: {
+      combine: 'Combine',
+      combineOps: { union: 'Union', subtract: 'Subtract', intersect: 'Intersect', exclude: 'Exclude' },
+      mask: 'Mask',
+      maskBy: 'Shows through where it is',
+      maskTypes: { alpha: 'Opaque', luminance: 'Bright' },
       applyTo: 'Apply changes to',
       forAllSizes: 'For all sizes',
       allSizes: 'All sizes',

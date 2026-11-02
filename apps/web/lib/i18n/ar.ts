@@ -185,6 +185,8 @@ export const ar: Messages = {
       withKey: '{label} ({key})',
     },
     bar: {
+      textDirection: 'اتجاه النص',
+      textDirections: { auto: 'تلقائي', ltr: 'من اليسار إلى اليمين', rtl: 'من اليمين إلى اليسار' },
       label: 'التحديد',
       lineUp: 'محاذاة',
       order: 'الترتيب',
@@ -275,6 +277,11 @@ export const ar: Messages = {
       noFonts: 'لا خطوط بعد. أضفها من تعديل.',
     },
     props: {
+      combine: 'الدمج',
+      combineOps: { union: 'توحيد', subtract: 'طرح', intersect: 'تقاطع', exclude: 'استبعاد' },
+      mask: 'القناع',
+      maskBy: 'يظهر ما تحته حيث يكون',
+      maskTypes: { alpha: 'معتمًا', luminance: 'ساطعًا' },
       applyTo: 'طبّق التغييرات على',
       forAllSizes: 'لكل المقاسات',
       allSizes: 'كل المقاسات',
