@@ -95,6 +95,27 @@ test('a path drawn before paths had a size gets one on its first resize, and sca
   expect(errors).toEqual([])
 })
 
+test('an SVG placed as layers scales with its group, export included', async ({ browser }) => {
+  const { page, errors } = await openStage(browser, { ...design, nodes: {} })
+  await page.context().grantPermissions(['clipboard-read', 'clipboard-write'])
+  await page.evaluate(() => navigator.clipboard.writeText('<svg xmlns="http://www.w3.org/2000/svg" width="200" height="100"><path d="M0 0H100V100Z" fill="#E02020"/><circle cx="150" cy="50" r="50" fill="#2050E0"/></svg>'))
+  const middle = await screenPoint(page, 540, 540)
+  await page.mouse.click(middle.x, middle.y)
+  await page.keyboard.press('Control+v')
+  await expect.poll(async () => Object.keys((await read(page)).nodes).length).toBe(3)
+  // Placed at its own size in the middle of the square: 440,490 to 640,590.
+  const [groupId] = await page.evaluate(() => window.dazbee?.selection() ?? [])
+  expect(await props(page, groupId ?? '')).toMatchObject({ x: 440, y: 490, width: 200, height: 100 })
+  await stretch(page, 200, 100)
+  // Twice the size: the circle's middle is now 740,590, its edge 90 further right.
+  expect(await exported(page, 740, 590)).toEqual([32, 80, 224])
+  expect(await exported(page, 830, 590)).toEqual([32, 80, 224])
+  writeOutput('path-resize-5-svg.png', await page.screenshot())
+  await press(page, 'undo')
+  expect(await exported(page, 830, 590)).toEqual([255, 255, 255])
+  expect(errors).toEqual([])
+})
+
 test('a group of paths scales every path in it', async ({ browser }) => {
   const { page, errors } = await openStage(browser, design)
   const at = await screenPoint(page, 200, 540)
