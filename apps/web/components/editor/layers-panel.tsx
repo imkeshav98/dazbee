@@ -182,8 +182,8 @@ export function LayersPanel({ editor }: { editor: Editor }) {
     observer.observe(el)
     return () => observer.disconnect()
   }, [follow])
-  const first = view.from
-  const last = Math.min(rows.length, view.to)
+  const first = Math.min(0, view.from)
+  const last = Math.max(rows.length, view.to)
 
   // The row keyboard focus is on: the one the arrows move from. Tab lands on it.
   const [active, setActive] = useState<string | null>(null)

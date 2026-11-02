@@ -3,6 +3,7 @@
 // page only hands it a canvas and an overlay the size of the stage.
 import { HocuspocusProvider, WebSocketStatus } from '@hocuspocus/provider'
 import { anchorOffset, childrenOf, CommandError, openSession, readDesign, textAnchor, type Session, type TextAnchor } from '@dazbee/doc'
+import { exportDesign } from '@dazbee/export'
 import { FALLBACK_FAMILIES, FONT_FACES } from '@dazbee/fonts'
 import {
   caretAt, caretPosition, drawPage, layerPictures, paragraphCache, selectionBoxes, render, renderDesign, resourceCache, sceneMemo, textMeasure, type MeasureText, type ResourceCache, type Resources, type Scene, type SceneLayer,
@@ -1243,10 +1244,9 @@ function live(
     c.scale(camera.zoom, camera.zoom)
     for (const frame of drawnFrames) {
       const entry = cached(frame)
-      if (!entry.picture) {
-        entry.picture = record(entry.scene, withParagraphs(screen))
-        recorded++
-      }
+      entry.picture?.delete()
+      entry.picture = record(entry.scene, withParagraphs(screen))
+      recorded++
       const box = ck.XYWHRect(frame.x, frame.y, frame.width, frame.height)
       c.drawRect(box, backing)
       c.save()
@@ -1540,6 +1540,7 @@ function live(
     let toY = Math.round
     snapped = null
     const moving = g.roots.map((id) => g.boxes.get(id)).filter((b): b is Box => b !== undefined)
+    g.targets = targetsFor(g.frame, g.roots, g.around)
     if (snap && g.targets && moving.length > 0) {
       snapWork.moves++
       snapWork.checked += g.targets.boxes.length
@@ -3581,7 +3582,7 @@ function live(
       // A family picked or an image placed a moment ago is drawn as itself, never the fallback or a gap.
       screenResources(session.design())
       await Promise.all([fontsLoading, imagesLoading])
-      return exporter.run(session.design(), request, resourceBytes, progress)
+      return exportDesign(ck, JSON.parse(JSON.stringify(session.design())), request, resourceBytes, cache, progress)
     },
     /**
      * Gives layers back the values every format has, in one format (`scope`, `format:<id>`): the
