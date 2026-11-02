@@ -889,10 +889,14 @@ test.describe('shapes and frames', () => {
       await expect.poll(async () => (await props(page, 'plain')).cornerRadius).toBe(50)
     })
     await step(page, () => box.getByRole('switch', { name: 'Each corner its own' }).click(), async () => {
-      await expect.poll(async () => (await props(page, 'plain')).corners).toEqual([50, 50, 50, 50])
+      await expect.poll(async () => (await props(page, 'plain')).cornerRadius).toEqual([50, 50, 50, 50])
     }, { draws: false })
     await step(page, () => enter(box.getByRole('spinbutton', { name: 'Top right radius' }), '0'), async () => {
-      await expect.poll(async () => (await props(page, 'plain')).corners).toEqual([50, 0, 50, 50])
+      await expect.poll(async () => (await props(page, 'plain')).cornerRadius).toEqual([50, 0, 50, 50])
+    })
+    // Back to one radius: the top left's.
+    await step(page, () => box.getByRole('switch', { name: 'Each corner its own' }).click(), async () => {
+      await expect.poll(async () => (await props(page, 'plain')).cornerRadius).toBe(50)
     })
     await reloads(page)
   })

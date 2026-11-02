@@ -1,5 +1,5 @@
-// Schema version 4: frames have a rectangle's corners, one radius or each corner's own, and a
-// version 3 design comes up as it is.
+// Schema version 4: frames have rounded corners, one radius or each corner's own in one value, and
+// a version 3 design comes up as it is.
 import { describe, expect, it } from 'vitest'
 import { migrateDesign, parseDesign, SCHEMA_VERSION } from './index.ts'
 
@@ -13,9 +13,9 @@ const designWith = (frame: Record<string, unknown>, version = SCHEMA_VERSION) =>
 
 describe('frame corners', () => {
   it('keeps a frame\'s radius and each corner\'s own, in format overrides too', () => {
-    const result = parseDesign({ ...designWith({ cornerRadius: 24, corners: [0, 12, 40, 8] }), overrides: { 'format:sq': { f: { cornerRadius: 6 } } } })
+    const result = parseDesign({ ...designWith({ cornerRadius: [0, 12, 40, 8] }), overrides: { 'format:sq': { f: { cornerRadius: 6 } } } })
     if (!result.success) throw new Error(result.errors.join('\n'))
-    expect(result.design.nodes.f?.props).toMatchObject({ cornerRadius: 24, corners: [0, 12, 40, 8] })
+    expect(result.design.nodes.f?.props).toMatchObject({ cornerRadius: [0, 12, 40, 8] })
     expect(result.design.overrides['format:sq']?.f?.cornerRadius).toBe(6)
   })
 
@@ -23,12 +23,12 @@ describe('frame corners', () => {
     const result = parseDesign(designWith({}))
     if (!result.success) throw new Error(result.errors.join('\n'))
     expect(result.design.nodes.f?.props).toMatchObject({ cornerRadius: 0 })
-    expect(result.design.nodes.f?.props).not.toHaveProperty('corners')
   })
 
-  it('refuses a negative radius', () => {
-    const result = parseDesign(designWith({ cornerRadius: -1 }))
-    expect(result.success).toBe(false)
+  it('refuses a negative radius, and three corners', () => {
+    expect(parseDesign(designWith({ cornerRadius: -1 })).success).toBe(false)
+    expect(parseDesign(designWith({ cornerRadius: [0, 4, -1, 2] })).success).toBe(false)
+    expect(parseDesign(designWith({ cornerRadius: [0, 4, 2] })).success).toBe(false)
   })
 })
 

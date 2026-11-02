@@ -179,7 +179,7 @@ function CornerFields({ target, p, read, write }: { target: Target; p: P; read: 
   const radius = (n: number) => clamp(Math.round(n), 0, 200)
   const eachCorner = (on: boolean) => set(target, (now) => {
     const { cornerRadius = 0, corners } = read(now)
-    return write(now, on ? { corners: [cornerRadius, cornerRadius, cornerRadius, cornerRadius] } : { cornerRadius: corners?.[0] ?? cornerRadius, corners: undefined })
+    return write(now, on ? { corners: corners ?? [cornerRadius, cornerRadius, cornerRadius, cornerRadius] } : { cornerRadius: corners?.[0] ?? cornerRadius, corners: undefined })
   })
   const setCorner = (i: number, to: (r: number) => number) => set(target, (now) => {
     const corners = [...(read(now).corners ?? [0, 0, 0, 0])]
@@ -230,10 +230,16 @@ const shapeCorners = {
     shape: Object.fromEntries(Object.entries({ ...(now.shape as Record<string, unknown>), ...next }).filter(([, v]) => v !== undefined)),
   }),
 }
-/** A frame keeps its corners among its own props. */
+/** A frame keeps its corners in one prop: a number for all four, or each corner's own. */
 const frameCorners = {
-  read: (props: Props) => ({ cornerRadius: props.cornerRadius as number | undefined, corners: props.corners as readonly number[] | undefined }),
-  write: (_now: Props, next: Corners): Patch => next,
+  read: (props: Props): Corners => {
+    const value = props.cornerRadius as number | readonly number[] | undefined
+    return typeof value === 'object' ? { cornerRadius: value[0], corners: value } : { cornerRadius: value ?? 0 }
+  },
+  write: (now: Props, next: Corners): Patch => {
+    const { cornerRadius = 0, corners } = { ...frameCorners.read(now), ...next }
+    return { cornerRadius: corners ? [...corners] : cornerRadius }
+  },
 }
 
 /**
@@ -998,7 +1004,7 @@ type OwnGroup = keyof P['ownGroups']
 const OWN_GROUP: Record<string, OwnGroup> = {
   x: 'layout', y: 'layout', width: 'layout', height: 'layout', rotation: 'layout', sizing: 'layout', absolute: 'layout',
   opacity: 'appearance', blendMode: 'appearance', visible: 'appearance',
-  fills: 'fill', strokes: 'stroke', effects: 'effects', shape: 'shape', cornerRadius: 'shape', corners: 'shape',
+  fills: 'fill', strokes: 'stroke', effects: 'effects', shape: 'shape', cornerRadius: 'shape',
   text: 'text', runs: 'text', style: 'text', align: 'text', verticalAlign: 'text', direction: 'text', boxMode: 'text', list: 'text', paragraphSpacing: 'text', maxLines: 'text', shrinkToFit: 'text',
   layout: 'autoLayout',
 }

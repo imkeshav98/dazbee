@@ -27,7 +27,7 @@
     },
     "each": {
       "type": "frame", "parentId": "p1", "index": "a1", "name": "Each corner its own",
-      "props": { "x": 580, "y": 60, "width": 440, "height": 300, "corners": [0, 120, 24, 200], "fills": [{ "type": "linear", "from": { "x": 0, "y": 0 }, "to": { "x": 1, "y": 1 }, "stops": [{ "offset": 0, "color": "#E0157FFF" }, { "offset": 1, "color": "#3D6BFFFF" }] }] }
+      "props": { "x": 580, "y": 60, "width": 440, "height": 300, "cornerRadius": [0, 120, 24, 200], "fills": [{ "type": "linear", "from": { "x": 0, "y": 0 }, "to": { "x": 1, "y": 1 }, "stops": [{ "offset": 0, "color": "#E0157FFF" }, { "offset": 1, "color": "#3D6BFFFF" }] }] }
     },
     "each-dot": {
       "type": "graphic", "parentId": "each", "index": "a0", "name": "Dot in the corner",

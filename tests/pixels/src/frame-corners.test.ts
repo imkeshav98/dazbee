@@ -39,7 +39,7 @@ describe('rounded boxes', () => {
   })
 
   it('give each corner its own radius, from the top left clockwise', () => {
-    const r = renderDesign(ck, design({ corners: [0, 60, 0, 60] }), 'p1', 'f', bytes)
+    const r = renderDesign(ck, design({ cornerRadius: [0, 60, 0, 60] }), 'p1', 'f', bytes)
     expect(at(r, 22, 22)).toEqual(RED)
     expect(at(r, 177, 22)).toEqual(WHITE)
     expect(at(r, 177, 177)).toEqual(RED)
@@ -58,7 +58,7 @@ describe('rounded boxes', () => {
   })
 
   it('draw the same in the PDF and the SVG as on the CPU', async () => {
-    for (const frame of [{ cornerRadius: 40 }, { corners: [0, 60, 10, 80] }, { cornerRadius: 40, clip: false }]) {
+    for (const frame of [{ cornerRadius: 40 }, { cornerRadius: [0, 60, 10, 80] }, { cornerRadius: 40, clip: false }]) {
       const json = design(frame)
       const cpu = overWhite(renderDesign(ck, json, 'p1', 'f', bytes))
       const pdf = await rasterisePdf(pdfium, renderVector(ck, json, 'p1', 'f', bytes, 'pdf'))
