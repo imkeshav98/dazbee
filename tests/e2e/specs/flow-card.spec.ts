@@ -1,5 +1,5 @@
-// The auto layout sizing card (#155) in Chromium, with real input: a child of an auto layout frame
-// fills the room, hugs or stays fixed on each axis, and can be kept out of the flow where it is put;
+// The In the stack card in Chromium, with real input: a child of an auto layout frame
+// fills the room, fits its content or keeps its own size on each axis, and can be kept where it is put;
 // the frame itself hugs its children. A layer outside any auto layout has no such card.
 import { expect, test, type Page } from '../support/test.ts'
 import type { DesignInput } from '@dazbee/schema'
@@ -39,34 +39,36 @@ const select = async (page: Page, ids: string[]) => {
 
 test('a child of an auto layout fills, hugs or keeps its size, and can leave the flow', async ({ browser }) => {
   const { page, errors } = await openStage(browser, design())
-  const card = page.getByTestId('flow-card')
+  const card = page.getByTestId('in-stack-card')
+  const width = card.getByRole('radiogroup', { name: 'Width sizing' })
 
   await select(page, ['loose'])
   await expect(card).toHaveCount(0)
 
   await select(page, ['two'])
-  await expect(card.getByRole('heading')).toHaveText('In auto layout')
-  await expect(card.getByRole('combobox', { name: 'Width sizing' })).toHaveAttribute('data-value', 'fixed')
-  await choose(card.getByRole('combobox', { name: 'Width sizing' }), 'fill')
+  await expect(card.getByRole('heading')).toHaveText('In the stack')
+  await expect(width.getByRole('radio', { name: 'Own size' })).toHaveAttribute('aria-checked', 'true')
+  await width.getByRole('radio', { name: 'Fill the space' }).click()
   await expect.poll(() => propsOf(page, 'two')).toMatchObject({ sizing: { width: 'fill', height: 'fixed' } })
   // Filling the row, Two takes what One and the gap leave: 920 - 40 padding - 160 - 20.
   await expect.poll(async () => (await boxOf(page, 'two')).width).toBe(700)
   await page.evaluate(() => window.dazbee?.drawn())
   writeOutput('flow-card-fill.png', await page.screenshot())
 
-  await card.getByRole('checkbox', { name: 'Keep where it is, out of the flow' }).check()
+  const keep = card.getByRole('switch', { name: 'Keep where I put it' })
+  await keep.click()
+  await expect(keep).toHaveAttribute('aria-checked', 'true')
   await expect.poll(async () => (await propsOf(page, 'two')).absolute).toBe(true)
-  await card.getByRole('checkbox', { name: 'Keep where it is, out of the flow' }).uncheck()
+  await keep.click()
   await expect.poll(async () => (await propsOf(page, 'two')).absolute).toBeUndefined()
 
-  // The frame itself hugs its children, so it shrinks to them.
+  // The frame itself hugs its children, so it shrinks to them: its sizing is in the Stack card.
   await select(page, ['stack'])
-  await expect(card.getByRole('heading')).toHaveText('Sizing')
-  await expect(card.getByRole('checkbox')).toHaveCount(0)
+  await expect(card).toHaveCount(0)
   await select(page, ['two'])
-  await choose(card.getByRole('combobox', { name: 'Width sizing' }), 'fixed')
+  await width.getByRole('radio', { name: 'Own size' }).click()
   await select(page, ['stack'])
-  await choose(card.getByRole('combobox', { name: 'Width sizing' }), 'hug')
+  await choose(page.getByTestId('stack-card').getByRole('combobox', { name: 'Width sizing' }), 'hug')
   await expect.poll(async () => (await propsOf(page, 'stack')).sizing).toEqual({ width: 'hug', height: 'fixed' })
   // 20 + 160 + 20 + 160 + 20.
   await expect.poll(async () => (await boxOf(page, 'stack')).width).toBe(380)

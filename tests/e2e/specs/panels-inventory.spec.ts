@@ -1016,11 +1016,13 @@ test.describe('photos', () => {
 
 test.describe('frames and auto layout', () => {
   const layout = async (page: Page, id = 'stack') => (await props(page, id)).layout as Record<string, unknown> | undefined
+  /** The Line up pad's cell that lines up along the flow at `justify` and across it at `align`. */
+  const cell = (page: Page, justify: unknown, align: unknown) => page.getByTestId('stack-card').locator(`[data-justify="${justify}"][data-align="${align}"]`)
 
   row(50, 'add auto layout', async (open) => {
     const page = await open()
     await select(page, ['plain'])
-    await step(page, () => page.getByTestId('auto-layout-card').getByRole('button', { name: 'Add auto layout' }).click(), async () => {
+    await step(page, () => page.getByTestId('stack-card').getByRole('switch', { name: 'Stack' }).click(), async () => {
       await expect.poll(() => layout(page, 'plain')).toBeTruthy()
     })
     await reloads(page)
@@ -1029,18 +1031,18 @@ test.describe('frames and auto layout', () => {
   row(51, 'direction and wrap', async (open) => {
     const page = await open()
     await select(page, ['stack'])
-    const card = page.getByTestId('auto-layout-card')
-    await step(page, () => choose(card.getByRole('combobox', { name: 'Direction' }), 'column'), async () => { await expect.poll(() => layout(page)).toMatchObject({ direction: 'column' }) })
-    await choose(card.getByRole('combobox', { name: 'Direction' }), 'row')
-    await enter(card.getByRole('spinbutton', { name: 'Gap', exact: true }), '400')
-    await step(page, () => card.getByRole('checkbox', { name: 'Wrap' }).click(), async () => { await expect.poll(() => layout(page)).toMatchObject({ wrap: true }) })
+    const card = page.getByTestId('stack-card')
+    await step(page, () => card.getByRole('radio', { name: 'Column' }).click(), async () => { await expect.poll(() => layout(page)).toMatchObject({ direction: 'column' }) })
+    await card.getByRole('radio', { name: 'Row' }).click()
+    await enter(card.getByRole('spinbutton', { name: 'Room between' }), '400')
+    await step(page, () => card.getByRole('switch', { name: 'Wrap onto more lines' }).click(), async () => { await expect.poll(() => layout(page)).toMatchObject({ wrap: true }) })
     await reloads(page)
   })
 
   row(52, 'gap', async (open) => {
     const page = await open()
     await select(page, ['stack'])
-    await step(page, () => enter(page.getByTestId('auto-layout-card').getByRole('spinbutton', { name: 'Gap', exact: true }), '48'), async () => {
+    await step(page, () => enter(page.getByTestId('stack-card').getByRole('spinbutton', { name: 'Room between' }), '48'), async () => {
       await expect.poll(() => layout(page)).toMatchObject({ gap: 48 })
     })
     await reloads(page)
@@ -1049,10 +1051,10 @@ test.describe('frames and auto layout', () => {
   row(53, 'padding, four sides', async (open) => {
     const page = await open()
     await select(page, ['stack'])
-    const card = page.getByTestId('auto-layout-card')
+    const card = page.getByTestId('stack-card')
     for (const side of ['top', 'right', 'bottom', 'left']) {
       // The stack is wider than its row: padding on the end side moves nothing.
-      await step(page, () => enter(card.getByRole('spinbutton', { name: `Padding ${side}` }), '8'), async () => {
+      await step(page, () => enter(card.getByRole('spinbutton', { name: `Room at the ${side}` }), '8'), async () => {
         await expect.poll(async () => ((await layout(page))?.padding as Record<string, number>)[side]).toBe(8)
       }, { draws: side === 'top' || side === 'left' })
     }
@@ -1062,22 +1064,26 @@ test.describe('frames and auto layout', () => {
   row(54, 'distribute: start, centre, end, space between', async (open) => {
     const page = await open()
     await select(page, ['stack'])
-    const field = page.getByTestId('auto-layout-card').getByRole('combobox', { name: 'Distribute' })
-    for (const justify of ['center', 'end', 'space-between', 'start']) {
-      await step(page, () => choose(field, justify), async () => { await expect.poll(() => layout(page)).toMatchObject({ justify }) })
+    const { align } = (await layout(page)) ?? {}
+    for (const justify of ['center', 'end']) {
+      await step(page, () => cell(page, justify, align).click(), async () => { await expect.poll(() => layout(page)).toMatchObject({ justify, align }) })
     }
+    const spread = page.getByTestId('stack-card').getByRole('combobox', { name: 'Spread out' })
+    await step(page, () => choose(spread, 'between'), async () => { await expect.poll(() => layout(page)).toMatchObject({ justify: 'space-between' }) })
+    // Packed again, the stack lines up from the start.
+    await step(page, () => choose(spread, 'packed'), async () => { await expect.poll(() => layout(page)).toMatchObject({ justify: 'start' }) })
     await reloads(page)
   })
 
   row(55, 'align: start, centre, end', async (open) => {
     const page = await open()
     await select(page, ['stack'])
-    const card = page.getByTestId('auto-layout-card')
-    await enter(card.getByRole('spinbutton', { name: 'Padding top' }), '0')
-    await enter(card.getByRole('spinbutton', { name: 'Padding bottom' }), '0')
-    const field = card.getByRole('combobox', { name: 'Align', exact: true })
+    const card = page.getByTestId('stack-card')
+    await enter(card.getByRole('spinbutton', { name: 'Room at the top' }), '0')
+    await enter(card.getByRole('spinbutton', { name: 'Room at the bottom' }), '0')
+    const { justify } = (await layout(page)) ?? {}
     for (const align of ['center', 'end', 'start']) {
-      await step(page, () => choose(field, align), async () => { await expect.poll(() => layout(page)).toMatchObject({ align }) })
+      await step(page, () => cell(page, justify, align).click(), async () => { await expect.poll(() => layout(page)).toMatchObject({ align, justify }) })
     }
     await reloads(page)
   })
@@ -1085,7 +1091,7 @@ test.describe('frames and auto layout', () => {
   row(56, "the frame's own sizing", async (open) => {
     const page = await open()
     await select(page, ['stack'])
-    const card = page.getByTestId('flow-card')
+    const card = page.getByTestId('stack-card')
     await step(page, () => choose(card.getByRole('combobox', { name: 'Width sizing' }), 'hug'), async () => {
       await expect.poll(async () => (await props(page, 'stack')).sizing).toMatchObject({ width: 'hug' })
     })
@@ -1102,18 +1108,19 @@ test.describe('frames and auto layout', () => {
   row(57, "a child's sizing", async (open) => {
     const page = await open()
     await select(page, ['chip1'])
-    const card = page.getByTestId('flow-card')
-    await step(page, () => choose(card.getByRole('combobox', { name: 'Width sizing' }), 'fill'), async () => {
+    const card = page.getByTestId('in-stack-card')
+    const pick = (axis: 'Width' | 'Height', sizing: string) => card.getByRole('radiogroup', { name: `${axis} sizing` }).locator(`[data-value="${sizing}"]`).click()
+    await step(page, () => pick('Width', 'fill'), async () => {
       await expect.poll(async () => (await props(page, 'chip1')).sizing).toMatchObject({ width: 'fill' })
     })
     // Fixed keeps the width fill gave it; hug, with nothing inside, keeps it too.
     for (const sizing of ['fixed', 'hug']) {
-      await step(page, () => choose(card.getByRole('combobox', { name: 'Width sizing' }), sizing), async () => {
+      await step(page, () => pick('Width', sizing), async () => {
         await expect.poll(async () => (await props(page, 'chip1')).sizing).toMatchObject({ width: sizing })
       }, { draws: false })
     }
     // The chip is already as tall as the stack's inside.
-    await step(page, () => choose(card.getByRole('combobox', { name: 'Height sizing' }), 'fill'), async () => {
+    await step(page, () => pick('Height', 'fill'), async () => {
       await expect.poll(async () => (await props(page, 'chip1')).sizing).toMatchObject({ height: 'fill' })
     }, { draws: false })
     await reloads(page)
@@ -1122,7 +1129,7 @@ test.describe('frames and auto layout', () => {
   row(58, 'a child kept where it is, out of the flow', async (open) => {
     const page = await open()
     await select(page, ['chip1'])
-    const box = page.getByTestId('flow-card').getByRole('checkbox', { name: 'Keep where it is, out of the flow' })
+    const box = page.getByTestId('in-stack-card').getByRole('switch', { name: 'Keep where I put it' })
     // Out of the flow, Chip 2 moves up to where Chip 1 was.
     await step(page, () => box.click(), async () => { await expect.poll(async () => (await props(page, 'chip1')).absolute).toBe(true) })
     await step(page, () => box.click(), async () => { await expect.poll(async () => (await props(page, 'chip1')).absolute).toBeFalsy() })

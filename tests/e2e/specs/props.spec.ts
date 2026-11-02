@@ -164,10 +164,10 @@ test('several layers: mixed values, set together or each from its own; text and 
 
   // Auto layout.
   await select(page, ['stack'])
-  const auto = page.getByTestId('auto-layout-card')
-  await enter(auto.getByRole('spinbutton', { name: 'Gap', exact: true }), '32')
-  await choose(auto.getByRole('combobox', { name: 'Direction' }), 'column')
-  await enter(auto.getByRole('spinbutton', { name: 'Padding left' }), '40')
+  const auto = page.getByTestId('stack-card')
+  await enter(auto.getByRole('spinbutton', { name: 'Room between' }), '32')
+  await auto.getByRole('radio', { name: 'Column' }).click()
+  await enter(auto.getByRole('spinbutton', { name: 'Room at the left' }), '40')
   await expect.poll(async () => (await props(page, 'stack')).layout).toMatchObject({ direction: 'column', gap: 32, padding: { left: 40, top: 20 } })
   await page.evaluate(() => window.dazbee?.drawn())
   writeOutput('props-3-auto-layout.png', await page.screenshot())
