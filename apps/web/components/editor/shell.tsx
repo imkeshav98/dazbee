@@ -302,7 +302,7 @@ export function EditorShell({ brandId, brandName, designName, onRename, status, 
   }, [hasCards])
 
   return (
-    <MotionConfig reducedMotion="user">
+    <MotionConfig reducedMotion="never">
         <div className="h-dvh overflow-hidden bg-bg text-text">
           <div className="relative flex h-full min-h-0">
           {/* No top bar (#110): two islands float over the canvas, the design's name and save state at
@@ -358,7 +358,7 @@ export function EditorShell({ brandId, brandName, designName, onRename, status, 
                       )}
                     >
                       {open && (
-                        <motion.span layoutId="rail-blob" transition={BLOB} aria-hidden data-testid="rail-blob" className="absolute inset-0">
+                        <motion.span layoutId="rail-blob" transition={reduced ? BLOB : { duration: 0 }} aria-hidden data-testid="rail-blob" className="absolute inset-0">
                           <motion.span
                             key={id}
                             initial={reduced ? false : phone ? 'wide' : 'tall'}
