@@ -142,6 +142,8 @@ export function openSession(doc: DesignDoc) {
     run,
     batch,
     beginGesture,
+    /** Whether a gesture is open: its commands are still being gathered into one undo step. */
+    inGesture: () => inGesture,
     gesture,
     undo: () => stepThen(undoManager.undoStack, () => undoManager.undo()),
     redo: () => stepThen(undoManager.redoStack, () => undoManager.redo()),
