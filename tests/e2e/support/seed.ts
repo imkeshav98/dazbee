@@ -30,47 +30,43 @@ export const liveDesign = (): DesignInput => ({
   overrides: {},
 })
 
-/** Creates a design for a brand, the development one unless given, through the API, starting from `content`, and returns its id. */
-export async function seed(content: DesignInput, name = content.meta.name, brandId = DEV_BRAND): Promise<string> {
-  const response = await fetch(`${API_URL}/brands/${brandId}/designs`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ name, content }),
+/** Which brand a helper works in; the development brand when none is given. */
+export interface InBrand {
+  brandId?: string
+}
+
+/** Sends a request to the API, with `body` as JSON when given, and returns the JSON it answers; throws when it refuses. */
+export async function callApi(method: 'GET' | 'POST' | 'PUT', path: string, body?: unknown): Promise<unknown> {
+  const response = await fetch(`${API_URL}${path}`, body === undefined ? { method } : {
+    method, headers: { 'content-type': 'application/json' }, body: JSON.stringify(body),
   }).catch(() => {
     throw new Error(`no API at ${API_URL}; run docker compose up -d --wait`)
   })
-  const json: unknown = await response.json()
-  if (!response.ok) throw new Error(`the API refused the design: ${JSON.stringify(json)}`)
-  return DesignSummary.parse(json).id
+  const text = await response.text()
+  if (!response.ok) throw new Error(`the API refused ${method} ${path}: ${response.status} ${text}`)
+  return JSON.parse(text) as unknown
+}
+
+/** Creates a design for a brand through the API, starting from `content`, and returns its id. */
+export async function seed(content: DesignInput, { name = content.meta.name, brandId = DEV_BRAND }: InBrand & { name?: string } = {}): Promise<string> {
+  return DesignSummary.parse(await callApi('POST', `/brands/${brandId}/designs`, { name, content })).id
 }
 
 /**
- * Creates a brand in the development workspace through the API and returns its id. A spec that
- * writes a brand kit, or reads a brand's designs in order, works in a brand of its own, so specs
- * running side by side never change what it checks.
+ * Creates a brand in the development workspace through the API and returns its id: a brand of its
+ * own for a spec that writes a brand kit or reads Recent in order, so no spec running alongside
+ * changes its kit or puts designs before its own. Its kit starts empty.
  */
 export async function newBrand(name: string): Promise<string> {
-  const response = await fetch(`${API_URL}/brands`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ name }),
-  })
-  const json: unknown = await response.json()
-  if (!response.ok) throw new Error(`the API refused the brand: ${JSON.stringify(json)}`)
-  return BrandSummary.parse(json).id
+  return BrandSummary.parse(await callApi('POST', '/brands', { name })).id
+}
+
+/** A brand's kit as the API has it now. */
+export async function getKit(brandId: string): Promise<BrandKit> {
+  return BrandKit.parse(await callApi('GET', `/brands/${brandId}/kit`))
 }
 
 /** Saves a brand's whole kit through the API: the parts given, the rest empty. */
 export async function putKit(brandId: string, kit: Partial<BrandKit>): Promise<BrandKit> {
-  const response = await fetch(`${API_URL}/brands/${brandId}/kit`, {
-    method: 'PUT',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ ...EMPTY_BRAND_KIT, ...kit }),
-  })
-  const json: unknown = await response.json()
-  if (!response.ok) throw new Error(`the API refused the kit: ${JSON.stringify(json)}`)
-  return BrandKit.parse(json)
+  return BrandKit.parse(await callApi('PUT', `/brands/${brandId}/kit`, { ...EMPTY_BRAND_KIT, ...kit }))
 }
-
-/** A brand's kit as the API has it now. */
-export const kitOf = async (brandId: string) => BrandKit.parse(await (await fetch(`${API_URL}/brands/${brandId}/kit`)).json())

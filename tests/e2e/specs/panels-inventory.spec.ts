@@ -6,7 +6,7 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { expect, test, type Browser, type Locator, type Page } from '../support/test.ts'
-import { EMPTY_BRAND_KIT, type DesignInput } from '@dazbee/schema'
+import type { DesignInput } from '@dazbee/schema'
 import { photo, upload } from '../support/assets.ts'
 import { designOf, placed, synced, writeOutput } from '../support/editor.ts'
 import { importGoogleFonts } from '../support/fonts.ts'
@@ -25,17 +25,15 @@ const KNOWN: Record<number, number> = {}
 const righteous = new Uint8Array(readFileSync(join(import.meta.dirname, '..', 'assets', 'fonts', 'Righteous-Regular.ttf')))
 const tile = new Uint8Array(readFileSync(join(import.meta.dirname, '..', '..', 'pixels', 'assets', 'tile.jpg')))
 const KIT = {
-  ...EMPTY_BRAND_KIT,
   colors: [{ token: 'berry', name: 'Berry', value: '#FF3D6EFF' }, { token: 'roast', name: 'Roast', value: '#2A140AFF' }],
   fonts: [{ token: 'body', name: 'Body', family: 'Noto Sans' }],
 }
 
-// Each worker's rows work in a brand of their own, so no spec running alongside changes its kit.
 let brandId: string
 let assets: { photo: string; tile: string }
 test.beforeAll(async () => {
-  brandId = await newBrand('Panels inventory')
-  assets = { photo: (await upload(photo, brandId)).id, tile: (await upload(tile, brandId)).id }
+  brandId = await newBrand('e2e panels-inventory')
+  assets = { photo: (await upload(photo, { brandId })).id, tile: (await upload(tile, { brandId })).id }
   await putKit(brandId, KIT)
 })
 
@@ -165,7 +163,7 @@ function row(n: number, title: string, body: (open: (withStory?: boolean) => Pro
     let page: Page | undefined
     try {
       await body(async (withStory = false) => {
-        page = (await openStage(browser, design(withStory), brandId)).page
+        page = (await openStage(browser, design(withStory), { brandId })).page
         return page
       })
     } catch (error) {

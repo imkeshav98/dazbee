@@ -65,10 +65,9 @@ test.beforeAll(() => {
 })
 
 test('a brand kit font change refits the text bound to it in every format, and undo leaves the refit', async ({ browser }) => {
-  // A brand of its own, its Heading font Noto Sans, so no spec running alongside changes its kit.
-  const brandId = await newBrand('Brand font refit')
+  const brandId = await newBrand('e2e brand-font-refit')
   await putKit(brandId, { fonts: [{ token: 'heading', name: 'Heading', family: 'Noto Sans' }] })
-  const { page, errors } = await openStage(browser, design(), brandId)
+  const { page, errors } = await openStage(browser, design(), { brandId })
   const before = { wide: (await text(page, 'wide')).props.width, story: await storyWidth(page), tall: (await text(page, 'tall')).props.height }
 
   // Change the kit's Heading font in the Brand panel.

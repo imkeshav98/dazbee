@@ -5,7 +5,7 @@
 import { expect, test, type Page } from '../support/test.ts'
 import type { DesignInput } from '@dazbee/schema'
 import { editorPath, writeOutput } from '../support/editor.ts'
-import { kitOf, newBrand, putKit, seed } from '../support/seed.ts'
+import { getKit, newBrand, putKit, seed } from '../support/seed.ts'
 import { openStage, read } from '../support/stage.ts'
 
 test.describe.configure({ timeout: 120_000 })
@@ -35,11 +35,10 @@ const storedFill = async (page: Page) => {
   return { bindings: box.bindings, color: box.props.fills.at(-1)?.color }
 }
 
-// Each check works in a brand of its own, so no spec running alongside changes its kit.
 test('a layer bound to a brand colour changes when the brand colour does', async ({ browser }) => {
   // A new brand's kit starts empty.
-  const brandId = await newBrand('Brand kit')
-  const { page, errors } = await openStage(browser, design(), brandId)
+  const brandId = await newBrand('e2e brand-kit')
+  const { page, errors } = await openStage(browser, design(), { brandId })
   await page.locator('[data-panel="brand"]').click()
   const kit = page.getByTestId('brand-kit')
   await expect(kit).toHaveAttribute('data-mode', 'pick')
@@ -56,7 +55,7 @@ test('a layer bound to a brand colour changes when the brand colour does', async
   await row.getByRole('textbox', { name: 'Name of colour 1' }).press('Enter')
   await row.getByRole('textbox', { name: 'Hex value of Harbour red' }).fill('e0262b')
   await row.getByRole('textbox', { name: 'Hex value of Harbour red' }).press('Enter')
-  await expect.poll(async () => (await kitOf(brandId)).colors).toEqual([{ token: 'colour-1', name: 'Harbour red', value: '#E0262BFF' }])
+  await expect.poll(async () => (await getKit(brandId)).colors).toEqual([{ token: 'colour-1', name: 'Harbour red', value: '#E0262BFF' }])
   writeOutput('brand-kit-0-kit.png', await page.screenshot())
 
   // Apply it to the box: the box follows brand:colour-1 and stores its value too.
@@ -76,7 +75,7 @@ test('a layer bound to a brand colour changes when the brand colour does', async
   await row.getByRole('textbox', { name: 'Hex value of Harbour red' }).press('Enter')
   await expect.poll(() => boxColor(page)).toEqual([31, 157, 85])
   expect(await read(page)).toEqual(before)
-  await expect.poll(async () => (await kitOf(brandId)).colors[0]?.value).toBe('#1F9D55FF')
+  await expect.poll(async () => (await getKit(brandId)).colors[0]?.value).toBe('#1F9D55FF')
   await page.evaluate(() => window.dazbee?.drawn())
   writeOutput('brand-kit-2-changed.png', await page.screenshot())
 
@@ -99,14 +98,14 @@ test('a layer bound to a brand colour changes when the brand colour does', async
 })
 
 test('the picker applies a colour tile and a font row, and the Page card shows the colours', async ({ browser }) => {
-  const brandId = await newBrand('Brand kit picker')
+  const brandId = await newBrand('e2e brand-kit')
   await putKit(brandId, { colors: [{ token: 'sun', name: 'Sun', value: '#FF8A3DFF' }, { token: 'roast', name: 'Roast', value: '#2A140AFF' }], fonts: [{ token: 'body', name: 'Body', family: 'Noto Sans' }] })
   const content = design()
   content.nodes.title = {
     type: 'text', parentId: 'p1', index: 'a1', name: 'Title',
     props: { x: 80, y: 80, width: 600, height: 120, text: 'Cold brew', style: { fontFamily: 'Noto Sans', fontSize: 96, fontWeight: 700, color: '#111111FF' } },
   } as DesignInput['nodes'][string]
-  const { page, errors } = await openStage(browser, content, brandId)
+  const { page, errors } = await openStage(browser, content, { brandId })
 
   // With nothing selected, the Page card offers the brand's colours before the fixed set.
   const brandRow = page.getByTestId('page-brand-colors')
@@ -135,15 +134,15 @@ test('the picker applies a colour tile and a font row, and the Page card shows t
 
 test('another design bound to the brand colour opens in its current value', async ({ browser }) => {
   // Bound when the colour was red, stored red; the brand has since changed it.
-  const brandId = await newBrand('Brand kit reopened')
+  const brandId = await newBrand('e2e brand-kit')
   await putKit(brandId, { colors: [{ token: 'colour-1', name: 'Harbour red', value: '#1F9D55FF' }] })
   const content = design({ fill: 'brand:colour-1' })
   const box = content.nodes.box as { props: { fills: { type: string; color: string }[] } }
   box.props.fills = [{ type: 'solid', color: '#E0262BFF' }]
-  const designId = await seed(content, undefined, brandId)
+  const designId = await seed(content, { brandId })
   const context = await browser.newContext({ viewport: { width: 1280, height: 900 } })
   const page = await context.newPage()
-  await page.goto(editorPath(designId, brandId))
+  await page.goto(editorPath(designId, { brandId }))
   await expect(page.getByTestId('status')).toHaveAttribute('data-ready', '', { timeout: 30_000 })
   await expect.poll(() => boxColor(page)).toEqual([31, 157, 85])
   await context.close()

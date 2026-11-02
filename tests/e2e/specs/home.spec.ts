@@ -26,11 +26,10 @@ test.use({ viewport: { width: 1440, height: 900 } })
 
 test('Recent is a page of real pictures, each in its shape, filtered by shape', async ({ page }) => {
   const run = crypto.randomUUID().slice(0, 6)
-  // A brand of its own, so designs saved by specs running alongside never come before these.
-  const brandId = await newBrand(`Recent ${run}`)
-  await seed(poster(`Story ${run}`, 1080, 1920, '#3D6BFFFF', '#FFD23FFF'), undefined, brandId)
-  await seed(poster(`Banner ${run}`, 1500, 500, '#1A1420FF', '#FF48B0FF'), undefined, brandId)
-  await seed(poster(`Square ${run}`, 1080, 1080, '#FF48B0FF', '#FFFFFFFF'), undefined, brandId)
+  const brandId = await newBrand('e2e home')
+  await seed(poster(`Story ${run}`, 1080, 1920, '#3D6BFFFF', '#FFD23FFF'), { brandId })
+  await seed(poster(`Banner ${run}`, 1500, 500, '#1A1420FF', '#FF48B0FF'), { brandId })
+  await seed(poster(`Square ${run}`, 1080, 1080, '#FF48B0FF', '#FFFFFFFF'), { brandId })
   await page.context().addCookies([{ name: 'theme', value: 'dark', url: 'http://localhost:3100' }])
   await page.goto(`/brands/${brandId}/designs`)
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Recent')

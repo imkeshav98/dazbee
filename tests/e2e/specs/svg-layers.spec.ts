@@ -6,7 +6,7 @@ import { randomUUID } from 'node:crypto'
 import { expect, test, type Page } from '../support/test.ts'
 import type { DesignInput } from '@dazbee/schema'
 import { screenPoint, writeOutput } from '../support/editor.ts'
-import { DEV_BRAND, kitOf, newBrand } from '../support/seed.ts'
+import { DEV_BRAND, getKit, newBrand } from '../support/seed.ts'
 import { fillList, openStage, press, read, selection, type Design } from '../support/stage.ts'
 
 test.describe.configure({ timeout: 120_000 })
@@ -114,14 +114,13 @@ test('SVG markup pasted on the stage places as layers', async ({ browser }) => {
 })
 
 test('an SVG set as the brand logo places from the Brand panel as layers', async ({ browser }) => {
-  // A brand of its own, its kit without a logo, so setting one changes no kit another spec checks.
-  const brandId = await newBrand('SVG logo')
-  const { page, errors } = await openStage(browser, design, brandId)
+  const brandId = await newBrand('e2e svg-layers')
+  const { page, errors } = await openStage(browser, design, { brandId })
   await page.locator('[data-panel="brand"]').click()
   const kit = page.getByTestId('brand-kit')
   await kit.getByRole('button', { name: 'Edit' }).click()
   await kit.locator('input[name="logo-file"]').setInputFiles({ name: `Brand logo ${run}.svg`, mimeType: 'image/svg+xml', buffer: Buffer.from(logo('kit')) })
-  await expect.poll(async () => (await kitOf(brandId)).logoAssetId, { timeout: 20_000 }).not.toBeNull()
+  await expect.poll(async () => (await getKit(brandId)).logoAssetId, { timeout: 20_000 }).not.toBeNull()
   await kit.getByRole('button', { name: 'Done' }).click()
   const place = kit.getByTestId('kit-logo-place').first()
   await expect(place.locator('img')).toHaveJSProperty('complete', true)

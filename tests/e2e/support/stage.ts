@@ -5,15 +5,15 @@ import { pressFor, type ShortcutAction } from '@dazbee/editor/shortcuts'
 import type { DesignInput } from '@dazbee/schema'
 import type { Browser, Locator, Page } from '@playwright/test'
 import { designOf, openTabs, placed, screenPoint } from './editor.ts'
-import { DEV_BRAND, seed } from './seed.ts'
+import { DEV_BRAND, seed, type InBrand } from './seed.ts'
 
 /**
  * Opens a fresh copy of a design in one tab, 1440 × 1000, with the camera where design pixels in
- * steps of 5 land on whole screen pixels, so drags measure exactly. The copy belongs to the
- * development brand unless another is given.
+ * steps of 5 land on whole screen pixels, so drags measure exactly. The copy belongs to the brand
+ * given, or the development brand.
  */
-export async function openStage(browser: Browser, content: DesignInput, brandId = DEV_BRAND) {
-  const { tabs, errors } = await openTabs(browser, 1, await seed(content, undefined, brandId), brandId)
+export async function openStage(browser: Browser, content: DesignInput, { brandId = DEV_BRAND }: InBrand = {}) {
+  const { tabs, errors } = await openTabs(browser, 1, await seed(content, { brandId }), { brandId })
   const page = tabs[0] as Page
   await page.setViewportSize({ width: 1440, height: 1000 })
   await page.evaluate(() => window.dazbee?.setCamera({ x: 100, y: 60, zoom: 0.8 }))

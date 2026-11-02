@@ -44,7 +44,7 @@ test('+ adds a reference ad and uploaded images above the brief, each taken off 
   test.setTimeout(60_000)
   const run = crypto.randomUUID().slice(0, 6)
   const name = `Reference ${run}`
-  const designId = await seed(liveDesign(), name)
+  const designId = await seed(liveDesign(), { name })
   await page.goto(`/brands/${DEV_BRAND}`)
   const add = page.getByRole('button', { name: 'Add a reference or images' })
 
@@ -77,8 +77,7 @@ test('+ adds a reference ad and uploaded images above the brief, each taken off 
 })
 
 test('Brand kit opens the whole kit: the switch, and each colour, font and the voice picked or not', async ({ page }) => {
-  // A brand of its own, so no spec running alongside changes its kit under this one.
-  const brandId = await newBrand('Composer kit')
+  const brandId = await newBrand('e2e composer')
   await putKit(brandId, {
     colors: [{ token: 'ink', name: 'Ink', value: '#1A1420FF' }, { token: 'pop', name: 'Pop pink', value: '#FF48B0FF' }],
     fonts: [{ token: 'heading', name: 'Headings', family: 'Bricolage Grotesque' }],

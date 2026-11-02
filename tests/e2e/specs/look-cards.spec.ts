@@ -30,10 +30,9 @@ type Node = { bindings?: Record<string, string>; props: Record<string, unknown> 
 const node = (page: Page, id: string) => page.evaluate((id) => window.dazbee?.design().nodes[id], id) as Promise<Node>
 
 test('the look comes first: size and brand colour, effect tiles, and the header card', async ({ browser }) => {
-  // A brand of its own, so no spec running alongside changes its kit.
-  const brandId = await newBrand('Look cards')
+  const brandId = await newBrand('e2e look-cards')
   await putKit(brandId, { colors: [{ token: 'berry', name: 'Berry', value: '#FF3D6EFF' }, { token: 'roast', name: 'Roast', value: '#2A140AFF' }] })
-  const { page, errors } = await openStage(browser, design(), brandId)
+  const { page, errors } = await openStage(browser, design(), { brandId })
   await page.evaluate(() => window.dazbee?.select(['headline']))
 
   // Text, in the bar: the size, and the brand's colours with the colour it has now leading them.
