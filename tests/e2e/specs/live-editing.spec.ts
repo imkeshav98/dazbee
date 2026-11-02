@@ -283,7 +283,7 @@ test('a design survives the sync server restarting, from Postgres', { tag: '@syn
   // Wait until Postgres holds the edits, so the restart can't race the server's store.
   await expect.poll(() => storedAfter(designId, startedAt), { timeout: 15_000 }).toBe(true)
   await a.context().close()
-  restartSyncServer()
+  await restartSyncServer()
 
   const reopened = await openTabs(browser, 1, designId)
   const [b] = reopened.tabs as [Page]

@@ -52,7 +52,8 @@ jobs:
   # it. With the check job that is 19 of the 20 jobs GitHub runs at once, leaving one for on-demand runs.
   # The speed report's tests (@perf) run in the perf job below, on main only. The sync server restart
   # test (@sync-restart) drops every tab connected to the server, so it runs on its own at the end of
-  # shard 11's job, once that job's other tests are done.
+  # shard 11's job, once that job's other tests are done, whether they passed or not, with an HTML
+  # report of its own uploaded beside the shard's.
   e2e:
     name: e2e (${{ matrix.part }})
     runs-on: ubuntu-24.04
@@ -91,8 +92,10 @@ jobs:
       - run: pnpm --filter @dazbee/e2e exec playwright install --with-deps chromium
       - run: pnpm turbo run build --filter=@dazbee/web
       - run: pnpm --filter @dazbee/e2e exec playwright test ${{ matrix.args }}
-      - if: matrix.alone
+      - if: ${{ !cancelled() && matrix.alone }}
         run: pnpm --filter @dazbee/e2e exec playwright test ${{ matrix.alone }}
+        env:
+          PLAYWRIGHT_HTML_OUTPUT_DIR: playwright-report-alone
       - if: failure()
         run: docker compose logs api sync
       - if: failure()
@@ -100,6 +103,13 @@ jobs:
         with:
           name: playwright-report-${{ matrix.part }}
           path: tests/e2e/playwright-report
+          retention-days: 7
+      - if: failure() && matrix.alone
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-report-${{ matrix.part }}-alone
+          path: tests/e2e/playwright-report-alone
+          if-no-files-found: ignore
           retention-days: 7
       - if: always()
         uses: actions/upload-artifact@v7
