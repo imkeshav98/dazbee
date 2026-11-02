@@ -408,6 +408,38 @@ test('images that finish uploading while a pen path is open go on within a few s
   expect(errors).toEqual([])
 })
 
+test('images that finish uploading while a layer is dragged on the canvas go on after it is let go, the drag and the images one undo step each', async ({ browser }) => {
+  const brandId = await newBrand('e2e dropped files')
+  const square: DesignInput['nodes'][string] = { type: 'graphic', parentId: 'p1', index: 'a0', name: 'Square', props: { x: 100, y: 100, width: 200, height: 200, shape: { kind: 'rect' }, fills: [{ type: 'solid', color: '#2F6BFFFF' }] } }
+  const { page, errors } = await openStage(browser, design({ square }), { brandId })
+  const release = await routeUploads(page, brandId, { hold: true })
+  const x = async () => ((await read(page)).nodes as unknown as Record<string, { props: { x: number } }>).square?.props.x
+
+  const files = [{ name: `Dropped ${randomUUID().slice(0, 8)}.jpg`, type: 'image/jpeg', bytes: card }, { name: `Dropped ${randomUUID().slice(0, 8)}.jpg`, type: 'image/jpeg', bytes: second }]
+  expect(await dropFiles(page, await screenPoint(page, 540, 800), files)).toBe(true)
+  // The square is pressed and dragged, and still held when the uploads finish, for longer than the pen path's limit.
+  const from = await screenPoint(page, 200, 200)
+  await page.mouse.move(from.x, from.y)
+  await page.mouse.down()
+  await page.mouse.move(from.x + 60, from.y + 30, { steps: 5 })
+  release()
+  await page.waitForTimeout(4_500)
+  expect(await images(page)).toEqual([])
+  await page.mouse.move(from.x + 120, from.y + 60, { steps: 5 })
+  await page.mouse.up()
+
+  await expect.poll(async () => (await images(page)).length, { timeout: 20_000 }).toBe(2)
+  const moved = await x()
+  expect(moved).not.toBe(100)
+  // One undo takes both images away and leaves the square where it was dragged; the next puts it back.
+  await page.evaluate(() => window.dazbee?.perform('undo'))
+  expect(await images(page)).toEqual([])
+  expect(await x()).toBe(moved)
+  await page.evaluate(() => window.dazbee?.perform('undo'))
+  expect(await x()).toBe(100)
+  expect(errors).toEqual([])
+})
+
 test('an SVG file whose format goes while it uploads is not placed, and the notice says it is in the library', async ({ browser }) => {
   const brandId = await newBrand('e2e dropped files')
   const { page, errors } = await openStage(browser, design({}, { formats: { wide: { name: 'Wide', width: 1920, height: 1080, order: 'a1' } } }), { brandId })

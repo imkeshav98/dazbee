@@ -187,7 +187,7 @@ test('a stroke and the page background take the same paint editor: an angular st
   expect(errors).toEqual([])
 })
 
-test('a gradient stop removed while it is dragged ends the drag and its undo step', async ({ browser }) => {
+test('a gradient stop removed while it is dragged ends the drag and its undo step, and moves no other stop', async ({ browser }) => {
   const asset = await upload(photo)
   const { page, errors } = await openStage(browser, design(asset.id))
   await press(page, 'deselect')
@@ -195,13 +195,32 @@ test('a gradient stop removed while it is dragged ends the drag and its undo ste
   await layers.locator('[data-row="1"]').getByTestId('paint-swatch').click()
   const editor = page.getByTestId('paint-editor')
   await editor.getByRole('radio', { name: 'Line gradient' }).click()
-  const stops = async () => ((await read(page)) as unknown as { pages: Record<string, { fills: Fill[] }> }).pages.p1?.fills[0]?.stops?.length
+  const offsets = async () => ((await read(page)) as unknown as { pages: Record<string, { fills: Fill[] }> }).pages.p1?.fills[0]?.stops?.map((s) => s.offset)
+  const stops = async () => (await offsets())?.length
   const bar = await editor.getByTestId('gradient-bar').boundingBox()
   if (!bar) throw new Error('no bar')
   await page.mouse.click(bar.x + bar.width * 0.5, bar.y + bar.height / 2)
   await expect.poll(stops).toBe(3)
 
-  // The last stop is pressed and, while held, removed with Delete; the pointer is let go away from the bar.
+  // The middle stop is pressed and, while held, removed with Delete: the drag ends there, and the
+  // pointer moving on along the bar moves the stop that took its place in the list no more.
+  const middle = await editor.locator('[data-stop="1"]').boundingBox()
+  if (!middle) throw new Error('no stop')
+  await page.mouse.move(middle.x + middle.width / 2, middle.y + middle.height / 2)
+  await page.mouse.down()
+  await expect.poll(() => page.evaluate(() => window.dazbee?.gesturing())).toBe(true)
+  await page.keyboard.press('Delete')
+  await expect.poll(stops).toBe(2)
+  await expect.poll(() => page.evaluate(() => window.dazbee?.gesturing())).toBe(false)
+  const left = await offsets()
+  await page.mouse.move(bar.x + bar.width * 0.2, middle.y + middle.height / 2, { steps: 4 })
+  await page.mouse.up()
+  expect(await offsets()).toEqual(left)
+  await expect.poll(() => page.evaluate(() => window.dazbee?.gesturing())).toBe(false)
+
+  // The last stop, with a third stop again, the pointer let go away from the bar.
+  await page.mouse.click(bar.x + bar.width * 0.5, bar.y + bar.height / 2)
+  await expect.poll(stops).toBe(3)
   const last = await editor.locator('[data-stop="2"]').boundingBox()
   if (!last) throw new Error('no stop')
   await page.mouse.move(last.x + last.width / 2, last.y + last.height / 2)
