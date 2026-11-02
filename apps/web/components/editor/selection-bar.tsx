@@ -12,7 +12,7 @@ import { cn } from '../../lib/cn.ts'
 import { useLocale, useMessages } from '../../lib/i18n/client.tsx'
 import { dirOf, format } from '../../lib/i18n/index.ts'
 import { ALIGN, COMBINE, DISTRIBUTE, keyOf, useSelection } from './arrange-panel.tsx'
-import { BarPopover, keepFocus } from './bar-popover.tsx'
+import { BarPopover, useMenuFocus } from './bar-popover.tsx'
 import { RotationField, set, shared, useTarget } from './selection-cards.tsx'
 import { BAR, BAR_BUTTON, BAR_DIVIDER, ICON_BUTTON, MENU, MENU_DIVIDER, MENU_ITEM, MENU_KEY } from './styles.ts'
 import { ShapeBar } from './shape-bar.tsx'
@@ -97,10 +97,12 @@ function SubMenu({ label, testId, children }: { label: string; testId: string; c
   const [open, setOpen] = useState(false)
   const rtl = dirOf(useLocale()) === 'rtl'
   const [toward, back] = rtl ? ['ArrowLeft', 'ArrowRight'] : ['ArrowRight', 'ArrowLeft']
+  const focus = useMenuFocus()
   return (
     <Popover.Root open={open} onOpenChange={setOpen}>
       <Popover.Trigger asChild>
         <button
+          ref={focus.button}
           type="button"
           aria-haspopup="dialog"
           data-testid={`more-${testId}`}
@@ -123,6 +125,7 @@ function SubMenu({ label, testId, children }: { label: string; testId: string; c
           collisionPadding={12}
           // A click elsewhere, Esc or the arrow back closes it; focus moving as ⋯ More opens does not.
           onFocusOutside={(event) => event.preventDefault()}
+          {...focus.content}
           aria-label={label}
           data-testid={`more-${testId}-menu`}
           onKeyDown={(event) => {
@@ -229,6 +232,7 @@ export function SelectionBar({ editor, brandId }: { editor: Editor; brandId: str
   const [bar, setBar] = useState<HTMLDivElement | null>(null)
   const place = usePlace(editor, bar)
   const [open, setOpen] = useState<string | null>(null)
+  const moreFocus = useMenuFocus()
   // A popover belongs to the selection it was opened for.
   const [openFor, setOpenFor] = useState(ids)
   if (openFor !== ids) {
@@ -297,12 +301,12 @@ export function SelectionBar({ editor, brandId }: { editor: Editor; brandId: str
       )}
       <Popover.Root open={open === 'more'} onOpenChange={(to) => setOpen(to ? 'more' : null)}>
         <Popover.Trigger asChild>
-          <button type="button" data-bar-item aria-label={b.more} title={b.more} data-testid="bar-more" className={cn(BAR_BUTTON, 'px-1.5')}>
+          <button ref={moreFocus.button} type="button" data-bar-item aria-label={b.more} title={b.more} data-testid="bar-more" className={cn(BAR_BUTTON, 'px-1.5')}>
             <DotsThreeIcon size={18} weight="bold" aria-hidden />
           </button>
         </Popover.Trigger>
         <Popover.Portal>
-          <Popover.Content side="bottom" align="end" sideOffset={8} collisionPadding={12} onCloseAutoFocus={(event) => keepFocus(event, open, 'more')} aria-label={b.more} data-testid="bar-more-menu" className={cn(MENU, 'w-60')}>
+          <Popover.Content side="bottom" align="end" sideOffset={8} collisionPadding={12} {...moreFocus.content} aria-label={b.more} data-testid="bar-more-menu" className={cn(MENU, 'w-60')}>
             <LayerActions editor={editor} ids={ids} onDone={() => setOpen(null)} />
           </Popover.Content>
         </Popover.Portal>
