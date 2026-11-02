@@ -1,10 +1,11 @@
 // The layers panel (#59) in Chromium, with real pointer and keyboard input: the tree in step with the
 // stage's selection both ways, a layer dragged into a group (the stage redraws it there, one undo
 // step), rename, lock and hide; the same by keyboard alone, with the focus following a key pressed
-// just after the panel redraws and a layer moved past a big open group, going to the next row when
-// the focused one is deleted, Tab landing on the selected row, and a rename finished with a click
-// leaving the focus where the click put it; and 300 layers scrolling with only the rows in view in
-// the page, the focused row staying focused and reachable by Tab when it scrolls away.
+// just after the panel redraws and a layer moved past a big open group, going to the next row (and
+// selecting it) when the focused one is deleted or grouped and back on undo, Tab landing on the
+// selected row, one tab stop in the tree, and a rename finished or Delete pressed off the tree
+// leaving the focus where it was; and 300 layers scrolling with only the rows in view in the page,
+// the focused row staying focused and reachable by Tab when it scrolls away.
 import { expect, test, type Locator, type Page } from '../support/test.ts'
 import type { DesignInput } from '@dazbee/schema'
 import { screenPoint, writeOutput } from '../support/editor.ts'
@@ -367,6 +368,134 @@ test('a rename finished by clicking the canvas keeps the name and leaves the foc
   expect(errors).toEqual([])
 })
 
+/** The selected layers' ids. */
+const selectionOf = (page: Page) => page.evaluate(() => window.dazbee?.selection() ?? [])
+/** The layer of the row the focus is on, or null off the rows. */
+const focusedLayer = (page: Page) => page.evaluate(() => document.activeElement?.getAttribute('data-layer') ?? null)
+/** The ids of the layers in the document. */
+const layerIds = async (page: Page) => Object.keys((await read(page)).nodes)
+
+test('keyboard only: the row that takes the focus after a delete is selected, so Delete again deletes it', async ({ browser }) => {
+  const { page, errors } = await openStage(browser, design())
+  await openLayers(page)
+  await row(page, 'Box').click()
+  await page.keyboard.press('Delete')
+  await expect.poll(() => layerIds(page)).not.toContain('box')
+  await expect(row(page, 'Card')).toBeFocused()
+  await expect.poll(() => selectionOf(page)).toEqual(['card'])
+  await expect(row(page, 'Card')).toHaveAttribute('aria-selected', 'true')
+
+  await page.keyboard.press('Delete')
+  await expect.poll(() => layerIds(page)).not.toContain('card')
+  await expect(row(page, 'Backdrop')).toBeFocused()
+  await expect.poll(() => selectionOf(page)).toEqual(['backdrop'])
+  expect(errors).toEqual([])
+})
+
+test('keyboard only: undo after a delete selects the row it gives the focus back to, so Delete acts on that row', async ({ browser }) => {
+  const { page, errors } = await openStage(browser, design())
+  await openLayers(page)
+  await row(page, 'Box').click()
+  await page.keyboard.press('Delete')
+  await expect.poll(() => layerIds(page)).not.toContain('box')
+  await page.keyboard.press('ArrowDown')
+  await expect(row(page, 'Backdrop')).toBeFocused()
+  expect(await selectionOf(page)).toEqual(['backdrop'])
+
+  // Undo brings Box back with the focus and the selection on it.
+  await page.keyboard.press('ControlOrMeta+Z')
+  await expect.poll(() => layerIds(page)).toContain('box')
+  await expect(row(page, 'Box')).toBeFocused()
+  await expect.poll(() => selectionOf(page)).toEqual(['box'])
+  // Delete again deletes Box, the row that looks current, and leaves Backdrop.
+  await page.keyboard.press('Delete')
+  await expect.poll(() => layerIds(page)).not.toContain('box')
+  expect(await layerIds(page)).toContain('backdrop')
+  expect(errors).toEqual([])
+})
+
+test('keyboard only: grouping from the tree puts the focus on the new group, and undo on a selected row', async ({ browser }) => {
+  const { page, errors } = await openStage(browser, design())
+  await openLayers(page)
+  await row(page, 'Dot').click()
+  await row(page, 'Box').click({ modifiers: ['ControlOrMeta'] })
+  await expect(row(page, 'Box')).toBeFocused()
+  expect(await selectionOf(page)).toEqual(['dot', 'box'])
+
+  await page.keyboard.press('ControlOrMeta+G')
+  await expect.poll(async () => (await selectionOf(page)).filter((id) => id !== 'dot' && id !== 'box').length).toBe(1)
+  const [group] = await selectionOf(page)
+  if (!group) throw new Error('no group selected')
+  await expect.poll(() => focusedLayer(page)).toBe(group)
+  writeOutput('layers-12-grouped-focus.png', await page.screenshot())
+
+  // Undo takes the group away: the focus is on a row that is selected.
+  await page.keyboard.press('ControlOrMeta+Z')
+  await expect.poll(() => layerIds(page)).not.toContain(group)
+  await expect.poll(async () => {
+    const on = await focusedLayer(page)
+    return on !== null && (await selectionOf(page)).includes(on)
+  }).toBe(true)
+  expect(errors).toEqual([])
+})
+
+test('keyboard only: deleting the only layer and undoing puts the focus back on its row', async ({ browser }) => {
+  const only: DesignInput['nodes'] = { box: { type: 'graphic', parentId: 'p1', index: 'a0', name: 'Box', props: rect(120, 120, 400, 300, '#E0262BFF') } }
+  const { page, errors } = await openStage(browser, { ...design(), nodes: only })
+  await openLayers(page)
+  await row(page, 'Box').click()
+  await page.keyboard.press('Delete')
+  await expect.poll(() => layerIds(page)).not.toContain('box')
+  await expect(tree(page)).toHaveCount(0)
+
+  await page.keyboard.press('ControlOrMeta+Z')
+  await expect.poll(() => layerIds(page)).toContain('box')
+  await expect(row(page, 'Box')).toBeFocused()
+  await expect.poll(() => selectionOf(page)).toEqual(['box'])
+  expect(errors).toEqual([])
+})
+
+test('keyboard: the tree has one tab stop, the row the focus is on, even when that row is not selected', async ({ browser }) => {
+  const { page, errors } = await openStage(browser, design())
+  await openLayers(page)
+  const stops = () => tree(page).locator('[role=treeitem][tabindex="0"]').evaluateAll((rows) => rows.map((r) => r.getAttribute('data-layer')))
+  await row(page, 'Box').click()
+  await row(page, 'Card').click({ modifiers: ['ControlOrMeta'] })
+  await row(page, 'Card').click({ modifiers: ['ControlOrMeta'] })
+  await expect(row(page, 'Card')).toBeFocused()
+  expect(await selectionOf(page)).toEqual(['box'])
+  expect(await stops()).toEqual(['card'])
+  // Shift+Tab leaves the tree instead of stopping on Box.
+  await page.keyboard.press('Shift+Tab')
+  expect(await focusInTree(page)).toBe(false)
+
+  // The lock on an unselected row: that row is the tab stop.
+  await row(page, 'Dot').hover()
+  await row(page, 'Dot').getByRole('button', { name: 'Lock Dot' }).click()
+  await expect.poll(async () => (await node(page, 'dot')).lock?.move).toBe(true)
+  expect(await selectionOf(page)).toEqual(['box'])
+  expect(await stops()).toEqual(['dot'])
+  expect(errors).toEqual([])
+})
+
+test('Delete pressed on the canvas after the tree had the focus leaves the focus off the tree', async ({ browser }) => {
+  const { page, errors } = await openStage(browser, design())
+  await openLayers(page)
+  await row(page, 'Box').click()
+  await expect(row(page, 'Box')).toBeFocused()
+  await click(page, 480, 380)
+  expect(await selectionOf(page)).toEqual(['box'])
+  expect(await focusInTree(page)).toBe(false)
+
+  await page.keyboard.press('Delete')
+  await expect.poll(() => layerIds(page)).not.toContain('box')
+  await page.evaluate(() => window.dazbee?.drawn())
+  expect(await focusInTree(page)).toBe(false)
+  expect(await page.evaluate(() => document.activeElement === document.body)).toBe(true)
+  expect(await selectionOf(page)).toEqual([])
+  expect(errors).toEqual([])
+})
+
 /** A design of 300 layers. */
 const threeHundred = (): DesignInput => {
   const nodes: DesignInput['nodes'] = {}
@@ -485,6 +614,32 @@ test('300 layers: Tab reaches the tree on the selected row when it is scrolled o
   await expect(row(page, 'Layer 168')).toBeFocused()
   await expect(row(page, 'Layer 168')).toBeInViewport()
   writeOutput('layers-11-tab-to-scrolled-row.png', await page.screenshot())
+  expect(errors).toEqual([])
+})
+
+test('300 layers: the bottom row deleted and brought back by undo is focused and selected', async ({ browser }) => {
+  const { page, errors } = await openStage(browser, threeHundred())
+  await openLayers(page)
+  await tree(page).getByRole('treeitem').first().focus()
+  await page.keyboard.press('End')
+  await expect(row(page, 'Layer 1')).toBeFocused()
+
+  // Delete the last row: the focus and the selection go to the row now last.
+  await page.keyboard.press('Delete')
+  await expect.poll(() => layerIds(page)).not.toContain('n0')
+  await expect(row(page, 'Layer 2')).toBeFocused()
+  await expect.poll(() => selectionOf(page)).toEqual(['n1'])
+  await page.keyboard.press('ArrowUp')
+  await expect(row(page, 'Layer 3')).toBeFocused()
+
+  // Undo: Layer 1 is back, focused and selected, and Delete deletes it, not Layer 3.
+  await page.keyboard.press('ControlOrMeta+Z')
+  await expect.poll(() => layerIds(page)).toContain('n0')
+  await expect(row(page, 'Layer 1')).toBeFocused()
+  await expect.poll(() => selectionOf(page)).toEqual(['n0'])
+  await page.keyboard.press('Delete')
+  await expect.poll(() => layerIds(page)).not.toContain('n0')
+  expect(await layerIds(page)).toContain('n2')
   expect(errors).toEqual([])
 })
 
