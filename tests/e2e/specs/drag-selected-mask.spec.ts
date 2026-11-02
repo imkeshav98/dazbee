@@ -25,7 +25,7 @@ const box = async (page: Page, id: string) => {
 }
 const row = (page: Page, name: string) => page.getByRole('tree').getByRole('treeitem').filter({ has: page.locator(`[data-testid="layer-name"]:text-is("${name}")`) })
 
-test('a mask picked in the layers panel is dragged on the stage, and what it masks stays', async ({ browser }) => {
+test('a mask picked in the layers panel is dragged on the stage, and what it masks stays; a click there without a drag picks what is under the pointer', async ({ browser }) => {
   const { page, errors } = await openStage(browser, design)
   await page.locator('[data-panel="layers"]').click()
   if (!(await row(page, 'Mask').isVisible())) {
@@ -50,11 +50,8 @@ test('a mask picked in the layers panel is dragged on the stage, and what it mas
   // One undo puts it back.
   await press(page, 'undo')
   expect(await box(page, 'mask')).toEqual({ x: 200, y: 200, width: 400, height: 300 })
-  expect(errors).toEqual([])
-})
 
-test('a click inside the selection without a drag picks what is under the pointer', async ({ browser }) => {
-  const { page, errors } = await openStage(browser, design)
+  // A click there without a drag picks what is under the pointer.
   await page.evaluate(() => window.dazbee?.select(['mask'], 'p1', 'sq'))
   await page.evaluate(() => window.dazbee?.drawn())
   const at = await screenPoint(page, 400, 350)

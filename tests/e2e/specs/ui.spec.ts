@@ -33,8 +33,17 @@ const watchAnimations = (page: Page) => page.evaluate(() => {
 })
 const animations = (page: Page) => page.evaluate(() => (window as unknown as { animations: { on: string | null; properties: string[]; ms: number }[] }).animations)
 
-test('dark and light change only the tokens', async ({ page }) => {
+test('the system theme is followed until a pick is made, and dark and light change only the tokens', async ({ page, browser }) => {
   test.setTimeout(90_000)
+  for (const colorScheme of ['light', 'dark'] as const) {
+    const context = await browser.newContext({ colorScheme })
+    const system = await context.newPage()
+    await system.goto('/')
+    await expect(system.locator('html')).toHaveAttribute('data-theme', colorScheme)
+    await context.close()
+  }
+
+  // A pick: the library and the editor in each theme.
   const designId = await seed(liveDesign())
   for (const theme of ['dark', 'light'] as const) {
     await setCookies(page, { theme })
@@ -60,17 +69,7 @@ test('dark and light change only the tokens', async ({ page }) => {
   expect(backgrounds[0]).not.toBe(backgrounds[1])
 })
 
-test('the system theme is followed until a pick is made', async ({ browser }) => {
-  for (const colorScheme of ['light', 'dark'] as const) {
-    const context = await browser.newContext({ colorScheme })
-    const page = await context.newPage()
-    await page.goto('/')
-    await expect(page.locator('html')).toHaveAttribute('data-theme', colorScheme)
-    await context.close()
-  }
-})
-
-test('in Arabic the chrome mirrors and reads right to left, the design does not', async ({ page }) => {
+test('in Arabic the chrome mirrors and reads right to left, the islands too, the design does not', async ({ page }) => {
   const designId = await seed(liveDesign())
   await setCookies(page, { locale: 'ar', theme: 'dark' })
   await page.goto('/brands/dev-brand-coffee')
@@ -87,11 +86,19 @@ test('in Arabic the chrome mirrors and reads right to left, the design does not'
   // The capsule floats over the right side of the stage in Arabic.
   expect(rail.x).toBeGreaterThan(stage.x + stage.width / 2)
   await expect(page.getByTestId('stage').locator('xpath=..')).toHaveCSS('direction', 'ltr')
+  // The islands swap sides: the design's name at the right, its actions at the left, clear of the
+  // rulers, which stay on the left.
+  const start = await page.getByTestId('island-start').boundingBox()
+  const end = await page.getByTestId('island-end').boundingBox()
+  if (!start || !end) throw new Error('missing islands')
+  expect(start.x).toBeGreaterThan(end.x)
+  expect(end.x).toBeGreaterThanOrEqual(20)
+  expect(1440 - (start.x + start.width)).toBeLessThan(48)
   await page.getByRole('button', { name: 'الطبقات' }).click()
   await shoot(page, 'arabic-editor')
 })
 
-test('reduced motion turns chrome animation off', async ({ browser }) => {
+test('reduced motion turns chrome animation off: the flyout appears outright and the blob jumps without sliding or squishing', async ({ browser }) => {
   test.setTimeout(90_000)
   const designId = await seed(liveDesign())
   for (const reducedMotion of ['no-preference', 'reduce'] as const) {
@@ -109,6 +116,17 @@ test('reduced motion turns chrome animation off', async ({ browser }) => {
     if (reducedMotion === 'reduce') {
       expect(onFlyout.filter((a) => a.ms > 0)).toEqual([])
       expect(Number.parseFloat(tooltipTransition)).toBeLessThan(0.001)
+      // The capsule's blob jumps from Layers to Brand without sliding or squishing.
+      const layers = centre(await page.getByRole('button', { name: 'Layers', exact: true }).boundingBox())
+      const { landing, frames: path } = await blobPath(page, 'Brand')
+      const brand = centre(await page.getByRole('button', { name: 'Brand', exact: true }).boundingBox())
+      expect(landing).toBe(1)
+      // Every frame has the blob on Layers (before the click lands) or on Brand, never between.
+      expect(Math.abs((path.at(-1)?.y ?? Number.NaN) - brand.y)).toBeLessThan(1)
+      for (const p of path) {
+        expect(Math.min(Math.abs(p.y - layers.y), Math.abs(p.y - brand.y))).toBeLessThan(1)
+        expect(p.scaleY).toBe(1)
+      }
     } else {
       expect(onFlyout.filter((a) => a.properties.includes('opacity')).map((a) => a.ms)).toEqual([CHROME_MS])
     }
@@ -266,26 +284,6 @@ test('the panels live in a capsule floating over the canvas', async ({ page }) =
   await page.keyboard.press('Enter')
   await expect(ai).toHaveAttribute('aria-expanded', 'false')
   await expect(page.getByTestId('flyout')).toHaveCount(0)
-})
-
-test('with reduced motion the blob jumps without sliding or squishing', async ({ browser }) => {
-  const designId = await seed(liveDesign())
-  const context = await browser.newContext({ reducedMotion: 'reduce', viewport: { width: 1440, height: 900 } })
-  const page = await context.newPage()
-  await page.goto(editorPath(designId))
-  await expect(page.getByTestId('status')).toHaveAttribute('data-ready', '', { timeout: 30_000 })
-  await page.getByRole('button', { name: 'Layers', exact: true }).click()
-  const layers = centre(await page.getByRole('button', { name: 'Layers', exact: true }).boundingBox())
-  const { landing, frames: path } = await blobPath(page, 'Brand')
-  const brand = centre(await page.getByRole('button', { name: 'Brand', exact: true }).boundingBox())
-  expect(landing).toBe(1)
-  // Every frame has the blob on Layers (before the click lands) or on Brand, never between.
-  expect(Math.abs((path.at(-1)?.y ?? Number.NaN) - brand.y)).toBeLessThan(1)
-  for (const p of path) {
-    expect(Math.min(Math.abs(p.y - layers.y), Math.abs(p.y - brand.y))).toBeLessThan(1)
-    expect(p.scaleY).toBe(1)
-  }
-  await context.close()
 })
 
 test('on a phone the capsule is a tab bar at the bottom', async ({ browser }) => {

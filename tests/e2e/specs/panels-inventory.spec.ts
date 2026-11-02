@@ -1,8 +1,10 @@
 // Every control in the editor's panels (#235), one test per row of the inventory, in Chromium with
 // real input. Each control is used and the design checked: the document holds the change, the
 // export draws it, one undo takes it back and redo brings it again, and it is there after a reload.
-// The panel redesign runs the same list, so a control that goes missing fails here. Rows known to
-// fail have their bug in KNOWN; such a test is expected to fail, and passes once the bug is fixed.
+// The panel redesign runs the same list, so a control that goes missing fails here. Rows 64 to 68
+// (snap and rulers, the layers, assets and brand panels, export) are checked by their own specs:
+// snapping, layers, assets with image-into-shape, brand-kit and export. Rows known to fail have
+// their bug in KNOWN; such a test is expected to fail, and passes once the bug is fixed.
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { expect, test, type Browser, type Locator, type Page } from '../support/test.ts'
@@ -1320,141 +1322,5 @@ test.describe('nothing selected', () => {
     await p1.getByRole('button', { name: 'Show Page 1' }).click()
     await expect(p1).toHaveAttribute('aria-current', 'page')
     await reloads(page)
-  })
-
-  row(64, 'snap and rulers', async (open) => {
-    // Snap and rulers are how this tab shows the design, not part of it: no undo, nothing to reload.
-    const page = await open()
-    await page.getByTestId('zoom').click()
-    const view = page.getByTestId('zoom-menu')
-    for (const name of ['Snap', 'Rulers']) {
-      const button = view.getByRole('switch', { name })
-      const was = await button.getAttribute('aria-checked')
-      await button.click()
-      await expect(button).not.toHaveAttribute('aria-checked', was ?? '')
-    }
-    await expect(page.locator('.stage-overlay .ruler[data-axis="x"]')).toHaveCount(await view.getByRole('switch', { name: 'Rulers' }).getAttribute('aria-checked') === 'true' ? 1 : 0)
-    expect(await page.evaluate(() => [window.dazbee?.snapping(), window.dazbee?.rulers()])).toEqual(
-      [await view.getByRole('switch', { name: 'Snap' }).getAttribute('aria-checked') === 'true', await view.getByRole('switch', { name: 'Rulers' }).getAttribute('aria-checked') === 'true'],
-    )
-  })
-})
-
-test.describe('left panels and export', () => {
-  row(65, 'layers: rename, lock, hide, expand, drag to reorder and into a group', async (open) => {
-    const page = await open()
-    await page.locator('[data-panel="layers"]').click()
-    const tree = page.getByRole('tree')
-    const item = (name: string) => tree.getByRole('treeitem').filter({ has: page.locator(`[data-testid="layer-name"]:text-is("${name}")`) })
-    await step(page, async () => {
-      await item('Box').dblclick()
-      await tree.getByRole('textbox', { name: 'Name of Box' }).fill('Hero')
-      await tree.getByRole('textbox', { name: 'Name of Box' }).press('Enter')
-    }, async () => { await expect.poll(async () => (await doc(page)).nodes.box?.name).toBe('Hero') }, { draws: false })
-    await item('Hero').hover()
-    await step(page, () => item('Hero').getByRole('button', { name: 'Lock Hero' }).click(), async () => {
-      await expect.poll(async () => (await doc(page)).nodes.box?.lock).toMatchObject({ move: true })
-    }, { draws: false })
-    await step(page, () => item('Hero').getByRole('button', { name: 'Hide Hero' }).click(), async () => {
-      await expect.poll(async () => (await props(page, 'box')).visible).toBe(false)
-    })
-    await item('Stack').getByRole('button', { name: 'Expand Stack' }).click()
-    await expect(item('Chip 1')).toBeVisible()
-    // The dot overlaps nothing, so its new place shows only in the order.
-    await step(page, () => item('Dot').dragTo(item('Hex'), { targetPosition: { x: 60, y: 3 } }), async () => {
-      await expect.poll(async () => (await children(page, 'p1')).indexOf('dot')).toBe(2)
-    }, { draws: false })
-    const stack = await item('Stack').boundingBox()
-    await step(page, () => item('Star').dragTo(item('Stack'), { targetPosition: { x: 60, y: (stack?.height ?? 28) / 2 } }), async () => {
-      await expect.poll(async () => (await doc(page)).nodes.star?.parentId).toBe('stack')
-    })
-    // Into a group: the group grows to hold it, and it is drawn where it was.
-    await select(page, ['dot', 'poly'])
-    await page.getByTestId('selection-bar').locator('[data-action="group"]').click()
-    const group = (await doc(page)).nodes.dot?.parentId ?? ''
-    const groupRow = tree.getByRole('treeitem').filter({ has: page.locator(`[data-testid="layer-name"]:text-is("${(await doc(page)).nodes[group]?.name ?? ''}")`) })
-    const groupBox = await groupRow.boundingBox()
-    await step(page, () => item('Rule').dragTo(groupRow, { targetPosition: { x: 60, y: (groupBox?.height ?? 28) / 2 } }), async () => {
-      await expect.poll(async () => (await doc(page)).nodes.rule?.parentId).toBe(group)
-    }, { draws: false })
-    await reloads(page)
-  })
-
-  row(66, 'assets: search, upload, drag onto the page or a shape', async (open) => {
-    const page = await open()
-    await page.locator('[data-panel="assets"]').click()
-    const library = page.getByTestId('asset-library')
-    const images = async () => Object.values((await doc(page)).nodes).filter((n) => n.props.fills?.some((f) => f.type === 'image')).length
-    const name = `Inventory ${Date.now()}`
-    await library.locator('input[type="file"]').setInputFiles({ name: `${name}.jpg`, mimeType: 'image/jpeg', buffer: Buffer.concat([tile, Buffer.from(name)]) })
-    const item = library.locator('li[data-asset]').filter({ hasText: name })
-    await expect(item).toBeVisible({ timeout: 30_000 })
-    await library.getByRole('searchbox', { name: 'Search by name or tag' }).fill(name)
-    await expect(library.locator('li[data-asset]')).toHaveCount(1)
-    const place = item.getByRole('button', { name: /^Place .* on the design$/ })
-    const stage = page.getByTestId('stage')
-    /** Where a design pixel is, inside the stage. */
-    const onStage = async (x: number, y: number) => {
-      const [box, at] = await Promise.all([stage.boundingBox(), page.evaluate(({ x, y }) => window.dazbee?.screenPoint(x, y), { x, y })])
-      return { x: (at?.x ?? 0) - (box?.x ?? 0), y: (at?.y ?? 0) - (box?.y ?? 0) }
-    }
-    await step(page, async () => place.dragTo(stage, { targetPosition: await onStage(900, 900) }), async () => {
-      await expect.poll(images).toBe(2)
-    })
-    await step(page, async () => place.dragTo(stage, { targetPosition: await onStage(820, 240) }), async () => {
-      await expect.poll(async () => (await fills(page, 'dot')).at(-1)?.type).toBe('image')
-    })
-    await reloads(page)
-  })
-
-  row(67, 'brand: colours and fonts on the selection', async (open) => {
-    const page = await open()
-    await page.locator('[data-panel="brand"]').click()
-    const picker = page.getByTestId('brand-kit')
-    await page.evaluate(() => window.dazbee?.select(['box']))
-    await step(page, () => picker.getByRole('button', { name: 'Apply Berry to the selection' }).click(), async () => {
-      await expect.poll(async () => (await doc(page)).nodes.box?.bindings).toMatchObject({ fill: 'brand:berry' })
-    })
-    await page.evaluate(() => window.dazbee?.select(['headline']))
-    // Body is Noto Sans, the family the headline has already.
-    await step(page, () => picker.getByRole('button', { name: 'Apply Body to the selection' }).click(), async () => {
-      await expect.poll(async () => (await doc(page)).nodes.headline?.bindings).toMatchObject({ fontFamily: 'brand:body' })
-    }, { draws: false })
-    await reloads(page)
-  })
-
-  row(68, 'export: pages, formats, file type, JPG quality', async (open) => {
-    const page = await open(true)
-    await page.getByRole('button', { name: 'Add page' }).click()
-    const dialog = page.getByTestId('export')
-    const opened = async () => {
-      if (await dialog.isVisible()) return
-      await page.getByTestId('share-open').click()
-      await page.getByTestId('export-open').click()
-    }
-    await opened()
-    await dialog.getByRole('radio', { name: 'All 2' }).click()
-    await expect(page.getByTestId('export-run')).toHaveText('Export 4 files')
-    await dialog.getByRole('radio', { name: 'This page' }).click()
-    await choose(page.getByTestId('export-page'), 'p1')
-    await expect(page.getByTestId('export-run')).toHaveText('Export 2 files')
-    await dialog.locator('[data-format="story"]').click()
-    await expect(dialog.locator('[data-format="story"]')).toHaveAttribute('aria-pressed', 'false')
-    await dialog.locator('[data-type="jpg"]').click()
-    await expect(page.getByTestId('export-run')).toHaveText('Export 1 file')
-    const jpgAt = async (quality: string) => {
-      await opened()
-      await enter(page.getByTestId('export-quality'), quality)
-      const [jpg] = await Promise.all([page.waitForEvent('download'), page.getByTestId('export-run').click()])
-      expect(jpg.suggestedFilename()).toBe('Promo Square.jpg')
-      return readFileSync(await jpg.path()).length
-    }
-    await page.getByTestId('export-name').fill('Promo {format}')
-    expect(await jpgAt('30')).toBeLessThan(await jpgAt('95'))
-    await opened()
-    await dialog.locator('[data-type="png"]').click()
-    await dialog.locator('[data-format="story"]').click()
-    const [zip] = await Promise.all([page.waitForEvent('download'), page.getByTestId('export-run').click()])
-    expect(zip.suggestedFilename()).toMatch(/\.zip$/)
   })
 })

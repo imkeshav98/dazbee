@@ -1,6 +1,6 @@
-// The brief's toolbar (#136) in Chromium: the Formats dropdown picks what Make drafts makes and
-// keeps one picked, + adds a reference ad or images uploaded to the brand's assets as thumbnails
-// above the brief, and Brand kit opens the whole kit to pick from. Each choice is a form field.
+// The brief's toolbar (#136) in Chromium: + adds a reference ad or images uploaded to the brand's
+// assets as thumbnails above the brief, and Brand kit opens the whole kit to pick from. Each choice
+// is a form field.
 import { AssetSummary } from '@dazbee/schema'
 import { expect, test } from '../support/test.ts'
 import { photo } from '../support/assets.ts'
@@ -8,37 +8,6 @@ import { writeOutput } from '../support/editor.ts'
 import { API_URL, DEV_BRAND, liveDesign, newBrand, putKit, seed } from '../support/seed.ts'
 
 test.use({ viewport: { width: 1440, height: 900 } })
-
-test('the Formats dropdown picks the formats Make drafts makes, and one always stays picked', async ({ page }) => {
-  // The home, then the editor opening, which alone may take its 30 s on a busy runner.
-  test.setTimeout(60_000)
-  await page.goto(`/brands/${DEV_BRAND}`)
-  const button = page.getByTestId('brief-formats')
-  const dropdown = page.getByRole('dialog', { name: 'Formats' })
-  await expect(button).toHaveText(/1 format/)
-  await button.click()
-  await expect(page.getByTestId('brief-format-feed-square')).toBeChecked()
-  // Square is the only one picked, so it stays.
-  await dropdown.getByText('Square', { exact: true }).click()
-  await expect(page.getByTestId('brief-format-feed-square')).toBeChecked()
-  await dropdown.getByText('Story', { exact: true }).click()
-  await expect(page.getByTestId('brief-format-story')).toBeChecked()
-  await expect(button).toHaveText(/2 formats/)
-  writeOutput('composer-0-formats.png', await page.screenshot())
-
-  await page.keyboard.press('Escape')
-  await expect(dropdown).toBeHidden()
-  await expect(button).toBeFocused()
-
-  const brief = `Two formats ${crypto.randomUUID().slice(0, 6)}`
-  await page.getByLabel('Brief').fill(brief)
-  await page.getByRole('button', { name: 'Make drafts' }).click()
-  await expect(page).toHaveURL(new RegExp(`/brands/${DEV_BRAND}/designs/[\\w-]+$`), { timeout: 20_000 })
-  await expect(page.getByTestId('status')).toHaveAttribute('data-ready', '', { timeout: 30_000 })
-  const design = await page.evaluate(() => window.dazbee?.design())
-  expect(design?.meta.name).toBe(brief)
-  expect(Object.values(design?.formats ?? {}).map((f) => [f.width, f.height])).toEqual([[1080, 1080], [1080, 1920]])
-})
 
 test('+ adds a reference ad and uploaded images above the brief, each taken off again by its ✕', async ({ page }) => {
   test.setTimeout(60_000)

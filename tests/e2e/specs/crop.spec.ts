@@ -48,7 +48,7 @@ const cornerHandle = async (page: Page, i: number) => {
 }
 const undo = async (page: Page) => press(page, 'undo')
 
-test('Enter crops a photo: a drag moves it, a corner scales it, each one undo step, and the export matches Node', async ({ browser }) => {
+test('Enter crops a photo: a drag moves it, a corner scales it, each one undo step, and the export matches Node; a double click crops too, and a click outside ends it', async ({ browser }) => {
   const asset = await upload(photo)
   const { page, errors } = await openStage(browser, design(asset.id))
   const before = await exportHashOf(page)
@@ -105,12 +105,10 @@ test('Enter crops a photo: a drag moves it, a corner scales it, each one undo st
   await undo(page)
   expect((await read(page)).overrides['format:sq']?.photo).toBeUndefined()
   expect(await exportHashOf(page)).toBe(before)
-  expect(errors).toEqual([])
-})
 
-test('a double click crops too, and a click outside the image ends it', async ({ browser }) => {
-  const asset = await upload(photo)
-  const { page, errors } = await openStage(browser, design(asset.id))
+  // From nothing selected, a double click crops too, and a click outside the image ends it.
+  await press(page, 'deselect')
+  expect(await selection(page)).toEqual([])
   const at = await screenPoint(page, 400, 400)
   await page.mouse.dblclick(at.x, at.y)
   await page.evaluate(() => window.dazbee?.drawn())

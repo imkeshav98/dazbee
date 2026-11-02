@@ -1,7 +1,7 @@
 // Export (#55) in Chromium, through the Export menu: every format of a page as PNG downloads as one
 // zip with a folder per format, and every file in it is byte for byte what Node exports from the
-// same design, drawn in the export worker rather than on the main thread; and one format as JPG
-// downloads as itself.
+// same design, drawn in the export worker rather than on the main thread, and named by the File
+// names field; and one format as JPG downloads as itself.
 import { readFileSync } from 'node:fs'
 import { expect, test, type Page } from '../support/test.ts'
 import { exportDesign, readZip } from '@dazbee/export'
@@ -115,13 +115,15 @@ async function nodeExport(page: Page, assetId: string) {
   return (request: { pageIds: string[]; formatIds: string[]; type: 'png' | 'jpg'; quality?: number }) => exportDesign(ck, json, request, bytes).bytes
 }
 
-test('every format of a page as PNG is one zip whose files are what Node exports, drawn in the export worker', async ({ browser }) => {
+test('every format of a page as PNG is one zip whose files are what Node exports, drawn in the export worker, named by the File names field', async ({ browser }) => {
   const asset = await upload(photo)
   const { page, errors } = await openStage(browser, design(asset.id))
   await page.getByTestId('share-open').click()
   await page.getByTestId('export-open').click()
   const dialog = page.getByTestId('export')
   await expect(dialog).toBeVisible()
+  // Every page in every format, until the export is narrowed.
+  await expect(page.getByTestId('export-run')).toHaveText('Export 10 files')
   await dialog.getByRole('radio', { name: 'This page' }).click()
   await choose(page.getByTestId('export-page'), 'p1')
   await expect(page.getByTestId('export-run')).toHaveText('Export 5 files')
@@ -150,6 +152,15 @@ test('every format of a page as PNG is one zip whose files are what Node exports
     ...Object.keys(FORMATS).map((_, i) => ({ kind: 'progress', done: i + 1, total: 5 })),
     { kind: 'done', bytes: zipped.length },
   ])
+
+  // The File names field names every file in the zip, each page in each format's folder.
+  await dialog.getByRole('radio', { name: 'All 2' }).click()
+  await page.getByTestId('export-name').fill('{page} for {size}')
+  await expect(page.getByTestId('export-run')).toHaveText('Export 10 files')
+  const [named] = await Promise.all([page.waitForEvent('download'), page.getByTestId('export-run').click()])
+  const names = readZip(new Uint8Array(readFileSync(await named.path()))).map((e) => e.path).sort()
+  const folders = Object.values(FORMATS).map((f) => f.name.replace(':', '-'))
+  expect(names).toEqual(folders.flatMap((folder) => ['Hero', 'Offer'].map((pageName) => `${folder}/${pageName} for ${folder}.png`)).sort())
   expect(errors).toEqual([])
 })
 

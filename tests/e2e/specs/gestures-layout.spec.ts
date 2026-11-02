@@ -167,28 +167,6 @@ test('a child of auto layout: a resize fixes its size and the flow moves up; a d
   expect(errors).toEqual([])
 })
 
-test('the arrow keys move a child along its flow; across it, or align, auto layout decides and the page says so', async ({ browser }) => {
-  const { page, errors } = await openStage(browser, design())
-  const at = await screenPoint(page, 250, 130)
-  await page.mouse.dblclick(at.x, at.y)
-  await page.evaluate(() => window.dazbee?.drawn())
-  expect(await selection(page)).toEqual(['c1'])
-  await press(page, 'nudgeRight')
-  expect(await order(page, 'row')).toEqual(['c0', 'c2', 'c1', 'c3'])
-  await press(page, 'nudgeLeft')
-  await press(page, 'nudgeLeft')
-  expect(await order(page, 'row')).toEqual(['c1', 'c0', 'c2', 'c3'])
-  await press(page, 'nudgeDown')
-  await expect(page.getByTestId('notice-toast')).toContainText('Auto layout places this layer')
-  writeOutput('layout-nudge-notice.png', await page.screenshot({ animations: 'disabled' }))
-  expect(await order(page, 'row')).toEqual(['c1', 'c0', 'c2', 'c3'])
-  const before = JSON.stringify(await read(page))
-  await press(page, 'alignBottom')
-  expect(JSON.stringify(await read(page))).toBe(before)
-  await expect(page.getByTestId('notice-toast')).toBeVisible()
-  expect(errors).toEqual([])
-})
-
 test('auto width text resized takes the size given instead of snapping back', async ({ browser }) => {
   const { page, errors } = await openStage(browser, design())
   await click(page, 120, 590)
@@ -221,8 +199,30 @@ test('a fill child grows with its frame; in a wrapped flow a drag lands next to 
   expect(errors).toEqual([])
 })
 
-test('in a wrapped flow, a layer dropped beside one on the first line goes next to it', async ({ browser }) => {
+test('the arrow keys move a child along its flow; across it, or align, auto layout decides and the page says so; in a wrapped flow, a layer dropped beside one on the first line goes next to it', async ({ browser }) => {
   const { page, errors } = await openStage(browser, design())
+  const second = await screenPoint(page, 250, 130)
+  await page.mouse.dblclick(second.x, second.y)
+  await page.evaluate(() => window.dazbee?.drawn())
+  expect(await selection(page)).toEqual(['c1'])
+  await press(page, 'nudgeRight')
+  expect(await order(page, 'row')).toEqual(['c0', 'c2', 'c1', 'c3'])
+  await press(page, 'nudgeLeft')
+  await press(page, 'nudgeLeft')
+  expect(await order(page, 'row')).toEqual(['c1', 'c0', 'c2', 'c3'])
+  await press(page, 'nudgeDown')
+  await expect(page.getByTestId('notice-toast')).toContainText('Auto layout places this layer')
+  writeOutput('layout-nudge-notice.png', await page.screenshot({ animations: 'disabled' }))
+  expect(await order(page, 'row')).toEqual(['c1', 'c0', 'c2', 'c3'])
+  const before = JSON.stringify(await read(page))
+  await press(page, 'alignBottom')
+  expect(JSON.stringify(await read(page))).toBe(before)
+  await expect(page.getByTestId('notice-toast')).toBeVisible()
+  // One more to the right puts the row back in its first order; Esc goes up to the row.
+  await press(page, 'nudgeRight')
+  expect(await order(page, 'row')).toEqual(['c0', 'c1', 'c2', 'c3'])
+  await press(page, 'deselect')
+
   await click(page, 70, 70)
   await dragHandle(page, 'e', -200, 0)
   // Two lines: C0 C1 / C2 C3. C3 dropped just after C0, on the first line.
