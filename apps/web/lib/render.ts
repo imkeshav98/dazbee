@@ -1,6 +1,7 @@
 // Whether the browser draws in software (no GPU): headless CI and machines where Chrome falls back
-// to SwiftShader. There, every frame of the home's turning aurora redraws a large blur and the
-// frosted surfaces over it, so the page crawls (#144); the root's data-render says to hold it still.
+// to SwiftShader. There, every frame of a turning aurora (the home's, the sign-in page's) redraws a
+// large blur and the frosted surfaces over it, so the page crawls (#144); the root's data-render
+// says to hold it still.
 
 const SOFTWARE = /swiftshader|llvmpipe|softpipe|software|basic render/i
 /** Kept for the browser session only, so a browser that drew in software once probes again next time. */

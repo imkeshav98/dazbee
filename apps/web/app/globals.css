@@ -932,6 +932,11 @@ body {
     animation: ad-fan 7s cubic-bezier(0.2, 1, 0.3, 1) infinite;
   }
 }
+/* Drawn in software, each turn of the blurred aurora is a full redraw that holds up the page, the
+   answer to Sign in included, so it holds still there, as the home's does. The ads still fan out. */
+[data-render='software'] .signin-aurora > div {
+  animation-play-state: paused;
+}
 
 /* A see-through paint's swatch shows over a checkerboard, as design tools draw one. */
 @utility checker {
