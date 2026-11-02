@@ -1,12 +1,12 @@
 // The asset library (#52) in Chromium: two images uploaded at once, each with its progress shown,
 // one tagged, found again by that tag, and dragged onto the design, where it becomes a graphic with
-// the image as its fill at the drop point, in one undo step. A click places one too, for those who
-// can't drag.
+// the image as its fill at the drop point, in one undo step that redo brings back. A click places one
+// too, for those who can't drag, and it is there after a reload.
 import { crc32, deflateSync } from 'node:zlib'
 import { randomUUID } from 'node:crypto'
 import { expect, test, type Page } from '../support/test.ts'
 import { AssetSummary, type DesignInput } from '@dazbee/schema'
-import { screenPoint, writeOutput } from '../support/editor.ts'
+import { reloads, screenPoint, writeOutput } from '../support/editor.ts'
 import { API_URL, DEV_BRAND } from '../support/seed.ts'
 import { openStage, read } from '../support/stage.ts'
 
@@ -60,6 +60,16 @@ async function images(page: Page) {
   const nodes = (await read(page)).nodes as unknown as Record<string, { parentId: string; props: { x: number; y: number; width: number; height: number; fills?: { type: string; assetId?: string }[] } }>
   return Object.entries(nodes).filter(([, n]) => n.props.fills?.[0]?.type === 'image').map(([id, n]) => ({ id, assetId: n.props.fills?.[0]?.assetId, ...n.props }))
 }
+
+/** The colour the square's PNG export draws at a design pixel; the export waits for every image's bytes. */
+const exportedAt = (page: Page, x: number, y: number) => page.evaluate(async ({ x, y }) => {
+  const file = await window.dazbee?.exportFiles({ pageIds: ['p1'], formatIds: ['sq'], type: 'png' })
+  const bitmap = await createImageBitmap(new Blob([new Uint8Array(file?.bytes ?? [])], { type: 'image/png' }))
+  const canvas = new OffscreenCanvas(bitmap.width, bitmap.height)
+  const context = canvas.getContext('2d')
+  context?.drawImage(bitmap, 0, 0)
+  return [...(context?.getImageData(x, y, 1, 1).data ?? [])]
+}, { x, y })
 
 test('uploads two images with progress, tags one, finds it by its tag and drags it onto the design', async ({ browser }) => {
   const { page, errors } = await openStage(browser, design())
@@ -133,14 +143,7 @@ test('uploads two images with progress, tags one, finds it by its tag and drags 
   expect(await page.evaluate(() => window.dazbee?.selection())).toEqual([placed?.id])
   // Its bytes arrive and it is drawn: the middle of the image is the photo, not the white page.
   // The export waits for the bytes, so it draws the photo, not the white page.
-  const middle = await page.evaluate(async () => {
-    const file = await window.dazbee?.exportFiles({ pageIds: ['p1'], formatIds: ['sq'], type: 'png' })
-    const bitmap = await createImageBitmap(new Blob([new Uint8Array(file?.bytes ?? [])], { type: 'image/png' }))
-    const canvas = new OffscreenCanvas(bitmap.width, bitmap.height)
-    const context = canvas.getContext('2d')
-    context?.drawImage(bitmap, 0, 0)
-    return [...(context?.getImageData(760, 360, 1, 1).data ?? [])]
-  })
+  const middle = await exportedAt(page, 760, 360)
   expect(middle.slice(0, 3)).not.toEqual([255, 255, 255])
   await expect.poll(async () => page.evaluate(() => {
     try {
@@ -152,7 +155,11 @@ test('uploads two images with progress, tags one, finds it by its tag and drags 
   await page.evaluate(() => window.dazbee?.drawn())
   writeOutput('assets-3-dropped.png', await page.screenshot())
 
-  // One undo step takes it away again.
+  // One undo step takes it away again; redo puts it back where it was dropped.
+  await page.evaluate(() => window.dazbee?.perform('undo'))
+  await expect.poll(async () => (await images(page)).length).toBe(0)
+  await page.evaluate(() => window.dazbee?.perform('redo'))
+  await expect.poll(() => images(page)).toEqual([placed])
   await page.evaluate(() => window.dazbee?.perform('undo'))
   await expect.poll(async () => (await images(page)).length).toBe(0)
 
@@ -163,5 +170,9 @@ test('uploads two images with progress, tags one, finds it by its tag and drags 
   await expect.poll(async () => (await images(page)).length).toBe(1)
   const [clicked] = await images(page)
   expect(clicked).toMatchObject({ width: 540, height: 360, x: 270, y: 360 })
+
+  // After a reload it is still there, and the export draws its photo in the middle of the square.
+  await reloads(page)
+  expect((await exportedAt(page, 540, 540)).slice(0, 3)).not.toEqual([255, 255, 255])
   expect(errors).toEqual([])
 })

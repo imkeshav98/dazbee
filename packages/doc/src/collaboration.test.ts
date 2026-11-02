@@ -58,6 +58,35 @@ describe('two tabs', () => {
       expect(design.nodes.box?.props).toMatchObject({ x: 100, y: 700 })
       expect(design.nodes.headline?.type === 'text' && design.nodes.headline.props.text).toBe('Big Summer sale')
     }
+
+    // The other tab's undo takes back its own last edit, the text, and leaves the rest.
+    tabB.undo()
+    sync()
+
+    for (const doc of [a, b]) {
+      const design = readDesign(doc)
+      expect(design.nodes.box?.props).toMatchObject({ x: 100, y: 700 })
+      expect(design.nodes.headline?.type === 'text' && design.nodes.headline.props.text).toBe('Summer sale')
+    }
+  })
+
+  it('the same property set by each tab in turn: each undo takes back only its own tab’s value', () => {
+    const { a, b, tabA, tabB, sync } = twoTabs()
+
+    tabA.run('node.update', { ids: ['box'], patch: { y: 400 } })
+    sync()
+    tabB.run('node.update', { ids: ['box'], patch: { y: 600 } })
+    sync()
+
+    // A's undo leaves B's later value.
+    tabA.undo()
+    sync()
+    for (const doc of [a, b]) expect(readDesign(doc).nodes.box?.props.y).toBe(600)
+
+    // B's undo puts back the value B replaced, which was A's.
+    tabB.undo()
+    sync()
+    for (const doc of [a, b]) expect(readDesign(doc).nodes.box?.props.y).toBe(400)
   })
 
   it('undoing an edit that won over a concurrent edit restores the old value instead of leaving it unset', () => {

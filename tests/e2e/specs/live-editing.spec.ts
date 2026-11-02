@@ -132,47 +132,6 @@ test('two tabs make 200 random edits each and end with the same document and the
   expect(errors).toEqual([])
 })
 
-test("each tab's undo leaves the other tab's edits intact", async ({ browser }) => {
-  const { tabs, errors } = await openTabs(browser, 2)
-  const [a, b] = tabs as [Page, Page]
-  await a.evaluate(() => window.dazbee?.session.run('node.update', { ids: ['box'], patch: { x: 500 } }))
-  await b.evaluate(() => window.dazbee?.session.run('node.update', { ids: ['dot'], patch: { x: 300 } }))
-  await b.evaluate(() => window.dazbee?.session.run('text.edit', { id: 'headline', op: { kind: 'insert', at: 11, text: '!' } }))
-  await settle(tabs)
-
-  await a.evaluate(() => window.dazbee?.session.undo())
-  await settle(tabs)
-  for (const tab of tabs) {
-    const design = JSON.parse(await designOf(tab))
-    expect(design.nodes.box.props.x).toBe(80)
-    expect(design.nodes.dot.props.x).toBe(300)
-    expect(design.nodes.headline.props.text).toBe('Summer sale!')
-  }
-
-  await b.evaluate(() => window.dazbee?.session.undo())
-  await settle(tabs)
-  for (const tab of tabs) {
-    const design = JSON.parse(await designOf(tab))
-    expect(design.nodes.box.props.x).toBe(80)
-    expect(design.nodes.dot.props.x).toBe(300)
-    expect(design.nodes.headline.props.text).toBe('Summer sale')
-  }
-
-  // The same property from both tabs: A's undo must not take back B's later value.
-  await a.evaluate(() => window.dazbee?.session.run('node.update', { ids: ['box'], patch: { y: 400 } }))
-  await settle(tabs)
-  await b.evaluate(() => window.dazbee?.session.run('node.update', { ids: ['box'], patch: { y: 600 } }))
-  await settle(tabs)
-  await a.evaluate(() => window.dazbee?.session.undo())
-  await settle(tabs)
-  for (const tab of tabs) expect(JSON.parse(await designOf(tab)).nodes.box.props.y).toBe(600)
-  // B's undo puts back the value B replaced, which was A's.
-  await b.evaluate(() => window.dazbee?.session.undo())
-  await settle(tabs)
-  for (const tab of tabs) expect(JSON.parse(await designOf(tab)).nodes.box.props.y).toBe(400)
-  expect(errors).toEqual([])
-})
-
 test('a real mouse drag and real typing in one tab show up in the other, and undo as one step each', async ({ browser }) => {
   const { tabs, errors } = await openTabs(browser, 2)
   const [a, b] = tabs as [Page, Page]

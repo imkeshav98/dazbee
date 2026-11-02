@@ -2,10 +2,10 @@
 // format of a design that has two, with real pointer and keyboard input. Each gesture is checked
 // against what it should do: a move moves the layer by the drag, a resize sizes it from the handle
 // dragged (scaling a group's or boolean's layers, never a frame's) and a path's drawing with its
-// box, a turn turns it, align lines it up, the other format stays as it was, auto layout keeps
-// placing its flow (a drag or an arrow moves a layer along it, and what it decides is said), the
-// gesture is one undo step, and nothing logs an error. Failures that have a ticket of their own
-// are listed in KNOWN.
+// box, and fixes the sizing of the axes it drags while the other keeps its own, a turn turns it,
+// align lines it up, the other format stays as it was, auto layout keeps placing its flow (a drag
+// or an arrow moves a layer along it, and what it decides is said), the gesture is one undo step,
+// and nothing logs an error. Failures that have a ticket of their own are listed in KNOWN.
 import { pressFor, type ShortcutAction } from '@dazbee/editor/shortcuts'
 import type { DesignInput } from '@dazbee/schema'
 import type { Browser, Page } from '@playwright/test'
@@ -272,6 +272,15 @@ async function run(page: Page, subject: Subject, gesture: string, formatId: stri
         const kid = after[id]
         if (kid && b && !turnBy && (kid.x < b.x - 0.5 || kid.y < b.y - 0.5 || kid.x + kid.width > b.x + b.width + 0.5 || kid.y + kid.height > b.y + b.height + 0.5)) problems.push(`${id} outside its frame`)
       }
+    }
+    // The axes dragged become fixed; the other keeps its sizing, so a hugging frame made narrower
+    // still hugs its height.
+    const sizingOf = (d: Doc) => ({ ...d.nodes[subject]?.props, ...d.overrides[`format:${formatId}`]?.[subject] }.sizing) as { width: string; height: string } | undefined
+    const was = sizingOf(doc)
+    if (was) {
+      const want = { width: h.w ? 'fixed' : was.width, height: h.h ? 'fixed' : was.height }
+      const is = sizingOf(now)
+      if (is?.width !== want.width || is.height !== want.height) problems.push(`sizing ${JSON.stringify(is)}, not ${JSON.stringify(want)}`)
     }
     if (subject === 'photo' && JSON.stringify(now.nodes.photo?.props.fills) !== JSON.stringify(doc.nodes.photo?.props.fills)) problems.push('crop changed')
     // A path draws to its new box, in the export too.
