@@ -76,40 +76,60 @@ function useSelection(editor: Editor) {
   return state
 }
 
-/** Each slice of pictures' budget, in ms. */
+/** How long the list must be still before pictures are drawn, and a slice's budget where the browser can't say, in ms. */
+const PICTURES_AFTER_SCROLL = 300
 const PICTURES_SLICE = 6
 
+/** Runs `work` when the browser is idle, with how many ms it may take; returns the cancel. */
+function whenIdle(work: (left: () => number) => void): () => void {
+  if (typeof requestIdleCallback === 'function') {
+    const id = requestIdleCallback((deadline) => work(() => deadline.timeRemaining()), { timeout: 1000 })
+    return () => cancelIdleCallback(id)
+  }
+  const id = setTimeout(() => {
+    const end = performance.now() + PICTURES_SLICE
+    work(() => end - performance.now())
+  }, 0)
+  return () => clearTimeout(id)
+}
+
 /**
- * Each listed layer's picture in the frame the panel shows, drawn once the stage and the list have
- * settled (so a drag or a scroll draws none) and again once fonts and images arrive, a few at a
- * time so no frame waits long on them.
+ * Each listed layer's picture in the frame the panel shows, drawn once the stage has settled and
+ * the list has been still a moment (so a drag or a scroll draws none) and again once fonts and
+ * images arrive, a few at a time in the browser's idle time so no frame waits on them.
+ * `scrolledAt` is when the list last scrolled.
  */
-function useLayerPictures(editor: Editor, frameKey: string, ids: readonly string[]): Record<string, string | null> {
+function useLayerPictures(editor: Editor, frameKey: string, ids: readonly string[], scrolledAt: { current: number }): Record<string, string | null> {
   const [pictures, setPictures] = useState<{ frameKey: string; urls: Record<string, string | null> }>({ frameKey, urls: {} })
   const wanted = ids.join(' ')
   useEffect(() => {
-    let slicing: ReturnType<typeof setTimeout> | undefined
+    let cancel = () => {}
     const stop = afterDraws(editor, () => {
-      clearTimeout(slicing)
+      cancel()
       const list = wanted.split(' ').filter(Boolean)
       const next: Record<string, string | null> = {}
       let i = 0
-      const slice = () => {
-        const end = performance.now() + PICTURES_SLICE
-        while (i < list.length && performance.now() < end) {
+      const slice = (left: () => number) => {
+        const still = performance.now() - scrolledAt.current
+        if (still < PICTURES_AFTER_SCROLL) {
+          const id = setTimeout(() => (cancel = whenIdle(slice)), PICTURES_AFTER_SCROLL - still)
+          cancel = () => clearTimeout(id)
+          return
+        }
+        while (i < list.length && left() > 1) {
           const id = list[i++] ?? ''
           next[id] = editor.layerThumbnail(id, 44, false, frameKey)
         }
-        if (i < list.length) slicing = setTimeout(slice, 0)
+        if (i < list.length) cancel = whenIdle(slice)
         else setPictures((now) => (now.frameKey === frameKey && sameUrls(now.urls, next) ? now : { frameKey, urls: next }))
       }
-      slice()
+      cancel = whenIdle(slice)
     })
     return () => {
-      clearTimeout(slicing)
+      cancel()
       stop()
     }
-  }, [editor, frameKey, wanted])
+  }, [editor, frameKey, wanted, scrolledAt])
   // Another frame's pictures are not this one's.
   return pictures.frameKey === frameKey ? pictures.urls : {}
 }
@@ -148,6 +168,7 @@ export function LayersPanel({ editor }: { editor: Editor }) {
   const scrollerRef = useOverlayScroll(scroller)
   // Kept in rows, not pixels: a scroll that shows no new row renders nothing.
   const [view, setView] = useState({ from: 0, to: Math.ceil(400 / LAYER_ROW) + OVERSCAN })
+  const scrolledAt = useRef(0)
   const follow = useCallback((el: HTMLElement) => {
     const from = Math.max(0, Math.floor(el.scrollTop / LAYER_ROW) - OVERSCAN)
     const to = Math.ceil((el.scrollTop + el.clientHeight) / LAYER_ROW) + OVERSCAN
@@ -337,7 +358,7 @@ export function LayersPanel({ editor }: { editor: Editor }) {
   }, [])
 
   const shown = rows.slice(first, last)
-  const pictures = useLayerPictures(editor, `${pageId}/${formatId}`, shown.map((row) => row.id))
+  const pictures = useLayerPictures(editor, `${pageId}/${formatId}`, shown.map((row) => row.id), scrolledAt)
   return (
     <div className="flex min-h-0 flex-1 flex-col" data-testid="layers">
       {rows.length === 0
@@ -345,7 +366,10 @@ export function LayersPanel({ editor }: { editor: Editor }) {
         : (
           <div
             ref={scrollerRef}
-            onScroll={(event) => follow(event.currentTarget)}
+            onScroll={(event) => {
+              scrolledAt.current = performance.now()
+              follow(event.currentTarget)
+            }}
             className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-1.5 pb-2"
             data-testid="layers-scroller"
           >
