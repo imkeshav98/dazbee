@@ -139,8 +139,8 @@ export function LayerActions({ editor, ids, onDone }: { editor: Editor; ids: str
   )
 }
 
-/** The bar's buttons, in order. */
-const itemsOf = (bar: HTMLElement) => [...bar.querySelectorAll<HTMLElement>('[data-bar-item]')]
+/** The bar's buttons that can be used, in order. */
+const itemsOf = (bar: HTMLElement) => [...bar.querySelectorAll<HTMLElement>('[data-bar-item]:not(:disabled)')]
 
 /** Moves focus along the bar's buttons with the arrow keys, as a toolbar does. */
 function arrowAlong(event: KeyboardEvent<HTMLDivElement>) {
@@ -196,7 +196,7 @@ export function SelectionBar({ editor, brandId }: { editor: Editor; brandId: str
       style={place ? { left: place.left, top: place.top } : undefined}
       className={cn(BAR, place ? 'visible' : 'invisible')}
     >
-      {selected && selected.target.types.every((type) => type === 'text') && <TextBar target={selected.target} brandId={brandId} open={open} onOpen={setOpen} />}
+      {selected && selected.target.types.some((type) => type === 'text') && <TextBar target={selected.target} brandId={brandId} open={open} onOpen={setOpen} />}
       <BarPopover id="line-up" open={open} onOpen={setOpen} label={b.lineUp} testId="line-up">
         <div dir="ltr" role="group" aria-label={t.editor.arrange.align} className="grid grid-cols-6 gap-0.5">
           {ALIGN.map(({ action, icon: Icon }) => (

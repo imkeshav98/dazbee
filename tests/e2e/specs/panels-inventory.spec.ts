@@ -400,6 +400,12 @@ test.describe('text', () => {
       await page.getByTestId('font-search').fill('playf')
       await page.getByTestId('font-search').press('Enter')
     }, async () => { await expect.poll(family).toBe('Playfair Display') })
+    // A family under Google Fonts picked with the mouse.
+    await perform(page, 'undo')
+    await step(page, async () => {
+      await barMenu(page, 'font')
+      await page.getByRole('listbox', { name: 'Font' }).getByRole('group', { name: 'Google Fonts' }).getByRole('option', { name: 'Playfair Display' }).click()
+    }, async () => { await expect.poll(family).toBe('Playfair Display') })
     await step(page, async () => {
       await barMenu(page, 'font')
       await page.getByTestId('font-search').fill('')
@@ -545,7 +551,7 @@ test.describe('text', () => {
   row(19, 'alignment: start, centre, end, justify', async (open) => {
     const page = await open()
     await select(page, ['headline'])
-    const pick = async (align: string) => (await barMenu(page, 'align')).getByRole('group', { name: 'Alignment', exact: true }).locator(`[data-value="${align}"]`).click()
+    const pick = async (align: string) => (await barMenu(page, 'align')).getByRole('radiogroup', { name: 'Alignment', exact: true }).locator(`[data-value="${align}"]`).click()
     // Each line is a paragraph's last, which justify leaves at the start: those two draw alike.
     for (const align of ['center', 'end', 'justify', 'start']) {
       await step(page, () => pick(align), async () => {
@@ -571,7 +577,7 @@ test.describe('text', () => {
   row(21, 'case: as typed, upper, lower, title', async (open) => {
     const page = await open()
     await select(page, ['headline'])
-    const pick = async (textCase: string) => (await barMenu(page, 'align')).getByRole('group', { name: 'Case' }).locator(`[data-value="${textCase}"]`).click()
+    const pick = async (textCase: string) => (await barMenu(page, 'align')).getByRole('radiogroup', { name: 'Case' }).locator(`[data-value="${textCase}"]`).click()
     for (const textCase of ['upper', 'lower', 'title', 'none']) {
       await step(page, () => pick(textCase), async () => {
         await expect.poll(async () => (await style(page, 'headline')).textCase ?? 'none').toBe(textCase)
@@ -596,7 +602,7 @@ test.describe('text', () => {
   row(23, 'list: none, bullets, numbers', async (open) => {
     const page = await open()
     await select(page, ['headline'])
-    const pick = async (list: string) => (await barMenu(page, 'align')).getByRole('group', { name: 'List' }).locator(`[data-value="${list}"]`).click()
+    const pick = async (list: string) => (await barMenu(page, 'align')).getByRole('radiogroup', { name: 'List' }).locator(`[data-value="${list}"]`).click()
     for (const list of ['bullet', 'number', 'none']) {
       await step(page, () => pick(list), async () => {
         await expect.poll(async () => (await props(page, 'headline')).list ?? 'none').toBe(list)

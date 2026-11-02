@@ -53,7 +53,7 @@ export const set = (target: Target, to: (now: Props, i: number) => Patch | null)
 }
 
 /** The one value every layer has, or 'mixed'. */
-function shared<T>(values: T[]): T | 'mixed' {
+export function shared<T>(values: T[]): T | 'mixed' {
   const [first] = values
   const same = values.every((v) => JSON.stringify(v) === JSON.stringify(first))
   return same ? first as T : 'mixed'
@@ -434,7 +434,7 @@ function EffectRow({ effect, i, target, p, write }: { effect: Effect; i: number;
   )
 }
 
-type Style = Record<string, unknown> & { fontSize: number; color: string; letterSpacing?: number; lineHeight?: number; textCase?: string }
+export type Style = Record<string, unknown> & { fontFamily: string; fontWeight: number; fontSize: number; color: string; letterSpacing?: number; lineHeight?: number; textCase?: string }
 
 /** The text's style as one setter per key, and a nudge for its numbers. */
 function textStyle(target: Target) {
@@ -492,18 +492,21 @@ export function TextColourBody({ target, brandId, p }: { target: Target; brandId
   )
 }
 
-/** A row of choices of which one is on, as pressed buttons. */
-function Pick<T extends string>({ name, value, options, labels, onSet }: { name: string; value: T | 'mixed'; options: readonly T[]; labels: Record<T, ReactNode>; onSet: (to: T) => void }) {
+/** A row of choices of which one is on; `marks` shows a short mark in place of a choice's name. */
+function Segments<T extends string>({ name, value, options, labels, marks, onSet }: { name: string; value: T | 'mixed'; options: readonly T[]; labels: Record<T, string>; marks?: Record<T, string>; onSet: (to: T) => void }) {
   return (
-    <div role="group" aria-label={name} className={SEGMENTS}>
+    <div role="radiogroup" aria-label={name} className={SEGMENTS}>
       {options.map((option) => (
-        <button key={option} type="button" aria-pressed={value === option} data-value={option} onClick={() => onSet(option)} className={SEGMENT}>
-          {labels[option]}
+        <button key={option} type="button" role="radio" aria-checked={value === option} aria-label={marks ? labels[option] : undefined} title={marks ? labels[option] : undefined} data-value={option} onClick={() => onSet(option)} className={SEGMENT}>
+          {marks?.[option] ?? labels[option]}
         </button>
       ))}
     </div>
   )
 }
+
+/** How each case shows on its button: the same letters in every language, as a font sample is. */
+const CASE_MARKS = { none: 'Ab', upper: 'AB', lower: 'ab', title: 'Aa' }
 
 /** The bar's align popover for text: alignment, case, lists, underline and strikethrough. */
 export function TextAlignBody({ target, p }: { target: Target; p: P }) {
@@ -514,9 +517,9 @@ export function TextAlignBody({ target, p }: { target: Target; p: P }) {
   }
   return (
     <div className="flex w-80 flex-col gap-2.5 p-1">
-      <Pick name={p.textAlign} value={shared(target.props.map((pr) => (pr.align ?? 'start') as 'start' | 'center' | 'end' | 'justify'))} options={['start', 'center', 'end', 'justify'] as const} labels={p.textAligns} onSet={(align) => set(target, () => ({ align }))} />
-      <Pick name={p.textCase} value={(style('textCase') ?? 'none') as 'none' | 'upper' | 'lower' | 'title' | 'mixed'} options={['none', 'upper', 'lower', 'title'] as const} labels={{ none: 'Ab', upper: 'AB', lower: 'ab', title: 'Aa' }} onSet={(v) => setStyle('textCase', v)} />
-      <Pick name={p.list} value={shared(target.props.map((pr) => (pr.list ?? 'none') as 'none' | 'bullet' | 'number'))} options={['none', 'bullet', 'number'] as const} labels={p.lists} onSet={(list) => set(target, () => ({ list: list === 'none' ? undefined : list }))} />
+      <Segments name={p.textAlign} value={shared(target.props.map((pr) => (pr.align ?? 'start') as 'start' | 'center' | 'end' | 'justify'))} options={['start', 'center', 'end', 'justify'] as const} labels={p.textAligns} onSet={(align) => set(target, () => ({ align }))} />
+      <Segments name={p.textCase} value={(style('textCase') ?? 'none') as 'none' | 'upper' | 'lower' | 'title' | 'mixed'} options={['none', 'upper', 'lower', 'title'] as const} labels={p.textCases} marks={CASE_MARKS} onSet={(v) => setStyle('textCase', v)} />
+      <Segments name={p.list} value={shared(target.props.map((pr) => (pr.list ?? 'none') as 'none' | 'bullet' | 'number'))} options={['none', 'bullet', 'number'] as const} labels={p.lists} onSet={(list) => set(target, () => ({ list: list === 'none' ? undefined : list }))} />
       <Toggles
         items={[
           { name: p.underline, label: 'U', on: flag('underline'), onSet: (on) => setStyle('underline', on) },
@@ -1074,7 +1077,7 @@ export function EffectsBody({ target, p }: { target: Target; p: P }) {
   )
 }
 
-/** The Effects card, for layers whose effects are not in the bar yet. */
+/** The Effects card: the tiles and each effect's numbers in the panel. */
 function EffectsCard({ target, p }: { target: Target; p: P }) {
   return (
     <section aria-labelledby="effects-card-title" className={CARD} data-testid="effects-card">

@@ -196,11 +196,24 @@ test('text adds the font, size, colour, bold, align and effects; bold turns on a
   await expect(page.getByTestId('bar-align-menu')).toBeVisible()
   await expect(page.getByTestId('bar-size-menu')).toBeHidden()
   // The focus stays in the new popover, so it stays open.
-  await page.waitForTimeout(500)
+  const focusIn = (id: string) => page.evaluate((id) => document.activeElement?.closest(`[data-testid="${id}"]`) !== null, id)
+  await expect.poll(() => focusIn('bar-align-menu')).toBe(true)
   await expect(page.getByTestId('bar-align-menu')).toBeVisible()
-  await expect(page.getByTestId('bar-align-menu')).toContainText('Centre')
   await bar.getByTestId('bar-more').click()
-  await page.waitForTimeout(500)
+  await expect.poll(() => focusIn('bar-more-menu')).toBe(true)
   await expect(page.getByTestId('bar-more-menu')).toBeVisible()
+  await page.keyboard.press('Escape')
+
+  // Text with another layer offers the text's font only; bold is mixed over bold and regular text.
+  await select(page, ['headline', 'a'])
+  await expect(bar.getByTestId('bar-font')).toHaveText('Noto Sans')
+  await expect(bar.getByTestId('bar-size')).toHaveCount(0)
+  await select(page, ['headline'])
+  await page.evaluate(() => window.dazbee?.perform('duplicate'))
+  const copy = (await page.evaluate(() => window.dazbee?.selection() ?? []))[0] ?? ''
+  await select(page, ['headline'])
+  await bold.click()
+  await select(page, ['headline', copy])
+  await expect(bold).toHaveAttribute('aria-pressed', 'mixed')
   expect(errors).toEqual([])
 })

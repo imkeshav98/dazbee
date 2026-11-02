@@ -152,8 +152,8 @@ test('several layers: mixed values, set together or each from its own; text and 
   await enter(text.getByRole('spinbutton', { name: 'Line height' }), '1.1')
   await enter((await barMenu(page, 'colour')).getByRole('textbox', { name: 'Text colour hex' }), '1f9d55')
   await page.keyboard.press('Escape')
-  await (await barMenu(page, 'align')).getByRole('group', { name: 'Alignment', exact: true }).locator('[data-value="center"]').click()
-  await (await barMenu(page, 'align')).getByRole('group', { name: 'Case' }).locator('[data-value="upper"]').click()
+  await (await barMenu(page, 'align')).getByRole('radiogroup', { name: 'Alignment', exact: true }).locator('[data-value="center"]').click()
+  await (await barMenu(page, 'align')).getByRole('radiogroup', { name: 'Case' }).locator('[data-value="upper"]').click()
   await page.keyboard.press('Escape')
   await expect.poll(async () => {
     const p = await props(page, 'headline')

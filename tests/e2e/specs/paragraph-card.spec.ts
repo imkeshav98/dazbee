@@ -40,7 +40,7 @@ test('the Box and paragraphs card sets the box, lines and fit; the bar sets list
   await expect(card).toBeVisible()
   const align = () => barMenu(page, 'align')
   const effects = () => barMenu(page, 'effects')
-  const list = async (to: string) => (await align()).getByRole('group', { name: 'List' }).locator(`[data-value="${to}"]`).click()
+  const list = async (to: string) => (await align()).getByRole('radiogroup', { name: 'List' }).locator(`[data-value="${to}"]`).click()
 
   await choose(card.getByRole('combobox', { name: 'Box' }), 'fixed')
   await list('bullet')

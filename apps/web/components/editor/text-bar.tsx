@@ -2,43 +2,58 @@
 
 // The bar's own buttons for text, as in the mock: the font, the size, the colour, bold, the align
 // popover and the effects. Each opens a popover under the bar, but bold, which turns on or off.
-import { SparkleIcon, TextAlignLeftIcon, TextBIcon } from '@phosphor-icons/react'
+// With text and other layers selected together, the bar offers the text's font only.
+import { SparkleIcon, TextAlignCenterIcon, TextAlignJustifyIcon, TextAlignLeftIcon, TextAlignRightIcon, TextBIcon } from '@phosphor-icons/react'
 import { useMessages } from '../../lib/i18n/client.tsx'
 import { BarPopover } from './bar-popover.tsx'
 import { FontChooser, nearest, useFontCatalog, weightsOf } from './font-panel.tsx'
-import { EffectsBody, TextAlignBody, TextColourBody, TextSizeField, type Target } from './selection-cards.tsx'
+import { EffectsBody, set, shared, TextAlignBody, TextColourBody, TextSizeField, type Style, type Target } from './selection-cards.tsx'
 import { BAR_DIVIDER, BAR_TOGGLE } from './styles.ts'
-
-type TextStyle = { fontFamily: string; fontWeight: number; fontSize: number; color: string }
-
-/** The value every layer shares, or null where they differ. */
-const same = <T,>(values: T[]) => (values.every((v) => v === values[0]) ? values[0] ?? null : null)
 
 /** Bold from this weight up, as type designers name their weights. */
 const BOLD = 600
+
+/** The Align button shows the alignment the text has, mirrored where the language runs right to left. */
+const ALIGN_ICON = {
+  start: <TextAlignLeftIcon size={16} aria-hidden className="rtl:-scale-x-100" />,
+  center: <TextAlignCenterIcon size={16} aria-hidden />,
+  end: <TextAlignRightIcon size={16} aria-hidden className="rtl:-scale-x-100" />,
+  justify: <TextAlignJustifyIcon size={16} aria-hidden />,
+}
 
 export function TextBar({ target, brandId, open, onOpen }: { target: Target; brandId: string; open: string | null; onOpen: (id: string | null) => void }) {
   const t = useMessages()
   const p = t.editor.props
   const b = t.editor.bar
-  const { catalog } = useFontCatalog(brandId)
-  const styles = target.props.map((pr) => pr.style as TextStyle)
-  const family = same(styles.map((s) => s.fontFamily))
-  const size = same(styles.map((s) => s.fontSize))
-  const color = same(styles.map((s) => s.color))
-  const bold = styles.every((s) => s.fontWeight >= BOLD)
-  const weights = weightsOf(catalog.find((f) => f.family === family))
-  const canBold = family !== null && weights.some((w) => w >= BOLD) && weights.some((w) => w < BOLD)
+  const { catalog, refresh } = useFontCatalog(brandId)
+  const texts = target.props.flatMap((pr, i) => (target.types[i] === 'text' ? [pr.style as Style] : []))
+  const onlyText = texts.length === target.props.length
+  const family = shared(texts.map((s) => s.fontFamily))
+  const size = shared(texts.map((s) => s.fontSize))
+  const color = shared(texts.map((s) => s.color))
+  const align = shared(target.props.map((pr) => (pr.align ?? 'start') as keyof typeof ALIGN_ICON))
+  const bolds = texts.map((s) => s.fontWeight >= BOLD)
+  const bold = bolds.every(Boolean) ? true : bolds.some(Boolean) ? 'mixed' : false
+  // Bold on is each family's weight nearest Bold; off, its weight nearest Regular.
+  const weightFor = (fontFamily: string, on: boolean) => {
+    const weights = weightsOf(catalog.find((f) => f.family === fontFamily)).filter((w) => (on ? w >= BOLD : w < BOLD))
+    return weights.length > 0 ? nearest(weights, on ? 700 : 400) : null
+  }
+  const canBold = texts.every((s) => weightFor(s.fontFamily, bold !== true) !== null)
   const done = () => onOpen(null)
+  const font = (
+    <BarPopover id="font" open={open} onOpen={onOpen} label={b.font} face={<span className="max-w-28 truncate">{family === 'mixed' ? t.editor.fonts.mixed : family}</span>} testId="font" className="w-auto">
+      <FontChooser editor={target.editor} brandId={brandId} catalog={catalog} refresh={refresh} onDone={done} />
+    </BarPopover>
+  )
+  if (!onlyText) return <>{font}<span aria-hidden className={BAR_DIVIDER} /></>
   return (
     <>
-      <BarPopover id="font" open={open} onOpen={onOpen} label={b.font} face={<span className="max-w-28 truncate">{family ?? t.editor.fonts.mixed}</span>} testId="font" className="w-auto">
-        <FontChooser editor={target.editor} brandId={brandId} onDone={done} />
-      </BarPopover>
-      <BarPopover id="size" open={open} onOpen={onOpen} label={p.fontSize} face={<span className="tabular-nums">{size === null ? t.editor.fonts.mixed : Math.round(size * 10) / 10}</span>} testId="size" className="w-48">
+      {font}
+      <BarPopover id="size" open={open} onOpen={onOpen} label={p.fontSize} face={<span className="tabular-nums">{size === 'mixed' ? t.editor.fonts.mixed : Math.round(size * 10) / 10}</span>} testId="size" className="w-48">
         <TextSizeField target={target} p={p} />
       </BarPopover>
-      <BarPopover id="colour" open={open} onOpen={onOpen} label={p.textColour} face={<span aria-hidden className="size-4 rounded-full border border-line-strong" style={{ background: color ? color.slice(0, 7) : 'conic-gradient(red, yellow, lime, aqua, blue, magenta, red)' }} />} testId="colour" className="w-auto">
+      <BarPopover id="colour" open={open} onOpen={onOpen} label={p.textColour} face={<span aria-hidden className="size-4 rounded-full border border-line-strong" style={{ background: color === 'mixed' ? 'conic-gradient(red, yellow, lime, aqua, blue, magenta, red)' : color.slice(0, 7) }} />} testId="colour" className="w-auto">
         <TextColourBody target={target} brandId={brandId} p={p} />
       </BarPopover>
       <span aria-hidden className={BAR_DIVIDER} />
@@ -49,13 +64,17 @@ export function TextBar({ target, brandId, open, onOpen }: { target: Target; bra
         title={b.bold}
         aria-pressed={bold}
         disabled={!canBold}
-        onClick={() => family && target.editor.setFont(family, nearest(weights, bold ? 400 : 700))}
+        onClick={() => set(target, (now) => {
+          const style = now.style as Style
+          const fontWeight = weightFor(style.fontFamily, bold !== true)
+          return fontWeight === null ? null : { style: { ...style, fontWeight } }
+        })}
         data-testid="bar-bold"
         className={BAR_TOGGLE}
       >
         <TextBIcon size={16} weight="bold" aria-hidden />
       </button>
-      <BarPopover id="align" open={open} onOpen={onOpen} label={b.align} face={<TextAlignLeftIcon size={16} aria-hidden />} testId="align" className="w-auto">
+      <BarPopover id="align" open={open} onOpen={onOpen} label={b.align} face={ALIGN_ICON[align === 'mixed' ? 'start' : align]} testId="align" className="w-auto">
         <TextAlignBody target={target} p={p} />
       </BarPopover>
       <span aria-hidden className={BAR_DIVIDER} />

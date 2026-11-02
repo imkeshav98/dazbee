@@ -55,8 +55,8 @@ export const KNOBS = 'grid grid-cols-2 gap-1.5 [&>:last-child:nth-child(odd)]:co
 export const KNOBS_FOUR = 'grid grid-cols-4 gap-1 [&>*]:gap-1 [&>*]:px-[7px]'
 /** A row of choices that look as one control, one of them on. */
 export const SEGMENTS = 'grid auto-cols-fr grid-flow-col gap-0.5 rounded-[10px] bg-hover p-[3px]'
-/** One choice of SEGMENTS, aria-checked or aria-pressed while it is the one. */
-export const SEGMENT = `h-7 min-w-0 cursor-pointer truncate rounded-[7px] px-2 text-[12px] font-semibold text-muted transition-colors duration-[var(--chrome-fast)] hover:text-text aria-checked:bg-accent-solid aria-checked:text-on-accent aria-pressed:bg-accent-solid aria-pressed:text-on-accent ${FOCUS_RING}`
+/** One choice of SEGMENTS, aria-checked while it is the one. */
+export const SEGMENT = `h-7 min-w-0 cursor-pointer truncate rounded-[7px] px-2 text-[12px] font-semibold text-muted transition-colors duration-[var(--chrome-fast)] hover:text-text aria-checked:bg-accent-solid aria-checked:text-on-accent ${FOCUS_RING}`
 
 /** A row of a menu: its words at the start, a shortcut or a switch at the end. */
 export const MENU_ITEM = `group flex h-9 w-full shrink-0 cursor-pointer items-center justify-between gap-3 rounded-row px-2.5 text-start text-[13px] font-medium text-text transition-colors duration-[var(--chrome-fast)] hover:bg-hover ${DISABLED} ${FOCUS_RING}`

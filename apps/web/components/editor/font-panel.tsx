@@ -100,11 +100,13 @@ export function FontPreview({ brandId, family, className, big = false }: { brand
  * The font of the selected text, for the bar's font popover: the list of families to search and pick
  * from, and the weight. The catalog is fetched again each time it opens, so a brand's new upload shows.
  */
-export function FontChooser({ editor, brandId, onDone }: { editor: Editor; brandId: string; onDone: () => void }) {
+export function FontChooser({ editor, brandId, catalog, refresh, onDone }: { editor: Editor; brandId: string; catalog: FontFamily[]; refresh: () => Promise<void>; onDone: () => void }) {
   const t = useMessages()
   const { design } = useEditorDesign(editor)
   const selected = useSelection(editor)
-  const { catalog, refresh } = useFontCatalog(brandId)
+  useEffect(() => {
+    void refresh()
+  }, [refresh])
   const listId = useId()
   const [, frameFormat] = editor.selectedFrame()?.split('/') ?? []
   const current = selectedFont(design, selected, frameFormat && design.formats[frameFormat] ? frameFormat : design.meta.primaryFormatId)

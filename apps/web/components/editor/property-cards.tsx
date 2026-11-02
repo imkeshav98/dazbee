@@ -1,8 +1,8 @@
 'use client'
 
-// The property cards floating at the stage's top end (#83). With nothing selected they show the
+// The property cards floating at the stage's top end. With nothing selected they show the
 // design: the Page card (its background), then Formats and Pages. With a selection they show the
-// selection's look and Arrange (text has its font and look in the bar by the selection), with the numbers last (#60):
+// selection's look and Arrange (text has its font and look in the bar by the selection), with the numbers last:
 // as in the final mock, what changes how it looks comes first. Several layers show Arrange first. Each card is only as tall as what it
 // holds, every card is open, and controls are visual first.
 import type { Editor } from '@dazbee/editor'
