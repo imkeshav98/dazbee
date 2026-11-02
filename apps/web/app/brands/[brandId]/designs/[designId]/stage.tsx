@@ -8,6 +8,7 @@ import { FocusChip, NoticeToast, UndoToast } from '../../../../../components/edi
 import { useLocale, useMessages } from '../../../../../lib/i18n/client.tsx'
 import { format } from '../../../../../lib/i18n/index.ts'
 import { placeAsset } from '../../../../../lib/place-asset.ts'
+import { carriesFiles, isAssetFile, oneFillImage, placeDroppedFiles } from '../../../../../lib/drop-files.ts'
 import { PropertyCards } from '../../../../../components/editor/property-cards.tsx'
 import { ZoomControl } from '../../../../../components/editor/zoom-control.tsx'
 import { SelectionBar, StageMenu } from '../../../../../components/editor/selection-bar.tsx'
@@ -143,6 +144,25 @@ export function EditorStage({ designId, designName, brandId, brandName, everyBra
   const dockTool = isShapeTool(tool) ? 'shape' : tool
   const dismissRemoved = useCallback(() => setRemoved(null), [])
 
+  // Files dropped from the computer: the images upload into the library and go where they were
+  // dropped; the notice says what is uploading, what was left out and what didn't upload.
+  const dropped = useMessages().editor.droppedFiles
+  const dropFiles = (files: File[], client: { x: number; y: number }) => {
+    if (!editor) return
+    const take = files.filter(isAssetFile)
+    const left = files.filter((file) => !isAssetFile(file))
+    const at = Date.now()
+    const say = (text: string) => setNotice({ text, at })
+    if (left.length > 0) say(format(dropped.notImages, { names: new Intl.ListFormat(locale, { type: 'conjunction' }).format(left.map((file) => file.name)) }))
+    else if (take[0]) say(take.length === 1 ? format(dropped.uploading, { name: take[0].name }) : format(dropped.uploadingMany, { n: take.length }))
+    if (take.length === 0) return
+    void placeDroppedFiles(editor, brandId, take, client).then(({ failed: [failed], unplaced }) => {
+      if (failed) say(format(dropped.failed, failed))
+      else if (unplaced > 0) say(dropped.offPage)
+      else if (left.length === 0) setNotice((now) => (now?.at === at ? null : now))
+    })
+  }
+
   // The stage's edges the capsule, cards and dock cover (#83): the editor fits the ads between
   // them. The first time they are known the design is fitted again, since it opened fitted to the
   // whole stage. The editor counts as ready only after that, so nothing set on its camera (or
@@ -245,7 +265,8 @@ export function EditorStage({ designId, designName, brandId, brandName, everyBra
     >
       {/* The design is a picture, so it never mirrors: the stage stays left to right in Arabic too. */}
       {/* An asset dragged from the library lands where it is dropped (#52): into the shape it is
-          dropped on, lit while it is over it, or as a new layer. */}
+          dropped on, lit while it is over it, or as a new layer. Image files dropped from the
+          computer upload first, then land the same way. */}
       <div
         dir="ltr"
         className="absolute inset-0"
@@ -257,7 +278,14 @@ export function EditorStage({ designId, designName, brandId, brandName, everyBra
           setMenuAt((now) => (ids.length > 0 ? { x: e.clientX - box.left, y: e.clientY - box.top, n: (now?.n ?? 0) + 1 } : null))
         }}
         onDragOver={(e) => {
-          if (!editor || !e.dataTransfer.types.includes(ASSET_DRAG_TYPE)) return
+          if (!editor) return
+          if (!e.dataTransfer.types.includes(ASSET_DRAG_TYPE) && carriesFiles(e.dataTransfer)) {
+            e.preventDefault()
+            e.dataTransfer.dropEffect = 'copy'
+            editor.imageTarget(oneFillImage(e.dataTransfer) ? { x: e.clientX, y: e.clientY } : null)
+            return
+          }
+          if (!e.dataTransfer.types.includes(ASSET_DRAG_TYPE)) return
           e.preventDefault()
           e.dataTransfer.dropEffect = 'copy'
           // An SVG file becomes layers of its own, so no shape lights up to take it.
@@ -268,6 +296,12 @@ export function EditorStage({ designId, designName, brandId, brandName, everyBra
         }}
         onDrop={(e) => {
           const asset = editor && draggedAsset(e)
+          if (editor && !asset && carriesFiles(e.dataTransfer)) {
+            e.preventDefault()
+            editor.imageTarget(null)
+            dropFiles([...e.dataTransfer.files], { x: e.clientX, y: e.clientY })
+            return
+          }
           if (!asset) return
           e.preventDefault()
           const at = { x: e.clientX, y: e.clientY }

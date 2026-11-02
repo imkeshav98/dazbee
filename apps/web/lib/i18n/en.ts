@@ -172,6 +172,14 @@ export const en = {
       'text-path': 'text along a path',
       'external-reference': 'links to other files',
     },
+    /** What the stage tells about files dropped on it from the computer. */
+    droppedFiles: {
+      uploading: 'Uploading {name}',
+      uploadingMany: 'Uploading {n} images',
+      notImages: 'Left out, as only PNG, JPEG, WebP and SVG files go on the design: {names}.',
+      failed: '{name} didn’t upload: {reason}',
+      offPage: 'Uploaded to the library. Drop an image on a page to place it there.',
+    },
     imageTool: {
       title: 'Place an image',
       upload: 'Upload from computer',
