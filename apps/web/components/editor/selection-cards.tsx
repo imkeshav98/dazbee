@@ -17,7 +17,7 @@ import { useMessages } from '../../lib/i18n/client.tsx'
 import { format, type Messages } from '../../lib/i18n/index.ts'
 import { Select } from '../ui/select.tsx'
 import { CARD, CARD_LOWER, CardHeader, PICKED_RING, SWATCHES } from './card.tsx'
-import { CHIP, CHIP_ACCENT, DASHED_BUTTON, FIELD, FOCUS_RING, KNOBS, KNOBS_FOUR, LINK_BUTTON, POPOVER, SEGMENT, SEGMENTS, SWATCH, SWITCH, SWITCH_ROW, TILE, TILE_FACE, TILE_FACE_WIDE } from './styles.ts'
+import { CHIP, CHIP_ACCENT, DASHED_BUTTON, FIELD, FIELD_LABEL, FOCUS_RING, KNOBS, KNOBS_FOUR, LINK_BUTTON, POPOVER, SEGMENT, SEGMENTS, SWATCH, SWITCH, SWITCH_ROW, TILE, TILE_FACE, TILE_FACE_WIDE } from './styles.ts'
 import { ImagePickerButton } from './image-tool.tsx'
 import { useBrandKit } from './use-brand-kit.ts'
 import { useLiveDesign } from './use-live-design.ts'
@@ -61,7 +61,7 @@ export function shared<T>(values: T[]): T | 'mixed' {
 }
 
 /** A card of the selection's settings, open, as every card is: its title, an action at the end, its controls. */
-function Card({ id, title, note, action, children }: { id: string; title: string; note?: string; action?: ReactNode; children: ReactNode }) {
+function Card({ id, title, note, action, children }: { id: string; title: string; note?: string; action?: ReactNode; children?: ReactNode }) {
   return (
     <section aria-labelledby={`${id}-title`} className={CARD} data-testid={id}>
       <CardHeader id={`${id}-title`} title={title} note={note}>{action}</CardHeader>
@@ -69,7 +69,6 @@ function Card({ id, title, note, action, children }: { id: string; title: string
     </section>
   )
 }
-
 
 const num = (props: Props, key: string) => props[key] as number
 
@@ -212,7 +211,7 @@ function ShapeCard({ target, p, kind }: { target: Target; p: P; kind: ShapeKind 
         ? (
           <div className="grid grid-cols-2 gap-x-3">
             {(['start', 'end'] as const).map((end) => (
-              <label key={end} className="flex min-w-0 flex-col gap-1 text-xs font-semibold text-muted">
+              <label key={end} className={cn('flex min-w-0 flex-col gap-1', FIELD_LABEL)}>
                 {p.lineEndShort[end]}
                 <Choice
                 name={p.lineEnd[end]}
@@ -286,7 +285,7 @@ function ListBody<T>({ title, p, target, field, fresh, onTop = fresh, topFirst =
   return (
     <div className="flex flex-col gap-2" data-testid={testId}>
       {header && (
-        <div className="flex items-center justify-between text-xs font-semibold text-muted">
+        <div className={cn('flex items-center justify-between', FIELD_LABEL)}>
           {title}
           <AddButton label={format(p.add, { name: title.toLowerCase() })} onClick={add} />
         </div>
@@ -486,9 +485,18 @@ function textStyle(target: Target) {
 /** A row that turns something on or off: its name, then a switch. */
 function SwitchRow({ name, on, onSet }: { name: string; on: boolean | 'mixed'; onSet: (on: boolean) => void }) {
   return (
-    // A switch has no mixed state: while the layers differ it is a checkbox that says so.
-    <button type="button" role={on === 'mixed' ? 'checkbox' : 'switch'} aria-checked={on} onClick={() => onSet(on !== true)} className={SWITCH_ROW}>
+    <Switch on={on} onSet={onSet} className={SWITCH_ROW}>
       {name}
+    </Switch>
+  )
+}
+
+/** A switch on its own, named by `label`, or with its name beside it as `children`. */
+function Switch({ on, onSet, label, className, children }: { on: boolean | 'mixed'; onSet: (on: boolean) => void; label?: string; className: string; children?: ReactNode }) {
+  return (
+    // A switch has no mixed state: while the layers differ it is a checkbox that says so.
+    <button type="button" role={on === 'mixed' ? 'checkbox' : 'switch'} aria-checked={on} aria-label={label} onClick={() => onSet(on !== true)} className={className}>
+      {children}
       <span aria-hidden className={SWITCH} />
     </button>
   )
@@ -816,30 +824,25 @@ type Layout = { direction: 'row' | 'column'; gap: number; padding: Record<'top' 
 type Place = 'start' | 'center' | 'end'
 const PLACES: Place[] = ['start', 'center', 'end']
 
-/** A box (a frame): whether what is inside shows past its edges. */
-function BoxCard({ target, p }: { target: Target; p: P }) {
-  const clips = target.props.map((pr) => pr.clip !== false)
+/** A frame: whether what is inside shows past its edges. */
+function FrameCard({ target, p }: { target: Target; p: P }) {
   return (
-    <Card id="box-card" title={p.box}>
-      <SwitchRow name={p.clip} on={clips.every(Boolean) ? true : clips.some(Boolean) ? 'mixed' : false} onSet={(clip) => set(target, () => ({ clip }))} />
+    <Card id="frame-card" title={p.frame}>
+      <SwitchRow name={p.clip} on={shared(target.props.map((pr) => pr.clip !== false))} onSet={(clip) => set(target, () => ({ clip }))} />
     </Card>
   )
 }
 
 /**
- * A box's stack (auto layout), turned on and off from its title: row or column, wrapping, a 3×3
- * pad that lines up what is inside along both axes at once, the room between and around, spreading
- * out, each side's padding, and how the box sizes.
+ * A frame's auto layout, turned on and off from its title: row or column, wrapping, a 3×3 pad that
+ * lines up what is inside along both axes at once, the room between and around, spreading out,
+ * each side's padding, and, when `ownSizing`, how the frame sizes.
  */
-function StackCard({ target, p, sizes }: { target: Target; p: P; sizes: boolean }) {
+function AutoLayoutCard({ target, p, ownSizing }: { target: Target; p: P; ownSizing: boolean }) {
   const layouts = target.props.map((pr) => pr.layout as Layout | undefined)
-  const on = layouts.every(Boolean) ? true : layouts.some(Boolean) ? 'mixed' : false
-  const toggle = (
-    <button type="button" role={on === 'mixed' ? 'checkbox' : 'switch'} aria-checked={on} aria-label={p.stack} onClick={() => target.editor.perform('autoLayout')} className={cn('group cursor-pointer rounded-full', FOCUS_RING)}>
-      <span aria-hidden className={SWITCH} />
-    </button>
-  )
-  if (on !== true) return <Card id="stack-card" title={p.stack} action={toggle}>{null}</Card>
+  const on = shared(layouts.map(Boolean))
+  const toggle = <Switch on={on} label={p.autoLayout} onSet={() => target.editor.perform('autoLayout')} className={cn('group flex cursor-pointer rounded-full', FOCUS_RING)} />
+  if (on !== true) return <Card id="auto-layout-card" title={p.autoLayout} action={toggle} />
   const value = (key: keyof Layout) => shared(layouts.map((l) => l?.[key]))
   const setLayout = (change: (l: Layout) => Partial<Layout>) => set(target, (now) => {
     const l = now.layout as Layout
@@ -849,9 +852,8 @@ function StackCard({ target, p, sizes }: { target: Target; p: P; sizes: boolean 
   const justify = value('justify') as string
   const align = value('align') as string
   const around = shared(layouts.flatMap((l) => (l ? [l.padding.top, l.padding.right, l.padding.bottom, l.padding.left] : [])))
-  const sizings = target.props.map((pr, i) => sizingOf(target.types[i] ?? '', pr))
   return (
-    <Card id="stack-card" title={p.stack} action={toggle}>
+    <Card id="auto-layout-card" title={p.autoLayout} action={toggle}>
       <Segments name={p.direction} value={direction} options={['row', 'column'] as const} labels={p.directions} onSet={(to) => setLayout(() => ({ direction: to }))} />
       <SwitchRow name={p.wrap} on={value('wrap') === 'mixed' ? 'mixed' : value('wrap') === true} onSet={(wrap) => setLayout(() => ({ wrap }))} />
       <div className="flex gap-3">
@@ -868,7 +870,10 @@ function StackCard({ target, p, sizes }: { target: Target; p: P; sizes: boolean 
                 aria-pressed={pressed}
                 data-justify={along}
                 data-align={across}
-                onClick={() => setLayout((l) => ({ justify: l.justify === 'space-between' ? 'space-between' : along, align: across }))}
+                onClick={() => setLayout((l) => {
+                  const own = l.direction === 'column' ? { justify: y, align: x } : { justify: x, align: y }
+                  return { justify: l.justify === 'space-between' ? 'space-between' : own.justify, align: own.align }
+                })}
                 className={cn('grid cursor-pointer place-items-center rounded-[5px] hover:bg-surface after:size-1 after:rounded-full after:bg-subtle aria-pressed:after:h-1.5 aria-pressed:after:w-4 aria-pressed:after:rounded-[2px] aria-pressed:after:bg-accent', FOCUS_RING)}
               />
             )
@@ -880,7 +885,6 @@ function StackCard({ target, p, sizes }: { target: Target; p: P; sizes: boolean 
             label={p.around}
             name={p.paddingAll}
             value={around}
-            min={0}
             editor={target.editor}
             onSet={(v) => setLayout(() => ({ padding: { top: v, right: v, bottom: v, left: v } }))}
             onShift={(by) => setLayout((l) => ({ padding: { top: tidy(l.padding.top + by), right: tidy(l.padding.right + by), bottom: tidy(l.padding.bottom + by), left: tidy(l.padding.left + by) } }))}
@@ -901,20 +905,7 @@ function StackCard({ target, p, sizes }: { target: Target; p: P; sizes: boolean 
           />
         ))}
       </div>
-      {sizes && (
-        <div className="grid grid-cols-2 gap-x-3">
-          {(['width', 'height'] as const).map((axis) => (
-            <Choice
-              key={axis}
-              name={p.sizingAxis[axis]}
-              value={shared(sizings.map((sz) => sz[axis]))}
-              options={['hug', 'fill', 'fixed'] as const}
-              labels={p.sizings}
-              onSet={(to) => set(target, (now, i) => ({ sizing: { ...sizingOf(target.types[i] ?? '', now), [axis]: to } }))}
-            />
-          ))}
-        </div>
-      )}
+      {ownSizing && <SizingFields target={target} p={p} options={['hug', 'fill', 'fixed']} labels={p.sizings} />}
     </Card>
   )
 }
@@ -929,25 +920,33 @@ function sizingOf(type: string, props: Props): { width: Sizing; height: Sizing }
   return { width: 'fixed', height: 'fixed' }
 }
 
-/** A layer in a stack: on each axis its own size, fitting its content or filling the room, and kept where it is put, out of the flow. */
-function InStackCard({ target, p }: { target: Target; p: P }) {
+/** How the layers size on each axis: a menu each, under the axis's name. */
+function SizingFields({ target, p, options, labels }: { target: Target; p: P; options: readonly Sizing[]; labels: Record<Sizing, string> }) {
   const sizings = target.props.map((pr, i) => sizingOf(target.types[i] ?? '', pr))
-  const kept = target.props.map((pr) => pr.absolute === true)
   return (
-    <Card id="in-stack-card" title={p.inStack}>
+    <div className="grid grid-cols-2 gap-x-3">
       {(['width', 'height'] as const).map((axis) => (
-        <div key={axis} className="flex flex-col gap-1">
-          <span className="text-xs font-semibold text-muted">{p.axes[axis]}</span>
-          <Segments
+        <div key={axis} className="flex min-w-0 flex-col gap-1">
+          <span className={FIELD_LABEL}>{p.axes[axis]}</span>
+          <Choice
             name={p.sizingAxis[axis]}
             value={shared(sizings.map((sz) => sz[axis]))}
-            options={['fixed', 'hug', 'fill'] as const}
-            labels={p.childSizings}
+            options={options}
+            labels={labels}
             onSet={(to) => set(target, (now, i) => ({ sizing: { ...sizingOf(target.types[i] ?? '', now), [axis]: to } }))}
           />
         </div>
       ))}
-      <SwitchRow name={p.absolute} on={kept.every(Boolean) ? true : kept.some(Boolean) ? 'mixed' : false} onSet={(absolute) => set(target, () => ({ absolute: absolute ? true : undefined }))} />
+    </div>
+  )
+}
+
+/** A layer in an auto layout: on each axis its own size, fitting its content or filling the room, and kept where it is put, out of the flow. */
+function FlowCard({ target, p }: { target: Target; p: P }) {
+  return (
+    <Card id="flow-card" title={p.inAutoLayout}>
+      <SizingFields target={target} p={p} options={['fixed', 'hug', 'fill']} labels={p.childSizings} />
+      <SwitchRow name={p.absolute} on={shared(target.props.map((pr) => pr.absolute === true))} onSet={(absolute) => set(target, () => ({ absolute: absolute ? true : undefined }))} />
     </Card>
   )
 }
@@ -1333,9 +1332,9 @@ export function SelectionCards({ editor, brandId, ids }: { editor: Editor; brand
       {several && !all('text') && <EffectsCard target={target} p={p} />}
       {all('text') && <TextBoxCard target={target} p={p} />}
       {all('text') && <SpacingCard target={target} p={p} />}
-      {all('frame') && <BoxCard target={target} p={p} />}
-      {all('frame') && <StackCard target={target} p={p} sizes={!inFlow} />}
-      {inFlow && <InStackCard target={target} p={p} />}
+      {all('frame') && <FrameCard target={target} p={p} />}
+      {all('frame') && <AutoLayoutCard target={target} p={p} ownSizing={!inFlow} />}
+      {inFlow && <FlowCard target={target} p={p} />}
       <SeeThroughCard target={target} p={p} />
     </>
   )

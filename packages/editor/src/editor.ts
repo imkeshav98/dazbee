@@ -739,7 +739,7 @@ function live(
     }
   }
 
-  const pageThumbnails = new Map<string, { scene: Scene; resources: Resources; url: string }>()
+  const pageThumbnails = new Map<string, { pageId: string; scene: Scene; resources: Resources; url: string }>()
   /**
    * A small picture of a page in one format, as the stage draws it, `size` pixels on its longer side:
    * a PNG as an object URL, drawn on the CPU surface and kept until the page or what it is drawn
@@ -748,7 +748,8 @@ function live(
   function pageThumbnail(frame: Frame, size: number): string | null {
     const { scene } = cached(frame)
     const drawWith = screenResources(session.design())
-    const kept = pageThumbnails.get(frame.key)
+    const key = `${frame.key}@${size}`
+    const kept = pageThumbnails.get(key)
     if (kept?.scene === scene && kept.resources === drawWith) return kept.url
     const scale = size / Math.max(frame.width, frame.height, 1)
     const surface = ck.MakeSurface(Math.max(1, Math.round(frame.width * scale)), Math.max(1, Math.round(frame.height * scale)))
@@ -764,7 +765,13 @@ function live(
       if (!png) return null
       if (kept) URL.revokeObjectURL(kept.url)
       const url = URL.createObjectURL(new Blob([png.slice()], { type: 'image/png' }))
-      pageThumbnails.set(frame.key, { scene, resources: drawWith, url })
+      pageThumbnails.set(key, { pageId: frame.pageId, scene, resources: drawWith, url })
+      // A deleted page's pictures go with it.
+      for (const [other, { pageId, url: old }] of pageThumbnails) {
+        if (design.pages[pageId]) continue
+        URL.revokeObjectURL(old)
+        pageThumbnails.delete(other)
+      }
       return url
     } finally {
       surface.delete()
@@ -3543,6 +3550,8 @@ function live(
       surface?.delete()
       for (const { url } of thumbnails.values()) URL.revokeObjectURL(url)
       thumbnails.clear()
+      for (const { url } of pageThumbnails.values()) URL.revokeObjectURL(url)
+      pageThumbnails.clear()
       gl.delete()
     },
   }

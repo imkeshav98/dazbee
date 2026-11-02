@@ -164,7 +164,7 @@ test('several layers: mixed values, set together or each from its own; text and 
 
   // Auto layout.
   await select(page, ['stack'])
-  const auto = page.getByTestId('stack-card')
+  const auto = page.getByTestId('auto-layout-card')
   await enter(auto.getByRole('spinbutton', { name: 'Room between' }), '32')
   await auto.getByRole('radio', { name: 'Column' }).click()
   await enter(auto.getByRole('spinbutton', { name: 'Room at the left' }), '40')
