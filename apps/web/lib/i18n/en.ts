@@ -209,7 +209,7 @@ export const en = {
       font: 'Font',
       bold: 'Bold',
       align: 'Align',
-      colour: 'Colour',
+      fill: 'Colour',
       outline: 'Outline',
       crop: 'Crop',
       mask: 'Mask',

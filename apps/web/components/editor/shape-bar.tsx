@@ -1,16 +1,16 @@
 'use client'
 
-// The bar's own buttons for shapes, frames and photos, as in the mock. A photo first gets Replace,
-// Crop, Mask and Look; then Colour (the fills) for anything with fills, Outline (the strokes) for
-// shapes, and ✦ Effects for every selection that is not all text.
+// The bar's own buttons for everything but text, as in the mock. A photo first gets Replace, Crop,
+// Mask and Look; then Colour (the fills) for shapes, frames and booleans, Outline (the strokes) for
+// shapes and booleans, and ✦ Effects for every selection that is not all text.
 import { ArrowsClockwiseIcon, CropIcon, SparkleIcon } from '@phosphor-icons/react'
 import { withImage } from '@dazbee/editor'
 import { boundFillIndex, type Paint } from '@dazbee/schema'
 import { useMessages } from '../../lib/i18n/client.tsx'
 import { BarPopover } from './bar-popover.tsx'
 import { ImagePickerButton } from './image-tool.tsx'
-import { EffectsBody, FillColourBody, imageFillOf, OutlineBody, PhotoLookBody, set, shared, type Target } from './selection-cards.tsx'
-import { BAR_BUTTON, BAR_DIVIDER, BAR_TOGGLE } from './styles.ts'
+import { EffectsBody, FillBody, imageFillOf, OutlineBody, PhotoLookBody, set, shared, type Target } from './selection-cards.tsx'
+import { BAR_BUTTON, BAR_DIVIDER, BAR_TOGGLE, MIXED_COLOUR } from './styles.ts'
 
 export function ShapeBar({ target, brandId, open, onOpen }: { target: Target; brandId: string; open: string | null; onOpen: (id: string | null) => void }) {
   const t = useMessages()
@@ -19,7 +19,10 @@ export function ShapeBar({ target, brandId, open, onOpen }: { target: Target; br
   const filled = target.types.every((type) => type === 'graphic' || type === 'frame' || type === 'boolean')
   const stroked = target.types.every((type) => type === 'graphic' || type === 'boolean')
   const photo = filled ? imageFillOf(target) : null
+  const one = target.ids.length === 1
   const masks = target.props.every((pr) => Boolean(pr.mask))
+  // A line has no brand swatches: its look is its stroke.
+  const lines = target.props.every((pr) => (pr.shape as { kind?: string } | undefined)?.kind === 'line')
   // The colour the brand swatches paint: the topmost solid fill that shows.
   const colour = shared(target.props.map((pr) => {
     const fills = (pr.fills ?? []) as Paint[]
@@ -35,19 +38,22 @@ export function ShapeBar({ target, brandId, open, onOpen }: { target: Target; br
             title={p.replaceImageTitle}
             testId="bar-replace"
             below
+            open={open === 'replace'}
+            onOpen={(to) => onOpen(to ? 'replace' : null)}
             className={BAR_BUTTON}
             onPick={(asset) => set(target, (now) => ({ fills: withImage((now.fills ?? []) as Paint[], asset.id) }))}
           >
             <ArrowsClockwiseIcon size={15} aria-hidden />
             <span aria-hidden>{p.replaceImage}</span>
           </ImagePickerButton>
-          {target.ids.length === 1 && (
+          {one && (
             <button type="button" data-bar-item data-testid="bar-crop" onClick={() => target.editor.perform('editPoints')} className={BAR_BUTTON}>
               <CropIcon size={15} aria-hidden />
               {b.crop}
             </button>
           )}
-          <button type="button" data-bar-item data-testid="bar-mask" aria-pressed={masks} onClick={() => target.editor.perform('mask')} className={BAR_TOGGLE}>
+          {/* One layer turns into a mask and back; several become a group masked by the bottom one, as ⋯ More does. */}
+          <button type="button" data-bar-item data-testid="bar-mask" aria-pressed={one ? masks : undefined} onClick={() => target.editor.perform('mask')} className={BAR_TOGGLE}>
             {b.mask}
           </button>
           <BarPopover id="look" open={open} onOpen={onOpen} label={b.look} testId="look" className="w-auto">
@@ -61,12 +67,12 @@ export function ShapeBar({ target, brandId, open, onOpen }: { target: Target; br
           id="colour"
           open={open}
           onOpen={onOpen}
-          label={b.colour}
-          icon={<span aria-hidden className="size-4 rounded-full border border-line-strong" style={{ background: colour === 'mixed' || colour === null ? 'conic-gradient(red, yellow, lime, aqua, blue, magenta, red)' : colour }} />}
+          label={b.fill}
+          icon={<span aria-hidden className="size-4 rounded-full border border-line-strong" style={{ background: colour === 'mixed' || colour === null ? MIXED_COLOUR : colour }} />}
           testId="colour"
           className="w-auto"
         >
-          <FillColourBody target={target} brandId={brandId} p={p} />
+          <FillBody target={target} brandId={brandId} p={p} swatches={!lines} />
         </BarPopover>
       )}
       {stroked && (

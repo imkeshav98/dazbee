@@ -200,7 +200,7 @@ export const ar: Messages = {
       font: 'الخط',
       bold: 'عريض',
       align: 'المحاذاة',
-      colour: 'اللون',
+      fill: 'اللون',
       outline: 'الحدّ',
       crop: 'قص',
       mask: 'قناع',

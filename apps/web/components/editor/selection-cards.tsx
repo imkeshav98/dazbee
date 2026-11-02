@@ -1,11 +1,12 @@
 'use client'
 
-// The selection's property cards (#60), visual first as in the final mock (layout A): the look
-// card (text size and colour, or the shape and its fill, or the image's filters), the effects as
-// tiles, then Details, one folded row per card of numbers (#151 to #157). A value the selected
-// layers don't share shows as mixed; setting it gives them all the same one, and scrubbing or the
-// arrow keys move each from its own. With more than one format the changes go to every format or to
-// this one only. Each change is one undo step, and a drag on a number, however long, is one too.
+// The selection's property cards, every one open: the header card with the box, then the numbers
+// of each kind (the shape, the photo's fit and adjustments, the text's spacing and box, auto layout),
+// and See-through last; and the bodies of the bar's popovers (the text's size, colour and align, the
+// fills, the strokes, the photo's filters, the effects). A value the selected layers don't share
+// shows as mixed; setting it gives them all the same one, and scrubbing or the arrow keys move each
+// from its own. With more than one format the changes go to every format or to this one only. Each
+// change is one undo step, and a drag on a number, however long, is one too.
 import * as Popover from '@radix-ui/react-popover'
 import { CaretDownIcon, ImageSquareIcon } from '@phosphor-icons/react'
 import { withImage, type Editor } from '@dazbee/editor'
@@ -16,7 +17,7 @@ import { useMessages } from '../../lib/i18n/client.tsx'
 import { format, type Messages } from '../../lib/i18n/index.ts'
 import { Select } from '../ui/select.tsx'
 import { CARD, CARD_LOWER, CardHeader, PICKED_RING, SWATCHES } from './card.tsx'
-import { CHIP, CHIP_ACCENT, DASHED_BUTTON, FIELD, FOCUS_RING, KNOBS, KNOBS_FOUR, LINK_BUTTON, POPOVER, SEGMENT, SEGMENTS, SWATCH } from './styles.ts'
+import { BAR_PANEL, CHIP, CHIP_ACCENT, DASHED_BUTTON, FIELD, FOCUS_RING, KNOBS, KNOBS_FOUR, LINK_BUTTON, POPOVER, SEGMENT, SEGMENTS, SWATCH } from './styles.ts'
 import { ImagePickerButton } from './image-tool.tsx'
 import { useBrandKit } from './use-brand-kit.ts'
 import { useLiveDesign } from './use-live-design.ts'
@@ -189,7 +190,7 @@ const CORNER_FIELDS = [0, 1, 3, 2] as const
  * A shape's own settings (#151), for layers that are all the same kind: a rectangle's corner radius
  * or each corner's own, a polygon's sides, a star's points and inner radius, a line's ends.
  */
-function ShapeCard({ target, p, kind, look }: { target: Target; p: P; kind: ShapeKind; look?: ReactNode }) {
+function ShapeCard({ target, p, kind }: { target: Target; p: P; kind: ShapeKind }) {
   const shapes = target.props.map((pr) => pr.shape as Shape)
   const value = (key: string) => shared(shapes.map((s) => (s as Record<string, unknown>)[key])) as number | string | 'mixed' | undefined
   const setShape = (change: (now: Record<string, unknown>) => Record<string, unknown>) =>
@@ -226,7 +227,6 @@ function ShapeCard({ target, p, kind, look }: { target: Target; p: P; kind: Shap
   })
   return (
     <Card id="shape-card" title={p.shapeKinds[kind]} note={target.names.join(', ')}>
-      {look}
       {kind === 'line'
         ? (
           <div className="grid grid-cols-2 gap-x-3">
@@ -315,11 +315,11 @@ function ListBody<T>({ title, p, target, field, fresh, onTop = fresh, topFirst =
   )
 }
 
-/** The bar's Colour popover: the brand's colours, then the fill list with each fill's editor. */
-export function FillColourBody({ target, brandId, p }: { target: Target; brandId: string; p: P }) {
+/** The bar's fill popover: the brand's colours (not for lines), then the fill list with each fill's editor. */
+export function FillBody({ target, brandId, p, swatches = true }: { target: Target; brandId: string; p: P; swatches?: boolean }) {
   return (
-    <div className="flex w-80 flex-col gap-3 p-1.5">
-      <FillLook target={target} brandId={brandId} p={p} />
+    <div className={BAR_PANEL}>
+      {swatches && <FillLook target={target} brandId={brandId} p={p} />}
       <ListBody<Paint>
         title={p.fill}
         p={p}
@@ -338,7 +338,7 @@ export function FillColourBody({ target, brandId, p }: { target: Target; brandId
 /** The bar's Outline popover: the stroke list, each stroke's paint, width, place, dashes, ends and corners. */
 export function OutlineBody({ target, brandId, p }: { target: Target; brandId: string; p: P }) {
   return (
-    <div className="flex w-80 flex-col gap-3 p-1.5">
+    <div className={BAR_PANEL}>
       <ListBody<Stroke>
         title={p.stroke}
         p={p}
@@ -676,11 +676,6 @@ const FILTER_LOOK: Record<ImageFilter, string> = {
   cool: 'saturate(0.9) hue-rotate(18deg) brightness(1.04)',
 }
 
-/**
- * An image fill's own settings (#154): its filter as tiles of the picture itself, how it fits the
- * layer, and under them its opacity and adjustments (exposure, contrast, saturation, temperature,
- * tint). It acts on the first image fill the selected layers share.
- */
 /** The topmost image fill, the one showing, when every selected layer has the same fills; null otherwise. */
 export function imageFillOf(target: Target): { index: number; paint: ImageFill } | null {
   const fills = shared(target.props.map((pr) => (pr.fills ?? []) as Paint[]))
@@ -721,7 +716,7 @@ export function PhotoLookBody({ target, p, brandId, index, paint }: { target: Ta
   )
 }
 
-/** The photo's card: how it fits its layer, its opacity and its adjustments. */
+/** The photo's card: how its topmost image fits the layer, the image's opacity and its adjustments (exposure, contrast, saturation, temperature, tint). */
 function ImageCard({ target, p, index, paint }: { target: Target; p: P; index: number; paint: ImageFill }) {
   const setPaint = (change: (now: ImageFill) => Partial<ImageFill>) => setImage(target, index, change)
   const setAdjust = (key: keyof ImageAdjust, to: (n: number) => number) => setPaint((now) => {
@@ -952,7 +947,7 @@ function FillLook({ target, brandId, p }: { target: Target; brandId: string; p: 
     const color = `${hex}FF`
     return { fills: i < 0 ? [...fills, { type: 'solid', color }] : fills.map((f, j) => (j === i && f.type === 'solid' ? { ...f, color } : f)) }
   })
-  // A picture goes into layers that have none; one that has a picture changes it from the Image card.
+  // A picture goes into layers that have none; one that has a picture changes it with Replace on the bar.
   const pictureless = target.props.every((pr) => !((pr.fills ?? []) as Paint[]).some((f) => f.type === 'image'))
   return (
     <div className="flex flex-col gap-3">
@@ -1149,7 +1144,6 @@ function ScopeMenu({ everyFormat, onChange, size, p, children }: { everyFormat: 
     </Popover.Root>
   )
 }
-
 
 /**
  * The selected layers as the cards and the bar act on them, in the frame they are selected in: like a

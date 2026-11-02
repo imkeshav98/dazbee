@@ -111,6 +111,8 @@ test('the bar replaces the picture, keeping its filter; Add image puts one into 
   await page.getByTestId('bar-replace').click()
   const picker = page.getByTestId('bar-replace-picker')
   await expect(picker).toBeVisible()
+  // One of the bar's popovers at a time: Replace closes Look.
+  await expect(page.getByTestId('bar-look-menu')).toBeHidden()
   await expect(picker.locator(`li[data-asset="${other.id}"]`)).toBeVisible({ timeout: 30_000 })
   await expect.poll(() => picker.locator('img').evaluateAll((imgs) => imgs.every((img) => (img as HTMLImageElement).complete && (img as HTMLImageElement).naturalWidth > 0))).toBe(true)
   writeOutput('into-shape-3-replace-picker.png', await page.screenshot({ animations: 'disabled' }))
