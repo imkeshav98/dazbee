@@ -11,7 +11,7 @@ export function LocaleSwitch() {
   const t = useMessages().language
   const router = useRouter()
   function choose(next: Locale) {
-    document.cookie = `locale=${next}; path=/; max-age=0; samesite=lax`
+    document.cookie = `locale=${next}; path=/; max-age=31536000; samesite=lax`
     router.refresh()
   }
   return (

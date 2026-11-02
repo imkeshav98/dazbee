@@ -127,7 +127,7 @@ export function AssetLibrary({ editor, brandId }: { editor: Editor; brandId: str
         if (!hasFiles(e)) return
         e.preventDefault()
         setDropping(false)
-        upload([...e.dataTransfer.files, ...e.dataTransfer.files])
+        upload([...e.dataTransfer.files])
       }}
     >
       <div className="flex shrink-0 flex-col gap-2 px-[18px] pb-3">
