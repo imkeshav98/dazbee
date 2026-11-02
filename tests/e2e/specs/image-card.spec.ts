@@ -63,7 +63,7 @@ test('the bar\'s Look sets the filter; the header card the fit; the Adjust card 
   await enter(card.getByRole('spinbutton', { name: 'Image opacity' }), '80')
   await enter(card.getByRole('spinbutton', { name: 'Contrast' }), '30')
   await enter(card.getByRole('spinbutton', { name: 'Saturation' }), '-250')
-  await card.getByRole('spinbutton', { name: 'Exposure' }).press('Shift+ArrowUp')
+  await card.getByRole('spinbutton', { name: 'Light' }).press('Shift+ArrowUp')
   await expect.poll(() => imageOf(page)).toMatchObject({ opacity: 0.8, adjust: { exposure: 10, contrast: 30, saturation: -100, temperature: 0, tint: 0 } })
   await page.evaluate(() => window.dazbee?.drawn())
   writeOutput('image-card.png', await page.screenshot())

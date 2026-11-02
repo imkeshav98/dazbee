@@ -8,7 +8,7 @@
 // from its own. With more than one format the changes go to every format or to this one only. Each
 // change is one undo step, and a drag on a number, however long, is one too.
 import * as Popover from '@radix-ui/react-popover'
-import { CaretDownIcon, ImageSquareIcon } from '@phosphor-icons/react'
+import { ArrowsHorizontalIcon, ArrowsVerticalIcon, CaretDownIcon, ImageSquareIcon, RectangleIcon } from '@phosphor-icons/react'
 import { withImage, type Editor } from '@dazbee/editor'
 import { BlendMode, boundFillIndex, brandRef, ContainerBlendMode, ImageFilter, LineEnd, type Design, type Effect, type ImageAdjust, type Paint, type Shape } from '@dazbee/schema'
 import { useEffect, useState, type ReactNode } from 'react'
@@ -17,7 +17,7 @@ import { useMessages } from '../../lib/i18n/client.tsx'
 import { format, type Messages } from '../../lib/i18n/index.ts'
 import { Select } from '../ui/select.tsx'
 import { CARD, CARD_LOWER, CardHeader, PICKED_RING, SWATCHES } from './card.tsx'
-import { CHIP, CHIP_ACCENT, DASHED_BUTTON, FIELD, FOCUS_RING, KNOBS, KNOBS_FOUR, LINK_BUTTON, POPOVER, SEGMENT, SEGMENTS, SWATCH } from './styles.ts'
+import { CHIP, CHIP_ACCENT, DASHED_BUTTON, FIELD, FOCUS_RING, KNOBS, KNOBS_FOUR, LINK_BUTTON, POPOVER, SEGMENT, SEGMENTS, SWATCH, SWITCH, SWITCH_ROW, TILE, TILE_FACE, TILE_FACE_WIDE } from './styles.ts'
 import { ImagePickerButton } from './image-tool.tsx'
 import { useBrandKit } from './use-brand-kit.ts'
 import { useLiveDesign } from './use-live-design.ts'
@@ -251,6 +251,7 @@ function ShapeCard({ target, p, kind }: { target: Target; p: P; kind: ShapeKind 
               {kind === 'star' && knob('innerRadius', p.innerRadius, { min: 0.05, max: 0.95, scale: 100, unit: '%', whole: false })}
               {!each && knob('cornerRadius', p.cornerRadius, { min: 0, max: 200 })}
             </div>
+            {kind === 'rect' && <SwitchRow name={p.eachCorner} on={each} onSet={eachCorner} />}
             <div dir="ltr" className={cn(KNOBS, 'empty:hidden')}>
               {each && CORNER_FIELDS.map((i) => CORNERS[i]).map((corner, n) => {
                 const i = CORNER_FIELDS[n] ?? 0
@@ -270,12 +271,6 @@ function ShapeCard({ target, p, kind }: { target: Target; p: P; kind: ShapeKind 
             </div>
           </>
         )}
-      {kind === 'rect' && (
-        <label className="flex items-center gap-2 text-[12px]">
-          <DocCheckbox name="each-corner" checked={each} onSet={eachCorner} />
-          {p.eachCorner}
-        </label>
-      )}
     </Card>
   )
 }
@@ -506,14 +501,24 @@ function textStyle(target: Target) {
   }
 }
 
-/** The lines and letters of the text: line height (Auto when cleared) and letter spacing. */
-function TextCard({ target, p }: { target: Target; p: P }) {
+/** A row that turns something on or off: its name, then a switch. */
+function SwitchRow({ name, on, onSet }: { name: string; on: boolean | 'mixed'; onSet: (on: boolean) => void }) {
+  return (
+    <button type="button" role="switch" aria-checked={on === 'mixed' ? 'mixed' : on} onClick={() => onSet(on !== true)} className={SWITCH_ROW}>
+      {name}
+      <span aria-hidden className={SWITCH} />
+    </button>
+  )
+}
+
+/** The text's spacing: between its lines (Auto when cleared), its letters and its paragraphs. */
+function SpacingCard({ target, p }: { target: Target; p: P }) {
   const { style, setStyle, shiftStyle } = textStyle(target)
   return (
-    <Card id="text-card" title={p.textNumbers}>
+    <Card id="spacing-card" title={p.spacing}>
       <div className={KNOBS}>
         <NumberField
-          label="↕"
+          label={p.spacingShort.lines}
           name={p.lineHeight}
           value={style('lineHeight') as number | 'mixed' | undefined}
           step={0.05}
@@ -524,7 +529,16 @@ function TextCard({ target, p }: { target: Target; p: P }) {
           onShift={(by) => shiftStyle('lineHeight', by, 0.5, 1.2)}
           onClear={() => setStyle('lineHeight', undefined)}
         />
-        <NumberField label="↔" name={p.letterSpacing} value={(style('letterSpacing') ?? 0) as number | 'mixed'} step={0.1} editor={target.editor} onSet={(v) => setStyle('letterSpacing', v)} onShift={(by) => shiftStyle('letterSpacing', by)} />
+        <NumberField label={p.spacingShort.letters} name={p.letterSpacing} value={(style('letterSpacing') ?? 0) as number | 'mixed'} step={0.1} editor={target.editor} onSet={(v) => setStyle('letterSpacing', v)} onShift={(by) => shiftStyle('letterSpacing', by)} />
+        <NumberField
+          label={p.spacingShort.paragraphs}
+          name={p.paragraphSpacing}
+          value={(shared(target.props.map((pr) => pr.paragraphSpacing)) ?? 0) as number | 'mixed'}
+          min={0}
+          editor={target.editor}
+          onSet={(v) => set(target, () => ({ paragraphSpacing: v }))}
+          onShift={(by) => set(target, (now) => ({ paragraphSpacing: tidy(clamp(((now.paragraphSpacing as number | undefined) ?? 0) + by, 0)) }))}
+        />
       </div>
     </Card>
   )
@@ -611,16 +625,61 @@ function Toggles({ items }: { items: Toggle[] }) {
   )
 }
 
-/** The text's box and paragraphs: how the box sizes, lines shown at most, shrinking to fit, and paragraph spacing. */
-function ParagraphCard({ target, p }: { target: Target; p: P }) {
+/** How each box mode's tile draws it: growing along a line, growing down, or held. */
+const BOX_ICONS = {
+  autoWidth: <ArrowsHorizontalIcon size={18} aria-hidden />,
+  autoHeight: <ArrowsVerticalIcon size={18} aria-hidden />,
+  fixed: <RectangleIcon size={18} aria-hidden />,
+}
+
+/** The text's box: how it sizes, shrinking to fit between a smallest and a largest size, and the lines shown at most. */
+function TextBoxCard({ target, p }: { target: Target; p: P }) {
   const value = (key: string) => shared(target.props.map((pr) => pr[key])) as unknown
   const shrink = value('shrinkToFit') as { min: number; max: number } | undefined | 'mixed'
+  const mode = (value('boxMode') ?? 'autoHeight') as BoxMode | 'mixed'
   return (
-    <Card id="paragraph-card" title={p.paragraph}>
+    <Card id="text-box-card" title={p.textBox}>
+      <div role="radiogroup" aria-label={p.boxMode} className="grid grid-cols-3 gap-[7px]">
+        {(['autoWidth', 'autoHeight', 'fixed'] as const).map((to) => (
+          <button key={to} type="button" role="radio" aria-checked={mode === to} data-value={to} onClick={() => set(target, () => ({ boxMode: to }))} className={TILE}>
+            <span className={TILE_FACE_WIDE}>{BOX_ICONS[to]}</span>
+            {p.boxModes[to]}
+          </button>
+        ))}
+      </div>
+      <SwitchRow
+        name={p.shrinkToFit}
+        on={shrink === 'mixed' ? 'mixed' : shrink !== undefined}
+        onSet={(on) => set(target, (now) => {
+          const size = (now.style as Style).fontSize
+          return { shrinkToFit: on ? { min: tidy(Math.max(1, size / 2)), max: size } : undefined }
+        })}
+      />
       <div className={KNOBS}>
-        <Choice name={p.boxMode} value={value('boxMode') as BoxMode | 'mixed' | undefined ?? 'autoHeight'} options={['autoWidth', 'autoHeight', 'fixed'] as const} labels={p.boxModes} onSet={(boxMode) => set(target, () => ({ boxMode }))} />
+        {shrink !== undefined && shrink !== 'mixed' && (['min', 'max'] as const).map((end) => (
+          <NumberField
+            key={end}
+            label={p.shrinkShort[end]}
+            name={p.shrinkSize[end]}
+            value={shrink[end]}
+            min={1}
+            editor={target.editor}
+            onSet={(v) => set(target, (now) => {
+              const was = now.shrinkToFit as { min: number; max: number } | undefined
+              if (!was) return null
+              const next = { ...was, [end]: v }
+              return { shrinkToFit: end === 'min' ? { min: Math.min(next.min, next.max), max: next.max } : { min: next.min, max: Math.max(next.min, next.max) } }
+            })}
+            onShift={(by) => set(target, (now) => {
+              const was = now.shrinkToFit as { min: number; max: number } | undefined
+              if (!was) return null
+              const v = tidy(Math.max(1, was[end] + by))
+              return { shrinkToFit: end === 'min' ? { min: Math.min(v, was.max), max: was.max } : { min: was.min, max: Math.max(v, was.min) } }
+            })}
+          />
+        ))}
         <NumberField
-          label="≡"
+          label={p.maxLines}
           name={p.maxLines}
           value={value('maxLines') as number | 'mixed' | undefined}
           min={0}
@@ -633,50 +692,7 @@ function ParagraphCard({ target, p }: { target: Target; p: P }) {
             return { maxLines: next >= 1 ? next : undefined }
           })}
         />
-        <NumberField
-          label="¶"
-          name={p.paragraphSpacing}
-          value={(value('paragraphSpacing') ?? 0) as number | 'mixed'}
-          min={0}
-          editor={target.editor}
-          onSet={(v) => set(target, () => ({ paragraphSpacing: v }))}
-          onShift={(by) => set(target, (now) => ({ paragraphSpacing: tidy(clamp(((now.paragraphSpacing as number | undefined) ?? 0) + by, 0)) }))}
-        />
       </div>
-      <Toggles
-        items={[
-          { name: p.shrinkToFit, label: p.shrinkToFitShort, on: shrink === 'mixed' ? 'mixed' : shrink !== undefined, onSet: (on) => set(target, (now) => {
-            const size = (now.style as Style).fontSize
-            return { shrinkToFit: on ? { min: tidy(Math.max(1, size / 2)), max: size } : undefined }
-          }) },
-        ]}
-      />
-      {shrink !== undefined && shrink !== 'mixed' && (
-        <div className={KNOBS}>
-          {(['min', 'max'] as const).map((end) => (
-            <NumberField
-              key={end}
-              label={end === 'min' ? '↓' : '↑'}
-              name={p.shrinkSize[end]}
-              value={shrink[end]}
-              min={1}
-              editor={target.editor}
-              onSet={(v) => set(target, (now) => {
-                const was = now.shrinkToFit as { min: number; max: number } | undefined
-                if (!was) return null
-                const next = { ...was, [end]: v }
-                return { shrinkToFit: end === 'min' ? { min: Math.min(next.min, next.max), max: next.max } : { min: next.min, max: Math.max(next.min, next.max) } }
-              })}
-              onShift={(by) => set(target, (now) => {
-                const was = now.shrinkToFit as { min: number; max: number } | undefined
-                if (!was) return null
-                const v = tidy(Math.max(1, was[end] + by))
-                return { shrinkToFit: end === 'min' ? { min: Math.min(v, was.max), max: was.max } : { min: was.min, max: Math.max(v, was.min) } }
-              })}
-            />
-          ))}
-        </div>
-      )}
     </Card>
   )
 }
@@ -741,7 +757,7 @@ function FitRow({ target, p, index, paint }: { target: Target; p: P; index: numb
   return <Segments name={p.fit} value={paint.fit} options={['fill', 'crop', 'fit', 'tile'] as const} labels={p.fits} onSet={(fit) => setImage(target, index, () => ({ fit }))} />
 }
 
-/** The photo's adjustments: how much of the image shows, its exposure, contrast, saturation, temperature and tint. */
+/** The photo's adjustments: its light, contrast, saturation, warmth and tint, and how much of the image shows. */
 function AdjustCard({ target, p, index, paint }: { target: Target; p: P; index: number; paint: ImageFill }) {
   const setPaint = (change: (now: ImageFill) => Partial<ImageFill>) => setImage(target, index, change)
   const setAdjust = (key: keyof ImageAdjust, to: (n: number) => number) => setPaint((now) => {
@@ -751,8 +767,21 @@ function AdjustCard({ target, p, index, paint }: { target: Target; p: P; index: 
   return (
     <Card id="adjust-card" title={p.adjustTitle}>
       <div className={KNOBS}>
+        {ADJUSTMENTS.map((key) => (
+          <NumberField
+            key={key}
+            label={p.adjust[key]}
+            name={p.adjust[key]}
+            value={paint.adjust?.[key] ?? 0}
+            min={-100}
+            max={100}
+            editor={target.editor}
+            onSet={(v) => setAdjust(key, () => v)}
+            onShift={(by) => setAdjust(key, (n) => n + by)}
+          />
+        ))}
         <NumberField
-          label={p.opacity}
+          label={p.imageShort}
           unit="%"
           name={p.imageOpacity}
           value={paint.opacity}
@@ -763,19 +792,6 @@ function AdjustCard({ target, p, index, paint }: { target: Target; p: P; index: 
           onSet={(v) => setPaint(() => ({ opacity: tidy(v) }))}
           onShift={(by) => setPaint((now) => ({ opacity: tidy(clamp(now.opacity + by, 0, 1)) }))}
         />
-        {ADJUSTMENTS.map((key) => (
-          <NumberField
-            key={key}
-            label={p.adjustShort[key]}
-            name={p.adjust[key]}
-            value={paint.adjust?.[key] ?? 0}
-            min={-100}
-            max={100}
-            editor={target.editor}
-            onSet={(v) => setAdjust(key, () => v)}
-            onShift={(by) => setAdjust(key, (n) => n + by)}
-          />
-        ))}
       </div>
     </Card>
   )
@@ -1124,9 +1140,9 @@ export function EffectsBody({ target, p }: { target: Target; p: P }) {
             aria-pressed={on(tile)}
             data-tile={tile}
             onClick={() => press(tile)}
-            className="group flex min-w-0 cursor-pointer flex-col items-center gap-1 text-[11px] font-semibold text-muted aria-pressed:text-text"
+            className={TILE}
           >
-            <span className="grid aspect-square w-full place-items-center rounded-[10px] border border-line bg-bg/60 transition-colors duration-[var(--chrome-fast)] group-hover:border-line-strong group-aria-pressed:border-accent">
+            <span className={TILE_FACE}>
               {thumbnails?.plain
                 ? <img src={(tile === 'outline' && thumbnails.outlined) || thumbnails.plain} alt="" draggable={false} data-thumbnail className={cn('size-[62%] object-contain', THUMB_LOOK[tile])} />
                 : <span aria-hidden className={cn('font-display text-[19px] font-extrabold text-text', TILE_LOOK[tile])}>{TILE_SAMPLE}</span>}
@@ -1282,8 +1298,8 @@ export function SelectionCards({ editor, brandId, ids }: { editor: Editor; brand
           ? <ColourCard target={target} brandId={brandId} p={p} b={t.editor.bar} swatches />
           : ownShape && <ShapeCard target={target} p={p} kind={ownShape} />)}
       {several && !all('text') && <EffectsCard target={target} p={p} />}
-      {all('text') && <TextCard target={target} p={p} />}
-      {all('text') && <ParagraphCard target={target} p={p} />}
+      {all('text') && <TextBoxCard target={target} p={p} />}
+      {all('text') && <SpacingCard target={target} p={p} />}
       {all('frame') && <AutoLayoutCard target={target} p={p} />}
       {(inFlow || all('frame') && target.props.every((pr) => pr.layout)) && <FlowCard target={target} p={p} inFlow={inFlow} />}
       <SeeThroughCard target={target} p={p} />

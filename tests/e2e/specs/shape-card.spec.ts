@@ -47,14 +47,14 @@ test('the Shape card sets corners, sides, points and line ends', async ({ browse
   await enter(card.getByRole('spinbutton', { name: 'Corners' }), '40')
   await expect.poll(() => shapeOf(page, 'box')).toEqual({ kind: 'rect', cornerRadius: 40 })
   // Each corner its own: all four start at the one radius, then one changes alone.
-  await card.getByRole('checkbox', { name: 'Each corner its own radius' }).check()
+  await card.getByRole('switch', { name: 'Each corner its own' }).click()
   await expect.poll(() => shapeOf(page, 'box')).toMatchObject({ corners: [40, 40, 40, 40] })
   await enter(card.getByRole('spinbutton', { name: 'Bottom right radius' }), '120')
   await expect.poll(() => shapeOf(page, 'box')).toMatchObject({ corners: [40, 40, 120, 40] })
   await page.evaluate(() => window.dazbee?.drawn())
   writeOutput('shape-card-rect.png', await page.screenshot())
   // Back to one radius: the corners go and the first corner's radius stays.
-  await card.getByRole('checkbox', { name: 'Each corner its own radius' }).uncheck()
+  await card.getByRole('switch', { name: 'Each corner its own' }).click()
   await expect.poll(() => shapeOf(page, 'box')).toEqual({ kind: 'rect', cornerRadius: 40 })
 
   await select(page, ['hex'])
