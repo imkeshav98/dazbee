@@ -148,6 +148,19 @@ export const ar: Messages = {
     notices: {
       placedByLayout: 'التخطيط التلقائي يحدد مكان هذه الطبقة. اسحبها على طول الصف أو العمود، أو اجعلها تبقى في مكانها لتحريكها بحرية.',
       flowEnd: 'هذه الطبقة في طرف صفها أو عمودها بالفعل.',
+      svgLeftOut: 'وُضع كطبقات. حُذف ما لا تعرضه أي طبقة: {parts}.',
+      svgUnreadable: 'تعذّرت قراءة ملف SVG هذا، فلم يوضع شيء.',
+    },
+    svgParts: {
+      filter: 'المرشّحات',
+      image: 'الصور المضمّنة فيه',
+      'embedded-font': 'خطوطه المضمّنة',
+      'foreign-object': 'محتوى الويب',
+      pattern: 'تعبئات النقش',
+      marker: 'علامات أطراف الخطوط',
+      script: 'النصوص البرمجية',
+      'text-path': 'النص على مسار',
+      'external-reference': 'الروابط إلى ملفات أخرى',
     },
     imageTool: {
       title: 'ضع صورة',
@@ -158,6 +171,7 @@ export const ar: Messages = {
       pick: 'ضع {name}',
       uploading: 'جارٍ رفع {name}',
       failed: 'تعذّر رفع {name}: {reason}',
+      svgNotFill: '{name} ملف SVG لا يمكنه تعبئة شكل. هو في المكتبة لتضعه كطبقات.',
     },
     arrange: {
       align: 'محاذاة',
@@ -252,6 +266,7 @@ export const ar: Messages = {
       colors: 'الألوان',
       fonts: 'الخطوط',
       logo: 'الشعار',
+      placeLogo: 'ضع الشعار في التصميم',
       voice: 'نبرة الصوت',
       voiceHint: 'كيف تتحدث هذه العلامة، لكتابة نصوصها.',
       addColor: 'أضف لونًا',

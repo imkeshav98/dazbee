@@ -22,6 +22,7 @@
     "@dazbee/fonts": "workspace:*",
     "@dazbee/renderer": "workspace:*",
     "@dazbee/schema": "workspace:*",
+    "@dazbee/svg": "workspace:*",
     "@resvg/resvg-js": "2.6.2",
     "@types/node": "^22.20.0",
     "esbuild": "^0.28.2",

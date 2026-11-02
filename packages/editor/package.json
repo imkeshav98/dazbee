@@ -20,6 +20,7 @@
     "@dazbee/fonts": "workspace:*",
     "@dazbee/renderer": "workspace:*",
     "@dazbee/schema": "workspace:*",
+    "@dazbee/svg": "workspace:*",
     "y-indexeddb": "9.0.12",
     "yjs": "^13.6.27"
   },

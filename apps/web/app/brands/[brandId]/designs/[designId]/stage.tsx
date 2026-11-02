@@ -5,15 +5,17 @@ import { SHAPE_TOOLS, startEditor, type Editor, type ShapeTool, type Tool } from
 import { fetchSyncToken, renameFromEditor } from './actions.ts'
 import { EditorShell, type ChromeInsets } from '../../../../../components/editor/shell.tsx'
 import { FocusChip, NoticeToast, UndoToast } from '../../../../../components/editor/formats-panel.tsx'
-import { useMessages } from '../../../../../lib/i18n/client.tsx'
+import { useLocale, useMessages } from '../../../../../lib/i18n/client.tsx'
+import { format } from '../../../../../lib/i18n/index.ts'
+import { placeAsset } from '../../../../../lib/place-asset.ts'
 import { PropertyCards } from '../../../../../components/editor/property-cards.tsx'
 import { ZoomControl } from '../../../../../components/editor/zoom-control.tsx'
 import { SelectionBar, StageMenu } from '../../../../../components/editor/selection-bar.tsx'
-import { ASSET_DRAG_TYPE, AssetLibrary, draggedAsset } from '../../../../../components/editor/asset-library.tsx'
+import { ASSET_DRAG_TYPE, AssetLibrary, draggedAsset, VECTOR_DRAG_TYPE } from '../../../../../components/editor/asset-library.tsx'
 import { BrandKitPanel } from '../../../../../components/editor/brand-kit-panel.tsx'
 import { ShareMenu } from '../../../../../components/editor/share-menu.tsx'
 import { LayersPanel } from '../../../../../components/editor/layers-panel.tsx'
-import { BrandKit, brandVariables, FontFamily, type Variables } from '@dazbee/schema'
+import { BrandKit, brandVariables, FontFamily, isVectorAsset, type Variables } from '@dazbee/schema'
 import { useValue, valueStore, type ValueStore } from '../../../../../lib/value-store.ts'
 
 /** The editor's tools that the dock shows as the one shape button. */
@@ -106,17 +108,22 @@ export function EditorStage({ designId, designName, brandId, brandName, everyBra
   const [removed, setRemoved] = useState<string | null>(null)
   // Why a gesture did nothing: auto layout decides where a layer in its flow goes.
   const notices = useMessages().editor.notices
+  const svgParts = useMessages().editor.svgParts
+  const locale = useLocale()
   const [notice, setNotice] = useState<{ text: string; at: number } | null>(null)
   // A right-click on a layer: where, for the menu of its actions, and a count so each right-click opens its own.
   const [menuAt, setMenuAt] = useState<{ x: number; y: number; n: number } | null>(null)
   const dismissNotice = useCallback(() => setNotice(null), [])
   useEffect(() => {
     if (!editor) return
-    const stop = editor.onNotice((n) => setNotice({ text: notices[n], at: Date.now() }))
+    const stop = editor.onNotice((n, parts) => {
+      const listed = new Intl.ListFormat(locale, { type: 'conjunction' }).format(parts.map((part) => svgParts[part]))
+      setNotice({ text: format(notices[n], { parts: listed }), at: Date.now() })
+    })
     return () => {
       stop()
     }
-  }, [editor, notices])
+  }, [editor, notices, svgParts, locale])
   // The dock follows the editor's tool: a key picks one, and drawing a shape goes back to select.
   const [tool, setEditorTool] = useState<Tool>('select')
   const [shape, setShape] = useState<ShapeTool>('rect')
@@ -220,6 +227,11 @@ export function EditorStage({ designId, designName, brandId, brandName, everyBra
       image={{
         picking: !imagePicked,
         onPick: (asset) => {
+          // An SVG file goes on the page at once, as layers; an image is placed by a click or a drag.
+          if (isVectorAsset(asset)) {
+            if (editor) placeAsset(editor, brandId, asset)
+            return
+          }
           editor?.armImage(asset)
           setImagePicked(true)
         },
@@ -248,7 +260,8 @@ export function EditorStage({ designId, designName, brandId, brandName, everyBra
           if (!editor || !e.dataTransfer.types.includes(ASSET_DRAG_TYPE)) return
           e.preventDefault()
           e.dataTransfer.dropEffect = 'copy'
-          editor.imageTarget({ x: e.clientX, y: e.clientY })
+          // An SVG file becomes layers of its own, so no shape lights up to take it.
+          if (!e.dataTransfer.types.includes(VECTOR_DRAG_TYPE)) editor.imageTarget({ x: e.clientX, y: e.clientY })
         }}
         onDragLeave={(e) => {
           if (!e.currentTarget.contains(e.relatedTarget as Node | null)) editor?.imageTarget(null)
@@ -257,8 +270,9 @@ export function EditorStage({ designId, designName, brandId, brandName, everyBra
           const asset = editor && draggedAsset(e)
           if (!asset) return
           e.preventDefault()
-          const into = editor.imageTarget({ x: e.clientX, y: e.clientY })
-          if (!into || !editor.fillWithImage(into, asset)) editor.placeImage(asset, { x: e.clientX, y: e.clientY })
+          const at = { x: e.clientX, y: e.clientY }
+          const into = isVectorAsset(asset) ? null : editor.imageTarget(at)
+          if (!into || !editor.fillWithImage(into, asset)) placeAsset(editor, brandId, asset, at)
           editor.imageTarget(null)
         }}
       >

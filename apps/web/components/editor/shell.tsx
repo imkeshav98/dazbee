@@ -9,7 +9,8 @@ import {
   CloudArrowUpIcon, CloudCheckIcon, CloudSlashIcon, CursorIcon, FrameCornersIcon, HandIcon, ImageIcon, ImagesIcon, PaletteIcon, PenNibIcon, ShapesIcon,
   SlidersHorizontalIcon, SparkleIcon, StackIcon, TextTIcon, XIcon, type Icon,
 } from '@phosphor-icons/react'
-import type { PlacedAsset, ShapeTool } from '@dazbee/editor'
+import type { ShapeTool } from '@dazbee/editor'
+import type { Placeable } from '../../lib/place-asset.ts'
 import { AnimatePresence, motion, MotionConfig, useReducedMotion } from 'motion/react'
 import Link from 'next/link'
 import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
@@ -241,7 +242,7 @@ export function EditorShell({ brandId, brandName, designName, onRename, status, 
   shape?: ShapeTool
   onToolChange?: (tool: Tool, shape: ShapeTool) => void
   /** The image tool: whether it is waiting for an image to be picked, and what to do with the one picked. */
-  image?: { picking: boolean; onPick: (asset: PlacedAsset) => void }
+  image?: { picking: boolean; onPick: (asset: Placeable) => void }
   /** Called with the stage's edges the chrome covers, whenever they change; `withCards` once the cards are in. */
   onInsets?: (insets: ChromeInsets, withCards: boolean) => void
   /** False until the stage has fitted the design between the chrome: the editor is not ready before. */

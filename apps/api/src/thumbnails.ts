@@ -2,7 +2,8 @@
 // make and store as their own objects, never resized on the fly. CanvasKit decodes the original, as
 // it does for every render.
 import { loadCanvasKit } from '@dazbee/renderer/node'
-import type { ImageType } from '@dazbee/schema'
+import { isVectorAsset, type ImageType } from '@dazbee/schema'
+import { svgThumbnail } from './svg-assets.ts'
 
 /** The longest side of a thumbnail, in pixels: two library columns on a 2× screen. */
 export const THUMBNAIL_SIZE = 320
@@ -11,9 +12,11 @@ export interface Thumbnail { bytes: Uint8Array; contentType: 'image/png' | 'imag
 
 /**
  * The image scaled down to fit THUMBNAIL_SIZE (never up). A JPEG stays a JPEG; PNG and WebP, which
- * can be see-through, become PNG. Throws when CanvasKit can't decode the original.
+ * can be see-through, become PNG; an SVG file is its layers drawn to fit, as a PNG. Throws when
+ * CanvasKit can't decode the original, or the SVG can't be read.
  */
 export async function makeThumbnail(bytes: Uint8Array, contentType: ImageType): Promise<Thumbnail> {
+  if (isVectorAsset({ contentType })) return { bytes: await svgThumbnail(bytes, THUMBNAIL_SIZE), contentType: 'image/png' }
   const ck = await loadCanvasKit()
   const image = ck.MakeImageFromEncoded(bytes)
   if (!image) throw new Error('CanvasKit can\'t decode this image')

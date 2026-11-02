@@ -397,8 +397,8 @@ describe('image uploads', { timeout: 30_000 }, () => {
   const sha256 = (bytes: Uint8Array) => createHash('sha256').update(bytes).digest('hex')
 
   /** Starts an upload, PUTs the bytes when asked to, and records the asset. */
-  async function upload(as: string, brandId: string, bytes: Uint8Array, name?: string) {
-    const ticket = UploadTicket.parse((await call(as, 'POST', `/brands/${brandId}/assets/uploads`, { sha256: sha256(bytes), byteSize: bytes.length, contentType: 'image/png' })).json)
+  async function upload(as: string, brandId: string, bytes: Uint8Array, name?: string, contentType = 'image/png') {
+    const ticket = UploadTicket.parse((await call(as, 'POST', `/brands/${brandId}/assets/uploads`, { sha256: sha256(bytes), byteSize: bytes.length, contentType })).json)
     if (ticket.asset) return { asset: ticket.asset, uploaded: false }
     const put = await fetch(ticket.upload.url, { method: 'PUT', body: bytes, headers: ticket.upload.headers })
     expect(put.status).toBe(200)
@@ -447,7 +447,7 @@ describe('image uploads', { timeout: 30_000 }, () => {
     const ticket = UploadTicket.parse((await call('a', 'POST', `/brands/${brand.id}/assets/uploads`, { sha256: sha256(text), byteSize: text.length, contentType: 'image/png' })).json)
     if (!ticket.upload) throw new Error('expected an upload URL')
     await fetch(ticket.upload.url, { method: 'PUT', body: text, headers: ticket.upload.headers })
-    expect((await call('a', 'POST', `/brands/${brand.id}/assets`, { sha256: sha256(text) })).json).toEqual({ error: 'The upload is not a PNG, JPEG or WebP image' })
+    expect((await call('a', 'POST', `/brands/${brand.id}/assets`, { sha256: sha256(text) })).json).toEqual({ error: 'The upload is not a PNG, JPEG or WebP image, or an SVG file we can read' })
 
     // Bytes put under someone else's hash.
     const real = png(2, 2, `${run}-real`)
@@ -518,7 +518,24 @@ describe('image uploads', { timeout: 30_000 }, () => {
 
   it('refuses uploads that are too big or not an image type', async () => {
     expect((await call('a', 'POST', `/brands/${brand.id}/assets/uploads`, { sha256: 'a'.repeat(64), byteSize: 31 * 1024 * 1024, contentType: 'image/png' })).status).toBe(400)
-    expect((await call('a', 'POST', `/brands/${brand.id}/assets/uploads`, { sha256: 'a'.repeat(64), byteSize: 10, contentType: 'image/svg+xml' })).status).toBe(400)
+    expect((await call('a', 'POST', `/brands/${brand.id}/assets/uploads`, { sha256: 'a'.repeat(64), byteSize: 10, contentType: 'image/gif' })).status).toBe(400)
+    expect((await call('a', 'POST', `/brands/${brand.id}/assets/uploads`, { sha256: 'a'.repeat(64), byteSize: 6_000_000, contentType: 'image/svg+xml' })).status).toBe(400)
+  })
+
+  it('records an SVG file at its own size, with its layers drawn as the thumbnail, and refuses one it can\'t read (#225)', async () => {
+    const svg = new TextEncoder().encode(`<svg xmlns="http://www.w3.org/2000/svg" width="120" height="80" viewBox="0 0 60 40"><!-- ${run} --><rect width="60" height="40" fill="#E0204F"/></svg>`)
+    const { asset } = await upload('a', brand.id, svg, 'Logo', 'image/svg+xml')
+    expect(asset).toMatchObject({ contentType: 'image/svg+xml', width: 120, height: 80, name: 'Logo' })
+    const thumbnail = SignedLink.parse((await call('a', 'GET', `/brands/${brand.id}/assets/${asset.id}/thumbnail`)).json)
+    const drawn = new Uint8Array(await (await fetch(thumbnail.url)).arrayBuffer())
+    expect(readImageHeader(drawn)).toMatchObject({ contentType: 'image/png', width: 320, height: 213 })
+
+    // A page that calls itself SVG is refused, and its bytes are dropped.
+    const page = new TextEncoder().encode(`<html><body><script>alert('${run}')</script></body></html>`)
+    const ticket = UploadTicket.parse((await call('a', 'POST', `/brands/${brand.id}/assets/uploads`, { sha256: sha256(page), byteSize: page.length, contentType: 'image/svg+xml' })).json)
+    if (!ticket.upload) throw new Error('expected an upload URL')
+    await fetch(ticket.upload.url, { method: 'PUT', body: page, headers: ticket.upload.headers })
+    expect((await call('a', 'POST', `/brands/${brand.id}/assets`, { sha256: sha256(page) })).json).toEqual({ error: 'The upload is not a PNG, JPEG or WebP image, or an SVG file we can read' })
   })
 
   it('signs an upload URL for its key, content type and size only', async () => {
