@@ -1,4 +1,4 @@
-name: e2e on demand
+name: Browser tests on demand
 
 # Runs chosen browser tests on a pushed branch on GitHub's machines, the same way CI's e2e jobs do.
 # `args` are Playwright's: a spec file such as specs/layers.spec.ts, or a filter such as
