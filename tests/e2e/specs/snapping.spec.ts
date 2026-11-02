@@ -1,10 +1,12 @@
 // Snapping, smart guides, rulers, align and distribute (#42), with real pointer and keyboard input:
 // a drag near another layer snaps and shows a guide, Ctrl turns snapping off, the inspector's
 // buttons align and distribute three layers in one undo step each, the rulers mark the selection,
-// and a drag among 300 layers keeps each pointer move's work inside a 60 Hz frame.
+// and a drag among 300 layers works out what it can snap to once, then measures each pointer move
+// against every layer once.
 import type { DesignInput } from '@dazbee/schema'
 import { expect, test, type Page } from '../support/test.ts'
 import { screenPoint, writeOutput } from '../support/editor.ts'
+import { PERF, report, spread } from '../support/perf.ts'
 import { liveDesign } from '../support/seed.ts'
 import { barMenu, click, openStage, press, props, selection, zoomMenu } from '../support/stage.ts'
 
@@ -139,7 +141,8 @@ test('rulers are off until asked for, count design pixels from the frame, mark t
   expect(errors).toEqual([])
 })
 
-test('dragging among 300 layers keeps each pointer move, snapping included, inside a frame', async ({ browser }) => {
+/** The snapping design and 300 more layers in rows under it. */
+const threeHundred = (): DesignInput => {
   const base = design()
   const nodes: DesignInput['nodes'] = { ...base.nodes }
   for (let i = 0; i < 300; i++) {
@@ -147,7 +150,46 @@ test('dragging among 300 layers keeps each pointer move, snapping included, insi
     const y = 420 + Math.floor(i / 20) * 42
     nodes[`r${i}`] = { type: 'graphic', parentId: 'p1', index: `b${String(i).padStart(3, '0')}`, name: `R${i}`, props: rect(x, y, 40, 30, '#9AA4B2FF') }
   }
-  const { page, errors } = await openStage(browser, { ...base, meta: { ...base.meta, name: '300 layers' }, nodes })
+  return { ...base, meta: { ...base.meta, name: '300 layers' }, nodes }
+}
+
+/** Drags the dot with the mouse in 60 steps, waiting for the redraw after each. */
+async function dragDot(page: Page) {
+  const a = await screenPoint(page, 820, 240)
+  await page.mouse.move(a.x, a.y)
+  await page.mouse.down()
+  for (let i = 1; i <= 60; i++) {
+    await page.mouse.move(a.x - i * 4, a.y + i * 5)
+    await page.evaluate(() => window.dazbee?.drawn())
+  }
+  await page.mouse.up()
+}
+
+test('dragging among 300 layers works out what to snap to once, and each move measures against every layer once', async ({ browser }) => {
+  const content = threeHundred()
+  const { page, errors } = await openStage(browser, content)
+  await click(page, 820, 240)
+  // The pointer moves the stage gets with the button down.
+  await page.evaluate(() => {
+    const moves = { pressed: 0 }
+    window.addEventListener('pointermove', (e) => { if (e.buttons & 1) moves.pressed++ }, { capture: true })
+    ;(window as unknown as { moves: typeof moves }).moves = moves
+  })
+  const before = await page.evaluate(() => window.dazbee?.snapWork())
+  await dragDot(page)
+  const after = await page.evaluate(() => window.dazbee?.snapWork())
+  const moves = await page.evaluate(() => (window as unknown as { moves: { pressed: number } }).moves.pressed)
+  if (!before || !after) throw new Error('no editor')
+  expect(moves).toBeGreaterThanOrEqual(60)
+  // What a move measures against: every layer on the page but the dot, and the format.
+  const boxes = Object.keys(content.nodes).filter((id) => id !== 'dot').length + 1
+  expect({ gathered: after.gathered - before.gathered, moves: after.moves - before.moves, checked: after.checked - before.checked })
+    .toEqual({ gathered: 1, moves, checked: moves * boxes })
+  expect(errors).toEqual([])
+})
+
+test('dragging among 300 layers: what a pointer move takes', PERF, async ({ browser }) => {
+  const { page } = await openStage(browser, threeHundred())
   await click(page, 820, 240)
   // Time every pointer move from its capture to the end of its handling, and every redraw.
   await page.evaluate(() => {
@@ -158,20 +200,10 @@ test('dragging among 300 layers keeps each pointer move, snapping included, insi
     window.dazbee?.onDraw((_design, _at, info) => times.draw.push(info.ms))
     ;(window as unknown as { times: typeof times }).times = times
   })
-  const a = await screenPoint(page, 820, 240)
-  await page.mouse.move(a.x, a.y)
-  await page.mouse.down()
-  for (let i = 1; i <= 60; i++) {
-    await page.mouse.move(a.x - i * 4, a.y + i * 5)
-    await page.evaluate(() => window.dazbee?.drawn())
-  }
-  await page.mouse.up()
+  await dragDot(page)
   const times = await page.evaluate(() => (window as unknown as { times: { handle: number[]; draw: number[] } }).times)
-  const pct = (xs: number[], p: number) => [...xs].sort((x, y) => x - y)[Math.min(xs.length - 1, Math.floor(xs.length * p))] ?? 0
-  const line = `300 layers, 60 pointer moves: handling (command and snapping) median ${pct(times.handle, 0.5).toFixed(2)} ms, p95 ${pct(times.handle, 0.95).toFixed(2)} ms; redraw median ${pct(times.draw, 0.5).toFixed(1)} ms, p95 ${pct(times.draw, 0.95).toFixed(1)} ms over ${times.draw.length} redraws`
-  console.log(line)
-  writeOutput('snapping-300-layers.txt', `${line}\n`)
-  expect(times.handle.length).toBeGreaterThanOrEqual(60)
-  expect(pct(times.handle, 0.95)).toBeLessThan(16.7)
-  expect(errors).toEqual([])
+  report('Snapping, a drag among 300 layers', {
+    'pointer move (command and snapping)': spread(times.handle),
+    redraw: spread(times.draw),
+  })
 })

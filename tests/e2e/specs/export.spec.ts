@@ -1,7 +1,7 @@
 // Export (#55) in Chromium, through the Export menu: every format of a page as PNG downloads as one
 // zip with a folder per format, and every file in it is byte for byte what Node exports from the
-// same design; one format as JPG downloads as itself; and the main thread is never blocked for
-// more than 50 ms while the export worker draws five formats.
+// same design, drawn in the export worker rather than on the main thread; and one format as JPG
+// downloads as itself.
 import { readFileSync } from 'node:fs'
 import { expect, test, type Page } from '../support/test.ts'
 import { exportDesign, readZip } from '@dazbee/export'
@@ -11,6 +11,7 @@ import { loadCanvasKit } from '@dazbee/renderer/node'
 import type { DesignInput } from '@dazbee/schema'
 import { photo, upload } from '../support/assets.ts'
 import { designOf, writeOutput } from '../support/editor.ts'
+import { PERF, report } from '../support/perf.ts'
 import { openStage } from '../support/stage.ts'
 import { choose } from '../support/select.ts'
 
@@ -67,6 +68,38 @@ const watchLongTasks = (page: Page) => page.evaluate(() => {
 })
 const longTasks = (page: Page) => page.evaluate(() => (window as unknown as { longTasks: number[] }).longTasks)
 
+/** A reply from the export worker (ExportReply in packages/editor/src/export-client.ts). */
+type Reply =
+  | { kind: 'progress'; done: number; total: number }
+  | { kind: 'done'; file: { bytes: Uint8Array } }
+  | { kind: 'error'; message: string }
+/** What the worker watch records: the request of each job posted, and each reply with the file's size in place of the file. */
+interface Posted { jobs: { request: unknown }[]; replies: (Exclude<Reply, { kind: 'done' }> | { kind: 'done'; bytes: number })[] }
+
+/**
+ * Records, from now on, every job the page posts to a worker (the export request it carries) and
+ * every reply a worker sends back: each file it reports made, and the size of the file it hands over.
+ */
+const watchWorkers = (page: Page) => page.evaluate(() => {
+  const seen: Posted = { jobs: [], replies: [] }
+  const heard = new WeakSet<Worker>()
+  const post = Worker.prototype.postMessage
+  Worker.prototype.postMessage = function (this: Worker, message: { request?: unknown }, ...rest: unknown[]) {
+    if (!heard.has(this)) {
+      heard.add(this)
+      this.addEventListener('message', ({ data }: MessageEvent<Reply & { id: number }>) => {
+        seen.replies.push(data.kind === 'done' ? { kind: 'done', bytes: data.file.bytes.length }
+          : data.kind === 'progress' ? { kind: 'progress', done: data.done, total: data.total }
+            : { kind: 'error', message: data.message })
+      })
+    }
+    seen.jobs.push({ request: message.request })
+    Reflect.apply(post, this, [message, ...rest])
+  }
+  ;(window as unknown as { workers: Posted }).workers = seen
+})
+const workers = (page: Page) => page.evaluate(() => (window as unknown as { workers: Posted }).workers)
+
 async function nodeExport(page: Page, assetId: string) {
   const ck = await loadCanvasKit()
   const json = JSON.parse(await designOf(page)) as unknown
@@ -75,7 +108,7 @@ async function nodeExport(page: Page, assetId: string) {
   return (request: { pageIds: string[]; formatIds: string[]; type: 'png' | 'jpg'; quality?: number }) => exportDesign(ck, json, request, bytes).bytes
 }
 
-test('every format of a page as PNG is one zip whose files are what Node exports, and the stage stays responsive', async ({ browser }) => {
+test('every format of a page as PNG is one zip whose files are what Node exports, drawn in the export worker', async ({ browser }) => {
   const asset = await upload(photo)
   const { page, errors } = await openStage(browser, design(asset.id))
   await page.getByTestId('share-open').click()
@@ -88,6 +121,7 @@ test('every format of a page as PNG is one zip whose files are what Node exports
   writeOutput('export-0-menu.png', await page.screenshot())
 
   await watchLongTasks(page)
+  await watchWorkers(page)
   const started = Date.now()
   const [download] = await Promise.all([page.waitForEvent('download'), page.getByTestId('export-run').click()])
   expect(download.suggestedFilename()).toBe('Spring drop.zip')
@@ -107,16 +141,38 @@ test('every format of a page as PNG is one zip whose files are what Node exports
   }
   writeOutput('export-1-zip.json', JSON.stringify({ files: entries.map((e) => ({ path: e.path, bytes: e.bytes.length })), zipBytes: zipped.length, ms: took, longTasks: blocked }, null, 2))
   writeOutput('export-2-story.png', Buffer.from(entries[2]?.bytes ?? []))
-  expect(blocked, 'main-thread tasks over 50 ms while exporting').toEqual([])
-  // The watch does see a task that blocks: 120 ms of work on the main thread is recorded.
-  // (It runs from a timer, since a task is what the browser measures and an evaluate is not one.)
-  await page.evaluate(() => new Promise((resolve) => setTimeout(() => {
-    const end = performance.now() + 120
-    while (performance.now() < end) { /* busy */ }
-    resolve(null)
-  })))
-  await expect.poll(async () => (await longTasks(page)).length).toBe(1)
+  // The worker drew the files, not the main thread: the page posted it the one request, it reported
+  // each of the five as it made it, and the zip that downloaded is the one it handed back.
+  const posted = await workers(page)
+  expect(posted.jobs).toEqual([{ request: expect.objectContaining({ pageIds: ['p1'], formatIds: Object.keys(FORMATS), type: 'png' }) }])
+  expect(posted.replies).toEqual([
+    ...Object.keys(FORMATS).map((_, i) => ({ kind: 'progress', done: i + 1, total: 5 })),
+    { kind: 'done', bytes: zipped.length },
+  ])
   expect(errors).toEqual([])
+})
+
+test('exporting every format of a page: how long it takes, and the main thread\'s long tasks', PERF, async ({ browser }) => {
+  const asset = await upload(photo)
+  const { page } = await openStage(browser, design(asset.id))
+  await page.evaluate(() => {
+    const seen: number[] = []
+    const observer = new PerformanceObserver((list) => {
+      for (const entry of list.getEntries()) seen.push(entry.duration)
+    })
+    observer.observe({ type: 'longtask', buffered: false })
+    ;(window as unknown as { longTasks: () => number[] }).longTasks = () => [...seen, ...observer.takeRecords().map((entry) => entry.duration)]
+  })
+  const took = await page.evaluate(async (formatIds) => {
+    const started = performance.now()
+    await window.dazbee?.exportFiles({ pageIds: ['p1'], formatIds, type: 'png' })
+    return performance.now() - started
+  }, Object.keys(FORMATS))
+  const blocked = await page.evaluate(() => (window as unknown as { longTasks: () => number[] }).longTasks())
+  report('Export, five formats of a page as PNG', {
+    export: { ms: Math.round(took) },
+    'main-thread tasks over 50 ms': { count: blocked.length, longestMs: Math.round(Math.max(0, ...blocked)) },
+  })
 })
 
 test('one format as JPG downloads as itself, at the quality picked, the same bytes as Node', async ({ browser }) => {

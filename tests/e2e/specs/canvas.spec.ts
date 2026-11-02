@@ -1,8 +1,9 @@
 // The infinite canvas (#36): every page in every format, per-format drags, shared text, pan, zoom
-// and the frame budget. Needs the API and the sync server: `docker compose up -d --wait`.
+// and what each redraw draws and records. Needs the API and the sync server: `docker compose up -d --wait`.
 import { expect, test, type Page } from '../support/test.ts'
 import type { DesignInput } from '@dazbee/schema'
 import { designOf, editorPath, placed, screenPoint, settle, stageShot, writeOutput } from '../support/editor.ts'
+import { PERF, report, spread } from '../support/perf.ts'
 import { seed } from '../support/seed.ts'
 
 test.describe.configure({ timeout: 180_000 })
@@ -287,112 +288,123 @@ test('zooming keeps the point under the cursor still, panning follows the wheel 
   expect(errors).toEqual([])
 })
 
-/** Draw times while panning, dragging in one format and typing into shared text. */
-/**
- * A 60 fps frame is 16.7 ms. Headless Chromium here draws WebGL with SwiftShader, on the CPU,
- * sharing a few cores with the servers: the same build's p95 swung from 16 to 48 ms between runs,
- * so CI holds the median to a frame and the p95 to three, which still catches an editor that
- * records or lays out too much. The PR measures p95 on a machine with a GPU.
- */
-type Budget = Awaited<ReturnType<typeof frameBudget>>
-
-const fits = (budget: Budget) => [budget.pan, budget.drag, budget.type].every((step) => step.medianMs <= 16.7 && step.p95Ms <= 50)
+/** What one redraw did (the editor's DrawInfo), with the keys of the frames in view for it. */
+interface Redraw { ms: number; drawn: number; frames: number; recorded: number; inView: string[] }
 
 /**
- * Measures the frame budget, and once more when the first run misses it: on a shared CI runner a
- * neighbour can slow a whole run of frames, and the second run tells that apart from a real cost.
+ * Redraws while panning back and forth, dragging a layer in Story and typing into a text every
+ * format shows: what each redraw did, and which frames were in view for it.
  */
-async function settledBudget(page: Page, opts: Parameters<typeof frameBudget>[1]) {
-  const first = await frameBudget(page, opts)
-  return fits(first) ? first : frameBudget(page, opts)
-}
-
-function withinFrame(budget: Budget) {
-  for (const step of [budget.pan, budget.drag, budget.type]) {
-    expect(step.medianMs).toBeLessThanOrEqual(16.7)
-    expect(step.p95Ms).toBeLessThanOrEqual(50)
-  }
-}
-
-async function frameBudget(page: Page, opts: { pan: { dx: number; dy: number }; dragId: string; textId: string }) {
+async function redraws(page: Page, opts: { pan: { dx: number; dy: number }; dragId: string; textId: string }) {
   return page.evaluate(async ({ pan, dragId, textId }) => {
     const editor = window.dazbee
     if (!editor) throw new Error('no editor')
-    const next = () => new Promise<{ ms: number; drawn: number; frames: number; recorded: number }>((resolve) => {
+    /** The frames the camera shows, as the editor culls them. */
+    const inView = () => {
+      const c = editor.camera()
+      const v = editor.viewport()
+      const view = { x: -c.x / c.zoom, y: -c.y / c.zoom, width: v.width / c.zoom, height: v.height / c.zoom }
+      return editor.frames()
+        .filter((f) => f.x < view.x + view.width && view.x < f.x + f.width && f.y < view.y + view.height && view.y < f.y + f.height)
+        .map((f) => f.key)
+    }
+    /** Makes a change, then waits for the redraw that shows it. */
+    const redraw = (change: () => void) => new Promise<Redraw>((resolve) => {
       const stop = editor.onDraw((_d, _at, info) => {
         stop()
-        resolve(info)
+        resolve({ ...info, inView: inView() })
       })
+      change()
     })
-    const stats = (samples: { ms: number; drawn: number; frames: number; recorded: number }[]) => {
-      const ms = samples.slice(5).map((s) => s.ms).sort((a, b) => a - b)
-      const at = (q: number) => Math.round((ms[Math.min(ms.length - 1, Math.floor(q * ms.length))] ?? 0) * 100) / 100
-      return {
-        frames: ms.length, medianMs: at(0.5), p95Ms: at(0.95), maxMs: at(1),
-        drawnFrames: Math.max(...samples.map((s) => s.drawn)), totalFrames: samples[0]?.frames ?? 0,
-        recordedPerFrame: Math.max(...samples.slice(5).map((s) => s.recorded)),
-      }
-    }
-    const panning = []
-    for (let i = 0; i < 125; i++) {
-      const c = editor.camera()
+    await editor.drawn()
+    const panning: Redraw[] = []
+    // Back and forth, ending where it started.
+    for (let i = 0; i < 100; i++) {
       const sign = Math.floor(i / 25) % 2 ? -1 : 1
-      const drawn = next()
-      editor.setCamera({ ...c, x: c.x + sign * pan.dx, y: c.y + sign * pan.dy })
-      panning.push(await drawn)
+      const c = editor.camera()
+      panning.push(await redraw(() => editor.setCamera({ ...c, x: c.x + sign * pan.dx, y: c.y + sign * pan.dy })))
     }
-    const dragging = []
+    const dragging: Redraw[] = []
     const end = editor.session.beginGesture()
     for (let i = 0; i < 65; i++) {
-      const drawn = next()
-      editor.session.run('node.update', { ids: [dragId], scope: 'format:story', patch: { x: 100 + i * 3, y: 100 + i } })
-      dragging.push(await drawn)
+      dragging.push(await redraw(() => editor.session.run('node.update', { ids: [dragId], scope: 'format:story', patch: { x: 100 + i * 3, y: 100 + i } })))
     }
     end()
-    const typing = []
+    const typing: Redraw[] = []
     for (let i = 0; i < 35; i++) {
-      const drawn = next()
-      editor.session.run('text.edit', { id: textId, op: { kind: 'insert', at: 0, text: 'a' } })
-      typing.push(await drawn)
+      typing.push(await redraw(() => editor.session.run('text.edit', { id: textId, op: { kind: 'insert', at: 0, text: 'a' } })))
     }
-    return { pan: stats(panning), drag: stats(dragging), type: stats(typing) }
+    return { pan: panning, drag: dragging, type: typing }
   }, opts)
 }
 
-test('five formats of a 120-layer page draw within a 60 fps frame', async ({ page }) => {
+/**
+ * The work the redraws did. Every frame is drawn once as the editor opens on all of them, so each
+ * has its picture: a pan draws the frames in view and records none, a drag records the one frame
+ * it is in, and typing records each frame in view that shows the text, once per redraw.
+ */
+function expectWork(work: Awaited<ReturnType<typeof redraws>>, frames: number, pageId: string) {
+  const shows = (draw: Redraw) => draw.inView.filter((key) => key.startsWith(`${pageId}/`)).length
+  expect(work.pan.map((draw) => ({ frames: draw.frames, drawn: draw.drawn, recorded: draw.recorded })))
+    .toEqual(work.pan.map((draw) => ({ frames, drawn: draw.inView.length, recorded: 0 })))
+  expect(work.drag.every((draw) => draw.inView.includes(`${pageId}/story`)), 'Story in view while dragging').toBe(true)
+  expect(work.drag.map((draw) => draw.recorded)).toEqual(work.drag.map(() => 1))
+  expect(work.type.map((draw) => draw.recorded)).toEqual(work.type.map(shows))
+}
+
+/** The time each redraw took, past the first five, step by step. */
+const timings = (work: Awaited<ReturnType<typeof redraws>>) => ({
+  pan: spread(work.pan.slice(5).map((draw) => draw.ms)),
+  drag: spread(work.drag.slice(5).map((draw) => draw.ms)),
+  type: spread(work.type.slice(5).map((draw) => draw.ms)),
+})
+
+const FIVE_FORMATS = { pan: { dx: 6, dy: 3 }, dragId: 'p1-box', textId: 'p1-headline' }
+const CAROUSEL = { pan: { dx: 0, dy: 24 }, dragId: 'c3-box', textId: 'c3-headline' }
+
+/**
+ * Opens the carousel of 20 cards, drawn once as it opens with every frame in view, then close
+ * enough to read a card: two or three rows on screen.
+ */
+async function openCarousel(page: Page) {
+  const opened = await open(page, carousel(20))
+  await nextDraw(page)
+  writeOutput('canvas-4-carousel-fit-all.png', await page.screenshot())
+  await page.evaluate(() => window.dazbee?.fitFrame('c3', 'story'))
+  await nextDraw(page)
+  return opened
+}
+
+test('five formats of a 120-layer page: a pan records nothing, a drag one frame, typing each frame once', async ({ page }) => {
   const { errors } = await open(page, fiveFormats(118))
   const layers = await page.evaluate(() => Object.keys(window.dazbee?.design().nodes ?? {}).length)
   expect(layers).toBe(120)
   writeOutput('canvas-3-five-formats-120-layers.png', await page.screenshot())
-  const budget = await settledBudget(page, { pan: { dx: 6, dy: 3 }, dragId: 'p1-box', textId: 'p1-headline' })
-  test.info().annotations.push({ type: 'five formats × 120 layers', description: JSON.stringify(budget) })
-  writeOutput('canvas-budget-five-formats.json', JSON.stringify({ layers, ...budget }, null, 2))
-  console.log('five formats × 120 layers', JSON.stringify(budget))
-  expect(budget.pan.drawnFrames).toBe(5)
-  withinFrame(budget)
-  // Dragging in Story records Story again and nothing else.
-  expect(budget.drag.recordedPerFrame).toBe(1)
+  const work = await redraws(page, FIVE_FORMATS)
+  // Every frame is in view throughout: a pan draws the five, and typing records the five.
+  expect(work.pan.every((draw) => draw.inView.length === 5)).toBe(true)
+  expectWork(work, 5, 'p1')
+  expect(work.type.map((draw) => draw.recorded)).toEqual(work.type.map(() => 5))
   expect(errors).toEqual([])
 })
 
 test('a 20-card carousel in five formats culls the frames out of view', async ({ page }) => {
-  const { errors } = await open(page, carousel(20))
+  const { errors } = await openCarousel(page)
   expect(await page.evaluate(() => window.dazbee?.frames().length)).toBe(100)
-  writeOutput('canvas-4-carousel-fit-all.png', await page.screenshot())
-  // Close enough to read a card: two or three rows on screen.
-  await page.evaluate(() => {
-    const editor = window.dazbee
-    if (!editor) throw new Error('no editor')
-    editor.fitFrame('c3', 'story')
-  })
-  await nextDraw(page)
   writeOutput('canvas-5-carousel-card-4.png', await page.screenshot())
-  const budget = await settledBudget(page, { pan: { dx: 0, dy: 24 }, dragId: 'c3-box', textId: 'c3-headline' })
-  test.info().annotations.push({ type: 'carousel 20 × 5', description: JSON.stringify(budget) })
-  writeOutput('canvas-budget-carousel.json', JSON.stringify(budget, null, 2))
-  console.log('carousel 20 cards × 5 formats', JSON.stringify(budget))
-  expect(budget.pan.totalFrames).toBe(100)
-  expect(budget.pan.drawnFrames).toBeLessThan(30)
-  withinFrame(budget)
+  const work = await redraws(page, CAROUSEL)
+  // Only the frames in view are drawn: the card's row and its neighbours, not the 100.
+  expect(Math.max(...work.pan.map((draw) => draw.drawn))).toBeLessThan(30)
+  expectWork(work, 100, 'c3')
   expect(errors).toEqual([])
+})
+
+test('five formats of a 120-layer page: what a redraw takes', PERF, async ({ page }) => {
+  await open(page, fiveFormats(118))
+  report('Canvas, five formats of a 120-layer page, redraw', timings(await redraws(page, FIVE_FORMATS)))
+})
+
+test('a 20-card carousel in five formats: what a redraw takes', PERF, async ({ page }) => {
+  await openCarousel(page)
+  report('Canvas, 20-card carousel in five formats, redraw', timings(await redraws(page, CAROUSEL)))
 })

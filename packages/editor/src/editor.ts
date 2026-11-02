@@ -111,7 +111,7 @@ type SizingOf = NonNullable<Layer['props']['sizing']>
 export type SaveState = 'Saved' | 'Saving' | 'Offline'
 export const SAVE_STATES: readonly string[] = ['Saved', 'Saving', 'Offline'] satisfies SaveState[]
 
-/** What one redraw did, for the frame budget checks. */
+/** What one redraw did, for the checks that count a redraw's work. */
 export interface DrawInfo {
   /** Time spent drawing, from reading the design to submitting the frame. */
   ms: number
@@ -323,6 +323,11 @@ function live(
   let entered: string | null = null
   /** What the drag in progress snapped to, shown as guides and equal gaps (#42). */
   let snapped: { frame: Frame; guides: Guide[]; gaps: Gap[] } | null = null
+  /**
+   * Snapping's work since the editor opened: how often a drag gathered what it can snap to, the
+   * pointer moves that snapped, and the boxes those moves were measured against.
+   */
+  const snapWork = { gathered: 0, moves: 0, checked: 0 }
   /** The rulers are off until asked for (Shift+R or the View card): the stage is for the ads. */
   let rulers = false
   /** Snapping to layers and the frame while dragging; Ctrl (⌘) still turns it off for a drag. */
@@ -1536,6 +1541,8 @@ function live(
     snapped = null
     const moving = g.roots.map((id) => g.boxes.get(id)).filter((b): b is Box => b !== undefined)
     if (snap && g.targets && moving.length > 0) {
+      snapWork.moves++
+      snapWork.checked += g.targets.boxes.length
       const from = boundsOf(moving)
       const s = snapMove({ ...from, x: Math.round(from.x + dx), y: Math.round(from.y + dy) }, g.targets, SNAP_DISTANCE / camera.zoom, { x: axisLock && dx === 0, y: axisLock && dy === 0 })
       if (s.dx !== 0) {
@@ -1576,6 +1583,7 @@ function live(
         if (sibling) others.push(boundsOf([sibling]))
       }
     }
+    snapWork.gathered++
     return snapTargets(others, { x: 0, y: 0, width: format.width, height: format.height })
   }
 
@@ -1588,6 +1596,8 @@ function live(
     snapped = null
     // The dragged edges snap; a turned box has none that run along the page.
     if (snap && g.targets && outer.rotation === 0) {
+      snapWork.moves++
+      snapWork.checked += g.targets.boxes.length
       const s = snapResize(outer, g.handle, g.targets, SNAP_DISTANCE / camera.zoom)
       if (s.dx !== 0 || s.dy !== 0) outer = resizeBox(g.outer, g.handle, { x: to.x + s.dx, y: to.y + s.dy }, { keepRatio, fromCentre })
       snapped = { frame: g.frame, guides: s.guides, gaps: [] }
@@ -3465,6 +3475,12 @@ function live(
     rulers: () => rulers,
     /** Whether a drag snaps to layers and the frame. */
     snapping: () => snapping,
+    /**
+     * Snapping's work since the editor opened, for the checks that count it: `gathered` drags
+     * worked out what they can snap to, `moves` pointer moves snapped, and `checked` is the boxes
+     * those moves were measured against.
+     */
+    snapWork: () => ({ ...snapWork }),
     /** Turns snapping on or off for every drag. */
     setSnapping(on: boolean) {
       if (on === snapping) return
