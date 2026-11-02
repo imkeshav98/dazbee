@@ -1496,23 +1496,26 @@ function live(
     })
   }
   /**
-   * Where layers inside an auto layout frame are drawn, in every format of their page, for a
-   * command that wraps them; none for layers whose parent has no auto layout.
+   * Where layers inside a frame that has auto layout in any format are drawn, in every format of
+   * their page (shown or not), for a command that wraps them; none for layers in no flow.
    */
   function drawnInFlow(ids: string[], pageId: string): Record<string, Record<string, Omit<Box, 'rotation'>>> | undefined {
     const now = session.design()
-    const parent = now.nodes[now.nodes[ids[0] ?? '']?.parentId ?? '']
-    if (parent?.type !== 'frame' || !parent.props.layout) return undefined
+    const parentId = now.nodes[ids[0] ?? '']?.parentId ?? ''
+    const parent = now.nodes[parentId]
+    const laidOut = parent?.type === 'frame' && Object.keys(now.formats).some((f) => ({ ...parent.props, ...now.overrides[`format:${f}`]?.[parentId] }).layout)
+    if (!laidOut) return undefined
     const drawn: Record<string, Record<string, Omit<Box, 'rotation'>>> = {}
     for (const formatId of Object.keys(now.formats)) {
-      const f = frameOf(`${pageId}/${formatId}`)
-      if (!f) continue
       const boxes: Record<string, Omit<Box, 'rotation'>> = {}
-      for (const id of ids) {
-        const b = boxIn(f, id, now)
-        if (b) boxes[id] = { x: b.x, y: b.y, width: b.width, height: b.height }
+      const walk = (layers: SceneLayer[]) => {
+        for (const l of layers) {
+          if (ids.includes(l.id)) boxes[l.id] = { x: l.props.x, y: l.props.y, width: l.props.width, height: l.props.height }
+          walk(l.children)
+        }
       }
-      drawn[scope(f)] = boxes
+      walk(render(now, pageId, formatId, undefined, measureText(), resourceBytes.variables).layers)
+      drawn[`format:${formatId}`] = boxes
     }
     return drawn
   }
@@ -2573,7 +2576,7 @@ function live(
     const frame = selection && frameOf(selection.frame)
     if (!frame) return
     let id = ''
-    if (runQuietly(() => { id = session.run('node.boolean', { ids: roots(), op }) })) select([id], frame.key)
+    if (runQuietly(() => { id = session.run('node.boolean', { ids: roots(), op, drawn: drawnInFlow(roots(), frame.pageId) }) })) select([id], frame.key)
   }
 
   /**
@@ -2826,7 +2829,7 @@ function live(
         // where they are: layers already in an even row or column don't move.
         let framed = ''
         if (runQuietly(() => session.gesture(() => {
-          framed = session.run('node.frame', { ids })
+          framed = session.run('node.frame', { ids, drawn: drawnInFlow(ids, frame.pageId) })
           session.run('node.autoLayout', { id: framed, on: true })
           session.run('node.update', { ids: [framed], patch: { sizing: { width: 'hug', height: 'hug' } } })
         }))) select([framed], frame.key)

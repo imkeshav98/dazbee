@@ -1,5 +1,5 @@
 // Grouping or framing layers inside an auto layout frame (#233), at the commands seam, with the
-// boxes the flow draws them at: a fixed, a filling, a hugging and a kept-in-place child, each
+// boxes the flow draws them at: a fixed, a filling, a hugging, a kept-in-place child and a group, each
 // wrapped in a group and in a frame, leaves every drawn box where it was in every format.
 import { loadDesign, openSession, readDesign } from '@dazbee/doc'
 import { render, type SceneLayer } from '@dazbee/renderer'
@@ -25,9 +25,12 @@ const json = {
     },
     aHugIn: rect('Hug inner', 'aHug', 'a0', 60, 60),
     aAbs: rect('Flow absolute', 'auto', 'a3', 60, 60, { x: 520, y: 330, absolute: true }),
+    aGroup: { type: 'group', parentId: 'auto', index: 'a4', name: 'Flow group', props: { x: 0, y: 0, width: 80, height: 80 } },
+    aGroupIn: rect('Group inner', 'aGroup', 'a0', 80, 80),
   },
-  // The wide format makes the frame wider, so the filling child is drawn wider there.
-  overrides: { 'format:wide': { auto: { width: 900 } } },
+  // The wide format makes the frame wider, so the filling child is drawn wider there, and takes
+  // the kept-in-place child into the flow.
+  overrides: { 'format:wide': { auto: { width: 900 }, aAbs: { absolute: false } } },
 }
 
 type Box = { x: number; y: number; width: number; height: number }
@@ -46,7 +49,7 @@ function drawn(design: Design, formatId: string): Record<string, Box> {
 
 describe('wrapping layers in a flow', () => {
   for (const command of ['node.group', 'node.frame'] as const) {
-    for (const id of ['aFixed', 'aFill', 'aHug', 'aAbs']) {
+    for (const id of ['aFixed', 'aFill', 'aHug', 'aAbs', 'aGroup']) {
       it(`${command} on ${id} keeps every drawn box, in every format`, () => {
         const parsed = parseDesign(json)
         if (!parsed.success) throw new Error(parsed.errors.join('\n'))
@@ -65,8 +68,9 @@ describe('wrapping layers in a flow', () => {
             for (const key of ['x', 'y', 'width', 'height'] as const) expect(Math.abs((a?.[key] ?? 0) - box[key]), `${layer}.${key} in ${f}`).toBeLessThanOrEqual(0.5)
           }
         }
-        // Around a layer that keeps where it is, the wrapper keeps where it is.
+        // Around a layer that keeps where it is, the wrapper keeps where it is, format by format.
         expect(Boolean(now.nodes[wrapper]?.props.absolute)).toBe(id === 'aAbs')
+        expect(Boolean(({ ...now.nodes[wrapper]?.props, ...now.overrides['format:wide']?.[wrapper] } as { absolute?: boolean }).absolute)).toBe(false)
         tab.undo()
         expect(readDesign(doc).nodes[wrapper]).toBeUndefined()
       })
