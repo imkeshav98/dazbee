@@ -16,9 +16,15 @@ pnpm + Turborepo monorepo. `apps/` deploy (web, api, sync, worker); `packages/` 
 - Fonts and images are loaded from bytes we control, never from the system or the browser's decoder.
 - Never put server addresses or secrets in the repo.
 
+## Dev flow
+
+Dazbee has no testers: bugs and UI flaws are caught before Keshav sees the work. Follow `docs/agents/dev-flow.md` when you write a spec, show a mock, build a ticket, merge a PR, close a parent spec or file a bug.
+
+This repo keeps its tests: commit them, and every bug fix adds a test that fails without the fix. That holds here even where a general rule says tests are throwaway.
+
 ## Pull requests
 
-One ticket, one PR, closing its issue. Keshav's standing rule: merge your own PR (merge commit, not squash) as soon as CI is green on its head; he reviews after merge. GitHub auto-merge needs branch protection, which this private repo can't have on the Free plan (checked via the API on 2026-10-30).
+One ticket, one PR, closing its issue. Keshav's standing rule: once the merge steps in `docs/agents/dev-flow.md` are done, turn on the PR's auto-merge with a merge commit (not squash); GitHub merges it when every required CI check on its head is green, and he reviews after merge. `main` is protected: nothing merges while a required check is red.
 
 Test every user-facing feature in a real browser (Playwright on Chromium) and put the evidence in the PR: screenshots, numbers, the test cases run. Only ask Keshav when a decision is needed.
 
