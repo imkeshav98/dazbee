@@ -13,8 +13,6 @@
     "e2e": "playwright test"
   },
   "devDependencies": {
-    "@hyzyla/pdfium": "3.0.0",
-    "@playwright/test": "1.63.0",
     "@dazbee/canvaskit": "workspace:*",
     "@dazbee/config": "workspace:*",
     "@dazbee/doc": "workspace:*",
@@ -23,12 +21,14 @@
     "@dazbee/renderer": "workspace:*",
     "@dazbee/schema": "workspace:*",
     "@dazbee/svg": "workspace:*",
+    "@hyzyla/pdfium": "3.0.0",
+    "@playwright/test": "1.64.1",
     "@resvg/resvg-js": "2.6.2",
-    "@types/node": "^22.20.0",
+    "@types/node": "^22.20.5",
     "esbuild": "^0.28.2",
-    "eslint": "^9.39.0",
-    "typescript": "~5.9.3",
-    "vitest": "^3.2.7",
+    "eslint": "^9.39.5",
+    "typescript": "~6.0.3",
+    "vitest": "^5.0.5",
     "yjs": "^13.6.33"
   }
 }

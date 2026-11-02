@@ -4,7 +4,7 @@ Formerly Razzlr. The local Postgres and storage (user, database, bucket and keys
 
 ## Develop
 
-Needs Node 22 and pnpm 10 (`corepack enable` picks the pinned version).
+Needs Node 22.18 or later (CI and docker compose run Node 26) and pnpm 12 (`npm install -g pnpm@12`).
 
 ```sh
 pnpm install

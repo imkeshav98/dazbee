@@ -13,7 +13,6 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@hocuspocus/provider": "4.8.0",
     "@dazbee/canvaskit": "workspace:*",
     "@dazbee/doc": "workspace:*",
     "@dazbee/export": "workspace:*",
@@ -21,14 +20,15 @@
     "@dazbee/renderer": "workspace:*",
     "@dazbee/schema": "workspace:*",
     "@dazbee/svg": "workspace:*",
+    "@hocuspocus/provider": "4.8.0",
     "y-indexeddb": "9.0.12",
-    "yjs": "^13.6.27"
+    "yjs": "^13.6.33"
   },
   "devDependencies": {
     "@dazbee/config": "workspace:*",
-    "@types/node": "^22.20.0",
-    "eslint": "^9.39.0",
-    "typescript": "~5.9.3",
-    "vitest": "^3.2.7"
+    "@types/node": "^22.20.5",
+    "eslint": "^9.39.5",
+    "typescript": "~6.0.3",
+    "vitest": "^5.0.5"
   }
 }
