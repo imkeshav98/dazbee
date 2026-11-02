@@ -16,14 +16,13 @@ const recordStatuses = (page: Page) => page.evaluate(() => {
 })
 const statuses = (page: Page) => page.evaluate(() => (window as unknown as { statuses: string[] }).statuses)
 
-const typeAtEnd = (page: Page, text: string) => page.evaluate(async (text) => {
+const typeAtEnd = (page: Page, text: string) => page.evaluate((text) => {
   const editor = window.dazbee
   if (!editor) throw new Error('no editor')
   for (const ch of text) {
     const node = editor.design().nodes.headline
     if (node?.type !== 'text') throw new Error('no headline')
     editor.session.run('text.edit', { id: 'headline', op: { kind: 'insert', at: node.props.text.length, text: ch } })
-    await new Promise((resolve) => setTimeout(resolve, 30))
   }
 }, text)
 

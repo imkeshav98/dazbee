@@ -116,9 +116,10 @@ test('dragging a layer with its tiles showing stays within a frame, and redraws 
   await click(page, 250, 260)
   await barMenu(page, 'effects')
   await expect(tiles(page).locator('img[data-thumbnail]')).toHaveCount(4)
-  // Every font and image is here, and the tiles have drawn with them.
+  // Every font and image is here, and the None tile shows the star as the editor draws it with them.
   await page.evaluate(() => window.dazbee?.exportFiles({ pageIds: ['p1'], formatIds: ['sq'], type: 'png' }))
-  await page.waitForTimeout(400)
+  const none = effects(page).locator('[data-tile="none"] img')
+  await expect.poll(async () => (await none.getAttribute('src')) === (await page.evaluate(() => window.dazbee?.layerThumbnail('star')))).toBe(true)
   // Every picture the None tile shows, as it changes.
   await page.evaluate(() => {
     const seen: string[] = []

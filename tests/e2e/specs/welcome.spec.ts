@@ -34,7 +34,6 @@ test('on a phone the website field fits', async ({ browser }) => {
   const open = await page.getByRole('button', { name: 'Open it' }).boundingBox()
   expect((open?.x ?? 0) + (open?.width ?? 0)).toBeLessThanOrEqual(390)
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390)
-  await page.waitForTimeout(400)
-  await writeOutput('welcome-phone.png', await page.screenshot({ fullPage: true }))
+  await writeOutput('welcome-phone.png', await page.screenshot({ fullPage: true, animations: 'disabled' }))
   await context.close()
 })

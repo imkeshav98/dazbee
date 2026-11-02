@@ -6,7 +6,7 @@ import type { DesignInput } from '@dazbee/schema'
 import { writeOutput } from '../support/editor.ts'
 import { newBrand, seed } from '../support/seed.ts'
 
-const shoot = async (page: Page, name: string, fullPage = false) => writeOutput(`home-${name}.png`, await page.screenshot({ fullPage }))
+const shoot = async (page: Page, name: string, fullPage = false) => writeOutput(`home-${name}.png`, await page.screenshot({ fullPage, animations: 'disabled' }))
 
 /** A design in one format with a coloured page and a block, so its picture is easy to tell apart. */
 const poster = (name: string, width: number, height: number, page: string, block: string): DesignInput => ({
@@ -69,7 +69,6 @@ test('Recent is a page of real pictures, each in its shape, filtered by shape', 
     })
     for (const [i, c] of colour.entries()) expect(Math.abs((pixel[i] ?? 0) - c), `${name} channel ${i}`).toBeLessThanOrEqual(2)
   }
-  await page.waitForTimeout(400)
   await shoot(page, 'recent', true)
 
   // The Story chip keeps only the tall ones.
@@ -148,7 +147,6 @@ test('on a phone the brief and the Recent page fit the screen', async ({ browser
   await expect(page.getByRole('button', { name: 'Make drafts' })).toBeVisible()
   // Nothing runs off the side.
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390)
-  await page.waitForTimeout(400)
   await shoot(page, 'phone', true)
 
   await page.getByTestId('library-capsule').getByRole('link', { name: 'Recent' }).click()

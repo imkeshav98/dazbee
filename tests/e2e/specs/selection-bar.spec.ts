@@ -5,7 +5,7 @@
 import { expect, test, type Page } from '../support/test.ts'
 import type { DesignInput } from '@dazbee/schema'
 import { screenPoint } from '../support/editor.ts'
-import { moreMenu, moreSubmenu, openStage } from '../support/stage.ts'
+import { moreAction, moreMenu, moreSubmenu, openStage } from '../support/stage.ts'
 
 test.describe.configure({ timeout: 120_000 })
 
@@ -144,12 +144,12 @@ test('Hide and Lock turn back from the same row; a right-click on a locked layer
   })
   const locked = () => page.evaluate(() => Object.values(window.dazbee?.design().nodes.a?.lock ?? {}).some(Boolean))
   await select(page, ['a'])
-  await (await moreMenu(page)).getByRole('button', { name: 'Hide' }).click()
+  await moreAction(page, 'Hide')
   await expect.poll(visible).toBe(false)
-  await (await moreMenu(page)).getByRole('button', { name: 'Show' }).click()
+  await moreAction(page, 'Show')
   await expect.poll(visible).toBe(true)
 
-  await (await moreMenu(page)).getByRole('button', { name: 'Lock' }).click()
+  await moreAction(page, 'Lock')
   await expect.poll(locked).toBe(true)
   await select(page, [])
   const at = await screenPoint(page, 250, 480)
@@ -165,7 +165,7 @@ test('Hide and Lock turn back from the same row; a right-click on a locked layer
   const other = await screenPoint(page, 570, 480)
   await page.mouse.click(other.x, other.y, { button: 'right' })
   await expect(menu).toBeVisible()
-  expect(await page.evaluate(() => window.dazbee?.selection())).toEqual(['b'])
+  await expect.poll(() => page.evaluate(() => window.dazbee?.selection())).toEqual(['b'])
   expect(errors).toEqual([])
 })
 

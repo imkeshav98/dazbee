@@ -57,15 +57,22 @@ const design = (assetId: string): DesignInput => ({
   },
 })
 
+type LongTasks = { longTasks: number[]; longTaskWatch: PerformanceObserver }
 /** Records every task that blocks the main thread for more than 50 ms, from now on. */
 const watchLongTasks = (page: Page) => page.evaluate(() => {
   const seen: number[] = []
-  new PerformanceObserver((list) => {
+  const watch = new PerformanceObserver((list) => {
     for (const entry of list.getEntries()) seen.push(Math.round(entry.duration))
-  }).observe({ type: 'longtask', buffered: false })
-  ;(window as unknown as { longTasks: number[] }).longTasks = seen
+  })
+  watch.observe({ type: 'longtask', buffered: false })
+  Object.assign(window, { longTasks: seen, longTaskWatch: watch })
 })
-const longTasks = (page: Page) => page.evaluate(() => (window as unknown as { longTasks: number[] }).longTasks)
+/** The tasks recorded so far, with those the browser has queued but not yet handed to the watch. */
+const longTasks = (page: Page) => page.evaluate(() => {
+  const { longTasks: seen, longTaskWatch: watch } = window as unknown as LongTasks
+  for (const entry of watch.takeRecords()) seen.push(Math.round(entry.duration))
+  return seen
+})
 
 async function nodeExport(page: Page, assetId: string) {
   const ck = await loadCanvasKit()
@@ -93,8 +100,6 @@ test('every format of a page as PNG is one zip whose files are what Node exports
   expect(download.suggestedFilename()).toBe('Spring drop.zip')
   const zipped = new Uint8Array(readFileSync(await download.path()))
   const took = Date.now() - started
-  // The task records arrive a frame after the task ends.
-  await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => setTimeout(resolve, 100))))
   const blocked = await longTasks(page)
 
   const entries = readZip(zipped)

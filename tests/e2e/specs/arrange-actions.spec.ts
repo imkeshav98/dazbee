@@ -3,7 +3,7 @@
 import { expect, test, type Page } from '../support/test.ts'
 import type { DesignInput } from '@dazbee/schema'
 import { screenPoint, writeOutput } from '../support/editor.ts'
-import { moreAction, moreMenu, moreSubmenu, openStage } from '../support/stage.ts'
+import { closeBarMenu, moreAction, moreMenu, moreSubmenu, openStage } from '../support/stage.ts'
 
 test.describe.configure({ timeout: 120_000 })
 
@@ -37,8 +37,8 @@ test('one layer has its actions in ⋯ More and the right-click menu; several la
   await page.evaluate(() => window.dazbee?.drawn())
   writeOutput('arrange-actions-more.png', await page.screenshot())
   // Esc closes the menu beside, then ⋯ More.
-  await page.keyboard.press('Escape')
-  await page.keyboard.press('Escape')
+  await closeBarMenu(page, 'more-order')
+  await closeBarMenu(page, 'bar-more')
   await expect(menu).toBeHidden()
 
   await more('Bring to front')
@@ -46,6 +46,7 @@ test('one layer has its actions in ⋯ More and the right-click menu; several la
   await more('Send backward')
   await expect.poll(() => order(page)).toEqual(['B', 'A', 'C'])
   await more('Send to back')
+  await expect.poll(() => order(page)).toEqual(['A', 'B', 'C'])
   await more('Bring forward')
   await expect.poll(() => order(page)).toEqual(['B', 'A', 'C'])
 

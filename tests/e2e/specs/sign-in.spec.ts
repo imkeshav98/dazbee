@@ -12,8 +12,8 @@ test('the sign-in page offers one button, and says when sign-in is not set up', 
   await expect(page.getByRole('heading', { name: 'Make every size, for every client.' })).toBeVisible()
   await expect(page).toHaveTitle('Sign in to Dazbee')
   await expect(page.getByTestId('sign-in-notice')).toHaveCount(0)
-  await page.getByTestId('sign-in').click()
-  await expect(page).toHaveURL(/\/login\?unavailable=1$/)
+  // The click starts the server action whose answer sends the page to the notice.
+  await Promise.all([page.waitForURL(/\/login\?unavailable=1$/, { timeout: 20_000 }), page.getByTestId('sign-in').click()])
   await expect(page.getByTestId('sign-in-notice')).toHaveText('Sign-in is not set up on this server yet.')
   await page.screenshot({ path: join(OUTPUT, 'sign-in-page.png') })
 })

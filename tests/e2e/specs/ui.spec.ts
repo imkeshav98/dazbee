@@ -4,7 +4,7 @@ import { expect, test, type Page } from '../support/test.ts'
 import { writeOutput, editorPath } from '../support/editor.ts'
 import { liveDesign, seed } from '../support/seed.ts'
 
-const shoot = async (page: Page, name: string) => writeOutput(`ui-${name}.png`, await page.screenshot())
+const shoot = async (page: Page, name: string) => writeOutput(`ui-${name}.png`, await page.screenshot({ animations: 'disabled' }))
 
 async function setCookies(page: Page, cookies: Record<string, string>) {
   await page.context().addCookies(Object.entries(cookies).map(([name, value]) => ({ name, value, url: 'http://localhost:3100' })))
@@ -19,16 +19,13 @@ test('dark and light change only the tokens', async ({ page }) => {
     await setCookies(page, { theme })
     await page.goto('/')
     await expect(page.locator('html')).toHaveAttribute('data-theme', theme)
-    await page.waitForTimeout(300)
     await shoot(page, `${theme}-brands`)
     await page.goto('/brands/dev-brand-coffee')
-    await page.waitForTimeout(400)
     await shoot(page, `${theme}-designs`)
     await page.goto(editorPath(designId))
     await expect(page.getByTestId('status')).toHaveAttribute('data-ready', '', { timeout: 30_000 })
     await page.getByRole('button', { name: 'AI', exact: true }).click()
     await expect(page.getByTestId('flyout')).toBeVisible()
-    await page.waitForTimeout(300)
     await shoot(page, `${theme}-editor`)
   }
   // Same markup in both themes: only custom properties differ.
@@ -58,7 +55,6 @@ test('in Arabic the chrome mirrors and reads right to left, the design does not'
   await page.goto('/brands/dev-brand-coffee')
   await expect(page.locator('html')).toHaveAttribute('dir', 'rtl')
   await expect(page.getByRole('button', { name: 'اصنع المسودات' })).toBeVisible()
-  await page.waitForTimeout(400)
   await shoot(page, 'arabic-designs')
 
   await page.goto(editorPath(designId))
@@ -71,7 +67,6 @@ test('in Arabic the chrome mirrors and reads right to left, the design does not'
   expect(rail.x).toBeGreaterThan(stage.x + stage.width / 2)
   await expect(page.getByTestId('stage').locator('xpath=..')).toHaveCSS('direction', 'ltr')
   await page.getByRole('button', { name: 'الطبقات' }).click()
-  await page.waitForTimeout(300)
   await shoot(page, 'arabic-editor')
 })
 
@@ -131,7 +126,6 @@ test('floating chrome is frosted with grain in both themes', async ({ page }) =>
       expect(style.filter).toContain('blur(18px)')
       expect(style.image).toContain('feTurbulence')
     }
-    await page.waitForTimeout(300)
     await shoot(page, `${theme}-frost`)
     const dock = await page.getByRole('toolbar').boundingBox()
     const zoom = await page.getByRole('group', { name: 'Zoom' }).boundingBox()
@@ -236,10 +230,10 @@ test('the panels live in a capsule floating over the canvas', async ({ page }) =
   await page.keyboard.press('Enter')
   await expect(ai).toHaveAttribute('aria-expanded', 'true')
   await expect(ai).toBeFocused()
-  await page.waitForTimeout(400)
-  // A flyout is only as tall as what it holds: the AI one, still empty, is short. (Brand holds the
-  // brand kit since #53.)
-  expect((await page.getByTestId('flyout').boundingBox())?.height).toBeLessThan(stage.height / 2)
+  // A flyout is only as tall as what it holds: the AI one, still empty, is short, where Brand's holds
+  // the brand kit. Brand's flyout leaves first, then AI's settles at its height.
+  await expect(page.getByTestId('flyout')).toHaveCount(1)
+  await expect.poll(async () => (await page.getByTestId('flyout').boundingBox())?.height).toBeLessThan(stage.height / 2)
   await shoot(page, 'capsule-ai')
   await page.keyboard.press('Enter')
   await expect(ai).toHaveAttribute('aria-expanded', 'false')
@@ -290,7 +284,6 @@ test('on a phone the capsule is a tab bar at the bottom', async ({ browser }) =>
   expect(flyout.y + flyout.height).toBeLessThanOrEqual(dock.y)
   expect(flyout.x).toBeGreaterThanOrEqual(0)
   expect(flyout.x + flyout.width).toBeLessThanOrEqual(390)
-  await page.waitForTimeout(400)
   await shoot(page, 'capsule-phone-layers')
   await context.close()
 })
