@@ -19,10 +19,13 @@ const second = readFileSync(join(import.meta.dirname, '..', '..', 'pixels', 'ass
 const third = readFileSync(join(import.meta.dirname, '..', '..', 'pixels', 'assets', 'card-3.jpg'))
 const notes = Buffer.from('Not a picture.\n')
 
-const design = (nodes: DesignInput['nodes'] = {}): DesignInput => ({
+const svgBadge = readFileSync(join(import.meta.dirname, '..', '..', 'pixels', 'assets', 'svg', 'figma-badge.svg'))
+
+/** A square design with one white page, and any more formats and pages given. */
+const design = (nodes: DesignInput['nodes'] = {}, more: Partial<Pick<DesignInput, 'formats' | 'pages'>> = {}): DesignInput => ({
   meta: { schemaVersion: 5, designId: 'replaced-by-the-api', name: 'Dropped files', kind: 'single', primaryFormatId: 'sq' },
-  formats: { sq: { name: 'Square', width: 1080, height: 1080, order: 'a0' } },
-  pages: { p1: { name: 'Page 1', order: 'a0', fills: [{ type: 'solid', color: '#FFFFFFFF' }] } },
+  formats: { sq: { name: 'Square', width: 1080, height: 1080, order: 'a0' }, ...more.formats },
+  pages: { p1: { name: 'Page 1', order: 'a0', fills: [{ type: 'solid', color: '#FFFFFFFF' }] }, ...more.pages },
   nodes,
   overrides: {},
 })
@@ -49,6 +52,32 @@ function dropFiles(page: Page, at: { x: number; y: number }, files: { name: stri
   }, { at, files: files.map((f) => ({ name: f.name, type: f.type, base64: f.bytes.toString('base64') })) })
 }
 
+/** Fires only the start of a drag of files over a point: it enters and passes over, without dropping. */
+function dragFilesOver(page: Page, at: { x: number; y: number }, files: { name: string; type: string }[]) {
+  return page.evaluate(({ at, files }) => {
+    const transfer = new DataTransfer()
+    for (const f of files) transfer.items.add(new File(['x'], f.name, { type: f.type }))
+    const target = document.elementFromPoint(at.x, at.y)
+    for (const type of ['dragenter', 'dragover']) target?.dispatchEvent(new DragEvent(type, { bubbles: true, cancelable: true, composed: true, clientX: at.x, clientY: at.y, dataTransfer: transfer }))
+  }, { at, files })
+}
+
+/**
+ * Holds every upload into the brand's library until the returned function is called; uploads of
+ * files whose names start with `fail-` are answered with an error instead.
+ */
+async function routeUploads(page: Page, brandId: string, { hold = false } = {}) {
+  let release = () => {}
+  const held = hold ? new Promise<void>((resolve) => { release = resolve }) : Promise.resolve()
+  await page.route((url) => url.pathname === `/brands/${brandId}/assets`, async (route) => {
+    if (route.request().method() !== 'POST') return route.fallback()
+    if (/filename="fail-/.test(route.request().postDataBuffer()?.toString('latin1') ?? '')) return route.fulfill({ status: 500, json: { error: 'Storage is down' } })
+    await held
+    return route.continue()
+  })
+  return release
+}
+
 /** Counts, from now on, the uploads the page sends into the brand's asset library. */
 function watchUploads(page: Page, brandId: string) {
   let count = 0
@@ -62,8 +91,8 @@ const assetsOf = async (brandId: string) => AssetSummary.array().parse(await cal
 
 /** The graphics on the page filled with an image, and the asset each shows. */
 async function images(page: Page) {
-  const nodes = (await read(page)).nodes as unknown as Record<string, { props: { x: number; y: number; width: number; height: number; fills?: { type: string; assetId?: string }[] } }>
-  return Object.entries(nodes).filter(([, n]) => n.props.fills?.[0]?.type === 'image').map(([id, n]) => ({ id, assetId: n.props.fills?.[0]?.assetId, ...n.props }))
+  const nodes = (await read(page)).nodes as unknown as Record<string, { parentId: string; props: { x: number; y: number; width: number; height: number; fills?: { type: string; assetId?: string }[] } }>
+  return Object.entries(nodes).filter(([, n]) => n.props.fills?.[0]?.type === 'image').map(([id, n]) => ({ id, parentId: n.parentId, assetId: n.props.fills?.[0]?.assetId, ...n.props }))
 }
 
 test('an image dropped from the computer on the asset library uploads once and shows in the library', async ({ browser }) => {
@@ -150,21 +179,32 @@ test('several images dropped on the canvas upload once each and go on cascading 
   expect(errors).toEqual([])
 })
 
-test('an image dropped on a frame fills it, as one undo step', async ({ browser }) => {
+test('an image dropped with a text file on a frame in the second format lights the frame, fills it and selects it in that format, as one undo step', async ({ browser }) => {
   const brandId = await newBrand('e2e dropped files')
-  const { page, errors } = await openStage(browser, design({ box }), { brandId })
+  const { page, errors } = await openStage(browser, design({ box }, { formats: { wide: { name: 'Wide', width: 1920, height: 1080, order: 'a1' } } }), { brandId })
+  // Both formats in view, clear of the cards on the right.
+  await page.evaluate(() => window.dazbee?.setCamera({ x: 40, y: 80, zoom: 0.35 }))
+  await page.evaluate(() => window.dazbee?.drawn())
   const uploads = watchUploads(page, brandId)
 
   const name = `Dropped ${randomUUID().slice(0, 8)}`
-  expect(await dropFiles(page, await screenPoint(page, 300, 300), [{ name: `${name}.jpg`, type: 'image/jpeg', bytes: card }])).toBe(true)
+  const files = [{ name: `${name}.jpg`, type: 'image/jpeg', bytes: card }, { name: 'notes.txt', type: 'text/plain', bytes: notes }]
+  const at = await screenPoint(page, 300, 300, { pageId: 'p1', formatId: 'wide' })
+  // The text file will be left out, so the one image lights the frame it would fill.
+  await dragFilesOver(page, at, files)
+  await expect(page.locator('.stage-overlay .drop-target')).toHaveCount(1)
+  expect(await dropFiles(page, at, files)).toBe(true)
+  await expect(page.locator('.stage-overlay .drop-target')).toHaveCount(0)
   const fills = async () => ((await read(page)).nodes as unknown as Record<string, { props: { fills: { type: string; assetId?: string }[] } }>).box?.props.fills
   // The image goes on top of the frame's colour.
   await expect.poll(async () => (await fills())?.map((f) => f.type), { timeout: 30_000 }).toEqual(['solid', 'image'])
   const [asset] = await assetsOf(brandId)
   expect((await fills())?.[1]?.assetId).toBe(asset?.id)
-  // No new layer: the frame took the image, and it is selected.
+  // No new layer: the frame took the image, and it is selected where it was dropped.
   expect(Object.keys((await read(page)).nodes)).toEqual(['box'])
   expect(await selection(page)).toEqual(['box'])
+  expect(await page.evaluate(() => window.dazbee?.selectedFrame())).toBe('p1/wide')
+  await expect(page.getByTestId('notice-toast')).toContainText('notes.txt')
   await page.evaluate(() => window.dazbee?.drawn())
   writeOutput('dropped-files-3-frame.png', await page.screenshot())
   expect(uploads()).toBe(1)
@@ -207,5 +247,128 @@ test('a file that is not an image is left out with a notice, while the image dro
   await expect(page.getByTestId('notice-toast')).toContainText('other.txt')
   expect(uploads()).toBe(count)
   expect(await images(page)).toEqual([])
+  expect(errors).toEqual([])
+})
+
+test('images dropped on the second page at another zoom go where they were dropped though the view moves while they upload, and the notice stays until they are up', async ({ browser }) => {
+  const brandId = await newBrand('e2e dropped files')
+  const { page, errors } = await openStage(browser, design({}, { pages: { p2: { name: 'Page 2', order: 'a1', fills: [{ type: 'solid', color: '#FFF8F0FF' }] } } }), { brandId })
+  await page.evaluate(() => window.dazbee?.setCamera({ x: 60, y: 60, zoom: 0.4 }))
+  await page.evaluate(() => window.dazbee?.drawn())
+  const release = await routeUploads(page, brandId, { hold: true })
+
+  const names = [`Dropped ${randomUUID().slice(0, 8)}`, `Dropped ${randomUUID().slice(0, 8)}`]
+  const files = [{ name: `${names[0]}.jpg`, type: 'image/jpeg', bytes: card }, { name: `${names[1]}.jpg`, type: 'image/jpeg', bytes: second }]
+  expect(await dropFiles(page, await screenPoint(page, 300, 400, { pageId: 'p2', formatId: 'sq' }), files)).toBe(true)
+  const toast = page.getByTestId('notice-toast')
+  await expect(toast).toContainText('Uploading 2 images')
+  // While they upload the view zooms in and pans, and the notice stays past the time a notice usually goes.
+  await page.evaluate(() => window.dazbee?.setCamera({ x: -200, y: -150, zoom: 1.1 }))
+  await page.waitForTimeout(9_000)
+  await expect(toast).toContainText('Uploading 2 images')
+  release()
+
+  await expect.poll(async () => (await images(page)).length, { timeout: 30_000 }).toBe(2)
+  await expect(toast).toHaveCount(0)
+  // On page 2, the first centred on the drop point and the next 24 screen pixels on at the zoom it was dropped at.
+  const placed = (await images(page)).sort((a, b) => a.x - b.x)
+  expect(placed.map((p) => p.parentId)).toEqual(['p2', 'p2'])
+  const step = 24 / 0.4
+  for (const [i, p] of placed.entries()) {
+    expect(Math.abs(p.x + p.width / 2 - (300 + i * step))).toBeLessThanOrEqual(1)
+    expect(Math.abs(p.y + p.height / 2 - (400 + i * step))).toBeLessThanOrEqual(1)
+  }
+  expect(await page.evaluate(() => window.dazbee?.selectedFrame())).toBe('p2/sq')
+  expect((await selection(page)).sort()).toEqual(placed.map((p) => p.id).sort())
+  await page.evaluate(() => window.dazbee?.fitAll())
+  await page.evaluate(() => window.dazbee?.drawn())
+  writeOutput('dropped-files-5-second-page.png', await page.screenshot())
+
+  await page.evaluate(() => window.dazbee?.perform('undo'))
+  expect(await images(page)).toEqual([])
+  expect(errors).toEqual([])
+})
+
+test('files that don’t upload are each named with why, beside the file left out, and the rest still go on', async ({ browser }) => {
+  const brandId = await newBrand('e2e dropped files')
+  const { page, errors } = await openStage(browser, design(), { brandId })
+  await routeUploads(page, brandId)
+
+  const name = `Dropped ${randomUUID().slice(0, 8)}`
+  const files = [
+    { name: `${name}.jpg`, type: 'image/jpeg', bytes: card },
+    { name: 'fail-one.jpg', type: 'image/jpeg', bytes: second },
+    { name: 'fail-two.png', type: 'image/png', bytes: third },
+    { name: 'notes.txt', type: 'text/plain', bytes: notes },
+  ]
+  expect(await dropFiles(page, await screenPoint(page, 540, 540), files)).toBe(true)
+  await expect.poll(async () => (await images(page)).length, { timeout: 30_000 }).toBe(1)
+  const toast = page.getByTestId('notice-toast')
+  await expect(toast).toContainText('notes.txt')
+  await expect(toast).toContainText('fail-one.jpg (Storage is down)')
+  await expect(toast).toContainText('fail-two.png (Storage is down)')
+  const [placed] = await images(page)
+  expect(Math.abs((placed?.x ?? 0) + (placed?.width ?? 0) / 2 - 540)).toBeLessThanOrEqual(1)
+  expect((await assetsOf(brandId)).map((a) => a.name)).toEqual([name])
+  await page.evaluate(() => window.dazbee?.drawn())
+  writeOutput('dropped-files-6-failed.png', await page.screenshot())
+  expect(errors).toEqual([])
+})
+
+test('an SVG file dropped on the canvas uploads once, goes on as layers centred where it was dropped, and shows in the open library', async ({ browser }) => {
+  const brandId = await newBrand('e2e dropped files')
+  const { page, errors } = await openStage(browser, design(), { brandId })
+  const uploads = watchUploads(page, brandId)
+  await page.locator('[data-panel="assets"]').click()
+  const library = page.getByTestId('asset-library')
+  await expect(library).toBeVisible()
+
+  const name = `Badge ${randomUUID().slice(0, 8)}`
+  expect(await dropFiles(page, await screenPoint(page, 760, 540), [{ name: `${name}.svg`, type: 'image/svg+xml', bytes: svgBadge }])).toBe(true)
+  const group = async () => Object.entries((await read(page)).nodes as unknown as Record<string, { type: string; name: string; parentId: string }>).find(([, n]) => n.type === 'group' && n.name === name)?.[0]
+  await expect.poll(group, { timeout: 30_000 }).toBeTruthy()
+  const id = await group() as string
+  const box = await page.evaluate((id) => window.dazbee?.boxOf(id), id)
+  expect(Math.abs((box?.x ?? 0) + (box?.width ?? 0) / 2 - 760)).toBeLessThanOrEqual(1)
+  expect(Math.abs((box?.y ?? 0) + (box?.height ?? 0) / 2 - 540)).toBeLessThanOrEqual(1)
+  expect(await selection(page)).toEqual([id])
+  // The library, open while it uploaded, lists it without being opened again.
+  await expect(library.locator('li[data-asset]').filter({ hasText: name })).toBeVisible()
+  await page.evaluate(() => window.dazbee?.drawn())
+  writeOutput('dropped-files-7-svg.png', await page.screenshot())
+  expect(uploads()).toBe(1)
+  expect((await assetsOf(brandId)).map((a) => [a.name, a.contentType])).toEqual([[name, 'image/svg+xml']])
+
+  await page.evaluate(() => window.dazbee?.perform('undo'))
+  expect(await group()).toBeUndefined()
+  expect(errors).toEqual([])
+})
+
+test('images that finish uploading while a text is typed into end the typing and go on as one undo step of their own', async ({ browser }) => {
+  const brandId = await newBrand('e2e dropped files')
+  const title: DesignInput['nodes'][string] = { type: 'text', parentId: 'p1', index: 'a0', name: 'Title', props: { x: 100, y: 100, width: 600, height: 60, text: 'Hello', style: { fontFamily: 'Noto Sans', fontSize: 40, color: '#111111FF' } } }
+  const { page, errors } = await openStage(browser, design({ title }), { brandId })
+  const release = await routeUploads(page, brandId, { hold: true })
+  const text = async () => ((await read(page)).nodes as unknown as Record<string, { props: { text: string } }>).title?.props.text
+
+  const files = [{ name: `Dropped ${randomUUID().slice(0, 8)}.jpg`, type: 'image/jpeg', bytes: card }, { name: `Dropped ${randomUUID().slice(0, 8)}.jpg`, type: 'image/jpeg', bytes: second }]
+  expect(await dropFiles(page, await screenPoint(page, 540, 700), files)).toBe(true)
+  await expect(page.getByTestId('notice-toast')).toContainText('Uploading 2 images')
+  // Typing into the title, past its end, when the uploads finish.
+  const end = await screenPoint(page, 600, 130)
+  await page.mouse.dblclick(end.x, end.y)
+  await expect(page.locator('.caret')).toBeVisible()
+  await page.keyboard.type('abc')
+  release()
+
+  await expect.poll(async () => (await images(page)).length, { timeout: 30_000 }).toBe(2)
+  await expect(page.locator('.caret')).toHaveCount(0)
+  expect(await text()).toBe('Helloabc')
+  // One undo takes both images away and leaves the typing; the next takes the typing back.
+  await page.evaluate(() => window.dazbee?.perform('undo'))
+  expect(await images(page)).toEqual([])
+  expect(await text()).toBe('Helloabc')
+  await page.evaluate(() => window.dazbee?.perform('undo'))
+  expect(await text()).toBe('Hello')
   expect(errors).toEqual([])
 })
