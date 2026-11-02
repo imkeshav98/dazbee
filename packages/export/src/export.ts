@@ -55,8 +55,7 @@ export function exportPdf(ck: CanvasKit, design: Design, pageId: string, formatI
 
 /** One page in one format as an SVG, its text drawn as shapes so it looks the same in every app. */
 export function exportSvg(ck: CanvasKit, design: Design, pageId: string, formatId: string, bytes: ResourceBytes, cache?: ResourceCache): Uint8Array {
-  const svg = new TextDecoder().decode(renderVector(ck, design, pageId, formatId, bytes, 'svg', cache))
-  return new TextEncoder().encode(svg.replace(/<image\b[\s\S]*?(?:\/>|<\/image>)/g, ''))
+  return renderVector(ck, design, pageId, formatId, bytes, 'svg', cache)
 }
 
 /** A name safe on every file system: no path separators or reserved characters, never empty. */

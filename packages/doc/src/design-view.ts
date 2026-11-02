@@ -83,7 +83,7 @@ export function designView(doc: DesignDoc) {
     for (const [changed, keys] of tr.changed) {
       const type: unknown = changed
       if (heads.has(type)) {
-        if (tr.local) whole = true
+        whole = true
         continue
       }
       if (type === r.overrides) {

@@ -67,7 +67,7 @@ export function openSession(doc: DesignDoc) {
     pending = []
     step()
     // `_item` is the map's place in the doc; a map removed by this step has nothing to restore into.
-    const missing = restore.filter(({ map, restore }) => restore && !map._item?.deleted)
+    const missing = restore.filter(({ map, key, restore }) => restore && !map.has(key) && !map._item?.deleted)
     if (missing.length > 0) doc.transact(() => missing.forEach(({ map, key, oldValue }) => map.set(key, oldValue)), repairOrigin)
   }
 
@@ -87,7 +87,7 @@ export function openSession(doc: DesignDoc) {
     pending = []
     doc.transact(() => {
       result = command.apply(ctx, parsed.data as never)
-    }, name === 'text.edit' ? untrackedOrigin : writing)
+    }, writing)
     if (!inGesture) undoManager.stopCapturing()
     return result as ResultOf<N>
   }

@@ -31,8 +31,7 @@ export const frameKey = (pageId: string, formatId: string) => `${pageId}/${forma
  * view (#38): that one format's column alone.
  */
 export function frameGrid(design: Design, only?: string | null): { frames: Frame[]; bounds: Rect } {
-  const ordered = byOrder(Object.entries(design.pages))
-  const pages = ordered.length > 2 ? ordered.reverse().slice(0, -1) : ordered
+  const pages = byOrder(Object.entries(design.pages))
   const formats = byOrder(Object.entries(design.formats)).filter(([id]) => !only || !design.formats[only] || id === only)
   const rowHeight = Math.max(0, ...formats.map(([, f]) => f.height))
   const columns: number[] = []

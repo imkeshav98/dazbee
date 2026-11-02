@@ -170,7 +170,7 @@ export function FormatsPanel({ editor, onRemoved }: { editor: Editor; onRemoved:
                   <button
                     type="button"
                     aria-label={t.editor.formats.remove}
-                    disabled={formats.length === 1}
+                    disabled={primary || formats.length === 1}
                     onClick={() => {
                       run('format.remove', { id })
                       onRemoved(format(t.editor.formats.removed, { name: f.name }))
@@ -236,7 +236,7 @@ function AddFormat({ editor }: { editor: Editor }) {
             {FORMAT_SHAPES.map((shape) => {
               const presets = FORMAT_PRESETS.filter((p) => shapeOf(p.width, p.height) === shape)
               return (
-                <div key={shape}>
+                <div key={shape} role="group" aria-label={t.editor.formats.shape[shape]}>
                   <h4 className="px-4 pt-2 pb-1 text-[11px] font-semibold tracking-wide text-subtle">{t.editor.formats.shape[shape]}</h4>
                   {presets.map((preset) => {
                     const name = t.editor.formats.preset[preset.id] ?? preset.id
@@ -300,7 +300,7 @@ export function FocusChip({ editor }: { editor: Editor }) {
     <div role="status" data-testid="focus-chip" className="pointer-events-auto flex h-9 items-center gap-1 rounded-full surface-frost ps-3.5 pe-1 text-[13px]">
       <ArrowsInSimpleIcon size={14} aria-hidden className="text-accent-text" />
       <span className="ms-1">{format(t.editor.formats.focusing, { name })}</span>
-      <Button variant="ghost" className="ms-1 h-7 rounded-full px-2.5 text-xs" onClick={() => undefined}>{t.editor.formats.exitFocus}</Button>
+      <Button variant="ghost" className="ms-1 h-7 rounded-full px-2.5 text-xs" onClick={() => editor.focus(null)}>{t.editor.formats.exitFocus}</Button>
     </div>
   )
 }
