@@ -84,3 +84,10 @@ export async function zoomMenu(page: Page) {
   if (!(await menu.isVisible())) await page.getByTestId('zoom').click()
   return menu
 }
+
+/** Opens ⋯ More on the bar by the selection, unless it is open: the selected layers' own actions. */
+export async function moreMenu(page: Page) {
+  const menu = page.getByTestId('bar-more-menu')
+  if (!(await menu.isVisible())) await page.getByTestId('bar-more').click()
+  return menu
+}

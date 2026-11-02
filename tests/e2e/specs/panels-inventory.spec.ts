@@ -12,7 +12,7 @@ import { designOf, placed, synced, writeOutput } from '../support/editor.ts'
 import { importGoogleFonts } from '../support/fonts.ts'
 import { API_URL, DEV_BRAND } from '../support/seed.ts'
 import { choose } from '../support/select.ts'
-import { drag, openStage, scopeMenu } from '../support/stage.ts'
+import { drag, moreMenu, openStage, scopeMenu } from '../support/stage.ts'
 
 // Each row opens its own design, so CI spreads the rows over its shards.
 test.describe.configure({ mode: 'parallel', timeout: 180_000 })
@@ -226,7 +226,7 @@ test.describe('every selection', () => {
   row(4, 'rotation', async (open) => {
     const page = await open()
     await select(page, ['box'])
-    await step(page, () => enter(page.getByTestId('layout-card').getByRole('spinbutton', { name: 'Rotation in degrees' }), '15'), async () => {
+    await step(page, async () => enter((await moreMenu(page)).getByRole('spinbutton', { name: 'Rotation in degrees' }), '15'), async () => {
       await expect.poll(async () => (await props(page, 'box')).rotation).toBe(15)
     })
     await reloads(page)
@@ -354,19 +354,20 @@ test.describe('every selection', () => {
     const page = await open()
     await select(page, ['box'])
     const arrange = page.getByTestId('arrange')
-    const layer = arrange.getByRole('group', { name: 'Layer' })
-    await step(page, () => layer.getByRole('button', { name: 'Duplicate' }).click(), async () => {
+    // One layer's actions are in ⋯ More on the bar by it.
+    const more = async (name: string) => (await moreMenu(page)).getByRole('button', { name }).click()
+    await step(page, () => more('Duplicate'), async () => {
       await expect.poll(async () => (await children(page, 'p1')).length).toBe(10)
     })
     await perform(page, 'undo')
     await select(page, ['box'])
     // The box overlaps nothing, so its place in the order changes only the document.
     const at = async () => (await children(page, 'p1')).indexOf('box')
-    await step(page, () => layer.getByRole('button', { name: 'Bring to front' }).click(), async () => { await expect.poll(at).toBe(8) }, { draws: false })
-    await step(page, () => layer.getByRole('button', { name: 'Send backward' }).click(), async () => { await expect.poll(at).toBe(7) }, { draws: false })
-    await step(page, () => layer.getByRole('button', { name: 'Send to back' }).click(), async () => { await expect.poll(at).toBe(0) }, { draws: false })
-    await step(page, () => layer.getByRole('button', { name: 'Bring forward' }).click(), async () => { await expect.poll(at).toBe(1) }, { draws: false })
-    await step(page, () => layer.getByRole('button', { name: 'Use as mask' }).click(), async () => {
+    await step(page, () => more('Bring to front'), async () => { await expect.poll(at).toBe(8) }, { draws: false })
+    await step(page, () => more('Send backward'), async () => { await expect.poll(at).toBe(7) }, { draws: false })
+    await step(page, () => more('Send to back'), async () => { await expect.poll(at).toBe(0) }, { draws: false })
+    await step(page, () => more('Bring forward'), async () => { await expect.poll(at).toBe(1) }, { draws: false })
+    await step(page, () => more('Use as mask'), async () => {
       await expect.poll(async () => (await props(page, 'box')).mask).toBe('alpha')
     })
     await perform(page, 'undo')
@@ -376,7 +377,7 @@ test.describe('every selection', () => {
     }, { draws: false })
     const group = (await doc(page)).nodes.box?.parentId ?? ''
     await select(page, [group])
-    await step(page, () => layer.getByRole('button', { name: 'Ungroup' }).click(), async () => {
+    await step(page, () => more('Ungroup'), async () => {
       await expect.poll(async () => (await doc(page)).nodes.box?.parentId).toBe('p1')
     }, { draws: false })
     await select(page, ['box', 'poly'])
@@ -489,7 +490,7 @@ test.describe('text', () => {
     })
     // Two texts, one at 1.6 and its copy at Auto: emptied, both are Auto.
     await enter(field, '1.6')
-    await page.getByTestId('arrange').getByRole('group', { name: 'Layer' }).getByRole('button', { name: 'Duplicate' }).click()
+    await (await moreMenu(page)).getByRole('button', { name: 'Duplicate' }).click()
     const copy = (await page.evaluate(() => window.dazbee?.selection() ?? []))[0] ?? ''
     await select(page, [copy])
     await enter(field, '')
@@ -554,9 +555,10 @@ test.describe('text', () => {
   row(20, 'vertical alignment: top, middle, bottom', async (open) => {
     const page = await open()
     await select(page, ['headline'])
-    const field = page.getByTestId('text-card').getByRole('combobox', { name: 'Vertical alignment' })
+    // Up and down in the box is in ⋯ More on the bar by the text.
+    const field = async () => (await moreMenu(page)).getByRole('combobox', { name: 'Up and down in the box' })
     for (const align of ['bottom', 'middle', 'top']) {
-      await step(page, () => choose(field, align), async () => {
+      await step(page, async () => choose(await field(), align), async () => {
         await expect.poll(async () => (await props(page, 'headline')).verticalAlign).toBe(align)
       })
     }
@@ -993,9 +995,9 @@ test.describe('photos', () => {
   row(49, 'use as mask', async (open) => {
     const page = await open()
     await select(page, ['photo'])
-    const button = page.getByTestId('arrange').getByRole('group', { name: 'Layer' }).getByRole('button', { name: 'Use as mask' })
-    await step(page, () => button.click(), async () => { await expect.poll(async () => (await props(page, 'photo')).mask).toBe('alpha') })
-    await step(page, () => button.click(), async () => { await expect.poll(async () => (await props(page, 'photo')).mask).toBeFalsy() })
+    const mask = async () => (await moreMenu(page)).getByRole('button', { name: 'Use as mask' }).click()
+    await step(page, mask, async () => { await expect.poll(async () => (await props(page, 'photo')).mask).toBe('alpha') })
+    await step(page, mask, async () => { await expect.poll(async () => (await props(page, 'photo')).mask).toBeFalsy() })
     await reloads(page)
   })
 })

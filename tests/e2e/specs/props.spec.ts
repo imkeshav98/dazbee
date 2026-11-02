@@ -4,7 +4,7 @@
 import { expect, test, type Locator, type Page } from '../support/test.ts'
 import type { DesignInput } from '@dazbee/schema'
 import { writeOutput } from '../support/editor.ts'
-import { openStage, scopeMenu } from '../support/stage.ts'
+import { moreMenu, openStage, scopeMenu } from '../support/stage.ts'
 import { choose } from '../support/select.ts'
 
 test.describe.configure({ timeout: 120_000 })
@@ -64,7 +64,8 @@ test('one layer: position, size, turn, opacity, blend, fill, stroke and effects'
   await expect.poll(async () => (await props(page, 'box')).width).toBe(301)
   await layout.getByRole('spinbutton', { name: 'Width' }).press('Shift+ArrowUp')
   await expect.poll(async () => (await props(page, 'box')).width).toBe(311)
-  await enter(layout.getByRole('spinbutton', { name: 'Rotation in degrees' }), '15')
+  await enter((await moreMenu(page)).getByRole('spinbutton', { name: 'Rotation in degrees' }), '15')
+  await page.keyboard.press('Escape')
   await expect.poll(async () => (await props(page, 'box')).rotation).toBe(15)
 
   const look = page.getByTestId('appearance-card')

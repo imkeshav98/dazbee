@@ -4,8 +4,11 @@
 /** The ring a focused control shows when reached by keyboard. */
 export const FOCUS_RING = 'focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent'
 
+/** A disabled control: faded and not clickable. */
+const DISABLED = 'disabled:pointer-events-none disabled:opacity-40'
+
 /** A small pill button, as the mock's chips under a list. */
-export const CHIP = 'inline-flex h-7 cursor-pointer items-center gap-1 rounded-full border border-line px-3 text-xs font-semibold text-muted transition-colors duration-[var(--chrome-fast)] hover:border-line-strong hover:text-text disabled:pointer-events-none disabled:opacity-40'
+export const CHIP = `inline-flex h-7 cursor-pointer items-center gap-1 rounded-full border border-line px-3 text-xs font-semibold text-muted transition-colors duration-[var(--chrome-fast)] hover:border-line-strong hover:text-text ${DISABLED}`
 
 /** A small square icon button in a card's row. */
 export const ICON_BUTTON = 'grid size-7 shrink-0 cursor-pointer place-items-center rounded-row text-subtle transition-colors duration-[var(--chrome-fast)] hover:bg-hover hover:text-text disabled:pointer-events-none disabled:opacity-30'
@@ -56,13 +59,20 @@ export const SEGMENTS = 'grid auto-cols-fr grid-flow-col gap-0.5 rounded-[10px] 
 export const SEGMENT = `h-7 min-w-0 cursor-pointer truncate rounded-[7px] px-2 text-[12px] font-semibold text-muted transition-colors duration-[var(--chrome-fast)] hover:text-text aria-checked:bg-accent-solid aria-checked:text-on-accent ${FOCUS_RING}`
 
 /** A row of a menu: its words at the start, a shortcut or a switch at the end. */
-export const MENU_ITEM = `group flex h-9 w-full shrink-0 cursor-pointer items-center justify-between gap-3 rounded-row px-2.5 text-start text-[13px] font-medium text-text transition-colors duration-[var(--chrome-fast)] hover:bg-hover ${FOCUS_RING}`
+export const MENU_ITEM = `group flex h-9 w-full shrink-0 cursor-pointer items-center justify-between gap-3 rounded-row px-2.5 text-start text-[13px] font-medium text-text transition-colors duration-[var(--chrome-fast)] hover:bg-hover ${DISABLED} ${FOCUS_RING}`
 /** The hairline between a menu's groups of rows. */
 export const MENU_DIVIDER = 'mx-1.5 my-1 border-t border-line'
 /** A shortcut shown in a menu row. */
 export const MENU_KEY = 'font-mono text-[11px] font-normal text-subtle'
 /** A switch drawn in a menu row that is role="switch": checked, its knob slides to the end. */
 export const SWITCH = 'relative h-5 w-[34px] shrink-0 rounded-full bg-line-strong transition-colors duration-[var(--chrome-fast)] group-aria-checked:bg-accent-solid after:absolute after:start-0.5 after:top-0.5 after:size-4 after:rounded-full after:bg-white after:transition-transform after:duration-[var(--chrome-fast)] group-aria-checked:after:translate-x-3.5 rtl:group-aria-checked:after:-translate-x-3.5'
+
+/** The bar by the selection: a frosted pill of buttons on the stage. */
+export const BAR = 'absolute z-20 flex items-center gap-0.5 rounded-[14px] surface-frost p-1'
+/** One button of the bar: words or an icon, lit while its popover is open. */
+export const BAR_BUTTON = `flex h-[30px] min-w-[30px] shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-row px-2 text-[12px] font-semibold whitespace-nowrap text-text transition-colors duration-[var(--chrome-fast)] hover:bg-hover aria-expanded:bg-hover ${FOCUS_RING}`
+/** The upright hairline between the bar's groups of buttons. */
+export const BAR_DIVIDER = 'mx-0.5 h-5 w-px bg-line'
 
 /** A small message floating at the stage's start corner: a layer removed, something auto layout decides. */
 export const TOAST = 'toast-in pointer-events-auto flex h-10 items-center gap-2 rounded-card surface-frost ps-3.5 pe-1.5 text-[13px]'

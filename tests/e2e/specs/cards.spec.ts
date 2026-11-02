@@ -83,24 +83,27 @@ test('the Page card paints the page, and its hex takes any colour', async ({ pag
   await shoot(page, 'page-fine-tune')
 })
 
-test('a selection swaps the design cards for Arrange, which aligns, distributes and groups', async ({ page }) => {
+test('a selection swaps the design cards for its own; several layers get Arrange, which aligns, distributes and groups', async ({ page }) => {
   await open(page)
   const at = await screenPoint(page, 200, 180)
   await page.mouse.click(at.x, at.y)
   const arrange = page.getByTestId('arrange')
-  await expect(arrange).toBeVisible()
+  await expect(page.getByTestId('layout-card')).toBeVisible()
   await expect(page.getByTestId('page-card')).toHaveCount(0)
   await expect(page.getByTestId('formats')).toHaveCount(0)
-  // One layer aligns to its format; distribute and group need more.
-  await expect(arrange.getByRole('button', { name: 'Align left' })).toBeEnabled()
-  await expect(arrange.getByRole('button', { name: 'Distribute horizontally' })).toBeDisabled()
-  await expect(arrange.getByRole('button', { name: 'Group', exact: true })).toBeDisabled()
+  // One layer lines up with its format from the bar by it; the Arrange card is for several.
+  await expect(arrange).toHaveCount(0)
+  await page.getByTestId('bar-line-up').click()
+  await expect(page.getByTestId('bar-line-up-menu').getByRole('button', { name: 'Align left' })).toBeEnabled()
+  await expect(page.getByTestId('bar-line-up-menu').getByRole('button', { name: 'Distribute horizontally' })).toBeDisabled()
+  await page.keyboard.press('Escape')
+
+  await page.keyboard.press('Control+a')
+  await expect(arrange).toBeVisible()
   // The align buttons are the big ones.
   const big = await arrange.getByRole('button', { name: 'Align left' }).boundingBox()
   const small = await arrange.getByRole('button', { name: 'Distribute horizontally' }).boundingBox()
   expect(big?.height ?? 0).toBeGreaterThan((small?.height ?? Infinity) * 1.3)
-
-  await page.keyboard.press('Control+a')
   await expect(arrange.getByRole('button', { name: 'Distribute horizontally' })).toBeEnabled()
   await shoot(page, 'arrange')
   const before = Object.keys(JSON.parse(await designOf(page)).nodes).length

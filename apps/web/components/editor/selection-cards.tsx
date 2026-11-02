@@ -20,6 +20,7 @@ import { CHIP, CHIP_ACCENT, DASHED_BUTTON, FIELD, FOCUS_RING, KNOBS, KNOBS_FOUR,
 import { ImagePickerButton } from './image-tool.tsx'
 import { useBrandKit } from './use-brand-kit.ts'
 import { useLiveDesign } from './use-live-design.ts'
+import { setEveryFormat, useEveryFormat } from './scope-store.ts'
 import { Choice, clamp, ColorField, NumberField, tidy } from './fields.tsx'
 import { AddButton, PaintRow, RemoveButton, Stack } from './paint-stack.tsx'
 
@@ -33,7 +34,7 @@ const FILL_ON_TOP: Paint = { type: 'solid', color: '#00000033' }
 const NEW_STROKE = { paint: { type: 'solid', color: '#1A1420FF' } as Paint, width: 2, align: 'center' as const }
 
 /** What the cards act on: the layers, the frame they are shown in, and where changes go. */
-interface Target {
+export interface Target {
   editor: Editor
   ids: string[]
   pageId: string
@@ -46,7 +47,7 @@ interface Target {
   names: string[]
 }
 
-const set = (target: Target, to: (now: Props, i: number) => Patch | null) => {
+export const set = (target: Target, to: (now: Props, i: number) => Patch | null) => {
   const index = new Map(target.ids.map((id, i) => [id, i]))
   return target.editor.setProps(target.ids, (id, now) => to(now, index.get(id) ?? 0), target.everyFormat, target.pageId, target.formatId)
 }
@@ -125,20 +126,22 @@ function HeaderCard({ target, p, scope }: { target: Target; p: P; scope: ReactNo
             )
         ))}
       </div>
-      {sized && (
-        <div className={KNOBS}>
-          <NumberField
-            label="↻"
-            unit="°"
-            name={p.rotationName}
-            value={shared(target.props.map((pr) => num(pr, 'rotation') ?? 0))}
-            editor={target.editor}
-            onSet={(v) => set(target, () => ({ rotation: tidy(((v % 360) + 360) % 360) }))}
-            onShift={(by) => set(target, (now) => ({ rotation: tidy((((num(now, 'rotation') ?? 0) + by) % 360 + 360) % 360) }))}
-          />
-        </div>
-      )}
     </Card>
+  )
+}
+
+/** The layers' turn in degrees, wrapping round at 360; groups and booleans turn with what they hold. */
+export function RotationField({ target, p }: { target: Target; p: P }) {
+  return (
+    <NumberField
+      label="↻"
+      unit="°"
+      name={p.rotationName}
+      value={shared(target.props.map((pr) => num(pr, 'rotation') ?? 0))}
+      editor={target.editor}
+      onSet={(v) => set(target, () => ({ rotation: tidy(((v % 360) + 360) % 360) }))}
+      onShift={(by) => set(target, (now) => ({ rotation: tidy((((num(now, 'rotation') ?? 0) + by) % 360 + 360) % 360) }))}
+    />
   )
 }
 
@@ -462,22 +465,13 @@ function TextCard({ target, p }: { target: Target; p: P }) {
         <Choice name={p.textCase} value={(style('textCase') ?? 'none') as string} options={['none', 'upper', 'lower', 'title']} labels={p.textCases} onSet={(v) => setStyle('textCase', v)} />
       </div>
       <ColorField name={p.textColour} value={style('color') as string | 'mixed'} onSet={(to) => set(target, (now) => ({ style: { ...(now.style as Style), color: to((now.style as Style).color) } }))} />
-      <div className="grid grid-cols-2 gap-x-3">
-        <Choice
-          name={p.textAlign}
-          value={shared(target.props.map((pr) => (pr.align ?? 'start') as string))}
-          options={['start', 'center', 'end', 'justify']}
-          labels={p.textAligns}
-          onSet={(align) => set(target, () => ({ align }))}
-        />
-        <Choice
-          name={p.verticalAlign}
-          value={shared(target.props.map((pr) => (pr.verticalAlign ?? 'top') as string))}
-          options={['top', 'middle', 'bottom']}
-          labels={p.verticalAligns}
-          onSet={(verticalAlign) => set(target, () => ({ verticalAlign }))}
-        />
-      </div>
+      <Choice
+        name={p.textAlign}
+        value={shared(target.props.map((pr) => (pr.align ?? 'start') as string))}
+        options={['start', 'center', 'end', 'justify']}
+        labels={p.textAligns}
+        onSet={(align) => set(target, () => ({ align }))}
+      />
     </Card>
   )
 }
@@ -1103,26 +1097,41 @@ function ScopeMenu({ everyFormat, onChange, size, p, children }: { everyFormat: 
 }
 
 /**
+ * The selected layers as the cards and the bar act on them, in the frame they are selected in: like a
+ * drag on the canvas, a change goes to the format shown unless every format is asked for. Null when
+ * none of them is in the design.
+ */
+export function useTarget(editor: Editor, ids: string[]): { target: Target; design: Design } | null {
+  const { design } = useLiveDesign(editor)
+  const everyFormat = useEveryFormat()
+  const [framePage, frameFormat] = editor.selectedFrame()?.split('/') ?? []
+  const formatId = frameFormat && design.formats[frameFormat] ? frameFormat : design.meta.primaryFormatId
+  const live = ids.filter((id) => design.nodes[id])
+  if (live.length === 0) return null
+  const placedIn = (id: string) => ({ ...design.nodes[id]?.props, ...design.overrides[`format:${formatId}`]?.[id] }) as Props
+  return {
+    design,
+    target: {
+      editor, ids: live, pageId: framePage ?? '', formatId, everyFormat: everyFormat || Object.keys(design.formats).length === 1,
+      props: live.map(placedIn), types: live.map((id) => design.nodes[id]?.type ?? ''), names: live.map((id) => design.nodes[id]?.name ?? ''),
+    },
+  }
+}
+
+/**
  * The selection's cards, after the font: the header card first (Arrange before it for several
  * layers, as the mock's "3 selected"), then the look, the rest open, and See-through last.
  */
 export function SelectionCards({ editor, brandId, ids, arrange }: { editor: Editor; brandId: string; ids: string[]; arrange: ReactNode }) {
   const t = useMessages()
   const p = t.editor.props
-  const { design } = useLiveDesign(editor)
-  // Like a drag on the canvas, a change goes to the format shown unless every format is asked for.
-  const [everyFormat, setEveryFormat] = useState(false)
-  const [framePage, frameFormat] = editor.selectedFrame()?.split('/') ?? []
-  const formatId = frameFormat && design.formats[frameFormat] ? frameFormat : design.meta.primaryFormatId
-  const pageId = framePage ?? ''
-  const live = ids.filter((id) => design.nodes[id])
-  if (live.length === 0) return arrange
-  const placedIn = (d: Design, id: string) => ({ ...d.nodes[id]?.props, ...d.overrides[`format:${formatId}`]?.[id] }) as Props
-  const types = live.map((id) => design.nodes[id]?.type ?? '')
-  const target: Target = {
-    editor, ids: live, pageId, formatId, everyFormat: everyFormat || Object.keys(design.formats).length === 1, props: live.map((id) => placedIn(design, id)), types,
-    names: live.map((id) => design.nodes[id]?.name ?? ''),
-  }
+  const everyFormat = useEveryFormat()
+  // Once nothing is selected, changes go to the format shown again.
+  useEffect(() => () => setEveryFormat(false), [])
+  const selected = useTarget(editor, ids)
+  if (!selected) return arrange
+  const { target, design } = selected
+  const { ids: live, types, formatId } = target
   const all = (...kinds: string[]) => types.every((type) => kinds.includes(type))
   const several = live.length > 1
   const shapeKinds = new Set(live.map((id) => {
@@ -1162,7 +1171,6 @@ export function SelectionCards({ editor, brandId, ids, arrange }: { editor: Edit
             </section>
           ))}
       <EffectsCard target={target} p={p} />
-      {!several && arrange}
       {all('text') && <TextCard target={target} p={p} />}
       {all('text') && <ParagraphCard target={target} p={p} />}
       {all('graphic', 'frame', 'boolean') && (

@@ -790,6 +790,13 @@ function live(
 
   /** Room the tool dock takes along the bottom of the stage, which the size label stays out of. */
   const SIZE_CLEARANCE = 72
+  /** The room the selection's size label takes, in screen pixels. */
+  const SIZE_LABEL_HEIGHT = 20
+  /** Where the size label's top goes for a box spanning `ys` on screen: under it, or over it when the tool dock along the stage's bottom would cover it. */
+  function sizeLabelTop(ys: number[]) {
+    const below = Math.max(...ys) + 8
+    return below + 24 > viewport.height - SIZE_CLEARANCE ? Math.min(...ys) - 26 : below
+  }
   /** A box on the overlay, turned as the layer is. */
   function outline(className: string, frame: Frame, box: Box) {
     const el = document.createElement('div')
@@ -872,9 +879,7 @@ function live(
       const size = document.createElement('div')
       size.className = 'selection-size'
       size.textContent = `${round(box.width, 0)} × ${round(box.height, 0)}`
-      // Under the box, or over it when the tool dock along the stage's bottom would cover it.
-      const below = Math.max(...corners.map((c) => c.y)) + 8
-      const top = below + 24 > viewport.height - SIZE_CLEARANCE ? Math.min(...corners.map((c) => c.y)) - 26 : below
+      const top = sizeLabelTop(corners.map((c) => c.y))
       Object.assign(size.style, { left: px((Math.min(...corners.map((c) => c.x)) + Math.max(...corners.map((c) => c.x))) / 2), top: px(top) })
       parts.push(size)
     }
@@ -3132,6 +3137,51 @@ function live(
     onNotice(listener: (notice: Notice) => void) {
       noticeListeners.add(listener)
       return () => noticeListeners.delete(listener)
+    },
+    /**
+     * Where the selection is drawn on the stage, in pixels from the stage's top start corner: the
+     * upright box round it, turned or not, and its size label under or over it. Null with nothing
+     * selected.
+     */
+    selectionRect(): Rect | null {
+      const outer = selectionBox()
+      if (!outer) return null
+      const { frame, drawn } = outer
+      const turn = ((drawn.rotation ?? 0) * Math.PI) / 180
+      const centre = { x: frame.x + drawn.x + drawn.width / 2, y: frame.y + drawn.y + drawn.height / 2 }
+      const corners = [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([sx = 0, sy = 0]) => {
+        const dx = (sx * drawn.width) / 2
+        const dy = (sy * drawn.height) / 2
+        return toScreen(camera, { x: centre.x + dx * Math.cos(turn) - dy * Math.sin(turn), y: centre.y + dx * Math.sin(turn) + dy * Math.cos(turn) })
+      })
+      const xs = corners.map((c) => c.x)
+      const ys = corners.map((c) => c.y)
+      if (!editing) {
+        const label = sizeLabelTop(ys)
+        ys.push(label, label + SIZE_LABEL_HEIGHT)
+      }
+      return { x: Math.min(...xs), y: Math.min(...ys), width: Math.max(...xs) - Math.min(...xs), height: Math.max(...ys) - Math.min(...ys) }
+    },
+    /**
+     * Picks what a right-click at `client` (client coordinates) acts on: the selection when the point
+     * is on it, else the layer there, selected, locked or not. Returns the selected layers, none when
+     * the point is on no layer.
+     */
+    selectAt(client: Point): string[] {
+      const rect = canvas.getBoundingClientRect()
+      const world = toWorld(camera, { x: client.x - rect.left, y: client.y - rect.top })
+      const frame = frameAt(grid.frames, world)
+      if (!frame) return []
+      const deepest = hitTest(cached(frame).scene.layers, { x: world.x - frame.x, y: world.y - frame.y })
+      if (!deepest) return []
+      const id = target(deepest.id, frame.key)
+      if (!(selection?.frame === frame.key && selection.ids.includes(id))) select([id], frame.key)
+      return [...(selection?.ids ?? [])]
+    },
+    /** Whether a gesture is running, or a range of text is being edited: when the bar by the selection keeps out of the way. */
+    busy() {
+      const range = textRange()
+      return gesture !== null || (range !== null && range.end > range.start)
     },
     /** Calls back with the selected layers whenever the selection changes. */
     onSelection(listener: (ids: string[]) => void) {
