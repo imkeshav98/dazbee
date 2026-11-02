@@ -1,4 +1,4 @@
-import { DesignSummary, type DesignInput } from '@dazbee/schema'
+import { BrandKit, BrandSummary, DesignSummary, EMPTY_BRAND_KIT, type DesignInput } from '@dazbee/schema'
 
 export const API_URL = process.env.API_URL ?? 'http://localhost:8787'
 /** A brand of the development workspace the API seeds (apps/api/src/session.ts). */
@@ -30,16 +30,43 @@ export const liveDesign = (): DesignInput => ({
   overrides: {},
 })
 
-/** Creates a design for the development brand through the API, starting from `content`, and returns its id. */
-export async function seed(content: DesignInput, name = content.meta.name): Promise<string> {
-  const response = await fetch(`${API_URL}/brands/${DEV_BRAND}/designs`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ name, content }),
+/** Which brand a helper works in; the development brand when none is given. */
+export interface InBrand {
+  brandId?: string
+}
+
+/** Sends a request to the API, with `body` as JSON when given, and returns the JSON it answers; throws when it refuses. */
+export async function callApi(method: 'GET' | 'POST' | 'PUT', path: string, body?: unknown): Promise<unknown> {
+  const response = await fetch(`${API_URL}${path}`, body === undefined ? { method } : {
+    method, headers: { 'content-type': 'application/json' }, body: JSON.stringify(body),
   }).catch(() => {
     throw new Error(`no API at ${API_URL}; run docker compose up -d --wait`)
   })
-  const json: unknown = await response.json()
-  if (!response.ok) throw new Error(`the API refused the design: ${JSON.stringify(json)}`)
-  return DesignSummary.parse(json).id
+  const text = await response.text()
+  if (!response.ok) throw new Error(`the API refused ${method} ${path}: ${response.status} ${text}`)
+  return JSON.parse(text) as unknown
+}
+
+/** Creates a design for a brand through the API, starting from `content`, and returns its id. */
+export async function seed(content: DesignInput, { name = content.meta.name, brandId = DEV_BRAND }: InBrand & { name?: string } = {}): Promise<string> {
+  return DesignSummary.parse(await callApi('POST', `/brands/${brandId}/designs`, { name, content })).id
+}
+
+/**
+ * Creates a brand in the development workspace through the API and returns its id: a brand of its
+ * own for a spec that writes a brand kit or reads Recent in order, so no spec running alongside
+ * changes its kit or puts designs before its own. Its kit starts empty.
+ */
+export async function newBrand(name: string): Promise<string> {
+  return BrandSummary.parse(await callApi('POST', '/brands', { name })).id
+}
+
+/** A brand's kit as the API has it now. */
+export async function getKit(brandId: string): Promise<BrandKit> {
+  return BrandKit.parse(await callApi('GET', `/brands/${brandId}/kit`))
+}
+
+/** Saves a brand's whole kit through the API: the parts given, the rest empty. */
+export async function putKit(brandId: string, kit: Partial<BrandKit>): Promise<BrandKit> {
+  return BrandKit.parse(await callApi('PUT', `/brands/${brandId}/kit`, { ...EMPTY_BRAND_KIT, ...kit }))
 }
