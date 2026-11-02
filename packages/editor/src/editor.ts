@@ -1492,6 +1492,27 @@ function live(
       }
     })
   }
+  /**
+   * Where layers inside an auto layout frame are drawn, in every format of their page, for a
+   * command that wraps them; none for layers whose parent has no auto layout.
+   */
+  function drawnInFlow(ids: string[], pageId: string): Record<string, Record<string, Omit<Box, 'rotation'>>> | undefined {
+    const now = session.design()
+    const parent = now.nodes[now.nodes[ids[0] ?? '']?.parentId ?? '']
+    if (parent?.type !== 'frame' || !parent.props.layout) return undefined
+    const drawn: Record<string, Record<string, Omit<Box, 'rotation'>>> = {}
+    for (const formatId of Object.keys(now.formats)) {
+      const f = frameOf(`${pageId}/${formatId}`)
+      if (!f) continue
+      const boxes: Record<string, Omit<Box, 'rotation'>> = {}
+      for (const id of ids) {
+        const b = boxIn(f, id, now)
+        if (b) boxes[id] = { x: b.x, y: b.y, width: b.width, height: b.height }
+      }
+      drawn[scope(f)] = boxes
+    }
+    return drawn
+  }
   /** Every layer under `id` in the document, nearest first. */
   const under = (id: string, from: Design): string[] => childrenOf(from, id).flatMap(([child]) => [child, ...under(child, from)])
 
@@ -2723,7 +2744,7 @@ function live(
       }
       case 'group': {
         let group = ''
-        if (runQuietly(() => { group = session.run('node.group', { ids }) })) select([group], frame.key)
+        if (runQuietly(() => { group = session.run('node.group', { ids, drawn: drawnInFlow(ids, frame.pageId) }) })) select([group], frame.key)
         break
       }
       case 'alignLeft': alignTo('left')
@@ -2761,7 +2782,7 @@ function live(
         }
         let group = ''
         if (runQuietly(() => session.gesture(() => {
-          group = session.run('node.group', { ids })
+          group = session.run('node.group', { ids, drawn: drawnInFlow(ids, frame.pageId) })
           const [[bottom] = []] = childrenOf(session.design(), group)
           if (bottom) session.run('node.mask', { ids: [bottom], mask: 'alpha' })
         }))) select([group], frame.key)
@@ -2769,7 +2790,7 @@ function live(
       }
       case 'frameSelection': {
         let framed = ''
-        if (runQuietly(() => { framed = session.run('node.frame', { ids }) })) select([framed], frame.key)
+        if (runQuietly(() => { framed = session.run('node.frame', { ids, drawn: drawnInFlow(ids, frame.pageId) }) })) select([framed], frame.key)
         break
       }
       case 'autoLayout': {
