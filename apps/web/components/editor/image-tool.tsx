@@ -15,6 +15,7 @@ import { ASSET_ACCEPT, IMAGE_ACCEPT, sendAsset } from '../../lib/upload-asset.ts
 import type { Placeable } from '../../lib/place-asset.ts'
 import { overlayScroll } from '../ui/overlay-scroll.ts'
 import { Tooltip } from '../ui/tooltip.tsx'
+import { useMenuFocus } from './bar-popover.tsx'
 import { ASSET_TILE, DASHED_BUTTON, dockTool, FOCUS_RING, POPOVER } from './styles.ts'
 
 const base = (brandId: string) => `/brands/${encodeURIComponent(brandId)}/assets`
@@ -187,13 +188,15 @@ export function ImagePickerButton({ brandId, title, testId, className, children,
   // The cards sit at the stage's end, so the picker opens towards its middle.
   const toward = dirOf(useLocale()) === 'rtl' ? 'right' : 'left'
   const side = below ? 'bottom' : toward
+  const focus = useMenuFocus()
   return (
     <Popover.Root open={open} onOpenChange={setOpen}>
       <Popover.Trigger asChild>
-        <button type="button" aria-label={title} data-testid={testId} data-bar-item={below || undefined} className={className}>{children}</button>
+        <button ref={focus.button} type="button" aria-label={title} data-testid={testId} data-bar-item={below || undefined} className={className}>{children}</button>
       </Popover.Trigger>
       <Popover.Portal>
-        <Popover.Content side={side} align="start" sideOffset={12} collisionPadding={12} aria-label={title} data-testid={`${testId}-picker`} onKeyDown={(e) => e.stopPropagation()} className={PANEL}>
+        <Popover.Content side={side} align="start" sideOffset={12} collisionPadding={12} aria-label={title} data-testid={`${testId}-picker`} onKeyDown={(e) => e.stopPropagation()} {...focus.content} className={PANEL}>
+          {focus.back}
           <ImagePickerPanel
             brandId={brandId}
             open={open}

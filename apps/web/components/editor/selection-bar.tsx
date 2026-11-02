@@ -135,6 +135,7 @@ function SubMenu({ label, testId, children }: { label: string; testId: string; c
           }}
           className={cn(MENU, 'min-w-52')}
         >
+          {focus.back}
           {children}
         </Popover.Content>
       </Popover.Portal>
@@ -307,6 +308,7 @@ export function SelectionBar({ editor, brandId }: { editor: Editor; brandId: str
         </Popover.Trigger>
         <Popover.Portal>
           <Popover.Content side="bottom" align="end" sideOffset={8} collisionPadding={12} {...moreFocus.content} aria-label={b.more} data-testid="bar-more-menu" className={cn(MENU, 'w-60')}>
+            {moreFocus.back}
             <LayerActions editor={editor} ids={ids} onDone={() => setOpen(null)} />
           </Popover.Content>
         </Popover.Portal>
