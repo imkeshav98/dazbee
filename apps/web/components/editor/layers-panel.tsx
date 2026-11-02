@@ -159,8 +159,11 @@ export function LayersPanel({ editor }: { editor: Editor }) {
     if ([...open].some((id) => !expanded.has(id))) setExpanded(new Set([...expanded, ...open]))
   }, [selection.ids, design, version, expanded])
 
+  // The panel's own moves, counted so the rows show a move in the render that follows its key, not
+  // a frame later at the redraw.
+  const [moved, setMoved] = useState(0)
   // The version is how the live design says it changed.
-  const rows = useMemo(() => rowsOf(design, pageId, expanded), [design, version, pageId, expanded])
+  const rows = useMemo(() => rowsOf(design, pageId, expanded), [design, version, moved, pageId, expanded])
   const indexOf = useMemo(() => new Map(rows.map((row, i) => [row.id, i])), [rows])
 
   // Which rows are in view.
@@ -188,31 +191,41 @@ export function LayersPanel({ editor }: { editor: Editor }) {
   // The row keyboard focus is on: the one the arrows move from. Tab lands on it.
   const [active, setActive] = useState<string | null>(null)
   const current = active && indexOf.has(active) ? active : selection.ids.find((id) => indexOf.has(id)) ?? rows[0]?.id ?? null
-  // The row to focus once it is rendered, by id: the next effect to run focuses this row, even one
-  // still waiting from an earlier render that had another row current.
+  // The row to focus once it is rendered, by id.
   const focusing = useRef<string | null>(null)
   const [renaming, setRenaming] = useState<string | null>(null)
   const [drop, setDrop] = useState<{ id: string; where: Where } | null>(null)
   const dragged = useRef<string | null>(null)
 
-  /** Scrolls a row into view, then focuses it once it is rendered. */
-  const reveal = useCallback((id: string) => {
+  /**
+   * Scrolls a row into view, then focuses it once it is rendered. `at` is its place in the list, when
+   * that is not where the panel last listed it, as after a move.
+   */
+  const reveal = useCallback((id: string, at = indexOf.get(id)) => {
     const el = scroller.current
-    const i = indexOf.get(id)
-    if (!el || i === undefined) return
-    const top = i * LAYER_ROW
+    if (!el || at === undefined) return
+    const top = at * LAYER_ROW
     if (top < el.scrollTop) el.scrollTop = top
     else if (top + LAYER_ROW > el.scrollTop + el.clientHeight) el.scrollTop = top + LAYER_ROW - el.clientHeight
     follow(el)
     setActive(id)
     focusing.current = id
   }, [indexOf, follow])
-  useEffect(() => {
+  // Focuses the row asked for in the commit that renders it, so it reads the rows that commit put in
+  // the page and no effect of an earlier render is left to run after a key. The focus moves only from
+  // the panel or from the page itself, never out of a field or control elsewhere; a row no longer in
+  // the list is no longer asked for.
+  useLayoutEffect(() => {
     const id = focusing.current
     if (!id) return
+    if (!indexOf.has(id)) {
+      focusing.current = null
+      return
+    }
     const row = scroller.current?.querySelector<HTMLElement>(`[data-layer="${CSS.escape(id)}"]`)
     if (!row) return
-    if (document.activeElement !== row) row.focus({ preventScroll: true })
+    const from = document.activeElement
+    if (from !== row && (!from || from === document.body || !from.isConnected || scroller.current?.contains(from))) row.focus({ preventScroll: true })
     focusing.current = null
   })
 
@@ -269,6 +282,14 @@ export function LayersPanel({ editor }: { editor: Editor }) {
     return editor.moveLayer(row.id, parent.parentId, outer[outer.indexOf(row.parentId) + 1])
   }
 
+  /** A layer's place in the list as the document has it now, with the groups it is in open: where a move took it. */
+  const placeOf = (id: string) => {
+    const open = new Set(expanded)
+    for (let up = design.nodes[id]?.parentId; up && design.nodes[up]; up = design.nodes[up]?.parentId) open.add(up)
+    const at = rowsOf(design, pageId, open).findIndex((r) => r.id === id)
+    return at < 0 ? undefined : at
+  }
+
   const onKey = (event: KeyboardEvent<HTMLElement>, row: Row, i: number) => {
     if (renaming) return
     const inward = rtl ? 'ArrowLeft' : 'ArrowRight'
@@ -280,7 +301,10 @@ export function LayersPanel({ editor }: { editor: Editor }) {
     }
     let handled = true
     if (event.altKey && ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key)) {
-      if (shift(row, event.key)) reveal(row.id)
+      if (shift(row, event.key)) {
+        setMoved((n) => n + 1)
+        reveal(row.id, placeOf(row.id))
+      }
     } else if (event.key === 'ArrowDown') go(rows[i + 1])
     else if (event.key === 'ArrowUp') go(rows[i - 1])
     else if (event.key === 'Home') go(rows[0])
