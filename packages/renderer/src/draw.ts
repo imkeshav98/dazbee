@@ -215,7 +215,7 @@ function drawContent(ck: CanvasKit, canvas: Canvas, layer: SceneLayer, resources
       drawLayers(ck, canvas, layer.children, resources)
       canvas.restore()
       // Over what is inside, and never cut by the clip, so an outside stroke shows whole.
-      strokePath(ck, canvas, path, props, resources, null, true)
+      strokePath(ck, canvas, path, props, resources, null)
       path.delete()
       return
     }
@@ -529,15 +529,16 @@ type LineShape = Extract<GraphicLayer['props']['shape'], { kind: 'line' }>
 /** Fills and strokes an outline; a line's strokes are always centred, and draw its ends. */
 function drawShape(ck: CanvasKit, canvas: Canvas, path: Path, props: GraphicLayer['props'] | BooleanLayer['props'], resources: Resources, line: LineShape | null) {
   if (!line) for (const fill of props.fills) fillPath(ck, canvas, path, fill, props, resources)
-  strokePath(ck, canvas, path, props, resources, line, false)
+  strokePath(ck, canvas, path, props, resources, line)
 }
 
 /**
  * A shape's or a frame's strokes along `path`, inside, centred on or outside it; a line's along it,
- * with its ends. With `evenOdd`, an outside stroke is clipped to everywhere but the outline as one
- * even-odd path, which an SVG can hold where it can't hold a difference.
+ * with its ends. An outside stroke is clipped to everywhere but the outline, worked out as one path
+ * with the outline's own fill rule kept, which an SVG can hold where it can't hold a difference.
  */
-export function strokePath(ck: CanvasKit, canvas: Canvas, path: Path, props: Box & { strokes: readonly Stroke[] }, resources: Resources, line: LineShape | null, evenOdd: boolean) {
+export function strokePath(ck: CanvasKit, canvas: Canvas, path: Path, props: Box & { strokes: readonly Stroke[] }, resources: Resources, line: LineShape | null) {
+  let outside: Path | null = null
   for (const stroke of props.strokes) {
     const paint = paintFor(ck, stroke.paint, props, resources)
     if (!paint) continue
@@ -565,20 +566,20 @@ export function strokePath(ck: CanvasKit, canvas: Canvas, path: Path, props: Box
       // Half of a doubled stroke falls on each side of the outline; the clip keeps the wanted half.
       paint.setStrokeWidth(stroke.width * 2)
       if (stroke.align === 'inside') canvas.clipPath(path, ck.ClipOp.Intersect, true)
-      else if (!evenOdd) canvas.clipPath(path, ck.ClipOp.Difference, true)
       else {
-        const beyond = new ck.PathBuilder().addRect(EVERYWHERE)
-        beyond.addPath(path)
-        beyond.setFillType(ck.FillType.EvenOdd)
-        const outside = beyond.detachAndDelete()
-        canvas.clipPath(outside, ck.ClipOp.Intersect, true)
-        outside.delete()
+        if (!outside) {
+          const everywhere = new ck.PathBuilder().addRect(EVERYWHERE).detachAndDelete()
+          outside = ck.Path.MakeFromOp(everywhere, path, ck.PathOp.Difference)
+          everywhere.delete()
+        }
+        if (outside) canvas.clipPath(outside, ck.ClipOp.Intersect, true)
       }
     }
     canvas.drawPath(path, paint)
     canvas.restore()
     paint.delete()
   }
+  outside?.delete()
 }
 
 /**
