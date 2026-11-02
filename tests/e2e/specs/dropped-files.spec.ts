@@ -372,3 +372,57 @@ test('images that finish uploading while a text is typed into end the typing and
   expect(await text()).toBe('Hello')
   expect(errors).toEqual([])
 })
+
+test('images that finish uploading while a pen path is open go on within a few seconds as one undo step, the path kept as drawn', async ({ browser }) => {
+  const brandId = await newBrand('e2e dropped files')
+  const { page, errors } = await openStage(browser, design(), { brandId })
+  const release = await routeUploads(page, brandId, { hold: true })
+  const paths = async () => Object.entries((await read(page)).nodes as unknown as Record<string, { props: { shape?: { kind: string } } }>).filter(([, n]) => n.props.shape?.kind === 'path').map(([id]) => id)
+
+  const files = [{ name: `Dropped ${randomUUID().slice(0, 8)}.jpg`, type: 'image/jpeg', bytes: card }, { name: `Dropped ${randomUUID().slice(0, 8)}.jpg`, type: 'image/jpeg', bytes: second }]
+  expect(await dropFiles(page, await screenPoint(page, 540, 700), files)).toBe(true)
+  await expect(page.getByTestId('notice-toast')).toContainText('Uploading 2 images')
+  // A pen path with two anchors, left open, when the uploads finish.
+  await page.getByRole('toolbar', { name: 'Tools' }).getByRole('button', { name: 'Pen' }).click()
+  for (const [x, y] of [[200, 200], [420, 260]] as const) {
+    const at = await screenPoint(page, x, y)
+    await page.mouse.click(at.x, at.y)
+  }
+  await expect.poll(paths).toHaveLength(1)
+  expect(await page.evaluate(() => window.dazbee?.gesturing())).toBe(true)
+  const released = Date.now()
+  release()
+
+  await expect.poll(async () => (await images(page)).length, { timeout: 20_000 }).toBe(2)
+  expect(Date.now() - released).toBeLessThan(12_000)
+  await expect(page.getByTestId('notice-toast')).toHaveCount(0)
+  const [path] = await paths()
+  await page.evaluate(() => window.dazbee?.drawn())
+  writeOutput('dropped-files-8-pen.png', await page.screenshot())
+  // One undo takes both images away and keeps the path; the next takes the path.
+  await page.evaluate(() => window.dazbee?.perform('undo'))
+  expect(await images(page)).toEqual([])
+  expect(await paths()).toEqual([path])
+  await page.evaluate(() => window.dazbee?.perform('undo'))
+  expect(await paths()).toEqual([])
+  expect(errors).toEqual([])
+})
+
+test('an SVG file whose format goes while it uploads is not placed, and the notice says it is in the library', async ({ browser }) => {
+  const brandId = await newBrand('e2e dropped files')
+  const { page, errors } = await openStage(browser, design({}, { formats: { wide: { name: 'Wide', width: 1920, height: 1080, order: 'a1' } } }), { brandId })
+  await page.evaluate(() => window.dazbee?.setCamera({ x: 40, y: 80, zoom: 0.35 }))
+  await page.evaluate(() => window.dazbee?.drawn())
+  const release = await routeUploads(page, brandId, { hold: true })
+
+  const name = `Badge ${randomUUID().slice(0, 8)}`
+  expect(await dropFiles(page, await screenPoint(page, 500, 500, { pageId: 'p1', formatId: 'wide' }), [{ name: `${name}.svg`, type: 'image/svg+xml', bytes: svgBadge }])).toBe(true)
+  await page.evaluate(() => window.dazbee?.session.run('format.remove', { id: 'wide' }))
+  release()
+
+  await expect(page.getByTestId('notice-toast')).toContainText('Uploaded to the library', { timeout: 30_000 })
+  expect(Object.values((await read(page)).nodes)).toEqual([])
+  expect((await assetsOf(brandId)).map((a) => a.name)).toEqual([name])
+  writeOutput('dropped-files-9-format-gone.png', await page.screenshot())
+  expect(errors).toEqual([])
+})

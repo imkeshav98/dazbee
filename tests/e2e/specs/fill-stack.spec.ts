@@ -186,3 +186,31 @@ test('a stroke and the page background take the same paint editor: an angular st
   await expect.poll(async () => ((await read(page)) as unknown as { pages: Record<string, { fills: Fill[] }> }).pages.p1?.fills.map((f) => f.type)).toEqual(['radial', 'image'])
   expect(errors).toEqual([])
 })
+
+test('a gradient stop removed while it is dragged ends the drag and its undo step', async ({ browser }) => {
+  const asset = await upload(photo)
+  const { page, errors } = await openStage(browser, design(asset.id))
+  await press(page, 'deselect')
+  const layers = page.getByTestId('page-card').getByTestId('page-fills')
+  await layers.locator('[data-row="1"]').getByTestId('paint-swatch').click()
+  const editor = page.getByTestId('paint-editor')
+  await editor.getByRole('radio', { name: 'Line gradient' }).click()
+  const stops = async () => ((await read(page)) as unknown as { pages: Record<string, { fills: Fill[] }> }).pages.p1?.fills[0]?.stops?.length
+  const bar = await editor.getByTestId('gradient-bar').boundingBox()
+  if (!bar) throw new Error('no bar')
+  await page.mouse.click(bar.x + bar.width * 0.5, bar.y + bar.height / 2)
+  await expect.poll(stops).toBe(3)
+
+  // The last stop is pressed and, while held, removed with Delete; the pointer is let go away from the bar.
+  const last = await editor.locator('[data-stop="2"]').boundingBox()
+  if (!last) throw new Error('no stop')
+  await page.mouse.move(last.x + last.width / 2, last.y + last.height / 2)
+  await page.mouse.down()
+  await expect.poll(() => page.evaluate(() => window.dazbee?.gesturing())).toBe(true)
+  await page.keyboard.press('Delete')
+  await expect.poll(stops).toBe(2)
+  await page.mouse.move(5, 500)
+  await page.mouse.up()
+  await expect.poll(() => page.evaluate(() => window.dazbee?.gesturing())).toBe(false)
+  expect(errors).toEqual([])
+})
