@@ -17,7 +17,7 @@ const design = (): DesignInput => ({
   overrides: {},
 })
 
-test('? and the keyboard button list every shortcut', async ({ browser }) => {
+test('? and the keyboard button list every shortcut, F, I and Mod+Alt+G among them', async ({ browser }) => {
   const { page, errors } = await openStage(browser, design())
   const list = page.getByTestId('shortcuts')
   await expect(list).toBeHidden()
@@ -27,6 +27,9 @@ test('? and the keyboard button list every shortcut', async ({ browser }) => {
   await expect(list.getByRole('heading', { level: 2 })).toHaveText('Keyboard shortcuts')
   await expect(list.locator('[data-shortcut]')).toHaveCount(SHORTCUTS.length)
   await expect(list.locator('[data-shortcut="bringForward"] kbd')).toHaveText(['Ctrl', ']'])
+  await expect(list.locator('[data-shortcut="toolFrame"]')).toContainText('F')
+  await expect(list.locator('[data-shortcut="toolImage"]')).toContainText('I')
+  await expect(list.locator('[data-shortcut="frameSelection"]')).toContainText('G')
   writeOutput('shortcuts.png', await page.screenshot())
   await page.keyboard.press('Escape')
   await expect(list).toBeHidden()

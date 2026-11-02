@@ -198,14 +198,3 @@ test('I opens the image picker; the image uploaded there lands where the stage i
   expect(await page.evaluate(() => window.dazbee?.tool())).toBe('select')
   expect(errors).toEqual([])
 })
-
-test('F, I and Mod+Alt+G are in the shortcuts list', async ({ browser }) => {
-  const { page } = await openStage(browser, design())
-  await page.keyboard.press('Shift+Slash')
-  const dialog = page.getByTestId('shortcuts')
-  await expect(dialog).toBeVisible()
-  await expect(dialog.locator('[data-shortcut="toolFrame"]')).toContainText('F')
-  await expect(dialog.locator('[data-shortcut="toolImage"]')).toContainText('I')
-  await expect(dialog.locator('[data-shortcut="frameSelection"]')).toContainText('G')
-  writeOutput('frame-5-shortcuts.png', await page.screenshot({ animations: 'disabled' }))
-})

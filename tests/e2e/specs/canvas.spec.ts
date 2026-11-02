@@ -224,7 +224,7 @@ test('typing into the headline in one format changes it in every format', async 
   expect(errors).toEqual([])
 })
 
-test('zooming keeps the point under the cursor still, panning follows the wheel and space, and fit all shows every frame', async ({ page }) => {
+test('zooming keeps the point under the cursor still, panning follows the wheel and space, fit all shows every frame, and the zoom menu zooms to the selection and to 100%', async ({ page }) => {
   const { errors } = await open(page, fiveFormats(10))
   const camera = () => page.evaluate(() => {
     const editor = window.dazbee
@@ -286,7 +286,17 @@ test('zooming keeps the point under the cursor still, panning follows the wheel 
   await page.getByTestId('zoom').click()
   await page.getByTestId('zoom-menu').getByRole('button', { name: 'Zoom to fit' }).click()
   await nextDraw(page)
-  expect((await camera()).zoom).toBeLessThan(1)
+  const fitted = (await camera()).zoom
+  expect(fitted).toBeLessThan(1)
+
+  // The zoom menu zooms to the selection, and to 100%.
+  await page.evaluate(() => window.dazbee?.select(['p1-headline']))
+  await page.getByTestId('zoom').click()
+  await page.getByTestId('zoom-menu').getByRole('button', { name: /Zoom to selection/ }).click()
+  await expect.poll(async () => (await camera()).zoom).not.toBe(fitted)
+  await page.getByTestId('zoom').click()
+  await page.getByTestId('zoom-menu').getByRole('button', { name: /100%/ }).click()
+  await expect.poll(async () => (await camera()).zoom).toBe(1)
   expect(errors).toEqual([])
 })
 

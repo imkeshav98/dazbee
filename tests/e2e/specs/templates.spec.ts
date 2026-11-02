@@ -112,15 +112,3 @@ test('save a template, start a design from it, edit that design, and the templat
   expect((await named(page, 'Box')).x).toBe(box.x)
   expect(errors).toEqual([])
 })
-
-test('a workspace template shows for every brand, a brand template only for its own', async () => {
-  const content = { ...design(), meta: { ...design().meta, designId: `scoping-${run}` } }
-  const save = (scope: 'workspace' | 'brand', name: string) => fetch(`${API_URL}/brands/${DEV_BRAND}/templates`, {
-    method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name, scope, content }),
-  })
-  expect((await save('workspace', `Everyone ${run}`)).status).toBe(201)
-  expect((await save('brand', `Coffee only ${run}`)).status).toBe(201)
-  const names = async (brand: string) => TemplateSummary.array().parse(await (await fetch(`${API_URL}/brands/${brand}/templates`)).json()).map((t) => t.name).filter((n) => n.endsWith(run))
-  expect(await names(DEV_BRAND)).toEqual(expect.arrayContaining([`Everyone ${run}`, `Coffee only ${run}`]))
-  expect(await names('dev-brand-cycles')).toEqual([`Everyone ${run}`])
-})

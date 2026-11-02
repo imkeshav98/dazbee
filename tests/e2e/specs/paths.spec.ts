@@ -1,6 +1,7 @@
 // The pen and path editing (#45), with real pointer and keyboard input: draw a closed curved path
 // with clicks and drags, go into its points, drag one, and undo the drag in one step; then an open
-// path with Shift, a point added on a segment, a handle dragged, and a point deleted.
+// path with Shift, a point added on a segment, a handle dragged, and a point deleted; and a smooth
+// point's handles turned together, or one alone with Alt.
 import { parsePath, pathBounds, type Anchor, type PenPath } from '@dazbee/editor/path'
 import { expect, test, type Page } from '../support/test.ts'
 import { exportHashOf, writeOutput } from '../support/editor.ts'
@@ -115,7 +116,7 @@ test('the pen draws a closed curved path, a point of it is dragged, and undo tak
   expect(errors).toEqual([])
 })
 
-test('Shift keeps the pen to 45°, a click on a segment adds a point, a handle drags, and Delete takes a point out', async ({ browser }) => {
+test('Shift keeps the pen to 45°, a click on a segment adds a point, a handle drags, Delete takes a point out, and a smooth point\'s handles turn together unless Alt lets one go alone', async ({ browser }) => {
   const { page, errors } = await openStage(browser, liveDesign())
   const before = new Set(Object.keys((await read(page)).nodes))
   await press(page, 'toolPen')
@@ -167,28 +168,26 @@ test('Shift keeps the pen to 45°, a click on a segment adds a point, a handle d
   await page.evaluate(() => window.dazbee?.drawn())
   await expect(page.locator('.path-anchor')).toHaveCount(0)
   expect(await selection(page)).toEqual([id])
-  expect(errors).toEqual([])
-})
 
-test('a smooth point\'s handles turn together, and Alt lets one go alone', async ({ browser }) => {
-  const { page, errors } = await openStage(browser, liveDesign())
-  const before = new Set(Object.keys((await read(page)).nodes))
+  // Deleted, it leaves room for a path through a smooth point, drawn where it was.
+  await press(page, 'delete')
+  expect((await read(page)).nodes[id]).toBeUndefined()
+  const kept = new Set(Object.keys((await read(page)).nodes))
   await press(page, 'toolPen')
   await click(page, 100, 900)
   await drag(page, { x: 300, y: 900 }, { x: 360, y: 900 })
   await click(page, 500, 900)
   await press(page, 'editPoints')
-  const [id = ''] = Object.keys((await read(page)).nodes).filter((n) => !before.has(n))
+  const [curve = ''] = Object.keys((await read(page)).nodes).filter((n) => !kept.has(n))
   await press(page, 'editPoints')
   // Select the smooth point to show its handles, then drag its out handle down.
   const point = await dotAt(page, 'anchor', '0:1')
   await page.mouse.click(point.x, point.y)
   await page.evaluate(() => window.dazbee?.drawn())
   await expect(page.locator('.path-control')).toHaveCount(2)
-  const zoom = await page.evaluate(() => window.dazbee?.camera().zoom ?? 1)
   const out = await dotAt(page, 'control', '0:1:out')
   await dragScreen(page, out, { x: out.x, y: out.y + 60 * zoom })
-  let smooth = anchorsOf(await read(page), id)[1]
+  let smooth = anchorsOf(await read(page), curve)[1]
   expectAt(smooth?.out, 360, 960)
   // The in handle turned to stay opposite, keeping its 60.
   expectAt(smooth?.in, 300 - 60 / Math.SQRT2, 900 - 60 / Math.SQRT2)
@@ -196,7 +195,7 @@ test('a smooth point\'s handles turn together, and Alt lets one go alone', async
   // With Alt, the out handle moves alone.
   const out2 = await dotAt(page, 'control', '0:1:out')
   await dragScreen(page, out2, { x: out2.x + 40 * zoom, y: out2.y }, ['Alt'])
-  smooth = anchorsOf(await read(page), id)[1]
+  smooth = anchorsOf(await read(page), curve)[1]
   expectAt(smooth?.out, 400, 960)
   expectAt(smooth?.in, 300 - 60 / Math.SQRT2, 900 - 60 / Math.SQRT2)
   expect(errors).toEqual([])

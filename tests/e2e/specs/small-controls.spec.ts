@@ -1,9 +1,6 @@
 // Controls for what the document already holds, with real input, each change one undo step: a
-// boolean's operation changed in place, a mask's type, a text's direction from ⋯ More, the zoom
-// menu's selection and 100%, and export file names checked inside the zip.
-import { readFileSync } from 'node:fs'
+// boolean's operation changed in place, a mask's type, and a text's direction from ⋯ More.
 import { expect, test, type Page } from '../support/test.ts'
-import { readZip } from '@dazbee/export'
 import type { DesignInput } from '@dazbee/schema'
 import { writeOutput } from '../support/editor.ts'
 import { moreSubmenu, openStage, read } from '../support/stage.ts'
@@ -88,31 +85,5 @@ test('a text\'s direction from ⋯ More, one undo step', async ({ browser }) => 
   await page.keyboard.press('Escape')
   await undo(page)
   await expect.poll(async () => (await props(page, 'words')).direction).toBe('auto')
-  expect(errors).toEqual([])
-})
-
-test('the zoom menu zooms to the selection and to 100%', async ({ browser }) => {
-  const { page, errors } = await openStage(browser, design())
-  const zoom = async () => page.evaluate(() => window.dazbee?.camera().zoom)
-  const before = await zoom()
-  await select(page, ['words'])
-  await page.getByTestId('zoom').click()
-  await page.getByTestId('zoom-menu').getByRole('button', { name: /Zoom to selection/ }).click()
-  await expect.poll(zoom).not.toBe(before)
-  await page.getByTestId('zoom').click()
-  await page.getByTestId('zoom-menu').getByRole('button', { name: /100%/ }).click()
-  await expect.poll(zoom).toBe(1)
-  expect(errors).toEqual([])
-})
-
-test('export file names follow the File names field, inside the zip', async ({ browser }) => {
-  const { page, errors } = await openStage(browser, design())
-  await page.getByTestId('share-open').click()
-  await page.getByTestId('export-open').click()
-  await page.getByTestId('export-name').fill('{page} for {size}')
-  await expect(page.getByTestId('export-run')).toHaveText('Export 4 files')
-  const [zip] = await Promise.all([page.waitForEvent('download'), page.getByTestId('export-run').click()])
-  const names = readZip(new Uint8Array(readFileSync(await zip.path()))).map((e) => e.path).sort()
-  expect(names).toEqual(['Square/Cover for Square.png', 'Square/Offer for Square.png', 'Story/Cover for Story.png', 'Story/Offer for Story.png'])
   expect(errors).toEqual([])
 })

@@ -52,10 +52,11 @@ test('an edit made offline survives a reload offline and reaches the other tab w
   writeOutput('offline-1-saving.png', await a.screenshot())
   await expect(status).toHaveText('Saved')
 
-  // Without a connection: Offline, and edits are kept on this device.
+  // Without a connection: Offline, said in words beside the cloud, and edits are kept on this device.
   await a.context().setOffline(true)
   await expect(status).toHaveAttribute('data-status', 'Offline', { timeout: 30_000 })
   await expect(status).toContainText('Offline')
+  expect((await status.boundingBox())?.width).toBeGreaterThan(40)
   await typeAtEnd(a, ' 2')
   writeOutput('offline-2-offline.png', await a.screenshot())
 

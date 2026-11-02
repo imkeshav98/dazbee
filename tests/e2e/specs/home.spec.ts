@@ -1,6 +1,7 @@
 // The brand's home (#84): "What are we making today?" as a brief with Format chips and Make
-// drafts, alone. The capsule's Recent, Templates and Brand kit are pages of their own; Recent shows
-// every design as the earlier mock's masonry, each picture in its own shape.
+// drafts, alone. The capsule's Recent, Templates and Brand kit are pages of their own, Settings is in
+// the account menu, and on a phone the capsule is a tab bar; Recent shows every design as the
+// earlier mock's masonry, each picture in its own shape.
 import { expect, test, type Page } from '../support/test.ts'
 import type { DesignInput } from '@dazbee/schema'
 import { writeOutput } from '../support/editor.ts'
@@ -78,9 +79,15 @@ test('Recent is a page of real pictures, each in its shape, filtered by shape', 
   await expect(tile(`Banner ${run}`)).toHaveCount(0)
 })
 
-test('the brief is alone on the home, and the capsule goes to Recent, Templates and Brand kit pages', async ({ page }) => {
+test('the brief is alone on the home, and the capsule goes to Recent, Templates and Brand kit pages, Settings to the account menu', async ({ page }) => {
   await page.goto('/brands/dev-brand-coffee')
   const capsule = page.getByTestId('library-capsule')
+  // A tall capsule at the start edge, Home lit.
+  await expect(capsule.getByRole('link', { name: 'Home' })).toHaveAttribute('aria-current', 'page')
+  const shape = await capsule.boundingBox()
+  if (!shape) throw new Error('no capsule')
+  expect(shape.x).toBeLessThanOrEqual(20)
+  expect(shape.height).toBeGreaterThan(shape.width)
   const brief = page.getByRole('heading', { level: 1 })
   // One line, "today" in the AI gradient, the editor's top bar (the brand switcher in the crumb,
   // the account avatar), no list beside the page.
@@ -98,6 +105,7 @@ test('the brief is alone on the home, and the capsule goes to Recent, Templates 
     await expect(page).toHaveURL(new RegExp(`/brands/dev-brand-coffee/${path}$`))
     await expect(page.getByRole('heading', { level: 1 })).toHaveText(heading)
     await expect(capsule.locator('[data-lit]')).toHaveAttribute('data-entry', entry)
+    await expect(capsule.getByRole('link', { name })).toHaveAttribute('aria-current', 'page')
   }
   await capsule.getByRole('link', { name: 'Home' }).click()
   await expect(page).toHaveURL(/\/brands\/dev-brand-coffee$/)
@@ -105,6 +113,13 @@ test('the brief is alone on the home, and the capsule goes to Recent, Templates 
   // The old panel links still land, on the pages.
   await page.goto('/brands/dev-brand-coffee?show=templates')
   await expect(page).toHaveURL(/\/brands\/dev-brand-coffee\/templates$/)
+
+  // Settings is in the account menu, not the capsule, which lights nothing there.
+  await expect(capsule.getByRole('link', { name: 'Settings' })).toHaveCount(0)
+  await page.getByTestId('account-open').click()
+  await page.getByTestId('settings-link').click()
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Settings')
+  await expect(capsule.locator('[data-lit]')).toHaveCount(0)
 })
 
 test('a size under the brief opens a blank design in that size', async ({ page }) => {
@@ -118,21 +133,32 @@ test('a size under the brief opens a blank design in that size', async ({ page }
   expect(Object.values(design?.formats ?? {}).map((f) => [f.width, f.height])).toEqual([[1080, 1920]])
 })
 
-test('Make drafts opens a design in the formats the brief picked, named by the brief', async ({ page }) => {
+test('the Formats dropdown keeps one format picked, and Make drafts opens a design in the formats picked, named by the brief', async ({ page }) => {
   // The home, then the editor opening, which alone may take its 30 s on a busy runner.
   test.setTimeout(60_000)
   await page.goto('/brands/dev-brand-coffee')
   const brief = `Autumn roast launch ${crypto.randomUUID().slice(0, 6)}`
   await page.getByLabel('Brief').fill(`${brief}\nWarm, cosy, a cup on a wooden table`)
-  // Feed square is picked from the start; add Story.
+  // Feed square is picked from the start, and as the only one picked it stays; add Story.
+  const button = page.getByTestId('brief-formats')
+  const dropdown = page.getByRole('dialog', { name: 'Formats' })
+  await expect(button).toHaveText(/1 format/)
   await expect(page.getByTestId('brief-format-feed-square')).toBeChecked()
-  await page.getByTestId('brief-formats').click()
-  await page.getByRole('dialog', { name: 'Formats' }).getByText('Story', { exact: true }).click()
+  await button.click()
+  await expect(page.getByTestId('brief-format-feed-square')).toBeChecked()
+  await dropdown.getByText('Square', { exact: true }).click()
+  await expect(page.getByTestId('brief-format-feed-square')).toBeChecked()
+  await dropdown.getByText('Story', { exact: true }).click()
   await expect(page.getByTestId('brief-format-story')).toBeChecked()
+  await expect(button).toHaveText(/2 formats/)
+  await shoot(page, 'formats')
+  // Esc closes the dropdown and gives the focus back to its button.
   await page.keyboard.press('Escape')
+  await expect(dropdown).toBeHidden()
+  await expect(button).toBeFocused()
   await shoot(page, 'brief')
   await page.getByRole('button', { name: 'Make drafts' }).click()
-  await expect(page).toHaveURL(/\/brands\/dev-brand-coffee\/designs\/[\w-]+$/)
+  await expect(page).toHaveURL(/\/brands\/dev-brand-coffee\/designs\/[\w-]+$/, { timeout: 20_000 })
   await expect(page.getByTestId('status')).toHaveAttribute('data-ready', '', { timeout: 30_000 })
   const design = await page.evaluate(() => window.dazbee?.design())
   expect(design?.meta.name).toBe(brief)
@@ -140,13 +166,16 @@ test('Make drafts opens a design in the formats the brief picked, named by the b
   expect(design?.meta.primaryFormatId).toBe('f1')
 })
 
-test('on a phone the brief and the Recent page fit the screen', async ({ browser }) => {
+test('on a phone the brief and the Recent page fit the screen, and the capsule is a tab bar at the bottom', async ({ browser }) => {
   const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true })
   const page = await context.newPage()
   await page.goto('/brands/dev-brand-coffee')
   await expect(page.getByRole('button', { name: 'Make drafts' })).toBeVisible()
   // Nothing runs off the side.
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390)
+  const bar = await page.getByTestId('library-capsule').boundingBox()
+  expect(bar?.width).toBeGreaterThan(bar?.height ?? 0)
+  expect(844 - ((bar?.y ?? 0) + (bar?.height ?? 0))).toBeLessThan(24)
   await shoot(page, 'phone', true)
 
   await page.getByTestId('library-capsule').getByRole('link', { name: 'Recent' }).click()
