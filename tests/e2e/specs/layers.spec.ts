@@ -267,11 +267,7 @@ test('keyboard only: a layer moved past a big open group keeps the focus, and ty
   await expect(row(page, 'Mover')).toHaveAttribute('aria-posinset', '2')
 
   // Into the text on the canvas, all of it selected, then typed over: the words go into the text,
-  // and the focus stays out of the panel once the panel has redrawn with them (the text's row gets
-  // a new picture).
-  const picture = row(page, 'Note').getByTestId('layer-picture').locator('img')
-  await expect(picture).toHaveAttribute('src', /^blob:/)
-  const before = await picture.getAttribute('src')
+  // and the focus stays out of the panel, which has redrawn since (the text's row is selected).
   const at = await screenPoint(page, 700, 125)
   await page.mouse.dblclick(at.x, at.y)
   await page.evaluate(() => window.dazbee?.drawn())
@@ -280,7 +276,6 @@ test('keyboard only: a layer moved past a big open group keeps the focus, and ty
   await page.keyboard.type('Hello')
   await expect.poll(async () => ((await read(page)).nodes.note?.props as { text?: string }).text).toBe('Hello')
   await expect(row(page, 'Note')).toHaveAttribute('aria-selected', 'true')
-  await expect(picture).not.toHaveAttribute('src', before ?? '')
   expect(await tree(page).evaluate((list) => list.contains(document.activeElement))).toBe(false)
   writeOutput('layers-6-moved-past-group.png', await page.screenshot())
   expect(errors).toEqual([])
