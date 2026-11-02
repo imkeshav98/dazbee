@@ -147,6 +147,19 @@ export const overrideReset = defineCommand({
   },
 })
 
+/** Shows or hides layers in every format: the base, with every format's own visibility gone. */
+export const nodeVisibleEverywhere = defineCommand({
+  name: 'node.visibleEverywhere',
+  input: z.object({ ids: NodeId.array().min(1), visible: z.boolean() }),
+  check: ({ design }, { ids }) => ids.map((id) => (design.nodes[id] ? undefined : `no layer "${id}"`)).find(Boolean),
+  apply: ({ r, design }, { ids, visible }) => {
+    for (const id of ids) {
+      ;(r.nodes.get(id)?.get('props') as Y.Map<unknown> | undefined)?.set('visible', visible)
+      for (const scope of Object.keys(design.overrides)) r.overrides.delete(overrideKey(scope, id, 'visible'))
+    }
+  },
+})
+
 const isInside = (design: Design, id: string, maybeAncestor: string) => {
   for (let up: string | undefined = id; up; up = design.nodes[up]?.parentId) if (up === maybeAncestor) return true
   return false
@@ -1001,6 +1014,7 @@ export const COMMANDS = {
   'node.create': nodeCreate,
   'node.update': nodeUpdate,
   'override.reset': overrideReset,
+  'node.visibleEverywhere': nodeVisibleEverywhere,
   'node.move': nodeMove,
   'node.delete': nodeDelete,
   'node.lock': nodeLock,

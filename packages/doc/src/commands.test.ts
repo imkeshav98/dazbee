@@ -558,3 +558,38 @@ describe('commands', () => {
     })
   })
 })
+
+describe('node.visibleEverywhere', () => {
+  const visibleIn = (doc: Y.Doc, id: string) => {
+    const design = readDesign(doc)
+    return Object.keys(design.formats).map((f) => (design.overrides[`format:${f}`]?.[id]?.visible ?? design.nodes[id]?.props.visible) !== false)
+  }
+
+  it('hides a layer in every format, then shows it, one undo step each, and leaves its other own values', () => {
+    const doc = freshDoc()
+    const tab = openSession(doc)
+    // Hidden in the banner only, with a place of its own there.
+    tab.run('node.update', { ids: ['box'], scope: 'format:banner', patch: { visible: false, x: 4 } })
+    expect(visibleIn(doc, 'box')).toEqual([true, false])
+
+    tab.run('node.visibleEverywhere', { ids: ['box', 'headline'], visible: false })
+    expect(visibleIn(doc, 'box')).toEqual([false, false])
+    expect(visibleIn(doc, 'headline')).toEqual([false, false])
+    expect(readDesign(doc).overrides['format:banner']?.box).toEqual({ x: 4 })
+    expect(readDesign(doc).overrides['format:banner']?.headline).toMatchObject({ text: 'Sale' })
+
+    tab.run('node.visibleEverywhere', { ids: ['box'], visible: true })
+    expect(visibleIn(doc, 'box')).toEqual([true, true])
+
+    tab.undo()
+    expect(visibleIn(doc, 'box')).toEqual([false, false])
+    tab.undo()
+    expect(visibleIn(doc, 'box')).toEqual([true, false])
+    expect(visibleIn(doc, 'headline')).toEqual([true, true])
+  })
+
+  it('refuses a layer it does not know', () => {
+    const tab = openSession(freshDoc())
+    expect(() => tab.run('node.visibleEverywhere', { ids: ['nope'], visible: false })).toThrow(/no layer "nope"/)
+  })
+})

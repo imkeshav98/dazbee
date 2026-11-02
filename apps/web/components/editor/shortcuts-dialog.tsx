@@ -16,7 +16,7 @@ type Group = keyof Messages['editor']['shortcuts']['groups']
 const GROUPS: [Group, ShortcutAction[]][] = [
   ['edit', ['undo', 'redo', 'selectAll', 'deselect', 'delete', 'duplicate', 'editPoints']],
   ['tools', ['toolSelect', 'toolHand', 'toolFrame', 'toolRect', 'toolEllipse', 'toolLine', 'toolArrow', 'toolPen', 'toolText', 'toolImage']],
-  ['arrange', ['group', 'ungroup', 'frameSelection', 'bringForward', 'sendBackward', 'bringToFront', 'sendToBack', 'lock', 'hide', 'mask', 'autoLayout']],
+  ['arrange', ['group', 'ungroup', 'frameSelection', 'bringForward', 'sendBackward', 'bringToFront', 'sendToBack', 'lock', 'hide', 'hideEverywhere', 'mask', 'autoLayout']],
   ['align', ['alignLeft', 'alignCentre', 'alignRight', 'alignTop', 'alignMiddle', 'alignBottom', 'distributeHorizontal', 'distributeVertical']],
   ['combine', ['booleanUnion', 'booleanSubtract', 'booleanIntersect', 'booleanExclude']],
   ['move', ['nudgeLeft', 'nudgeRight', 'nudgeUp', 'nudgeDown', 'nudgeLeftFar', 'nudgeRightFar', 'nudgeUpFar', 'nudgeDownFar']],
