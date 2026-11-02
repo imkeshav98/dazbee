@@ -3,7 +3,7 @@
 // table, and reading layers back from the document.
 import { pressFor, type ShortcutAction } from '@dazbee/editor/shortcuts'
 import type { DesignInput } from '@dazbee/schema'
-import type { Browser, Locator, Page } from '@playwright/test'
+import { expect, type Browser, type Locator, type Page } from '@playwright/test'
 import { designOf, openTabs, placed, screenPoint } from './editor.ts'
 import { DEV_BRAND, seed, type InBrand } from './seed.ts'
 
@@ -86,18 +86,36 @@ export async function zoomMenu(page: Page) {
   return menu
 }
 
-/** Opens ⋯ More on the bar by the selection, unless it is open: the selected layers' own actions. */
+/**
+ * Opens ⋯ More on the bar by the selection, unless it is open, and gives it once it shows: the
+ * selected layers' own actions. A row that closes it is waited out by its caller, so a menu still
+ * closing is never taken for an open one.
+ */
 export async function moreMenu(page: Page) {
   const menu = page.getByTestId('bar-more-menu')
   if (!(await menu.isVisible())) await page.getByTestId('bar-more').click()
+  await expect(menu).toBeVisible()
   return menu
 }
 
-/** Opens the popover of one of the bar's buttons, `bar-<id>`, unless it is open, and gives it. */
+/** Opens the popover of one of the bar's buttons, `bar-<id>`, unless it is open, and gives it once it shows. */
 export async function barMenu(page: Page, id: string) {
   const menu = page.getByTestId(`bar-${id}-menu`)
   if (!(await menu.isVisible())) await page.getByTestId(`bar-${id}`).click()
+  await expect(menu).toBeVisible()
   return menu
+}
+
+/**
+ * Closes the open menu of a button on the bar with Esc, by the button's test id (`bar-size`, `bar-more`,
+ * or `more-order` for the menu beside that row of ⋯ More), and waits for the focus to be back on the
+ * button. It comes back a moment after the menu closes: a key pressed before then reaches the stage
+ * (Esc there clears the selection), and a menu opened before then loses the focus to it and closes.
+ */
+export async function closeBarMenu(page: Page, button: string) {
+  await page.keyboard.press('Escape')
+  await expect(page.getByTestId(`${button}-menu`)).toBeHidden()
+  await expect(page.getByTestId(button)).toBeFocused()
 }
 
 /** The fill list: in the Colour card (a photo, several layers), or else in the bar's Colour popover, opened. */
@@ -117,26 +135,34 @@ const SUBMENUS = ['line-up', 'order', 'group']
 
 /**
  * Clicks an action of ⋯ More, or of the right-click menu when `menu` is it, by the start of its name:
- * at the top of the menu, or in the menu beside a row (Line up ▸, Order ▸, Group ▸).
+ * at the top of the menu, or in the menu beside a row (Line up ▸, Order ▸, Group ▸). The action
+ * closes the menu, and this waits until it has.
  */
 export async function moreAction(page: Page, name: string, menu?: Locator) {
   const root = menu ?? (await moreMenu(page))
   const named = (within: Locator) => within.getByRole('button', { name: new RegExp(`^${name}`) })
-  if ((await named(root).count()) > 0) return named(root).click()
+  const run = async (action: Locator) => {
+    await action.click()
+    await expect(root).toBeHidden()
+  }
+  if ((await named(root).count()) > 0) return run(named(root))
   for (const id of SUBMENUS) {
     const row = root.getByTestId(`more-${id}`)
     if ((await row.count()) === 0) continue
+    const beside = page.getByTestId(`more-${id}-menu`)
     await row.click()
-    const items = named(page.getByTestId(`more-${id}-menu`))
-    if ((await items.count()) > 0) return items.click()
+    await expect(beside).toBeVisible()
+    if ((await named(beside).count()) > 0) return run(named(beside))
     await page.keyboard.press('Escape')
+    await expect(beside).toBeHidden()
   }
   throw new Error(`no ${name} in the menu`)
 }
 
-/** Opens the menu beside one of ⋯ More's rows, `more-<id>`, and gives it. */
+/** Opens the menu beside one of ⋯ More's rows, `more-<id>`, and gives it once it shows. */
 export async function moreSubmenu(page: Page, id: string) {
   const sub = page.getByTestId(`more-${id}-menu`)
   if (!(await sub.isVisible())) await (await moreMenu(page)).getByTestId(`more-${id}`).click()
+  await expect(sub).toBeVisible()
   return sub
 }

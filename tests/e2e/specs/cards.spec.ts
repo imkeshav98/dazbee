@@ -7,7 +7,7 @@ import { designOf, editorPath, screenPoint, writeOutput } from '../support/edito
 import { liveDesign, seed } from '../support/seed.ts'
 import { barMenu, moreSubmenu } from '../support/stage.ts'
 
-const shoot = async (page: Page, name: string) => writeOutput(`cards-${name}.png`, await page.screenshot())
+const shoot = async (page: Page, name: string) => writeOutput(`cards-${name}.png`, await page.screenshot({ animations: 'disabled' }))
 const box = async (page: Page, testId: string) => {
   const found = await page.getByTestId(testId).boundingBox()
   if (!found) throw new Error(`no ${testId}`)
@@ -132,7 +132,6 @@ test('on a phone the cards are a bottom sheet opened from the tab bar', async ({
   expect(cards.width).toBeGreaterThan(360)
   expect(cards.y + cards.height).toBeLessThanOrEqual(rail.y)
   await expect(page.getByTestId('flyout')).toHaveCount(0)
-  await page.waitForTimeout(300)
   await shoot(page, 'phone-sheet')
   await page.getByRole('button', { name: 'Inspector' }).tap()
   await expect(page.getByTestId('cards')).toBeHidden()

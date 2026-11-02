@@ -4,7 +4,7 @@
 import { expect, test, type Locator, type Page } from '../support/test.ts'
 import type { DesignInput } from '@dazbee/schema'
 import { writeOutput } from '../support/editor.ts'
-import { barMenu, fillList, moreMenu, openStage, scopeMenu, strokeList } from '../support/stage.ts'
+import { barMenu, closeBarMenu, fillList, moreMenu, openStage, scopeMenu, strokeList } from '../support/stage.ts'
 import { choose } from '../support/select.ts'
 
 test.describe.configure({ timeout: 120_000 })
@@ -147,11 +147,11 @@ test('several layers: mixed values, set together or each from its own; text and 
   await select(page, ['headline'])
   const text = page.getByTestId('spacing-card')
   await enter((await barMenu(page, 'size')).getByRole('spinbutton', { name: 'Size' }), '120')
-  await page.keyboard.press('Escape')
+  await closeBarMenu(page, 'bar-size')
   await enter(text.getByRole('spinbutton', { name: 'Letter spacing' }), '2')
   await enter(text.getByRole('spinbutton', { name: 'Line height' }), '1.1')
   await enter((await barMenu(page, 'colour')).getByRole('textbox', { name: 'Text colour hex' }), '1f9d55')
-  await page.keyboard.press('Escape')
+  await closeBarMenu(page, 'bar-colour')
   await (await barMenu(page, 'align')).getByRole('radiogroup', { name: 'Alignment', exact: true }).locator('[data-value="center"]').click()
   await (await barMenu(page, 'align')).getByRole('radiogroup', { name: 'Case' }).locator('[data-value="upper"]').click()
   await page.keyboard.press('Escape')

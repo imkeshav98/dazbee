@@ -58,6 +58,23 @@ const design = (assetId: string): DesignInput => ({
   },
 })
 
+type LongTasks = { longTasks: number[]; longTaskWatch: PerformanceObserver }
+/** Records every task that blocks the main thread for more than 50 ms, from now on. */
+const watchLongTasks = (page: Page) => page.evaluate(() => {
+  const seen: number[] = []
+  const watch = new PerformanceObserver((list) => {
+    for (const entry of list.getEntries()) seen.push(Math.round(entry.duration))
+  })
+  watch.observe({ type: 'longtask', buffered: false })
+  Object.assign(window, { longTasks: seen, longTaskWatch: watch })
+})
+/** The tasks recorded so far, with those the browser has queued but not yet handed to the watch. */
+const longTasks = (page: Page) => page.evaluate(() => {
+  const { longTasks: seen, longTaskWatch: watch } = window as unknown as LongTasks
+  for (const entry of watch.takeRecords()) seen.push(Math.round(entry.duration))
+  return seen
+})
+
 /** A reply from the export worker (ExportReply in packages/editor/src/export-client.ts). */
 type Reply =
   | { kind: 'progress'; done: number; total: number }
@@ -139,14 +156,7 @@ test('every format of a page as PNG is one zip whose files are what Node exports
 test('exporting every format of a page: how long it takes, and the main thread\'s long tasks', PERF, async ({ browser }) => {
   const asset = await upload(photo)
   const { page } = await openStage(browser, design(asset.id))
-  await page.evaluate(() => {
-    const seen: number[] = []
-    const observer = new PerformanceObserver((list) => {
-      for (const entry of list.getEntries()) seen.push(entry.duration)
-    })
-    observer.observe({ type: 'longtask', buffered: false })
-    ;(window as unknown as { longTasks: () => number[] }).longTasks = () => [...seen, ...observer.takeRecords().map((entry) => entry.duration)]
-  })
+  await watchLongTasks(page)
   // Started from a timer, as a click would start it: the browser times tasks, and an evaluate is not one.
   const took = await page.evaluate((formatIds) => new Promise<number>((resolve, reject) => {
     setTimeout(() => {
@@ -156,7 +166,7 @@ test('exporting every format of a page: how long it takes, and the main thread\'
       editor.exportFiles({ pageIds: ['p1'], formatIds, type: 'png' }).then(() => resolve(performance.now() - started), reject)
     })
   }), Object.keys(FORMATS))
-  const blocked = await page.evaluate(() => (window as unknown as { longTasks: () => number[] }).longTasks())
+  const blocked = await longTasks(page)
   report('Export, five formats of a page as PNG', {
     export: { ms: Math.round(took) },
     'main-thread tasks over 50 ms': { count: blocked.length, longestMs: Math.round(Math.max(0, ...blocked)) },

@@ -491,8 +491,10 @@ test.describe('text', () => {
     })
     await expect(field).toHaveValue('')
     await expect(field).toHaveAttribute('placeholder', 'Auto')
-    // Leaving an emptied field does the same.
+    // Leaving an emptied field does the same, once 1.4 is in the document and the field shows it.
     await enter(field, '1.4')
+    await expect.poll(async () => (await style(page, 'headline')).lineHeight).toBe(1.4)
+    await expect(field).toHaveValue('1.4')
     await step(page, async () => {
       await field.fill('')
       await field.press('Tab')
@@ -501,9 +503,11 @@ test.describe('text', () => {
     })
     // Two texts, one at 1.6 and its copy at Auto: emptied, both are Auto.
     await enter(field, '1.6')
-    await (await moreMenu(page)).getByRole('button', { name: 'Duplicate' }).click()
+    await expect.poll(async () => (await style(page, 'headline')).lineHeight).toBe(1.6)
+    await moreAction(page, 'Duplicate')
     const copy = (await page.evaluate(() => window.dazbee?.selection() ?? []))[0] ?? ''
     await select(page, [copy])
+    await expect(field).toHaveValue('1.6')
     await enter(field, '')
     await select(page, ['headline', copy])
     await expect(field).toHaveAttribute('placeholder', 'Mixed')
