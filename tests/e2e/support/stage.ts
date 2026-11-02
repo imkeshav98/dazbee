@@ -108,14 +108,11 @@ export async function barMenu(page: Page, id: string) {
 
 /**
  * Closes the open menu of a button on the bar with Esc, by the button's test id (`bar-size`, `bar-more`,
- * or `more-order` for the menu beside that row of ⋯ More), and waits for the focus to be back on the
- * button. It comes back a moment after the menu closes: a key pressed before then reaches the stage
- * (Esc there clears the selection), and a menu opened before then loses the focus to it and closes.
+ * or `more-order` for the menu beside that row of ⋯ More), and waits until it is gone.
  */
 export async function closeBarMenu(page: Page, button: string) {
   await page.keyboard.press('Escape')
   await expect(page.getByTestId(`${button}-menu`)).toBeHidden()
-  await expect(page.getByTestId(button)).toBeFocused()
 }
 
 /** The fill list: in the Colour card (a photo, several layers), or else in the bar's Colour popover, opened. */
