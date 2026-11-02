@@ -121,6 +121,8 @@ function SubMenu({ label, testId, children }: { label: string; testId: string; c
           align="start"
           sideOffset={8}
           collisionPadding={12}
+          // A click elsewhere, Esc or the arrow back closes it; focus moving as ⋯ More opens does not.
+          onFocusOutside={(event) => event.preventDefault()}
           aria-label={label}
           data-testid={`more-${testId}-menu`}
           onKeyDown={(event) => {
