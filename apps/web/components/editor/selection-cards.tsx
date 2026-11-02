@@ -892,16 +892,24 @@ type Layout = { direction: 'row' | 'column'; gap: number; padding: Record<'top' 
 type Place = 'start' | 'center' | 'end'
 const PLACES: Place[] = ['start', 'center', 'end']
 
-/** A boolean's operation, changed in place: its shapes added together, the rest cut from the first, where they overlap, or where they don't. */
-function CombineCard({ target, p }: { target: Target; p: P }) {
+/** Each operation's action, which names it and gives its icon. */
+const OPERATIONS = { union: 'booleanUnion', subtract: 'booleanSubtract', intersect: 'booleanIntersect', exclude: 'booleanExclude' } as const
+
+/**
+ * A boolean's operation, changed in place for every format: its shapes added together, the rest
+ * cut from the first, where they overlap, or where they don't.
+ */
+function CombineCard({ target, p, a }: { target: Target; p: P; a: Messages['editor']['arrange'] }) {
   const value = shared(target.props.map((pr) => pr.op as (typeof BooleanOp.options)[number]))
   return (
     <Card id="combine-card" title={p.combine}>
       <div role="radiogroup" aria-label={p.combine} className={SEGMENTS}>
-        {BooleanOp.options.map((op, i) => {
-          const Icon = COMBINE[i]?.icon
+        {BooleanOp.options.map((op) => {
+          const action = OPERATIONS[op]
+          const Icon = COMBINE.find((c) => c.action === action)?.icon
+          const name = a[action]
           return (
-            <button key={op} type="button" role="radio" aria-checked={value === op} aria-label={p.combineOps[op]} title={p.combineOps[op]} data-value={op} onClick={() => set(target, () => ({ op }))} className={cn(SEGMENT, 'grid place-items-center')}>
+            <button key={op} type="button" role="radio" aria-checked={value === op} aria-label={name} title={name} data-value={op} onClick={() => set({ ...target, everyFormat: true }, () => ({ op }))} className={cn(SEGMENT, 'grid place-items-center')}>
               {Icon && <Icon size={16} aria-hidden />}
             </button>
           )
@@ -911,11 +919,20 @@ function CombineCard({ target, p }: { target: Target; p: P }) {
   )
 }
 
-/** A mask: whether the layers it holds show where it is opaque or where it is bright. */
+/** A mask: by its shape (where it is opaque) or by its brightness. A mask is the same in every format. */
 function MaskCard({ target, p }: { target: Target; p: P }) {
   return (
     <Card id="mask-card" title={p.mask}>
-      <Segments name={p.maskBy} value={shared(target.props.map((pr) => pr.mask as 'alpha' | 'luminance'))} options={['alpha', 'luminance'] as const} labels={p.maskTypes} onSet={(mask) => set(target, () => ({ mask }))} />
+      <div className="flex flex-col gap-1">
+        <span className={FIELD_LABEL}>{p.maskBy}</span>
+        <Segments
+          name={p.maskBy}
+          value={shared(target.props.map((pr) => pr.mask as 'alpha' | 'luminance'))}
+          options={['alpha', 'luminance'] as const}
+          labels={p.maskTypes}
+          onSet={(mask) => target.editor.session.run('node.mask', { ids: target.ids, mask })}
+        />
+      </div>
     </Card>
   )
 }
@@ -1447,7 +1464,7 @@ export function SelectionCards({ editor, brandId, ids }: { editor: Editor; brand
           ? <ColourCard target={target} brandId={brandId} p={p} b={t.editor.bar} swatches />
           : ownShape && <ShapeCard target={target} p={p} kind={ownShape} />)}
       {several && !all('text') && <EffectsCard target={target} p={p} />}
-      {all('boolean') && <CombineCard target={target} p={p} />}
+      {all('boolean') && <CombineCard target={target} p={p} a={t.editor.arrange} />}
       {target.props.every((pr) => pr.mask) && <MaskCard target={target} p={p} />}
       {all('text') && <TextBoxCard target={target} p={p} />}
       {all('text') && <SpacingCard target={target} p={p} />}

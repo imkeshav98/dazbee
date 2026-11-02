@@ -287,10 +287,9 @@ export const en = {
     },
     props: {
       combine: 'Combine',
-      combineOps: { union: 'Union', subtract: 'Subtract', intersect: 'Intersect', exclude: 'Exclude' },
       mask: 'Mask',
-      maskBy: 'Shows through where it is',
-      maskTypes: { alpha: 'Opaque', luminance: 'Bright' },
+      maskBy: 'Mask by',
+      maskTypes: { alpha: 'Shape', luminance: 'Brightness' },
       applyTo: 'Apply changes to',
       forAllSizes: 'For all sizes',
       allSizes: 'All sizes',

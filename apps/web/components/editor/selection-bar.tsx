@@ -190,7 +190,7 @@ export function LayerActions({ editor, ids, onDone }: { editor: Editor; ids: str
       {texts && (
         <SubMenu label={b.textDirection} testId="text-direction">
           {(['auto', 'ltr', 'rtl'] as const).map((to) => (
-            <button key={to} type="button" role="menuitemradio" aria-checked={direction === to} data-direction={to} onClick={() => { set(target, () => ({ direction: to })); onDone() }} className={MENU_ITEM}>
+            <button key={to} type="button" aria-pressed={direction === to} data-direction={to} onClick={() => { set({ ...target, everyFormat: true }, () => ({ direction: to })); onDone() }} className={MENU_ITEM}>
               {b.textDirections[to]}
             </button>
           ))}

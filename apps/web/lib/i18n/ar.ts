@@ -278,10 +278,9 @@ export const ar: Messages = {
     },
     props: {
       combine: 'الدمج',
-      combineOps: { union: 'توحيد', subtract: 'طرح', intersect: 'تقاطع', exclude: 'استبعاد' },
       mask: 'القناع',
-      maskBy: 'يظهر ما تحته حيث يكون',
-      maskTypes: { alpha: 'معتمًا', luminance: 'ساطعًا' },
+      maskBy: 'القناع حسب',
+      maskTypes: { alpha: 'الشكل', luminance: 'السطوع' },
       applyTo: 'طبّق التغييرات على',
       forAllSizes: 'لكل المقاسات',
       allSizes: 'كل المقاسات',
