@@ -737,7 +737,8 @@ export const nodeReshape = defineCommand({
     const node = design.nodes[id]
     if (node?.type !== 'graphic' || node.props.shape.kind !== 'path') return
     const props = r.nodes.get(id)?.get('props') as Y.Map<unknown>
-    props.set('shape', { ...node.props.shape, d })
+    // The new data is drawn in the new box, so a format of another size scales it from there.
+    props.set('shape', { ...node.props.shape, d, size: { width, height } })
     const place = new Placement(design)
     for (const scope of place.scopes) {
       const was = place.get(scope, id)

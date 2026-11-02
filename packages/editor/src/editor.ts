@@ -8,7 +8,7 @@ import {
   caretAt, caretPosition, drawPage, layerPictures, paragraphCache, selectionBoxes, render, renderDesign, resourceCache, sceneMemo, textMeasure, type MeasureText, type ResourceCache, type Resources, type Scene, type SceneLayer,
 } from '@dazbee/renderer'
 import {
-  boundFillIndex, canBind, canHold, fontFamilies, imageAssetIds, isContainer, LAYER_CLIPBOARD_TYPE, LayerClipboard, LOCK_FLAGS, SCHEMA_VERSION, type BindingTarget, type Design, type ExportRequestInput, type Layer, type LayerTree, type Paint, type Variables, type VariableRef,
+  boundFillIndex, canBind, canHold, fontFamilies, imageAssetIds, isContainer, LAYER_CLIPBOARD_TYPE, LayerClipboard, LOCK_FLAGS, pathScale, SCHEMA_VERSION, type BindingTarget, type Design, type ExportRequestInput, type Layer, type LayerTree, type Paint, type Variables, type VariableRef,
 } from '@dazbee/schema'
 import type { CanvasKit, GrDirectContext, Image, SkPicture, Surface } from '@dazbee/canvaskit'
 import canvasKitModule from '@dazbee/canvaskit'
@@ -23,7 +23,7 @@ import { coverCrop, cornersOfRect, cropOf, imageRect, panned, scaled } from './c
 import { exportClient } from './export-client.ts'
 import { clickedBox, drawnBox, imageIn, isDrawTool, newDrawn, newImage, newText, withImage, type DrawTool, type ShapeTool } from './draw-tools.ts'
 import {
-  anchorOf, constrain, deleteAnchors, formatPath, hitPath, isSmooth, moveAnchors, moveControl, offsetPath, parsePath, pathBounds, sameRef, segmentsOf, splitSegment,
+  anchorOf, constrain, deleteAnchors, formatPath, hitPath, isSmooth, moveAnchors, moveControl, offsetPath, parsePath, pathBounds, sameRef, scalePath, segmentsOf, splitSegment,
   type Anchor, type AnchorRef, type PenPath, type Side,
 } from './path.ts'
 import { rulerParts } from './rulers.ts'
@@ -677,7 +677,9 @@ function live(
     const shape = { ...node.props, ...from.overrides[scope(frame)]?.[id] }.shape
     if (shape.kind !== 'path') return null
     try {
-      return { path: offsetPath(parsePath(shape.d), box.x, box.y), box, around: [...containersOf(frame, node.parentId, from), box] }
+      // As it is drawn: scaled from the box it was drawn in to this one.
+      const { sx, sy } = pathScale(shape, box.width, box.height)
+      return { path: offsetPath(scalePath(parsePath(shape.d), sx, sy), box.x, box.y), box, around: [...containersOf(frame, node.parentId, from), box] }
     } catch {
       return null
     }
@@ -1471,10 +1473,21 @@ function live(
           if ((box[key] !== was?.[key] || wrote.has(`${id}|${key}`)) && box[key] !== current?.[key]) patch[key] = box[key]
         }
         for (const key of Object.keys(patch)) wrote.add(`${id}|${key}`)
+        if ('width' in patch || 'height' in patch) pinPathSize(id, now)
         // Another tab may delete or lock a layer mid-drag; the drag then just leaves it be.
         if (Object.keys(patch).length > 0) runQuietly(() => session.run('node.update', { ids: [id], scope: scope(frame), patch }))
       }
     })
+  }
+  /**
+   * Gives a path that has no size of its own the size it is drawn at, its box in the base, so a new
+   * box scales it from there. Paths drawn before paths had a size get theirs on their first resize.
+   */
+  function pinPathSize(id: string, now: Design) {
+    const node = now.nodes[id]
+    if (node?.type !== 'graphic' || node.props.shape.kind !== 'path' || node.props.shape.size) return
+    const size = { width: node.props.width, height: node.props.height }
+    runQuietly(() => session.run('node.update', { ids: [id], scope: 'base', patch: { shape: { ...node.props.shape, size } } }))
   }
   /** Every layer under `id` in the document, nearest first. */
   const under = (id: string, from: Design): string[] => childrenOf(from, id).flatMap(([child]) => [child, ...under(child, from)])
@@ -2334,7 +2347,7 @@ function live(
     const box = { x: round(b.x), y: round(b.y), width: round(b.width), height: round(b.height), rotation: 0 }
     const { parentId } = pen
     let id = ''
-    const shape = { kind: 'path', d: formatPath(path, box) }
+    const shape = { kind: 'path', d: formatPath(path, box), size: { width: box.width, height: box.height } }
     const layer = { type: 'graphic' as const, name: 'Path', props: { x: box.x, y: box.y, width: box.width, height: box.height, shape, strokes: [PEN_STROKE] } }
     if (runQuietly(() => { id = session.run('node.create', { parentId, layer }) })) pen.layer = { id, start: box, applied: { x: 0, y: 0 } }
   }
@@ -3237,6 +3250,7 @@ function live(
             ...(node?.bindings?.fontFamily && style && style.fontFamily !== was?.fontFamily ? ['fontFamily' as const] : []),
           ]
           for (const target of unbind) session.run('node.bind', { ids: [id], target, ref: null })
+          if ('width' in patch || 'height' in patch) pinPathSize(id, session.design())
           if (!everyFormat) {
             session.run('node.update', { ids: [id], scope: here, patch })
             continue

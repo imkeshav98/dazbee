@@ -39,7 +39,8 @@ describe('node.reshape', () => {
     const { doc, tab } = open()
     // A new first point 20 to the left and 10 above: the outline now starts there.
     tab.run('node.reshape', { id: 'zig', d: 'M0 0 L20 10 L120 60', dx: -20, dy: -10, width: 120, height: 60 })
-    expect(placed(doc, 'format:sq')).toMatchObject({ x: 80, y: 90, width: 120, height: 60, shape: { kind: 'path', d: 'M0 0 L20 10 L120 60' } })
+    // The new data is drawn in the new box, so that is its size.
+    expect(placed(doc, 'format:sq')).toMatchObject({ x: 80, y: 90, width: 120, height: 60, shape: { kind: 'path', d: 'M0 0 L20 10 L120 60', size: { width: 120, height: 60 } } })
     expect(placed(doc, 'format:wide')).toMatchObject({ x: 380, y: 90, width: 120, height: 60 })
     // The old points draw where they did in every format, the turned one included.
     for (const scope of ['format:sq', 'format:wide', 'format:tall']) {
