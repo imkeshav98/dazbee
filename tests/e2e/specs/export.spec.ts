@@ -1,7 +1,8 @@
 // Export (#55) in Chromium, through the Export menu: every format of a page as PNG downloads as one
 // zip with a folder per format, and every file in it is byte for byte what Node exports from the
 // same design, drawn in the export worker rather than on the main thread, and named by the File
-// names field; and one format as JPG downloads as itself.
+// names field; every page of a carousel downloads as one zip of each page's own file; and one
+// format as JPG downloads as itself.
 import { readFileSync } from 'node:fs'
 import { expect, test, type Page } from '../support/test.ts'
 import { exportDesign, readZip } from '@dazbee/export'
@@ -182,6 +183,67 @@ test('exporting every format of a page: how long it takes, and the main thread\'
     export: { ms: Math.round(took) },
     'main-thread tasks over 50 ms': { count: blocked.length, longestMs: Math.round(Math.max(0, ...blocked)) },
   })
+})
+
+/** A carousel of three pages in one format, each its own picture: a photo and words, words on dark, a badge on pink. */
+const carousel = (assetId: string): DesignInput => ({
+  meta: { schemaVersion: 5, designId: 'replaced-by-the-api', name: 'Spring carousel', kind: 'carousel', primaryFormatId: 'pt' },
+  formats: { pt: FORMATS.pt },
+  pages: {
+    s1: { name: 'Slide 1', order: 'a0', fills: [{ type: 'solid', color: '#FFF6E8FF' }] },
+    s2: { name: 'Slide 2', order: 'a1', fills: [{ type: 'solid', color: '#15121AFF' }] },
+    s3: { name: 'Slide 3', order: 'a2', fills: [{ type: 'solid', color: '#FF48B0FF' }] },
+  },
+  nodes: {
+    photo: {
+      type: 'graphic', parentId: 's1', index: 'a0', name: 'Photo',
+      props: { x: 80, y: 80, width: 920, height: 760, shape: { kind: 'rect', cornerRadius: 40 }, fills: [{ type: 'image', assetId, fit: 'fill' }] },
+    },
+    title: {
+      type: 'text', parentId: 's1', index: 'a1', name: 'Title', role: 'headline',
+      props: { x: 80, y: 960, width: 920, height: 140, text: 'Spring drop', style: { fontFamily: 'Noto Sans', fontSize: 110, fontWeight: 800, color: '#15121AFF' } },
+    },
+    offer: {
+      type: 'text', parentId: 's2', index: 'a0', name: 'Offer',
+      props: { x: 80, y: 600, width: 920, height: 140, text: '30% off', style: { fontFamily: 'Noto Sans', fontSize: 120, fontWeight: 800, color: '#FFFFFFFF' } },
+    },
+    badge: {
+      type: 'graphic', parentId: 's3', index: 'a0', name: 'Badge',
+      props: { x: 340, y: 300, width: 400, height: 400, shape: { kind: 'star', points: 10, innerRadius: 0.75 }, fills: [{ type: 'solid', color: '#FFD23FFF' }] },
+    },
+    cta: {
+      type: 'text', parentId: 's3', index: 'a1', name: 'Call to action',
+      props: { x: 80, y: 900, width: 920, height: 120, text: 'Shop now', style: { fontFamily: 'Noto Sans', fontSize: 96, fontWeight: 700, color: '#15121AFF' } },
+    },
+  },
+  overrides: {},
+})
+
+test('every page of a carousel as PNG is one zip whose files are each what Node exports of that page', async ({ browser }) => {
+  const asset = await upload(photo)
+  const { page, errors } = await openStage(browser, carousel(asset.id))
+  await page.getByTestId('share-open').click()
+  await page.getByTestId('export-open').click()
+  const dialog = page.getByTestId('export')
+  // Every page, as the export opens.
+  await expect(dialog.getByRole('radio', { name: 'All 3' })).toHaveAttribute('aria-checked', 'true')
+  await expect(page.getByTestId('export-run')).toHaveText('Export 3 files')
+  writeOutput('export-5-carousel-menu.png', await page.screenshot())
+  const [download] = await Promise.all([page.waitForEvent('download'), page.getByTestId('export-run').click()])
+  expect(download.suggestedFilename()).toBe('Spring carousel.zip')
+  const entries = readZip(new Uint8Array(readFileSync(await download.path())))
+  expect(entries).toHaveLength(3)
+
+  // Each file is its own page, byte for byte what Node exports of that page alone.
+  const node = await nodeExport(page, asset.id)
+  for (const [i, pageId] of ['s1', 's2', 's3'].entries()) {
+    const browserFile = Buffer.from(entries[i]?.bytes ?? [])
+    expect(browserFile.equals(Buffer.from(node({ pageIds: [pageId], formatIds: ['pt'], type: 'png' }))), `file ${i + 1} is ${pageId} as Node exports it`).toBe(true)
+    writeOutput(`export-6-carousel-${pageId}.png`, browserFile)
+  }
+  expect(new Set(entries.map((e) => Buffer.from(e.bytes).toString('base64'))).size).toBe(3)
+  expect(entries.map((e) => e.path)).toEqual(['Slide 1', 'Slide 2', 'Slide 3'].map((pageName) => `Portrait 4-5/Spring carousel - ${pageName} - Portrait 4-5.png`))
+  expect(errors).toEqual([])
 })
 
 test('one format as JPG downloads as itself, at the quality picked, the same bytes as Node', async ({ browser }) => {
