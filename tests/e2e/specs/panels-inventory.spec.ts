@@ -92,9 +92,9 @@ const props = async (page: Page, id: string) => placed(await doc(page), id, 'sq'
 const byOrder = <T extends { order: string }>(a: T, b: T) => (a.order < b.order ? -1 : 1)
 const style = async (page: Page, id: string) => (await props(page, id)).style ?? {}
 const boxOf = async (page: Page, id: string) => { const p = await props(page, id); return { width: Number(p.width), height: Number(p.height) } }
-/** Makes the headline size itself to its words, as the Box menu does. */
+/** Makes the headline size itself to its words, as the Text box card's tiles do. */
 const autoBox = async (page: Page, mode: 'autoWidth' | 'autoHeight') => {
-  await choose(page.getByTestId('paragraph-card').getByRole('combobox', { name: 'Box' }), mode)
+  await page.getByTestId('text-box-card').getByRole('radiogroup', { name: 'Box' }).locator(`[data-value="${mode}"]`).click()
   await expect.poll(async () => (await props(page, 'headline')).boxMode).toBe(mode)
 }
 const fills = async (page: Page, id: string) => (await props(page, id)).fills ?? []
@@ -481,7 +481,7 @@ test.describe('text', () => {
   row(16, 'line height, and back to Auto', async (open) => {
     const page = await open()
     await select(page, ['headline'])
-    const field = page.getByTestId('text-card').getByRole('spinbutton', { name: 'Line height' })
+    const field = page.getByTestId('spacing-card').getByRole('spinbutton', { name: 'Line height' })
     await step(page, () => enter(field, '1.6'), async () => {
       await expect.poll(async () => (await style(page, 'headline')).lineHeight).toBe(1.6)
     })
@@ -518,7 +518,7 @@ test.describe('text', () => {
     await select(page, ['headline'])
     // A field with no unset value keeps its number when emptied.
     const before = await designOf(page)
-    const spacing = page.getByTestId('text-card').getByRole('spinbutton', { name: 'Letter spacing' })
+    const spacing = page.getByTestId('spacing-card').getByRole('spinbutton', { name: 'Letter spacing' })
     await enter(spacing, '')
     await expect(spacing).toHaveValue('0')
     expect(await designOf(page)).toBe(before)
@@ -528,13 +528,13 @@ test.describe('text', () => {
   row(17, 'letter spacing', async (open) => {
     const page = await open()
     await select(page, ['headline'])
-    await step(page, () => enter(page.getByTestId('text-card').getByRole('spinbutton', { name: 'Letter spacing' }), '4'), async () => {
+    await step(page, () => enter(page.getByTestId('spacing-card').getByRole('spinbutton', { name: 'Letter spacing' }), '4'), async () => {
       await expect.poll(async () => (await style(page, 'headline')).letterSpacing).toBe(4)
     })
     // A box as wide as its words widens with them.
     await autoBox(page, 'autoWidth')
     const wide = (await boxOf(page, 'headline')).width
-    await step(page, () => enter(page.getByTestId('text-card').getByRole('spinbutton', { name: 'Letter spacing' }), '20'), async () => {
+    await step(page, () => enter(page.getByTestId('spacing-card').getByRole('spinbutton', { name: 'Letter spacing' }), '20'), async () => {
       await expect.poll(async () => (await boxOf(page, 'headline')).width).toBeGreaterThan(wide)
     })
     await reloads(page)
@@ -543,7 +543,7 @@ test.describe('text', () => {
   row(18, 'paragraph spacing', async (open) => {
     const page = await open()
     await select(page, ['headline'])
-    await step(page, () => enter(page.getByTestId('paragraph-card').getByRole('spinbutton', { name: 'Paragraph spacing' }), '24'), async () => {
+    await step(page, () => enter(page.getByTestId('spacing-card').getByRole('spinbutton', { name: 'Paragraph spacing' }), '24'), async () => {
       await expect.poll(async () => (await props(page, 'headline')).paragraphSpacing).toBe(24)
     })
     await reloads(page)
@@ -631,19 +631,19 @@ test.describe('text', () => {
   row(25, 'box mode: auto width, auto height, fixed', async (open) => {
     const page = await open()
     await select(page, ['headline'])
-    const field = page.getByTestId('paragraph-card').getByRole('combobox', { name: 'Box' })
+    const box = page.getByTestId('text-box-card').getByRole('radiogroup', { name: 'Box' })
     const size = async () => { const p = await props(page, 'headline'); return [p.width, p.height] }
     // The lines start at the box's start and top in every mode, so the picture stays the same.
-    await step(page, () => choose(field, 'autoWidth'), async () => {
+    await step(page, () => box.locator('[data-value="autoWidth"]').click(), async () => {
       await expect.poll(async () => (await props(page, 'headline')).boxMode).toBe('autoWidth')
       await expect.poll(async () => (await size())[0]).toBeLessThan(760)
     }, { draws: false })
-    await step(page, () => choose(field, 'autoHeight'), async () => {
+    await step(page, () => box.locator('[data-value="autoHeight"]').click(), async () => {
       await expect.poll(async () => (await props(page, 'headline')).boxMode).toBe('autoHeight')
       await expect.poll(async () => (await size())[1]).toBeLessThan(260)
     }, { draws: false })
     const kept = await size()
-    await step(page, () => choose(field, 'fixed'), async () => {
+    await step(page, () => box.locator('[data-value="fixed"]').click(), async () => {
       await expect.poll(async () => (await props(page, 'headline')).boxMode).toBe('fixed')
       expect(await size()).toEqual(kept)
     }, { draws: false })
@@ -653,9 +653,9 @@ test.describe('text', () => {
   row(26, 'shrink to fit, smallest and largest size', async (open) => {
     const page = await open()
     await select(page, ['headline'])
-    const card = page.getByTestId('paragraph-card')
+    const card = page.getByTestId('text-box-card')
     // The text fits its box at 72 already, so turning it on changes nothing drawn.
-    await step(page, () => card.getByRole('button', { name: 'Shrink to fit' }).click(), async () => {
+    await step(page, () => card.getByRole('switch', { name: 'Shrink to fit' }).click(), async () => {
       await expect.poll(async () => (await props(page, 'headline')).shrinkToFit).toBeTruthy()
     }, { draws: false })
     await step(page, () => enter(card.getByRole('spinbutton', { name: 'Largest size' }), '200'), async () => {
@@ -670,7 +670,7 @@ test.describe('text', () => {
   row(27, 'lines at most', async (open) => {
     const page = await open()
     await select(page, ['headline'])
-    await step(page, () => enter(page.getByTestId('paragraph-card').getByRole('spinbutton', { name: 'Lines at most' }), '1'), async () => {
+    await step(page, () => enter(page.getByTestId('text-box-card').getByRole('spinbutton', { name: 'Max lines' }), '1'), async () => {
       await expect.poll(async () => (await props(page, 'headline')).maxLines).toBe(1)
     })
     await reloads(page)
@@ -722,7 +722,7 @@ test.describe('shapes and frames', () => {
     await select(page, ['box'])
     await (await fillList(page)).locator('[data-row="1"]').getByTestId('paint-swatch').click()
     const editor = page.getByTestId('paint-editor')
-    for (const [name, type] of [['Linear gradient', 'linear'], ['Radial gradient', 'radial'], ['Angular gradient', 'angular'], ['Solid', 'solid']] as const) {
+    for (const [name, type] of [['Line gradient', 'linear'], ['Circle gradient', 'radial'], ['Sweep gradient', 'angular'], ['Solid', 'solid']] as const) {
       await step(page, () => editor.getByRole('radio', { name }).click(), async () => {
         await expect.poll(async () => (await fills(page, 'box'))[0]?.type).toBe(type)
       })
@@ -741,7 +741,7 @@ test.describe('shapes and frames', () => {
     await select(page, ['box'])
     await (await fillList(page)).locator('[data-row="1"]').getByTestId('paint-swatch').click()
     const editor = page.getByTestId('paint-editor')
-    await editor.getByRole('radio', { name: 'Linear gradient' }).click()
+    await editor.getByRole('radio', { name: 'Line gradient' }).click()
     const stops = async () => ((await fills(page, 'box'))[0]?.stops ?? []) as { offset: number; color: string }[]
     await expect.poll(async () => (await stops()).length).toBe(2)
     const bar = editor.getByTestId('gradient-bar')
@@ -765,7 +765,7 @@ test.describe('shapes and frames', () => {
     await step(page, () => enter(editor.getByRole('spinbutton', { name: 'Gradient angle' }), '45'), async () => {
       await expect.poll(ends).not.toBe(along)
     })
-    await editor.getByRole('radio', { name: 'Radial gradient' }).click()
+    await editor.getByRole('radio', { name: 'Circle gradient' }).click()
     await step(page, () => enter(editor.getByRole('spinbutton', { name: 'Gradient centre across' }), '20'), async () => {
       await expect.poll(async () => (await fills(page, 'box'))[0]?.center).toMatchObject({ x: 0.2 })
     })
@@ -789,7 +789,7 @@ test.describe('shapes and frames', () => {
       await expect.poll(async () => (await fills(page, 'box'))[0]?.color).toBe('#00A889CC')
     })
     await card.locator('[data-row="1"]').getByTestId('paint-swatch').click()
-    await page.getByTestId('paint-editor').getByRole('radio', { name: 'Linear gradient' }).click()
+    await page.getByTestId('paint-editor').getByRole('radio', { name: 'Line gradient' }).click()
     await page.keyboard.press('Escape')
     await step(page, () => enter(card.getByRole('spinbutton', { name: 'Colour 1 opacity' }), '50'), async () => {
       await expect.poll(async () => (await fills(page, 'box'))[0]?.opacity).toBe(0.5)
@@ -874,7 +874,7 @@ test.describe('shapes and frames', () => {
     const shape = async () => (await props(page, 'box')).shape as Record<string, unknown>
     await step(page, () => enter(card.getByRole('spinbutton', { name: 'Corners' }), '60'), async () => { await expect.poll(shape).toMatchObject({ cornerRadius: 60 }) })
     // Each corner starts at the radius all four had.
-    await step(page, () => card.getByRole('checkbox', { name: 'Each corner its own radius' }).click(), async () => {
+    await step(page, () => card.getByRole('switch', { name: 'Each corner its own' }).click(), async () => {
       await expect.poll(async () => (await shape()).corners).toEqual([60, 60, 60, 60])
     }, { draws: false })
     for (const [i, corner, radius] of [[0, 'Top left', 0], [1, 'Top right', 20], [2, 'Bottom right', 90], [3, 'Bottom left', 40]] as const) {
@@ -986,7 +986,7 @@ test.describe('photos', () => {
     const page = await open()
     await select(page, ['photo'])
     const card = page.getByTestId('adjust-card')
-    for (const [name, key] of [['Exposure', 'exposure'], ['Contrast', 'contrast'], ['Saturation', 'saturation'], ['Temperature', 'temperature'], ['Tint', 'tint']] as const) {
+    for (const [name, key] of [['Light', 'exposure'], ['Contrast', 'contrast'], ['Saturation', 'saturation'], ['Warmth', 'temperature'], ['Tint', 'tint']] as const) {
       await step(page, () => enter(card.getByRole('spinbutton', { name }), '40'), async () => {
         await expect.poll(async () => ((await image(page)).adjust as Record<string, number> | undefined)?.[key]).toBe(40)
       })
@@ -1158,7 +1158,7 @@ test.describe('nothing selected', () => {
       await expect.poll(async () => (await background(page))[1]?.color).toMatch(/^#2F6BFF/)
     })
     await layers.locator('[data-row="1"]').getByTestId('paint-swatch').click()
-    await step(page, () => page.getByTestId('paint-editor').getByRole('radio', { name: 'Linear gradient' }).click(), async () => {
+    await step(page, () => page.getByTestId('paint-editor').getByRole('radio', { name: 'Line gradient' }).click(), async () => {
       await expect.poll(async () => (await background(page))[1]?.type).toBe('linear')
     })
     await page.keyboard.press('Escape')

@@ -145,7 +145,7 @@ test('several layers: mixed values, set together or each from its own; text and 
 
   // Text.
   await select(page, ['headline'])
-  const text = page.getByTestId('text-card')
+  const text = page.getByTestId('spacing-card')
   await enter((await barMenu(page, 'size')).getByRole('spinbutton', { name: 'Size' }), '120')
   await page.keyboard.press('Escape')
   await enter(text.getByRole('spinbutton', { name: 'Letter spacing' }), '2')

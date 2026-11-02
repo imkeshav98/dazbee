@@ -71,7 +71,7 @@ test('a gradient over a photo: added on top, a stop edited, the two reordered, o
   // Its swatch turns it into a linear gradient, which keeps its colour as the first stop.
   await card.locator('[data-row="1"]').getByTestId('paint-swatch').click()
   const editor = page.getByTestId('paint-editor')
-  await editor.getByRole('radio', { name: 'Linear gradient' }).click()
+  await editor.getByRole('radio', { name: 'Line gradient' }).click()
   await expect.poll(async () => (await fillsOf(page))[1]?.type).toBe('linear')
   // The second stop: pink, half see-through.
   await editor.locator('[data-stop="1"]').click()
@@ -155,7 +155,7 @@ test('a stroke and the page background take the same paint editor: an angular st
   await stroke.getByRole('button', { name: 'Add outline' }).click()
   await stroke.locator('[data-row="1"]').getByTestId('paint-swatch').click()
   const editor = page.getByTestId('paint-editor')
-  await editor.getByRole('radio', { name: 'Angular gradient' }).click()
+  await editor.getByRole('radio', { name: 'Sweep gradient' }).click()
   await expect.poll(async () => ((await read(page)).nodes.card?.props.strokes as { paint: Fill }[])[0]?.paint.type).toBe('angular')
   await editor.getByRole('spinbutton', { name: 'Gradient angle' }).fill('45')
   await editor.getByRole('spinbutton', { name: 'Gradient angle' }).press('Enter')
@@ -169,7 +169,7 @@ test('a stroke and the page background take the same paint editor: an angular st
   const pageCard = page.getByTestId('page-card')
   const layers = pageCard.getByTestId('page-fills')
   await layers.locator('[data-row="1"]').getByTestId('paint-swatch').click()
-  await editor.getByRole('radio', { name: 'Radial gradient' }).click()
+  await editor.getByRole('radio', { name: 'Circle gradient' }).click()
   await expect.poll(async () => ((await read(page)) as unknown as { pages: Record<string, { fills: Fill[] }> }).pages.p1?.fills[0]?.type).toBe('radial')
   await editor.getByRole('spinbutton', { name: 'Gradient size' }).fill('80')
   await editor.getByRole('spinbutton', { name: 'Gradient size' }).press('Enter')
