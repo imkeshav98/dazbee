@@ -3,10 +3,10 @@
 // undone with it); a box that shrinks its words to fit keeps them inside, and the export draws every
 // word within its box.
 import { expect, test, type Page } from '../support/test.ts'
-import { EMPTY_BRAND_KIT, type DesignInput } from '@dazbee/schema'
+import type { DesignInput } from '@dazbee/schema'
 import { writeOutput } from '../support/editor.ts'
 import { importGoogleFonts } from '../support/fonts.ts'
-import { API_URL, DEV_BRAND } from '../support/seed.ts'
+import { newBrand, putKit } from '../support/seed.ts'
 import { openStage, read } from '../support/stage.ts'
 
 test.describe.configure({ timeout: 180_000 })
@@ -33,7 +33,6 @@ const design = (): DesignInput => ({
 type Text = { props: { width: number; height: number; style: { fontFamily: string } } }
 const text = async (page: Page, id: string) => (await read(page)).nodes[id] as unknown as Text
 const storyWidth = async (page: Page) => ((await read(page)).overrides['format:story']?.wide as { width?: number } | undefined)?.width
-const putKit = (family: string) => fetch(`${API_URL}/brands/${DEV_BRAND}/kit`, { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ ...EMPTY_BRAND_KIT, fonts: [{ token: 'heading', name: 'Heading', family }] }) })
 
 /** Whether the export draws anything but the white page under a box, over its columns, before the next layer. */
 const inkBelow = (page: Page, box: { x: number; y: number; width: number; height: number }) => page.evaluate((box) => {
@@ -61,16 +60,15 @@ const inkRightOf = (page: Page, box: { x: number; y: number; width: number; heig
   return false
 }, box)
 
-test.beforeAll(async () => {
+test.beforeAll(() => {
   importGoogleFonts(['Playfair Display'])
-  expect((await putKit('Noto Sans')).ok).toBe(true)
-})
-test.afterAll(async () => {
-  await fetch(`${API_URL}/brands/${DEV_BRAND}/kit`, { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(EMPTY_BRAND_KIT) })
 })
 
 test('a brand kit font change refits the text bound to it in every format, and undo leaves the refit', async ({ browser }) => {
-  const { page, errors } = await openStage(browser, design())
+  // A brand of its own, its Heading font Noto Sans, so no spec running alongside changes its kit.
+  const brandId = await newBrand('Brand font refit')
+  await putKit(brandId, { fonts: [{ token: 'heading', name: 'Heading', family: 'Noto Sans' }] })
+  const { page, errors } = await openStage(browser, design(), brandId)
   const before = { wide: (await text(page, 'wide')).props.width, story: await storyWidth(page), tall: (await text(page, 'tall')).props.height }
 
   // Change the kit's Heading font in the Brand panel.

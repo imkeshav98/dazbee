@@ -8,25 +8,26 @@ import { DEV_BRAND, liveDesign, seed } from './seed.ts'
 export const OUTPUT = join(import.meta.dirname, '..', 'output')
 
 /**
- * Opens a design in `count` tabs, each in its own browser context, all live. Without a design id
- * it creates a fresh one; with one it opens what the sync server already has.
+ * Opens a design of a brand, the development one unless given, in `count` tabs, each in its own
+ * browser context, all live. Without a design id it creates a fresh one; with one it opens what the
+ * sync server already has.
  */
-export async function openTabs(browser: Browser, count: number, existing?: string) {
-  const designId = existing ?? await seed(liveDesign())
+export async function openTabs(browser: Browser, count: number, existing?: string, brandId = DEV_BRAND) {
+  const designId = existing ?? await seed(liveDesign(), undefined, brandId)
   const tabs: Page[] = []
   const errors: string[] = []
   for (let i = 0; i < count; i++) {
     const context = await browser.newContext({ viewport: { width: 1280, height: 900 } })
     const page = await context.newPage()
     page.on('pageerror', (error) => errors.push(`tab ${i + 1}: ${error.message}`))
-    await page.goto(editorPath(designId))
+    await page.goto(editorPath(designId, brandId))
     await expect(page.getByTestId('status')).toHaveAttribute('data-ready', '', { timeout: 30_000 })
     tabs.push(page)
   }
   return { designId, tabs, errors }
 }
 
-export const editorPath = (designId: string) => `/brands/${DEV_BRAND}/designs/${designId}`
+export const editorPath = (designId: string, brandId = DEV_BRAND) => `/brands/${brandId}/designs/${designId}`
 
 /**
  * What the stage shows, with the panel capsule masked: it floats over the canvas (#82) and the AI

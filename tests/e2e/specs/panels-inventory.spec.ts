@@ -10,7 +10,7 @@ import { EMPTY_BRAND_KIT, type DesignInput } from '@dazbee/schema'
 import { photo, upload } from '../support/assets.ts'
 import { designOf, placed, synced, writeOutput } from '../support/editor.ts'
 import { importGoogleFonts } from '../support/fonts.ts'
-import { API_URL, DEV_BRAND } from '../support/seed.ts'
+import { newBrand, putKit } from '../support/seed.ts'
 import { choose } from '../support/select.ts'
 import { barMenu, drag, fillList, moreAction, moreMenu, openStage, scopeMenu, strokeList } from '../support/stage.ts'
 
@@ -30,10 +30,13 @@ const KIT = {
   fonts: [{ token: 'body', name: 'Body', family: 'Noto Sans' }],
 }
 
+// Each worker's rows work in a brand of their own, so no spec running alongside changes its kit.
+let brandId: string
 let assets: { photo: string; tile: string }
 test.beforeAll(async () => {
-  assets = { photo: (await upload(photo)).id, tile: (await upload(tile)).id }
-  expect((await fetch(`${API_URL}/brands/${DEV_BRAND}/kit`, { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(KIT) })).ok).toBe(true)
+  brandId = await newBrand('Panels inventory')
+  assets = { photo: (await upload(photo, brandId)).id, tile: (await upload(tile, brandId)).id }
+  await putKit(brandId, KIT)
 })
 
 const solid = (color: string) => [{ type: 'solid' as const, color }]
@@ -162,7 +165,7 @@ function row(n: number, title: string, body: (open: (withStory?: boolean) => Pro
     let page: Page | undefined
     try {
       await body(async (withStory = false) => {
-        page = (await openStage(browser, design(withStory))).page
+        page = (await openStage(browser, design(withStory), brandId)).page
         return page
       })
     } catch (error) {

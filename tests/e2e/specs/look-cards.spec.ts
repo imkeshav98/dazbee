@@ -2,9 +2,9 @@
 // from the brand kit, the effects as tiles with their numbers under them, and the header card that
 // names the layer and holds its box.
 import { expect, test, type Page } from '../support/test.ts'
-import { EMPTY_BRAND_KIT, type DesignInput } from '@dazbee/schema'
+import type { DesignInput } from '@dazbee/schema'
 import { writeOutput } from '../support/editor.ts'
-import { API_URL, DEV_BRAND } from '../support/seed.ts'
+import { newBrand, putKit } from '../support/seed.ts'
 import { barMenu, openStage } from '../support/stage.ts'
 
 test.describe.configure({ timeout: 120_000 })
@@ -30,9 +30,10 @@ type Node = { bindings?: Record<string, string>; props: Record<string, unknown> 
 const node = (page: Page, id: string) => page.evaluate((id) => window.dazbee?.design().nodes[id], id) as Promise<Node>
 
 test('the look comes first: size and brand colour, effect tiles, and the header card', async ({ browser }) => {
-  const kit = { ...EMPTY_BRAND_KIT, colors: [{ token: 'berry', name: 'Berry', value: '#FF3D6EFF' }, { token: 'roast', name: 'Roast', value: '#2A140AFF' }] }
-  expect((await fetch(`${API_URL}/brands/${DEV_BRAND}/kit`, { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(kit) })).ok).toBe(true)
-  const { page, errors } = await openStage(browser, design())
+  // A brand of its own, so no spec running alongside changes its kit.
+  const brandId = await newBrand('Look cards')
+  await putKit(brandId, { colors: [{ token: 'berry', name: 'Berry', value: '#FF3D6EFF' }, { token: 'roast', name: 'Roast', value: '#2A140AFF' }] })
+  const { page, errors } = await openStage(browser, design(), brandId)
   await page.evaluate(() => window.dazbee?.select(['headline']))
 
   // Text, in the bar: the size, and the brand's colours with the colour it has now leading them.

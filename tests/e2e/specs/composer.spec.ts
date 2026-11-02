@@ -1,16 +1,13 @@
 // The brief's toolbar (#136) in Chromium: the Formats dropdown picks what Make drafts makes and
 // keeps one picked, + adds a reference ad or images uploaded to the brand's assets as thumbnails
 // above the brief, and Brand kit opens the whole kit to pick from. Each choice is a form field.
-import { AssetSummary, EMPTY_BRAND_KIT, type BrandKit } from '@dazbee/schema'
+import { AssetSummary } from '@dazbee/schema'
 import { expect, test } from '../support/test.ts'
 import { photo } from '../support/assets.ts'
 import { writeOutput } from '../support/editor.ts'
-import { API_URL, DEV_BRAND, liveDesign, seed } from '../support/seed.ts'
+import { API_URL, DEV_BRAND, liveDesign, newBrand, putKit, seed } from '../support/seed.ts'
 
 test.use({ viewport: { width: 1440, height: 900 } })
-
-const putKit = (brandId: string, kit: BrandKit) =>
-  fetch(`${API_URL}/brands/${brandId}/kit`, { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(kit) })
 
 test('the Formats dropdown picks the formats Make drafts makes, and one always stays picked', async ({ page }) => {
   // The home, then the editor opening, which alone may take its 30 s on a busy runner.
@@ -80,47 +77,41 @@ test('+ adds a reference ad and uploaded images above the brief, each taken off 
 })
 
 test('Brand kit opens the whole kit: the switch, and each colour, font and the voice picked or not', async ({ page }) => {
-  // A brand of its own here, so the brand kit checks elsewhere never change it under this one.
-  const brandId = 'dev-brand-cycles'
-  const kit: BrandKit = {
+  // A brand of its own, so no spec running alongside changes its kit under this one.
+  const brandId = await newBrand('Composer kit')
+  await putKit(brandId, {
     colors: [{ token: 'ink', name: 'Ink', value: '#1A1420FF' }, { token: 'pop', name: 'Pop pink', value: '#FF48B0FF' }],
     fonts: [{ token: 'heading', name: 'Headings', family: 'Bricolage Grotesque' }],
-    logoAssetId: null,
     voice: 'Warm, quick and never pushy.',
-  }
-  expect((await putKit(brandId, kit)).ok).toBe(true)
-  try {
-    await page.goto(`/brands/${brandId}`)
-    const button = page.getByTestId('brief-kit')
-    await expect(button).toHaveAttribute('aria-pressed', 'true')
-    await button.click()
-    const panel = page.getByTestId('brief-kit-panel')
-    await expect(panel).toContainText('2 of 2 colours, 1 of 1 fonts')
-    await expect(panel).toContainText('Warm, quick and never pushy.')
-    await expect(page.locator('input[name="kitColor"]')).toHaveCount(2)
+  })
+  await page.goto(`/brands/${brandId}`)
+  const button = page.getByTestId('brief-kit')
+  await expect(button).toHaveAttribute('aria-pressed', 'true')
+  await button.click()
+  const panel = page.getByTestId('brief-kit-panel')
+  await expect(panel).toContainText('2 of 2 colours, 1 of 1 fonts')
+  await expect(panel).toContainText('Warm, quick and never pushy.')
+  await expect(page.locator('input[name="kitColor"]')).toHaveCount(2)
 
-    // Leave one colour out.
-    const pink = panel.getByRole('button', { name: 'Pop pink' })
-    await pink.click()
-    await expect(pink).toHaveAttribute('aria-pressed', 'false')
-    await expect(panel).toContainText('1 of 2 colours')
-    await expect(page.locator('input[name="kitColor"]')).toHaveCount(1)
-    await expect(page.locator('input[name="kitColor"]')).toHaveValue('ink')
-    await expect(page.locator('input[name="kitFont"]')).toHaveValue('heading')
-    await expect(page.locator('input[name="kitVoice"]')).toHaveValue('on')
-    writeOutput('composer-3-kit.png', await page.screenshot())
+  // Leave one colour out.
+  const pink = panel.getByRole('button', { name: 'Pop pink' })
+  await pink.click()
+  await expect(pink).toHaveAttribute('aria-pressed', 'false')
+  await expect(panel).toContainText('1 of 2 colours')
+  await expect(page.locator('input[name="kitColor"]')).toHaveCount(1)
+  await expect(page.locator('input[name="kitColor"]')).toHaveValue('ink')
+  await expect(page.locator('input[name="kitFont"]')).toHaveValue('heading')
+  await expect(page.locator('input[name="kitVoice"]')).toHaveValue('on')
+  writeOutput('composer-3-kit.png', await page.screenshot())
 
-    // The switch turns the whole kit off: nothing of it is sent.
-    const use = panel.getByRole('switch', { name: 'Use brand kit' })
-    await use.click()
-    await expect(use).toHaveAttribute('aria-checked', 'false')
-    await expect(page.locator('input[name="kit"], input[name="kitColor"], input[name="kitFont"], input[name="kitVoice"]')).toHaveCount(0)
+  // The switch turns the whole kit off: nothing of it is sent.
+  const use = panel.getByRole('switch', { name: 'Use brand kit' })
+  await use.click()
+  await expect(use).toHaveAttribute('aria-checked', 'false')
+  await expect(page.locator('input[name="kit"], input[name="kitColor"], input[name="kitFont"], input[name="kitVoice"]')).toHaveCount(0)
 
-    await page.keyboard.press('Escape')
-    await expect(panel).toBeHidden()
-    await expect(button).toHaveAttribute('aria-pressed', 'false')
-    await expect(button).toBeFocused()
-  } finally {
-    await putKit(brandId, EMPTY_BRAND_KIT)
-  }
+  await page.keyboard.press('Escape')
+  await expect(panel).toBeHidden()
+  await expect(button).toHaveAttribute('aria-pressed', 'false')
+  await expect(button).toBeFocused()
 })
