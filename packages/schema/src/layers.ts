@@ -83,11 +83,29 @@ export const Shape = z.discriminatedUnion('kind', [
    * drawn by the layer's strokes; rotation turns it (#44). The ends take the first stroke's size.
    */
   z.object({ kind: z.literal('line'), start: LineEnd.default('none'), end: LineEnd.default('none') }),
-  /** SVG path data in the layer's own box; evenodd lets a path have holes. */
-  z.object({ kind: z.literal('path'), d: z.string().min(1), fillRule: z.enum(['nonzero', 'evenodd']).default('nonzero') }),
+  /**
+   * SVG path data in the layer's own box; evenodd lets a path have holes. `drawnIn` is the width and
+   * height of the box the data was drawn in: a box of another size draws it scaled to fit, as each
+   * format's own box does. Left out, the data is drawn at its own size whatever the box.
+   */
+  z.object({
+    kind: z.literal('path'),
+    d: z.string().min(1),
+    fillRule: z.enum(['nonzero', 'evenodd']).default('nonzero'),
+    drawnIn: z.object({ width: z.number().min(0), height: z.number().min(0) }).optional(),
+  }),
 ])
 
 export type Shape = z.infer<typeof Shape>
+
+/**
+ * How much a path's data is scaled to fill a box of `width` × `height`: by the box over the box it
+ * was drawn in, or 1 on an axis that box has no length on, and when it has none.
+ */
+export function pathScale(shape: { drawnIn?: { width: number; height: number } | undefined }, width: number, height: number) {
+  const { drawnIn } = shape
+  return { sx: drawnIn && drawnIn.width > 0 ? width / drawnIn.width : 1, sy: drawnIn && drawnIn.height > 0 ? height / drawnIn.height : 1 }
+}
 
 export const GraphicProps = z.object({
   ...commonProps,
