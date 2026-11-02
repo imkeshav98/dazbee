@@ -102,7 +102,7 @@ test('Esc in a number field of ⋯ More throws away what was typed: the menu clo
   await expect(more).toBeHidden()
   await timers(page)
 
-  expect((await read(page)).nodes.a?.props.rotation).toBeUndefined()
+  expect((await read(page)).nodes.a?.props.rotation).toBe(0)
   expect(await selection(page)).toEqual(['a'])
   await expect(page.getByTestId('bar-more')).toBeFocused()
   expect(errors).toEqual([])
