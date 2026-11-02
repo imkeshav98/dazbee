@@ -18,13 +18,13 @@ pnpm + Turborepo monorepo. `apps/` deploy (web, api, sync, worker); `packages/` 
 
 ## Dev flow
 
-Dazbee has no testers: bugs and UI flaws are caught before Keshav sees the work. Follow `docs/agents/dev-flow.md` when you write a spec, show a mock, build a ticket, merge a PR, close an epic or file a bug.
+Dazbee has no testers: bugs and UI flaws are caught before Keshav sees the work. Follow `docs/agents/dev-flow.md` when you write a spec, show a mock, build a ticket, merge a PR, close a parent spec or file a bug.
 
-Tests here are kept: commit them, and every bug fix adds a test that fails without the fix. This overrides any general rule that tests are throwaway.
+This repo keeps its tests: commit them, and every bug fix adds a test that fails without the fix. That holds here even where a general rule says tests are throwaway.
 
 ## Pull requests
 
-One ticket, one PR, closing its issue. Keshav's standing rule: merge your own PR (merge commit, not squash) as soon as CI is green on its head and the PR has passed the merge steps in `docs/agents/dev-flow.md` (goldfish QA for a user-facing change, `/code-review` for every PR); he reviews after merge. GitHub auto-merge needs branch protection, which this private repo can't have on the Free plan (checked via the API on 2026-10-30).
+One ticket, one PR, closing its issue. Keshav's standing rule: merge your own PR (merge commit, not squash) as soon as CI is green on its head and the merge steps in `docs/agents/dev-flow.md` are done; he reviews after merge. GitHub auto-merge needs branch protection, which this private repo can't have on the Free plan (checked via the API on 2026-10-30).
 
 Test every user-facing feature in a real browser (Playwright on Chromium) and put the evidence in the PR: screenshots, numbers, the test cases run. Only ask Keshav when a decision is needed.
 
