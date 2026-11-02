@@ -17,7 +17,8 @@ import { useLocale, useMessages } from '../../lib/i18n/client.tsx'
 import { dirOf, format } from '../../lib/i18n/index.ts'
 import { useOverlayScroll } from '../ui/overlay-scroll.ts'
 import { useFlyoutNote } from './shell.tsx'
-import { DROP_LINE } from './styles.ts'
+import { afterDraws, sameUrls } from './after-draws.ts'
+import { DROP_LINE, LAYER_PICTURE, LAYER_PICTURE_PICKED } from './styles.ts'
 import { useLiveDesign } from './use-live-design.ts'
 
 /** A row's height in pixels: every row is the same, which is what lets only the rows in view render. */
@@ -75,21 +76,21 @@ function useSelection(editor: Editor) {
   return state
 }
 
-/** How long the stage or the list must be still before the pictures are drawn, and each slice's budget, in ms. */
-const PICTURES_AFTER = 150
+/** Each slice of pictures' budget, in ms. */
 const PICTURES_SLICE = 6
 
 /**
  * Each listed layer's picture in the frame the panel shows, drawn once the stage and the list have
- * been still a moment (so a drag or a scroll draws none) and again once fonts and images arrive, a
- * few at a time so no frame waits long on them.
+ * settled (so a drag or a scroll draws none) and again once fonts and images arrive, a few at a
+ * time so no frame waits long on them.
  */
 function useLayerPictures(editor: Editor, frameKey: string, ids: readonly string[]): Record<string, string | null> {
-  const [pictures, setPictures] = useState<Record<string, string | null>>({})
+  const [pictures, setPictures] = useState<{ frameKey: string; urls: Record<string, string | null> }>({ frameKey, urls: {} })
   const wanted = ids.join(' ')
   useEffect(() => {
-    let timer: ReturnType<typeof setTimeout> | undefined
-    const draw = () => {
+    let slicing: ReturnType<typeof setTimeout> | undefined
+    const stop = afterDraws(editor, () => {
+      clearTimeout(slicing)
       const list = wanted.split(' ').filter(Boolean)
       const next: Record<string, string | null> = {}
       let i = 0
@@ -99,23 +100,18 @@ function useLayerPictures(editor: Editor, frameKey: string, ids: readonly string
           const id = list[i++] ?? ''
           next[id] = editor.layerThumbnail(id, 44, false, frameKey)
         }
-        if (i < list.length) timer = setTimeout(slice, 0)
-        else setPictures((now) => (Object.keys(next).length === Object.keys(now).length && Object.entries(next).every(([id, url]) => now[id] === url) ? now : next))
+        if (i < list.length) slicing = setTimeout(slice, 0)
+        else setPictures((now) => (now.frameKey === frameKey && sameUrls(now.urls, next) ? now : { frameKey, urls: next }))
       }
       slice()
-    }
-    const later = () => {
-      clearTimeout(timer)
-      timer = setTimeout(draw, PICTURES_AFTER)
-    }
-    const stop = editor.onDraw(later)
-    later()
+    })
     return () => {
-      clearTimeout(timer)
+      clearTimeout(slicing)
       stop()
     }
   }, [editor, frameKey, wanted])
-  return pictures
+  // Another frame's pictures are not this one's.
+  return pictures.frameKey === frameKey ? pictures.urls : {}
 }
 
 export function LayersPanel({ editor }: { editor: Editor }) {
@@ -483,8 +479,8 @@ const LayerRow = memo(function LayerRow({ row, i, selected, focusable, renaming,
         data-testid="layer-picture"
         className={cn(
           'grid size-[22px] shrink-0 place-items-center overflow-hidden rounded-[5px] transition-colors duration-[var(--chrome-fast)]',
-          picture ? 'border border-line bg-surface' : selected ? 'bg-accent-solid text-on-accent' : 'bg-text/10 text-muted',
-          picture && selected && 'border-accent ring-1 ring-accent',
+          picture ? LAYER_PICTURE : selected ? 'bg-accent-solid text-on-accent' : 'bg-text/10 text-muted',
+          picture && selected && LAYER_PICTURE_PICKED,
         )}
       >
         {picture ? <img src={picture} alt="" draggable={false} className="size-full object-contain" /> : <LayerIcon size={13} weight={selected ? 'bold' : 'regular'} />}

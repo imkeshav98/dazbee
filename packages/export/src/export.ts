@@ -2,7 +2,7 @@
 // (ADR-0005) and PDF and SVG on Skia's PDF and SVG canvases, by the render seam, so the browser's
 // export worker and Node make the same bytes from the same design.
 import { renderDesign, renderVector, type ResourceBytes, type ResourceCache } from '@dazbee/renderer'
-import { ExportRequest, parseDesign, type Design, type ExportType } from '@dazbee/schema'
+import { EXPORT_NAME_TOKENS, ExportRequest, parseDesign, type Design, type ExportNameToken, type ExportType } from '@dazbee/schema'
 import type { CanvasKit } from '@dazbee/canvaskit'
 import { zip } from './zip.ts'
 
@@ -65,9 +65,12 @@ function safe(part: string) {
   return cleaned || 'untitled'
 }
 
+const TOKENS = new RegExp(`\\{(${EXPORT_NAME_TOKENS.join('|')})\\}`, 'g')
+
 /** A file name from the request's template, its tokens filled in: `{size}` and `{format}` both name the format. */
 export function fileName(template: string, values: { design: string; page: string; format: string }): string {
-  return safe(template.replace(/\{(design|page|size|format)\}/g, (_, token: string) => values[token === 'size' ? 'format' : (token as keyof typeof values)]))
+  const value: Record<ExportNameToken, string> = { ...values, size: values.format }
+  return safe(template.replace(TOKENS, (_, token: ExportNameToken) => value[token]))
 }
 
 /**

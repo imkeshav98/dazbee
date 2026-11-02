@@ -7,6 +7,7 @@ export type ExportType = z.infer<typeof ExportType>
 
 /** The tokens a file name is built from. `{size}` is the format's name as the screen says it; `{format}` is the same. */
 export const EXPORT_NAME_TOKENS = ['design', 'page', 'size', 'format'] as const
+export type ExportNameToken = (typeof EXPORT_NAME_TOKENS)[number]
 export const DEFAULT_EXPORT_NAME = '{design} - {page} - {size}'
 
 /**

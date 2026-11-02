@@ -707,7 +707,7 @@ function live(
   function layerThumbnail(frame: Frame, id: string, size: number, outlined: boolean): string | null {
     const found = find(cached(frame).scene.layers, id)
     if (!found || found.props.mask) return null
-    const key = `${id}${outlined ? '/outlined' : ''}@${size}`
+    const key = `${frame.key}/${id}${outlined ? '/outlined' : ''}@${size}`
     const kept = thumbnails.get(key)
     // Drawn with what the stage draws with: an image whose bytes are still coming is a placeholder.
     const drawWith = screenResources(session.design())
@@ -733,11 +733,13 @@ function live(
       if (kept) URL.revokeObjectURL(kept.url)
       const url = URL.createObjectURL(new Blob([png.slice()], { type: 'image/png' }))
       thumbnails.set(key, { id, layer: found, resources: drawWith, url })
-      // A deleted layer's pictures go with it.
-      for (const [other, { id: was, url: old }] of thumbnails) {
-        if (design.nodes[was]) continue
-        URL.revokeObjectURL(old)
-        thumbnails.delete(other)
+      // Deleted layers' pictures go, once there are more pictures than the design could show.
+      if (thumbnails.size > 4 * Object.keys(design.nodes).length + 16) {
+        for (const [other, { id: was, url: old }] of thumbnails) {
+          if (design.nodes[was]) continue
+          URL.revokeObjectURL(old)
+          thumbnails.delete(other)
+        }
       }
       return url
     } finally {

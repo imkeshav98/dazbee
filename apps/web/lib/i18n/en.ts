@@ -441,7 +441,7 @@ export const en = {
       show: 'Show {name}',
       rename: 'Name of {name}',
     },
-    share: { open: 'Share', title: 'Share and export', exportHint: 'PNG or JPG, any page and format', templateHint: 'For {brand} or {all}' },
+    share: { open: 'Share', title: 'Share and export', },
     view: { snap: 'Snap while dragging', rulers: 'Rulers', rulersKey: 'Shift+R' },
     shortcuts: {
       title: 'Keyboard shortcuts',
@@ -519,6 +519,7 @@ export const en = {
       page: 'Page',
       formats: 'Sizes',
       allFormats: 'All',
+      allFormatsName: 'All sizes',
       fileNames: 'File names',
       type: 'File type',
       quality: 'Quality',

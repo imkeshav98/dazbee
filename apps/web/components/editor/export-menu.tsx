@@ -14,7 +14,7 @@ import { Select } from '../ui/select.tsx'
 import { useSelection } from './arrange-panel.tsx'
 import { NumberField } from './fields.tsx'
 import { Proportion } from './formats-panel.tsx'
-import { FIELD, LINK_BUTTON, SEGMENT, SEGMENTS, TILE, TILE_FACE_WIDE } from './styles.ts'
+import { FIELD, FIELD_LABEL, LINK_BUTTON, SEGMENT, SEGMENTS, TILE, TILE_FACE_WIDE } from './styles.ts'
 
 const byOrder = <T extends { order: string }>(items: Record<string, T>) =>
   Object.entries(items).sort(([a, x], [b, y]) => (x.order < y.order ? -1 : x.order > y.order ? 1 : a < b ? -1 : 1))
@@ -29,26 +29,30 @@ function download(name: string, type: string, bytes: Uint8Array<ArrayBuffer>) {
   setTimeout(() => URL.revokeObjectURL(url), 10_000)
 }
 
-const LABEL = 'text-xs font-semibold tracking-wide text-muted'
+const LABEL = FIELD_LABEL
+const sizeOf = ({ width, height }: { width: number; height: number }) => `${width} × ${height}`
 
 /** The export form, opened from the Share menu. */
 export function ExportForm({ id, editor, design }: { id: string; editor: Editor; design: Design }) {
   const t = useMessages()
   const pages = byOrder(design.pages)
   const formats = byOrder(design.formats)
-  // The page the selection is on, else the first.
-  let selectionPage = useSelection(editor)[0]
-  while (selectionPage && design.nodes[selectionPage]) selectionPage = design.nodes[selectionPage]?.parentId
-  const [page, setPage] = useState<string>('all')
-  const thisPage = selectionPage && design.pages[selectionPage] ? selectionPage : pages[0]?.[0] ?? ''
+  // This page: the one picked here while it exists, else the one the selection is on (as the layers
+  // panel shows it), else the first.
+  useSelection(editor)
+  const selectionPage = editor.selectedFrame()?.split('/')[0]
+  const [allPages, setAllPages] = useState(true)
+  const [chosen, setChosen] = useState<string | null>(null)
+  const thisPage = chosen && design.pages[chosen] ? chosen : selectionPage && design.pages[selectionPage] ? selectionPage : pages[0]?.[0] ?? ''
+  const everyFormat = () => new Set(formats.map(([formatId]) => formatId))
   const [name, setName] = useState(DEFAULT_EXPORT_NAME)
-  const [picked, setPicked] = useState<Set<string>>(() => new Set(formats.map(([formatId]) => formatId)))
+  const [picked, setPicked] = useState<Set<string>>(everyFormat)
   const [type, setType] = useState<ExportType>('png')
   const [quality, setQuality] = useState(90)
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null)
   const [error, setError] = useState<string | null>(null)
 
-  const pageIds = page === 'all' ? pages.map(([pageId]) => pageId) : [page]
+  const pageIds = allPages ? pages.map(([pageId]) => pageId) : [thisPage]
   const formatIds = formats.map(([formatId]) => formatId).filter((formatId) => picked.has(formatId))
   const count = pageIds.length * formatIds.length
   const allPicked = formatIds.length === formats.length
@@ -57,8 +61,6 @@ export function ExportForm({ id, editor, design }: { id: string; editor: Editor;
     if (!next.delete(formatId)) next.add(formatId)
     setPicked(next)
   }
-
-  const pickPages = (to: 'all' | 'one') => setPage(to === 'all' ? 'all' : thisPage)
 
   const run = async () => {
     setError(null)
@@ -84,20 +86,21 @@ export function ExportForm({ id, editor, design }: { id: string; editor: Editor;
       <div className="flex flex-col gap-1.5">
         <span className={LABEL}>{t.editor.exports.pages}</span>
         <div role="radiogroup" aria-label={t.editor.exports.pages} className={SEGMENTS}>
-          {(['all', 'one'] as const).map((value) => (
-            <button key={value} type="button" role="radio" aria-checked={(page === 'all') === (value === 'all')} onClick={() => pickPages(value)} data-pages={value} className={SEGMENT}>
-              {value === 'all' ? format(t.editor.exports.allPages, { n: pages.length }) : t.editor.exports.thisPage}
-            </button>
-          ))}
+          <button type="button" role="radio" aria-checked={allPages} onClick={() => setAllPages(true)} data-pages="all" className={SEGMENT}>
+            {format(t.editor.exports.allPages, { n: pages.length })}
+          </button>
+          <button type="button" role="radio" aria-checked={!allPages} onClick={() => setAllPages(false)} data-pages="one" className={SEGMENT}>
+            {t.editor.exports.thisPage}
+          </button>
         </div>
         {/* Any other page can still be the one. */}
-        {page !== 'all' && pages.length > 1 && (
+        {!allPages && pages.length > 1 && (
           <Select
             name="page"
             label={t.editor.exports.page}
-            value={page}
+            value={thisPage}
             options={pages.map(([pageId, p]) => ({ value: pageId, label: p.name }))}
-            onChange={setPage}
+            onChange={setChosen}
             testId="export-page"
             className="h-8 bg-raised px-2 text-[13px]"
           />
@@ -110,7 +113,8 @@ export function ExportForm({ id, editor, design }: { id: string; editor: Editor;
           <button
             type="button"
             aria-pressed={allPicked}
-            onClick={() => setPicked(allPicked ? new Set() : new Set(formats.map(([formatId]) => formatId)))}
+            aria-label={t.editor.exports.allFormatsName}
+            onClick={() => setPicked(allPicked ? new Set() : everyFormat())}
             data-testid="export-all-formats"
             className={LINK_BUTTON}
           >
@@ -119,7 +123,16 @@ export function ExportForm({ id, editor, design }: { id: string; editor: Editor;
         </div>
         <div role="group" aria-label={t.editor.exports.formats} className="grid grid-cols-3 gap-2">
           {formats.map(([formatId, f]) => (
-            <button key={formatId} type="button" aria-pressed={picked.has(formatId)} onClick={() => toggle(formatId)} data-format={formatId} className={TILE}>
+            <button
+              key={formatId}
+              type="button"
+              aria-pressed={picked.has(formatId)}
+              aria-label={`${f.name}, ${sizeOf(f)}`}
+              title={`${f.name}, ${sizeOf(f)}`}
+              onClick={() => toggle(formatId)}
+              data-format={formatId}
+              className={TILE}
+            >
               <span className={TILE_FACE_WIDE}>
                 <Proportion width={f.width} height={f.height} />
               </span>
