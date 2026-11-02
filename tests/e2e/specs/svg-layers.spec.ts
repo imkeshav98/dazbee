@@ -60,6 +60,10 @@ test('an SVG uploaded to the library places as layers in one step, and a shape i
   // The tile shows the file drawn by the server, as layers.
   await expect(tile.locator('img')).toHaveJSProperty('complete', true)
   writeOutput('svg-layers-1-library.png', await page.screenshot())
+  // Its original comes back as text the browser neither runs nor draws.
+  const served = await page.request.get(`${new URL(page.url()).origin}/brands/${DEV_BRAND}/assets/${await tile.getAttribute('data-asset')}`)
+  expect(served.headers()).toMatchObject({ 'content-type': 'text/plain; charset=utf-8', 'content-security-policy': "default-src 'none'; sandbox", 'x-content-type-options': 'nosniff' })
+  expect(await served.text()).toContain('<svg')
 
   await tile.getByRole('button', { name: `Place ${name} on the design` }).click()
   await expect.poll(async () => (await nodes(page)).length).toBe(5)

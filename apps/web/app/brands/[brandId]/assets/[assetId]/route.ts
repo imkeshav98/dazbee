@@ -2,7 +2,7 @@
 // back a short-lived signed URL; the bytes pass through here, so the browser needs no storage
 // address or credentials. PATCH renames it or sets its tags; DELETE deletes it unless something
 // still uses it, and then answers 409 with what does.
-import { UpdateAsset } from '@dazbee/schema'
+import { isVectorAsset, UpdateAsset } from '@dazbee/schema'
 import { ApiFailure, assetLink, deleteAsset, updateAsset } from '../../../../../lib/api.ts'
 
 export async function GET(_request: Request, { params }: { params: Promise<{ brandId: string; assetId: string }> }) {
@@ -13,7 +13,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ bra
   if (!stored.ok) return new Response('Storage did not answer', { status: 502 })
   // An SVG file is sent as text, never as a page or image the browser runs or decodes: the editor
   // reads it as layers.
-  const svg = link.asset.contentType === 'image/svg+xml'
+  const svg = isVectorAsset(link.asset)
   return new Response(stored.body, {
     headers: {
       'content-type': svg ? 'text/plain; charset=utf-8' : link.asset.contentType,

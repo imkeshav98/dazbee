@@ -15,7 +15,7 @@ import { ASSET_DRAG_TYPE, AssetLibrary, draggedAsset, VECTOR_DRAG_TYPE } from '.
 import { BrandKitPanel } from '../../../../../components/editor/brand-kit-panel.tsx'
 import { ShareMenu } from '../../../../../components/editor/share-menu.tsx'
 import { LayersPanel } from '../../../../../components/editor/layers-panel.tsx'
-import { BrandKit, brandVariables, FontFamily, type Variables } from '@dazbee/schema'
+import { BrandKit, brandVariables, FontFamily, isVectorAsset, type Variables } from '@dazbee/schema'
 import { useValue, valueStore, type ValueStore } from '../../../../../lib/value-store.ts'
 
 /** The editor's tools that the dock shows as the one shape button. */
@@ -228,7 +228,7 @@ export function EditorStage({ designId, designName, brandId, brandName, everyBra
         picking: !imagePicked,
         onPick: (asset) => {
           // An SVG file goes on the page at once, as layers; an image is placed by a click or a drag.
-          if (asset.contentType === 'image/svg+xml') {
+          if (isVectorAsset(asset)) {
             if (editor) placeAsset(editor, brandId, asset)
             return
           }
@@ -271,7 +271,7 @@ export function EditorStage({ designId, designName, brandId, brandName, everyBra
           if (!asset) return
           e.preventDefault()
           const at = { x: e.clientX, y: e.clientY }
-          const into = asset.contentType === 'image/svg+xml' ? null : editor.imageTarget(at)
+          const into = isVectorAsset(asset) ? null : editor.imageTarget(at)
           if (!into || !editor.fillWithImage(into, asset)) placeAsset(editor, brandId, asset, at)
           editor.imageTarget(null)
         }}

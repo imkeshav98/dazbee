@@ -45,6 +45,12 @@ export class SvgError extends Error {
 
 /** More layers than this, or a file larger than MAX_SVG_BYTES, is refused, so a hostile file can't run away with the page. */
 const MAX_LAYERS = 5_000
+/**
+ * Elements read, counting each time a <use> reads one again, and how deep elements and uses may
+ * nest: past these the file is refused, so a fan of uses that draw nothing can't run away either.
+ */
+const MAX_WORK = 100_000
+const MAX_NESTING = 400
 
 type LayerInput = { type: string; parentId: string; index: string; name: string; props: Record<string, unknown> }
 type Box = { x: number; y: number; width: number; height: number }
@@ -143,6 +149,11 @@ export function svgToLayers(ck: CanvasKit, text: string, options: ConvertOptions
   const viewport = { width: vbWidth || width, height: vbHeight || height }
 
   const nodes: Record<string, LayerInput> = {}
+  let work = 0
+  const spend = () => {
+    if (++work > MAX_WORK) throw new SvgError('too-big', `more than ${MAX_WORK} elements to read`)
+  }
+  let nesting = 0
   let made = 0
   const newId = () => {
     if (++made > MAX_LAYERS) throw new SvgError('too-big', `more than ${MAX_LAYERS} layers`)
@@ -420,6 +431,12 @@ export function svgToLayers(ck: CanvasKit, text: string, options: ConvertOptions
     const fillPaint = paintOf(style.fill ?? 'black', style['fill-opacity'], style, m, { x: 0, y: 0, width: 1, height: 1 }, { x: 0, y: 0, width: 1, height: 1 })
     const color = !fillPaint ? '#00000000' : fillPaint.type === 'solid' ? withOpacity(fillPaint.color, fillPaint.opacity ?? 1)
       : 'stops' in fillPaint ? fillPaint.stops[0]?.color ?? '#000000FF' : '#000000FF'
+    // A stroke along the letters is the text's outline, in its first colour.
+    const strokePaint = paintOf(style.stroke, style['stroke-opacity'], style, m, { x: 0, y: 0, width: 1, height: 1 }, { x: 0, y: 0, width: 1, height: 1 })
+    const outlineWidth = length(style['stroke-width'], 16, 1) * k
+    const outlineColor = !strokePaint ? null : strokePaint.type === 'solid' ? withOpacity(strokePaint.color, strokePaint.opacity ?? 1)
+      : 'stops' in strokePaint ? strokePaint.stops[0]?.color ?? null : null
+    const outline = outlineColor && outlineWidth > 0 ? { width: outlineWidth, color: outlineColor } : null
     const anchor = style['text-anchor'] ?? 'start'
     const rows = content.split('\n')
     // The width is a guess from the letters until the editor lays the text out.
@@ -444,6 +461,7 @@ export function svgToLayers(ck: CanvasKit, text: string, options: ConvertOptions
           color,
           fontWeight: Number.isFinite(weight) ? Math.min(900, Math.max(100, Math.round(weight / 100) * 100)) : 400,
           fontStyle: style['font-style'] === 'italic' || style['font-style'] === 'oblique' ? 'italic' : 'normal',
+          ...(outline ? { outline } : {}),
         },
         align: anchor === 'middle' ? 'center' : anchor === 'end' ? 'end' : 'start',
         boxMode: 'autoWidth',
@@ -470,6 +488,7 @@ export function svgToLayers(ck: CanvasKit, text: string, options: ConvertOptions
     let rectangles = 0
     let parts = 0
     const add = (element: XmlElement, style: Style, mm: Matrix) => {
+      spend()
       const own = outline(element, { ...style, 'fill-rule': style['clip-rule'] ?? 'nonzero' })
       if (!own) return
       parts++
@@ -521,21 +540,22 @@ export function svgToLayers(ck: CanvasKit, text: string, options: ConvertOptions
     return { id: maskId, box }
   }
 
-  /** The element's mask as a mask layer drawn from the mask's content. */
-  function maskLayer(id: string, style: Style, m: Matrix, inside: Box): Piece | null | undefined {
+  /** The element's mask as a mask layer drawn from the mask's content; none for a mask inside itself. */
+  function maskLayer(id: string, style: Style, m: Matrix, inside: Box, using: string[]): Piece | null | undefined {
     const mask = ids.get(id)
-    if (mask?.name !== 'mask') return undefined
+    const key = `mask:${id}`
+    if (mask?.name !== 'mask' || using.includes(key)) return undefined
     const contentUnits = mask.attrs.maskContentUnits === 'objectBoundingBox'
       ? multiply(translate(inside.x, inside.y), scale(inside.width, inside.height))
       : m
-    const pieces = children(mask, styleOf(mask, style, rules), contentUnits)
+    const pieces = children(mask, styleOf(mask, style, rules), contentUnits, [...using, key])
     if (pieces.length === 0) return null
-    const kind = (mask.attrs['mask-type'] ?? styleOf(mask, {}, rules)['mask-type']) === 'alpha' ? 'alpha' : 'luminance'
+    const kind = styleOf(mask, {}, rules)['mask-type'] === 'alpha' ? 'alpha' : 'luminance'
     return group(nameOf(mask, 'Mask'), pieces, {}, { mask: kind })
   }
 
   /** The element under its clip path and mask, if it has them. */
-  function clipped(element: XmlElement, style: Style, m: Matrix, piece: Piece | null): Piece | null {
+  function clipped(element: XmlElement, style: Style, m: Matrix, piece: Piece | null, using: string[]): Piece | null {
     if (!piece) return null
     let out = piece
     const clipId = refOf(element.attrs['clip-path'] ?? style['clip-path'])
@@ -546,7 +566,7 @@ export function svgToLayers(ck: CanvasKit, text: string, options: ConvertOptions
     }
     const maskId = refOf(element.attrs.mask ?? style.mask)
     if (maskId) {
-      const mask = maskLayer(maskId, style, m, out.box)
+      const mask = maskLayer(maskId, style, m, out.box, using)
       if (mask === null) return null
       if (mask) out = { ...group('Mask', [mask, out], {}), box: out.box }
     }
@@ -555,6 +575,16 @@ export function svgToLayers(ck: CanvasKit, text: string, options: ConvertOptions
 
   /** The layers for one element, with `m` taking its user space to the design's. */
   function convert(element: XmlElement, parentStyle: Style, parentMatrix: Matrix, using: string[]): Piece | null {
+    spend()
+    if (++nesting > MAX_NESTING) throw new SvgError('too-big', `nested more than ${MAX_NESTING} deep`)
+    try {
+      return convertElement(element, parentStyle, parentMatrix, using)
+    } finally {
+      nesting--
+    }
+  }
+
+  function convertElement(element: XmlElement, parentStyle: Style, parentMatrix: Matrix, using: string[]): Piece | null {
     if (DEFINITIONS.has(element.name)) return null
     const unconverted = UNCONVERTED[element.name]
     if (unconverted) {
@@ -573,8 +603,8 @@ export function svgToLayers(ck: CanvasKit, text: string, options: ConvertOptions
     delete inner['clip-path']
     delete inner.mask
 
-    if (SHAPES.has(element.name)) return clipped(element, style, m, shape(element, style, m))
-    if (element.name === 'text') return clipped(element, style, m, textLayer(element, style, m))
+    if (SHAPES.has(element.name)) return clipped(element, style, m, shape(element, style, m), using)
+    if (element.name === 'text') return clipped(element, style, m, textLayer(element, style, m), using)
     if (element.name === 'use') {
       const href = element.attrs.href ?? ''
       if (!href.startsWith('#')) {
@@ -591,27 +621,27 @@ export function svgToLayers(ck: CanvasKit, text: string, options: ConvertOptions
         const inside = multiply(at, viewBoxMatrix(target.attrs.viewBox, w, h, target.attrs.preserveAspectRatio))
         const pieces = children(target, styleOf(target, inner, rules), inside, [...using, href])
         piece = pieces.length ? group(nameOf(element, nameOf(target, 'Group')), pieces, style) : null
-        return clipped(element, {}, m, piece)
+        return clipped(element, {}, m, piece, using)
       }
       piece = convert(target, inner, at, [...using, href])
       if (!piece) return null
       const opacity = clamp01(Number.parseFloat(style.opacity ?? '1'))
       if (opacity < 1 || style['mix-blend-mode']) piece = group(nameOf(element, 'Group'), [piece], style)
-      return clipped(element, style, m, piece)
+      return clipped(element, style, m, piece, using)
     }
     if (element.name === 'svg') {
       const w = length(element.attrs.width, viewport.width, viewport.width)
       const h = length(element.attrs.height, viewport.height, viewport.height)
       const at = multiply(m, translate(length(element.attrs.x, viewport.width), length(element.attrs.y, viewport.height)))
       const pieces = children(element, inner, multiply(at, viewBoxMatrix(element.attrs.viewBox, w, h, element.attrs.preserveAspectRatio)), using)
-      return pieces.length ? clipped(element, style, m, group(nameOf(element, 'Group'), pieces, style)) : null
+      return pieces.length ? clipped(element, style, m, group(nameOf(element, 'Group'), pieces, style), using) : null
     }
     if (element.name === 'g' || element.name === 'a' || element.name === 'switch') {
       const pieces = element.name === 'switch'
         ? children({ ...element, children: element.children.filter((c) => typeof c !== 'string' && c.name !== 'foreignObject' && !c.attrs.requiredExtensions).slice(0, 1) }, inner, m, using)
         : children(element, inner, m, using)
       if (pieces.length === 0) return null
-      return clipped(element, style, m, group(nameOf(element, 'Group'), pieces, style))
+      return clipped(element, style, m, group(nameOf(element, 'Group'), pieces, style), using)
     }
     return null
   }
@@ -632,7 +662,9 @@ export function svgToLayers(ck: CanvasKit, text: string, options: ConvertOptions
   const pieces = children(root, inner, top)
   if (pieces.length === 0) throw new SvgError('empty', 'nothing in the file can be drawn')
   const only = pieces.length === 1 ? nodes[pieces[0]?.id ?? ''] : undefined
-  const rootPiece = only?.type === 'group' && !only.props.mask ? (pieces[0] as Piece) : group('', pieces, rootStyle)
+  // The one group the file holds is the root, unless the file's own opacity or blending needs a group of its own.
+  const plainRoot = clamp01(Number.parseFloat(rootStyle.opacity ?? '1')) === 1 && !rootStyle['mix-blend-mode']
+  const rootPiece = plainRoot && only?.type === 'group' && !only.props.mask ? (pieces[0] as Piece) : group('', pieces, rootStyle)
   ;(nodes[rootPiece.id] as { name: string }).name = options.name ?? nameOf(root, 'SVG')
 
   const tree = LayerTree.parse({ nodes, roots: [rootPiece.id] })

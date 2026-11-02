@@ -3044,14 +3044,14 @@ function live(
   }
 
   /**
-   * Places an SVG file as layers (#225): a group of path, text and mask layers drawn as the file
+   * Places an SVG file as layers: a group of path, text and mask layers drawn as the file
    * is, in one undo step. It goes centred at `client`, in client coordinates, or at the pointer when
    * `atPointer`, or else in the middle of the frame in view; a file larger than SVG_ROOM of the
-   * frame's shorter side is scaled down to it. Returns the group's id and what the file had that no
-   * layer shows, or null when it placed nothing: there is no frame to put it in, or the file can't
-   * be read, which the notices say.
+   * frame's shorter side is scaled down to it; what the file had that no layer shows is noticed.
+   * Returns the group's id, or null when it placed nothing: there is no frame to put it in, or the
+   * file can't be read, which is noticed too.
    */
-  function placeSvg(text: string, name: string, where: { client?: Point; atPointer?: boolean }): { id: string; skipped: Skipped[] } | null {
+  function placeSvg(text: string, name: string, where: { client?: Point; atPointer?: boolean }): string | null {
     const rect = canvas.getBoundingClientRect()
     const client = where.client ?? (where.atPointer && pointer ? { x: pointer.clientX, y: pointer.clientY } : undefined)
     const screen = client ? { x: client.x - rect.left, y: client.y - rect.top } : centre()
@@ -3079,21 +3079,18 @@ function live(
       ids = session.run('design.place', { parentId: frame.pageId, tree: made.tree, dx: round(at.x - (box.x + box.width / 2)), dy: round(at.y - (box.y + box.height / 2)) })
       // Text is measured in its font, as the editor lays it out.
       const placed = session.design()
-      for (const id of Object.keys(placed.nodes)) {
-        if (placed.nodes[id]?.type === 'text' && ids.some((root) => id === root || ancestorsIn(placed, id).includes(root))) fitText(id)
+      const fitTexts = (id: string) => {
+        if (placed.nodes[id]?.type === 'text') fitText(id)
+        for (const [child] of childrenOf(placed, id)) fitTexts(child)
       }
+      for (const root of ids) fitTexts(root)
     }))
     const id = ids[0]
     if (!ok || !id) return null
     setTool('select')
     select([id], frame.key)
     if (made.skipped.length > 0) notify('svgLeftOut', made.skipped)
-    return { id, skipped: made.skipped }
-  }
-  const ancestorsIn = (now: Design, id: string) => {
-    const out: string[] = []
-    for (let up = now.nodes[id]?.parentId; up && now.nodes[up]; up = now.nodes[up]?.parentId) out.push(up)
-    return out
+    return id
   }
 
   // Copy, cut and paste plain text while typing (#47), and layers otherwise (#49). Pasted line

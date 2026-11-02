@@ -29,7 +29,7 @@ A layer property that follows a variable, such as a fill bound to `brand:primary
 _Avoid_: Link, sync, style reference
 
 **Asset library**:
-A brand's uploaded images, each with a name and tags it is found by. Placing one on a design makes a graphic whose fill is that image; the original is stored once per workspace, but each brand's asset, name and tags are its own.
+A brand's uploaded images and SVG files, each with a name and tags it is found by. Placing an image on a design makes a graphic whose fill is that image; placing an SVG file makes a group of the layers it draws (paths, text, masks), and an SVG file is never a fill. The original is stored once per workspace, but each brand's asset, name and tags are its own.
 _Avoid_: Media library, uploads, gallery
 
 **Template**:

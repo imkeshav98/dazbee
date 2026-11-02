@@ -171,6 +171,7 @@ export const ar: Messages = {
       pick: 'ضع {name}',
       uploading: 'جارٍ رفع {name}',
       failed: 'تعذّر رفع {name}: {reason}',
+      svgNotFill: '{name} ملف SVG لا يمكنه تعبئة شكل. هو في المكتبة لتضعه كطبقات.',
     },
     arrange: {
       align: 'محاذاة',

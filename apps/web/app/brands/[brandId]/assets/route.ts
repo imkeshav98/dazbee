@@ -38,7 +38,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ bra
   if (file.size > MAX_UPLOAD_BYTES) return Response.json({ error: 'The image is larger than 30 MB' }, { status: 400 })
   const bytes = new Uint8Array(await file.arrayBuffer())
   const type = imageType(bytes)
-  if (!type) return Response.json({ error: 'The file is not a PNG, JPEG or WebP image, or an SVG file of at most 5 MB' }, { status: 400 })
+  if (!type) return Response.json({ error: `The file is not a PNG, JPEG or WebP image, or an SVG file of at most ${MAX_SVG_BYTES / 1_000_000} MB` }, { status: 400 })
   try {
     return Response.json(await uploadAsset(brandId, bytes, type, assetName(file.name)), { status: 201 })
   } catch (e) {

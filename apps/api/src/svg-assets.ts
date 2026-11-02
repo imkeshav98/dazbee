@@ -1,12 +1,12 @@
-// SVG files in the asset library (#225). They are never decoded as images: the bytes are read as
+// SVG files in the asset library. They are never decoded as images: the bytes are read as
 // layers by @dazbee/svg, which refuses what it can't read or what would run away, and the
 // thumbnail is those layers drawn by the renderer, as the editor will draw them once placed.
 import { FALLBACK_FAMILIES } from '@dazbee/fonts'
 import { loadFontFiles } from '@dazbee/fonts/node'
 import { renderDesign } from '@dazbee/renderer'
 import { loadCanvasKit } from '@dazbee/renderer/node'
-import { MAX_SVG_BYTES } from '@dazbee/schema'
-import { SvgError, svgMarkup, svgToLayers } from '@dazbee/svg'
+import { MAX_SVG_BYTES, SCHEMA_VERSION } from '@dazbee/schema'
+import { SvgError, svgMarkup, svgToLayers, SVG_TYPE } from '@dazbee/svg'
 import type { ImageHeader } from './images.ts'
 
 let shipped: { family: string; bytes: Uint8Array }[] | undefined
@@ -29,7 +29,7 @@ export async function readSvgHeader(bytes: Uint8Array): Promise<ImageHeader | nu
   if (!text) return null
   try {
     const { width, height } = svgToLayers(await loadCanvasKit(), text)
-    return { contentType: 'image/svg+xml', width: Math.max(1, Math.ceil(width)), height: Math.max(1, Math.ceil(height)) }
+    return { contentType: SVG_TYPE, width: Math.max(1, Math.ceil(width)), height: Math.max(1, Math.ceil(height)) }
   } catch (error) {
     if (error instanceof SvgError) return null
     throw error
@@ -44,7 +44,7 @@ export async function svgThumbnail(bytes: Uint8Array, size: number): Promise<Uin
   const { tree, root, width, height } = svgToLayers(ck, text, { fit: size })
   const nodes = Object.fromEntries(Object.entries(tree.nodes).map(([id, node]) => [id, id === root ? { ...node, parentId: 'page', index: 'a0' } : node]))
   const design = {
-    meta: { schemaVersion: 5, designId: 'thumbnail', name: 'Thumbnail', kind: 'single', primaryFormatId: 'f' },
+    meta: { schemaVersion: SCHEMA_VERSION, designId: 'thumbnail', name: 'Thumbnail', kind: 'single', primaryFormatId: 'f' },
     formats: { f: { name: 'Thumbnail', width: Math.max(1, Math.round(width)), height: Math.max(1, Math.round(height)), order: 'a0' } },
     pages: { page: { name: 'Page', order: 'a0' } },
     nodes,

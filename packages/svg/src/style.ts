@@ -16,7 +16,7 @@ const INHERITED = new Set([
 
 /** Every property this package reads; other attributes aren't style. */
 const PROPERTIES = new Set([
-  ...INHERITED, 'opacity', 'display', 'stop-color', 'stop-opacity', 'clip-path', 'mask', 'filter', 'mix-blend-mode',
+  ...INHERITED, 'opacity', 'display', 'stop-color', 'stop-opacity', 'clip-path', 'mask', 'mask-type', 'filter', 'mix-blend-mode',
 ])
 
 interface Rule {
@@ -52,19 +52,61 @@ function parseSelector(text: string) {
   return { tag, id: ids[0], classes, specificity: (ids.length ? 100 : 0) + classes.length * 10 + (tag ? 1 : 0) }
 }
 
+/** More rules than this are left out: every element is matched against each one. */
+const MAX_RULES = 1_000
+
+/**
+ * A sheet's plain rules, their selectors and the text in their braces, read in one pass. Comments
+ * go, and at-rules (@media, @font-face, @import) with everything they hold are left out.
+ */
+function ruleBlocks(css: string): { selectors: string; body: string }[] {
+  const blocks: { selectors: string; body: string }[] = []
+  let depth = 0
+  let selectors = ''
+  let body = ''
+  let atRule = false
+  for (let i = 0; i < css.length; i++) {
+    if (css.startsWith('/*', i)) {
+      const end = css.indexOf('*/', i + 2)
+      if (end < 0) break
+      i = end + 1
+      continue
+    }
+    const c = css[i] ?? ''
+    if (c === '{') {
+      if (depth === 0) atRule = selectors.trim().startsWith('@')
+      else body += c
+      depth++
+    } else if (c === '}' && depth > 0) {
+      depth--
+      if (depth > 0) body += c
+      else {
+        if (!atRule) blocks.push({ selectors, body })
+        selectors = ''
+        body = ''
+      }
+    } else if (depth > 0) {
+      body += c
+    } else if (c === ';') {
+      // An at-rule with no block, such as @import.
+      selectors = ''
+    } else {
+      selectors += c
+    }
+  }
+  return blocks
+}
+
 /** The rules of every <style> sheet in the file, in the order they apply. */
 export function readSheets(root: XmlElement, textOf: (e: XmlElement) => string): Rule[] {
   const rules: Rule[] = []
   const visit = (element: XmlElement) => {
     if (element.name === 'style') {
-      const css = textOf(element).replace(/\/\*[\s\S]*?\*\//g, '')
-      // At-rules and what they hold are dropped, braces and all.
-      const flat = css.replace(/@[^{;]*(\{(?:[^{}]|\{[^{}]*\})*\}|;)/g, '')
-      for (const [, selectors, body] of flat.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
-        const declarations = parseDeclarations(body ?? '')
-        for (const text of (selectors ?? '').split(',')) {
+      for (const { selectors, body } of ruleBlocks(textOf(element))) {
+        const declarations = parseDeclarations(body)
+        for (const text of selectors.split(',')) {
           const selector = parseSelector(text)
-          if (selector) rules.push({ ...selector, order: rules.length, declarations })
+          if (selector && rules.length < MAX_RULES) rules.push({ ...selector, order: rules.length, declarations })
         }
       }
     }

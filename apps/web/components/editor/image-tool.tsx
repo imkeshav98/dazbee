@@ -29,7 +29,7 @@ const PANEL = cn(POPOVER, 'flex max-h-[min(26rem,60dvh)] w-72 flex-col')
 function ImagePickerPanel({ brandId, open, title, hint, vectors = false, onPick }: { brandId: string; open: boolean; title: string; hint?: string; vectors?: boolean; onPick: (asset: Placeable) => void }) {
   const t = useMessages().editor
   const [assets, setAssets] = useState<AssetSummary[] | null>(null)
-  const [upload, setUpload] = useState<{ name: string; progress: number; error?: string } | null>(null)
+  const [upload, setUpload] = useState<{ name: string; progress: number; error?: string; notice?: string } | null>(null)
   const showing = useRef(open)
   useEffect(() => {
     showing.current = open
@@ -54,6 +54,11 @@ function ImagePickerPanel({ brandId, open, title, hint, vectors = false, onPick 
     setUpload({ name: file.name, progress: 0 })
     sendAsset(brandId, file, (progress) => setUpload({ name: file.name, progress }))
       .then((asset) => {
+        // An SVG file can't be a fill; it stays in the library to place as layers.
+        if (!vectors && isVectorAsset(asset)) {
+          setUpload({ name: file.name, progress: 0, notice: format(t.imageTool.svgNotFill, { name: file.name }) })
+          return
+        }
         setUpload(null)
         if (showing.current) onPick(asset)
       })
@@ -80,8 +85,8 @@ function ImagePickerPanel({ brandId, open, title, hint, vectors = false, onPick 
           />
         </label>
         {upload && (
-          upload.error
-            ? <p role="alert" className="text-xs text-danger">{format(t.imageTool.failed, { name: upload.name, reason: upload.error })}</p>
+          upload.notice || upload.error
+            ? <p role="alert" className="text-xs text-danger">{upload.notice ?? format(t.imageTool.failed, { name: upload.name, reason: upload.error ?? '' })}</p>
             : (
               <div
                 role="progressbar"

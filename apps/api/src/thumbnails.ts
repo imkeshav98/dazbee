@@ -2,7 +2,7 @@
 // make and store as their own objects, never resized on the fly. CanvasKit decodes the original, as
 // it does for every render.
 import { loadCanvasKit } from '@dazbee/renderer/node'
-import type { ImageType } from '@dazbee/schema'
+import { isVectorAsset, type ImageType } from '@dazbee/schema'
 import { svgThumbnail } from './svg-assets.ts'
 
 /** The longest side of a thumbnail, in pixels: two library columns on a 2× screen. */
@@ -16,7 +16,7 @@ export interface Thumbnail { bytes: Uint8Array; contentType: 'image/png' | 'imag
  * CanvasKit can't decode the original, or the SVG can't be read.
  */
 export async function makeThumbnail(bytes: Uint8Array, contentType: ImageType): Promise<Thumbnail> {
-  if (contentType === 'image/svg+xml') return { bytes: await svgThumbnail(bytes, THUMBNAIL_SIZE), contentType: 'image/png' }
+  if (isVectorAsset({ contentType })) return { bytes: await svgThumbnail(bytes, THUMBNAIL_SIZE), contentType: 'image/png' }
   const ck = await loadCanvasKit()
   const image = ck.MakeImageFromEncoded(bytes)
   if (!image) throw new Error('CanvasKit can\'t decode this image')

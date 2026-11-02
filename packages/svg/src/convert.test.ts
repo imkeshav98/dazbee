@@ -119,6 +119,34 @@ describe('svgToLayers with hostile files', () => {
     expect(problem(bomb)).toBe('too-big')
   })
 
+  it('refuses a fan of uses that draw nothing, before it runs away', () => {
+    const fan = (id: string, to: string) => `<g id="${id}">${Array.from({ length: 10 }, () => `<use href="#${to}"/>`).join('')}</g>`
+    const levels = Array.from({ length: 30 }, (_, i) => fan(`e${i + 1}`, `e${i}`)).join('')
+    const started = performance.now()
+    expect(problem(svg(`<defs><g id="e0"/>${levels}</defs><rect width="5" height="5"/><use href="#e30"/>`))).toBe('too-big')
+    expect(performance.now() - started).toBeLessThan(2_000)
+  })
+
+  it('leaves out a mask that masks itself, or two that mask each other', () => {
+    const self = layers(svg('<mask id="m"><rect width="50" height="50" fill="white" mask="url(#m)"/></mask><rect width="80" height="80" mask="url(#m)"/>'))
+    expect(self.list.some((n) => n.props.mask === 'luminance')).toBe(true)
+    const pair = svg('<mask id="a"><rect width="50" height="50" fill="white" mask="url(#b)"/></mask><mask id="b"><rect width="40" height="40" fill="white" mask="url(#a)"/></mask><rect width="80" height="80" mask="url(#a)"/>')
+    expect(() => svgToLayers(ck, pair)).not.toThrow()
+  })
+
+  it('refuses nesting deeper than it reads, through uses as well as groups', () => {
+    const chain = Array.from({ length: 30 }, (_, i) => `<g id="c${i + 1}">${'<g>'.repeat(20)}<use href="#c${i}"/>${'</g>'.repeat(20)}</g>`).join('')
+    expect(problem(svg(`<defs><rect id="c0" width="1" height="1"/>${chain}</defs><use href="#c30"/>`))).toBe('too-big')
+  })
+
+  it('reads a flood of comments or a style sheet with no braces in a moment', () => {
+    const started = performance.now()
+    expect(problem(`${'<!--a-->'.repeat(5_000)}x`)).toBe('unreadable')
+    expect(problem(svg(`<style>${'a'.repeat(200_000)}</style><rect width="5" height="5"/>`))).toBe('none')
+    expect(problem(svg(`<style>${'/*'.repeat(50_000)}</style><rect width="5" height="5"/>`))).toBe('none')
+    expect(performance.now() - started).toBeLessThan(2_000)
+  })
+
   it('refuses what is not an SVG, or not well formed, or draws nothing', () => {
     expect(problem('<html><body/></html>')).toBe('not-svg')
     expect(problem('<svg><rect></svg>')).toBe('unreadable')

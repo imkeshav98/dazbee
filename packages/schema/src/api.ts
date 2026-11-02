@@ -74,7 +74,7 @@ export type SyncToken = z.infer<typeof SyncToken>
 
 /**
  * The image types we accept: PNG, JPEG and WebP, decoded with CanvasKit (ADR-0006: images are
- * fills), and SVG, which is never decoded as an image but placed as layers (#225).
+ * fills), and SVG, which is never decoded as an image but placed as layers.
  */
 export const ImageType = z.enum(['image/png', 'image/jpeg', 'image/webp', 'image/svg+xml'])
 export type ImageType = z.infer<typeof ImageType>
@@ -122,7 +122,7 @@ export const StartUpload = z.object({
   contentType: ImageType,
   /** The asset's name, used when the API records it straight away. */
   name: z.string().trim().min(1).max(120).optional(),
-}).refine((u) => u.contentType !== 'image/svg+xml' || u.byteSize <= MAX_SVG_BYTES, { message: 'An SVG file is at most 5 MB', path: ['byteSize'] })
+}).refine((u) => u.contentType !== 'image/svg+xml' || u.byteSize <= MAX_SVG_BYTES, { message: `An SVG file is at most ${MAX_SVG_BYTES / 1_000_000} MB`, path: ['byteSize'] })
 export type StartUpload = z.infer<typeof StartUpload>
 
 export const UploadTicket = z.union([

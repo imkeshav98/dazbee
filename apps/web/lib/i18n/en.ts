@@ -181,6 +181,7 @@ export const en = {
       pick: 'Place {name}',
       uploading: 'Uploading {name}',
       failed: 'Couldn’t upload {name}: {reason}',
+      svgNotFill: '{name} is an SVG file, which can’t fill a shape. It’s in the library, to place as layers.',
     },
     arrange: {
       align: 'Align',

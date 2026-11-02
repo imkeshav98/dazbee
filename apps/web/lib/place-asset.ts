@@ -1,5 +1,5 @@
 // Puts an asset from the library on the stage: an image as a graphic filled with it (#52), an SVG
-// file as the layers it draws (#225). An SVG's bytes come through the web app as text and are read
+// file as the layers it draws. An SVG's bytes come through the web app as text and are read
 // by the editor, never by the browser's image decoder.
 import type { Editor, Point } from '@dazbee/editor'
 import { isVectorAsset, type AssetSummary } from '@dazbee/schema'
@@ -7,7 +7,7 @@ import { isVectorAsset, type AssetSummary } from '@dazbee/schema'
 export type Placeable = Pick<AssetSummary, 'id' | 'name' | 'width' | 'height' | 'contentType'>
 
 /** An SVG asset's markup. */
-export async function svgOf(brandId: string, assetId: string): Promise<string> {
+async function svgOf(brandId: string, assetId: string): Promise<string> {
   const response = await fetch(`/brands/${encodeURIComponent(brandId)}/assets/${encodeURIComponent(assetId)}`)
   if (!response.ok) throw new Error(`the SVG didn't load (${response.status})`)
   return response.text()

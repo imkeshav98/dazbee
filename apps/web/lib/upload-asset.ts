@@ -4,7 +4,7 @@ import { AssetSummary } from '@dazbee/schema'
 
 /** The image types a fill takes; the web app checks the bytes again. */
 export const IMAGE_ACCEPT = 'image/png,image/jpeg,image/webp'
-/** What the library takes: those images and SVG files, which are placed as layers (#225). */
+/** What the library takes: those images and SVG files, which are placed as layers. */
 export const ASSET_ACCEPT = `${IMAGE_ACCEPT},image/svg+xml,.svg`
 
 const base = (brandId: string) => `/brands/${encodeURIComponent(brandId)}/assets`
