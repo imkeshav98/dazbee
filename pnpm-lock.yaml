@@ -17,9 +17,6 @@ importers:
 
   apps/api:
     dependencies:
-      '@hono/node-server':
-        specifier: ^2.1.0
-        version: 2.1.5(hono@4.13.14)
       '@dazbee/db':
         specifier: workspace:*
         version: link:../../packages/db
@@ -41,6 +38,9 @@ importers:
       '@dazbee/sync-token':
         specifier: workspace:*
         version: link:../../packages/sync-token
+      '@hono/node-server':
+        specifier: ^2.1.0
+        version: 2.1.5(hono@4.13.14)
       '@workos-inc/node':
         specifier: 11.0.0
         version: 11.0.0
@@ -75,12 +75,6 @@ importers:
 
   apps/sync:
     dependencies:
-      '@hocuspocus/extension-database':
-        specifier: 4.8.0
-        version: 4.8.0(y-protocols@1.0.7(yjs@13.6.33))(yjs@13.6.33)
-      '@hocuspocus/server':
-        specifier: 4.8.0
-        version: 4.8.0(y-protocols@1.0.7(yjs@13.6.33))(yjs@13.6.33)
       '@dazbee/db':
         specifier: workspace:*
         version: link:../../packages/db
@@ -90,13 +84,19 @@ importers:
       '@dazbee/sync-token':
         specifier: workspace:*
         version: link:../../packages/sync-token
-    devDependencies:
-      '@hocuspocus/provider':
+      '@hocuspocus/extension-database':
         specifier: 4.8.0
         version: 4.8.0(y-protocols@1.0.7(yjs@13.6.33))(yjs@13.6.33)
+      '@hocuspocus/server':
+        specifier: 4.8.0
+        version: 4.8.0(y-protocols@1.0.7(yjs@13.6.33))(yjs@13.6.33)
+    devDependencies:
       '@dazbee/config':
         specifier: workspace:*
         version: link:../../packages/config
+      '@hocuspocus/provider':
+        specifier: 4.8.0
+        version: 4.8.0(y-protocols@1.0.7(yjs@13.6.33))(yjs@13.6.33)
       '@types/node':
         specifier: ^22.20.0
         version: 22.20.5
@@ -115,6 +115,21 @@ importers:
 
   apps/web:
     dependencies:
+      '@dazbee/canvaskit':
+        specifier: workspace:*
+        version: link:../../packages/canvaskit
+      '@dazbee/doc':
+        specifier: workspace:*
+        version: link:../../packages/doc
+      '@dazbee/editor':
+        specifier: workspace:*
+        version: link:../../packages/editor
+      '@dazbee/fonts':
+        specifier: workspace:*
+        version: link:../../packages/fonts
+      '@dazbee/schema':
+        specifier: workspace:*
+        version: link:../../packages/schema
       '@fontsource-variable/bricolage-grotesque':
         specifier: ^5.3.0
         version: 5.3.0
@@ -133,21 +148,6 @@ importers:
       '@radix-ui/react-tooltip':
         specifier: ^1.4.1
         version: 1.4.1(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
-      '@dazbee/canvaskit':
-        specifier: workspace:*
-        version: link:../../packages/canvaskit
-      '@dazbee/doc':
-        specifier: workspace:*
-        version: link:../../packages/doc
-      '@dazbee/editor':
-        specifier: workspace:*
-        version: link:../../packages/editor
-      '@dazbee/fonts':
-        specifier: workspace:*
-        version: link:../../packages/fonts
-      '@dazbee/schema':
-        specifier: workspace:*
-        version: link:../../packages/schema
       '@tailwindcss/postcss':
         specifier: ^4.3.3
         version: 4.3.3
@@ -308,9 +308,6 @@ importers:
 
   packages/editor:
     dependencies:
-      '@hocuspocus/provider':
-        specifier: 4.8.0
-        version: 4.8.0(y-protocols@1.0.7(yjs@13.6.33))(yjs@13.6.33)
       '@dazbee/canvaskit':
         specifier: workspace:*
         version: link:../canvaskit
@@ -329,6 +326,9 @@ importers:
       '@dazbee/schema':
         specifier: workspace:*
         version: link:../schema
+      '@hocuspocus/provider':
+        specifier: 4.8.0
+        version: 4.8.0(y-protocols@1.0.7(yjs@13.6.33))(yjs@13.6.33)
       y-indexeddb:
         specifier: 9.0.12
         version: 9.0.12(yjs@13.6.33)
@@ -473,6 +473,37 @@ importers:
         specifier: ^3.2.7
         version: 3.2.7(@types/node@22.20.5)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.15)
 
+  packages/svg:
+    dependencies:
+      '@dazbee/canvaskit':
+        specifier: workspace:*
+        version: link:../canvaskit
+      '@dazbee/schema':
+        specifier: workspace:*
+        version: link:../schema
+      fractional-indexing:
+        specifier: ^3.2.0
+        version: 3.4.0
+    devDependencies:
+      '@dazbee/config':
+        specifier: workspace:*
+        version: link:../config
+      '@dazbee/renderer':
+        specifier: workspace:*
+        version: link:../renderer
+      '@types/node':
+        specifier: ^22.20.0
+        version: 22.20.5
+      eslint:
+        specifier: ^9.39.0
+        version: 9.39.5(jiti@2.7.0)
+      typescript:
+        specifier: ~5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.7
+        version: 3.2.7(@types/node@22.20.5)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.15)
+
   packages/sync-token:
     devDependencies:
       '@dazbee/config':
@@ -493,12 +524,6 @@ importers:
 
   tests/e2e:
     devDependencies:
-      '@hyzyla/pdfium':
-        specifier: 3.0.0
-        version: 3.0.0
-      '@playwright/test':
-        specifier: 1.63.0
-        version: 1.63.0
       '@dazbee/canvaskit':
         specifier: workspace:*
         version: link:../../packages/canvaskit
@@ -529,6 +554,12 @@ importers:
       '@dazbee/web':
         specifier: workspace:*
         version: link:../../apps/web
+      '@hyzyla/pdfium':
+        specifier: 3.0.0
+        version: 3.0.0
+      '@playwright/test':
+        specifier: 1.63.0
+        version: 1.63.0
       '@types/node':
         specifier: ^22.20.0
         version: 22.20.5
@@ -541,12 +572,6 @@ importers:
 
   tests/pixels:
     devDependencies:
-      '@hyzyla/pdfium':
-        specifier: 3.0.0
-        version: 3.0.0
-      '@playwright/test':
-        specifier: 1.63.0
-        version: 1.63.0
       '@dazbee/canvaskit':
         specifier: workspace:*
         version: link:../../packages/canvaskit
@@ -568,6 +593,15 @@ importers:
       '@dazbee/schema':
         specifier: workspace:*
         version: link:../../packages/schema
+      '@dazbee/svg':
+        specifier: workspace:*
+        version: link:../../packages/svg
+      '@hyzyla/pdfium':
+        specifier: 3.0.0
+        version: 3.0.0
+      '@playwright/test':
+        specifier: 1.63.0
+        version: 1.63.0
       '@resvg/resvg-js':
         specifier: 2.6.2
         version: 2.6.2

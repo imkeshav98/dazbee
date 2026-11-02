@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="300" height="150">
+  <style>
+    rect.card { fill: hsl(210, 40%, 96%); stroke: rgb(30 41 59); stroke-width: 2px }
+    #sun { fill: url(#glow) }
+    .bar, .dash { stroke: tomato }
+    .dash { stroke-dasharray: 8 4; stroke-width: 3; fill: none }
+    @media (prefers-color-scheme: dark) { rect.card { fill: black } }
+  </style>
+  <defs>
+    <radialGradient id="glow">
+      <stop offset="0%" stop-color="#FFF7AE"/>
+      <stop offset="60%" stop-color="gold"/>
+      <stop offset="100%" stop-color="#F59E0B" stop-opacity="0.6"/>
+    </radialGradient>
+  </defs>
+  <rect class="card" x="6" y="6" width="288" height="138" rx="14"/>
+  <ellipse id="sun" cx="70" cy="75" rx="50" ry="40"/>
+  <g transform="translate(140 30) skewX(-15)">
+    <rect class="bar" x="10" y="40" width="20" height="50" fill="rgba(37, 99, 235, 0.8)"/>
+    <rect class="bar" x="40" y="20" width="20" height="70" fill="#25E"/>
+    <rect class="bar" x="70" y="0" width="20" height="90" fill="navy" opacity="0.6"/>
+  </g>
+  <path class="dash" d="M130 130 Q 200 100 280 130"/>
+</svg>
