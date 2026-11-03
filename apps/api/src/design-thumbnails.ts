@@ -8,11 +8,11 @@ import * as Y from 'yjs'
 
 import { type Db, readDesignState } from '@dazbee/db'
 import { migrateDoc, readDesign } from '@dazbee/doc'
-import { type Design, type DesignSummary, inOrder } from '@dazbee/schema'
+import type { Design, DesignSummary } from '@dazbee/schema'
 import type { Storage } from '@dazbee/storage'
 
 import type { DrawJob, DrawResult } from './draw-worker.ts'
-import { brandResourcesFor } from './render.ts'
+import { brandResourcesFor, firstPageId } from './render.ts'
 
 /** The longest side of a design's picture: the bento's big tile on a 2× screen. */
 const DESIGN_THUMBNAIL_SIZE = 640
@@ -22,7 +22,7 @@ const designThumbnailKey = (workspaceId: string, design: DesignSummary) =>
 
 /** The page and format a design's picture shows: its first page, in its primary format. */
 export function coverOf(design: Design) {
-  const [pageId] = inOrder(design.pages).map(([id]) => id)
+  const pageId = firstPageId(design)
   const formatId = design.formats[design.meta.primaryFormatId]
     ? design.meta.primaryFormatId
     : Object.keys(design.formats)[0]
