@@ -11,7 +11,12 @@ import { placeAsset } from '../../../../../lib/place-asset.ts'
 import { carriesFiles, dragFills, dropAt, isAssetFile, placeDroppedFiles } from '../../../../../lib/drop-files.ts'
 import { PropertyCards } from '../../../../../components/editor/property-cards.tsx'
 import { ZoomControl } from '../../../../../components/editor/zoom-control.tsx'
-import { SelectionBar, StageMenu } from '../../../../../components/editor/selection-bar.tsx'
+import { StageMenu } from '../../../../../components/editor/layer-actions.tsx'
+import { TopBar } from '../../../../../components/editor/top-bar.tsx'
+import { SmallMenu } from '../../../../../components/editor/small-menu.tsx'
+import { EditPanel } from '../../../../../components/editor/edit-panel.tsx'
+import { HistoryButtons } from '../../../../../components/editor/history-buttons.tsx'
+import { useEditState } from '../../../../../components/editor/edit-store.ts'
 import { ASSET_DRAG_TYPE, AssetLibrary, draggedAsset, VECTOR_DRAG_TYPE } from '../../../../../components/editor/asset-library.tsx'
 import { BrandKitPanel } from '../../../../../components/editor/brand-kit-panel.tsx'
 import { ShareMenu } from '../../../../../components/editor/share-menu.tsx'
@@ -115,6 +120,9 @@ export function EditorStage({ designId, designName, brandId, brandName, everyBra
   // A right-click on a layer: where, for the menu of its actions, and a count so each right-click opens its own.
   const [menuAt, setMenuAt] = useState<{ x: number; y: number; n: number } | null>(null)
   const dismissNotice = useCallback(() => setNotice(null), [])
+  // Where the top bar ends and, on a phone, where the open sheet starts: the show-alone chip sits
+  // under the bar, and the toasts above the sheet.
+  const { bar, barBottom, sheetTop } = useEditState()
   useEffect(() => {
     if (!editor) return
     const stop = editor.onNotice((n, parts) => {
@@ -240,6 +248,7 @@ export function EditorStage({ designId, designName, brandId, brandName, everyBra
       designName={name}
       onRename={async (next) => setName(await renameFromEditor(brandId, designId, next))}
       status={status}
+      history={editor ? <HistoryButtons editor={editor} /> : undefined}
       tool={dockTool}
       shape={shape}
       onToolChange={(tool, picked) => {
@@ -319,15 +328,18 @@ export function EditorStage({ designId, designName, brandId, brandName, everyBra
       >
         <canvas ref={canvas} className="block size-full touch-none" data-testid="stage" />
         <div ref={overlay} className="stage-overlay pointer-events-none absolute inset-0 overflow-hidden" aria-hidden />
-        {editor && <SelectionBar editor={editor} brandId={brandId} />}
         {editor && menuAt && <StageMenu key={menuAt.n} editor={editor} at={menuAt} onClose={() => setMenuAt(null)} />}
-        <div data-slot="mini-bar" className="pointer-events-none absolute inset-x-0 top-4 flex justify-center">
-          {editor && <FocusChip editor={editor} />}
-        </div>
-        <div className="pointer-events-none absolute start-4 bottom-4 z-10">
-          {editor && removed && <UndoToast key={removed} editor={editor} message={removed} onDone={dismissRemoved} />}
-          {!removed && notice && <NoticeToast key={notice.at} message={notice.text} onDone={dismissNotice} lasting={notice.lasting ?? false} />}
-        </div>
+      </div>
+      {/* The top bar, the small menu and the edit panel follow the page's direction, so they mirror in Arabic. */}
+      {editor && <TopBar editor={editor} brandId={brandId} />}
+      {editor && <SmallMenu editor={editor} rightClick={menuAt !== null} />}
+      {editor && <EditPanel editor={editor} brandId={brandId} />}
+      <div data-slot="mini-bar" style={{ top: bar ? barBottom + 8 : 16 }} className="pointer-events-none absolute inset-x-0 z-10 flex justify-center">
+        {editor && <FocusChip editor={editor} />}
+      </div>
+      <div data-toasts style={sheetTop === null ? undefined : { bottom: `calc(100% - ${sheetTop}px + 8px)` }} className="pointer-events-none absolute start-4 bottom-4 z-30">
+        {editor && removed && <UndoToast key={removed} editor={editor} message={removed} onDone={dismissRemoved} />}
+        {!removed && notice && <NoticeToast key={notice.at} message={notice.text} onDone={dismissNotice} lasting={notice.lasting ?? false} />}
       </div>
       <StageZoom editor={editor} store={zoom} />
     </EditorShell>

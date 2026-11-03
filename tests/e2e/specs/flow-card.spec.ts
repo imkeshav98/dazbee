@@ -4,7 +4,7 @@
 import { expect, test, type Page } from '../support/test.ts'
 import type { DesignInput } from '@dazbee/schema'
 import { writeOutput } from '../support/editor.ts'
-import { openStage } from '../support/stage.ts'
+import { barMenu, openStage, openCard } from '../support/stage.ts'
 import { choose } from '../support/select.ts'
 
 test.describe.configure({ timeout: 120_000 })
@@ -34,19 +34,21 @@ const boxOf = (page: Page, id: string) => page.evaluate((id) => window.dazbee?.b
 const propsOf = (page: Page, id: string) => page.evaluate((id) => window.dazbee?.design().nodes[id]?.props, id) as Promise<Record<string, unknown>>
 const select = async (page: Page, ids: string[]) => {
   await page.evaluate((ids) => window.dazbee?.select(ids), ids)
-  await expect(page.getByTestId('layout-card')).toBeVisible()
+  await expect((await openCard(page, 'layout-card'))).toBeVisible()
 }
 
 test('a child of an auto layout fills, hugs or keeps its size, and can leave the flow', async ({ browser }) => {
   const { page, errors } = await openStage(browser, design())
-  const card = page.getByTestId('flow-card')
-  const width = card.getByRole('combobox', { name: 'Width sizing' })
+  const card = async () => (await openCard(page, 'flow-card'))
 
+  // A layer out of any flow has no In the stack part in its Position panel.
   await select(page, ['loose'])
-  await expect(card).toHaveCount(0)
+  await expect((await barMenu(page, 'position')).getByTestId('flow-card')).toHaveCount(0)
+  await page.keyboard.press('Escape')
 
   await select(page, ['two'])
-  await expect(card.getByRole('heading')).toHaveText('In the stack')
+  const width = (await card()).getByRole('combobox', { name: 'Width sizing' })
+  await expect((await card()).getByRole('heading')).toHaveText('In the stack')
   await expect(width).toHaveAttribute('data-value', 'fixed')
   await expect(width).toHaveText('Own size')
   await choose(width, 'fill')
@@ -56,7 +58,7 @@ test('a child of an auto layout fills, hugs or keeps its size, and can leave the
   await page.evaluate(() => window.dazbee?.drawn())
   writeOutput('flow-card-fill.png', await page.screenshot())
 
-  const keep = card.getByRole('switch', { name: 'Keep where I put it' })
+  const keep = (await card()).getByRole('switch', { name: 'Keep where I put it' })
   await keep.click()
   await expect(keep).toHaveAttribute('aria-checked', 'true')
   await expect.poll(async () => (await propsOf(page, 'two')).absolute).toBe(true)
@@ -65,11 +67,11 @@ test('a child of an auto layout fills, hugs or keeps its size, and can leave the
 
   // The frame itself hugs its children, so it shrinks to them: its sizing is in the Stack card.
   await select(page, ['stack'])
-  await expect(card).toHaveCount(0)
+  await expect((await card())).toHaveCount(0)
   await select(page, ['two'])
   await choose(width, 'fixed')
   await select(page, ['stack'])
-  await choose(page.getByTestId('auto-layout-card').getByRole('combobox', { name: 'Width sizing' }), 'hug')
+  await choose((await openCard(page, 'auto-layout-card')).getByRole('combobox', { name: 'Width sizing' }), 'hug')
   await expect.poll(async () => (await propsOf(page, 'stack')).sizing).toEqual({ width: 'hug', height: 'fixed' })
   // 20 + 160 + 20 + 160 + 20.
   await expect.poll(async () => (await boxOf(page, 'stack')).width).toBe(380)

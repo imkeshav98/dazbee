@@ -1,9 +1,8 @@
 'use client'
 
-// The property cards floating at the stage's top end. With nothing selected they show the
-// design: the Page card (its background), then Formats and Pages. With a selection they show the
-// selection's cards, its look and actions being in the bar by the selection. Each card is only as
-// tall as what it holds, every card is open, and controls are visual first.
+// The property cards floating at the stage's top end, with nothing selected: the Page card (its
+// background), then Formats and Pages. Each card is only as tall as what it holds, every card is
+// open, and controls are visual first. A selection's settings are in the top bar instead.
 import type { Editor } from '@dazbee/editor'
 import type { Design, Paint } from '@dazbee/schema'
 import { useState } from 'react'
@@ -15,7 +14,6 @@ import { CARD, CARD_LOWER, CardHeader, PICKED_RING, SWATCHES } from './card.tsx'
 import { FormatsPanel, useEditorDesign } from './formats-panel.tsx'
 import { PagesPanel } from './pages-panel.tsx'
 import { AddButton, PaintRow, Stack } from './paint-stack.tsx'
-import { SelectionCards } from './selection-cards.tsx'
 import { useBrandKit } from './use-brand-kit.ts'
 import { SWATCH } from './styles.ts'
 
@@ -122,13 +120,8 @@ export function PropertyCards({ editor, brandId, onRemoved }: { editor: Editor; 
   // The page the Page card paints: the one last brought into view from Pages, or the first.
   const [shown, setShown] = useState<string | null>(null)
   const pageId = shown && design.pages[shown] ? shown : ordered(design)[0]?.[0]
-  if (selected.length > 0) {
-    return (
-      <>
-        <SelectionCards editor={editor} brandId={brandId} ids={selected} />
-      </>
-    )
-  }
+  // A selection's settings are in the top bar and its edit panel.
+  if (selected.length > 0) return null
   return (
     <>
       {pageId && <PageCard editor={editor} brandId={brandId} pageId={pageId} />}

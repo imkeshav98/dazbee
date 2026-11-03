@@ -4,7 +4,7 @@
 import { expect, test, type Locator, type Page } from '../support/test.ts'
 import type { DesignInput } from '@dazbee/schema'
 import { writeOutput } from '../support/editor.ts'
-import { barMenu, closeBarMenu, fillList, moreMenu, openStage, scopeMenu, strokeList } from '../support/stage.ts'
+import { barMenu, closeBarMenu, fillList, moreMenu, openStage, scopeMenu, strokeList, openCard } from '../support/stage.ts'
 import { choose } from '../support/select.ts'
 
 test.describe.configure({ timeout: 120_000 })
@@ -44,7 +44,7 @@ const overrides = (page: Page) => page.evaluate(() => JSON.parse(JSON.stringify(
 const props = async (page: Page, id: string) => ({ ...await base(page, id), ...(await overrides(page))['format:sq']?.[id] })
 const select = async (page: Page, ids: string[]) => {
   await page.evaluate((ids) => window.dazbee?.select(ids), ids)
-  await expect(page.getByTestId('layout-card')).toBeVisible()
+  await expect((await openCard(page, 'layout-card'))).toBeVisible()
 }
 /** Types a value into a field and presses Enter. */
 const enter = async (field: Locator, value: string) => {
@@ -55,23 +55,23 @@ const enter = async (field: Locator, value: string) => {
 test('one layer: position, size, turn, opacity, blend, fill, stroke and effects', async ({ browser }) => {
   const { page, errors } = await openStage(browser, design())
   await select(page, ['box'])
-  const layout = page.getByTestId('layout-card')
-  await expect(layout.getByRole('spinbutton', { name: 'X position' })).toHaveValue('80')
+  const layout = async () => (await openCard(page, 'layout-card'))
+  await expect((await layout()).getByRole('spinbutton', { name: 'X position' })).toHaveValue('80')
 
-  await enter(layout.getByRole('spinbutton', { name: 'X position' }), '140')
+  await enter((await layout()).getByRole('spinbutton', { name: 'X position' }), '140')
   await expect.poll(async () => (await props(page, 'box')).x).toBe(140)
-  await layout.getByRole('spinbutton', { name: 'Width' }).press('ArrowUp')
+  await (await layout()).getByRole('spinbutton', { name: 'Width' }).press('ArrowUp')
   await expect.poll(async () => (await props(page, 'box')).width).toBe(301)
-  await layout.getByRole('spinbutton', { name: 'Width' }).press('Shift+ArrowUp')
+  await (await layout()).getByRole('spinbutton', { name: 'Width' }).press('Shift+ArrowUp')
   await expect.poll(async () => (await props(page, 'box')).width).toBe(311)
   await enter((await moreMenu(page)).getByRole('spinbutton', { name: 'Rotation in degrees' }), '15')
   await page.keyboard.press('Escape')
   await expect.poll(async () => (await props(page, 'box')).rotation).toBe(15)
 
-  const look = page.getByTestId('appearance-card')
-  await enter(look.getByRole('spinbutton', { name: 'Opacity' }), '50')
+  const look = async () => (await openCard(page, 'appearance-card'))
+  await enter((await look()).getByRole('spinbutton', { name: 'Opacity' }), '50')
   await expect.poll(async () => (await props(page, 'box')).opacity).toBe(0.5)
-  await choose(look.getByRole('combobox', { name: 'Blend mode' }), 'multiply')
+  await choose((await look()).getByRole('combobox', { name: 'Blend mode' }), 'multiply')
   await expect.poll(async () => (await props(page, 'box')).blendMode).toBe('multiply')
 
   const fill = await fillList(page)
@@ -123,37 +123,36 @@ test('one layer: position, size, turn, opacity, blend, fill, stroke and effects'
 test('several layers: mixed values, set together or each from its own; text and auto layout', async ({ browser }) => {
   const { page, errors } = await openStage(browser, design())
   await select(page, ['box', 'dot'])
-  const layout = page.getByTestId('layout-card')
-  const x = layout.getByRole('spinbutton', { name: 'X position' })
+  const layout = async () => (await openCard(page, 'layout-card'))
+  const x = (await layout()).getByRole('spinbutton', { name: 'X position' })
   await expect(x).toHaveValue('')
   await expect(x).toHaveAttribute('placeholder', 'Mixed')
   await expect(await fillList(page)).toContainText('The selected layers differ.')
   writeOutput('props-1-mixed.png', await page.screenshot())
 
   // The arrow moves each from its own; Enter gives both the same.
-  await x.press('ArrowUp')
+  await (await layout()).getByRole('spinbutton', { name: 'X position' }).press('ArrowUp')
   await expect.poll(async () => [(await props(page, 'box')).x, (await props(page, 'dot')).x]).toEqual([81, 701])
-  await enter(layout.getByRole('spinbutton', { name: 'Y position' }), '300')
+  await enter((await layout()).getByRole('spinbutton', { name: 'Y position' }), '300')
   await expect.poll(async () => [(await props(page, 'box')).y, (await props(page, 'dot')).y]).toEqual([300, 300])
-  await expect(layout.getByRole('spinbutton', { name: 'Y position' })).toHaveValue('300')
+  await expect((await layout()).getByRole('spinbutton', { name: 'Y position' })).toHaveValue('300')
   await (await fillList(page)).getByRole('button', { name: 'Use one for all' }).click()
   await expect.poll(async () => [(await props(page, 'box')).fills, (await props(page, 'dot')).fills]).toEqual([[{ type: 'solid', color: '#D9D9D9FF' }], [{ type: 'solid', color: '#D9D9D9FF' }]])
   await enter((await fillList(page)).getByRole('textbox', { name: 'Colour 1 hex' }), '#FFB020')
   await expect.poll(async () => [(await props(page, 'box')).fills, (await props(page, 'dot')).fills]).toEqual([[{ type: 'solid', color: '#FFB020FF' }], [{ type: 'solid', color: '#FFB020FF' }]])
-  await enter(page.getByTestId('appearance-card').getByRole('spinbutton', { name: 'Opacity' }), '75')
+  await enter((await openCard(page, 'appearance-card')).getByRole('spinbutton', { name: 'Opacity' }), '75')
   await expect.poll(async () => [(await props(page, 'box')).opacity, (await props(page, 'dot')).opacity]).toEqual([0.75, 0.75])
 
   // Text.
   await select(page, ['headline'])
-  const text = page.getByTestId('spacing-card')
-  await enter((await barMenu(page, 'size')).getByRole('spinbutton', { name: 'Size' }), '120')
-  await closeBarMenu(page, 'bar-size')
-  await enter(text.getByRole('spinbutton', { name: 'Letter spacing' }), '2')
-  await enter(text.getByRole('spinbutton', { name: 'Line height' }), '1.1')
+  const text = async () => (await openCard(page, 'spacing-card'))
+  await enter(page.getByTestId('bar-size-field'), '120')
+  await enter((await text()).getByRole('spinbutton', { name: 'Letter spacing' }), '2')
+  await enter((await text()).getByRole('spinbutton', { name: 'Line height' }), '1.1')
   await enter((await barMenu(page, 'colour')).getByRole('textbox', { name: 'Text colour hex' }), '1f9d55')
   await closeBarMenu(page, 'bar-colour')
   await (await barMenu(page, 'align')).getByRole('radiogroup', { name: 'Alignment', exact: true }).locator('[data-value="center"]').click()
-  await (await barMenu(page, 'align')).getByRole('radiogroup', { name: 'Case' }).locator('[data-value="upper"]').click()
+  await (await barMenu(page, 'case')).getByRole('radiogroup', { name: 'Case' }).locator('[data-value="upper"]').click()
   await page.keyboard.press('Escape')
   await expect.poll(async () => {
     const p = await props(page, 'headline')
@@ -164,10 +163,10 @@ test('several layers: mixed values, set together or each from its own; text and 
 
   // Auto layout.
   await select(page, ['stack'])
-  const auto = page.getByTestId('auto-layout-card')
-  await enter(auto.getByRole('spinbutton', { name: 'Room between' }), '32')
-  await auto.getByRole('radio', { name: 'Column' }).click()
-  await enter(auto.getByRole('spinbutton', { name: 'Room at the left' }), '40')
+  const auto = async () => (await openCard(page, 'auto-layout-card'))
+  await enter((await auto()).getByRole('spinbutton', { name: 'Room between' }), '32')
+  await (await auto()).getByRole('radio', { name: 'Column' }).click()
+  await enter((await auto()).getByRole('spinbutton', { name: 'Room at the left' }), '40')
   await expect.poll(async () => (await props(page, 'stack')).layout).toMatchObject({ direction: 'column', gap: 32, padding: { left: 40, top: 20 } })
   await page.evaluate(() => window.dazbee?.drawn())
   writeOutput('props-3-auto-layout.png', await page.screenshot())
@@ -181,22 +180,22 @@ test('a change goes to the format shown, like a drag; all formats writes the bas
   await expect(chip).toHaveText('Only Square')
   await expect((await scopeMenu(page)).getByRole('radio', { name: 'Only Square' })).toHaveAttribute('aria-checked', 'true')
   await page.keyboard.press('Escape')
-  const x = page.getByTestId('layout-card').getByRole('spinbutton', { name: 'X position' })
-  await enter(x, '500')
+  const x = async () => (await openCard(page, 'layout-card')).getByRole('spinbutton', { name: 'X position' })
+  await enter((await x()), '500')
   await enter((await fillList(page)).getByRole('textbox', { name: 'Colour 1 hex' }), '00A889')
   await expect.poll(async () => (await overrides(page))['format:sq']?.box).toMatchObject({ x: 500, fills: [{ type: 'solid', color: '#00A889FF' }] })
   // The base and the other format are as they were.
   expect((await base(page, 'box')).x).toBe(80)
   expect((await base(page, 'box')).fills).toEqual([{ type: 'solid', color: '#E0262BFF' }])
   expect((await overrides(page))['format:story']?.box ?? {}).toEqual({})
-  await expect(x).toHaveValue('500')
+  await expect((await x())).toHaveValue('500')
   writeOutput('props-4-this-format.png', await page.screenshot())
 
   // All formats: the value goes to the base and this format's override of it goes.
   await (await scopeMenu(page)).getByRole('radio', { name: 'All sizes' }).click()
   await page.keyboard.press('Escape')
   await expect(chip).toHaveText('For all sizes')
-  await enter(x, '200')
+  await enter((await x()), '200')
   await expect.poll(async () => (await base(page, 'box')).x).toBe(200)
   const after = (await overrides(page))['format:sq']?.box ?? {}
   expect(after).not.toHaveProperty('x')
@@ -208,8 +207,8 @@ test('a change goes to the format shown, like a drag; all formats writes the bas
 test('scrubbing a number is one undo step', async ({ browser }) => {
   const { page, errors } = await openStage(browser, design())
   await select(page, ['box', 'dot'])
-  const handle = page.getByTestId('layout-card').locator('[data-scrub="X position"]')
-  const box = await handle.boundingBox()
+  const handle = async () => (await openCard(page, 'layout-card')).locator('[data-scrub="X position"]')
+  const box = await (await handle()).boundingBox()
   if (!box) throw new Error('no scrub handle')
   const start = { x: box.x + box.width / 2, y: box.y + box.height / 2 }
   await page.mouse.move(start.x, start.y)

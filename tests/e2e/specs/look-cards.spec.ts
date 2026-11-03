@@ -5,7 +5,7 @@ import { expect, test, type Page } from '../support/test.ts'
 import type { DesignInput } from '@dazbee/schema'
 import { writeOutput } from '../support/editor.ts'
 import { newBrand, putKit } from '../support/seed.ts'
-import { barMenu, openStage } from '../support/stage.ts'
+import { barMenu, openStage, openCard } from '../support/stage.ts'
 
 test.describe.configure({ timeout: 120_000 })
 
@@ -36,7 +36,7 @@ test('the look comes first: size and brand colour, effect tiles, and the header 
   await page.evaluate(() => window.dazbee?.select(['headline']))
 
   // Text, in the bar: the size, and the brand's colours with the colour it has now leading them.
-  const size = (await barMenu(page, 'size')).getByRole('spinbutton', { name: 'Size' })
+  const size = page.getByTestId('bar-size-field')
   await size.fill('64')
   await size.press('Enter')
   await expect.poll(async () => (await node(page, 'headline')).props.style?.fontSize).toBe(64)
@@ -67,17 +67,19 @@ test('the look comes first: size and brand colour, effect tiles, and the header 
     return [(props.effects as unknown[]).length, props.style?.outline]
   }).toEqual([0, undefined])
 
-  // The header card names the layer and holds its box, open.
-  const header = page.getByTestId('layout-card')
-  await expect(header.getByRole('heading')).toHaveText('Headline')
-  await expect(header.getByRole('spinbutton', { name: 'X position' })).toHaveValue('76')
+  // The Position panel names the layer and holds its box.
+  const header = async () => (await openCard(page, 'layout-card'))
+  await header()
+  await expect(page.getByTestId('edit-panel-note')).toHaveText('Headline')
+  await expect((await header()).getByRole('spinbutton', { name: 'X position' })).toHaveValue('76')
 
   // A shape: its fill from the same colours, and Blur in place of Outline; the header follows it.
   await page.evaluate(() => window.dazbee?.select(['badge']))
   await expect((await barMenu(page, 'effects')).locator('[data-tile="blur"]')).toBeVisible()
   await (await barMenu(page, 'colour')).getByRole('button', { name: 'Roast' }).click()
   await expect.poll(async () => (await node(page, 'badge')).bindings).toMatchObject({ fill: 'brand:roast' })
-  await expect(header.getByRole('heading')).toHaveText('Badge')
+  await header()
+  await expect(page.getByTestId('edit-panel-note')).toHaveText('Badge')
   writeOutput('look-cards-shape.png', await page.screenshot())
   expect(errors).toEqual([])
 })

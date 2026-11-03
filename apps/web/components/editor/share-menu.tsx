@@ -52,10 +52,10 @@ export function ShareMenu({ editor, brandId, brandName, designName, everyBrand }
         aria-controls={id}
         onClick={() => setOpen(open ? null : 'menu')}
         data-testid="share-open"
-        className="h-9 rounded-full px-4 text-sm font-semibold"
+        className="h-9 rounded-full px-4 text-sm font-semibold max-sm:w-9 max-sm:px-0"
       >
         <ShareFatIcon size={16} weight="fill" aria-hidden className="rtl:-scale-x-100" />
-        {t.editor.share.open}
+        <span className="max-sm:sr-only">{t.editor.share.open}</span>
       </Button>
       {open === 'menu' && (
         <div id={id} role="menu" aria-label={t.editor.share.title} className="pop-in-end absolute end-0 top-full z-30 mt-2 flex w-80 flex-col rounded-card surface-frost p-1.5">

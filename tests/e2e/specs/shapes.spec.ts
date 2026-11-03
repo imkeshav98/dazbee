@@ -120,7 +120,9 @@ test('two shapes combine into a live boolean that follows a shape dragged inside
   const front = await draw(page, { x: 200, y: 860 }, { x: 320, y: 980 })
   const shapes = await exportHashOf(page)
 
-  // Select both and combine from the bar by them: the boolean takes the bottom shape's paint.
+  // Select both and combine them from the top bar: the boolean takes the bottom shape's paint. Esc
+  // first: the drawn ellipse is still selected, and its small menu stands where the first click goes.
+  await page.keyboard.press('Escape')
   await click(page, 120, 840)
   await click(page, 300, 960, ['Shift'])
   await (await barMenu(page, 'combine')).locator('[data-action="booleanSubtract"]').click()
@@ -162,14 +164,16 @@ test('two shapes combine into a live boolean that follows a shape dragged inside
   expect(await exportHashOf(page)).not.toBe(united)
   writeOutput('shapes-3-edited.png', await page.screenshot({ animations: 'disabled' }))
 
-  // A text does not combine: with the boolean and the headline selected, Union leaves both alone.
+  // A text does not combine: with the boolean and the headline selected the top bar has no Combine,
+  // and the Union shortcut leaves both alone.
   await page.keyboard.press('Escape')
   await page.keyboard.press('Escape')
   await click(page, 160, 900)
   await click(page, 500, 540, ['Shift'])
   expect(await selection(page)).toEqual([union, 'headline'])
   const unchanged = await read(page)
-  await (await barMenu(page, 'combine')).locator('[data-action="booleanUnion"]').click()
+  await expect(page.getByTestId('bar-combine')).toHaveCount(0)
+  await press(page, 'booleanUnion')
   expect(await read(page)).toEqual(unchanged)
   expect(errors).toEqual([])
 })

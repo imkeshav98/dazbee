@@ -112,7 +112,13 @@ test('move, resize and rotate with handles, each one undo step, on a turned laye
   await dragScreen(page, e, { x: e.x + 50 * zoom, y: e.y }, ['Alt'])
   expect(await props(page, 'box')).toMatchObject({ x: 130, y: 80, width: 550, height: 300 })
 
-  // Rotate from just outside a corner; shift snaps to 15°. A quarter turn about the centre.
+  // Rotate from just outside a corner; shift snaps to 15°. A quarter turn about the centre. The
+  // stage first moves the box down, clear of the top bar's row, where a press lands on the bar.
+  await page.evaluate(() => {
+    const camera = window.dazbee?.camera()
+    if (camera) window.dazbee?.setCamera({ ...camera, y: camera.y + 100 })
+  })
+  await page.evaluate(() => window.dazbee?.drawn())
   const box = await props(page, 'box')
   const centre = await screenPoint(page, box.x + box.width / 2, box.y + box.height / 2)
   const ne = await handle(page, 'ne')
@@ -123,6 +129,11 @@ test('move, resize and rotate with handles, each one undo step, on a turned laye
   writeOutput('selection-4-rotated.png', await page.screenshot())
   await press(page, 'undo')
   expect((await props(page, 'box')).rotation ?? 0).toBe(0)
+  await page.evaluate(() => {
+    const camera = window.dazbee?.camera()
+    if (camera) window.dazbee?.setCamera({ ...camera, y: camera.y - 100 })
+  })
+  await page.evaluate(() => window.dazbee?.drawn())
 
   // The turned layer: its east handle stretches it along its own 30° side, and its west edge stays put.
   await click(page, 710, 880)

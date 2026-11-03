@@ -9,7 +9,7 @@ import { expect, test, type Page } from '../support/test.ts'
 import type { DesignInput } from '@dazbee/schema'
 import { photo, upload } from '../support/assets.ts'
 import { placed, reloads, screenPoint, writeOutput } from '../support/editor.ts'
-import { barMenu, click, openStage, press, read, selection } from '../support/stage.ts'
+import { barMenu, click, openStage, press, read, selection, openCard } from '../support/stage.ts'
 
 test.describe.configure({ timeout: 120_000 })
 
@@ -116,14 +116,14 @@ test('the bar replaces the picture, keeping its filter; Add image puts one into 
   await page.evaluate(() => window.dazbee?.drawn())
 
   // Mono, then Replace with another brand image: the new picture, still mono, no old crop.
-  const imageCard = page.getByTestId('adjust-card')
-  await expect(imageCard).toBeVisible()
-  await (await barMenu(page, 'look')).getByRole('radio', { name: 'Mono' }).click()
+  const imageCard = async () => (await openCard(page, 'adjust-card'))
+  await expect((await imageCard())).toBeVisible()
+  await (await openCard(page, 'look-card')).getByRole('radio', { name: 'Mono' }).click()
   await page.getByTestId('bar-replace').click()
   const picker = page.getByTestId('bar-replace-picker')
   await expect(picker).toBeVisible()
-  // One of the bar's popovers at a time: Replace closes Look.
-  await expect(page.getByTestId('bar-look-menu')).toBeHidden()
+  // One thing open at a time: Replace closes the Edit image panel.
+  await expect(page.getByTestId('bar-edit-menu')).toHaveCount(0)
   await expect(picker.locator(`li[data-asset="${other.id}"]`)).toBeVisible({ timeout: 30_000 })
   await expect.poll(() => picker.locator('img').evaluateAll((imgs) => imgs.every((img) => (img as HTMLImageElement).complete && (img as HTMLImageElement).naturalWidth > 0))).toBe(true)
   writeOutput('into-shape-3-replace-picker.png', await page.screenshot({ animations: 'disabled' }))
@@ -147,7 +147,7 @@ test('the bar replaces the picture, keeping its filter; Add image puts one into 
   await adding.locator(`li[data-asset="${sneaker.id}"] button`).click()
   await page.evaluate(() => window.dazbee?.drawn())
   expect(await fillsOf(page, 'box')).toEqual([{ type: 'solid', color: '#2F6BFFFF' }, { type: 'image', assetId: sneaker.id, fit: 'fill', opacity: 1 }])
-  await expect(page.getByTestId('adjust-card')).toBeVisible()
+  await expect((await openCard(page, 'adjust-card'))).toBeVisible()
   writeOutput('into-shape-5-added.png', await page.screenshot({ animations: 'disabled' }))
   await undo(page)
   expect(await fillsOf(page, 'box')).toEqual([{ type: 'solid', color: '#2F6BFFFF' }])

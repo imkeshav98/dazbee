@@ -4,7 +4,7 @@
 // one is open, so only one is open at a time.
 import * as Popover from '@radix-ui/react-popover'
 import { CaretDownIcon } from '@phosphor-icons/react'
-import { useEffect, useRef, type ReactNode, type RefObject } from 'react'
+import { useEffect, useRef, useState, type FocusEvent, type KeyboardEvent, type ReactNode, type RefObject } from 'react'
 import { cn } from '../../lib/cn.ts'
 import { BAR_BUTTON, POPOVER } from './styles.ts'
 
@@ -76,4 +76,40 @@ export function BarPopover({ id, open, onOpen, label, face, icon, children, test
       </Popover.Portal>
     </Popover.Root>
   )
+}
+
+/** A toolbar's buttons that can be used and show, in order: a closed second row's are left out. */
+export const itemsOf = (bar: HTMLElement) => [...bar.querySelectorAll<HTMLElement>('[data-bar-item]:not(:disabled)')].filter((item) => item.checkVisibility({ visibilityProperty: true }))
+
+/** Moves focus along a toolbar's buttons with the arrow keys, Home and End. */
+export function arrowAlong(event: KeyboardEvent<HTMLElement>) {
+  if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight' && event.key !== 'Home' && event.key !== 'End') return
+  const items = itemsOf(event.currentTarget)
+  const at = items.indexOf(document.activeElement as HTMLElement)
+  if (at < 0) return
+  event.preventDefault()
+  const forward = (event.key === 'ArrowRight') !== (getComputedStyle(event.currentTarget).direction === 'rtl')
+  const next = event.key === 'Home' ? 0 : event.key === 'End' ? items.length - 1 : (at + (forward ? 1 : -1) + items.length) % items.length
+  items[next]?.focus()
+}
+
+/**
+ * Lets Tab reach a toolbar once, at the button last focused, as a toolbar should; the arrows move
+ * along it. Returns the focus handler to put on the toolbar.
+ */
+export function useRovingTab(bar: HTMLElement | null) {
+  const [current, setCurrent] = useState(0)
+  useEffect(() => {
+    if (!bar) return
+    const items = itemsOf(bar)
+    const at = Math.min(current, items.length - 1)
+    items.forEach((item, i) => {
+      item.tabIndex = i === at ? 0 : -1
+    })
+  })
+  return (event: FocusEvent<HTMLElement>) => {
+    if (!(event.currentTarget instanceof HTMLElement)) return
+    const at = itemsOf(event.currentTarget).indexOf(event.target as HTMLElement)
+    if (at >= 0) setCurrent(at)
+  }
 }

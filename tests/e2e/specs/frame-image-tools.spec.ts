@@ -6,7 +6,7 @@ import { expect, test, type Page } from '../support/test.ts'
 import type { DesignInput } from '@dazbee/schema'
 import { photo } from '../support/assets.ts'
 import { writeOutput } from '../support/editor.ts'
-import { click, drag, openStage, press, read, selection } from '../support/stage.ts'
+import { click, drag, moreAction, openStage, press, read, selection } from '../support/stage.ts'
 
 test.describe.configure({ timeout: 120_000 })
 
@@ -114,10 +114,10 @@ test('Mod+Alt+G and the Arrange card frame the selection; Shift+A wraps shapes i
   await undo(page)
   expect((await read(page)).nodes.c?.parentId).toBe('p1')
 
-  // The same from the bar's Box.
+  // The same from the full menu's Put in a box.
   await click(page, 660, 160)
   await click(page, 860, 210, ['Shift'])
-  await page.getByTestId('selection-bar').locator('[data-action="frameSelection"]').click()
+  await moreAction(page, 'Put in a box')
   const [carded] = await selection(page)
   expect(await childrenOf(page, carded ?? '')).toEqual(['c', 'd'])
   await undo(page)

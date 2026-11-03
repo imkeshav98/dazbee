@@ -91,8 +91,13 @@ export const TILE_FACE_WIDE = `${TILE_FACE_BASE} aspect-[3/2]`
 /** A row that turns something on or off, with role="switch": its words, then the switch. */
 export const SWITCH_ROW = `group flex h-8 w-full cursor-pointer items-center justify-between gap-3 rounded-row text-[13px] font-semibold text-text ${FOCUS_RING}`
 
-/** The bar by the selection: a frosted pill of buttons on the stage. */
-export const BAR = 'absolute z-20 flex items-center gap-0.5 rounded-[14px] surface-frost p-1'
+/** One part of an edit panel or pop-up: a card's controls under a small heading, a hairline above all but the first. */
+export const PANEL_PART = 'flex flex-col gap-2.5 border-t border-line pt-3 first:border-t-0 first:pt-0'
+
+/** The top bar's row on the stage, under the header pill: where the bar sits, and the room the fit keeps for it. */
+export const BAR_ROW = 'top-[90px] max-sm:top-[72px]'
+/** The top bar's height, for the room the fit keeps. */
+export const BAR_ROW_HEIGHT = 'h-[38px]'
 /** One button of the bar: words or an icon, lit while its popover is open. */
 export const BAR_BUTTON = `flex h-[30px] min-w-[30px] shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-row px-2 text-[12px] font-semibold whitespace-nowrap text-text transition-colors duration-[var(--chrome-fast)] hover:bg-hover aria-expanded:bg-hover ${FOCUS_RING}`
 /** A button of the bar that turns something on or off, such as bold: lit while it is on. */

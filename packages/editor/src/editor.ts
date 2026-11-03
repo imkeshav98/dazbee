@@ -3055,16 +3055,22 @@ function live(
    * drops custom types) still pastes the layers.
    */
   const REMEMBERED = 'dazbee.copiedLayers'
-  function putOnClipboard(data: DataTransfer, copied: LayerClipboard) {
+  /** Keeps copied layers on this device, as JSON and as their names in plain text; `kept` is false without storage. */
+  function keepCopy(copied: LayerClipboard) {
     const json = JSON.stringify(copied)
     const plain = copied.tree.roots.map((id) => copied.tree.nodes[id]?.name || 'Layer').join('\n')
-    data.setData(LAYER_CLIPBOARD_TYPE, json)
-    data.setData('text/plain', plain)
     try {
       localStorage.setItem(REMEMBERED, JSON.stringify({ plain, json }))
+      return { json, plain, kept: true }
     } catch {
-      // Without storage, only pastes that keep our own type paste layers.
+      return { json, plain, kept: false }
     }
+  }
+  function putOnClipboard(data: DataTransfer, copied: LayerClipboard) {
+    // Without storage, only pastes that keep our own type paste layers.
+    const { json, plain } = keepCopy(copied)
+    data.setData(LAYER_CLIPBOARD_TYPE, json)
+    data.setData('text/plain', plain)
   }
   function layersOnClipboard(data: DataTransfer | null): LayerTree | null {
     let raw = data?.getData(LAYER_CLIPBOARD_TYPE)
@@ -3075,6 +3081,16 @@ function live(
         if (kept?.plain === plain) raw = kept.json
       }
       const parsed = raw ? LayerClipboard.safeParse(JSON.parse(raw)) : null
+      return parsed?.success ? parsed.data.tree : null
+    } catch {
+      return null
+    }
+  }
+  /** The layers last copied in Dazbee on this device, as kept in browser storage; null when there are none. */
+  function rememberedLayers(): LayerTree | null {
+    try {
+      const kept = JSON.parse(localStorage.getItem(REMEMBERED) ?? 'null') as { json?: string } | null
+      const parsed = kept?.json ? LayerClipboard.safeParse(JSON.parse(kept.json)) : null
       return parsed?.success ? parsed.data.tree : null
     } catch {
       return null
@@ -3315,6 +3331,35 @@ function live(
     },
     /** Does what a shortcut does, as if its key was pressed on the stage. */
     perform,
+    /** Whether this tab has a change of its own to undo, or an undone one to redo. */
+    canUndo: () => session.canUndo(),
+    canRedo: () => session.canRedo(),
+    /** Calls back whenever what undo or redo would do may have changed. */
+    onHistory: (listener: () => void) => session.onHistory(listener),
+    /**
+     * Copies the selected layers as Mod+C does, from a menu: kept on this device for Paste, and
+     * their names as plain text on the clipboard, which a Mod+V elsewhere matches to the kept copy.
+     * False with nothing to copy.
+     */
+    copyLayers() {
+      const copied = copiedLayers()
+      if (!copied) return false
+      const { plain, kept } = keepCopy(copied)
+      if (!kept) return false
+      void navigator.clipboard?.writeText(plain).catch(() => {
+        // Without clipboard access, Paste in the menu still has the kept copy.
+      })
+      return true
+    },
+    /** Whether Paste in a menu has layers to place: the ones last copied in Dazbee on this device. */
+    canPasteLayers: () => rememberedLayers() !== null,
+    /** Pastes the layers last copied in Dazbee on this device, as Mod+V does; false with none kept. */
+    pasteLayers() {
+      const tree = rememberedLayers()
+      if (!tree) return false
+      pasteLayers(tree, false)
+      return true
+    },
     /**
      * Moves a layer under a page or container, before a sibling or on top (#59), as one undo step;
      * groups it leaves and enters fit what they hold again. False when the move isn't allowed, such
