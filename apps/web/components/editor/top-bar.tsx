@@ -17,7 +17,7 @@ import { cn } from '../../lib/cn.ts'
 import { useMessages } from '../../lib/i18n/client.tsx'
 import { COMBINE, DISTRIBUTE, keyOf, useSelection } from './arrange-panel.tsx'
 import { arrowAlong, BarPopover, useRovingTab } from './bar-popover.tsx'
-import { editState, isPanel, setBar, setOpen, useEditState, usePhone, type PanelId } from './edit-store.ts'
+import { editState, isLayerPanel, isPanel, setBar, setOpen, useEditState, usePhone, type PanelId } from './edit-store.ts'
 import { nearest, useFontCatalog, weightsOf } from './font-panel.tsx'
 import { ImagePickerButton } from './image-tool.tsx'
 import { AlignRow } from './layer-actions.tsx'
@@ -399,7 +399,7 @@ function Bar({ target, design, brandId }: { target: Target; design: Design; bran
   }, [row, selectionKey])
   // A panel whose item has left the bar closes, as a shape's Colour does once it holds a photo.
   useLayoutEffect(() => {
-    if (isPanel(open) && !items.some((item) => item.key === open)) setOpen(null)
+    if (isLayerPanel(open) && !items.some((item) => item.key === open)) setOpen(null)
   }, [open, keys])
   // A pop-up hangs from its item: once the window changes size the item may have moved, so it closes.
   useEffect(() => {

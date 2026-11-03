@@ -16,6 +16,7 @@ import { TopBar } from '../../../../../components/editor/top-bar.tsx'
 import { SmallMenu } from '../../../../../components/editor/small-menu.tsx'
 import { EditPanel } from '../../../../../components/editor/edit-panel.tsx'
 import { HistoryButtons } from '../../../../../components/editor/history-buttons.tsx'
+import { SizesButton, SizesPanel } from '../../../../../components/editor/sizes-panel.tsx'
 import { useEditState } from '../../../../../components/editor/edit-store.ts'
 import { ASSET_DRAG_TYPE, AssetLibrary, draggedAsset, VECTOR_DRAG_TYPE } from '../../../../../components/editor/asset-library.tsx'
 import { BrandKitPanel } from '../../../../../components/editor/brand-kit-panel.tsx'
@@ -248,6 +249,7 @@ export function EditorStage({ designId, designName, brandId, brandName, everyBra
       designName={name}
       onRename={async (next) => setName(await renameFromEditor(brandId, designId, next))}
       status={status}
+      sizes={editor ? <SizesButton editor={editor} /> : undefined}
       history={editor ? <HistoryButtons editor={editor} /> : undefined}
       tool={dockTool}
       shape={shape}
@@ -334,6 +336,7 @@ export function EditorStage({ designId, designName, brandId, brandName, everyBra
       {editor && <TopBar editor={editor} brandId={brandId} />}
       {editor && <SmallMenu editor={editor} rightClick={menuAt !== null} />}
       {editor && <EditPanel editor={editor} brandId={brandId} />}
+      {editor && <SizesPanel editor={editor} onRemoved={setRemoved} />}
       <div data-slot="mini-bar" style={{ top: bar ? barBottom + 8 : 16 }} className="pointer-events-none absolute inset-x-0 z-10 flex justify-center">
         {editor && <FocusChip editor={editor} />}
       </div>

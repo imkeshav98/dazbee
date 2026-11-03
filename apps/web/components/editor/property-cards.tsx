@@ -11,7 +11,8 @@ import { useMessages } from '../../lib/i18n/client.tsx'
 import { format } from '../../lib/i18n/index.ts'
 import { useSelection } from './arrange-panel.tsx'
 import { CARD, CARD_LOWER, CardHeader, PICKED_RING, SWATCHES } from './card.tsx'
-import { FormatsPanel, useEditorDesign } from './formats-panel.tsx'
+import { isPanel, useEditState } from './edit-store.ts'
+import { useEditorDesign } from './formats-panel.tsx'
 import { PagesPanel } from './pages-panel.tsx'
 import { AddButton, PaintRow, Stack } from './paint-stack.tsx'
 import { useBrandKit } from './use-brand-kit.ts'
@@ -120,12 +121,13 @@ export function PropertyCards({ editor, brandId, onRemoved }: { editor: Editor; 
   // The page the Page card paints: the one last brought into view from Pages, or the first.
   const [shown, setShown] = useState<string | null>(null)
   const pageId = shown && design.pages[shown] ? shown : ordered(design)[0]?.[0]
-  // A selection's settings are in the top bar and its edit panel.
-  if (selected.length > 0) return null
+  const { open } = useEditState()
+  // A selection's settings are in the top bar and its edit panel, the sizes in the Sizes panel, and
+  // an open panel stands where the cards do.
+  if (selected.length > 0 || isPanel(open)) return null
   return (
     <>
       {pageId && <PageCard editor={editor} brandId={brandId} pageId={pageId} />}
-      <FormatsPanel editor={editor} onRemoved={onRemoved} />
       <PagesPanel editor={editor} onRemoved={onRemoved} onShow={setShown} />
     </>
   )

@@ -131,6 +131,14 @@ export const fillList = async (page: Page) => {
   return panel.getByTestId('fill-list')
 }
 
+/** The Sizes panel, opened from the header pill unless it is open. */
+export async function sizesPanel(page: Page) {
+  const panel = page.getByTestId('bar-sizes-menu')
+  if (!(await panel.isVisible())) await page.getByTestId('sizes-button').click()
+  await expect(panel).toBeVisible()
+  return panel
+}
+
 /** The text colour's hex field, in the Colour panel, under its +: opened. */
 export async function textColourHex(page: Page) {
   const panel = await barMenu(page, 'colour')

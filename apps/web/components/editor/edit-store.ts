@@ -5,11 +5,17 @@
 // phone an edit panel is a sheet, and a rail flyout and a sheet close each other.
 import { useEffect, useState, useSyncExternalStore } from 'react'
 
-/** The top bar's items that open the edit panel; every other id is a pop-up or the full menu. */
-export const PANELS = ['font', 'colour', 'spacing', 'effects', 'position', 'edit', 'outline', 'stack'] as const
+/** The top bar's items that open the edit panel for the selected layers. */
+export const LAYER_PANELS = ['font', 'colour', 'spacing', 'effects', 'position', 'edit', 'outline', 'stack'] as const
+/** The design's own panels, opened from the header pill, whatever is selected. */
+export const DESIGN_PANELS = ['sizes'] as const
+/** Every id that opens the edit panel; every other id is a pop-up or the full menu. */
+export const PANELS = [...LAYER_PANELS, ...DESIGN_PANELS] as const
+export type LayerPanelId = (typeof LAYER_PANELS)[number]
 export type PanelId = (typeof PANELS)[number]
 
 export const isPanel = (id: string | null): id is PanelId => (PANELS as readonly string[]).includes(id ?? '')
+export const isLayerPanel = (id: string | null): id is LayerPanelId => (LAYER_PANELS as readonly string[]).includes(id ?? '')
 
 interface EditState {
   /** The open pop-up, full menu or edit panel, by its top bar id. */

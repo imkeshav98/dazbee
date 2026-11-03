@@ -9,12 +9,12 @@ import {
   ArrowDownIcon, ArrowLineDownIcon, ArrowLineUpIcon, ArrowsOutLineHorizontalIcon, ArrowsOutLineVerticalIcon, ArrowUpIcon, XIcon, type Icon,
 } from '@phosphor-icons/react'
 import type { Editor, ShortcutAction } from '@dazbee/editor'
-import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from 'react'
 import { cn } from '../../lib/cn.ts'
 import { useMessages } from '../../lib/i18n/client.tsx'
 import { format } from '../../lib/i18n/index.ts'
 import { ALIGN, keyOf, useSelection } from './arrange-panel.tsx'
-import { isPanel, setOpen, setSheetTop, useEditState, usePhone, type PanelId } from './edit-store.ts'
+import { isLayerPanel, setOpen, setSheetTop, useEditState, usePhone, type LayerPanelId, type PanelId } from './edit-store.ts'
 import { FontChooser, useFontCatalog } from './font-panel.tsx'
 import { ORDER } from './layer-actions.tsx'
 import { factsOf, PanelContent, useTarget, type Target } from './selection-cards.tsx'
@@ -134,30 +134,60 @@ export function EditPanel({ editor, brandId }: { editor: Editor; brandId: string
   const { open } = useEditState()
   const ids = useSelection(editor)
   const selected = useTarget(editor, ids)
-  if (!isPanel(open) || !selected) return null
+  if (!isLayerPanel(open) || !selected) return null
   return <Panel key={open} id={open} target={selected.target} design={selected.design} brandId={brandId} />
 }
 
-function Panel({ id, target, design, brandId }: { id: PanelId; target: Target; design: Parameters<typeof PanelContent>[0]['design']; brandId: string }) {
+function Panel({ id, target, design, brandId }: { id: LayerPanelId; target: Target; design: Parameters<typeof PanelContent>[0]['design']; brandId: string }) {
   const t = useMessages()
-  const b = t.editor.bar
+  const { catalog, refresh } = useFontCatalog(brandId)
+  const note = target.ids.length > 1 ? format(t.editor.props.layers, { n: target.ids.length }) : target.names[0] || t.editor.props.layer
+  return (
+    <PanelFrame id={id} title={t.editor.bar.panels[id]} note={note}>
+      {id === 'font'
+        ? <FontChooser editor={target.editor} brandId={brandId} catalog={catalog} refresh={refresh} onDone={() => closePanel(id, true)} />
+        : (
+          <>
+            {id === 'position' && <ArrangePart target={target} placed={factsOf(target, design).inFlow && target.props.every((pr) => pr.absolute !== true)} />}
+            <PanelContent panel={id} target={target} design={design} brandId={brandId} />
+          </>
+        )}
+    </PanelFrame>
+  )
+}
+
+/**
+ * Closes the open panel; with `back`, the focus goes back to the item that opened it at once,
+ * before the panel goes: later, it could take the focus from whatever the next click or key opened.
+ */
+function closePanel(id: PanelId, back: boolean) {
+  if (back) document.querySelector<HTMLElement>(`[data-opens="${id}"]`)?.focus()
+  setOpen(null)
+}
+
+/**
+ * The edit panel's frame, for a layer's panels and the design's own (Sizes): its title, a note and
+ * an action beside it, ✕, and a body that scrolls. It floats at the stage's end side under the top
+ * bar's row, only as tall as what it holds; on a phone it is a sheet at the bottom. Esc or ✕ closes
+ * it, and the focus goes back to the item that opened it when closed from inside it.
+ */
+export function PanelFrame({ id, title, note, action, children }: { id: PanelId; title: string; note?: string; action?: ReactNode; children: ReactNode }) {
+  const t = useMessages()
   const { barBottom } = useEditState()
   const phone = usePhone()
-  const { catalog, refresh } = useFontCatalog(brandId)
   const panel = useRef<HTMLElement>(null)
   const body = useRef<HTMLDivElement>(null)
   const bodyRef = useOverlayScroll(body)
   const scroll = useScrollEdges(body)
-  const note = target.ids.length > 1 ? format(t.editor.props.layers, { n: target.ids.length }) : target.names[0] || t.editor.props.layer
-  // The focus goes back to the bar item at once, before the panel goes: later, it could take the
-  // focus from whatever the next click or key opened.
-  const close = (back: boolean) => {
-    if (back) document.querySelector<HTMLElement>(`[data-opens="${id}"]`)?.focus()
-    setOpen(null)
-  }
+  // Under the top bar while it shows; with nothing selected, under the row kept for it.
+  const [rowBottom, setRowBottom] = useState(0)
+  useLayoutEffect(() => {
+    const row = document.querySelector<HTMLElement>('[data-bar-row]')
+    if (row) setRowBottom(row.offsetTop + row.offsetHeight)
+  }, [])
   // Esc closes the panel before it clears the selection, wherever the focus is. In a field of the
   // panel the field still takes the key, throwing away what was typed, and the panel closes with
-  // it; the focus goes back to the bar item once the field has let it go.
+  // it; the focus goes back to the item that opened it once the field has let it go.
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.key !== 'Escape' || event.defaultPrevented) return
@@ -173,7 +203,7 @@ function Panel({ id, target, design, brandId }: { id: PanelId; target: Target; d
       }
       event.stopImmediatePropagation()
       event.preventDefault()
-      close(panel.current?.contains(at) ?? false)
+      closePanel(id, panel.current?.contains(at) ?? false)
     }
     window.addEventListener('keydown', onKey, true)
     return () => window.removeEventListener('keydown', onKey, true)
@@ -199,7 +229,7 @@ function Panel({ id, target, design, brandId }: { id: PanelId; target: Target; d
       setSheetTop(null)
     }
   }, [phone])
-  const top = barBottom + 10
+  const top = (barBottom || rowBottom) + 10
   return (
     <section
       ref={panel}
@@ -219,21 +249,15 @@ function Panel({ id, target, design, brandId }: { id: PanelId; target: Target; d
       )}
     >
       <div className={cn('flex h-12 shrink-0 items-center gap-2 border-b ps-4 pe-2 transition-colors', scroll.down ? 'border-line' : 'border-transparent')}>
-        <h2 id="edit-panel-title" className="min-w-0 flex-1 truncate font-display text-[15px] font-bold tracking-tight">{b.panels[id]}</h2>
-        <span data-testid="edit-panel-note" className="min-w-0 max-w-[50%] shrink-0 truncate pe-0.5 text-[11px] font-medium text-muted">{note}</span>
-        <button type="button" aria-label={t.editor.closePanel} data-testid="edit-panel-close" onClick={() => close(true)} className="grid size-7 shrink-0 cursor-pointer place-items-center rounded-full text-subtle hover:bg-hover hover:text-text">
+        <h2 id="edit-panel-title" className="min-w-0 flex-1 truncate font-display text-[15px] font-bold tracking-tight">{title}</h2>
+        {note && <span data-testid="edit-panel-note" className="min-w-0 max-w-[50%] shrink-0 truncate pe-0.5 text-[11px] font-medium text-muted">{note}</span>}
+        {action}
+        <button type="button" aria-label={t.editor.closePanel} data-testid="edit-panel-close" onClick={() => closePanel(id, true)} className="grid size-7 shrink-0 cursor-pointer place-items-center rounded-full text-subtle hover:bg-hover hover:text-text">
           <XIcon size={14} aria-hidden />
         </button>
       </div>
       <div ref={bodyRef} onScroll={scroll.measure} className={cn('flex min-h-0 flex-col gap-3 overflow-y-auto overscroll-contain px-4 pb-4 [&>*]:shrink-0', scroll.more && '[mask-image:linear-gradient(to_bottom,black_calc(100%-28px),transparent)]')}>
-        {id === 'font'
-          ? <FontChooser editor={target.editor} brandId={brandId} catalog={catalog} refresh={refresh} onDone={() => close(true)} />
-          : (
-            <>
-              {id === 'position' && <ArrangePart target={target} placed={factsOf(target, design).inFlow && target.props.every((pr) => pr.absolute !== true)} />}
-              <PanelContent panel={id} target={target} design={design} brandId={brandId} />
-            </>
-          )}
+        {children}
       </div>
     </section>
   )

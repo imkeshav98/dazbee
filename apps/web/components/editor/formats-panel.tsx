@@ -64,7 +64,12 @@ const tileSize = ({ width, height }: { width: number; height: number }) => {
   return { width: Math.max(12, Math.round(width * scale)), height: Math.max(12, Math.round(height * scale)) }
 }
 
-export function FormatsPanel({ editor, onRemoved }: { editor: Editor; onRemoved: (message: string) => void }) {
+/**
+ * The design's sizes: a tile of each in its proportions, then the list, each with its primary star,
+ * show alone, move up and down, and remove. With `bare`, without the card round it, for the Sizes
+ * panel, which has Add in its title row.
+ */
+export function FormatsPanel({ editor, onRemoved, bare = false }: { editor: Editor; onRemoved: (message: string) => void; bare?: boolean }) {
   const t = useMessages()
   const { design, focused } = useEditorDesign(editor)
   const formats = ordered(design)
@@ -78,15 +83,12 @@ export function FormatsPanel({ editor, onRemoved }: { editor: Editor; onRemoved:
     if (trimmed && trimmed !== design.formats[id]?.name) run('format.update', { id, name: trimmed })
   }
 
-  return (
-    <section aria-labelledby="formats-title" className={CARD}>
-      <CardHeader id="formats-title" title={t.editor.formats.title} count={formats.length}>
-        <AddFormat editor={editor} />
-      </CardHeader>
+  const content = (
+    <>
       {/* The formats as a picture, as in the final mock: each a tile in its proportions, filled with
           the first page's background, ringed while shown alone, starred if primary. The list below
           does the work. */}
-      <div aria-hidden className="flex items-end gap-3 overflow-x-auto px-[18px] pb-3 [scrollbar-width:none]" data-testid="format-tiles">
+      <div aria-hidden className={cn('flex items-end gap-3 overflow-x-auto pb-3 [scrollbar-width:none]', !bare && 'px-[18px]')} data-testid="format-tiles">
         {formats.map(([id, f]) => (
           <span key={id} className="flex shrink-0 flex-col items-center gap-1.5 text-[11px] font-semibold text-muted">
             <span
@@ -99,7 +101,7 @@ export function FormatsPanel({ editor, onRemoved }: { editor: Editor; onRemoved:
           </span>
         ))}
       </div>
-      <ul aria-label={t.editor.formats.title} className="px-2.5 pb-2" data-testid="formats">
+      <ul aria-label={t.editor.formats.title} className={cn('pb-2', bare ? '-mx-1.5' : 'px-2.5')} data-testid="formats">
         {formats.map(([id, f], i) => {
           const primary = design.meta.primaryFormatId === id
           return (
@@ -185,11 +187,20 @@ export function FormatsPanel({ editor, onRemoved }: { editor: Editor; onRemoved:
           )
         })}
       </ul>
+    </>
+  )
+  if (bare) return <div className="flex flex-col" data-testid="sizes-part">{content}</div>
+  return (
+    <section aria-labelledby="formats-title" className={CARD}>
+      <CardHeader id="formats-title" title={t.editor.formats.title} count={formats.length}>
+        <AddFormat editor={editor} />
+      </CardHeader>
+      {content}
     </section>
   )
 }
 
-function AddFormat({ editor }: { editor: Editor }) {
+export function AddFormat({ editor }: { editor: Editor }) {
   const t = useMessages()
   const [open, setOpen] = useState(false)
   const [width, setWidth] = useState('')

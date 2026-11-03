@@ -14,7 +14,7 @@ import { designOf, openTabs, placed, reloads, settle, writeOutput } from '../sup
 import { importGoogleFonts } from '../support/fonts.ts'
 import { newBrand, putKit } from '../support/seed.ts'
 import { choose } from '../support/select.ts'
-import { barMenu, drag, fillList, moreAction, moreMenu, moreSubmenu, openStage, scopeMenu, strokeList, openCard, textColourHex } from '../support/stage.ts'
+import { barMenu, drag, fillList, moreAction, moreMenu, moreSubmenu, openStage, scopeMenu, strokeList, openCard, textColourHex, sizesPanel } from '../support/stage.ts'
 
 // Each row opens its own design, so CI spreads the rows over its shards.
 test.describe.configure({ mode: 'parallel', timeout: 180_000 })
@@ -1238,6 +1238,7 @@ test.describe('nothing selected', () => {
   row(61, 'formats: add a preset, a custom size, with checks', async (open) => {
     const page = await open()
     const count = async () => Object.keys((await doc(page)).formats).length
+    await sizesPanel(page)
     await page.getByRole('button', { name: 'Add format' }).click()
     const dialog = page.getByRole('dialog', { name: 'Add format' })
     // The presets are grouped by shape.
@@ -1263,6 +1264,7 @@ test.describe('nothing selected', () => {
 
   row(62, 'formats: rename, make primary, move, remove with undo, show alone', async (open) => {
     const page = await open(true)
+    await sizesPanel(page)
     const formats = page.getByTestId('formats')
     const row = formats.locator('[data-format="story"]')
     const square = formats.locator('[data-format="sq"]')

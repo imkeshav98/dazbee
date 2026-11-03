@@ -231,7 +231,7 @@ function DesignName({ name, onRename }: { name: string; onRename?: ((name: strin
   )
 }
 
-export function EditorShell({ brandId, brandName, designName, onRename, status, history, tool: shownTool, shape = 'rect', onToolChange, image, onInsets, fitted = true, inspector, actions, account, panels, children }: {
+export function EditorShell({ brandId, brandName, designName, onRename, status, sizes, history, tool: shownTool, shape = 'rect', onToolChange, image, onInsets, fitted = true, inspector, actions, account, panels, children }: {
   brandId: string
   brandName: string
   designName: string
@@ -240,6 +240,8 @@ export function EditorShell({ brandId, brandName, designName, onRename, status, 
   /** The editor's save state, or what it is doing before it opens. */
   status: ValueStore<string>
   /** Undo and redo, after the save state in the header pill. */
+  /** The design's sizes button, after its name. */
+  sizes?: ReactNode
   history?: ReactNode
   /** The tool in use, when the editor decides it (a key, or drawing a shape ends); the dock keeps its own otherwise. */
   tool?: Tool
@@ -359,6 +361,7 @@ export function EditorShell({ brandId, brandName, designName, onRename, status, 
                 <span aria-hidden className="text-subtle max-sm:hidden">/</span>
                 <DesignName name={designName} onRename={onRename} />
               </nav>
+              {sizes}
               <SaveStatus status={status} fitted={fitted} />
               {history}
             </div>

@@ -631,6 +631,7 @@ export const en = {
     },
     formats: {
       title: 'Sizes',
+      button: 'Sizes · {n}',
       add: 'Add format',
       presets: 'Presets',
       custom: 'Custom size',

@@ -619,6 +619,7 @@ export const ar: Messages = {
       failed: 'تعذّر التصدير: {reason}',
     },
     formats: {
+      button: 'المقاسات · {n}',
       title: 'المقاسات',
       add: 'إضافة مقاس',
       presets: 'مقاسات جاهزة',
