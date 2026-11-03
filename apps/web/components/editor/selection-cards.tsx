@@ -96,7 +96,7 @@ function PlaceCard({ target, p, title, children }: { target: Target; p: P; title
     // The side Lock ratio moves stops where a typed side would.
     const size = Object.fromEntries(Object.entries(sizeTo({ width: num(now, 'width'), height: num(now, 'height') }, axis, to, keepRatio)).map(([key, v]) => [key, Math.min(v, LIMITS.any)]))
     // Text given a height of its own gets a fixed box: an auto one would grow back to its words.
-    return 'boxMode' in now && now.boxMode !== 'fixed' && size.height !== num(now, 'height') ? { ...size, boxMode: 'fixed' } : size
+    return 'boxMode' in now && now.boxMode !== 'fixed' && (axis === 'height' || size.height !== num(now, 'height')) ? { ...size, boxMode: 'fixed' } : size
   }
   const sides = [
     { key: 'width', label: p.width, name: p.widthName },

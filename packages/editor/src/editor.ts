@@ -1636,18 +1636,20 @@ function live(
     // The dragged edges snap; a turned box has none that run along the page. With the shape kept,
     // the edge nearest a guide snaps and the other follows.
     if (snap && g.targets && outer.rotation === 0) {
-      const corner = g.handle.length === 2
+      const corner = isCorner(g.handle)
       const s = snapResize(outer, g.handle, g.targets, SNAP_DISTANCE / camera.zoom, ratio && corner)
-      if (ratio && corner && (s.dx !== 0 || s.dy !== 0)) {
+      if (ratio && corner && (s.dx !== 0 || s.dy !== 0) && g.outer.width > 0 && g.outer.height > 0) {
+        // From the centre both edges move, so the box grows by twice what the dragged edge does.
+        const grows = fromCentre ? 2 : 1
         const factor = s.dx !== 0
-          ? (outer.width + (g.handle.includes('e') ? s.dx : -s.dx)) / g.outer.width
-          : (outer.height + (g.handle.includes('s') ? s.dy : -s.dy)) / g.outer.height
+          ? (outer.width + grows * (g.handle.includes('e') ? s.dx : -s.dx)) / g.outer.width
+          : (outer.height + grows * (g.handle.includes('s') ? s.dy : -s.dy)) / g.outer.height
         outer = boxAt(g, factor, fromCentre)
       } else if (s.dx !== 0 || s.dy !== 0) outer = resizeBox(g.outer, g.handle, { x: to.x + s.dx, y: to.y + s.dy }, { keepRatio: ratio, fromCentre })
       snapped = { frame: g.frame, guides: s.guides, gaps: [] }
     }
     if (scales) {
-      g.factor = g.outer.width > 0 ? outer.width / g.outer.width : outer.height / g.outer.height
+      g.factor = g.outer.width > 0 ? outer.width / g.outer.width : g.outer.height > 0 ? outer.height / g.outer.height : 1
       if (g.factor < g.floor) {
         g.factor = g.floor
         outer = boxAt(g, g.factor, fromCentre)
@@ -1685,12 +1687,9 @@ function live(
     writeBoxes(g.frame, g.boxes, new Map([...next].map(([id, b]) => [id, { ...b, x: round(b.x), y: round(b.y), width: round(b.width), height: round(b.height) }])))
     // The text a corner scales takes its sizes scaled from where they were, in this format.
     for (const [id, start] of g.texts) {
-      const sized = scaleText(start, g.factor)
-      const patch: Record<string, unknown> = { style: sized.style }
-      if (start.runs.length > 0) patch.runs = sized.runs
-      if (sized.paragraphSpacing !== undefined) patch.paragraphSpacing = sized.paragraphSpacing
-      if (sized.shrinkToFit) patch.shrinkToFit = sized.shrinkToFit
-      runQuietly(() => session.run('node.update', { ids: [id], scope: scope(g.frame), patch }))
+      // Text without runs gets none of this format's own.
+      const { runs, ...sized } = scaleText(start, g.factor)
+      runQuietly(() => session.run('node.update', { ids: [id], scope: scope(g.frame), patch: start.runs.length > 0 ? { ...sized, runs } : sized }))
     }
     // Text that grows with its words takes the size its new width and sizes give it.
     for (const id of new Set([...g.roots.filter((root) => now.nodes[root]?.type === 'text'), ...g.texts.keys()])) fitText(id, g.frame.formatId)
@@ -1698,12 +1697,12 @@ function live(
 
   /**
    * The text a corner drag on `roots` scales, with its sizes in the frame now: each text whose box
-   * scales with the drag, selected itself or in a group, not one in a frame, which keeps what it
-   * holds as it is. A text whose style is locked isn't scaled.
+   * scales with the drag, selected itself or in a group, not one in a frame, whose text keeps its
+   * size. A text whose style is locked isn't scaled.
    */
   function scalingTexts(frame: Frame, roots: string[], handle: Handle): Map<string, ScaledText> {
     const texts = new Map<string, ScaledText>()
-    if (handle.length !== 2) return texts
+    if (!isCorner(handle)) return texts
     const now = session.design()
     const add = (id: string) => {
       const node = now.nodes[id]
@@ -1716,13 +1715,17 @@ function live(
         ...(props.shrinkToFit ? { shrinkToFit: props.shrinkToFit } : {}),
       })
     }
-    for (const root of roots) {
-      const type = now.nodes[root]?.type
-      if (type === 'text') add(root)
-      else if (type === 'group' || type === 'boolean') for (const id of under(root, now)) add(id)
+    const walk = (id: string) => {
+      const type = now.nodes[id]?.type
+      if (type === 'text') add(id)
+      else if (type === 'group' || type === 'boolean') for (const [child] of childrenOf(now, id)) walk(child)
     }
+    for (const id of roots) walk(id)
     return texts
   }
+
+  /** Whether a handle is a corner: it moves two edges. */
+  const isCorner = (handle: Handle) => handle.length === 2
 
   /** The box a resize from `g` gives at `factor` of its size, its shape kept: about the opposite corner, or the centre. */
   function boxAt(g: Extract<Gesture, { kind: 'resize' }>, factor: number, fromCentre: boolean): Box {
@@ -1754,7 +1757,7 @@ function live(
    * with its words gets a fixed box there, wrapping inside a width given to it, unless a corner
    * scales it.
    */
-  function switchSizing(frame: Frame, ids: string[], handle: Handle, from: Design, scaled: Map<string, unknown>) {
+  function switchSizing(frame: Frame, ids: string[], handle: Handle, from: Design, scaled: ReadonlyMap<string, unknown>) {
     const across = handle.includes('e') || handle.includes('w')
     const down = handle.includes('n') || handle.includes('s')
     for (const id of ids) {

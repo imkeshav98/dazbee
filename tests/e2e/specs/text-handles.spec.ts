@@ -125,10 +125,28 @@ test('a corner on a group scales the text in it; text in a frame keeps its size;
     box: { type: 'frame', parentId: 'p1', index: 'a1', name: 'Box', props: { x: 80, y: 400, width: 500, height: 200, fills: [{ type: 'solid', color: '#EEEEEEFF' }] } },
     inBox: { ...text('inBox', { y: 420 }), parentId: 'box' },
     locked: text('locked', { y: 700 }, { lock: { style: true } }),
+    boxInGroup: { type: 'frame', parentId: 'group', index: 'a9', name: 'Box in group', props: { x: 80, y: 180, width: 200, height: 100, fills: [] } },
+    inBoxInGroup: { ...text('inBoxInGroup', { y: 190, width: 180 }), parentId: 'boxInGroup' },
+    note: text('note', { x: 600, y: 800, width: 300 }),
+    dot: { type: 'graphic', parentId: 'p1', index: 'a8', name: 'Dot', props: { x: 950, y: 800, width: 60, height: 60, shape: { kind: 'ellipse' }, fills: [{ type: 'solid', color: '#3D6BFFFF' }] } },
   }))
   await select(page, ['group'])
+  // The size label of a group is its box's only.
+  const from = await handle(page, 'se')
+  await page.mouse.move(from.x, from.y)
+  await page.mouse.down()
+  await page.mouse.move(from.x + 60, from.y + 30, { steps: 4 })
+  await expect(page.locator('.selection-size')).not.toContainText('→')
+  await page.mouse.up()
+  await press(page, 'undo')
   await dragHandle(page, 'se', 200, 40)
   expect((await placed(page, 'inGroup')).style.fontSize).toBeGreaterThan(50)
+  // A box in the group moves what it holds and never scales it.
+  expect((await placed(page, 'inBoxInGroup')).style.fontSize).toBe(40)
+  // Several layers, text among them: the text scales with the box round them.
+  await select(page, ['note', 'dot'])
+  await dragHandle(page, 'se', 200, 100)
+  expect((await placed(page, 'note')).style.fontSize).toBeGreaterThan(45)
   await select(page, ['box'])
   await dragHandle(page, 'se', 100, 50)
   expect((await placed(page, 'inBox')).style.fontSize).toBe(40)
@@ -149,8 +167,16 @@ test('typed after a corner drag in one size, the text keeps that size\'s runs on
   // The square's runs are its own now, scaled with its text.
   const own = async () => ((await read(page)).overrides['format:sq']?.headline as { runs?: unknown } | undefined)?.runs
   expect(await own()).toEqual([expect.objectContaining({ start: 7, end: 11 })])
-  // Typed before the pink word, in the base text: the square's own run moves with it.
-  await page.evaluate(() => window.dazbee?.session.run('text.edit', { id: 'headline', op: { kind: 'insert', at: 0, text: 'Hot ' } }))
+  // Typed before the pink word: the square's own run moves with it.
+  const box = await page.evaluate(() => window.dazbee?.boxOf('headline', 'p1', 'sq'))
+  if (!box) throw new Error('no box')
+  const at = await page.evaluate(({ x, y }) => window.dazbee?.screenPoint(x, y, 'p1', 'sq'), { x: box.x + 20, y: box.y + box.height / 2 })
+  if (!at) throw new Error('no point')
+  await page.mouse.dblclick(at.x, at.y)
+  await page.keyboard.press('Home')
+  await page.keyboard.type('Hot ')
+  await page.keyboard.press('Escape')
+  await expect.poll(async () => (await read(page)).nodes.headline?.props.text).toBe('Hot Summer sale')
   expect(await own()).toEqual([expect.objectContaining({ start: 11, end: 15 })])
   expect(errors).toEqual([])
 })
@@ -183,3 +209,51 @@ test('a corner that scales text snaps one edge to a guide and keeps the shape', 
   expect(now.height / now.width).toBeCloseTo(100 / 400, 2)
   expect(errors).toEqual([])
 })
+
+test('a fixed box\'s top and bottom change its height and the size stays; a turned text scales along its own edges; Alt scales from the centre', async ({ browser }) => {
+  const { page, errors } = await openStage(browser, design({
+    fixed: text('fixed', { boxMode: 'fixed', height: 120 }),
+    turned: text('turned', { y: 400, rotation: 20 }),
+    centred: text('centred', { y: 700 }),
+  }))
+  await select(page, ['fixed'])
+  await dragHandle(page, 's', 0, 80)
+  expect((await placed(page, 'fixed')).height).toBeCloseTo(200, 0)
+  expect((await placed(page, 'fixed')).style.fontSize).toBe(40)
+  await dragHandle(page, 'n', 0, -40)
+  expect((await placed(page, 'fixed')).height).toBeCloseTo(240, 0)
+  expect((await placed(page, 'fixed')).style.fontSize).toBe(40)
+  // Turned, a corner still scales: its box keeps its shape and its turn.
+  await select(page, ['turned'])
+  const was = await placed(page, 'turned')
+  await dragHandle(page, 'se', 120, 120)
+  const turned = await placed(page, 'turned') as unknown as Props & { rotation: number }
+  const factor = turned.style.fontSize / 40
+  expect(factor).toBeGreaterThan(1.2)
+  expect(turned.rotation).toBe(20)
+  expect(turned.width).toBeCloseTo(was.width * factor, -1)
+  // Alt keeps the centre where it was.
+  await select(page, ['centred'])
+  const before = await page.evaluate(() => window.dazbee?.boxOf('centred', 'p1', 'sq'))
+  await dragHandle(page, 'se', 80, 80, ['Alt'])
+  const after = await page.evaluate(() => window.dazbee?.boxOf('centred', 'p1', 'sq'))
+  if (!before || !after) throw new Error('no box')
+  expect((await placed(page, 'centred')).style.fontSize).toBeGreaterThan(40)
+  expect(after.x + after.width / 2).toBeCloseTo(before.x + before.width / 2, 0)
+  expect(errors).toEqual([])
+})
+
+for (const [width, height] of [[820, 1180], [390, 844]] as const) {
+  test(`at ${width}×${height} a corner scales text and the handles are a text's`, async ({ browser }) => {
+    // Big enough on a phone's fitted stage to show its handles.
+    const { page, errors } = await openStage(browser, design({ headline: text('headline', { width: 800, style: style(96) }) }))
+    await page.setViewportSize({ width, height })
+    await page.evaluate(() => window.dazbee?.fitAll())
+    await select(page, ['headline'])
+    expect(await handles(page)).toEqual(['e', 'ne', 'nw', 'se', 'sw', 'w'])
+    await dragHandle(page, 'se', 100, 100)
+    expect((await placed(page, 'headline')).style.fontSize).toBeGreaterThan(100)
+    writeOutput(`text-handles-${width}.png`, await page.screenshot({ animations: 'disabled' }))
+    expect(errors).toEqual([])
+  })
+}
