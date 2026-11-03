@@ -4,15 +4,15 @@ import { join } from 'node:path'
 import type { Drift, DriftBaseline } from '../../src/drift.ts'
 import { OUTPUT_DIR } from '../../src/pixels.ts'
 
-export const BROWSER_OUT = join(OUTPUT_DIR, 'browser')
-const ROWS = join(OUTPUT_DIR, 'webgl-rows')
-const REPORT = join(OUTPUT_DIR, 'webgl-vs-cpu.md')
-
 export interface DriftRow extends Drift {
   case: string
   limit?: DriftBaseline['limit']
   problem?: string
 }
+
+export const BROWSER_OUT = join(OUTPUT_DIR, 'browser')
+const ROWS = join(OUTPUT_DIR, 'webgl-rows')
+const REPORT = join(OUTPUT_DIR, 'webgl-vs-cpu.md')
 
 /** Each test writes its own row, so a worker restart after a failure loses nothing. */
 export function saveDriftRow(row: DriftRow) {

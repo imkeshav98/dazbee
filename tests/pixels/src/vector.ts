@@ -8,14 +8,9 @@ import { PDFiumLibrary } from '@hyzyla/pdfium'
 import { Resvg } from '@resvg/resvg-js'
 
 import type { CanvasKit } from '@dazbee/canvaskit'
-import { renderDesign, renderVector,type ResourceBytes } from '@dazbee/renderer'
+import { renderDesign, renderVector, type ResourceBytes } from '@dazbee/renderer'
 
 import { type Pixels, REFERENCE_DIR } from './pixels.ts'
-
-/** How far a channel may differ before a pixel counts as different, out of 255. */
-export const VECTOR_CHANNEL_TOLERANCE = 16
-
-export const VECTOR_BASELINES = join(REFERENCE_DIR, 'vector-baselines.json')
 
 /** One case's measured share of differing pixels, in percent, and the limit it must stay within. */
 export interface VectorBaseline {
@@ -29,6 +24,14 @@ export interface ThreeWays {
   pdf: Pixels
   svg: Pixels
 }
+
+/** How far a channel may differ before a pixel counts as different, out of 255. */
+export const VECTOR_CHANNEL_TOLERANCE = 16
+
+export const VECTOR_BASELINES = join(REFERENCE_DIR, 'vector-baselines.json')
+
+/** The limit set when a baseline is recorded: a quarter more than measured plus 0.05 percentage points. */
+export const vectorLimit = (percent: number) => Number((percent * 1.25 + 0.05).toFixed(3))
 
 /** Starts pdfium for a test file, and frees it with the hook given, such as vitest's `afterAll`. */
 export async function startPdfium(after: (free: () => void) => void): Promise<PDFiumLibrary> {
@@ -126,9 +129,6 @@ export function vectorDifference(expected: Pixels, actual: Pixels): number {
   }
   return (differing / (width * height)) * 100
 }
-
-/** The limit set when a baseline is recorded: a quarter more than measured plus 0.05 percentage points. */
-export const vectorLimit = (percent: number) => Number((percent * 1.25 + 0.05).toFixed(3))
 
 export function readVectorBaselines(): Record<string, VectorBaseline> {
   return existsSync(VECTOR_BASELINES)

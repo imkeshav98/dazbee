@@ -6,10 +6,10 @@ import { join } from 'node:path'
 import type { Canvas, CanvasKit } from '@dazbee/canvaskit'
 import { loadCanvasKit } from '@dazbee/renderer/node'
 
-const ck: CanvasKit = await loadCanvasKit()
-const ASSETS_DIR = join(import.meta.dirname, '..', 'assets')
-
 type Painter = (canvas: Canvas, w: number, h: number) => void
+
+const ASSETS_DIR = join(import.meta.dirname, '..', 'assets')
+const ck: CanvasKit = await loadCanvasKit()
 
 const paint = (setup: (p: InstanceType<CanvasKit['Paint']>) => void) => {
   const p = new ck.Paint()
