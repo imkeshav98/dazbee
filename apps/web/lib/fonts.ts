@@ -3,7 +3,7 @@
 // for those scripts.
 import localFont from 'next/font/local'
 
-export const figtree = localFont({
+const figtree = localFont({
   src: [
     { path: '../node_modules/@fontsource-variable/figtree/files/figtree-latin-wght-normal.woff2', weight: '300 900' },
     {
@@ -15,7 +15,7 @@ export const figtree = localFont({
   display: 'swap',
 })
 
-export const bricolage = localFont({
+const bricolage = localFont({
   src: [
     {
       path: '../node_modules/@fontsource-variable/bricolage-grotesque/files/bricolage-grotesque-latin-wght-normal.woff2',
@@ -30,14 +30,14 @@ export const bricolage = localFont({
   display: 'swap',
 })
 
-export const jetbrains = localFont({
+const jetbrains = localFont({
   src: '../node_modules/@fontsource-variable/jetbrains-mono/files/jetbrains-mono-latin-wght-normal.woff2',
   weight: '100 800',
   variable: '--font-jetbrains',
   display: 'swap',
 })
 
-export const notoArabic = localFont({
+const notoArabic = localFont({
   src: [
     { path: '../../../packages/fonts/files/NotoNaskhArabic-Regular.ttf', weight: '400' },
     { path: '../../../packages/fonts/files/NotoNaskhArabic-Bold.ttf', weight: '700' },

@@ -15,9 +15,9 @@ import type { DrawJob, DrawResult } from './draw-worker.ts'
 import { brandResourcesFor } from './render.ts'
 
 /** The longest side of a design's picture: the bento's big tile on a 2× screen. */
-export const DESIGN_THUMBNAIL_SIZE = 640
+const DESIGN_THUMBNAIL_SIZE = 640
 
-export const designThumbnailKey = (workspaceId: string, design: DesignSummary) =>
+const designThumbnailKey = (workspaceId: string, design: DesignSummary) =>
   `workspaces/${workspaceId}/designs/${design.id}/thumbnail-${Date.parse(design.updatedAt)}.png`
 
 /** The page and format a design's picture shows: its first page, in its primary format. */

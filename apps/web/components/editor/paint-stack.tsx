@@ -34,7 +34,7 @@ const keepOf = (paint: Paint) => ({
   ...(paint.opacity === undefined ? {} : { opacity: paint.opacity }),
   ...(paint.visible === undefined ? {} : { visible: paint.visible }),
 })
-export const PAINT_TYPES = ['solid', 'linear', 'radial', 'angular', 'image'] as const
+const PAINT_TYPES = ['solid', 'linear', 'radial', 'angular', 'image'] as const
 type PaintType = (typeof PAINT_TYPES)[number]
 
 /** A gradient's stops in order, as the renderer needs them. */
@@ -57,7 +57,7 @@ const linearAt = (deg: number) => {
 }
 
 /** A paint as a CSS background, close to what the renderer draws in the layer's box. */
-export function paintBackground(paint: Paint, brandId: string): string {
+function paintBackground(paint: Paint, brandId: string): string {
   switch (paint.type) {
     case 'solid':
       return `linear-gradient(${paint.color}, ${paint.color})`
@@ -130,7 +130,7 @@ function colourAt(stops: Stop[], at: number): string {
 }
 
 /** A paint's swatch over a checkerboard, so a see-through paint shows as one. */
-export function PaintSwatch({ paint, brandId, className }: { paint: Paint; brandId: string; className?: string }) {
+function PaintSwatch({ paint, brandId, className }: { paint: Paint; brandId: string; className?: string }) {
   return (
     <span
       aria-hidden

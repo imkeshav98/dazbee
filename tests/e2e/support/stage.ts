@@ -141,9 +141,6 @@ export async function barMenu(page: Page, id: string) {
   return menu
 }
 
-/** Opens an edit panel from the top bar, `bar-<id>`, unless it is open, and gives the part of it with `testId`. */
-export const panelPart = async (page: Page, id: string, testId: string) => (await barMenu(page, id)).getByTestId(testId)
-
 /**
  * Closes the open pop-up or panel of an item on the top bar with Esc, by the item's test id
  * (`bar-align`, `bar-more`, or `more-order` for the menu beside that row of the full menu), and

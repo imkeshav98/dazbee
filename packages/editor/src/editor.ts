@@ -234,7 +234,6 @@ interface Reshaping {
   scope: string
 }
 
-/** Something the editor tells the person, for the page to show: a gesture that auto layout decides instead. */
 /** Something the page should say: why a gesture did nothing, or how placing an SVG went. */
 export type Notice = 'placedByLayout' | 'flowEnd' | 'svgLeftOut' | 'svgUnreadable'
 

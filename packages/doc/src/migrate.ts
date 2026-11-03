@@ -8,7 +8,7 @@ type Json = Record<string, unknown>
 const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b)
 
 /** Marks the migration's writes, which no tab's undo holds. */
-export const MIGRATION_ORIGIN = { migration: true }
+const MIGRATION_ORIGIN = { migration: true }
 
 /**
  * Brings a document saved at an older schema version up to SCHEMA_VERSION (#43), writing only

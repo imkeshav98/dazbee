@@ -108,7 +108,7 @@ export function scaleWithin(box: Box, from: Box, to: Box): Box {
 }
 
 /** Shift while rotating: the angle snaps to steps of 15°. */
-export const ANGLE_STEP = 15
+const ANGLE_STEP = 15
 export const snapAngle = (deg: number) => Math.round(deg / ANGLE_STEP) * ANGLE_STEP
 
 /** The angle of a point about a centre, in degrees. */

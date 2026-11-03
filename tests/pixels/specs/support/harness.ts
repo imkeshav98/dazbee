@@ -13,7 +13,7 @@ import { ASSETS_DIR, type Pixels } from '../../src/pixels.ts'
 
 const ORIGIN = 'http://parity.test'
 
-export type Surface = 'cpu' | 'webgl'
+type Surface = 'cpu' | 'webgl'
 export interface Harness {
   render(json: unknown, pageId: string, formatId: string, surface: Surface, assetIds: string[]): Promise<Pixels>
   /** The file the browser's export makes: PNG, JPG at quality 85, PDF or SVG (#55, #56). */

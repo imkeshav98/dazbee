@@ -39,14 +39,12 @@ import { boundsOf, centreOf, normalAngle, round, turn } from './geometry.ts'
 import { inferLayout } from './infer-layout.ts'
 import { Placement } from './placement.ts'
 
-export { childrenOf }
-
 /**
  * A fractional index between two neighbours that never throws. Neighbours can tie (two tabs
  * inserting at once) or use keys the library rejects (hand-written fixtures such as `a000`);
  * then it falls back to the nearest key it can make, and id order settles any remaining tie.
  */
-export function indexBetween(before: string | null, after: string | null): string {
+function indexBetween(before: string | null, after: string | null): string {
   const attempts: [string | null, string | null][] = [
     [before, after],
     [before, null],
@@ -82,7 +80,7 @@ const parentProblem = (design: Design, parentId: string, type: string) => {
 }
 
 /** The lock flag a change to a property needs clear: position, size and rotation, content or style. */
-export function lockFor(path: string): keyof LayerLock | null {
+function lockFor(path: string): keyof LayerLock | null {
   if (path === 'x' || path === 'y') return 'move'
   if (path === 'width' || path === 'height' || path === 'rotation') return 'resize'
   if (path === 'visible') return null
@@ -100,7 +98,7 @@ const LayerInput = z.object({
   props: z.record(z.string(), z.unknown()),
 })
 
-export const nodeCreate = defineCommand({
+const nodeCreate = defineCommand({
   name: 'node.create',
   input: z.object({ id: NodeId.optional(), parentId: z.union([PageId, NodeId]), layer: LayerInput }),
   check: (ctx, { id, parentId, layer }) => {
@@ -122,7 +120,7 @@ export const nodeCreate = defineCommand({
 /** Base scope, or `format:<id>` to change one format only. */
 const Scope = z.union([z.literal('base'), FormatScope]).default('base')
 
-export const nodeUpdate = defineCommand({
+const nodeUpdate = defineCommand({
   name: 'node.update',
   input: z.object({ ids: NodeId.array().min(1), scope: Scope, patch: z.record(z.string(), z.unknown()) }),
   check: ({ design }, { ids, scope, patch }) => {
@@ -181,7 +179,7 @@ function keepDrawnIn(r: CommandContext['r'], design: Design, id: string) {
  * Puts layers back to the base in one format: removes their overrides there, every one or only
  * the named property paths. Values the layers don't override are left as they are.
  */
-export const overrideReset = defineCommand({
+const overrideReset = defineCommand({
   name: 'override.reset',
   input: z.object({ ids: NodeId.array().min(1), scope: FormatScope, paths: z.string().array().min(1).optional() }),
   check: ({ design }, { ids, scope }) => {
@@ -197,7 +195,7 @@ export const overrideReset = defineCommand({
 })
 
 /** Shows or hides layers in every format: the base, with every format's own visibility gone. */
-export const nodeVisibleEverywhere = defineCommand({
+const nodeVisibleEverywhere = defineCommand({
   name: 'node.visibleEverywhere',
   input: z.object({ ids: NodeId.array().min(1), visible: z.boolean() }),
   check: ({ design }, { ids }) => ids.map((id) => (design.nodes[id] ? undefined : `no layer "${id}"`)).find(Boolean),
@@ -214,7 +212,7 @@ const isInside = (design: Design, id: string, maybeAncestor: string) => {
   return false
 }
 
-export const nodeMove = defineCommand({
+const nodeMove = defineCommand({
   name: 'node.move',
   /** `keepDrawn` false leaves the layer's box as stored, for a caller that places it itself. */
   input: z.object({
@@ -294,7 +292,7 @@ function keepDrawnPlace(r: CommandContext['r'], design: Design, id: string, pare
   place.write(r)
 }
 
-export const nodeDelete = defineCommand({
+const nodeDelete = defineCommand({
   name: 'node.delete',
   input: z.object({ ids: NodeId.array().min(1) }),
   check: ({ design }, { ids }) => {
@@ -323,7 +321,7 @@ export const nodeDelete = defineCommand({
 })
 
 /** Renames a layer (#59). A name is how the layers panel shows it; it changes nothing drawn, so no lock stops it. */
-export const nodeRename = defineCommand({
+const nodeRename = defineCommand({
   name: 'node.rename',
   input: z.object({ id: NodeId, name: z.string().trim().min(1).max(120) }),
   check: ({ design }, { id }) => (design.nodes[id] ? undefined : `no layer "${id}"`),
@@ -333,7 +331,7 @@ export const nodeRename = defineCommand({
 })
 
 /** Sets some of layers' lock flags, keeping the others; a layer with nothing locked loses the field. */
-export const nodeLock = defineCommand({
+const nodeLock = defineCommand({
   name: 'node.lock',
   input: z.object({
     ids: NodeId.array().min(1),
@@ -355,7 +353,7 @@ export const nodeLock = defineCommand({
  * before it loads) still looks as it did; a fill binds the topmost solid fill, added if there is none.
  * Unbinding keeps the value the property has.
  */
-export const nodeBind = defineCommand({
+const nodeBind = defineCommand({
   name: 'node.bind',
   input: z.object({
     ids: NodeId.array().min(1),
@@ -407,7 +405,7 @@ export const nodeBind = defineCommand({
  * Makes layers masks, or plain layers again (#48). A mask is the same in every format, so the flag
  * is set on the base and any format's override of it goes.
  */
-export const nodeMask = defineCommand({
+const nodeMask = defineCommand({
   name: 'node.mask',
   input: z.object({ ids: NodeId.array().min(1), mask: z.enum(['alpha', 'luminance']).nullable() }),
   check: ({ design }, { ids }) => {
@@ -450,7 +448,7 @@ function restack(order: string[], moving: Set<string>, to: 'forward' | 'backward
  * Brings layers forward or back one step, or to the front or back, among their siblings. Only the
  * moved layers get new indexes, so a concurrent change to the others merges.
  */
-export const nodeReorder = defineCommand({
+const nodeReorder = defineCommand({
   name: 'node.reorder',
   input: z.object({ ids: NodeId.array().min(1), to: z.enum(['forward', 'backward', 'front', 'back']) }),
   check: ({ design }, { ids }) => ids.map((id) => (design.nodes[id] ? undefined : `no layer "${id}"`)).find(Boolean),
@@ -520,7 +518,7 @@ function copyLayers(
 }
 
 /** Copies layers in place, each right above its original. Returns the copies' ids, in order. */
-export const nodeDuplicate = defineCommand({
+const nodeDuplicate = defineCommand({
   name: 'node.duplicate',
   input: z.object({ ids: NodeId.array().min(1) }),
   check: ({ design }, { ids }) => ids.map((id) => (design.nodes[id] ? undefined : `no layer "${id}"`)).find(Boolean),
@@ -542,7 +540,7 @@ export const nodeDuplicate = defineCommand({
  * a fresh id, the roots go on top in their order, and everything moves by `dx`, `dy`. Placing the
  * same tree twice gives two copies. Returns the new roots' ids, bottom to top.
  */
-export const designPlace = defineCommand({
+const designPlace = defineCommand({
   name: 'design.place',
   input: z.object({
     parentId: z.union([PageId, NodeId]),
@@ -667,7 +665,7 @@ function wrap(
  * Wraps layers that share a parent in a new group where the topmost of them was, without moving
  * anything on screen. The group's box hugs them in each format. Returns the group's id.
  */
-export const nodeGroup = defineCommand({
+const nodeGroup = defineCommand({
   name: 'node.group',
   input: z.object({
     ids: NodeId.array().min(1),
@@ -684,7 +682,7 @@ export const nodeGroup = defineCommand({
  * anything on screen: its box hugs them in each format, it has no fill, and it doesn't clip, so a
  * stroke or shadow past a layer's box still shows. Returns the frame's id.
  */
-export const nodeFrame = defineCommand({
+const nodeFrame = defineCommand({
   name: 'node.frame',
   input: z.object({
     ids: NodeId.array().min(1),
@@ -703,7 +701,7 @@ export const nodeFrame = defineCommand({
  * the layers as they are there, as far from them and as large against them as where it was drawn,
  * so it holds them in every format. They keep their order inside it.
  */
-export const nodeEnclose = defineCommand({
+const nodeEnclose = defineCommand({
   name: 'node.enclose',
   input: z.object({ id: NodeId, ids: NodeId.array().min(1), scope: FormatScope }),
   check: ({ design }, { id, ids, scope }) => {
@@ -748,7 +746,7 @@ export const nodeEnclose = defineCommand({
  * without moving them. It paints with the bottom shape's fills and strokes, the shape the others
  * add to or cut from. Returns the boolean's id.
  */
-export const nodeBoolean = defineCommand({
+const nodeBoolean = defineCommand({
   name: 'node.boolean',
   input: z.object({
     ids: NodeId.array().min(2),
@@ -782,7 +780,7 @@ export const nodeBoolean = defineCommand({
  * screen: a turned group's turn goes into each layer it held, and a group hidden in a format
  * hides them there. Shapes out of a boolean show their own paints again. The layers take the group's place among its siblings. Returns their ids, in order.
  */
-export const nodeUngroup = defineCommand({
+const nodeUngroup = defineCommand({
   name: 'node.ungroup',
   input: z.object({ ids: NodeId.array().min(1) }),
   check: ({ design }, { ids }) => {
@@ -847,7 +845,7 @@ export const nodeUngroup = defineCommand({
  * named layers are in, innermost first. A turned group's layers shift with its new centre so nothing
  * moves on screen. The editor runs it after a change to layers inside a group, in the same step.
  */
-export const nodeHug = defineCommand({
+const nodeHug = defineCommand({
   name: 'node.hug',
   input: z.object({ ids: NodeId.array().min(1) }),
   check: ({ design }, { ids }) => ids.map((id) => (design.nodes[id] ? undefined : `no layer "${id}"`)).find(Boolean),
@@ -894,7 +892,7 @@ export const nodeHug = defineCommand({
  * so it scales the same outline; a turned box also shifts with its new centre, so the points that
  * didn't change stay where they are drawn.
  */
-export const nodeReshape = defineCommand({
+const nodeReshape = defineCommand({
   name: 'node.reshape',
   input: z.object({
     id: NodeId,
@@ -946,7 +944,7 @@ export const nodeReshape = defineCommand({
  * frame whose children already sit in an even row or column looks the same. Off, the layout goes
  * from the base and every format.
  */
-export const nodeAutoLayout = defineCommand({
+const nodeAutoLayout = defineCommand({
   name: 'node.autoLayout',
   input: z.object({ id: NodeId, on: z.boolean() }),
   check: ({ design }, { id }) => {
@@ -997,7 +995,7 @@ const TextOp = z.discriminatedUnion('kind', [
 ])
 
 /** Offsets count UTF-16 units. Inserted text takes the style of the character before it. */
-export const textEdit = defineCommand({
+const textEdit = defineCommand({
   name: 'text.edit',
   input: z.object({ id: NodeId, op: TextOp }),
   check: ({ design }, { id, op }) => {
@@ -1048,7 +1046,7 @@ function deletedFrom<T extends { start: number; end: number }>(run: T, at: numbe
  * format: its width and height for auto width, its height for auto height. The editor runs it as
  * text is typed, in the same undo step, so the box is always where the words are.
  */
-export const textFit = defineCommand({
+const textFit = defineCommand({
   name: 'text.fit',
   input: z.object({
     id: NodeId,
@@ -1077,7 +1075,7 @@ const lastOrder = (entries: { order: string }[]) =>
     .sort()
     .at(-1) ?? null
 
-export const pageAdd = defineCommand({
+const pageAdd = defineCommand({
   name: 'page.add',
   input: z.object({ id: PageId.optional(), name: z.string() }),
   check: (ctx, { id }) => idProblem(ctx, id),
@@ -1098,7 +1096,7 @@ function descendants(design: Design, parentId: string): string[] {
 }
 
 /** Renames a page, or sets its background fills (the Page card, #83). */
-export const pageUpdate = defineCommand({
+const pageUpdate = defineCommand({
   name: 'page.update',
   input: z.object({ id: PageId, name: z.string().optional(), fills: Paint.array().optional() }),
   check: ({ design }, { id }) => (design.pages[id] ? undefined : `no page "${id}"`),
@@ -1113,7 +1111,7 @@ export const pageUpdate = defineCommand({
  * Copies a page right after itself: every layer with a fresh id, and every override those layers
  * have in any format. Returns the new page's id.
  */
-export const pageDuplicate = defineCommand({
+const pageDuplicate = defineCommand({
   name: 'page.duplicate',
   input: z.object({ id: PageId, newId: PageId.optional(), name: z.string().optional() }),
   check: (ctx, { id, newId }) => (ctx.design.pages[id] ? idProblem(ctx, newId) : `no page "${id}"`),
@@ -1134,7 +1132,7 @@ export const pageDuplicate = defineCommand({
 })
 
 /** Moves a page ahead of another page, or to the end with null. */
-export const pageMove = defineCommand({
+const pageMove = defineCommand({
   name: 'page.move',
   input: z.object({ id: PageId, before: PageId.nullable() }),
   check: ({ design }, { id, before }) => {
@@ -1150,7 +1148,7 @@ export const pageMove = defineCommand({
 })
 
 /** Deletes a page and its layers; undo brings both back. A design keeps at least one page. */
-export const pageDelete = defineCommand({
+const pageDelete = defineCommand({
   name: 'page.delete',
   input: z.object({ id: PageId }),
   check: ({ design }, { id }) => {
@@ -1174,7 +1172,7 @@ const byOrder = (design: Design) =>
  * Adds a format. Its layout starts as the primary format's, scaled to fit and centred, written
  * as the new format's overrides; constraints and AI adapt come later (phase 3).
  */
-export const formatAdd = defineCommand({
+const formatAdd = defineCommand({
   name: 'format.add',
   input: z.object({
     id: FormatId.optional(),
@@ -1217,7 +1215,7 @@ export const formatAdd = defineCommand({
 })
 
 /** Renames, resizes or moves a format; `before` puts it ahead of another format, null at the end. */
-export const formatUpdate = defineCommand({
+const formatUpdate = defineCommand({
   name: 'format.update',
   input: z.object({
     id: FormatId,
@@ -1246,7 +1244,7 @@ export const formatUpdate = defineCommand({
 })
 
 /** Removes a format and every override it holds. The primary format and the last one stay. */
-export const formatRemove = defineCommand({
+const formatRemove = defineCommand({
   name: 'format.remove',
   input: z.object({ id: FormatId }),
   check: ({ design }, { id }) => {
@@ -1263,7 +1261,7 @@ export const formatRemove = defineCommand({
 })
 
 /** Makes a format the primary one: new formats start from its layout. */
-export const formatSetPrimary = defineCommand({
+const formatSetPrimary = defineCommand({
   name: 'format.setPrimary',
   input: z.object({ id: FormatId }),
   check: ({ design }, { id }) => (design.formats[id] ? undefined : `no format "${id}"`),

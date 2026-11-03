@@ -55,7 +55,7 @@ interface Rule {
 }
 
 /** The declarations in a style attribute or a rule's braces. */
-export function parseDeclarations(text: string): Style {
+function parseDeclarations(text: string): Style {
   const out: Style = {}
   for (const part of text.split(';')) {
     const colon = part.indexOf(':')

@@ -41,19 +41,6 @@ export async function brandResourcesFor(
   return { fonts, fallbackFamilies: [...FALLBACK_FAMILIES], images: Object.fromEntries(images.flat()), variables }
 }
 
-/** What drawing the design for this brand needs, the shipped fonts included. */
-export async function resourcesFor(
-  db: Db,
-  storage: Storage,
-  workspaceId: string,
-  brandId: string,
-  design: Design,
-): Promise<ResourceBytes> {
-  shipped ??= loadFontFiles().map(({ family, bytes }) => ({ family, bytes }))
-  const resources = await brandResourcesFor(db, storage, workspaceId, brandId, design)
-  return { ...resources, fonts: [...shipped, ...resources.fonts] }
-}
-
 /** The first page in the primary format, as an export draws it. */
 export async function renderFirstPage(
   db: Db,
@@ -74,4 +61,17 @@ export async function renderFirstPage(
     design.meta.primaryFormatId,
     await resourcesFor(db, storage, workspaceId, brandId, design),
   )
+}
+
+/** What drawing the design for this brand needs, the shipped fonts included. */
+async function resourcesFor(
+  db: Db,
+  storage: Storage,
+  workspaceId: string,
+  brandId: string,
+  design: Design,
+): Promise<ResourceBytes> {
+  shipped ??= loadFontFiles().map(({ family, bytes }) => ({ family, bytes }))
+  const resources = await brandResourcesFor(db, storage, workspaceId, brandId, design)
+  return { ...resources, fonts: [...shipped, ...resources.fonts] }
 }

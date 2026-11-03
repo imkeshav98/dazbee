@@ -442,7 +442,6 @@ function ShapeCard({ target, p, kind }: { target: Target; p: P; kind: ShapeKind 
   )
 }
 
-/** A list of paints, strokes or effects that every selected layer has the same of, or a way to make it so. */
 /** A list of fills or strokes: the rows the selected layers share, and adding one on top. */
 function useList<T>(target: Target, field: string, fresh: T, onTop: T, topFirst: boolean) {
   const list = shared(target.props.map((pr) => (pr[field] ?? []) as T[]))
@@ -517,7 +516,7 @@ function ListBody<T>({
 }
 
 /** The fill list, under a heading with +, each fill with its editor. */
-export function FillBody({ target, brandId, p, title }: { target: Target; brandId: string; p: P; title: string }) {
+function FillBody({ target, brandId, p, title }: { target: Target; brandId: string; p: P; title: string }) {
   return (
     <ListBody<Paint>
       title={title}
@@ -547,7 +546,7 @@ export function FillBody({ target, brandId, p, title }: { target: Target; brandI
  * The strokes, each with its paint, width, place, dashes, ends and corners, under a heading with +:
  * the Outline panel's Advanced.
  */
-export function StrokeBody({ target, brandId, p, title }: { target: Target; brandId: string; p: P; title: string }) {
+function StrokeBody({ target, brandId, p, title }: { target: Target; brandId: string; p: P; title: string }) {
   return (
     <ListBody<Stroke>
       title={title}
@@ -1036,23 +1035,6 @@ function SpacingCard({ target, p }: { target: Target; p: P }) {
   )
 }
 
-/** The bar's size popover for text: the size, any size from 1 up. */
-export function TextSizeField({ target, p }: { target: Target; p: P }) {
-  const { style, setStyle, shiftStyle } = textStyle(target)
-  return (
-    <NumberField
-      label={p.fontSize}
-      name={p.fontSize}
-      value={style('fontSize') as number | 'mixed'}
-      min={1}
-      max={LIMITS.fontSize}
-      editor={target.editor}
-      onSet={(v) => setStyle('fontSize', v)}
-      onShift={(by) => shiftStyle('fontSize', by, 1, 0, LIMITS.fontSize)}
-    />
-  )
-}
-
 /** A row of choices of which one is on; `marks` shows a short mark in place of a choice's name. */
 function Segments<T extends string>({
   name,
@@ -1094,7 +1076,7 @@ function Segments<T extends string>({
 const CASE_MARKS = { none: 'Ab', upper: 'AB', lower: 'ab', title: 'Aa' }
 
 /** The text's alignment, as the top bar's Align pop-up shows it: along the line, and up and down in the box. */
-export function TextAlignBody({ target, p }: { target: Target; p: P }) {
+function TextAlignBody({ target, p }: { target: Target; p: P }) {
   const t = useMessages()
   return (
     <div className="flex w-72 flex-col gap-2.5 p-1">
@@ -1117,7 +1099,7 @@ export function TextAlignBody({ target, p }: { target: Target; p: P }) {
 }
 
 /** The text's list, as the top bar's List pop-up shows it: none, bullets or numbers. */
-export function TextListBody({ target, p }: { target: Target; p: P }) {
+function TextListBody({ target, p }: { target: Target; p: P }) {
   return (
     <div className="flex w-64 flex-col p-1">
       <Segments
@@ -1132,7 +1114,7 @@ export function TextListBody({ target, p }: { target: Target; p: P }) {
 }
 
 /** The text's case, as the top bar's aA pop-up shows it. */
-export function TextCaseBody({ target, p }: { target: Target; p: P }) {
+function TextCaseBody({ target, p }: { target: Target; p: P }) {
   const { style, setStyle } = textStyle(target)
   return (
     <div className="flex w-56 flex-col p-1">
@@ -1331,7 +1313,7 @@ const setImage = (target: Target, index: number, change: (now: ImageFill) => Par
   })
 
 /** The bar's Look popover for a photo: each filter as the photo with it. */
-export function PhotoLookBody({
+function PhotoLookBody({
   target,
   p,
   brandId,
@@ -2321,7 +2303,7 @@ function EffectSample({ sample, tile }: { sample: Sample; tile: Tile }) {
  * remove button, text's outline with its width and colour, and Add another, which adds a second
  * effect of a type.
  */
-export function EffectsBody({
+function EffectsBody({
   target,
   p,
   b,

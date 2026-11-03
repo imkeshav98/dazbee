@@ -33,8 +33,6 @@ const commonProps = {
   mask: z.enum(['alpha', 'luminance']).optional(),
 }
 
-export const PER_FORMAT_PROPS = ['x', 'y', 'width', 'height', 'rotation', 'visible'] as const
-
 export const Stroke = z.object({
   paint: Paint,
   width: z.number().positive(),

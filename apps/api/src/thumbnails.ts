@@ -7,7 +7,7 @@ import { type ImageType, isVectorAsset } from '@dazbee/schema'
 import { svgThumbnail } from './svg-assets.ts'
 
 /** The longest side of a thumbnail, in pixels: two library columns on a 2× screen. */
-export const THUMBNAIL_SIZE = 320
+const THUMBNAIL_SIZE = 320
 
 export interface Thumbnail {
   bytes: Uint8Array

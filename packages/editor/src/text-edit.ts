@@ -17,10 +17,7 @@ const graphemes = new Intl.Segmenter(undefined, { granularity: 'grapheme' })
 const words = new Intl.Segmenter(undefined, { granularity: 'word' })
 
 /** Every offset a caret can stand at: the edges of Unicode's graphemes. */
-export const graphemeEdges = (text: string) => [
-  0,
-  ...[...graphemes.segment(text)].map((g) => g.index + g.segment.length),
-]
+const graphemeEdges = (text: string) => [0, ...[...graphemes.segment(text)].map((g) => g.index + g.segment.length)]
 
 /** The offset one grapheme on, or back. */
 export function step(text: string, offset: number, forward: boolean): number {

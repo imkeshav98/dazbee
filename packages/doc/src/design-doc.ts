@@ -46,7 +46,7 @@ export const toYMap = (json: Json) => {
 }
 
 /** A text layer's text and style runs as one Y.Text: run styles become formatting attributes. */
-export function toYText(text: string, runs: { start: number; end: number; style: Json }[]) {
+function toYText(text: string, runs: { start: number; end: number; style: Json }[]) {
   const ytext = new Y.Text()
   ytext.insert(0, text)
   for (const run of runs) ytext.format(run.start, run.end - run.start, run.style)
@@ -54,7 +54,7 @@ export function toYText(text: string, runs: { start: number; end: number; style:
 }
 
 /** The reverse of toYText. Adjacent ranges with the same style come back as one run. */
-export function fromYText(ytext: Y.Text) {
+function fromYText(ytext: Y.Text) {
   const runs: { start: number; end: number; style: Json }[] = []
   let at = 0
   for (const op of ytext.toDelta() as { insert: string; attributes?: Json }[]) {

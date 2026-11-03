@@ -8,6 +8,24 @@ Where code goes, the order inside each file, and the imports each folder may mak
 2. **Order it.** Keep the whole file in its order: [Order inside a file](#order-inside-a-file), or its kind under [Files with their own order](#files-with-their-own-order). Done when every section of the file sits in its place in that order.
 3. **Import it.** Check every import against [Imports](#imports) for its workspace. Done when each import is one its folder may make.
 4. **Check it.** `pnpm lint`, `pnpm typecheck` and the unit tests of each touched workspace pass. When you moved code, madge finds no value-import cycle in each workspace you moved code in ([Import cycles](#import-cycles)), and each test runner collects as many tests as before (Tests, under [Where code lives](#where-code-lives)).
+5. **Commit it.** Code moved to another file lands as a move commit, then an edit commit ([Moving code](#moving-code)). Done when each move commit holds only the changes a move may make, and the PR body names it.
+
+## Moving code
+
+A split, or any move of code to another file, lands in two commits:
+
+1. **The move commit** carries the code over unchanged. It may change only imports, exports, indentation, and how a moved function reaches state it used to capture: a closure variable becomes a parameter or a dependency.
+2. **The edit commit** holds every other change.
+
+Review the move commit with:
+
+```sh
+git diff --color-moved=dimmed-zebra --color-moved-ws=allow-indentation-change <move commit>~ <move commit>
+```
+
+Moved lines show dimmed. Done when every line in full colour is one of the changes a move commit may make.
+
+The PR body says which commits are moves.
 
 ## Where code lives
 
@@ -215,4 +233,5 @@ Each piece of the editor's state has one owner:
 | Server-only code stays out of client bundles | `import 'server-only'`, failing `next build` |
 | Yjs imports in the editor package | `no-restricted-imports` |
 | Import cycles | madge, run by hand ([Import cycles](#import-cycles)) |
+| A move commit holds only the changes a move may make | review only: the `--color-moved` diff ([Moving code](#moving-code)) and `/code-review` |
 | Section order, feature folders, names, test placement, deep modules, the editor's layer order | review only: `/code-review` on every PR |

@@ -5,7 +5,7 @@ import { type Camera, toScreen, toWorld, type Viewport } from './camera.ts'
 import type { Frame, Rect } from './grid.ts'
 
 /** The rulers' thickness, in CSS pixels. */
-export const RULER_SIZE = 20
+const RULER_SIZE = 20
 /** Numbered ticks stay at least this far apart on screen. */
 const MIN_SPACING = 64
 /** Small ticks between numbered ones. */

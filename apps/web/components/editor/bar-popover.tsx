@@ -121,7 +121,7 @@ export function BarPopover({
 }
 
 /** A toolbar's buttons that can be used and show, in order: a closed second row's are left out. */
-export const itemsOf = (bar: HTMLElement) =>
+const itemsOf = (bar: HTMLElement) =>
   [...bar.querySelectorAll<HTMLElement>('[data-bar-item]:not(:disabled)')].filter((item) =>
     item.checkVisibility({ visibilityProperty: true }),
   )

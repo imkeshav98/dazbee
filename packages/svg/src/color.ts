@@ -12,7 +12,7 @@ const hex2 = (n: number) =>
     .toUpperCase()
 
 /** A colour in the design's #RRGGBBAA, from red, green and blue in 0–255 and alpha in 0–1. */
-export const rgba = (r: number, g: number, b: number, a = 1) => `#${hex2(r)}${hex2(g)}${hex2(b)}${hex2(a * 255)}`
+const rgba = (r: number, g: number, b: number, a = 1) => `#${hex2(r)}${hex2(g)}${hex2(b)}${hex2(a * 255)}`
 
 /** A component of rgb() or hsl(): a number, or a percentage of `full`. */
 const part = (text: string, full: number) =>

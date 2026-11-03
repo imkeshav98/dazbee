@@ -13,10 +13,10 @@ import type { Storage } from '@dazbee/storage'
 import { SIGNED_URL_SECONDS } from './assets.ts'
 import { fontPreview, readFontInfo } from './font-file.ts'
 
-export const googleFontKey = (sha256: string) => `fonts/google/${sha256}`
-export const uploadedFontKey = (workspaceId: string, sha256: string) => `workspaces/${workspaceId}/fonts/${sha256}`
+const googleFontKey = (sha256: string) => `fonts/google/${sha256}`
+const uploadedFontKey = (workspaceId: string, sha256: string) => `workspaces/${workspaceId}/fonts/${sha256}`
 /** Each file's preview sits next to it. */
-export const previewKey = (fontKey: string) => `${fontKey}.preview.png`
+const previewKey = (fontKey: string) => `${fontKey}.preview.png`
 
 type Row = typeof fontFaces.$inferSelect
 

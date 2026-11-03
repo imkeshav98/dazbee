@@ -17,7 +17,7 @@ export interface DriftBaseline extends Drift {
   limit: { percent: number; maxDelta: number }
 }
 
-export const DRIFT_BASELINES = join(REFERENCE_DIR, 'webgl-drift.json')
+const DRIFT_BASELINES = join(REFERENCE_DIR, 'webgl-drift.json')
 
 /**
  * The limit set when a baseline is recorded: a quarter more than measured plus 0.05 percentage
