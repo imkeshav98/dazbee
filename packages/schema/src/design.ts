@@ -65,6 +65,7 @@ export const Format = z.object({
   height: z.number().int().positive(),
   order: FractionalIndex,
 })
+export type Format = z.infer<typeof Format>
 
 /**
  * Sizes a format may take when added or resized (#38): 1:3 to 3:1, a short side of at least
@@ -133,6 +134,7 @@ export const Page = z.object({
   /** Paints behind every layer on the page. */
   fills: Paint.array().default([]),
 })
+export type Page = z.infer<typeof Page>
 
 export const DesignMeta = z.object({
   schemaVersion: z.literal(SCHEMA_VERSION),
@@ -141,12 +143,20 @@ export const DesignMeta = z.object({
   kind: z.enum(['single', 'carousel', 'story', 'document']),
   primaryFormatId: FormatId,
 })
+export type DesignMeta = z.infer<typeof DesignMeta>
 
 /** Spike scopes: only `format:<id>`. Variant and page scopes arrive with variants and masters. */
 const FORMAT_SCOPE = /^format:([\w-]+)$/
 /** The format a `format:<id>` scope names, or undefined for any other string. */
 export const formatIdOf = (scope: string) => scope.match(FORMAT_SCOPE)?.[1]
+/** The scope that holds one format's overrides. */
+export const formatScope = (formatId: string): `format:${string}` => `format:${formatId}`
 export const Scope = z.string().refine((s) => formatIdOf(s) !== undefined, 'the spike only supports format:<id> scopes')
+export type Scope = z.infer<typeof Scope>
+
+/** Where an edit lands: the base, or one format's overrides. */
+export const AnyScope = z.union([z.literal('base'), Scope]).default('base')
+export type AnyScope = z.infer<typeof AnyScope>
 
 /** overrides[scope][nodeId][propertyPath] = value. Any property can be overridden per format. */
 const Overrides = z.record(Scope, z.record(NodeId, z.record(z.string(), z.unknown())))

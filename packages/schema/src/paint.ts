@@ -13,9 +13,11 @@ const Stops = GradientStop.array().min(2)
 const paintCommon = { opacity: z.number().min(0).max(1).optional(), visible: z.boolean().optional() }
 
 export const SolidPaint = z.object({ type: z.literal('solid'), color: Color, ...paintCommon })
+export type SolidPaint = z.infer<typeof SolidPaint>
 
 /** Gradient geometry is in the layer's unit box: (0,0) top left, (1,1) bottom right. */
 export const LinearPaint = z.object({ type: z.literal('linear'), from: Point, to: Point, stops: Stops, ...paintCommon })
+export type LinearPaint = z.infer<typeof LinearPaint>
 export const RadialPaint = z.object({
   type: z.literal('radial'),
   center: Point,
@@ -23,6 +25,7 @@ export const RadialPaint = z.object({
   stops: Stops,
   ...paintCommon,
 })
+export type RadialPaint = z.infer<typeof RadialPaint>
 
 /**
  * A conic sweep of colour about `center` (#43): offset 0 starts at `angle` degrees, turning
@@ -35,6 +38,7 @@ export const AngularPaint = z.object({
   stops: Stops,
   ...paintCommon,
 })
+export type AngularPaint = z.infer<typeof AngularPaint>
 
 /** A crop is the fill's transform: the visible part of the image, in image pixels. */
 export const ImageCrop = z.object({
@@ -43,6 +47,7 @@ export const ImageCrop = z.object({
   width: z.number().positive(),
   height: z.number().positive(),
 })
+export type ImageCrop = z.infer<typeof ImageCrop>
 /** How far to push each adjustment of an image fill (#48), from -100 to 100; 0 leaves it as it is. */
 const Amount = z.number().min(-100).max(100).default(0)
 export const ImageAdjust = z.object({
@@ -70,6 +75,7 @@ export const ImagePaint = z.object({
   adjust: ImageAdjust.optional(),
   filter: ImageFilter.optional(),
 })
+export type ImagePaint = z.infer<typeof ImagePaint>
 
 export const Paint = z.discriminatedUnion('type', [SolidPaint, LinearPaint, RadialPaint, AngularPaint, ImagePaint])
 export type Paint = z.infer<typeof Paint>

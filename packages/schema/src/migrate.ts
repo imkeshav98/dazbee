@@ -2,11 +2,12 @@
 // at an older version first runs every step from there up to this one. Steps work on plain JSON,
 // before validation, and never change what they are given.
 
+import { isRecord } from './json.ts'
+
 /** The version every design is written at. */
 export const SCHEMA_VERSION = 5
 
 type Json = Record<string, unknown>
-const isRecord = (v: unknown): v is Json => typeof v === 'object' && v !== null && !Array.isArray(v)
 
 /**
  * Version 2 gives groups and frames pass-through blending, and makes `normal` on them draw the

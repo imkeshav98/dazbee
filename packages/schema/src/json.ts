@@ -1,3 +1,7 @@
+// Helpers over plain JSON values for every schema file. This module imports nothing, so importing
+// it never makes a cycle.
+
+/** Whether a value is an object that isn't null or an array. */
 export const isRecord = (v: unknown): v is Record<string, unknown> =>
   typeof v === 'object' && v !== null && !Array.isArray(v)
 
