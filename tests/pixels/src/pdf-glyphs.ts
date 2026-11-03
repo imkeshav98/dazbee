@@ -14,6 +14,11 @@ type Value = number | string | Value[] | { [key: string]: Value } | { ref: numbe
 type Dict = { [key: string]: Value }
 type Matrix = [number, number, number, number, number, number]
 
+interface PdfObject {
+  dict: Dict
+  stream?: string
+}
+
 const IDENTITY: Matrix = [1, 0, 0, 1, 0, 0]
 /** a then b, in PDF's row-vector order. */
 const times = (a: Matrix, b: Matrix): Matrix => [
@@ -26,6 +31,137 @@ const times = (a: Matrix, b: Matrix): Matrix => [
 ]
 
 const DELIMITER = /[\s()<>[\]{}/%]/
+
+/** Every glyph a one-page PDF draws, layers included, where it draws it. */
+export function pdfGlyphs(bytes: Uint8Array): PdfGlyph[] {
+  const all = objects(bytes)
+  const resolve = (v: Value | undefined): Value | undefined =>
+    v && typeof v === 'object' && 'ref' in v ? all.get((v as { ref: number }).ref)?.dict : v
+  const page = [...all.values()].find((o) => o.dict.Type === '/Page')
+  if (!page) throw new Error('the PDF has no page')
+  const box = resolve(page.dict.MediaBox) as number[]
+  const height = (box[3] ?? 0) - (box[1] ?? 0)
+  const glyphs: PdfGlyph[] = []
+
+  const run = (stream: string, resources: Dict, start: Matrix) => {
+    let ctm = start
+    const saved: Matrix[] = []
+    let tm = IDENTITY
+    let line = IDENTITY
+    let font: { size: number; widths: Map<number, number>; fallback: number; twoByte: boolean } | null = null
+    const operands: Value[] = []
+    const show = (hex: string) => {
+      if (!font) return
+      const step = font.twoByte ? 4 : 2
+      for (let k = 0; k < hex.length; k += step) {
+        const glyph = parseInt(hex.slice(k, k + step), 16)
+        const [, , , , x, y] = times(tm, ctm)
+        glyphs.push({ glyph, x, y: height - y })
+        const advance = ((font.widths.get(glyph) ?? font.fallback) / 1000) * font.size
+        tm = times([1, 0, 0, 1, advance, 0], tm)
+      }
+    }
+    for (const token of tokens(stream)) {
+      if (!(typeof token === 'object' && token !== null && 'op' in token)) {
+        operands.push(token as Value)
+        continue
+      }
+      const args = operands.splice(0)
+      const n = (k: number) => Number(args[k])
+      switch (token.op) {
+        case 'q':
+          saved.push(ctm)
+          break
+        case 'Q':
+          ctm = saved.pop() ?? IDENTITY
+          break
+        case 'cm':
+          ctm = times([n(0), n(1), n(2), n(3), n(4), n(5)], ctm)
+          break
+        case 'BT':
+          tm = IDENTITY
+          line = IDENTITY
+          break
+        case 'Tm':
+          tm = [n(0), n(1), n(2), n(3), n(4), n(5)]
+          line = tm
+          break
+        case 'Td':
+          line = times([1, 0, 0, 1, n(0), n(1)], line)
+          tm = line
+          break
+        case 'Tf': {
+          const dict = resolve((resolve(resources.Font) as Dict | undefined)?.[String(args[0]).slice(1)]) as
+            Dict | undefined
+          font = dict ? { size: n(1), twoByte: dict.Subtype === '/Type0', ...widthsOf(dict, resolve) } : null
+          break
+        }
+        case 'Tj':
+          show((args[0] as { hex: string }).hex ?? '')
+          break
+        case 'TJ':
+          for (const part of args[0] as Value[]) {
+            if (typeof part === 'number') tm = times([1, 0, 0, 1, (-part / 1000) * (font?.size ?? 0), 0], tm)
+            else show((part as { hex: string }).hex ?? '')
+          }
+          break
+        case 'Do': {
+          const ref = (resolve(resources.XObject) as Dict | undefined)?.[String(args[0]).slice(1)] as
+            { ref: number } | undefined
+          const form = ref && all.get(ref.ref)
+          if (form?.stream && form.dict.Subtype === '/Form') {
+            const matrix = (resolve(form.dict.Matrix) as number[] | undefined) ?? IDENTITY
+            run(form.stream, (resolve(form.dict.Resources) as Dict | undefined) ?? {}, times(matrix as Matrix, ctm))
+          }
+          break
+        }
+      }
+    }
+  }
+
+  const contents = page.dict.Contents
+  const refs = (Array.isArray(contents) ? contents : [contents]) as { ref: number }[]
+  const stream = refs.map((r) => all.get(r.ref)?.stream ?? '').join('\n')
+  run(stream, (resolve(page.dict.Resources) as Dict | undefined) ?? {}, IDENTITY)
+  return glyphs
+}
+
+/** Every object in a PDF Skia wrote, by number, with its stream inflated. */
+function objects(bytes: Uint8Array): Map<number, PdfObject> {
+  const text = Buffer.from(bytes).toString('latin1')
+  const found = new Map<number, PdfObject>()
+  for (const match of text.matchAll(/(\d+) 0 obj\s*/g)) {
+    const start = (match.index ?? 0) + match[0].length
+    if (!text.startsWith('<<', start)) continue
+    let depth = 0
+    let end = start
+    for (; end < text.length; end++) {
+      if (text.startsWith('<<', end)) {
+        depth++
+        end++
+        continue
+      }
+      if (text.startsWith('>>', end)) {
+        if (--depth === 0) {
+          end += 2
+          break
+        }
+        end++
+      }
+    }
+    const [dict] = [...tokens(text.slice(start, end))] as Dict[]
+    if (!dict) continue
+    const object: PdfObject = { dict }
+    const after = text.slice(end).match(/^\s*stream\r?\n/)
+    if (after) {
+      const from = end + after[0].length
+      const raw = Buffer.from(text.slice(from, from + Number(dict.Length)), 'latin1')
+      object.stream = (dict.Filter === '/FlateDecode' ? inflateSync(raw) : raw).toString('latin1')
+    }
+    found.set(Number(match[1]), object)
+  }
+  return found
+}
 
 /** Splits PDF syntax into values and operators. */
 function* tokens(text: string): Generator<Value | { op: string }> {
@@ -121,48 +257,6 @@ function* tokens(text: string): Generator<Value | { op: string }> {
   }
 }
 
-interface PdfObject {
-  dict: Dict
-  stream?: string
-}
-
-/** Every object in a PDF Skia wrote, by number, with its stream inflated. */
-function objects(bytes: Uint8Array): Map<number, PdfObject> {
-  const text = Buffer.from(bytes).toString('latin1')
-  const found = new Map<number, PdfObject>()
-  for (const match of text.matchAll(/(\d+) 0 obj\s*/g)) {
-    const start = (match.index ?? 0) + match[0].length
-    if (!text.startsWith('<<', start)) continue
-    let depth = 0
-    let end = start
-    for (; end < text.length; end++) {
-      if (text.startsWith('<<', end)) {
-        depth++
-        end++
-        continue
-      }
-      if (text.startsWith('>>', end)) {
-        if (--depth === 0) {
-          end += 2
-          break
-        }
-        end++
-      }
-    }
-    const [dict] = [...tokens(text.slice(start, end))] as Dict[]
-    if (!dict) continue
-    const object: PdfObject = { dict }
-    const after = text.slice(end).match(/^\s*stream\r?\n/)
-    if (after) {
-      const from = end + after[0].length
-      const raw = Buffer.from(text.slice(from, from + Number(dict.Length)), 'latin1')
-      object.stream = (dict.Filter === '/FlateDecode' ? inflateSync(raw) : raw).toString('latin1')
-    }
-    found.set(Number(match[1]), object)
-  }
-  return found
-}
-
 /** Glyph widths of a Type0 font, in thousandths of the font size, from its CID font's /W. */
 function widthsOf(font: Dict, resolve: (v: Value | undefined) => Value | undefined) {
   const descendant = resolve((resolve(font.DescendantFonts) as Value[] | undefined)?.[0]) as Dict | undefined
@@ -180,98 +274,4 @@ function widthsOf(font: Dict, resolve: (v: Value | undefined) => Value | undefin
     }
   }
   return { widths, fallback: Number(resolve(descendant?.DW) ?? 1000) }
-}
-
-/** Every glyph a one-page PDF draws, layers included, where it draws it. */
-export function pdfGlyphs(bytes: Uint8Array): PdfGlyph[] {
-  const all = objects(bytes)
-  const resolve = (v: Value | undefined): Value | undefined =>
-    v && typeof v === 'object' && 'ref' in v ? all.get((v as { ref: number }).ref)?.dict : v
-  const page = [...all.values()].find((o) => o.dict.Type === '/Page')
-  if (!page) throw new Error('the PDF has no page')
-  const box = resolve(page.dict.MediaBox) as number[]
-  const height = (box[3] ?? 0) - (box[1] ?? 0)
-  const glyphs: PdfGlyph[] = []
-
-  const run = (stream: string, resources: Dict, start: Matrix) => {
-    let ctm = start
-    const saved: Matrix[] = []
-    let tm = IDENTITY
-    let line = IDENTITY
-    let font: { size: number; widths: Map<number, number>; fallback: number; twoByte: boolean } | null = null
-    const operands: Value[] = []
-    const show = (hex: string) => {
-      if (!font) return
-      const step = font.twoByte ? 4 : 2
-      for (let k = 0; k < hex.length; k += step) {
-        const glyph = parseInt(hex.slice(k, k + step), 16)
-        const [, , , , x, y] = times(tm, ctm)
-        glyphs.push({ glyph, x, y: height - y })
-        const advance = ((font.widths.get(glyph) ?? font.fallback) / 1000) * font.size
-        tm = times([1, 0, 0, 1, advance, 0], tm)
-      }
-    }
-    for (const token of tokens(stream)) {
-      if (!(typeof token === 'object' && token !== null && 'op' in token)) {
-        operands.push(token as Value)
-        continue
-      }
-      const args = operands.splice(0)
-      const n = (k: number) => Number(args[k])
-      switch (token.op) {
-        case 'q':
-          saved.push(ctm)
-          break
-        case 'Q':
-          ctm = saved.pop() ?? IDENTITY
-          break
-        case 'cm':
-          ctm = times([n(0), n(1), n(2), n(3), n(4), n(5)], ctm)
-          break
-        case 'BT':
-          tm = IDENTITY
-          line = IDENTITY
-          break
-        case 'Tm':
-          tm = [n(0), n(1), n(2), n(3), n(4), n(5)]
-          line = tm
-          break
-        case 'Td':
-          line = times([1, 0, 0, 1, n(0), n(1)], line)
-          tm = line
-          break
-        case 'Tf': {
-          const dict = resolve((resolve(resources.Font) as Dict | undefined)?.[String(args[0]).slice(1)]) as
-            Dict | undefined
-          font = dict ? { size: n(1), twoByte: dict.Subtype === '/Type0', ...widthsOf(dict, resolve) } : null
-          break
-        }
-        case 'Tj':
-          show((args[0] as { hex: string }).hex ?? '')
-          break
-        case 'TJ':
-          for (const part of args[0] as Value[]) {
-            if (typeof part === 'number') tm = times([1, 0, 0, 1, (-part / 1000) * (font?.size ?? 0), 0], tm)
-            else show((part as { hex: string }).hex ?? '')
-          }
-          break
-        case 'Do': {
-          const ref = (resolve(resources.XObject) as Dict | undefined)?.[String(args[0]).slice(1)] as
-            { ref: number } | undefined
-          const form = ref && all.get(ref.ref)
-          if (form?.stream && form.dict.Subtype === '/Form') {
-            const matrix = (resolve(form.dict.Matrix) as number[] | undefined) ?? IDENTITY
-            run(form.stream, (resolve(form.dict.Resources) as Dict | undefined) ?? {}, times(matrix as Matrix, ctm))
-          }
-          break
-        }
-      }
-    }
-  }
-
-  const contents = page.dict.Contents
-  const refs = (Array.isArray(contents) ? contents : [contents]) as { ref: number }[]
-  const stream = refs.map((r) => all.get(r.ref)?.stream ?? '').join('\n')
-  run(stream, (resolve(page.dict.Resources) as Dict | undefined) ?? {}, IDENTITY)
-  return glyphs
 }

@@ -6,6 +6,12 @@ import { FALLBACK_FAMILIES } from '@dazbee/fonts'
 import { loadFontFiles } from '@dazbee/fonts/node'
 import type { ResourceBytes } from '@dazbee/renderer'
 
+export interface Pixels {
+  width: number
+  height: number
+  pixels: Uint8Array
+}
+
 export const ASSETS_DIR = join(import.meta.dirname, '..', 'assets')
 export const REFERENCE_DIR = join(import.meta.dirname, '..', 'reference')
 export const OUTPUT_DIR = join(import.meta.dirname, '..', 'output')
@@ -18,12 +24,6 @@ export function fixtureResources(): ResourceBytes {
       .map((f) => [f.replace(/\.jpg$/, ''), new Uint8Array(readFileSync(join(ASSETS_DIR, f)))]),
   )
   return { fonts: loadFontFiles(), fallbackFamilies: [...FALLBACK_FAMILIES], images }
-}
-
-export interface Pixels {
-  width: number
-  height: number
-  pixels: Uint8Array
 }
 
 /** Decodes a PNG to unpremultiplied RGBA with CanvasKit. */
@@ -93,4 +93,15 @@ export function comparePixels(expected: Pixels, actual: Pixels): { differing: nu
     }
   }
   return { differing, diff: { width: expected.width, height: expected.height, pixels: diff } }
+}
+
+/** The red, green and blue of the pixel at x, y. */
+export function at(image: Pick<Pixels, 'width' | 'pixels'>, x: number, y: number): number[] {
+  return rgbaAt(image, x, y).slice(0, 3)
+}
+
+/** The red, green, blue and alpha of the pixel at x, y. */
+export function rgbaAt(image: Pick<Pixels, 'width' | 'pixels'>, x: number, y: number): number[] {
+  const i = (y * image.width + x) * 4
+  return [...image.pixels.slice(i, i + 4)]
 }

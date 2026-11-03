@@ -1,19 +1,17 @@
 // A path in a box of another size than it was drawn in is drawn scaled to fit (#278): the same
 // pixels as its data drawn at that size, in each format, on the CPU surface and in the PDF and SVG.
 // A path with no box it was drawn in is drawn at its own size, as before.
-import { PDFiumLibrary } from '@hyzyla/pdfium'
 import { afterAll, describe, expect, it } from 'vitest'
 
-import { renderDesign, renderVector } from '@dazbee/renderer'
+import { renderDesign } from '@dazbee/renderer'
 import { loadCanvasKit } from '@dazbee/renderer/node'
 
 import { comparePixels, fixtureResources } from './pixels.ts'
-import { rasterisePdf, rasteriseSvg, vectorDifference } from './vector.ts'
+import { renderThreeWays, startPdfium, vectorDifference } from './vector.ts'
 
 const ck = await loadCanvasKit()
 const bytes = fixtureResources()
-const pdfium = await PDFiumLibrary.init()
-afterAll(() => pdfium.destroy())
+const pdfium = await startPdfium(afterAll)
 
 /** A blob with a hole, a gradient fill and a stroke, drawn in a 100 × 50 box. */
 const D =
@@ -87,9 +85,7 @@ describe('path scale', () => {
 
   it('exports a scaled path as it is drawn, in PDF and SVG', async () => {
     const json = design({ d: D, drawnIn: { width: 100, height: 50 } }, { width: 300, height: 100 })
-    const cpu = renderDesign(ck, json, 'p1', 'f', bytes)
-    const pdf = await rasterisePdf(pdfium, renderVector(ck, json, 'p1', 'f', bytes, 'pdf'))
-    const svg = rasteriseSvg(renderVector(ck, json, 'p1', 'f', bytes, 'svg'))
+    const { cpu, pdf, svg } = await renderThreeWays(ck, pdfium, json, 'p1', 'f', bytes)
     expect(vectorDifference(cpu, pdf)).toBeLessThan(1)
     expect(vectorDifference(cpu, svg)).toBeLessThan(1)
   })

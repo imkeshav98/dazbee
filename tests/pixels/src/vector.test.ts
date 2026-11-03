@@ -1,7 +1,6 @@
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 
-import { PDFiumLibrary } from '@hyzyla/pdfium'
 import { afterAll, describe, expect, it } from 'vitest'
 
 import { exportDesign } from '@dazbee/export'
@@ -27,8 +26,11 @@ import {
   rasteriseSvg,
   readVectorBaselines,
   recordVectorBaseline,
+  startPdfium,
   vectorDifference,
 } from './vector.ts'
+
+type Affine = [number, number, number, number, number, number]
 
 /** Set to record the baselines from the current exports, after checking them by eye. */
 const UPDATE = process.env.UPDATE_VECTOR_BASELINES === '1'
@@ -37,11 +39,8 @@ if (UPDATE && process.env.CI) throw new Error('UPDATE_VECTOR_BASELINES rewrites 
 const ck = await loadCanvasKit()
 const bytes = fixtureResources()
 const cache = resourceCache(ck)
-const pdfium = await PDFiumLibrary.init()
-afterAll(() => {
-  pdfium.destroy()
-  cache.delete()
-})
+const pdfium = await startPdfium(afterAll)
+afterAll(() => cache.delete())
 
 const cases = loadFixtures().flatMap(({ name, json }) => {
   const parsed = parseDesign(json)
@@ -63,6 +62,64 @@ const baselines = readVectorBaselines()
 const pdfs = new Map<string, Uint8Array>()
 /** Lets the test worker answer vitest between long draws, which otherwise time its messages out. */
 const breathe = () => new Promise((resolve) => setImmediate(resolve))
+
+const apply = ([a, b, c, d, e, f]: Affine, x: number, y: number) => [a * x + c * y + e, b * x + d * y + f] as const
+const turn = (m: Affine, degrees: number, cx: number, cy: number): Affine => {
+  if (degrees === 0) return m
+  const r = (degrees * Math.PI) / 180
+  const [cos, sin] = [Math.cos(r), Math.sin(r)]
+  // m × (translate(c) · rotate · translate(-c))
+  const [a, b, c, d, e, f] = m
+  const tx = cx - cos * cx + sin * cy
+  const ty = cy - sin * cx - cos * cy
+  return [
+    a * cos + c * sin,
+    b * cos + d * sin,
+    -a * sin + c * cos,
+    -b * sin + d * cos,
+    a * tx + c * ty + e,
+    b * tx + d * ty + f,
+  ]
+}
+
+/** Every glyph the renderer lays out, by glyph id, where it draws it on the page, each layer turned as it is drawn. */
+function rendererGlyphs(
+  layers: readonly SceneLayer[],
+  resources: ReturnType<typeof cache.resources>,
+  m: Affine = [1, 0, 0, 1, 0, 0],
+  into = new Map<number, [number, number][]>(),
+) {
+  for (const layer of layers) {
+    const { props } = layer
+    const turned = turn(m, props.rotation, props.x + props.width / 2, props.y + props.height / 2)
+    if (layer.type === 'text') {
+      const laid = layoutText(ck, layer.props, resources)
+      for (const b of laid.blocks) {
+        const pieces: [typeof b.paragraph | null, number, number][] = [
+          [b.paragraph, b.x, b.y],
+          [b.marker, b.markerX, b.y + b.markerY],
+        ]
+        for (const [paragraph, ox, oy] of pieces) {
+          for (const line of paragraph?.getShapedLines() ?? []) {
+            for (const run of line.runs) {
+              run.glyphs.forEach((glyph, i) => {
+                const at = apply(
+                  turned,
+                  props.x + ox + (run.positions[2 * i] ?? 0),
+                  props.y + laid.dy + oy + (run.positions[2 * i + 1] ?? 0),
+                )
+                into.set(glyph, [...(into.get(glyph) ?? []), [at[0], at[1]]])
+              })
+            }
+          }
+        }
+      }
+      laid.delete()
+    }
+    rendererGlyphs(layer.children, resources, turned, into)
+  }
+  return into
+}
 
 describe('PDF and SVG exports (#56)', () => {
   it.each(cases)(
@@ -152,62 +209,3 @@ describe('PDF and SVG exports (#56)', () => {
     }
   })
 })
-
-type Affine = [number, number, number, number, number, number]
-const apply = ([a, b, c, d, e, f]: Affine, x: number, y: number) => [a * x + c * y + e, b * x + d * y + f] as const
-const turn = (m: Affine, degrees: number, cx: number, cy: number): Affine => {
-  if (degrees === 0) return m
-  const r = (degrees * Math.PI) / 180
-  const [cos, sin] = [Math.cos(r), Math.sin(r)]
-  // m × (translate(c) · rotate · translate(-c))
-  const [a, b, c, d, e, f] = m
-  const tx = cx - cos * cx + sin * cy
-  const ty = cy - sin * cx - cos * cy
-  return [
-    a * cos + c * sin,
-    b * cos + d * sin,
-    -a * sin + c * cos,
-    -b * sin + d * cos,
-    a * tx + c * ty + e,
-    b * tx + d * ty + f,
-  ]
-}
-
-/** Every glyph the renderer lays out, by glyph id, where it draws it on the page, each layer turned as it is drawn. */
-function rendererGlyphs(
-  layers: readonly SceneLayer[],
-  resources: ReturnType<typeof cache.resources>,
-  m: Affine = [1, 0, 0, 1, 0, 0],
-  into = new Map<number, [number, number][]>(),
-) {
-  for (const layer of layers) {
-    const { props } = layer
-    const turned = turn(m, props.rotation, props.x + props.width / 2, props.y + props.height / 2)
-    if (layer.type === 'text') {
-      const laid = layoutText(ck, layer.props, resources)
-      for (const b of laid.blocks) {
-        const pieces: [typeof b.paragraph | null, number, number][] = [
-          [b.paragraph, b.x, b.y],
-          [b.marker, b.markerX, b.y + b.markerY],
-        ]
-        for (const [paragraph, ox, oy] of pieces) {
-          for (const line of paragraph?.getShapedLines() ?? []) {
-            for (const run of line.runs) {
-              run.glyphs.forEach((glyph, i) => {
-                const at = apply(
-                  turned,
-                  props.x + ox + (run.positions[2 * i] ?? 0),
-                  props.y + laid.dy + oy + (run.positions[2 * i + 1] ?? 0),
-                )
-                into.set(glyph, [...(into.get(glyph) ?? []), [at[0], at[1]]])
-              })
-            }
-          }
-        }
-      }
-      laid.delete()
-    }
-    rendererGlyphs(layer.children, resources, turned, into)
-  }
-  return into
-}

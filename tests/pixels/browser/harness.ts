@@ -1,4 +1,4 @@
-// Runs in Chromium. Bundled by specs/parity.fixture.ts and served from memory, with the
+// Runs in Chromium. Bundled by specs/support/harness.ts and served from memory, with the
 // CanvasKit wasm, the font files and the fixture images beside it.
 import type { Surface } from '@dazbee/canvaskit'
 import canvasKitModule from '@dazbee/canvaskit'
@@ -21,33 +21,8 @@ const fonts = await Promise.all(
   FONT_FACES.map(async (f) => ({ family: f.family, bytes: await bytes(`/fonts/${f.file}`) })),
 )
 
-async function resourcesFor(assetIds: string[]): Promise<ResourceBytes> {
-  const images = Object.fromEntries(
-    await Promise.all(assetIds.map(async (id) => [id, await bytes(`/assets/${id}.jpg`)] as const)),
-  )
-  return { fonts, fallbackFamilies: [...FALLBACK_FAMILIES], images }
-}
-
 /** One WebGL surface per size, kept for the page's life: Chromium allows only a few live WebGL contexts. */
 const webglSurfaces = new Map<string, Surface>()
-function webglSurface(width: number, height: number) {
-  const key = `${width}×${height}`
-  let surface = webglSurfaces.get(key)
-  if (!surface) {
-    const made = ck.MakeWebGLCanvasSurface(new OffscreenCanvas(width, height))
-    // CanvasKit quietly falls back to a CPU surface when WebGL is missing; that would fake the measurement.
-    if (!made?.reportBackendTypeIsGPU()) throw new Error('no WebGL in this browser')
-    surface = made
-    webglSurfaces.set(key, surface)
-  }
-  return surface
-}
-
-function toBase64(data: Uint8Array) {
-  let binary = ''
-  for (let i = 0; i < data.length; i += 0x8000) binary += String.fromCharCode(...data.subarray(i, i + 0x8000))
-  return btoa(binary)
-}
 
 /**
  * Renders one page and format and returns raw RGBA pixels as base64. CPU goes through the export
@@ -91,6 +66,32 @@ async function exportFixture(json: unknown, pageId: string, formatId: string, ty
     await resourcesFor(assetIds),
   )
   return toBase64(file.bytes)
+}
+
+async function resourcesFor(assetIds: string[]): Promise<ResourceBytes> {
+  const images = Object.fromEntries(
+    await Promise.all(assetIds.map(async (id) => [id, await bytes(`/assets/${id}.jpg`)] as const)),
+  )
+  return { fonts, fallbackFamilies: [...FALLBACK_FAMILIES], images }
+}
+
+function toBase64(data: Uint8Array) {
+  let binary = ''
+  for (let i = 0; i < data.length; i += 0x8000) binary += String.fromCharCode(...data.subarray(i, i + 0x8000))
+  return btoa(binary)
+}
+
+function webglSurface(width: number, height: number) {
+  const key = `${width}×${height}`
+  let surface = webglSurfaces.get(key)
+  if (!surface) {
+    const made = ck.MakeWebGLCanvasSurface(new OffscreenCanvas(width, height))
+    // CanvasKit quietly falls back to a CPU surface when WebGL is missing; that would fake the measurement.
+    if (!made?.reportBackendTypeIsGPU()) throw new Error('no WebGL in this browser')
+    surface = made
+    webglSurfaces.set(key, surface)
+  }
+  return surface
 }
 
 Object.assign(globalThis, { renderFixture, exportFixture, harnessReady: true })

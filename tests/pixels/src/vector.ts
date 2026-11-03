@@ -4,20 +4,55 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 
-import type { PDFiumLibrary } from '@hyzyla/pdfium'
+import { PDFiumLibrary } from '@hyzyla/pdfium'
 import { Resvg } from '@resvg/resvg-js'
 
+import type { CanvasKit } from '@dazbee/canvaskit'
+import { renderDesign, renderVector, type ResourceBytes } from '@dazbee/renderer'
+
 import { type Pixels, REFERENCE_DIR } from './pixels.ts'
+
+/** One case's measured share of differing pixels, in percent, and the limit it must stay within. */
+export interface VectorBaseline {
+  pdf: { percent: number; limit: number }
+  svg: { percent: number; limit: number }
+}
+
+/** One page drawn on the CPU surface and from its PDF and SVG exports, each over white. */
+export interface ThreeWays {
+  cpu: Pixels
+  pdf: Pixels
+  svg: Pixels
+}
 
 /** How far a channel may differ before a pixel counts as different, out of 255. */
 export const VECTOR_CHANNEL_TOLERANCE = 16
 
 export const VECTOR_BASELINES = join(REFERENCE_DIR, 'vector-baselines.json')
 
-/** One case's measured share of differing pixels, in percent, and the limit it must stay within. */
-export interface VectorBaseline {
-  pdf: { percent: number; limit: number }
-  svg: { percent: number; limit: number }
+/** The limit set when a baseline is recorded: a quarter more than measured plus 0.05 percentage points. */
+export const vectorLimit = (percent: number) => Number((percent * 1.25 + 0.05).toFixed(3))
+
+/** Starts pdfium for a test file, and frees it with the hook given, such as vitest's `afterAll`. */
+export async function startPdfium(after: (free: () => void) => void): Promise<PDFiumLibrary> {
+  const pdfium = await PDFiumLibrary.init()
+  after(() => pdfium.destroy())
+  return pdfium
+}
+
+/** Draws one page on the CPU surface and exports it as PDF and SVG, each drawn over white to compare. */
+export async function renderThreeWays(
+  ck: CanvasKit,
+  pdfium: PDFiumLibrary,
+  json: unknown,
+  pageId: string,
+  formatId: string,
+  bytes: ResourceBytes,
+): Promise<ThreeWays> {
+  const cpu = overWhite(renderDesign(ck, json, pageId, formatId, bytes))
+  const pdf = await rasterisePdf(pdfium, renderVector(ck, json, pageId, formatId, bytes, 'pdf'))
+  const svg = rasteriseSvg(renderVector(ck, json, pageId, formatId, bytes, 'svg'))
+  return { cpu, pdf, svg }
 }
 
 /** The pixels over white, as a PDF viewer draws a page. */
@@ -94,9 +129,6 @@ export function vectorDifference(expected: Pixels, actual: Pixels): number {
   }
   return (differing / (width * height)) * 100
 }
-
-/** The limit set when a baseline is recorded: a quarter more than measured plus 0.05 percentage points. */
-export const vectorLimit = (percent: number) => Number((percent * 1.25 + 0.05).toFixed(3))
 
 export function readVectorBaselines(): Record<string, VectorBaseline> {
   return existsSync(VECTOR_BASELINES)

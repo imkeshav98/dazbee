@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest'
 import { renderDesign } from '@dazbee/renderer'
 import { loadCanvasKit } from '@dazbee/renderer/node'
 
-import { fixtureResources } from './pixels.ts'
+import { at, fixtureResources } from './pixels.ts'
 
 const ck = await loadCanvasKit()
 const design = {
@@ -53,9 +53,6 @@ const design = {
 }
 const draw = (variables?: Record<string, string>, formatId = 'f') =>
   renderDesign(ck, design, 'p1', formatId, { ...fixtureResources(), ...(variables ? { variables } : {}) })
-const at = (r: { pixels: Uint8Array; width: number }, x: number, y: number) => [
-  ...r.pixels.slice((y * r.width + x) * 4, (y * r.width + x) * 4 + 3),
-]
 /** Every distinct opaque colour in a region, so text's anti-aliased edges don't count. */
 const inked = (r: { pixels: Uint8Array; width: number }, x0: number, x1: number) => {
   const seen = new Set<string>()

@@ -7,7 +7,7 @@ import { imageColorMatrix, renderDesign } from '@dazbee/renderer'
 import { loadCanvasKit } from '@dazbee/renderer/node'
 import type { ImageAdjust, ImageFilter } from '@dazbee/schema'
 
-import { fixtureResources } from './pixels.ts'
+import { fixtureResources, rgbaAt } from './pixels.ts'
 
 const ck = await loadCanvasKit()
 const SIZE = 40
@@ -51,9 +51,6 @@ const design = (nodes: Record<string, Node>) => ({
   overrides: {},
 })
 const draw = (nodes: Record<string, Node>) => renderDesign(ck, design(nodes), 'p1', 'f', bytes)
-const at = (r: { pixels: Uint8Array; width: number }, x: number, y: number) => [
-  ...r.pixels.slice((y * r.width + x) * 4, (y * r.width + x) * 4 + 4),
-]
 const solid = (color: string) => [{ type: 'solid', color }]
 
 describe('image adjustments and filters', () => {
@@ -74,7 +71,7 @@ describe('image adjustments and filters', () => {
       ...(adjust && { adjust }),
       ...(paint.filter && { filter: paint.filter }),
     }
-    const drawn = at(draw({ a: rect('a0', { fills: [fill] }) }), 50, 50)
+    const drawn = rgbaAt(draw({ a: rect('a0', { fills: [fill] }) }), 50, 50)
     const m = imageColorMatrix(adjust, paint.filter) ?? []
     const [r, g, b] = BASE.map((v) => v / 255)
     const expected = [0, 1, 2].map((row) =>
@@ -116,10 +113,10 @@ describe('masks', () => {
       }),
       a: rect('a1', { fills: solid('#FF0000FF') }),
     })
-    expect(at(r, 50, 50)).toEqual(RED)
-    expect(at(r, 5, 5)).toEqual(WHITE)
+    expect(rgbaAt(r, 50, 50)).toEqual(RED)
+    expect(rgbaAt(r, 5, 5)).toEqual(WHITE)
     // Just inside the ellipse's box but outside its curve.
-    expect(at(r, 23, 23)).toEqual(WHITE)
+    expect(rgbaAt(r, 23, 23)).toEqual(WHITE)
   })
 
   it('a translucent mask lets through as much as it is opaque', () => {
@@ -128,7 +125,7 @@ describe('masks', () => {
       a: rect('a1', { fills: solid('#FF0000FF') }),
     })
     // Half red over white.
-    const [red = 0, green = 0] = at(r, 50, 50)
+    const [red = 0, green = 0] = rgbaAt(r, 50, 50)
     expect(red).toBe(255)
     expect(Math.abs(green - 127)).toBeLessThanOrEqual(1)
   })
@@ -153,13 +150,13 @@ describe('masks', () => {
       a: rect('a1', { fills: solid('#FF0000FF') }),
     })
     // Near black lets little red through, near white nearly all.
-    expect(at(r, 1, 50)[1]).toBeGreaterThan(240)
-    expect(at(r, 48, 50)[1]).toBeLessThan(20)
-    const [, mid = 0] = at(r, 25, 50)
+    expect(rgbaAt(r, 1, 50)[1]).toBeGreaterThan(240)
+    expect(rgbaAt(r, 48, 50)[1]).toBeLessThan(20)
+    const [, mid = 0] = rgbaAt(r, 25, 50)
     expect(mid).toBeGreaterThan(90)
     expect(mid).toBeLessThan(160)
     // Past the mask's box it is transparent, so dark.
-    expect(at(r, 75, 50)).toEqual(WHITE)
+    expect(rgbaAt(r, 75, 50)).toEqual(WHITE)
   })
 
   it('masks only up to the next mask, inside its own parent; a hidden mask masks nothing', () => {
@@ -174,13 +171,13 @@ describe('masks', () => {
       hidden: rect('a2', { width: 10, height: 10, fills: solid('#000000FF'), mask: 'alpha', visible: false }),
       d: rect('a3', { x: 60, y: 80, width: 10, height: 10, fills: solid('#FFFF00FF') }),
     })
-    expect(at(r, 10, 10)).toEqual(RED)
-    expect(at(r, 75, 75)).toEqual(WHITE)
+    expect(rgbaAt(r, 10, 10)).toEqual(RED)
+    expect(rgbaAt(r, 75, 75)).toEqual(WHITE)
     // The blue band shows only under the second mask, and over the red it is masked away.
-    expect(at(r, 75, 45)).toEqual([0, 0, 255, 255])
-    expect(at(r, 25, 45)).toEqual(RED)
-    expect(at(r, 75, 55)).toEqual(WHITE)
-    expect(at(r, 95, 95)).toEqual([0, 255, 0, 255])
-    expect(at(r, 65, 85)).toEqual([255, 255, 0, 255])
+    expect(rgbaAt(r, 75, 45)).toEqual([0, 0, 255, 255])
+    expect(rgbaAt(r, 25, 45)).toEqual(RED)
+    expect(rgbaAt(r, 75, 55)).toEqual(WHITE)
+    expect(rgbaAt(r, 95, 95)).toEqual([0, 255, 0, 255])
+    expect(rgbaAt(r, 65, 85)).toEqual([255, 255, 0, 255])
   })
 })
