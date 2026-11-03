@@ -19,7 +19,7 @@ const design = (() => {
   return parsed.design
 })()
 
-describe('frame grid', () => {
+describe('frameGrid', () => {
   it('puts pages in rows and formats in columns, in their order, with nothing stored', () => {
     const { frames, bounds } = frameGrid(design)
     expect(frames.map((f) => f.key)).toEqual(['one/sq', 'one/story', 'one/mpu', 'two/sq', 'two/story', 'two/mpu'])

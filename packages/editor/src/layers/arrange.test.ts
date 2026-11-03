@@ -4,13 +4,13 @@ import { align, distribute } from './arrange.ts'
 
 const format = { x: 0, y: 0, width: 1080, height: 1080 }
 
-describe('align and distribute', () => {
-  const boxes = [
-    { x: 100, y: 100, width: 100, height: 50 },
-    { x: 300, y: 220, width: 50, height: 100 },
-    { x: 600, y: 160, width: 80, height: 80 },
-  ]
+const boxes = [
+  { x: 100, y: 100, width: 100, height: 50 },
+  { x: 300, y: 220, width: 50, height: 100 },
+  { x: 600, y: 160, width: 80, height: 80 },
+]
 
+describe('align', () => {
   it('lines several layers up with the box around them', () => {
     expect(align(boxes, 'left', format).map((o) => o.dx)).toEqual([0, -200, -500])
     expect(align(boxes, 'right', format).map((o) => o.dx)).toEqual([480, 330, 0])
@@ -23,7 +23,9 @@ describe('align and distribute', () => {
     expect(align([boxes[0] as never], 'centre', format)).toEqual([{ dx: 390, dy: 0 }])
     expect(align([boxes[0] as never], 'bottom', { x: 0, y: 0, width: 500, height: 400 })).toEqual([{ dx: 0, dy: 250 }])
   })
+})
 
+describe('distribute', () => {
   it('spaces three or more out evenly between the first and the last', () => {
     // 680 - 100 = 580 across, 230 of it boxes: gaps of 175.
     expect(distribute(boxes, 'horizontal')).toEqual([

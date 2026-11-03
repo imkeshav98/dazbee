@@ -20,7 +20,7 @@ const design = (() => {
   return parsed.design
 })()
 
-describe('camera', () => {
+describe('zoomAt', () => {
   it('keeps the world point under the cursor fixed while zooming', () => {
     const camera = { x: 40, y: -12, zoom: 0.3 }
     const at = { x: 517, y: 233 }
@@ -31,7 +31,9 @@ describe('camera', () => {
       expect(after.y).toBeCloseTo(before.y, 9)
     }
   })
+})
 
+describe('fit', () => {
   it('fits a rect inside the viewport, centred, and sees what it fits', () => {
     const { bounds } = frameGrid(design)
     const viewport = { width: 1280, height: 800 }
@@ -44,21 +46,6 @@ describe('camera', () => {
     expect(bottomRight.y).toBeLessThanOrEqual(800 - 48 + 1e-9)
     expect((topLeft.x + bottomRight.x) / 2).toBeCloseTo(640)
     for (const frame of frameGrid(design).frames) expect(intersects(frame, visibleRect(camera, viewport))).toBe(true)
-  })
-
-  it('draws the frames the viewport shows any part of, and only those', () => {
-    const { frames } = frameGrid(design)
-    const viewport = { width: 1000, height: 600 }
-    // At 100%, from one/story's top start corner: a 1000 × 600 part of it only.
-    const story = frames.find((f) => f.key === 'one/story') ?? { x: 0, y: 0 }
-    expect(framesInView(frames, { x: -story.x, y: -story.y, zoom: 1 }, viewport).map((f) => f.key)).toEqual([
-      'one/story',
-    ])
-    // Moved the gap and one pixel toward the start, one/sq's last column of pixels shows too.
-    expect(
-      framesInView(frames, { x: -story.x + COLUMN_GAP + 1, y: -story.y, zoom: 1 }, viewport).map((f) => f.key),
-    ).toEqual(['one/sq', 'one/story'])
-    expect(framesInView(frames, fit(frameGrid(design).bounds, viewport), viewport)).toHaveLength(6)
   })
 
   it('fits between the floating chrome, centred in the clear part of the stage', () => {
@@ -88,5 +75,22 @@ describe('camera', () => {
     expect(bottomRight.x).toBeLessThanOrEqual(390 - 16 + 1e-9)
     expect(bottomRight.y).toBeLessThanOrEqual(760 - 150 - 16 + 1e-9)
     expect((topLeft.x + bottomRight.x) / 2).toBeCloseTo(195)
+  })
+})
+
+describe('framesInView', () => {
+  it('draws the frames the viewport shows any part of, and only those', () => {
+    const { frames } = frameGrid(design)
+    const viewport = { width: 1000, height: 600 }
+    // At 100%, from one/story's top start corner: a 1000 × 600 part of it only.
+    const story = frames.find((f) => f.key === 'one/story') ?? { x: 0, y: 0 }
+    expect(framesInView(frames, { x: -story.x, y: -story.y, zoom: 1 }, viewport).map((f) => f.key)).toEqual([
+      'one/story',
+    ])
+    // Moved the gap and one pixel toward the start, one/sq's last column of pixels shows too.
+    expect(
+      framesInView(frames, { x: -story.x + COLUMN_GAP + 1, y: -story.y, zoom: 1 }, viewport).map((f) => f.key),
+    ).toEqual(['one/sq', 'one/story'])
+    expect(framesInView(frames, fit(frameGrid(design).bounds, viewport), viewport)).toHaveLength(6)
   })
 })

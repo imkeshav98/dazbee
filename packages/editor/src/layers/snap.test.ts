@@ -7,7 +7,7 @@ const format = { x: 0, y: 0, width: 1080, height: 1080 }
 const a = { x: 100, y: 100, width: 200, height: 100 }
 const b = { x: 600, y: 400, width: 100, height: 100 }
 
-describe('snapping a move', () => {
+describe('snapMove', () => {
   it('lines up edges and centres with other layers and the format, showing why', () => {
     const targets = snapTargets([a, b], format)
     // Its left edge 4 px past A's: it snaps back onto it, and a guide spans both.
@@ -74,7 +74,7 @@ describe('snapping a move', () => {
   })
 })
 
-describe('snapping a resize', () => {
+describe('snapResize', () => {
   it('snaps only the edges the handle moves', () => {
     const targets = snapTargets([a], format)
     // Dragging the east edge to 297: it snaps to A's right edge at 300.
