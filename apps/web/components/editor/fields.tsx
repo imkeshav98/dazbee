@@ -3,7 +3,7 @@
 // The property cards' fields, shared by every card that edits a value: a number that types, nudges
 // and scrubs, a colour with its hex and opacity, and a choice from a list.
 import { useEffect, useRef, useState, type CSSProperties } from 'react'
-import type { Editor } from '@dazbee/editor'
+import { shortcutFor, type Editor } from '@dazbee/editor'
 import { cn } from '../../lib/cn.ts'
 import { fillOf } from '../../lib/fill.ts'
 import { useMessages } from '../../lib/i18n/client.tsx'
@@ -31,7 +31,8 @@ function useDraft() {
 /**
  * A number, as a knob: drag it sideways to scrub the value (Shift for 10 times, Alt for a tenth on a
  * field with fractional steps), one undo step for the whole drag; click it, or tab to it, and type a
- * value and press Enter; nudge it with the arrow keys (Shift for 10). With `min` and `max`, or
+ * value and press Enter; nudge it with the arrow keys (Shift for 10), and undo or redo the design with
+ * its keys while nothing is being typed. With `min` and `max`, or
  * `fillRange` for a fill that doesn't hold the value in, a fill behind it shows where the value sits
  * between them; a range either side of 0 fills from 0 out, each way. Home and End go to `min` and
  * `max`. Steps are in the value as shown, after `scale`.
@@ -146,7 +147,13 @@ export function NumberField({ label, name, value, step = 1, min, max, fillRange,
           if (typedNow.current !== null) commit(event.target.value)
         }}
         onKeyDown={(event) => {
-          if (event.key === 'Enter') commit(event.currentTarget.value)
+          // Undo and redo are the design's while nothing is being typed; once something is, the
+          // field's own, taking back what was typed.
+          const action = shortcutFor(event.nativeEvent)
+          if (editor && draft === null && (action === 'undo' || action === 'redo')) {
+            event.preventDefault()
+            editor.perform(action)
+          } else if (event.key === 'Enter') commit(event.currentTarget.value)
           else if (event.key === 'Escape') {
             setDraft(null)
             event.currentTarget.blur()
