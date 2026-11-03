@@ -1474,6 +1474,25 @@ test.describe('top bar and full menu', () => {
     await reloads(page)
   })
 
+  row(76, 'several photos: replace and the filters, for all of them', async (open) => {
+    const page = await open()
+    // The box shows the same picture as the photo, so the two are several photos.
+    await page.evaluate((assetId) => window.dazbee?.session.run('node.update', { ids: ['box'], patch: { fills: [{ type: 'image', assetId, fit: 'fill' }] } }), assets.photo)
+    await select(page, ['photo', 'box'])
+    const card = async () => (await openCard(page, 'photos-card'))
+    const filters = async () => [(await fills(page, 'photo')).at(-1)?.filter, (await fills(page, 'box')).at(-1)?.filter]
+    await step(page, async () => (await card()).getByRole('radiogroup', { name: 'Filter' }).getByRole('radio', { name: 'Mono' }).click(), async () => {
+      await expect.poll(filters).toEqual(['mono', 'mono'])
+    })
+    await step(page, async () => {
+      await (await card()).getByTestId('replace-image').click()
+      await page.locator(`li[data-asset="${assets.tile}"] button`).first().click()
+    }, async () => {
+      await expect.poll(async () => [(await fills(page, 'photo')).at(-1)?.assetId, (await fills(page, 'box')).at(-1)?.assetId]).toEqual([assets.tile, assets.tile])
+    })
+    await reloads(page)
+  })
+
   row(75, "a boolean's operation from its Combine pop-up", async (open) => {
     const page = await open()
     await select(page, ['box', 'poly'])

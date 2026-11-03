@@ -1,4 +1,4 @@
-// Every edit panel at desktop and phone size, for each kind that has it: simple choices
+// Every edit panel at desktop, tablet and phone size, for each kind that has it: simple choices
 // first and the numbers under Advanced, last; a picture of each for review.
 import { expect, test, type Page } from '../support/test.ts'
 import type { DesignInput } from '@dazbee/schema'
@@ -29,6 +29,7 @@ const PANELS: [string, string[], string[]][] = [
   ['shape', ['badge'], ['colour', 'outline', 'effects']],
   ['photo', ['photo'], ['edit', 'outline', 'effects']],
   ['stack', ['button'], ['colour', 'stack']],
+  ['in a stack', ['label'], ['position']],
 ]
 
 const select = async (page: Page, ids: string[]) => {
@@ -36,7 +37,7 @@ const select = async (page: Page, ids: string[]) => {
   await expect(page.getByTestId('top-bar')).toHaveAttribute('data-selection', ids.join(' '))
 }
 
-for (const [width, height] of [[1280, 760], [390, 844]] as const) {
+for (const [width, height] of [[1280, 760], [820, 1180], [390, 844]] as const) {
   test(`at ${width}×${height} every panel puts its numbers under Advanced, last`, async ({ browser }) => {
     const asset = await upload(photo)
     const { page, errors } = await openStage(browser, design(asset.id))
@@ -57,7 +58,7 @@ for (const [width, height] of [[1280, 760], [390, 844]] as const) {
         const squeezed = await panel.locator('input[role="spinbutton"]').evaluateAll((els) => els.filter((el) => el.checkVisibility() && el.clientWidth < 18).map((el) => el.getAttribute('aria-label')))
         expect(squeezed, `${kind} ${id}: values with no room`).toEqual([])
         await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))))
-        writeOutput(`panel-${width}-${kind}-${id}.png`, await page.screenshot({ animations: 'disabled' }))
+        writeOutput(`panel-${width}-${kind.replaceAll(' ', '-')}-${id}.png`, await page.screenshot({ animations: 'disabled' }))
         await page.keyboard.press('Escape')
         await expect(page.getByTestId(`bar-${id}-menu`)).toBeHidden()
       }

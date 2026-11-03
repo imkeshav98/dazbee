@@ -84,9 +84,10 @@ const num = (props: Props, key: string) => props[key] as number
 /**
  * The Position panel's numbers, under Advanced: the box's width and height, then where it sits, then
  * its turn, two to a row. With Lock ratio on, a width or height set moves the other side with it.
- * Groups and booleans take their box from what they hold, so they have only X and Y.
+ * Groups and booleans take their box from what they hold, so they have only X and Y. A layer in an
+ * auto layout has its sizing in `children`, under them.
  */
-function PlaceCard({ target, p, title }: { target: Target; p: P; title: string }) {
+function PlaceCard({ target, p, title, children }: { target: Target; p: P; title: string; children?: ReactNode }) {
   const placing = useMessages().editor.bar.placing
   const [keepRatio, setKeepRatio] = useState(false)
   const sized = target.types.every((type) => type !== 'group' && type !== 'boolean')
@@ -132,6 +133,7 @@ function PlaceCard({ target, p, title }: { target: Target; p: P; title: string }
           </Switch>
         )}
       </div>
+      {children}
     </Card>
   )
 }
@@ -1177,13 +1179,17 @@ function SizingFields({ target, p, options, labels }: { target: Target; p: P; op
   )
 }
 
-/** A layer in an auto layout: on each axis its own size, fitting its content or filling the room, and kept where it is put, out of the flow. */
-function FlowCard({ target, p }: { target: Target; p: P }) {
+/**
+ * A layer in an auto layout, in the Position panel's Advanced: on each axis its own size, fitting
+ * its content or filling the room, and kept where it is put, out of the flow.
+ */
+function FlowPart({ target, p }: { target: Target; p: P }) {
   return (
-    <Card id="flow-card" title={p.inAutoLayout}>
+    <div role="group" aria-labelledby="flow-card-title" data-testid="flow-card" className="flex flex-col gap-2.5">
+      <h4 id="flow-card-title" className={PANEL_HEADING}>{p.inAutoLayout}</h4>
       <SizingFields target={target} p={p} options={['fixed', 'hug', 'fill']} labels={p.childSizings} />
       <SwitchRow name={p.absolute} on={shared(target.props.map((pr) => pr.absolute === true))} onSet={(absolute) => set(target, () => ({ absolute: absolute ? true : undefined }))} />
-    </Card>
+    </div>
   )
 }
 
@@ -1688,8 +1694,9 @@ export function PanelContent({ panel, target, design, brandId }: { panel: string
       case 'position':
         return (
           <>
-            <PlaceCard target={target} p={p} title={t.editor.bar.advanced} />
-            {facts.inFlow && <FlowCard target={target} p={p} />}
+            <PlaceCard target={target} p={p} title={t.editor.bar.advanced}>
+              {facts.inFlow && <FlowPart target={target} p={p} />}
+            </PlaceCard>
           </>
         )
       case 'spacing':
