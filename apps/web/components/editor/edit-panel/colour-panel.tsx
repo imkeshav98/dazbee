@@ -10,8 +10,8 @@ import { boundFillIndex, brandRef, type Design, type Paint } from '@dazbee/schem
 
 import { useBrandKit } from '@/components/brand-kit/use-brand-kit.ts'
 import { ImagePickerButton } from '@/components/editor/image-tool.tsx'
-import { AddButton, PaintEditor, PaintRow, Stack } from '@/components/editor/paint-stack.tsx'
-import { ListBody } from '@/components/editor/reorder-list.tsx'
+import { PaintEditor, PaintRow } from '@/components/editor/paint-stack.tsx'
+import { AddButton, ListBody, Stack } from '@/components/editor/reorder-list.tsx'
 import { FIELD_LABEL, PANEL_BUTTON, PICKED_RING, SWATCH, SWATCHES } from '@/components/editor/styles.ts'
 import { FOCUS_RING } from '@/components/ui/looks.ts'
 import { cn } from '@/lib/cn.ts'

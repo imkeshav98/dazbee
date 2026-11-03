@@ -3,16 +3,12 @@
 import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react'
 
 import { type Editor, SHAPE_TOOLS, type ShapeTool, startEditor, type Tool } from '@dazbee/editor'
-import { BrandKit, brandVariables, FontFamily, isVectorAsset, type Variables } from '@dazbee/schema'
+import { isVectorAsset } from '@dazbee/schema'
 
+import { ASSET_DRAG_TYPE, draggedAsset, VECTOR_DRAG_TYPE } from '@/components/editor/asset-drag.ts'
 import { EditPanel } from '@/components/editor/edit-panel/edit-panel.tsx'
 import { useEditState } from '@/components/editor/edit-store.ts'
-import {
-  ASSET_DRAG_TYPE,
-  AssetLibrary,
-  draggedAsset,
-  VECTOR_DRAG_TYPE,
-} from '@/components/editor/flyouts/asset-library.tsx'
+import { AssetLibrary } from '@/components/editor/flyouts/asset-library.tsx'
 import { BrandKitPanel } from '@/components/editor/flyouts/brand-kit-panel.tsx'
 import { LayersPanel } from '@/components/editor/flyouts/layers-panel.tsx'
 import { FocusChip } from '@/components/editor/focus-chip.tsx'
@@ -33,6 +29,7 @@ import { useLocale, useMessages } from '@/lib/i18n/client.tsx'
 import { format } from '@/lib/i18n/index.ts'
 
 import { fetchSyncToken, renameFromEditor } from './actions.ts'
+import { assetBytes, brandKitVariables, fontLoader, keepForOffline } from './editor-io.ts'
 
 /** The editor's tools that the dock shows as the one shape button. */
 const isShapeTool = (tool: Tool): tool is ShapeTool => (SHAPE_TOOLS as readonly string[]).includes(tool)
@@ -41,59 +38,6 @@ declare global {
   interface Window {
     dazbee?: Editor
   }
-}
-
-async function assetBytes(brandId: string, assetId: string) {
-  const response = await fetch(`/brands/${encodeURIComponent(brandId)}/assets/${encodeURIComponent(assetId)}`)
-  if (!response.ok) throw new Error(`asset ${assetId}: ${response.status}`)
-  return new Uint8Array(await response.arrayBuffer())
-}
-
-/**
- * The files of the families the editor asks for (#50), from the brand's catalog: fetched once, and
- * again when a family isn't in it yet, as after an upload.
- */
-function fontLoader(brandId: string) {
-  const brand = `/brands/${encodeURIComponent(brandId)}/fonts`
-  let catalog: Promise<FontFamily[]> | null = null
-  const fetchCatalog = async () => {
-    const response = await fetch(brand)
-    if (!response.ok) throw new Error(`fonts: ${response.status}`)
-    return FontFamily.array().parse(await response.json())
-  }
-  return async (families: string[]) => {
-    let known = await (catalog ??= fetchCatalog()).catch((error: unknown) => {
-      catalog = null
-      throw error
-    })
-    if (families.some((family) => !known.some((f) => f.family === family))) known = await (catalog = fetchCatalog())
-    const faces = known.filter((f) => families.includes(f.family)).flatMap((f) => f.faces)
-    return Promise.all(
-      faces.map(async (face) => {
-        const response = await fetch(`${brand}/${encodeURIComponent(face.id)}`)
-        if (!response.ok) throw new Error(`font ${face.family} ${face.weight}: ${response.status}`)
-        return { family: face.family, bytes: new Uint8Array(await response.arrayBuffer()) }
-      }),
-    )
-  }
-}
-
-/**
- * The values of the brand kit's tokens (#53), for layers bound to them. Without a connection the
- * editor starts without them, and bound layers keep the values they were bound with.
- */
-async function brandKitVariables(brandId: string): Promise<Variables | undefined> {
-  const response = await fetch(`/brands/${encodeURIComponent(brandId)}/kit/data`).catch(() => null)
-  if (!response?.ok) return undefined
-  return brandVariables(BrandKit.parse(await response.json()))
-}
-
-/** Asks the offline worker to keep this page and everything it has loaded so far. */
-async function keepForOffline() {
-  if (!('serviceWorker' in navigator)) return
-  const registration = await navigator.serviceWorker.ready
-  const urls = [location.href, ...performance.getEntriesByType('resource').map((entry) => entry.name)]
-  registration.active?.postMessage({ type: 'keep', urls })
 }
 
 /** The zoom pill, reading the zoom from the store, and Pages beside it. */
