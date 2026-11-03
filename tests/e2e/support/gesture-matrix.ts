@@ -272,7 +272,8 @@ async function run(page: Page, subject: Subject, gesture: string, formatId: stri
       const sizeOf = (d: Doc) => ({ ...d.nodes[subject]?.props, ...d.overrides[`format:${formatId}`]?.[subject] }.style as { fontSize: number }).fontSize
       const want = Math.round(sizeOf(doc) * factor * 10) / 10
       if (!close(sizeOf(now), want, 0.15)) problems.push(`font size ${sizeOf(now)}, not ${want}`)
-      if (!close(b.width, box.width * factor, box.width * factor * 0.04)) problems.push(`width ${b.width}, not ${box.width * factor}`)
+      // Auto width text takes the width its scaled words have; the others keep the box's shape.
+      if (subject !== 'tWide' && !close(b.width, box.width * factor, box.width * factor * 0.04)) problems.push(`width ${b.width}, not ${box.width * factor}`)
     } else if (h.w && !close(b.width, wantW, 1.5)) problems.push(`width ${b.width}, not ${wantW}`)
     if (h.h && !TEXT.has(subject) && !turnBy && !close(b.height, box.height + h.h, 1.5)) problems.push(`height ${b.height}, not ${box.height + h.h}`)
     // A frame's layers keep their size; a group's or boolean's scale with it; a flow fills what it is given.

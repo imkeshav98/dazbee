@@ -212,9 +212,10 @@ test('a corner that scales text snaps one edge to a guide and keeps the shape', 
 
 test('a fixed box\'s top and bottom change its height and the size stays; a turned text scales along its own edges; Alt scales from the centre', async ({ browser }) => {
   const { page, errors } = await openStage(browser, design({
-    fixed: text('fixed', { boxMode: 'fixed', height: 120 }),
-    turned: text('turned', { y: 400, rotation: 20 }),
-    centred: text('centred', { y: 700 }),
+    // Low enough that the small menu over it leaves its top handle free.
+    fixed: text('fixed', { y: 300, boxMode: 'fixed', height: 120 }),
+    turned: text('turned', { y: 600, rotation: 20 }),
+    centred: text('centred', { y: 850 }),
   }))
   await select(page, ['fixed'])
   await dragHandle(page, 's', 0, 80)
@@ -248,7 +249,8 @@ for (const [width, height] of [[820, 1180], [390, 844]] as const) {
     // Big enough on a phone's fitted stage to show its handles.
     const { page, errors } = await openStage(browser, design({ headline: text('headline', { width: 800, style: style(96) }) }))
     await page.setViewportSize({ width, height })
-    await page.evaluate(() => window.dazbee?.fitAll())
+    // The square alone, fitted, as a phone shows one size to work on.
+    await page.evaluate(() => window.dazbee?.focus('sq'))
     await select(page, ['headline'])
     expect(await handles(page)).toEqual(['e', 'ne', 'nw', 'se', 'sw', 'w'])
     await dragHandle(page, 'se', 100, 100)
