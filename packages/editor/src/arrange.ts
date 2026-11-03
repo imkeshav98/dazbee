@@ -3,7 +3,7 @@
 // the format or the group or frame it is in.
 import type { Rect } from './grid.ts'
 
-const ALIGNMENTS = ['left', 'centre', 'right', 'top', 'middle', 'bottom'] as const
+export const ALIGNMENTS = ['left', 'centre', 'right', 'top', 'middle', 'bottom'] as const
 export type Alignment = (typeof ALIGNMENTS)[number]
 export type Distribution = 'horizontal' | 'vertical'
 
