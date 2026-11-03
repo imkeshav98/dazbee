@@ -41,7 +41,10 @@ for (const [width, height] of [[1280, 760], [390, 844]] as const) {
     const asset = await upload(photo)
     const { page, errors } = await openStage(browser, design(asset.id))
     await page.setViewportSize({ width, height })
+    // The stage takes its new size before the design is fitted to it.
+    await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))))
     await page.evaluate(() => window.dazbee?.fitAll())
+    await page.evaluate(() => window.dazbee?.drawn())
     for (const [kind, ids, panels] of PANELS) {
       await select(page, ids)
       for (const id of panels) {

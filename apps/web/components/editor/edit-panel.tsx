@@ -192,7 +192,7 @@ function Panel({ id, target, design, brandId }: { id: PanelId; target: Target; d
     >
       <div className="flex h-12 shrink-0 items-center gap-2 ps-4 pe-2">
         <h2 id="edit-panel-title" className="min-w-0 flex-1 truncate font-display text-[15px] font-bold tracking-tight">{b.panels[id]}</h2>
-        <span data-testid="edit-panel-note" className="min-w-0 max-w-[50%] truncate text-[11px] font-medium text-muted">{note}</span>
+        <span data-testid="edit-panel-note" className="min-w-0 max-w-[50%] shrink-0 truncate text-[11px] font-medium text-muted">{note}</span>
         <button type="button" aria-label={t.editor.closePanel} data-testid="edit-panel-close" onClick={() => close(true)} className="grid size-7 shrink-0 cursor-pointer place-items-center rounded-full text-subtle hover:bg-hover hover:text-text">
           <XIcon size={14} aria-hidden />
         </button>
