@@ -11,13 +11,13 @@ import * as Popover from '@radix-ui/react-popover'
 import { ArrowsHorizontalIcon, ArrowsVerticalIcon, CaretDownIcon, ImageSquareIcon, RectangleIcon } from '@phosphor-icons/react'
 import { withImage, type Editor } from '@dazbee/editor'
 import { BlendMode, BooleanOp, boundFillIndex, brandRef, ContainerBlendMode, ImageFilter, LineEnd, type Design, type Effect, type ImageAdjust, type Paint, type Shape } from '@dazbee/schema'
-import { useEffect, useState, type ReactNode } from 'react'
+import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
 import { cn } from '../../lib/cn.ts'
 import { useMessages } from '../../lib/i18n/client.tsx'
 import { format, type Messages } from '../../lib/i18n/index.ts'
 import { Select } from '../ui/select.tsx'
 import { CARD, CARD_LOWER, CardHeader, PICKED_RING, SWATCHES } from './card.tsx'
-import { CHIP, CHIP_ACCENT, DASHED_BUTTON, FIELD, FIELD_LABEL, FOCUS_RING, KNOBS, KNOBS_FOUR, LINK_BUTTON, POPOVER, SEGMENT, SEGMENTS, SWATCH, SWITCH, SWITCH_ROW, TILE, TILE_FACE, TILE_FACE_WIDE } from './styles.ts'
+import { CHIP, CHIP_ACCENT, DASHED_BUTTON, FIELD, FIELD_LABEL, FOCUS_RING, KNOBS, KNOBS_FOUR, LINK_BUTTON, PANEL_PART, POPOVER, SEGMENT, SEGMENTS, SWATCH, SWITCH, SWITCH_ROW, TILE, TILE_FACE, TILE_FACE_WIDE } from './styles.ts'
 import { COMBINE } from './arrange-panel.tsx'
 import { ImagePickerButton } from './image-tool.tsx'
 import { useBrandKit } from './use-brand-kit.ts'
@@ -63,8 +63,29 @@ export function shared<T>(values: T[]): T | 'mixed' {
   return same ? first as T : 'mixed'
 }
 
+/** Whether cards are drawn inside an edit panel or a pop-up, as parts of it under small headings, rather than as frosted cards of their own. */
+const InPanel = createContext(false)
+
+/** Draws the cards inside it as parts of the edit panel or pop-up they are in. */
+export function PanelParts({ children }: { children: ReactNode }) {
+  return <InPanel.Provider value>{children}</InPanel.Provider>
+}
+
 /** A card of the selection's settings, open, as every card is: its title, an action at the end, its controls. */
 function Card({ id, title, note, action, children }: { id: string; title: string; note?: string; action?: ReactNode; children?: ReactNode }) {
+  const inPanel = useContext(InPanel)
+  if (inPanel) {
+    return (
+      <section aria-labelledby={`${id}-title`} className={PANEL_PART} data-testid={id}>
+        <div className="flex h-8 items-center gap-2">
+          <h3 id={`${id}-title`} className="min-w-0 flex-1 truncate text-[13px] font-semibold text-text">{title}</h3>
+          {note && <span className="min-w-0 max-w-[60%] truncate text-[11px] font-medium text-muted">{note}</span>}
+          {action}
+        </div>
+        {children}
+      </section>
+    )
+  }
   return (
     <section aria-labelledby={`${id}-title`} className={CARD} data-testid={id}>
       <CardHeader id={`${id}-title`} title={title} note={note}>{action}</CardHeader>
@@ -79,7 +100,7 @@ const num = (props: Props, key: string) => props[key] as number
  * The first card for every selection: the layer's name (or how many layers), the sizes a change goes
  * to, and its box on one line, the turn under it.
  */
-function HeaderCard({ target, p, scope, children }: { target: Target; p: P; scope: ReactNode; children?: ReactNode }) {
+function HeaderCard({ target, p, scope, title: named, children }: { target: Target; p: P; scope: ReactNode; title?: string; children?: ReactNode }) {
   const fields = [
     { key: 'x', label: p.x, name: p.xName },
     { key: 'y', label: p.y, name: p.yName },
@@ -88,7 +109,7 @@ function HeaderCard({ target, p, scope, children }: { target: Target; p: P; scop
   ] as const
   // A group's box follows what it holds; its size and turn come from them.
   const sized = target.types.every((type) => type !== 'group' && type !== 'boolean')
-  const title = target.ids.length > 1 ? format(p.layers, { n: target.ids.length }) : target.names[0] || p.layer
+  const title = named ?? (target.ids.length > 1 ? format(p.layers, { n: target.ids.length }) : target.names[0] || p.layer)
   return (
     <Card id="layout-card" title={title} action={scope}>
       <div className={sized ? KNOBS_FOUR : KNOBS}>
@@ -637,52 +658,44 @@ function Segments<T extends string>({ name, value, options, labels, marks, onSet
 /** How each case shows on its button: the same letters in every language, as a font sample is. */
 const CASE_MARKS = { none: 'Ab', upper: 'AB', lower: 'ab', title: 'Aa' }
 
-/** The bar's align popover for text: alignment, up and down in the box, case, lists, underline and strikethrough. */
+/** The text's alignment, as the top bar's Align pop-up shows it: along the line, and up and down in the box. */
 export function TextAlignBody({ target, p }: { target: Target; p: P }) {
   const t = useMessages()
-  const { style, setStyle } = textStyle(target)
-  const flag = (key: string) => {
-    const on = style(key)
-    return on === 'mixed' ? 'mixed' : on === true
-  }
   return (
-    <div className="flex w-80 flex-col gap-2.5 p-1">
+    <div className="flex w-72 flex-col gap-2.5 p-1">
       <Segments name={p.textAlign} value={shared(target.props.map((pr) => (pr.align ?? 'start') as 'start' | 'center' | 'end' | 'justify'))} options={['start', 'center', 'end', 'justify'] as const} labels={p.textAligns} onSet={(align) => set(target, () => ({ align }))} />
       <Segments name={t.editor.bar.upDown} value={shared(target.props.map((pr) => (pr.verticalAlign ?? 'top') as 'top' | 'middle' | 'bottom'))} options={['top', 'middle', 'bottom'] as const} labels={p.verticalAligns} onSet={(verticalAlign) => set(target, () => ({ verticalAlign }))} />
-      <Segments name={p.textCase} value={(style('textCase') ?? 'none') as 'none' | 'upper' | 'lower' | 'title' | 'mixed'} options={['none', 'upper', 'lower', 'title'] as const} labels={p.textCases} marks={CASE_MARKS} onSet={(v) => setStyle('textCase', v)} />
-      <Segments name={p.list} value={shared(target.props.map((pr) => (pr.list ?? 'none') as 'none' | 'bullet' | 'number'))} options={['none', 'bullet', 'number'] as const} labels={p.lists} onSet={(list) => set(target, () => ({ list: list === 'none' ? undefined : list }))} />
-      <Toggles
-        items={[
-          { name: p.underline, label: 'U', on: flag('underline'), onSet: (on) => setStyle('underline', on) },
-          { name: p.strikethrough, label: 'S', on: flag('strikethrough'), onSet: (on) => setStyle('strikethrough', on) },
-        ]}
-      />
     </div>
   )
 }
 
-type Toggle = { name: string; label: string; on: boolean | 'mixed'; onSet: (on: boolean) => void }
-
-/** Buttons that each turn something on or off, such as underline; pressed while it is on. */
-function Toggles({ items }: { items: Toggle[] }) {
+/** The text's list, as the top bar's List pop-up shows it: none, bullets or numbers. */
+export function TextListBody({ target, p }: { target: Target; p: P }) {
   return (
-    <div className="flex gap-1">
-      {items.map((item) => (
-        <button
-          key={item.name}
-          type="button"
-          aria-label={item.name}
-          title={item.name}
-          aria-pressed={item.on === 'mixed' ? 'mixed' : item.on}
-          onClick={() => item.onSet(item.on !== true)}
-          className="h-7 min-w-8 cursor-pointer rounded-row border border-line px-2 text-[12px] text-muted hover:bg-hover aria-pressed:border-accent aria-pressed:bg-accent-soft aria-pressed:text-accent-text"
-        >
-          {item.label}
-        </button>
-      ))}
+    <div className="flex w-64 flex-col p-1">
+      <Segments name={p.list} value={shared(target.props.map((pr) => (pr.list ?? 'none') as 'none' | 'bullet' | 'number'))} options={['none', 'bullet', 'number'] as const} labels={p.lists} onSet={(list) => set(target, () => ({ list: list === 'none' ? undefined : list }))} />
     </div>
   )
 }
+
+/** The text's case, as the top bar's aA pop-up shows it. */
+export function TextCaseBody({ target, p }: { target: Target; p: P }) {
+  const { style, setStyle } = textStyle(target)
+  return (
+    <div className="flex w-56 flex-col p-1">
+      <Segments name={p.textCase} value={(style('textCase') ?? 'none') as 'none' | 'upper' | 'lower' | 'title' | 'mixed'} options={['none', 'upper', 'lower', 'title'] as const} labels={p.textCases} marks={CASE_MARKS} onSet={(v) => setStyle('textCase', v)} />
+    </div>
+  )
+}
+
+/** Whether every selected text (or the selected run) has a style flag on, such as underline, or some do. */
+export function textFlag(target: Target, key: 'underline' | 'strikethrough'): boolean | 'mixed' {
+  const on = textStyle(target).style(key)
+  return on === 'mixed' ? 'mixed' : on === true
+}
+
+/** Turns a style flag on or off for the selected text, or the selected run while editing. */
+export const setTextFlag = (target: Target, key: 'underline' | 'strikethrough', on: boolean) => textStyle(target).setStyle(key, on)
 
 /** How each box mode's tile draws it: growing along a line, growing down, or held. */
 const BOX_ICONS = {
@@ -877,9 +890,9 @@ function PhotosCard({ target, p, brandId, index, paint }: { target: Target; p: P
  * The fills, + in the header, then the strokes under an Outline heading with their own +: for a
  * photo, whose bar holds the photo's own actions, and for several layers.
  */
-function ColourCard({ target, brandId, p, b, swatches }: { target: Target; brandId: string; p: P; b: Messages['editor']['bar']; swatches: boolean }) {
+function ColourCard({ target, brandId, p, b, swatches, strokes = true }: { target: Target; brandId: string; p: P; b: Messages['editor']['bar']; swatches: boolean; strokes?: boolean }) {
   const { add } = useList<Paint>(target, 'fills', NEW_FILL, FILL_ON_TOP, true)
-  const stroked = target.types.every((type) => type === 'graphic' || type === 'frame' || type === 'boolean')
+  const stroked = strokes && target.types.every((type) => type === 'graphic' || type === 'frame' || type === 'boolean')
   return (
     <Card id="fill-card" title={b.fill} action={<AddButton label={format(p.add, { name: p.fill.toLowerCase() })} onClick={add} />}>
       <FillBody target={target} brandId={brandId} p={p} swatches={swatches} header={false} />
@@ -1341,17 +1354,17 @@ export function EffectsBody({ target, p }: { target: Target; p: P }) {
  * Where changes go when a design has more than one size: a chip in the header card naming them, which
  * opens to choose all sizes or only this one, and to reset what this size has of its own.
  */
-function ScopeMenu({ everyFormat, onChange, size, p, children }: { everyFormat: boolean; onChange: (every: boolean) => void; size: string; p: P; children?: ReactNode }) {
+function ScopeMenu({ everyFormat, onChange, size, p, open, onOpen, children }: { everyFormat: boolean; onChange: (every: boolean) => void; size: string; p: P; open: boolean; onOpen: (open: boolean) => void; children?: ReactNode }) {
   return (
-    <Popover.Root>
+    <Popover.Root open={open} onOpenChange={onOpen}>
       <Popover.Trigger asChild>
-        <button type="button" data-testid="scope-chip" className={cn(CHIP_ACCENT, 'shrink-0', FOCUS_RING)}>
+        <button type="button" data-bar-item data-testid="scope-chip" className={cn(CHIP_ACCENT, 'shrink-0', FOCUS_RING)}>
           {everyFormat ? p.forAllSizes : format(p.onlySize, { size })}
           <CaretDownIcon size={10} weight="bold" aria-hidden />
         </button>
       </Popover.Trigger>
       <Popover.Portal>
-        <Popover.Content side="bottom" align="end" sideOffset={6} collisionPadding={12} aria-label={p.applyTo} data-testid="scope-menu" className={cn(POPOVER, 'flex w-64 flex-col gap-2.5 p-2.5')}>
+        <Popover.Content side="bottom" align="start" sideOffset={8} collisionPadding={12} aria-label={p.applyTo} data-testid="scope-menu" className={cn(POPOVER, 'flex w-64 flex-col gap-2.5 p-2.5')}>
           <div role="radiogroup" aria-label={p.applyTo} className={SEGMENTS}>
             {([true, false] as const).map((every) => (
               <button key={String(every)} type="button" role="radio" aria-checked={everyFormat === every} onClick={() => onChange(every)} className={SEGMENT}>
@@ -1363,16 +1376,6 @@ function ScopeMenu({ everyFormat, onChange, size, p, children }: { everyFormat: 
         </Popover.Content>
       </Popover.Portal>
     </Popover.Root>
-  )
-}
-
-/** The effects of several layers, which have no bar of their own for them. */
-function EffectsCard({ target, p }: { target: Target; p: P }) {
-  return (
-    <section aria-labelledby="effects-card-title" className={CARD} data-testid="effects-card">
-      <CardHeader id="effects-card-title" title={p.effects} />
-      <EffectsBody target={target} p={p} />
-    </section>
   )
 }
 
@@ -1412,66 +1415,144 @@ export function useTarget(editor: Editor, ids: string[]): { target: Target; desi
   }
 }
 
-/**
- * The selection's cards, after the font: the header card first (Arrange before it for several
- * layers, as the mock's "3 selected"), then the look, the rest open, and See-through last.
- */
-export function SelectionCards({ editor, brandId, ids }: { editor: Editor; brandId: string; ids: string[] }) {
-  const t = useMessages()
-  const p = t.editor.props
-  const everyFormat = useEveryFormat()
-  // Once nothing is selected, changes go to the format shown again.
-  useEffect(() => () => setEveryFormat(false), [])
-  const selected = useTarget(editor, ids)
-  if (!selected) return null
-  const { target, design } = selected
-  const { ids: live, types, formatId } = target
-  const all = (...kinds: string[]) => types.every((type) => kinds.includes(type))
-  const several = live.length > 1
-  const shapeKinds = new Set(live.map((id) => {
+/** Which top bar a selection gets: the kind every one of its layers is, or mixed. */
+export type Kind = 'text' | 'photo' | 'shape' | 'box' | 'group' | 'mixed'
+
+export function kindOf(target: Target): Kind {
+  const all = (...kinds: string[]) => target.types.every((type) => kinds.includes(type))
+  if (all('text')) return 'text'
+  if (all('graphic', 'frame', 'boolean') && imageFillOf(target)) return 'photo'
+  if (all('graphic', 'boolean')) return 'shape'
+  if (all('frame')) return 'box'
+  if (all('group', 'instance', 'lottie')) return 'group'
+  return 'mixed'
+}
+
+/** What the top bar and its panels need to know of the selected layers beyond their kind. */
+export function factsOf(target: Target, design: Design) {
+  const shapeKinds = new Set(target.ids.map((id) => {
     const node = design.nodes[id]
     return node?.type === 'graphic' ? node.props.shape.kind : null
   }))
   const [shapeKind] = shapeKinds
+  const ownShape: ShapeKind | null = shapeKinds.size === 1 && (shapeKind === 'rect' || shapeKind === 'polygon' || shapeKind === 'star' || shapeKind === 'line') ? shapeKind : null
   // Children of an auto layout frame, every one of them.
-  const inFlow = live.every((id) => {
+  const inFlow = target.ids.every((id) => {
     const parent = design.nodes[design.nodes[id]?.parentId ?? '']
     return parent?.type === 'frame' && parent.props.layout !== undefined
   })
-  const imageFill = imageFillOf(target)
-  const ownShape = shapeKinds.size === 1 && (shapeKind === 'rect' || shapeKind === 'polygon' || shapeKind === 'star' || shapeKind === 'line') ? shapeKind : null
-  const scope = Object.keys(design.formats).length > 1 && (
-    <ScopeMenu everyFormat={everyFormat} onChange={setEveryFormat} size={design.formats[formatId]?.name ?? ''} p={p}>
-      <OwnChanges design={design} ids={live} formatId={formatId} editor={editor} p={p} />
+  return {
+    ownShape,
+    inFlow,
+    lines: ownShape === 'line',
+    booleans: target.types.every((type) => type === 'boolean'),
+    frames: target.types.every((type) => type === 'frame'),
+    masks: target.props.every((pr) => Boolean(pr.mask)),
+    sized: target.types.every((type) => type !== 'group' && type !== 'boolean'),
+  }
+}
+
+/**
+ * The scope chip, the top bar's first item when the design has more than one format: which formats
+ * a change goes to, and the own changes of the one shown, each with Reset.
+ */
+export function ScopeChip({ target, design, open, onOpen }: { target: Target; design: Design; open: boolean; onOpen: (open: boolean) => void }) {
+  const p = useMessages().editor.props
+  const everyFormat = useEveryFormat()
+  if (Object.keys(design.formats).length < 2) return null
+  return (
+    <ScopeMenu everyFormat={everyFormat} onChange={setEveryFormat} size={design.formats[target.formatId]?.name ?? ''} p={p} open={open} onOpen={onOpen}>
+      <OwnChanges design={design} ids={target.ids} formatId={target.formatId} editor={target.editor} p={p} />
     </ScopeMenu>
   )
-  return (
-    <>
-      <HeaderCard target={target} p={p} scope={scope}>
-        {imageFill && <FitRow target={target} p={p} index={imageFill.index} paint={imageFill.paint} />}
-      </HeaderCard>
-      {/* One layer's look, outline and effects are in the bar; the panel keeps their numbers. A photo's
-          fills and strokes, and several layers' look, outline and effects, are cards here. */}
-      {imageFill
-        ? (
+}
+
+/**
+ * What an edit panel holds for the selection, the cards it had moved in as they are: Colour,
+ * Outline, Effects, Position, Spacing, Edit image and Stack. Font is the font panel's own.
+ */
+export function PanelContent({ panel, target, design, brandId }: { panel: string; target: Target; design: Design; brandId: string }) {
+  const t = useMessages()
+  const p = t.editor.props
+  const kind = kindOf(target)
+  const facts = factsOf(target, design)
+  const several = target.ids.length > 1
+  const imageFill = imageFillOf(target)
+  const body = (() => {
+    switch (panel) {
+      case 'colour':
+        if (kind === 'text') return <TextColourBody target={target} brandId={brandId} p={p} />
+        return several
+          ? <ColourCard target={target} brandId={brandId} p={p} b={t.editor.bar} swatches strokes={false} />
+          : <FillBody target={target} brandId={brandId} p={p} swatches={!facts.lines} />
+      case 'outline':
+        return <OutlineBody target={target} brandId={brandId} p={p} />
+      case 'effects':
+        return <EffectsBody target={target} p={p} />
+      case 'position':
+        return (
           <>
-            {several && <PhotosCard target={target} p={p} brandId={brandId} index={imageFill.index} paint={imageFill.paint} />}
-            <AdjustCard target={target} p={p} index={imageFill.index} paint={imageFill.paint} />
-            <ColourCard target={target} brandId={brandId} p={p} b={t.editor.bar} swatches={false} />
+            <HeaderCard target={target} p={p} scope={null} title={t.editor.bar.position} />
+            {facts.sized && <RotationField target={target} p={p} />}
+            {facts.inFlow && <FlowCard target={target} p={p} />}
           </>
         )
-        : all('graphic', 'frame', 'boolean') && (several
-          ? <ColourCard target={target} brandId={brandId} p={p} b={t.editor.bar} swatches />
-          : ownShape && <ShapeCard target={target} p={p} kind={ownShape} />)}
-      {several && !all('text') && <EffectsCard target={target} p={p} />}
-      {all('boolean') && <CombineCard target={target} p={p} a={t.editor.arrange} />}
-      {target.props.every((pr) => pr.mask) && <MaskCard target={target} p={p} />}
-      {all('text') && <TextBoxCard target={target} p={p} />}
-      {all('text') && <SpacingCard target={target} p={p} />}
-      {all('frame') && <FrameCard target={target} p={p} />}
-      {all('frame') && <AutoLayoutCard target={target} p={p} ownSizing={!inFlow} />}
-      {inFlow && <FlowCard target={target} p={p} />}
-      <SeeThroughCard target={target} p={p} />
-    </>
-  )
+      case 'spacing':
+        return (
+          <>
+            <SpacingCard target={target} p={p} />
+            <TextBoxCard target={target} p={p} />
+          </>
+        )
+      case 'edit':
+        if (!imageFill) return null
+        return (
+          <>
+            {several
+              ? <PhotosCard target={target} p={p} brandId={brandId} index={imageFill.index} paint={imageFill.paint} />
+              : <Card id="look-card" title={t.editor.bar.look}><PhotoLookBody target={target} p={p} brandId={brandId} index={imageFill.index} paint={imageFill.paint} /></Card>}
+            <Card id="fit-card" title={p.fit}><FitRow target={target} p={p} index={imageFill.index} paint={imageFill.paint} /></Card>
+            <AdjustCard target={target} p={p} index={imageFill.index} paint={imageFill.paint} />
+            <ColourCard target={target} brandId={brandId} p={p} b={t.editor.bar} swatches={false} strokes={false} />
+          </>
+        )
+      case 'stack':
+        return <AutoLayoutCard target={target} p={p} ownSizing={!facts.inFlow} />
+      default:
+        return null
+    }
+  })()
+  return <PanelParts>{body}</PanelParts>
+}
+
+/** What a top bar pop-up holds for the selection: the short cards and choices moved in as they are. */
+export function PopupContent({ popup, target, design }: { popup: string; target: Target; design: Design }) {
+  const t = useMessages()
+  const p = t.editor.props
+  const facts = factsOf(target, design)
+  const body = (() => {
+    switch (popup) {
+      case 'transparency':
+        return <SeeThroughCard target={target} p={p} />
+      case 'shape':
+        return facts.ownShape && <ShapeCard target={target} p={p} kind={facts.ownShape} />
+      case 'corners':
+        return facts.frames ? <FrameCard target={target} p={p} /> : facts.ownShape === 'rect' && <ShapeCard target={target} p={p} kind="rect" />
+      case 'box':
+        return <FrameCard target={target} p={p} />
+      case 'combine':
+        return <CombineCard target={target} p={p} a={t.editor.arrange} />
+      case 'mask':
+        return <MaskCard target={target} p={p} />
+      case 'align':
+        return <TextAlignBody target={target} p={p} />
+      case 'list':
+        return <TextListBody target={target} p={p} />
+      case 'case':
+        return <TextCaseBody target={target} p={p} />
+      default:
+        return null
+    }
+  })()
+  return <PanelParts>{body}</PanelParts>
 }

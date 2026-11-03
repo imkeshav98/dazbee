@@ -167,6 +167,15 @@ export function openSession(doc: DesignDoc) {
     undo: () => stepThen(undoManager.undoStack, () => undoManager.undo()),
     redo: () => stepThen(undoManager.redoStack, () => undoManager.redo()),
     canUndo: () => undoManager.canUndo(),
+    canRedo: () => undoManager.canRedo(),
+    /** Calls back whenever a step is added to, taken from or merged into the undo or redo stack. */
+    onHistory(listener: () => void) {
+      const events = ['stack-item-added', 'stack-item-popped', 'stack-item-updated', 'stack-cleared'] as const
+      for (const event of events) undoManager.on(event, listener)
+      return () => {
+        for (const event of events) undoManager.off(event, listener)
+      }
+    },
     /**
      * The design, validated. It is live: it always shows the document as it is now, and can't be
      * changed through. Its layers and override values are frozen and replaced when they change.

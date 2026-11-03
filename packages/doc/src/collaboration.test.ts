@@ -40,6 +40,40 @@ describe('changes no one undoes', () => {
   })
 })
 
+describe('what undo and redo can do', () => {
+  it('says whether there is a step to undo or redo, and calls back each time that may change', () => {
+    const result = parseDesign(testDesign())
+    if (!result.success) throw new Error(result.errors.join('\n'))
+    const session = openSession(loadDesign(result.design))
+    const [id] = Object.keys(session.design().nodes)
+    if (!id) throw new Error('no layer')
+    let calls = 0
+    const stop = session.onHistory(() => calls++)
+    expect([session.canUndo(), session.canRedo()]).toEqual([false, false])
+    session.run('node.update', { ids: [id], patch: { x: 11 } })
+    expect([session.canUndo(), session.canRedo(), calls > 0]).toEqual([true, false, true])
+    calls = 0
+    session.undo()
+    expect([session.canUndo(), session.canRedo(), calls > 0]).toEqual([false, true, true])
+    calls = 0
+    session.redo()
+    expect([session.canUndo(), session.canRedo(), calls > 0]).toEqual([true, false, true])
+    stop()
+    calls = 0
+    session.undo()
+    expect(calls).toBe(0)
+  })
+
+  it('a change from another tab gives this tab nothing to undo', () => {
+    const { tabA, tabB, sync } = twoTabs()
+    const [id] = Object.keys(tabB.design().nodes)
+    if (!id) throw new Error('no layer')
+    tabB.run('node.update', { ids: [id], patch: { x: 5 } })
+    sync()
+    expect([tabA.canUndo(), tabA.canRedo()]).toEqual([false, false])
+  })
+})
+
 describe('two tabs', () => {
   it('undo in one tab reverts only its own edits, never the other tab’s', () => {
     const { a, b, tabA, tabB, sync } = twoTabs()

@@ -22,6 +22,7 @@ import { BrandMark } from '../brand-mark.tsx'
 import { useOverlayScroll } from '../ui/overlay-scroll.ts'
 import { Tooltip } from '../ui/tooltip.tsx'
 import { ImageTool } from './image-tool.tsx'
+import { isPanel, setFlyoutEnd, setOpen, useEditState } from './edit-store.ts'
 import { ShapeTools } from './shape-menu.tsx'
 import { dockTool } from './styles.ts'
 
@@ -230,7 +231,7 @@ function DesignName({ name, onRename }: { name: string; onRename?: ((name: strin
   )
 }
 
-export function EditorShell({ brandId, brandName, designName, onRename, status, tool: shownTool, shape = 'rect', onToolChange, image, onInsets, fitted = true, inspector, actions, account, panels, children }: {
+export function EditorShell({ brandId, brandName, designName, onRename, status, history, tool: shownTool, shape = 'rect', onToolChange, image, onInsets, fitted = true, inspector, actions, account, panels, children }: {
   brandId: string
   brandName: string
   designName: string
@@ -238,6 +239,8 @@ export function EditorShell({ brandId, brandName, designName, onRename, status, 
   onRename?: (name: string) => Promise<void>
   /** The editor's save state, or what it is doing before it opens. */
   status: ValueStore<string>
+  /** Undo and redo, after the save state in the header pill. */
+  history?: ReactNode
   /** The tool in use, when the editor decides it (a key, or drawing a shape ends); the dock keeps its own otherwise. */
   tool?: Tool
   /** The shape the shape tool draws (#44). */
@@ -274,6 +277,38 @@ export function EditorShell({ brandId, brandName, designName, onRename, status, 
   const panelEmpty = { layers: t.editor.layersEmpty, assets: t.editor.assetsEmpty, ai: t.editor.aiEmpty, brand: t.editor.brandEmpty }
   const flyout = panel === 'properties' ? null : panel
   const hasCards = Boolean(inspector)
+  // What the top bar has open: on a phone an edit panel is a sheet, which hides the tab bar and the
+  // dock, and a sheet and a rail flyout close each other.
+  const edit = useEditState()
+  const sheet = phone && isPanel(edit.open)
+  useEffect(() => {
+    if (sheet) setPanel((now) => (now === null ? now : null))
+  }, [sheet])
+  // With something selected the top bar holds its settings, so the phones' cards sheet has nothing to show.
+  useEffect(() => {
+    if (edit.bar) setPanel((now) => (now === 'properties' ? null : now))
+  }, [edit.bar])
+  const flyoutEl = useRef<HTMLElement>(null)
+  useLayoutEffect(() => {
+    const el = flyoutEl.current
+    if (!flyout || phone || !el || !stage.current) {
+      setFlyoutEnd(null)
+      return
+    }
+    const measure = () => {
+      const box = el.getBoundingClientRect()
+      const area = stage.current?.getBoundingClientRect()
+      if (!area) return
+      setFlyoutEnd(Math.round(rtl ? area.right - box.left : box.right - area.left))
+    }
+    measure()
+    const watch = new ResizeObserver(measure)
+    watch.observe(el)
+    return () => {
+      watch.disconnect()
+      setFlyoutEnd(null)
+    }
+  }, [flyout, phone, rtl])
 
   const stage = useRef<HTMLElement>(null)
   const startIsland = useRef<HTMLDivElement>(null)
@@ -282,6 +317,7 @@ export function EditorShell({ brandId, brandName, designName, onRename, status, 
   const cards = useRef<HTMLElement>(null)
   const cardsRef = useOverlayScroll(cards)
   const dock = useRef<HTMLDivElement>(null)
+  const barRow = useRef<HTMLDivElement>(null)
   const reported = useRef('')
   const report = useRef(onInsets)
   report.current = onInsets
@@ -291,7 +327,8 @@ export function EditorShell({ brandId, brandName, designName, onRename, status, 
       const box = stage.current.getBoundingClientRect()
       // On a phone the zoom pill sits under the end island, so the ads start below it.
       const zoom = box.width < 640 ? stage.current.querySelector('[data-zoom]') : null
-      const insets = measureInsets(box, [startIsland.current, endIsland.current, zoom], [rail.current, cards.current, dock.current])
+      // The top bar's row is kept clear whether or not the bar shows, so selecting never covers the design.
+      const insets = measureInsets(box, [startIsland.current, endIsland.current, zoom, barRow.current], [rail.current, cards.current, dock.current])
       const key = JSON.stringify([insets, hasCards])
       if (key === reported.current) return
       reported.current = key
@@ -323,6 +360,7 @@ export function EditorShell({ brandId, brandName, designName, onRename, status, 
                 <DesignName name={designName} onRename={onRename} />
               </nav>
               <SaveStatus status={status} fitted={fitted} />
+              {history}
             </div>
             <div ref={endIsland} data-testid="island-end" className="pointer-events-auto flex shrink-0 items-center gap-2">
               {actions}
@@ -338,6 +376,7 @@ export function EditorShell({ brandId, brandName, designName, onRename, status, 
                 'absolute z-20 flex gap-2 overflow-hidden rounded-full surface-frost p-2',
                 // A vertical capsule at the start edge; on phones a tab bar floating at the bottom.
                 'start-5 top-1/2 -translate-y-1/2 flex-col sm:p-2.5 max-sm:start-1/2 max-sm:top-auto max-sm:bottom-3 max-sm:translate-y-0 max-sm:flex-row max-sm:-translate-x-1/2 max-sm:rtl:translate-x-1/2',
+                sheet && 'max-sm:hidden',
               )}
             >
               {PANELS.map(({ id, icon: PanelIcon, phone: phoneOnly }) => {
@@ -351,10 +390,14 @@ export function EditorShell({ brandId, brandName, designName, onRename, status, 
                       aria-expanded={open}
                       aria-controls={id === 'properties' ? 'editor-cards' : 'editor-flyout'}
                       data-panel={id}
-                      onClick={() => setPanel(open ? null : id)}
+                      onClick={() => {
+                        setPanel(open ? null : id)
+                        if (phone && !open) setOpen(null)
+                      }}
                       className={cn(
                         'relative grid size-11 sm:size-13 cursor-pointer place-items-center rounded-full transition-colors duration-[var(--chrome-fast)]',
                         phoneOnly && 'sm:hidden',
+                        phoneOnly && edit.bar && 'hidden',
                         open ? 'text-on-accent' : 'text-subtle hover:bg-hover hover:text-text',
                         ai && !open && 'text-accent-text',
                       )}
@@ -383,6 +426,7 @@ export function EditorShell({ brandId, brandName, designName, onRename, status, 
             <AnimatePresence>
               {flyout && (
                 <motion.section
+                  ref={flyoutEl}
                   key={flyout}
                   id="editor-flyout"
                   aria-label={panelTitle(flyout)}
@@ -391,7 +435,7 @@ export function EditorShell({ brandId, brandName, designName, onRename, status, 
                   exit={{ opacity: 0, x: rtl ? 12 : -12 }}
                   transition={chrome}
                   data-testid="flyout"
-                  className="absolute start-[7.25rem] top-20 z-10 flex max-h-[calc(100%-5.75rem)] w-[21.5rem] flex-col overflow-hidden rounded-[16px] surface-frost max-sm:inset-x-3 max-sm:start-3 max-sm:top-auto max-sm:bottom-[9rem] max-sm:w-auto"
+                  className="absolute start-[7.25rem] top-20 z-10 flex max-h-[calc(100%-5.75rem)] w-[21.5rem] flex-col overflow-hidden rounded-[16px] surface-frost max-sm:inset-x-3 max-sm:start-3 max-sm:top-auto max-sm:bottom-[9rem] max-sm:max-h-[calc(100%-9rem-7.5rem)] max-sm:w-auto"
                 >
                   {/* The title at the start and, as in the mock, a small grey note at the end: the brand, or the page and format. */}
                   <div className="flex h-14 shrink-0 items-center gap-2 ps-[18px] pe-2">
@@ -410,9 +454,10 @@ export function EditorShell({ brandId, brandName, designName, onRename, status, 
               )}
             </AnimatePresence>
 
-            <main ref={stage} className="canvas-dots relative min-w-0 flex-1 overflow-hidden">
+            <main ref={stage} data-bar={edit.bar ? '' : undefined} className="group/stage canvas-dots relative min-w-0 flex-1 overflow-hidden">
+              <div ref={barRow} aria-hidden data-bar-row className="pointer-events-none invisible absolute inset-x-0 top-[90px] h-[38px] max-sm:top-[72px]" />
               {children}
-              <div ref={dock} role="toolbar" aria-label={t.editor.tools} className={cn('absolute inset-x-0 bottom-4 z-10 mx-auto flex w-max max-sm:bottom-[5.25rem] items-center gap-1 rounded-[18px] surface-frost p-1.5', panel === 'properties' && 'max-sm:hidden')}>
+              <div ref={dock} role="toolbar" aria-label={t.editor.tools} data-dock className={cn('absolute inset-x-0 bottom-4 z-10 mx-auto flex w-max max-sm:bottom-[5.25rem] items-center gap-1 rounded-[18px] surface-frost p-1.5', (panel === 'properties' || sheet) && 'max-sm:hidden')}>
                 {TOOLS.map(({ id, icon: ToolIcon, key }) => {
                   if (id === 'shape') {
                     return (

@@ -51,7 +51,7 @@ export function ZoomControl({ zoom, editor }: { zoom: number | null; editor: Edi
     { label: t.editor.view.snap, on: view.snapping, flip: () => editor?.setSnapping(!view.snapping) },
   ] satisfies { label: string; key?: string; on: boolean; flip: () => void }[]
   return (
-    <div role="group" aria-label={t.editor.zoom} data-zoom className="absolute end-4 bottom-4 z-10 flex max-sm:top-20 max-sm:bottom-auto items-center gap-0.5 rounded-card surface-frost p-1">
+    <div role="group" aria-label={t.editor.zoom} data-zoom className="absolute end-4 bottom-4 z-10 flex max-sm:top-20 max-sm:bottom-auto max-sm:group-data-[bar]/stage:hidden items-center gap-0.5 rounded-card surface-frost p-1">
       <Tooltip label={`${t.editor.zoomOut} · ${t.editor.zoomOutKey}`}>
         <button type="button" aria-label={t.editor.zoomOut} disabled={off} onClick={() => editor?.zoomOut()} className={BUTTON}>
           <MinusIcon size={16} aria-hidden />
