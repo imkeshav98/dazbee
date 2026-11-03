@@ -442,7 +442,6 @@ function ShapeCard({ target, p, kind }: { target: Target; p: P; kind: ShapeKind 
   )
 }
 
-/** A list of paints, strokes or effects that every selected layer has the same of, or a way to make it so. */
 /** A list of fills or strokes: the rows the selected layers share, and adding one on top. */
 function useList<T>(target: Target, field: string, fresh: T, onTop: T, topFirst: boolean) {
   const list = shared(target.props.map((pr) => (pr[field] ?? []) as T[]))
@@ -1033,23 +1032,6 @@ function SpacingCard({ target, p }: { target: Target; p: P }) {
         />
       </div>
     </Card>
-  )
-}
-
-/** The bar's size popover for text: the size, any size from 1 up. */
-export function TextSizeField({ target, p }: { target: Target; p: P }) {
-  const { style, setStyle, shiftStyle } = textStyle(target)
-  return (
-    <NumberField
-      label={p.fontSize}
-      name={p.fontSize}
-      value={style('fontSize') as number | 'mixed'}
-      min={1}
-      max={LIMITS.fontSize}
-      editor={target.editor}
-      onSet={(v) => setStyle('fontSize', v)}
-      onShift={(by) => shiftStyle('fontSize', by, 1, 0, LIMITS.fontSize)}
-    />
   )
 }
 

@@ -88,8 +88,6 @@ export const SWITCH =
 export const TILE = `group flex min-w-0 cursor-pointer flex-col items-center gap-1 text-[11px] font-semibold text-muted aria-pressed:text-text aria-checked:text-text ${FOCUS_RING}`
 const TILE_FACE_BASE =
   'grid w-full place-items-center overflow-hidden rounded-[10px] border border-line bg-bg/60 transition-colors duration-[var(--chrome-fast)] group-hover:border-line-strong group-aria-pressed:border-accent group-aria-pressed:ring-1 group-aria-pressed:ring-accent group-aria-checked:border-accent group-aria-checked:ring-1 group-aria-checked:ring-accent'
-/** The picture of a TILE, square. */
-export const TILE_FACE = `${TILE_FACE_BASE} aspect-square`
 /** The picture of a TILE, wider than tall. */
 export const TILE_FACE_WIDE = `${TILE_FACE_BASE} aspect-[3/2]`
 /** A row that turns something on or off, with role="switch": its words, then the switch. */
@@ -112,8 +110,6 @@ export const BAR_ROW_HEIGHT = 'h-[38px]'
 export const BAR_BUTTON = `flex h-[30px] min-w-[30px] shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-row px-2 text-[12px] font-semibold whitespace-nowrap text-text transition-colors duration-[var(--chrome-fast)] hover:bg-hover aria-expanded:bg-hover ${FOCUS_RING}`
 /** A button of the bar that turns something on or off, such as bold: lit while it is on. */
 export const BAR_TOGGLE = `${BAR_BUTTON} aria-pressed:bg-accent-soft aria-pressed:text-accent-text ${DISABLED}`
-/** The body of a bar popover that holds a list, such as the fills or the strokes. */
-export const BAR_PANEL = 'flex w-80 flex-col gap-3 p-1.5'
 /** The swatch a bar button shows for a colour the selected layers don't share. */
 export const MIXED_COLOUR = 'conic-gradient(red, yellow, lime, aqua, blue, magenta, red)'
 /** The upright hairline between the bar's groups of buttons. */
