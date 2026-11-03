@@ -3,7 +3,7 @@
 // from a template makes one, so the two never collide when layers are copied between them.
 import { nanoid } from 'nanoid'
 
-import type { Design } from '@dazbee/schema'
+import { type Design, formatIdOf, formatScope } from '@dazbee/schema'
 
 export function withFreshIds(design: Design, newId: () => string = nanoid): Design {
   const fresh = (ids: string[]) => new Map(ids.map((id) => [id, newId()]))
@@ -24,8 +24,8 @@ export function withFreshIds(design: Design, newId: () => string = nanoid): Desi
     })),
     overrides: Object.fromEntries(
       Object.entries(design.overrides).map(([scope, byNode]) => {
-        const formatId = /^format:(.+)$/.exec(scope)?.[1]
-        return [formatId ? `format:${to(formats, formatId)}` : scope, rekey(byNode, nodes)]
+        const formatId = formatIdOf(scope)
+        return [formatId ? formatScope(to(formats, formatId)) : scope, rekey(byNode, nodes)]
       }),
     ),
   }

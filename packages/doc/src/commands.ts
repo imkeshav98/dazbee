@@ -4,6 +4,7 @@ import * as Y from 'yjs'
 import { z } from 'zod'
 
 import {
+  AnyScope,
   BINDING_TARGETS,
   BooleanOp,
   boundFillIndex,
@@ -14,7 +15,9 @@ import {
   Format,
   FormatId,
   formatIdOf,
+  formatScope,
   formatSizeProblem,
+  inOrder,
   Layer,
   type Layer as LayerT,
   LAYER_PROPS,
@@ -28,7 +31,7 @@ import {
   parseLayer,
   parseOverrideValues,
   RunStyle,
-  Scope as FormatScope,
+  Scope,
   VariableRef,
 } from '@dazbee/schema'
 
@@ -37,7 +40,7 @@ import { type CommandContext, defineCommand } from './command.ts'
 import { DELETED, overrideKey, splitOverrideKey, toYMap, toYNode } from './design-doc.ts'
 import { boundsOf, centreOf, normalAngle, round, turn } from './geometry.ts'
 import { inferLayout } from './infer-layout.ts'
-import { Placement } from './placement.ts'
+import { mergedProps, Placement } from './placement.ts'
 
 /**
  * A fractional index between two neighbours that never throws. Neighbours can tie (two tabs
@@ -117,12 +120,9 @@ const nodeCreate = defineCommand({
   },
 })
 
-/** Base scope, or `format:<id>` to change one format only. */
-const Scope = z.union([z.literal('base'), FormatScope]).default('base')
-
 const nodeUpdate = defineCommand({
   name: 'node.update',
-  input: z.object({ ids: NodeId.array().min(1), scope: Scope, patch: z.record(z.string(), z.unknown()) }),
+  input: z.object({ ids: NodeId.array().min(1), scope: AnyScope, patch: z.record(z.string(), z.unknown()) }),
   check: ({ design }, { ids, scope, patch }) => {
     // Only the patched layers and their overrides are checked: nothing else changes (#29).
     if (scope !== 'base' && !design.formats[formatIdOf(scope) ?? '']) return `no format "${formatIdOf(scope) ?? scope}"`
@@ -181,7 +181,7 @@ function keepDrawnIn(r: CommandContext['r'], design: Design, id: string) {
  */
 const overrideReset = defineCommand({
   name: 'override.reset',
-  input: z.object({ ids: NodeId.array().min(1), scope: FormatScope, paths: z.string().array().min(1).optional() }),
+  input: z.object({ ids: NodeId.array().min(1), scope: Scope, paths: z.string().array().min(1).optional() }),
   check: ({ design }, { ids, scope }) => {
     if (!design.formats[formatIdOf(scope) ?? '']) return `no format "${formatIdOf(scope) ?? scope}"`
     return ids.map((id) => (design.nodes[id] ? undefined : `no layer "${id}"`)).find(Boolean)
@@ -555,11 +555,7 @@ const designPlace = defineCommand({
   },
 })
 
-const depthOf = (design: Design, id: string) => {
-  let depth = 0
-  for (let up = design.nodes[id]?.parentId; up && design.nodes[up]; up = design.nodes[up]?.parentId) depth++
-  return depth
-}
+const depthOf = (design: Design, id: string) => ancestorsOf(design, design.nodes[id]?.parentId ?? '').length
 
 /** What wrapping layers in a new group, frame or boolean checks: they exist, share a parent, and the parent can hold the wrapper. */
 function wrapProblem(ctx: CommandContext, ids: string[], id: string | undefined, type: 'group' | 'frame' | 'boolean') {
@@ -613,14 +609,10 @@ function wrap(
     }
   }
   place.write(r)
-  const keptIn = (scope: string) =>
-    inside.every(
-      ([child, node]) =>
-        (({ ...node.props, ...(scope === 'base' ? {} : design.overrides[scope]?.[child]) }) as { absolute?: boolean })
-          .absolute,
-    )
+  const keptIn = (scope: AnyScope) =>
+    inside.every(([child]) => (mergedProps(design, scope, child) as { absolute?: boolean }).absolute)
   const absolute = keptIn('base')
-  const boxIn = (scope: Parameters<Placement['get']>[0]) => boundsOf(inside.map(([child]) => place.get(scope, child)))
+  const boxIn = (scope: AnyScope) => boundsOf(inside.map(([child]) => place.get(scope, child)))
   const base = boxIn('base')
   const box = { x: round(base.x), y: round(base.y), width: round(base.width), height: round(base.height) }
   r.nodes.set(
@@ -691,7 +683,7 @@ const nodeFrame = defineCommand({
  */
 const nodeEnclose = defineCommand({
   name: 'node.enclose',
-  input: z.object({ id: NodeId, ids: NodeId.array().min(1), scope: FormatScope }),
+  input: z.object({ id: NodeId, ids: NodeId.array().min(1), scope: Scope }),
   check: ({ design }, { id, ids, scope }) => {
     const frame = design.nodes[id]
     if (!frame) return `no layer "${id}"`
@@ -708,9 +700,8 @@ const nodeEnclose = defineCommand({
   },
   apply: ({ r, design }, { id, ids, scope }) => {
     const place = new Placement(design)
-    const drawnIn = scope as `format:${string}`
-    const drawn = place.get(drawnIn, id)
-    const was = boundsOf(ids.map((layer) => place.get(drawnIn, layer)))
+    const drawn = place.get(scope, id)
+    const was = boundsOf(ids.map((layer) => place.get(scope, layer)))
     for (const other of place.scopes) {
       if (other === scope) continue
       const now = boundsOf(ids.map((layer) => place.get(other, layer)))
@@ -840,7 +831,7 @@ const nodeHug = defineCommand({
   apply: ({ r, design }, { ids }) => {
     const groups = new Set<string>()
     for (const id of ids) {
-      for (let up: string | undefined = id; up && design.nodes[up]; up = design.nodes[up]?.parentId) {
+      for (const up of ancestorsOf(design, id)) {
         const type = design.nodes[up]?.type
         if (type === 'group' || type === 'boolean') groups.add(up)
       }
@@ -889,7 +880,7 @@ const nodeReshape = defineCommand({
     dy: z.number(),
     width: z.number().min(0),
     height: z.number().min(0),
-    scope: Scope,
+    scope: AnyScope,
   }),
   check: ({ design }, { id }) => {
     const node = design.nodes[id]
@@ -907,7 +898,7 @@ const nodeReshape = defineCommand({
     const props = r.nodes.get(id)?.get('props') as Y.Map<unknown>
     props.set('shape', { ...node.props.shape, d, drawnIn: { width, height } })
     const place = new Placement(design)
-    const from = place.get(edited as (typeof place.scopes)[number], id)
+    const from = place.get(edited, id)
     // Each scope's box against the edited one's: an axis with no length there scales by 1.
     const ratio = (was: number, there: number) => (there > 0 ? was / there : 1)
     for (const scope of place.scopes) {
@@ -943,7 +934,7 @@ const nodeAutoLayout = defineCommand({
   },
   apply: ({ r, design }, { id, on }) => {
     const props = r.nodes.get(id)?.get('props') as Y.Map<unknown>
-    const scopes = Object.keys(design.formats).map((f) => `format:${f}` as const)
+    const scopes = Object.keys(design.formats).map((f) => formatScope(f))
     if (!on) {
       props.delete('layout')
       for (const scope of scopes) r.overrides.delete(overrideKey(scope, id, 'layout'))
@@ -951,7 +942,7 @@ const nodeAutoLayout = defineCommand({
     }
     const place = new Placement(design)
     const flow = childrenOf(design, id).filter(([, node]) => !node.props.absolute)
-    const inferIn = (scope: 'base' | `format:${string}`) =>
+    const inferIn = (scope: AnyScope) =>
       inferLayout(
         place.get(scope, id),
         flow.map(([kid]) => [kid, place.get(scope, kid)]),
@@ -1052,7 +1043,7 @@ const textFit = defineCommand({
     const place = new Placement(design)
     const primary = sizes[design.meta.primaryFormatId]
     if (primary) place.set('base', id, primary)
-    for (const [formatId, size] of Object.entries(sizes)) place.set(`format:${formatId}`, id, size)
+    for (const [formatId, size] of Object.entries(sizes)) place.set(formatScope(formatId), id, size)
     place.write(r)
   },
 })
@@ -1072,11 +1063,6 @@ const pageAdd = defineCommand({
     return id
   },
 })
-
-const pagesInOrder = (design: Design) =>
-  Object.entries(design.pages).sort(([a, x], [b, y]) =>
-    x.order < y.order ? -1 : x.order > y.order ? 1 : a < b ? -1 : 1,
-  )
 
 /** Renames a page, or sets its background fills (the Page card, #83). */
 const pageUpdate = defineCommand({
@@ -1101,7 +1087,7 @@ const pageDuplicate = defineCommand({
   apply: ({ r, design }, { id, newId = nanoid(), name }) => {
     const page = design.pages[id]
     if (!page) return newId
-    const pages = pagesInOrder(design)
+    const pages = inOrder(design.pages)
     const next = pages[pages.findIndex(([other]) => other === id) + 1]?.[1].order ?? null
     r.pages.set(newId, toYMap(Page.parse({ ...page, name: name ?? page.name, order: indexBetween(page.order, next) })))
     copyLayers(
@@ -1124,7 +1110,7 @@ const pageMove = defineCommand({
     return undefined
   },
   apply: ({ r, design }, { id, before }) => {
-    const others = pagesInOrder(design).filter(([other]) => other !== id)
+    const others = inOrder(design.pages).filter(([other]) => other !== id)
     const at = before === null ? others.length : others.findIndex(([other]) => other === before)
     r.pages.get(id)?.set('order', indexBetween(others[at - 1]?.[1].order ?? null, others[at]?.[1].order ?? null))
   },
@@ -1145,11 +1131,6 @@ const pageDelete = defineCommand({
     r.pages.delete(id)
   },
 })
-
-const byOrder = (design: Design) =>
-  Object.entries(design.formats).sort(([a, x], [b, y]) =>
-    x.order < y.order ? -1 : x.order > y.order ? 1 : a < b ? -1 : 1,
-  )
 
 /**
  * Adds a format. Its layout starts as the primary format's, scaled to fit and centred, written
@@ -1173,9 +1154,9 @@ const formatAdd = defineCommand({
     const dx = (format.width - primary.width * scale) / 2
     const dy = (format.height - primary.height * scale) / 2
     const round = (n: number) => Math.round(n * 100) / 100
-    const from = design.overrides[`format:${primaryId}`] ?? {}
-    for (const [nodeId, node] of Object.entries(design.nodes)) {
-      const props = { ...node.props, ...from[nodeId] } as Record<string, unknown> & {
+    const from = design.overrides[formatScope(primaryId)] ?? {}
+    for (const nodeId of Object.keys(design.nodes)) {
+      const props = mergedProps(design, formatScope(primaryId), nodeId) as Record<string, unknown> & {
         x: number
         y: number
         width: number
@@ -1191,7 +1172,7 @@ const formatAdd = defineCommand({
       for (const path of ['rotation', 'visible'])
         if (from[nodeId]?.[path] !== undefined) scaled[path] = from[nodeId][path]
       for (const [path, value] of Object.entries(scaled))
-        r.overrides.set(overrideKey(`format:${id}`, nodeId, path), value)
+        r.overrides.set(overrideKey(formatScope(id), nodeId, path), value)
     }
     return id
   },
@@ -1220,7 +1201,7 @@ const formatUpdate = defineCommand({
     if (!yformat) return
     for (const [key, value] of Object.entries(change)) if (value !== undefined) yformat.set(key, value)
     if (before === undefined) return
-    const others = byOrder(design).filter(([other]) => other !== id)
+    const others = inOrder(design.formats).filter(([other]) => other !== id)
     const at = before === null ? others.length : others.findIndex(([other]) => other === before)
     yformat.set('order', indexBetween(others[at - 1]?.[1].order ?? null, others[at]?.[1].order ?? null))
   },
@@ -1238,7 +1219,7 @@ const formatRemove = defineCommand({
   },
   apply: ({ r }, { id }) => {
     r.formats.delete(id)
-    const scope = `format:${id}`
+    const scope = formatScope(id)
     for (const key of [...r.overrides.keys()]) if (splitOverrideKey(key).scope === scope) r.overrides.delete(key)
   },
 })

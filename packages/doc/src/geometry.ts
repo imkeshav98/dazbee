@@ -2,11 +2,9 @@
 // it about its centre, and a container's rotation turns what is inside it about the container's
 // centre. Commands that keep layers where they are on screen (group, ungroup, hug) and the
 // editor's transforms share it.
+import type { Point } from '@dazbee/schema'
 
-export interface Point {
-  x: number
-  y: number
-}
+export type { Point }
 export interface Box {
   x: number
   y: number

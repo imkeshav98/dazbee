@@ -1,10 +1,7 @@
-import type { Design, Layer } from '@dazbee/schema'
+import { byCodeUnits, type Design, type Layer } from '@dazbee/schema'
 
 /** The ids of the layers directly under a page or layer, back to front. */
 export type ChildIndex = (parentId: string) => readonly string[]
-
-/** Code-unit order, the same on every device (unlike localeCompare) and the order fractional indexes use. */
-const byCodeUnits = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0)
 
 /** Ties in index break by id, the same on every device. */
 export const siblingOrder = (nodes: Readonly<Record<string, Layer>> | ReadonlyMap<string, Layer>) => {

@@ -2,6 +2,7 @@ import type * as Y from 'yjs'
 
 import {
   canHold,
+  deepFreeze,
   type Design,
   formatIdOf,
   type Layer,
@@ -345,12 +346,4 @@ function readOnlyRecord<V>(entries: () => ReadonlyMap<string, V>): Record<string
     deleteProperty: () => false,
     setPrototypeOf: () => false,
   })
-}
-
-function deepFreeze<T>(value: T): T {
-  if (typeof value === 'object' && value !== null && !Object.isFrozen(value)) {
-    Object.freeze(value)
-    for (const inner of Object.values(value)) deepFreeze(inner)
-  }
-  return value
 }

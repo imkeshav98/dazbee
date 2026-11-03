@@ -91,8 +91,8 @@ describe('carrying layers along', () => {
   })
 })
 
-describe('angles and bounds', () => {
-  it('keeps angles in (-180, 180] and snaps to 15° steps', () => {
+describe('snapAngle', () => {
+  it('snaps to 15° steps', () => {
     expect(snapAngle(37)).toBe(30)
     expect(snapAngle(-8)).toBe(-15)
   })
