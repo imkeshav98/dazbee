@@ -10,6 +10,7 @@ A **goldfish** is a subagent with a fresh context. Its brief names everything it
 2. Each ticket names its **test grid** before work starts:
    - the layer types it touches: frame, group, graphic (with a shape, and with a photo fill), boolean, text, instance, lottie, and several selected;
    - the states: rotated, inside a group, inside an auto layout frame, masked, locked, hidden;
+   - for text, each box mode (auto width, auto height, fixed) and shrink to fit on, since they change what the size and the handles do;
    - one format and several formats, with overrides;
    - the screen sizes 1280×760, 820×1180 and 390×844;
    - undo and redo.
