@@ -6,6 +6,7 @@ import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import { shortcutFor, type Editor } from '@dazbee/editor'
 import { cn } from '../../lib/cn.ts'
 import { fillOf } from '../../lib/fill.ts'
+import { LIMITS } from '../../lib/limits.ts'
 import { useMessages } from '../../lib/i18n/client.tsx'
 import { format } from '../../lib/i18n/index.ts'
 import { Select } from '../ui/select.tsx'
@@ -35,11 +36,12 @@ function useDraft() {
  * its keys while nothing is being typed. With `min` and `max`, or
  * `fillRange` for a fill that doesn't hold the value in, a fill behind it shows where the value sits
  * between them; a range either side of 0 fills from 0 out, each way. Home and End go to `min` and
- * `max`. Steps are in the value as shown, after `scale`.
+ * `max`. A value typed, stepped or dragged stops at `min` and `max`, or without them at
+ * `LIMITS.any` either way. Steps are in the value as shown, after `scale`.
  * With `onClear`, emptying the field calls it, for a value that can be left unset (its placeholder
  * shows then), mixed values too once something was typed; without, an empty field is ignored.
  */
-export function NumberField({ label, name, value, step = 1, min, max, fillRange, scale = 1, unit = '', placeholder, editor, testId, onSet, onShift, onClear }: {
+export function NumberField({ label, name, value, step = 1, min: least, max: most, fillRange, scale = 1, unit = '', placeholder, editor, testId, onSet, onShift, onClear }: {
   label: string
   name: string
   value: number | 'mixed' | undefined
@@ -62,13 +64,23 @@ export function NumberField({ label, name, value, step = 1, min, max, fillRange,
 }) {
   const t = useMessages()
   const input = useRef<HTMLInputElement>(null)
+  // What a value typed, stepped or dragged stops at: the field's own limits, or, without, where a
+  // design would only break. `least` and `most` are the field's own, for its fill and Home and End.
+  const min = least ?? -LIMITS.any
+  const max = most ?? LIMITS.any
+  /** A step from the value shown, cut short at `min` and `max`; with values the layers don't share, each layer's own steps. */
+  const shift = (by: number) => {
+    if (typeof value !== 'number') return onShift(by)
+    const to = clamp(value + by, min, max) - value
+    if (to !== 0) onShift(to)
+  }
   const shown = value === undefined || value === 'mixed' ? '' : String(tidy(value * scale))
   const [draft, setDraft, typedNow] = useDraft()
   const [typing, setTyping] = useState(false)
   const press = useRef<{ x: number; applied: number; end: (() => void) | null } | null>(null)
   /** Whether Home and End have a lowest and a highest value to go to. */
-  const hasEnds = min !== undefined && max !== undefined && Number.isFinite(min) && Number.isFinite(max) && max > min
-  const fill = fillOf(value, fillRange ?? (min !== undefined && max !== undefined ? [min, max] : undefined))
+  const hasEnds = least !== undefined && most !== undefined && Number.isFinite(least) && Number.isFinite(most) && most > least
+  const fill = fillOf(value, fillRange ?? (least !== undefined && most !== undefined ? [least, most] : undefined))
   /** One step, or ten with Shift, or a tenth with Alt where the steps are fractions. */
   const stepOf = (event: { shiftKey: boolean; altKey: boolean }) => step * (event.shiftKey ? 10 : event.altKey && step < 1 ? 0.1 : 1)
   const commit = (text: string) => {
@@ -114,7 +126,7 @@ export function NumberField({ label, name, value, step = 1, min, max, fillRange,
         p.end ??= editor?.beginGesture() ?? (() => undefined)
         const by = Math.round((event.clientX - p.x) / 2) * stepOf(event)
         if (by === p.applied) return
-        onShift((by - p.applied) / scale)
+        shift((by - p.applied) / scale)
         p.applied = by
       }}
       onPointerUp={() => release(true)}
@@ -129,8 +141,8 @@ export function NumberField({ label, name, value, step = 1, min, max, fillRange,
         role="spinbutton"
         aria-label={name}
         aria-valuenow={typeof value === 'number' ? tidy(value * scale) : undefined}
-        aria-valuemin={min === undefined || !Number.isFinite(min) ? undefined : tidy(min * scale)}
-        aria-valuemax={max === undefined || !Number.isFinite(max) ? undefined : tidy(max * scale)}
+        aria-valuemin={least === undefined || !Number.isFinite(least) ? undefined : tidy(least * scale)}
+        aria-valuemax={most === undefined || !Number.isFinite(most) ? undefined : tidy(most * scale)}
         aria-valuetext={value === 'mixed' ? t.editor.props.mixed : shown ? `${shown}${unit}` : placeholder}
         data-testid={testId}
         inputMode="decimal"
@@ -160,7 +172,7 @@ export function NumberField({ label, name, value, step = 1, min, max, fillRange,
           } else if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
             event.preventDefault()
             setDraft(null)
-            onShift(((event.key === 'ArrowUp' ? 1 : -1) * stepOf(event)) / scale)
+            shift(((event.key === 'ArrowUp' ? 1 : -1) * stepOf(event)) / scale)
           } else if ((event.key === 'Home' || event.key === 'End') && hasEnds && draft === null) {
             // A range's ends, as a slider's; while a value is being typed they move the caret.
             event.preventDefault()
