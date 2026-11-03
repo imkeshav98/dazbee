@@ -6,8 +6,8 @@ import { openStorage, storageSettings } from '@dazbee/storage'
 import { syncTokenSecret } from '@dazbee/sync-token'
 
 import { createApp } from './app.ts'
-import { DEV_BRANDS, DEV_WORKSPACE, devSession, firstSession, sessionSecret, tokenSession } from './auth/session.ts'
-import { workosProvider, workosSettings } from './auth/sign-in.ts'
+import { DEV_BRANDS, DEV_WORKSPACE, devSession, firstSession, sessionSecret, tokenSession } from './sign-in/session.ts'
+import { workosProvider, workosSettings } from './sign-in/sign-in.ts'
 
 const databaseUrl = process.env.DATABASE_URL
 if (!databaseUrl) throw new Error('DATABASE_URL is not set')

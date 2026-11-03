@@ -11,9 +11,9 @@ services:
       POSTGRES_PASSWORD: razzlr-local
       POSTGRES_DB: razzlr
     ports:
-      - "127.0.0.1:55432:5432"
+      - '127.0.0.1:55432:5432'
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U razzlr -d razzlr"]
+      test: ['CMD-SHELL', 'pg_isready -U razzlr -d razzlr']
       interval: 30s
       start_period: 60s
       start_interval: 1s
@@ -28,9 +28,9 @@ services:
       RUSTFS_SECRET_KEY: razzlr-local-secret
       RUSTFS_VOLUMES: /data
     ports:
-      - "127.0.0.1:59000:9000"
+      - '127.0.0.1:59000:9000'
     healthcheck:
-      test: ["CMD", "curl", "-s", "-o", "/dev/null", "http://localhost:9000/"]
+      test: ['CMD', 'curl', '-s', '-o', '/dev/null', 'http://localhost:9000/']
       interval: 30s
       start_period: 60s
       start_interval: 1s
@@ -40,14 +40,14 @@ services:
   api:
     image: node:26.13.0-slim
     working_dir: /repo
-    command: ["node", "apps/api/src/main.ts"]
+    command: ['node', 'apps/api/src/main.ts']
     environment:
       DATABASE_URL: postgres://razzlr:razzlr-local@postgres:5432/razzlr
-      API_PORT: "8787"
+      API_PORT: '8787'
       # A local-only key; deployed servers get their own from the environment.
       SYNC_TOKEN_SECRET: ${SYNC_TOKEN_SECRET:-local-only-sync-token-secret-0000}
-      # Local and CI only: a request without a session token is the development user (apps/api/src/auth/session.ts).
-      DAZBEE_DEV_SESSION: "on"
+      # Local and CI only: a request without a session token is the development user (apps/api/src/sign-in/session.ts).
+      DAZBEE_DEV_SESSION: 'on'
       # Sign-in (#58) is on when these three are set, from a git-ignored .env next to this file.
       WORKOS_API_KEY: ${WORKOS_API_KEY:-}
       WORKOS_CLIENT_ID: ${WORKOS_CLIENT_ID:-}
@@ -60,18 +60,24 @@ services:
       STORAGE_REGION: us-east-1
       # Signed upload URLs must name an address the browser and tests can reach.
       STORAGE_PUBLIC_ENDPOINT: http://127.0.0.1:59000
-      STORAGE_CREATE_BUCKET: "on"
+      STORAGE_CREATE_BUCKET: 'on'
     volumes:
       - ./:/repo:ro
     ports:
-      - "127.0.0.1:8787:8787"
+      - '127.0.0.1:8787:8787'
     depends_on:
       postgres:
         condition: service_healthy
       storage:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "node", "-e", "fetch('http://localhost:8787/health').then(r => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://localhost:8787/health').then(r => process.exit(r.ok ? 0 : 1), () => process.exit(1))",
+        ]
       interval: 30s
       start_period: 60s
       start_interval: 1s
@@ -81,20 +87,26 @@ services:
   sync:
     image: node:26.13.0-slim
     working_dir: /repo
-    command: ["node", "apps/sync/src/main.ts"]
+    command: ['node', 'apps/sync/src/main.ts']
     environment:
       DATABASE_URL: postgres://razzlr:razzlr-local@postgres:5432/razzlr
-      SYNC_PORT: "1234"
+      SYNC_PORT: '1234'
       SYNC_TOKEN_SECRET: ${SYNC_TOKEN_SECRET:-local-only-sync-token-secret-0000}
     volumes:
       - ./:/repo:ro
     ports:
-      - "127.0.0.1:1234:1234"
+      - '127.0.0.1:1234:1234'
     depends_on:
       api:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "node", "-e", "fetch('http://localhost:1234').then(r => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://localhost:1234').then(r => process.exit(r.ok ? 0 : 1), () => process.exit(1))",
+        ]
       interval: 30s
       start_period: 60s
       start_interval: 1s
