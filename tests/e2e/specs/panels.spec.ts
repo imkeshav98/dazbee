@@ -90,6 +90,16 @@ test.describe('found by QA', () => {
     await expect.poll(async () => ((await propsOf(page, 'badge')).effects as { blur: number; x: number }[])[0]).toMatchObject({ blur: 1000, x: -10000 })
     await enter((await barMenu(page, 'position')).getByRole('spinbutton', { name: 'X position' }), '1e12')
     await expect.poll(async () => (await propsOf(page, 'badge')).x).toBe(100000)
+    // Stepped past it with the arrow keys, it stays.
+    await (await barMenu(page, 'position')).getByRole('spinbutton', { name: 'X position' }).focus()
+    await page.keyboard.press('ArrowUp')
+    await page.keyboard.press('Shift+ArrowUp')
+    await expect.poll(async () => (await propsOf(page, 'badge')).x).toBe(100000)
+    // With Lock ratio on, the side that follows stops at it too.
+    const position = await barMenu(page, 'position')
+    await position.getByRole('switch', { name: 'Lock ratio' }).click()
+    await enter(position.getByRole('spinbutton', { name: 'Height' }), '50000')
+    await expect.poll(async () => (await propsOf(page, 'badge')).width).toBeLessThanOrEqual(100000)
     // Text's spacing and size, last, since text this large takes a while to draw.
     await select(page, ['headline'])
     const spacing = await barMenu(page, 'spacing')
