@@ -37,7 +37,7 @@ const design = (): DesignInput => {
 
 const open = (browser: Browser) => openStage(browser, design())
 
-test('click, shift-click and marquee select; locked and hidden layers are not picked', async ({ browser }) => {
+test("click, shift-click and marquee select; select all and a marquee leave locked layers out, and hidden ones can't be hit", async ({ browser }) => {
   test.setTimeout(90_000)
   const { page, errors } = await open(browser)
 
@@ -72,7 +72,7 @@ test('click, shift-click and marquee select; locked and hidden layers are not pi
   await press(page, 'selectAll')
   expect((await selection(page)).sort()).toEqual(['arabic', 'box', 'dot', 'g', 'headline', 'tilt'])
 
-  // A locked layer can't be picked or dragged: the press starts a marquee instead.
+  // A drag from a locked layer neither picks nor moves it: it draws a marquee.
   await press(page, 'deselect')
   await drag(page, { x: 970, y: 970 }, { x: 1000, y: 1000 })
   expect(await selection(page)).toEqual([])
@@ -80,6 +80,51 @@ test('click, shift-click and marquee select; locked and hidden layers are not pi
   // A hidden layer draws nothing and can't be hit.
   await click(page, 480, 400)
   expect(await selection(page)).toEqual([])
+  expect(errors).toEqual([])
+})
+
+test('a click on a locked layer selects it, without handles, so the small menu can unlock it; a drag from it still draws a marquee', async ({ browser }) => {
+  const { page, errors } = await open(browser)
+  await click(page, 970, 970)
+  expect(await selection(page)).toEqual(['locked'])
+  await expect(page.locator('.selection[data-layer="locked"]')).toHaveCount(1)
+  await expect(page.locator('.selection[data-layer="locked"] .handle')).toHaveCount(0)
+  // Locked in place, it stays put under a drag, which draws a marquee as before.
+  await drag(page, { x: 970, y: 970 }, { x: 1000, y: 1000 })
+  expect(await props(page, 'locked')).toMatchObject({ x: 900, y: 900 })
+  // Clicked again, it is selected again, and the small menu's lock, pressed, unlocks it.
+  await click(page, 970, 970)
+  expect(await selection(page)).toEqual(['locked'])
+  const lock = page.getByTestId('small-lock')
+  await expect(lock).toHaveAttribute('aria-pressed', 'true')
+  await lock.click()
+  await expect.poll(async () => (await read(page)).nodes.locked?.lock).toBeUndefined()
+  await expect(page.locator('.selection[data-layer="locked"] .handle')).toHaveCount(8)
+  await drag(page, { x: 970, y: 970 }, { x: 1010, y: 970 })
+  expect(await props(page, 'locked')).toMatchObject({ x: 940, y: 900 })
+  expect(errors).toEqual([])
+})
+
+test('a locked layer over another is the one a click selects, a drag from it moves neither, and a double-click goes into neither', async ({ browser }) => {
+  const base = design()
+  const locked = base.nodes.locked
+  if (locked?.type !== 'graphic') throw new Error('no locked graphic')
+  // The locked layer sits on the box, as a logo on a background does.
+  const { page, errors } = await openStage(browser, { ...base, nodes: { ...base.nodes, locked: { ...locked, props: rect(200, 150, 60, 60, '#444444FF') } } })
+  await click(page, 230, 180)
+  expect(await selection(page)).toEqual(['locked'])
+  await expect(page.locator('.selection[data-layer="locked"]')).toHaveCount(1)
+  await expect(page.locator('.selection[data-layer="locked"] .handle')).toHaveCount(0)
+  const box = await props(page, 'box')
+  await drag(page, { x: 230, y: 180 }, { x: 300, y: 260 })
+  expect(await props(page, 'box')).toMatchObject({ x: box.x, y: box.y })
+  expect(await props(page, 'locked')).toMatchObject({ x: 200, y: 150 })
+  // A second click keeps it selected, with no moment of nothing selected between.
+  await click(page, 230, 180)
+  expect(await selection(page)).toEqual(['locked'])
+  const at = await screenPoint(page, 230, 180)
+  await page.mouse.dblclick(at.x, at.y)
+  expect(await selection(page)).toEqual(['locked'])
   expect(errors).toEqual([])
 })
 
@@ -234,7 +279,8 @@ test('nudge, duplicate, z-order, lock, hide and delete from the keyboard', async
   await press(page, 'hide')
   expect(await props(page, 'dot')).toMatchObject({ visible: true })
 
-  // Lock: every flag on, then the layer can't be picked or deleted; the same keys unlock it.
+  // Lock: every flag on, then the layer can't be deleted; a click selects it again, and the same
+  // keys unlock it.
   await click(page, 230, 180)
   await press(page, 'lock')
   expect((await read(page)).nodes.box?.lock).toEqual({ move: true, resize: true, content: true, style: true, delete: true })
@@ -242,8 +288,7 @@ test('nudge, duplicate, z-order, lock, hide and delete from the keyboard', async
   expect((await read(page)).nodes.box).toBeDefined()
   await press(page, 'deselect')
   await click(page, 230, 180)
-  expect(await selection(page)).toEqual([])
-  await page.evaluate(() => window.dazbee?.select(['box']))
+  expect(await selection(page)).toEqual(['box'])
   await press(page, 'lock')
   expect((await read(page)).nodes.box?.lock).toBeUndefined()
 

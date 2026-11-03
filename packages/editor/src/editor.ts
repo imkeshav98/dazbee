@@ -612,8 +612,20 @@ function live(
     const box = boxIn(frame, id, from)
     return box && drawnFrom(box, containersOf(frame, from.nodes[id]?.parentId, from))
   }
-  /** Locked in place layers can't be picked on the stage: a click goes to what lies beneath. */
+  /** Locked in place layers are left out where layers are gathered: select all and a marquee. */
   const pickable = (layer: SceneLayer) => !design.nodes[layer.id]?.lock?.move
+  /** Whether the selection is locked in place: it shows no handles and a press can't move it. */
+  const lockedSelection = () => Boolean(selection?.ids.some((id) => design.nodes[id]?.lock?.move))
+  /**
+   * The locked in place layer a press at `p` lands on, the one a click would select: the topmost
+   * layer there, as a click picks it, when that one is locked. A click selects it, so its lock can
+   * be undone; a drag from it draws a marquee and moves nothing, it or what lies beneath.
+   */
+  function lockedAt(frame: Frame, p: Point): string | null {
+    const top = hitTest(cached(frame).scene.layers, p)
+    const id = top ? target(top.id, frame.key) : null
+    return id && design.nodes[id]?.lock?.move ? id : null
+  }
   /** Drops selected layers that are gone, and the selection once none are left or its frame is. */
   function keepSelection() {
     if (!selection) return
@@ -968,8 +980,8 @@ function live(
     el.dataset.frame = frame.key
     el.dataset.count = String(selection.ids.length)
     if (!several) el.dataset.layer = selection.ids[0]
-    // Handles only once the box is big enough on screen to grab them apart.
-    if (!editing && Math.min(box.width, box.height) * camera.zoom >= 2 * HANDLE_SIZE) {
+    // Handles only once the box is big enough on screen to grab them apart, and not on a locked one.
+    if (!editing && !lockedSelection() && Math.min(box.width, box.height) * camera.zoom >= 2 * HANDLE_SIZE) {
       for (const h of HANDLES) {
         const handle = document.createElement('div')
         handle.className = 'handle'
@@ -1454,6 +1466,8 @@ function live(
    * press there on nothing, which a click deselects.
    */
   let clickedAlone: string | null = null
+  /** The locked layer under a press that started a marquee: a click, with no drag, selects it. */
+  let lockedClick: { id: string; frame: string } | null = null
   /** Where a press that may still be a click went down, on screen: it drags only once it has gone CLICK_SLOP from there. */
   let pressedAt: Point | null = null
   let pan: { from: Point; camera: Camera } | null = null
@@ -1833,7 +1847,7 @@ function live(
   /** The handle under a screen point: one to resize by, or the zone outside a corner to turn by. */
   function handleUnder(screen: Point): { kind: 'resize'; handle: Handle } | { kind: 'rotate'; corner: number } | null {
     const outer = selectionBox()
-    if (!outer || editing || pathEditing) return null
+    if (!outer || editing || pathEditing || lockedSelection()) return null
     const { frame, drawn: box } = outer
     const onScreen = (p: Point) => toScreen(camera, { x: frame.x + p.x, y: frame.y + p.y })
     const c = centreOf(box)
@@ -1946,16 +1960,17 @@ function live(
       return
     }
     const inSelection = (id: string) => selection?.frame === at?.frame.key && selection?.ids.includes(id)
+    const locked = at && !e.shiftKey ? lockedAt(at.frame, at.p) : null
     // Inside the selection's box, a press moves the selection, gaps and layers over it included:
     // a mask, which isn't drawn, or a layer under others, is dragged where it is.
     const inner = at && outer && localTo(at.p, outer.around)
     // A selection that can't move leaves the press to what is under it.
-    const movable = selection && !selection.ids.some((id) => design.nodes[id]?.lock?.move)
+    const movable = selection && !lockedSelection()
     const inOuter = inner && outer && selection && movable && selection.ids.length > 0 && outer.frame.key === at.frame.key
       && inner.x >= outer.box.x && inner.x <= outer.box.x + outer.box.width && inner.y >= outer.box.y && inner.y <= outer.box.y + outer.box.height
     // A press outside the group or frame double-clicked into leaves it.
-    if (entered && !inOuter && !(deepest && insideEntered(deepest.id))) entered = null
-    const hit = at && deepest ? { id: target(deepest.id, at.frame.key) } : null
+    if (entered && !inOuter && !(deepest && insideEntered(deepest.id)) && !(locked && insideEntered(locked))) entered = null
+    const hit = at && deepest && !(locked && !inOuter) ? { id: target(deepest.id, at.frame.key) } : null
     if (at && hit) {
       if (e.shiftKey) {
         // Shift adds a layer to the selection, or takes it out again.
@@ -1971,14 +1986,20 @@ function live(
       } else {
         select([hit.id], at.frame.key)
       }
+      // Inside the selection's box a drag still moves the selection; a click picks the locked layer
+      // on top there.
+      if (locked && inOuter) clickedAlone = locked
     } else if (!inOuter) {
-      // Empty canvas: a marquee, adding to the selection with shift.
+      // Empty canvas, or a locked layer: a marquee, adding to the selection with shift.
       canvas.setPointerCapture(e.pointerId)
+      lockedClick = at && locked ? { id: locked, frame: at.frame.key } : null
       const from = toWorld(camera, screen)
       const base = e.shiftKey ? selection?.ids ?? [] : []
       const baseFrame = e.shiftKey ? selection?.frame ?? null : null
-      if (!e.shiftKey) selection = null
-      entered = null
+      // A press on a locked layer keeps the selection until it is a drag, so a click on the one
+      // selected leaves it be.
+      if (!e.shiftKey && !locked) selection = null
+      if (!(locked && insideEntered(locked))) entered = null
       gesture = { kind: 'marquee', from, to: from, base, baseFrame }
       drawOverlay()
       return
@@ -2031,7 +2052,7 @@ function live(
   let pointer: MouseEvent | null = null
   function rehover() {
     const at = pointer && !gesture && !panning() ? pointIn(pointer) : null
-    const hit = at && hitTest(cached(at.frame).scene.layers, at.p, pickable)
+    const hit = at && hitTest(cached(at.frame).scene.layers, at.p)
     const next = at && hit ? { id: target(hit.id, at.frame.key), frame: at.frame.key } : null
     const changed = next?.id !== hovered?.id || next?.frame !== hovered?.frame
     hovered = next
@@ -2481,6 +2502,11 @@ function live(
       hug(gesture.roots)
       gesture.end()
     }
+    // A click on a locked layer, not a drag, selects it.
+    if (gesture?.kind === 'marquee' && lockedClick && Math.hypot(gesture.to.x - gesture.from.x, gesture.to.y - gesture.from.y) * camera.zoom < CLICK_SLOP) {
+      select([lockedClick.id], lockedClick.frame)
+    }
+    lockedClick = null
     if (clickedAlone !== null && selection) {
       // A click that picks a layer outside the group gone into, or nothing, leaves it.
       if (entered && (!clickedAlone || !insideEntered(clickedAlone))) entered = null
@@ -2494,8 +2520,9 @@ function live(
     drawOverlay()
   }
   const cancelDrag = () => {
-    // A drag the browser took away drops nothing into a flow.
+    // A drag the browser took away drops nothing into a flow, and selects no locked layer.
     if (gesture?.kind === 'reorder') gesture.moved = false
+    lockedClick = null
     endDrag()
   }
   canvas.addEventListener('pointerup', endDrag, on)
@@ -2515,7 +2542,7 @@ function live(
     if (panning()) return
     const at = pointIn(e)
     const hit = at && hitTest(cached(at.frame).scene.layers, at.p, pickable)
-    if (!at || !hit) return
+    if (!at || !hit || lockedAt(at.frame, at.p)) return
     if (editing && hit.id === editing.id && editing.frame === at.frame.key) {
       // A double click in the text being edited selects the word there (#47).
       const node = session.design().nodes[editing.id]
