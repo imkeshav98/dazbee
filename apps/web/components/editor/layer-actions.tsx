@@ -9,6 +9,7 @@ import * as Popover from '@radix-ui/react-popover'
 import { type ReactNode, useEffect, useState } from 'react'
 
 import type { Editor, ShortcutAction } from '@dazbee/editor'
+import { formatScope } from '@dazbee/schema'
 
 import { cn } from '@/lib/cn.ts'
 import { useLocale, useMessages } from '@/lib/i18n/client.tsx'
@@ -133,7 +134,7 @@ export function LayerActions({ editor, ids, onDone }: { editor: Editor; ids: str
   const hidden = target.props.every((pr) => pr.visible === false)
   const hiddenEverywhere = target.ids.every((id) =>
     Object.keys(design.formats).every(
-      (f) => (design.overrides[`format:${f}`]?.[id]?.visible ?? design.nodes[id]?.props.visible) === false,
+      (f) => (design.overrides[formatScope(f)]?.[id]?.visible ?? design.nodes[id]?.props.visible) === false,
     ),
   )
   const masks = target.props.every((pr) => Boolean(pr.mask))

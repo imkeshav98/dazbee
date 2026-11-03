@@ -11,6 +11,7 @@ import { CaretDownIcon, ImageSquareIcon, PlusIcon } from '@phosphor-icons/react'
 import * as Popover from '@radix-ui/react-popover'
 import { type ReactNode, useEffect, useState } from 'react'
 
+import { mergedProps } from '@dazbee/doc'
 import { type Editor, withImage } from '@dazbee/editor'
 import {
   BlendMode,
@@ -20,6 +21,7 @@ import {
   ContainerBlendMode,
   type Design,
   type Effect,
+  formatScope,
   type ImageAdjust,
   ImageFilter,
   LineEnd,
@@ -1850,7 +1852,7 @@ function OwnChanges({
   editor: Editor
   p: P
 }) {
-  const scope = `format:${formatId}` as const
+  const scope = formatScope(formatId)
   const byNode = design.overrides[scope] ?? {}
   const paths = [...new Set(ids.flatMap((id) => Object.keys(byNode[id] ?? {})))]
   if (paths.length === 0) return null
@@ -2551,8 +2553,7 @@ export function useTarget(editor: Editor, ids: string[]): { target: Target; desi
   const formatId = frameFormat && design.formats[frameFormat] ? frameFormat : design.meta.primaryFormatId
   const live = ids.filter((id) => design.nodes[id])
   if (live.length === 0) return null
-  const placedIn = (id: string) =>
-    ({ ...design.nodes[id]?.props, ...design.overrides[`format:${formatId}`]?.[id] }) as Props
+  const placedIn = (id: string): Props => mergedProps(design, formatScope(formatId), id)
   return {
     design,
     target: {
