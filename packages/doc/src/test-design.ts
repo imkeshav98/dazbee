@@ -48,12 +48,7 @@ export const testDesign = (): DesignInput => ({
   overrides: { 'format:banner': { headline: { text: 'Sale', x: 4, runs: [] } } },
 })
 
-export const freshDoc = () => {
-  const result = parseDesign(testDesign())
-  if (!result.success) throw new Error(result.errors.join('\n'))
-  return loadDesign(result.design)
-}
-
+/** A shape to add with node.create. */
 export const badge = {
   type: 'graphic',
   name: 'Badge',
@@ -67,11 +62,16 @@ export const badge = {
   },
 } as const
 
+/** A document holding `design`, the test design unless given. */
+export function testDoc(design: DesignInput = testDesign()) {
+  const result = parseDesign(design)
+  if (!result.success) throw new Error(result.errors.join('\n'))
+  return loadDesign(result.design)
+}
+
 /** Two tabs on one design, each with its own doc, exchanging updates like the sync server would. */
 export function twoTabs() {
-  const result = parseDesign(testDesign())
-  if (!result.success) throw new Error(result.errors.join('\n'))
-  const a = loadDesign(result.design)
+  const a = testDoc()
   const b = new Y.Doc()
   Y.applyUpdate(b, Y.encodeStateAsUpdate(a))
   const sync = () => {

@@ -1,3 +1,4 @@
+// The checks commands share: a free id, a parent that can hold a layer, a layer that exists, and locks.
 import { canHold, type Design, type Layer as LayerT, LayerLock } from '@dazbee/schema'
 
 import type { CommandContext } from './define.ts'
@@ -28,3 +29,9 @@ export function lockFor(path: string): keyof LayerLock | null {
 
 export const lockProblem = (id: string, node: LayerT, flag: keyof LayerLock | null) =>
   flag && node.lock?.[flag] ? `"${id}" is locked (${flag})` : undefined
+
+/** The first of `ids` that names no layer, as a reason to refuse. */
+export const missingLayer = (design: Design, ids: readonly string[]) => {
+  const id = ids.find((one) => !design.nodes[one])
+  return id === undefined ? undefined : `no layer "${id}"`
+}

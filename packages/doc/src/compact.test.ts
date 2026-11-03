@@ -1,16 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import * as Y from 'yjs'
 
-import { parseDesign } from '@dazbee/schema'
+import { compact, type DesignDoc, openSession, readDesign } from './index.ts'
+import { testDoc } from './test-design.ts'
 
-import { compact, type DesignDoc, loadDesign, openSession, readDesign } from './index.ts'
-import { testDesign } from './test-design.ts'
-
-const freshDoc = () => {
-  const result = parseDesign(testDesign())
-  if (!result.success) throw new Error(result.errors.join('\n'))
-  return loadDesign(result.design)
-}
 const sizeOf = (doc: DesignDoc) => Y.encodeStateAsUpdate(doc).byteLength
 const badge = (x: number) =>
   ({
@@ -28,7 +21,7 @@ const badge = (x: number) =>
 
 /** 50 layers that stay, made with commands, and with `deletes` more made, overridden and deleted. */
 function edited(deletes: number) {
-  const doc = freshDoc()
+  const doc = testDoc()
   const tab = openSession(doc)
   for (let i = 0; i < 50; i++) tab.run('node.create', { parentId: 'p1', layer: badge(i) })
   for (let i = 0; i < deletes; i++) {

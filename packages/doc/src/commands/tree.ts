@@ -1,3 +1,4 @@
+// Where layers, pages and formats go in their order, and copies of layers with fresh ids.
 import { generateKeyBetween } from 'fractional-indexing'
 import { nanoid } from 'nanoid'
 

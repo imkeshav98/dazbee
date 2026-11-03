@@ -1,3 +1,5 @@
+// Commands that put layers in a new group, frame or boolean without moving them on screen, take them out
+// again, and fit groups to what they hold.
 import { nanoid } from 'nanoid'
 import { z } from 'zod'
 
@@ -6,7 +8,7 @@ import { AnyScope, BooleanOp, canHold, formatIdOf, Layer, type Layer as LayerT, 
 import { ancestorsOf, childrenOf, descendants, isInside } from '../children.ts'
 import { DELETED, overrideKey, toYNode } from '../design-doc.ts'
 import { boundsOf, centreOf, normalAngle, round, turn } from '../geometry.ts'
-import { idProblem, lockProblem, parentProblem } from './checks.ts'
+import { idProblem, lockProblem, missingLayer, parentProblem } from './checks.ts'
 import { type CommandContext, defineCommand } from './define.ts'
 import { mergedProps, Placement } from './placement.ts'
 import { depthOf, indexBetween } from './tree.ts'
@@ -66,12 +68,12 @@ export const nodeEnclose = defineCommand({
   input: z.object({ id: NodeId, ids: NodeId.array().min(1), scope: Scope }),
   check: ({ design }, { id, ids, scope }) => {
     const frame = design.nodes[id]
-    if (!frame) return `no layer "${id}"`
+    if (!frame) return missingLayer(design, [id])
     if (frame.type !== 'frame') return `"${id}" is a ${frame.type}, not a frame`
     if (!design.formats[formatIdOf(scope) ?? '']) return `no format "${formatIdOf(scope) ?? scope}"`
     for (const layer of ids) {
       const node = design.nodes[layer]
-      if (!node) return `no layer "${layer}"`
+      if (!node) return missingLayer(design, [layer])
       if (layer === id) return `can't put "${id}" inside itself`
       if (node.parentId !== frame.parentId) return `"${layer}" is not beside "${id}"`
       if (!canHold('frame', node.type)) return `a frame can't hold a ${node.type}`
@@ -145,7 +147,7 @@ export const nodeUngroup = defineCommand({
   check: ({ design }, { ids }) => {
     for (const id of ids) {
       const node = design.nodes[id]
-      if (!node) return `no layer "${id}"`
+      if (!node) return missingLayer(design, [id])
       if (node.type !== 'group' && node.type !== 'boolean') return `"${id}" is a ${node.type}, not a group or boolean`
       const locked = lockProblem(id, node, 'delete')
       if (locked) return locked
@@ -207,7 +209,7 @@ export const nodeUngroup = defineCommand({
 export const nodeHug = defineCommand({
   name: 'node.hug',
   input: z.object({ ids: NodeId.array().min(1) }),
-  check: ({ design }, { ids }) => ids.map((id) => (design.nodes[id] ? undefined : `no layer "${id}"`)).find(Boolean),
+  check: ({ design }, { ids }) => missingLayer(design, ids),
   apply: ({ r, design }, { ids }) => {
     const groups = new Set<string>()
     for (const id of ids) {
@@ -246,7 +248,7 @@ export const nodeHug = defineCommand({
 /** What wrapping layers in a new group, frame or boolean checks: they exist, share a parent, and the parent can hold the wrapper. */
 function wrapProblem(ctx: CommandContext, ids: string[], id: string | undefined, type: 'group' | 'frame' | 'boolean') {
   const { design } = ctx
-  const missing = ids.map((layer) => (design.nodes[layer] ? undefined : `no layer "${layer}"`)).find(Boolean)
+  const missing = missingLayer(design, ids)
   if (missing) return missing
   if (new Set(ids.map((layer) => design.nodes[layer]?.parentId)).size > 1)
     return `layers to ${type === 'boolean' ? 'combine' : type} must share a parent`

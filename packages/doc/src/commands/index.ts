@@ -1,3 +1,4 @@
+// Every command, by the name a session runs it with.
 import { designPlace, nodeDuplicate, nodeMove, nodeReorder } from './arrange.ts'
 import { nodeAutoLayout } from './auto-layout.ts'
 import { formatAdd, formatRemove, formatSetPrimary, formatUpdate } from './formats.ts'

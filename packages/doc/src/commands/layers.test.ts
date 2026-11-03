@@ -4,11 +4,11 @@ import * as Y from 'yjs'
 import { formatScope } from '@dazbee/schema'
 
 import { openSession, readDesign } from '../index.ts'
-import { badge, freshDoc } from '../test-design.ts'
+import { badge, testDoc } from '../test-design.ts'
 
-describe('commands', () => {
-  it('node.create adds a layer on top of its siblings, and undo removes it', () => {
-    const doc = freshDoc()
+describe('node.create', () => {
+  it('adds a layer on top of its siblings, and undo removes it', () => {
+    const doc = testDoc()
     const tab = openSession(doc)
 
     const id = tab.run('node.create', { parentId: 'p1', layer: badge })
@@ -25,7 +25,7 @@ describe('commands', () => {
   })
 
   it('rejects invalid input before touching the document', () => {
-    const doc = freshDoc()
+    const doc = testDoc()
     const before = Y.encodeStateVector(doc)
     const tab = openSession(doc)
 
@@ -38,8 +38,19 @@ describe('commands', () => {
     expect(Y.encodeStateVector(doc)).toEqual(before)
   })
 
-  it('node.update sets base properties, or overrides them for one format only', () => {
-    const doc = freshDoc()
+  it('refuses the id of a deleted layer, so undoing that delete still works', () => {
+    const doc = testDoc()
+    const tab = openSession(doc)
+    tab.run('node.delete', { ids: ['box'] })
+    expect(() => tab.run('node.create', { id: 'box', parentId: 'p1', layer: badge })).toThrow(/id "box" is taken/)
+    tab.undo()
+    expect(readDesign(doc).nodes.box?.name).toBe('Box')
+  })
+})
+
+describe('node.update', () => {
+  it('sets base properties, or overrides them for one format only', () => {
+    const doc = testDoc()
     const tab = openSession(doc)
 
     tab.run('node.update', { ids: ['box'], patch: { x: 140, opacity: 0.5 } })
@@ -50,8 +61,18 @@ describe('commands', () => {
     expect(design.overrides['format:banner']?.box).toEqual({ x: 8, width: 40 })
   })
 
-  it('override.reset puts layers back to the base in one format, and undo brings the overrides back', () => {
-    const doc = freshDoc()
+  it('refuses a patch that would make the layer invalid', () => {
+    const tab = openSession(testDoc())
+    expect(() => tab.run('node.update', { ids: ['box'], patch: { opacity: 2 } })).toThrow(/node.update: box.opacity/)
+    expect(() => tab.run('node.update', { ids: ['box'], patch: { text: 'x' } })).toThrow(
+      /node.update: a graphic has no property "text"/,
+    )
+  })
+})
+
+describe('override.reset', () => {
+  it('puts layers back to the base in one format, and undo brings the overrides back', () => {
+    const doc = testDoc()
     const tab = openSession(doc)
     tab.run('node.update', { ids: ['box'], scope: 'format:banner', patch: { x: 8, y: 4, width: 40 } })
 
@@ -68,17 +89,48 @@ describe('commands', () => {
     expect(() => tab.run('override.reset', { ids: ['box'], scope: 'format:nope' })).toThrow(/no format "nope"/)
     expect(() => tab.run('override.reset', { ids: ['gone'], scope: 'format:banner' })).toThrow(/no layer "gone"/)
   })
+})
 
-  it('node.update refuses a patch that would make the layer invalid', () => {
-    const tab = openSession(freshDoc())
-    expect(() => tab.run('node.update', { ids: ['box'], patch: { opacity: 2 } })).toThrow(/node.update: box.opacity/)
-    expect(() => tab.run('node.update', { ids: ['box'], patch: { text: 'x' } })).toThrow(
-      /node.update: a graphic has no property "text"/,
+describe('node.visibleEverywhere', () => {
+  const visibleIn = (doc: Y.Doc, id: string) => {
+    const design = readDesign(doc)
+    return Object.keys(design.formats).map(
+      (f) => (design.overrides[formatScope(f)]?.[id]?.visible ?? design.nodes[id]?.props.visible) !== false,
     )
+  }
+
+  it('hides a layer in every format, then shows it, one undo step each, and leaves its other own values', () => {
+    const doc = testDoc()
+    const tab = openSession(doc)
+    // Hidden in the banner only, with a place of its own there.
+    tab.run('node.update', { ids: ['box'], scope: 'format:banner', patch: { visible: false, x: 4 } })
+    expect(visibleIn(doc, 'box')).toEqual([true, false])
+
+    tab.run('node.visibleEverywhere', { ids: ['box', 'headline'], visible: false })
+    expect(visibleIn(doc, 'box')).toEqual([false, false])
+    expect(visibleIn(doc, 'headline')).toEqual([false, false])
+    expect(readDesign(doc).overrides['format:banner']?.box).toEqual({ x: 4 })
+    expect(readDesign(doc).overrides['format:banner']?.headline).toMatchObject({ text: 'Sale' })
+
+    tab.run('node.visibleEverywhere', { ids: ['box'], visible: true })
+    expect(visibleIn(doc, 'box')).toEqual([true, true])
+
+    tab.undo()
+    expect(visibleIn(doc, 'box')).toEqual([false, false])
+    tab.undo()
+    expect(visibleIn(doc, 'box')).toEqual([true, false])
+    expect(visibleIn(doc, 'headline')).toEqual([true, true])
   })
 
-  it('node.delete removes layers, their children and their overrides', () => {
-    const doc = freshDoc()
+  it('refuses a layer it does not know', () => {
+    const tab = openSession(testDoc())
+    expect(() => tab.run('node.visibleEverywhere', { ids: ['nope'], visible: false })).toThrow(/no layer "nope"/)
+  })
+})
+
+describe('node.delete', () => {
+  it('removes layers, their children and their overrides', () => {
+    const doc = testDoc()
     const tab = openSession(doc)
     const group = tab.run('node.create', {
       parentId: 'p1',
@@ -96,35 +148,24 @@ describe('commands', () => {
     expect(readDesign(doc).nodes.headline?.parentId).toBe(group)
   })
 
-  it('node.create refuses the id of a deleted layer, so undoing that delete still works', () => {
-    const doc = freshDoc()
+  it("a group with a delete-locked layer inside can't be deleted", () => {
+    const doc = testDoc()
     const tab = openSession(doc)
-    tab.run('node.delete', { ids: ['box'] })
-    expect(() => tab.run('node.create', { id: 'box', parentId: 'p1', layer: badge })).toThrow(/id "box" is taken/)
-    tab.undo()
-    expect(readDesign(doc).nodes.box?.name).toBe('Box')
+    tab.run('node.create', {
+      id: 'g',
+      parentId: 'p1',
+      layer: { type: 'group', name: 'G', props: { x: 0, y: 0, width: 10, height: 10 } },
+    })
+    tab.run('node.create', { id: 'dot', parentId: 'g', layer: badge })
+    tab.run('node.lock', { ids: ['dot'], lock: { delete: true } })
+    expect(() => tab.run('node.delete', { ids: ['g'] })).toThrow(/"dot" is locked \(delete\)/)
+    expect(readDesign(doc).nodes.g).toBeDefined()
   })
+})
 
-  it('node.mask makes layers masks in every format and plain again, each one undo step', () => {
-    const doc = freshDoc()
-    const tab = openSession(doc)
-    // A stray format override of the flag goes when the base one is set.
-    tab.run('node.update', { ids: ['box'], scope: 'format:banner', patch: { mask: 'luminance' } })
-    tab.run('node.mask', { ids: ['box'], mask: 'alpha' })
-    let design = readDesign(doc)
-    expect(design.nodes.box?.props.mask).toBe('alpha')
-    expect(design.overrides['format:banner']?.box).toBeUndefined()
-    tab.run('node.mask', { ids: ['box'], mask: null })
-    design = readDesign(doc)
-    expect(design.nodes.box?.props).not.toHaveProperty('mask')
-    tab.undo()
-    expect(readDesign(doc).nodes.box?.props.mask).toBe('alpha')
-    tab.run('node.lock', { ids: ['box'], lock: { style: true } })
-    expect(() => tab.run('node.mask', { ids: ['box'], mask: null })).toThrow(/locked \(style\)/)
-  })
-
-  it('node.rename renames a layer in one undo step, locked or not, and refuses an empty name (#59)', () => {
-    const doc = freshDoc()
+describe('node.rename', () => {
+  it('renames a layer in one undo step, locked or not, and refuses an empty name (#59)', () => {
+    const doc = testDoc()
     const tab = openSession(doc)
     tab.run('node.lock', { ids: ['box'], lock: { move: true, resize: true, content: true, style: true, delete: true } })
     tab.run('node.rename', { id: 'box', name: '  Hero card ' })
@@ -134,9 +175,61 @@ describe('commands', () => {
     expect(() => tab.run('node.rename', { id: 'box', name: '   ' })).toThrow()
     expect(() => tab.run('node.rename', { id: 'nope', name: 'X' })).toThrow(/no layer "nope"/)
   })
+})
 
-  it('node.bind binds a fill, text colour and font to brand tokens and unbinds them, each one undo step (#53)', () => {
-    const doc = freshDoc()
+describe('node.lock', () => {
+  it('sets flags one by one, and clearing them all drops the field', () => {
+    const doc = testDoc()
+    const tab = openSession(doc)
+    tab.run('node.lock', { ids: ['box'], lock: { move: true } })
+    expect(readDesign(doc).nodes.box?.lock).toEqual({
+      move: true,
+      resize: false,
+      content: false,
+      style: false,
+      delete: false,
+    })
+    tab.run('node.lock', { ids: ['box'], lock: { delete: true } })
+    expect(readDesign(doc).nodes.box?.lock).toMatchObject({ move: true, delete: true })
+    tab.run('node.lock', { ids: ['box'], lock: { move: false, delete: false } })
+    expect(readDesign(doc).nodes.box).not.toHaveProperty('lock')
+    tab.undo()
+    expect(readDesign(doc).nodes.box?.lock).toMatchObject({ move: true, delete: true })
+  })
+
+  it('each flag refuses only its own changes, in the base and in every format', () => {
+    const doc = testDoc()
+    const tab = openSession(doc)
+    const all = { move: true, resize: true, content: true, style: true, delete: true }
+    tab.run('node.lock', { ids: ['box', 'headline'], lock: { move: true } })
+    expect(() => tab.run('node.update', { ids: ['box'], patch: { x: 1 } })).toThrow(/"box" is locked \(move\)/)
+    expect(() => tab.run('node.update', { ids: ['box'], scope: 'format:banner', patch: { y: 1 } })).toThrow(
+      /locked \(move\)/,
+    )
+    tab.run('node.update', { ids: ['box'], patch: { width: 50, opacity: 0.5 } })
+    tab.run('node.update', { ids: ['box'], scope: 'format:banner', patch: { visible: false } })
+
+    tab.run('node.lock', { ids: ['box', 'headline'], lock: all })
+    expect(() => tab.run('node.update', { ids: ['box'], patch: { rotation: 15 } })).toThrow(/locked \(resize\)/)
+    expect(() => tab.run('node.update', { ids: ['box'], patch: { opacity: 1 } })).toThrow(/locked \(style\)/)
+    expect(() => tab.run('text.edit', { id: 'headline', op: { kind: 'insert', at: 0, text: 'Big ' } })).toThrow(
+      /locked \(content\)/,
+    )
+    expect(() =>
+      tab.run('text.edit', { id: 'headline', op: { kind: 'style', at: 0, length: 3, style: { fontWeight: 700 } } }),
+    ).toThrow(/locked \(style\)/)
+    expect(() => tab.run('node.delete', { ids: ['box'] })).toThrow(/locked \(delete\)/)
+    // Hiding is not locked, z-order and copies aren't either.
+    tab.run('node.update', { ids: ['box'], patch: { visible: false } })
+    tab.run('node.reorder', { ids: ['box'], to: 'front' })
+    tab.run('node.duplicate', { ids: ['box'] })
+    expect(readDesign(doc).nodes.box?.props).toMatchObject({ width: 50, opacity: 0.5, visible: false })
+  })
+})
+
+describe('node.bind', () => {
+  it('binds a fill, text colour and font to brand tokens and unbinds them, each one undo step (#53)', () => {
+    const doc = testDoc()
     const tab = openSession(doc)
     tab.run('node.bind', { ids: ['box'], target: 'fill', ref: 'brand:primary', value: '#E0262BFF' })
     let design = readDesign(doc)
@@ -179,105 +272,24 @@ describe('commands', () => {
     tab.run('node.lock', { ids: ['box'], lock: { style: true } })
     expect(() => tab.run('node.bind', { ids: ['box'], target: 'fill', ref: null })).toThrow(/locked \(style\)/)
   })
-
-  describe('locks', () => {
-    it('node.lock sets flags one by one, and clearing them all drops the field', () => {
-      const doc = freshDoc()
-      const tab = openSession(doc)
-      tab.run('node.lock', { ids: ['box'], lock: { move: true } })
-      expect(readDesign(doc).nodes.box?.lock).toEqual({
-        move: true,
-        resize: false,
-        content: false,
-        style: false,
-        delete: false,
-      })
-      tab.run('node.lock', { ids: ['box'], lock: { delete: true } })
-      expect(readDesign(doc).nodes.box?.lock).toMatchObject({ move: true, delete: true })
-      tab.run('node.lock', { ids: ['box'], lock: { move: false, delete: false } })
-      expect(readDesign(doc).nodes.box).not.toHaveProperty('lock')
-      tab.undo()
-      expect(readDesign(doc).nodes.box?.lock).toMatchObject({ move: true, delete: true })
-    })
-
-    it('each flag refuses only its own changes, in the base and in every format', () => {
-      const doc = freshDoc()
-      const tab = openSession(doc)
-      const all = { move: true, resize: true, content: true, style: true, delete: true }
-      tab.run('node.lock', { ids: ['box', 'headline'], lock: { move: true } })
-      expect(() => tab.run('node.update', { ids: ['box'], patch: { x: 1 } })).toThrow(/"box" is locked \(move\)/)
-      expect(() => tab.run('node.update', { ids: ['box'], scope: 'format:banner', patch: { y: 1 } })).toThrow(
-        /locked \(move\)/,
-      )
-      tab.run('node.update', { ids: ['box'], patch: { width: 50, opacity: 0.5 } })
-      tab.run('node.update', { ids: ['box'], scope: 'format:banner', patch: { visible: false } })
-
-      tab.run('node.lock', { ids: ['box', 'headline'], lock: all })
-      expect(() => tab.run('node.update', { ids: ['box'], patch: { rotation: 15 } })).toThrow(/locked \(resize\)/)
-      expect(() => tab.run('node.update', { ids: ['box'], patch: { opacity: 1 } })).toThrow(/locked \(style\)/)
-      expect(() => tab.run('text.edit', { id: 'headline', op: { kind: 'insert', at: 0, text: 'Big ' } })).toThrow(
-        /locked \(content\)/,
-      )
-      expect(() =>
-        tab.run('text.edit', { id: 'headline', op: { kind: 'style', at: 0, length: 3, style: { fontWeight: 700 } } }),
-      ).toThrow(/locked \(style\)/)
-      expect(() => tab.run('node.delete', { ids: ['box'] })).toThrow(/locked \(delete\)/)
-      // Hiding is not locked, z-order and copies aren't either.
-      tab.run('node.update', { ids: ['box'], patch: { visible: false } })
-      tab.run('node.reorder', { ids: ['box'], to: 'front' })
-      tab.run('node.duplicate', { ids: ['box'] })
-      expect(readDesign(doc).nodes.box?.props).toMatchObject({ width: 50, opacity: 0.5, visible: false })
-    })
-
-    it("a group with a delete-locked layer inside can't be deleted", () => {
-      const doc = freshDoc()
-      const tab = openSession(doc)
-      tab.run('node.create', {
-        id: 'g',
-        parentId: 'p1',
-        layer: { type: 'group', name: 'G', props: { x: 0, y: 0, width: 10, height: 10 } },
-      })
-      tab.run('node.create', { id: 'dot', parentId: 'g', layer: badge })
-      tab.run('node.lock', { ids: ['dot'], lock: { delete: true } })
-      expect(() => tab.run('node.delete', { ids: ['g'] })).toThrow(/"dot" is locked \(delete\)/)
-      expect(readDesign(doc).nodes.g).toBeDefined()
-    })
-  })
 })
 
-describe('node.visibleEverywhere', () => {
-  const visibleIn = (doc: Y.Doc, id: string) => {
-    const design = readDesign(doc)
-    return Object.keys(design.formats).map(
-      (f) => (design.overrides[formatScope(f)]?.[id]?.visible ?? design.nodes[id]?.props.visible) !== false,
-    )
-  }
-
-  it('hides a layer in every format, then shows it, one undo step each, and leaves its other own values', () => {
-    const doc = freshDoc()
+describe('node.mask', () => {
+  it('makes layers masks in every format and plain again, each one undo step', () => {
+    const doc = testDoc()
     const tab = openSession(doc)
-    // Hidden in the banner only, with a place of its own there.
-    tab.run('node.update', { ids: ['box'], scope: 'format:banner', patch: { visible: false, x: 4 } })
-    expect(visibleIn(doc, 'box')).toEqual([true, false])
-
-    tab.run('node.visibleEverywhere', { ids: ['box', 'headline'], visible: false })
-    expect(visibleIn(doc, 'box')).toEqual([false, false])
-    expect(visibleIn(doc, 'headline')).toEqual([false, false])
-    expect(readDesign(doc).overrides['format:banner']?.box).toEqual({ x: 4 })
-    expect(readDesign(doc).overrides['format:banner']?.headline).toMatchObject({ text: 'Sale' })
-
-    tab.run('node.visibleEverywhere', { ids: ['box'], visible: true })
-    expect(visibleIn(doc, 'box')).toEqual([true, true])
-
+    // A stray format override of the flag goes when the base one is set.
+    tab.run('node.update', { ids: ['box'], scope: 'format:banner', patch: { mask: 'luminance' } })
+    tab.run('node.mask', { ids: ['box'], mask: 'alpha' })
+    let design = readDesign(doc)
+    expect(design.nodes.box?.props.mask).toBe('alpha')
+    expect(design.overrides['format:banner']?.box).toBeUndefined()
+    tab.run('node.mask', { ids: ['box'], mask: null })
+    design = readDesign(doc)
+    expect(design.nodes.box?.props).not.toHaveProperty('mask')
     tab.undo()
-    expect(visibleIn(doc, 'box')).toEqual([false, false])
-    tab.undo()
-    expect(visibleIn(doc, 'box')).toEqual([true, false])
-    expect(visibleIn(doc, 'headline')).toEqual([true, true])
-  })
-
-  it('refuses a layer it does not know', () => {
-    const tab = openSession(freshDoc())
-    expect(() => tab.run('node.visibleEverywhere', { ids: ['nope'], visible: false })).toThrow(/no layer "nope"/)
+    expect(readDesign(doc).nodes.box?.props.mask).toBe('alpha')
+    tab.run('node.lock', { ids: ['box'], lock: { style: true } })
+    expect(() => tab.run('node.mask', { ids: ['box'], mask: null })).toThrow(/locked \(style\)/)
   })
 })

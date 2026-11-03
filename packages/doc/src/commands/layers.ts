@@ -1,3 +1,5 @@
+// Commands that change layers where they are: create, edit, reset to the base, show, delete, rename, lock, bind
+// and mask.
 import { nanoid } from 'nanoid'
 import type * as Y from 'yjs'
 import { z } from 'zod'
@@ -25,7 +27,7 @@ import {
 
 import { childrenOf, descendants } from '../children.ts'
 import { DELETED, overrideKey, toYNode } from '../design-doc.ts'
-import { idProblem, lockFor, lockProblem, parentProblem } from './checks.ts'
+import { idProblem, lockFor, lockProblem, missingLayer, parentProblem } from './checks.ts'
 import { defineCommand } from './define.ts'
 import { keepDrawnIn } from './paths.ts'
 import { topIndex } from './tree.ts'
@@ -64,7 +66,7 @@ export const nodeUpdate = defineCommand({
     if (scope !== 'base' && !design.formats[formatIdOf(scope) ?? '']) return `no format "${formatIdOf(scope) ?? scope}"`
     for (const id of ids) {
       const node = design.nodes[id]
-      if (!node) return `no layer "${id}"`
+      if (!node) return missingLayer(design, [id])
       for (const path of Object.keys(patch)) {
         if (!Object.hasOwn(LAYER_PROPS[node.type].shape, path)) return `a ${node.type} has no property "${path}"`
         const locked = lockProblem(id, node, lockFor(path))
@@ -109,7 +111,7 @@ export const overrideReset = defineCommand({
   input: z.object({ ids: NodeId.array().min(1), scope: Scope, paths: z.string().array().min(1).optional() }),
   check: ({ design }, { ids, scope }) => {
     if (!design.formats[formatIdOf(scope) ?? '']) return `no format "${formatIdOf(scope) ?? scope}"`
-    return ids.map((id) => (design.nodes[id] ? undefined : `no layer "${id}"`)).find(Boolean)
+    return missingLayer(design, ids)
   },
   apply: ({ r, design }, { ids, scope, paths }) => {
     for (const id of ids) {
@@ -123,7 +125,7 @@ export const overrideReset = defineCommand({
 export const nodeVisibleEverywhere = defineCommand({
   name: 'node.visibleEverywhere',
   input: z.object({ ids: NodeId.array().min(1), visible: z.boolean() }),
-  check: ({ design }, { ids }) => ids.map((id) => (design.nodes[id] ? undefined : `no layer "${id}"`)).find(Boolean),
+  check: ({ design }, { ids }) => missingLayer(design, ids),
   apply: ({ r, design }, { ids, visible }) => {
     for (const id of ids) {
       ;(r.nodes.get(id)?.get('props') as Y.Map<unknown> | undefined)?.set('visible', visible)
@@ -138,7 +140,7 @@ export const nodeDelete = defineCommand({
   check: ({ design }, { ids }) => {
     for (const id of ids) {
       const node = design.nodes[id]
-      if (!node) return `no layer "${id}"`
+      if (!node) return missingLayer(design, [id])
       const locked = [id, ...descendants(design, id)]
         .map((inner) => lockProblem(inner, design.nodes[inner] as LayerT, 'delete'))
         .find(Boolean)
@@ -164,7 +166,7 @@ export const nodeDelete = defineCommand({
 export const nodeRename = defineCommand({
   name: 'node.rename',
   input: z.object({ id: NodeId, name: z.string().trim().min(1).max(120) }),
-  check: ({ design }, { id }) => (design.nodes[id] ? undefined : `no layer "${id}"`),
+  check: ({ design }, { id }) => missingLayer(design, [id]),
   apply: ({ r }, { id, name }) => {
     r.nodes.get(id)?.set('name', name)
   },
@@ -177,7 +179,7 @@ export const nodeLock = defineCommand({
     ids: NodeId.array().min(1),
     lock: z.object(Object.fromEntries(LOCK_FLAGS.map((flag) => [flag, z.boolean().optional()]))),
   }),
-  check: ({ design }, { ids }) => ids.map((id) => (design.nodes[id] ? undefined : `no layer "${id}"`)).find(Boolean),
+  check: ({ design }, { ids }) => missingLayer(design, ids),
   apply: ({ r, design }, { ids, lock }) => {
     for (const id of ids) {
       const next = LayerLock.parse({ ...design.nodes[id]?.lock, ...lock })
@@ -207,7 +209,7 @@ export const nodeBind = defineCommand({
       return target === 'fontFamily' ? 'a font family needs a name' : 'colours are #RRGGBBAA'
     for (const id of ids) {
       const node = design.nodes[id]
-      if (!node) return `no layer "${id}"`
+      if (!node) return missingLayer(design, [id])
       if (!canBind(node.type, target)) return `a ${node.type} has no ${target} to bind`
       const locked = lockProblem(id, node, 'style')
       if (locked) return locked
@@ -251,7 +253,7 @@ export const nodeMask = defineCommand({
   check: ({ design }, { ids }) => {
     for (const id of ids) {
       const node = design.nodes[id]
-      if (!node) return `no layer "${id}"`
+      if (!node) return missingLayer(design, [id])
       const locked = lockProblem(id, node, 'style')
       if (locked) return locked
     }

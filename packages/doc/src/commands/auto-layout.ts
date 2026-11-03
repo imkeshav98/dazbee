@@ -1,5 +1,5 @@
-// Settings for a frame switched to auto layout (#46), read off where its children are, so that
-// switching moves nothing when the children already sit in an even row or column.
+// Switching a frame's auto layout on or off (#46), with its settings read off where its children are, so
+// that switching moves nothing when the children already sit in an even row or column.
 import type * as Y from 'yjs'
 import { z } from 'zod'
 
@@ -8,7 +8,7 @@ import { AnyScope, formatScope, NodeId, type Rect } from '@dazbee/schema'
 import { childrenOf } from '../children.ts'
 import { overrideKey } from '../design-doc.ts'
 import { round } from '../geometry.ts'
-import { lockProblem } from './checks.ts'
+import { lockProblem, missingLayer } from './checks.ts'
 import { defineCommand } from './define.ts'
 import { Placement } from './placement.ts'
 
@@ -33,7 +33,7 @@ export const nodeAutoLayout = defineCommand({
   input: z.object({ id: NodeId, on: z.boolean() }),
   check: ({ design }, { id }) => {
     const node = design.nodes[id]
-    if (!node) return `no layer "${id}"`
+    if (!node) return missingLayer(design, [id])
     if (node.type !== 'frame') return `"${id}" is a ${node.type}; only frames have auto layout`
     return lockProblem(id, node, 'style')
   },

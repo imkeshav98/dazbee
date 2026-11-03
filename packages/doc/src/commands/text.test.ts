@@ -3,11 +3,11 @@ import { describe, expect, it } from 'vitest'
 import { parseDesign } from '@dazbee/schema'
 
 import { loadDesign, openSession, readDesign } from '../index.ts'
-import { freshDoc, testDesign } from '../test-design.ts'
+import { testDesign, testDoc } from '../test-design.ts'
 
-describe('commands', () => {
-  it('text.edit inserts, deletes and styles ranges of a text layer', () => {
-    const doc = freshDoc()
+describe('text.edit', () => {
+  it('inserts, deletes and styles ranges of a text layer', () => {
+    const doc = testDoc()
     const tab = openSession(doc)
 
     tab.run('text.edit', { id: 'headline', op: { kind: 'insert', at: 11, text: '!' } })
@@ -31,7 +31,7 @@ describe('commands', () => {
     )
   })
 
-  it("text.edit keeps a format's own runs on their characters as text is typed and deleted, and leaves a format with its own text be", () => {
+  it("keeps a format's own runs on their characters as text is typed and deleted, and leaves a format with its own text be", () => {
     const result = parseDesign({
       ...testDesign(),
       overrides: {
@@ -84,9 +84,11 @@ describe('commands', () => {
       { start: 10, end: 14, style: { color: '#FF3D6EFF' } },
     ])
   })
+})
 
-  it('text.fit sizes a text box in each format, base from the primary, one undo step', () => {
-    const doc = freshDoc()
+describe('text.fit', () => {
+  it('sizes a text box in each format, base from the primary, one undo step', () => {
+    const doc = testDoc()
     const tab = openSession(doc)
     tab.run('text.fit', {
       id: 'headline',

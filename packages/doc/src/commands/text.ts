@@ -1,10 +1,11 @@
+// Commands for text layers: editing characters and styles, and fitting the box to the words.
 import type * as Y from 'yjs'
 import { z } from 'zod'
 
 import { formatScope, NodeId, RunStyle } from '@dazbee/schema'
 
 import { overrideKey } from '../design-doc.ts'
-import { lockProblem } from './checks.ts'
+import { lockProblem, missingLayer } from './checks.ts'
 import { defineCommand } from './define.ts'
 import { Placement } from './placement.ts'
 
@@ -25,7 +26,7 @@ export const textEdit = defineCommand({
   input: z.object({ id: NodeId, op: TextOp }),
   check: ({ design }, { id, op }) => {
     const node = design.nodes[id]
-    if (!node) return `no layer "${id}"`
+    if (!node) return missingLayer(design, [id])
     if (node.type !== 'text') return `"${id}" is a ${node.type}, not a text layer`
     const locked = lockProblem(id, node, op.kind === 'style' ? 'style' : 'content')
     if (locked) return locked
@@ -67,7 +68,7 @@ export const textFit = defineCommand({
   }),
   check: ({ design }, { id, sizes }) => {
     const node = design.nodes[id]
-    if (!node) return `no layer "${id}"`
+    if (!node) return missingLayer(design, [id])
     if (node.type !== 'text') return `"${id}" is a ${node.type}, not a text layer`
     return Object.keys(sizes)
       .map((f) => (design.formats[f] ? undefined : `no format "${f}"`))

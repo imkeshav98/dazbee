@@ -1,3 +1,5 @@
+// Commands that move layers to another parent or another place among their siblings, copy them, and place a
+// tree of them.
 import { nanoid } from 'nanoid'
 import { z } from 'zod'
 
@@ -6,7 +8,7 @@ import { type Design, Layer, type Layer as LayerT, LayerTree, NodeId, PageId } f
 import { ancestorsOf, childrenOf, descendants, isInside } from '../children.ts'
 import { toYNode } from '../design-doc.ts'
 import { centreOf, normalAngle, turn } from '../geometry.ts'
-import { parentProblem } from './checks.ts'
+import { missingLayer, parentProblem } from './checks.ts'
 import { type CommandContext, defineCommand } from './define.ts'
 import { Placement } from './placement.ts'
 import { copyLayers, indexBetween } from './tree.ts'
@@ -22,7 +24,7 @@ export const nodeMove = defineCommand({
   }),
   check: ({ design }, { id, parentId, before }) => {
     const node = design.nodes[id]
-    if (!node) return `no layer "${id}"`
+    if (!node) return missingLayer(design, [id])
     const problem = parentProblem(design, parentId, node.type)
     if (problem) return problem
     if (isInside(design, parentId, id)) return `can't move "${id}" inside itself`
@@ -48,7 +50,7 @@ export const nodeMove = defineCommand({
 export const nodeReorder = defineCommand({
   name: 'node.reorder',
   input: z.object({ ids: NodeId.array().min(1), to: z.enum(['forward', 'backward', 'front', 'back']) }),
-  check: ({ design }, { ids }) => ids.map((id) => (design.nodes[id] ? undefined : `no layer "${id}"`)).find(Boolean),
+  check: ({ design }, { ids }) => missingLayer(design, ids),
   apply: ({ r, design }, { ids, to }) => {
     const moving = new Set(ids)
     const parents = new Set(ids.map((id) => design.nodes[id]?.parentId as string))
@@ -91,7 +93,7 @@ export const nodeReorder = defineCommand({
 export const nodeDuplicate = defineCommand({
   name: 'node.duplicate',
   input: z.object({ ids: NodeId.array().min(1) }),
-  check: ({ design }, { ids }) => ids.map((id) => (design.nodes[id] ? undefined : `no layer "${id}"`)).find(Boolean),
+  check: ({ design }, { ids }) => missingLayer(design, ids),
   apply: ({ r, design }, { ids }) => {
     // A layer inside another one being copied comes along with it.
     const roots = ids.filter((id) => !ids.some((other) => other !== id && isInside(design, id, other)))

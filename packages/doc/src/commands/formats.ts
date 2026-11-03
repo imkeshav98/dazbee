@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { Format, FormatId, formatScope, formatSizeProblem, inOrder } from '@dazbee/schema'
 
 import { overrideKey, splitOverrideKey, toYMap } from '../design-doc.ts'
+import { round } from '../geometry.ts'
 import { idProblem } from './checks.ts'
 import { defineCommand } from './define.ts'
 import { mergedProps } from './placement.ts'
@@ -30,7 +31,6 @@ export const formatAdd = defineCommand({
     const scale = Math.min(format.width / primary.width, format.height / primary.height)
     const dx = (format.width - primary.width * scale) / 2
     const dy = (format.height - primary.height * scale) / 2
-    const round = (n: number) => Math.round(n * 100) / 100
     const from = design.overrides[formatScope(primaryId)] ?? {}
     for (const nodeId of Object.keys(design.nodes)) {
       const props = mergedProps(design, formatScope(primaryId), nodeId) as Record<string, unknown> & {

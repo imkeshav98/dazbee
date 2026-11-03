@@ -1,10 +1,11 @@
+// Path layers: new path data, and the box a path is drawn in as its size changes.
 import type * as Y from 'yjs'
 import { z } from 'zod'
 
 import { AnyScope, type Design, NodeId } from '@dazbee/schema'
 
 import { centreOf, turn } from '../geometry.ts'
-import { lockProblem } from './checks.ts'
+import { lockProblem, missingLayer } from './checks.ts'
 import { type CommandContext, defineCommand } from './define.ts'
 import { Placement } from './placement.ts'
 
@@ -29,7 +30,7 @@ export const nodeReshape = defineCommand({
   }),
   check: ({ design }, { id }) => {
     const node = design.nodes[id]
-    if (!node) return `no layer "${id}"`
+    if (!node) return missingLayer(design, [id])
     if (node.type !== 'graphic' || node.props.shape.kind !== 'path') return `"${id}" is not a path`
     for (const flag of ['style', 'move', 'resize'] as const) {
       const locked = lockProblem(id, node, flag)

@@ -3,11 +3,11 @@ import { describe, expect, it } from 'vitest'
 import { inOrder } from '@dazbee/schema'
 
 import { openSession, readDesign } from '../index.ts'
-import { badge, freshDoc } from '../test-design.ts'
+import { badge, testDoc } from '../test-design.ts'
 
-describe('commands', () => {
-  it('page.add and format.add extend the design', () => {
-    const doc = freshDoc()
+describe('page.add', () => {
+  it('extends the design, and so does format.add', () => {
+    const doc = testDoc()
     const tab = openSession(doc)
 
     const page = tab.run('page.add', { name: 'Card 2' })
@@ -19,9 +19,11 @@ describe('commands', () => {
     expect(design.formats[format]).toMatchObject({ name: 'Story', width: 1080, height: 1920 })
     expect(() => tab.run('format.add', { name: 'Bad', width: 0, height: 10 })).toThrow(/format.add: width/)
   })
+})
 
-  it('page.duplicate copies the page after itself with fresh layer ids, their nesting and their overrides', () => {
-    const doc = freshDoc()
+describe('page.duplicate', () => {
+  it('copies the page after itself with fresh layer ids, their nesting and their overrides', () => {
+    const doc = testDoc()
     const tab = openSession(doc)
     tab.run('page.add', { id: 'p2', name: 'Card 2' })
     tab.run('node.create', {
@@ -56,9 +58,11 @@ describe('commands', () => {
     expect(readDesign(doc).pages[copy]).toBeUndefined()
     expect(Object.keys(readDesign(doc).nodes).sort()).toEqual(['box', 'dot', 'g', 'headline'])
   })
+})
 
-  it('page.move reorders pages and page.update renames one', () => {
-    const doc = freshDoc()
+describe('page.move', () => {
+  it('reorders pages, and page.update renames one', () => {
+    const doc = testDoc()
     const tab = openSession(doc)
     tab.run('page.add', { id: 'p2', name: 'Card 2' })
     tab.run('page.add', { id: 'p3', name: 'Card 3' })
@@ -78,9 +82,11 @@ describe('commands', () => {
     expect(readDesign(doc).pages.p2?.fills).toEqual([])
     expect(() => tab.run('page.move', { id: 'p2', before: 'nope' })).toThrow(/no other page/)
   })
+})
 
-  it('page.delete removes a page with its layers, keeps the last page, and undo brings the layers back', () => {
-    const doc = freshDoc()
+describe('page.delete', () => {
+  it('removes a page with its layers, keeps the last page, and undo brings the layers back', () => {
+    const doc = testDoc()
     const tab = openSession(doc)
     expect(() => tab.run('page.delete', { id: 'p1' })).toThrow(/at least one page/)
     const copy = tab.run('page.duplicate', { id: 'p1' })

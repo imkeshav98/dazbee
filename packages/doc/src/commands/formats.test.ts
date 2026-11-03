@@ -3,11 +3,11 @@ import { describe, expect, it } from 'vitest'
 import { inOrder } from '@dazbee/schema'
 
 import { openSession, readDesign } from '../index.ts'
-import { freshDoc } from '../test-design.ts'
+import { testDoc } from '../test-design.ts'
 
-describe('commands', () => {
-  it('format.add starts a format from the primary layout scaled to fit and centred, written as overrides', () => {
-    const doc = freshDoc()
+describe('format.add', () => {
+  it('starts a format from the primary layout scaled to fit and centred, written as overrides', () => {
+    const doc = testDoc()
     const tab = openSession(doc)
     tab.run('node.update', { ids: ['box'], scope: 'format:sq', patch: { x: 140, rotation: 15 } })
 
@@ -32,17 +32,19 @@ describe('commands', () => {
     })
   })
 
-  it('format.add and format.update refuse sizes outside 1:3 to 3:1 or under the short side', () => {
-    const tab = openSession(freshDoc())
+  it('refuses sizes outside 1:3 to 3:1 or under the short side, as format.update does', () => {
+    const tab = openSession(testDoc())
     expect(() => tab.run('format.add', { name: 'Skyscraper', width: 160, height: 600 })).toThrow(/1:3 to 3:1/)
     expect(() => tab.run('format.add', { name: 'Strip', width: 1600, height: 500 })).toThrow(/1:3 to 3:1/)
     expect(() => tab.run('format.add', { name: 'Tiny', width: 90, height: 90 })).toThrow(/short side/)
     expect(tab.run('format.add', { name: 'Edge', width: 1500, height: 500 })).toBeTruthy()
     expect(() => tab.run('format.update', { id: 'sq', width: 4000 })).toThrow(/1:3 to 3:1/)
   })
+})
 
-  it('format.update renames, resizes and reorders a format', () => {
-    const doc = freshDoc()
+describe('format.update', () => {
+  it('renames, resizes and reorders a format', () => {
+    const doc = testDoc()
     const tab = openSession(doc)
     tab.run('format.add', { id: 'story', name: 'Story', width: 1080, height: 1920 })
     tab.run('format.update', { id: 'story', name: 'Reel', width: 1080, height: 1350 })
@@ -56,9 +58,11 @@ describe('commands', () => {
     expect(order()).toEqual(['story', 'sq', 'banner'])
     expect(() => tab.run('format.update', { id: 'story', before: 'story' })).toThrow(/no other format/)
   })
+})
 
-  it('format.remove drops the format and its overrides, keeps the primary and the last one, and undo brings both back', () => {
-    const doc = freshDoc()
+describe('format.remove', () => {
+  it('drops the format and its overrides, keeps the primary and the last one, and undo brings both back', () => {
+    const doc = testDoc()
     const tab = openSession(doc)
     expect(readDesign(doc).overrides['format:banner']?.headline).toMatchObject({ x: 4 })
 
