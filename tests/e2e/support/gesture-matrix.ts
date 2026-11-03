@@ -155,7 +155,10 @@ async function drag(page: Page, a: { x: number; y: number }, b: { x: number; y: 
   await drawn(page)
 }
 async function handleAt(page: Page, which: string) {
-  const box = await page.locator(`.selection .handle[data-handle="${which}"]`).boundingBox()
+  const handle = page.locator(`.selection .handle[data-handle="${which}"]`)
+  // A handle the selection hasn't is none, at once.
+  if ((await handle.count()) === 0) return null
+  const box = await handle.boundingBox()
   return box && { x: box.x + box.width / 2, y: box.y + box.height / 2 }
 }
 const close = (a: number, b: number, tol = 0.6) => Math.abs(a - b) <= tol
