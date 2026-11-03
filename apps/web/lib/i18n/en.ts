@@ -439,6 +439,7 @@ export const en = {
       addEffect: 'Add effect',
       effectField: { x: 'X', y: 'Y', blur: 'Blur', spread: 'Spread', radius: 'Radius' },
       effectFieldName: '{effect} {n} {field}',
+      effectNamed: '{effect} {n}',
       fontSize: 'Size',
       lineHeight: 'Line height',
       lineHeightAuto: 'Auto',

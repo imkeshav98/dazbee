@@ -17,7 +17,7 @@ import { ALIGN, keyOf, useSelection } from './arrange-panel.tsx'
 import { isPanel, setOpen, setSheetTop, useEditState, usePhone, type PanelId } from './edit-store.ts'
 import { FontChooser, useFontCatalog } from './font-panel.tsx'
 import { ORDER } from './layer-actions.tsx'
-import { PanelContent, useTarget, type Target } from './selection-cards.tsx'
+import { factsOf, PanelContent, useTarget, type Target } from './selection-cards.tsx'
 import { PANEL_BUTTON, PANEL_HEADING, PANEL_PART } from './styles.ts'
 import { useOverlayScroll } from '../ui/overlay-scroll.ts'
 
@@ -45,10 +45,10 @@ const SPREAD = [
 
 /**
  * The Position panel's simple choices: the four moves along the stack, then lining up. One layer
- * lines up with its size, by name; several line up with each other, by icon, and three or more
- * spread out evenly. Each button runs its shortcut's action, and its tooltip names the shortcut.
+ * lines up with its size, by name, unless an auto layout places it (`placed`); several line up
+ * with each other, by icon, and three or more spread out evenly. Each button runs its shortcut's action, and its tooltip names the shortcut.
  */
-function ArrangePart({ target }: { target: Target }) {
+function ArrangePart({ target, placed }: { target: Target; placed: boolean }) {
   const t = useMessages()
   const a = t.editor.arrange
   const placing = t.editor.bar.placing
@@ -89,7 +89,7 @@ function ArrangePart({ target }: { target: Target }) {
             </div>
           </>
         )
-        : (
+        : !placed && (
           <>
             <h3 className={PANEL_HEADING}>{placing.lineUpSize}</h3>
             <div className="grid grid-cols-2 gap-1.5">
@@ -162,8 +162,8 @@ function Panel({ id, target, design, brandId }: { id: PanelId; target: Target; d
     const onKey = (event: KeyboardEvent) => {
       if (event.key !== 'Escape' || event.defaultPrevented) return
       const at = document.activeElement
-      // A pop-up of the panel's own, such as a select's list, closes first.
-      if (at instanceof Element && at.closest('[data-radix-popper-content-wrapper]')) return
+      // A list of the panel's own, a select's or a pop-up's, closes first.
+      if (at instanceof Element && (at.closest('[data-radix-popper-content-wrapper]') || at.getAttribute('aria-expanded') === 'true')) return
       if (at instanceof HTMLElement && panel.current?.contains(at) && (at.tagName === 'INPUT' || at.tagName === 'TEXTAREA' || at.tagName === 'SELECT')) {
         setOpen(null)
         requestAnimationFrame(() => {
@@ -230,7 +230,7 @@ function Panel({ id, target, design, brandId }: { id: PanelId; target: Target; d
           ? <FontChooser editor={target.editor} brandId={brandId} catalog={catalog} refresh={refresh} onDone={() => close(true)} />
           : (
             <>
-              {id === 'position' && <ArrangePart target={target} />}
+              {id === 'position' && <ArrangePart target={target} placed={factsOf(target, design).inFlow && target.props.every((pr) => pr.absolute !== true)} />}
               <PanelContent panel={id} target={target} design={design} brandId={brandId} />
             </>
           )}

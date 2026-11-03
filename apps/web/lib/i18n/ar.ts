@@ -427,6 +427,7 @@ export const ar: Messages = {
       effect: { dropShadow: 'ظل خارجي', innerShadow: 'ظل داخلي', glow: 'توهج', layerBlur: 'تمويه الطبقة', backgroundBlur: 'تمويه الخلفية' },
       addEffect: 'إضافة تأثير',
       effectField: { x: 'س', y: 'ص', blur: 'التمويه', spread: 'الانتشار', radius: 'نصف القطر' },
+      effectNamed: '{effect} {n}',
       effectFieldName: '{effect} {n} {field}',
       fontSize: 'الحجم',
       lineHeight: 'ارتفاع السطر',

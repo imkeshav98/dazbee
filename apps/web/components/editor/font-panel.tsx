@@ -103,7 +103,8 @@ export function FontPreview({ brandId, family, className, big = false }: { brand
 /**
  * The font of the selected text, for the Font panel: a search, the weight, then the families in
  * their groups to pick from, and an upload. The catalog is fetched again each time it opens, so a
- * brand's new upload shows.
+ * brand's new upload shows. A pick or an upload sets the font and leaves the panel open, to try
+ * another or set the weight.
  */
 export function FontChooser({ editor, brandId, catalog, refresh, onDone }: { editor: Editor; brandId: string; catalog: FontFamily[]; refresh: () => Promise<void>; onDone: () => void }) {
   const t = useMessages()
@@ -124,7 +125,6 @@ export function FontChooser({ editor, brandId, catalog, refresh, onDone }: { edi
   const pick = (picked: FontFamily) => {
     const available = weightsOf(picked)
     editor.setFont(picked.family, available.length > 0 ? nearest(available, current.weight ?? 400) : undefined)
-    onDone()
   }
   return (
     <div className="flex min-w-0 flex-col" data-testid="font-chooser">
@@ -138,7 +138,6 @@ export function FontChooser({ editor, brandId, catalog, refresh, onDone }: { edi
         onUploaded={async (face) => {
           await refresh()
           editor.setFont(face.family, face.weight)
-          onDone()
         }}
         weight={(
           <label className="flex flex-col gap-1.5">

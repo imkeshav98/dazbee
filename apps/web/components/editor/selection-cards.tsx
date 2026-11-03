@@ -600,7 +600,7 @@ function EffectRow({ effect, i, target, p, write }: { effect: Effect; i: number;
           )
         })}
       </div>
-      {'color' in effect && <ColorField name={effectName} value={effect.color} onSet={(to) => change((now) => ({ ...now, color: to('color' in now ? now.color : undefined) }) as Effect)} />}
+      {'color' in effect && <ColorField name={format(p.effectNamed, { effect: effectName, n: i + 1 })} value={effect.color} onSet={(to) => change((now) => ({ ...now, color: to('color' in now ? now.color : undefined) }) as Effect)} />}
     </div>
   )
 }
@@ -854,8 +854,9 @@ function TextFitCard({ target, p, title }: { target: Target; p: P; title: string
         min={0}
         placeholder={p.none}
         editor={target.editor}
-        // 0 lifts the limit.
+        // 0, or nothing, lifts the limit.
         onSet={(v) => set(target, () => ({ maxLines: Math.round(v) >= 1 ? Math.round(v) : undefined }))}
+        onClear={() => set(target, () => ({ maxLines: undefined }))}
         onShift={(by) => set(target, (now) => {
           const next = Math.round(((now.maxLines as number | undefined) ?? 0) + by)
           return { maxLines: next >= 1 ? next : undefined }
@@ -1347,9 +1348,17 @@ function ColourPanel({ target, design, brandId, p, b }: { target: Target; design
     return { fills: i < 0 ? [...fills, to(NEW_FILL)] : fills.map((f, j) => (j === i ? to(f) : f)) }
   })
   const paint = (hex: string) => paintFill((now) => (now.type === 'solid' ? { ...now, color: `${hex}FF` } : { type: 'solid', color: `${hex}FF` }))
+  // The picker edits the topmost fill that shows, whatever its type, so a gradient picked stays the one it shows.
+  const showing = (fills: Paint[]) => fills.findLastIndex((f) => f.visible !== false)
+  const pickFill = (to: (now: Paint) => Paint) => set(target, (now) => {
+    const fills = (now.fills ?? []) as Paint[]
+    const i = showing(fills)
+    return { fills: i < 0 ? [...fills, to(NEW_FILL)] : fills.map((f, j) => (j === i ? to(f) : f)) }
+  })
   // A picture goes into layers that have none; one that has a picture changes it with Replace on the bar.
   const pictureless = target.props.every((pr) => !((pr.fills ?? []) as Paint[]).some((f) => f.type === 'image'))
-  const first = bound((target.props[0]?.fills ?? []) as Paint[]) ?? NEW_FILL
+  const firstFills = (target.props[0]?.fills ?? []) as Paint[]
+  const first = firstFills[showing(firstFills)] ?? NEW_FILL
   return (
     <>
       <ColourChoices
@@ -1360,7 +1369,7 @@ function ColourPanel({ target, design, brandId, p, b }: { target: Target; design
         b={b}
         current={shown}
         paint={paint}
-        picker={<PaintEditor paint={first} brandId={brandId} editor={target.editor} p={p} onSet={paintFill} />}
+        picker={<PaintEditor paint={first} brandId={brandId} editor={target.editor} p={p} onSet={pickFill} />}
       />
       {pictureless && (
         <ImagePickerButton
@@ -1519,10 +1528,13 @@ export function EffectsBody({ target, p, b, brandId }: { target: Target; p: P; b
       <Card id="effects-card" title={b.advanced} strong>
         {text && outline && outline !== 'mixed' && outline.width > 0 && (
           <div className="flex flex-col gap-1.5" data-item="text-outline">
-            <span className="text-xs font-bold text-text">{p.tiles.outline}</span>
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-text">{p.tiles.outline}</span>
+              <RemoveButton label={format(p.remove, { name: p.tiles.outline.toLowerCase(), n: 1 })} onClick={() => press('outline')} />
+            </div>
             <div className="flex items-center gap-1">
               <div className="w-24 shrink-0">
-                <NumberField label="W" name={p.outlineWidth} value={outline.width} min={0} step={0.5} editor={target.editor} onSet={(width) => setOutline((was) => ({ ...was, width }))} onShift={(by) => setOutline((was) => ({ ...was, width: tidy(clamp(was.width + by, 0)) }))} />
+                <NumberField label="W" name={p.outlineWidth} value={outline.width} min={0.5} step={0.5} editor={target.editor} onSet={(width) => setOutline((was) => ({ ...was, width }))} onShift={(by) => setOutline((was) => ({ ...was, width: tidy(clamp(was.width + by, 0.5)) }))} />
               </div>
               <ColorField name={p.outline} value={outline.color} onSet={(to) => setOutline((was) => ({ ...was, color: to(was.color) }))} />
             </div>
