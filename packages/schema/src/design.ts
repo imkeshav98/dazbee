@@ -1,5 +1,6 @@
 import { z } from 'zod'
 
+import { deepFreeze, isRecord } from './json.ts'
 import { canHold, LAYER_PROPS, type LayerType } from './layers.ts'
 import { migrateDesign, SCHEMA_VERSION } from './migrate.ts'
 import { Paint } from './paint.ts'
@@ -305,16 +306,6 @@ export function parseDesign(input: unknown): ParseResult {
   }
 }
 
-/** Freezes an object and everything inside it, so a cached result can be shared safely. */
-function deepFreeze<T>(value: T): T {
-  if (typeof value === 'object' && value !== null && !Object.isFrozen(value)) {
-    Object.freeze(value)
-    for (const inner of Object.values(value)) deepFreeze(inner)
-  }
-  return value
-}
-
-const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v)
 /** Validated layers by the object they came from; a validated layer maps to itself. */
 const layerCache = new WeakMap<object, Layer>()
 const validIds = new Set<string>()

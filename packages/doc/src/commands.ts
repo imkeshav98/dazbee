@@ -32,7 +32,7 @@ import {
   VariableRef,
 } from '@dazbee/schema'
 
-import { childrenOf } from './children.ts'
+import { ancestorsOf, childrenOf, descendants, isInside } from './children.ts'
 import { type CommandContext, defineCommand } from './command.ts'
 import { DELETED, overrideKey, splitOverrideKey, toYMap, toYNode } from './design-doc.ts'
 import { boundsOf, centreOf, normalAngle, round, turn } from './geometry.ts'
@@ -207,11 +207,6 @@ const nodeVisibleEverywhere = defineCommand({
   },
 })
 
-const isInside = (design: Design, id: string, maybeAncestor: string) => {
-  for (let up: string | undefined = id; up; up = design.nodes[up]?.parentId) if (up === maybeAncestor) return true
-  return false
-}
-
 const nodeMove = defineCommand({
   name: 'node.move',
   /** `keepDrawn` false leaves the layer's box as stored, for a caller that places it itself. */
@@ -241,13 +236,6 @@ const nodeMove = defineCommand({
     node?.set('index', index)
   },
 })
-
-/** The layers a layer sits in, its own parent first, up to the page. */
-const ancestorsOf = (design: Design, parentId: string): string[] => {
-  const out: string[] = []
-  for (let up: string | undefined = parentId; up && design.nodes[up]; up = design.nodes[up]?.parentId) out.push(up)
-  return out
-}
 
 /**
  * Keeps a layer where it is drawn as it moves under `parentId`, in every format: each layer it sits
@@ -1089,11 +1077,6 @@ const pagesInOrder = (design: Design) =>
   Object.entries(design.pages).sort(([a, x], [b, y]) =>
     x.order < y.order ? -1 : x.order > y.order ? 1 : a < b ? -1 : 1,
   )
-
-/** Every layer under a page or layer, parents before children. */
-function descendants(design: Design, parentId: string): string[] {
-  return childrenOf(design, parentId).flatMap(([id]) => [id, ...descendants(design, id)])
-}
 
 /** Renames a page, or sets its background fills (the Page card, #83). */
 const pageUpdate = defineCommand({

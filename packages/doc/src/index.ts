@@ -1,5 +1,5 @@
 export { CommandError, defineCommand, type Command } from './command.ts'
-export { childrenOf } from './children.ts'
+export { ancestorsOf, childrenOf, descendants, isInside } from './children.ts'
 export { COMMANDS, type CommandName } from './commands.ts'
 export {
   anchorOffset,

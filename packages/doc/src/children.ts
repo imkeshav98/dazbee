@@ -43,3 +43,20 @@ export function childrenOf(design: Design, parentId: string): [string, Layer][] 
   }
   return index(parentId).map((id) => [id, design.nodes[id] as Layer])
 }
+
+/** Every layer under a page or layer, parents before children. */
+export function descendants(design: Design, parentId: string): string[] {
+  return childrenOf(design, parentId).flatMap(([id]) => [id, ...descendants(design, id)])
+}
+
+/** The layers a layer sits in, its own parent first, up to the page. */
+export const ancestorsOf = (design: Design, parentId: string): string[] => {
+  const out: string[] = []
+  for (let up: string | undefined = parentId; up && design.nodes[up]; up = design.nodes[up]?.parentId) out.push(up)
+  return out
+}
+
+export const isInside = (design: Design, id: string, maybeAncestor: string) => {
+  for (let up: string | undefined = id; up; up = design.nodes[up]?.parentId) if (up === maybeAncestor) return true
+  return false
+}
