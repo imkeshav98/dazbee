@@ -73,7 +73,7 @@ export const exportHashOf = (page: Page) =>
     return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('')
   })
 
-export const synced = (page: Page) => page.evaluate(() => window.dazbee?.synced() ?? false)
+const synced = (page: Page) => page.evaluate(() => window.dazbee?.synced() ?? false)
 
 /** Waits for the sync server to have every change, reloads, and checks the design came back the same. */
 export async function reloads(page: Page) {

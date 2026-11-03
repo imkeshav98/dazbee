@@ -58,7 +58,7 @@ export function findViolations(workspaces: WorkspacePackage[]): string[] {
  * Reads the workspace packages named by `pnpm-workspace.yaml` under `root`.
  * Anything it can't check is reported as a problem, so the check never passes by seeing nothing.
  */
-export function readWorkspaces(root: string): { workspaces: WorkspacePackage[]; problems: string[] } {
+function readWorkspaces(root: string): { workspaces: WorkspacePackage[]; problems: string[] } {
   const yaml = readFileSync(join(root, 'pnpm-workspace.yaml'), 'utf8')
   const packagesBlock = yaml.match(/^packages:\s*\n((?:[ \t]+-.*\n?)*)/m)?.[1] ?? ''
   const patterns = [...packagesBlock.matchAll(/^[ \t]+-[ \t]*['"]?([^'"\n]+?)['"]?[ \t]*$/gm)].map(

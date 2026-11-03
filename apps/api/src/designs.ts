@@ -126,7 +126,7 @@ export async function deleteDesign(db: Db, workspaceId: string, brandId: string,
 }
 
 /** One blank 1080×1080 page: what a design starts as when nothing else is given. */
-export const blankDesign = (designId: string, name: string): DesignInput => ({
+const blankDesign = (designId: string, name: string): DesignInput => ({
   meta: { schemaVersion: SCHEMA_VERSION, designId, name, kind: 'single', primaryFormatId: 'sq' },
   formats: { sq: { name: 'Square', width: 1080, height: 1080, order: 'a0' } },
   pages: { p1: { name: 'Page 1', order: 'a0', fills: [{ type: 'solid', color: '#FFFFFFFF' }] } },

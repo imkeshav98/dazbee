@@ -70,7 +70,7 @@ const row = (direction: 'row' | 'column', gap = 20, pad = 20) => ({
 })
 
 /** One page holding a layer of each kind, spread out so each can be pressed on its own. */
-export const matrixDesign = (assetId: string): DesignInput => ({
+const matrixDesign = (assetId: string): DesignInput => ({
   meta: {
     schemaVersion: 5,
     designId: 'replaced-by-the-api',
@@ -402,7 +402,7 @@ const HANDLES: Record<string, { dx: number; dy: number; w: number; h: number }> 
   ne: { dx: 40, dy: -30, w: 40, h: 30 },
   sw: { dx: -40, dy: 30, w: 40, h: 30 },
 }
-export const GESTURES = [
+const GESTURES = [
   'move',
   ...Object.keys(HANDLES).map((h) => `resize-${h}`),
   'rotate',

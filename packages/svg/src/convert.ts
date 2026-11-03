@@ -886,7 +886,7 @@ const num = (n: number) => String(Math.round(n * 1000) / 1000)
  * A path's SVG data. Skia's own writer splits conics, as circles are made of, into many
  * quadratics; here each conic becomes one cubic, the usual way to draw a quarter circle.
  */
-export function pathData(path: Path): string {
+function pathData(path: Path): string {
   const cmds = path.toCmds()
   const out: string[] = []
   let x = 0

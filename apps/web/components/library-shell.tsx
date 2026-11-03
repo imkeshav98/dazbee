@@ -19,7 +19,7 @@ import { BrandMark } from './brand-mark.tsx'
 import { LibraryCapsule } from './library-capsule.tsx'
 import { NewBrandRow } from './new-brand-row.tsx'
 
-export function BrandAvatar({ name, active = false }: { name: string; active?: boolean }) {
+function BrandAvatar({ name, active = false }: { name: string; active?: boolean }) {
   return (
     <span
       aria-hidden

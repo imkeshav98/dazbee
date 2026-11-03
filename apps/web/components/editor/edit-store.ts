@@ -6,11 +6,11 @@
 import { useEffect, useState, useSyncExternalStore } from 'react'
 
 /** The top bar's items that open the edit panel for the selected layers. */
-export const LAYER_PANELS = ['font', 'colour', 'spacing', 'effects', 'position', 'edit', 'outline', 'stack'] as const
+const LAYER_PANELS = ['font', 'colour', 'spacing', 'effects', 'position', 'edit', 'outline', 'stack'] as const
 /** The design's own panels: Sizes from the header pill, Pages from by the zoom, and the picked page's Background. */
-export const DESIGN_PANELS = ['sizes', 'pages', 'background'] as const
+const DESIGN_PANELS = ['sizes', 'pages', 'background'] as const
 /** Every id that opens the edit panel; every other id is a pop-up or the full menu. */
-export const PANELS = [...LAYER_PANELS, ...DESIGN_PANELS] as const
+const PANELS = [...LAYER_PANELS, ...DESIGN_PANELS] as const
 export type LayerPanelId = (typeof LAYER_PANELS)[number]
 export type PanelId = (typeof PANELS)[number]
 

@@ -516,7 +516,7 @@ function ListBody<T>({
 }
 
 /** The fill list, under a heading with +, each fill with its editor. */
-export function FillBody({ target, brandId, p, title }: { target: Target; brandId: string; p: P; title: string }) {
+function FillBody({ target, brandId, p, title }: { target: Target; brandId: string; p: P; title: string }) {
   return (
     <ListBody<Paint>
       title={title}
@@ -546,7 +546,7 @@ export function FillBody({ target, brandId, p, title }: { target: Target; brandI
  * The strokes, each with its paint, width, place, dashes, ends and corners, under a heading with +:
  * the Outline panel's Advanced.
  */
-export function StrokeBody({ target, brandId, p, title }: { target: Target; brandId: string; p: P; title: string }) {
+function StrokeBody({ target, brandId, p, title }: { target: Target; brandId: string; p: P; title: string }) {
   return (
     <ListBody<Stroke>
       title={title}
@@ -1076,7 +1076,7 @@ function Segments<T extends string>({
 const CASE_MARKS = { none: 'Ab', upper: 'AB', lower: 'ab', title: 'Aa' }
 
 /** The text's alignment, as the top bar's Align pop-up shows it: along the line, and up and down in the box. */
-export function TextAlignBody({ target, p }: { target: Target; p: P }) {
+function TextAlignBody({ target, p }: { target: Target; p: P }) {
   const t = useMessages()
   return (
     <div className="flex w-72 flex-col gap-2.5 p-1">
@@ -1099,7 +1099,7 @@ export function TextAlignBody({ target, p }: { target: Target; p: P }) {
 }
 
 /** The text's list, as the top bar's List pop-up shows it: none, bullets or numbers. */
-export function TextListBody({ target, p }: { target: Target; p: P }) {
+function TextListBody({ target, p }: { target: Target; p: P }) {
   return (
     <div className="flex w-64 flex-col p-1">
       <Segments
@@ -1114,7 +1114,7 @@ export function TextListBody({ target, p }: { target: Target; p: P }) {
 }
 
 /** The text's case, as the top bar's aA pop-up shows it. */
-export function TextCaseBody({ target, p }: { target: Target; p: P }) {
+function TextCaseBody({ target, p }: { target: Target; p: P }) {
   const { style, setStyle } = textStyle(target)
   return (
     <div className="flex w-56 flex-col p-1">
@@ -1313,7 +1313,7 @@ const setImage = (target: Target, index: number, change: (now: ImageFill) => Par
   })
 
 /** The bar's Look popover for a photo: each filter as the photo with it. */
-export function PhotoLookBody({
+function PhotoLookBody({
   target,
   p,
   brandId,
@@ -2303,7 +2303,7 @@ function EffectSample({ sample, tile }: { sample: Sample; tile: Tile }) {
  * remove button, text's outline with its width and colour, and Add another, which adds a second
  * effect of a type.
  */
-export function EffectsBody({
+function EffectsBody({
   target,
   p,
   b,

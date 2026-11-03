@@ -27,7 +27,7 @@ export const SIGNED_URL_SECONDS = 5 * 60
 
 export const originalKey = (workspaceId: string, sha256: string) => `workspaces/${workspaceId}/originals/${sha256}`
 /** The asset library's small copy of an original, made once and shared like the original (#52). */
-export const thumbnailKey = (workspaceId: string, sha256: string) => `workspaces/${workspaceId}/thumbnails/${sha256}`
+const thumbnailKey = (workspaceId: string, sha256: string) => `workspaces/${workspaceId}/thumbnails/${sha256}`
 
 const summary = {
   id: assets.id,
@@ -83,7 +83,7 @@ export async function listAssets(db: Db, workspaceId: string, brandId: string, q
  * What of the brand shows the asset: its designs as they are stored, the templates saved from it
  * (whose images are its assets), and its logo. Only the brand's own, since an asset is one brand's.
  */
-export async function assetUses(db: Db, workspaceId: string, brandId: string, id: string): Promise<AssetUse[]> {
+async function assetUses(db: Db, workspaceId: string, brandId: string, id: string): Promise<AssetUse[]> {
   const uses: AssetUse[] = []
   // Only designs whose stored state holds the id's bytes can show it; each of those is read to be sure.
   const brandDesigns = await db

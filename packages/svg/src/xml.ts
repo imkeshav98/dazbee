@@ -9,7 +9,7 @@ export interface XmlElement {
   attrs: Record<string, string>
   children: XmlNode[]
 }
-export type XmlNode = XmlElement | string
+type XmlNode = XmlElement | string
 
 export class XmlError extends Error {}
 

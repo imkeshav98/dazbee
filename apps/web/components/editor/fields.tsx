@@ -221,8 +221,8 @@ export function NumberField({
 }
 
 /** A colour as #RRGGBBAA: one part changed, the other as the document holds it now. */
-export const withHex = (hex: string) => (now: string | undefined) => `${hex}${now?.slice(7, 9) || 'FF'}`
-export const withOpacity = (alpha: number) => (now: string | undefined) =>
+const withHex = (hex: string) => (now: string | undefined) => `${hex}${now?.slice(7, 9) || 'FF'}`
+const withOpacity = (alpha: number) => (now: string | undefined) =>
   `${now?.slice(0, 7) || '#000000'}${Math.round(clamp(alpha, 0, 1) * 255)
     .toString(16)
     .padStart(2, '0')

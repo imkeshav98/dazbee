@@ -7,15 +7,15 @@ import { normalAngle, round } from './transform.ts'
 
 export const SHAPE_TOOLS = ['rect', 'ellipse', 'polygon', 'star', 'line', 'arrow'] as const
 export type ShapeTool = (typeof SHAPE_TOOLS)[number]
-export const isShapeTool = (tool: string): tool is ShapeTool => (SHAPE_TOOLS as readonly string[]).includes(tool)
+const isShapeTool = (tool: string): tool is ShapeTool => (SHAPE_TOOLS as readonly string[]).includes(tool)
 /** What a drag draws: a shape, or a frame. */
 export type DrawTool = ShapeTool | 'frame'
 export const isDrawTool = (tool: string): tool is DrawTool => tool === 'frame' || isShapeTool(tool)
 
 /** The size a click without a drag draws, in design pixels. */
-export const CLICK_SIZE = 100
+const CLICK_SIZE = 100
 /** A frame clicked without a drag is bigger: room for what goes in it. */
-export const FRAME_CLICK_SIZE = 200
+const FRAME_CLICK_SIZE = 200
 /** New shapes are a neutral grey until a style is picked; lines a near-black stroke. */
 const FILL = '#C9CED6FF'
 const INK = '#1F2329FF'
@@ -28,7 +28,7 @@ export interface NewLayer {
 }
 
 /** A new frame for the frame tool, at no size yet: white, as frames start in most design tools. */
-export const newFrame = (): NewLayer => ({
+const newFrame = (): NewLayer => ({
   type: 'frame',
   name: 'Frame',
   props: { x: 0, y: 0, width: 0, height: 0, fills: [{ type: 'solid', color: '#FFFFFFFF' }] },
@@ -155,7 +155,7 @@ export function withImage(fills: readonly Paint[], assetId: string): Paint[] {
 }
 
 /** The most of a frame's width or height an image placed from the asset library takes at first (#52). */
-export const PLACED_SHARE = 0.5
+const PLACED_SHARE = 0.5
 
 /**
  * A graphic filled with an image asset (#52), centred on `at` in a frame of `frame` size: the

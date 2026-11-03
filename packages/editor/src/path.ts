@@ -23,7 +23,7 @@ export interface AnchorRef {
 }
 export type Side = 'in' | 'out'
 /** The four points of a cubic Bézier segment. */
-export type Cubic = [Point, Point, Point, Point]
+type Cubic = [Point, Point, Point, Point]
 
 const near = (a: Point, b: Point, within = 1e-6) => Math.abs(a.x - b.x) <= within && Math.abs(a.y - b.y) <= within
 const lerp = (a: Point, b: Point, t: number): Point => ({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t })
@@ -378,7 +378,7 @@ export function nearestOnCubic(cubic: Cubic, p: Point): { t: number; point: Poin
 }
 
 /** What a press at `p` is on: a shown handle first, then an anchor, then a segment; null for none. */
-export type PathHit =
+type PathHit =
   | { kind: 'control'; ref: AnchorRef; side: Side }
   | { kind: 'anchor'; ref: AnchorRef }
   | { kind: 'segment'; contour: number; from: number; t: number }

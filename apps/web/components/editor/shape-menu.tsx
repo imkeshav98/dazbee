@@ -24,7 +24,7 @@ import { useMessages } from '@/lib/i18n/client.tsx'
 
 import { DOCK_BUTTON, DOCK_OFF, DOCK_ON, POPOVER } from './styles.ts'
 
-export const SHAPES: { id: ShapeTool; icon: Icon; key?: string }[] = [
+const SHAPES: { id: ShapeTool; icon: Icon; key?: string }[] = [
   { id: 'rect', icon: RectangleIcon, key: 'R' },
   { id: 'ellipse', icon: CircleIcon, key: 'O' },
   { id: 'polygon', icon: PentagonIcon },

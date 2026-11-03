@@ -42,7 +42,7 @@ export async function brandResourcesFor(
 }
 
 /** What drawing the design for this brand needs, the shipped fonts included. */
-export async function resourcesFor(
+async function resourcesFor(
   db: Db,
   storage: Storage,
   workspaceId: string,
