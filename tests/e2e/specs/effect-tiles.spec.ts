@@ -1,4 +1,4 @@
-// The Effects panel's tiles (#288) preview each effect on a sample of the selection's kind, never
+// The Effects panel's tiles preview each effect on a sample of the selection's kind, never
 // the layer itself: "Ag" for text, the photo for a photo, a rounded shape for every other kind. A
 // tile adds its effect and takes every effect of its type off again, None takes them all off, and
 // Add another adds a second effect of a type; each is one undo step.

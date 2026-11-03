@@ -1,4 +1,4 @@
-// The Position panel (#288) in Chromium: the moves along the stack and lining up first, by name for
+// The Position panel in Chromium: the moves along the stack and lining up first, by name for
 // one layer and by icon for several, and the numbers under Advanced, where Lock ratio keeps the
 // box's shape. Every button is one undo step. Screenshots at desktop, tablet and phone sizes.
 import { expect, test, type Locator, type Page } from '../support/test.ts'

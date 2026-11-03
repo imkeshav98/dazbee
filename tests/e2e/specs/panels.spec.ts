@@ -1,4 +1,4 @@
-// Every edit panel (#288) at desktop and phone size, for each kind that has it: simple choices
+// Every edit panel at desktop and phone size, for each kind that has it: simple choices
 // first and the numbers under Advanced, last; a picture of each for review.
 import { expect, test, type Page } from '../support/test.ts'
 import type { DesignInput } from '@dazbee/schema'
@@ -52,6 +52,10 @@ for (const [width, height] of [[1280, 760], [390, 844]] as const) {
         const headings = await panel.locator('h3').allTextContents()
         const advanced = headings.indexOf('Advanced')
         if (advanced >= 0) expect(advanced, `${kind} ${id}: ${headings.join(', ')}`).toBe(headings.length - 1)
+        // The layer's name beside the title shows whole, and every number field has room for its value.
+        expect(await page.getByTestId('edit-panel-note').evaluate((el) => el.scrollWidth <= el.clientWidth), `${kind} ${id}: the name is cut`).toBe(true)
+        const squeezed = await panel.locator('input[role="spinbutton"]').evaluateAll((els) => els.filter((el) => el.checkVisibility() && el.clientWidth < 18).map((el) => el.getAttribute('aria-label')))
+        expect(squeezed, `${kind} ${id}: values with no room`).toEqual([])
         await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))))
         writeOutput(`panel-${width}-${kind}-${id}.png`, await page.screenshot({ animations: 'disabled' }))
         await page.keyboard.press('Escape')

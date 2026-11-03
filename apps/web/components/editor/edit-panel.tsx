@@ -55,6 +55,8 @@ function ArrangePart({ target }: { target: Target }) {
   const run = (action: ShortcutAction) => target.editor.perform(action)
   const tip = (label: string, action: ShortcutAction) => format(a.withKey, { label, key: keyOf(action) })
   const several = target.ids.length > 1
+  // Spreading needs a layer between the two at the ends.
+  const spreads = target.ids.length >= 3
   return (
     <section aria-labelledby="arrange-part-title" className={PANEL_PART} data-testid="arrange-part">
       <h3 id="arrange-part-title" className={PANEL_HEADING}>{placing.arrange}</h3>
@@ -79,7 +81,7 @@ function ArrangePart({ target }: { target: Target }) {
             </div>
             <div className="grid gap-1.5">
               {SPREAD.map(({ action, icon: Icon }) => (
-                <button key={action} type="button" data-action={action} disabled={target.ids.length < 3} title={target.ids.length < 3 ? placing.needsThree : tip(a[action], action)} onClick={() => run(action)} className={PANEL_BUTTON}>
+                <button key={action} type="button" data-action={action} disabled={!spreads} title={spreads ? tip(a[action], action) : placing.needsThree} onClick={() => run(action)} className={PANEL_BUTTON}>
                   <Icon size={14} aria-hidden className="shrink-0" />
                   <span>{placing[action]}</span>
                 </button>

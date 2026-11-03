@@ -15,6 +15,7 @@ import { useEffect, useState, type ReactNode } from 'react'
 import { cn } from '../../lib/cn.ts'
 import { useMessages } from '../../lib/i18n/client.tsx'
 import { format, type Messages } from '../../lib/i18n/index.ts'
+import { designColours } from '../../lib/design-colours.ts'
 import { sizeTo } from '../../lib/size.ts'
 import { Select } from '../ui/select.tsx'
 import { PICKED_RING, SWATCHES } from './card.tsx'
@@ -25,7 +26,7 @@ import { useBrandKit } from './use-brand-kit.ts'
 import { useLiveDesign } from './use-live-design.ts'
 import { setEveryFormat, useEveryFormat } from './scope-store.ts'
 import { Choice, clamp, ColorField, NumberField, tidy } from './fields.tsx'
-import { AddButton, PaintEditor, PaintRow, RemoveButton, Stack } from './paint-stack.tsx'
+import { AddButton, assetThumbnail, PaintEditor, PaintRow, RemoveButton, Stack } from './paint-stack.tsx'
 
 type Props = Readonly<Record<string, unknown>>
 type Patch = Record<string, unknown>
@@ -89,6 +90,7 @@ function PlaceCard({ target, p, title }: { target: Target; p: P; title: string }
   const placing = useMessages().editor.bar.placing
   const [keepRatio, setKeepRatio] = useState(false)
   const sized = target.types.every((type) => type !== 'group' && type !== 'boolean')
+  const resize = (now: Props, axis: 'width' | 'height', to: number) => sizeTo({ width: num(now, 'width'), height: num(now, 'height') }, axis, to, keepRatio)
   const sides = [
     { key: 'width', label: p.width, name: p.widthName },
     { key: 'height', label: p.height, name: p.heightName },
@@ -108,8 +110,8 @@ function PlaceCard({ target, p, title }: { target: Target; p: P; title: string }
             value={shared(target.props.map((pr) => num(pr, f.key)))}
             min={0}
             editor={target.editor}
-            onSet={(v) => set(target, (now) => sizeTo({ width: num(now, 'width'), height: num(now, 'height') }, f.key, v, keepRatio))}
-            onShift={(by) => set(target, (now) => sizeTo({ width: num(now, 'width'), height: num(now, 'height') }, f.key, tidy(clamp(num(now, f.key) + by, 0)), keepRatio))}
+            onSet={(v) => set(target, (now) => resize(now, f.key, v))}
+            onShift={(by) => set(target, (now) => resize(now, f.key, tidy(clamp(num(now, f.key) + by, 0))))}
           />
         ))}
         {spots.map((f) => (
@@ -393,10 +395,10 @@ export function FillBody({ target, brandId, p, title }: { target: Target; brandI
 }
 
 /**
- * The outlines, each with its paint, width, place, dashes, ends and corners, under a heading with +:
+ * The strokes, each with its paint, width, place, dashes, ends and corners, under a heading with +:
  * the Outline panel's Advanced.
  */
-export function OutlineBody({ target, brandId, p, title }: { target: Target; brandId: string; p: P; title: string }) {
+export function StrokeBody({ target, brandId, p, title }: { target: Target; brandId: string; p: P; title: string }) {
   return (
     <ListBody<Stroke>
       title={title}
@@ -405,17 +407,17 @@ export function OutlineBody({ target, brandId, p, title }: { target: Target; bra
       field="strokes"
       fresh={NEW_STROKE}
       topFirst
-      item={p.outline}
+      item={p.stroke}
       testId="stroke-list"
       render={(stroke, n, change) => <StrokeRow stroke={stroke} place={n} brandId={brandId} p={p} editor={target.editor} onSet={change} />}
     />
   )
 }
 
-type Look = 'none' | 'solid' | 'dashed'
-const LOOKS: Look[] = ['none', 'solid', 'dashed']
-/** How each outline tile draws its look: a faint square for none, a solid or a dashed one. */
-const LOOK_FACE: Record<Look, string> = {
+type StrokeLook = 'none' | 'solid' | 'dashed'
+const STROKE_LOOKS: StrokeLook[] = ['none', 'solid', 'dashed']
+/** How each of the Outline panel's tiles draws its stroke: a faint square for none, a solid or a dashed one. */
+const STROKE_FACE: Record<StrokeLook, string> = {
   none: 'border-2 border-line-strong',
   solid: 'border-[3px] border-text',
   dashed: 'border-[3px] border-dashed border-text',
@@ -431,18 +433,18 @@ function solidOf(stroke: Stroke): Stroke {
 }
 
 /**
- * The Outline panel: its look as three tiles, none, solid or dashed, and the width of every outline,
- * then each outline's own settings under Advanced. Picking solid or dashed gives a layer without an
- * outline a new one.
+ * The Outline panel: the strokes' look as three tiles, none, solid or dashed, and the width of every
+ * stroke, then each stroke's own settings under Advanced. Picking solid or dashed gives a layer
+ * without a stroke a new one.
  */
-function OutlinePanel({ target, brandId, p, b }: { target: Target; brandId: string; p: P; b: Messages['editor']['bar'] }) {
+function StrokePanel({ target, brandId, p, b }: { target: Target; brandId: string; p: P; b: Messages['editor']['bar'] }) {
   const lists = target.props.map((pr) => (pr.strokes ?? []) as Stroke[])
-  const look: Look | 'mixed' = lists.every((l) => l.length === 0)
+  const look: StrokeLook | 'mixed' = lists.every((l) => l.length === 0)
     ? 'none'
     : lists.every((l) => l.length > 0 && l.every(dashed))
       ? 'dashed'
       : lists.every((l) => l.length > 0 && !l.some(dashed)) ? 'solid' : 'mixed'
-  const pick = (to: Look) => set(target, (now) => {
+  const pick = (to: StrokeLook) => set(target, (now) => {
     const strokes = (now.strokes ?? []) as Stroke[]
     if (to === 'none') return { strokes: [] }
     const kept = strokes.length > 0 ? strokes : [NEW_STROKE]
@@ -452,19 +454,19 @@ function OutlinePanel({ target, brandId, p, b }: { target: Target; brandId: stri
   const setWidths = (to: (now: number) => number) => set(target, (now) => ({ strokes: ((now.strokes ?? []) as Stroke[]).map((stroke) => ({ ...stroke, width: tidy(clamp(to(stroke.width), 0.5)) })) }))
   return (
     <>
-      <Card id="outline-look" title={b.outlineLook.title}>
-        <div role="radiogroup" aria-label={b.outlineLook.title} className="grid grid-cols-3 gap-[7px]">
-          {LOOKS.map((to) => (
+      <Card id="stroke-look" title={b.strokeLook.title}>
+        <div role="radiogroup" aria-label={b.strokeLook.title} className="grid grid-cols-3 gap-[7px]">
+          {STROKE_LOOKS.map((to) => (
             <button key={to} type="button" role="radio" aria-checked={look === to} data-value={to} onClick={() => pick(to)} className={TILE}>
-              <span className={TILE_FACE_WIDE}><span aria-hidden className={cn('size-6 rounded-[5px]', LOOK_FACE[to])} /></span>
-              <span className="w-full truncate text-center">{b.outlineLook[to]}</span>
+              <span className={TILE_FACE_WIDE}><span aria-hidden className={cn('size-6 rounded-[5px]', STROKE_FACE[to])} /></span>
+              <span className="w-full truncate text-center">{b.strokeLook[to]}</span>
             </button>
           ))}
         </div>
         {look !== 'none' && (
           <NumberField
-            label={b.outlineLook.width}
-            name={b.outlineLook.widthName}
+            label={b.strokeLook.width}
+            name={b.strokeLook.widthName}
             value={widths}
             min={0.5}
             step={0.5}
@@ -475,8 +477,8 @@ function OutlinePanel({ target, brandId, p, b }: { target: Target; brandId: stri
           />
         )}
       </Card>
-      <Card id="outline-card" title={b.advanced}>
-        <OutlineBody target={target} brandId={brandId} p={p} title={b.outlineLook.outlines} />
+      <Card id="stroke-card" title={b.advanced}>
+        <StrokeBody target={target} brandId={brandId} p={p} title={b.strokeLook.outlines} />
       </Card>
     </>
   )
@@ -893,7 +895,7 @@ const setImage = (target: Target, index: number, change: (now: ImageFill) => Par
 
 /** The bar's Look popover for a photo: each filter as the photo with it. */
 export function PhotoLookBody({ target, p, brandId, index, paint }: { target: Target; p: P; brandId: string; index: number; paint: ImageFill }) {
-  const picture = `/brands/${encodeURIComponent(brandId)}/assets/${encodeURIComponent(paint.assetId)}/thumbnail`
+  const picture = assetThumbnail(brandId, paint.assetId)
   const filter = paint.filter ?? 'none'
   return (
     <div role="radiogroup" aria-label={p.filter} className="grid grid-cols-4 gap-1.5">
@@ -1277,25 +1279,6 @@ function Swatches({ target, brandId, p, current, paint }: { target: Target; bran
   )
 }
 
-/** The solid colours a design uses, in its pages' and layers' fills, outlines and text, each once, as #RRGGBB. */
-function designColours(design: Design): string[] {
-  const found = new Set<string>()
-  const add = (color: unknown) => {
-    if (typeof color === 'string' && /^#[0-9a-f]{6}/i.test(color)) found.add(color.slice(0, 7).toUpperCase())
-  }
-  const paints = (list: unknown) => {
-    for (const paint of (list ?? []) as Paint[]) if (paint.type === 'solid') add(paint.color)
-  }
-  for (const page of Object.values(design.pages)) paints(page.fills)
-  for (const node of Object.values(design.nodes)) {
-    const props = node.props as Props
-    paints(props.fills)
-    for (const stroke of (props.strokes ?? []) as Stroke[]) paints([stroke.paint])
-    add((props.style as Style | undefined)?.color)
-  }
-  return [...found].slice(0, 14)
-}
-
 /**
  * The colours to pick from, simple first: the brand kit's, which the layers then follow, and the
  * colours already in the design, with + first, which opens `picker` under them: any colour, or
@@ -1486,7 +1469,7 @@ export function EffectsBody({ target, p, b, brandId }: { target: Target; p: P; b
   const kind = kindOf(target)
   const text = kind === 'text'
   const image = imageFillOf(target)
-  const sample: Sample = text ? { kind: 'text' } : kind === 'photo' && image ? { kind: 'photo', src: `/brands/${encodeURIComponent(brandId)}/assets/${encodeURIComponent(image.paint.assetId)}/thumbnail` } : { kind: 'shape' }
+  const sample: Sample = text ? { kind: 'text' } : kind === 'photo' && image ? { kind: 'photo', src: assetThumbnail(brandId, image.paint.assetId) } : { kind: 'shape' }
   const tiles = TILES.filter((tile) => tile !== 'outline' || text)
   const outlined = (pr: Props) => ((pr.style as Style | undefined)?.outline as { width: number } | undefined)?.width ?? 0
   const on = (tile: Tile): boolean => {
@@ -1699,7 +1682,7 @@ export function PanelContent({ panel, target, design, brandId }: { panel: string
           ? <TextColourPanel target={target} design={design} brandId={brandId} p={p} b={t.editor.bar} />
           : <ColourPanel target={target} design={design} brandId={brandId} p={p} b={t.editor.bar} />
       case 'outline':
-        return <OutlinePanel target={target} brandId={brandId} p={p} b={t.editor.bar} />
+        return <StrokePanel target={target} brandId={brandId} p={p} b={t.editor.bar} />
       case 'effects':
         return <EffectsBody target={target} p={p} b={t.editor.bar} brandId={brandId} />
       case 'position':

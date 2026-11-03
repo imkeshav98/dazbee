@@ -5,6 +5,7 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import type { Editor } from '@dazbee/editor'
 import { cn } from '../../lib/cn.ts'
+import { fillOf } from '../../lib/fill.ts'
 import { useMessages } from '../../lib/i18n/client.tsx'
 import { format } from '../../lib/i18n/index.ts'
 import { Select } from '../ui/select.tsx'
@@ -64,12 +65,9 @@ export function NumberField({ label, name, value, step = 1, min, max, fillRange,
   const [draft, setDraft, typedNow] = useDraft()
   const [typing, setTyping] = useState(false)
   const press = useRef<{ x: number; applied: number; end: (() => void) | null } | null>(null)
-  const bounded = min !== undefined && max !== undefined && Number.isFinite(min) && Number.isFinite(max) && max > min
-  const [lo, hi] = fillRange ?? [min, max]
-  const ranged = lo !== undefined && hi !== undefined && Number.isFinite(lo) && Number.isFinite(hi) && hi > lo
-  const at = (n: number) => (ranged ? ((clamp(n, lo, hi) - lo) / (hi - lo)) * 100 : 0)
-  const zero = ranged && lo < 0 ? at(0) : 0
-  const fill = ranged && typeof value === 'number' ? at(value) : zero
+  /** Whether Home and End have a lowest and a highest value to go to. */
+  const hasEnds = min !== undefined && max !== undefined && Number.isFinite(min) && Number.isFinite(max) && max > min
+  const fill = fillOf(value, fillRange ?? (min !== undefined && max !== undefined ? [min, max] : undefined))
   /** One step, or ten with Shift, or a tenth with Alt where the steps are fractions. */
   const stepOf = (event: { shiftKey: boolean; altKey: boolean }) => step * (event.shiftKey ? 10 : event.altKey && step < 1 ? 0.1 : 1)
   const commit = (text: string) => {
@@ -95,7 +93,7 @@ export function NumberField({ label, name, value, step = 1, min, max, fillRange,
     <div
       data-scrub={name}
       title={format(t.editor.props.scrub, { name })}
-      style={{ '--fill-from': `${Math.min(zero, fill)}%`, '--fill': `${Math.abs(fill - zero)}%` } as CSSProperties}
+      style={{ '--fill-from': `${fill.from}%`, '--fill': `${fill.width}%` } as CSSProperties}
       onPointerDown={(event) => {
         // A press on the field being typed in places the caret; anywhere else it starts a drag.
         if (event.button !== 0 || (typing && event.target === input.current)) return
@@ -155,7 +153,7 @@ export function NumberField({ label, name, value, step = 1, min, max, fillRange,
             event.preventDefault()
             setDraft(null)
             onShift(((event.key === 'ArrowUp' ? 1 : -1) * stepOf(event)) / scale)
-          } else if ((event.key === 'Home' || event.key === 'End') && bounded && draft === null) {
+          } else if ((event.key === 'Home' || event.key === 'End') && hasEnds && draft === null) {
             // A range's ends, as a slider's; while a value is being typed they move the caret.
             event.preventDefault()
             onSet(event.key === 'Home' ? min : max)
