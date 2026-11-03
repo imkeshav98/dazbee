@@ -102,7 +102,8 @@ function PagesFrame({ label, disabled = false, children }: { label: string; disa
     watch.observe(pill)
     return () => watch.disconnect()
   }, [])
-  const place = { '--zoom-width': `${zoom.width}px`, '--zoom-height': `${zoom.height}px` } as CSSProperties
+  // As tall as the zoom pill beside it.
+  const place = { '--zoom-width': `${zoom.width}px`, '--zoom-height': `${zoom.height}px`, ...(zoom.height > 0 ? { height: zoom.height } : {}) } as CSSProperties
   return (
     <button
       ref={button}
@@ -117,7 +118,7 @@ function PagesFrame({ label, disabled = false, children }: { label: string; disa
       onClick={() => setOpen(open === 'pages' ? null : 'pages')}
       style={place}
       className={cn(
-        'absolute z-10 flex h-10 cursor-pointer items-center gap-1.5 rounded-card surface-frost px-3 text-[12px] font-semibold text-text transition-colors hover:text-accent-text disabled:cursor-default disabled:opacity-40 aria-expanded:text-accent-text',
+        'absolute z-10 flex h-9 cursor-pointer items-center gap-1.5 rounded-card surface-frost px-3 text-[12px] font-semibold text-text transition-colors hover:text-accent-text disabled:cursor-default disabled:opacity-40 aria-expanded:bg-accent-soft aria-expanded:text-accent-text',
         'end-[calc(1.5rem+var(--zoom-width))] bottom-4 max-lg:end-4 max-lg:bottom-[calc(1.5rem+var(--zoom-height))]',
         'max-sm:start-4 max-sm:end-auto max-sm:top-20 max-sm:bottom-auto max-sm:group-data-[bar]/stage:hidden',
         FOCUS_RING,

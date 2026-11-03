@@ -261,6 +261,8 @@ test('in Arabic Sizes, Pages and the page\'s Background mirror and sit clear of 
     await open()
     expect(await layoutProblems(page, { pieces: PIECES, uncut: 'h1, [data-testid="edit-panel-note"]' })).toEqual([])
   }
+  // A hex and its opacity read left to right in Arabic too, the # first.
+  for (const name of ['colour-hex', 'colour-opacity']) expect(await page.locator(`#edit-panel [name="${name}"]`).first().evaluate((el) => getComputedStyle(el).direction)).toBe('ltr')
   writeOutput('nothing-selected-rtl.png', await page.screenshot({ animations: 'disabled' }))
   expect(errors).toEqual([])
   await context.close()

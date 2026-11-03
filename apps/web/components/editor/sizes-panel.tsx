@@ -51,7 +51,7 @@ export function SizesButton({ editor }: { editor: Editor }) {
       aria-label={format(t.editor.formats.button, { n: count })}
       title={format(t.editor.formats.button, { n: count })}
       onClick={() => setOpen(open === 'sizes' ? null : 'sizes')}
-      className={cn('flex h-7 shrink-0 cursor-pointer items-center gap-1 rounded-full px-2 text-[12px] font-semibold text-muted transition-colors hover:bg-hover hover:text-text aria-expanded:bg-accent-soft aria-expanded:text-accent-text', FOCUS_RING)}
+      className={cn('flex h-[26px] shrink-0 cursor-pointer items-center gap-1.5 rounded-full border border-line bg-surface px-2.5 text-[12px] font-semibold text-text transition-colors hover:bg-hover aria-expanded:border-transparent aria-expanded:bg-accent-soft aria-expanded:text-accent-text', FOCUS_RING)}
     >
       <FrameCornersIcon size={14} aria-hidden />
       <span aria-hidden className="max-sm:hidden">{format(t.editor.formats.button, { n: count })}</span>

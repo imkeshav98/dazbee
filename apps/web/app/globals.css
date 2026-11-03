@@ -436,7 +436,7 @@ body {
 /* The page picked by a click on its background: each of its sizes outlined, dashed. */
 .stage-overlay .page-picked {
   position: absolute;
-  outline: 1.5px dashed var(--accent);
+  outline: 2px dashed var(--accent);
 }
 .stage-overlay .hover {
   outline: 1.5px solid var(--accent);
