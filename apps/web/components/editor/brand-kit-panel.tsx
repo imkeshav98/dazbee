@@ -17,8 +17,8 @@ import { useMessages } from '@/lib/i18n/client.tsx'
 import { format } from '@/lib/i18n/index.ts'
 import { placeAsset } from '@/lib/place-asset.ts'
 
+import { useEditorDesign } from './editor-hooks.ts'
 import { FontPreview, useFontCatalog } from './font-panel.tsx'
-import { useEditorDesign } from './formats-panel.tsx'
 import { KitEditor, shown, useKitSaver } from './kit-editor.tsx'
 import { loadKit, useBrandKit } from './use-brand-kit.ts'
 

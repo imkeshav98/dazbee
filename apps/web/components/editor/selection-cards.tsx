@@ -9,7 +9,7 @@
 // change is one undo step, and a drag on a number, however long, is one too.
 import { CaretDownIcon, ImageSquareIcon, PlusIcon } from '@phosphor-icons/react'
 import * as Popover from '@radix-ui/react-popover'
-import { type ReactNode, useEffect, useState } from 'react'
+import { type ReactNode, useState } from 'react'
 
 import { mergedProps } from '@dazbee/doc'
 import { type Editor, withImage } from '@dazbee/editor'
@@ -37,12 +37,13 @@ import { format, type Messages } from '@/lib/i18n/index.ts'
 import { LIMITS } from '@/lib/limits.ts'
 import { sizeTo } from '@/lib/size.ts'
 
-import { COMBINE } from './arrange-panel.tsx'
-import { PICKED_RING, SWATCHES } from './card.tsx'
+import { COMBINE } from './arrange-actions.ts'
+import { useTextSelection } from './editor-hooks.ts'
 import { Choice, clamp, ColorField, NumberField, tidy } from './fields.tsx'
 import { ImagePickerButton } from './image-tool.tsx'
 import { AddButton, assetThumbnail, PaintEditor, PaintRow, RemoveButton, Stack } from './paint-stack.tsx'
 import { setEveryFormat, useEveryFormat } from './scope-store.ts'
+import { PICKED_RING, SWATCHES } from './styles.ts'
 import {
   CHIP,
   CHIP_ACCENT,
@@ -2526,18 +2527,6 @@ function ScopeMenu({
       </Popover.Portal>
     </Popover.Root>
   )
-}
-
-/** Renders again whenever the text being edited, or its selected range, changes. */
-function useTextSelection(editor: Editor) {
-  const [, setVersion] = useState(0)
-  useEffect(() => {
-    const stop = editor.onTextSelection(() => setVersion((v) => v + 1))
-    return () => {
-      stop()
-    }
-  }, [editor])
-  return editor.textSelection()
 }
 
 /**

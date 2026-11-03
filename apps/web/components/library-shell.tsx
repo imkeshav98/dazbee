@@ -15,7 +15,7 @@ import { initialsOf } from '@/lib/initials.ts'
 import { SESSION_COOKIE } from '@/lib/sign-in.ts'
 
 import { AccountMenu } from './account-menu.tsx'
-import { BrandMark } from './brand-mark.tsx'
+import { BrandMark } from './dazbee-mark.tsx'
 import { LibraryCapsule } from './library-capsule.tsx'
 import { NewBrandRow } from './new-brand-row.tsx'
 

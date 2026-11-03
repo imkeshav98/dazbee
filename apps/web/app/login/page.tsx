@@ -6,7 +6,7 @@ import { WarningCircleIcon } from '@phosphor-icons/react/ssr'
 import { cookies, headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 
-import { BrandMark } from '@/components/brand-mark.tsx'
+import { BrandMark } from '@/components/dazbee-mark.tsx'
 import { buttonStyles } from '@/components/ui/button.tsx'
 import { signInLink } from '@/lib/api.ts'
 import { cn } from '@/lib/cn.ts'

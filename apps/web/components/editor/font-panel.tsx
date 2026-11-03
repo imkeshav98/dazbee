@@ -17,7 +17,7 @@ import { cn } from '@/lib/cn.ts'
 import { useMessages } from '@/lib/i18n/client.tsx'
 import { format } from '@/lib/i18n/index.ts'
 
-import { useEditorDesign } from './formats-panel.tsx'
+import { useEditorDesign } from './editor-hooks.ts'
 import { PANEL_BUTTON, PANEL_HEADING } from './styles.ts'
 
 /** The fonts we ship, as catalog families; they have no stored preview. */

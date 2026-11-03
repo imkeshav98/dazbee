@@ -18,9 +18,9 @@ import { useLocale, useMessages } from '@/lib/i18n/client.tsx'
 import { dirOf, format, type Messages } from '@/lib/i18n/index.ts'
 
 import { useMenuFocus } from './bar-popover.tsx'
-import { PICKED_RING } from './card.tsx'
 import { Choice, clamp, ColorField, NumberField, tidy } from './fields.tsx'
 import { ImagePickerButton } from './image-tool.tsx'
+import { PICKED_RING } from './styles.ts'
 import { CHIP, FOCUS_RING, ICON_BUTTON, KNOBS, POPOVER, SWATCH } from './styles.ts'
 import { useBrandKit } from './use-brand-kit.ts'
 

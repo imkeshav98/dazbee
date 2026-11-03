@@ -45,6 +45,24 @@ export const dockTool = (on: boolean) => `${DOCK_BUTTON} w-10 ${on ? DOCK_ON : D
 export const SWATCH =
   'shrink-0 cursor-pointer rounded-full border border-line-strong transition-transform duration-[var(--chrome-fast)] hover:scale-110'
 
+/** Colours a click away when the brand's kit has none; the hex fields take any colour. */
+export const SWATCHES = [
+  '#FFFFFF',
+  '#FBF7F2',
+  '#1A1420',
+  '#FF48B0',
+  '#3D6BFF',
+  '#FFD23F',
+  '#3DD68C',
+  '#FF6B3D',
+] as const
+
+/**
+ * The ring round a picked swatch or tile, as in the mock: pink with a gap, a shape and not only a
+ * colour, so it reads without colour vision too.
+ */
+export const PICKED_RING = 'shadow-[0_0_0_2px_var(--surface),0_0_0_4px_var(--accent)]'
+
 /** The look of a value typed into a field: a number, a hex, a dash pattern. */
 export const VALUE_TEXT = 'font-mono text-[12px] tabular-nums text-text'
 /** A field to type a value into, as tall as a knob: its border shows the focus, with no ring besides. */

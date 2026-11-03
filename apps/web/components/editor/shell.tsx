@@ -28,7 +28,7 @@ import { createContext, type ReactNode, useContext, useEffect, useLayoutEffect, 
 
 import type { ShapeTool } from '@dazbee/editor'
 
-import { BrandMark } from '@/components/brand-mark.tsx'
+import { BrandMark } from '@/components/dazbee-mark.tsx'
 import { Tooltip } from '@/components/ui/tooltip.tsx'
 import { cn } from '@/lib/cn.ts'
 import { useLocale, useMessages } from '@/lib/i18n/client.tsx'

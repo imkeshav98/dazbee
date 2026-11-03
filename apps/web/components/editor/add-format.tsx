@@ -1,10 +1,8 @@
 'use client'
 
-// Adding a size to the design: every preset grouped by shape, or a size of your own, checked
-// against the sizes the formats allow; and the design as the editor holds it, kept current.
-import { ArrowsInSimpleIcon, InfoIcon, PlusIcon, TrashIcon } from '@phosphor-icons/react'
+import { PlusIcon } from '@phosphor-icons/react'
 import * as Popover from '@radix-ui/react-popover'
-import { type FormEvent, useEffect, useId, useState } from 'react'
+import { type FormEvent, useId, useState } from 'react'
 
 import type { Editor } from '@dazbee/editor'
 import { FORMAT_LIMITS, FORMAT_PRESETS, FORMAT_SHAPES, formatSizeIssue, shapeOf } from '@dazbee/schema'
@@ -16,21 +14,7 @@ import { cn } from '@/lib/cn.ts'
 import { useMessages } from '@/lib/i18n/client.tsx'
 import { format } from '@/lib/i18n/index.ts'
 
-import { ICON_BUTTON, POPOVER, TOAST } from './styles.ts'
-import { useLiveDesign } from './use-live-design.ts'
-
-/** The design as the editor holds it, kept current: every redraw hands over the latest one. */
-export function useEditorDesign(editor: Editor) {
-  const { design } = useLiveDesign(editor)
-  const [focused, setFocused] = useState(() => editor.focused())
-  useEffect(() => {
-    const stop = editor.onDraw(() => setFocused(editor.focused()))
-    return () => {
-      stop()
-    }
-  }, [editor])
-  return { design, focused }
-}
+import { ICON_BUTTON, POPOVER } from './styles.ts'
 
 /** A size as the app writes it, in numerals that read the same in every locale. */
 const sizeOf = ({ width, height }: { width: number; height: number }) => `${width} × ${height}`
@@ -165,90 +149,5 @@ export function AddFormat({ editor }: { editor: Editor }) {
         </Popover.Content>
       </Popover.Portal>
     </Popover.Root>
-  )
-}
-
-/** Over the stage while one format shows alone: which one, and the way back to all of them. */
-export function FocusChip({ editor }: { editor: Editor }) {
-  const t = useMessages()
-  const { design, focused } = useEditorDesign(editor)
-  const name = focused ? design.formats[focused]?.name : undefined
-  if (!focused || name === undefined) return null
-  return (
-    <div
-      role="status"
-      data-testid="focus-chip"
-      className="pointer-events-auto flex h-9 items-center gap-1 rounded-full surface-frost ps-3.5 pe-1 text-[13px]"
-    >
-      <ArrowsInSimpleIcon size={14} aria-hidden className="text-accent-text" />
-      <span className="ms-1">{format(t.editor.formats.focusing, { name })}</span>
-      <Button variant="ghost" className="ms-1 h-7 rounded-full px-2.5 text-xs" onClick={() => editor.focus(null)}>
-        {t.editor.formats.exitFocus}
-      </Button>
-    </div>
-  )
-}
-
-const TOAST_MS = 8000
-
-/** After a format or page is removed: says so, with undo, for a few seconds. */
-export function UndoToast({ editor, message, onDone }: { editor: Editor; message: string; onDone: () => void }) {
-  const t = useMessages()
-  // It stays while the pointer or focus is on it, so the undo can't vanish from under a click.
-  const [held, setHeld] = useState(false)
-  useEffect(() => {
-    if (held) return
-    const timer = setTimeout(onDone, TOAST_MS)
-    return () => clearTimeout(timer)
-  }, [message, onDone, held])
-  return (
-    <div
-      role="status"
-      data-testid="removed-toast"
-      onPointerEnter={() => setHeld(true)}
-      onPointerLeave={() => setHeld(false)}
-      onFocus={() => setHeld(true)}
-      onBlur={() => setHeld(false)}
-      className={TOAST}
-    >
-      <TrashIcon size={14} aria-hidden className="text-subtle" />
-      <span>{message}</span>
-      <Button
-        variant="ghost"
-        className="h-7 px-2.5 text-xs font-semibold text-accent-text"
-        onClick={() => {
-          editor.session.undo()
-          onDone()
-        }}
-      >
-        {t.editor.formats.undo}
-      </Button>
-    </div>
-  )
-}
-
-/**
- * Says why a gesture did nothing, such as a nudge auto layout decides; it goes after a few seconds.
- * A `lasting` one, such as files uploading, stays until its message changes or it is taken away.
- */
-export function NoticeToast({
-  message,
-  onDone,
-  lasting = false,
-}: {
-  message: string
-  onDone: () => void
-  lasting?: boolean
-}) {
-  useEffect(() => {
-    if (lasting) return
-    const timer = setTimeout(onDone, TOAST_MS)
-    return () => clearTimeout(timer)
-  }, [message, onDone, lasting])
-  return (
-    <div role="status" data-testid="notice-toast" className={cn(TOAST, 'pe-3.5')}>
-      <InfoIcon size={14} aria-hidden className="shrink-0 text-subtle" />
-      <span>{message}</span>
-    </div>
   )
 }

@@ -18,9 +18,8 @@ import {
   SubtractSquareIcon,
   UniteSquareIcon,
 } from '@phosphor-icons/react'
-import { useEffect, useState } from 'react'
 
-import { type Editor, type ShortcutAction, SHORTCUTS } from '@dazbee/editor'
+import { type ShortcutAction, SHORTCUTS } from '@dazbee/editor'
 
 export type Action = Extract<
   ShortcutAction,
@@ -66,16 +65,4 @@ export function keyOf(action: ShortcutAction) {
   const spec = specOf(action)
   const mac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform)
   return brackets(spec.replace('Mod', mac ? '⌘' : 'Ctrl').replace('Alt', mac ? '⌥' : 'Alt'))
-}
-
-/** The selected layers, kept current. */
-export function useSelection(editor: Editor) {
-  const [ids, setIds] = useState(() => editor.selection())
-  useEffect(() => {
-    const stop = editor.onSelection(setIds)
-    return () => {
-      stop()
-    }
-  }, [editor])
-  return ids
 }

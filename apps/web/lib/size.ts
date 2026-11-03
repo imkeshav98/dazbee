@@ -3,7 +3,10 @@
 type Box = { width: number; height: number }
 type Axis = keyof Box
 
-const tidy = (n: number) => Math.round(n * 100) / 100
+export const tidy = (n: number) => Math.round(n * 100) / 100
+export const sizeOf = ({ width, height }: { width: number; height: number }) => `${width} × ${height}`
+/** A size as a chip shows it, short. */
+export const shortSizeOf = ({ width, height }: { width: number; height: number }) => `${width}×${height}`
 
 export function sizeTo(now: Box, axis: Axis, to: number, keepRatio: boolean): Partial<Box> {
   const other: Axis = axis === 'width' ? 'height' : 'width'

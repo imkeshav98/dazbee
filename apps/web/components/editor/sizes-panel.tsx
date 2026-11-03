@@ -13,19 +13,18 @@ import { type Design, FORMAT_PRESETS, inOrder } from '@dazbee/schema'
 import { cn } from '@/lib/cn.ts'
 import { useMessages } from '@/lib/i18n/client.tsx'
 import { format } from '@/lib/i18n/index.ts'
+import { shortSizeOf, sizeOf } from '@/lib/size.ts'
 
+import { AddFormat } from './add-format.tsx'
 import { CARD_BUTTON, CARD_ROW, CardMenu } from './card.tsx'
 import { PanelFrame } from './edit-panel.tsx'
 import { setOpen, useEditState } from './edit-store.ts'
-import { AddFormat, useEditorDesign } from './formats-panel.tsx'
+import { useEditorDesign } from './editor-hooks.ts'
 import { CHIP, FOCUS_RING, PANEL_HEADING, PANEL_PART } from './styles.ts'
 
 /** The presets Add a size offers at a tap; the rest, and any size, are under More sizes. */
 const COMMON = ['feed-portrait', 'story', 'link-image', 'medium-rectangle'] as const
 
-const sizeOf = ({ width, height }: { width: number; height: number }) => `${width} × ${height}`
-/** A size as a chip shows it, short. */
-const shortSizeOf = ({ width, height }: { width: number; height: number }) => `${width}×${height}`
 /** A size's picture in its proportions, its long side 34. */
 const thumbOf = ({ width, height }: { width: number; height: number }) => {
   const scale = 34 / Math.max(width, height)
