@@ -41,6 +41,8 @@ tests/pixels/         Vitest and Playwright checks: exports against reference re
 
 Packages only depend downward: schema → doc → renderer → editor, and never on an app. `pnpm lint:deps` enforces it (ADR-0001).
 
+Inside each workspace, code is laid out by `docs/agents/code-layout.md`: feature folders, one order inside every file, and the imports each folder may make.
+
 ## Vercel previews
 
 One-time setup by the repo owner: in Vercel, **Add New → Project**, import `imkeshav98/dazbee`, set **Root Directory** to `apps/web` (framework Next.js; Vercel detects pnpm and the workspace). Every pull request then gets a preview URL.
