@@ -56,7 +56,6 @@ import {
   imageAssetIds,
   isContainer,
   type Layer,
-  LAYER_CLIPBOARD_TYPE,
   LayerClipboard,
   type LayerTree,
   LOCK_FLAGS,
@@ -82,9 +81,11 @@ import {
   type Viewport,
   zoomAt,
 } from './canvas/camera.ts'
-import { type Frame, frameAt, frameGrid, intersects } from './canvas/grid.ts'
+import { HANDLE_ANGLE, RESIZE_CURSORS, ROTATE_CURSOR } from './canvas/cursors.ts'
+import { type Frame, frameAt, frameGrid, intersects, scope } from './canvas/grid.ts'
 import { hitTest } from './canvas/hit-test.ts'
 import { rulerParts } from './canvas/rulers.ts'
+import { keepCopy, layersOnClipboard, putOnClipboard, rememberedLayers } from './clipboard.ts'
 import { exportClient } from './export/export-client.ts'
 import { cornersOfRect, coverCrop, cropOf, imageRect, panned, scaled } from './gestures/crop.ts'
 import {
@@ -93,9 +94,11 @@ import {
   type DrawTool,
   imageIn,
   isDrawTool,
+  keepRatio,
   newDrawn,
   newImage,
   newText,
+  PEN_STROKE,
   type ShapeTool,
   withImage,
 } from './gestures/draw-tools.ts'
@@ -121,23 +124,40 @@ import {
   splitSegment,
 } from './gestures/path.ts'
 import { align, type Alignment, distribute, type Distribution, type Offset } from './layers/arrange.ts'
+import {
+  type AutoLayoutOf,
+  flowSiblings,
+  inFlow,
+  laidOut,
+  layoutIn,
+  placedInside,
+  propIn,
+  rowIn,
+} from './layers/auto-layout.ts'
 import { type Gap, type Guide, SNAP_DISTANCE, snapMove, snapResize, snapTargets, type Targets } from './layers/snap.ts'
 import {
   angleOf,
   boundsOf,
   type Box,
+  boxAt,
   carry,
   centreOf,
   cornersOf,
+  drawnFrom,
   type Handle,
   handleAt,
   HANDLES,
+  isCorner,
+  keptOnScreen,
+  localTo,
   normalAngle,
+  pageFrom,
   resize as resizeBox,
   round,
   scaleWithin,
   snapAngle,
   turn,
+  undrawn,
 } from './layers/transform.ts'
 import { NUDGE, NUDGE_FAR, type ShortcutAction, shortcutFor } from './shortcuts.ts'
 import {
@@ -231,8 +251,20 @@ const SVG_ROOM = 0.6
 const CLICK_SLOP = 3
 /** How near, in screen pixels, a press picks a path's point, handle or segment (#45). */
 const POINT_REACH = 6
-/** The pen's stroke until a style is picked: the near-black that lines draw with. */
-const PEN_STROKE = { paint: { type: 'solid', color: '#1F2329FF' }, width: 2, cap: 'round', join: 'round' }
+/** Screen pixels a frame needs before it gets a label. */
+const MIN_LABEL_WIDTH = 56
+/** How far a label stays from the stage's start edge when its frame runs past it. */
+const LABEL_INSET = 8
+/** Room the tool dock takes along the bottom of the stage, which the size label stays out of. */
+const SIZE_CLEARANCE = 72
+/** The room the selection's size label takes, in screen pixels. */
+const SIZE_LABEL_HEIGHT = 20
+/** Screen size of a handle, and how far from it a press still grabs it. */
+const HANDLE_SIZE = 8
+const HANDLE_REACH = 7
+/** How far outside a corner a press turns the selection. */
+const ROTATE_REACH = 24
+const SVG = 'http://www.w3.org/2000/svg'
 
 /** A path layer being drawn or edited: the box it had when that began, which its points are relative to, and how far the box has moved since. */
 interface Reshaping {
@@ -245,8 +277,7 @@ interface Reshaping {
 /** Something the page should say: why a gesture did nothing, or how placing an SVG went. */
 export type Notice = 'placedByLayout' | 'flowEnd' | 'svgLeftOut' | 'svgUnreadable'
 
-/** A frame's auto layout and a layer's sizing, as the schema has them. */
-type AutoLayoutOf = NonNullable<Extract<Layer, { type: 'frame' }>['props']['layout']>
+/** A layer's sizing, as the schema has it. */
 type SizingOf = NonNullable<Layer['props']['sizing']>
 
 /** Where the design's edits are, once it is open. */
@@ -545,6 +576,31 @@ function pageOf(design: Design, id: string) {
   let up = id
   while (design.nodes[up]) up = design.nodes[up]?.parentId ?? ''
   return up
+}
+
+const px = (n: number) => `${n}px`
+/** Keys typed into the page's own fields belong to them. */
+const inField = (target: EventTarget | null) =>
+  target instanceof HTMLElement &&
+  (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName))
+/** Keys pressed in a popover or dialog, such as Escape to close it, are its own, not the stage's; undo and redo still are. */
+const inDialog = (target: EventTarget | null) =>
+  target instanceof Element && target.closest('[role="dialog"], dialog') !== null
+const isPath = (from: Design, id: string) => {
+  const node = from.nodes[id]
+  return node?.type === 'graphic' && node.props.shape.kind === 'path'
+}
+const visibleIn = (now: Design, frame: Frame, id: string) => {
+  const value = now.overrides[scope(frame)]?.[id]?.visible ?? now.nodes[id]?.props.visible
+  return value !== false
+}
+const find = (layers: SceneLayer[], id: string): SceneLayer | undefined => {
+  for (const l of layers) {
+    if (l.id === id) return l
+    const inner = find(l.children, id)
+    if (inner) return inner
+  }
+  return undefined
 }
 
 async function bytes(url: string) {
@@ -853,7 +909,6 @@ function live(
     if (recordingWith?.for !== screen) recordingWith = { for: screen, resources: { ...screen, paragraphs, layers } }
     return recordingWith.resources
   }
-  const scope = (frame: Frame) => formatScope(frame.formatId)
 
   function depsOf(frame: Frame) {
     const overrides = design.overrides[scope(frame)]
@@ -900,14 +955,6 @@ function live(
     }
   }
 
-  const find = (layers: SceneLayer[], id: string): SceneLayer | undefined => {
-    for (const l of layers) {
-      if (l.id === id) return l
-      const inner = find(l.children, id)
-      if (inner) return inner
-    }
-    return undefined
-  }
   /** The layer as a frame shows it now, with the frame. */
   function pickedLayer(picked: Picked | null) {
     const frame = picked && frameOf(picked.frame)
@@ -1030,34 +1077,6 @@ function live(
     }
     return { x: p.x, y: p.y, width: p.width, height: p.height, rotation: p.rotation ?? 0 }
   }
-  /** Whether auto layout sizes or places a layer: an auto layout frame, or a layer anywhere inside one. */
-  function laidOut(id: string, from: Design) {
-    for (const up of ancestorsOf(from, id)) {
-      const node = from.nodes[up]
-      if (node?.type === 'frame' && (node.props.layout || Object.values(from.overrides).some((o) => o[up]?.layout)))
-        return true
-    }
-    return false
-  }
-  /** A layer's value of one property as a frame's format has it: the base with the format's override. */
-  const propIn = (frame: Frame, id: string, key: string, from: Design) => mergedProps(from, scope(frame), id)[key]
-  /** Whether a flow runs in a row (not a column) in a frame's format. */
-  const rowIn = (frame: Frame, id: string, from: Design) =>
-    (propIn(frame, id, 'layout', from) as AutoLayoutOf | undefined)?.direction !== 'column'
-  /** Whether a frame lays out what it holds with auto layout in a frame's format. */
-  const layoutIn = (frame: Frame, id: string, from: Design) =>
-    from.nodes[id]?.type === 'frame' && propIn(frame, id, 'layout', from) !== undefined
-  /** Whether a layer is in an auto layout frame's flow in a frame's format, so the frame places it. */
-  const inFlow = (frame: Frame, id: string, from: Design) =>
-    layoutIn(frame, from.nodes[id]?.parentId ?? '', from) && !propIn(frame, id, 'absolute', from)
-  /** Whether auto layout places a layer that is inside `root`, with whatever between them it is part of. */
-  function placedInside(frame: Frame, id: string, root: string, from: Design) {
-    for (const up of ancestorsOf(from, id)) {
-      if (up === root) break
-      if (inFlow(frame, up, from)) return true
-    }
-    return false
-  }
 
   /** The groups and frames a layer is inside, outermost first, as boxes in a frame. */
   function containersOf(frame: Frame, parentId: string | undefined, from: Design = session.design()): Box[] {
@@ -1067,22 +1086,6 @@ function live(
       if (box) boxes.unshift(box)
     }
     return boxes
-  }
-  /** A box as drawn inside containers: each one turns it about the container's centre. */
-  function drawnFrom(box: Box, around: Box[]): Box {
-    let c = centreOf(box)
-    let rotation = box.rotation
-    for (const outer of [...around].reverse()) {
-      c = turn(c, centreOf(outer), outer.rotation)
-      rotation += outer.rotation
-    }
-    return { ...box, x: c.x - box.width / 2, y: c.y - box.height / 2, rotation: normalAngle(rotation) }
-  }
-  /** A point on the page as layers inside containers see it, before the containers turn them. */
-  function localTo(p: Point, around: Box[]): Point {
-    let q = p
-    for (const outer of around) q = turn(q, centreOf(outer), -outer.rotation)
-    return q
   }
   /** A layer's box as it is drawn in a frame. */
   function drawnBoxOf(frame: Frame, id: string, from: Design = session.design()) {
@@ -1173,16 +1176,6 @@ function live(
     drawOverlay()
   }
 
-  /** A point inside containers as it is on the page: back through each one's turn, innermost first. */
-  function pageFrom(q: Point, around: Box[]): Point {
-    let p = q
-    for (const outer of [...around].reverse()) p = turn(p, centreOf(outer), outer.rotation)
-    return p
-  }
-  const isPath = (from: Design, id: string) => {
-    const node = from.nodes[id]
-    return node?.type === 'graphic' && node.props.shape.kind === 'path'
-  }
   /**
    * A path layer's path in one frame, in the coordinates of its parent before the layer turns it
    * (#45), with its box and what turns it: its containers, then the layer itself.
@@ -1411,11 +1404,6 @@ function live(
     return url
   }
 
-  const px = (n: number) => `${n}px`
-  /** Screen pixels a frame needs before it gets a label. */
-  const MIN_LABEL_WIDTH = 56
-  /** How far a label stays from the stage's start edge when its frame runs past it. */
-  const LABEL_INSET = 8
   /** A design-pixel box in a frame, as CSS on the overlay. */
   function placeBox(el: HTMLElement, frame: Frame, box: Rect) {
     const at = toScreen(camera, { x: frame.x + box.x, y: frame.y + box.y })
@@ -1457,10 +1445,6 @@ function live(
     return label
   }
 
-  /** Room the tool dock takes along the bottom of the stage, which the size label stays out of. */
-  const SIZE_CLEARANCE = 72
-  /** The room the selection's size label takes, in screen pixels. */
-  const SIZE_LABEL_HEIGHT = 20
   /** Where the size label's top goes for a box spanning `ys` on screen: under it, or over it when the tool dock along the stage's bottom would cover it. */
   function sizeLabelTop(ys: number[]) {
     const below = Math.max(...ys) + 8
@@ -1701,7 +1685,6 @@ function live(
     if (pageGone) for (const listener of pageListeners) listener(null)
   }
 
-  const SVG = 'http://www.w3.org/2000/svg'
   /**
    * The path the pen is drawing or whose points are being edited (#45): its outline, its anchors,
    * the handles of the anchors in play, and, for the pen, the next segment to where the pointer is.
@@ -2325,7 +2308,7 @@ function live(
       const box = boxIn(frame, parent, now)
       if (box) others.push(box)
       for (const [id] of childrenOf(now, parent)) {
-        const sibling = !ids.includes(id) && visibleIn(frame, id) && boxIn(frame, id, now)
+        const sibling = !ids.includes(id) && visibleIn(now, frame, id) && boxIn(frame, id, now)
         if (sibling) others.push(boundsOf([sibling]))
       }
     }
@@ -2367,7 +2350,7 @@ function live(
           s.dx !== 0
             ? (outer.width + grows * (g.handle.includes('e') ? s.dx : -s.dx)) / g.outer.width
             : (outer.height + grows * (g.handle.includes('s') ? s.dy : -s.dy)) / g.outer.height
-        outer = boxAt(g, factor, fromCentre)
+        outer = boxAt(g.outer, g.handle, factor, fromCentre)
       } else if (s.dx !== 0 || s.dy !== 0)
         outer = resizeBox(g.outer, g.handle, { x: to.x + s.dx, y: to.y + s.dy }, { keepRatio: ratio, fromCentre })
       snapped = { frame: g.frame, guides: s.guides, gaps: [] }
@@ -2377,7 +2360,7 @@ function live(
         g.outer.width > 0 ? outer.width / g.outer.width : g.outer.height > 0 ? outer.height / g.outer.height : 1
       if (g.factor < g.floor) {
         g.factor = g.floor
-        outer = boxAt(g, g.factor, fromCentre)
+        outer = boxAt(g.outer, g.handle, g.factor, fromCentre)
       }
     }
     const next = new Map<string, Box>()
@@ -2465,35 +2448,6 @@ function live(
     return texts
   }
 
-  /** Whether a handle is a corner: it moves two edges. */
-  const isCorner = (handle: Handle) => handle.length === 2
-
-  /** The box a resize from `g` gives at `factor` of its size, its shape kept: about the opposite corner, or the centre. */
-  function boxAt(g: Extract<Gesture, { kind: 'resize' }>, factor: number, fromCentre: boolean): Box {
-    const { outer } = g
-    const at = handleAt(g.handle)
-    const width = outer.width * factor
-    const height = outer.height * factor
-    const anchor = fromCentre
-      ? centreOf(outer)
-      : { x: outer.x + (1 - at.x) * outer.width, y: outer.y + (1 - at.y) * outer.height }
-    const left = fromCentre ? anchor.x - width / 2 : at.x === 1 ? anchor.x : anchor.x - width
-    const top = fromCentre ? anchor.y - height / 2 : at.y === 1 ? anchor.y : anchor.y - height
-    const centre = turn({ x: left + width / 2, y: top + height / 2 }, centreOf(outer), outer.rotation)
-    return { x: centre.x - width / 2, y: centre.y - height / 2, width, height, rotation: outer.rotation }
-  }
-
-  /**
-   * How far a frame's layers move so they stay where they are drawn when the frame, turned, changes
-   * from `was` to `box`: it turns them about its centre, which has moved.
-   */
-  function keptOnScreen(was: Box, box: Box): Point {
-    if (box.rotation === 0) return { x: 0, y: 0 }
-    const v = { x: centreOf(was).x - centreOf(box).x, y: centreOf(was).y - centreOf(box).y }
-    const w = turn(v, { x: 0, y: 0 }, -box.rotation)
-    return { x: w.x - v.x, y: w.y - v.y }
-  }
-
   /**
    * At the start of a resize, the axes it drags stop following their content, as in Figma: an auto
    * layout frame or a layer in a flow becomes fixed there (from hug or fill), and text that grows
@@ -2535,12 +2489,6 @@ function live(
     }
   }
 
-  /** The flow siblings of layers in an auto layout frame, without them, in the frame's order. */
-  function flowSiblings(frame: Frame, parentId: string, moving: string[], from: Design) {
-    return childrenOf(from, parentId)
-      .map(([id]) => id)
-      .filter((id) => !moving.includes(id) && inFlow(frame, id, from))
-  }
   /**
    * Where in a flow a point puts layers being moved: next to the sibling nearest it (on its line,
    * when the flow wraps), before it or after it as the point is before or past its middle along the
@@ -2651,18 +2599,6 @@ function live(
     const q = turn(p, centreOf(box), -box.rotation)
     return q.x >= box.x && q.y >= box.y && q.x <= box.x + box.width && q.y <= box.y + box.height
   }
-  /** A box as drawn on the page, as layers inside containers keep it: the inverse of drawnFrom. */
-  function undrawn(drawn: Box, around: Box[]): Box {
-    const c = localTo(centreOf(drawn), around)
-    const rotation = normalAngle(around.reduce((r, b) => r - b.rotation, drawn.rotation))
-    return {
-      x: round(c.x - drawn.width / 2),
-      y: round(c.y - drawn.height / 2),
-      width: round(drawn.width),
-      height: round(drawn.height),
-      rotation: round(rotation),
-    }
-  }
 
   function rotateTo(g: Extract<Gesture, { kind: 'rotate' }>, p: Point, snap: boolean) {
     const centre = centreOf(g.outer)
@@ -2720,12 +2656,6 @@ function live(
         : null
   }
 
-  /** Screen size of a handle, and how far from it a press still grabs it. */
-  const HANDLE_SIZE = 8
-  const HANDLE_REACH = 7
-  /** How far outside a corner a press turns the selection. */
-  const ROTATE_REACH = 24
-
   /** The handle under a screen point: one to resize by, or the zone outside a corner to turn by. */
   function handleUnder(screen: Point): { kind: 'resize'; handle: Handle } | { kind: 'rotate'; corner: number } | null {
     const outer = selectionBox()
@@ -2752,10 +2682,6 @@ function live(
     return corner === -1 ? null : { kind: 'rotate', corner }
   }
 
-  /** Resize cursors point along the handle's direction as the box is turned. */
-  const RESIZE_CURSORS = ['ew-resize', 'nwse-resize', 'ns-resize', 'nesw-resize']
-  const HANDLE_ANGLE: Record<Handle, number> = { e: 0, se: 45, s: 90, sw: 135, w: 180, nw: 225, n: 270, ne: 315 }
-  const ROTATE_CURSOR = `url("data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path d="M6 15a7 7 0 1 1 3 4.7" fill="none" stroke="white" stroke-width="4" stroke-linecap="round"/><path d="M6 15a7 7 0 1 1 3 4.7" fill="none" stroke="black" stroke-width="1.75" stroke-linecap="round"/><path d="M3 12l3 3.5 3.5-3" fill="none" stroke="white" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 12l3 3.5 3.5-3" fill="none" stroke="black" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg>')}") 12 12, crosshair`
   let hoverCursor = ''
   const showCursor = () => {
     const drawing = isDrawTool(tool) || tool === 'pen' || (tool === 'image' && imageToPlace)
@@ -3226,15 +3152,6 @@ function live(
     canvas.setPointerCapture(e.pointerId)
     gesture = { kind: 'imageBox', ...boxStart(at, 'graphic'), asset }
   }
-  /** The corner a drag from `from` reaches with the image's shape kept: as far as the pointer went on the longer side. */
-  function keepRatio(from: Point, to: Point, asset: PlacedAsset): Point {
-    if (asset.width <= 0 || asset.height <= 0) return to
-    const ratio = asset.width / asset.height
-    const dx = to.x - from.x
-    const dy = to.y - from.y
-    const width = Math.max(Math.abs(dx), Math.abs(dy) * ratio)
-    return { x: from.x + Math.sign(dx || 1) * width, y: from.y + Math.sign(dy || 1) * (width / ratio) }
-  }
   /** Places the image the image tool drew, one undo step; it is selected and the select tool comes back. */
   function finishImageBox(g: Extract<Gesture, { kind: 'imageBox' }>) {
     const box = draggedBox(g)
@@ -3696,14 +3613,6 @@ function live(
     { ...on, passive: false },
   )
 
-  /** Keys typed into the page's own fields belong to them. */
-  const inField = (target: EventTarget | null) =>
-    target instanceof HTMLElement &&
-    (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName))
-  /** Keys pressed in a popover or dialog, such as Escape to close it, are its own, not the stage's; undo and redo still are. */
-  const inDialog = (target: EventTarget | null) =>
-    target instanceof Element && target.closest('[role="dialog"], dialog') !== null
-
   /** Groups fit what they hold again after a change inside them, in the same undo step (#41). */
   function hug(ids: string[]) {
     const now = session.design()
@@ -4118,7 +4027,7 @@ function live(
       }
       case 'hide': {
         // Hidden in this format only, like a move; the layer stays selected so it can be shown again.
-        const shown = selection.ids.some((id) => visibleIn(frame, id))
+        const shown = selection.ids.some((id) => visibleIn(session.design(), frame, id))
         runQuietly(() =>
           session.run('node.update', { ids: selection?.ids ?? [], scope: scope(frame), patch: { visible: !shown } }),
         )
@@ -4156,11 +4065,6 @@ function live(
     }
     drawOverlay()
     return true
-  }
-  const visibleIn = (frame: Frame, id: string) => {
-    const now = session.design()
-    const value = now.overrides[scope(frame)]?.[id]?.visible ?? now.nodes[id]?.props.visible
-    return value !== false
   }
 
   function onKey(e: KeyboardEvent) {
@@ -4315,53 +4219,6 @@ function live(
       schemaVersion: SCHEMA_VERSION,
       designId: options.designId,
       tree: { nodes, roots: tops },
-    }
-  }
-  /**
-   * The last layers copied, kept in this browser too with the plain text the copy wrote: a paste
-   * that brings that text but not our own type (Mod+Shift+V pastes plain text only, and Safari
-   * drops custom types) still pastes the layers.
-   */
-  const REMEMBERED = 'dazbee.copiedLayers'
-  /** Keeps copied layers on this device, as JSON and as their names in plain text; `kept` is false without storage. */
-  function keepCopy(copied: LayerClipboard) {
-    const json = JSON.stringify(copied)
-    const plain = copied.tree.roots.map((id) => copied.tree.nodes[id]?.name || 'Layer').join('\n')
-    try {
-      localStorage.setItem(REMEMBERED, JSON.stringify({ plain, json }))
-      return { json, plain, kept: true }
-    } catch {
-      return { json, plain, kept: false }
-    }
-  }
-  function putOnClipboard(data: DataTransfer, copied: LayerClipboard) {
-    // Without storage, only pastes that keep our own type paste layers.
-    const { json, plain } = keepCopy(copied)
-    data.setData(LAYER_CLIPBOARD_TYPE, json)
-    data.setData('text/plain', plain)
-  }
-  function layersOnClipboard(data: DataTransfer | null): LayerTree | null {
-    let raw = data?.getData(LAYER_CLIPBOARD_TYPE)
-    const plain = data?.getData('text/plain')
-    try {
-      if (!raw && plain) {
-        const kept = JSON.parse(localStorage.getItem(REMEMBERED) ?? 'null') as { plain?: string; json?: string } | null
-        if (kept?.plain === plain) raw = kept.json
-      }
-      const parsed = raw ? LayerClipboard.safeParse(JSON.parse(raw)) : null
-      return parsed?.success ? parsed.data.tree : null
-    } catch {
-      return null
-    }
-  }
-  /** The layers last copied in Dazbee on this device, as kept in browser storage; null when there are none. */
-  function rememberedLayers(): LayerTree | null {
-    try {
-      const kept = JSON.parse(localStorage.getItem(REMEMBERED) ?? 'null') as { json?: string } | null
-      const parsed = kept?.json ? LayerClipboard.safeParse(JSON.parse(kept.json)) : null
-      return parsed?.success ? parsed.data.tree : null
-    } catch {
-      return null
     }
   }
   /** Whether the paste being made goes where the pointer is (Mod+Shift+V), not where the layers were. */

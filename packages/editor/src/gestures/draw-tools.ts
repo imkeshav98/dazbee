@@ -187,3 +187,16 @@ export function imageIn(
     },
   }
 }
+
+/** The pen's stroke until a style is picked: the near-black that lines draw with. */
+export const PEN_STROKE = { paint: { type: 'solid', color: '#1F2329FF' }, width: 2, cap: 'round', join: 'round' }
+
+/** The corner a drag from `from` reaches with the image's shape kept: as far as the pointer went on the longer side. */
+export function keepRatio(from: Point, to: Point, asset: { width: number; height: number }): Point {
+  if (asset.width <= 0 || asset.height <= 0) return to
+  const ratio = asset.width / asset.height
+  const dx = to.x - from.x
+  const dy = to.y - from.y
+  const width = Math.max(Math.abs(dx), Math.abs(dy) * ratio)
+  return { x: from.x + Math.sign(dx || 1) * width, y: from.y + Math.sign(dy || 1) * (width / ratio) }
+}
