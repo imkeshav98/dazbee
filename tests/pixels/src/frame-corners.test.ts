@@ -6,7 +6,7 @@ import { afterAll, describe, expect, it } from 'vitest'
 import { renderDesign, renderVector } from '@dazbee/renderer'
 import { loadCanvasKit } from '@dazbee/renderer/node'
 
-import { fixtureResources } from './pixels.ts'
+import { at, fixtureResources } from './pixels.ts'
 import { overWhite, rasterisePdf, rasteriseSvg, vectorDifference } from './vector.ts'
 
 const ck = await loadCanvasKit()
@@ -38,9 +38,6 @@ const design = (frame: Record<string, unknown>) => ({
   },
   overrides: {},
 })
-const at = (r: { pixels: Uint8Array; width: number }, x: number, y: number) => [
-  ...r.pixels.slice((y * r.width + x) * 4, (y * r.width + x) * 4 + 3),
-]
 const WHITE = [255, 255, 255]
 const RED = [224, 32, 32]
 

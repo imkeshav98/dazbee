@@ -94,3 +94,7 @@ export function comparePixels(expected: Pixels, actual: Pixels): { differing: nu
   }
   return { differing, diff: { width: expected.width, height: expected.height, pixels: diff } }
 }
+
+export const at = (r: { pixels: Uint8Array; width: number }, x: number, y: number) => [
+  ...r.pixels.slice((y * r.width + x) * 4, (y * r.width + x) * 4 + 3),
+]
