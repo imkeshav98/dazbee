@@ -5,7 +5,7 @@ import { type Design, type DesignInput, parseDesign } from '@dazbee/schema'
 import { root } from '../design-doc.ts'
 import { boundsOf, centreOf, normalAngle, turn } from '../geometry.ts'
 import { childrenOf, loadDesign, openSession, readDesign } from '../index.ts'
-import { shapesDesign, testDoc } from '../test-design.ts'
+import { openShapes } from '../test-design.ts'
 
 const rect = (x: number, y: number, width: number, height: number, rotation = 0) => ({
   x,
@@ -219,13 +219,8 @@ describe('node.enclose', () => {
 })
 
 describe('node.boolean', () => {
-  const open = () => {
-    const doc = testDoc(shapesDesign())
-    return { doc, tab: openSession(doc) }
-  }
-
   it('combines shapes where the top one was, painted like the bottom one, hugging them in every format', () => {
-    const { doc, tab } = open()
+    const { doc, tab } = openShapes()
     const id = tab.run('node.boolean', { ids: ['b', 'a'], op: 'subtract' })
     const d = readDesign(doc)
     expect(d.nodes[id]).toMatchObject({ type: 'boolean', name: 'Subtract', parentId: 'p1', index: 'a1' })
@@ -246,7 +241,7 @@ describe('node.boolean', () => {
   })
 
   it('combines only two or more shapes or booleans that share a parent', () => {
-    const { tab } = open()
+    const { tab } = openShapes()
     expect(() => tab.run('node.boolean', { ids: ['a'], op: 'union' })).toThrow(/ids/)
     expect(() => tab.run('node.boolean', { ids: ['a', 't'], op: 'union' })).toThrow(
       /"t" is a text; only shapes and booleans combine/,
@@ -264,7 +259,7 @@ describe('node.boolean', () => {
   })
 
   it('holds only shapes and booleans, however a layer gets there', () => {
-    const { doc, tab } = open()
+    const { doc, tab } = openShapes()
     const id = tab.run('node.boolean', { ids: ['a', 'b'], op: 'intersect' })
     expect(() => tab.run('node.move', { id: 't', parentId: id })).toThrow(
       /parent "\S+" is a boolean, which holds only shapes and booleans/,
@@ -293,7 +288,7 @@ describe('node.boolean', () => {
   })
 
   it('stays live: an edited shape changes it, hug refits it, and ungroup lets the shapes go', () => {
-    const { doc, tab } = open()
+    const { doc, tab } = openShapes()
     const id = tab.run('node.boolean', { ids: ['a', 'b'], op: 'union' })
     tab.run('node.update', {
       ids: ['b'],

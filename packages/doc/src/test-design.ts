@@ -100,6 +100,12 @@ export function testDoc(design: DesignInput = testDesign()) {
   return loadDesign(result.design)
 }
 
+/** A session on a document holding shapesDesign(). */
+export function openShapes() {
+  const doc = testDoc(shapesDesign())
+  return { doc, tab: openSession(doc) }
+}
+
 /** Two tabs on one design, each with its own doc, exchanging updates like the sync server would. */
 export function twoTabs() {
   const a = testDoc()

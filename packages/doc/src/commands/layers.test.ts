@@ -4,7 +4,7 @@ import * as Y from 'yjs'
 import { formatScope } from '@dazbee/schema'
 
 import { openSession, readDesign } from '../index.ts'
-import { badge, shapesDesign, testDoc } from '../test-design.ts'
+import { badge, openShapes, testDoc } from '../test-design.ts'
 
 describe('node.create', () => {
   it('adds a layer on top of its siblings, and undo removes it', () => {
@@ -49,11 +49,6 @@ describe('node.create', () => {
 })
 
 describe('node.update', () => {
-  const openShapes = () => {
-    const doc = testDoc(shapesDesign())
-    return { doc, tab: openSession(doc) }
-  }
-
   it('sets base properties, or overrides them for one format only', () => {
     const doc = testDoc()
     const tab = openSession(doc)
