@@ -349,7 +349,7 @@ export function PaintRow({ paint, name, brandId, editor, p, onSet }: { paint: Pa
         : (
           <>
             <span className="min-w-0 flex-1 truncate text-xs text-muted">{p.paint[paint.type]}</span>
-            <div className="w-16 shrink-0">
+            <div className="w-[4.5rem] shrink-0">
               <NumberField
                 label="%"
                 name={format(p.alpha, { name })}
