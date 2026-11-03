@@ -72,7 +72,7 @@ export async function handle(page: Page, which: string) {
 }
 export const zoomOf = (page: Page) => page.evaluate(() => window.dazbee?.camera().zoom ?? 1)
 
-/** Opens the header card's scope menu, unless it is open: all sizes or only this one, and its own changes. */
+/** Opens the top bar's scope menu, unless it is open: all sizes or only this one, and its own changes. */
 export async function scopeMenu(page: Page) {
   const menu = page.getByTestId('scope-menu')
   if (!(await menu.isVisible())) await page.getByTestId('scope-chip').click()
@@ -87,7 +87,7 @@ export async function zoomMenu(page: Page) {
 }
 
 /**
- * Opens ⋯ More on the bar by the selection, unless it is open, and gives it once it shows: the
+ * Opens the full menu from the small menu's ⋯, unless it is open, and gives it once it shows: the
  * selected layers' own actions. A row that closes it is waited out by its caller, so a menu still
  * closing is never taken for an open one.
  */
@@ -98,46 +98,53 @@ export async function moreMenu(page: Page) {
   return menu
 }
 
-/** Opens the popover of one of the bar's buttons, `bar-<id>`, unless it is open, and gives it once it shows. */
+/**
+ * Opens what one of the top bar's items opens, `bar-<id>`, unless it is open, and gives it once it
+ * shows: its pop-up, or the edit panel. An item in the bar's second row is reached through ⋯.
+ */
 export async function barMenu(page: Page, id: string) {
   const menu = page.getByTestId(`bar-${id}-menu`)
-  if (!(await menu.isVisible())) await page.getByTestId(`bar-${id}`).click()
+  if (await menu.isVisible()) return menu
+  const item = page.getByTestId(`bar-${id}`)
+  if (!(await item.isVisible()) && (await page.getByTestId('bar-overflow').isVisible())) await page.getByTestId('bar-overflow').click()
+  await item.click()
   await expect(menu).toBeVisible()
   return menu
 }
 
+/** Opens an edit panel from the top bar, `bar-<id>`, unless it is open, and gives the part of it with `testId`. */
+export const panelPart = async (page: Page, id: string, testId: string) => (await barMenu(page, id)).getByTestId(testId)
+
 /**
- * Closes the open menu of a button on the bar with Esc, by the button's test id (`bar-size`, `bar-more`,
- * or `more-order` for the menu beside that row of ⋯ More), and waits until it is gone.
+ * Closes the open pop-up or panel of an item on the top bar with Esc, by the item's test id
+ * (`bar-align`, `bar-more`, or `more-order` for the menu beside that row of the full menu), and
+ * waits until it is gone.
  */
 export async function closeBarMenu(page: Page, button: string) {
   await page.keyboard.press('Escape')
   await expect(page.getByTestId(`${button}-menu`)).toBeHidden()
 }
 
-/** The fill list: in the Colour card (a photo, several layers), or else in the bar's Colour popover, opened. */
+/** The fill list: in the Colour panel, or a photo's in its Edit image panel, opened. */
 export const fillList = async (page: Page) => {
-  const card = page.getByTestId('fill-card')
-  return ((await card.isVisible()) ? card : await barMenu(page, 'colour')).getByTestId('fill-list')
+  const panel = await barMenu(page, (await page.getByTestId('bar-colour').count()) > 0 ? 'colour' : 'edit')
+  return panel.getByTestId('fill-list')
 }
 
-/** The stroke list: in the Colour card (a photo, several layers), or else in the bar's Outline popover, opened. */
-export const strokeList = async (page: Page) => {
-  const card = page.getByTestId('fill-card')
-  return ((await card.isVisible()) ? card : await barMenu(page, 'outline')).getByTestId('stroke-list')
-}
+/** The stroke list, in the Outline panel, opened. */
+export const strokeList = async (page: Page) => (await barMenu(page, 'outline')).getByTestId('stroke-list')
 
-/** The menus beside ⋯ More's rows, by their test ids. */
-const SUBMENUS = ['line-up', 'order', 'group']
+/** The menus beside the full menu's rows, by their test ids. */
+const SUBMENUS = ['line-up', 'order']
 
 /**
- * Clicks an action of ⋯ More, or of the right-click menu when `menu` is it, by the start of its name:
- * at the top of the menu, or in the menu beside a row (Line up ▸, Order ▸, Group ▸). The action
- * closes the menu, and this waits until it has.
+ * Clicks an action of the full menu, or of the right-click menu when `menu` is it, by the start of
+ * its name (the first row that starts so): in the menu, or in the menu beside a row (Line up ▸,
+ * Order ▸). The action closes the menu, and this waits until it has.
  */
 export async function moreAction(page: Page, name: string, menu?: Locator) {
   const root = menu ?? (await moreMenu(page))
-  const named = (within: Locator) => within.getByRole('button', { name: new RegExp(`^${name}`) })
+  const named = (within: Locator) => within.getByRole('button', { name: new RegExp(`^${name}`) }).first()
   const run = async (action: Locator) => {
     await action.click()
     await expect(root).toBeHidden()
@@ -156,7 +163,7 @@ export async function moreAction(page: Page, name: string, menu?: Locator) {
   throw new Error(`no ${name} in the menu`)
 }
 
-/** Opens the menu beside one of ⋯ More's rows, `more-<id>`, and gives it once it shows. */
+/** Opens the menu beside one of the full menu's rows, `more-<id>`, and gives it once it shows. */
 export async function moreSubmenu(page: Page, id: string) {
   const sub = page.getByTestId(`more-${id}-menu`)
   if (!(await sub.isVisible())) await (await moreMenu(page)).getByTestId(`more-${id}`).click()

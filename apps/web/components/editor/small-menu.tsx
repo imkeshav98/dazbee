@@ -11,8 +11,8 @@ import { CopyIcon, DotsThreeIcon, LockSimpleIcon, LockSimpleOpenIcon, SelectionP
 import type { Editor } from '@dazbee/editor'
 import { useEffect, useState } from 'react'
 import { cn } from '../../lib/cn.ts'
-import { useMessages } from '../../lib/i18n/client.tsx'
-import { format } from '../../lib/i18n/index.ts'
+import { useLocale, useMessages } from '../../lib/i18n/client.tsx'
+import { dirOf, format } from '../../lib/i18n/index.ts'
 import { keyOf, useSelection } from './arrange-panel.tsx'
 import { arrowAlong, useMenuFocus, useRovingTab } from './bar-popover.tsx'
 import { editState, isPanel, setOpen, useEditState } from './edit-store.ts'
@@ -126,6 +126,7 @@ export function SmallMenu({ editor, rightClick }: { editor: Editor; rightClick: 
   const place = usePlace(editor, menu, rightClick)
   const { open } = useEditState()
   const moreFocus = useMenuFocus()
+  const rtl = dirOf(useLocale()) === 'rtl'
   const focused = useRovingTab(menu)
   if (!selected) return null
   const { target, design } = selected
@@ -167,7 +168,15 @@ export function SmallMenu({ editor, rightClick }: { editor: Editor; rightClick: 
           </button>
         </Popover.Trigger>
         <Popover.Portal>
-          <Popover.Content side="right" align="start" sideOffset={8} collisionPadding={{ top: 140, bottom: 72, left: 12, right: 12 }} {...moreFocus.content} aria-label={b.more} data-testid="bar-more-menu" className={cn(MENU, 'max-h-[var(--radix-popover-content-available-height)] w-64 overflow-y-auto')}>
+          <Popover.Content
+            side={rtl ? 'left' : 'right'}
+            align="start"
+            sideOffset={8}
+            collisionPadding={{ top: 140, bottom: 72 }}
+            {...moreFocus.content}
+            aria-label={b.more}
+            data-testid="bar-more-menu"
+            className={cn(MENU, 'max-h-[var(--radix-popover-content-available-height)] w-72 overflow-y-auto')}>
             {moreFocus.back}
             <LayerActions editor={editor} ids={ids} onDone={() => setOpen(null)} />
           </Popover.Content>
