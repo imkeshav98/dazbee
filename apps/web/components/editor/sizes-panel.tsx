@@ -22,11 +22,15 @@ import { CHIP, FOCUS_RING, ICON_BUTTON, MENU, MENU_DIVIDER, MENU_ITEM, PANEL_HEA
 const COMMON = ['feed-portrait', 'story', 'link-image', 'medium-rectangle'] as const
 
 const sizeOf = ({ width, height }: { width: number; height: number }) => `${width} × ${height}`
+/** A size as a chip shows it, short. */
+const shortSizeOf = ({ width, height }: { width: number; height: number }) => `${width}×${height}`
+/** A size's own button on its card: a 44 px target on a phone. */
+const CARD_BUTTON = cn(ICON_BUTTON, 'max-sm:size-10')
 const ordered = (design: Design) =>
   Object.entries(design.formats).sort(([a, x], [b, y]) => (x.order < y.order ? -1 : x.order > y.order ? 1 : a < b ? -1 : 1))
-/** A size's picture in its proportions, at most 28 tall and 40 wide. */
+/** A size's picture in its proportions, its long side 34. */
 const thumbOf = ({ width, height }: { width: number; height: number }) => {
-  const scale = Math.min(28 / height, 40 / width)
+  const scale = 34 / Math.max(width, height)
   return { width: Math.max(8, Math.round(width * scale)), height: Math.max(8, Math.round(height * scale)) }
 }
 /** The first page's background, when it is one colour: what a size's picture is filled with. */
@@ -48,6 +52,7 @@ export function SizesButton({ editor }: { editor: Editor }) {
       data-testid="sizes-button"
       aria-expanded={open === 'sizes'}
       aria-label={format(t.editor.formats.button, { n: count })}
+      title={format(t.editor.formats.button, { n: count })}
       onClick={() => setOpen(open === 'sizes' ? null : 'sizes')}
       className={cn('flex h-7 shrink-0 cursor-pointer items-center gap-1 rounded-full px-2 text-[12px] font-semibold text-muted transition-colors hover:bg-hover hover:text-text aria-expanded:bg-accent-soft aria-expanded:text-accent-text', FOCUS_RING)}
     >
@@ -85,12 +90,12 @@ function SizeList({ editor, onRemoved }: { editor: Editor; onRemoved: (message: 
     if (trimmed && trimmed !== design.formats[id]?.name) run('format.update', { id, name: trimmed })
   }
   return (
-    <ul aria-label={f.title} className={cn(PANEL_PART, 'gap-1')} data-testid="formats">
+    <ul aria-label={f.title} className={cn(PANEL_PART, 'gap-1.5')} data-testid="formats">
       {formats.map(([id, size], i) => {
         const primary = design.meta.primaryFormatId === id
         return (
-          <li key={id} data-format={id} data-focused={focused === id ? '' : undefined} className="flex h-12 items-center gap-2.5 rounded-row ps-1 pe-0.5 data-[focused]:bg-accent-soft">
-            <span aria-hidden className="grid w-10 shrink-0 place-items-center">
+          <li key={id} data-format={id} data-focused={focused === id ? '' : undefined} className="flex items-center gap-2.5 rounded-[10px] border border-line bg-surface p-2 data-[focused]:border-accent data-[focused]:bg-accent-soft">
+            <span aria-hidden className="grid size-[34px] shrink-0 place-items-center">
               <span className="rounded-[3px] border border-line-strong bg-hover" style={{ ...thumbOf(size), backgroundColor: background }} />
             </span>
             <span className="flex min-w-0 flex-1 flex-col">
@@ -118,10 +123,10 @@ function SizeList({ editor, onRemoved }: { editor: Editor; onRemoved: (message: 
                 )}
               <span className="font-mono text-[11px] text-subtle tabular-nums">{sizeOf(size)}</span>
             </span>
-            <button type="button" aria-label={primary ? f.primary : f.makePrimary} title={primary ? f.primary : f.makePrimary} aria-pressed={primary} onClick={() => primary || run('format.setPrimary', { id })} className={cn(ICON_BUTTON, primary && 'text-accent-text')}>
+            <button type="button" aria-label={primary ? f.primary : f.makePrimary} title={primary ? f.primary : f.makePrimary} aria-pressed={primary} onClick={() => primary || run('format.setPrimary', { id })} className={cn(CARD_BUTTON, primary && 'text-accent-text')}>
               <StarIcon size={15} weight={primary ? 'fill' : 'regular'} aria-hidden />
             </button>
-            <button type="button" aria-label={focused === id ? f.exitFocus : f.focus} title={focused === id ? f.exitFocus : f.focus} aria-pressed={focused === id} onClick={() => editor.focus(focused === id ? null : id)} className={cn(ICON_BUTTON, focused === id && 'text-accent-text')}>
+            <button type="button" aria-label={focused === id ? f.exitFocus : f.focus} title={focused === id ? f.exitFocus : f.focus} aria-pressed={focused === id} onClick={() => editor.focus(focused === id ? null : id)} className={cn(CARD_BUTTON, focused === id && 'text-accent-text')}>
               <EyeIcon size={15} aria-hidden />
             </button>
             <SizeMenu
@@ -166,7 +171,7 @@ function SizeMenu({ name, first, last, removable, onRename, onUp, onDown, onRemo
   return (
     <Popover.Root open={open} onOpenChange={setMenuOpen}>
       <Popover.Trigger asChild>
-        <button ref={focus.button} type="button" aria-label={format(f.more, { name })} title={format(f.more, { name })} className={ICON_BUTTON}>
+        <button ref={focus.button} type="button" aria-label={format(f.more, { name })} title={format(f.more, { name })} className={CARD_BUTTON}>
           <DotsThreeIcon size={16} weight="bold" aria-hidden />
         </button>
       </Popover.Trigger>
@@ -184,10 +189,13 @@ function SizeMenu({ name, first, last, removable, onRename, onUp, onDown, onRemo
   )
 }
 
-/** Add a size: the common presets at a tap, and More sizes for every preset and a size of your own. */
+/** Add a size: the common presets the design doesn't have yet at a tap, and + for every preset and a size of your own. */
 function AddSize({ editor }: { editor: Editor }) {
   const t = useMessages()
   const f = t.editor.formats
+  const { design } = useEditorDesign(editor)
+  // A preset the design has a size of already isn't offered again.
+  const has = new Set(Object.values(design.formats).map(sizeOf))
   const add = (name: string, width: number, height: number) => {
     const id = editor.session.run('format.add', { name, width, height })
     // Show where the new size landed: every frame, with the new column at the end.
@@ -203,12 +211,12 @@ function AddSize({ editor }: { editor: Editor }) {
       <div className="flex flex-wrap gap-1.5">
         {COMMON.map((presetId) => {
           const preset = FORMAT_PRESETS.find((p) => p.id === presetId)
-          if (!preset) return null
+          if (!preset || has.has(sizeOf(preset))) return null
           const name = f.preset[preset.id] ?? preset.id
           return (
-            <button key={preset.id} type="button" data-preset={preset.id} onClick={() => add(name, preset.width, preset.height)} className={cn(CHIP, FOCUS_RING)}>
+            <button key={preset.id} type="button" data-preset={preset.id} onClick={() => add(name, preset.width, preset.height)} className={cn(CHIP, 'h-7 gap-1.5 px-2.5 text-[12px] font-medium text-text max-sm:h-9', FOCUS_RING)}>
               {name}
-              <span className="font-mono text-[11px] font-normal text-subtle tabular-nums">{sizeOf(preset)}</span>
+              <span className="text-subtle tabular-nums">{shortSizeOf(preset)}</span>
             </button>
           )
         })}
