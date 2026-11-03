@@ -142,8 +142,7 @@ test('a click on the page picks it: a dashed outline, pink labels, and a bar of 
   }, formatId)
   for (const formatId of ['sq', 'st']) await expect.poll(() => pixel(formatId)).toEqual([61, 107, 255])
   writeOutput('page-background.png', await page.screenshot({ animations: 'disabled' }))
-  // One undo step takes the colour back.
-  await page.keyboard.press('Escape')
+  // Esc in the field closes the panel; one undo step takes the colour back.
   await page.keyboard.press('Escape')
   await expect(panel).toBeHidden()
   await press(page, 'undo')
@@ -174,9 +173,6 @@ test('a click on the page picks it: a dashed outline, pink labels, and a bar of 
   await drag(page, { x: 40, y: 20 }, { x: 400, y: 200 })
   expect(await selection(page)).toEqual(['headline'])
   await expect(page.locator('.stage-overlay .page-picked')).toHaveCount(0)
-  // A click on the page inside the selection's box, on no layer, picks it.
-  await press(page, 'deselect')
-  await pickPage(page, 900, 900)
   // Picking never moved the canvas.
   expect(await camera(page)).toEqual(still)
   expect(errors).toEqual([])

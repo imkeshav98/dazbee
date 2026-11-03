@@ -8,7 +8,7 @@
 import { FilesIcon, PlusIcon } from '@phosphor-icons/react'
 import type { Editor } from '@dazbee/editor'
 import type { Design } from '@dazbee/schema'
-import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { cn } from '../../lib/cn.ts'
 import { useMessages } from '../../lib/i18n/client.tsx'
 import { format } from '../../lib/i18n/index.ts'
@@ -66,6 +66,27 @@ function usePagePictures(editor: Editor): Record<string, string | null> {
  */
 export function PagesButton({ editor }: { editor: Editor | null }) {
   const t = useMessages()
+  if (!editor) return <PagesFrame label={t.editor.pages.title} disabled><span>{t.editor.pages.title}</span></PagesFrame>
+  return <LivePages editor={editor} />
+}
+
+/** Pages once the design is open: which page is in view, of how many. */
+function LivePages({ editor }: { editor: Editor }) {
+  const t = useMessages()
+  const { design } = useEditorDesign(editor)
+  usePickedPage(editor)
+  const current = useCurrentPage(design)
+  const pages = orderedPages(design)
+  const counts = { n: Math.max(1, pages.findIndex(([id]) => id === current) + 1), total: pages.length }
+  return (
+    <PagesFrame label={format(t.editor.pages.buttonLabel, counts)}>
+      <span aria-hidden className="tabular-nums max-sm:hidden">{format(t.editor.pages.button, counts)}</span>
+      <span aria-hidden className="font-mono tabular-nums sm:hidden">{format(t.editor.pages.buttonShort, counts)}</span>
+    </PagesFrame>
+  )
+}
+
+function PagesFrame({ label, disabled = false, children }: { label: string; disabled?: boolean; children: ReactNode }) {
   const { open } = useEditState()
   const button = useRef<HTMLButtonElement>(null)
   // Where the zoom pill ends, so Pages sits just beside or above it.
@@ -87,7 +108,9 @@ export function PagesButton({ editor }: { editor: Editor | null }) {
       data-pages
       data-opens="pages"
       data-testid="pages-button"
-      disabled={!editor}
+      disabled={disabled}
+      aria-label={label}
+      title={label}
       aria-expanded={open === 'pages'}
       onClick={() => setOpen(open === 'pages' ? null : 'pages')}
       style={place}
@@ -98,26 +121,9 @@ export function PagesButton({ editor }: { editor: Editor | null }) {
         FOCUS_RING,
       )}
     >
-      {editor ? <PagesCount editor={editor} /> : <span>{t.editor.pages.title}</span>}
-    </button>
-  )
-}
-
-function PagesCount({ editor }: { editor: Editor }) {
-  const t = useMessages()
-  const { design } = useEditorDesign(editor)
-  usePickedPage(editor)
-  const current = useCurrentPage(design)
-  const pages = orderedPages(design)
-  const counts = { n: Math.max(1, pages.findIndex(([id]) => id === current) + 1), total: pages.length }
-  const label = format(t.editor.pages.buttonLabel, counts)
-  return (
-    <>
       <FilesIcon size={15} aria-hidden />
-      <span className="sr-only">{label}</span>
-      <span aria-hidden title={label} className="tabular-nums max-sm:hidden">{format(t.editor.pages.button, counts)}</span>
-      <span aria-hidden title={label} className="font-mono tabular-nums sm:hidden">{format(t.editor.pages.buttonShort, counts)}</span>
-    </>
+      {children}
+    </button>
   )
 }
 

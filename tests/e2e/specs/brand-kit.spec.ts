@@ -110,7 +110,9 @@ test('the picker applies a colour tile and a font row, and the page Background p
 
   // The page picked, its Background panel offers the brand's colours in place of the fixed set.
   const brandRow = (await backgroundPanel(page)).getByTestId('brand-colours')
-  await expect(brandRow.getByRole('button')).toHaveCount(2)
+  // The kit's two, after the page's own white, which the kit doesn't hold.
+  await expect(brandRow.getByRole('button')).toHaveCount(3)
+  await expect(brandRow.getByRole('button', { name: 'Roast' })).toBeVisible()
   await brandRow.getByRole('button', { name: 'Sun' }).click()
   await expect.poll(async () => ((await read(page)) as unknown as { pages: Record<string, { fills: unknown[] }> }).pages.p1?.fills).toEqual([{ type: 'solid', color: '#FF8A3DFF' }])
 

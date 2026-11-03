@@ -1206,7 +1206,7 @@ test.describe('nothing selected', () => {
     await step(page, async () => panel.getByTestId('brand-colours').getByRole('button', { name: 'Berry' }).click(), async () => {
       await expect.poll(() => background(page)).toEqual(solid('#FF3D6EFF'))
     })
-    await step(page, async () => panel.getByTestId('design-colours').getByRole('button').nth(1).click(), async () => {
+    await step(page, async () => panel.getByTestId('design-colours').locator('button[aria-pressed="false"]:not([data-testid="colour-pick"])').first().click(), async () => {
       await expect.poll(async () => (await background(page))[0]?.color).not.toBe('#FFFFFFFF')
     })
     await panel.getByTestId('colour-pick').click()

@@ -116,7 +116,10 @@ test('an ad set rebuilt in 5 formats through real input exports PNG, JPG, PDF an
   await page.keyboard.press('Escape')
   await drawn(page)
 
-  // The page takes the brand colour from its Background panel, the page picked by a click on it.
+  // The page takes the brand colour from its Background panel, the page picked by a click on it
+  // once the library is closed, which covers the page's start.
+  await page.locator('[data-panel="assets"]').click()
+  await expect(page.getByTestId('flyout')).toHaveCount(0)
   await (await backgroundPanel(page, 30, 30)).getByTestId('brand-colours').getByRole('button', { name: colour }).click()
   await expect.poll(async () => (await stored(page)).pages.p1?.fills).toEqual([{ type: 'solid', color: '#1F7A4DFF' }])
 
