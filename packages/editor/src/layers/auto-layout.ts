@@ -1,4 +1,4 @@
-// What auto layout decides about a layer in one frame (#46): whether a frame lays out what it
+// What auto layout decides about a layer in one frame: whether a frame lays out what it
 // holds there, in a row or a column, and which layers its flow places.
 import { ancestorsOf, childrenOf, mergedProps } from '@dazbee/doc'
 import type { Design, Layer } from '@dazbee/schema'

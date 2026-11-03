@@ -102,6 +102,23 @@ describe('placing an image from the asset library (#52)', () => {
   })
 })
 
+describe('newPath', () => {
+  it('makes the pen’s path a graphic in its box, stroked near-black until a style is picked (#45)', () => {
+    expect(newPath('M0 0 L40 30', { x: 10, y: 20, width: 40, height: 30 })).toEqual({
+      type: 'graphic',
+      name: 'Path',
+      props: {
+        x: 10,
+        y: 20,
+        width: 40,
+        height: 30,
+        shape: { kind: 'path', d: 'M0 0 L40 30', drawnIn: { width: 40, height: 30 } },
+        strokes: [{ paint: { type: 'solid', color: '#1F2329FF' }, width: 2, cap: 'round', join: 'round' }],
+      },
+    })
+  })
+})
+
 describe('withImage', () => {
   const pink = { type: 'solid' as const, color: '#FF2E7EFF' }
   it('puts an image on top of fills that have none', () => {
@@ -122,23 +139,6 @@ describe('withImage', () => {
       pink,
       { type: 'image', assetId: 'a2', fit: 'crop', opacity: 0.5, filter: 'mono' },
     ])
-  })
-})
-
-describe('newPath', () => {
-  it('makes the pen’s path a graphic in its box, stroked near-black until a style is picked (#45)', () => {
-    expect(newPath('M0 0 L40 30', { x: 10, y: 20, width: 40, height: 30 })).toEqual({
-      type: 'graphic',
-      name: 'Path',
-      props: {
-        x: 10,
-        y: 20,
-        width: 40,
-        height: 30,
-        shape: { kind: 'path', d: 'M0 0 L40 30', drawnIn: { width: 40, height: 30 } },
-        strokes: [{ paint: { type: 'solid', color: '#1F2329FF' }, width: 2, cap: 'round', join: 'round' }],
-      },
-    })
   })
 })
 

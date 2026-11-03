@@ -1,4 +1,4 @@
-// Copied layers on the clipboard (#49), kept on this device too, so a paste that brings only their
+// Copied layers on the clipboard, kept on this device too, so a paste that brings only their
 // plain text still pastes them.
 import { LAYER_CLIPBOARD_TYPE, LayerClipboard, type LayerTree } from '@dazbee/schema'
 

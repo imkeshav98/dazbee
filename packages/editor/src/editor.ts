@@ -2039,16 +2039,21 @@ function live(
   const zoomOut = () => zoomTo(camera.zoom / ZOOM_STEP)
 
   // Pointer: screen points are CSS pixels from the canvas's corner.
-  const screenOf = (e: MouseEvent): Point => {
+  /** A point in client coordinates as a point on the stage. */
+  const onStage = (client: Point): Point => {
     const rect = canvas.getBoundingClientRect()
-    return { x: e.clientX - rect.left, y: e.clientY - rect.top }
+    return { x: client.x - rect.left, y: client.y - rect.top }
   }
+  const screenOf = (e: MouseEvent): Point => onStage({ x: e.clientX, y: e.clientY })
   /** The frame under a point on screen, in client coordinates, and the point in its page's design pixels. */
   function pointAt(client: Point) {
-    const rect = canvas.getBoundingClientRect()
-    const world = toWorld(camera, { x: client.x - rect.left, y: client.y - rect.top })
+    const world = toWorld(camera, onStage(client))
     const frame = frameAt(grid.frames, world)
     return frame ? { frame, p: { x: world.x - frame.x, y: world.y - frame.y } } : null
+  }
+  /** Where something placed with no point goes: the frame in the middle of the view, else the selection's or the first. */
+  function middleFrame() {
+    return frameAt(grid.frames, toWorld(camera, centre())) ?? frameOf(selection?.frame) ?? grid.frames[0]
   }
   /** The spot under a point on screen, in client coordinates: the frame there and the point in it. */
   function spotAt(client: Point): Spot | null {
@@ -4282,11 +4287,7 @@ function live(
     const spot = where.spot ?? (client && spotAt(client))
     // A point off every frame puts the file in the middle of the selection's frame; with no point,
     // it goes in the frame in the middle of the view.
-    const frame = spot
-      ? frameOf(spot.frame)
-      : client
-        ? frameOf(selection?.frame)
-        : (frameAt(grid.frames, toWorld(camera, centre())) ?? frameOf(selection?.frame) ?? grid.frames[0])
+    const frame = spot ? frameOf(spot.frame) : client ? frameOf(selection?.frame) : middleFrame()
     if (!frame) return null
     const at = spot ? { x: spot.x, y: spot.y } : { x: frame.width / 2, y: frame.height / 2 }
     let made: ReturnType<typeof svgToLayers>
@@ -4847,9 +4848,7 @@ function live(
       // A point off every frame places nothing; with no point, it goes in the frame in the middle of the view.
       const spot = where && ('frame' in where ? where : spotAt(where))
       if (where && !spot) return null
-      const frame = spot
-        ? frameOf(spot.frame)
-        : (frameAt(grid.frames, toWorld(camera, centre())) ?? frameOf(selection?.frame) ?? grid.frames[0])
+      const frame = spot ? frameOf(spot.frame) : middleFrame()
       if (!frame) return null
       const at = spot ? { x: spot.x, y: spot.y } : { x: frame.width / 2, y: frame.height / 2 }
       stopEditing()

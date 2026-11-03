@@ -1,6 +1,6 @@
 // Drawing shapes with a drag (#44): what each shape tool makes, and the box a drag gives it. Kept
 // free of the editor so the geometry can be tested on its own. Points are a page's design pixels.
-import type { Paint, Point } from '@dazbee/schema'
+import type { Paint, Point, Rect } from '@dazbee/schema'
 
 import { normalAngle, round } from '../layers/transform.ts'
 
@@ -143,8 +143,8 @@ export function newText(x: number, y: number, box: { x: number; y: number; width
   }
 }
 
-/** A new path layer for the pen (#45): the path data `d`, drawn in `box`, stroked as lines are. */
-export function newPath(d: string, box: { x: number; y: number; width: number; height: number }): NewLayer {
+/** A new path layer for the pen: the path data `d`, drawn in `box`, stroked as lines are. */
+export function newPath(d: string, box: Rect): NewLayer {
   const shape = { kind: 'path', d, drawnIn: { width: box.width, height: box.height } }
   return {
     type: 'graphic',
