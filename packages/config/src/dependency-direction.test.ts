@@ -6,7 +6,7 @@ import type { Linter } from 'eslint'
 import { afterEach, describe, expect, it } from 'vitest'
 
 import { adr0001Pattern, webAliasPatterns } from '../eslint.config.js'
-import { checkRepo, findImportRuleGaps, findViolations, type WorkspacePackage } from './dependency-direction.ts'
+import { checkRepo, findViolations, type WorkspacePackage } from './dependency-direction.ts'
 
 const workspacePackage = (name: string, dir: string, deps: string[] = []): WorkspacePackage => ({ name, dir, deps })
 const importRule = (...patterns: object[]): Linter.Config => ({
@@ -56,7 +56,7 @@ describe('checkRepo', () => {
     expect(await checkRepo(root)).toEqual(['apps/web/package.json: missing "name"'])
   })
 
-  it('fails when a block of a workspace ESLint config sets no-restricted-imports without adr0001Pattern', async () => {
+  it("fails when a block of a package's ESLint config sets no-restricted-imports without adr0001Pattern", async () => {
     repo('packages:\n  - packages/*\n')
     pkg('packages/doc', { name: '@dazbee/doc', type: 'module' })
     eslintConfig('packages/doc', [
@@ -80,7 +80,7 @@ describe('checkRepo', () => {
   })
 })
 
-describe('dependency direction', () => {
+describe('findViolations', () => {
   it('flags a package that depends on an app', () => {
     const violations = findViolations([
       workspacePackage('@dazbee/web', 'apps/web'),
@@ -118,35 +118,5 @@ describe('dependency direction', () => {
       workspacePackage('@dazbee/e2e', 'tests/e2e', ['@dazbee/web']),
     ])
     expect(violations).toEqual([])
-  })
-})
-
-describe('findImportRuleGaps', () => {
-  it('passes blocks that hold the patterns their workspace needs, and holds the preset to ADR-0001 only', () => {
-    const preset = importRule(adr0001Pattern)
-    const editorRules: Linter.RulesRecord = {
-      'no-restricted-imports': ['error', { paths: ['yjs'], patterns: [adr0001Pattern] }],
-    }
-    const editor = [preset, { files: ['src/**'], rules: editorRules }]
-    const web = [preset, importRule(adr0001Pattern, ...webAliasPatterns)]
-
-    expect(findImportRuleGaps('packages/editor', editor, new Set([preset]))).toEqual([])
-    expect(findImportRuleGaps('apps/web', web, new Set([preset]))).toEqual([])
-  })
-
-  it('fails the web config when no block of its own sets webAliasPatterns', () => {
-    const preset = importRule(adr0001Pattern)
-
-    expect(findImportRuleGaps('apps/web', [preset], new Set([preset]))).toEqual([
-      'apps/web/eslint.config.js: no block of its own sets no-restricted-imports with webAliasPatterns from @dazbee/config/eslint',
-    ])
-  })
-
-  it('fails a block that sets no-restricted-imports below error', () => {
-    const rules: Linter.RulesRecord = { 'no-restricted-imports': ['warn', { patterns: [adr0001Pattern] }] }
-
-    expect(findImportRuleGaps('packages/doc', [{ rules }], new Set())).toEqual([
-      'packages/doc/eslint.config.js: block 0 sets no-restricted-imports below error',
-    ])
   })
 })

@@ -29,6 +29,10 @@ const MIME: Record<ExportType | 'zip', string> = {
   zip: 'application/zip',
 }
 
+/** Path separators, the characters some file systems reserve, and control characters. */
+// eslint-disable-next-line no-control-regex
+const UNSAFE_IN_NAMES = /[/\\:*?"<>|\u0000-\u001f]/g
+
 /** One page in one format as a PNG, transparency kept. */
 export function exportPng(
   ck: CanvasKit,
@@ -106,10 +110,6 @@ export function exportSvg(
 ): Uint8Array {
   return renderVector(ck, design, pageId, formatId, bytes, 'svg', cache)
 }
-
-/** Path separators, the characters some file systems reserve, and control characters. */
-// eslint-disable-next-line no-control-regex
-const UNSAFE_IN_NAMES = /[/\\:*?"<>|\u0000-\u001f]/g
 
 /** A name safe on every file system: no path separators or reserved characters, never empty. */
 function safe(part: string) {
