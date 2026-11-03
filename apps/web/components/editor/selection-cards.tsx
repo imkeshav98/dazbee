@@ -15,9 +15,10 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from '
 import { cn } from '../../lib/cn.ts'
 import { useMessages } from '../../lib/i18n/client.tsx'
 import { format, type Messages } from '../../lib/i18n/index.ts'
+import { sizeTo } from '../../lib/size.ts'
 import { Select } from '../ui/select.tsx'
 import { CARD, CARD_LOWER, CardHeader, PICKED_RING, SWATCHES } from './card.tsx'
-import { CHIP, CHIP_ACCENT, DASHED_BUTTON, FIELD, FIELD_LABEL, FOCUS_RING, KNOBS, KNOBS_FOUR, LINK_BUTTON, PANEL_PART, POPOVER, SEGMENT, SEGMENTS, SWATCH, SWITCH, SWITCH_ROW, TILE, TILE_FACE, TILE_FACE_WIDE } from './styles.ts'
+import { CHIP, CHIP_ACCENT, DASHED_BUTTON, FIELD, FIELD_LABEL, FOCUS_RING, KNOB_SWITCH, KNOBS, KNOBS_FOUR, LINK_BUTTON, PANEL_PART, POPOVER, SEGMENT, SEGMENTS, SWATCH, SWITCH, SWITCH_ROW, TILE, TILE_FACE, TILE_FACE_WIDE } from './styles.ts'
 import { COMBINE } from './arrange-panel.tsx'
 import { ImagePickerButton } from './image-tool.tsx'
 import { useBrandKit } from './use-brand-kit.ts'
@@ -97,49 +98,64 @@ function Card({ id, title, note, action, children }: { id: string; title: string
 const num = (props: Props, key: string) => props[key] as number
 
 /**
- * The first card for every selection: the layer's name (or how many layers), the sizes a change goes
- * to, and its box on one line, the turn under it.
+ * The Position panel's numbers, under Advanced: the box's width and height, then where it sits, then
+ * its turn, two to a row. With Lock ratio on, a width or height set moves the other side with it.
+ * Groups and booleans take their box from what they hold, so they have only X and Y.
  */
-function HeaderCard({ target, p, scope, title: named, children }: { target: Target; p: P; scope: ReactNode; title?: string; children?: ReactNode }) {
-  const fields = [
+function PlaceCard({ target, p, title }: { target: Target; p: P; title: string }) {
+  const placing = useMessages().editor.bar.placing
+  const [keepRatio, setKeepRatio] = useState(false)
+  const sized = target.types.every((type) => type !== 'group' && type !== 'boolean')
+  const sides = [
+    { key: 'width', label: p.width, name: p.widthName },
+    { key: 'height', label: p.height, name: p.heightName },
+  ] as const
+  const spots = [
     { key: 'x', label: p.x, name: p.xName },
     { key: 'y', label: p.y, name: p.yName },
-    { key: 'width', label: p.width, name: p.widthName, min: 0 },
-    { key: 'height', label: p.height, name: p.heightName, min: 0 },
   ] as const
-  // A group's box follows what it holds; its size and turn come from them.
-  const sized = target.types.every((type) => type !== 'group' && type !== 'boolean')
-  const title = named ?? (target.ids.length > 1 ? format(p.layers, { n: target.ids.length }) : target.names[0] || p.layer)
   return (
-    <Card id="layout-card" title={title} action={scope}>
-      <div className={sized ? KNOBS_FOUR : KNOBS}>
-        {fields.map((f) => (
-          (f.key === 'width' || f.key === 'height') && !sized
-            ? null
-            : (
-              <NumberField
-                key={f.key}
-                label={f.label}
-                name={f.name}
-                value={shared(target.props.map((pr) => num(pr, f.key)))}
-                min={'min' in f ? f.min : undefined}
-                editor={target.editor}
-                onSet={(v) => set(target, () => ({ [f.key]: v }))}
-                onShift={(by) => set(target, (now) => ({ [f.key]: tidy(clamp(num(now, f.key) + by, 'min' in f ? f.min : undefined)) }))}
-              />
-            )
+    <Card id="layout-card" title={title}>
+      <div className={KNOBS}>
+        {sized && sides.map((f) => (
+          <NumberField
+            key={f.key}
+            label={f.label}
+            name={f.name}
+            value={shared(target.props.map((pr) => num(pr, f.key)))}
+            min={0}
+            editor={target.editor}
+            onSet={(v) => set(target, (now) => sizeTo({ width: num(now, 'width'), height: num(now, 'height') }, f.key, v, keepRatio))}
+            onShift={(by) => set(target, (now) => sizeTo({ width: num(now, 'width'), height: num(now, 'height') }, f.key, tidy(clamp(num(now, f.key) + by, 0)), keepRatio))}
+          />
         ))}
+        {spots.map((f) => (
+          <NumberField
+            key={f.key}
+            label={f.label}
+            name={f.name}
+            value={shared(target.props.map((pr) => num(pr, f.key)))}
+            editor={target.editor}
+            onSet={(v) => set(target, () => ({ [f.key]: v }))}
+            onShift={(by) => set(target, (now) => ({ [f.key]: tidy(num(now, f.key) + by) }))}
+          />
+        ))}
+        {sized && <RotationField target={target} p={p} label={placing.rotate} />}
+        {sized && (
+          <Switch on={keepRatio} onSet={setKeepRatio} className={KNOB_SWITCH}>
+            {placing.lockRatio}
+          </Switch>
+        )}
       </div>
-      {children}
     </Card>
   )
 }
 
 /** The layers' turn in degrees, wrapping round at 360; groups and booleans turn with what they hold. */
-export function RotationField({ target, p }: { target: Target; p: P }) {
+export function RotationField({ target, p, label = '↻' }: { target: Target; p: P; label?: string }) {
   return (
     <NumberField
-      label="↻"
+      label={label}
       unit="°"
       name={p.rotationName}
       value={shared(target.props.map((pr) => num(pr, 'rotation') ?? 0))}
@@ -1492,9 +1508,7 @@ export function PanelContent({ panel, target, design, brandId }: { panel: string
       case 'position':
         return (
           <>
-            <HeaderCard target={target} p={p} scope={null} title={t.editor.bar.sizeAndPlace}>
-              {facts.sized && <RotationField target={target} p={p} />}
-            </HeaderCard>
+            <PlaceCard target={target} p={p} title={t.editor.bar.advanced} />
             {facts.inFlow && <FlowCard target={target} p={p} />}
           </>
         )

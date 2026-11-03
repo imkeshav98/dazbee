@@ -93,6 +93,12 @@ export const SWITCH_ROW = `group flex h-8 w-full cursor-pointer items-center jus
 
 /** One part of an edit panel or pop-up: a card's controls under a small heading, a hairline above all but the first. */
 export const PANEL_PART = 'flex flex-col gap-2.5 border-t border-line pt-3 first:border-t-0 first:pt-0'
+/** A small heading over a group of an edit panel's choices, as Line up with the size. */
+export const PANEL_HEADING = 'text-xs font-semibold text-muted'
+/** A boxed button of an edit panel that acts at once: its icon, then its words, or its icon alone. */
+export const PANEL_BUTTON = `flex h-[34px] min-w-0 cursor-pointer items-center gap-2 rounded-row border border-line bg-surface px-2.5 text-[12.5px] font-medium whitespace-nowrap text-text transition-colors duration-[var(--chrome-fast)] hover:bg-hover disabled:cursor-not-allowed disabled:opacity-45 [&>span]:truncate ${FOCUS_RING}`
+/** A switch shaped as a knob, its name at the start: Lock ratio among the size fields. */
+export const KNOB_SWITCH = `group flex h-8 min-w-0 cursor-pointer items-center justify-between gap-2 rounded-row border border-line bg-surface px-2.5 text-[12px] font-semibold whitespace-nowrap text-muted transition-colors duration-[var(--chrome-fast)] hover:border-line-strong aria-checked:text-text ${FOCUS_RING}`
 
 /** The top bar's row on the stage, under the header pill: where the bar sits, and the room the fit keeps for it. */
 export const BAR_ROW = 'top-[90px] max-sm:top-[72px]'

@@ -4,45 +4,105 @@
 // bar, only as tall as what it holds and scrolling past the room above the bottom controls. On a
 // phone it is a sheet at the bottom. It closes on ✕, Esc, another selection or a pop-up opening,
 // and gives the focus back to its bar item when closed from inside it.
-import { XIcon } from '@phosphor-icons/react'
+import {
+  AlignBottomIcon, AlignCenterHorizontalIcon, AlignCenterVerticalIcon, AlignLeftIcon, AlignRightIcon, AlignTopIcon,
+  ArrowDownIcon, ArrowLineDownIcon, ArrowLineUpIcon, ArrowsOutLineHorizontalIcon, ArrowsOutLineVerticalIcon, ArrowUpIcon, XIcon, type Icon,
+} from '@phosphor-icons/react'
 import type { Editor, ShortcutAction } from '@dazbee/editor'
 import { useEffect, useLayoutEffect, useRef } from 'react'
 import { cn } from '../../lib/cn.ts'
 import { useMessages } from '../../lib/i18n/client.tsx'
 import { format } from '../../lib/i18n/index.ts'
-import { keyOf, useSelection } from './arrange-panel.tsx'
+import { ALIGN, keyOf, useSelection } from './arrange-panel.tsx'
 import { isPanel, setOpen, setSheetTop, useEditState, usePhone, type PanelId } from './edit-store.ts'
 import { FontChooser, useFontCatalog } from './font-panel.tsx'
-import { AlignRow, ORDER } from './layer-actions.tsx'
+import { ORDER } from './layer-actions.tsx'
 import { PanelContent, useTarget, type Target } from './selection-cards.tsx'
-import { MENU_ITEM, MENU_KEY, PANEL_PART } from './styles.ts'
+import { PANEL_BUTTON, PANEL_HEADING, PANEL_PART } from './styles.ts'
 import { useOverlayScroll } from '../ui/overlay-scroll.ts'
 
-/** The Position panel's arrange part: the moves along the stack, and lining one layer up with its size. */
+/** The four moves along the stack, two to a row: a step forward and back, then all the way. */
+const MOVES: { action: (typeof ORDER)[number]; icon: Icon }[] = [
+  { action: 'bringForward', icon: ArrowUpIcon },
+  { action: 'sendBackward', icon: ArrowDownIcon },
+  { action: 'bringToFront', icon: ArrowLineUpIcon },
+  { action: 'sendToBack', icon: ArrowLineDownIcon },
+]
+/** One layer lines up with its size by these, two to a row: each up-down one beside its across one. */
+const SIZE_ALIGN = [
+  { action: 'alignTop', icon: AlignTopIcon },
+  { action: 'alignLeft', icon: AlignLeftIcon },
+  { action: 'alignMiddle', icon: AlignCenterVerticalIcon },
+  { action: 'alignCentre', icon: AlignCenterHorizontalIcon },
+  { action: 'alignBottom', icon: AlignBottomIcon },
+  { action: 'alignRight', icon: AlignRightIcon },
+] as const satisfies readonly { action: ShortcutAction; icon: Icon }[]
+/** Three or more layers spread out evenly, across or down. */
+const SPREAD = [
+  { action: 'distributeHorizontal', icon: ArrowsOutLineHorizontalIcon },
+  { action: 'distributeVertical', icon: ArrowsOutLineVerticalIcon },
+] as const satisfies readonly { action: ShortcutAction; icon: Icon }[]
+
+/**
+ * The Position panel's simple choices: the four moves along the stack, then lining up. One layer
+ * lines up with its size, by name; several line up with each other, by icon, and three or more
+ * spread out evenly. Each button runs its shortcut's action, and its tooltip names the shortcut.
+ */
 function ArrangePart({ target }: { target: Target }) {
   const t = useMessages()
+  const a = t.editor.arrange
+  const placing = t.editor.bar.placing
   const run = (action: ShortcutAction) => target.editor.perform(action)
+  const tip = (label: string, action: ShortcutAction) => format(a.withKey, { label, key: keyOf(action) })
+  const several = target.ids.length > 1
   return (
     <section aria-labelledby="arrange-part-title" className={PANEL_PART} data-testid="arrange-part">
-      <h3 id="arrange-part-title" className="flex h-8 items-center text-[13px] font-semibold text-text">{t.editor.bar.order}</h3>
-      <div className="flex flex-col">
-        {ORDER.map((action) => (
-          <button key={action} type="button" data-action={action} onClick={() => run(action)} className={cn(MENU_ITEM, 'h-8 px-2')}>
-            {t.editor.arrange[action]}
-            <kbd className={MENU_KEY}>{keyOf(action)}</kbd>
+      <h3 id="arrange-part-title" className={PANEL_HEADING}>{placing.arrange}</h3>
+      <div className="grid grid-cols-2 gap-1.5">
+        {MOVES.map(({ action, icon: Icon }) => (
+          <button key={action} type="button" data-action={action} title={tip(a[action], action)} onClick={() => run(action)} className={PANEL_BUTTON}>
+            <Icon size={14} aria-hidden className="shrink-0" />
+            <span>{placing[action]}</span>
           </button>
         ))}
       </div>
-      {target.ids.length === 1 && (
-        <>
-          <span className="text-xs font-semibold text-muted">{t.editor.bar.lineUp}</span>
-          <AlignRow editor={target.editor} />
-        </>
-      )}
+      {several
+        ? (
+          <>
+            <h3 className={PANEL_HEADING}>{placing.lineUpSelection}</h3>
+            <div dir="ltr" className="grid grid-cols-3 gap-1.5">
+              {ALIGN.map(({ action, icon: Icon }) => (
+                <button key={action} type="button" data-action={action} aria-label={a[action]} title={tip(a[action], action)} onClick={() => run(action)} className={cn(PANEL_BUTTON, 'justify-center')}>
+                  <Icon size={16} aria-hidden />
+                </button>
+              ))}
+            </div>
+            <div className="grid gap-1.5">
+              {SPREAD.map(({ action, icon: Icon }) => (
+                <button key={action} type="button" data-action={action} disabled={target.ids.length < 3} title={target.ids.length < 3 ? placing.needsThree : tip(a[action], action)} onClick={() => run(action)} className={PANEL_BUTTON}>
+                  <Icon size={14} aria-hidden className="shrink-0" />
+                  <span>{placing[action]}</span>
+                </button>
+              ))}
+            </div>
+          </>
+        )
+        : (
+          <>
+            <h3 className={PANEL_HEADING}>{placing.lineUpSize}</h3>
+            <div className="grid grid-cols-2 gap-1.5">
+              {SIZE_ALIGN.map(({ action, icon: Icon }) => (
+                <button key={action} type="button" data-action={action} title={tip(a[action], action)} onClick={() => run(action)} className={PANEL_BUTTON}>
+                  <Icon size={15} aria-hidden className="shrink-0" />
+                  <span>{placing[action]}</span>
+                </button>
+              ))}
+            </div>
+          </>
+        )}
     </section>
   )
 }
-
 
 export function EditPanel({ editor, brandId }: { editor: Editor; brandId: string }) {
   const { open } = useEditState()
@@ -142,8 +202,8 @@ function Panel({ id, target, design, brandId }: { id: PanelId; target: Target; d
           ? <FontChooser editor={target.editor} brandId={brandId} catalog={catalog} refresh={refresh} onDone={() => close(true)} />
           : (
             <>
-              <PanelContent panel={id} target={target} design={design} brandId={brandId} />
               {id === 'position' && <ArrangePart target={target} />}
+              <PanelContent panel={id} target={target} design={design} brandId={brandId} />
             </>
           )}
       </div>
