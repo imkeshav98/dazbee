@@ -90,8 +90,10 @@ test.describe('found by QA', () => {
     await expect.poll(async () => ((await propsOf(page, 'badge')).effects as { blur: number; x: number }[])[0]).toMatchObject({ blur: 1000, x: -10000 })
     await enter((await barMenu(page, 'position')).getByRole('spinbutton', { name: 'X position' }), '1e12')
     await expect.poll(async () => (await propsOf(page, 'badge')).x).toBe(100000)
-    // Stepped past it with the arrow keys, it stays.
-    await (await barMenu(page, 'position')).getByRole('spinbutton', { name: 'X position' }).focus()
+    // Stepped past it with the arrow keys, once the field shows it, it stays.
+    const x = (await barMenu(page, 'position')).getByRole('spinbutton', { name: 'X position' })
+    await expect(x).toHaveValue('100000')
+    await x.focus()
     await page.keyboard.press('ArrowUp')
     await page.keyboard.press('Shift+ArrowUp')
     await expect.poll(async () => (await propsOf(page, 'badge')).x).toBe(100000)
