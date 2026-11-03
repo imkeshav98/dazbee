@@ -149,8 +149,6 @@ export type DesignMeta = z.infer<typeof DesignMeta>
 const FORMAT_SCOPE = /^format:([\w-]+)$/
 /** The format a `format:<id>` scope names, or undefined for any other string. */
 export const formatIdOf = (scope: string) => scope.match(FORMAT_SCOPE)?.[1]
-/** The scope that holds one format's overrides. */
-export const formatScope = (formatId: string): `format:${string}` => `format:${formatId}`
 export const Scope = z.string().refine((s) => formatIdOf(s) !== undefined, 'the spike only supports format:<id> scopes')
 export type Scope = z.infer<typeof Scope>
 
@@ -302,6 +300,9 @@ export type Design = z.infer<typeof Design>
 export type DesignInput = z.input<typeof Design>
 
 export type ParseResult = { success: true; design: Design } | { success: false; errors: string[] }
+
+/** The scope that holds one format's overrides, the one formatIdOf reads back. */
+export const formatScope = (formatId: string): `format:${string}` => `format:${formatId}`
 
 /**
  * Validates untrusted JSON as a design, first bringing one saved at an older schema version up

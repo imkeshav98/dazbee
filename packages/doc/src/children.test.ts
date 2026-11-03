@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { type DesignInput, parseDesign } from '@dazbee/schema'
+import { type DesignInput, parseDesign, SCHEMA_VERSION } from '@dazbee/schema'
 
 import { ancestorsOf, childrenOf, descendants, isInside } from './children.ts'
 
@@ -9,7 +9,7 @@ const rect = { x: 0, y: 0, width: 10, height: 10, shape: { kind: 'rect' as const
 /** Page p1 holds a frame `f` with a group `g` inside, which holds `a` and `b`; `c` sits on p1 above `f`. Page p2 holds `d`. */
 const design = () => {
   const input: DesignInput = {
-    meta: { schemaVersion: 5, designId: 'd1', name: 'Tree', kind: 'single', primaryFormatId: 'sq' },
+    meta: { schemaVersion: SCHEMA_VERSION, designId: 'd1', name: 'Tree', kind: 'single', primaryFormatId: 'sq' },
     formats: { sq: { name: 'Square', width: 1080, height: 1080, order: 'a0' } },
     pages: { p1: { name: 'Page 1', order: 'a0' }, p2: { name: 'Page 2', order: 'a1' } },
     nodes: {

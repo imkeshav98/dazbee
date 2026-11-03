@@ -4635,7 +4635,7 @@ function live(
       const now = session.design()
       const node = selected && now.nodes[selected.id]
       if (!selected || !editing || node?.type !== 'text') return null
-      const own = now.overrides[formatScope(frameOf(editing.frame)?.formatId ?? '')]?.[selected.id]?.style as
+      const own = now.overrides[formatScope(String(frameOf(editing.frame)?.formatId))]?.[selected.id]?.style as
         Partial<typeof node.props.style> | undefined
       return stylesIn({ ...node.props, style: { ...node.props.style, ...own } }, selected.range)
     },
