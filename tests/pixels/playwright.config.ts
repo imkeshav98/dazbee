@@ -10,8 +10,13 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   timeout: 120_000,
   reporter: process.env.CI ? [['github'], ['list']] : 'list',
-  projects: [{
-    name: 'chromium',
-    use: { ...devices['Desktop Chrome'], launchOptions: { args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] } },
-  }],
+  projects: [
+    {
+      name: 'chromium',
+      use: {
+        ...devices['Desktop Chrome'],
+        launchOptions: { args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] },
+      },
+    },
+  ],
 })

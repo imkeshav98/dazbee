@@ -6,6 +6,7 @@
 import { renderDesign, resourceCache } from '@dazbee/renderer'
 import { loadCanvasKit } from '@dazbee/renderer/node'
 import { parseDesign } from '@dazbee/schema'
+
 import { bigCarousel } from '../src/big-carousel.ts'
 import { loadFixtures } from '../src/fixtures.ts'
 import { fixtureResources } from '../src/pixels.ts'
@@ -17,10 +18,15 @@ let start = performance.now()
 const ck = await loadCanvasKit()
 const bytes = fixtureResources()
 const cache = process.argv.includes('--no-cache') ? undefined : resourceCache(ck)
-console.log(`${cache ? 'with' : 'without'} a resource cache; start: CanvasKit and fonts loaded in ${(performance.now() - start).toFixed(0)} ms, peak memory ${mb(process.resourceUsage().maxRSS)}`)
+console.log(
+  `${cache ? 'with' : 'without'} a resource cache; start: CanvasKit and fonts loaded in ${(performance.now() - start).toFixed(0)} ms, peak memory ${mb(process.resourceUsage().maxRSS)}`,
+)
 
 console.log('\n| Fixture page.format | Size | Render, median of 3 |\n|---|---|---|')
-const fixtures = [...loadFixtures().filter((f) => f.name !== 'layer-bounds'), { name: 'big-carousel', json: bigCarousel() as unknown }]
+const fixtures = [
+  ...loadFixtures().filter((f) => f.name !== 'layer-bounds'),
+  { name: 'big-carousel', json: bigCarousel() as unknown },
+]
 for (const { name, json } of fixtures) {
   const parsed = parseDesign(json)
   if (!parsed.success) throw new Error(parsed.errors.join('\n'))
@@ -34,12 +40,17 @@ for (const { name, json } of fixtures) {
         return performance.now() - start
       })
       all.push(median(runs))
-      if (name !== 'big-carousel') console.log(`| ${name} ${pageId}.${formatId} | ${format.width}×${format.height} | ${median(runs).toFixed(0)} ms |`)
+      if (name !== 'big-carousel')
+        console.log(
+          `| ${name} ${pageId}.${formatId} | ${format.width}×${format.height} | ${median(runs).toFixed(0)} ms |`,
+        )
     }
   }
   if (name === 'big-carousel') {
     const total = all.reduce((a, b) => a + b, 0)
-    console.log(`| big-carousel, all ${all.length} renders | 5 formats | ${median(all).toFixed(0)} ms median, ${Math.max(...all).toFixed(0)} ms max, ${(total / 1000).toFixed(1)} s in all |`)
+    console.log(
+      `| big-carousel, all ${all.length} renders | 5 formats | ${median(all).toFixed(0)} ms median, ${Math.max(...all).toFixed(0)} ms max, ${(total / 1000).toFixed(1)} s in all |`,
+    )
   }
 }
 console.log(`\npeak memory of the whole run: ${mb(process.resourceUsage().maxRSS)}`)

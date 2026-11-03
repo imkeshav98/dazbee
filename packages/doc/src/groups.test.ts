@@ -1,10 +1,19 @@
-import { parseDesign, type Design, type DesignInput } from '@dazbee/schema'
 import { describe, expect, it } from 'vitest'
+
+import { type Design, type DesignInput, parseDesign } from '@dazbee/schema'
+
 import { boundsOf, centreOf, normalAngle, turn } from './geometry.ts'
 import { childrenOf, loadDesign, openSession, readDesign } from './index.ts'
 
-const rect = (x: number, y: number, width: number, height: number, rotation = 0) =>
-  ({ x, y, width, height, rotation, shape: { kind: 'rect' as const }, fills: [{ type: 'solid' as const, color: '#FF5A36FF' }] })
+const rect = (x: number, y: number, width: number, height: number, rotation = 0) => ({
+  x,
+  y,
+  width,
+  height,
+  rotation,
+  shape: { kind: 'rect' as const },
+  fills: [{ type: 'solid' as const, color: '#FF5A36FF' }],
+})
 
 /**
  * Two loose layers, and a turned frame holding a layer and a turned group: a square and a banner,
@@ -20,9 +29,21 @@ const design = (): DesignInput => ({
   nodes: {
     a: { type: 'graphic', parentId: 'p1', index: 'a0', name: 'A', props: rect(100, 100, 200, 100, 20) },
     b: { type: 'graphic', parentId: 'p1', index: 'a1', name: 'B', props: rect(400, 150, 120, 120) },
-    f: { type: 'frame', parentId: 'p1', index: 'a2', name: 'F', props: { x: 300, y: 500, width: 500, height: 400, rotation: 30, clip: true } },
+    f: {
+      type: 'frame',
+      parentId: 'p1',
+      index: 'a2',
+      name: 'F',
+      props: { x: 300, y: 500, width: 500, height: 400, rotation: 30, clip: true },
+    },
     c: { type: 'graphic', parentId: 'f', index: 'a0', name: 'C', props: rect(340, 540, 100, 60) },
-    g2: { type: 'group', parentId: 'f', index: 'a1', name: 'G2', props: { x: 500, y: 600, width: 200, height: 150, rotation: -15 } },
+    g2: {
+      type: 'group',
+      parentId: 'f',
+      index: 'a1',
+      name: 'G2',
+      props: { x: 500, y: 600, width: 200, height: 150, rotation: -15 },
+    },
     d: { type: 'graphic', parentId: 'g2', index: 'a0', name: 'D', props: rect(500, 600, 200, 150, 10) },
   },
   overrides: {
@@ -44,7 +65,14 @@ type Scope = (typeof SCOPES)[number]
 
 /** A layer's own box in a scope: the base with the scope's overrides. */
 function boxOf(d: Design, scope: Scope, id: string) {
-  const p = { ...d.nodes[id]?.props, ...(scope === 'base' ? {} : d.overrides[scope]?.[id]) } as { x: number; y: number; width: number; height: number; rotation?: number; visible?: boolean }
+  const p = { ...d.nodes[id]?.props, ...(scope === 'base' ? {} : d.overrides[scope]?.[id]) } as {
+    x: number
+    y: number
+    width: number
+    height: number
+    rotation?: number
+    visible?: boolean
+  }
   return { x: p.x, y: p.y, width: p.width, height: p.height, rotation: p.rotation ?? 0, visible: p.visible ?? true }
 }
 
@@ -62,7 +90,8 @@ function drawn(d: Design, scope: Scope, id: string) {
   }
   return { x: centre.x, y: centre.y, width: own.width, height: own.height, rotation: normalAngle(rotation), visible }
 }
-const drawnAll = (d: Design, ids: string[]) => Object.fromEntries(SCOPES.flatMap((scope) => ids.map((id) => [`${scope} ${id}`, drawn(d, scope, id)])))
+const drawnAll = (d: Design, ids: string[]) =>
+  Object.fromEntries(SCOPES.flatMap((scope) => ids.map((id) => [`${scope} ${id}`, drawn(d, scope, id)])))
 /**
  * Two placements are the same within what the document keeps: values are rounded to hundredths,
  * so a centre can be off by a few of them after a turn.
@@ -95,7 +124,9 @@ describe('groups', () => {
     for (const scope of SCOPES) {
       const hug = boundsOf([boxOf(after, scope, 'a'), boxOf(after, scope, 'b')])
       const box = boxOf(after, scope, id)
-      expect([box.x, box.y, box.width, box.height]).toEqual([hug.x, hug.y, hug.width, hug.height].map((n) => Math.round(n * 100) / 100))
+      expect([box.x, box.y, box.width, box.height]).toEqual(
+        [hug.x, hug.y, hug.width, hug.height].map((n) => Math.round(n * 100) / 100),
+      )
     }
     expectSame(drawnAll(after, LEAVES), before)
 
@@ -184,12 +215,19 @@ describe('groups', () => {
     const id = tab.run('node.frame', { ids: ['c', 'g2'] })
 
     const after = readDesign(doc)
-    expect(after.nodes[id]).toMatchObject({ type: 'frame', parentId: 'f', name: 'Frame', props: { clip: false, fills: [] } })
+    expect(after.nodes[id]).toMatchObject({
+      type: 'frame',
+      parentId: 'f',
+      name: 'Frame',
+      props: { clip: false, fills: [] },
+    })
     expect(childrenOf(after, id).map(([child]) => child)).toEqual(['c', 'g2'])
     for (const scope of SCOPES) {
       const hug = boundsOf([boxOf(after, scope, 'c'), boxOf(after, scope, 'g2')])
       const box = boxOf(after, scope, id)
-      expect([box.x, box.y, box.width, box.height]).toEqual([hug.x, hug.y, hug.width, hug.height].map((n) => Math.round(n * 100) / 100))
+      expect([box.x, box.y, box.width, box.height]).toEqual(
+        [hug.x, hug.y, hug.width, hug.height].map((n) => Math.round(n * 100) / 100),
+      )
     }
     expectSame(drawnAll(after, LEAVES), before)
 
@@ -212,7 +250,12 @@ describe('groups', () => {
     expect(childrenOf(after, id).map(([child]) => child)).toEqual(['a', 'b'])
     expectSame(drawnAll(after, LEAVES), before)
     // In the square it stays where it was drawn; in the banner, where A is smaller and elsewhere, it holds them as it did.
-    expect(boxOf(after, 'format:sq', id)).toMatchObject({ x: drawnBox.x, y: drawnBox.y, width: drawnBox.width, height: drawnBox.height })
+    expect(boxOf(after, 'format:sq', id)).toMatchObject({
+      x: drawnBox.x,
+      y: drawnBox.y,
+      width: drawnBox.width,
+      height: drawnBox.height,
+    })
     for (const scope of SCOPES) {
       const kids = boundsOf([boxOf(after, scope, 'a'), boxOf(after, scope, 'b')])
       const box = boxOf(after, scope, id)

@@ -5,9 +5,11 @@
 // that clips its content never cuts it off. It works by keyboard as a listbox does: the arrows,
 // Home and End move, Enter or Space picks, Esc closes, and typing jumps to an option.
 import { CaretDownIcon, CheckIcon } from '@phosphor-icons/react'
-import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
+import { type ReactNode, useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { cn } from '../../lib/cn.ts'
+
+import { cn } from '@/lib/cn.ts'
+
 import { useOverlayScroll } from './overlay-scroll.ts'
 
 export interface SelectOption {
@@ -18,7 +20,17 @@ export interface SelectOption {
   disabled?: boolean
 }
 
-export function Select({ name, label, value, options, onChange, placeholder, disabled = false, className, testId }: {
+export function Select({
+  name,
+  label,
+  value,
+  options,
+  onChange,
+  placeholder,
+  disabled = false,
+  className,
+  testId,
+}: {
   name: string
   /** The field's accessible name. */
   label: string
@@ -107,7 +119,8 @@ export function Select({ name, label, value, options, onChange, placeholder, dis
     const option = open && active >= 0 ? box?.querySelectorAll<HTMLElement>('[role="option"]')[active] : undefined
     if (!box || !option) return
     if (option.offsetTop < box.scrollTop) box.scrollTop = option.offsetTop
-    else if (option.offsetTop + option.offsetHeight > box.scrollTop + box.clientHeight) box.scrollTop = option.offsetTop + option.offsetHeight - box.clientHeight
+    else if (option.offsetTop + option.offsetHeight > box.scrollTop + box.clientHeight)
+      box.scrollTop = option.offsetTop + option.offsetHeight - box.clientHeight
   }, [open, active])
 
   const onKeyDown = (event: React.KeyboardEvent) => {
@@ -134,8 +147,13 @@ export function Select({ name, label, value, options, onChange, placeholder, dis
       pick(active)
     } else if (event.key.length === 1) {
       const now = Date.now()
-      typed.current = { text: (now - typed.current.at < 700 ? typed.current.text : '') + event.key.toLowerCase(), at: now }
-      const found = options.findIndex((o) => !o.disabled && (o.text ?? String(o.label)).toLowerCase().startsWith(typed.current.text))
+      typed.current = {
+        text: (now - typed.current.at < 700 ? typed.current.text : '') + event.key.toLowerCase(),
+        at: now,
+      }
+      const found = options.findIndex(
+        (o) => !o.disabled && (o.text ?? String(o.label)).toLowerCase().startsWith(typed.current.text),
+      )
       if (found >= 0) setActive(found)
     }
   }
@@ -163,46 +181,58 @@ export function Select({ name, label, value, options, onChange, placeholder, dis
         )}
       >
         <span className={cn('min-w-0 flex-1 truncate', !current && 'text-muted')}>{current?.label ?? placeholder}</span>
-        <CaretDownIcon size={11} weight="bold" aria-hidden className={cn('shrink-0 text-subtle transition-transform duration-[var(--chrome-fast)]', open && 'rotate-180')} />
+        <CaretDownIcon
+          size={11}
+          weight="bold"
+          aria-hidden
+          className={cn(
+            'shrink-0 text-subtle transition-transform duration-[var(--chrome-fast)]',
+            open && 'rotate-180',
+          )}
+        />
       </button>
-      {open && createPortal(
-        <ul
-          ref={listRef}
-          id={`${id}-list`}
-          role="listbox"
-          aria-label={label}
-          style={{ top: place?.top ?? -9999, left: place?.left ?? -9999, width: place?.width }}
-          // The list sits outside the menu or dialog that holds its field; a press on it is not one
-          // outside them, so it doesn't reach their close-on-outside-press listeners.
-          onPointerDown={(event) => event.stopPropagation()}
-          className={cn('pop-in fixed z-[60] max-h-72 overflow-y-auto overscroll-contain rounded-[12px] surface-frost p-1', place?.up && 'origin-bottom')}
-        >
-          {options.map((option, i) => (
-            <li
-              key={option.value}
-              id={`${id}-${i}`}
-              role="option"
-              aria-selected={i === picked}
-              aria-disabled={option.disabled || undefined}
-              data-value={option.value}
-              onPointerEnter={() => !option.disabled && setActive(i)}
-              // The field keeps the focus, so the keys go on working there.
-              onPointerDown={(event) => event.preventDefault()}
-              onClick={() => pick(i)}
-              className={cn(
-                'flex h-8 cursor-pointer items-center gap-2 rounded-[8px] px-2.5 text-[12.5px] text-text',
-                i === active && 'bg-hover',
-                i === picked && 'font-semibold text-accent-text',
-                option.disabled && 'cursor-default opacity-40',
-              )}
-            >
-              <span className="min-w-0 flex-1 truncate">{option.label}</span>
-              {i === picked && <CheckIcon size={13} weight="bold" aria-hidden className="shrink-0" />}
-            </li>
-          ))}
-        </ul>,
-        document.body,
-      )}
+      {open &&
+        createPortal(
+          <ul
+            ref={listRef}
+            id={`${id}-list`}
+            role="listbox"
+            aria-label={label}
+            style={{ top: place?.top ?? -9999, left: place?.left ?? -9999, width: place?.width }}
+            // The list sits outside the menu or dialog that holds its field; a press on it is not one
+            // outside them, so it doesn't reach their close-on-outside-press listeners.
+            onPointerDown={(event) => event.stopPropagation()}
+            className={cn(
+              'pop-in fixed z-[60] max-h-72 overflow-y-auto overscroll-contain rounded-[12px] surface-frost p-1',
+              place?.up && 'origin-bottom',
+            )}
+          >
+            {options.map((option, i) => (
+              <li
+                key={option.value}
+                id={`${id}-${i}`}
+                role="option"
+                aria-selected={i === picked}
+                aria-disabled={option.disabled || undefined}
+                data-value={option.value}
+                onPointerEnter={() => !option.disabled && setActive(i)}
+                // The field keeps the focus, so the keys go on working there.
+                onPointerDown={(event) => event.preventDefault()}
+                onClick={() => pick(i)}
+                className={cn(
+                  'flex h-8 cursor-pointer items-center gap-2 rounded-[8px] px-2.5 text-[12.5px] text-text',
+                  i === active && 'bg-hover',
+                  i === picked && 'font-semibold text-accent-text',
+                  option.disabled && 'cursor-default opacity-40',
+                )}
+              >
+                <span className="min-w-0 flex-1 truncate">{option.label}</span>
+                {i === picked && <CheckIcon size={13} weight="bold" aria-hidden className="shrink-0" />}
+              </li>
+            ))}
+          </ul>,
+          document.body,
+        )}
     </>
   )
 }

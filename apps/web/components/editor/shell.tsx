@@ -5,22 +5,39 @@
 // above the selection. The canvas runs edge to edge under all of it; the stage is the editor itself, told
 // which edges the chrome covers so it fits the ads between.
 import {
-  CloudArrowUpIcon, CloudCheckIcon, CloudSlashIcon, CursorIcon, FrameCornersIcon, HandIcon, ImageIcon, ImagesIcon, PaletteIcon, PenNibIcon, ShapesIcon,
-  SparkleIcon, StackIcon, TextTIcon, XIcon, type Icon,
+  CloudArrowUpIcon,
+  CloudCheckIcon,
+  CloudSlashIcon,
+  CursorIcon,
+  FrameCornersIcon,
+  HandIcon,
+  type Icon,
+  ImageIcon,
+  ImagesIcon,
+  PaletteIcon,
+  PenNibIcon,
+  ShapesIcon,
+  SparkleIcon,
+  StackIcon,
+  TextTIcon,
+  XIcon,
 } from '@phosphor-icons/react'
-import type { ShapeTool } from '@dazbee/editor'
-import type { Placeable } from '../../lib/place-asset.ts'
 import { AnimatePresence, motion, MotionConfig, useReducedMotion } from 'motion/react'
 import Link from 'next/link'
-import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
-import { cn } from '../../lib/cn.ts'
-import { useLocale, useMessages } from '../../lib/i18n/client.tsx'
-import { dirOf, format } from '../../lib/i18n/index.ts'
-import { useValue, type ValueStore } from '../../lib/value-store.ts'
-import { BrandMark } from '../brand-mark.tsx'
-import { Tooltip } from '../ui/tooltip.tsx'
-import { ImageTool } from './image-tool.tsx'
+import { createContext, type ReactNode, useContext, useEffect, useLayoutEffect, useRef, useState } from 'react'
+
+import type { ShapeTool } from '@dazbee/editor'
+
+import { BrandMark } from '@/components/brand-mark.tsx'
+import { Tooltip } from '@/components/ui/tooltip.tsx'
+import { cn } from '@/lib/cn.ts'
+import { useLocale, useMessages } from '@/lib/i18n/client.tsx'
+import { dirOf, format } from '@/lib/i18n/index.ts'
+import type { Placeable } from '@/lib/place-asset.ts'
+import { useValue, type ValueStore } from '@/lib/value-store.ts'
+
 import { isPanel, setFlyoutEnd, setOpen, useEditState } from './edit-store.ts'
+import { ImageTool } from './image-tool.tsx'
 import { ShapeTools } from './shape-menu.tsx'
 import { BAR_ROW, BAR_ROW_HEIGHT, dockTool } from './styles.ts'
 
@@ -47,7 +64,11 @@ const CHROME = { duration: 0.18, ease: [0.2, 0.8, 0.2, 1] as const }
 /** The capsule's pink blob slides to the open panel on a spring, so it overshoots a little. */
 const BLOB = { type: 'spring', stiffness: 520, damping: 34, mass: 0.9 } as const
 /** On arrival the blob is stretched along its travel and settles round: the squish. */
-const SQUISH = { tall: { scaleX: 0.78, scaleY: 1.28 }, wide: { scaleX: 1.28, scaleY: 0.78 }, still: { scaleX: 1, scaleY: 1 } }
+const SQUISH = {
+  tall: { scaleX: 0.78, scaleY: 1.28 },
+  wide: { scaleX: 1.28, scaleY: 0.78 },
+  still: { scaleX: 1, scaleY: 1 },
+}
 
 /**
  * The design's save state (#37) and how it shows: a small muted cloud while all is well (#110), so
@@ -143,13 +164,20 @@ function SaveStatus({ status, fitted }: { status: ValueStore<string>; fitted: bo
         <span aria-hidden className={cn('size-1.5 rounded-full', failed ? 'bg-danger' : 'animate-pulse bg-subtle')} />
       )}
       <span className={cn(!(failed || save?.words) && 'sr-only')}>{t.editor.statusText[shown] ?? shown}</span>
-      {shown === 'Offline' && <span className="hidden font-normal text-muted md:inline">{t.editor.statusHint.Offline}</span>}
+      {shown === 'Offline' && (
+        <span className="hidden font-normal text-muted md:inline">{t.editor.statusHint.Offline}</span>
+      )}
     </span>
   )
 }
 
 /** The stage's edges the floating chrome covers, in CSS pixels, left and right as on screen. */
-export interface ChromeInsets { top: number; right: number; bottom: number; left: number }
+export interface ChromeInsets {
+  top: number
+  right: number
+  bottom: number
+  left: number
+}
 
 /**
  * Measures how much of the stage the islands, the capsule and the dock cover. The
@@ -170,7 +198,8 @@ function measureInsets(stage: DOMRect, tops: (Element | null)[], pieces: (Elemen
     if (!box || box.width === 0 || box.height === 0) continue
     if (box.top > stage.top + stage.height * 0.6) insets.bottom = Math.max(insets.bottom, stage.bottom - box.top + gap)
     else if (box.width > stage.width * 0.6) continue
-    else if (box.left + box.width / 2 < stage.left + stage.width / 2) insets.left = Math.max(insets.left, box.right - stage.left + gap)
+    else if (box.left + box.width / 2 < stage.left + stage.width / 2)
+      insets.left = Math.max(insets.left, box.right - stage.left + gap)
     else insets.right = Math.max(insets.right, stage.right - box.left + gap)
   }
   return insets
@@ -191,7 +220,12 @@ function DesignName({ name, onRename }: { name: string; onRename?: ((name: strin
     // as much; the button, not the heading, ends the name in "…" when the crumb has no room for it.
     return (
       <h1 className={cn(title, '-mx-1 min-w-0')}>
-        <button type="button" title={format(t.library.renameDesign, { name })} onClick={() => setEditing(true)} className="max-w-full cursor-text truncate rounded-[6px] px-1 hover:bg-hover">
+        <button
+          type="button"
+          title={format(t.library.renameDesign, { name })}
+          onClick={() => setEditing(true)}
+          className="max-w-full cursor-text truncate rounded-[6px] px-1 hover:bg-hover"
+        >
           {name}
         </button>
       </h1>
@@ -227,7 +261,25 @@ function DesignName({ name, onRename }: { name: string; onRename?: ((name: strin
   )
 }
 
-export function EditorShell({ brandId, brandName, designName, onRename, status, sizes, history, tool: shownTool, shape = 'rect', onToolChange, image, onInsets, fitted = true, actions, account, panels, children }: {
+export function EditorShell({
+  brandId,
+  brandName,
+  designName,
+  onRename,
+  status,
+  sizes,
+  history,
+  tool: shownTool,
+  shape = 'rect',
+  onToolChange,
+  image,
+  onInsets,
+  fitted = true,
+  actions,
+  account,
+  panels,
+  children,
+}: {
   brandId: string
   brandName: string
   designName: string
@@ -270,7 +322,12 @@ export function EditorShell({ brandId, brandName, designName, onRename, status, 
   const [ownTool, setTool] = useState<Tool>('select')
   const tool = shownTool ?? ownTool
   const panelTitle = (id: Panel) => t.editor[id]
-  const panelEmpty = { layers: t.editor.layersEmpty, assets: t.editor.assetsEmpty, ai: t.editor.aiEmpty, brand: t.editor.brandEmpty }
+  const panelEmpty = {
+    layers: t.editor.layersEmpty,
+    assets: t.editor.assetsEmpty,
+    ai: t.editor.aiEmpty,
+    brand: t.editor.brandEmpty,
+  }
   const flyout = panel
   // What the top bar has open: on a phone an edit panel is a sheet, which hides the tab bar and the
   // dock, and a sheet and a rail flyout close each other.
@@ -319,193 +376,278 @@ export function EditorShell({ brandId, brandName, designName, onRename, status, 
       const corner = [stage.current.querySelector('[data-zoom]'), stage.current.querySelector('[data-pages]')]
       const phone = box.width < 640
       // The top bar's row is kept clear whether or not the bar shows, so selecting never covers the design.
-      const insets = measureInsets(box, [startIsland.current, endIsland.current, ...(phone ? corner : []), barRow.current], [rail.current, dock.current, ...(phone ? [] : corner)])
+      const insets = measureInsets(
+        box,
+        [startIsland.current, endIsland.current, ...(phone ? corner : []), barRow.current],
+        [rail.current, dock.current, ...(phone ? [] : corner)],
+      )
       const key = JSON.stringify(insets)
       if (key === reported.current) return
       reported.current = key
       report.current?.(insets)
     }
     const watch = new ResizeObserver(measure)
-    for (const el of [stage.current, startIsland.current, endIsland.current, rail.current, dock.current, stage.current?.querySelector('[data-zoom]'), stage.current?.querySelector('[data-pages]')]) if (el) watch.observe(el)
+    for (const el of [
+      stage.current,
+      startIsland.current,
+      endIsland.current,
+      rail.current,
+      dock.current,
+      stage.current?.querySelector('[data-zoom]'),
+      stage.current?.querySelector('[data-pages]'),
+    ])
+      if (el) watch.observe(el)
     measure()
     return () => watch.disconnect()
   }, [])
 
   return (
     <MotionConfig reducedMotion="user">
-        <div className="h-dvh overflow-hidden bg-bg text-text">
-          <div className="relative flex h-full min-h-0">
+      <div className="h-dvh overflow-hidden bg-bg text-text">
+        <div className="relative flex h-full min-h-0">
           {/* No top bar (#110): two islands float over the canvas, the design's name and save state at
               the start and Share and the account at the end, clear of the rulers when they are on (top and
               left in either direction, so the insets swap in right-to-left). The start island sits on a
               small frosted pill, so its words read over an ad zoomed in under it; the end island's
               buttons are solid and need none. */}
           <header className="pointer-events-none absolute start-6 end-4 rtl:start-4 rtl:end-6 top-6 z-30 flex items-center justify-between gap-3">
-            <div ref={startIsland} data-testid="island-start" className="pointer-events-auto flex min-w-0 items-center gap-2 rounded-full surface-frost py-0.5 ps-0.5 pe-3">
-              <Link href="/" aria-label={t.library.home} className="grid size-9 shrink-0 place-items-center rounded-row hover:bg-hover">
+            <div
+              ref={startIsland}
+              data-testid="island-start"
+              className="pointer-events-auto flex min-w-0 items-center gap-2 rounded-full surface-frost py-0.5 ps-0.5 pe-3"
+            >
+              <Link
+                href="/"
+                aria-label={t.library.home}
+                className="grid size-9 shrink-0 place-items-center rounded-row hover:bg-hover"
+              >
                 <BrandMark size={28} />
               </Link>
               <nav aria-label={t.library.designs} className="flex min-w-0 items-center gap-1.5 text-[13px]">
-                <Link href={`/brands/${brandId}`} className="truncate text-muted transition-colors hover:text-text max-sm:hidden">{brandName}</Link>
-                <span aria-hidden className="text-subtle max-sm:hidden">/</span>
+                <Link
+                  href={`/brands/${brandId}`}
+                  className="truncate text-muted transition-colors hover:text-text max-sm:hidden"
+                >
+                  {brandName}
+                </Link>
+                <span aria-hidden className="text-subtle max-sm:hidden">
+                  /
+                </span>
                 <DesignName name={designName} onRename={onRename} />
               </nav>
               {sizes}
               <SaveStatus status={status} fitted={fitted} />
               {history}
             </div>
-            <div ref={endIsland} data-testid="island-end" className="pointer-events-auto flex shrink-0 items-center gap-2">
+            <div
+              ref={endIsland}
+              data-testid="island-end"
+              className="pointer-events-auto flex shrink-0 items-center gap-2"
+            >
               {actions}
               {account}
             </div>
           </header>
-            <nav
-              ref={rail}
+          <nav
+            ref={rail}
+            aria-label={t.editor.tools}
+            data-testid="rail"
+            className={cn(
+              // Clipped, so the AI button's moving glow stays inside and never shows on the canvas.
+              'absolute z-20 flex gap-2 overflow-hidden rounded-full surface-frost p-2',
+              // A vertical capsule at the start edge; on phones a tab bar floating at the bottom.
+              'start-5 top-1/2 -translate-y-1/2 flex-col sm:p-2.5 max-sm:start-1/2 max-sm:top-auto max-sm:bottom-3 max-sm:translate-y-0 max-sm:flex-row max-sm:-translate-x-1/2 max-sm:rtl:translate-x-1/2',
+              sheet && 'max-sm:hidden',
+            )}
+          >
+            {PANELS.map(({ id, icon: PanelIcon }) => {
+              const open = panel === id
+              const ai = id === 'ai'
+              return (
+                <Tooltip key={id} label={panelTitle(id)} side={rtl ? 'left' : 'right'}>
+                  <button
+                    type="button"
+                    aria-label={panelTitle(id)}
+                    aria-expanded={open}
+                    aria-controls="editor-flyout"
+                    data-panel={id}
+                    onClick={() => {
+                      setPanel(open ? null : id)
+                      if (phone && !open) setOpen(null)
+                    }}
+                    className={cn(
+                      'relative grid size-11 sm:size-13 cursor-pointer place-items-center rounded-full transition-colors duration-[var(--chrome-fast)]',
+                      open ? 'text-on-accent' : 'text-subtle hover:bg-hover hover:text-text',
+                      ai && !open && 'text-accent-text',
+                    )}
+                  >
+                    {open && (
+                      <motion.span
+                        layoutId="rail-blob"
+                        transition={reduced ? { duration: 0 } : BLOB}
+                        aria-hidden
+                        data-testid="rail-blob"
+                        className="absolute inset-0"
+                      >
+                        <motion.span
+                          key={id}
+                          initial={reduced ? false : phone ? 'wide' : 'tall'}
+                          animate="still"
+                          variants={SQUISH}
+                          transition={BLOB}
+                          className={cn(
+                            'absolute inset-0 rounded-full shadow-[0_6px_18px_-6px_rgb(194_16_108/0.7)]',
+                            ai ? 'ai-glow' : 'bg-accent-solid',
+                          )}
+                        />
+                      </motion.span>
+                    )}
+                    {/* A still gradient: a blur over a sliding one would be redrawn on every frame. */}
+                    {ai && !open && (
+                      <span
+                        aria-hidden
+                        className="absolute inset-1.5 rounded-full bg-[image:var(--ai-gradient)] opacity-20 blur-[6px]"
+                      />
+                    )}
+                    <PanelIcon
+                      size={22}
+                      weight={ai ? 'duotone' : open ? 'fill' : 'regular'}
+                      aria-hidden
+                      className="relative"
+                    />
+                  </button>
+                </Tooltip>
+              )
+            })}
+          </nav>
+
+          <AnimatePresence>
+            {flyout && (
+              <motion.section
+                ref={flyoutEl}
+                key={flyout}
+                id="editor-flyout"
+                aria-label={panelTitle(flyout)}
+                initial={{ opacity: 0, x: rtl ? 12 : -12 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: rtl ? 12 : -12 }}
+                transition={chrome}
+                data-testid="flyout"
+                className="absolute start-[7.25rem] top-20 z-10 flex max-h-[calc(100%-5.75rem)] w-[21.5rem] flex-col overflow-hidden rounded-[16px] surface-frost max-sm:inset-x-3 max-sm:start-3 max-sm:top-auto max-sm:bottom-[9rem] max-sm:max-h-[calc(100%-9rem-7.5rem)] max-sm:w-auto"
+              >
+                {/* The title at the start and, as in the mock, a small grey note at the end: the brand, or the page and format. */}
+                <div className="flex h-14 shrink-0 items-center gap-2 ps-[18px] pe-2">
+                  <h2
+                    className={cn(
+                      'min-w-0 flex-1 truncate font-display text-[17px] font-bold tracking-tight',
+                      flyout === 'ai' && 'bg-[image:var(--ai-gradient)] bg-clip-text text-transparent',
+                    )}
+                  >
+                    {panelTitle(flyout)}
+                  </h2>
+                  {(note ?? (flyout === 'assets' || flyout === 'brand' ? brandName : null)) && (
+                    <span
+                      data-testid="flyout-note"
+                      className="min-w-0 max-w-[60%] truncate text-[11px] font-medium text-muted"
+                    >
+                      {note ?? brandName}
+                    </span>
+                  )}
+                  <button
+                    type="button"
+                    aria-label={t.editor.closePanel}
+                    onClick={() => setPanel(null)}
+                    className="grid size-7 shrink-0 cursor-pointer place-items-center rounded-full text-subtle hover:bg-hover hover:text-text"
+                  >
+                    <XIcon size={14} aria-hidden />
+                  </button>
+                </div>
+                <FlyoutNote.Provider value={setNote}>
+                  {panels?.[flyout] ?? <p className="px-[18px] pb-4 text-[13px] text-muted">{panelEmpty[flyout]}</p>}
+                </FlyoutNote.Provider>
+              </motion.section>
+            )}
+          </AnimatePresence>
+
+          <main
+            ref={stage}
+            data-bar={edit.bar ? '' : undefined}
+            className="group/stage canvas-dots relative min-w-0 flex-1 overflow-clip"
+          >
+            <div
+              ref={barRow}
+              aria-hidden
+              data-bar-row
+              className={cn('pointer-events-none invisible absolute inset-x-0', BAR_ROW, BAR_ROW_HEIGHT)}
+            />
+            {children}
+            <div
+              ref={dock}
+              role="toolbar"
               aria-label={t.editor.tools}
-              data-testid="rail"
+              data-dock
               className={cn(
-                // Clipped, so the AI button's moving glow stays inside and never shows on the canvas.
-                'absolute z-20 flex gap-2 overflow-hidden rounded-full surface-frost p-2',
-                // A vertical capsule at the start edge; on phones a tab bar floating at the bottom.
-                'start-5 top-1/2 -translate-y-1/2 flex-col sm:p-2.5 max-sm:start-1/2 max-sm:top-auto max-sm:bottom-3 max-sm:translate-y-0 max-sm:flex-row max-sm:-translate-x-1/2 max-sm:rtl:translate-x-1/2',
+                'absolute inset-x-0 bottom-4 z-10 mx-auto flex w-max max-sm:bottom-[5.25rem] items-center gap-1 rounded-[18px] surface-frost p-1.5',
                 sheet && 'max-sm:hidden',
               )}
             >
-              {PANELS.map(({ id, icon: PanelIcon }) => {
-                const open = panel === id
-                const ai = id === 'ai'
+              {TOOLS.map(({ id, icon: ToolIcon, key }) => {
+                if (id === 'shape') {
+                  return (
+                    <ShapeTools
+                      key={id}
+                      active={tool === 'shape'}
+                      shape={shape}
+                      onPick={(picked) => {
+                        setTool('shape')
+                        onToolChange?.('shape', picked)
+                      }}
+                    />
+                  )
+                }
+                if (id === 'image') {
+                  return (
+                    <ImageTool
+                      key={id}
+                      brandId={brandId}
+                      active={tool === 'image'}
+                      open={tool === 'image' && Boolean(image?.picking)}
+                      onPress={() => {
+                        setTool('image')
+                        onToolChange?.('image', shape)
+                      }}
+                      onPick={(asset) => image?.onPick(asset)}
+                      onClose={() => {
+                        setTool('select')
+                        onToolChange?.('select', shape)
+                      }}
+                    />
+                  )
+                }
+                const label = t.editor[`tool${id[0]?.toUpperCase()}${id.slice(1)}` as `tool${Capitalize<Tool>}`]
+                const on = tool === id
                 return (
-                  <Tooltip key={id} label={panelTitle(id)} side={rtl ? 'left' : 'right'}>
+                  <Tooltip key={id} label={`${label} · ${key}`}>
                     <button
                       type="button"
-                      aria-label={panelTitle(id)}
-                      aria-expanded={open}
-                      aria-controls="editor-flyout"
-                      data-panel={id}
+                      aria-label={label}
+                      aria-pressed={on}
+                      data-tool={id}
                       onClick={() => {
-                        setPanel(open ? null : id)
-                        if (phone && !open) setOpen(null)
+                        setTool(id)
+                        onToolChange?.(id, shape)
                       }}
-                      className={cn(
-                        'relative grid size-11 sm:size-13 cursor-pointer place-items-center rounded-full transition-colors duration-[var(--chrome-fast)]',
-                        open ? 'text-on-accent' : 'text-subtle hover:bg-hover hover:text-text',
-                        ai && !open && 'text-accent-text',
-                      )}
+                      className={dockTool(on)}
                     >
-                      {open && (
-                        <motion.span layoutId="rail-blob" transition={reduced ? { duration: 0 } : BLOB} aria-hidden data-testid="rail-blob" className="absolute inset-0">
-                          <motion.span
-                            key={id}
-                            initial={reduced ? false : phone ? 'wide' : 'tall'}
-                            animate="still"
-                            variants={SQUISH}
-                            transition={BLOB}
-                            className={cn('absolute inset-0 rounded-full shadow-[0_6px_18px_-6px_rgb(194_16_108/0.7)]', ai ? 'ai-glow' : 'bg-accent-solid')}
-                          />
-                        </motion.span>
-                      )}
-                      {/* A still gradient: a blur over a sliding one would be redrawn on every frame. */}
-                      {ai && !open && <span aria-hidden className="absolute inset-1.5 rounded-full bg-[image:var(--ai-gradient)] opacity-20 blur-[6px]" />}
-                      <PanelIcon size={22} weight={ai ? 'duotone' : open ? 'fill' : 'regular'} aria-hidden className="relative" />
+                      <ToolIcon size={20} weight={on ? 'fill' : 'regular'} aria-hidden />
                     </button>
                   </Tooltip>
                 )
               })}
-            </nav>
-
-            <AnimatePresence>
-              {flyout && (
-                <motion.section
-                  ref={flyoutEl}
-                  key={flyout}
-                  id="editor-flyout"
-                  aria-label={panelTitle(flyout)}
-                  initial={{ opacity: 0, x: rtl ? 12 : -12 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: rtl ? 12 : -12 }}
-                  transition={chrome}
-                  data-testid="flyout"
-                  className="absolute start-[7.25rem] top-20 z-10 flex max-h-[calc(100%-5.75rem)] w-[21.5rem] flex-col overflow-hidden rounded-[16px] surface-frost max-sm:inset-x-3 max-sm:start-3 max-sm:top-auto max-sm:bottom-[9rem] max-sm:max-h-[calc(100%-9rem-7.5rem)] max-sm:w-auto"
-                >
-                  {/* The title at the start and, as in the mock, a small grey note at the end: the brand, or the page and format. */}
-                  <div className="flex h-14 shrink-0 items-center gap-2 ps-[18px] pe-2">
-                    <h2 className={cn('min-w-0 flex-1 truncate font-display text-[17px] font-bold tracking-tight', flyout === 'ai' && 'bg-[image:var(--ai-gradient)] bg-clip-text text-transparent')}>{panelTitle(flyout)}</h2>
-                    {(note ?? (flyout === 'assets' || flyout === 'brand' ? brandName : null)) && (
-                      <span data-testid="flyout-note" className="min-w-0 max-w-[60%] truncate text-[11px] font-medium text-muted">{note ?? brandName}</span>
-                    )}
-                    <button type="button" aria-label={t.editor.closePanel} onClick={() => setPanel(null)} className="grid size-7 shrink-0 cursor-pointer place-items-center rounded-full text-subtle hover:bg-hover hover:text-text">
-                      <XIcon size={14} aria-hidden />
-                    </button>
-                  </div>
-                  <FlyoutNote.Provider value={setNote}>
-                    {panels?.[flyout] ?? <p className="px-[18px] pb-4 text-[13px] text-muted">{panelEmpty[flyout]}</p>}
-                  </FlyoutNote.Provider>
-                </motion.section>
-              )}
-            </AnimatePresence>
-
-            <main ref={stage} data-bar={edit.bar ? '' : undefined} className="group/stage canvas-dots relative min-w-0 flex-1 overflow-clip">
-              <div ref={barRow} aria-hidden data-bar-row className={cn('pointer-events-none invisible absolute inset-x-0', BAR_ROW, BAR_ROW_HEIGHT)} />
-              {children}
-              <div ref={dock} role="toolbar" aria-label={t.editor.tools} data-dock className={cn('absolute inset-x-0 bottom-4 z-10 mx-auto flex w-max max-sm:bottom-[5.25rem] items-center gap-1 rounded-[18px] surface-frost p-1.5', sheet && 'max-sm:hidden')}>
-                {TOOLS.map(({ id, icon: ToolIcon, key }) => {
-                  if (id === 'shape') {
-                    return (
-                      <ShapeTools
-                        key={id}
-                        active={tool === 'shape'}
-                        shape={shape}
-                        onPick={(picked) => {
-                          setTool('shape')
-                          onToolChange?.('shape', picked)
-                        }}
-                      />
-                    )
-                  }
-                  if (id === 'image') {
-                    return (
-                      <ImageTool
-                        key={id}
-                        brandId={brandId}
-                        active={tool === 'image'}
-                        open={tool === 'image' && Boolean(image?.picking)}
-                        onPress={() => {
-                          setTool('image')
-                          onToolChange?.('image', shape)
-                        }}
-                        onPick={(asset) => image?.onPick(asset)}
-                        onClose={() => {
-                          setTool('select')
-                          onToolChange?.('select', shape)
-                        }}
-                      />
-                    )
-                  }
-                  const label = t.editor[`tool${id[0]?.toUpperCase()}${id.slice(1)}` as `tool${Capitalize<Tool>}`]
-                  const on = tool === id
-                  return (
-                    <Tooltip key={id} label={`${label} · ${key}`}>
-                      <button
-                        type="button"
-                        aria-label={label}
-                        aria-pressed={on}
-                        data-tool={id}
-                        onClick={() => {
-                          setTool(id)
-                          onToolChange?.(id, shape)
-                        }}
-                        className={dockTool(on)}
-                      >
-                        <ToolIcon size={20} weight={on ? 'fill' : 'regular'} aria-hidden />
-                      </button>
-                    </Tooltip>
-                  )
-                })}
-              </div>
-            </main>
-
-          </div>
+            </div>
+          </main>
         </div>
+      </div>
     </MotionConfig>
   )
 }

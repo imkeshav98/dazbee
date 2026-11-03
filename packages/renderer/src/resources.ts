@@ -1,5 +1,6 @@
 import type { CanvasKit, FontCollection, Image, TypefaceFontProvider } from '@dazbee/canvaskit'
 import type { Variables } from '@dazbee/schema'
+
 import type { Resources } from './draw.ts'
 
 export interface ResourceBytes {
@@ -72,7 +73,11 @@ export function resourceCache(ck: CanvasKit) {
 
   return {
     resources(bytes: ResourceBytes): Resources {
-      return { fonts: fontsFor(bytes.fonts), fallbackFamilies: [...bytes.fallbackFamilies], images: imagesFor(bytes.images) }
+      return {
+        fonts: fontsFor(bytes.fonts),
+        fallbackFamilies: [...bytes.fallbackFamilies],
+        images: imagesFor(bytes.images),
+      }
     },
     delete() {
       for (const { image } of images.values()) image.delete()

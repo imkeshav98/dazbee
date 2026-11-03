@@ -1,4 +1,5 @@
 import { z } from 'zod'
+
 import { Effect } from './effects.ts'
 import { Paint } from './paint.ts'
 import { BlendMode, Color, ContainerBlendMode } from './primitives.ts'
@@ -42,7 +43,12 @@ export const Stroke = z.object({
    * Dash and gap lengths in design pixels, taken in turn and repeated (#43); none is a solid
    * line. An odd number of lengths is taken twice, as in SVG, so dashes and gaps alternate.
    */
-  dashes: z.number().min(0).array().refine((d) => d.length === 0 || d.some((n) => n > 0), 'dashes need a length above 0').default([]),
+  dashes: z
+    .number()
+    .min(0)
+    .array()
+    .refine((d) => d.length === 0 || d.some((n) => n > 0), 'dashes need a length above 0')
+    .default([]),
   /** How far into the pattern the dashes start, in design pixels. */
   dashOffset: z.number().default(0),
   /** The ends of open paths and of each dash. */
@@ -67,7 +73,11 @@ export const Shape = z.discriminatedUnion('kind', [
   }),
   z.object({ kind: z.literal('ellipse') }),
   /** A regular polygon in the layer's box, its first corner at the top centre (#44). */
-  z.object({ kind: z.literal('polygon'), sides: z.number().int().min(3).max(100).default(5), cornerRadius: Radius.default(0) }),
+  z.object({
+    kind: z.literal('polygon'),
+    sides: z.number().int().min(3).max(100).default(5),
+    cornerRadius: Radius.default(0),
+  }),
   /**
    * A star in the layer's box, its first point at the top centre (#44). Its inner corners sit at
    * `innerRadius` of the way out, as a share of the box.
@@ -102,9 +112,16 @@ export type Shape = z.infer<typeof Shape>
  * How much a path's data is scaled to fill a box of `width` × `height`: by the box over the box it
  * was drawn in, or 1 on an axis that box has no length on, and when it has none.
  */
-export function pathScale(shape: { drawnIn?: { width: number; height: number } | undefined }, width: number, height: number) {
+export function pathScale(
+  shape: { drawnIn?: { width: number; height: number } | undefined },
+  width: number,
+  height: number,
+) {
   const { drawnIn } = shape
-  return { sx: drawnIn && drawnIn.width > 0 ? width / drawnIn.width : 1, sy: drawnIn && drawnIn.height > 0 ? height / drawnIn.height : 1 }
+  return {
+    sx: drawnIn && drawnIn.width > 0 ? width / drawnIn.width : 1,
+    sy: drawnIn && drawnIn.height > 0 ? height / drawnIn.height : 1,
+  }
 }
 
 export const GraphicProps = z.object({
@@ -122,7 +139,9 @@ export const GraphicProps = z.object({
 export const AutoLayout = z.object({
   direction: z.enum(['row', 'column']),
   gap: z.number().default(0),
-  padding: z.object({ top: z.number(), right: z.number(), bottom: z.number(), left: z.number() }).default({ top: 0, right: 0, bottom: 0, left: 0 }),
+  padding: z
+    .object({ top: z.number(), right: z.number(), bottom: z.number(), left: z.number() })
+    .default({ top: 0, right: 0, bottom: 0, left: 0 }),
   justify: z.enum(['start', 'center', 'end', 'space-between']).default('start'),
   align: z.enum(['start', 'center', 'end']).default('start'),
   wrap: z.boolean().default(false),
@@ -196,41 +215,51 @@ export const TextStyle = z.object({
 export const RunStyle = z.object(textStyleFields).partial()
 
 /** Run offsets count UTF-16 code units, as JavaScript strings and Y.Text do. */
-export const TextRun = z.object({
-  start: z.number().int().min(0),
-  end: z.number().int().min(0),
-  style: RunStyle,
-}).refine((r) => r.end > r.start, 'a run must cover at least one character')
+export const TextRun = z
+  .object({
+    start: z.number().int().min(0),
+    end: z.number().int().min(0),
+    style: RunStyle,
+  })
+  .refine((r) => r.end > r.start, 'a run must cover at least one character')
 
-export const TextProps = z.object({
-  ...commonProps,
-  text: z.string(),
-  style: TextStyle,
-  runs: TextRun.array().default([]),
-  align: z.enum(['start', 'center', 'end', 'justify']).default('start'),
-  direction: z.enum(['auto', 'ltr', 'rtl']).default('auto'),
-  verticalAlign: z.enum(['top', 'middle', 'bottom']).default('top'),
-  boxMode: z.enum(['autoWidth', 'autoHeight', 'fixed']).default('autoHeight'),
-  /** Every paragraph that has text gets a bullet or its number, in a gutter its lines wrap clear of (#47). */
-  list: z.enum(['bullet', 'number']).optional(),
-  /** Space between paragraphs, in pixels at the base font size. */
-  paragraphSpacing: z.number().min(0).optional(),
-  /** Lines shown at most; text past them is cut and the last line ends in an ellipsis. */
-  maxLines: z.number().int().positive().optional(),
-  /**
-   * The base font size is the largest, a quarter point apart, from `min` to `max` at which the
-   * text fits its box: no word broken and, in a fixed box, no line below it. Every size in the
-   * text scales with it. Text that can't fit is drawn at `min`.
-   */
-  shrinkToFit: z.object({ min: z.number().positive(), max: z.number().positive() })
-    .refine((f) => f.min <= f.max, 'the smallest size must not be more than the largest').optional(),
-}).superRefine((t, ctx) => {
-  for (const [i, run] of t.runs.entries()) {
-    if (run.end > t.text.length) {
-      ctx.addIssue({ code: 'custom', path: ['runs', i, 'end'], message: `run ends at ${run.end} but the text is ${t.text.length} UTF-16 units long` })
+export const TextProps = z
+  .object({
+    ...commonProps,
+    text: z.string(),
+    style: TextStyle,
+    runs: TextRun.array().default([]),
+    align: z.enum(['start', 'center', 'end', 'justify']).default('start'),
+    direction: z.enum(['auto', 'ltr', 'rtl']).default('auto'),
+    verticalAlign: z.enum(['top', 'middle', 'bottom']).default('top'),
+    boxMode: z.enum(['autoWidth', 'autoHeight', 'fixed']).default('autoHeight'),
+    /** Every paragraph that has text gets a bullet or its number, in a gutter its lines wrap clear of (#47). */
+    list: z.enum(['bullet', 'number']).optional(),
+    /** Space between paragraphs, in pixels at the base font size. */
+    paragraphSpacing: z.number().min(0).optional(),
+    /** Lines shown at most; text past them is cut and the last line ends in an ellipsis. */
+    maxLines: z.number().int().positive().optional(),
+    /**
+     * The base font size is the largest, a quarter point apart, from `min` to `max` at which the
+     * text fits its box: no word broken and, in a fixed box, no line below it. Every size in the
+     * text scales with it. Text that can't fit is drawn at `min`.
+     */
+    shrinkToFit: z
+      .object({ min: z.number().positive(), max: z.number().positive() })
+      .refine((f) => f.min <= f.max, 'the smallest size must not be more than the largest')
+      .optional(),
+  })
+  .superRefine((t, ctx) => {
+    for (const [i, run] of t.runs.entries()) {
+      if (run.end > t.text.length) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['runs', i, 'end'],
+          message: `run ends at ${run.end} but the text is ${t.text.length} UTF-16 units long`,
+        })
+      }
     }
-  }
-})
+  })
 
 /** Five of the seven layer types in ADR-0006: boolean arrived with #44; instance and lottie come later. */
 export const LAYER_PROPS = {
@@ -250,7 +279,8 @@ export const CONTAINERS = {
 
 /** Whether a layer of type `parent` can hold one of type `child`. */
 export const canHold = (parent: string, child: string) =>
-  Object.hasOwn(CONTAINERS, parent) && (CONTAINERS[parent as keyof typeof CONTAINERS] as readonly string[]).includes(child)
+  Object.hasOwn(CONTAINERS, parent) &&
+  (CONTAINERS[parent as keyof typeof CONTAINERS] as readonly string[]).includes(child)
 /** Whether a layer of this type holds other layers. */
 export const isContainer = (type: string) => Object.hasOwn(CONTAINERS, type)
 export type LayerType = keyof typeof LAYER_PROPS

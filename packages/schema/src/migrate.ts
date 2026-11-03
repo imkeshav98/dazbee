@@ -20,18 +20,31 @@ function toVersion2(design: Json): Json {
     return isRecord(node) && (node.type === 'group' || node.type === 'frame')
   }
   const passThrough = (props: Json, always: boolean) =>
-    props.blendMode === 'normal' || (always && props.blendMode === undefined) ? { ...props, blendMode: 'pass-through' } : props
-  const migratedNodes = Object.fromEntries(Object.entries(nodes).map(([id, node]) => [
-    id,
-    isContainer(id) && isRecord(node) && isRecord(node.props) ? { ...node, props: passThrough(node.props, true) } : node,
-  ]))
+    props.blendMode === 'normal' || (always && props.blendMode === undefined)
+      ? { ...props, blendMode: 'pass-through' }
+      : props
+  const migratedNodes = Object.fromEntries(
+    Object.entries(nodes).map(([id, node]) => [
+      id,
+      isContainer(id) && isRecord(node) && isRecord(node.props)
+        ? { ...node, props: passThrough(node.props, true) }
+        : node,
+    ]),
+  )
   const overrides = isRecord(design.overrides)
-    ? Object.fromEntries(Object.entries(design.overrides).map(([scope, byNode]) => [
-      scope,
-      isRecord(byNode)
-        ? Object.fromEntries(Object.entries(byNode).map(([id, values]) => [id, isContainer(id) && isRecord(values) ? passThrough(values, false) : values]))
-        : byNode,
-    ]))
+    ? Object.fromEntries(
+        Object.entries(design.overrides).map(([scope, byNode]) => [
+          scope,
+          isRecord(byNode)
+            ? Object.fromEntries(
+                Object.entries(byNode).map(([id, values]) => [
+                  id,
+                  isContainer(id) && isRecord(values) ? passThrough(values, false) : values,
+                ]),
+              )
+            : byNode,
+        ]),
+      )
     : design.overrides
   return { ...design, nodes: migratedNodes, ...(design.overrides === undefined ? {} : { overrides }) }
 }

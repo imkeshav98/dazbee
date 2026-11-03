@@ -23,16 +23,53 @@ export function after(a: ColorMatrix, b: ColorMatrix): ColorMatrix {
 }
 
 /** Red, green and blue each times its own factor, then plus its own amount. */
-const channels = (r: number, g: number, b: number, add = 0): ColorMatrix => [r, 0, 0, 0, add, 0, g, 0, 0, add, 0, 0, b, 0, add, 0, 0, 0, 1, 0]
+const channels = (r: number, g: number, b: number, add = 0): ColorMatrix => [
+  r,
+  0,
+  0,
+  0,
+  add,
+  0,
+  g,
+  0,
+  0,
+  add,
+  0,
+  0,
+  b,
+  0,
+  add,
+  0,
+  0,
+  0,
+  1,
+  0,
+]
 
 /** Saturation `s`: 0 is grey at the same luma, 1 the image, more is more vivid. */
 function saturation(s: number): ColorMatrix {
   const [lr, lg, lb] = LUMA
   return [
-    lr * (1 - s) + s, lg * (1 - s), lb * (1 - s), 0, 0,
-    lr * (1 - s), lg * (1 - s) + s, lb * (1 - s), 0, 0,
-    lr * (1 - s), lg * (1 - s), lb * (1 - s) + s, 0, 0,
-    0, 0, 0, 1, 0,
+    lr * (1 - s) + s,
+    lg * (1 - s),
+    lb * (1 - s),
+    0,
+    0,
+    lr * (1 - s),
+    lg * (1 - s) + s,
+    lb * (1 - s),
+    0,
+    0,
+    lr * (1 - s),
+    lg * (1 - s),
+    lb * (1 - s) + s,
+    0,
+    0,
+    0,
+    0,
+    0,
+    1,
+    0,
   ]
 }
 
@@ -42,10 +79,7 @@ const contrast = (c: number) => channels(c, c, c, 0.5 * (1 - c))
 const temperature = (t: number) => channels(1 + 0.2 * t, 1, 1 - 0.2 * t)
 
 const SEPIA: ColorMatrix = [
-  0.393, 0.769, 0.189, 0, 0,
-  0.349, 0.686, 0.168, 0, 0,
-  0.272, 0.534, 0.131, 0, 0,
-  0, 0, 0, 1, 0,
+  0.393, 0.769, 0.189, 0, 0, 0.349, 0.686, 0.168, 0, 0, 0.272, 0.534, 0.131, 0, 0, 0, 0, 0, 1, 0,
 ]
 
 const FILTERS: Record<ImageFilter, ColorMatrix> = {

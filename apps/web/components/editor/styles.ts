@@ -11,7 +11,8 @@ const DISABLED = 'disabled:pointer-events-none disabled:opacity-40'
 export const CHIP = `inline-flex h-7 cursor-pointer items-center gap-1 rounded-full border border-line px-3 text-xs font-semibold text-muted transition-colors duration-[var(--chrome-fast)] hover:border-line-strong hover:text-text ${DISABLED}`
 
 /** A small square icon button in a card's row. */
-export const ICON_BUTTON = 'grid size-7 shrink-0 cursor-pointer place-items-center rounded-row text-subtle transition-colors duration-[var(--chrome-fast)] hover:bg-hover hover:text-text disabled:pointer-events-none disabled:opacity-30'
+export const ICON_BUTTON =
+  'grid size-7 shrink-0 cursor-pointer place-items-center rounded-row text-subtle transition-colors duration-[var(--chrome-fast)] hover:bg-hover hover:text-text disabled:pointer-events-none disabled:opacity-30'
 
 /** A dashed button that adds something or takes an upload: Add image, Upload, a kit's Add. */
 export const DASHED_BUTTON = `flex h-8 cursor-pointer items-center justify-center gap-1.5 rounded-[10px] border border-dashed border-line-strong text-xs font-semibold text-muted transition-colors duration-[var(--chrome-fast)] hover:border-accent hover:text-text focus-within:border-accent focus-within:text-text ${FOCUS_RING}`
@@ -24,7 +25,8 @@ export const LINK_BUTTON = `shrink-0 cursor-pointer rounded-row px-1.5 text-[12p
 export const QUIET_BUTTON = `flex h-8 cursor-pointer items-center gap-1.5 rounded-row px-3 text-[13px] font-medium text-muted hover:bg-hover hover:text-text disabled:pointer-events-none disabled:opacity-50 ${FOCUS_RING}`
 
 /** A square tile showing one image asset's thumbnail, in the asset library and the image picker. */
-export const ASSET_TILE = 'grid aspect-square place-items-center overflow-hidden rounded-[10px] border border-line bg-bg/40 transition-colors duration-[var(--chrome-fast)]'
+export const ASSET_TILE =
+  'grid aspect-square place-items-center overflow-hidden rounded-[10px] border border-line bg-bg/40 transition-colors duration-[var(--chrome-fast)]'
 
 /** A popover's frosted panel, as the cards are: the shape menu, the image picker, Add format. */
 export const POPOVER = 'pop-in z-50 rounded-card surface-frost'
@@ -40,7 +42,8 @@ export const DOCK_OFF = 'text-muted hover:bg-hover hover:text-text'
 export const dockTool = (on: boolean) => `${DOCK_BUTTON} w-10 ${on ? DOCK_ON : DOCK_OFF}`
 
 /** A round colour swatch that picks its colour; its size is the caller's. */
-export const SWATCH = 'shrink-0 cursor-pointer rounded-full border border-line-strong transition-transform duration-[var(--chrome-fast)] hover:scale-110'
+export const SWATCH =
+  'shrink-0 cursor-pointer rounded-full border border-line-strong transition-transform duration-[var(--chrome-fast)] hover:scale-110'
 
 /** The look of a value typed into a field: a number, a hex, a dash pattern. */
 export const VALUE_TEXT = 'font-mono text-[12px] tabular-nums text-text'
@@ -78,11 +81,13 @@ export const MENU_DIVIDER = 'mx-1.5 my-1 border-t border-line'
 /** A shortcut shown in a menu row. */
 export const MENU_KEY = 'font-mono text-[11px] font-normal text-subtle'
 /** A switch drawn in a menu row or a card's row that is role="switch": checked, its knob slides to the end. */
-export const SWITCH = 'relative h-5 w-[34px] shrink-0 rounded-full bg-subtle/70 transition-colors duration-[var(--chrome-fast)] group-aria-checked:bg-accent-solid after:absolute after:start-0.5 after:top-0.5 after:size-4 after:rounded-full after:bg-white after:transition-transform after:duration-[var(--chrome-fast)] group-aria-checked:after:translate-x-3.5 rtl:group-aria-checked:after:-translate-x-3.5'
+export const SWITCH =
+  'relative h-5 w-[34px] shrink-0 rounded-full bg-subtle/70 transition-colors duration-[var(--chrome-fast)] group-aria-checked:bg-accent-solid after:absolute after:start-0.5 after:top-0.5 after:size-4 after:rounded-full after:bg-white after:transition-transform after:duration-[var(--chrome-fast)] group-aria-checked:after:translate-x-3.5 rtl:group-aria-checked:after:-translate-x-3.5'
 
 /** A tile to pick, as the effects and the box modes are: its picture, its name under it, lit while it is on. */
 export const TILE = `group flex min-w-0 cursor-pointer flex-col items-center gap-1 text-[11px] font-semibold text-muted aria-pressed:text-text aria-checked:text-text ${FOCUS_RING}`
-const TILE_FACE_BASE = 'grid w-full place-items-center overflow-hidden rounded-[10px] border border-line bg-bg/60 transition-colors duration-[var(--chrome-fast)] group-hover:border-line-strong group-aria-pressed:border-accent group-aria-pressed:ring-1 group-aria-pressed:ring-accent group-aria-checked:border-accent group-aria-checked:ring-1 group-aria-checked:ring-accent'
+const TILE_FACE_BASE =
+  'grid w-full place-items-center overflow-hidden rounded-[10px] border border-line bg-bg/60 transition-colors duration-[var(--chrome-fast)] group-hover:border-line-strong group-aria-pressed:border-accent group-aria-pressed:ring-1 group-aria-pressed:ring-accent group-aria-checked:border-accent group-aria-checked:ring-1 group-aria-checked:ring-accent'
 /** The picture of a TILE, square. */
 export const TILE_FACE = `${TILE_FACE_BASE} aspect-square`
 /** The picture of a TILE, wider than tall. */
@@ -115,4 +120,5 @@ export const MIXED_COLOUR = 'conic-gradient(red, yellow, lime, aqua, blue, magen
 export const BAR_DIVIDER = 'mx-0.5 h-5 w-px bg-line'
 
 /** A small message floating at the stage's start corner: a layer removed, something auto layout decides. */
-export const TOAST = 'toast-in pointer-events-auto flex h-10 items-center gap-2 rounded-card surface-frost ps-3.5 pe-1.5 text-[13px]'
+export const TOAST =
+  'toast-in pointer-events-auto flex h-10 items-center gap-2 rounded-card surface-frost ps-3.5 pe-1.5 text-[13px]'

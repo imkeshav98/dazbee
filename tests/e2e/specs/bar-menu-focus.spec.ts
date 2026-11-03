@@ -3,18 +3,38 @@
 // arrow back out of that menu then Esc. Both inputs are sent inside one page script that waits only
 // on microtasks, so they land before any timer of the page runs, as they do for a person when the
 // page is busy. Esc in a field of a menu still throws away what was typed.
-import { expect, test, type Page } from '../support/test.ts'
 import type { DesignInput } from '@dazbee/schema'
+
 import { barMenu, moreMenu, moreSubmenu, openStage, read, selection } from '../support/stage.ts'
+import { expect, type Page, test } from '../support/test.ts'
 
 test.describe.configure({ timeout: 120_000 })
 
 const design = (): DesignInput => ({
-  meta: { schemaVersion: 5, designId: 'replaced-by-the-api', name: 'Bar menu focus', kind: 'single', primaryFormatId: 'sq' },
+  meta: {
+    schemaVersion: 5,
+    designId: 'replaced-by-the-api',
+    name: 'Bar menu focus',
+    kind: 'single',
+    primaryFormatId: 'sq',
+  },
   formats: { sq: { name: 'Square', width: 1080, height: 1080, order: 'a0' } },
   pages: { p1: { name: 'Page 1', order: 'a0', fills: [{ type: 'solid', color: '#FFFFFFFF' }] } },
   nodes: {
-    a: { type: 'graphic', parentId: 'p1', index: 'a0', name: 'A', props: { x: 300, y: 400, width: 300, height: 300, shape: { kind: 'rect' }, fills: [{ type: 'solid', color: '#14213DFF' }] } },
+    a: {
+      type: 'graphic',
+      parentId: 'p1',
+      index: 'a0',
+      name: 'A',
+      props: {
+        x: 300,
+        y: 400,
+        width: 300,
+        height: 300,
+        shape: { kind: 'rect' },
+        fills: [{ type: 'solid', color: '#14213DFF' }],
+      },
+    },
   },
   overrides: {},
 })
@@ -36,7 +56,10 @@ const keyThen = (page: Page, step: { key: 'Escape' | 'ArrowLeft'; closed: string
       for (let i = 0; i < 1000 && !done(); i++) await Promise.resolve()
       if (!done()) throw new Error(`${what} without a timer`)
     }
-    const press = (name: string) => (document.activeElement ?? document.body).dispatchEvent(new KeyboardEvent('keydown', { key: name, code: name, bubbles: true, cancelable: true }))
+    const press = (name: string) =>
+      (document.activeElement ?? document.body).dispatchEvent(
+        new KeyboardEvent('keydown', { key: name, code: name, bubbles: true, cancelable: true }),
+      )
     press(key)
     await until(() => !there(closed), `${closed} did not close`)
     if (next === 'esc') press('Escape')
@@ -44,7 +67,9 @@ const keyThen = (page: Page, step: { key: 'Escape' | 'ArrowLeft'; closed: string
     await until(() => (then.startsWith('!') ? !there(then.slice(1)) : there(then)), `${then} did not come`)
   }, step)
 
-test('Esc in one popover of the bar and a click on another at once: the new one stays open with the focus', async ({ browser }) => {
+test('Esc in one popover of the bar and a click on another at once: the new one stays open with the focus', async ({
+  browser,
+}) => {
   const { page, errors } = await openStage(browser, design())
   await select(page, ['a'])
   await barMenu(page, 'colour')
@@ -59,7 +84,9 @@ test('Esc in one popover of the bar and a click on another at once: the new one 
   expect(errors).toEqual([])
 })
 
-test('Esc twice at once in the menu beside Order: the first closes it, the second ⋯ More, and the layer stays selected', async ({ browser }) => {
+test('Esc twice at once in the menu beside Order: the first closes it, the second ⋯ More, and the layer stays selected', async ({
+  browser,
+}) => {
   const { page, errors } = await openStage(browser, design())
   await select(page, ['a'])
   const order = await moreSubmenu(page, 'order')
@@ -75,7 +102,9 @@ test('Esc twice at once in the menu beside Order: the first closes it, the secon
   expect(errors).toEqual([])
 })
 
-test('the arrow back out of the menu beside Order, then Esc at once: ⋯ More closes and the layer stays selected', async ({ browser }) => {
+test('the arrow back out of the menu beside Order, then Esc at once: ⋯ More closes and the layer stays selected', async ({
+  browser,
+}) => {
   const { page, errors } = await openStage(browser, design())
   await select(page, ['a'])
   const order = await moreSubmenu(page, 'order')
@@ -90,7 +119,9 @@ test('the arrow back out of the menu beside Order, then Esc at once: ⋯ More cl
   expect(errors).toEqual([])
 })
 
-test('Esc in a number field of ⋯ More throws away what was typed: the menu closes and the layer keeps its rotation', async ({ browser }) => {
+test('Esc in a number field of ⋯ More throws away what was typed: the menu closes and the layer keeps its rotation', async ({
+  browser,
+}) => {
   const { page, errors } = await openStage(browser, design())
   await select(page, ['a'])
   const more = await moreMenu(page)

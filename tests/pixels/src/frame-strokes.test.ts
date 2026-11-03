@@ -1,9 +1,11 @@
 // Frame strokes: they follow the frame's corners, sit inside, on or outside its edge, go over what
 // is inside it and are never cut by its clip, on the CPU surface and in the PDF and SVG.
 import { PDFiumLibrary } from '@hyzyla/pdfium'
+import { afterAll, describe, expect, it } from 'vitest'
+
 import { renderDesign, renderVector } from '@dazbee/renderer'
 import { loadCanvasKit } from '@dazbee/renderer/node'
-import { afterAll, describe, expect, it } from 'vitest'
+
 import { fixtureResources } from './pixels.ts'
 import { overWhite, rasterisePdf, rasteriseSvg, vectorDifference } from './vector.ts'
 
@@ -20,14 +22,33 @@ const design = (align: 'inside' | 'center' | 'outside', frame: Record<string, un
   pages: { p1: { name: 'Page', order: 'a0', fills: solid('#FFFFFFFF') } },
   nodes: {
     box: {
-      type: 'frame', parentId: 'p1', index: 'a0', name: 'Box',
-      props: { x: 50, y: 50, width: 200, height: 200, fills: solid('#2050E0FF'), strokes: [{ paint: { type: 'solid', color: '#000000FF' }, width: 10, align }], ...frame },
+      type: 'frame',
+      parentId: 'p1',
+      index: 'a0',
+      name: 'Box',
+      props: {
+        x: 50,
+        y: 50,
+        width: 200,
+        height: 200,
+        fills: solid('#2050E0FF'),
+        strokes: [{ paint: { type: 'solid', color: '#000000FF' }, width: 10, align }],
+        ...frame,
+      },
     },
-    inner: { type: 'graphic', parentId: 'box', index: 'a0', name: 'Inner', props: { x: 0, y: 0, width: 300, height: 300, shape: { kind: 'rect' }, fills: solid('#E02020FF') } },
+    inner: {
+      type: 'graphic',
+      parentId: 'box',
+      index: 'a0',
+      name: 'Inner',
+      props: { x: 0, y: 0, width: 300, height: 300, shape: { kind: 'rect' }, fills: solid('#E02020FF') },
+    },
   },
   overrides: {},
 })
-const at = (r: { pixels: Uint8Array; width: number }, x: number, y: number) => [...r.pixels.slice((y * r.width + x) * 4, (y * r.width + x) * 4 + 3)]
+const at = (r: { pixels: Uint8Array; width: number }, x: number, y: number) => [
+  ...r.pixels.slice((y * r.width + x) * 4, (y * r.width + x) * 4 + 3),
+]
 const WHITE = [255, 255, 255]
 const RED = [224, 32, 32]
 const BLACK = [0, 0, 0]
@@ -51,7 +72,7 @@ describe('frame strokes', () => {
     expect(at(outside, 38, 150)).toEqual(WHITE)
   })
 
-  it('follow the frame\'s corners', () => {
+  it("follow the frame's corners", () => {
     const r = renderDesign(ck, design('inside', { cornerRadius: 60 }), 'p1', 'f', bytes)
     // The square corner's spot is outside the rounded frame; along the curve the stroke shows.
     expect(at(r, 53, 53)).toEqual(WHITE)
@@ -62,7 +83,19 @@ describe('frame strokes', () => {
   })
 
   it('draw the same in the PDF and the SVG as on the CPU', async () => {
-    const angular = { paint: { type: 'angular', center: { x: 0.5, y: 0.5 }, angle: 0, stops: [{ offset: 0, color: '#E0157FFF' }, { offset: 1, color: '#3D6BFFFF' }] }, width: 12, align: 'outside' }
+    const angular = {
+      paint: {
+        type: 'angular',
+        center: { x: 0.5, y: 0.5 },
+        angle: 0,
+        stops: [
+          { offset: 0, color: '#E0157FFF' },
+          { offset: 1, color: '#3D6BFFFF' },
+        ],
+      },
+      width: 12,
+      align: 'outside',
+    }
     const cases = [
       ['inside', { cornerRadius: 40 }],
       ['center', { cornerRadius: [0, 60, 10, 80] }],

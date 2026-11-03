@@ -1,6 +1,7 @@
 // Schema version 3 (#219): every paint has an opacity of its own and can be hidden, and a version 2
 // design comes up as it is.
 import { describe, expect, it } from 'vitest'
+
 import { migrateDesign, parseDesign, SCHEMA_VERSION } from './index.ts'
 
 type Json = Record<string, unknown>
@@ -9,10 +10,29 @@ const designWith = (fills: unknown[], version = SCHEMA_VERSION, overrides: Json 
   meta: { schemaVersion: version, designId: 'd1', name: 'D', kind: 'single', primaryFormatId: 'sq' },
   formats: { sq: { name: 'Square', width: 1080, height: 1080, order: 'a0' } },
   pages: { p1: { name: 'Page 1', order: 'a0', fills } },
-  nodes: { r: { type: 'graphic', parentId: 'p1', index: 'a0', name: 'Box', props: { x: 0, y: 0, width: 100, height: 100, shape: { kind: 'rect' }, fills, strokes: [{ paint: fills[0], width: 2 }] } } },
+  nodes: {
+    r: {
+      type: 'graphic',
+      parentId: 'p1',
+      index: 'a0',
+      name: 'Box',
+      props: {
+        x: 0,
+        y: 0,
+        width: 100,
+        height: 100,
+        shape: { kind: 'rect' },
+        fills,
+        strokes: [{ paint: fills[0], width: 2 }],
+      },
+    },
+  },
   overrides,
 })
-const stops = [{ offset: 0, color: '#FF0000FF' }, { offset: 1, color: '#0000FFFF' }]
+const stops = [
+  { offset: 0, color: '#FF0000FF' },
+  { offset: 1, color: '#0000FFFF' },
+]
 const paints = [
   { type: 'solid', color: '#FF0000FF', opacity: 0.5, visible: false },
   { type: 'linear', from: { x: 0, y: 0 }, to: { x: 1, y: 1 }, stops, opacity: 0.25 },
@@ -39,7 +59,9 @@ describe('paint opacity and visibility', () => {
 
   it('refuses an opacity outside 0 to 1', () => {
     const result = parseDesign(designWith([{ type: 'solid', color: '#FF0000FF', opacity: 1.5 }]))
-    expect(result.success ? [] : result.errors).toContain('pages.p1.fills.0.opacity: Too big: expected number to be <=1')
+    expect(result.success ? [] : result.errors).toContain(
+      'pages.p1.fills.0.opacity: Too big: expected number to be <=1',
+    )
   })
 })
 

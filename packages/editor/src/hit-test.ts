@@ -1,6 +1,9 @@
 import type { SceneLayer } from '@dazbee/renderer'
 
-export interface Point { x: number; y: number }
+export interface Point {
+  x: number
+  y: number
+}
 
 /** The point as seen from inside a layer: un-rotated about the layer's centre. */
 function unrotate(p: Point, layer: SceneLayer): Point {
@@ -38,7 +41,11 @@ const inside = (p: Point, layer: SceneLayer) => {
  * lies outside it. A layer that isn't `pickable` (locked) is passed over with everything in it,
  * so the click reaches what lies beneath. A mask is never picked here, and what it masks only inside its box.
  */
-export function hitTest(layers: SceneLayer[], p: Point, pickable: (layer: SceneLayer) => boolean = () => true): SceneLayer | null {
+export function hitTest(
+  layers: SceneLayer[],
+  p: Point,
+  pickable: (layer: SceneLayer) => boolean = () => true,
+): SceneLayer | null {
   // A mask isn't drawn, and what it masks shows only inside it (#48).
   const maskOf: (SceneLayer | null)[] = []
   let mask: SceneLayer | null = null

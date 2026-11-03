@@ -1,9 +1,11 @@
 // The database every server shares: tables, migrations and the design state the sync server keeps.
 import { fileURLToPath } from 'node:url'
+
 import { eq, sql } from 'drizzle-orm'
 import { drizzle, type NodePgDatabase } from 'drizzle-orm/node-postgres'
 import { migrate } from 'drizzle-orm/node-postgres/migrator'
 import pg from 'pg'
+
 import * as tables from './tables.ts'
 
 export * from './tables.ts'
@@ -29,7 +31,10 @@ export async function migrateDatabase(db: Db): Promise<void> {
 
 /** A design's Yjs state, or null when the design has none yet. */
 export async function readDesignState(db: Db, designId: string): Promise<Uint8Array | null> {
-  const [row] = await db.select({ state: tables.designStates.state }).from(tables.designStates).where(eq(tables.designStates.designId, designId))
+  const [row] = await db
+    .select({ state: tables.designStates.state })
+    .from(tables.designStates)
+    .where(eq(tables.designStates.designId, designId))
   return row?.state ?? null
 }
 
@@ -39,10 +44,18 @@ export async function readDesignState(db: Db, designId: string): Promise<Uint8Ar
  */
 export async function writeDesignState(db: Db, designId: string, state: Uint8Array): Promise<void> {
   await db.transaction(async (tx) => {
-    const [design] = await tx.select({ id: tables.designs.id }).from(tables.designs).where(eq(tables.designs.id, designId))
+    const [design] = await tx
+      .select({ id: tables.designs.id })
+      .from(tables.designs)
+      .where(eq(tables.designs.id, designId))
     if (!design) return
-    await tx.insert(tables.designStates).values({ designId, state })
+    await tx
+      .insert(tables.designStates)
+      .values({ designId, state })
       .onConflictDoUpdate({ target: tables.designStates.designId, set: { state, updatedAt: sql`now()` } })
-    await tx.update(tables.designs).set({ updatedAt: sql`now()` }).where(eq(tables.designs.id, designId))
+    await tx
+      .update(tables.designs)
+      .set({ updatedAt: sql`now()` })
+      .where(eq(tables.designs.id, designId))
   })
 }

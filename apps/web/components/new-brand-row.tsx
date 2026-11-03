@@ -6,16 +6,29 @@
 import { PlusIcon } from '@phosphor-icons/react'
 import { useEffect, useRef, useState } from 'react'
 import { useFormStatus } from 'react-dom'
-import { cn } from '../lib/cn.ts'
+
+import { buttonStyles } from '@/components/ui/button.tsx'
+import { cn } from '@/lib/cn.ts'
+
 import { BrandNaming, type NamingWords } from './brand-naming.tsx'
-import { buttonStyles } from './ui/button.tsx'
 
 function Create({ label }: { label: string }) {
   const { pending } = useFormStatus()
-  return <button type="submit" disabled={pending} className={cn(buttonStyles({ variant: 'primary' }), 'h-9 px-4 font-semibold')}>{label}</button>
+  return (
+    <button
+      type="submit"
+      disabled={pending}
+      className={cn(buttonStyles({ variant: 'primary' }), 'h-9 px-4 font-semibold')}
+    >
+      {label}
+    </button>
+  )
 }
 
-export function NewBrandRow({ action, words }: {
+export function NewBrandRow({
+  action,
+  words,
+}: {
   action: (form: FormData) => Promise<void>
   words: NamingWords & { add: string; start: string; placeholder: string; create: string }
 }) {
@@ -33,14 +46,18 @@ export function NewBrandRow({ action, words }: {
         data-testid="new-brand-row"
         className="flex h-10 w-full cursor-pointer items-center gap-2.5 rounded-row px-2 text-start text-[13px] font-semibold text-accent-text transition-colors duration-[var(--chrome-fast)] hover:bg-hover"
       >
-        <span aria-hidden className="grid size-7 shrink-0 place-items-center rounded-[7px] bg-accent-soft"><PlusIcon size={14} weight="bold" /></span>
+        <span aria-hidden className="grid size-7 shrink-0 place-items-center rounded-[7px] bg-accent-soft">
+          <PlusIcon size={14} weight="bold" />
+        </span>
         {words.add}
       </button>
     )
   }
   return (
     <form action={action} className="flex flex-col gap-2 p-2">
-      <label htmlFor="menu-new-brand" className="text-[12px] font-semibold text-muted">{words.start}</label>
+      <label htmlFor="menu-new-brand" className="text-[12px] font-semibold text-muted">
+        {words.start}
+      </label>
       <div className="flex items-center gap-2">
         <input
           ref={field}

@@ -1,15 +1,19 @@
 // The brand's asset library (#52): its images, found by name and tag, and image uploads. An upload
 // passes through here to the API and storage, so the browser needs no storage address or credentials.
-import { svgMarkup, SVG_TYPE } from '@dazbee/svg'
-import { MAX_SVG_BYTES, MAX_UPLOAD_BYTES, type ImageType } from '@dazbee/schema'
-import { ApiFailure, listAssets, uploadAsset } from '../../../../lib/api.ts'
+import { type ImageType, MAX_SVG_BYTES, MAX_UPLOAD_BYTES } from '@dazbee/schema'
+import { SVG_TYPE, svgMarkup } from '@dazbee/svg'
+
+import { ApiFailure, listAssets, uploadAsset } from '@/lib/api.ts'
 
 export async function GET(request: Request, { params }: { params: Promise<{ brandId: string }> }) {
   const { brandId } = await params
   try {
-    return Response.json(await listAssets(brandId, new URL(request.url).searchParams.get('q') ?? ''), { headers: { 'cache-control': 'private, no-store' } })
+    return Response.json(await listAssets(brandId, new URL(request.url).searchParams.get('q') ?? ''), {
+      headers: { 'cache-control': 'private, no-store' },
+    })
   } catch (e) {
-    if (e instanceof ApiFailure && (e.status === 400 || e.status === 404)) return Response.json({ error: e.message }, { status: e.status })
+    if (e instanceof ApiFailure && (e.status === 400 || e.status === 404))
+      return Response.json({ error: e.message }, { status: e.status })
     throw e
   }
 }
@@ -34,15 +38,21 @@ export async function POST(request: Request, { params }: { params: Promise<{ bra
   const { brandId } = await params
   const form = await request.formData().catch(() => null)
   const file = form?.get('file')
-  if (!(file instanceof File)) return Response.json({ error: 'Send the image as the form field "file"' }, { status: 400 })
+  if (!(file instanceof File))
+    return Response.json({ error: 'Send the image as the form field "file"' }, { status: 400 })
   if (file.size > MAX_UPLOAD_BYTES) return Response.json({ error: 'The image is larger than 30 MB' }, { status: 400 })
   const bytes = new Uint8Array(await file.arrayBuffer())
   const type = imageType(bytes)
-  if (!type) return Response.json({ error: `The file is not a PNG, JPEG or WebP image, or an SVG file of at most ${MAX_SVG_BYTES / 1_000_000} MB` }, { status: 400 })
+  if (!type)
+    return Response.json(
+      { error: `The file is not a PNG, JPEG or WebP image, or an SVG file of at most ${MAX_SVG_BYTES / 1_000_000} MB` },
+      { status: 400 },
+    )
   try {
     return Response.json(await uploadAsset(brandId, bytes, type, assetName(file.name)), { status: 201 })
   } catch (e) {
-    if (e instanceof ApiFailure && (e.status === 400 || e.status === 404)) return Response.json({ error: e.message }, { status: e.status })
+    if (e instanceof ApiFailure && (e.status === 400 || e.status === 404))
+      return Response.json({ error: e.message }, { status: e.status })
     throw e
   }
 }

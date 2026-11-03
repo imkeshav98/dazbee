@@ -4,8 +4,9 @@
 // brand home's brief and Brand kit panel: a change made in one shows in the others at once. Fetched
 // once per brand, and again each time the flyout or panel opens; a fetch waits for a save still on
 // its way, so it never brings back the kit from before that save.
-import { BrandKit, EMPTY_BRAND_KIT } from '@dazbee/schema'
 import { useCallback, useEffect, useSyncExternalStore } from 'react'
+
+import { BrandKit, EMPTY_BRAND_KIT } from '@dazbee/schema'
 
 export const kitUrl = (brandId: string) => `/brands/${encodeURIComponent(brandId)}/kit/data`
 
@@ -21,7 +22,11 @@ export function showKit(brandId: string, kit: BrandKit) {
 
 /** Saves the kit; a fetch started meanwhile waits for it. Resolves to the response, or rejects as fetch does. */
 export function saveKit(brandId: string, kit: BrandKit) {
-  const put = fetch(kitUrl(brandId), { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(kit) })
+  const put = fetch(kitUrl(brandId), {
+    method: 'PUT',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(kit),
+  })
   const settled = put.catch(() => undefined)
   saving.set(brandId, settled)
   void settled.then(() => {
@@ -48,14 +53,21 @@ export async function loadKit(brandId: string) {
  */
 export function useBrandKit(brandId: string, first?: BrandKit) {
   if (first && !kits.has(brandId)) kits.set(brandId, first)
-  const subscribe = useCallback((listener: () => void) => {
-    const set = listeners.get(brandId) ?? new Set()
-    listeners.set(brandId, set.add(listener))
-    return () => {
-      set.delete(listener)
-    }
-  }, [brandId])
-  const kit = useSyncExternalStore(subscribe, () => kits.get(brandId) ?? null, () => null)
+  const subscribe = useCallback(
+    (listener: () => void) => {
+      const set = listeners.get(brandId) ?? new Set()
+      listeners.set(brandId, set.add(listener))
+      return () => {
+        set.delete(listener)
+      }
+    },
+    [brandId],
+  )
+  const kit = useSyncExternalStore(
+    subscribe,
+    () => kits.get(brandId) ?? null,
+    () => null,
+  )
   useEffect(() => {
     if (!kits.has(brandId)) void loadKit(brandId)
   }, [brandId])

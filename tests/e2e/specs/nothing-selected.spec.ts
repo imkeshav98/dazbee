@@ -4,22 +4,57 @@
 // sizes, its labels pink, and a top bar of Background and Sizes; Background paints the page in every
 // size. No cards are left, nor the phones' properties button. Nothing overlaps at the three screen
 // sizes, and the canvas never moves.
-import { expect, test, type Page } from '../support/test.ts'
 import type { DesignInput } from '@dazbee/schema'
+
 import { designOf, editorPath, screenPoint, writeOutput } from '../support/editor.ts'
 import { layoutProblems } from '../support/layout.ts'
 import { seed } from '../support/seed.ts'
-import { backgroundPanel, barMenu, click, drag, openStage, pagesPanel, pickPage, press, selection, sizesPanel } from '../support/stage.ts'
+import {
+  backgroundPanel,
+  barMenu,
+  click,
+  drag,
+  openStage,
+  pagesPanel,
+  pickPage,
+  press,
+  selection,
+  sizesPanel,
+} from '../support/stage.ts'
+import { expect, type Page, test } from '../support/test.ts'
 
 test.describe.configure({ timeout: 120_000 })
 
 const solid = (color: string) => [{ type: 'solid' as const, color }]
 const design = (): DesignInput => ({
-  meta: { schemaVersion: 5, designId: 'replaced-by-the-api', name: 'Summer sale', kind: 'single', primaryFormatId: 'sq' },
-  formats: { sq: { name: 'Square', width: 1080, height: 1080, order: 'a0' }, st: { name: 'Story', width: 1080, height: 1920, order: 'a1' } },
+  meta: {
+    schemaVersion: 5,
+    designId: 'replaced-by-the-api',
+    name: 'Summer sale',
+    kind: 'single',
+    primaryFormatId: 'sq',
+  },
+  formats: {
+    sq: { name: 'Square', width: 1080, height: 1080, order: 'a0' },
+    st: { name: 'Story', width: 1080, height: 1920, order: 'a1' },
+  },
   pages: { p1: { name: 'Page 1', order: 'a0', fills: solid('#FFF8F0FF') } },
   nodes: {
-    headline: { type: 'text', parentId: 'p1', index: 'a0', name: 'Headline', props: { x: 80, y: 60, width: 600, height: 90, boxMode: 'autoHeight', text: 'Summer sale', style: { fontFamily: 'Noto Sans', fontSize: 64, fontWeight: 800, color: '#C2106CFF' } } },
+    headline: {
+      type: 'text',
+      parentId: 'p1',
+      index: 'a0',
+      name: 'Headline',
+      props: {
+        x: 80,
+        y: 60,
+        width: 600,
+        height: 90,
+        boxMode: 'autoHeight',
+        text: 'Summer sale',
+        style: { fontFamily: 'Noto Sans', fontSize: 64, fontWeight: 800, color: '#C2106CFF' },
+      },
+    },
   },
   overrides: {},
 })
@@ -37,18 +72,25 @@ const PIECES = {
 /** Where each size of the page is on screen: the ads, which the chrome keeps clear of at a fit. */
 const ads = async (page: Page) => {
   const frames = await page.evaluate(() => window.dazbee?.frames() ?? [])
-  return Promise.all(frames.map(async (f) => {
-    const a = await screenPoint(page, 0, 0, f)
-    const b = await screenPoint(page, f.width, f.height, f)
-    return { x: a.x, y: a.y, width: b.x - a.x, height: b.y - a.y }
-  }))
+  return Promise.all(
+    frames.map(async (f) => {
+      const a = await screenPoint(page, 0, 0, f)
+      const b = await screenPoint(page, f.width, f.height, f)
+      return { x: a.x, y: a.y, width: b.x - a.x, height: b.y - a.y }
+    }),
+  )
 }
 const camera = (page: Page) => page.evaluate(() => window.dazbee?.camera())
-const settle = (page: Page) => page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))))
-const fills = async (page: Page) => (JSON.parse(await designOf(page)) as { pages: Record<string, { fills: { type: string; color?: string }[] }> }).pages.p1?.fills
+const settle = (page: Page) =>
+  page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))))
+const fills = async (page: Page) =>
+  (JSON.parse(await designOf(page)) as { pages: Record<string, { fills: { type: string; color?: string }[] }> }).pages
+    .p1?.fills
 const pageBar = (page: Page) => page.locator('[data-testid="top-bar"][data-page]')
 
-test('Sizes opens from the header pill and lists the sizes; Esc closes it and the focus goes back to the button', async ({ browser }) => {
+test('Sizes opens from the header pill and lists the sizes; Esc closes it and the focus goes back to the button', async ({
+  browser,
+}) => {
   const { page, errors } = await openStage(browser, design())
   const button = page.getByTestId('sizes-button')
   await expect(button).toHaveAccessibleName('Sizes · 2')
@@ -84,7 +126,9 @@ test('Sizes opens from the header pill and lists the sizes; Esc closes it and th
   expect(errors).toEqual([])
 })
 
-test('Pages opens from by the zoom pill: it counts the pages, adds one, shows one, and Esc gives the focus back', async ({ browser }) => {
+test('Pages opens from by the zoom pill: it counts the pages, adds one, shows one, and Esc gives the focus back', async ({
+  browser,
+}) => {
   const { page, errors } = await openStage(browser, design())
   const button = page.getByTestId('pages-button')
   await expect(button).toHaveAccessibleName('Pages: page 1 of 1')
@@ -115,13 +159,20 @@ test('Pages opens from by the zoom pill: it counts the pages, adds one, shows on
   expect(errors).toEqual([])
 })
 
-test('a click on the page picks it: a dashed outline, pink labels, and a bar of Background and Sizes; Background paints it in every size', async ({ browser }) => {
+test('a click on the page picks it: a dashed outline, pink labels, and a bar of Background and Sizes; Background paints it in every size', async ({
+  browser,
+}) => {
   const { page, errors } = await openStage(browser, design())
   const still = await camera(page)
   await pickPage(page, 900, 900)
   // Each of its sizes outlined, dashed, and their labels lit.
   await expect(page.locator('.stage-overlay .page-picked')).toHaveCount(2)
-  expect(await page.locator('.stage-overlay .page-picked').first().evaluate((el) => getComputedStyle(el).outlineStyle)).toBe('dashed')
+  expect(
+    await page
+      .locator('.stage-overlay .page-picked')
+      .first()
+      .evaluate((el) => getComputedStyle(el).outlineStyle),
+  ).toBe('dashed')
   await expect(page.locator('.stage-overlay .frame-label[data-active]')).toHaveCount(2)
   // No layer is selected, and there is no small menu.
   expect(await selection(page)).toEqual([])
@@ -145,11 +196,12 @@ test('a click on the page picks it: a dashed outline, pink labels, and a bar of 
   await expect.poll(() => fills(page)).toEqual(solid('#3D6BFFFF'))
   // The page's fills are the page's, the same in every size: both frames draw it.
   // The export's pixel at (1000, 1000), as RGB, in one size.
-  const pixel = (formatId: string) => page.evaluate((formatId) => {
-    const pixels = window.dazbee?.exportPixels('p1', formatId)
-    const i = (1000 * 1080 + 1000) * 4
-    return pixels ? [pixels[i], pixels[i + 1], pixels[i + 2]] : null
-  }, formatId)
+  const pixel = (formatId: string) =>
+    page.evaluate((formatId) => {
+      const pixels = window.dazbee?.exportPixels('p1', formatId)
+      const i = (1000 * 1080 + 1000) * 4
+      return pixels ? [pixels[i], pixels[i + 1], pixels[i + 2]] : null
+    }, formatId)
   for (const formatId of ['sq', 'st']) await expect.poll(() => pixel(formatId)).toEqual([61, 107, 255])
   writeOutput('page-background.png', await page.screenshot({ animations: 'disabled' }))
   // Esc in the field closes the panel; one undo step takes the colour back.
@@ -192,7 +244,7 @@ test('a click on the page picks it: a dashed outline, pink labels, and a bar of 
   expect(errors).toEqual([])
 })
 
-test('Sizes on the page\'s bar opens the Sizes panel, and the focus goes back to it on Esc', async ({ browser }) => {
+test("Sizes on the page's bar opens the Sizes panel, and the focus goes back to it on Esc", async ({ browser }) => {
   const { page, errors } = await openStage(browser, design())
   await pickPage(page, 900, 900)
   await page.getByTestId('bar-sizes').click()
@@ -204,8 +256,14 @@ test('Sizes on the page\'s bar opens the Sizes panel, and the focus goes back to
   expect(errors).toEqual([])
 })
 
-for (const [width, height] of [[1280, 760], [820, 1180], [390, 844]] as const) {
-  test(`at ${width}×${height} Sizes, Pages and the page's Background sit clear of everything, and the canvas stays`, async ({ browser }) => {
+for (const [width, height] of [
+  [1280, 760],
+  [820, 1180],
+  [390, 844],
+] as const) {
+  test(`at ${width}×${height} Sizes, Pages and the page's Background sit clear of everything, and the canvas stays`, async ({
+    browser,
+  }) => {
     const { page, errors } = await openStage(browser, design())
     await page.setViewportSize({ width, height })
     await settle(page)
@@ -220,7 +278,10 @@ for (const [width, height] of [[1280, 760], [820, 1180], [390, 844]] as const) {
     }
     const check = async (name: string) => {
       await settle(page)
-      expect(await layoutProblems(page, { pieces: PIECES, uncut: 'h1, [data-testid="edit-panel-note"]' }), name).toEqual([])
+      expect(
+        await layoutProblems(page, { pieces: PIECES, uncut: 'h1, [data-testid="edit-panel-note"]' }),
+        name,
+      ).toEqual([])
       expect(await camera(page), name).toEqual(still)
       writeOutput(`${name}-${width}.png`, await page.screenshot({ animations: 'disabled' }))
     }
@@ -240,7 +301,7 @@ for (const [width, height] of [[1280, 760], [820, 1180], [390, 844]] as const) {
   })
 }
 
-test('in Arabic Sizes, Pages and the page\'s Background mirror and sit clear of everything', async ({ browser }) => {
+test("in Arabic Sizes, Pages and the page's Background mirror and sit clear of everything", async ({ browser }) => {
   const designId = await seed(design())
   const context = await browser.newContext({ viewport: { width: 1280, height: 760 } })
   await context.addCookies([{ name: 'locale', value: 'ar', url: 'http://localhost' }])
@@ -254,15 +315,25 @@ test('in Arabic Sizes, Pages and the page\'s Background mirror and sit clear of 
   const pages = await page.getByTestId('pages-button').boundingBox()
   const zoom = await page.locator('[data-zoom]').boundingBox()
   expect(pages && zoom && pages.x > zoom.x + zoom.width).toBe(true)
-  for (const open of [() => sizesPanel(page), () => pagesPanel(page), async () => {
-    await page.keyboard.press('Escape')
-    return backgroundPanel(page, 900, 900)
-  }]) {
+  for (const open of [
+    () => sizesPanel(page),
+    () => pagesPanel(page),
+    async () => {
+      await page.keyboard.press('Escape')
+      return backgroundPanel(page, 900, 900)
+    },
+  ]) {
     await open()
     expect(await layoutProblems(page, { pieces: PIECES, uncut: 'h1, [data-testid="edit-panel-note"]' })).toEqual([])
   }
   // A hex and its opacity read left to right in Arabic too, the # first.
-  for (const name of ['colour-hex', 'colour-opacity']) expect(await page.locator(`#edit-panel [name="${name}"]`).first().evaluate((el) => getComputedStyle(el).direction)).toBe('ltr')
+  for (const name of ['colour-hex', 'colour-opacity'])
+    expect(
+      await page
+        .locator(`#edit-panel [name="${name}"]`)
+        .first()
+        .evaluate((el) => getComputedStyle(el).direction),
+    ).toBe('ltr')
   writeOutput('nothing-selected-rtl.png', await page.screenshot({ animations: 'disabled' }))
   expect(errors).toEqual([])
   await context.close()

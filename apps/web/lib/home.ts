@@ -4,7 +4,7 @@ import type { BrandSummary } from '@dazbee/schema'
 
 /** The brand to open straight away, or null to show the list. */
 export function openingBrand(brands: readonly BrandSummary[]): BrandSummary | null {
-  return brands.length === 1 ? brands[0] ?? null : null
+  return brands.length === 1 ? (brands[0] ?? null) : null
 }
 
 /** Whether the brand list shows beside a brand's page: once there are two. */
@@ -26,12 +26,19 @@ export function nameFromWebsite(text: string): string | null {
   } catch {
     return null
   }
-  const labels = host.replace(/^www\./i, '').split('.').filter(Boolean)
+  const labels = host
+    .replace(/^www\./i, '')
+    .split('.')
+    .filter(Boolean)
   // The label before the public suffix: harbour-coffee in harbour-coffee.co.uk too.
   const second = labels.at(-2)
-  const name = labels.length > 2 && second && second.length <= 3 ? labels.at(-3) : second ?? labels[0]
+  const name = labels.length > 2 && second && second.length <= 3 ? labels.at(-3) : (second ?? labels[0])
   if (!name || !/[a-z]/i.test(name)) return null
-  return name.split(/[-_]+/).filter(Boolean).map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
+  return name
+    .split(/[-_]+/)
+    .filter(Boolean)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(' ')
 }
 
 /** What a brand's start field holds (#203): its name, and its website when an address was typed. */
@@ -49,14 +56,19 @@ export function readBrandStart(text: string): BrandStart | null {
   const address = !/\s/.test(trimmed) && /^([a-z][a-z\d+.-]*:\/\/)?[^/?#\s]+\.[a-z]{2,}([/:?#]|$)/i.test(trimmed)
   const name = address ? nameFromWebsite(trimmed) : null
   if (!name) return { name: trimmed.slice(0, 120), website: null }
-  const website = scheme === undefined || scheme === 'http' || scheme === 'https' ? new URL(scheme ? trimmed : `https://${trimmed}`).href : null
+  const website =
+    scheme === undefined || scheme === 'http' || scheme === 'https'
+      ? new URL(scheme ? trimmed : `https://${trimmed}`).href
+      : null
   return { name, website }
 }
 
 /** The brand a start form sends: its `start` field, and the `name` typed over it with Change. */
 export function brandFromForm(form: FormData): BrandStart | null {
   const start = readBrandStart(String(form.get('start') ?? ''))
-  const typed = String(form.get('name') ?? '').trim().slice(0, 120)
+  const typed = String(form.get('name') ?? '')
+    .trim()
+    .slice(0, 120)
   if (!start) return null
   return { name: typed || start.name, website: start.website }
 }
@@ -67,4 +79,4 @@ export type BrandPage = 'designs' | 'templates' | 'kit'
 const FROM_PANEL: Record<string, BrandPage> = { recent: 'designs', templates: 'templates', kit: 'kit' }
 
 /** The page an old ?show= panel link means now, or null. */
-export const brandPage = (show: string | undefined): BrandPage | null => (show ? FROM_PANEL[show] ?? null : null)
+export const brandPage = (show: string | undefined): BrandPage | null => (show ? (FROM_PANEL[show] ?? null) : null)

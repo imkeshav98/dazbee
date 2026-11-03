@@ -3,11 +3,12 @@
 // colour opens in the new one, and one undo lets the layer go of the brand again. The flyout opens
 // as a picker: its colour tiles and font rows apply the kit, each one undo step that redo brings
 // back and there after a reload, and the page's Background panel shows the colours.
-import { expect, test, type Page } from '../support/test.ts'
 import type { DesignInput } from '@dazbee/schema'
+
 import { editorPath, reloads, writeOutput } from '../support/editor.ts'
 import { getKit, newBrand, putKit, seed } from '../support/seed.ts'
 import { backgroundPanel, openStage, read } from '../support/stage.ts'
+import { expect, type Page, test } from '../support/test.ts'
 
 test.describe.configure({ timeout: 120_000 })
 
@@ -18,21 +19,36 @@ const design = (bindings?: Record<string, string>): DesignInput => ({
   pages: { p1: { name: 'Page 1', order: 'a0', fills: [{ type: 'solid', color: '#FFFFFFFF' }] } },
   nodes: {
     box: {
-      type: 'graphic', parentId: 'p1', index: 'a0', name: 'Box', ...(bindings ? { bindings } : {}),
-      props: { x: 640, y: 140, width: 300, height: 300, shape: { kind: 'rect', cornerRadius: 24 }, fills: [{ type: 'solid', color: navy }] },
+      type: 'graphic',
+      parentId: 'p1',
+      index: 'a0',
+      name: 'Box',
+      ...(bindings ? { bindings } : {}),
+      props: {
+        x: 640,
+        y: 140,
+        width: 300,
+        height: 300,
+        shape: { kind: 'rect', cornerRadius: 24 },
+        fills: [{ type: 'solid', color: navy }],
+      },
     },
   },
   overrides: {},
 })
 
 /** The colour the export render draws in the middle of the box. */
-const boxColor = (page: Page) => page.evaluate(() => {
-  const pixels = window.dazbee?.exportPixels()
-  const at = (290 * 1080 + 790) * 4
-  return pixels ? [pixels[at], pixels[at + 1], pixels[at + 2]] : null
-})
+const boxColor = (page: Page) =>
+  page.evaluate(() => {
+    const pixels = window.dazbee?.exportPixels()
+    const at = (290 * 1080 + 790) * 4
+    return pixels ? [pixels[at], pixels[at + 1], pixels[at + 2]] : null
+  })
 const storedFill = async (page: Page) => {
-  const box = (await read(page)).nodes.box as unknown as { bindings?: Record<string, string>; props: { fills: { color: string }[] } }
+  const box = (await read(page)).nodes.box as unknown as {
+    bindings?: Record<string, string>
+    props: { fills: { color: string }[] }
+  }
   return { bindings: box.bindings, color: box.props.fills.at(-1)?.color }
 }
 
@@ -56,7 +72,9 @@ test('a layer bound to a brand colour changes when the brand colour does', async
   await row.getByRole('textbox', { name: 'Name of colour 1' }).press('Enter')
   await row.getByRole('textbox', { name: 'Hex value of Harbour red' }).fill('e0262b')
   await row.getByRole('textbox', { name: 'Hex value of Harbour red' }).press('Enter')
-  await expect.poll(async () => (await getKit(brandId)).colors).toEqual([{ token: 'colour-1', name: 'Harbour red', value: '#E0262BFF' }])
+  await expect
+    .poll(async () => (await getKit(brandId)).colors)
+    .toEqual([{ token: 'colour-1', name: 'Harbour red', value: '#E0262BFF' }])
   writeOutput('brand-kit-0-kit.png', await page.screenshot())
 
   // Apply it to the box: the box follows brand:colour-1 and stores its value too.
@@ -98,13 +116,31 @@ test('a layer bound to a brand colour changes when the brand colour does', async
   expect(errors).toEqual([])
 })
 
-test('the picker applies a colour tile and a font row, and the page Background panel shows the colours', async ({ browser }) => {
+test('the picker applies a colour tile and a font row, and the page Background panel shows the colours', async ({
+  browser,
+}) => {
   const brandId = await newBrand('e2e brand-kit')
-  await putKit(brandId, { colors: [{ token: 'sun', name: 'Sun', value: '#FF8A3DFF' }, { token: 'roast', name: 'Roast', value: '#2A140AFF' }], fonts: [{ token: 'body', name: 'Body', family: 'Noto Sans' }] })
+  await putKit(brandId, {
+    colors: [
+      { token: 'sun', name: 'Sun', value: '#FF8A3DFF' },
+      { token: 'roast', name: 'Roast', value: '#2A140AFF' },
+    ],
+    fonts: [{ token: 'body', name: 'Body', family: 'Noto Sans' }],
+  })
   const content = design()
   content.nodes.title = {
-    type: 'text', parentId: 'p1', index: 'a1', name: 'Title',
-    props: { x: 80, y: 80, width: 600, height: 120, text: 'Cold brew', style: { fontFamily: 'Noto Sans', fontSize: 96, fontWeight: 700, color: '#111111FF' } },
+    type: 'text',
+    parentId: 'p1',
+    index: 'a1',
+    name: 'Title',
+    props: {
+      x: 80,
+      y: 80,
+      width: 600,
+      height: 120,
+      text: 'Cold brew',
+      style: { fontFamily: 'Noto Sans', fontSize: 96, fontWeight: 700, color: '#111111FF' },
+    },
   } as DesignInput['nodes'][string]
   const { page, errors } = await openStage(browser, content, { brandId })
 
@@ -114,7 +150,11 @@ test('the picker applies a colour tile and a font row, and the page Background p
   await expect(brandRow.getByRole('button')).toHaveCount(3)
   await expect(brandRow.getByRole('button', { name: 'Roast' })).toBeVisible()
   await brandRow.getByRole('button', { name: 'Sun' }).click()
-  await expect.poll(async () => ((await read(page)) as unknown as { pages: Record<string, { fills: unknown[] }> }).pages.p1?.fills).toEqual([{ type: 'solid', color: '#FF8A3DFF' }])
+  await expect
+    .poll(
+      async () => ((await read(page)) as unknown as { pages: Record<string, { fills: unknown[] }> }).pages.p1?.fills,
+    )
+    .toEqual([{ type: 'solid', color: '#FF8A3DFF' }])
 
   await page.keyboard.press('Escape')
   await page.keyboard.press('Escape')
@@ -130,7 +170,10 @@ test('the picker applies a colour tile and a font row, and the page Background p
   // One undo lets the box go of the brand, and redo binds it again; the tile follows both.
   await page.evaluate(() => window.dazbee?.perform('undo'))
   await expect.poll(() => storedFill(page)).toEqual({ bindings: undefined, color: navy })
-  await expect(picker.getByRole('button', { name: 'Apply Sun to the selection' })).toHaveAttribute('aria-pressed', 'false')
+  await expect(picker.getByRole('button', { name: 'Apply Sun to the selection' })).toHaveAttribute(
+    'aria-pressed',
+    'false',
+  )
   await page.evaluate(() => window.dazbee?.perform('redo'))
   await expect.soft.poll(() => storedFill(page)).toEqual({ bindings: { fill: 'brand:sun' }, color: '#FF8A3DFF' })
   await expect.soft(picker.getByRole('button', { name: 'Stop following Sun' })).toHaveAttribute('aria-pressed', 'true')
@@ -138,7 +181,8 @@ test('the picker applies a colour tile and a font row, and the page Background p
   await expect(picker.getByRole('button', { name: 'Apply Body to the selection' })).toBeDisabled()
   await page.evaluate(() => window.dazbee?.select(['title']))
   await picker.getByRole('button', { name: 'Apply Body to the selection' }).click()
-  const titleBindings = async () => ((await read(page)).nodes.title as unknown as { bindings?: Record<string, string> }).bindings
+  const titleBindings = async () =>
+    ((await read(page)).nodes.title as unknown as { bindings?: Record<string, string> }).bindings
   await expect.poll(titleBindings).toMatchObject({ fontFamily: 'brand:body' })
   await page.evaluate(() => window.dazbee?.perform('undo'))
   await expect.poll(titleBindings).toBeUndefined()

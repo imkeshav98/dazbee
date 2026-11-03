@@ -1,7 +1,8 @@
 'use client'
 
-import type { Editor } from '@dazbee/editor'
 import { useEffect, useState } from 'react'
+
+import type { Editor } from '@dazbee/editor'
 
 /**
  * The editor's design and a count of its changes. The design is live, the same object as it

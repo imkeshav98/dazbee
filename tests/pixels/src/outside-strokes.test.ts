@@ -1,9 +1,11 @@
 // Outside strokes on shapes and booleans (#270) export to SVG and PDF as the CPU draws them: the
 // stroke lies outside the edge only, never on a band inside it.
 import { PDFiumLibrary } from '@hyzyla/pdfium'
+import { afterAll, describe, expect, it } from 'vitest'
+
 import { renderDesign, renderVector } from '@dazbee/renderer'
 import { loadCanvasKit } from '@dazbee/renderer/node'
-import { afterAll, describe, expect, it } from 'vitest'
+
 import { fixtureResources } from './pixels.ts'
 import { rasterisePdf, rasteriseSvg, vectorDifference } from './vector.ts'
 
@@ -13,22 +15,69 @@ const pdfium = await PDFiumLibrary.init()
 afterAll(() => pdfium.destroy())
 
 const solid = (color: string) => [{ type: 'solid', color }]
-const stroke = (align: 'inside' | 'center' | 'outside') => [{ paint: { type: 'solid', color: '#000000FF' }, width: 10, align }]
+const stroke = (align: 'inside' | 'center' | 'outside') => [
+  { paint: { type: 'solid', color: '#000000FF' }, width: 10, align },
+]
 /** A 300 square page holding a 200 rounded rect, or a boolean of two overlapping squares, stroked 10 wide. */
 const design = (align: 'inside' | 'center' | 'outside', kind: 'shape' | 'boolean') => ({
   meta: { schemaVersion: 5, designId: 'd', name: 'Outside strokes', kind: 'single', primaryFormatId: 'f' },
   formats: { f: { name: 'F', width: 300, height: 300, order: 'a0' } },
   pages: { p1: { name: 'Page', order: 'a0', fills: solid('#FFFFFFFF') } },
-  nodes: kind === 'shape'
-    ? { box: { type: 'graphic', parentId: 'p1', index: 'a0', name: 'Box', props: { x: 50, y: 50, width: 200, height: 200, shape: { kind: 'rect', cornerRadius: 24 }, fills: solid('#2050E0FF'), strokes: stroke(align) } } }
-    : {
-        both: { type: 'boolean', parentId: 'p1', index: 'a0', name: 'Both', props: { x: 50, y: 50, width: 200, height: 200, op: 'union', fills: solid('#E02020FF'), strokes: stroke(align) } },
-        a: { type: 'graphic', parentId: 'both', index: 'a0', name: 'A', props: { x: 50, y: 50, width: 140, height: 140, shape: { kind: 'rect' }, fills: solid('#000000FF') } },
-        b: { type: 'graphic', parentId: 'both', index: 'a1', name: 'B', props: { x: 110, y: 110, width: 140, height: 140, shape: { kind: 'ellipse' }, fills: solid('#000000FF') } },
-      },
+  nodes:
+    kind === 'shape'
+      ? {
+          box: {
+            type: 'graphic',
+            parentId: 'p1',
+            index: 'a0',
+            name: 'Box',
+            props: {
+              x: 50,
+              y: 50,
+              width: 200,
+              height: 200,
+              shape: { kind: 'rect', cornerRadius: 24 },
+              fills: solid('#2050E0FF'),
+              strokes: stroke(align),
+            },
+          },
+        }
+      : {
+          both: {
+            type: 'boolean',
+            parentId: 'p1',
+            index: 'a0',
+            name: 'Both',
+            props: {
+              x: 50,
+              y: 50,
+              width: 200,
+              height: 200,
+              op: 'union',
+              fills: solid('#E02020FF'),
+              strokes: stroke(align),
+            },
+          },
+          a: {
+            type: 'graphic',
+            parentId: 'both',
+            index: 'a0',
+            name: 'A',
+            props: { x: 50, y: 50, width: 140, height: 140, shape: { kind: 'rect' }, fills: solid('#000000FF') },
+          },
+          b: {
+            type: 'graphic',
+            parentId: 'both',
+            index: 'a1',
+            name: 'B',
+            props: { x: 110, y: 110, width: 140, height: 140, shape: { kind: 'ellipse' }, fills: solid('#000000FF') },
+          },
+        },
   overrides: {},
 })
-const at = (r: { pixels: Uint8Array; width: number }, x: number, y: number) => [...r.pixels.slice((y * r.width + x) * 4, (y * r.width + x) * 4 + 3)]
+const at = (r: { pixels: Uint8Array; width: number }, x: number, y: number) => [
+  ...r.pixels.slice((y * r.width + x) * 4, (y * r.width + x) * 4 + 3),
+]
 
 describe('outside strokes', () => {
   for (const kind of ['shape', 'boolean'] as const) {
@@ -52,7 +101,23 @@ describe('outside strokes', () => {
     const star = 'M100 0 L159 181 L4 69 L196 69 L41 181 Z'
     const json = {
       ...design('outside', 'shape'),
-      nodes: { star: { type: 'graphic', parentId: 'p1', index: 'a0', name: 'Star', props: { x: 50, y: 50, width: 200, height: 190, shape: { kind: 'path', d: star }, fills: [{ type: 'solid', color: '#2050E0FF' }], strokes: stroke('outside') } } },
+      nodes: {
+        star: {
+          type: 'graphic',
+          parentId: 'p1',
+          index: 'a0',
+          name: 'Star',
+          props: {
+            x: 50,
+            y: 50,
+            width: 200,
+            height: 190,
+            shape: { kind: 'path', d: star },
+            fills: [{ type: 'solid', color: '#2050E0FF' }],
+            strokes: stroke('outside'),
+          },
+        },
+      },
     }
     const cpu = renderDesign(ck, json, 'p1', 'f', bytes)
     // Just inside the star's middle, which winds twice, 5 px below a line crossing it: the fill shows.

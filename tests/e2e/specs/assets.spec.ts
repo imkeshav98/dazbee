@@ -2,13 +2,15 @@
 // one tagged, found again by that tag, and dragged onto the design, where it becomes a graphic with
 // the image as its fill at the drop point, in one undo step that redo brings back. A click places one
 // too, for those who can't drag, and it is there after a reload.
-import { crc32, deflateSync } from 'node:zlib'
 import { randomUUID } from 'node:crypto'
-import { expect, test, type Page } from '../support/test.ts'
+import { crc32, deflateSync } from 'node:zlib'
+
 import { AssetSummary, type DesignInput } from '@dazbee/schema'
+
 import { reloads, screenPoint, writeOutput } from '../support/editor.ts'
 import { API_URL, DEV_BRAND } from '../support/seed.ts'
 import { openStage, read } from '../support/stage.ts'
+import { expect, type Page, test } from '../support/test.ts'
 
 test.describe.configure({ timeout: 120_000 })
 
@@ -40,15 +42,30 @@ function photo(from: [number, number, number], to: [number, number, number]) {
       const t = (x + y) / (width + height)
       noise = (noise * 1664525 + 1013904223) >>> 0
       const grain = (noise >>> 28) - 8
-      for (let c = 0; c < 3; c++) rows[y * (1 + width * 3) + 1 + x * 3 + c] = Math.max(0, Math.min(255, Math.round((from[c] ?? 0) * (1 - t) + (to[c] ?? 0) * t) + grain))
+      for (let c = 0; c < 3; c++)
+        rows[y * (1 + width * 3) + 1 + x * 3 + c] = Math.max(
+          0,
+          Math.min(255, Math.round((from[c] ?? 0) * (1 - t) + (to[c] ?? 0) * t) + grain),
+        )
     }
   }
   const signature = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
-  return Buffer.concat([signature, chunk('IHDR', header), chunk('IDAT', deflateSync(rows)), chunk('IEND', Buffer.alloc(0))])
+  return Buffer.concat([
+    signature,
+    chunk('IHDR', header),
+    chunk('IDAT', deflateSync(rows)),
+    chunk('IEND', Buffer.alloc(0)),
+  ])
 }
 
 const design = (): DesignInput => ({
-  meta: { schemaVersion: 5, designId: 'replaced-by-the-api', name: 'Asset library', kind: 'single', primaryFormatId: 'sq' },
+  meta: {
+    schemaVersion: 5,
+    designId: 'replaced-by-the-api',
+    name: 'Asset library',
+    kind: 'single',
+    primaryFormatId: 'sq',
+  },
   formats: { sq: { name: 'Square', width: 1080, height: 1080, order: 'a0' } },
   pages: { p1: { name: 'Page 1', order: 'a0', fills: [{ type: 'solid', color: '#FFFFFFFF' }] } },
   nodes: {},
@@ -57,21 +74,35 @@ const design = (): DesignInput => ({
 
 /** The graphics on the page filled with an image, and the asset each shows. */
 async function images(page: Page) {
-  const nodes = (await read(page)).nodes as unknown as Record<string, { parentId: string; props: { x: number; y: number; width: number; height: number; fills?: { type: string; assetId?: string }[] } }>
-  return Object.entries(nodes).filter(([, n]) => n.props.fills?.[0]?.type === 'image').map(([id, n]) => ({ id, assetId: n.props.fills?.[0]?.assetId, ...n.props }))
+  const nodes = (await read(page)).nodes as unknown as Record<
+    string,
+    {
+      parentId: string
+      props: { x: number; y: number; width: number; height: number; fills?: { type: string; assetId?: string }[] }
+    }
+  >
+  return Object.entries(nodes)
+    .filter(([, n]) => n.props.fills?.[0]?.type === 'image')
+    .map(([id, n]) => ({ id, assetId: n.props.fills?.[0]?.assetId, ...n.props }))
 }
 
 /** The colour the square's PNG export draws at a design pixel; the export waits for every image's bytes. */
-const exportedAt = (page: Page, x: number, y: number) => page.evaluate(async ({ x, y }) => {
-  const file = await window.dazbee?.exportFiles({ pageIds: ['p1'], formatIds: ['sq'], type: 'png' })
-  const bitmap = await createImageBitmap(new Blob([new Uint8Array(file?.bytes ?? [])], { type: 'image/png' }))
-  const canvas = new OffscreenCanvas(bitmap.width, bitmap.height)
-  const context = canvas.getContext('2d')
-  context?.drawImage(bitmap, 0, 0)
-  return [...(context?.getImageData(x, y, 1, 1).data ?? [])]
-}, { x, y })
+const exportedAt = (page: Page, x: number, y: number) =>
+  page.evaluate(
+    async ({ x, y }) => {
+      const file = await window.dazbee?.exportFiles({ pageIds: ['p1'], formatIds: ['sq'], type: 'png' })
+      const bitmap = await createImageBitmap(new Blob([new Uint8Array(file?.bytes ?? [])], { type: 'image/png' }))
+      const canvas = new OffscreenCanvas(bitmap.width, bitmap.height)
+      const context = canvas.getContext('2d')
+      context?.drawImage(bitmap, 0, 0)
+      return [...(context?.getImageData(x, y, 1, 1).data ?? [])]
+    },
+    { x, y },
+  )
 
-test('uploads two images with progress, tags one, finds it by its tag and drags it onto the design', async ({ browser }) => {
+test('uploads two images with progress, tags one, finds it by its tag and drags it onto the design', async ({
+  browser,
+}) => {
   const { page, errors } = await openStage(browser, design())
   await page.locator('[data-panel="assets"]').click()
   const library = page.getByTestId('asset-library')
@@ -82,12 +113,19 @@ test('uploads two images with progress, tags one, finds it by its tag and drags 
     const seen: number[] = []
     ;(window as unknown as { progress: number[] }).progress = seen
     new MutationObserver(() => {
-      document.querySelectorAll('[data-testid="asset-uploads"] [role="progressbar"]').forEach((bar) => seen.push(Number(bar.getAttribute('aria-valuenow'))))
+      document
+        .querySelectorAll('[data-testid="asset-uploads"] [role="progressbar"]')
+        .forEach((bar) => seen.push(Number(bar.getAttribute('aria-valuenow'))))
     }).observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ['aria-valuenow'] })
   })
   // A slow uplink, so the bars have time to move.
   const cdp = await page.context().newCDPSession(page)
-  await cdp.send('Network.emulateNetworkConditions', { offline: false, latency: 20, downloadThroughput: -1, uploadThroughput: 400 * 1024 })
+  await cdp.send('Network.emulateNetworkConditions', {
+    offline: false,
+    latency: 20,
+    downloadThroughput: -1,
+    uploadThroughput: 400 * 1024,
+  })
 
   const beach = `Beach ${run}`
   const mountain = `Mountain ${run}`
@@ -101,17 +139,33 @@ test('uploads two images with progress, tags one, finds it by its tag and drags 
   await expect(item(beach)).toBeVisible({ timeout: 30_000 })
   await expect(item(mountain)).toBeVisible({ timeout: 30_000 })
   await expect(library.getByTestId('asset-uploads')).toHaveCount(0)
-  await cdp.send('Network.emulateNetworkConditions', { offline: false, latency: 0, downloadThroughput: -1, uploadThroughput: -1 })
+  await cdp.send('Network.emulateNetworkConditions', {
+    offline: false,
+    latency: 0,
+    downloadThroughput: -1,
+    uploadThroughput: -1,
+  })
   const progress = await page.evaluate(() => (window as unknown as { progress: number[] }).progress)
-  expect(progress.some((p) => p > 0 && p < 100), `the bars moved: ${progress.join(', ')}`).toBe(true)
+  expect(
+    progress.some((p) => p > 0 && p < 100),
+    `the bars moved: ${progress.join(', ')}`,
+  ).toBe(true)
 
   // Both thumbnails are the small copies the API made.
   for (const name of [beach, mountain]) {
-    await expect.poll(() => item(name).locator('img').evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth)).toBe(320)
+    await expect
+      .poll(() =>
+        item(name)
+          .locator('img')
+          .evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth),
+      )
+      .toBe(320)
   }
 
   // Tag the beach.
-  await item(beach).getByRole('button', { name: /Name and tags/ }).click()
+  await item(beach)
+    .getByRole('button', { name: /Name and tags/ })
+    .click()
   const details = page.getByTestId('asset-details')
   await details.getByRole('textbox', { name: 'Add a tag and press Enter' }).fill(`sunny-${run}`)
   await details.getByRole('textbox', { name: 'Add a tag and press Enter' }).press('Enter')
@@ -124,7 +178,9 @@ test('uploads two images with progress, tags one, finds it by its tag and drags 
   await library.getByRole('searchbox', { name: 'Search by name or tag' }).fill(`sunny-${run}`)
   await expect(library.locator('li[data-asset]')).toHaveCount(1)
   await expect(item(beach)).toBeVisible()
-  const listed = AssetSummary.array().parse(await (await fetch(`${API_URL}/brands/${DEV_BRAND}/assets?q=${encodeURIComponent(`sunny-${run}`)}`)).json())
+  const listed = AssetSummary.array().parse(
+    await (await fetch(`${API_URL}/brands/${DEV_BRAND}/assets?q=${encodeURIComponent(`sunny-${run}`)}`)).json(),
+  )
   expect(listed.map((a) => [a.name, a.tags])).toEqual([[beach, [`sunny-${run}`]]])
   const beachId = listed[0]?.id
   writeOutput('assets-2-found-by-tag.png', await page.screenshot())
@@ -135,7 +191,9 @@ test('uploads two images with progress, tags one, finds it by its tag and drags 
   const drop = await screenPoint(page, 760, 360)
   const flyout = await page.getByTestId('flyout').boundingBox()
   expect(box && flyout && drop.x > flyout.x + flyout.width, 'the drop point is clear of the flyout').toBe(true)
-  await item(beach).getByRole('button', { name: `Place ${beach} on the design` }).dragTo(stage, { targetPosition: { x: drop.x - (box?.x ?? 0), y: drop.y - (box?.y ?? 0) } })
+  await item(beach)
+    .getByRole('button', { name: `Place ${beach} on the design` })
+    .dragTo(stage, { targetPosition: { x: drop.x - (box?.x ?? 0), y: drop.y - (box?.y ?? 0) } })
   await expect.poll(async () => (await images(page)).length).toBe(1)
   const [placed] = await images(page)
   // Half the square wide at most, the photo's shape kept, centred where it was dropped.
@@ -145,13 +203,19 @@ test('uploads two images with progress, tags one, finds it by its tag and drags 
   // The export waits for the bytes, so it draws the photo, not the white page.
   const middle = await exportedAt(page, 760, 360)
   expect(middle.slice(0, 3)).not.toEqual([255, 255, 255])
-  await expect.poll(async () => page.evaluate(() => {
-    try {
-      return window.dazbee?.exportPixels().length ?? 0
-    } catch {
-      return 0
-    }
-  }), { timeout: 15_000 }).toBeGreaterThan(0)
+  await expect
+    .poll(
+      async () =>
+        page.evaluate(() => {
+          try {
+            return window.dazbee?.exportPixels().length ?? 0
+          } catch {
+            return 0
+          }
+        }),
+      { timeout: 15_000 },
+    )
+    .toBeGreaterThan(0)
   await page.evaluate(() => window.dazbee?.drawn())
   writeOutput('assets-3-dropped.png', await page.screenshot())
 
@@ -166,7 +230,9 @@ test('uploads two images with progress, tags one, finds it by its tag and drags 
   // Without a drag: a click places the mountain in the middle of the square.
   await library.getByRole('searchbox', { name: 'Search by name or tag' }).fill(mountain)
   await expect(library.locator('li[data-asset]')).toHaveCount(1)
-  await item(mountain).getByRole('button', { name: `Place ${mountain} on the design` }).click()
+  await item(mountain)
+    .getByRole('button', { name: `Place ${mountain} on the design` })
+    .click()
   await expect.poll(async () => (await images(page)).length).toBe(1)
   const [clicked] = await images(page)
   expect(clicked).toMatchObject({ width: 540, height: 360, x: 270, y: 360 })

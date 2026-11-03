@@ -1,7 +1,9 @@
-import { renderDesign, resourceCache, type ResourceBytes } from '@dazbee/renderer'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+
+import { renderDesign, type ResourceBytes, resourceCache } from '@dazbee/renderer'
 import { loadCanvasKit } from '@dazbee/renderer/node'
 import { parseDesign } from '@dazbee/schema'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+
 import { loadFixtures } from './fixtures.ts'
 import { comparePixels, fixtureResources } from './pixels.ts'
 
@@ -12,7 +14,8 @@ const cases = loadFixtures().flatMap(({ name, json }) => {
   const parsed = parseDesign(json)
   if (!parsed.success) throw new Error(parsed.errors.join('\n'))
   return Object.keys(parsed.design.pages).flatMap((pageId) =>
-    Object.keys(parsed.design.formats).map((formatId) => ({ name, json, pageId, formatId })))
+    Object.keys(parsed.design.formats).map((formatId) => ({ name, json, pageId, formatId })),
+  )
 })
 
 /** Counts what CanvasKit decodes and registers while `run` runs. */
@@ -30,18 +33,27 @@ describe('resource cache', () => {
   const cache = resourceCache(ck)
   afterEach(() => vi.restoreAllMocks())
 
-  it.each(cases)('$name $pageId in $formatId renders the same pixels with and without the cache', ({ json, pageId, formatId }) => {
-    const fresh = renderDesign(ck, json, pageId, formatId, bytes)
-    const cached = renderDesign(ck, json, pageId, formatId, bytes, cache)
-    expect(comparePixels(fresh, cached).differing).toBe(0)
-  })
+  it.each(cases)(
+    '$name $pageId in $formatId renders the same pixels with and without the cache',
+    ({ json, pageId, formatId }) => {
+      const fresh = renderDesign(ck, json, pageId, formatId, bytes)
+      const cached = renderDesign(ck, json, pageId, formatId, bytes, cache)
+      expect(comparePixels(fresh, cached).differing).toBe(0)
+    },
+  )
 
   it('decodes nothing for a second render of the same resources', () => {
     const [c] = cases
     if (!c) throw new Error('no cases')
     const own = resourceCache(ck)
-    expect(decodes(() => renderDesign(ck, c.json, c.pageId, c.formatId, bytes, own))).toEqual({ images: Object.keys(bytes.images).length, fontSets: 1 })
-    expect(decodes(() => renderDesign(ck, c.json, c.pageId, c.formatId, bytes, own))).toEqual({ images: 0, fontSets: 0 })
+    expect(decodes(() => renderDesign(ck, c.json, c.pageId, c.formatId, bytes, own))).toEqual({
+      images: Object.keys(bytes.images).length,
+      fontSets: 1,
+    })
+    expect(decodes(() => renderDesign(ck, c.json, c.pageId, c.formatId, bytes, own))).toEqual({
+      images: 0,
+      fontSets: 0,
+    })
     own.delete()
   })
 
@@ -50,9 +62,15 @@ describe('resource cache', () => {
     own.resources(bytes)
     const [first, ...rest] = Object.keys(bytes.images)
     if (!first) throw new Error('no images')
-    const changed: ResourceBytes = { ...bytes, images: { ...bytes.images, [first]: new Uint8Array(bytes.images[first] as Uint8Array) } }
+    const changed: ResourceBytes = {
+      ...bytes,
+      images: { ...bytes.images, [first]: new Uint8Array(bytes.images[first] as Uint8Array) },
+    }
     expect(decodes(() => own.resources(changed))).toEqual({ images: 1, fontSets: 0 })
-    const fewer: ResourceBytes = { ...bytes, images: Object.fromEntries(rest.map((id) => [id, bytes.images[id] as Uint8Array])) }
+    const fewer: ResourceBytes = {
+      ...bytes,
+      images: Object.fromEntries(rest.map((id) => [id, bytes.images[id] as Uint8Array])),
+    }
     const resources = own.resources(fewer)
     expect([...resources.images.keys()].sort()).toEqual([...rest].sort())
     own.delete()

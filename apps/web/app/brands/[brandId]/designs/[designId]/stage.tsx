@@ -1,35 +1,40 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
-import { SHAPE_TOOLS, startEditor, type Editor, type ShapeTool, type Tool } from '@dazbee/editor'
-import { fetchSyncToken, renameFromEditor } from './actions.ts'
-import { EditorShell, type ChromeInsets } from '../../../../../components/editor/shell.tsx'
-import { FocusChip, NoticeToast, UndoToast } from '../../../../../components/editor/formats-panel.tsx'
-import { useLocale, useMessages } from '../../../../../lib/i18n/client.tsx'
-import { format } from '../../../../../lib/i18n/index.ts'
-import { placeAsset } from '../../../../../lib/place-asset.ts'
-import { carriesFiles, dragFills, dropAt, isAssetFile, placeDroppedFiles } from '../../../../../lib/drop-files.ts'
-import { BackgroundPanel, PagesButton, PagesPanel } from '../../../../../components/editor/pages-panel.tsx'
-import { ZoomControl } from '../../../../../components/editor/zoom-control.tsx'
-import { StageMenu } from '../../../../../components/editor/layer-actions.tsx'
-import { TopBar } from '../../../../../components/editor/top-bar.tsx'
-import { SmallMenu } from '../../../../../components/editor/small-menu.tsx'
-import { EditPanel } from '../../../../../components/editor/edit-panel.tsx'
-import { HistoryButtons } from '../../../../../components/editor/history-buttons.tsx'
-import { SizesButton, SizesPanel } from '../../../../../components/editor/sizes-panel.tsx'
-import { useEditState } from '../../../../../components/editor/edit-store.ts'
-import { ASSET_DRAG_TYPE, AssetLibrary, draggedAsset, VECTOR_DRAG_TYPE } from '../../../../../components/editor/asset-library.tsx'
-import { BrandKitPanel } from '../../../../../components/editor/brand-kit-panel.tsx'
-import { ShareMenu } from '../../../../../components/editor/share-menu.tsx'
-import { LayersPanel } from '../../../../../components/editor/layers-panel.tsx'
+import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react'
+
+import { type Editor, SHAPE_TOOLS, type ShapeTool, startEditor, type Tool } from '@dazbee/editor'
 import { BrandKit, brandVariables, FontFamily, isVectorAsset, type Variables } from '@dazbee/schema'
-import { useValue, valueStore, type ValueStore } from '../../../../../lib/value-store.ts'
+
+import { ASSET_DRAG_TYPE, AssetLibrary, draggedAsset, VECTOR_DRAG_TYPE } from '@/components/editor/asset-library.tsx'
+import { BrandKitPanel } from '@/components/editor/brand-kit-panel.tsx'
+import { EditPanel } from '@/components/editor/edit-panel.tsx'
+import { useEditState } from '@/components/editor/edit-store.ts'
+import { FocusChip, NoticeToast, UndoToast } from '@/components/editor/formats-panel.tsx'
+import { HistoryButtons } from '@/components/editor/history-buttons.tsx'
+import { StageMenu } from '@/components/editor/layer-actions.tsx'
+import { LayersPanel } from '@/components/editor/layers-panel.tsx'
+import { BackgroundPanel, PagesButton, PagesPanel } from '@/components/editor/pages-panel.tsx'
+import { ShareMenu } from '@/components/editor/share-menu.tsx'
+import { type ChromeInsets, EditorShell } from '@/components/editor/shell.tsx'
+import { SizesButton, SizesPanel } from '@/components/editor/sizes-panel.tsx'
+import { SmallMenu } from '@/components/editor/small-menu.tsx'
+import { TopBar } from '@/components/editor/top-bar.tsx'
+import { ZoomControl } from '@/components/editor/zoom-control.tsx'
+import { carriesFiles, dragFills, dropAt, isAssetFile, placeDroppedFiles } from '@/lib/drop-files.ts'
+import { useLocale, useMessages } from '@/lib/i18n/client.tsx'
+import { format } from '@/lib/i18n/index.ts'
+import { placeAsset } from '@/lib/place-asset.ts'
+import { useValue, type ValueStore, valueStore } from '@/lib/value-store.ts'
+
+import { fetchSyncToken, renameFromEditor } from './actions.ts'
 
 /** The editor's tools that the dock shows as the one shape button. */
 const isShapeTool = (tool: Tool): tool is ShapeTool => (SHAPE_TOOLS as readonly string[]).includes(tool)
 
 declare global {
-  interface Window { dazbee?: Editor }
+  interface Window {
+    dazbee?: Editor
+  }
 }
 
 async function assetBytes(brandId: string, assetId: string) {
@@ -57,11 +62,13 @@ function fontLoader(brandId: string) {
     })
     if (families.some((family) => !known.some((f) => f.family === family))) known = await (catalog = fetchCatalog())
     const faces = known.filter((f) => families.includes(f.family)).flatMap((f) => f.faces)
-    return Promise.all(faces.map(async (face) => {
-      const response = await fetch(`${brand}/${encodeURIComponent(face.id)}`)
-      if (!response.ok) throw new Error(`font ${face.family} ${face.weight}: ${response.status}`)
-      return { family: face.family, bytes: new Uint8Array(await response.arrayBuffer()) }
-    }))
+    return Promise.all(
+      faces.map(async (face) => {
+        const response = await fetch(`${brand}/${encodeURIComponent(face.id)}`)
+        if (!response.ok) throw new Error(`font ${face.family} ${face.weight}: ${response.status}`)
+        return { family: face.family, bytes: new Uint8Array(await response.arrayBuffer()) }
+      }),
+    )
   }
 }
 
@@ -94,7 +101,16 @@ function StageZoom({ editor, store }: { editor: Editor | null; store: ValueStore
   )
 }
 
-export function EditorStage({ designId, designName, brandId, brandName, everyBrand, formatId, syncUrl, account }: {
+export function EditorStage({
+  designId,
+  designName,
+  brandId,
+  brandName,
+  everyBrand,
+  formatId,
+  syncUrl,
+  account,
+}: {
   designId: string
   designName: string
   brandId: string
@@ -172,11 +188,17 @@ export function EditorStage({ designId, designName, brandId, brandName, everyBra
       if (leftOut) setNotice({ text: leftOut, at })
       return
     }
-    const uploading = take.length === 1 ? format(dropped.uploading, { name: take[0].name }) : format(dropped.uploadingMany, { n: take.length })
+    const uploading =
+      take.length === 1
+        ? format(dropped.uploading, { name: take[0].name })
+        : format(dropped.uploadingMany, { n: take.length })
     setNotice({ text: [leftOut, uploading].filter(Boolean).join(' '), at, lasting: true })
     void placeDroppedFiles(editor, brandId, take, dropAt(editor, client, files)).then(({ failed, unplaced }) => {
       setUploaded((n) => n + 1)
-      const didntUpload = failed.length > 0 ? format(dropped.failed, { files: list(failed.map((file) => format(dropped.failedFile, file))) }) : ''
+      const didntUpload =
+        failed.length > 0
+          ? format(dropped.failed, { files: list(failed.map((file) => format(dropped.failedFile, file))) })
+          : ''
       const text = [leftOut, didntUpload, unplaced > 0 ? dropped.offPage : ''].filter(Boolean).join(' ')
       setNotice((now) => (text ? { text, at } : now?.at === at ? null : now))
     })
@@ -208,9 +230,12 @@ export function EditorStage({ designId, designName, brandId, brandName, everyBra
       void navigator.serviceWorker.getRegistrations().then((all) => Promise.all(all.map((r) => r.unregister())))
       return
     }
-    navigator.serviceWorker.register('/sw.js').then(keepForOffline).catch(() => {
-      // Without the worker the editor still works online; only reopening offline is lost.
-    })
+    navigator.serviceWorker
+      .register('/sw.js')
+      .then(keepForOffline)
+      .catch(() => {
+        // Without the worker the editor still works online; only reopening offline is lost.
+      })
   }, [])
 
   useEffect(() => {
@@ -219,11 +244,22 @@ export function EditorStage({ designId, designName, brandId, brandName, everyBra
     const unmounted = new AbortController()
     const [stage, layer] = [canvas.current, overlay.current]
     brandKitVariables(brandId)
-      .then((variables) => startEditor({
-        canvas: stage, overlay: layer, designId, syncUrl,
-        syncToken: () => fetchSyncToken(brandId, designId), assetBytes: (assetId) => assetBytes(brandId, assetId), fontFiles: fontLoader(brandId),
-        ...(variables ? { variables } : {}), ...(formatId ? { formatId } : {}), onStatus: status.set, onZoom: zoom.set, signal: unmounted.signal,
-      }))
+      .then((variables) =>
+        startEditor({
+          canvas: stage,
+          overlay: layer,
+          designId,
+          syncUrl,
+          syncToken: () => fetchSyncToken(brandId, designId),
+          assetBytes: (assetId) => assetBytes(brandId, assetId),
+          fontFiles: fontLoader(brandId),
+          ...(variables ? { variables } : {}),
+          ...(formatId ? { formatId } : {}),
+          onStatus: status.set,
+          onZoom: zoom.set,
+          signal: unmounted.signal,
+        }),
+      )
       .then((started) => {
         if (unmounted.signal.aborted) return started.destroy()
         editor = started
@@ -278,9 +314,27 @@ export function EditorStage({ designId, designName, brandId, brandName, everyBra
       }}
       onInsets={onInsets}
       fitted={editor !== null && fittedTo === editor}
-      actions={editor ? <ShareMenu editor={editor} brandId={brandId} brandName={brandName} designName={name} everyBrand={everyBrand} /> : undefined}
+      actions={
+        editor ? (
+          <ShareMenu
+            editor={editor}
+            brandId={brandId}
+            brandName={brandName}
+            designName={name}
+            everyBrand={everyBrand}
+          />
+        ) : undefined
+      }
       account={account}
-      panels={editor ? { layers: <LayersPanel editor={editor} />, assets: <AssetLibrary editor={editor} brandId={brandId} changed={uploaded} />, brand: <BrandKitPanel editor={editor} brandId={brandId} /> } : {}}
+      panels={
+        editor
+          ? {
+              layers: <LayersPanel editor={editor} />,
+              assets: <AssetLibrary editor={editor} brandId={brandId} changed={uploaded} />,
+              brand: <BrandKitPanel editor={editor} brandId={brandId} />,
+            }
+          : {}
+      }
     >
       {/* The design is a picture, so it never mirrors: the stage stays left to right in Arabic too. */}
       {/* An asset dragged from the library lands where it is dropped (#52): into the shape it is
@@ -294,7 +348,9 @@ export function EditorStage({ designId, designName, brandId, brandName, everyBra
           e.preventDefault()
           const ids = editor.selectAt({ x: e.clientX, y: e.clientY })
           const box = e.currentTarget.getBoundingClientRect()
-          setMenuAt((now) => (ids.length > 0 ? { x: e.clientX - box.left, y: e.clientY - box.top, n: (now?.n ?? 0) + 1 } : null))
+          setMenuAt((now) =>
+            ids.length > 0 ? { x: e.clientX - box.left, y: e.clientY - box.top, n: (now?.n ?? 0) + 1 } : null,
+          )
         }}
         onDragOver={(e) => {
           if (!editor) return
@@ -340,12 +396,22 @@ export function EditorStage({ designId, designName, brandId, brandName, everyBra
       {editor && <SizesPanel editor={editor} onRemoved={setRemoved} />}
       {editor && <PagesPanel editor={editor} onRemoved={setRemoved} />}
       {editor && <BackgroundPanel editor={editor} brandId={brandId} />}
-      <div data-slot="mini-bar" style={{ top: bar ? barBottom + 8 : 16 }} className="pointer-events-none absolute inset-x-0 z-10 flex justify-center">
+      <div
+        data-slot="mini-bar"
+        style={{ top: bar ? barBottom + 8 : 16 }}
+        className="pointer-events-none absolute inset-x-0 z-10 flex justify-center"
+      >
         {editor && <FocusChip editor={editor} />}
       </div>
-      <div data-toasts style={sheetTop === null ? undefined : { bottom: `calc(100% - ${sheetTop}px + 8px)` }} className="pointer-events-none absolute start-4 bottom-4 z-30">
+      <div
+        data-toasts
+        style={sheetTop === null ? undefined : { bottom: `calc(100% - ${sheetTop}px + 8px)` }}
+        className="pointer-events-none absolute start-4 bottom-4 z-30"
+      >
         {editor && removed && <UndoToast key={removed} editor={editor} message={removed} onDone={dismissRemoved} />}
-        {!removed && notice && <NoticeToast key={notice.at} message={notice.text} onDone={dismissNotice} lasting={notice.lasting ?? false} />}
+        {!removed && notice && (
+          <NoticeToast key={notice.at} message={notice.text} onDone={dismissNotice} lasting={notice.lasting ?? false} />
+        )}
       </div>
       <StageZoom editor={editor} store={zoom} />
     </EditorShell>

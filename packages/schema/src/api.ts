@@ -1,9 +1,10 @@
 // The API's requests and responses. The API parses every body with these, and the web app reads
 // every response with them, so the two can't drift apart.
 import { z } from 'zod'
+
 import { DesignMeta } from './design.ts'
 import { Color } from './primitives.ts'
-import { BrandToken, brandRef, type Variables } from './variables.ts'
+import { brandRef, BrandToken, type Variables } from './variables.ts'
 
 /** Server-made ids of workspaces, brands and designs. Design ids double as Yjs document names. */
 export const RecordId = z.string().regex(/^[\w-]{1,64}$/, 'ids are 1–64 letters, digits, _ and -')
@@ -20,10 +21,12 @@ export const WorkspaceSummary = z.object({
 export type WorkspaceSummary = z.infer<typeof WorkspaceSummary>
 
 /** Who the workspace is for, its name, or both. */
-export const UpdateWorkspace = z.object({
-  kind: WorkspaceKind.optional(),
-  name: z.string().trim().min(1).max(120).optional(),
-}).refine((input) => input.kind !== undefined || input.name !== undefined, 'give a kind, a name or both')
+export const UpdateWorkspace = z
+  .object({
+    kind: WorkspaceKind.optional(),
+    name: z.string().trim().min(1).max(120).optional(),
+  })
+  .refine((input) => input.kind !== undefined || input.name !== undefined, 'give a kind, a name or both')
 export type UpdateWorkspace = z.infer<typeof UpdateWorkspace>
 
 export const BrandSummary = z.object({
@@ -35,7 +38,10 @@ export type BrandSummary = z.infer<typeof BrandSummary>
 export const CreateBrand = z.object({
   name: z.string().trim().min(1).max(120),
   /** The brand's website, kept for reading its kit from it later. */
-  website: z.url({ protocol: /^https?$/ }).max(2048).optional(),
+  website: z
+    .url({ protocol: /^https?$/ })
+    .max(2048)
+    .optional(),
 })
 export type CreateBrand = z.infer<typeof CreateBrand>
 
@@ -116,19 +122,27 @@ export const AssetInUse = ApiError.extend({ usedIn: AssetUse.array().min(1) })
 export type AssetInUse = z.infer<typeof AssetInUse>
 
 /** Asks to upload an original; the API answers with the asset when it already has those bytes. */
-export const StartUpload = z.object({
-  sha256: Sha256,
-  byteSize: z.number().int().positive().max(MAX_UPLOAD_BYTES),
-  contentType: ImageType,
-  /** The asset's name, used when the API records it straight away. */
-  name: z.string().trim().min(1).max(120).optional(),
-}).refine((u) => u.contentType !== 'image/svg+xml' || u.byteSize <= MAX_SVG_BYTES, { message: `An SVG file is at most ${MAX_SVG_BYTES / 1_000_000} MB`, path: ['byteSize'] })
+export const StartUpload = z
+  .object({
+    sha256: Sha256,
+    byteSize: z.number().int().positive().max(MAX_UPLOAD_BYTES),
+    contentType: ImageType,
+    /** The asset's name, used when the API records it straight away. */
+    name: z.string().trim().min(1).max(120).optional(),
+  })
+  .refine((u) => u.contentType !== 'image/svg+xml' || u.byteSize <= MAX_SVG_BYTES, {
+    message: `An SVG file is at most ${MAX_SVG_BYTES / 1_000_000} MB`,
+    path: ['byteSize'],
+  })
 export type StartUpload = z.infer<typeof StartUpload>
 
 export const UploadTicket = z.union([
   z.object({ asset: AssetSummary, upload: z.null() }),
   /** PUT the bytes to url with these headers, then record the asset with its sha256. */
-  z.object({ asset: z.null(), upload: z.object({ url: z.url(), headers: z.record(z.string(), z.string()), expiresAt: z.iso.datetime() }) }),
+  z.object({
+    asset: z.null(),
+    upload: z.object({ url: z.url(), headers: z.record(z.string(), z.string()), expiresAt: z.iso.datetime() }),
+  }),
 ])
 export type UploadTicket = z.infer<typeof UploadTicket>
 
@@ -143,10 +157,16 @@ export const RecordAsset = z.object({ sha256: Sha256, name: AssetName.optional()
 export type RecordAsset = z.infer<typeof RecordAsset>
 
 /** Renames an asset or sets its tags (#52); tags are kept once each, in the order given. */
-export const UpdateAsset = z.object({
-  name: AssetName.optional(),
-  tags: z.array(AssetTag).max(MAX_ASSET_TAGS).transform((tags) => [...new Set(tags)]).optional(),
-}).refine((u) => u.name !== undefined || u.tags !== undefined, 'send a name, tags or both')
+export const UpdateAsset = z
+  .object({
+    name: AssetName.optional(),
+    tags: z
+      .array(AssetTag)
+      .max(MAX_ASSET_TAGS)
+      .transform((tags) => [...new Set(tags)])
+      .optional(),
+  })
+  .refine((u) => u.name !== undefined || u.tags !== undefined, 'send a name, tags or both')
 export type UpdateAsset = z.infer<typeof UpdateAsset>
 
 /** A short-lived URL to read something from storage. */
@@ -212,7 +232,10 @@ export type StartFontUpload = z.infer<typeof StartFontUpload>
 export const FontUploadTicket = z.union([
   z.object({ face: FontFace, upload: z.null() }),
   /** PUT the bytes to url with these headers, then record the font with its sha256. */
-  z.object({ face: z.null(), upload: z.object({ url: z.url(), headers: z.record(z.string(), z.string()), expiresAt: z.iso.datetime() }) }),
+  z.object({
+    face: z.null(),
+    upload: z.object({ url: z.url(), headers: z.record(z.string(), z.string()), expiresAt: z.iso.datetime() }),
+  }),
 ])
 export type FontUploadTicket = z.infer<typeof FontUploadTicket>
 
@@ -232,33 +255,40 @@ export type FontLink = z.infer<typeof FontLink>
 export const BrandColor = z.object({ token: BrandToken, name: z.string().trim().min(1).max(60), value: Color })
 export type BrandColor = z.infer<typeof BrandColor>
 /** A font in a brand kit (#53), such as the heading or body family. */
-export const BrandFont = z.object({ token: BrandToken, name: z.string().trim().min(1).max(60), family: z.string().trim().min(1).max(100) })
+export const BrandFont = z.object({
+  token: BrandToken,
+  name: z.string().trim().min(1).max(60),
+  family: z.string().trim().min(1).max(100),
+})
 export type BrandFont = z.infer<typeof BrandFont>
 
 /**
  * A brand's kit (#53): its colours and fonts, which designs bind to as `brand:<token>`, its logo (an
  * asset of the brand) and its tone of voice. A token names one colour or font in the kit.
  */
-export const BrandKit = z.object({
-  colors: BrandColor.array().max(24),
-  fonts: BrandFont.array().max(8),
-  logoAssetId: RecordId.nullable(),
-  voice: z.string().max(2000),
-}).superRefine((kit, ctx) => {
-  const seen = new Set<string>()
-  for (const { token } of [...kit.colors, ...kit.fonts]) {
-    if (seen.has(token)) ctx.addIssue({ code: 'custom', message: `the token "${token}" names two things` })
-    seen.add(token)
-  }
-})
+export const BrandKit = z
+  .object({
+    colors: BrandColor.array().max(24),
+    fonts: BrandFont.array().max(8),
+    logoAssetId: RecordId.nullable(),
+    voice: z.string().max(2000),
+  })
+  .superRefine((kit, ctx) => {
+    const seen = new Set<string>()
+    for (const { token } of [...kit.colors, ...kit.fonts]) {
+      if (seen.has(token)) ctx.addIssue({ code: 'custom', message: `the token "${token}" names two things` })
+      seen.add(token)
+    }
+  })
 export type BrandKit = z.infer<typeof BrandKit>
 export const EMPTY_BRAND_KIT: BrandKit = { colors: [], fonts: [], logoAssetId: null, voice: '' }
 
 /** The values a kit gives its tokens, for drawing designs bound to them. */
-export const brandVariables = (kit: BrandKit): Variables => Object.fromEntries([
-  ...kit.colors.map((c) => [brandRef(c.token), c.value]),
-  ...kit.fonts.map((f) => [brandRef(f.token), f.family]),
-])
+export const brandVariables = (kit: BrandKit): Variables =>
+  Object.fromEntries([
+    ...kit.colors.map((c) => [brandRef(c.token), c.value]),
+    ...kit.fonts.map((f) => [brandRef(f.token), f.family]),
+  ])
 
 /**
  * Who can start from a template (#54): every brand of the workspace (an agency's own templates), or

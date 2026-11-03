@@ -5,14 +5,20 @@
 import { GearSixIcon, SignOutIcon } from '@phosphor-icons/react'
 import Link from 'next/link'
 import { useEffect, useId, useRef, useState } from 'react'
-import { useMessages } from '../lib/i18n/client.tsx'
-import { initialsOf } from '../lib/initials.ts'
+
+import { useMessages } from '@/lib/i18n/client.tsx'
+import { initialsOf } from '@/lib/initials.ts'
+
 import { LocaleSwitch } from './locale-switch.tsx'
 import { ThemeSwitch } from './theme-switch.tsx'
 
-const ROW = 'flex h-10 w-full cursor-pointer items-center gap-3 rounded-row px-3 text-start text-[13px] font-medium transition-colors duration-[var(--chrome-fast)] hover:bg-hover focus-visible:bg-hover focus-visible:outline-none'
+const ROW =
+  'flex h-10 w-full cursor-pointer items-center gap-3 rounded-row px-3 text-start text-[13px] font-medium transition-colors duration-[var(--chrome-fast)] hover:bg-hover focus-visible:bg-hover focus-visible:outline-none'
 
-export function AccountMenu({ name, signedIn }: {
+export function AccountMenu({
+  name,
+  signedIn,
+}: {
   /** The workspace's name, shown as the avatar's initials and at the menu's top. */
   name: string
   /** Whether there is a session to end, so Sign out shows (#58). */
@@ -49,10 +55,21 @@ export function AccountMenu({ name, signedIn }: {
         <span aria-hidden>{initialsOf(name)}</span>
       </button>
       {open && (
-        <div id={id} role="dialog" aria-label={t.account.open} data-testid="account" className="pop-in-end absolute end-0 top-full z-40 mt-2 flex w-72 flex-col gap-1 rounded-card surface-frost p-1.5">
+        <div
+          id={id}
+          role="dialog"
+          aria-label={t.account.open}
+          data-testid="account"
+          className="pop-in-end absolute end-0 top-full z-40 mt-2 flex w-72 flex-col gap-1 rounded-card surface-frost p-1.5"
+        >
           {/* As in the final mock: the avatar beside the workspace's name. */}
           <div className="flex items-center gap-3 px-3 pt-2 pb-1.5">
-            <span aria-hidden className="grid size-9 shrink-0 place-items-center rounded-full bg-[image:var(--ai-gradient)] text-[13px] font-bold text-white">{initialsOf(name)}</span>
+            <span
+              aria-hidden
+              className="grid size-9 shrink-0 place-items-center rounded-full bg-[image:var(--ai-gradient)] text-[13px] font-bold text-white"
+            >
+              {initialsOf(name)}
+            </span>
             <p className="flex min-w-0 flex-col">
               <span className="truncate font-display text-sm font-semibold">{name}</span>
               <span className="truncate text-[11px] text-muted">{t.account.workspace}</span>

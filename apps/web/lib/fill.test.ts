@@ -1,6 +1,7 @@
 // Where a number field's fill sits: from the start of its range up to the value, or from 0 either
 // way when the range runs either side of 0.
 import { describe, expect, it } from 'vitest'
+
 import { fillOf } from './fill.ts'
 
 describe('a number field’s fill', () => {

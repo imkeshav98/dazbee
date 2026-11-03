@@ -1,19 +1,31 @@
 // Schema version 4: frames have rounded corners, one radius or each corner's own in one value, and
 // a version 3 design comes up as it is.
 import { describe, expect, it } from 'vitest'
+
 import { migrateDesign, parseDesign, SCHEMA_VERSION } from './index.ts'
 
 const designWith = (frame: Record<string, unknown>, version = SCHEMA_VERSION) => ({
   meta: { schemaVersion: version, designId: 'd1', name: 'D', kind: 'single', primaryFormatId: 'sq' },
   formats: { sq: { name: 'Square', width: 1080, height: 1080, order: 'a0' } },
   pages: { p1: { name: 'Page 1', order: 'a0' } },
-  nodes: { f: { type: 'frame', parentId: 'p1', index: 'a0', name: 'Box', props: { x: 0, y: 0, width: 300, height: 200, ...frame } } },
+  nodes: {
+    f: {
+      type: 'frame',
+      parentId: 'p1',
+      index: 'a0',
+      name: 'Box',
+      props: { x: 0, y: 0, width: 300, height: 200, ...frame },
+    },
+  },
   overrides: {},
 })
 
 describe('frame corners', () => {
-  it('keeps a frame\'s radius and each corner\'s own, in format overrides too', () => {
-    const result = parseDesign({ ...designWith({ cornerRadius: [0, 12, 40, 8] }), overrides: { 'format:sq': { f: { cornerRadius: 6 } } } })
+  it("keeps a frame's radius and each corner's own, in format overrides too", () => {
+    const result = parseDesign({
+      ...designWith({ cornerRadius: [0, 12, 40, 8] }),
+      overrides: { 'format:sq': { f: { cornerRadius: 6 } } },
+    })
     if (!result.success) throw new Error(result.errors.join('\n'))
     expect(result.design.nodes.f?.props).toMatchObject({ cornerRadius: [0, 12, 40, 8] })
     expect(result.design.overrides['format:sq']?.f?.cornerRadius).toBe(6)

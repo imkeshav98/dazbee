@@ -1,5 +1,5 @@
 // What of the brand shows an image, so the asset library can say before deleting it.
-import { ApiFailure, assetUses } from '../../../../../../lib/api.ts'
+import { ApiFailure, assetUses } from '@/lib/api.ts'
 
 export async function GET(_request: Request, { params }: { params: Promise<{ brandId: string; assetId: string }> }) {
   const { brandId, assetId } = await params

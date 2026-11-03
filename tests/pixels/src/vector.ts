@@ -3,9 +3,11 @@
 // only when nothing within one pixel of it in the CPU render is within VECTOR_CHANNEL_TOLERANCE.
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
+
 import type { PDFiumLibrary } from '@hyzyla/pdfium'
 import { Resvg } from '@resvg/resvg-js'
-import { REFERENCE_DIR, type Pixels } from './pixels.ts'
+
+import { type Pixels, REFERENCE_DIR } from './pixels.ts'
 
 /** How far a channel may differ before a pixel counts as different, out of 255. */
 export const VECTOR_CHANNEL_TOLERANCE = 16
@@ -53,7 +55,10 @@ export async function pdfText(pdfium: PDFiumLibrary, bytes: Uint8Array): Promise
 
 /** An SVG drawn by resvg at its own size, over white; it needs no fonts, since our text is shapes. */
 export function rasteriseSvg(bytes: Uint8Array): Pixels {
-  const image = new Resvg(Buffer.from(bytes), { fitTo: { mode: 'original' }, font: { loadSystemFonts: false } }).render()
+  const image = new Resvg(Buffer.from(bytes), {
+    fitTo: { mode: 'original' },
+    font: { loadSystemFonts: false },
+  }).render()
   return overWhite({ width: image.width, height: image.height, pixels: new Uint8Array(image.pixels) })
 }
 
@@ -67,7 +72,9 @@ export function vectorDifference(expected: Pixels, actual: Pixels): number {
   const b = actual.pixels
   const t = VECTOR_CHANNEL_TOLERANCE
   const near = (i: number, j: number) =>
-    Math.abs((a[j] ?? 0) - (b[i] ?? 0)) <= t && Math.abs((a[j + 1] ?? 0) - (b[i + 1] ?? 0)) <= t && Math.abs((a[j + 2] ?? 0) - (b[i + 2] ?? 0)) <= t
+    Math.abs((a[j] ?? 0) - (b[i] ?? 0)) <= t &&
+    Math.abs((a[j + 1] ?? 0) - (b[i + 1] ?? 0)) <= t &&
+    Math.abs((a[j + 2] ?? 0) - (b[i + 2] ?? 0)) <= t
   let differing = 0
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
@@ -92,7 +99,9 @@ export function vectorDifference(expected: Pixels, actual: Pixels): number {
 export const vectorLimit = (percent: number) => Number((percent * 1.25 + 0.05).toFixed(3))
 
 export function readVectorBaselines(): Record<string, VectorBaseline> {
-  return existsSync(VECTOR_BASELINES) ? (JSON.parse(readFileSync(VECTOR_BASELINES, 'utf8')) as Record<string, VectorBaseline>) : {}
+  return existsSync(VECTOR_BASELINES)
+    ? (JSON.parse(readFileSync(VECTOR_BASELINES, 'utf8')) as Record<string, VectorBaseline>)
+    : {}
 }
 
 /** Records one case's baseline, keeping the others; cases stay sorted so diffs are readable. */

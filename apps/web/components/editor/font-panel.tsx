@@ -5,22 +5,34 @@
 // drawn in it, so the browser never decodes a design font; its files load in the editor only once a
 // layer uses it. A brand can upload a TrueType or OpenType file from the same list.
 import { MagnifyingGlassIcon, UploadSimpleIcon } from '@phosphor-icons/react'
+import { type KeyboardEvent, type ReactNode, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
+
 import type { Editor } from '@dazbee/editor'
 import { FONT_FACES } from '@dazbee/fonts'
-import { FontFace, FontFamily, type Design } from '@dazbee/schema'
-import { useCallback, useEffect, useId, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
-import { cn } from '../../lib/cn.ts'
-import { useMessages } from '../../lib/i18n/client.tsx'
-import { format } from '../../lib/i18n/index.ts'
-import { useOverlayScroll } from '../ui/overlay-scroll.ts'
-import { Select } from '../ui/select.tsx'
+import { type Design, FontFace, FontFamily } from '@dazbee/schema'
+
+import { useOverlayScroll } from '@/components/ui/overlay-scroll.ts'
+import { Select } from '@/components/ui/select.tsx'
+import { cn } from '@/lib/cn.ts'
+import { useMessages } from '@/lib/i18n/client.tsx'
+import { format } from '@/lib/i18n/index.ts'
+
 import { useEditorDesign } from './formats-panel.tsx'
 import { PANEL_BUTTON, PANEL_HEADING } from './styles.ts'
 
 /** The fonts we ship, as catalog families; they have no stored preview. */
 const SHIPPED: FontFamily[] = [...new Set(FONT_FACES.map((f) => f.family))].map((family) => ({
-  family, source: 'builtin', category: null,
-  faces: FONT_FACES.filter((f) => f.family === family).map((f) => ({ id: `builtin-${f.file.replace(/\.\w+$/, '')}`, family, weight: f.weight, style: f.style, source: 'builtin', byteSize: 1 })),
+  family,
+  source: 'builtin',
+  category: null,
+  faces: FONT_FACES.filter((f) => f.family === family).map((f) => ({
+    id: `builtin-${f.file.replace(/\.\w+$/, '')}`,
+    family,
+    weight: f.weight,
+    style: f.style,
+    source: 'builtin',
+    byteSize: 1,
+  })),
 }))
 
 /** The brand's catalog, with the shipped fonts last; `refresh` fetches it again after an upload. */
@@ -53,7 +65,7 @@ function useSelection(editor: Editor) {
 }
 
 /** The one value every entry has, or null. */
-const same = <T,>(values: T[]) => (values.every((v) => v === values[0]) ? values[0] ?? null : null)
+const same = <T,>(values: T[]) => (values.every((v) => v === values[0]) ? (values[0] ?? null) : null)
 
 /**
  * The base style of the selected text layers: their family and weight, or null where they differ;
@@ -66,18 +78,28 @@ function selectedFont(design: Design, ids: string[], formatId: string) {
     return node?.type === 'text' ? [{ id, style: node.props.style }] : []
   })
   if (texts.length === 0) return null
-  const sizes = texts.map(({ id, style }) => (design.overrides[`format:${formatId}`]?.[id]?.style as Partial<typeof style> | undefined)?.fontSize ?? style.fontSize)
-  return { family: same(texts.map(({ style }) => style.fontFamily)), weight: same(texts.map(({ style }) => style.fontWeight)), size: same(sizes) }
+  const sizes = texts.map(
+    ({ id, style }) =>
+      (design.overrides[`format:${formatId}`]?.[id]?.style as Partial<typeof style> | undefined)?.fontSize ??
+      style.fontSize,
+  )
+  return {
+    family: same(texts.map(({ style }) => style.fontFamily)),
+    weight: same(texts.map(({ style }) => style.fontWeight)),
+    size: same(sizes),
+  }
 }
 
 /** The face that previews a family: upright and nearest Regular. */
 const previewFace = (family: FontFamily) =>
-  [...family.faces].sort((a, b) => (a.style === b.style ? Math.abs(a.weight - 400) - Math.abs(b.weight - 400) : a.style === 'normal' ? -1 : 1))[0]
+  [...family.faces].sort((a, b) =>
+    a.style === b.style ? Math.abs(a.weight - 400) - Math.abs(b.weight - 400) : a.style === 'normal' ? -1 : 1,
+  )[0]
 
 /** The family's upright weights, or every weight when it has no upright face. */
 export const weightsOf = (family: FontFamily | undefined) => {
   const upright = family?.faces.filter((f) => f.style === 'normal') ?? []
-  return [...new Set((upright.length > 0 ? upright : family?.faces ?? []).map((f) => f.weight))].sort((a, b) => a - b)
+  return [...new Set((upright.length > 0 ? upright : (family?.faces ?? [])).map((f) => f.weight))].sort((a, b) => a - b)
 }
 
 /** The weight a family is set in: the one it had when the family has it, otherwise the nearest. */
@@ -85,9 +107,30 @@ export const nearest = (weights: number[], wanted: number) =>
   weights.reduce((best, w) => (Math.abs(w - wanted) < Math.abs(best - wanted) ? w : best), weights[0] ?? wanted)
 
 /** A family's name drawn in its own face. */
-export function FontPreview({ brandId, family, className, big = false }: { brandId: string; family: FontFamily; className?: string; big?: boolean }) {
+export function FontPreview({
+  brandId,
+  family,
+  className,
+  big = false,
+}: {
+  brandId: string
+  family: FontFamily
+  className?: string
+  big?: boolean
+}) {
   const face = previewFace(family)
-  if (family.source === 'builtin' || !face) return <span className={cn('block truncate', big ? 'text-[24px] leading-8 font-semibold tracking-tight' : 'text-[13px]', className)}>{family.family}</span>
+  if (family.source === 'builtin' || !face)
+    return (
+      <span
+        className={cn(
+          'block truncate',
+          big ? 'text-[24px] leading-8 font-semibold tracking-tight' : 'text-[13px]',
+          className,
+        )}
+      >
+        {family.family}
+      </span>
+    )
   return (
     // The family's name drawn in its own face by the API, at twice the size it shows.
     <img
@@ -95,7 +138,11 @@ export function FontPreview({ brandId, family, className, big = false }: { brand
       alt={family.family}
       loading="lazy"
       draggable={false}
-      className={cn(big ? 'h-8' : 'h-6', 'max-w-full object-contain object-left dark:invert rtl:object-right', className)}
+      className={cn(
+        big ? 'h-8' : 'h-6',
+        'max-w-full object-contain object-left dark:invert rtl:object-right',
+        className,
+      )}
     />
   )
 }
@@ -106,7 +153,19 @@ export function FontPreview({ brandId, family, className, big = false }: { brand
  * brand's new upload shows. A pick or an upload sets the font and leaves the panel open, to try
  * another or set the weight.
  */
-export function FontChooser({ editor, brandId, catalog, refresh, onDone }: { editor: Editor; brandId: string; catalog: FontFamily[]; refresh: () => Promise<void>; onDone: () => void }) {
+export function FontChooser({
+  editor,
+  brandId,
+  catalog,
+  refresh,
+  onDone,
+}: {
+  editor: Editor
+  brandId: string
+  catalog: FontFamily[]
+  refresh: () => Promise<void>
+  onDone: () => void
+}) {
   const t = useMessages()
   const { design } = useEditorDesign(editor)
   const selected = useSelection(editor)
@@ -119,7 +178,11 @@ export function FontChooser({ editor, brandId, catalog, refresh, onDone }: { edi
   const range = editor.textSelectionStyles()
   const current = range
     ? { family: same(range.map((s) => s.fontFamily)), weight: same(range.map((s) => s.fontWeight)) }
-    : selectedFont(design, selected, frameFormat && design.formats[frameFormat] ? frameFormat : design.meta.primaryFormatId)
+    : selectedFont(
+        design,
+        selected,
+        frameFormat && design.formats[frameFormat] ? frameFormat : design.meta.primaryFormatId,
+      )
   if (!current) return null
   const weights = weightsOf(catalog.find((f) => f.family === current.family))
   const pick = (picked: FontFamily) => {
@@ -139,7 +202,7 @@ export function FontChooser({ editor, brandId, catalog, refresh, onDone }: { edi
           await refresh()
           editor.setFont(face.family, face.weight)
         }}
-        weight={(
+        weight={
           <label className="flex flex-col gap-1.5">
             <span className={PANEL_HEADING}>{t.editor.fonts.weight}</span>
             <Select
@@ -157,7 +220,7 @@ export function FontChooser({ editor, brandId, catalog, refresh, onDone }: { edi
               className="h-[34px] w-full rounded-row border border-line bg-surface px-2.5 text-[13px]"
             />
           </label>
-        )}
+        }
       />
     </div>
   )
@@ -165,7 +228,16 @@ export function FontChooser({ editor, brandId, catalog, refresh, onDone }: { edi
 
 const GROUPS = ['upload', 'google', 'builtin'] as const
 
-function FontList({ id, brandId, catalog, current, onPick, onClose, onUploaded, weight }: {
+function FontList({
+  id,
+  brandId,
+  catalog,
+  current,
+  onPick,
+  onClose,
+  onUploaded,
+  weight,
+}: {
   id: string
   /** Shown between the search and the list. */
   weight: ReactNode
@@ -220,7 +292,9 @@ function FontList({ id, brandId, catalog, current, onPick, onClose, onUploaded, 
       if (!response.ok) throw new Error((json as { error?: string } | null)?.error ?? String(response.status))
       await onUploaded(FontFace.parse(json))
     } catch (reason) {
-      setError(format(t.editor.fonts.uploadFailed, { reason: reason instanceof Error ? reason.message : String(reason) }))
+      setError(
+        format(t.editor.fonts.uploadFailed, { reason: reason instanceof Error ? reason.message : String(reason) }),
+      )
     } finally {
       setUploading(false)
     }
@@ -253,15 +327,25 @@ function FontList({ id, brandId, catalog, current, onPick, onClose, onUploaded, 
         />
       </div>
       {weight}
-      <div ref={listRef} id={id} role="listbox" aria-label={t.editor.fonts.title} className="-mx-1 max-h-[min(20rem,40vh)] min-h-0 overflow-y-auto">
-        {shown.length === 0 && <p className="px-3 py-4 text-xs text-muted">{format(t.editor.fonts.none, { query: query.trim() })}</p>}
+      <div
+        ref={listRef}
+        id={id}
+        role="listbox"
+        aria-label={t.editor.fonts.title}
+        className="-mx-1 max-h-[min(20rem,40vh)] min-h-0 overflow-y-auto"
+      >
+        {shown.length === 0 && (
+          <p className="px-3 py-4 text-xs text-muted">{format(t.editor.fonts.none, { query: query.trim() })}</p>
+        )}
         {/* Each source is a group of options, so a screen reader reads the group, then each family by name. */}
         {GROUPS.map((source) => {
           const options = shown.flatMap((family, i) => (family.source === source ? [{ family, i }] : []))
           if (options.length === 0) return null
           return (
             <div key={source} role="group" aria-labelledby={`${id}-${source}`} className="pb-2">
-              <div id={`${id}-${source}`} className={cn(PANEL_HEADING, 'px-1 pb-1')}>{label[source]}</div>
+              <div id={`${id}-${source}`} className={cn(PANEL_HEADING, 'px-1 pb-1')}>
+                {label[source]}
+              </div>
               {options.map(({ family, i }) => (
                 <div
                   key={family.family}
@@ -284,7 +368,13 @@ function FontList({ id, brandId, catalog, current, onPick, onClose, onUploaded, 
         })}
       </div>
       <div>
-        <label className={cn(PANEL_BUTTON, 'focus-within:outline-2 focus-within:outline-accent', uploading && 'pointer-events-none opacity-60')}>
+        <label
+          className={cn(
+            PANEL_BUTTON,
+            'focus-within:outline-2 focus-within:outline-accent',
+            uploading && 'pointer-events-none opacity-60',
+          )}
+        >
           <UploadSimpleIcon size={14} aria-hidden className="shrink-0" />
           <span>{uploading ? t.editor.fonts.uploading : t.editor.fonts.upload}</span>
           <input
@@ -300,7 +390,11 @@ function FontList({ id, brandId, catalog, current, onPick, onClose, onUploaded, 
             }}
           />
         </label>
-        {error && <p role="alert" className="px-1 pt-1.5 text-xs text-danger">{error}</p>}
+        {error && (
+          <p role="alert" className="px-1 pt-1.5 text-xs text-danger">
+            {error}
+          </p>
+        )}
       </div>
     </div>
   )

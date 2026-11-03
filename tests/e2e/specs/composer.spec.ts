@@ -2,10 +2,11 @@
 // assets as thumbnails above the brief, and Brand kit opens the whole kit to pick from. Each choice
 // is a form field.
 import { AssetSummary } from '@dazbee/schema'
-import { expect, test } from '../support/test.ts'
+
 import { photo } from '../support/assets.ts'
 import { writeOutput } from '../support/editor.ts'
 import { API_URL, DEV_BRAND, liveDesign, newBrand, putKit, seed } from '../support/seed.ts'
+import { expect, test } from '../support/test.ts'
 
 test.use({ viewport: { width: 1440, height: 900 } })
 
@@ -45,10 +46,15 @@ test('+ adds a reference ad and uploaded images above the brief, each taken off 
   await expect(page.locator('input[name="image"]')).toHaveCount(0)
 })
 
-test('Brand kit opens the whole kit: the switch, and each colour, font and the voice picked or not', async ({ page }) => {
+test('Brand kit opens the whole kit: the switch, and each colour, font and the voice picked or not', async ({
+  page,
+}) => {
   const brandId = await newBrand('e2e composer')
   await putKit(brandId, {
-    colors: [{ token: 'ink', name: 'Ink', value: '#1A1420FF' }, { token: 'pop', name: 'Pop pink', value: '#FF48B0FF' }],
+    colors: [
+      { token: 'ink', name: 'Ink', value: '#1A1420FF' },
+      { token: 'pop', name: 'Pop pink', value: '#FF48B0FF' },
+    ],
     fonts: [{ token: 'heading', name: 'Headings', family: 'Bricolage Grotesque' }],
     voice: 'Warm, quick and never pushy.',
   })
@@ -76,7 +82,9 @@ test('Brand kit opens the whole kit: the switch, and each colour, font and the v
   const use = panel.getByRole('switch', { name: 'Use brand kit' })
   await use.click()
   await expect(use).toHaveAttribute('aria-checked', 'false')
-  await expect(page.locator('input[name="kit"], input[name="kitColor"], input[name="kitFont"], input[name="kitVoice"]')).toHaveCount(0)
+  await expect(
+    page.locator('input[name="kit"], input[name="kitColor"], input[name="kitFont"], input[name="kitVoice"]'),
+  ).toHaveCount(0)
 
   await page.keyboard.press('Escape')
   await expect(panel).toBeHidden()

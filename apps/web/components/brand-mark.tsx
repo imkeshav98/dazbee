@@ -11,7 +11,14 @@ export function BrandMark({ size = 28 }: { size?: number }) {
       {size < 32 ? (
         <>
           <rect x="4" y="12" width="80" height="80" rx="22" fill="#FFD23F" />
-          <path d="M25,36 H63 L31,72 H65" fill="none" stroke="#15121A" strokeWidth="13" strokeLinejoin="round" strokeLinecap="round" />
+          <path
+            d="M25,36 H63 L31,72 H65"
+            fill="none"
+            stroke="#15121A"
+            strokeWidth="13"
+            strokeLinejoin="round"
+            strokeLinecap="round"
+          />
           <path d="M82,0 Q82,16 98,16 Q82,16 82,32 Q82,16 66,16 Q82,16 82,0Z" fill="#FF48B0" />
         </>
       ) : (
@@ -19,7 +26,13 @@ export function BrandMark({ size = 28 }: { size?: number }) {
           <defs>
             <mask id="dazbee-bee-gap" maskUnits="userSpaceOnUse" x="-10" y="-10" width="120" height="120">
               <rect x="-10" y="-10" width="120" height="120" fill="#fff" />
-              <g transform="translate(78 25) scale(.72)" fill="#000" stroke="#000" strokeWidth="11" strokeLinejoin="round">
+              <g
+                transform="translate(78 25) scale(.72)"
+                fill="#000"
+                stroke="#000"
+                strokeWidth="11"
+                strokeLinejoin="round"
+              >
                 <path d={WING_PINK} />
                 <path d={WING_BLUE} />
                 <rect x="-20" y="-12" width="40" height="24" rx="12" transform="rotate(-20)" />
@@ -28,7 +41,14 @@ export function BrandMark({ size = 28 }: { size?: number }) {
             </mask>
           </defs>
           <rect x="6" y="14" width="76" height="76" rx="22" fill="#FFD23F" mask="url(#dazbee-bee-gap)" />
-          <path d="M26,36 H62 L32,70 H64" fill="none" stroke="#15121A" strokeWidth="11" strokeLinejoin="round" strokeLinecap="round" />
+          <path
+            d="M26,36 H62 L32,70 H64"
+            fill="none"
+            stroke="#15121A"
+            strokeWidth="11"
+            strokeLinejoin="round"
+            strokeLinecap="round"
+          />
           <g transform="translate(78 25) scale(.72)">
             <path d={WING_PINK} fill="#FF48B0" />
             <path d={WING_BLUE} fill="#3D6BFF" />

@@ -25,7 +25,14 @@ export function exportClient() {
   let next = 0
   let fontsSent: ResourceBytes['fonts'] | undefined
   const imagesSent = new Map<string, Uint8Array>()
-  const waiting = new Map<number, { progress?: (done: number, total: number) => void; resolve: (file: ExportedFile) => void; reject: (error: Error) => void }>()
+  const waiting = new Map<
+    number,
+    {
+      progress?: (done: number, total: number) => void
+      resolve: (file: ExportedFile) => void
+      reject: (error: Error) => void
+    }
+  >()
 
   function start() {
     const made = new Worker(new URL('./export-worker.ts', import.meta.url), { type: 'module' })
@@ -51,13 +58,29 @@ export function exportClient() {
 
   return {
     /** Exports the request from `design` in the worker; `progress` hears each file as it is made. */
-    run(design: Design, request: ExportJob['request'], bytes: ResourceBytes, progress?: (done: number, total: number) => void) {
+    run(
+      design: Design,
+      request: ExportJob['request'],
+      bytes: ResourceBytes,
+      progress?: (done: number, total: number) => void,
+    ) {
       worker ??= start()
       const id = next++
       const fresh = fontsSent !== bytes.fonts
-      const images = Object.fromEntries(Object.entries(bytes.images).filter(([assetId, data]) => imagesSent.get(assetId) !== data))
-      const job: ExportJob = { id, design: JSON.stringify(design), request, images, ...(bytes.variables ? { variables: bytes.variables } : {}), ...(fresh ? { fonts: bytes.fonts, fallbackFamilies: bytes.fallbackFamilies } : {}) }
-      const result = new Promise<ExportedFile>((resolve, reject) => waiting.set(id, { resolve, reject, ...(progress ? { progress } : {}) }))
+      const images = Object.fromEntries(
+        Object.entries(bytes.images).filter(([assetId, data]) => imagesSent.get(assetId) !== data),
+      )
+      const job: ExportJob = {
+        id,
+        design: JSON.stringify(design),
+        request,
+        images,
+        ...(bytes.variables ? { variables: bytes.variables } : {}),
+        ...(fresh ? { fonts: bytes.fonts, fallbackFamilies: bytes.fallbackFamilies } : {}),
+      }
+      const result = new Promise<ExportedFile>((resolve, reject) =>
+        waiting.set(id, { resolve, reject, ...(progress ? { progress } : {}) }),
+      )
       worker.postMessage(job)
       fontsSent = bytes.fonts
       for (const [assetId, data] of Object.entries(images)) imagesSent.set(assetId, data)

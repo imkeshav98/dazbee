@@ -5,22 +5,26 @@
 // editor's Brand flyout shows it in its Edit mode, with buttons that bind the selected layers to a
 // colour or font; the brand home shows it in its Brand kit panel, laid out wide, without them.
 import { CheckIcon, PaintBucketIcon, PlusIcon, TextAaIcon, UploadSimpleIcon, XIcon } from '@phosphor-icons/react'
-import { AssetSummary, type BrandColor, type BrandFont, type BrandKit } from '@dazbee/schema'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { cn } from '../../lib/cn.ts'
-import { useMessages } from '../../lib/i18n/client.tsx'
-import { format } from '../../lib/i18n/index.ts'
-import { ASSET_ACCEPT, sendAsset } from '../../lib/upload-asset.ts'
-import { Select } from '../ui/select.tsx'
-import { DASHED_BUTTON } from './styles.ts'
+
+import { AssetSummary, type BrandColor, type BrandFont, type BrandKit } from '@dazbee/schema'
+
+import { Select } from '@/components/ui/select.tsx'
+import { cn } from '@/lib/cn.ts'
+import { useMessages } from '@/lib/i18n/client.tsx'
+import { format } from '@/lib/i18n/index.ts'
+import { ASSET_ACCEPT, sendAsset } from '@/lib/upload-asset.ts'
+
 import { useFontCatalog } from './font-panel.tsx'
+import { DASHED_BUTTON } from './styles.ts'
 import { saveKit, showKit } from './use-brand-kit.ts'
 
 /** How long a run of changes (a colour picker's drag) waits before it is saved. */
 const SAVE_DELAY_MS = 400
 
 /** A colour as people type it: #RRGGBB, with the alpha only when it isn't opaque. */
-export const shown = (value: string) => (value.slice(7).toUpperCase() === 'FF' ? value.slice(0, 7) : value).toUpperCase()
+export const shown = (value: string) =>
+  (value.slice(7).toUpperCase() === 'FF' ? value.slice(0, 7) : value).toUpperCase()
 /** A typed hex colour as the design stores it, #RRGGBBAA, or null when it isn't one. */
 export function parseHex(text: string): string | null {
   const match = /^#?([0-9a-f]{6})([0-9a-f]{2})?$/i.exec(text.trim())
@@ -29,7 +33,12 @@ export function parseHex(text: string): string | null {
 
 /** A token not yet in the kit, from a name: "Colour 3" gives colour-3. */
 function newToken(kit: BrandKit, name: string) {
-  const base = name.toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'token'
+  const base =
+    name
+      .toLowerCase()
+      .normalize('NFKD')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '') || 'token'
   const taken = new Set([...kit.colors, ...kit.fonts].map((x) => x.token))
   let token = base
   for (let n = 2; taken.has(token); n++) token = `${base}-${n}`
@@ -42,7 +51,10 @@ function newToken(kit: BrandKit, name: string) {
  */
 export function useKitSaver(brandId: string, onShow?: (kit: BrandKit) => void) {
   const [error, setError] = useState<string | null>(null)
-  const saving = useRef<{ timer: ReturnType<typeof setTimeout> | null; kit: BrandKit | null }>({ timer: null, kit: null })
+  const saving = useRef<{ timer: ReturnType<typeof setTimeout> | null; kit: BrandKit | null }>({
+    timer: null,
+    kit: null,
+  })
   const shows = useRef(onShow)
   shows.current = onShow
 
@@ -54,21 +66,31 @@ export function useKitSaver(brandId: string, onShow?: (kit: BrandKit) => void) {
       .then(async (response) => {
         if (response.ok) return setError(null)
         const body: unknown = await response.json().catch(() => null)
-        setError(body && typeof body === 'object' && 'error' in body && typeof body.error === 'string' ? body.error : `${response.status}`)
+        setError(
+          body && typeof body === 'object' && 'error' in body && typeof body.error === 'string'
+            ? body.error
+            : `${response.status}`,
+        )
       })
       .catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)))
   }, [brandId])
-  useEffect(() => () => {
-    if (saving.current.timer) clearTimeout(saving.current.timer)
-    flush()
-  }, [flush])
+  useEffect(
+    () => () => {
+      if (saving.current.timer) clearTimeout(saving.current.timer)
+      flush()
+    },
+    [flush],
+  )
 
-  const change = useCallback((next: BrandKit) => {
-    showKit(brandId, next)
-    shows.current?.(next)
-    if (saving.current.timer) clearTimeout(saving.current.timer)
-    saving.current = { kit: next, timer: setTimeout(flush, SAVE_DELAY_MS) }
-  }, [brandId, flush])
+  const change = useCallback(
+    (next: BrandKit) => {
+      showKit(brandId, next)
+      shows.current?.(next)
+      if (saving.current.timer) clearTimeout(saving.current.timer)
+      saving.current = { kit: next, timer: setTimeout(flush, SAVE_DELAY_MS) }
+    },
+    [brandId, flush],
+  )
 
   return { change, error }
 }
@@ -82,7 +104,14 @@ export interface KitBinding {
   canFont: boolean
 }
 
-export function KitEditor({ brandId, kit, change, error, binding, wide = false }: {
+export function KitEditor({
+  brandId,
+  kit,
+  change,
+  error,
+  binding,
+  wide = false,
+}: {
   brandId: string
   kit: BrandKit
   change: (next: BrandKit) => void
@@ -105,8 +134,10 @@ export function KitEditor({ brandId, kit, change, error, binding, wide = false }
       .catch(() => undefined)
   }, [brandId])
 
-  const setColor = (i: number, patch: Partial<BrandColor>) => change({ ...kit, colors: kit.colors.map((c, j) => (j === i ? { ...c, ...patch } : c)) })
-  const setFont = (i: number, patch: Partial<BrandFont>) => change({ ...kit, fonts: kit.fonts.map((f, j) => (j === i ? { ...f, ...patch } : f)) })
+  const setColor = (i: number, patch: Partial<BrandColor>) =>
+    change({ ...kit, colors: kit.colors.map((c, j) => (j === i ? { ...c, ...patch } : c)) })
+  const setFont = (i: number, patch: Partial<BrandFont>) =>
+    change({ ...kit, fonts: kit.fonts.map((f, j) => (j === i ? { ...f, ...patch } : f)) })
   const uploadLogo = (file: File) => {
     setUpload({ progress: 0 })
     sendAsset(brandId, file, (progress) => setUpload({ progress }))
@@ -123,12 +154,16 @@ export function KitEditor({ brandId, kit, change, error, binding, wide = false }
   const section = wide
     ? 'flex min-w-0 flex-col gap-2.5 rounded-[16px] border border-line bg-bg/40 p-4'
     : 'flex flex-col gap-2.5 border-t border-line px-[18px] py-4'
-  const field = 'h-8 min-w-0 rounded-[8px] border border-line bg-bg/40 px-2 text-[13px] hover:border-line-strong focus:border-accent focus:outline-none'
-  const iconButton = 'grid size-8 shrink-0 cursor-pointer place-items-center rounded-full text-subtle hover:bg-hover hover:text-text disabled:cursor-default disabled:opacity-40 aria-pressed:bg-accent-soft aria-pressed:text-accent-text'
+  const field =
+    'h-8 min-w-0 rounded-[8px] border border-line bg-bg/40 px-2 text-[13px] hover:border-line-strong focus:border-accent focus:outline-none'
+  const iconButton =
+    'grid size-8 shrink-0 cursor-pointer place-items-center rounded-full text-subtle hover:bg-hover hover:text-text disabled:cursor-default disabled:opacity-40 aria-pressed:bg-accent-soft aria-pressed:text-accent-text'
 
   const colours = (
     <section key="colours" aria-labelledby="kit-colors" className={section}>
-      <h3 id="kit-colors" className={heading}>{t.colors}</h3>
+      <h3 id="kit-colors" className={heading}>
+        {t.colors}
+      </h3>
       <ul className="flex flex-col gap-1.5">
         {kit.colors.map((c, i) => {
           const on = binding?.follows('color', c.token) ?? false
@@ -149,7 +184,11 @@ export function KitEditor({ brandId, kit, change, error, binding, wide = false }
                   defaultValue={c.name}
                   aria-label={format(t.colorName, { n: i + 1 })}
                   maxLength={60}
-                  onBlur={(e) => e.target.value.trim() && e.target.value.trim() !== c.name && setColor(i, { name: e.target.value.trim() })}
+                  onBlur={(e) =>
+                    e.target.value.trim() &&
+                    e.target.value.trim() !== c.name &&
+                    setColor(i, { name: e.target.value.trim() })
+                  }
                   onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
                   className={field}
                 />
@@ -180,7 +219,12 @@ export function KitEditor({ brandId, kit, change, error, binding, wide = false }
                   {on ? <CheckIcon size={15} aria-hidden /> : <PaintBucketIcon size={15} aria-hidden />}
                 </button>
               )}
-              <button type="button" aria-label={format(t.remove, { name: c.name })} onClick={() => change({ ...kit, colors: kit.colors.filter((_, j) => j !== i) })} className={iconButton}>
+              <button
+                type="button"
+                aria-label={format(t.remove, { name: c.name })}
+                onClick={() => change({ ...kit, colors: kit.colors.filter((_, j) => j !== i) })}
+                className={iconButton}
+              >
                 <XIcon size={13} aria-hidden />
               </button>
             </li>
@@ -203,7 +247,9 @@ export function KitEditor({ brandId, kit, change, error, binding, wide = false }
 
   const fonts = (
     <section key="fonts" aria-labelledby="kit-fonts" className={section}>
-      <h3 id="kit-fonts" className={heading}>{t.fonts}</h3>
+      <h3 id="kit-fonts" className={heading}>
+        {t.fonts}
+      </h3>
       <ul className="flex flex-col gap-1.5">
         {kit.fonts.map((f, i) => {
           const on = binding?.follows('font', f.token) ?? false
@@ -216,7 +262,11 @@ export function KitEditor({ brandId, kit, change, error, binding, wide = false }
                   defaultValue={f.name}
                   aria-label={format(t.fontName, { n: i + 1 })}
                   maxLength={60}
-                  onBlur={(e) => e.target.value.trim() && e.target.value.trim() !== f.name && setFont(i, { name: e.target.value.trim() })}
+                  onBlur={(e) =>
+                    e.target.value.trim() &&
+                    e.target.value.trim() !== f.name &&
+                    setFont(i, { name: e.target.value.trim() })
+                  }
                   onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
                   className={field}
                 />
@@ -241,7 +291,12 @@ export function KitEditor({ brandId, kit, change, error, binding, wide = false }
                   {on ? <CheckIcon size={15} aria-hidden /> : <TextAaIcon size={15} aria-hidden />}
                 </button>
               )}
-              <button type="button" aria-label={format(t.remove, { name: f.name })} onClick={() => change({ ...kit, fonts: kit.fonts.filter((_, j) => j !== i) })} className={iconButton}>
+              <button
+                type="button"
+                aria-label={format(t.remove, { name: f.name })}
+                onClick={() => change({ ...kit, fonts: kit.fonts.filter((_, j) => j !== i) })}
+                className={iconButton}
+              >
                 <XIcon size={13} aria-hidden />
               </button>
             </li>
@@ -252,7 +307,10 @@ export function KitEditor({ brandId, kit, change, error, binding, wide = false }
         type="button"
         onClick={() => {
           const name = format(t.newFont, { n: kit.fonts.length + 1 })
-          change({ ...kit, fonts: [...kit.fonts, { token: newToken(kit, name), name, family: families[0] ?? 'Noto Sans' }] })
+          change({
+            ...kit,
+            fonts: [...kit.fonts, { token: newToken(kit, name), name, family: families[0] ?? 'Noto Sans' }],
+          })
         }}
         className={DASHED_BUTTON}
       >
@@ -264,10 +322,18 @@ export function KitEditor({ brandId, kit, change, error, binding, wide = false }
 
   const logo = (
     <section key="logo" aria-labelledby="kit-logo" className={section}>
-      <h3 id="kit-logo" className={heading}>{t.logo}</h3>
+      <h3 id="kit-logo" className={heading}>
+        {t.logo}
+      </h3>
       <div className="flex items-center gap-2">
         <div className="grid size-12 shrink-0 place-items-center overflow-hidden rounded-[12px] border border-line bg-bg/40">
-          {kit.logoAssetId && <img src={`/brands/${encodeURIComponent(brandId)}/assets/${encodeURIComponent(kit.logoAssetId)}/thumbnail`} alt="" className="size-full object-contain" />}
+          {kit.logoAssetId && (
+            <img
+              src={`/brands/${encodeURIComponent(brandId)}/assets/${encodeURIComponent(kit.logoAssetId)}/thumbnail`}
+              alt=""
+              className="size-full object-contain"
+            />
+          )}
         </div>
         <Select
           name="logo"
@@ -300,14 +366,24 @@ export function KitEditor({ brandId, kit, change, error, binding, wide = false }
           }}
         />
       </div>
-      {upload && 'progress' in upload && <p role="status" className="text-xs text-muted tabular-nums">{format(t.uploading, { percent: Math.round(upload.progress * 100) })}</p>}
-      {upload && 'error' in upload && <p role="alert" className="text-xs text-danger">{format(t.uploadFailed, { reason: upload.error })}</p>}
+      {upload && 'progress' in upload && (
+        <p role="status" className="text-xs text-muted tabular-nums">
+          {format(t.uploading, { percent: Math.round(upload.progress * 100) })}
+        </p>
+      )}
+      {upload && 'error' in upload && (
+        <p role="alert" className="text-xs text-danger">
+          {format(t.uploadFailed, { reason: upload.error })}
+        </p>
+      )}
     </section>
   )
 
   const voice = (
     <section key="voice" aria-labelledby="kit-voice" className={section}>
-      <h3 id="kit-voice" className={heading}>{t.voice}</h3>
+      <h3 id="kit-voice" className={heading}>
+        {t.voice}
+      </h3>
       <textarea
         name="voice"
         key={`voice-${kit.voice}`}
@@ -322,31 +398,33 @@ export function KitEditor({ brandId, kit, change, error, binding, wide = false }
     </section>
   )
 
-  const failed = error && <p role="alert" className={cn('text-xs text-danger', !wide && 'px-[18px] pb-4')}>{format(t.saveFailed, { reason: error })}</p>
+  const failed = error && (
+    <p role="alert" className={cn('text-xs text-danger', !wide && 'px-[18px] pb-4')}>
+      {format(t.saveFailed, { reason: error })}
+    </p>
+  )
 
   // Wide: the logo and voice beside the colours and fonts, as the mock's panel; the flyout keeps the
   // editor's order, colours first.
-  return wide
-    ? (
-      <div className="flex flex-col gap-3">
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-          {colours}
-          {fonts}
-          <div className="flex min-w-0 flex-col gap-3">
-            {logo}
-            {voice}
-          </div>
-        </div>
-        {failed}
-      </div>
-    )
-    : (
-      <>
+  return wide ? (
+    <div className="flex flex-col gap-3">
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
         {colours}
         {fonts}
-        {logo}
-        {voice}
-        {failed}
-      </>
-    )
+        <div className="flex min-w-0 flex-col gap-3">
+          {logo}
+          {voice}
+        </div>
+      </div>
+      {failed}
+    </div>
+  ) : (
+    <>
+      {colours}
+      {fonts}
+      {logo}
+      {voice}
+      {failed}
+    </>
+  )
 }

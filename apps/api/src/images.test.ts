@@ -1,7 +1,9 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { deflateSync } from 'node:zlib'
+
 import { describe, expect, it } from 'vitest'
+
 import { readImageHeader } from './images.ts'
 
 const crcTable = Array.from({ length: 256 }, (_, n) => {
@@ -30,9 +32,17 @@ export function png(width: number, height: number, seed: string): Uint8Array {
   header.writeUInt32BE(height, 4)
   header.set([8, 6, 0, 0, 0], 8)
   const rows = Buffer.alloc(height * (1 + width * 4))
-  for (let i = 0; i < rows.length; i++) rows[i] = i % (1 + width * 4) === 0 ? 0 : (seed.charCodeAt(i % seed.length) * (i + 7)) & 0xff
+  for (let i = 0; i < rows.length; i++)
+    rows[i] = i % (1 + width * 4) === 0 ? 0 : (seed.charCodeAt(i % seed.length) * (i + 7)) & 0xff
   const signature = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
-  return new Uint8Array(Buffer.concat([signature, chunk('IHDR', header), chunk('IDAT', deflateSync(rows)), chunk('IEND', new Uint8Array())]))
+  return new Uint8Array(
+    Buffer.concat([
+      signature,
+      chunk('IHDR', header),
+      chunk('IDAT', deflateSync(rows)),
+      chunk('IEND', new Uint8Array()),
+    ]),
+  )
 }
 
 describe('image headers', () => {
@@ -42,16 +52,41 @@ describe('image headers', () => {
 
   it('reads a JPEG past its other markers', () => {
     const jpeg = new Uint8Array(readFileSync(join(import.meta.dirname, '../../../tests/pixels/assets/sneaker.jpg')))
-    expect(readImageHeader(jpeg)).toMatchObject({ contentType: 'image/jpeg', width: expect.any(Number), height: expect.any(Number) })
+    expect(readImageHeader(jpeg)).toMatchObject({
+      contentType: 'image/jpeg',
+      width: expect.any(Number),
+      height: expect.any(Number),
+    })
   })
 
   it('reads each kind of WebP', () => {
-    const riff = (chunkName: string, body: number[]) => new Uint8Array([...Buffer.from('RIFF'), 0, 0, 0, 0, ...Buffer.from('WEBP'), ...Buffer.from(chunkName), 0, 0, 0, 0, ...body, ...new Array(20).fill(0)])
+    const riff = (chunkName: string, body: number[]) =>
+      new Uint8Array([
+        ...Buffer.from('RIFF'),
+        0,
+        0,
+        0,
+        0,
+        ...Buffer.from('WEBP'),
+        ...Buffer.from(chunkName),
+        0,
+        0,
+        0,
+        0,
+        ...body,
+        ...new Array(20).fill(0),
+      ])
     // VP8X: 24-bit width and height minus one at bytes 24 and 27.
-    expect(readImageHeader(riff('VP8X', [0, 0, 0, 0, 99, 0, 0, 49, 0, 0]))).toEqual({ contentType: 'image/webp', width: 100, height: 50 })
+    expect(readImageHeader(riff('VP8X', [0, 0, 0, 0, 99, 0, 0, 49, 0, 0]))).toEqual({
+      contentType: 'image/webp',
+      width: 100,
+      height: 50,
+    })
     // VP8L: signature byte, then 14-bit width and height minus one.
     const bits = (300 - 1) | ((200 - 1) << 14)
-    expect(readImageHeader(riff('VP8L', [0x2f, bits & 0xff, (bits >> 8) & 0xff, (bits >> 16) & 0xff, (bits >> 24) & 0xff]))).toEqual({ contentType: 'image/webp', width: 300, height: 200 })
+    expect(
+      readImageHeader(riff('VP8L', [0x2f, bits & 0xff, (bits >> 8) & 0xff, (bits >> 16) & 0xff, (bits >> 24) & 0xff])),
+    ).toEqual({ contentType: 'image/webp', width: 300, height: 200 })
   })
 
   it('refuses what is not an image, or claims an absurd size', () => {

@@ -1,7 +1,15 @@
-import { pathScale, type Effect, type Paint } from '@dazbee/schema'
 import type {
-  Canvas, CanvasKit, FontCollection, Image, ImageFilter, Paint as CkPaint, Path, Shader,
+  Canvas,
+  CanvasKit,
+  FontCollection,
+  Image,
+  ImageFilter,
+  Paint as CkPaint,
+  Path,
+  Shader,
 } from '@dazbee/canvaskit'
+import { type Effect, type Paint, pathScale } from '@dazbee/schema'
+
 import { imageColorMatrix, LUMA_TO_ALPHA } from './adjust.ts'
 import { color } from './color.ts'
 import type { LayerPictures } from './pictures.ts'
@@ -67,16 +75,29 @@ function drawPageContent(ck: CanvasKit, canvas: Canvas, scene: Scene, resources:
   for (const fill of scene.fills) fillPath(ck, canvas, pagePath, fill, page, resources)
   pagePath.delete()
   const { layers } = resources
-  drawLayers(ck, canvas, scene.layers, resources, layers
-    ? (layer) => canvas.drawPicture(layers.picture(ck, layer, resources, (into) => drawLayer(ck, into, layer, resources)))
-    : (layer) => drawLayer(ck, canvas, layer, resources))
+  drawLayers(
+    ck,
+    canvas,
+    scene.layers,
+    resources,
+    layers
+      ? (layer) =>
+          canvas.drawPicture(layers.picture(ck, layer, resources, (into) => drawLayer(ck, into, layer, resources)))
+      : (layer) => drawLayer(ck, canvas, layer, resources),
+  )
 }
 
 /**
  * Draws one parent's layers in order. A mask isn't drawn (#48): the layers after it, up to the next
  * mask, are drawn together, then kept only where the mask is opaque or, for a luminance mask, bright.
  */
-export function drawLayers(ck: CanvasKit, canvas: Canvas, layers: readonly SceneLayer[], resources: Resources, draw = (layer: SceneLayer) => drawLayer(ck, canvas, layer, resources)) {
+export function drawLayers(
+  ck: CanvasKit,
+  canvas: Canvas,
+  layers: readonly SceneLayer[],
+  resources: Resources,
+  draw = (layer: SceneLayer) => drawLayer(ck, canvas, layer, resources),
+) {
   for (let i = 0; i < layers.length; i++) {
     const mask = layers[i] as SceneLayer
     if (!mask.props.mask) {
@@ -89,7 +110,11 @@ export function drawLayers(ck: CanvasKit, canvas: Canvas, layers: readonly Scene
     i = end - 1
     if (masked.length === 0) continue
     // Nothing shows outside what the mask draws, so the offscreen layers need be no bigger.
-    const reach = rotated(withEffects(drawnBounds(ck, mask, resources), mask.props.effects), mask.props, mask.props.rotation)
+    const reach = rotated(
+      withEffects(drawnBounds(ck, mask, resources), mask.props.effects),
+      mask.props,
+      mask.props.rotation,
+    )
     const bounds = ck.XYWHRect(reach.x - 1, reach.y - 1, reach.width + 2, reach.height + 2)
     canvas.saveLayer(undefined, bounds)
     for (const layer of masked) draw(layer)
@@ -117,7 +142,9 @@ export function drawLayer(ck: CanvasKit, canvas: Canvas, layer: SceneLayer, reso
   if (props.rotation !== 0) canvas.rotate(props.rotation, props.x + props.width / 2, props.y + props.height / 2)
 
   // Frosted glass first: what is already drawn behind the layer, blurred inside its outline.
-  const glass = props.effects.find((e): e is Extract<Effect, { type: 'backgroundBlur' }> => e.type === 'backgroundBlur' && e.radius > 0)
+  const glass = props.effects.find(
+    (e): e is Extract<Effect, { type: 'backgroundBlur' }> => e.type === 'backgroundBlur' && e.radius > 0,
+  )
   if (glass) blurBehind(ck, canvas, layer, glass.radius)
 
   const content = () => drawContent(ck, canvas, layer, resources)
@@ -149,9 +176,17 @@ export function drawLayer(ck: CanvasKit, canvas: Canvas, layer: SceneLayer, reso
       if (effect.type === 'glow') withFilter(ck, canvas, dropShadow(ck, { ...effect, x: 0, y: 0 }), bounds, content)
     }
     // The first blur that blurs; a zero-radius one before it no longer hides it.
-    const blur = props.effects.find((e): e is Extract<Effect, { type: 'layerBlur' }> => e.type === 'layerBlur' && e.radius > 0)
+    const blur = props.effects.find(
+      (e): e is Extract<Effect, { type: 'layerBlur' }> => e.type === 'layerBlur' && e.radius > 0,
+    )
     if (blur) {
-      withFilter(ck, canvas, ck.ImageFilter.MakeBlur(sigma(blur.radius), sigma(blur.radius), ck.TileMode.Decal, null), bounds, content)
+      withFilter(
+        ck,
+        canvas,
+        ck.ImageFilter.MakeBlur(sigma(blur.radius), sigma(blur.radius), ck.TileMode.Decal, null),
+        bounds,
+        content,
+      )
     } else {
       content()
     }
@@ -235,10 +270,24 @@ function withFilter(ck: CanvasKit, canvas: Canvas, filter: ImageFilter, bounds: 
   filter.delete()
 }
 
-function dropShadow(ck: CanvasKit, effect: Pick<Extract<Effect, { type: 'dropShadow' }>, 'x' | 'y' | 'blur' | 'spread' | 'color'>) {
-  const spread = effect.spread > 0 ? ck.ImageFilter.MakeDilate(effect.spread, effect.spread, null)
-    : effect.spread < 0 ? ck.ImageFilter.MakeErode(-effect.spread, -effect.spread, null) : null
-  const shadow = ck.ImageFilter.MakeDropShadowOnly(effect.x, effect.y, sigma(effect.blur), sigma(effect.blur), color(ck, effect.color), spread)
+function dropShadow(
+  ck: CanvasKit,
+  effect: Pick<Extract<Effect, { type: 'dropShadow' }>, 'x' | 'y' | 'blur' | 'spread' | 'color'>,
+) {
+  const spread =
+    effect.spread > 0
+      ? ck.ImageFilter.MakeDilate(effect.spread, effect.spread, null)
+      : effect.spread < 0
+        ? ck.ImageFilter.MakeErode(-effect.spread, -effect.spread, null)
+        : null
+  const shadow = ck.ImageFilter.MakeDropShadowOnly(
+    effect.x,
+    effect.y,
+    sigma(effect.blur),
+    sigma(effect.blur),
+    color(ck, effect.color),
+    spread,
+  )
   spread?.delete()
   return shadow
 }
@@ -250,12 +299,7 @@ function dropShadow(ck: CanvasKit, effect: Pick<Extract<Effect, { type: 'dropSha
  */
 function innerShadow(ck: CanvasKit, effect: Extract<Effect, { type: 'innerShadow' }>) {
   const [r = 0, g = 0, b = 0, a = 0] = color(ck, effect.color)
-  const outside = ck.ColorFilter.MakeMatrix([
-    0, 0, 0, 0, r,
-    0, 0, 0, 0, g,
-    0, 0, 0, 0, b,
-    0, 0, 0, -a, a,
-  ])
+  const outside = ck.ColorFilter.MakeMatrix([0, 0, 0, 0, r, 0, 0, 0, 0, g, 0, 0, 0, 0, b, 0, 0, 0, -a, a])
   const colored = ck.ImageFilter.MakeColorFilter(outside, null)
   outside.delete()
   const spread = effect.spread > 0 ? ck.ImageFilter.MakeDilate(effect.spread, effect.spread, colored) : colored
@@ -277,9 +321,19 @@ const BLUR_REACH = 3
 const union = (a: Box, b: Box): Box => {
   const x = Math.min(a.x, b.x)
   const y = Math.min(a.y, b.y)
-  return { x, y, width: Math.max(a.x + a.width, b.x + b.width) - x, height: Math.max(a.y + a.height, b.y + b.height) - y }
+  return {
+    x,
+    y,
+    width: Math.max(a.x + a.width, b.x + b.width) - x,
+    height: Math.max(a.y + a.height, b.y + b.height) - y,
+  }
 }
-export const outset = (box: Box, by: number): Box => ({ x: box.x - by, y: box.y - by, width: box.width + 2 * by, height: box.height + 2 * by })
+export const outset = (box: Box, by: number): Box => ({
+  x: box.x - by,
+  y: box.y - by,
+  width: box.width + 2 * by,
+  height: box.height + 2 * by,
+})
 
 /** The box after turning it about its own centre, as the axis-aligned box around the result. */
 function rotated(box: Box, about: Box, degrees: number): Box {
@@ -287,11 +341,23 @@ function rotated(box: Box, about: Box, degrees: number): Box {
   const a = (degrees * Math.PI) / 180
   const cx = about.x + about.width / 2
   const cy = about.y + about.height / 2
-  const corners = [[box.x, box.y], [box.x + box.width, box.y], [box.x, box.y + box.height], [box.x + box.width, box.y + box.height]]
-    .map(([px = 0, py = 0]) => [cx + (px - cx) * Math.cos(a) - (py - cy) * Math.sin(a), cy + (px - cx) * Math.sin(a) + (py - cy) * Math.cos(a)])
+  const corners = [
+    [box.x, box.y],
+    [box.x + box.width, box.y],
+    [box.x, box.y + box.height],
+    [box.x + box.width, box.y + box.height],
+  ].map(([px = 0, py = 0]) => [
+    cx + (px - cx) * Math.cos(a) - (py - cy) * Math.sin(a),
+    cy + (px - cx) * Math.sin(a) + (py - cy) * Math.cos(a),
+  ])
   const xs = corners.map(([x = 0]) => x)
   const ys = corners.map(([, y = 0]) => y)
-  return { x: Math.min(...xs), y: Math.min(...ys), width: Math.max(...xs) - Math.min(...xs), height: Math.max(...ys) - Math.min(...ys) }
+  return {
+    x: Math.min(...xs),
+    y: Math.min(...ys),
+    width: Math.max(...xs) - Math.min(...xs),
+    height: Math.max(...ys) - Math.min(...ys),
+  }
 }
 
 /** What a layer's content can touch, in its own unrotated coordinates. */
@@ -303,7 +369,10 @@ function drawnBounds(ck: CanvasKit, layer: SceneLayer, resources: Resources): Bo
       const [left = 0, top = 0, right = 0, bottom = 0] = path.computeTightBounds()
       path.delete()
       const line = layer.type === 'graphic' && layer.props.shape.kind === 'line'
-      return outset({ x: left, y: top, width: right - left, height: bottom - top }, strokeReach(layer.props.strokes, line))
+      return outset(
+        { x: left, y: top, width: right - left, height: bottom - top },
+        strokeReach(layer.props.strokes, line),
+      )
     }
     case 'text':
       return textBounds(ck, layer, resources)
@@ -321,18 +390,24 @@ function drawnBounds(ck: CanvasKit, layer: SceneLayer, resources: Resources): Bo
  * width, a square cap √2 × half; a line's ends reach END_SIZE widths.
  */
 export function strokeReach(strokes: readonly Stroke[], line: boolean) {
-  return Math.max(0, ...strokes.map((s) => {
-    if (line) return s.width * END_SIZE
-    const half = s.align === 'inside' ? 0 : s.align === 'center' ? s.width / 2 : s.width
-    return half * (s.join === 'miter' ? Math.max(s.miterLimit, Math.SQRT2) : Math.SQRT2)
-  }))
+  return Math.max(
+    0,
+    ...strokes.map((s) => {
+      if (line) return s.width * END_SIZE
+      const half = s.align === 'inside' ? 0 : s.align === 'center' ? s.width / 2 : s.width
+      return half * (s.join === 'miter' ? Math.max(s.miterLimit, Math.SQRT2) : Math.SQRT2)
+    }),
+  )
 }
 
 /** A container's own box grown by everything its children draw, each turned as it is drawn. */
 function childrenBounds(ck: CanvasKit, layer: SceneLayer, resources: Resources, own: Box): Box {
   let box = own
   for (const child of layer.children) {
-    box = union(box, rotated(withEffects(drawnBounds(ck, child, resources), child.props.effects), child.props, child.props.rotation))
+    box = union(
+      box,
+      rotated(withEffects(drawnBounds(ck, child, resources), child.props.effects), child.props, child.props.rotation),
+    )
   }
   return box
 }
@@ -349,13 +424,25 @@ function textBounds(ck: CanvasKit, layer: TextLayer, resources: Resources): Box 
   let box: Box = props
   for (const b of blocks) {
     for (const line of b.paragraph.getLineMetrics()) {
-      box = union(box, { x: props.x + b.x + line.left, y: props.y + dy + b.y + line.baseline - line.ascent, width: line.width, height: line.ascent + line.descent })
+      box = union(box, {
+        x: props.x + b.x + line.left,
+        y: props.y + dy + b.y + line.baseline - line.ascent,
+        width: line.width,
+        height: line.ascent + line.descent,
+      })
     }
-    if (b.marker) box = union(box, { x: props.x + b.markerX, y: props.y + dy + b.y + b.markerY, width: b.marker.getMaxIntrinsicWidth(), height: b.marker.getHeight() })
+    if (b.marker)
+      box = union(box, {
+        x: props.x + b.markerX,
+        y: props.y + dy + b.y + b.markerY,
+        width: b.marker.getMaxIntrinsicWidth(),
+        height: b.marker.getHeight(),
+      })
   }
   done()
   // Outlines reach half their width past the glyphs.
-  const outline = Math.max(props.style.outline?.width ?? 0, ...props.runs.map((r) => r.style.outline?.width ?? 0)) * scale
+  const outline =
+    Math.max(props.style.outline?.width ?? 0, ...props.runs.map((r) => r.style.outline?.width ?? 0)) * scale
   const largest = Math.max(props.style.fontSize, ...props.runs.map((r) => r.style.fontSize ?? 0)) * Math.max(1, scale)
   return outset(box, largest / 2 + outline / 2)
 }
@@ -371,7 +458,10 @@ function withEffects(box: Box, effects: readonly Effect[]): Box {
     } else if (effect.type === 'innerShadow') {
       // Drawn only inside the layer, but made from what lies around it: the offscreen holds that
       // much of the outside, so the edges of the offscreen never show as edges of the layer.
-      reach = union(reach, outset(box, Math.max(Math.abs(effect.x), Math.abs(effect.y)) + BLUR_REACH * sigma(effect.blur) + effect.spread))
+      reach = union(
+        reach,
+        outset(box, Math.max(Math.abs(effect.x), Math.abs(effect.y)) + BLUR_REACH * sigma(effect.blur) + effect.spread),
+      )
     } else if (effect.type === 'layerBlur') {
       reach = outset(reach, BLUR_REACH * sigma(effect.radius))
     }
@@ -379,7 +469,8 @@ function withEffects(box: Box, effects: readonly Effect[]): Box {
   return reach
 }
 
-export const rectPath = (ck: CanvasKit, box: Box) => new ck.PathBuilder().addRect(ck.XYWHRect(box.x, box.y, box.width, box.height)).detachAndDelete()
+export const rectPath = (ck: CanvasKit, box: Box) =>
+  new ck.PathBuilder().addRect(ck.XYWHRect(box.x, box.y, box.width, box.height)).detachAndDelete()
 
 /** A box with one radius on every corner, no more than half its shorter side. */
 function evenRectPath(ck: CanvasKit, { x, y, width, height }: Box, radius: number): Path {
@@ -392,10 +483,18 @@ function evenRectPath(ck: CanvasKit, { x, y, width, height }: Box, radius: numbe
  * scaled down with the others where two would overlap, as CSS does, and built from arcs rather than
  * as an RRect: Skia's SVG writer clips to an RRect as a <rect> with the first corner's radius.
  */
-export function framePath(ck: CanvasKit, props: Box & { cornerRadius: number | readonly [number, number, number, number] }): Path {
+export function framePath(
+  ck: CanvasKit,
+  props: Box & { cornerRadius: number | readonly [number, number, number, number] },
+): Path {
   const { x, y, width, height, cornerRadius: corners } = props
   if (typeof corners === 'number') return evenRectPath(ck, props, corners)
-  const sides = [[corners[0], corners[1], width], [corners[3], corners[2], width], [corners[0], corners[3], height], [corners[1], corners[2], height]] as const
+  const sides = [
+    [corners[0], corners[1], width],
+    [corners[3], corners[2], width],
+    [corners[0], corners[3], height],
+    [corners[1], corners[2], height],
+  ] as const
   const scale = Math.min(1, ...sides.map(([one, other, side]) => (one + other > 0 ? side / (one + other) : 1)))
   const [tl, tr, br, bl] = corners.map((r) => r * scale) as [number, number, number, number]
   const quarter = Math.SQRT1_2
@@ -420,18 +519,31 @@ function shapePath(ck: CanvasKit, layer: GraphicLayer): Path {
       if (shape.corners) {
         // Skia scales radii down together when two corners would overlap, as CSS does.
         const [a, b, c, d] = shape.corners
-        return new ck.PathBuilder().addRRect(Float32Array.of(x, y, x + width, y + height, a, a, b, b, c, c, d, d)).detachAndDelete()
+        return new ck.PathBuilder()
+          .addRRect(Float32Array.of(x, y, x + width, y + height, a, a, b, b, c, c, d, d))
+          .detachAndDelete()
       }
       return evenRectPath(ck, { x, y, width, height }, shape.cornerRadius)
     }
     case 'ellipse':
       return new ck.PathBuilder().addOval(ck.XYWHRect(x, y, width, height)).detachAndDelete()
     case 'polygon':
-      return roundedPolygon(ck, around(layer.props, shape.sides, () => 1), shape.cornerRadius)
+      return roundedPolygon(
+        ck,
+        around(layer.props, shape.sides, () => 1),
+        shape.cornerRadius,
+      )
     case 'star':
-      return roundedPolygon(ck, around(layer.props, shape.points * 2, (i) => (i % 2 === 0 ? 1 : shape.innerRadius)), shape.cornerRadius)
+      return roundedPolygon(
+        ck,
+        around(layer.props, shape.points * 2, (i) => (i % 2 === 0 ? 1 : shape.innerRadius)),
+        shape.cornerRadius,
+      )
     case 'line':
-      return new ck.PathBuilder().moveTo(x, y + height / 2).lineTo(x + width, y + height / 2).detachAndDelete()
+      return new ck.PathBuilder()
+        .moveTo(x, y + height / 2)
+        .lineTo(x + width, y + height / 2)
+        .detachAndDelete()
     case 'path': {
       // Path data is placed at x and y, scaled from the box it was drawn in to this one.
       const parsed = ck.Path.MakeFromSVGString(shape.d)
@@ -496,7 +608,12 @@ function roundedPolygon(ck: CanvasKit, points: [number, number][], radius: numbe
  * enclose nothing, so they add nothing.
  */
 function booleanPath(ck: CanvasKit, layer: BooleanLayer): Path {
-  const op = { union: ck.PathOp.Union, subtract: ck.PathOp.Difference, intersect: ck.PathOp.Intersect, exclude: ck.PathOp.XOR }[layer.props.op]
+  const op = {
+    union: ck.PathOp.Union,
+    subtract: ck.PathOp.Difference,
+    intersect: ck.PathOp.Intersect,
+    exclude: ck.PathOp.XOR,
+  }[layer.props.op]
   let result: Path | null = null
   for (const child of layer.children) {
     if (child.type === 'graphic' && child.props.shape.kind === 'line') continue
@@ -505,7 +622,9 @@ function booleanPath(ck: CanvasKit, layer: BooleanLayer): Path {
     const { x, y, width, height, rotation } = child.props
     const builder = new ck.PathBuilder(own)
     own.delete()
-    const outline = builder.transform(ck.Matrix.rotated((rotation * Math.PI) / 180, x + width / 2, y + height / 2)).detachAndDelete()
+    const outline = builder
+      .transform(ck.Matrix.rotated((rotation * Math.PI) / 180, x + width / 2, y + height / 2))
+      .detachAndDelete()
     if (!result) {
       result = outline
       continue
@@ -527,7 +646,14 @@ const END_SIZE = 3
 type LineShape = Extract<GraphicLayer['props']['shape'], { kind: 'line' }>
 
 /** Fills and strokes an outline; a line's strokes are always centred, and draw its ends. */
-function drawShape(ck: CanvasKit, canvas: Canvas, path: Path, props: GraphicLayer['props'] | BooleanLayer['props'], resources: Resources, line: LineShape | null) {
+function drawShape(
+  ck: CanvasKit,
+  canvas: Canvas,
+  path: Path,
+  props: GraphicLayer['props'] | BooleanLayer['props'],
+  resources: Resources,
+  line: LineShape | null,
+) {
   if (!line) for (const fill of props.fills) fillPath(ck, canvas, path, fill, props, resources)
   strokePath(ck, canvas, path, props, resources, line)
 }
@@ -537,18 +663,30 @@ function drawShape(ck: CanvasKit, canvas: Canvas, path: Path, props: GraphicLaye
  * with its ends. An outside stroke is clipped to everywhere but the outline, worked out as one path
  * with the outline's own fill rule kept, which an SVG can hold where it can't hold a difference.
  */
-export function strokePath(ck: CanvasKit, canvas: Canvas, path: Path, props: Box & { strokes: readonly Stroke[] }, resources: Resources, line: LineShape | null) {
+export function strokePath(
+  ck: CanvasKit,
+  canvas: Canvas,
+  path: Path,
+  props: Box & { strokes: readonly Stroke[] },
+  resources: Resources,
+  line: LineShape | null,
+) {
   let outside: Path | null = null
   for (const stroke of props.strokes) {
     const paint = paintFor(ck, stroke.paint, props, resources)
     if (!paint) continue
     paint.setStyle(ck.PaintStyle.Stroke)
     paint.setStrokeCap({ butt: ck.StrokeCap.Butt, round: ck.StrokeCap.Round, square: ck.StrokeCap.Square }[stroke.cap])
-    paint.setStrokeJoin({ miter: ck.StrokeJoin.Miter, round: ck.StrokeJoin.Round, bevel: ck.StrokeJoin.Bevel }[stroke.join])
+    paint.setStrokeJoin(
+      { miter: ck.StrokeJoin.Miter, round: ck.StrokeJoin.Round, bevel: ck.StrokeJoin.Bevel }[stroke.join],
+    )
     paint.setStrokeMiter(stroke.miterLimit)
     if (stroke.dashes.length > 0) {
       // Skia needs dash and gap pairs; an odd list repeats, as in SVG.
-      const dash = ck.PathEffect.MakeDash(stroke.dashes.length % 2 === 0 ? [...stroke.dashes] : [...stroke.dashes, ...stroke.dashes], stroke.dashOffset)
+      const dash = ck.PathEffect.MakeDash(
+        stroke.dashes.length % 2 === 0 ? [...stroke.dashes] : [...stroke.dashes, ...stroke.dashes],
+        stroke.dashOffset,
+      )
       paint.setPathEffect(dash)
       dash.delete()
     }
@@ -596,11 +734,18 @@ function drawLine(ck: CanvasKit, canvas: Canvas, box: Box, line: LineShape, stro
   if (to > from) canvas.drawLine(from, y, to, y, paint)
   // Ends are solid, whatever the dashes.
   paint.setPathEffect(null)
-  for (const [end, tip, back] of [[line.start, box.x, 1], [line.end, box.x + box.width, -1]] as const) {
+  for (const [end, tip, back] of [
+    [line.start, box.x, 1],
+    [line.end, box.x + box.width, -1],
+  ] as const) {
     if (end === 'none') continue
     const base = tip + back * size
     if (end === 'arrow') {
-      const shaft = new ck.PathBuilder().moveTo(base, y - size / 2).lineTo(tip, y).lineTo(base, y + size / 2).detachAndDelete()
+      const shaft = new ck.PathBuilder()
+        .moveTo(base, y - size / 2)
+        .lineTo(tip, y)
+        .lineTo(base, y + size / 2)
+        .detachAndDelete()
       canvas.drawPath(shaft, paint)
       shaft.delete()
       continue
@@ -609,7 +754,9 @@ function drawLine(ck: CanvasKit, canvas: Canvas, box: Box, line: LineShape, stro
     fill.setStyle(ck.PaintStyle.Fill)
     if (end === 'circle') canvas.drawCircle(tip, y, size / 2, fill)
     else {
-      const head = new ck.PathBuilder().addPolygon([tip, y, base, y - size / 2, base, y + size / 2], true).detachAndDelete()
+      const head = new ck.PathBuilder()
+        .addPolygon([tip, y, base, y - size / 2, base, y + size / 2], true)
+        .detachAndDelete()
       canvas.drawPath(head, fill)
       head.delete()
     }
@@ -650,22 +797,34 @@ function paintFor(ck: CanvasKit, fill: Paint, box: Box, resources: Resources): C
       break
     case 'linear':
       shader = ck.Shader.MakeLinearGradient(
-        [fill.from.x, fill.from.y], [fill.to.x, fill.to.y],
-        fill.stops.map((s) => color(ck, s.color)), fill.stops.map((s) => s.offset), ck.TileMode.Clamp, unitBox,
+        [fill.from.x, fill.from.y],
+        [fill.to.x, fill.to.y],
+        fill.stops.map((s) => color(ck, s.color)),
+        fill.stops.map((s) => s.offset),
+        ck.TileMode.Clamp,
+        unitBox,
       )
       break
     case 'radial':
       shader = ck.Shader.MakeRadialGradient(
-        [fill.center.x, fill.center.y], fill.radius,
-        fill.stops.map((s) => color(ck, s.color)), fill.stops.map((s) => s.offset), ck.TileMode.Clamp, unitBox,
+        [fill.center.x, fill.center.y],
+        fill.radius,
+        fill.stops.map((s) => color(ck, s.color)),
+        fill.stops.map((s) => s.offset),
+        ck.TileMode.Clamp,
+        unitBox,
       )
       break
     case 'angular': {
       // Turned about its centre in the unit box, so offset 0 starts at the angle.
       const turn = ck.Matrix.rotated((fill.angle * Math.PI) / 180, fill.center.x, fill.center.y)
       shader = ck.Shader.MakeSweepGradient(
-        fill.center.x, fill.center.y, fill.stops.map((s) => color(ck, s.color)), fill.stops.map((s) => s.offset),
-        ck.TileMode.Clamp, ck.Matrix.multiply(unitBox, turn),
+        fill.center.x,
+        fill.center.y,
+        fill.stops.map((s) => color(ck, s.color)),
+        fill.stops.map((s) => s.offset),
+        ck.TileMode.Clamp,
+        ck.Matrix.multiply(unitBox, turn),
       )
       break
     }
@@ -698,7 +857,12 @@ function imageShader(ck: CanvasKit, image: Image, fill: Extract<Paint, { type: '
   const ih = image.height()
   const sampling = [ck.FilterMode.Linear, ck.MipmapMode.None] as const
   if (fill.fit === 'tile') {
-    return image.makeShaderOptions(ck.TileMode.Repeat, ck.TileMode.Repeat, ...sampling, ck.Matrix.translated(box.x, box.y))
+    return image.makeShaderOptions(
+      ck.TileMode.Repeat,
+      ck.TileMode.Repeat,
+      ...sampling,
+      ck.Matrix.translated(box.x, box.y),
+    )
   }
   let src = { x: 0, y: 0, width: iw, height: ih }
   let dst: Box = box
@@ -706,10 +870,20 @@ function imageShader(ck: CanvasKit, image: Image, fill: Extract<Paint, { type: '
     src = fill.crop
   } else if (fill.fit === 'fill' || fill.fit === 'crop') {
     const scale = Math.max(box.width / iw, box.height / ih)
-    src = { width: box.width / scale, height: box.height / scale, x: (iw - box.width / scale) / 2, y: (ih - box.height / scale) / 2 }
+    src = {
+      width: box.width / scale,
+      height: box.height / scale,
+      x: (iw - box.width / scale) / 2,
+      y: (ih - box.height / scale) / 2,
+    }
   } else {
     const scale = Math.min(box.width / iw, box.height / ih)
-    dst = { width: iw * scale, height: ih * scale, x: box.x + (box.width - iw * scale) / 2, y: box.y + (box.height - ih * scale) / 2 }
+    dst = {
+      width: iw * scale,
+      height: ih * scale,
+      x: box.x + (box.width - iw * scale) / 2,
+      y: box.y + (box.height - ih * scale) / 2,
+    }
   }
   const matrix = ck.Matrix.multiply(
     ck.Matrix.translated(dst.x, dst.y),
@@ -747,9 +921,22 @@ function drawAsShapes(ck: CanvasKit, canvas: Canvas, draw: (into: Canvas) => voi
 function blendMode(ck: CanvasKit, mode: SceneLayer['props']['blendMode']) {
   const b = ck.BlendMode
   return {
-    normal: b.SrcOver, multiply: b.Multiply, screen: b.Screen, overlay: b.Overlay, darken: b.Darken, lighten: b.Lighten,
-    'color-dodge': b.ColorDodge, 'color-burn': b.ColorBurn, 'hard-light': b.HardLight, 'soft-light': b.SoftLight,
-    difference: b.Difference, exclusion: b.Exclusion, hue: b.Hue, saturation: b.Saturation, color: b.Color, luminosity: b.Luminosity,
+    normal: b.SrcOver,
+    multiply: b.Multiply,
+    screen: b.Screen,
+    overlay: b.Overlay,
+    darken: b.Darken,
+    lighten: b.Lighten,
+    'color-dodge': b.ColorDodge,
+    'color-burn': b.ColorBurn,
+    'hard-light': b.HardLight,
+    'soft-light': b.SoftLight,
+    difference: b.Difference,
+    exclusion: b.Exclusion,
+    hue: b.Hue,
+    saturation: b.Saturation,
+    color: b.Color,
+    luminosity: b.Luminosity,
     // Only reached when a pass-through group needs its own layer for opacity or effects.
     'pass-through': b.SrcOver,
   }[mode]

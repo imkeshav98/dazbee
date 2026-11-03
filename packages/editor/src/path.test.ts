@@ -1,6 +1,21 @@
 import { describe, expect, it } from 'vitest'
+
 import {
-  constrain, cubicOf, deleteAnchors, formatPath, hitPath, isSmooth, moveAnchors, moveControl, nearestOnCubic, parsePath, pathBounds, pointAt, splitSegment, type Anchor, type PenPath,
+  type Anchor,
+  constrain,
+  cubicOf,
+  deleteAnchors,
+  formatPath,
+  hitPath,
+  isSmooth,
+  moveAnchors,
+  moveControl,
+  nearestOnCubic,
+  parsePath,
+  pathBounds,
+  type PenPath,
+  pointAt,
+  splitSegment,
 } from './path.ts'
 
 const drop = (path: PenPath) => JSON.parse(JSON.stringify(path)) as PenPath
@@ -12,12 +27,24 @@ const close = (a: { x: number; y: number }, b: { x: number; y: number }, digits 
 describe('path data (#45)', () => {
   it('reads every command and writes M, L, C and Z back', () => {
     const path = parsePath('M10 10 L110 10 C150 10 150 90 110 90 H10 Z')
-    expect(drop(path)).toEqual([{ closed: true, anchors: [{ x: 10, y: 10 }, { x: 110, y: 10, out: { x: 150, y: 10 } }, { x: 110, y: 90, in: { x: 150, y: 90 } }, { x: 10, y: 90 }] }])
+    expect(drop(path)).toEqual([
+      {
+        closed: true,
+        anchors: [
+          { x: 10, y: 10 },
+          { x: 110, y: 10, out: { x: 150, y: 10 } },
+          { x: 110, y: 90, in: { x: 150, y: 90 } },
+          { x: 10, y: 90 },
+        ],
+      },
+    ])
     expect(formatPath(path)).toBe('M10 10 L110 10 C150 10 150 90 110 90 L10 90 Z')
     // Relative commands, implicit lines after a move, smooth cubics and quadratics.
     const relative = parsePath('m0 0 10 0 v10 h-10 z m20 0 c0 -10 10 -10 10 0 s10 10 10 0 q5 -5 10 0 t10 0')
     expect(relative).toHaveLength(2)
-    expect(formatPath(relative)).toBe('M0 0 L10 0 L10 10 L0 10 Z M20 0 C20 -10 30 -10 30 0 C30 10 40 10 40 0 C43.33 -3.33 46.67 -3.33 50 0 C53.33 3.33 56.67 3.33 60 0')
+    expect(formatPath(relative)).toBe(
+      'M0 0 L10 0 L10 10 L0 10 Z M20 0 C20 -10 30 -10 30 0 C30 10 40 10 40 0 C43.33 -3.33 46.67 -3.33 50 0 C53.33 3.33 56.67 3.33 60 0',
+    )
     // A curve ending on its start closes into it, keeping the last handle as the first anchor's in.
     const loop = parsePath('M0 0 C10 -10 20 -10 30 0 C20 10 10 10 0 0 Z')
     expect(loop[0]?.anchors).toHaveLength(2)
@@ -56,7 +83,11 @@ describe('editing a path (#45)', () => {
     const p = path()
     // The handle at (100, -50) is only there to grab when its anchor shows its handles.
     expect(hitPath(p, { x: 101, y: -49 }, 5)).toBeNull()
-    expect(hitPath(p, { x: 101, y: -49 }, 5, [{ contour: 0, index: 1 }])).toEqual({ kind: 'control', ref: { contour: 0, index: 1 }, side: 'in' })
+    expect(hitPath(p, { x: 101, y: -49 }, 5, [{ contour: 0, index: 1 }])).toEqual({
+      kind: 'control',
+      ref: { contour: 0, index: 1 },
+      side: 'in',
+    })
     expect(hitPath(p, { x: 98, y: 3 }, 5)).toEqual({ kind: 'anchor', ref: { contour: 0, index: 1 } })
     const onCurve = hitPath(p, { x: 50, y: -36 }, 5)
     expect(onCurve).toMatchObject({ kind: 'segment', contour: 0, from: 0 })
@@ -105,12 +136,18 @@ describe('editing a path (#45)', () => {
     const a = mirrored[0]?.anchors[1] as Anchor
     expect(isSmooth(a)).toBe(true)
     // The other handle keeps its length.
-    expect(Math.hypot((a.in?.x ?? 0) - a.x, (a.in?.y ?? 0) - a.y)).toBeCloseTo(Math.hypot((at.in?.x ?? 0) - at.x, (at.in?.y ?? 0) - at.y), 6)
+    expect(Math.hypot((a.in?.x ?? 0) - a.x, (a.in?.y ?? 0) - a.y)).toBeCloseTo(
+      Math.hypot((at.in?.x ?? 0) - at.x, (at.in?.y ?? 0) - at.y),
+      6,
+    )
     const broken = moveControl(smooth.path, smooth.ref, 'out', { x: at.x + 30, y: at.y + 30 }, false)
     expect(broken[0]?.anchors[1]?.in).toEqual(at.in)
     expect(isSmooth(broken[0]?.anchors[1] as Anchor)).toBe(false)
     // A handle dragged onto its anchor is gone.
-    expect(moveControl(path(), { contour: 0, index: 0 }, 'out', { x: 0, y: 0 }, false)[0]?.anchors[0]).toEqual({ x: 0, y: 0 })
+    expect(moveControl(path(), { contour: 0, index: 0 }, 'out', { x: 0, y: 0 }, false)[0]?.anchors[0]).toEqual({
+      x: 0,
+      y: 0,
+    })
   })
 
   it('deletes anchors, and a contour left with one', () => {

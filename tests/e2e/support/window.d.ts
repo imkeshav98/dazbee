@@ -2,5 +2,7 @@
 import type { Editor } from '@dazbee/editor'
 
 declare global {
-  interface Window { dazbee?: Editor }
+  interface Window {
+    dazbee?: Editor
+  }
 }

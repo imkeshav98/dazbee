@@ -1,10 +1,12 @@
+import { afterAll, describe, expect, it } from 'vitest'
+
+import type { Paragraph } from '@dazbee/canvaskit'
 import { FALLBACK_FAMILIES } from '@dazbee/fonts'
 import { loadFontFiles } from '@dazbee/fonts/node'
 import { caretAt, caretPosition, layoutText, makeResources, selectionBoxes, type TextLayout } from '@dazbee/renderer'
 import { loadCanvasKit } from '@dazbee/renderer/node'
 import { TextProps } from '@dazbee/schema'
-import type { Paragraph } from '@dazbee/canvaskit'
-import { afterAll, describe, expect, it } from 'vitest'
+
 import { MIXED, SAMPLES, type TextSample } from './text-samples.ts'
 
 const ck = await loadCanvasKit()
@@ -17,13 +19,21 @@ const LATIN_OR_DIGIT = /[\p{Script=Latin}\p{Nd}]/u
 
 /** Graphemes as Unicode defines them (Intl.Segmenter), with their UTF-16 ranges. */
 function graphemes(text: string) {
-  return [...new Intl.Segmenter('und', { granularity: 'grapheme' }).segment(text)]
-    .map((s) => ({ text: s.segment, start: s.index, end: s.index + s.segment.length }))
+  return [...new Intl.Segmenter('und', { granularity: 'grapheme' }).segment(text)].map((s) => ({
+    text: s.segment,
+    start: s.index,
+    end: s.index + s.segment.length,
+  }))
 }
 
 function laidOut(sample: TextSample, width?: number) {
   const props = TextProps.parse({
-    x: 0, y: 0, width: width ?? 0, height: 0, boxMode: width ? 'autoHeight' : 'autoWidth', text: sample.text,
+    x: 0,
+    y: 0,
+    width: width ?? 0,
+    height: 0,
+    boxMode: width ? 'autoHeight' : 'autoWidth',
+    text: sample.text,
     style: { fontFamily: sample.family, fontWeight: sample.weight, fontSize: 48, color: '#000000FF' },
   })
   return layoutText(ck, props, resources)
@@ -45,8 +55,14 @@ function glyphOrigins(paragraph: Paragraph, text: string) {
     bytes += code < 0x80 ? 1 : code < 0x800 ? 2 : code < 0x10000 ? 3 : 4
     if (code >= 0x10000) i++
   }
-  return paragraph.getShapedLines().flatMap((line) => line.runs.flatMap((run) =>
-    [...run.glyphs].map((_, i) => ({ offset: utf16At.get(run.offsets[i] ?? -1) ?? -1, x: run.positions[2 * i] ?? Number.NaN }))))
+  return paragraph.getShapedLines().flatMap((line) =>
+    line.runs.flatMap((run) =>
+      [...run.glyphs].map((_, i) => ({
+        offset: utf16At.get(run.offsets[i] ?? -1) ?? -1,
+        x: run.positions[2 * i] ?? Number.NaN,
+      })),
+    ),
+  )
 }
 
 describe.each([...SAMPLES, MIXED])('caret and selection in $label', (sample) => {

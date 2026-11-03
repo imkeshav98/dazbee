@@ -7,12 +7,20 @@ export const ALIGNMENTS = ['left', 'centre', 'right', 'top', 'middle', 'bottom']
 export type Alignment = (typeof ALIGNMENTS)[number]
 export type Distribution = 'horizontal' | 'vertical'
 
-export interface Offset { dx: number; dy: number }
+export interface Offset {
+  dx: number
+  dy: number
+}
 
 const around = (boxes: Rect[]): Rect => {
   const x = Math.min(...boxes.map((b) => b.x))
   const y = Math.min(...boxes.map((b) => b.y))
-  return { x, y, width: Math.max(...boxes.map((b) => b.x + b.width)) - x, height: Math.max(...boxes.map((b) => b.y + b.height)) - y }
+  return {
+    x,
+    y,
+    width: Math.max(...boxes.map((b) => b.x + b.width)) - x,
+    height: Math.max(...boxes.map((b) => b.y + b.height)) - y,
+  }
 }
 
 /** How far each box moves to line up; with one box, it lines up with `within`. */
@@ -20,12 +28,18 @@ export function align(boxes: Rect[], to: Alignment, within: Rect): Offset[] {
   const target = boxes.length === 1 ? within : around(boxes)
   return boxes.map((b) => {
     switch (to) {
-      case 'left': return { dx: target.x - b.x, dy: 0 }
-      case 'centre': return { dx: target.x + target.width / 2 - (b.x + b.width / 2), dy: 0 }
-      case 'right': return { dx: target.x + target.width - (b.x + b.width), dy: 0 }
-      case 'top': return { dx: 0, dy: target.y - b.y }
-      case 'middle': return { dx: 0, dy: target.y + target.height / 2 - (b.y + b.height / 2) }
-      case 'bottom': return { dx: 0, dy: target.y + target.height - (b.y + b.height) }
+      case 'left':
+        return { dx: target.x - b.x, dy: 0 }
+      case 'centre':
+        return { dx: target.x + target.width / 2 - (b.x + b.width / 2), dy: 0 }
+      case 'right':
+        return { dx: target.x + target.width - (b.x + b.width), dy: 0 }
+      case 'top':
+        return { dx: 0, dy: target.y - b.y }
+      case 'middle':
+        return { dx: 0, dy: target.y + target.height / 2 - (b.y + b.height / 2) }
+      case 'bottom':
+        return { dx: 0, dy: target.y + target.height - (b.y + b.height) }
     }
   })
 }

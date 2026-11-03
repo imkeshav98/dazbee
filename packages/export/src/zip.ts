@@ -2,7 +2,10 @@
 // would only cost time. Every entry gets the same fixed date, so the same files always give the
 // same bytes, in the browser and in Node.
 
-export interface ZipEntry { path: string; bytes: Uint8Array }
+export interface ZipEntry {
+  path: string
+  bytes: Uint8Array
+}
 
 const CRC_TABLE = (() => {
   const table = new Uint32Array(256)
@@ -35,30 +38,68 @@ export function zip(entries: ZipEntry[]): Uint8Array {
   const out = new Uint8Array(localSize + directorySize + 22)
   const view = new DataView(out.buffer)
   let at = 0
-  const u16 = (v: number) => { view.setUint16(at, v, true); at += 2 }
-  const u32 = (v: number) => { view.setUint32(at, v, true); at += 4 }
-  const put = (bytes: Uint8Array) => { out.set(bytes, at); at += bytes.length }
+  const u16 = (v: number) => {
+    view.setUint16(at, v, true)
+    at += 2
+  }
+  const u32 = (v: number) => {
+    view.setUint32(at, v, true)
+    at += 4
+  }
+  const put = (bytes: Uint8Array) => {
+    out.set(bytes, at)
+    at += bytes.length
+  }
 
   const offsets: number[] = []
   entries.forEach((entry, i) => {
     const name = names[i] ?? new Uint8Array()
     offsets.push(at)
-    u32(0x04034b50); u16(20); u16(UTF8); u16(0); u16(DOS_TIME); u16(DOS_DATE)
-    u32(crcs[i] ?? 0); u32(entry.bytes.length); u32(entry.bytes.length); u16(name.length); u16(0)
+    u32(0x04034b50)
+    u16(20)
+    u16(UTF8)
+    u16(0)
+    u16(DOS_TIME)
+    u16(DOS_DATE)
+    u32(crcs[i] ?? 0)
+    u32(entry.bytes.length)
+    u32(entry.bytes.length)
+    u16(name.length)
+    u16(0)
     put(name)
     put(entry.bytes)
   })
   const central = at
   entries.forEach((entry, i) => {
     const name = names[i] ?? new Uint8Array()
-    u32(0x02014b50); u16(20); u16(20); u16(UTF8); u16(0); u16(DOS_TIME); u16(DOS_DATE)
-    u32(crcs[i] ?? 0); u32(entry.bytes.length); u32(entry.bytes.length); u16(name.length); u16(0); u16(0)
-    u16(0); u16(0); u32(0); u32(offsets[i] ?? 0)
+    u32(0x02014b50)
+    u16(20)
+    u16(20)
+    u16(UTF8)
+    u16(0)
+    u16(DOS_TIME)
+    u16(DOS_DATE)
+    u32(crcs[i] ?? 0)
+    u32(entry.bytes.length)
+    u32(entry.bytes.length)
+    u16(name.length)
+    u16(0)
+    u16(0)
+    u16(0)
+    u16(0)
+    u32(0)
+    u32(offsets[i] ?? 0)
     put(name)
   })
   const centralSize = at - central
-  u32(0x06054b50); u16(0); u16(0); u16(entries.length); u16(entries.length)
-  u32(centralSize); u32(central); u16(0)
+  u32(0x06054b50)
+  u16(0)
+  u16(0)
+  u16(entries.length)
+  u16(entries.length)
+  u32(centralSize)
+  u32(central)
+  u16(0)
   return out
 }
 

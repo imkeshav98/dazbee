@@ -48,9 +48,10 @@ export function inferLayout(frame: Rect, kids: [string, Rect][]): { layout: Infe
   const bottom = frame.y + frame.height - Math.max(...boxes.map((b) => b.y + b.height))
   const across = (part: 0 | 0.5 | 1) => boxes.map((b) => (row ? b.y + b.height * part : b.x + b.width * part))
   const align = same(across(0)) ? 'start' : same(across(0.5)) ? 'center' : same(across(1)) ? 'end' : 'start'
-  const padding = kids.length === 0
-    ? { top: 0, right: 0, bottom: 0, left: 0 }
-    : { top: round(top), right: round(right), bottom: round(bottom), left: round(left) }
+  const padding =
+    kids.length === 0
+      ? { top: 0, right: 0, bottom: 0, left: 0 }
+      : { top: round(top), right: round(right), bottom: round(bottom), left: round(left) }
   // Centred across the flow, the paddings either side must differ by as much as the centre line
   // is off the frame's middle; at the start or end, the paddings read off already hold them there.
   if (align === 'center' && kids.length > 0) {

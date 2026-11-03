@@ -1,9 +1,11 @@
 // Rounded boxes: a frame's fills, its clip and its shadow follow its corners, one radius or each
 // corner's own, on the CPU surface and in the PDF and SVG exports alike.
 import { PDFiumLibrary } from '@hyzyla/pdfium'
+import { afterAll, describe, expect, it } from 'vitest'
+
 import { renderDesign, renderVector } from '@dazbee/renderer'
 import { loadCanvasKit } from '@dazbee/renderer/node'
-import { afterAll, describe, expect, it } from 'vitest'
+
 import { fixtureResources } from './pixels.ts'
 import { overWhite, rasterisePdf, rasteriseSvg, vectorDifference } from './vector.ts'
 
@@ -19,17 +21,31 @@ const design = (frame: Record<string, unknown>) => ({
   formats: { f: { name: 'F', width: 300, height: 300, order: 'a0' } },
   pages: { p1: { name: 'Page', order: 'a0', fills: solid('#FFFFFFFF') } },
   nodes: {
-    box: { type: 'frame', parentId: 'p1', index: 'a0', name: 'Box', props: { x: 20, y: 20, width: 160, height: 160, fills: solid('#2050E0FF'), ...frame } },
-    inner: { type: 'graphic', parentId: 'box', index: 'a0', name: 'Inner', props: { x: 0, y: 0, width: 200, height: 200, shape: { kind: 'rect' }, fills: solid('#E02020FF') } },
+    box: {
+      type: 'frame',
+      parentId: 'p1',
+      index: 'a0',
+      name: 'Box',
+      props: { x: 20, y: 20, width: 160, height: 160, fills: solid('#2050E0FF'), ...frame },
+    },
+    inner: {
+      type: 'graphic',
+      parentId: 'box',
+      index: 'a0',
+      name: 'Inner',
+      props: { x: 0, y: 0, width: 200, height: 200, shape: { kind: 'rect' }, fills: solid('#E02020FF') },
+    },
   },
   overrides: {},
 })
-const at = (r: { pixels: Uint8Array; width: number }, x: number, y: number) => [...r.pixels.slice((y * r.width + x) * 4, (y * r.width + x) * 4 + 3)]
+const at = (r: { pixels: Uint8Array; width: number }, x: number, y: number) => [
+  ...r.pixels.slice((y * r.width + x) * 4, (y * r.width + x) * 4 + 3),
+]
 const WHITE = [255, 255, 255]
 const RED = [224, 32, 32]
 
 describe('rounded boxes', () => {
-  it('cut what is inside to the rounded corners, and not with Hide what\'s outside off', () => {
+  it("cut what is inside to the rounded corners, and not with Hide what's outside off", () => {
     const clipped = renderDesign(ck, design({ cornerRadius: 40 }), 'p1', 'f', bytes)
     expect(at(clipped, 22, 22)).toEqual(WHITE)
     expect(at(clipped, 100, 22)).toEqual(RED)

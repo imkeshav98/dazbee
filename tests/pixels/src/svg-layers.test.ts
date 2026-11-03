@@ -3,12 +3,15 @@
 // drawn by the CPU renderer, then compared with resvg's drawing of the original file.
 import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
+
+import { Resvg } from '@resvg/resvg-js'
+import { describe, expect, it } from 'vitest'
+
 import { renderDesign } from '@dazbee/renderer'
 import { loadCanvasKit } from '@dazbee/renderer/node'
 import { svgToLayers } from '@dazbee/svg'
-import { describe, expect, it } from 'vitest'
+
 import { ASSETS_DIR, encodePng, fixtureResources, OUTPUT_DIR } from './pixels.ts'
-import { Resvg } from '@resvg/resvg-js'
 import { vectorDifference } from './vector.ts'
 
 const ck = await loadCanvasKit()
@@ -19,13 +22,19 @@ const LIMIT = 1
 
 /** The file drawn by resvg over white, as the page is. */
 function rasterise(text: string) {
-  const image = new Resvg(text, { background: '#FFFFFF', fitTo: { mode: 'original' }, font: { loadSystemFonts: false } }).render()
+  const image = new Resvg(text, {
+    background: '#FFFFFF',
+    fitTo: { mode: 'original' },
+    font: { loadSystemFonts: false },
+  }).render()
   return { width: image.width, height: image.height, pixels: new Uint8Array(image.pixels) }
 }
 
 function draw(text: string) {
   const { tree, root, width, height, skipped } = svgToLayers(ck, text)
-  const nodes = Object.fromEntries(Object.entries(tree.nodes).map(([id, node]) => [id, id === root ? { ...node, parentId: 'p1', index: 'a0' } : node]))
+  const nodes = Object.fromEntries(
+    Object.entries(tree.nodes).map(([id, node]) => [id, id === root ? { ...node, parentId: 'p1', index: 'a0' } : node]),
+  )
   const design = {
     meta: { schemaVersion: 5, designId: 'd', name: 'Logo', kind: 'single', primaryFormatId: 'f' },
     formats: { f: { name: 'Logo', width: Math.round(width), height: Math.round(height), order: 'a0' } },
@@ -36,7 +45,9 @@ function draw(text: string) {
 }
 
 describe('SVG files as layers', () => {
-  const files = readdirSync(LOGOS).filter((f) => f.endsWith('.svg')).sort()
+  const files = readdirSync(LOGOS)
+    .filter((f) => f.endsWith('.svg'))
+    .sort()
   it('has the logos to check', () => expect(files.length).toBeGreaterThanOrEqual(8))
 
   for (const file of files) {
@@ -48,7 +59,9 @@ describe('SVG files as layers', () => {
       writeFileSync(join(OUTPUT_DIR, 'svg-layers', file.replace('.svg', '.layers.png')), encodePng(ck, drawn))
       writeFileSync(join(OUTPUT_DIR, 'svg-layers', file.replace('.svg', '.resvg.png')), encodePng(ck, expected))
       const percent = vectorDifference(expected, drawn)
-      console.log(`${file}: ${layers} layers, ${percent.toFixed(3)}% differ${skipped.length ? `, left out: ${skipped.join(', ')}` : ''}`)
+      console.log(
+        `${file}: ${layers} layers, ${percent.toFixed(3)}% differ${skipped.length ? `, left out: ${skipped.join(', ')}` : ''}`,
+      )
       expect(skipped).toEqual([])
       expect(percent).toBeLessThan(LIMIT)
     })

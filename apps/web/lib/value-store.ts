@@ -31,4 +31,4 @@ export function valueStore<T>(initial: T): ValueStore<T> {
 }
 
 /** The store's value, re-rendering the caller when it changes. */
-export const useValue = <T,>(store: ValueStore<T>) => useSyncExternalStore(store.subscribe, store.get, store.get)
+export const useValue = <T>(store: ValueStore<T>) => useSyncExternalStore(store.subscribe, store.get, store.get)

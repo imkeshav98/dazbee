@@ -1,13 +1,16 @@
 // The UI foundation (#51): themes change only tokens, Arabic mirrors the chrome but not the design,
 // reduced motion turns chrome animation off. Screenshots go to output/ for the PR.
-import { expect, test, type Page } from '../support/test.ts'
-import { writeOutput, editorPath } from '../support/editor.ts'
+import { editorPath, writeOutput } from '../support/editor.ts'
 import { liveDesign, seed } from '../support/seed.ts'
+import { expect, type Page, test } from '../support/test.ts'
 
-const shoot = async (page: Page, name: string) => writeOutput(`ui-${name}.png`, await page.screenshot({ animations: 'disabled' }))
+const shoot = async (page: Page, name: string) =>
+  writeOutput(`ui-${name}.png`, await page.screenshot({ animations: 'disabled' }))
 
 async function setCookies(page: Page, cookies: Record<string, string>) {
-  await page.context().addCookies(Object.entries(cookies).map(([name, value]) => ({ name, value, url: 'http://localhost:3100' })))
+  await page
+    .context()
+    .addCookies(Object.entries(cookies).map(([name, value]) => ({ name, value, url: 'http://localhost:3100' })))
 }
 
 test.use({ viewport: { width: 1440, height: 900 } })
@@ -19,21 +22,38 @@ const CHROME_MS = 180
  * Records every animation the page asks an element for from now on, as Motion does to run a fade
  * on the browser's clock: the element's test id, the properties it animates and how long it lasts.
  */
-const watchAnimations = (page: Page) => page.evaluate(() => {
-  const started: { on: string | null; properties: string[]; ms: number }[] = []
-  const animate = Element.prototype.animate
-  Element.prototype.animate = function (this: Element, keyframes: Keyframe[] | PropertyIndexedKeyframes | null, options?: number | KeyframeAnimationOptions) {
-    const animation = animate.call(this, keyframes, options)
-    const frames = Array.isArray(keyframes) ? keyframes : keyframes ? [keyframes] : []
-    const properties = [...new Set(frames.flatMap((frame) => Object.keys(frame)))].filter((key) => !['offset', 'easing', 'composite'].includes(key))
-    started.push({ on: this.getAttribute('data-testid'), properties, ms: Number(animation.effect?.getTiming().duration ?? 0) })
-    return animation
-  }
-  ;(window as unknown as { animations: typeof started }).animations = started
-})
-const animations = (page: Page) => page.evaluate(() => (window as unknown as { animations: { on: string | null; properties: string[]; ms: number }[] }).animations)
+const watchAnimations = (page: Page) =>
+  page.evaluate(() => {
+    const started: { on: string | null; properties: string[]; ms: number }[] = []
+    const animate = Element.prototype.animate
+    Element.prototype.animate = function (
+      this: Element,
+      keyframes: Keyframe[] | PropertyIndexedKeyframes | null,
+      options?: number | KeyframeAnimationOptions,
+    ) {
+      const animation = animate.call(this, keyframes, options)
+      const frames = Array.isArray(keyframes) ? keyframes : keyframes ? [keyframes] : []
+      const properties = [...new Set(frames.flatMap((frame) => Object.keys(frame)))].filter(
+        (key) => !['offset', 'easing', 'composite'].includes(key),
+      )
+      started.push({
+        on: this.getAttribute('data-testid'),
+        properties,
+        ms: Number(animation.effect?.getTiming().duration ?? 0),
+      })
+      return animation
+    }
+    ;(window as unknown as { animations: typeof started }).animations = started
+  })
+const animations = (page: Page) =>
+  page.evaluate(
+    () => (window as unknown as { animations: { on: string | null; properties: string[]; ms: number }[] }).animations,
+  )
 
-test('the system theme is followed until a pick is made, and dark and light change only the tokens', async ({ page, browser }) => {
+test('the system theme is followed until a pick is made, and dark and light change only the tokens', async ({
+  page,
+  browser,
+}) => {
   test.setTimeout(90_000)
   for (const colorScheme of ['light', 'dark'] as const) {
     const context = await browser.newContext({ colorScheme })
@@ -61,10 +81,12 @@ test('the system theme is followed until a pick is made, and dark and light chan
   // Same markup in both themes: only custom properties differ.
   const backgrounds: string[] = []
   for (const theme of ['dark', 'light'] as const) {
-    backgrounds.push(await page.evaluate((t) => {
-      document.documentElement.dataset.theme = t
-      return getComputedStyle(document.body).backgroundColor
-    }, theme))
+    backgrounds.push(
+      await page.evaluate((t) => {
+        document.documentElement.dataset.theme = t
+        return getComputedStyle(document.body).backgroundColor
+      }, theme),
+    )
   }
   expect(backgrounds[0]).not.toBe(backgrounds[1])
 })
@@ -98,7 +120,9 @@ test('in Arabic the chrome mirrors and reads right to left, the islands too, the
   await shoot(page, 'arabic-editor')
 })
 
-test('reduced motion turns chrome animation off: the flyout appears outright and the blob jumps without sliding or squishing', async ({ browser }) => {
+test('reduced motion turns chrome animation off: the flyout appears outright and the blob jumps without sliding or squishing', async ({
+  browser,
+}) => {
   test.setTimeout(90_000)
   const designId = await seed(liveDesign())
   for (const reducedMotion of ['no-preference', 'reduce'] as const) {
@@ -112,7 +136,10 @@ test('reduced motion turns chrome animation off: the flyout appears outright and
     await page.getByRole('button', { name: 'Layers', exact: true }).click()
     await expect(page.getByTestId('flyout')).toHaveCSS('opacity', '1')
     const onFlyout = (await animations(page)).filter((a) => a.on === 'flyout')
-    const tooltipTransition = await page.locator('.rise, [role=toolbar] button').first().evaluate((el) => getComputedStyle(el).transitionDuration)
+    const tooltipTransition = await page
+      .locator('.rise, [role=toolbar] button')
+      .first()
+      .evaluate((el) => getComputedStyle(el).transitionDuration)
     if (reducedMotion === 'reduce') {
       expect(onFlyout.filter((a) => a.ms > 0)).toEqual([])
       expect(Number.parseFloat(tooltipTransition)).toBeLessThan(0.001)
@@ -145,7 +172,11 @@ test('floating chrome is frosted with grain in both themes', async ({ page }) =>
     await expect(page.getByTestId('status')).toHaveAttribute('data-ready', '', { timeout: 30_000 })
     await page.getByRole('button', { name: 'Layers', exact: true }).click()
     await expect(page.getByTestId('flyout')).toBeVisible()
-    for (const surface of [page.getByRole('toolbar'), page.getByRole('group', { name: 'Zoom' }), page.getByTestId('flyout')]) {
+    for (const surface of [
+      page.getByRole('toolbar'),
+      page.getByRole('group', { name: 'Zoom' }),
+      page.getByTestId('flyout'),
+    ]) {
       const style = await surface.evaluate((el) => {
         const s = getComputedStyle(el)
         return { filter: s.backdropFilter, image: s.backgroundImage }
@@ -157,7 +188,12 @@ test('floating chrome is frosted with grain in both themes', async ({ page }) =>
     const dock = await page.getByRole('toolbar').boundingBox()
     const zoom = await page.getByRole('group', { name: 'Zoom' }).boundingBox()
     if (!dock || !zoom) throw new Error('missing dock or zoom')
-    writeOutput(`ui-${theme}-frost-dock.png`, await page.screenshot({ clip: { x: dock.x - 40, y: dock.y - 40, width: zoom.x + zoom.width - dock.x + 80, height: dock.height + 80 } }))
+    writeOutput(
+      `ui-${theme}-frost-dock.png`,
+      await page.screenshot({
+        clip: { x: dock.x - 40, y: dock.y - 40, width: zoom.x + zoom.width - dock.x + 80, height: dock.height + 80 },
+      }),
+    )
   }
 })
 
@@ -176,54 +212,68 @@ const centre = (box: { x: number; y: number; width: number; height: number } | n
  * ends however slow the machine is; 10 s without resting ends it too, for the checks to report.
  */
 async function blobPath(page: Page, name: string) {
-  const path = page.evaluate((name) => new Promise<{ landing: number; frames: { y: number; scaleY: number }[] }>((resolve) => {
-    const seen: { y: number; scaleY: number }[] = []
-    let landing = 1
-    const rail = document.querySelector('[data-testid=rail]')
-    const button = rail?.querySelector(`button[aria-label="${name}"]`)
-    if (!rail || !button) throw new Error(`no ${name} button in the capsule`)
-    const target = button.getBoundingClientRect()
-    /** Where the blob is now and how stretched, recorded; null with no blob. */
-    const look = () => {
-      const blob = document.querySelector('[data-testid=rail-blob]')
-      const squish = blob?.firstElementChild
-      if (!blob || !(squish instanceof HTMLElement)) return null
-      const box = blob.getBoundingClientRect()
-      const at = { y: box.y + box.height / 2, scaleY: new DOMMatrix(getComputedStyle(squish).transform).d, on: blob.closest('button') === button }
-      seen.push({ y: at.y, scaleY: at.scaleY })
-      return at
-    }
-    // Motion writes the blob's style on each step of the slide, so this also sees the steps a busy
-    // machine draws no frame for.
-    let moved = true
-    const watch = new MutationObserver(() => {
-      moved = true
-      const squish = document.querySelector('[data-testid=rail-blob]')?.firstElementChild
-      if (squish instanceof HTMLElement) landing = Math.max(landing, new DOMMatrix(squish.style.transform || 'none').d)
-      look()
-    })
-    watch.observe(rail, { childList: true, subtree: true, attributes: true, attributeFilter: ['style'] })
-    let finished = false
-    const finish = () => {
-      finished = true
-      watch.disconnect()
-      resolve({ landing, frames: seen })
-    }
-    const giveUp = setTimeout(finish, 10_000)
-    // At rest: on the button, round, and not moved since the last frame, which a spring passing
-    // through its end on the way back would be.
-    const tick = () => {
-      if (finished) return
-      const at = look()
-      const still = !moved
-      moved = false
-      if (still && at?.on && Math.abs(at.y - (target.y + target.height / 2)) < 1 && Math.abs(at.scaleY - 1) < 0.001) {
-        clearTimeout(giveUp)
-        finish()
-      } else requestAnimationFrame(tick)
-    }
-    requestAnimationFrame(tick)
-  }), name)
+  const path = page.evaluate(
+    (name) =>
+      new Promise<{ landing: number; frames: { y: number; scaleY: number }[] }>((resolve) => {
+        const seen: { y: number; scaleY: number }[] = []
+        let landing = 1
+        const rail = document.querySelector('[data-testid=rail]')
+        const button = rail?.querySelector(`button[aria-label="${name}"]`)
+        if (!rail || !button) throw new Error(`no ${name} button in the capsule`)
+        const target = button.getBoundingClientRect()
+        /** Where the blob is now and how stretched, recorded; null with no blob. */
+        const look = () => {
+          const blob = document.querySelector('[data-testid=rail-blob]')
+          const squish = blob?.firstElementChild
+          if (!blob || !(squish instanceof HTMLElement)) return null
+          const box = blob.getBoundingClientRect()
+          const at = {
+            y: box.y + box.height / 2,
+            scaleY: new DOMMatrix(getComputedStyle(squish).transform).d,
+            on: blob.closest('button') === button,
+          }
+          seen.push({ y: at.y, scaleY: at.scaleY })
+          return at
+        }
+        // Motion writes the blob's style on each step of the slide, so this also sees the steps a busy
+        // machine draws no frame for.
+        let moved = true
+        const watch = new MutationObserver(() => {
+          moved = true
+          const squish = document.querySelector('[data-testid=rail-blob]')?.firstElementChild
+          if (squish instanceof HTMLElement)
+            landing = Math.max(landing, new DOMMatrix(squish.style.transform || 'none').d)
+          look()
+        })
+        watch.observe(rail, { childList: true, subtree: true, attributes: true, attributeFilter: ['style'] })
+        let finished = false
+        const finish = () => {
+          finished = true
+          watch.disconnect()
+          resolve({ landing, frames: seen })
+        }
+        const giveUp = setTimeout(finish, 10_000)
+        // At rest: on the button, round, and not moved since the last frame, which a spring passing
+        // through its end on the way back would be.
+        const tick = () => {
+          if (finished) return
+          const at = look()
+          const still = !moved
+          moved = false
+          if (
+            still &&
+            at?.on &&
+            Math.abs(at.y - (target.y + target.height / 2)) < 1 &&
+            Math.abs(at.scaleY - 1) < 0.001
+          ) {
+            clearTimeout(giveUp)
+            finish()
+          } else requestAnimationFrame(tick)
+        }
+        requestAnimationFrame(tick)
+      }),
+    name,
+  )
   await page.getByRole('button', { name }).click()
   return path
 }
@@ -242,14 +292,18 @@ test('the panels live in a capsule floating over the canvas', async ({ page }) =
   expect(box.x - stage.x).toBeLessThan(24)
   expect(Math.abs(centre(box).y - centre(stage).y)).toBeLessThan(4)
   expect(box.height).toBeGreaterThan(box.width)
-  expect(Number.parseFloat(await rail.evaluate((el) => getComputedStyle(el).borderTopLeftRadius))).toBeGreaterThanOrEqual(box.width / 2)
+  expect(
+    Number.parseFloat(await rail.evaluate((el) => getComputedStyle(el).borderTopLeftRadius)),
+  ).toBeGreaterThanOrEqual(box.width / 2)
   expect(await rail.evaluate((el) => getComputedStyle(el).backdropFilter)).toContain('blur(18px)')
 
   // The blob lands on the open panel's button and slides there, stretched, when another opens.
   await expect(page.getByTestId('rail-blob')).toHaveCount(0)
   await page.getByRole('button', { name: 'Layers', exact: true }).click()
   const layers = centre(await page.getByRole('button', { name: 'Layers', exact: true }).boundingBox())
-  await expect.poll(async () => Math.abs(centre(await page.getByTestId('rail-blob').boundingBox()).y - layers.y)).toBeLessThan(1)
+  await expect
+    .poll(async () => Math.abs(centre(await page.getByTestId('rail-blob').boundingBox()).y - layers.y))
+    .toBeLessThan(1)
   await shoot(page, 'capsule-layers')
   const { landing, frames: path } = await blobPath(page, 'Brand')
   const brand = centre(await page.getByRole('button', { name: 'Brand', exact: true }).boundingBox())
@@ -257,9 +311,14 @@ test('the panels live in a capsule floating over the canvas', async ({ page }) =
   // there, though it may draw a frame back on Layers. (How many steps between a busy machine draws
   // depends on its frame rate.) It lands stretched and settles on Brand.
   const between = path.filter((p) => p.y > layers.y + 4 && p.y < brand.y - 4)
-  expect(between.length, `the blob's centre on each step: ${path.map((p) => Math.round(p.y)).join(', ')}`).toBeGreaterThan(0)
+  expect(
+    between.length,
+    `the blob's centre on each step: ${path.map((p) => Math.round(p.y)).join(', ')}`,
+  ).toBeGreaterThan(0)
   expect(landing).toBeGreaterThan(1.05)
-  await expect.poll(async () => Math.abs(centre(await page.getByTestId('rail-blob').boundingBox()).y - brand.y)).toBeLessThan(1)
+  await expect
+    .poll(async () => Math.abs(centre(await page.getByTestId('rail-blob').boundingBox()).y - brand.y))
+    .toBeLessThan(1)
   await expect(page.getByRole('button', { name: 'Brand', exact: true })).toHaveAttribute('aria-expanded', 'true')
   await expect(page.getByRole('button', { name: 'Layers', exact: true })).toHaveAttribute('aria-expanded', 'false')
 

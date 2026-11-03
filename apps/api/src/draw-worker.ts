@@ -3,9 +3,10 @@
 // or hundreds of layers takes long enough to stall every request queued behind it. The thread
 // keeps CanvasKit, the fonts we ship and its resource cache for its whole life.
 import { parentPort } from 'node:worker_threads'
+
 import { FALLBACK_FAMILIES } from '@dazbee/fonts'
 import { loadFontFiles } from '@dazbee/fonts/node'
-import { drawDesign, resourceCache, type ResourceBytes, type ResourceCache } from '@dazbee/renderer'
+import { drawDesign, type ResourceBytes, type ResourceCache, resourceCache } from '@dazbee/renderer'
 import { loadCanvasKit } from '@dazbee/renderer/node'
 import type { Design } from '@dazbee/schema'
 
@@ -30,11 +31,16 @@ async function draw(job: DrawJob): Promise<Uint8Array> {
   const ck = await loadCanvasKit()
   cache ??= resourceCache(ck)
   const surface = ck.MakeSurface(job.size.width, job.size.height)
-  if (!surface) throw new Error(`CanvasKit could not make a ${job.size.width}×${job.size.height} surface for a design picture`)
+  if (!surface)
+    throw new Error(`CanvasKit could not make a ${job.size.width}×${job.size.height} surface for a design picture`)
   try {
     // Drawn straight at the small size: a story is a 360×640 draw, not a 1080×1920 one.
     surface.getCanvas().scale(job.size.width / job.format.width, job.size.height / job.format.height)
-    const resources = { ...job.resources, fonts: [...shipped, ...job.resources.fonts], fallbackFamilies: [...FALLBACK_FAMILIES] }
+    const resources = {
+      ...job.resources,
+      fonts: [...shipped, ...job.resources.fonts],
+      fallbackFamilies: [...FALLBACK_FAMILIES],
+    }
     drawDesign(ck, surface, job.design, job.pageId, job.formatId, resources, cache)
     const snapshot = surface.makeImageSnapshot()
     try {
@@ -57,7 +63,10 @@ parentPort?.on('message', (job: DrawJob) => {
       const png = await draw(job)
       parentPort?.postMessage({ id: job.id, png } satisfies DrawResult)
     } catch (error) {
-      parentPort?.postMessage({ id: job.id, error: error instanceof Error ? error.message : String(error) } satisfies DrawResult)
+      parentPort?.postMessage({
+        id: job.id,
+        error: error instanceof Error ? error.message : String(error),
+      } satisfies DrawResult)
     }
   })
 })

@@ -3,50 +3,158 @@
 // keeps what it holds as it is while a group scales it; a child of auto layout resized gets a fixed
 // size and its siblings move up; a child dragged moves along the flow, or out of the frame; the
 // arrow keys reorder along the flow and explain across it; auto text resized keeps the size given.
-import { expect, test, type Page } from '../support/test.ts'
 import type { DesignInput } from '@dazbee/schema'
+
 import { writeOutput } from '../support/editor.ts'
-import { click, dragScreen, handle, openStage, press, read, selection } from '../support/stage.ts'
 import { screenPoint } from '../support/editor.ts'
+import { click, dragScreen, handle, openStage, press, read, selection } from '../support/stage.ts'
+import { expect, type Page, test } from '../support/test.ts'
 
 test.describe.configure({ timeout: 120_000 })
 
 type Node = DesignInput['nodes'][string]
 const circle = (name: string, index: string): Node =>
-  ({ type: 'graphic', parentId: 'row', index, name, props: { x: 0, y: 0, width: 100, height: 100, shape: { kind: 'ellipse' }, fills: [{ type: 'solid', color: ['#FF2E7EFF', '#2F6BFFFF', '#FFB020FF', '#00A88AFF'][Number(index.slice(1))] ?? '#000000FF' }] } }) as Node
-const rect = (name: string, parentId: string, index: string, x: number, y: number, width: number, height: number, color: string): Node =>
-  ({ type: 'graphic', parentId, index, name, props: { x, y, width, height, shape: { kind: 'rect' }, fills: [{ type: 'solid', color }] } }) as Node
+  ({
+    type: 'graphic',
+    parentId: 'row',
+    index,
+    name,
+    props: {
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+      shape: { kind: 'ellipse' },
+      fills: [
+        {
+          type: 'solid',
+          color: ['#FF2E7EFF', '#2F6BFFFF', '#FFB020FF', '#00A88AFF'][Number(index.slice(1))] ?? '#000000FF',
+        },
+      ],
+    },
+  }) as Node
+const rect = (
+  name: string,
+  parentId: string,
+  index: string,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  color: string,
+): Node =>
+  ({
+    type: 'graphic',
+    parentId,
+    index,
+    name,
+    props: { x, y, width, height, shape: { kind: 'rect' }, fills: [{ type: 'solid', color }] },
+  }) as Node
 
 const design = (): DesignInput => ({
-  meta: { schemaVersion: 5, designId: 'replaced-by-the-api', name: 'Gestures and layout', kind: 'single', primaryFormatId: 'sq' },
-  formats: { sq: { name: 'Square', width: 1080, height: 1080, order: 'a0' }, wide: { name: 'Wide', width: 1920, height: 1080, order: 'a1' } },
+  meta: {
+    schemaVersion: 5,
+    designId: 'replaced-by-the-api',
+    name: 'Gestures and layout',
+    kind: 'single',
+    primaryFormatId: 'sq',
+  },
+  formats: {
+    sq: { name: 'Square', width: 1080, height: 1080, order: 'a0' },
+    wide: { name: 'Wide', width: 1920, height: 1080, order: 'a1' },
+  },
   pages: { p1: { name: 'Page 1', order: 'a0', fills: [{ type: 'solid', color: '#FFF8F0FF' }] } },
   nodes: {
     // Four circles in a row that wraps, the frame as tall as they need.
     row: {
-      type: 'frame', parentId: 'p1', index: 'a0', name: 'Row',
-      props: { x: 60, y: 60, width: 520, height: 140, sizing: { width: 'fixed', height: 'hug' }, fills: [{ type: 'solid', color: '#EEF1F6FF' }], layout: { direction: 'row', gap: 20, padding: { top: 20, right: 20, bottom: 20, left: 20 }, wrap: true, lineGap: 20 } },
+      type: 'frame',
+      parentId: 'p1',
+      index: 'a0',
+      name: 'Row',
+      props: {
+        x: 60,
+        y: 60,
+        width: 520,
+        height: 140,
+        sizing: { width: 'fixed', height: 'hug' },
+        fills: [{ type: 'solid', color: '#EEF1F6FF' }],
+        layout: {
+          direction: 'row',
+          gap: 20,
+          padding: { top: 20, right: 20, bottom: 20, left: 20 },
+          wrap: true,
+          lineGap: 20,
+        },
+      },
     },
-    c0: circle('C0', 'a0'), c1: circle('C1', 'a1'), c2: circle('C2', 'a2'), c3: circle('C3', 'a3'),
-    plain: { type: 'frame', parentId: 'p1', index: 'a1', name: 'Plain', props: { x: 660, y: 60, width: 340, height: 220, fills: [{ type: 'solid', color: '#1F2329FF' }] } },
+    c0: circle('C0', 'a0'),
+    c1: circle('C1', 'a1'),
+    c2: circle('C2', 'a2'),
+    c3: circle('C3', 'a3'),
+    plain: {
+      type: 'frame',
+      parentId: 'p1',
+      index: 'a1',
+      name: 'Plain',
+      props: { x: 660, y: 60, width: 340, height: 220, fills: [{ type: 'solid', color: '#1F2329FF' }] },
+    },
     inner: rect('Inner', 'plain', 'a0', 700, 100, 120, 80, '#9747FFFF'),
-    grp: { type: 'group', parentId: 'p1', index: 'a2', name: 'Group', props: { x: 660, y: 360, width: 300, height: 120 } },
+    grp: {
+      type: 'group',
+      parentId: 'p1',
+      index: 'a2',
+      name: 'Group',
+      props: { x: 660, y: 360, width: 300, height: 120 },
+    },
     g0: rect('G0', 'grp', 'a0', 660, 360, 120, 120, '#FF2E7EFF'),
     g1: rect('G1', 'grp', 'a1', 840, 360, 120, 120, '#2F6BFFFF'),
-    turned: { type: 'frame', parentId: 'p1', index: 'a3', name: 'Turned', props: { x: 640, y: 640, width: 320, height: 200, rotation: 30, clip: false, fills: [{ type: 'solid', color: '#E8E0FFFF' }] } },
+    turned: {
+      type: 'frame',
+      parentId: 'p1',
+      index: 'a3',
+      name: 'Turned',
+      props: {
+        x: 640,
+        y: 640,
+        width: 320,
+        height: 200,
+        rotation: 30,
+        clip: false,
+        fills: [{ type: 'solid', color: '#E8E0FFFF' }],
+      },
+    },
     tchild: rect('Turned child', 'turned', 'a0', 680, 680, 100, 60, '#00A88AFF'),
-    label: { type: 'text', parentId: 'p1', index: 'a4', name: 'Label', props: { x: 60, y: 560, width: 300, height: 66, text: 'Fresh coffee', boxMode: 'autoWidth', style: { fontFamily: 'Noto Sans', fontSize: 48, fontWeight: 700, color: '#1F2329FF' } } },
+    label: {
+      type: 'text',
+      parentId: 'p1',
+      index: 'a4',
+      name: 'Label',
+      props: {
+        x: 60,
+        y: 560,
+        width: 300,
+        height: 66,
+        text: 'Fresh coffee',
+        boxMode: 'autoWidth',
+        style: { fontFamily: 'Noto Sans', fontSize: 48, fontWeight: 700, color: '#1F2329FF' },
+      },
+    },
   },
   overrides: {},
 })
 
 type Box = { x: number; y: number; width: number; height: number }
-const boxOf = (page: Page, id: string, formatId = 'sq') => page.evaluate(({ id, formatId }) => window.dazbee?.boxOf(id, 'p1', formatId), { id, formatId }) as Promise<Box>
+const boxOf = (page: Page, id: string, formatId = 'sq') =>
+  page.evaluate(({ id, formatId }) => window.dazbee?.boxOf(id, 'p1', formatId), { id, formatId }) as Promise<Box>
 const near = (a: Box, b: Box, what: string) => {
-  for (const k of ['x', 'y', 'width', 'height'] as const) expect(Math.abs(a[k] - b[k]), `${what} ${k}: ${a[k]} vs ${b[k]}`).toBeLessThanOrEqual(0.5)
+  for (const k of ['x', 'y', 'width', 'height'] as const)
+    expect(Math.abs(a[k] - b[k]), `${what} ${k}: ${a[k]} vs ${b[k]}`).toBeLessThanOrEqual(0.5)
 }
-const order = async (page: Page, parentId: string) => Object.entries((await read(page)).nodes)
-  .filter(([, n]) => n.parentId === parentId).sort(([, a], [, b]) => (a.index < b.index ? -1 : 1)).map(([id]) => id)
+const order = async (page: Page, parentId: string) =>
+  Object.entries((await read(page)).nodes)
+    .filter(([, n]) => n.parentId === parentId)
+    .sort(([, a], [, b]) => (a.index < b.index ? -1 : 1))
+    .map(([id]) => id)
 const undo = async (page: Page) => {
   await press(page, 'undo')
   await page.evaluate(() => window.dazbee?.drawn())
@@ -69,7 +177,9 @@ async function dragDesign(page: Page, from: { x: number; y: number }, to: { x: n
   await page.evaluate(() => window.dazbee?.drawn())
 }
 
-test('an auto layout frame resized from its handle keeps its circles\' size and reflows them; one undo step', async ({ browser }) => {
+test("an auto layout frame resized from its handle keeps its circles' size and reflows them; one undo step", async ({
+  browser,
+}) => {
   const { page, errors } = await openStage(browser, design())
   const before = await Promise.all(['c0', 'c1', 'c2', 'c3'].map((id) => boxOf(page, id)))
   // One row of four: 20 + 4 × 100 + 3 × 20 + 20 = 520 wide, 140 tall.
@@ -81,7 +191,12 @@ test('an auto layout frame resized from its handle keeps its circles\' size and 
   await dragHandle(page, 'e', -200, 0)
   const after = await Promise.all(['c0', 'c1', 'c2', 'c3'].map((id) => boxOf(page, id)))
   for (const [i, b] of after.entries()) expect([b.width, b.height], `c${i} keeps its size`).toEqual([100, 100])
-  expect(after.map((b) => [b.x, b.y])).toEqual([[80, 80], [200, 80], [80, 200], [200, 200]])
+  expect(after.map((b) => [b.x, b.y])).toEqual([
+    [80, 80],
+    [200, 80],
+    [80, 200],
+    [200, 200],
+  ])
   near(await boxOf(page, 'row'), { x: 60, y: 60, width: 320, height: 260 }, 'row')
   const row = (await read(page)).overrides['format:sq']?.row as { width?: number; sizing?: unknown } | undefined
   expect(row?.width).toBe(320)
@@ -119,7 +234,9 @@ test('a plain frame keeps what it holds as it is, also turned; a group still sca
   expect(errors).toEqual([])
 })
 
-test('a child of auto layout: a resize fixes its size and the flow moves up; a drag moves it along the flow or out', async ({ browser }) => {
+test('a child of auto layout: a resize fixes its size and the flow moves up; a drag moves it along the flow or out', async ({
+  browser,
+}) => {
   const { page, errors } = await openStage(browser, design())
   const at = await screenPoint(page, 130, 130)
   await page.mouse.dblclick(at.x, at.y)
@@ -170,11 +287,17 @@ test('auto width text resized takes the size given instead of snapping back', as
   expect(errors).toEqual([])
 })
 
-test('a fill child grows with its frame; in a wrapped flow a drag lands next to the layer it is dropped by', async ({ browser }) => {
+test('a fill child grows with its frame; in a wrapped flow a drag lands next to the layer it is dropped by', async ({
+  browser,
+}) => {
   const content = design()
   // C1 fills the row's room left over.
   ;(content.nodes.c1 as { props: Record<string, unknown> }).props.sizing = { width: 'fill', height: 'fixed' }
-  ;(content.nodes.row as { props: Record<string, unknown> }).props.layout = { direction: 'row', gap: 20, padding: { top: 20, right: 20, bottom: 20, left: 20 } }
+  ;(content.nodes.row as { props: Record<string, unknown> }).props.layout = {
+    direction: 'row',
+    gap: 20,
+    padding: { top: 20, right: 20, bottom: 20, left: 20 },
+  }
   const { page, errors } = await openStage(browser, content)
   const fill = (await boxOf(page, 'c1')).width
   await click(page, 70, 70)
@@ -185,7 +308,9 @@ test('a fill child grows with its frame; in a wrapped flow a drag lands next to 
   expect(errors).toEqual([])
 })
 
-test('the arrow keys move a child along its flow; across it, or align, auto layout decides and the page says so; in a wrapped flow, a layer dropped beside one on the first line goes next to it', async ({ browser }) => {
+test('the arrow keys move a child along its flow; across it, or align, auto layout decides and the page says so; in a wrapped flow, a layer dropped beside one on the first line goes next to it', async ({
+  browser,
+}) => {
   const { page, errors } = await openStage(browser, design())
   const second = await screenPoint(page, 250, 130)
   await page.mouse.dblclick(second.x, second.y)

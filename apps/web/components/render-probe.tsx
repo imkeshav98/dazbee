@@ -1,7 +1,8 @@
 'use client'
 
 import { useEffect } from 'react'
-import { markRender } from '../lib/render.ts'
+
+import { markRender } from '@/lib/render.ts'
 
 /** Marks the root with how this browser draws, once the page is up (#144). */
 export function RenderProbe() {

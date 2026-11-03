@@ -1,6 +1,8 @@
-import { migrateDesign, SCHEMA_VERSION } from '@dazbee/schema'
 import * as Y from 'yjs'
-import { nodeToJson, overrideKey, root, splitOverrideKey, type DesignDoc } from './design-doc.ts'
+
+import { migrateDesign, SCHEMA_VERSION } from '@dazbee/schema'
+
+import { type DesignDoc, nodeToJson, overrideKey, root, splitOverrideKey } from './design-doc.ts'
 
 type Json = Record<string, unknown>
 const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b)

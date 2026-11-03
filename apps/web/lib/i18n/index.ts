@@ -10,7 +10,7 @@ export type Locale = keyof typeof CATALOGS
 export const LOCALES = Object.keys(CATALOGS) as Locale[]
 export const LOCALE_NAMES: Record<Locale, string> = { en: 'English', ar: 'العربية' }
 
-export const localeOf = (value: string | undefined): Locale => (value && value in CATALOGS ? value as Locale : 'en')
+export const localeOf = (value: string | undefined): Locale => (value && value in CATALOGS ? (value as Locale) : 'en')
 export const dirOf = (locale: Locale): 'ltr' | 'rtl' => (locale === 'ar' ? 'rtl' : 'ltr')
 
 /** The words for a workspace's brands, which every workspace calls brands (ADR-0013). */

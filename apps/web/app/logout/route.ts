@@ -1,8 +1,9 @@
 // Sign out (#58): forget the session token, and end the WorkOS session too when there was one.
 import { cookies } from 'next/headers'
-import { NextResponse, type NextRequest } from 'next/server'
-import { signOutLink } from '../../lib/api.ts'
-import { SESSION_COOKIE } from '../../lib/sign-in.ts'
+import { type NextRequest, NextResponse } from 'next/server'
+
+import { signOutLink } from '@/lib/api.ts'
+import { SESSION_COOKIE } from '@/lib/sign-in.ts'
 
 export async function POST(request: NextRequest) {
   // Only this site's own sign-out button may sign the person out.

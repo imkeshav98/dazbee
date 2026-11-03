@@ -1,4 +1,4 @@
-import { DELETED, root, splitOverrideKey, type DesignDoc } from './design-doc.ts'
+import { DELETED, type DesignDoc, root, splitOverrideKey } from './design-doc.ts'
 
 /** The origin of compaction's transaction, so a server can tell it from an edit. */
 export const COMPACTION = 'compaction'

@@ -1,10 +1,12 @@
 // Schema version 2 at the commands seam (#43): node.update sets every new property, and a
 // document saved at version 1 is migrated when a tab opens it, outside its undo history.
-import { parseDesign, SCHEMA_VERSION, type DesignInput } from '@dazbee/schema'
 import { describe, expect, it } from 'vitest'
 import * as Y from 'yjs'
-import { loadDesign, migrateDoc, openSession, readDesign } from './index.ts'
+
+import { type DesignInput, parseDesign, SCHEMA_VERSION } from '@dazbee/schema'
+
 import { root } from './design-doc.ts'
+import { loadDesign, migrateDoc, openSession, readDesign } from './index.ts'
 import { testDesign } from './test-design.ts'
 
 const freshDoc = (design: DesignInput = testDesign()) => {
@@ -13,24 +15,60 @@ const freshDoc = (design: DesignInput = testDesign()) => {
   return loadDesign(result.design)
 }
 
-const stops = [{ offset: 0, color: '#FF0000FF' }, { offset: 1, color: '#0000FFFF' }]
+const stops = [
+  { offset: 0, color: '#FF0000FF' },
+  { offset: 1, color: '#0000FFFF' },
+]
 
 describe('node.update sets each new property', () => {
   it('angular gradients, and strokes with dashes, caps, joins and a miter limit', () => {
     const doc = freshDoc()
     const tab = openSession(doc)
-    tab.run('node.update', { ids: ['box'], patch: { fills: [{ type: 'angular', center: { x: 0.5, y: 0.5 }, angle: 30, stops }] } })
-    tab.run('node.update', { ids: ['box'], patch: { strokes: [{ paint: { type: 'solid', color: '#000000FF' }, width: 4, dashes: [8, 4], dashOffset: 2, cap: 'round', join: 'bevel', miterLimit: 2 }] } })
+    tab.run('node.update', {
+      ids: ['box'],
+      patch: { fills: [{ type: 'angular', center: { x: 0.5, y: 0.5 }, angle: 30, stops }] },
+    })
+    tab.run('node.update', {
+      ids: ['box'],
+      patch: {
+        strokes: [
+          {
+            paint: { type: 'solid', color: '#000000FF' },
+            width: 4,
+            dashes: [8, 4],
+            dashOffset: 2,
+            cap: 'round',
+            join: 'bevel',
+            miterLimit: 2,
+          },
+        ],
+      },
+    })
     // In one format only.
-    tab.run('node.update', { ids: ['box'], scope: 'format:banner', patch: { strokes: [{ paint: { type: 'angular', center: { x: 0, y: 0 }, stops }, width: 1, cap: 'square' }] } })
+    tab.run('node.update', {
+      ids: ['box'],
+      scope: 'format:banner',
+      patch: { strokes: [{ paint: { type: 'angular', center: { x: 0, y: 0 }, stops }, width: 1, cap: 'square' }] },
+    })
 
     const design = readDesign(doc)
     expect(design.nodes.box?.props).toMatchObject({
       fills: [{ type: 'angular', center: { x: 0.5, y: 0.5 }, angle: 30, stops }],
-      strokes: [{ width: 4, align: 'center', dashes: [8, 4], dashOffset: 2, cap: 'round', join: 'bevel', miterLimit: 2 }],
+      strokes: [
+        { width: 4, align: 'center', dashes: [8, 4], dashOffset: 2, cap: 'round', join: 'bevel', miterLimit: 2 },
+      ],
     })
     expect(design.overrides['format:banner']?.box?.strokes).toEqual([
-      { paint: { type: 'angular', center: { x: 0, y: 0 }, angle: 0, stops }, width: 1, align: 'center', dashes: [], dashOffset: 0, cap: 'square', join: 'miter', miterLimit: 4 },
+      {
+        paint: { type: 'angular', center: { x: 0, y: 0 }, angle: 0, stops },
+        width: 1,
+        align: 'center',
+        dashes: [],
+        dashOffset: 0,
+        cap: 'square',
+        join: 'miter',
+        miterLimit: 4,
+      },
     ])
     tab.undo()
     tab.undo()
@@ -50,7 +88,9 @@ describe('node.update sets each new property', () => {
     for (const id of ['box', 'headline']) {
       expect(design.nodes[id]?.props.effects).toEqual([effects[0], { ...effects[1], spread: 0 }, effects[2]])
     }
-    expect(() => tab.run('node.update', { ids: ['box'], patch: { effects: [{ type: 'glow', blur: -1, color: '#000000FF' }] } })).toThrow(/box.effects.0.blur/)
+    expect(() =>
+      tab.run('node.update', { ids: ['box'], patch: { effects: [{ type: 'glow', blur: -1, color: '#000000FF' }] } }),
+    ).toThrow(/box.effects.0.blur/)
   })
 
   it('pass-through and normal on groups and frames, never on other layers', () => {
@@ -62,7 +102,9 @@ describe('node.update sets each new property', () => {
     expect(readDesign(doc).nodes[group]?.props.blendMode).toBe('normal')
     tab.run('node.update', { ids: [group], scope: 'format:banner', patch: { blendMode: 'pass-through' } })
     expect(readDesign(doc).overrides['format:banner']?.[group]).toMatchObject({ blendMode: 'pass-through' })
-    expect(() => tab.run('node.update', { ids: ['box'], patch: { blendMode: 'pass-through' } })).toThrow(/box.blendMode/)
+    expect(() => tab.run('node.update', { ids: ['box'], patch: { blendMode: 'pass-through' } })).toThrow(
+      /box.blendMode/,
+    )
   })
 })
 
@@ -76,9 +118,18 @@ const version1Doc = () => {
     nodes: {
       ...design.nodes,
       box: { ...box, parentId: 'g' },
-      g: { type: 'group', parentId: 'p1', index: 'a2', name: 'Group', props: { x: 100, y: 100, width: 200, height: 100, blendMode: 'normal' } },
+      g: {
+        type: 'group',
+        parentId: 'p1',
+        index: 'a2',
+        name: 'Group',
+        props: { x: 100, y: 100, width: 200, height: 100, blendMode: 'normal' },
+      },
     },
-    overrides: { ...design.overrides, 'format:banner': { ...design.overrides?.['format:banner'], g: { blendMode: 'normal', opacity: 0.5 } } },
+    overrides: {
+      ...design.overrides,
+      'format:banner': { ...design.overrides?.['format:banner'], g: { blendMode: 'normal', opacity: 0.5 } },
+    },
   })
   // What a version 1 document holds: loadDesign writes version 2's values, so put version 1's back.
   const r = root(doc)

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { parseDesign, fontFamilies, type Design } from './design.ts'
+
+import { type Design, fontFamilies, parseDesign } from './design.ts'
 import { bindProps, BrandToken, VariableRef } from './variables.ts'
 
 const red = '#E0262BFF'
@@ -25,8 +26,16 @@ describe('brand kit bindings (#53)', () => {
   })
 
   it('sets text colour and font family on the base style only', () => {
-    const props = { style: { fontFamily: 'Noto Sans', color: navy, fontSize: 40 }, runs: [{ start: 0, end: 2, style: { color: '#00FF00FF' } }] }
-    const bound = bindProps('text', props, { textColor: 'brand:primary', fontFamily: 'brand:heading' }, { 'brand:primary': red, 'brand:heading': 'Playfair Display' })
+    const props = {
+      style: { fontFamily: 'Noto Sans', color: navy, fontSize: 40 },
+      runs: [{ start: 0, end: 2, style: { color: '#00FF00FF' } }],
+    }
+    const bound = bindProps(
+      'text',
+      props,
+      { textColor: 'brand:primary', fontFamily: 'brand:heading' },
+      { 'brand:primary': red, 'brand:heading': 'Playfair Display' },
+    )
     expect(bound.style).toEqual({ fontFamily: 'Playfair Display', color: red, fontSize: 40 })
     expect(bound.runs).toBe(props.runs)
     // A text layer has no fill to bind, a graphic no text.
@@ -39,7 +48,21 @@ describe('brand kit bindings (#53)', () => {
       formats: { sq: { name: 'Square', width: 100, height: 100, order: 'a0' } },
       pages: { p1: { name: 'Page 1', order: 'a0' } },
       nodes: {
-        t: { type: 'text', parentId: 'p1', index: 'a0', name: 'T', bindings: { fontFamily: 'brand:heading' }, props: { x: 0, y: 0, width: 10, height: 10, text: 'Hi', style: { fontFamily: 'Noto Sans', fontSize: 10, color: navy } } },
+        t: {
+          type: 'text',
+          parentId: 'p1',
+          index: 'a0',
+          name: 'T',
+          bindings: { fontFamily: 'brand:heading' },
+          props: {
+            x: 0,
+            y: 0,
+            width: 10,
+            height: 10,
+            text: 'Hi',
+            style: { fontFamily: 'Noto Sans', fontSize: 10, color: navy },
+          },
+        },
       },
       overrides: {},
     }
@@ -49,6 +72,8 @@ describe('brand kit bindings (#53)', () => {
     expect(design.nodes.t?.bindings).toEqual({ fontFamily: 'brand:heading' })
     expect(fontFamilies(design)).toEqual(['Noto Sans'])
     expect(fontFamilies(design, { 'brand:heading': 'Playfair Display' })).toEqual(['Noto Sans', 'Playfair Display'])
-    expect(parseDesign({ ...json, nodes: { t: { ...json.nodes.t, bindings: { fontFamily: 'brand:Heading' } } } }).success).toBe(false)
+    expect(
+      parseDesign({ ...json, nodes: { t: { ...json.nodes.t, bindings: { fontFamily: 'brand:Heading' } } } }).success,
+    ).toBe(false)
   })
 })

@@ -3,7 +3,7 @@
 // machine never writes into the workspace their local site shows. CI's servers are thrown away
 // after each run, so it uses docker compose's as before. A POST to /restart-sync on the control port
 // restarts the suite's sync server and answers once the new one is listening.
-import { spawn, type ChildProcess } from 'node:child_process'
+import { type ChildProcess, spawn } from 'node:child_process'
 import { createServer } from 'node:http'
 import { createRequire } from 'node:module'
 import { fileURLToPath } from 'node:url'
@@ -67,7 +67,13 @@ function run(script: string) {
 /** Waits up to a minute for a server to answer `url`; whether it did. */
 async function answers(url: string) {
   for (let i = 0; i < 120; i++) {
-    if (await fetch(url).then((r) => r.ok, () => false)) return true
+    if (
+      await fetch(url).then(
+        (r) => r.ok,
+        () => false,
+      )
+    )
+      return true
     await new Promise((resolve) => setTimeout(resolve, 500))
   }
   return false
@@ -92,8 +98,13 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     if (request.method !== 'POST' || request.url !== '/restart-sync') return void response.writeHead(404).end()
     void restartSync(sync).then(async (next) => {
       sync = next
-      response.writeHead(await answers(`http://127.0.0.1:${LOCAL.sync}`) ? 200 : 503).end()
+      response.writeHead((await answers(`http://127.0.0.1:${LOCAL.sync}`)) ? 200 : 503).end()
     })
   }).listen(LOCAL.control, '127.0.0.1')
-  for (const signal of ['SIGINT', 'SIGTERM'] as const) process.on(signal, () => { api.kill(); sync.kill(); process.exit(0) })
+  for (const signal of ['SIGINT', 'SIGTERM'] as const)
+    process.on(signal, () => {
+      api.kill()
+      sync.kill()
+      process.exit(0)
+    })
 }

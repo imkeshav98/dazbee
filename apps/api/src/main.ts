@@ -1,8 +1,10 @@
 // The API server: migrates the database, then serves. Settings come from the environment only.
 import { serve } from '@hono/node-server'
-import { migrateDatabase, openDatabase, workspaces, brands } from '@dazbee/db'
+
+import { brands, migrateDatabase, openDatabase, workspaces } from '@dazbee/db'
 import { openStorage, storageSettings } from '@dazbee/storage'
 import { syncTokenSecret } from '@dazbee/sync-token'
+
 import { createApp } from './app.ts'
 import { DEV_BRANDS, DEV_WORKSPACE, devSession, firstSession, sessionSecret, tokenSession } from './session.ts'
 import { workosProvider, workosSettings } from './sign-in.ts'
@@ -24,12 +26,16 @@ const { db, close } = openDatabase(databaseUrl)
 await migrateDatabase(db)
 if (dev) {
   await db.insert(workspaces).values(DEV_WORKSPACE).onConflictDoNothing()
-  await db.insert(brands).values(DEV_BRANDS.map((c) => ({ ...c, workspaceId: DEV_WORKSPACE.id }))).onConflictDoNothing()
+  await db
+    .insert(brands)
+    .values(DEV_BRANDS.map((c) => ({ ...c, workspaceId: DEV_WORKSPACE.id })))
+    .onConflictDoNothing()
 }
 
 const sessionOf = firstSession(...(signIn ? [tokenSession(db, signIn.secret)] : []), ...(dev ? [devSession] : []))
 const app = createApp({ db, storage, sessionOf, syncSecret, signIn })
-const ways = [signIn && 'WorkOS sign-in', dev && 'the development session'].filter(Boolean).join(' and ') || 'no way to sign in'
+const ways =
+  [signIn && 'WorkOS sign-in', dev && 'the development session'].filter(Boolean).join(' and ') || 'no way to sign in'
 const server = serve({ fetch: app.fetch, port }, () => console.log(`api on http://localhost:${port} with ${ways}`))
 
 for (const signal of ['SIGINT', 'SIGTERM']) {

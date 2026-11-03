@@ -2,13 +2,17 @@
 // make and store as their own objects, never resized on the fly. CanvasKit decodes the original, as
 // it does for every render.
 import { loadCanvasKit } from '@dazbee/renderer/node'
-import { isVectorAsset, type ImageType } from '@dazbee/schema'
+import { type ImageType, isVectorAsset } from '@dazbee/schema'
+
 import { svgThumbnail } from './svg-assets.ts'
 
 /** The longest side of a thumbnail, in pixels: two library columns on a 2× screen. */
 export const THUMBNAIL_SIZE = 320
 
-export interface Thumbnail { bytes: Uint8Array; contentType: 'image/png' | 'image/jpeg' }
+export interface Thumbnail {
+  bytes: Uint8Array
+  contentType: 'image/png' | 'image/jpeg'
+}
 
 /**
  * The image scaled down to fit THUMBNAIL_SIZE (never up). A JPEG stays a JPEG; PNG and WebP, which
@@ -16,10 +20,11 @@ export interface Thumbnail { bytes: Uint8Array; contentType: 'image/png' | 'imag
  * CanvasKit can't decode the original, or the SVG can't be read.
  */
 export async function makeThumbnail(bytes: Uint8Array, contentType: ImageType): Promise<Thumbnail> {
-  if (isVectorAsset({ contentType })) return { bytes: await svgThumbnail(bytes, THUMBNAIL_SIZE), contentType: 'image/png' }
+  if (isVectorAsset({ contentType }))
+    return { bytes: await svgThumbnail(bytes, THUMBNAIL_SIZE), contentType: 'image/png' }
   const ck = await loadCanvasKit()
   const image = ck.MakeImageFromEncoded(bytes)
-  if (!image) throw new Error('CanvasKit can\'t decode this image')
+  if (!image) throw new Error("CanvasKit can't decode this image")
   try {
     const scale = Math.min(1, THUMBNAIL_SIZE / Math.max(image.width(), image.height()))
     const width = Math.max(1, Math.round(image.width() * scale))
@@ -28,7 +33,16 @@ export async function makeThumbnail(bytes: Uint8Array, contentType: ImageType): 
     if (!surface) throw new Error('could not make a surface for the thumbnail')
     try {
       // Mipmapped, so a photo several times the size shrinks without shimmering edges.
-      surface.getCanvas().drawImageRectOptions(image, ck.XYWHRect(0, 0, image.width(), image.height()), ck.XYWHRect(0, 0, width, height), ck.FilterMode.Linear, ck.MipmapMode.Linear, null)
+      surface
+        .getCanvas()
+        .drawImageRectOptions(
+          image,
+          ck.XYWHRect(0, 0, image.width(), image.height()),
+          ck.XYWHRect(0, 0, width, height),
+          ck.FilterMode.Linear,
+          ck.MipmapMode.Linear,
+          null,
+        )
       const snapshot = surface.makeImageSnapshot()
       const jpeg = contentType === 'image/jpeg'
       const encoded = jpeg ? snapshot.encodeToBytes(ck.ImageFormat.JPEG, 82) : snapshot.encodeToBytes()

@@ -1,16 +1,29 @@
 // The Position panel in Chromium: the moves along the stack and lining up first, by name for
 // one layer and by icon for several, and the numbers under Advanced, where Lock ratio keeps the
 // box's shape. Every button is one undo step. Screenshots at desktop, tablet and phone sizes.
-import { expect, test, type Locator, type Page } from '../support/test.ts'
 import type { DesignInput } from '@dazbee/schema'
+
 import { writeOutput } from '../support/editor.ts'
 import { barMenu, openStage, order, props } from '../support/stage.ts'
+import { expect, type Locator, type Page, test } from '../support/test.ts'
 
 test.describe.configure({ timeout: 120_000 })
 
 const solid = (color: string) => [{ type: 'solid' as const, color }]
-const rect = (name: string, index: string, x: number, y: number, width: number, height: number, color: string, parentId = 'p1') => ({
-  type: 'graphic' as const, parentId, index, name,
+const rect = (
+  name: string,
+  index: string,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  color: string,
+  parentId = 'p1',
+) => ({
+  type: 'graphic' as const,
+  parentId,
+  index,
+  name,
   props: { x, y, width, height, shape: { kind: 'rect' as const, cornerRadius: 12 }, fills: solid(color) },
 })
 
@@ -19,17 +32,36 @@ const design = (): DesignInput => ({
   formats: { sq: { name: 'Square', width: 1080, height: 1080, order: 'a0' } },
   pages: { p1: { name: 'Page 1', order: 'a0', fills: solid('#FFF8F0FF') } },
   nodes: {
-    headline: { type: 'text', parentId: 'p1', index: 'a0', name: 'Headline', props: { x: 120, y: 80, width: 640, height: 90, boxMode: 'autoHeight', text: 'Summer sale', style: { fontFamily: 'Noto Sans', fontSize: 64, fontWeight: 400, color: '#111111FF' } } },
+    headline: {
+      type: 'text',
+      parentId: 'p1',
+      index: 'a0',
+      name: 'Headline',
+      props: {
+        x: 120,
+        y: 80,
+        width: 640,
+        height: 90,
+        boxMode: 'autoHeight',
+        text: 'Summer sale',
+        style: { fontFamily: 'Noto Sans', fontSize: 64, fontWeight: 400, color: '#111111FF' },
+      },
+    },
     one: rect('One', 'a1', 120, 300, 200, 100, '#FCA311FF'),
     two: rect('Two', 'a2', 400, 340, 160, 160, '#14213DFF'),
     three: rect('Three', 'a3', 700, 380, 120, 120, '#E0262BFF'),
-    group: { type: 'group', parentId: 'p1', index: 'a4', name: 'Group', props: { x: 120, y: 700, width: 400, height: 200 } },
+    group: {
+      type: 'group',
+      parentId: 'p1',
+      index: 'a4',
+      name: 'Group',
+      props: { x: 120, y: 700, width: 400, height: 200 },
+    },
     g1: rect('G1', 'a0', 120, 700, 180, 200, '#2A9D8FFF', 'group'),
     g2: rect('G2', 'a1', 340, 700, 180, 200, '#E0157FFF', 'group'),
   },
   overrides: {},
 })
-
 
 const select = async (page: Page, ids: string[]) => {
   await page.evaluate((ids) => window.dazbee?.select(ids), ids)
@@ -41,14 +73,28 @@ const enter = async (field: Locator, value: string) => {
   await field.press('Enter')
 }
 const panel = (page: Page) => barMenu(page, 'position')
-const button = async (page: Page, name: string | RegExp) => (await panel(page)).getByRole('button', { name, exact: typeof name === 'string' })
+const button = async (page: Page, name: string | RegExp) =>
+  (await panel(page)).getByRole('button', { name, exact: typeof name === 'string' })
 
-test('one layer: the moves along the stack, lining up with the size by name, and the numbers under Advanced', async ({ browser }) => {
+test('one layer: the moves along the stack, lining up with the size by name, and the numbers under Advanced', async ({
+  browser,
+}) => {
   const { page, errors } = await openStage(browser, design())
   await select(page, ['one'])
   const part = (await panel(page)).getByTestId('arrange-part')
   await expect(part.getByRole('heading')).toHaveText(['Arrange', 'Line up with the size'])
-  await expect(part.getByRole('button')).toHaveText(['Forward', 'Backward', 'To front', 'To back', 'Top', 'Left', 'Middle', 'Centre', 'Bottom', 'Right'])
+  await expect(part.getByRole('button')).toHaveText([
+    'Forward',
+    'Backward',
+    'To front',
+    'To back',
+    'Top',
+    'Left',
+    'Middle',
+    'Centre',
+    'Bottom',
+    'Right',
+  ])
   await expect(part.getByRole('button', { name: 'To front' })).toHaveAttribute('title', 'Bring to front (Ctrl+Shift+])')
 
   // Each move is one undo step.
@@ -77,7 +123,9 @@ test('one layer: the moves along the stack, lining up with the size by name, and
   const advanced = (await panel(page)).getByTestId('layout-card')
   await expect(advanced.getByRole('heading')).toHaveText('Advanced')
   await expect(advanced.getByRole('spinbutton')).toHaveCount(5)
-  const names = await advanced.getByRole('spinbutton').evaluateAll((els) => els.map((el) => el.getAttribute('aria-label')))
+  const names = await advanced
+    .getByRole('spinbutton')
+    .evaluateAll((els) => els.map((el) => el.getAttribute('aria-label')))
   expect(names).toEqual(['Width', 'Height', 'X position', 'Y position', 'Rotation in degrees'])
   await enter(advanced.getByRole('spinbutton', { name: 'Width' }), '300')
   await expect.poll(() => props(page, 'one')).toMatchObject({ width: 300, height: 100 })
@@ -116,7 +164,9 @@ test('several layers line up with each other by icon, and spread out once there 
   await expect(await button(page, 'Spread across')).toBeEnabled()
   await (await button(page, 'Spread across')).click()
   // From 120 to 820, 200 + 160 + 120 wide, leaves two gaps of 110.
-  await expect.poll(async () => [(await props(page, 'one')).x, (await props(page, 'two')).x, (await props(page, 'three')).x]).toEqual([120, 430, 700])
+  await expect
+    .poll(async () => [(await props(page, 'one')).x, (await props(page, 'two')).x, (await props(page, 'three')).x])
+    .toEqual([120, 430, 700])
   expect(errors).toEqual([])
 })
 
@@ -131,12 +181,19 @@ test('a group takes its size from what it holds, so its Advanced has only where 
   expect(errors).toEqual([])
 })
 
-for (const [width, height] of [[1280, 760], [820, 1180], [390, 844]] as const) {
+for (const [width, height] of [
+  [1280, 760],
+  [820, 1180],
+  [390, 844],
+] as const) {
   test(`screenshots at ${width}×${height}: one layer and several`, { tag: '@evidence' }, async ({ browser }) => {
     const { page, errors } = await openStage(browser, design())
     await page.setViewportSize({ width, height })
     await page.evaluate(() => window.dazbee?.fitAll())
-    for (const [name, ids] of [['one', ['headline']], ['several', ['one', 'two', 'three']]] as const) {
+    for (const [name, ids] of [
+      ['one', ['headline']],
+      ['several', ['one', 'two', 'three']],
+    ] as const) {
       await select(page, [...ids])
       await panel(page)
       await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))))

@@ -1,9 +1,17 @@
 // Exports (#55, #56): one function per file type. PNG and JPG are drawn on the CPU surface
 // (ADR-0005) and PDF and SVG on Skia's PDF and SVG canvases, by the render seam, so the browser's
 // export worker and Node make the same bytes from the same design.
-import { renderDesign, renderVector, type ResourceBytes, type ResourceCache } from '@dazbee/renderer'
-import { EXPORT_NAME_TOKENS, ExportRequest, parseDesign, type Design, type ExportNameToken, type ExportType } from '@dazbee/schema'
 import type { CanvasKit } from '@dazbee/canvaskit'
+import { renderDesign, renderVector, type ResourceBytes, type ResourceCache } from '@dazbee/renderer'
+import {
+  type Design,
+  EXPORT_NAME_TOKENS,
+  type ExportNameToken,
+  ExportRequest,
+  type ExportType,
+  parseDesign,
+} from '@dazbee/schema'
+
 import { zip } from './zip.ts'
 
 export interface ExportedFile {
@@ -14,17 +22,38 @@ export interface ExportedFile {
 }
 
 const MIME: Record<ExportType | 'zip', string> = {
-  png: 'image/png', jpg: 'image/jpeg', pdf: 'application/pdf', svg: 'image/svg+xml', zip: 'application/zip',
+  png: 'image/png',
+  jpg: 'image/jpeg',
+  pdf: 'application/pdf',
+  svg: 'image/svg+xml',
+  zip: 'application/zip',
 }
 
+/** Path separators, the characters some file systems reserve, and control characters. */
+// eslint-disable-next-line no-control-regex
+const UNSAFE_IN_NAMES = /[/\\:*?"<>|\u0000-\u001f]/g
+
 /** One page in one format as a PNG, transparency kept. */
-export function exportPng(ck: CanvasKit, design: Design, pageId: string, formatId: string, bytes: ResourceBytes, cache?: ResourceCache): Uint8Array {
+export function exportPng(
+  ck: CanvasKit,
+  design: Design,
+  pageId: string,
+  formatId: string,
+  bytes: ResourceBytes,
+  cache?: ResourceCache,
+): Uint8Array {
   return renderDesign(ck, design, pageId, formatId, bytes, cache).png
 }
 
 /** One page in one format as a JPG at a quality from 1 to 100, over white where the page is see-through. */
 export function exportJpg(
-  ck: CanvasKit, design: Design, pageId: string, formatId: string, bytes: ResourceBytes, quality: number, cache?: ResourceCache,
+  ck: CanvasKit,
+  design: Design,
+  pageId: string,
+  formatId: string,
+  bytes: ResourceBytes,
+  quality: number,
+  cache?: ResourceCache,
 ): Uint8Array {
   const { width, height, pixels } = renderDesign(ck, design, pageId, formatId, bytes, cache)
   const opaque = new Uint8Array(pixels.length)
@@ -34,7 +63,17 @@ export function exportJpg(
     for (let c = 0; c < 3; c++) opaque[i + c] = Math.round(((pixels[i + c] ?? 0) * a + 255 * (255 - a)) / 255)
     opaque[i + 3] = 255
   }
-  const image = ck.MakeImage({ width, height, colorType: ck.ColorType.RGBA_8888, alphaType: ck.AlphaType.Opaque, colorSpace: ck.ColorSpace.SRGB }, opaque, width * 4)
+  const image = ck.MakeImage(
+    {
+      width,
+      height,
+      colorType: ck.ColorType.RGBA_8888,
+      alphaType: ck.AlphaType.Opaque,
+      colorSpace: ck.ColorSpace.SRGB,
+    },
+    opaque,
+    width * 4,
+  )
   if (!image) throw new Error('CanvasKit could not make the image to encode')
   try {
     const jpg = image.encodeToBytes(ck.ImageFormat.JPEG, quality)
@@ -49,19 +88,32 @@ export function exportJpg(
  * One page in one format as a one-page PDF for print: shapes and text stay vectors, text keeps its
  * fonts embedded and can be selected, and a page unit is one pixel of the format.
  */
-export function exportPdf(ck: CanvasKit, design: Design, pageId: string, formatId: string, bytes: ResourceBytes, cache?: ResourceCache): Uint8Array {
+export function exportPdf(
+  ck: CanvasKit,
+  design: Design,
+  pageId: string,
+  formatId: string,
+  bytes: ResourceBytes,
+  cache?: ResourceCache,
+): Uint8Array {
   return renderVector(ck, design, pageId, formatId, bytes, 'pdf', cache, { title: design.meta.name })
 }
 
 /** One page in one format as an SVG, its text drawn as shapes so it looks the same in every app. */
-export function exportSvg(ck: CanvasKit, design: Design, pageId: string, formatId: string, bytes: ResourceBytes, cache?: ResourceCache): Uint8Array {
+export function exportSvg(
+  ck: CanvasKit,
+  design: Design,
+  pageId: string,
+  formatId: string,
+  bytes: ResourceBytes,
+  cache?: ResourceCache,
+): Uint8Array {
   return renderVector(ck, design, pageId, formatId, bytes, 'svg', cache)
 }
 
 /** A name safe on every file system: no path separators or reserved characters, never empty. */
 function safe(part: string) {
-  // eslint-disable-next-line no-control-regex
-  const cleaned = part.replace(/[/\\:*?"<>|\u0000-\u001f]/g, '-').replace(/\s+/g, ' ').trim().replace(/^\.+/, '')
+  const cleaned = part.replace(UNSAFE_IN_NAMES, '-').replace(/\s+/g, ' ').trim().replace(/^\.+/, '')
   return cleaned || 'untitled'
 }
 
@@ -79,7 +131,12 @@ export function fileName(template: string, values: { design: string; page: strin
  * as it is made, so a caller can show progress.
  */
 export function exportDesign(
-  ck: CanvasKit, json: unknown, input: unknown, bytes: ResourceBytes, cache?: ResourceCache, onFile?: (done: number, total: number) => void,
+  ck: CanvasKit,
+  json: unknown,
+  input: unknown,
+  bytes: ResourceBytes,
+  cache?: ResourceCache,
+  onFile?: (done: number, total: number) => void,
 ): ExportedFile {
   const parsed = parseDesign(json)
   if (!parsed.success) throw new Error(`invalid design:\n${parsed.errors.join('\n')}`)
@@ -109,5 +166,9 @@ export function exportDesign(
   })
   const [only] = files
   if (files.length === 1 && only) return only
-  return { name: `${safe(design.meta.name)}.zip`, type: MIME.zip, bytes: zip(files.map((f) => ({ path: f.name, bytes: f.bytes }))) }
+  return {
+    name: `${safe(design.meta.name)}.zip`,
+    type: MIME.zip,
+    bytes: zip(files.map((f) => ({ path: f.name, bytes: f.bytes }))),
+  }
 }

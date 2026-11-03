@@ -1,8 +1,19 @@
 import { describe, expect, it } from 'vitest'
-import { pressFor, SHORTCUTS, shortcutFor } from './shortcuts.ts'
 
-const key = (key: string, code: string, mods: { ctrl?: boolean; meta?: boolean; shift?: boolean; alt?: boolean } = {}) =>
-  ({ key, code, ctrlKey: Boolean(mods.ctrl), metaKey: Boolean(mods.meta), shiftKey: Boolean(mods.shift), altKey: Boolean(mods.alt) })
+import { pressFor, shortcutFor, SHORTCUTS } from './shortcuts.ts'
+
+const key = (
+  key: string,
+  code: string,
+  mods: { ctrl?: boolean; meta?: boolean; shift?: boolean; alt?: boolean } = {},
+) => ({
+  key,
+  code,
+  ctrlKey: Boolean(mods.ctrl),
+  metaKey: Boolean(mods.meta),
+  shiftKey: Boolean(mods.shift),
+  altKey: Boolean(mods.alt),
+})
 
 describe('shortcuts', () => {
   it('match letters by the character typed and other keys by their code, with exact modifiers', () => {

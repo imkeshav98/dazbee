@@ -2,11 +2,12 @@
 // with clicks and drags, go into its points, drag one, and undo the drag in one step; then an open
 // path with Shift, a point added on a segment, a handle dragged, and a point deleted; and a smooth
 // point's handles turned together, or one alone with Alt.
-import { parsePath, pathBounds, type Anchor, type PenPath } from '@dazbee/editor/path'
-import { expect, test, type Page } from '../support/test.ts'
+import { type Anchor, parsePath, pathBounds, type PenPath } from '@dazbee/editor/path'
+
 import { exportHashOf, writeOutput } from '../support/editor.ts'
 import { liveDesign } from '../support/seed.ts'
-import { click, drag, dragScreen, openStage, press, read, selection, type Design } from '../support/stage.ts'
+import { click, type Design, drag, dragScreen, openStage, press, read, selection } from '../support/stage.ts'
+import { expect, type Page, test } from '../support/test.ts'
 
 test.describe.configure({ timeout: 120_000 })
 
@@ -18,7 +19,8 @@ const pathOf = (d: Design, id: string): PenPath => {
   return parsePath(p.shape.d).map((c) => ({
     closed: c.closed,
     anchors: c.anchors.map((a) => ({
-      x: a.x + p.x, y: a.y + p.y,
+      x: a.x + p.x,
+      y: a.y + p.y,
       ...(a.in && { in: { x: a.in.x + p.x, y: a.in.y + p.y } }),
       ...(a.out && { out: { x: a.out.x + p.x, y: a.out.y + p.y } }),
     })),
@@ -41,7 +43,9 @@ const undo = async (page: Page) => {
   await page.evaluate(() => window.dazbee?.drawn())
 }
 
-test('the pen draws a closed curved path, a point of it is dragged, and undo takes the drag back in one step', async ({ browser }) => {
+test('the pen draws a closed curved path, a point of it is dragged, and undo takes the drag back in one step', async ({
+  browser,
+}) => {
   const { page, errors } = await openStage(browser, liveDesign())
   const blank = await exportHashOf(page)
   const before = new Set(Object.keys((await read(page)).nodes))
@@ -51,7 +55,7 @@ test('the pen draws a closed curved path, a point of it is dragged, and undo tak
   await expect(page.locator('[role="toolbar"] [data-tool="pen"]')).toHaveAttribute('aria-pressed', 'true')
   await click(page, 150, 850)
   await drag(page, { x: 400, y: 850 }, { x: 460, y: 850 })
-  const hover = await page.evaluate(() => window.dazbee?.screenPoint(380, 980)) as { x: number; y: number }
+  const hover = (await page.evaluate(() => window.dazbee?.screenPoint(380, 980))) as { x: number; y: number }
   await page.mouse.move(hover.x, hover.y, { steps: 4 })
   writeOutput('paths-0-drawing.png', await page.screenshot({ animations: 'disabled' }))
   await drag(page, { x: 380, y: 1000 }, { x: 330, y: 1000 })
@@ -61,7 +65,12 @@ test('the pen draws a closed curved path, a point of it is dragged, and undo tak
   // One layer, a closed path through the three points with the handles the drags pulled out.
   let d = await read(page)
   const [id = ''] = Object.keys(d.nodes).filter((n) => !before.has(n))
-  expect(d.nodes[id]).toMatchObject({ type: 'graphic', parentId: 'p1', name: 'Path', props: { shape: { kind: 'path' }, strokes: [{ width: 2 }] } })
+  expect(d.nodes[id]).toMatchObject({
+    type: 'graphic',
+    parentId: 'p1',
+    name: 'Path',
+    props: { shape: { kind: 'path' }, strokes: [{ width: 2 }] },
+  })
   const drawn = pathOf(d, id)
   expect(drawn).toHaveLength(1)
   expect(drawn[0]?.closed).toBe(true)
@@ -116,7 +125,9 @@ test('the pen draws a closed curved path, a point of it is dragged, and undo tak
   expect(errors).toEqual([])
 })
 
-test('Shift keeps the pen to 45°, a click on a segment adds a point, a handle drags, Delete takes a point out, and a smooth point\'s handles turn together unless Alt lets one go alone', async ({ browser }) => {
+test("Shift keeps the pen to 45°, a click on a segment adds a point, a handle drags, Delete takes a point out, and a smooth point's handles turn together unless Alt lets one go alone", async ({
+  browser,
+}) => {
   const { page, errors } = await openStage(browser, liveDesign())
   const before = new Set(Object.keys((await read(page)).nodes))
   await press(page, 'toolPen')
@@ -133,7 +144,7 @@ test('Shift keeps the pen to 45°, a click on a segment adds a point, a handle d
   expect(await toolOf(page)).toBe('select')
 
   // Double-click goes into its points. A press on the segment adds a point and drags it down.
-  const middle = await page.evaluate(() => window.dazbee?.screenPoint(250, 900)) as { x: number; y: number }
+  const middle = (await page.evaluate(() => window.dazbee?.screenPoint(250, 900))) as { x: number; y: number }
   await page.mouse.dblclick(middle.x, middle.y)
   await page.evaluate(() => window.dazbee?.drawn())
   await expect(page.locator('.path-anchor')).toHaveCount(2)

@@ -1,5 +1,7 @@
-import { parseDesign } from '@dazbee/schema'
 import { describe, expect, it } from 'vitest'
+
+import { parseDesign } from '@dazbee/schema'
+
 import { loadDesign, readDesign } from './index.ts'
 import { testDesign } from './test-design.ts'
 

@@ -1,10 +1,11 @@
 // Rich text editing (#47) with real pointer and keyboard input: a double-clicked word made bold;
 // a range across an Arabic and Latin boundary whose boxes sit where the caret and word selection
 // say; the text tool, line breaks, copy, cut and paste; each typing session one undo step.
-import { expect, test, type Page } from '../support/test.ts'
 import type { DesignInput } from '@dazbee/schema'
+
 import { exportHashOf, writeOutput } from '../support/editor.ts'
 import { openStage, press, read, selection } from '../support/stage.ts'
+import { expect, type Page, test } from '../support/test.ts'
 
 test.describe.configure({ timeout: 120_000 })
 
@@ -14,12 +15,32 @@ const design = (): DesignInput => ({
   pages: { p1: { name: 'Page 1', order: 'a0', fills: [{ type: 'solid', color: '#FFF8F0FF' }] } },
   nodes: {
     body: {
-      type: 'text', parentId: 'p1', index: 'a0', name: 'Body',
-      props: { x: 80, y: 100, width: 920, height: 90, text: 'Fresh roast every morning', style: { fontFamily: 'Noto Sans', fontSize: 64, color: '#1F2329FF' } },
+      type: 'text',
+      parentId: 'p1',
+      index: 'a0',
+      name: 'Body',
+      props: {
+        x: 80,
+        y: 100,
+        width: 920,
+        height: 90,
+        text: 'Fresh roast every morning',
+        style: { fontFamily: 'Noto Sans', fontSize: 64, color: '#1F2329FF' },
+      },
     },
     mixed: {
-      type: 'text', parentId: 'p1', index: 'a1', name: 'Mixed',
-      props: { x: 80, y: 300, width: 920, height: 130, text: 'خصم Razzlr اليوم', style: { fontFamily: 'Noto Naskh Arabic', fontSize: 80, color: '#1F2329FF' } },
+      type: 'text',
+      parentId: 'p1',
+      index: 'a1',
+      name: 'Mixed',
+      props: {
+        x: 80,
+        y: 300,
+        width: 920,
+        height: 130,
+        text: 'خصم Razzlr اليوم',
+        style: { fontFamily: 'Noto Naskh Arabic', fontSize: 80, color: '#1F2329FF' },
+      },
     },
   },
   overrides: {},
@@ -29,9 +50,14 @@ type Rect = { x: number; y: number; width: number; height: number }
 const textRuns = async (page: Page, id: string) => ((await read(page)).nodes[id]?.props as { runs: unknown[] }).runs
 const textOf = async (page: Page, id: string) => ((await read(page)).nodes[id]?.props as { text: string }).text
 const drawn = (page: Page) => page.evaluate(() => window.dazbee?.drawn())
-const at = (page: Page, x: number, y: number) => page.evaluate(({ x, y }) => window.dazbee?.screenPoint(x, y), { x, y }) as Promise<{ x: number; y: number }>
-const boxes = async (page: Page) => (await page.locator('.text-selection').evaluateAll((els) => els.map((el) => el.getBoundingClientRect().toJSON() as Rect)))
-  .sort((a, b) => a.x - b.x)
+const at = (page: Page, x: number, y: number) =>
+  page.evaluate(({ x, y }) => window.dazbee?.screenPoint(x, y), { x, y }) as Promise<{ x: number; y: number }>
+const boxes = async (page: Page) =>
+  (
+    await page
+      .locator('.text-selection')
+      .evaluateAll((els) => els.map((el) => el.getBoundingClientRect().toJSON() as Rect))
+  ).sort((a, b) => a.x - b.x)
 const caretX = async (page: Page) => {
   const box = await page.locator('.caret').boundingBox()
   if (!box) throw new Error('no caret')
@@ -84,7 +110,9 @@ test('a double-clicked word is made bold with the keyboard, one undo step with t
   expect(errors).toEqual([])
 })
 
-test('a range across an Arabic and Latin boundary has a box for each direction, where the caret and word selection put them', async ({ browser }) => {
+test('a range across an Arabic and Latin boundary has a box for each direction, where the caret and word selection put them', async ({
+  browser,
+}) => {
   const { page, errors } = await openStage(browser, design())
   // "خصم Razzlr اليوم": Arabic 0–3, a space, "Razzlr" 4–10, a space, Arabic 11–16.
   await dblclick(page, 900, 360)
@@ -146,7 +174,13 @@ test('the text tool makes text by a click or a box, with line breaks, copy, cut 
   const [id = ''] = Object.keys((await read(page)).nodes).filter((n) => !start.has(n))
   expect(await textOf(page, id)).toBe('Hello\nWorld')
   // Text made by a click grows as it is typed: its box is as big as its words.
-  const grown = (await read(page)).nodes[id]?.props as { boxMode: string; width: number; height: number; x: number; y: number }
+  const grown = (await read(page)).nodes[id]?.props as {
+    boxMode: string
+    width: number
+    height: number
+    x: number
+    y: number
+  }
   expect(grown).toMatchObject({ boxMode: 'autoWidth', x: 100, y: 600 })
   expect(grown.width).toBeGreaterThan(100)
   expect(grown.height).toBeGreaterThan(100)
@@ -181,7 +215,13 @@ test('the text tool makes text by a click or a box, with line breaks, copy, cut 
   await page.mouse.up()
   await drawn(page)
   const [boxed = ''] = Object.keys((await read(page)).nodes).filter((n) => !start.has(n))
-  expect((await read(page)).nodes[boxed]?.props).toMatchObject({ boxMode: 'fixed', x: 100, y: 700, width: 300, height: 100 })
+  expect((await read(page)).nodes[boxed]?.props).toMatchObject({
+    boxMode: 'fixed',
+    x: 100,
+    y: 700,
+    width: 300,
+    height: 100,
+  })
   await keys(page, 'Escape')
   expect((await read(page)).nodes[boxed]).toBeUndefined()
   expect(await exportHashOf(page)).toBe(before)

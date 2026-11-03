@@ -1,6 +1,6 @@
 // An asset's thumbnail for the asset library (#52): the small copy the API made and stored, passed
 // through here like the original, so the browser needs no storage address or credentials.
-import { thumbnailLink } from '../../../../../../lib/api.ts'
+import { thumbnailLink } from '@/lib/api.ts'
 
 export async function GET(_request: Request, { params }: { params: Promise<{ brandId: string; assetId: string }> }) {
   const { brandId, assetId } = await params

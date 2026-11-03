@@ -4,17 +4,25 @@
 // the frame at its own size or scaled down to fit; an SVG set as the brand logo places from the
 // Brand panel as layers too.
 import { randomUUID } from 'node:crypto'
-import { expect, test, type Page } from '../support/test.ts'
+
 import type { DesignInput } from '@dazbee/schema'
+
 import { screenPoint, writeOutput } from '../support/editor.ts'
 import { DEV_BRAND, getKit, newBrand } from '../support/seed.ts'
-import { fillList, openStage, press, read, selection, type Design } from '../support/stage.ts'
+import { type Design, fillList, openStage, press, read, selection } from '../support/stage.ts'
+import { expect, type Page, test } from '../support/test.ts'
 
 test.describe.configure({ timeout: 120_000 })
 
 const run = randomUUID().slice(0, 8)
 const design: DesignInput = {
-  meta: { schemaVersion: 5, designId: 'replaced-by-the-api', name: 'SVG layers', kind: 'single', primaryFormatId: 'sq' },
+  meta: {
+    schemaVersion: 5,
+    designId: 'replaced-by-the-api',
+    name: 'SVG layers',
+    kind: 'single',
+    primaryFormatId: 'sq',
+  },
   formats: { sq: { name: 'Square', width: 1080, height: 1080, order: 'a0' } },
   pages: { p1: { name: 'Page 1', order: 'a0', fills: [{ type: 'solid', color: '#FFF8F0FF' }] } },
   nodes: {},
@@ -36,13 +44,18 @@ const logo = (tag: string) => `<svg xmlns="http://www.w3.org/2000/svg" width="30
 type Node = Design['nodes'][string] & { type: string; name: string }
 const nodes = async (page: Page) => Object.entries((await read(page)).nodes) as [string, Node][]
 const named = async (page: Page, name: string) => (await nodes(page)).find(([, n]) => n.name === name)
-const fillColor = async (page: Page, name: string) => ((await named(page, name))?.[1].props.fills as { color?: string }[] | undefined)?.[0]?.color
+const fillColor = async (page: Page, name: string) =>
+  ((await named(page, name))?.[1].props.fills as { color?: string }[] | undefined)?.[0]?.color
 /** The colour the export draws at a design pixel of the square. */
-const exported = (page: Page, x: number, y: number) => page.evaluate(({ x, y }) => {
-  const pixels = window.dazbee?.exportPixels()
-  const at = (y * 1080 + x) * 4
-  return pixels ? [pixels[at], pixels[at + 1], pixels[at + 2]] : null
-}, { x, y })
+const exported = (page: Page, x: number, y: number) =>
+  page.evaluate(
+    ({ x, y }) => {
+      const pixels = window.dazbee?.exportPixels()
+      const at = (y * 1080 + x) * 4
+      return pixels ? [pixels[at], pixels[at + 1], pixels[at + 2]] : null
+    },
+    { x, y },
+  )
 
 /** Checks the placed logo: one group on the page holding the four shapes as path layers, the badge keeping its gradient. */
 async function expectPlacedLogo(page: Page, groupName: string) {
@@ -56,20 +69,30 @@ async function expectPlacedLogo(page: Page, groupName: string) {
   return group?.[0] as string
 }
 
-test('an SVG uploaded to the library places as layers in one step, and a shape in it takes a new colour', async ({ browser }) => {
+test('an SVG uploaded to the library places as layers in one step, and a shape in it takes a new colour', async ({
+  browser,
+}) => {
   const { page, errors } = await openStage(browser, design)
   await page.locator('[data-panel="assets"]').click()
   const library = page.getByTestId('asset-library')
   const name = `Logo ${run}`
-  await library.locator('input[type="file"]').setInputFiles({ name: `${name}.svg`, mimeType: 'image/svg+xml', buffer: Buffer.from(logo('library')) })
+  await library
+    .locator('input[type="file"]')
+    .setInputFiles({ name: `${name}.svg`, mimeType: 'image/svg+xml', buffer: Buffer.from(logo('library')) })
   const tile = library.locator('li[data-asset]').filter({ hasText: name })
   await expect(tile).toHaveCount(1, { timeout: 20_000 })
   // The tile shows the file drawn by the server, as layers.
   await expect(tile.locator('img')).toHaveJSProperty('complete', true)
   writeOutput('svg-layers-1-library.png', await page.screenshot())
   // Its original comes back as text the browser neither runs nor draws.
-  const served = await page.request.get(`${new URL(page.url()).origin}/brands/${DEV_BRAND}/assets/${await tile.getAttribute('data-asset')}`)
-  expect(served.headers()).toMatchObject({ 'content-type': 'text/plain; charset=utf-8', 'content-security-policy': "default-src 'none'; sandbox", 'x-content-type-options': 'nosniff' })
+  const served = await page.request.get(
+    `${new URL(page.url()).origin}/brands/${DEV_BRAND}/assets/${await tile.getAttribute('data-asset')}`,
+  )
+  expect(served.headers()).toMatchObject({
+    'content-type': 'text/plain; charset=utf-8',
+    'content-security-policy': "default-src 'none'; sandbox",
+    'x-content-type-options': 'nosniff',
+  })
   expect(await served.text()).toContain('<svg')
 
   await tile.getByRole('button', { name: `Place ${name} on the design` }).click()
@@ -77,12 +100,14 @@ test('an SVG uploaded to the library places as layers in one step, and a shape i
   const groupId = await expectPlacedLogo(page, name)
   expect(await selection(page)).toEqual([groupId])
   // The blur is named as left out.
-  await expect(page.getByRole('status').filter({ hasText: 'Left out, since no layer can show them: filters.' })).toBeVisible()
+  await expect(
+    page.getByRole('status').filter({ hasText: 'Left out, since no layer can show them: filters.' }),
+  ).toBeVisible()
   await page.evaluate(() => window.dazbee?.drawn())
   writeOutput('svg-layers-2-placed.png', await page.screenshot())
 
   // The dot is a layer of its own: a double-click goes into the group and picks it.
-  const [dotId, dot] = await named(page, 'Dot') as [string, Node]
+  const [dotId, dot] = (await named(page, 'Dot')) as [string, Node]
   const { x, y, width, height } = dot.props as { x: number; y: number; width: number; height: number }
   const at = await screenPoint(page, x + width / 2, y + height / 2)
   await page.mouse.dblclick(at.x, at.y)
@@ -106,7 +131,9 @@ test('an SVG uploaded to the library places as layers in one step, and a shape i
   expect(errors).toEqual([])
 })
 
-test('SVG markup pasted on the stage places as layers in the middle of the frame, at its own size or scaled down to fit', async ({ browser }) => {
+test('SVG markup pasted on the stage places as layers in the middle of the frame, at its own size or scaled down to fit', async ({
+  browser,
+}) => {
   const { page, errors } = await openStage(browser, design)
   await page.context().grantPermissions(['clipboard-read', 'clipboard-write'])
   await page.evaluate((text) => navigator.clipboard.writeText(text), logo('paste'))
@@ -119,22 +146,34 @@ test('SVG markup pasted on the stage places as layers in the middle of the frame
   // file, so 280 × 186 from 400,447. Each shape keeps its place in it: the bar is drawn where it is.
   expect(await selection(page)).toEqual([groupId])
   /** Each layer's box, by its name. */
-  const boxes = async () => Object.fromEntries((await nodes(page)).map(([, n]) => {
-    const { x, y, width, height } = n.props
-    return [n.name, { x, y, width, height }]
-  }))
-  expect.soft(await boxes()).toMatchObject({ SVG: { x: 400, y: 447, width: 280, height: 186 }, Bar: { x: 600, y: 477, width: 80, height: 120 } })
-  expect.soft(await exported(page, 640, 537)).toEqual([0x07, 0x3B, 0x4C])
+  const boxes = async () =>
+    Object.fromEntries(
+      (await nodes(page)).map(([, n]) => {
+        const { x, y, width, height } = n.props
+        return [n.name, { x, y, width, height }]
+      }),
+    )
+  expect.soft(await boxes()).toMatchObject({
+    SVG: { x: 400, y: 447, width: 280, height: 186 },
+    Bar: { x: 600, y: 477, width: 80, height: 120 },
+  })
+  expect.soft(await exported(page, 640, 537)).toEqual([0x07, 0x3b, 0x4c])
   await page.evaluate(() => window.dazbee?.drawn())
   writeOutput('svg-layers-4-pasted.png', await page.screenshot())
 
   // A file wider than 60% of the square is scaled down to that, 648 wide, and centred the same way.
   await press(page, 'undo')
   await expect.poll(async () => (await nodes(page)).length).toBe(0)
-  await page.evaluate((text) => navigator.clipboard.writeText(text), `<svg xmlns="http://www.w3.org/2000/svg" width="2000" height="1000"><rect id="Wide" width="2000" height="1000" fill="#073B4C"/></svg>`)
+  await page.evaluate(
+    (text) => navigator.clipboard.writeText(text),
+    `<svg xmlns="http://www.w3.org/2000/svg" width="2000" height="1000"><rect id="Wide" width="2000" height="1000" fill="#073B4C"/></svg>`,
+  )
   await page.keyboard.press('Control+v')
   await expect.poll(async () => (await nodes(page)).length).toBe(2)
-  expect(await boxes()).toMatchObject({ SVG: { x: 216, y: 378, width: 648, height: 324 }, Wide: { x: 216, y: 378, width: 648, height: 324 } })
+  expect(await boxes()).toMatchObject({
+    SVG: { x: 216, y: 378, width: 648, height: 324 },
+    Wide: { x: 216, y: 378, width: 648, height: 324 },
+  })
   expect(errors).toEqual([])
 })
 
@@ -144,7 +183,9 @@ test('an SVG set as the brand logo places from the Brand panel as layers', async
   await page.locator('[data-panel="brand"]').click()
   const kit = page.getByTestId('brand-kit')
   await kit.getByRole('button', { name: 'Edit' }).click()
-  await kit.locator('input[name="logo-file"]').setInputFiles({ name: `Brand logo ${run}.svg`, mimeType: 'image/svg+xml', buffer: Buffer.from(logo('kit')) })
+  await kit
+    .locator('input[name="logo-file"]')
+    .setInputFiles({ name: `Brand logo ${run}.svg`, mimeType: 'image/svg+xml', buffer: Buffer.from(logo('kit')) })
   await expect.poll(async () => (await getKit(brandId)).logoAssetId, { timeout: 20_000 }).not.toBeNull()
   await kit.getByRole('button', { name: 'Done' }).click()
   const place = kit.getByTestId('kit-logo-place').first()

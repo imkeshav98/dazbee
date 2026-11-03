@@ -2,11 +2,15 @@
 // colours and fonts, named `brand:<token>`, which a layer binds its fill, its text colour or its
 // font family to, so changing the brand colour changes every design that uses it.
 import { z } from 'zod'
+
 import { boundFillIndex } from './paint.ts'
 import { Color } from './primitives.ts'
 
 /** A brand kit token's name: lowercase words joined by hyphens, such as `primary` or `sale-red`. */
-export const BrandToken = z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'a token is lowercase words joined by hyphens').max(40)
+export const BrandToken = z
+  .string()
+  .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'a token is lowercase words joined by hyphens')
+  .max(40)
 export type BrandToken = z.infer<typeof BrandToken>
 
 /** What a bound property follows: a brand kit token, `brand:<token>`. */
@@ -20,7 +24,11 @@ export const brandRef = (token: string): VariableRef => `brand:${token}` as Vari
  */
 export const BINDING_TARGETS = ['fill', 'textColor', 'fontFamily'] as const
 export type BindingTarget = (typeof BINDING_TARGETS)[number]
-export const Bindings = z.object({ fill: VariableRef.optional(), textColor: VariableRef.optional(), fontFamily: VariableRef.optional() })
+export const Bindings = z.object({
+  fill: VariableRef.optional(),
+  textColor: VariableRef.optional(),
+  fontFamily: VariableRef.optional(),
+})
 export type Bindings = z.infer<typeof Bindings>
 
 /** Whether a layer of this type has the property a target binds. */
@@ -39,7 +47,12 @@ export const fitsTarget = (target: BindingTarget, value: string) =>
  * value, or a value that doesn't suit it, leaves the property as the layer stores it: the value it
  * had when it was bound, or last set. Props come back as they were when nothing changes.
  */
-export function bindProps<P extends Record<string, unknown>>(type: string, props: P, bindings: Bindings | undefined, variables: Variables | undefined): P {
+export function bindProps<P extends Record<string, unknown>>(
+  type: string,
+  props: P,
+  bindings: Bindings | undefined,
+  variables: Variables | undefined,
+): P {
   if (!bindings || !variables) return props
   let out = props
   for (const target of BINDING_TARGETS) {

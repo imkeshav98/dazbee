@@ -2,15 +2,26 @@
 
 // What the edit panels share: the fixed colours offered without a brand kit and the ring round the
 // one picked; and the cards a size or a page has in its panel's list, with their buttons and menu.
-import * as Popover from '@radix-ui/react-popover'
 import { DotsThreeIcon } from '@phosphor-icons/react'
+import * as Popover from '@radix-ui/react-popover'
 import { Fragment, useState } from 'react'
-import { cn } from '../../lib/cn.ts'
+
+import { cn } from '@/lib/cn.ts'
+
 import { useMenuFocus } from './bar-popover.tsx'
 import { ICON_BUTTON, MENU, MENU_DIVIDER, MENU_ITEM } from './styles.ts'
 
 /** Colours a click away when the brand's kit has none; the hex fields take any colour. */
-export const SWATCHES = ['#FFFFFF', '#FBF7F2', '#1A1420', '#FF48B0', '#3D6BFF', '#FFD23F', '#3DD68C', '#FF6B3D'] as const
+export const SWATCHES = [
+  '#FFFFFF',
+  '#FBF7F2',
+  '#1A1420',
+  '#FF48B0',
+  '#3D6BFF',
+  '#FFD23F',
+  '#3DD68C',
+  '#FF6B3D',
+] as const
 
 /**
  * The ring round a picked swatch or tile, as in the mock: pink with a gap, a shape and not only a
@@ -24,7 +35,12 @@ export const CARD_BUTTON = cn(ICON_BUTTON, 'max-sm:size-10')
 export const CARD_ROW = 'flex items-center gap-2.5 rounded-[10px] border border-line bg-surface p-2'
 
 /** One item of a card's menu; a `danger` one, last, removes, which a toast undoes. */
-export interface CardMenuItem { label: string; run: () => void; disabled?: boolean; danger?: boolean }
+export interface CardMenuItem {
+  label: string
+  run: () => void
+  disabled?: boolean
+  danger?: boolean
+}
 
 /** A size's or a page's menu behind ⋯ on its card; a line goes before the item that removes it. */
 export function CardMenu({ label, items }: { label: string; items: CardMenuItem[] }) {
@@ -38,7 +54,16 @@ export function CardMenu({ label, items }: { label: string; items: CardMenuItem[
         </button>
       </Popover.Trigger>
       <Popover.Portal>
-        <Popover.Content side="bottom" align="end" sideOffset={6} collisionPadding={12} {...focus.content} aria-label={label} onKeyDown={(e) => e.stopPropagation()} className={cn(MENU, 'min-w-44')}>
+        <Popover.Content
+          side="bottom"
+          align="end"
+          sideOffset={6}
+          collisionPadding={12}
+          {...focus.content}
+          aria-label={label}
+          onKeyDown={(e) => e.stopPropagation()}
+          className={cn(MENU, 'min-w-44')}
+        >
           {focus.back}
           {items.map((item) => (
             <Fragment key={item.label}>

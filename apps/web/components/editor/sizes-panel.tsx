@@ -5,12 +5,15 @@
 // pixels, and its primary star, show alone and a menu (rename, move up, move down, remove); then
 // Add a size, from the common presets at a tap or any size. Every change is a command, one undo step.
 import { EyeIcon, FrameCornersIcon, StarIcon } from '@phosphor-icons/react'
-import type { Editor } from '@dazbee/editor'
-import { FORMAT_PRESETS, type Design } from '@dazbee/schema'
 import { useState } from 'react'
-import { cn } from '../../lib/cn.ts'
-import { useMessages } from '../../lib/i18n/client.tsx'
-import { format } from '../../lib/i18n/index.ts'
+
+import type { Editor } from '@dazbee/editor'
+import { type Design, FORMAT_PRESETS } from '@dazbee/schema'
+
+import { cn } from '@/lib/cn.ts'
+import { useMessages } from '@/lib/i18n/client.tsx'
+import { format } from '@/lib/i18n/index.ts'
+
 import { CARD_BUTTON, CARD_ROW, CardMenu } from './card.tsx'
 import { PanelFrame } from './edit-panel.tsx'
 import { setOpen, useEditState } from './edit-store.ts'
@@ -25,7 +28,9 @@ const sizeOf = ({ width, height }: { width: number; height: number }) => `${widt
 /** A size as a chip shows it, short. */
 const shortSizeOf = ({ width, height }: { width: number; height: number }) => `${width}×${height}`
 const ordered = (design: Design) =>
-  Object.entries(design.formats).sort(([a, x], [b, y]) => (x.order < y.order ? -1 : x.order > y.order ? 1 : a < b ? -1 : 1))
+  Object.entries(design.formats).sort(([a, x], [b, y]) =>
+    x.order < y.order ? -1 : x.order > y.order ? 1 : a < b ? -1 : 1,
+  )
 /** A size's picture in its proportions, its long side 34. */
 const thumbOf = ({ width, height }: { width: number; height: number }) => {
   const scale = 34 / Math.max(width, height)
@@ -51,11 +56,18 @@ export function SizesButton({ editor }: { editor: Editor }) {
       aria-label={format(t.editor.formats.button, { n: count })}
       title={format(t.editor.formats.button, { n: count })}
       onClick={() => setOpen(open === 'sizes' ? null : 'sizes')}
-      className={cn('flex h-[26px] shrink-0 cursor-pointer items-center gap-1.5 rounded-full border border-line bg-surface px-2.5 text-[12px] font-semibold text-text transition-colors hover:bg-hover aria-expanded:border-transparent aria-expanded:bg-accent-soft aria-expanded:text-accent-text', FOCUS_RING)}
+      className={cn(
+        'flex h-[26px] shrink-0 cursor-pointer items-center gap-1.5 rounded-full border border-line bg-surface px-2.5 text-[12px] font-semibold text-text transition-colors hover:bg-hover aria-expanded:border-transparent aria-expanded:bg-accent-soft aria-expanded:text-accent-text',
+        FOCUS_RING,
+      )}
     >
       <FrameCornersIcon size={14} aria-hidden />
-      <span aria-hidden className="max-sm:hidden">{format(t.editor.formats.button, { n: count })}</span>
-      <span aria-hidden className="font-mono tabular-nums sm:hidden">{count}</span>
+      <span aria-hidden className="max-sm:hidden">
+        {format(t.editor.formats.button, { n: count })}
+      </span>
+      <span aria-hidden className="font-mono tabular-nums sm:hidden">
+        {count}
+      </span>
     </button>
   )
 }
@@ -91,47 +103,81 @@ function SizeList({ editor, onRemoved }: { editor: Editor; onRemoved: (message: 
       {formats.map(([id, size], i) => {
         const primary = design.meta.primaryFormatId === id
         return (
-          <li key={id} data-format={id} data-focused={focused === id ? '' : undefined} className={cn(CARD_ROW, 'data-[focused]:border-accent data-[focused]:bg-accent-soft')}>
+          <li
+            key={id}
+            data-format={id}
+            data-focused={focused === id ? '' : undefined}
+            className={cn(CARD_ROW, 'data-[focused]:border-accent data-[focused]:bg-accent-soft')}
+          >
             <span aria-hidden className="grid size-[34px] shrink-0 place-items-center">
-              <span className="rounded-[3px] border border-line-strong bg-hover" style={{ ...thumbOf(size), backgroundColor: background }} />
+              <span
+                className="rounded-[3px] border border-line-strong bg-hover"
+                style={{ ...thumbOf(size), backgroundColor: background }}
+              />
             </span>
             <span className="flex min-w-0 flex-1 flex-col">
-              {renaming === id
-                ? (
-                  <input
-                    name="format-name"
-                    aria-label={f.rename}
-                    defaultValue={size.name}
-                    autoFocus
-                    onFocus={(e) => e.currentTarget.select()}
-                    onBlur={(e) => rename(id, e.currentTarget.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') rename(id, e.currentTarget.value)
-                      if (e.key === 'Escape') setRenaming(null)
-                      e.stopPropagation()
-                    }}
-                    className="h-6 min-w-0 rounded-[6px] border border-accent bg-surface px-1.5 text-[13px] outline-none"
-                  />
-                )
-                : (
-                  <button type="button" onDoubleClick={() => setRenaming(id)} onKeyDown={(e) => e.key === 'Enter' && setRenaming(id)} aria-label={`${f.rename}: ${size.name}`} className="min-w-0 cursor-default truncate text-start text-[13px] font-semibold text-text">
-                    {size.name}
-                  </button>
-                )}
+              {renaming === id ? (
+                <input
+                  name="format-name"
+                  aria-label={f.rename}
+                  defaultValue={size.name}
+                  autoFocus
+                  onFocus={(e) => e.currentTarget.select()}
+                  onBlur={(e) => rename(id, e.currentTarget.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') rename(id, e.currentTarget.value)
+                    if (e.key === 'Escape') setRenaming(null)
+                    e.stopPropagation()
+                  }}
+                  className="h-6 min-w-0 rounded-[6px] border border-accent bg-surface px-1.5 text-[13px] outline-none"
+                />
+              ) : (
+                <button
+                  type="button"
+                  onDoubleClick={() => setRenaming(id)}
+                  onKeyDown={(e) => e.key === 'Enter' && setRenaming(id)}
+                  aria-label={`${f.rename}: ${size.name}`}
+                  className="min-w-0 cursor-default truncate text-start text-[13px] font-semibold text-text"
+                >
+                  {size.name}
+                </button>
+              )}
               <span className="font-mono text-[11px] text-subtle tabular-nums">{sizeOf(size)}</span>
             </span>
-            <button type="button" aria-label={primary ? f.primary : f.makePrimary} title={primary ? f.primary : f.makePrimary} aria-pressed={primary} onClick={() => primary || run('format.setPrimary', { id })} className={cn(CARD_BUTTON, primary && 'text-accent-text')}>
+            <button
+              type="button"
+              aria-label={primary ? f.primary : f.makePrimary}
+              title={primary ? f.primary : f.makePrimary}
+              aria-pressed={primary}
+              onClick={() => primary || run('format.setPrimary', { id })}
+              className={cn(CARD_BUTTON, primary && 'text-accent-text')}
+            >
               <StarIcon size={15} weight={primary ? 'fill' : 'regular'} aria-hidden />
             </button>
-            <button type="button" aria-label={focused === id ? f.exitFocus : f.focus} title={focused === id ? f.exitFocus : f.focus} aria-pressed={focused === id} onClick={() => editor.focus(focused === id ? null : id)} className={cn(CARD_BUTTON, focused === id && 'text-accent-text')}>
+            <button
+              type="button"
+              aria-label={focused === id ? f.exitFocus : f.focus}
+              title={focused === id ? f.exitFocus : f.focus}
+              aria-pressed={focused === id}
+              onClick={() => editor.focus(focused === id ? null : id)}
+              className={cn(CARD_BUTTON, focused === id && 'text-accent-text')}
+            >
               <EyeIcon size={15} aria-hidden />
             </button>
             <CardMenu
               label={format(f.more, { name: size.name })}
               items={[
                 { label: f.rename, run: () => setRenaming(id) },
-                { label: f.moveUp, disabled: i === 0, run: () => run('format.update', { id, before: formats[i - 1]?.[0] ?? null }) },
-                { label: f.moveDown, disabled: i === formats.length - 1, run: () => run('format.update', { id, before: formats[i + 2]?.[0] ?? null }) },
+                {
+                  label: f.moveUp,
+                  disabled: i === 0,
+                  run: () => run('format.update', { id, before: formats[i - 1]?.[0] ?? null }),
+                },
+                {
+                  label: f.moveDown,
+                  disabled: i === formats.length - 1,
+                  run: () => run('format.update', { id, before: formats[i + 2]?.[0] ?? null }),
+                },
                 {
                   label: f.remove,
                   disabled: primary || formats.length === 1,
@@ -166,7 +212,9 @@ function AddSize({ editor }: { editor: Editor }) {
   return (
     <section aria-labelledby="add-size-title" className={PANEL_PART} data-testid="add-size">
       <div className="flex h-7 items-center gap-2">
-        <h3 id="add-size-title" className={cn(PANEL_HEADING, 'flex-1')}>{f.addSize}</h3>
+        <h3 id="add-size-title" className={cn(PANEL_HEADING, 'flex-1')}>
+          {f.addSize}
+        </h3>
         <AddFormat editor={editor} />
       </div>
       <div className="flex flex-wrap gap-1.5">
@@ -175,7 +223,13 @@ function AddSize({ editor }: { editor: Editor }) {
           if (!preset || has.has(sizeOf(preset))) return null
           const name = f.preset[preset.id] ?? preset.id
           return (
-            <button key={preset.id} type="button" data-preset={preset.id} onClick={() => add(name, preset.width, preset.height)} className={cn(CHIP, 'h-7 gap-1.5 px-2.5 text-[12px] font-medium text-text max-sm:h-9', FOCUS_RING)}>
+            <button
+              key={preset.id}
+              type="button"
+              data-preset={preset.id}
+              onClick={() => add(name, preset.width, preset.height)}
+              className={cn(CHIP, 'h-7 gap-1.5 px-2.5 text-[12px] font-medium text-text max-sm:h-9', FOCUS_RING)}
+            >
               {name}
               <span className="text-subtle tabular-nums">{shortSizeOf(preset)}</span>
             </button>

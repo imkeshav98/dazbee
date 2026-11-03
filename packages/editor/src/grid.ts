@@ -15,7 +15,12 @@ export interface Frame {
   height: number
 }
 
-export interface Rect { x: number; y: number; width: number; height: number }
+export interface Rect {
+  x: number
+  y: number
+  width: number
+  height: number
+}
 
 /** Space between formats, and between pages, which also holds the frame labels. */
 export const COLUMN_GAP = 160
@@ -32,7 +37,9 @@ export const frameKey = (pageId: string, formatId: string) => `${pageId}/${forma
  */
 export function frameGrid(design: Design, only?: string | null): { frames: Frame[]; bounds: Rect } {
   const pages = byOrder(Object.entries(design.pages))
-  const formats = byOrder(Object.entries(design.formats)).filter(([id]) => !only || !design.formats[only] || id === only)
+  const formats = byOrder(Object.entries(design.formats)).filter(
+    ([id]) => !only || !design.formats[only] || id === only,
+  )
   const rowHeight = Math.max(0, ...formats.map(([, f]) => f.height))
   const columns: number[] = []
   let x = 0
@@ -40,10 +47,19 @@ export function frameGrid(design: Design, only?: string | null): { frames: Frame
     columns.push(x)
     x += format.width + COLUMN_GAP
   }
-  const frames = pages.flatMap(([pageId], row) => formats.map(([formatId, format], column) => ({
-    key: frameKey(pageId, formatId), pageId, formatId, row, column,
-    x: columns[column] ?? 0, y: row * (rowHeight + ROW_GAP), width: format.width, height: format.height,
-  })))
+  const frames = pages.flatMap(([pageId], row) =>
+    formats.map(([formatId, format], column) => ({
+      key: frameKey(pageId, formatId),
+      pageId,
+      formatId,
+      row,
+      column,
+      x: columns[column] ?? 0,
+      y: row * (rowHeight + ROW_GAP),
+      width: format.width,
+      height: format.height,
+    })),
+  )
   const width = Math.max(0, x - COLUMN_GAP)
   const height = Math.max(0, pages.length * (rowHeight + ROW_GAP) - ROW_GAP)
   return { frames, bounds: { x: 0, y: 0, width, height } }

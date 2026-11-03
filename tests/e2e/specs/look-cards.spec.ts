@@ -1,26 +1,53 @@
 // The visual-first property cards (as in the final mock) in Chromium: text's size and its colour
 // from the brand kit, the effects as tiles with their numbers under them, and the header card that
 // names the layer and holds its box.
-import { expect, test, type Page } from '../support/test.ts'
 import type { DesignInput } from '@dazbee/schema'
+
 import { writeOutput } from '../support/editor.ts'
 import { newBrand, putKit } from '../support/seed.ts'
-import { barMenu, openStage, openCard } from '../support/stage.ts'
+import { barMenu, openCard, openStage } from '../support/stage.ts'
+import { expect, type Page, test } from '../support/test.ts'
 
 test.describe.configure({ timeout: 120_000 })
 
 const design = (): DesignInput => ({
-  meta: { schemaVersion: 5, designId: 'replaced-by-the-api', name: 'Look cards', kind: 'single', primaryFormatId: 'sq' },
+  meta: {
+    schemaVersion: 5,
+    designId: 'replaced-by-the-api',
+    name: 'Look cards',
+    kind: 'single',
+    primaryFormatId: 'sq',
+  },
   formats: { sq: { name: 'Square', width: 1080, height: 1080, order: 'a0' } },
   pages: { p1: { name: 'Page 1', order: 'a0', fills: [{ type: 'solid', color: '#FF8A3DFF' }] } },
   nodes: {
     headline: {
-      type: 'text', parentId: 'p1', index: 'a0', name: 'Headline',
-      props: { x: 76, y: 162, width: 610, height: 204, text: 'Cold brew is back', style: { fontFamily: 'Noto Sans', fontSize: 96, fontWeight: 800, color: '#FFFFFFFF' } },
+      type: 'text',
+      parentId: 'p1',
+      index: 'a0',
+      name: 'Headline',
+      props: {
+        x: 76,
+        y: 162,
+        width: 610,
+        height: 204,
+        text: 'Cold brew is back',
+        style: { fontFamily: 'Noto Sans', fontSize: 96, fontWeight: 800, color: '#FFFFFFFF' },
+      },
     },
     badge: {
-      type: 'graphic', parentId: 'p1', index: 'a1', name: 'Badge',
-      props: { x: 80, y: 700, width: 280, height: 280, shape: { kind: 'ellipse' }, fills: [{ type: 'solid', color: '#FFE14DFF' }] },
+      type: 'graphic',
+      parentId: 'p1',
+      index: 'a1',
+      name: 'Badge',
+      props: {
+        x: 80,
+        y: 700,
+        width: 280,
+        height: 280,
+        shape: { kind: 'ellipse' },
+        fills: [{ type: 'solid', color: '#FFE14DFF' }],
+      },
     },
   },
   overrides: {},
@@ -31,7 +58,12 @@ const node = (page: Page, id: string) => page.evaluate((id) => window.dazbee?.de
 
 test('the look comes first: size and brand colour, effect tiles, and the header card', async ({ browser }) => {
   const brandId = await newBrand('e2e look-cards')
-  await putKit(brandId, { colors: [{ token: 'berry', name: 'Berry', value: '#FF3D6EFF' }, { token: 'roast', name: 'Roast', value: '#2A140AFF' }] })
+  await putKit(brandId, {
+    colors: [
+      { token: 'berry', name: 'Berry', value: '#FF3D6EFF' },
+      { token: 'roast', name: 'Roast', value: '#2A140AFF' },
+    ],
+  })
   const { page, errors } = await openStage(browser, design(), { brandId })
   await page.evaluate(() => window.dazbee?.select(['headline']))
 
@@ -52,23 +84,30 @@ test('the look comes first: size and brand colour, effect tiles, and the header 
   await expect(effects.locator('[data-tile="none"]')).toHaveAttribute('aria-pressed', 'true')
   await effects.locator('[data-tile="dropShadow"]').click()
   await effects.locator('[data-tile="outline"]').click()
-  await expect.poll(async () => {
-    const props = (await node(page, 'headline')).props
-    return [(props.effects as { type: string }[]).map((e) => e.type), (props.style?.outline as { width: number } | undefined)?.width]
-  }).toEqual([['dropShadow'], 2])
+  await expect
+    .poll(async () => {
+      const props = (await node(page, 'headline')).props
+      return [
+        (props.effects as { type: string }[]).map((e) => e.type),
+        (props.style?.outline as { width: number } | undefined)?.width,
+      ]
+    })
+    .toEqual([['dropShadow'], 2])
   await expect(effects.locator('[data-tile="none"]')).toHaveAttribute('aria-pressed', 'false')
   await page.evaluate(() => window.dazbee?.drawn())
   writeOutput('look-cards-text.png', await page.screenshot())
   // The picked effect's numbers are under the tiles.
   await expect(effects.getByRole('spinbutton', { name: 'Drop shadow 1 Blur' })).toBeVisible()
   await effects.locator('[data-tile="none"]').click()
-  await expect.poll(async () => {
-    const props = (await node(page, 'headline')).props
-    return [(props.effects as unknown[]).length, props.style?.outline]
-  }).toEqual([0, undefined])
+  await expect
+    .poll(async () => {
+      const props = (await node(page, 'headline')).props
+      return [(props.effects as unknown[]).length, props.style?.outline]
+    })
+    .toEqual([0, undefined])
 
   // The Position panel names the layer and holds its box.
-  const header = async () => (await openCard(page, 'layout-card'))
+  const header = async () => await openCard(page, 'layout-card')
   await header()
   await expect(page.getByTestId('edit-panel-note')).toHaveText('Headline')
   await expect((await header()).getByRole('spinbutton', { name: 'X position' })).toHaveValue('76')

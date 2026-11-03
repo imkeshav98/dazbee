@@ -1,4 +1,5 @@
 import type { CanvasKit, FontCollection, Paragraph, TextStyle as CkTextStyle } from '@dazbee/canvaskit'
+
 import { color } from './color.ts'
 import type { Resources } from './draw.ts'
 import type { SceneLayer } from './scene.ts'
@@ -56,7 +57,11 @@ const ELLIPSIS = '\u2026'
  * clear of a gutter for its marker, and paragraph spacing goes between them. A text with one
  * paragraph is laid out as one SkParagraph, as before.
  */
-export function layoutText(ck: CanvasKit, props: TextProps, resources: Pick<Resources, 'fonts' | 'fallbackFamilies'>): TextLayout {
+export function layoutText(
+  ck: CanvasKit,
+  props: TextProps,
+  resources: Pick<Resources, 'fonts' | 'fallbackFamilies'>,
+): TextLayout {
   const fit = props.shrinkToFit
   if (!fit) return place(props, build(ck, props, resources, 1))
   // The largest quarter point size from min to max that fits; min when none does.
@@ -91,40 +96,65 @@ function fits(props: TextProps, laid: TextLayout): boolean {
   if (props.boxMode === 'autoWidth') return true
   const total = props.text.split('\n').length
   if (laid.blocks.length < total || laid.blocks.some((b) => b.paragraph.didExceedMaxLines())) return false
-  for (const b of laid.blocks) if (b.paragraph.getMinIntrinsicWidth() > props.width - b.x - gutterRight(props, laid, b) + 0.01) return false
+  for (const b of laid.blocks)
+    if (b.paragraph.getMinIntrinsicWidth() > props.width - b.x - gutterRight(props, laid, b) + 0.01) return false
   return props.boxMode !== 'fixed' || laid.height <= props.height + 0.01
 }
-const gutterRight = (props: TextProps, laid: TextLayout, b: TextBlock) => (b.marker && b.x === 0 ? laid.width - b.paragraph.getMaxWidth() : 0)
+const gutterRight = (props: TextProps, laid: TextLayout, b: TextBlock) =>
+  b.marker && b.x === 0 ? laid.width - b.paragraph.getMaxWidth() : 0
 
-function build(ck: CanvasKit, props: TextProps, resources: Pick<Resources, 'fonts' | 'fallbackFamilies'>, scale: number): TextLayout {
+function build(
+  ck: CanvasKit,
+  props: TextProps,
+  resources: Pick<Resources, 'fonts' | 'fallbackFamilies'>,
+  scale: number,
+): TextLayout {
   const direction = props.direction === 'auto' ? autoDirection(props.text) : props.direction
   const rtl = direction === 'rtl'
   const base = scaled(props.style, scale) as Style
   // Later runs win where runs overlap, so split the text at every run edge and merge per piece.
-  const edges = [...new Set([0, props.text.length, ...props.runs.flatMap((r) => [r.start, r.end])])].sort((a, b) => a - b)
+  const edges = [...new Set([0, props.text.length, ...props.runs.flatMap((r) => [r.start, r.end])])].sort(
+    (a, b) => a - b,
+  )
   const pieces = edges.slice(0, -1).map((start, i) => {
     const end = edges[i + 1] ?? props.text.length
     const style = { ...props.style }
     for (const run of props.runs) if (run.start <= start && run.end >= end) Object.assign(style, run.style)
     return { start, end, style: scaled(style, scale) as Style }
   })
-  const styleAt = (offset: number) => pieces.find((p) => offset >= p.start && offset < p.end)?.style ?? pieces.at(-1)?.style ?? base
+  const styleAt = (offset: number) =>
+    pieces.find((p) => offset >= p.start && offset < p.end)?.style ?? pieces.at(-1)?.style ?? base
   const shown = withCase(props.text, styleAt)
 
-  const paragraphStyle = (style: Style, extra: { maxLines?: number; ellipsis?: string } = {}) => new ck.ParagraphStyle({
-    textAlign: { start: ck.TextAlign.Start, center: ck.TextAlign.Center, end: ck.TextAlign.End, justify: ck.TextAlign.Justify }[props.align],
-    textDirection: rtl ? ck.TextDirection.RTL : ck.TextDirection.LTR,
-    textStyle: textStyle(ck, style, resources),
-    ...extra,
-  })
+  const paragraphStyle = (style: Style, extra: { maxLines?: number; ellipsis?: string } = {}) =>
+    new ck.ParagraphStyle({
+      textAlign: {
+        start: ck.TextAlign.Start,
+        center: ck.TextAlign.Center,
+        end: ck.TextAlign.End,
+        justify: ck.TextAlign.Justify,
+      }[props.align],
+      textDirection: rtl ? ck.TextDirection.RTL : ck.TextDirection.LTR,
+      textStyle: textStyle(ck, style, resources),
+      ...extra,
+    })
   const outlined = pieces.some((p) => (p.style.outline?.width ?? 0) > 0)
   const clear = new ck.Paint()
   clear.setColor(ck.TRANSPARENT)
   /** One paragraph of the text; with `outline`, its outline pass. `more` is drawn after it, as an ellipsis is. */
-  const paragraphOf = (start: number, end: number, extra: { maxLines?: number; ellipsis?: string }, outline: boolean, more = '') => {
+  const paragraphOf = (
+    start: number,
+    end: number,
+    extra: { maxLines?: number; ellipsis?: string },
+    outline: boolean,
+    more = '',
+  ) => {
     // An empty paragraph takes the style typing would give it: the character before's.
     const lead = start < end ? styleAt(start) : styleAt(Math.max(0, start - 1))
-    const builder = ck.ParagraphBuilder.MakeFromFontCollection(paragraphStyle(start === 0 && end === props.text.length ? base : lead, extra), resources.fonts)
+    const builder = ck.ParagraphBuilder.MakeFromFontCollection(
+      paragraphStyle(start === 0 && end === props.text.length ? base : lead, extra),
+      resources.fonts,
+    )
     for (const piece of pieces) {
       const from = Math.max(piece.start, start)
       const to = Math.min(piece.end, end)
@@ -184,7 +214,9 @@ function build(ck: CanvasKit, props: TextProps, resources: Pick<Resources, 'font
     return paragraph
   })
   // The gutter: the widest marker and half the base size more.
-  const gutter = props.list ? Math.ceil(Math.max(0, ...markers.map((m) => m?.getMaxIntrinsicWidth() ?? 0)) + base.fontSize / 2) : 0
+  const gutter = props.list
+    ? Math.ceil(Math.max(0, ...markers.map((m) => m?.getMaxIntrinsicWidth() ?? 0)) + base.fontSize / 2)
+    : 0
 
   let paragraphs = ranges.map(({ start, end }) => paragraphOf(start, end, {}, false))
   /** How the last paragraph was cut, so its outline pass is cut alike. */
@@ -238,18 +270,30 @@ function build(ck: CanvasKit, props: TextProps, resources: Pick<Resources, 'font
     }
     const marker = markers[i] ?? null
     const block: TextBlock = {
-      paragraph, outline, marker,
+      paragraph,
+      outline,
+      marker,
       markerX: rtl ? inner + gutter - (marker?.getMaxIntrinsicWidth() ?? 0) : 0,
       markerY: (paragraph.getLineMetrics()[0]?.baseline ?? 0) - (marker?.getLineMetrics()[0]?.baseline ?? 0),
-      text: shown.slice(range.start, range.end), start: range.start, end: range.end,
-      x: rtl ? 0 : gutter, y, height: paragraph.getHeight(),
+      text: shown.slice(range.start, range.end),
+      start: range.start,
+      end: range.end,
+      x: rtl ? 0 : gutter,
+      y,
+      height: paragraph.getHeight(),
     }
     y += block.height + (i < paragraphs.length - 1 ? spacing : 0)
     return block
   })
   clear.delete()
   return {
-    blocks, dy: 0, width, height: y, scale, align: props.align, rtl,
+    blocks,
+    dy: 0,
+    width,
+    height: y,
+    scale,
+    align: props.align,
+    rtl,
     delete() {
       for (const b of blocks) {
         b.paragraph.delete()
@@ -280,10 +324,23 @@ function withCase(text: string, styleAt: (offset: number) => Style): string {
 }
 
 /** What a text layer's layout depends on: everything but where it is placed and how it is painted over. */
-const layoutKey = (props: TextProps, fallbackFamilies: string[]) => JSON.stringify([
-  props.text, props.runs, props.style, props.width, props.height, props.boxMode, props.align, props.verticalAlign, props.direction,
-  props.list, props.paragraphSpacing, props.maxLines, props.shrinkToFit, fallbackFamilies,
-])
+const layoutKey = (props: TextProps, fallbackFamilies: string[]) =>
+  JSON.stringify([
+    props.text,
+    props.runs,
+    props.style,
+    props.width,
+    props.height,
+    props.boxMode,
+    props.align,
+    props.verticalAlign,
+    props.direction,
+    props.list,
+    props.paragraphSpacing,
+    props.maxLines,
+    props.shrinkToFit,
+    fallbackFamilies,
+  ])
 
 /**
  * Laid-out text kept by what shapes it, for a screen that redraws often: a redraw lays out only
@@ -325,8 +382,15 @@ export function paragraphCache(limit = 4000) {
 export type ParagraphCache = ReturnType<typeof paragraphCache>
 
 /** A style for CanvasKit; for an outline pass, without the lines, which the fill pass draws. */
-function textStyle(ck: CanvasKit, style: Style, resources: Pick<Resources, 'fallbackFamilies'>, outline = false): CkTextStyle {
-  const decoration = outline ? 0 : (style.underline ? ck.UnderlineDecoration : 0) | (style.strikethrough ? ck.LineThroughDecoration : 0)
+function textStyle(
+  ck: CanvasKit,
+  style: Style,
+  resources: Pick<Resources, 'fallbackFamilies'>,
+  outline = false,
+): CkTextStyle {
+  const decoration = outline
+    ? 0
+    : (style.underline ? ck.UnderlineDecoration : 0) | (style.strikethrough ? ck.LineThroughDecoration : 0)
   return new ck.TextStyle({
     color: color(ck, style.color),
     fontFamilies: [style.fontFamily, ...resources.fallbackFamilies.filter((f) => f !== style.fontFamily)],
@@ -349,7 +413,11 @@ function autoDirection(text: string): 'ltr' | 'rtl' {
 
 const graphemeSegmenter = new Intl.Segmenter(undefined, { granularity: 'grapheme' })
 
-interface GraphemeBox extends SelectionBox { start: number; end: number; line: number }
+interface GraphemeBox extends SelectionBox {
+  start: number
+  end: number
+  line: number
+}
 
 /** Every grapheme's box, in its block, measured once per paragraph: a drag asks for the caret every frame. */
 const graphemeBoxes = new WeakMap<Paragraph, GraphemeBox[]>()
@@ -384,7 +452,10 @@ function blockOf(laid: TextLayout, offset: number): TextBlock | undefined {
  */
 export function caretAt(ck: CanvasKit, laid: TextLayout, x: number, y: number): number {
   const gap = (top: number, height: number) => Math.max(top - y, 0, y - (top + height))
-  const block = laid.blocks.reduce<TextBlock | undefined>((best, b) => (!best || gap(b.y, b.height) < gap(best.y, best.height) ? b : best), undefined)
+  const block = laid.blocks.reduce<TextBlock | undefined>(
+    (best, b) => (!best || gap(b.y, b.height) < gap(best.y, best.height) ? b : best),
+    undefined,
+  )
   if (!block) return 0
   const lines = block.paragraph.getLineMetrics()
   if (lines.length === 0) return block.start
@@ -412,7 +483,11 @@ export function caretAt(ck: CanvasKit, laid: TextLayout, x: number, y: number): 
  * trailing edge of the grapheme before it, or at the start of a paragraph the leading edge of the
  * grapheme after it. At a bidi boundary this is the edge next to the text just typed.
  */
-export function caretPosition(ck: CanvasKit, laid: TextLayout, offset: number): { x: number; y: number; height: number } {
+export function caretPosition(
+  ck: CanvasKit,
+  laid: TextLayout,
+  offset: number,
+): { x: number; y: number; height: number } {
   const block = blockOf(laid, offset)
   if (!block) return { x: 0, y: 0, height: 0 }
   const local = Math.min(offset - block.start, block.text.length)
@@ -429,13 +504,24 @@ export function caretPosition(ck: CanvasKit, laid: TextLayout, offset: number): 
   return at(x, 0, block.height)
 }
 
-export interface SelectionBox { x: number; y: number; width: number; height: number; rtl: boolean }
+export interface SelectionBox {
+  x: number
+  y: number
+  width: number
+  height: number
+  rtl: boolean
+}
 
 function rectsOf(ck: CanvasKit, paragraph: Paragraph, start: number, end: number): SelectionBox[] {
-  return paragraph.getRectsForRange(start, end, ck.RectHeightStyle.Max, ck.RectWidthStyle.Tight).map(({ rect, dir }) => ({
-    x: rect[0] ?? 0, y: rect[1] ?? 0, width: (rect[2] ?? 0) - (rect[0] ?? 0), height: (rect[3] ?? 0) - (rect[1] ?? 0),
-    rtl: dir.value === ck.TextDirection.RTL.value,
-  }))
+  return paragraph
+    .getRectsForRange(start, end, ck.RectHeightStyle.Max, ck.RectWidthStyle.Tight)
+    .map(({ rect, dir }) => ({
+      x: rect[0] ?? 0,
+      y: rect[1] ?? 0,
+      width: (rect[2] ?? 0) - (rect[0] ?? 0),
+      height: (rect[3] ?? 0) - (rect[1] ?? 0),
+      rtl: dir.value === ck.TextDirection.RTL.value,
+    }))
 }
 
 /** The boxes that highlight a text range, in the layout's own coordinates: one per run of one direction on one line. */
@@ -454,7 +540,11 @@ export function selectionBoxes(ck: CanvasKit, laid: TextLayout, start: number, e
  */
 export function textMeasure(ck: CanvasKit, resources: Pick<Resources, 'fonts' | 'fallbackFamilies'>) {
   return (props: TextProps, width: number | null) => {
-    const laid = layoutText(ck, width === null ? { ...props, boxMode: 'autoWidth' } : { ...props, boxMode: 'autoHeight', width }, resources)
+    const laid = layoutText(
+      ck,
+      width === null ? { ...props, boxMode: 'autoWidth' } : { ...props, boxMode: 'autoHeight', width },
+      resources,
+    )
     try {
       return { width: width ?? laid.width, height: laid.height }
     } finally {

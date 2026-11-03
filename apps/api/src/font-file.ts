@@ -4,9 +4,15 @@
 import { loadCanvasKit } from '@dazbee/renderer/node'
 import type { FontType } from '@dazbee/schema'
 
-export interface FontInfo { contentType: FontType; family: string; weight: number; style: 'normal' | 'italic' }
+export interface FontInfo {
+  contentType: FontType
+  family: string
+  weight: number
+  style: 'normal' | 'italic'
+}
 
-const tag = (view: DataView, at: number) => String.fromCharCode(view.getUint8(at), view.getUint8(at + 1), view.getUint8(at + 2), view.getUint8(at + 3))
+const tag = (view: DataView, at: number) =>
+  String.fromCharCode(view.getUint8(at), view.getUint8(at + 1), view.getUint8(at + 2), view.getUint8(at + 3))
 
 function utf16be(view: DataView, at: number, length: number) {
   let text = ''
@@ -29,9 +35,18 @@ function names(view: DataView, at: number, length: number): Map<number, string> 
   for (let i = 0; i < count; i++) {
     const record = at + 6 + i * 12
     if (record + 12 > at + length) break
-    const [platform, encoding, language, nameId, size, offset] = [0, 2, 4, 6, 8, 10].map((o) => view.getUint16(record + o)) as [number, number, number, number, number, number]
+    const [platform, encoding, language, nameId, size, offset] = [0, 2, 4, 6, 8, 10].map((o) =>
+      view.getUint16(record + o),
+    ) as [number, number, number, number, number, number]
     if (strings + offset + size > view.byteLength) continue
-    const rank = platform === 3 && (encoding === 1 || encoding === 10) ? (language === 0x409 ? 0 : 1) : platform === 1 && encoding === 0 ? 2 : -1
+    const rank =
+      platform === 3 && (encoding === 1 || encoding === 10)
+        ? language === 0x409
+          ? 0
+          : 1
+        : platform === 1 && encoding === 0
+          ? 2
+          : -1
     if (rank < 0 || (found.get(nameId)?.rank ?? 9) <= rank) continue
     const text = (platform === 3 ? utf16be(view, strings + offset, size) : latin1(view, strings + offset, size)).trim()
     if (text) found.set(nameId, { rank, text })
@@ -45,7 +60,8 @@ export function readFontInfo(bytes: Uint8Array): FontInfo | null {
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
   const version = view.getUint32(0)
   // TrueType outlines (1.0 or Apple's 'true'), or CFF outlines ('OTTO'). Collections and WOFF are refused.
-  const contentType: FontType | null = version === 0x00010000 || version === 0x74727565 ? 'font/ttf' : version === 0x4f54544f ? 'font/otf' : null
+  const contentType: FontType | null =
+    version === 0x00010000 || version === 0x74727565 ? 'font/ttf' : version === 0x4f54544f ? 'font/otf' : null
   if (!contentType) return null
   const tables = new Map<string, { at: number; length: number }>()
   const count = view.getUint16(4)
@@ -89,10 +105,13 @@ const PREVIEW_MAX_WIDTH = 640
  * The family's name drawn in the face itself, near black on clear, as a PNG: the font picker shows
  * it, so the browser never decodes the font. Throws when CanvasKit can't read the font.
  */
-export async function fontPreview(bytes: Uint8Array, { family, weight, style }: Pick<FontInfo, 'family' | 'weight' | 'style'>): Promise<Uint8Array> {
+export async function fontPreview(
+  bytes: Uint8Array,
+  { family, weight, style }: Pick<FontInfo, 'family' | 'weight' | 'style'>,
+): Promise<Uint8Array> {
   const ck = await loadCanvasKit()
   const typeface = ck.Typeface.MakeTypefaceFromData(bytes.slice().buffer)
-  if (!typeface) throw new Error('CanvasKit can\'t read this font')
+  if (!typeface) throw new Error("CanvasKit can't read this font")
   typeface.delete()
   const provider = ck.TypefaceFontProvider.Make()
   const fonts = ck.FontCollection.Make()
@@ -101,10 +120,16 @@ export async function fontPreview(bytes: Uint8Array, { family, weight, style }: 
     fonts.setDefaultFontManager(provider)
     const paragraphStyle = new ck.ParagraphStyle({
       textStyle: {
-        color: ck.Color(31, 35, 41, 1), fontFamilies: ['preview'], fontSize: PREVIEW_SIZE,
-        fontStyle: { weight: { value: weight }, slant: style === 'italic' ? ck.FontSlant.Italic : ck.FontSlant.Upright },
+        color: ck.Color(31, 35, 41, 1),
+        fontFamilies: ['preview'],
+        fontSize: PREVIEW_SIZE,
+        fontStyle: {
+          weight: { value: weight },
+          slant: style === 'italic' ? ck.FontSlant.Italic : ck.FontSlant.Upright,
+        },
       },
-      maxLines: 1, ellipsis: '…',
+      maxLines: 1,
+      ellipsis: '…',
     })
     const builder = ck.ParagraphBuilder.MakeFromFontCollection(paragraphStyle, fonts)
     builder.addText(family)

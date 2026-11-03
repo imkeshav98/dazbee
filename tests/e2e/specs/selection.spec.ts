@@ -3,16 +3,43 @@
 // arrow nudges, duplicate, z-order, delete, lock and hide from the shortcut table. Every drag,
 // resize and rotate undoes in one step.
 import type { DesignInput } from '@dazbee/schema'
-import { expect, test, type Browser } from '../support/test.ts'
+
 import { screenPoint, writeOutput } from '../support/editor.ts'
 import { liveDesign } from '../support/seed.ts'
-import { click, drag, dragScreen, handle, openStage, order, press, props, read, selection, zoomOf } from '../support/stage.ts'
+import {
+  click,
+  drag,
+  dragScreen,
+  handle,
+  openStage,
+  order,
+  press,
+  props,
+  read,
+  selection,
+  zoomOf,
+} from '../support/stage.ts'
+import { type Browser, expect, test } from '../support/test.ts'
 
 // Each check opens the editor (up to 30 s for the renderer on a slow runner) and then drags for a while.
 test.describe.configure({ timeout: 120_000 })
 
-const rect = (x: number, y: number, width: number, height: number, color: string, more: { rotation?: number; visible?: boolean } = {}) =>
-  ({ x, y, width, height, shape: { kind: 'rect' as const, cornerRadius: 12 }, fills: [{ type: 'solid' as const, color }], ...more })
+const rect = (
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  color: string,
+  more: { rotation?: number; visible?: boolean } = {},
+) => ({
+  x,
+  y,
+  width,
+  height,
+  shape: { kind: 'rect' as const, cornerRadius: 12 },
+  fills: [{ type: 'solid' as const, color }],
+  ...more,
+})
 
 /** The live design plus a turned layer, a group of two, a locked layer and a hidden one. */
 const design = (): DesignInput => {
@@ -22,22 +49,46 @@ const design = (): DesignInput => {
     meta: { ...base.meta, name: 'Selection' },
     nodes: {
       ...base.nodes,
-      tilt: { type: 'graphic', parentId: 'p1', index: 'a4', name: 'Tilt', props: rect(560, 820, 300, 120, '#8E44FFFF', { rotation: 30 }) },
-      g: { type: 'group', parentId: 'p1', index: 'a5', name: 'Group', props: { x: 120, y: 860, width: 200, height: 160 } },
+      tilt: {
+        type: 'graphic',
+        parentId: 'p1',
+        index: 'a4',
+        name: 'Tilt',
+        props: rect(560, 820, 300, 120, '#8E44FFFF', { rotation: 30 }),
+      },
+      g: {
+        type: 'group',
+        parentId: 'p1',
+        index: 'a5',
+        name: 'Group',
+        props: { x: 120, y: 860, width: 200, height: 160 },
+      },
       g1: { type: 'graphic', parentId: 'g', index: 'a0', name: 'G1', props: rect(120, 860, 90, 160, '#00A889FF') },
       g2: { type: 'graphic', parentId: 'g', index: 'a1', name: 'G2', props: rect(230, 860, 90, 160, '#FFB020FF') },
       locked: {
-        type: 'graphic', parentId: 'p1', index: 'a6', name: 'Locked', props: rect(900, 900, 140, 140, '#444444FF'),
+        type: 'graphic',
+        parentId: 'p1',
+        index: 'a6',
+        name: 'Locked',
+        props: rect(900, 900, 140, 140, '#444444FF'),
         lock: { move: true, resize: true, content: true, style: true, delete: true },
       },
-      ghost: { type: 'graphic', parentId: 'p1', index: 'a7', name: 'Ghost', props: rect(420, 360, 120, 80, '#FF00FFFF', { visible: false }) },
+      ghost: {
+        type: 'graphic',
+        parentId: 'p1',
+        index: 'a7',
+        name: 'Ghost',
+        props: rect(420, 360, 120, 80, '#FF00FFFF', { visible: false }),
+      },
     },
   }
 }
 
 const open = (browser: Browser) => openStage(browser, design())
 
-test("click, shift-click and marquee select; select all and a marquee leave locked layers out, and hidden ones can't be hit", async ({ browser }) => {
+test("click, shift-click and marquee select; select all and a marquee leave locked layers out, and hidden ones can't be hit", async ({
+  browser,
+}) => {
   test.setTimeout(90_000)
   const { page, errors } = await open(browser)
 
@@ -83,7 +134,9 @@ test("click, shift-click and marquee select; select all and a marquee leave lock
   expect(errors).toEqual([])
 })
 
-test('a click on a locked layer selects it, without handles, so the small menu can unlock it; a drag from it still draws a marquee', async ({ browser }) => {
+test('a click on a locked layer selects it, without handles, so the small menu can unlock it; a drag from it still draws a marquee', async ({
+  browser,
+}) => {
   const { page, errors } = await open(browser)
   await click(page, 970, 970)
   expect(await selection(page)).toEqual(['locked'])
@@ -105,12 +158,17 @@ test('a click on a locked layer selects it, without handles, so the small menu c
   expect(errors).toEqual([])
 })
 
-test('a locked layer over another is the one a click selects, a drag from it moves neither, and a double-click goes into neither', async ({ browser }) => {
+test('a locked layer over another is the one a click selects, a drag from it moves neither, and a double-click goes into neither', async ({
+  browser,
+}) => {
   const base = design()
   const locked = base.nodes.locked
   if (locked?.type !== 'graphic') throw new Error('no locked graphic')
   // The locked layer sits on the box, as a logo on a background does.
-  const { page, errors } = await openStage(browser, { ...base, nodes: { ...base.nodes, locked: { ...locked, props: rect(200, 150, 60, 60, '#444444FF') } } })
+  const { page, errors } = await openStage(browser, {
+    ...base,
+    nodes: { ...base.nodes, locked: { ...locked, props: rect(200, 150, 60, 60, '#444444FF') } },
+  })
   await click(page, 230, 180)
   expect(await selection(page)).toEqual(['locked'])
   await expect(page.locator('.selection[data-layer="locked"]')).toHaveCount(1)
@@ -283,7 +341,13 @@ test('nudge, duplicate, z-order, lock, hide and delete from the keyboard', async
   // keys unlock it.
   await click(page, 230, 180)
   await press(page, 'lock')
-  expect((await read(page)).nodes.box?.lock).toEqual({ move: true, resize: true, content: true, style: true, delete: true })
+  expect((await read(page)).nodes.box?.lock).toEqual({
+    move: true,
+    resize: true,
+    content: true,
+    style: true,
+    delete: true,
+  })
   await press(page, 'delete')
   expect((await read(page)).nodes.box).toBeDefined()
   await press(page, 'deselect')

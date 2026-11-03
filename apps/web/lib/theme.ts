@@ -1,7 +1,8 @@
 // The person's theme pick: system (the default), light or dark, kept in the `theme` cookie.
 export const THEMES = ['system', 'light', 'dark'] as const
 export type ThemePick = (typeof THEMES)[number]
-export const themeOf = (value: string | undefined): ThemePick => (THEMES as readonly string[]).includes(value ?? '') ? value as ThemePick : 'system'
+export const themeOf = (value: string | undefined): ThemePick =>
+  (THEMES as readonly string[]).includes(value ?? '') ? (value as ThemePick) : 'system'
 
 /**
  * Runs before first paint: resolves "system" to light or dark and keeps following the system

@@ -9,14 +9,40 @@ export type Style = Record<string, string>
 
 /** Properties a child takes from its parent unless it sets its own. */
 const INHERITED = new Set([
-  'fill', 'fill-opacity', 'fill-rule', 'stroke', 'stroke-width', 'stroke-opacity', 'stroke-linecap', 'stroke-linejoin',
-  'stroke-miterlimit', 'stroke-dasharray', 'stroke-dashoffset', 'visibility', 'color', 'clip-rule',
-  'font-family', 'font-size', 'font-weight', 'font-style', 'text-anchor', 'letter-spacing',
+  'fill',
+  'fill-opacity',
+  'fill-rule',
+  'stroke',
+  'stroke-width',
+  'stroke-opacity',
+  'stroke-linecap',
+  'stroke-linejoin',
+  'stroke-miterlimit',
+  'stroke-dasharray',
+  'stroke-dashoffset',
+  'visibility',
+  'color',
+  'clip-rule',
+  'font-family',
+  'font-size',
+  'font-weight',
+  'font-style',
+  'text-anchor',
+  'letter-spacing',
 ])
 
 /** Every property this package reads; other attributes aren't style. */
 const PROPERTIES = new Set([
-  ...INHERITED, 'opacity', 'display', 'stop-color', 'stop-opacity', 'clip-path', 'mask', 'mask-type', 'filter', 'mix-blend-mode',
+  ...INHERITED,
+  'opacity',
+  'display',
+  'stop-color',
+  'stop-opacity',
+  'clip-path',
+  'mask',
+  'mask-type',
+  'filter',
+  'mix-blend-mode',
 ])
 
 interface Rule {
@@ -35,7 +61,10 @@ export function parseDeclarations(text: string): Style {
     const colon = part.indexOf(':')
     if (colon < 0) continue
     const name = part.slice(0, colon).trim().toLowerCase()
-    const value = part.slice(colon + 1).replace(/!important/i, '').trim()
+    const value = part
+      .slice(colon + 1)
+      .replace(/!important/i, '')
+      .trim()
     if (name && value) out[name] = value
   }
   return out

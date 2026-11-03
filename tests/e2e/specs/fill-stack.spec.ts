@@ -3,24 +3,45 @@
 // whose stop is edited; a drag swaps the two; the eye hides one. The stage and a PNG export show the
 // same, and the browser's export matches Node's to the pixel.
 import { createHash } from 'node:crypto'
-import { expect, test, type Page } from '../support/test.ts'
+
 import { FALLBACK_FAMILIES } from '@dazbee/fonts'
 import { loadFontFiles } from '@dazbee/fonts/node'
 import { renderDesign } from '@dazbee/renderer'
 import { loadCanvasKit } from '@dazbee/renderer/node'
 import { AssetLink, type DesignInput } from '@dazbee/schema'
+
 import { api, photo, upload } from '../support/assets.ts'
 import { designOf, exportHashOf, screenPoint, writeOutput } from '../support/editor.ts'
-import { backgroundPanel, click, fillList, openStage, press, read, strokeList, openCard } from '../support/stage.ts'
+import { backgroundPanel, click, fillList, openCard, openStage, press, read, strokeList } from '../support/stage.ts'
+import { expect, type Page, test } from '../support/test.ts'
 
 test.describe.configure({ timeout: 120_000 })
 
 const design = (assetId: string): DesignInput => ({
-  meta: { schemaVersion: 5, designId: 'replaced-by-the-api', name: 'Fill stack', kind: 'single', primaryFormatId: 'sq' },
+  meta: {
+    schemaVersion: 5,
+    designId: 'replaced-by-the-api',
+    name: 'Fill stack',
+    kind: 'single',
+    primaryFormatId: 'sq',
+  },
   formats: { sq: { name: 'Square', width: 1080, height: 1080, order: 'a0' } },
   pages: { p1: { name: 'Page 1', order: 'a0', fills: [{ type: 'solid', color: '#FFF8F0FF' }] } },
   nodes: {
-    card: { type: 'graphic', parentId: 'p1', index: 'a0', name: 'Card', props: { x: 540, y: 140, width: 440, height: 440, shape: { kind: 'rect', cornerRadius: 32 }, fills: [{ type: 'image', assetId, fit: 'fill' }] } },
+    card: {
+      type: 'graphic',
+      parentId: 'p1',
+      index: 'a0',
+      name: 'Card',
+      props: {
+        x: 540,
+        y: 140,
+        width: 440,
+        height: 440,
+        shape: { kind: 'rect', cornerRadius: 32 },
+        fills: [{ type: 'image', assetId, fit: 'fill' }],
+      },
+    },
   },
   overrides: {},
 })
@@ -36,7 +57,12 @@ async function stageAndExport(page: Page, x: number, y: number) {
   const at = await screenPoint(page, x, y)
   await page.evaluate(() => window.dazbee?.drawn())
   // What the screen shows there: a one-pixel screenshot, decoded in the page.
-  const shot = (await page.screenshot({ clip: { x: Math.round(at.x), y: Math.round(at.y), width: 1, height: 1 }, animations: 'disabled' })).toString('base64')
+  const shot = (
+    await page.screenshot({
+      clip: { x: Math.round(at.x), y: Math.round(at.y), width: 1, height: 1 },
+      animations: 'disabled',
+    })
+  ).toString('base64')
   const stage = await page.evaluate(async (png) => {
     const bitmap = await createImageBitmap(await (await fetch(`data:image/png;base64,${png}`)).blob())
     const canvas = new OffscreenCanvas(bitmap.width, bitmap.height)
@@ -44,18 +70,23 @@ async function stageAndExport(page: Page, x: number, y: number) {
     context?.drawImage(bitmap, 0, 0)
     return [...(context?.getImageData(0, 0, 1, 1).data ?? [])].slice(0, 3)
   }, shot)
-  const exported = await page.evaluate(async ({ x, y }) => {
-    const file = await window.dazbee?.exportFiles({ pageIds: ['p1'], formatIds: ['sq'], type: 'png' })
-    const bitmap = await createImageBitmap(new Blob([new Uint8Array(file?.bytes ?? [])], { type: 'image/png' }))
-    const canvas = new OffscreenCanvas(bitmap.width, bitmap.height)
-    const context = canvas.getContext('2d')
-    context?.drawImage(bitmap, 0, 0)
-    return [...(context?.getImageData(x, y, 1, 1).data ?? [])].slice(0, 3)
-  }, { x, y })
+  const exported = await page.evaluate(
+    async ({ x, y }) => {
+      const file = await window.dazbee?.exportFiles({ pageIds: ['p1'], formatIds: ['sq'], type: 'png' })
+      const bitmap = await createImageBitmap(new Blob([new Uint8Array(file?.bytes ?? [])], { type: 'image/png' }))
+      const canvas = new OffscreenCanvas(bitmap.width, bitmap.height)
+      const context = canvas.getContext('2d')
+      context?.drawImage(bitmap, 0, 0)
+      return [...(context?.getImageData(x, y, 1, 1).data ?? [])].slice(0, 3)
+    },
+    { x, y },
+  )
   return { stage, exported }
 }
 
-test('a gradient over a photo: added on top, a stop edited, the two reordered, one hidden; stage and export agree', async ({ browser }) => {
+test('a gradient over a photo: added on top, a stop edited, the two reordered, one hidden; stage and export agree', async ({
+  browser,
+}) => {
   const asset = await upload(photo)
   const { page, errors } = await openStage(browser, design(asset.id))
   await click(page, 760, 360)
@@ -101,7 +132,11 @@ test('a gradient over a photo: added on top, a stop edited, the two reordered, o
   await page.keyboard.press('Escape')
   await expect(editor).toBeHidden()
   const over = await stageAndExport(page, 940, 540)
-  for (let c = 0; c < 3; c++) expect(Math.abs((over.stage[c] ?? 0) - (over.exported[c] ?? 0)), `channel ${c}: ${over.stage} vs ${over.exported}`).toBeLessThanOrEqual(8)
+  for (let c = 0; c < 3; c++)
+    expect(
+      Math.abs((over.stage[c] ?? 0) - (over.exported[c] ?? 0)),
+      `channel ${c}: ${over.stage} vs ${over.exported}`,
+    ).toBeLessThanOrEqual(8)
   writeOutput('fill-stack-2-gradient-over-photo.png', await page.screenshot({ animations: 'disabled' }))
 
   // A drag of the photo's row onto the gradient's puts the photo on top.
@@ -125,7 +160,8 @@ test('a gradient over a photo: added on top, a stop edited, the two reordered, o
   await expect.poll(async () => (await fillsOf(page))[1]?.visible).toBe(false)
   await page.evaluate(() => window.dazbee?.drawn())
   const hidden = await stageAndExport(page, 940, 540)
-  for (let c = 0; c < 3; c++) expect(Math.abs((hidden.stage[c] ?? 0) - (hidden.exported[c] ?? 0))).toBeLessThanOrEqual(8)
+  for (let c = 0; c < 3; c++)
+    expect(Math.abs((hidden.stage[c] ?? 0) - (hidden.exported[c] ?? 0))).toBeLessThanOrEqual(8)
   expect(hidden.exported).not.toEqual(over.exported)
   writeOutput('fill-stack-4-hidden.png', await page.screenshot({ animations: 'disabled' }))
 
@@ -137,7 +173,11 @@ test('a gradient over a photo: added on top, a stop edited, the two reordered, o
   const link = AssetLink.parse(await api(`/assets/${asset.id}`))
   const stored = new Uint8Array(await (await fetch(link.url)).arrayBuffer())
   const ck = await loadCanvasKit()
-  const node = renderDesign(ck, doc, 'p1', 'sq', { fonts: loadFontFiles().map((f) => ({ family: f.family, bytes: f.bytes })), fallbackFamilies: [...FALLBACK_FAMILIES], images: { [asset.id]: stored } })
+  const node = renderDesign(ck, doc, 'p1', 'sq', {
+    fonts: loadFontFiles().map((f) => ({ family: f.family, bytes: f.bytes })),
+    fallbackFamilies: [...FALLBACK_FAMILIES],
+    images: { [asset.id]: stored },
+  })
   expect(createHash('sha256').update(node.pixels).digest('hex')).toBe(browserHash)
 
   // Each change was one undo step: show, hide, the two moves, the stop added, the colour, the gradient, the add.
@@ -146,7 +186,9 @@ test('a gradient over a photo: added on top, a stop edited, the two reordered, o
   expect(errors).toEqual([])
 })
 
-test('a stroke and the page background take the same paint editor: an angular stroke, a radial page', async ({ browser }) => {
+test('a stroke and the page background take the same paint editor: an angular stroke, a radial page', async ({
+  browser,
+}) => {
   const asset = await upload(photo)
   const { page, errors } = await openStage(browser, design(asset.id))
   await click(page, 760, 360)
@@ -156,10 +198,14 @@ test('a stroke and the page background take the same paint editor: an angular st
   await stroke.locator('[data-row="1"]').getByTestId('paint-swatch').click()
   const editor = page.getByTestId('paint-editor')
   await editor.getByRole('radio', { name: 'Sweep gradient' }).click()
-  await expect.poll(async () => ((await read(page)).nodes.card?.props.strokes as { paint: Fill }[])[0]?.paint.type).toBe('angular')
+  await expect
+    .poll(async () => ((await read(page)).nodes.card?.props.strokes as { paint: Fill }[])[0]?.paint.type)
+    .toBe('angular')
   await editor.getByRole('spinbutton', { name: 'Gradient angle' }).fill('45')
   await editor.getByRole('spinbutton', { name: 'Gradient angle' }).press('Enter')
-  await expect.poll(async () => ((await read(page)).nodes.card?.props.strokes as { paint: { angle?: number } }[])[0]?.paint.angle).toBe(45)
+  await expect
+    .poll(async () => ((await read(page)).nodes.card?.props.strokes as { paint: { angle?: number } }[])[0]?.paint.angle)
+    .toBe(45)
   // Esc closes the paint editor, then the Outline popover.
   await page.keyboard.press('Escape')
   await page.keyboard.press('Escape')
@@ -169,7 +215,12 @@ test('a stroke and the page background take the same paint editor: an angular st
   const layers = (await backgroundPanel(page)).getByTestId('page-fills')
   await layers.locator('[data-row="1"]').getByTestId('paint-swatch').click()
   await editor.getByRole('radio', { name: 'Circle gradient' }).click()
-  await expect.poll(async () => ((await read(page)) as unknown as { pages: Record<string, { fills: Fill[] }> }).pages.p1?.fills[0]?.type).toBe('radial')
+  await expect
+    .poll(
+      async () =>
+        ((await read(page)) as unknown as { pages: Record<string, { fills: Fill[] }> }).pages.p1?.fills[0]?.type,
+    )
+    .toBe('radial')
   await editor.getByRole('spinbutton', { name: 'Gradient size' }).fill('80')
   await editor.getByRole('spinbutton', { name: 'Gradient size' }).press('Enter')
   await page.keyboard.press('Escape')
@@ -182,11 +233,19 @@ test('a stroke and the page background take the same paint editor: an angular st
   await editor.getByTestId('paint-image').click()
   const picker = page.getByTestId('paint-image-picker')
   await picker.locator(`li[data-asset="${asset.id}"] button`).click()
-  await expect.poll(async () => ((await read(page)) as unknown as { pages: Record<string, { fills: Fill[] }> }).pages.p1?.fills.map((f) => f.type)).toEqual(['radial', 'image'])
+  await expect
+    .poll(async () =>
+      ((await read(page)) as unknown as { pages: Record<string, { fills: Fill[] }> }).pages.p1?.fills.map(
+        (f) => f.type,
+      ),
+    )
+    .toEqual(['radial', 'image'])
   expect(errors).toEqual([])
 })
 
-test('a gradient stop removed while it is dragged ends the drag and its undo step, and moves no other stop', async ({ browser }) => {
+test('a gradient stop removed while it is dragged ends the drag and its undo step, and moves no other stop', async ({
+  browser,
+}) => {
   const asset = await upload(photo)
   const { page, errors } = await openStage(browser, design(asset.id))
   await press(page, 'deselect')
@@ -194,7 +253,10 @@ test('a gradient stop removed while it is dragged ends the drag and its undo ste
   await layers.locator('[data-row="1"]').getByTestId('paint-swatch').click()
   const editor = page.getByTestId('paint-editor')
   await editor.getByRole('radio', { name: 'Line gradient' }).click()
-  const offsets = async () => ((await read(page)) as unknown as { pages: Record<string, { fills: Fill[] }> }).pages.p1?.fills[0]?.stops?.map((s) => s.offset)
+  const offsets = async () =>
+    ((await read(page)) as unknown as { pages: Record<string, { fills: Fill[] }> }).pages.p1?.fills[0]?.stops?.map(
+      (s) => s.offset,
+    )
   const stops = async () => (await offsets())?.length
   const bar = await editor.getByTestId('gradient-bar').boundingBox()
   if (!bar) throw new Error('no bar')

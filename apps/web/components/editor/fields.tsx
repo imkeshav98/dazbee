@@ -2,17 +2,21 @@
 
 // The property cards' fields, shared by every card that edits a value: a number that types, nudges
 // and scrubs, a colour with its hex and opacity, and a choice from a list.
-import { useEffect, useRef, useState, type CSSProperties } from 'react'
-import { shortcutFor, type Editor } from '@dazbee/editor'
-import { cn } from '../../lib/cn.ts'
-import { fillOf } from '../../lib/fill.ts'
-import { LIMITS } from '../../lib/limits.ts'
-import { useMessages } from '../../lib/i18n/client.tsx'
-import { format } from '../../lib/i18n/index.ts'
-import { Select } from '../ui/select.tsx'
+import { type CSSProperties, useEffect, useRef, useState } from 'react'
+
+import { type Editor, shortcutFor } from '@dazbee/editor'
+
+import { Select } from '@/components/ui/select.tsx'
+import { cn } from '@/lib/cn.ts'
+import { fillOf } from '@/lib/fill.ts'
+import { useMessages } from '@/lib/i18n/client.tsx'
+import { format } from '@/lib/i18n/index.ts'
+import { LIMITS } from '@/lib/limits.ts'
+
 import { FIELD, KNOB, SELECT, VALUE_TEXT } from './styles.ts'
 
-export const clamp = (n: number, min = Number.NEGATIVE_INFINITY, max = Number.POSITIVE_INFINITY) => Math.min(max, Math.max(min, n))
+export const clamp = (n: number, min = Number.NEGATIVE_INFINITY, max = Number.POSITIVE_INFINITY) =>
+  Math.min(max, Math.max(min, n))
 export const tidy = (n: number) => Math.round(n * 100) / 100
 
 /**
@@ -41,7 +45,23 @@ function useDraft() {
  * With `onClear`, emptying the field calls it, for a value that can be left unset (its placeholder
  * shows then), mixed values too once something was typed; without, an empty field is ignored.
  */
-export function NumberField({ label, name, value, step = 1, min: least, max: most, fillRange, scale = 1, unit = '', placeholder, editor, testId, onSet, onShift, onClear }: {
+export function NumberField({
+  label,
+  name,
+  value,
+  step = 1,
+  min: least,
+  max: most,
+  fillRange,
+  scale = 1,
+  unit = '',
+  placeholder,
+  editor,
+  testId,
+  onSet,
+  onShift,
+  onClear,
+}: {
   label: string
   name: string
   value: number | 'mixed' | undefined
@@ -79,10 +99,12 @@ export function NumberField({ label, name, value, step = 1, min: least, max: mos
   const [typing, setTyping] = useState(false)
   const press = useRef<{ x: number; applied: number; end: (() => void) | null } | null>(null)
   /** Whether Home and End have a lowest and a highest value to go to. */
-  const hasEnds = least !== undefined && most !== undefined && Number.isFinite(least) && Number.isFinite(most) && most > least
+  const hasEnds =
+    least !== undefined && most !== undefined && Number.isFinite(least) && Number.isFinite(most) && most > least
   const fill = fillOf(value, fillRange ?? (least !== undefined && most !== undefined ? [least, most] : undefined))
   /** One step, or ten with Shift, or a tenth with Alt where the steps are fractions. */
-  const stepOf = (event: { shiftKey: boolean; altKey: boolean }) => step * (event.shiftKey ? 10 : event.altKey && step < 1 ? 0.1 : 1)
+  const stepOf = (event: { shiftKey: boolean; altKey: boolean }) =>
+    step * (event.shiftKey ? 10 : event.altKey && step < 1 ? 0.1 : 1)
   const commit = (text: string) => {
     const typed = typedNow.current !== null
     setDraft(null)
@@ -107,7 +129,9 @@ export function NumberField({ label, name, value, step = 1, min: least, max: mos
       data-scrub={name}
       title={format(t.editor.props.scrub, { name })}
       data-ranged={fill.at === null ? undefined : ''}
-      style={{ '--fill-from': `${fill.from}%`, '--fill': `${fill.width}%`, '--fill-at': `${fill.at ?? 0}%` } as CSSProperties}
+      style={
+        { '--fill-from': `${fill.from}%`, '--fill': `${fill.width}%`, '--fill-at': `${fill.at ?? 0}%` } as CSSProperties
+      }
       onPointerDown={(event) => {
         // A press on the field being typed in places the caret; anywhere else it starts a drag.
         if (event.button !== 0 || (typing && event.target === input.current)) return
@@ -181,9 +205,17 @@ export function NumberField({ label, name, value, step = 1, min: least, max: mos
           // Keys typed into a field are the field's, not the stage's.
           event.stopPropagation()
         }}
-        className={cn(VALUE_TEXT, 'relative min-w-[3ch] flex-1 cursor-[inherit] bg-transparent text-end outline-none focus-visible:outline-none! placeholder:text-subtle focus:cursor-text', typing && 'select-text')}
+        className={cn(
+          VALUE_TEXT,
+          'relative min-w-[3ch] flex-1 cursor-[inherit] bg-transparent text-end outline-none focus-visible:outline-none! placeholder:text-subtle focus:cursor-text',
+          typing && 'select-text',
+        )}
       />
-      {unit && shown && <span aria-hidden className={cn(VALUE_TEXT, 'relative -ms-2')}>{unit}</span>}
+      {unit && shown && (
+        <span aria-hidden className={cn(VALUE_TEXT, 'relative -ms-2')}>
+          {unit}
+        </span>
+      )}
     </div>
   )
 }
@@ -191,7 +223,10 @@ export function NumberField({ label, name, value, step = 1, min: least, max: mos
 /** A colour as #RRGGBBAA: one part changed, the other as the document holds it now. */
 export const withHex = (hex: string) => (now: string | undefined) => `${hex}${now?.slice(7, 9) || 'FF'}`
 export const withOpacity = (alpha: number) => (now: string | undefined) =>
-  `${now?.slice(0, 7) || '#000000'}${Math.round(clamp(alpha, 0, 1) * 255).toString(16).padStart(2, '0').toUpperCase()}`
+  `${now?.slice(0, 7) || '#000000'}${Math.round(clamp(alpha, 0, 1) * 255)
+    .toString(16)
+    .padStart(2, '0')
+    .toUpperCase()}`
 
 /**
  * A colour: a swatch that opens the system picker (unless `swatch` is off, where a swatch beside it
@@ -199,7 +234,17 @@ export const withOpacity = (alpha: number) => (now: string | undefined) =>
  * change gives `onSet` the colour to build from the one the document holds then, so a hex and an
  * opacity committed one after the other each keep the other's change.
  */
-export function ColorField({ name, value, swatch = true, onSet }: { name: string; value: string | 'mixed' | undefined; swatch?: boolean; onSet: (to: (now: string | undefined) => string) => void }) {
+export function ColorField({
+  name,
+  value,
+  swatch = true,
+  onSet,
+}: {
+  name: string
+  value: string | 'mixed' | undefined
+  swatch?: boolean
+  onSet: (to: (now: string | undefined) => string) => void
+}) {
   const t = useMessages()
   const p = t.editor.props
   const hex = value && value !== 'mixed' ? value.slice(0, 7).toUpperCase() : ''
@@ -260,7 +305,19 @@ export function ColorField({ name, value, swatch = true, onSet }: { name: string
   )
 }
 
-export function Choice<T extends string>({ name, value, options, labels, onSet }: { name: string; value: T | 'mixed' | undefined; options: readonly T[]; labels: Record<T, string>; onSet: (value: T) => void }) {
+export function Choice<T extends string>({
+  name,
+  value,
+  options,
+  labels,
+  onSet,
+}: {
+  name: string
+  value: T | 'mixed' | undefined
+  options: readonly T[]
+  labels: Record<T, string>
+  onSet: (value: T) => void
+}) {
   const t = useMessages()
   return (
     <Select

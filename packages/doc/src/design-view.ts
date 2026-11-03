@@ -1,7 +1,18 @@
-import { canHold, formatIdOf, parseDesignIncrementally, parseLayer, parseOverrideValues, SCHEMA_VERSION, type Design, type Layer } from '@dazbee/schema'
 import type * as Y from 'yjs'
+
+import {
+  canHold,
+  type Design,
+  formatIdOf,
+  type Layer,
+  parseDesignIncrementally,
+  parseLayer,
+  parseOverrideValues,
+  SCHEMA_VERSION,
+} from '@dazbee/schema'
+
 import { buildChildIndex, registerChildIndex, siblingOrder } from './children.ts'
-import { DELETED, nodeToJson, readDesign, root, splitOverrideKey, type DesignDoc } from './design-doc.ts'
+import { DELETED, type DesignDoc, nodeToJson, readDesign, root, splitOverrideKey } from './design-doc.ts'
 import { repair } from './repair.ts'
 
 type Json = Record<string, unknown>
@@ -38,10 +49,14 @@ export function designView(doc: DesignDoc) {
       return
     }
     filled.set(scope, byNode)
-    if (!scopeRecords.has(scope)) scopeRecords.set(scope, readOnlyRecord(() => {
-      refresh()
-      return filled.get(scope) ?? new Map<string, Json>()
-    }))
+    if (!scopeRecords.has(scope))
+      scopeRecords.set(
+        scope,
+        readOnlyRecord(() => {
+          refresh()
+          return filled.get(scope) ?? new Map<string, Json>()
+        }),
+      )
   }
   let children = new Map<string, string[]>()
   let head: Head | null = null
@@ -63,7 +78,13 @@ export function designView(doc: DesignDoc) {
     const byNode = rawOverrides.get(scope) ?? new Map<string, Json>()
     const props = Object.fromEntries(Object.entries(byNode.get(nodeId) ?? {}).filter(([p]) => p !== path))
     // Defined, not assigned: a path such as `__proto__` from another tab stays a plain key.
-    if (r.overrides.has(key)) Object.defineProperty(props, path, { value: r.overrides.get(key), enumerable: true, writable: true, configurable: true })
+    if (r.overrides.has(key))
+      Object.defineProperty(props, path, {
+        value: r.overrides.get(key),
+        enumerable: true,
+        writable: true,
+        configurable: true,
+      })
     if (Object.keys(props).length > 0) byNode.set(nodeId, props)
     else byNode.delete(nodeId)
     if (byNode.size > 0) rawOverrides.set(scope, byNode)
@@ -96,7 +117,8 @@ export function designView(doc: DesignDoc) {
       }
       // A change inside a layer or a head map: walk up to the root map it hangs from.
       let item = changed._item
-      while (item && item.parent !== r.nodes && !heads.has(item.parent)) item = (item.parent as Y.AbstractType<unknown>)._item
+      while (item && item.parent !== r.nodes && !heads.has(item.parent))
+        item = (item.parent as Y.AbstractType<unknown>)._item
       if (!item) continue
       if (item.parent === r.nodes && typeof item.parentSub === 'string') dirtyNodes.add(item.parentSub)
       else whole = true
@@ -120,7 +142,9 @@ export function designView(doc: DesignDoc) {
     for (const scope of [...filled.keys()]) if (!Object.hasOwn(d.overrides, scope)) setScope(scope, undefined)
     for (const [scope, byNode] of Object.entries(d.overrides)) setScope(scope, new Map(Object.entries(byNode)))
     children = buildChildIndex(layers)
-    placesRepaired = [...layers].some(([id, layer]) => rawNodes.get(id)?.parentId !== layer.parentId || rawNodes.get(id)?.index !== layer.index)
+    placesRepaired = [...layers].some(
+      ([id, layer]) => rawNodes.get(id)?.parentId !== layer.parentId || rawNodes.get(id)?.index !== layer.index,
+    )
   }
 
   /**
@@ -175,7 +199,8 @@ export function designView(doc: DesignDoc) {
     // A changed layer's overrides are checked against it again, in every scope; a removed layer's go.
     const pairs = new Map([...dirtyPairs].map(([scope, ids]) => [scope, new Set(ids)]))
     for (const id of [...staged.keys(), ...removed]) {
-      for (const [scope, byNode] of rawOverrides) if (byNode.has(id)) pairs.set(scope, (pairs.get(scope) ?? new Set()).add(id))
+      for (const [scope, byNode] of rawOverrides)
+        if (byNode.has(id)) pairs.set(scope, (pairs.get(scope) ?? new Set()).add(id))
     }
     const stagedValues: [string, string, Json | undefined][] = []
     for (const [scope, ids] of pairs) {
@@ -263,9 +288,15 @@ export function designView(doc: DesignDoc) {
     return head
   }
   const design = Object.freeze({
-    get meta() { return current().meta },
-    get formats() { return current().formats },
-    get pages() { return current().pages },
+    get meta() {
+      return current().meta
+    },
+    get formats() {
+      return current().formats
+    },
+    get pages() {
+      return current().pages
+    },
     nodes,
     overrides,
   }) as unknown as Design

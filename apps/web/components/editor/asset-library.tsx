@@ -5,15 +5,18 @@
 // onto a format or by clicking it, and delete one nothing uses. Thumbnails are small copies the API made and stored;
 // the design itself draws the original, decoded by CanvasKit.
 import { MagnifyingGlassIcon, PencilSimpleIcon, TrashIcon, UploadSimpleIcon, XIcon } from '@phosphor-icons/react'
+import { type DragEvent, type KeyboardEvent, useCallback, useEffect, useRef, useState } from 'react'
+
 import type { Editor } from '@dazbee/editor'
 import { AssetInUse, AssetSummary, AssetUse, imageAssetIds, isVectorAsset, type UpdateAsset } from '@dazbee/schema'
-import { useCallback, useEffect, useRef, useState, type DragEvent, type KeyboardEvent } from 'react'
-import { cn } from '../../lib/cn.ts'
-import { useMessages } from '../../lib/i18n/client.tsx'
-import { format } from '../../lib/i18n/index.ts'
-import { placeAsset } from '../../lib/place-asset.ts'
-import { ASSET_ACCEPT as ACCEPT, sendAsset as send } from '../../lib/upload-asset.ts'
-import { overlayScroll } from '../ui/overlay-scroll.ts'
+
+import { overlayScroll } from '@/components/ui/overlay-scroll.ts'
+import { cn } from '@/lib/cn.ts'
+import { useMessages } from '@/lib/i18n/client.tsx'
+import { format } from '@/lib/i18n/index.ts'
+import { placeAsset } from '@/lib/place-asset.ts'
+import { ASSET_ACCEPT as ACCEPT, sendAsset as send } from '@/lib/upload-asset.ts'
+
 import { ASSET_TILE, DASHED_BUTTON, QUIET_BUTTON } from './styles.ts'
 
 /** What an asset dragged from the library carries, for the stage to place it. */
@@ -29,20 +32,34 @@ export type DraggedAsset = Pick<AssetSummary, 'id' | 'name' | 'width' | 'height'
 export function draggedAsset(e: DragEvent): DraggedAsset | null {
   const data = e.dataTransfer.getData(ASSET_DRAG_TYPE)
   if (!data) return null
-  const parsed = AssetSummary.pick({ id: true, name: true, width: true, height: true, contentType: true }).safeParse(JSON.parse(data))
+  const parsed = AssetSummary.pick({ id: true, name: true, width: true, height: true, contentType: true }).safeParse(
+    JSON.parse(data),
+  )
   return parsed.success ? parsed.data : null
 }
 
-interface Upload { key: string; name: string; progress: number; error?: string }
+interface Upload {
+  key: string
+  name: string
+  progress: number
+  error?: string
+}
 
 const base = (brandId: string) => `/brands/${encodeURIComponent(brandId)}/assets`
 
 async function save(brandId: string, id: string, update: UpdateAsset): Promise<AssetSummary> {
   const response = await fetch(`${base(brandId)}/${encodeURIComponent(id)}`, {
-    method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify(update),
+    method: 'PATCH',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(update),
   })
   const body: unknown = await response.json().catch(() => null)
-  if (!response.ok) throw new Error(body && typeof body === 'object' && 'error' in body && typeof body.error === 'string' ? body.error : `${response.status}`)
+  if (!response.ok)
+    throw new Error(
+      body && typeof body === 'object' && 'error' in body && typeof body.error === 'string'
+        ? body.error
+        : `${response.status}`,
+    )
   return AssetSummary.parse(body)
 }
 
@@ -50,7 +67,12 @@ async function save(brandId: string, id: string, update: UpdateAsset): Promise<A
 async function usesOf(brandId: string, id: string): Promise<AssetUse[]> {
   const response = await fetch(`${base(brandId)}/${encodeURIComponent(id)}/uses`)
   const body: unknown = await response.json().catch(() => null)
-  if (!response.ok) throw new Error(body && typeof body === 'object' && 'error' in body && typeof body.error === 'string' ? body.error : `${response.status}`)
+  if (!response.ok)
+    throw new Error(
+      body && typeof body === 'object' && 'error' in body && typeof body.error === 'string'
+        ? body.error
+        : `${response.status}`,
+    )
   return AssetUse.array().parse(body)
 }
 
@@ -61,7 +83,11 @@ async function remove(brandId: string, id: string): Promise<AssetUse[] | null> {
   const body: unknown = await response.json().catch(() => null)
   const used = AssetInUse.safeParse(body)
   if (response.status === 409 && used.success) return used.data.usedIn
-  throw new Error(body && typeof body === 'object' && 'error' in body && typeof body.error === 'string' ? body.error : `${response.status}`)
+  throw new Error(
+    body && typeof body === 'object' && 'error' in body && typeof body.error === 'string'
+      ? body.error
+      : `${response.status}`,
+  )
 }
 
 /** `changed` counts uploads made elsewhere, such as files dropped on the stage; each change lists the assets again. */
@@ -79,34 +105,41 @@ export function AssetLibrary({ editor, brandId, changed = 0 }: { editor: Editor;
 
   useEffect(() => {
     const ask = new AbortController()
-    const timer = setTimeout(() => {
-      const q = query.trim()
-      fetch(`${base(brandId)}${q ? `?q=${encodeURIComponent(q)}` : ''}`, { signal: ask.signal })
-        .then(async (response) => {
-          if (response.ok) setAssets(AssetSummary.array().parse(await response.json()))
-        })
-        // Offline, or a newer search took over: the list keeps what it had.
-        .catch(() => undefined)
-    }, version === 0 && !query ? 0 : SEARCH_DELAY_MS)
+    const timer = setTimeout(
+      () => {
+        const q = query.trim()
+        fetch(`${base(brandId)}${q ? `?q=${encodeURIComponent(q)}` : ''}`, { signal: ask.signal })
+          .then(async (response) => {
+            if (response.ok) setAssets(AssetSummary.array().parse(await response.json()))
+          })
+          // Offline, or a newer search took over: the list keeps what it had.
+          .catch(() => undefined)
+      },
+      version === 0 && !query ? 0 : SEARCH_DELAY_MS,
+    )
     return () => {
       clearTimeout(timer)
       ask.abort()
     }
   }, [brandId, query, version, changed])
 
-  const upload = useCallback((files: File[]) => {
-    for (const file of files) {
-      const key = `${file.name}-${file.size}-${Math.random()}`
-      const change = (patch: Partial<Upload>) => setUploads((all) => all.map((u) => (u.key === key ? { ...u, ...patch } : u)))
-      setUploads((all) => [...all, { key, name: file.name, progress: 0 }])
-      send(brandId, file, (progress) => change({ progress }))
-        .then(() => {
-          setUploads((all) => all.filter((u) => u.key !== key))
-          refresh()
-        })
-        .catch((error: unknown) => change({ error: error instanceof Error ? error.message : String(error) }))
-    }
-  }, [brandId, refresh])
+  const upload = useCallback(
+    (files: File[]) => {
+      for (const file of files) {
+        const key = `${file.name}-${file.size}-${Math.random()}`
+        const change = (patch: Partial<Upload>) =>
+          setUploads((all) => all.map((u) => (u.key === key ? { ...u, ...patch } : u)))
+        setUploads((all) => [...all, { key, name: file.name, progress: 0 }])
+        send(brandId, file, (progress) => change({ progress }))
+          .then(() => {
+            setUploads((all) => all.filter((u) => u.key !== key))
+            refresh()
+          })
+          .catch((error: unknown) => change({ error: error instanceof Error ? error.message : String(error) }))
+      }
+    },
+    [brandId, refresh],
+  )
 
   const replace = (asset: AssetSummary) => setAssets((all) => all?.map((a) => (a.id === asset.id ? asset : a)) ?? null)
   const edited = assets?.find((a) => a.id === editing)
@@ -164,11 +197,21 @@ export function AssetLibrary({ editor, brandId, changed = 0 }: { editor: Editor;
             {uploads.map((u) => (
               <li key={u.key} className="flex flex-col gap-1">
                 <div className="flex items-center gap-2 text-xs">
-                  <span className={cn('min-w-0 flex-1 truncate', u.error ? 'text-danger' : 'text-muted')} role={u.error ? 'alert' : undefined}>
-                    {u.error ? format(t.uploadFailed, { name: u.name, reason: u.error }) : format(t.uploading, { name: u.name })}
+                  <span
+                    className={cn('min-w-0 flex-1 truncate', u.error ? 'text-danger' : 'text-muted')}
+                    role={u.error ? 'alert' : undefined}
+                  >
+                    {u.error
+                      ? format(t.uploadFailed, { name: u.name, reason: u.error })
+                      : format(t.uploading, { name: u.name })}
                   </span>
                   {u.error && (
-                    <button type="button" aria-label={t.done} onClick={() => setUploads((all) => all.filter((x) => x.key !== u.key))} className="grid size-5 cursor-pointer place-items-center rounded-row text-subtle hover:bg-hover hover:text-text">
+                    <button
+                      type="button"
+                      aria-label={t.done}
+                      onClick={() => setUploads((all) => all.filter((x) => x.key !== u.key))}
+                      className="grid size-5 cursor-pointer place-items-center rounded-row text-subtle hover:bg-hover hover:text-text"
+                    >
                       <XIcon size={12} aria-hidden />
                     </button>
                   )}
@@ -182,7 +225,13 @@ export function AssetLibrary({ editor, brandId, changed = 0 }: { editor: Editor;
                     aria-valuenow={Math.round(u.progress * 100)}
                     className="h-1 overflow-hidden rounded-full bg-hover"
                   >
-                    <div className={cn('h-full rounded-full bg-accent-solid transition-[width]', u.progress >= 1 && 'animate-pulse')} style={{ width: `${Math.max(4, u.progress * 100)}%` }} />
+                    <div
+                      className={cn(
+                        'h-full rounded-full bg-accent-solid transition-[width]',
+                        u.progress >= 1 && 'animate-pulse',
+                      )}
+                      style={{ width: `${Math.max(4, u.progress * 100)}%` }}
+                    />
                   </div>
                 )}
               </li>
@@ -228,16 +277,34 @@ export function AssetLibrary({ editor, brandId, changed = 0 }: { editor: Editor;
                     title={t.placeHint}
                     onClick={() => placeAsset(editor, brandId, asset)}
                     onDragStart={(e) => {
-                      e.dataTransfer.setData(ASSET_DRAG_TYPE, JSON.stringify({ id: asset.id, name: asset.name, width: asset.width, height: asset.height, contentType: asset.contentType }))
+                      e.dataTransfer.setData(
+                        ASSET_DRAG_TYPE,
+                        JSON.stringify({
+                          id: asset.id,
+                          name: asset.name,
+                          width: asset.width,
+                          height: asset.height,
+                          contentType: asset.contentType,
+                        }),
+                      )
                       if (isVectorAsset(asset)) e.dataTransfer.setData(VECTOR_DRAG_TYPE, '1')
                       e.dataTransfer.effectAllowed = 'copy'
                     }}
                     className={cn(
-                      ASSET_TILE, 'cursor-grab hover:border-line-strong active:cursor-grabbing',
+                      ASSET_TILE,
+                      'cursor-grab hover:border-line-strong active:cursor-grabbing',
                       editing === asset.id && 'border-accent',
                     )}
                   >
-                    <img src={`${base(brandId)}/${encodeURIComponent(asset.id)}/thumbnail`} alt="" width={asset.width} height={asset.height} draggable={false} loading="lazy" className="size-full object-contain" />
+                    <img
+                      src={`${base(brandId)}/${encodeURIComponent(asset.id)}/thumbnail`}
+                      alt=""
+                      width={asset.width}
+                      height={asset.height}
+                      draggable={false}
+                      loading="lazy"
+                      className="size-full object-contain"
+                    />
                   </button>
                   {/* Name and tags open from the tile's corner, shown on hover or focus, and while open. */}
                   <button
@@ -264,8 +331,18 @@ export function AssetLibrary({ editor, brandId, changed = 0 }: { editor: Editor;
                   >
                     <TrashIcon size={12} aria-hidden />
                   </button>
-                  <span className={cn('min-w-0 truncate text-[11px] font-medium', asset.name ? 'text-muted' : 'text-subtle')} title={name}>{name}</span>
-                  {asset.tags.length > 0 && <p className="-mt-0.5 truncate text-[10px] text-subtle">{asset.tags.join(' · ')}</p>}
+                  <span
+                    className={cn(
+                      'min-w-0 truncate text-[11px] font-medium',
+                      asset.name ? 'text-muted' : 'text-subtle',
+                    )}
+                    title={name}
+                  >
+                    {name}
+                  </span>
+                  {asset.tags.length > 0 && (
+                    <p className="-mt-0.5 truncate text-[10px] text-subtle">{asset.tags.join(' · ')}</p>
+                  )}
                 </li>
               )
             })}
@@ -281,7 +358,16 @@ export function AssetLibrary({ editor, brandId, changed = 0 }: { editor: Editor;
  * as it is added or removed. Delete asks first; an image the open design, another design, a
  * template or the logo uses stays, and the panel says where it is used.
  */
-function AssetDetails({ asset, brandId, usedHere, openDesign, askNow, onSaved, onDeleted, onDone }: {
+function AssetDetails({
+  asset,
+  brandId,
+  usedHere,
+  openDesign,
+  askNow,
+  onSaved,
+  onDeleted,
+  onDone,
+}: {
   asset: AssetSummary
   brandId: string
   usedHere: () => boolean
@@ -301,7 +387,11 @@ function AssetDetails({ asset, brandId, usedHere, openDesign, askNow, onSaved, o
   const [usedIn, setUsedIn] = useState<string[] | null>(null)
   const deleteButton = useRef<HTMLButtonElement>(null)
   const where = (use: AssetUse) =>
-    use.kind === 'logo' ? t.logo : use.kind === 'design' && use.id === openDesign ? t.thisDesign : use.name || (use.kind === 'template' ? t.untitledTemplate : t.untitledDesign)
+    use.kind === 'logo'
+      ? t.logo
+      : use.kind === 'design' && use.id === openDesign
+        ? t.thisDesign
+        : use.name || (use.kind === 'template' ? t.untitledTemplate : t.untitledDesign)
   /** Shows where the asset is used, the open design first and once. */
   const showUses = (uses: AssetUse[]) => {
     const places = [...new Set([...(usedHere() ? [t.thisDesign] : []), ...uses.map(where)])]
@@ -342,7 +432,9 @@ function AssetDetails({ asset, brandId, usedHere, openDesign, askNow, onSaved, o
 
   const commit = (update: UpdateAsset) => {
     setError(null)
-    save(brandId, asset.id, update).then(onSaved).catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)))
+    save(brandId, asset.id, update)
+      .then(onSaved)
+      .catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)))
   }
   const saveName = () => {
     const trimmed = name.trim()
@@ -359,7 +451,11 @@ function AssetDetails({ asset, brandId, usedHere, openDesign, askNow, onSaved, o
   }
 
   return (
-    <section aria-label={format(t.editing, { name: asset.name || t.untitled })} data-testid="asset-details" className="mx-[18px] mb-3 flex shrink-0 flex-col gap-2 rounded-[12px] border border-line bg-bg/40 p-3">
+    <section
+      aria-label={format(t.editing, { name: asset.name || t.untitled })}
+      data-testid="asset-details"
+      className="mx-[18px] mb-3 flex shrink-0 flex-col gap-2 rounded-[12px] border border-line bg-bg/40 p-3"
+    >
       <label className="flex flex-col gap-1">
         <span className="text-xs text-muted">{t.name}</span>
         <input
@@ -376,13 +472,23 @@ function AssetDetails({ asset, brandId, usedHere, openDesign, askNow, onSaved, o
         />
       </label>
       <div className="flex flex-col gap-1">
-        <span id={`tags-${asset.id}`} className="text-xs text-muted">{t.tags}</span>
+        <span id={`tags-${asset.id}`} className="text-xs text-muted">
+          {t.tags}
+        </span>
         {asset.tags.length > 0 && (
           <ul aria-labelledby={`tags-${asset.id}`} className="flex flex-wrap gap-1">
             {asset.tags.map((x) => (
-              <li key={x} className="flex h-6 items-center gap-0.5 rounded-full bg-accent-soft ps-2 pe-0.5 text-xs text-accent-text">
+              <li
+                key={x}
+                className="flex h-6 items-center gap-0.5 rounded-full bg-accent-soft ps-2 pe-0.5 text-xs text-accent-text"
+              >
                 {x}
-                <button type="button" aria-label={format(t.removeTag, { tag: x })} onClick={() => commit({ tags: asset.tags.filter((y) => y !== x) })} className="grid size-5 cursor-pointer place-items-center rounded-full hover:bg-hover">
+                <button
+                  type="button"
+                  aria-label={format(t.removeTag, { tag: x })}
+                  onClick={() => commit({ tags: asset.tags.filter((y) => y !== x) })}
+                  className="grid size-5 cursor-pointer place-items-center rounded-full hover:bg-hover"
+                >
                   <XIcon size={10} aria-hidden />
                 </button>
               </li>
@@ -400,34 +506,58 @@ function AssetDetails({ asset, brandId, usedHere, openDesign, askNow, onSaved, o
           className="h-8 rounded-row border border-line bg-raised px-2 text-[13px] placeholder:text-subtle"
         />
       </div>
-      {error && <p role="alert" className="text-xs text-danger">{format(t.saveFailed, { reason: error })}</p>}
-      {deleteError && <p role="alert" className="text-xs text-danger">{format(t.deleteFailed, { reason: deleteError })}</p>}
-      {usedIn && <p role="alert" data-testid="asset-in-use" className="text-xs text-danger">{format(usedIn.length === 1 ? t.inUseOnce : t.inUse, { n: usedIn.length, places: usedIn.join(', ') })}</p>}
+      {error && (
+        <p role="alert" className="text-xs text-danger">
+          {format(t.saveFailed, { reason: error })}
+        </p>
+      )}
+      {deleteError && (
+        <p role="alert" className="text-xs text-danger">
+          {format(t.deleteFailed, { reason: deleteError })}
+        </p>
+      )}
+      {usedIn && (
+        <p role="alert" data-testid="asset-in-use" className="text-xs text-danger">
+          {format(usedIn.length === 1 ? t.inUseOnce : t.inUse, { n: usedIn.length, places: usedIn.join(', ') })}
+        </p>
+      )}
       <div className="flex items-center justify-between gap-2">
-        {asking
-          ? (
-            <span className="flex items-center gap-1">
-              <button type="button" autoFocus onClick={confirmDelete} data-testid="asset-delete-confirm" className={cn(QUIET_BUTTON, 'bg-danger/10 text-danger hover:bg-danger/20')}>
-                {format(t.deleteNamed, { name: asset.name || t.untitled })}
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setAsking(false)
-                  setTimeout(() => deleteButton.current?.focus())
-                }}
-                className={QUIET_BUTTON}
-              >
-                {t.keep}
-              </button>
-            </span>
-          )
-          : (
-            <button type="button" ref={deleteButton} disabled={busy} aria-busy={busy} onClick={askToDelete} data-testid="asset-delete" className={cn(QUIET_BUTTON, 'hover:text-danger')}>
-              <TrashIcon size={13} aria-hidden />
-              {t.delete}
+        {asking ? (
+          <span className="flex items-center gap-1">
+            <button
+              type="button"
+              autoFocus
+              onClick={confirmDelete}
+              data-testid="asset-delete-confirm"
+              className={cn(QUIET_BUTTON, 'bg-danger/10 text-danger hover:bg-danger/20')}
+            >
+              {format(t.deleteNamed, { name: asset.name || t.untitled })}
             </button>
-          )}
+            <button
+              type="button"
+              onClick={() => {
+                setAsking(false)
+                setTimeout(() => deleteButton.current?.focus())
+              }}
+              className={QUIET_BUTTON}
+            >
+              {t.keep}
+            </button>
+          </span>
+        ) : (
+          <button
+            type="button"
+            ref={deleteButton}
+            disabled={busy}
+            aria-busy={busy}
+            onClick={askToDelete}
+            data-testid="asset-delete"
+            className={cn(QUIET_BUTTON, 'hover:text-danger')}
+          >
+            <TrashIcon size={13} aria-hidden />
+            {t.delete}
+          </button>
+        )}
         <button type="button" onClick={onDone} className={QUIET_BUTTON}>
           {t.done}
         </button>

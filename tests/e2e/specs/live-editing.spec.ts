@@ -3,8 +3,19 @@
 // `docker compose up -d --wait` from the repo root. The restart test drops every tab connected to
 // the sync server, whichever spec opened it, so it is tagged @sync-restart and CI runs it on its own
 // once a job's other tests are done; run it with `--workers=1` or alone.
-import { expect, test, type Page } from '../support/test.ts'
-import { designOf, exportHashOf, openTabs, placed, restartSyncServer, screenPoint, stageShot, storedAfter, settle, writeOutput } from '../support/editor.ts'
+import {
+  designOf,
+  exportHashOf,
+  openTabs,
+  placed,
+  restartSyncServer,
+  screenPoint,
+  settle,
+  stageShot,
+  storedAfter,
+  writeOutput,
+} from '../support/editor.ts'
+import { expect, type Page, test } from '../support/test.ts'
 
 test.describe.configure({ timeout: 120_000 })
 
@@ -13,59 +24,105 @@ test.describe.configure({ timeout: 120_000 })
  * `interleave` it yields to the page after each one, so the other tab's edits can arrive in between.
  */
 const randomEdits = (page: Page, seed: number, count: number, interleave = false) =>
-  page.evaluate(async ({ seed, count, interleave }) => {
-    const editor = window.dazbee
-    if (!editor) throw new Error('no editor')
-    let state = seed
-    // mulberry32: the same seed makes the same edits on every run.
-    const random = () => {
-      state = (state + 0x6d2b79f5) | 0
-      let t = Math.imul(state ^ (state >>> 15), 1 | state)
-      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
-      return ((t ^ (t >>> 14)) >>> 0) / 4294967296
-    }
-    const pick = <T,>(xs: T[]) => xs[Math.floor(random() * xs.length)] as T
-    const ran: Record<string, number> = {}
-    let refused = 0
-    for (let i = 0; i < count; i++) {
-      const design = editor.design()
-      const ids = Object.keys(design.nodes)
-      const texts = ids.filter((id) => design.nodes[id]?.type === 'text')
-      const roll = random()
-      const kind = roll < 0.12 ? 'node.create' : roll < 0.4 ? 'node.update' : roll < 0.5 ? 'node.move' : roll < 0.56 ? 'node.delete'
-        : roll < 0.84 ? 'text.edit' : roll < 0.92 ? 'undo' : 'redo'
-      ran[kind] = (ran[kind] ?? 0) + 1
-      try {
-        if (kind === 'undo') editor.session.undo()
-        else if (kind === 'redo') editor.session.redo()
-        else if (kind === 'node.create') {
-          editor.session.run('node.create', {
-            parentId: 'p1',
-            layer: { type: 'graphic', name: 'R', props: { x: Math.round(random() * 1000), y: Math.round(random() * 1000), width: 60, height: 60, shape: { kind: 'rect' }, fills: [{ type: 'solid', color: '#7E57C2FF' }] } },
-          })
-        } else if (kind === 'node.update') {
-          editor.session.run('node.update', { ids: [pick(ids)], patch: random() < 0.5 ? { x: Math.round(random() * 1000) } : { rotation: Math.round(random() * 90), opacity: 0.5 + random() / 2 } })
-        } else if (kind === 'node.move') {
-          editor.session.run('node.move', { id: pick(ids), parentId: 'p1', ...(random() < 0.5 ? { before: pick(ids) } : {}) })
-        } else if (kind === 'node.delete') {
-          // Keep the two text layers: the text edits need somewhere to land.
-          editor.session.run('node.delete', { ids: [pick(ids.filter((id) => !texts.includes(id)).concat('box'))] })
-        } else {
-          const id = pick(texts)
-          const length = design.nodes[id]?.type === 'text' ? design.nodes[id].props.text.length : 0
-          editor.session.run('text.edit', random() < 0.65 || length < 2
-            ? { id, op: { kind: 'insert', at: Math.floor(random() * (length + 1)), text: pick(['a', 'S', 'ب', 'ع', ' ', '%', '4']) } }
-            : { id, op: { kind: 'delete', at: Math.floor(random() * (length - 1)), length: 1 } })
-        }
-      } catch (error) {
-        // A command the document as it is doesn't allow is refused whole.
-        if (!(error instanceof Error) || error.name !== 'CommandError') throw error
-        refused++
+  page.evaluate(
+    async ({ seed, count, interleave }) => {
+      const editor = window.dazbee
+      if (!editor) throw new Error('no editor')
+      let state = seed
+      // mulberry32: the same seed makes the same edits on every run.
+      const random = () => {
+        state = (state + 0x6d2b79f5) | 0
+        let t = Math.imul(state ^ (state >>> 15), 1 | state)
+        t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296
       }
-      if (interleave) await new Promise((resolve) => setTimeout(resolve))
-    }
-    return { ran, refused }
-  }, { seed, count, interleave })
+      const pick = <T>(xs: T[]) => xs[Math.floor(random() * xs.length)] as T
+      const ran: Record<string, number> = {}
+      let refused = 0
+      for (let i = 0; i < count; i++) {
+        const design = editor.design()
+        const ids = Object.keys(design.nodes)
+        const texts = ids.filter((id) => design.nodes[id]?.type === 'text')
+        const roll = random()
+        const kind =
+          roll < 0.12
+            ? 'node.create'
+            : roll < 0.4
+              ? 'node.update'
+              : roll < 0.5
+                ? 'node.move'
+                : roll < 0.56
+                  ? 'node.delete'
+                  : roll < 0.84
+                    ? 'text.edit'
+                    : roll < 0.92
+                      ? 'undo'
+                      : 'redo'
+        ran[kind] = (ran[kind] ?? 0) + 1
+        try {
+          if (kind === 'undo') editor.session.undo()
+          else if (kind === 'redo') editor.session.redo()
+          else if (kind === 'node.create') {
+            editor.session.run('node.create', {
+              parentId: 'p1',
+              layer: {
+                type: 'graphic',
+                name: 'R',
+                props: {
+                  x: Math.round(random() * 1000),
+                  y: Math.round(random() * 1000),
+                  width: 60,
+                  height: 60,
+                  shape: { kind: 'rect' },
+                  fills: [{ type: 'solid', color: '#7E57C2FF' }],
+                },
+              },
+            })
+          } else if (kind === 'node.update') {
+            editor.session.run('node.update', {
+              ids: [pick(ids)],
+              patch:
+                random() < 0.5
+                  ? { x: Math.round(random() * 1000) }
+                  : { rotation: Math.round(random() * 90), opacity: 0.5 + random() / 2 },
+            })
+          } else if (kind === 'node.move') {
+            editor.session.run('node.move', {
+              id: pick(ids),
+              parentId: 'p1',
+              ...(random() < 0.5 ? { before: pick(ids) } : {}),
+            })
+          } else if (kind === 'node.delete') {
+            // Keep the two text layers: the text edits need somewhere to land.
+            editor.session.run('node.delete', { ids: [pick(ids.filter((id) => !texts.includes(id)).concat('box'))] })
+          } else {
+            const id = pick(texts)
+            const length = design.nodes[id]?.type === 'text' ? design.nodes[id].props.text.length : 0
+            editor.session.run(
+              'text.edit',
+              random() < 0.65 || length < 2
+                ? {
+                    id,
+                    op: {
+                      kind: 'insert',
+                      at: Math.floor(random() * (length + 1)),
+                      text: pick(['a', 'S', 'ب', 'ع', ' ', '%', '4']),
+                    },
+                  }
+                : { id, op: { kind: 'delete', at: Math.floor(random() * (length - 1)), length: 1 } },
+            )
+          }
+        } catch (error) {
+          // A command the document as it is doesn't allow is refused whole.
+          if (!(error instanceof Error) || error.name !== 'CommandError') throw error
+          refused++
+        }
+        if (interleave) await new Promise((resolve) => setTimeout(resolve))
+      }
+      return { ran, refused }
+    },
+    { seed, count, interleave },
+  )
 
 /** Waits for both tabs to settle, then checks they hold the same document, export the same pixels and show the same stage. */
 async function expectSame(a: Page, b: Page) {
@@ -76,10 +133,15 @@ async function expectSame(a: Page, b: Page) {
   const [hashA, hashB] = await Promise.all([exportHashOf(a), exportHashOf(b)])
   expect(hashA).toBe(hashB)
   for (const tab of [a, b]) await tab.keyboard.press('Escape')
-  await expect.poll(async () => {
-    const [stageA, stageB] = await Promise.all([stageShot(a), stageShot(b)])
-    return stageA.equals(stageB)
-  }, { timeout: 10_000 }).toBe(true)
+  await expect
+    .poll(
+      async () => {
+        const [stageA, stageB] = await Promise.all([stageShot(a), stageShot(b)])
+        return stageA.equals(stageB)
+      },
+      { timeout: 10_000 },
+    )
+    .toBe(true)
   return { design: designA, hash: hashA }
 }
 
@@ -94,21 +156,45 @@ test('two tabs make 200 random edits each and end with the same document and the
     await expect(tab.getByTestId('status')).toHaveAttribute('data-status', 'Offline', { timeout: 30_000 })
   }
   const [ranA, ranB] = await Promise.all([randomEdits(a, 2026, 200), randomEdits(b, 31337, 200)])
-  test.info().annotations.push({ type: 'tab A', description: JSON.stringify(ranA) }, { type: 'tab B', description: JSON.stringify(ranB) })
+  test
+    .info()
+    .annotations.push(
+      { type: 'tab A', description: JSON.stringify(ranA) },
+      { type: 'tab B', description: JSON.stringify(ranB) },
+    )
   for (const tab of tabs) await tab.context().setOffline(false)
   await expectSame(a, b)
 
   // Then both online at once: each tab's edits reach the other while it is still editing, and its
   // stage draws them as they come.
   const [liveA, liveB] = await Promise.all([randomEdits(a, 7, 50, true), randomEdits(b, 8, 50, true)])
-  test.info().annotations.push({ type: 'tab A online', description: JSON.stringify(liveA) }, { type: 'tab B online', description: JSON.stringify(liveB) })
+  test
+    .info()
+    .annotations.push(
+      { type: 'tab A online', description: JSON.stringify(liveA) },
+      { type: 'tab B online', description: JSON.stringify(liveB) },
+    )
   const { design, hash } = await expectSame(a, b)
 
   // A command on a layer the other tab deleted is refused whole, and neither document changes.
-  await a.evaluate(() => window.dazbee?.session.run('node.create', {
-    id: 'gone', parentId: 'p1',
-    layer: { type: 'graphic', name: 'Gone', props: { x: 40, y: 40, width: 60, height: 60, shape: { kind: 'rect' }, fills: [{ type: 'solid', color: '#7E57C2FF' }] } },
-  }))
+  await a.evaluate(() =>
+    window.dazbee?.session.run('node.create', {
+      id: 'gone',
+      parentId: 'p1',
+      layer: {
+        type: 'graphic',
+        name: 'Gone',
+        props: {
+          x: 40,
+          y: 40,
+          width: 60,
+          height: 60,
+          shape: { kind: 'rect' },
+          fills: [{ type: 'solid', color: '#7E57C2FF' }],
+        },
+      },
+    }),
+  )
   await settle(tabs)
   await a.evaluate(() => window.dazbee?.session.run('node.delete', { ids: ['gone'] }))
   await settle(tabs)
@@ -128,11 +214,27 @@ test('two tabs make 200 random edits each and end with the same document and the
 
   writeOutput('two-tabs-a.png', await a.getByTestId('stage').screenshot())
   writeOutput('two-tabs-b.png', await b.getByTestId('stage').screenshot())
-  writeOutput('two-tabs.json', JSON.stringify({ tabA: ranA, tabB: ranB, tabAOnline: liveA, tabBOnline: liveB, exportSha256: hash, layers: Object.keys(JSON.parse(design).nodes).length }, null, 2))
+  writeOutput(
+    'two-tabs.json',
+    JSON.stringify(
+      {
+        tabA: ranA,
+        tabB: ranB,
+        tabAOnline: liveA,
+        tabBOnline: liveB,
+        exportSha256: hash,
+        layers: Object.keys(JSON.parse(design).nodes).length,
+      },
+      null,
+      2,
+    ),
+  )
   expect(errors).toEqual([])
 })
 
-test('a real mouse drag and real typing in one tab show up in the other, and undo as one step each', async ({ browser }) => {
+test('a real mouse drag and real typing in one tab show up in the other, and undo as one step each', async ({
+  browser,
+}) => {
   const { tabs, errors } = await openTabs(browser, 2)
   const [a, b] = tabs as [Page, Page]
   writeOutput('real-input-0-start.png', await a.screenshot())
@@ -142,7 +244,8 @@ test('a real mouse drag and real typing in one tab show up in the other, and und
   const to = await screenPoint(a, 430, 280)
   await a.mouse.move(from.x, from.y)
   await a.mouse.down()
-  for (let i = 1; i <= 20; i++) await a.mouse.move(from.x + ((to.x - from.x) * i) / 20, from.y + ((to.y - from.y) * i) / 20)
+  for (let i = 1; i <= 20; i++)
+    await a.mouse.move(from.x + ((to.x - from.x) * i) / 20, from.y + ((to.y - from.y) * i) / 20)
   await expect(a.locator('.selection[data-layer="box"]')).toBeVisible()
   writeOutput('real-input-1-dragging.png', await a.screenshot())
   await a.mouse.up()
@@ -165,7 +268,9 @@ test('a real mouse drag and real typing in one tab show up in the other, and und
   expect(JSON.parse(await designOf(b)).nodes.headline.props.text).toBe('Summer sale now')
 
   // Tab B types ahead of tab A's caret; A's caret moves along, so A's next key lands where it was.
-  await b.evaluate(() => window.dazbee?.session.run('text.edit', { id: 'headline', op: { kind: 'insert', at: 0, text: 'Hot ' } }))
+  await b.evaluate(() =>
+    window.dazbee?.session.run('text.edit', { id: 'headline', op: { kind: 'insert', at: 0, text: 'Hot ' } }),
+  )
   await settle(tabs)
   await a.keyboard.type('!')
   await settle(tabs)
@@ -187,7 +292,11 @@ test('a real mouse drag and real typing in one tab show up in the other, and und
     await settle(tabs)
     const design = JSON.parse(await designOf(b))
     const { nodes } = design
-    expect({ arabic: nodes.arabic.props.text, headline: nodes.headline.props.text, x: Math.round(placed(design, 'box', 'sq').x as number) }).toEqual(expected)
+    expect({
+      arabic: nodes.arabic.props.text,
+      headline: nodes.headline.props.text,
+      x: Math.round(placed(design, 'box', 'sq').x as number),
+    }).toEqual(expected)
   }
   // Tab B's 'Hot ' stays through all of them.
   await undo({ arabic: 'تخفيضات الصيف', headline: 'Hot Summer sale now!', x: 280 })
@@ -203,13 +312,17 @@ test('latency from a command in tab A to the redraw in tab B', async ({ browser 
   const samples: number[] = []
   for (let i = 0; i < 60; i++) {
     const x = 100 + i
-    const seen = b.evaluate((x) => new Promise<number>((resolve) => {
-      const stop = window.dazbee?.onDraw((design, at) => {
-        if (design.nodes.box?.props.x !== x) return
-        stop?.()
-        resolve(at)
-      })
-    }), x)
+    const seen = b.evaluate(
+      (x) =>
+        new Promise<number>((resolve) => {
+          const stop = window.dazbee?.onDraw((design, at) => {
+            if (design.nodes.box?.props.x !== x) return
+            stop?.()
+            resolve(at)
+          })
+        }),
+      x,
+    )
     // Let tab B's listener be in place before tab A sends.
     await b.evaluate(() => new Promise((resolve) => requestAnimationFrame(resolve)))
     const sent = await a.evaluate((x) => {
@@ -221,10 +334,28 @@ test('latency from a command in tab A to the redraw in tab B', async ({ browser 
   }
   const warm = samples.slice(10).sort((p, q) => p - q)
   const at = (share: number) => warm[Math.min(warm.length - 1, Math.floor(share * warm.length))] as number
-  const report = { samples: warm.length, medianMs: Math.round(at(0.5) * 10) / 10, p95Ms: Math.round(at(0.95) * 10) / 10, maxMs: Math.round(at(1) * 10) / 10 }
+  const report = {
+    samples: warm.length,
+    medianMs: Math.round(at(0.5) * 10) / 10,
+    p95Ms: Math.round(at(0.95) * 10) / 10,
+    maxMs: Math.round(at(1) * 10) / 10,
+  }
   test.info().annotations.push({ type: 'latency', description: JSON.stringify(report) })
-  writeOutput('latency.json', JSON.stringify({ ...report, note: 'Both tabs and the sync server on one machine; the first 10 sends are warm-up and left out.', allMs: samples }, null, 2))
-  console.log(`tab A command → tab B redraw: median ${report.medianMs} ms, p95 ${report.p95Ms} ms over ${report.samples} edits`)
+  writeOutput(
+    'latency.json',
+    JSON.stringify(
+      {
+        ...report,
+        note: 'Both tabs and the sync server on one machine; the first 10 sends are warm-up and left out.',
+        allMs: samples,
+      },
+      null,
+      2,
+    ),
+  )
+  console.log(
+    `tab A command → tab B redraw: median ${report.medianMs} ms, p95 ${report.p95Ms} ms over ${report.samples} edits`,
+  )
   expect(report.p95Ms).toBeLessThan(1000)
   expect(errors).toEqual([])
 })

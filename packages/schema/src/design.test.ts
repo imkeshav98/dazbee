@@ -1,5 +1,16 @@
 import { describe, expect, it } from 'vitest'
-import { FORMAT_PRESETS, FORMAT_SHAPES, fontFamilies, formatSizeProblem, imageAssetIds, parseDesign, parseDesignIncrementally, SCHEMA_VERSION, shapeOf } from './index.ts'
+
+import {
+  fontFamilies,
+  FORMAT_PRESETS,
+  FORMAT_SHAPES,
+  formatSizeProblem,
+  imageAssetIds,
+  parseDesign,
+  parseDesignIncrementally,
+  SCHEMA_VERSION,
+  shapeOf,
+} from './index.ts'
 
 /**
  * Parses with the full parser, checking on the way that the incremental one agrees exactly,
@@ -25,7 +36,10 @@ const minimal = () => ({
       index: 'a0',
       name: 'Box',
       props: {
-        x: 100, y: 100, width: 200, height: 100,
+        x: 100,
+        y: 100,
+        width: 200,
+        height: 100,
         shape: { kind: 'rect' },
         fills: [{ type: 'solid', color: '#FF5A36FF' }],
       },
@@ -60,7 +74,12 @@ describe('parseDesign', () => {
     withBanner(d)
     Object.assign(d.overrides, {
       'format:banner': {
-        r1: { x: 4, width: 60, visible: false, effects: [{ type: 'dropShadow', x: 0, y: 2, blur: 4, color: '#00000080' }] },
+        r1: {
+          x: 4,
+          width: 60,
+          visible: false,
+          effects: [{ type: 'dropShadow', x: 0, y: 2, blur: 4, color: '#00000080' }],
+        },
       },
     })
     const result = parse(d)
@@ -71,72 +90,112 @@ describe('parseDesign', () => {
   })
 
   it('rejects colours that are not #RRGGBBAA', () => {
-    expect(errorsFor((d) => { d.nodes.r1.props.fills = [{ type: 'solid', color: '#FF5A36' }] }))
-      .toEqual(['nodes.r1.props.fills.0.color: colours are #RRGGBBAA'])
+    expect(
+      errorsFor((d) => {
+        d.nodes.r1.props.fills = [{ type: 'solid', color: '#FF5A36' }]
+      }),
+    ).toEqual(['nodes.r1.props.fills.0.color: colours are #RRGGBBAA'])
   })
 
   it('rejects a layer whose parent does not exist', () => {
-    expect(errorsFor((d) => { d.nodes.r1.parentId = 'ghost' }))
-      .toEqual(['nodes.r1.parentId: parent "ghost" is neither a page nor a layer'])
+    expect(
+      errorsFor((d) => {
+        d.nodes.r1.parentId = 'ghost'
+      }),
+    ).toEqual(['nodes.r1.parentId: parent "ghost" is neither a page nor a layer'])
   })
 
   it('rejects a layer inside a graphic', () => {
-    expect(errorsFor((d) => {
-      Object.assign(d.nodes, { r2: { ...d.nodes.r1, parentId: 'r1' } })
-    })).toEqual(['nodes.r2.parentId: parent "r1" is a graphic, which can\'t hold layers'])
+    expect(
+      errorsFor((d) => {
+        Object.assign(d.nodes, { r2: { ...d.nodes.r1, parentId: 'r1' } })
+      }),
+    ).toEqual(['nodes.r2.parentId: parent "r1" is a graphic, which can\'t hold layers'])
   })
 
-  const group = (parentId: string) => ({ type: 'group', parentId, index: 'a0', name: 'G', props: { x: 0, y: 0, width: 10, height: 10 } })
+  const group = (parentId: string) => ({
+    type: 'group',
+    parentId,
+    index: 'a0',
+    name: 'G',
+    props: { x: 0, y: 0, width: 10, height: 10 },
+  })
 
   it('rejects groups that contain each other', () => {
-    expect(errorsFor((d) => { Object.assign(d.nodes, { g1: group('g2'), g2: group('g1') }) }))
-      .toEqual(['nodes.g1.parentId: "g1" is inside itself', 'nodes.g2.parentId: "g2" is inside itself'])
+    expect(
+      errorsFor((d) => {
+        Object.assign(d.nodes, { g1: group('g2'), g2: group('g1') })
+      }),
+    ).toEqual(['nodes.g1.parentId: "g1" is inside itself', 'nodes.g2.parentId: "g2" is inside itself'])
   })
 
   it('names only the layers in a cycle, not a layer hanging below it', () => {
-    expect(errorsFor((d) => { Object.assign(d.nodes, { g0: group('g1'), g1: group('g2'), g2: group('g1') }) }))
-      .toEqual(['nodes.g1.parentId: "g1" is inside itself', 'nodes.g2.parentId: "g2" is inside itself'])
+    expect(
+      errorsFor((d) => {
+        Object.assign(d.nodes, { g0: group('g1'), g1: group('g2'), g2: group('g1') })
+      }),
+    ).toEqual(['nodes.g1.parentId: "g1" is inside itself', 'nodes.g2.parentId: "g2" is inside itself'])
   })
 
   it('rejects a text run that ends past the text', () => {
-    expect(errorsFor((d) => {
-      Object.assign(d.nodes, {
-        t1: {
-          type: 'text', parentId: 'p1', index: 'a1', name: 'Headline',
-          props: {
-            x: 0, y: 0, width: 500, height: 80, text: 'Sale',
-            style: { fontFamily: 'Noto Sans', fontSize: 64, color: '#000000FF' },
-            runs: [{ start: 0, end: 9, style: { fontWeight: 700 } }],
+    expect(
+      errorsFor((d) => {
+        Object.assign(d.nodes, {
+          t1: {
+            type: 'text',
+            parentId: 'p1',
+            index: 'a1',
+            name: 'Headline',
+            props: {
+              x: 0,
+              y: 0,
+              width: 500,
+              height: 80,
+              text: 'Sale',
+              style: { fontFamily: 'Noto Sans', fontSize: 64, color: '#000000FF' },
+              runs: [{ start: 0, end: 9, style: { fontWeight: 700 } }],
+            },
           },
-        },
-      })
-    })).toEqual(['nodes.t1.props.runs.0.end: run ends at 9 but the text is 4 UTF-16 units long'])
+        })
+      }),
+    ).toEqual(['nodes.t1.props.runs.0.end: run ends at 9 but the text is 4 UTF-16 units long'])
   })
 
   it('rejects a format override of text that leaves a style run past its end', () => {
-    expect(errorsFor((d) => {
-      withBanner(d)
-      Object.assign(d.nodes, {
-        t1: {
-          type: 'text', parentId: 'p1', index: 'a1', name: 'Headline',
-          props: {
-            x: 0, y: 0, width: 500, height: 80, text: 'Summer sale',
-            style: { fontFamily: 'Noto Sans', fontSize: 64, color: '#000000FF' },
-            runs: [{ start: 7, end: 11, style: { fontWeight: 700 } }],
+    expect(
+      errorsFor((d) => {
+        withBanner(d)
+        Object.assign(d.nodes, {
+          t1: {
+            type: 'text',
+            parentId: 'p1',
+            index: 'a1',
+            name: 'Headline',
+            props: {
+              x: 0,
+              y: 0,
+              width: 500,
+              height: 80,
+              text: 'Summer sale',
+              style: { fontFamily: 'Noto Sans', fontSize: 64, color: '#000000FF' },
+              runs: [{ start: 7, end: 11, style: { fontWeight: 700 } }],
+            },
           },
-        },
-      })
-      Object.assign(d.overrides, { 'format:banner': { t1: { text: 'Sale' } } })
-    })).toEqual(['overrides.format:banner.t1.runs.0.end: run ends at 11 but the text is 4 UTF-16 units long'])
+        })
+        Object.assign(d.overrides, { 'format:banner': { t1: { text: 'Sale' } } })
+      }),
+    ).toEqual(['overrides.format:banner.t1.runs.0.end: run ends at 11 but the text is 4 UTF-16 units long'])
   })
 
   it('rejects overrides for unknown formats, layers and properties, and invalid values', () => {
-    expect(errorsFor((d) => {
-      Object.assign(d.overrides, {
-        'format:nope': { r1: { x: 1 } },
-        'format:sq': { ghost: { x: 1 }, r1: { text: 'hi', opacity: 2 } },
-      })
-    })).toEqual([
+    expect(
+      errorsFor((d) => {
+        Object.assign(d.overrides, {
+          'format:nope': { r1: { x: 1 } },
+          'format:sq': { ghost: { x: 1 }, r1: { text: 'hi', opacity: 2 } },
+        })
+      }),
+    ).toEqual([
       'overrides.format:nope: no format "nope"',
       'overrides.format:sq.ghost: no layer "ghost"',
       'overrides.format:sq.r1.text: a graphic has no property "text"',
@@ -149,9 +208,17 @@ describe('text runs', () => {
   it('keep only the style keys they set, so the rest come from the base style', () => {
     const d = minimal() as ReturnType<typeof minimal> & { nodes: Record<string, unknown> }
     d.nodes.t1 = {
-      type: 'text', parentId: 'p1', index: 'a1', name: 'Headline',
+      type: 'text',
+      parentId: 'p1',
+      index: 'a1',
+      name: 'Headline',
       props: {
-        x: 0, y: 0, width: 500, height: 80, text: 'Sale', style: { fontFamily: 'Noto Sans', fontSize: 64, color: '#000000FF', fontWeight: 700 },
+        x: 0,
+        y: 0,
+        width: 500,
+        height: 80,
+        text: 'Sale',
+        style: { fontFamily: 'Noto Sans', fontSize: 64, color: '#000000FF', fontWeight: 700 },
         runs: [{ start: 0, end: 2, style: { color: '#FF0000FF' } }],
       },
     }
@@ -191,11 +258,33 @@ describe('imageAssetIds', () => {
     const image = (assetId: string) => ({ type: 'image', assetId })
     const parsed = parseDesign({
       meta: { schemaVersion: 5, designId: 'd', name: 'D', kind: 'single', primaryFormatId: 'sq' },
-      formats: { sq: { name: 'Square', width: 100, height: 100, order: 'a0' }, st: { name: 'Story', width: 100, height: 200, order: 'a1' } },
+      formats: {
+        sq: { name: 'Square', width: 100, height: 100, order: 'a0' },
+        st: { name: 'Story', width: 100, height: 200, order: 'a1' },
+      },
       pages: { p1: { name: 'P', order: 'a0', fills: [image('page-bg')] } },
       nodes: {
-        g: { type: 'graphic', parentId: 'p1', index: 'a0', name: 'G', props: { x: 0, y: 0, width: 10, height: 10, shape: { kind: 'rect' }, fills: [{ type: 'solid', color: '#000000FF' }, image('photo')] } },
-        h: { type: 'graphic', parentId: 'p1', index: 'a1', name: 'H', props: { x: 0, y: 0, width: 10, height: 10, shape: { kind: 'rect' }, fills: [image('photo')] } },
+        g: {
+          type: 'graphic',
+          parentId: 'p1',
+          index: 'a0',
+          name: 'G',
+          props: {
+            x: 0,
+            y: 0,
+            width: 10,
+            height: 10,
+            shape: { kind: 'rect' },
+            fills: [{ type: 'solid', color: '#000000FF' }, image('photo')],
+          },
+        },
+        h: {
+          type: 'graphic',
+          parentId: 'p1',
+          index: 'a1',
+          name: 'H',
+          props: { x: 0, y: 0, width: 10, height: 10, shape: { kind: 'rect' }, fills: [image('photo')] },
+        },
       },
       overrides: { 'format:st': { g: { fills: [image('story-photo')] } } },
     })
@@ -206,15 +295,41 @@ describe('imageAssetIds', () => {
 
 describe('fontFamilies', () => {
   it('finds the families of base styles, runs and format overrides, once each', () => {
-    const text = (fontFamily: string, runs: unknown[] = []) => ({ x: 0, y: 0, width: 10, height: 10, text: 'Sale now', style: { fontFamily, fontSize: 20, color: '#000000FF' }, runs })
+    const text = (fontFamily: string, runs: unknown[] = []) => ({
+      x: 0,
+      y: 0,
+      width: 10,
+      height: 10,
+      text: 'Sale now',
+      style: { fontFamily, fontSize: 20, color: '#000000FF' },
+      runs,
+    })
     const parsed = parseDesign({
       meta: { schemaVersion: 5, designId: 'd', name: 'D', kind: 'single', primaryFormatId: 'sq' },
-      formats: { sq: { name: 'Square', width: 100, height: 100, order: 'a0' }, st: { name: 'Story', width: 100, height: 200, order: 'a1' } },
+      formats: {
+        sq: { name: 'Square', width: 100, height: 100, order: 'a0' },
+        st: { name: 'Story', width: 100, height: 200, order: 'a1' },
+      },
       pages: { p1: { name: 'P', order: 'a0' } },
       nodes: {
-        a: { type: 'text', parentId: 'p1', index: 'a0', name: 'A', props: text('Inter', [{ start: 0, end: 4, style: { fontFamily: 'Lobster' } }, { start: 5, end: 8, style: { fontWeight: 700 } }]) },
+        a: {
+          type: 'text',
+          parentId: 'p1',
+          index: 'a0',
+          name: 'A',
+          props: text('Inter', [
+            { start: 0, end: 4, style: { fontFamily: 'Lobster' } },
+            { start: 5, end: 8, style: { fontWeight: 700 } },
+          ]),
+        },
         b: { type: 'text', parentId: 'p1', index: 'a1', name: 'B', props: text('Inter') },
-        g: { type: 'graphic', parentId: 'p1', index: 'a2', name: 'G', props: { x: 0, y: 0, width: 10, height: 10, shape: { kind: 'rect' } } },
+        g: {
+          type: 'graphic',
+          parentId: 'p1',
+          index: 'a2',
+          name: 'G',
+          props: { x: 0, y: 0, width: 10, height: 10, shape: { kind: 'rect' } },
+        },
       },
       overrides: { 'format:st': { b: { style: { fontFamily: 'Bebas Neue', fontSize: 30, color: '#000000FF' } } } },
     })
@@ -225,7 +340,8 @@ describe('fontFamilies', () => {
 
 describe('format sizes', () => {
   it('offers presets inside the limits, at least one of every shape', () => {
-    for (const preset of FORMAT_PRESETS) expect(formatSizeProblem(preset.width, preset.height), preset.id).toBeUndefined()
+    for (const preset of FORMAT_PRESETS)
+      expect(formatSizeProblem(preset.width, preset.height), preset.id).toBeUndefined()
     expect(new Set(FORMAT_PRESETS.map((p) => shapeOf(p.width, p.height)))).toEqual(new Set(FORMAT_SHAPES))
   })
 

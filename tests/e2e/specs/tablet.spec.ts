@@ -1,10 +1,10 @@
 // The app on a tablet, 820 × 1180: the brand's home, and the editor as it opens and with a layer
 // selected, show every piece whole and inside the window, nothing drawn over anything else.
-import { expect, test, type Page } from '../support/test.ts'
 import { editorPath, screenPoint, writeOutput } from '../support/editor.ts'
 import { layoutProblems } from '../support/layout.ts'
 import { liveDesign, seed } from '../support/seed.ts'
 import { click } from '../support/stage.ts'
+import { expect, type Page, test } from '../support/test.ts'
 
 test.use({ viewport: { width: 820, height: 1180 } })
 
@@ -22,10 +22,18 @@ const CHROME = {
 const NAME = '[data-testid="island-start"] h1'
 
 /** The layers selected in turn, by a click on their middle: a shape, then a text layer, whose bar has the most in it. */
-const LAYERS = [['box', 230, 180], ['headline', 540, 540]] as const
+const LAYERS = [
+  ['box', 230, 180],
+  ['headline', 540, 540],
+] as const
 
 /** The chrome with the bar by the selection and the selected layer's box on the stage. */
-const selected = (id: string) => ({ ...CHROME, 'top bar': '[data-testid="top-bar-row"]', 'small menu': '[data-testid="small-menu"]', 'selected layer': `.stage-overlay .selection[data-layer="${id}"]` })
+const selected = (id: string) => ({
+  ...CHROME,
+  'top bar': '[data-testid="top-bar-row"]',
+  'small menu': '[data-testid="small-menu"]',
+  'selected layer': `.stage-overlay .selection[data-layer="${id}"]`,
+})
 
 async function openEditor(page: Page) {
   const designId = await seed(liveDesign())
@@ -40,7 +48,9 @@ async function select(page: Page, [id, x, y]: (typeof LAYERS)[number]) {
   await expect(page.getByTestId('top-bar')).toBeVisible()
 }
 
-test('on a tablet the home and the editor, with a layer selected, show everything inside the window and nothing over anything else', async ({ page }) => {
+test('on a tablet the home and the editor, with a layer selected, show everything inside the window and nothing over anything else', async ({
+  page,
+}) => {
   // The home, then the editor opening, which alone may take its 30 s on a busy runner.
   test.setTimeout(90_000)
   await page.goto('/brands/dev-brand-coffee')
@@ -49,15 +59,19 @@ test('on a tablet the home and the editor, with a layer selected, show everythin
   const capsule = await page.getByTestId('library-capsule').boundingBox()
   expect(capsule && capsule.height > capsule.width).toBe(true)
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(820)
-  await expect.poll(() => layoutProblems(page, {
-    scrolls: true,
-    pieces: {
-      capsule: '[data-testid="library-capsule"]',
-      'top bar': 'body header',
-      brief: 'section[aria-labelledby="brief-title"]',
-      'blank sizes': 'section[aria-labelledby="start-blank"]',
-    },
-  })).toEqual([])
+  await expect
+    .poll(() =>
+      layoutProblems(page, {
+        scrolls: true,
+        pieces: {
+          capsule: '[data-testid="library-capsule"]',
+          'top bar': 'body header',
+          brief: 'section[aria-labelledby="brief-title"]',
+          'blank sizes': 'section[aria-labelledby="start-blank"]',
+        },
+      }),
+    )
+    .toEqual([])
   writeOutput('tablet-0-home.png', await page.screenshot({ animations: 'disabled' }))
 
   await openEditor(page)
@@ -77,7 +91,7 @@ test('on a tablet the home and the editor, with a layer selected, show everythin
   }
 })
 
-test('on a tablet the design\'s name in the editor shows whole, neither cut off nor cut short', async ({ page }) => {
+test("on a tablet the design's name in the editor shows whole, neither cut off nor cut short", async ({ page }) => {
   test.setTimeout(90_000)
   await openEditor(page)
   await expect(page.locator(NAME)).toHaveText('Live editing')

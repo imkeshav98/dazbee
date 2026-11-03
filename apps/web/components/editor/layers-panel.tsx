@@ -5,19 +5,45 @@
 // change is an editor call, so each is one undo step. Only the rows in view are in the page, so a
 // page of hundreds of layers scrolls as smoothly as one of ten.
 import {
-  CaretRightIcon, CircleIcon, EyeClosedIcon, EyeIcon, EyeSlashIcon, FolderSimpleIcon, FrameCornersIcon, ImageIcon, LockSimpleIcon,
-  LockSimpleOpenIcon, PenNibIcon, SquareIcon, TextTIcon, UniteIcon, type Icon,
+  CaretRightIcon,
+  CircleIcon,
+  EyeClosedIcon,
+  EyeIcon,
+  EyeSlashIcon,
+  FolderSimpleIcon,
+  FrameCornersIcon,
+  type Icon,
+  ImageIcon,
+  LockSimpleIcon,
+  LockSimpleOpenIcon,
+  PenNibIcon,
+  SquareIcon,
+  TextTIcon,
+  UniteIcon,
 } from '@phosphor-icons/react'
+import {
+  type DragEvent,
+  type KeyboardEvent,
+  memo,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
+
 import { childrenOf } from '@dazbee/doc'
 import type { Editor } from '@dazbee/editor'
-import { canHold, LOCK_FLAGS, type Design } from '@dazbee/schema'
-import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type DragEvent, type KeyboardEvent } from 'react'
-import { cn } from '../../lib/cn.ts'
-import { useLocale, useMessages } from '../../lib/i18n/client.tsx'
-import { dirOf, format } from '../../lib/i18n/index.ts'
-import { useOverlayScroll } from '../ui/overlay-scroll.ts'
-import { useFlyoutNote } from './shell.tsx'
+import { canHold, type Design, LOCK_FLAGS } from '@dazbee/schema'
+
+import { useOverlayScroll } from '@/components/ui/overlay-scroll.ts'
+import { cn } from '@/lib/cn.ts'
+import { useLocale, useMessages } from '@/lib/i18n/client.tsx'
+import { dirOf, format } from '@/lib/i18n/index.ts'
+
 import { afterDraws, sameUrls } from './after-draws.ts'
+import { useFlyoutNote } from './shell.tsx'
 import { DROP_LINE, LAYER_PICTURE, LAYER_PICTURE_PICKED } from './styles.ts'
 import { useLiveDesign } from './use-live-design.ts'
 
@@ -29,7 +55,15 @@ const INDENT = 16
 const DRAG_TYPE = 'application/x-dazbee-layer'
 
 type Layer = Design['nodes'][string]
-interface Row { id: string; node: Layer; depth: number; parentId: string; hasChildren: boolean; position: number; siblings: number }
+interface Row {
+  id: string
+  node: Layer
+  depth: number
+  parentId: string
+  hasChildren: boolean
+  position: number
+  siblings: number
+}
 type Where = 'above' | 'below' | 'into'
 
 const ordered = <T extends { order: string }>(items: Record<string, T>) =>
@@ -99,8 +133,16 @@ function whenIdle(work: (left: () => number) => void): () => void {
  * images arrive, a few at a time in the browser's idle time so no frame waits on them.
  * `scrolledAt` is when the list last scrolled.
  */
-function useLayerPictures(editor: Editor, frameKey: string, ids: readonly string[], scrolledAt: { current: number }): Record<string, string | null> {
-  const [pictures, setPictures] = useState<{ frameKey: string; urls: Record<string, string | null> }>({ frameKey, urls: {} })
+function useLayerPictures(
+  editor: Editor,
+  frameKey: string,
+  ids: readonly string[],
+  scrolledAt: { current: number },
+): Record<string, string | null> {
+  const [pictures, setPictures] = useState<{ frameKey: string; urls: Record<string, string | null> }>({
+    frameKey,
+    urls: {},
+  })
   const wanted = ids.join(' ')
   useEffect(() => {
     let cancel = () => {}
@@ -121,7 +163,8 @@ function useLayerPictures(editor: Editor, frameKey: string, ids: readonly string
           next[id] = editor.layerThumbnail(id, 44, false, frameKey)
         }
         if (i < list.length) cancel = whenIdle(slice)
-        else setPictures((now) => (now.frameKey === frameKey && sameUrls(now.urls, next) ? now : { frameKey, urls: next }))
+        else
+          setPictures((now) => (now.frameKey === frameKey && sameUrls(now.urls, next) ? now : { frameKey, urls: next }))
       }
       cancel = whenIdle(slice)
     })
@@ -143,7 +186,7 @@ export function LayersPanel({ editor }: { editor: Editor }) {
 
   // The frame the panel shows: the selection's, or the first page in the primary format.
   const [framePage, frameFormat] = selection.frame?.split('/') ?? []
-  const pageId = framePage && design.pages[framePage] ? framePage : ordered(design.pages)[0]?.[0] ?? ''
+  const pageId = framePage && design.pages[framePage] ? framePage : (ordered(design.pages)[0]?.[0] ?? '')
   const formatId = frameFormat && design.formats[frameFormat] ? frameFormat : design.meta.primaryFormatId
   const page = design.pages[pageId]
   // The title row's note says which frame the tree is of, as in the mock: "Page 1 · Square".
@@ -196,9 +239,10 @@ export function LayersPanel({ editor }: { editor: Editor }) {
   // from outside, the selected row the focus was last on, else the first selected row, else the row
   // the focus was last on, else the first row.
   const listedSelection = selection.ids.filter((id) => indexOf.has(id))
-  const current = active && indexOf.has(active) && (inTree || listedSelection.includes(active))
-    ? active
-    : listedSelection[0] ?? (active && indexOf.has(active) ? active : rows[0]?.id ?? null)
+  const current =
+    active && indexOf.has(active) && (inTree || listedSelection.includes(active))
+      ? active
+      : (listedSelection[0] ?? (active && indexOf.has(active) ? active : (rows[0]?.id ?? null)))
   // The row to focus once it is rendered, by id.
   const focusing = useRef<string | null>(null)
   // The row the focus is on while it is in the tree, and its place in the list at the last commit.
@@ -229,16 +273,19 @@ export function LayersPanel({ editor }: { editor: Editor }) {
    * Scrolls a row into view, then focuses it once it is rendered. `at` is its place in the list, when
    * that is not where the panel last listed it, as after a move.
    */
-  const reveal = useCallback((id: string, at = indexOf.get(id)) => {
-    const el = scroller.current
-    if (!el || at === undefined) return
-    const top = at * LAYER_ROW
-    if (top < el.scrollTop) el.scrollTop = top
-    else if (top + LAYER_ROW > el.scrollTop + el.clientHeight) el.scrollTop = top + LAYER_ROW - el.clientHeight
-    follow(el)
-    setActive(id)
-    focusing.current = id
-  }, [indexOf, follow])
+  const reveal = useCallback(
+    (id: string, at = indexOf.get(id)) => {
+      const el = scroller.current
+      if (!el || at === undefined) return
+      const top = at * LAYER_ROW
+      if (top < el.scrollTop) el.scrollTop = top
+      else if (top + LAYER_ROW > el.scrollTop + el.clientHeight) el.scrollTop = top + LAYER_ROW - el.clientHeight
+      follow(el)
+      setActive(id)
+      focusing.current = id
+    },
+    [indexOf, follow],
+  )
   // Moves the focus off a row that left the list and back when it returns, then focuses the row
   // asked for in the commit that renders it, so it reads the rows that commit put in
   // the page and no effect of an earlier render is left to run after a key. The focus moves only from
@@ -277,7 +324,8 @@ export function LayersPanel({ editor }: { editor: Editor }) {
     const row = scroller.current?.querySelector<HTMLElement>(`[data-layer="${CSS.escape(id)}"]`)
     if (!row) return
     const from = document.activeElement
-    if (from !== row && (!from || from === document.body || !from.isConnected || scroller.current?.contains(from))) row.focus({ preventScroll: true })
+    if (from !== row && (!from || from === document.body || !from.isConnected || scroller.current?.contains(from)))
+      row.focus({ preventScroll: true })
     focusing.current = null
   })
 
@@ -301,7 +349,9 @@ export function LayersPanel({ editor }: { editor: Editor }) {
       return moved
     }
     // Rows run topmost first; in the document the topmost is last. Above a row is after it there.
-    const siblings = childrenOf(design, target.parentId).map(([sibling]) => sibling).filter((sibling) => sibling !== id)
+    const siblings = childrenOf(design, target.parentId)
+      .map(([sibling]) => sibling)
+      .filter((sibling) => sibling !== id)
     const at = siblings.indexOf(target.id)
     const before = where === 'below' ? target.id : siblings[at + 1]
     return editor.moveLayer(id, target.parentId, before)
@@ -436,17 +486,30 @@ export function LayersPanel({ editor }: { editor: Editor }) {
     },
   }
   const api = useMemo<RowApi>(() => {
-    const call = <K extends keyof RowApi>(name: K) => ((...args: unknown[]) => (latest.current?.[name] as (...a: unknown[]) => unknown)(...args)) as RowApi[K]
+    const call = <K extends keyof RowApi>(name: K) =>
+      ((...args: unknown[]) => (latest.current?.[name] as (...a: unknown[]) => unknown)(...args)) as RowApi[K]
     return {
-      focus: call('focus'), key: call('key'), click: call('click'), rename: call('rename'), renamed: call('renamed'), toggle: call('toggle'),
-      lock: call('lock'), hide: call('hide'), dragStart: call('dragStart'), dragEnd: call('dragEnd'), dragOver: call('dragOver'),
-      dragLeave: call('dragLeave'), drop: call('drop'),
+      focus: call('focus'),
+      key: call('key'),
+      click: call('click'),
+      rename: call('rename'),
+      renamed: call('renamed'),
+      toggle: call('toggle'),
+      lock: call('lock'),
+      hide: call('hide'),
+      dragStart: call('dragStart'),
+      dragEnd: call('dragEnd'),
+      dragOver: call('dragOver'),
+      dragLeave: call('dragLeave'),
+      drop: call('drop'),
     }
   }, [])
 
   /** Hidden in some formats and shown in others. */
   const partlyHidden = (id: string) => {
-    const visible = Object.keys(design.formats).map((f) => (design.overrides[`format:${f}`]?.[id]?.visible ?? design.nodes[id]?.props.visible) !== false)
+    const visible = Object.keys(design.formats).map(
+      (f) => (design.overrides[`format:${f}`]?.[id]?.visible ?? design.nodes[id]?.props.visible) !== false,
+    )
     return visible.some(Boolean) && !visible.every(Boolean)
   }
   // The rows in view, with the row Tab lands on and the row the focus was last on wherever they are,
@@ -458,47 +521,52 @@ export function LayersPanel({ editor }: { editor: Editor }) {
     if (at !== undefined) places.add(at)
   }
   const shown = [...places].sort((a, b) => a - b).flatMap((i) => (rows[i] ? [{ row: rows[i], i }] : []))
-  const pictures = useLayerPictures(editor, `${pageId}/${formatId}`, shown.map(({ row }) => row.id), scrolledAt)
+  const pictures = useLayerPictures(
+    editor,
+    `${pageId}/${formatId}`,
+    shown.map(({ row }) => row.id),
+    scrolledAt,
+  )
   return (
     <div className="flex min-h-0 flex-1 flex-col" data-testid="layers">
-      {rows.length === 0
-        ? <p className="p-4 text-[13px] text-muted">{t.editor.layersPanel.empty}</p>
-        : (
+      {rows.length === 0 ? (
+        <p className="p-4 text-[13px] text-muted">{t.editor.layersPanel.empty}</p>
+      ) : (
+        <div
+          ref={scrollerRef}
+          onScroll={(event) => {
+            scrolledAt.current = performance.now()
+            follow(event.currentTarget)
+          }}
+          className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-1.5 pb-2"
+          data-testid="layers-scroller"
+        >
           <div
-            ref={scrollerRef}
-            onScroll={(event) => {
-              scrolledAt.current = performance.now()
-              follow(event.currentTarget)
-            }}
-            className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-1.5 pb-2"
-            data-testid="layers-scroller"
+            role="tree"
+            aria-label={format(t.editor.layersPanel.tree, { page: page?.name ?? '' })}
+            aria-multiselectable
+            className="relative"
+            style={{ height: rows.length * LAYER_ROW }}
           >
-            <div
-              role="tree"
-              aria-label={format(t.editor.layersPanel.tree, { page: page?.name ?? '' })}
-              aria-multiselectable
-              className="relative"
-              style={{ height: rows.length * LAYER_ROW }}
-            >
-              {shown.map(({ row, i }) => (
-                <LayerRow
-                  key={row.id}
-                  row={row}
-                  i={i}
-                  selected={selected.has(row.id)}
-                  focusable={row.id === current}
-                  renaming={renaming === row.id}
-                  open={expanded.has(row.id)}
-                  hidden={(design.overrides[`format:${formatId}`]?.[row.id]?.visible ?? row.node.props.visible) === false}
-                  partlyHidden={partlyHidden(row.id)}
-                  drop={drop?.id === row.id ? drop.where : null}
-                  picture={pictures[row.id] ?? null}
-                  api={api}
-                />
-              ))}
-            </div>
+            {shown.map(({ row, i }) => (
+              <LayerRow
+                key={row.id}
+                row={row}
+                i={i}
+                selected={selected.has(row.id)}
+                focusable={row.id === current}
+                renaming={renaming === row.id}
+                open={expanded.has(row.id)}
+                hidden={(design.overrides[`format:${formatId}`]?.[row.id]?.visible ?? row.node.props.visible) === false}
+                partlyHidden={partlyHidden(row.id)}
+                drop={drop?.id === row.id ? drop.where : null}
+                picture={pictures[row.id] ?? null}
+                api={api}
+              />
+            ))}
           </div>
-        )}
+        </div>
+      )}
     </div>
   )
 }
@@ -520,7 +588,19 @@ interface RowApi {
 }
 
 /** One row of the tree. Rendered again only when something it shows changes. */
-const LayerRow = memo(function LayerRow({ row, i, selected, focusable, renaming, open, hidden, partlyHidden, drop, picture, api }: {
+const LayerRow = memo(function LayerRow({
+  row,
+  i,
+  selected,
+  focusable,
+  renaming,
+  open,
+  hidden,
+  partlyHidden,
+  drop,
+  picture,
+  api,
+}: {
   row: Row
   i: number
   selected: boolean
@@ -538,7 +618,12 @@ const LayerRow = memo(function LayerRow({ row, i, selected, focusable, renaming,
   const locked = isLocked(node)
   const LayerIcon = iconOf(node)
   // A frame says whether it is a plain box or stacks what it holds.
-  const kind = node.type === 'frame' ? ((node.props as { layout?: unknown }).layout ? t.editor.layersPanel.stack : t.editor.layersPanel.box) : null
+  const kind =
+    node.type === 'frame'
+      ? (node.props as { layout?: unknown }).layout
+        ? t.editor.layersPanel.stack
+        : t.editor.layersPanel.box
+      : null
   return (
     <div
       key={id}
@@ -584,22 +669,30 @@ const LayerRow = memo(function LayerRow({ row, i, selected, focusable, renaming,
     >
       {drop === 'above' && <span aria-hidden className={cn(DROP_LINE, '-top-px')} />}
       {drop === 'below' && <span aria-hidden className={cn(DROP_LINE, '-bottom-px')} />}
-      {row.hasChildren
-        ? (
-          <button
-            type="button"
-            tabIndex={-1}
-            aria-label={format(open ? t.editor.layersPanel.collapse : t.editor.layersPanel.expand, { name: node.name })}
-            onClick={(event) => {
-              event.stopPropagation()
-              api.toggle(id)
-            }}
-            className="grid size-4 shrink-0 cursor-pointer place-items-center rounded-row text-subtle hover:text-text"
-          >
-            <CaretRightIcon size={11} weight="bold" aria-hidden className={cn('transition-transform duration-[var(--chrome-fast)] rtl:-scale-x-100', open && 'rotate-90 rtl:-rotate-90')} />
-          </button>
-        )
-        : <span aria-hidden className="size-4 shrink-0" />}
+      {row.hasChildren ? (
+        <button
+          type="button"
+          tabIndex={-1}
+          aria-label={format(open ? t.editor.layersPanel.collapse : t.editor.layersPanel.expand, { name: node.name })}
+          onClick={(event) => {
+            event.stopPropagation()
+            api.toggle(id)
+          }}
+          className="grid size-4 shrink-0 cursor-pointer place-items-center rounded-row text-subtle hover:text-text"
+        >
+          <CaretRightIcon
+            size={11}
+            weight="bold"
+            aria-hidden
+            className={cn(
+              'transition-transform duration-[var(--chrome-fast)] rtl:-scale-x-100',
+              open && 'rotate-90 rtl:-rotate-90',
+            )}
+          />
+        </button>
+      ) : (
+        <span aria-hidden className="size-4 shrink-0" />
+      )}
       <span
         aria-hidden
         data-testid="layer-picture"
@@ -609,18 +702,31 @@ const LayerRow = memo(function LayerRow({ row, i, selected, focusable, renaming,
           picture && selected && LAYER_PICTURE_PICKED,
         )}
       >
-        {picture ? <img src={picture} alt="" draggable={false} className="size-full object-contain" /> : <LayerIcon size={13} weight={selected ? 'bold' : 'regular'} />}
+        {picture ? (
+          <img src={picture} alt="" draggable={false} className="size-full object-contain" />
+        ) : (
+          <LayerIcon size={13} weight={selected ? 'bold' : 'regular'} />
+        )}
       </span>
-      {renaming
-        ? (
-          <RenameField
-            name={node.name}
-            label={format(t.editor.layersPanel.rename, { name: node.name })}
-            onDone={(name, byKey) => api.renamed(id, name, node.name, byKey)}
-          />
-        )
-        : <span data-testid="layer-name" className={cn('min-w-0 flex-1 truncate', hidden && 'line-through decoration-subtle/60')}>{node.name}</span>}
-      {kind && !renaming && <span data-testid="layer-kind" className="shrink-0 font-mono text-[11px] text-subtle">{kind}</span>}
+      {renaming ? (
+        <RenameField
+          name={node.name}
+          label={format(t.editor.layersPanel.rename, { name: node.name })}
+          onDone={(name, byKey) => api.renamed(id, name, node.name, byKey)}
+        />
+      ) : (
+        <span
+          data-testid="layer-name"
+          className={cn('min-w-0 flex-1 truncate', hidden && 'line-through decoration-subtle/60')}
+        >
+          {node.name}
+        </span>
+      )}
+      {kind && !renaming && (
+        <span data-testid="layer-kind" className="shrink-0 font-mono text-[11px] text-subtle">
+          {kind}
+        </span>
+      )}
       {/* In this format; with Alt, in every format: hidden in all of them if it shows in any. A layer hidden only in some shows a closed eye. */}
       <RowToggle
         on={hidden}
@@ -644,7 +750,16 @@ const LayerRow = memo(function LayerRow({ row, i, selected, focusable, renaming,
 })
 
 /** Lock or hide on a row: shown while the row is hovered or focused, and always while it is on. `onToggle` hears whether Alt was held. */
-function RowToggle({ on, stay = false, label, title, state, onToggle, icon: ToggleIcon, testId }: {
+function RowToggle({
+  on,
+  stay = false,
+  label,
+  title,
+  state,
+  onToggle,
+  icon: ToggleIcon,
+  testId,
+}: {
   on: boolean
   /** Shown even while off and not hovered. */
   stay?: boolean
@@ -683,7 +798,15 @@ function RowToggle({ on, stay = false, label, title, state, onToggle, icon: Togg
  * The name as a field: Enter or leaving it keeps the new name, Escape keeps the old one. `onDone`
  * hears whether it ended from the keyboard.
  */
-function RenameField({ name, label, onDone }: { name: string; label: string; onDone: (name: string | null, byKey: boolean) => void }) {
+function RenameField({
+  name,
+  label,
+  onDone,
+}: {
+  name: string
+  label: string
+  onDone: (name: string | null, byKey: boolean) => void
+}) {
   const [value, setValue] = useState(name)
   const done = useRef(false)
   const finish = (next: string | null, byKey: boolean) => {

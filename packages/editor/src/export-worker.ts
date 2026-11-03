@@ -1,11 +1,12 @@
 // The export worker (#55): draws exports on the CPU surface off the main thread, so the editor
 // stays responsive while it makes every format. It has its own CanvasKit and keeps the fonts and
 // images it was sent between exports, so each is decoded once.
-import { exportDesign, type ExportedFile } from '@dazbee/export'
-import { resourceCache, type ResourceBytes } from '@dazbee/renderer'
 import canvasKitModule from '@dazbee/canvaskit'
 import { WASM_FILE } from '@dazbee/canvaskit/wasm'
-import type { ExportReply, ExportJob } from './export-client.ts'
+import { exportDesign, type ExportedFile } from '@dazbee/export'
+import { type ResourceBytes, resourceCache } from '@dazbee/renderer'
+
+import type { ExportJob, ExportReply } from './export-client.ts'
 
 // CommonJS whose types claim an ES default export; the bundler hands over the init function itself.
 const CanvasKitInit = canvasKitModule as unknown as typeof import('@dazbee/canvaskit').default
@@ -16,7 +17,9 @@ const scope = self as unknown as {
   postMessage(message: ExportReply, transfer?: Transferable[]): void
 }
 
-const loaded = CanvasKitInit({ locateFile: (file: string) => `/vendor/${file === 'canvaskit.wasm' ? WASM_FILE : file}` }).then((ck) => ({ ck, cache: resourceCache(ck) }))
+const loaded = CanvasKitInit({
+  locateFile: (file: string) => `/vendor/${file === 'canvaskit.wasm' ? WASM_FILE : file}`,
+}).then((ck) => ({ ck, cache: resourceCache(ck) }))
 const bytes: ResourceBytes = { fonts: [], fallbackFamilies: [], images: {} }
 
 scope.onmessage = async ({ data: job }) => {
@@ -25,7 +28,14 @@ scope.onmessage = async ({ data: job }) => {
     if (job.fonts) bytes.fonts = job.fonts
     if (job.fallbackFamilies) bytes.fallbackFamilies = job.fallbackFamilies
     Object.assign(bytes.images, job.images)
-    const file: ExportedFile = exportDesign(ck, JSON.parse(job.design), job.request, { ...bytes, ...(job.variables ? { variables: job.variables } : {}) }, cache, (done, total) => scope.postMessage({ id: job.id, kind: 'progress', done, total }))
+    const file: ExportedFile = exportDesign(
+      ck,
+      JSON.parse(job.design),
+      job.request,
+      { ...bytes, ...(job.variables ? { variables: job.variables } : {}) },
+      cache,
+      (done, total) => scope.postMessage({ id: job.id, kind: 'progress', done, total }),
+    )
     scope.postMessage({ id: job.id, kind: 'done', file }, [file.bytes.buffer])
   } catch (error) {
     scope.postMessage({ id: job.id, kind: 'error', message: error instanceof Error ? error.message : String(error) })

@@ -15,7 +15,8 @@ export type LayerPanelId = (typeof LAYER_PANELS)[number]
 export type PanelId = (typeof PANELS)[number]
 
 export const isPanel = (id: string | null): id is PanelId => (PANELS as readonly string[]).includes(id ?? '')
-export const isLayerPanel = (id: string | null): id is LayerPanelId => (LAYER_PANELS as readonly string[]).includes(id ?? '')
+export const isLayerPanel = (id: string | null): id is LayerPanelId =>
+  (LAYER_PANELS as readonly string[]).includes(id ?? '')
 
 interface EditState {
   /** The open pop-up, full menu or edit panel, by its top bar id. */
@@ -56,7 +57,11 @@ const subscribe = (listener: () => void) => {
 
 /** What the top bar has open and where it sits, re-rendering the caller when that changes. */
 export function useEditState() {
-  return useSyncExternalStore(subscribe, () => state, () => state)
+  return useSyncExternalStore(
+    subscribe,
+    () => state,
+    () => state,
+  )
 }
 
 /** Under 640 px wide the editor is laid out for a phone: the edit panel is a sheet and the top bar scrolls. */

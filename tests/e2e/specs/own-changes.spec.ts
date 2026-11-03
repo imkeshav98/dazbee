@@ -1,27 +1,50 @@
 // A format's own changes (#157) in Chromium: the scope card lists, by card, what the format shown
 // has of its own for the selected layers, and each one, or all of them, goes back to following the
 // other formats in one undo step.
-import { expect, test, type Locator, type Page } from '../support/test.ts'
 import type { DesignInput } from '@dazbee/schema'
+
 import { writeOutput } from '../support/editor.ts'
-import { fillList, openStage, scopeMenu, openCard } from '../support/stage.ts'
+import { fillList, openCard, openStage, scopeMenu } from '../support/stage.ts'
+import { expect, type Locator, type Page, test } from '../support/test.ts'
 
 test.describe.configure({ timeout: 120_000 })
 
 const design = (): DesignInput => ({
-  meta: { schemaVersion: 5, designId: 'replaced-by-the-api', name: 'Own changes', kind: 'single', primaryFormatId: 'sq' },
+  meta: {
+    schemaVersion: 5,
+    designId: 'replaced-by-the-api',
+    name: 'Own changes',
+    kind: 'single',
+    primaryFormatId: 'sq',
+  },
   formats: {
     sq: { name: 'Square', width: 1080, height: 1080, order: 'a0' },
     story: { name: 'Story', width: 1080, height: 1920, order: 'a1' },
   },
   pages: { p1: { name: 'Page 1', order: 'a0', fills: [{ type: 'solid', color: '#FFFFFFFF' }] } },
   nodes: {
-    box: { type: 'graphic', parentId: 'p1', index: 'a0', name: 'Box', props: { x: 80, y: 80, width: 300, height: 200, shape: { kind: 'rect' }, fills: [{ type: 'solid', color: '#E0262BFF' }] } },
+    box: {
+      type: 'graphic',
+      parentId: 'p1',
+      index: 'a0',
+      name: 'Box',
+      props: {
+        x: 80,
+        y: 80,
+        width: 300,
+        height: 200,
+        shape: { kind: 'rect' },
+        fills: [{ type: 'solid', color: '#E0262BFF' }],
+      },
+    },
   },
   overrides: {},
 })
 
-const squareOwn = (page: Page) => page.evaluate(() => JSON.parse(JSON.stringify(window.dazbee?.design().overrides['format:sq']?.box ?? {}))) as Promise<Record<string, unknown>>
+const squareOwn = (page: Page) =>
+  page.evaluate(() => JSON.parse(JSON.stringify(window.dazbee?.design().overrides['format:sq']?.box ?? {}))) as Promise<
+    Record<string, unknown>
+  >
 const enter = async (field: Locator, value: string) => {
   await field.fill(value)
   await field.press('Enter')

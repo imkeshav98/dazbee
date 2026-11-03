@@ -1,7 +1,7 @@
 // Rulers along the stage's top and start edges (#42): positions in one frame's design pixels, with
 // the selection's extent marked on both. Built as overlay elements each time the overlay is drawn;
 // numbered ticks are elements, the small ticks between them a repeating background.
-import { toScreen, toWorld, type Camera, type Viewport } from './camera.ts'
+import { type Camera, toScreen, toWorld, type Viewport } from './camera.ts'
 import type { Frame, Rect } from './grid.ts'
 
 /** The rulers' thickness, in CSS pixels. */
@@ -33,23 +33,41 @@ export function rulerParts(camera: Camera, viewport: Viewport, frame: Frame, ban
     const el = document.createElement('div')
     el.className = 'ruler'
     el.dataset.axis = axis
-    Object.assign(el.style, across
-      ? { left: px(RULER_SIZE), top: '0', width: px(Math.max(0, viewport.width - RULER_SIZE)), height: px(RULER_SIZE) }
-      : { left: '0', top: px(RULER_SIZE), width: px(RULER_SIZE), height: px(Math.max(0, viewport.height - RULER_SIZE)) })
+    Object.assign(
+      el.style,
+      across
+        ? {
+            left: px(RULER_SIZE),
+            top: '0',
+            width: px(Math.max(0, viewport.width - RULER_SIZE)),
+            height: px(RULER_SIZE),
+          }
+        : {
+            left: '0',
+            top: px(RULER_SIZE),
+            width: px(RULER_SIZE),
+            height: px(Math.max(0, viewport.height - RULER_SIZE)),
+          },
+    )
     const zero = (across ? origin.x : origin.y) - RULER_SIZE
     const minor = (step / MINOR) * camera.zoom
     el.style.backgroundSize = across ? `${px(minor)} 5px` : `5px ${px(minor)}`
-    el.style.backgroundPosition = across ? `${px(((zero % minor) + minor) % minor)} 100%` : `100% ${px(((zero % minor) + minor) % minor)}`
+    el.style.backgroundPosition = across
+      ? `${px(((zero % minor) + minor) % minor)} 100%`
+      : `100% ${px(((zero % minor) + minor) % minor)}`
 
     // The selection's extent, and its two ends as numbers; numbered ticks too close to them give way.
     const ends: number[] = []
     if (band) {
-      const start = (across ? band.x : band.y)
+      const start = across ? band.x : band.y
       const size = across ? band.width : band.height
       const mark = document.createElement('div')
       mark.className = 'ruler-band'
       const at = zero + start * camera.zoom
-      Object.assign(mark.style, across ? { left: px(at), width: px(size * camera.zoom) } : { top: px(at), height: px(size * camera.zoom) })
+      Object.assign(
+        mark.style,
+        across ? { left: px(at), width: px(size * camera.zoom) } : { top: px(at), height: px(size * camera.zoom) },
+      )
       el.append(mark)
       for (const value of [start, start + size]) {
         const end = document.createElement('span')
@@ -63,7 +81,8 @@ export function rulerParts(camera: Camera, viewport: Viewport, frame: Frame, ban
     }
 
     const length = across ? viewport.width : viewport.height
-    const world = (screen: number) => (across ? toWorld(camera, { x: screen, y: 0 }).x - frame.x : toWorld(camera, { x: 0, y: screen }).y - frame.y)
+    const world = (screen: number) =>
+      across ? toWorld(camera, { x: screen, y: 0 }).x - frame.x : toWorld(camera, { x: 0, y: screen }).y - frame.y
     for (let value = Math.ceil(world(RULER_SIZE) / step) * step; value <= world(length); value += step) {
       const where = zero + value * camera.zoom
       if (ends.some((end) => Math.abs(end - where) < MIN_SPACING * 0.6)) continue

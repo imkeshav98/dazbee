@@ -1,9 +1,9 @@
 // Floating islands (#110): the editor has no top bar. The design's name and save state float at
 // the start, its actions at the end, below the rulers and over the canvas, and the ads fit below
 // them.
-import { expect, test, type Page } from '../support/test.ts'
 import { editorPath, screenPoint, writeOutput } from '../support/editor.ts'
 import { liveDesign, seed } from '../support/seed.ts'
+import { expect, type Page, test } from '../support/test.ts'
 
 const box = async (page: Page, testId: string) => {
   const found = await page.getByTestId(testId).boundingBox()
@@ -38,9 +38,13 @@ test('the editor has no top bar: two islands float over the canvas and the ads f
   expect(1440 - (end.x + end.width)).toBeLessThan(16)
   // The start island sits on a small frosted pill, so the design's name reads over an ad under it;
   // the end island has no surface of its own.
-  expect(await page.getByTestId('island-start').evaluate((el) => getComputedStyle(el).backdropFilter)).toContain('blur(18px)')
+  expect(await page.getByTestId('island-start').evaluate((el) => getComputedStyle(el).backdropFilter)).toContain(
+    'blur(18px)',
+  )
   expect(start.height).toBeLessThan(48)
-  expect(await page.getByTestId('island-end').evaluate((el) => getComputedStyle(el).backgroundColor)).toBe('rgba(0, 0, 0, 0)')
+  expect(await page.getByTestId('island-end').evaluate((el) => getComputedStyle(el).backgroundColor)).toBe(
+    'rgba(0, 0, 0, 0)',
+  )
   await expect(page.getByTestId('island-start').getByRole('heading', { level: 1 })).toBeVisible()
   // The end island is the mock's: a pink Share button and the account avatar, nothing else.
   const end_ = page.getByTestId('island-end')
@@ -56,7 +60,10 @@ test('the editor has no top bar: two islands float over the canvas and the ads f
   await expect(account.getByRole('radiogroup', { name: 'Language' })).toBeVisible()
   await expect(account.getByRole('radiogroup', { name: 'Theme' })).toBeVisible()
   await expect(account.getByRole('link', { name: 'Settings' })).toHaveAttribute('href', '/settings')
-  await writeOutput('islands-account.png', await page.screenshot({ clip: { x: 1440 - 320, y: 0, width: 320, height: 320 } }))
+  await writeOutput(
+    'islands-account.png',
+    await page.screenshot({ clip: { x: 1440 - 320, y: 0, width: 320, height: 320 } }),
+  )
   await page.keyboard.press('Escape')
 
   // Saved is a small muted cloud: no pill, no green words. The words stay for screen readers.

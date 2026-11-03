@@ -2,10 +2,12 @@
 
 // One button of the bar by the selection and the popover it opens under it. The bar keeps which
 // one is open, so only one is open at a time.
-import * as Popover from '@radix-ui/react-popover'
 import { CaretDownIcon } from '@phosphor-icons/react'
-import { useEffect, useRef, useState, type FocusEvent, type KeyboardEvent, type ReactNode, type RefObject } from 'react'
-import { cn } from '../../lib/cn.ts'
+import * as Popover from '@radix-ui/react-popover'
+import { type FocusEvent, type KeyboardEvent, type ReactNode, type RefObject, useEffect, useRef, useState } from 'react'
+
+import { cn } from '@/lib/cn.ts'
+
 import { BAR_BUTTON, POPOVER } from './styles.ts'
 
 const nowhere = () => document.activeElement === null || document.activeElement === document.body
@@ -41,7 +43,9 @@ export function useMenuFocus() {
     onOpenAutoFocus: (event: Event) => {
       const into = event.currentTarget
       if (!(into instanceof HTMLElement)) return
-      const first = into.querySelector<HTMLElement>('button:not([disabled]), input:not([disabled]), textarea, select, [href], [tabindex]:not([tabindex="-1"])')
+      const first = into.querySelector<HTMLElement>(
+        'button:not([disabled]), input:not([disabled]), textarea, select, [href], [tabindex]:not([tabindex="-1"])',
+      )
       if (first?.tagName !== 'INPUT' && first?.tagName !== 'TEXTAREA') return
       event.preventDefault()
       into.focus({ preventScroll: true })
@@ -56,7 +60,17 @@ export function useMenuFocus() {
   return { button, content, back: <FocusBack button={button} outside={outside} /> }
 }
 
-export function BarPopover({ id, open, onOpen, label, face, icon, children, testId, className }: {
+export function BarPopover({
+  id,
+  open,
+  onOpen,
+  label,
+  face,
+  icon,
+  children,
+  testId,
+  className,
+}: {
   id: string
   open: string | null
   onOpen: (id: string | null) => void
@@ -73,14 +87,31 @@ export function BarPopover({ id, open, onOpen, label, face, icon, children, test
   return (
     <Popover.Root open={open === id} onOpenChange={(to) => onOpen(to ? id : null)}>
       <Popover.Trigger asChild>
-        <button ref={focus.button} type="button" data-bar-item aria-label={face ? label : undefined} title={face ? label : undefined} data-testid={`bar-${testId}`} className={BAR_BUTTON}>
+        <button
+          ref={focus.button}
+          type="button"
+          data-bar-item
+          aria-label={face ? label : undefined}
+          title={face ? label : undefined}
+          data-testid={`bar-${testId}`}
+          className={BAR_BUTTON}
+        >
           {icon}
           {face ?? label}
           <CaretDownIcon size={10} weight="bold" aria-hidden className="text-subtle" />
         </button>
       </Popover.Trigger>
       <Popover.Portal>
-        <Popover.Content side="bottom" align="center" sideOffset={8} collisionPadding={12} {...focus.content} aria-label={label} data-testid={`bar-${testId}-menu`} className={cn(POPOVER, 'flex flex-col p-1.5', className ?? 'min-w-56')}>
+        <Popover.Content
+          side="bottom"
+          align="center"
+          sideOffset={8}
+          collisionPadding={12}
+          {...focus.content}
+          aria-label={label}
+          data-testid={`bar-${testId}-menu`}
+          className={cn(POPOVER, 'flex flex-col p-1.5', className ?? 'min-w-56')}
+        >
           {focus.back}
           {children}
         </Popover.Content>
@@ -90,7 +121,10 @@ export function BarPopover({ id, open, onOpen, label, face, icon, children, test
 }
 
 /** A toolbar's buttons that can be used and show, in order: a closed second row's are left out. */
-export const itemsOf = (bar: HTMLElement) => [...bar.querySelectorAll<HTMLElement>('[data-bar-item]:not(:disabled)')].filter((item) => item.checkVisibility({ visibilityProperty: true }))
+export const itemsOf = (bar: HTMLElement) =>
+  [...bar.querySelectorAll<HTMLElement>('[data-bar-item]:not(:disabled)')].filter((item) =>
+    item.checkVisibility({ visibilityProperty: true }),
+  )
 
 /** Moves focus along a toolbar's buttons with the arrow keys, Home and End. */
 export function arrowAlong(event: KeyboardEvent<HTMLElement>) {
@@ -100,7 +134,12 @@ export function arrowAlong(event: KeyboardEvent<HTMLElement>) {
   if (at < 0) return
   event.preventDefault()
   const forward = (event.key === 'ArrowRight') !== (getComputedStyle(event.currentTarget).direction === 'rtl')
-  const next = event.key === 'Home' ? 0 : event.key === 'End' ? items.length - 1 : (at + (forward ? 1 : -1) + items.length) % items.length
+  const next =
+    event.key === 'Home'
+      ? 0
+      : event.key === 'End'
+        ? items.length - 1
+        : (at + (forward ? 1 : -1) + items.length) % items.length
   items[next]?.focus()
 }
 

@@ -2,7 +2,9 @@
 // last word in the AI colours, and a composer with a gradient edge around the brief's form
 // (#136). Until AI drafts arrive (phase 2), Make drafts opens a blank design in the formats picked.
 import type { BrandKit } from '@dazbee/schema'
-import type { Messages } from '../lib/i18n/index.ts'
+
+import type { Messages } from '@/lib/i18n/index.ts'
+
 import { BriefForm, type BriefReference } from './brief-form.tsx'
 
 /** The heading with one word in the AI gradient: "What are we making today?". */
@@ -11,13 +13,22 @@ function Prompt({ template, word }: { template: string; word: string }) {
   return (
     <>
       {before}
-      <span className="bg-[image:var(--ai-gradient)] bg-clip-text text-transparent [-webkit-box-decoration-break:clone] [box-decoration-break:clone]">{word}</span>
+      <span className="bg-[image:var(--ai-gradient)] bg-clip-text text-transparent [-webkit-box-decoration-break:clone] [box-decoration-break:clone]">
+        {word}
+      </span>
       {after}
     </>
   )
 }
 
-export function BriefComposer({ t, brandId, brandName, kit, references, action }: {
+export function BriefComposer({
+  t,
+  brandId,
+  brandName,
+  kit,
+  references,
+  action,
+}: {
   t: Messages
   brandId: string
   brandName: string
@@ -30,7 +41,10 @@ export function BriefComposer({ t, brandId, brandName, kit, references, action }
   return (
     // Above the size row under it, so the brief's dropdowns open over it.
     <section aria-labelledby="brief-title" className="relative z-10 pt-2 pb-10 md:-mt-8 md:pt-0 md:pb-12">
-      <h1 id="brief-title" className="mx-auto max-w-5xl text-center font-display text-3xl font-bold tracking-tight text-balance md:text-[2.75rem] md:leading-tight">
+      <h1
+        id="brief-title"
+        className="mx-auto max-w-5xl text-center font-display text-3xl font-bold tracking-tight text-balance md:text-[2.75rem] md:leading-tight"
+      >
         <Prompt template={t.home.prompt} word={t.home.promptToday} />
       </h1>
       {/* A gradient edge: the gradient behind, the composer inset by its width. */}

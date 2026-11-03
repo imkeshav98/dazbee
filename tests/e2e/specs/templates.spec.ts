@@ -2,27 +2,55 @@
 // thumbnail on the brand page, start a design from it (same pixels, no shared ids), edit that
 // design, and the template is unchanged: a second design started from it is the original again.
 import { randomUUID } from 'node:crypto'
-import { expect, test, type Page } from '../support/test.ts'
-import { TemplateSummary, type DesignInput } from '@dazbee/schema'
+
+import { type DesignInput, TemplateSummary } from '@dazbee/schema'
+
 import { exportHashOf, placed, writeOutput } from '../support/editor.ts'
 import { API_URL, DEV_BRAND } from '../support/seed.ts'
 import { drag, openStage, read } from '../support/stage.ts'
+import { expect, type Page, test } from '../support/test.ts'
 
 test.describe.configure({ timeout: 120_000 })
 
 const run = randomUUID().slice(0, 8)
 const design = (): DesignInput => ({
-  meta: { schemaVersion: 5, designId: 'replaced-by-the-api', name: `Autumn sale ${run}`, kind: 'single', primaryFormatId: 'sq' },
+  meta: {
+    schemaVersion: 5,
+    designId: 'replaced-by-the-api',
+    name: `Autumn sale ${run}`,
+    kind: 'single',
+    primaryFormatId: 'sq',
+  },
   formats: { sq: { name: 'Square', width: 1080, height: 1080, order: 'a0' } },
   pages: { p1: { name: 'Page 1', order: 'a0', fills: [{ type: 'solid', color: '#FFF4E6FF' }] } },
   nodes: {
     box: {
-      type: 'graphic', parentId: 'p1', index: 'a0', name: 'Box',
-      props: { x: 140, y: 140, width: 500, height: 360, shape: { kind: 'rect', cornerRadius: 40 }, fills: [{ type: 'solid', color: '#C2410CFF' }] },
+      type: 'graphic',
+      parentId: 'p1',
+      index: 'a0',
+      name: 'Box',
+      props: {
+        x: 140,
+        y: 140,
+        width: 500,
+        height: 360,
+        shape: { kind: 'rect', cornerRadius: 40 },
+        fills: [{ type: 'solid', color: '#C2410CFF' }],
+      },
     },
     dot: {
-      type: 'graphic', parentId: 'p1', index: 'a1', name: 'Dot',
-      props: { x: 600, y: 560, width: 320, height: 320, shape: { kind: 'ellipse' }, fills: [{ type: 'solid', color: '#14213DFF' }] },
+      type: 'graphic',
+      parentId: 'p1',
+      index: 'a1',
+      name: 'Dot',
+      props: {
+        x: 600,
+        y: 560,
+        width: 320,
+        height: 320,
+        shape: { kind: 'ellipse' },
+        fills: [{ type: 'solid', color: '#14213DFF' }],
+      },
     },
   },
   overrides: {},
@@ -44,13 +72,19 @@ const idsOf = (design: object) => {
 
 /** The layer named `name`, with its id and its place in the primary format. */
 const named = async (page: Page, name: string) => {
-  const design = await read(page) as unknown as { meta: { primaryFormatId: string }; nodes: Record<string, { name: string; props: Record<string, unknown> }>; overrides: Record<string, Record<string, Record<string, unknown>>> }
+  const design = (await read(page)) as unknown as {
+    meta: { primaryFormatId: string }
+    nodes: Record<string, { name: string; props: Record<string, unknown> }>
+    overrides: Record<string, Record<string, Record<string, unknown>>>
+  }
   const found = Object.entries(design.nodes).find(([, n]) => n.name === name)
   if (!found) throw new Error(`no layer ${name}`)
-  return { id: found[0], ...placed(design, found[0], design.meta.primaryFormatId) as { x: number; y: number } }
+  return { id: found[0], ...(placed(design, found[0], design.meta.primaryFormatId) as { x: number; y: number }) }
 }
 
-test('save a template, start a design from it, edit that design, and the template is unchanged', async ({ browser }) => {
+test('save a template, start a design from it, edit that design, and the template is unchanged', async ({
+  browser,
+}) => {
   const { page, errors } = await openStage(browser, design())
   const original = await exportHashOf(page)
   const source = await read(page)
@@ -80,8 +114,17 @@ test('save a template, start a design from it, edit that design, and the templat
   const card = page.locator(`li[data-template="${template?.id}"]`)
   await expect(card).toBeVisible()
   await expect(card).toContainText('Harbour Coffee')
-  await expect.poll(() => card.locator('img').evaluate((img: HTMLImageElement) => img.complete ? [img.naturalWidth, img.naturalHeight] : null)).toEqual([320, 320])
-  writeOutput('templates-2-gallery.png', await page.getByRole('list', { name: 'Templates' }).screenshot({ animations: 'disabled' }))
+  await expect
+    .poll(() =>
+      card
+        .locator('img')
+        .evaluate((img: HTMLImageElement) => (img.complete ? [img.naturalWidth, img.naturalHeight] : null)),
+    )
+    .toEqual([320, 320])
+  writeOutput(
+    'templates-2-gallery.png',
+    await page.getByRole('list', { name: 'Templates' }).screenshot({ animations: 'disabled' }),
+  )
 
   // Start a design from it: a new design, the same pixels, none of the template's ids.
   await card.getByRole('button', { name: `Use ${name}` }).click()
@@ -104,7 +147,10 @@ test('save a template, start a design from it, edit that design, and the templat
 
   // The template is as it was: a second design started from it is the original again.
   await page.goto(`/brands/${DEV_BRAND}/templates`)
-  await page.locator(`li[data-template="${template?.id}"]`).getByRole('button', { name: `Use ${name}` }).click()
+  await page
+    .locator(`li[data-template="${template?.id}"]`)
+    .getByRole('button', { name: `Use ${name}` })
+    .click()
   await expect(page).not.toHaveURL(new RegExp(`/designs/${startedId}$`))
   await expect(page).toHaveURL(/\/designs\//, { timeout: 20_000 })
   await ready(page)

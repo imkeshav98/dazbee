@@ -1,6 +1,8 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
+import { checkImportRules } from './import-rules.ts'
+
 /** One package in the pnpm workspace (not a Workspace; see GLOSSARY.md). */
 export interface WorkspacePackage {
   name: string
@@ -17,6 +19,20 @@ const CHAIN_TEXT = CORE_CHAIN.map((name) => name.replace('@dazbee/', '')).join('
 /** What a workspace root holds. Packages may never depend on apps or test suites. */
 const ROOT_KINDS: Record<string, string> = { apps: 'an app', packages: 'a package', tests: 'a test suite' }
 const kindOf = (w: WorkspacePackage) => ROOT_KINDS[w.dir.split('/')[0] ?? '']
+
+const DEP_FIELDS = ['dependencies', 'devDependencies', 'peerDependencies', 'optionalDependencies']
+
+export async function checkRepo(root: string): Promise<string[]> {
+  const { workspaces, problems } = readWorkspaces(root)
+  return [
+    ...problems,
+    ...findViolations(workspaces),
+    ...(await checkImportRules(
+      root,
+      workspaces.map((w) => w.dir),
+    )),
+  ]
+}
 
 export function findViolations(workspaces: WorkspacePackage[]): string[] {
   const byName = new Map(workspaces.map((w) => [w.name, w]))
@@ -38,8 +54,6 @@ export function findViolations(workspaces: WorkspacePackage[]): string[] {
   return violations
 }
 
-const DEP_FIELDS = ['dependencies', 'devDependencies', 'peerDependencies', 'optionalDependencies']
-
 /**
  * Reads the workspace packages named by `pnpm-workspace.yaml` under `root`.
  * Anything it can't check is reported as a problem, so the check never passes by seeing nothing.
@@ -47,7 +61,9 @@ const DEP_FIELDS = ['dependencies', 'devDependencies', 'peerDependencies', 'opti
 export function readWorkspaces(root: string): { workspaces: WorkspacePackage[]; problems: string[] } {
   const yaml = readFileSync(join(root, 'pnpm-workspace.yaml'), 'utf8')
   const packagesBlock = yaml.match(/^packages:\s*\n((?:[ \t]+-.*\n?)*)/m)?.[1] ?? ''
-  const patterns = [...packagesBlock.matchAll(/^[ \t]+-[ \t]*['"]?([^'"\n]+?)['"]?[ \t]*$/gm)].map((m) => m[1] as string)
+  const patterns = [...packagesBlock.matchAll(/^[ \t]+-[ \t]*['"]?([^'"\n]+?)['"]?[ \t]*$/gm)].map(
+    (m) => m[1] as string,
+  )
   const workspaces: WorkspacePackage[] = []
   const problems: string[] = []
   for (const pattern of patterns) {
@@ -74,9 +90,4 @@ export function readWorkspaces(root: string): { workspaces: WorkspacePackage[]; 
     problems.push('pnpm-workspace.yaml: no workspace packages found')
   }
   return { workspaces, problems }
-}
-
-export function checkRepo(root: string): string[] {
-  const { workspaces, problems } = readWorkspaces(root)
-  return [...problems, ...findViolations(workspaces)]
 }

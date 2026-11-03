@@ -5,6 +5,7 @@
 import { migrateDatabase, openDatabase } from '@dazbee/db'
 import { GOOGLE_FONTS } from '@dazbee/fonts'
 import { openStorage, storageSettings } from '@dazbee/storage'
+
 import { importGoogleFamily } from './fonts.ts'
 
 const databaseUrl = process.env.DATABASE_URL

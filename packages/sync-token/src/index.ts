@@ -24,20 +24,29 @@ export function syncTokenSecret(env: NodeJS.ProcessEnv = process.env): string {
 
 const sign = (secret: string, text: string) => createHmac('sha256', secret).update(text).digest('base64url')
 
-export function signSyncToken(secret: string, payload: Omit<SyncTokenPayload, 'expiresAt'>, now = Date.now()): { token: string; expiresAt: number } {
+export function signSyncToken(
+  secret: string,
+  payload: Omit<SyncTokenPayload, 'expiresAt'>,
+  now = Date.now(),
+): { token: string; expiresAt: number } {
   const expiresAt = now + SYNC_TOKEN_TTL_MS
   const text = Buffer.from(JSON.stringify({ ...payload, expiresAt })).toString('base64url')
   return { token: `${text}.${sign(secret, text)}`, expiresAt }
 }
 
 /** The token's payload when it is signed with `secret`, unexpired and for `designId`; otherwise why not. */
-export function verifySyncToken(secret: string, token: string, designId: string, now = Date.now()):
-  { ok: true; payload: SyncTokenPayload } | { ok: false; reason: string } {
+export function verifySyncToken(
+  secret: string,
+  token: string,
+  designId: string,
+  now = Date.now(),
+): { ok: true; payload: SyncTokenPayload } | { ok: false; reason: string } {
   const [text, signature, extra] = token.split('.')
   if (!text || !signature || extra !== undefined) return { ok: false, reason: 'malformed token' }
   const expected = Buffer.from(sign(secret, text))
   const given = Buffer.from(signature)
-  if (expected.length !== given.length || !timingSafeEqual(expected, given)) return { ok: false, reason: 'bad signature' }
+  if (expected.length !== given.length || !timingSafeEqual(expected, given))
+    return { ok: false, reason: 'bad signature' }
   let payload: SyncTokenPayload
   try {
     payload = JSON.parse(Buffer.from(text, 'base64url').toString('utf8')) as SyncTokenPayload

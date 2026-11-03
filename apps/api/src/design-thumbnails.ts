@@ -2,12 +2,15 @@
 // drawn on a small CPU surface like an export (ADR-0005), on a thread of its own, with the fonts
 // and images we store. Like an asset's thumbnail (ADR-0010) it is an image we make and store, once
 // per version of the design: the key carries the design's updatedAt, so an edit makes a new one.
-import { readDesignState, type Db } from '@dazbee/db'
+import { Worker } from 'node:worker_threads'
+
+import * as Y from 'yjs'
+
+import { type Db, readDesignState } from '@dazbee/db'
 import { migrateDoc, readDesign } from '@dazbee/doc'
 import type { Design, DesignSummary } from '@dazbee/schema'
 import type { Storage } from '@dazbee/storage'
-import { Worker } from 'node:worker_threads'
-import * as Y from 'yjs'
+
 import type { DrawJob, DrawResult } from './draw-worker.ts'
 import { brandResourcesFor } from './render.ts'
 
@@ -19,8 +22,12 @@ export const designThumbnailKey = (workspaceId: string, design: DesignSummary) =
 
 /** The page and format a design's picture shows: its first page, in its primary format. */
 export function coverOf(design: Design) {
-  const [pageId] = Object.entries(design.pages).sort(([a, x], [b, y]) => (x.order < y.order ? -1 : x.order > y.order ? 1 : a < b ? -1 : 1)).map(([id]) => id)
-  const formatId = design.formats[design.meta.primaryFormatId] ? design.meta.primaryFormatId : Object.keys(design.formats)[0]
+  const [pageId] = Object.entries(design.pages)
+    .sort(([a, x], [b, y]) => (x.order < y.order ? -1 : x.order > y.order ? 1 : a < b ? -1 : 1))
+    .map(([id]) => id)
+  const formatId = design.formats[design.meta.primaryFormatId]
+    ? design.meta.primaryFormatId
+    : Object.keys(design.formats)[0]
   const format = formatId ? design.formats[formatId] : undefined
   if (!pageId || !formatId || !format) return null
   return { pageId, formatId, width: format.width, height: format.height }
@@ -36,7 +43,11 @@ export async function storedDesign(db: Db, designId: string): Promise<Design | n
   return readDesign(doc)
 }
 
-export interface DesignCover { key: string; width: number; height: number }
+export interface DesignCover {
+  key: string
+  width: number
+  height: number
+}
 
 /** The primary format's size, read from the stored design without drawing: what a tile needs to take its shape. */
 export async function designCover(db: Db, summary: DesignSummary): Promise<{ width: number; height: number } | null> {
@@ -92,7 +103,12 @@ const making = new Map<string, Promise<void>>()
  * primary format's size. It is drawn on its own thread (see draw-worker.ts), straight at its small
  * size. Null when the design has nothing to show.
  */
-export async function ensureDesignThumbnail(db: Db, storage: Storage, workspaceId: string, summary: DesignSummary): Promise<DesignCover | null> {
+export async function ensureDesignThumbnail(
+  db: Db,
+  storage: Storage,
+  workspaceId: string,
+  summary: DesignSummary,
+): Promise<DesignCover | null> {
   const design = await storedDesign(db, summary.id)
   const cover = design && coverOf(design)
   if (!design || !cover) return null
@@ -104,8 +120,18 @@ export async function ensureDesignThumbnail(db: Db, storage: Storage, workspaceI
     made = (async () => {
       const resources = await brandResourcesFor(db, storage, workspaceId, summary.brandId, design)
       const scale = Math.min(1, DESIGN_THUMBNAIL_SIZE / Math.max(cover.width, cover.height))
-      const size = { width: Math.max(1, Math.round(cover.width * scale)), height: Math.max(1, Math.round(cover.height * scale)) }
-      const png = await drawOnThread({ design, pageId: cover.pageId, formatId: cover.formatId, format: { width: cover.width, height: cover.height }, size, resources })
+      const size = {
+        width: Math.max(1, Math.round(cover.width * scale)),
+        height: Math.max(1, Math.round(cover.height * scale)),
+      }
+      const png = await drawOnThread({
+        design,
+        pageId: cover.pageId,
+        formatId: cover.formatId,
+        format: { width: cover.width, height: cover.height },
+        size,
+        resources,
+      })
       await storage.put(key, png, 'image/png')
     })().finally(() => making.delete(key))
     making.set(key, made)

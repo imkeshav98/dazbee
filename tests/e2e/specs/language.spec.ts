@@ -1,15 +1,33 @@
 // The language picked in the account menu: the editor's words change at once, Arabic turns the
 // chrome right to left, and the pick is kept after a reload, into Arabic and back to English.
-import { expect, test, type Page } from '../support/test.ts'
 import { editorPath, writeOutput } from '../support/editor.ts'
 import { liveDesign, seed } from '../support/seed.ts'
+import { expect, type Page, test } from '../support/test.ts'
 
 test.use({ viewport: { width: 1440, height: 900 } })
 
 /** Words of the editor in each language: the capsule's panels, the dock's Select tool, Share and the save state. */
 const WORDS = {
-  en: { dir: 'ltr', name: 'English', layers: 'Layers', assets: 'Assets', brand: 'Brand', select: 'Select', share: 'Share', saved: 'Saved' },
-  ar: { dir: 'rtl', name: 'العربية', layers: 'الطبقات', assets: 'الملفات', brand: 'الهوية', select: 'تحديد', share: 'مشاركة', saved: 'تم الحفظ' },
+  en: {
+    dir: 'ltr',
+    name: 'English',
+    layers: 'Layers',
+    assets: 'Assets',
+    brand: 'Brand',
+    select: 'Select',
+    share: 'Share',
+    saved: 'Saved',
+  },
+  ar: {
+    dir: 'rtl',
+    name: 'العربية',
+    layers: 'الطبقات',
+    assets: 'الملفات',
+    brand: 'الهوية',
+    select: 'تحديد',
+    share: 'مشاركة',
+    saved: 'تم الحفظ',
+  },
 } as const
 type Locale = keyof typeof WORDS
 
@@ -19,8 +37,11 @@ async function speaks(page: Page, locale: Locale) {
   await expect(page.locator('html')).toHaveAttribute('lang', locale)
   await expect(page.locator('html')).toHaveAttribute('dir', words.dir)
   const rail = page.getByTestId('rail')
-  for (const name of [words.layers, words.assets, words.brand]) await expect(rail.getByRole('button', { name, exact: true })).toBeVisible()
-  await expect(page.locator('main > [role="toolbar"]').getByRole('button', { name: words.select, exact: true })).toBeVisible()
+  for (const name of [words.layers, words.assets, words.brand])
+    await expect(rail.getByRole('button', { name, exact: true })).toBeVisible()
+  await expect(
+    page.locator('main > [role="toolbar"]').getByRole('button', { name: words.select, exact: true }),
+  ).toBeVisible()
   await expect(page.getByTestId('share-open')).toHaveText(words.share)
   await expect(page.getByTestId('status')).toHaveText(words.saved)
 }
@@ -40,7 +61,9 @@ async function reload(page: Page) {
   await expect(page.getByTestId('status')).toHaveAttribute('data-ready', '', { timeout: 30_000 })
 }
 
-test('the language picked in the account menu changes the editor\'s words at once and is kept after a reload', async ({ page }) => {
+test("the language picked in the account menu changes the editor's words at once and is kept after a reload", async ({
+  page,
+}) => {
   test.setTimeout(120_000)
   const designId = await seed(liveDesign())
   await page.goto(editorPath(designId))
@@ -53,7 +76,10 @@ test('the language picked in the account menu changes the editor\'s words at onc
   await reload(page)
   await speaks(page, 'ar')
   await page.getByTestId('account-open').click()
-  await expect(page.getByTestId('account').getByRole('radio', { name: WORDS.ar.name, exact: true })).toHaveAttribute('aria-checked', 'true')
+  await expect(page.getByTestId('account').getByRole('radio', { name: WORDS.ar.name, exact: true })).toHaveAttribute(
+    'aria-checked',
+    'true',
+  )
   writeOutput('language-1-arabic-reloaded.png', await page.screenshot({ animations: 'disabled' }))
   await page.keyboard.press('Escape')
 

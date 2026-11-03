@@ -4,14 +4,24 @@
 // beside it opens a menu of every shape, each with its key. The menu is a list of radio items,
 // moved through with the arrow keys, Home and End; Escape closes it and returns focus.
 import {
-  ArrowUpRightIcon, CaretUpIcon, CircleIcon, LineSegmentIcon, PentagonIcon, RectangleIcon, StarIcon, type Icon,
+  ArrowUpRightIcon,
+  CaretUpIcon,
+  CircleIcon,
+  type Icon,
+  LineSegmentIcon,
+  PentagonIcon,
+  RectangleIcon,
+  StarIcon,
 } from '@phosphor-icons/react'
 import * as Popover from '@radix-ui/react-popover'
+import { type KeyboardEvent, useRef, useState } from 'react'
+
 import type { ShapeTool } from '@dazbee/editor'
-import { useRef, useState, type KeyboardEvent } from 'react'
-import { cn } from '../../lib/cn.ts'
-import { useMessages } from '../../lib/i18n/client.tsx'
-import { Tooltip } from '../ui/tooltip.tsx'
+
+import { Tooltip } from '@/components/ui/tooltip.tsx'
+import { cn } from '@/lib/cn.ts'
+import { useMessages } from '@/lib/i18n/client.tsx'
+
 import { DOCK_BUTTON, DOCK_OFF, DOCK_ON, POPOVER } from './styles.ts'
 
 export const SHAPES: { id: ShapeTool; icon: Icon; key?: string }[] = [
@@ -23,25 +33,41 @@ export const SHAPES: { id: ShapeTool; icon: Icon; key?: string }[] = [
   { id: 'arrow', icon: ArrowUpRightIcon, key: 'Shift+L' },
 ]
 
-
-export function ShapeTools({ active, shape, onPick }: { active: boolean; shape: ShapeTool; onPick: (shape: ShapeTool) => void }) {
+export function ShapeTools({
+  active,
+  shape,
+  onPick,
+}: {
+  active: boolean
+  shape: ShapeTool
+  onPick: (shape: ShapeTool) => void
+}) {
   const t = useMessages()
   const [open, setOpen] = useState(false)
   const items = useRef<(HTMLButtonElement | null)[]>([])
-  const current = SHAPES.find((s) => s.id === shape) ?? SHAPES[0] as (typeof SHAPES)[number]
+  const current = SHAPES.find((s) => s.id === shape) ?? (SHAPES[0] as (typeof SHAPES)[number])
   const label = t.editor.shapes[current.id]
 
   const move = (e: KeyboardEvent) => {
     const at = items.current.findIndex((item) => item === document.activeElement)
     const last = SHAPES.length - 1
-    const next = { ArrowDown: at + 1 > last ? 0 : at + 1, ArrowUp: at - 1 < 0 ? last : at - 1, Home: 0, End: last }[e.key]
+    const next = { ArrowDown: at + 1 > last ? 0 : at + 1, ArrowUp: at - 1 < 0 ? last : at - 1, Home: 0, End: last }[
+      e.key
+    ]
     if (next === undefined) return
     e.preventDefault()
     items.current[next]?.focus()
   }
 
   return (
-    <div role="group" aria-label={t.editor.shapes.menu} className={cn('flex items-center rounded-[12px] transition-colors duration-[var(--chrome-fast)]', active && DOCK_ON)}>
+    <div
+      role="group"
+      aria-label={t.editor.shapes.menu}
+      className={cn(
+        'flex items-center rounded-[12px] transition-colors duration-[var(--chrome-fast)]',
+        active && DOCK_ON,
+      )}
+    >
       <Tooltip label={current.key ? `${label} · ${current.key}` : label}>
         <button
           type="button"
@@ -63,7 +89,11 @@ export function ShapeTools({ active, shape, onPick }: { active: boolean; shape: 
               aria-label={t.editor.shapes.more}
               aria-haspopup="menu"
               data-testid="shape-menu"
-              className={cn(DOCK_BUTTON, 'w-4', active ? 'text-on-accent/80 hover:text-on-accent' : 'text-subtle hover:bg-hover hover:text-text')}
+              className={cn(
+                DOCK_BUTTON,
+                'w-4',
+                active ? 'text-on-accent/80 hover:text-on-accent' : 'text-subtle hover:bg-hover hover:text-text',
+              )}
             >
               <CaretUpIcon size={10} weight="bold" aria-hidden />
             </button>
@@ -88,7 +118,9 @@ export function ShapeTools({ active, shape, onPick }: { active: boolean; shape: 
               {SHAPES.map(({ id, icon: ShapeIcon, key }, i) => (
                 <button
                   key={id}
-                  ref={(el) => { items.current[i] = el }}
+                  ref={(el) => {
+                    items.current[i] = el
+                  }}
                   type="button"
                   role="menuitemradio"
                   aria-checked={id === shape}
@@ -102,7 +134,12 @@ export function ShapeTools({ active, shape, onPick }: { active: boolean; shape: 
                     id === shape ? 'text-text' : 'text-muted',
                   )}
                 >
-                  <ShapeIcon size={16} weight={id === shape ? 'fill' : 'regular'} aria-hidden className={cn(id === shape && 'text-accent-text')} />
+                  <ShapeIcon
+                    size={16}
+                    weight={id === shape ? 'fill' : 'regular'}
+                    aria-hidden
+                    className={cn(id === shape && 'text-accent-text')}
+                  />
                   <span className="flex-1 text-start">{t.editor.shapes[id]}</span>
                   {key && <kbd className="font-mono text-[11px] text-subtle">{key}</kbd>}
                 </button>

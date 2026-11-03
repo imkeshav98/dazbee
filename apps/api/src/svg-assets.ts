@@ -6,7 +6,8 @@ import { loadFontFiles } from '@dazbee/fonts/node'
 import { renderDesign } from '@dazbee/renderer'
 import { loadCanvasKit } from '@dazbee/renderer/node'
 import { MAX_SVG_BYTES, SCHEMA_VERSION } from '@dazbee/schema'
-import { SvgError, svgMarkup, svgToLayers, SVG_TYPE } from '@dazbee/svg'
+import { SVG_TYPE, SvgError, svgMarkup, svgToLayers } from '@dazbee/svg'
+
 import type { ImageHeader } from './images.ts'
 
 let shipped: { family: string; bytes: Uint8Array }[] | undefined
@@ -42,13 +43,32 @@ export async function svgThumbnail(bytes: Uint8Array, size: number): Promise<Uin
   if (!text) throw new Error('not an SVG file')
   const ck = await loadCanvasKit()
   const { tree, root, width, height } = svgToLayers(ck, text, { fit: size })
-  const nodes = Object.fromEntries(Object.entries(tree.nodes).map(([id, node]) => [id, id === root ? { ...node, parentId: 'page', index: 'a0' } : node]))
+  const nodes = Object.fromEntries(
+    Object.entries(tree.nodes).map(([id, node]) => [
+      id,
+      id === root ? { ...node, parentId: 'page', index: 'a0' } : node,
+    ]),
+  )
   const design = {
-    meta: { schemaVersion: SCHEMA_VERSION, designId: 'thumbnail', name: 'Thumbnail', kind: 'single', primaryFormatId: 'f' },
-    formats: { f: { name: 'Thumbnail', width: Math.max(1, Math.round(width)), height: Math.max(1, Math.round(height)), order: 'a0' } },
+    meta: {
+      schemaVersion: SCHEMA_VERSION,
+      designId: 'thumbnail',
+      name: 'Thumbnail',
+      kind: 'single',
+      primaryFormatId: 'f',
+    },
+    formats: {
+      f: {
+        name: 'Thumbnail',
+        width: Math.max(1, Math.round(width)),
+        height: Math.max(1, Math.round(height)),
+        order: 'a0',
+      },
+    },
     pages: { page: { name: 'Page', order: 'a0' } },
     nodes,
   }
   shipped ??= loadFontFiles().map(({ family, bytes: font }) => ({ family, bytes: font }))
-  return renderDesign(ck, design, 'page', 'f', { fonts: shipped, fallbackFamilies: [...FALLBACK_FAMILIES], images: {} }).png
+  return renderDesign(ck, design, 'page', 'f', { fonts: shipped, fallbackFamilies: [...FALLBACK_FAMILIES], images: {} })
+    .png
 }

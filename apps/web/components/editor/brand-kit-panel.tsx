@@ -6,14 +6,17 @@
 // changes. Edit turns the flyout into the kit's form (kit-editor.tsx), where each change is saved
 // as it is made.
 import { CheckIcon, PencilSimpleIcon } from '@phosphor-icons/react'
+import { useEffect, useState } from 'react'
+
 import type { Editor } from '@dazbee/editor'
 import { AssetSummary, brandRef, brandVariables, type Design } from '@dazbee/schema'
-import { useEffect, useState } from 'react'
-import { cn } from '../../lib/cn.ts'
-import { useMessages } from '../../lib/i18n/client.tsx'
-import { format } from '../../lib/i18n/index.ts'
-import { placeAsset } from '../../lib/place-asset.ts'
-import { overlayScroll } from '../ui/overlay-scroll.ts'
+
+import { overlayScroll } from '@/components/ui/overlay-scroll.ts'
+import { cn } from '@/lib/cn.ts'
+import { useMessages } from '@/lib/i18n/client.tsx'
+import { format } from '@/lib/i18n/index.ts'
+import { placeAsset } from '@/lib/place-asset.ts'
+
 import { FontPreview, useFontCatalog } from './font-panel.tsx'
 import { useEditorDesign } from './formats-panel.tsx'
 import { KitEditor, shown, useKitSaver } from './kit-editor.tsx'
@@ -63,7 +66,8 @@ export function BrandKitPanel({ editor, brandId }: { editor: Editor; brandId: st
   }
   // As the mock's flyouts: small spaced capitals over each part, quiet fields, round swatches.
   const heading = 'text-[11px] font-bold tracking-[0.08em] text-subtle uppercase'
-  const modeButton = 'flex h-8 shrink-0 cursor-pointer items-center gap-1.5 rounded-full border border-line px-3 text-xs font-semibold text-muted hover:border-line-strong hover:text-text'
+  const modeButton =
+    'flex h-8 shrink-0 cursor-pointer items-center gap-1.5 rounded-full border border-line px-3 text-xs font-semibold text-muted hover:border-line-strong hover:text-text'
   const textSelected = selection.some((id) => design.nodes[id]?.type === 'text')
 
   /** Puts the kit's logo on the design: an SVG file as layers, an image as a graphic filled with it. */
@@ -71,16 +75,32 @@ export function BrandKitPanel({ editor, brandId }: { editor: Editor; brandId: st
     const id = kit.logoAssetId
     if (!id) return
     fetch(`/brands/${encodeURIComponent(brandId)}/assets`)
-      .then(async (response) => (response.ok ? AssetSummary.array().parse(await response.json()).find((asset) => asset.id === id) : undefined))
-      .then((asset) => {
-        if (asset) placeAsset(editor, brandId, asset)
-      }, () => undefined)
+      .then(async (response) =>
+        response.ok
+          ? AssetSummary.array()
+              .parse(await response.json())
+              .find((asset) => asset.id === id)
+          : undefined,
+      )
+      .then(
+        (asset) => {
+          if (asset) placeAsset(editor, brandId, asset)
+        },
+        () => undefined,
+      )
   }
 
   if (!editing) {
-    const logo = kit.logoAssetId ? `/brands/${encodeURIComponent(brandId)}/assets/${encodeURIComponent(kit.logoAssetId)}/thumbnail` : null
+    const logo = kit.logoAssetId
+      ? `/brands/${encodeURIComponent(brandId)}/assets/${encodeURIComponent(kit.logoAssetId)}/thumbnail`
+      : null
     return (
-      <div ref={overlayScroll} data-testid="brand-kit" data-mode="pick" className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+      <div
+        ref={overlayScroll}
+        data-testid="brand-kit"
+        data-mode="pick"
+        className="flex min-h-0 flex-1 flex-col overflow-y-auto"
+      >
         <div className="flex justify-end px-[18px] pb-3">
           <button type="button" onClick={() => setEditing(true)} className={modeButton}>
             <PencilSimpleIcon size={13} aria-hidden />
@@ -90,7 +110,9 @@ export function BrandKitPanel({ editor, brandId }: { editor: Editor; brandId: st
 
         {logo && (
           <section aria-labelledby="kit-logo" className="flex flex-col gap-2.5 border-t border-line px-[18px] py-4">
-            <h3 id="kit-logo" className={heading}>{t.logo}</h3>
+            <h3 id="kit-logo" className={heading}>
+              {t.logo}
+            </h3>
             {/* The one logo on a light and a dark ground, to see how it reads on each; either places it. */}
             <div className="grid grid-cols-2 gap-2">
               {['bg-white', 'bg-[#1A1420]'].map((ground) => (
@@ -101,7 +123,10 @@ export function BrandKitPanel({ editor, brandId }: { editor: Editor; brandId: st
                   title={t.placeLogo}
                   data-testid="kit-logo-place"
                   onClick={() => placeLogo()}
-                  className={cn('grid aspect-[1.3] cursor-pointer place-items-center overflow-hidden rounded-[10px] border border-line p-3 hover:border-accent', ground)}
+                  className={cn(
+                    'grid aspect-[1.3] cursor-pointer place-items-center overflow-hidden rounded-[10px] border border-line p-3 hover:border-accent',
+                    ground,
+                  )}
                 >
                   <img src={logo} alt="" className="size-full object-contain" />
                 </button>
@@ -111,79 +136,96 @@ export function BrandKitPanel({ editor, brandId }: { editor: Editor; brandId: st
         )}
 
         <section aria-labelledby="kit-colors" className="flex flex-col gap-2.5 border-t border-line px-[18px] py-4">
-          <h3 id="kit-colors" className={heading}>{t.colors}</h3>
-          {kit.colors.length === 0
-            ? <p className="text-xs text-muted">{t.noColors}</p>
-            : (
-              <ul className="grid grid-cols-5 gap-2">
-                {kit.colors.map((c) => {
-                  const on = follows(design, selection, 'color', c.token)
-                  return (
-                    <li key={c.token} data-token={c.token}>
-                      <button
-                        type="button"
-                        aria-label={format(on ? t.unbind : t.apply, { name: c.name })}
-                        aria-pressed={on}
-                        disabled={selection.length === 0}
-                        title={`${c.name} · ${shown(c.value)}`}
-                        onClick={() => apply('color', c.token)}
-                        className="group flex w-full cursor-pointer flex-col gap-1 text-start disabled:cursor-default"
-                      >
-                        <span
-                          style={{ backgroundColor: c.value.slice(0, 7) }}
-                          className={cn(
-                            'block aspect-square w-full rounded-[10px] border border-line-strong transition-transform duration-[var(--chrome-fast)] group-enabled:group-hover:scale-105',
-                            // The followed colour is ringed in pink with a gap, a shape and not only a colour.
-                            on && 'shadow-[0_0_0_2px_var(--surface),0_0_0_4px_var(--accent)]',
-                          )}
-                        />
-                        <span className="truncate font-mono text-[10px] text-muted">{c.name}</span>
-                      </button>
-                    </li>
-                  )
-                })}
-              </ul>
-            )}
+          <h3 id="kit-colors" className={heading}>
+            {t.colors}
+          </h3>
+          {kit.colors.length === 0 ? (
+            <p className="text-xs text-muted">{t.noColors}</p>
+          ) : (
+            <ul className="grid grid-cols-5 gap-2">
+              {kit.colors.map((c) => {
+                const on = follows(design, selection, 'color', c.token)
+                return (
+                  <li key={c.token} data-token={c.token}>
+                    <button
+                      type="button"
+                      aria-label={format(on ? t.unbind : t.apply, { name: c.name })}
+                      aria-pressed={on}
+                      disabled={selection.length === 0}
+                      title={`${c.name} · ${shown(c.value)}`}
+                      onClick={() => apply('color', c.token)}
+                      className="group flex w-full cursor-pointer flex-col gap-1 text-start disabled:cursor-default"
+                    >
+                      <span
+                        style={{ backgroundColor: c.value.slice(0, 7) }}
+                        className={cn(
+                          'block aspect-square w-full rounded-[10px] border border-line-strong transition-transform duration-[var(--chrome-fast)] group-enabled:group-hover:scale-105',
+                          // The followed colour is ringed in pink with a gap, a shape and not only a colour.
+                          on && 'shadow-[0_0_0_2px_var(--surface),0_0_0_4px_var(--accent)]',
+                        )}
+                      />
+                      <span className="truncate font-mono text-[10px] text-muted">{c.name}</span>
+                    </button>
+                  </li>
+                )
+              })}
+            </ul>
+          )}
         </section>
 
         <section aria-labelledby="kit-fonts" className="flex flex-col gap-1 border-t border-line px-[18px] py-4">
-          <h3 id="kit-fonts" className={cn(heading, 'pb-1.5')}>{t.fonts}</h3>
-          {kit.fonts.length === 0
-            ? <p className="text-xs text-muted">{t.noFonts}</p>
-            : (
-              <ul className="flex flex-col">
-                {kit.fonts.map((f) => {
-                  const on = follows(design, selection, 'font', f.token)
-                  const family = catalog.find((x) => x.family === f.family)
-                  return (
-                    <li key={f.token} data-token={f.token} className="border-t border-line first:border-t-0">
-                      <button
-                        type="button"
-                        aria-label={format(on ? t.unbind : t.apply, { name: f.name })}
-                        aria-pressed={on}
-                        disabled={!textSelected}
-                        onClick={() => apply('font', f.token)}
-                        className="flex min-h-12 w-full cursor-pointer items-center gap-3 rounded-[8px] py-2 text-start enabled:hover:bg-hover disabled:cursor-default aria-pressed:text-accent-text"
-                      >
-                        <span className="min-w-0 flex-1">
-                          {family ? <FontPreview brandId={brandId} family={family} big /> : <span className="block truncate text-[20px] font-semibold">{f.family}</span>}
-                        </span>
-                        <span className="shrink-0 text-[11px] text-muted">{f.name}</span>
-                        {on && <CheckIcon size={14} aria-hidden className="shrink-0" />}
-                      </button>
-                    </li>
-                  )
-                })}
-              </ul>
-            )}
+          <h3 id="kit-fonts" className={cn(heading, 'pb-1.5')}>
+            {t.fonts}
+          </h3>
+          {kit.fonts.length === 0 ? (
+            <p className="text-xs text-muted">{t.noFonts}</p>
+          ) : (
+            <ul className="flex flex-col">
+              {kit.fonts.map((f) => {
+                const on = follows(design, selection, 'font', f.token)
+                const family = catalog.find((x) => x.family === f.family)
+                return (
+                  <li key={f.token} data-token={f.token} className="border-t border-line first:border-t-0">
+                    <button
+                      type="button"
+                      aria-label={format(on ? t.unbind : t.apply, { name: f.name })}
+                      aria-pressed={on}
+                      disabled={!textSelected}
+                      onClick={() => apply('font', f.token)}
+                      className="flex min-h-12 w-full cursor-pointer items-center gap-3 rounded-[8px] py-2 text-start enabled:hover:bg-hover disabled:cursor-default aria-pressed:text-accent-text"
+                    >
+                      <span className="min-w-0 flex-1">
+                        {family ? (
+                          <FontPreview brandId={brandId} family={family} big />
+                        ) : (
+                          <span className="block truncate text-[20px] font-semibold">{f.family}</span>
+                        )}
+                      </span>
+                      <span className="shrink-0 text-[11px] text-muted">{f.name}</span>
+                      {on && <CheckIcon size={14} aria-hidden className="shrink-0" />}
+                    </button>
+                  </li>
+                )
+              })}
+            </ul>
+          )}
         </section>
-        {error && <p role="alert" className="px-[18px] pb-4 text-xs text-danger">{format(t.saveFailed, { reason: error })}</p>}
+        {error && (
+          <p role="alert" className="px-[18px] pb-4 text-xs text-danger">
+            {format(t.saveFailed, { reason: error })}
+          </p>
+        )}
       </div>
     )
   }
 
   return (
-    <div ref={overlayScroll} data-testid="brand-kit" data-mode="edit" className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+    <div
+      ref={overlayScroll}
+      data-testid="brand-kit"
+      data-mode="edit"
+      className="flex min-h-0 flex-1 flex-col overflow-y-auto"
+    >
       <div className="flex justify-end px-[18px] pb-3">
         <button type="button" onClick={() => setEditing(false)} className={modeButton}>
           <CheckIcon size={13} aria-hidden />

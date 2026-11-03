@@ -3,17 +3,27 @@
 // text layers. Every outline is baked into the design's own coordinates, so the layers draw the
 // file without a transform of their own. What has no layer to become is left out and named.
 
+import { generateKeyBetween } from 'fractional-indexing'
+
 import type { CanvasKit, Path } from '@dazbee/canvaskit'
 import { LayerTree, MAX_SVG_BYTES, type Paint } from '@dazbee/schema'
-import { generateKeyBetween } from 'fractional-indexing'
+
 import { parseColor, parsePaint, withOpacity } from './color.ts'
-import { readSheets, styleOf, type Style } from './style.ts'
-import { apply, IDENTITY, lengthScale, multiply, parseTransform, scale, translate, type Matrix } from './transform.ts'
-import { parseXml, textOf, XmlError, type XmlElement } from './xml.ts'
+import { readSheets, type Style, styleOf } from './style.ts'
+import { apply, IDENTITY, lengthScale, type Matrix, multiply, parseTransform, scale, translate } from './transform.ts'
+import { parseXml, textOf, type XmlElement, XmlError } from './xml.ts'
 
 /** What a file had that the layers leave out. */
 export type Skipped =
-  | 'filter' | 'image' | 'embedded-font' | 'foreign-object' | 'pattern' | 'marker' | 'script' | 'text-path' | 'external-reference'
+  | 'filter'
+  | 'image'
+  | 'embedded-font'
+  | 'foreign-object'
+  | 'pattern'
+  | 'marker'
+  | 'script'
+  | 'text-path'
+  | 'external-reference'
 
 export interface Converted {
   tree: LayerTree
@@ -55,27 +65,78 @@ const MAX_NESTING = 400
 type LayerInput = { type: string; parentId: string; index: string; name: string; props: Record<string, unknown> }
 type Box = { x: number; y: number; width: number; height: number }
 /** A layer made from an element: its id and its box in design pixels. */
-interface Piece { id: string; box: Box }
+interface Piece {
+  id: string
+  box: Box
+}
 
 const DEFAULT_NAMES: Record<string, string> = {
-  path: 'Path', rect: 'Rectangle', circle: 'Ellipse', ellipse: 'Ellipse', line: 'Line', polyline: 'Line', polygon: 'Polygon',
+  path: 'Path',
+  rect: 'Rectangle',
+  circle: 'Ellipse',
+  ellipse: 'Ellipse',
+  line: 'Line',
+  polyline: 'Line',
+  polygon: 'Polygon',
 }
 const SHAPES = new Set(Object.keys(DEFAULT_NAMES))
 /** Elements that define things for others and draw nothing where they stand. */
 const DEFINITIONS = new Set([
-  'defs', 'symbol', 'clipPath', 'mask', 'linearGradient', 'radialGradient', 'pattern', 'marker', 'filter',
-  'title', 'desc', 'metadata', 'style',
+  'defs',
+  'symbol',
+  'clipPath',
+  'mask',
+  'linearGradient',
+  'radialGradient',
+  'pattern',
+  'marker',
+  'filter',
+  'title',
+  'desc',
+  'metadata',
+  'style',
 ])
 const UNCONVERTED: Record<string, Skipped> = {
-  image: 'image', foreignObject: 'foreign-object', script: 'script', font: 'embedded-font', 'font-face': 'embedded-font',
-  textPath: 'text-path', video: 'image', canvas: 'image', iframe: 'foreign-object', audio: 'foreign-object',
+  image: 'image',
+  foreignObject: 'foreign-object',
+  script: 'script',
+  font: 'embedded-font',
+  'font-face': 'embedded-font',
+  textPath: 'text-path',
+  video: 'image',
+  canvas: 'image',
+  iframe: 'foreign-object',
+  audio: 'foreign-object',
 }
 const BLEND_MODES = new Set([
-  'multiply', 'screen', 'overlay', 'darken', 'lighten', 'color-dodge', 'color-burn', 'hard-light', 'soft-light',
-  'difference', 'exclusion', 'hue', 'saturation', 'color', 'luminosity',
+  'multiply',
+  'screen',
+  'overlay',
+  'darken',
+  'lighten',
+  'color-dodge',
+  'color-burn',
+  'hard-light',
+  'soft-light',
+  'difference',
+  'exclusion',
+  'hue',
+  'saturation',
+  'color',
+  'luminosity',
 ])
 
-const UNITS: Record<string, number> = { px: 1, pt: 4 / 3, pc: 16, mm: 96 / 25.4, cm: 96 / 2.54, in: 96, em: 16, rem: 16, ex: 8 }
+const UNITS: Record<string, number> = {
+  px: 1,
+  pt: 4 / 3,
+  pc: 16,
+  mm: 96 / 25.4,
+  cm: 96 / 2.54,
+  in: 96,
+  em: 16,
+  rem: 16,
+  ex: 8,
+}
 
 /** A length in pixels; a percentage is of `whole`. */
 function length(raw: string | undefined, whole = 0, fallback = 0): number {
@@ -86,7 +147,8 @@ function length(raw: string | undefined, whole = 0, fallback = 0): number {
   if (unit === '%') return (n / 100) * whole
   return n * (UNITS[unit || 'px'] ?? 1)
 }
-const numbers = (raw: string | undefined) => (raw ?? '').match(/[+-]?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?/gi)?.map(Number) ?? []
+const numbers = (raw: string | undefined) =>
+  (raw ?? '').match(/[+-]?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?/gi)?.map(Number) ?? []
 
 /** Where a viewBox lands in a viewport of `width` × `height`, as preserveAspectRatio says. */
 function viewBoxMatrix(viewBox: string | undefined, width: number, height: number, aspect = ''): Matrix {
@@ -106,7 +168,14 @@ const ckMatrix = (m: Matrix) => [m[0], m[2], m[4], m[1], m[3], m[5], 0, 0, 1]
 const invert = (m: Matrix): Matrix | null => {
   const det = m[0] * m[3] - m[1] * m[2]
   if (!Number.isFinite(det) || Math.abs(det) < 1e-12) return null
-  return [m[3] / det, -m[1] / det, -m[2] / det, m[0] / det, (m[2] * m[5] - m[3] * m[4]) / det, (m[1] * m[4] - m[0] * m[5]) / det]
+  return [
+    m[3] / det,
+    -m[1] / det,
+    -m[2] / det,
+    m[0] / det,
+    (m[2] * m[5] - m[3] * m[4]) / det,
+    (m[1] * m[4] - m[0] * m[5]) / det,
+  ]
 }
 
 const union = (boxes: Box[]): Box => {
@@ -145,7 +214,10 @@ export function svgToLayers(ck: CanvasKit, text: string, options: ConvertOptions
   if (root.attrs.height?.trim().endsWith('%')) height = vbHeight || 150
   if (!(width > 0 && height > 0)) throw new SvgError('empty', 'the drawing has no size')
   const fitScale = options.fit ? options.fit / Math.max(width, height) : 1
-  const top = multiply(scale(fitScale), viewBoxMatrix(root.attrs.viewBox, width, height, root.attrs.preserveAspectRatio))
+  const top = multiply(
+    scale(fitScale),
+    viewBoxMatrix(root.attrs.viewBox, width, height, root.attrs.preserveAspectRatio),
+  )
   const viewport = { width: vbWidth || width, height: vbHeight || height }
 
   const nodes: Record<string, LayerInput> = {}
@@ -176,14 +248,23 @@ export function svgToLayers(ck: CanvasKit, text: string, options: ConvertOptions
     const opacity = clamp01(Number.parseFloat(style.opacity ?? '1'))
     const blend = style['mix-blend-mode']
     nodes[id] = {
-      type: 'group', parentId: 'root', index: 'a0', name,
-      props: { ...box, ...(opacity < 1 ? { opacity } : {}), ...(blend && BLEND_MODES.has(blend) ? { blendMode: blend } : {}), ...extra },
+      type: 'group',
+      parentId: 'root',
+      index: 'a0',
+      name,
+      props: {
+        ...box,
+        ...(opacity < 1 ? { opacity } : {}),
+        ...(blend && BLEND_MODES.has(blend) ? { blendMode: blend } : {}),
+        ...extra,
+      },
     } as LayerInput
     adopt(id, pieces)
     return { id, box }
   }
 
-  const nameOf = (element: XmlElement, fallback: string) => element.attrs['data-name'] ?? element.attrs.label ?? element.attrs.id ?? fallback
+  const nameOf = (element: XmlElement, fallback: string) =>
+    element.attrs['data-name'] ?? element.attrs.label ?? element.attrs.id ?? fallback
 
   /** The element's outline in its own user space, or null when it has none. */
   function outline(element: XmlElement, style: Style): Path | null {
@@ -205,13 +286,17 @@ export function svgToLayers(ck: CanvasKit, text: string, options: ConvertOptions
         rx ??= ry ?? 0
         ry ??= rx
         const rect = ck.XYWHRect(n('x', vw), n('y', vh), w, h)
-        path = new ck.PathBuilder().addRRect(ck.RRectXY(rect, Math.min(Math.max(0, rx), w / 2), Math.min(Math.max(0, ry), h / 2))).detachAndDelete()
+        path = new ck.PathBuilder()
+          .addRRect(ck.RRectXY(rect, Math.min(Math.max(0, rx), w / 2), Math.min(Math.max(0, ry), h / 2)))
+          .detachAndDelete()
         break
       }
       case 'circle': {
         const r = length(a.r, Math.hypot(vw, vh) / Math.SQRT2)
         if (!(r > 0)) return null
-        path = new ck.PathBuilder().addOval(ck.XYWHRect(n('cx', vw) - r, n('cy', vh) - r, 2 * r, 2 * r)).detachAndDelete()
+        path = new ck.PathBuilder()
+          .addOval(ck.XYWHRect(n('cx', vw) - r, n('cy', vh) - r, 2 * r, 2 * r))
+          .detachAndDelete()
         break
       }
       case 'ellipse': {
@@ -220,7 +305,9 @@ export function svgToLayers(ck: CanvasKit, text: string, options: ConvertOptions
         rx ??= ry ?? 0
         ry ??= rx
         if (!(rx > 0 && ry > 0)) return null
-        path = new ck.PathBuilder().addOval(ck.XYWHRect(n('cx', vw) - rx, n('cy', vh) - ry, 2 * rx, 2 * ry)).detachAndDelete()
+        path = new ck.PathBuilder()
+          .addOval(ck.XYWHRect(n('cx', vw) - rx, n('cy', vh) - ry, 2 * rx, 2 * ry))
+          .detachAndDelete()
         break
       }
       case 'line':
@@ -257,7 +344,14 @@ export function svgToLayers(ck: CanvasKit, text: string, options: ConvertOptions
    * A fill or stroke paint. `user` is the outline's box in its own user space, which an
    * objectBoundingBox gradient spans; `box` is the layer's box, which the design's gradients span.
    */
-  function paintOf(raw: string | undefined, opacityText: string | undefined, style: Style, m: Matrix, user: Box, box: Box): Paint | null {
+  function paintOf(
+    raw: string | undefined,
+    opacityText: string | undefined,
+    style: Style,
+    m: Matrix,
+    user: Box,
+    box: Box,
+  ): Paint | null {
     if (raw === undefined) return null
     const value = raw.trim().toLowerCase() === 'currentcolor' ? (style.color ?? 'black') : raw
     const paint = parsePaint(value)
@@ -268,7 +362,7 @@ export function svgToLayers(ck: CanvasKit, text: string, options: ConvertOptions
     const target = ids.get(paint.url)
     if (target?.name === 'linearGradient' || target?.name === 'radialGradient') {
       const gradient = gradientPaint(target, m, user, box)
-      return gradient ? { ...gradient, ...extra } as Paint : null
+      return gradient ? ({ ...gradient, ...extra } as Paint) : null
     }
     if (target?.name === 'pattern') skipped.add('pattern')
     return paint.fallback ? { type: 'solid', color: paint.fallback, ...extra } : null
@@ -279,7 +373,11 @@ export function svgToLayers(ck: CanvasKit, text: string, options: ConvertOptions
     const attrs: Record<string, string> = {}
     let stops: XmlElement[] = []
     const seen = new Set<XmlElement>()
-    for (let at: XmlElement | undefined = element; at && !seen.has(at); at = ids.get((at.attrs.href ?? '').replace(/^#/, ''))) {
+    for (
+      let at: XmlElement | undefined = element;
+      at && !seen.has(at);
+      at = ids.get((at.attrs.href ?? '').replace(/^#/, ''))
+    ) {
       seen.add(at)
       for (const [key, value] of Object.entries(at.attrs)) attrs[key] ??= value
       const own = at.children.filter((c): c is XmlElement => typeof c !== 'string' && c.name === 'stop')
@@ -294,7 +392,10 @@ export function svgToLayers(ck: CanvasKit, text: string, options: ConvertOptions
     const stops = stopElements.map((stop) => {
       const style = styleOf(stop, {}, rules)
       const raw = stop.attrs.offset ?? '0'
-      const offset = Math.max(last, clamp01(raw.trim().endsWith('%') ? Number.parseFloat(raw) / 100 : Number.parseFloat(raw)))
+      const offset = Math.max(
+        last,
+        clamp01(raw.trim().endsWith('%') ? Number.parseFloat(raw) / 100 : Number.parseFloat(raw)),
+      )
       last = offset
       const color = parseColor(style['stop-color'] ?? 'black') ?? '#000000FF'
       return { offset, color: withOpacity(color, Number.parseFloat(style['stop-opacity'] ?? '1')) }
@@ -364,31 +465,48 @@ export function svgToLayers(ck: CanvasKit, text: string, options: ConvertOptions
     // A line has no inside to fill.
     if (fill && element.name !== 'line') fills.push(fill)
     const strokes: Record<string, unknown>[] = []
-    const strokeWidth = length(style['stroke-width'], Math.hypot(viewport.width, viewport.height) / Math.SQRT2, 1) * lengthScale(m)
+    const strokeWidth =
+      length(style['stroke-width'], Math.hypot(viewport.width, viewport.height) / Math.SQRT2, 1) * lengthScale(m)
     const strokePaint = paintOf(style.stroke, style['stroke-opacity'], style, m, user, box)
     if (strokePaint && strokeWidth > 0) {
       const dashes = numbers(style['stroke-dasharray']).map((n) => Math.max(0, n * lengthScale(m)))
       strokes.push({
         paint: strokePaint,
         width: strokeWidth,
-        ...(dashes.some((n) => n > 0) ? { dashes, dashOffset: length(style['stroke-dashoffset']) * lengthScale(m) } : {}),
+        ...(dashes.some((n) => n > 0)
+          ? { dashes, dashOffset: length(style['stroke-dashoffset']) * lengthScale(m) }
+          : {}),
         cap: oneOf(style['stroke-linecap'], ['butt', 'round', 'square'], 'butt'),
         join: oneOf(style['stroke-linejoin'], ['miter', 'round', 'bevel'], 'miter'),
         miterLimit: Math.max(1, Number.parseFloat(style['stroke-miterlimit'] ?? '4') || 4),
       })
     }
     if (fills.length === 0 && strokes.length === 0) return null
-    if (['marker-start', 'marker-mid', 'marker-end', 'marker'].some((key) => element.attrs[key] && element.attrs[key] !== 'none')) skipped.add('marker')
+    if (
+      ['marker-start', 'marker-mid', 'marker-end', 'marker'].some(
+        (key) => element.attrs[key] && element.attrs[key] !== 'none',
+      )
+    )
+      skipped.add('marker')
 
     const id = newId()
     const opacity = clamp01(Number.parseFloat(style.opacity ?? '1'))
     const blend = style['mix-blend-mode']
     nodes[id] = {
-      type: 'graphic', parentId: 'root', index: 'a0', name: nameOf(element, DEFAULT_NAMES[element.name] ?? 'Path'),
+      type: 'graphic',
+      parentId: 'root',
+      index: 'a0',
+      name: nameOf(element, DEFAULT_NAMES[element.name] ?? 'Path'),
       props: {
         ...box,
-        shape: { kind: 'path', d, fillRule: style['fill-rule'] === 'evenodd' ? 'evenodd' : 'nonzero', drawnIn: { width: box.width, height: box.height } },
-        fills, strokes,
+        shape: {
+          kind: 'path',
+          d,
+          fillRule: style['fill-rule'] === 'evenodd' ? 'evenodd' : 'nonzero',
+          drawnIn: { width: box.width, height: box.height },
+        },
+        fills,
+        strokes,
         ...(opacity < 1 ? { opacity } : {}),
         ...(blend && BLEND_MODES.has(blend) ? { blendMode: blend } : {}),
       },
@@ -428,14 +546,38 @@ export function svgToLayers(ck: CanvasKit, text: string, options: ConvertOptions
     const k = lengthScale(m)
     const fontSize = length(style['font-size'], 16, 16) * k
     if (!(fontSize > 0)) return null
-    const fillPaint = paintOf(style.fill ?? 'black', style['fill-opacity'], style, m, { x: 0, y: 0, width: 1, height: 1 }, { x: 0, y: 0, width: 1, height: 1 })
-    const color = !fillPaint ? '#00000000' : fillPaint.type === 'solid' ? withOpacity(fillPaint.color, fillPaint.opacity ?? 1)
-      : 'stops' in fillPaint ? fillPaint.stops[0]?.color ?? '#000000FF' : '#000000FF'
+    const fillPaint = paintOf(
+      style.fill ?? 'black',
+      style['fill-opacity'],
+      style,
+      m,
+      { x: 0, y: 0, width: 1, height: 1 },
+      { x: 0, y: 0, width: 1, height: 1 },
+    )
+    const color = !fillPaint
+      ? '#00000000'
+      : fillPaint.type === 'solid'
+        ? withOpacity(fillPaint.color, fillPaint.opacity ?? 1)
+        : 'stops' in fillPaint
+          ? (fillPaint.stops[0]?.color ?? '#000000FF')
+          : '#000000FF'
     // A stroke along the letters is the text's outline, in its first colour.
-    const strokePaint = paintOf(style.stroke, style['stroke-opacity'], style, m, { x: 0, y: 0, width: 1, height: 1 }, { x: 0, y: 0, width: 1, height: 1 })
+    const strokePaint = paintOf(
+      style.stroke,
+      style['stroke-opacity'],
+      style,
+      m,
+      { x: 0, y: 0, width: 1, height: 1 },
+      { x: 0, y: 0, width: 1, height: 1 },
+    )
     const outlineWidth = length(style['stroke-width'], 16, 1) * k
-    const outlineColor = !strokePaint ? null : strokePaint.type === 'solid' ? withOpacity(strokePaint.color, strokePaint.opacity ?? 1)
-      : 'stops' in strokePaint ? strokePaint.stops[0]?.color ?? null : null
+    const outlineColor = !strokePaint
+      ? null
+      : strokePaint.type === 'solid'
+        ? withOpacity(strokePaint.color, strokePaint.opacity ?? 1)
+        : 'stops' in strokePaint
+          ? (strokePaint.stops[0]?.color ?? null)
+          : null
     const outline = outlineColor && outlineWidth > 0 ? { width: outlineWidth, color: outlineColor } : null
     const anchor = style['text-anchor'] ?? 'start'
     const rows = content.split('\n')
@@ -445,12 +587,23 @@ export function svgToLayers(ck: CanvasKit, text: string, options: ConvertOptions
     const at = apply(m, x, y)
     const shift = anchor === 'middle' ? width / 2 : anchor === 'end' ? width : 0
     const box = { x: at.x - shift, y: at.y - fontSize * 0.9, width, height }
-    const weight = style['font-weight'] === 'bold' ? 700 : style['font-weight'] === 'normal' ? 400 : Number.parseInt(style['font-weight'] ?? '400', 10)
-    const families = (style['font-family'] ?? '').split(',').map((f) => f.trim().replace(/^['"]|['"]$/g, '')).filter(Boolean)
+    const weight =
+      style['font-weight'] === 'bold'
+        ? 700
+        : style['font-weight'] === 'normal'
+          ? 400
+          : Number.parseInt(style['font-weight'] ?? '400', 10)
+    const families = (style['font-family'] ?? '')
+      .split(',')
+      .map((f) => f.trim().replace(/^['"]|['"]$/g, ''))
+      .filter(Boolean)
     const rotation = (Math.atan2(m[1], m[0]) * 180) / Math.PI
     const id = newId()
     nodes[id] = {
-      type: 'text', parentId: 'root', index: 'a0', name: content.slice(0, 40).replace(/\n/g, ' '),
+      type: 'text',
+      parentId: 'root',
+      index: 'a0',
+      name: content.slice(0, 40).replace(/\n/g, ' '),
       props: {
         ...box,
         ...(Math.abs(rotation) > 0.01 ? { rotation } : {}),
@@ -480,9 +633,10 @@ export function svgToLayers(ck: CanvasKit, text: string, options: ConvertOptions
   function clipMask(id: string, m: Matrix, inside: Box): Piece | null | undefined {
     const clip = ids.get(id)
     if (clip?.name !== 'clipPath') return undefined
-    const units = clip.attrs.clipPathUnits === 'objectBoundingBox'
-      ? multiply(translate(inside.x, inside.y), scale(inside.width, inside.height))
-      : m
+    const units =
+      clip.attrs.clipPathUnits === 'objectBoundingBox'
+        ? multiply(translate(inside.x, inside.y), scale(inside.width, inside.height))
+        : m
     const at = multiply(units, parseTransform(clip.attrs.transform ?? ''))
     let combined: Path | null = null
     let rectangles = 0
@@ -514,15 +668,22 @@ export function svgToLayers(ck: CanvasKit, text: string, options: ConvertOptions
       else if (child.name === 'use') {
         const target = ids.get((child.attrs.href ?? '').replace(/^#/, ''))
         if (target && SHAPES.has(target.name)) {
-          add(target, styleOf(target, style, rules), multiply(mm, translate(length(child.attrs.x), length(child.attrs.y))))
+          add(
+            target,
+            styleOf(target, style, rules),
+            multiply(mm, translate(length(child.attrs.x), length(child.attrs.y))),
+          )
         }
       }
     }
     const path = combined as Path | null
     if (!path) return null
     const box = boundsOf(path)
-    const holds = box.x <= inside.x + 0.01 && box.y <= inside.y + 0.01
-      && box.x + box.width >= inside.x + inside.width - 0.01 && box.y + box.height >= inside.y + inside.height - 0.01
+    const holds =
+      box.x <= inside.x + 0.01 &&
+      box.y <= inside.y + 0.01 &&
+      box.x + box.width >= inside.x + inside.width - 0.01 &&
+      box.y + box.height >= inside.y + inside.height - 0.01
     if (parts === 1 && rectangles === 1 && holds) {
       path.delete()
       return undefined
@@ -534,8 +695,16 @@ export function svgToLayers(ck: CanvasKit, text: string, options: ConvertOptions
     if (!d) return null
     const maskId = newId()
     nodes[maskId] = {
-      type: 'graphic', parentId: 'root', index: 'a0', name: nameOf(clip, 'Clip'),
-      props: { ...box, mask: 'alpha', shape: { kind: 'path', d, drawnIn: { width: box.width, height: box.height } }, fills: [{ type: 'solid', color: '#000000FF' }] },
+      type: 'graphic',
+      parentId: 'root',
+      index: 'a0',
+      name: nameOf(clip, 'Clip'),
+      props: {
+        ...box,
+        mask: 'alpha',
+        shape: { kind: 'path', d, drawnIn: { width: box.width, height: box.height } },
+        fills: [{ type: 'solid', color: '#000000FF' }],
+      },
     } as LayerInput
     return { id: maskId, box }
   }
@@ -545,9 +714,10 @@ export function svgToLayers(ck: CanvasKit, text: string, options: ConvertOptions
     const mask = ids.get(id)
     const key = `mask:${id}`
     if (mask?.name !== 'mask' || using.includes(key)) return undefined
-    const contentUnits = mask.attrs.maskContentUnits === 'objectBoundingBox'
-      ? multiply(translate(inside.x, inside.y), scale(inside.width, inside.height))
-      : m
+    const contentUnits =
+      mask.attrs.maskContentUnits === 'objectBoundingBox'
+        ? multiply(translate(inside.x, inside.y), scale(inside.width, inside.height))
+        : m
     const pieces = children(mask, styleOf(mask, style, rules), contentUnits, [...using, key])
     if (pieces.length === 0) return null
     const kind = styleOf(mask, {}, rules)['mask-type'] === 'alpha' ? 'alpha' : 'luminance'
@@ -584,7 +754,12 @@ export function svgToLayers(ck: CanvasKit, text: string, options: ConvertOptions
     }
   }
 
-  function convertElement(element: XmlElement, parentStyle: Style, parentMatrix: Matrix, using: string[]): Piece | null {
+  function convertElement(
+    element: XmlElement,
+    parentStyle: Style,
+    parentMatrix: Matrix,
+    using: string[],
+  ): Piece | null {
     if (DEFINITIONS.has(element.name)) return null
     const unconverted = UNCONVERTED[element.name]
     if (unconverted) {
@@ -613,7 +788,10 @@ export function svgToLayers(ck: CanvasKit, text: string, options: ConvertOptions
       }
       const target = ids.get(href.slice(1))
       if (!target || using.includes(href) || using.length > 32) return null
-      const at = multiply(m, translate(length(element.attrs.x, viewport.width), length(element.attrs.y, viewport.height)))
+      const at = multiply(
+        m,
+        translate(length(element.attrs.x, viewport.width), length(element.attrs.y, viewport.height)),
+      )
       let piece: Piece | null
       if (target.name === 'symbol' || target.name === 'svg') {
         const w = length(element.attrs.width ?? target.attrs.width, viewport.width, viewport.width)
@@ -632,14 +810,33 @@ export function svgToLayers(ck: CanvasKit, text: string, options: ConvertOptions
     if (element.name === 'svg') {
       const w = length(element.attrs.width, viewport.width, viewport.width)
       const h = length(element.attrs.height, viewport.height, viewport.height)
-      const at = multiply(m, translate(length(element.attrs.x, viewport.width), length(element.attrs.y, viewport.height)))
-      const pieces = children(element, inner, multiply(at, viewBoxMatrix(element.attrs.viewBox, w, h, element.attrs.preserveAspectRatio)), using)
+      const at = multiply(
+        m,
+        translate(length(element.attrs.x, viewport.width), length(element.attrs.y, viewport.height)),
+      )
+      const pieces = children(
+        element,
+        inner,
+        multiply(at, viewBoxMatrix(element.attrs.viewBox, w, h, element.attrs.preserveAspectRatio)),
+        using,
+      )
       return pieces.length ? clipped(element, style, m, group(nameOf(element, 'Group'), pieces, style), using) : null
     }
     if (element.name === 'g' || element.name === 'a' || element.name === 'switch') {
-      const pieces = element.name === 'switch'
-        ? children({ ...element, children: element.children.filter((c) => typeof c !== 'string' && c.name !== 'foreignObject' && !c.attrs.requiredExtensions).slice(0, 1) }, inner, m, using)
-        : children(element, inner, m, using)
+      const pieces =
+        element.name === 'switch'
+          ? children(
+              {
+                ...element,
+                children: element.children
+                  .filter((c) => typeof c !== 'string' && c.name !== 'foreignObject' && !c.attrs.requiredExtensions)
+                  .slice(0, 1),
+              },
+              inner,
+              m,
+              using,
+            )
+          : children(element, inner, m, using)
       if (pieces.length === 0) return null
       return clipped(element, style, m, group(nameOf(element, 'Group'), pieces, style), using)
     }
@@ -664,7 +861,8 @@ export function svgToLayers(ck: CanvasKit, text: string, options: ConvertOptions
   const only = pieces.length === 1 ? nodes[pieces[0]?.id ?? ''] : undefined
   // The one group the file holds is the root, unless the file's own opacity or blending needs a group of its own.
   const plainRoot = clamp01(Number.parseFloat(rootStyle.opacity ?? '1')) === 1 && !rootStyle['mix-blend-mode']
-  const rootPiece = plainRoot && only?.type === 'group' && !only.props.mask ? (pieces[0] as Piece) : group('', pieces, rootStyle)
+  const rootPiece =
+    plainRoot && only?.type === 'group' && !only.props.mask ? (pieces[0] as Piece) : group('', pieces, rootStyle)
   ;(nodes[rootPiece.id] as { name: string }).name = options.name ?? nameOf(root, 'SVG')
 
   const tree = LayerTree.parse({ nodes, roots: [rootPiece.id] })
@@ -718,7 +916,9 @@ export function pathData(path: Path): string {
       case 3: {
         const [cx, cy, ex, ey, w] = [at(0), at(1), at(2), at(3), at(4)]
         const k = (4 * w) / (3 * (1 + w))
-        out.push(`C${[x + (cx - x) * k, y + (cy - y) * k, ex + (cx - ex) * k, ey + (cy - ey) * k, ex, ey].map(num).join(' ')}`)
+        out.push(
+          `C${[x + (cx - x) * k, y + (cy - y) * k, ex + (cx - ex) * k, ey + (cy - ey) * k, ex, ey].map(num).join(' ')}`,
+        )
         x = ex
         y = ey
         i += 5

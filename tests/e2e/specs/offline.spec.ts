@@ -1,39 +1,56 @@
 // Autosave and offline edits (#37): the design is kept in the browser, an edit made offline
 // survives a reload without a connection, and it reaches the other tab once the connection is back.
 import { WASM_FILE } from '@dazbee/canvaskit/wasm'
-import { expect, test, type Page } from '../support/test.ts'
-import { designOf, openTabs, settle, writeOutput } from '../support/editor.ts'
 
-const headline = async (page: Page) => (JSON.parse(await designOf(page)) as { nodes: { headline: { props: { text: string } } } }).nodes.headline.props.text
+import { designOf, openTabs, settle, writeOutput } from '../support/editor.ts'
+import { expect, type Page, test } from '../support/test.ts'
+
+const headline = async (page: Page) =>
+  (JSON.parse(await designOf(page)) as { nodes: { headline: { props: { text: string } } } }).nodes.headline.props.text
 
 /** Records every status the badge reports, so a Saving that lasts a few milliseconds is still seen. */
-const recordStatuses = (page: Page) => page.evaluate(() => {
-  const badge = document.querySelector('[data-testid=status]')
-  if (!badge) throw new Error('no status')
-  const seen = [badge.getAttribute('data-status')]
-  new MutationObserver(() => seen.push(badge.getAttribute('data-status'))).observe(badge, { attributeFilter: ['data-status'] })
-  ;(window as unknown as { statuses: unknown[] }).statuses = seen
-})
+const recordStatuses = (page: Page) =>
+  page.evaluate(() => {
+    const badge = document.querySelector('[data-testid=status]')
+    if (!badge) throw new Error('no status')
+    const seen = [badge.getAttribute('data-status')]
+    new MutationObserver(() => seen.push(badge.getAttribute('data-status'))).observe(badge, {
+      attributeFilter: ['data-status'],
+    })
+    ;(window as unknown as { statuses: unknown[] }).statuses = seen
+  })
 const statuses = (page: Page) => page.evaluate(() => (window as unknown as { statuses: string[] }).statuses)
 
-const typeAtEnd = (page: Page, text: string) => page.evaluate((text) => {
-  const editor = window.dazbee
-  if (!editor) throw new Error('no editor')
-  for (const ch of text) {
-    const node = editor.design().nodes.headline
-    if (node?.type !== 'text') throw new Error('no headline')
-    editor.session.run('text.edit', { id: 'headline', op: { kind: 'insert', at: node.props.text.length, text: ch } })
-  }
-}, text)
+const typeAtEnd = (page: Page, text: string) =>
+  page.evaluate((text) => {
+    const editor = window.dazbee
+    if (!editor) throw new Error('no editor')
+    for (const ch of text) {
+      const node = editor.design().nodes.headline
+      if (node?.type !== 'text') throw new Error('no headline')
+      editor.session.run('text.edit', { id: 'headline', op: { kind: 'insert', at: node.props.text.length, text: ch } })
+    }
+  }, text)
 
-test('an edit made offline survives a reload offline and reaches the other tab when back online', async ({ browser }) => {
+test('an edit made offline survives a reload offline and reaches the other tab when back online', async ({
+  browser,
+}) => {
   test.setTimeout(120_000)
   const { tabs, errors } = await openTabs(browser, 2)
   const [a, b] = tabs as [Page, Page]
   const status = a.getByTestId('status')
 
   // The worker keeps the page and what it loaded, so it opens again without a connection.
-  await expect.poll(() => a.evaluate(async (wasm) => Boolean(await caches.match(location.href)) && Boolean(await caches.match(`/vendor/${wasm}`)), WASM_FILE), { timeout: 30_000 }).toBe(true)
+  await expect
+    .poll(
+      () =>
+        a.evaluate(
+          async (wasm) => Boolean(await caches.match(location.href)) && Boolean(await caches.match(`/vendor/${wasm}`)),
+          WASM_FILE,
+        ),
+      { timeout: 30_000 },
+    )
+    .toBe(true)
   await expect(status).toHaveAttribute('data-status', 'Saved')
   await expect(status).toHaveText('Saved')
   writeOutput('offline-0-saved.png', await a.screenshot())

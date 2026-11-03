@@ -5,10 +5,11 @@
 import { DotsThreeIcon } from '@phosphor-icons/react'
 import { useEffect, useRef, useState } from 'react'
 import { useFormStatus } from 'react-dom'
-import { cn } from '../lib/cn.ts'
-import { useMessages } from '../lib/i18n/client.tsx'
-import { format } from '../lib/i18n/index.ts'
-import { buttonStyles } from './ui/button.tsx'
+
+import { buttonStyles } from '@/components/ui/button.tsx'
+import { cn } from '@/lib/cn.ts'
+import { useMessages } from '@/lib/i18n/client.tsx'
+import { format } from '@/lib/i18n/index.ts'
 
 type Step = 'menu' | 'rename' | 'delete'
 
@@ -18,14 +19,23 @@ function Submit({ label, danger = false }: { label: string; danger?: boolean }) 
     <button
       type="submit"
       disabled={pending}
-      className={cn(buttonStyles({ variant: danger ? 'secondary' : 'primary' }), 'h-8 px-3 font-semibold', danger && 'border-danger/60 text-danger hover:border-danger hover:bg-danger/10')}
+      className={cn(
+        buttonStyles({ variant: danger ? 'secondary' : 'primary' }),
+        'h-8 px-3 font-semibold',
+        danger && 'border-danger/60 text-danger hover:border-danger hover:bg-danger/10',
+      )}
     >
       {label}
     </button>
   )
 }
 
-export function TileMenu({ name, rename, duplicate, remove }: {
+export function TileMenu({
+  name,
+  rename,
+  duplicate,
+  remove,
+}: {
   /** What the tile is called, for the button's label and the fields. */
   name: string
   rename: (form: FormData) => Promise<void>
@@ -47,7 +57,8 @@ export function TileMenu({ name, rename, duplicate, remove }: {
       window.removeEventListener('pointerdown', onPress)
     }
   }, [step])
-  const row = 'flex h-9 w-full cursor-pointer items-center rounded-row px-3 text-start text-[13px] font-medium hover:bg-hover'
+  const row =
+    'flex h-9 w-full cursor-pointer items-center rounded-row px-3 text-start text-[13px] font-medium hover:bg-hover'
   return (
     <div ref={box} className="absolute end-2 top-2 z-10" data-testid="tile-menu">
       <button
@@ -64,20 +75,43 @@ export function TileMenu({ name, rename, duplicate, remove }: {
         <DotsThreeIcon size={18} weight="bold" aria-hidden />
       </button>
       {step === 'menu' && (
-        <div role="menu" aria-label={format(t.moreFor, { name })} className="pop-in-end absolute end-0 top-full mt-1.5 flex w-44 flex-col rounded-card surface-frost p-1">
-          <button type="button" role="menuitem" className={row} onClick={() => setStep('rename')}>{t.rename}</button>
+        <div
+          role="menu"
+          aria-label={format(t.moreFor, { name })}
+          className="pop-in-end absolute end-0 top-full mt-1.5 flex w-44 flex-col rounded-card surface-frost p-1"
+        >
+          <button type="button" role="menuitem" className={row} onClick={() => setStep('rename')}>
+            {t.rename}
+          </button>
           {duplicate && (
             // The menu closes once the copy is made: closing it on the click would take the form away before it sends.
-            <form action={async () => { await duplicate(); setStep(null) }}>
-              <button type="submit" role="menuitem" className={row}>{t.duplicate}</button>
+            <form
+              action={async () => {
+                await duplicate()
+                setStep(null)
+              }}
+            >
+              <button type="submit" role="menuitem" className={row}>
+                {t.duplicate}
+              </button>
             </form>
           )}
-          <button type="button" role="menuitem" className={cn(row, 'text-danger')} onClick={() => setStep('delete')}>{t.delete}</button>
+          <button type="button" role="menuitem" className={cn(row, 'text-danger')} onClick={() => setStep('delete')}>
+            {t.delete}
+          </button>
         </div>
       )}
       {step === 'rename' && (
-        <form action={async (form) => { await rename(form); setStep(null) }} className="pop-in-end absolute end-0 top-full mt-1.5 flex w-64 flex-col gap-2 rounded-card surface-frost p-3">
-          <label htmlFor="tile-rename" className="text-xs font-semibold text-muted">{t.newName}</label>
+        <form
+          action={async (form) => {
+            await rename(form)
+            setStep(null)
+          }}
+          className="pop-in-end absolute end-0 top-full mt-1.5 flex w-64 flex-col gap-2 rounded-card surface-frost p-3"
+        >
+          <label htmlFor="tile-rename" className="text-xs font-semibold text-muted">
+            {t.newName}
+          </label>
           <input
             id="tile-rename"
             name="name"
@@ -89,16 +123,31 @@ export function TileMenu({ name, rename, duplicate, remove }: {
             className="h-9 min-w-0 rounded-row border border-line bg-bg px-2.5 text-[14px] outline-none hover:border-line-strong focus:border-accent"
           />
           <div className="flex justify-end gap-2">
-            <button type="button" onClick={() => setStep(null)} className={cn(buttonStyles({ variant: 'ghost' }), 'h-8 px-3')}>{t.cancel}</button>
+            <button
+              type="button"
+              onClick={() => setStep(null)}
+              className={cn(buttonStyles({ variant: 'ghost' }), 'h-8 px-3')}
+            >
+              {t.cancel}
+            </button>
             <Submit label={t.save} />
           </div>
         </form>
       )}
       {step === 'delete' && (
-        <form action={remove} className="pop-in-end absolute end-0 top-full mt-1.5 flex w-64 flex-col gap-3 rounded-card surface-frost p-3">
+        <form
+          action={remove}
+          className="pop-in-end absolute end-0 top-full mt-1.5 flex w-64 flex-col gap-3 rounded-card surface-frost p-3"
+        >
           <p className="text-[13px] leading-snug">{format(t.deleteConfirm, { name })}</p>
           <div className="flex justify-end gap-2">
-            <button type="button" onClick={() => setStep(null)} className={cn(buttonStyles({ variant: 'ghost' }), 'h-8 px-3')}>{t.cancel}</button>
+            <button
+              type="button"
+              onClick={() => setStep(null)}
+              className={cn(buttonStyles({ variant: 'ghost' }), 'h-8 px-3')}
+            >
+              {t.cancel}
+            </button>
             <Submit label={t.delete} danger />
           </div>
         </form>

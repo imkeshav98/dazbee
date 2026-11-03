@@ -1,5 +1,7 @@
-import { parseDesign } from '@dazbee/schema'
 import { describe, expect, it } from 'vitest'
+
+import { parseDesign } from '@dazbee/schema'
+
 import { fit, framesInView, toScreen, toWorld, visibleRect, zoomAt } from './camera.ts'
 import { COLUMN_GAP, frameAt, frameGrid, intersects, ROW_GAP } from './grid.ts'
 
@@ -23,7 +25,11 @@ describe('frame grid', () => {
     const { frames, bounds } = frameGrid(design)
     expect(frames.map((f) => f.key)).toEqual(['one/sq', 'one/story', 'one/mpu', 'two/sq', 'two/story', 'two/mpu'])
     expect(frames.find((f) => f.key === 'one/story')).toMatchObject({ x: 1080 + COLUMN_GAP, y: 0 })
-    expect(frames.find((f) => f.key === 'two/mpu')).toMatchObject({ x: 2160 + 2 * COLUMN_GAP, y: 1920 + ROW_GAP, width: 300 })
+    expect(frames.find((f) => f.key === 'two/mpu')).toMatchObject({
+      x: 2160 + 2 * COLUMN_GAP,
+      y: 1920 + ROW_GAP,
+      width: 300,
+    })
     expect(bounds).toEqual({ x: 0, y: 0, width: 2160 + 300 + 2 * COLUMN_GAP, height: 2 * 1920 + ROW_GAP })
     expect(frameAt(frames, { x: 1080 + COLUMN_GAP + 5, y: 1920 + ROW_GAP + 5 })?.key).toBe('two/story')
     expect(frameAt(frames, { x: 1080 + 5, y: 5 })).toBeUndefined()
@@ -67,9 +73,13 @@ describe('camera', () => {
     const viewport = { width: 1000, height: 600 }
     // At 100%, from one/story's top start corner: a 1000 × 600 part of it only.
     const story = frames.find((f) => f.key === 'one/story') ?? { x: 0, y: 0 }
-    expect(framesInView(frames, { x: -story.x, y: -story.y, zoom: 1 }, viewport).map((f) => f.key)).toEqual(['one/story'])
+    expect(framesInView(frames, { x: -story.x, y: -story.y, zoom: 1 }, viewport).map((f) => f.key)).toEqual([
+      'one/story',
+    ])
     // Moved the gap and one pixel toward the start, one/sq's last column of pixels shows too.
-    expect(framesInView(frames, { x: -story.x + COLUMN_GAP + 1, y: -story.y, zoom: 1 }, viewport).map((f) => f.key)).toEqual(['one/sq', 'one/story'])
+    expect(
+      framesInView(frames, { x: -story.x + COLUMN_GAP + 1, y: -story.y, zoom: 1 }, viewport).map((f) => f.key),
+    ).toEqual(['one/sq', 'one/story'])
     expect(framesInView(frames, fit(frameGrid(design).bounds, viewport), viewport)).toHaveLength(6)
   })
 

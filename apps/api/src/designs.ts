@@ -1,10 +1,20 @@
 // The workspace, its brands and their designs, always read and written within one workspace.
 import { randomUUID } from 'node:crypto'
-import { brands, designs, designStates, workspaces, type Db } from '@dazbee/db'
-import { loadDesign } from '@dazbee/doc'
-import { parseDesign, SCHEMA_VERSION, type BrandSummary, type DesignInput, type DesignSummary, type UpdateWorkspace, type WorkspaceSummary } from '@dazbee/schema'
+
 import { and, asc, desc, eq } from 'drizzle-orm'
 import * as Y from 'yjs'
+
+import { brands, type Db, designs, designStates, workspaces } from '@dazbee/db'
+import { loadDesign } from '@dazbee/doc'
+import {
+  type BrandSummary,
+  type DesignInput,
+  type DesignSummary,
+  parseDesign,
+  SCHEMA_VERSION,
+  type UpdateWorkspace,
+  type WorkspaceSummary,
+} from '@dazbee/schema'
 
 const workspaceSummary = { id: workspaces.id, name: workspaces.name, kind: workspaces.kind }
 
@@ -13,58 +23,105 @@ export async function findWorkspace(db: Db, workspaceId: string): Promise<Worksp
   return row ?? null
 }
 
-export async function updateWorkspace(db: Db, workspaceId: string, { kind, name }: UpdateWorkspace): Promise<WorkspaceSummary | null> {
-  const [row] = await db.update(workspaces).set({ ...(kind ? { kind } : {}), ...(name ? { name } : {}) }).where(eq(workspaces.id, workspaceId)).returning(workspaceSummary)
+export async function updateWorkspace(
+  db: Db,
+  workspaceId: string,
+  { kind, name }: UpdateWorkspace,
+): Promise<WorkspaceSummary | null> {
+  const [row] = await db
+    .update(workspaces)
+    .set({ ...(kind ? { kind } : {}), ...(name ? { name } : {}) })
+    .where(eq(workspaces.id, workspaceId))
+    .returning(workspaceSummary)
   return row ?? null
 }
 
 export async function listBrands(db: Db, workspaceId: string): Promise<BrandSummary[]> {
-  return db.select({ id: brands.id, name: brands.name }).from(brands)
-    .where(eq(brands.workspaceId, workspaceId)).orderBy(asc(brands.name), asc(brands.id))
+  return db
+    .select({ id: brands.id, name: brands.name })
+    .from(brands)
+    .where(eq(brands.workspaceId, workspaceId))
+    .orderBy(asc(brands.name), asc(brands.id))
 }
 
 export async function createBrand(db: Db, workspaceId: string, name: string, website?: string): Promise<BrandSummary> {
-  const [row] = await db.insert(brands).values({ id: randomUUID(), workspaceId, name, website: website ?? null }).returning({ id: brands.id, name: brands.name })
+  const [row] = await db
+    .insert(brands)
+    .values({ id: randomUUID(), workspaceId, name, website: website ?? null })
+    .returning({ id: brands.id, name: brands.name })
   if (!row) throw new Error('insert returned no brand')
   return row
 }
 
 export async function findBrand(db: Db, workspaceId: string, brandId: string): Promise<BrandSummary | null> {
-  const [row] = await db.select({ id: brands.id, name: brands.name }).from(brands)
+  const [row] = await db
+    .select({ id: brands.id, name: brands.name })
+    .from(brands)
     .where(and(eq(brands.id, brandId), eq(brands.workspaceId, workspaceId)))
   return row ?? null
 }
 
 const summary = {
-  id: designs.id, brandId: designs.brandId, name: designs.name, kind: designs.kind,
-  createdAt: designs.createdAt, updatedAt: designs.updatedAt,
+  id: designs.id,
+  brandId: designs.brandId,
+  name: designs.name,
+  kind: designs.kind,
+  createdAt: designs.createdAt,
+  updatedAt: designs.updatedAt,
 }
-const toSummary = (row: { id: string; brandId: string; name: string; kind: DesignSummary['kind']; createdAt: Date; updatedAt: Date }): DesignSummary =>
-  ({ ...row, createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString() })
+const toSummary = (row: {
+  id: string
+  brandId: string
+  name: string
+  kind: DesignSummary['kind']
+  createdAt: Date
+  updatedAt: Date
+}): DesignSummary => ({ ...row, createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString() })
 
 export async function listDesigns(db: Db, workspaceId: string, brandId: string): Promise<DesignSummary[]> {
-  const rows = await db.select(summary).from(designs)
-    .where(and(eq(designs.workspaceId, workspaceId), eq(designs.brandId, brandId))).orderBy(desc(designs.updatedAt), asc(designs.id))
+  const rows = await db
+    .select(summary)
+    .from(designs)
+    .where(and(eq(designs.workspaceId, workspaceId), eq(designs.brandId, brandId)))
+    .orderBy(desc(designs.updatedAt), asc(designs.id))
   return rows.map(toSummary)
 }
 
-export async function findDesign(db: Db, workspaceId: string, brandId: string, designId: string): Promise<DesignSummary | null> {
-  const [row] = await db.select(summary).from(designs)
+export async function findDesign(
+  db: Db,
+  workspaceId: string,
+  brandId: string,
+  designId: string,
+): Promise<DesignSummary | null> {
+  const [row] = await db
+    .select(summary)
+    .from(designs)
     .where(and(eq(designs.id, designId), eq(designs.workspaceId, workspaceId), eq(designs.brandId, brandId)))
   return row ? toSummary(row) : null
 }
 
 /** Renames a design of the brand; null when there is no such design. */
-export async function renameDesign(db: Db, workspaceId: string, brandId: string, designId: string, name: string): Promise<DesignSummary | null> {
-  const [row] = await db.update(designs).set({ name })
-    .where(and(eq(designs.id, designId), eq(designs.workspaceId, workspaceId), eq(designs.brandId, brandId))).returning(summary)
+export async function renameDesign(
+  db: Db,
+  workspaceId: string,
+  brandId: string,
+  designId: string,
+  name: string,
+): Promise<DesignSummary | null> {
+  const [row] = await db
+    .update(designs)
+    .set({ name })
+    .where(and(eq(designs.id, designId), eq(designs.workspaceId, workspaceId), eq(designs.brandId, brandId)))
+    .returning(summary)
   return row ? toSummary(row) : null
 }
 
 /** Deletes a design of the brand and its stored state; false when there is no such design. */
 export async function deleteDesign(db: Db, workspaceId: string, brandId: string, designId: string): Promise<boolean> {
-  const rows = await db.delete(designs)
-    .where(and(eq(designs.id, designId), eq(designs.workspaceId, workspaceId), eq(designs.brandId, brandId))).returning({ id: designs.id })
+  const rows = await db
+    .delete(designs)
+    .where(and(eq(designs.id, designId), eq(designs.workspaceId, workspaceId), eq(designs.brandId, brandId)))
+    .returning({ id: designs.id })
   return rows.length > 0
 }
 
@@ -83,14 +140,23 @@ export class InvalidContent extends Error {}
  * Creates a design and its first Yjs state together, so the editor never opens a design with
  * nothing in it. `content` is checked like any design; its id and name become the new design's.
  */
-export async function createDesign(db: Db, workspaceId: string, brandId: string, name: string, content?: unknown): Promise<DesignSummary> {
+export async function createDesign(
+  db: Db,
+  workspaceId: string,
+  brandId: string,
+  name: string,
+  content?: unknown,
+): Promise<DesignSummary> {
   const id = randomUUID()
   const input = content === undefined ? blankDesign(id, name) : withMeta(content, id, name)
   const parsed = parseDesign(input)
   if (!parsed.success) throw new InvalidContent(parsed.errors.slice(0, 5).join('; '))
   const state = Y.encodeStateAsUpdate(loadDesign(parsed.design))
   return db.transaction(async (tx) => {
-    const [row] = await tx.insert(designs).values({ id, workspaceId, brandId, name, kind: parsed.design.meta.kind }).returning(summary)
+    const [row] = await tx
+      .insert(designs)
+      .values({ id, workspaceId, brandId, name, kind: parsed.design.meta.kind })
+      .returning(summary)
     if (!row) throw new Error('insert returned no design')
     await tx.insert(designStates).values({ designId: id, state })
     return toSummary(row)

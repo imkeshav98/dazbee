@@ -1,39 +1,95 @@
 // Auto layout (#46), with real pointer and keyboard input: typing into a button's label grows the
 // button and pushes what follows it along the row; and Shift+A turns a frame laid out by hand into
 // auto layout without moving anything, after which deleting a child closes the gap.
-import { expect, test, type Page } from '../support/test.ts'
 import type { DesignInput } from '@dazbee/schema'
+
 import { exportHashOf, writeOutput } from '../support/editor.ts'
 import { click, openStage, press, read, selection } from '../support/stage.ts'
+import { expect, type Page, test } from '../support/test.ts'
 
 test.describe.configure({ timeout: 120_000 })
 
 type Node = DesignInput['nodes'][string]
-const rect = (parentId: string, index: string, x: number, y: number, width: number, height: number, color: string): Node =>
-  ({ type: 'graphic', parentId, index, name: index, props: { x, y, width, height, shape: { kind: 'rect', cornerRadius: 12 }, fills: [{ type: 'solid', color }] } }) as Node
+const rect = (
+  parentId: string,
+  index: string,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  color: string,
+): Node =>
+  ({
+    type: 'graphic',
+    parentId,
+    index,
+    name: index,
+    props: { x, y, width, height, shape: { kind: 'rect', cornerRadius: 12 }, fills: [{ type: 'solid', color }] },
+  }) as Node
 
 const design = (): DesignInput => ({
-  meta: { schemaVersion: 5, designId: 'replaced-by-the-api', name: 'Auto layout', kind: 'single', primaryFormatId: 'sq' },
+  meta: {
+    schemaVersion: 5,
+    designId: 'replaced-by-the-api',
+    name: 'Auto layout',
+    kind: 'single',
+    primaryFormatId: 'sq',
+  },
   formats: { sq: { name: 'Square', width: 1080, height: 1080, order: 'a0' } },
   pages: { p1: { name: 'Page 1', order: 'a0', fills: [{ type: 'solid', color: '#FFF8F0FF' }] } },
   nodes: {
     // A row: a button that hugs its label, then a tile, 24 apart, centred across.
     bar: {
-      type: 'frame', parentId: 'p1', index: 'a0', name: 'Bar',
-      props: { x: 100, y: 100, width: 880, height: 200, fills: [{ type: 'solid', color: '#EEF1F6FF' }], layout: { direction: 'row', gap: 24, padding: { top: 24, right: 24, bottom: 24, left: 24 }, align: 'center' } },
+      type: 'frame',
+      parentId: 'p1',
+      index: 'a0',
+      name: 'Bar',
+      props: {
+        x: 100,
+        y: 100,
+        width: 880,
+        height: 200,
+        fills: [{ type: 'solid', color: '#EEF1F6FF' }],
+        layout: { direction: 'row', gap: 24, padding: { top: 24, right: 24, bottom: 24, left: 24 }, align: 'center' },
+      },
     },
     btn: {
-      type: 'frame', parentId: 'bar', index: 'a0', name: 'Button',
-      props: { x: 0, y: 0, width: 10, height: 10, sizing: { width: 'hug', height: 'hug' }, fills: [{ type: 'solid', color: '#FF2E7EFF' }], layout: { direction: 'row', padding: { top: 16, right: 32, bottom: 16, left: 32 } } },
+      type: 'frame',
+      parentId: 'bar',
+      index: 'a0',
+      name: 'Button',
+      props: {
+        x: 0,
+        y: 0,
+        width: 10,
+        height: 10,
+        sizing: { width: 'hug', height: 'hug' },
+        fills: [{ type: 'solid', color: '#FF2E7EFF' }],
+        layout: { direction: 'row', padding: { top: 16, right: 32, bottom: 16, left: 32 } },
+      },
     },
     label: {
-      type: 'text', parentId: 'btn', index: 'a0', name: 'Label',
-      props: { x: 0, y: 0, width: 10, height: 10, text: 'Buy', boxMode: 'autoWidth', style: { fontFamily: 'Noto Sans', fontSize: 40, fontWeight: 700, color: '#FFFFFFFF' } },
+      type: 'text',
+      parentId: 'btn',
+      index: 'a0',
+      name: 'Label',
+      props: {
+        x: 0,
+        y: 0,
+        width: 10,
+        height: 10,
+        text: 'Buy',
+        boxMode: 'autoWidth',
+        style: { fontFamily: 'Noto Sans', fontSize: 40, fontWeight: 700, color: '#FFFFFFFF' },
+      },
     },
     tile: rect('bar', 'a1', 0, 0, 120, 120, '#2F6BFFFF'),
     // Laid out by hand: three tiles in a row, 20 apart, 30 in from the frame's top and left.
     shelf: {
-      type: 'frame', parentId: 'p1', index: 'a1', name: 'Shelf',
+      type: 'frame',
+      parentId: 'p1',
+      index: 'a1',
+      name: 'Shelf',
       props: { x: 100, y: 500, width: 700, height: 220, fills: [{ type: 'solid', color: '#1F2329FF' }] },
     },
     one: rect('shelf', 'a0', 130, 530, 160, 160, '#FFB020FF'),
@@ -43,13 +99,19 @@ const design = (): DesignInput => ({
   overrides: {},
 })
 
-const boxOf = (page: Page, id: string) => page.evaluate((id) => window.dazbee?.boxOf(id), id) as Promise<{ x: number; y: number; width: number; height: number }>
+const boxOf = (page: Page, id: string) =>
+  page.evaluate((id) => window.dazbee?.boxOf(id), id) as Promise<{
+    x: number
+    y: number
+    width: number
+    height: number
+  }>
 const undo = async (page: Page) => {
   await press(page, 'undo')
   await page.evaluate(() => window.dazbee?.drawn())
 }
 
-test('typing into a button\'s label grows the button and moves the tile after it along', async ({ browser }) => {
+test("typing into a button's label grows the button and moves the tile after it along", async ({ browser }) => {
   const { page, errors } = await openStage(browser, design())
   const before = { btn: await boxOf(page, 'btn'), label: await boxOf(page, 'label'), tile: await boxOf(page, 'tile') }
   const startHash = await exportHashOf(page)
@@ -67,7 +129,7 @@ test('typing into a button\'s label grows the button and moves the tile after it
   // Double-clicks go into the bar, then the button, then the label, where a caret lands at its end.
   const end = { x: before.label.x + before.label.width - 2, y: before.label.y + before.label.height / 2 }
   for (let i = 0; i < 3; i++) {
-    const at = await page.evaluate(({ x, y }) => window.dazbee?.screenPoint(x, y), end) as { x: number; y: number }
+    const at = (await page.evaluate(({ x, y }) => window.dazbee?.screenPoint(x, y), end)) as { x: number; y: number }
     await page.mouse.dblclick(at.x, at.y)
     await page.evaluate(() => window.dazbee?.drawn())
   }
@@ -99,10 +161,13 @@ test('typing into a button\'s label grows the button and moves the tile after it
   expect(errors).toEqual([])
 })
 
-test('Shift+A turns a frame into auto layout without moving anything, and a deleted child\'s gap closes', async ({ browser }) => {
+test("Shift+A turns a frame into auto layout without moving anything, and a deleted child's gap closes", async ({
+  browser,
+}) => {
   const { page, errors } = await openStage(browser, design())
   const ids = ['one', 'two', 'three'] as const
-  const placedBy = async () => Object.fromEntries(await Promise.all(ids.map(async (id) => [id, await boxOf(page, id)] as const)))
+  const placedBy = async () =>
+    Object.fromEntries(await Promise.all(ids.map(async (id) => [id, await boxOf(page, id)] as const)))
   const before = await placedBy()
   const startHash = await exportHashOf(page)
 
@@ -111,14 +176,16 @@ test('Shift+A turns a frame into auto layout without moving anything, and a dele
   expect(await selection(page)).toEqual(['shelf'])
   await press(page, 'autoLayout')
   const d = await read(page)
-  expect(d.nodes.shelf?.props).toMatchObject({ layout: { direction: 'row', gap: 20, align: 'start', padding: { top: 30, left: 30 } } })
+  expect(d.nodes.shelf?.props).toMatchObject({
+    layout: { direction: 'row', gap: 20, align: 'start', padding: { top: 30, left: 30 } },
+  })
   // Nothing moved: the same boxes and the same pixels.
   expect(await placedBy()).toEqual(before)
   expect(await exportHashOf(page)).toBe(startHash)
   writeOutput('auto-layout-3-switched.png', await page.screenshot({ animations: 'disabled' }))
 
   // Double-click into the shelf picks the middle tile; deleting it brings the last one over.
-  const middle = await page.evaluate(() => window.dazbee?.screenPoint(400, 600)) as { x: number; y: number }
+  const middle = (await page.evaluate(() => window.dazbee?.screenPoint(400, 600))) as { x: number; y: number }
   await page.mouse.dblclick(middle.x, middle.y)
   await page.evaluate(() => window.dazbee?.drawn())
   expect(await selection(page)).toEqual(['two'])
