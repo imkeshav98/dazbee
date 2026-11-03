@@ -87,15 +87,15 @@ export function watchSaveState({ provider, onSaveState: status }: SaveStateDeps)
     saveState()
   }
 
-  function destroy() {
-    listening.abort()
-    clearTimeout(offlineTimer)
-    provider.off('status', onConnection)
-    provider.off('unsyncedChanges', onUnsynced)
-  }
-
   provider.on('status', onConnection)
   provider.on('unsyncedChanges', onUnsynced)
+
+  function destroy() {
+    provider.off('unsyncedChanges', onUnsynced)
+    provider.off('status', onConnection)
+    clearTimeout(offlineTimer)
+    listening.abort()
+  }
 
   return {
     connected,

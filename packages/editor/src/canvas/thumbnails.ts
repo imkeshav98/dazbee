@@ -7,7 +7,7 @@ import type { Design } from '@dazbee/schema'
 import { boundsOf } from '../layers/transform.ts'
 import type { EditorResources } from '../resources.ts'
 import type { Frame } from './grid.ts'
-import { find, type FrameScenes } from './scenes.ts'
+import { findLayer, type FrameScenes } from './scenes.ts'
 
 export interface ThumbnailsDeps {
   ck: CanvasKit
@@ -81,7 +81,7 @@ export function thumbnailCache({ ck, scenes, resources, current, drawn }: Thumbn
    * nothing there.
    */
   function layerThumbnail(frame: Frame, id: string, size: number, outlined: boolean): string | null {
-    const found = find(scenes.scene(frame).layers, id)
+    const found = findLayer(scenes.scene(frame).layers, id)
     if (!found || found.props.mask) return null
     const key = `${frame.key}/${id}${outlined ? '/outlined' : ''}@${size}`
     const kept = thumbnails.get(key)
@@ -186,16 +186,18 @@ export function thumbnailCache({ ck, scenes, resources, current, drawn }: Thumbn
     return url
   }
 
+  function destroy() {
+    for (const { url } of pageThumbnails.values()) URL.revokeObjectURL(url)
+    pageThumbnails.clear()
+    for (const { url } of thumbnails.values()) URL.revokeObjectURL(url)
+    thumbnails.clear()
+  }
+
   return {
     layer: layerThumbnail,
     page: pageThumbnail,
     ghost: ghostOf,
-    destroy: () => {
-      for (const { url } of thumbnails.values()) URL.revokeObjectURL(url)
-      thumbnails.clear()
-      for (const { url } of pageThumbnails.values()) URL.revokeObjectURL(url)
-      pageThumbnails.clear()
-    },
+    destroy,
   }
 }
 

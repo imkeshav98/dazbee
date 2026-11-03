@@ -75,7 +75,7 @@ import { resizeCursor, ROTATE_CURSOR } from './canvas/cursors.ts'
 import { type Frame, frameAt, frameGrid, frameKey, intersects, scope } from './canvas/grid.ts'
 import { hitTest } from './canvas/hit-test.ts'
 import { px, rulerParts } from './canvas/rulers.ts'
-import { find, frameScenes } from './canvas/scenes.ts'
+import { findLayer, frameScenes } from './canvas/scenes.ts'
 import { thumbnailCache } from './canvas/thumbnails.ts'
 import { loadCanvasKit } from './canvaskit.ts'
 import { keepCopy, layersOnClipboard, putOnClipboard, rememberedLayers } from './clipboard.ts'
@@ -779,7 +779,7 @@ function live(
   /** The layer as a frame shows it now, with the frame. */
   function pickedLayer(picked: Picked | null) {
     const frame = picked && frameOf(picked.frame)
-    const layer = frame && find(scenes.scene(frame).layers, picked.id)
+    const layer = frame && findLayer(scenes.scene(frame).layers, picked.id)
     return frame && layer ? { frame, layer } : null
   }
 
@@ -879,7 +879,7 @@ function live(
     if (!node) return null
     // Auto layout places and sizes a layer as the scene is built (#46): its box is the scene's.
     if (laidOut(id, from)) {
-      const shown = find(scenes.scene(frame).layers, id)
+      const shown = findLayer(scenes.scene(frame).layers, id)
       if (shown)
         return {
           x: shown.props.x,
@@ -4292,7 +4292,7 @@ function live(
     },
     setTool: (next: Tool) => tools.setTool(next),
     tool: () => tools.tool(),
-    armImage: (asset: PlacedAsset | null) => tools.armImage(asset),
+    armImage: (asset: PlacedAsset | null) => tools.setTool(asset ? 'image' : tools.tool(), asset),
     imageArmed: () => tools.imageToPlace() !== null,
     onTool: (listener: (tool: Tool) => void) => tools.onTool(listener),
     screenPoint(x: number, y: number, pageId?: string, formatId?: string): Point {

@@ -17,7 +17,7 @@ export interface PlacedAsset {
 export interface ToolsDeps {
   /** Ends what the tool in use has open, before another tool takes over: the pen's path. */
   finish: () => void
-  /** Shows the tool or the image to place changed, before the tool listeners hear of it: the cursor. */
+  /** Shows that the tool or the image to place changed, before the tool listeners hear of it: the cursor. */
   changed: () => void
   /** Told when snapping turns on or off. */
   onSnapping: () => void
@@ -25,11 +25,12 @@ export interface ToolsDeps {
 
 export interface EditorTools {
   tool(): Tool
-  /** Switches to a tool; the image tool keeps its image, any other forgets it. */
-  setTool(next: Tool): void
-  /** Picks the image the image tool places with its next click or drag, and switches to that tool; null forgets it. */
-  armImage(asset: PlacedAsset | null): void
-  /** The image the image tool places with the next click or drag, or null. */
+  /**
+   * Switches to a tool; the image tool keeps its image, any other forgets it. With `image`, that
+   * is then the image the image tool places, or null to forget it.
+   */
+  setTool(next: Tool, image?: PlacedAsset | null): void
+  /** The image the image tool places with its next click or drag, or null. */
   imageToPlace(): PlacedAsset | null
   /** Whether a drag snaps to layers and the frame. */
   snapping(): boolean
@@ -40,25 +41,25 @@ export interface EditorTools {
 }
 
 export function editorTools({ finish, changed, onSnapping }: ToolsDeps): EditorTools {
+  /** What a drag on the stage does now. */
   let tool: Tool = 'select'
+  /** The image the image tool places with the next click or drag; picked after the tool is. */
+  let imageToPlace: PlacedAsset | null = null
   /** Snapping to layers and the frame while dragging; Ctrl (⌘) still turns it off for a drag. */
   let snapping = true
   /** Told when the tool changes, by a key or after drawing a shape, so the tool dock follows. */
   const toolListeners = new Set<(tool: Tool) => void>()
-  /** The image the image tool places with the next click or drag; picked after the tool is. */
-  let imageToPlace: PlacedAsset | null = null
 
-  function setTool(next: Tool) {
-    if (next === tool) return
-    finish()
-    if (next !== 'image') imageToPlace = null
-    tool = next
-    changed()
-    for (const listener of toolListeners) listener(tool)
-  }
-  function armImage(asset: PlacedAsset | null) {
-    if (asset) setTool('image')
-    imageToPlace = asset
+  function setTool(next: Tool, image?: PlacedAsset | null) {
+    if (next !== tool) {
+      finish()
+      if (next !== 'image') imageToPlace = null
+      tool = next
+      changed()
+      for (const listener of toolListeners) listener(tool)
+    }
+    if (image === undefined) return
+    imageToPlace = image
     changed()
   }
   function setSnapping(on: boolean) {
@@ -75,7 +76,6 @@ export function editorTools({ finish, changed, onSnapping }: ToolsDeps): EditorT
   return {
     tool: () => tool,
     setTool,
-    armImage,
     imageToPlace: () => imageToPlace,
     snapping: () => snapping,
     setSnapping,

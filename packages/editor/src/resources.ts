@@ -2,7 +2,7 @@
 // coming, which the screen draws in placeholders until they arrive.
 import type { CanvasKit, Image } from '@dazbee/canvaskit'
 import { FONT_FACES } from '@dazbee/fonts'
-import { type renderDesign, type ResourceCache, type Resources } from '@dazbee/renderer'
+import type { ResourceBytes, ResourceCache, Resources } from '@dazbee/renderer'
 import { type Design, fontFamilies, imageAssetIds, type Variables } from '@dazbee/schema'
 
 /** Where fonts and images come from, beside the fonts we ship. */
@@ -17,7 +17,7 @@ export interface ResourcesDeps {
   ck: CanvasKit
   cache: ResourceCache
   /** The bytes the design opened with. */
-  first: Parameters<typeof renderDesign>[4]
+  first: ResourceBytes
   sources: ResourceSources
   /** Whether the sync server is connected: a font or image that fails offline waits for it. */
   connected: () => boolean
@@ -29,7 +29,7 @@ export interface ResourcesDeps {
 
 export interface EditorResources {
   /** The bytes the editor has: fonts, images and the brand kit's values. */
-  bytes(): Parameters<typeof renderDesign>[4]
+  bytes(): ResourceBytes
   /** The bytes decoded, from the cache. */
   resources(): Resources
   /**
@@ -38,16 +38,16 @@ export interface EditorResources {
    */
   screen(current: Design): Resources
   /**
-   * Asks for the files of the families not asked for yet. Each family's load, settled when its
-   * files are here or failed to come; undefined for a family that never loads (shipped, or no way
-   * to load it).
+   * Asks for the files of the families not asked for yet. Returns each family's load, settled when
+   * its files are here or failed to come; undefined for a family that never loads (shipped, or no
+   * way to load it).
    */
   loadFamilies(families: string[]): (Promise<void> | undefined)[]
   /** Settles once the fonts and images asked for so far are here or failed to come. */
   loaded(): Promise<undefined>
   /** The families whose files the editor has, shipped ones included (#50). */
   families(): string[]
-  /** Gives bound properties new values; the brand kit's families load as the screen asks for them. */
+  /** Gives bound properties new values: the brand kit's, from the next scene on. */
   setVariables(variables: Variables): void
   /** Calls back when fonts or images arrive: `fonts` when they were fonts. */
   onArrive(listener: (fonts: boolean) => void): () => boolean
@@ -57,44 +57,27 @@ export interface EditorResources {
 /** The families we ship are loaded already; the rest come from the catalog, when the editor was given a way. */
 export const SHIPPED_FAMILIES = new Set(FONT_FACES.map((f) => f.family))
 
-/** The fonts we ship, from the app's `/vendor/fonts/`. */
-export function shippedFonts() {
-  return Promise.all(FONT_FACES.map(async (f) => ({ family: f.family, bytes: await bytes(`/vendor/fonts/${f.file}`) })))
-}
-
-export async function loadImages(ids: string[], options: ResourceSources): Promise<Record<string, Uint8Array>> {
-  if (ids.length === 0) return {}
-  const { assetBytes } = options
-  if (!assetBytes) throw new Error('the design has images, but the editor was given no way to load them')
-  return Object.fromEntries(await Promise.all(ids.map(async (id) => [id, await assetBytes(id)] as const)))
-}
-
-export async function loadFonts(
-  families: string[],
-  options: ResourceSources,
-): Promise<{ family: string; bytes: Uint8Array }[]> {
-  const wanted = families.filter((family) => !SHIPPED_FAMILIES.has(family))
-  if (wanted.length === 0 || !options.fontFiles) return []
-  return options.fontFiles(wanted)
-}
-
 export function editorResources({
   ck,
   cache,
   first,
-  sources: options,
+  sources,
   connected,
   status,
   signal,
 }: ResourcesDeps): EditorResources {
+  /** The bytes the editor has, which grow as fonts and images arrive. */
   let resourceBytes = first
+  /** The bytes decoded, from the cache. */
   let resources = cache.resources(resourceBytes)
-  const loading = new Set<string>()
   /** The last resources with placeholders, kept while the same images are missing so pictures stay. */
   let placeholders: { for: Resources; missing: string; resources: Resources } | null = null
+  /** The images on their way. */
+  const loading = new Set<string>()
   // Families text names after the design opened (a pick in the font menu, another tab) load in the
   // background (#50); until then that text draws in the fallback fonts. Exports wait for them.
   const fontsAsked = new Set([...SHIPPED_FAMILIES, ...resourceBytes.fonts.map((f) => f.family)])
+  /** Settles when every family asked for so far is here or failed to come. */
   let fontsLoading: Promise<void> = Promise.resolve()
   /** Each family asked for after the design opened, settled when its files are here or failed to come. */
   const familyLoads = new Map<string, Promise<void>>()
@@ -119,44 +102,14 @@ export function editorResources({
   if (!maybeClear) throw new Error('could not make the image placeholder')
   const clear: Image = maybeClear
 
-  function loadNewFonts(current: Design) {
-    loadFamilies(fontFamilies(current, resourceBytes.variables))
-  }
-  /** Asks for the files of the families not asked for yet; `fontsLoading` settles when they are here. */
-  function loadFamilies(families: string[]) {
-    if (!options.fontFiles) return
-    const fresh = families.filter((family) => !fontsAsked.has(family))
-    if (fresh.length === 0) return
-    for (const family of fresh) fontsAsked.add(family)
-    const loading = loadFonts(fresh, options).then(
-      (fonts) => {
-        if (signal.aborted || fonts.length === 0) return
-        resourceBytes = { ...resourceBytes, fonts: [...resourceBytes.fonts, ...fonts] }
-        resources = cache.resources(resourceBytes)
-        // Auto layout measures text in its font, so every frame's scene is made again, not only its picture.
-        for (const listener of arriveListeners) listener(true)
-      },
-      (error: unknown) => {
-        // Offline, a family waits for the connection; the next redraw asks for it again.
-        if (!connected()) {
-          for (const family of fresh) fontsAsked.delete(family)
-          return
-        }
-        status(`Error: a font did not load (${error instanceof Error ? error.message : String(error)})`)
-      },
-    )
-    for (const family of fresh) familyLoads.set(family, loading)
-    fontsLoading = Promise.all([fontsLoading, loading]).then(() => undefined)
-  }
-
-  function screenResources(current: Design): Resources {
-    loadNewFonts(current)
+  function screen(current: Design): Resources {
+    askFamilies(fontFamilies(current, resourceBytes.variables))
     const missing = imageAssetIds(current).filter((id) => !resources.images.has(id))
     if (missing.length === 0) return resources
     const fresh = missing.filter((id) => !loading.has(id))
-    if (fresh.length > 0 && options.assetBytes) {
+    if (fresh.length > 0 && sources.assetBytes) {
       for (const id of fresh) loading.add(id)
-      const arriving = loadImages(fresh, options)
+      const arriving = loadImages(fresh, sources)
         .then(
           (images) => {
             if (signal.aborted) return
@@ -182,31 +135,87 @@ export function editorResources({
     placeholders = { for: resources, missing: key, resources: { ...resources, images } }
     return placeholders.resources
   }
+  function loaded() {
+    return Promise.all([fontsLoading, imagesLoading]).then(() => undefined)
+  }
+  function families() {
+    return [...new Set(resourceBytes.fonts.map((f) => f.family))]
+  }
+
+  function loadFamilies(families: string[]) {
+    askFamilies(families)
+    return families.map((family) => familyLoads.get(family))
+  }
+  /** Asks for the files of the families not asked for yet; `fontsLoading` settles when they are here. */
+  function askFamilies(families: string[]) {
+    if (!sources.fontFiles) return
+    const fresh = families.filter((family) => !fontsAsked.has(family))
+    if (fresh.length === 0) return
+    for (const family of fresh) fontsAsked.add(family)
+    const loading = loadFonts(fresh, sources).then(
+      (fonts) => {
+        if (signal.aborted || fonts.length === 0) return
+        resourceBytes = { ...resourceBytes, fonts: [...resourceBytes.fonts, ...fonts] }
+        resources = cache.resources(resourceBytes)
+        for (const listener of arriveListeners) listener(true)
+      },
+      (error: unknown) => {
+        // Offline, a family waits for the connection; the next redraw asks for it again.
+        if (!connected()) {
+          for (const family of fresh) fontsAsked.delete(family)
+          return
+        }
+        status(`Error: a font did not load (${error instanceof Error ? error.message : String(error)})`)
+      },
+    )
+    for (const family of fresh) familyLoads.set(family, loading)
+    fontsLoading = Promise.all([fontsLoading, loading]).then(() => undefined)
+  }
+  function setVariables(variables: Variables) {
+    resourceBytes = { ...resourceBytes, variables }
+  }
 
   function onArrive(listener: (fonts: boolean) => void) {
     arriveListeners.add(listener)
     return () => arriveListeners.delete(listener)
   }
 
+  function destroy() {
+    arriveListeners.clear()
+    clear.delete()
+  }
+
   return {
     bytes: () => resourceBytes,
     resources: () => resources,
-    screen: screenResources,
-    loadFamilies: (families: string[]) => {
-      loadFamilies(families)
-      return families.map((family) => familyLoads.get(family))
-    },
-    loaded: () => Promise.all([fontsLoading, imagesLoading]).then(() => undefined),
-    families: () => [...new Set(resourceBytes.fonts.map((f) => f.family))],
-    setVariables: (variables: Variables) => {
-      resourceBytes = { ...resourceBytes, variables }
-    },
+    screen,
+    loadFamilies,
+    loaded,
+    families,
+    setVariables,
     onArrive,
-    destroy: () => {
-      arriveListeners.clear()
-      clear.delete()
-    },
+    destroy,
   }
+}
+
+/** The fonts we ship, from the app's `/vendor/fonts/`. */
+export function shippedFonts() {
+  return Promise.all(FONT_FACES.map(async (f) => ({ family: f.family, bytes: await bytes(`/vendor/fonts/${f.file}`) })))
+}
+
+/** The bytes of image assets, from `assetBytes`; no images need none. */
+export async function loadImages(ids: string[], sources: ResourceSources): Promise<Record<string, Uint8Array>> {
+  if (ids.length === 0) return {}
+  const { assetBytes } = sources
+  if (!assetBytes) throw new Error('the design has images, but the editor was given no way to load them')
+  return Object.fromEntries(await Promise.all(ids.map(async (id) => [id, await assetBytes(id)] as const)))
+}
+
+/** The files of the families we don't ship, from `fontFiles`; none without it. */
+export async function loadFonts(families: string[], sources: ResourceSources): Promise<ResourceBytes['fonts']> {
+  const wanted = families.filter((family) => !SHIPPED_FAMILIES.has(family))
+  if (wanted.length === 0 || !sources.fontFiles) return []
+  return sources.fontFiles(wanted)
 }
 
 async function bytes(url: string) {
