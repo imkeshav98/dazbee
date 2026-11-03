@@ -164,8 +164,8 @@ test('auto width text resized takes the size given instead of snapping back', as
   expect((await boxOf(page, 'label')).width).toBeCloseTo(was.width - 120, 0)
   // Taller than one line now, as it wraps in the width given.
   expect((await boxOf(page, 'label')).height).toBeGreaterThan(was.height)
-  await dragHandle(page, 's', 0, 40)
-  expect(((await read(page)).overrides['format:sq']?.label as { boxMode?: string }).boxMode).toBe('fixed')
+  // Auto height text has no bottom handle to drag: only a fixed box has a height of its own.
+  await expect(page.locator('.selection .handle[data-handle="s"]')).toHaveCount(0)
   writeOutput('layout-text-resize.png', await page.screenshot({ animations: 'disabled' }))
   expect(errors).toEqual([])
 })
