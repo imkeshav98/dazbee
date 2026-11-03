@@ -547,20 +547,39 @@ export type Style = Record<string, unknown> & { fontFamily: string; fontWeight: 
 export function textStyle(target: Target) {
   const { range } = target
   const styles = range ?? target.props.map((pr) => pr.style as Style)
+  /** A layer's style with `key` set, and with shrink to fit on, a size set is its largest size too. */
+  const styled = (now: Props, key: string, value: unknown): Patch => ({
+    style: { ...(now.style as Style), [key]: value },
+    ...(key === 'fontSize' && typeof value === 'number' ? largestAt(now, value) : {}),
+  })
   return {
     styles,
     style: (key: string) => shared(styles.map((s) => s[key])),
     setStyle: (key: string, value: unknown) =>
-      range ? target.editor.styleTextSelection({ [key]: value }) : set(target, (now) => ({ style: { ...(now.style as Style), [key]: value } })),
+      range ? target.editor.styleTextSelection({ [key]: value }) : set(target, (now) => styled(now, key, value)),
     shiftStyle: (key: string, by: number, min?: number, from = 0) =>
       range
         ? target.editor.styleTextSelection({ [key]: tidy(clamp(((range[0]?.[key] as number | undefined) ?? from) + by, min)) })
-        : set(target, (now) => {
-          const s = now.style as Style
-          return { style: { ...s, [key]: tidy(clamp(((s[key] as number | undefined) ?? from) + by, min)) } }
-        }),
+        : set(target, (now) => styled(now, key, tidy(clamp((((now.style as Style)[key] as number | undefined) ?? from) + by, min)))),
   }
 }
+
+/** The sizes shrink to fit draws text between. */
+type Fit = { min: number; max: number }
+
+/**
+ * With shrink to fit on, the text is drawn at the largest size that fits between its smallest and
+ * largest, whatever its size says, so its size is kept as its largest: a size set becomes the
+ * largest, and the smallest comes down to it when it was above it. Selected characters' own sizes
+ * are scaled with the text's, so a size set on them needs nothing more.
+ */
+function largestAt(now: Props, size: number): Patch {
+  const fit = now.shrinkToFit as Fit | undefined
+  return fit ? { shrinkToFit: { min: Math.min(fit.min, size), max: size } } : {}
+}
+
+/** Shrink to fit's sizes set from the Text box card, the text's size following the largest. */
+const fitPatch = (now: Props, fit: Fit): Patch => ({ shrinkToFit: fit, style: { ...(now.style as Style), fontSize: fit.max } })
 
 /** A row that turns something on or off: its name, then a switch. */
 function SwitchRow({ name, on, onSet }: { name: string; on: boolean | 'mixed'; onSet: (on: boolean) => void }) {
@@ -707,7 +726,7 @@ const BOX_ICONS = {
 /** The text's box: how it sizes, shrinking to fit between a smallest and a largest size, and the lines shown at most. */
 function TextBoxCard({ target, p }: { target: Target; p: P }) {
   const value = (key: string) => shared(target.props.map((pr) => pr[key])) as unknown
-  const shrink = value('shrinkToFit') as { min: number; max: number } | undefined | 'mixed'
+  const shrink = value('shrinkToFit') as Fit | undefined | 'mixed'
   const mode = (value('boxMode') ?? 'autoHeight') as BoxMode | 'mixed'
   return (
     <Card id="text-box-card" title={p.textBox}>
@@ -737,16 +756,16 @@ function TextBoxCard({ target, p }: { target: Target; p: P }) {
             min={1}
             editor={target.editor}
             onSet={(v) => set(target, (now) => {
-              const was = now.shrinkToFit as { min: number; max: number } | undefined
+              const was = now.shrinkToFit as Fit | undefined
               if (!was) return null
               const next = { ...was, [end]: v }
-              return { shrinkToFit: end === 'min' ? { min: Math.min(next.min, next.max), max: next.max } : { min: next.min, max: Math.max(next.min, next.max) } }
+              return fitPatch(now, end === 'min' ? { min: Math.min(next.min, next.max), max: next.max } : { min: next.min, max: Math.max(next.min, next.max) })
             })}
             onShift={(by) => set(target, (now) => {
-              const was = now.shrinkToFit as { min: number; max: number } | undefined
+              const was = now.shrinkToFit as Fit | undefined
               if (!was) return null
               const v = tidy(Math.max(1, was[end] + by))
-              return { shrinkToFit: end === 'min' ? { min: Math.min(v, was.max), max: was.max } : { min: was.min, max: Math.max(v, was.min) } }
+              return fitPatch(now, end === 'min' ? { min: Math.min(v, was.max), max: was.max } : { min: was.min, max: Math.max(v, was.min) })
             })}
           />
         ))}
