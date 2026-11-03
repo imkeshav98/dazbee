@@ -60,9 +60,9 @@ export const FIELD_LABEL = 'text-xs font-semibold text-muted'
 export const SELECT = 'h-8 w-full bg-surface px-1.5 text-[12px]'
 /**
  * A number you drag sideways, as in the mock: its label at the start, its value in mono at the end,
- * and a soft fill behind them showing where the value sits in its range (`--fill`).
+ * and a soft fill behind them showing where the value sits in its range: from `--fill-from`, `--fill` wide.
  */
-export const KNOB = `relative flex h-8 min-w-0 cursor-ew-resize touch-pan-y select-none items-center gap-2 overflow-hidden rounded-row border border-line bg-surface px-2.5 text-[12px] font-semibold text-muted transition-colors duration-[var(--chrome-fast)] hover:border-line-strong focus-within:border-accent before:pointer-events-none before:absolute before:inset-y-0 before:start-0 before:w-[var(--fill,0%)] before:bg-accent-soft before:transition-[width] before:duration-75`
+export const KNOB = `relative flex h-8 min-w-0 cursor-ew-resize touch-pan-y select-none items-center gap-2 overflow-hidden rounded-row border border-line bg-surface px-2.5 text-[12px] font-semibold text-muted transition-colors duration-[var(--chrome-fast)] hover:border-line-strong focus-within:border-accent before:pointer-events-none before:absolute before:inset-y-0 before:start-[var(--fill-from,0%)] before:w-[var(--fill,0%)] before:bg-accent-soft before:transition-[width] before:duration-75`
 /** Knobs two to a row; a lone last one takes the whole row. */
 export const KNOBS = 'grid grid-cols-2 gap-1.5 [&>:last-child:nth-child(odd)]:col-span-2'
 /** Four small knobs on one line, as a box's X, Y, W and H. */

@@ -1,12 +1,13 @@
-// The Effects card's tiles preview each effect on the selected layer: a star shows the star, a photo
-// the photo, a group or a frame a render of itself, text "Aa" in its own font and colour (its
-// Outline tile outlined), and several layers Aa. The pictures are drawn by the editor's renderer,
-// follow a fill change, and dragging with the card open draws the tiles again once, after the drag.
+// The Effects panel's tiles (#288) preview each effect on a sample of the selection's kind, never
+// the layer itself: "Ag" for text, the photo for a photo, a rounded shape for every other kind. A
+// tile adds its effect and takes every effect of its type off again, None takes them all off, and
+// Add another adds a second effect of a type; each is one undo step.
 import { expect, test, type Page } from '../support/test.ts'
 import type { DesignInput } from '@dazbee/schema'
 import { photo, upload } from '../support/assets.ts'
 import { writeOutput } from '../support/editor.ts'
-import { barMenu, click, fillList, openStage } from '../support/stage.ts'
+import { barMenu, openStage } from '../support/stage.ts'
+import { choose } from '../support/select.ts'
 
 test.describe.configure({ timeout: 120_000 })
 
@@ -24,128 +25,90 @@ const design = (assetId: string): DesignInput => ({
     headline: { type: 'text', parentId: 'p1', index: 'a2', name: 'Headline', props: { x: 120, y: 520, width: 400, height: 80, text: 'Run lighter', boxMode: 'autoWidth', style: { fontFamily: 'Noto Sans', fontSize: 64, fontWeight: 800, color: '#2F6BFFFF' } } },
     pair: { type: 'group', parentId: 'p1', index: 'a3', name: 'Pair', props: { x: 600, y: 600, width: 400, height: 260 } },
     left: shape('Left', 'a0', 'pair', 600, 600, 'ellipse', '#00A88AFF'),
+    right: shape('Right', 'a1', 'pair', 740, 600, 'rect', '#FFB020FF'),
     card: { type: 'frame', parentId: 'p1', index: 'a4', name: 'Card', props: { x: 120, y: 760, width: 300, height: 200, fills: [{ type: 'solid', color: '#14213DFF' }] } },
-    right: { ...shape('Right', 'a1', 'pair', 740, 600, 'rect', '#FFB020FF'), props: { ...shape('Right', 'a1', 'pair', 740, 600, 'rect', '#FFB020FF').props, width: 260 } } as Node,
   },
   overrides: {},
 })
 
-/** The tiles, in the top bar's Effects panel. */
-const effects = (page: Page) => page.getByTestId('bar-effects-menu')
-const tiles = (page: Page) => effects(page).locator('[data-tile]')
-/** Whether a tile's picture has a pixel of a colour, within a few levels. */
-const hasColour = (page: Page, tile: string, rgb: number[]) => effects(page).locator(`[data-tile="${tile}"] img`).evaluate(async (img: HTMLImageElement, rgb) => {
-  await img.decode()
-  const canvas = new OffscreenCanvas(img.naturalWidth, img.naturalHeight)
-  const context = canvas.getContext('2d')
-  context?.drawImage(img, 0, 0)
-  const data = context?.getImageData(0, 0, img.naturalWidth, img.naturalHeight).data ?? new Uint8ClampedArray()
-  for (let i = 0; i < data.length; i += 4) if ((data[i + 3] ?? 0) > 200 && rgb.every((c, j) => Math.abs((data[i + j] ?? 0) - c) <= 4)) return true
-  return false
-}, rgb)
-/** The colour at the middle of the None tile's picture, read from the picture itself. */
-const middleOf = (page: Page) => effects(page).locator('[data-tile="none"] img').evaluate(async (img: HTMLImageElement) => {
-  await img.decode()
-  const canvas = new OffscreenCanvas(img.naturalWidth, img.naturalHeight)
-  const context = canvas.getContext('2d')
-  context?.drawImage(img, 0, 0)
-  return [...(context?.getImageData(Math.floor(img.naturalWidth / 2), Math.floor(img.naturalHeight / 2), 1, 1).data ?? [])]
-})
+const select = async (page: Page, ids: string[]) => {
+  await page.evaluate((ids) => window.dazbee?.select(ids), ids)
+  await expect(page.getByTestId('top-bar')).toHaveAttribute('data-selection', ids.join(' '))
+}
+const panel = (page: Page) => barMenu(page, 'effects')
+const tiles = async (page: Page) => (await panel(page)).locator('[data-tile]')
+const tile = async (page: Page, name: string) => (await panel(page)).locator(`[data-tile="${name}"]`)
+const effectsOf = (page: Page, id: string) => page.evaluate((id) => (window.dazbee?.design().nodes[id]?.props as { effects?: { type: string }[] }).effects?.map((e) => e.type) ?? [], id)
+const undo = (page: Page) => page.evaluate(() => window.dazbee?.perform('undo'))
 
-test('each layer previews the effects on itself; a fill change follows; several layers show Aa', async ({ browser }) => {
+test('each kind previews the effects on its own sample, never on the layer', async ({ browser }) => {
   const asset = await upload(photo)
   const { page, errors } = await openStage(browser, design(asset.id))
 
-  // A star: every tile shows the pink star, drawn by the renderer.
-  await click(page, 250, 260)
-  await barMenu(page, 'effects')
-  await expect(tiles(page).locator('img[data-thumbnail]')).toHaveCount(4)
-  expect((await middleOf(page)).slice(0, 3)).toEqual([255, 46, 126])
-  writeOutput('effect-tiles-1-star.png', await effects(page).screenshot())
-  const starSrc = await tiles(page).first().locator('img').getAttribute('src')
+  // A shape: a rounded shape on every tile, six of them, no picture of the star.
+  await select(page, ['star'])
+  await expect(await tiles(page)).toHaveText(['None', 'Drop shadow', 'Inner shadow', 'Glow', 'Layer blur', 'Background blur'])
+  await expect((await tiles(page)).locator('img')).toHaveCount(0)
+  writeOutput('effect-tiles-1-shape.png', await (await panel(page)).screenshot())
 
-  // A fill change redraws them, once the change settles.
-  const fill = await fillList(page)
-  await fill.getByRole('textbox', { name: 'Colour 1 hex' }).fill('2F6BFF')
-  await fill.getByRole('textbox', { name: 'Colour 1 hex' }).press('Enter')
-  await barMenu(page, 'effects')
-  await expect.poll(async () => (await middleOf(page)).slice(0, 3)).toEqual([47, 107, 255])
-  expect(await tiles(page).first().locator('img').getAttribute('src')).not.toBe(starSrc)
+  // A photo: the photo on every tile.
+  await select(page, ['photo'])
+  await expect((await tiles(page)).locator('img')).toHaveCount(6)
+  expect(await (await tile(page, 'glow')).locator('img').getAttribute('src')).toContain(`/assets/${asset.id}/thumbnail`)
+  writeOutput('effect-tiles-2-photo.png', await (await panel(page)).screenshot())
 
-  // A photo shows the photo.
-  await click(page, 800, 250)
-  await barMenu(page, 'effects')
-  await expect.poll(async () => (await middleOf(page)).slice(0, 3)).not.toEqual([47, 107, 255])
-  await expect(tiles(page).locator('img[data-thumbnail]')).toHaveCount(4)
-  writeOutput('effect-tiles-2-photo.png', await effects(page).screenshot())
-  const photoSrc = await tiles(page).first().locator('img').getAttribute('src')
+  // A group and a box: the rounded shape, as for a shape.
+  for (const ids of [['pair'], ['card'], ['star', 'card']]) {
+    await select(page, ids)
+    await expect(await tiles(page)).toHaveCount(6)
+    await expect((await tiles(page)).locator('img')).toHaveCount(0)
+    await expect(await tiles(page)).not.toContainText(['Ag'])
+  }
 
-  // A group shows a render of itself: its two shapes.
-  await click(page, 680, 730)
-  await barMenu(page, 'effects')
-  await expect(tiles(page).locator('img[data-thumbnail]')).toHaveCount(4)
-  expect(await tiles(page).first().locator('img').getAttribute('src')).not.toBe(photoSrc)
-  expect((await middleOf(page))[3]).toBeGreaterThan(0)
-  writeOutput('effect-tiles-3-group.png', await effects(page).screenshot())
-
-  // A frame shows a render of itself.
-  await click(page, 270, 860)
-  await barMenu(page, 'effects')
-  await expect(tiles(page).locator('img[data-thumbnail]')).toHaveCount(4)
-  expect((await middleOf(page)).slice(0, 3)).toEqual([20, 33, 61])
-
-  // Text is Aa, drawn in its own font and colour; its Outline tile is the same Aa outlined.
-  await click(page, 200, 560)
-  await barMenu(page, 'effects')
-  await expect(tiles(page).locator('img[data-thumbnail]')).toHaveCount(4)
-  expect(await hasColour(page, 'none', [47, 107, 255])).toBe(true)
-  const outlined = await effects(page).locator('[data-tile="outline"] img').getAttribute('src')
-  expect(outlined).not.toBe(await tiles(page).first().locator('img').getAttribute('src'))
-  writeOutput('effect-tiles-4-text.png', await page.getByTestId('bar-effects-menu').screenshot())
-
-  // Several layers: Aa as before, in the Effects panel, opened again for the new selection.
-  await click(page, 250, 260, ['Shift'])
-  await barMenu(page, 'effects')
-  await expect(tiles(page).locator('img')).toHaveCount(0)
-  await expect(tiles(page).first()).toContainText('Aa')
+  // Text: "Ag", with an Outline tile of its own.
+  await select(page, ['headline'])
+  await expect(await tiles(page)).toHaveText(['AgNone', 'AgDrop shadow', 'AgInner shadow', 'AgGlow', 'AgOutline', 'AgLayer blur', 'AgBackground blur'])
+  writeOutput('effect-tiles-3-text.png', await (await panel(page)).screenshot())
   expect(errors).toEqual([])
 })
 
-test('dragging a layer with its tiles showing redraws the tiles once, after it stops', async ({ browser }) => {
+test('a tile adds its effect and takes it off, None takes them all off, and Add another adds a second', async ({ browser }) => {
   const asset = await upload(photo)
   const { page, errors } = await openStage(browser, design(asset.id))
-  await click(page, 250, 260)
-  await barMenu(page, 'effects')
-  await expect(tiles(page).locator('img[data-thumbnail]')).toHaveCount(4)
-  // Every font and image is here, and the None tile shows the star as the editor draws it with them.
-  await page.evaluate(() => window.dazbee?.exportFiles({ pageIds: ['p1'], formatIds: ['sq'], type: 'png' }))
-  const none = effects(page).locator('[data-tile="none"] img')
-  await expect.poll(async () => (await none.getAttribute('src')) === (await page.evaluate(() => window.dazbee?.layerThumbnail('star')))).toBe(true)
-  // Every picture the None tile shows, as it changes.
-  await page.evaluate(() => {
-    const seen: string[] = []
-    ;(window as unknown as { seen: string[] }).seen = seen
-    const img = document.querySelector('[data-testid="bar-effects-menu"] [data-tile="none"] img')
-    if (img) new MutationObserver(() => seen.push(img.getAttribute('src') ?? '')).observe(img, { attributes: true, attributeFilter: ['src'] })
-  })
-  await page.evaluate(async () => {
-    const editor = window.dazbee
-    if (!editor) throw new Error('no editor')
-    const next = () => new Promise<void>((resolve) => {
-      const stop = editor.onDraw(() => {
-        stop()
-        resolve()
-      })
-    })
-    const end = editor.session.beginGesture()
-    for (let i = 0; i < 65; i++) {
-      const drawn = next()
-      editor.session.run('node.update', { ids: ['star'], scope: 'format:sq', patch: { x: 120 + i * 3, y: 120 + i } })
-      await drawn
-    }
-    end()
-  })
-  // The tiles drew the star again once, after the drag, not on every step of it.
-  await expect.poll(() => page.evaluate(() => (window as unknown as { seen: string[] }).seen.length), { timeout: 5_000 }).toBe(1)
+  await select(page, ['star'])
+  const advanced = async () => (await panel(page)).getByTestId('effects-card')
+  await expect((await advanced()).getByRole('heading')).toHaveText('Advanced')
+  await expect(await advanced()).toContainText('Pick one or more effects above')
+
+  await (await tile(page, 'dropShadow')).click()
+  await expect(await tile(page, 'dropShadow')).toHaveAttribute('aria-pressed', 'true')
+  await expect(await tile(page, 'none')).toHaveAttribute('aria-pressed', 'false')
+  await expect.poll(() => effectsOf(page, 'star')).toEqual(['dropShadow'])
+  // Its numbers show under Advanced, with its own remove button.
+  await expect((await advanced()).locator('[data-item="effects-0"]')).toContainText('Drop shadow')
+  await expect((await advanced()).getByRole('spinbutton', { name: 'Drop shadow 1 Blur' })).toHaveValue('24')
+
+  await (await tile(page, 'innerShadow')).click()
+  await expect.poll(() => effectsOf(page, 'star')).toEqual(['dropShadow', 'innerShadow'])
+  // Add another: a second drop shadow.
+  await choose((await advanced()).getByRole('combobox', { name: 'Add another' }), 'dropShadow')
+  await expect.poll(() => effectsOf(page, 'star')).toEqual(['dropShadow', 'innerShadow', 'dropShadow'])
+  // The tile takes every drop shadow off, in one undo step.
+  await (await tile(page, 'dropShadow')).click()
+  await expect.poll(() => effectsOf(page, 'star')).toEqual(['innerShadow'])
+  await undo(page)
+  await expect.poll(() => effectsOf(page, 'star')).toEqual(['dropShadow', 'innerShadow', 'dropShadow'])
+  // None takes every effect off.
+  await (await tile(page, 'none')).click()
+  await expect.poll(() => effectsOf(page, 'star')).toEqual([])
+  await expect(await tile(page, 'none')).toHaveAttribute('aria-pressed', 'true')
+
+  // Text's Outline tile outlines the letters, with its width and colour under Advanced.
+  await select(page, ['headline'])
+  await (await tile(page, 'outline')).click()
+  await expect.poll(() => page.evaluate(() => (window.dazbee?.design().nodes.headline?.props as { style: { outline?: { width: number } } }).style.outline?.width)).toBe(2)
+  await expect((await advanced()).getByRole('spinbutton', { name: 'Outline width' })).toHaveValue('2')
+  await (await tile(page, 'none')).click()
+  await expect.poll(() => page.evaluate(() => (window.dazbee?.design().nodes.headline?.props as { style: { outline?: unknown } }).style.outline)).toBeUndefined()
   expect(errors).toEqual([])
 })

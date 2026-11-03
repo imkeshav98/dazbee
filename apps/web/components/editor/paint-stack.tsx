@@ -234,7 +234,7 @@ function GradientBar({ paint, picked, onPick, editor, p, onSet }: {
 }
 
 /** One paint's editor: its type, then a solid's colour, a gradient's stops and shape, or an image. */
-function PaintEditor({ paint, brandId, editor, p, onSet }: { paint: Paint; brandId: string; editor: Editor; p: P; onSet: (to: (now: Paint) => Paint) => void }) {
+export function PaintEditor({ paint, brandId, editor, p, onSet }: { paint: Paint; brandId: string; editor: Editor; p: P; onSet: (to: (now: Paint) => Paint) => void }) {
   const [picked, setPicked] = useState(0)
   const stop = isGradient(paint) ? paint.stops[Math.min(picked, paint.stops.length - 1)] : undefined
   const setGradient = (to: (now: Gradient) => Gradient) => onSet((now) => (isGradient(now) ? to(now) : now))

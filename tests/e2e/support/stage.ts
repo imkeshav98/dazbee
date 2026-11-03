@@ -175,7 +175,8 @@ export async function moreSubmenu(page: Page, id: string) {
 const HOLDER: Record<string, string> = {
   'layout-card': 'position', 'flow-card': 'position', 'appearance-card': 'transparency', 'spacing-card': 'spacing', 'text-box-card': 'spacing',
   'frame-card': 'box', 'auto-layout-card': 'stack', 'combine-card': 'combine-op', 'mask-card': 'mask', 'adjust-card': 'edit', 'look-card': 'edit',
-  'fit-card': 'edit', 'photos-card': 'edit',
+  'fit-card': 'edit', 'photos-card': 'edit', 'text-fit-card': 'spacing', 'outline-look': 'outline', 'outline-card': 'outline',
+  'effect-tiles': 'effects', 'effects-card': 'effects', 'brand-colours': 'colour', 'design-colours': 'colour', 'auto-layout-advanced': 'stack',
 }
 
 /**

@@ -8,13 +8,14 @@ import { MagnifyingGlassIcon, UploadSimpleIcon } from '@phosphor-icons/react'
 import type { Editor } from '@dazbee/editor'
 import { FONT_FACES } from '@dazbee/fonts'
 import { FontFace, FontFamily, type Design } from '@dazbee/schema'
-import { useCallback, useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from 'react'
+import { useCallback, useEffect, useId, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
 import { cn } from '../../lib/cn.ts'
 import { useMessages } from '../../lib/i18n/client.tsx'
 import { format } from '../../lib/i18n/index.ts'
 import { useOverlayScroll } from '../ui/overlay-scroll.ts'
 import { Select } from '../ui/select.tsx'
 import { useEditorDesign } from './formats-panel.tsx'
+import { PANEL_BUTTON, PANEL_HEADING } from './styles.ts'
 
 /** The fonts we ship, as catalog families; they have no stored preview. */
 const SHIPPED: FontFamily[] = [...new Set(FONT_FACES.map((f) => f.family))].map((family) => ({
@@ -100,8 +101,9 @@ export function FontPreview({ brandId, family, className, big = false }: { brand
 }
 
 /**
- * The font of the selected text, for the bar's font popover: the list of families to search and pick
- * from, and the weight. The catalog is fetched again each time it opens, so a brand's new upload shows.
+ * The font of the selected text, for the Font panel: a search, the weight, then the families in
+ * their groups to pick from, and an upload. The catalog is fetched again each time it opens, so a
+ * brand's new upload shows.
  */
 export function FontChooser({ editor, brandId, catalog, refresh, onDone }: { editor: Editor; brandId: string; catalog: FontFamily[]; refresh: () => Promise<void>; onDone: () => void }) {
   const t = useMessages()
@@ -125,7 +127,7 @@ export function FontChooser({ editor, brandId, catalog, refresh, onDone }: { edi
     onDone()
   }
   return (
-    <div className="flex w-72 flex-col" data-testid="font-chooser">
+    <div className="flex min-w-0 flex-col" data-testid="font-chooser">
       <FontList
         id={listId}
         brandId={brandId}
@@ -138,32 +140,36 @@ export function FontChooser({ editor, brandId, catalog, refresh, onDone }: { edi
           editor.setFont(face.family, face.weight)
           onDone()
         }}
+        weight={(
+          <label className="flex flex-col gap-1.5">
+            <span className={PANEL_HEADING}>{t.editor.fonts.weight}</span>
+            <Select
+              name="font-weight"
+              label={t.editor.fonts.weight}
+              value={current.weight === null ? '' : String(current.weight)}
+              placeholder={t.editor.fonts.mixed}
+              options={(weights.length > 0 ? weights : current.weight === null ? [] : [current.weight]).map((w) => ({
+                value: String(w),
+                label: t.editor.fonts.weights[w as keyof typeof t.editor.fonts.weights] ?? String(w),
+              }))}
+              onChange={(w) => current.family && editor.setFont(current.family, Number(w))}
+              disabled={!current.family || weights.length < 2}
+              testId="font-weight"
+              className="h-[34px] w-full rounded-row border border-line bg-surface px-2.5 text-[13px]"
+            />
+          </label>
+        )}
       />
-      <label className="flex items-center justify-between gap-3 border-t border-line px-2 pt-2 pb-0.5">
-        <span className="text-xs text-muted">{t.editor.fonts.weight}</span>
-        <Select
-          name="font-weight"
-          label={t.editor.fonts.weight}
-          value={current.weight === null ? '' : String(current.weight)}
-          placeholder={t.editor.fonts.mixed}
-          options={(weights.length > 0 ? weights : current.weight === null ? [] : [current.weight]).map((w) => ({
-            value: String(w),
-            label: t.editor.fonts.weights[w as keyof typeof t.editor.fonts.weights] ?? String(w),
-          }))}
-          onChange={(w) => current.family && editor.setFont(current.family, Number(w))}
-          disabled={!current.family || weights.length < 2}
-          testId="font-weight"
-          className="h-8 flex-1 bg-transparent px-2 text-[13px]"
-        />
-      </label>
     </div>
   )
 }
 
 const GROUPS = ['upload', 'google', 'builtin'] as const
 
-function FontList({ id, brandId, catalog, current, onPick, onClose, onUploaded }: {
+function FontList({ id, brandId, catalog, current, onPick, onClose, onUploaded, weight }: {
   id: string
+  /** Shown between the search and the list. */
+  weight: ReactNode
   brandId: string
   catalog: FontFamily[]
   current: string | null
@@ -223,8 +229,8 @@ function FontList({ id, brandId, catalog, current, onPick, onClose, onUploaded }
 
   const label = { upload: t.editor.fonts.brand, google: t.editor.fonts.google, builtin: t.editor.fonts.builtin }
   return (
-    <div className="flex max-h-[min(26rem,55vh)] min-h-0 flex-col" data-testid="font-list">
-      <div className="flex items-center gap-2 border-b border-line px-3">
+    <div className="flex min-h-0 flex-col gap-3" data-testid="font-list">
+      <div className="flex h-[34px] items-center gap-2 rounded-row border border-line bg-surface px-2.5 focus-within:border-accent">
         <MagnifyingGlassIcon size={14} aria-hidden className="shrink-0 text-subtle" />
         <input
           name="font-search"
@@ -244,18 +250,19 @@ function FontList({ id, brandId, catalog, current, onPick, onClose, onUploaded }
           }}
           onKeyDown={onKey}
           data-testid="font-search"
-          className="h-9 min-w-0 flex-1 bg-transparent text-[13px] outline-none placeholder:text-subtle"
+          className="h-full min-w-0 flex-1 bg-transparent text-[13px] outline-none placeholder:text-subtle"
         />
       </div>
-      <div ref={listRef} id={id} role="listbox" aria-label={t.editor.fonts.title} className="min-h-0 flex-1 overflow-y-auto py-1">
+      {weight}
+      <div ref={listRef} id={id} role="listbox" aria-label={t.editor.fonts.title} className="-mx-1 max-h-[min(20rem,40vh)] min-h-0 overflow-y-auto">
         {shown.length === 0 && <p className="px-3 py-4 text-xs text-muted">{format(t.editor.fonts.none, { query: query.trim() })}</p>}
         {/* Each source is a group of options, so a screen reader reads the group, then each family by name. */}
         {GROUPS.map((source) => {
           const options = shown.flatMap((family, i) => (family.source === source ? [{ family, i }] : []))
           if (options.length === 0) return null
           return (
-            <div key={source} role="group" aria-labelledby={`${id}-${source}`}>
-              <div id={`${id}-${source}`} className="px-3 pt-2 pb-1 text-[11px] font-semibold tracking-wide text-subtle">{label[source]}</div>
+            <div key={source} role="group" aria-labelledby={`${id}-${source}`} className="pb-2">
+              <div id={`${id}-${source}`} className={cn(PANEL_HEADING, 'px-1 pb-1')}>{label[source]}</div>
               {options.map(({ family, i }) => (
                 <div
                   key={family.family}
@@ -277,10 +284,10 @@ function FontList({ id, brandId, catalog, current, onPick, onClose, onUploaded }
           )
         })}
       </div>
-      <div className="border-t border-line p-2">
-        <label className={cn('flex h-8 cursor-pointer items-center justify-center gap-2 rounded-row text-[13px] font-medium text-muted hover:bg-hover hover:text-text', uploading && 'pointer-events-none opacity-60')}>
-          <UploadSimpleIcon size={14} aria-hidden />
-          {uploading ? t.editor.fonts.uploading : t.editor.fonts.upload}
+      <div>
+        <label className={cn(PANEL_BUTTON, 'focus-within:outline-2 focus-within:outline-accent', uploading && 'pointer-events-none opacity-60')}>
+          <UploadSimpleIcon size={14} aria-hidden className="shrink-0" />
+          <span>{uploading ? t.editor.fonts.uploading : t.editor.fonts.upload}</span>
           <input
             name="font-file"
             type="file"
