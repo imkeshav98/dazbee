@@ -135,7 +135,7 @@ const longTasks = (page: Page) =>
     return seen
   })
 
-/** A reply from the export worker (ExportReply in packages/editor/src/export-client.ts). */
+/** A reply from the export worker (ExportReply in packages/editor/src/export/export-client.ts). */
 type Reply =
   | { kind: 'progress'; done: number; total: number }
   | { kind: 'done'; file: { bytes: Uint8Array } }

@@ -21,6 +21,7 @@ import {
   type TextAnchor,
   textAnchor,
 } from '@dazbee/doc'
+import type { ExportedFile } from '@dazbee/export'
 import { FALLBACK_FAMILIES, FONT_FACES } from '@dazbee/fonts'
 import {
   caretAt,
@@ -64,12 +65,12 @@ import {
   type Point,
   type Rect,
   SCHEMA_VERSION,
+  type TextStyle,
   type VariableRef,
   type Variables,
 } from '@dazbee/schema'
 import { type Skipped, SVG_TYPE, SvgError, svgMarkup, svgToLayers } from '@dazbee/svg'
 
-import { align, type Alignment, distribute, type Distribution, type Offset } from './arrange.ts'
 import {
   type Camera,
   fit,
@@ -80,8 +81,12 @@ import {
   toWorld,
   type Viewport,
   zoomAt,
-} from './camera.ts'
-import { cornersOfRect, coverCrop, cropOf, imageRect, panned, scaled } from './crop.ts'
+} from './canvas/camera.ts'
+import { type Frame, frameAt, frameGrid, intersects } from './canvas/grid.ts'
+import { hitTest } from './canvas/hit-test.ts'
+import { rulerParts } from './canvas/rulers.ts'
+import { exportClient } from './export/export-client.ts'
+import { cornersOfRect, coverCrop, cropOf, imageRect, panned, scaled } from './gestures/crop.ts'
 import {
   clickedBox,
   drawnBox,
@@ -93,10 +98,7 @@ import {
   newText,
   type ShapeTool,
   withImage,
-} from './draw-tools.ts'
-import { exportClient } from './export-client.ts'
-import { type Frame, frameAt, frameGrid, intersects } from './grid.ts'
-import { hitTest } from './hit-test.ts'
+} from './gestures/draw-tools.ts'
 import {
   type Anchor,
   anchorOf,
@@ -117,20 +119,9 @@ import {
   segmentsOf,
   type Side,
   splitSegment,
-} from './path.ts'
-import { rulerParts } from './rulers.ts'
-import { NUDGE, NUDGE_FAR, type ShortcutAction, shortcutFor } from './shortcuts.ts'
-import { type Gap, type Guide, SNAP_DISTANCE, snapMove, snapResize, snapTargets, type Targets } from './snap.ts'
-import {
-  paragraphAt,
-  type RunStyle,
-  step,
-  stylesIn,
-  type StyleToggle,
-  type TextRange,
-  toggled,
-  wordAt,
-} from './text-edit.ts'
+} from './gestures/path.ts'
+import { align, type Alignment, distribute, type Distribution, type Offset } from './layers/arrange.ts'
+import { type Gap, type Guide, SNAP_DISTANCE, snapMove, snapResize, snapTargets, type Targets } from './layers/snap.ts'
 import {
   angleOf,
   boundsOf,
@@ -147,7 +138,18 @@ import {
   scaleWithin,
   snapAngle,
   turn,
-} from './transform.ts'
+} from './layers/transform.ts'
+import { NUDGE, NUDGE_FAR, type ShortcutAction, shortcutFor } from './shortcuts.ts'
+import {
+  paragraphAt,
+  type RunStyle,
+  step,
+  stylesIn,
+  type StyleToggle,
+  type TextRange,
+  toggled,
+  wordAt,
+} from './text/text-edit.ts'
 
 // CommonJS whose types claim an ES default export; the bundler hands over the init function itself.
 const CanvasKitInit = canvasKitModule as unknown as typeof import('@dazbee/canvaskit').default
@@ -260,6 +262,245 @@ export interface DrawInfo {
   frames: number
   /** Frames whose picture was recorded again because they changed. */
   recorded: number
+}
+
+/** The open editor that `startEditor` resolves to: everything it makes is freed by `destroy`. */
+export interface Editor {
+  session: Session
+  doc: Y.Doc
+  /** The design as the document holds it now, which can be ahead of the last redraw. */
+  design: () => Design
+  /** The first selected layer, or null. */
+  selected: () => string | null
+  /** Every selected layer, in the order they were picked. */
+  selection: () => string[]
+  /** The frame the selection is in, as `<pageId>/<formatId>`. */
+  selectedFrame: () => string | null
+  /** Selects layers in one frame, the first page in the primary format by default; none clears it. */
+  select(ids: string[], pageId?: string, formatId?: string): void
+  /** Does what a shortcut does, as if its key was pressed on the stage. */
+  perform: (action: ShortcutAction) => boolean
+  /** Whether this tab has a change of its own to undo, or an undone one to redo. */
+  canUndo: () => boolean
+  canRedo: () => boolean
+  /** Calls back whenever what undo or redo would do may have changed. */
+  onHistory: (listener: () => void) => () => void
+  /**
+   * Copies the selected layers as Mod+C does, from a menu: kept on this device for Paste, and
+   * their names as plain text on the clipboard, which a Mod+V elsewhere matches to the kept copy.
+   * False with nothing to copy.
+   */
+  copyLayers(): boolean
+  /** Whether Paste in a menu has layers to place: the ones last copied in Dazbee on this device. */
+  canPasteLayers: () => boolean
+  /** Pastes the layers last copied in Dazbee on this device, as Mod+V does; false with none kept. */
+  pasteLayers(): boolean
+  /**
+   * Moves a layer under a page or container, before a sibling or on top (#59), as one undo step;
+   * groups it leaves and enters fit what they hold again. False when the move isn't allowed, such
+   * as into itself or into a layer that can't hold it.
+   */
+  moveLayer(id: string, parentId: string, before?: string): boolean
+  /**
+   * Starts one undo step for the properties panel's scrubbing (#60): every change until the
+   * returned function is called is undone together.
+   */
+  beginGesture: () => () => void
+  /** Whether a gesture is running: a drag, resize or turn on the stage, a scrub in the panels, or text being typed. */
+  gesturing: () => boolean
+  /**
+   * Sets properties of layers as the properties panel does (#60), as one undo step, or as part of
+   * the gesture open. `to` gives a layer's patch from the values it has in the frame now (base
+   * and that format's overrides); null leaves it be. In this format only (`everyFormat` false)
+   * the values become overrides of the frame's format, as a drag on the stage does. In every
+   * format they become the base values and the layers' overrides of those properties go, so every
+   * format shows what this one does. X and Y of a group or frame carry what it holds along;
+   * groups fit what they hold again. A fill, text colour or font set by hand no longer follows
+   * the brand. False when a change isn't allowed, such as on a locked layer.
+   */
+  setProps(
+    ids: string[],
+    to: (id: string, now: Readonly<Record<string, unknown>>) => Record<string, unknown> | null,
+    everyFormat: boolean,
+    pageId?: string,
+    formatId?: string,
+  ): boolean
+  /** Renames a layer (#59), as one undo step; false for an empty name. */
+  renameLayer: (id: string, name: string) => boolean
+  /** Locks layers completely, or unlocks them (#59), as one undo step. */
+  setLocked: (ids: string[], locked: boolean) => boolean
+  /**
+   * Hides layers in one frame's format, or shows them (#59), as one undo step: like the Hide
+   * shortcut, in that format only. The first page in the primary format by default.
+   */
+  setHidden(ids: string[], hidden: boolean, pageId?: string, formatId?: string, everyFormat?: boolean): boolean
+  /** Calls back with what the editor tells the person, such as a nudge auto layout decides. */
+  onNotice(listener: (notice: Notice, parts: readonly Skipped[]) => void): () => boolean
+  /**
+   * Where the selection is drawn on the stage, in pixels from the stage's top start corner: the
+   * upright box round it, turned or not, and its size label under or over it. Null with nothing
+   * selected.
+   */
+  selectionRect(): Rect | null
+  /**
+   * Picks what a right-click at `client` (client coordinates) acts on: the selection when the point
+   * is on it, else the layer there, selected, locked or not. Returns the selected layers, none when
+   * the point is on no layer.
+   */
+  selectAt(client: Point): string[]
+  /** Whether a gesture is running: when the bar by the selection keeps out of the way. */
+  busy: () => boolean
+  /** The text layer being edited and its selected range, when one is selected; what the bar and cards then style. */
+  textSelection: () => { id: string; range: TextRange } | null
+  /** Each character's style in the selected range of the text being edited, or null with no range. */
+  textSelectionStyles(): TextStyle[] | null
+  /** Styles the selected range of the text being edited, as one undo step; false with no range. */
+  styleTextSelection: (style: RunStyle) => boolean
+  /** Calls back when the text being edited, or its selected range, changes. */
+  onTextSelection(listener: () => void): () => boolean
+  /** Calls back with the selected layers whenever the selection changes. */
+  onSelection(listener: (ids: string[]) => void): () => boolean
+  /** The page a click on its background picked, or null; no layer is selected while one is. */
+  pickedPage: () => string | null
+  /** Picks a page as a click on its background does, clearing the selection; null lets it go. */
+  pickPage: (pageId: string | null) => void
+  /** Calls back with the picked page, or null, whenever it changes. */
+  onPagePick(listener: (pageId: string | null) => void): () => boolean
+  /** Whether the rulers along the stage's edges show. */
+  rulers: () => boolean
+  /** Whether a drag snaps to layers and the frame. */
+  snapping: () => boolean
+  /**
+   * Snapping's work since the editor opened, for the checks that count it: `gathered` drags
+   * worked out what they can snap to, `moves` pointer moves of a drag snapped, and the last
+   * drag gathered `targets` boxes, each move measured against all of them.
+   */
+  snapWork: () => { gathered: number; moves: number; targets: number }
+  /** Turns snapping on or off for every drag. */
+  setSnapping(on: boolean): void
+  /** Calls back whenever the rulers or snapping turn on or off. */
+  onView(listener: () => void): () => boolean
+  frames: () => Frame[]
+  /** The format the focus view shows alone, or null when every format shows. */
+  focused: () => string | null
+  /** Shows one format alone, fitted, or every format again with null. */
+  focus(formatId: string | null): void
+  camera: () => Camera
+  viewport: () => Viewport
+  setCamera: (next: Camera) => void
+  /** The stage's edges floating chrome covers, in screen pixels; later fits keep clear of them. */
+  setInsets(next: Insets): void
+  zoomTo: (zoom: number, at?: Point) => void
+  zoomIn: () => void
+  zoomOut: () => void
+  fitAll: () => void
+  fitSelection: () => void
+  fitFrame: (pageId: string, formatId: string) => void
+  /** Brings one page's row into view: every format of that page, fitted. */
+  fitPage(pageId: string): void
+  setTool: (next: Tool) => void
+  tool: () => Tool
+  /**
+   * Picks the image the image tool places with its next click or drag, and switches to that
+   * tool; null forgets it. Another tool forgets it too.
+   */
+  armImage(asset: PlacedAsset | null): void
+  /** Whether the image tool has an image to place. */
+  imageArmed: () => boolean
+  /** Calls back with the tool whenever it changes, by a key or after drawing a shape. */
+  onTool(listener: (tool: Tool) => void): () => boolean
+  /** Where a design pixel of one frame is on screen now, in client coordinates; the first page and the primary format by default. */
+  screenPoint(x: number, y: number, pageId?: string, formatId?: string): Point
+  /** A layer's box as drawn in one frame, in design pixels, auto layout solved; the first page and the primary format by default. */
+  boxOf(id: string, pageId?: string, formatId?: string): Rect | null
+  /**
+   * Resolves once the fonts and images the design has asked for so far are here or failed to
+   * come. One arriving drops every frame's picture, so the next redraw records them again.
+   */
+  loaded: () => Promise<undefined>
+  /** Resolves once what the screen shows is up to date: after the pending redraw, if there is one. */
+  drawn: () => Promise<void>
+  onDraw(listener: (design: Design, at: number, info: DrawInfo) => void): () => boolean
+  /** The export render of one frame as this tab holds it now, on the CPU surface, as RGBA; the first page in the primary format by default. */
+  exportPixels(pageId?: string, formatId?: string): Uint8Array
+  /**
+   * Exports pages in formats as PNG or JPG, as this tab holds the design now, drawn in the export
+   * worker so the stage stays responsive (#55). One file comes as itself, more as one zip.
+   */
+  exportFiles(request: ExportRequestInput, progress?: (done: number, total: number) => void): Promise<ExportedFile>
+  /**
+   * Gives layers back the values every format has, in one format (`scope`, `format:<id>`): the
+   * properties in `paths`, or all of them. Text that grows the size of its words fits them again
+   * there, in the same undo step.
+   */
+  resetOwn(ids: string[], scope: ReturnType<typeof formatScope>, paths?: string[]): boolean
+  /** The families whose files the editor has, shipped ones included (#50). */
+  loadedFamilies: () => string[]
+  /**
+   * Sets the font of the selected text layers, or of the selected range of the text being edited,
+   * as one undo step: the family, and the weight when one is given. It waits for the family's files
+   * first, so text that grows the size of its words is measured in it and fits its box in the same step.
+   */
+  setFont(fontFamily: string, fontWeight?: number): Promise<void>
+  /** The brand kit's values bound properties take now (#53). */
+  variables: () => Variables
+  /**
+   * Gives bound properties new values, as when the brand kit changes: bound layers redraw with them,
+   * the families of brand fonts load, and exports use them. Text bound to a brand font whose family
+   * changed takes the new one and refits once its files are here, a change no one undoes; the
+   * promise settles then.
+   */
+  setVariables(variables: Variables): Promise<void>
+  /**
+   * Binds the selected layers to a brand colour or font, or unbinds them with null, in one undo
+   * step (#53). A colour binds a text layer's colour and any other layer's fill; a font binds text
+   * only. Returns how many layers changed.
+   */
+  bindSelection(kind: 'color' | 'font', ref: VariableRef | null): number
+  /**
+   * Places an image asset as a graphic filled with it (#52), in one undo step: centred on `where`,
+   * a spot or a point in client coordinates, or else in the middle of the frame in the middle of
+   * the view. The image's bytes load in the background. Returns the new layer's id, or null when
+   * the point is on no frame.
+   */
+  placeImage(asset: PlacedAsset, where?: Point | Spot): string | null
+  placeSvg: (text: string, name: string, where?: Point | Spot) => string | null
+  /** The spot under a point on screen, in client coordinates: the frame there and the point in it. Null off every frame. */
+  spotAt(client: Point): Spot | null
+  /** Ends typing into a text layer, if one is being typed into, closing its undo step. */
+  stopEditing: () => void
+  /**
+   * Ends what stays open on the stage until a key ends it, closing its undo step: typing, and a
+   * pen path, which keeps the anchors placed so far, as Enter does.
+   */
+  settle(): void
+  /** Whether the editor has been destroyed. */
+  destroyed: () => boolean
+  /**
+   * Outlines the layer an image dragged over the stage at `client` would go into, or clears the
+   * outline with null. Returns that layer's id, or null where a drop makes a new layer.
+   */
+  imageTarget(client: Point | null): string | null
+  /**
+   * Puts an image into a layer as its fill, in every format, as one undo step: in place of its
+   * topmost image fill (keeping its fit, adjustments and filter, the crop reset), or on top of its
+   * fills when it has none. A format with fills of its own gets the image in them too, keeping its
+   * colours; a fill bound to a brand colour stays bound. The layer is selected, in `inFrame` when
+   * given, as `<pageId>/<formatId>`. False when it can't take one, such as a layer whose style is
+   * locked.
+   */
+  fillWithImage(id: string, asset: PlacedAsset, inFrame?: string): boolean
+  /** A page's picture in its main format, `size` pixels on its longer side, for the Pages card. Null when it has none. */
+  pageThumbnail(pageId: string, size?: number): string | null
+  /**
+   * A small picture of a layer for the effect tiles and the layers panel: drawn by the renderer
+   * without the layer's own effects, in `frameKey` (the frame the selection is in, else the first
+   * page in the primary format), and kept until the layer or what it is drawn with changes. Text
+   * is "Aa" in its look, outlined with no fill when asked. A PNG object URL, or null.
+   */
+  layerThumbnail(id: string, size?: number, outlined?: boolean, frameKey?: string): string | null
+  synced: () => boolean
+  destroy(): void
 }
 
 /** A frame's scene and its recorded drawing, kept until the layers it shows change. */
@@ -423,7 +664,7 @@ function live(
   provider: HocuspocusProvider,
   local: IndexeddbPersistence,
   options: EditorOptions,
-) {
+): Editor {
   const { canvas, overlay } = options
   let resourceBytes = firstBytes
   let resources = cache.resources(resourceBytes)
@@ -4403,15 +4644,10 @@ function live(
   return {
     session,
     doc,
-    /** The design as the document holds it now, which can be ahead of the last redraw. */
     design: () => session.design(),
-    /** The first selected layer, or null. */
     selected: () => selection?.ids[0] ?? null,
-    /** Every selected layer, in the order they were picked. */
     selection: () => [...(selection?.ids ?? [])],
-    /** The frame the selection is in, as `<pageId>/<formatId>`. */
     selectedFrame: () => selection?.frame ?? null,
-    /** Selects layers in one frame, the first page in the primary format by default; none clears it. */
     select(ids: string[], pageId?: string, formatId?: string) {
       stopEditing()
       select(
@@ -4419,18 +4655,10 @@ function live(
         defaultFrame(pageId, formatId).key,
       )
     },
-    /** Does what a shortcut does, as if its key was pressed on the stage. */
     perform,
-    /** Whether this tab has a change of its own to undo, or an undone one to redo. */
     canUndo: () => session.canUndo(),
     canRedo: () => session.canRedo(),
-    /** Calls back whenever what undo or redo would do may have changed. */
     onHistory: (listener: () => void) => session.onHistory(listener),
-    /**
-     * Copies the selected layers as Mod+C does, from a menu: kept on this device for Paste, and
-     * their names as plain text on the clipboard, which a Mod+V elsewhere matches to the kept copy.
-     * False with nothing to copy.
-     */
     copyLayers() {
       const copied = copiedLayers()
       if (!copied) return false
@@ -4441,20 +4669,13 @@ function live(
       })
       return true
     },
-    /** Whether Paste in a menu has layers to place: the ones last copied in Dazbee on this device. */
     canPasteLayers: () => rememberedLayers() !== null,
-    /** Pastes the layers last copied in Dazbee on this device, as Mod+V does; false with none kept. */
     pasteLayers() {
       const tree = rememberedLayers()
       if (!tree) return false
       pasteLayers(tree, false)
       return true
     },
-    /**
-     * Moves a layer under a page or container, before a sibling or on top (#59), as one undo step;
-     * groups it leaves and enters fit what they hold again. False when the move isn't allowed, such
-     * as into itself or into a layer that can't hold it.
-     */
     moveLayer(id: string, parentId: string, before?: string) {
       const from = session.design().nodes[id]?.parentId
       return runQuietly(() =>
@@ -4464,23 +4685,8 @@ function live(
         }),
       )
     },
-    /**
-     * Starts one undo step for the properties panel's scrubbing (#60): every change until the
-     * returned function is called is undone together.
-     */
     beginGesture: () => session.beginGesture(),
-    /** Whether a gesture is running: a drag, resize or turn on the stage, a scrub in the panels, or text being typed. */
     gesturing: () => gesture !== null || session.inGesture(),
-    /**
-     * Sets properties of layers as the properties panel does (#60), as one undo step, or as part of
-     * the gesture open. `to` gives a layer's patch from the values it has in the frame now (base
-     * and that format's overrides); null leaves it be. In this format only (`everyFormat` false)
-     * the values become overrides of the frame's format, as a drag on the stage does. In every
-     * format they become the base values and the layers' overrides of those properties go, so every
-     * format shows what this one does. X and Y of a group or frame carry what it holds along;
-     * groups fit what they hold again. A fill, text colour or font set by hand no longer follows
-     * the brand. False when a change isn't allowed, such as on a locked layer.
-     */
     setProps(
       ids: string[],
       to: (id: string, now: Readonly<Record<string, unknown>>) => Record<string, unknown> | null,
@@ -4551,32 +4757,20 @@ function live(
         }),
       )
     },
-    /** Renames a layer (#59), as one undo step; false for an empty name. */
     renameLayer: (id: string, name: string) => runQuietly(() => session.run('node.rename', { id, name })),
-    /** Locks layers completely, or unlocks them (#59), as one undo step. */
     setLocked: (ids: string[], locked: boolean) =>
       runQuietly(() =>
         session.run('node.lock', { ids, lock: Object.fromEntries(LOCK_FLAGS.map((flag) => [flag, locked])) }),
       ),
-    /**
-     * Hides layers in one frame's format, or shows them (#59), as one undo step: like the Hide
-     * shortcut, in that format only. The first page in the primary format by default.
-     */
     setHidden(ids: string[], hidden: boolean, pageId?: string, formatId?: string, everyFormat = false) {
       if (everyFormat) return hideInEveryFormat(ids, hidden)
       const frame = defaultFrame(pageId, formatId)
       return runQuietly(() => session.run('node.update', { ids, scope: scope(frame), patch: { visible: !hidden } }))
     },
-    /** Calls back with what the editor tells the person, such as a nudge auto layout decides. */
     onNotice(listener: (notice: Notice, parts: readonly Skipped[]) => void) {
       noticeListeners.add(listener)
       return () => noticeListeners.delete(listener)
     },
-    /**
-     * Where the selection is drawn on the stage, in pixels from the stage's top start corner: the
-     * upright box round it, turned or not, and its size label under or over it. Null with nothing
-     * selected.
-     */
     selectionRect(): Rect | null {
       const outer = selectionBox()
       if (!outer) return null
@@ -4609,11 +4803,6 @@ function live(
         height: Math.max(...ys) - Math.min(...ys),
       }
     },
-    /**
-     * Picks what a right-click at `client` (client coordinates) acts on: the selection when the point
-     * is on it, else the layer there, selected, locked or not. Returns the selected layers, none when
-     * the point is on no layer.
-     */
     selectAt(client: Point): string[] {
       const rect = canvas.getBoundingClientRect()
       const world = toWorld(camera, { x: client.x - rect.left, y: client.y - rect.top })
@@ -4625,11 +4814,8 @@ function live(
       if (!(selection?.frame === frame.key && selection.ids.includes(id))) select([id], frame.key)
       return [...(selection?.ids ?? [])]
     },
-    /** Whether a gesture is running: when the bar by the selection keeps out of the way. */
     busy: () => gesture !== null,
-    /** The text layer being edited and its selected range, when one is selected; what the bar and cards then style. */
     textSelection: () => selectedText(),
-    /** Each character's style in the selected range of the text being edited, or null with no range. */
     textSelectionStyles() {
       const selected = selectedText()
       const now = session.design()
@@ -4639,52 +4825,35 @@ function live(
         Partial<typeof node.props.style> | undefined
       return stylesIn({ ...node.props, style: { ...node.props.style, ...own } }, selected.range)
     },
-    /** Styles the selected range of the text being edited, as one undo step; false with no range. */
     styleTextSelection: (style: RunStyle) => styleSelectedText(style),
-    /** Calls back when the text being edited, or its selected range, changes. */
     onTextSelection(listener: () => void) {
       textSelectionListeners.add(listener)
       return () => textSelectionListeners.delete(listener)
     },
-    /** Calls back with the selected layers whenever the selection changes. */
     onSelection(listener: (ids: string[]) => void) {
       selectionListeners.add(listener)
       return () => selectionListeners.delete(listener)
     },
-    /** The page a click on its background picked, or null; no layer is selected while one is. */
     pickedPage: () => pickedPage,
-    /** Picks a page as a click on its background does, clearing the selection; null lets it go. */
     pickPage,
-    /** Calls back with the picked page, or null, whenever it changes. */
     onPagePick(listener: (pageId: string | null) => void) {
       pageListeners.add(listener)
       return () => pageListeners.delete(listener)
     },
-    /** Whether the rulers along the stage's edges show. */
     rulers: () => rulers,
-    /** Whether a drag snaps to layers and the frame. */
     snapping: () => snapping,
-    /**
-     * Snapping's work since the editor opened, for the checks that count it: `gathered` drags
-     * worked out what they can snap to, `moves` pointer moves of a drag snapped, and the last
-     * drag gathered `targets` boxes, each move measured against all of them.
-     */
     snapWork: () => ({ ...snapWork }),
-    /** Turns snapping on or off for every drag. */
     setSnapping(on: boolean) {
       if (on === snapping) return
       snapping = on
       viewChanged()
     },
-    /** Calls back whenever the rulers or snapping turn on or off. */
     onView(listener: () => void) {
       viewListeners.add(listener)
       return () => viewListeners.delete(listener)
     },
     frames: () => frameGrid(session.design(), focused).frames,
-    /** The format the focus view shows alone, or null when every format shows. */
     focused: () => focused,
-    /** Shows one format alone, fitted, or every format again with null. */
     focus(formatId: string | null) {
       focused = formatId && design.formats[formatId] ? formatId : null
       grid = frameGrid(design, focused)
@@ -4695,7 +4864,6 @@ function live(
     camera: () => camera,
     viewport: () => viewport,
     setCamera,
-    /** The stage's edges floating chrome covers, in screen pixels; later fits keep clear of them. */
     setInsets(next: Insets) {
       insets = next
     },
@@ -4705,7 +4873,6 @@ function live(
     fitAll,
     fitSelection,
     fitFrame: (pageId: string, formatId: string) => fitFrame(defaultFrame(pageId, formatId)),
-    /** Brings one page's row into view: every format of that page, fitted. */
     fitPage(pageId: string) {
       const row = grid.frames.filter((f) => f.pageId === pageId)
       const first = row[0]
@@ -4723,40 +4890,27 @@ function live(
     },
     setTool,
     tool: () => tool,
-    /**
-     * Picks the image the image tool places with its next click or drag, and switches to that
-     * tool; null forgets it. Another tool forgets it too.
-     */
     armImage(asset: PlacedAsset | null) {
       if (asset) setTool('image')
       imageToPlace = asset
       showCursor()
     },
-    /** Whether the image tool has an image to place. */
     imageArmed: () => imageToPlace !== null,
-    /** Calls back with the tool whenever it changes, by a key or after drawing a shape. */
     onTool(listener: (tool: Tool) => void) {
       toolListeners.add(listener)
       return () => toolListeners.delete(listener)
     },
-    /** Where a design pixel of one frame is on screen now, in client coordinates; the first page and the primary format by default. */
     screenPoint(x: number, y: number, pageId?: string, formatId?: string): Point {
       const frame = defaultFrame(pageId, formatId)
       const at = toScreen(camera, { x: frame.x + x, y: frame.y + y })
       const rect = canvas.getBoundingClientRect()
       return { x: rect.left + at.x, y: rect.top + at.y }
     },
-    /** A layer's box as drawn in one frame, in design pixels, auto layout solved; the first page and the primary format by default. */
     boxOf(id: string, pageId?: string, formatId?: string) {
       const box = drawnBoxOf(defaultFrame(pageId, formatId), id)
       return box && { x: box.x, y: box.y, width: box.width, height: box.height }
     },
-    /**
-     * Resolves once the fonts and images the design has asked for so far are here or failed to
-     * come. One arriving drops every frame's picture, so the next redraw records them again.
-     */
     loaded: () => Promise.all([fontsLoading, imagesLoading]).then(() => undefined),
-    /** Resolves once what the screen shows is up to date: after the pending redraw, if there is one. */
     drawn: () =>
       new Promise<void>((resolve) => {
         if (!pending) return resolve()
@@ -4770,26 +4924,16 @@ function live(
       drawListeners.add(listener)
       return () => drawListeners.delete(listener)
     },
-    /** The export render of one frame as this tab holds it now, on the CPU surface, as RGBA; the first page in the primary format by default. */
     exportPixels(pageId?: string, formatId?: string) {
       const frame = defaultFrame(pageId, formatId)
       return renderDesign(ck, session.design(), frame.pageId, frame.formatId, resourceBytes, cache).pixels
     },
-    /**
-     * Exports pages in formats as PNG or JPG, as this tab holds the design now, drawn in the export
-     * worker so the stage stays responsive (#55). One file comes as itself, more as one zip.
-     */
     async exportFiles(request: ExportRequestInput, progress?: (done: number, total: number) => void) {
       // A family picked or an image placed a moment ago is drawn as itself, never the fallback or a gap.
       screenResources(session.design())
       await Promise.all([fontsLoading, imagesLoading])
       return exporter.run(session.design(), request, resourceBytes, progress)
     },
-    /**
-     * Gives layers back the values every format has, in one format (`scope`, `format:<id>`): the
-     * properties in `paths`, or all of them. Text that grows the size of its words fits them again
-     * there, in the same undo step.
-     */
     resetOwn(ids: string[], scope: ReturnType<typeof formatScope>, paths?: string[]) {
       return runQuietly(() =>
         session.gesture(() => {
@@ -4798,13 +4942,7 @@ function live(
         }),
       )
     },
-    /** The families whose files the editor has, shipped ones included (#50). */
     loadedFamilies: () => [...new Set(resourceBytes.fonts.map((f) => f.family))],
-    /**
-     * Sets the font of the selected text layers, or of the selected range of the text being edited,
-     * as one undo step: the family, and the weight when one is given. It waits for the family's files
-     * first, so text that grows the size of its words is measured in it and fits its box in the same step.
-     */
     async setFont(fontFamily: string, fontWeight?: number) {
       const ids = (selection?.ids ?? []).filter((id) => session.design().nodes[id]?.type === 'text')
       const range = selectedText()
@@ -4832,25 +4970,13 @@ function live(
         }
       })
     },
-    /** The brand kit's values bound properties take now (#53). */
     variables: () => resourceBytes.variables ?? {},
-    /**
-     * Gives bound properties new values, as when the brand kit changes: bound layers redraw with them,
-     * the families of brand fonts load, and exports use them. Text bound to a brand font whose family
-     * changed takes the new one and refits once its files are here, a change no one undoes; the
-     * promise settles then.
-     */
     setVariables(variables: Variables) {
       resourceBytes = { ...resourceBytes, variables }
       loadNewFonts(session.design())
       redraw()
       return refitBrandFonts()
     },
-    /**
-     * Binds the selected layers to a brand colour or font, or unbinds them with null, in one undo
-     * step (#53). A colour binds a text layer's colour and any other layer's fill; a font binds text
-     * only. Returns how many layers changed.
-     */
     bindSelection(kind: 'color' | 'font', ref: VariableRef | null): number {
       const current = session.design()
       const value = ref ? resourceBytes.variables?.[ref] : undefined
@@ -4876,12 +5002,6 @@ function live(
       })
       return changed
     },
-    /**
-     * Places an image asset as a graphic filled with it (#52), in one undo step: centred on `where`,
-     * a spot or a point in client coordinates, or else in the middle of the frame in the middle of
-     * the view. The image's bytes load in the background. Returns the new layer's id, or null when
-     * the point is on no frame.
-     */
     placeImage(
       asset: { id: string; name: string; width: number; height: number },
       where?: Point | Spot,
@@ -4913,35 +5033,24 @@ function live(
     },
     placeSvg: (text: string, name: string, where?: Point | Spot) =>
       placeSvg(text, name, !where ? {} : 'frame' in where ? { spot: where } : { client: where }),
-    /** The spot under a point on screen, in client coordinates: the frame there and the point in it. Null off every frame. */
     spotAt(client: Point): Spot | null {
       const rect = canvas.getBoundingClientRect()
       const world = toWorld(camera, { x: client.x - rect.left, y: client.y - rect.top })
       const frame = frameAt(grid.frames, world)
       return frame ? { frame: frame.key, x: world.x - frame.x, y: world.y - frame.y } : null
     },
-    /** Ends typing into a text layer, if one is being typed into, closing its undo step. */
     stopEditing: () => {
       if (!editing) return
       stopEditing()
       drawOverlay()
     },
-    /**
-     * Ends what stays open on the stage until a key ends it, closing its undo step: typing, and a
-     * pen path, which keeps the anchors placed so far, as Enter does.
-     */
     settle() {
       if (!editing && !pen) return
       stopEditing()
       finishPen()
       drawOverlay()
     },
-    /** Whether the editor has been destroyed. */
     destroyed: () => listening.signal.aborted,
-    /**
-     * Outlines the layer an image dragged over the stage at `client` would go into, or clears the
-     * outline with null. Returns that layer's id, or null where a drop makes a new layer.
-     */
     imageTarget(client: Point | null): string | null {
       const next = client ? imageTargetAt(client) : null
       if (next?.id !== dropTarget?.id || next?.frame !== dropTarget?.frame) {
@@ -4950,14 +5059,6 @@ function live(
       }
       return next?.id ?? null
     },
-    /**
-     * Puts an image into a layer as its fill, in every format, as one undo step: in place of its
-     * topmost image fill (keeping its fit, adjustments and filter, the crop reset), or on top of its
-     * fills when it has none. A format with fills of its own gets the image in them too, keeping its
-     * colours; a fill bound to a brand colour stays bound. The layer is selected, in `inFrame` when
-     * given, as `<pageId>/<formatId>`. False when it can't take one, such as a layer whose style is
-     * locked.
-     */
     fillWithImage(id: string, asset: PlacedAsset, inFrame?: string): boolean {
       const now = session.design()
       const node = now.nodes[id]
@@ -4988,17 +5089,10 @@ function live(
       drawOverlay()
       return ok
     },
-    /** A page's picture in its main format, `size` pixels on its longer side, for the Pages card. Null when it has none. */
     pageThumbnail(pageId: string, size = 72): string | null {
       const frame = frameOf(`${pageId}/${design.meta.primaryFormatId}`)
       return frame ? pageThumbnail(frame, size) : null
     },
-    /**
-     * A small picture of a layer for the effect tiles and the layers panel: drawn by the renderer
-     * without the layer's own effects, in `frameKey` (the frame the selection is in, else the first
-     * page in the primary format), and kept until the layer or what it is drawn with changes. Text
-     * is "Aa" in its look, outlined with no fill when asked. A PNG object URL, or null.
-     */
     layerThumbnail(id: string, size = 96, outlined = false, frameKey?: string): string | null {
       const frame = frameOf(frameKey ?? selection?.frame) ?? frameOf(`${firstPage()}/${design.meta.primaryFormatId}`)
       return frame ? layerThumbnail(frame, id, size, outlined) : null
@@ -5039,4 +5133,3 @@ function live(
     },
   }
 }
-export type Editor = ReturnType<typeof live>
