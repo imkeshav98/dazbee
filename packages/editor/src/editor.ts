@@ -1,11 +1,11 @@
 // The editor: one infinite canvas per design with every page in every format as a frame (#36),
 // click to select, drag to move, typing into text, pan and zoom. It has no framework in it; the
 // page only hands it a canvas and an overlay the size of the stage.
-import { HocuspocusProvider, WebSocketStatus } from '@hocuspocus/provider'
+import { HocuspocusProvider } from '@hocuspocus/provider'
 import { IndexeddbPersistence } from 'y-indexeddb'
 import * as Y from 'yjs'
 
-import type { CanvasKit, GrDirectContext, Image, SkPicture, Surface } from '@dazbee/canvaskit'
+import type { CanvasKit, GrDirectContext, Surface } from '@dazbee/canvaskit'
 import {
   ancestorsOf,
   anchorOffset,
@@ -20,27 +20,19 @@ import {
   textAnchor,
 } from '@dazbee/doc'
 import type { ExportedFile } from '@dazbee/export'
-import { FALLBACK_FAMILIES, FONT_FACES } from '@dazbee/fonts'
+import { FALLBACK_FAMILIES } from '@dazbee/fonts'
 import {
   caretAt,
   caretPosition,
-  drawPage,
-  layerPictures,
-  type MeasureText,
-  paragraphCache,
   render,
   renderDesign,
   type ResourceCache,
   resourceCache,
-  type Resources,
   type ScaledText,
   scaleText,
-  type Scene,
   type SceneLayer,
-  sceneMemo,
   selectionBoxes,
   smallestSize,
-  textMeasure,
 } from '@dazbee/renderer'
 import {
   type BindingTarget,
@@ -83,6 +75,8 @@ import { resizeCursor, ROTATE_CURSOR } from './canvas/cursors.ts'
 import { type Frame, frameAt, frameGrid, frameKey, intersects, scope } from './canvas/grid.ts'
 import { hitTest } from './canvas/hit-test.ts'
 import { px, rulerParts } from './canvas/rulers.ts'
+import { find, frameScenes } from './canvas/scenes.ts'
+import { thumbnailCache } from './canvas/thumbnails.ts'
 import { loadCanvasKit } from './canvaskit.ts'
 import { keepCopy, layersOnClipboard, putOnClipboard, rememberedLayers } from './clipboard.ts'
 import { exportClient } from './export/export-client.ts'
@@ -98,7 +92,6 @@ import {
   newImage,
   newPath,
   newText,
-  type ShapeTool,
   withImage,
 } from './gestures/draw-tools.ts'
 import {
@@ -158,6 +151,8 @@ import {
   turn,
   undrawn,
 } from './layers/transform.ts'
+import { editorResources, loadFonts, loadImages, SHIPPED_FAMILIES, shippedFonts } from './resources.ts'
+import { watchSaveState } from './save-state.ts'
 import { NUDGE, NUDGE_FAR, type ShortcutAction, shortcutFor } from './shortcuts.ts'
 import {
   paragraphAt,
@@ -169,6 +164,7 @@ import {
   toggled,
   wordAt,
 } from './text/text-edit.ts'
+import { editorTools, type PlacedAsset, type Tool } from './tools.ts'
 
 export interface EditorOptions {
   canvas: HTMLCanvasElement
@@ -221,18 +217,6 @@ interface Editing extends Picked {
   endGesture: () => void
   created: boolean
 }
-/**
- * What a drag on the stage does: select and move, pan with the hand, draw a shape (#44), a path
- * (#45), a text box (#47) or a frame, or place the image picked for the image tool.
- */
-export type Tool = 'select' | 'hand' | 'pen' | 'text' | 'frame' | 'image' | ShapeTool
-/** An image asset as the editor places it. */
-export interface PlacedAsset {
-  id: string
-  name: string
-  width: number
-  height: number
-}
 /** A point on the design: a frame, as `<pageId>/<formatId>`, and a point in it in design pixels. */
 export interface Spot {
   frame: string
@@ -276,10 +260,6 @@ export type Notice = 'placedByLayout' | 'flowEnd' | 'svgLeftOut' | 'svgUnreadabl
 
 /** A layer's sizing, as the schema has it. */
 type SizingOf = NonNullable<Layer['props']['sizing']>
-
-/** Where the design's edits are, once it is open. */
-export type SaveState = 'Saved' | 'Saving' | 'Offline'
-export const SAVE_STATES: readonly string[] = ['Saved', 'Saving', 'Offline'] satisfies SaveState[]
 
 /** What one redraw did, for the checks that count a redraw's work. */
 export interface DrawInfo {
@@ -531,19 +511,9 @@ export interface Editor {
   destroy(): void
 }
 
-/** A frame's scene and its recorded drawing, kept until the layers it shows change. */
-interface FrameCache {
-  deps: unknown[]
-  scene: Scene
-  picture: SkPicture | null
-}
-
-const sameDeps = (a: unknown[], b: unknown[]) => a.length === b.length && a.every((x, i) => x === b[i])
 const ZOOM_STEP = 2
 /** Room around the frames when the focus view fits them, past the chip over the stage. */
 const FOCUS_PADDING = 104
-/** How long the connection can be gone before the save state reads Offline. */
-const OFFLINE_AFTER_MS = 1500
 
 /**
  * Runs a command that edits from other tabs may have made impossible, such as typing into a layer
@@ -590,27 +560,6 @@ const visibleIn = (now: Design, frame: Frame, id: string) => {
   const value = now.overrides[scope(frame)]?.[id]?.visible ?? now.nodes[id]?.props.visible
   return value !== false
 }
-const find = (layers: SceneLayer[], id: string): SceneLayer | undefined => {
-  for (const l of layers) {
-    if (l.id === id) return l
-    const inner = find(l.children, id)
-    if (inner) return inner
-  }
-  return undefined
-}
-
-/** An image as a PNG object URL, or null when it doesn't encode. */
-function pngUrl(image: Image): string | null {
-  const png = image.encodeToBytes()
-  return png ? URL.createObjectURL(new Blob([png.slice()], { type: 'image/png' })) : null
-}
-
-async function bytes(url: string) {
-  const res = await fetch(url)
-  if (!res.ok) throw new Error(`${url}: ${res.status}`)
-  return new Uint8Array(await res.arrayBuffer())
-}
-
 /** Text properties that change how big its words are, so an auto-sized box fits them again. */
 const SIZES_TEXT = new Set([
   'text',
@@ -631,9 +580,7 @@ export async function startEditor(options: EditorOptions) {
   status('Loading renderer')
   const ck: CanvasKit = await loadCanvasKit()
   // The fonts we ship, the fallbacks among them, load first; the design's own families once it is here.
-  const fontBytes = await Promise.all(
-    FONT_FACES.map(async (f) => ({ family: f.family, bytes: await bytes(`/vendor/fonts/${f.file}`) })),
-  )
+  const fontBytes = await shippedFonts()
   const resourceBytes = {
     fonts: fontBytes,
     fallbackFamilies: [...FALLBACK_FAMILIES],
@@ -696,21 +643,6 @@ export async function startEditor(options: EditorOptions) {
   }
 }
 
-async function loadImages(ids: string[], options: EditorOptions): Promise<Record<string, Uint8Array>> {
-  if (ids.length === 0) return {}
-  const { assetBytes } = options
-  if (!assetBytes) throw new Error('the design has images, but the editor was given no way to load them')
-  return Object.fromEntries(await Promise.all(ids.map(async (id) => [id, await assetBytes(id)] as const)))
-}
-
-/** The families we ship are loaded already; the rest come from the catalog, when the editor was given a way. */
-const SHIPPED_FAMILIES = new Set(FONT_FACES.map((f) => f.family))
-async function loadFonts(families: string[], options: EditorOptions): Promise<{ family: string; bytes: Uint8Array }[]> {
-  const wanted = families.filter((family) => !SHIPPED_FAMILIES.has(family))
-  if (wanted.length === 0 || !options.fontFiles) return []
-  return options.fontFiles(wanted)
-}
-
 /** The editor once the design has arrived: everything it makes is freed by `destroy`. */
 function live(
   ck: CanvasKit,
@@ -722,50 +654,9 @@ function live(
   options: EditorOptions,
 ): Editor {
   const { canvas, overlay } = options
-  let resourceBytes = firstBytes
-  let resources = cache.resources(resourceBytes)
   const status = options.onStatus ?? (() => {})
 
-  let connection = provider.configuration.websocketProvider.status
-  let shown: SaveState | null = null
-  let offlineTimer = 0
-  /**
-   * Shows where the edits are: on the sync server, on their way, or only on this device. A lost
-   * connection reads Offline after a moment, so a reconnect that takes a blink doesn't flash it.
-   */
-  const saveState = () => {
-    let next: SaveState
-    if (connection === WebSocketStatus.Connected) {
-      clearTimeout(offlineTimer)
-      offlineTimer = 0
-      next = provider.hasUnsyncedChanges ? 'Saving' : 'Saved'
-    } else if (!navigator.onLine) {
-      next = 'Offline'
-    } else {
-      if (!offlineTimer && shown !== 'Offline') {
-        offlineTimer = window.setTimeout(() => {
-          offlineTimer = 0
-          if (connection !== WebSocketStatus.Connected) show('Offline')
-        }, OFFLINE_AFTER_MS)
-      }
-      next = shown === 'Offline' ? 'Offline' : 'Saving'
-    }
-    show(next)
-  }
-  const show = (next: SaveState) => {
-    if (next === shown) return
-    shown = next
-    status(next)
-  }
-  const onConnection = ({ status: next }: { status: WebSocketStatus }) => {
-    connection = next
-    if (shown) saveState()
-  }
-  const onUnsynced = () => {
-    if (shown) saveState()
-  }
-  provider.on('status', onConnection)
-  provider.on('unsyncedChanges', onUnsynced)
+  const saving = watchSaveState({ provider, onSaveState: (state) => status(state) })
 
   const maybeGl = ck.MakeWebGLContext(ck.GetWebGLContext(canvas))
   if (!maybeGl) throw new Error('this browser has no WebGL')
@@ -779,24 +670,22 @@ function live(
   // Removes every listener the editor adds, on destroy.
   const listening = new AbortController()
   const on = { signal: listening.signal }
-  // The browser knows first when the network goes: drop the socket rather than wait for it to time
-  // out, and connect again as soon as the network is back.
-  window.addEventListener(
-    'offline',
-    () => {
-      provider.disconnect()
-      onConnection({ status: WebSocketStatus.Disconnected })
-    },
-    on,
-  )
-  window.addEventListener('online', () => void provider.connect(), on)
+  const resources = editorResources({
+    ck,
+    cache,
+    first: firstBytes,
+    sources: options,
+    connected: saving.connected,
+    status,
+    signal: listening.signal,
+  })
 
   let design: Design = session.design()
   /** The one format the focus view shows, or null for every format. */
   let focused: string | null = null
   let grid = frameGrid(design, focused)
   let camera: Camera = { x: 0, y: 0, zoom: 1 }
-  let tool: Tool = 'select'
+  const scenes = frameScenes({ ck, resources, drawn: () => design })
   let selection: Selection | null = null
   /**
    * The page a click on its background picked: outlined dashed in every size, its labels lit. No
@@ -828,8 +717,6 @@ function live(
   const snapWork = { gathered: 0, moves: 0, targets: 0 }
   /** The rulers are off until asked for (Shift+R or the View card): the stage is for the ads. */
   let rulers = false
-  /** Snapping to layers and the frame while dragging; Ctrl (⌘) still turns it off for a drag. */
-  let snapping = true
   /** Told when the rulers or snapping turn on or off, so the View card follows a shortcut too. */
   const viewListeners = new Set<() => void>()
   const viewChanged = () => {
@@ -850,18 +737,13 @@ function live(
   const notify = (notice: Notice, parts: readonly Skipped[] = []) => {
     for (const listener of noticeListeners) listener(notice, parts)
   }
-  /** Told when the tool changes, by a key or after drawing a shape, so the tool dock follows. */
-  const toolListeners = new Set<(tool: Tool) => void>()
-  /** The image the image tool places with the next click or drag; picked after the tool is. */
-  let imageToPlace: PlacedAsset | null = null
-  function setTool(next: Tool) {
-    if (next === tool) return
-    if (pen) finishPen()
-    if (next !== 'image') imageToPlace = null
-    tool = next
-    showCursor()
-    for (const listener of toolListeners) listener(tool)
-  }
+  const tools = editorTools({
+    finish: () => {
+      if (pen) finishPen()
+    },
+    changed: () => showCursor(),
+    onSnapping: viewChanged,
+  })
   let lastSelection = ''
   /** The layer under the pointer, outlined while nothing is being dragged. */
   let hovered: Picked | null = null
@@ -894,71 +776,10 @@ function live(
   const frameOf = (key: string | undefined) => grid.frames.find((f) => f.key === key)
   const firstPage = () => grid.frames[0]?.pageId ?? ''
 
-  // Scenes and pictures by frame. A frame is recorded again only when a layer it shows, an
-  // override in its format, its page or its format changed: dragging in one format leaves the
-  // other formats' pictures as they are, and panning records nothing.
-  const frames = new Map<string, FrameCache>()
-  let picturesFor: Resources | null = null
-  // Text laid out and layers recorded once and kept: recording a frame again records only the
-  // layers that changed, and lays out only the text that did.
-  const paragraphs = paragraphCache()
-  const scenes = sceneMemo()
-  const layers = layerPictures()
-  let recordingWith: { for: Resources; resources: Resources } | null = null
-  const withParagraphs = (screen: Resources) => {
-    if (recordingWith?.for !== screen) recordingWith = { for: screen, resources: { ...screen, paragraphs, layers } }
-    return recordingWith.resources
-  }
-
-  function depsOf(frame: Frame) {
-    const overrides = design.overrides[scope(frame)]
-    // The brand kit's values too (#53): a change rebuilds the scene, reusing every unbound layer.
-    const deps: unknown[] = [design.pages[frame.pageId], design.formats[frame.formatId], resourceBytes.variables]
-    const walk = (parentId: string) => {
-      for (const [id, node] of childrenOf(design, parentId)) {
-        deps.push(id, node, overrides?.[id])
-        walk(id)
-      }
-    }
-    walk(frame.pageId)
-    return deps
-  }
-
-  // Auto layout measures text with the fonts the screen draws with (#46); a new font set measures anew.
-  let measuring: { for: Resources; measure: MeasureText } | null = null
-  const measureText = () => {
-    if (measuring?.for !== resources) measuring = { for: resources, measure: textMeasure(ck, resources) }
-    return measuring.measure
-  }
-
-  function cached(frame: Frame): FrameCache {
-    const deps = depsOf(frame)
-    const entry = frames.get(frame.key)
-    if (entry && sameDeps(entry.deps, deps)) return entry
-    entry?.picture?.delete()
-    const fresh = {
-      deps,
-      scene: render(design, frame.pageId, frame.formatId, scenes, measureText(), resourceBytes.variables),
-      picture: null,
-    }
-    frames.set(frame.key, fresh)
-    return fresh
-  }
-
-  function record(scene: Scene, with_: Resources) {
-    const recorder = new ck.PictureRecorder()
-    try {
-      drawPage(ck, recorder.beginRecording(ck.XYWHRect(0, 0, scene.width, scene.height)), scene, with_)
-      return recorder.finishRecordingAsPicture()
-    } finally {
-      recorder.delete()
-    }
-  }
-
   /** The layer as a frame shows it now, with the frame. */
   function pickedLayer(picked: Picked | null) {
     const frame = picked && frameOf(picked.frame)
-    const layer = frame && find(cached(frame).scene.layers, picked.id)
+    const layer = frame && find(scenes.scene(frame).layers, picked.id)
     return frame && layer ? { frame, layer } : null
   }
 
@@ -966,7 +787,7 @@ function live(
   function editingText() {
     const found = pickedLayer(editing)
     if (found?.layer.type !== 'text') return null
-    return { ...found, layer: found.layer, laid: paragraphs.layout(ck, found.layer.props, resources) }
+    return { ...found, layer: found.layer, laid: scenes.layout(found.layer.props) }
   }
   /** The selected range of the text being edited; empty at the caret when nothing is selected. */
   function textRange(): TextRange | null {
@@ -992,10 +813,10 @@ function live(
     const now = session.design()
     const node = now.nodes[id]
     if (node?.type !== 'text') return
-    const measure = measureText()
+    const measure = scenes.measure()
     const sizes: Record<string, { width: number; height: number }> = {}
     // Text bound to a brand font is drawn, so measured, in the family the kit gives it.
-    const bound = node.bindings?.fontFamily ? resourceBytes.variables?.[node.bindings.fontFamily] : undefined
+    const bound = node.bindings?.fontFamily ? resources.bytes().variables?.[node.bindings.fontFamily] : undefined
     for (const formatId of only ? [only] : Object.keys(now.formats)) {
       const own = mergedProps(now, formatScope(formatId), id) as typeof node.props
       const props = bound ? { ...own, style: { ...own.style, fontFamily: bound } } : own
@@ -1058,7 +879,7 @@ function live(
     if (!node) return null
     // Auto layout places and sizes a layer as the scene is built (#46): its box is the scene's.
     if (laidOut(id, from)) {
-      const shown = find(cached(frame).scene.layers, id)
+      const shown = find(scenes.scene(frame).layers, id)
       if (shown)
         return {
           x: shown.props.x,
@@ -1127,7 +948,7 @@ function live(
    * be undone; a drag from it draws a marquee and moves nothing, it or what lies beneath.
    */
   function lockedAt(frame: Frame, p: Point): string | null {
-    const top = hitTest(cached(frame).scene.layers, p)
+    const top = hitTest(scenes.scene(frame).layers, p)
     const id = top ? target(top.id, frame.key) : null
     return id && design.nodes[id]?.lock?.move ? id : null
   }
@@ -1242,7 +1063,7 @@ function live(
     const { fills } = mergedProps(from, scope(frame), id) as { fills: Paint[] }
     const index = fills.findLastIndex((f) => f.type === 'image')
     const fill = fills[index]
-    const image = fill?.type === 'image' ? resources.images.get(fill.assetId) : undefined
+    const image = fill?.type === 'image' ? resources.resources().images.get(fill.assetId) : undefined
     if (fill?.type !== 'image' || !image) return null
     const size = { width: image.width(), height: image.height() }
     const crop = fill.fit === 'crop' && fill.crop ? fill.crop : coverCrop(size, box)
@@ -1258,156 +1079,7 @@ function live(
     }
   }
   type CropTarget = NonNullable<ReturnType<typeof cropTarget>>
-  /**
-   * Each layer's preview for the effect tiles, with what it was drawn from: its scene layer and the
-   * fonts and images there were then, so one that arrives later draws it again.
-   */
-  const thumbnails = new Map<string, { id: string; layer: SceneLayer; resources: Resources; url: string }>()
-  /**
-   * Text's preview: "Aa" in the layer's font, weight and colour, as wide as it is; `outlined` draws
-   * its outline in its colour with no fill, as the Outline tile shows it.
-   */
-  function textSample(layer: Extract<SceneLayer, { type: 'text' }>, outlined: boolean): SceneLayer {
-    const { style } = layer.props
-    const sample = {
-      ...layer.props,
-      x: 0,
-      y: 0,
-      rotation: 0,
-      text: 'Aa',
-      runs: [],
-      boxMode: 'autoWidth' as const,
-      align: 'start' as const,
-      verticalAlign: 'top' as const,
-      list: undefined,
-      maxLines: undefined,
-      shrinkToFit: undefined,
-      effects: [],
-      style: {
-        ...style,
-        fontSize: 96,
-        outline: outlined ? { width: 4, color: style.color } : undefined,
-        color: outlined ? '#00000000' : style.color,
-      },
-    }
-    const size = measureText()(sample, null)
-    return { ...layer, props: { ...sample, width: size.width, height: size.height } }
-  }
-  /**
-   * A small picture of one layer as a frame shows it, without its own effects (the tiles show
-   * those), drawn by the renderer on the CPU surface and kept until the layer, or the fonts and
-   * images it is drawn with, change: a PNG as an object URL, `size` pixels square, the layer fitted
-   * inside with a margin. Text is "Aa" in its look. Null when the layer isn't in the frame or draws
-   * nothing there.
-   */
-  function layerThumbnail(frame: Frame, id: string, size: number, outlined: boolean): string | null {
-    const found = find(cached(frame).scene.layers, id)
-    if (!found || found.props.mask) return null
-    const key = `${frame.key}/${id}${outlined ? '/outlined' : ''}@${size}`
-    const kept = thumbnails.get(key)
-    // Drawn with what the stage draws with: an image whose bytes are still coming is a placeholder.
-    const drawWith = screenResources(session.design())
-    if (kept?.layer === found && kept.resources === drawWith) return kept.url
-    const layer = found.type === 'text' ? textSample(found, outlined) : found
-    const bounds = boundsOf([layer.props])
-    if (bounds.width <= 0 && bounds.height <= 0) return null
-    const margin = size * 0.12
-    const scale = (size - 2 * margin) / Math.max(bounds.width, bounds.height, 1)
-    const surface = ck.MakeSurface(size, size)
-    if (!surface) return null
-    try {
-      const canvas = surface.getCanvas()
-      canvas.clear(ck.TRANSPARENT)
-      canvas.translate(
-        size / 2 - (bounds.x + bounds.width / 2) * scale,
-        size / 2 - (bounds.y + bounds.height / 2) * scale,
-      )
-      canvas.scale(scale, scale)
-      const alone = { ...layer, props: { ...layer.props, effects: [] } } as SceneLayer
-      drawPage(
-        ck,
-        canvas,
-        {
-          pageId: frame.pageId,
-          formatId: frame.formatId,
-          width: frame.width,
-          height: frame.height,
-          fills: [],
-          layers: [alone],
-        },
-        drawWith,
-      )
-      const image = surface.makeImageSnapshot()
-      const url = pngUrl(image)
-      image.delete()
-      if (!url) return null
-      if (kept) URL.revokeObjectURL(kept.url)
-      thumbnails.set(key, { id, layer: found, resources: drawWith, url })
-      // Deleted layers' pictures go, once there are more pictures than the design could show.
-      if (thumbnails.size > 4 * Object.keys(design.nodes).length + 16) {
-        for (const [other, { id: was, url: old }] of thumbnails) {
-          if (design.nodes[was]) continue
-          URL.revokeObjectURL(old)
-          thumbnails.delete(other)
-        }
-      }
-      return url
-    } finally {
-      surface.delete()
-    }
-  }
-
-  const pageThumbnails = new Map<string, { pageId: string; scene: Scene; resources: Resources; url: string }>()
-  /**
-   * A small picture of a page in one format, as the stage draws it, `size` pixels on its longer side:
-   * a PNG as an object URL, drawn on the CPU surface and kept until the page or what it is drawn
-   * with changes.
-   */
-  function pageThumbnail(frame: Frame, size: number): string | null {
-    const { scene } = cached(frame)
-    const drawWith = screenResources(session.design())
-    const key = `${frame.key}@${size}`
-    const kept = pageThumbnails.get(key)
-    if (kept?.scene === scene && kept.resources === drawWith) return kept.url
-    const scale = size / Math.max(frame.width, frame.height, 1)
-    const surface = ck.MakeSurface(
-      Math.max(1, Math.round(frame.width * scale)),
-      Math.max(1, Math.round(frame.height * scale)),
-    )
-    if (!surface) return null
-    try {
-      const canvas = surface.getCanvas()
-      canvas.clear(ck.TRANSPARENT)
-      canvas.scale(scale, scale)
-      drawPage(ck, canvas, scene, drawWith)
-      const image = surface.makeImageSnapshot()
-      const url = pngUrl(image)
-      image.delete()
-      if (!url) return null
-      if (kept) URL.revokeObjectURL(kept.url)
-      pageThumbnails.set(key, { pageId: frame.pageId, scene, resources: drawWith, url })
-      // A deleted page's pictures go with it.
-      for (const [other, { pageId, url: old }] of pageThumbnails) {
-        if (design.pages[pageId]) continue
-        URL.revokeObjectURL(old)
-        pageThumbnails.delete(other)
-      }
-      return url
-    } finally {
-      surface.delete()
-    }
-  }
-
-  /** Each image as a URL for the crop's faint whole image, made once from the decoded image. */
-  const ghosts = new WeakMap<Image, string>()
-  function ghostOf(image: Image) {
-    let url = ghosts.get(image)
-    if (url === undefined) {
-      url = pngUrl(image) ?? ''
-      ghosts.set(image, url)
-    }
-    return url
-  }
+  const thumbnails = thumbnailCache({ ck, scenes, resources, current: () => session.design(), drawn: () => design })
 
   /** A design-pixel box in a frame, as CSS on the overlay. */
   function placeBox(el: HTMLElement, frame: Frame, box: Rect) {
@@ -1565,7 +1237,7 @@ function live(
     const whole = outline('crop-image', frame, drawnFrom({ ...rect, rotation: 0 }, around))
     const ghost = document.createElement('div')
     ghost.className = 'crop-ghost'
-    ghost.style.backgroundImage = `url("${ghostOf(target.image)}")`
+    ghost.style.backgroundImage = `url("${thumbnails.ghost(target.image)}")`
     // Clear over the box, where the layer shows the image itself.
     const [l, t, r, b] = [box.x - rect.x, box.y - rect.y, box.x + box.width - rect.x, box.y + box.height - rect.y].map(
       (v, i) => `${(v / (i % 2 === 0 ? rect.width : rect.height)) * 100}%`,
@@ -1840,40 +1512,21 @@ function live(
     if (editing && !pickedLayer(editing)) stopEditing()
     if (!surface) return
 
-    const screen = screenResources(design)
-    if (screen !== picturesFor) {
-      for (const entry of frames.values()) {
-        entry.picture?.delete()
-        entry.picture = null
-      }
-      picturesFor = screen
-    }
-    const kept = new Set(grid.frames.map((f) => f.key))
-    for (const [key, entry] of frames) {
-      if (kept.has(key)) continue
-      entry.picture?.delete()
-      frames.delete(key)
-    }
-
+    const screen = resources.screen(design)
     drawnFrames = framesInView(grid.frames, camera, viewport)
-    let recorded = 0
+    const { pictures, recorded } = scenes.pictures(grid.frames, drawnFrames, screen)
     const c = surface.getCanvas()
     c.clear(ck.TRANSPARENT)
     c.save()
     c.scale(dpr, dpr)
     c.translate(camera.x, camera.y)
     c.scale(camera.zoom, camera.zoom)
-    for (const frame of drawnFrames) {
-      const entry = cached(frame)
-      if (!entry.picture) {
-        entry.picture = record(entry.scene, withParagraphs(screen))
-        recorded++
-      }
+    for (const { frame, picture } of pictures) {
       const box = ck.XYWHRect(frame.x, frame.y, frame.width, frame.height)
       c.drawRect(box, backing)
       c.save()
       c.translate(frame.x, frame.y)
-      c.drawPicture(entry.picture)
+      c.drawPicture(picture)
       c.restore()
       c.drawRect(box, edge)
     }
@@ -1889,98 +1542,6 @@ function live(
   // Exports are drawn in a worker of their own (#55), started at the first one.
   const exporter = exportClient()
 
-  // Images that arrive after the design (another tab added them) load in the background; until
-  // then the screen draws them clear. Exports never do: they throw until every image is loaded.
-  const maybeClear = ck.MakeImage(
-    {
-      width: 1,
-      height: 1,
-      alphaType: ck.AlphaType.Premul,
-      colorType: ck.ColorType.RGBA_8888,
-      colorSpace: ck.ColorSpace.SRGB,
-    },
-    new Uint8Array(4),
-    4,
-  )
-  if (!maybeClear) throw new Error('could not make the image placeholder')
-  const clear: Image = maybeClear
-  const loading = new Set<string>()
-  /** The last resources with placeholders, kept while the same images are missing so pictures stay. */
-  let placeholders: { for: Resources; missing: string; resources: Resources } | null = null
-  // Families text names after the design opened (a pick in the font menu, another tab) load in the
-  // background (#50); until then that text draws in the fallback fonts. Exports wait for them.
-  const fontsAsked = new Set([...SHIPPED_FAMILIES, ...resourceBytes.fonts.map((f) => f.family)])
-  let fontsLoading: Promise<void> = Promise.resolve()
-  /** Each family asked for after the design opened, settled when its files are here or failed to come. */
-  const familyLoads = new Map<string, Promise<void>>()
-  /** Images a design named after it opened (one placed from the asset library, #52); exports wait for them too. */
-  let imagesLoading: Promise<void> = Promise.resolve()
-  function loadNewFonts(current: Design) {
-    loadFamilies(fontFamilies(current, resourceBytes.variables))
-  }
-  /** Asks for the files of the families not asked for yet; `fontsLoading` settles when they are here. */
-  function loadFamilies(families: string[]) {
-    if (!options.fontFiles) return
-    const fresh = families.filter((family) => !fontsAsked.has(family))
-    if (fresh.length === 0) return
-    for (const family of fresh) fontsAsked.add(family)
-    const loading = loadFonts(fresh, options).then(
-      (fonts) => {
-        if (listening.signal.aborted || fonts.length === 0) return
-        resourceBytes = { ...resourceBytes, fonts: [...resourceBytes.fonts, ...fonts] }
-        resources = cache.resources(resourceBytes)
-        // Auto layout measures text in its font, so every frame's scene is made again, not only its picture.
-        for (const entry of frames.values()) entry.picture?.delete()
-        frames.clear()
-        redraw()
-      },
-      (error: unknown) => {
-        // Offline, a family waits for the connection; the next redraw asks for it again.
-        if (connection !== WebSocketStatus.Connected) {
-          for (const family of fresh) fontsAsked.delete(family)
-          return
-        }
-        status(`Error: a font did not load (${error instanceof Error ? error.message : String(error)})`)
-      },
-    )
-    for (const family of fresh) familyLoads.set(family, loading)
-    fontsLoading = Promise.all([fontsLoading, loading]).then(() => undefined)
-  }
-
-  function screenResources(current: Design): Resources {
-    loadNewFonts(current)
-    const missing = imageAssetIds(current).filter((id) => !resources.images.has(id))
-    if (missing.length === 0) return resources
-    const fresh = missing.filter((id) => !loading.has(id))
-    if (fresh.length > 0 && options.assetBytes) {
-      for (const id of fresh) loading.add(id)
-      const arriving = loadImages(fresh, options)
-        .then(
-          (images) => {
-            if (listening.signal.aborted) return
-            resourceBytes = { ...resourceBytes, images: { ...resourceBytes.images, ...images } }
-            resources = cache.resources(resourceBytes)
-            redraw()
-          },
-          (error: unknown) => {
-            // Offline, an image waits for the connection; the next redraw asks for it again.
-            if (connection !== WebSocketStatus.Connected) return
-            status(`Error: an image did not load (${error instanceof Error ? error.message : String(error)})`)
-          },
-        )
-        .finally(() => {
-          for (const id of fresh) loading.delete(id)
-        })
-      imagesLoading = Promise.all([imagesLoading, arriving]).then(() => undefined)
-    }
-    const key = missing.join('\n')
-    if (placeholders?.for === resources && placeholders.missing === key) return placeholders.resources
-    const images = new Map(resources.images)
-    for (const id of missing) images.set(id, clear)
-    placeholders = { for: resources, missing: key, resources: { ...resources, images } }
-    return placeholders.resources
-  }
-
   let pending = 0
   const redraw = () => {
     if (!pending)
@@ -1990,6 +1551,7 @@ function live(
       })
   }
   doc.on('update', redraw)
+  resources.onArrive(() => redraw())
 
   function setCamera(next: Camera) {
     const zoomed = next.zoom !== camera.zoom
@@ -2200,7 +1762,7 @@ function live(
   let pressedAt: Point | null = null
   let pan: { from: Point; camera: Camera } | null = null
   let spaceHeld = false
-  const panning = () => tool === 'hand' || spaceHeld
+  const panning = () => tools.tool() === 'hand' || spaceHeld
 
   /**
    * The boxes a transform changes: each root and every layer under it, as they are now. A layer
@@ -2270,7 +1832,7 @@ function live(
           walk(l.children)
         }
       }
-      walk(render(now, pageId, formatId, undefined, measureText(), resourceBytes.variables).layers)
+      walk(render(now, pageId, formatId, undefined, scenes.measure(), resources.bytes().variables).layers)
       drawn[formatScope(formatId)] = boxes
     }
     return drawn
@@ -2322,8 +1884,9 @@ function live(
     const format = now.formats[frame.formatId]
     if (!format) return null
     const holds = (id: string) => ids.some((selected) => ancestorsOf(now, selected).includes(id))
-    const others = cached(frame)
-      .scene.layers.filter((layer) => !holds(layer.id))
+    const others = scenes
+      .scene(frame)
+      .layers.filter((layer) => !holds(layer.id))
       .map((layer) => boundsOf([layer.props]))
     const parent = now.nodes[ids[0] ?? '']?.parentId
     if (parent && now.nodes[parent]) {
@@ -2668,8 +2231,9 @@ function live(
     const frame = frameAt(grid.frames, g.from) ?? grid.frames.find((f) => intersects(f, rect))
     if (!frame) return
     const local = { x: rect.x - frame.x, y: rect.y - frame.y, width: rect.width, height: rect.height }
-    const hits = cached(frame)
-      .scene.layers.filter((layer) => pickable(layer) && intersects(boundsOf([{ ...layer.props }]), local))
+    const hits = scenes
+      .scene(frame)
+      .layers.filter((layer) => pickable(layer) && intersects(boundsOf([{ ...layer.props }]), local))
       .map((layer) => layer.id)
     const base = g.baseFrame === frame.key ? g.base : []
     selection =
@@ -2706,7 +2270,8 @@ function live(
 
   let hoverCursor = ''
   const showCursor = () => {
-    const drawing = isDrawTool(tool) || tool === 'pen' || (tool === 'image' && imageToPlace)
+    const tool = tools.tool()
+    const drawing = isDrawTool(tool) || tool === 'pen' || (tool === 'image' && tools.imageToPlace())
     canvas.style.cursor = pan
       ? 'grabbing'
       : panning()
@@ -2748,11 +2313,13 @@ function live(
       if (e.button !== 0) return
       const screen = screenOf(e)
       const at = pointIn(e)
+      const tool = tools.tool()
       if (isDrawTool(tool)) {
         if (at) startDrawing(e, tool, at)
         return
       }
       if (tool === 'image') {
+        const imageToPlace = tools.imageToPlace()
         if (at && imageToPlace) startImageBox(e, at, imageToPlace)
         return
       }
@@ -2766,7 +2333,7 @@ function live(
       }
       if (pathEditing && startPathEdit(e, at)) return
       if (cropping && startCrop(e, screen)) return
-      const deepest = at && hitTest(cached(at.frame).scene.layers, at.p, pickable)
+      const deepest = at && hitTest(scenes.scene(at.frame).layers, at.p, pickable)
       if (at && editing && deepest?.id === editing.id && editing.frame === at.frame.key) {
         // In the text being edited (#47): a press puts the caret there, Shift extends the range to
         // it, a drag selects, and a third click selects the paragraph.
@@ -2947,7 +2514,7 @@ function live(
    */
   function imageTargetAt(client: Point): Picked | null {
     const at = pointAt(client)
-    const hit = at && hitTest(cached(at.frame).scene.layers, at.p, pickable)
+    const hit = at && hitTest(scenes.scene(at.frame).layers, at.p, pickable)
     if (!at || !hit) return null
     let id = hit.id
     for (const up of ancestorsOf(design, design.nodes[id]?.parentId ?? ''))
@@ -2964,7 +2531,7 @@ function live(
   let pointer: MouseEvent | null = null
   function rehover() {
     const at = pointer && !gesture && !panning() ? pointIn(pointer) : null
-    const hit = at && hitTest(cached(at.frame).scene.layers, at.p)
+    const hit = at && hitTest(scenes.scene(at.frame).layers, at.p)
     const next = at && hit ? { id: target(hit.id, at.frame.key), frame: at.frame.key } : null
     const changed = next?.id !== hovered?.id || next?.frame !== hovered?.frame
     hovered = next
@@ -3025,7 +2592,7 @@ function live(
         return
       }
       // Holding Ctrl (⌘ on a Mac) turns snapping off for as long as it is held.
-      const snap = snapping && !(e.ctrlKey || e.metaKey)
+      const snap = tools.snapping() && !(e.ctrlKey || e.metaKey)
       if (gesture.kind === 'reorder') {
         reorderTo(gesture, p)
         drawOverlay()
@@ -3187,7 +2754,7 @@ function live(
       )
     )
       return
-    setTool('select')
+    tools.setTool('select')
     select([id], g.frame.key)
   }
 
@@ -3211,7 +2778,7 @@ function live(
       end()
       return
     }
-    setTool('select')
+    tools.setTool('select')
     select([id], g.frame.key)
     startEditing(id, g.frame.key, 0, end, true)
   }
@@ -3428,7 +2995,7 @@ function live(
     if (done.layer) hug([done.layer.id])
     done.end()
     if (done.layer && session.design().nodes[done.layer.id]) select([done.layer.id], done.frame.key)
-    setTool('select')
+    tools.setTool('select')
     drawOverlay()
   }
 
@@ -3442,7 +3009,7 @@ function live(
     hug([g.id])
     g.end()
     select([g.id], g.frame.key)
-    setTool('select')
+    tools.setTool('select')
   }
 
   /**
@@ -3555,7 +3122,7 @@ function live(
     (e) => {
       if (panning()) return
       const at = pointIn(e)
-      const hit = at && hitTest(cached(at.frame).scene.layers, at.p, pickable)
+      const hit = at && hitTest(scenes.scene(at.frame).layers, at.p, pickable)
       if (!at || !hit || lockedAt(at.frame, at.p)) return
       if (editing && hit.id === editing.id && editing.frame === at.frame.key) {
         // A double click in the text being edited selects the word there (#47).
@@ -3766,8 +3333,9 @@ function live(
       frameOf(selection?.frame) ?? frameOf(frameKey(firstPage(), design.meta.primaryFormatId)) ?? grid.frames[0]
     if (!frame) return
     select(
-      cached(frame)
-        .scene.layers.filter(pickable)
+      scenes
+        .scene(frame)
+        .layers.filter(pickable)
         .map((layer) => layer.id),
       frame.key,
     )
@@ -3792,16 +3360,16 @@ function live(
         drawOverlay()
         viewChanged()
       },
-      toolSelect: () => setTool('select'),
-      toolHand: () => setTool('hand'),
-      toolRect: () => setTool('rect'),
-      toolEllipse: () => setTool('ellipse'),
-      toolLine: () => setTool('line'),
-      toolArrow: () => setTool('arrow'),
-      toolPen: () => setTool('pen'),
-      toolText: () => setTool('text'),
-      toolFrame: () => setTool('frame'),
-      toolImage: () => setTool('image'),
+      toolSelect: () => tools.setTool('select'),
+      toolHand: () => tools.setTool('hand'),
+      toolRect: () => tools.setTool('rect'),
+      toolEllipse: () => tools.setTool('ellipse'),
+      toolLine: () => tools.setTool('line'),
+      toolArrow: () => tools.setTool('arrow'),
+      toolPen: () => tools.setTool('pen'),
+      toolText: () => tools.setTool('text'),
+      toolFrame: () => tools.setTool('frame'),
+      toolImage: () => tools.setTool('image'),
     }
     // The pen's path ends with Enter or Escape, open as it is (#45).
     if (pen && (action === 'deselect' || action === 'editPoints')) {
@@ -4323,7 +3891,7 @@ function live(
     )
     const id = ids[0]
     if (!ok || !id) return null
-    setTool('select')
+    tools.setTool('select')
     select([id], frame.key)
     if (made.skipped.length > 0) notify('svgLeftOut', made.skipped)
     return id
@@ -4448,7 +4016,7 @@ function live(
   else fitAll()
   options.onZoom?.(camera.zoom)
   draw()
-  saveState()
+  saving.start()
 
   const defaultFrame = (pageId?: string, formatId?: string) => {
     const page = pageId ?? firstPage()
@@ -4465,7 +4033,7 @@ function live(
    * kit changes and when the design opens.
    */
   async function refitBrandFonts() {
-    const kit = resourceBytes.variables ?? {}
+    const kit = resources.bytes().variables ?? {}
     const stale = Object.entries(session.design().nodes).flatMap(([id, node]) => {
       const ref = node.type === 'text' ? node.bindings?.fontFamily : undefined
       const family = ref ? kit[ref] : undefined
@@ -4475,16 +4043,15 @@ function live(
     })
     if (stale.length === 0) return
     const families = [...new Set(stale.map((s) => s.family))]
-    loadFamilies(families)
-    await Promise.all(families.map((family) => familyLoads.get(family)))
+    await Promise.all(resources.loadFamilies(families))
     if (listening.signal.aborted) return
     // Fitted in the fallback fonts, a box would be wrong: only a family whose files came is written.
-    const here = new Set([...SHIPPED_FAMILIES, ...resourceBytes.fonts.map((f) => f.family)])
+    const here = new Set([...SHIPPED_FAMILIES, ...resources.bytes().fonts.map((f) => f.family)])
     session.untracked(() => {
       for (const { id, ref, family } of stale) {
         const node = session.design().nodes[id]
         // Still bound, the kit still gives this family (not a newer one), and the text has not taken it already.
-        if (node?.type !== 'text' || node.bindings?.fontFamily !== ref || resourceBytes.variables?.[ref] !== family)
+        if (node?.type !== 'text' || node.bindings?.fontFamily !== ref || resources.bytes().variables?.[ref] !== family)
           continue
         if (node.props.style.fontFamily === family || !here.has(family)) continue
         if (!runQuietly(() => session.run('node.bind', { ids: [id], target: 'fontFamily', ref, value: family })))
@@ -4647,7 +4214,7 @@ function live(
       const at = pointAt(client)
       if (!at) return []
       const { frame } = at
-      const deepest = hitTest(cached(frame).scene.layers, at.p)
+      const deepest = hitTest(scenes.scene(frame).layers, at.p)
       if (!deepest) return []
       const id = target(deepest.id, frame.key)
       if (!(selection?.frame === frame.key && selection.ids.includes(id))) select([id], frame.key)
@@ -4680,13 +4247,9 @@ function live(
       return () => pageListeners.delete(listener)
     },
     rulers: () => rulers,
-    snapping: () => snapping,
+    snapping: () => tools.snapping(),
     snapWork: () => ({ ...snapWork }),
-    setSnapping(on: boolean) {
-      if (on === snapping) return
-      snapping = on
-      viewChanged()
-    },
+    setSnapping: (on: boolean) => tools.setSnapping(on),
     onView(listener: () => void) {
       viewListeners.add(listener)
       return () => viewListeners.delete(listener)
@@ -4727,18 +4290,11 @@ function live(
         ),
       )
     },
-    setTool,
-    tool: () => tool,
-    armImage(asset: PlacedAsset | null) {
-      if (asset) setTool('image')
-      imageToPlace = asset
-      showCursor()
-    },
-    imageArmed: () => imageToPlace !== null,
-    onTool(listener: (tool: Tool) => void) {
-      toolListeners.add(listener)
-      return () => toolListeners.delete(listener)
-    },
+    setTool: (next: Tool) => tools.setTool(next),
+    tool: () => tools.tool(),
+    armImage: (asset: PlacedAsset | null) => tools.armImage(asset),
+    imageArmed: () => tools.imageToPlace() !== null,
+    onTool: (listener: (tool: Tool) => void) => tools.onTool(listener),
     screenPoint(x: number, y: number, pageId?: string, formatId?: string): Point {
       const frame = defaultFrame(pageId, formatId)
       const at = toScreen(camera, { x: frame.x + x, y: frame.y + y })
@@ -4749,7 +4305,7 @@ function live(
       const box = drawnBoxOf(defaultFrame(pageId, formatId), id)
       return box && { x: box.x, y: box.y, width: box.width, height: box.height }
     },
-    loaded: () => Promise.all([fontsLoading, imagesLoading]).then(() => undefined),
+    loaded: () => resources.loaded(),
     drawn: () =>
       new Promise<void>((resolve) => {
         if (!pending) return resolve()
@@ -4765,13 +4321,13 @@ function live(
     },
     exportPixels(pageId?: string, formatId?: string) {
       const frame = defaultFrame(pageId, formatId)
-      return renderDesign(ck, session.design(), frame.pageId, frame.formatId, resourceBytes, cache).pixels
+      return renderDesign(ck, session.design(), frame.pageId, frame.formatId, resources.bytes(), cache).pixels
     },
     async exportFiles(request: ExportRequestInput, progress?: (done: number, total: number) => void) {
       // A family picked or an image placed a moment ago is drawn as itself, never the fallback or a gap.
-      screenResources(session.design())
-      await Promise.all([fontsLoading, imagesLoading])
-      return exporter.run(session.design(), request, resourceBytes, progress)
+      resources.screen(session.design())
+      await resources.loaded()
+      return exporter.run(session.design(), request, resources.bytes(), progress)
     },
     resetOwn(ids: string[], scope: ReturnType<typeof formatScope>, paths?: string[]) {
       return runQuietly(() =>
@@ -4781,13 +4337,12 @@ function live(
         }),
       )
     },
-    loadedFamilies: () => [...new Set(resourceBytes.fonts.map((f) => f.family))],
+    loadedFamilies: () => resources.families(),
     async setFont(fontFamily: string, fontWeight?: number) {
       const ids = (selection?.ids ?? []).filter((id) => session.design().nodes[id]?.type === 'text')
       const range = selectedText()
       if (ids.length === 0 && !range) return
-      loadFamilies([fontFamily])
-      await familyLoads.get(fontFamily)
+      await resources.loadFamilies([fontFamily])[0]
       if (listening.signal.aborted) return
       if (range) {
         const node = session.design().nodes[range.id]
@@ -4809,16 +4364,16 @@ function live(
         }
       })
     },
-    variables: () => resourceBytes.variables ?? {},
+    variables: () => resources.bytes().variables ?? {},
     setVariables(variables: Variables) {
-      resourceBytes = { ...resourceBytes, variables }
-      loadNewFonts(session.design())
+      resources.setVariables(variables)
+      resources.loadFamilies(fontFamilies(session.design(), variables))
       redraw()
       return refitBrandFonts()
     },
     bindSelection(kind: 'color' | 'font', ref: VariableRef | null): number {
       const current = session.design()
-      const value = ref ? resourceBytes.variables?.[ref] : undefined
+      const value = ref ? resources.bytes().variables?.[ref] : undefined
       if (ref && value === undefined) return 0
       const targets = (selection?.ids ?? []).flatMap((id) => {
         const type = current.nodes[id]?.type ?? ''
@@ -4859,7 +4414,7 @@ function live(
         })
       )
         return null
-      setTool('select')
+      tools.setTool('select')
       select([id], frame.key)
       return id
     },
@@ -4918,11 +4473,11 @@ function live(
     },
     pageThumbnail(pageId: string, size = 72): string | null {
       const frame = frameOf(frameKey(pageId, design.meta.primaryFormatId))
-      return frame ? pageThumbnail(frame, size) : null
+      return frame ? thumbnails.page(frame, size) : null
     },
     layerThumbnail(id: string, size = 96, outlined = false, inFrame?: string): string | null {
       const frame = frameOf(inFrame ?? selection?.frame) ?? frameOf(frameKey(firstPage(), design.meta.primaryFormatId))
-      return frame ? layerThumbnail(frame, id, size, outlined) : null
+      return frame ? thumbnails.layer(frame, id, size, outlined) : null
     },
     synced: () => provider.synced && provider.unsyncedChanges === 0,
     destroy() {
@@ -4934,28 +4489,20 @@ function live(
       selectionListeners.clear()
       pageListeners.clear()
       noticeListeners.clear()
-      toolListeners.clear()
+      tools.destroy()
       doc.off('update', redraw)
-      for (const entry of frames.values()) entry.picture?.delete()
-      frames.clear()
-      paragraphs.delete()
-      layers.delete()
+      scenes.destroy()
       session.destroy()
-      clearTimeout(offlineTimer)
-      provider.off('status', onConnection)
-      provider.off('unsyncedChanges', onUnsynced)
+      saving.destroy()
       provider.destroy()
       void local.destroy()
       doc.destroy()
       cache.delete()
-      clear.delete()
+      resources.destroy()
       backing.delete()
       edge.delete()
       surface?.delete()
-      for (const { url } of thumbnails.values()) URL.revokeObjectURL(url)
-      thumbnails.clear()
-      for (const { url } of pageThumbnails.values()) URL.revokeObjectURL(url)
-      pageThumbnails.clear()
+      thumbnails.destroy()
       gl.delete()
     },
   }
