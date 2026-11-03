@@ -39,7 +39,9 @@ const select = async (page: Page, ids: string[]) => {
 }
 
 for (const [width, height] of [[1280, 760], [820, 1180], [390, 844]] as const) {
-  test(`at ${width}×${height} every panel puts its numbers under Advanced, last`, async ({ browser }) => {
+  // The panel is as wide at every size but the phone's, so CI checks it at desktop size; the other
+  // sizes take the pictures for review.
+  test(`at ${width}×${height} every panel puts its numbers under Advanced, last`, { tag: width === 1280 ? [] : ['@evidence'] }, async ({ browser }) => {
     const asset = await upload(photo)
     const { page, errors } = await openStage(browser, design(asset.id))
     await page.setViewportSize({ width, height })

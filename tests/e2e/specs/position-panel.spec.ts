@@ -132,7 +132,7 @@ test('a group takes its size from what it holds, so its Advanced has only where 
 })
 
 for (const [width, height] of [[1280, 760], [820, 1180], [390, 844]] as const) {
-  test(`screenshots at ${width}×${height}: one layer and several`, async ({ browser }) => {
+  test(`screenshots at ${width}×${height}: one layer and several`, { tag: '@evidence' }, async ({ browser }) => {
     const { page, errors } = await openStage(browser, design())
     await page.setViewportSize({ width, height })
     await page.evaluate(() => window.dazbee?.fitAll())
