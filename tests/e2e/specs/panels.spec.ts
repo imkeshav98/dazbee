@@ -78,6 +78,40 @@ const enter = async (field: Locator, value: string) => {
 }
 
 test.describe('found by QA', () => {
+  test('Ctrl+Z and Ctrl+Shift+Z in a number field not being typed in undo and redo the design', async ({ browser }) => {
+    const asset = await upload(photo)
+    const { page, errors } = await openStage(browser, design(asset.id))
+    await select(page, ['headline'])
+    const field = (await barMenu(page, 'spacing')).getByRole('spinbutton', { name: 'Paragraph spacing' })
+    const spacing = async () => (await propsOf(page, 'headline')).paragraphSpacing ?? 0
+    await field.focus()
+    await page.keyboard.press('ArrowUp')
+    await page.keyboard.press('ArrowUp')
+    await expect.poll(spacing).toBe(2)
+    await page.keyboard.press('Control+z')
+    await expect.poll(spacing).toBe(1)
+    await expect(field).toHaveValue('1')
+    await expect(field).toBeFocused()
+    await page.keyboard.press('Control+Shift+z')
+    await expect.poll(spacing).toBe(2)
+    await expect(field).toBeFocused()
+    await page.keyboard.press('Control+y')
+    await expect.poll(spacing).toBe(2)
+    // The top bar's size field undoes the design too.
+    const size = page.getByTestId('bar-size-field')
+    await size.focus()
+    await page.keyboard.press('ArrowUp')
+    await expect.poll(async () => ((await propsOf(page, 'headline')).style as { fontSize: number }).fontSize).toBe(65)
+    await page.keyboard.press('Control+z')
+    await expect.poll(async () => ((await propsOf(page, 'headline')).style as { fontSize: number }).fontSize).toBe(64)
+    await field.focus()
+    // While a value is being typed, Ctrl+Z is the field's own: it takes back what was typed.
+    await field.fill('40')
+    await page.keyboard.press('Control+z')
+    await expect.poll(spacing).toBe(2)
+    expect(errors).toEqual([])
+  })
+
   test('the Colour panel\'s + edits the fill that shows, gradient or not, and never stacks a new one', async ({ browser }) => {
     const asset = await upload(photo)
     const { page, errors } = await openStage(browser, design(asset.id))
