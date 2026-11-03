@@ -3,8 +3,8 @@ import { describe, expect, it } from 'vitest'
 
 import { type DesignInput, parseDesign, pathScale } from '@dazbee/schema'
 
-import { type Box, centreOf, turn } from './geometry.ts'
-import { loadDesign, openSession, readDesign } from './index.ts'
+import { type Box, centreOf, turn } from '../geometry.ts'
+import { loadDesign, openSession, readDesign } from '../index.ts'
 
 const design = (): DesignInput => ({
   meta: { schemaVersion: 5, designId: 'd1', name: 'Paths', kind: 'single', primaryFormatId: 'sq' },

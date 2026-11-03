@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest'
 
 import { type Design, type DesignInput, parseDesign } from '@dazbee/schema'
 
-import { boundsOf, centreOf, normalAngle, turn } from './geometry.ts'
-import { childrenOf, loadDesign, openSession, readDesign } from './index.ts'
+import { boundsOf, centreOf, normalAngle, turn } from '../geometry.ts'
+import { childrenOf, loadDesign, openSession, readDesign } from '../index.ts'
 
 const rect = (x: number, y: number, width: number, height: number, rotation = 0) => ({
   x,

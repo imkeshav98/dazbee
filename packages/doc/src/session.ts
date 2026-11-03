@@ -3,8 +3,8 @@ import { z } from 'zod'
 
 import type { Design } from '@dazbee/schema'
 
-import { CommandError } from './command.ts'
-import { type CommandName, COMMANDS } from './commands.ts'
+import { CommandError } from './commands/define.ts'
+import { type CommandName, COMMANDS } from './commands/index.ts'
 import { type DesignDoc, root } from './design-doc.ts'
 import { designView } from './design-view.ts'
 import { migrateDoc } from './migrate.ts'

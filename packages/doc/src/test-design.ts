@@ -1,4 +1,9 @@
-import type { DesignInput } from '@dazbee/schema'
+import * as Y from 'yjs'
+
+import { type DesignInput, parseDesign } from '@dazbee/schema'
+
+import { loadDesign } from './design-doc.ts'
+import { openSession } from './session.ts'
 
 /** A small design for tests: one page, a square and a banner, a box and a headline. */
 export const testDesign = (): DesignInput => ({
@@ -42,3 +47,36 @@ export const testDesign = (): DesignInput => ({
   },
   overrides: { 'format:banner': { headline: { text: 'Sale', x: 4, runs: [] } } },
 })
+
+export const freshDoc = () => {
+  const result = parseDesign(testDesign())
+  if (!result.success) throw new Error(result.errors.join('\n'))
+  return loadDesign(result.design)
+}
+
+export const badge = {
+  type: 'graphic',
+  name: 'Badge',
+  props: {
+    x: 900,
+    y: 40,
+    width: 120,
+    height: 120,
+    shape: { kind: 'ellipse' },
+    fills: [{ type: 'solid', color: '#FFC400FF' }],
+  },
+} as const
+
+/** Two tabs on one design, each with its own doc, exchanging updates like the sync server would. */
+export function twoTabs() {
+  const result = parseDesign(testDesign())
+  if (!result.success) throw new Error(result.errors.join('\n'))
+  const a = loadDesign(result.design)
+  const b = new Y.Doc()
+  Y.applyUpdate(b, Y.encodeStateAsUpdate(a))
+  const sync = () => {
+    Y.applyUpdate(b, Y.encodeStateAsUpdate(a, Y.encodeStateVector(b)))
+    Y.applyUpdate(a, Y.encodeStateAsUpdate(b, Y.encodeStateVector(a)))
+  }
+  return { a, b, tabA: openSession(a), tabB: openSession(b), sync }
+}

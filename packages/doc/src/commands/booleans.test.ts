@@ -4,8 +4,8 @@ import type { z } from 'zod'
 
 import { type DesignInput, parseDesign, type Shape } from '@dazbee/schema'
 
-import { root } from './design-doc.ts'
-import { childrenOf, loadDesign, openSession, readDesign } from './index.ts'
+import { root } from '../design-doc.ts'
+import { childrenOf, loadDesign, openSession, readDesign } from '../index.ts'
 
 const shape = (index: string, x: number, kind: z.input<typeof Shape>, color: string) => ({
   type: 'graphic' as const,
