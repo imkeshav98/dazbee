@@ -3,7 +3,7 @@
 // The brand kit's form (#53, #200): colours with names and values, fonts with names and families,
 // the logo and the tone of voice. Each change shows at once and is saved a moment later. The
 // editor's Brand flyout shows it in its Edit mode, with buttons that bind the selected layers to a
-// colour or font; the brand home shows it in its Brand kit panel, laid out wide, without them.
+// colour or font; the Brand kit page shows it laid out wide, without them.
 import { CheckIcon, PaintBucketIcon, PlusIcon, TextAaIcon, UploadSimpleIcon, XIcon } from '@phosphor-icons/react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 

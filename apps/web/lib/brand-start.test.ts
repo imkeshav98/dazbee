@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import { nameFromWebsite } from './brand-start.ts'
 
-describe('onboarding (#109)', () => {
+describe('nameFromWebsite', () => {
   it('names a brand from its website', () => {
     expect(nameFromWebsite('harbourcoffee.com')).toBe('Harbourcoffee')
     expect(nameFromWebsite('https://www.harbour-coffee.com/menu?x=1')).toBe('Harbour Coffee')

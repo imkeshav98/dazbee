@@ -1,5 +1,6 @@
-// The editor chrome's shared looks, as class strings, and the colours offered without a brand kit:
-// every control that looks like one of these takes it from here instead of spelling its classes again.
+// The editor chrome's own looks, as class strings, and the colours offered without a brand kit: every
+// editor control that looks like one of these takes it from here instead of spelling its classes again.
+// Looks that controls outside the editor share live in components/ui/looks.ts.
 
 import { FOCUS_RING } from '@/components/ui/looks.ts'
 

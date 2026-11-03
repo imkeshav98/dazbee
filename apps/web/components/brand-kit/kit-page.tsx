@@ -1,8 +1,8 @@
 'use client'
 
-// The brand home's Brand kit panel (#200): the kit's whole form, laid out wide under the brief, so
-// a new brand's colours, fonts, logo and voice are set before any design. A change shows in the
-// brief's kit picker at once and is saved a moment later.
+// The Brand kit page's form (#200): the kit's whole form, laid out wide, so a brand's colours, fonts,
+// logo and voice are set before any design. A change shows in the brief's kit picker at once and is
+// saved a moment later.
 import { useEffect } from 'react'
 
 import type { BrandKit } from '@dazbee/schema'
