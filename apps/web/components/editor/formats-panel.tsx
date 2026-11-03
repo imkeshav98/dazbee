@@ -11,6 +11,7 @@ import type { Editor } from '@dazbee/editor'
 import { type Design, FORMAT_PRESETS, inOrder } from '@dazbee/schema'
 
 import { PanelFrame } from '@/components/editor/edit-panel/edit-panel.tsx'
+import { FOCUS_RING } from '@/components/ui/looks.ts'
 import { cn } from '@/lib/cn.ts'
 import { shortSizeOf, sizeOf } from '@/lib/editor/size.ts'
 import { useMessages } from '@/lib/i18n/client.tsx'
@@ -20,7 +21,7 @@ import { AddFormat } from './add-format.tsx'
 import { CARD_BUTTON, CARD_ROW, CardMenu } from './card.tsx'
 import { setOpen, useEditState } from './edit-store.ts'
 import { useEditorDesign } from './editor-hooks.ts'
-import { CHIP, FOCUS_RING, PANEL_HEADING, PANEL_PART } from './styles.ts'
+import { CHIP, PANEL_HEADING, PANEL_PART } from './styles.ts'
 
 /** The presets Add a size offers at a tap; the rest, and any size, are under More sizes. */
 const COMMON = ['feed-portrait', 'story', 'link-image', 'medium-rectangle'] as const

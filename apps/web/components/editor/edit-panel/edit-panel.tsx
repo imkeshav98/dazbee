@@ -24,6 +24,7 @@ import { type CSSProperties, type ReactNode, type RefObject, useEffect, useLayou
 
 import type { Editor, ShortcutAction } from '@dazbee/editor'
 
+import { useFontCatalog } from '@/components/brand-kit/font-catalog.ts'
 import { ALIGN, keyOf } from '@/components/editor/arrange-actions.ts'
 import {
   isLayerPanel,
@@ -35,7 +36,7 @@ import {
   usePhone,
 } from '@/components/editor/edit-store.ts'
 import { useSelection } from '@/components/editor/editor-hooks.ts'
-import { FontChooser, useFontCatalog } from '@/components/editor/flyouts/font-panel.tsx'
+import { FontChooser } from '@/components/editor/flyouts/font-panel.tsx'
 import { factsOf, PanelContent, type Target, useTarget } from '@/components/editor/selection-cards.tsx'
 import { PANEL_BUTTON, PANEL_HEADING, PANEL_PART } from '@/components/editor/styles.ts'
 import { ORDER } from '@/components/editor/top-bar/layer-actions.tsx'

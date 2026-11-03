@@ -15,6 +15,7 @@ import type { Paint } from '@dazbee/schema'
 import { useBrandKit } from '@/components/brand-kit/use-brand-kit.ts'
 import { Choice, clamp, ColorField, NumberField } from '@/components/editor/edit-panel/fields.tsx'
 import { useMenuFocus } from '@/components/editor/top-bar/bar-popover.tsx'
+import { FOCUS_RING } from '@/components/ui/looks.ts'
 import { segment, SEGMENTED } from '@/components/ui/segmented.tsx'
 import { cn } from '@/lib/cn.ts'
 import { tidy } from '@/lib/editor/size.ts'
@@ -22,7 +23,7 @@ import { useLocale, useMessages } from '@/lib/i18n/client.tsx'
 import { dirOf, format, type Messages } from '@/lib/i18n/index.ts'
 
 import { ImagePickerButton } from './image-tool.tsx'
-import { CHIP, FOCUS_RING, ICON_BUTTON, KNOBS, PICKED_RING, POPOVER, SWATCH } from './styles.ts'
+import { CHIP, ICON_BUTTON, KNOBS, PICKED_RING, POPOVER, SWATCH } from './styles.ts'
 
 type P = Messages['editor']['props']
 type Gradient = Extract<Paint, { type: 'linear' | 'radial' | 'angular' }>

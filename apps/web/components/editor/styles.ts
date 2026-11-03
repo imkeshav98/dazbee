@@ -1,8 +1,7 @@
 // The editor chrome's shared looks, as class strings, and the colours offered without a brand kit:
 // every control that looks like one of these takes it from here instead of spelling its classes again.
 
-/** The ring a focused control shows when reached by keyboard. */
-export const FOCUS_RING = 'focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent'
+import { FOCUS_RING } from '@/components/ui/looks.ts'
 
 /** A disabled control: faded and not clickable. */
 const DISABLED = 'disabled:pointer-events-none disabled:opacity-40'
@@ -13,9 +12,6 @@ export const CHIP = `inline-flex h-7 cursor-pointer items-center gap-1 rounded-f
 /** A small square icon button in a card's row. */
 export const ICON_BUTTON =
   'grid size-7 shrink-0 cursor-pointer place-items-center rounded-row text-subtle transition-colors duration-[var(--chrome-fast)] hover:bg-hover hover:text-text disabled:pointer-events-none disabled:opacity-30'
-
-/** A dashed button that adds something or takes an upload: Add image, Upload, a kit's Add. */
-export const DASHED_BUTTON = `flex h-8 cursor-pointer items-center justify-center gap-1.5 rounded-[10px] border border-dashed border-line-strong text-xs font-semibold text-muted transition-colors duration-[var(--chrome-fast)] hover:border-accent hover:text-text focus-within:border-accent focus-within:text-text ${FOCUS_RING}`
 
 /** A chip in pink, for a choice that is set: the header card's sizes. */
 export const CHIP_ACCENT = `${CHIP} border-transparent bg-accent-soft text-accent-text hover:border-transparent hover:text-accent-text`

@@ -6,7 +6,7 @@ import { redirect } from 'next/navigation'
 
 import { BrandStartForm } from '@/components/brands/brand-start-form.tsx'
 import { LibraryHeader } from '@/components/library/library-shell.tsx'
-import { brandFromForm } from '@/lib/home.ts'
+import { brandFromForm } from '@/lib/brand-start.ts'
 import { brandWords } from '@/lib/i18n/index.ts'
 import { getMessages } from '@/lib/i18n/server.ts'
 import { createBrand, getWorkspace } from '@/lib/server/api.ts'

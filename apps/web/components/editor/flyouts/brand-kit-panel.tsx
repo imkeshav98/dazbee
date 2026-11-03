@@ -11,6 +11,7 @@ import { useEffect, useState } from 'react'
 import type { Editor } from '@dazbee/editor'
 import { AssetSummary, brandRef, brandVariables, type Design } from '@dazbee/schema'
 
+import { useFontCatalog } from '@/components/brand-kit/font-catalog.ts'
 import { KitEditor, shown, useKitSaver } from '@/components/brand-kit/kit-editor.tsx'
 import { loadKit, useBrandKit } from '@/components/brand-kit/use-brand-kit.ts'
 import { useEditorDesign, useSelection } from '@/components/editor/editor-hooks.ts'
@@ -20,7 +21,7 @@ import { placeAsset } from '@/lib/editor/place-asset.ts'
 import { useMessages } from '@/lib/i18n/client.tsx'
 import { format } from '@/lib/i18n/index.ts'
 
-import { FontPreview, useFontCatalog } from './font-panel.tsx'
+import { FontPreview } from './font-panel.tsx'
 
 /** Whether every selected layer that can follow a token of this kind follows this one. */
 function follows(design: Design, ids: string[], kind: 'color' | 'font', token: string) {

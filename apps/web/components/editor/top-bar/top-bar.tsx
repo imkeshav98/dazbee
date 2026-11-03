@@ -41,6 +41,7 @@ import { type ReactNode, useEffect, useLayoutEffect, useRef, useState } from 're
 import { type Editor, type ShortcutAction, shortcutFor, withImage } from '@dazbee/editor'
 import { boundFillIndex, type Design, type Paint } from '@dazbee/schema'
 
+import { nearest, useFontCatalog, weightsOf } from '@/components/brand-kit/font-catalog.ts'
 import { COMBINE, DISTRIBUTE, keyOf } from '@/components/editor/arrange-actions.ts'
 import {
   editState,
@@ -54,7 +55,6 @@ import {
   usePhone,
 } from '@/components/editor/edit-store.ts'
 import { usePickedPage, useSelection } from '@/components/editor/editor-hooks.ts'
-import { nearest, useFontCatalog, weightsOf } from '@/components/editor/flyouts/font-panel.tsx'
 import { ImagePickerButton } from '@/components/editor/image-tool.tsx'
 import {
   factsOf,
@@ -76,13 +76,13 @@ import {
   BAR_DIVIDER,
   BAR_ROW,
   BAR_TOGGLE,
-  FOCUS_RING,
   MENU_DIVIDER,
   MENU_ITEM,
   MENU_KEY,
   MIXED_COLOUR,
 } from '@/components/editor/styles.ts'
 import { useLiveDesign } from '@/components/editor/use-live-design.ts'
+import { FOCUS_RING } from '@/components/ui/looks.ts'
 import { cn } from '@/lib/cn.ts'
 import { LIMITS } from '@/lib/editor/limits.ts'
 import { useMessages } from '@/lib/i18n/client.tsx'

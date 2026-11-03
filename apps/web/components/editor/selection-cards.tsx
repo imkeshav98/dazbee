@@ -31,6 +31,7 @@ import {
 
 import { useBrandKit } from '@/components/brand-kit/use-brand-kit.ts'
 import { Choice, clamp, ColorField, NumberField } from '@/components/editor/edit-panel/fields.tsx'
+import { FOCUS_RING } from '@/components/ui/looks.ts'
 import { Select } from '@/components/ui/select.tsx'
 import { cn } from '@/lib/cn.ts'
 import { designColours } from '@/lib/editor/design-colours.ts'
@@ -49,7 +50,6 @@ import {
   CHIP_ACCENT,
   FIELD,
   FIELD_LABEL,
-  FOCUS_RING,
   KNOB_SWITCH,
   KNOBS,
   LINK_BUTTON,

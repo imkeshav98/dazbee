@@ -10,7 +10,8 @@ import { type DragEvent, type KeyboardEvent, useCallback, useEffect, useRef, use
 import type { Editor } from '@dazbee/editor'
 import { AssetInUse, AssetSummary, AssetUse, imageAssetIds, isVectorAsset, type UpdateAsset } from '@dazbee/schema'
 
-import { ASSET_TILE, DASHED_BUTTON, QUIET_BUTTON } from '@/components/editor/styles.ts'
+import { ASSET_TILE, QUIET_BUTTON } from '@/components/editor/styles.ts'
+import { DASHED_BUTTON } from '@/components/ui/looks.ts'
 import { overlayScroll } from '@/components/ui/overlay-scroll.ts'
 import { cn } from '@/lib/cn.ts'
 import { placeAsset } from '@/lib/editor/place-asset.ts'

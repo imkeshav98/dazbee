@@ -1,0 +1,5 @@
+/** The ring a focused control shows when reached by keyboard. */
+export const FOCUS_RING = 'focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent'
+
+/** A dashed button that adds something or takes an upload: Add image, Upload, a kit's Add. */
+export const DASHED_BUTTON = `flex h-8 cursor-pointer items-center justify-center gap-1.5 rounded-[10px] border border-dashed border-line-strong text-xs font-semibold text-muted transition-colors duration-[var(--chrome-fast)] hover:border-accent hover:text-text focus-within:border-accent focus-within:text-text ${FOCUS_RING}`
