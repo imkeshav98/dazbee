@@ -1110,7 +1110,7 @@ function AutoLayoutCard({ target, p, b, ownSizing }: { target: Target; p: P; b: 
           {(['top', 'right', 'bottom', 'left'] as const).map((side) => (
             <NumberField
               key={side}
-              label={p.padding[side]}
+              label={p.paddingSides[side]}
               name={p.padding[side]}
               value={shared(layouts.map((l) => l?.padding[side] ?? 0))}
               editor={target.editor}

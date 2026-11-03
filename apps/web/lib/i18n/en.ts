@@ -494,6 +494,7 @@ export const en = {
       spreads: { packed: 'Together', between: 'Spread out' },
       padding: { top: 'Room at the top', right: 'Room at the right', bottom: 'Room at the bottom', left: 'Room at the left' },
       paddingShort: { top: '↑', right: '→', bottom: '↓', left: '←' },
+      paddingSides: { top: 'Top', right: 'Right', bottom: 'Bottom', left: 'Left' },
       none: 'None',
       brandColours: 'Brand colours',
       colours: 'Colours',

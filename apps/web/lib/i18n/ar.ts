@@ -483,6 +483,7 @@ export const ar: Messages = {
       spreads: { packed: 'متقاربة', between: 'موزّعة' },
       padding: { top: 'المسافة في الأعلى', right: 'المسافة يمينًا', bottom: 'المسافة في الأسفل', left: 'المسافة يسارًا' },
       paddingShort: { top: '↑', right: '→', bottom: '↓', left: '←' },
+      paddingSides: { top: 'أعلى', right: 'يمين', bottom: 'أسفل', left: 'يسار' },
       none: 'لا شيء',
       brandColours: 'ألوان العلامة',
       colours: 'الألوان',

@@ -163,7 +163,7 @@ export function NumberField({ label, name, value, step = 1, min, max, fillRange,
           // Keys typed into a field are the field's, not the stage's.
           event.stopPropagation()
         }}
-        className={cn(VALUE_TEXT, 'relative min-w-0 flex-1 cursor-[inherit] bg-transparent text-end outline-none placeholder:text-subtle focus:cursor-text', typing && 'select-text')}
+        className={cn(VALUE_TEXT, 'relative min-w-[3ch] flex-1 cursor-[inherit] bg-transparent text-end outline-none placeholder:text-subtle focus:cursor-text', typing && 'select-text')}
       />
       {unit && shown && <span aria-hidden className={cn(VALUE_TEXT, 'relative -ms-2')}>{unit}</span>}
     </div>

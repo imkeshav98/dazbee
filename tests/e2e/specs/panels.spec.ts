@@ -1,0 +1,60 @@
+// Every edit panel (#288) at desktop and phone size, for each kind that has it: simple choices
+// first and the numbers under Advanced, last; a picture of each for review.
+import { expect, test, type Page } from '../support/test.ts'
+import type { DesignInput } from '@dazbee/schema'
+import { photo, upload } from '../support/assets.ts'
+import { writeOutput } from '../support/editor.ts'
+import { barMenu, openStage } from '../support/stage.ts'
+
+test.describe.configure({ timeout: 240_000 })
+
+const solid = (color: string) => [{ type: 'solid' as const, color }]
+const design = (assetId: string): DesignInput => ({
+  meta: { schemaVersion: 5, designId: 'replaced-by-the-api', name: 'Panels', kind: 'single', primaryFormatId: 'sq' },
+  formats: { sq: { name: 'Square', width: 1080, height: 1080, order: 'a0' } },
+  pages: { p1: { name: 'Page 1', order: 'a0', fills: solid('#FFF8F0FF') } },
+  nodes: {
+    headline: { type: 'text', parentId: 'p1', index: 'a0', name: 'Headline', props: { x: 80, y: 60, width: 600, height: 90, boxMode: 'autoHeight', text: 'Summer sale', style: { fontFamily: 'Noto Sans', fontSize: 64, fontWeight: 800, color: '#C2106CFF' } } },
+    badge: { type: 'graphic', parentId: 'p1', index: 'a1', name: 'Badge', props: { x: 80, y: 220, width: 220, height: 220, shape: { kind: 'star', points: 5, innerRadius: 0.5 }, fills: solid('#FFD23FFF'), strokes: [{ paint: { type: 'solid', color: '#15121AFF' }, width: 4, align: 'center' }] } },
+    photo: { type: 'graphic', parentId: 'p1', index: 'a2', name: 'Photo', props: { x: 380, y: 220, width: 300, height: 300, shape: { kind: 'rect', cornerRadius: 20 }, fills: [{ type: 'image', assetId, fit: 'fill' }] } },
+    button: { type: 'frame', parentId: 'p1', index: 'a3', name: 'Button', props: { x: 80, y: 600, width: 360, height: 120, fills: solid('#C2106CFF'), cornerRadius: 60, layout: { direction: 'row', gap: 16, padding: { top: 24, right: 40, bottom: 24, left: 40 } } } },
+    label: { type: 'text', parentId: 'button', index: 'a0', name: 'Label', props: { x: 0, y: 0, width: 200, height: 60, boxMode: 'autoWidth', text: 'Shop now', style: { fontFamily: 'Noto Sans', fontSize: 40, fontWeight: 700, color: '#FFFFFFFF' } } },
+  },
+  overrides: {},
+})
+
+/** Each kind's panels, by the top bar item that opens them. */
+const PANELS: [string, string[], string[]][] = [
+  ['text', ['headline'], ['font', 'colour', 'spacing', 'effects', 'position']],
+  ['shape', ['badge'], ['colour', 'outline', 'effects']],
+  ['photo', ['photo'], ['edit', 'outline', 'effects']],
+  ['stack', ['button'], ['colour', 'stack']],
+]
+
+const select = async (page: Page, ids: string[]) => {
+  await page.evaluate((ids) => window.dazbee?.select(ids), ids)
+  await expect(page.getByTestId('top-bar')).toHaveAttribute('data-selection', ids.join(' '))
+}
+
+for (const [width, height] of [[1280, 760], [390, 844]] as const) {
+  test(`at ${width}×${height} every panel puts its numbers under Advanced, last`, async ({ browser }) => {
+    const asset = await upload(photo)
+    const { page, errors } = await openStage(browser, design(asset.id))
+    await page.setViewportSize({ width, height })
+    await page.evaluate(() => window.dazbee?.fitAll())
+    for (const [kind, ids, panels] of PANELS) {
+      await select(page, ids)
+      for (const id of panels) {
+        const panel = await barMenu(page, id)
+        const headings = await panel.locator('h3').allTextContents()
+        const advanced = headings.indexOf('Advanced')
+        if (advanced >= 0) expect(advanced, `${kind} ${id}: ${headings.join(', ')}`).toBe(headings.length - 1)
+        await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))))
+        writeOutput(`panel-${width}-${kind}-${id}.png`, await page.screenshot({ animations: 'disabled' }))
+        await page.keyboard.press('Escape')
+        await expect(page.getByTestId(`bar-${id}-menu`)).toBeHidden()
+      }
+    }
+    expect(errors).toEqual([])
+  })
+}
