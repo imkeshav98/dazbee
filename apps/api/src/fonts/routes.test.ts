@@ -1,4 +1,4 @@
-// The API seam, against Postgres from Docker Compose (`docker compose up -d --wait postgres`).
+// The font routes, against Postgres from Docker Compose (`docker compose up -d --wait postgres`).
 import { eq } from 'drizzle-orm'
 import { afterAll, describe, expect, it } from 'vitest'
 

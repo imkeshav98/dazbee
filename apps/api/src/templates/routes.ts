@@ -1,3 +1,5 @@
+// The routes of the templates a brand can see: saving, renaming and deleting one, its thumbnail, and
+// starting a design from it.
 import { Hono } from 'hono'
 
 import type { Db } from '@dazbee/db'

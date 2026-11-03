@@ -1,4 +1,5 @@
-// The API seam, against Postgres from Docker Compose (`docker compose up -d --wait postgres`).
+// A design's picture through its route, against Postgres from Docker Compose
+// (`docker compose up -d --wait postgres`).
 import { describe, expect, it } from 'vitest'
 import * as Y from 'yjs'
 

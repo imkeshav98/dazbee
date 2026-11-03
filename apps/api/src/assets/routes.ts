@@ -1,3 +1,5 @@
+// The routes of a brand's images: uploading and recording them, the library's search, names and tags,
+// thumbnails, and deleting one nothing shows.
 import { Hono } from 'hono'
 
 import type { Db } from '@dazbee/db'

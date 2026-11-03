@@ -1,3 +1,5 @@
+// The routes of the session's workspace, its brands and their designs: renaming, copying and deleting a
+// design, its picture and size for the library, and the token that opens it on the sync server.
 import { Hono } from 'hono'
 
 import type { Db } from '@dazbee/db'
@@ -127,7 +129,6 @@ export function workspaceRoutes({
     return deleted ? c.body(null, 204) : c.json(error('No such design'), 404)
   })
 
-  // A token for the sync server, only after the same workspace and brand checks as opening the design.
   // The primary format's size alone, read without drawing, for the home to lay out its bento (#84).
   app.get('/brands/:brandId/designs/:designId/cover', async (c) => {
     const design = await findDesign(db, c.var.session.workspaceId, c.req.param('brandId'), c.req.param('designId'))
@@ -146,6 +147,7 @@ export function workspaceRoutes({
     return c.json({ url, width: cover.width, height: cover.height, expiresAt } satisfies DesignThumbnail)
   })
 
+  // A token for the sync server, only after the same workspace and brand checks as opening the design.
   app.post('/brands/:brandId/designs/:designId/sync-token', async (c) => {
     const { workspaceId, userId } = c.var.session
     const design = await findDesign(db, workspaceId, c.req.param('brandId'), c.req.param('designId'))

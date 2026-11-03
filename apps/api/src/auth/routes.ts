@@ -1,3 +1,4 @@
+// The sign-in routes: the WorkOS link, the callback that makes a session, and signing out. None needs a session.
 import { Hono } from 'hono'
 
 import type { Db } from '@dazbee/db'

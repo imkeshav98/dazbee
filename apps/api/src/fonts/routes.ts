@@ -1,3 +1,4 @@
+// The routes of the fonts a brand can use: the catalog, uploading a font, and a face's file and preview.
 import { Hono } from 'hono'
 
 import type { Db } from '@dazbee/db'

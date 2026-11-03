@@ -1,4 +1,4 @@
-// The API seam, against Postgres from Docker Compose (`docker compose up -d --wait postgres`).
+// The brand kit routes, against Postgres from Docker Compose (`docker compose up -d --wait postgres`).
 import { describe, expect, it } from 'vitest'
 
 import { BrandKit, brandVariables } from '@dazbee/schema'
@@ -6,7 +6,8 @@ import { BrandKit, brandVariables } from '@dazbee/schema'
 import { brand, call, run, sibling, uploadImage } from '../test-api.ts'
 import { png } from '../test-files.ts'
 
-describe('brand kits (#53)', () => {
+// Recording the logo makes its thumbnail with CanvasKit, which takes seconds to load on a busy CI runner.
+describe('brand kits (#53)', { timeout: 30_000 }, () => {
   const kit = {
     colors: [
       { token: 'primary', name: 'Harbour red', value: '#E0262BFF' },

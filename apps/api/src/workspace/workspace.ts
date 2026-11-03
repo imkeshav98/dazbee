@@ -1,4 +1,4 @@
-// The workspace, its brands and their designs, always read and written within one workspace.
+// The workspace and its brands, always read and written within one workspace.
 import { randomUUID } from 'node:crypto'
 
 import { and, asc, eq } from 'drizzle-orm'

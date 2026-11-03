@@ -1,5 +1,6 @@
-// The API's routes. /workspace and every route below /brands need a session, and reads and writes only that
-// session's workspace; a brand or design of another workspace is answered as if it didn't exist.
+// The API: every area's routes on one app. /workspace and every route below /brands need a session, and
+// read and write only that session's workspace; a brand or design of another workspace is answered as if it
+// didn't exist.
 import { Hono } from 'hono'
 
 import type { Db } from '@dazbee/db'

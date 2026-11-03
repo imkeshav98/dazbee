@@ -1,3 +1,4 @@
+// The routes of a brand's kit: reading it and saving it whole.
 import { Hono } from 'hono'
 
 import type { Db } from '@dazbee/db'
