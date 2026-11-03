@@ -6,7 +6,7 @@ Read `GLOSSARY.md` before naming anything, and the ADRs in `docs/adr/` before ch
 
 ## Layout
 
-pnpm + Turborepo monorepo. `apps/` deploy (web, api, sync); `packages/` are shared code and only ever depend downward: schema → doc → renderer → editor. `tests/` holds cross-app suites (Playwright). ADR-0001 also plans a worker app and a `python/` uv workspace for model-adjacent work; they don't exist yet, so add each with the ticket that first needs it. See the layout in `README.md`.
+pnpm + Turborepo monorepo. `apps/` deploy (web, api, sync); `packages/` are shared code and only ever depend downward: schema → doc → renderer → editor. `tests/` holds cross-app suites (Playwright, and Vitest in `tests/pixels`). Add ADR-0001's worker app and `python/` uv workspace (model-adjacent work, phase 2) with the ticket that first needs each. Before adding, moving or removing a workspace, read the layout in `README.md` and update it in the same PR.
 
 ## Rules
 
