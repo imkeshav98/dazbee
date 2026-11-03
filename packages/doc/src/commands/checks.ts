@@ -1,4 +1,4 @@
-// The checks commands share: a free id, a parent that can hold a layer, a layer that exists, and locks.
+// The checks commands share: a free id, a parent that can hold a layer, locks, and layers that exist.
 import { canHold, type Design, type Layer as LayerT, LayerLock } from '@dazbee/schema'
 
 import type { CommandContext } from './define.ts'

@@ -4,7 +4,7 @@ import * as Y from 'yjs'
 import { formatScope } from '@dazbee/schema'
 
 import { openSession, readDesign } from '../index.ts'
-import { badge, testDoc } from '../test-design.ts'
+import { badge, shapesDesign, testDoc } from '../test-design.ts'
 
 describe('node.create', () => {
   it('adds a layer on top of its siblings, and undo removes it', () => {
@@ -49,6 +49,11 @@ describe('node.create', () => {
 })
 
 describe('node.update', () => {
+  const openShapes = () => {
+    const doc = testDoc(shapesDesign())
+    return { doc, tab: openSession(doc) }
+  }
+
   it('sets base properties, or overrides them for one format only', () => {
     const doc = testDoc()
     const tab = openSession(doc)
@@ -66,6 +71,45 @@ describe('node.update', () => {
     expect(() => tab.run('node.update', { ids: ['box'], patch: { opacity: 2 } })).toThrow(/node.update: box.opacity/)
     expect(() => tab.run('node.update', { ids: ['box'], patch: { text: 'x' } })).toThrow(
       /node.update: a graphic has no property "text"/,
+    )
+  })
+
+  it("keeps preset shapes' parameters, per format too", () => {
+    const { doc, tab } = openShapes()
+    tab.run('node.update', { ids: ['c'], patch: { shape: { kind: 'polygon', sides: 8, cornerRadius: 12 } } })
+    tab.run('node.update', {
+      ids: ['a'],
+      scope: 'format:wide',
+      patch: { shape: { kind: 'rect', corners: [40, 0, 40, 0] } },
+    })
+    tab.run('node.create', {
+      parentId: 'p1',
+      layer: {
+        type: 'graphic',
+        name: 'Arrow',
+        props: {
+          x: 0,
+          y: 500,
+          width: 300,
+          height: 0,
+          rotation: 30,
+          shape: { kind: 'line', end: 'arrow' },
+          strokes: [{ paint: { type: 'solid', color: '#000000FF' }, width: 4 }],
+        },
+      },
+    })
+    const d = readDesign(doc)
+    expect(d.nodes.c?.props).toHaveProperty('shape', { kind: 'polygon', sides: 8, cornerRadius: 12 })
+    expect(d.overrides['format:wide']?.a?.shape).toEqual({ kind: 'rect', cornerRadius: 0, corners: [40, 0, 40, 0] })
+    expect(Object.values(d.nodes).find((n) => n.name === 'Arrow')?.props).toMatchObject({
+      height: 0,
+      shape: { kind: 'line', start: 'none', end: 'arrow' },
+    })
+    expect(() => tab.run('node.update', { ids: ['c'], patch: { shape: { kind: 'polygon', sides: 2 } } })).toThrow(
+      /c.shape.sides/,
+    )
+    expect(() => tab.run('node.update', { ids: ['b'], patch: { shape: { kind: 'star', innerRadius: 1.5 } } })).toThrow(
+      /b.shape.innerRadius/,
     )
   })
 })

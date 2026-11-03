@@ -1,6 +1,7 @@
 import * as Y from 'yjs'
+import type { z } from 'zod'
 
-import { type DesignInput, parseDesign } from '@dazbee/schema'
+import { type DesignInput, parseDesign, type Shape } from '@dazbee/schema'
 
 import { loadDesign } from './design-doc.ts'
 import { openSession } from './session.ts'
@@ -48,6 +49,36 @@ export const testDesign = (): DesignInput => ({
   overrides: { 'format:banner': { headline: { text: 'Sale', x: 4, runs: [] } } },
 })
 
+/** Three shapes (a rect with its own corners, a star, a triangle) and a text, in a square and a wide format. */
+export const shapesDesign = (): DesignInput => ({
+  meta: { schemaVersion: 5, designId: 'd1', name: 'Booleans', kind: 'single', primaryFormatId: 'sq' },
+  formats: {
+    sq: { name: 'Square', width: 1080, height: 1080, order: 'a0' },
+    wide: { name: 'Wide', width: 1200, height: 628, order: 'a1' },
+  },
+  pages: { p1: { name: 'Page 1', order: 'a0' } },
+  nodes: {
+    a: shape('a0', 100, { kind: 'rect', corners: [0, 10, 20, 30] }, '#FF0000FF'),
+    b: shape('a1', 150, { kind: 'star', points: 6 }, '#00FF00FF'),
+    c: shape('a2', 400, { kind: 'polygon', sides: 3 }, '#0000FFFF'),
+    t: {
+      type: 'text',
+      parentId: 'p1',
+      index: 'a3',
+      name: 'Text',
+      props: {
+        x: 0,
+        y: 0,
+        width: 100,
+        height: 40,
+        text: 'Hi',
+        style: { fontFamily: 'Noto Sans', fontSize: 20, color: '#000000FF' },
+      },
+    },
+  },
+  overrides: { 'format:wide': { b: { x: 300 } } },
+})
+
 /** A shape to add with node.create. */
 export const badge = {
   type: 'graphic',
@@ -79,4 +110,15 @@ export function twoTabs() {
     Y.applyUpdate(a, Y.encodeStateAsUpdate(b, Y.encodeStateVector(a)))
   }
   return { a, b, tabA: openSession(a), tabB: openSession(b), sync }
+}
+
+/** A shape on p1 at `x`, filled with one colour. */
+function shape(index: string, x: number, kind: z.input<typeof Shape>, color: string) {
+  return {
+    type: 'graphic' as const,
+    parentId: 'p1',
+    index,
+    name: `Shape ${index}`,
+    props: { x, y: 100, width: 100, height: 100, shape: kind, fills: [{ type: 'solid' as const, color }] },
+  }
 }

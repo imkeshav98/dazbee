@@ -2,8 +2,10 @@ import { describe, expect, it } from 'vitest'
 
 import { type Design, type DesignInput, parseDesign } from '@dazbee/schema'
 
+import { root } from '../design-doc.ts'
 import { boundsOf, centreOf, normalAngle, turn } from '../geometry.ts'
 import { childrenOf, loadDesign, openSession, readDesign } from '../index.ts'
+import { shapesDesign, testDoc } from '../test-design.ts'
 
 const rect = (x: number, y: number, width: number, height: number, rotation = 0) => ({
   x,
@@ -108,8 +110,8 @@ function expectSame(after: ReturnType<typeof drawnAll>, before: ReturnType<typeo
 }
 const LEAVES = ['a', 'b', 'c', 'd']
 
-describe('groups', () => {
-  it('node.group wraps layers in a group that hugs them in each format, and nothing moves', () => {
+describe('node.group', () => {
+  it('wraps layers in a group that hugs them in each format, and nothing moves', () => {
     const doc = fresh()
     const tab = openSession(doc)
     const before = drawnAll(readDesign(doc), LEAVES)
@@ -136,78 +138,20 @@ describe('groups', () => {
     expect(undone.nodes.a?.parentId).toBe('p1')
   })
 
-  it('group then ungroup leaves every layer where it was in every format, inside turned containers too', () => {
-    const doc = fresh()
-    const tab = openSession(doc)
-    const before = drawnAll(readDesign(doc), LEAVES)
-
-    // Inside the turned frame: C and the turned group G2 together.
-    const outer = tab.run('node.group', { ids: ['c', 'g2'] })
-    expectSame(drawnAll(readDesign(doc), LEAVES), before)
-
-    // G2 is turned -15° in the square and the banner: its turn goes into D.
-    expect(tab.run('node.ungroup', { ids: ['g2'] })).toEqual(['d'])
-    let now = readDesign(doc)
-    expect(now.nodes.g2).toBeUndefined()
-    expect(now.nodes.d?.parentId).toBe(outer)
-    expect(now.nodes.d?.props.rotation).toBe(-5)
-    expectSame(drawnAll(now, LEAVES), before)
-
-    expect(tab.run('node.ungroup', { ids: [outer] })).toEqual(['c', 'd'])
-    now = readDesign(doc)
-    expect(childrenOf(now, 'f').map(([child]) => child)).toEqual(['c', 'd'])
-    expectSame(drawnAll(now, LEAVES), before)
-
-    // Each was one undo step.
-    tab.undo()
-    expect(readDesign(doc).nodes[outer]?.type).toBe('group')
-    tab.undo()
-    expect(readDesign(doc).nodes.g2?.type).toBe('group')
-    tab.undo()
-    expect(readDesign(doc)).toEqual(readDesign(fresh()))
+  it('refuses what it can not do, as node.frame, node.enclose and node.ungroup do', () => {
+    const tab = openSession(fresh())
+    expect(() => tab.run('node.frame', { ids: ['a', 'c'] })).toThrow(/frame must share a parent/)
+    expect(() => tab.run('node.enclose', { id: 'g2', ids: ['d'], scope: 'format:sq' })).toThrow(/not a frame/)
+    expect(() => tab.run('node.enclose', { id: 'f', ids: ['c'], scope: 'format:sq' })).toThrow(/not beside/)
+    expect(() => tab.run('node.group', { ids: ['a', 'c'] })).toThrow(/share a parent/)
+    expect(() => tab.run('node.ungroup', { ids: ['f'] })).toThrow(/frame, not a group/)
+    tab.run('node.lock', { ids: ['g2'], lock: { delete: true } })
+    expect(() => tab.run('node.ungroup', { ids: ['g2'] })).toThrow(/locked/)
   })
+})
 
-  it('a format that turns the group differently gets its own overrides when ungrouping', () => {
-    const doc = fresh()
-    const tab = openSession(doc)
-    const id = tab.run('node.group', { ids: ['a', 'b'] })
-    tab.run('node.update', { ids: [id], scope: 'format:banner', patch: { rotation: 45, visible: false } })
-    const before = drawnAll(readDesign(doc), ['a', 'b'])
-
-    tab.run('node.ungroup', { ids: [id] })
-
-    const after = readDesign(doc)
-    expectSame(drawnAll(after, ['a', 'b']), before)
-    // The banner hid the group, so it hides what the group held; the square still shows them.
-    expect(drawn(after, 'format:banner', 'b').visible).toBe(false)
-    expect(drawn(after, 'format:sq', 'b').visible).toBe(true)
-    expect(after.overrides['format:banner']?.b).toMatchObject({ rotation: 45 })
-  })
-
-  it('node.hug fits a turned group to what it holds after one of them moves, and nothing moves on screen', () => {
-    const doc = fresh()
-    const tab = openSession(doc)
-    tab.run('node.update', { ids: ['d'], scope: 'format:sq', patch: { x: 560, y: 700 } })
-    const before = drawnAll(readDesign(doc), LEAVES)
-
-    tab.run('node.hug', { ids: ['d'] })
-
-    const after = readDesign(doc)
-    expectSame(drawnAll(after, LEAVES), before)
-    for (const scope of SCOPES) {
-      const hug = boundsOf([boxOf(after, scope, 'd')])
-      const box = boxOf(after, scope, 'g2')
-      expect(box.x).toBeCloseTo(hug.x, 1)
-      expect(box.y).toBeCloseTo(hug.y, 1)
-      expect(box.width).toBeCloseTo(hug.width, 1)
-      expect(box.height).toBeCloseTo(hug.height, 1)
-    }
-    // Fitting again changes nothing.
-    tab.run('node.hug', { ids: ['g2'] })
-    expect(readDesign(doc)).toEqual(after)
-  })
-
-  it('node.frame wraps layers in a frame that hugs them in each format, without a fill or clipping, and nothing moves', () => {
+describe('node.frame', () => {
+  it('wraps layers in a frame that hugs them in each format, without a fill or clipping, and nothing moves', () => {
     const doc = fresh()
     const tab = openSession(doc)
     const before = drawnAll(readDesign(doc), LEAVES)
@@ -234,8 +178,10 @@ describe('groups', () => {
     tab.undo()
     expect(readDesign(doc)).toEqual(readDesign(fresh()))
   })
+})
 
-  it('node.enclose moves layers into a frame drawn around them, placing the frame around them in every format', () => {
+describe('node.enclose', () => {
+  it('moves layers into a frame drawn around them, placing the frame around them in every format', () => {
     const doc = fresh()
     const tab = openSession(doc)
     // A frame drawn in the square around A and B, 20 px clear of them.
@@ -270,15 +216,177 @@ describe('groups', () => {
     expect(undone.nodes.a?.parentId).toBe('p1')
     expect(undone.nodes[id]?.props).toMatchObject(drawnBox)
   })
+})
 
-  it('refuses what it can not do', () => {
-    const tab = openSession(fresh())
-    expect(() => tab.run('node.frame', { ids: ['a', 'c'] })).toThrow(/frame must share a parent/)
-    expect(() => tab.run('node.enclose', { id: 'g2', ids: ['d'], scope: 'format:sq' })).toThrow(/not a frame/)
-    expect(() => tab.run('node.enclose', { id: 'f', ids: ['c'], scope: 'format:sq' })).toThrow(/not beside/)
-    expect(() => tab.run('node.group', { ids: ['a', 'c'] })).toThrow(/share a parent/)
-    expect(() => tab.run('node.ungroup', { ids: ['f'] })).toThrow(/frame, not a group/)
-    tab.run('node.lock', { ids: ['g2'], lock: { delete: true } })
-    expect(() => tab.run('node.ungroup', { ids: ['g2'] })).toThrow(/locked/)
+describe('node.boolean', () => {
+  const open = () => {
+    const doc = testDoc(shapesDesign())
+    return { doc, tab: openSession(doc) }
+  }
+
+  it('combines shapes where the top one was, painted like the bottom one, hugging them in every format', () => {
+    const { doc, tab } = open()
+    const id = tab.run('node.boolean', { ids: ['b', 'a'], op: 'subtract' })
+    const d = readDesign(doc)
+    expect(d.nodes[id]).toMatchObject({ type: 'boolean', name: 'Subtract', parentId: 'p1', index: 'a1' })
+    expect(d.nodes[id]?.props).toMatchObject({
+      op: 'subtract',
+      x: 100,
+      y: 100,
+      width: 150,
+      height: 100,
+      fills: [{ type: 'solid', color: '#FF0000FF' }],
+    })
+    expect(d.overrides['format:wide']?.[id]).toEqual({ width: 300 })
+    expect(childrenOf(d, id).map(([child]) => child)).toEqual(['a', 'b'])
+    // One undo step takes it all back.
+    tab.undo()
+    expect(readDesign(doc).nodes[id]).toBeUndefined()
+    expect(readDesign(doc).nodes.a?.parentId).toBe('p1')
+  })
+
+  it('combines only two or more shapes or booleans that share a parent', () => {
+    const { tab } = open()
+    expect(() => tab.run('node.boolean', { ids: ['a'], op: 'union' })).toThrow(/ids/)
+    expect(() => tab.run('node.boolean', { ids: ['a', 't'], op: 'union' })).toThrow(
+      /"t" is a text; only shapes and booleans combine/,
+    )
+    const group = tab.run('node.group', { ids: ['c'] })
+    expect(() => tab.run('node.boolean', { ids: ['a', group], op: 'union' })).toThrow(
+      /is a group; only shapes and booleans combine/,
+    )
+    expect(() => tab.run('node.boolean', { ids: ['a', 'c'], op: 'union' })).toThrow(/must share a parent/)
+    // A boolean of booleans nests.
+    const inner = tab.run('node.boolean', { ids: ['a', 'b'], op: 'union' })
+    tab.run('node.move', { id: 'c', parentId: 'p1' })
+    const outer = tab.run('node.boolean', { ids: [inner, 'c'], op: 'exclude' })
+    expect(tab.design().nodes[inner]?.parentId).toBe(outer)
+  })
+
+  it('holds only shapes and booleans, however a layer gets there', () => {
+    const { doc, tab } = open()
+    const id = tab.run('node.boolean', { ids: ['a', 'b'], op: 'intersect' })
+    expect(() => tab.run('node.move', { id: 't', parentId: id })).toThrow(
+      /parent "\S+" is a boolean, which holds only shapes and booleans/,
+    )
+    expect(() =>
+      tab.run('node.create', {
+        parentId: id,
+        layer: { type: 'group', name: 'G', props: { x: 0, y: 0, width: 1, height: 1 } },
+      }),
+    ).toThrow(/holds only shapes/)
+    const drawn = tab.run('node.create', {
+      parentId: id,
+      layer: {
+        type: 'graphic',
+        name: 'Cut',
+        props: { x: 120, y: 120, width: 20, height: 20, shape: { kind: 'ellipse' } },
+      },
+    })
+    expect(readDesign(doc).nodes[drawn]?.parentId).toBe(id)
+    expect(() => tab.run('node.group', { ids: ['a', 'b'] })).toThrow(/holds only shapes/)
+    // Another tab's write that puts a text inside it anyway is repaired on read, the same everywhere.
+    const repairs: string[] = []
+    doc.transact(() => root(doc).nodes.get('t')?.set('parentId', id))
+    expect(readDesign(doc, (r) => repairs.push(...r)).nodes.t?.parentId).toBe('p1')
+    expect(repairs).toEqual([`"t" lost its parent "${id}"; moved to page "p1"`])
+  })
+
+  it('stays live: an edited shape changes it, hug refits it, and ungroup lets the shapes go', () => {
+    const { doc, tab } = open()
+    const id = tab.run('node.boolean', { ids: ['a', 'b'], op: 'union' })
+    tab.run('node.update', {
+      ids: ['b'],
+      patch: { x: 300, shape: { kind: 'star', points: 8, innerRadius: 0.6, cornerRadius: 4 } },
+    })
+    tab.run('node.hug', { ids: ['b'] })
+    expect(readDesign(doc).nodes[id]?.props).toMatchObject({ x: 100, width: 300 })
+    expect(readDesign(doc).nodes.b?.props).toHaveProperty('shape', {
+      kind: 'star',
+      points: 8,
+      innerRadius: 0.6,
+      cornerRadius: 4,
+    })
+    tab.run('node.update', { ids: [id], patch: { op: 'exclude' } })
+    expect(readDesign(doc).nodes[id]?.props).toMatchObject({ op: 'exclude' })
+    const freed = tab.run('node.ungroup', { ids: [id] })
+    expect(freed).toEqual(['a', 'b'])
+    expect(readDesign(doc).nodes[id]).toBeUndefined()
+    expect(readDesign(doc).nodes.a?.parentId).toBe('p1')
+  })
+})
+
+describe('node.ungroup', () => {
+  it('leaves every layer where it was after node.group, in every format, inside turned containers too', () => {
+    const doc = fresh()
+    const tab = openSession(doc)
+    const before = drawnAll(readDesign(doc), LEAVES)
+
+    // Inside the turned frame: C and the turned group G2 together.
+    const outer = tab.run('node.group', { ids: ['c', 'g2'] })
+    expectSame(drawnAll(readDesign(doc), LEAVES), before)
+
+    // G2 is turned -15° in the square and the banner: its turn goes into D.
+    expect(tab.run('node.ungroup', { ids: ['g2'] })).toEqual(['d'])
+    let now = readDesign(doc)
+    expect(now.nodes.g2).toBeUndefined()
+    expect(now.nodes.d?.parentId).toBe(outer)
+    expect(now.nodes.d?.props.rotation).toBe(-5)
+    expectSame(drawnAll(now, LEAVES), before)
+
+    expect(tab.run('node.ungroup', { ids: [outer] })).toEqual(['c', 'd'])
+    now = readDesign(doc)
+    expect(childrenOf(now, 'f').map(([child]) => child)).toEqual(['c', 'd'])
+    expectSame(drawnAll(now, LEAVES), before)
+
+    // Each was one undo step.
+    tab.undo()
+    expect(readDesign(doc).nodes[outer]?.type).toBe('group')
+    tab.undo()
+    expect(readDesign(doc).nodes.g2?.type).toBe('group')
+    tab.undo()
+    expect(readDesign(doc)).toEqual(readDesign(fresh()))
+  })
+
+  it('gives a format that turns the group differently its own overrides', () => {
+    const doc = fresh()
+    const tab = openSession(doc)
+    const id = tab.run('node.group', { ids: ['a', 'b'] })
+    tab.run('node.update', { ids: [id], scope: 'format:banner', patch: { rotation: 45, visible: false } })
+    const before = drawnAll(readDesign(doc), ['a', 'b'])
+
+    tab.run('node.ungroup', { ids: [id] })
+
+    const after = readDesign(doc)
+    expectSame(drawnAll(after, ['a', 'b']), before)
+    // The banner hid the group, so it hides what the group held; the square still shows them.
+    expect(drawn(after, 'format:banner', 'b').visible).toBe(false)
+    expect(drawn(after, 'format:sq', 'b').visible).toBe(true)
+    expect(after.overrides['format:banner']?.b).toMatchObject({ rotation: 45 })
+  })
+})
+
+describe('node.hug', () => {
+  it('fits a turned group to what it holds after one of them moves, and nothing moves on screen', () => {
+    const doc = fresh()
+    const tab = openSession(doc)
+    tab.run('node.update', { ids: ['d'], scope: 'format:sq', patch: { x: 560, y: 700 } })
+    const before = drawnAll(readDesign(doc), LEAVES)
+
+    tab.run('node.hug', { ids: ['d'] })
+
+    const after = readDesign(doc)
+    expectSame(drawnAll(after, LEAVES), before)
+    for (const scope of SCOPES) {
+      const hug = boundsOf([boxOf(after, scope, 'd')])
+      const box = boxOf(after, scope, 'g2')
+      expect(box.x).toBeCloseTo(hug.x, 1)
+      expect(box.y).toBeCloseTo(hug.y, 1)
+      expect(box.width).toBeCloseTo(hug.width, 1)
+      expect(box.height).toBeCloseTo(hug.height, 1)
+    }
+    // Fitting again changes nothing.
+    tab.run('node.hug', { ids: ['g2'] })
+    expect(readDesign(doc)).toEqual(after)
   })
 })
