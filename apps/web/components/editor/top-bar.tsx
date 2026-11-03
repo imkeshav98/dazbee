@@ -14,6 +14,7 @@ import { withImage, type Editor, type ShortcutAction } from '@dazbee/editor'
 import { boundFillIndex, type Design, type Paint } from '@dazbee/schema'
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { cn } from '../../lib/cn.ts'
+import { LIMITS } from '../../lib/limits.ts'
 import { useMessages } from '../../lib/i18n/client.tsx'
 import { COMBINE, DISTRIBUTE, keyOf, useSelection } from './arrange-panel.tsx'
 import { arrowAlong, BarPopover, useRovingTab } from './bar-popover.tsx'
@@ -84,12 +85,12 @@ function SizeStepper({ target }: { target: Target }) {
   const [draft, setDraft] = useState<string | null>(null)
   const commit = (text: string) => {
     const n = Number(text)
-    if (text.trim() !== '' && Number.isFinite(n) && n >= 1) setStyle('fontSize', Math.round(n * 10) / 10)
+    if (text.trim() !== '' && Number.isFinite(n) && n >= 1) setStyle('fontSize', Math.round(Math.min(n, LIMITS.fontSize) * 10) / 10)
     setDraft(null)
   }
   return (
     <div role="group" aria-label={t.editor.props.fontSize} data-testid="bar-size" className="flex h-[30px] shrink-0 items-center rounded-row border border-line">
-      <button type="button" data-bar-item aria-label={t.editor.bar.smaller} title={t.editor.bar.smaller} onClick={() => shiftStyle('fontSize', -1, 1)} className="grid h-full w-6 cursor-pointer place-items-center rounded-s-row text-muted hover:bg-hover hover:text-text">
+      <button type="button" data-bar-item aria-label={t.editor.bar.smaller} title={t.editor.bar.smaller} onClick={() => shiftStyle('fontSize', -1, 1, 0, LIMITS.fontSize)} className="grid h-full w-6 cursor-pointer place-items-center rounded-s-row text-muted hover:bg-hover hover:text-text">
         <MinusIcon size={12} aria-hidden />
       </button>
       <input
@@ -108,13 +109,13 @@ function SizeStepper({ target }: { target: Target }) {
           if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
             event.preventDefault()
             setDraft(null)
-            shiftStyle('fontSize', (event.key === 'ArrowUp' ? 1 : -1) * (event.shiftKey ? 10 : 1), 1)
+            shiftStyle('fontSize', (event.key === 'ArrowUp' ? 1 : -1) * (event.shiftKey ? 10 : 1), 1, 0, LIMITS.fontSize)
           }
         }}
         onBlur={(event) => draft !== null && commit(event.currentTarget.value)}
         className={cn('h-full w-10 bg-transparent text-center font-mono text-[12px] tabular-nums text-text outline-none', FOCUS_RING)}
       />
-      <button type="button" data-bar-item aria-label={t.editor.bar.bigger} title={t.editor.bar.bigger} onClick={() => shiftStyle('fontSize', 1, 1)} className="grid h-full w-6 cursor-pointer place-items-center rounded-e-row text-muted hover:bg-hover hover:text-text">
+      <button type="button" data-bar-item aria-label={t.editor.bar.bigger} title={t.editor.bar.bigger} onClick={() => shiftStyle('fontSize', 1, 1, 0, LIMITS.fontSize)} className="grid h-full w-6 cursor-pointer place-items-center rounded-e-row text-muted hover:bg-hover hover:text-text">
         <PlusIcon size={12} aria-hidden />
       </button>
     </div>

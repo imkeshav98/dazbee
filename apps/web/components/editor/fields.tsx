@@ -6,6 +6,7 @@ import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import type { Editor } from '@dazbee/editor'
 import { cn } from '../../lib/cn.ts'
 import { fillOf } from '../../lib/fill.ts'
+import { LIMITS } from '../../lib/limits.ts'
 import { useMessages } from '../../lib/i18n/client.tsx'
 import { format } from '../../lib/i18n/index.ts'
 import { Select } from '../ui/select.tsx'
@@ -38,7 +39,7 @@ function useDraft() {
  * With `onClear`, emptying the field calls it, for a value that can be left unset (its placeholder
  * shows then), mixed values too once something was typed; without, an empty field is ignored.
  */
-export function NumberField({ label, name, value, step = 1, min, max, fillRange, scale = 1, unit = '', placeholder, editor, testId, onSet, onShift, onClear }: {
+export function NumberField({ label, name, value, step = 1, min: least, max: most, fillRange, scale = 1, unit = '', placeholder, editor, testId, onSet, onShift, onClear }: {
   label: string
   name: string
   value: number | 'mixed' | undefined
@@ -61,13 +62,16 @@ export function NumberField({ label, name, value, step = 1, min, max, fillRange,
 }) {
   const t = useMessages()
   const input = useRef<HTMLInputElement>(null)
+  // A field without limits of its own still stops where a design would only break.
+  const min = least ?? -LIMITS.any
+  const max = most ?? LIMITS.any
   const shown = value === undefined || value === 'mixed' ? '' : String(tidy(value * scale))
   const [draft, setDraft, typedNow] = useDraft()
   const [typing, setTyping] = useState(false)
   const press = useRef<{ x: number; applied: number; end: (() => void) | null } | null>(null)
   /** Whether Home and End have a lowest and a highest value to go to. */
-  const hasEnds = min !== undefined && max !== undefined && Number.isFinite(min) && Number.isFinite(max) && max > min
-  const fill = fillOf(value, fillRange ?? (min !== undefined && max !== undefined ? [min, max] : undefined))
+  const hasEnds = least !== undefined && most !== undefined && Number.isFinite(least) && Number.isFinite(most) && most > least
+  const fill = fillOf(value, fillRange ?? (least !== undefined && most !== undefined ? [least, most] : undefined))
   /** One step, or ten with Shift, or a tenth with Alt where the steps are fractions. */
   const stepOf = (event: { shiftKey: boolean; altKey: boolean }) => step * (event.shiftKey ? 10 : event.altKey && step < 1 ? 0.1 : 1)
   const commit = (text: string) => {
@@ -128,8 +132,8 @@ export function NumberField({ label, name, value, step = 1, min, max, fillRange,
         role="spinbutton"
         aria-label={name}
         aria-valuenow={typeof value === 'number' ? tidy(value * scale) : undefined}
-        aria-valuemin={min === undefined || !Number.isFinite(min) ? undefined : tidy(min * scale)}
-        aria-valuemax={max === undefined || !Number.isFinite(max) ? undefined : tidy(max * scale)}
+        aria-valuemin={least === undefined || !Number.isFinite(least) ? undefined : tidy(least * scale)}
+        aria-valuemax={most === undefined || !Number.isFinite(most) ? undefined : tidy(most * scale)}
         aria-valuetext={value === 'mixed' ? t.editor.props.mixed : shown ? `${shown}${unit}` : placeholder}
         data-testid={testId}
         inputMode="decimal"
