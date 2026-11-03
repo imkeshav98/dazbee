@@ -1,6 +1,6 @@
 // Where each frame of the infinite canvas sits (#36): an auto grid with pages as rows and formats
 // as columns, so nothing about placement is stored and a new page or format slots in by itself.
-import type { Design } from '@dazbee/schema'
+import { type Design, inOrder, type Rect } from '@dazbee/schema'
 
 /** One page in one format, placed on the canvas in world units (design pixels at 100%). */
 export interface Frame {
@@ -15,19 +15,9 @@ export interface Frame {
   height: number
 }
 
-export interface Rect {
-  x: number
-  y: number
-  width: number
-  height: number
-}
-
 /** Space between formats, and between pages, which also holds the frame labels. */
 export const COLUMN_GAP = 160
 export const ROW_GAP = 240
-
-const byOrder = <T extends { order: string }>(entries: [string, T][]) =>
-  entries.sort(([a, x], [b, y]) => (x.order < y.order ? -1 : x.order > y.order ? 1 : a < b ? -1 : a > b ? 1 : 0))
 
 export const frameKey = (pageId: string, formatId: string) => `${pageId}/${formatId}`
 
@@ -36,10 +26,8 @@ export const frameKey = (pageId: string, formatId: string) => `${pageId}/${forma
  * view (#38): that one format's column alone.
  */
 export function frameGrid(design: Design, only?: string | null): { frames: Frame[]; bounds: Rect } {
-  const pages = byOrder(Object.entries(design.pages))
-  const formats = byOrder(Object.entries(design.formats)).filter(
-    ([id]) => !only || !design.formats[only] || id === only,
-  )
+  const pages = inOrder(design.pages)
+  const formats = inOrder(design.formats).filter(([id]) => !only || !design.formats[only] || id === only)
   const rowHeight = Math.max(0, ...formats.map(([, f]) => f.height))
   const columns: number[] = []
   let x = 0

@@ -1,7 +1,8 @@
 // The view onto the infinite canvas (#36). A screen point, in CSS pixels from the stage's corner,
 // is world × zoom + (x, y); world units are design pixels.
-import { intersects, type Rect } from './grid.ts'
-import type { Point } from './hit-test.ts'
+import type { Point, Rect } from '@dazbee/schema'
+
+import { intersects } from './grid.ts'
 
 export interface Camera {
   x: number
