@@ -15,6 +15,7 @@ pnpm + Turborepo monorepo. `apps/` deploy (web, api, sync); `packages/` are shar
 - Exports are drawn on the CPU surface only. Never add an export path that reads pixels from WebGL.
 - Fonts and images are loaded from bytes we control, never from the system or the browser's decoder.
 - Never put server addresses or secrets in the repo.
+- Before adding or moving code, read `docs/agents/code-layout.md`: which folder and file it goes in, the order inside the file, and the imports each folder may make.
 
 ## Dev flow
 
