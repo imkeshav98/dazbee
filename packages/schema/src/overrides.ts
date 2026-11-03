@@ -1,6 +1,5 @@
 import { z } from 'zod'
 
-import type { DesignShape } from './design.ts'
 import { deepFreeze } from './json.ts'
 import { type Layer, LAYER_PROPS, type LayerType } from './layers.ts'
 import { NodeId } from './primitives.ts'
@@ -18,6 +17,7 @@ export type AnyScope = z.infer<typeof AnyScope>
 
 /** overrides[scope][nodeId][propertyPath] = value. Any property can be overridden per format. */
 export const Overrides = z.record(Scope, z.record(NodeId, z.record(z.string(), z.unknown())))
+export type Overrides = z.infer<typeof Overrides>
 
 export type Fail = (path: PropertyKey[], message: string) => void
 
@@ -87,7 +87,7 @@ export function overrideDefaults(node: Layer, props: Record<string, unknown>) {
 }
 
 /** Gives override values the same defaults as base values, so a renderer never sees a half-filled paint or effect. */
-export function withOverrideDefaults(d: DesignShape): DesignShape {
+export function withOverrideDefaults<D extends { nodes: Record<string, Layer>; overrides: Overrides }>(d: D): D {
   const overrides = Object.fromEntries(
     Object.entries(d.overrides).map(([scope, byNode]) => [
       scope,

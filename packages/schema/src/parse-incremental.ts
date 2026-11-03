@@ -46,16 +46,9 @@ export function parseDesignIncrementally(input: unknown): ParseResult {
       if (!NodeId.safeParse(id).success) return parseDesign(input)
       validIds.add(id)
     }
-    let layer = isRecord(raw) ? layerCache.get(raw) : undefined
-    if (!layer) {
-      const parsed = Layer.safeParse(raw)
-      if (!parsed.success) return parseDesign(input)
-      // Frozen: it is shared by every design parsed from this object from now on.
-      layer = deepFreeze(parsed.data)
-      if (isRecord(raw)) layerCache.set(raw, layer)
-      layerCache.set(layer, layer)
-    }
-    entries.push([id, layer])
+    const parsed = parseLayer(raw)
+    if (!parsed.success) return parseDesign(input)
+    entries.push([id, parsed.layer])
   }
   const nodes = Object.fromEntries(entries)
 
@@ -86,7 +79,10 @@ export function parseDesignIncrementally(input: unknown): ParseResult {
   return { success: true, design: { ...head, nodes, overrides } }
 }
 
-/** One layer, validated on its own: its type, props and defaults, but not its parent. Frozen. */
+/**
+ * One layer, validated on its own: its type, props and defaults, but not its parent. Frozen: it is
+ * shared by every later parse of the same object.
+ */
 export function parseLayer(input: unknown): { success: true; layer: Layer } | { success: false; errors: string[] } {
   const cached = isRecord(input) ? layerCache.get(input) : undefined
   if (cached) return { success: true, layer: cached }
