@@ -1986,6 +1986,9 @@ function live(
       } else {
         select([hit.id], at.frame.key)
       }
+      // Inside the selection's box a drag still moves the selection; a click picks the locked layer
+      // on top there.
+      if (locked && inOuter) clickedAlone = locked
     } else if (!inOuter) {
       // Empty canvas, or a locked layer: a marquee, adding to the selection with shift.
       canvas.setPointerCapture(e.pointerId)
