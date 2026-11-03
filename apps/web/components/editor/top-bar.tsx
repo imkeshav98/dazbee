@@ -10,7 +10,7 @@ import {
   RowsIcon, SparkleIcon, StarIcon, TextAaIcon, TextAlignCenterIcon, TextAlignJustifyIcon, TextAlignLeftIcon, TextAlignRightIcon, TextBIcon, TextItalicIcon, TextStrikethroughIcon,
   TextUnderlineIcon, AlignLeftIcon, UniteSquareIcon,
 } from '@phosphor-icons/react'
-import { withImage, type Editor, type ShortcutAction } from '@dazbee/editor'
+import { shortcutFor, withImage, type Editor, type ShortcutAction } from '@dazbee/editor'
 import { boundFillIndex, type Design, type Paint } from '@dazbee/schema'
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { cn } from '../../lib/cn.ts'
@@ -104,6 +104,13 @@ function SizeStepper({ target }: { target: Target }) {
         onFocus={(event) => event.currentTarget.select()}
         onKeyDown={(event) => {
           event.stopPropagation()
+          // Undo and redo are the design's while nothing is being typed, as in the panels' fields.
+          const action = shortcutFor(event.nativeEvent)
+          if (draft === null && (action === 'undo' || action === 'redo')) {
+            event.preventDefault()
+            target.editor.perform(action)
+            return
+          }
           if (event.key === 'Enter') commit(event.currentTarget.value)
           if (event.key === 'Escape') setDraft(null)
           if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
