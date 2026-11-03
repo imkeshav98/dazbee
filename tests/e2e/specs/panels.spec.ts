@@ -169,3 +169,20 @@ test.describe('found by QA', () => {
     expect(errors).toEqual([])
   })
 })
+
+test.describe('found by Keshav', () => {
+  test("a pop-up opened by a click puts no number field in focus: the Shape pop-up's corners", async ({ browser }) => {
+    const asset = await upload(photo)
+    const { page, errors } = await openStage(browser, design(asset.id))
+    await page.evaluate(() => window.dazbee?.session.run('node.update', { ids: ['badge'], patch: { shape: { kind: 'rect', cornerRadius: 12 } } }))
+    await select(page, ['badge'])
+    const popup = await barMenu(page, 'shape')
+    await expect(popup.getByRole('spinbutton').first()).toBeVisible()
+    expect(await page.evaluate(() => document.activeElement?.tagName)).not.toBe('INPUT')
+    // The focus is in the pop-up, so Tab goes on to its controls and Esc closes it.
+    expect(await popup.evaluate((el) => el.contains(document.activeElement))).toBe(true)
+    await page.keyboard.press('Tab')
+    expect(await page.evaluate(() => document.activeElement?.getAttribute('role'))).toBe('spinbutton')
+    expect(errors).toEqual([])
+  })
+})
