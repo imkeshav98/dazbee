@@ -3,7 +3,7 @@
 import { fileURLToPath } from 'node:url'
 
 import { ESLint } from 'eslint'
-import { describe, expect, it } from 'vitest'
+import { beforeAll, describe, expect, it } from 'vitest'
 
 const eslint = new ESLint({ cwd: fileURLToPath(new URL('..', import.meta.url)) })
 
@@ -13,6 +13,9 @@ const ruleIds = async (code: string) => {
 }
 
 describe('import paths', () => {
+  // Loading the app's whole ESLint config takes past 5 s on a cold CI runner, so it loads once, up front.
+  beforeAll(() => eslint.calculateConfigForFile('components/hello.ts'), 60_000)
+
   it('fails an import that leaves its folder through ../', async () => {
     expect(await ruleIds("export { api } from '../lib/api.ts'\n")).toContain('no-restricted-imports')
   })
