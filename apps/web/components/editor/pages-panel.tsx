@@ -1,22 +1,54 @@
 'use client'
 
-// The design's pages in the inspector: add, duplicate, rename, reorder (by dragging or the arrows)
-// and delete them, and bring one into view. Every change is a command, so it is one undo step and reaches the other tabs.
-import { CaretDownIcon, CaretUpIcon, CopyIcon, PlusIcon, TrashIcon } from '@phosphor-icons/react'
+// The design's pages. Pages, by the zoom pill, says which page is in view and how many there are
+// ("Pages 2/3", the numbers alone on a phone) and opens the Pages panel: each page's picture, name
+// and sizes, shown with a click and reordered by dragging; ⋯ renames, duplicates, moves and deletes
+// one, and Add page adds one. A click on a page's background picks it, and its Background panel
+// paints it in every size. Every change is a command, so it is one undo step and reaches the other tabs.
+import { FilesIcon, PlusIcon } from '@phosphor-icons/react'
 import type { Editor } from '@dazbee/editor'
 import type { Design } from '@dazbee/schema'
-import { useEffect, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { cn } from '../../lib/cn.ts'
 import { useMessages } from '../../lib/i18n/client.tsx'
 import { format } from '../../lib/i18n/index.ts'
-import { Tooltip } from '../ui/tooltip.tsx'
-import { CARD, CardHeader } from './card.tsx'
+import { useValue, valueStore } from '../../lib/value-store.ts'
 import { afterDraws, sameUrls } from './after-draws.ts'
+import { CARD_ROW, CardMenu } from './card.tsx'
+import { PanelFrame } from './edit-panel.tsx'
+import { setOpen, useEditState } from './edit-store.ts'
 import { useEditorDesign } from './formats-panel.tsx'
-import { CHIP, DROP_LINE, ICON_BUTTON } from './styles.ts'
+import { BackgroundBody } from './selection-cards.tsx'
+import { DROP_LINE, FOCUS_RING, PANEL_BUTTON } from './styles.ts'
 
-const ordered = (design: Design) =>
+export const orderedPages = (design: Design) =>
   Object.entries(design.pages).sort(([a, x], [b, y]) => (x.order < y.order ? -1 : x.order > y.order ? 1 : a < b ? -1 : 1))
+
+/** The page last brought into view, from the Pages panel or by picking it on the stage. */
+const shownPage = valueStore<string | null>(null)
+
+/** The page a click on its background picked, or null, following the stage. */
+export function usePickedPage(editor: Editor) {
+  const [picked, setPicked] = useState(() => editor.pickedPage())
+  useEffect(() => {
+    const follow = (pageId: string | null) => {
+      setPicked(pageId)
+      if (pageId) shownPage.set(pageId)
+    }
+    follow(editor.pickedPage())
+    const stop = editor.onPagePick(follow)
+    return () => {
+      stop()
+    }
+  }, [editor])
+  return picked
+}
+
+/** The page in view: the one last shown or picked while it is still there, else the first. */
+function useCurrentPage(design: Design) {
+  const shown = useValue(shownPage)
+  return shown && design.pages[shown] ? shown : orderedPages(design)[0]?.[0] ?? null
+}
 
 /** Each page's picture in the primary format, drawn once the stage settles and again once its fonts and images arrive. */
 function usePagePictures(editor: Editor): Record<string, string | null> {
@@ -28,13 +60,110 @@ function usePagePictures(editor: Editor): Record<string, string | null> {
   return pictures
 }
 
-export function PagesPanel({ editor, onRemoved, onShow }: { editor: Editor; onRemoved: (message: string) => void; onShow?: (pageId: string) => void }) {
+/**
+ * Pages by the zoom pill: before it on desktop, over it on a tablet, where the tool dock leaves no
+ * room beside it, and on a phone at the top start, across from it, hidden with it while the top bar shows.
+ */
+export function PagesButton({ editor }: { editor: Editor | null }) {
   const t = useMessages()
+  if (!editor) return <PagesFrame label={t.editor.pages.title} disabled><span>{t.editor.pages.title}</span></PagesFrame>
+  return <LivePages editor={editor} />
+}
+
+/** Pages once the design is open: which page is in view, of how many. */
+function LivePages({ editor }: { editor: Editor }) {
+  const t = useMessages()
+  // Each design opens on its first page.
+  useEffect(() => () => shownPage.set(null), [editor])
   const { design } = useEditorDesign(editor)
-  const pages = ordered(design)
+  usePickedPage(editor)
+  const current = useCurrentPage(design)
+  const pages = orderedPages(design)
+  const counts = { n: Math.max(1, pages.findIndex(([id]) => id === current) + 1), total: pages.length }
+  return (
+    <PagesFrame label={format(t.editor.pages.buttonLabel, counts)}>
+      <span aria-hidden className="tabular-nums max-sm:hidden">{format(t.editor.pages.button, counts)}</span>
+      <span aria-hidden className="font-mono tabular-nums sm:hidden">{format(t.editor.pages.buttonShort, counts)}</span>
+    </PagesFrame>
+  )
+}
+
+function PagesFrame({ label, disabled = false, children }: { label: string; disabled?: boolean; children: ReactNode }) {
+  const { open } = useEditState()
+  const button = useRef<HTMLButtonElement>(null)
+  // Where the zoom pill ends, so Pages sits just beside or above it.
+  const [zoom, setZoom] = useState({ width: 0, height: 0 })
+  useLayoutEffect(() => {
+    const pill = button.current?.parentElement?.querySelector<HTMLElement>('[data-zoom]')
+    if (!pill) return
+    const measure = () => setZoom({ width: pill.offsetWidth, height: pill.offsetHeight })
+    measure()
+    const watch = new ResizeObserver(measure)
+    watch.observe(pill)
+    return () => watch.disconnect()
+  }, [])
+  // As tall as the zoom pill beside it.
+  const place = { '--zoom-width': `${zoom.width}px`, '--zoom-height': `${zoom.height}px`, ...(zoom.height > 0 ? { height: zoom.height } : {}) } as CSSProperties
+  return (
+    <button
+      ref={button}
+      type="button"
+      data-pages
+      data-opens="pages"
+      data-testid="pages-button"
+      disabled={disabled}
+      aria-label={label}
+      title={label}
+      aria-expanded={open === 'pages'}
+      onClick={() => setOpen(open === 'pages' ? null : 'pages')}
+      style={place}
+      className={cn(
+        'absolute z-10 flex h-9 cursor-pointer items-center gap-1.5 rounded-card surface-frost px-3 text-[12px] font-semibold text-text transition-colors hover:text-accent-text disabled:cursor-default disabled:opacity-40 aria-expanded:bg-accent-soft aria-expanded:text-accent-text',
+        'end-[calc(1.5rem+var(--zoom-width))] bottom-4 max-lg:end-4 max-lg:bottom-[calc(1.5rem+var(--zoom-height))]',
+        'max-sm:start-4 max-sm:end-auto max-sm:top-20 max-sm:bottom-auto max-sm:group-data-[bar]/stage:hidden',
+        FOCUS_RING,
+      )}
+    >
+      <FilesIcon size={15} aria-hidden />
+      {children}
+    </button>
+  )
+}
+
+export function PagesPanel({ editor, onRemoved }: { editor: Editor; onRemoved: (message: string) => void }) {
+  const t = useMessages()
+  const { open } = useEditState()
+  if (open !== 'pages') return null
+  return (
+    <PanelFrame id="pages" title={t.editor.pages.title}>
+      <PageList editor={editor} onRemoved={onRemoved} />
+    </PanelFrame>
+  )
+}
+
+/** The picked page's Background panel: the Colour panel's choices, for the page in every size. */
+export function BackgroundPanel({ editor, brandId }: { editor: Editor; brandId: string }) {
+  const t = useMessages()
+  const { open } = useEditState()
+  const { design } = useEditorDesign(editor)
+  const picked = usePickedPage(editor)
+  const page = picked ? design.pages[picked] : undefined
+  if (open !== 'background' || !picked || !page) return null
+  return (
+    <PanelFrame id="background" title={t.editor.page.backgroundColour} note={page.name}>
+      <BackgroundBody editor={editor} design={design} pageId={picked} brandId={brandId} />
+    </PanelFrame>
+  )
+}
+
+/** Each page: its picture, name and sizes, shown with a click, renamed with a double click, dragged to reorder; then Add page. */
+function PageList({ editor, onRemoved }: { editor: Editor; onRemoved: (message: string) => void }) {
+  const t = useMessages()
+  const g = t.editor.pages
+  const { design } = useEditorDesign(editor)
+  const pages = orderedPages(design)
+  const current = useCurrentPage(design)
   const [renaming, setRenaming] = useState<string | null>(null)
-  // The page last brought into view from here; the stage itself shows every page.
-  const [current, setCurrent] = useState<string | null>(null)
   // The page being dragged, and the page it would land before (null for the end).
   const [dragging, setDragging] = useState<string | null>(null)
   const [landing, setLanding] = useState<{ before: string | null } | null>(null)
@@ -42,8 +171,9 @@ export function PagesPanel({ editor, onRemoved, onShow }: { editor: Editor; onRe
   const pictures = usePagePictures(editor)
 
   const show = (id: string) => {
-    setCurrent(id)
-    onShow?.(id)
+    shownPage.set(id)
+    // Another page in view lets the picked one go.
+    if (editor.pickedPage() !== id) editor.pickPage(null)
     // After the command's redraw, so a new page's row is in the grid already.
     requestAnimationFrame(() => editor.fitPage(id))
   }
@@ -65,19 +195,18 @@ export function PagesPanel({ editor, onRemoved, onShow }: { editor: Editor; onRe
     // "Page N" after the last, skipping a name a page already has.
     const names = new Set(pages.map(([, p]) => p.name))
     let n = pages.length + 1
-    while (names.has(format(t.editor.pages.newName, { n }))) n++
-    show(run('page.add', { name: format(t.editor.pages.newName, { n }) }))
+    while (names.has(format(g.newName, { n }))) n++
+    show(run('page.add', { name: format(g.newName, { n }) }))
   }
 
   const formatCount = Object.keys(design.formats).length
   const primary = design.formats[design.meta.primaryFormatId]
-  // Each page's tile: a picture of it in the primary format, on its background until one is drawn.
-  const tile = primary ? { width: Math.round(36 * Math.min(1, primary.width / primary.height)), height: Math.round(36 * Math.min(1, primary.height / primary.width)) } : { width: 36, height: 36 }
+  // Each page's picture in the primary format, its long side 34, on its background until one is drawn.
+  const tile = primary ? { width: Math.max(8, Math.round(34 * Math.min(1, primary.width / primary.height))), height: Math.max(8, Math.round(34 * Math.min(1, primary.height / primary.width))) } : { width: 34, height: 34 }
 
   return (
-    <section aria-labelledby="pages-title" className={CARD}>
-      <CardHeader id="pages-title" title={t.editor.pages.title} count={pages.length} />
-      <ol aria-label={t.editor.pages.title} className="flex flex-col gap-1 px-2.5" data-testid="pages">
+    <>
+      <ol aria-label={g.title} className="flex flex-col gap-1.5" data-testid="pages">
         {pages.map(([id, page], i) => {
           const fill = page.fills[0]
           const picture = pictures[id]
@@ -108,14 +237,14 @@ export function PagesPanel({ editor, onRemoved, onShow }: { editor: Editor; onRe
                 setDragging(null)
                 setLanding(null)
               }}
-              className="group relative flex h-12 cursor-grab items-center gap-2.5 rounded-[10px] ps-1.5 pe-1 hover:bg-hover active:cursor-grabbing aria-[current]:bg-accent-soft data-[dragging]:opacity-40"
+              className={cn(CARD_ROW, 'relative cursor-grab active:cursor-grabbing aria-[current]:border-accent aria-[current]:bg-accent-soft data-[dragging]:opacity-40')}
             >
-              {moves && landing?.before === id && <span aria-hidden className={cn(DROP_LINE, '-top-[3px]')} />}
-              {moves && landing?.before === null && i === pages.length - 1 && <span aria-hidden className={cn(DROP_LINE, '-bottom-[3px]')} />}
-              <span aria-hidden className="grid size-9 shrink-0 place-items-center">
+              {moves && landing?.before === id && <span aria-hidden className={cn(DROP_LINE, '-top-[4px]')} />}
+              {moves && landing?.before === null && i === pages.length - 1 && <span aria-hidden className={cn(DROP_LINE, '-bottom-[4px]')} />}
+              <span aria-hidden className="grid size-[34px] shrink-0 place-items-center">
                 <span
                   data-testid="page-thumbnail"
-                  className="relative grid place-items-center overflow-hidden rounded-[4px] border border-line-strong bg-hover font-mono text-[10px] font-semibold text-white tabular-nums [text-shadow:0_1px_2px_rgb(0_0_0/0.6)]"
+                  className="relative grid place-items-center overflow-hidden rounded-[3px] border border-line-strong bg-hover font-mono text-[10px] font-semibold text-white tabular-nums [text-shadow:0_1px_2px_rgb(0_0_0/0.6)]"
                   style={{ ...tile, backgroundColor: fill?.type === 'solid' ? fill.color : undefined }}
                 >
                   {picture && <img src={picture} alt="" draggable={false} className="absolute inset-0 size-full" />}
@@ -125,7 +254,7 @@ export function PagesPanel({ editor, onRemoved, onShow }: { editor: Editor; onRe
               {renaming === id ? (
                 <input
                   name="page-name"
-                  aria-label={t.editor.pages.rename}
+                  aria-label={g.rename}
                   defaultValue={page.name}
                   autoFocus
                   onFocus={(e) => e.currentTarget.select()}
@@ -143,62 +272,40 @@ export function PagesPanel({ editor, onRemoved, onShow }: { editor: Editor; onRe
                   onClick={() => show(id)}
                   onDoubleClick={() => setRenaming(id)}
                   onKeyDown={(e) => e.key === 'F2' && setRenaming(id)}
-                  aria-label={format(t.editor.pages.show, { name: page.name })}
-                  className="flex min-w-0 flex-1 cursor-pointer flex-col items-start text-start"
+                  aria-label={format(g.show, { name: page.name })}
+                  className={cn('flex min-w-0 flex-1 cursor-pointer flex-col items-start rounded-[6px] text-start', FOCUS_RING)}
                 >
-                  <span className="w-full truncate text-[13px]">{format(t.editor.pages.numbered, { n: i + 1, name: page.name })}</span>
-                  <span className="w-full truncate text-[11px] text-muted">{format(formatCount === 1 ? t.editor.pages.formatsOne : t.editor.pages.formatsMany, { n: formatCount })}</span>
+                  <span className="w-full truncate text-[13px] font-semibold text-text">{format(g.numbered, { n: i + 1, name: page.name })}</span>
+                  <span className="w-full truncate text-[11px] text-subtle">{format(formatCount === 1 ? g.formatsOne : g.formatsMany, { n: formatCount })}</span>
                 </button>
               )}
-              <span className="hidden shrink-0 items-center group-hover:flex group-focus-within:flex">
-                <Tooltip label={t.editor.pages.duplicate}>
-                  <button
-                    type="button"
-                    aria-label={t.editor.pages.duplicate}
-                    onClick={() => show(run('page.duplicate', { id, name: format(t.editor.pages.copyName, { name: page.name }) }))}
-                    className={ICON_BUTTON}
-                  >
-                    <CopyIcon size={14} aria-hidden />
-                  </button>
-                </Tooltip>
-                <Tooltip label={t.editor.pages.moveUp}>
-                  <button type="button" aria-label={t.editor.pages.moveUp} disabled={i === 0} onClick={() => run('page.move', { id, before: pages[i - 1]?.[0] ?? null })} className={ICON_BUTTON}>
-                    <CaretUpIcon size={14} aria-hidden />
-                  </button>
-                </Tooltip>
-                <Tooltip label={t.editor.pages.moveDown}>
-                  <button type="button" aria-label={t.editor.pages.moveDown} disabled={i === pages.length - 1} onClick={() => run('page.move', { id, before: pages[i + 2]?.[0] ?? null })} className={ICON_BUTTON}>
-                    <CaretDownIcon size={14} aria-hidden />
-                  </button>
-                </Tooltip>
-                <Tooltip label={t.editor.pages.remove}>
-                  <button
-                    type="button"
-                    aria-label={t.editor.pages.remove}
-                    disabled={pages.length === 1}
-                    onClick={() => {
+              <CardMenu
+                label={format(g.more, { name: page.name })}
+                items={[
+                  { label: g.rename, run: () => setRenaming(id) },
+                  { label: g.duplicate, run: () => show(run('page.duplicate', { id, name: format(g.copyName, { name: page.name }) })) },
+                  { label: g.moveUp, disabled: i === 0, run: () => run('page.move', { id, before: pages[i - 1]?.[0] ?? null }) },
+                  { label: g.moveDown, disabled: i === pages.length - 1, run: () => run('page.move', { id, before: pages[i + 2]?.[0] ?? null }) },
+                  {
+                    label: g.remove,
+                    disabled: pages.length === 1,
+                    danger: true,
+                    run: () => {
                       run('page.delete', { id })
-                      if (current === id) setCurrent(null)
-                      onRemoved(format(t.editor.pages.removed, { name: page.name }))
-                    }}
-                    className={cn(ICON_BUTTON, 'hover:text-danger')}
-                  >
-                    <TrashIcon size={14} aria-hidden />
-                  </button>
-                </Tooltip>
-              </span>
+                      if (shownPage.get() === id) shownPage.set(null)
+                      onRemoved(format(g.removed, { name: page.name }))
+                    },
+                  },
+                ]}
+              />
             </li>
           )
         })}
       </ol>
-      <div className="px-[18px] pt-3 pb-4">
-        <Tooltip label={t.editor.pages.add}>
-          <button type="button" aria-label={t.editor.pages.add} onClick={add} className={CHIP}>
-            <PlusIcon size={12} aria-hidden />
-            {t.editor.pages.addShort}
-          </button>
-        </Tooltip>
-      </div>
-    </section>
+      <button type="button" onClick={add} data-testid="add-page" className={cn(PANEL_BUTTON, 'justify-center')}>
+        <PlusIcon size={14} aria-hidden className="shrink-0" />
+        <span>{g.add}</span>
+      </button>
+    </>
   )
 }

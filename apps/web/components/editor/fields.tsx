@@ -222,8 +222,10 @@ export function ColorField({ name, value, swatch = true, onSet }: { name: string
           className="size-7 shrink-0 cursor-pointer rounded-row border border-line bg-surface p-0.5"
         />
       )}
+      {/* A hex reads left to right in every language, with its # first. */}
       <input
         name="colour-hex"
+        dir="ltr"
         aria-label={format(p.hexOf, { name })}
         value={draft ?? hex}
         placeholder={value === 'mixed' ? p.mixed : ''}
@@ -238,6 +240,7 @@ export function ColorField({ name, value, swatch = true, onSet }: { name: string
       />
       <input
         name="colour-opacity"
+        dir="ltr"
         aria-label={format(p.alpha, { name })}
         inputMode="numeric"
         key={alpha ?? 'mixed'}

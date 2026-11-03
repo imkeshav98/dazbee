@@ -131,6 +131,37 @@ export const fillList = async (page: Page) => {
   return panel.getByTestId('fill-list')
 }
 
+/** The Sizes panel, opened from the header pill unless it is open. */
+export async function sizesPanel(page: Page) {
+  const panel = page.getByTestId('bar-sizes-menu')
+  if (!(await panel.isVisible())) await page.getByTestId('sizes-button').click()
+  await expect(panel).toBeVisible()
+  return panel
+}
+
+/**
+ * Picks the page by a click on its background at a design pixel of the first page's primary size
+ * (`x`, `y`, on no layer), and waits for its top bar.
+ */
+export async function pickPage(page: Page, x = 4, y = 4) {
+  await click(page, x, y)
+  await expect(page.getByTestId('top-bar')).toHaveAttribute('data-page', /.+/)
+}
+
+/** The picked page's Background panel, picking the page at (`x`, `y`) first when no page is picked. */
+export async function backgroundPanel(page: Page, x = 4, y = 4) {
+  if (!(await page.getByTestId('bar-background').isVisible())) await pickPage(page, x, y)
+  return barMenu(page, 'background')
+}
+
+/** The Pages panel, from Pages by the zoom pill: opened. */
+export async function pagesPanel(page: Page) {
+  const panel = page.getByTestId('bar-pages-menu')
+  if (!(await panel.isVisible())) await page.getByTestId('pages-button').click()
+  await expect(panel).toBeVisible()
+  return panel
+}
+
 /** The text colour's hex field, in the Colour panel, under its +: opened. */
 export async function textColourHex(page: Page) {
   const panel = await barMenu(page, 'colour')

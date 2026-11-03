@@ -5,7 +5,7 @@ import { expect, test } from '../support/test.ts'
 import { SHORTCUTS } from '@dazbee/editor'
 import type { DesignInput } from '@dazbee/schema'
 import { writeOutput } from '../support/editor.ts'
-import { openStage } from '../support/stage.ts'
+import { backgroundPanel, openStage } from '../support/stage.ts'
 
 test.describe.configure({ timeout: 120_000 })
 
@@ -35,8 +35,9 @@ test('? and the keyboard button list every shortcut, F, I and Mod+Alt+G among th
   await expect(list).toBeHidden()
 
   // Typing ? into a field types it.
-  const card = page.getByTestId('page-card')
-  const hex = card.getByRole('textbox', { name: 'Hex', exact: true })
+  const panel = await backgroundPanel(page)
+  await panel.getByTestId('colour-pick').click()
+  const hex = panel.getByTestId('colour-picker').getByRole('textbox', { name: 'Colour hex' })
   await hex.fill('')
   await hex.press('Shift+Slash')
   await expect(hex).toHaveValue('?')

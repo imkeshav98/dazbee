@@ -11,7 +11,7 @@ import { loadCanvasKit } from '@dazbee/renderer/node'
 import { AssetLink, type DesignInput } from '@dazbee/schema'
 import { api, photo, upload } from '../support/assets.ts'
 import { designOf, exportHashOf, screenPoint, writeOutput } from '../support/editor.ts'
-import { click, fillList, openStage, press, read, strokeList, openCard } from '../support/stage.ts'
+import { backgroundPanel, click, fillList, openStage, press, read, strokeList, openCard } from '../support/stage.ts'
 
 test.describe.configure({ timeout: 120_000 })
 
@@ -164,10 +164,9 @@ test('a stroke and the page background take the same paint editor: an angular st
   await page.keyboard.press('Escape')
   await page.keyboard.press('Escape')
 
-  // With nothing selected, the Page card holds the page's background as a stack too.
+  // The page picked, its Background panel holds the page's background as a stack too.
   await press(page, 'deselect')
-  const pageCard = page.getByTestId('page-card')
-  const layers = pageCard.getByTestId('page-fills')
+  const layers = (await backgroundPanel(page)).getByTestId('page-fills')
   await layers.locator('[data-row="1"]').getByTestId('paint-swatch').click()
   await editor.getByRole('radio', { name: 'Circle gradient' }).click()
   await expect.poll(async () => ((await read(page)) as unknown as { pages: Record<string, { fills: Fill[] }> }).pages.p1?.fills[0]?.type).toBe('radial')
@@ -191,7 +190,7 @@ test('a gradient stop removed while it is dragged ends the drag and its undo ste
   const asset = await upload(photo)
   const { page, errors } = await openStage(browser, design(asset.id))
   await press(page, 'deselect')
-  const layers = page.getByTestId('page-card').getByTestId('page-fills')
+  const layers = (await backgroundPanel(page)).getByTestId('page-fills')
   await layers.locator('[data-row="1"]').getByTestId('paint-swatch').click()
   const editor = page.getByTestId('paint-editor')
   await editor.getByRole('radio', { name: 'Line gradient' }).click()

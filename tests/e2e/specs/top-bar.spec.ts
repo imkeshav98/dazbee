@@ -411,8 +411,6 @@ test('on a phone a panel is a sheet that hides the tab bar and dock, and it and 
   await page.getByTestId('edit-panel-close').click()
   await page.locator('[data-panel="layers"]').click()
   await expect(page.getByTestId('flyout')).toBeVisible()
-  // The phones' properties tab has nothing to show while something is selected.
-  await expect(page.locator('[data-panel="properties"]')).toBeHidden()
   await select(page, [])
   await expect(page.locator('[data-zoom]')).toBeVisible()
   expect(errors).toEqual([])

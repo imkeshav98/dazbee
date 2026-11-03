@@ -21,7 +21,7 @@ import { expect, test, type Page } from '../support/test.ts'
 import { photo } from '../support/assets.ts'
 import { designOf, OUTPUT, screenPoint, writeOutput } from '../support/editor.ts'
 import { newBrand } from '../support/seed.ts'
-import { barMenu, press } from '../support/stage.ts'
+import { backgroundPanel, barMenu, press, sizesPanel } from '../support/stage.ts'
 
 test.describe.configure({ timeout: 600_000 })
 
@@ -116,10 +116,16 @@ test('an ad set rebuilt in 5 formats through real input exports PNG, JPG, PDF an
   await page.keyboard.press('Escape')
   await drawn(page)
 
-  // The page takes the brand colour from the Page card.
-  await page.mouse.click(40, 900)
-  await page.getByTestId('page-brand-colors').getByRole('button', { name: new RegExp(`^${colour}`) }).click()
+  // The page takes the brand colour from its Background panel, the page picked by a click on it
+  // once the library is closed, which covers the page's start.
+  await page.locator('[data-panel="assets"]').click()
+  await expect(page.getByTestId('flyout')).toHaveCount(0)
+  await (await backgroundPanel(page, 30, 30)).getByTestId('brand-colours').getByRole('button', { name: colour }).click()
   await expect.poll(async () => (await stored(page)).pages.p1?.fills).toEqual([{ type: 'solid', color: '#1F7A4DFF' }])
+  // Esc closes the panel, then lets the page go.
+  await page.keyboard.press('Escape')
+  await page.keyboard.press('Escape')
+  await expect(page.getByTestId('top-bar')).toHaveCount(0)
 
   // A badge drawn with the rectangle tool, in the brand colour from the kit.
   await press(page, 'toolRect')
@@ -166,6 +172,7 @@ test('an ad set rebuilt in 5 formats through real input exports PNG, JPG, PDF an
   // Four more formats from presets, each starting from the square's layout scaled to fit; each is in
   // the design and its menu closed before the next is added.
   const presets = page.getByRole('dialog', { name: 'Add format' })
+  await sizesPanel(page)
   for (const [i, preset] of ['feed-portrait', 'story', 'link-image', 'medium-rectangle'].entries()) {
     await page.getByRole('button', { name: 'Add format' }).click()
     await presets.locator(`[data-preset=${preset}]`).click()
