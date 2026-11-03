@@ -4,28 +4,13 @@
 // bar, only as tall as what it holds and scrolling past the room above the bottom controls. On a
 // phone it is a sheet at the bottom. It closes on ✕, Esc, another selection or a pop-up opening,
 // and gives the focus back to its bar item when closed from inside it.
-import {
-  AlignBottomIcon,
-  AlignCenterHorizontalIcon,
-  AlignCenterVerticalIcon,
-  AlignLeftIcon,
-  AlignRightIcon,
-  AlignTopIcon,
-  ArrowDownIcon,
-  ArrowLineDownIcon,
-  ArrowLineUpIcon,
-  ArrowsOutLineHorizontalIcon,
-  ArrowsOutLineVerticalIcon,
-  ArrowUpIcon,
-  type Icon,
-  XIcon,
-} from '@phosphor-icons/react'
+import { XIcon } from '@phosphor-icons/react'
 import { type CSSProperties, type ReactNode, type RefObject, useEffect, useLayoutEffect, useRef, useState } from 'react'
 
-import type { Editor, ShortcutAction } from '@dazbee/editor'
+import type { Editor } from '@dazbee/editor'
+import { type Design } from '@dazbee/schema'
 
 import { useFontCatalog } from '@/components/brand-kit/font-catalog.ts'
-import { ALIGN, keyOf } from '@/components/editor/arrange-actions.ts'
 import {
   isLayerPanel,
   type LayerPanelId,
@@ -37,130 +22,21 @@ import {
 } from '@/components/editor/edit-store.ts'
 import { useSelection } from '@/components/editor/editor-hooks.ts'
 import { FontChooser } from '@/components/editor/flyouts/font-panel.tsx'
-import { factsOf, PanelContent, type Target, useTarget } from '@/components/editor/selection-cards.tsx'
-import { PANEL_BUTTON, PANEL_HEADING, PANEL_PART } from '@/components/editor/styles.ts'
-import { ORDER } from '@/components/editor/top-bar/layer-actions.tsx'
+import { PANEL_HEADING } from '@/components/editor/styles.ts'
 import { useOverlayScroll } from '@/components/ui/overlay-scroll.ts'
 import { cn } from '@/lib/cn.ts'
 import { useMessages } from '@/lib/i18n/client.tsx'
 import { format } from '@/lib/i18n/index.ts'
 
-/** The four moves along the stack, two to a row: a step forward and back, then all the way. */
-const MOVES: { action: (typeof ORDER)[number]; icon: Icon }[] = [
-  { action: 'bringForward', icon: ArrowUpIcon },
-  { action: 'sendBackward', icon: ArrowDownIcon },
-  { action: 'bringToFront', icon: ArrowLineUpIcon },
-  { action: 'sendToBack', icon: ArrowLineDownIcon },
-]
-/** One layer lines up with its size by these, two to a row: each up-down one beside its across one. */
-const SIZE_ALIGN = [
-  { action: 'alignTop', icon: AlignTopIcon },
-  { action: 'alignLeft', icon: AlignLeftIcon },
-  { action: 'alignMiddle', icon: AlignCenterVerticalIcon },
-  { action: 'alignCentre', icon: AlignCenterHorizontalIcon },
-  { action: 'alignBottom', icon: AlignBottomIcon },
-  { action: 'alignRight', icon: AlignRightIcon },
-] as const satisfies readonly { action: ShortcutAction; icon: Icon }[]
-/** Three or more layers spread out evenly, across or down. */
-const SPREAD = [
-  { action: 'distributeHorizontal', icon: ArrowsOutLineHorizontalIcon },
-  { action: 'distributeVertical', icon: ArrowsOutLineVerticalIcon },
-] as const satisfies readonly { action: ShortcutAction; icon: Icon }[]
-
-/**
- * The Position panel's simple choices: the four moves along the stack, then lining up. One layer
- * lines up with its size, by name, unless an auto layout places it (`placed`); several line up
- * with each other, by icon, and three or more spread out evenly. Each button runs its shortcut's action, and its tooltip names the shortcut.
- */
-function ArrangePart({ target, placed }: { target: Target; placed: boolean }) {
-  const t = useMessages()
-  const a = t.editor.arrange
-  const placing = t.editor.bar.placing
-  const run = (action: ShortcutAction) => target.editor.perform(action)
-  const tip = (label: string, action: ShortcutAction) => format(a.withKey, { label, key: keyOf(action) })
-  const several = target.ids.length > 1
-  // Spreading needs a layer between the two at the ends.
-  const spreads = target.ids.length >= 3
-  return (
-    <section aria-labelledby="arrange-part-title" className={PANEL_PART} data-testid="arrange-part">
-      <h3 id="arrange-part-title" className={PANEL_HEADING}>
-        {placing.arrange}
-      </h3>
-      <div className="grid grid-cols-2 gap-1.5">
-        {MOVES.map(({ action, icon: Icon }) => (
-          <button
-            key={action}
-            type="button"
-            data-action={action}
-            title={tip(a[action], action)}
-            onClick={() => run(action)}
-            className={PANEL_BUTTON}
-          >
-            <Icon size={14} aria-hidden className="shrink-0" />
-            <span>{placing[action]}</span>
-          </button>
-        ))}
-      </div>
-      {several ? (
-        <>
-          <h3 className={PANEL_HEADING}>{placing.lineUpSelection}</h3>
-          <div dir="ltr" className="grid grid-cols-3 gap-1.5">
-            {ALIGN.map(({ action, icon: Icon }) => (
-              <button
-                key={action}
-                type="button"
-                data-action={action}
-                aria-label={a[action]}
-                title={tip(a[action], action)}
-                onClick={() => run(action)}
-                className={cn(PANEL_BUTTON, 'justify-center')}
-              >
-                <Icon size={16} aria-hidden />
-              </button>
-            ))}
-          </div>
-          <div className="grid gap-1.5">
-            {SPREAD.map(({ action, icon: Icon }) => (
-              <button
-                key={action}
-                type="button"
-                data-action={action}
-                disabled={!spreads}
-                title={spreads ? tip(a[action], action) : placing.needsThree}
-                onClick={() => run(action)}
-                className={PANEL_BUTTON}
-              >
-                <Icon size={14} aria-hidden className="shrink-0" />
-                <span>{placing[action]}</span>
-              </button>
-            ))}
-          </div>
-        </>
-      ) : (
-        !placed && (
-          <>
-            <h3 className={PANEL_HEADING}>{placing.lineUpSize}</h3>
-            <div className="grid grid-cols-2 gap-1.5">
-              {SIZE_ALIGN.map(({ action, icon: Icon }) => (
-                <button
-                  key={action}
-                  type="button"
-                  data-action={action}
-                  title={tip(a[action], action)}
-                  onClick={() => run(action)}
-                  className={PANEL_BUTTON}
-                >
-                  <Icon size={15} aria-hidden className="shrink-0" />
-                  <span>{placing[action]}</span>
-                </button>
-              ))}
-            </div>
-          </>
-        )
-      )}
-    </section>
-  )
-}
+import { AutoLayoutCard } from './auto-layout-panel.tsx'
+import { ColourPanel, FillsCard, TextColourPanel } from './colour-panel.tsx'
+import { EffectsBody } from './effects-panel.tsx'
+import { Card } from './fields.tsx'
+import { AdjustCard, FitRow, PhotoLookBody, PhotosCard } from './image-panel.tsx'
+import { StrokePanel } from './outline-panel.tsx'
+import { ArrangePart, FlowPart, PlaceCard } from './position-panel.tsx'
+import { SpacingCard, TextBoxCard, TextFitCard } from './spacing-panel.tsx'
+import { factsOf, imageFillOf, kindOf, type Target, useTarget } from './target.ts'
 
 /**
  * Whether a scrolling body has been scrolled down from its top, and whether more of it is below:
@@ -402,4 +278,93 @@ export function PanelFrame({
       </div>
     </section>
   )
+}
+
+/**
+ * What an edit panel holds for the selection, each card as a part of it: Colour, Outline,
+ * Effects, Position, Spacing, Edit image and Stack. Font is the font panel's own.
+ */
+export function PanelContent({
+  panel,
+  target,
+  design,
+  brandId,
+}: {
+  panel: string
+  target: Target
+  design: Design
+  brandId: string
+}) {
+  const t = useMessages()
+  const p = t.editor.props
+  const kind = kindOf(target)
+  const facts = factsOf(target, design)
+  const several = target.ids.length > 1
+  const imageFill = imageFillOf(target)
+  const body = (() => {
+    switch (panel) {
+      case 'colour':
+        return kind === 'text' ? (
+          <TextColourPanel target={target} design={design} brandId={brandId} p={p} b={t.editor.bar} />
+        ) : (
+          <ColourPanel target={target} design={design} brandId={brandId} p={p} b={t.editor.bar} />
+        )
+      case 'outline':
+        return <StrokePanel target={target} brandId={brandId} p={p} b={t.editor.bar} />
+      case 'effects':
+        return <EffectsBody target={target} p={p} b={t.editor.bar} brandId={brandId} />
+      case 'position':
+        return (
+          <>
+            <PlaceCard target={target} p={p} title={t.editor.bar.advanced}>
+              {facts.inFlow && <FlowPart target={target} p={p} />}
+            </PlaceCard>
+          </>
+        )
+      case 'spacing':
+        return (
+          <>
+            <SpacingCard target={target} p={p} />
+            <TextBoxCard target={target} p={p} />
+            <TextFitCard target={target} p={p} title={t.editor.bar.advanced} />
+          </>
+        )
+      case 'edit':
+        if (!imageFill) return null
+        return (
+          <>
+            {several ? (
+              <PhotosCard
+                target={target}
+                p={p}
+                b={t.editor.bar}
+                brandId={brandId}
+                index={imageFill.index}
+                paint={imageFill.paint}
+              />
+            ) : (
+              <Card id="look-card" title={t.editor.bar.filters}>
+                <PhotoLookBody
+                  target={target}
+                  p={p}
+                  brandId={brandId}
+                  index={imageFill.index}
+                  paint={imageFill.paint}
+                />
+              </Card>
+            )}
+            <AdjustCard target={target} p={p} index={imageFill.index} paint={imageFill.paint} />
+            <FillsCard target={target} brandId={brandId} p={p} b={t.editor.bar}>
+              <span className={PANEL_HEADING}>{p.fit}</span>
+              <FitRow target={target} p={p} index={imageFill.index} paint={imageFill.paint} />
+            </FillsCard>
+          </>
+        )
+      case 'stack':
+        return <AutoLayoutCard target={target} p={p} b={t.editor.bar} ownSizing={!facts.inFlow} />
+      default:
+        return null
+    }
+  })()
+  return body
 }
