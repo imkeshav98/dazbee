@@ -8,23 +8,25 @@
 // from its own. With more than one format the changes go to every format or to this one only. Each
 // change is one undo step, and a drag on a number, however long, is one too.
 import * as Popover from '@radix-ui/react-popover'
-import { ArrowsHorizontalIcon, ArrowsVerticalIcon, CaretDownIcon, ImageSquareIcon, RectangleIcon } from '@phosphor-icons/react'
+import { CaretDownIcon, ImageSquareIcon, PlusIcon } from '@phosphor-icons/react'
 import { withImage, type Editor } from '@dazbee/editor'
 import { BlendMode, BooleanOp, boundFillIndex, brandRef, ContainerBlendMode, ImageFilter, LineEnd, type Design, type Effect, type ImageAdjust, type Paint, type Shape } from '@dazbee/schema'
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { cn } from '../../lib/cn.ts'
 import { useMessages } from '../../lib/i18n/client.tsx'
 import { format, type Messages } from '../../lib/i18n/index.ts'
+import { designColours } from '../../lib/design-colours.ts'
+import { sizeTo } from '../../lib/size.ts'
 import { Select } from '../ui/select.tsx'
-import { CARD, CARD_LOWER, CardHeader, PICKED_RING, SWATCHES } from './card.tsx'
-import { CHIP, CHIP_ACCENT, DASHED_BUTTON, FIELD, FIELD_LABEL, FOCUS_RING, KNOBS, KNOBS_FOUR, LINK_BUTTON, PANEL_PART, POPOVER, SEGMENT, SEGMENTS, SWATCH, SWITCH, SWITCH_ROW, TILE, TILE_FACE, TILE_FACE_WIDE } from './styles.ts'
+import { PICKED_RING, SWATCHES } from './card.tsx'
+import { CHIP, CHIP_ACCENT, FIELD, FIELD_LABEL, FOCUS_RING, KNOB_SWITCH, KNOBS, LINK_BUTTON, PANEL_BUTTON, PANEL_HEADING, PANEL_PART, POPOVER, SEGMENT, SEGMENTS, SWATCH, SWITCH, SWITCH_ROW, TILE, TILE_FACE_WIDE } from './styles.ts'
 import { COMBINE } from './arrange-panel.tsx'
 import { ImagePickerButton } from './image-tool.tsx'
 import { useBrandKit } from './use-brand-kit.ts'
 import { useLiveDesign } from './use-live-design.ts'
 import { setEveryFormat, useEveryFormat } from './scope-store.ts'
 import { Choice, clamp, ColorField, NumberField, tidy } from './fields.tsx'
-import { AddButton, PaintRow, RemoveButton, Stack } from './paint-stack.tsx'
+import { AddButton, assetThumbnail, PaintEditor, PaintRow, RemoveButton, Stack } from './paint-stack.tsx'
 
 type Props = Readonly<Record<string, unknown>>
 type Patch = Record<string, unknown>
@@ -63,33 +65,16 @@ export function shared<T>(values: T[]): T | 'mixed' {
   return same ? first as T : 'mixed'
 }
 
-/** Whether cards are drawn inside an edit panel or a pop-up, as parts of it under small headings, rather than as frosted cards of their own. */
-const InPanel = createContext(false)
-
-/** Draws the cards inside it as parts of the edit panel or pop-up they are in. */
-export function PanelParts({ children }: { children: ReactNode }) {
-  return <InPanel.Provider value>{children}</InPanel.Provider>
-}
-
-/** A card of the selection's settings, open, as every card is: its title, an action at the end, its controls. */
-function Card({ id, title, note, action, children }: { id: string; title: string; note?: string; action?: ReactNode; children?: ReactNode }) {
-  const inPanel = useContext(InPanel)
-  if (inPanel) {
-    return (
-      <section aria-labelledby={`${id}-title`} className={PANEL_PART} data-testid={id}>
-        <div className="flex h-8 items-center gap-2">
-          <h3 id={`${id}-title`} className="min-w-0 flex-1 truncate text-[13px] font-semibold text-text">{title}</h3>
-          {note && <span className="min-w-0 max-w-[60%] truncate text-[11px] font-medium text-muted">{note}</span>}
-          {action}
-        </div>
-        {children}
-      </section>
-    )
-  }
+/** A part of an edit panel or pop-up: its heading, an action at the end, its controls. Advanced's heading is `strong`. */
+function Card({ id, title, note, action, strong = false, children }: { id: string; title: string; note?: string; action?: ReactNode; strong?: boolean; children?: ReactNode }) {
   return (
-    <section aria-labelledby={`${id}-title`} className={CARD} data-testid={id}>
-      <CardHeader id={`${id}-title`} title={title} note={note}>{action}</CardHeader>
-      <div className="flex flex-col gap-2.5 px-[18px] pb-4 empty:hidden">{children}</div>
+    <section aria-labelledby={`${id}-title`} className={PANEL_PART} data-testid={id}>
+      <div className="flex h-7 items-center gap-2">
+        <h3 id={`${id}-title`} className={cn('min-w-0 flex-1 truncate text-xs font-semibold', strong ? 'text-text' : 'text-muted')}>{title}</h3>
+        {note && <span className="min-w-0 max-w-[60%] truncate text-[11px] font-medium text-muted">{note}</span>}
+        {action}
+      </div>
+      {children}
     </section>
   )
 }
@@ -97,38 +82,56 @@ function Card({ id, title, note, action, children }: { id: string; title: string
 const num = (props: Props, key: string) => props[key] as number
 
 /**
- * The first card for every selection: the layer's name (or how many layers), the sizes a change goes
- * to, and its box on one line, the turn under it.
+ * The Position panel's numbers, under Advanced: the box's width and height, then where it sits, then
+ * its turn, two to a row. With Lock ratio on, a width or height set moves the other side with it.
+ * Groups and booleans take their box from what they hold, so they have only X and Y. A layer in an
+ * auto layout has its sizing in `children`, under them.
  */
-function HeaderCard({ target, p, scope, title: named, children }: { target: Target; p: P; scope: ReactNode; title?: string; children?: ReactNode }) {
-  const fields = [
+function PlaceCard({ target, p, title, children }: { target: Target; p: P; title: string; children?: ReactNode }) {
+  const placing = useMessages().editor.bar.placing
+  const [keepRatio, setKeepRatio] = useState(false)
+  const sized = target.types.every((type) => type !== 'group' && type !== 'boolean')
+  const resize = (now: Props, axis: 'width' | 'height', to: number) => sizeTo({ width: num(now, 'width'), height: num(now, 'height') }, axis, to, keepRatio)
+  const sides = [
+    { key: 'width', label: p.width, name: p.widthName },
+    { key: 'height', label: p.height, name: p.heightName },
+  ] as const
+  const spots = [
     { key: 'x', label: p.x, name: p.xName },
     { key: 'y', label: p.y, name: p.yName },
-    { key: 'width', label: p.width, name: p.widthName, min: 0 },
-    { key: 'height', label: p.height, name: p.heightName, min: 0 },
   ] as const
-  // A group's box follows what it holds; its size and turn come from them.
-  const sized = target.types.every((type) => type !== 'group' && type !== 'boolean')
-  const title = named ?? (target.ids.length > 1 ? format(p.layers, { n: target.ids.length }) : target.names[0] || p.layer)
   return (
-    <Card id="layout-card" title={title} action={scope}>
-      <div className={sized ? KNOBS_FOUR : KNOBS}>
-        {fields.map((f) => (
-          (f.key === 'width' || f.key === 'height') && !sized
-            ? null
-            : (
-              <NumberField
-                key={f.key}
-                label={f.label}
-                name={f.name}
-                value={shared(target.props.map((pr) => num(pr, f.key)))}
-                min={'min' in f ? f.min : undefined}
-                editor={target.editor}
-                onSet={(v) => set(target, () => ({ [f.key]: v }))}
-                onShift={(by) => set(target, (now) => ({ [f.key]: tidy(clamp(num(now, f.key) + by, 'min' in f ? f.min : undefined)) }))}
-              />
-            )
+    <Card id="layout-card" title={title} strong>
+      <div className={KNOBS}>
+        {sized && sides.map((f) => (
+          <NumberField
+            key={f.key}
+            label={f.label}
+            name={f.name}
+            value={shared(target.props.map((pr) => num(pr, f.key)))}
+            min={0}
+            editor={target.editor}
+            onSet={(v) => set(target, (now) => resize(now, f.key, v))}
+            onShift={(by) => set(target, (now) => resize(now, f.key, tidy(clamp(num(now, f.key) + by, 0))))}
+          />
         ))}
+        {spots.map((f) => (
+          <NumberField
+            key={f.key}
+            label={f.label}
+            name={f.name}
+            value={shared(target.props.map((pr) => num(pr, f.key)))}
+            editor={target.editor}
+            onSet={(v) => set(target, () => ({ [f.key]: v }))}
+            onShift={(by) => set(target, (now) => ({ [f.key]: tidy(num(now, f.key) + by) }))}
+          />
+        ))}
+        {sized && <RotationField target={target} p={p} label={placing.rotate} />}
+        {sized && (
+          <Switch on={keepRatio} onSet={setKeepRatio} className={KNOB_SWITCH}>
+            {placing.lockRatio}
+          </Switch>
+        )}
       </div>
       {children}
     </Card>
@@ -136,10 +139,10 @@ function HeaderCard({ target, p, scope, title: named, children }: { target: Targ
 }
 
 /** The layers' turn in degrees, wrapping round at 360; groups and booleans turn with what they hold. */
-export function RotationField({ target, p }: { target: Target; p: P }) {
+export function RotationField({ target, p, label = '↻' }: { target: Target; p: P; label?: string }) {
   return (
     <NumberField
-      label="↻"
+      label={label}
       unit="°"
       name={p.rotationName}
       value={shared(target.props.map((pr) => num(pr, 'rotation') ?? 0))}
@@ -336,7 +339,9 @@ function useList<T>(target: Target, field: string, fresh: T, onTop: T, topFirst:
   return { list, write, add }
 }
 
-function ListBody<T>({ title, p, target, field, fresh, onTop = fresh, topFirst = false, header = true, testId, render }: {
+function ListBody<T>({ title, item = title, p, target, field, fresh, onTop = fresh, topFirst = false, header = true, testId, render }: {
+  /** What one row is called in its add and remove buttons, where it differs from `title`. */
+  item?: string
   /** What + adds over a list that has items already; `fresh` starts an empty one. */
   onTop?: T
   /** The last item, drawn on top, shows first, and rows can be reordered. */
@@ -358,7 +363,7 @@ function ListBody<T>({ title, p, target, field, fresh, onTop = fresh, topFirst =
       {header && (
         <div className={cn('flex items-center justify-between', FIELD_LABEL)}>
           {title}
-          <AddButton label={format(p.add, { name: title.toLowerCase() })} onClick={add} />
+          <AddButton label={format(p.add, { name: item.toLowerCase() })} onClick={add} />
         </div>
       )}
       {list === 'mixed'
@@ -368,53 +373,116 @@ function ListBody<T>({ title, p, target, field, fresh, onTop = fresh, topFirst =
             <button type="button" onClick={() => write(() => [fresh])} className="cursor-pointer font-medium text-accent-text hover:underline">{p.useOne}</button>
           </div>
         )
-        : <Stack items={list} field={field} topFirst={topFirst} removeLabel={(n) => format(p.remove, { name: title.toLowerCase(), n })} onWrite={write} render={render} />}
+        : <Stack items={list} field={field} topFirst={topFirst} removeLabel={(n) => format(p.remove, { name: item.toLowerCase(), n })} onWrite={write} render={render} />}
     </div>
   )
 }
 
-/**
- * The fills: the brand's colours (not for lines or photos), then the fill list with each fill's
- * editor. In the bar's Colour popover, and in a photo's Colour card.
- */
-export function FillBody({ target, brandId, p, swatches = true, header = true }: { target: Target; brandId: string; p: P; swatches?: boolean; header?: boolean }) {
+/** The fill list, under a heading with +, each fill with its editor. */
+export function FillBody({ target, brandId, p, title }: { target: Target; brandId: string; p: P; title: string }) {
   return (
-    <div className="flex flex-col gap-3">
-      {swatches && <FillLook target={target} brandId={brandId} p={p} />}
-      <ListBody<Paint>
-        title={p.fill}
-        p={p}
-        target={target}
-        field="fills"
-        fresh={NEW_FILL}
-        onTop={FILL_ON_TOP}
-        topFirst
-        header={header}
-        testId="fill-list"
-        render={(paint, n, change) => <PaintRow paint={paint} name={format(p.colour, { n })} brandId={brandId} editor={target.editor} p={p} onSet={change} />}
-      />
-    </div>
+    <ListBody<Paint>
+      title={title}
+      p={p}
+      target={target}
+      field="fills"
+      fresh={NEW_FILL}
+      onTop={FILL_ON_TOP}
+      topFirst
+      item={p.fill}
+      testId="fill-list"
+      render={(paint, n, change) => <PaintRow paint={paint} name={format(p.colour, { n })} brandId={brandId} editor={target.editor} p={p} onSet={change} />}
+    />
   )
 }
 
 /**
- * The strokes, each with its paint, width, place, dashes, ends and corners. In the bar's Outline
- * popover, and in a photo's Outline card.
+ * The strokes, each with its paint, width, place, dashes, ends and corners, under a heading with +:
+ * the Outline panel's Advanced.
  */
-export function OutlineBody({ target, brandId, p, title = p.stroke }: { target: Target; brandId: string; p: P; title?: string }) {
+export function StrokeBody({ target, brandId, p, title }: { target: Target; brandId: string; p: P; title: string }) {
   return (
-    <div className="flex flex-col gap-3">
-      <ListBody<Stroke>
-        title={title}
-        p={p}
-        target={target}
-        field="strokes"
-        fresh={NEW_STROKE}
-        topFirst
-        testId="stroke-list"
-        render={(stroke, n, change) => <StrokeRow stroke={stroke} place={n} brandId={brandId} p={p} editor={target.editor} onSet={change} />}
-      />
-    </div>
+    <ListBody<Stroke>
+      title={title}
+      p={p}
+      target={target}
+      field="strokes"
+      fresh={NEW_STROKE}
+      topFirst
+      item={p.stroke}
+      testId="stroke-list"
+      render={(stroke, n, change) => <StrokeRow stroke={stroke} place={n} brandId={brandId} p={p} editor={target.editor} onSet={change} />}
+    />
+  )
+}
+
+type StrokeLook = 'none' | 'solid' | 'dashed'
+const STROKE_LOOKS: StrokeLook[] = ['none', 'solid', 'dashed']
+/** How each of the Outline panel's tiles draws its stroke: a faint square for none, a solid or a dashed one. */
+const STROKE_FACE: Record<StrokeLook, string> = {
+  none: 'border-2 border-line-strong',
+  solid: 'border-[3px] border-text',
+  dashed: 'border-[3px] border-dashed border-text',
+}
+const DASHES = [8, 4]
+const dashed = (stroke: Stroke) => (stroke.dashes?.length ?? 0) > 0
+/** A stroke drawn solid: its dashes and their offset gone. */
+function solidOf(stroke: Stroke): Stroke {
+  const next = { ...stroke }
+  delete next.dashes
+  delete next.dashOffset
+  return next
+}
+
+/**
+ * The Outline panel: the strokes' look as three tiles, none, solid or dashed, and the width of every
+ * stroke, then each stroke's own settings under Advanced. Picking solid or dashed gives a layer
+ * without a stroke a new one.
+ */
+function StrokePanel({ target, brandId, p, b }: { target: Target; brandId: string; p: P; b: Messages['editor']['bar'] }) {
+  const lists = target.props.map((pr) => (pr.strokes ?? []) as Stroke[])
+  const look: StrokeLook | 'mixed' = lists.every((l) => l.length === 0)
+    ? 'none'
+    : lists.every((l) => l.length > 0 && l.every(dashed))
+      ? 'dashed'
+      : lists.every((l) => l.length > 0 && !l.some(dashed)) ? 'solid' : 'mixed'
+  const pick = (to: StrokeLook) => set(target, (now) => {
+    const strokes = (now.strokes ?? []) as Stroke[]
+    if (to === 'none') return { strokes: [] }
+    const kept = strokes.length > 0 ? strokes : [NEW_STROKE]
+    return { strokes: kept.map((stroke) => (to === 'solid' ? solidOf(stroke) : dashed(stroke) ? stroke : { ...stroke, dashes: DASHES })) }
+  })
+  const widths = shared(lists.flatMap((l) => l.map((stroke) => stroke.width)))
+  const setWidths = (to: (now: number) => number) => set(target, (now) => ({ strokes: ((now.strokes ?? []) as Stroke[]).map((stroke) => ({ ...stroke, width: tidy(clamp(to(stroke.width), 0.5)) })) }))
+  return (
+    <>
+      <Card id="stroke-look" title={b.strokeLook.title}>
+        <div role="radiogroup" aria-label={b.strokeLook.title} className="grid grid-cols-3 gap-[7px]">
+          {STROKE_LOOKS.map((to) => (
+            <button key={to} type="button" role="radio" aria-checked={look === to} data-value={to} onClick={() => pick(to)} className={TILE}>
+              <span className={TILE_FACE_WIDE}><span aria-hidden className={cn('size-6 rounded-[5px]', STROKE_FACE[to])} /></span>
+              <span className="w-full truncate text-center">{b.strokeLook[to]}</span>
+            </button>
+          ))}
+        </div>
+        {look !== 'none' && (
+          <NumberField
+            label={b.strokeLook.width}
+            name={b.strokeLook.widthName}
+            value={widths}
+            min={0.5}
+            step={0.5}
+            fillRange={[0, 24]}
+            editor={target.editor}
+            onSet={(v) => setWidths(() => v)}
+            onShift={(by) => setWidths((now) => now + by)}
+          />
+        )}
+      </Card>
+      <Card id="stroke-card" title={b.advanced} strong>
+        <StrokeBody target={target} brandId={brandId} p={p} title={b.strokeLook.outlines} />
+      </Card>
+    </>
   )
 }
 
@@ -509,7 +577,7 @@ function EffectRow({ effect, i, target, p, write }: { effect: Effect; i: number;
   const change = (to: (now: Effect) => Effect) => write((now) => now.map((x, j) => (j === i ? to(x) : x)))
   const effectName = p.effect[effect.type]
   return (
-    <div className="flex flex-col gap-1.5 border-t border-line pt-2.5" data-item={`effects-${i}`}>
+    <div className="flex flex-col gap-1.5" data-item={`effects-${i}`}>
       <div className="flex items-center justify-between">
         <span className="text-xs font-bold text-text">{effectName}</span>
         <RemoveButton label={format(p.remove, { name: effectName.toLowerCase(), n: i + 1 })} onClick={() => write((now) => now.filter((_, j) => j !== i))} />
@@ -532,7 +600,7 @@ function EffectRow({ effect, i, target, p, write }: { effect: Effect; i: number;
           )
         })}
       </div>
-      {'color' in effect && <ColorField name={effectName} value={effect.color} onSet={(to) => change((now) => ({ ...now, color: to('color' in now ? now.color : undefined) }) as Effect)} />}
+      {'color' in effect && <ColorField name={format(p.effectNamed, { effect: effectName, n: i + 1 })} value={effect.color} onSet={(to) => change((now) => ({ ...now, color: to('color' in now ? now.color : undefined) }) as Effect)} />}
     </div>
   )
 }
@@ -578,7 +646,7 @@ function largestAt(now: Props, size: number): Patch {
   return fit ? { shrinkToFit: { min: Math.min(fit.min, size), max: size } } : {}
 }
 
-/** Shrink to fit's sizes set from the Text box card, the text's size following the largest. */
+/** Shrink to fit's sizes as set under the Spacing panel's Advanced, the text's size following the largest. */
 const fitPatch = (now: Props, fit: Fit): Patch => ({ shrinkToFit: fit, style: { ...(now.style as Style), fontSize: fit.max } })
 
 /** A row that turns something on or off: its name, then a switch. */
@@ -601,30 +669,35 @@ function Switch({ on, onSet, label, className, children }: { on: boolean | 'mixe
   )
 }
 
-/** The text's spacing: between its lines (Auto when cleared), its letters and its paragraphs. */
+/**
+ * The text's spacing as slider fields, one to a row: between its lines (Auto when cleared), its
+ * letters, which can come closer as well as part, and its paragraphs.
+ */
 function SpacingCard({ target, p }: { target: Target; p: P }) {
   const { style, setStyle, shiftStyle } = textStyle(target)
   return (
     <Card id="spacing-card" title={p.spacing}>
-      <div className={KNOBS}>
+      <div className="grid gap-1.5">
         <NumberField
-          label={p.spacingShort.lines}
+          label={p.lineHeight}
           name={p.lineHeight}
           value={style('lineHeight') as number | 'mixed' | undefined}
           step={0.05}
           min={0.5}
+          fillRange={[0.8, 2]}
           placeholder={p.lineHeightAuto}
           editor={target.editor}
           onSet={(v) => setStyle('lineHeight', v)}
           onShift={(by) => shiftStyle('lineHeight', by, 0.5, 1.2)}
           onClear={() => setStyle('lineHeight', undefined)}
         />
-        <NumberField label={p.spacingShort.letters} name={p.letterSpacing} value={(style('letterSpacing') ?? 0) as number | 'mixed'} step={0.1} editor={target.editor} onSet={(v) => setStyle('letterSpacing', v)} onShift={(by) => shiftStyle('letterSpacing', by)} />
+        <NumberField label={p.letterSpacing} name={p.letterSpacing} value={(style('letterSpacing') ?? 0) as number | 'mixed'} step={0.1} fillRange={[-20, 20]} editor={target.editor} onSet={(v) => setStyle('letterSpacing', v)} onShift={(by) => shiftStyle('letterSpacing', by)} />
         <NumberField
-          label={p.spacingShort.paragraphs}
+          label={p.paragraphSpacing}
           name={p.paragraphSpacing}
           value={(shared(target.props.map((pr) => pr.paragraphSpacing)) ?? 0) as number | 'mixed'}
           min={0}
+          fillRange={[0, 60]}
           editor={target.editor}
           onSet={(v) => set(target, () => ({ paragraphSpacing: v }))}
           onShift={(by) => set(target, (now) => ({ paragraphSpacing: tidy(clamp(((now.paragraphSpacing as number | undefined) ?? 0) + by, 0)) }))}
@@ -638,27 +711,6 @@ function SpacingCard({ target, p }: { target: Target; p: P }) {
 export function TextSizeField({ target, p }: { target: Target; p: P }) {
   const { style, setStyle, shiftStyle } = textStyle(target)
   return <NumberField label={p.fontSize} name={p.fontSize} value={style('fontSize') as number | 'mixed'} min={1} editor={target.editor} onSet={(v) => setStyle('fontSize', v)} onShift={(by) => shiftStyle('fontSize', by, 1)} />
-}
-
-/** The bar's colour popover for text: the brand's colours, then any colour by its hex. */
-export function TextColourBody({ target, brandId, p }: { target: Target; brandId: string; p: P }) {
-  const { style, setStyle } = textStyle(target)
-  const color = style('color') as string | 'mixed'
-  // A range's colour builds on its first character's, as a layer's on its own.
-  const first = (target.range?.[0]?.color as string | undefined) ?? ''
-  const paint = (hex: string) => (target.range
-    ? setStyle('color', `${hex}${first.slice(7, 9) || 'FF'}`)
-    : set(target, (now) => ({ style: { ...(now.style as Style), color: `${hex}${((now.style as Style).color ?? '').slice(7, 9) || 'FF'}` } })))
-  return (
-    <div className="flex w-60 flex-col gap-3 p-1">
-      <Swatches target={target} brandId={brandId} p={p} current={color} paint={paint} />
-      <ColorField
-        name={p.textColour}
-        value={color}
-        onSet={(to) => (target.range ? setStyle('color', to(first)) : set(target, (now) => ({ style: { ...(now.style as Style), color: to((now.style as Style).color) } })))}
-      />
-    </div>
-  )
 }
 
 /** A row of choices of which one is on; `marks` shows a short mark in place of a choice's name. */
@@ -716,28 +768,51 @@ export function textFlag(target: Target, key: 'underline' | 'strikethrough'): bo
 /** Turns a style flag on or off for the selected text, or the selected run while editing. */
 export const setTextFlag = (target: Target, key: 'underline' | 'strikethrough', on: boolean) => textStyle(target).setStyle(key, on)
 
-/** How each box mode's tile draws it: growing along a line, growing down, or held. */
-const BOX_ICONS = {
-  autoWidth: <ArrowsHorizontalIcon size={18} aria-hidden />,
-  autoHeight: <ArrowsVerticalIcon size={18} aria-hidden />,
-  fixed: <RectangleIcon size={18} aria-hidden />,
+/** The letters a box mode's tile draws in its box; the same in every language, as a font sample is. */
+const SAMPLE_LETTERS = 'Aa'
+/**
+ * How each box mode's tile draws it: a box round "Aa", dashed where it grows, with arrows along the
+ * way it grows, or solid with its corners marked where it holds its size.
+ */
+function BoxArt({ mode }: { mode: BoxMode }) {
+  const box = mode === 'autoWidth' ? { x: 16, y: 8, width: 32, height: 18 } : mode === 'autoHeight' ? { x: 6, y: 4, width: 52, height: 26 } : { x: 6, y: 8, width: 52, height: 18 }
+  const marks = {
+    autoWidth: 'M4 17h8M8 14l-4 3 4 3M60 17h-8M56 14l4 3-4 3',
+    autoHeight: 'M58 6v22M55 9l3-3 3 3M55 25l3 3 3-3',
+    fixed: 'M6 8h3M6 8v3M58 26h-3M58 26v-3',
+  }
+  return (
+    <svg width="64" height="34" viewBox="0 0 64 34" aria-hidden fill="none" stroke="currentColor" strokeWidth="1.5">
+      <rect {...box} rx="3" strokeDasharray={mode === 'fixed' ? undefined : '3 2'} />
+      <text x="32" y="21" textAnchor="middle" fill="currentColor" stroke="none" className="font-sans text-[10px] font-semibold">{SAMPLE_LETTERS}</text>
+      <path d={marks[mode]} strokeWidth={mode === 'fixed' ? 2 : 1.5} />
+    </svg>
+  )
 }
 
-/** The text's box: how it sizes, shrinking to fit between a smallest and a largest size, and the lines shown at most. */
+/** The text's box as three picture tiles: growing along a line, growing down, or holding its size. */
 function TextBoxCard({ target, p }: { target: Target; p: P }) {
-  const value = (key: string) => shared(target.props.map((pr) => pr[key])) as unknown
-  const shrink = value('shrinkToFit') as Fit | undefined | 'mixed'
-  const mode = (value('boxMode') ?? 'autoHeight') as BoxMode | 'mixed'
+  const mode = (shared(target.props.map((pr) => pr.boxMode)) ?? 'autoHeight') as BoxMode | 'mixed'
   return (
     <Card id="text-box-card" title={p.textBox}>
       <div role="radiogroup" aria-label={p.boxMode} className="grid grid-cols-3 gap-[7px]">
         {(['autoWidth', 'autoHeight', 'fixed'] as const).map((to) => (
           <button key={to} type="button" role="radio" aria-checked={mode === to} data-value={to} onClick={() => set(target, () => ({ boxMode: to }))} className={TILE}>
-            <span className={TILE_FACE_WIDE}>{BOX_ICONS[to]}</span>
-            {p.boxModes[to]}
+            <span className={cn(TILE_FACE_WIDE, 'text-muted group-aria-checked:text-text')}><BoxArt mode={to} /></span>
+            <span className="w-full truncate text-center">{p.boxModes[to]}</span>
           </button>
         ))}
       </div>
+    </Card>
+  )
+}
+
+/** The text box's numbers, under Advanced: shrinking to fit between a smallest and a largest size, and the lines shown at most. */
+function TextFitCard({ target, p, title }: { target: Target; p: P; title: string }) {
+  const value = (key: string) => shared(target.props.map((pr) => pr[key])) as unknown
+  const shrink = value('shrinkToFit') as Fit | undefined | 'mixed'
+  return (
+    <Card id="text-fit-card" title={title} strong>
       <SwitchRow
         name={p.shrinkToFit}
         on={shrink === 'mixed' ? 'mixed' : shrink !== undefined}
@@ -746,44 +821,47 @@ function TextBoxCard({ target, p }: { target: Target; p: P }) {
           return { shrinkToFit: on ? { min: tidy(Math.max(1, size / 2)), max: size } : undefined }
         })}
       />
-      <div className={KNOBS}>
-        {shrink !== undefined && shrink !== 'mixed' && (['min', 'max'] as const).map((end) => (
-          <NumberField
-            key={end}
-            label={p.shrinkShort[end]}
-            name={p.shrinkSize[end]}
-            value={shrink[end]}
-            min={1}
-            editor={target.editor}
-            onSet={(v) => set(target, (now) => {
-              const was = now.shrinkToFit as Fit | undefined
-              if (!was) return null
-              const next = { ...was, [end]: v }
-              return fitPatch(now, end === 'min' ? { min: Math.min(next.min, next.max), max: next.max } : { min: next.min, max: Math.max(next.min, next.max) })
-            })}
-            onShift={(by) => set(target, (now) => {
-              const was = now.shrinkToFit as Fit | undefined
-              if (!was) return null
-              const v = tidy(Math.max(1, was[end] + by))
-              return fitPatch(now, end === 'min' ? { min: Math.min(v, was.max), max: was.max } : { min: was.min, max: Math.max(v, was.min) })
-            })}
-          />
-        ))}
-        <NumberField
-          label={p.maxLines}
-          name={p.maxLines}
-          value={value('maxLines') as number | 'mixed' | undefined}
-          min={0}
-          placeholder={p.none}
-          editor={target.editor}
-          // 0 lifts the limit.
-          onSet={(v) => set(target, () => ({ maxLines: Math.round(v) >= 1 ? Math.round(v) : undefined }))}
-          onShift={(by) => set(target, (now) => {
-            const next = Math.round(((now.maxLines as number | undefined) ?? 0) + by)
-            return { maxLines: next >= 1 ? next : undefined }
-          })}
-        />
-      </div>
+      {shrink !== undefined && shrink !== 'mixed' && (
+        <div className={KNOBS}>
+          {(['min', 'max'] as const).map((end) => (
+            <NumberField
+              key={end}
+              label={p.shrinkShort[end]}
+              name={p.shrinkSize[end]}
+              value={shrink[end]}
+              min={1}
+              editor={target.editor}
+              onSet={(v) => set(target, (now) => {
+                const was = now.shrinkToFit as Fit | undefined
+                if (!was) return null
+                const next = { ...was, [end]: v }
+                return fitPatch(now, end === 'min' ? { min: Math.min(next.min, next.max), max: next.max } : { min: next.min, max: Math.max(next.min, next.max) })
+              })}
+              onShift={(by) => set(target, (now) => {
+                const was = now.shrinkToFit as Fit | undefined
+                if (!was) return null
+                const v = tidy(Math.max(1, was[end] + by))
+                return fitPatch(now, end === 'min' ? { min: Math.min(v, was.max), max: was.max } : { min: was.min, max: Math.max(v, was.min) })
+              })}
+            />
+          ))}
+        </div>
+      )}
+      <NumberField
+        label={p.maxLines}
+        name={p.maxLines}
+        value={value('maxLines') as number | 'mixed' | undefined}
+        min={0}
+        placeholder={p.none}
+        editor={target.editor}
+        // 0, or nothing, lifts the limit.
+        onSet={(v) => set(target, () => ({ maxLines: Math.round(v) >= 1 ? Math.round(v) : undefined }))}
+        onClear={() => set(target, () => ({ maxLines: undefined }))}
+        onShift={(by) => set(target, (now) => {
+          const next = Math.round(((now.maxLines as number | undefined) ?? 0) + by)
+          return { maxLines: next >= 1 ? next : undefined }
+        })}
+      />
     </Card>
   )
 }
@@ -820,10 +898,10 @@ const setImage = (target: Target, index: number, change: (now: ImageFill) => Par
 
 /** The bar's Look popover for a photo: each filter as the photo with it. */
 export function PhotoLookBody({ target, p, brandId, index, paint }: { target: Target; p: P; brandId: string; index: number; paint: ImageFill }) {
-  const picture = `/brands/${encodeURIComponent(brandId)}/assets/${encodeURIComponent(paint.assetId)}/thumbnail`
+  const picture = assetThumbnail(brandId, paint.assetId)
   const filter = paint.filter ?? 'none'
   return (
-    <div role="radiogroup" aria-label={p.filter} className="grid w-72 grid-cols-4 gap-1.5 p-1.5">
+    <div role="radiogroup" aria-label={p.filter} className="grid grid-cols-4 gap-1.5">
       {ImageFilter.options.map((name) => (
         <button
           key={name}
@@ -848,7 +926,10 @@ function FitRow({ target, p, index, paint }: { target: Target; p: P; index: numb
   return <Segments name={p.fit} value={paint.fit} options={['fill', 'crop', 'fit', 'tile'] as const} labels={p.fits} onSet={(fit) => setImage(target, index, () => ({ fit }))} />
 }
 
-/** The photo's adjustments: its light, contrast, saturation, warmth and tint, and how much of the image shows. */
+/**
+ * The photo's adjustments as slider fields, one to a row, each filling from 0 either way: its light,
+ * contrast, saturation, warmth and tint; then how much of the image shows.
+ */
 function AdjustCard({ target, p, index, paint }: { target: Target; p: P; index: number; paint: ImageFill }) {
   const setPaint = (change: (now: ImageFill) => Partial<ImageFill>) => setImage(target, index, change)
   const setAdjust = (key: keyof ImageAdjust, to: (n: number) => number) => setPaint((now) => {
@@ -857,7 +938,7 @@ function AdjustCard({ target, p, index, paint }: { target: Target; p: P; index: 
   })
   return (
     <Card id="adjust-card" title={p.adjustTitle}>
-      <div className={KNOBS}>
+      <div className="grid gap-1.5">
         {ADJUSTMENTS.map((key) => (
           <NumberField
             key={key}
@@ -872,7 +953,7 @@ function AdjustCard({ target, p, index, paint }: { target: Target; p: P; index: 
           />
         ))}
         <NumberField
-          label={p.image}
+          label={p.imageOpacity}
           unit="%"
           name={p.imageOpacity}
           value={paint.opacity}
@@ -889,11 +970,11 @@ function AdjustCard({ target, p, index, paint }: { target: Target; p: P; index: 
 }
 
 /** Several photos with the same picture: Replace and the filters, which one photo has on its bar. */
-function PhotosCard({ target, p, brandId, index, paint }: { target: Target; p: P; brandId: string; index: number; paint: ImageFill }) {
+function PhotosCard({ target, p, b, brandId, index, paint }: { target: Target; p: P; b: Messages['editor']['bar']; brandId: string; index: number; paint: ImageFill }) {
   return (
     <Card
       id="photos-card"
-      title={p.image}
+      title={b.filters}
       action={(
         <ImagePickerButton brandId={brandId} title={p.replaceImageTitle} testId="replace-image" className={cn(CHIP, FOCUS_RING, 'shrink-0')} onPick={(asset) => set(target, (now) => ({ fills: withImage((now.fills ?? []) as Paint[], asset.id) }))}>
           <span aria-hidden>{p.replaceImage}</span>
@@ -905,17 +986,12 @@ function PhotosCard({ target, p, brandId, index, paint }: { target: Target; p: P
   )
 }
 
-/**
- * The fills, + in the header, then the strokes under an Outline heading with their own +: for a
- * photo, whose bar holds the photo's own actions, and for several layers.
- */
-function ColourCard({ target, brandId, p, b, swatches, strokes = true }: { target: Target; brandId: string; p: P; b: Messages['editor']['bar']; swatches: boolean; strokes?: boolean }) {
-  const { add } = useList<Paint>(target, 'fills', NEW_FILL, FILL_ON_TOP, true)
-  const stroked = strokes && target.types.every((type) => type === 'graphic' || type === 'frame' || type === 'boolean')
+/** The fills, under Advanced with + in its heading: the Colour panel's, and a photo's in its Edit image panel. */
+function FillsCard({ target, brandId, p, b, children }: { target: Target; brandId: string; p: P; b: Messages['editor']['bar']; children?: ReactNode }) {
   return (
-    <Card id="fill-card" title={b.fill} action={<AddButton label={format(p.add, { name: p.fill.toLowerCase() })} onClick={add} />}>
-      <FillBody target={target} brandId={brandId} p={p} swatches={swatches} header={false} />
-      {stroked && <OutlineBody target={target} brandId={brandId} p={p} title={b.outline} />}
+    <Card id="fill-card" title={b.advanced} strong>
+      {children}
+      <FillBody target={target} brandId={brandId} p={p} title={b.colourPanel.fills} />
     </Card>
   )
 }
@@ -979,16 +1055,20 @@ function FrameCard({ target, p }: { target: Target; p: P }) {
   )
 }
 
+/** The room between that the Stack panel offers at a tap. */
+const GAPS = [0, 8, 16, 32]
+
 /**
- * A frame's auto layout, turned on and off from its title: row or column, wrapping, a 3×3 pad that
- * lines up what is inside along both axes at once, the room between and around, spreading out,
- * each side's padding, and, when `ownSizing`, how the frame sizes.
+ * The Stack panel: auto layout on or off by the switch in its heading; then its direction and
+ * wrapping, the room between, at a tap or by number, and together or spread out. Under Advanced, a
+ * 3×3 pad that lines up what is inside along both axes at once, the room around and each side's,
+ * and, when `ownSizing`, how the frame sizes.
  */
-function AutoLayoutCard({ target, p, ownSizing }: { target: Target; p: P; ownSizing: boolean }) {
+function AutoLayoutCard({ target, p, b, ownSizing }: { target: Target; p: P; b: Messages['editor']['bar']; ownSizing: boolean }) {
   const layouts = target.props.map((pr) => pr.layout as Layout | undefined)
   const on = shared(layouts.map(Boolean))
   const toggle = <Switch on={on} label={p.autoLayout} onSet={() => target.editor.perform('autoLayout')} className={cn('group flex cursor-pointer rounded-full', FOCUS_RING)} />
-  if (on !== true) return <Card id="auto-layout-card" title={p.autoLayout} action={toggle} />
+  if (on !== true) return <Card id="auto-layout-card" title={p.autoLayout} action={toggle} strong />
   const value = (key: keyof Layout) => shared(layouts.map((l) => l?.[key]))
   const setLayout = (change: (l: Layout) => Partial<Layout>) => set(target, (now) => {
     const l = now.layout as Layout
@@ -997,62 +1077,75 @@ function AutoLayoutCard({ target, p, ownSizing }: { target: Target; p: P; ownSiz
   const direction = value('direction') as Layout['direction'] | 'mixed'
   const justify = value('justify') as string
   const align = value('align') as string
+  const gap = value('gap') as number | 'mixed'
   const around = shared(layouts.flatMap((l) => (l ? [l.padding.top, l.padding.right, l.padding.bottom, l.padding.left] : [])))
   return (
-    <Card id="auto-layout-card" title={p.autoLayout} action={toggle}>
-      <Segments name={p.direction} value={direction} options={['row', 'column'] as const} labels={p.directions} onSet={(to) => setLayout(() => ({ direction: to }))} />
-      <SwitchRow name={p.wrap} on={value('wrap') === 'mixed' ? 'mixed' : value('wrap') === true} onSet={(wrap) => setLayout(() => ({ wrap }))} />
-      <div className="flex gap-3">
-        {/* Across the pad is along a row's line (or down a column's), so each cell sets both axes. */}
-        <div role="group" aria-label={p.lineUp} dir="ltr" className="grid size-[84px] shrink-0 grid-cols-3 gap-[3px] rounded-[10px] bg-hover p-[5px]">
-          {PLACES.map((y) => PLACES.map((x) => {
-            const [along, across] = direction === 'column' ? [y, x] : [x, y]
-            const pressed = align === across && (justify === along || justify === 'space-between')
-            return (
-              <button
-                key={`${y}-${x}`}
-                type="button"
-                aria-label={p.padCells[`${y}-${x}`]}
-                aria-pressed={pressed}
-                data-justify={along}
-                data-align={across}
-                onClick={() => setLayout((l) => {
-                  const own = l.direction === 'column' ? { justify: y, align: x } : { justify: x, align: y }
-                  return { justify: l.justify === 'space-between' ? 'space-between' : own.justify, align: own.align }
-                })}
-                className={cn('grid cursor-pointer place-items-center rounded-[5px] hover:bg-surface after:size-1 after:rounded-full after:bg-subtle aria-pressed:after:h-1.5 aria-pressed:after:w-4 aria-pressed:after:rounded-[2px] aria-pressed:after:bg-accent', FOCUS_RING)}
-              />
-            )
-          }))}
+    <>
+      <Card id="auto-layout-card" title={p.autoLayout} action={toggle} strong>
+        <span className={PANEL_HEADING}>{p.direction}</span>
+        <Segments name={p.direction} value={direction} options={['row', 'column'] as const} labels={p.directions} onSet={(to) => setLayout(() => ({ direction: to }))} />
+        <SwitchRow name={p.wrap} on={value('wrap') === 'mixed' ? 'mixed' : value('wrap') === true} onSet={(wrap) => setLayout(() => ({ wrap }))} />
+        <span className={PANEL_HEADING}>{p.gap}</span>
+        <div role="group" aria-label={p.gap} className="grid grid-cols-4 gap-1.5">
+          {GAPS.map((to) => (
+            <button key={to} type="button" aria-pressed={gap === to} data-gap={to} onClick={() => setLayout(() => ({ gap: to }))} className={cn(PANEL_BUTTON, 'justify-center font-mono tabular-nums aria-pressed:border-accent aria-pressed:bg-accent-soft aria-pressed:text-accent-text')}>
+              {to}
+            </button>
+          ))}
         </div>
-        <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-          <NumberField label={p.between} name={p.gap} value={value('gap') as number | 'mixed'} editor={target.editor} onSet={(gap) => setLayout(() => ({ gap }))} onShift={(by) => setLayout((l) => ({ gap: tidy(l.gap + by) }))} />
-          <NumberField
-            label={p.around}
-            name={p.paddingAll}
-            value={around}
-            editor={target.editor}
-            onSet={(v) => setLayout(() => ({ padding: { top: v, right: v, bottom: v, left: v } }))}
-            onShift={(by) => setLayout((l) => ({ padding: { top: tidy(l.padding.top + by), right: tidy(l.padding.right + by), bottom: tidy(l.padding.bottom + by), left: tidy(l.padding.left + by) } }))}
-          />
-          <Choice name={p.spreadOut} value={justify === 'mixed' ? 'mixed' : justify === 'space-between' ? 'between' : 'packed'} options={['packed', 'between'] as const} labels={p.spreads} onSet={(to) => setLayout((l) => ({ justify: to === 'between' ? 'space-between' : l.justify === 'space-between' ? 'start' : l.justify }))} />
+        <NumberField label={p.between} name={p.gap} value={gap} fillRange={[0, 64]} editor={target.editor} onSet={(to) => setLayout(() => ({ gap: to }))} onShift={(by) => setLayout((l) => ({ gap: tidy(l.gap + by) }))} />
+        <Segments name={p.spreadOut} value={justify === 'mixed' ? 'mixed' : justify === 'space-between' ? 'between' : 'packed'} options={['packed', 'between'] as const} labels={p.spreads} onSet={(to) => setLayout((l) => ({ justify: to === 'between' ? 'space-between' : l.justify === 'space-between' ? 'start' : l.justify }))} />
+      </Card>
+      <Card id="auto-layout-advanced" title={b.advanced} strong>
+        <div className="flex items-center justify-between gap-3">
+          <span className="text-[13px] font-semibold text-text">{p.lineUp}</span>
+          {/* Across the pad is along a row's line (or down a column's), so each cell sets both axes. */}
+          <div role="group" aria-label={p.lineUp} dir="ltr" className="grid size-[84px] shrink-0 grid-cols-3 gap-[3px] rounded-[10px] bg-hover p-[5px]">
+            {PLACES.map((y) => PLACES.map((x) => {
+              const [along, across] = direction === 'column' ? [y, x] : [x, y]
+              const pressed = align === across && (justify === along || justify === 'space-between')
+              return (
+                <button
+                  key={`${y}-${x}`}
+                  type="button"
+                  aria-label={p.padCells[`${y}-${x}`]}
+                  aria-pressed={pressed}
+                  data-justify={along}
+                  data-align={across}
+                  onClick={() => setLayout((l) => {
+                    const own = l.direction === 'column' ? { justify: y, align: x } : { justify: x, align: y }
+                    return { justify: l.justify === 'space-between' ? 'space-between' : own.justify, align: own.align }
+                  })}
+                  className={cn('grid cursor-pointer place-items-center rounded-[5px] hover:bg-surface after:size-1 after:rounded-full after:bg-subtle aria-pressed:after:h-1.5 aria-pressed:after:w-4 aria-pressed:after:rounded-[2px] aria-pressed:after:bg-accent', FOCUS_RING)}
+                />
+              )
+            }))}
+          </div>
         </div>
-      </div>
-      <div className={KNOBS_FOUR}>
-        {(['top', 'right', 'bottom', 'left'] as const).map((side) => (
-          <NumberField
-            key={side}
-            label={p.paddingShort[side]}
-            name={p.padding[side]}
-            value={shared(layouts.map((l) => l?.padding[side] ?? 0))}
-            editor={target.editor}
-            onSet={(v) => setLayout((l) => ({ padding: { ...l.padding, [side]: v } }))}
-            onShift={(by) => setLayout((l) => ({ padding: { ...l.padding, [side]: tidy(l.padding[side] + by) } }))}
-          />
-        ))}
-      </div>
-      {ownSizing && <SizingFields target={target} p={p} options={['hug', 'fill', 'fixed']} labels={p.sizings} />}
-    </Card>
+        <NumberField
+          label={p.paddingAll}
+          name={p.paddingAll}
+          value={around}
+          editor={target.editor}
+          onSet={(v) => setLayout(() => ({ padding: { top: v, right: v, bottom: v, left: v } }))}
+          onShift={(by) => setLayout((l) => ({ padding: { top: tidy(l.padding.top + by), right: tidy(l.padding.right + by), bottom: tidy(l.padding.bottom + by), left: tidy(l.padding.left + by) } }))}
+        />
+        <div className={KNOBS}>
+          {(['top', 'right', 'bottom', 'left'] as const).map((side) => (
+            <NumberField
+              key={side}
+              label={p.paddingSides[side]}
+              name={p.padding[side]}
+              value={shared(layouts.map((l) => l?.padding[side] ?? 0))}
+              editor={target.editor}
+              onSet={(v) => setLayout((l) => ({ padding: { ...l.padding, [side]: v } }))}
+              onShift={(by) => setLayout((l) => ({ padding: { ...l.padding, [side]: tidy(l.padding[side] + by) } }))}
+            />
+          ))}
+        </div>
+        {ownSizing && <SizingFields target={target} p={p} options={['hug', 'fill', 'fixed']} labels={p.sizings} />}
+      </Card>
+    </>
   )
 }
 
@@ -1087,13 +1180,17 @@ function SizingFields({ target, p, options, labels }: { target: Target; p: P; op
   )
 }
 
-/** A layer in an auto layout: on each axis its own size, fitting its content or filling the room, and kept where it is put, out of the flow. */
-function FlowCard({ target, p }: { target: Target; p: P }) {
+/**
+ * A layer in an auto layout, in the Position panel's Advanced: on each axis its own size, fitting
+ * its content or filling the room, and kept where it is put, out of the flow.
+ */
+function FlowPart({ target, p }: { target: Target; p: P }) {
   return (
-    <Card id="flow-card" title={p.inAutoLayout}>
+    <div role="group" aria-labelledby="flow-card-title" data-testid="flow-card" className="flex flex-col gap-2.5">
+      <h4 id="flow-card-title" className={cn(PANEL_HEADING, 'pt-1.5')}>{p.inAutoLayout}</h4>
       <SizingFields target={target} p={p} options={['fixed', 'hug', 'fill']} labels={p.childSizings} />
       <SwitchRow name={p.absolute} on={shared(target.props.map((pr) => pr.absolute === true))} onSet={(absolute) => set(target, () => ({ absolute: absolute ? true : undefined }))} />
-    </Card>
+    </div>
   )
 }
 
@@ -1189,110 +1286,212 @@ function Swatches({ target, brandId, p, current, paint }: { target: Target; bran
   )
 }
 
-/** A shape's or frame's look: its fill from the brand, painted over its first solid fill. */
-function FillLook({ target, brandId, p }: { target: Target; brandId: string; p: P }) {
-  // The fill a brand colour binds: the topmost one that shows.
-  const bound = (fills: Paint[]) => fills[boundFillIndex(fills)] as Extract<Paint, { type: 'solid' }> | undefined
-  const current = shared(target.props.map((pr) => bound((pr.fills ?? []) as Paint[])?.color))
-  const paint = (hex: string) => set(target, (now) => {
-    const fills = (now.fills ?? []) as Paint[]
-    const i = boundFillIndex(fills)
-    const color = `${hex}FF`
-    return { fills: i < 0 ? [...fills, { type: 'solid', color }] : fills.map((f, j) => (j === i && f.type === 'solid' ? { ...f, color } : f)) }
-  })
-  // A picture goes into layers that have none; one that has a picture changes it with Replace on the bar.
-  const pictureless = target.props.every((pr) => !((pr.fills ?? []) as Paint[]).some((f) => f.type === 'image'))
+/**
+ * The colours to pick from, simple first: the brand kit's, which the layers then follow, and the
+ * colours already in the design, with + first, which opens `picker` under them: any colour, or
+ * for shapes and boxes a gradient or an image too.
+ */
+function ColourChoices({ target, design, brandId, p, b, current, paint, picker }: {
+  target: Target
+  design: Design
+  brandId: string
+  p: P
+  b: Messages['editor']['bar']
+  current: string | 'mixed' | undefined
+  paint: (hex: string) => void
+  picker: ReactNode
+}) {
+  const [picking, setPicking] = useState(false)
+  const kit = (useBrandKit(brandId)?.colors.length ?? 0) > 0
+  const now = current && current !== 'mixed' ? current.slice(0, 7).toUpperCase() : null
   return (
-    <div className="flex flex-col gap-3">
-      <Swatches target={target} brandId={brandId} p={p} current={current} paint={paint} />
-      {pictureless && <ImagePickerButton
-        brandId={brandId}
-        title={p.addImageTitle}
-        testId="add-image"
-        className={DASHED_BUTTON}
-        onPick={(asset) => set(target, (now) => ({ fills: withImage((now.fills ?? []) as Paint[], asset.id) }))}
-      >
-        <ImageSquareIcon size={14} aria-hidden />
-        <span aria-hidden>{p.addImage}</span>
-      </ImagePickerButton>}
-    </div>
+    <>
+      <Card id="brand-colours" title={kit ? b.colourPanel.brandKit : p.colours}>
+        <Swatches target={target} brandId={brandId} p={p} current={current} paint={paint} />
+      </Card>
+      <Card id="design-colours" title={b.colourPanel.inDesign}>
+        <div role="group" aria-label={b.colourPanel.inDesign} className="flex flex-wrap items-center gap-1.5">
+          <button
+            type="button"
+            aria-label={b.colourPanel.pick}
+            title={b.colourPanel.pick}
+            aria-pressed={picking}
+            data-testid="colour-pick"
+            onClick={() => setPicking(!picking)}
+            className={cn('grid size-[22px] shrink-0 cursor-pointer place-items-center rounded-full border border-dashed border-line-strong text-muted transition-colors hover:border-accent hover:text-text aria-pressed:border-accent aria-pressed:text-accent-text', FOCUS_RING)}
+          >
+            <PlusIcon size={12} weight="bold" aria-hidden />
+          </button>
+          {designColours(design).map((hex) => <Swatch key={hex} color={hex} label={hex} on={now === hex} onPick={() => paint(hex)} />)}
+        </div>
+        {picking && <div className="rounded-[12px] border border-line" data-testid="colour-picker">{picker}</div>}
+      </Card>
+    </>
   )
 }
 
-/** The letters each effect tile shows its effect on; the same in every language, as a font sample is. */
-const TILE_SAMPLE = 'Aa'
+/**
+ * The Colour panel of shapes and boxes: the kit's and the design's colours, which paint the fill
+ * that shows, + with any paint for it, Add image for layers without one, then every fill under
+ * Advanced.
+ */
+function ColourPanel({ target, design, brandId, p, b }: { target: Target; design: Design; brandId: string; p: P; b: Messages['editor']['bar'] }) {
+  // The fill a colour paints: the topmost one that shows.
+  const bound = (fills: Paint[]) => fills[boundFillIndex(fills)]
+  const shown = shared(target.props.map((pr) => {
+    const fill = bound((pr.fills ?? []) as Paint[])
+    return fill?.type === 'solid' ? fill.color : undefined
+  }))
+  const paintFill = (to: (now: Paint) => Paint) => set(target, (now) => {
+    const fills = (now.fills ?? []) as Paint[]
+    const i = boundFillIndex(fills)
+    return { fills: i < 0 ? [...fills, to(NEW_FILL)] : fills.map((f, j) => (j === i ? to(f) : f)) }
+  })
+  const paint = (hex: string) => paintFill((now) => (now.type === 'solid' ? { ...now, color: `${hex}FF` } : { type: 'solid', color: `${hex}FF` }))
+  // The picker edits the topmost fill that shows, whatever its type, so a gradient picked stays the one it shows.
+  const showing = (fills: Paint[]) => fills.findLastIndex((f) => f.visible !== false)
+  const pickFill = (to: (now: Paint) => Paint) => set(target, (now) => {
+    const fills = (now.fills ?? []) as Paint[]
+    const i = showing(fills)
+    return { fills: i < 0 ? [...fills, to(NEW_FILL)] : fills.map((f, j) => (j === i ? to(f) : f)) }
+  })
+  // A picture goes into layers that have none; one that has a picture changes it with Replace on the bar.
+  const pictureless = target.props.every((pr) => !((pr.fills ?? []) as Paint[]).some((f) => f.type === 'image'))
+  const firstFills = (target.props[0]?.fills ?? []) as Paint[]
+  const first = firstFills[showing(firstFills)] ?? NEW_FILL
+  return (
+    <>
+      <ColourChoices
+        target={target}
+        design={design}
+        brandId={brandId}
+        p={p}
+        b={b}
+        current={shown}
+        paint={paint}
+        picker={<PaintEditor paint={first} brandId={brandId} editor={target.editor} p={p} onSet={pickFill} />}
+      />
+      {pictureless && (
+        <ImagePickerButton
+          brandId={brandId}
+          title={p.addImageTitle}
+          testId="add-image"
+          className={PANEL_BUTTON}
+          onPick={(asset) => set(target, (now) => ({ fills: withImage((now.fills ?? []) as Paint[], asset.id) }))}
+        >
+          <ImageSquareIcon size={14} aria-hidden className="shrink-0" />
+          <span aria-hidden>{p.addImage}</span>
+        </ImagePickerButton>
+      )}
+      <FillsCard target={target} brandId={brandId} p={p} b={b} />
+    </>
+  )
+}
 
-type Tile = 'none' | 'shadow' | 'glow' | 'outline' | 'blur'
-const TILE_EFFECT: Partial<Record<Tile, Effect['type']>> = { shadow: 'dropShadow', glow: 'glow', blur: 'layerBlur' }
-/** How each tile draws its Aa, close to what the effect does. */
+/** The Colour panel of text: the kit's and the design's colours, and + with any colour by its hex and how much shows. */
+function TextColourPanel({ target, design, brandId, p, b }: { target: Target; design: Design; brandId: string; p: P; b: Messages['editor']['bar'] }) {
+  const { style, setStyle } = textStyle(target)
+  const color = style('color') as string | 'mixed'
+  // A range's colour builds on its first character's, as a layer's on its own.
+  const first = (target.range?.[0]?.color as string | undefined) ?? ''
+  const paint = (hex: string) => (target.range
+    ? setStyle('color', `${hex}${first.slice(7, 9) || 'FF'}`)
+    : set(target, (now) => ({ style: { ...(now.style as Style), color: `${hex}${((now.style as Style).color ?? '').slice(7, 9) || 'FF'}` } })))
+  return (
+    <ColourChoices
+      target={target}
+      design={design}
+      brandId={brandId}
+      p={p}
+      b={b}
+      current={color}
+      paint={paint}
+      picker={(
+        <div className="p-3">
+          <ColorField
+            name={p.textColour}
+            value={color}
+            onSet={(to) => (target.range ? setStyle('color', to(first)) : set(target, (now) => ({ style: { ...(now.style as Style), color: to((now.style as Style).color) } })))}
+          />
+        </div>
+      )}
+    />
+  )
+}
+
+/** The letters text's effect tiles show their effects on; the same in every language, as a font sample is. */
+const SAMPLE_GLYPHS = 'Ag'
+/** The effect tiles, in the order the panel shows them; Outline is text's alone. */
+type Tile = 'none' | Effect['type'] | 'outline'
+const TILES: Tile[] = ['none', 'dropShadow', 'innerShadow', 'glow', 'outline', 'layerBlur', 'backgroundBlur']
+/** How a tile's sample shows its effect, close to what the renderer draws. */
 const TILE_LOOK: Record<Tile, string> = {
   none: '',
-  shadow: '[text-shadow:3px_3px_0_rgb(0_0_0/0.55)]',
-  glow: '[text-shadow:0_0_7px_var(--accent),0_0_14px_var(--accent)]',
-  outline: 'text-transparent [-webkit-text-stroke:1px_var(--text)]',
-  blur: 'blur-[1.5px]',
-}
-/** How each tile draws the selected layer's picture, close to what its effect does; Outline is a picture of its own. */
-const THUMB_LOOK: Record<Tile, string> = {
-  none: '',
-  shadow: '[filter:drop-shadow(3px_3px_0_rgb(0_0_0/0.55))]',
-  glow: '[filter:drop-shadow(0_0_4px_var(--accent))_drop-shadow(0_0_8px_var(--accent))]',
+  dropShadow: '[filter:drop-shadow(0_4px_3px_rgb(0_0_0/0.55))]',
+  innerShadow: '',
+  glow: '[filter:drop-shadow(0_0_8px_rgb(255_72_176/0.6))]',
   outline: '',
-  blur: 'blur-[1.5px]',
+  layerBlur: 'blur-[1.8px]',
+  backgroundBlur: '',
 }
-/** How long the layer has to stay as it is before its tiles draw it again; a drag redraws them once, after it ends. */
-const THUMB_SETTLE_MS = 150
+/** What the effect tiles show their effects on: "Ag" for text, a photo for a photo, a rounded shape for the rest. */
+type Sample = { kind: 'text' } | { kind: 'photo'; src: string } | { kind: 'shape' }
 
-type Thumbnails = { id: string; plain: string | null; outlined: string | null }
+/** One tile's picture: the sample with the tile's effect on it. Background blur sets it on a frosted pane over stripes. */
+function EffectSample({ sample, tile }: { sample: Sample; tile: Tile }) {
+  const inner = tile === 'innerShadow'
+  const body = sample.kind === 'text'
+    ? (
+      <span
+        aria-hidden
+        className={cn(
+          'font-display text-[26px] leading-none font-extrabold',
+          tile === 'outline' ? 'text-transparent [-webkit-text-stroke:1.4px_var(--accent)]' : inner ? 'bg-[linear-gradient(180deg,color-mix(in_srgb,var(--accent),black_55%)_0_30%,var(--accent)_62%)] bg-clip-text text-transparent' : 'text-accent',
+          TILE_LOOK[tile],
+        )}
+      >
+        {SAMPLE_GLYPHS}
+      </span>
+    )
+    : sample.kind === 'photo'
+      ? (
+        <span aria-hidden className={cn('relative block size-[60%] overflow-hidden rounded-[6px]', TILE_LOOK[tile])}>
+          <img src={sample.src} alt="" draggable={false} loading="lazy" className="size-full object-cover" />
+          {inner && <span className="absolute inset-0 shadow-[inset_0_4px_6px_rgb(0_0_0/0.65)]" />}
+        </span>
+      )
+      : <span aria-hidden className={cn('block size-[56%] rounded-[10px] bg-accent', inner && 'shadow-[inset_0_4px_6px_rgb(0_0_0/0.55)]', TILE_LOOK[tile])} />
+  if (tile !== 'backgroundBlur') return body
+  // Background blur blurs what is behind the layer: bright stripes, softened through a frosted pane
+  // that holds the sample, sharp.
+  return (
+    <span aria-hidden className="grid size-full place-items-center bg-[repeating-linear-gradient(135deg,#ff48b0_0_6px,#ffd23f_6px_12px,#3d6bff_12px_18px)]">
+      <span className="grid aspect-[4/3] h-[72%] place-items-center rounded-[8px] border border-white/60 bg-white/35 backdrop-blur-[3px]">{body}</span>
+    </span>
+  )
+}
 
 /**
- * One layer's pictures for the effect tiles, drawn by the editor's renderer: as soon as the layer is
- * selected, and again a moment after the stage last drew (an edit, or a font or image arriving),
- * so a drag draws them once, at its end. For text, also its outlined "Aa". Null while there are
- * none (several layers, nothing drawn).
+ * The Effects panel: one grid of picture tiles, each previewing its effect on a sample of the
+ * selection's kind, never the layer itself. A tile adds its effect, or takes every effect of its type
+ * off; None takes them all off. Under Advanced, each effect that is on with its numbers and its own
+ * remove button, text's outline with its width and colour, and Add another, which adds a second
+ * effect of a type.
  */
-function useLayerThumbnails(editor: Editor, id: string | null, text: boolean): Thumbnails | null {
-  const [shown, setShown] = useState<Thumbnails | null>(null)
-  useEffect(() => {
-    if (!id) return
-    const draw = () => {
-      const next = { id, plain: editor.layerThumbnail(id), outlined: text ? editor.layerThumbnail(id, 96, true) : null }
-      setShown((now) => (now?.id === next.id && now.plain === next.plain && now.outlined === next.outlined ? now : next))
-    }
-    draw()
-    let timer: ReturnType<typeof setTimeout> | undefined
-    const later = () => {
-      clearTimeout(timer)
-      timer = setTimeout(() => (editor.gesturing() ? later() : draw()), THUMB_SETTLE_MS)
-    }
-    const stop = editor.onDraw(later)
-    return () => {
-      stop()
-      clearTimeout(timer)
-    }
-  }, [editor, id, text])
-  return shown?.id === id ? shown : null
-}
-
-/**
- * The effects as tiles, as in the mock: none, a shadow, a glow, and an outline for text or a blur for
- * the rest. A tile turns its effect on or off; under the tiles are the outline's width and colour
- * for outlined text, every effect's numbers, and a menu that adds the ones without a tile.
- */
-export function EffectsBody({ target, p }: { target: Target; p: P }) {
-  // One layer previews each effect on itself: its picture, or for text "Aa" in its look.
-  const one = target.ids.length === 1 ? target.ids[0] ?? null : null
-  const thumbnails = useLayerThumbnails(target.editor, one, target.types[0] === 'text')
+export function EffectsBody({ target, p, b, brandId }: { target: Target; p: P; b: Messages['editor']['bar']; brandId: string }) {
   const lists = target.props.map((pr) => (pr.effects ?? []) as Effect[])
   const list = shared(lists)
   const write = (to: (now: Effect[]) => Effect[]) => set(target, (now) => ({ effects: to((now.effects ?? []) as Effect[]) }))
-  const text = target.types.every((type) => type === 'text')
-  const tiles: Tile[] = ['none', 'shadow', 'glow', text ? 'outline' : 'blur']
+  const kind = kindOf(target)
+  const text = kind === 'text'
+  const image = imageFillOf(target)
+  const sample: Sample = text ? { kind: 'text' } : kind === 'photo' && image ? { kind: 'photo', src: assetThumbnail(brandId, image.paint.assetId) } : { kind: 'shape' }
+  const tiles = TILES.filter((tile) => tile !== 'outline' || text)
   const outlined = (pr: Props) => ((pr.style as Style | undefined)?.outline as { width: number } | undefined)?.width ?? 0
   const on = (tile: Tile): boolean => {
     if (tile === 'outline') return target.props.every((pr) => outlined(pr) > 0)
     if (tile === 'none') return lists.every((l) => l.length === 0) && (!text || target.props.every((pr) => outlined(pr) === 0))
-    return lists.every((l) => l.some((e) => e.type === TILE_EFFECT[tile]))
+    return lists.every((l) => l.some((e) => e.type === tile))
   }
   const press = (tile: Tile) => {
     if (tile === 'none') {
@@ -1304,9 +1503,8 @@ export function EffectsBody({ target, p }: { target: Target; p: P }) {
       set(target, (now) => ({ style: { ...(now.style as Style), outline: off ? undefined : { width: 2, color: ((now.style as Style).outline as { color?: string } | undefined)?.color ?? '#000000FF' } } }))
       return
     }
-    const type = TILE_EFFECT[tile] as Effect['type']
     const off = on(tile)
-    write((now) => (off ? now.filter((e) => e.type !== type) : now.some((e) => e.type === type) ? now : [...now, NEW_EFFECT[type]]))
+    write((now) => (off ? now.filter((e) => e.type !== tile) : now.some((e) => e.type === tile) ? now : [...now, NEW_EFFECT[tile]]))
   }
   const outline = shared(target.props.map((pr) => (pr.style as Style | undefined)?.outline as { width: number; color: string } | undefined))
   const setOutline = (to: (was: { width: number; color: string }) => { width: number; color: string }) =>
@@ -1314,57 +1512,56 @@ export function EffectsBody({ target, p }: { target: Target; p: P }) {
       const was = (now.style as Style).outline as { width: number; color: string } | undefined
       return was ? { style: { ...(now.style as Style), outline: to(was) } } : null
     })
+  const empty = list !== 'mixed' && list.length === 0 && !(text && outline && outline !== 'mixed' && outline.width > 0)
   return (
     <>
-      <div role="group" aria-label={p.effects} className="grid grid-cols-4 gap-[7px] px-[18px] pb-3.5">
-        {tiles.map((tile) => (
-          <button
-            key={tile}
-            type="button"
-            aria-pressed={on(tile)}
-            data-tile={tile}
-            onClick={() => press(tile)}
-            className={TILE}
-          >
-            <span className={TILE_FACE}>
-              {thumbnails?.plain
-                ? <img src={(tile === 'outline' && thumbnails.outlined) || thumbnails.plain} alt="" draggable={false} data-thumbnail className={cn('size-[62%] object-contain', THUMB_LOOK[tile])} />
-                : <span aria-hidden className={cn('font-display text-[19px] font-extrabold text-text', TILE_LOOK[tile])}>{TILE_SAMPLE}</span>}
-            </span>
-            {p.tiles[tile]}
-          </button>
-        ))}
-      </div>
-      <div className={cn('flex flex-col gap-2.5', CARD_LOWER)}>
-          {text && outline && outline !== 'mixed' && outline.width > 0 && (
+      <section aria-label={p.effects} className={PANEL_PART} data-testid="effect-tiles">
+        <div role="group" aria-label={p.effects} className="grid grid-cols-3 gap-[7px]">
+          {tiles.map((tile) => (
+            <button key={tile} type="button" aria-pressed={on(tile)} data-tile={tile} onClick={() => press(tile)} className={TILE}>
+              <span className={TILE_FACE_WIDE}><EffectSample sample={sample} tile={tile} /></span>
+              <span className="w-full truncate text-center">{tile === 'none' || tile === 'outline' ? p.tiles[tile] : p.effect[tile]}</span>
+            </button>
+          ))}
+        </div>
+      </section>
+      <Card id="effects-card" title={b.advanced} strong>
+        {text && outline && outline !== 'mixed' && outline.width > 0 && (
+          <div className="flex flex-col gap-1.5" data-item="text-outline">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-text">{p.tiles.outline}</span>
+              <RemoveButton label={format(p.remove, { name: p.tiles.outline.toLowerCase(), n: 1 })} onClick={() => press('outline')} />
+            </div>
             <div className="flex items-center gap-1">
               <div className="w-24 shrink-0">
-                <NumberField label="W" name={p.outlineWidth} value={outline.width} min={0} step={0.5} editor={target.editor} onSet={(width) => setOutline((was) => ({ ...was, width }))} onShift={(by) => setOutline((was) => ({ ...was, width: tidy(clamp(was.width + by, 0)) }))} />
+                <NumberField label="W" name={p.outlineWidth} value={outline.width} min={0.5} step={0.5} editor={target.editor} onSet={(width) => setOutline((was) => ({ ...was, width }))} onShift={(by) => setOutline((was) => ({ ...was, width: tidy(clamp(was.width + by, 0.5)) }))} />
               </div>
               <ColorField name={p.outline} value={outline.color} onSet={(to) => setOutline((was) => ({ ...was, color: to(was.color) }))} />
             </div>
-          )}
-          <Select
-            name="add-effect"
-            label={p.addEffect}
-            value=""
-            placeholder={p.addEffect}
-            options={(Object.keys(NEW_EFFECT) as Effect['type'][]).map((type) => ({ value: type, label: p.effect[type] }))}
-            onChange={(type) => {
-              const fresh = NEW_EFFECT[type as Effect['type']]
-              write((now) => [...(list === 'mixed' ? [] : now), fresh])
-            }}
-            className="h-7 w-full bg-bg/40 px-2 text-[12px] font-semibold"
-          />
-          {list === 'mixed'
-            ? (
-              <div className="flex items-center justify-between gap-2 text-xs text-muted">
-                {p.mixedList}
-                <button type="button" onClick={() => write(() => [])} className="cursor-pointer font-medium text-accent-text hover:underline">{p.useOne}</button>
-              </div>
-            )
-            : list.map((effect, i) => <EffectRow key={i} effect={effect} i={i} target={target} p={p} write={write} />)}
-        </div>
+          </div>
+        )}
+        {list === 'mixed'
+          ? (
+            <div className="flex items-center justify-between gap-2 text-xs text-muted">
+              {p.mixedList}
+              <button type="button" onClick={() => write(() => [])} className="cursor-pointer font-medium text-accent-text hover:underline">{p.useOne}</button>
+            </div>
+          )
+          : list.map((effect, i) => <EffectRow key={i} effect={effect} i={i} target={target} p={p} write={write} />)}
+        {empty && <p className="text-xs text-muted">{b.effectsHint}</p>}
+        <Select
+          name="add-effect"
+          label={empty ? p.addEffect : b.addAnother}
+          value=""
+          placeholder={empty ? p.addEffect : b.addAnother}
+          options={(Object.keys(NEW_EFFECT) as Effect['type'][]).map((type) => ({ value: type, label: p.effect[type] }))}
+          onChange={(type) => {
+            const fresh = NEW_EFFECT[type as Effect['type']]
+            write((now) => [...(list === 'mixed' ? [] : now), fresh])
+          }}
+          className="h-8 w-full rounded-row border border-line bg-surface px-2.5 text-[12px] font-semibold"
+        />
+      </Card>
     </>
   )
 }
@@ -1500,21 +1697,19 @@ export function PanelContent({ panel, target, design, brandId }: { panel: string
   const body = (() => {
     switch (panel) {
       case 'colour':
-        if (kind === 'text') return <TextColourBody target={target} brandId={brandId} p={p} />
-        return several
-          ? <ColourCard target={target} brandId={brandId} p={p} b={t.editor.bar} swatches strokes={false} />
-          : <FillBody target={target} brandId={brandId} p={p} swatches={!facts.lines} />
+        return kind === 'text'
+          ? <TextColourPanel target={target} design={design} brandId={brandId} p={p} b={t.editor.bar} />
+          : <ColourPanel target={target} design={design} brandId={brandId} p={p} b={t.editor.bar} />
       case 'outline':
-        return <OutlineBody target={target} brandId={brandId} p={p} />
+        return <StrokePanel target={target} brandId={brandId} p={p} b={t.editor.bar} />
       case 'effects':
-        return <EffectsBody target={target} p={p} />
+        return <EffectsBody target={target} p={p} b={t.editor.bar} brandId={brandId} />
       case 'position':
         return (
           <>
-            <HeaderCard target={target} p={p} scope={null} title={t.editor.bar.sizeAndPlace}>
-              {facts.sized && <RotationField target={target} p={p} />}
-            </HeaderCard>
-            {facts.inFlow && <FlowCard target={target} p={p} />}
+            <PlaceCard target={target} p={p} title={t.editor.bar.advanced}>
+              {facts.inFlow && <FlowPart target={target} p={p} />}
+            </PlaceCard>
           </>
         )
       case 'spacing':
@@ -1522,6 +1717,7 @@ export function PanelContent({ panel, target, design, brandId }: { panel: string
           <>
             <SpacingCard target={target} p={p} />
             <TextBoxCard target={target} p={p} />
+            <TextFitCard target={target} p={p} title={t.editor.bar.advanced} />
           </>
         )
       case 'edit':
@@ -1529,20 +1725,22 @@ export function PanelContent({ panel, target, design, brandId }: { panel: string
         return (
           <>
             {several
-              ? <PhotosCard target={target} p={p} brandId={brandId} index={imageFill.index} paint={imageFill.paint} />
-              : <Card id="look-card" title={t.editor.bar.look}><PhotoLookBody target={target} p={p} brandId={brandId} index={imageFill.index} paint={imageFill.paint} /></Card>}
-            <Card id="fit-card" title={p.fit}><FitRow target={target} p={p} index={imageFill.index} paint={imageFill.paint} /></Card>
+              ? <PhotosCard target={target} p={p} b={t.editor.bar} brandId={brandId} index={imageFill.index} paint={imageFill.paint} />
+              : <Card id="look-card" title={t.editor.bar.filters}><PhotoLookBody target={target} p={p} brandId={brandId} index={imageFill.index} paint={imageFill.paint} /></Card>}
             <AdjustCard target={target} p={p} index={imageFill.index} paint={imageFill.paint} />
-            <ColourCard target={target} brandId={brandId} p={p} b={t.editor.bar} swatches={false} strokes={false} />
+            <FillsCard target={target} brandId={brandId} p={p} b={t.editor.bar}>
+              <span className={PANEL_HEADING}>{p.fit}</span>
+              <FitRow target={target} p={p} index={imageFill.index} paint={imageFill.paint} />
+            </FillsCard>
           </>
         )
       case 'stack':
-        return <AutoLayoutCard target={target} p={p} ownSizing={!facts.inFlow} />
+        return <AutoLayoutCard target={target} p={p} b={t.editor.bar} ownSizing={!facts.inFlow} />
       default:
         return null
     }
   })()
-  return <PanelParts>{body}</PanelParts>
+  return body
 }
 
 /** What a top bar pop-up holds for the selection: a short card or a row of choices. */
@@ -1574,5 +1772,5 @@ export function PopupContent({ popup, target, design }: { popup: string; target:
         return null
     }
   })()
-  return <PanelParts>{body}</PanelParts>
+  return body
 }

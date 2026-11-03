@@ -4,7 +4,7 @@
 import { expect, test, type Locator, type Page } from '../support/test.ts'
 import type { DesignInput } from '@dazbee/schema'
 import { writeOutput } from '../support/editor.ts'
-import { barMenu, closeBarMenu, fillList, moreMenu, openStage, scopeMenu, strokeList, openCard } from '../support/stage.ts'
+import { barMenu, closeBarMenu, fillList, moreMenu, openStage, scopeMenu, strokeList, openCard, textColourHex } from '../support/stage.ts'
 import { choose } from '../support/select.ts'
 
 test.describe.configure({ timeout: 120_000 })
@@ -85,27 +85,27 @@ test('one layer: position, size, turn, opacity, blend, fill, stroke and effects'
   await expect.poll(async () => ((await props(page, 'box')).fills as unknown[]).length).toBe(1)
 
   const stroke = await strokeList(page)
-  await stroke.getByRole('button', { name: 'Add stroke' }).click()
+  await stroke.getByRole('button', { name: 'Add outline' }).click()
   await expect.poll(async () => (await props(page, 'box')).strokes).toMatchObject([{ width: 2, align: 'center' }])
-  await enter(stroke.getByRole('spinbutton', { name: 'Stroke 1 width' }), '6')
-  await choose(stroke.getByRole('combobox', { name: 'Stroke 1 position' }), 'inside')
+  await enter(stroke.getByRole('spinbutton', { name: 'Outline 1 width' }), '6')
+  await choose(stroke.getByRole('combobox', { name: 'Outline 1 position' }), 'inside')
   await expect.poll(async () => (await props(page, 'box')).strokes).toMatchObject([{ width: 6, align: 'inside' }])
   // Dashes typed as lengths, an offset, and the look of the ends and corners (#152); a pattern
   // that isn't one is refused, and clearing it makes the line solid again.
-  await enter(stroke.getByRole('textbox', { name: 'Stroke 1 dashes' }), '12, 6')
-  await enter(stroke.getByRole('spinbutton', { name: 'Stroke 1 dash offset' }), '3')
-  await choose(stroke.getByRole('combobox', { name: 'Stroke 1 ends' }), 'round')
-  await choose(stroke.getByRole('combobox', { name: 'Stroke 1 corners' }), 'bevel')
+  await enter(stroke.getByRole('textbox', { name: 'Outline 1 dashes' }), '12, 6')
+  await enter(stroke.getByRole('spinbutton', { name: 'Outline 1 dash offset' }), '3')
+  await choose(stroke.getByRole('combobox', { name: 'Outline 1 ends' }), 'round')
+  await choose(stroke.getByRole('combobox', { name: 'Outline 1 corners' }), 'bevel')
   await expect.poll(async () => (await props(page, 'box')).strokes).toMatchObject([{ width: 6, align: 'inside', dashes: [12, 6], dashOffset: 3, cap: 'round', join: 'bevel' }])
   await page.evaluate(() => window.dazbee?.drawn())
   writeOutput('props-dashed-stroke.png', await page.screenshot())
-  await enter(stroke.getByRole('textbox', { name: 'Stroke 1 dashes' }), '0 0')
-  await expect(stroke.getByRole('textbox', { name: 'Stroke 1 dashes' })).toHaveValue('12 6')
-  await enter(stroke.getByRole('textbox', { name: 'Stroke 1 dashes' }), '')
+  await enter(stroke.getByRole('textbox', { name: 'Outline 1 dashes' }), '0 0')
+  await expect(stroke.getByRole('textbox', { name: 'Outline 1 dashes' })).toHaveValue('12 6')
+  await enter(stroke.getByRole('textbox', { name: 'Outline 1 dashes' }), '')
   await expect.poll(async () => (await props(page, 'box')).strokes).toMatchObject([{ dashes: [] }])
 
   const effects = await barMenu(page, 'effects')
-  await choose(effects.getByRole('combobox', { name: 'Add effect' }), 'dropShadow')
+  await choose(effects.getByRole('combobox', { name: /^Add (effect|another)$/ }), 'dropShadow')
   await expect.poll(async () => (await props(page, 'box')).effects).toMatchObject([{ type: 'dropShadow', blur: 24 }])
   await enter(effects.getByRole('spinbutton', { name: 'Drop shadow 1 Blur' }), '40')
   await expect.poll(async () => (await props(page, 'box')).effects).toMatchObject([{ type: 'dropShadow', blur: 40 }])
@@ -149,7 +149,7 @@ test('several layers: mixed values, set together or each from its own; text and 
   await enter(page.getByTestId('bar-size-field'), '120')
   await enter((await text()).getByRole('spinbutton', { name: 'Letter spacing' }), '2')
   await enter((await text()).getByRole('spinbutton', { name: 'Line height' }), '1.1')
-  await enter((await barMenu(page, 'colour')).getByRole('textbox', { name: 'Text colour hex' }), '1f9d55')
+  await enter(await textColourHex(page), '1f9d55')
   await closeBarMenu(page, 'bar-colour')
   await (await barMenu(page, 'align')).getByRole('radiogroup', { name: 'Alignment', exact: true }).locator('[data-value="center"]').click()
   await (await barMenu(page, 'case')).getByRole('radiogroup', { name: 'Case' }).locator('[data-value="upper"]').click()
@@ -166,7 +166,7 @@ test('several layers: mixed values, set together or each from its own; text and 
   const auto = async () => (await openCard(page, 'auto-layout-card'))
   await enter((await auto()).getByRole('spinbutton', { name: 'Room between' }), '32')
   await (await auto()).getByRole('radio', { name: 'Column' }).click()
-  await enter((await auto()).getByRole('spinbutton', { name: 'Room at the left' }), '40')
+  await enter((await openCard(page, 'auto-layout-advanced')).getByRole('spinbutton', { name: 'Room at the left' }), '40')
   await expect.poll(async () => (await props(page, 'stack')).layout).toMatchObject({ direction: 'column', gap: 32, padding: { left: 40, top: 20 } })
   await page.evaluate(() => window.dazbee?.drawn())
   writeOutput('props-3-auto-layout.png', await page.screenshot())

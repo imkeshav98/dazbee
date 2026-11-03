@@ -36,6 +36,7 @@ test('the Text box card sets the box, lines and fit; the bar sets lists, decorat
   const { page, errors } = await openStage(browser, design())
   await page.evaluate(() => window.dazbee?.select(['copy']))
   const card = async () => (await openCard(page, 'text-box-card'))
+  const fit = async () => (await openCard(page, 'text-fit-card'))
   const spacing = async () => (await openCard(page, 'spacing-card'))
   await expect((await card())).toBeVisible()
   const effects = () => barMenu(page, 'effects')
@@ -45,7 +46,7 @@ test('the Text box card sets the box, lines and fit; the bar sets lists, decorat
   await list('bullet')
   await page.keyboard.press('Escape')
   await enter((await spacing()).getByRole('spinbutton', { name: 'Paragraph spacing' }), '24')
-  await enter((await card()).getByRole('spinbutton', { name: 'Max lines' }), '2')
+  await enter((await fit()).getByRole('spinbutton', { name: 'Max lines' }), '2')
   await expect.poll(() => copy(page)).toMatchObject({ boxMode: 'fixed', list: 'bullet', paragraphSpacing: 24, maxLines: 2 })
 
   await page.getByTestId('bar-underline').click()
@@ -64,23 +65,23 @@ test('the Text box card sets the box, lines and fit; the bar sets lists, decorat
   await page.keyboard.press('Escape')
 
   // Shrink to fit starts from half the size up to the size; the smallest can't pass the largest.
-  await (await card()).getByRole('switch', { name: 'Shrink to fit' }).click()
+  await (await fit()).getByRole('switch', { name: 'Shrink to fit' }).click()
   await expect.poll(async () => (await copy(page)).shrinkToFit).toEqual({ min: 36, max: 72 })
-  await enter((await card()).getByRole('spinbutton', { name: 'Smallest size' }), '90')
+  await enter((await fit()).getByRole('spinbutton', { name: 'Smallest size' }), '90')
   await expect.poll(async () => (await copy(page)).shrinkToFit).toEqual({ min: 72, max: 72 })
 
   // 0 lines lifts the limit; turning things off removes them.
-  await enter((await card()).getByRole('spinbutton', { name: 'Max lines' }), '0')
+  await enter((await fit()).getByRole('spinbutton', { name: 'Max lines' }), '0')
   await list('none')
   await page.keyboard.press('Escape')
-  await (await card()).getByRole('switch', { name: 'Shrink to fit' }).click()
+  await (await fit()).getByRole('switch', { name: 'Shrink to fit' }).click()
   await (await effects()).locator('[data-tile="outline"]').click()
   await page.keyboard.press('Escape')
   await expect.poll(async () => {
     const props = await copy(page)
     return [props.maxLines, props.list, props.shrinkToFit, props.style.outline]
   }).toEqual([undefined, undefined, undefined, undefined])
-  await expect((await card()).getByRole('spinbutton', { name: 'Max lines' })).toHaveValue('')
+  await expect((await fit()).getByRole('spinbutton', { name: 'Max lines' })).toHaveValue('')
 
   // One undo takes the outline back.
   await page.evaluate(() => window.dazbee?.perform('undo'))
@@ -91,7 +92,7 @@ test('the Text box card sets the box, lines and fit; the bar sets lists, decorat
 test('with shrink to fit on, the size on the bar is the largest size, so the text follows it', async ({ browser }) => {
   const { page, errors } = await openStage(browser, design())
   await page.evaluate(() => window.dazbee?.select(['copy']))
-  await (await openCard(page, 'text-box-card')).getByRole('switch', { name: 'Shrink to fit' }).click()
+  await (await openCard(page, 'text-fit-card')).getByRole('switch', { name: 'Shrink to fit' }).click()
   await expect.poll(async () => (await copy(page)).shrinkToFit).toEqual({ min: 36, max: 72 })
   await page.keyboard.press('Escape')
   const height = () => page.evaluate(() => window.dazbee?.boxOf('copy')?.height ?? 0)
@@ -115,7 +116,7 @@ test('with shrink to fit on, the size on the bar is the largest size, so the tex
   await expect.poll(async () => (await copy(page)).shrinkToFit).toEqual({ min: 20, max: 21 })
 
   // The Largest field is the same size: the bar shows it, and steps down from it.
-  await enter((await openCard(page, 'text-box-card')).getByRole('spinbutton', { name: 'Largest size' }), '60')
+  await enter((await openCard(page, 'text-fit-card')).getByRole('spinbutton', { name: 'Largest size' }), '60')
   await expect.poll(async () => (await copy(page)).style.fontSize).toBe(60)
   await page.keyboard.press('Escape')
   await expect(page.getByTestId('bar-size-field')).toHaveValue('60')

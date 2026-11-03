@@ -50,7 +50,7 @@ test('the look comes first: size and brand colour, effect tiles, and the header 
   // Effects as tiles, in the bar for text: None to start, Shadow and Outline on together, None takes both off.
   const effects = await barMenu(page, 'effects')
   await expect(effects.locator('[data-tile="none"]')).toHaveAttribute('aria-pressed', 'true')
-  await effects.locator('[data-tile="shadow"]').click()
+  await effects.locator('[data-tile="dropShadow"]').click()
   await effects.locator('[data-tile="outline"]').click()
   await expect.poll(async () => {
     const props = (await node(page, 'headline')).props
@@ -75,7 +75,7 @@ test('the look comes first: size and brand colour, effect tiles, and the header 
 
   // A shape: its fill from the same colours, and Blur in place of Outline; the header follows it.
   await page.evaluate(() => window.dazbee?.select(['badge']))
-  await expect((await barMenu(page, 'effects')).locator('[data-tile="blur"]')).toBeVisible()
+  await expect((await barMenu(page, 'effects')).locator('[data-tile="layerBlur"]')).toBeVisible()
   await (await barMenu(page, 'colour')).getByRole('button', { name: 'Roast' }).click()
   await expect.poll(async () => (await node(page, 'badge')).bindings).toMatchObject({ fill: 'brand:roast' })
   await header()

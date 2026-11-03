@@ -44,8 +44,8 @@ export const SWATCH = 'shrink-0 cursor-pointer rounded-full border border-line-s
 
 /** The look of a value typed into a field: a number, a hex, a dash pattern. */
 export const VALUE_TEXT = 'font-mono text-[12px] tabular-nums text-text'
-/** A field to type a value into, as tall as a knob. */
-export const FIELD = `h-8 min-w-0 w-full rounded-row border border-line bg-surface px-1.5 ${VALUE_TEXT} outline-none placeholder:text-subtle focus:border-accent`
+/** A field to type a value into, as tall as a knob: its border shows the focus, with no ring besides. */
+export const FIELD = `h-8 min-w-0 w-full rounded-row border border-line bg-surface px-1.5 ${VALUE_TEXT} outline-none focus-visible:outline-none! placeholder:text-subtle focus:border-accent`
 /** Where a dragged row would land in a list: a line across it, placed by the row above or below. */
 export const DROP_LINE = 'pointer-events-none absolute inset-x-0 h-0.5 rounded-full bg-accent'
 
@@ -60,17 +60,16 @@ export const FIELD_LABEL = 'text-xs font-semibold text-muted'
 export const SELECT = 'h-8 w-full bg-surface px-1.5 text-[12px]'
 /**
  * A number you drag sideways, as in the mock: its label at the start, its value in mono at the end,
- * and a soft fill behind them showing where the value sits in its range (`--fill`).
+ * and a soft fill behind them showing where the value sits in its range: from `--fill-from`, `--fill` wide,
+ * with a line at the value (`--fill-at`) on a field that has a range (`data-ranged`).
  */
-export const KNOB = `relative flex h-8 min-w-0 cursor-ew-resize touch-pan-y select-none items-center gap-2 overflow-hidden rounded-row border border-line bg-surface px-2.5 text-[12px] font-semibold text-muted transition-colors duration-[var(--chrome-fast)] hover:border-line-strong focus-within:border-accent before:pointer-events-none before:absolute before:inset-y-0 before:start-0 before:w-[var(--fill,0%)] before:bg-accent-soft before:transition-[width] before:duration-75`
+export const KNOB = `relative flex h-8 min-w-0 cursor-ew-resize touch-pan-y select-none items-center gap-2 overflow-hidden rounded-row border border-line bg-surface px-2.5 text-[12px] font-semibold text-muted transition-colors duration-[var(--chrome-fast)] hover:border-line-strong focus-within:border-accent before:pointer-events-none before:absolute before:inset-y-0 before:start-[var(--fill-from,0%)] before:w-[var(--fill,0%)] before:bg-accent-soft before:transition-[width] before:duration-75 data-ranged:after:pointer-events-none data-ranged:after:absolute data-ranged:after:inset-y-1.5 data-ranged:after:start-[clamp(4px,var(--fill-at),calc(100%-6px))] data-ranged:after:w-0.5 data-ranged:after:-translate-x-1/2 data-ranged:after:rounded-full data-ranged:after:bg-accent data-ranged:after:shadow-[0_0_8px_rgb(255_72_176/0.7)] rtl:data-ranged:after:translate-x-1/2`
 /** Knobs two to a row; a lone last one takes the whole row. */
 export const KNOBS = 'grid grid-cols-2 gap-1.5 [&>:last-child:nth-child(odd)]:col-span-2'
-/** Four small knobs on one line, as a box's X, Y, W and H. */
-export const KNOBS_FOUR = 'grid grid-cols-4 gap-1 [&>*]:gap-1 [&>*]:px-[7px]'
-/** A row of choices that look as one control, one of them on. */
-export const SEGMENTS = 'grid auto-cols-fr grid-flow-col gap-0.5 rounded-[10px] bg-hover p-[3px]'
+/** A row of choices that look as one control, one of them on: each as wide as its words need, sharing what is left. */
+export const SEGMENTS = 'grid auto-cols-auto grid-flow-col gap-0.5 rounded-[10px] bg-hover p-[3px] [&>*]:min-w-max'
 /** One choice of SEGMENTS, aria-checked while it is the one. */
-export const SEGMENT = `h-7 min-w-0 cursor-pointer truncate rounded-[7px] px-2 text-[12px] font-semibold text-muted transition-colors duration-[var(--chrome-fast)] hover:text-text aria-checked:bg-accent-solid aria-checked:text-on-accent ${FOCUS_RING}`
+export const SEGMENT = `h-7 min-w-0 cursor-pointer truncate rounded-[7px] px-2 text-[12px] font-semibold text-muted transition-colors duration-[var(--chrome-fast)] hover:text-text aria-checked:bg-accent-soft aria-checked:text-accent-text ${FOCUS_RING}`
 
 /** A row of a menu: its words at the start, a shortcut or a switch at the end. */
 export const MENU_ITEM = `group flex h-9 w-full shrink-0 cursor-pointer items-center justify-between gap-3 rounded-row px-2.5 text-start text-[13px] font-medium text-text transition-colors duration-[var(--chrome-fast)] hover:bg-hover ${DISABLED} ${FOCUS_RING}`
@@ -79,11 +78,11 @@ export const MENU_DIVIDER = 'mx-1.5 my-1 border-t border-line'
 /** A shortcut shown in a menu row. */
 export const MENU_KEY = 'font-mono text-[11px] font-normal text-subtle'
 /** A switch drawn in a menu row or a card's row that is role="switch": checked, its knob slides to the end. */
-export const SWITCH = 'relative h-5 w-[34px] shrink-0 rounded-full bg-line-strong transition-colors duration-[var(--chrome-fast)] group-aria-checked:bg-accent-solid after:absolute after:start-0.5 after:top-0.5 after:size-4 after:rounded-full after:bg-white after:transition-transform after:duration-[var(--chrome-fast)] group-aria-checked:after:translate-x-3.5 rtl:group-aria-checked:after:-translate-x-3.5'
+export const SWITCH = 'relative h-5 w-[34px] shrink-0 rounded-full bg-subtle/70 transition-colors duration-[var(--chrome-fast)] group-aria-checked:bg-accent-solid after:absolute after:start-0.5 after:top-0.5 after:size-4 after:rounded-full after:bg-white after:transition-transform after:duration-[var(--chrome-fast)] group-aria-checked:after:translate-x-3.5 rtl:group-aria-checked:after:-translate-x-3.5'
 
 /** A tile to pick, as the effects and the box modes are: its picture, its name under it, lit while it is on. */
 export const TILE = `group flex min-w-0 cursor-pointer flex-col items-center gap-1 text-[11px] font-semibold text-muted aria-pressed:text-text aria-checked:text-text ${FOCUS_RING}`
-const TILE_FACE_BASE = 'grid w-full place-items-center overflow-hidden rounded-[10px] border border-line bg-bg/60 transition-colors duration-[var(--chrome-fast)] group-hover:border-line-strong group-aria-pressed:border-accent group-aria-checked:border-accent'
+const TILE_FACE_BASE = 'grid w-full place-items-center overflow-hidden rounded-[10px] border border-line bg-bg/60 transition-colors duration-[var(--chrome-fast)] group-hover:border-line-strong group-aria-pressed:border-accent group-aria-pressed:ring-1 group-aria-pressed:ring-accent group-aria-checked:border-accent group-aria-checked:ring-1 group-aria-checked:ring-accent'
 /** The picture of a TILE, square. */
 export const TILE_FACE = `${TILE_FACE_BASE} aspect-square`
 /** The picture of a TILE, wider than tall. */
@@ -93,6 +92,12 @@ export const SWITCH_ROW = `group flex h-8 w-full cursor-pointer items-center jus
 
 /** One part of an edit panel or pop-up: a card's controls under a small heading, a hairline above all but the first. */
 export const PANEL_PART = 'flex flex-col gap-2.5 border-t border-line pt-3 first:border-t-0 first:pt-0'
+/** A small heading over a group of an edit panel's choices, as Line up with the size. */
+export const PANEL_HEADING = 'text-xs font-semibold text-muted'
+/** A boxed button of an edit panel that acts at once: its icon, then its words, or its icon alone. */
+export const PANEL_BUTTON = `flex h-[34px] min-w-0 cursor-pointer items-center gap-2 rounded-row border border-line bg-surface px-2.5 text-[12.5px] font-medium whitespace-nowrap text-text transition-colors duration-[var(--chrome-fast)] hover:bg-hover disabled:cursor-not-allowed disabled:opacity-45 [&>span]:truncate ${FOCUS_RING}`
+/** A switch shaped as a knob, its name at the start: Lock ratio among the size fields. */
+export const KNOB_SWITCH = `group flex h-8 min-w-0 cursor-pointer items-center justify-between gap-2 rounded-row border border-line bg-surface px-2.5 text-[12px] font-semibold whitespace-nowrap text-muted transition-colors duration-[var(--chrome-fast)] hover:border-line-strong aria-checked:text-text ${FOCUS_RING}`
 
 /** The top bar's row on the stage, under the header pill: where the bar sits, and the room the fit keeps for it. */
 export const BAR_ROW = 'top-[90px] max-sm:top-[72px]'

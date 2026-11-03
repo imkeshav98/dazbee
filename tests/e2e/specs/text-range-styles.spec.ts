@@ -4,7 +4,7 @@
 import { expect, test, type Page } from '../support/test.ts'
 import type { DesignInput } from '@dazbee/schema'
 import { writeOutput } from '../support/editor.ts'
-import { barMenu, closeBarMenu, openStage, read } from '../support/stage.ts'
+import { barMenu, closeBarMenu, openStage, read, textColourHex } from '../support/stage.ts'
 
 test.describe.configure({ timeout: 180_000 })
 
@@ -49,9 +49,9 @@ test('one word made pink, larger and another font from the bar; the rest keeps i
   const bar = page.getByTestId('top-bar')
   await expect(bar).toBeVisible()
 
-  const colour = await barMenu(page, 'colour')
-  await colour.getByRole('textbox', { name: 'Text colour hex' }).fill('ff48b0')
-  await colour.getByRole('textbox', { name: 'Text colour hex' }).press('Enter')
+  const hex = await textColourHex(page)
+  await hex.fill('ff48b0')
+  await hex.press('Enter')
   await expect.poll(() => runOver(page, 'body', 6, 11)).toMatchObject({ color: '#FF48B0FF' })
   await closeBarMenu(page, 'bar-colour')
 
@@ -107,9 +107,9 @@ test('bold and italic across an Arabic and Latin boundary, from the bar', async 
   expect(props.style).toMatchObject({ fontStyle: 'normal' })
   for (const run of props.runs) expect([run.start, run.end]).toEqual([2, 7])
   // A colour across the boundary too.
-  const colour = await barMenu(page, 'colour')
-  await colour.getByRole('textbox', { name: 'Text colour hex' }).fill('e0157f')
-  await colour.getByRole('textbox', { name: 'Text colour hex' }).press('Enter')
+  const hex = await textColourHex(page)
+  await hex.fill('e0157f')
+  await hex.press('Enter')
   await expect.poll(() => runOver(page, 'mixed', 2, 7)).toMatchObject({ fontWeight: 700, fontStyle: 'italic', color: '#E0157FFF' })
   await closeBarMenu(page, 'bar-colour')
   await drawn(page)

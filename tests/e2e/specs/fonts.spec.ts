@@ -149,7 +149,8 @@ test('the font picker on the bar shows families as pictures of their names, sear
   await expect(list.locator('[role="option"]')).toHaveCount(1)
   writeOutput('fonts-3-search.png', await page.screenshot())
   await page.getByTestId('font-search').press('Enter')
-  await expect(list).toBeHidden()
+  // The panel stays open for another pick or the weight.
+  await expect(list).toBeVisible()
   // Noto Sans 400 becomes Playfair Display 400 once its files are here.
   await expect.poll(() => style(page, 'body')).toMatchObject({ fontFamily: 'Playfair Display', fontWeight: 400 })
   await expect.poll(() => [...requests.seen].sort()).toEqual(faceIds(families, 'Playfair Display'))
@@ -170,7 +171,7 @@ test('the font picker on the bar shows families as pictures of their names, sear
   // An upload from the list joins the brand's fonts and is set at once.
   await barMenu(page, 'font')
   await page.getByTestId('font-upload').setInputFiles({ name: 'Righteous-Regular.ttf', mimeType: 'font/ttf', buffer: Buffer.from(righteous) })
-  await expect(list).toBeHidden()
+  await expect(list).toBeVisible()
   await expect.poll(async () => (await style(page, 'body'))?.fontFamily).toBe('Righteous')
   await barMenu(page, 'font')
   await expect(list.locator('[data-family="Righteous"]')).toHaveAttribute('aria-selected', 'true')

@@ -32,7 +32,8 @@ type PaintType = (typeof PAINT_TYPES)[number]
 
 /** A gradient's stops in order, as the renderer needs them. */
 const sorted = (stops: Stop[]) => [...stops].sort((a, b) => a.offset - b.offset)
-const thumbnail = (brandId: string, assetId: string) => `/brands/${encodeURIComponent(brandId)}/assets/${encodeURIComponent(assetId)}/thumbnail`
+/** An image asset's small picture, as the API serves it. */
+export const assetThumbnail = (brandId: string, assetId: string) => `/brands/${encodeURIComponent(brandId)}/assets/${encodeURIComponent(assetId)}/thumbnail`
 const stopsCss = (stops: Stop[], unit: 'percent' | 'degrees') => sorted(stops).map((s) => `${s.color} ${tidy(s.offset * (unit === 'percent' ? 100 : 360))}${unit === 'percent' ? '%' : 'deg'}`).join(', ')
 /** A linear gradient's direction in degrees, clockwise from pointing right, as drawn in a square. */
 const angleOf = (g: Extract<Paint, { type: 'linear' }>) => Math.round((Math.atan2(g.to.y - g.from.y, g.to.x - g.from.x) * 180) / Math.PI)
@@ -50,7 +51,7 @@ export function paintBackground(paint: Paint, brandId: string): string {
     case 'linear': return `linear-gradient(${angleOf(paint) + 90}deg, ${stopsCss(paint.stops, 'percent')})`
     case 'radial': return `radial-gradient(${tidy(paint.radius * 100)}% ${tidy(paint.radius * 100)}% at ${tidy(paint.center.x * 100)}% ${tidy(paint.center.y * 100)}%, ${stopsCss(paint.stops, 'percent')})`
     case 'angular': return `conic-gradient(from ${paint.angle + 90}deg at ${tidy(paint.center.x * 100)}% ${tidy(paint.center.y * 100)}%, ${stopsCss(paint.stops, 'degrees')})`
-    case 'image': return `url("${thumbnail(brandId, paint.assetId)}") center / cover no-repeat`
+    case 'image': return `url("${assetThumbnail(brandId, paint.assetId)}") center / cover no-repeat`
   }
 }
 
@@ -234,7 +235,7 @@ function GradientBar({ paint, picked, onPick, editor, p, onSet }: {
 }
 
 /** One paint's editor: its type, then a solid's colour, a gradient's stops and shape, or an image. */
-function PaintEditor({ paint, brandId, editor, p, onSet }: { paint: Paint; brandId: string; editor: Editor; p: P; onSet: (to: (now: Paint) => Paint) => void }) {
+export function PaintEditor({ paint, brandId, editor, p, onSet }: { paint: Paint; brandId: string; editor: Editor; p: P; onSet: (to: (now: Paint) => Paint) => void }) {
   const [picked, setPicked] = useState(0)
   const stop = isGradient(paint) ? paint.stops[Math.min(picked, paint.stops.length - 1)] : undefined
   const setGradient = (to: (now: Gradient) => Gradient) => onSet((now) => (isGradient(now) ? to(now) : now))
@@ -345,11 +346,11 @@ export function PaintRow({ paint, name, brandId, editor, p, onSet }: { paint: Pa
         </Popover.Portal>
       </Popover.Root>
       {paint.type === 'solid'
-        ? <ColorField name={name} value={paint.color} onSet={(to) => onSet((now) => (now.type === 'solid' ? { ...now, color: to(now.color) } : now))} />
+        ? <ColorField name={name} value={paint.color} swatch={false} onSet={(to) => onSet((now) => (now.type === 'solid' ? { ...now, color: to(now.color) } : now))} />
         : (
           <>
             <span className="min-w-0 flex-1 truncate text-xs text-muted">{p.paint[paint.type]}</span>
-            <div className="w-16 shrink-0">
+            <div className="w-[4.5rem] shrink-0">
               <NumberField
                 label="%"
                 name={format(p.alpha, { name })}

@@ -152,7 +152,7 @@ test('a stroke and the page background take the same paint editor: an angular st
   await click(page, 760, 360)
   const stroke = await strokeList(page)
   // The photo's strokes are in its Outline panel, each list with its +.
-  await stroke.getByRole('button', { name: 'Add stroke' }).click()
+  await stroke.getByRole('button', { name: 'Add outline' }).click()
   await stroke.locator('[data-row="1"]').getByTestId('paint-swatch').click()
   const editor = page.getByTestId('paint-editor')
   await editor.getByRole('radio', { name: 'Sweep gradient' }).click()

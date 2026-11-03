@@ -71,7 +71,7 @@ test('a child of an auto layout fills, hugs or keeps its size, and can leave the
   await select(page, ['two'])
   await choose(width, 'fixed')
   await select(page, ['stack'])
-  await choose((await openCard(page, 'auto-layout-card')).getByRole('combobox', { name: 'Width sizing' }), 'hug')
+  await choose((await openCard(page, 'auto-layout-advanced')).getByRole('combobox', { name: 'Width sizing' }), 'hug')
   await expect.poll(async () => (await propsOf(page, 'stack')).sizing).toEqual({ width: 'hug', height: 'fixed' })
   // 20 + 160 + 20 + 160 + 20.
   await expect.poll(async () => (await boxOf(page, 'stack')).width).toBe(380)

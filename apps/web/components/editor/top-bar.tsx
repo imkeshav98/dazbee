@@ -397,6 +397,10 @@ function Bar({ target, design, brandId }: { target: Target; design: Design; bran
     if (row) row.scrollLeft = 0
     setRowOpen(false)
   }, [row, selectionKey])
+  // A panel whose item has left the bar closes, as a shape's Colour does once it holds a photo.
+  useLayoutEffect(() => {
+    if (isPanel(open) && !items.some((item) => item.key === open)) setOpen(null)
+  }, [open, keys])
   // A pop-up hangs from its item: once the window changes size the item may have moved, so it closes.
   useEffect(() => {
     const onResize = () => {

@@ -58,7 +58,7 @@ const SELECTIONS: Record<string, string[]> = {
   text: ['headline'], rectangle: ['box'], star: ['star'], line: ['line'], box: ['frame'], group: ['group'], boolean: ['combo'],
   photo: ['photo'], 'photo in a box': ['photoFrame'], 'several shapes': ['box', 'star'], 'text and a shape': ['headline', 'box'],
   'several photos': ['photo', 'photoB'], 'several boxes': ['frame', 'frameB'], 'several booleans': ['combo', 'comboB'],
-  rotated: ['turned'], 'in a group': ['g1'], 'in auto layout': ['inStack'], masked: ['cutter'], locked: ['locked'], hidden: ['hidden'],
+  rotated: ['turned'], 'in a group': ['g1'], 'auto layout': ['stack'], 'in auto layout': ['inStack'], masked: ['cutter'], locked: ['locked'], hidden: ['hidden'],
 }
 
 /** The editor's chrome and the pieces of the top bar, small menu and edit panel that must never meet. */
