@@ -9,15 +9,16 @@ import { ASSET_DRAG_TYPE, AssetLibrary, draggedAsset, VECTOR_DRAG_TYPE } from '@
 import { BrandKitPanel } from '@/components/editor/brand-kit-panel.tsx'
 import { EditPanel } from '@/components/editor/edit-panel.tsx'
 import { useEditState } from '@/components/editor/edit-store.ts'
-import { FocusChip, NoticeToast, UndoToast } from '@/components/editor/formats-panel.tsx'
+import { FocusChip } from '@/components/editor/focus-chip.tsx'
+import { FormatsButton, FormatsPanel } from '@/components/editor/formats-panel.tsx'
 import { HistoryButtons } from '@/components/editor/history-buttons.tsx'
 import { StageMenu } from '@/components/editor/layer-actions.tsx'
 import { LayersPanel } from '@/components/editor/layers-panel.tsx'
 import { BackgroundPanel, PagesButton, PagesPanel } from '@/components/editor/pages-panel.tsx'
 import { ShareMenu } from '@/components/editor/share-menu.tsx'
 import { type ChromeInsets, EditorShell } from '@/components/editor/shell.tsx'
-import { SizesButton, SizesPanel } from '@/components/editor/sizes-panel.tsx'
 import { SmallMenu } from '@/components/editor/small-menu.tsx'
+import { NoticeToast, UndoToast } from '@/components/editor/toasts.tsx'
 import { TopBar } from '@/components/editor/top-bar.tsx'
 import { ZoomControl } from '@/components/editor/zoom-control.tsx'
 import { carriesFiles, dragFills, dropAt, isAssetFile, placeDroppedFiles } from '@/lib/drop-files.ts'
@@ -287,7 +288,7 @@ export function EditorStage({
       designName={name}
       onRename={async (next) => setName(await renameFromEditor(brandId, designId, next))}
       status={status}
-      sizes={editor ? <SizesButton editor={editor} /> : undefined}
+      formats={editor ? <FormatsButton editor={editor} /> : undefined}
       history={editor ? <HistoryButtons editor={editor} /> : undefined}
       tool={dockTool}
       shape={shape}
@@ -326,7 +327,7 @@ export function EditorStage({
         ) : undefined
       }
       account={account}
-      panels={
+      flyouts={
         editor
           ? {
               layers: <LayersPanel editor={editor} />,
@@ -393,7 +394,7 @@ export function EditorStage({
       {editor && <TopBar editor={editor} brandId={brandId} />}
       {editor && <SmallMenu editor={editor} rightClick={menuAt !== null} />}
       {editor && <EditPanel editor={editor} brandId={brandId} />}
-      {editor && <SizesPanel editor={editor} onRemoved={setRemoved} />}
+      {editor && <FormatsPanel editor={editor} onRemoved={setRemoved} />}
       {editor && <PagesPanel editor={editor} onRemoved={setRemoved} />}
       {editor && <BackgroundPanel editor={editor} brandId={brandId} />}
       <div

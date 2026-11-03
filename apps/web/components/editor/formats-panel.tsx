@@ -1,254 +1,235 @@
 'use client'
 
-// Adding a size to the design: every preset grouped by shape, or a size of your own, checked
-// against the sizes the formats allow; and the design as the editor holds it, kept current.
-import { ArrowsInSimpleIcon, InfoIcon, PlusIcon, TrashIcon } from '@phosphor-icons/react'
-import * as Popover from '@radix-ui/react-popover'
-import { type FormEvent, useEffect, useId, useState } from 'react'
+// The design's sizes, opened from the header pill after the design's name: "Sizes · 3" on desktop
+// and tablet, the count alone on a phone. The panel lists each size with its picture, name and
+// pixels, and its primary star, show alone and a menu (rename, move up, move down, remove); then
+// Add a size, from the common presets at a tap or any size. Every change is a command, one undo step.
+import { EyeIcon, FrameCornersIcon, StarIcon } from '@phosphor-icons/react'
+import { useState } from 'react'
 
 import type { Editor } from '@dazbee/editor'
-import { FORMAT_LIMITS, FORMAT_PRESETS, FORMAT_SHAPES, formatSizeIssue, shapeOf } from '@dazbee/schema'
+import { type Design, FORMAT_PRESETS, inOrder } from '@dazbee/schema'
 
-import { Button } from '@/components/ui/button.tsx'
-import { overlayScroll } from '@/components/ui/overlay-scroll.ts'
-import { Tooltip } from '@/components/ui/tooltip.tsx'
 import { cn } from '@/lib/cn.ts'
 import { useMessages } from '@/lib/i18n/client.tsx'
 import { format } from '@/lib/i18n/index.ts'
+import { shortSizeOf, sizeOf } from '@/lib/size.ts'
 
-import { ICON_BUTTON, POPOVER, TOAST } from './styles.ts'
-import { useLiveDesign } from './use-live-design.ts'
+import { AddFormat } from './add-format.tsx'
+import { CARD_BUTTON, CARD_ROW, CardMenu } from './card.tsx'
+import { PanelFrame } from './edit-panel.tsx'
+import { setOpen, useEditState } from './edit-store.ts'
+import { useEditorDesign } from './editor-hooks.ts'
+import { CHIP, FOCUS_RING, PANEL_HEADING, PANEL_PART } from './styles.ts'
 
-/** The design as the editor holds it, kept current: every redraw hands over the latest one. */
-export function useEditorDesign(editor: Editor) {
-  const { design } = useLiveDesign(editor)
-  const [focused, setFocused] = useState(() => editor.focused())
-  useEffect(() => {
-    const stop = editor.onDraw(() => setFocused(editor.focused()))
-    return () => {
-      stop()
-    }
-  }, [editor])
-  return { design, focused }
+/** The presets Add a size offers at a tap; the rest, and any size, are under More sizes. */
+const COMMON = ['feed-portrait', 'story', 'link-image', 'medium-rectangle'] as const
+
+/** A size's picture in its proportions, its long side 34. */
+const thumbOf = ({ width, height }: { width: number; height: number }) => {
+  const scale = 34 / Math.max(width, height)
+  return { width: Math.max(8, Math.round(width * scale)), height: Math.max(8, Math.round(height * scale)) }
+}
+/** The first page's background, when it is one colour: what a size's picture is filled with. */
+const backgroundOf = (design: Design) => {
+  const fill = inOrder(design.pages)[0]?.[1].fills[0]
+  return fill?.type === 'solid' ? fill.color : undefined
 }
 
-/** A size as the app writes it, in numerals that read the same in every locale. */
-const sizeOf = ({ width, height }: { width: number; height: number }) => `${width} × ${height}`
-
-/** A small box with the format's own proportions. */
-export function Proportion({ width, height, className }: { width: number; height: number; className?: string }) {
-  const scale = 14 / Math.max(width, height)
+export function FormatsButton({ editor }: { editor: Editor }) {
+  const t = useMessages()
+  const { design } = useEditorDesign(editor)
+  const { open } = useEditState()
+  const count = Object.keys(design.formats).length
   return (
-    <span aria-hidden className={cn('grid size-4 shrink-0 place-items-center', className)}>
-      <span
-        className="rounded-[2px] border-[1.5px] border-current"
-        style={{ width: Math.max(4, width * scale), height: Math.max(4, height * scale) }}
-      />
-    </span>
+    <button
+      type="button"
+      data-opens="sizes"
+      data-testid="sizes-button"
+      aria-expanded={open === 'sizes'}
+      aria-label={format(t.editor.formats.button, { n: count })}
+      title={format(t.editor.formats.button, { n: count })}
+      onClick={() => setOpen(open === 'sizes' ? null : 'sizes')}
+      className={cn(
+        'flex h-[26px] shrink-0 cursor-pointer items-center gap-1.5 rounded-full border border-line bg-surface px-2.5 text-[12px] font-semibold text-text transition-colors hover:bg-hover aria-expanded:border-transparent aria-expanded:bg-accent-soft aria-expanded:text-accent-text',
+        FOCUS_RING,
+      )}
+    >
+      <FrameCornersIcon size={14} aria-hidden />
+      <span aria-hidden className="max-sm:hidden">
+        {format(t.editor.formats.button, { n: count })}
+      </span>
+      <span aria-hidden className="font-mono tabular-nums sm:hidden">
+        {count}
+      </span>
+    </button>
   )
 }
 
-export function AddFormat({ editor }: { editor: Editor }) {
+export function FormatsPanel({ editor, onRemoved }: { editor: Editor; onRemoved: (message: string) => void }) {
   const t = useMessages()
-  const [open, setOpen] = useState(false)
-  const [width, setWidth] = useState('')
-  const [height, setHeight] = useState('')
-  const ids = { width: useId(), height: useId(), issue: useId() }
-  const w = Number(width)
-  const h = Number(height)
-  const typed = width !== '' && height !== ''
-  const issue = typed ? formatSizeIssue(w, h) : undefined
+  const { open } = useEditState()
+  if (open !== 'sizes') return null
+  return (
+    <PanelFrame id="sizes" title={t.editor.formats.title}>
+      <SizeList editor={editor} onRemoved={onRemoved} />
+      <AddSize editor={editor} />
+    </PanelFrame>
+  )
+}
+
+/** Each size: its picture, name and pixels; its star, show alone and its menu. */
+function SizeList({ editor, onRemoved }: { editor: Editor; onRemoved: (message: string) => void }) {
+  const t = useMessages()
+  const f = t.editor.formats
+  const { design, focused } = useEditorDesign(editor)
+  const run = editor.session.run.bind(editor.session)
+  const formats = inOrder(design.formats)
+  const background = backgroundOf(design)
+  const [renaming, setRenaming] = useState<string | null>(null)
+  const rename = (id: string, name: string) => {
+    setRenaming(null)
+    const trimmed = name.trim()
+    if (trimmed && trimmed !== design.formats[id]?.name) run('format.update', { id, name: trimmed })
+  }
+  return (
+    <ul aria-label={f.title} className={cn(PANEL_PART, 'gap-1.5')} data-testid="formats">
+      {formats.map(([id, size], i) => {
+        const primary = design.meta.primaryFormatId === id
+        return (
+          <li
+            key={id}
+            data-format={id}
+            data-focused={focused === id ? '' : undefined}
+            className={cn(CARD_ROW, 'data-[focused]:border-accent data-[focused]:bg-accent-soft')}
+          >
+            <span aria-hidden className="grid size-[34px] shrink-0 place-items-center">
+              <span
+                className="rounded-[3px] border border-line-strong bg-hover"
+                style={{ ...thumbOf(size), backgroundColor: background }}
+              />
+            </span>
+            <span className="flex min-w-0 flex-1 flex-col">
+              {renaming === id ? (
+                <input
+                  name="format-name"
+                  aria-label={f.rename}
+                  defaultValue={size.name}
+                  autoFocus
+                  onFocus={(e) => e.currentTarget.select()}
+                  onBlur={(e) => rename(id, e.currentTarget.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') rename(id, e.currentTarget.value)
+                    if (e.key === 'Escape') setRenaming(null)
+                    e.stopPropagation()
+                  }}
+                  className="h-6 min-w-0 rounded-[6px] border border-accent bg-surface px-1.5 text-[13px] outline-none"
+                />
+              ) : (
+                <button
+                  type="button"
+                  onDoubleClick={() => setRenaming(id)}
+                  onKeyDown={(e) => e.key === 'Enter' && setRenaming(id)}
+                  aria-label={`${f.rename}: ${size.name}`}
+                  className="min-w-0 cursor-default truncate text-start text-[13px] font-semibold text-text"
+                >
+                  {size.name}
+                </button>
+              )}
+              <span className="font-mono text-[11px] text-subtle tabular-nums">{sizeOf(size)}</span>
+            </span>
+            <button
+              type="button"
+              aria-label={primary ? f.primary : f.makePrimary}
+              title={primary ? f.primary : f.makePrimary}
+              aria-pressed={primary}
+              onClick={() => primary || run('format.setPrimary', { id })}
+              className={cn(CARD_BUTTON, primary && 'text-accent-text')}
+            >
+              <StarIcon size={15} weight={primary ? 'fill' : 'regular'} aria-hidden />
+            </button>
+            <button
+              type="button"
+              aria-label={focused === id ? f.exitFocus : f.focus}
+              title={focused === id ? f.exitFocus : f.focus}
+              aria-pressed={focused === id}
+              onClick={() => editor.focus(focused === id ? null : id)}
+              className={cn(CARD_BUTTON, focused === id && 'text-accent-text')}
+            >
+              <EyeIcon size={15} aria-hidden />
+            </button>
+            <CardMenu
+              label={format(f.more, { name: size.name })}
+              items={[
+                { label: f.rename, run: () => setRenaming(id) },
+                {
+                  label: f.moveUp,
+                  disabled: i === 0,
+                  run: () => run('format.update', { id, before: formats[i - 1]?.[0] ?? null }),
+                },
+                {
+                  label: f.moveDown,
+                  disabled: i === formats.length - 1,
+                  run: () => run('format.update', { id, before: formats[i + 2]?.[0] ?? null }),
+                },
+                {
+                  label: f.remove,
+                  disabled: primary || formats.length === 1,
+                  danger: true,
+                  run: () => {
+                    run('format.remove', { id })
+                    onRemoved(format(f.removed, { name: size.name }))
+                  },
+                },
+              ]}
+            />
+          </li>
+        )
+      })}
+    </ul>
+  )
+}
+
+/** Add a size: the common presets the design doesn't have yet at a tap, and + for every preset and a size of your own. */
+function AddSize({ editor }: { editor: Editor }) {
+  const t = useMessages()
+  const f = t.editor.formats
+  const { design } = useEditorDesign(editor)
+  // A preset the design has a size of already isn't offered again.
+  const has = new Set(Object.values(design.formats).map(sizeOf))
   const add = (name: string, width: number, height: number) => {
     const id = editor.session.run('format.add', { name, width, height })
-    setOpen(false)
-    setWidth('')
-    setHeight('')
-    // Show where the new format landed: every frame, with the new column at the end.
+    // Show where the new size landed: every frame, with the new column at the end.
     if (editor.focused()) editor.focus(id)
     else editor.fitAll()
   }
-  const submit = (e: FormEvent) => {
-    e.preventDefault()
-    if (typed && !issue) add(sizeOf({ width: w, height: h }), w, h)
-  }
-  const issueText =
-    issue && format(t.editor.formats.issue[issue], { min: FORMAT_LIMITS.minShortSide, max: FORMAT_LIMITS.maxSide })
-
   return (
-    <Popover.Root open={open} onOpenChange={setOpen}>
-      <Tooltip label={t.editor.formats.add}>
-        <Popover.Trigger asChild>
-          <button type="button" aria-label={t.editor.formats.add} className={ICON_BUTTON}>
-            <PlusIcon size={16} aria-hidden />
-          </button>
-        </Popover.Trigger>
-      </Tooltip>
-      <Popover.Portal>
-        <Popover.Content
-          side="left"
-          align="start"
-          sideOffset={12}
-          aria-label={t.editor.formats.add}
-          onKeyDown={(e) => e.stopPropagation()}
-          className={cn(
-            POPOVER,
-            'flex max-h-[min(560px,var(--radix-popover-content-available-height))] w-72 flex-col overflow-hidden',
-          )}
-        >
-          <div
-            ref={overlayScroll}
-            className="min-h-0 flex-1 overflow-y-auto py-1"
-            role="group"
-            aria-label={t.editor.formats.presets}
-          >
-            {FORMAT_SHAPES.map((shape) => {
-              const presets = FORMAT_PRESETS.filter((p) => shapeOf(p.width, p.height) === shape)
-              return (
-                <div key={shape} role="group" aria-label={t.editor.formats.shape[shape]}>
-                  <h4 className="px-4 pt-2 pb-1 text-[11px] font-semibold tracking-wide text-subtle">
-                    {t.editor.formats.shape[shape]}
-                  </h4>
-                  {presets.map((preset) => {
-                    const name = t.editor.formats.preset[preset.id] ?? preset.id
-                    return (
-                      <button
-                        key={preset.id}
-                        type="button"
-                        data-preset={preset.id}
-                        onClick={() => add(name, preset.width, preset.height)}
-                        className="mx-1 flex h-[var(--row)] w-[calc(100%-8px)] cursor-pointer items-center gap-2 rounded-row px-3 text-start text-[13px] hover:bg-hover focus-visible:bg-hover"
-                      >
-                        <Proportion width={preset.width} height={preset.height} className="text-muted" />
-                        <span className="min-w-0 flex-1 truncate">{name}</span>
-                        <span className="font-mono text-[11px] text-subtle tabular-nums">{sizeOf(preset)}</span>
-                      </button>
-                    )
-                  })}
-                </div>
-              )
-            })}
-          </div>
-          <form onSubmit={submit} className="border-t border-line p-3" aria-label={t.editor.formats.custom}>
-            <h4 className="pb-2 text-[11px] font-semibold tracking-wide text-subtle">{t.editor.formats.custom}</h4>
-            <div className="flex items-end gap-2">
-              {(['width', 'height'] as const).map((side) => (
-                <label
-                  key={side}
-                  htmlFor={ids[side]}
-                  className="flex min-w-0 flex-1 flex-col gap-1 text-[11px] text-muted"
-                >
-                  {t.editor.formats[side]}
-                  <input
-                    id={ids[side]}
-                    inputMode="numeric"
-                    value={side === 'width' ? width : height}
-                    onChange={(e) =>
-                      (side === 'width' ? setWidth : setHeight)(e.currentTarget.value.replace(/[^\d]/g, ''))
-                    }
-                    aria-invalid={issue ? true : undefined}
-                    aria-describedby={issue ? ids.issue : undefined}
-                    className={cn(
-                      'h-[var(--row)] w-full rounded-row border bg-surface px-2 font-mono text-[13px] text-text tabular-nums outline-none focus:border-accent',
-                      issue ? 'border-danger/60' : 'border-line',
-                    )}
-                  />
-                </label>
-              ))}
-              <Button type="submit" variant="primary" disabled={!typed || Boolean(issue)}>
-                {t.editor.formats.addCustom}
-              </Button>
-            </div>
-            <p id={ids.issue} role="alert" className="min-h-4 pt-1.5 text-[11px] text-danger">
-              {issueText}
-            </p>
-          </form>
-        </Popover.Content>
-      </Popover.Portal>
-    </Popover.Root>
-  )
-}
-
-/** Over the stage while one format shows alone: which one, and the way back to all of them. */
-export function FocusChip({ editor }: { editor: Editor }) {
-  const t = useMessages()
-  const { design, focused } = useEditorDesign(editor)
-  const name = focused ? design.formats[focused]?.name : undefined
-  if (!focused || name === undefined) return null
-  return (
-    <div
-      role="status"
-      data-testid="focus-chip"
-      className="pointer-events-auto flex h-9 items-center gap-1 rounded-full surface-frost ps-3.5 pe-1 text-[13px]"
-    >
-      <ArrowsInSimpleIcon size={14} aria-hidden className="text-accent-text" />
-      <span className="ms-1">{format(t.editor.formats.focusing, { name })}</span>
-      <Button variant="ghost" className="ms-1 h-7 rounded-full px-2.5 text-xs" onClick={() => editor.focus(null)}>
-        {t.editor.formats.exitFocus}
-      </Button>
-    </div>
-  )
-}
-
-const TOAST_MS = 8000
-
-/** After a format or page is removed: says so, with undo, for a few seconds. */
-export function UndoToast({ editor, message, onDone }: { editor: Editor; message: string; onDone: () => void }) {
-  const t = useMessages()
-  // It stays while the pointer or focus is on it, so the undo can't vanish from under a click.
-  const [held, setHeld] = useState(false)
-  useEffect(() => {
-    if (held) return
-    const timer = setTimeout(onDone, TOAST_MS)
-    return () => clearTimeout(timer)
-  }, [message, onDone, held])
-  return (
-    <div
-      role="status"
-      data-testid="removed-toast"
-      onPointerEnter={() => setHeld(true)}
-      onPointerLeave={() => setHeld(false)}
-      onFocus={() => setHeld(true)}
-      onBlur={() => setHeld(false)}
-      className={TOAST}
-    >
-      <TrashIcon size={14} aria-hidden className="text-subtle" />
-      <span>{message}</span>
-      <Button
-        variant="ghost"
-        className="h-7 px-2.5 text-xs font-semibold text-accent-text"
-        onClick={() => {
-          editor.session.undo()
-          onDone()
-        }}
-      >
-        {t.editor.formats.undo}
-      </Button>
-    </div>
-  )
-}
-
-/**
- * Says why a gesture did nothing, such as a nudge auto layout decides; it goes after a few seconds.
- * A `lasting` one, such as files uploading, stays until its message changes or it is taken away.
- */
-export function NoticeToast({
-  message,
-  onDone,
-  lasting = false,
-}: {
-  message: string
-  onDone: () => void
-  lasting?: boolean
-}) {
-  useEffect(() => {
-    if (lasting) return
-    const timer = setTimeout(onDone, TOAST_MS)
-    return () => clearTimeout(timer)
-  }, [message, onDone, lasting])
-  return (
-    <div role="status" data-testid="notice-toast" className={cn(TOAST, 'pe-3.5')}>
-      <InfoIcon size={14} aria-hidden className="shrink-0 text-subtle" />
-      <span>{message}</span>
-    </div>
+    <section aria-labelledby="add-size-title" className={PANEL_PART} data-testid="add-size">
+      <div className="flex h-7 items-center gap-2">
+        <h3 id="add-size-title" className={cn(PANEL_HEADING, 'flex-1')}>
+          {f.addSize}
+        </h3>
+        <AddFormat editor={editor} />
+      </div>
+      <div className="flex flex-wrap gap-1.5">
+        {COMMON.map((presetId) => {
+          const preset = FORMAT_PRESETS.find((p) => p.id === presetId)
+          if (!preset || has.has(sizeOf(preset))) return null
+          const name = f.preset[preset.id] ?? preset.id
+          return (
+            <button
+              key={preset.id}
+              type="button"
+              data-preset={preset.id}
+              onClick={() => add(name, preset.width, preset.height)}
+              className={cn(CHIP, 'h-7 gap-1.5 px-2.5 text-[12px] font-medium text-text max-sm:h-9', FOCUS_RING)}
+            >
+              {name}
+              <span className="text-subtle tabular-nums">{shortSizeOf(preset)}</span>
+            </button>
+          )
+        })}
+      </div>
+    </section>
   )
 }

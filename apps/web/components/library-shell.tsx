@@ -15,7 +15,7 @@ import { initialsOf } from '@/lib/initials.ts'
 import { SESSION_COOKIE } from '@/lib/sign-in.ts'
 
 import { AccountMenu } from './account-menu.tsx'
-import { BrandMark } from './brand-mark.tsx'
+import { DazbeeMark } from './dazbee-mark.tsx'
 import { LibraryCapsule } from './library-capsule.tsx'
 import { NewBrandRow } from './new-brand-row.tsx'
 
@@ -111,10 +111,10 @@ function BrandSwitcher({
 }
 
 /**
- * The top bar of every page outside the editor: the mark at the start, a crumb, and the account
+ * The header of every page outside the editor: the mark at the start, a crumb, and the account
  * avatar at the end. Onboarding uses it too, with no brand to switch to yet.
  */
-export async function TopBar({
+export async function LibraryHeader({
   t,
   workspace,
   children,
@@ -133,7 +133,7 @@ export async function TopBar({
         aria-label={t.app.name}
         className="grid size-9 shrink-0 place-items-center rounded-row hover:bg-hover"
       >
-        <BrandMark size={28} />
+        <DazbeeMark size={28} />
       </Link>
       <div className="flex min-w-0 items-center gap-1 text-[13px]">{children}</div>
       <span className="ms-auto">
@@ -217,7 +217,7 @@ export async function LibraryShell({
         ]}
       />
 
-      <TopBar t={t} workspace={workspace}>
+      <LibraryHeader t={t} workspace={workspace}>
         {showBrands || active ? (
           <BrandSwitcher t={t} words={words} brands={brands} active={active} showAll={showBrands} />
         ) : null}
@@ -232,7 +232,7 @@ export async function LibraryShell({
             <span className="truncate px-1.5 font-semibold text-text">{placeName}</span>
           </>
         )}
-      </TopBar>
+      </LibraryHeader>
 
       <main className="mx-auto w-full min-w-0 max-w-[110rem] px-4 pb-28 md:ps-44 md:pe-16 md:pb-12">{children}</main>
     </div>

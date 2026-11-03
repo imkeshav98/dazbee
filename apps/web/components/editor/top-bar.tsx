@@ -46,7 +46,7 @@ import { useMessages } from '@/lib/i18n/client.tsx'
 import { format } from '@/lib/i18n/index.ts'
 import { LIMITS } from '@/lib/limits.ts'
 
-import { COMBINE, DISTRIBUTE, keyOf, useSelection } from './arrange-panel.tsx'
+import { COMBINE, DISTRIBUTE, keyOf } from './arrange-actions.ts'
 import { arrowAlong, BarPopover, useRovingTab } from './bar-popover.tsx'
 import {
   editState,
@@ -54,15 +54,15 @@ import {
   isPanel,
   type PanelId,
   setBar,
+  setEveryFormat,
   setOpen,
   useEditState,
   usePhone,
 } from './edit-store.ts'
+import { usePickedPage, useSelection } from './editor-hooks.ts'
 import { nearest, useFontCatalog, weightsOf } from './font-panel.tsx'
 import { ImagePickerButton } from './image-tool.tsx'
 import { AlignRow } from './layer-actions.tsx'
-import { usePickedPage } from './pages-panel.tsx'
-import { setEveryFormat } from './scope-store.ts'
 import {
   factsOf,
   imageFillOf,

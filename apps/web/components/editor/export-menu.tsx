@@ -13,10 +13,11 @@ import { Select } from '@/components/ui/select.tsx'
 import { cn } from '@/lib/cn.ts'
 import { useMessages } from '@/lib/i18n/client.tsx'
 import { format } from '@/lib/i18n/index.ts'
+import { sizeOf } from '@/lib/size.ts'
 
-import { useSelection } from './arrange-panel.tsx'
+import { Proportion } from './add-format.tsx'
+import { useSelection } from './editor-hooks.ts'
 import { NumberField } from './fields.tsx'
-import { Proportion } from './formats-panel.tsx'
 import { FIELD, FIELD_LABEL, LINK_BUTTON, SEGMENT, SEGMENTS, TILE, TILE_FACE_WIDE } from './styles.ts'
 
 function download(name: string, type: string, bytes: Uint8Array<ArrayBuffer>) {
@@ -30,7 +31,6 @@ function download(name: string, type: string, bytes: Uint8Array<ArrayBuffer>) {
 }
 
 const LABEL = FIELD_LABEL
-const sizeOf = ({ width, height }: { width: number; height: number }) => `${width} × ${height}`
 
 /** The export form, opened from the Share menu. */
 export function ExportForm({ id, editor, design }: { id: string; editor: Editor; design: Design }) {

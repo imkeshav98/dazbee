@@ -1,5 +1,5 @@
-// The editor chrome's shared looks, as class strings: every control that looks like one of these
-// takes it from here instead of spelling its classes again.
+// The editor chrome's shared looks, as class strings, and the colours offered without a brand kit:
+// every control that looks like one of these takes it from here instead of spelling its classes again.
 
 /** The ring a focused control shows when reached by keyboard. */
 export const FOCUS_RING = 'focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent'
@@ -44,6 +44,24 @@ export const dockTool = (on: boolean) => `${DOCK_BUTTON} w-10 ${on ? DOCK_ON : D
 /** A round colour swatch that picks its colour; its size is the caller's. */
 export const SWATCH =
   'shrink-0 cursor-pointer rounded-full border border-line-strong transition-transform duration-[var(--chrome-fast)] hover:scale-110'
+
+/** Colours a click away when the brand's kit has none; the hex fields take any colour. */
+export const SWATCHES = [
+  '#FFFFFF',
+  '#FBF7F2',
+  '#1A1420',
+  '#FF48B0',
+  '#3D6BFF',
+  '#FFD23F',
+  '#3DD68C',
+  '#FF6B3D',
+] as const
+
+/**
+ * The ring round a picked swatch or tile, as in the mock: pink with a gap, a shape and not only a
+ * colour, so it reads without colour vision too.
+ */
+export const PICKED_RING = 'shadow-[0_0_0_2px_var(--surface),0_0_0_4px_var(--accent)]'
 
 /** The look of a value typed into a field: a number, a hex, a dash pattern. */
 export const VALUE_TEXT = 'font-mono text-[12px] tabular-nums text-text'

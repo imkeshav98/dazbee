@@ -17,7 +17,7 @@ import { cn } from '@/lib/cn.ts'
 import { useMessages } from '@/lib/i18n/client.tsx'
 import { format } from '@/lib/i18n/index.ts'
 
-import { useEditorDesign } from './formats-panel.tsx'
+import { useEditorDesign, useSelection } from './editor-hooks.ts'
 import { PANEL_BUTTON, PANEL_HEADING } from './styles.ts'
 
 /** The fonts we ship, as catalog families; they have no stored preview. */
@@ -50,18 +50,6 @@ export function useFontCatalog(brandId: string) {
     void refresh()
   }, [refresh])
   return { catalog, refresh }
-}
-
-/** The selected layers, kept current. */
-function useSelection(editor: Editor) {
-  const [ids, setIds] = useState(() => editor.selection())
-  useEffect(() => {
-    const stop = editor.onSelection(setIds)
-    return () => {
-      stop()
-    }
-  }, [editor])
-  return ids
 }
 
 /** The one value every entry has, or null. */

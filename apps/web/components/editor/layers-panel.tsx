@@ -43,6 +43,7 @@ import { useLocale, useMessages } from '@/lib/i18n/client.tsx'
 import { dirOf, format } from '@/lib/i18n/index.ts'
 
 import { afterDraws, sameUrls } from './after-draws.ts'
+import { useSelectionWithFrame } from './editor-hooks.ts'
 import { useFlyoutNote } from './shell.tsx'
 import { DROP_LINE, LAYER_PICTURE, LAYER_PICTURE_PICKED } from './styles.ts'
 import { useLiveDesign } from './use-live-design.ts'
@@ -94,18 +95,6 @@ function iconOf(node: Layer): Icon {
 }
 
 const isLocked = (node: Layer) => LOCK_FLAGS.some((flag) => node.lock?.[flag])
-
-/** The selection and the frame it is in, kept current. */
-function useSelection(editor: Editor) {
-  const [state, setState] = useState(() => ({ ids: editor.selection(), frame: editor.selectedFrame() }))
-  useEffect(() => {
-    const stop = editor.onSelection((ids) => setState({ ids, frame: editor.selectedFrame() }))
-    return () => {
-      stop()
-    }
-  }, [editor])
-  return state
-}
 
 /** How long the list must be still before pictures are drawn, and a slice's budget where the browser can't say, in ms. */
 const PICTURES_AFTER_SCROLL = 300
@@ -178,7 +167,7 @@ export function LayersPanel({ editor }: { editor: Editor }) {
   const t = useMessages()
   const rtl = dirOf(useLocale()) === 'rtl'
   const { design, version } = useLiveDesign(editor)
-  const selection = useSelection(editor)
+  const selection = useSelectionWithFrame(editor)
   const selected = useMemo(() => new Set(selection.ids), [selection.ids])
 
   // The frame the panel shows: the selection's, or the first page in the primary format.

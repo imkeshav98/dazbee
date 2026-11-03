@@ -28,7 +28,7 @@ import { createContext, type ReactNode, useContext, useEffect, useLayoutEffect, 
 
 import type { ShapeTool } from '@dazbee/editor'
 
-import { BrandMark } from '@/components/brand-mark.tsx'
+import { DazbeeMark } from '@/components/dazbee-mark.tsx'
 import { Tooltip } from '@/components/ui/tooltip.tsx'
 import { cn } from '@/lib/cn.ts'
 import { useLocale, useMessages } from '@/lib/i18n/client.tsx'
@@ -36,15 +36,15 @@ import { dirOf, format } from '@/lib/i18n/index.ts'
 import type { Placeable } from '@/lib/place-asset.ts'
 import { useValue, type ValueStore } from '@/lib/value-store.ts'
 
-import { isPanel, setFlyoutEnd, setOpen, useEditState } from './edit-store.ts'
+import { isPanel, setFlyoutEnd, setOpen, useEditState, usePhone } from './edit-store.ts'
 import { ImageTool } from './image-tool.tsx'
 import { ShapeTools } from './shape-menu.tsx'
 import { BAR_ROW, BAR_ROW_HEIGHT, dockTool } from './styles.ts'
 
-export type Panel = 'layers' | 'assets' | 'ai' | 'brand'
+export type Flyout = 'layers' | 'assets' | 'ai' | 'brand'
 export type Tool = 'select' | 'frame' | 'shape' | 'text' | 'pen' | 'image' | 'hand'
 
-const PANELS: { id: Panel; icon: Icon }[] = [
+const FLYOUTS: { id: Flyout; icon: Icon }[] = [
   { id: 'layers', icon: StackIcon },
   { id: 'assets', icon: ImagesIcon },
   { id: 'ai', icon: SparkleIcon },
@@ -97,19 +97,6 @@ export function useFlyoutNote(text: string | null) {
     setNote(() => (text ? { owner, text } : null))
     return () => setNote((now) => (now?.owner === owner ? null : now))
   }, [setNote, owner, text])
-}
-
-/** Phones get the capsule as a bottom tab bar, so the blob travels sideways there. */
-function usePhone() {
-  const [phone, setPhone] = useState(false)
-  useEffect(() => {
-    const query = window.matchMedia('(max-width: 639px)')
-    const update = () => setPhone(query.matches)
-    update()
-    query.addEventListener('change', update)
-    return () => query.removeEventListener('change', update)
-  }, [])
-  return phone
 }
 
 /**
@@ -267,7 +254,7 @@ export function EditorShell({
   designName,
   onRename,
   status,
-  sizes,
+  formats,
   history,
   tool: shownTool,
   shape = 'rect',
@@ -277,7 +264,7 @@ export function EditorShell({
   fitted = true,
   actions,
   account,
-  panels,
+  flyouts,
   children,
 }: {
   brandId: string
@@ -287,8 +274,8 @@ export function EditorShell({
   onRename?: (name: string) => Promise<void>
   /** The editor's save state, or what it is doing before it opens. */
   status: ValueStore<string>
-  /** The design's sizes button, after its name. */
-  sizes?: ReactNode
+  /** The button for the design's formats (Sizes on screen), after its name. */
+  formats?: ReactNode
   /** Undo and redo, after the save state in the header pill. */
   history?: ReactNode
   /** The tool in use, when the editor decides it (a key, or drawing a shape ends); the dock keeps its own otherwise. */
@@ -307,7 +294,7 @@ export function EditorShell({
   /** The account avatar after it, with language, theme, settings and sign out. */
   account?: ReactNode
   /** What a flyout shows once its ticket fills it, such as the asset library (#52); an empty state until then. */
-  panels?: Partial<Record<Panel, ReactNode>>
+  flyouts?: Partial<Record<Flyout, ReactNode>>
   children: ReactNode
 }) {
   const t = useMessages()
@@ -316,25 +303,24 @@ export function EditorShell({
   const reduced = useReducedMotion()
   const chrome = reduced ? { duration: 0 } : CHROME
   const phone = usePhone()
-  const [panel, setPanel] = useState<Panel | null>(null)
+  const [flyout, setFlyout] = useState<Flyout | null>(null)
   const [flyoutNote, setNote] = useState<Note>(null)
   const note = flyoutNote?.text ?? null
   const [ownTool, setTool] = useState<Tool>('select')
   const tool = shownTool ?? ownTool
-  const panelTitle = (id: Panel) => t.editor[id]
-  const panelEmpty = {
+  const flyoutTitle = (id: Flyout) => t.editor[id]
+  const flyoutEmpty = {
     layers: t.editor.layersEmpty,
     assets: t.editor.assetsEmpty,
     ai: t.editor.aiEmpty,
     brand: t.editor.brandEmpty,
   }
-  const flyout = panel
   // What the top bar has open: on a phone an edit panel is a sheet, which hides the tab bar and the
   // dock, and a sheet and a rail flyout close each other.
   const edit = useEditState()
   const sheet = phone && isPanel(edit.open)
   useEffect(() => {
-    if (sheet) setPanel((now) => (now === null ? now : null))
+    if (sheet) setFlyout((now) => (now === null ? now : null))
   }, [sheet])
   const flyoutEl = useRef<HTMLElement>(null)
   useLayoutEffect(() => {
@@ -421,7 +407,7 @@ export function EditorShell({
                 aria-label={t.library.home}
                 className="grid size-9 shrink-0 place-items-center rounded-row hover:bg-hover"
               >
-                <BrandMark size={28} />
+                <DazbeeMark size={28} />
               </Link>
               <nav aria-label={t.library.designs} className="flex min-w-0 items-center gap-1.5 text-[13px]">
                 <Link
@@ -435,7 +421,7 @@ export function EditorShell({
                 </span>
                 <DesignName name={designName} onRename={onRename} />
               </nav>
-              {sizes}
+              {formats}
               <SaveStatus status={status} fitted={fitted} />
               {history}
             </div>
@@ -460,19 +446,19 @@ export function EditorShell({
               sheet && 'max-sm:hidden',
             )}
           >
-            {PANELS.map(({ id, icon: PanelIcon }) => {
-              const open = panel === id
+            {FLYOUTS.map(({ id, icon: FlyoutIcon }) => {
+              const open = flyout === id
               const ai = id === 'ai'
               return (
-                <Tooltip key={id} label={panelTitle(id)} side={rtl ? 'left' : 'right'}>
+                <Tooltip key={id} label={flyoutTitle(id)} side={rtl ? 'left' : 'right'}>
                   <button
                     type="button"
-                    aria-label={panelTitle(id)}
+                    aria-label={flyoutTitle(id)}
                     aria-expanded={open}
                     aria-controls="editor-flyout"
                     data-panel={id}
                     onClick={() => {
-                      setPanel(open ? null : id)
+                      setFlyout(open ? null : id)
                       if (phone && !open) setOpen(null)
                     }}
                     className={cn(
@@ -509,7 +495,7 @@ export function EditorShell({
                         className="absolute inset-1.5 rounded-full bg-[image:var(--ai-gradient)] opacity-20 blur-[6px]"
                       />
                     )}
-                    <PanelIcon
+                    <FlyoutIcon
                       size={22}
                       weight={ai ? 'duotone' : open ? 'fill' : 'regular'}
                       aria-hidden
@@ -527,7 +513,7 @@ export function EditorShell({
                 ref={flyoutEl}
                 key={flyout}
                 id="editor-flyout"
-                aria-label={panelTitle(flyout)}
+                aria-label={flyoutTitle(flyout)}
                 initial={{ opacity: 0, x: rtl ? 12 : -12 }}
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: rtl ? 12 : -12 }}
@@ -543,7 +529,7 @@ export function EditorShell({
                       flyout === 'ai' && 'bg-[image:var(--ai-gradient)] bg-clip-text text-transparent',
                     )}
                   >
-                    {panelTitle(flyout)}
+                    {flyoutTitle(flyout)}
                   </h2>
                   {(note ?? (flyout === 'assets' || flyout === 'brand' ? brandName : null)) && (
                     <span
@@ -556,14 +542,14 @@ export function EditorShell({
                   <button
                     type="button"
                     aria-label={t.editor.closePanel}
-                    onClick={() => setPanel(null)}
+                    onClick={() => setFlyout(null)}
                     className="grid size-7 shrink-0 cursor-pointer place-items-center rounded-full text-subtle hover:bg-hover hover:text-text"
                   >
                     <XIcon size={14} aria-hidden />
                   </button>
                 </div>
                 <FlyoutNote.Provider value={setNote}>
-                  {panels?.[flyout] ?? <p className="px-[18px] pb-4 text-[13px] text-muted">{panelEmpty[flyout]}</p>}
+                  {flyouts?.[flyout] ?? <p className="px-[18px] pb-4 text-[13px] text-muted">{flyoutEmpty[flyout]}</p>}
                 </FlyoutNote.Provider>
               </motion.section>
             )}

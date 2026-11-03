@@ -14,35 +14,15 @@ import { type Design, inOrder } from '@dazbee/schema'
 import { cn } from '@/lib/cn.ts'
 import { useMessages } from '@/lib/i18n/client.tsx'
 import { format } from '@/lib/i18n/index.ts'
-import { useValue, valueStore } from '@/lib/value-store.ts'
+import { useValue } from '@/lib/value-store.ts'
 
 import { afterDraws, sameUrls } from './after-draws.ts'
 import { CARD_ROW, CardMenu } from './card.tsx'
 import { PanelFrame } from './edit-panel.tsx'
 import { setOpen, useEditState } from './edit-store.ts'
-import { useEditorDesign } from './formats-panel.tsx'
+import { shownPage, useEditorDesign, usePickedPage } from './editor-hooks.ts'
 import { BackgroundBody } from './selection-cards.tsx'
 import { DROP_LINE, FOCUS_RING, PANEL_BUTTON } from './styles.ts'
-
-/** The page last brought into view, from the Pages panel or by picking it on the stage. */
-const shownPage = valueStore<string | null>(null)
-
-/** The page a click on its background picked, or null, following the stage. */
-export function usePickedPage(editor: Editor) {
-  const [picked, setPicked] = useState(() => editor.pickedPage())
-  useEffect(() => {
-    const follow = (pageId: string | null) => {
-      setPicked(pageId)
-      if (pageId) shownPage.set(pageId)
-    }
-    follow(editor.pickedPage())
-    const stop = editor.onPagePick(follow)
-    return () => {
-      stop()
-    }
-  }, [editor])
-  return picked
-}
 
 /** The page in view: the one last shown or picked while it is still there, else the first. */
 function useCurrentPage(design: Design) {

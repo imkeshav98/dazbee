@@ -15,9 +15,10 @@ import { cn } from '@/lib/cn.ts'
 import { useLocale, useMessages } from '@/lib/i18n/client.tsx'
 import { dirOf, format } from '@/lib/i18n/index.ts'
 
-import { ALIGN, keyOf, useSelection } from './arrange-panel.tsx'
+import { ALIGN, keyOf } from './arrange-actions.ts'
 import { useMenuFocus } from './bar-popover.tsx'
 import { useEditState } from './edit-store.ts'
+import { useSelection } from './editor-hooks.ts'
 import { RotationField, set, shared, useTarget } from './selection-cards.tsx'
 import { ICON_BUTTON, MENU, MENU_DIVIDER, MENU_ITEM, MENU_KEY } from './styles.ts'
 

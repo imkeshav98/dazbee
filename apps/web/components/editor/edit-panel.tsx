@@ -29,7 +29,7 @@ import { cn } from '@/lib/cn.ts'
 import { useMessages } from '@/lib/i18n/client.tsx'
 import { format } from '@/lib/i18n/index.ts'
 
-import { ALIGN, keyOf, useSelection } from './arrange-panel.tsx'
+import { ALIGN, keyOf } from './arrange-actions.ts'
 import {
   isLayerPanel,
   type LayerPanelId,
@@ -39,6 +39,7 @@ import {
   useEditState,
   usePhone,
 } from './edit-store.ts'
+import { useSelection } from './editor-hooks.ts'
 import { FontChooser, useFontCatalog } from './font-panel.tsx'
 import { ORDER } from './layer-actions.tsx'
 import { factsOf, PanelContent, type Target, useTarget } from './selection-cards.tsx'
