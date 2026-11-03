@@ -1,5 +1,8 @@
 'use client'
 
+// The fonts a brand can pick from: its uploads, the Google Fonts we copied into our storage, and the
+// fonts we ship; and how a family's faces are chosen: the face that previews it, and the weight it is
+// set in.
 import { useCallback, useEffect, useState } from 'react'
 
 import { FONT_FACES } from '@dazbee/fonts'

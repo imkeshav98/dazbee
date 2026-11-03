@@ -16,7 +16,7 @@ import { expect, type Locator, type Page, test } from '../support/test.ts'
 
 test.describe.configure({ timeout: 120_000 })
 
-/** A row's height in the panel, in pixels (LAYER_ROW in components/editor/layers-panel.tsx). */
+/** A row's height in the panel, in pixels (LAYER_ROW in components/editor/flyouts/layers-panel.tsx). */
 const ROW = 36
 /** How far one turn of the wheel scrolls the 300 layers, in pixels. */
 const WHEEL = 420

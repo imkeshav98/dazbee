@@ -10,7 +10,7 @@ import type { BrandKit } from '@dazbee/schema'
 import { KitEditor, useKitSaver } from './kit-editor.tsx'
 import { loadKit, useBrandKit } from './use-brand-kit.ts'
 
-export function HomeKit({
+export function KitPage({
   brandId,
   kit: first,
 }: {

@@ -1,3 +1,6 @@
+// Class strings for looks that controls in more than one folder share, such as the dashed button
+// that adds something or takes an upload.
+
 /** The ring a focused control shows when reached by keyboard. */
 export const FOCUS_RING = 'focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent'
 
