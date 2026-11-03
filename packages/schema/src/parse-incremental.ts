@@ -1,12 +1,9 @@
-import type { z } from 'zod'
-
 import { checkStructure, DesignHead, parseDesign, type ParseResult } from './design.ts'
 import { deepFreeze, isRecord } from './json.ts'
 import { Layer } from './layers.ts'
 import { checkOverride, formatIdOf, overrideDefaults, Scope } from './overrides.ts'
 import { NodeId } from './primitives.ts'
 
-type Head = z.infer<typeof DesignHead>
 /** Each scope as last parsed: the object it came in as, its filled values, and the layers it was checked against. */
 type ScopeResult = { input: object; filled: Record<string, Record<string, unknown>>; nodes: Record<string, Layer> }
 
@@ -20,9 +17,9 @@ const validIds = new Set<string>()
 const validScopes = new Set<string>()
 
 /** Validated heads by their meta object, with the formats and pages they go with; a validated head maps to itself. */
-const headCache = new WeakMap<object, { formats: unknown; pages: unknown; head: Head }>()
+const headCache = new WeakMap<object, { formats: unknown; pages: unknown; head: DesignHead }>()
 /** The head and layers of the last design parsed here. */
-let last: { head: Head; nodes: Record<string, Layer> } | undefined
+let last: { head: DesignHead; nodes: Record<string, Layer> } | undefined
 const lastScopes = new Map<string, ScopeResult>()
 /** Checked override values, by their object and by their filled object, with the layer they were checked against. */
 const pairCache = new WeakMap<object, { node: Layer; filled: Record<string, unknown> }>()
@@ -95,7 +92,7 @@ export function parseLayer(input: unknown): { success: true; layer: Layer } | { 
   return { success: true, layer }
 }
 
-function parseHead(input: Record<string, unknown>): Head | undefined {
+function parseHead(input: Record<string, unknown>): DesignHead | undefined {
   const cached = isRecord(input.meta) ? headCache.get(input.meta) : undefined
   if (cached && cached.formats === input.formats && cached.pages === input.pages) return cached.head
   const parsed = DesignHead.safeParse(input)

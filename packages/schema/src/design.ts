@@ -31,6 +31,7 @@ export const DesignHead = z.object({
   formats: z.record(FormatId, Format),
   pages: z.record(PageId, Page),
 })
+export type DesignHead = z.infer<typeof DesignHead>
 
 export const DesignShape = z.object({
   ...DesignHead.shape,

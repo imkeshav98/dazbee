@@ -4,10 +4,19 @@ import { deepFreeze } from './json.ts'
 import { type Layer, LAYER_PROPS, type LayerType } from './layers.ts'
 import { NodeId } from './primitives.ts'
 
+export type Fail = (path: PropertyKey[], message: string) => void
+
+type InScope = ReturnType<(typeof LAYER_PROPS)[LayerType]['safeParse']> & {
+  /** Overridden paths the layer's type doesn't have. */
+  unknownPaths: string[]
+}
+
 /** Spike scopes: only `format:<id>`. Variant and page scopes arrive with variants and masters. */
 const FORMAT_SCOPE = /^format:([\w-]+)$/
 /** The format a `format:<id>` scope names, or undefined for any other string. */
 export const formatIdOf = (scope: string) => scope.match(FORMAT_SCOPE)?.[1]
+/** The scope that holds one format's overrides, the one formatIdOf reads back. */
+export const formatScope = (formatId: string): `format:${string}` => `format:${formatId}`
 export const Scope = z.string().refine((s) => formatIdOf(s) !== undefined, 'the spike only supports format:<id> scopes')
 export type Scope = z.infer<typeof Scope>
 
@@ -19,20 +28,11 @@ export type AnyScope = z.infer<typeof AnyScope>
 export const Overrides = z.record(Scope, z.record(NodeId, z.record(z.string(), z.unknown())))
 export type Overrides = z.infer<typeof Overrides>
 
-export type Fail = (path: PropertyKey[], message: string) => void
-
-type InScope = ReturnType<(typeof LAYER_PROPS)[LayerType]['safeParse']> & {
-  /** Overridden paths the layer's type doesn't have. */
-  unknownPaths: string[]
-}
 /** Merged props by layer, then by override object: both are only ever replaced, never changed. */
 const inScopeCache = new WeakMap<Layer, WeakMap<object, InScope>>()
 
 /** Each override object with its defaults filled, by layer and then by the override object. */
 const defaultsCache = new WeakMap<Layer, WeakMap<object, Record<string, unknown>>>()
-
-/** The scope that holds one format's overrides, the one formatIdOf reads back. */
-export const formatScope = (formatId: string): `format:${string}` => `format:${formatId}`
 
 /**
  * One layer's override values in one scope, checked against the layer as `parseDesign` checks
