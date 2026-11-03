@@ -171,7 +171,8 @@ test('a click on the page picks it: a dashed outline, pink labels, and a bar of 
 
   // A click off every page lets it go too.
   await pickPage(page, 900, 900)
-  await click(page, -200, 500)
+  // Under the square, where no size is.
+  await click(page, 500, 1100)
   await expect(page.getByTestId('top-bar')).toHaveCount(0)
   // A click on a layer selects it and the page goes.
   await pickPage(page, 900, 900)

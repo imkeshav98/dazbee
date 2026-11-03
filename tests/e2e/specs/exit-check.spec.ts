@@ -122,6 +122,10 @@ test('an ad set rebuilt in 5 formats through real input exports PNG, JPG, PDF an
   await expect(page.getByTestId('flyout')).toHaveCount(0)
   await (await backgroundPanel(page, 30, 30)).getByTestId('brand-colours').getByRole('button', { name: colour }).click()
   await expect.poll(async () => (await stored(page)).pages.p1?.fills).toEqual([{ type: 'solid', color: '#1F7A4DFF' }])
+  // Esc closes the panel, then lets the page go.
+  await page.keyboard.press('Escape')
+  await page.keyboard.press('Escape')
+  await expect(page.getByTestId('top-bar')).toHaveCount(0)
 
   // A badge drawn with the rectangle tool, in the brand colour from the kit.
   await press(page, 'toolRect')
