@@ -1428,7 +1428,7 @@ const TILE_LOOK: Record<Tile, string> = {
 /** What the effect tiles show their effects on: "Ag" for text, a photo for a photo, a rounded shape for the rest. */
 type Sample = { kind: 'text' } | { kind: 'photo'; src: string } | { kind: 'shape' }
 
-/** One tile's picture: the sample with the tile's effect on it. Background blur frosts a pane over it. */
+/** One tile's picture: the sample with the tile's effect on it. Background blur sets it on a frosted pane over stripes. */
 function EffectSample({ sample, tile }: { sample: Sample; tile: Tile }) {
   const inner = tile === 'innerShadow'
   const body = sample.kind === 'text'
@@ -1453,10 +1453,11 @@ function EffectSample({ sample, tile }: { sample: Sample; tile: Tile }) {
       )
       : <span aria-hidden className={cn('block size-[56%] rounded-[10px] bg-accent', inner && 'shadow-[inset_0_4px_6px_rgb(0_0_0/0.55)]', TILE_LOOK[tile])} />
   if (tile !== 'backgroundBlur') return body
+  // Background blur blurs what is behind the layer: bright stripes, softened through a frosted pane
+  // that holds the sample, sharp.
   return (
-    <span aria-hidden className="relative grid size-full place-items-center">
-      {body}
-      <span className="absolute inset-x-[18%] bottom-[16%] h-[42%] rounded-[6px] border border-white/40 bg-white/20 backdrop-blur-[3px]" />
+    <span aria-hidden className="grid size-full place-items-center bg-[repeating-linear-gradient(135deg,#ff48b0_0_6px,#ffd23f_6px_12px,#3d6bff_12px_18px)]">
+      <span className="grid aspect-[4/3] h-[72%] place-items-center rounded-[8px] border border-white/60 bg-white/35 backdrop-blur-[3px]">{body}</span>
     </span>
   )
 }
