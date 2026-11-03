@@ -185,4 +185,15 @@ test.describe('found by Keshav', () => {
     expect(await page.evaluate(() => document.activeElement?.getAttribute('role'))).toBe('spinbutton')
     expect(errors).toEqual([])
   })
+
+  test('a number field reached by the keyboard shows its focus on its own border, with no second ring round its value', async ({ browser }) => {
+    const asset = await upload(photo)
+    const { page, errors } = await openStage(browser, design(asset.id))
+    await select(page, ['headline'])
+    const field = (await barMenu(page, 'spacing')).getByRole('spinbutton', { name: 'Line height' })
+    await field.focus()
+    await page.keyboard.press('ArrowUp')
+    expect(await field.evaluate((el) => getComputedStyle(el).outlineStyle)).toBe('none')
+    expect(errors).toEqual([])
+  })
 })
