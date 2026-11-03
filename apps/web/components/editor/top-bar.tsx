@@ -1,12 +1,12 @@
 'use client'
 
 // The top bar: fixed at the top centre of the stage while something is selected, its items set by
-// what is selected (text, a photo, a shape, a box, a group, or several). An item with ▾ opens a
-// pop-up under the bar; a panel item opens the one edit panel at the stage's end; the rest act at
-// once. When the items don't fit, the last ones go into ⋯, which opens a second row under the bar;
+// what is selected (text, a photo, a shape, a box, a group, or several); a locked layer's bar says
+// it is locked and unlocks it. An item with ▾ opens a pop-up under the bar; a panel item opens the
+// one edit panel at the stage's end; the rest act at once. When the items don't fit, the last ones go into ⋯, which opens a second row under the bar;
 // on a phone the bar scrolls sideways instead.
 import {
-  ArrowsClockwiseIcon, CircleHalfIcon, CornersOutIcon, CropIcon, DotsThreeIcon, FadersIcon, FrameCornersIcon, ListBulletsIcon, ListNumbersIcon, MaskHappyIcon, MinusIcon, PlusIcon,
+  ArrowsClockwiseIcon, CircleHalfIcon, LockSimpleIcon, LockSimpleOpenIcon, CornersOutIcon, CropIcon, DotsThreeIcon, FadersIcon, FrameCornersIcon, ListBulletsIcon, ListNumbersIcon, MaskHappyIcon, MinusIcon, PlusIcon,
   RowsIcon, SparkleIcon, StarIcon, TextAaIcon, TextAlignCenterIcon, TextAlignJustifyIcon, TextAlignLeftIcon, TextAlignRightIcon, TextBIcon, TextItalicIcon, TextStrikethroughIcon,
   TextUnderlineIcon, AlignLeftIcon, UniteSquareIcon,
 } from '@phosphor-icons/react'
@@ -149,6 +149,22 @@ function useItems(target: Target, design: Design, brandId: string): Item[] {
       </BarPopover>
     ))
   const popup = (id: string) => <PopupContent popup={id} target={target} design={design} />
+
+  // A locked layer's settings would all be refused: its bar says it is locked, and unlocks it.
+  const locked = target.ids.filter((id) => Object.values(design.nodes[id]?.lock ?? {}).some(Boolean))
+  if (locked.length > 0) {
+    add('locked', (
+      <span data-testid="bar-locked" className="flex items-center gap-1 ps-2 text-[12.5px] font-medium text-muted">
+        <LockSimpleIcon size={15} weight="fill" aria-hidden />
+        {b.locked}
+        <button type="button" data-bar-item data-testid="bar-unlock" onClick={() => target.editor.setLocked(locked, false)} className={cn(BAR_BUTTON, 'ms-1')}>
+          <LockSimpleOpenIcon size={15} aria-hidden />
+          {b.unlock}
+        </button>
+      </span>
+    ))
+    return items
+  }
 
   if (Object.keys(design.formats).length > 1) {
     add('scope', <ScopeChip target={target} design={design} open={open === 'scope'} onOpen={(to) => setOpen(to ? 'scope' : null)} />)
