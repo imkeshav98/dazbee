@@ -1,5 +1,7 @@
 'use client'
 
+// The top bar's items for what is selected: text, a photo, a shape, a box or several layers, each
+// with the buttons and pop-ups it offers; or the picked page's Background and Sizes.
 import {
   AlignLeftIcon,
   ArrowsClockwiseIcon,
@@ -82,15 +84,6 @@ const ALIGN_ICON = {
   end: <TextAlignRightIcon size={16} aria-hidden className="rtl:-scale-x-100" />,
   justify: <TextAlignJustifyIcon size={16} aria-hidden />,
 }
-
-/** A swatch on a bar button: the colour, or a rainbow where the layers have different ones. */
-const Dot = ({ colour }: { colour: string | null | 'mixed' }) => (
-  <span
-    aria-hidden
-    className="size-4 rounded-full border border-line-strong"
-    style={{ background: colour === 'mixed' || colour === null ? MIXED_COLOUR : colour }}
-  />
-)
 
 /** The items of the top bar for the selection, in order. */
 export function useItems(target: Target, design: Design, brandId: string): Item[] {
@@ -497,5 +490,16 @@ function PanelButton({ id, label, icon, face }: { id: PanelId; label: string; ic
       {icon}
       {face ?? label}
     </button>
+  )
+}
+
+/** A swatch on a bar button: the colour, or a rainbow where the layers have different ones. */
+function Dot({ colour }: { colour: string | null | 'mixed' }) {
+  return (
+    <span
+      aria-hidden
+      className="size-4 rounded-full border border-line-strong"
+      style={{ background: colour === 'mixed' || colour === null ? MIXED_COLOUR : colour }}
+    />
   )
 }

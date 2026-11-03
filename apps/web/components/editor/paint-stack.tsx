@@ -1,10 +1,9 @@
 'use client'
 
-// Paints as the cards edit them (#219): a stack whose rows show the top coat first, as in Figma and
-// Photoshop, and can be dragged into another order; each row's swatch opens a paint editor that
-// switches it between a solid colour, a linear, radial or angular gradient and an image, and edits
-// a gradient's stops (add, move, remove, colour and opacity, brand colours too) and its angle or
-// centre. A row hides its paint without deleting it, and a gradient or image has its own opacity.
+// Paints as the cards edit them (#219): each row's swatch opens a paint editor that switches it
+// between a solid colour, a linear, radial or angular gradient and an image, and edits a gradient's
+// stops (add, move, remove, colour and opacity, brand colours too) and its angle or centre. A row
+// hides its paint without deleting it, and a gradient or image has its own opacity.
 import { EyeIcon, EyeSlashIcon, ImageIcon, MinusIcon } from '@phosphor-icons/react'
 import * as Popover from '@radix-ui/react-popover'
 import { useState } from 'react'
@@ -14,19 +13,18 @@ import type { Paint } from '@dazbee/schema'
 
 import { useBrandKit } from '@/components/brand-kit/use-brand-kit.ts'
 import { Choice, clamp, ColorField, NumberField } from '@/components/editor/edit-panel/fields.tsx'
+import type { P } from '@/components/editor/edit-panel/target.ts'
 import { useMenuFocus } from '@/components/editor/top-bar/bar-popover.tsx'
 import { FOCUS_RING } from '@/components/ui/looks.ts'
 import { segment, SEGMENTED } from '@/components/ui/segmented.tsx'
 import { cn } from '@/lib/cn.ts'
 import { tidy } from '@/lib/editor/size.ts'
 import { useLocale } from '@/lib/i18n/client.tsx'
-import { dirOf, format, type Messages } from '@/lib/i18n/index.ts'
+import { dirOf, format } from '@/lib/i18n/index.ts'
 
 import { angleOf, type Gradient, GradientBar, linearAt, type Stop, stopsCss } from './gradient-bar.tsx'
 import { ImagePickerButton } from './image-tool.tsx'
 import { CHIP, ICON_BUTTON, KNOBS, POPOVER, SWATCH } from './styles.ts'
-
-type P = Messages['editor']['props']
 
 /** An image asset's small picture, as the API serves it. */
 export const assetThumbnail = (brandId: string, assetId: string) =>

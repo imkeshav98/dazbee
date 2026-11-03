@@ -1,5 +1,8 @@
 'use client'
 
+// One row of the layers panel's tree: its layer's picture or icon, name and kind, and its hide and
+// lock toggles. The panel hands every row one set of handlers, so a row renders again only when what
+// it shows changes.
 import {
   CaretRightIcon,
   CircleIcon,
@@ -59,6 +62,8 @@ export const LAYER_ROW = 36
 const INDENT = 16
 const DRAG_TYPE = 'application/x-dazbee-layer'
 
+const isLocked = (node: Layer) => LOCK_FLAGS.some((flag) => node.lock?.[flag])
+
 function iconOf(node: Layer): Icon {
   if (node.type === 'text') return TextTIcon
   if (node.type === 'group') return FolderSimpleIcon
@@ -70,8 +75,6 @@ function iconOf(node: Layer): Icon {
   if (props.shape?.kind === 'path') return PenNibIcon
   return SquareIcon
 }
-
-const isLocked = (node: Layer) => LOCK_FLAGS.some((flag) => node.lock?.[flag])
 
 /** One row of the tree. Rendered again only when something it shows changes. */
 export const LayerRow = memo(function LayerRow({

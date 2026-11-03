@@ -8,9 +8,9 @@ import { MagnifyingGlassIcon, PencilSimpleIcon, TrashIcon, UploadSimpleIcon, XIc
 import { type DragEvent, useCallback, useEffect, useState } from 'react'
 
 import type { Editor } from '@dazbee/editor'
-import { AssetSummary, imageAssetIds, isVectorAsset } from '@dazbee/schema'
+import { AssetSummary, imageAssetIds } from '@dazbee/schema'
 
-import { ASSET_DRAG_TYPE, VECTOR_DRAG_TYPE } from '@/components/editor/asset-drag.ts'
+import { carryAsset } from '@/components/editor/asset-drag.ts'
 import { ASSET_TILE } from '@/components/editor/styles.ts'
 import { DASHED_BUTTON } from '@/components/ui/looks.ts'
 import { overlayScroll } from '@/components/ui/overlay-scroll.ts'
@@ -221,17 +221,7 @@ export function AssetLibrary({ editor, brandId, changed = 0 }: { editor: Editor;
                     title={t.placeHint}
                     onClick={() => placeAsset(editor, brandId, asset)}
                     onDragStart={(e) => {
-                      e.dataTransfer.setData(
-                        ASSET_DRAG_TYPE,
-                        JSON.stringify({
-                          id: asset.id,
-                          name: asset.name,
-                          width: asset.width,
-                          height: asset.height,
-                          contentType: asset.contentType,
-                        }),
-                      )
-                      if (isVectorAsset(asset)) e.dataTransfer.setData(VECTOR_DRAG_TYPE, '1')
+                      carryAsset(e, asset)
                       e.dataTransfer.effectAllowed = 'copy'
                     }}
                     className={cn(

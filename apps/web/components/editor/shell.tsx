@@ -195,6 +195,7 @@ export function EditorShell({
   useEffect(() => {
     if (sheet) setFlyout((now) => (now === null ? now : null))
   }, [sheet])
+  const stage = useRef<HTMLElement>(null)
   const flyoutEl = useRef<HTMLElement>(null)
   useLayoutEffect(() => {
     const el = flyoutEl.current
@@ -217,7 +218,6 @@ export function EditorShell({
     }
   }, [flyout, phone, rtl])
 
-  const stage = useRef<HTMLElement>(null)
   const startIsland = useRef<HTMLDivElement>(null)
   const endIsland = useRef<HTMLDivElement>(null)
   const rail = useRef<HTMLElement>(null)

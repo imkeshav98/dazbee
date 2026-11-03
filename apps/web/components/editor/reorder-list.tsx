@@ -1,7 +1,8 @@
 'use client'
 
-// A list of fills or strokes in an edit panel: the rows the selected layers share, with + to add one
-// on top; when the layers' lists differ, a way to give them all one.
+// Lists in an edit panel: rows of fills, strokes or effects, each with a remove button, that can be
+// put in another order by their grips; and the fills or strokes the selected layers share, with + to
+// add one on top and, when the layers' lists differ, a way to give them all one.
 import { DotsSixVerticalIcon, MinusIcon, PlusIcon } from '@phosphor-icons/react'
 import { type CSSProperties, type ReactNode, useRef, useState } from 'react'
 
@@ -73,7 +74,7 @@ export function ListBody<T>({
           </button>
         </div>
       ) : (
-        <Stack
+        <ReorderList
           items={list}
           field={field}
           topFirst={topFirst}
@@ -91,7 +92,7 @@ export function ListBody<T>({
  * `topFirst` the last item, the one drawn on top, is the first row, and rows can be dragged by
  * their grip, or moved with its arrow keys, into another order.
  */
-export function Stack<T>({
+export function ReorderList<T>({
   items,
   field,
   topFirst = false,

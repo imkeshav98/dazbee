@@ -31,25 +31,14 @@ import { format } from '@/lib/i18n/index.ts'
 import { fetchSyncToken, renameFromEditor } from './actions.ts'
 import { assetBytes, brandKitVariables, fontLoader, keepForOffline } from './editor-io.ts'
 
-/** The editor's tools that the dock shows as the one shape button. */
-const isShapeTool = (tool: Tool): tool is ShapeTool => (SHAPE_TOOLS as readonly string[]).includes(tool)
-
 declare global {
   interface Window {
     dazbee?: Editor
   }
 }
 
-/** The zoom pill, reading the zoom from the store, and Pages beside it. */
-function StageZoom({ editor, store }: { editor: Editor | null; store: ValueStore<number | null> }) {
-  const zoom = useValue(store)
-  return (
-    <>
-      <ZoomControl zoom={editor ? zoom : null} editor={editor} />
-      <PagesButton editor={editor} />
-    </>
-  )
-}
+/** The editor's tools that the dock shows as the one shape button. */
+const isShapeTool = (tool: Tool): tool is ShapeTool => (SHAPE_TOOLS as readonly string[]).includes(tool)
 
 export function EditorStage({
   designId,
@@ -365,5 +354,16 @@ export function EditorStage({
       </div>
       <StageZoom editor={editor} store={zoom} />
     </EditorShell>
+  )
+}
+
+/** The zoom pill, reading the zoom from the store, and Pages beside it. */
+function StageZoom({ editor, store }: { editor: Editor | null; store: ValueStore<number | null> }) {
+  const zoom = useValue(store)
+  return (
+    <>
+      <ZoomControl zoom={editor ? zoom : null} editor={editor} />
+      <PagesButton editor={editor} />
+    </>
   )
 }

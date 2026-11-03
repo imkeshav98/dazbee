@@ -1,3 +1,5 @@
+// What the editor loads through the app's own routes: an asset's bytes, the brand's font files and
+// its brand kit's values; and asking the offline worker to keep the page.
 import { BrandKit, brandVariables, FontFamily, type Variables } from '@dazbee/schema'
 
 export async function assetBytes(brandId: string, assetId: string) {
