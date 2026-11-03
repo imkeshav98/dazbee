@@ -2,6 +2,7 @@ import type { CanvasKit, FontCollection, Paragraph, TextStyle as CkTextStyle } f
 import { color } from './color.ts'
 import type { Resources } from './draw.ts'
 import type { SceneLayer } from './scene.ts'
+import { scaled } from './text-scale.ts'
 
 type TextProps = Extract<SceneLayer, { type: 'text' }>['props']
 
@@ -94,16 +95,6 @@ function fits(props: TextProps, laid: TextLayout): boolean {
   return props.boxMode !== 'fixed' || laid.height <= props.height + 0.01
 }
 const gutterRight = (props: TextProps, laid: TextLayout, b: TextBlock) => (b.marker && b.x === 0 ? laid.width - b.paragraph.getMaxWidth() : 0)
-
-/** Every size in a style scaled by shrink to fit. */
-function scaled(style: Partial<Style>, scale: number): Partial<Style> {
-  if (scale === 1) return style
-  const out = { ...style }
-  if (out.fontSize !== undefined) out.fontSize *= scale
-  if (out.letterSpacing !== undefined) out.letterSpacing *= scale
-  if (out.outline) out.outline = { ...out.outline, width: out.outline.width * scale }
-  return out
-}
 
 function build(ck: CanvasKit, props: TextProps, resources: Pick<Resources, 'fonts' | 'fallbackFamilies'>, scale: number): TextLayout {
   const direction = props.direction === 'auto' ? autoDirection(props.text) : props.direction
