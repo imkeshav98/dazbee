@@ -78,6 +78,46 @@ const enter = async (field: Locator, value: string) => {
 }
 
 test.describe('found by QA', () => {
+  test('number fields stop at limits a design never needs to pass', async ({ browser }) => {
+    const asset = await upload(photo)
+    const { page, errors } = await openStage(browser, design(asset.id))
+    // An effect's numbers, and where a layer is.
+    await select(page, ['badge'])
+    const effects = await barMenu(page, 'effects')
+    await effects.locator('[data-tile="dropShadow"]').click()
+    await enter(effects.getByRole('spinbutton', { name: 'Drop shadow 1 Blur' }), '99999')
+    await enter(effects.getByRole('spinbutton', { name: 'Drop shadow 1 X' }), '-99999')
+    await expect.poll(async () => ((await propsOf(page, 'badge')).effects as { blur: number; x: number }[])[0]).toMatchObject({ blur: 1000, x: -10000 })
+    await enter((await barMenu(page, 'position')).getByRole('spinbutton', { name: 'X position' }), '1e12')
+    await expect.poll(async () => (await propsOf(page, 'badge')).x).toBe(100000)
+    // Stepped past it with the arrow keys, once the field shows it, it stays.
+    const x = (await barMenu(page, 'position')).getByRole('spinbutton', { name: 'X position' })
+    await expect(x).toHaveValue('100000')
+    await x.focus()
+    await page.keyboard.press('ArrowUp')
+    await page.keyboard.press('Shift+ArrowUp')
+    await expect.poll(async () => (await propsOf(page, 'badge')).x).toBe(100000)
+    // With Lock ratio on, the side that follows stops at it too.
+    const position = await barMenu(page, 'position')
+    await position.getByRole('switch', { name: 'Lock ratio' }).click()
+    await enter(position.getByRole('spinbutton', { name: 'Height' }), '50000')
+    await expect.poll(async () => (await propsOf(page, 'badge')).width).toBeLessThanOrEqual(100000)
+    // Text's spacing and size, last, since text this large takes a while to draw.
+    await select(page, ['headline'])
+    const spacing = await barMenu(page, 'spacing')
+    await enter(spacing.getByRole('spinbutton', { name: 'Line height' }), '99999')
+    await enter(spacing.getByRole('spinbutton', { name: 'Letter spacing' }), '100000')
+    await enter(spacing.getByRole('spinbutton', { name: 'Paragraph spacing' }), '1e9')
+    await expect.poll(async () => {
+      const p = await propsOf(page, 'headline')
+      const style = p.style as { lineHeight: number; letterSpacing: number }
+      return [style.lineHeight, style.letterSpacing, p.paragraphSpacing]
+    }).toEqual([10, 1000, 1000])
+    await enter(page.getByTestId('bar-size-field'), '99999')
+    await expect.poll(async () => ((await propsOf(page, 'headline')).style as { fontSize: number }).fontSize).toBe(2000)
+    expect(errors).toEqual([])
+  })
+
   test('Ctrl+Z and Ctrl+Shift+Z in a number field not being typed in undo and redo the design', async ({ browser }) => {
     const asset = await upload(photo)
     const { page, errors } = await openStage(browser, design(asset.id))
@@ -188,6 +228,8 @@ test.describe('found by QA', () => {
     const field = (await barMenu(page, 'spacing')).getByRole('spinbutton', { name: 'Max lines' })
     await enter(field, '3')
     await expect.poll(async () => (await propsOf(page, 'headline')).maxLines).toBe(3)
+    // Emptied once the field shows the limit it has.
+    await expect(field).toHaveValue('3')
     await enter(field, '')
     await expect.poll(async () => (await propsOf(page, 'headline')).maxLines).toBeUndefined()
     expect(errors).toEqual([])
