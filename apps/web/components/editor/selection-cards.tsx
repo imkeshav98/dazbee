@@ -16,6 +16,7 @@ import { cn } from '../../lib/cn.ts'
 import { useMessages } from '../../lib/i18n/client.tsx'
 import { format, type Messages } from '../../lib/i18n/index.ts'
 import { designColours } from '../../lib/design-colours.ts'
+import { LIMITS } from '../../lib/limits.ts'
 import { sizeTo } from '../../lib/size.ts'
 import { Select } from '../ui/select.tsx'
 import { PICKED_RING, SWATCHES } from './card.tsx'
@@ -92,7 +93,8 @@ function PlaceCard({ target, p, title, children }: { target: Target; p: P; title
   const [keepRatio, setKeepRatio] = useState(false)
   const sized = target.types.every((type) => type !== 'group' && type !== 'boolean')
   const resize = (now: Props, axis: 'width' | 'height', to: number): Patch => {
-    const size = sizeTo({ width: num(now, 'width'), height: num(now, 'height') }, axis, to, keepRatio)
+    // The side Lock ratio moves stops where a typed side would.
+    const size = Object.fromEntries(Object.entries(sizeTo({ width: num(now, 'width'), height: num(now, 'height') }, axis, to, keepRatio)).map(([key, v]) => [key, Math.min(v, LIMITS.any)]))
     // Text given a height of its own gets a fixed box: an auto one would grow back to its words.
     return 'boxMode' in now && now.boxMode !== 'fixed' && size.height !== num(now, 'height') ? { ...size, boxMode: 'fixed' } : size
   }
@@ -150,6 +152,9 @@ export function RotationField({ target, p, label = '↻' }: { target: Target; p:
       unit="°"
       name={p.rotationName}
       value={shared(target.props.map((pr) => num(pr, 'rotation') ?? 0))}
+      // A turn wraps round at 360, so any number typed is one.
+      min={Number.NEGATIVE_INFINITY}
+      max={Number.POSITIVE_INFINITY}
       editor={target.editor}
       onSet={(v) => set(target, () => ({ rotation: tidy(((v % 360) + 360) % 360) }))}
       onShift={(by) => set(target, (now) => ({ rotation: tidy((((num(now, 'rotation') ?? 0) + by) % 360 + 360) % 360) }))}
@@ -504,7 +509,7 @@ type Stroke = {
 function parseDashes(text: string): number[] | null {
   const parts = text.split(/[\s,]+/).filter(Boolean)
   const lengths = parts.map((part) => Number.parseFloat(part))
-  if (lengths.some((n) => !Number.isFinite(n) || n < 0)) return null
+  if (lengths.some((n) => !Number.isFinite(n) || n < 0 || n > LIMITS.any)) return null
   if (lengths.length > 0 && !lengths.some((n) => n > 0)) return null
   return lengths.map(tidy)
 }
@@ -589,7 +594,8 @@ function EffectRow({ effect, i, target, p, write }: { effect: Effect; i: number;
       <div className={KNOBS}>
         {EFFECT_FIELDS[effect.type].map((field) => {
           const value = (effect as unknown as Record<string, number>)[field] ?? 0
-          const min = field === 'x' || field === 'y' || (field === 'spread' && effect.type === 'dropShadow') ? undefined : 0
+          const far = field === 'x' || field === 'y' ? LIMITS.effectOffset : field === 'spread' ? LIMITS.effectSpread : LIMITS.effectBlur
+          const min = field === 'x' || field === 'y' || (field === 'spread' && effect.type === 'dropShadow') ? -far : 0
           return (
             <NumberField
               key={field}
@@ -597,9 +603,10 @@ function EffectRow({ effect, i, target, p, write }: { effect: Effect; i: number;
               name={format(p.effectFieldName, { effect: effectName, n: i + 1, field: p.effectField[field] })}
               value={value}
               min={min}
+              max={far}
               editor={target.editor}
               onSet={(v) => change((now) => ({ ...now, [field]: v }) as Effect)}
-              onShift={(by) => change((now) => ({ ...now, [field]: tidy(clamp(((now as unknown as Record<string, number>)[field] ?? 0) + by, min)) }) as Effect)}
+              onShift={(by) => change((now) => ({ ...now, [field]: tidy(clamp(((now as unknown as Record<string, number>)[field] ?? 0) + by, min, far)) }) as Effect)}
             />
           )
         })}
@@ -629,10 +636,10 @@ export function textStyle(target: Target) {
     style: (key: string) => shared(styles.map((s) => s[key])),
     setStyle: (key: string, value: unknown) =>
       range ? target.editor.styleTextSelection({ [key]: value }) : set(target, (now) => styled(now, key, value)),
-    shiftStyle: (key: string, by: number, min?: number, from = 0) =>
+    shiftStyle: (key: string, by: number, min?: number, from = 0, max?: number) =>
       range
-        ? target.editor.styleTextSelection({ [key]: tidy(clamp(((range[0]?.[key] as number | undefined) ?? from) + by, min)) })
-        : set(target, (now) => styled(now, key, tidy(clamp((((now.style as Style)[key] as number | undefined) ?? from) + by, min)))),
+        ? target.editor.styleTextSelection({ [key]: tidy(clamp(((range[0]?.[key] as number | undefined) ?? from) + by, min, max)) })
+        : set(target, (now) => styled(now, key, tidy(clamp((((now.style as Style)[key] as number | undefined) ?? from) + by, min, max)))),
   }
 }
 
@@ -688,23 +695,25 @@ function SpacingCard({ target, p }: { target: Target; p: P }) {
           value={style('lineHeight') as number | 'mixed' | undefined}
           step={0.05}
           min={0.5}
+          max={LIMITS.lineHeight}
           fillRange={[0.8, 2]}
           placeholder={p.lineHeightAuto}
           editor={target.editor}
           onSet={(v) => setStyle('lineHeight', v)}
-          onShift={(by) => shiftStyle('lineHeight', by, 0.5, 1.2)}
+          onShift={(by) => shiftStyle('lineHeight', by, 0.5, 1.2, LIMITS.lineHeight)}
           onClear={() => setStyle('lineHeight', undefined)}
         />
-        <NumberField label={p.letterSpacing} name={p.letterSpacing} value={(style('letterSpacing') ?? 0) as number | 'mixed'} step={0.1} fillRange={[-20, 20]} editor={target.editor} onSet={(v) => setStyle('letterSpacing', v)} onShift={(by) => shiftStyle('letterSpacing', by)} />
+        <NumberField label={p.letterSpacing} name={p.letterSpacing} value={(style('letterSpacing') ?? 0) as number | 'mixed'} step={0.1} min={-LIMITS.letterSpacing} max={LIMITS.letterSpacing} fillRange={[-20, 20]} editor={target.editor} onSet={(v) => setStyle('letterSpacing', v)} onShift={(by) => shiftStyle('letterSpacing', by, -LIMITS.letterSpacing, 0, LIMITS.letterSpacing)} />
         <NumberField
           label={p.paragraphSpacing}
           name={p.paragraphSpacing}
           value={(shared(target.props.map((pr) => pr.paragraphSpacing)) ?? 0) as number | 'mixed'}
           min={0}
+          max={LIMITS.paragraphSpacing}
           fillRange={[0, 60]}
           editor={target.editor}
           onSet={(v) => set(target, () => ({ paragraphSpacing: v }))}
-          onShift={(by) => set(target, (now) => ({ paragraphSpacing: tidy(clamp(((now.paragraphSpacing as number | undefined) ?? 0) + by, 0)) }))}
+          onShift={(by) => set(target, (now) => ({ paragraphSpacing: tidy(clamp(((now.paragraphSpacing as number | undefined) ?? 0) + by, 0, LIMITS.paragraphSpacing)) }))}
         />
       </div>
     </Card>
@@ -714,7 +723,7 @@ function SpacingCard({ target, p }: { target: Target; p: P }) {
 /** The bar's size popover for text: the size, any size from 1 up. */
 export function TextSizeField({ target, p }: { target: Target; p: P }) {
   const { style, setStyle, shiftStyle } = textStyle(target)
-  return <NumberField label={p.fontSize} name={p.fontSize} value={style('fontSize') as number | 'mixed'} min={1} editor={target.editor} onSet={(v) => setStyle('fontSize', v)} onShift={(by) => shiftStyle('fontSize', by, 1)} />
+  return <NumberField label={p.fontSize} name={p.fontSize} value={style('fontSize') as number | 'mixed'} min={1} max={LIMITS.fontSize} editor={target.editor} onSet={(v) => setStyle('fontSize', v)} onShift={(by) => shiftStyle('fontSize', by, 1, 0, LIMITS.fontSize)} />
 }
 
 /** A row of choices of which one is on; `marks` shows a short mark in place of a choice's name. */
@@ -834,6 +843,7 @@ function TextFitCard({ target, p, title }: { target: Target; p: P; title: string
               name={p.shrinkSize[end]}
               value={shrink[end]}
               min={1}
+              max={LIMITS.fontSize}
               editor={target.editor}
               onSet={(v) => set(target, (now) => {
                 const was = now.shrinkToFit as Fit | undefined
