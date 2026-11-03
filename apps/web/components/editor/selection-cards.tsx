@@ -1,9 +1,9 @@
 'use client'
 
-// The selection's property cards, every one open: the header card with the box, then the numbers
-// of each kind (the shape, the photo's fit and adjustments, the text's spacing and box, auto layout),
-// and See-through last; and the bodies of the bar's popovers (the text's size, colour and align, the
-// fills, the strokes, the photo's filters, the effects). A value the selected layers don't share
+// The selection's settings, as the top bar's edit panels and pop-ups show them: the box and the
+// turn, the shape's own, the photo's filters, fit and adjustments, the text's colour, alignment,
+// list, case, spacing and box, auto layout, the fills, the strokes, the effects, how much it shows
+// through, its mask and its boolean operation. A value the selected layers don't share
 // shows as mixed; setting it gives them all the same one, and scrubbing or the arrow keys move each
 // from its own. With more than one format the changes go to every format or to this one only. Each
 // change is one undo step, and a drag on a number, however long, is one too.
@@ -1468,8 +1468,8 @@ export function ScopeChip({ target, design, open, onOpen }: { target: Target; de
 }
 
 /**
- * What an edit panel holds for the selection, the cards it had moved in as they are: Colour,
- * Outline, Effects, Position, Spacing, Edit image and Stack. Font is the font panel's own.
+ * What an edit panel holds for the selection, each card as a part of it: Colour, Outline,
+ * Effects, Position, Spacing, Edit image and Stack. Font is the font panel's own.
  */
 export function PanelContent({ panel, target, design, brandId }: { panel: string; target: Target; design: Design; brandId: string }) {
   const t = useMessages()
@@ -1526,7 +1526,7 @@ export function PanelContent({ panel, target, design, brandId }: { panel: string
   return <PanelParts>{body}</PanelParts>
 }
 
-/** What a top bar pop-up holds for the selection: the short cards and choices moved in as they are. */
+/** What a top bar pop-up holds for the selection: a short card or a row of choices. */
 export function PopupContent({ popup, target, design }: { popup: string; target: Target; design: Design }) {
   const t = useMessages()
   const p = t.editor.props

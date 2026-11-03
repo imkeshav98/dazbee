@@ -65,9 +65,32 @@ function Panel({ id, target, design, brandId }: { id: PanelId; target: Target; d
   // The focus goes back to the bar item at once, before the panel goes: later, it could take the
   // focus from whatever the next click or key opened.
   const close = (back: boolean) => {
-    if (back) document.querySelector<HTMLElement>(`[data-testid="bar-${id}"]`)?.focus()
+    if (back) document.querySelector<HTMLElement>(`[data-opens="${id}"]`)?.focus()
     setOpen(null)
   }
+  // Esc closes the panel before it clears the selection, wherever the focus is. In a field of the
+  // panel the field still takes the key, throwing away what was typed, and the panel closes with
+  // it; the focus goes back to the bar item once the field has let it go.
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape' || event.defaultPrevented) return
+      const at = document.activeElement
+      // A pop-up of the panel's own, such as a select's list, closes first.
+      if (at instanceof Element && at.closest('[data-radix-popper-content-wrapper]')) return
+      if (at instanceof HTMLElement && panel.current?.contains(at) && (at.tagName === 'INPUT' || at.tagName === 'TEXTAREA' || at.tagName === 'SELECT')) {
+        setOpen(null)
+        requestAnimationFrame(() => {
+          if (document.activeElement === document.body || document.activeElement === null) document.querySelector<HTMLElement>(`[data-opens="${id}"]`)?.focus()
+        })
+        return
+      }
+      event.stopImmediatePropagation()
+      event.preventDefault()
+      close(panel.current?.contains(at) ?? false)
+    }
+    window.addEventListener('keydown', onKey, true)
+    return () => window.removeEventListener('keydown', onKey, true)
+  })
   // The focus moves into the panel as it opens, onto the panel itself: Tab goes on to its
   // controls, and no field takes the focus, so a phone's keyboard stays down.
   useEffect(() => {
@@ -100,12 +123,6 @@ function Panel({ id, target, design, brandId }: { id: PanelId; target: Target; d
       tabIndex={-1}
       data-testid={`bar-${id}-menu`}
       data-panel={id}
-      onKeyDown={(event) => {
-        if (event.key !== 'Escape' || event.defaultPrevented) return
-        event.preventDefault()
-        event.stopPropagation()
-        close(true)
-      }}
       style={phone ? undefined : { top, maxHeight: `calc(100% - ${top}px - 4.5rem)` }}
       className={cn(
         'pop-in absolute z-20 flex flex-col overflow-hidden rounded-[16px] surface-frost outline-none',

@@ -14,7 +14,7 @@ import { designOf, openTabs, placed, reloads, settle, writeOutput } from '../sup
 import { importGoogleFonts } from '../support/fonts.ts'
 import { newBrand, putKit } from '../support/seed.ts'
 import { choose } from '../support/select.ts'
-import { barMenu, drag, fillList, moreAction, moreMenu, openStage, scopeMenu, strokeList, openCard } from '../support/stage.ts'
+import { barMenu, drag, fillList, moreAction, moreMenu, moreSubmenu, openStage, scopeMenu, strokeList, openCard } from '../support/stage.ts'
 
 // Each row opens its own design, so CI spreads the rows over its shards.
 test.describe.configure({ mode: 'parallel', timeout: 180_000 })
@@ -172,16 +172,16 @@ test.describe('every selection', () => {
   row(1, 'apply changes to this format or all formats', async (open) => {
     const page = await open(true)
     await select(page, ['box'])
-    const x = (await openCard(page, 'layout-card')).getByRole('spinbutton', { name: 'X position' })
+    const x = async () => (await openCard(page, 'layout-card')).getByRole('spinbutton', { name: 'X position' })
     await expect((await scopeMenu(page)).getByRole('radio', { name: 'Only Square' })).toHaveAttribute('aria-checked', 'true')
     await page.keyboard.press('Escape')
-    await step(page, async () => enter(x, '500'), async () => {
+    await step(page, async () => enter((await x()), '500'), async () => {
       await expect.poll(async () => (await doc(page)).overrides['format:sq']?.box?.x).toBe(500)
       expect((await doc(page)).nodes.box?.props.x).toBe(80)
     })
     await (await scopeMenu(page)).getByRole('radio', { name: 'All sizes' }).click()
     await page.keyboard.press('Escape')
-    await step(page, async () => enter(x, '200'), async () => {
+    await step(page, async () => enter((await x()), '200'), async () => {
       await expect.poll(async () => (await doc(page)).nodes.box?.props.x).toBe(200)
       expect((await doc(page)).overrides['format:sq']?.box ?? {}).not.toHaveProperty('x')
     })
@@ -208,9 +208,9 @@ test.describe('every selection', () => {
   row(3, 'X, Y, W, H', async (open) => {
     const page = await open()
     await select(page, ['box'])
-    const card = (await openCard(page, 'layout-card'))
+    const card = async () => (await openCard(page, 'layout-card'))
     for (const [name, key, value] of [['X position', 'x', 140], ['Y position', 'y', 120], ['Width', 'width', 320], ['Height', 'height', 220]] as const) {
-      await step(page, async () => enter(card.getByRole('spinbutton', { name }), String(value)), async () => {
+      await step(page, async () => enter((await card()).getByRole('spinbutton', { name }), String(value)), async () => {
         await expect.poll(async () => (await props(page, 'box'))[key]).toBe(value)
       })
     }
@@ -238,24 +238,24 @@ test.describe('every selection', () => {
   row(6, 'blend mode, pass-through for groups and frames', async (open) => {
     const page = await open()
     await select(page, ['box'])
-    const blend = (await openCard(page, 'appearance-card')).getByRole('combobox', { name: 'Blend mode' })
-    await step(page, async () => choose(blend, 'difference'), async () => {
+    const blend = async () => (await openCard(page, 'appearance-card')).getByRole('combobox', { name: 'Blend mode' })
+    await step(page, async () => choose((await blend()), 'difference'), async () => {
       await expect.poll(async () => (await props(page, 'box')).blendMode).toBe('difference')
     })
-    await blend.click()
+    await (await blend()).click()
     await expect(page.locator('[role="listbox"] [role="option"]')).toHaveCount(16)
     await page.keyboard.press('Escape')
     // A frame starts as pass-through, which only groups and frames are offered.
     await select(page, ['stack'])
-    await expect(blend).toHaveAttribute('data-value', 'pass-through')
-    await blend.click()
+    await expect((await blend())).toHaveAttribute('data-value', 'pass-through')
+    await (await blend()).click()
     await expect(page.locator('[role="listbox"] [role="option"]')).toHaveCount(17)
     await page.keyboard.press('Escape')
     // Over a white page, the stack draws the same blended as a whole or layer by layer.
-    await step(page, async () => choose(blend, 'normal'), async () => {
+    await step(page, async () => choose((await blend()), 'normal'), async () => {
       await expect.poll(async () => (await props(page, 'stack')).blendMode).toBe('normal')
     }, { draws: false })
-    await step(page, async () => choose(blend, 'pass-through'), async () => {
+    await step(page, async () => choose((await blend()), 'pass-through'), async () => {
       await expect.poll(async () => (await props(page, 'stack')).blendMode).toBe('pass-through')
     }, { draws: false })
     await reloads(page)
@@ -264,11 +264,11 @@ test.describe('every selection', () => {
   row(7, 'mixed values on a multi-selection', async (open) => {
     const page = await open()
     await select(page, ['box', 'dot'])
-    const x = (await openCard(page, 'layout-card')).getByRole('spinbutton', { name: 'X position' })
-    await expect(x).toHaveValue('')
-    await expect(x).toHaveAttribute('placeholder', 'Mixed')
+    const x = async () => (await openCard(page, 'layout-card')).getByRole('spinbutton', { name: 'X position' })
+    await expect((await x())).toHaveValue('')
+    await expect((await x())).toHaveAttribute('placeholder', 'Mixed')
     await expect(await fillList(page)).toContainText('The selected layers differ.')
-    await step(page, async () => x.press('ArrowUp'), async () => {
+    await step(page, async () => (await x()).press('ArrowUp'), async () => {
       await expect.poll(async () => [(await props(page, 'box')).x, (await props(page, 'dot')).x]).toEqual([81, 701])
     })
     await step(page, async () => (await fillList(page)).getByRole('button', { name: 'Use one for all' }).click(), async () => {
@@ -475,50 +475,50 @@ test.describe('text', () => {
   row(16, 'line height, and back to Auto', async (open) => {
     const page = await open()
     await select(page, ['headline'])
-    const field = (await openCard(page, 'spacing-card')).getByRole('spinbutton', { name: 'Line height' })
-    await step(page, async () => enter(field, '1.6'), async () => {
+    const field = async () => (await openCard(page, 'spacing-card')).getByRole('spinbutton', { name: 'Line height' })
+    await step(page, async () => enter((await field()), '1.6'), async () => {
       await expect.poll(async () => (await style(page, 'headline')).lineHeight).toBe(1.6)
     })
-    await step(page, async () => enter(field, ''), async () => {
+    await step(page, async () => enter((await field()), ''), async () => {
       await expect.poll(async () => (await style(page, 'headline')).lineHeight).toBeUndefined()
     })
-    await expect(field).toHaveValue('')
-    await expect(field).toHaveAttribute('placeholder', 'Auto')
+    await expect((await field())).toHaveValue('')
+    await expect((await field())).toHaveAttribute('placeholder', 'Auto')
     // Leaving an emptied field does the same, once 1.4 is in the document and the field shows it.
-    await enter(field, '1.4')
+    await enter((await field()), '1.4')
     await expect.poll(async () => (await style(page, 'headline')).lineHeight).toBe(1.4)
-    await expect(field).toHaveValue('1.4')
+    await expect((await field())).toHaveValue('1.4')
     await step(page, async () => {
-      await field.fill('')
-      await field.press('Tab')
+      await (await field()).fill('')
+      await (await field()).press('Tab')
     }, async () => {
       await expect.poll(async () => (await style(page, 'headline')).lineHeight).toBeUndefined()
     })
     // Two texts, one at 1.6 and its copy at Auto: emptied, both are Auto.
-    await enter(field, '1.6')
+    await enter((await field()), '1.6')
     await expect.poll(async () => (await style(page, 'headline')).lineHeight).toBe(1.6)
     await moreAction(page, 'Duplicate')
     const copy = (await page.evaluate(() => window.dazbee?.selection() ?? []))[0] ?? ''
     await select(page, [copy])
-    await expect(field).toHaveValue('1.6')
-    await enter(field, '')
+    await expect((await field())).toHaveValue('1.6')
+    await enter((await field()), '')
     await select(page, ['headline', copy])
-    await expect(field).toHaveAttribute('placeholder', 'Mixed')
-    await field.press('Enter')
+    await expect((await field())).toHaveAttribute('placeholder', 'Mixed')
+    await (await field()).press('Enter')
     expect((await style(page, 'headline')).lineHeight).toBe(1.6)
     await step(page, async () => {
-      await field.fill('1')
-      await field.fill('')
-      await field.press('Enter')
+      await (await field()).fill('1')
+      await (await field()).fill('')
+      await (await field()).press('Enter')
     }, async () => {
       await expect.poll(async () => [(await style(page, 'headline')).lineHeight, (await style(page, copy)).lineHeight]).toEqual([undefined, undefined])
     })
     await select(page, ['headline'])
     // A field with no unset value keeps its number when emptied.
     const before = await designOf(page)
-    const spacing = (await openCard(page, 'spacing-card')).getByRole('spinbutton', { name: 'Letter spacing' })
-    await enter(spacing, '')
-    await expect(spacing).toHaveValue('0')
+    const spacing = async () => (await openCard(page, 'spacing-card')).getByRole('spinbutton', { name: 'Letter spacing' })
+    await enter((await spacing()), '')
+    await expect((await spacing())).toHaveValue('0')
     expect(await designOf(page)).toBe(before)
     await reloads(page)
   })
@@ -576,7 +576,7 @@ test.describe('text', () => {
   row(21, 'case: as typed, upper, lower, title', async (open) => {
     const page = await open()
     await select(page, ['headline'])
-    const pick = async (textCase: string) => (await barMenu(page, 'align')).getByRole('radiogroup', { name: 'Case' }).locator(`[data-value="${textCase}"]`).click()
+    const pick = async (textCase: string) => (await barMenu(page, 'case')).getByRole('radiogroup', { name: 'Case' }).locator(`[data-value="${textCase}"]`).click()
     for (const textCase of ['upper', 'lower', 'title', 'none']) {
       await step(page, async () => pick(textCase), async () => {
         await expect.poll(async () => (await style(page, 'headline')).textCase ?? 'none').toBe(textCase)
@@ -588,7 +588,7 @@ test.describe('text', () => {
   row(22, 'underline, strikethrough', async (open) => {
     const page = await open()
     await select(page, ['headline'])
-    const toggle = async (name: string) => (await barMenu(page, 'align')).getByRole('button', { name }).click()
+    const toggle = async (name: string) => page.getByTestId('top-bar').getByRole('button', { name, exact: true }).click()
     await step(page, async () => toggle('Underline'), async () => {
       await expect.poll(async () => (await style(page, 'headline')).underline).toBe(true)
     })
@@ -601,7 +601,7 @@ test.describe('text', () => {
   row(23, 'list: none, bullets, numbers', async (open) => {
     const page = await open()
     await select(page, ['headline'])
-    const pick = async (list: string) => (await barMenu(page, 'align')).getByRole('radiogroup', { name: 'List' }).locator(`[data-value="${list}"]`).click()
+    const pick = async (list: string) => (await barMenu(page, 'list')).getByRole('radiogroup', { name: 'List' }).locator(`[data-value="${list}"]`).click()
     for (const list of ['bullet', 'number', 'none']) {
       await step(page, async () => pick(list), async () => {
         await expect.poll(async () => (await props(page, 'headline')).list ?? 'none').toBe(list)
@@ -629,19 +629,19 @@ test.describe('text', () => {
   row(25, 'box mode: auto width, auto height, fixed', async (open) => {
     const page = await open()
     await select(page, ['headline'])
-    const box = (await openCard(page, 'text-box-card')).getByRole('radiogroup', { name: 'Box' })
+    const box = async () => (await openCard(page, 'text-box-card')).getByRole('radiogroup', { name: 'Box' })
     const size = async () => { const p = await props(page, 'headline'); return [p.width, p.height] }
     // The lines start at the box's start and top in every mode, so the picture stays the same.
-    await step(page, async () => box.locator('[data-value="autoWidth"]').click(), async () => {
+    await step(page, async () => (await box()).locator('[data-value="autoWidth"]').click(), async () => {
       await expect.poll(async () => (await props(page, 'headline')).boxMode).toBe('autoWidth')
       await expect.poll(async () => (await size())[0]).toBeLessThan(760)
     }, { draws: false })
-    await step(page, async () => box.locator('[data-value="autoHeight"]').click(), async () => {
+    await step(page, async () => (await box()).locator('[data-value="autoHeight"]').click(), async () => {
       await expect.poll(async () => (await props(page, 'headline')).boxMode).toBe('autoHeight')
       await expect.poll(async () => (await size())[1]).toBeLessThan(260)
     }, { draws: false })
     const kept = await size()
-    await step(page, async () => box.locator('[data-value="fixed"]').click(), async () => {
+    await step(page, async () => (await box()).locator('[data-value="fixed"]').click(), async () => {
       await expect.poll(async () => (await props(page, 'headline')).boxMode).toBe('fixed')
       expect(await size()).toEqual(kept)
     }, { draws: false })
@@ -651,15 +651,15 @@ test.describe('text', () => {
   row(26, 'shrink to fit, smallest and largest size', async (open) => {
     const page = await open()
     await select(page, ['headline'])
-    const card = (await openCard(page, 'text-box-card'))
+    const card = async () => (await openCard(page, 'text-box-card'))
     // The text fits its box at 72 already, so turning it on changes nothing drawn.
-    await step(page, async () => card.getByRole('switch', { name: 'Shrink to fit' }).click(), async () => {
+    await step(page, async () => (await card()).getByRole('switch', { name: 'Shrink to fit' }).click(), async () => {
       await expect.poll(async () => (await props(page, 'headline')).shrinkToFit).toBeTruthy()
     }, { draws: false })
-    await step(page, async () => enter(card.getByRole('spinbutton', { name: 'Largest size' }), '200'), async () => {
+    await step(page, async () => enter((await card()).getByRole('spinbutton', { name: 'Largest size' }), '200'), async () => {
       await expect.poll(async () => (await props(page, 'headline')).shrinkToFit).toMatchObject({ max: 200 })
     })
-    await step(page, async () => enter(card.getByRole('spinbutton', { name: 'Smallest size' }), '120'), async () => {
+    await step(page, async () => enter((await card()).getByRole('spinbutton', { name: 'Smallest size' }), '120'), async () => {
       await expect.poll(async () => (await props(page, 'headline')).shrinkToFit).toMatchObject({ min: 120, max: 200 })
     })
     await reloads(page)
@@ -895,40 +895,40 @@ test.describe('shapes and frames', () => {
   row(38, 'rectangle and box corners, each corner its own', async (open) => {
     const page = await open()
     await select(page, ['box'])
-    const card = (await openCard(page, 'shape-card'))
-    await expect.soft(card.getByRole('heading')).toHaveText('Rectangle')
+    const card = async () => (await openCard(page, 'shape-card'))
+    await expect.soft((await card()).getByRole('heading')).toHaveText('Rectangle')
     const shape = async () => (await props(page, 'box')).shape as Record<string, unknown>
-    await step(page, async () => enter(card.getByRole('spinbutton', { name: 'Corners' }), '60'), async () => { await expect.poll(shape).toMatchObject({ cornerRadius: 60 }) })
+    await step(page, async () => enter((await card()).getByRole('spinbutton', { name: 'Corners' }), '60'), async () => { await expect.poll(shape).toMatchObject({ cornerRadius: 60 }) })
     // Each corner starts at the radius all four had.
-    await step(page, async () => card.getByRole('switch', { name: 'Each corner its own' }).click(), async () => {
+    await step(page, async () => (await card()).getByRole('switch', { name: 'Each corner its own' }).click(), async () => {
       await expect.poll(async () => (await shape()).corners).toEqual([60, 60, 60, 60])
     }, { draws: false })
     for (const [i, corner, radius] of [[0, 'Top left', 0], [1, 'Top right', 20], [2, 'Bottom right', 90], [3, 'Bottom left', 40]] as const) {
-      await step(page, async () => enter(card.getByRole('spinbutton', { name: `${corner} radius` }), String(radius)), async () => {
+      await step(page, async () => enter((await card()).getByRole('spinbutton', { name: `${corner} radius` }), String(radius)), async () => {
         await expect.poll(async () => ((await shape()).corners as number[])[i]).toBe(radius)
       })
     }
     // Back to one radius: the top left's, and the corners go.
-    await step(page, async () => enter(card.getByRole('spinbutton', { name: 'Top left radius' }), '30'), async () => {
+    await step(page, async () => enter((await card()).getByRole('spinbutton', { name: 'Top left radius' }), '30'), async () => {
       await expect.poll(async () => ((await shape()).corners as number[])[0]).toBe(30)
     })
-    await step(page, async () => card.getByRole('switch', { name: 'Each corner its own' }).click(), async () => {
+    await step(page, async () => (await card()).getByRole('switch', { name: 'Each corner its own' }).click(), async () => {
       await expect.poll(shape).toEqual({ kind: 'rect', cornerRadius: 30 })
     })
     // A box has the same corners, in its Box card.
     await select(page, ['plain'])
-    const box = (await openCard(page, 'frame-card'))
-    await step(page, async () => enter(box.getByRole('spinbutton', { name: 'Corners' }), '50'), async () => {
+    const box = async () => (await openCard(page, 'frame-card'))
+    await step(page, async () => enter((await box()).getByRole('spinbutton', { name: 'Corners' }), '50'), async () => {
       await expect.poll(async () => (await props(page, 'plain')).cornerRadius).toBe(50)
     })
-    await step(page, async () => box.getByRole('switch', { name: 'Each corner its own' }).click(), async () => {
+    await step(page, async () => (await box()).getByRole('switch', { name: 'Each corner its own' }).click(), async () => {
       await expect.poll(async () => (await props(page, 'plain')).cornerRadius).toEqual([50, 50, 50, 50])
     }, { draws: false })
-    await step(page, async () => enter(box.getByRole('spinbutton', { name: 'Top right radius' }), '0'), async () => {
+    await step(page, async () => enter((await box()).getByRole('spinbutton', { name: 'Top right radius' }), '0'), async () => {
       await expect.poll(async () => (await props(page, 'plain')).cornerRadius).toEqual([50, 0, 50, 50])
     })
     // Back to one radius: the top left's.
-    await step(page, async () => box.getByRole('switch', { name: 'Each corner its own' }).click(), async () => {
+    await step(page, async () => (await box()).getByRole('switch', { name: 'Each corner its own' }).click(), async () => {
       await expect.poll(async () => (await props(page, 'plain')).cornerRadius).toBe(50)
     })
     await reloads(page)
@@ -937,43 +937,43 @@ test.describe('shapes and frames', () => {
   row(39, 'polygon sides and corners', async (open) => {
     const page = await open()
     await select(page, ['poly'])
-    const card = (await openCard(page, 'shape-card'))
-    await expect.soft(card.getByRole('heading')).toHaveText('Polygon')
+    const card = async () => (await openCard(page, 'shape-card'))
+    await expect.soft((await card()).getByRole('heading')).toHaveText('Polygon')
     const shape = async () => (await props(page, 'poly')).shape
-    await step(page, async () => enter(card.getByRole('spinbutton', { name: 'Sides' }), '8'), async () => { await expect.poll(shape).toMatchObject({ sides: 8 }) })
+    await step(page, async () => enter((await card()).getByRole('spinbutton', { name: 'Sides' }), '8'), async () => { await expect.poll(shape).toMatchObject({ sides: 8 }) })
     // Sides are at least three: Home takes them there.
-    await step(page, async () => card.getByRole('spinbutton', { name: 'Sides' }).press('Home'), async () => { await expect.poll(shape).toMatchObject({ sides: 3 }) })
-    await step(page, async () => enter(card.getByRole('spinbutton', { name: 'Corners' }), '20'), async () => { await expect.poll(shape).toMatchObject({ cornerRadius: 20 }) })
+    await step(page, async () => (await card()).getByRole('spinbutton', { name: 'Sides' }).press('Home'), async () => { await expect.poll(shape).toMatchObject({ sides: 3 }) })
+    await step(page, async () => enter((await card()).getByRole('spinbutton', { name: 'Corners' }), '20'), async () => { await expect.poll(shape).toMatchObject({ cornerRadius: 20 }) })
     await reloads(page)
   })
 
   row(40, 'star points, inner, corners', async (open) => {
     const page = await open()
     await select(page, ['star'])
-    const card = (await openCard(page, 'shape-card'))
+    const card = async () => (await openCard(page, 'shape-card'))
     const shape = async () => (await props(page, 'star')).shape
-    await step(page, async () => enter(card.getByRole('spinbutton', { name: 'Points' }), '8'), async () => { await expect.poll(shape).toMatchObject({ points: 8 }) })
-    await step(page, async () => enter(card.getByRole('spinbutton', { name: 'Inner' }), '70'), async () => { await expect.poll(shape).toMatchObject({ innerRadius: 0.7 }) })
+    await step(page, async () => enter((await card()).getByRole('spinbutton', { name: 'Points' }), '8'), async () => { await expect.poll(shape).toMatchObject({ points: 8 }) })
+    await step(page, async () => enter((await card()).getByRole('spinbutton', { name: 'Inner' }), '70'), async () => { await expect.poll(shape).toMatchObject({ innerRadius: 0.7 }) })
     // The arrow keys step the points by one and the inner radius by a percent, as it shows.
-    await step(page, async () => card.getByRole('spinbutton', { name: 'Points' }).press('ArrowUp'), async () => { await expect.soft.poll(shape).toMatchObject({ points: 9 }) })
-    await step(page, async () => card.getByRole('spinbutton', { name: 'Inner' }).press('ArrowUp'), async () => { await expect.soft.poll(shape).toMatchObject({ innerRadius: 0.71 }) })
-    await step(page, async () => enter(card.getByRole('spinbutton', { name: 'Corners' }), '10'), async () => { await expect.poll(shape).toMatchObject({ cornerRadius: 10 }) })
+    await step(page, async () => (await card()).getByRole('spinbutton', { name: 'Points' }).press('ArrowUp'), async () => { await expect.soft.poll(shape).toMatchObject({ points: 9 }) })
+    await step(page, async () => (await card()).getByRole('spinbutton', { name: 'Inner' }).press('ArrowUp'), async () => { await expect.soft.poll(shape).toMatchObject({ innerRadius: 0.71 }) })
+    await step(page, async () => enter((await card()).getByRole('spinbutton', { name: 'Corners' }), '10'), async () => { await expect.poll(shape).toMatchObject({ cornerRadius: 10 }) })
     // A rectangle and a star selected together have no Shape card.
     await select(page, ['box', 'star'])
-    await expect.soft(card).toHaveCount(0)
+    await expect.soft((await card())).toHaveCount(0)
     await reloads(page)
   })
 
   row(41, 'line start and end', async (open) => {
     const page = await open()
     await select(page, ['rule'])
-    const card = (await openCard(page, 'shape-card'))
+    const card = async () => (await openCard(page, 'shape-card'))
     const shape = async () => (await props(page, 'rule')).shape
     for (const end of ['arrow', 'triangle', 'circle']) {
-      await step(page, async () => choose(card.getByRole('combobox', { name: 'Line start' }), end), async () => { await expect.poll(shape).toMatchObject({ start: end }) })
+      await step(page, async () => choose((await card()).getByRole('combobox', { name: 'Line start' }), end), async () => { await expect.poll(shape).toMatchObject({ start: end }) })
     }
-    await step(page, async () => choose(card.getByRole('combobox', { name: 'Line end' }), 'arrow'), async () => { await expect.poll(shape).toMatchObject({ end: 'arrow' }) })
-    await step(page, async () => choose(card.getByRole('combobox', { name: 'Line start' }), 'none'), async () => { await expect.poll(shape).toMatchObject({ start: 'none' }) })
+    await step(page, async () => choose((await card()).getByRole('combobox', { name: 'Line end' }), 'arrow'), async () => { await expect.poll(shape).toMatchObject({ end: 'arrow' }) })
+    await step(page, async () => choose((await card()).getByRole('combobox', { name: 'Line start' }), 'none'), async () => { await expect.poll(shape).toMatchObject({ start: 'none' }) })
     await reloads(page)
   })
 
@@ -1022,10 +1022,10 @@ test.describe('photos', () => {
     const page = await open()
     await select(page, ['photo'])
     // The fit is a row in the header card.
-    const field = (await openCard(page, 'layout-card')).getByRole('radiogroup', { name: 'Fit' })
+    const field = async () => (await openCard(page, 'layout-card')).getByRole('radiogroup', { name: 'Fit' })
     for (const fit of ['fit', 'tile', 'crop', 'fill']) {
       // Crop with no crop box shows what fill shows.
-      await step(page, async () => field.locator(`[data-value="${fit}"]`).click(), async () => { await expect.poll(() => image(page)).toMatchObject({ fit }) }, { draws: fit !== 'crop' && fit !== 'fill' })
+      await step(page, async () => (await field()).locator(`[data-value="${fit}"]`).click(), async () => { await expect.poll(() => image(page)).toMatchObject({ fit }) }, { draws: fit !== 'crop' && fit !== 'fill' })
     }
     await reloads(page)
   })
@@ -1033,9 +1033,9 @@ test.describe('photos', () => {
   row(46, 'filter', async (open) => {
     const page = await open()
     await select(page, ['photo'])
-    const filters = (await openCard(page, 'look-card')).getByRole('radiogroup', { name: 'Filter' })
+    const filters = async () => (await openCard(page, 'look-card')).getByRole('radiogroup', { name: 'Filter' })
     for (const [name, filter] of [['Mono', 'mono'], ['Sepia', 'sepia'], ['Vivid', 'vivid'], ['Fade', 'fade'], ['Warm', 'warm'], ['Cool', 'cool'], ['Original', undefined]] as const) {
-      await step(page, async () => filters.getByRole('radio', { name }).click(), async () => { await expect.poll(async () => (await image(page)).filter).toBe(filter) })
+      await step(page, async () => (await filters()).getByRole('radio', { name }).click(), async () => { await expect.poll(async () => (await image(page)).filter).toBe(filter) })
     }
     await reloads(page)
   })
@@ -1043,9 +1043,9 @@ test.describe('photos', () => {
   row(47, 'adjust: exposure, contrast, saturation, temperature, tint', async (open) => {
     const page = await open()
     await select(page, ['photo'])
-    const card = (await openCard(page, 'adjust-card'))
+    const card = async () => (await openCard(page, 'adjust-card'))
     for (const [name, key] of [['Light', 'exposure'], ['Contrast', 'contrast'], ['Saturation', 'saturation'], ['Warmth', 'temperature'], ['Tint', 'tint']] as const) {
-      await step(page, async () => enter(card.getByRole('spinbutton', { name }), '40'), async () => {
+      await step(page, async () => enter((await card()).getByRole('spinbutton', { name }), '40'), async () => {
         await expect.poll(async () => ((await image(page)).adjust as Record<string, number> | undefined)?.[key]).toBe(40)
       })
     }
@@ -1055,8 +1055,8 @@ test.describe('photos', () => {
   row(48, 'image opacity', async (open) => {
     const page = await open()
     await select(page, ['photo'])
-    const card = (await openCard(page, 'adjust-card'))
-    await step(page, async () => enter(card.getByRole('spinbutton', { name: 'Image opacity' }), '50'), async () => {
+    const card = async () => (await openCard(page, 'adjust-card'))
+    await step(page, async () => enter((await card()).getByRole('spinbutton', { name: 'Image opacity' }), '50'), async () => {
       await expect.poll(async () => (await image(page)).opacity).toBe(0.5)
     })
     await reloads(page)
@@ -1089,11 +1089,11 @@ test.describe('frames and auto layout', () => {
   row(51, 'direction and wrap', async (open) => {
     const page = await open()
     await select(page, ['stack'])
-    const card = (await openCard(page, 'auto-layout-card'))
-    await step(page, async () => card.getByRole('radio', { name: 'Column' }).click(), async () => { await expect.poll(() => layout(page)).toMatchObject({ direction: 'column' }) })
-    await card.getByRole('radio', { name: 'Row' }).click()
-    await enter(card.getByRole('spinbutton', { name: 'Room between' }), '400')
-    await step(page, async () => card.getByRole('switch', { name: 'Wrap onto more lines' }).click(), async () => { await expect.poll(() => layout(page)).toMatchObject({ wrap: true }) })
+    const card = async () => (await openCard(page, 'auto-layout-card'))
+    await step(page, async () => (await card()).getByRole('radio', { name: 'Column' }).click(), async () => { await expect.poll(() => layout(page)).toMatchObject({ direction: 'column' }) })
+    await (await card()).getByRole('radio', { name: 'Row' }).click()
+    await enter((await card()).getByRole('spinbutton', { name: 'Room between' }), '400')
+    await step(page, async () => (await card()).getByRole('switch', { name: 'Wrap onto more lines' }).click(), async () => { await expect.poll(() => layout(page)).toMatchObject({ wrap: true }) })
     await reloads(page)
   })
 
@@ -1109,10 +1109,10 @@ test.describe('frames and auto layout', () => {
   row(53, 'padding, four sides', async (open) => {
     const page = await open()
     await select(page, ['stack'])
-    const card = (await openCard(page, 'auto-layout-card'))
+    const card = async () => (await openCard(page, 'auto-layout-card'))
     for (const side of ['top', 'right', 'bottom', 'left']) {
       // The stack is wider than its row: padding on the end side moves nothing.
-      await step(page, async () => enter(card.getByRole('spinbutton', { name: `Room at the ${side}` }), '8'), async () => {
+      await step(page, async () => enter((await card()).getByRole('spinbutton', { name: `Room at the ${side}` }), '8'), async () => {
         await expect.poll(async () => ((await layout(page))?.padding as Record<string, number>)[side]).toBe(8)
       }, { draws: side === 'top' || side === 'left' })
     }
@@ -1126,19 +1126,19 @@ test.describe('frames and auto layout', () => {
     for (const justify of ['center', 'end']) {
       await step(page, async () => (await cell(page, justify, align)).click(), async () => { await expect.poll(() => layout(page)).toMatchObject({ justify, align }) })
     }
-    const spread = (await openCard(page, 'auto-layout-card')).getByRole('combobox', { name: 'Spread out' })
-    await step(page, async () => choose(spread, 'between'), async () => { await expect.poll(() => layout(page)).toMatchObject({ justify: 'space-between' }) })
+    const spread = async () => (await openCard(page, 'auto-layout-card')).getByRole('combobox', { name: 'Spread out' })
+    await step(page, async () => choose((await spread()), 'between'), async () => { await expect.poll(() => layout(page)).toMatchObject({ justify: 'space-between' }) })
     // Packed again, the stack lines up from the start.
-    await step(page, async () => choose(spread, 'packed'), async () => { await expect.poll(() => layout(page)).toMatchObject({ justify: 'start' }) })
+    await step(page, async () => choose((await spread()), 'packed'), async () => { await expect.poll(() => layout(page)).toMatchObject({ justify: 'start' }) })
     await reloads(page)
   })
 
   row(55, 'align: start, centre, end', async (open) => {
     const page = await open()
     await select(page, ['stack'])
-    const card = (await openCard(page, 'auto-layout-card'))
-    await enter(card.getByRole('spinbutton', { name: 'Room at the top' }), '0')
-    await enter(card.getByRole('spinbutton', { name: 'Room at the bottom' }), '0')
+    const card = async () => (await openCard(page, 'auto-layout-card'))
+    await enter((await card()).getByRole('spinbutton', { name: 'Room at the top' }), '0')
+    await enter((await card()).getByRole('spinbutton', { name: 'Room at the bottom' }), '0')
     const { justify } = (await layout(page)) ?? {}
     for (const align of ['center', 'end', 'start']) {
       await step(page, async () => (await cell(page, justify, align)).click(), async () => { await expect.poll(() => layout(page)).toMatchObject({ align, justify }) })
@@ -1149,15 +1149,15 @@ test.describe('frames and auto layout', () => {
   row(56, "the frame's own sizing", async (open) => {
     const page = await open()
     await select(page, ['stack'])
-    const card = (await openCard(page, 'auto-layout-card'))
-    await step(page, async () => choose(card.getByRole('combobox', { name: 'Width sizing' }), 'hug'), async () => {
+    const card = async () => (await openCard(page, 'auto-layout-card'))
+    await step(page, async () => choose((await card()).getByRole('combobox', { name: 'Width sizing' }), 'hug'), async () => {
       await expect.poll(async () => (await props(page, 'stack')).sizing).toMatchObject({ width: 'hug' })
     })
-    await step(page, async () => choose(card.getByRole('combobox', { name: 'Width sizing' }), 'fixed'), async () => {
+    await step(page, async () => choose((await card()).getByRole('combobox', { name: 'Width sizing' }), 'fixed'), async () => {
       await expect.poll(async () => (await props(page, 'stack')).sizing).toMatchObject({ width: 'fixed' })
     }, { draws: false })
     // Its height is already what its chips need, so hug draws it the same.
-    await step(page, async () => choose(card.getByRole('combobox', { name: 'Height sizing' }), 'hug'), async () => {
+    await step(page, async () => choose((await card()).getByRole('combobox', { name: 'Height sizing' }), 'hug'), async () => {
       await expect.poll(async () => (await props(page, 'stack')).sizing).toMatchObject({ height: 'hug' })
     }, { draws: false })
     await reloads(page)
@@ -1166,8 +1166,8 @@ test.describe('frames and auto layout', () => {
   row(57, "a child's sizing", async (open) => {
     const page = await open()
     await select(page, ['chip1'])
-    const card = (await openCard(page, 'flow-card'))
-    const pick = (axis: 'Width' | 'Height', sizing: string) => choose(card.getByRole('combobox', { name: `${axis} sizing` }), sizing)
+    const card = async () => (await openCard(page, 'flow-card'))
+    const pick = async (axis: 'Width' | 'Height', sizing: string) => choose((await card()).getByRole('combobox', { name: `${axis} sizing` }), sizing)
     await step(page, async () => pick('Width', 'fill'), async () => {
       await expect.poll(async () => (await props(page, 'chip1')).sizing).toMatchObject({ width: 'fill' })
     })
@@ -1187,10 +1187,10 @@ test.describe('frames and auto layout', () => {
   row(58, 'a child kept where it is, out of the flow', async (open) => {
     const page = await open()
     await select(page, ['chip1'])
-    const box = (await openCard(page, 'flow-card')).getByRole('switch', { name: 'Keep where I put it' })
+    const box = async () => (await openCard(page, 'flow-card')).getByRole('switch', { name: 'Keep where I put it' })
     // Out of the flow, Chip 2 moves up to where Chip 1 was.
-    await step(page, async () => box.click(), async () => { await expect.poll(async () => (await props(page, 'chip1')).absolute).toBe(true) })
-    await step(page, async () => box.click(), async () => { await expect.poll(async () => (await props(page, 'chip1')).absolute).toBeFalsy() })
+    await step(page, async () => (await box()).click(), async () => { await expect.poll(async () => (await props(page, 'chip1')).absolute).toBe(true) })
+    await step(page, async () => (await box()).click(), async () => { await expect.poll(async () => (await props(page, 'chip1')).absolute).toBeFalsy() })
     await reloads(page)
   })
 })
@@ -1397,5 +1397,88 @@ test.describe('nothing selected', () => {
     } finally {
       await other.context().close()
     }
+  })
+})
+
+test.describe('top bar and full menu', () => {
+  row(69, 'bold and italic on the top bar', async (open) => {
+    const page = await open()
+    await select(page, ['headline'])
+    await step(page, async () => page.getByTestId('bar-bold').click(), async () => {
+      await expect.poll(async () => (await style(page, 'headline')).fontWeight).toBeLessThan(600)
+    })
+    await step(page, async () => page.getByTestId('bar-italic').click(), async () => {
+      await expect.poll(async () => (await style(page, 'headline')).fontStyle).toBe('italic')
+    })
+    await reloads(page)
+  })
+
+  row(70, 'text direction in the full menu', async (open) => {
+    const page = await open()
+    await select(page, ['headline'])
+    await step(page, async () => (await moreSubmenu(page, 'text-direction')).getByRole('button', { name: 'Right to left' }).click(), async () => {
+      await expect.poll(async () => (await props(page, 'headline')).direction).toBe('rtl')
+    })
+    await reloads(page)
+  })
+
+  row(71, 'line up and spread selected layers from the top bar', async (open) => {
+    const page = await open()
+    await select(page, ['box', 'dot'])
+    await step(page, async () => (await barMenu(page, 'line-up')).getByRole('button', { name: 'Align left' }).click(), async () => {
+      await expect.poll(async () => (await props(page, 'dot')).x).toBe(80)
+    })
+    await page.keyboard.press('Escape')
+    await select(page, ['box', 'dot', 'poly'])
+    await step(page, async () => (await barMenu(page, 'line-up')).getByRole('button', { name: /^Distribute horizontally/ }).click(), async () => {
+      await expect.poll(async () => (await props(page, 'poly')).x).not.toBe(420)
+    })
+    await reloads(page)
+  })
+
+  row(72, 'lock and hide in this size from the full menu', async (open) => {
+    const page = await open(true)
+    await select(page, ['box'])
+    await step(page, async () => moreAction(page, 'Lock'), async () => {
+      await expect.poll(async () => Object.values((await doc(page)).nodes.box?.lock ?? {}).some(Boolean)).toBe(true)
+    }, { draws: false })
+    await step(page, async () => moreAction(page, 'Hide in this size'), async () => {
+      await expect.poll(async () => (await props(page, 'box')).visible).toBe(false)
+      await expect.poll(async () => (await doc(page)).nodes.box?.props.visible).not.toBe(false)
+    })
+    await reloads(page)
+  })
+
+  row(73, 'frame clipping from the Box pop-up', async (open) => {
+    const page = await open()
+    await select(page, ['plain'])
+    await step(page, async () => (await openCard(page, 'frame-card')).getByRole('switch', { name: "Hide what's outside" }).click(), async () => {
+      await expect.poll(async () => (await props(page, 'plain')).clip).toBe(false)
+    })
+    await reloads(page)
+  })
+
+  row(74, 'mask by brightness from the Mask pop-up', async (open) => {
+    const page = await open()
+    await select(page, ['box'])
+    await moreAction(page, 'Use as mask')
+    await expect.poll(async () => (await props(page, 'box')).mask).toBe('alpha')
+    await step(page, async () => (await openCard(page, 'mask-card')).getByRole('radio', { name: 'Brightness' }).click(), async () => {
+      await expect.poll(async () => (await props(page, 'box')).mask).toBe('luminance')
+    })
+    await reloads(page)
+  })
+
+  row(75, "a boolean's operation from its Combine pop-up", async (open) => {
+    const page = await open()
+    await select(page, ['box', 'poly'])
+    await (await barMenu(page, 'combine')).getByRole('button', { name: /^Union/ }).click()
+    const made = async () => Object.entries((await doc(page)).nodes).find(([, n]) => n.type === 'boolean')?.[0] ?? ''
+    await expect.poll(made).not.toBe('')
+    await select(page, [await made()])
+    await step(page, async () => (await openCard(page, 'combine-card')).getByRole('radio', { name: 'Subtract' }).click(), async () => {
+      await expect.poll(async () => (await props(page, await made())).op).toBe('subtract')
+    })
+    await reloads(page)
   })
 })

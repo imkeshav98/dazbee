@@ -43,6 +43,12 @@ const design = (assetId: string): DesignInput => ({
     turned: rect('Turned', 'b0', 820, 60, { width: 160, height: 100, rotation: 30 }),
     cutter: rect('Cutter', 'b1', 740, 880, { width: 120, height: 120, mask: 'alpha', shape: { kind: 'rect', cornerRadius: 30 } }),
     locked: { ...rect('Locked', 'b2', 900, 880, { width: 120, height: 120 }), lock: { move: true, resize: true } },
+    hidden: rect('Hidden', 'b3', 900, 280, { width: 120, height: 80, visible: false }),
+    photoB: rect('Photo B', 'b4', 900, 380, { width: 120, height: 80, fills: [{ type: 'image', assetId, fit: 'fill' }] }),
+    frameB: { type: 'frame', parentId: 'p1', index: 'b5', name: 'Card B', props: { x: 560, y: 320, width: 160, height: 90, fills: solid('#EEF1F6FF') } },
+    comboB: { type: 'boolean', parentId: 'p1', index: 'b6', name: 'Combo B', props: { x: 60, y: 660, width: 140, height: 50, op: 'subtract', fills: solid('#E0157FFF') } },
+    d1: { type: 'graphic', parentId: 'comboB', index: 'a0', name: 'D1', props: { x: 60, y: 660, width: 100, height: 50, shape: { kind: 'ellipse' } } },
+    d2: { type: 'graphic', parentId: 'comboB', index: 'a1', name: 'D2', props: { x: 100, y: 660, width: 100, height: 50, shape: { kind: 'ellipse' } } },
   },
   overrides: { 'format:st': { headline: { y: 200 } } },
 })
@@ -51,7 +57,8 @@ const design = (assetId: string): DesignInput => ({
 const SELECTIONS: Record<string, string[]> = {
   text: ['headline'], rectangle: ['box'], star: ['star'], line: ['line'], box: ['frame'], group: ['group'], boolean: ['combo'],
   photo: ['photo'], 'photo in a box': ['photoFrame'], 'several shapes': ['box', 'star'], 'text and a shape': ['headline', 'box'],
-  rotated: ['turned'], 'in a group': ['g1'], 'in auto layout': ['inStack'], masked: ['cutter'], locked: ['locked'],
+  'several photos': ['photo', 'photoB'], 'several boxes': ['frame', 'frameB'], 'several booleans': ['combo', 'comboB'],
+  rotated: ['turned'], 'in a group': ['g1'], 'in auto layout': ['inStack'], masked: ['cutter'], locked: ['locked'], hidden: ['hidden'],
 }
 
 /** The editor's chrome and the pieces of the top bar, small menu and edit panel that must never meet. */
@@ -163,11 +170,17 @@ test('each kind gets its own top bar; several layers add Line up, Combine for sh
   expect(await items(['frame'])).toEqual(['scope', 'colour', 'outline', 'stack', 'box', 'effects', 'transparency', 'position'])
   expect(await items(['group'])).toEqual(['scope', 'effects', 'transparency', 'position'])
   expect(await items(['photo'])).toEqual(['scope', 'edit', 'replace', 'crop', 'corners', 'outline', 'effects', 'transparency', 'position'])
-  expect(await items(['photoFrame'])).toEqual(['scope', 'edit', 'replace', 'crop', 'outline', 'stack', 'box', 'effects', 'transparency', 'position'])
+  expect(await items(['photoFrame'])).toEqual(['scope', 'edit', 'replace', 'crop', 'stack', 'box', 'outline', 'effects', 'transparency', 'position'])
   expect(await items(['cutter'])).toEqual(['scope', 'colour', 'outline', 'shape', 'mask', 'effects', 'transparency', 'position'])
   expect(await items(['box', 'star'])).toEqual(['scope', 'colour', 'outline', 'effects', 'transparency', 'position', 'line-up', 'combine', 'autoLayout'])
   expect(await items(['headline', 'box'])).toEqual(['scope', 'font', 'effects', 'transparency', 'position', 'line-up', 'autoLayout'])
   expect(await items(['box', 'frame'])).toEqual(['scope', 'colour', 'outline', 'effects', 'transparency', 'position', 'line-up', 'autoLayout'])
+  // Several booleans make one new boolean of them; several photos combine into nothing.
+  expect(await items(['combo', 'comboB'])).toEqual(['scope', 'colour', 'outline', 'effects', 'transparency', 'position', 'line-up', 'combine', 'autoLayout'])
+  expect(await items(['photo', 'photoB'])).toEqual(['scope', 'edit', 'replace', 'corners', 'outline', 'effects', 'transparency', 'position', 'line-up', 'autoLayout'])
+  // Several boxes have their own Stack panel, and the action that puts them in one stack is named apart.
+  expect(await items(['frame', 'frameB'])).toEqual(['scope', 'colour', 'outline', 'stack', 'box', 'effects', 'transparency', 'position', 'line-up', 'autoLayout'])
+  await expect(page.getByTestId('top-bar').locator('[data-action="autoLayout"]')).toHaveText('Stack together')
   // Several layers put in a stack from the bar.
   await select(page, ['box', 'star'])
   await page.getByTestId('top-bar').locator('[data-action="autoLayout"]').click()
@@ -542,5 +555,23 @@ test('the size field steps with the arrows; a pop-up closes when the window chan
   await expect.poll(() => row.evaluate((el) => el.scrollLeft)).toBeGreaterThan(0)
   await select(page, ['box'])
   await expect.poll(() => row.evaluate((el) => el.scrollLeft)).toBe(0)
+  expect(errors).toEqual([])
+})
+
+test('⋯ on the top bar leaves an open panel open, and Esc closes the panel first wherever the focus is', async ({ browser }) => {
+  const asset = await upload(photo)
+  const { page, errors } = await openStage(browser, design(asset.id))
+  await page.setViewportSize({ width: 820, height: 1180 })
+  await select(page, ['headline'])
+  await barMenu(page, 'font')
+  await page.getByTestId('bar-overflow').click()
+  await expect(page.getByTestId('top-bar-overflow')).toBeVisible()
+  await expect(page.locator('#edit-panel')).toBeVisible()
+  await expect.poll(() => layoutProblems(page, { pieces: PIECES, uncut: UNCUT })).toEqual([])
+
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur())
+  await page.keyboard.press('Escape')
+  await expect(page.locator('#edit-panel')).toHaveCount(0)
+  expect(await page.evaluate(() => window.dazbee?.selection())).toEqual(['headline'])
   expect(errors).toEqual([])
 })

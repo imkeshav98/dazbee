@@ -25,7 +25,7 @@ import { setEveryFormat } from './scope-store.ts'
 import {
   factsOf, imageFillOf, kindOf, PopupContent, ScopeChip, set, setTextFlag, shared, textFlag, textStyle, useTarget, type Style, type Target,
 } from './selection-cards.tsx'
-import { BAR_BUTTON, BAR_DIVIDER, BAR_TOGGLE, FOCUS_RING, MENU_DIVIDER, MENU_ITEM, MENU_KEY, MIXED_COLOUR } from './styles.ts'
+import { BAR_BUTTON, BAR_DIVIDER, BAR_ROW, BAR_TOGGLE, FOCUS_RING, MENU_DIVIDER, MENU_ITEM, MENU_KEY, MIXED_COLOUR } from './styles.ts'
 
 /** Bold from this weight up, as type designers name their weights. */
 const BOLD = 600
@@ -64,6 +64,7 @@ function PanelButton({ id, label, icon, face }: { id: PanelId; label: string; ic
       aria-label={face ? label : undefined}
       title={face ? label : undefined}
       data-testid={`bar-${id}`}
+      data-opens={id}
       onClick={() => setOpen(open === id ? null : id)}
       className={BAR_BUTTON}
     >
@@ -214,11 +215,11 @@ function useItems(target: Target, design: Design, brandId: string): Item[] {
     if (!several) add('crop', <button type="button" data-bar-item data-testid="bar-crop" onClick={() => target.editor.perform('editPoints')} className={BAR_BUTTON}><CropIcon size={15} aria-hidden />{b.crop}</button>)
     // A photo in a box keeps the box's own settings, whose Box pop-up holds its corners.
     if (!facts.frames && facts.ownShape === 'rect') pop('corners', b.corners, popup('corners'), { icon: <CornersOutIcon size={16} aria-hidden />, className: 'w-72 p-2.5' })
-    add('outline', <PanelButton id="outline" label={b.outline} />)
     if (facts.frames) {
       add('stack', <PanelButton id="stack" label={b.autoLayout} icon={<RowsIcon size={15} aria-hidden />} />)
       pop('box', b.box, popup('box'), { icon: <FrameCornersIcon size={15} aria-hidden />, className: 'w-72 p-2.5' })
     }
+    add('outline', <PanelButton id="outline" label={b.outline} />)
   }
 
   // Shapes and boxes together keep their colour and outline.
@@ -236,10 +237,9 @@ function useItems(target: Target, design: Design, brandId: string): Item[] {
     }))
     if (!facts.lines) add('colour', <PanelButton id="colour" label={b.fill} face={<Dot colour={colour} />} />)
     add('outline', <PanelButton id="outline" label={b.outline} />)
-    if (kind === 'shape' && facts.booleans) pop('combine', p.combine, popup('combine'), { icon: <UniteSquareIcon size={15} aria-hidden />, className: 'w-72 p-2.5', testId: 'combine-op' })
+    if (kind === 'shape' && facts.booleans && !several) pop('combine', p.combine, popup('combine'), { icon: <UniteSquareIcon size={15} aria-hidden />, className: 'w-72 p-2.5', testId: 'combine-op' })
     else if (kind === 'shape' && facts.ownShape) pop('shape', b.shape, popup('shape'), { icon: <StarIcon size={15} aria-hidden />, className: 'w-72 p-2.5' })
     if (kind === 'box') {
-      if (several) add('autoLayout', <button type="button" data-bar-item data-action="autoLayout" onClick={() => target.editor.perform('autoLayout')} className={BAR_BUTTON}><RowsIcon size={15} aria-hidden />{b.autoLayout}</button>)
       add('stack', <PanelButton id="stack" label={b.autoLayout} icon={<RowsIcon size={15} aria-hidden />} />)
       pop('box', b.box, popup('box'), { icon: <FrameCornersIcon size={15} aria-hidden />, className: 'w-72 p-2.5' })
     }
@@ -269,7 +269,7 @@ function useItems(target: Target, design: Design, brandId: string): Item[] {
         ))}
       </>
     ), { icon: <AlignLeftIcon size={15} aria-hidden />, className: 'min-w-56' })
-    if (target.types.every((type) => type === 'graphic' || type === 'boolean')) {
+    if (kind === 'shape') {
       pop('combine', b.combine, (
         <>
           {COMBINE.map(({ action, icon: Icon }) => (
@@ -281,7 +281,7 @@ function useItems(target: Target, design: Design, brandId: string): Item[] {
         </>
       ), { icon: <UniteSquareIcon size={15} aria-hidden />, className: 'min-w-56' })
     }
-    if (kind !== 'box') add('autoLayout', <button type="button" data-bar-item data-action="autoLayout" onClick={() => act('autoLayout')} className={BAR_BUTTON}><RowsIcon size={15} aria-hidden />{b.autoLayout}</button>)
+    add('autoLayout', <button type="button" data-bar-item data-action="autoLayout" onClick={() => act('autoLayout')} className={BAR_BUTTON}><RowsIcon size={15} aria-hidden />{kind === 'box' ? b.stackTogether : b.autoLayout}</button>)
   }
   return items
 }
@@ -298,9 +298,10 @@ function useFit(row: HTMLElement | null, extra: HTMLElement | null, keys: string
       setFit(Infinity)
       return
     }
-    const stage = row.parentElement
+    const wrapper = row.parentElement
     const measure = () => {
-      const room = (stage?.clientWidth ?? window.innerWidth) - SIDE * 2 - 8
+      // The bar's own padding and border take 8 px; each item has 2 px of gap after it; ⋯ is 34 px.
+      const room = (wrapper?.clientWidth ?? window.innerWidth) - SIDE * 2 - 8
       // Each item's wrapper draws nothing of its own (display: contents); its button has the width.
       const widths = [...row.children, ...extra.children].filter((el) => el instanceof HTMLElement && el.dataset.item !== undefined).map((el) => ((el.firstElementChild as HTMLElement | null)?.offsetWidth ?? 0) + 2)
       const total = widths.reduce((sum, w) => sum + w, 0)
@@ -317,7 +318,7 @@ function useFit(row: HTMLElement | null, extra: HTMLElement | null, keys: string
     }
     measure()
     const watch = new ResizeObserver(measure)
-    if (stage) watch.observe(stage)
+    if (wrapper) watch.observe(wrapper)
     for (const el of [...row.children, ...extra.children]) watch.observe(el.firstElementChild ?? el)
     return () => watch.disconnect()
   }, [row, extra, keys, off])
@@ -328,11 +329,12 @@ export function TopBar({ editor, brandId }: { editor: Editor; brandId: string })
   const ids = useSelection(editor)
   const selected = useTarget(editor, ids)
   // A pop-up or panel belongs to the selection it was opened for.
-  const [openFor, setOpenFor] = useState(ids)
-  if (openFor !== ids) {
-    setOpenFor(ids)
+  const opened = useRef(ids)
+  useLayoutEffect(() => {
+    if (opened.current === ids) return
+    opened.current = ids
     setOpen(null)
-  }
+  }, [ids])
   // Once nothing is selected, changes go to the format shown again.
   useEffect(() => {
     if (ids.length === 0) setEveryFormat(false)
@@ -369,7 +371,9 @@ function Bar({ target, design, brandId }: { target: Target; design: Design; bran
   const first = items.slice(0, shown)
   const rest = items.slice(shown).filter((item, i) => !(i === 0 && item.key.startsWith('divider')))
   const overflowing = rest.length > 0
-  const overflowOpen = overflowing && (open === 'overflow' || rest.some((item) => item.key === open))
+  // The second row is its own: opening it leaves an open panel, which moves down under it.
+  const [rowOpen, setRowOpen] = useState(false)
+  const overflowOpen = overflowing && (rowOpen || rest.some((item) => item.key === open))
   const focused = useRovingTab(bar)
   // The bar's bottom edge, under the second row when it is open, for what sits under the bar.
   const reported = useRef(-1)
@@ -391,6 +395,7 @@ function Bar({ target, design, brandId }: { target: Target; design: Design; bran
   const selectionKey = target.ids.join(' ')
   useLayoutEffect(() => {
     if (row) row.scrollLeft = 0
+    setRowOpen(false)
   }, [row, selectionKey])
   // A pop-up hangs from its item: once the window changes size the item may have moved, so it closes.
   useEffect(() => {
@@ -403,15 +408,16 @@ function Bar({ target, design, brandId }: { target: Target; design: Design; bran
   }, [])
   // Esc closes the bar's second row before anything else, so it never also clears the selection.
   useEffect(() => {
-    if (open !== 'overflow') return
+    if (!rowOpen) return
     const onKey = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape') return
+      // A pop-up or panel open from the row closes first, on its own Esc.
+      if (event.key !== 'Escape' || editState().open !== null) return
       event.stopImmediatePropagation()
-      setOpen(null)
+      setRowOpen(false)
     }
     window.addEventListener('keydown', onKey, true)
     return () => window.removeEventListener('keydown', onKey, true)
-  }, [open])
+  }, [rowOpen])
   const item = ({ key, node }: Item) => <span key={key} data-item={key} className="contents [&>*]:shrink-0">{node}</span>
   return (
     <div
@@ -422,7 +428,7 @@ function Bar({ target, design, brandId }: { target: Target; design: Design; bran
       onKeyDown={arrowAlong}
       onFocus={focused}
       style={{ insetInlineStart: startAt }}
-      className="pointer-events-none absolute end-0 top-[90px] z-20 flex flex-col items-center gap-1.5 px-4 max-sm:top-[72px] max-sm:px-2"
+      className={cn('pointer-events-none absolute end-0 z-20 flex flex-col items-center gap-1.5 px-4 max-sm:px-2', BAR_ROW)}
     >
       <div ref={setRow} className={cn(TOP_BAR, 'pointer-events-auto max-w-full', phone && 'no-scrollbar overflow-x-auto')} data-testid="top-bar-row">
         {first.map(item)}
@@ -434,7 +440,7 @@ function Bar({ target, design, brandId }: { target: Target; design: Design; bran
             title={t.editor.bar.overflow}
             aria-expanded={overflowOpen}
             data-testid="bar-overflow"
-            onClick={() => setOpen(overflowOpen ? null : 'overflow')}
+            onClick={() => setRowOpen(!overflowOpen)}
             className={cn(BAR_BUTTON, 'px-1.5')}
           >
             <DotsThreeIcon size={18} weight="bold" aria-hidden />
@@ -448,5 +454,3 @@ function Bar({ target, design, brandId }: { target: Target; design: Design; bran
   )
 }
 
-/** The panel ids a bar item may open, for the edit panel's title. */
-export const panelIdOf = (open: string | null): PanelId | null => (isPanel(open) ? open : null)

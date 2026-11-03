@@ -116,8 +116,8 @@ test('the bar replaces the picture, keeping its filter; Add image puts one into 
   await page.evaluate(() => window.dazbee?.drawn())
 
   // Mono, then Replace with another brand image: the new picture, still mono, no old crop.
-  const imageCard = (await openCard(page, 'adjust-card'))
-  await expect(imageCard).toBeVisible()
+  const imageCard = async () => (await openCard(page, 'adjust-card'))
+  await expect((await imageCard())).toBeVisible()
   await (await openCard(page, 'look-card')).getByRole('radio', { name: 'Mono' }).click()
   await page.getByTestId('bar-replace').click()
   const picker = page.getByTestId('bar-replace-picker')

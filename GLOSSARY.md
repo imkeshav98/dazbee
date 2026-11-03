@@ -85,7 +85,15 @@ The one panel a top bar item opens, at the stage's end side; on a phone, a sheet
 _Avoid_: properties panel, inspector
 
 **Small menu**:
-The pill by the selection: lock, duplicate, delete, and ⋯ for the **full menu** of the layers' actions, which the right-click menu shows too.
+The pill by the selection: lock, duplicate, delete, and ⋯ for the full menu.
+
+**Full menu**:
+Every action of the selected layers, in one list: copy, paste, duplicate, delete, order, line up with the size, turn, group, box, mask, ungroup, lock, hide in this size or every size, and text direction. The small menu's ⋯ opens it, and a right-click shows the same list.
+_Avoid_: More menu, context menu
+
+**Transparency**:
+How much a layer shows through (its opacity) and how it blends with what is under it, set from the top bar's Transparency pop-up.
+_Avoid_: See-through
 
 **Property cards**:
 The cards at the stage's top end that edit the design while nothing is selected: the page's colour, its sizes and its pages.

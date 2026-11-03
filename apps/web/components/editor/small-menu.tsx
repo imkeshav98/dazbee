@@ -98,7 +98,8 @@ function usePlace(editor: Editor, menu: HTMLElement | null, rightClick: boolean)
       frame = requestAnimationFrame(update)
     }
     update()
-    // A panel, pop-up or flyout that just opened grows into place; look again once it has.
+    // A panel, pop-up or flyout that just opened grows into place (its opening animation is
+    // shorter than this); look again once it has.
     const settled = setTimeout(update, 260)
     const stop = editor.onDraw(update)
     const stopSelection = editor.onSelection(later)
@@ -127,11 +128,10 @@ export function SmallMenu({ editor, rightClick }: { editor: Editor; rightClick: 
   const selected = useTarget(editor, ids)
   const [menu, setMenu] = useState<HTMLDivElement | null>(null)
   const place = usePlace(editor, menu, rightClick)
-  const { open } = useEditState()
+  const { open, barBottom } = useEditState()
   const moreFocus = useMenuFocus()
   const rtl = dirOf(useLocale()) === 'rtl'
   const phone = usePhone()
-  const { barBottom } = useEditState()
   const focused = useRovingTab(menu)
   if (!selected) return null
   const { target, design } = selected
@@ -185,7 +185,7 @@ export function SmallMenu({ editor, rightClick }: { editor: Editor; rightClick: 
               {...moreFocus.content}
               aria-label={b.more}
               data-testid="bar-more-menu"
-              className={cn(MENU, 'max-h-[var(--radix-popover-content-available-height)] w-72 overflow-y-auto')}>
+              className={cn(MENU, 'max-h-[var(--radix-popover-content-available-height)] w-80 overflow-y-auto')}>
               {moreFocus.back}
               <LayerActions editor={editor} ids={ids} onDone={() => setOpen(null)} />
             </Popover.Content>

@@ -252,6 +252,7 @@ export const ar: Messages = {
       transparency: 'الشفافية',
       position: 'الموضع',
       sizeAndPlace: 'الحجم والموضع',
+      stackTogether: 'رصّها معًا',
       edit: 'تعديل',
       editImage: 'تعديل الصورة',
       replace: 'استبدال',

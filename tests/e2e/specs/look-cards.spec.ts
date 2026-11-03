@@ -67,17 +67,19 @@ test('the look comes first: size and brand colour, effect tiles, and the header 
     return [(props.effects as unknown[]).length, props.style?.outline]
   }).toEqual([0, undefined])
 
-  // The header card names the layer and holds its box, open.
-  const header = (await openCard(page, 'layout-card'))
-  await expect(header.getByRole('heading')).toHaveText('Headline')
-  await expect(header.getByRole('spinbutton', { name: 'X position' })).toHaveValue('76')
+  // The Position panel names the layer and holds its box.
+  const header = async () => (await openCard(page, 'layout-card'))
+  await header()
+  await expect(page.getByTestId('edit-panel-note')).toHaveText('Headline')
+  await expect((await header()).getByRole('spinbutton', { name: 'X position' })).toHaveValue('76')
 
   // A shape: its fill from the same colours, and Blur in place of Outline; the header follows it.
   await page.evaluate(() => window.dazbee?.select(['badge']))
   await expect((await barMenu(page, 'effects')).locator('[data-tile="blur"]')).toBeVisible()
   await (await barMenu(page, 'colour')).getByRole('button', { name: 'Roast' }).click()
   await expect.poll(async () => (await node(page, 'badge')).bindings).toMatchObject({ fill: 'brand:roast' })
-  await expect(header.getByRole('heading')).toHaveText('Badge')
+  await header()
+  await expect(page.getByTestId('edit-panel-note')).toHaveText('Badge')
   writeOutput('look-cards-shape.png', await page.screenshot())
   expect(errors).toEqual([])
 })

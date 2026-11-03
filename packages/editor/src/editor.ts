@@ -3055,16 +3055,22 @@ function live(
    * drops custom types) still pastes the layers.
    */
   const REMEMBERED = 'dazbee.copiedLayers'
-  function putOnClipboard(data: DataTransfer, copied: LayerClipboard) {
+  /** Keeps copied layers on this device, as JSON and as their names in plain text; `kept` is false without storage. */
+  function keepCopy(copied: LayerClipboard) {
     const json = JSON.stringify(copied)
     const plain = copied.tree.roots.map((id) => copied.tree.nodes[id]?.name || 'Layer').join('\n')
-    data.setData(LAYER_CLIPBOARD_TYPE, json)
-    data.setData('text/plain', plain)
     try {
       localStorage.setItem(REMEMBERED, JSON.stringify({ plain, json }))
+      return { json, plain, kept: true }
     } catch {
-      // Without storage, only pastes that keep our own type paste layers.
+      return { json, plain, kept: false }
     }
+  }
+  function putOnClipboard(data: DataTransfer, copied: LayerClipboard) {
+    // Without storage, only pastes that keep our own type paste layers.
+    const { json, plain } = keepCopy(copied)
+    data.setData(LAYER_CLIPBOARD_TYPE, json)
+    data.setData('text/plain', plain)
   }
   function layersOnClipboard(data: DataTransfer | null): LayerTree | null {
     let raw = data?.getData(LAYER_CLIPBOARD_TYPE)
@@ -3338,13 +3344,8 @@ function live(
     copyLayers() {
       const copied = copiedLayers()
       if (!copied) return false
-      const json = JSON.stringify(copied)
-      const plain = copied.tree.roots.map((id) => copied.tree.nodes[id]?.name || 'Layer').join('\n')
-      try {
-        localStorage.setItem(REMEMBERED, JSON.stringify({ plain, json }))
-      } catch {
-        return false
-      }
+      const { plain, kept } = keepCopy(copied)
+      if (!kept) return false
       void navigator.clipboard?.writeText(plain).catch(() => {
         // Without clipboard access, Paste in the menu still has the kept copy.
       })

@@ -263,6 +263,7 @@ export const en = {
       transparency: 'Transparency',
       position: 'Position',
       sizeAndPlace: 'Size and place',
+      stackTogether: 'Stack together',
       edit: 'Edit',
       editImage: 'Edit image',
       replace: 'Replace',
