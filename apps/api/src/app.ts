@@ -10,7 +10,7 @@ import { assetRoutes } from './assets/routes.ts'
 import { brandKitRoutes } from './brand-kits/routes.ts'
 import { fontRoutes } from './fonts/routes.ts'
 import { type Env, error, requireSession } from './http.ts'
-import { authRoutes } from './sign-in/routes.ts'
+import { signInRoutes } from './sign-in/routes.ts'
 import type { SessionOf } from './sign-in/session.ts'
 import type { SignInSettings } from './sign-in/sign-in.ts'
 import { templateRoutes } from './templates/routes.ts'
@@ -33,7 +33,7 @@ export function createApp({
 
   app.get('/health', (c) => c.json({ ok: true }))
 
-  app.route('/', authRoutes({ db, signIn }))
+  app.route('/', signInRoutes({ db, signIn }))
 
   const signedIn = requireSession(sessionOf)
   app.use('/workspace', signedIn)

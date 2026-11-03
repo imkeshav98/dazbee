@@ -8,7 +8,7 @@ import { body, type Env, error } from '../http.ts'
 import { bearerToken, readSessionToken } from './session.ts'
 import { completeSignIn, type SignedInPerson, type SignInSettings } from './sign-in.ts'
 
-export function authRoutes({ db, signIn }: { db: Db; signIn: SignInSettings | null }): Hono<Env> {
+export function signInRoutes({ db, signIn }: { db: Db; signIn: SignInSettings | null }): Hono<Env> {
   const app = new Hono<Env>()
 
   // Sign-in (#58). The web app's /login asks for the link, its /callback hands back the code.

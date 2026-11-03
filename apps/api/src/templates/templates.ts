@@ -91,7 +91,7 @@ export async function deleteTemplate(
   return true
 }
 
-export const findTemplate = async (db: Db, workspaceId: string, brandId: string, id: string) => {
+export async function findTemplate(db: Db, workspaceId: string, brandId: string, id: string) {
   const row = await visibleTemplate(db, workspaceId, brandId, id)
   return row ? toSummary(row) : null
 }

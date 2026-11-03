@@ -1,5 +1,5 @@
-// The routes of a brand's images: uploading and recording them, the library's search, names and tags,
-// thumbnails, and deleting one nothing shows.
+// The routes of a brand's asset library, its images and SVG files: uploading and recording them, finding
+// them by name and tag, naming and tagging them, their thumbnails, and deleting one nothing shows.
 import { Hono } from 'hono'
 
 import type { Db } from '@dazbee/db'
