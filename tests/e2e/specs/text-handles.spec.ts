@@ -2,7 +2,7 @@
 // the width; only a fixed box has top and bottom handles. A drag changes the size shown only, runs
 // and shrink to fit included, in one undo step, and stops at 1 px. Text in a group scales with it,
 // text in a frame doesn't, and text whose style is locked resizes its box only.
-import type { DesignInput } from '@dazbee/schema'
+import { type DesignInput, formatScope } from '@dazbee/schema'
 
 import { writeOutput } from '../support/editor.ts'
 import { barMenu, dragScreen, handle, openStage, press, read } from '../support/stage.ts'
@@ -56,7 +56,7 @@ type Props = {
 /** A layer's values in a format: its own, with that format's on top. */
 const placed = async (page: Page, id: string, formatId = 'sq') => {
   const d = await read(page)
-  return { ...d.nodes[id]?.props, ...d.overrides[`format:${formatId}`]?.[id] } as unknown as Props
+  return { ...d.nodes[id]?.props, ...d.overrides[formatScope(formatId)]?.[id] } as unknown as Props
 }
 const select = async (page: Page, ids: string[]) => {
   await page.evaluate((ids) => window.dazbee?.select(ids, 'p1', 'sq'), ids)

@@ -18,7 +18,7 @@ import { decodePng, encodePng, type Pixels } from '@dazbee/pixels/pixels'
 import { overWhite, rasterisePdf, rasteriseSvg, vectorDifference } from '@dazbee/pixels/vector'
 import { renderDesign } from '@dazbee/renderer'
 import { loadCanvasKit } from '@dazbee/renderer/node'
-import type { ExportType } from '@dazbee/schema'
+import { type ExportType, formatScope } from '@dazbee/schema'
 
 import { photo } from '../support/assets.ts'
 import { designOf, OUTPUT, screenPoint, writeOutput } from '../support/editor.ts'
@@ -233,7 +233,7 @@ test('an ad set rebuilt in 5 formats through real input exports PNG, JPG, PDF an
   await drawn(page)
 
   // The headline moves down in the story only, into the tall format's lower third.
-  const before = { ...design.nodes[headline]?.props, ...design.overrides[`format:${story}`]?.[headline] } as {
+  const before = { ...design.nodes[headline]?.props, ...design.overrides[formatScope(story)]?.[headline] } as {
     x: number
     y: number
     width: number
@@ -256,7 +256,7 @@ test('an ad set rebuilt in 5 formats through real input exports PNG, JPG, PDF an
   await page.mouse.up()
   await drawn(page)
   const after = await stored(page)
-  expect((after.overrides[`format:${story}`]?.[headline] as { y: number }).y).toBeGreaterThan(before.y + 500)
+  expect((after.overrides[formatScope(story)]?.[headline] as { y: number }).y).toBeGreaterThan(before.y + 500)
   expect(after.nodes[headline]?.props.y).toBe(design.nodes[headline]?.props.y)
   await page.keyboard.press('Escape')
   await drawn(page)

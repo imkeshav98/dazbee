@@ -4,6 +4,8 @@ import { join } from 'node:path'
 
 import { type Browser, expect, type Page } from '@playwright/test'
 
+import { formatScope } from '@dazbee/schema'
+
 import { DATABASE, LOCAL } from './local-servers.ts'
 import { DEV_BRAND, type InBrand, liveDesign, seed } from './seed.ts'
 
@@ -120,7 +122,7 @@ export function placed(
   id: string,
   formatId: string,
 ) {
-  return { ...design.nodes[id]?.props, ...design.overrides?.[`format:${formatId}`]?.[id] }
+  return { ...design.nodes[id]?.props, ...design.overrides?.[formatScope(formatId)]?.[id] }
 }
 
 export function writeOutput(name: string, content: string | Buffer) {

@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 
 import { loadDesign, openSession, readDesign } from '@dazbee/doc'
 import { render, type SceneLayer } from '@dazbee/renderer'
-import { type Design, parseDesign } from '@dazbee/schema'
+import { type Design, formatScope, parseDesign } from '@dazbee/schema'
 
 const rect = (
   name: string,
@@ -107,7 +107,7 @@ describe('wrapping layers in a flow', () => {
         const tab = openSession(doc)
         const before = Object.fromEntries(['sq', 'wide'].map((f) => [f, drawn(readDesign(doc), f)]))
         // Where the editor sees them drawn, by format scope.
-        const boxes = Object.fromEntries(['sq', 'wide'].map((f) => [`format:${f}`, { [id]: before[f]?.[id] as Box }]))
+        const boxes = Object.fromEntries(['sq', 'wide'].map((f) => [formatScope(f), { [id]: before[f]?.[id] as Box }]))
         const wrapper = tab.run(command, { ids: [id], drawn: boxes })
         const now = readDesign(doc)
         for (const f of ['sq', 'wide']) {

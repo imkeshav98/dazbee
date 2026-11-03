@@ -9,7 +9,7 @@
 import type { Browser, Page } from '@playwright/test'
 
 import { pressFor, type ShortcutAction } from '@dazbee/editor/shortcuts'
-import type { DesignInput } from '@dazbee/schema'
+import { type DesignInput, formatScope } from '@dazbee/schema'
 
 import { photo, upload } from './assets.ts'
 import { designOf } from './editor.ts'
@@ -641,7 +641,7 @@ async function run(
       const factor = Math.max((box.width + h.w) / box.width, (box.height + h.h) / box.height)
       const sizeOf = (d: Doc) =>
         (
-          ({ ...d.nodes[subject]?.props, ...d.overrides[`format:${formatId}`]?.[subject] }).style as {
+          ({ ...d.nodes[subject]?.props, ...d.overrides[formatScope(formatId)]?.[subject] }).style as {
             fontSize: number
           }
         ).fontSize
@@ -683,7 +683,7 @@ async function run(
     // The axes dragged become fixed; the other keeps its sizing, so a hugging frame made narrower
     // still hugs its height.
     const sizingOf = (d: Doc) =>
-      ({ ...d.nodes[subject]?.props, ...d.overrides[`format:${formatId}`]?.[subject] }).sizing as
+      ({ ...d.nodes[subject]?.props, ...d.overrides[formatScope(formatId)]?.[subject] }).sizing as
         { width: string; height: string } | undefined
     const was = sizingOf(doc)
     if (was) {
@@ -717,7 +717,7 @@ async function run(
   }
   if (gesture === 'rotate') {
     const turn = (d: Doc) =>
-      Number({ ...d.nodes[subject]?.props, ...d.overrides[`format:${formatId}`]?.[subject] }.rotation ?? 0)
+      Number({ ...d.nodes[subject]?.props, ...d.overrides[formatScope(formatId)]?.[subject] }.rotation ?? 0)
     if (close(turn(doc), turn(now), 0.5)) problems.push('not turned')
   }
   if (gesture === 'nudge' && b) {
