@@ -858,13 +858,36 @@ export const textEdit = defineCommand({
     if (end > node.props.text.length) return `the range ${op.at}–${end} runs past the end of the text (${node.props.text.length})`
     return undefined
   },
-  apply: ({ r }, { id, op }) => {
+  apply: ({ r, design }, { id, op }) => {
     const ytext = (r.nodes.get(id)?.get('props') as Y.Map<unknown>).get('text') as Y.Text
     if (op.kind === 'insert') ytext.insert(op.at, op.text)
     else if (op.kind === 'delete') ytext.delete(op.at, op.length)
     else ytext.format(op.at, op.length, op.style)
+    if (op.kind === 'style') return
+    // A format's own runs stay on their characters, as the base's do; a format with text of its own keeps its runs.
+    for (const [scope, byNode] of Object.entries(design.overrides)) {
+      const own = byNode[id]
+      if (!own || 'text' in own || !Array.isArray(own.runs)) continue
+      const runs = (own.runs as { start: number; end: number; style: unknown }[]).flatMap((run) => {
+        const moved = op.kind === 'insert' ? insertedInto(run, op.at, op.text.length) : deletedFrom(run, op.at, op.length)
+        return moved.end > moved.start ? [moved] : []
+      })
+      r.overrides.set(overrideKey(scope, id, 'runs'), runs)
+    }
   },
 })
+
+/** A run after `length` characters go in at `at`: they take the style of the character before them, so a run ending there grows. */
+function insertedInto<T extends { start: number; end: number }>(run: T, at: number, length: number): T {
+  if (at <= run.start) return { ...run, start: run.start + length, end: run.end + length }
+  return at <= run.end ? { ...run, end: run.end + length } : run
+}
+
+/** A run after the `length` characters from `at` go; empty once they all did. */
+function deletedFrom<T extends { start: number; end: number }>(run: T, at: number, length: number): T {
+  const map = (p: number) => (p <= at ? p : p >= at + length ? p - length : at)
+  return { ...run, start: map(run.start), end: map(run.end) }
+}
 
 /**
  * Sets the box of text that grows to the size it is drawn at (#47), measured by the caller in each

@@ -155,7 +155,10 @@ async function drag(page: Page, a: { x: number; y: number }, b: { x: number; y: 
   await drawn(page)
 }
 async function handleAt(page: Page, which: string) {
-  const box = await page.locator(`.selection .handle[data-handle="${which}"]`).boundingBox()
+  const handle = page.locator(`.selection .handle[data-handle="${which}"]`)
+  // A handle the selection hasn't is none, at once.
+  if ((await handle.count()) === 0) return null
+  const box = await handle.boundingBox()
   return box && { x: box.x + box.width / 2, y: box.y + box.height / 2 }
 }
 const close = (a: number, b: number, tol = 0.6) => Math.abs(a - b) <= tol
@@ -194,6 +197,8 @@ async function run(page: Page, subject: Subject, gesture: string, formatId: stri
       const which = gesture.slice(7)
       const h = HANDLES[which]
       const at = await handleAt(page, which)
+      // Text that grows with its words has no top or bottom handles: only a fixed box has a height of its own.
+      if (TEXT.has(subject) && subject !== 'tFixed' && (which === 'n' || which === 's')) return at ? `has an ${which} handle` : 'n/a'
       if (!h || !at) return `no ${which} handle`
       await drag(page, at, { x: at.x + h.dx * zoom, y: at.y + h.dy * zoom })
       break
@@ -260,7 +265,16 @@ async function run(page: Page, subject: Subject, gesture: string, formatId: stri
     // The drag along the layer's own sides, as it is turned.
     const sx = which.includes('e') ? 1 : which.includes('w') ? -1 : 0
     const wantW = box.width + sx * (h.dx * Math.cos(turnBy) + h.dy * Math.sin(turnBy))
-    if (h.w && !close(b.width, wantW, 1.5)) problems.push(`width ${b.width}, not ${wantW}`)
+    // A corner scales text: its box keeps its shape, by the factor of the side moved more, and its size with it.
+    const corner = which.length === 2
+    if (TEXT.has(subject) && corner) {
+      const factor = Math.max((box.width + h.w) / box.width, (box.height + h.h) / box.height)
+      const sizeOf = (d: Doc) => ({ ...d.nodes[subject]?.props, ...d.overrides[`format:${formatId}`]?.[subject] }.style as { fontSize: number }).fontSize
+      const want = Math.round(sizeOf(doc) * factor * 10) / 10
+      if (!close(sizeOf(now), want, 0.15)) problems.push(`font size ${sizeOf(now)}, not ${want}`)
+      // Auto width text takes the width its scaled words have; the others keep the box's shape.
+      if (subject !== 'tWide' && !close(b.width, box.width * factor, box.width * factor * 0.04)) problems.push(`width ${b.width}, not ${box.width * factor}`)
+    } else if (h.w && !close(b.width, wantW, 1.5)) problems.push(`width ${b.width}, not ${wantW}`)
     if (h.h && !TEXT.has(subject) && !turnBy && !close(b.height, box.height + h.h, 1.5)) problems.push(`height ${b.height}, not ${box.height + h.h}`)
     // A frame's layers keep their size; a group's or boolean's scale with it; a flow fills what it is given.
     const scaled = subject === 'group' || subject === 'bool' || subject === 'paths'

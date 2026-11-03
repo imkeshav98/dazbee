@@ -75,6 +75,17 @@ describe('snapping a resize', () => {
     const sw = snapResize({ x: 98, y: 400, width: 200, height: 138 }, 'sw', targets, 6)
     expect(sw).toMatchObject({ dx: 2, dy: 2 })
   })
+
+  it('with the shape kept, snaps the corner edge nearest a guide and leaves the other to follow', () => {
+    const targets = snapTargets([a], format)
+    // The same corner, the west edge 2 off a guide and the south edge 2 off one: only the nearer, by its axis order, snaps.
+    const sw = snapResize({ x: 97, y: 400, width: 200, height: 139 }, 'sw', targets, 6, true)
+    expect(sw.dx !== 0 && sw.dy !== 0).toBe(false)
+    expect(Math.abs(sw.dx) + Math.abs(sw.dy)).toBeGreaterThan(0)
+    // Its guides are the snapped axis's only.
+    const axis = sw.dx !== 0 ? 'x' : 'y'
+    expect(sw.guides.every((g) => g.axis === axis)).toBe(true)
+  })
 })
 
 describe('align and distribute', () => {

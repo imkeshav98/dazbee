@@ -92,8 +92,12 @@ function PlaceCard({ target, p, title, children }: { target: Target; p: P; title
   const placing = useMessages().editor.bar.placing
   const [keepRatio, setKeepRatio] = useState(false)
   const sized = target.types.every((type) => type !== 'group' && type !== 'boolean')
-  // The side Lock ratio moves stops where a typed side would.
-  const resize = (now: Props, axis: 'width' | 'height', to: number) => Object.fromEntries(Object.entries(sizeTo({ width: num(now, 'width'), height: num(now, 'height') }, axis, to, keepRatio)).map(([key, v]) => [key, Math.min(v, LIMITS.any)]))
+  const resize = (now: Props, axis: 'width' | 'height', to: number): Patch => {
+    // The side Lock ratio moves stops where a typed side would.
+    const size = Object.fromEntries(Object.entries(sizeTo({ width: num(now, 'width'), height: num(now, 'height') }, axis, to, keepRatio)).map(([key, v]) => [key, Math.min(v, LIMITS.any)]))
+    // Text given a height of its own gets a fixed box: an auto one would grow back to its words.
+    return 'boxMode' in now && now.boxMode !== 'fixed' && (axis === 'height' || size.height !== num(now, 'height')) ? { ...size, boxMode: 'fixed' } : size
+  }
   const sides = [
     { key: 'width', label: p.width, name: p.widthName },
     { key: 'height', label: p.height, name: p.heightName },
