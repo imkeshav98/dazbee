@@ -189,7 +189,12 @@ export function PanelFrame({ id, title, note, action, children }: { id: PanelId;
   const [rowBottom, setRowBottom] = useState(0)
   useLayoutEffect(() => {
     const row = document.querySelector<HTMLElement>('[data-bar-row]')
-    if (row) setRowBottom(row.offsetTop + row.offsetHeight)
+    if (!row) return
+    const measure = () => setRowBottom(row.offsetTop + row.offsetHeight)
+    measure()
+    const watch = new ResizeObserver(measure)
+    watch.observe(row)
+    return () => watch.disconnect()
   }, [])
   // Esc closes the panel before it clears the selection, wherever the focus is. In a field of the
   // panel the field still takes the key, throwing away what was typed, and the panel closes with

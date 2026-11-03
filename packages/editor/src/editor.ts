@@ -332,7 +332,11 @@ function live(
     const next = pageId && design.pages[pageId] && grid.frames.some((f) => f.pageId === pageId) ? pageId : null
     if (next === pickedPage) return
     pickedPage = next
-    if (next) selection = null
+    // Picking the page lets the selection go, with a crop or path edit on it and any group gone into.
+    if (next && selection) {
+      entered = null
+      select([], selection.frame)
+    }
     drawOverlay()
     for (const listener of pageListeners) listener(pickedPage)
   }

@@ -182,7 +182,7 @@ export function EditorStage({ designId, designName, brandId, brandName, everyBra
     })
   }
 
-  // The stage's edges the always-on chrome covers (#83): the editor fits the ads between them. The
+  // The stage's edges the always-on chrome covers: the editor fits the ads between them. The
   // first time the editor and they are both known the design is fitted again, since it opened
   // fitted to the whole stage. The editor counts as ready only after that, so nothing set on its
   // camera (or read from it) before then is undone by the fit.

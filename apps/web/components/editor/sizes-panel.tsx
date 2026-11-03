@@ -4,19 +4,19 @@
 // and tablet, the count alone on a phone. The panel lists each size with its picture, name and
 // pixels, and its primary star, show alone and a menu (rename, move up, move down, remove); then
 // Add a size, from the common presets at a tap or any size. Every change is a command, one undo step.
-import * as Popover from '@radix-ui/react-popover'
-import { DotsThreeIcon, EyeIcon, FrameCornersIcon, StarIcon } from '@phosphor-icons/react'
+import { EyeIcon, FrameCornersIcon, StarIcon } from '@phosphor-icons/react'
 import type { Editor } from '@dazbee/editor'
 import { FORMAT_PRESETS, type Design } from '@dazbee/schema'
-import { Fragment, useState } from 'react'
+import { useState } from 'react'
 import { cn } from '../../lib/cn.ts'
 import { useMessages } from '../../lib/i18n/client.tsx'
 import { format } from '../../lib/i18n/index.ts'
-import { useMenuFocus } from './bar-popover.tsx'
+import { CARD_BUTTON, CARD_ROW, CardMenu } from './card.tsx'
 import { PanelFrame } from './edit-panel.tsx'
 import { setOpen, useEditState } from './edit-store.ts'
 import { AddFormat, useEditorDesign } from './formats-panel.tsx'
-import { CHIP, FOCUS_RING, ICON_BUTTON, MENU, MENU_DIVIDER, MENU_ITEM, PANEL_HEADING, PANEL_PART } from './styles.ts'
+import { orderedPages } from './pages-panel.tsx'
+import { CHIP, FOCUS_RING, PANEL_HEADING, PANEL_PART } from './styles.ts'
 
 /** The presets Add a size offers at a tap; the rest, and any size, are under More sizes. */
 const COMMON = ['feed-portrait', 'story', 'link-image', 'medium-rectangle'] as const
@@ -24,10 +24,6 @@ const COMMON = ['feed-portrait', 'story', 'link-image', 'medium-rectangle'] as c
 const sizeOf = ({ width, height }: { width: number; height: number }) => `${width} × ${height}`
 /** A size as a chip shows it, short. */
 const shortSizeOf = ({ width, height }: { width: number; height: number }) => `${width}×${height}`
-/** A size's or a page's own button on its card: a 44 px target on a phone. */
-export const CARD_BUTTON = cn(ICON_BUTTON, 'max-sm:size-10')
-/** A size's or a page's card in its panel's list. */
-export const CARD_ROW = 'flex items-center gap-2.5 rounded-[10px] border border-line bg-surface p-2'
 const ordered = (design: Design) =>
   Object.entries(design.formats).sort(([a, x], [b, y]) => (x.order < y.order ? -1 : x.order > y.order ? 1 : a < b ? -1 : 1))
 /** A size's picture in its proportions, its long side 34. */
@@ -37,8 +33,7 @@ const thumbOf = ({ width, height }: { width: number; height: number }) => {
 }
 /** The first page's background, when it is one colour: what a size's picture is filled with. */
 const backgroundOf = (design: Design) => {
-  const first = Object.values(design.pages).sort((x, y) => (x.order < y.order ? -1 : x.order > y.order ? 1 : 0))[0]
-  const fill = first?.fills[0]
+  const fill = orderedPages(design)[0]?.[1].fills[0]
   return fill?.type === 'solid' ? fill.color : undefined
 }
 
@@ -152,45 +147,6 @@ function SizeList({ editor, onRemoved }: { editor: Editor; onRemoved: (message: 
         )
       })}
     </ul>
-  )
-}
-
-/** One item of a card's menu; a `danger` one, last, removes, which a toast undoes. */
-export interface CardMenuItem { label: string; run: () => void; disabled?: boolean; danger?: boolean }
-
-/** A size's or a page's menu behind ⋯ on its card; a line goes before the item that removes it. */
-export function CardMenu({ label, items }: { label: string; items: CardMenuItem[] }) {
-  const [open, setMenuOpen] = useState(false)
-  const focus = useMenuFocus()
-  return (
-    <Popover.Root open={open} onOpenChange={setMenuOpen}>
-      <Popover.Trigger asChild>
-        <button ref={focus.button} type="button" aria-label={label} title={label} className={CARD_BUTTON}>
-          <DotsThreeIcon size={16} weight="bold" aria-hidden />
-        </button>
-      </Popover.Trigger>
-      <Popover.Portal>
-        <Popover.Content side="bottom" align="end" sideOffset={6} collisionPadding={12} {...focus.content} aria-label={label} onKeyDown={(e) => e.stopPropagation()} className={cn(MENU, 'min-w-44')}>
-          {focus.back}
-          {items.map((item) => (
-            <Fragment key={item.label}>
-              {item.danger && <div className={MENU_DIVIDER} />}
-              <button
-                type="button"
-                disabled={item.disabled}
-                onClick={() => {
-                  setMenuOpen(false)
-                  item.run()
-                }}
-                className={cn(MENU_ITEM, item.danger && 'text-danger')}
-              >
-                {item.label}
-              </button>
-            </Fragment>
-          ))}
-        </Popover.Content>
-      </Popover.Portal>
-    </Popover.Root>
   )
 }
 

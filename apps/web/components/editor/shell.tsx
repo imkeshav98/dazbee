@@ -1,8 +1,8 @@
 'use client'
 
-// The editor's chrome (#51): two islands floating at the top (#110); a capsule floating over the
-// canvas whose buttons open flyouts (Layers, Assets, AI, Brand; #82); a bottom tool dock and a slot
-// for the mini bar above the selection. The canvas runs edge to edge under all of it; the stage is the editor itself, told
+// The editor's chrome: two islands floating at the top; a capsule floating over the canvas whose
+// buttons open flyouts (Layers, Assets, AI, Brand); a bottom tool dock and a slot for the mini bar
+// above the selection. The canvas runs edge to edge under all of it; the stage is the editor itself, told
 // which edges the chrome covers so it fits the ads between.
 import {
   CloudArrowUpIcon, CloudCheckIcon, CloudSlashIcon, CursorIcon, FrameCornersIcon, HandIcon, ImageIcon, ImagesIcon, PaletteIcon, PenNibIcon, ShapesIcon,
@@ -314,10 +314,12 @@ export function EditorShell({ brandId, brandName, designName, onRename, status, 
     const measure = () => {
       if (!stage.current) return
       const box = stage.current.getBoundingClientRect()
-      // On a phone the zoom pill and Pages sit under the islands, so the ads start below them.
-      const phoneTops = box.width < 640 ? [stage.current.querySelector('[data-zoom]'), stage.current.querySelector('[data-pages]')] : []
+      // The zoom pill and Pages: under the islands on a phone, so the ads start below them; at the
+      // bottom elsewhere, so the ads end above them.
+      const corner = [stage.current.querySelector('[data-zoom]'), stage.current.querySelector('[data-pages]')]
+      const phone = box.width < 640
       // The top bar's row is kept clear whether or not the bar shows, so selecting never covers the design.
-      const insets = measureInsets(box, [startIsland.current, endIsland.current, ...phoneTops, barRow.current], [rail.current, dock.current])
+      const insets = measureInsets(box, [startIsland.current, endIsland.current, ...(phone ? corner : []), barRow.current], [rail.current, dock.current, ...(phone ? [] : corner)])
       const key = JSON.stringify(insets)
       if (key === reported.current) return
       reported.current = key

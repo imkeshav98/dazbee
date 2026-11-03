@@ -1,5 +1,13 @@
-// The swatches' shared look in the edit panels: the fixed colours offered without a brand kit, and
-// the ring round the one picked.
+'use client'
+
+// What the edit panels share: the fixed colours offered without a brand kit and the ring round the
+// one picked; and the cards a size or a page has in its panel's list, with their buttons and menu.
+import * as Popover from '@radix-ui/react-popover'
+import { DotsThreeIcon } from '@phosphor-icons/react'
+import { Fragment, useState } from 'react'
+import { cn } from '../../lib/cn.ts'
+import { useMenuFocus } from './bar-popover.tsx'
+import { ICON_BUTTON, MENU, MENU_DIVIDER, MENU_ITEM } from './styles.ts'
 
 /** Colours a click away when the brand's kit has none; the hex fields take any colour. */
 export const SWATCHES = ['#FFFFFF', '#FBF7F2', '#1A1420', '#FF48B0', '#3D6BFF', '#FFD23F', '#3DD68C', '#FF6B3D'] as const
@@ -9,3 +17,47 @@ export const SWATCHES = ['#FFFFFF', '#FBF7F2', '#1A1420', '#FF48B0', '#3D6BFF', 
  * colour, so it reads without colour vision too.
  */
 export const PICKED_RING = 'shadow-[0_0_0_2px_var(--surface),0_0_0_4px_var(--accent)]'
+
+/** A size's or a page's own button on its card: a 44 px target on a phone. */
+export const CARD_BUTTON = cn(ICON_BUTTON, 'max-sm:size-10')
+/** A size's or a page's card in its panel's list. */
+export const CARD_ROW = 'flex items-center gap-2.5 rounded-[10px] border border-line bg-surface p-2'
+
+/** One item of a card's menu; a `danger` one, last, removes, which a toast undoes. */
+export interface CardMenuItem { label: string; run: () => void; disabled?: boolean; danger?: boolean }
+
+/** A size's or a page's menu behind ⋯ on its card; a line goes before the item that removes it. */
+export function CardMenu({ label, items }: { label: string; items: CardMenuItem[] }) {
+  const [open, setMenuOpen] = useState(false)
+  const focus = useMenuFocus()
+  return (
+    <Popover.Root open={open} onOpenChange={setMenuOpen}>
+      <Popover.Trigger asChild>
+        <button ref={focus.button} type="button" aria-label={label} title={label} className={CARD_BUTTON}>
+          <DotsThreeIcon size={16} weight="bold" aria-hidden />
+        </button>
+      </Popover.Trigger>
+      <Popover.Portal>
+        <Popover.Content side="bottom" align="end" sideOffset={6} collisionPadding={12} {...focus.content} aria-label={label} onKeyDown={(e) => e.stopPropagation()} className={cn(MENU, 'min-w-44')}>
+          {focus.back}
+          {items.map((item) => (
+            <Fragment key={item.label}>
+              {item.danger && <div className={MENU_DIVIDER} />}
+              <button
+                type="button"
+                disabled={item.disabled}
+                onClick={() => {
+                  setMenuOpen(false)
+                  item.run()
+                }}
+                className={cn(MENU_ITEM, item.danger && 'text-danger')}
+              >
+                {item.label}
+              </button>
+            </Fragment>
+          ))}
+        </Popover.Content>
+      </Popover.Portal>
+    </Popover.Root>
+  )
+}

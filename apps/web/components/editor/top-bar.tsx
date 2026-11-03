@@ -2,9 +2,8 @@
 
 // The top bar: fixed at the top centre of the stage while something is selected, its items set by
 // what is selected (text, a photo, a shape, a box, a group, or several, or the page: its Background
-// and Sizes). An item with ▾ opens a
-// pop-up under the bar; a panel item opens the one edit panel at the stage's end; the rest act at
-// once. When the items don't fit, the last ones go into ⋯, which opens a second row under the bar;
+// and Sizes). An item with ▾ opens a pop-up under the bar; a panel item opens the one edit panel at
+// the stage's end; the rest act at once. When the items don't fit, the last ones go into ⋯, which opens a second row under the bar;
 // on a phone the bar scrolls sideways instead.
 import {
   ArrowsClockwiseIcon, CircleHalfIcon, CornersOutIcon, CropIcon, DotsThreeIcon, FadersIcon, FrameCornersIcon, ListBulletsIcon, ListNumbersIcon, MaskHappyIcon, MinusIcon, PlusIcon,
@@ -341,10 +340,11 @@ function useFit(row: HTMLElement | null, extra: HTMLElement | null, keys: string
 function usePageItems(pageId: string, design: Design): Item[] {
   const t = useMessages()
   const fills = design.pages[pageId]?.fills ?? []
-  const fill = fills[boundFillIndex(fills)]
+  const top = fills.findLast((f) => f.visible !== false)
+  const colour = top?.type === 'solid' ? top.color : top && 'stops' in top ? top.stops[0]?.color : undefined
   const sizes = format(t.editor.formats.button, { n: Object.keys(design.formats).length })
   return [
-    { key: 'background', node: <PanelButton id="background" label={t.editor.page.backgroundColour} face={<><Dot colour={fill?.type === 'solid' ? fill.color.slice(0, 7) : 'mixed'} />{t.editor.page.background}</>} /> },
+    { key: 'background', node: <PanelButton id="background" label={t.editor.page.backgroundColour} face={<><Dot colour={colour?.slice(0, 7) ?? 'mixed'} />{t.editor.page.background}</>} /> },
     { key: 'sizes', node: <PanelButton id="sizes" label={sizes} icon={<FrameCornersIcon size={15} aria-hidden />} /> },
   ]
 }
@@ -353,14 +353,15 @@ export function TopBar({ editor, brandId }: { editor: Editor; brandId: string })
   const ids = useSelection(editor)
   const selected = useTarget(editor, ids)
   const picked = usePickedPage(editor)
-  // A pop-up or a layer's panel belongs to the selection it was opened for, and Background to the
-  // page picked; the design's Sizes and Pages stay open.
+  // A pop-up or panel belongs to the selection it was opened for, and Background to the page
+  // picked: another page brought into view from Pages leaves Pages and Sizes open.
   const opened = useRef({ ids, picked })
   useLayoutEffect(() => {
-    if (opened.current.ids === ids && opened.current.picked === picked) return
+    const was = opened.current
+    if (was.ids === ids && was.picked === picked) return
     opened.current = { ids, picked }
     const now = editState().open
-    if (now === 'background' || !isPanel(now) || isLayerPanel(now)) setOpen(null)
+    if (was.ids !== ids || now === 'background' || !isPanel(now) || isLayerPanel(now)) setOpen(null)
   }, [ids, picked])
   // Once nothing is selected, changes go to the format shown again.
   useEffect(() => {
@@ -383,17 +384,17 @@ function BarGone() {
 
 function LayerBar({ target, design, brandId }: { target: Target; design: Design; brandId: string }) {
   const items = useItems(target, design, brandId)
-  return <Bar items={items} label={useMessages().editor.bar.topBar} picked={{ 'data-selection': target.ids.join(' ') }} />
+  return <Bar items={items} label={useMessages().editor.bar.topBar} named={{ 'data-selection': target.ids.join(' ') }} />
 }
 
 function PageBar({ editor, pageId }: { editor: Editor; pageId: string }) {
   const { design } = useLiveDesign(editor)
   const items = usePageItems(pageId, design)
-  return <Bar items={items} label={useMessages().editor.page.title} picked={{ 'data-page': pageId }} />
+  return <Bar items={items} label={useMessages().editor.page.title} named={{ 'data-page': pageId }} />
 }
 
-/** The bar for what is picked, named on it by `picked`: the selected layers, or the page. */
-function Bar({ items, label, picked }: { items: Item[]; label: string; picked: { 'data-selection': string } | { 'data-page': string } }) {
+/** The bar for what it acts on, which `named` names on it: the selected layers, or the page. */
+function Bar({ items, label, named }: { items: Item[]; label: string; named: { 'data-selection': string } | { 'data-page': string } }) {
   const t = useMessages()
   const { open, flyoutEnd } = useEditState()
   const phone = usePhone()
@@ -431,7 +432,7 @@ function Bar({ items, label, picked }: { items: Item[]; label: string; picked: {
   }, [bar, row, extra, overflowOpen])
   useLayoutEffect(() => () => setBar(false), [])
   // Each selection's bar starts at its first item, on a phone too, where the bar scrolls sideways.
-  const selectionKey = Object.values(picked).join(' ')
+  const selectionKey = Object.values(named).join(' ')
   useLayoutEffect(() => {
     if (row) row.scrollLeft = 0
     setRowOpen(false)
@@ -468,7 +469,7 @@ function Bar({ items, label, picked }: { items: Item[]; label: string; picked: {
       role="toolbar"
       aria-label={label}
       data-testid="top-bar"
-      {...picked}
+      {...named}
       onKeyDown={arrowAlong}
       onFocus={focused}
       style={{ insetInlineStart: startAt }}

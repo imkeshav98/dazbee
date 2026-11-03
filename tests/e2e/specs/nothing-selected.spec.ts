@@ -6,8 +6,9 @@
 // sizes, and the canvas never moves.
 import { expect, test, type Page } from '../support/test.ts'
 import type { DesignInput } from '@dazbee/schema'
-import { designOf, writeOutput } from '../support/editor.ts'
+import { designOf, editorPath, screenPoint, writeOutput } from '../support/editor.ts'
 import { layoutProblems } from '../support/layout.ts'
+import { seed } from '../support/seed.ts'
 import { backgroundPanel, barMenu, click, drag, openStage, pagesPanel, pickPage, press, selection, sizesPanel } from '../support/stage.ts'
 
 test.describe.configure({ timeout: 120_000 })
@@ -32,6 +33,15 @@ const PIECES = {
   dock: '[data-dock]',
   zoom: '[data-zoom]',
   pages: '[data-pages]',
+}
+/** Where each size of the page is on screen: the ads, which the chrome keeps clear of at a fit. */
+const ads = async (page: Page) => {
+  const frames = await page.evaluate(() => window.dazbee?.frames() ?? [])
+  return Promise.all(frames.map(async (f) => {
+    const a = await screenPoint(page, 0, 0, f)
+    const b = await screenPoint(page, f.width, f.height, f)
+    return { x: a.x, y: a.y, width: b.x - a.x, height: b.y - a.y }
+  }))
 }
 const camera = (page: Page) => page.evaluate(() => window.dazbee?.camera())
 const settle = (page: Page) => page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))))
@@ -173,6 +183,9 @@ test('a click on the page picks it: a dashed outline, pink labels, and a bar of 
   await drag(page, { x: 40, y: 20 }, { x: 400, y: 200 })
   expect(await selection(page)).toEqual(['headline'])
   await expect(page.locator('.stage-overlay .page-picked')).toHaveCount(0)
+  // With a layer selected, a click on the page away from it picks the page and lets the layer go.
+  await pickPage(page, 900, 900)
+  expect(await selection(page)).toEqual([])
   // Picking never moved the canvas.
   expect(await camera(page)).toEqual(still)
   expect(errors).toEqual([])
@@ -210,6 +223,10 @@ for (const [width, height] of [[1280, 760], [820, 1180], [390, 844]] as const) {
       expect(await camera(page), name).toEqual(still)
       writeOutput(`${name}-${width}.png`, await page.screenshot({ animations: 'disabled' }))
     }
+    // Fitted, the ads sit clear of the chrome: Pages and the zoom pill too.
+    const [square, story] = await ads(page)
+    if (!square || !story) throw new Error('no ads')
+    expect(await layoutProblems(page, { pieces: { ...PIECES, square, story } })).toEqual([])
     await check('nothing-selected')
     await sizesPanel(page)
     await check('sizes')
@@ -221,3 +238,29 @@ for (const [width, height] of [[1280, 760], [820, 1180], [390, 844]] as const) {
     expect(errors).toEqual([])
   })
 }
+
+test('in Arabic Sizes, Pages and the page\'s Background mirror and sit clear of everything', async ({ browser }) => {
+  const designId = await seed(design())
+  const context = await browser.newContext({ viewport: { width: 1280, height: 760 } })
+  await context.addCookies([{ name: 'locale', value: 'ar', url: 'http://localhost' }])
+  const page = await context.newPage()
+  const errors: string[] = []
+  page.on('pageerror', (error) => errors.push(error.message))
+  await page.goto(editorPath(designId))
+  await expect(page.getByTestId('status')).toHaveAttribute('data-ready', '', { timeout: 30_000 })
+  await expect(page.locator('html')).toHaveAttribute('dir', 'rtl')
+  // Pages sits beside the zoom pill at the screen's left, the end side in Arabic.
+  const pages = await page.getByTestId('pages-button').boundingBox()
+  const zoom = await page.locator('[data-zoom]').boundingBox()
+  expect(pages && zoom && pages.x > zoom.x + zoom.width).toBe(true)
+  for (const open of [() => sizesPanel(page), () => pagesPanel(page), async () => {
+    await page.keyboard.press('Escape')
+    return backgroundPanel(page, 900, 900)
+  }]) {
+    await open()
+    expect(await layoutProblems(page, { pieces: PIECES, uncut: 'h1, [data-testid="edit-panel-note"]' })).toEqual([])
+  }
+  writeOutput('nothing-selected-rtl.png', await page.screenshot({ animations: 'disabled' }))
+  expect(errors).toEqual([])
+  await context.close()
+})

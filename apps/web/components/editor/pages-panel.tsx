@@ -14,11 +14,11 @@ import { useMessages } from '../../lib/i18n/client.tsx'
 import { format } from '../../lib/i18n/index.ts'
 import { useValue, valueStore } from '../../lib/value-store.ts'
 import { afterDraws, sameUrls } from './after-draws.ts'
+import { CARD_ROW, CardMenu } from './card.tsx'
 import { PanelFrame } from './edit-panel.tsx'
 import { setOpen, useEditState } from './edit-store.ts'
 import { useEditorDesign } from './formats-panel.tsx'
 import { BackgroundBody } from './selection-cards.tsx'
-import { CARD_ROW, CardMenu } from './sizes-panel.tsx'
 import { DROP_LINE, FOCUS_RING, PANEL_BUTTON } from './styles.ts'
 
 export const orderedPages = (design: Design) =>
@@ -73,6 +73,8 @@ export function PagesButton({ editor }: { editor: Editor | null }) {
 /** Pages once the design is open: which page is in view, of how many. */
 function LivePages({ editor }: { editor: Editor }) {
   const t = useMessages()
+  // Each design opens on its first page.
+  useEffect(() => () => shownPage.set(null), [editor])
   const { design } = useEditorDesign(editor)
   usePickedPage(editor)
   const current = useCurrentPage(design)
