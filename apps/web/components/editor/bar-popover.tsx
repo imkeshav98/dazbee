@@ -35,6 +35,17 @@ export function useMenuFocus() {
   const button = useRef<HTMLButtonElement>(null)
   const outside = useRef(false)
   const content = {
+    // A pop-up takes the focus as it opens, as a menu does. When its first control is a field to
+    // type in, the pop-up itself takes it: a click to open never leaves a field typing, and on a
+    // phone never brings the keyboard up. Tab goes on to the field.
+    onOpenAutoFocus: (event: Event) => {
+      const into = event.currentTarget
+      if (!(into instanceof HTMLElement)) return
+      const first = into.querySelector<HTMLElement>('button:not([disabled]), input:not([disabled]), textarea, select, [href], [tabindex]:not([tabindex="-1"])')
+      if (first?.tagName !== 'INPUT' && first?.tagName !== 'TEXTAREA') return
+      event.preventDefault()
+      into.focus({ preventScroll: true })
+    },
     onInteractOutside: () => {
       outside.current = true
     },

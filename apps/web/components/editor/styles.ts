@@ -44,8 +44,8 @@ export const SWATCH = 'shrink-0 cursor-pointer rounded-full border border-line-s
 
 /** The look of a value typed into a field: a number, a hex, a dash pattern. */
 export const VALUE_TEXT = 'font-mono text-[12px] tabular-nums text-text'
-/** A field to type a value into, as tall as a knob. */
-export const FIELD = `h-8 min-w-0 w-full rounded-row border border-line bg-surface px-1.5 ${VALUE_TEXT} outline-none placeholder:text-subtle focus:border-accent`
+/** A field to type a value into, as tall as a knob: its border shows the focus, with no ring besides. */
+export const FIELD = `h-8 min-w-0 w-full rounded-row border border-line bg-surface px-1.5 ${VALUE_TEXT} outline-none focus-visible:outline-none! placeholder:text-subtle focus:border-accent`
 /** Where a dragged row would land in a list: a line across it, placed by the row above or below. */
 export const DROP_LINE = 'pointer-events-none absolute inset-x-0 h-0.5 rounded-full bg-accent'
 

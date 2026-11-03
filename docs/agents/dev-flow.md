@@ -34,7 +34,7 @@ Before Keshav sees a mock:
 
 ## Merging a PR
 
-1. **Goldfish QA**, for any change a user can see or do in the app or its exports. A goldfish gets the ticket, its test grid and the URL of the app running the branch, and tries to break the change in Chromium: every cell of the grid, odd input, the keyboard, undo and redo, the three screen sizes. It reports each bug with steps and a screenshot. Each bug becomes a test that goes red, then a fix in the same PR, and the PR lists each finding with what happened to it.
+1. **Goldfish QA**, for any change a user can see or do in the app or its exports. A goldfish gets the ticket, its test grid and the URL of the app running the branch, and tries to break the change in Chromium: every cell of the grid, odd input, the keyboard, undo and redo, the three screen sizes, and for each pop-up, panel and menu opened by a click and by a key, what has the focus and how that looks. It reports each bug with steps and a screenshot. Each bug becomes a test that goes red, then a fix in the same PR, and the PR lists each finding with what happened to it.
 2. `/code-review` against the ticket, on every PR. Fix or answer every finding.
 
 ## Closing a parent spec
