@@ -14,45 +14,15 @@ export interface FontInfo {
 const tag = (view: DataView, at: number) =>
   String.fromCharCode(view.getUint8(at), view.getUint8(at + 1), view.getUint8(at + 2), view.getUint8(at + 3))
 
-function utf16be(view: DataView, at: number, length: number) {
-  let text = ''
-  for (let i = 0; i + 1 < length; i += 2) text += String.fromCharCode(view.getUint16(at + i))
-  return text
-}
-
-function latin1(view: DataView, at: number, length: number) {
-  let text = ''
-  for (let i = 0; i < length; i++) text += String.fromCharCode(view.getUint8(at + i))
-  return text
-}
-
-/** The name table's strings by name id, Windows English first, then any Windows, then Mac Roman. */
-function names(view: DataView, at: number, length: number): Map<number, string> {
-  const found = new Map<number, { rank: number; text: string }>()
-  if (length < 6) return new Map()
-  const count = view.getUint16(at + 2)
-  const strings = at + view.getUint16(at + 4)
-  for (let i = 0; i < count; i++) {
-    const record = at + 6 + i * 12
-    if (record + 12 > at + length) break
-    const [platform, encoding, language, nameId, size, offset] = [0, 2, 4, 6, 8, 10].map((o) =>
-      view.getUint16(record + o),
-    ) as [number, number, number, number, number, number]
-    if (strings + offset + size > view.byteLength) continue
-    const rank =
-      platform === 3 && (encoding === 1 || encoding === 10)
-        ? language === 0x409
-          ? 0
-          : 1
-        : platform === 1 && encoding === 0
-          ? 2
-          : -1
-    if (rank < 0 || (found.get(nameId)?.rank ?? 9) <= rank) continue
-    const text = (platform === 3 ? utf16be(view, strings + offset, size) : latin1(view, strings + offset, size)).trim()
-    if (text) found.set(nameId, { rank, text })
-  }
-  return new Map([...found].map(([id, { text }]) => [id, text]))
-}
+/**
+ * A preview is the family's name at 32 pixels on a 48 pixel tall strip with its baseline 36 down,
+ * every family alike, so the picker shows them at one size on one line; it shows them at half size.
+ * What a family draws above or below the strip is cut.
+ */
+const PREVIEW_SIZE = 32
+const PREVIEW_HEIGHT = 48
+const PREVIEW_BASELINE = 36
+const PREVIEW_MAX_WIDTH = 640
 
 /** The font's family, weight and style, or null when the bytes are not one TrueType or OpenType font. */
 export function readFontInfo(bytes: Uint8Array): FontInfo | null {
@@ -90,16 +60,6 @@ export function readFontInfo(bytes: Uint8Array): FontInfo | null {
   }
   return { contentType, family, weight, style: italic ? 'italic' : 'normal' }
 }
-
-/**
- * A preview is the family's name at 32 pixels on a 48 pixel tall strip with its baseline 36 down,
- * every family alike, so the picker shows them at one size on one line; it shows them at half size.
- * What a family draws above or below the strip is cut.
- */
-const PREVIEW_SIZE = 32
-const PREVIEW_HEIGHT = 48
-const PREVIEW_BASELINE = 36
-const PREVIEW_MAX_WIDTH = 640
 
 /**
  * The family's name drawn in the face itself, near black on clear, as a PNG: the font picker shows
@@ -157,4 +117,44 @@ export async function fontPreview(
     fonts.delete()
     provider.delete()
   }
+}
+
+/** The name table's strings by name id, Windows English first, then any Windows, then Mac Roman. */
+function names(view: DataView, at: number, length: number): Map<number, string> {
+  const found = new Map<number, { rank: number; text: string }>()
+  if (length < 6) return new Map()
+  const count = view.getUint16(at + 2)
+  const strings = at + view.getUint16(at + 4)
+  for (let i = 0; i < count; i++) {
+    const record = at + 6 + i * 12
+    if (record + 12 > at + length) break
+    const [platform, encoding, language, nameId, size, offset] = [0, 2, 4, 6, 8, 10].map((o) =>
+      view.getUint16(record + o),
+    ) as [number, number, number, number, number, number]
+    if (strings + offset + size > view.byteLength) continue
+    const rank =
+      platform === 3 && (encoding === 1 || encoding === 10)
+        ? language === 0x409
+          ? 0
+          : 1
+        : platform === 1 && encoding === 0
+          ? 2
+          : -1
+    if (rank < 0 || (found.get(nameId)?.rank ?? 9) <= rank) continue
+    const text = (platform === 3 ? utf16be(view, strings + offset, size) : latin1(view, strings + offset, size)).trim()
+    if (text) found.set(nameId, { rank, text })
+  }
+  return new Map([...found].map(([id, { text }]) => [id, text]))
+}
+
+function utf16be(view: DataView, at: number, length: number) {
+  let text = ''
+  for (let i = 0; i + 1 < length; i += 2) text += String.fromCharCode(view.getUint16(at + i))
+  return text
+}
+
+function latin1(view: DataView, at: number, length: number) {
+  let text = ''
+  for (let i = 0; i < length; i++) text += String.fromCharCode(view.getUint8(at + i))
+  return text
 }

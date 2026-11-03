@@ -1,7 +1,7 @@
 import { BrandKit, BrandSummary, type DesignInput, DesignSummary, EMPTY_BRAND_KIT } from '@dazbee/schema'
 
 export const API_URL = process.env.API_URL ?? 'http://localhost:8787'
-/** A brand of the development workspace the API seeds (apps/api/src/session.ts). */
+/** A brand of the development workspace the API seeds (apps/api/src/sign-in/session.ts). */
 export const DEV_BRAND = 'dev-brand-coffee'
 
 /** A design for the live editing checks: shapes to drag, and English and Arabic text to type into. */

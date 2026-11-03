@@ -1,68 +1,14 @@
-// The workspace, its brands and their designs, always read and written within one workspace.
+// A brand's designs, always read and written within one workspace.
 import { randomUUID } from 'node:crypto'
 
 import { and, asc, desc, eq } from 'drizzle-orm'
 import * as Y from 'yjs'
 
-import { brands, type Db, designs, designStates, readDesignState, workspaces } from '@dazbee/db'
+import { type Db, designs, designStates, readDesignState } from '@dazbee/db'
 import { loadDesign, migrateDoc, readDesign } from '@dazbee/doc'
-import {
-  type BrandSummary,
-  type Design,
-  type DesignInput,
-  type DesignSummary,
-  parseDesign,
-  SCHEMA_VERSION,
-  type UpdateWorkspace,
-  type WorkspaceSummary,
-} from '@dazbee/schema'
+import { type Design, type DesignInput, type DesignSummary, parseDesign, SCHEMA_VERSION } from '@dazbee/schema'
 
 export class InvalidContent extends Error {}
-
-const workspaceSummary = { id: workspaces.id, name: workspaces.name, kind: workspaces.kind }
-
-export async function findWorkspace(db: Db, workspaceId: string): Promise<WorkspaceSummary | null> {
-  const [row] = await db.select(workspaceSummary).from(workspaces).where(eq(workspaces.id, workspaceId))
-  return row ?? null
-}
-
-export async function updateWorkspace(
-  db: Db,
-  workspaceId: string,
-  { kind, name }: UpdateWorkspace,
-): Promise<WorkspaceSummary | null> {
-  const [row] = await db
-    .update(workspaces)
-    .set({ ...(kind ? { kind } : {}), ...(name ? { name } : {}) })
-    .where(eq(workspaces.id, workspaceId))
-    .returning(workspaceSummary)
-  return row ?? null
-}
-
-export async function listBrands(db: Db, workspaceId: string): Promise<BrandSummary[]> {
-  return db
-    .select({ id: brands.id, name: brands.name })
-    .from(brands)
-    .where(eq(brands.workspaceId, workspaceId))
-    .orderBy(asc(brands.name), asc(brands.id))
-}
-
-export async function createBrand(db: Db, workspaceId: string, name: string, website?: string): Promise<BrandSummary> {
-  const [row] = await db
-    .insert(brands)
-    .values({ id: randomUUID(), workspaceId, name, website: website ?? null })
-    .returning({ id: brands.id, name: brands.name })
-  if (!row) throw new Error('insert returned no brand')
-  return row
-}
-
-export async function findBrand(db: Db, workspaceId: string, brandId: string): Promise<BrandSummary | null> {
-  const [row] = await db
-    .select({ id: brands.id, name: brands.name })
-    .from(brands)
-    .where(and(eq(brands.id, brandId), eq(brands.workspaceId, workspaceId)))
-  return row ?? null
-}
 
 const summary = {
   id: designs.id,
@@ -80,6 +26,15 @@ const toSummary = (row: {
   createdAt: Date
   updatedAt: Date
 }): DesignSummary => ({ ...row, createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString() })
+
+/** One blank 1080×1080 page: what a design starts as when nothing else is given. */
+const blankDesign = (designId: string, name: string): DesignInput => ({
+  meta: { schemaVersion: SCHEMA_VERSION, designId, name, kind: 'single', primaryFormatId: 'sq' },
+  formats: { sq: { name: 'Square', width: 1080, height: 1080, order: 'a0' } },
+  pages: { p1: { name: 'Page 1', order: 'a0', fills: [{ type: 'solid', color: '#FFFFFFFF' }] } },
+  nodes: {},
+  overrides: {},
+})
 
 export async function listDesigns(db: Db, workspaceId: string, brandId: string): Promise<DesignSummary[]> {
   const rows = await db
@@ -127,15 +82,6 @@ export async function deleteDesign(db: Db, workspaceId: string, brandId: string,
     .returning({ id: designs.id })
   return rows.length > 0
 }
-
-/** One blank 1080×1080 page: what a design starts as when nothing else is given. */
-const blankDesign = (designId: string, name: string): DesignInput => ({
-  meta: { schemaVersion: SCHEMA_VERSION, designId, name, kind: 'single', primaryFormatId: 'sq' },
-  formats: { sq: { name: 'Square', width: 1080, height: 1080, order: 'a0' } },
-  pages: { p1: { name: 'Page 1', order: 'a0', fills: [{ type: 'solid', color: '#FFFFFFFF' }] } },
-  nodes: {},
-  overrides: {},
-})
 
 /**
  * Creates a design and its first Yjs state together, so the editor never opens a design with

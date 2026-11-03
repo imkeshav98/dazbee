@@ -8,10 +8,10 @@ import { describe, expect, it } from 'vitest'
 import { memberships, users, workspaces } from '@dazbee/db'
 import { ApiError, SignedIn, SignedOut, SignInLink, WorkspaceSummary } from '@dazbee/schema'
 
-import { createApp } from './app.ts'
+import { createApp } from '../app.ts'
+import { db, storage, syncSecret } from '../test-api.ts'
 import { bearerToken, readSessionToken, SESSION_TTL_MS, signSessionToken, tokenSession } from './session.ts'
 import { accessTokenSessionId, type SignedInPerson, type SignInProvider, workosSettings } from './sign-in.ts'
-import { db, storage, syncSecret } from './test-api.ts'
 
 const run = randomUUID().slice(0, 8)
 const secret = 'test-session-secret-'.padEnd(32, 'x')

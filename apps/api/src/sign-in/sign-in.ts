@@ -44,6 +44,10 @@ export interface WorkosSettings {
   redirectUri: string
 }
 
+/** The workspace a first sign-in makes is called after its person until onboarding names it. */
+const firstWorkspaceName = (user: SignedInPerson['user']) =>
+  (user.name || user.email.split('@')[0] || user.email).slice(0, 120)
+
 /** WorkOS settings from the environment, or null when sign-in is not set up. */
 export function workosSettings(env: NodeJS.ProcessEnv = process.env): WorkosSettings | null {
   const { WORKOS_API_KEY: apiKey, WORKOS_CLIENT_ID: clientId, WORKOS_REDIRECT_URI: redirectUri } = env
@@ -89,10 +93,6 @@ export function workosProvider({ apiKey, clientId, redirectUri }: WorkosSettings
     signOutUrl: (sessionId) => workos.userManagement.getLogoutUrl({ sessionId }),
   }
 }
-
-/** The workspace a first sign-in makes is called after its person until onboarding names it. */
-const firstWorkspaceName = (user: SignedInPerson['user']) =>
-  (user.name || user.email.split('@')[0] || user.email).slice(0, 120)
 
 /**
  * Signs in a person WorkOS vouched for: records them, picks their workspace (the organization WorkOS

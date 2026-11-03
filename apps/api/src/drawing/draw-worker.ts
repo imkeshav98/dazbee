@@ -27,6 +27,22 @@ export type DrawResult = { id: number; png: Uint8Array } | { id: number; error: 
 const shipped = loadFontFiles()
 let cache: ResourceCache | undefined
 
+// One job at a time, in the order they came: each draw is synchronous anyway.
+let queue = Promise.resolve()
+parentPort?.on('message', (job: DrawJob) => {
+  queue = queue.then(async () => {
+    try {
+      const png = await draw(job)
+      parentPort?.postMessage({ id: job.id, png } satisfies DrawResult)
+    } catch (error) {
+      parentPort?.postMessage({
+        id: job.id,
+        error: error instanceof Error ? error.message : String(error),
+      } satisfies DrawResult)
+    }
+  })
+})
+
 async function draw(job: DrawJob): Promise<Uint8Array> {
   const ck = await loadCanvasKit()
   cache ??= resourceCache(ck)
@@ -54,19 +70,3 @@ async function draw(job: DrawJob): Promise<Uint8Array> {
     surface.dispose()
   }
 }
-
-// One job at a time, in the order they came: each draw is synchronous anyway.
-let queue = Promise.resolve()
-parentPort?.on('message', (job: DrawJob) => {
-  queue = queue.then(async () => {
-    try {
-      const png = await draw(job)
-      parentPort?.postMessage({ id: job.id, png } satisfies DrawResult)
-    } catch (error) {
-      parentPort?.postMessage({
-        id: job.id,
-        error: error instanceof Error ? error.message : String(error),
-      } satisfies DrawResult)
-    }
-  })
-})

@@ -6,7 +6,7 @@ import { migrateDatabase, openDatabase } from '@dazbee/db'
 import { GOOGLE_FONTS } from '@dazbee/fonts'
 import { openStorage, storageSettings } from '@dazbee/storage'
 
-import { importGoogleFamily } from './fonts-google.ts'
+import { importGoogleFamily } from '../fonts/google.ts'
 
 const databaseUrl = process.env.DATABASE_URL
 if (!databaseUrl) throw new Error('DATABASE_URL is not set')

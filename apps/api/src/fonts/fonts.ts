@@ -16,8 +16,8 @@ import {
 } from '@dazbee/schema'
 import type { Storage } from '@dazbee/storage'
 
+import { checkUpload, googleFontKey, previewKey, signedLink, signedUpload, uploadedFontKey } from '../storage-keys.ts'
 import { fontPreview, readFontInfo } from './font-file.ts'
-import { checkUpload, googleFontKey, previewKey, signedLink, signedUpload, uploadedFontKey } from './storage-keys.ts'
 
 export class InvalidFont extends Error {}
 
@@ -38,19 +38,6 @@ const byFace = (a: Row, b: Row) => (a.style === b.style ? a.weight - b.weight : 
 const visibleTo = (workspaceId: string, brandId: string) =>
   or(eq(fontFaces.source, 'google'), and(eq(fontFaces.workspaceId, workspaceId), eq(fontFaces.brandId, brandId)))
 
-/** The faces of each family as the brand sees them: where it uploaded a family Google has, only its own. */
-function families(rows: Row[]): Map<string, Row[]> {
-  const out = new Map<string, Row[]>()
-  for (const row of rows) {
-    const known = out.get(row.family)
-    if (!known) out.set(row.family, [row])
-    else if (known[0]?.source === row.source) known.push(row)
-    else if (row.source === 'upload') out.set(row.family, [row])
-  }
-  for (const faces of out.values()) faces.sort(byFace)
-  return out
-}
-
 /** The catalog a brand picks from, families by name. */
 export async function listFonts(db: Db, workspaceId: string, brandId: string): Promise<FontFamily[]> {
   const rows = await db.select().from(fontFaces).where(visibleTo(workspaceId, brandId))
@@ -62,14 +49,6 @@ export async function listFonts(db: Db, workspaceId: string, brandId: string): P
       category: faces[0]?.category ?? null,
       faces: faces.map(toFace),
     }))
-}
-
-async function visibleFace(db: Db, workspaceId: string, brandId: string, faceId: string) {
-  const [row] = await db
-    .select()
-    .from(fontFaces)
-    .where(and(eq(fontFaces.id, faceId), visibleTo(workspaceId, brandId)))
-  return row ?? null
 }
 
 /** A face the brand can use and short-lived URLs to its file and preview, or null. */
@@ -198,4 +177,25 @@ export async function replaceFace(db: Db, row: typeof fontFaces.$inferInsert) {
       )
     await tx.insert(fontFaces).values(row)
   })
+}
+
+/** The faces of each family as the brand sees them: where it uploaded a family Google has, only its own. */
+function families(rows: Row[]): Map<string, Row[]> {
+  const out = new Map<string, Row[]>()
+  for (const row of rows) {
+    const known = out.get(row.family)
+    if (!known) out.set(row.family, [row])
+    else if (known[0]?.source === row.source) known.push(row)
+    else if (row.source === 'upload') out.set(row.family, [row])
+  }
+  for (const faces of out.values()) faces.sort(byFace)
+  return out
+}
+
+async function visibleFace(db: Db, workspaceId: string, brandId: string, faceId: string) {
+  const [row] = await db
+    .select()
+    .from(fontFaces)
+    .where(and(eq(fontFaces.id, faceId), visibleTo(workspaceId, brandId)))
+  return row ?? null
 }

@@ -5,7 +5,7 @@ import { and, eq } from 'drizzle-orm'
 import { brandKits, type Db } from '@dazbee/db'
 import { type BrandKit, EMPTY_BRAND_KIT } from '@dazbee/schema'
 
-import { findAsset } from './assets.ts'
+import { findAsset } from '../assets/assets.ts'
 
 export class InvalidKit extends Error {}
 
