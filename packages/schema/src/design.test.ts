@@ -1,20 +1,8 @@
 import { describe, expect, it } from 'vitest'
 
-import {
-  AnyScope,
-  fontFamilies,
-  FORMAT_PRESETS,
-  FORMAT_SHAPES,
-  formatIdOf,
-  formatScope,
-  formatSizeProblem,
-  imageAssetIds,
-  parseDesign,
-  parseDesignIncrementally,
-  SCHEMA_VERSION,
-  Scope,
-  shapeOf,
-} from './index.ts'
+import { fontFamilies, imageAssetIds, parseDesign } from './design.ts'
+import { parseDesignIncrementally } from './parse-incremental.ts'
+import { minimal } from './test-design.ts'
 
 /**
  * Parses with the full parser, checking on the way that the incremental one agrees exactly,
@@ -27,30 +15,6 @@ const parse = (input: unknown) => {
   expect(parseDesignIncrementally(input)).toEqual(full)
   return full
 }
-
-/** The smallest valid design: one page, one format, one rectangle. */
-const minimal = () => ({
-  meta: { schemaVersion: SCHEMA_VERSION, designId: 'd1', name: 'Minimal', kind: 'single', primaryFormatId: 'sq' },
-  formats: { sq: { name: 'Square', width: 1080, height: 1080, order: 'a0' } },
-  pages: { p1: { name: 'Page 1', order: 'a0', fills: [{ type: 'solid', color: '#FFFFFFFF' }] } },
-  nodes: {
-    r1: {
-      type: 'graphic',
-      parentId: 'p1',
-      index: 'a0',
-      name: 'Box',
-      props: {
-        x: 100,
-        y: 100,
-        width: 200,
-        height: 100,
-        shape: { kind: 'rect' },
-        fills: [{ type: 'solid', color: '#FF5A36FF' }],
-      },
-    },
-  },
-  overrides: {},
-})
 
 describe('parseDesign', () => {
   it('accepts a minimal design and fills in defaults', () => {
@@ -233,30 +197,6 @@ describe('text runs', () => {
   })
 })
 
-describe('parseDesignIncrementally', () => {
-  it('reuses the validated layer for an unchanged layer object, and validates a replaced one again', () => {
-    const d = minimal()
-    const r2 = { ...d.nodes.r1, name: 'Second' }
-    const nodes = { ...d.nodes, r2 }
-    const first = parseDesignIncrementally({ ...d, nodes })
-    const changed = { ...d, nodes: { ...nodes, r2: { ...r2, props: { ...r2.props, x: 5 } } } }
-    const second = parseDesignIncrementally(changed)
-    if (!first.success || !second.success) throw new Error('expected both to parse')
-    expect(second.design.nodes.r1).toBe(first.design.nodes.r1)
-    expect(second.design.nodes.r2).not.toBe(first.design.nodes.r2)
-    expect(second.design.nodes.r2?.props.x).toBe(5)
-  })
-
-  it('accepts its own output as input and returns the same layers', () => {
-    const first = parseDesignIncrementally(minimal())
-    if (!first.success) throw new Error('expected a design')
-    const again = parseDesignIncrementally(first.design)
-    if (!again.success) throw new Error('expected a design')
-    expect(again.design.nodes.r1).toBe(first.design.nodes.r1)
-    expect(again.design).toEqual(first.design)
-  })
-})
-
 describe('imageAssetIds', () => {
   it('finds image fills on pages, layers and format overrides, once each', () => {
     const image = (assetId: string) => ({ type: 'image', assetId })
@@ -339,46 +279,5 @@ describe('fontFamilies', () => {
     })
     if (!parsed.success) throw new Error(parsed.errors.join('\n'))
     expect(fontFamilies(parsed.design)).toEqual(['Bebas Neue', 'Inter', 'Lobster'])
-  })
-})
-
-describe('format sizes', () => {
-  it('offers presets inside the limits, at least one of every shape', () => {
-    for (const preset of FORMAT_PRESETS)
-      expect(formatSizeProblem(preset.width, preset.height), preset.id).toBeUndefined()
-    expect(new Set(FORMAT_PRESETS.map((p) => shapeOf(p.width, p.height)))).toEqual(new Set(FORMAT_SHAPES))
-  })
-
-  it('runs from 1:3 to 3:1 with a short side of at least 100 px', () => {
-    expect(formatSizeProblem(1500, 500)).toBeUndefined()
-    expect(formatSizeProblem(500, 1500)).toBeUndefined()
-    expect(formatSizeProblem(1501, 500)).toMatch(/1:3 to 3:1/)
-    expect(formatSizeProblem(320, 50)).toMatch(/short side/)
-    expect(formatSizeProblem(8001, 8000)).toMatch(/at most 8000/)
-    expect(formatSizeProblem(100.5, 200)).toMatch(/whole number/)
-  })
-})
-
-describe('Scope', () => {
-  it('takes only format scopes', () => {
-    expect(Scope.safeParse('format:sq').success).toBe(true)
-    expect(Scope.safeParse('base').success).toBe(false)
-  })
-})
-
-describe('AnyScope', () => {
-  it('takes the base and format scopes, and defaults to the base', () => {
-    expect(AnyScope.parse('format:sq')).toBe('format:sq')
-    expect(AnyScope.parse('base')).toBe('base')
-    expect(AnyScope.parse(undefined)).toBe('base')
-    expect(AnyScope.safeParse('page:p1').success).toBe(false)
-    expect(AnyScope.safeParse('format:').success).toBe(false)
-  })
-})
-
-describe('formatScope', () => {
-  it('names the scope of a format, which formatIdOf reads back', () => {
-    expect(formatScope('sq')).toBe('format:sq')
-    expect(formatIdOf(formatScope('sq'))).toBe('sq')
   })
 })

@@ -1,7 +1,6 @@
 import { z } from 'zod'
 
-import { Layer } from './design.ts'
-import { canHold } from './layers.ts'
+import { canHold, Layer } from './layers.ts'
 import { SCHEMA_VERSION } from './migrate.ts'
 import { NodeId } from './primitives.ts'
 
