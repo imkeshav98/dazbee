@@ -35,7 +35,9 @@ test('the cards float over a full-width canvas and the ads fit between the capsu
   // Below the end island (#110).
   expect(cards.y - stage.y).toBeLessThan(96)
   expect(await page.getByTestId('cards').evaluate((el) => getComputedStyle(el).backgroundColor)).toBe('rgba(0, 0, 0, 0)')
-  for (const card of ['page-card', 'formats', 'pages']) await expect(page.getByTestId(card)).toBeVisible()
+  for (const card of ['page-card', 'pages']) await expect(page.getByTestId(card)).toBeVisible()
+  // The sizes are in the Sizes panel, from the header pill.
+  await expect(page.getByTestId('formats')).toHaveCount(0)
   // Each card is as tall as what it holds, and frosted.
   const pageCard = page.getByTestId('page-card')
   // The brand's own colours, when its kit has any, add a row of their own above the fixed set.
