@@ -30,8 +30,8 @@ const design = (assetId: string): DesignInput => ({
   overrides: {},
 })
 
-/** The tiles: in the bar's Effects for one layer, in the Effects card for several. */
-const effects = (page: Page) => page.locator('[data-testid="bar-effects-menu"], [data-testid="effects-card"]')
+/** The tiles, in the top bar's Effects panel. */
+const effects = (page: Page) => page.getByTestId('bar-effects-menu')
 const tiles = (page: Page) => effects(page).locator('[data-tile]')
 /** Whether a tile's picture has a pixel of a colour, within a few levels. */
 const hasColour = (page: Page, tile: string, rgb: number[]) => effects(page).locator(`[data-tile="${tile}"] img`).evaluate(async (img: HTMLImageElement, rgb) => {
@@ -103,8 +103,9 @@ test('each layer previews the effects on itself; a fill change follows; several 
   expect(outlined).not.toBe(await tiles(page).first().locator('img').getAttribute('src'))
   writeOutput('effect-tiles-4-text.png', await page.getByTestId('bar-effects-menu').screenshot())
 
-  // Several layers: Aa as before.
+  // Several layers: Aa as before, in the Effects panel, opened again for the new selection.
   await click(page, 250, 260, ['Shift'])
+  await barMenu(page, 'effects')
   await expect(tiles(page).locator('img')).toHaveCount(0)
   await expect(tiles(page).first()).toContainText('Aa')
   expect(errors).toEqual([])

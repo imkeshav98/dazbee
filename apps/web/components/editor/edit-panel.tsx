@@ -62,9 +62,11 @@ function Panel({ id, target, design, brandId }: { id: PanelId; target: Target; d
   const body = useRef<HTMLDivElement>(null)
   const bodyRef = useOverlayScroll(body)
   const note = target.ids.length > 1 ? format(t.editor.props.layers, { n: target.ids.length }) : target.names[0] || t.editor.props.layer
+  // The focus goes back to the bar item at once, before the panel goes: later, it could take the
+  // focus from whatever the next click or key opened.
   const close = (back: boolean) => {
+    if (back) document.querySelector<HTMLElement>(`[data-testid="bar-${id}"]`)?.focus()
     setOpen(null)
-    if (back) requestAnimationFrame(() => document.querySelector<HTMLElement>(`[data-testid="bar-${id}"]`)?.focus())
   }
   // The focus moves into the panel as it opens, onto the panel itself: Tab goes on to its
   // controls, and no field takes the focus, so a phone's keyboard stays down.
