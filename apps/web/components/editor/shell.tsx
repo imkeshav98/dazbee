@@ -454,7 +454,7 @@ export function EditorShell({ brandId, brandName, designName, onRename, status, 
               )}
             </AnimatePresence>
 
-            <main ref={stage} data-bar={edit.bar ? '' : undefined} className="group/stage canvas-dots relative min-w-0 flex-1 overflow-hidden">
+            <main ref={stage} data-bar={edit.bar ? '' : undefined} className="group/stage canvas-dots relative min-w-0 flex-1 overflow-clip">
               <div ref={barRow} aria-hidden data-bar-row className="pointer-events-none invisible absolute inset-x-0 top-[90px] h-[38px] max-sm:top-[72px]" />
               {children}
               <div ref={dock} role="toolbar" aria-label={t.editor.tools} data-dock className={cn('absolute inset-x-0 bottom-4 z-10 mx-auto flex w-max max-sm:bottom-[5.25rem] items-center gap-1 rounded-[18px] surface-frost p-1.5', (panel === 'properties' || sheet) && 'max-sm:hidden')}>

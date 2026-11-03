@@ -26,17 +26,17 @@ const nodes = (page: Page) => page.evaluate(() => window.dazbee?.design().nodes)
 const order = async (page: Page) => Object.values(await nodes(page)).filter((n) => n.parentId === 'p1').sort((x, y) => (x.index < y.index ? -1 : 1)).map((n) => n.name)
 const select = (page: Page, ids: string[]) => page.evaluate((ids) => window.dazbee?.select(ids), ids)
 
-test('one layer has its actions in ⋯ More and the right-click menu; several layers group from the bar', async ({ browser }) => {
+test('one layer has its actions in the full menu and the right-click menu; several layers group from the small menu', async ({ browser }) => {
   const { page, errors } = await openStage(browser, design())
   const more = (name: string) => moreAction(page, name)
 
-  // One layer's actions are in ⋯ More, the order in the menu beside Order, each with its shortcut.
+  // One layer's actions are in the full menu, the order in the menu beside Order, each with its shortcut.
   await select(page, ['a'])
   const menu = await moreMenu(page)
   await expect((await moreSubmenu(page, 'order')).getByRole('button', { name: 'Bring forward' })).toContainText('Ctrl+]')
   await page.evaluate(() => window.dazbee?.drawn())
   writeOutput('arrange-actions-more.png', await page.screenshot())
-  // Esc closes the menu beside, then ⋯ More.
+  // Esc closes the menu beside, then the full menu.
   await closeBarMenu(page, 'more-order')
   await closeBarMenu(page, 'bar-more')
   await expect(menu).toBeHidden()
@@ -54,9 +54,9 @@ test('one layer has its actions in ⋯ More and the right-click menu; several la
   await expect.poll(async () => (await order(page)).length).toBe(4)
   await page.evaluate(() => window.dazbee?.perform('undo'))
 
-  // Group two from the bar, then ungroup them from ⋯ More.
+  // Group two from the small menu, then ungroup them from the full menu.
   await select(page, ['b', 'c'])
-  await page.getByTestId('selection-bar').locator('[data-action="group"]').click()
+  await page.getByTestId('small-group').click()
   await expect.poll(async () => Object.values(await nodes(page)).some((n) => n.type === 'group')).toBe(true)
   const group = Object.entries(await nodes(page)).find(([, n]) => n.type === 'group')?.[0] ?? ''
   await select(page, [group])

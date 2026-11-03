@@ -84,7 +84,7 @@ test('the Page card paints the page, and its hex takes any colour', async ({ pag
   await shoot(page, 'page-fine-tune')
 })
 
-test('a selection swaps the design cards for its own; several layers line up, spread out and group from the bar', async ({ page }) => {
+test('a selection swaps the design cards for the top bar; several layers line up and spread out from it and group from the small menu', async ({ page }) => {
   await open(page)
   const at = await screenPoint(page, 200, 180)
   await page.mouse.click(at.x, at.y)
@@ -92,14 +92,14 @@ test('a selection swaps the design cards for its own; several layers line up, sp
   await expect((await openCard(page, 'layout-card'))).toBeVisible()
   await expect(page.getByTestId('page-card')).toHaveCount(0)
   await expect(page.getByTestId('formats')).toHaveCount(0)
-  // One layer lines up with its format from ⋯ More on the bar by it.
+  // One layer lines up with its format from the full menu.
   await expect(arrange).toHaveCount(0)
   await expect(page.getByTestId('bar-line-up')).toHaveCount(0)
   await expect((await moreSubmenu(page, 'line-up')).getByRole('button', { name: 'Align left' })).toBeEnabled()
   await page.keyboard.press('Escape')
   await page.keyboard.press('Escape')
 
-  // Several layers: Line up with the spread outs, Group and the rest on the bar; no Arrange card.
+  // Several layers: Line up with the spread outs on the top bar, Group in the small menu.
   await page.keyboard.press('Control+a')
   await expect(arrange).toHaveCount(0)
   const lineUp = await barMenu(page, 'line-up')
@@ -108,7 +108,7 @@ test('a selection swaps the design cards for its own; several layers line up, sp
   await shoot(page, 'arrange')
   await page.keyboard.press('Escape')
   const before = Object.keys(JSON.parse(await designOf(page)).nodes).length
-  await page.getByTestId('selection-bar').locator('[data-action="group"]').click()
+  await page.getByTestId('small-group').click()
   await expect.poll(async () => Object.values(JSON.parse(await designOf(page)).nodes as Record<string, { type: string }>).filter((n) => n.type === 'group').length).toBe(1)
   expect(Object.keys(JSON.parse(await designOf(page)).nodes).length).toBe(before + 1)
 

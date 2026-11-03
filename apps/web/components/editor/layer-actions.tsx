@@ -13,6 +13,7 @@ import { useLocale, useMessages } from '../../lib/i18n/client.tsx'
 import { dirOf, format } from '../../lib/i18n/index.ts'
 import { ALIGN, keyOf, useSelection } from './arrange-panel.tsx'
 import { useMenuFocus } from './bar-popover.tsx'
+import { useEditState } from './edit-store.ts'
 import { RotationField, set, shared, useTarget } from './selection-cards.tsx'
 import { ICON_BUTTON, MENU, MENU_DIVIDER, MENU_ITEM, MENU_KEY } from './styles.ts'
 
@@ -182,6 +183,7 @@ export function LayerActions({ editor, ids, onDone }: { editor: Editor; ids: str
 export function StageMenu({ editor, at, onClose }: { editor: Editor; at: { x: number; y: number }; onClose: () => void }) {
   const t = useMessages()
   const ids = useSelection(editor)
+  const { barBottom } = useEditState()
   const [openedFor] = useState(ids)
   useEffect(() => {
     if (ids !== openedFor) onClose()
@@ -196,11 +198,13 @@ export function StageMenu({ editor, at, onClose }: { editor: Editor; at: { x: nu
           side="bottom"
           align="start"
           sideOffset={2}
-          collisionPadding={12}
+          sticky="always"
+          // Kept between the top bar and the bottom controls, scrolling inside when it has less room.
+          collisionPadding={{ top: barBottom + 8, bottom: 72, left: 12, right: 12 }}
           // A click elsewhere or Esc closes it; focus given back to a button that just closed does not.
           onFocusOutside={(event) => event.preventDefault()}
           aria-label={t.editor.bar.actions}
-          data-testid="stage-menu" className={cn(MENU, 'w-72')}>
+          data-testid="stage-menu" className={cn(MENU, 'max-h-[var(--radix-popover-content-available-height)] w-72 overflow-y-auto')}>
           <LayerActions editor={editor} ids={ids} onDone={onClose} />
         </Popover.Content>
       </Popover.Portal>

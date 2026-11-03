@@ -348,9 +348,9 @@ test.describe('every selection', () => {
   row(11, 'arrange: duplicate, order, group, ungroup, frame selection, use as mask', async (open) => {
     const page = await open()
     await select(page, ['box'])
-    // Several layers group and go in a box from the bar by them.
-    const bar = page.getByTestId('selection-bar')
-    // One layer's actions are in ⋯ More on the bar by it.
+    // Several layers group from the small menu and go in a box from the full menu.
+    const small = page.getByTestId('small-menu')
+    // One layer's actions are in the full menu.
     const more = (name: string) => moreAction(page, name)
     await step(page, async () => more('Duplicate'), async () => {
       await expect.poll(async () => (await children(page, 'p1')).length).toBe(10)
@@ -368,7 +368,7 @@ test.describe('every selection', () => {
     })
     await perform(page, 'undo')
     await select(page, ['box', 'poly'])
-    await step(page, async () => bar.locator('[data-action="group"]').click(), async () => {
+    await step(page, async () => small.getByTestId('small-group').click(), async () => {
       await expect.poll(async () => (await doc(page)).nodes.box?.parentId).not.toBe('p1')
     }, { draws: false })
     const group = (await doc(page)).nodes.box?.parentId ?? ''
@@ -377,7 +377,7 @@ test.describe('every selection', () => {
       await expect.poll(async () => (await doc(page)).nodes.box?.parentId).toBe('p1')
     }, { draws: false })
     await select(page, ['box', 'poly'])
-    await step(page, async () => bar.locator('[data-action="frameSelection"]').click(), async () => {
+    await step(page, async () => more('Put in a box'), async () => {
       await expect.poll(async () => { const d = await doc(page); return d.nodes[d.nodes.box?.parentId ?? '']?.type }).toBe('frame')
     }, { draws: false })
     await reloads(page)
@@ -444,7 +444,7 @@ test.describe('text', () => {
   row(14, 'size', async (open) => {
     const page = await open()
     await select(page, ['headline'])
-    const size = async () => (await barMenu(page, 'size')).getByRole('spinbutton', { name: 'Size' })
+    const size = async () => page.getByTestId('bar-size-field')
     await step(page, async () => enter(await size(), '64'), async () => {
       await expect.poll(async () => (await style(page, 'headline')).fontSize).toBe(64)
     })

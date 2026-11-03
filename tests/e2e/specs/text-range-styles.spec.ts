@@ -46,7 +46,7 @@ test('one word made pink, larger and another font from the bar; the rest keeps i
   await dblclick(page, 300, 140)
   await dblclick(page, 300, 140)
   await expect.poll(() => page.evaluate(() => window.dazbee?.textSelection())).toMatchObject({ id: 'body', range: { start: 6, end: 11 } })
-  const bar = page.getByTestId('selection-bar')
+  const bar = page.getByTestId('top-bar')
   await expect(bar).toBeVisible()
 
   const colour = await barMenu(page, 'colour')
@@ -55,11 +55,10 @@ test('one word made pink, larger and another font from the bar; the rest keeps i
   await expect.poll(() => runOver(page, 'body', 6, 11)).toMatchObject({ color: '#FF48B0FF' })
   await closeBarMenu(page, 'bar-colour')
 
-  const size = await barMenu(page, 'size')
-  await size.getByRole('spinbutton', { name: 'Size' }).fill('96')
-  await size.getByRole('spinbutton', { name: 'Size' }).press('Enter')
+  const size = page.getByTestId('bar-size-field')
+  await size.fill('96')
+  await size.press('Enter')
   await expect.poll(() => runOver(page, 'body', 6, 11)).toMatchObject({ color: '#FF48B0FF', fontSize: 96 })
-  await closeBarMenu(page, 'bar-size')
 
   // A built-in family, whose files the editor has already.
   await barMenu(page, 'font')
@@ -97,7 +96,7 @@ test('bold and italic across an Arabic and Latin boundary, from the bar', async 
   for (let i = 0; i < 5; i++) await page.keyboard.press('Shift+ArrowRight')
   await drawn(page)
   await expect.poll(() => page.evaluate(() => window.dazbee?.textSelection())).toMatchObject({ id: 'mixed', range: { start: 2, end: 7 } })
-  const bar = page.getByTestId('selection-bar')
+  const bar = page.getByTestId('top-bar')
   await bar.getByTestId('bar-bold').click()
   await expect.poll(() => runOver(page, 'mixed', 2, 7)).toMatchObject({ fontWeight: 700 })
   await expect(bar.getByTestId('bar-bold')).toHaveAttribute('aria-pressed', 'true')
@@ -134,7 +133,7 @@ test('bold and italic across an Arabic and Latin boundary, from the bar', async 
 test('italic on the bar sets a whole text layer, and turns off again', async ({ browser }) => {
   const { page, errors } = await openStage(browser, design())
   await page.evaluate(() => window.dazbee?.select(['body']))
-  const italic = page.getByTestId('selection-bar').getByTestId('bar-italic')
+  const italic = page.getByTestId('top-bar').getByTestId('bar-italic')
   await italic.click()
   await expect.poll(async () => (await textProps(page, 'body')).style.fontStyle).toBe('italic')
   await expect(italic).toHaveAttribute('aria-pressed', 'true')

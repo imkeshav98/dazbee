@@ -451,3 +451,96 @@ test('in Arabic the edit panel opens at the start of the screen, which is its en
   writeOutput('top-bar-rtl.png', await page.screenshot({ animations: 'disabled' }))
   expect(errors).toEqual([])
 })
+
+test('at tablet size with a flyout open, the bar\'s second row and its pop-ups and panels never scroll the stage, and nothing meets', async ({ browser }) => {
+  const asset = await upload(photo)
+  const { page, errors } = await openStage(browser, design(asset.id))
+  await page.setViewportSize({ width: 820, height: 1180 })
+  await page.locator('[data-panel="layers"]').click()
+  await select(page, ['headline'])
+  const scrolled = () => page.evaluate(() => [document.querySelector('main')?.scrollLeft, document.querySelector('main')?.scrollTop])
+  for (const id of ['transparency', 'position', 'font', 'effects']) {
+    await barMenu(page, id)
+    await settle(page)
+    expect(await scrolled()).toEqual([0, 0])
+    await expect.poll(() => layoutProblems(page, { pieces: PIECES, uncut: UNCUT })).toEqual([])
+    await page.keyboard.press('Escape')
+  }
+  expect(errors).toEqual([])
+})
+
+test('the full menu opens clear of the small menu, also flipped at the stage\'s end, and the right-click menu clear of the dock', async ({ browser }) => {
+  const asset = await upload(photo)
+  const { page, errors } = await openStage(browser, design(asset.id))
+  await page.setViewportSize({ width: 1280, height: 760 })
+  await select(page, ['turned'])
+  // The selection by the stage's end edge, so the full menu has no room beside the small menu there.
+  await page.evaluate(() => {
+    const camera = window.dazbee?.camera()
+    const box = window.dazbee?.selectionRect()
+    if (camera && box) window.dazbee?.setCamera({ ...camera, x: camera.x - (1150 - (box.x + box.width / 2)) / camera.zoom })
+  })
+  await settle(page)
+  await moreMenu(page)
+  await expect.poll(() => layoutProblems(page, { pieces: PIECES, uncut: UNCUT })).toEqual([])
+  await page.keyboard.press('Escape')
+
+  await select(page, [])
+  await page.evaluate(() => window.dazbee?.fitAll())
+  await settle(page)
+  const at = await screenPoint(page, 410, 290)
+  await page.mouse.click(at.x, at.y, { button: 'right' })
+  await expect(page.getByTestId('stage-menu')).toBeVisible()
+  // The right-click menu is one of the pop-ups the check keeps clear of everything else.
+  await expect.poll(() => layoutProblems(page, { pieces: PIECES, uncut: UNCUT })).toEqual([])
+  expect(errors).toEqual([])
+})
+
+test('Esc closes the bar\'s second row and keeps the selection; the arrows and End reach only the items that show', async ({ browser }) => {
+  const asset = await upload(photo)
+  const { page, errors } = await openStage(browser, design(asset.id))
+  await page.setViewportSize({ width: 820, height: 1180 })
+  await select(page, ['headline'])
+  const more = page.getByTestId('bar-overflow')
+  await expect(more).toBeVisible()
+  const row = page.getByTestId('top-bar-row')
+  await row.locator('[data-bar-item]').first().focus()
+  await page.keyboard.press('End')
+  await expect(more).toBeFocused()
+  await page.keyboard.press('ArrowRight')
+  await expect(row.locator('[data-bar-item]').first()).toBeFocused()
+
+  await more.click()
+  await expect(page.getByTestId('top-bar-overflow')).toBeVisible()
+  await page.keyboard.press('Escape')
+  await expect(page.getByTestId('top-bar-overflow')).toBeHidden()
+  expect(await page.evaluate(() => window.dazbee?.selection())).toEqual(['headline'])
+  expect(errors).toEqual([])
+})
+
+test('the size field steps with the arrows; a pop-up closes when the window changes size; a new selection shows the phone bar from its start', async ({ browser }) => {
+  const asset = await upload(photo)
+  const { page, errors } = await openStage(browser, design(asset.id))
+  const size = () => page.evaluate(() => {
+    const d = window.dazbee?.design()
+    return ({ ...d?.nodes.headline?.props, ...d?.overrides['format:sq']?.headline } as { style: { fontSize: number } }).style.fontSize
+  })
+  await select(page, ['headline'])
+  await page.getByTestId('bar-size-field').click()
+  await page.keyboard.press('ArrowUp')
+  await page.keyboard.press('ArrowUp')
+  await expect.poll(size).toBe(66)
+  await page.keyboard.press('Shift+ArrowDown')
+  await expect.poll(size).toBe(56)
+
+  await barMenu(page, 'align')
+  await page.setViewportSize({ width: 390, height: 844 })
+  await expect(page.getByTestId('bar-align-menu')).toBeHidden()
+
+  const row = page.getByTestId('top-bar-row')
+  await row.evaluate((el) => { el.scrollLeft = el.scrollWidth })
+  await expect.poll(() => row.evaluate((el) => el.scrollLeft)).toBeGreaterThan(0)
+  await select(page, ['box'])
+  await expect.poll(() => row.evaluate((el) => el.scrollLeft)).toBe(0)
+  expect(errors).toEqual([])
+})

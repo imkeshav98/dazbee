@@ -78,8 +78,8 @@ export function BarPopover({ id, open, onOpen, label, face, icon, children, test
   )
 }
 
-/** A toolbar's buttons that can be used, in order. */
-export const itemsOf = (bar: HTMLElement) => [...bar.querySelectorAll<HTMLElement>('[data-bar-item]:not(:disabled)')]
+/** A toolbar's buttons that can be used and show, in order: a closed second row's are left out. */
+export const itemsOf = (bar: HTMLElement) => [...bar.querySelectorAll<HTMLElement>('[data-bar-item]:not(:disabled)')].filter((item) => item.checkVisibility({ visibilityProperty: true }))
 
 /** Moves focus along a toolbar's buttons with the arrow keys, Home and End. */
 export function arrowAlong(event: KeyboardEvent<HTMLElement>) {

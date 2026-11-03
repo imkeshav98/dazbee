@@ -146,8 +146,7 @@ test('several layers: mixed values, set together or each from its own; text and 
   // Text.
   await select(page, ['headline'])
   const text = (await openCard(page, 'spacing-card'))
-  await enter((await barMenu(page, 'size')).getByRole('spinbutton', { name: 'Size' }), '120')
-  await closeBarMenu(page, 'bar-size')
+  await enter(page.getByTestId('bar-size-field'), '120')
   await enter(text.getByRole('spinbutton', { name: 'Letter spacing' }), '2')
   await enter(text.getByRole('spinbutton', { name: 'Line height' }), '1.1')
   await enter((await barMenu(page, 'colour')).getByRole('textbox', { name: 'Text colour hex' }), '1f9d55')

@@ -126,7 +126,7 @@ test('the font picker on the bar shows families as pictures of their names, sear
   const families = await catalog()
   await page.evaluate(() => window.dazbee?.select(['body']))
   await expect(page.getByTestId('bar-font')).toHaveText('Noto Sans')
-  writeOutput('fonts-1-bar.png', await page.getByTestId('selection-bar').screenshot())
+  writeOutput('fonts-1-bar.png', await page.getByTestId('top-bar-row').screenshot())
 
   const requests = fontRequests(page)
   await barMenu(page, 'font')

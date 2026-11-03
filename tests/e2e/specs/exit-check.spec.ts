@@ -150,8 +150,8 @@ test('an ad set rebuilt in 5 formats through real input exports PNG, JPG, PDF an
   // An upload from the list joins the brand's fonts and is set at once.
   await page.getByTestId('font-upload').setInputFiles({ name: 'Righteous-Regular.ttf', mimeType: 'font/ttf', buffer: Buffer.from(righteous) })
   await expect.poll(async () => ((await stored(page)).nodes[headline]?.props.style as { fontFamily: string }).fontFamily).toBe('Righteous')
-  // The size is a number to drag or type: the bar's size opens on it, ready to type over; 140, typed.
-  await expect((await barMenu(page, 'size')).getByRole('spinbutton', { name: 'Size' })).toBeFocused()
+  // The size is a field on the top bar: a click selects it, ready to type over; 140, typed.
+  await page.getByTestId('bar-size-field').click()
   await page.keyboard.type('140')
   await page.keyboard.press('Enter')
   await expect.poll(async () => ((await stored(page)).nodes[headline]?.props.style as { fontSize: number }).fontSize).toBe(140)

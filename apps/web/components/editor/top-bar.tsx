@@ -17,7 +17,7 @@ import { cn } from '../../lib/cn.ts'
 import { useMessages } from '../../lib/i18n/client.tsx'
 import { COMBINE, DISTRIBUTE, keyOf, useSelection } from './arrange-panel.tsx'
 import { arrowAlong, BarPopover, useRovingTab } from './bar-popover.tsx'
-import { isPanel, setBar, setOpen, useEditState, usePhone, type PanelId } from './edit-store.ts'
+import { editState, isPanel, setBar, setOpen, useEditState, usePhone, type PanelId } from './edit-store.ts'
 import { nearest, useFontCatalog, weightsOf } from './font-panel.tsx'
 import { ImagePickerButton } from './image-tool.tsx'
 import { AlignRow } from './layer-actions.tsx'
@@ -79,10 +79,12 @@ function SizeStepper({ target }: { target: Target }) {
   const { style, setStyle, shiftStyle } = textStyle(target)
   const size = style('fontSize') as number | 'mixed'
   const shown = size === 'mixed' ? '' : String(Math.round(size * 10) / 10)
-  const commit = (field: HTMLInputElement) => {
-    const n = Number(field.value)
-    if (field.value.trim() !== '' && Number.isFinite(n) && n >= 1) setStyle('fontSize', Math.round(n * 10) / 10)
-    else field.value = shown
+  // What is being typed, until Enter, leaving the field or Esc; the size shows otherwise.
+  const [draft, setDraft] = useState<string | null>(null)
+  const commit = (text: string) => {
+    const n = Number(text)
+    if (text.trim() !== '' && Number.isFinite(n) && n >= 1) setStyle('fontSize', Math.round(n * 10) / 10)
+    setDraft(null)
   }
   return (
     <div role="group" aria-label={t.editor.props.fontSize} data-testid="bar-size" className="flex h-[30px] shrink-0 items-center rounded-row border border-line">
@@ -90,19 +92,25 @@ function SizeStepper({ target }: { target: Target }) {
         <MinusIcon size={12} aria-hidden />
       </button>
       <input
-        key={shown}
         name="font-size"
         aria-label={t.editor.props.fontSize}
-        defaultValue={shown}
+        value={draft ?? shown}
+        onChange={(event) => setDraft(event.target.value)}
         placeholder="--"
         inputMode="decimal"
         data-testid="bar-size-field"
+        onFocus={(event) => event.currentTarget.select()}
         onKeyDown={(event) => {
           event.stopPropagation()
-          if (event.key === 'Enter') commit(event.currentTarget)
-          if (event.key === 'Escape') event.currentTarget.value = shown
+          if (event.key === 'Enter') commit(event.currentTarget.value)
+          if (event.key === 'Escape') setDraft(null)
+          if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
+            event.preventDefault()
+            setDraft(null)
+            shiftStyle('fontSize', (event.key === 'ArrowUp' ? 1 : -1) * (event.shiftKey ? 10 : 1), 1)
+          }
         }}
-        onBlur={(event) => commit(event.currentTarget)}
+        onBlur={(event) => draft !== null && commit(event.currentTarget.value)}
         className={cn('h-full w-10 bg-transparent text-center font-mono text-[12px] tabular-nums text-text outline-none', FOCUS_RING)}
       />
       <button type="button" data-bar-item aria-label={t.editor.bar.bigger} title={t.editor.bar.bigger} onClick={() => shiftStyle('fontSize', 1, 1)} className="grid h-full w-6 cursor-pointer place-items-center rounded-e-row text-muted hover:bg-hover hover:text-text">
@@ -379,6 +387,31 @@ function Bar({ target, design, brandId }: { target: Target; design: Design; bran
     return () => watch.disconnect()
   }, [bar, row, extra, overflowOpen])
   useLayoutEffect(() => () => setBar(false), [])
+  // Each selection's bar starts at its first item, on a phone too, where the bar scrolls sideways.
+  const selectionKey = target.ids.join(' ')
+  useLayoutEffect(() => {
+    if (row) row.scrollLeft = 0
+  }, [row, selectionKey])
+  // A pop-up hangs from its item: once the window changes size the item may have moved, so it closes.
+  useEffect(() => {
+    const onResize = () => {
+      const now = editState().open
+      if (now !== null && !isPanel(now)) setOpen(null)
+    }
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
+  // Esc closes the bar's second row before anything else, so it never also clears the selection.
+  useEffect(() => {
+    if (open !== 'overflow') return
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return
+      event.stopImmediatePropagation()
+      setOpen(null)
+    }
+    window.addEventListener('keydown', onKey, true)
+    return () => window.removeEventListener('keydown', onKey, true)
+  }, [open])
   const item = ({ key, node }: Item) => <span key={key} data-item={key} className="contents [&>*]:shrink-0">{node}</span>
   return (
     <div
@@ -408,7 +441,7 @@ function Bar({ target, design, brandId }: { target: Target; design: Design; bran
           </button>
         )}
       </div>
-      <div ref={setExtra} data-testid="top-bar-overflow" className={cn(TOP_BAR, 'pointer-events-auto max-w-full', !overflowOpen && 'invisible absolute', !overflowing && 'hidden')}>
+      <div ref={setExtra} data-testid="top-bar-overflow" className={cn(TOP_BAR, 'pointer-events-auto max-w-full flex-wrap justify-center', !overflowOpen && 'invisible absolute', !overflowing && 'hidden')}>
         {rest.map(item)}
       </div>
     </div>

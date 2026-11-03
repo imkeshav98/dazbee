@@ -25,7 +25,7 @@ const NAME = '[data-testid="island-start"] h1'
 const LAYERS = [['box', 230, 180], ['headline', 540, 540]] as const
 
 /** The chrome with the bar by the selection and the selected layer's box on the stage. */
-const selected = (id: string) => ({ ...CHROME, 'selection bar': '[data-testid="selection-bar"]', 'selected layer': `.stage-overlay .selection[data-layer="${id}"]` })
+const selected = (id: string) => ({ ...CHROME, 'top bar': '[data-testid="top-bar-row"]', 'small menu': '[data-testid="small-menu"]', 'selected layer': `.stage-overlay .selection[data-layer="${id}"]` })
 
 async function openEditor(page: Page) {
   const designId = await seed(liveDesign())
@@ -37,7 +37,7 @@ async function openEditor(page: Page) {
 async function select(page: Page, [id, x, y]: (typeof LAYERS)[number]) {
   await click(page, x, y)
   await expect.poll(() => page.evaluate(() => window.dazbee?.selection())).toEqual([id])
-  await expect(page.getByTestId('selection-bar')).toBeVisible()
+  await expect(page.getByTestId('top-bar')).toBeVisible()
 }
 
 test('on a tablet the home and the editor, with a layer selected, show everything inside the window and nothing over anything else', async ({ page }) => {

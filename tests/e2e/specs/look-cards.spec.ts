@@ -36,7 +36,7 @@ test('the look comes first: size and brand colour, effect tiles, and the header 
   await page.evaluate(() => window.dazbee?.select(['headline']))
 
   // Text, in the bar: the size, and the brand's colours with the colour it has now leading them.
-  const size = (await barMenu(page, 'size')).getByRole('spinbutton', { name: 'Size' })
+  const size = page.getByTestId('bar-size-field')
   await size.fill('64')
   await size.press('Enter')
   await expect.poll(async () => (await node(page, 'headline')).props.style?.fontSize).toBe(64)

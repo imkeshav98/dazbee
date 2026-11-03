@@ -49,7 +49,7 @@ function obstacles(stage: HTMLElement): Box[] {
  */
 function usePlace(editor: Editor, menu: HTMLElement | null, rightClick: boolean): Place | null {
   const [place, setPlace] = useState<Place | null>(null)
-  const { open, barBottom, sheetTop } = useEditState()
+  const { open, barBottom, sheetTop, flyoutEnd } = useEditState()
   const popup = open !== null && open !== 'more' && !isPanel(open)
   useEffect(() => {
     if (!menu) {
@@ -98,6 +98,8 @@ function usePlace(editor: Editor, menu: HTMLElement | null, rightClick: boolean)
       frame = requestAnimationFrame(update)
     }
     update()
+    // A panel, pop-up or flyout that just opened grows into place; look again once it has.
+    const settled = setTimeout(update, 260)
     const stop = editor.onDraw(update)
     const stopSelection = editor.onSelection(later)
     const resize = new ResizeObserver(later)
@@ -107,13 +109,14 @@ function usePlace(editor: Editor, menu: HTMLElement | null, rightClick: boolean)
     window.addEventListener('keyup', later)
     return () => {
       cancelAnimationFrame(frame)
+      clearTimeout(settled)
       stop()
       stopSelection()
       resize.disconnect()
       window.removeEventListener('pointerup', later)
       window.removeEventListener('keyup', later)
     }
-  }, [editor, menu, popup, rightClick, barBottom, sheetTop, open])
+  }, [editor, menu, popup, rightClick, barBottom, sheetTop, open, flyoutEnd])
   return place
 }
 
@@ -139,52 +142,56 @@ export function SmallMenu({ editor, rightClick }: { editor: Editor; rightClick: 
   const several = target.ids.length > 1
   const withKey = (label: string, action: Parameters<typeof keyOf>[0]) => format(t.editor.arrange.withKey, { label, key: keyOf(action) })
   return (
-    <div
-      ref={setMenu}
-      role="toolbar"
-      aria-label={b.smallMenu}
-      data-testid="small-menu"
-      onKeyDown={arrowAlong}
-      onFocus={focused}
-      style={place ? { left: place.left, top: place.top } : undefined}
-      className={cn('absolute z-20 flex items-center gap-0.5 rounded-full surface-frost p-1', place ? 'visible' : 'invisible')}
-    >
-      {several && (
-        <button type="button" data-bar-item data-testid="small-group" aria-label={t.editor.arrange.group} title={withKey(t.editor.arrange.group, 'group')} onClick={() => editor.perform('group')} className={cn(BAR_BUTTON, 'rounded-full px-1.5')}>
-          <SelectionPlusIcon size={16} aria-hidden />
-        </button>
-      )}
-      <button type="button" data-bar-item data-testid="small-lock" aria-label={locked ? b.unlock : b.lock} title={withKey(locked ? b.unlock : b.lock, 'lock')} aria-pressed={locked} onClick={() => editor.setLocked(target.ids, !locked)} className={cn(BAR_TOGGLE, 'rounded-full px-1.5')}>
-        {locked ? <LockSimpleIcon size={16} weight="fill" aria-hidden /> : <LockSimpleOpenIcon size={16} aria-hidden />}
-      </button>
-      <button type="button" data-bar-item data-testid="small-duplicate" aria-label={t.editor.arrange.duplicate} title={withKey(t.editor.arrange.duplicate, 'duplicate')} onClick={() => editor.perform('duplicate')} className={cn(BAR_BUTTON, 'rounded-full px-1.5')}>
-        <CopyIcon size={16} aria-hidden />
-      </button>
-      <button type="button" data-bar-item data-testid="small-delete" aria-label={b.delete} title={withKey(b.delete, 'delete')} onClick={() => editor.perform('delete')} className={cn(BAR_BUTTON, 'rounded-full px-1.5')}>
-        <TrashIcon size={16} aria-hidden />
-      </button>
-      <Popover.Root open={open === 'more'} onOpenChange={(to) => setOpen(to ? 'more' : null)}>
-        <Popover.Trigger asChild>
-          <button ref={moreFocus.button} type="button" data-bar-item aria-label={b.more} title={b.more} data-testid="bar-more" className={cn(BAR_BUTTON, 'rounded-full px-1.5')}>
-            <DotsThreeIcon size={18} weight="bold" aria-hidden />
+    <Popover.Root open={open === 'more'} onOpenChange={(to) => setOpen(to ? 'more' : null)}>
+      <Popover.Anchor asChild>
+        <div
+          ref={setMenu}
+          role="toolbar"
+          aria-label={b.smallMenu}
+          data-testid="small-menu"
+          onKeyDown={arrowAlong}
+          onFocus={focused}
+          style={place ? { left: place.left, top: place.top } : undefined}
+          className={cn('absolute z-20 flex items-center gap-0.5 rounded-full surface-frost p-1', place ? 'visible' : 'invisible')}
+        >
+          {several && (
+            <button type="button" data-bar-item data-testid="small-group" aria-label={t.editor.arrange.group} title={withKey(t.editor.arrange.group, 'group')} onClick={() => editor.perform('group')} className={cn(BAR_BUTTON, 'rounded-full px-1.5')}>
+              <SelectionPlusIcon size={16} aria-hidden />
+            </button>
+          )}
+          <button type="button" data-bar-item data-testid="small-lock" aria-label={locked ? b.unlock : b.lock} title={withKey(locked ? b.unlock : b.lock, 'lock')} aria-pressed={locked} onClick={() => editor.setLocked(target.ids, !locked)} className={cn(BAR_TOGGLE, 'rounded-full px-1.5')}>
+            {locked ? <LockSimpleIcon size={16} weight="fill" aria-hidden /> : <LockSimpleOpenIcon size={16} aria-hidden />}
           </button>
-        </Popover.Trigger>
-        <Popover.Portal>
-          <Popover.Content
-            // Beside the small menu, or under it on a phone, kept between the top bar and the bottom controls.
-            side={phone ? 'bottom' : rtl ? 'left' : 'right'}
-            align={phone ? 'center' : 'start'}
-            sideOffset={8}
-            collisionPadding={{ top: barBottom + 8, bottom: phone ? 150 : 72, left: 8, right: 8 }}
-            {...moreFocus.content}
-            aria-label={b.more}
-            data-testid="bar-more-menu"
-            className={cn(MENU, 'max-h-[var(--radix-popover-content-available-height)] w-72 overflow-y-auto')}>
-            {moreFocus.back}
-            <LayerActions editor={editor} ids={ids} onDone={() => setOpen(null)} />
-          </Popover.Content>
-        </Popover.Portal>
-      </Popover.Root>
-    </div>
+          <button type="button" data-bar-item data-testid="small-duplicate" aria-label={t.editor.arrange.duplicate} title={withKey(t.editor.arrange.duplicate, 'duplicate')} onClick={() => editor.perform('duplicate')} className={cn(BAR_BUTTON, 'rounded-full px-1.5')}>
+            <CopyIcon size={16} aria-hidden />
+          </button>
+          <button type="button" data-bar-item data-testid="small-delete" aria-label={b.delete} title={withKey(b.delete, 'delete')} onClick={() => editor.perform('delete')} className={cn(BAR_BUTTON, 'rounded-full px-1.5')}>
+            <TrashIcon size={16} aria-hidden />
+          </button>
+          <Popover.Trigger asChild>
+            <button ref={moreFocus.button} type="button" data-bar-item aria-label={b.more} title={b.more} data-testid="bar-more" className={cn(BAR_BUTTON, 'rounded-full px-1.5')}>
+              <DotsThreeIcon size={18} weight="bold" aria-hidden />
+            </button>
+          </Popover.Trigger>
+          <Popover.Portal>
+            <Popover.Content
+              // Beside the small menu, or under it on a phone, kept between the top bar and the bottom controls.
+              side={phone ? 'bottom' : rtl ? 'left' : 'right'}
+              align={phone ? 'center' : 'start'}
+              sideOffset={8}
+              // Wholly inside the room between the top bar and the bottom controls, even moving off its button.
+              sticky="always"
+              collisionPadding={{ top: barBottom + 8, bottom: phone ? 150 : 72, left: 8, right: 8 }}
+              {...moreFocus.content}
+              aria-label={b.more}
+              data-testid="bar-more-menu"
+              className={cn(MENU, 'max-h-[var(--radix-popover-content-available-height)] w-72 overflow-y-auto')}>
+              {moreFocus.back}
+              <LayerActions editor={editor} ids={ids} onDone={() => setOpen(null)} />
+            </Popover.Content>
+          </Popover.Portal>
+        </div>
+      </Popover.Anchor>
+    </Popover.Root>
   )
 }
