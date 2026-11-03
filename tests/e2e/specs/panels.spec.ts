@@ -78,6 +78,34 @@ const enter = async (field: Locator, value: string) => {
 }
 
 test.describe('found by QA', () => {
+  test('number fields stop at limits a design never needs to pass', async ({ browser }) => {
+    const asset = await upload(photo)
+    const { page, errors } = await openStage(browser, design(asset.id))
+    await select(page, ['headline'])
+    const spacing = await barMenu(page, 'spacing')
+    await enter(spacing.getByRole('spinbutton', { name: 'Line height' }), '99999')
+    await enter(spacing.getByRole('spinbutton', { name: 'Letter spacing' }), '100000')
+    await enter(spacing.getByRole('spinbutton', { name: 'Paragraph spacing' }), '1e9')
+    await expect.poll(async () => {
+      const p = await propsOf(page, 'headline')
+      const style = p.style as { lineHeight: number; letterSpacing: number }
+      return [style.lineHeight, style.letterSpacing, p.paragraphSpacing]
+    }).toEqual([10, 1000, 1000])
+    // The size on the top bar too.
+    await enter(page.getByTestId('bar-size-field'), '99999')
+    await expect.poll(async () => ((await propsOf(page, 'headline')).style as { fontSize: number }).fontSize).toBe(2000)
+    // An effect's numbers, and where a layer is.
+    await select(page, ['badge'])
+    const effects = await barMenu(page, 'effects')
+    await effects.locator('[data-tile="dropShadow"]').click()
+    await enter(effects.getByRole('spinbutton', { name: 'Drop shadow 1 Blur' }), '99999')
+    await enter(effects.getByRole('spinbutton', { name: 'Drop shadow 1 X' }), '-99999')
+    await expect.poll(async () => ((await propsOf(page, 'badge')).effects as { blur: number; x: number }[])[0]).toMatchObject({ blur: 1000, x: -10000 })
+    await enter((await barMenu(page, 'position')).getByRole('spinbutton', { name: 'X position' }), '1e12')
+    await expect.poll(async () => (await propsOf(page, 'badge')).x).toBe(100000)
+    expect(errors).toEqual([])
+  })
+
   test('the Colour panel\'s + edits the fill that shows, gradient or not, and never stacks a new one', async ({ browser }) => {
     const asset = await upload(photo)
     const { page, errors } = await openStage(browser, design(asset.id))
