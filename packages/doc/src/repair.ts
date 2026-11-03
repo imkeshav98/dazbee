@@ -1,4 +1,4 @@
-import { canHold } from '@dazbee/schema'
+import { byCodeUnits, canHold } from '@dazbee/schema'
 
 type Json = Record<string, unknown>
 type NodeJson = { parentId: string } & Json
@@ -9,8 +9,6 @@ type Snapshot = {
   overrides: Record<string, unknown>
 }
 
-/** Code-unit order, the same on every device (unlike localeCompare) and the order fractional indexes use. */
-const byCodeUnits = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0)
 const orderOf = (page: unknown) => String((page as { order?: unknown } | undefined)?.order)
 
 /**

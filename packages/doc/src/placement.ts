@@ -1,6 +1,6 @@
 import type * as Y from 'yjs'
 
-import type { Design } from '@dazbee/schema'
+import { type AnyScope, type Design, formatScope } from '@dazbee/schema'
 
 import type { CommandContext } from './command.ts'
 import { overrideKey } from './design-doc.ts'
@@ -9,9 +9,6 @@ import { type Box, round } from './geometry.ts'
 /** Where a layer is in one scope, and whether it shows there. */
 export type Placed = Box & { visible: boolean }
 type Path = keyof Placed
-
-/** `base`, or `format:<id>` for one format's overrides. */
-export type ScopeKey = 'base' | `format:${string}`
 
 const same = (a: unknown, b: unknown) =>
   typeof a === 'number' && typeof b === 'number' ? Math.abs(a - b) < 0.005 : a === b
@@ -23,21 +20,20 @@ const same = (a: unknown, b: unknown) =>
  * from what that scope shows now.
  */
 export class Placement {
-  private readonly want = new Map<ScopeKey, Map<string, Partial<Placed>>>()
+  private readonly want = new Map<AnyScope, Map<string, Partial<Placed>>>()
   private readonly design: Design
 
   constructor(design: Design) {
     this.design = design
   }
 
-  get scopes(): ScopeKey[] {
-    return ['base', ...Object.keys(this.design.formats).map((id) => `format:${id}` as const)]
+  get scopes(): AnyScope[] {
+    return ['base', ...Object.keys(this.design.formats).map((id) => formatScope(id))]
   }
 
   /** What a scope shows now: the base with the scope's overrides. */
-  private shown(scope: ScopeKey, id: string): Placed {
-    const node = this.design.nodes[id]
-    const p = { ...node?.props, ...(scope === 'base' ? {} : this.design.overrides[scope]?.[id]) } as Partial<Placed>
+  private shown(scope: AnyScope, id: string): Placed {
+    const p = mergedProps(this.design, scope, id) as Partial<Placed>
     return {
       x: p.x ?? 0,
       y: p.y ?? 0,
@@ -49,11 +45,11 @@ export class Placement {
   }
 
   /** A layer in a scope, with what has been planned for it so far. */
-  get(scope: ScopeKey, id: string): Placed {
+  get(scope: AnyScope, id: string): Placed {
     return { ...this.shown(scope, id), ...this.want.get(scope)?.get(id) }
   }
 
-  set(scope: ScopeKey, id: string, patch: Partial<Placed>) {
+  set(scope: AnyScope, id: string, patch: Partial<Placed>) {
     const byId = this.want.get(scope) ?? new Map<string, Partial<Placed>>()
     this.want.set(scope, byId)
     const rounded = Object.fromEntries(Object.entries(patch).map(([k, v]) => [k, typeof v === 'number' ? round(v) : v]))
@@ -86,4 +82,12 @@ export class Placement {
       }
     }
   }
+}
+
+/**
+ * A layer's props as one scope shows them: its own, with that scope's overrides on top. Only
+ * merged: the values are neither checked nor given their defaults.
+ */
+export function mergedProps(design: Design, scope: AnyScope, id: string): Readonly<Record<string, unknown>> {
+  return { ...design.nodes[id]?.props, ...(scope === 'base' ? {} : design.overrides[scope]?.[id]) }
 }

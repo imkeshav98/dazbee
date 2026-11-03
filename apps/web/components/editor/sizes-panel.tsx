@@ -8,7 +8,7 @@ import { EyeIcon, FrameCornersIcon, StarIcon } from '@phosphor-icons/react'
 import { useState } from 'react'
 
 import type { Editor } from '@dazbee/editor'
-import { type Design, FORMAT_PRESETS } from '@dazbee/schema'
+import { type Design, FORMAT_PRESETS, inOrder } from '@dazbee/schema'
 
 import { cn } from '@/lib/cn.ts'
 import { useMessages } from '@/lib/i18n/client.tsx'
@@ -18,7 +18,6 @@ import { CARD_BUTTON, CARD_ROW, CardMenu } from './card.tsx'
 import { PanelFrame } from './edit-panel.tsx'
 import { setOpen, useEditState } from './edit-store.ts'
 import { AddFormat, useEditorDesign } from './formats-panel.tsx'
-import { orderedPages } from './pages-panel.tsx'
 import { CHIP, FOCUS_RING, PANEL_HEADING, PANEL_PART } from './styles.ts'
 
 /** The presets Add a size offers at a tap; the rest, and any size, are under More sizes. */
@@ -27,10 +26,6 @@ const COMMON = ['feed-portrait', 'story', 'link-image', 'medium-rectangle'] as c
 const sizeOf = ({ width, height }: { width: number; height: number }) => `${width} × ${height}`
 /** A size as a chip shows it, short. */
 const shortSizeOf = ({ width, height }: { width: number; height: number }) => `${width}×${height}`
-const ordered = (design: Design) =>
-  Object.entries(design.formats).sort(([a, x], [b, y]) =>
-    x.order < y.order ? -1 : x.order > y.order ? 1 : a < b ? -1 : 1,
-  )
 /** A size's picture in its proportions, its long side 34. */
 const thumbOf = ({ width, height }: { width: number; height: number }) => {
   const scale = 34 / Math.max(width, height)
@@ -38,7 +33,7 @@ const thumbOf = ({ width, height }: { width: number; height: number }) => {
 }
 /** The first page's background, when it is one colour: what a size's picture is filled with. */
 const backgroundOf = (design: Design) => {
-  const fill = orderedPages(design)[0]?.[1].fills[0]
+  const fill = inOrder(design.pages)[0]?.[1].fills[0]
   return fill?.type === 'solid' ? fill.color : undefined
 }
 
@@ -90,7 +85,7 @@ function SizeList({ editor, onRemoved }: { editor: Editor; onRemoved: (message: 
   const f = t.editor.formats
   const { design, focused } = useEditorDesign(editor)
   const run = editor.session.run.bind(editor.session)
-  const formats = ordered(design)
+  const formats = inOrder(design.formats)
   const background = backgroundOf(design)
   const [renaming, setRenaming] = useState<string | null>(null)
   const rename = (id: string, name: string) => {

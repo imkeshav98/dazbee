@@ -1,8 +1,7 @@
 // Drawing shapes with a drag (#44): what each shape tool makes, and the box a drag gives it. Kept
 // free of the editor so the geometry can be tested on its own. Points are a page's design pixels.
-import type { Paint } from '@dazbee/schema'
+import type { Paint, Point } from '@dazbee/schema'
 
-import type { Point } from './hit-test.ts'
 import { normalAngle, round } from './transform.ts'
 
 export const SHAPE_TOOLS = ['rect', 'ellipse', 'polygon', 'star', 'line', 'arrow'] as const

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { parseDesign } from '@dazbee/schema'
+import { formatScope, parseDesign } from '@dazbee/schema'
 
 import { withFreshIds } from './fresh-ids.ts'
 import { testDesign } from './test-design.ts'
@@ -21,7 +21,7 @@ describe('withFreshIds (#54)', () => {
     const headline = Object.entries(after.nodes).find(([, n]) => n.name === 'Headline')
     expect(headline?.[1].parentId).toBe(Object.keys(after.pages)[0])
     const banner = Object.keys(after.formats).find((id) => after.formats[id]?.name === before.formats.banner?.name)
-    expect(after.overrides[`format:${banner}`]?.[headline?.[0] ?? '']).toEqual(
+    expect(after.overrides[formatScope(banner ?? '')]?.[headline?.[0] ?? '']).toEqual(
       before.overrides['format:banner']?.headline,
     )
   })

@@ -1,7 +1,7 @@
 // Hiding a layer in every format, in Chromium with real input: a plain click on the eye hides it in
 // the format shown and the eye shows it is hidden only there; Alt-click hides it in every format and
 // shows it again; Alt+Mod+Shift+H does the same for the selection; each is one undo step.
-import type { DesignInput } from '@dazbee/schema'
+import { type DesignInput, formatScope } from '@dazbee/schema'
 
 import { writeOutput } from '../support/editor.ts'
 import { openStage, read } from '../support/stage.ts'
@@ -58,7 +58,9 @@ const design = (): DesignInput => ({
 /** Whether the layer shows in each format: Square, then Story. */
 const visible = async (page: Page, id: string) => {
   const d = await read(page)
-  return ['sq', 'story'].map((f) => (d.overrides[`format:${f}`]?.[id]?.visible ?? d.nodes[id]?.props.visible) !== false)
+  return ['sq', 'story'].map(
+    (f) => (d.overrides[formatScope(f)]?.[id]?.visible ?? d.nodes[id]?.props.visible) !== false,
+  )
 }
 const undo = (page: Page) => page.evaluate(() => window.dazbee?.perform('undo'))
 /** How many of Story's pixels are the badge's pink, as the export draws it. */

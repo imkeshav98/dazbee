@@ -55,6 +55,7 @@ export const Stroke = z.object({
   /** How far a mitred corner may reach, as a multiple of half the stroke width, before it is bevelled. */
   miterLimit: z.number().min(1).default(4),
 })
+export type Stroke = z.infer<typeof Stroke>
 
 /** What the end of a line looks like (#44). */
 export const LineEnd = z.enum(['none', 'arrow', 'triangle', 'circle'])
@@ -128,6 +129,7 @@ export const GraphicProps = z.object({
   fills: Paint.array().default([]),
   strokes: Stroke.array().default([]),
 })
+export type GraphicProps = z.infer<typeof GraphicProps>
 
 /**
  * A frame's auto layout (#46): its children in a row or a column, `gap` apart, inside its
@@ -145,6 +147,7 @@ export const AutoLayout = z.object({
   wrap: z.boolean().default(false),
   lineGap: z.number().default(0),
 })
+export type AutoLayout = z.infer<typeof AutoLayout>
 
 export const FrameProps = z.object({
   ...commonProps,
@@ -161,11 +164,14 @@ export const FrameProps = z.object({
   /** Lays out the frame's children (#46); left out, they stay where they are put. */
   layout: AutoLayout.optional(),
 })
+export type FrameProps = z.infer<typeof FrameProps>
 
 export const GroupProps = z.object({ ...commonProps, blendMode: ContainerBlendMode.default('pass-through') })
+export type GroupProps = z.infer<typeof GroupProps>
 
 /** How a boolean layer combines its shapes, in order: the first with each of the others (#44). */
 export const BooleanOp = z.enum(['union', 'subtract', 'intersect', 'exclude'])
+export type BooleanOp = z.infer<typeof BooleanOp>
 
 /**
  * A live boolean of the shapes inside it (#44): their outlines combined by `op` and painted with
@@ -178,6 +184,7 @@ export const BooleanProps = z.object({
   fills: Paint.array().default([]),
   strokes: Stroke.array().default([]),
 })
+export type BooleanProps = z.infer<typeof BooleanProps>
 
 const textStyleFields = {
   fontFamily: z.string().min(1),
@@ -208,9 +215,11 @@ export const TextStyle = z.object({
   textCase: textStyleFields.textCase.optional(),
   outline: textStyleFields.outline.optional(),
 })
+export type TextStyle = z.infer<typeof TextStyle>
 
 /** A run's style: only the keys it changes, with no defaults, so the rest come from the base style. */
 export const RunStyle = z.object(textStyleFields).partial()
+export type RunStyle = z.infer<typeof RunStyle>
 
 /** Run offsets count UTF-16 code units, as JavaScript strings and Y.Text do. */
 export const TextRun = z
@@ -220,6 +229,7 @@ export const TextRun = z
     style: RunStyle,
   })
   .refine((r) => r.end > r.start, 'a run must cover at least one character')
+export type TextRun = z.infer<typeof TextRun>
 
 export const TextProps = z
   .object({
@@ -258,6 +268,7 @@ export const TextProps = z
       }
     }
   })
+export type TextProps = z.infer<typeof TextProps>
 
 /** Five of the seven layer types in ADR-0006: boolean arrived with #44; instance and lottie come later. */
 export const LAYER_PROPS = {

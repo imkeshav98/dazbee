@@ -1,8 +1,10 @@
 // Rulers along the stage's top and start edges (#42): positions in one frame's design pixels, with
 // the selection's extent marked on both. Built as overlay elements each time the overlay is drawn;
 // numbered ticks are elements, the small ticks between them a repeating background.
+import type { Rect } from '@dazbee/schema'
+
 import { type Camera, toScreen, toWorld, type Viewport } from './camera.ts'
-import type { Frame, Rect } from './grid.ts'
+import type { Frame } from './grid.ts'
 
 /** The rulers' thickness, in CSS pixels. */
 const RULER_SIZE = 20

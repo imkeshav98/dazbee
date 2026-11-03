@@ -1,7 +1,7 @@
 // Align and distribute (#42): where each selected layer moves to, by the box around it as drawn.
 // Several layers line up with the box around them all; one layer lines up with what holds it,
 // the format or the group or frame it is in.
-import type { Rect } from './grid.ts'
+import type { Rect } from '@dazbee/schema'
 
 export const ALIGNMENTS = ['left', 'centre', 'right', 'top', 'middle', 'bottom'] as const
 export type Alignment = (typeof ALIGNMENTS)[number]

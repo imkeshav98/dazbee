@@ -8,7 +8,22 @@ import type {
   Path,
   Shader,
 } from '@dazbee/canvaskit'
-import { type Effect, type Paint, pathScale } from '@dazbee/schema'
+import {
+  type BackgroundBlur,
+  type BooleanProps,
+  type DropShadow,
+  type Effect,
+  type GraphicProps,
+  type ImagePaint,
+  type InnerShadow,
+  type LayerBlur,
+  type Paint,
+  pathScale,
+  type Rect,
+  type Shape,
+  type Stroke,
+  type TextProps,
+} from '@dazbee/schema'
 
 import { imageColorMatrix, LUMA_TO_ALPHA } from './adjust.ts'
 import { color } from './color.ts'
@@ -31,17 +46,15 @@ export interface Resources {
 }
 
 /** A text layer laid out, from the paragraph cache when there is one; `done` frees what the cache doesn't own. */
-function laidOut(ck: CanvasKit, props: TextLayer['props'], resources: Resources) {
+function laidOut(ck: CanvasKit, props: TextProps, resources: Resources) {
   if (resources.paragraphs) return { ...resources.paragraphs.layout(ck, props, resources), done: () => {} }
   const laid = layoutText(ck, props, resources)
   return { ...laid, done: () => laid.delete() }
 }
 
-export type Box = { x: number; y: number; width: number; height: number }
 type TextLayer = Extract<SceneLayer, { type: 'text' }>
 type GraphicLayer = Extract<SceneLayer, { type: 'graphic' }>
 type BooleanLayer = Extract<SceneLayer, { type: 'boolean' }>
-type Stroke = GraphicLayer['props']['strokes'][number]
 
 /** A clip wider than any page, so clipping to it changes nothing. */
 const EVERYWHERE = Float32Array.of(-1e6, -1e6, 1e6, 1e6)
@@ -142,9 +155,7 @@ function drawLayer(ck: CanvasKit, canvas: Canvas, layer: SceneLayer, resources: 
   if (props.rotation !== 0) canvas.rotate(props.rotation, props.x + props.width / 2, props.y + props.height / 2)
 
   // Frosted glass first: what is already drawn behind the layer, blurred inside its outline.
-  const glass = props.effects.find(
-    (e): e is Extract<Effect, { type: 'backgroundBlur' }> => e.type === 'backgroundBlur' && e.radius > 0,
-  )
+  const glass = props.effects.find((e): e is BackgroundBlur => e.type === 'backgroundBlur' && e.radius > 0)
   if (glass) blurBehind(ck, canvas, layer, glass.radius)
 
   const content = () => drawContent(ck, canvas, layer, resources)
@@ -176,9 +187,7 @@ function drawLayer(ck: CanvasKit, canvas: Canvas, layer: SceneLayer, resources: 
       if (effect.type === 'glow') withFilter(ck, canvas, dropShadow(ck, { ...effect, x: 0, y: 0 }), bounds, content)
     }
     // The first blur that blurs; a zero-radius one before it no longer hides it.
-    const blur = props.effects.find(
-      (e): e is Extract<Effect, { type: 'layerBlur' }> => e.type === 'layerBlur' && e.radius > 0,
-    )
+    const blur = props.effects.find((e): e is LayerBlur => e.type === 'layerBlur' && e.radius > 0)
     if (blur) {
       withFilter(
         ck,
@@ -270,10 +279,7 @@ function withFilter(ck: CanvasKit, canvas: Canvas, filter: ImageFilter, bounds: 
   filter.delete()
 }
 
-function dropShadow(
-  ck: CanvasKit,
-  effect: Pick<Extract<Effect, { type: 'dropShadow' }>, 'x' | 'y' | 'blur' | 'spread' | 'color'>,
-) {
+function dropShadow(ck: CanvasKit, effect: Pick<DropShadow, 'x' | 'y' | 'blur' | 'spread' | 'color'>) {
   const spread =
     effect.spread > 0
       ? ck.ImageFilter.MakeDilate(effect.spread, effect.spread, null)
@@ -297,7 +303,7 @@ function dropShadow(
  * blurred, then kept only where the layer is. The colour matrix turns transparent into the
  * shadow colour and opaque into nothing, working on unpremultiplied values in 0 to 1.
  */
-function innerShadow(ck: CanvasKit, effect: Extract<Effect, { type: 'innerShadow' }>) {
+function innerShadow(ck: CanvasKit, effect: InnerShadow) {
   const [r = 0, g = 0, b = 0, a = 0] = color(ck, effect.color)
   const outside = ck.ColorFilter.MakeMatrix([0, 0, 0, 0, r, 0, 0, 0, 0, g, 0, 0, 0, 0, b, 0, 0, 0, -a, a])
   const colored = ck.ImageFilter.MakeColorFilter(outside, null)
@@ -311,14 +317,14 @@ function innerShadow(ck: CanvasKit, effect: Extract<Effect, { type: 'innerShadow
 }
 
 /** Everything a layer draws, shadows and blur included, in its parent's coordinates. */
-export function layerReach(ck: CanvasKit, layer: SceneLayer, resources: Resources): Box {
+export function layerReach(ck: CanvasKit, layer: SceneLayer, resources: Resources): Rect {
   return rotated(withEffects(drawnBounds(ck, layer, resources), layer.props.effects), layer.props, layer.props.rotation)
 }
 
 /** A Gaussian blur's visible reach, in sigmas. */
 const BLUR_REACH = 3
 
-const union = (a: Box, b: Box): Box => {
+const union = (a: Rect, b: Rect): Rect => {
   const x = Math.min(a.x, b.x)
   const y = Math.min(a.y, b.y)
   return {
@@ -328,7 +334,7 @@ const union = (a: Box, b: Box): Box => {
     height: Math.max(a.y + a.height, b.y + b.height) - y,
   }
 }
-export const outset = (box: Box, by: number): Box => ({
+export const outset = (box: Rect, by: number): Rect => ({
   x: box.x - by,
   y: box.y - by,
   width: box.width + 2 * by,
@@ -336,7 +342,7 @@ export const outset = (box: Box, by: number): Box => ({
 })
 
 /** The box after turning it about its own centre, as the axis-aligned box around the result. */
-function rotated(box: Box, about: Box, degrees: number): Box {
+function rotated(box: Rect, about: Rect, degrees: number): Rect {
   if (degrees === 0) return box
   const a = (degrees * Math.PI) / 180
   const cx = about.x + about.width / 2
@@ -361,7 +367,7 @@ function rotated(box: Box, about: Box, degrees: number): Box {
 }
 
 /** What a layer's content can touch, in its own unrotated coordinates. */
-function drawnBounds(ck: CanvasKit, layer: SceneLayer, resources: Resources): Box {
+function drawnBounds(ck: CanvasKit, layer: SceneLayer, resources: Resources): Rect {
   switch (layer.type) {
     case 'graphic':
     case 'boolean': {
@@ -401,7 +407,7 @@ export function strokeReach(strokes: readonly Stroke[], line: boolean) {
 }
 
 /** A container's own box grown by everything its children draw, each turned as it is drawn. */
-function childrenBounds(ck: CanvasKit, layer: SceneLayer, resources: Resources, own: Box): Box {
+function childrenBounds(ck: CanvasKit, layer: SceneLayer, resources: Resources, own: Rect): Rect {
   let box = own
   for (const child of layer.children) {
     box = union(
@@ -418,10 +424,10 @@ function childrenBounds(ck: CanvasKit, layer: SceneLayer, resources: Resources, 
  * ascent, descent and advance (marks, swashes, wide letters), so each side gets half the largest
  * font size more.
  */
-function textBounds(ck: CanvasKit, layer: TextLayer, resources: Resources): Box {
+function textBounds(ck: CanvasKit, layer: TextLayer, resources: Resources): Rect {
   const { props } = layer
   const { blocks, dy, scale, done } = laidOut(ck, props, resources)
-  let box: Box = props
+  let box: Rect = props
   for (const b of blocks) {
     for (const line of b.paragraph.getLineMetrics()) {
       box = union(box, {
@@ -448,7 +454,7 @@ function textBounds(ck: CanvasKit, layer: TextLayer, resources: Resources): Box 
 }
 
 /** Grows a layer's drawn bounds by how far its shadows and blur reach. */
-function withEffects(box: Box, effects: readonly Effect[]): Box {
+function withEffects(box: Rect, effects: readonly Effect[]): Rect {
   let reach = box
   for (const effect of effects) {
     if (effect.type === 'dropShadow' || effect.type === 'glow') {
@@ -469,11 +475,11 @@ function withEffects(box: Box, effects: readonly Effect[]): Box {
   return reach
 }
 
-export const rectPath = (ck: CanvasKit, box: Box) =>
+export const rectPath = (ck: CanvasKit, box: Rect) =>
   new ck.PathBuilder().addRect(ck.XYWHRect(box.x, box.y, box.width, box.height)).detachAndDelete()
 
 /** A box with one radius on every corner, no more than half its shorter side. */
-function evenRectPath(ck: CanvasKit, { x, y, width, height }: Box, radius: number): Path {
+function evenRectPath(ck: CanvasKit, { x, y, width, height }: Rect, radius: number): Path {
   const r = Math.min(radius, width / 2, height / 2)
   return new ck.PathBuilder().addRRect(ck.RRectXY(ck.XYWHRect(x, y, width, height), r, r)).detachAndDelete()
 }
@@ -485,7 +491,7 @@ function evenRectPath(ck: CanvasKit, { x, y, width, height }: Box, radius: numbe
  */
 export function framePath(
   ck: CanvasKit,
-  props: Box & { cornerRadius: number | readonly [number, number, number, number] },
+  props: Rect & { cornerRadius: number | readonly [number, number, number, number] },
 ): Path {
   const { x, y, width, height, cornerRadius: corners } = props
   if (typeof corners === 'number') return evenRectPath(ck, props, corners)
@@ -564,7 +570,7 @@ function shapePath(ck: CanvasKit, layer: GraphicLayer): Path {
  * from the centre (a regular polygon, or a star's outer and inner corners), then stretched so
  * they fill the box: a triangle's base sits on the box's bottom edge, as in other design tools.
  */
-function around(box: Box, count: number, scale: (i: number) => number): [number, number][] {
+function around(box: Rect, count: number, scale: (i: number) => number): [number, number][] {
   const unit = Array.from({ length: count }, (_, i) => {
     const a = -Math.PI / 2 + (2 * Math.PI * i) / count
     return [scale(i) * Math.cos(a), scale(i) * Math.sin(a)] as const
@@ -643,14 +649,14 @@ function booleanPath(ck: CanvasKit, layer: BooleanLayer): Path {
 /** How long a line's end is, in widths of the stroke it ends. */
 const END_SIZE = 3
 
-type LineShape = Extract<GraphicLayer['props']['shape'], { kind: 'line' }>
+type LineShape = Extract<Shape, { kind: 'line' }>
 
 /** Fills and strokes an outline; a line's strokes are always centred, and draw its ends. */
 function drawShape(
   ck: CanvasKit,
   canvas: Canvas,
   path: Path,
-  props: GraphicLayer['props'] | BooleanLayer['props'],
+  props: GraphicProps | BooleanProps,
   resources: Resources,
   line: LineShape | null,
 ) {
@@ -667,7 +673,7 @@ export function strokePath(
   ck: CanvasKit,
   canvas: Canvas,
   path: Path,
-  props: Box & { strokes: readonly Stroke[] },
+  props: Rect & { strokes: readonly Stroke[] },
   resources: Resources,
   line: LineShape | null,
 ) {
@@ -725,7 +731,7 @@ export function strokePath(
  * and a circle are filled, END_SIZE widths long. The line stops short under a triangle, so its
  * point stays sharp.
  */
-function drawLine(ck: CanvasKit, canvas: Canvas, box: Box, line: LineShape, stroke: Stroke, paint: CkPaint) {
+function drawLine(ck: CanvasKit, canvas: Canvas, box: Rect, line: LineShape, stroke: Stroke, paint: CkPaint) {
   const w = stroke.width
   const size = w * END_SIZE
   const y = box.y + box.height / 2
@@ -764,7 +770,7 @@ function drawLine(ck: CanvasKit, canvas: Canvas, box: Box, line: LineShape, stro
   }
 }
 
-export function fillPath(ck: CanvasKit, canvas: Canvas, path: Path, fill: Paint, box: Box, resources: Resources) {
+export function fillPath(ck: CanvasKit, canvas: Canvas, path: Path, fill: Paint, box: Rect, resources: Resources) {
   // A PDF reader can drop a see-through image pattern's alpha, so a vector export draws the image
   // whole inside a layer that holds its opacity instead.
   const faded = resources.vector && fill.type === 'image' && fill.opacity < 1
@@ -785,7 +791,7 @@ export function fillPath(ck: CanvasKit, canvas: Canvas, path: Path, fill: Paint,
  * A CanvasKit paint for one schema paint, or null for a hidden one. Gradient and image geometry is
  * placed in the layer's box; the paint's own opacity multiplies its colours' alpha.
  */
-function paintFor(ck: CanvasKit, fill: Paint, box: Box, resources: Resources): CkPaint | null {
+function paintFor(ck: CanvasKit, fill: Paint, box: Rect, resources: Resources): CkPaint | null {
   if (fill.visible === false) return null
   const paint = new ck.Paint()
   paint.setAntiAlias(true)
@@ -852,7 +858,7 @@ function paintFor(ck: CanvasKit, fill: Paint, box: Box, resources: Resources): C
 }
 
 /** Places an image in a box: fill covers it, fit fits inside it, crop shows the crop rect stretched to it, tile repeats it. */
-function imageShader(ck: CanvasKit, image: Image, fill: Extract<Paint, { type: 'image' }>, box: Box): Shader {
+function imageShader(ck: CanvasKit, image: Image, fill: ImagePaint, box: Rect): Shader {
   const iw = image.width()
   const ih = image.height()
   const sampling = [ck.FilterMode.Linear, ck.MipmapMode.None] as const
@@ -865,7 +871,7 @@ function imageShader(ck: CanvasKit, image: Image, fill: Extract<Paint, { type: '
     )
   }
   let src = { x: 0, y: 0, width: iw, height: ih }
-  let dst: Box = box
+  let dst: Rect = box
   if (fill.fit === 'crop' && fill.crop) {
     src = fill.crop
   } else if (fill.fit === 'fill' || fill.fit === 'crop') {

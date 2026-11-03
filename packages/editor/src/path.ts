@@ -2,7 +2,8 @@
 // have a handle in (towards the anchor before it) and out (towards the one after). Any SVG path
 // data reads in, with quadratics and arcs turned into cubics; it is written back as M, L, C and Z
 // only. Points are in one coordinate space throughout; the editor picks which.
-import type { Point } from './hit-test.ts'
+import type { Point } from '@dazbee/schema'
+
 import { round } from './transform.ts'
 
 export interface Anchor {

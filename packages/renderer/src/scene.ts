@@ -1,5 +1,5 @@
-import { childrenOf } from '@dazbee/doc'
-import { bindProps, type Design, type Layer, type Paint, type Variables } from '@dazbee/schema'
+import { childrenOf, mergedProps } from '@dazbee/doc'
+import { bindProps, type Design, formatScope, type Layer, type Paint, type Variables } from '@dazbee/schema'
 
 import { applyLayout, type MeasureText } from './layout.ts'
 
@@ -52,14 +52,15 @@ export function render(
   if (!page) throw new Error(`no page "${pageId}"`)
   const format = design.formats[formatId]
   if (!format) throw new Error(`no format "${formatId}"`)
-  const overrides = design.overrides[`format:${formatId}`] ?? {}
+  const scope = formatScope(formatId)
+  const overrides = design.overrides[scope] ?? {}
   let built = memo?.get(formatId)
   if (memo && !built) memo.set(formatId, (built = new WeakMap()))
 
   const layersUnder = (parentId: string): SceneLayer[] =>
     childrenOf(design, parentId).flatMap(([id, node]) => {
       const override = overrides[id]
-      const props = { ...node.props, ...override }
+      const props = mergedProps(design, scope, id)
       if (!props.visible) return []
       const children = layersUnder(id)
       // Only a bound layer depends on the variables, so a brand change rebuilds only those.

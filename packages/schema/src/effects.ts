@@ -10,7 +10,9 @@ export const DropShadow = z.object({
   spread: z.number().default(0),
   color: Color,
 })
+export type DropShadow = z.infer<typeof DropShadow>
 export const LayerBlur = z.object({ type: z.literal('layerBlur'), radius: z.number().min(0) })
+export type LayerBlur = z.infer<typeof LayerBlur>
 
 /** A shadow inside the layer's edges, as if the layer were cut out of a surface the light falls on. Spread pushes it further in. (#43) */
 export const InnerShadow = z.object({
@@ -21,6 +23,7 @@ export const InnerShadow = z.object({
   spread: z.number().min(0).default(0),
   color: Color,
 })
+export type InnerShadow = z.infer<typeof InnerShadow>
 /** A coloured haze around the layer's edges: a shadow that falls evenly on every side. (#43) */
 export const Glow = z.object({
   type: z.literal('glow'),
@@ -28,8 +31,10 @@ export const Glow = z.object({
   spread: z.number().min(0).default(0),
   color: Color,
 })
+export type Glow = z.infer<typeof Glow>
 /** Blurs what is behind the layer, inside its outline, as frosted glass does. (#43) */
 export const BackgroundBlur = z.object({ type: z.literal('backgroundBlur'), radius: z.number().min(0) })
+export type BackgroundBlur = z.infer<typeof BackgroundBlur>
 
 export const Effect = z.discriminatedUnion('type', [DropShadow, InnerShadow, Glow, LayerBlur, BackgroundBlur])
 export type Effect = z.infer<typeof Effect>

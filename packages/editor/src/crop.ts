@@ -1,14 +1,8 @@
 // Cropping an image fill on the stage (#48): where the whole image sits for a crop, and the crop a
 // pan or a corner drag of it gives. All in the layer's own, unturned coordinates. Kept free of the
 // editor so it can be tested on its own.
+import type { Rect } from '@dazbee/schema'
 
-/** A rectangle, unturned. */
-export interface Rect {
-  x: number
-  y: number
-  width: number
-  height: number
-}
 export interface Size {
   width: number
   height: number

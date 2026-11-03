@@ -6,7 +6,7 @@
 import { useState } from 'react'
 
 import type { Editor } from '@dazbee/editor'
-import { DEFAULT_EXPORT_NAME, type Design, type ExportType } from '@dazbee/schema'
+import { DEFAULT_EXPORT_NAME, type Design, type ExportType, inOrder } from '@dazbee/schema'
 
 import { Button } from '@/components/ui/button.tsx'
 import { Select } from '@/components/ui/select.tsx'
@@ -18,9 +18,6 @@ import { useSelection } from './arrange-panel.tsx'
 import { NumberField } from './fields.tsx'
 import { Proportion } from './formats-panel.tsx'
 import { FIELD, FIELD_LABEL, LINK_BUTTON, SEGMENT, SEGMENTS, TILE, TILE_FACE_WIDE } from './styles.ts'
-
-const byOrder = <T extends { order: string }>(items: Record<string, T>) =>
-  Object.entries(items).sort(([a, x], [b, y]) => (x.order < y.order ? -1 : x.order > y.order ? 1 : a < b ? -1 : 1))
 
 function download(name: string, type: string, bytes: Uint8Array<ArrayBuffer>) {
   const url = URL.createObjectURL(new Blob([bytes], { type }))
@@ -38,8 +35,8 @@ const sizeOf = ({ width, height }: { width: number; height: number }) => `${widt
 /** The export form, opened from the Share menu. */
 export function ExportForm({ id, editor, design }: { id: string; editor: Editor; design: Design }) {
   const t = useMessages()
-  const pages = byOrder(design.pages)
-  const formats = byOrder(design.formats)
+  const pages = inOrder(design.pages)
+  const formats = inOrder(design.formats)
   // This page: the one picked here while it exists, else the one the selection is on (as the layers
   // panel shows it), else the first.
   useSelection(editor)

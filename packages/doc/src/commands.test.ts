@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import * as Y from 'yjs'
 import type { z } from 'zod'
 
-import { LayerTree, parseDesign } from '@dazbee/schema'
+import { formatScope, inOrder, LayerTree, parseDesign } from '@dazbee/schema'
 
 import { childrenOf, loadDesign, openSession, readDesign } from './index.ts'
 import { testDesign } from './test-design.ts'
@@ -294,10 +294,7 @@ describe('commands', () => {
     tab.run('format.add', { id: 'story', name: 'Story', width: 1080, height: 1920 })
     tab.run('format.update', { id: 'story', name: 'Reel', width: 1080, height: 1350 })
     tab.run('format.update', { id: 'story', before: 'sq' })
-    const order = (d = readDesign(doc)) =>
-      Object.entries(d.formats)
-        .sort(([, a], [, b]) => (a.order < b.order ? -1 : 1))
-        .map(([id]) => id)
+    const order = (d = readDesign(doc)) => inOrder(d.formats).map(([id]) => id)
     expect(readDesign(doc).formats.story).toMatchObject({ name: 'Reel', width: 1080, height: 1350 })
     expect(order()).toEqual(['story', 'sq', 'banner'])
     tab.run('format.update', { id: 'story', before: null })
@@ -342,9 +339,7 @@ describe('commands', () => {
     const copy = tab.run('page.duplicate', { id: 'p1', name: 'Card 1 copy' })
 
     const design = readDesign(doc)
-    const order = Object.entries(design.pages)
-      .sort(([, a], [, b]) => (a.order < b.order ? -1 : 1))
-      .map(([id]) => id)
+    const order = inOrder(design.pages).map(([id]) => id)
     expect(order).toEqual(['p1', copy, 'p2'])
     expect(design.pages[copy]).toMatchObject({ name: 'Card 1 copy', fills: design.pages.p1?.fills })
     const copied = Object.entries(design.nodes)
@@ -372,10 +367,7 @@ describe('commands', () => {
     const tab = openSession(doc)
     tab.run('page.add', { id: 'p2', name: 'Card 2' })
     tab.run('page.add', { id: 'p3', name: 'Card 3' })
-    const order = () =>
-      Object.entries(readDesign(doc).pages)
-        .sort(([, a], [, b]) => (a.order < b.order ? -1 : 1))
-        .map(([id]) => id)
+    const order = () => inOrder(readDesign(doc).pages).map(([id]) => id)
     tab.run('page.move', { id: 'p3', before: 'p1' })
     expect(order()).toEqual(['p3', 'p1', 'p2'])
     tab.run('page.move', { id: 'p3', before: null })
@@ -773,7 +765,7 @@ describe('node.visibleEverywhere', () => {
   const visibleIn = (doc: Y.Doc, id: string) => {
     const design = readDesign(doc)
     return Object.keys(design.formats).map(
-      (f) => (design.overrides[`format:${f}`]?.[id]?.visible ?? design.nodes[id]?.props.visible) !== false,
+      (f) => (design.overrides[formatScope(f)]?.[id]?.visible ?? design.nodes[id]?.props.visible) !== false,
     )
   }
 

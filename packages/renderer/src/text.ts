@@ -1,11 +1,9 @@
 import type { CanvasKit, FontCollection, Paragraph, TextStyle as CkTextStyle } from '@dazbee/canvaskit'
+import type { TextProps } from '@dazbee/schema'
 
 import { color } from './color.ts'
 import type { Resources } from './draw.ts'
-import type { SceneLayer } from './scene.ts'
 import { scaled } from './text-scale.ts'
-
-type TextProps = Extract<SceneLayer, { type: 'text' }>['props']
 
 /** Hebrew, Arabic, Syriac, Thaana, NKo, their presentation forms, and the right-to-left blocks beyond the BMP. */
 const RTL_CHAR = /[\u0590-\u08FF\uFB1D-\uFDFF\uFE70-\uFEFF\u{10800}-\u{10FFF}\u{1E800}-\u{1EFFF}]/u

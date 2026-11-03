@@ -1,9 +1,9 @@
 // Settings for a frame switched to auto layout (#46), read off where its children are, so that
 // switching moves nothing when the children already sit in an even row or column.
-import type { Box } from './geometry.ts'
+import type { Rect } from '@dazbee/schema'
+
 import { round } from './geometry.ts'
 
-type Rect = Pick<Box, 'x' | 'y' | 'width' | 'height'>
 export interface Inferred {
   direction: 'row' | 'column'
   gap: number

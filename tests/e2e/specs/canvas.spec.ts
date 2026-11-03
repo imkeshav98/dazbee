@@ -2,7 +2,7 @@
 // and what each redraw draws and records. Needs the API and the sync server: `docker compose up -d --wait`.
 import type { Camera, DrawInfo } from '@dazbee/editor'
 import { framesInView } from '@dazbee/editor/camera'
-import type { DesignInput } from '@dazbee/schema'
+import { type DesignInput, formatScope } from '@dazbee/schema'
 
 import { designOf, editorPath, placed, screenPoint, settle, stageShot, writeOutput } from '../support/editor.ts'
 import { PERF, report, spread } from '../support/perf.ts'
@@ -231,7 +231,7 @@ test('a drag in the second format moves the layer there only; undo and override.
   expect(Math.abs(moved.y - 150)).toBeLessThanOrEqual(Math.ceil(1 / zoom))
   expect(design.nodes['p1-box'].props).toMatchObject({ x: 100, y: 100 })
   for (const formatId of FORMAT_IDS.filter((f) => f !== 'story'))
-    expect(design.overrides[`format:${formatId}`]?.['p1-box']).toBeUndefined()
+    expect(design.overrides[formatScope(formatId)]?.['p1-box']).toBeUndefined()
   writeOutput('canvas-1-dragged-in-story.png', await page.screenshot())
 
   // Undo takes the whole drag back in one step.

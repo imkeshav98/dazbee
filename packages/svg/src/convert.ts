@@ -6,7 +6,7 @@
 import { generateKeyBetween } from 'fractional-indexing'
 
 import type { CanvasKit, Path } from '@dazbee/canvaskit'
-import { LayerTree, MAX_SVG_BYTES, type Paint } from '@dazbee/schema'
+import { LayerTree, MAX_SVG_BYTES, type Paint, type Rect } from '@dazbee/schema'
 
 import { parseColor, parsePaint, withOpacity } from './color.ts'
 import { readSheets, type Style, styleOf } from './style.ts'
@@ -63,11 +63,10 @@ const MAX_WORK = 100_000
 const MAX_NESTING = 400
 
 type LayerInput = { type: string; parentId: string; index: string; name: string; props: Record<string, unknown> }
-type Box = { x: number; y: number; width: number; height: number }
 /** A layer made from an element: its id and its box in design pixels. */
 interface Piece {
   id: string
-  box: Box
+  box: Rect
 }
 
 const DEFAULT_NAMES: Record<string, string> = {
@@ -178,7 +177,7 @@ const invert = (m: Matrix): Matrix | null => {
   ]
 }
 
-const union = (boxes: Box[]): Box => {
+const union = (boxes: Rect[]): Rect => {
   const left = Math.min(...boxes.map((b) => b.x))
   const top = Math.min(...boxes.map((b) => b.y))
   const right = Math.max(...boxes.map((b) => b.x + b.width))
@@ -335,7 +334,7 @@ export function svgToLayers(ck: CanvasKit, text: string, options: ConvertOptions
     const builder = new ck.PathBuilder(path)
     return builder.transform(ckMatrix(m)).detachAndDelete()
   }
-  const boundsOf = (path: Path): Box => {
+  const boundsOf = (path: Path): Rect => {
     const [left = 0, top = 0, right = 0, bottom = 0] = path.computeTightBounds()
     return { x: left, y: top, width: right - left, height: bottom - top }
   }
@@ -349,8 +348,8 @@ export function svgToLayers(ck: CanvasKit, text: string, options: ConvertOptions
     opacityText: string | undefined,
     style: Style,
     m: Matrix,
-    user: Box,
-    box: Box,
+    user: Rect,
+    box: Rect,
   ): Paint | null {
     if (raw === undefined) return null
     const value = raw.trim().toLowerCase() === 'currentcolor' ? (style.color ?? 'black') : raw
@@ -386,7 +385,7 @@ export function svgToLayers(ck: CanvasKit, text: string, options: ConvertOptions
     return { attrs, stops }
   }
 
-  function gradientPaint(element: XmlElement, m: Matrix, user: Box, box: Box): Record<string, unknown> | null {
+  function gradientPaint(element: XmlElement, m: Matrix, user: Rect, box: Rect): Record<string, unknown> | null {
     const { attrs, stops: stopElements } = gradientOf(element)
     let last = 0
     const stops = stopElements.map((stop) => {
@@ -630,7 +629,7 @@ export function svgToLayers(ck: CanvasKit, text: string, options: ConvertOptions
    * The element's clip path as a mask layer, or undefined when it clips nothing away: a clip
    * that is one rectangle holding the whole of `inside`, as most design tools write.
    */
-  function clipMask(id: string, m: Matrix, inside: Box): Piece | null | undefined {
+  function clipMask(id: string, m: Matrix, inside: Rect): Piece | null | undefined {
     const clip = ids.get(id)
     if (clip?.name !== 'clipPath') return undefined
     const units =
@@ -710,7 +709,7 @@ export function svgToLayers(ck: CanvasKit, text: string, options: ConvertOptions
   }
 
   /** The element's mask as a mask layer drawn from the mask's content; none for a mask inside itself. */
-  function maskLayer(id: string, style: Style, m: Matrix, inside: Box, using: string[]): Piece | null | undefined {
+  function maskLayer(id: string, style: Style, m: Matrix, inside: Rect, using: string[]): Piece | null | undefined {
     const mask = ids.get(id)
     const key = `mask:${id}`
     if (mask?.name !== 'mask' || using.includes(key)) return undefined

@@ -9,9 +9,12 @@ import type { CanvasKit, GrDirectContext, Image, SkPicture, Surface } from '@daz
 import canvasKitModule from '@dazbee/canvaskit'
 import { WASM_FILE } from '@dazbee/canvaskit/wasm'
 import {
+  ancestorsOf,
   anchorOffset,
   childrenOf,
   CommandError,
+  descendants,
+  mergedProps,
   openSession,
   readDesign,
   type Session,
@@ -48,6 +51,7 @@ import {
   type Design,
   type ExportRequestInput,
   fontFamilies,
+  formatScope,
   imageAssetIds,
   isContainer,
   type Layer,
@@ -57,6 +61,8 @@ import {
   LOCK_FLAGS,
   type Paint,
   pathScale,
+  type Point,
+  type Rect,
   SCHEMA_VERSION,
   type VariableRef,
   type Variables,
@@ -89,8 +95,8 @@ import {
   withImage,
 } from './draw-tools.ts'
 import { exportClient } from './export-client.ts'
-import { type Frame, frameAt, frameGrid, intersects, type Rect } from './grid.ts'
-import { hitTest, type Point } from './hit-test.ts'
+import { type Frame, frameAt, frameGrid, intersects } from './grid.ts'
+import { hitTest } from './hit-test.ts'
 import {
   type Anchor,
   anchorOf,
@@ -606,7 +612,7 @@ function live(
     if (recordingWith?.for !== screen) recordingWith = { for: screen, resources: { ...screen, paragraphs, layers } }
     return recordingWith.resources
   }
-  const scope = (frame: Frame) => `format:${frame.formatId}`
+  const scope = (frame: Frame) => formatScope(frame.formatId)
 
   function depsOf(frame: Frame) {
     const overrides = design.overrides[scope(frame)]
@@ -703,7 +709,7 @@ function live(
     // Text bound to a brand font is drawn, so measured, in the family the kit gives it.
     const bound = node.bindings?.fontFamily ? resourceBytes.variables?.[node.bindings.fontFamily] : undefined
     for (const formatId of only ? [only] : Object.keys(now.formats)) {
-      const own = { ...node.props, ...now.overrides[`format:${formatId}`]?.[id] } as typeof node.props
+      const own = mergedProps(now, formatScope(formatId), id) as typeof node.props
       const props = bound ? { ...own, style: { ...own.style, fontFamily: bound } } : own
       if (props.boxMode === 'fixed') continue
       const size = measure(props, props.boxMode === 'autoWidth' ? null : props.width)
@@ -774,7 +780,7 @@ function live(
           rotation: shown.props.rotation,
         }
     }
-    const p = { ...node.props, ...from.overrides[scope(frame)]?.[id] } as {
+    const p = mergedProps(from, scope(frame), id) as {
       x: number
       y: number
       width: number
@@ -785,19 +791,15 @@ function live(
   }
   /** Whether auto layout sizes or places a layer: an auto layout frame, or a layer anywhere inside one. */
   function laidOut(id: string, from: Design) {
-    for (let up: string | undefined = id; up && from.nodes[up]; up = from.nodes[up]?.parentId) {
+    for (const up of ancestorsOf(from, id)) {
       const node = from.nodes[up]
-      if (
-        node?.type === 'frame' &&
-        (node.props.layout || Object.values(from.overrides).some((o) => o[up as string]?.layout))
-      )
+      if (node?.type === 'frame' && (node.props.layout || Object.values(from.overrides).some((o) => o[up]?.layout)))
         return true
     }
     return false
   }
   /** A layer's value of one property as a frame's format has it: the base with the format's override. */
-  const propIn = (frame: Frame, id: string, key: string, from: Design) =>
-    (({ ...from.nodes[id]?.props, ...from.overrides[scope(frame)]?.[id] }) as Record<string, unknown>)[key]
+  const propIn = (frame: Frame, id: string, key: string, from: Design) => mergedProps(from, scope(frame), id)[key]
   /** Whether a flow runs in a row (not a column) in a frame's format. */
   const rowIn = (frame: Frame, id: string, from: Design) =>
     (propIn(frame, id, 'layout', from) as AutoLayoutOf | undefined)?.direction !== 'column'
@@ -809,15 +811,17 @@ function live(
     layoutIn(frame, from.nodes[id]?.parentId ?? '', from) && !propIn(frame, id, 'absolute', from)
   /** Whether auto layout places a layer that is inside `root`, with whatever between them it is part of. */
   function placedInside(frame: Frame, id: string, root: string, from: Design) {
-    for (let up: string | undefined = id; up && up !== root && from.nodes[up]; up = from.nodes[up]?.parentId)
+    for (const up of ancestorsOf(from, id)) {
+      if (up === root) break
       if (inFlow(frame, up, from)) return true
+    }
     return false
   }
 
   /** The groups and frames a layer is inside, outermost first, as boxes in a frame. */
   function containersOf(frame: Frame, parentId: string | undefined, from: Design = session.design()): Box[] {
     const boxes: Box[] = []
-    for (let up = parentId; up && from.nodes[up]; up = from.nodes[up]?.parentId) {
+    for (const up of ancestorsOf(from, parentId ?? '')) {
       const box = boxIn(frame, up, from)
       if (box) boxes.unshift(box)
     }
@@ -887,11 +891,7 @@ function live(
   /** Selected layers that aren't inside another selected layer: the ones a transform moves. */
   function roots(from: Design = session.design()) {
     const ids = selection?.ids ?? []
-    const inside = (id: string) => {
-      for (let up = from.nodes[id]?.parentId; up && from.nodes[up]; up = from.nodes[up]?.parentId)
-        if (ids.includes(up)) return true
-      return false
-    }
+    const inside = (id: string) => ancestorsOf(from, from.nodes[id]?.parentId ?? '').some((up) => ids.includes(up))
     return ids.filter((id) => from.nodes[id] && !inside(id))
   }
   /**
@@ -915,17 +915,14 @@ function live(
    * that holds it, so a click on a group's child picks the group.
    */
   function target(hitId: string, frame: string) {
-    const chain: string[] = []
-    for (let up: string | undefined = hitId; up && design.nodes[up]; up = design.nodes[up]?.parentId) chain.push(up)
+    const chain = ancestorsOf(design, hitId)
     const selected = selection?.frame === frame ? chain.find((id) => selection?.ids.includes(id)) : undefined
     const at = entered ? chain.indexOf(entered) : -1
     return selected ?? (at > 0 ? chain[at - 1] : chain.at(-1)) ?? hitId
   }
   /** Whether a layer is inside the entered group or frame, not the container itself. */
   function insideEntered(id: string) {
-    for (let up = design.nodes[id]?.parentId; up && design.nodes[up]; up = design.nodes[up]?.parentId)
-      if (up === entered) return true
-    return false
+    return ancestorsOf(design, design.nodes[id]?.parentId ?? '').some((up) => up === entered)
   }
   function select(ids: string[], frame: string) {
     selection = ids.length > 0 ? { ids, frame } : null
@@ -953,7 +950,7 @@ function live(
     const node = from.nodes[id]
     const box = boxIn(frame, id, from)
     if (node?.type !== 'graphic' || !box) return null
-    const shape = { ...node.props, ...from.overrides[scope(frame)]?.[id] }.shape
+    const { shape } = mergedProps(from, scope(frame), id) as typeof node.props
     if (shape.kind !== 'path') return null
     try {
       // As it is drawn: scaled from the box it was drawn in to this one. A box squashed flat on an
@@ -1000,7 +997,7 @@ function live(
     const node = from.nodes[id]
     const box = boxIn(frame, id, from)
     if (!node || !box || !('fills' in node.props)) return null
-    const { fills } = { ...node.props, ...from.overrides[scope(frame)]?.[id] } as { fills: Paint[] }
+    const { fills } = mergedProps(from, scope(frame), id) as { fills: Paint[] }
     const index = fills.findLastIndex((f) => f.type === 'image')
     const fill = fills[index]
     const image = fill?.type === 'image' ? resources.images.get(fill.assetId) : undefined
@@ -2015,7 +2012,7 @@ function live(
     const parent = now.nodes[parentId]
     const laidOut =
       parent?.type === 'frame' &&
-      Object.keys(now.formats).some((f) => ({ ...parent.props, ...now.overrides[`format:${f}`]?.[parentId] }).layout)
+      Object.keys(now.formats).some((f) => mergedProps(now, formatScope(f), parentId).layout)
     if (!laidOut) return undefined
     const drawn: Record<string, Record<string, Omit<Box, 'rotation'>>> = {}
     for (const formatId of Object.keys(now.formats)) {
@@ -2028,14 +2025,10 @@ function live(
         }
       }
       walk(render(now, pageId, formatId, undefined, measureText(), resourceBytes.variables).layers)
-      drawn[`format:${formatId}`] = boxes
+      drawn[formatScope(formatId)] = boxes
     }
     return drawn
   }
-  /** Every layer under `id` in the document, nearest first. */
-  const under = (id: string, from: Design): string[] =>
-    childrenOf(from, id).flatMap(([child]) => [child, ...under(child, from)])
-
   function moveTo(g: Extract<Gesture, { kind: 'move' }>, p: Point, axisLock: boolean, snap: boolean) {
     let dx = p.x - g.from.x
     let dy = p.y - g.from.y
@@ -2082,12 +2075,7 @@ function live(
     const now = session.design()
     const format = now.formats[frame.formatId]
     if (!format) return null
-    const holds = (id: string) =>
-      ids.some((selected) => {
-        for (let up: string | undefined = selected; up && now.nodes[up]; up = now.nodes[up]?.parentId)
-          if (up === id) return true
-        return false
-      })
+    const holds = (id: string) => ids.some((selected) => ancestorsOf(now, selected).includes(id))
     const others = cached(frame)
       .scene.layers.filter((layer) => !holds(layer.id))
       .map((layer) => boundsOf([layer.props]))
@@ -2166,7 +2154,7 @@ function live(
       const type = now.nodes[root]?.type
       if (type === 'group' || type === 'boolean') {
         // Layers inside a group or boolean keep their place in it, scaled with it.
-        for (const id of under(root, now)) {
+        for (const id of descendants(now, root)) {
           const inner = g.boxes.get(id)
           if (inner) next.set(id, carry(inner, was, box))
         }
@@ -2174,7 +2162,7 @@ function live(
         // A frame changes its own size only: what it holds stays as it is, where it is on screen;
         // with several layers it moves along with its frame.
         const shift = g.roots.length === 1 ? keptOnScreen(was, box) : { x: box.x - was.x, y: box.y - was.y }
-        for (const id of under(root, now)) {
+        for (const id of descendants(now, root)) {
           const inner = g.boxes.get(id)
           if (inner) next.set(id, { ...inner, x: inner.x + shift.x, y: inner.y + shift.y })
         }
@@ -2219,7 +2207,7 @@ function live(
     const add = (id: string) => {
       const node = now.nodes[id]
       if (node?.type !== 'text' || node.lock?.style) return
-      const props = { ...node.props, ...now.overrides[scope(frame)]?.[id] } as typeof node.props
+      const props = mergedProps(now, scope(frame), id) as typeof node.props
       texts.set(id, {
         style: props.style,
         runs: props.runs,
@@ -2461,7 +2449,7 @@ function live(
           y: round(was.y + dy),
           rotation: round(normalAngle(was.rotation + delta)),
         })
-        for (const id of under(root, now)) {
+        for (const id of descendants(now, root)) {
           const inner = g.boxes.get(id)
           if (inner) next.set(id, { ...inner, x: round(inner.x + dx), y: round(inner.y + dy) })
         }
@@ -2779,7 +2767,7 @@ function live(
     const hit = frame && hitTest(cached(frame).scene.layers, { x: world.x - frame.x, y: world.y - frame.y }, pickable)
     if (!frame || !hit) return null
     let id = hit.id
-    for (let up = design.nodes[id]?.parentId; up && design.nodes[up]; up = design.nodes[up]?.parentId)
+    for (const up of ancestorsOf(design, design.nodes[id]?.parentId ?? ''))
       if (design.nodes[up]?.type === 'boolean') id = up
     const node = design.nodes[id]
     const takes =
@@ -3535,7 +3523,7 @@ function live(
     const next = new Map<string, Box>()
     ids.forEach((id, i) => {
       const { dx, dy } = moves[i] ?? { dx: 0, dy: 0 }
-      for (const inner of [id, ...under(id, now)]) {
+      for (const inner of [id, ...descendants(now, id)]) {
         const b = boxes.get(inner)
         if (b) next.set(inner, { ...b, x: round(b.x + dx), y: round(b.y + dy) })
       }
@@ -3900,7 +3888,7 @@ function live(
         const now = session.design()
         const shown = selection.ids.some((id) =>
           Object.keys(now.formats).some(
-            (f) => (now.overrides[`format:${f}`]?.[id]?.visible ?? now.nodes[id]?.props.visible) !== false,
+            (f) => (now.overrides[formatScope(f)]?.[id]?.visible ?? now.nodes[id]?.props.visible) !== false,
           ),
         )
         hideInEveryFormat(selection.ids, shown)
@@ -4077,7 +4065,7 @@ function live(
       const node = now.nodes[id]
       const box = boxIn(frame, id, now)
       if (!node || !box) return
-      nodes[id] = { ...node, props: { ...node.props, ...now.overrides[scope(frame)]?.[id], ...box } } as Layer
+      nodes[id] = { ...node, props: { ...mergedProps(now, scope(frame), id), ...box } } as Layer
       for (const [child] of childrenOf(now, id)) add(child)
     }
     for (const id of tops) add(id)
@@ -4505,8 +4493,7 @@ function live(
       return runQuietly(() =>
         session.gesture(() => {
           const now = session.design()
-          const placedProps = (id: string) =>
-            ({ ...now.nodes[id]?.props, ...now.overrides[here]?.[id] }) as Record<string, unknown>
+          const placedProps = (id: string) => mergedProps(now, here, id)
           const writes = new Map<string, Record<string, unknown>>()
           for (const id of ids) {
             const node = now.nodes[id]
@@ -4524,7 +4511,7 @@ function live(
             if (!isContainer(node.type) || !('x' in patch || 'y' in patch)) continue
             const dx = 'x' in patch ? Number(patch.x) - Number(at.x) : 0
             const dy = 'y' in patch ? Number(patch.y) - Number(at.y) : 0
-            for (const inner of under(id, now)) {
+            for (const inner of descendants(now, id)) {
               if (ids.includes(inner)) continue
               const was = placedProps(inner)
               writes.set(inner, { ...writes.get(inner), x: round(Number(was.x) + dx), y: round(Number(was.y) + dy) })
@@ -4552,8 +4539,7 @@ function live(
             session.run('node.update', { ids: [id], scope: 'base', patch })
             for (const [other, byNode] of Object.entries(session.design().overrides)) {
               const paths = Object.keys(patch).filter((path) => byNode[id] && path in byNode[id])
-              if (paths.length > 0)
-                session.run('override.reset', { ids: [id], scope: other as `format:${string}`, paths })
+              if (paths.length > 0) session.run('override.reset', { ids: [id], scope: other, paths })
             }
           }
           // Text that grows the size of its words fits them again, in the formats the change reached.
@@ -4649,7 +4635,7 @@ function live(
       const now = session.design()
       const node = selected && now.nodes[selected.id]
       if (!selected || !editing || node?.type !== 'text') return null
-      const own = now.overrides[`format:${frameOf(editing.frame)?.formatId}`]?.[selected.id]?.style as
+      const own = now.overrides[formatScope(String(frameOf(editing.frame)?.formatId))]?.[selected.id]?.style as
         Partial<typeof node.props.style> | undefined
       return stylesIn({ ...node.props, style: { ...node.props.style, ...own } }, selected.range)
     },
@@ -4804,7 +4790,7 @@ function live(
      * properties in `paths`, or all of them. Text that grows the size of its words fits them again
      * there, in the same undo step.
      */
-    resetOwn(ids: string[], scope: `format:${string}`, paths?: string[]) {
+    resetOwn(ids: string[], scope: ReturnType<typeof formatScope>, paths?: string[]) {
       return runQuietly(() =>
         session.gesture(() => {
           session.run('override.reset', { ids, scope, ...(paths ? { paths } : {}) })
@@ -4992,7 +4978,7 @@ function live(
             if (own)
               session.run('node.update', {
                 ids: [id],
-                scope: scope as `format:${string}`,
+                scope,
                 patch: { fills: withImage(own, asset.id) },
               })
           }

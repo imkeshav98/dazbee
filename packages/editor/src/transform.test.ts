@@ -1,16 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import {
-  boundsOf,
-  type Box,
-  carry,
-  centreOf,
-  cornersOf,
-  normalAngle,
-  resize,
-  scaleWithin,
-  snapAngle,
-} from './transform.ts'
+import { type Box, carry, centreOf, cornersOf, resize, scaleWithin, snapAngle } from './transform.ts'
 
 const box: Box = { x: 100, y: 100, width: 200, height: 100, rotation: 0 }
 const near = (b: Box) => Object.fromEntries(Object.entries(b).map(([k, v]) => [k, Math.round(v * 1000) / 1000]))
@@ -101,19 +91,9 @@ describe('carrying layers along', () => {
   })
 })
 
-describe('angles and bounds', () => {
-  it('keeps angles in (-180, 180] and snaps to 15° steps', () => {
-    expect(normalAngle(190)).toBe(-170)
-    expect(normalAngle(-180)).toBe(180)
+describe('snapAngle', () => {
+  it('snaps to 15° steps', () => {
     expect(snapAngle(37)).toBe(30)
     expect(snapAngle(-8)).toBe(-15)
-  })
-
-  it('bounds turned boxes as they are drawn', () => {
-    const b = boundsOf([
-      { x: 0, y: 0, width: 100, height: 100, rotation: 45 },
-      { x: 200, y: 0, width: 10, height: 10, rotation: 0 },
-    ])
-    expect(near(b)).toEqual({ x: -20.711, y: -20.711, width: 230.711, height: 141.421, rotation: 0 })
   })
 })

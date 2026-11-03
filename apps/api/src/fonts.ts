@@ -7,7 +7,14 @@ import { and, eq, inArray, isNull, or } from 'drizzle-orm'
 
 import { type Db, fontFaces } from '@dazbee/db'
 import { googleCssUrl, googleFaces, type GoogleFamily } from '@dazbee/fonts'
-import type { FontFace, FontFamily, FontLink, FontUploadTicket, StartFontUpload } from '@dazbee/schema'
+import {
+  byCodeUnits,
+  type FontFace,
+  type FontFamily,
+  type FontLink,
+  type FontUploadTicket,
+  type StartFontUpload,
+} from '@dazbee/schema'
 import type { Storage } from '@dazbee/storage'
 
 import { SIGNED_URL_SECONDS } from './assets.ts'
@@ -52,7 +59,7 @@ function families(rows: Row[]): Map<string, Row[]> {
 export async function listFonts(db: Db, workspaceId: string, brandId: string): Promise<FontFamily[]> {
   const rows = await db.select().from(fontFaces).where(visibleTo(workspaceId, brandId))
   return [...families(rows)]
-    .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+    .sort(([a], [b]) => byCodeUnits(a, b))
     .map(([family, faces]) => ({
       family,
       source: faces[0]?.source ?? 'google',

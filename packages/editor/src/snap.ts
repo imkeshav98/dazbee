@@ -2,7 +2,8 @@
 // between layers, and to the format's edges and centre, with the guides that show why. Kept free
 // of the editor so the maths can be tested on its own. Everything is in one page's design pixels;
 // turned layers snap by the box around them as drawn.
-import type { Rect } from './grid.ts'
+import type { Rect } from '@dazbee/schema'
+
 import type { Handle } from './transform.ts'
 
 /** How close a line has to come to snap, in screen pixels: the same reach at any zoom. */

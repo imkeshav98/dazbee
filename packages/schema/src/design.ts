@@ -1,5 +1,6 @@
 import { z } from 'zod'
 
+import { deepFreeze, isRecord } from './json.ts'
 import { canHold, LAYER_PROPS, type LayerType } from './layers.ts'
 import { migrateDesign, SCHEMA_VERSION } from './migrate.ts'
 import { Paint } from './paint.ts'
@@ -64,6 +65,7 @@ export const Format = z.object({
   height: z.number().int().positive(),
   order: FractionalIndex,
 })
+export type Format = z.infer<typeof Format>
 
 /**
  * Sizes a format may take when added or resized (#38): 1:3 to 3:1, a short side of at least
@@ -132,6 +134,7 @@ export const Page = z.object({
   /** Paints behind every layer on the page. */
   fills: Paint.array().default([]),
 })
+export type Page = z.infer<typeof Page>
 
 export const DesignMeta = z.object({
   schemaVersion: z.literal(SCHEMA_VERSION),
@@ -140,12 +143,18 @@ export const DesignMeta = z.object({
   kind: z.enum(['single', 'carousel', 'story', 'document']),
   primaryFormatId: FormatId,
 })
+export type DesignMeta = z.infer<typeof DesignMeta>
 
 /** Spike scopes: only `format:<id>`. Variant and page scopes arrive with variants and masters. */
 const FORMAT_SCOPE = /^format:([\w-]+)$/
 /** The format a `format:<id>` scope names, or undefined for any other string. */
 export const formatIdOf = (scope: string) => scope.match(FORMAT_SCOPE)?.[1]
 export const Scope = z.string().refine((s) => formatIdOf(s) !== undefined, 'the spike only supports format:<id> scopes')
+export type Scope = z.infer<typeof Scope>
+
+/** Where an edit lands: the base, or one format's overrides. */
+export const AnyScope = z.union([z.literal('base'), Scope]).default('base')
+export type AnyScope = z.infer<typeof AnyScope>
 
 /** overrides[scope][nodeId][propertyPath] = value. Any property can be overridden per format. */
 const Overrides = z.record(Scope, z.record(NodeId, z.record(z.string(), z.unknown())))
@@ -292,6 +301,9 @@ export type DesignInput = z.input<typeof Design>
 
 export type ParseResult = { success: true; design: Design } | { success: false; errors: string[] }
 
+/** The scope that holds one format's overrides, the one formatIdOf reads back. */
+export const formatScope = (formatId: string): `format:${string}` => `format:${formatId}`
+
 /**
  * Validates untrusted JSON as a design, first bringing one saved at an older schema version up
  * to this one (see migrate.ts). Errors read `path: message`.
@@ -305,16 +317,6 @@ export function parseDesign(input: unknown): ParseResult {
   }
 }
 
-/** Freezes an object and everything inside it, so a cached result can be shared safely. */
-function deepFreeze<T>(value: T): T {
-  if (typeof value === 'object' && value !== null && !Object.isFrozen(value)) {
-    Object.freeze(value)
-    for (const inner of Object.values(value)) deepFreeze(inner)
-  }
-  return value
-}
-
-const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v)
 /** Validated layers by the object they came from; a validated layer maps to itself. */
 const layerCache = new WeakMap<object, Layer>()
 const validIds = new Set<string>()

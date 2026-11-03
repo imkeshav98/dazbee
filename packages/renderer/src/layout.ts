@@ -3,9 +3,10 @@
 // sizing each one fixed, hugging what it holds or filling the room left; children marked
 // `absolute` stay where they are put. Boxes stay in page space and unturned: a turned frame turns
 // its laid-out children about its centre when drawn, as it does any child.
+import type { AutoLayout, TextProps } from '@dazbee/schema'
+
 import type { SceneLayer } from './scene.ts'
 
-type TextProps = Extract<SceneLayer, { type: 'text' }>['props']
 type FrameLayer = Extract<SceneLayer, { type: 'frame' }>
 type Size = { width: number; height: number }
 type Sizing = 'fixed' | 'hug' | 'fill'
@@ -27,9 +28,7 @@ export function sizingOf(layer: SceneLayer): { width: Sizing; height: Sizing } {
   return { width: 'fixed', height: 'fixed' }
 }
 
-const hasLayout = (
-  layer: SceneLayer,
-): layer is FrameLayer & { props: { layout: NonNullable<FrameLayer['props']['layout']> } } =>
+const hasLayout = (layer: SceneLayer): layer is FrameLayer & { props: { layout: AutoLayout } } =>
   layer.type === 'frame' && layer.props.layout !== undefined
 
 /** Moves a layer and everything inside it. */
@@ -114,7 +113,7 @@ interface Item {
  * children; absolute children are only laid out inside.
  */
 function solveFrame(
-  frame: FrameLayer & { props: { layout: NonNullable<FrameLayer['props']['layout']> } },
+  frame: FrameLayer & { props: { layout: AutoLayout } },
   given: Partial<Size>,
   measure?: MeasureText,
 ): SceneLayer {

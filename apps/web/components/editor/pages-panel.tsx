@@ -9,7 +9,7 @@ import { FilesIcon, PlusIcon } from '@phosphor-icons/react'
 import { type CSSProperties, type ReactNode, useEffect, useLayoutEffect, useRef, useState } from 'react'
 
 import type { Editor } from '@dazbee/editor'
-import type { Design } from '@dazbee/schema'
+import { type Design, inOrder } from '@dazbee/schema'
 
 import { cn } from '@/lib/cn.ts'
 import { useMessages } from '@/lib/i18n/client.tsx'
@@ -23,11 +23,6 @@ import { setOpen, useEditState } from './edit-store.ts'
 import { useEditorDesign } from './formats-panel.tsx'
 import { BackgroundBody } from './selection-cards.tsx'
 import { DROP_LINE, FOCUS_RING, PANEL_BUTTON } from './styles.ts'
-
-export const orderedPages = (design: Design) =>
-  Object.entries(design.pages).sort(([a, x], [b, y]) =>
-    x.order < y.order ? -1 : x.order > y.order ? 1 : a < b ? -1 : 1,
-  )
 
 /** The page last brought into view, from the Pages panel or by picking it on the stage. */
 const shownPage = valueStore<string | null>(null)
@@ -52,7 +47,7 @@ export function usePickedPage(editor: Editor) {
 /** The page in view: the one last shown or picked while it is still there, else the first. */
 function useCurrentPage(design: Design) {
   const shown = useValue(shownPage)
-  return shown && design.pages[shown] ? shown : (orderedPages(design)[0]?.[0] ?? null)
+  return shown && design.pages[shown] ? shown : (inOrder(design.pages)[0]?.[0] ?? null)
 }
 
 /** Each page's picture in the primary format, drawn once the stage settles and again once its fonts and images arrive. */
@@ -94,7 +89,7 @@ function LivePages({ editor }: { editor: Editor }) {
   const { design } = useEditorDesign(editor)
   usePickedPage(editor)
   const current = useCurrentPage(design)
-  const pages = orderedPages(design)
+  const pages = inOrder(design.pages)
   const counts = { n: Math.max(1, pages.findIndex(([id]) => id === current) + 1), total: pages.length }
   return (
     <PagesFrame label={format(t.editor.pages.buttonLabel, counts)}>
@@ -185,7 +180,7 @@ function PageList({ editor, onRemoved }: { editor: Editor; onRemoved: (message: 
   const t = useMessages()
   const g = t.editor.pages
   const { design } = useEditorDesign(editor)
-  const pages = orderedPages(design)
+  const pages = inOrder(design.pages)
   const current = useCurrentPage(design)
   const [renaming, setRenaming] = useState<string | null>(null)
   // The page being dragged, and the page it would land before (null for the end).

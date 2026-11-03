@@ -8,7 +8,7 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
-import type { DesignInput } from '@dazbee/schema'
+import { type DesignInput, inOrder } from '@dazbee/schema'
 
 import { photo, upload } from '../support/assets.ts'
 import { designOf, openTabs, placed, reloads, settle, writeOutput } from '../support/editor.ts'
@@ -235,7 +235,6 @@ type Doc = {
 const doc = async (page: Page) => JSON.parse(await designOf(page)) as Doc
 /** A layer's props as the Square format shows them. */
 const props = async (page: Page, id: string) => placed(await doc(page), id, 'sq') as Props
-const byOrder = <T extends { order: string }>(a: T, b: T) => (a.order < b.order ? -1 : 1)
 const style = async (page: Page, id: string) => (await props(page, id)).style ?? {}
 const boxOf = async (page: Page, id: string) => {
   const p = await props(page, id)
@@ -2375,10 +2374,7 @@ test.describe('nothing selected', () => {
     await expect.soft((await menu(row, 'Reel')).getByRole('button', { name: 'Remove format' })).toBeDisabled()
     await page.keyboard.press('Escape')
     // The order of formats is the order of the list, not of the picture.
-    const order = async () =>
-      Object.entries((await doc(page)).formats)
-        .sort(([, a], [, b]) => byOrder(a, b))
-        .map(([id]) => id)
+    const order = async () => inOrder((await doc(page)).formats).map(([id]) => id)
     await step(
       page,
       async () => (await menu(row, 'Reel')).getByRole('button', { name: 'Move up' }).click(),
@@ -2452,10 +2448,7 @@ test.describe('nothing selected', () => {
         await page.keyboard.press('Escape')
         return on
       }
-      const names = async () =>
-        Object.values((await doc(page)).pages)
-          .sort(byOrder)
-          .map((p) => p.name)
+      const names = async () => inOrder((await doc(page)).pages).map(([, p]) => p.name)
       const idOf = async (name: string) => Object.entries((await doc(page)).pages).find(([, p]) => p.name === name)?.[0]
       /** The pages of the stage's rows, top to bottom. */
       const rows = () =>

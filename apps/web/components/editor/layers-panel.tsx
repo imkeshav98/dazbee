@@ -33,9 +33,9 @@ import {
   useState,
 } from 'react'
 
-import { childrenOf } from '@dazbee/doc'
+import { ancestorsOf, childrenOf } from '@dazbee/doc'
 import type { Editor } from '@dazbee/editor'
-import { canHold, type Design, LOCK_FLAGS } from '@dazbee/schema'
+import { canHold, type Design, formatScope, inOrder, LOCK_FLAGS } from '@dazbee/schema'
 
 import { useOverlayScroll } from '@/components/ui/overlay-scroll.ts'
 import { cn } from '@/lib/cn.ts'
@@ -65,9 +65,6 @@ interface Row {
   siblings: number
 }
 type Where = 'above' | 'below' | 'into'
-
-const ordered = <T extends { order: string }>(items: Record<string, T>) =>
-  Object.entries(items).sort(([a, x], [b, y]) => (x.order < y.order ? -1 : x.order > y.order ? 1 : a < b ? -1 : 1))
 
 /** The page's layers as rows, topmost first, with the children of expanded layers under them. */
 function rowsOf(design: Design, pageId: string, expanded: ReadonlySet<string>) {
@@ -186,7 +183,7 @@ export function LayersPanel({ editor }: { editor: Editor }) {
 
   // The frame the panel shows: the selection's, or the first page in the primary format.
   const [framePage, frameFormat] = selection.frame?.split('/') ?? []
-  const pageId = framePage && design.pages[framePage] ? framePage : (ordered(design.pages)[0]?.[0] ?? '')
+  const pageId = framePage && design.pages[framePage] ? framePage : (inOrder(design.pages)[0]?.[0] ?? '')
   const formatId = frameFormat && design.formats[frameFormat] ? frameFormat : design.meta.primaryFormatId
   const page = design.pages[pageId]
   // The title row's note says which frame the tree is of, as in the mock: "Page 1 · Square".
@@ -197,7 +194,7 @@ export function LayersPanel({ editor }: { editor: Editor }) {
   useEffect(() => {
     const open = new Set<string>()
     for (const id of selection.ids) {
-      for (let up = design.nodes[id]?.parentId; up && design.nodes[up]; up = design.nodes[up]?.parentId) open.add(up)
+      for (const up of ancestorsOf(design, design.nodes[id]?.parentId ?? '')) open.add(up)
     }
     if ([...open].some((id) => !expanded.has(id))) setExpanded(new Set([...expanded, ...open]))
   }, [selection.ids, design, version, expanded])
@@ -387,7 +384,7 @@ export function LayersPanel({ editor }: { editor: Editor }) {
   /** A layer's place in the list as the document has it now, with the groups it is in open: where a move took it. */
   const placeOf = (id: string) => {
     const open = new Set(expanded)
-    for (let up = design.nodes[id]?.parentId; up && design.nodes[up]; up = design.nodes[up]?.parentId) open.add(up)
+    for (const up of ancestorsOf(design, design.nodes[id]?.parentId ?? '')) open.add(up)
     const at = rowsOf(design, pageId, open).findIndex((r) => r.id === id)
     return at < 0 ? undefined : at
   }
@@ -508,7 +505,7 @@ export function LayersPanel({ editor }: { editor: Editor }) {
   /** Hidden in some formats and shown in others. */
   const partlyHidden = (id: string) => {
     const visible = Object.keys(design.formats).map(
-      (f) => (design.overrides[`format:${f}`]?.[id]?.visible ?? design.nodes[id]?.props.visible) !== false,
+      (f) => (design.overrides[formatScope(f)]?.[id]?.visible ?? design.nodes[id]?.props.visible) !== false,
     )
     return visible.some(Boolean) && !visible.every(Boolean)
   }
@@ -557,7 +554,9 @@ export function LayersPanel({ editor }: { editor: Editor }) {
                 focusable={row.id === current}
                 renaming={renaming === row.id}
                 open={expanded.has(row.id)}
-                hidden={(design.overrides[`format:${formatId}`]?.[row.id]?.visible ?? row.node.props.visible) === false}
+                hidden={
+                  (design.overrides[formatScope(formatId)]?.[row.id]?.visible ?? row.node.props.visible) === false
+                }
                 partlyHidden={partlyHidden(row.id)}
                 drop={drop?.id === row.id ? drop.where : null}
                 picture={pictures[row.id] ?? null}

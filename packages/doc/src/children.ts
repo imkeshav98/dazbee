@@ -1,10 +1,7 @@
-import type { Design, Layer } from '@dazbee/schema'
+import { byCodeUnits, type Design, type Layer } from '@dazbee/schema'
 
 /** The ids of the layers directly under a page or layer, back to front. */
 export type ChildIndex = (parentId: string) => readonly string[]
-
-/** Code-unit order, the same on every device (unlike localeCompare) and the order fractional indexes use. */
-const byCodeUnits = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0)
 
 /** Ties in index break by id, the same on every device. */
 export const siblingOrder = (nodes: Readonly<Record<string, Layer>> | ReadonlyMap<string, Layer>) => {
@@ -42,4 +39,21 @@ export function childrenOf(design: Design, parentId: string): [string, Layer][] 
     indexes.set(design.nodes, index)
   }
   return index(parentId).map((id) => [id, design.nodes[id] as Layer])
+}
+
+/** Every layer under a page or layer, parents before children. */
+export function descendants(design: Design, parentId: string): string[] {
+  return childrenOf(design, parentId).flatMap(([id]) => [id, ...descendants(design, id)])
+}
+
+/** The layers a layer sits in, its own parent first, up to the page. */
+export const ancestorsOf = (design: Design, parentId: string): string[] => {
+  const out: string[] = []
+  for (let up: string | undefined = parentId; up && design.nodes[up]; up = design.nodes[up]?.parentId) out.push(up)
+  return out
+}
+
+export const isInside = (design: Design, id: string, maybeAncestor: string) => {
+  for (let up: string | undefined = id; up; up = design.nodes[up]?.parentId) if (up === maybeAncestor) return true
+  return false
 }

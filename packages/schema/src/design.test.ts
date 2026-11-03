@@ -1,14 +1,18 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  AnyScope,
   fontFamilies,
   FORMAT_PRESETS,
   FORMAT_SHAPES,
+  formatIdOf,
+  formatScope,
   formatSizeProblem,
   imageAssetIds,
   parseDesign,
   parseDesignIncrementally,
   SCHEMA_VERSION,
+  Scope,
   shapeOf,
 } from './index.ts'
 
@@ -352,5 +356,29 @@ describe('format sizes', () => {
     expect(formatSizeProblem(320, 50)).toMatch(/short side/)
     expect(formatSizeProblem(8001, 8000)).toMatch(/at most 8000/)
     expect(formatSizeProblem(100.5, 200)).toMatch(/whole number/)
+  })
+})
+
+describe('Scope', () => {
+  it('takes only format scopes', () => {
+    expect(Scope.safeParse('format:sq').success).toBe(true)
+    expect(Scope.safeParse('base').success).toBe(false)
+  })
+})
+
+describe('AnyScope', () => {
+  it('takes the base and format scopes, and defaults to the base', () => {
+    expect(AnyScope.parse('format:sq')).toBe('format:sq')
+    expect(AnyScope.parse('base')).toBe('base')
+    expect(AnyScope.parse(undefined)).toBe('base')
+    expect(AnyScope.safeParse('page:p1').success).toBe(false)
+    expect(AnyScope.safeParse('format:').success).toBe(false)
+  })
+})
+
+describe('formatScope', () => {
+  it('names the scope of a format, which formatIdOf reads back', () => {
+    expect(formatScope('sq')).toBe('format:sq')
+    expect(formatIdOf(formatScope('sq'))).toBe('sq')
   })
 })

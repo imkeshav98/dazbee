@@ -13,5 +13,6 @@ export {
 export { type Camera, type Insets } from './camera.ts'
 export { SHAPE_TOOLS, withImage, type DrawTool, type ShapeTool } from './draw-tools.ts'
 export { type Frame } from './grid.ts'
-export { hitTest, type Point } from './hit-test.ts'
+export { hitTest } from './hit-test.ts'
+export type { Point } from '@dazbee/schema'
 export { pressFor, SHORTCUTS, shortcutFor, type ShortcutAction } from './shortcuts.ts'

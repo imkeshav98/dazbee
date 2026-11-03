@@ -9,7 +9,7 @@ import { type KeyboardEvent, type ReactNode, useCallback, useEffect, useId, useM
 
 import type { Editor } from '@dazbee/editor'
 import { FONT_FACES } from '@dazbee/fonts'
-import { type Design, FontFace, FontFamily } from '@dazbee/schema'
+import { type Design, FontFace, FontFamily, formatScope } from '@dazbee/schema'
 
 import { useOverlayScroll } from '@/components/ui/overlay-scroll.ts'
 import { Select } from '@/components/ui/select.tsx'
@@ -80,7 +80,7 @@ function selectedFont(design: Design, ids: string[], formatId: string) {
   if (texts.length === 0) return null
   const sizes = texts.map(
     ({ id, style }) =>
-      (design.overrides[`format:${formatId}`]?.[id]?.style as Partial<typeof style> | undefined)?.fontSize ??
+      (design.overrides[formatScope(formatId)]?.[id]?.style as Partial<typeof style> | undefined)?.fontSize ??
       style.fontSize,
   )
   return {

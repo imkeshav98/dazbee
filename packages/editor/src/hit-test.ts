@@ -1,9 +1,5 @@
 import type { SceneLayer } from '@dazbee/renderer'
-
-export interface Point {
-  x: number
-  y: number
-}
+import type { Point } from '@dazbee/schema'
 
 /** The point as seen from inside a layer: un-rotated about the layer's centre. */
 function unrotate(p: Point, layer: SceneLayer): Point {

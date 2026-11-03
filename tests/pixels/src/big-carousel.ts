@@ -1,4 +1,4 @@
-import type { DesignInput } from '@dazbee/schema'
+import { type DesignInput, formatScope } from '@dazbee/schema'
 
 /** The five formats a carousel campaign typically ships in, primary first. */
 const FORMATS = {
@@ -135,7 +135,7 @@ export function bigCarousel(cards = 20): DesignInput {
       if (formatId === 'sq') continue
       const sx = f.width / 1080
       const sy = f.height / 1080
-      const scoped = (overrides[`format:${formatId}`] ??= {})
+      const scoped = (overrides[formatScope(formatId)] ??= {})
       for (const [id, node] of Object.entries(layers)) {
         const { x, y, width, height } = node.props as { x: number; y: number; width: number; height: number }
         scoped[`${p}-${id}`] = {
