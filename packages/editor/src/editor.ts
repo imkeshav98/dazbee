@@ -5,7 +5,8 @@ import { HocuspocusProvider, WebSocketStatus } from '@hocuspocus/provider'
 import { anchorOffset, childrenOf, CommandError, openSession, readDesign, textAnchor, type Session, type TextAnchor } from '@dazbee/doc'
 import { FALLBACK_FAMILIES, FONT_FACES } from '@dazbee/fonts'
 import {
-  caretAt, caretPosition, drawPage, layerPictures, paragraphCache, selectionBoxes, render, renderDesign, resourceCache, sceneMemo, textMeasure, type MeasureText, type ResourceCache, type Resources, type Scene, type SceneLayer,
+  caretAt, caretPosition, drawPage, layerPictures, paragraphCache, selectionBoxes, render, renderDesign, resourceCache, sceneMemo, scaleText, smallestSize, textMeasure,
+  type MeasureText, type ResourceCache, type Resources, type ScaledText, type Scene, type SceneLayer,
 } from '@dazbee/renderer'
 import {
   boundFillIndex, canBind, canHold, fontFamilies, imageAssetIds, isContainer, LAYER_CLIPBOARD_TYPE, LayerClipboard, LOCK_FLAGS, pathScale, SCHEMA_VERSION, type BindingTarget, type Design, type ExportRequestInput, type Layer, type LayerTree, type Paint, type Variables, type VariableRef,
@@ -617,6 +618,17 @@ function live(
   /** Whether the selection is locked in place: it shows no handles and a press can't move it. */
   const lockedSelection = () => Boolean(selection?.ids.some((id) => design.nodes[id]?.lock?.move))
   /**
+   * The handles the selection has: none while it is locked in place; one text that grows with its
+   * words has no top or bottom ones, since only a fixed box has a height of its own.
+   */
+  function handlesFor(): readonly Handle[] {
+    const frame = frameOf(selection?.frame)
+    if (!selection || !frame || lockedSelection()) return []
+    const [only] = selection.ids
+    if (selection.ids.length === 1 && only && design.nodes[only]?.type === 'text' && propIn(frame, only, 'boxMode', design) !== 'fixed') return HANDLES.filter((h) => h !== 'n' && h !== 's')
+    return HANDLES
+  }
+  /**
    * The locked in place layer a press at `p` lands on, the one a click would select: the topmost
    * layer there, as a click picks it, when that one is locked. A click selects it, so its lock can
    * be undone; a drag from it draws a marquee and moves nothing, it or what lies beneath.
@@ -981,8 +993,8 @@ function live(
     el.dataset.count = String(selection.ids.length)
     if (!several) el.dataset.layer = selection.ids[0]
     // Handles only once the box is big enough on screen to grab them apart, and not on a locked one.
-    if (!editing && !lockedSelection() && Math.min(box.width, box.height) * camera.zoom >= 2 * HANDLE_SIZE) {
-      for (const h of HANDLES) {
+    if (!editing && Math.min(box.width, box.height) * camera.zoom >= 2 * HANDLE_SIZE) {
+      for (const h of handlesFor()) {
         const handle = document.createElement('div')
         handle.className = 'handle'
         handle.dataset.handle = h
@@ -997,6 +1009,10 @@ function live(
       const size = document.createElement('div')
       size.className = 'selection-size'
       size.textContent = `${round(box.width, 0)} × ${round(box.height, 0)}`
+      // A corner scaling one text says its size too, from where it was.
+      const g = gesture?.kind === 'resize' ? gesture : null
+      const text = g && !several ? g.texts.get(selection.ids[0] ?? '') : undefined
+      if (g && text) size.textContent += ` · ${text.style.fontSize} → ${scaleText(text, g.factor).style.fontSize}`
       const top = sizeLabelTop(corners.map((c) => c.y))
       Object.assign(size.style, { left: px((Math.min(...corners.map((c) => c.x)) + Math.max(...corners.map((c) => c.x))) / 2), top: px(top) })
       parts.push(size)
@@ -1443,7 +1459,11 @@ function live(
   /** What a drag on the stage is doing, from pointer down to up. */
   type Gesture =
     | { kind: 'move'; frame: Frame; around: Box[]; from: Point; roots: string[]; boxes: Map<string, Box>; targets: Targets | null; end: () => void }
-    | { kind: 'resize'; frame: Frame; around: Box[]; handle: Handle; outer: Box; grab: Point; roots: string[]; boxes: Map<string, Box>; targets: Targets | null; switched: boolean; end: () => void }
+    | {
+      kind: 'resize'; frame: Frame; around: Box[]; handle: Handle; outer: Box; grab: Point; roots: string[]; boxes: Map<string, Box>; targets: Targets | null; switched: boolean
+      /** The text a corner scales, with its sizes in the frame as the drag began; how much, and the least it may. */
+      texts: Map<string, ScaledText>; factor: number; floor: number; end: () => void
+    }
     | {
       kind: 'reorder'; frame: Frame; around: Box[]; parentId: string; roots: string[]; boxes: Map<string, Box>; from: Point; to: Point
       moved: boolean; slot: number; near: { id: string; after: boolean } | null; outside: boolean; end: () => void
@@ -1608,19 +1628,36 @@ function live(
     const at = handleAt(g.handle)
     const handle = turn({ x: g.outer.x + at.x * g.outer.width, y: g.outer.y + at.y * g.outer.height }, centreOf(g.outer), g.outer.rotation)
     const to = { x: handle.x + p.x - g.grab.x, y: handle.y + p.y - g.grab.y }
-    let outer = resizeBox(g.outer, g.handle, to, { keepRatio, fromCentre })
+    // A corner that scales text keeps the box's shape, so the text scales as one.
+    const scales = g.texts.size > 0
+    const ratio = keepRatio || scales
+    let outer = resizeBox(g.outer, g.handle, to, { keepRatio: ratio, fromCentre })
     snapped = null
-    // The dragged edges snap; a turned box has none that run along the page.
+    // The dragged edges snap; a turned box has none that run along the page. With the shape kept,
+    // the edge nearest a guide snaps and the other follows.
     if (snap && g.targets && outer.rotation === 0) {
-      const s = snapResize(outer, g.handle, g.targets, SNAP_DISTANCE / camera.zoom)
-      if (s.dx !== 0 || s.dy !== 0) outer = resizeBox(g.outer, g.handle, { x: to.x + s.dx, y: to.y + s.dy }, { keepRatio, fromCentre })
+      const corner = g.handle.length === 2
+      const s = snapResize(outer, g.handle, g.targets, SNAP_DISTANCE / camera.zoom, ratio && corner)
+      if (ratio && corner && (s.dx !== 0 || s.dy !== 0)) {
+        const factor = s.dx !== 0
+          ? (outer.width + (g.handle.includes('e') ? s.dx : -s.dx)) / g.outer.width
+          : (outer.height + (g.handle.includes('s') ? s.dy : -s.dy)) / g.outer.height
+        outer = boxAt(g, factor, fromCentre)
+      } else if (s.dx !== 0 || s.dy !== 0) outer = resizeBox(g.outer, g.handle, { x: to.x + s.dx, y: to.y + s.dy }, { keepRatio: ratio, fromCentre })
       snapped = { frame: g.frame, guides: s.guides, gaps: [] }
+    }
+    if (scales) {
+      g.factor = g.outer.width > 0 ? outer.width / g.outer.width : outer.height / g.outer.height
+      if (g.factor < g.floor) {
+        g.factor = g.floor
+        outer = boxAt(g, g.factor, fromCentre)
+      }
     }
     const next = new Map<string, Box>()
     const now = session.design()
     if (!g.switched) {
       g.switched = true
-      switchSizing(g.frame, g.roots, g.handle, now)
+      switchSizing(g.frame, g.roots, g.handle, now, g.texts)
     }
     for (const root of g.roots) {
       const was = g.boxes.get(root)
@@ -1646,8 +1683,58 @@ function live(
       }
     }
     writeBoxes(g.frame, g.boxes, new Map([...next].map(([id, b]) => [id, { ...b, x: round(b.x), y: round(b.y), width: round(b.width), height: round(b.height) }])))
-    // Text that grows with its words takes the height its new width gives it.
-    for (const root of g.roots) if (now.nodes[root]?.type === 'text') fitText(root, g.frame.formatId)
+    // The text a corner scales takes its sizes scaled from where they were, in this format.
+    for (const [id, start] of g.texts) {
+      const sized = scaleText(start, g.factor)
+      const patch: Record<string, unknown> = { style: sized.style }
+      if (start.runs.length > 0) patch.runs = sized.runs
+      if (sized.paragraphSpacing !== undefined) patch.paragraphSpacing = sized.paragraphSpacing
+      if (sized.shrinkToFit) patch.shrinkToFit = sized.shrinkToFit
+      runQuietly(() => session.run('node.update', { ids: [id], scope: scope(g.frame), patch }))
+    }
+    // Text that grows with its words takes the size its new width and sizes give it.
+    for (const id of new Set([...g.roots.filter((root) => now.nodes[root]?.type === 'text'), ...g.texts.keys()])) fitText(id, g.frame.formatId)
+  }
+
+  /**
+   * The text a corner drag on `roots` scales, with its sizes in the frame now: each text whose box
+   * scales with the drag, selected itself or in a group, not one in a frame, which keeps what it
+   * holds as it is. A text whose style is locked isn't scaled.
+   */
+  function scalingTexts(frame: Frame, roots: string[], handle: Handle): Map<string, ScaledText> {
+    const texts = new Map<string, ScaledText>()
+    if (handle.length !== 2) return texts
+    const now = session.design()
+    const add = (id: string) => {
+      const node = now.nodes[id]
+      if (node?.type !== 'text' || node.lock?.style) return
+      const props = { ...node.props, ...now.overrides[scope(frame)]?.[id] } as typeof node.props
+      texts.set(id, {
+        style: props.style,
+        runs: props.runs,
+        ...(props.paragraphSpacing === undefined ? {} : { paragraphSpacing: props.paragraphSpacing }),
+        ...(props.shrinkToFit ? { shrinkToFit: props.shrinkToFit } : {}),
+      })
+    }
+    for (const root of roots) {
+      const type = now.nodes[root]?.type
+      if (type === 'text') add(root)
+      else if (type === 'group' || type === 'boolean') for (const id of under(root, now)) add(id)
+    }
+    return texts
+  }
+
+  /** The box a resize from `g` gives at `factor` of its size, its shape kept: about the opposite corner, or the centre. */
+  function boxAt(g: Extract<Gesture, { kind: 'resize' }>, factor: number, fromCentre: boolean): Box {
+    const { outer } = g
+    const at = handleAt(g.handle)
+    const width = outer.width * factor
+    const height = outer.height * factor
+    const anchor = fromCentre ? centreOf(outer) : { x: outer.x + (1 - at.x) * outer.width, y: outer.y + (1 - at.y) * outer.height }
+    const left = fromCentre ? anchor.x - width / 2 : at.x === 1 ? anchor.x : anchor.x - width
+    const top = fromCentre ? anchor.y - height / 2 : at.y === 1 ? anchor.y : anchor.y - height
+    const centre = turn({ x: left + width / 2, y: top + height / 2 }, centreOf(outer), outer.rotation)
+    return { x: centre.x - width / 2, y: centre.y - height / 2, width, height, rotation: outer.rotation }
   }
 
   /**
@@ -1664,9 +1751,10 @@ function live(
   /**
    * At the start of a resize, the axes it drags stop following their content, as in Figma: an auto
    * layout frame or a layer in a flow becomes fixed there (from hug or fill), and text that grows
-   * with its words gets a fixed box there, wrapping inside a width given to it.
+   * with its words gets a fixed box there, wrapping inside a width given to it, unless a corner
+   * scales it.
    */
-  function switchSizing(frame: Frame, ids: string[], handle: Handle, from: Design) {
+  function switchSizing(frame: Frame, ids: string[], handle: Handle, from: Design, scaled: Map<string, unknown>) {
     const across = handle.includes('e') || handle.includes('w')
     const down = handle.includes('n') || handle.includes('s')
     for (const id of ids) {
@@ -1674,7 +1762,8 @@ function live(
       if (!node) continue
       const patch: Record<string, unknown> = {}
       const boxMode = propIn(frame, id, 'boxMode', from)
-      if (node.type === 'text' && boxMode !== 'fixed') {
+      // Text a corner scales keeps its box mode: it grows with its words still.
+      if (node.type === 'text' && boxMode !== 'fixed' && !scaled.has(id)) {
         const next = down ? 'fixed' : boxMode === 'autoWidth' && across ? 'autoHeight' : boxMode
         if (next !== boxMode) patch.boxMode = next
       }
@@ -1853,7 +1942,7 @@ function live(
     const c = centreOf(box)
     const dist = (p: Point) => Math.hypot(p.x - screen.x, p.y - screen.y)
     if (Math.min(box.width, box.height) * camera.zoom >= 2 * HANDLE_SIZE) {
-      for (const handle of HANDLES) {
+      for (const handle of handlesFor()) {
         const at = handleAt(handle)
         if (dist(onScreen(turn({ x: box.x + at.x * box.width, y: box.y + at.y * box.height }, c, box.rotation))) <= HANDLE_REACH) return { kind: 'resize', handle }
       }
@@ -1954,7 +2043,12 @@ function live(
       const world = toWorld(camera, screen)
       const { around } = outer
       const grab = localTo({ x: world.x - outer.frame.x, y: world.y - outer.frame.y }, around)
-      if (grabbed.kind === 'resize') gesture = { kind: 'resize', frame: outer.frame, around, handle: grabbed.handle, outer: outer.box, grab, roots: ids, boxes, targets: targetsFor(outer.frame, ids, around), switched: false, end }
+      if (grabbed.kind === 'resize') {
+        const texts = scalingTexts(outer.frame, ids, grabbed.handle)
+        // Scaled down, the smallest size anywhere in the text stops at 1 px.
+        const floor = Math.max(0, ...[...texts.values()].map((t) => 1 / smallestSize(t)))
+        gesture = { kind: 'resize', frame: outer.frame, around, handle: grabbed.handle, outer: outer.box, grab, roots: ids, boxes, targets: targetsFor(outer.frame, ids, around), switched: false, texts, factor: 1, floor, end }
+      }
       else gesture = { kind: 'rotate', frame: outer.frame, around, outer: outer.box, from: angleOf(grab, centreOf(outer.box)), roots: ids, boxes, end }
       drawOverlay()
       return

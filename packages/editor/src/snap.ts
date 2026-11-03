@@ -144,20 +144,32 @@ export function snapMove(moving: Rect, targets: Targets, reach: number, still: {
 
 /**
  * Snaps the edges a resize handle moves: the offset to add to the pointer on each axis, and the
- * guides. Only the dragged edges snap; the others stay where the resize puts them.
+ * guides. Only the dragged edges snap; the others stay where the resize puts them. With
+ * `keepRatio` a corner snaps one edge only, the one nearer its guide, and the other follows it.
  */
-export function snapResize(box: Rect, handle: Handle, targets: Targets, reach: number): Snapped {
+export function snapResize(box: Rect, handle: Handle, targets: Targets, reach: number, keepRatio = false): Snapped {
   const edge = (axis: Axis, low: string, high: string) => {
     const moves = handle.includes(high) ? endOf(box, axis) : handle.includes(low) ? startOf(box, axis) : null
     return moves === null ? 0 : nearestLine([moves], axis === 'x' ? targets.xs : targets.ys, reach) ?? 0
   }
-  const dx = edge('x', 'w', 'e')
-  const dy = edge('y', 'n', 's')
+  let dx = edge('x', 'w', 'e')
+  let dy = edge('y', 'n', 's')
+  if (keepRatio && dx !== 0 && dy !== 0) {
+    if (Math.abs(dx) <= Math.abs(dy)) dy = 0
+    else dx = 0
+  }
+  let width = box.width + (handle.includes('e') ? dx : handle.includes('w') ? -dx : 0)
+  let height = box.height + (handle.includes('s') ? dy : handle.includes('n') ? -dy : 0)
+  // The side that follows grows by the same factor, from the corner opposite the handle.
+  if (keepRatio && box.width > 0 && box.height > 0) {
+    if (dx !== 0) height = (box.height * width) / box.width
+    else if (dy !== 0) width = (box.width * height) / box.height
+  }
   const after: Rect = {
-    x: handle.includes('w') ? box.x + dx : box.x,
-    y: handle.includes('n') ? box.y + dy : box.y,
-    width: box.width + (handle.includes('e') ? dx : handle.includes('w') ? -dx : 0),
-    height: box.height + (handle.includes('s') ? dy : handle.includes('n') ? -dy : 0),
+    x: handle.includes('w') ? box.x + box.width - width : box.x,
+    y: handle.includes('n') ? box.y + box.height - height : box.y,
+    width,
+    height,
   }
   const only = (guides: Guide[], axis: Axis, edges: number[]) => guides.filter((g) => g.axis !== axis || edges.some((e) => Math.abs(e - g.at) < EXACT))
   let guides = [...guidesFor(after, targets, 'x'), ...guidesFor(after, targets, 'y')]

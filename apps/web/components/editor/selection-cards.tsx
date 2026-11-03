@@ -91,7 +91,11 @@ function PlaceCard({ target, p, title, children }: { target: Target; p: P; title
   const placing = useMessages().editor.bar.placing
   const [keepRatio, setKeepRatio] = useState(false)
   const sized = target.types.every((type) => type !== 'group' && type !== 'boolean')
-  const resize = (now: Props, axis: 'width' | 'height', to: number) => sizeTo({ width: num(now, 'width'), height: num(now, 'height') }, axis, to, keepRatio)
+  const resize = (now: Props, axis: 'width' | 'height', to: number): Patch => {
+    const size = sizeTo({ width: num(now, 'width'), height: num(now, 'height') }, axis, to, keepRatio)
+    // Text given a height of its own gets a fixed box: an auto one would grow back to its words.
+    return 'boxMode' in now && now.boxMode !== 'fixed' && size.height !== num(now, 'height') ? { ...size, boxMode: 'fixed' } : size
+  }
   const sides = [
     { key: 'width', label: p.width, name: p.widthName },
     { key: 'height', label: p.height, name: p.heightName },
