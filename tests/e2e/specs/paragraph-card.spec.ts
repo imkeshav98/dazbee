@@ -87,3 +87,29 @@ test('the Text box card sets the box, lines and fit; the bar sets lists, decorat
   await expect.poll(async () => (await copy(page)).style.outline).toEqual({ width: 4, color: '#FF3D6EFF' })
   expect(errors).toEqual([])
 })
+
+test('with shrink to fit on, the size on the bar is the largest size, so the text follows it', async ({ browser }) => {
+  const { page, errors } = await openStage(browser, design())
+  await page.evaluate(() => window.dazbee?.select(['copy']))
+  await (await openCard(page, 'text-box-card')).getByRole('switch', { name: 'Shrink to fit' }).click()
+  await expect.poll(async () => (await copy(page)).shrinkToFit).toEqual({ min: 36, max: 72 })
+  await page.keyboard.press('Escape')
+  const height = () => page.evaluate(() => window.dazbee?.boxOf('copy')?.height ?? 0)
+  const before = await height()
+
+  // A smaller size draws the text smaller: the largest size comes down with it.
+  await enter(page.getByTestId('bar-size-field'), '40')
+  await expect.poll(async () => (await copy(page)).shrinkToFit).toEqual({ min: 36, max: 40 })
+  expect((await copy(page)).style.fontSize).toBe(40)
+  await expect.poll(height).toBeLessThan(before)
+  // Below the smallest, the smallest comes down too; + steps both up from there.
+  await enter(page.getByTestId('bar-size-field'), '20')
+  await expect.poll(async () => (await copy(page)).shrinkToFit).toEqual({ min: 20, max: 20 })
+  await page.getByRole('button', { name: 'Bigger' }).click()
+  await expect.poll(async () => (await copy(page)).shrinkToFit).toEqual({ min: 20, max: 21 })
+  expect((await copy(page)).style.fontSize).toBe(21)
+  // Each change is one undo step.
+  await page.evaluate(() => window.dazbee?.perform('undo'))
+  await expect.poll(async () => (await copy(page)).shrinkToFit).toEqual({ min: 20, max: 20 })
+  expect(errors).toEqual([])
+})
