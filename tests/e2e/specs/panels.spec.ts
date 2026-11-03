@@ -172,6 +172,28 @@ test.describe('found by QA', () => {
   })
 })
 
+test('Ctrl+Z and Ctrl+Shift+Z in a number field not being typed in undo and redo the design', async ({ browser }) => {
+  const asset = await upload(photo)
+  const { page, errors } = await openStage(browser, design(asset.id))
+  await select(page, ['headline'])
+  const field = (await barMenu(page, 'spacing')).getByRole('spinbutton', { name: 'Paragraph spacing' })
+  const spacing = async () => (await propsOf(page, 'headline')).paragraphSpacing ?? 0
+  await field.focus()
+  await page.keyboard.press('ArrowUp')
+  await page.keyboard.press('ArrowUp')
+  await expect.poll(spacing).toBe(2)
+  await page.keyboard.press('Control+z')
+  await expect.poll(spacing).toBe(1)
+  await expect(field).toBeFocused()
+  await page.keyboard.press('Control+Shift+z')
+  await expect.poll(spacing).toBe(2)
+  // While a value is being typed, Ctrl+Z is the field's own: it takes back what was typed.
+  await field.fill('40')
+  await page.keyboard.press('Control+z')
+  await expect.poll(spacing).toBe(2)
+  expect(errors).toEqual([])
+})
+
 test.describe('found by Keshav', () => {
   test("a pop-up opened by a click puts no number field in focus: the Shape pop-up's corners", async ({ browser }) => {
     const asset = await upload(photo)
