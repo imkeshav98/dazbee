@@ -2,7 +2,7 @@
 // free of the editor so the geometry can be tested on its own. Points are a page's design pixels.
 import type { Paint, Point } from '@dazbee/schema'
 
-import { normalAngle, round } from './transform.ts'
+import { normalAngle, round } from '../layers/transform.ts'
 
 export const SHAPE_TOOLS = ['rect', 'ellipse', 'polygon', 'star', 'line', 'arrow'] as const
 export type ShapeTool = (typeof SHAPE_TOOLS)[number]

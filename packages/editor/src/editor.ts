@@ -69,7 +69,6 @@ import {
 } from '@dazbee/schema'
 import { type Skipped, SVG_TYPE, SvgError, svgMarkup, svgToLayers } from '@dazbee/svg'
 
-import { align, type Alignment, distribute, type Distribution, type Offset } from './arrange.ts'
 import {
   type Camera,
   fit,
@@ -80,8 +79,12 @@ import {
   toWorld,
   type Viewport,
   zoomAt,
-} from './camera.ts'
-import { cornersOfRect, coverCrop, cropOf, imageRect, panned, scaled } from './crop.ts'
+} from './canvas/camera.ts'
+import { type Frame, frameAt, frameGrid, intersects } from './canvas/grid.ts'
+import { hitTest } from './canvas/hit-test.ts'
+import { rulerParts } from './canvas/rulers.ts'
+import { exportClient } from './export/export-client.ts'
+import { cornersOfRect, coverCrop, cropOf, imageRect, panned, scaled } from './gestures/crop.ts'
 import {
   clickedBox,
   drawnBox,
@@ -93,10 +96,7 @@ import {
   newText,
   type ShapeTool,
   withImage,
-} from './draw-tools.ts'
-import { exportClient } from './export-client.ts'
-import { type Frame, frameAt, frameGrid, intersects } from './grid.ts'
-import { hitTest } from './hit-test.ts'
+} from './gestures/draw-tools.ts'
 import {
   type Anchor,
   anchorOf,
@@ -117,20 +117,9 @@ import {
   segmentsOf,
   type Side,
   splitSegment,
-} from './path.ts'
-import { rulerParts } from './rulers.ts'
-import { NUDGE, NUDGE_FAR, type ShortcutAction, shortcutFor } from './shortcuts.ts'
-import { type Gap, type Guide, SNAP_DISTANCE, snapMove, snapResize, snapTargets, type Targets } from './snap.ts'
-import {
-  paragraphAt,
-  type RunStyle,
-  step,
-  stylesIn,
-  type StyleToggle,
-  type TextRange,
-  toggled,
-  wordAt,
-} from './text-edit.ts'
+} from './gestures/path.ts'
+import { align, type Alignment, distribute, type Distribution, type Offset } from './layers/arrange.ts'
+import { type Gap, type Guide, SNAP_DISTANCE, snapMove, snapResize, snapTargets, type Targets } from './layers/snap.ts'
 import {
   angleOf,
   boundsOf,
@@ -147,7 +136,18 @@ import {
   scaleWithin,
   snapAngle,
   turn,
-} from './transform.ts'
+} from './layers/transform.ts'
+import { NUDGE, NUDGE_FAR, type ShortcutAction, shortcutFor } from './shortcuts.ts'
+import {
+  paragraphAt,
+  type RunStyle,
+  step,
+  stylesIn,
+  type StyleToggle,
+  type TextRange,
+  toggled,
+  wordAt,
+} from './text/text-edit.ts'
 
 // CommonJS whose types claim an ES default export; the bundler hands over the init function itself.
 const CanvasKitInit = canvasKitModule as unknown as typeof import('@dazbee/canvaskit').default
