@@ -1,5 +1,7 @@
 'use client'
 
+// A list of fills or strokes in an edit panel: the rows the selected layers share, with + to add one
+// on top; when the layers' lists differ, a way to give them all one.
 import { type ReactNode } from 'react'
 
 import { type P, set, shared, type Target } from '@/components/editor/edit-panel/target.ts'

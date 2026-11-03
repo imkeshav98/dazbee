@@ -1,20 +1,25 @@
 'use client'
 
+// The Edit image panel of a photo: its filters, its adjustments and how much of it shows, then under
+// Advanced how it fits and every fill.
 import { withImage } from '@dazbee/editor'
 import { type ImageAdjust, ImageFilter, type Paint } from '@dazbee/schema'
 
 import { ImagePickerButton } from '@/components/editor/image-tool.tsx'
 import { assetThumbnail } from '@/components/editor/paint-stack.tsx'
-import { CHIP } from '@/components/editor/styles.ts'
+import { CHIP, PANEL_HEADING } from '@/components/editor/styles.ts'
 import { FOCUS_RING } from '@/components/ui/looks.ts'
 import { cn } from '@/lib/cn.ts'
 import { tidy } from '@/lib/editor/size.ts'
+import { useMessages } from '@/lib/i18n/client.tsx'
 import { type Messages } from '@/lib/i18n/index.ts'
 
-import { Card, clamp, NumberField, Segments } from './fields.tsx'
-import { type ImageFill, type P, set, type Target } from './target.ts'
+import { FillsCard } from './colour-panel.tsx'
+import { clamp, NumberField, PanelPart, Segments } from './fields.tsx'
+import { type ImageFill, imageFillOf, type P, type PanelProps, set, type Target } from './target.ts'
 
 const ADJUSTMENTS = ['exposure', 'contrast', 'saturation', 'temperature', 'tint'] as const
+
 /** Each filter's tile: the image's picture with a CSS look near the one the renderer draws. */
 const FILTER_LOOK: Record<ImageFilter, string> = {
   none: 'none',
@@ -35,8 +40,76 @@ const setImage = (target: Target, index: number, change: (now: ImageFill) => Par
     return { fills: fills.map((f, i) => (i === index ? { ...at, ...change(at) } : f)) }
   })
 
+/** The Edit image panel, for layers whose fill that shows is a photo: several share Replace and the filters. */
+export function ImagePanel({ target, brandId }: PanelProps) {
+  const t = useMessages()
+  const p = t.editor.props
+  const imageFill = imageFillOf(target)
+  if (!imageFill) return null
+  return (
+    <>
+      {target.ids.length > 1 ? (
+        <PhotosCard
+          target={target}
+          p={p}
+          b={t.editor.bar}
+          brandId={brandId}
+          index={imageFill.index}
+          paint={imageFill.paint}
+        />
+      ) : (
+        <PanelPart id="look-card" title={t.editor.bar.filters}>
+          <PhotoLookBody target={target} p={p} brandId={brandId} index={imageFill.index} paint={imageFill.paint} />
+        </PanelPart>
+      )}
+      <AdjustCard target={target} p={p} index={imageFill.index} paint={imageFill.paint} />
+      <FillsCard target={target} brandId={brandId} p={p} b={t.editor.bar}>
+        <span className={PANEL_HEADING}>{p.fit}</span>
+        <FitRow target={target} p={p} index={imageFill.index} paint={imageFill.paint} />
+      </FillsCard>
+    </>
+  )
+}
+
+/** Several photos with the same picture: Replace and the filters, which one photo has on its bar. */
+function PhotosCard({
+  target,
+  p,
+  b,
+  brandId,
+  index,
+  paint,
+}: {
+  target: Target
+  p: P
+  b: Messages['editor']['bar']
+  brandId: string
+  index: number
+  paint: ImageFill
+}) {
+  return (
+    <PanelPart
+      id="photos-card"
+      title={b.filters}
+      action={
+        <ImagePickerButton
+          brandId={brandId}
+          title={p.replaceImageTitle}
+          testId="replace-image"
+          className={cn(CHIP, FOCUS_RING, 'shrink-0')}
+          onPick={(asset) => set(target, (now) => ({ fills: withImage((now.fills ?? []) as Paint[], asset.id) }))}
+        >
+          <span aria-hidden>{p.replaceImage}</span>
+        </ImagePickerButton>
+      }
+    >
+      <PhotoLookBody target={target} p={p} brandId={brandId} index={index} paint={paint} />
+    </PanelPart>
+  )
+}
+
 /** The bar's Look popover for a photo: each filter as the photo with it. */
-export function PhotoLookBody({
+function PhotoLookBody({
   target,
   p,
   brandId,
@@ -79,24 +152,11 @@ export function PhotoLookBody({
   )
 }
 
-/** How the photo fits its layer, as a row under the header card's box: fill it, crop it, fit inside it, or tile it. */
-export function FitRow({ target, p, index, paint }: { target: Target; p: P; index: number; paint: ImageFill }) {
-  return (
-    <Segments
-      name={p.fit}
-      value={paint.fit}
-      options={['fill', 'crop', 'fit', 'tile'] as const}
-      labels={p.fits}
-      onSet={(fit) => setImage(target, index, () => ({ fit }))}
-    />
-  )
-}
-
 /**
  * The photo's adjustments as slider fields, one to a row, each filling from 0 either way: its light,
  * contrast, saturation, warmth and tint; then how much of the image shows.
  */
-export function AdjustCard({ target, p, index, paint }: { target: Target; p: P; index: number; paint: ImageFill }) {
+function AdjustCard({ target, p, index, paint }: { target: Target; p: P; index: number; paint: ImageFill }) {
   const setPaint = (change: (now: ImageFill) => Partial<ImageFill>) => setImage(target, index, change)
   const setAdjust = (key: keyof ImageAdjust, to: (n: number) => number) =>
     setPaint((now) => {
@@ -104,7 +164,7 @@ export function AdjustCard({ target, p, index, paint }: { target: Target; p: P; 
       return { adjust: { ...adjust, [key]: Math.round(clamp(to(adjust[key]), -100, 100)) } }
     })
   return (
-    <Card id="adjust-card" title={p.adjustTitle}>
+    <PanelPart id="adjust-card" title={p.adjustTitle}>
       <div className="grid gap-1.5">
         {ADJUSTMENTS.map((key) => (
           <NumberField
@@ -132,43 +192,19 @@ export function AdjustCard({ target, p, index, paint }: { target: Target; p: P; 
           onShift={(by) => setPaint((now) => ({ opacity: tidy(clamp(now.opacity + by, 0, 1)) }))}
         />
       </div>
-    </Card>
+    </PanelPart>
   )
 }
 
-/** Several photos with the same picture: Replace and the filters, which one photo has on its bar. */
-export function PhotosCard({
-  target,
-  p,
-  b,
-  brandId,
-  index,
-  paint,
-}: {
-  target: Target
-  p: P
-  b: Messages['editor']['bar']
-  brandId: string
-  index: number
-  paint: ImageFill
-}) {
+/** How the photo fits its layer, as a row under the header card's box: fill it, crop it, fit inside it, or tile it. */
+function FitRow({ target, p, index, paint }: { target: Target; p: P; index: number; paint: ImageFill }) {
   return (
-    <Card
-      id="photos-card"
-      title={b.filters}
-      action={
-        <ImagePickerButton
-          brandId={brandId}
-          title={p.replaceImageTitle}
-          testId="replace-image"
-          className={cn(CHIP, FOCUS_RING, 'shrink-0')}
-          onPick={(asset) => set(target, (now) => ({ fills: withImage((now.fills ?? []) as Paint[], asset.id) }))}
-        >
-          <span aria-hidden>{p.replaceImage}</span>
-        </ImagePickerButton>
-      }
-    >
-      <PhotoLookBody target={target} p={p} brandId={brandId} index={index} paint={paint} />
-    </Card>
+    <Segments
+      name={p.fit}
+      value={paint.fit}
+      options={['fill', 'crop', 'fit', 'tile'] as const}
+      labels={p.fits}
+      onSet={(fit) => setImage(target, index, () => ({ fit }))}
+    />
   )
 }

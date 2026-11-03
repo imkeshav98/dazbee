@@ -1,7 +1,8 @@
 'use client'
 
-// The property cards' fields, shared by every card that edits a value: a number that types, nudges
-// and scrubs, a colour with its hex and opacity, and a choice from a list.
+// The edit panels' fields and parts: a number that types, nudges and scrubs, a colour with its hex
+// and opacity, a choice from a list, a part of a panel under its heading, a switch, and a row of
+// segments.
 import { type CSSProperties, type ReactNode, useEffect, useRef, useState } from 'react'
 
 import { type Editor, shortcutFor } from '@dazbee/editor'
@@ -27,6 +28,15 @@ import { format } from '@/lib/i18n/index.ts'
 
 export const clamp = (n: number, min = Number.NEGATIVE_INFINITY, max = Number.POSITIVE_INFINITY) =>
   Math.min(max, Math.max(min, n))
+
+/** A colour as #RRGGBBAA: one part changed, the other as the document holds it now. */
+const withHex = (hex: string) => (now: string | undefined) => `${hex}${now?.slice(7, 9) || 'FF'}`
+
+const withOpacity = (alpha: number) => (now: string | undefined) =>
+  `${now?.slice(0, 7) || '#000000'}${Math.round(clamp(alpha, 0, 1) * 255)
+    .toString(16)
+    .padStart(2, '0')
+    .toUpperCase()}`
 
 /**
  * What is being typed into a field, null when nothing is: `typed.current` has it as soon as it is
@@ -229,14 +239,6 @@ export function NumberField({
   )
 }
 
-/** A colour as #RRGGBBAA: one part changed, the other as the document holds it now. */
-const withHex = (hex: string) => (now: string | undefined) => `${hex}${now?.slice(7, 9) || 'FF'}`
-const withOpacity = (alpha: number) => (now: string | undefined) =>
-  `${now?.slice(0, 7) || '#000000'}${Math.round(clamp(alpha, 0, 1) * 255)
-    .toString(16)
-    .padStart(2, '0')
-    .toUpperCase()}`
-
 /**
  * A colour: a swatch that opens the system picker (unless `swatch` is off, where a swatch beside it
  * does more), the hex, and its opacity as a percentage. A
@@ -342,7 +344,7 @@ export function Choice<T extends string>({
 }
 
 /** A part of an edit panel or pop-up: its heading, an action at the end, its controls. Advanced's heading is `strong`. */
-export function Card({
+export function PanelPart({
   id,
   title,
   note,
@@ -374,15 +376,6 @@ export function Card({
   )
 }
 
-/** A row that turns something on or off: its name, then a switch. */
-export function SwitchRow({ name, on, onSet }: { name: string; on: boolean | 'mixed'; onSet: (on: boolean) => void }) {
-  return (
-    <Switch on={on} onSet={onSet} className={SWITCH_ROW}>
-      {name}
-    </Switch>
-  )
-}
-
 /** A switch on its own, named by `label`, or with its name beside it as `children`. */
 export function Switch({
   on,
@@ -410,6 +403,15 @@ export function Switch({
       {children}
       <span aria-hidden className={SWITCH} />
     </button>
+  )
+}
+
+/** A row that turns something on or off: its name, then a switch. */
+export function SwitchRow({ name, on, onSet }: { name: string; on: boolean | 'mixed'; onSet: (on: boolean) => void }) {
+  return (
+    <Switch on={on} onSet={onSet} className={SWITCH_ROW}>
+      {name}
+    </Switch>
   )
 }
 

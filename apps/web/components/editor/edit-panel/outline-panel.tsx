@@ -1,5 +1,7 @@
 'use client'
 
+// The Outline panel: the strokes' look and width, then under Advanced each stroke's paint, width,
+// place, dashes, ends and corners.
 import { useState } from 'react'
 
 import { type Editor } from '@dazbee/editor'
@@ -12,45 +14,38 @@ import { cn } from '@/lib/cn.ts'
 import { LIMITS } from '@/lib/editor/limits.ts'
 import { tidy } from '@/lib/editor/size.ts'
 import { useMessages } from '@/lib/i18n/client.tsx'
-import { format, type Messages } from '@/lib/i18n/index.ts'
+import { format } from '@/lib/i18n/index.ts'
 
-import { Card, Choice, clamp, NumberField } from './fields.tsx'
-import { type P, set, shared, type Target } from './target.ts'
+import { Choice, clamp, NumberField, PanelPart } from './fields.tsx'
+import { type P, type PanelProps, set, shared, type Target } from './target.ts'
 
-const NEW_STROKE = { paint: { type: 'solid', color: '#1A1420FF' } as Paint, width: 2, align: 'center' as const }
-
-/**
- * The strokes, each with its paint, width, place, dashes, ends and corners, under a heading with +:
- * the Outline panel's Advanced.
- */
-function StrokeBody({ target, brandId, p, title }: { target: Target; brandId: string; p: P; title: string }) {
-  return (
-    <ListBody<Stroke>
-      title={title}
-      p={p}
-      target={target}
-      field="strokes"
-      fresh={NEW_STROKE}
-      topFirst
-      item={p.stroke}
-      testId="stroke-list"
-      render={(stroke, n, change) => (
-        <StrokeRow stroke={stroke} place={n} brandId={brandId} p={p} editor={target.editor} onSet={change} />
-      )}
-    />
-  )
+type Stroke = {
+  paint: Paint
+  width: number
+  align: 'inside' | 'center' | 'outside'
+  dashes?: number[]
+  dashOffset?: number
+  cap?: 'butt' | 'round' | 'square'
+  join?: 'miter' | 'round' | 'bevel'
 }
 
 type StrokeLook = 'none' | 'solid' | 'dashed'
+
+const NEW_STROKE = { paint: { type: 'solid', color: '#1A1420FF' } as Paint, width: 2, align: 'center' as const }
+
 const STROKE_LOOKS: StrokeLook[] = ['none', 'solid', 'dashed']
+
 /** How each of the Outline panel's tiles draws its stroke: a faint square for none, a solid or a dashed one. */
 const STROKE_FACE: Record<StrokeLook, string> = {
   none: 'border-2 border-line-strong',
   solid: 'border-[3px] border-text',
   dashed: 'border-[3px] border-dashed border-text',
 }
+
 const DASHES = [8, 4]
+
 const dashed = (stroke: Stroke) => (stroke.dashes?.length ?? 0) > 0
+
 /** A stroke drawn solid: its dashes and their offset gone. */
 function solidOf(stroke: Stroke): Stroke {
   const next = { ...stroke }
@@ -59,22 +54,24 @@ function solidOf(stroke: Stroke): Stroke {
   return next
 }
 
+/** Dash and gap lengths as typed, "8 4", or null when they aren't a pattern; nothing typed is solid. */
+function parseDashes(text: string): number[] | null {
+  const parts = text.split(/[\s,]+/).filter(Boolean)
+  const lengths = parts.map((part) => Number.parseFloat(part))
+  if (lengths.some((n) => !Number.isFinite(n) || n < 0 || n > LIMITS.any)) return null
+  if (lengths.length > 0 && !lengths.some((n) => n > 0)) return null
+  return lengths.map(tidy)
+}
+
 /**
  * The Outline panel: the strokes' look as three tiles, none, solid or dashed, and the width of every
  * stroke, then each stroke's own settings under Advanced. Picking solid or dashed gives a layer
  * without a stroke a new one.
  */
-export function StrokePanel({
-  target,
-  brandId,
-  p,
-  b,
-}: {
-  target: Target
-  brandId: string
-  p: P
-  b: Messages['editor']['bar']
-}) {
+export function OutlinePanel({ target, brandId }: PanelProps) {
+  const t = useMessages()
+  const p = t.editor.props
+  const b = t.editor.bar
   const lists = target.props.map((pr) => (pr.strokes ?? []) as Stroke[])
   const look: StrokeLook | 'mixed' = lists.every((l) => l.length === 0)
     ? 'none'
@@ -104,7 +101,7 @@ export function StrokePanel({
     }))
   return (
     <>
-      <Card id="stroke-look" title={b.strokeLook.title}>
+      <PanelPart id="stroke-look" title={b.strokeLook.title}>
         <div role="radiogroup" aria-label={b.strokeLook.title} className="grid grid-cols-3 gap-[7px]">
           {STROKE_LOOKS.map((to) => (
             <button
@@ -136,62 +133,32 @@ export function StrokePanel({
             onShift={(by) => setWidths((now) => now + by)}
           />
         )}
-      </Card>
-      <Card id="stroke-card" title={b.advanced} strong>
+      </PanelPart>
+      <PanelPart id="stroke-card" title={b.advanced} strong>
         <StrokeBody target={target} brandId={brandId} p={p} title={b.strokeLook.outlines} />
-      </Card>
+      </PanelPart>
     </>
   )
 }
 
-type Stroke = {
-  paint: Paint
-  width: number
-  align: 'inside' | 'center' | 'outside'
-  dashes?: number[]
-  dashOffset?: number
-  cap?: 'butt' | 'round' | 'square'
-  join?: 'miter' | 'round' | 'bevel'
-}
-
-/** Dash and gap lengths as typed, "8 4", or null when they aren't a pattern; nothing typed is solid. */
-function parseDashes(text: string): number[] | null {
-  const parts = text.split(/[\s,]+/).filter(Boolean)
-  const lengths = parts.map((part) => Number.parseFloat(part))
-  if (lengths.some((n) => !Number.isFinite(n) || n < 0 || n > LIMITS.any)) return null
-  if (lengths.length > 0 && !lengths.some((n) => n > 0)) return null
-  return lengths.map(tidy)
-}
-
-/** A stroke's dash pattern, typed as lengths: dash, gap, dash and so on. */
-function DashField({ name, value, onSet }: { name: string; value: number[]; onSet: (dashes: number[]) => void }) {
-  const t = useMessages()
-  const shown = value.join(' ')
-  const [draft, setDraft] = useState<string | null>(null)
-  const commit = (text: string) => {
-    setDraft(null)
-    const dashes = parseDashes(text)
-    if (dashes && dashes.join(' ') !== shown) onSet(dashes)
-  }
+/**
+ * The strokes, each with its paint, width, place, dashes, ends and corners, under a heading with +:
+ * the Outline panel's Advanced.
+ */
+function StrokeBody({ target, brandId, p, title }: { target: Target; brandId: string; p: P; title: string }) {
   return (
-    <input
-      name="dashes"
-      aria-label={name}
-      title={t.editor.props.dashesHint}
-      value={draft ?? shown}
-      placeholder={t.editor.props.solid}
-      spellCheck={false}
-      onChange={(event) => setDraft(event.target.value)}
-      onBlur={(event) => draft !== null && commit(event.target.value)}
-      onKeyDown={(event) => {
-        if (event.key === 'Enter') commit(event.currentTarget.value)
-        else if (event.key === 'Escape') {
-          setDraft(null)
-          event.currentTarget.blur()
-        }
-        event.stopPropagation()
-      }}
-      className={FIELD}
+    <ListBody<Stroke>
+      title={title}
+      p={p}
+      target={target}
+      field="strokes"
+      fresh={NEW_STROKE}
+      topFirst
+      item={p.stroke}
+      testId="stroke-list"
+      render={(stroke, n, change) => (
+        <StrokeRow stroke={stroke} place={n} brandId={brandId} p={p} editor={target.editor} onSet={change} />
+      )}
     />
   )
 }
@@ -270,5 +237,38 @@ function StrokeRow({
         />
       </div>
     </div>
+  )
+}
+
+/** A stroke's dash pattern, typed as lengths: dash, gap, dash and so on. */
+function DashField({ name, value, onSet }: { name: string; value: number[]; onSet: (dashes: number[]) => void }) {
+  const t = useMessages()
+  const shown = value.join(' ')
+  const [draft, setDraft] = useState<string | null>(null)
+  const commit = (text: string) => {
+    setDraft(null)
+    const dashes = parseDashes(text)
+    if (dashes && dashes.join(' ') !== shown) onSet(dashes)
+  }
+  return (
+    <input
+      name="dashes"
+      aria-label={name}
+      title={t.editor.props.dashesHint}
+      value={draft ?? shown}
+      placeholder={t.editor.props.solid}
+      spellCheck={false}
+      onChange={(event) => setDraft(event.target.value)}
+      onBlur={(event) => draft !== null && commit(event.target.value)}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter') commit(event.currentTarget.value)
+        else if (event.key === 'Escape') {
+          setDraft(null)
+          event.currentTarget.blur()
+        }
+        event.stopPropagation()
+      }}
+      className={FIELD}
+    />
   )
 }

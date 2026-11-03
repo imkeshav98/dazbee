@@ -4,9 +4,26 @@ import { KNOBS, TILE, TILE_FACE_WIDE } from '@/components/editor/styles.ts'
 import { cn } from '@/lib/cn.ts'
 import { LIMITS } from '@/lib/editor/limits.ts'
 import { tidy } from '@/lib/editor/size.ts'
+import { useMessages } from '@/lib/i18n/client.tsx'
 
-import { Card, clamp, NumberField, SwitchRow } from './fields.tsx'
-import { type Fit, type P, type Patch, type Props, set, shared, type Style, type Target, textStyle } from './target.ts'
+import { clamp, NumberField, PanelPart, SwitchRow } from './fields.tsx'
+import {
+  type Fit,
+  type P,
+  type PanelProps,
+  type Patch,
+  type Props,
+  set,
+  shared,
+  type Style,
+  type Target,
+  textStyle,
+} from './target.ts'
+
+type BoxMode = 'autoWidth' | 'autoHeight' | 'fixed'
+
+/** The letters a box mode's tile draws in its box; the same in every language, as a font sample is. */
+const SAMPLE_LETTERS = 'Aa'
 
 /** Shrink to fit's sizes as set under the Spacing panel's Advanced, the text's size following the largest. */
 const fitPatch = (now: Props, fit: Fit): Patch => ({
@@ -14,14 +31,27 @@ const fitPatch = (now: Props, fit: Fit): Patch => ({
   style: { ...(now.style as Style), fontSize: fit.max },
 })
 
+/** The Spacing panel of text: the room between its lines, letters and paragraphs, its box, and under Advanced shrinking to fit and the most lines it shows. */
+export function SpacingPanel({ target }: PanelProps) {
+  const t = useMessages()
+  const p = t.editor.props
+  return (
+    <>
+      <SpacingCard target={target} p={p} />
+      <TextBoxCard target={target} p={p} />
+      <TextFitCard target={target} p={p} title={t.editor.bar.advanced} />
+    </>
+  )
+}
+
 /**
  * The text's spacing as slider fields, one to a row: between its lines (Auto when cleared), its
  * letters, which can come closer as well as part, and its paragraphs.
  */
-export function SpacingCard({ target, p }: { target: Target; p: P }) {
+function SpacingCard({ target, p }: { target: Target; p: P }) {
   const { style, setStyle, shiftStyle } = textStyle(target)
   return (
-    <Card id="spacing-card" title={p.spacing}>
+    <PanelPart id="spacing-card" title={p.spacing}>
       <div className="grid gap-1.5">
         <NumberField
           label={p.lineHeight}
@@ -67,12 +97,36 @@ export function SpacingCard({ target, p }: { target: Target; p: P }) {
           }
         />
       </div>
-    </Card>
+    </PanelPart>
   )
 }
 
-/** The letters a box mode's tile draws in its box; the same in every language, as a font sample is. */
-const SAMPLE_LETTERS = 'Aa'
+/** The text's box as three picture tiles: growing along a line, growing down, or holding its size. */
+function TextBoxCard({ target, p }: { target: Target; p: P }) {
+  const mode = (shared(target.props.map((pr) => pr.boxMode)) ?? 'autoHeight') as BoxMode | 'mixed'
+  return (
+    <PanelPart id="text-box-card" title={p.textBox}>
+      <div role="radiogroup" aria-label={p.boxMode} className="grid grid-cols-3 gap-[7px]">
+        {(['autoWidth', 'autoHeight', 'fixed'] as const).map((to) => (
+          <button
+            key={to}
+            type="button"
+            role="radio"
+            aria-checked={mode === to}
+            data-value={to}
+            onClick={() => set(target, () => ({ boxMode: to }))}
+            className={TILE}
+          >
+            <span className={cn(TILE_FACE_WIDE, 'text-muted group-aria-checked:text-text')}>
+              <BoxArt mode={to} />
+            </span>
+            <span className="w-full truncate text-center">{p.boxModes[to]}</span>
+          </button>
+        ))}
+      </div>
+    </PanelPart>
+  )
+}
 
 /**
  * How each box mode's tile draws it: a box round "Aa", dashed where it grows, with arrows along the
@@ -108,39 +162,12 @@ function BoxArt({ mode }: { mode: BoxMode }) {
   )
 }
 
-/** The text's box as three picture tiles: growing along a line, growing down, or holding its size. */
-export function TextBoxCard({ target, p }: { target: Target; p: P }) {
-  const mode = (shared(target.props.map((pr) => pr.boxMode)) ?? 'autoHeight') as BoxMode | 'mixed'
-  return (
-    <Card id="text-box-card" title={p.textBox}>
-      <div role="radiogroup" aria-label={p.boxMode} className="grid grid-cols-3 gap-[7px]">
-        {(['autoWidth', 'autoHeight', 'fixed'] as const).map((to) => (
-          <button
-            key={to}
-            type="button"
-            role="radio"
-            aria-checked={mode === to}
-            data-value={to}
-            onClick={() => set(target, () => ({ boxMode: to }))}
-            className={TILE}
-          >
-            <span className={cn(TILE_FACE_WIDE, 'text-muted group-aria-checked:text-text')}>
-              <BoxArt mode={to} />
-            </span>
-            <span className="w-full truncate text-center">{p.boxModes[to]}</span>
-          </button>
-        ))}
-      </div>
-    </Card>
-  )
-}
-
 /** The text box's numbers, under Advanced: shrinking to fit between a smallest and a largest size, and the lines shown at most. */
-export function TextFitCard({ target, p, title }: { target: Target; p: P; title: string }) {
+function TextFitCard({ target, p, title }: { target: Target; p: P; title: string }) {
   const value = (key: string) => shared(target.props.map((pr) => pr[key])) as unknown
   const shrink = value('shrinkToFit') as Fit | undefined | 'mixed'
   return (
-    <Card id="text-fit-card" title={title} strong>
+    <PanelPart id="text-fit-card" title={title} strong>
       <SwitchRow
         name={p.shrinkToFit}
         on={shrink === 'mixed' ? 'mixed' : shrink !== undefined}
@@ -209,8 +236,6 @@ export function TextFitCard({ target, p, title }: { target: Target; p: P; title:
           })
         }
       />
-    </Card>
+    </PanelPart>
   )
 }
-
-type BoxMode = 'autoWidth' | 'autoHeight' | 'fixed'

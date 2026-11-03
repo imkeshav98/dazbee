@@ -1,5 +1,7 @@
 'use client'
 
+// The scope chip: where a change goes when a design has more than one format, and what the format
+// shown has of its own, each part with Reset.
 import { CaretDownIcon } from '@phosphor-icons/react'
 import * as Popover from '@radix-ui/react-popover'
 import { type ReactNode } from 'react'
@@ -17,6 +19,7 @@ import { format } from '@/lib/i18n/index.ts'
 import { type P, type Target } from './target.ts'
 
 type OwnGroup = keyof P['ownGroups']
+
 /** Which card's words name a property a format can have of its own. */
 const OWN_GROUP: Record<string, OwnGroup> = {
   x: 'layout',
@@ -49,55 +52,34 @@ const OWN_GROUP: Record<string, OwnGroup> = {
 }
 
 /**
- * What the format shown has of its own for the selected layers (#157), grouped as the cards are;
- * each group, or all of them, goes back to following the other formats in one undo step.
+ * The scope chip, the top bar's first item when the design has more than one format: which formats
+ * a change goes to, and the own changes of the one shown, each with Reset.
  */
-function OwnChanges({
+export function ScopeChip({
+  target,
   design,
-  ids,
-  formatId,
-  editor,
-  p,
+  open,
+  onOpen,
 }: {
+  target: Target
   design: Design
-  ids: string[]
-  formatId: string
-  editor: Editor
-  p: P
+  open: boolean
+  onOpen: (open: boolean) => void
 }) {
-  const scope = formatScope(formatId)
-  const byNode = design.overrides[scope] ?? {}
-  const paths = [...new Set(ids.flatMap((id) => Object.keys(byNode[id] ?? {})))]
-  if (paths.length === 0) return null
-  const groups = new Map<OwnGroup, string[]>()
-  for (const path of paths) {
-    const group = OWN_GROUP[path] ?? 'other'
-    groups.set(group, [...(groups.get(group) ?? []), path])
-  }
-  const reset = (only?: string[]) => editor.resetOwn(ids, scope, only)
-  const name = design.formats[formatId]?.name ?? ''
+  const p = useMessages().editor.props
+  const everyFormat = useEveryFormat()
+  if (Object.keys(design.formats).length < 2) return null
   return (
-    <div data-testid="own-changes" className="flex flex-col gap-1">
-      <p className="px-1 text-[11px] font-semibold text-subtle">{format(p.ownChanges, { format: name })}</p>
-      <ul className="flex flex-col">
-        {[...groups].map(([group, groupPaths]) => (
-          <li key={group} className="flex h-8 items-center justify-between gap-2 px-1 text-[13px]">
-            <span className="min-w-0 truncate">{p.ownGroups[group]}</span>
-            <button
-              type="button"
-              onClick={() => reset(groupPaths)}
-              aria-label={format(p.resetOwn, { name: p.ownGroups[group] })}
-              className={LINK_BUTTON}
-            >
-              {p.reset}
-            </button>
-          </li>
-        ))}
-      </ul>
-      <button type="button" onClick={() => reset()} className={cn(CHIP, 'mt-1 h-8 w-full justify-center')}>
-        {p.resetAll}
-      </button>
-    </div>
+    <ScopeMenu
+      everyFormat={everyFormat}
+      onChange={setEveryFormat}
+      size={design.formats[target.formatId]?.name ?? ''}
+      p={p}
+      open={open}
+      onOpen={onOpen}
+    >
+      <OwnChanges design={design} ids={target.ids} formatId={target.formatId} editor={target.editor} p={p} />
+    </ScopeMenu>
   )
 }
 
@@ -167,33 +149,54 @@ function ScopeMenu({
 }
 
 /**
- * The scope chip, the top bar's first item when the design has more than one format: which formats
- * a change goes to, and the own changes of the one shown, each with Reset.
+ * What the format shown has of its own for the selected layers (#157), grouped as the cards are;
+ * each group, or all of them, goes back to following the other formats in one undo step.
  */
-export function ScopeChip({
-  target,
+function OwnChanges({
   design,
-  open,
-  onOpen,
+  ids,
+  formatId,
+  editor,
+  p,
 }: {
-  target: Target
   design: Design
-  open: boolean
-  onOpen: (open: boolean) => void
+  ids: string[]
+  formatId: string
+  editor: Editor
+  p: P
 }) {
-  const p = useMessages().editor.props
-  const everyFormat = useEveryFormat()
-  if (Object.keys(design.formats).length < 2) return null
+  const scope = formatScope(formatId)
+  const byNode = design.overrides[scope] ?? {}
+  const paths = [...new Set(ids.flatMap((id) => Object.keys(byNode[id] ?? {})))]
+  if (paths.length === 0) return null
+  const groups = new Map<OwnGroup, string[]>()
+  for (const path of paths) {
+    const group = OWN_GROUP[path] ?? 'other'
+    groups.set(group, [...(groups.get(group) ?? []), path])
+  }
+  const reset = (only?: string[]) => editor.resetOwn(ids, scope, only)
+  const name = design.formats[formatId]?.name ?? ''
   return (
-    <ScopeMenu
-      everyFormat={everyFormat}
-      onChange={setEveryFormat}
-      size={design.formats[target.formatId]?.name ?? ''}
-      p={p}
-      open={open}
-      onOpen={onOpen}
-    >
-      <OwnChanges design={design} ids={target.ids} formatId={target.formatId} editor={target.editor} p={p} />
-    </ScopeMenu>
+    <div data-testid="own-changes" className="flex flex-col gap-1">
+      <p className="px-1 text-[11px] font-semibold text-subtle">{format(p.ownChanges, { format: name })}</p>
+      <ul className="flex flex-col">
+        {[...groups].map(([group, groupPaths]) => (
+          <li key={group} className="flex h-8 items-center justify-between gap-2 px-1 text-[13px]">
+            <span className="min-w-0 truncate">{p.ownGroups[group]}</span>
+            <button
+              type="button"
+              onClick={() => reset(groupPaths)}
+              aria-label={format(p.resetOwn, { name: p.ownGroups[group] })}
+              className={LINK_BUTTON}
+            >
+              {p.reset}
+            </button>
+          </li>
+        ))}
+      </ul>
+      <button type="button" onClick={() => reset()} className={cn(CHIP, 'mt-1 h-8 w-full justify-center')}>
+        {p.resetAll}
+      </button>
+    </div>
   )
 }

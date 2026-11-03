@@ -4,10 +4,11 @@ import { FIELD_LABEL, KNOBS, PANEL_BUTTON, PANEL_HEADING } from '@/components/ed
 import { FOCUS_RING } from '@/components/ui/looks.ts'
 import { cn } from '@/lib/cn.ts'
 import { tidy } from '@/lib/editor/size.ts'
+import { useMessages } from '@/lib/i18n/client.tsx'
 import { type Messages } from '@/lib/i18n/index.ts'
 
-import { Card, Choice, NumberField, Segments, Switch, SwitchRow } from './fields.tsx'
-import { type P, type Props, set, shared, type Target } from './target.ts'
+import { Choice, NumberField, PanelPart, Segments, Switch, SwitchRow } from './fields.tsx'
+import { factsOf, type P, type PanelProps, type Props, set, shared, type Target } from './target.ts'
 
 type Layout = {
   direction: 'row' | 'column'
@@ -18,11 +19,68 @@ type Layout = {
   wrap: boolean
   lineGap: number
 }
+
 type Place = 'start' | 'center' | 'end'
+
+type Sizing = 'fixed' | 'hug' | 'fill'
+
 const PLACES: Place[] = ['start', 'center', 'end']
 
 /** The room between that the Stack panel offers at a tap. */
 const GAPS = [0, 8, 16, 32]
+
+/** How a layer sizes on each axis, as the renderer reads it: left unsaid, text hugs as its box mode says and the rest is fixed. */
+function sizingOf(type: string, props: Props): { width: Sizing; height: Sizing } {
+  const own = props.sizing as { width: Sizing; height: Sizing } | undefined
+  if (own) return own
+  if (type === 'text')
+    return {
+      width: props.boxMode === 'autoWidth' ? 'hug' : 'fixed',
+      height: props.boxMode === 'fixed' ? 'fixed' : 'hug',
+    }
+  return { width: 'fixed', height: 'fixed' }
+}
+
+/** The Stack panel. A frame inside another auto layout sets its sizing in the Position panel, so this one leaves it out. */
+export function AutoLayoutPanel({ target, design }: PanelProps) {
+  const t = useMessages()
+  return (
+    <AutoLayoutCard target={target} p={t.editor.props} b={t.editor.bar} ownSizing={!factsOf(target, design).inFlow} />
+  )
+}
+
+/** How the layers size on each axis: a menu each, under the axis's name. */
+export function SizingFields({
+  target,
+  p,
+  options,
+  labels,
+}: {
+  target: Target
+  p: P
+  options: readonly Sizing[]
+  labels: Record<Sizing, string>
+}) {
+  const sizings = target.props.map((pr, i) => sizingOf(target.types[i] ?? '', pr))
+  return (
+    <div className="grid grid-cols-2 gap-x-3">
+      {(['width', 'height'] as const).map((axis) => (
+        <div key={axis} className="flex min-w-0 flex-col gap-1">
+          <span className={FIELD_LABEL}>{p.axes[axis]}</span>
+          <Choice
+            name={p.sizingAxis[axis]}
+            value={shared(sizings.map((sz) => sz[axis]))}
+            options={options}
+            labels={labels}
+            onSet={(to) =>
+              set(target, (now, i) => ({ sizing: { ...sizingOf(target.types[i] ?? '', now), [axis]: to } }))
+            }
+          />
+        </div>
+      ))}
+    </div>
+  )
+}
 
 /**
  * The Stack panel: auto layout on or off by the switch in its heading; then its direction and
@@ -30,7 +88,7 @@ const GAPS = [0, 8, 16, 32]
  * 3×3 pad that lines up what is inside along both axes at once, the room around and each side's,
  * and, when `ownSizing`, how the frame sizes.
  */
-export function AutoLayoutCard({
+function AutoLayoutCard({
   target,
   p,
   b,
@@ -51,7 +109,7 @@ export function AutoLayoutCard({
       className={cn('group flex cursor-pointer rounded-full', FOCUS_RING)}
     />
   )
-  if (on !== true) return <Card id="auto-layout-card" title={p.autoLayout} action={toggle} strong />
+  if (on !== true) return <PanelPart id="auto-layout-card" title={p.autoLayout} action={toggle} strong />
   const value = (key: keyof Layout) => shared(layouts.map((l) => l?.[key]))
   const setLayout = (change: (l: Layout) => Partial<Layout>) =>
     set(target, (now) => {
@@ -67,7 +125,7 @@ export function AutoLayoutCard({
   )
   return (
     <>
-      <Card id="auto-layout-card" title={p.autoLayout} action={toggle} strong>
+      <PanelPart id="auto-layout-card" title={p.autoLayout} action={toggle} strong>
         <span className={PANEL_HEADING}>{p.direction}</span>
         <Segments
           name={p.direction}
@@ -119,8 +177,8 @@ export function AutoLayoutCard({
             }))
           }
         />
-      </Card>
-      <Card id="auto-layout-advanced" title={b.advanced} strong>
+      </PanelPart>
+      <PanelPart id="auto-layout-advanced" title={b.advanced} strong>
         <div className="flex items-center justify-between gap-3">
           <span className="text-[13px] font-semibold text-text">{p.lineUp}</span>
           {/* Across the pad is along a row's line (or down a column's), so each cell sets both axes. */}
@@ -192,54 +250,7 @@ export function AutoLayoutCard({
           ))}
         </div>
         {ownSizing && <SizingFields target={target} p={p} options={['hug', 'fill', 'fixed']} labels={p.sizings} />}
-      </Card>
+      </PanelPart>
     </>
-  )
-}
-
-type Sizing = 'fixed' | 'hug' | 'fill'
-
-/** How a layer sizes on each axis, as the renderer reads it: left unsaid, text hugs as its box mode says and the rest is fixed. */
-function sizingOf(type: string, props: Props): { width: Sizing; height: Sizing } {
-  const own = props.sizing as { width: Sizing; height: Sizing } | undefined
-  if (own) return own
-  if (type === 'text')
-    return {
-      width: props.boxMode === 'autoWidth' ? 'hug' : 'fixed',
-      height: props.boxMode === 'fixed' ? 'fixed' : 'hug',
-    }
-  return { width: 'fixed', height: 'fixed' }
-}
-
-/** How the layers size on each axis: a menu each, under the axis's name. */
-export function SizingFields({
-  target,
-  p,
-  options,
-  labels,
-}: {
-  target: Target
-  p: P
-  options: readonly Sizing[]
-  labels: Record<Sizing, string>
-}) {
-  const sizings = target.props.map((pr, i) => sizingOf(target.types[i] ?? '', pr))
-  return (
-    <div className="grid grid-cols-2 gap-x-3">
-      {(['width', 'height'] as const).map((axis) => (
-        <div key={axis} className="flex min-w-0 flex-col gap-1">
-          <span className={FIELD_LABEL}>{p.axes[axis]}</span>
-          <Choice
-            name={p.sizingAxis[axis]}
-            value={shared(sizings.map((sz) => sz[axis]))}
-            options={options}
-            labels={labels}
-            onSet={(to) =>
-              set(target, (now, i) => ({ sizing: { ...sizingOf(target.types[i] ?? '', now), [axis]: to } }))
-            }
-          />
-        </div>
-      ))}
-    </div>
   )
 }

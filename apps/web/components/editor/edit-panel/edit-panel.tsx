@@ -8,7 +8,6 @@ import { XIcon } from '@phosphor-icons/react'
 import { type CSSProperties, type ReactNode, type RefObject, useEffect, useLayoutEffect, useRef, useState } from 'react'
 
 import type { Editor } from '@dazbee/editor'
-import { type Design } from '@dazbee/schema'
 
 import { useFontCatalog } from '@/components/brand-kit/font-catalog.ts'
 import {
@@ -22,21 +21,46 @@ import {
 } from '@/components/editor/edit-store.ts'
 import { useSelection } from '@/components/editor/editor-hooks.ts'
 import { FontChooser } from '@/components/editor/flyouts/font-panel.tsx'
-import { PANEL_HEADING } from '@/components/editor/styles.ts'
 import { useOverlayScroll } from '@/components/ui/overlay-scroll.ts'
 import { cn } from '@/lib/cn.ts'
 import { useMessages } from '@/lib/i18n/client.tsx'
 import { format } from '@/lib/i18n/index.ts'
 
-import { AutoLayoutCard } from './auto-layout-panel.tsx'
-import { ColourPanel, FillsCard, TextColourPanel } from './colour-panel.tsx'
-import { EffectsBody } from './effects-panel.tsx'
-import { Card } from './fields.tsx'
-import { AdjustCard, FitRow, PhotoLookBody, PhotosCard } from './image-panel.tsx'
-import { StrokePanel } from './outline-panel.tsx'
-import { ArrangePart, FlowPart, PlaceCard } from './position-panel.tsx'
-import { SpacingCard, TextBoxCard, TextFitCard } from './spacing-panel.tsx'
-import { factsOf, imageFillOf, kindOf, type Target, useTarget } from './target.ts'
+import { AutoLayoutPanel } from './auto-layout-panel.tsx'
+import { ColourPanel } from './colour-panel.tsx'
+import { EffectsPanel } from './effects-panel.tsx'
+import { ImagePanel } from './image-panel.tsx'
+import { OutlinePanel } from './outline-panel.tsx'
+import { PositionPanel } from './position-panel.tsx'
+import { SpacingPanel } from './spacing-panel.tsx'
+import { type PanelProps, useTarget } from './target.ts'
+
+/** What each layer panel holds for the selection, by the panel's id. */
+const PANELS: Record<LayerPanelId, (props: PanelProps) => ReactNode> = {
+  font: FontPanel,
+  colour: ColourPanel,
+  spacing: SpacingPanel,
+  effects: EffectsPanel,
+  position: PositionPanel,
+  edit: ImagePanel,
+  outline: OutlinePanel,
+  stack: AutoLayoutPanel,
+}
+
+/** The item that opened panel `id`: the one that had the focus as it opened, else the first that opens it. */
+const openerOf = (id: PanelId, opener: Element | null) =>
+  opener instanceof HTMLElement && opener.isConnected && opener.dataset.opens === id
+    ? opener
+    : document.querySelector<HTMLElement>(`[data-opens="${id}"]`)
+
+/**
+ * Closes the open panel; with `back`, the focus goes back to the item that opened it at once,
+ * before the panel goes: later, it could take the focus from whatever the next click or key opened.
+ */
+function closePanel(id: PanelId, back: boolean, opener: Element | null = null) {
+  if (back) openerOf(id, opener)?.focus()
+  setOpen(null)
+}
 
 /**
  * Whether a scrolling body has been scrolled down from its top, and whether more of it is below:
@@ -69,63 +93,6 @@ export function EditPanel({ editor, brandId }: { editor: Editor; brandId: string
   if (!isLayerPanel(open) || !selected) return null
   return <Panel key={open} id={open} target={selected.target} design={selected.design} brandId={brandId} />
 }
-
-function Panel({
-  id,
-  target,
-  design,
-  brandId,
-}: {
-  id: LayerPanelId
-  target: Target
-  design: Parameters<typeof PanelContent>[0]['design']
-  brandId: string
-}) {
-  const t = useMessages()
-  const { catalog, refresh } = useFontCatalog(brandId)
-  const note =
-    target.ids.length > 1
-      ? format(t.editor.props.layers, { n: target.ids.length })
-      : target.names[0] || t.editor.props.layer
-  return (
-    <PanelFrame id={id} title={t.editor.bar.panels[id]} note={note}>
-      {id === 'font' ? (
-        <FontChooser
-          editor={target.editor}
-          brandId={brandId}
-          catalog={catalog}
-          refresh={refresh}
-          onDone={() => closePanel(id, true)}
-        />
-      ) : (
-        <>
-          {id === 'position' && (
-            <ArrangePart
-              target={target}
-              placed={factsOf(target, design).inFlow && target.props.every((pr) => pr.absolute !== true)}
-            />
-          )}
-          <PanelContent panel={id} target={target} design={design} brandId={brandId} />
-        </>
-      )}
-    </PanelFrame>
-  )
-}
-
-/**
- * Closes the open panel; with `back`, the focus goes back to the item that opened it at once,
- * before the panel goes: later, it could take the focus from whatever the next click or key opened.
- */
-function closePanel(id: PanelId, back: boolean, opener: Element | null = null) {
-  if (back) openerOf(id, opener)?.focus()
-  setOpen(null)
-}
-
-/** The item that opened panel `id`: the one that had the focus as it opened, else the first that opens it. */
-const openerOf = (id: PanelId, opener: Element | null) =>
-  opener instanceof HTMLElement && opener.isConnected && opener.dataset.opens === id
-    ? opener
-    : document.querySelector<HTMLElement>(`[data-opens="${id}"]`)
 
 /**
  * The edit panel's frame, for a layer's panels and the design's own (Sizes, Pages, Background): its title, a note and
@@ -280,91 +247,31 @@ export function PanelFrame({
   )
 }
 
-/**
- * What an edit panel holds for the selection, each card as a part of it: Colour, Outline,
- * Effects, Position, Spacing, Edit image and Stack. Font is the font panel's own.
- */
-export function PanelContent({
-  panel,
-  target,
-  design,
-  brandId,
-}: {
-  panel: string
-  target: Target
-  design: Design
-  brandId: string
-}) {
+function Panel({ id, ...props }: PanelProps & { id: LayerPanelId }) {
   const t = useMessages()
-  const p = t.editor.props
-  const kind = kindOf(target)
-  const facts = factsOf(target, design)
-  const several = target.ids.length > 1
-  const imageFill = imageFillOf(target)
-  const body = (() => {
-    switch (panel) {
-      case 'colour':
-        return kind === 'text' ? (
-          <TextColourPanel target={target} design={design} brandId={brandId} p={p} b={t.editor.bar} />
-        ) : (
-          <ColourPanel target={target} design={design} brandId={brandId} p={p} b={t.editor.bar} />
-        )
-      case 'outline':
-        return <StrokePanel target={target} brandId={brandId} p={p} b={t.editor.bar} />
-      case 'effects':
-        return <EffectsBody target={target} p={p} b={t.editor.bar} brandId={brandId} />
-      case 'position':
-        return (
-          <>
-            <PlaceCard target={target} p={p} title={t.editor.bar.advanced}>
-              {facts.inFlow && <FlowPart target={target} p={p} />}
-            </PlaceCard>
-          </>
-        )
-      case 'spacing':
-        return (
-          <>
-            <SpacingCard target={target} p={p} />
-            <TextBoxCard target={target} p={p} />
-            <TextFitCard target={target} p={p} title={t.editor.bar.advanced} />
-          </>
-        )
-      case 'edit':
-        if (!imageFill) return null
-        return (
-          <>
-            {several ? (
-              <PhotosCard
-                target={target}
-                p={p}
-                b={t.editor.bar}
-                brandId={brandId}
-                index={imageFill.index}
-                paint={imageFill.paint}
-              />
-            ) : (
-              <Card id="look-card" title={t.editor.bar.filters}>
-                <PhotoLookBody
-                  target={target}
-                  p={p}
-                  brandId={brandId}
-                  index={imageFill.index}
-                  paint={imageFill.paint}
-                />
-              </Card>
-            )}
-            <AdjustCard target={target} p={p} index={imageFill.index} paint={imageFill.paint} />
-            <FillsCard target={target} brandId={brandId} p={p} b={t.editor.bar}>
-              <span className={PANEL_HEADING}>{p.fit}</span>
-              <FitRow target={target} p={p} index={imageFill.index} paint={imageFill.paint} />
-            </FillsCard>
-          </>
-        )
-      case 'stack':
-        return <AutoLayoutCard target={target} p={p} b={t.editor.bar} ownSizing={!facts.inFlow} />
-      default:
-        return null
-    }
-  })()
-  return body
+  const { target } = props
+  const Content = PANELS[id]
+  const note =
+    target.ids.length > 1
+      ? format(t.editor.props.layers, { n: target.ids.length })
+      : target.names[0] || t.editor.props.layer
+  return (
+    <PanelFrame id={id} title={t.editor.bar.panels[id]} note={note}>
+      <Content {...props} />
+    </PanelFrame>
+  )
+}
+
+/** The Font panel: the brand's fonts to pick from; picking one closes the panel. */
+function FontPanel({ target, brandId }: PanelProps) {
+  const { catalog, refresh } = useFontCatalog(brandId)
+  return (
+    <FontChooser
+      editor={target.editor}
+      brandId={brandId}
+      catalog={catalog}
+      refresh={refresh}
+      onDone={() => closePanel('font', true)}
+    />
+  )
 }
