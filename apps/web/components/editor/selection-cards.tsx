@@ -547,19 +547,31 @@ export type Style = Record<string, unknown> & { fontFamily: string; fontWeight: 
 export function textStyle(target: Target) {
   const { range } = target
   const styles = range ?? target.props.map((pr) => pr.style as Style)
+  /** A layer's style with `key` set, and with shrink to fit on, a size set is its largest size too. */
+  const styled = (now: Props, key: string, value: unknown): Patch => ({
+    style: { ...(now.style as Style), [key]: value },
+    ...(key === 'fontSize' && typeof value === 'number' ? fitTo(now, value) : {}),
+  })
   return {
     styles,
     style: (key: string) => shared(styles.map((s) => s[key])),
     setStyle: (key: string, value: unknown) =>
-      range ? target.editor.styleTextSelection({ [key]: value }) : set(target, (now) => ({ style: { ...(now.style as Style), [key]: value } })),
+      range ? target.editor.styleTextSelection({ [key]: value }) : set(target, (now) => styled(now, key, value)),
     shiftStyle: (key: string, by: number, min?: number, from = 0) =>
       range
         ? target.editor.styleTextSelection({ [key]: tidy(clamp(((range[0]?.[key] as number | undefined) ?? from) + by, min)) })
-        : set(target, (now) => {
-          const s = now.style as Style
-          return { style: { ...s, [key]: tidy(clamp(((s[key] as number | undefined) ?? from) + by, min)) } }
-        }),
+        : set(target, (now) => styled(now, key, tidy(clamp((((now.style as Style)[key] as number | undefined) ?? from) + by, min)))),
   }
+}
+
+/**
+ * With shrink to fit on, the text is drawn at the largest size that fits between its smallest and
+ * largest, whatever its size says: a size set becomes the largest, and the smallest comes down to
+ * it when it was above it.
+ */
+function fitTo(now: Props, size: number): Patch {
+  const fit = now.shrinkToFit as { min: number; max: number } | undefined
+  return fit ? { shrinkToFit: { min: Math.min(fit.min, size), max: size } } : {}
 }
 
 /** A row that turns something on or off: its name, then a switch. */
