@@ -1,8 +1,7 @@
 // A text's sizes scaled: shrink to fit draws its style at a scale, and a corner drag on the stage
 // writes its sizes scaled by the box's factor.
-import type { SceneLayer } from './scene.ts'
+import type { TextProps } from '@dazbee/schema'
 
-type TextProps = Extract<SceneLayer, { type: 'text' }>['props']
 type Style = TextProps['style']
 type Run = TextProps['runs'][number]
 /** The sizes a style may hold. */

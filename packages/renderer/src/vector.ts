@@ -1,8 +1,7 @@
 import type { Canvas, CanvasKit } from '@dazbee/canvaskit'
-import type { Paint } from '@dazbee/schema'
+import type { Paint, Rect } from '@dazbee/schema'
 
 import {
-  type Box,
   drawLayers,
   drawScene,
   fillPath,
@@ -147,7 +146,7 @@ function drawContainer(
 }
 
 /** Everything a unit draws: its first layer's reach, which for a mask is all that shows. */
-function unitReach(ck: CanvasKit, unit: SceneLayer[], resources: Resources): Box {
+function unitReach(ck: CanvasKit, unit: SceneLayer[], resources: Resources): Rect {
   const [first] = unit
   return first ? layerReach(ck, first, resources) : { x: 0, y: 0, width: 0, height: 0 }
 }
@@ -156,7 +155,14 @@ function unitReach(ck: CanvasKit, unit: SceneLayer[], resources: Resources): Box
  * Draws `draw` onto a CPU surface covering `box` at `scale` pixels a unit, then places the result
  * over the box. The box grows to whole pixels, and is cut to `within` when given.
  */
-function drawImage(ck: CanvasKit, canvas: Canvas, box: Box, scale: number, draw: (into: Canvas) => void, within?: Box) {
+function drawImage(
+  ck: CanvasKit,
+  canvas: Canvas,
+  box: Rect,
+  scale: number,
+  draw: (into: Canvas) => void,
+  within?: Rect,
+) {
   let left = Math.floor(box.x - 1)
   let top = Math.floor(box.y - 1)
   let right = Math.ceil(box.x + box.width + 1)
