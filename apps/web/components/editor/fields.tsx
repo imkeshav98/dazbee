@@ -36,7 +36,8 @@ function useDraft() {
  * its keys while nothing is being typed. With `min` and `max`, or
  * `fillRange` for a fill that doesn't hold the value in, a fill behind it shows where the value sits
  * between them; a range either side of 0 fills from 0 out, each way. Home and End go to `min` and
- * `max`. Steps are in the value as shown, after `scale`.
+ * `max`. A value typed, stepped or dragged stops at `min` and `max`, or without them at
+ * `LIMITS.any` either way. Steps are in the value as shown, after `scale`.
  * With `onClear`, emptying the field calls it, for a value that can be left unset (its placeholder
  * shows then), mixed values too once something was typed; without, an empty field is ignored.
  */
@@ -63,9 +64,16 @@ export function NumberField({ label, name, value, step = 1, min: least, max: mos
 }) {
   const t = useMessages()
   const input = useRef<HTMLInputElement>(null)
-  // A field without limits of its own still stops where a design would only break.
+  // What a value typed, stepped or dragged stops at: the field's own limits, or, without, where a
+  // design would only break. `least` and `most` are the field's own, for its fill and Home and End.
   const min = least ?? -LIMITS.any
   const max = most ?? LIMITS.any
+  /** A step from the value shown, cut short at `min` and `max`; with values the layers don't share, each layer's own steps. */
+  const shift = (by: number) => {
+    if (typeof value !== 'number') return onShift(by)
+    const to = clamp(value + by, min, max) - value
+    if (to !== 0) onShift(to)
+  }
   const shown = value === undefined || value === 'mixed' ? '' : String(tidy(value * scale))
   const [draft, setDraft, typedNow] = useDraft()
   const [typing, setTyping] = useState(false)
@@ -118,7 +126,7 @@ export function NumberField({ label, name, value, step = 1, min: least, max: mos
         p.end ??= editor?.beginGesture() ?? (() => undefined)
         const by = Math.round((event.clientX - p.x) / 2) * stepOf(event)
         if (by === p.applied) return
-        onShift((by - p.applied) / scale)
+        shift((by - p.applied) / scale)
         p.applied = by
       }}
       onPointerUp={() => release(true)}
@@ -164,7 +172,7 @@ export function NumberField({ label, name, value, step = 1, min: least, max: mos
           } else if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
             event.preventDefault()
             setDraft(null)
-            onShift(((event.key === 'ArrowUp' ? 1 : -1) * stepOf(event)) / scale)
+            shift(((event.key === 'ArrowUp' ? 1 : -1) * stepOf(event)) / scale)
           } else if ((event.key === 'Home' || event.key === 'End') && hasEnds && draft === null) {
             // A range's ends, as a slider's; while a value is being typed they move the caret.
             event.preventDefault()

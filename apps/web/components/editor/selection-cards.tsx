@@ -92,7 +92,8 @@ function PlaceCard({ target, p, title, children }: { target: Target; p: P; title
   const placing = useMessages().editor.bar.placing
   const [keepRatio, setKeepRatio] = useState(false)
   const sized = target.types.every((type) => type !== 'group' && type !== 'boolean')
-  const resize = (now: Props, axis: 'width' | 'height', to: number) => sizeTo({ width: num(now, 'width'), height: num(now, 'height') }, axis, to, keepRatio)
+  // The side Lock ratio moves stops where a typed side would.
+  const resize = (now: Props, axis: 'width' | 'height', to: number) => Object.fromEntries(Object.entries(sizeTo({ width: num(now, 'width'), height: num(now, 'height') }, axis, to, keepRatio)).map(([key, v]) => [key, Math.min(v, LIMITS.any)]))
   const sides = [
     { key: 'width', label: p.width, name: p.widthName },
     { key: 'height', label: p.height, name: p.heightName },
@@ -147,6 +148,9 @@ export function RotationField({ target, p, label = '↻' }: { target: Target; p:
       unit="°"
       name={p.rotationName}
       value={shared(target.props.map((pr) => num(pr, 'rotation') ?? 0))}
+      // A turn wraps round at 360, so any number typed is one.
+      min={Number.NEGATIVE_INFINITY}
+      max={Number.POSITIVE_INFINITY}
       editor={target.editor}
       onSet={(v) => set(target, () => ({ rotation: tidy(((v % 360) + 360) % 360) }))}
       onShift={(by) => set(target, (now) => ({ rotation: tidy((((num(now, 'rotation') ?? 0) + by) % 360 + 360) % 360) }))}
@@ -501,7 +505,7 @@ type Stroke = {
 function parseDashes(text: string): number[] | null {
   const parts = text.split(/[\s,]+/).filter(Boolean)
   const lengths = parts.map((part) => Number.parseFloat(part))
-  if (lengths.some((n) => !Number.isFinite(n) || n < 0)) return null
+  if (lengths.some((n) => !Number.isFinite(n) || n < 0 || n > LIMITS.any)) return null
   if (lengths.length > 0 && !lengths.some((n) => n > 0)) return null
   return lengths.map(tidy)
 }
@@ -835,6 +839,7 @@ function TextFitCard({ target, p, title }: { target: Target; p: P; title: string
               name={p.shrinkSize[end]}
               value={shrink[end]}
               min={1}
+              max={LIMITS.fontSize}
               editor={target.editor}
               onSet={(v) => set(target, (now) => {
                 const was = now.shrinkToFit as Fit | undefined
