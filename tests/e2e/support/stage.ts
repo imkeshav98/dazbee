@@ -131,7 +131,15 @@ export const fillList = async (page: Page) => {
   return panel.getByTestId('fill-list')
 }
 
-/** The stroke list, in the Outline panel, opened. */
+/** The text colour's hex field, in the Colour panel, under its +: opened. */
+export async function textColourHex(page: Page) {
+  const panel = await barMenu(page, 'colour')
+  const field = panel.getByRole('textbox', { name: 'Text colour hex' })
+  if (!(await field.isVisible())) await panel.getByTestId('colour-pick').click()
+  return field
+}
+
+/** The outline list, in the Outline panel, opened. */
 export const strokeList = async (page: Page) => (await barMenu(page, 'outline')).getByTestId('stroke-list')
 
 /** The menus beside the full menu's rows, by their test ids. */
@@ -175,7 +183,7 @@ export async function moreSubmenu(page: Page, id: string) {
 const HOLDER: Record<string, string> = {
   'layout-card': 'position', 'flow-card': 'position', 'appearance-card': 'transparency', 'spacing-card': 'spacing', 'text-box-card': 'spacing',
   'frame-card': 'box', 'auto-layout-card': 'stack', 'combine-card': 'combine-op', 'mask-card': 'mask', 'adjust-card': 'edit', 'look-card': 'edit',
-  'fit-card': 'edit', 'photos-card': 'edit', 'text-fit-card': 'spacing', 'outline-look': 'outline', 'outline-card': 'outline',
+  'photos-card': 'edit', 'text-fit-card': 'spacing', 'outline-look': 'outline', 'outline-card': 'outline',
   'effect-tiles': 'effects', 'effects-card': 'effects', 'brand-colours': 'colour', 'design-colours': 'colour', 'auto-layout-advanced': 'stack',
 }
 

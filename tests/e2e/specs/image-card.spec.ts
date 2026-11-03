@@ -55,7 +55,7 @@ test('the bar\'s Look sets the filter; the header card the fit; the Adjust card 
   await expect(filters.locator('img').first()).toHaveJSProperty('complete', true)
 
   await filters.getByRole('radio', { name: 'Warm' }).click()
-  await (await openCard(page, 'fit-card')).getByRole('radiogroup', { name: 'Fit' }).getByRole('radio', { name: 'Fit inside' }).click()
+  await (await openCard(page, 'fill-card')).getByRole('radiogroup', { name: 'Fit' }).getByRole('radio', { name: 'Fit inside' }).click()
   await expect.poll(() => imageOf(page)).toMatchObject({ filter: 'warm', fit: 'fit' })
 
   await enter((await card()).getByRole('spinbutton', { name: 'Image opacity' }), '80')
