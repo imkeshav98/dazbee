@@ -612,8 +612,13 @@ function live(
     const box = boxIn(frame, id, from)
     return box && drawnFrom(box, containersOf(frame, from.nodes[id]?.parentId, from))
   }
-  /** Locked in place layers can't be picked on the stage: a click goes to what lies beneath. */
+  /**
+   * Locked in place layers can't be picked by a press: a drag from one goes to what lies beneath, or
+   * draws a marquee. A click on one, though, selects it (`lockedClick`), so its lock can be undone.
+   */
   const pickable = (layer: SceneLayer) => !design.nodes[layer.id]?.lock?.move
+  /** Whether the selection is locked in place: it shows no handles and a press can't move it. */
+  const lockedSelection = () => Boolean(selection?.ids.some((id) => design.nodes[id]?.lock?.move))
   /** Drops selected layers that are gone, and the selection once none are left or its frame is. */
   function keepSelection() {
     if (!selection) return
@@ -968,8 +973,8 @@ function live(
     el.dataset.frame = frame.key
     el.dataset.count = String(selection.ids.length)
     if (!several) el.dataset.layer = selection.ids[0]
-    // Handles only once the box is big enough on screen to grab them apart.
-    if (!editing && Math.min(box.width, box.height) * camera.zoom >= 2 * HANDLE_SIZE) {
+    // Handles only once the box is big enough on screen to grab them apart, and not on a locked one.
+    if (!editing && !lockedSelection() && Math.min(box.width, box.height) * camera.zoom >= 2 * HANDLE_SIZE) {
       for (const h of HANDLES) {
         const handle = document.createElement('div')
         handle.className = 'handle'
@@ -1454,6 +1459,8 @@ function live(
    * press there on nothing, which a click deselects.
    */
   let clickedAlone: string | null = null
+  /** The locked layer under a press that started a marquee: a click, with no drag, selects it. */
+  let lockedClick: { id: string; frame: string } | null = null
   /** Where a press that may still be a click went down, on screen: it drags only once it has gone CLICK_SLOP from there. */
   let pressedAt: Point | null = null
   let pan: { from: Point; camera: Camera } | null = null
@@ -1833,7 +1840,7 @@ function live(
   /** The handle under a screen point: one to resize by, or the zone outside a corner to turn by. */
   function handleUnder(screen: Point): { kind: 'resize'; handle: Handle } | { kind: 'rotate'; corner: number } | null {
     const outer = selectionBox()
-    if (!outer || editing || pathEditing) return null
+    if (!outer || editing || pathEditing || lockedSelection()) return null
     const { frame, drawn: box } = outer
     const onScreen = (p: Point) => toScreen(camera, { x: frame.x + p.x, y: frame.y + p.y })
     const c = centreOf(box)
@@ -1972,8 +1979,11 @@ function live(
         select([hit.id], at.frame.key)
       }
     } else if (!inOuter) {
-      // Empty canvas: a marquee, adding to the selection with shift.
+      // Empty canvas, or a locked layer: a marquee, adding to the selection with shift.
       canvas.setPointerCapture(e.pointerId)
+      const under = at && !e.shiftKey ? hitTest(cached(at.frame).scene.layers, at.p) : null
+      const lockedId = under && at ? target(under.id, at.frame.key) : null
+      lockedClick = at && lockedId && design.nodes[lockedId]?.lock?.move ? { id: lockedId, frame: at.frame.key } : null
       const from = toWorld(camera, screen)
       const base = e.shiftKey ? selection?.ids ?? [] : []
       const baseFrame = e.shiftKey ? selection?.frame ?? null : null
@@ -2481,6 +2491,11 @@ function live(
       hug(gesture.roots)
       gesture.end()
     }
+    // A click on a locked layer, not a drag, selects it.
+    if (gesture?.kind === 'marquee' && lockedClick && Math.hypot(gesture.to.x - gesture.from.x, gesture.to.y - gesture.from.y) * camera.zoom < CLICK_SLOP) {
+      select([lockedClick.id], lockedClick.frame)
+    }
+    lockedClick = null
     if (clickedAlone !== null && selection) {
       // A click that picks a layer outside the group gone into, or nothing, leaves it.
       if (entered && (!clickedAlone || !insideEntered(clickedAlone))) entered = null
