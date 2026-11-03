@@ -150,7 +150,7 @@ export function NumberField({ label, name, value, step = 1, min, max, fillRange,
           // Undo and redo are the design's while nothing is being typed; once something is, the
           // field's own, taking back what was typed.
           const action = shortcutFor(event.nativeEvent)
-          if (editor && draft === null && (action === 'undo' || action === 'redo')) {
+          if (editor && typedNow.current === null && (action === 'undo' || action === 'redo')) {
             event.preventDefault()
             editor.perform(action)
           } else if (event.key === 'Enter') commit(event.currentTarget.value)
