@@ -27,7 +27,8 @@ export function coverOf(design: Design) {
   return { pageId, formatId, width: format.width, height: format.height }
 }
 
-export interface DesignCover {
+/** Where a design's stored picture is, and the size of the format it shows. */
+export interface ThumbnailCover {
   key: string
   width: number
   height: number
@@ -92,7 +93,7 @@ export async function ensureDesignThumbnail(
   storage: Storage,
   workspaceId: string,
   summary: DesignSummary,
-): Promise<DesignCover | null> {
+): Promise<ThumbnailCover | null> {
   const design = await storedDesign(db, summary.id)
   const cover = design && coverOf(design)
   if (!design || !cover) return null

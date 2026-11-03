@@ -62,7 +62,7 @@ import { fontLink, InvalidFont, listFonts, recordFont, startFontUpload } from '.
 import { body, type Env, error, requireSession } from './http.ts'
 import { bearerToken, readSessionToken, type SessionOf } from './session.ts'
 import { completeSignIn, type SignedInPerson, type SignInSettings } from './sign-in.ts'
-import { originalKey, SIGNED_URL_SECONDS, templateThumbnailKey } from './storage-keys.ts'
+import { originalKey, signedLink, templateThumbnailKey } from './storage-keys.ts'
 import {
   deleteTemplate,
   findTemplate,
@@ -226,13 +226,8 @@ export function createApp({
     if (!design) return c.json(error('No such design'), 404)
     const cover = await ensureDesignThumbnail(db, storage, workspaceId, design)
     if (!cover) return c.json(error('This design has nothing to show yet'), 404)
-    const url = await storage.signedGet(cover.key, SIGNED_URL_SECONDS)
-    return c.json({
-      url,
-      width: cover.width,
-      height: cover.height,
-      expiresAt: new Date(Date.now() + SIGNED_URL_SECONDS * 1000).toISOString(),
-    } satisfies DesignThumbnail)
+    const { url, expiresAt } = await signedLink(storage, cover.key)
+    return c.json({ url, width: cover.width, height: cover.height, expiresAt } satisfies DesignThumbnail)
   })
 
   app.post('/brands/:brandId/designs/:designId/sync-token', async (c) => {
@@ -281,12 +276,8 @@ export function createApp({
     const { workspaceId } = c.var.session
     const asset = await findAsset(db, workspaceId, c.req.param('brandId'), { id: c.req.param('assetId') })
     if (!asset) return c.json(error('No such asset'), 404)
-    const url = await storage.signedGet(originalKey(workspaceId, asset.sha256), SIGNED_URL_SECONDS)
-    return c.json({
-      asset,
-      url,
-      expiresAt: new Date(Date.now() + SIGNED_URL_SECONDS * 1000).toISOString(),
-    } satisfies AssetLink)
+    const { url, expiresAt } = await signedLink(storage, originalKey(workspaceId, asset.sha256))
+    return c.json({ asset, url, expiresAt } satisfies AssetLink)
   })
 
   app.patch('/brands/:brandId/assets/:assetId', async (c) => {
@@ -320,11 +311,7 @@ export function createApp({
     const { workspaceId } = c.var.session
     const asset = await findAsset(db, workspaceId, c.req.param('brandId'), { id: c.req.param('assetId') })
     if (!asset) return c.json(error('No such asset'), 404)
-    const url = await storage.signedGet(await ensureThumbnail(storage, workspaceId, asset), SIGNED_URL_SECONDS)
-    return c.json({
-      url,
-      expiresAt: new Date(Date.now() + SIGNED_URL_SECONDS * 1000).toISOString(),
-    } satisfies SignedLink)
+    return c.json((await signedLink(storage, await ensureThumbnail(storage, workspaceId, asset))) satisfies SignedLink)
   })
 
   // Templates (#54): the workspace's and the brand's, a design saved to start others from.
@@ -377,11 +364,7 @@ export function createApp({
     const { workspaceId } = c.var.session
     const template = await findTemplate(db, workspaceId, c.req.param('brandId'), c.req.param('templateId'))
     if (!template) return c.json(error('No such template'), 404)
-    const url = await storage.signedGet(templateThumbnailKey(workspaceId, template.id), SIGNED_URL_SECONDS)
-    return c.json({
-      url,
-      expiresAt: new Date(Date.now() + SIGNED_URL_SECONDS * 1000).toISOString(),
-    } satisfies SignedLink)
+    return c.json((await signedLink(storage, templateThumbnailKey(workspaceId, template.id))) satisfies SignedLink)
   })
 
   app.post('/brands/:brandId/templates/:templateId/designs', async (c) => {

@@ -1,15 +1,21 @@
+// The API as its seam tests call it: the test database and storage, two workspaces with a brand and a
+// person each, `call` to ask the app as one of them, and the upload flow. A test file that imports it
+// adds the workspaces before its tests and closes the database after them.
 import { randomUUID } from 'node:crypto'
 
-import { afterAll, beforeAll } from 'vitest'
+import { afterAll, beforeAll, expect } from 'vitest'
 
 import { brands, memberships, openDatabase, users, workspaces } from '@dazbee/db'
+import { AssetSummary, UploadTicket } from '@dazbee/schema'
 import { openStorage, storageSettings } from '@dazbee/storage'
 
 import { createApp } from './app.ts'
 import { type Session, signSessionToken, tokenSession } from './session.ts'
 import { DATABASE_URL } from './test-database.ts'
+import { sha256 } from './test-files.ts'
 
-export const { db, close } = openDatabase(DATABASE_URL)
+const database = openDatabase(DATABASE_URL)
+export const db = database.db
 
 // Two workspaces with a brand each, fresh for every run so runs never see each other's rows.
 export const run = randomUUID().slice(0, 8)
@@ -59,6 +65,34 @@ export async function call(as: string | null, method: string, path: string, body
   return { status: response.status, json: response.status === 204 ? null : ((await response.json()) as unknown) }
 }
 
+/** Starts an image upload as `as`, PUTs the bytes when asked to, and records the asset. */
+export async function uploadImage(
+  as: string,
+  brandId: string,
+  bytes: Uint8Array,
+  name?: string,
+  contentType = 'image/png',
+) {
+  const ticket = UploadTicket.parse(
+    (
+      await call(as, 'POST', `/brands/${brandId}/assets/uploads`, {
+        sha256: sha256(bytes),
+        byteSize: bytes.length,
+        contentType,
+      })
+    ).json,
+  )
+  if (ticket.asset) return { asset: ticket.asset, uploaded: false }
+  const put = await fetch(ticket.upload.url, { method: 'PUT', body: bytes, headers: ticket.upload.headers })
+  expect(put.status).toBe(200)
+  const recorded = await call(as, 'POST', `/brands/${brandId}/assets`, {
+    sha256: sha256(bytes),
+    ...(name ? { name } : {}),
+  })
+  expect(recorded.status).toBe(201)
+  return { asset: AssetSummary.parse(recorded.json), uploaded: true }
+}
+
 beforeAll(async () => {
   await storage.ensureBucket()
   await db.insert(workspaces).values([workspace, other])
@@ -70,5 +104,5 @@ beforeAll(async () => {
   ])
 })
 afterAll(async () => {
-  await close()
+  await database.close()
 })

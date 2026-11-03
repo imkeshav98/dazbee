@@ -1,15 +1,10 @@
 // The API seam, against Postgres from Docker Compose (`docker compose up -d --wait postgres`).
-import { createHash } from 'node:crypto'
-import { readFileSync } from 'node:fs'
-import { join } from 'node:path'
-
 import { eq } from 'drizzle-orm'
 import { afterAll, describe, expect, it } from 'vitest'
 import * as Y from 'yjs'
 
 import { fontFaces, readDesignState, writeDesignState } from '@dazbee/db'
 import { loadDesign, readDesign } from '@dazbee/doc'
-import { FONT_FILES_DIR } from '@dazbee/fonts/node'
 import {
   ApiError,
   AssetInUse,
@@ -51,15 +46,10 @@ import {
   sibling,
   storage,
   syncSecret,
+  uploadImage,
   workspace,
 } from './test-api.ts'
-import { png } from './test-files.ts'
-
-/** A stand-in Google family, served by a fake Google from the Noto files, removed after the run. */
-const googleFamily = { family: `Test Sans ${run}`, category: 'sans-serif', weights: [400, 700], italic: false } as const
-afterAll(async () => {
-  await db.delete(fontFaces).where(eq(fontFaces.family, googleFamily.family))
-})
+import { fontFile, png, sha256 } from './test-files.ts'
 
 describe('the workspace', () => {
   it('answers with the session’s own workspace and its kind', async () => {
@@ -279,21 +269,6 @@ describe('renaming, copying and deleting designs (#159)', () => {
 })
 
 describe('templates (#54)', { timeout: 60_000 }, () => {
-  const sha256 = (bytes: Uint8Array) => createHash('sha256').update(bytes).digest('hex')
-  async function imageAsset(brandId: string, bytes: Uint8Array) {
-    const ticket = UploadTicket.parse(
-      (
-        await call('a', 'POST', `/brands/${brandId}/assets/uploads`, {
-          sha256: sha256(bytes),
-          byteSize: bytes.length,
-          contentType: 'image/png',
-        })
-      ).json,
-    )
-    if (ticket.asset) return ticket.asset
-    await fetch(ticket.upload.url, { method: 'PUT', body: bytes, headers: ticket.upload.headers })
-    return AssetSummary.parse((await call('a', 'POST', `/brands/${brandId}/assets`, { sha256: sha256(bytes) })).json)
-  }
   /** A design with a shape, text and one of the brand's images, in two formats. */
   const content = (assetId: string) => ({
     meta: { schemaVersion: 5, designId: 'any', name: 'Sale', kind: 'single', primaryFormatId: 'sq' },
@@ -362,7 +337,7 @@ describe('templates (#54)', { timeout: 60_000 }, () => {
   ]
 
   it('saves a brand template with a thumbnail, and starting from it gives a design with the same pixels and no shared ids', async () => {
-    const photo = await imageAsset(brand.id, png(64, 48, `${run}-template`))
+    const photo = (await uploadImage('a', brand.id, png(64, 48, `${run}-template`))).asset
     const saved = await call('a', 'POST', `/brands/${brand.id}/templates`, {
       name: 'Sale square',
       scope: 'brand',
@@ -422,7 +397,7 @@ describe('templates (#54)', { timeout: 60_000 }, () => {
   })
 
   it('renames and deletes a template the brand can see (#159)', async () => {
-    const photo = await imageAsset(brand.id, png(64, 48, `${run}-template`))
+    const photo = (await uploadImage('a', brand.id, png(64, 48, `${run}-template`))).asset
     const template = TemplateSummary.parse(
       (
         await call('a', 'POST', `/brands/${brand.id}/templates`, {
@@ -450,7 +425,7 @@ describe('templates (#54)', { timeout: 60_000 }, () => {
   })
 
   it('shows workspace templates to every brand and brand templates to their brand only', async () => {
-    const photo = await imageAsset(brand.id, png(64, 48, `${run}-template`))
+    const photo = (await uploadImage('a', brand.id, png(64, 48, `${run}-template`))).asset
     const mine = TemplateSummary.parse(
       (
         await call('a', 'POST', `/brands/${brand.id}/templates`, {
@@ -486,7 +461,7 @@ describe('templates (#54)', { timeout: 60_000 }, () => {
   })
 
   it("gives another brand its own assets of a workspace template's images, drawn the same", async () => {
-    const photo = await imageAsset(brand.id, png(64, 48, `${run}-crossing`))
+    const photo = (await uploadImage('a', brand.id, png(64, 48, `${run}-crossing`))).asset
     const shared = TemplateSummary.parse(
       (
         await call('a', 'POST', `/brands/${brand.id}/templates`, {
@@ -517,7 +492,7 @@ describe('templates (#54)', { timeout: 60_000 }, () => {
   })
 
   it("refuses a design that is not valid or names another brand's image", async () => {
-    const theirs = await imageAsset(sibling.id, png(8, 8, `${run}-not-mine`))
+    const theirs = (await uploadImage('a', sibling.id, png(8, 8, `${run}-not-mine`))).asset
     expect(
       (
         await call('a', 'POST', `/brands/${brand.id}/templates`, {
@@ -570,27 +545,7 @@ describe('brand kits (#53)', () => {
   })
 
   it("takes a logo only from the brand's own assets", async () => {
-    const sha = createHash('sha256')
-    const bytes = png(12, 12, `${run}-logo`)
-    const ticket = UploadTicket.parse(
-      (
-        await call('a', 'POST', `/brands/${brand.id}/assets/uploads`, {
-          sha256: sha.update(bytes).digest('hex'),
-          byteSize: bytes.length,
-          contentType: 'image/png',
-        })
-      ).json,
-    )
-    if (ticket.upload) await fetch(ticket.upload.url, { method: 'PUT', body: bytes, headers: ticket.upload.headers })
-    const logo =
-      ticket.asset ??
-      AssetSummary.parse(
-        (
-          await call('a', 'POST', `/brands/${brand.id}/assets`, {
-            sha256: createHash('sha256').update(bytes).digest('hex'),
-          })
-        ).json,
-      )
+    const { asset: logo } = await uploadImage('a', brand.id, png(12, 12, `${run}-logo`))
     expect((await call('a', 'PUT', `/brands/${brand.id}/kit`, { ...kit, logoAssetId: logo.id })).json).toMatchObject({
       logoAssetId: logo.id,
     })
@@ -627,33 +582,9 @@ describe('brand kits (#53)', () => {
 
 // Recording an image makes its thumbnail with CanvasKit, which takes seconds to load on a busy CI runner.
 describe('image uploads', { timeout: 30_000 }, () => {
-  const sha256 = (bytes: Uint8Array) => createHash('sha256').update(bytes).digest('hex')
-
-  /** Starts an upload, PUTs the bytes when asked to, and records the asset. */
-  async function upload(as: string, brandId: string, bytes: Uint8Array, name?: string, contentType = 'image/png') {
-    const ticket = UploadTicket.parse(
-      (
-        await call(as, 'POST', `/brands/${brandId}/assets/uploads`, {
-          sha256: sha256(bytes),
-          byteSize: bytes.length,
-          contentType,
-        })
-      ).json,
-    )
-    if (ticket.asset) return { asset: ticket.asset, uploaded: false }
-    const put = await fetch(ticket.upload.url, { method: 'PUT', body: bytes, headers: ticket.upload.headers })
-    expect(put.status).toBe(200)
-    const recorded = await call(as, 'POST', `/brands/${brandId}/assets`, {
-      sha256: sha256(bytes),
-      ...(name ? { name } : {}),
-    })
-    expect(recorded.status).toBe(201)
-    return { asset: AssetSummary.parse(recorded.json), uploaded: true }
-  }
-
   it('uploads, records and fetches an image by asset id', async () => {
     const bytes = png(3, 2, run)
-    const { asset, uploaded } = await upload('a', brand.id, bytes)
+    const { asset, uploaded } = await uploadImage('a', brand.id, bytes)
     expect(uploaded).toBe(true)
     expect(asset).toMatchObject({
       brandId: brand.id,
@@ -672,17 +603,17 @@ describe('image uploads', { timeout: 30_000 }, () => {
 
   it('stores the same file once: a second upload gets the asset without sending bytes', async () => {
     const bytes = png(4, 4, `${run}-twice`)
-    const first = await upload('a', brand.id, bytes)
-    const second = await upload('a', brand.id, bytes)
+    const first = await uploadImage('a', brand.id, bytes)
+    const second = await uploadImage('a', brand.id, bytes)
     expect(second).toEqual({ asset: first.asset, uploaded: false })
     // Another brand of the workspace gets its own asset over the same stored original.
-    const sibling$ = await upload('a', sibling.id, bytes)
+    const sibling$ = await uploadImage('a', sibling.id, bytes)
     expect(sibling$.uploaded).toBe(false)
     expect(sibling$.asset.id).not.toBe(first.asset.id)
   })
 
   it('keeps assets to their workspace and brand', async () => {
-    const { asset } = await upload('a', brand.id, png(5, 5, `${run}-scoped`))
+    const { asset } = await uploadImage('a', brand.id, png(5, 5, `${run}-scoped`))
     expect((await call('b', 'GET', `/brands/${brand.id}/assets/${asset.id}`)).status).toBe(404)
     expect((await call('a', 'GET', `/brands/${sibling.id}/assets/${asset.id}`)).status).toBe(404)
     expect((await call('b', 'GET', `/brands/${brand.id}/assets`)).status).toBe(404)
@@ -737,19 +668,19 @@ describe('image uploads', { timeout: 30_000 }, () => {
       error: 'The uploaded bytes do not match their SHA-256',
     })
     // The bad bytes are gone, so the real owner of that hash can still upload it.
-    const honest = await upload('a', brand.id, png(2, 2, `${run}-claimed`))
+    const honest = await uploadImage('a', brand.id, png(2, 2, `${run}-claimed`))
     expect(honest).toMatchObject({ uploaded: true, asset: { sha256: claimed } })
   })
 
   it('names an asset as uploaded, renames and tags it, and finds it by either (#52)', async () => {
-    const { asset } = await upload('a', brand.id, png(7, 3, `${run}-named`), `Summer sale ${run}.png`)
+    const { asset } = await uploadImage('a', brand.id, png(7, 3, `${run}-named`), `Summer sale ${run}.png`)
     expect(asset).toMatchObject({ name: `Summer sale ${run}.png`, tags: [] })
     const tagged = await call('a', 'PATCH', `/brands/${brand.id}/assets/${asset.id}`, {
       tags: ['Beach ', 'hero', 'beach'],
     })
     expect(tagged.status).toBe(200)
     expect(AssetSummary.parse(tagged.json).tags).toEqual(['beach', 'hero'])
-    const { asset: plain } = await upload('a', brand.id, png(7, 4, `${run}-plain`), `Winter ${run}.png`)
+    const { asset: plain } = await uploadImage('a', brand.id, png(7, 4, `${run}-plain`), `Winter ${run}.png`)
 
     const search = async (q: string) =>
       AssetSummary.array()
@@ -773,10 +704,10 @@ describe('image uploads', { timeout: 30_000 }, () => {
   })
 
   it('keeps names, tags and search to the brand', async () => {
-    const { asset } = await upload('a', brand.id, png(8, 3, `${run}-walled`), `Walled ${run}`)
+    const { asset } = await uploadImage('a', brand.id, png(8, 3, `${run}-walled`), `Walled ${run}`)
     await call('a', 'PATCH', `/brands/${brand.id}/assets/${asset.id}`, { tags: [`walled-${run}`] })
     // The sibling brand uploads the same bytes and gets its own, unnamed and untagged asset.
-    const { asset: theirs } = await upload('a', sibling.id, png(8, 3, `${run}-walled`))
+    const { asset: theirs } = await uploadImage('a', sibling.id, png(8, 3, `${run}-walled`))
     expect(theirs).toMatchObject({ name: '', tags: [] })
     expect((await call('a', 'GET', `/brands/${sibling.id}/assets?q=walled-${run}`)).json).toEqual([])
     expect((await call('a', 'PATCH', `/brands/${sibling.id}/assets/${asset.id}`, { name: 'Mine now' })).status).toBe(
@@ -786,7 +717,7 @@ describe('image uploads', { timeout: 30_000 }, () => {
   })
 
   it('refuses an empty name, too many tags or nothing to change', async () => {
-    const { asset } = await upload('a', brand.id, png(9, 3, `${run}-refused`))
+    const { asset } = await uploadImage('a', brand.id, png(9, 3, `${run}-refused`))
     expect((await call('a', 'PATCH', `/brands/${brand.id}/assets/${asset.id}`, { name: '   ' })).status).toBe(400)
     expect(
       (
@@ -800,11 +731,11 @@ describe('image uploads', { timeout: 30_000 }, () => {
   })
 
   it('makes a thumbnail no larger than 320 pixels a side, for the brand only', async () => {
-    const { asset } = await upload('a', brand.id, png(960, 600, `${run}-big`))
+    const { asset } = await uploadImage('a', brand.id, png(960, 600, `${run}-big`))
     const link = SignedLink.parse((await call('a', 'GET', `/brands/${brand.id}/assets/${asset.id}/thumbnail`)).json)
     const thumbnail = new Uint8Array(await (await fetch(link.url)).arrayBuffer())
     expect(readImageHeader(thumbnail)).toEqual({ contentType: 'image/png', width: 320, height: 200 })
-    const { asset: small } = await upload('a', brand.id, png(40, 30, `${run}-small`))
+    const { asset: small } = await uploadImage('a', brand.id, png(40, 30, `${run}-small`))
     const smallLink = SignedLink.parse(
       (await call('a', 'GET', `/brands/${brand.id}/assets/${small.id}/thumbnail`)).json,
     )
@@ -849,7 +780,7 @@ describe('image uploads', { timeout: 30_000 }, () => {
     const svg = new TextEncoder().encode(
       `<svg xmlns="http://www.w3.org/2000/svg" width="120" height="80" viewBox="0 0 60 40"><!-- ${run} --><rect width="60" height="40" fill="#E0204F"/></svg>`,
     )
-    const { asset } = await upload('a', brand.id, svg, 'Logo', 'image/svg+xml')
+    const { asset } = await uploadImage('a', brand.id, svg, 'Logo', 'image/svg+xml')
     expect(asset).toMatchObject({ contentType: 'image/svg+xml', width: 120, height: 80, name: 'Logo' })
     const thumbnail = SignedLink.parse(
       (await call('a', 'GET', `/brands/${brand.id}/assets/${asset.id}/thumbnail`)).json,
@@ -960,8 +891,13 @@ describe('design thumbnails', { timeout: 30_000 }, () => {
 })
 
 describe('fonts', { timeout: 30_000 }, () => {
-  const fontFile = (file: string) => new Uint8Array(readFileSync(join(FONT_FILES_DIR, file)))
-  const sha256 = (bytes: Uint8Array) => createHash('sha256').update(bytes).digest('hex')
+  /** A stand-in Google family, served by a fake Google from the Noto files, removed after the run. */
+  const googleFamily = {
+    family: `Test Sans ${run}`,
+    category: 'sans-serif',
+    weights: [400, 700],
+    italic: false,
+  } as const
   const regular = fontFile('NotoSans-Regular.ttf')
   const bold = fontFile('NotoSans-Bold.ttf')
 
@@ -977,6 +913,10 @@ describe('fonts', { timeout: 30_000 }, () => {
     if (url === 'https://fonts.gstatic.com/s/test/v1/w700.ttf') return new Response(bold)
     return new Response('not found', { status: 404 })
   }) as typeof fetch
+
+  afterAll(async () => {
+    await db.delete(fontFaces).where(eq(fontFaces.family, googleFamily.family))
+  })
 
   async function upload(as: string, brandId: string, bytes: Uint8Array) {
     const ticket = FontUploadTicket.parse(
@@ -1089,21 +1029,6 @@ describe('fonts', { timeout: 30_000 }, () => {
 })
 
 describe('deleting images', { timeout: 60_000 }, () => {
-  const sha256 = (bytes: Uint8Array) => createHash('sha256').update(bytes).digest('hex')
-  async function image(bytes: Uint8Array) {
-    const ticket = UploadTicket.parse(
-      (
-        await call('a', 'POST', `/brands/${brand.id}/assets/uploads`, {
-          sha256: sha256(bytes),
-          byteSize: bytes.length,
-          contentType: 'image/png',
-        })
-      ).json,
-    )
-    if (ticket.asset) return ticket.asset
-    await fetch(ticket.upload.url, { method: 'PUT', body: bytes, headers: ticket.upload.headers })
-    return AssetSummary.parse((await call('a', 'POST', `/brands/${brand.id}/assets`, { sha256: sha256(bytes) })).json)
-  }
   const withPhoto = (assetId: string) => ({
     meta: { schemaVersion: 5, designId: 'any', name: 'Any', kind: 'single', primaryFormatId: 'sq' },
     formats: { sq: { name: 'Square', width: 400, height: 400, order: 'a0' } },
@@ -1134,7 +1059,7 @@ describe('deleting images', { timeout: 60_000 }, () => {
 
   it("deletes an image nothing uses from the library, and only the brand's own; a design that names it again still draws it", async () => {
     const bytes = png(10, 10, `${run}-unused`)
-    const unused = await image(bytes)
+    const unused = (await uploadImage('a', brand.id, bytes)).asset
     expect((await call('a', 'GET', `/brands/${brand.id}/assets/${unused.id}/uses`)).json).toEqual([])
     expect((await call('b', 'DELETE', `/brands/${brand.id}/assets/${unused.id}`)).status).toBe(404)
     expect((await call('b', 'GET', `/brands/${brand.id}/assets/${unused.id}/uses`)).status).toBe(404)
@@ -1146,12 +1071,12 @@ describe('deleting images', { timeout: 60_000 }, () => {
     // Undo, or a tab not yet saved, can bring a fill of it back: it still draws.
     expect((await call('a', 'GET', `/brands/${brand.id}/assets/${unused.id}`)).status).toBe(200)
     // Uploading the same bytes again brings it back to the library, the same asset.
-    expect((await image(bytes)).id).toBe(unused.id)
+    expect((await uploadImage('a', brand.id, bytes)).asset.id).toBe(unused.id)
     expect(await listedIds()).toContain(unused.id)
   })
 
   it('refuses to delete an image a design, a template or the logo shows, naming them; it goes once none does', async () => {
-    const used = await image(png(11, 11, `${run}-used`))
+    const used = (await uploadImage('a', brand.id, png(11, 11, `${run}-used`))).asset
     const design = DesignSummary.parse(
       (
         await call('a', 'POST', `/brands/${brand.id}/designs`, {

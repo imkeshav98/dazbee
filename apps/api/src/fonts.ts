@@ -1,7 +1,7 @@
 // The font catalog (#50): Google Fonts copied into our storage, shared by every workspace, and the
 // fonts each brand uploads, its own. A brand's upload of a family Google also has is the one that
 // brand sees. Every file is read back from our storage, by the editor and by Node renders alike.
-import { createHash, randomUUID } from 'node:crypto'
+import { randomUUID } from 'node:crypto'
 
 import { and, eq, inArray, isNull, or } from 'drizzle-orm'
 
@@ -17,7 +17,7 @@ import {
 import type { Storage } from '@dazbee/storage'
 
 import { fontPreview, readFontInfo } from './font-file.ts'
-import { googleFontKey, previewKey, SIGNED_URL_SECONDS, uploadedFontKey } from './storage-keys.ts'
+import { checkUpload, googleFontKey, previewKey, signedLink, signedUpload, uploadedFontKey } from './storage-keys.ts'
 
 export class InvalidFont extends Error {}
 
@@ -83,16 +83,8 @@ export async function fontLink(
   const row = await visibleFace(db, workspaceId, brandId, faceId)
   if (!row) return null
   const key = keyOf(row)
-  const [url, previewUrl] = await Promise.all([
-    storage.signedGet(key, SIGNED_URL_SECONDS),
-    storage.signedGet(previewKey(key), SIGNED_URL_SECONDS),
-  ])
-  return {
-    face: toFace(row),
-    url,
-    previewUrl,
-    expiresAt: new Date(Date.now() + SIGNED_URL_SECONDS * 1000).toISOString(),
-  }
+  const [file, preview] = await Promise.all([signedLink(storage, key), signedLink(storage, previewKey(key))])
+  return { face: toFace(row), url: file.url, previewUrl: preview.url, expiresAt: file.expiresAt }
 }
 
 /**
@@ -137,20 +129,11 @@ export async function startFontUpload(
       and(eq(fontFaces.workspaceId, workspaceId), eq(fontFaces.brandId, brandId), eq(fontFaces.sha256, upload.sha256)),
     )
   if (existing) return { face: toFace(existing), upload: null }
-  const url = await storage.signedPut(
-    uploadedFontKey(workspaceId, upload.sha256),
-    upload.contentType,
-    upload.byteSize,
-    SIGNED_URL_SECONDS,
-  )
-  return {
-    face: null,
-    upload: {
-      url,
-      headers: { 'content-type': upload.contentType },
-      expiresAt: new Date(Date.now() + SIGNED_URL_SECONDS * 1000).toISOString(),
-    },
-  }
+  const { url, expiresAt } = await signedUpload(storage, uploadedFontKey(workspaceId, upload.sha256), {
+    contentType: upload.contentType,
+    size: upload.byteSize,
+  })
+  return { face: null, upload: { url, headers: { 'content-type': upload.contentType }, expiresAt } }
 }
 
 /**
@@ -173,12 +156,7 @@ export async function recordFont(
     .from(fontFaces)
     .where(and(eq(fontFaces.workspaceId, workspaceId), eq(fontFaces.brandId, brandId), eq(fontFaces.sha256, sha256)))
   if (existing) return toFace(existing)
-  const refuse = async (message: string) => {
-    await storage.delete(key)
-    return new InvalidFont(message)
-  }
-  if (createHash('sha256').update(bytes).digest('hex') !== sha256)
-    throw await refuse('The uploaded bytes do not match their SHA-256')
+  const refuse = await checkUpload(storage, key, bytes, sha256, InvalidFont)
   const info = readFontInfo(bytes)
   if (!info) throw await refuse('The upload is not a TrueType or OpenType font')
   let preview: Uint8Array
