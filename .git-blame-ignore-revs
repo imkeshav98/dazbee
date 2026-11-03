@@ -1,0 +1,5 @@
+# Commits that only reformat code, which git blame skips (GitHub reads this file; locally run
+# git config blame.ignoreRevsFile .git-blame-ignore-revs).
+
+# Prettier over the whole repo, and simple-import-sort through eslint --fix.
+d971bbd53f1d75a07461b426e26625e54184c55d
