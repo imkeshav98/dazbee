@@ -1,6 +1,6 @@
 // The sign-in page's showcase: three copies of a sample ad that fan out over a slow aurora. Plain
 // HTML and CSS (classes in globals.css), decoration only, so it is hidden from assistive tech.
-import type { Messages } from '../../lib/i18n/en.ts'
+import type { Messages } from '@/lib/i18n/en.ts'
 
 const VARIANTS = ['teal', 'sunset', 'violet'] as const
 

@@ -2,7 +2,7 @@
 // API checks the design and that its images are the brand's own.
 import { SaveTemplate } from '@dazbee/schema'
 
-import { ApiFailure, saveTemplate } from '../../../../../lib/api.ts'
+import { ApiFailure, saveTemplate } from '@/lib/api.ts'
 
 export async function POST(request: Request, { params }: { params: Promise<{ brandId: string }> }) {
   const { brandId } = await params

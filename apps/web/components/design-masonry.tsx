@@ -4,9 +4,10 @@ import Link from 'next/link'
 
 import type { DesignSummary } from '@dazbee/schema'
 
-import { cn } from '../lib/cn.ts'
-import { format, type Messages } from '../lib/i18n/index.ts'
-import { tileOf } from '../lib/tile.ts'
+import { cn } from '@/lib/cn.ts'
+import { format, type Messages } from '@/lib/i18n/index.ts'
+import { tileOf } from '@/lib/tile.ts'
+
 import { TileMenu } from './tile-menu.tsx'
 
 /** What a tile's menu does to a design (#159), as server actions. */

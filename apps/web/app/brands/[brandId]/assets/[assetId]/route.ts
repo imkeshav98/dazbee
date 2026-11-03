@@ -4,7 +4,7 @@
 // still uses it, and then answers 409 with what does.
 import { isVectorAsset, UpdateAsset } from '@dazbee/schema'
 
-import { ApiFailure, assetLink, deleteAsset, updateAsset } from '../../../../../lib/api.ts'
+import { ApiFailure, assetLink, deleteAsset, updateAsset } from '@/lib/api.ts'
 
 export async function GET(_request: Request, { params }: { params: Promise<{ brandId: string; assetId: string }> }) {
   const { brandId, assetId } = await params

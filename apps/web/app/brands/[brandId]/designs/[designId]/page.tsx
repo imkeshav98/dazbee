@@ -1,11 +1,12 @@
 import { cookies } from 'next/headers'
 import { notFound } from 'next/navigation'
 
-import { AccountMenu } from '../../../../../components/account-menu.tsx'
-import { findDesign, getWorkspace } from '../../../../../lib/api.ts'
-import { brandWords } from '../../../../../lib/i18n/index.ts'
-import { getMessages } from '../../../../../lib/i18n/server.ts'
-import { SESSION_COOKIE } from '../../../../../lib/sign-in.ts'
+import { AccountMenu } from '@/components/account-menu.tsx'
+import { findDesign, getWorkspace } from '@/lib/api.ts'
+import { brandWords } from '@/lib/i18n/index.ts'
+import { getMessages } from '@/lib/i18n/server.ts'
+import { SESSION_COOKIE } from '@/lib/sign-in.ts'
+
 import { EditorStage } from './stage.tsx'
 
 export const metadata = { title: 'Dazbee editor' }

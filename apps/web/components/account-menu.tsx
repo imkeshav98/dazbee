@@ -6,8 +6,9 @@ import { GearSixIcon, SignOutIcon } from '@phosphor-icons/react'
 import Link from 'next/link'
 import { useEffect, useId, useRef, useState } from 'react'
 
-import { useMessages } from '../lib/i18n/client.tsx'
-import { initialsOf } from '../lib/initials.ts'
+import { useMessages } from '@/lib/i18n/client.tsx'
+import { initialsOf } from '@/lib/initials.ts'
+
 import { LocaleSwitch } from './locale-switch.tsx'
 import { ThemeSwitch } from './theme-switch.tsx'
 

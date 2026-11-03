@@ -4,12 +4,12 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 
-import { HomeKit } from '../../../../components/home-kit.tsx'
-import { LibraryShell } from '../../../../components/library-shell.tsx'
-import { designCover, getBrandKit, getWorkspace, listBrands, listDesigns } from '../../../../lib/api.ts'
-import { showsBrandList } from '../../../../lib/home.ts'
-import { brandWords, format } from '../../../../lib/i18n/index.ts'
-import { getMessages } from '../../../../lib/i18n/server.ts'
+import { HomeKit } from '@/components/home-kit.tsx'
+import { LibraryShell } from '@/components/library-shell.tsx'
+import { designCover, getBrandKit, getWorkspace, listBrands, listDesigns } from '@/lib/api.ts'
+import { showsBrandList } from '@/lib/home.ts'
+import { brandWords, format } from '@/lib/i18n/index.ts'
+import { getMessages } from '@/lib/i18n/server.ts'
 
 export const dynamic = 'force-dynamic'
 

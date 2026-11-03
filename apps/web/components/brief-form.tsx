@@ -25,15 +25,15 @@ import { type ReactNode, useRef, useState } from 'react'
 
 import { type AssetSummary, type BrandKit, FORMAT_PRESETS } from '@dazbee/schema'
 
-import { BRIEF_FORMATS, type BriefFormat } from '../lib/brief.ts'
-import { cn } from '../lib/cn.ts'
-import { useMessages } from '../lib/i18n/client.tsx'
-import { format } from '../lib/i18n/index.ts'
-import { IMAGE_ACCEPT, sendAsset } from '../lib/upload-asset.ts'
-import { useBrandKit } from './editor/use-brand-kit.ts'
-import { buttonStyles } from './ui/button.tsx'
-import { overlayScroll } from './ui/overlay-scroll.ts'
-import { Tooltip } from './ui/tooltip.tsx'
+import { useBrandKit } from '@/components/editor/use-brand-kit.ts'
+import { buttonStyles } from '@/components/ui/button.tsx'
+import { overlayScroll } from '@/components/ui/overlay-scroll.ts'
+import { Tooltip } from '@/components/ui/tooltip.tsx'
+import { BRIEF_FORMATS, type BriefFormat } from '@/lib/brief.ts'
+import { cn } from '@/lib/cn.ts'
+import { useMessages } from '@/lib/i18n/client.tsx'
+import { format } from '@/lib/i18n/index.ts'
+import { IMAGE_ACCEPT, sendAsset } from '@/lib/upload-asset.ts'
 
 /** A design a brief can start from, with its picture's size when it has one. */
 export type BriefReference = {

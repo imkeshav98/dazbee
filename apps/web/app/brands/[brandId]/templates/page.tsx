@@ -3,14 +3,14 @@
 // each card's menu renames or deletes it (#159).
 import { notFound } from 'next/navigation'
 
-import { FilterChips } from '../../../../components/filter-chips.tsx'
-import { LibraryShell } from '../../../../components/library-shell.tsx'
-import { TileMenu } from '../../../../components/tile-menu.tsx'
-import { getWorkspace, listBrands, listTemplates } from '../../../../lib/api.ts'
-import { showsBrandList } from '../../../../lib/home.ts'
-import { brandWords, format } from '../../../../lib/i18n/index.ts'
-import { getMessages } from '../../../../lib/i18n/server.ts'
-import { deleteTemplateAction, renameTemplateAction, startTemplate } from '../actions.ts'
+import { deleteTemplateAction, renameTemplateAction, startTemplate } from '@/app/brands/[brandId]/actions.ts'
+import { FilterChips } from '@/components/filter-chips.tsx'
+import { LibraryShell } from '@/components/library-shell.tsx'
+import { TileMenu } from '@/components/tile-menu.tsx'
+import { getWorkspace, listBrands, listTemplates } from '@/lib/api.ts'
+import { showsBrandList } from '@/lib/home.ts'
+import { brandWords, format } from '@/lib/i18n/index.ts'
+import { getMessages } from '@/lib/i18n/server.ts'
 
 export const dynamic = 'force-dynamic'
 

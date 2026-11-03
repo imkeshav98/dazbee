@@ -9,7 +9,7 @@ import { animate, useReducedMotion } from 'motion/react'
 import Link from 'next/link'
 import { type MouseEvent, useCallback, useLayoutEffect, useRef, useState } from 'react'
 
-import { cn } from '../lib/cn.ts'
+import { cn } from '@/lib/cn.ts'
 
 export type CapsuleEntry = 'home' | 'recent' | 'templates' | 'kit'
 

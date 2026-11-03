@@ -8,7 +8,8 @@ import { CaretDownIcon, CheckIcon } from '@phosphor-icons/react'
 import { type ReactNode, useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 
-import { cn } from '../../lib/cn.ts'
+import { cn } from '@/lib/cn.ts'
+
 import { useOverlayScroll } from './overlay-scroll.ts'
 
 export interface SelectOption {

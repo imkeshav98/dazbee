@@ -11,10 +11,11 @@ import { type CSSProperties, type ReactNode, useEffect, useLayoutEffect, useRef,
 import type { Editor } from '@dazbee/editor'
 import type { Design } from '@dazbee/schema'
 
-import { cn } from '../../lib/cn.ts'
-import { useMessages } from '../../lib/i18n/client.tsx'
-import { format } from '../../lib/i18n/index.ts'
-import { useValue, valueStore } from '../../lib/value-store.ts'
+import { cn } from '@/lib/cn.ts'
+import { useMessages } from '@/lib/i18n/client.tsx'
+import { format } from '@/lib/i18n/index.ts'
+import { useValue, valueStore } from '@/lib/value-store.ts'
+
 import { afterDraws, sameUrls } from './after-draws.ts'
 import { CARD_ROW, CardMenu } from './card.tsx'
 import { PanelFrame } from './edit-panel.tsx'

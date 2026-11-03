@@ -2,9 +2,9 @@
 
 import { useEffect, useState } from 'react'
 
-import { useMessages } from '../lib/i18n/client.tsx'
-import { themeOf, type ThemePick, THEMES } from '../lib/theme.ts'
-import { segment, SEGMENTED } from './ui/segmented.tsx'
+import { segment, SEGMENTED } from '@/components/ui/segmented.tsx'
+import { useMessages } from '@/lib/i18n/client.tsx'
+import { themeOf, type ThemePick, THEMES } from '@/lib/theme.ts'
 
 declare global {
   interface Window {

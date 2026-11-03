@@ -41,10 +41,11 @@ import { type ReactNode, useEffect, useLayoutEffect, useRef, useState } from 're
 import { type Editor, type ShortcutAction, shortcutFor, withImage } from '@dazbee/editor'
 import { boundFillIndex, type Design, type Paint } from '@dazbee/schema'
 
-import { cn } from '../../lib/cn.ts'
-import { useMessages } from '../../lib/i18n/client.tsx'
-import { format } from '../../lib/i18n/index.ts'
-import { LIMITS } from '../../lib/limits.ts'
+import { cn } from '@/lib/cn.ts'
+import { useMessages } from '@/lib/i18n/client.tsx'
+import { format } from '@/lib/i18n/index.ts'
+import { LIMITS } from '@/lib/limits.ts'
+
 import { COMBINE, DISTRIBUTE, keyOf, useSelection } from './arrange-panel.tsx'
 import { arrowAlong, BarPopover, useRovingTab } from './bar-popover.tsx'
 import {

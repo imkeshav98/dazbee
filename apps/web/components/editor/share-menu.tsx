@@ -8,8 +8,9 @@ import { useEffect, useId, useRef, useState } from 'react'
 
 import type { Editor } from '@dazbee/editor'
 
-import { useMessages } from '../../lib/i18n/client.tsx'
-import { Button } from '../ui/button.tsx'
+import { Button } from '@/components/ui/button.tsx'
+import { useMessages } from '@/lib/i18n/client.tsx'
+
 import { ExportForm } from './export-menu.tsx'
 import { useEditorDesign } from './formats-panel.tsx'
 import { TemplateForm } from './template-menu.tsx'

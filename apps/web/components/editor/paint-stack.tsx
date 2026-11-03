@@ -12,10 +12,11 @@ import { type CSSProperties, type KeyboardEvent, type ReactNode, useEffect, useR
 import type { Editor } from '@dazbee/editor'
 import type { Paint } from '@dazbee/schema'
 
-import { cn } from '../../lib/cn.ts'
-import { useLocale, useMessages } from '../../lib/i18n/client.tsx'
-import { dirOf, format, type Messages } from '../../lib/i18n/index.ts'
-import { segment, SEGMENTED } from '../ui/segmented.tsx'
+import { segment, SEGMENTED } from '@/components/ui/segmented.tsx'
+import { cn } from '@/lib/cn.ts'
+import { useLocale, useMessages } from '@/lib/i18n/client.tsx'
+import { dirOf, format, type Messages } from '@/lib/i18n/index.ts'
+
 import { useMenuFocus } from './bar-popover.tsx'
 import { PICKED_RING } from './card.tsx'
 import { Choice, clamp, ColorField, NumberField, tidy } from './fields.tsx'

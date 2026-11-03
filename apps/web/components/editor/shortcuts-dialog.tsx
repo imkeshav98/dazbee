@@ -8,9 +8,9 @@ import { useEffect, useRef, useState } from 'react'
 
 import { type ShortcutAction, SHORTCUTS } from '@dazbee/editor'
 
-import { useMessages } from '../../lib/i18n/client.tsx'
-import type { Messages } from '../../lib/i18n/index.ts'
-import { overlayScroll } from '../ui/overlay-scroll.ts'
+import { overlayScroll } from '@/components/ui/overlay-scroll.ts'
+import { useMessages } from '@/lib/i18n/client.tsx'
+import type { Messages } from '@/lib/i18n/index.ts'
 
 type Group = keyof Messages['editor']['shortcuts']['groups']
 

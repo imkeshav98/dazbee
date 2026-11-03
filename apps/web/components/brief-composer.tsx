@@ -3,7 +3,8 @@
 // (#136). Until AI drafts arrive (phase 2), Make drafts opens a blank design in the formats picked.
 import type { BrandKit } from '@dazbee/schema'
 
-import type { Messages } from '../lib/i18n/index.ts'
+import type { Messages } from '@/lib/i18n/index.ts'
+
 import { BriefForm, type BriefReference } from './brief-form.tsx'
 
 /** The heading with one word in the AI gradient: "What are we making today?". */

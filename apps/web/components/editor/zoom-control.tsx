@@ -10,9 +10,10 @@ import { useEffect, useMemo, useState } from 'react'
 
 import type { Editor } from '@dazbee/editor'
 
-import { cn } from '../../lib/cn.ts'
-import { useLocale, useMessages } from '../../lib/i18n/client.tsx'
-import { Tooltip } from '../ui/tooltip.tsx'
+import { Tooltip } from '@/components/ui/tooltip.tsx'
+import { cn } from '@/lib/cn.ts'
+import { useLocale, useMessages } from '@/lib/i18n/client.tsx'
+
 import { ShortcutsButton } from './shortcuts-dialog.tsx'
 import { MENU_DIVIDER, MENU_ITEM, MENU_KEY, POPOVER, SWITCH } from './styles.ts'
 

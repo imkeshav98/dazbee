@@ -7,8 +7,9 @@ import { useSyncExternalStore } from 'react'
 
 import type { Editor } from '@dazbee/editor'
 
-import { useMessages } from '../../lib/i18n/client.tsx'
-import { format } from '../../lib/i18n/index.ts'
+import { useMessages } from '@/lib/i18n/client.tsx'
+import { format } from '@/lib/i18n/index.ts'
+
 import { keyOf } from './arrange-panel.tsx'
 
 const BUTTON =

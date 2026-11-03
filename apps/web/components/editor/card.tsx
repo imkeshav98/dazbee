@@ -6,7 +6,8 @@ import { DotsThreeIcon } from '@phosphor-icons/react'
 import * as Popover from '@radix-ui/react-popover'
 import { Fragment, useState } from 'react'
 
-import { cn } from '../../lib/cn.ts'
+import { cn } from '@/lib/cn.ts'
+
 import { useMenuFocus } from './bar-popover.tsx'
 import { ICON_BUTTON, MENU, MENU_DIVIDER, MENU_ITEM } from './styles.ts'
 

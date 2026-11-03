@@ -2,9 +2,9 @@
 
 import { useRouter } from 'next/navigation'
 
-import { useLocale, useMessages } from '../lib/i18n/client.tsx'
-import { type Locale, LOCALE_NAMES, LOCALES } from '../lib/i18n/index.ts'
-import { segment, SEGMENTED } from './ui/segmented.tsx'
+import { segment, SEGMENTED } from '@/components/ui/segmented.tsx'
+import { useLocale, useMessages } from '@/lib/i18n/client.tsx'
+import { type Locale, LOCALE_NAMES, LOCALES } from '@/lib/i18n/index.ts'
 
 /** Picks the UI language, each named in itself; Arabic mirrors the whole UI. */
 export function LocaleSwitch() {

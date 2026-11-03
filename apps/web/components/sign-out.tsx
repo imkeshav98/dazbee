@@ -2,9 +2,9 @@
 import { SignOutIcon } from '@phosphor-icons/react/ssr'
 import { cookies } from 'next/headers'
 
-import { getMessages } from '../lib/i18n/server.ts'
-import { SESSION_COOKIE } from '../lib/sign-in.ts'
-import { buttonStyles } from './ui/button.tsx'
+import { buttonStyles } from '@/components/ui/button.tsx'
+import { getMessages } from '@/lib/i18n/server.ts'
+import { SESSION_COOKIE } from '@/lib/sign-in.ts'
 
 export async function SignOut() {
   const [jar, t] = await Promise.all([cookies(), getMessages()])

@@ -2,13 +2,14 @@
 // with its latest design and how many it has, and a last card that adds one.
 import { redirect } from 'next/navigation'
 
-import { BrandCard, type BrandCardData } from '../components/brand-cards.tsx'
-import { LibraryShell } from '../components/library-shell.tsx'
-import { NewBrandCard } from '../components/new-brand-card.tsx'
-import { designCover, getBrandKit, getWorkspace, listBrands, listDesigns } from '../lib/api.ts'
-import { needsWelcome, openingBrand } from '../lib/home.ts'
-import { brandWords, format } from '../lib/i18n/index.ts'
-import { getMessages } from '../lib/i18n/server.ts'
+import { BrandCard, type BrandCardData } from '@/components/brand-cards.tsx'
+import { LibraryShell } from '@/components/library-shell.tsx'
+import { NewBrandCard } from '@/components/new-brand-card.tsx'
+import { designCover, getBrandKit, getWorkspace, listBrands, listDesigns } from '@/lib/api.ts'
+import { needsWelcome, openingBrand } from '@/lib/home.ts'
+import { brandWords, format } from '@/lib/i18n/index.ts'
+import { getMessages } from '@/lib/i18n/server.ts'
+
 import { addBrand } from './actions.ts'
 
 export const dynamic = 'force-dynamic'

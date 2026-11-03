@@ -7,8 +7,8 @@ import { useEffect } from 'react'
 
 import type { BrandKit } from '@dazbee/schema'
 
-import { KitEditor, useKitSaver } from './editor/kit-editor.tsx'
-import { loadKit, useBrandKit } from './editor/use-brand-kit.ts'
+import { KitEditor, useKitSaver } from '@/components/editor/kit-editor.tsx'
+import { loadKit, useBrandKit } from '@/components/editor/use-brand-kit.ts'
 
 export function HomeKit({
   brandId,

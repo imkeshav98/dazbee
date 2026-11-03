@@ -8,11 +8,12 @@ import type { ReactNode } from 'react'
 
 import type { BrandSummary, WorkspaceSummary } from '@dazbee/schema'
 
-import { addBrand } from '../app/actions.ts'
-import { cn } from '../lib/cn.ts'
-import type { BrandWords, Messages } from '../lib/i18n/index.ts'
-import { initialsOf } from '../lib/initials.ts'
-import { SESSION_COOKIE } from '../lib/sign-in.ts'
+import { addBrand } from '@/app/actions.ts'
+import { cn } from '@/lib/cn.ts'
+import type { BrandWords, Messages } from '@/lib/i18n/index.ts'
+import { initialsOf } from '@/lib/initials.ts'
+import { SESSION_COOKIE } from '@/lib/sign-in.ts'
+
 import { AccountMenu } from './account-menu.tsx'
 import { BrandMark } from './brand-mark.tsx'
 import { LibraryCapsule } from './library-capsule.tsx'

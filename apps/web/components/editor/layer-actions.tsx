@@ -10,9 +10,10 @@ import { type ReactNode, useEffect, useState } from 'react'
 
 import type { Editor, ShortcutAction } from '@dazbee/editor'
 
-import { cn } from '../../lib/cn.ts'
-import { useLocale, useMessages } from '../../lib/i18n/client.tsx'
-import { dirOf, format } from '../../lib/i18n/index.ts'
+import { cn } from '@/lib/cn.ts'
+import { useLocale, useMessages } from '@/lib/i18n/client.tsx'
+import { dirOf, format } from '@/lib/i18n/index.ts'
+
 import { ALIGN, keyOf, useSelection } from './arrange-panel.tsx'
 import { useMenuFocus } from './bar-popover.tsx'
 import { useEditState } from './edit-store.ts'

@@ -24,10 +24,11 @@ import { type CSSProperties, type ReactNode, type RefObject, useEffect, useLayou
 
 import type { Editor, ShortcutAction } from '@dazbee/editor'
 
-import { cn } from '../../lib/cn.ts'
-import { useMessages } from '../../lib/i18n/client.tsx'
-import { format } from '../../lib/i18n/index.ts'
-import { useOverlayScroll } from '../ui/overlay-scroll.ts'
+import { useOverlayScroll } from '@/components/ui/overlay-scroll.ts'
+import { cn } from '@/lib/cn.ts'
+import { useMessages } from '@/lib/i18n/client.tsx'
+import { format } from '@/lib/i18n/index.ts'
+
 import { ALIGN, keyOf, useSelection } from './arrange-panel.tsx'
 import {
   isLayerPanel,

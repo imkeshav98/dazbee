@@ -12,7 +12,7 @@ import {
   renameDesign,
   renameTemplate,
   startFromTemplate,
-} from '../../../lib/api.ts'
+} from '@/lib/api.ts'
 
 /** The name a rename form sends, trimmed to what the API takes. */
 const nameOf = (form: FormData) =>

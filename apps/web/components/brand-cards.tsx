@@ -5,8 +5,8 @@ import Link from 'next/link'
 
 import type { BrandSummary } from '@dazbee/schema'
 
-import { initialsOf } from '../lib/initials.ts'
-import { tileOf } from '../lib/tile.ts'
+import { initialsOf } from '@/lib/initials.ts'
+import { tileOf } from '@/lib/tile.ts'
 
 export interface BrandCardData extends BrandSummary {
   designCount: number

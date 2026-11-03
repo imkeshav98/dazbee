@@ -3,8 +3,8 @@
 import { cookies } from 'next/headers'
 import { type NextRequest, NextResponse } from 'next/server'
 
-import { completeSignIn } from '../../lib/api.ts'
-import { cookieOptions, SESSION_COOKIE, STATE_COOKIE } from '../../lib/sign-in.ts'
+import { completeSignIn } from '@/lib/api.ts'
+import { cookieOptions, SESSION_COOKIE, STATE_COOKIE } from '@/lib/sign-in.ts'
 
 export async function GET(request: NextRequest) {
   const jar = await cookies()

@@ -1,6 +1,6 @@
 // A small pill of two or three choices, as the final mock draws language and theme in the account
 // menu: each choice in words, the picked one on a soft pink.
-import { cn } from '../../lib/cn.ts'
+import { cn } from '@/lib/cn.ts'
 
 export const SEGMENTED = 'flex items-center gap-0.5 rounded-full border border-line p-0.5'
 

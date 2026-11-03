@@ -27,13 +27,14 @@ import {
   type Shape,
 } from '@dazbee/schema'
 
-import { cn } from '../../lib/cn.ts'
-import { designColours } from '../../lib/design-colours.ts'
-import { useMessages } from '../../lib/i18n/client.tsx'
-import { format, type Messages } from '../../lib/i18n/index.ts'
-import { LIMITS } from '../../lib/limits.ts'
-import { sizeTo } from '../../lib/size.ts'
-import { Select } from '../ui/select.tsx'
+import { Select } from '@/components/ui/select.tsx'
+import { cn } from '@/lib/cn.ts'
+import { designColours } from '@/lib/design-colours.ts'
+import { useMessages } from '@/lib/i18n/client.tsx'
+import { format, type Messages } from '@/lib/i18n/index.ts'
+import { LIMITS } from '@/lib/limits.ts'
+import { sizeTo } from '@/lib/size.ts'
+
 import { COMBINE } from './arrange-panel.tsx'
 import { PICKED_RING, SWATCHES } from './card.tsx'
 import { Choice, clamp, ColorField, NumberField, tidy } from './fields.tsx'

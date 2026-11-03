@@ -3,7 +3,7 @@
 import { type ImageType, MAX_SVG_BYTES, MAX_UPLOAD_BYTES } from '@dazbee/schema'
 import { SVG_TYPE, svgMarkup } from '@dazbee/svg'
 
-import { ApiFailure, listAssets, uploadAsset } from '../../../../lib/api.ts'
+import { ApiFailure, listAssets, uploadAsset } from '@/lib/api.ts'
 
 export async function GET(request: Request, { params }: { params: Promise<{ brandId: string }> }) {
   const { brandId } = await params

@@ -1,7 +1,7 @@
 import { cva, type VariantProps } from 'class-variance-authority'
 import type { ButtonHTMLAttributes } from 'react'
 
-import { cn } from '../../lib/cn.ts'
+import { cn } from '@/lib/cn.ts'
 
 export const buttonStyles = cva(
   'inline-flex shrink-0 cursor-pointer items-center justify-center gap-2 rounded-row font-medium whitespace-nowrap select-none ' +

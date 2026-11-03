@@ -11,11 +11,12 @@ import type { Editor } from '@dazbee/editor'
 import { FONT_FACES } from '@dazbee/fonts'
 import { type Design, FontFace, FontFamily } from '@dazbee/schema'
 
-import { cn } from '../../lib/cn.ts'
-import { useMessages } from '../../lib/i18n/client.tsx'
-import { format } from '../../lib/i18n/index.ts'
-import { useOverlayScroll } from '../ui/overlay-scroll.ts'
-import { Select } from '../ui/select.tsx'
+import { useOverlayScroll } from '@/components/ui/overlay-scroll.ts'
+import { Select } from '@/components/ui/select.tsx'
+import { cn } from '@/lib/cn.ts'
+import { useMessages } from '@/lib/i18n/client.tsx'
+import { format } from '@/lib/i18n/index.ts'
+
 import { useEditorDesign } from './formats-panel.tsx'
 import { PANEL_BUTTON, PANEL_HEADING } from './styles.ts'
 

@@ -18,9 +18,10 @@ import { type KeyboardEvent, useRef, useState } from 'react'
 
 import type { ShapeTool } from '@dazbee/editor'
 
-import { cn } from '../../lib/cn.ts'
-import { useMessages } from '../../lib/i18n/client.tsx'
-import { Tooltip } from '../ui/tooltip.tsx'
+import { Tooltip } from '@/components/ui/tooltip.tsx'
+import { cn } from '@/lib/cn.ts'
+import { useMessages } from '@/lib/i18n/client.tsx'
+
 import { DOCK_BUTTON, DOCK_OFF, DOCK_ON, POPOVER } from './styles.ts'
 
 export const SHAPES: { id: ShapeTool; icon: Icon; key?: string }[] = [

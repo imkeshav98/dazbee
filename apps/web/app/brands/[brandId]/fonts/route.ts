@@ -2,7 +2,7 @@
 // the API and storage, so the browser needs no storage address or credentials.
 import { type FontType, MAX_FONT_BYTES } from '@dazbee/schema'
 
-import { ApiFailure, listFonts, uploadFont } from '../../../../lib/api.ts'
+import { ApiFailure, listFonts, uploadFont } from '@/lib/api.ts'
 
 export async function GET(_request: Request, { params }: { params: Promise<{ brandId: string }> }) {
   const { brandId } = await params

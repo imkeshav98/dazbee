@@ -4,14 +4,14 @@ import { notFound } from 'next/navigation'
 
 import { shapeOf } from '@dazbee/schema'
 
-import { DesignMasonry, type MasonryDesign } from '../../../../components/design-masonry.tsx'
-import { FilterChips } from '../../../../components/filter-chips.tsx'
-import { LibraryShell } from '../../../../components/library-shell.tsx'
-import { designCover, getWorkspace, listBrands, listDesigns } from '../../../../lib/api.ts'
-import { showsBrandList } from '../../../../lib/home.ts'
-import { brandWords, format } from '../../../../lib/i18n/index.ts'
-import { getLocale, getMessages } from '../../../../lib/i18n/server.ts'
-import { deleteDesignAction, duplicateDesignAction, renameDesignAction } from '../actions.ts'
+import { deleteDesignAction, duplicateDesignAction, renameDesignAction } from '@/app/brands/[brandId]/actions.ts'
+import { DesignMasonry, type MasonryDesign } from '@/components/design-masonry.tsx'
+import { FilterChips } from '@/components/filter-chips.tsx'
+import { LibraryShell } from '@/components/library-shell.tsx'
+import { designCover, getWorkspace, listBrands, listDesigns } from '@/lib/api.ts'
+import { showsBrandList } from '@/lib/home.ts'
+import { brandWords, format } from '@/lib/i18n/index.ts'
+import { getLocale, getMessages } from '@/lib/i18n/server.ts'
 
 export const dynamic = 'force-dynamic'
 

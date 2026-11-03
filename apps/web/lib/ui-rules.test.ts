@@ -1,8 +1,8 @@
-// The UI's fixed rules (#51), checked over the real source.
+// The UI's fixed rules (#51) and the app's import paths, checked over the real source.
 import { ESLint } from 'eslint'
 import { describe, expect, it } from 'vitest'
 
-import { physicalSides } from '../scripts/check-logical.ts'
+import { physicalSides } from '@/scripts/check-logical.ts'
 
 const eslint = new ESLint({ cwd: new URL('..', import.meta.url).pathname })
 
@@ -21,6 +21,26 @@ describe('message catalogs', () => {
       filePath: 'components/hello.tsx',
     })
     expect(result?.messages.map((m) => m.ruleId)).toContain('react/jsx-no-literals')
+  })
+})
+
+describe('import paths', () => {
+  const ruleIds = async (code: string) => {
+    const [result] = await eslint.lintText(code, { filePath: 'components/hello.ts' })
+    return result?.messages.map((m) => m.ruleId) ?? []
+  }
+
+  it('fails an import that leaves its folder through ../', async () => {
+    expect(await ruleIds("export { api } from '../lib/api.ts'\n")).toContain('no-restricted-imports')
+  })
+
+  it('fails a relative import into a subfolder', async () => {
+    expect(await ruleIds("export { Button } from './ui/button.tsx'\n")).toContain('no-restricted-imports')
+  })
+
+  it('allows a sibling through ./ and any other file through @/', async () => {
+    const code = "export { api } from '@/lib/api.ts'\nexport { Menu } from './menu.tsx'\n"
+    expect(await ruleIds(code)).not.toContain('no-restricted-imports')
   })
 })
 

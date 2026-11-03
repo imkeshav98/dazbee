@@ -9,11 +9,12 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { AssetSummary, type BrandColor, type BrandFont, type BrandKit } from '@dazbee/schema'
 
-import { cn } from '../../lib/cn.ts'
-import { useMessages } from '../../lib/i18n/client.tsx'
-import { format } from '../../lib/i18n/index.ts'
-import { ASSET_ACCEPT, sendAsset } from '../../lib/upload-asset.ts'
-import { Select } from '../ui/select.tsx'
+import { Select } from '@/components/ui/select.tsx'
+import { cn } from '@/lib/cn.ts'
+import { useMessages } from '@/lib/i18n/client.tsx'
+import { format } from '@/lib/i18n/index.ts'
+import { ASSET_ACCEPT, sendAsset } from '@/lib/upload-asset.ts'
+
 import { useFontCatalog } from './font-panel.tsx'
 import { DASHED_BUTTON } from './styles.ts'
 import { saveKit, showKit } from './use-brand-kit.ts'

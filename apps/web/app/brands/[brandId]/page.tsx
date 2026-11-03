@@ -3,14 +3,14 @@
 // templates and kit are pages of their own, from the capsule.
 import { notFound, redirect } from 'next/navigation'
 
-import { BriefComposer } from '../../../components/brief-composer.tsx'
-import { LibraryShell } from '../../../components/library-shell.tsx'
-import { StartBlank } from '../../../components/start-blank.tsx'
-import { createDesign, designCover, getBrandKit, getWorkspace, listBrands, listDesigns } from '../../../lib/api.ts'
-import { briefDesign, type BriefFormat } from '../../../lib/brief.ts'
-import { brandPage, showsBrandList } from '../../../lib/home.ts'
-import { brandWords } from '../../../lib/i18n/index.ts'
-import { getMessages } from '../../../lib/i18n/server.ts'
+import { BriefComposer } from '@/components/brief-composer.tsx'
+import { LibraryShell } from '@/components/library-shell.tsx'
+import { StartBlank } from '@/components/start-blank.tsx'
+import { createDesign, designCover, getBrandKit, getWorkspace, listBrands, listDesigns } from '@/lib/api.ts'
+import { briefDesign, type BriefFormat } from '@/lib/brief.ts'
+import { brandPage, showsBrandList } from '@/lib/home.ts'
+import { brandWords } from '@/lib/i18n/index.ts'
+import { getMessages } from '@/lib/i18n/server.ts'
 
 export const dynamic = 'force-dynamic'
 

@@ -6,10 +6,10 @@ import { DotsThreeIcon } from '@phosphor-icons/react'
 import { useEffect, useRef, useState } from 'react'
 import { useFormStatus } from 'react-dom'
 
-import { cn } from '../lib/cn.ts'
-import { useMessages } from '../lib/i18n/client.tsx'
-import { format } from '../lib/i18n/index.ts'
-import { buttonStyles } from './ui/button.tsx'
+import { buttonStyles } from '@/components/ui/button.tsx'
+import { cn } from '@/lib/cn.ts'
+import { useMessages } from '@/lib/i18n/client.tsx'
+import { format } from '@/lib/i18n/index.ts'
 
 type Step = 'menu' | 'rename' | 'delete'
 

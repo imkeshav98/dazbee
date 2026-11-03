@@ -2,7 +2,7 @@
 // address and works before any script loads.
 import Link from 'next/link'
 
-import { cn } from '../lib/cn.ts'
+import { cn } from '@/lib/cn.ts'
 
 export function FilterChips({
   label,

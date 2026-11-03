@@ -6,12 +6,13 @@ import { type CSSProperties, useEffect, useRef, useState } from 'react'
 
 import { type Editor, shortcutFor } from '@dazbee/editor'
 
-import { cn } from '../../lib/cn.ts'
-import { fillOf } from '../../lib/fill.ts'
-import { useMessages } from '../../lib/i18n/client.tsx'
-import { format } from '../../lib/i18n/index.ts'
-import { LIMITS } from '../../lib/limits.ts'
-import { Select } from '../ui/select.tsx'
+import { Select } from '@/components/ui/select.tsx'
+import { cn } from '@/lib/cn.ts'
+import { fillOf } from '@/lib/fill.ts'
+import { useMessages } from '@/lib/i18n/client.tsx'
+import { format } from '@/lib/i18n/index.ts'
+import { LIMITS } from '@/lib/limits.ts'
+
 import { FIELD, KNOB, SELECT, VALUE_TEXT } from './styles.ts'
 
 export const clamp = (n: number, min = Number.NEGATIVE_INFINITY, max = Number.POSITIVE_INFINITY) =>

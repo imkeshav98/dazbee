@@ -6,9 +6,10 @@ import { PlusIcon } from '@phosphor-icons/react'
 import { useEffect, useRef, useState } from 'react'
 import { useFormStatus } from 'react-dom'
 
-import { cn } from '../lib/cn.ts'
+import { buttonStyles } from '@/components/ui/button.tsx'
+import { cn } from '@/lib/cn.ts'
+
 import { BrandNaming, type NamingWords } from './brand-naming.tsx'
-import { buttonStyles } from './ui/button.tsx'
 
 function Create({ label }: { label: string }) {
   const { pending } = useFormStatus()

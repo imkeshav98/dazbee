@@ -10,9 +10,10 @@ import { useState } from 'react'
 import type { Editor } from '@dazbee/editor'
 import { type Design, FORMAT_PRESETS } from '@dazbee/schema'
 
-import { cn } from '../../lib/cn.ts'
-import { useMessages } from '../../lib/i18n/client.tsx'
-import { format } from '../../lib/i18n/index.ts'
+import { cn } from '@/lib/cn.ts'
+import { useMessages } from '@/lib/i18n/client.tsx'
+import { format } from '@/lib/i18n/index.ts'
+
 import { CARD_BUTTON, CARD_ROW, CardMenu } from './card.tsx'
 import { PanelFrame } from './edit-panel.tsx'
 import { setOpen, useEditState } from './edit-store.ts'

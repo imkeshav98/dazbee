@@ -19,9 +19,10 @@ import { useEffect, useState } from 'react'
 
 import type { Editor } from '@dazbee/editor'
 
-import { cn } from '../../lib/cn.ts'
-import { useLocale, useMessages } from '../../lib/i18n/client.tsx'
-import { dirOf, format } from '../../lib/i18n/index.ts'
+import { cn } from '@/lib/cn.ts'
+import { useLocale, useMessages } from '@/lib/i18n/client.tsx'
+import { dirOf, format } from '@/lib/i18n/index.ts'
+
 import { keyOf, useSelection } from './arrange-panel.tsx'
 import { arrowAlong, useMenuFocus, useRovingTab } from './bar-popover.tsx'
 import { editState, isPanel, setOpen, useEditState, usePhone } from './edit-store.ts'

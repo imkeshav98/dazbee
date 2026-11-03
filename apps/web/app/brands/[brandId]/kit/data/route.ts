@@ -2,7 +2,7 @@
 // it, and save it whole.
 import { BrandKit } from '@dazbee/schema'
 
-import { ApiFailure, getBrandKit, saveBrandKit } from '../../../../../lib/api.ts'
+import { ApiFailure, getBrandKit, saveBrandKit } from '@/lib/api.ts'
 
 const failure = (e: unknown) => {
   if (e instanceof ApiFailure && (e.status === 400 || e.status === 404))

@@ -6,8 +6,8 @@ import Link from 'next/link'
 
 import { FORMAT_PRESETS } from '@dazbee/schema'
 
-import { BRIEF_FORMATS, type BriefFormat } from '../lib/brief.ts'
-import { format, type Messages } from '../lib/i18n/index.ts'
+import { BRIEF_FORMATS, type BriefFormat } from '@/lib/brief.ts'
+import { format, type Messages } from '@/lib/i18n/index.ts'
 
 /** The longest side of a size's outline, in pixels. */
 const OUTLINE = 64
