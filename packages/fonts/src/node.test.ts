@@ -9,4 +9,8 @@ describe('loadFontFiles', () => {
     expect(faces.map((f) => f.file)).toEqual(FONT_FACES.map((f) => f.file))
     for (const face of faces) expect([...face.bytes.subarray(0, 4)]).toEqual([0, 1, 0, 0])
   })
+
+  it('reads the files once, then hands back what it read', () => {
+    expect(loadFontFiles()).toBe(loadFontFiles())
+  })
 })
