@@ -8,8 +8,6 @@ import type { Storage } from '@dazbee/storage'
 
 import { body, type Env, error } from '../http.ts'
 import { signedLink, templateThumbnailKey } from '../storage-keys.ts'
-import { InvalidContent } from '../workspace/designs.ts'
-import { findBrand } from '../workspace/workspace.ts'
 import {
   deleteTemplate,
   findTemplate,
@@ -25,23 +23,14 @@ export function templateRoutes({ db, storage }: { db: Db; storage: Storage }): H
   // Templates (#54): the workspace's and the brand's, a design saved to start others from.
   app.get('/brands/:brandId/templates', async (c) => {
     const { workspaceId } = c.var.session
-    const brand = await findBrand(db, workspaceId, c.req.param('brandId'))
-    if (!brand) return c.json(error('No such brand'), 404)
-    return c.json(await listTemplates(db, workspaceId, brand.id))
+    return c.json(await listTemplates(db, workspaceId, c.var.brand.id))
   })
 
   app.post('/brands/:brandId/templates', async (c) => {
     const { workspaceId } = c.var.session
-    const brand = await findBrand(db, workspaceId, c.req.param('brandId'))
-    if (!brand) return c.json(error('No such brand'), 404)
     const input = await body(c.req.raw, SaveTemplate)
     if (input instanceof Response) return input
-    try {
-      return c.json(await saveTemplate(db, storage, workspaceId, brand.id, input), 201)
-    } catch (e) {
-      if (e instanceof InvalidContent) return c.json(error(`The design is not valid: ${e.message}`), 400)
-      throw e
-    }
+    return c.json(await saveTemplate(db, storage, workspaceId, c.var.brand.id, input), 201)
   })
 
   app.patch('/brands/:brandId/templates/:templateId', async (c) => {
@@ -50,7 +39,7 @@ export function templateRoutes({ db, storage }: { db: Db; storage: Storage }): H
     const template = await renameTemplate(
       db,
       c.var.session.workspaceId,
-      c.req.param('brandId'),
+      c.var.brand.id,
       c.req.param('templateId'),
       input.name,
     )
@@ -62,7 +51,7 @@ export function templateRoutes({ db, storage }: { db: Db; storage: Storage }): H
       db,
       storage,
       c.var.session.workspaceId,
-      c.req.param('brandId'),
+      c.var.brand.id,
       c.req.param('templateId'),
     )
     return deleted ? c.body(null, 204) : c.json(error('No such template'), 404)
@@ -70,18 +59,16 @@ export function templateRoutes({ db, storage }: { db: Db; storage: Storage }): H
 
   app.get('/brands/:brandId/templates/:templateId/thumbnail', async (c) => {
     const { workspaceId } = c.var.session
-    const template = await findTemplate(db, workspaceId, c.req.param('brandId'), c.req.param('templateId'))
+    const template = await findTemplate(db, workspaceId, c.var.brand.id, c.req.param('templateId'))
     if (!template) return c.json(error('No such template'), 404)
     return c.json((await signedLink(storage, templateThumbnailKey(workspaceId, template.id))) satisfies SignedLink)
   })
 
   app.post('/brands/:brandId/templates/:templateId/designs', async (c) => {
     const { workspaceId } = c.var.session
-    const brand = await findBrand(db, workspaceId, c.req.param('brandId'))
-    if (!brand) return c.json(error('No such brand'), 404)
     const input = await body(c.req.raw, StartFromTemplate)
     if (input instanceof Response) return input
-    const design = await startFromTemplate(db, workspaceId, brand.id, c.req.param('templateId'), input.name)
+    const design = await startFromTemplate(db, workspaceId, c.var.brand.id, c.req.param('templateId'), input.name)
     return design ? c.json(design, 201) : c.json(error('No such template'), 404)
   })
 
