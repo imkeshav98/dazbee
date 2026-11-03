@@ -50,6 +50,16 @@ export function editorTools({ finish, changed, onSnapping }: ToolsDeps): EditorT
   /** Told when the tool changes, by a key or after drawing a shape, so the tool dock follows. */
   const toolListeners = new Set<(tool: Tool) => void>()
 
+  function current() {
+    return tool
+  }
+  function toPlace() {
+    return imageToPlace
+  }
+  function snaps() {
+    return snapping
+  }
+
   function setTool(next: Tool, image?: PlacedAsset | null) {
     if (next !== tool) {
       finish()
@@ -73,13 +83,17 @@ export function editorTools({ finish, changed, onSnapping }: ToolsDeps): EditorT
     return () => toolListeners.delete(listener)
   }
 
+  function destroy() {
+    toolListeners.clear()
+  }
+
   return {
-    tool: () => tool,
+    tool: current,
     setTool,
-    imageToPlace: () => imageToPlace,
-    snapping: () => snapping,
+    imageToPlace: toPlace,
+    snapping: snaps,
     setSnapping,
     onTool,
-    destroy: () => toolListeners.clear(),
+    destroy,
   }
 }

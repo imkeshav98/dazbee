@@ -9,7 +9,11 @@ import { type Design, fontFamilies, imageAssetIds, type Variables } from '@dazbe
 export interface ResourceSources {
   /** The stored bytes of an image asset (#35); designs with image fills need it. */
   assetBytes?: (assetId: string) => Promise<Uint8Array>
-  /** The font files of the named families, from our storage (#50). */
+  /**
+   * The font files of the named families, from our storage (#50): the editor asks for the families
+   * the design uses that it doesn't ship, when it opens and whenever text names a new one. A family
+   * the catalog doesn't have is left out, and its text draws in the fallback fonts.
+   */
   fontFiles?: (families: string[]) => Promise<{ family: string; bytes: Uint8Array }[]>
 }
 
@@ -135,6 +139,12 @@ export function editorResources({
     placeholders = { for: resources, missing: key, resources: { ...resources, images } }
     return placeholders.resources
   }
+  function bytes() {
+    return resourceBytes
+  }
+  function decoded() {
+    return resources
+  }
   function loaded() {
     return Promise.all([fontsLoading, imagesLoading]).then(() => undefined)
   }
@@ -186,8 +196,8 @@ export function editorResources({
   }
 
   return {
-    bytes: () => resourceBytes,
-    resources: () => resources,
+    bytes,
+    resources: decoded,
     screen,
     loadFamilies,
     loaded,
@@ -200,7 +210,9 @@ export function editorResources({
 
 /** The fonts we ship, from the app's `/vendor/fonts/`. */
 export function shippedFonts() {
-  return Promise.all(FONT_FACES.map(async (f) => ({ family: f.family, bytes: await bytes(`/vendor/fonts/${f.file}`) })))
+  return Promise.all(
+    FONT_FACES.map(async (f) => ({ family: f.family, bytes: await fetchBytes(`/vendor/fonts/${f.file}`) })),
+  )
 }
 
 /** The bytes of image assets, from `assetBytes`; no images need none. */
@@ -218,7 +230,7 @@ export async function loadFonts(families: string[], sources: ResourceSources): P
   return sources.fontFiles(wanted)
 }
 
-async function bytes(url: string) {
+async function fetchBytes(url: string) {
   const res = await fetch(url)
   if (!res.ok) throw new Error(`${url}: ${res.status}`)
   return new Uint8Array(await res.arrayBuffer())

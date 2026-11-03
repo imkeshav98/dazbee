@@ -151,7 +151,14 @@ import {
   turn,
   undrawn,
 } from './layers/transform.ts'
-import { editorResources, loadFonts, loadImages, SHIPPED_FAMILIES, shippedFonts } from './resources.ts'
+import {
+  editorResources,
+  loadFonts,
+  loadImages,
+  type ResourceSources,
+  SHIPPED_FAMILIES,
+  shippedFonts,
+} from './resources.ts'
 import { watchSaveState } from './save-state.ts'
 import { NUDGE, NUDGE_FAR, type ShortcutAction, shortcutFor } from './shortcuts.ts'
 import {
@@ -166,7 +173,7 @@ import {
 } from './text/text-edit.ts'
 import { editorTools, type PlacedAsset, type Tool } from './tools.ts'
 
-export interface EditorOptions {
+export interface EditorOptions extends ResourceSources {
   canvas: HTMLCanvasElement
   /** Holds the selection outline and the caret, laid over the canvas at the same size. */
   overlay: HTMLElement
@@ -174,14 +181,6 @@ export interface EditorOptions {
   syncUrl: string
   /** A sync token for the design, fetched again whenever the editor (re)connects (#34). */
   syncToken: () => Promise<string>
-  /** The stored bytes of an image asset (#35); designs with image fills need it. */
-  assetBytes?: (assetId: string) => Promise<Uint8Array>
-  /**
-   * The font files of the named families, from our storage (#50): the editor asks for the families
-   * the design uses that it doesn't ship, when it opens and whenever text names a new one. A family
-   * the catalog doesn't have is left out, and its text draws in the fallback fonts.
-   */
-  fontFiles?: (families: string[]) => Promise<{ family: string; bytes: Uint8Array }[]>
   /** The brand kit's values that bound properties take (#53), until `setVariables` changes them. */
   variables?: Variables
   /** The format to show first, zoomed to fit on the first page; every frame when left out. */
@@ -674,7 +673,10 @@ function live(
     ck,
     cache,
     first: firstBytes,
-    sources: options,
+    sources: {
+      ...(options.assetBytes ? { assetBytes: options.assetBytes } : {}),
+      ...(options.fontFiles ? { fontFiles: options.fontFiles } : {}),
+    },
     connected: saving.connected,
     status,
     signal: listening.signal,
@@ -4489,20 +4491,20 @@ function live(
       selectionListeners.clear()
       pageListeners.clear()
       noticeListeners.clear()
+      thumbnails.destroy()
       tools.destroy()
       doc.off('update', redraw)
       scenes.destroy()
+      resources.destroy()
       session.destroy()
       saving.destroy()
       provider.destroy()
       void local.destroy()
       doc.destroy()
       cache.delete()
-      resources.destroy()
       backing.delete()
       edge.delete()
       surface?.delete()
-      thumbnails.destroy()
       gl.delete()
     },
   }

@@ -32,7 +32,7 @@ export interface ScenesDeps {
 export interface FrameScenes {
   /** A frame's scene, made again only when what it shows changed. */
   scene(frame: Frame): Scene
-  /** Measures text with the fonts the screen draws with, as auto layout does (#46). */
+  /** Measures text with the fonts the screen draws with, as auto layout does. */
   measure(): MeasureText
   /** Text laid out as drawn, from the screen's cache, which owns it. */
   layout(props: Parameters<ParagraphCache['layout']>[1]): TextLayout
