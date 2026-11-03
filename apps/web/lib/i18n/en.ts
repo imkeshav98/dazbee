@@ -238,6 +238,7 @@ export const en = {
       look: 'Look',
       lock: 'Lock',
       unlock: 'Unlock',
+      locked: 'Locked',
       hide: 'Hide',
       show: 'Show',
       upDown: 'Up and down in the box',

@@ -227,6 +227,7 @@ export const ar: Messages = {
       look: 'المظهر',
       lock: 'قفل',
       unlock: 'فك القفل',
+      locked: 'مقفل',
       hide: 'إخفاء',
       show: 'إظهار',
       upDown: 'أعلى وأسفل في الصندوق',

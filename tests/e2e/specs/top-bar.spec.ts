@@ -108,7 +108,7 @@ const wrapped = (page: Page) => page.evaluate(() => {
 /** What the selection's top bar opens: every item with a pop-up or panel, by its test id, and the full menu. */
 const openers = (page: Page) => page.evaluate(() => {
   const items = [...document.querySelectorAll<HTMLElement>('[data-testid="top-bar"] [data-testid^="bar-"]')]
-  return items.map((el) => el.dataset.testid ?? '').filter((id) => ['bar-overflow', 'bar-size', 'bar-bold', 'bar-italic', 'bar-underline', 'bar-strikethrough', 'bar-crop', 'bar-replace', 'bar-size-field'].indexOf(id) < 0)
+  return items.map((el) => el.dataset.testid ?? '').filter((id) => ['bar-overflow', 'bar-size', 'bar-bold', 'bar-italic', 'bar-underline', 'bar-strikethrough', 'bar-crop', 'bar-replace', 'bar-size-field', 'bar-locked', 'bar-unlock'].indexOf(id) < 0)
 })
 
 for (const [width, height] of SIZES) {
