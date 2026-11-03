@@ -1,24 +1,28 @@
 // The geometry of moving, resizing and rotating layers (#40), kept free of the editor so it can be
 // tested on its own. Boxes are in one page's design pixels; a box's rotation turns it about its
 // centre, as the renderer draws it.
-import { type Box, centreOf, type Point, turn } from '@dazbee/doc'
+import { type Box, centreOf, normalAngle, type Point, round, turn } from '@dazbee/doc'
 
 export { boundsOf, centreOf, cornersOf, normalAngle, round, turn, type Box } from '@dazbee/doc'
+
 export type Handle = 'n' | 's' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw'
-export const HANDLES: readonly Handle[] = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w']
-
-const rad = (deg: number) => (deg * Math.PI) / 180
-
-/** Where a handle sits on a box, as a fraction of its width and height. */
-export function handleAt(h: Handle): Point {
-  return { x: h.includes('w') ? 0 : h.includes('e') ? 1 : 0.5, y: h.includes('n') ? 0 : h.includes('s') ? 1 : 0.5 }
-}
 
 export interface ResizeOptions {
   /** Shift: keep the box's proportions. */
   keepRatio?: boolean
   /** Alt: grow and shrink about the centre instead of the opposite handle. */
   fromCentre?: boolean
+}
+
+export const HANDLES: readonly Handle[] = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w']
+/** Shift while rotating: the angle snaps to steps of 15°. */
+const ANGLE_STEP = 15
+
+const rad = (deg: number) => (deg * Math.PI) / 180
+
+/** Where a handle sits on a box, as a fraction of its width and height. */
+export function handleAt(h: Handle): Point {
+  return { x: h.includes('w') ? 0 : h.includes('e') ? 1 : 0.5, y: h.includes('n') ? 0 : h.includes('s') ? 1 : 0.5 }
 }
 
 /**
@@ -107,9 +111,72 @@ export function scaleWithin(box: Box, from: Box, to: Box): Box {
   return { x: centre.x - width / 2, y: centre.y - height / 2, width, height, rotation: box.rotation }
 }
 
-/** Shift while rotating: the angle snaps to steps of 15°. */
-const ANGLE_STEP = 15
+/** Shift while rotating: an angle snapped to the nearest step. */
 export const snapAngle = (deg: number) => Math.round(deg / ANGLE_STEP) * ANGLE_STEP
 
 /** The angle of a point about a centre, in degrees. */
 export const angleOf = (p: Point, about: Point) => (Math.atan2(p.y - about.y, p.x - about.x) * 180) / Math.PI
+
+/** A box as drawn inside containers: each one turns it about the container's centre. */
+export function drawnFrom(box: Box, around: Box[]): Box {
+  let c = centreOf(box)
+  let rotation = box.rotation
+  for (const outer of [...around].reverse()) {
+    c = turn(c, centreOf(outer), outer.rotation)
+    rotation += outer.rotation
+  }
+  return { ...box, x: c.x - box.width / 2, y: c.y - box.height / 2, rotation: normalAngle(rotation) }
+}
+/** A point on the page as layers inside containers see it, before the containers turn them. */
+export function localTo(p: Point, around: Box[]): Point {
+  let q = p
+  for (const outer of around) q = turn(q, centreOf(outer), -outer.rotation)
+  return q
+}
+/** A point inside containers as it is on the page: back through each one's turn, innermost first. */
+export function pageFrom(q: Point, around: Box[]): Point {
+  let p = q
+  for (const outer of [...around].reverse()) p = turn(p, centreOf(outer), outer.rotation)
+  return p
+}
+
+/** A box as drawn on the page, as layers inside containers keep it: the inverse of drawnFrom. */
+export function undrawn(drawn: Box, around: Box[]): Box {
+  const c = localTo(centreOf(drawn), around)
+  const rotation = normalAngle(around.reduce((r, b) => r - b.rotation, drawn.rotation))
+  return {
+    x: round(c.x - drawn.width / 2),
+    y: round(c.y - drawn.height / 2),
+    width: round(drawn.width),
+    height: round(drawn.height),
+    rotation: round(rotation),
+  }
+}
+
+/**
+ * How far a frame's layers move so they stay where they are drawn when the frame, turned, changes
+ * from `was` to `box`: it turns them about its centre, which has moved.
+ */
+export function keptOnScreen(was: Box, box: Box): Point {
+  if (box.rotation === 0) return { x: 0, y: 0 }
+  const v = { x: centreOf(was).x - centreOf(box).x, y: centreOf(was).y - centreOf(box).y }
+  const w = turn(v, { x: 0, y: 0 }, -box.rotation)
+  return { x: w.x - v.x, y: w.y - v.y }
+}
+
+/** Whether a handle is a corner: it moves two edges. */
+export const isCorner = (handle: Handle) => handle.length === 2
+
+/** The box a resize of `outer` by `handle` gives at `factor` of its size, its shape kept: about the opposite corner, or the centre. */
+export function boxAt(outer: Box, handle: Handle, factor: number, fromCentre: boolean): Box {
+  const at = handleAt(handle)
+  const width = outer.width * factor
+  const height = outer.height * factor
+  const anchor = fromCentre
+    ? centreOf(outer)
+    : { x: outer.x + (1 - at.x) * outer.width, y: outer.y + (1 - at.y) * outer.height }
+  const left = fromCentre ? anchor.x - width / 2 : at.x === 1 ? anchor.x : anchor.x - width
+  const top = fromCentre ? anchor.y - height / 2 : at.y === 1 ? anchor.y : anchor.y - height
+  const centre = turn({ x: left + width / 2, y: top + height / 2 }, centreOf(outer), outer.rotation)
+  return { x: centre.x - width / 2, y: centre.y - height / 2, width, height, rotation: outer.rotation }
+}

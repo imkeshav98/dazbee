@@ -1,23 +1,13 @@
 // Drawing shapes with a drag (#44): what each shape tool makes, and the box a drag gives it. Kept
 // free of the editor so the geometry can be tested on its own. Points are a page's design pixels.
-import type { Paint, Point } from '@dazbee/schema'
+import type { Paint, Point, Rect } from '@dazbee/schema'
 
 import { normalAngle, round } from '../layers/transform.ts'
 
 export const SHAPE_TOOLS = ['rect', 'ellipse', 'polygon', 'star', 'line', 'arrow'] as const
 export type ShapeTool = (typeof SHAPE_TOOLS)[number]
-const isShapeTool = (tool: string): tool is ShapeTool => (SHAPE_TOOLS as readonly string[]).includes(tool)
 /** What a drag draws: a shape, or a frame. */
 export type DrawTool = ShapeTool | 'frame'
-export const isDrawTool = (tool: string): tool is DrawTool => tool === 'frame' || isShapeTool(tool)
-
-/** The size a click without a drag draws, in design pixels. */
-const CLICK_SIZE = 100
-/** A frame clicked without a drag is bigger: room for what goes in it. */
-const FRAME_CLICK_SIZE = 200
-/** New shapes are a neutral grey until a style is picked; lines a near-black stroke. */
-const FILL = '#C9CED6FF'
-const INK = '#1F2329FF'
 
 /** A layer as node.create takes it. */
 export interface NewLayer {
@@ -26,12 +16,33 @@ export interface NewLayer {
   props: Record<string, unknown>
 }
 
+export type Drawn = { x: number; y: number; width: number; height: number; rotation: number }
+
+/** The size a click without a drag draws, in design pixels. */
+const CLICK_SIZE = 100
+/** A frame clicked without a drag is bigger: room for what goes in it. */
+const FRAME_CLICK_SIZE = 200
+/** New shapes are a neutral grey until a style is picked; lines a near-black stroke. */
+const FILL = '#C9CED6FF'
+const INK = '#1F2329FF'
+/** New text is near-black Noto Sans until a style is picked: the family every script falls back to. */
+const NEW_TEXT_STYLE = { fontFamily: 'Noto Sans', fontSize: 48, fontWeight: 400, color: INK }
+/** The pen's stroke until a style is picked: the near-black that lines draw with. */
+const PEN_STROKE = { paint: { type: 'solid', color: INK }, width: 2, cap: 'round', join: 'round' }
+/** The most of a frame's width or height an image placed from the asset library takes at first (#52). */
+const PLACED_SHARE = 0.5
+
+const isShapeTool = (tool: string): tool is ShapeTool => (SHAPE_TOOLS as readonly string[]).includes(tool)
+
 /** A new frame for the frame tool, at no size yet: white, as frames start in most design tools. */
 const newFrame = (): NewLayer => ({
   type: 'frame',
   name: 'Frame',
   props: { x: 0, y: 0, width: 0, height: 0, fills: [{ type: 'solid', color: '#FFFFFFFF' }] },
 })
+
+/** Whether a tool draws with a drag: a shape tool or the frame tool. */
+export const isDrawTool = (tool: string): tool is DrawTool => tool === 'frame' || isShapeTool(tool)
 
 /** A new layer for a drawing tool, at no size yet. */
 export const newDrawn = (tool: DrawTool): NewLayer => (tool === 'frame' ? newFrame() : newShape(tool))
@@ -66,8 +77,6 @@ export function newShape(tool: ShapeTool): NewLayer {
       }
   }
 }
-
-export type Drawn = { x: number; y: number; width: number; height: number; rotation: number }
 
 /**
  * The box a drag from `from` to `to` draws. Shift keeps a shape's sides equal and turns a line in
@@ -120,9 +129,6 @@ export function clickedBox(tool: DrawTool, at: Point): Drawn {
   return { x: round(at.x - size / 2), y: round(at.y - size / 2), width: size, height: size, rotation: 0 }
 }
 
-/** New text is near-black Noto Sans until a style is picked: the family every script falls back to. */
-const NEW_TEXT_STYLE = { fontFamily: 'Noto Sans', fontSize: 48, fontWeight: 400, color: INK }
-
 /**
  * A new, empty text layer for the text tool (#47): at the point clicked, growing as it is typed,
  * or in the box dragged, wrapping inside it and keeping its size.
@@ -134,6 +140,16 @@ export function newText(x: number, y: number, box: { x: number; y: number; width
     props: box
       ? { ...box, text: '', boxMode: 'fixed', style: NEW_TEXT_STYLE }
       : { x, y, width: 0, height: 0, text: '', boxMode: 'autoWidth', style: NEW_TEXT_STYLE },
+  }
+}
+
+/** A new path layer for the pen: the path data `d`, drawn in `box`, stroked as lines are. */
+export function newPath(d: string, box: Rect): NewLayer {
+  const shape = { kind: 'path', d, drawnIn: { width: box.width, height: box.height } }
+  return {
+    type: 'graphic',
+    name: 'Path',
+    props: { x: box.x, y: box.y, width: box.width, height: box.height, shape, strokes: [PEN_STROKE] },
   }
 }
 
@@ -152,9 +168,6 @@ export function withImage(fills: readonly Paint[], assetId: string): Paint[] {
     return swapped
   })
 }
-
-/** The most of a frame's width or height an image placed from the asset library takes at first (#52). */
-const PLACED_SHARE = 0.5
 
 /**
  * A graphic filled with an image asset (#52), centred on `at` in a frame of `frame` size: the
@@ -186,4 +199,14 @@ export function imageIn(
       fills: [{ type: 'image', assetId: asset.id, fit: 'fill' }],
     },
   }
+}
+
+/** The corner a drag from `from` reaches with the image's shape kept: as far as the pointer went on the longer side. */
+export function keepRatio(from: Point, to: Point, asset: { width: number; height: number }): Point {
+  if (asset.width <= 0 || asset.height <= 0) return to
+  const ratio = asset.width / asset.height
+  const dx = to.x - from.x
+  const dy = to.y - from.y
+  const width = Math.max(Math.abs(dx), Math.abs(dy) * ratio)
+  return { x: from.x + Math.sign(dx || 1) * width, y: from.y + Math.sign(dy || 1) * (width / ratio) }
 }

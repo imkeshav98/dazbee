@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { clickedBox, drawnBox, newImage, newShape, withImage } from './draw-tools.ts'
+import { clickedBox, drawnBox, keepRatio, newImage, newPath, newShape, withImage } from './draw-tools.ts'
 
 describe('drawing a shape (#44)', () => {
   it('spans the drag in any direction, square with Shift, out from the centre with Alt', () => {
@@ -102,6 +102,23 @@ describe('placing an image from the asset library (#52)', () => {
   })
 })
 
+describe('newPath', () => {
+  it('makes the pen’s path a graphic in its box, stroked near-black until a style is picked (#45)', () => {
+    expect(newPath('M0 0 L40 30', { x: 10, y: 20, width: 40, height: 30 })).toEqual({
+      type: 'graphic',
+      name: 'Path',
+      props: {
+        x: 10,
+        y: 20,
+        width: 40,
+        height: 30,
+        shape: { kind: 'path', d: 'M0 0 L40 30', drawnIn: { width: 40, height: 30 } },
+        strokes: [{ paint: { type: 'solid', color: '#1F2329FF' }, width: 2, cap: 'round', join: 'round' }],
+      },
+    })
+  })
+})
+
 describe('withImage', () => {
   const pink = { type: 'solid' as const, color: '#FF2E7EFF' }
   it('puts an image on top of fills that have none', () => {
@@ -122,5 +139,18 @@ describe('withImage', () => {
       pink,
       { type: 'image', assetId: 'a2', fit: 'crop', opacity: 0.5, filter: 'mono' },
     ])
+  })
+})
+
+describe('keepRatio', () => {
+  const wide = { width: 200, height: 100 }
+  it('reaches as far as the pointer went on the longer side, in the image’s shape', () => {
+    expect(keepRatio({ x: 0, y: 0 }, { x: 100, y: 10 }, wide)).toEqual({ x: 100, y: 50 })
+    expect(keepRatio({ x: 0, y: 0 }, { x: 10, y: 100 }, wide)).toEqual({ x: 200, y: 100 })
+    expect(keepRatio({ x: 100, y: 100 }, { x: 0, y: 90 }, wide)).toEqual({ x: 0, y: 50 })
+  })
+
+  it('leaves the pointer be for an image with no size', () => {
+    expect(keepRatio({ x: 0, y: 0 }, { x: 30, y: 40 }, { width: 0, height: 100 })).toEqual({ x: 30, y: 40 })
   })
 })

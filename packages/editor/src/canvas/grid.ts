@@ -1,6 +1,6 @@
 // Where each frame of the infinite canvas sits (#36): an auto grid with pages as rows and formats
 // as columns, so nothing about placement is stored and a new page or format slots in by itself.
-import { type Design, inOrder, type Rect } from '@dazbee/schema'
+import { type Design, formatScope, inOrder, type Rect } from '@dazbee/schema'
 
 /** One page in one format, placed on the canvas in world units (design pixels at 100%). */
 export interface Frame {
@@ -20,6 +20,8 @@ export const COLUMN_GAP = 160
 export const ROW_GAP = 240
 
 export const frameKey = (pageId: string, formatId: string) => `${pageId}/${formatId}`
+/** Where edits made in a frame go: its format's overrides. */
+export const scope = (frame: Frame) => formatScope(frame.formatId)
 
 /**
  * Every frame of the design, row by row, and the box around them all. With `only`, the focus
