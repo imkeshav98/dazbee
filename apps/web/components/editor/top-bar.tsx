@@ -54,6 +54,7 @@ import {
   isPanel,
   type PanelId,
   setBar,
+  setEveryFormat,
   setOpen,
   useEditState,
   usePhone,
@@ -62,7 +63,6 @@ import { usePickedPage, useSelection } from './editor-hooks.ts'
 import { nearest, useFontCatalog, weightsOf } from './font-panel.tsx'
 import { ImagePickerButton } from './image-tool.tsx'
 import { AlignRow } from './layer-actions.tsx'
-import { setEveryFormat } from './scope-store.ts'
 import {
   factsOf,
   imageFillOf,

@@ -1,7 +1,6 @@
 'use client'
 
-// What the edit panels share: the fixed colours offered without a brand kit and the ring round the
-// one picked; and the cards a size or a page has in its panel's list, with their buttons and menu.
+// The cards a size or a page has in its panel's list, with their buttons and menu.
 import { DotsThreeIcon } from '@phosphor-icons/react'
 import * as Popover from '@radix-ui/react-popover'
 import { Fragment, useState } from 'react'

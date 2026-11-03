@@ -10,7 +10,7 @@ import { BrandKitPanel } from '@/components/editor/brand-kit-panel.tsx'
 import { EditPanel } from '@/components/editor/edit-panel.tsx'
 import { useEditState } from '@/components/editor/edit-store.ts'
 import { FocusChip } from '@/components/editor/focus-chip.tsx'
-import { SizesButton, SizesPanel } from '@/components/editor/formats-panel.tsx'
+import { FormatsButton, FormatsPanel } from '@/components/editor/formats-panel.tsx'
 import { HistoryButtons } from '@/components/editor/history-buttons.tsx'
 import { StageMenu } from '@/components/editor/layer-actions.tsx'
 import { LayersPanel } from '@/components/editor/layers-panel.tsx'
@@ -288,7 +288,7 @@ export function EditorStage({
       designName={name}
       onRename={async (next) => setName(await renameFromEditor(brandId, designId, next))}
       status={status}
-      sizes={editor ? <SizesButton editor={editor} /> : undefined}
+      sizes={editor ? <FormatsButton editor={editor} /> : undefined}
       history={editor ? <HistoryButtons editor={editor} /> : undefined}
       tool={dockTool}
       shape={shape}
@@ -327,7 +327,7 @@ export function EditorStage({
         ) : undefined
       }
       account={account}
-      panels={
+      flyouts={
         editor
           ? {
               layers: <LayersPanel editor={editor} />,
@@ -394,7 +394,7 @@ export function EditorStage({
       {editor && <TopBar editor={editor} brandId={brandId} />}
       {editor && <SmallMenu editor={editor} rightClick={menuAt !== null} />}
       {editor && <EditPanel editor={editor} brandId={brandId} />}
-      {editor && <SizesPanel editor={editor} onRemoved={setRemoved} />}
+      {editor && <FormatsPanel editor={editor} onRemoved={setRemoved} />}
       {editor && <PagesPanel editor={editor} onRemoved={setRemoved} />}
       {editor && <BackgroundPanel editor={editor} brandId={brandId} />}
       <div

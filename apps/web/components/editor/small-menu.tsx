@@ -39,7 +39,11 @@ const CLEAR = 8
 type Place = { left: number; top: number }
 type Box = { left: number; top: number; right: number; bottom: number }
 
-const clamp = (value: number, low: number, high: number) => Math.max(low, Math.min(value, high))
+/**
+ * `value` kept between `low` and `high`. When `low` is above `high`, as on a phone narrower than the
+ * menu, `low` wins, so the menu keeps to the start edge.
+ */
+const clampInto = (value: number, low: number, high: number) => Math.max(low, Math.min(value, high))
 const meets = (a: Box, b: Box) => a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom
 
 /** The pieces of chrome the menu keeps off, in the stage's pixels: what shows of them now. */
@@ -109,14 +113,14 @@ function usePlace(editor: Editor, menu: HTMLElement | null, rightClick: boolean)
         const top = Math.round(wanted)
         if (top < 0 || top + height > floor) continue
         // Off whatever it would cover, moving sideways the shorter way; still covering, try the next place.
-        let left = clamp(centre, CLEAR, room.width - width - CLEAR)
+        let left = clampInto(centre, CLEAR, room.width - width - CLEAR)
         for (let tries = 0; tries < 4; tries++) {
           const box = { left, top, right: left + width, bottom: top + height }
           const hit = blocked.find((b) => meets(box, b))
           if (!hit) break
           const toStart = hit.left - width
           const toEnd = hit.right
-          left = clamp(
+          left = clampInto(
             Math.abs(toStart - left) <= Math.abs(toEnd - left) && toStart >= CLEAR ? toStart : toEnd,
             CLEAR,
             room.width - width - CLEAR,

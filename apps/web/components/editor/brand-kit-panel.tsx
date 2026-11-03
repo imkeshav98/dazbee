@@ -17,21 +17,10 @@ import { useMessages } from '@/lib/i18n/client.tsx'
 import { format } from '@/lib/i18n/index.ts'
 import { placeAsset } from '@/lib/place-asset.ts'
 
-import { useEditorDesign } from './editor-hooks.ts'
+import { useEditorDesign, useSelection } from './editor-hooks.ts'
 import { FontPreview, useFontCatalog } from './font-panel.tsx'
 import { KitEditor, shown, useKitSaver } from './kit-editor.tsx'
 import { loadKit, useBrandKit } from './use-brand-kit.ts'
-
-function useSelection(editor: Editor) {
-  const [ids, setIds] = useState(() => editor.selection())
-  useEffect(() => {
-    const stop = editor.onSelection(setIds)
-    return () => {
-      stop()
-    }
-  }, [editor])
-  return ids
-}
 
 /** Whether every selected layer that can follow a token of this kind follows this one. */
 function follows(design: Design, ids: string[], kind: 'color' | 'font', token: string) {

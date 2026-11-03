@@ -1,5 +1,5 @@
-// The editor chrome's shared looks, as class strings: every control that looks like one of these
-// takes it from here instead of spelling its classes again.
+// The editor chrome's shared looks, as class strings, and the colours offered without a brand kit:
+// every control that looks like one of these takes it from here instead of spelling its classes again.
 
 /** The ring a focused control shows when reached by keyboard. */
 export const FOCUS_RING = 'focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent'

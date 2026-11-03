@@ -35,15 +35,14 @@ import { designColours } from '@/lib/design-colours.ts'
 import { useMessages } from '@/lib/i18n/client.tsx'
 import { format, type Messages } from '@/lib/i18n/index.ts'
 import { LIMITS } from '@/lib/limits.ts'
-import { sizeTo } from '@/lib/size.ts'
+import { sizeTo, tidy } from '@/lib/size.ts'
 
 import { COMBINE } from './arrange-actions.ts'
+import { setEveryFormat, useEveryFormat } from './edit-store.ts'
 import { useTextSelection } from './editor-hooks.ts'
-import { Choice, clamp, ColorField, NumberField, tidy } from './fields.tsx'
+import { Choice, clamp, ColorField, NumberField } from './fields.tsx'
 import { ImagePickerButton } from './image-tool.tsx'
 import { AddButton, assetThumbnail, PaintEditor, PaintRow, RemoveButton, Stack } from './paint-stack.tsx'
-import { setEveryFormat, useEveryFormat } from './scope-store.ts'
-import { PICKED_RING, SWATCHES } from './styles.ts'
 import {
   CHIP,
   CHIP_ACCENT,
@@ -56,10 +55,12 @@ import {
   PANEL_BUTTON,
   PANEL_HEADING,
   PANEL_PART,
+  PICKED_RING,
   POPOVER,
   SEGMENT,
   SEGMENTS,
   SWATCH,
+  SWATCHES,
   SWITCH,
   SWITCH_ROW,
   TILE,

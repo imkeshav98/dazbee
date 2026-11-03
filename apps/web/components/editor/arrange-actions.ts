@@ -56,7 +56,7 @@ export const COMBINE: { action: Action; icon: Icon }[] = [
   { action: 'booleanExclude', icon: ExcludeSquareIcon },
 ]
 
-/** What the layers' own order and make-up change to: duplicate, the four order moves, ungroup and mask. */
+/** The first key the shortcut table lists for an action, as it spells it (`Mod+BracketRight`). */
 const specOf = (action: ShortcutAction): string => SHORTCUTS.find((s) => s.action === action)?.keys[0] ?? ''
 const brackets = (spec: string) => spec.replace('BracketRight', ']').replace('BracketLeft', '[')
 

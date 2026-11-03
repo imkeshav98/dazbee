@@ -1,5 +1,7 @@
 'use client'
 
+// Adding a format to the design: every preset grouped by shape, or a size of your own, checked
+// against the sizes the formats allow.
 import { PlusIcon } from '@phosphor-icons/react'
 import * as Popover from '@radix-ui/react-popover'
 import { type FormEvent, useId, useState } from 'react'
@@ -13,24 +15,9 @@ import { Tooltip } from '@/components/ui/tooltip.tsx'
 import { cn } from '@/lib/cn.ts'
 import { useMessages } from '@/lib/i18n/client.tsx'
 import { format } from '@/lib/i18n/index.ts'
+import { sizeOf } from '@/lib/size.ts'
 
 import { ICON_BUTTON, POPOVER } from './styles.ts'
-
-/** A size as the app writes it, in numerals that read the same in every locale. */
-const sizeOf = ({ width, height }: { width: number; height: number }) => `${width} × ${height}`
-
-/** A small box with the format's own proportions. */
-export function Proportion({ width, height, className }: { width: number; height: number; className?: string }) {
-  const scale = 14 / Math.max(width, height)
-  return (
-    <span aria-hidden className={cn('grid size-4 shrink-0 place-items-center', className)}>
-      <span
-        className="rounded-[2px] border-[1.5px] border-current"
-        style={{ width: Math.max(4, width * scale), height: Math.max(4, height * scale) }}
-      />
-    </span>
-  )
-}
 
 export function AddFormat({ editor }: { editor: Editor }) {
   const t = useMessages()
@@ -149,5 +136,18 @@ export function AddFormat({ editor }: { editor: Editor }) {
         </Popover.Content>
       </Popover.Portal>
     </Popover.Root>
+  )
+}
+
+/** A small box with the format's own proportions. */
+export function Proportion({ width, height, className }: { width: number; height: number; className?: string }) {
+  const scale = 14 / Math.max(width, height)
+  return (
+    <span aria-hidden className={cn('grid size-4 shrink-0 place-items-center', className)}>
+      <span
+        className="rounded-[2px] border-[1.5px] border-current"
+        style={{ width: Math.max(4, width * scale), height: Math.max(4, height * scale) }}
+      />
+    </span>
   )
 }

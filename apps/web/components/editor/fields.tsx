@@ -12,12 +12,12 @@ import { fillOf } from '@/lib/fill.ts'
 import { useMessages } from '@/lib/i18n/client.tsx'
 import { format } from '@/lib/i18n/index.ts'
 import { LIMITS } from '@/lib/limits.ts'
+import { tidy } from '@/lib/size.ts'
 
 import { FIELD, KNOB, SELECT, VALUE_TEXT } from './styles.ts'
 
 export const clamp = (n: number, min = Number.NEGATIVE_INFINITY, max = Number.POSITIVE_INFINITY) =>
   Math.min(max, Math.max(min, n))
-export const tidy = (n: number) => Math.round(n * 100) / 100
 
 /**
  * What is being typed into a field, null when nothing is: `typed.current` has it as soon as it is

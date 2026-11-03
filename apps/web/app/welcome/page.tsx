@@ -5,7 +5,7 @@
 import { redirect } from 'next/navigation'
 
 import { BrandStartForm } from '@/components/brand-start-form.tsx'
-import { TopBar } from '@/components/library-shell.tsx'
+import { LibraryHeader } from '@/components/library-shell.tsx'
 import { createBrand, getWorkspace } from '@/lib/api.ts'
 import { brandFromForm } from '@/lib/home.ts'
 import { brandWords } from '@/lib/i18n/index.ts'
@@ -38,9 +38,9 @@ export default async function WelcomePage({ searchParams }: { searchParams: Prom
       >
         <div className="aurora" />
       </div>
-      <TopBar t={t} workspace={workspace}>
+      <LibraryHeader t={t} workspace={workspace}>
         <span className="truncate px-1.5 font-semibold text-text">{w.place}</span>
-      </TopBar>
+      </LibraryHeader>
       <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col justify-center px-4 pt-4 pb-16 md:px-8 md:pb-24">
         <h1 className={HEADLINE}>{w.websiteTitle}</h1>
         <p className={LEAD}>{w.websiteLead}</p>

@@ -2,8 +2,13 @@
 
 // What the top bar has open: one pop-up, the full menu or one edit panel, never two at once, since
 // they share this one value. Opening any of them closes what was open. The shell reads it too: on a
-// phone an edit panel is a sheet, and a rail flyout and a sheet close each other.
+// phone an edit panel is a sheet, and a rail flyout and a sheet close each other. Also where the
+// panels' and the bar's changes go when a design has more than one format: the format shown, as a
+// canvas drag does, or every format. That is one choice for the header card's chip and the bar's
+// menus, kept while the selection changes until nothing is selected.
 import { useEffect, useState, useSyncExternalStore } from 'react'
+
+import { useValue, valueStore } from '@/lib/value-store.ts'
 
 /** The top bar's items that open the edit panel for the selected layers. */
 const LAYER_PANELS = ['font', 'colour', 'spacing', 'effects', 'position', 'edit', 'outline', 'stack'] as const
@@ -33,6 +38,8 @@ interface EditState {
 
 let state: EditState = { open: null, bar: false, barBottom: 0, sheetTop: null, flyoutEnd: null }
 const listeners = new Set<() => void>()
+/** Whether changes go to every format rather than the one shown. */
+const everyFormat = valueStore(false)
 
 function update(change: Partial<EditState>) {
   const next = { ...state, ...change }
@@ -62,6 +69,16 @@ export function useEditState() {
     () => state,
     () => state,
   )
+}
+
+/** Sends the panels' and the bar's changes to every format, or to the format shown. */
+export function setEveryFormat(every: boolean) {
+  everyFormat.set(every)
+}
+
+/** Whether changes go to every format, re-rendering the caller when that changes. */
+export function useEveryFormat() {
+  return useValue(everyFormat)
 }
 
 /** Under 640 px wide the editor is laid out for a phone: the edit panel is a sheet and the top bar scrolls. */

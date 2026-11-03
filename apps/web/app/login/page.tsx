@@ -6,7 +6,7 @@ import { WarningCircleIcon } from '@phosphor-icons/react/ssr'
 import { cookies, headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 
-import { BrandMark } from '@/components/dazbee-mark.tsx'
+import { DazbeeMark } from '@/components/dazbee-mark.tsx'
 import { buttonStyles } from '@/components/ui/button.tsx'
 import { signInLink } from '@/lib/api.ts'
 import { cn } from '@/lib/cn.ts'
@@ -50,7 +50,7 @@ export default async function LoginPage({
       </aside>
       <section className="flex flex-col justify-center px-6 py-12 sm:px-12 lg:px-[7vw]">
         <form action={start} className="flex w-full max-w-[37rem] flex-col gap-[clamp(1rem,1.2vw,1.375rem)]">
-          <BrandMark size={46} />
+          <DazbeeMark size={46} />
           <h1 className="font-display text-[clamp(2.5rem,3vw,3.5rem)] leading-[1.05] font-extrabold tracking-[-0.02em]">
             {t.signIn.headline} <br />
             {t.signIn.headlineEnd}

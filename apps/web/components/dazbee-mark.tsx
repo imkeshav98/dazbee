@@ -1,3 +1,8 @@
+/** The bee's wings and stinger, drawn twice: in black for the gap cut round the bee, and in colour. */
+const WING_PINK = 'M-7,-33 Q-7,-19 7,-19 Q-7,-19 -7,-5 Q-7,-19 -21,-19 Q-7,-19 -7,-33Z'
+const WING_BLUE = 'M12,-34 Q12,-24 22,-24 Q12,-24 12,-14 Q12,-24 2,-24 Q12,-24 12,-34Z'
+const STINGER = 'M16,-11.5 L28,-10.2 L19.5,-1.5Z'
+
 /**
  * Dazbee's mark: an ink Z on a yellow tile with a sparkle bee on its top-right corner. Below 32 px
  * it draws the favicon's simpler form, the tile and Z with one pink sparkle. Decorative; the name
@@ -5,7 +10,7 @@
  * under the top bar never makes it redraw: without one, software-rendered pages (CI) drew so slowly
  * that screenshots timed out.
  */
-export function BrandMark({ size = 28 }: { size?: number }) {
+export function DazbeeMark({ size = 28 }: { size?: number }) {
   return (
     <svg aria-hidden viewBox="0 0 100 100" width={size} height={size} className="shrink-0 will-change-transform">
       {size < 32 ? (
@@ -66,7 +71,3 @@ export function BrandMark({ size = 28 }: { size?: number }) {
     </svg>
   )
 }
-
-const WING_PINK = 'M-7,-33 Q-7,-19 7,-19 Q-7,-19 -7,-5 Q-7,-19 -21,-19 Q-7,-19 -7,-33Z'
-const WING_BLUE = 'M12,-34 Q12,-24 22,-24 Q12,-24 12,-14 Q12,-24 2,-24 Q12,-24 12,-34Z'
-const STINGER = 'M16,-11.5 L28,-10.2 L19.5,-1.5Z'

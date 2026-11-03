@@ -36,7 +36,7 @@ const backgroundOf = (design: Design) => {
   return fill?.type === 'solid' ? fill.color : undefined
 }
 
-export function SizesButton({ editor }: { editor: Editor }) {
+export function FormatsButton({ editor }: { editor: Editor }) {
   const t = useMessages()
   const { design } = useEditorDesign(editor)
   const { open } = useEditState()
@@ -66,7 +66,7 @@ export function SizesButton({ editor }: { editor: Editor }) {
   )
 }
 
-export function SizesPanel({ editor, onRemoved }: { editor: Editor; onRemoved: (message: string) => void }) {
+export function FormatsPanel({ editor, onRemoved }: { editor: Editor; onRemoved: (message: string) => void }) {
   const t = useMessages()
   const { open } = useEditState()
   if (open !== 'sizes') return null

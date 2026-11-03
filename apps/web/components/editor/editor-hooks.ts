@@ -1,5 +1,7 @@
 'use client'
 
+// The hooks that follow the editor: the selection, the design and the format shown alone, the picked
+// page, and the text being edited. Each re-renders its caller when what it follows changes.
 import { useEffect, useState } from 'react'
 
 import type { Editor } from '@dazbee/editor'
@@ -48,7 +50,7 @@ export function useEditorDesign(editor: Editor) {
   return { design, focused }
 }
 
-/** The page a click on its background picked, or null, following the stage. */
+/** The page a click on its background picked, or null, following the stage; a picked page becomes `shownPage`. */
 export function usePickedPage(editor: Editor) {
   const [picked, setPicked] = useState(() => editor.pickedPage())
   useEffect(() => {
