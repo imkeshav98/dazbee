@@ -105,7 +105,7 @@ test('one layer: position, size, turn, opacity, blend, fill, stroke and effects'
   await expect.poll(async () => (await props(page, 'box')).strokes).toMatchObject([{ dashes: [] }])
 
   const effects = await barMenu(page, 'effects')
-  await choose(effects.getByRole('combobox', { name: 'Add another' }), 'dropShadow')
+  await choose(effects.getByRole('combobox', { name: /^Add (effect|another)$/ }), 'dropShadow')
   await expect.poll(async () => (await props(page, 'box')).effects).toMatchObject([{ type: 'dropShadow', blur: 24 }])
   await enter(effects.getByRole('spinbutton', { name: 'Drop shadow 1 Blur' }), '40')
   await expect.poll(async () => (await props(page, 'box')).effects).toMatchObject([{ type: 'dropShadow', blur: 40 }])

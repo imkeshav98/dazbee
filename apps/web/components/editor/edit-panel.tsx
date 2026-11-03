@@ -9,7 +9,7 @@ import {
   ArrowDownIcon, ArrowLineDownIcon, ArrowLineUpIcon, ArrowsOutLineHorizontalIcon, ArrowsOutLineVerticalIcon, ArrowUpIcon, XIcon, type Icon,
 } from '@phosphor-icons/react'
 import type { Editor, ShortcutAction } from '@dazbee/editor'
-import { useEffect, useLayoutEffect, useRef } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react'
 import { cn } from '../../lib/cn.ts'
 import { useMessages } from '../../lib/i18n/client.tsx'
 import { format } from '../../lib/i18n/index.ts'
@@ -106,6 +106,30 @@ function ArrangePart({ target }: { target: Target }) {
   )
 }
 
+/**
+ * Whether a scrolling body has been scrolled down from its top, and whether more of it is below:
+ * the panel then draws a line under its title, and fades its last lines out.
+ */
+function useScrollEdges(body: RefObject<HTMLElement | null>) {
+  const [edges, setEdges] = useState({ down: false, more: false })
+  const measure = () => {
+    const el = body.current
+    if (!el) return
+    const next = { down: el.scrollTop > 0, more: el.scrollTop + el.clientHeight < el.scrollHeight - 1 }
+    setEdges((now) => (now.down === next.down && now.more === next.more ? now : next))
+  }
+  useLayoutEffect(() => {
+    const el = body.current
+    if (!el) return
+    measure()
+    const watch = new ResizeObserver(measure)
+    watch.observe(el)
+    for (const child of el.children) watch.observe(child)
+    return () => watch.disconnect()
+  })
+  return { ...edges, measure }
+}
+
 export function EditPanel({ editor, brandId }: { editor: Editor; brandId: string }) {
   const { open } = useEditState()
   const ids = useSelection(editor)
@@ -123,6 +147,7 @@ function Panel({ id, target, design, brandId }: { id: PanelId; target: Target; d
   const panel = useRef<HTMLElement>(null)
   const body = useRef<HTMLDivElement>(null)
   const bodyRef = useOverlayScroll(body)
+  const scroll = useScrollEdges(body)
   const note = target.ids.length > 1 ? format(t.editor.props.layers, { n: target.ids.length }) : target.names[0] || t.editor.props.layer
   // The focus goes back to the bar item at once, before the panel goes: later, it could take the
   // focus from whatever the next click or key opened.
@@ -185,21 +210,22 @@ function Panel({ id, target, design, brandId }: { id: PanelId; target: Target; d
       tabIndex={-1}
       data-testid={`bar-${id}-menu`}
       data-panel={id}
-      style={phone ? undefined : { top, maxHeight: `calc(100% - ${top}px - 4.5rem)` }}
+      // The panel takes the focus as it opens but is no control itself, so it shows no focus ring.
+      style={{ outline: 'none', ...(phone ? {} : { top, maxHeight: `calc(100% - ${top}px - 4.5rem)` }) }}
       className={cn(
         'pop-in absolute z-20 flex flex-col overflow-hidden rounded-[16px] surface-frost outline-none',
         'end-3 w-[300px]',
         'max-sm:inset-x-2 max-sm:end-2 max-sm:top-auto max-sm:bottom-2 max-sm:max-h-[46%] max-sm:w-auto max-sm:rounded-[22px]',
       )}
     >
-      <div className="flex h-12 shrink-0 items-center gap-2 ps-4 pe-2">
+      <div className={cn('flex h-12 shrink-0 items-center gap-2 border-b ps-4 pe-2 transition-colors', scroll.down ? 'border-line' : 'border-transparent')}>
         <h2 id="edit-panel-title" className="min-w-0 flex-1 truncate font-display text-[15px] font-bold tracking-tight">{b.panels[id]}</h2>
-        <span data-testid="edit-panel-note" className="min-w-0 max-w-[50%] shrink-0 truncate text-[11px] font-medium text-muted">{note}</span>
+        <span data-testid="edit-panel-note" className="min-w-0 max-w-[50%] shrink-0 truncate pe-0.5 text-[11px] font-medium text-muted">{note}</span>
         <button type="button" aria-label={t.editor.closePanel} data-testid="edit-panel-close" onClick={() => close(true)} className="grid size-7 shrink-0 cursor-pointer place-items-center rounded-full text-subtle hover:bg-hover hover:text-text">
           <XIcon size={14} aria-hidden />
         </button>
       </div>
-      <div ref={bodyRef} className="flex min-h-0 flex-col gap-3 overflow-y-auto overscroll-contain px-4 pb-4 [&>*]:shrink-0">
+      <div ref={bodyRef} onScroll={scroll.measure} className={cn('flex min-h-0 flex-col gap-3 overflow-y-auto overscroll-contain px-4 pb-4 [&>*]:shrink-0', scroll.more && '[mask-image:linear-gradient(to_bottom,black_calc(100%-28px),transparent)]')}>
         {id === 'font'
           ? <FontChooser editor={target.editor} brandId={brandId} catalog={catalog} refresh={refresh} onDone={() => close(true)} />
           : (

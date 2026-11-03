@@ -346,7 +346,7 @@ export function PaintRow({ paint, name, brandId, editor, p, onSet }: { paint: Pa
         </Popover.Portal>
       </Popover.Root>
       {paint.type === 'solid'
-        ? <ColorField name={name} value={paint.color} onSet={(to) => onSet((now) => (now.type === 'solid' ? { ...now, color: to(now.color) } : now))} />
+        ? <ColorField name={name} value={paint.color} swatch={false} onSet={(to) => onSet((now) => (now.type === 'solid' ? { ...now, color: to(now.color) } : now))} />
         : (
           <>
             <span className="min-w-0 flex-1 truncate text-xs text-muted">{p.paint[paint.type]}</span>

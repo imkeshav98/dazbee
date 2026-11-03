@@ -91,7 +91,7 @@ test('a tile adds its effect and takes it off, None takes them all off, and Add 
   await (await tile(page, 'innerShadow')).click()
   await expect.poll(() => effectsOf(page, 'star')).toEqual(['dropShadow', 'innerShadow'])
   // Add another: a second drop shadow.
-  await choose((await advanced()).getByRole('combobox', { name: 'Add another' }), 'dropShadow')
+  await choose((await advanced()).getByRole('combobox', { name: /^Add (effect|another)$/ }), 'dropShadow')
   await expect.poll(() => effectsOf(page, 'star')).toEqual(['dropShadow', 'innerShadow', 'dropShadow'])
   // The tile takes every drop shadow off, in one undo step.
   await (await tile(page, 'dropShadow')).click()

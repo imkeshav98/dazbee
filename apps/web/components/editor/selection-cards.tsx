@@ -65,12 +65,12 @@ export function shared<T>(values: T[]): T | 'mixed' {
   return same ? first as T : 'mixed'
 }
 
-/** A part of an edit panel or pop-up: its heading, an action at the end, its controls. */
-function Card({ id, title, note, action, children }: { id: string; title: string; note?: string; action?: ReactNode; children?: ReactNode }) {
+/** A part of an edit panel or pop-up: its heading, an action at the end, its controls. Advanced's heading is `strong`. */
+function Card({ id, title, note, action, strong = false, children }: { id: string; title: string; note?: string; action?: ReactNode; strong?: boolean; children?: ReactNode }) {
   return (
     <section aria-labelledby={`${id}-title`} className={PANEL_PART} data-testid={id}>
-      <div className="flex h-8 items-center gap-2">
-        <h3 id={`${id}-title`} className="min-w-0 flex-1 truncate text-[13px] font-semibold text-text">{title}</h3>
+      <div className="flex h-7 items-center gap-2">
+        <h3 id={`${id}-title`} className={cn('min-w-0 flex-1 truncate text-xs font-semibold', strong ? 'text-text' : 'text-muted')}>{title}</h3>
         {note && <span className="min-w-0 max-w-[60%] truncate text-[11px] font-medium text-muted">{note}</span>}
         {action}
       </div>
@@ -101,7 +101,7 @@ function PlaceCard({ target, p, title, children }: { target: Target; p: P; title
     { key: 'y', label: p.y, name: p.yName },
   ] as const
   return (
-    <Card id="layout-card" title={title}>
+    <Card id="layout-card" title={title} strong>
       <div className={KNOBS}>
         {sized && sides.map((f) => (
           <NumberField
@@ -479,7 +479,7 @@ function StrokePanel({ target, brandId, p, b }: { target: Target; brandId: strin
           />
         )}
       </Card>
-      <Card id="stroke-card" title={b.advanced}>
+      <Card id="stroke-card" title={b.advanced} strong>
         <StrokeBody target={target} brandId={brandId} p={p} title={b.strokeLook.outlines} />
       </Card>
     </>
@@ -812,7 +812,7 @@ function TextFitCard({ target, p, title }: { target: Target; p: P; title: string
   const value = (key: string) => shared(target.props.map((pr) => pr[key])) as unknown
   const shrink = value('shrinkToFit') as Fit | undefined | 'mixed'
   return (
-    <Card id="text-fit-card" title={title}>
+    <Card id="text-fit-card" title={title} strong>
       <SwitchRow
         name={p.shrinkToFit}
         on={shrink === 'mixed' ? 'mixed' : shrink !== undefined}
@@ -988,7 +988,7 @@ function PhotosCard({ target, p, b, brandId, index, paint }: { target: Target; p
 /** The fills, under Advanced with + in its heading: the Colour panel's, and a photo's in its Edit image panel. */
 function FillsCard({ target, brandId, p, b, children }: { target: Target; brandId: string; p: P; b: Messages['editor']['bar']; children?: ReactNode }) {
   return (
-    <Card id="fill-card" title={b.advanced}>
+    <Card id="fill-card" title={b.advanced} strong>
       {children}
       <FillBody target={target} brandId={brandId} p={p} title={b.colourPanel.fills} />
     </Card>
@@ -1095,7 +1095,7 @@ function AutoLayoutCard({ target, p, b, ownSizing }: { target: Target; p: P; b: 
         <NumberField label={p.between} name={p.gap} value={gap} fillRange={[0, 64]} editor={target.editor} onSet={(to) => setLayout(() => ({ gap: to }))} onShift={(by) => setLayout((l) => ({ gap: tidy(l.gap + by) }))} />
         <Segments name={p.spreadOut} value={justify === 'mixed' ? 'mixed' : justify === 'space-between' ? 'between' : 'packed'} options={['packed', 'between'] as const} labels={p.spreads} onSet={(to) => setLayout((l) => ({ justify: to === 'between' ? 'space-between' : l.justify === 'space-between' ? 'start' : l.justify }))} />
       </Card>
-      <Card id="auto-layout-advanced" title={b.advanced}>
+      <Card id="auto-layout-advanced" title={b.advanced} strong>
         <div className="flex items-center justify-between gap-3">
           <span className="text-[13px] font-semibold text-text">{p.lineUp}</span>
           {/* Across the pad is along a row's line (or down a column's), so each cell sets both axes. */}
@@ -1437,7 +1437,7 @@ function EffectSample({ sample, tile }: { sample: Sample; tile: Tile }) {
         aria-hidden
         className={cn(
           'font-display text-[26px] leading-none font-extrabold',
-          tile === 'outline' ? 'text-transparent [-webkit-text-stroke:1.4px_var(--accent)]' : inner ? 'bg-[linear-gradient(180deg,rgb(0_0_0/0.6),var(--accent)_55%)] bg-clip-text text-transparent' : 'text-accent',
+          tile === 'outline' ? 'text-transparent [-webkit-text-stroke:1.4px_var(--accent)]' : inner ? 'bg-[linear-gradient(180deg,rgb(0_0_0/0.85)_10%,var(--accent)_70%)] bg-clip-text text-transparent' : 'text-accent',
           TILE_LOOK[tile],
         )}
       >
@@ -1516,7 +1516,7 @@ export function EffectsBody({ target, p, b, brandId }: { target: Target; p: P; b
           ))}
         </div>
       </section>
-      <Card id="effects-card" title={b.advanced}>
+      <Card id="effects-card" title={b.advanced} strong>
         {text && outline && outline !== 'mixed' && outline.width > 0 && (
           <div className="flex flex-col gap-1.5" data-item="text-outline">
             <span className="text-xs font-bold text-text">{p.tiles.outline}</span>
@@ -1539,9 +1539,9 @@ export function EffectsBody({ target, p, b, brandId }: { target: Target; p: P; b
         {empty && <p className="text-xs text-muted">{b.effectsHint}</p>}
         <Select
           name="add-effect"
-          label={b.addAnother}
+          label={empty ? p.addEffect : b.addAnother}
           value=""
-          placeholder={b.addAnother}
+          placeholder={empty ? p.addEffect : b.addAnother}
           options={(Object.keys(NEW_EFFECT) as Effect['type'][]).map((type) => ({ value: type, label: p.effect[type] }))}
           onChange={(type) => {
             const fresh = NEW_EFFECT[type as Effect['type']]

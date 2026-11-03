@@ -305,7 +305,7 @@ test.describe('every selection', () => {
       added.push(type)
       const want = [...added]
       // A background blur blurs what is behind the box: the white page, which looks the same.
-      await step(page, async () => choose(card.getByRole('combobox', { name: 'Add another' }), type), async () => {
+      await step(page, async () => choose(card.getByRole('combobox', { name: /^Add (effect|another)$/ }), type), async () => {
         await expect.poll(async () => ((await props(page, 'box')).effects ?? []).map((e) => e.type)).toEqual(want)
       }, { draws: type !== 'backgroundBlur' })
     }
@@ -317,10 +317,10 @@ test.describe('every selection', () => {
     await select(page, ['box'])
     const card = await barMenu(page, 'effects')
     const effects = async () => (await props(page, 'box')).effects ?? []
-    await choose(card.getByRole('combobox', { name: 'Add another' }), 'dropShadow')
-    await choose(card.getByRole('combobox', { name: 'Add another' }), 'dropShadow')
-    await choose(card.getByRole('combobox', { name: 'Add another' }), 'glow')
-    await choose(card.getByRole('combobox', { name: 'Add another' }), 'layerBlur')
+    await choose(card.getByRole('combobox', { name: /^Add (effect|another)$/ }), 'dropShadow')
+    await choose(card.getByRole('combobox', { name: /^Add (effect|another)$/ }), 'dropShadow')
+    await choose(card.getByRole('combobox', { name: /^Add (effect|another)$/ }), 'glow')
+    await choose(card.getByRole('combobox', { name: /^Add (effect|another)$/ }), 'layerBlur')
     await expect.poll(async () => (await effects()).length).toBe(4)
     for (const [field, key, value] of [['X', 'x', 30], ['Y', 'y', -20], ['Blur', 'blur', 40], ['Spread', 'spread', 12]] as const) {
       await step(page, async () => enter(card.getByRole('spinbutton', { name: `Drop shadow 1 ${field}` }), String(value)), async () => {

@@ -93,7 +93,8 @@ export function NumberField({ label, name, value, step = 1, min, max, fillRange,
     <div
       data-scrub={name}
       title={format(t.editor.props.scrub, { name })}
-      style={{ '--fill-from': `${fill.from}%`, '--fill': `${fill.width}%` } as CSSProperties}
+      data-ranged={fill.at === null ? undefined : ''}
+      style={{ '--fill-from': `${fill.from}%`, '--fill': `${fill.width}%`, '--fill-at': `${fill.at ?? 0}%` } as CSSProperties}
       onPointerDown={(event) => {
         // A press on the field being typed in places the caret; anywhere else it starts a drag.
         if (event.button !== 0 || (typing && event.target === input.current)) return
@@ -174,11 +175,12 @@ export const withOpacity = (alpha: number) => (now: string | undefined) =>
   `${now?.slice(0, 7) || '#000000'}${Math.round(clamp(alpha, 0, 1) * 255).toString(16).padStart(2, '0').toUpperCase()}`
 
 /**
- * A colour: a swatch that opens the system picker, the hex, and its opacity as a percentage. A
+ * A colour: a swatch that opens the system picker (unless `swatch` is off, where a swatch beside it
+ * does more), the hex, and its opacity as a percentage. A
  * change gives `onSet` the colour to build from the one the document holds then, so a hex and an
  * opacity committed one after the other each keep the other's change.
  */
-export function ColorField({ name, value, onSet }: { name: string; value: string | 'mixed' | undefined; onSet: (to: (now: string | undefined) => string) => void }) {
+export function ColorField({ name, value, swatch = true, onSet }: { name: string; value: string | 'mixed' | undefined; swatch?: boolean; onSet: (to: (now: string | undefined) => string) => void }) {
   const t = useMessages()
   const p = t.editor.props
   const hex = value && value !== 'mixed' ? value.slice(0, 7).toUpperCase() : ''
@@ -191,14 +193,16 @@ export function ColorField({ name, value, onSet }: { name: string; value: string
   }
   return (
     <div className="flex min-w-0 flex-1 items-center gap-1">
-      <input
-        name="colour"
-        type="color"
-        aria-label={format(p.colourOf, { name })}
-        value={hex || '#000000'}
-        onChange={(event) => onSet(withHex(event.target.value.toUpperCase()))}
-        className="size-7 shrink-0 cursor-pointer rounded-row border border-line bg-surface p-0.5"
-      />
+      {swatch && (
+        <input
+          name="colour"
+          type="color"
+          aria-label={format(p.colourOf, { name })}
+          value={hex || '#000000'}
+          onChange={(event) => onSet(withHex(event.target.value.toUpperCase()))}
+          className="size-7 shrink-0 cursor-pointer rounded-row border border-line bg-surface p-0.5"
+        />
+      )}
       <input
         name="colour-hex"
         aria-label={format(p.hexOf, { name })}

@@ -60,15 +60,16 @@ export const FIELD_LABEL = 'text-xs font-semibold text-muted'
 export const SELECT = 'h-8 w-full bg-surface px-1.5 text-[12px]'
 /**
  * A number you drag sideways, as in the mock: its label at the start, its value in mono at the end,
- * and a soft fill behind them showing where the value sits in its range: from `--fill-from`, `--fill` wide.
+ * and a soft fill behind them showing where the value sits in its range: from `--fill-from`, `--fill` wide,
+ * with a line at the value (`--fill-at`) on a field that has a range (`data-ranged`).
  */
-export const KNOB = `relative flex h-8 min-w-0 cursor-ew-resize touch-pan-y select-none items-center gap-2 overflow-hidden rounded-row border border-line bg-surface px-2.5 text-[12px] font-semibold text-muted transition-colors duration-[var(--chrome-fast)] hover:border-line-strong focus-within:border-accent before:pointer-events-none before:absolute before:inset-y-0 before:start-[var(--fill-from,0%)] before:w-[var(--fill,0%)] before:bg-accent-soft before:transition-[width] before:duration-75`
+export const KNOB = `relative flex h-8 min-w-0 cursor-ew-resize touch-pan-y select-none items-center gap-2 overflow-hidden rounded-row border border-line bg-surface px-2.5 text-[12px] font-semibold text-muted transition-colors duration-[var(--chrome-fast)] hover:border-line-strong focus-within:border-accent before:pointer-events-none before:absolute before:inset-y-0 before:start-[var(--fill-from,0%)] before:w-[var(--fill,0%)] before:bg-accent-soft before:transition-[width] before:duration-75 data-ranged:after:pointer-events-none data-ranged:after:absolute data-ranged:after:inset-y-1.5 data-ranged:after:start-[var(--fill-at)] data-ranged:after:w-0.5 data-ranged:after:-translate-x-1/2 data-ranged:after:rounded-full data-ranged:after:bg-accent rtl:data-ranged:after:translate-x-1/2`
 /** Knobs two to a row; a lone last one takes the whole row. */
 export const KNOBS = 'grid grid-cols-2 gap-1.5 [&>:last-child:nth-child(odd)]:col-span-2'
 /** A row of choices that look as one control, one of them on. */
 export const SEGMENTS = 'grid auto-cols-fr grid-flow-col gap-0.5 rounded-[10px] bg-hover p-[3px]'
 /** One choice of SEGMENTS, aria-checked while it is the one. */
-export const SEGMENT = `h-7 min-w-0 cursor-pointer truncate rounded-[7px] px-2 text-[12px] font-semibold text-muted transition-colors duration-[var(--chrome-fast)] hover:text-text aria-checked:bg-accent-solid aria-checked:text-on-accent ${FOCUS_RING}`
+export const SEGMENT = `h-7 min-w-0 cursor-pointer truncate rounded-[7px] px-2 text-[12px] font-semibold text-muted transition-colors duration-[var(--chrome-fast)] hover:text-text aria-checked:bg-accent-soft aria-checked:text-accent-text ${FOCUS_RING}`
 
 /** A row of a menu: its words at the start, a shortcut or a switch at the end. */
 export const MENU_ITEM = `group flex h-9 w-full shrink-0 cursor-pointer items-center justify-between gap-3 rounded-row px-2.5 text-start text-[13px] font-medium text-text transition-colors duration-[var(--chrome-fast)] hover:bg-hover ${DISABLED} ${FOCUS_RING}`
@@ -77,11 +78,11 @@ export const MENU_DIVIDER = 'mx-1.5 my-1 border-t border-line'
 /** A shortcut shown in a menu row. */
 export const MENU_KEY = 'font-mono text-[11px] font-normal text-subtle'
 /** A switch drawn in a menu row or a card's row that is role="switch": checked, its knob slides to the end. */
-export const SWITCH = 'relative h-5 w-[34px] shrink-0 rounded-full bg-line-strong transition-colors duration-[var(--chrome-fast)] group-aria-checked:bg-accent-solid after:absolute after:start-0.5 after:top-0.5 after:size-4 after:rounded-full after:bg-white after:transition-transform after:duration-[var(--chrome-fast)] group-aria-checked:after:translate-x-3.5 rtl:group-aria-checked:after:-translate-x-3.5'
+export const SWITCH = 'relative h-5 w-[34px] shrink-0 rounded-full bg-subtle/70 transition-colors duration-[var(--chrome-fast)] group-aria-checked:bg-accent-solid after:absolute after:start-0.5 after:top-0.5 after:size-4 after:rounded-full after:bg-white after:transition-transform after:duration-[var(--chrome-fast)] group-aria-checked:after:translate-x-3.5 rtl:group-aria-checked:after:-translate-x-3.5'
 
 /** A tile to pick, as the effects and the box modes are: its picture, its name under it, lit while it is on. */
 export const TILE = `group flex min-w-0 cursor-pointer flex-col items-center gap-1 text-[11px] font-semibold text-muted aria-pressed:text-text aria-checked:text-text ${FOCUS_RING}`
-const TILE_FACE_BASE = 'grid w-full place-items-center overflow-hidden rounded-[10px] border border-line bg-bg/60 transition-colors duration-[var(--chrome-fast)] group-hover:border-line-strong group-aria-pressed:border-accent group-aria-checked:border-accent'
+const TILE_FACE_BASE = 'grid w-full place-items-center overflow-hidden rounded-[10px] border border-line bg-bg/60 transition-colors duration-[var(--chrome-fast)] group-hover:border-line-strong group-aria-pressed:border-accent group-aria-pressed:ring-1 group-aria-pressed:ring-accent group-aria-checked:border-accent group-aria-checked:ring-1 group-aria-checked:ring-accent'
 /** The picture of a TILE, square. */
 export const TILE_FACE = `${TILE_FACE_BASE} aspect-square`
 /** The picture of a TILE, wider than tall. */
