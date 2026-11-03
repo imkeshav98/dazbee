@@ -42,11 +42,21 @@ test('Sizes opens from the header pill and lists the sizes; Esc closes it and th
   await expect(panel.getByTestId('formats').locator('[data-format]')).toHaveCount(2)
   // The Sizes card is gone from the cards.
   await expect(page.locator('#editor-cards [data-testid="formats"]')).toHaveCount(0)
-  // Adding a size from the panel's title row.
+  // Every preset, from More sizes.
   await panel.getByRole('button', { name: 'Add format' }).click()
-  await page.getByRole('dialog', { name: 'Add format' }).locator('[data-preset=feed-portrait]').click()
+  await page.getByRole('dialog', { name: 'Add format' }).locator('[data-preset=pin]').click()
   await expect(button.locator('span:visible')).toHaveText('Sizes · 3')
   await expect(panel.getByTestId('formats').locator('[data-format]')).toHaveCount(3)
+  // A common size at a tap, from Add a size.
+  await panel.getByTestId('add-size').locator('[data-preset=link-image]').click()
+  await expect(button.locator('span:visible')).toHaveText('Sizes · 4')
+  // Each size's menu renames it.
+  const story = panel.locator('[data-format="st"]')
+  await story.getByRole('button', { name: 'More for Story' }).click()
+  await page.getByRole('dialog', { name: 'More for Story' }).getByRole('button', { name: 'Rename' }).click()
+  await story.getByRole('textbox', { name: 'Rename' }).fill('Reel')
+  await story.getByRole('textbox', { name: 'Rename' }).press('Enter')
+  await expect.poll(() => page.evaluate(() => window.dazbee?.design().formats.st?.name)).toBe('Reel')
   await page.keyboard.press('Escape')
   await expect(panel).toBeHidden()
   // A second press of the button closes it too.

@@ -632,6 +632,8 @@ export const en = {
     formats: {
       title: 'Sizes',
       button: 'Sizes · {n}',
+      more: 'More for {name}',
+      addSize: 'Add a size',
       add: 'Add format',
       presets: 'Presets',
       custom: 'Custom size',

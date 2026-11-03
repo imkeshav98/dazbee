@@ -620,6 +620,8 @@ export const ar: Messages = {
     },
     formats: {
       button: 'المقاسات · {n}',
+      more: 'المزيد لـ {name}',
+      addSize: 'أضف مقاسًا',
       title: 'المقاسات',
       add: 'إضافة مقاس',
       presets: 'مقاسات جاهزة',

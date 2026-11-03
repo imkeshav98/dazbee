@@ -1277,34 +1277,30 @@ test.describe('nothing selected', () => {
       await expect.poll(async () => (await doc(page)).formats.story?.name).toBe('Reel')
       await expect.soft(page.locator('.frame-label[data-frame="p1/story"]')).toContainText('Reel')
     }, { draws: false })
+    // A size's menu: rename, move up and down, remove.
+    const menu = async (of: typeof row, name: string) => {
+      await of.getByRole('button', { name: /^More for / }).click()
+      return page.getByRole('dialog', { name: new RegExp(`^More for ${name}`) })
+    }
     // The primary format can't be removed.
-    await square.hover()
-    await expect.soft(square.getByRole('button', { name: 'Remove format' })).toBeDisabled()
+    await expect.soft((await menu(square, 'Square')).getByRole('button', { name: 'Remove format' })).toBeDisabled()
+    await page.keyboard.press('Escape')
     // Which format is primary changes no format's picture.
-    await step(page, async () => {
-      await row.hover()
-      await row.getByRole('button', { name: 'Make primary' }).click()
-    }, async () => { await expect.poll(async () => (await doc(page)).meta.primaryFormatId).toBe('story') }, { draws: false })
-    await row.hover()
-    await expect.soft(row.getByRole('button', { name: 'Remove format' })).toBeDisabled()
+    await step(page, async () => row.getByRole('button', { name: 'Make primary' }).click(), async () => {
+      await expect.poll(async () => (await doc(page)).meta.primaryFormatId).toBe('story')
+    }, { draws: false })
+    await expect.soft((await menu(row, 'Reel')).getByRole('button', { name: 'Remove format' })).toBeDisabled()
+    await page.keyboard.press('Escape')
     // The order of formats is the order of the list, not of the picture.
     const order = async () => Object.entries((await doc(page)).formats).sort(([, a], [, b]) => byOrder(a, b)).map(([id]) => id)
-    await step(page, async () => {
-      await row.hover()
-      await row.getByRole('button', { name: 'Move up' }).click()
-    }, async () => { await expect.poll(order).toEqual(['story', 'sq']) }, { draws: false })
-    await step(page, async () => {
-      await row.hover()
-      await row.getByRole('button', { name: 'Move down' }).click()
-    }, async () => { await expect.poll(order).toEqual(['sq', 'story']) }, { draws: false })
+    await step(page, async () => (await menu(row, 'Reel')).getByRole('button', { name: 'Move up' }).click(), async () => { await expect.poll(order).toEqual(['story', 'sq']) }, { draws: false })
+    await step(page, async () => (await menu(row, 'Reel')).getByRole('button', { name: 'Move down' }).click(), async () => { await expect.poll(order).toEqual(['sq', 'story']) }, { draws: false })
     const kept = await designOf(page)
-    await square.hover()
-    await square.getByRole('button', { name: 'Remove format' }).click()
+    await (await menu(square, 'Square')).getByRole('button', { name: 'Remove format' }).click()
     await expect.poll(async () => (await doc(page)).formats.sq).toBeUndefined()
     await expect.soft(page.getByTestId('removed-toast')).toContainText('Square removed')
     await page.getByTestId('removed-toast').getByRole('button', { name: 'Undo' }).click()
     await expect.poll(() => designOf(page), { message: 'the toast\'s Undo brings the format back whole' }).toBe(kept)
-    await square.hover()
     await square.getByRole('button', { name: 'Show alone' }).click()
     await expect(page.getByTestId('focus-chip')).toBeVisible()
     await expect.soft(page.getByTestId('focus-chip')).toContainText('Showing Square alone')

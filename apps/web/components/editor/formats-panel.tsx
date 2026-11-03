@@ -1,15 +1,14 @@
 'use client'
 
-// The design's formats in the inspector (#38): add one from presets grouped by shape or as a
-// custom size, rename, reorder, make primary, show one alone, remove. Every change is a command,
-// so it is one undo step and reaches the other tabs.
+// Adding a size to the design: every preset grouped by shape, or a size of your own, checked
+// against the sizes the formats allow; and the design as the editor holds it, kept current.
 import {
-  ArrowsInSimpleIcon, CaretDownIcon, CaretUpIcon, InfoIcon, PlusIcon, StarIcon, TrashIcon,
+  ArrowsInSimpleIcon, InfoIcon, PlusIcon, TrashIcon,
 } from '@phosphor-icons/react'
 import * as Popover from '@radix-ui/react-popover'
 import type { Editor } from '@dazbee/editor'
 import {
-  FORMAT_LIMITS, FORMAT_PRESETS, FORMAT_SHAPES, formatSizeIssue, shapeOf, type Design,
+  FORMAT_LIMITS, FORMAT_PRESETS, FORMAT_SHAPES, formatSizeIssue, shapeOf,
 } from '@dazbee/schema'
 import { useEffect, useId, useState, type FormEvent } from 'react'
 import { cn } from '../../lib/cn.ts'
@@ -18,7 +17,6 @@ import { format } from '../../lib/i18n/index.ts'
 import { Button } from '../ui/button.tsx'
 import { overlayScroll } from '../ui/overlay-scroll.ts'
 import { Tooltip } from '../ui/tooltip.tsx'
-import { CARD, CardHeader } from './card.tsx'
 import { ICON_BUTTON, POPOVER, TOAST } from './styles.ts'
 import { useLiveDesign } from './use-live-design.ts'
 
@@ -38,9 +36,6 @@ export function useEditorDesign(editor: Editor) {
 /** A size as the app writes it, in numerals that read the same in every locale. */
 const sizeOf = ({ width, height }: { width: number; height: number }) => `${width} × ${height}`
 
-const ordered = (design: Design) =>
-  Object.entries(design.formats).sort(([a, x], [b, y]) => (x.order < y.order ? -1 : x.order > y.order ? 1 : a < b ? -1 : 1))
-
 /** A small box with the format's own proportions. */
 export function Proportion({ width, height, className }: { width: number; height: number; className?: string }) {
   const scale = 14 / Math.max(width, height)
@@ -48,155 +43,6 @@ export function Proportion({ width, height, className }: { width: number; height
     <span aria-hidden className={cn('grid size-4 shrink-0 place-items-center', className)}>
       <span className="rounded-[2px] border-[1.5px] border-current" style={{ width: Math.max(4, width * scale), height: Math.max(4, height * scale) }} />
     </span>
-  )
-}
-
-/** The first page's background, when it is one colour: what a format's tile is filled with. */
-const backgroundOf = (design: Design) => {
-  const first = Object.values(design.pages).sort((x, y) => (x.order < y.order ? -1 : x.order > y.order ? 1 : 0))[0]
-  const fill = first?.fills[0]
-  return fill?.type === 'solid' ? fill.color : undefined
-}
-
-/** A format's tile in the strip: a box in its proportions, at most 44 tall and 64 wide. */
-const tileSize = ({ width, height }: { width: number; height: number }) => {
-  const scale = Math.min(44 / height, 64 / width)
-  return { width: Math.max(12, Math.round(width * scale)), height: Math.max(12, Math.round(height * scale)) }
-}
-
-/**
- * The design's sizes: a tile of each in its proportions, then the list, each with its primary star,
- * show alone, move up and down, and remove. With `bare`, without the card round it, for the Sizes
- * panel, which has Add in its title row.
- */
-export function FormatsPanel({ editor, onRemoved, bare = false }: { editor: Editor; onRemoved: (message: string) => void; bare?: boolean }) {
-  const t = useMessages()
-  const { design, focused } = useEditorDesign(editor)
-  const formats = ordered(design)
-  const [renaming, setRenaming] = useState<string | null>(null)
-  const run = editor.session.run.bind(editor.session)
-  const background = backgroundOf(design)
-
-  const rename = (id: string, name: string) => {
-    setRenaming(null)
-    const trimmed = name.trim()
-    if (trimmed && trimmed !== design.formats[id]?.name) run('format.update', { id, name: trimmed })
-  }
-
-  const content = (
-    <>
-      {/* The formats as a picture, as in the final mock: each a tile in its proportions, filled with
-          the first page's background, ringed while shown alone, starred if primary. The list below
-          does the work. */}
-      <div aria-hidden className={cn('flex items-end gap-3 overflow-x-auto pb-3 [scrollbar-width:none]', !bare && 'px-[18px]')} data-testid="format-tiles">
-        {formats.map(([id, f]) => (
-          <span key={id} className="flex shrink-0 flex-col items-center gap-1.5 text-[11px] font-semibold text-muted">
-            <span
-              className={cn('relative rounded-[4px] border border-line-strong bg-hover', focused === id && 'shadow-[0_0_0_2px_var(--accent)]')}
-              style={{ ...tileSize(f), backgroundColor: background }}
-            >
-              {design.meta.primaryFormatId === id && <StarIcon size={10} weight="fill" className="absolute -end-1 -top-1 text-accent-text drop-shadow" />}
-            </span>
-            <span className="max-w-16 truncate">{f.name}</span>
-          </span>
-        ))}
-      </div>
-      <ul aria-label={t.editor.formats.title} className={cn('pb-2', bare ? '-mx-1.5' : 'px-2.5')} data-testid="formats">
-        {formats.map(([id, f], i) => {
-          const primary = design.meta.primaryFormatId === id
-          return (
-            <li
-              key={id}
-              data-format={id}
-              data-focused={focused === id ? '' : undefined}
-              className="group flex h-[var(--row)] items-center gap-1 rounded-row ps-1 pe-2 hover:bg-hover data-[focused]:bg-accent-soft"
-            >
-              <Tooltip label={primary ? t.editor.formats.primary : t.editor.formats.makePrimary}>
-                <button
-                  type="button"
-                  aria-label={primary ? t.editor.formats.primary : t.editor.formats.makePrimary}
-                  aria-pressed={primary}
-                  onClick={() => primary || run('format.setPrimary', { id })}
-                  className={cn(ICON_BUTTON, primary ? 'text-accent-text' : 'opacity-0 group-hover:opacity-100 focus-visible:opacity-100')}
-                >
-                  <StarIcon size={14} weight={primary ? 'fill' : 'regular'} aria-hidden />
-                </button>
-              </Tooltip>
-              <Proportion width={f.width} height={f.height} className="text-subtle" />
-              {renaming === id ? (
-                <input
-                  name="format-name"
-                  aria-label={t.editor.formats.rename}
-                  defaultValue={f.name}
-                  autoFocus
-                  onFocus={(e) => e.currentTarget.select()}
-                  onBlur={(e) => rename(id, e.currentTarget.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') rename(id, e.currentTarget.value)
-                    if (e.key === 'Escape') setRenaming(null)
-                    e.stopPropagation()
-                  }}
-                  className="h-6 min-w-0 flex-1 rounded-[6px] border border-accent bg-surface px-1.5 text-[13px] outline-none"
-                />
-              ) : (
-                <button
-                  type="button"
-                  onDoubleClick={() => setRenaming(id)}
-                  onKeyDown={(e) => e.key === 'Enter' && setRenaming(id)}
-                  aria-label={`${t.editor.formats.rename}: ${f.name}`}
-                  className="min-w-0 flex-1 cursor-default truncate text-start text-[13px]"
-                >
-                  {f.name}
-                </button>
-              )}
-              <span className="shrink-0 font-mono text-[11px] text-subtle tabular-nums group-hover:hidden group-focus-within:hidden">
-                {sizeOf(f)}
-              </span>
-              <span className="hidden shrink-0 items-center group-hover:flex group-focus-within:flex">
-                <Tooltip label={focused === id ? t.editor.formats.exitFocus : t.editor.formats.focus}>
-                  <button type="button" aria-label={t.editor.formats.focus} aria-pressed={focused === id} onClick={() => editor.focus(focused === id ? null : id)} className={ICON_BUTTON}>
-                    <ArrowsInSimpleIcon size={14} aria-hidden />
-                  </button>
-                </Tooltip>
-                <Tooltip label={t.editor.formats.moveUp}>
-                  <button type="button" aria-label={t.editor.formats.moveUp} disabled={i === 0} onClick={() => run('format.update', { id, before: formats[i - 1]?.[0] ?? null })} className={ICON_BUTTON}>
-                    <CaretUpIcon size={14} aria-hidden />
-                  </button>
-                </Tooltip>
-                <Tooltip label={t.editor.formats.moveDown}>
-                  <button type="button" aria-label={t.editor.formats.moveDown} disabled={i === formats.length - 1} onClick={() => run('format.update', { id, before: formats[i + 2]?.[0] ?? null })} className={ICON_BUTTON}>
-                    <CaretDownIcon size={14} aria-hidden />
-                  </button>
-                </Tooltip>
-                <Tooltip label={t.editor.formats.remove}>
-                  <button
-                    type="button"
-                    aria-label={t.editor.formats.remove}
-                    disabled={primary || formats.length === 1}
-                    onClick={() => {
-                      run('format.remove', { id })
-                      onRemoved(format(t.editor.formats.removed, { name: f.name }))
-                    }}
-                    className={cn(ICON_BUTTON, 'hover:text-danger')}
-                  >
-                    <TrashIcon size={14} aria-hidden />
-                  </button>
-                </Tooltip>
-              </span>
-            </li>
-          )
-        })}
-      </ul>
-    </>
-  )
-  if (bare) return <div className="flex flex-col" data-testid="sizes-part">{content}</div>
-  return (
-    <section aria-labelledby="formats-title" className={CARD}>
-      <CardHeader id="formats-title" title={t.editor.formats.title} count={formats.length}>
-        <AddFormat editor={editor} />
-      </CardHeader>
-      {content}
-    </section>
   )
 }
 
