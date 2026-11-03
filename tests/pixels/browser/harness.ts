@@ -1,4 +1,4 @@
-// Runs in Chromium. Bundled by specs/parity.fixture.ts and served from memory, with the
+// Runs in Chromium. Bundled by specs/support/harness.ts and served from memory, with the
 // CanvasKit wasm, the font files and the fixture images beside it.
 import type { Surface } from '@dazbee/canvaskit'
 import canvasKitModule from '@dazbee/canvaskit'

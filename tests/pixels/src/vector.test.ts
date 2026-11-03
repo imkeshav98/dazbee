@@ -1,7 +1,6 @@
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 
-import { PDFiumLibrary } from '@hyzyla/pdfium'
 import { afterAll, describe, expect, it } from 'vitest'
 
 import { exportDesign } from '@dazbee/export'
@@ -27,6 +26,7 @@ import {
   rasteriseSvg,
   readVectorBaselines,
   recordVectorBaseline,
+  startPdfium,
   vectorDifference,
 } from './vector.ts'
 
@@ -37,11 +37,8 @@ if (UPDATE && process.env.CI) throw new Error('UPDATE_VECTOR_BASELINES rewrites 
 const ck = await loadCanvasKit()
 const bytes = fixtureResources()
 const cache = resourceCache(ck)
-const pdfium = await PDFiumLibrary.init()
-afterAll(() => {
-  pdfium.destroy()
-  cache.delete()
-})
+const pdfium = await startPdfium(afterAll)
+afterAll(() => cache.delete())
 
 const cases = loadFixtures().flatMap(({ name, json }) => {
   const parsed = parseDesign(json)

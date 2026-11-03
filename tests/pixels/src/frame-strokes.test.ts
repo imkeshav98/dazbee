@@ -1,18 +1,16 @@
 // Frame strokes: they follow the frame's corners, sit inside, on or outside its edge, go over what
 // is inside it and are never cut by its clip, on the CPU surface and in the PDF and SVG.
-import { PDFiumLibrary } from '@hyzyla/pdfium'
 import { afterAll, describe, expect, it } from 'vitest'
 
-import { renderDesign, renderVector } from '@dazbee/renderer'
+import { renderDesign } from '@dazbee/renderer'
 import { loadCanvasKit } from '@dazbee/renderer/node'
 
 import { at, fixtureResources } from './pixels.ts'
-import { overWhite, rasterisePdf, rasteriseSvg, vectorDifference } from './vector.ts'
+import { renderThreeWays, startPdfium, vectorDifference } from './vector.ts'
 
 const ck = await loadCanvasKit()
 const bytes = fixtureResources()
-const pdfium = await PDFiumLibrary.init()
-afterAll(() => pdfium.destroy())
+const pdfium = await startPdfium(afterAll)
 
 const solid = (color: string) => [{ type: 'solid', color }]
 /** A 300 square page: a blue frame at 50,50, 200 square, clipping a red square that fills it and more, stroked in black. */
@@ -102,10 +100,7 @@ describe('frame strokes', () => {
       ['outside', { cornerRadius: 20, rotation: 90, height: 100, strokes: [angular] }],
     ] as const
     for (const [align, frame] of cases) {
-      const json = design(align, frame)
-      const cpu = overWhite(renderDesign(ck, json, 'p1', 'f', bytes))
-      const pdf = await rasterisePdf(pdfium, renderVector(ck, json, 'p1', 'f', bytes, 'pdf'))
-      const svg = rasteriseSvg(renderVector(ck, json, 'p1', 'f', bytes, 'svg'))
+      const { cpu, pdf, svg } = await renderThreeWays(ck, pdfium, design(align, frame), 'p1', 'f', bytes)
       expect(vectorDifference(cpu, pdf), `PDF ${align} ${JSON.stringify(frame)}`).toBeLessThan(1)
       expect(vectorDifference(cpu, svg), `SVG ${align} ${JSON.stringify(frame)}`).toBeLessThan(1)
     }

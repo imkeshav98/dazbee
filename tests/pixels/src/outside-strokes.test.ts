@@ -1,18 +1,16 @@
 // Outside strokes on shapes and booleans (#270) export to SVG and PDF as the CPU draws them: the
 // stroke lies outside the edge only, never on a band inside it.
-import { PDFiumLibrary } from '@hyzyla/pdfium'
 import { afterAll, describe, expect, it } from 'vitest'
 
 import { renderDesign, renderVector } from '@dazbee/renderer'
 import { loadCanvasKit } from '@dazbee/renderer/node'
 
 import { at, fixtureResources } from './pixels.ts'
-import { rasterisePdf, rasteriseSvg, vectorDifference } from './vector.ts'
+import { rasteriseSvg, renderThreeWays, startPdfium, vectorDifference } from './vector.ts'
 
 const ck = await loadCanvasKit()
 const bytes = fixtureResources()
-const pdfium = await PDFiumLibrary.init()
-afterAll(() => pdfium.destroy())
+const pdfium = await startPdfium(afterAll)
 
 const solid = (color: string) => [{ type: 'solid', color }]
 const stroke = (align: 'inside' | 'center' | 'outside') => [
@@ -80,10 +78,7 @@ describe('outside strokes', () => {
   for (const kind of ['shape', 'boolean'] as const) {
     for (const align of ['inside', 'center', 'outside'] as const) {
       it(`a ${kind} with a stroke ${align} exports to SVG and PDF as drawn`, async () => {
-        const json = design(align, kind)
-        const cpu = renderDesign(ck, json, 'p1', 'f', bytes)
-        const svg = rasteriseSvg(renderVector(ck, json, 'p1', 'f', bytes, 'svg'))
-        const pdf = await rasterisePdf(pdfium, renderVector(ck, json, 'p1', 'f', bytes, 'pdf'))
+        const { cpu, pdf, svg } = await renderThreeWays(ck, pdfium, design(align, kind), 'p1', 'f', bytes)
         const svgPercent = vectorDifference(cpu, svg)
         const pdfPercent = vectorDifference(cpu, pdf)
         console.log(`${kind} ${align}: SVG ${svgPercent.toFixed(3)}%, PDF ${pdfPercent.toFixed(3)}%`)
@@ -116,11 +111,9 @@ describe('outside strokes', () => {
         },
       },
     }
-    const cpu = renderDesign(ck, json, 'p1', 'f', bytes)
+    const { cpu, pdf, svg } = await renderThreeWays(ck, pdfium, json, 'p1', 'f', bytes)
     // Just inside the star's middle, which winds twice, 5 px below a line crossing it: the fill shows.
     expect(at(cpu, 150, 124)).toEqual([32, 80, 224])
-    const svg = rasteriseSvg(renderVector(ck, json, 'p1', 'f', bytes, 'svg'))
-    const pdf = await rasterisePdf(pdfium, renderVector(ck, json, 'p1', 'f', bytes, 'pdf'))
     expect(at(svg, 150, 124)).toEqual([32, 80, 224])
     expect(vectorDifference(cpu, svg)).toBeLessThan(1)
     expect(vectorDifference(cpu, pdf)).toBeLessThan(1)

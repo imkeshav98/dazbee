@@ -1,18 +1,16 @@
 // Rounded boxes: a frame's fills, its clip and its shadow follow its corners, one radius or each
 // corner's own, on the CPU surface and in the PDF and SVG exports alike.
-import { PDFiumLibrary } from '@hyzyla/pdfium'
 import { afterAll, describe, expect, it } from 'vitest'
 
-import { renderDesign, renderVector } from '@dazbee/renderer'
+import { renderDesign } from '@dazbee/renderer'
 import { loadCanvasKit } from '@dazbee/renderer/node'
 
 import { at, fixtureResources } from './pixels.ts'
-import { overWhite, rasterisePdf, rasteriseSvg, vectorDifference } from './vector.ts'
+import { renderThreeWays, startPdfium, vectorDifference } from './vector.ts'
 
 const ck = await loadCanvasKit()
 const bytes = fixtureResources()
-const pdfium = await PDFiumLibrary.init()
-afterAll(() => pdfium.destroy())
+const pdfium = await startPdfium(afterAll)
 
 const solid = (color: string) => [{ type: 'solid', color }]
 /** A 300 square page: a blue box at 20,20, 160 square, holding a red square that reaches past it. */
@@ -72,10 +70,7 @@ describe('rounded boxes', () => {
 
   it('draw the same in the PDF and the SVG as on the CPU', async () => {
     for (const frame of [{ cornerRadius: 40 }, { cornerRadius: [0, 60, 10, 80] }, { cornerRadius: 40, clip: false }]) {
-      const json = design(frame)
-      const cpu = overWhite(renderDesign(ck, json, 'p1', 'f', bytes))
-      const pdf = await rasterisePdf(pdfium, renderVector(ck, json, 'p1', 'f', bytes, 'pdf'))
-      const svg = rasteriseSvg(renderVector(ck, json, 'p1', 'f', bytes, 'svg'))
+      const { cpu, pdf, svg } = await renderThreeWays(ck, pdfium, design(frame), 'p1', 'f', bytes)
       expect(vectorDifference(cpu, pdf), `PDF ${JSON.stringify(frame)}`).toBeLessThan(1)
       expect(vectorDifference(cpu, svg), `SVG ${JSON.stringify(frame)}`).toBeLessThan(1)
     }
