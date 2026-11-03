@@ -44,6 +44,7 @@ import { openStorage, storageSettings } from '@dazbee/storage'
 import { verifySyncToken } from '@dazbee/sync-token'
 
 import { createApp } from './app.ts'
+import { coverOf } from './design-thumbnails.ts'
 import { fontFiles, importGoogleFamily } from './fonts.ts'
 import { png } from './images.test.ts'
 import { readImageHeader } from './images.ts'
@@ -459,6 +460,23 @@ describe('templates (#54)', { timeout: 60_000 }, () => {
       renderFirstPage(db, storage, workspace.id, brand.id, copy),
     ])
     expect(Buffer.from(b.pixels).equals(Buffer.from(a.pixels))).toBe(true)
+  })
+
+  it("draws a template's thumbnail from the page a design's picture shows, when two pages share an order", async () => {
+    // Two pages at the same order: the one listed first is not the one first by id.
+    const parsed = parseDesign({
+      meta: { schemaVersion: 5, designId: 'any', name: 'Tie', kind: 'single', primaryFormatId: 'sq' },
+      formats: { sq: { name: 'Square', width: 40, height: 40, order: 'a0' } },
+      pages: {
+        pb: { name: 'Red', order: 'a0', fills: [{ type: 'solid', color: '#E0262BFF' }] },
+        pa: { name: 'Navy', order: 'a0', fills: [{ type: 'solid', color: '#14213DFF' }] },
+      },
+      nodes: {},
+    })
+    if (!parsed.success) throw new Error(parsed.errors.join('\n'))
+    expect(coverOf(parsed.design)?.pageId).toBe('pa')
+    const drawn = await renderFirstPage(db, storage, workspace.id, brand.id, parsed.design)
+    expect([...drawn.pixels.slice(0, 4)]).toEqual([0x14, 0x21, 0x3d, 0xff])
   })
 
   it('renames and deletes a template the brand can see (#159)', async () => {
