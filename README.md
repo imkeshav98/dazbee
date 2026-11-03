@@ -20,9 +20,23 @@ Off CI, `pnpm e2e` starts its own API (8797), sync server (1244) and web app (31
 ## Layout
 
 ```
-apps/web/          Next.js app shell (more apps arrive with their tickets)
-packages/config/   shared tsconfig, ESLint and Vitest presets; the dependency-direction check
-tests/e2e/         Playwright user flows
+apps/web/             Next.js app: brands, brand kit, assets, fonts, templates and the editor's UI
+apps/api/             Hono API: workspace records, migrations, uploads and sign-in (ADR-0009, ADR-0012)
+apps/sync/            Hocuspocus server that keeps each design's Yjs state
+packages/schema/      the zod contract for the design document and the API (ADR-0002)
+packages/doc/         the Yjs design document and the commands that change it (ADR-0004)
+packages/canvaskit/   our CanvasKit build, loaded by every runtime (ADR-0005)
+packages/renderer/    lays out and draws a design with CanvasKit
+packages/editor/      the client-only editor: canvas, tools, gestures, sync and offline copy
+packages/export/      PNG, JPG, PDF and SVG exports, and their zips
+packages/svg/         turns an SVG file into layers
+packages/fonts/       the font files we ship
+packages/db/          Drizzle tables and migrations
+packages/storage/     object storage over the S3 API (ADR-0010)
+packages/sync-token/  tokens the API signs for the sync server
+packages/config/      shared tsconfig, ESLint and Vitest presets; the dependency-direction check
+tests/e2e/            Playwright user flows
+tests/pixels/         export parity and vector checks against reference renders
 ```
 
 Packages only depend downward: schema → doc → renderer → editor, and never on an app. `pnpm lint:deps` enforces it (ADR-0001).
