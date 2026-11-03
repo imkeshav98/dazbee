@@ -1,11 +1,9 @@
 // The API's routes. /workspace and every route below /brands need a session, and reads and writes only that
 // session's workspace; a brand or design of another workspace is answered as if it didn't exist.
-import { Hono, type MiddlewareHandler } from 'hono'
-import type { z } from 'zod'
+import { Hono } from 'hono'
 
 import type { Db } from '@dazbee/db'
 import {
-  type ApiError,
   type AssetInUse,
   type AssetLink,
   BrandKit,
@@ -40,14 +38,12 @@ import {
   InvalidUpload,
   listAssets,
   listedAssetUses,
-  originalKey,
   recordAsset,
-  SIGNED_URL_SECONDS,
   startUpload,
   updateAsset,
 } from './assets.ts'
 import { getBrandKit, InvalidKit, saveBrandKit } from './brand-kits.ts'
-import { designCover, ensureDesignThumbnail, storedDesign } from './design-thumbnails.ts'
+import { designCover, ensureDesignThumbnail } from './design-thumbnails.ts'
 import {
   createBrand,
   createDesign,
@@ -59,11 +55,14 @@ import {
   listBrands,
   listDesigns,
   renameDesign,
+  storedDesign,
   updateWorkspace,
 } from './designs.ts'
 import { fontLink, InvalidFont, listFonts, recordFont, startFontUpload } from './fonts.ts'
-import { bearerToken, readSessionToken, type Session, type SessionOf } from './session.ts'
-import { completeSignIn, type SignedInPerson, type SignInProvider } from './sign-in.ts'
+import { body, type Env, error, requireSession } from './http.ts'
+import { bearerToken, readSessionToken, type SessionOf } from './session.ts'
+import { completeSignIn, type SignedInPerson, type SignInSettings } from './sign-in.ts'
+import { originalKey, SIGNED_URL_SECONDS, templateThumbnailKey } from './storage-keys.ts'
 import {
   deleteTemplate,
   findTemplate,
@@ -71,18 +70,7 @@ import {
   renameTemplate,
   saveTemplate,
   startFromTemplate,
-  templateThumbnailKey,
 } from './templates.ts'
-
-type Env = { Variables: { session: Session } }
-
-const error = (message: string): ApiError => ({ error: message })
-
-/** Sign-in with WorkOS, when it is set up: the provider, and the secret session tokens are signed with. */
-export interface SignInSettings {
-  provider: SignInProvider
-  secret: string
-}
 
 export function createApp({
   db,
@@ -130,32 +118,10 @@ export function createApp({
     return c.json({ logoutUrl } satisfies SignedOut)
   })
 
-  const requireSession: MiddlewareHandler<Env> = async (c, next) => {
-    const session = await sessionOf(c.req.raw)
-    if (!session) return c.json(error('Sign in first'), 401)
-    c.set('session', session)
-    await next()
-  }
-  app.use('/workspace', requireSession)
-  app.use('/brands', requireSession)
-  app.use('/brands/*', requireSession)
-
-  /** The body parsed with `schema`, or a 400 response saying what's wrong with it. */
-  async function body<T extends z.ZodType>(request: Request, schema: T): Promise<z.infer<T> | Response> {
-    let json: unknown
-    try {
-      json = await request.json()
-    } catch {
-      return Response.json(error('The body is not JSON'), { status: 400 })
-    }
-    const parsed = schema.safeParse(json)
-    if (!parsed.success)
-      return Response.json(
-        error(parsed.error.issues.map((i) => `${i.path.join('.') || 'body'}: ${i.message}`).join('; ')),
-        { status: 400 },
-      )
-    return parsed.data
-  }
+  const signedIn = requireSession(sessionOf)
+  app.use('/workspace', signedIn)
+  app.use('/brands', signedIn)
+  app.use('/brands/*', signedIn)
 
   app.get('/workspace', async (c) => {
     const workspace = await findWorkspace(db, c.var.session.workspaceId)

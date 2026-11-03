@@ -9,9 +9,10 @@ import { loadCanvasKit } from '@dazbee/renderer/node'
 import { brandVariables, type Design, fontFamilies, imageAssetIds, inOrder } from '@dazbee/schema'
 import type { Storage } from '@dazbee/storage'
 
-import { findAsset, originalKey } from './assets.ts'
+import { findAsset } from './assets.ts'
 import { getBrandKit } from './brand-kits.ts'
 import { fontFiles } from './fonts.ts'
+import { originalKey } from './storage-keys.ts'
 
 /**
  * What drawing the design for this brand needs beyond the fonts we ship: the brand's catalog

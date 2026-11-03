@@ -4,10 +4,11 @@ import { randomUUID } from 'node:crypto'
 import { and, asc, desc, eq } from 'drizzle-orm'
 import * as Y from 'yjs'
 
-import { brands, type Db, designs, designStates, workspaces } from '@dazbee/db'
-import { loadDesign } from '@dazbee/doc'
+import { brands, type Db, designs, designStates, readDesignState, workspaces } from '@dazbee/db'
+import { loadDesign, migrateDoc, readDesign } from '@dazbee/doc'
 import {
   type BrandSummary,
+  type Design,
   type DesignInput,
   type DesignSummary,
   parseDesign,
@@ -15,6 +16,8 @@ import {
   type UpdateWorkspace,
   type WorkspaceSummary,
 } from '@dazbee/schema'
+
+export class InvalidContent extends Error {}
 
 const workspaceSummary = { id: workspaces.id, name: workspaces.name, kind: workspaces.kind }
 
@@ -134,8 +137,6 @@ const blankDesign = (designId: string, name: string): DesignInput => ({
   overrides: {},
 })
 
-export class InvalidContent extends Error {}
-
 /**
  * Creates a design and its first Yjs state together, so the editor never opens a design with
  * nothing in it. `content` is checked like any design; its id and name become the new design's.
@@ -161,6 +162,16 @@ export async function createDesign(
     await tx.insert(designStates).values({ designId: id, state })
     return toSummary(row)
   })
+}
+
+/** The design as its stored Yjs state holds it, or null when it has none. */
+export async function storedDesign(db: Db, designId: string): Promise<Design | null> {
+  const state = await readDesignState(db, designId)
+  if (!state) return null
+  const doc = new Y.Doc()
+  Y.applyUpdate(doc, state)
+  migrateDoc(doc)
+  return readDesign(doc)
 }
 
 function withMeta(content: unknown, designId: string, name: string): unknown {

@@ -12,8 +12,8 @@ import { openStorage, storageSettings } from '@dazbee/storage'
 import { createApp } from './app.ts'
 import { bearerToken, readSessionToken, SESSION_TTL_MS, signSessionToken, tokenSession } from './session.ts'
 import { accessTokenSessionId, type SignedInPerson, type SignInProvider, workosSettings } from './sign-in.ts'
+import { DATABASE_URL } from './test-database.ts'
 
-const DATABASE_URL = process.env.DATABASE_URL ?? 'postgres://razzlr:razzlr-local@127.0.0.1:55432/razzlr'
 const { db, close } = openDatabase(DATABASE_URL)
 const run = randomUUID().slice(0, 8)
 const secret = 'test-session-secret-'.padEnd(32, 'x')

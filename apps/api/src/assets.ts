@@ -17,17 +17,13 @@ import {
 } from '@dazbee/schema'
 import type { Storage } from '@dazbee/storage'
 
-import { storedDesign } from './design-thumbnails.ts'
+import { storedDesign } from './designs.ts'
 import { readImageHeader } from './images.ts'
+import { originalKey, SIGNED_URL_SECONDS, thumbnailKey } from './storage-keys.ts'
 import { readSvgHeader } from './svg-assets.ts'
 import { makeThumbnail } from './thumbnails.ts'
 
-/** How long a signed upload or read URL works. */
-export const SIGNED_URL_SECONDS = 5 * 60
-
-export const originalKey = (workspaceId: string, sha256: string) => `workspaces/${workspaceId}/originals/${sha256}`
-/** The asset library's small copy of an original, made once and shared like the original (#52). */
-const thumbnailKey = (workspaceId: string, sha256: string) => `workspaces/${workspaceId}/thumbnails/${sha256}`
+export class InvalidUpload extends Error {}
 
 const summary = {
   id: assets.id,
@@ -225,8 +221,6 @@ export async function findAsset(
   const [row] = await db.select(summary).from(assets).where(where)
   return row ? toSummary(row) : null
 }
-
-export class InvalidUpload extends Error {}
 
 /**
  * Records the original stored under `sha256` as an asset of the brand, named `name`, after checking

@@ -31,6 +31,12 @@ export interface SignInProvider {
   signOutUrl(sessionId: string): string
 }
 
+/** Sign-in with WorkOS, when it is set up: the provider, and the secret session tokens are signed with. */
+export interface SignInSettings {
+  provider: SignInProvider
+  secret: string
+}
+
 export interface WorkosSettings {
   apiKey: string
   clientId: string

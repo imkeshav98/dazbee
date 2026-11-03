@@ -1,22 +1,13 @@
 // The API seam, against Postgres from Docker Compose (`docker compose up -d --wait postgres`).
-import { createHash, randomUUID } from 'node:crypto'
+import { createHash } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
 import { eq } from 'drizzle-orm'
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, describe, expect, it } from 'vitest'
 import * as Y from 'yjs'
 
-import {
-  brands,
-  fontFaces,
-  memberships,
-  openDatabase,
-  readDesignState,
-  users,
-  workspaces,
-  writeDesignState,
-} from '@dazbee/db'
+import { fontFaces, readDesignState, writeDesignState } from '@dazbee/db'
 import { loadDesign, readDesign } from '@dazbee/doc'
 import { FONT_FILES_DIR } from '@dazbee/fonts/node'
 import {
@@ -40,83 +31,34 @@ import {
   UploadTicket,
   WorkspaceSummary,
 } from '@dazbee/schema'
-import { openStorage, storageSettings } from '@dazbee/storage'
 import { verifySyncToken } from '@dazbee/sync-token'
 
-import { createApp } from './app.ts'
 import { coverOf } from './design-thumbnails.ts'
-import { fontFiles, importGoogleFamily } from './fonts.ts'
-import { png } from './images.test.ts'
+import { fontFiles } from './fonts.ts'
+import { importGoogleFamily } from './fonts-google.ts'
 import { readImageHeader } from './images.ts'
 import { renderFirstPage } from './render.ts'
-import { type Session, signSessionToken, tokenSession } from './session.ts'
+import {
+  app,
+  authorization,
+  brand,
+  call,
+  db,
+  other,
+  otherBrand,
+  personA,
+  run,
+  sibling,
+  storage,
+  syncSecret,
+  workspace,
+} from './test-api.ts'
+import { png } from './test-files.ts'
 
-const DATABASE_URL = process.env.DATABASE_URL ?? 'postgres://razzlr:razzlr-local@127.0.0.1:55432/razzlr'
-const { db, close } = openDatabase(DATABASE_URL)
-
-// Two workspaces with a brand each, fresh for every run so runs never see each other's rows.
-const run = randomUUID().slice(0, 8)
-const workspace = { id: `workspace-a-${run}`, name: 'Agency A', kind: 'agency' as const }
-const other = { id: `workspace-b-${run}`, name: 'Studio B', kind: 'solo' as const }
-const brand = { id: `brand-a-${run}`, workspaceId: workspace.id, name: 'Brand A' }
-const sibling = { id: `brand-a2-${run}`, workspaceId: workspace.id, name: 'Brand A2' }
-const otherBrand = { id: `brand-b-${run}`, workspaceId: other.id, name: 'Brand B' }
-
-// Real sessions (#58): a person in each workspace, signed in with a session token.
-const personA = { id: `user-a-${run}`, workosUserId: `workos-a-${run}`, email: `a-${run}@example.com` }
-const personB = { id: `user-b-${run}`, workosUserId: `workos-b-${run}`, email: `b-${run}@example.com` }
-const sessions: Record<string, Session> = {
-  a: { userId: personA.id, workspaceId: workspace.id },
-  b: { userId: personB.id, workspaceId: other.id },
-}
-const sessionSecret = 'test-session-secret-'.padEnd(32, 'x')
-const tokens = Object.fromEntries(
-  Object.entries(sessions).map(([as, session]) => [
-    as,
-    signSessionToken(sessionSecret, { ...session, workosSessionId: null }).token,
-  ]),
-)
-const authorization = (as: string) => ({ authorization: `Bearer ${tokens[as]}` })
 /** A stand-in Google family, served by a fake Google from the Noto files, removed after the run. */
 const googleFamily = { family: `Test Sans ${run}`, category: 'sans-serif', weights: [400, 700], italic: false } as const
-
-const syncSecret = 'test-secret-'.padEnd(32, 'x')
-const storage = openStorage(
-  storageSettings({
-    STORAGE_ENDPOINT: 'http://127.0.0.1:59000',
-    STORAGE_BUCKET: 'razzlr-test',
-    STORAGE_ACCESS_KEY_ID: 'razzlr',
-    STORAGE_SECRET_ACCESS_KEY: 'razzlr-local-secret',
-    STORAGE_REGION: 'us-east-1',
-    ...process.env,
-  }),
-)
-const app = createApp({ db, storage, sessionOf: tokenSession(db, sessionSecret), syncSecret })
-
-async function call(as: string | null, method: string, path: string, body?: unknown) {
-  const headers: Record<string, string> = { 'content-type': 'application/json' }
-  if (as) Object.assign(headers, authorization(as))
-  const response = await app.request(path, {
-    method,
-    headers,
-    ...(body === undefined ? {} : { body: JSON.stringify(body) }),
-  })
-  return { status: response.status, json: response.status === 204 ? null : ((await response.json()) as unknown) }
-}
-
-beforeAll(async () => {
-  await storage.ensureBucket()
-  await db.insert(workspaces).values([workspace, other])
-  await db.insert(brands).values([brand, sibling, otherBrand])
-  await db.insert(users).values([personA, personB])
-  await db.insert(memberships).values([
-    { workspaceId: workspace.id, userId: personA.id, role: 'owner' },
-    { workspaceId: other.id, userId: personB.id, role: 'editor' },
-  ])
-})
 afterAll(async () => {
   await db.delete(fontFaces).where(eq(fontFaces.family, googleFamily.family))
-  await close()
 })
 
 describe('the workspace', () => {

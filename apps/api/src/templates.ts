@@ -21,10 +21,8 @@ import type { Storage } from '@dazbee/storage'
 import { findAsset } from './assets.ts'
 import { createDesign, InvalidContent } from './designs.ts'
 import { renderFirstPage } from './render.ts'
+import { templateThumbnailKey } from './storage-keys.ts'
 import { makeThumbnail } from './thumbnails.ts'
-
-export const templateThumbnailKey = (workspaceId: string, templateId: string) =>
-  `workspaces/${workspaceId}/templates/${templateId}.png`
 
 const summary = {
   id: templates.id,
