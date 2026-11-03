@@ -425,6 +425,7 @@ function Bar({ target, design, brandId }: { target: Target; design: Design; bran
       role="toolbar"
       aria-label={t.editor.bar.topBar}
       data-testid="top-bar"
+      data-selection={target.ids.join(' ')}
       onKeyDown={arrowAlong}
       onFocus={focused}
       style={{ insetInlineStart: startAt }}

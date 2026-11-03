@@ -131,7 +131,7 @@ test('several layers: mixed values, set together or each from its own; text and 
   writeOutput('props-1-mixed.png', await page.screenshot())
 
   // The arrow moves each from its own; Enter gives both the same.
-  await x.press('ArrowUp')
+  await (await layout()).getByRole('spinbutton', { name: 'X position' }).press('ArrowUp')
   await expect.poll(async () => [(await props(page, 'box')).x, (await props(page, 'dot')).x]).toEqual([81, 701])
   await enter((await layout()).getByRole('spinbutton', { name: 'Y position' }), '300')
   await expect.poll(async () => [(await props(page, 'box')).y, (await props(page, 'dot')).y]).toEqual([300, 300])

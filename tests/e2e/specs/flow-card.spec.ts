@@ -4,7 +4,7 @@
 import { expect, test, type Page } from '../support/test.ts'
 import type { DesignInput } from '@dazbee/schema'
 import { writeOutput } from '../support/editor.ts'
-import { openStage, openCard } from '../support/stage.ts'
+import { barMenu, openStage, openCard } from '../support/stage.ts'
 import { choose } from '../support/select.ts'
 
 test.describe.configure({ timeout: 120_000 })
@@ -40,12 +40,14 @@ const select = async (page: Page, ids: string[]) => {
 test('a child of an auto layout fills, hugs or keeps its size, and can leave the flow', async ({ browser }) => {
   const { page, errors } = await openStage(browser, design())
   const card = async () => (await openCard(page, 'flow-card'))
-  const width = (await card()).getByRole('combobox', { name: 'Width sizing' })
 
+  // A layer out of any flow has no In the stack part in its Position panel.
   await select(page, ['loose'])
-  await expect((await card())).toHaveCount(0)
+  await expect((await barMenu(page, 'position')).getByTestId('flow-card')).toHaveCount(0)
+  await page.keyboard.press('Escape')
 
   await select(page, ['two'])
+  const width = (await card()).getByRole('combobox', { name: 'Width sizing' })
   await expect((await card()).getByRole('heading')).toHaveText('In the stack')
   await expect(width).toHaveAttribute('data-value', 'fixed')
   await expect(width).toHaveText('Own size')

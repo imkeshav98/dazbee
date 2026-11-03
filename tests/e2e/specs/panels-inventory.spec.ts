@@ -142,7 +142,9 @@ async function step(page: Page, act: () => Promise<unknown>, check: () => Promis
 
 const select = async (page: Page, ids: string[]) => {
   await page.evaluate((ids) => window.dazbee?.select(ids), ids)
-  await expect(page.getByTestId(ids.length > 0 ? 'top-bar-row' : 'page-card')).toBeVisible()
+  // Once the top bar shows these layers, so what opens next belongs to them.
+  if (ids.length > 0) await expect(page.getByTestId('top-bar')).toHaveAttribute('data-selection', ids.join(' '))
+  else await expect(page.getByTestId('page-card')).toBeVisible()
 }
 
 /**
@@ -958,9 +960,9 @@ test.describe('shapes and frames', () => {
     await step(page, async () => (await card()).getByRole('spinbutton', { name: 'Points' }).press('ArrowUp'), async () => { await expect.soft.poll(shape).toMatchObject({ points: 9 }) })
     await step(page, async () => (await card()).getByRole('spinbutton', { name: 'Inner' }).press('ArrowUp'), async () => { await expect.soft.poll(shape).toMatchObject({ innerRadius: 0.71 }) })
     await step(page, async () => enter((await card()).getByRole('spinbutton', { name: 'Corners' }), '10'), async () => { await expect.poll(shape).toMatchObject({ cornerRadius: 10 }) })
-    // A rectangle and a star selected together have no Shape card.
+    // A rectangle and a star selected together have no Shape pop-up.
     await select(page, ['box', 'star'])
-    await expect.soft((await card())).toHaveCount(0)
+    await expect.soft(page.getByTestId('bar-shape')).toHaveCount(0)
     await reloads(page)
   })
 
@@ -1021,8 +1023,8 @@ test.describe('photos', () => {
   row(45, 'fit: fill, fit inside, crop, tile', async (open) => {
     const page = await open()
     await select(page, ['photo'])
-    // The fit is a row in the header card.
-    const field = async () => (await openCard(page, 'layout-card')).getByRole('radiogroup', { name: 'Fit' })
+    // The fit is a part of the Edit image panel.
+    const field = async () => (await openCard(page, 'fit-card')).getByRole('radiogroup', { name: 'Fit' })
     for (const fit of ['fit', 'tile', 'crop', 'fill']) {
       // Crop with no crop box shows what fill shows.
       await step(page, async () => (await field()).locator(`[data-value="${fit}"]`).click(), async () => { await expect.poll(() => image(page)).toMatchObject({ fit }) }, { draws: fit !== 'crop' && fit !== 'fill' })
@@ -1429,9 +1431,10 @@ test.describe('top bar and full menu', () => {
       await expect.poll(async () => (await props(page, 'dot')).x).toBe(80)
     })
     await page.keyboard.press('Escape')
-    await select(page, ['box', 'dot', 'poly'])
+    // The hexagon between the box and the star moves to leave the same room each side: (900 - 380 - 160) / 2.
+    await select(page, ['box', 'poly', 'star'])
     await step(page, async () => (await barMenu(page, 'line-up')).getByRole('button', { name: /^Distribute horizontally/ }).click(), async () => {
-      await expect.poll(async () => (await props(page, 'poly')).x).not.toBe(420)
+      await expect.poll(async () => (await props(page, 'poly')).x).toBe(560)
     })
     await reloads(page)
   })
@@ -1452,9 +1455,10 @@ test.describe('top bar and full menu', () => {
   row(73, 'frame clipping from the Box pop-up', async (open) => {
     const page = await open()
     await select(page, ['plain'])
+    // Its tiles lie inside it, so the drawing is the same either way.
     await step(page, async () => (await openCard(page, 'frame-card')).getByRole('switch', { name: "Hide what's outside" }).click(), async () => {
       await expect.poll(async () => (await props(page, 'plain')).clip).toBe(false)
-    })
+    }, { draws: false })
     await reloads(page)
   })
 
@@ -1463,9 +1467,10 @@ test.describe('top bar and full menu', () => {
     await select(page, ['box'])
     await moreAction(page, 'Use as mask')
     await expect.poll(async () => (await props(page, 'box')).mask).toBe('alpha')
+    // Nothing in this design sits under the box for it to mask, so the drawing stays the same.
     await step(page, async () => (await openCard(page, 'mask-card')).getByRole('radio', { name: 'Brightness' }).click(), async () => {
       await expect.poll(async () => (await props(page, 'box')).mask).toBe('luminance')
-    })
+    }, { draws: false })
     await reloads(page)
   })
 

@@ -13,7 +13,7 @@ const CHROME = {
   'start island': '[data-testid="island-start"]',
   'end island': '[data-testid="island-end"]',
   capsule: '[data-testid="rail"]',
-  dock: 'main > [role="toolbar"]',
+  dock: '[data-dock]',
   zoom: '[data-zoom]',
   cards: '[data-testid="cards"]',
 }
