@@ -20,9 +20,10 @@ describe('a number field’s fill', () => {
     expect(fillOf(-300, [-100, 100])).toEqual({ from: 0, width: 50, at: 0 })
   })
 
-  it('has no line without a range, and sits at 0 for a value the layers don’t share', () => {
+  it('has no line without a range, nor for a value the layers don’t share or one left unset', () => {
     expect(fillOf(5, undefined)).toEqual({ from: 0, width: 0, at: null })
-    expect(fillOf('mixed', [0, 100])).toEqual({ from: 0, width: 0, at: 0 })
-    expect(fillOf('mixed', [-100, 100])).toEqual({ from: 50, width: 0, at: 50 })
+    expect(fillOf('mixed', [0, 100])).toEqual({ from: 0, width: 0, at: null })
+    expect(fillOf(undefined, [0.8, 2])).toEqual({ from: 0, width: 0, at: null })
+    expect(fillOf('mixed', [-100, 100])).toEqual({ from: 50, width: 0, at: null })
   })
 })

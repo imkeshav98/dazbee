@@ -1068,7 +1068,7 @@ function AutoLayoutCard({ target, p, b, ownSizing }: { target: Target; p: P; b: 
   const layouts = target.props.map((pr) => pr.layout as Layout | undefined)
   const on = shared(layouts.map(Boolean))
   const toggle = <Switch on={on} label={p.autoLayout} onSet={() => target.editor.perform('autoLayout')} className={cn('group flex cursor-pointer rounded-full', FOCUS_RING)} />
-  if (on !== true) return <Card id="auto-layout-card" title={p.autoLayout} action={toggle} />
+  if (on !== true) return <Card id="auto-layout-card" title={p.autoLayout} action={toggle} strong />
   const value = (key: keyof Layout) => shared(layouts.map((l) => l?.[key]))
   const setLayout = (change: (l: Layout) => Partial<Layout>) => set(target, (now) => {
     const l = now.layout as Layout
@@ -1081,7 +1081,7 @@ function AutoLayoutCard({ target, p, b, ownSizing }: { target: Target; p: P; b: 
   const around = shared(layouts.flatMap((l) => (l ? [l.padding.top, l.padding.right, l.padding.bottom, l.padding.left] : [])))
   return (
     <>
-      <Card id="auto-layout-card" title={p.autoLayout} action={toggle}>
+      <Card id="auto-layout-card" title={p.autoLayout} action={toggle} strong>
         <span className={PANEL_HEADING}>{p.direction}</span>
         <Segments name={p.direction} value={direction} options={['row', 'column'] as const} labels={p.directions} onSet={(to) => setLayout(() => ({ direction: to }))} />
         <SwitchRow name={p.wrap} on={value('wrap') === 'mixed' ? 'mixed' : value('wrap') === true} onSet={(wrap) => setLayout(() => ({ wrap }))} />
@@ -1187,7 +1187,7 @@ function SizingFields({ target, p, options, labels }: { target: Target; p: P; op
 function FlowPart({ target, p }: { target: Target; p: P }) {
   return (
     <div role="group" aria-labelledby="flow-card-title" data-testid="flow-card" className="flex flex-col gap-2.5">
-      <h4 id="flow-card-title" className={PANEL_HEADING}>{p.inAutoLayout}</h4>
+      <h4 id="flow-card-title" className={cn(PANEL_HEADING, 'pt-1.5')}>{p.inAutoLayout}</h4>
       <SizingFields target={target} p={p} options={['fixed', 'hug', 'fill']} labels={p.childSizings} />
       <SwitchRow name={p.absolute} on={shared(target.props.map((pr) => pr.absolute === true))} onSet={(absolute) => set(target, () => ({ absolute: absolute ? true : undefined }))} />
     </div>
@@ -1429,7 +1429,7 @@ const TILE_LOOK: Record<Tile, string> = {
   none: '',
   dropShadow: '[filter:drop-shadow(0_4px_3px_rgb(0_0_0/0.55))]',
   innerShadow: '',
-  glow: '[filter:drop-shadow(0_0_4px_var(--accent))_drop-shadow(0_0_2px_var(--accent))]',
+  glow: '[filter:drop-shadow(0_0_8px_rgb(255_72_176/0.6))]',
   outline: '',
   layerBlur: 'blur-[1.8px]',
   backgroundBlur: '',
@@ -1446,7 +1446,7 @@ function EffectSample({ sample, tile }: { sample: Sample; tile: Tile }) {
         aria-hidden
         className={cn(
           'font-display text-[26px] leading-none font-extrabold',
-          tile === 'outline' ? 'text-transparent [-webkit-text-stroke:1.4px_var(--accent)]' : inner ? 'bg-[linear-gradient(180deg,rgb(0_0_0/0.85)_10%,var(--accent)_70%)] bg-clip-text text-transparent' : 'text-accent',
+          tile === 'outline' ? 'text-transparent [-webkit-text-stroke:1.4px_var(--accent)]' : inner ? 'bg-[linear-gradient(180deg,color-mix(in_srgb,var(--accent),black_55%)_0_30%,var(--accent)_62%)] bg-clip-text text-transparent' : 'text-accent',
           TILE_LOOK[tile],
         )}
       >
