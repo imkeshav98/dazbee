@@ -2,58 +2,58 @@ import { describe, expect, it } from 'vitest'
 
 import { lru } from './lru.ts'
 
-/** A cache of `limit` strings that records each value it frees, in order. */
+/** A cache of `limit` strings, each made as its key in capitals, that records what it makes and frees. */
 function cache(limit: number) {
+  const made: string[] = []
   const freed: string[] = []
-  return { kept: lru<string, string>(limit, (value) => freed.push(value)), freed }
+  const kept = lru<string, string>(limit, (value) => freed.push(value))
+  const get = (key: string) =>
+    kept.get(key, () => {
+      made.push(key.toUpperCase())
+      return key.toUpperCase()
+    })
+  return { get, clear: kept.clear, made, freed }
 }
 
 describe('lru', () => {
-  it('hands back what was set under a key, and nothing for a key never set', () => {
-    const { kept } = cache(2)
-    kept.set('a', 'A')
-    expect(kept.get('a')).toBe('A')
-    expect(kept.get('b')).toBeUndefined()
+  it('makes a value once and hands it back while it is kept', () => {
+    const { get, made } = cache(2)
+    expect(get('a')).toBe('A')
+    expect(get('a')).toBe('A')
+    expect(made).toEqual(['A'])
   })
 
   it('frees the oldest value past the limit', () => {
-    const { kept, freed } = cache(2)
-    kept.set('a', 'A')
-    kept.set('b', 'B')
-    kept.set('c', 'C')
+    const { get, made, freed } = cache(2)
+    get('a')
+    get('b')
+    get('c')
     expect(freed).toEqual(['A'])
-    expect([kept.get('a'), kept.get('b'), kept.get('c')]).toEqual([undefined, 'B', 'C'])
+    get('b')
+    get('c')
+    expect(made).toEqual(['A', 'B', 'C'])
   })
 
-  it('counts a get as a use, so the least recently used goes first', () => {
-    const { kept, freed } = cache(2)
-    kept.set('a', 'A')
-    kept.set('b', 'B')
-    kept.get('a')
-    kept.set('c', 'C')
+  it('counts a hit as a use, so the least recently used goes first', () => {
+    const { get, freed } = cache(2)
+    get('a')
+    get('b')
+    get('a')
+    get('c')
     expect(freed).toEqual(['B'])
-    kept.set('d', 'D')
+    get('d')
     expect(freed).toEqual(['B', 'A'])
-    expect([kept.get('c'), kept.get('d')]).toEqual(['C', 'D'])
-  })
-
-  it('keeps a miss from counting as a use', () => {
-    const { kept, freed } = cache(2)
-    kept.set('a', 'A')
-    kept.set('b', 'B')
-    kept.get('c')
-    kept.set('c', 'C')
-    expect(freed).toEqual(['A'])
   })
 
   it('frees every value on clear, oldest use first, and keeps none', () => {
-    const { kept, freed } = cache(3)
-    kept.set('a', 'A')
-    kept.set('b', 'B')
-    kept.set('c', 'C')
-    kept.get('a')
-    kept.clear()
+    const { get, clear, made, freed } = cache(3)
+    get('a')
+    get('b')
+    get('c')
+    get('a')
+    clear()
     expect(freed).toEqual(['B', 'C', 'A'])
-    expect(kept.get('a')).toBeUndefined()
+    get('a')
+    expect(made).toEqual(['A', 'B', 'C', 'A'])
   })
 })

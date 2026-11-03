@@ -31,19 +31,19 @@ export function layerPictures(limit = 4000) {
       entries.clear()
       drawnWith = resources
     }
-    const hit = entries.get(layer)
-    if (hit) return hit
-    const recorder = new ck.PictureRecorder()
-    let recorded: Picture
-    try {
-      draw(recorder.beginRecording(ck.XYWHRect(-ANYWHERE, -ANYWHERE, 2 * ANYWHERE, 2 * ANYWHERE)))
-      recorded = recorder.finishRecordingAsPicture()
-    } finally {
-      recorder.delete()
-    }
-    entries.set(layer, recorded)
-    return recorded
+    return entries.get(layer, () => record(ck, draw))
   }
 
   return { picture, delete: entries.clear }
+}
+
+/** What `draw` draws, recorded as a picture. */
+function record(ck: CanvasKit, draw: (canvas: Canvas) => void): Picture {
+  const recorder = new ck.PictureRecorder()
+  try {
+    draw(recorder.beginRecording(ck.XYWHRect(-ANYWHERE, -ANYWHERE, 2 * ANYWHERE, 2 * ANYWHERE)))
+    return recorder.finishRecordingAsPicture()
+  } finally {
+    recorder.delete()
+  }
 }

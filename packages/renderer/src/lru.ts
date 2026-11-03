@@ -1,28 +1,28 @@
 /**
- * Values kept by key, at most `limit` of them: setting one more frees the least recently used,
- * where a set or a hit counts as a use. `free` releases a value as it leaves, and `clear` frees
- * them all. `set` is for a key not held.
+ * Values kept by key, at most `limit` of them: making one more frees the least recently used,
+ * where making a value or handing it back counts as a use. `free` releases a value as it leaves,
+ * and `clear` frees them all.
  */
 export function lru<K, V>(limit: number, free: (value: V) => void) {
   // The values by key; insertion order is use order, so a hit moves to the end and the front goes first.
   const entries = new Map<K, V>()
 
-  function get(key: K): V | undefined {
+  /** The value kept under `key`, or the one `make` gives, kept from then on. */
+  function get(key: K, make: () => V): V {
     const hit = entries.get(key)
     if (hit !== undefined) {
       entries.delete(key)
       entries.set(key, hit)
+      return hit
     }
-    return hit
-  }
-
-  function set(key: K, value: V) {
-    entries.set(key, value)
+    const made = make()
+    entries.set(key, made)
     for (const [oldest, old] of entries) {
       if (entries.size <= limit) break
       entries.delete(oldest)
       free(old)
     }
+    return made
   }
 
   function clear() {
@@ -30,5 +30,5 @@ export function lru<K, V>(limit: number, free: (value: V) => void) {
     entries.clear()
   }
 
-  return { get, set, clear }
+  return { get, clear }
 }

@@ -102,12 +102,7 @@ export function paragraphCache(limit = 4000) {
       entries.clear()
       fonts = resources.fonts
     }
-    const key = layoutKey(props, resources.fallbackFamilies)
-    const hit = entries.get(key)
-    if (hit) return hit
-    const laid = layoutText(ck, props, resources)
-    entries.set(key, laid)
-    return laid
+    return entries.get(layoutKey(props, resources.fallbackFamilies), () => layoutText(ck, props, resources))
   }
 
   return { layout, delete: entries.clear }
