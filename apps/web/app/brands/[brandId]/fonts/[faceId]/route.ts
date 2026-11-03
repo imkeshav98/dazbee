@@ -1,6 +1,6 @@
 // A font face's file, for the editor (#50). The API checks workspace and brand and hands back a
 // short-lived signed URL; the bytes pass through here from our storage.
-import { fontLink } from '@/lib/api.ts'
+import { fontLink } from '@/lib/server/api.ts'
 
 export async function GET(_request: Request, { params }: { params: Promise<{ brandId: string; faceId: string }> }) {
   const { brandId, faceId } = await params

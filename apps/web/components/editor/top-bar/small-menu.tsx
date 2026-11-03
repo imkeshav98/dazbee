@@ -19,17 +19,17 @@ import { useEffect, useState } from 'react'
 
 import type { Editor } from '@dazbee/editor'
 
+import { keyOf } from '@/components/editor/arrange-actions.ts'
+import { editState, isPanel, setOpen, useEditState, usePhone } from '@/components/editor/edit-store.ts'
+import { useSelection } from '@/components/editor/editor-hooks.ts'
+import { useTarget } from '@/components/editor/selection-cards.tsx'
+import { BAR_BUTTON, BAR_TOGGLE, MENU } from '@/components/editor/styles.ts'
 import { cn } from '@/lib/cn.ts'
 import { useLocale, useMessages } from '@/lib/i18n/client.tsx'
 import { dirOf, format } from '@/lib/i18n/index.ts'
 
-import { keyOf } from './arrange-actions.ts'
 import { arrowAlong, useMenuFocus, useRovingTab } from './bar-popover.tsx'
-import { editState, isPanel, setOpen, useEditState, usePhone } from './edit-store.ts'
-import { useSelection } from './editor-hooks.ts'
 import { LayerActions } from './layer-actions.tsx'
-import { useTarget } from './selection-cards.tsx'
-import { BAR_BUTTON, BAR_TOGGLE, MENU } from './styles.ts'
 
 /** Pixels between the selection and the menu, clear of the turn handles round its corners. */
 const GAP = 28

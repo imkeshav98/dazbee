@@ -7,10 +7,9 @@ import { useSyncExternalStore } from 'react'
 
 import type { Editor } from '@dazbee/editor'
 
+import { keyOf } from '@/components/editor/arrange-actions.ts'
 import { useMessages } from '@/lib/i18n/client.tsx'
 import { format } from '@/lib/i18n/index.ts'
-
-import { keyOf } from './arrange-actions.ts'
 
 const BUTTON =
   'grid size-7 shrink-0 cursor-pointer place-items-center rounded-full text-muted transition-colors duration-[var(--chrome-fast)] hover:bg-hover hover:text-text disabled:pointer-events-none disabled:opacity-35'

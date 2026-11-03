@@ -3,13 +3,13 @@
 import { CheckIcon } from '@phosphor-icons/react/ssr'
 import { redirect } from 'next/navigation'
 
-import { LibraryShell } from '@/components/library-shell.tsx'
+import { LibraryShell } from '@/components/library/library-shell.tsx'
 import { buttonStyles } from '@/components/ui/button.tsx'
-import { getWorkspace, listBrands, updateWorkspace } from '@/lib/api.ts'
 import { cn } from '@/lib/cn.ts'
 import { showsBrandList } from '@/lib/home.ts'
 import { brandWords } from '@/lib/i18n/index.ts'
 import { getMessages } from '@/lib/i18n/server.ts'
+import { getWorkspace, listBrands, updateWorkspace } from '@/lib/server/api.ts'
 
 export const dynamic = 'force-dynamic'
 

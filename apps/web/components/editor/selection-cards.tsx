@@ -29,18 +29,19 @@ import {
   type Shape,
 } from '@dazbee/schema'
 
+import { useBrandKit } from '@/components/brand-kit/use-brand-kit.ts'
+import { Choice, clamp, ColorField, NumberField } from '@/components/editor/edit-panel/fields.tsx'
 import { Select } from '@/components/ui/select.tsx'
 import { cn } from '@/lib/cn.ts'
-import { designColours } from '@/lib/design-colours.ts'
+import { designColours } from '@/lib/editor/design-colours.ts'
+import { LIMITS } from '@/lib/editor/limits.ts'
+import { sizeTo, tidy } from '@/lib/editor/size.ts'
 import { useMessages } from '@/lib/i18n/client.tsx'
 import { format, type Messages } from '@/lib/i18n/index.ts'
-import { LIMITS } from '@/lib/limits.ts'
-import { sizeTo, tidy } from '@/lib/size.ts'
 
 import { COMBINE } from './arrange-actions.ts'
 import { setEveryFormat, useEveryFormat } from './edit-store.ts'
 import { useTextSelection } from './editor-hooks.ts'
-import { Choice, clamp, ColorField, NumberField } from './fields.tsx'
 import { ImagePickerButton } from './image-tool.tsx'
 import { AddButton, assetThumbnail, PaintEditor, PaintRow, RemoveButton, Stack } from './paint-stack.tsx'
 import {
@@ -66,7 +67,6 @@ import {
   TILE,
   TILE_FACE_WIDE,
 } from './styles.ts'
-import { useBrandKit } from './use-brand-kit.ts'
 import { useLiveDesign } from './use-live-design.ts'
 
 type Props = Readonly<Record<string, unknown>>

@@ -6,12 +6,12 @@ import { WarningCircleIcon } from '@phosphor-icons/react/ssr'
 import { cookies, headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 
-import { DazbeeMark } from '@/components/dazbee-mark.tsx'
 import { buttonStyles } from '@/components/ui/button.tsx'
-import { signInLink } from '@/lib/api.ts'
+import { DazbeeMark } from '@/components/ui/dazbee-mark.tsx'
 import { cn } from '@/lib/cn.ts'
 import { getMessages } from '@/lib/i18n/server.ts'
-import { cookieOptions, STATE_COOKIE, STATE_SECONDS } from '@/lib/sign-in.ts'
+import { signInLink } from '@/lib/server/api.ts'
+import { cookieOptions, STATE_COOKIE, STATE_SECONDS } from '@/lib/server/sign-in.ts'
 
 import { AdFan } from './ad-fan.tsx'
 

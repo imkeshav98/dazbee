@@ -2,7 +2,7 @@
 import { ESLint } from 'eslint'
 import { describe, expect, it } from 'vitest'
 
-import { physicalSides } from '@/scripts/check-logical.ts'
+import { physicalSides } from './check-logical.ts'
 
 const eslint = new ESLint({ cwd: new URL('..', import.meta.url).pathname })
 

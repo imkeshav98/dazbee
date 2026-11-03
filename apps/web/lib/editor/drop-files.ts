@@ -5,7 +5,7 @@
 import type { Editor, Point, Spot } from '@dazbee/editor'
 import { type AssetSummary, isVectorAsset } from '@dazbee/schema'
 
-import { IMAGE_ACCEPT, sendAsset } from './upload-asset.ts'
+import { IMAGE_ACCEPT, sendAsset } from '@/lib/upload-asset.ts'
 
 /** The image types a fill takes. */
 const FILL_TYPES = IMAGE_ACCEPT.split(',')

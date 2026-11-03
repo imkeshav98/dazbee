@@ -10,15 +10,15 @@ import { type ReactNode, useEffect, useRef, useState } from 'react'
 
 import { AssetSummary, isVectorAsset } from '@dazbee/schema'
 
+import { useMenuFocus } from '@/components/editor/top-bar/bar-popover.tsx'
 import { overlayScroll } from '@/components/ui/overlay-scroll.ts'
 import { Tooltip } from '@/components/ui/tooltip.tsx'
 import { cn } from '@/lib/cn.ts'
+import type { Placeable } from '@/lib/editor/place-asset.ts'
 import { useLocale, useMessages } from '@/lib/i18n/client.tsx'
 import { dirOf, format } from '@/lib/i18n/index.ts'
-import type { Placeable } from '@/lib/place-asset.ts'
 import { ASSET_ACCEPT, IMAGE_ACCEPT, sendAsset } from '@/lib/upload-asset.ts'
 
-import { useMenuFocus } from './bar-popover.tsx'
 import { ASSET_TILE, DASHED_BUTTON, dockTool, FOCUS_RING, POPOVER } from './styles.ts'
 
 const base = (brandId: string) => `/brands/${encodeURIComponent(brandId)}/assets`

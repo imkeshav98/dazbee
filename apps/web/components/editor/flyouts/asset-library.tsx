@@ -10,14 +10,13 @@ import { type DragEvent, type KeyboardEvent, useCallback, useEffect, useRef, use
 import type { Editor } from '@dazbee/editor'
 import { AssetInUse, AssetSummary, AssetUse, imageAssetIds, isVectorAsset, type UpdateAsset } from '@dazbee/schema'
 
+import { ASSET_TILE, DASHED_BUTTON, QUIET_BUTTON } from '@/components/editor/styles.ts'
 import { overlayScroll } from '@/components/ui/overlay-scroll.ts'
 import { cn } from '@/lib/cn.ts'
+import { placeAsset } from '@/lib/editor/place-asset.ts'
 import { useMessages } from '@/lib/i18n/client.tsx'
 import { format } from '@/lib/i18n/index.ts'
-import { placeAsset } from '@/lib/place-asset.ts'
 import { ASSET_ACCEPT as ACCEPT, sendAsset as send } from '@/lib/upload-asset.ts'
-
-import { ASSET_TILE, DASHED_BUTTON, QUIET_BUTTON } from './styles.ts'
 
 /** What an asset dragged from the library carries, for the stage to place it. */
 export const ASSET_DRAG_TYPE = 'application/x-dazbee-asset'

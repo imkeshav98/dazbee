@@ -24,12 +24,7 @@ import { type CSSProperties, type ReactNode, type RefObject, useEffect, useLayou
 
 import type { Editor, ShortcutAction } from '@dazbee/editor'
 
-import { useOverlayScroll } from '@/components/ui/overlay-scroll.ts'
-import { cn } from '@/lib/cn.ts'
-import { useMessages } from '@/lib/i18n/client.tsx'
-import { format } from '@/lib/i18n/index.ts'
-
-import { ALIGN, keyOf } from './arrange-actions.ts'
+import { ALIGN, keyOf } from '@/components/editor/arrange-actions.ts'
 import {
   isLayerPanel,
   type LayerPanelId,
@@ -38,12 +33,16 @@ import {
   setSheetTop,
   useEditState,
   usePhone,
-} from './edit-store.ts'
-import { useSelection } from './editor-hooks.ts'
-import { FontChooser, useFontCatalog } from './font-panel.tsx'
-import { ORDER } from './layer-actions.tsx'
-import { factsOf, PanelContent, type Target, useTarget } from './selection-cards.tsx'
-import { PANEL_BUTTON, PANEL_HEADING, PANEL_PART } from './styles.ts'
+} from '@/components/editor/edit-store.ts'
+import { useSelection } from '@/components/editor/editor-hooks.ts'
+import { FontChooser, useFontCatalog } from '@/components/editor/flyouts/font-panel.tsx'
+import { factsOf, PanelContent, type Target, useTarget } from '@/components/editor/selection-cards.tsx'
+import { PANEL_BUTTON, PANEL_HEADING, PANEL_PART } from '@/components/editor/styles.ts'
+import { ORDER } from '@/components/editor/top-bar/layer-actions.tsx'
+import { useOverlayScroll } from '@/components/ui/overlay-scroll.ts'
+import { cn } from '@/lib/cn.ts'
+import { useMessages } from '@/lib/i18n/client.tsx'
+import { format } from '@/lib/i18n/index.ts'
 
 /** The four moves along the stack, two to a row: a step forward and back, then all the way. */
 const MOVES: { action: (typeof ORDER)[number]; icon: Icon }[] = [

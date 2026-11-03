@@ -9,15 +9,15 @@ import type { ReactNode } from 'react'
 import type { BrandSummary, WorkspaceSummary } from '@dazbee/schema'
 
 import { addBrand } from '@/app/actions.ts'
+import { NewBrandRow } from '@/components/brands/new-brand-row.tsx'
+import { DazbeeMark } from '@/components/ui/dazbee-mark.tsx'
 import { cn } from '@/lib/cn.ts'
 import type { BrandWords, Messages } from '@/lib/i18n/index.ts'
 import { initialsOf } from '@/lib/initials.ts'
-import { SESSION_COOKIE } from '@/lib/sign-in.ts'
+import { SESSION_COOKIE } from '@/lib/server/sign-in.ts'
 
 import { AccountMenu } from './account-menu.tsx'
-import { DazbeeMark } from './dazbee-mark.tsx'
 import { LibraryCapsule } from './library-capsule.tsx'
-import { NewBrandRow } from './new-brand-row.tsx'
 
 function BrandAvatar({ name, active = false }: { name: string; active?: boolean }) {
   return (

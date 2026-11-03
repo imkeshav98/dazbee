@@ -10,12 +10,12 @@ import { useEffect, useMemo, useState } from 'react'
 
 import type { Editor } from '@dazbee/editor'
 
+import { MENU_DIVIDER, MENU_ITEM, MENU_KEY, POPOVER, SWITCH } from '@/components/editor/styles.ts'
 import { Tooltip } from '@/components/ui/tooltip.tsx'
 import { cn } from '@/lib/cn.ts'
 import { useLocale, useMessages } from '@/lib/i18n/client.tsx'
 
 import { ShortcutsButton } from './shortcuts-dialog.tsx'
-import { MENU_DIVIDER, MENU_ITEM, MENU_KEY, POPOVER, SWITCH } from './styles.ts'
 
 const BUTTON =
   'grid h-8 min-w-8 cursor-pointer place-items-center rounded-row px-1.5 text-muted transition-colors duration-[var(--chrome-fast)] hover:bg-hover hover:text-text disabled:cursor-default disabled:opacity-40'

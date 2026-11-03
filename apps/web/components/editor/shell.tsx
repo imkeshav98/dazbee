@@ -28,17 +28,17 @@ import { createContext, type ReactNode, useContext, useEffect, useLayoutEffect, 
 
 import type { ShapeTool } from '@dazbee/editor'
 
-import { DazbeeMark } from '@/components/dazbee-mark.tsx'
+import { ShapeTools } from '@/components/editor/menus/shape-menu.tsx'
+import { DazbeeMark } from '@/components/ui/dazbee-mark.tsx'
 import { Tooltip } from '@/components/ui/tooltip.tsx'
 import { cn } from '@/lib/cn.ts'
+import type { Placeable } from '@/lib/editor/place-asset.ts'
+import { useValue, type ValueStore } from '@/lib/editor/value-store.ts'
 import { useLocale, useMessages } from '@/lib/i18n/client.tsx'
 import { dirOf, format } from '@/lib/i18n/index.ts'
-import type { Placeable } from '@/lib/place-asset.ts'
-import { useValue, type ValueStore } from '@/lib/value-store.ts'
 
 import { isPanel, setFlyoutEnd, setOpen, useEditState, usePhone } from './edit-store.ts'
 import { ImageTool } from './image-tool.tsx'
-import { ShapeTools } from './shape-menu.tsx'
 import { BAR_ROW, BAR_ROW_HEIGHT, dockTool } from './styles.ts'
 
 export type Flyout = 'layers' | 'assets' | 'ai' | 'brand'

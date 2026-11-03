@@ -6,7 +6,7 @@ import { useEffect, useState } from 'react'
 
 import type { Editor } from '@dazbee/editor'
 
-import { valueStore } from '@/lib/value-store.ts'
+import { valueStore } from '@/lib/editor/value-store.ts'
 
 import { useLiveDesign } from './use-live-design.ts'
 

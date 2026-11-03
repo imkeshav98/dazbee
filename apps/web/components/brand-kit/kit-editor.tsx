@@ -9,14 +9,14 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { AssetSummary, type BrandColor, type BrandFont, type BrandKit } from '@dazbee/schema'
 
+import { useFontCatalog } from '@/components/editor/flyouts/font-panel.tsx'
+import { DASHED_BUTTON } from '@/components/editor/styles.ts'
 import { Select } from '@/components/ui/select.tsx'
 import { cn } from '@/lib/cn.ts'
 import { useMessages } from '@/lib/i18n/client.tsx'
 import { format } from '@/lib/i18n/index.ts'
 import { ASSET_ACCEPT, sendAsset } from '@/lib/upload-asset.ts'
 
-import { useFontCatalog } from './font-panel.tsx'
-import { DASHED_BUTTON } from './styles.ts'
 import { saveKit, showKit } from './use-brand-kit.ts'
 
 /** How long a run of changes (a colour picker's drag) waits before it is saved. */

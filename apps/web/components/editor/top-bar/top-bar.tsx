@@ -41,13 +41,7 @@ import { type ReactNode, useEffect, useLayoutEffect, useRef, useState } from 're
 import { type Editor, type ShortcutAction, shortcutFor, withImage } from '@dazbee/editor'
 import { boundFillIndex, type Design, type Paint } from '@dazbee/schema'
 
-import { cn } from '@/lib/cn.ts'
-import { useMessages } from '@/lib/i18n/client.tsx'
-import { format } from '@/lib/i18n/index.ts'
-import { LIMITS } from '@/lib/limits.ts'
-
-import { COMBINE, DISTRIBUTE, keyOf } from './arrange-actions.ts'
-import { arrowAlong, BarPopover, useRovingTab } from './bar-popover.tsx'
+import { COMBINE, DISTRIBUTE, keyOf } from '@/components/editor/arrange-actions.ts'
 import {
   editState,
   isLayerPanel,
@@ -58,11 +52,10 @@ import {
   setOpen,
   useEditState,
   usePhone,
-} from './edit-store.ts'
-import { usePickedPage, useSelection } from './editor-hooks.ts'
-import { nearest, useFontCatalog, weightsOf } from './font-panel.tsx'
-import { ImagePickerButton } from './image-tool.tsx'
-import { AlignRow } from './layer-actions.tsx'
+} from '@/components/editor/edit-store.ts'
+import { usePickedPage, useSelection } from '@/components/editor/editor-hooks.ts'
+import { nearest, useFontCatalog, weightsOf } from '@/components/editor/flyouts/font-panel.tsx'
+import { ImagePickerButton } from '@/components/editor/image-tool.tsx'
 import {
   factsOf,
   imageFillOf,
@@ -77,7 +70,7 @@ import {
   textFlag,
   textStyle,
   useTarget,
-} from './selection-cards.tsx'
+} from '@/components/editor/selection-cards.tsx'
 import {
   BAR_BUTTON,
   BAR_DIVIDER,
@@ -88,8 +81,15 @@ import {
   MENU_ITEM,
   MENU_KEY,
   MIXED_COLOUR,
-} from './styles.ts'
-import { useLiveDesign } from './use-live-design.ts'
+} from '@/components/editor/styles.ts'
+import { useLiveDesign } from '@/components/editor/use-live-design.ts'
+import { cn } from '@/lib/cn.ts'
+import { LIMITS } from '@/lib/editor/limits.ts'
+import { useMessages } from '@/lib/i18n/client.tsx'
+import { format } from '@/lib/i18n/index.ts'
+
+import { arrowAlong, BarPopover, useRovingTab } from './bar-popover.tsx'
+import { AlignRow } from './layer-actions.tsx'
 
 /** Bold from this weight up, as type designers name their weights. */
 const BOLD = 600

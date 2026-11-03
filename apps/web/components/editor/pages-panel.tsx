@@ -11,14 +11,14 @@ import { type CSSProperties, type ReactNode, useEffect, useLayoutEffect, useRef,
 import type { Editor } from '@dazbee/editor'
 import { type Design, inOrder } from '@dazbee/schema'
 
+import { PanelFrame } from '@/components/editor/edit-panel/edit-panel.tsx'
 import { cn } from '@/lib/cn.ts'
+import { useValue } from '@/lib/editor/value-store.ts'
 import { useMessages } from '@/lib/i18n/client.tsx'
 import { format } from '@/lib/i18n/index.ts'
-import { useValue } from '@/lib/value-store.ts'
 
 import { afterDraws, sameUrls } from './after-draws.ts'
 import { CARD_ROW, CardMenu } from './card.tsx'
-import { PanelFrame } from './edit-panel.tsx'
 import { setOpen, useEditState } from './edit-store.ts'
 import { shownPage, useEditorDesign, usePickedPage } from './editor-hooks.ts'
 import { BackgroundBody } from './selection-cards.tsx'

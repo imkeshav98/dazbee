@@ -12,17 +12,17 @@ import { type CSSProperties, type KeyboardEvent, type ReactNode, useEffect, useR
 import type { Editor } from '@dazbee/editor'
 import type { Paint } from '@dazbee/schema'
 
+import { useBrandKit } from '@/components/brand-kit/use-brand-kit.ts'
+import { Choice, clamp, ColorField, NumberField } from '@/components/editor/edit-panel/fields.tsx'
+import { useMenuFocus } from '@/components/editor/top-bar/bar-popover.tsx'
 import { segment, SEGMENTED } from '@/components/ui/segmented.tsx'
 import { cn } from '@/lib/cn.ts'
+import { tidy } from '@/lib/editor/size.ts'
 import { useLocale, useMessages } from '@/lib/i18n/client.tsx'
 import { dirOf, format, type Messages } from '@/lib/i18n/index.ts'
-import { tidy } from '@/lib/size.ts'
 
-import { useMenuFocus } from './bar-popover.tsx'
-import { Choice, clamp, ColorField, NumberField } from './fields.tsx'
 import { ImagePickerButton } from './image-tool.tsx'
 import { CHIP, FOCUS_RING, ICON_BUTTON, KNOBS, PICKED_RING, POPOVER, SWATCH } from './styles.ts'
-import { useBrandKit } from './use-brand-kit.ts'
 
 type P = Messages['editor']['props']
 type Gradient = Extract<Paint, { type: 'linear' | 'radial' | 'angular' }>

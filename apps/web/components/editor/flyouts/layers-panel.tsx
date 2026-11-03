@@ -37,16 +37,15 @@ import { ancestorsOf, childrenOf } from '@dazbee/doc'
 import type { Editor } from '@dazbee/editor'
 import { canHold, type Design, formatScope, inOrder, LOCK_FLAGS } from '@dazbee/schema'
 
+import { afterDraws, sameUrls } from '@/components/editor/after-draws.ts'
+import { useSelectionWithFrame } from '@/components/editor/editor-hooks.ts'
+import { useFlyoutNote } from '@/components/editor/shell.tsx'
+import { DROP_LINE, LAYER_PICTURE, LAYER_PICTURE_PICKED } from '@/components/editor/styles.ts'
+import { useLiveDesign } from '@/components/editor/use-live-design.ts'
 import { useOverlayScroll } from '@/components/ui/overlay-scroll.ts'
 import { cn } from '@/lib/cn.ts'
 import { useLocale, useMessages } from '@/lib/i18n/client.tsx'
 import { dirOf, format } from '@/lib/i18n/index.ts'
-
-import { afterDraws, sameUrls } from './after-draws.ts'
-import { useSelectionWithFrame } from './editor-hooks.ts'
-import { useFlyoutNote } from './shell.tsx'
-import { DROP_LINE, LAYER_PICTURE, LAYER_PICTURE_PICKED } from './styles.ts'
-import { useLiveDesign } from './use-live-design.ts'
 
 /** A row's height in pixels: every row is the same, which is what lets only the rows in view render. */
 export const LAYER_ROW = 36

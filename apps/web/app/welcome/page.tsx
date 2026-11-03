@@ -4,12 +4,12 @@
 // headline, and the website in one wide field with its button at the end.
 import { redirect } from 'next/navigation'
 
-import { BrandStartForm } from '@/components/brand-start-form.tsx'
-import { LibraryHeader } from '@/components/library-shell.tsx'
-import { createBrand, getWorkspace } from '@/lib/api.ts'
+import { BrandStartForm } from '@/components/brands/brand-start-form.tsx'
+import { LibraryHeader } from '@/components/library/library-shell.tsx'
 import { brandFromForm } from '@/lib/home.ts'
 import { brandWords } from '@/lib/i18n/index.ts'
 import { getMessages } from '@/lib/i18n/server.ts'
+import { createBrand, getWorkspace } from '@/lib/server/api.ts'
 
 export const dynamic = 'force-dynamic'
 

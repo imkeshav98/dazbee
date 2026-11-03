@@ -1,6 +1,6 @@
 // A font face's preview, its family's name drawn in it as a PNG, for the font picker (#50): the
 // browser shows a picture and never decodes the font.
-import { fontLink } from '@/lib/api.ts'
+import { fontLink } from '@/lib/server/api.ts'
 
 export async function GET(_request: Request, { params }: { params: Promise<{ brandId: string; faceId: string }> }) {
   const { brandId, faceId } = await params

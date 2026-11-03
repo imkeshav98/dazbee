@@ -11,14 +11,13 @@ import type { Editor } from '@dazbee/editor'
 import { FONT_FACES } from '@dazbee/fonts'
 import { type Design, FontFace, FontFamily, formatScope } from '@dazbee/schema'
 
+import { useEditorDesign, useSelection } from '@/components/editor/editor-hooks.ts'
+import { PANEL_BUTTON, PANEL_HEADING } from '@/components/editor/styles.ts'
 import { useOverlayScroll } from '@/components/ui/overlay-scroll.ts'
 import { Select } from '@/components/ui/select.tsx'
 import { cn } from '@/lib/cn.ts'
 import { useMessages } from '@/lib/i18n/client.tsx'
 import { format } from '@/lib/i18n/index.ts'
-
-import { useEditorDesign, useSelection } from './editor-hooks.ts'
-import { PANEL_BUTTON, PANEL_HEADING } from './styles.ts'
 
 /** The fonts we ship, as catalog families; they have no stored preview. */
 const SHIPPED: FontFamily[] = [...new Set(FONT_FACES.map((f) => f.family))].map((family) => ({

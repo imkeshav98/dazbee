@@ -1,6 +1,6 @@
 'use server'
 
-import { renameDesign, syncToken } from '@/lib/api.ts'
+import { renameDesign, syncToken } from '@/lib/server/api.ts'
 
 /** Renames the design from the editor's crumb (#159); the name it has now, or the old one for an empty name. */
 export async function renameFromEditor(brandId: string, designId: string, name: string): Promise<string> {

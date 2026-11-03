@@ -1,6 +1,6 @@
 // A template's thumbnail for the gallery (#54), passed through like an asset's, so the browser
 // needs no storage address or credentials.
-import { templateThumbnailLink } from '@/lib/api.ts'
+import { templateThumbnailLink } from '@/lib/server/api.ts'
 
 export async function GET(_request: Request, { params }: { params: Promise<{ brandId: string; templateId: string }> }) {
   const { brandId, templateId } = await params
