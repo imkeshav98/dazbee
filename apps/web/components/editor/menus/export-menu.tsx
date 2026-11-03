@@ -8,17 +8,16 @@ import { useState } from 'react'
 import type { Editor } from '@dazbee/editor'
 import { DEFAULT_EXPORT_NAME, type Design, type ExportType, inOrder } from '@dazbee/schema'
 
+import { Proportion } from '@/components/editor/add-format.tsx'
+import { NumberField } from '@/components/editor/edit-panel/fields.tsx'
+import { useSelection } from '@/components/editor/editor-hooks.ts'
+import { FIELD, FIELD_LABEL, LINK_BUTTON, SEGMENT, SEGMENTS, TILE, TILE_FACE_WIDE } from '@/components/editor/styles.ts'
 import { Button } from '@/components/ui/button.tsx'
 import { Select } from '@/components/ui/select.tsx'
 import { cn } from '@/lib/cn.ts'
+import { sizeOf } from '@/lib/editor/size.ts'
 import { useMessages } from '@/lib/i18n/client.tsx'
 import { format } from '@/lib/i18n/index.ts'
-import { sizeOf } from '@/lib/size.ts'
-
-import { Proportion } from './add-format.tsx'
-import { useSelection } from './editor-hooks.ts'
-import { NumberField } from './fields.tsx'
-import { FIELD, FIELD_LABEL, LINK_BUTTON, SEGMENT, SEGMENTS, TILE, TILE_FACE_WIDE } from './styles.ts'
 
 function download(name: string, type: string, bytes: Uint8Array<ArrayBuffer>) {
   const url = URL.createObjectURL(new Blob([bytes], { type }))

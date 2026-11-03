@@ -6,9 +6,8 @@ import { CaretDownIcon } from '@phosphor-icons/react'
 import * as Popover from '@radix-ui/react-popover'
 import { type FocusEvent, type KeyboardEvent, type ReactNode, type RefObject, useEffect, useRef, useState } from 'react'
 
+import { BAR_BUTTON, POPOVER } from '@/components/editor/styles.ts'
 import { cn } from '@/lib/cn.ts'
-
-import { BAR_BUTTON, POPOVER } from './styles.ts'
 
 const nowhere = () => document.activeElement === null || document.activeElement === document.body
 

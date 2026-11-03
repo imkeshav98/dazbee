@@ -18,11 +18,10 @@ import { type KeyboardEvent, useRef, useState } from 'react'
 
 import type { ShapeTool } from '@dazbee/editor'
 
+import { DOCK_BUTTON, DOCK_OFF, DOCK_ON, POPOVER } from '@/components/editor/styles.ts'
 import { Tooltip } from '@/components/ui/tooltip.tsx'
 import { cn } from '@/lib/cn.ts'
 import { useMessages } from '@/lib/i18n/client.tsx'
-
-import { DOCK_BUTTON, DOCK_OFF, DOCK_ON, POPOVER } from './styles.ts'
 
 const SHAPES: { id: ShapeTool; icon: Icon; key?: string }[] = [
   { id: 'rect', icon: RectangleIcon, key: 'R' },

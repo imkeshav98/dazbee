@@ -3,20 +3,20 @@
 // The brand kit's form (#53, #200): colours with names and values, fonts with names and families,
 // the logo and the tone of voice. Each change shows at once and is saved a moment later. The
 // editor's Brand flyout shows it in its Edit mode, with buttons that bind the selected layers to a
-// colour or font; the brand home shows it in its Brand kit panel, laid out wide, without them.
+// colour or font; the Brand kit page shows it laid out wide, without them.
 import { CheckIcon, PaintBucketIcon, PlusIcon, TextAaIcon, UploadSimpleIcon, XIcon } from '@phosphor-icons/react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { AssetSummary, type BrandColor, type BrandFont, type BrandKit } from '@dazbee/schema'
 
+import { DASHED_BUTTON } from '@/components/ui/looks.ts'
 import { Select } from '@/components/ui/select.tsx'
 import { cn } from '@/lib/cn.ts'
 import { useMessages } from '@/lib/i18n/client.tsx'
 import { format } from '@/lib/i18n/index.ts'
 import { ASSET_ACCEPT, sendAsset } from '@/lib/upload-asset.ts'
 
-import { useFontCatalog } from './font-panel.tsx'
-import { DASHED_BUTTON } from './styles.ts'
+import { useFontCatalog } from './font-catalog.ts'
 import { saveKit, showKit } from './use-brand-kit.ts'
 
 /** How long a run of changes (a colour picker's drag) waits before it is saved. */

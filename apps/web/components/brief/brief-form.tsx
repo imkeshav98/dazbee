@@ -25,7 +25,7 @@ import { type ReactNode, useRef, useState } from 'react'
 
 import { type AssetSummary, type BrandKit, FORMAT_PRESETS } from '@dazbee/schema'
 
-import { useBrandKit } from '@/components/editor/use-brand-kit.ts'
+import { useBrandKit } from '@/components/brand-kit/use-brand-kit.ts'
 import { buttonStyles } from '@/components/ui/button.tsx'
 import { overlayScroll } from '@/components/ui/overlay-scroll.ts'
 import { Tooltip } from '@/components/ui/tooltip.tsx'

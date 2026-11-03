@@ -4,19 +4,19 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 
-import { HomeKit } from '@/components/home-kit.tsx'
-import { LibraryShell } from '@/components/library-shell.tsx'
-import { designCover, getBrandKit, getWorkspace, listBrands, listDesigns } from '@/lib/api.ts'
+import { KitPage } from '@/components/brand-kit/kit-page.tsx'
+import { LibraryShell } from '@/components/library/library-shell.tsx'
 import { showsBrandList } from '@/lib/home.ts'
 import { brandWords, format } from '@/lib/i18n/index.ts'
 import { getMessages } from '@/lib/i18n/server.ts'
+import { designCover, getBrandKit, getWorkspace, listBrands, listDesigns } from '@/lib/server/api.ts'
 
 export const dynamic = 'force-dynamic'
 
 /** How many of the latest designs show under the kit. */
 const LATEST = 6
 
-export default async function KitPage({ params }: { params: Promise<{ brandId: string }> }) {
+export default async function BrandKitPage({ params }: { params: Promise<{ brandId: string }> }) {
   const { brandId } = await params
   const [t, workspace, brands] = await Promise.all([getMessages(), getWorkspace(), listBrands()])
   const brand = brands.find((b) => b.id === brandId)
@@ -50,7 +50,7 @@ export default async function KitPage({ params }: { params: Promise<{ brandId: s
           </div>
           <p className="text-sm text-muted">{format(t.home.kit.panelLead, { brand: brand.name })}</p>
         </div>
-        <HomeKit brandId={brand.id} kit={kit} />
+        <KitPage brandId={brand.id} kit={kit} />
         {latest.length > 0 && (
           <section aria-labelledby="kit-latest" className="flex flex-col gap-3">
             <h2 id="kit-latest" className="text-[11px] font-bold tracking-[0.08em] text-subtle uppercase">

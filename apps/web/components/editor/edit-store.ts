@@ -8,7 +8,7 @@
 // menus, kept while the selection changes until nothing is selected.
 import { useEffect, useState, useSyncExternalStore } from 'react'
 
-import { useValue, valueStore } from '@/lib/value-store.ts'
+import { useValue, valueStore } from '@/lib/editor/value-store.ts'
 
 /** The top bar's items that open the edit panel for the selected layers. */
 const LAYER_PANELS = ['font', 'colour', 'spacing', 'effects', 'position', 'edit', 'outline', 'stack'] as const

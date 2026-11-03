@@ -4,13 +4,13 @@
 import { notFound } from 'next/navigation'
 
 import { deleteTemplateAction, renameTemplateAction, startTemplate } from '@/app/brands/[brandId]/actions.ts'
-import { FilterChips } from '@/components/filter-chips.tsx'
-import { LibraryShell } from '@/components/library-shell.tsx'
-import { TileMenu } from '@/components/tile-menu.tsx'
-import { getWorkspace, listBrands, listTemplates } from '@/lib/api.ts'
+import { FilterChips } from '@/components/library/filter-chips.tsx'
+import { LibraryShell } from '@/components/library/library-shell.tsx'
+import { TileMenu } from '@/components/library/tile-menu.tsx'
 import { showsBrandList } from '@/lib/home.ts'
 import { brandWords, format } from '@/lib/i18n/index.ts'
 import { getMessages } from '@/lib/i18n/server.ts'
+import { getWorkspace, listBrands, listTemplates } from '@/lib/server/api.ts'
 
 export const dynamic = 'force-dynamic'
 

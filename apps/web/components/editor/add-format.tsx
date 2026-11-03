@@ -13,9 +13,9 @@ import { Button } from '@/components/ui/button.tsx'
 import { overlayScroll } from '@/components/ui/overlay-scroll.ts'
 import { Tooltip } from '@/components/ui/tooltip.tsx'
 import { cn } from '@/lib/cn.ts'
+import { sizeOf } from '@/lib/editor/size.ts'
 import { useMessages } from '@/lib/i18n/client.tsx'
 import { format } from '@/lib/i18n/index.ts'
-import { sizeOf } from '@/lib/size.ts'
 
 import { ICON_BUTTON, POPOVER } from './styles.ts'
 

@@ -5,8 +5,8 @@
 // with that name.
 import { useEffect, useRef, useState } from 'react'
 
+import { readBrandStart } from '@/lib/brand-start.ts'
 import { cn } from '@/lib/cn.ts'
-import { readBrandStart } from '@/lib/home.ts'
 
 export type NamingWords = { callIt: string; change: string; name: string }
 

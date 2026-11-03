@@ -2,7 +2,7 @@
 // picture once per version and hands back a short-lived signed URL; the bytes pass through here,
 // so the browser needs no storage address. The page asks with ?v=<updatedAt>, so each version is
 // its own URL and can be kept.
-import { designThumbnail } from '@/lib/api.ts'
+import { designThumbnail } from '@/lib/server/api.ts'
 
 export async function GET(_request: Request, { params }: { params: Promise<{ brandId: string; designId: string }> }) {
   const { brandId, designId } = await params

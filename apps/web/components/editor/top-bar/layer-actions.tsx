@@ -11,16 +11,16 @@ import { type ReactNode, useEffect, useState } from 'react'
 import type { Editor, ShortcutAction } from '@dazbee/editor'
 import { formatScope } from '@dazbee/schema'
 
+import { ALIGN, keyOf } from '@/components/editor/arrange-actions.ts'
+import { useEditState } from '@/components/editor/edit-store.ts'
+import { useSelection } from '@/components/editor/editor-hooks.ts'
+import { RotationField, set, shared, useTarget } from '@/components/editor/selection-cards.tsx'
+import { ICON_BUTTON, MENU, MENU_DIVIDER, MENU_ITEM, MENU_KEY } from '@/components/editor/styles.ts'
 import { cn } from '@/lib/cn.ts'
 import { useLocale, useMessages } from '@/lib/i18n/client.tsx'
 import { dirOf, format } from '@/lib/i18n/index.ts'
 
-import { ALIGN, keyOf } from './arrange-actions.ts'
 import { useMenuFocus } from './bar-popover.tsx'
-import { useEditState } from './edit-store.ts'
-import { useSelection } from './editor-hooks.ts'
-import { RotationField, set, shared, useTarget } from './selection-cards.tsx'
-import { ICON_BUTTON, MENU, MENU_DIVIDER, MENU_ITEM, MENU_KEY } from './styles.ts'
 
 /** The six ways to line up the selection, as icons: left, centre, right, top, middle, bottom. */
 export function AlignRow({ editor }: { editor: Editor }) {

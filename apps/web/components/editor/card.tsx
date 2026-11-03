@@ -5,9 +5,9 @@ import { DotsThreeIcon } from '@phosphor-icons/react'
 import * as Popover from '@radix-ui/react-popover'
 import { Fragment, useState } from 'react'
 
+import { useMenuFocus } from '@/components/editor/top-bar/bar-popover.tsx'
 import { cn } from '@/lib/cn.ts'
 
-import { useMenuFocus } from './bar-popover.tsx'
 import { ICON_BUTTON, MENU, MENU_DIVIDER, MENU_ITEM } from './styles.ts'
 
 /** A size's or a page's own button on its card: a 44 px target on a phone. */

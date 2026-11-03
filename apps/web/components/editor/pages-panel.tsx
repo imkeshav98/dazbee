@@ -11,18 +11,19 @@ import { type CSSProperties, type ReactNode, useEffect, useLayoutEffect, useRef,
 import type { Editor } from '@dazbee/editor'
 import { type Design, inOrder } from '@dazbee/schema'
 
+import { PanelFrame } from '@/components/editor/edit-panel/edit-panel.tsx'
+import { FOCUS_RING } from '@/components/ui/looks.ts'
 import { cn } from '@/lib/cn.ts'
+import { useValue } from '@/lib/editor/value-store.ts'
 import { useMessages } from '@/lib/i18n/client.tsx'
 import { format } from '@/lib/i18n/index.ts'
-import { useValue } from '@/lib/value-store.ts'
 
 import { afterDraws, sameUrls } from './after-draws.ts'
 import { CARD_ROW, CardMenu } from './card.tsx'
-import { PanelFrame } from './edit-panel.tsx'
 import { setOpen, useEditState } from './edit-store.ts'
 import { shownPage, useEditorDesign, usePickedPage } from './editor-hooks.ts'
 import { BackgroundBody } from './selection-cards.tsx'
-import { DROP_LINE, FOCUS_RING, PANEL_BUTTON } from './styles.ts'
+import { DROP_LINE, PANEL_BUTTON } from './styles.ts'
 
 /** The page in view: the one last shown or picked while it is still there, else the first. */
 function useCurrentPage(design: Design) {
