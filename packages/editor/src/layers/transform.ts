@@ -4,21 +4,25 @@
 import { type Box, centreOf, normalAngle, type Point, round, turn } from '@dazbee/doc'
 
 export { boundsOf, centreOf, cornersOf, normalAngle, round, turn, type Box } from '@dazbee/doc'
+
 export type Handle = 'n' | 's' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw'
-export const HANDLES: readonly Handle[] = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w']
-
-const rad = (deg: number) => (deg * Math.PI) / 180
-
-/** Where a handle sits on a box, as a fraction of its width and height. */
-export function handleAt(h: Handle): Point {
-  return { x: h.includes('w') ? 0 : h.includes('e') ? 1 : 0.5, y: h.includes('n') ? 0 : h.includes('s') ? 1 : 0.5 }
-}
 
 export interface ResizeOptions {
   /** Shift: keep the box's proportions. */
   keepRatio?: boolean
   /** Alt: grow and shrink about the centre instead of the opposite handle. */
   fromCentre?: boolean
+}
+
+export const HANDLES: readonly Handle[] = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w']
+/** Shift while rotating: the angle snaps to steps of 15°. */
+const ANGLE_STEP = 15
+
+const rad = (deg: number) => (deg * Math.PI) / 180
+
+/** Where a handle sits on a box, as a fraction of its width and height. */
+export function handleAt(h: Handle): Point {
+  return { x: h.includes('w') ? 0 : h.includes('e') ? 1 : 0.5, y: h.includes('n') ? 0 : h.includes('s') ? 1 : 0.5 }
 }
 
 /**
@@ -107,8 +111,7 @@ export function scaleWithin(box: Box, from: Box, to: Box): Box {
   return { x: centre.x - width / 2, y: centre.y - height / 2, width, height, rotation: box.rotation }
 }
 
-/** Shift while rotating: the angle snaps to steps of 15°. */
-const ANGLE_STEP = 15
+/** Shift while rotating: an angle snapped to the nearest step. */
 export const snapAngle = (deg: number) => Math.round(deg / ANGLE_STEP) * ANGLE_STEP
 
 /** The angle of a point about a centre, in degrees. */

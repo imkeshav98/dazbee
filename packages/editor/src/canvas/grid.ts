@@ -20,6 +20,7 @@ export const COLUMN_GAP = 160
 export const ROW_GAP = 240
 
 export const frameKey = (pageId: string, formatId: string) => `${pageId}/${formatId}`
+/** Where edits made in a frame go: its format's overrides. */
 export const scope = (frame: Frame) => formatScope(frame.formatId)
 
 /**

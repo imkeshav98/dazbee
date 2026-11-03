@@ -8,6 +8,7 @@ import { LAYER_CLIPBOARD_TYPE, LayerClipboard, type LayerTree } from '@dazbee/sc
  * drops custom types) still pastes the layers.
  */
 const REMEMBERED = 'dazbee.copiedLayers'
+
 /** Keeps copied layers on this device, as JSON and as their names in plain text; `kept` is false without storage. */
 export function keepCopy(copied: LayerClipboard) {
   const json = JSON.stringify(copied)
@@ -19,12 +20,19 @@ export function keepCopy(copied: LayerClipboard) {
     return { json, plain, kept: false }
   }
 }
+
+/** Puts copied layers on the clipboard in our own type and as their names in plain text, and keeps them on this device. */
 export function putOnClipboard(data: DataTransfer, copied: LayerClipboard) {
   // Without storage, only pastes that keep our own type paste layers.
   const { json, plain } = keepCopy(copied)
   data.setData(LAYER_CLIPBOARD_TYPE, json)
   data.setData('text/plain', plain)
 }
+
+/**
+ * The layers a paste brings: in our own type, or the copy kept on this device when the paste brings
+ * only the plain text that copy wrote. Null for anything else.
+ */
 export function layersOnClipboard(data: DataTransfer | null): LayerTree | null {
   let raw = data?.getData(LAYER_CLIPBOARD_TYPE)
   const plain = data?.getData('text/plain')
@@ -39,6 +47,7 @@ export function layersOnClipboard(data: DataTransfer | null): LayerTree | null {
     return null
   }
 }
+
 /** The layers last copied in Dazbee on this device, as kept in browser storage; null when there are none. */
 export function rememberedLayers(): LayerTree | null {
   try {

@@ -13,15 +13,16 @@ const MIN_SPACING = 64
 /** Small ticks between numbered ones. */
 const MINOR = 5
 
+/** A length in CSS pixels, as a style value. */
+export const px = (n: number) => `${n}px`
+const label = (n: number) => String(Math.round(n * 100) / 100)
+
 /** The smallest of 1, 2, 5, 10, 20, 50 … design pixels that keeps numbered ticks MIN_SPACING apart at a zoom. */
 export function rulerStep(zoom: number) {
   const want = MIN_SPACING / zoom
   const power = 10 ** Math.floor(Math.log10(want))
   return [1, 2, 5, 10].map((m) => m * power).find((step) => step >= want) ?? 10 * power
 }
-
-const px = (n: number) => `${n}px`
-const label = (n: number) => String(Math.round(n * 100) / 100)
 
 /**
  * Both rulers for a frame: numbers count design pixels from the frame's corner, and `band`, the

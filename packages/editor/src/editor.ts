@@ -6,8 +6,6 @@ import { IndexeddbPersistence } from 'y-indexeddb'
 import * as Y from 'yjs'
 
 import type { CanvasKit, GrDirectContext, Image, SkPicture, Surface } from '@dazbee/canvaskit'
-import canvasKitModule from '@dazbee/canvaskit'
-import { WASM_FILE } from '@dazbee/canvaskit/wasm'
 import {
   ancestorsOf,
   anchorOffset,
@@ -81,10 +79,11 @@ import {
   type Viewport,
   zoomAt,
 } from './canvas/camera.ts'
-import { HANDLE_ANGLE, RESIZE_CURSORS, ROTATE_CURSOR } from './canvas/cursors.ts'
-import { type Frame, frameAt, frameGrid, intersects, scope } from './canvas/grid.ts'
+import { resizeCursor, ROTATE_CURSOR } from './canvas/cursors.ts'
+import { type Frame, frameAt, frameGrid, frameKey, intersects, scope } from './canvas/grid.ts'
 import { hitTest } from './canvas/hit-test.ts'
-import { rulerParts } from './canvas/rulers.ts'
+import { px, rulerParts } from './canvas/rulers.ts'
+import { loadCanvasKit } from './canvaskit.ts'
 import { keepCopy, layersOnClipboard, putOnClipboard, rememberedLayers } from './clipboard.ts'
 import { exportClient } from './export/export-client.ts'
 import { cornersOfRect, coverCrop, cropOf, imageRect, panned, scaled } from './gestures/crop.ts'
@@ -97,8 +96,8 @@ import {
   keepRatio,
   newDrawn,
   newImage,
+  newPath,
   newText,
-  PEN_STROKE,
   type ShapeTool,
   withImage,
 } from './gestures/draw-tools.ts'
@@ -170,9 +169,6 @@ import {
   toggled,
   wordAt,
 } from './text/text-edit.ts'
-
-// CommonJS whose types claim an ES default export; the bundler hands over the init function itself.
-const CanvasKitInit = canvasKitModule as unknown as typeof import('@dazbee/canvaskit').default
 
 export interface EditorOptions {
   canvas: HTMLCanvasElement
@@ -264,6 +260,7 @@ const HANDLE_SIZE = 8
 const HANDLE_REACH = 7
 /** How far outside a corner a press turns the selection. */
 const ROTATE_REACH = 24
+/** The SVG namespace, for the outline of a path being drawn or edited. */
 const SVG = 'http://www.w3.org/2000/svg'
 
 /** A path layer being drawn or edited: the box it had when that began, which its points are relative to, and how far the box has moved since. */
@@ -578,7 +575,6 @@ function pageOf(design: Design, id: string) {
   return up
 }
 
-const px = (n: number) => `${n}px`
 /** Keys typed into the page's own fields belong to them. */
 const inField = (target: EventTarget | null) =>
   target instanceof HTMLElement &&
@@ -601,6 +597,12 @@ const find = (layers: SceneLayer[], id: string): SceneLayer | undefined => {
     if (inner) return inner
   }
   return undefined
+}
+
+/** An image as a PNG object URL, or null when it doesn't encode. */
+function pngUrl(image: Image): string | null {
+  const png = image.encodeToBytes()
+  return png ? URL.createObjectURL(new Blob([png.slice()], { type: 'image/png' })) : null
 }
 
 async function bytes(url: string) {
@@ -627,9 +629,7 @@ export async function startEditor(options: EditorOptions) {
   const { designId, syncUrl } = options
   const status = options.onStatus ?? (() => {})
   status('Loading renderer')
-  const ck: CanvasKit = await CanvasKitInit({
-    locateFile: (file: string) => `/vendor/${file === 'canvaskit.wasm' ? WASM_FILE : file}`,
-  })
+  const ck: CanvasKit = await loadCanvasKit()
   // The fonts we ship, the fallbacks among them, load first; the design's own families once it is here.
   const fontBytes = await Promise.all(
     FONT_FACES.map(async (f) => ({ family: f.family, bytes: await bytes(`/vendor/fonts/${f.file}`) })),
@@ -1078,6 +1078,14 @@ function live(
     return { x: p.x, y: p.y, width: p.width, height: p.height, rotation: p.rotation ?? 0 }
   }
 
+  /**
+   * Where a new layer of `type` that a tool makes in a frame goes: into the group, frame or boolean
+   * double-clicked into if it can hold it, otherwise onto the frame's page.
+   */
+  function parentFor(frame: Frame, type: string, now: Design) {
+    const inside = entered ? now.nodes[entered] : undefined
+    return entered && inside && canHold(inside.type, type) ? entered : frame.pageId
+  }
   /** The groups and frames a layer is inside, outermost first, as boxes in a frame. */
   function containersOf(frame: Frame, parentId: string | undefined, from: Design = session.design()): Box[] {
     const boxes: Box[] = []
@@ -1330,11 +1338,10 @@ function live(
         drawWith,
       )
       const image = surface.makeImageSnapshot()
-      const png = image.encodeToBytes()
+      const url = pngUrl(image)
       image.delete()
-      if (!png) return null
+      if (!url) return null
       if (kept) URL.revokeObjectURL(kept.url)
-      const url = URL.createObjectURL(new Blob([png.slice()], { type: 'image/png' }))
       thumbnails.set(key, { id, layer: found, resources: drawWith, url })
       // Deleted layers' pictures go, once there are more pictures than the design could show.
       if (thumbnails.size > 4 * Object.keys(design.nodes).length + 16) {
@@ -1374,11 +1381,10 @@ function live(
       canvas.scale(scale, scale)
       drawPage(ck, canvas, scene, drawWith)
       const image = surface.makeImageSnapshot()
-      const png = image.encodeToBytes()
+      const url = pngUrl(image)
       image.delete()
-      if (!png) return null
+      if (!url) return null
       if (kept) URL.revokeObjectURL(kept.url)
-      const url = URL.createObjectURL(new Blob([png.slice()], { type: 'image/png' }))
       pageThumbnails.set(key, { pageId: frame.pageId, scene, resources: drawWith, url })
       // A deleted page's pictures go with it.
       for (const [other, { pageId, url: old }] of pageThumbnails) {
@@ -1397,8 +1403,7 @@ function live(
   function ghostOf(image: Image) {
     let url = ghosts.get(image)
     if (url === undefined) {
-      const png = image.encodeToBytes()
-      url = png ? URL.createObjectURL(new Blob([png.slice()], { type: 'image/png' })) : ''
+      url = pngUrl(image) ?? ''
       ghosts.set(image, url)
     }
     return url
@@ -2030,17 +2035,29 @@ function live(
     )
   }
   const zoomTo = (zoom: number, at: Point = centre()) => setCamera(zoomAt(camera, at, zoom))
+  const zoomIn = () => zoomTo(camera.zoom * ZOOM_STEP)
+  const zoomOut = () => zoomTo(camera.zoom / ZOOM_STEP)
 
   // Pointer: screen points are CSS pixels from the canvas's corner.
   const screenOf = (e: MouseEvent): Point => {
     const rect = canvas.getBoundingClientRect()
     return { x: e.clientX - rect.left, y: e.clientY - rect.top }
   }
-  /** The frame under the pointer and the point in its page's design pixels. */
-  function pointIn(e: MouseEvent) {
-    const world = toWorld(camera, screenOf(e))
+  /** The frame under a point on screen, in client coordinates, and the point in its page's design pixels. */
+  function pointAt(client: Point) {
+    const rect = canvas.getBoundingClientRect()
+    const world = toWorld(camera, { x: client.x - rect.left, y: client.y - rect.top })
     const frame = frameAt(grid.frames, world)
     return frame ? { frame, p: { x: world.x - frame.x, y: world.y - frame.y } } : null
+  }
+  /** The spot under a point on screen, in client coordinates: the frame there and the point in it. */
+  function spotAt(client: Point): Spot | null {
+    const at = pointAt(client)
+    return at ? { frame: at.frame.key, x: at.p.x, y: at.p.y } : null
+  }
+  /** The frame under the pointer and the point in its page's design pixels. */
+  function pointIn(e: MouseEvent) {
+    return pointAt({ x: e.clientX, y: e.clientY })
   }
 
   function stopEditing() {
@@ -2705,11 +2722,7 @@ function live(
     }
     const under = handleUnder(screen)
     const rotation = selectionBox()?.drawn.rotation ?? 0
-    hoverCursor = !under
-      ? ''
-      : under.kind === 'rotate'
-        ? ROTATE_CURSOR
-        : (RESIZE_CURSORS[Math.round(((((HANDLE_ANGLE[under.handle] + rotation) % 180) + 180) % 180) / 45) % 4] ?? '')
+    hoverCursor = !under ? '' : under.kind === 'rotate' ? ROTATE_CURSOR : resizeCursor(under.handle, rotation)
     showCursor()
   }
 
@@ -2928,11 +2941,9 @@ function live(
    * not a line, and not one whose style is locked. Null over text, a group's gaps or empty space.
    */
   function imageTargetAt(client: Point): Picked | null {
-    const rect = canvas.getBoundingClientRect()
-    const world = toWorld(camera, { x: client.x - rect.left, y: client.y - rect.top })
-    const frame = frameAt(grid.frames, world)
-    const hit = frame && hitTest(cached(frame).scene.layers, { x: world.x - frame.x, y: world.y - frame.y }, pickable)
-    if (!frame || !hit) return null
+    const at = pointAt(client)
+    const hit = at && hitTest(cached(at.frame).scene.layers, at.p, pickable)
+    if (!at || !hit) return null
     let id = hit.id
     for (const up of ancestorsOf(design, design.nodes[id]?.parentId ?? ''))
       if (design.nodes[up]?.type === 'boolean') id = up
@@ -2941,7 +2952,7 @@ function live(
       node?.type === 'frame' ||
       node?.type === 'boolean' ||
       (node?.type === 'graphic' && node.props.shape.kind !== 'line')
-    return takes && !node.lock?.style ? { id, frame: frame.key } : null
+    return takes && !node.lock?.style ? { id, frame: at.frame.key } : null
   }
 
   /** Where the pointer last was over the stage, so the hover outline follows edits under it. */
@@ -3030,9 +3041,7 @@ function live(
   function startDrawing(e: PointerEvent, shape: DrawTool, at: { frame: Frame; p: Point }) {
     stopEditing()
     const now = session.design()
-    const inside = entered ? now.nodes[entered] : undefined
-    const parentId =
-      entered && inside && canHold(inside.type, shape === 'frame' ? 'frame' : 'graphic') ? entered : at.frame.pageId
+    const parentId = parentFor(at.frame, shape === 'frame' ? 'frame' : 'graphic', now)
     const around = containersOf(at.frame, parentId, now)
     const from = localTo(at.p, around)
     const end = session.beginGesture()
@@ -3124,8 +3133,7 @@ function live(
    */
   function boxStart(at: { frame: Frame; p: Point }, type: 'text' | 'graphic') {
     const now = session.design()
-    const inside = entered ? now.nodes[entered] : undefined
-    const parentId = entered && inside && canHold(inside.type, type) ? entered : at.frame.pageId
+    const parentId = parentFor(at.frame, type, now)
     const around = containersOf(at.frame, parentId, now)
     const from = localTo(at.p, around)
     return { frame: at.frame, around, parentId, from, to: from }
@@ -3322,8 +3330,7 @@ function live(
     if (pen && pen.frame.key !== at.frame.key) finishPen()
     if (!pen) {
       const now = session.design()
-      const inside = entered ? now.nodes[entered] : undefined
-      const parentId = entered && inside && canHold(inside.type, 'graphic') ? entered : at.frame.pageId
+      const parentId = parentFor(at.frame, 'graphic', now)
       const around = containersOf(at.frame, parentId, now)
       pen = {
         frame: at.frame,
@@ -3399,12 +3406,7 @@ function live(
     const box = { x: round(b.x), y: round(b.y), width: round(b.width), height: round(b.height), rotation: 0 }
     const { parentId } = pen
     let id = ''
-    const shape = { kind: 'path', d: formatPath(path, box), drawnIn: { width: box.width, height: box.height } }
-    const layer = {
-      type: 'graphic' as const,
-      name: 'Path',
-      props: { x: box.x, y: box.y, width: box.width, height: box.height, shape, strokes: [PEN_STROKE] },
-    }
+    const layer = newPath(formatPath(path, box), box)
     if (
       runQuietly(() => {
         id = session.run('node.create', { parentId, layer })
@@ -3756,7 +3758,7 @@ function live(
   /** The top-level layers of the selection's page, or the first page's, that can be picked. */
   function selectAll() {
     const frame =
-      frameOf(selection?.frame) ?? frameOf(`${firstPage()}/${design.meta.primaryFormatId}`) ?? grid.frames[0]
+      frameOf(selection?.frame) ?? frameOf(frameKey(firstPage(), design.meta.primaryFormatId)) ?? grid.frames[0]
     if (!frame) return
     select(
       cached(frame)
@@ -3777,8 +3779,8 @@ function live(
       zoomToFit: fitAll,
       zoomToSelection: fitSelection,
       zoomTo100: () => zoomTo(1),
-      zoomIn: () => zoomTo(camera.zoom * ZOOM_STEP),
-      zoomOut: () => zoomTo(camera.zoom / ZOOM_STEP),
+      zoomIn,
+      zoomOut,
       selectAll,
       toggleRulers: () => {
         rulers = !rulers
@@ -4276,23 +4278,17 @@ function live(
     name: string,
     where: { client?: Point; atPointer?: boolean; spot?: Spot },
   ): string | null {
-    const rect = canvas.getBoundingClientRect()
     const client = where.client ?? (where.atPointer && pointer ? { x: pointer.clientX, y: pointer.clientY } : undefined)
-    const screen = client ? { x: client.x - rect.left, y: client.y - rect.top } : centre()
-    const world = toWorld(camera, screen)
-    const under = where.spot ? frameOf(where.spot.frame) : frameAt(grid.frames, world)
-    const frame = where.spot
-      ? under
+    const spot = where.spot ?? (client && spotAt(client))
+    // A point off every frame puts the file in the middle of the selection's frame; with no point,
+    // it goes in the frame in the middle of the view.
+    const frame = spot
+      ? frameOf(spot.frame)
       : client
-        ? (under ?? frameOf(selection?.frame))
-        : (under ?? frameOf(selection?.frame) ?? grid.frames[0])
+        ? frameOf(selection?.frame)
+        : (frameAt(grid.frames, toWorld(camera, centre())) ?? frameOf(selection?.frame) ?? grid.frames[0])
     if (!frame) return null
-    const inside = client && under?.key === frame.key
-    const at = where.spot
-      ? { x: where.spot.x, y: where.spot.y }
-      : inside
-        ? { x: world.x - frame.x, y: world.y - frame.y }
-        : { x: frame.width / 2, y: frame.height / 2 }
+    const at = spot ? { x: spot.x, y: spot.y } : { x: frame.width / 2, y: frame.height / 2 }
     let made: ReturnType<typeof svgToLayers>
     try {
       const natural = svgToLayers(ck, text, { name })
@@ -4446,7 +4442,7 @@ function live(
   )
 
   resize()
-  const firstFormat = options.formatId ? frameOf(`${firstPage()}/${options.formatId}`) : undefined
+  const firstFormat = options.formatId ? frameOf(frameKey(firstPage(), options.formatId)) : undefined
   if (firstFormat) fitFrame(firstFormat)
   else fitAll()
   options.onZoom?.(camera.zoom)
@@ -4456,7 +4452,7 @@ function live(
   const defaultFrame = (pageId?: string, formatId?: string) => {
     const page = pageId ?? firstPage()
     const format = formatId ?? design.meta.primaryFormatId
-    const found = frameOf(`${page}/${format}`)
+    const found = frameOf(frameKey(page, format))
     if (!found) throw new Error(`no frame for page "${page}" in format "${format}"`)
     return found
   }
@@ -4632,21 +4628,7 @@ function live(
       const outer = selectionBox()
       if (!outer) return null
       const { frame, drawn } = outer
-      const turn = ((drawn.rotation ?? 0) * Math.PI) / 180
-      const centre = { x: frame.x + drawn.x + drawn.width / 2, y: frame.y + drawn.y + drawn.height / 2 }
-      const corners = [
-        [-1, -1],
-        [1, -1],
-        [1, 1],
-        [-1, 1],
-      ].map(([sx = 0, sy = 0]) => {
-        const dx = (sx * drawn.width) / 2
-        const dy = (sy * drawn.height) / 2
-        return toScreen(camera, {
-          x: centre.x + dx * Math.cos(turn) - dy * Math.sin(turn),
-          y: centre.y + dx * Math.sin(turn) + dy * Math.cos(turn),
-        })
-      })
+      const corners = cornersOf(drawn).map((p) => toScreen(camera, { x: frame.x + p.x, y: frame.y + p.y }))
       const xs = corners.map((c) => c.x)
       const ys = corners.map((c) => c.y)
       if (!editing) {
@@ -4661,11 +4643,10 @@ function live(
       }
     },
     selectAt(client: Point): string[] {
-      const rect = canvas.getBoundingClientRect()
-      const world = toWorld(camera, { x: client.x - rect.left, y: client.y - rect.top })
-      const frame = frameAt(grid.frames, world)
-      if (!frame) return []
-      const deepest = hitTest(cached(frame).scene.layers, { x: world.x - frame.x, y: world.y - frame.y })
+      const at = pointAt(client)
+      if (!at) return []
+      const { frame } = at
+      const deepest = hitTest(cached(frame).scene.layers, at.p)
       if (!deepest) return []
       const id = target(deepest.id, frame.key)
       if (!(selection?.frame === frame.key && selection.ids.includes(id))) select([id], frame.key)
@@ -4725,8 +4706,8 @@ function live(
       insets = next
     },
     zoomTo,
-    zoomIn: () => zoomTo(camera.zoom * ZOOM_STEP),
-    zoomOut: () => zoomTo(camera.zoom / ZOOM_STEP),
+    zoomIn,
+    zoomOut,
     fitAll,
     fitSelection,
     fitFrame: (pageId: string, formatId: string) => fitFrame(defaultFrame(pageId, formatId)),
@@ -4863,19 +4844,14 @@ function live(
       asset: { id: string; name: string; width: number; height: number },
       where?: Point | Spot,
     ): string | null {
-      const spot = where && 'frame' in where ? where : null
-      const client = spot ? undefined : where
-      const rect = canvas.getBoundingClientRect()
-      const screen = client ? { x: client.x - rect.left, y: client.y - rect.top } : centre()
-      const world = toWorld(camera, screen)
-      const under = spot ? frameOf(spot.frame) : frameAt(grid.frames, world)
-      const frame = spot || client ? under : (under ?? frameOf(selection?.frame) ?? grid.frames[0])
+      // A point off every frame places nothing; with no point, it goes in the frame in the middle of the view.
+      const spot = where && ('frame' in where ? where : spotAt(where))
+      if (where && !spot) return null
+      const frame = spot
+        ? frameOf(spot.frame)
+        : (frameAt(grid.frames, toWorld(camera, centre())) ?? frameOf(selection?.frame) ?? grid.frames[0])
       if (!frame) return null
-      const at = spot
-        ? { x: spot.x, y: spot.y }
-        : client
-          ? { x: world.x - frame.x, y: world.y - frame.y }
-          : { x: frame.width / 2, y: frame.height / 2 }
+      const at = spot ? { x: spot.x, y: spot.y } : { x: frame.width / 2, y: frame.height / 2 }
       stopEditing()
       let id = ''
       if (
@@ -4890,12 +4866,7 @@ function live(
     },
     placeSvg: (text: string, name: string, where?: Point | Spot) =>
       placeSvg(text, name, !where ? {} : 'frame' in where ? { spot: where } : { client: where }),
-    spotAt(client: Point): Spot | null {
-      const rect = canvas.getBoundingClientRect()
-      const world = toWorld(camera, { x: client.x - rect.left, y: client.y - rect.top })
-      const frame = frameAt(grid.frames, world)
-      return frame ? { frame: frame.key, x: world.x - frame.x, y: world.y - frame.y } : null
-    },
+    spotAt,
     stopEditing: () => {
       if (!editing) return
       stopEditing()
@@ -4925,7 +4896,7 @@ function live(
       const near = [inFrame, dropTarget?.id === id ? dropTarget.frame : undefined, selection?.frame]
         .map(frameOf)
         .find((f) => f?.pageId === page)
-      const frame = near ?? frameOf(`${page}/${now.meta.primaryFormatId}`)
+      const frame = near ?? frameOf(frameKey(page, now.meta.primaryFormatId))
       dropTarget = null
       stopEditing()
       const ok = runQuietly(() =>
@@ -4947,11 +4918,11 @@ function live(
       return ok
     },
     pageThumbnail(pageId: string, size = 72): string | null {
-      const frame = frameOf(`${pageId}/${design.meta.primaryFormatId}`)
+      const frame = frameOf(frameKey(pageId, design.meta.primaryFormatId))
       return frame ? pageThumbnail(frame, size) : null
     },
-    layerThumbnail(id: string, size = 96, outlined = false, frameKey?: string): string | null {
-      const frame = frameOf(frameKey ?? selection?.frame) ?? frameOf(`${firstPage()}/${design.meta.primaryFormatId}`)
+    layerThumbnail(id: string, size = 96, outlined = false, inFrame?: string): string | null {
+      const frame = frameOf(inFrame ?? selection?.frame) ?? frameOf(frameKey(firstPage(), design.meta.primaryFormatId))
       return frame ? layerThumbnail(frame, id, size, outlined) : null
     },
     synced: () => provider.synced && provider.unsyncedChanges === 0,
