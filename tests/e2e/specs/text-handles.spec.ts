@@ -146,10 +146,12 @@ test('typed after a corner drag in one size, the text keeps that size\'s runs on
   }))
   await select(page, ['headline'])
   await dragHandle(page, 'se', 120, 60)
-  expect((await placed(page, 'headline')).runs).toEqual([expect.objectContaining({ start: 7, end: 11 })])
+  // The square's runs are its own now, scaled with its text.
+  const own = async () => ((await read(page)).overrides['format:sq']?.headline as { runs?: unknown } | undefined)?.runs
+  expect(await own()).toEqual([expect.objectContaining({ start: 7, end: 11 })])
   // Typed before the pink word, in the base text: the square's own run moves with it.
   await page.evaluate(() => window.dazbee?.session.run('text.edit', { id: 'headline', op: { kind: 'insert', at: 0, text: 'Hot ' } }))
-  expect((await placed(page, 'headline')).runs).toEqual([expect.objectContaining({ start: 11, end: 15 })])
+  expect(await own()).toEqual([expect.objectContaining({ start: 11, end: 15 })])
   expect(errors).toEqual([])
 })
 
