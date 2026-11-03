@@ -97,8 +97,7 @@ export function comparePixels(expected: Pixels, actual: Pixels): { differing: nu
 
 /** The red, green and blue of the pixel at x, y. */
 export function at(image: Pick<Pixels, 'width' | 'pixels'>, x: number, y: number): number[] {
-  const i = (y * image.width + x) * 4
-  return [...image.pixels.slice(i, i + 3)]
+  return rgbaAt(image, x, y).slice(0, 3)
 }
 
 /** The red, green, blue and alpha of the pixel at x, y. */
