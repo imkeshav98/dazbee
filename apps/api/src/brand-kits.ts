@@ -7,6 +7,8 @@ import { type BrandKit, EMPTY_BRAND_KIT } from '@dazbee/schema'
 
 import { findAsset } from './assets.ts'
 
+export class InvalidKit extends Error {}
+
 export async function getBrandKit(db: Db, workspaceId: string, brandId: string): Promise<BrandKit> {
   const [row] = await db
     .select()
@@ -16,8 +18,6 @@ export async function getBrandKit(db: Db, workspaceId: string, brandId: string):
     ? { colors: row.colors, fonts: row.fonts, logoAssetId: row.logoAssetId, voice: row.voice }
     : EMPTY_BRAND_KIT
 }
-
-export class InvalidKit extends Error {}
 
 /** Saves the brand's whole kit. Its logo has to be an asset of the same brand. */
 export async function saveBrandKit(db: Db, workspaceId: string, brandId: string, kit: BrandKit): Promise<BrandKit> {

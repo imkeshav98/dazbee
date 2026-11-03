@@ -4,21 +4,17 @@
 // per version of the design: the key carries the design's updatedAt, so an edit makes a new one.
 import { Worker } from 'node:worker_threads'
 
-import * as Y from 'yjs'
-
-import { type Db, readDesignState } from '@dazbee/db'
-import { migrateDoc, readDesign } from '@dazbee/doc'
-import type { Design, DesignSummary } from '@dazbee/schema'
+import type { Db } from '@dazbee/db'
+import type { Design, DesignCover, DesignSummary } from '@dazbee/schema'
 import type { Storage } from '@dazbee/storage'
 
+import { storedDesign } from './designs.ts'
 import type { DrawJob, DrawResult } from './draw-worker.ts'
 import { brandResourcesFor, firstPageId } from './render.ts'
+import { designThumbnailKey } from './storage-keys.ts'
 
 /** The longest side of a design's picture: the bento's big tile on a 2× screen. */
 const DESIGN_THUMBNAIL_SIZE = 640
-
-const designThumbnailKey = (workspaceId: string, design: DesignSummary) =>
-  `workspaces/${workspaceId}/designs/${design.id}/thumbnail-${Date.parse(design.updatedAt)}.png`
 
 /** The page and format a design's picture shows: its first page, in its primary format. */
 export function coverOf(design: Design) {
@@ -31,24 +27,11 @@ export function coverOf(design: Design) {
   return { pageId, formatId, width: format.width, height: format.height }
 }
 
-/** The design as its stored Yjs state holds it, or null when it has none. */
-export async function storedDesign(db: Db, designId: string): Promise<Design | null> {
-  const state = await readDesignState(db, designId)
-  if (!state) return null
-  const doc = new Y.Doc()
-  Y.applyUpdate(doc, state)
-  migrateDoc(doc)
-  return readDesign(doc)
-}
-
-export interface DesignCover {
-  key: string
-  width: number
-  height: number
-}
+/** Where a design's stored picture is, and the size of the format it shows. */
+export type ThumbnailCover = DesignCover & { key: string }
 
 /** The primary format's size, read from the stored design without drawing: what a tile needs to take its shape. */
-export async function designCover(db: Db, summary: DesignSummary): Promise<{ width: number; height: number } | null> {
+export async function designCover(db: Db, summary: DesignSummary): Promise<DesignCover | null> {
   const design = await storedDesign(db, summary.id)
   const cover = design && coverOf(design)
   return cover ? { width: cover.width, height: cover.height } : null
@@ -106,7 +89,7 @@ export async function ensureDesignThumbnail(
   storage: Storage,
   workspaceId: string,
   summary: DesignSummary,
-): Promise<DesignCover | null> {
+): Promise<ThumbnailCover | null> {
   const design = await storedDesign(db, summary.id)
   const cover = design && coverOf(design)
   if (!design || !cover) return null

@@ -1,14 +1,8 @@
-import { readFileSync } from 'node:fs'
-import { join } from 'node:path'
-
 import { describe, expect, it } from 'vitest'
-
-import { FONT_FILES_DIR } from '@dazbee/fonts/node'
 
 import { fontPreview, readFontInfo } from './font-file.ts'
 import { readImageHeader } from './images.ts'
-
-const fontFile = (file: string) => new Uint8Array(readFileSync(join(FONT_FILES_DIR, file)))
+import { fontFile } from './test-files.ts'
 
 describe('readFontInfo', () => {
   it('reads the family, weight and style from the font’s own tables', () => {

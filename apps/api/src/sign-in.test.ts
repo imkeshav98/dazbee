@@ -3,18 +3,16 @@
 import { randomUUID } from 'node:crypto'
 
 import { and, eq } from 'drizzle-orm'
-import { afterAll, describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vitest'
 
-import { memberships, openDatabase, users, workspaces } from '@dazbee/db'
+import { memberships, users, workspaces } from '@dazbee/db'
 import { ApiError, SignedIn, SignedOut, SignInLink, WorkspaceSummary } from '@dazbee/schema'
-import { openStorage, storageSettings } from '@dazbee/storage'
 
 import { createApp } from './app.ts'
 import { bearerToken, readSessionToken, SESSION_TTL_MS, signSessionToken, tokenSession } from './session.ts'
 import { accessTokenSessionId, type SignedInPerson, type SignInProvider, workosSettings } from './sign-in.ts'
+import { db, storage, syncSecret } from './test-api.ts'
 
-const DATABASE_URL = process.env.DATABASE_URL ?? 'postgres://razzlr:razzlr-local@127.0.0.1:55432/razzlr'
-const { db, close } = openDatabase(DATABASE_URL)
 const run = randomUUID().slice(0, 8)
 const secret = 'test-session-secret-'.padEnd(32, 'x')
 
@@ -55,21 +53,11 @@ const bo: SignedInPerson = {
   sessionId: null,
 }
 const workos = fakeWorkos({ [`code-ada-${run}`]: ada, [`code-bo-${run}`]: bo })
-const storage = openStorage(
-  storageSettings({
-    STORAGE_ENDPOINT: 'http://127.0.0.1:59000',
-    STORAGE_BUCKET: 'razzlr-test',
-    STORAGE_ACCESS_KEY_ID: 'razzlr',
-    STORAGE_SECRET_ACCESS_KEY: 'razzlr-local-secret',
-    STORAGE_REGION: 'us-east-1',
-    ...process.env,
-  }),
-)
 const app = createApp({
   db,
   storage,
   sessionOf: tokenSession(db, secret),
-  syncSecret: 'test-secret-'.padEnd(32, 'x'),
+  syncSecret,
   signIn: { provider: workos.provider, secret },
 })
 
@@ -84,8 +72,6 @@ async function call(method: string, path: string, { body, token }: { body?: unkn
   return { status: response.status, json: (await response.json()) as unknown }
 }
 const signIn = async (code: string) => SignedIn.parse((await call('POST', '/auth/callback', { body: { code } })).json)
-
-afterAll(close)
 
 describe('signing in (#58)', () => {
   it('gives the WorkOS sign-in link for a good state only', async () => {

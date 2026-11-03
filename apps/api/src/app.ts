@@ -1,11 +1,9 @@
 // The API's routes. /workspace and every route below /brands need a session, and reads and writes only that
 // session's workspace; a brand or design of another workspace is answered as if it didn't exist.
-import { Hono, type MiddlewareHandler } from 'hono'
-import type { z } from 'zod'
+import { Hono } from 'hono'
 
 import type { Db } from '@dazbee/db'
 import {
-  type ApiError,
   type AssetInUse,
   type AssetLink,
   BrandKit,
@@ -40,14 +38,12 @@ import {
   InvalidUpload,
   listAssets,
   listedAssetUses,
-  originalKey,
   recordAsset,
-  SIGNED_URL_SECONDS,
   startUpload,
   updateAsset,
 } from './assets.ts'
 import { getBrandKit, InvalidKit, saveBrandKit } from './brand-kits.ts'
-import { designCover, ensureDesignThumbnail, storedDesign } from './design-thumbnails.ts'
+import { designCover, ensureDesignThumbnail } from './design-thumbnails.ts'
 import {
   createBrand,
   createDesign,
@@ -59,11 +55,14 @@ import {
   listBrands,
   listDesigns,
   renameDesign,
+  storedDesign,
   updateWorkspace,
 } from './designs.ts'
 import { fontLink, InvalidFont, listFonts, recordFont, startFontUpload } from './fonts.ts'
-import { bearerToken, readSessionToken, type Session, type SessionOf } from './session.ts'
-import { completeSignIn, type SignedInPerson, type SignInProvider } from './sign-in.ts'
+import { body, type Env, error, requireSession } from './http.ts'
+import { bearerToken, readSessionToken, type SessionOf } from './session.ts'
+import { completeSignIn, type SignedInPerson, type SignInSettings } from './sign-in.ts'
+import { originalKey, signedLink, templateThumbnailKey } from './storage-keys.ts'
 import {
   deleteTemplate,
   findTemplate,
@@ -71,18 +70,7 @@ import {
   renameTemplate,
   saveTemplate,
   startFromTemplate,
-  templateThumbnailKey,
 } from './templates.ts'
-
-type Env = { Variables: { session: Session } }
-
-const error = (message: string): ApiError => ({ error: message })
-
-/** Sign-in with WorkOS, when it is set up: the provider, and the secret session tokens are signed with. */
-export interface SignInSettings {
-  provider: SignInProvider
-  secret: string
-}
 
 export function createApp({
   db,
@@ -130,32 +118,10 @@ export function createApp({
     return c.json({ logoutUrl } satisfies SignedOut)
   })
 
-  const requireSession: MiddlewareHandler<Env> = async (c, next) => {
-    const session = await sessionOf(c.req.raw)
-    if (!session) return c.json(error('Sign in first'), 401)
-    c.set('session', session)
-    await next()
-  }
-  app.use('/workspace', requireSession)
-  app.use('/brands', requireSession)
-  app.use('/brands/*', requireSession)
-
-  /** The body parsed with `schema`, or a 400 response saying what's wrong with it. */
-  async function body<T extends z.ZodType>(request: Request, schema: T): Promise<z.infer<T> | Response> {
-    let json: unknown
-    try {
-      json = await request.json()
-    } catch {
-      return Response.json(error('The body is not JSON'), { status: 400 })
-    }
-    const parsed = schema.safeParse(json)
-    if (!parsed.success)
-      return Response.json(
-        error(parsed.error.issues.map((i) => `${i.path.join('.') || 'body'}: ${i.message}`).join('; ')),
-        { status: 400 },
-      )
-    return parsed.data
-  }
+  const signedIn = requireSession(sessionOf)
+  app.use('/workspace', signedIn)
+  app.use('/brands', signedIn)
+  app.use('/brands/*', signedIn)
 
   app.get('/workspace', async (c) => {
     const workspace = await findWorkspace(db, c.var.session.workspaceId)
@@ -260,13 +226,8 @@ export function createApp({
     if (!design) return c.json(error('No such design'), 404)
     const cover = await ensureDesignThumbnail(db, storage, workspaceId, design)
     if (!cover) return c.json(error('This design has nothing to show yet'), 404)
-    const url = await storage.signedGet(cover.key, SIGNED_URL_SECONDS)
-    return c.json({
-      url,
-      width: cover.width,
-      height: cover.height,
-      expiresAt: new Date(Date.now() + SIGNED_URL_SECONDS * 1000).toISOString(),
-    } satisfies DesignThumbnail)
+    const { url, expiresAt } = await signedLink(storage, cover.key)
+    return c.json({ url, width: cover.width, height: cover.height, expiresAt } satisfies DesignThumbnail)
   })
 
   app.post('/brands/:brandId/designs/:designId/sync-token', async (c) => {
@@ -315,12 +276,8 @@ export function createApp({
     const { workspaceId } = c.var.session
     const asset = await findAsset(db, workspaceId, c.req.param('brandId'), { id: c.req.param('assetId') })
     if (!asset) return c.json(error('No such asset'), 404)
-    const url = await storage.signedGet(originalKey(workspaceId, asset.sha256), SIGNED_URL_SECONDS)
-    return c.json({
-      asset,
-      url,
-      expiresAt: new Date(Date.now() + SIGNED_URL_SECONDS * 1000).toISOString(),
-    } satisfies AssetLink)
+    const { url, expiresAt } = await signedLink(storage, originalKey(workspaceId, asset.sha256))
+    return c.json({ asset, url, expiresAt } satisfies AssetLink)
   })
 
   app.patch('/brands/:brandId/assets/:assetId', async (c) => {
@@ -354,11 +311,7 @@ export function createApp({
     const { workspaceId } = c.var.session
     const asset = await findAsset(db, workspaceId, c.req.param('brandId'), { id: c.req.param('assetId') })
     if (!asset) return c.json(error('No such asset'), 404)
-    const url = await storage.signedGet(await ensureThumbnail(storage, workspaceId, asset), SIGNED_URL_SECONDS)
-    return c.json({
-      url,
-      expiresAt: new Date(Date.now() + SIGNED_URL_SECONDS * 1000).toISOString(),
-    } satisfies SignedLink)
+    return c.json((await signedLink(storage, await ensureThumbnail(storage, workspaceId, asset))) satisfies SignedLink)
   })
 
   // Templates (#54): the workspace's and the brand's, a design saved to start others from.
@@ -411,11 +364,7 @@ export function createApp({
     const { workspaceId } = c.var.session
     const template = await findTemplate(db, workspaceId, c.req.param('brandId'), c.req.param('templateId'))
     if (!template) return c.json(error('No such template'), 404)
-    const url = await storage.signedGet(templateThumbnailKey(workspaceId, template.id), SIGNED_URL_SECONDS)
-    return c.json({
-      url,
-      expiresAt: new Date(Date.now() + SIGNED_URL_SECONDS * 1000).toISOString(),
-    } satisfies SignedLink)
+    return c.json((await signedLink(storage, templateThumbnailKey(workspaceId, template.id))) satisfies SignedLink)
   })
 
   app.post('/brands/:brandId/templates/:templateId/designs', async (c) => {

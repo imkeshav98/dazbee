@@ -1,12 +1,11 @@
 // The font catalog (#50): Google Fonts copied into our storage, shared by every workspace, and the
 // fonts each brand uploads, its own. A brand's upload of a family Google also has is the one that
 // brand sees. Every file is read back from our storage, by the editor and by Node renders alike.
-import { createHash, randomUUID } from 'node:crypto'
+import { randomUUID } from 'node:crypto'
 
 import { and, eq, inArray, isNull, or } from 'drizzle-orm'
 
 import { type Db, fontFaces } from '@dazbee/db'
-import { googleCssUrl, googleFaces, type GoogleFamily } from '@dazbee/fonts'
 import {
   byCodeUnits,
   type FontFace,
@@ -17,13 +16,10 @@ import {
 } from '@dazbee/schema'
 import type { Storage } from '@dazbee/storage'
 
-import { SIGNED_URL_SECONDS } from './assets.ts'
 import { fontPreview, readFontInfo } from './font-file.ts'
+import { checkUpload, googleFontKey, previewKey, signedLink, signedUpload, uploadedFontKey } from './storage-keys.ts'
 
-const googleFontKey = (sha256: string) => `fonts/google/${sha256}`
-const uploadedFontKey = (workspaceId: string, sha256: string) => `workspaces/${workspaceId}/fonts/${sha256}`
-/** Each file's preview sits next to it. */
-const previewKey = (fontKey: string) => `${fontKey}.preview.png`
+export class InvalidFont extends Error {}
 
 type Row = typeof fontFaces.$inferSelect
 
@@ -87,16 +83,8 @@ export async function fontLink(
   const row = await visibleFace(db, workspaceId, brandId, faceId)
   if (!row) return null
   const key = keyOf(row)
-  const [url, previewUrl] = await Promise.all([
-    storage.signedGet(key, SIGNED_URL_SECONDS),
-    storage.signedGet(previewKey(key), SIGNED_URL_SECONDS),
-  ])
-  return {
-    face: toFace(row),
-    url,
-    previewUrl,
-    expiresAt: new Date(Date.now() + SIGNED_URL_SECONDS * 1000).toISOString(),
-  }
+  const [file, preview] = await Promise.all([signedLink(storage, key), signedLink(storage, previewKey(key))])
+  return { face: toFace(row), url: file.url, previewUrl: preview.url, expiresAt: file.expiresAt }
 }
 
 /**
@@ -126,8 +114,6 @@ export async function fontFiles(
   )
 }
 
-export class InvalidFont extends Error {}
-
 /** The brand's face for these bytes when it has one; otherwise a signed URL to upload them. */
 export async function startFontUpload(
   db: Db,
@@ -143,20 +129,11 @@ export async function startFontUpload(
       and(eq(fontFaces.workspaceId, workspaceId), eq(fontFaces.brandId, brandId), eq(fontFaces.sha256, upload.sha256)),
     )
   if (existing) return { face: toFace(existing), upload: null }
-  const url = await storage.signedPut(
-    uploadedFontKey(workspaceId, upload.sha256),
-    upload.contentType,
-    upload.byteSize,
-    SIGNED_URL_SECONDS,
-  )
-  return {
-    face: null,
-    upload: {
-      url,
-      headers: { 'content-type': upload.contentType },
-      expiresAt: new Date(Date.now() + SIGNED_URL_SECONDS * 1000).toISOString(),
-    },
-  }
+  const { url, expiresAt } = await signedUpload(storage, uploadedFontKey(workspaceId, upload.sha256), {
+    contentType: upload.contentType,
+    size: upload.byteSize,
+  })
+  return { face: null, upload: { url, headers: { 'content-type': upload.contentType }, expiresAt } }
 }
 
 /**
@@ -179,12 +156,7 @@ export async function recordFont(
     .from(fontFaces)
     .where(and(eq(fontFaces.workspaceId, workspaceId), eq(fontFaces.brandId, brandId), eq(fontFaces.sha256, sha256)))
   if (existing) return toFace(existing)
-  const refuse = async (message: string) => {
-    await storage.delete(key)
-    return new InvalidFont(message)
-  }
-  if (createHash('sha256').update(bytes).digest('hex') !== sha256)
-    throw await refuse('The uploaded bytes do not match their SHA-256')
+  const refuse = await checkUpload(storage, key, bytes, sha256, InvalidFont)
   const info = readFontInfo(bytes)
   if (!info) throw await refuse('The upload is not a TrueType or OpenType font')
   let preview: Uint8Array
@@ -211,7 +183,7 @@ export async function recordFont(
 }
 
 /** Puts a face in, taking the place of the one with the same family, weight and style in its scope. */
-async function replaceFace(db: Db, row: typeof fontFaces.$inferInsert) {
+export async function replaceFace(db: Db, row: typeof fontFaces.$inferInsert) {
   await db.transaction(async (tx) => {
     await tx
       .delete(fontFaces)
@@ -226,52 +198,4 @@ async function replaceFace(db: Db, row: typeof fontFaces.$inferInsert) {
       )
     await tx.insert(fontFaces).values(row)
   })
-}
-
-/**
- * Copies one Google Fonts family into our storage: every weight and style the catalog lists,
- * named as the catalog names it. Faces already copied with the same bytes are left as they are.
- * Returns how many faces were copied anew.
- */
-export async function importGoogleFamily(
-  db: Db,
-  storage: Storage,
-  entry: GoogleFamily,
-  get: typeof fetch = fetch,
-): Promise<number> {
-  const css = await get(googleCssUrl(entry))
-  if (!css.ok) throw new Error(`Google Fonts answered ${css.status} for ${entry.family}`)
-  const faces = googleFaces(await css.text())
-  if (faces.length === 0) throw new Error(`Google Fonts named no TrueType files for ${entry.family}`)
-  const have = await db
-    .select()
-    .from(fontFaces)
-    .where(and(eq(fontFaces.source, 'google'), eq(fontFaces.family, entry.family)))
-  let copied = 0
-  for (const face of faces) {
-    const file = await get(face.url)
-    if (!file.ok)
-      throw new Error(`Google Fonts answered ${file.status} for ${entry.family} ${face.weight} ${face.style}`)
-    const bytes = new Uint8Array(await file.arrayBuffer())
-    const sha256 = createHash('sha256').update(bytes).digest('hex')
-    if (have.some((row) => row.weight === face.weight && row.style === face.style && row.sha256 === sha256)) continue
-    const key = googleFontKey(sha256)
-    const preview = await fontPreview(bytes, { family: entry.family, ...face })
-    await storage.put(key, bytes, 'font/ttf')
-    await storage.put(previewKey(key), preview, 'image/png')
-    await replaceFace(db, {
-      id: randomUUID(),
-      workspaceId: null,
-      brandId: null,
-      source: 'google',
-      family: entry.family,
-      weight: face.weight,
-      style: face.style,
-      category: entry.category,
-      sha256,
-      byteSize: bytes.length,
-    })
-    copied++
-  }
-  return copied
 }

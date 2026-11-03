@@ -1,7 +1,7 @@
 // Uploaded images. Originals are stored once per workspace by content hash; every brand that uploads
 // the same bytes gets its own asset, so a brand never sees another brand's assets. Each brand names
 // and tags its own, and finds them by those (#52).
-import { createHash, randomUUID } from 'node:crypto'
+import { randomUUID } from 'node:crypto'
 
 import { and, desc, eq, isNull, type SQL, sql } from 'drizzle-orm'
 
@@ -17,17 +17,13 @@ import {
 } from '@dazbee/schema'
 import type { Storage } from '@dazbee/storage'
 
-import { storedDesign } from './design-thumbnails.ts'
+import { storedDesign } from './designs.ts'
 import { readImageHeader } from './images.ts'
+import { assetThumbnailKey, checkUpload, originalKey, signedUpload } from './storage-keys.ts'
 import { readSvgHeader } from './svg-assets.ts'
 import { makeThumbnail } from './thumbnails.ts'
 
-/** How long a signed upload or read URL works. */
-export const SIGNED_URL_SECONDS = 5 * 60
-
-export const originalKey = (workspaceId: string, sha256: string) => `workspaces/${workspaceId}/originals/${sha256}`
-/** The asset library's small copy of an original, made once and shared like the original (#52). */
-const thumbnailKey = (workspaceId: string, sha256: string) => `workspaces/${workspaceId}/thumbnails/${sha256}`
+export class InvalidUpload extends Error {}
 
 const summary = {
   id: assets.id,
@@ -199,7 +195,7 @@ export async function updateAsset(
  * asset recorded before thumbnails existed gets one the first time the library shows it.
  */
 export async function ensureThumbnail(storage: Storage, workspaceId: string, asset: AssetSummary): Promise<string> {
-  const key = thumbnailKey(workspaceId, asset.sha256)
+  const key = assetThumbnailKey(workspaceId, asset.sha256)
   if (await storage.exists(key)) return key
   const original = await storage.get(originalKey(workspaceId, asset.sha256))
   if (!original) throw new Error(`the original of asset ${asset.id} is missing from storage`)
@@ -226,8 +222,6 @@ export async function findAsset(
   return row ? toSummary(row) : null
 }
 
-export class InvalidUpload extends Error {}
-
 /**
  * Records the original stored under `sha256` as an asset of the brand, named `name`, after checking
  * the bytes hash to it, are an image CanvasKit decodes or an SVG file read as layers, and makes its thumbnail. Recording
@@ -246,16 +240,10 @@ export async function recordAsset(
   const key = originalKey(workspaceId, sha256)
   const bytes = await storage.get(key)
   if (!bytes) throw new InvalidUpload('Nothing was uploaded for that SHA-256')
-  // Bad bytes are deleted, so they never block a real upload of the same hash.
-  const refuse = async (message: string) => {
-    await storage.delete(key)
-    return new InvalidUpload(message)
-  }
-  if (createHash('sha256').update(bytes).digest('hex') !== sha256)
-    throw await refuse('The uploaded bytes do not match their SHA-256')
+  const refuse = await checkUpload(storage, key, bytes, sha256, InvalidUpload)
   const header = readImageHeader(bytes) ?? (await readSvgHeader(bytes))
   if (!header) throw await refuse('The upload is not a PNG, JPEG or WebP image, or an SVG file we can read')
-  const thumbnail = thumbnailKey(workspaceId, sha256)
+  const thumbnail = assetThumbnailKey(workspaceId, sha256)
   if (!(await storage.exists(thumbnail))) {
     let made: Awaited<ReturnType<typeof makeThumbnail>>
     try {
@@ -292,8 +280,10 @@ export async function startUpload(
       if (!(e instanceof InvalidUpload)) throw e
     }
   }
-  const expiresAt = new Date(Date.now() + SIGNED_URL_SECONDS * 1000).toISOString()
-  const url = await storage.signedPut(key, upload.contentType, upload.byteSize, SIGNED_URL_SECONDS)
+  const { url, expiresAt } = await signedUpload(storage, key, {
+    contentType: upload.contentType,
+    size: upload.byteSize,
+  })
   // Browsers set content-length from the body themselves; it is signed, so it must match byteSize.
   return { asset: null, upload: { url, headers: { 'content-type': upload.contentType }, expiresAt } }
 }
