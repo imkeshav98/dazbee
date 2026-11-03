@@ -1,3 +1,4 @@
+// Layers' outlines as CanvasKit paths: boxes, frames with their corners, shapes and booleans.
 import type { CanvasKit, Path } from '@dazbee/canvaskit'
 import { pathScale, type Rect } from '@dazbee/schema'
 
@@ -9,22 +10,8 @@ type BooleanLayer = Extract<SceneLayer, { type: 'boolean' }>
 /** A clip wider than any page, so clipping to it changes nothing. */
 export const EVERYWHERE = Float32Array.of(-1e6, -1e6, 1e6, 1e6)
 
-/** The outline a background blur fills: a shape's own path, otherwise the layer's box. */
-export function outlineOf(ck: CanvasKit, layer: SceneLayer): Path {
-  if (layer.type === 'graphic') return shapePath(ck, layer)
-  if (layer.type === 'boolean') return booleanPath(ck, layer)
-  if (layer.type === 'frame') return framePath(ck, layer.props)
-  return rectPath(ck, layer.props)
-}
-
 export const rectPath = (ck: CanvasKit, box: Rect) =>
   new ck.PathBuilder().addRect(ck.XYWHRect(box.x, box.y, box.width, box.height)).detachAndDelete()
-
-/** A box with one radius on every corner, no more than half its shorter side. */
-function evenRectPath(ck: CanvasKit, { x, y, width, height }: Rect, radius: number): Path {
-  const r = Math.min(radius, width / 2, height / 2)
-  return new ck.PathBuilder().addRRect(ck.RRectXY(ck.XYWHRect(x, y, width, height), r, r)).detachAndDelete()
-}
 
 /**
  * A frame's outline, its fills and its clip: its box with its corners. Each corner's own radius is
@@ -108,6 +95,57 @@ export function shapePath(ck: CanvasKit, layer: GraphicLayer): Path {
 }
 
 /**
+ * A boolean's outline: its shapes' outlines, each turned as it is drawn, combined in order. Lines
+ * enclose nothing, so they add nothing.
+ */
+export function booleanPath(ck: CanvasKit, layer: BooleanLayer): Path {
+  const op = {
+    union: ck.PathOp.Union,
+    subtract: ck.PathOp.Difference,
+    intersect: ck.PathOp.Intersect,
+    exclude: ck.PathOp.XOR,
+  }[layer.props.op]
+  let result: Path | null = null
+  for (const child of layer.children) {
+    if (child.type === 'graphic' && child.props.shape.kind === 'line') continue
+    if (child.type !== 'graphic' && child.type !== 'boolean') continue
+    const own = child.type === 'graphic' ? shapePath(ck, child) : booleanPath(ck, child)
+    const { x, y, width, height, rotation } = child.props
+    const builder = new ck.PathBuilder(own)
+    own.delete()
+    const outline = builder
+      .transform(ck.Matrix.rotated((rotation * Math.PI) / 180, x + width / 2, y + height / 2))
+      .detachAndDelete()
+    if (!result) {
+      result = outline
+      continue
+    }
+    // Path.makeCombined is typed but not bound in this build; the factory is.
+    const combined: Path | null = ck.Path.MakeFromOp(result, outline, op)
+    outline.delete()
+    if (combined) {
+      result.delete()
+      result = combined
+    }
+  }
+  return result ?? new ck.PathBuilder().detachAndDelete()
+}
+
+/** The outline a background blur fills: a shape's own path, otherwise the layer's box. */
+export function outlineOf(ck: CanvasKit, layer: SceneLayer): Path {
+  if (layer.type === 'graphic') return shapePath(ck, layer)
+  if (layer.type === 'boolean') return booleanPath(ck, layer)
+  if (layer.type === 'frame') return framePath(ck, layer.props)
+  return rectPath(ck, layer.props)
+}
+
+/** A box with one radius on every corner, no more than half its shorter side. */
+function evenRectPath(ck: CanvasKit, { x, y, width, height }: Rect, radius: number): Path {
+  const r = Math.min(radius, width / 2, height / 2)
+  return new ck.PathBuilder().addRRect(ck.RRectXY(ck.XYWHRect(x, y, width, height), r, r)).detachAndDelete()
+}
+
+/**
  * `count` corners evenly round a circle, the first at the top, each at `scale(i)` of the way out
  * from the centre (a regular polygon, or a star's outer and inner corners), then stretched so
  * they fill the box: a triangle's base sits on the box's bottom edge, as in other design tools.
@@ -149,41 +187,4 @@ function roundedPolygon(ck: CanvasKit, points: [number, number][], radius: numbe
   }
   builder.close()
   return builder.detachAndDelete()
-}
-
-/**
- * A boolean's outline: its shapes' outlines, each turned as it is drawn, combined in order. Lines
- * enclose nothing, so they add nothing.
- */
-export function booleanPath(ck: CanvasKit, layer: BooleanLayer): Path {
-  const op = {
-    union: ck.PathOp.Union,
-    subtract: ck.PathOp.Difference,
-    intersect: ck.PathOp.Intersect,
-    exclude: ck.PathOp.XOR,
-  }[layer.props.op]
-  let result: Path | null = null
-  for (const child of layer.children) {
-    if (child.type === 'graphic' && child.props.shape.kind === 'line') continue
-    if (child.type !== 'graphic' && child.type !== 'boolean') continue
-    const own = child.type === 'graphic' ? shapePath(ck, child) : booleanPath(ck, child)
-    const { x, y, width, height, rotation } = child.props
-    const builder = new ck.PathBuilder(own)
-    own.delete()
-    const outline = builder
-      .transform(ck.Matrix.rotated((rotation * Math.PI) / 180, x + width / 2, y + height / 2))
-      .detachAndDelete()
-    if (!result) {
-      result = outline
-      continue
-    }
-    // Path.makeCombined is typed but not bound in this build; the factory is.
-    const combined: Path | null = ck.Path.MakeFromOp(result, outline, op)
-    outline.delete()
-    if (combined) {
-      result.delete()
-      result = combined
-    }
-  }
-  return result ?? new ck.PathBuilder().detachAndDelete()
 }

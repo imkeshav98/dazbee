@@ -1,8 +1,15 @@
+// Where the caret goes and what a selection covers in laid-out text, from the graphemes' boxes.
 import type { CanvasKit, Paragraph } from '@dazbee/canvaskit'
 
 import type { TextBlock, TextLayout } from './layout.ts'
 
-const graphemeSegmenter = new Intl.Segmenter(undefined, { granularity: 'grapheme' })
+export interface SelectionBox {
+  x: number
+  y: number
+  width: number
+  height: number
+  rtl: boolean
+}
 
 interface GraphemeBox extends SelectionBox {
   start: number
@@ -10,29 +17,10 @@ interface GraphemeBox extends SelectionBox {
   line: number
 }
 
+const graphemeSegmenter = new Intl.Segmenter(undefined, { granularity: 'grapheme' })
+
 /** Every grapheme's box, in its block, measured once per paragraph: a drag asks for the caret every frame. */
 const graphemeBoxes = new WeakMap<Paragraph, GraphemeBox[]>()
-
-function boxesOf(ck: CanvasKit, block: TextBlock): GraphemeBox[] {
-  const { paragraph, text } = block
-  let boxes = graphemeBoxes.get(paragraph)
-  if (!boxes) {
-    // getLineNumberAt answers 0 for every offset in CanvasKit 0.42, so lines come from their metrics.
-    const lines = paragraph.getLineMetrics()
-    boxes = [...graphemeSegmenter.segment(text)].flatMap((g) => {
-      const end = g.index + g.segment.length
-      const line = lines.find((l) => g.index >= l.startIndex && g.index < l.endIndex)?.lineNumber ?? -1
-      return rectsOf(ck, paragraph, g.index, end).map((box) => ({ ...box, start: g.index, end, line }))
-    })
-    graphemeBoxes.set(paragraph, boxes)
-  }
-  return boxes
-}
-
-/** The block an offset is in: the one whose text or end holds it, else (cut off by maxLines) the last. */
-function blockOf(laid: TextLayout, offset: number): TextBlock | undefined {
-  return laid.blocks.find((b) => offset >= b.start && offset <= b.end) ?? laid.blocks.at(-1)
-}
 
 /**
  * The text offset a click lands on, in the layout's own coordinates (before `dy`): the paragraph
@@ -95,12 +83,35 @@ export function caretPosition(
   return at(x, 0, block.height)
 }
 
-export interface SelectionBox {
-  x: number
-  y: number
-  width: number
-  height: number
-  rtl: boolean
+/** The boxes that highlight a text range, in the layout's own coordinates: one per run of one direction on one line. */
+export function selectionBoxes(ck: CanvasKit, laid: TextLayout, start: number, end: number): SelectionBox[] {
+  return laid.blocks.flatMap((b) => {
+    const from = Math.max(start, b.start) - b.start
+    const to = Math.min(end, b.end) - b.start
+    if (to <= from) return []
+    return rectsOf(ck, b.paragraph, from, to).map((r) => ({ ...r, x: r.x + b.x, y: r.y + b.y }))
+  })
+}
+
+function boxesOf(ck: CanvasKit, block: TextBlock): GraphemeBox[] {
+  const { paragraph, text } = block
+  let boxes = graphemeBoxes.get(paragraph)
+  if (!boxes) {
+    // getLineNumberAt answers 0 for every offset in CanvasKit 0.42, so lines come from their metrics.
+    const lines = paragraph.getLineMetrics()
+    boxes = [...graphemeSegmenter.segment(text)].flatMap((g) => {
+      const end = g.index + g.segment.length
+      const line = lines.find((l) => g.index >= l.startIndex && g.index < l.endIndex)?.lineNumber ?? -1
+      return rectsOf(ck, paragraph, g.index, end).map((box) => ({ ...box, start: g.index, end, line }))
+    })
+    graphemeBoxes.set(paragraph, boxes)
+  }
+  return boxes
+}
+
+/** The block an offset is in: the one whose text or end holds it, else (cut off by maxLines) the last. */
+function blockOf(laid: TextLayout, offset: number): TextBlock | undefined {
+  return laid.blocks.find((b) => offset >= b.start && offset <= b.end) ?? laid.blocks.at(-1)
 }
 
 function rectsOf(ck: CanvasKit, paragraph: Paragraph, start: number, end: number): SelectionBox[] {
@@ -113,14 +124,4 @@ function rectsOf(ck: CanvasKit, paragraph: Paragraph, start: number, end: number
       height: (rect[3] ?? 0) - (rect[1] ?? 0),
       rtl: dir.value === ck.TextDirection.RTL.value,
     }))
-}
-
-/** The boxes that highlight a text range, in the layout's own coordinates: one per run of one direction on one line. */
-export function selectionBoxes(ck: CanvasKit, laid: TextLayout, start: number, end: number): SelectionBox[] {
-  return laid.blocks.flatMap((b) => {
-    const from = Math.max(start, b.start) - b.start
-    const to = Math.min(end, b.end) - b.start
-    if (to <= from) return []
-    return rectsOf(ck, b.paragraph, from, to).map((r) => ({ ...r, x: r.x + b.x, y: r.y + b.y }))
-  })
 }

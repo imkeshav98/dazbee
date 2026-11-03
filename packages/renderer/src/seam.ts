@@ -15,82 +15,12 @@ export interface Rendered {
   png: Uint8Array
 }
 
-/**
- * Builds the scene and hands it to `draw` with the cache's resources, or with ones made for this
- * draw and freed after it. A long-lived process passes one cache to every render so fonts and
- * images are decoded once. Auto layout measures text with the same fonts the draw uses (#46).
- */
-function withScene<T>(
-  ck: CanvasKit,
-  json: unknown,
-  pageId: string,
-  formatId: string,
-  bytes: ResourceBytes,
-  cache: ResourceCache | undefined,
-  draw: (scene: Scene, resources: Resources) => T,
-): T {
-  const parsed = parseDesign(json)
-  if (!parsed.success) throw new Error(`invalid design:\n${parsed.errors.join('\n')}`)
-  const owned = cache ?? resourceCache(ck)
-  try {
-    const resources = owned.resources(bytes)
-    const scene = render(parsed.design, pageId, formatId, undefined, textMeasure(ck, resources), bytes.variables)
-    return draw(scene, resources)
-  } finally {
-    if (!cache) owned.delete()
-  }
-}
-
-function drawOn(
-  ck: CanvasKit,
-  surface: Surface,
-  json: unknown,
-  pageId: string,
-  formatId: string,
-  bytes: ResourceBytes,
-  cache?: ResourceCache,
-): Scene {
-  return withScene(ck, json, pageId, formatId, bytes, cache, (scene, resources) => {
-    drawScene(ck, surface.getCanvas(), scene, resources)
-    surface.flush()
-    return scene
-  })
-}
-
-/**
- * Draws one page in one format onto a surface the caller owns, such as the editor's WebGL
- * surface. Returns the page size.
- */
-export function drawDesign(
-  ck: CanvasKit,
-  surface: Surface,
-  json: unknown,
-  pageId: string,
-  formatId: string,
-  bytes: ResourceBytes,
-  cache?: ResourceCache,
-): { width: number; height: number } {
-  const scene = drawOn(ck, surface, json, pageId, formatId, bytes, cache)
-  return { width: scene.width, height: scene.height }
-}
-
-/** Reads a surface back as unpremultiplied RGBA and a PNG. */
-function readSurface(ck: CanvasKit, surface: Surface, width: number, height: number): Rendered {
-  const image = surface.makeImageSnapshot()
-  try {
-    const pixels = image.readPixels(0, 0, {
-      width,
-      height,
-      colorType: ck.ColorType.RGBA_8888,
-      alphaType: ck.AlphaType.Unpremul,
-      colorSpace: ck.ColorSpace.SRGB,
-    })
-    const png = image.encodeToBytes()
-    if (!(pixels instanceof Uint8Array) || !png) throw new Error('CanvasKit could not read back the rendered pixels')
-    return { width, height, pixels, png }
-  } finally {
-    image.delete()
-  }
+/** What a PDF says about itself. */
+export interface VectorOptions {
+  /** The PDF's title, such as the design's name. */
+  title?: string
+  /** The language of its text, such as `en` or `ar`. */
+  lang?: string
 }
 
 /**
@@ -118,14 +48,6 @@ export function renderDesign(
     // delete() alone keeps the w×h×4 pixel buffer in wasm memory; dispose() frees both.
     surface.dispose()
   }
-}
-
-/** What a PDF says about itself. */
-export interface VectorOptions {
-  /** The PDF's title, such as the design's name. */
-  title?: string
-  /** The language of its text, such as `en` or `ar`. */
-  lang?: string
 }
 
 /**
@@ -181,6 +103,84 @@ export function renderVector(
       svg.delete()
     }
   })
+}
+
+/**
+ * Draws one page in one format onto a surface the caller owns, such as the editor's WebGL
+ * surface. Returns the page size.
+ */
+export function drawDesign(
+  ck: CanvasKit,
+  surface: Surface,
+  json: unknown,
+  pageId: string,
+  formatId: string,
+  bytes: ResourceBytes,
+  cache?: ResourceCache,
+): { width: number; height: number } {
+  const scene = drawOn(ck, surface, json, pageId, formatId, bytes, cache)
+  return { width: scene.width, height: scene.height }
+}
+
+function drawOn(
+  ck: CanvasKit,
+  surface: Surface,
+  json: unknown,
+  pageId: string,
+  formatId: string,
+  bytes: ResourceBytes,
+  cache?: ResourceCache,
+): Scene {
+  return withScene(ck, json, pageId, formatId, bytes, cache, (scene, resources) => {
+    drawScene(ck, surface.getCanvas(), scene, resources)
+    surface.flush()
+    return scene
+  })
+}
+
+/** Reads a surface back as unpremultiplied RGBA and a PNG. */
+function readSurface(ck: CanvasKit, surface: Surface, width: number, height: number): Rendered {
+  const image = surface.makeImageSnapshot()
+  try {
+    const pixels = image.readPixels(0, 0, {
+      width,
+      height,
+      colorType: ck.ColorType.RGBA_8888,
+      alphaType: ck.AlphaType.Unpremul,
+      colorSpace: ck.ColorSpace.SRGB,
+    })
+    const png = image.encodeToBytes()
+    if (!(pixels instanceof Uint8Array) || !png) throw new Error('CanvasKit could not read back the rendered pixels')
+    return { width, height, pixels, png }
+  } finally {
+    image.delete()
+  }
+}
+
+/**
+ * Builds the scene and hands it to `draw` with the cache's resources, or with ones made for this
+ * draw and freed after it. A long-lived process passes one cache to every render so fonts and
+ * images are decoded once. Auto layout measures text with the same fonts the draw uses (#46).
+ */
+function withScene<T>(
+  ck: CanvasKit,
+  json: unknown,
+  pageId: string,
+  formatId: string,
+  bytes: ResourceBytes,
+  cache: ResourceCache | undefined,
+  draw: (scene: Scene, resources: Resources) => T,
+): T {
+  const parsed = parseDesign(json)
+  if (!parsed.success) throw new Error(`invalid design:\n${parsed.errors.join('\n')}`)
+  const owned = cache ?? resourceCache(ck)
+  try {
+    const resources = owned.resources(bytes)
+    const scene = render(parsed.design, pageId, formatId, undefined, textMeasure(ck, resources), bytes.variables)
+    return draw(scene, resources)
+  } finally {
+    if (!cache) owned.delete()
+  }
 }
 
 /**

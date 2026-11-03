@@ -28,6 +28,8 @@ export interface ResourceBytes {
   variables?: Variables
 }
 
+export type ResourceCache = ReturnType<typeof resourceCache>
+
 /** Registers fonts and decodes images with CanvasKit itself, so every runtime reads the same bytes the same way. */
 export function makeResources(ck: CanvasKit, bytes: ResourceBytes): Resources & { delete(): void } {
   const cache = resourceCache(ck)
@@ -46,11 +48,18 @@ export function makeResources(ck: CanvasKit, bytes: ResourceBytes): Resources & 
  * come as a new array. Resources from an earlier call stay usable only until the next one.
  */
 export function resourceCache(ck: CanvasKit) {
+  // Decoded images by asset id, each with the bytes it was decoded from.
   const images = new Map<string, { bytes: Uint8Array; image: Image }>()
+  // The registered fonts, with the list they were registered from.
   let fonts: { list: ResourceBytes['fonts']; provider: TypefaceFontProvider; collection: FontCollection } | undefined
 
-  const sameFonts = (a: ResourceBytes['fonts'], b: ResourceBytes['fonts']) =>
-    a.length === b.length && a.every((f, i) => f.family === b[i]?.family && f.bytes === b[i]?.bytes)
+  function resources(bytes: ResourceBytes): Resources {
+    return {
+      fonts: fontsFor(bytes.fonts),
+      fallbackFamilies: [...bytes.fallbackFamilies],
+      images: imagesFor(bytes.images),
+    }
+  }
 
   function fontsFor(list: ResourceBytes['fonts']) {
     if (fonts && sameFonts(fonts.list, list)) return fonts.collection
@@ -86,19 +95,15 @@ export function resourceCache(ck: CanvasKit) {
     return new Map([...images].map(([id, { image }]) => [id, image]))
   }
 
-  return {
-    resources(bytes: ResourceBytes): Resources {
-      return {
-        fonts: fontsFor(bytes.fonts),
-        fallbackFamilies: [...bytes.fallbackFamilies],
-        images: imagesFor(bytes.images),
-      }
-    },
-    delete() {
-      for (const { image } of images.values()) image.delete()
-      images.clear()
-      freeFonts()
-    },
+  function destroy() {
+    for (const { image } of images.values()) image.delete()
+    images.clear()
+    freeFonts()
   }
+
+  return { resources, delete: destroy }
 }
-export type ResourceCache = ReturnType<typeof resourceCache>
+
+function sameFonts(a: ResourceBytes['fonts'], b: ResourceBytes['fonts']) {
+  return a.length === b.length && a.every((f, i) => f.family === b[i]?.family && f.bytes === b[i]?.bytes)
+}

@@ -8,10 +8,10 @@ import { laidOut } from '../text/layout.ts'
 import { LUMA_TO_ALPHA } from './adjust.ts'
 import { fillPath } from './paint.ts'
 import { booleanPath, EVERYWHERE, framePath, outlineOf, rectPath, shapePath } from './paths.ts'
-import { drawnBounds, rotated, sigma, withEffects } from './reach.ts'
+import { layerReach, sigma, unturnedReach } from './reach.ts'
 import { drawShape, strokePath } from './strokes.ts'
 
-export type TextLayer = Extract<SceneLayer, { type: 'text' }>
+type TextLayer = Extract<SceneLayer, { type: 'text' }>
 
 /**
  * Draws a scene. The one drawing path for every surface: the same calls run on the CPU surface for
@@ -31,24 +31,6 @@ export function drawPage(ck: CanvasKit, canvas: Canvas, scene: Scene, resources:
   canvas.clipRect(ck.XYWHRect(0, 0, scene.width, scene.height), ck.ClipOp.Intersect, true)
   drawPageContent(ck, canvas, scene, resources)
   canvas.restore()
-}
-
-function drawPageContent(ck: CanvasKit, canvas: Canvas, scene: Scene, resources: Resources) {
-  const page = { x: 0, y: 0, width: scene.width, height: scene.height }
-  const pagePath = rectPath(ck, page)
-  for (const fill of scene.fills) fillPath(ck, canvas, pagePath, fill, page, resources)
-  pagePath.delete()
-  const { layers } = resources
-  drawLayers(
-    ck,
-    canvas,
-    scene.layers,
-    resources,
-    layers
-      ? (layer) =>
-          canvas.drawPicture(layers.picture(ck, layer, resources, (into) => drawLayer(ck, into, layer, resources)))
-      : (layer) => drawLayer(ck, canvas, layer, resources),
-  )
 }
 
 /**
@@ -74,11 +56,7 @@ export function drawLayers(
     i = end - 1
     if (masked.length === 0) continue
     // Nothing shows outside what the mask draws, so the offscreen layers need be no bigger.
-    const reach = rotated(
-      withEffects(drawnBounds(ck, mask, resources), mask.props.effects),
-      mask.props,
-      mask.props.rotation,
-    )
+    const reach = layerReach(ck, mask, resources)
     const bounds = ck.XYWHRect(reach.x - 1, reach.y - 1, reach.width + 2, reach.height + 2)
     canvas.saveLayer(undefined, bounds)
     for (const layer of masked) draw(layer)
@@ -98,6 +76,24 @@ export function drawLayers(
     canvas.restore()
     canvas.restore()
   }
+}
+
+function drawPageContent(ck: CanvasKit, canvas: Canvas, scene: Scene, resources: Resources) {
+  const page = { x: 0, y: 0, width: scene.width, height: scene.height }
+  const pagePath = rectPath(ck, page)
+  for (const fill of scene.fills) fillPath(ck, canvas, pagePath, fill, page, resources)
+  pagePath.delete()
+  const { layers } = resources
+  drawLayers(
+    ck,
+    canvas,
+    scene.layers,
+    resources,
+    layers
+      ? (layer) =>
+          canvas.drawPicture(layers.picture(ck, layer, resources, (into) => drawLayer(ck, into, layer, resources)))
+      : (layer) => drawLayer(ck, canvas, layer, resources),
+  )
 }
 
 function drawLayer(ck: CanvasKit, canvas: Canvas, layer: SceneLayer, resources: Resources) {
@@ -121,7 +117,7 @@ function drawLayer(ck: CanvasKit, canvas: Canvas, layer: SceneLayer, resources: 
     // An offscreen layer only as big as what the layer draws, effects included; a page-sized one
     // for every translucent layer made the 300-layer stress fixture take 15 s (#18).
     // One pixel more for anti-aliased edges.
-    const reach = withEffects(drawnBounds(ck, layer, resources), props.effects)
+    const reach = unturnedReach(ck, layer, resources)
     const bounds = ck.XYWHRect(reach.x - 1, reach.y - 1, reach.width + 2, reach.height + 2)
     const layerPaint = new ck.Paint()
     layerPaint.setAlphaf(props.opacity)
@@ -212,6 +208,30 @@ function drawContent(ck: CanvasKit, canvas: Canvas, layer: SceneLayer, resources
   }
 }
 
+function blendMode(ck: CanvasKit, mode: SceneLayer['props']['blendMode']) {
+  const b = ck.BlendMode
+  return {
+    normal: b.SrcOver,
+    multiply: b.Multiply,
+    screen: b.Screen,
+    overlay: b.Overlay,
+    darken: b.Darken,
+    lighten: b.Lighten,
+    'color-dodge': b.ColorDodge,
+    'color-burn': b.ColorBurn,
+    'hard-light': b.HardLight,
+    'soft-light': b.SoftLight,
+    difference: b.Difference,
+    exclusion: b.Exclusion,
+    hue: b.Hue,
+    saturation: b.Saturation,
+    color: b.Color,
+    luminosity: b.Luminosity,
+    // Only reached when a pass-through group needs its own layer for opacity or effects.
+    'pass-through': b.SrcOver,
+  }[mode]
+}
+
 function withFilter(ck: CanvasKit, canvas: Canvas, filter: ImageFilter, bounds: Float32Array | null, draw: () => void) {
   const paint = new ck.Paint()
   paint.setImageFilter(filter)
@@ -281,28 +301,4 @@ function drawAsShapes(ck: CanvasKit, canvas: Canvas, draw: (into: Canvas) => voi
   recorder.delete()
   ck.DrawTextAsPaths(canvas, picture)
   picture.delete()
-}
-
-function blendMode(ck: CanvasKit, mode: SceneLayer['props']['blendMode']) {
-  const b = ck.BlendMode
-  return {
-    normal: b.SrcOver,
-    multiply: b.Multiply,
-    screen: b.Screen,
-    overlay: b.Overlay,
-    darken: b.Darken,
-    lighten: b.Lighten,
-    'color-dodge': b.ColorDodge,
-    'color-burn': b.ColorBurn,
-    'hard-light': b.HardLight,
-    'soft-light': b.SoftLight,
-    difference: b.Difference,
-    exclusion: b.Exclusion,
-    hue: b.Hue,
-    saturation: b.Saturation,
-    color: b.Color,
-    luminosity: b.Luminosity,
-    // Only reached when a pass-through group needs its own layer for opacity or effects.
-    'pass-through': b.SrcOver,
-  }[mode]
 }

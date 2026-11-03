@@ -1,34 +1,17 @@
+// How far a layer draws past its box (its strokes, text, children, shadows and blur), so the
+// offscreen layer it is drawn into need be no bigger.
 import type { CanvasKit } from '@dazbee/canvaskit'
-import type { Effect, Rect } from '@dazbee/schema'
+import type { Effect, Rect, TextProps } from '@dazbee/schema'
 
 import type { Resources } from '../resources.ts'
 import type { SceneLayer } from '../scene.ts'
 import { laidOut } from '../text/layout.ts'
-import type { TextLayer } from './draw.ts'
 import { booleanPath, shapePath } from './paths.ts'
 import { strokeReach } from './strokes.ts'
 
 /** Blur radii in the schema are twice the Gaussian sigma, as in CSS box-shadow and design tools. */
 export const sigma = (radius: number) => radius / 2
 
-/** Everything a layer draws, shadows and blur included, in its parent's coordinates. */
-export function layerReach(ck: CanvasKit, layer: SceneLayer, resources: Resources): Rect {
-  return rotated(withEffects(drawnBounds(ck, layer, resources), layer.props.effects), layer.props, layer.props.rotation)
-}
-
-/** A Gaussian blur's visible reach, in sigmas. */
-const BLUR_REACH = 3
-
-const union = (a: Rect, b: Rect): Rect => {
-  const x = Math.min(a.x, b.x)
-  const y = Math.min(a.y, b.y)
-  return {
-    x,
-    y,
-    width: Math.max(a.x + a.width, b.x + b.width) - x,
-    height: Math.max(a.y + a.height, b.y + b.height) - y,
-  }
-}
 export const outset = (box: Rect, by: number): Rect => ({
   x: box.x - by,
   y: box.y - by,
@@ -36,8 +19,21 @@ export const outset = (box: Rect, by: number): Rect => ({
   height: box.height + 2 * by,
 })
 
+/** A Gaussian blur's visible reach, in sigmas. */
+const BLUR_REACH = 3
+
+/** Everything a layer draws, shadows and blur included, in its parent's coordinates. */
+export function layerReach(ck: CanvasKit, layer: SceneLayer, resources: Resources): Rect {
+  return rotated(unturnedReach(ck, layer, resources), layer.props, layer.props.rotation)
+}
+
+/** Everything a layer draws, shadows and blur included, in its own unturned coordinates. */
+export function unturnedReach(ck: CanvasKit, layer: SceneLayer, resources: Resources): Rect {
+  return withEffects(drawnBounds(ck, layer, resources), layer.props.effects)
+}
+
 /** The box after turning it about its own centre, as the axis-aligned box around the result. */
-export function rotated(box: Rect, about: Rect, degrees: number): Rect {
+function rotated(box: Rect, about: Rect, degrees: number): Rect {
   if (degrees === 0) return box
   const a = (degrees * Math.PI) / 180
   const cx = about.x + about.width / 2
@@ -61,8 +57,30 @@ export function rotated(box: Rect, about: Rect, degrees: number): Rect {
   }
 }
 
+/** Grows a layer's drawn bounds by how far its shadows and blur reach. */
+function withEffects(box: Rect, effects: readonly Effect[]): Rect {
+  let reach = box
+  for (const effect of effects) {
+    if (effect.type === 'dropShadow' || effect.type === 'glow') {
+      const shadow = outset(box, BLUR_REACH * sigma(effect.blur) + Math.max(0, effect.spread))
+      const { x = 0, y = 0 } = effect.type === 'dropShadow' ? effect : {}
+      reach = union(reach, { ...shadow, x: shadow.x + x, y: shadow.y + y })
+    } else if (effect.type === 'innerShadow') {
+      // Drawn only inside the layer, but made from what lies around it: the offscreen holds that
+      // much of the outside, so the edges of the offscreen never show as edges of the layer.
+      reach = union(
+        reach,
+        outset(box, Math.max(Math.abs(effect.x), Math.abs(effect.y)) + BLUR_REACH * sigma(effect.blur) + effect.spread),
+      )
+    } else if (effect.type === 'layerBlur') {
+      reach = outset(reach, BLUR_REACH * sigma(effect.radius))
+    }
+  }
+  return reach
+}
+
 /** What a layer's content can touch, in its own unrotated coordinates. */
-export function drawnBounds(ck: CanvasKit, layer: SceneLayer, resources: Resources): Rect {
+function drawnBounds(ck: CanvasKit, layer: SceneLayer, resources: Resources): Rect {
   switch (layer.type) {
     case 'graphic':
     case 'boolean': {
@@ -76,7 +94,7 @@ export function drawnBounds(ck: CanvasKit, layer: SceneLayer, resources: Resourc
       )
     }
     case 'text':
-      return textBounds(ck, layer, resources)
+      return textBounds(ck, layer.props, resources)
     case 'frame': {
       const own = outset(layer.props, strokeReach(layer.props.strokes, false))
       return layer.props.clip ? own : childrenBounds(ck, layer, resources, own)
@@ -86,16 +104,15 @@ export function drawnBounds(ck: CanvasKit, layer: SceneLayer, resources: Resourc
   }
 }
 
-/** A container's own box grown by everything its children draw, each turned as it is drawn. */
-function childrenBounds(ck: CanvasKit, layer: SceneLayer, resources: Resources, own: Rect): Rect {
-  let box = own
-  for (const child of layer.children) {
-    box = union(
-      box,
-      rotated(withEffects(drawnBounds(ck, child, resources), child.props.effects), child.props, child.props.rotation),
-    )
+function union(a: Rect, b: Rect): Rect {
+  const x = Math.min(a.x, b.x)
+  const y = Math.min(a.y, b.y)
+  return {
+    x,
+    y,
+    width: Math.max(a.x + a.width, b.x + b.width) - x,
+    height: Math.max(a.y + a.height, b.y + b.height) - y,
   }
-  return box
 }
 
 /**
@@ -104,8 +121,7 @@ function childrenBounds(ck: CanvasKit, layer: SceneLayer, resources: Resources, 
  * ascent, descent and advance (marks, swashes, wide letters), so each side gets half the largest
  * font size more.
  */
-function textBounds(ck: CanvasKit, layer: TextLayer, resources: Resources): Rect {
-  const { props } = layer
+function textBounds(ck: CanvasKit, props: TextProps, resources: Resources): Rect {
   const { blocks, dy, scale, done } = laidOut(ck, props, resources)
   let box: Rect = props
   for (const b of blocks) {
@@ -133,24 +149,11 @@ function textBounds(ck: CanvasKit, layer: TextLayer, resources: Resources): Rect
   return outset(box, largest / 2 + outline / 2)
 }
 
-/** Grows a layer's drawn bounds by how far its shadows and blur reach. */
-export function withEffects(box: Rect, effects: readonly Effect[]): Rect {
-  let reach = box
-  for (const effect of effects) {
-    if (effect.type === 'dropShadow' || effect.type === 'glow') {
-      const shadow = outset(box, BLUR_REACH * sigma(effect.blur) + Math.max(0, effect.spread))
-      const { x = 0, y = 0 } = effect.type === 'dropShadow' ? effect : {}
-      reach = union(reach, { ...shadow, x: shadow.x + x, y: shadow.y + y })
-    } else if (effect.type === 'innerShadow') {
-      // Drawn only inside the layer, but made from what lies around it: the offscreen holds that
-      // much of the outside, so the edges of the offscreen never show as edges of the layer.
-      reach = union(
-        reach,
-        outset(box, Math.max(Math.abs(effect.x), Math.abs(effect.y)) + BLUR_REACH * sigma(effect.blur) + effect.spread),
-      )
-    } else if (effect.type === 'layerBlur') {
-      reach = outset(reach, BLUR_REACH * sigma(effect.radius))
-    }
+/** A container's own box grown by everything its children draw, each turned as it is drawn. */
+function childrenBounds(ck: CanvasKit, layer: SceneLayer, resources: Resources, own: Rect): Rect {
+  let box = own
+  for (const child of layer.children) {
+    box = union(box, layerReach(ck, child, resources))
   }
-  return reach
+  return box
 }

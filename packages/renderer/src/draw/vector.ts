@@ -64,85 +64,14 @@ export function drawVectorPage(
   canvas.restore()
 }
 
-/** A parent's layers cut into what draws on its own: a layer, or a mask with the layers it masks. */
-function maskUnits(layers: readonly SceneLayer[]): SceneLayer[][] {
-  const units: SceneLayer[][] = []
-  for (const layer of layers) {
-    const last = units.at(-1)
-    if (last?.[0]?.props.mask && !layer.props.mask) last.push(layer)
-    else units.push([layer])
-  }
-  return units
-}
-
-function drawUnit(
-  ck: CanvasKit,
-  canvas: Canvas,
-  unit: SceneLayer[],
-  target: VectorTarget,
-  vector: Resources,
-  raster: Resources,
-  scale: number,
-) {
-  const [first] = unit
-  if (!first) return
-  if (target === 'pdf' || unit.every((layer) => svgSafe(layer))) {
-    drawLayers(ck, canvas, unit, vector)
-    return
-  }
-  if (unit.length === 1 && plainContainer(first)) {
-    drawContainer(ck, canvas, first, vector, raster, scale)
-    return
-  }
-  drawImage(ck, canvas, unitReach(ck, unit, raster), scale, (into) => drawLayers(ck, into, unit, raster))
-}
-
 /**
- * A group or frame drawn by its children alone, as drawLayer would without an offscreen layer,
- * so each child that SVG can hold stays vectors.
+ * Whether a paint is one Skia's SVG writer draws as it is: solid colours, and linear and radial
+ * gradients at their own full opacity. It has no angular gradient, and places image fills wrongly
+ * once they are scaled. A hidden paint draws nothing, which SVG holds too.
  */
-function drawContainer(
-  ck: CanvasKit,
-  canvas: Canvas,
-  layer: SceneLayer,
-  vector: Resources,
-  raster: Resources,
-  scale: number,
-) {
-  const { props } = layer
-  canvas.save()
-  if (props.rotation !== 0) canvas.rotate(props.rotation, props.x + props.width / 2, props.y + props.height / 2)
-  if (layer.type === 'frame') {
-    const path = framePath(ck, layer.props)
-    const fills = layer.props.fills
-    if (fills.every(svgPaint)) for (const fill of fills) fillPath(ck, canvas, path, fill, props, vector)
-    else
-      drawImage(ck, canvas, props, scale, (into) => {
-        for (const fill of fills) fillPath(ck, into, path, fill, props, raster)
-      })
-    canvas.save()
-    if (layer.props.clip) canvas.clipPath(path, ck.ClipOp.Intersect, true)
-    for (const unit of maskUnits(layer.children)) drawUnit(ck, canvas, unit, 'svg', vector, raster, scale)
-    canvas.restore()
-    // The strokes over what is inside, outside the clip, as drawContent draws them. The canvas is
-    // turned already, so a picture of them covers the frame's own box and their reach.
-    const { strokes } = layer.props
-    if (strokes.every((s) => svgPaint(s.paint))) strokePath(ck, canvas, path, layer.props, vector, null)
-    else
-      drawImage(ck, canvas, outset(layer.props, strokeReach(strokes, false)), scale, (into) =>
-        strokePath(ck, into, path, layer.props, raster, null),
-      )
-    path.delete()
-  } else {
-    for (const unit of maskUnits(layer.children)) drawUnit(ck, canvas, unit, 'svg', vector, raster, scale)
-  }
-  canvas.restore()
-}
-
-/** Everything a unit draws: its first layer's reach, which for a mask is all that shows. */
-function unitReach(ck: CanvasKit, unit: SceneLayer[], resources: Resources): Rect {
-  const [first] = unit
-  return first ? layerReach(ck, first, resources) : { x: 0, y: 0, width: 0, height: 0 }
+function svgPaint(paint: Paint): boolean {
+  if (paint.visible === false || paint.type === 'solid') return true
+  return (paint.type === 'linear' || paint.type === 'radial') && (paint.opacity ?? 1) === 1
 }
 
 /**
@@ -193,26 +122,51 @@ function drawImage(
   }
 }
 
-/**
- * Whether a paint is one Skia's SVG writer draws as it is: solid colours, and linear and radial
- * gradients at their own full opacity. It has no angular gradient, and places image fills wrongly
- * once they are scaled. A hidden paint draws nothing, which SVG holds too.
- */
-function svgPaint(paint: Paint): boolean {
-  if (paint.visible === false || paint.type === 'solid') return true
-  return (paint.type === 'linear' || paint.type === 'radial') && (paint.opacity ?? 1) === 1
+/** A parent's layers cut into what draws on its own: a layer, or a mask with the layers it masks. */
+function maskUnits(layers: readonly SceneLayer[]): SceneLayer[][] {
+  const units: SceneLayer[][] = []
+  for (const layer of layers) {
+    const last = units.at(-1)
+    if (last?.[0]?.props.mask && !layer.props.mask) last.push(layer)
+    else units.push([layer])
+  }
+  return units
 }
 
-/** A group or frame whose own drawing adds nothing an offscreen layer would change. */
-function plainContainer(layer: SceneLayer): boolean {
+/** Whether a layer, or one inside it, mixes with what is behind it in a way the file can't. */
+function readsBackdrop(layer: SceneLayer, target: VectorTarget): boolean {
   const { props } = layer
-  return (
-    (layer.type === 'group' || layer.type === 'frame') &&
-    props.opacity === 1 &&
-    props.effects.length === 0 &&
-    (props.blendMode === 'normal' || props.blendMode === 'pass-through') &&
-    !props.mask
-  )
+  if (props.effects.some((e) => e.type === 'backgroundBlur' && e.radius > 0)) return true
+  if (target === 'svg' && props.blendMode !== 'normal' && props.blendMode !== 'pass-through') return true
+  return layer.children.some((child) => readsBackdrop(child, target))
+}
+
+/** Everything a unit draws: its first layer's reach, which for a mask is all that shows. */
+function unitReach(ck: CanvasKit, unit: SceneLayer[], resources: Resources): Rect {
+  const [first] = unit
+  return first ? layerReach(ck, first, resources) : { x: 0, y: 0, width: 0, height: 0 }
+}
+
+function drawUnit(
+  ck: CanvasKit,
+  canvas: Canvas,
+  unit: SceneLayer[],
+  target: VectorTarget,
+  vector: Resources,
+  raster: Resources,
+  scale: number,
+) {
+  const [first] = unit
+  if (!first) return
+  if (target === 'pdf' || unit.every((layer) => svgSafe(layer))) {
+    drawLayers(ck, canvas, unit, vector)
+    return
+  }
+  if (unit.length === 1 && plainContainer(first)) {
+    drawContainer(ck, canvas, first, vector, raster, scale)
+    return
+  }
+  drawImage(ck, canvas, unitReach(ck, unit, raster), scale, (into) => drawLayers(ck, into, unit, raster))
 }
 
 /** Whether Skia's SVG writer draws a layer and everything in it exactly as the CPU does. */
@@ -227,10 +181,56 @@ function svgSafe(layer: SceneLayer): boolean {
   return layer.children.every(svgSafe)
 }
 
-/** Whether a layer, or one inside it, mixes with what is behind it in a way the file can't. */
-function readsBackdrop(layer: SceneLayer, target: VectorTarget): boolean {
+/** A group or frame whose own drawing adds nothing an offscreen layer would change. */
+function plainContainer(layer: SceneLayer): boolean {
   const { props } = layer
-  if (props.effects.some((e) => e.type === 'backgroundBlur' && e.radius > 0)) return true
-  if (target === 'svg' && props.blendMode !== 'normal' && props.blendMode !== 'pass-through') return true
-  return layer.children.some((child) => readsBackdrop(child, target))
+  return (
+    (layer.type === 'group' || layer.type === 'frame') &&
+    props.opacity === 1 &&
+    props.effects.length === 0 &&
+    (props.blendMode === 'normal' || props.blendMode === 'pass-through') &&
+    !props.mask
+  )
+}
+
+/**
+ * A group or frame drawn by its children alone, as drawLayer would without an offscreen layer,
+ * so each child that SVG can hold stays vectors.
+ */
+function drawContainer(
+  ck: CanvasKit,
+  canvas: Canvas,
+  layer: SceneLayer,
+  vector: Resources,
+  raster: Resources,
+  scale: number,
+) {
+  const { props } = layer
+  canvas.save()
+  if (props.rotation !== 0) canvas.rotate(props.rotation, props.x + props.width / 2, props.y + props.height / 2)
+  if (layer.type === 'frame') {
+    const path = framePath(ck, layer.props)
+    const fills = layer.props.fills
+    if (fills.every(svgPaint)) for (const fill of fills) fillPath(ck, canvas, path, fill, props, vector)
+    else
+      drawImage(ck, canvas, props, scale, (into) => {
+        for (const fill of fills) fillPath(ck, into, path, fill, props, raster)
+      })
+    canvas.save()
+    if (layer.props.clip) canvas.clipPath(path, ck.ClipOp.Intersect, true)
+    for (const unit of maskUnits(layer.children)) drawUnit(ck, canvas, unit, 'svg', vector, raster, scale)
+    canvas.restore()
+    // The strokes over what is inside, outside the clip, as drawContent draws them. The canvas is
+    // turned already, so a picture of them covers the frame's own box and their reach.
+    const { strokes } = layer.props
+    if (strokes.every((s) => svgPaint(s.paint))) strokePath(ck, canvas, path, layer.props, vector, null)
+    else
+      drawImage(ck, canvas, outset(layer.props, strokeReach(strokes, false)), scale, (into) =>
+        strokePath(ck, into, path, layer.props, raster, null),
+      )
+    path.delete()
+  } else {
+    for (const unit of maskUnits(layer.children)) drawUnit(ck, canvas, unit, 'svg', vector, raster, scale)
+  }
+  canvas.restore()
 }

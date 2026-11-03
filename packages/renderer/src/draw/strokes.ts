@@ -5,25 +5,10 @@ import type { Resources } from '../resources.ts'
 import { fillPath, paintFor } from './paint.ts'
 import { EVERYWHERE } from './paths.ts'
 
-/**
- * How far strokes reach past the outline: a mitred corner up to the miter limit × half the
- * width, a square cap √2 × half; a line's ends reach END_SIZE widths.
- */
-export function strokeReach(strokes: readonly Stroke[], line: boolean) {
-  return Math.max(
-    0,
-    ...strokes.map((s) => {
-      if (line) return s.width * END_SIZE
-      const half = s.align === 'inside' ? 0 : s.align === 'center' ? s.width / 2 : s.width
-      return half * (s.join === 'miter' ? Math.max(s.miterLimit, Math.SQRT2) : Math.SQRT2)
-    }),
-  )
-}
+type LineShape = Extract<Shape, { kind: 'line' }>
 
 /** How long a line's end is, in widths of the stroke it ends. */
 const END_SIZE = 3
-
-type LineShape = Extract<Shape, { kind: 'line' }>
 
 /** Fills and strokes an outline; a line's strokes are always centred, and draw its ends. */
 export function drawShape(
@@ -98,6 +83,21 @@ export function strokePath(
     paint.delete()
   }
   outside?.delete()
+}
+
+/**
+ * How far strokes reach past the outline: a mitred corner up to the miter limit × half the
+ * width, a square cap √2 × half; a line's ends reach END_SIZE widths.
+ */
+export function strokeReach(strokes: readonly Stroke[], line: boolean) {
+  return Math.max(
+    0,
+    ...strokes.map((s) => {
+      if (line) return s.width * END_SIZE
+      const half = s.align === 'inside' ? 0 : s.align === 'center' ? s.width / 2 : s.width
+      return half * (s.join === 'miter' ? Math.max(s.miterLimit, Math.SQRT2) : Math.SQRT2)
+    }),
+  )
 }
 
 /**

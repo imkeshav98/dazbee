@@ -2,14 +2,9 @@ import type { CanvasKit, FontCollection, Paragraph, TextStyle as CkTextStyle } f
 import type { TextProps } from '@dazbee/schema'
 
 import { color } from '../color.ts'
+import { lru } from '../lru.ts'
 import type { Resources } from '../resources.ts'
 import { scaled } from './scale.ts'
-
-/** Hebrew, Arabic, Syriac, Thaana, NKo, their presentation forms, and the right-to-left blocks beyond the BMP. */
-const RTL_CHAR = /[\u0590-\u08FF\uFB1D-\uFDFF\uFE70-\uFEFF\u{10800}-\u{10FFF}\u{1E800}-\u{1EFFF}]/u
-const STRONG_CHAR = /[\p{L}]/u
-
-type Style = TextProps['style']
 
 /** One paragraph of a text layer (the text between line breaks), laid out where it sits in the layer. */
 export interface TextBlock {
@@ -48,7 +43,17 @@ export interface TextLayout {
   delete(): void
 }
 
+export type ParagraphCache = ReturnType<typeof paragraphCache>
+
+type Style = TextProps['style']
+
+/** Hebrew, Arabic, Syriac, Thaana, NKo, their presentation forms, and the right-to-left blocks beyond the BMP. */
+const RTL_CHAR = /[\u0590-\u08FF\uFB1D-\uFDFF\uFE70-\uFEFF\u{10800}-\u{10FFF}\u{1E800}-\u{1EFFF}]/u
+const STRONG_CHAR = /[\p{L}]/u
+
 const ELLIPSIS = '\u2026'
+
+const WORD_CHAR = /[\p{L}\p{N}\p{M}]/u
 
 /**
  * Shapes and lays out a text layer, a paragraph at a time (#47): lists put each paragraph's lines
@@ -82,24 +87,64 @@ export function layoutText(
   return place(props, best ?? build(ck, props, resources, fit.min / base))
 }
 
+/**
+ * Laid-out text kept by what shapes it, for a screen that redraws often: a redraw lays out only
+ * the text that changed. The cache owns its layouts; `delete` frees them all.
+ */
+export function paragraphCache(limit = 4000) {
+  // The layouts by what shapes them, least recently used first.
+  const entries = lru<string, TextLayout>(limit, (laid) => laid.delete())
+  // The fonts the kept layouts were shaped with.
+  let fonts: FontCollection | null = null
+
+  function layout(ck: CanvasKit, props: TextProps, resources: Pick<Resources, 'fonts' | 'fallbackFamilies'>) {
+    if (resources.fonts !== fonts) {
+      entries.clear()
+      fonts = resources.fonts
+    }
+    const key = layoutKey(props, resources.fallbackFamilies)
+    const hit = entries.get(key)
+    if (hit) return hit
+    const laid = layoutText(ck, props, resources)
+    entries.set(key, laid)
+    return laid
+  }
+
+  return { layout, delete: entries.clear }
+}
+
+/** A text layer laid out, from the paragraph cache when there is one; `done` frees what the cache doesn't own. */
+export function laidOut(ck: CanvasKit, props: TextProps, resources: Resources) {
+  if (resources.paragraphs) return { ...resources.paragraphs.layout(ck, props, resources), done: () => {} }
+  const laid = layoutText(ck, props, resources)
+  return { ...laid, done: () => laid.delete() }
+}
+
+/**
+ * Measures text for auto layout (#46), the way `layoutText` lays it out to draw: natural width
+ * (rounded up, as a text box that grows draws) or the height at a given width.
+ */
+export function textMeasure(ck: CanvasKit, resources: Pick<Resources, 'fonts' | 'fallbackFamilies'>) {
+  return (props: TextProps, width: number | null) => {
+    const laid = layoutText(
+      ck,
+      width === null ? { ...props, boxMode: 'autoWidth' } : { ...props, boxMode: 'autoHeight', width },
+      resources,
+    )
+    try {
+      return { width: width ?? laid.width, height: laid.height }
+    } finally {
+      laid.delete()
+    }
+  }
+}
+
 /** Vertical alignment in a fixed box. */
 function place(props: TextProps, laid: TextLayout): TextLayout {
   const free = props.boxMode === 'fixed' ? props.height - laid.height : 0
   laid.dy = { top: 0, middle: free / 2, bottom: free }[props.verticalAlign]
   return laid
 }
-
-/** Whether text fits its box: no word broken across lines, nothing cut off, and in a fixed box no line below it. */
-function fits(props: TextProps, laid: TextLayout): boolean {
-  if (props.boxMode === 'autoWidth') return true
-  const total = props.text.split('\n').length
-  if (laid.blocks.length < total || laid.blocks.some((b) => b.paragraph.didExceedMaxLines())) return false
-  for (const b of laid.blocks)
-    if (b.paragraph.getMinIntrinsicWidth() > props.width - b.x - gutterRight(props, laid, b) + 0.01) return false
-  return props.boxMode !== 'fixed' || laid.height <= props.height + 0.01
-}
-const gutterRight = (props: TextProps, laid: TextLayout, b: TextBlock) =>
-  b.marker && b.x === 0 ? laid.width - b.paragraph.getMaxWidth() : 0
 
 function build(
   ck: CanvasKit,
@@ -302,7 +347,41 @@ function build(
   }
 }
 
-const WORD_CHAR = /[\p{L}\p{N}\p{M}]/u
+/** Whether text fits its box: no word broken across lines, nothing cut off, and in a fixed box no line below it. */
+function fits(props: TextProps, laid: TextLayout): boolean {
+  if (props.boxMode === 'autoWidth') return true
+  const total = props.text.split('\n').length
+  if (laid.blocks.length < total || laid.blocks.some((b) => b.paragraph.didExceedMaxLines())) return false
+  for (const b of laid.blocks)
+    if (b.paragraph.getMinIntrinsicWidth() > props.width - b.x - gutterRight(props, laid, b) + 0.01) return false
+  return props.boxMode !== 'fixed' || laid.height <= props.height + 0.01
+}
+
+/** What a text layer's layout depends on: everything but where it is placed and how it is painted over. */
+function layoutKey(props: TextProps, fallbackFamilies: string[]) {
+  return JSON.stringify([
+    props.text,
+    props.runs,
+    props.style,
+    props.width,
+    props.height,
+    props.boxMode,
+    props.align,
+    props.verticalAlign,
+    props.direction,
+    props.list,
+    props.paragraphSpacing,
+    props.maxLines,
+    props.shrinkToFit,
+    fallbackFamilies,
+  ])
+}
+
+/** The direction of the first strong character, as the Unicode bidi algorithm picks a paragraph's direction. */
+function autoDirection(text: string): 'ltr' | 'rtl' {
+  for (const ch of text) if (STRONG_CHAR.test(ch)) return RTL_CHAR.test(ch) ? 'rtl' : 'ltr'
+  return 'ltr'
+}
 
 /** The text with each piece's case applied, a code point at a time and only where that keeps its length, so offsets still match. */
 function withCase(text: string, styleAt: (offset: number) => Style): string {
@@ -319,71 +398,6 @@ function withCase(text: string, styleAt: (offset: number) => Style): string {
     i += ch.length
   }
   return out
-}
-
-/** What a text layer's layout depends on: everything but where it is placed and how it is painted over. */
-const layoutKey = (props: TextProps, fallbackFamilies: string[]) =>
-  JSON.stringify([
-    props.text,
-    props.runs,
-    props.style,
-    props.width,
-    props.height,
-    props.boxMode,
-    props.align,
-    props.verticalAlign,
-    props.direction,
-    props.list,
-    props.paragraphSpacing,
-    props.maxLines,
-    props.shrinkToFit,
-    fallbackFamilies,
-  ])
-
-/**
- * Laid-out text kept by what shapes it, for a screen that redraws often: a redraw lays out only
- * the text that changed. The cache owns its layouts; `delete` frees them all.
- */
-export function paragraphCache(limit = 4000) {
-  // Insertion order is use order: a hit moves to the end, and the front is evicted first.
-  const entries = new Map<string, TextLayout>()
-  let fonts: FontCollection | null = null
-  const clear = () => {
-    for (const laid of entries.values()) laid.delete()
-    entries.clear()
-  }
-  return {
-    layout(ck: CanvasKit, props: TextProps, resources: Pick<Resources, 'fonts' | 'fallbackFamilies'>) {
-      if (resources.fonts !== fonts) {
-        clear()
-        fonts = resources.fonts
-      }
-      const key = layoutKey(props, resources.fallbackFamilies)
-      const hit = entries.get(key)
-      if (hit) {
-        entries.delete(key)
-        entries.set(key, hit)
-        return hit
-      }
-      const laid = layoutText(ck, props, resources)
-      entries.set(key, laid)
-      for (const [oldest, old] of entries) {
-        if (entries.size <= limit) break
-        entries.delete(oldest)
-        old.delete()
-      }
-      return laid
-    },
-    delete: clear,
-  }
-}
-export type ParagraphCache = ReturnType<typeof paragraphCache>
-
-/** A text layer laid out, from the paragraph cache when there is one; `done` frees what the cache doesn't own. */
-export function laidOut(ck: CanvasKit, props: TextProps, resources: Resources) {
-  if (resources.paragraphs) return { ...resources.paragraphs.layout(ck, props, resources), done: () => {} }
-  const laid = layoutText(ck, props, resources)
-  return { ...laid, done: () => laid.delete() }
 }
 
 /** A style for CanvasKit; for an outline pass, without the lines, which the fill pass draws. */
@@ -410,27 +424,6 @@ function textStyle(
   })
 }
 
-/** The direction of the first strong character, as the Unicode bidi algorithm picks a paragraph's direction. */
-function autoDirection(text: string): 'ltr' | 'rtl' {
-  for (const ch of text) if (STRONG_CHAR.test(ch)) return RTL_CHAR.test(ch) ? 'rtl' : 'ltr'
-  return 'ltr'
-}
-
-/**
- * Measures text for auto layout (#46), the way `layoutText` lays it out to draw: natural width
- * (rounded up, as a text box that grows draws) or the height at a given width.
- */
-export function textMeasure(ck: CanvasKit, resources: Pick<Resources, 'fonts' | 'fallbackFamilies'>) {
-  return (props: TextProps, width: number | null) => {
-    const laid = layoutText(
-      ck,
-      width === null ? { ...props, boxMode: 'autoWidth' } : { ...props, boxMode: 'autoHeight', width },
-      resources,
-    )
-    try {
-      return { width: width ?? laid.width, height: laid.height }
-    } finally {
-      laid.delete()
-    }
-  }
+function gutterRight(props: TextProps, laid: TextLayout, b: TextBlock) {
+  return b.marker && b.x === 0 ? laid.width - b.paragraph.getMaxWidth() : 0
 }
