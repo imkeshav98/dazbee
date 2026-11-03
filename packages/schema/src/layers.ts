@@ -2,7 +2,8 @@ import { z } from 'zod'
 
 import { Effect } from './effects.ts'
 import { Paint } from './paint.ts'
-import { BlendMode, Color, ContainerBlendMode } from './primitives.ts'
+import { BlendMode, Color, ContainerBlendMode, FractionalIndex, NodeId, PageId } from './primitives.ts'
+import { Bindings } from './variables.ts'
 
 /**
  * Properties every layer has. Any property can be overridden per format (#1); the
@@ -278,6 +279,59 @@ export const LAYER_PROPS = {
   text: TextProps,
   boolean: BooleanProps,
 } as const
+export type LayerType = keyof typeof LAYER_PROPS
+
+/**
+ * What can't be changed about a layer, each on its own (as in Polotno): its position, its size and
+ * rotation, its content (text), its style, and whether it can be deleted. Locking a layer on the
+ * stage sets all five; a layer whose position is locked can't be picked on the stage.
+ */
+export const LayerLock = z.object({
+  move: z.boolean().default(false),
+  resize: z.boolean().default(false),
+  content: z.boolean().default(false),
+  style: z.boolean().default(false),
+  delete: z.boolean().default(false),
+})
+export type LayerLock = z.infer<typeof LayerLock>
+export const LOCK_FLAGS = ['move', 'resize', 'content', 'style', 'delete'] as const satisfies (keyof LayerLock)[]
+
+const nodeBase = {
+  parentId: z.union([PageId, NodeId]),
+  index: FractionalIndex,
+  name: z.string(),
+  role: z
+    .enum([
+      'headline',
+      'subhead',
+      'body',
+      'price',
+      'cta',
+      'logo',
+      'product',
+      'person',
+      'background',
+      'badge',
+      'decoration',
+    ])
+    .optional(),
+  /** Left out while nothing is locked. */
+  lock: LayerLock.optional(),
+  /** Properties that follow brand kit tokens (#53); left out while nothing is bound. */
+  bindings: Bindings.optional(),
+}
+
+const layerOf = <T extends LayerType>(type: T) =>
+  z.object({ type: z.literal(type), ...nodeBase, props: LAYER_PROPS[type] })
+
+export const Layer = z.discriminatedUnion('type', [
+  layerOf('frame'),
+  layerOf('group'),
+  layerOf('graphic'),
+  layerOf('text'),
+  layerOf('boolean'),
+])
+export type Layer = z.infer<typeof Layer>
 
 /** Layer types that hold other layers, and which types each can hold. */
 export const CONTAINERS = {
@@ -292,4 +346,3 @@ export const canHold = (parent: string, child: string) =>
   (CONTAINERS[parent as keyof typeof CONTAINERS] as readonly string[]).includes(child)
 /** Whether a layer of this type holds other layers. */
 export const isContainer = (type: string) => Object.hasOwn(CONTAINERS, type)
-export type LayerType = keyof typeof LAYER_PROPS
