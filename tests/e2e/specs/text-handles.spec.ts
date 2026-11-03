@@ -249,9 +249,10 @@ for (const [width, height] of [[820, 1180], [390, 844]] as const) {
     // Big enough on a phone's fitted stage to show its handles.
     const { page, errors } = await openStage(browser, design({ headline: text('headline', { width: 800, style: style(96) }) }))
     await page.setViewportSize({ width, height })
-    // The square alone, fitted, as a phone shows one size to work on.
-    await page.evaluate(() => window.dazbee?.focus('sq'))
+    // The square's top start in view, the text across the screen.
+    await page.evaluate(() => window.dazbee?.setCamera({ x: 10, y: 200, zoom: 0.4 }))
     await select(page, ['headline'])
+    await expect(page.locator('.selection[data-layer="headline"]')).toBeVisible()
     expect(await handles(page)).toEqual(['e', 'ne', 'nw', 'se', 'sw', 'w'])
     await dragHandle(page, 'se', 100, 100)
     expect((await placed(page, 'headline')).style.fontSize).toBeGreaterThan(100)
