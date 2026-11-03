@@ -108,8 +108,27 @@ test('with shrink to fit on, the size on the bar is the largest size, so the tex
   await page.getByRole('button', { name: 'Bigger' }).click()
   await expect.poll(async () => (await copy(page)).shrinkToFit).toEqual({ min: 20, max: 21 })
   expect((await copy(page)).style.fontSize).toBe(21)
-  // Each change is one undo step.
+  // Each change is one undo step, and comes back with redo.
   await page.evaluate(() => window.dazbee?.perform('undo'))
   await expect.poll(async () => (await copy(page)).shrinkToFit).toEqual({ min: 20, max: 20 })
+  await page.evaluate(() => window.dazbee?.perform('redo'))
+  await expect.poll(async () => (await copy(page)).shrinkToFit).toEqual({ min: 20, max: 21 })
+
+  // The Largest field is the same size: the bar shows it, and steps down from it.
+  await enter((await openCard(page, 'text-box-card')).getByRole('spinbutton', { name: 'Largest size' }), '60')
+  await expect.poll(async () => (await copy(page)).style.fontSize).toBe(60)
+  await page.keyboard.press('Escape')
+  await expect(page.getByTestId('bar-size-field')).toHaveValue('60')
+  await page.getByRole('button', { name: 'Smaller' }).click()
+  await expect.poll(async () => (await copy(page)).shrinkToFit).toEqual({ min: 20, max: 59 })
+  expect((await copy(page)).style.fontSize).toBe(59)
+
+  // In a fixed box too: a bigger size is the largest, and the text shrinks to fit the box under it.
+  await (await openCard(page, 'text-box-card')).getByRole('radiogroup', { name: 'Box' }).locator('[data-value="fixed"]').click()
+  await page.keyboard.press('Escape')
+  const fixed = await height()
+  await enter(page.getByTestId('bar-size-field'), '300')
+  await expect.poll(async () => (await copy(page)).shrinkToFit).toEqual({ min: 20, max: 300 })
+  expect(await height()).toBe(fixed)
   expect(errors).toEqual([])
 })
