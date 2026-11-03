@@ -1,4 +1,4 @@
-// Google Fonts families copied into our storage (#50), shared by every workspace.
+// Google Fonts families copied into our storage, shared by every workspace.
 import { createHash, randomUUID } from 'node:crypto'
 
 import { and, eq } from 'drizzle-orm'

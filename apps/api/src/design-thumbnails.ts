@@ -5,7 +5,7 @@
 import { Worker } from 'node:worker_threads'
 
 import type { Db } from '@dazbee/db'
-import type { Design, DesignSummary } from '@dazbee/schema'
+import type { Design, DesignCover, DesignSummary } from '@dazbee/schema'
 import type { Storage } from '@dazbee/storage'
 
 import { storedDesign } from './designs.ts'
@@ -28,14 +28,10 @@ export function coverOf(design: Design) {
 }
 
 /** Where a design's stored picture is, and the size of the format it shows. */
-export interface ThumbnailCover {
-  key: string
-  width: number
-  height: number
-}
+export type ThumbnailCover = DesignCover & { key: string }
 
 /** The primary format's size, read from the stored design without drawing: what a tile needs to take its shape. */
-export async function designCover(db: Db, summary: DesignSummary): Promise<{ width: number; height: number } | null> {
+export async function designCover(db: Db, summary: DesignSummary): Promise<DesignCover | null> {
   const design = await storedDesign(db, summary.id)
   const cover = design && coverOf(design)
   return cover ? { width: cover.width, height: cover.height } : null

@@ -2,7 +2,7 @@
 // the check an uploaded object passes before it is recorded.
 import { createHash } from 'node:crypto'
 
-import type { DesignSummary } from '@dazbee/schema'
+import type { DesignSummary, SignedLink } from '@dazbee/schema'
 import type { Storage } from '@dazbee/storage'
 
 export const originalKey = (workspaceId: string, sha256: string) => `workspaces/${workspaceId}/originals/${sha256}`
@@ -25,7 +25,7 @@ export const previewKey = (fontKey: string) => `${fontKey}.preview.png`
 const SIGNED_URL_SECONDS = 5 * 60
 
 /** A URL that reads the object at `key`, and when it stops working. */
-export async function signedLink(storage: Storage, key: string): Promise<{ url: string; expiresAt: string }> {
+export async function signedLink(storage: Storage, key: string): Promise<SignedLink> {
   const url = await storage.signedGet(key, SIGNED_URL_SECONDS)
   return { url, expiresAt: expiry() }
 }
@@ -35,7 +35,7 @@ export async function signedUpload(
   storage: Storage,
   key: string,
   { contentType, size }: { contentType: string; size: number },
-): Promise<{ url: string; expiresAt: string }> {
+): Promise<SignedLink> {
   const url = await storage.signedPut(key, contentType, size, SIGNED_URL_SECONDS)
   return { url, expiresAt: expiry() }
 }
