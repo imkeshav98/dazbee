@@ -1,7 +1,22 @@
 import type { CanvasKit, FontCollection, Image, TypefaceFontProvider } from '@dazbee/canvaskit'
 import type { Variables } from '@dazbee/schema'
 
-import type { Resources } from './draw.ts'
+import type { LayerPictures } from './pictures.ts'
+import type { ParagraphCache } from './text/layout.ts'
+
+/** What drawing needs besides the scene: fonts registered from our own files and images decoded by CanvasKit. */
+export interface Resources {
+  fonts: FontCollection
+  /** Families tried, in order, for characters a layer's own font lacks. */
+  fallbackFamilies: string[]
+  images: ReadonlyMap<string, Image>
+  /** Paragraphs kept between draws, for the editor's screen; without it each draw lays out its text and frees it. */
+  paragraphs?: ParagraphCache
+  /** Top-level layers recorded between draws, for the editor's screen; without it each draw draws every layer. */
+  layers?: LayerPictures
+  /** Set when drawing into a PDF or SVG: a text's outline pass is drawn as shapes, so the file holds the text once. */
+  vector?: boolean
+}
 
 export interface ResourceBytes {
   /** Font files by family; the font's own name is ignored. Never system fonts (CLAUDE.md). */

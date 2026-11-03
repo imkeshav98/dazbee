@@ -1,6 +1,6 @@
 import type { Canvas, CanvasKit, SkPicture as Picture } from '@dazbee/canvaskit'
 
-import type { Resources } from './draw.ts'
+import type { Resources } from './resources.ts'
 import type { SceneLayer } from './scene.ts'
 
 /** Wide enough for any layer on any page: playback never clips to it, the page clip does. */

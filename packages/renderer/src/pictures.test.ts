@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 
-import type { Resources } from './draw.ts'
 import { loadCanvasKit } from './node.ts'
 import { layerPictures } from './pictures.ts'
+import type { Resources } from './resources.ts'
 import type { SceneLayer } from './scene.ts'
 
 const ck = await loadCanvasKit()

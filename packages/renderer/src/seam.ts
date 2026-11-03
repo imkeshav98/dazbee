@@ -1,11 +1,11 @@
 import type { CanvasKit, Surface } from '@dazbee/canvaskit'
 import { parseDesign } from '@dazbee/schema'
 
-import { drawScene, type Resources } from './draw.ts'
-import { type ResourceBytes, type ResourceCache, resourceCache } from './resources.ts'
+import { drawScene } from './draw/draw.ts'
+import { drawVectorPage, type VectorTarget } from './draw/vector.ts'
+import { type ResourceBytes, type ResourceCache, resourceCache, type Resources } from './resources.ts'
 import { render, type Scene } from './scene.ts'
-import { textMeasure } from './text.ts'
-import { drawVectorPage, type VectorTarget } from './vector.ts'
+import { textMeasure } from './text/layout.ts'
 
 export interface Rendered {
   width: number

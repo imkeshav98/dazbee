@@ -1,19 +1,13 @@
 import type { Canvas, CanvasKit } from '@dazbee/canvaskit'
 import type { Paint, Rect } from '@dazbee/schema'
 
-import {
-  drawLayers,
-  drawScene,
-  fillPath,
-  framePath,
-  layerReach,
-  outset,
-  rectPath,
-  type Resources,
-  strokePath,
-  strokeReach,
-} from './draw.ts'
-import type { Scene, SceneLayer } from './scene.ts'
+import type { Resources } from '../resources.ts'
+import type { Scene, SceneLayer } from '../scene.ts'
+import { drawLayers, drawScene } from './draw.ts'
+import { fillPath } from './paint.ts'
+import { framePath, rectPath } from './paths.ts'
+import { layerReach, outset } from './reach.ts'
+import { strokePath, strokeReach } from './strokes.ts'
 
 /** The vector file a page is drawn into. */
 export type VectorTarget = 'pdf' | 'svg'

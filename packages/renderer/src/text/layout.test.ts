@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest'
 
 import { TextProps } from '@dazbee/schema'
 
-import { loadCanvasKit } from './node.ts'
-import { paragraphCache, type TextLayout } from './text.ts'
+import { loadCanvasKit } from '../node.ts'
+import { paragraphCache, type TextLayout } from './layout.ts'
 
 const ck = await loadCanvasKit()
 const resources = () => ({ fonts: ck.FontCollection.Make(), fallbackFamilies: [] })
