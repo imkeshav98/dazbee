@@ -4,7 +4,7 @@
 import { expect, test, type Page } from '../support/test.ts'
 import type { DesignInput } from '@dazbee/schema'
 import { writeOutput } from '../support/editor.ts'
-import { openStage } from '../support/stage.ts'
+import { openStage, openCard } from '../support/stage.ts'
 import { choose } from '../support/select.ts'
 
 test.describe.configure({ timeout: 120_000 })
@@ -34,12 +34,12 @@ const boxOf = (page: Page, id: string) => page.evaluate((id) => window.dazbee?.b
 const propsOf = (page: Page, id: string) => page.evaluate((id) => window.dazbee?.design().nodes[id]?.props, id) as Promise<Record<string, unknown>>
 const select = async (page: Page, ids: string[]) => {
   await page.evaluate((ids) => window.dazbee?.select(ids), ids)
-  await expect(page.getByTestId('layout-card')).toBeVisible()
+  await expect((await openCard(page, 'layout-card'))).toBeVisible()
 }
 
 test('a child of an auto layout fills, hugs or keeps its size, and can leave the flow', async ({ browser }) => {
   const { page, errors } = await openStage(browser, design())
-  const card = page.getByTestId('flow-card')
+  const card = (await openCard(page, 'flow-card'))
   const width = card.getByRole('combobox', { name: 'Width sizing' })
 
   await select(page, ['loose'])
@@ -69,7 +69,7 @@ test('a child of an auto layout fills, hugs or keeps its size, and can leave the
   await select(page, ['two'])
   await choose(width, 'fixed')
   await select(page, ['stack'])
-  await choose(page.getByTestId('auto-layout-card').getByRole('combobox', { name: 'Width sizing' }), 'hug')
+  await choose((await openCard(page, 'auto-layout-card')).getByRole('combobox', { name: 'Width sizing' }), 'hug')
   await expect.poll(async () => (await propsOf(page, 'stack')).sizing).toEqual({ width: 'hug', height: 'fixed' })
   // 20 + 160 + 20 + 160 + 20.
   await expect.poll(async () => (await boxOf(page, 'stack')).width).toBe(380)

@@ -4,7 +4,7 @@ import { expect, test, type Locator, type Page } from '../support/test.ts'
 import type { DesignInput } from '@dazbee/schema'
 import { photo, upload } from '../support/assets.ts'
 import { writeOutput } from '../support/editor.ts'
-import { barMenu, openStage } from '../support/stage.ts'
+import { barMenu, openStage, openCard } from '../support/stage.ts'
 
 test.describe.configure({ timeout: 120_000 })
 
@@ -36,20 +36,18 @@ test('the bar\'s Look sets the filter; the header card the fit; the Adjust card 
   const asset = await upload(photo)
   const { page, errors } = await openStage(browser, design(asset.id))
 
-  // A plain shape has no Adjust card and no Look.
+  // A plain shape has no Edit image panel.
   await page.evaluate(() => window.dazbee?.select(['box']))
   await expect(page.getByTestId('bar-colour')).toBeVisible()
-  await expect(page.getByTestId('adjust-card')).toHaveCount(0)
-  await expect(page.getByTestId('bar-look')).toHaveCount(0)
+  await expect(page.getByTestId('bar-edit')).toHaveCount(0)
 
   await page.evaluate(() => window.dazbee?.select(['photo']))
-  // A photo's fills and, under them, its strokes are one card in the panel; its bar holds the photo's own actions.
-  await expect(page.getByTestId('fill-card').getByTestId('fill-list')).toBeVisible()
-  await expect(page.getByTestId('fill-card').getByTestId('stroke-list')).toBeVisible()
+  // A photo's fills are in its Edit image panel and its strokes in Outline; its bar has no Colour.
+  await expect((await barMenu(page, 'outline')).getByTestId('stroke-list')).toBeVisible()
+  await expect((await openCard(page, 'fill-card')).getByTestId('fill-list')).toBeVisible()
   await expect(page.getByTestId('bar-colour')).toHaveCount(0)
-  await expect(page.getByTestId('bar-outline')).toHaveCount(0)
-  const card = page.getByTestId('adjust-card')
-  const look = async () => (await barMenu(page, 'look')).getByRole('radiogroup', { name: 'Filter' })
+  const card = (await openCard(page, 'adjust-card'))
+  const look = async () => (await openCard(page, 'look-card')).getByRole('radiogroup', { name: 'Filter' })
   const filters = await look()
   await expect(filters.getByRole('radio')).toHaveCount(7)
   await expect(filters.getByRole('radio', { name: 'Original' })).toHaveAttribute('aria-checked', 'true')
@@ -57,7 +55,7 @@ test('the bar\'s Look sets the filter; the header card the fit; the Adjust card 
   await expect(filters.locator('img').first()).toHaveJSProperty('complete', true)
 
   await filters.getByRole('radio', { name: 'Warm' }).click()
-  await page.getByTestId('layout-card').getByRole('radiogroup', { name: 'Fit' }).getByRole('radio', { name: 'Fit inside' }).click()
+  await (await openCard(page, 'fit-card')).getByRole('radiogroup', { name: 'Fit' }).getByRole('radio', { name: 'Fit inside' }).click()
   await expect.poll(() => imageOf(page)).toMatchObject({ filter: 'warm', fit: 'fit' })
 
   await enter(card.getByRole('spinbutton', { name: 'Image opacity' }), '80')

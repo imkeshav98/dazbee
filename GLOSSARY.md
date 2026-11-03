@@ -73,9 +73,23 @@ _Avoid_: Element, object, block, item
 The page's layers as a tree, topmost first: select, reorder, move into and out of groups, rename, lock and hide them. It selects in step with the stage.
 _Avoid_: Outline, layer list
 
+**Top bar**:
+The bar fixed at the top centre of the stage while something is selected; its items depend on what is selected. A value the selected layers don't share shows as mixed. With more than one format its first item, the scope chip, picks where a change goes: the format shown only (an override), as a drag on the canvas does, or every format (the base, with that property's overrides cleared).
+_Avoid_: toolbar, selection bar
+
+**Pop-up**:
+A short list that opens under the top bar from an item with ▾, such as Align or Transparency.
+
+**Edit panel**:
+The one panel a top bar item opens, at the stage's end side; on a phone, a sheet at the bottom. Opening a pop-up or another layer closes it.
+_Avoid_: properties panel, inspector
+
+**Small menu**:
+The pill by the selection: lock, duplicate, delete, and ⋯ for the **full menu** of the layers' actions, which the right-click menu shows too.
+
 **Property cards**:
-The cards at the stage's top end that edit the selection, or the design when nothing is selected. A value the selected layers don't share shows as mixed. With more than one format, a change goes to the format shown only (an override), as a drag on the canvas does, unless every format is picked (the base, with that property's overrides cleared).
-_Avoid_: Inspector (in code), properties panel
+The cards at the stage's top end that edit the design while nothing is selected: the page's colour, its sizes and its pages.
+_Avoid_: Inspector (in code)
 
 **Frame**:
 A layer that holds other layers in a box of its own: it paints fills behind them and strokes over them, hides what reaches past its edges (never its own strokes) unless told not to, and can carry auto layout.

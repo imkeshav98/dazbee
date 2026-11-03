@@ -4,7 +4,7 @@
 import { expect, test, type Locator, type Page } from '../support/test.ts'
 import type { DesignInput } from '@dazbee/schema'
 import { writeOutput } from '../support/editor.ts'
-import { barMenu, openStage } from '../support/stage.ts'
+import { barMenu, openStage, openCard } from '../support/stage.ts'
 
 test.describe.configure({ timeout: 120_000 })
 
@@ -35,8 +35,8 @@ const enter = async (field: Locator, value: string) => {
 test('the Text box card sets the box, lines and fit; the bar sets lists, decoration and the outline', async ({ browser }) => {
   const { page, errors } = await openStage(browser, design())
   await page.evaluate(() => window.dazbee?.select(['copy']))
-  const card = page.getByTestId('text-box-card')
-  const spacing = page.getByTestId('spacing-card')
+  const card = (await openCard(page, 'text-box-card'))
+  const spacing = (await openCard(page, 'spacing-card'))
   await expect(card).toBeVisible()
   const align = () => barMenu(page, 'align')
   const effects = () => barMenu(page, 'effects')

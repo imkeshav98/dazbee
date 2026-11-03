@@ -42,7 +42,7 @@ const design = (assetId: string): DesignInput => ({
     inStack: rect('In stack', 'a0', 0, 0, { width: 80, height: 80 }, 'stack'),
     turned: rect('Turned', 'b0', 820, 60, { width: 160, height: 100, rotation: 30 }),
     cutter: rect('Cutter', 'b1', 740, 880, { width: 120, height: 120, mask: 'alpha', shape: { kind: 'rect', cornerRadius: 30 } }),
-    locked: { ...rect('Locked', 'b2', 900, 880, { width: 120, height: 120 }), lock: { move: true, resize: true, select: false } },
+    locked: { ...rect('Locked', 'b2', 900, 880, { width: 120, height: 120 }), lock: { move: true, resize: true } },
   },
   overrides: { 'format:st': { headline: { y: 200 } } },
 })

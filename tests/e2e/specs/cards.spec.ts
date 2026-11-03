@@ -5,7 +5,7 @@
 import { expect, test, type Page } from '../support/test.ts'
 import { designOf, editorPath, screenPoint, writeOutput } from '../support/editor.ts'
 import { liveDesign, seed } from '../support/seed.ts'
-import { barMenu, moreSubmenu } from '../support/stage.ts'
+import { barMenu, moreSubmenu, openCard } from '../support/stage.ts'
 
 const shoot = async (page: Page, name: string) => writeOutput(`cards-${name}.png`, await page.screenshot({ animations: 'disabled' }))
 const box = async (page: Page, testId: string) => {
@@ -89,7 +89,7 @@ test('a selection swaps the design cards for its own; several layers line up, sp
   const at = await screenPoint(page, 200, 180)
   await page.mouse.click(at.x, at.y)
   const arrange = page.getByTestId('arrange')
-  await expect(page.getByTestId('layout-card')).toBeVisible()
+  await expect((await openCard(page, 'layout-card'))).toBeVisible()
   await expect(page.getByTestId('page-card')).toHaveCount(0)
   await expect(page.getByTestId('formats')).toHaveCount(0)
   // One layer lines up with its format from ⋯ More on the bar by it.

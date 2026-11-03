@@ -4,7 +4,7 @@
 import { expect, test, type Locator, type Page } from '../support/test.ts'
 import type { DesignInput } from '@dazbee/schema'
 import { writeOutput } from '../support/editor.ts'
-import { barMenu, closeBarMenu, fillList, moreMenu, openStage, scopeMenu, strokeList } from '../support/stage.ts'
+import { barMenu, closeBarMenu, fillList, moreMenu, openStage, scopeMenu, strokeList, openCard } from '../support/stage.ts'
 import { choose } from '../support/select.ts'
 
 test.describe.configure({ timeout: 120_000 })
@@ -44,7 +44,7 @@ const overrides = (page: Page) => page.evaluate(() => JSON.parse(JSON.stringify(
 const props = async (page: Page, id: string) => ({ ...await base(page, id), ...(await overrides(page))['format:sq']?.[id] })
 const select = async (page: Page, ids: string[]) => {
   await page.evaluate((ids) => window.dazbee?.select(ids), ids)
-  await expect(page.getByTestId('layout-card')).toBeVisible()
+  await expect((await openCard(page, 'layout-card'))).toBeVisible()
 }
 /** Types a value into a field and presses Enter. */
 const enter = async (field: Locator, value: string) => {
@@ -55,7 +55,7 @@ const enter = async (field: Locator, value: string) => {
 test('one layer: position, size, turn, opacity, blend, fill, stroke and effects', async ({ browser }) => {
   const { page, errors } = await openStage(browser, design())
   await select(page, ['box'])
-  const layout = page.getByTestId('layout-card')
+  const layout = (await openCard(page, 'layout-card'))
   await expect(layout.getByRole('spinbutton', { name: 'X position' })).toHaveValue('80')
 
   await enter(layout.getByRole('spinbutton', { name: 'X position' }), '140')
@@ -68,7 +68,7 @@ test('one layer: position, size, turn, opacity, blend, fill, stroke and effects'
   await page.keyboard.press('Escape')
   await expect.poll(async () => (await props(page, 'box')).rotation).toBe(15)
 
-  const look = page.getByTestId('appearance-card')
+  const look = (await openCard(page, 'appearance-card'))
   await enter(look.getByRole('spinbutton', { name: 'Opacity' }), '50')
   await expect.poll(async () => (await props(page, 'box')).opacity).toBe(0.5)
   await choose(look.getByRole('combobox', { name: 'Blend mode' }), 'multiply')
@@ -123,7 +123,7 @@ test('one layer: position, size, turn, opacity, blend, fill, stroke and effects'
 test('several layers: mixed values, set together or each from its own; text and auto layout', async ({ browser }) => {
   const { page, errors } = await openStage(browser, design())
   await select(page, ['box', 'dot'])
-  const layout = page.getByTestId('layout-card')
+  const layout = (await openCard(page, 'layout-card'))
   const x = layout.getByRole('spinbutton', { name: 'X position' })
   await expect(x).toHaveValue('')
   await expect(x).toHaveAttribute('placeholder', 'Mixed')
@@ -140,12 +140,12 @@ test('several layers: mixed values, set together or each from its own; text and 
   await expect.poll(async () => [(await props(page, 'box')).fills, (await props(page, 'dot')).fills]).toEqual([[{ type: 'solid', color: '#D9D9D9FF' }], [{ type: 'solid', color: '#D9D9D9FF' }]])
   await enter((await fillList(page)).getByRole('textbox', { name: 'Colour 1 hex' }), '#FFB020')
   await expect.poll(async () => [(await props(page, 'box')).fills, (await props(page, 'dot')).fills]).toEqual([[{ type: 'solid', color: '#FFB020FF' }], [{ type: 'solid', color: '#FFB020FF' }]])
-  await enter(page.getByTestId('appearance-card').getByRole('spinbutton', { name: 'Opacity' }), '75')
+  await enter((await openCard(page, 'appearance-card')).getByRole('spinbutton', { name: 'Opacity' }), '75')
   await expect.poll(async () => [(await props(page, 'box')).opacity, (await props(page, 'dot')).opacity]).toEqual([0.75, 0.75])
 
   // Text.
   await select(page, ['headline'])
-  const text = page.getByTestId('spacing-card')
+  const text = (await openCard(page, 'spacing-card'))
   await enter((await barMenu(page, 'size')).getByRole('spinbutton', { name: 'Size' }), '120')
   await closeBarMenu(page, 'bar-size')
   await enter(text.getByRole('spinbutton', { name: 'Letter spacing' }), '2')
@@ -164,7 +164,7 @@ test('several layers: mixed values, set together or each from its own; text and 
 
   // Auto layout.
   await select(page, ['stack'])
-  const auto = page.getByTestId('auto-layout-card')
+  const auto = (await openCard(page, 'auto-layout-card'))
   await enter(auto.getByRole('spinbutton', { name: 'Room between' }), '32')
   await auto.getByRole('radio', { name: 'Column' }).click()
   await enter(auto.getByRole('spinbutton', { name: 'Room at the left' }), '40')
@@ -181,7 +181,7 @@ test('a change goes to the format shown, like a drag; all formats writes the bas
   await expect(chip).toHaveText('Only Square')
   await expect((await scopeMenu(page)).getByRole('radio', { name: 'Only Square' })).toHaveAttribute('aria-checked', 'true')
   await page.keyboard.press('Escape')
-  const x = page.getByTestId('layout-card').getByRole('spinbutton', { name: 'X position' })
+  const x = (await openCard(page, 'layout-card')).getByRole('spinbutton', { name: 'X position' })
   await enter(x, '500')
   await enter((await fillList(page)).getByRole('textbox', { name: 'Colour 1 hex' }), '00A889')
   await expect.poll(async () => (await overrides(page))['format:sq']?.box).toMatchObject({ x: 500, fills: [{ type: 'solid', color: '#00A889FF' }] })
@@ -208,7 +208,7 @@ test('a change goes to the format shown, like a drag; all formats writes the bas
 test('scrubbing a number is one undo step', async ({ browser }) => {
   const { page, errors } = await openStage(browser, design())
   await select(page, ['box', 'dot'])
-  const handle = page.getByTestId('layout-card').locator('[data-scrub="X position"]')
+  const handle = (await openCard(page, 'layout-card')).locator('[data-scrub="X position"]')
   const box = await handle.boundingBox()
   if (!box) throw new Error('no scrub handle')
   const start = { x: box.x + box.width / 2, y: box.y + box.height / 2 }

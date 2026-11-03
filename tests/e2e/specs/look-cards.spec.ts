@@ -5,7 +5,7 @@ import { expect, test, type Page } from '../support/test.ts'
 import type { DesignInput } from '@dazbee/schema'
 import { writeOutput } from '../support/editor.ts'
 import { newBrand, putKit } from '../support/seed.ts'
-import { barMenu, openStage } from '../support/stage.ts'
+import { barMenu, openStage, openCard } from '../support/stage.ts'
 
 test.describe.configure({ timeout: 120_000 })
 
@@ -68,7 +68,7 @@ test('the look comes first: size and brand colour, effect tiles, and the header 
   }).toEqual([0, undefined])
 
   // The header card names the layer and holds its box, open.
-  const header = page.getByTestId('layout-card')
+  const header = (await openCard(page, 'layout-card'))
   await expect(header.getByRole('heading')).toHaveText('Headline')
   await expect(header.getByRole('spinbutton', { name: 'X position' })).toHaveValue('76')
 

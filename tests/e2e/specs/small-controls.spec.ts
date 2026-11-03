@@ -3,7 +3,7 @@
 import { expect, test, type Page } from '../support/test.ts'
 import type { DesignInput } from '@dazbee/schema'
 import { writeOutput } from '../support/editor.ts'
-import { moreSubmenu, openStage, read } from '../support/stage.ts'
+import { moreSubmenu, openStage, read, openCard } from '../support/stage.ts'
 
 test.describe.configure({ timeout: 180_000 })
 
@@ -33,7 +33,7 @@ const undo = (page: Page) => page.keyboard.press('ControlOrMeta+Z')
 test('a boolean\'s operation and a mask\'s type change in place, one undo step each', async ({ browser }) => {
   const { page, errors } = await openStage(browser, design())
   await select(page, ['combo'])
-  const combine = page.getByTestId('combine-card')
+  const combine = (await openCard(page, 'combine-card'))
   for (const op of ['subtract', 'intersect', 'exclude', 'union']) {
     await combine.locator(`[data-value="${op}"]`).click()
     await expect.poll(async () => (await props(page, 'combo')).op).toBe(op)
@@ -54,7 +54,7 @@ test('a boolean\'s operation and a mask\'s type change in place, one undo step e
   await expect.poll(async () => (await props(page, 'combo')).op).toBe('exclude')
 
   await select(page, ['cutter'])
-  const mask = page.getByTestId('mask-card')
+  const mask = (await openCard(page, 'mask-card'))
   await expect(mask.locator('[data-value="alpha"]')).toHaveAttribute('aria-checked', 'true')
   await mask.locator('[data-value="luminance"]').click()
   await expect.poll(async () => (await props(page, 'cutter')).mask).toBe('luminance')

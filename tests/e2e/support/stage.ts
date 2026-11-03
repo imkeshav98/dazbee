@@ -170,3 +170,25 @@ export async function moreSubmenu(page: Page, id: string) {
   await expect(sub).toBeVisible()
   return sub
 }
+
+/** Where each of the selection's cards is now: the top bar's pop-up or edit panel that holds it. */
+const HOLDER: Record<string, string> = {
+  'layout-card': 'position', 'flow-card': 'position', 'appearance-card': 'transparency', 'spacing-card': 'spacing', 'text-box-card': 'spacing',
+  'frame-card': 'box', 'auto-layout-card': 'stack', 'combine-card': 'combine-op', 'mask-card': 'mask', 'adjust-card': 'edit', 'look-card': 'edit',
+  'fit-card': 'edit', 'photos-card': 'edit',
+}
+
+/**
+ * One of the selection's cards, by its test id, in the pop-up or edit panel of the top bar that
+ * holds it, opened: the shape's card in Shape (or a photo's Corners), the fills in Colour (or a
+ * photo's Edit image panel).
+ */
+export async function openCard(page: Page, testId: string) {
+  const has = async (id: string) => (await page.getByTestId(`bar-${id}`).count()) > 0
+  const holder = testId === 'fill-card' ? ((await has('colour')) ? 'colour' : 'edit')
+    : testId === 'shape-card' ? ((await has('shape')) ? 'shape' : 'corners')
+      : testId === 'frame-card' && !(await has('box')) ? 'corners'
+        : HOLDER[testId]
+  if (!holder) throw new Error(`no top bar item holds ${testId}`)
+  return (await barMenu(page, holder)).getByTestId(testId)
+}

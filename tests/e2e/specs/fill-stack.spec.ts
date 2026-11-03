@@ -11,7 +11,7 @@ import { loadCanvasKit } from '@dazbee/renderer/node'
 import { AssetLink, type DesignInput } from '@dazbee/schema'
 import { api, photo, upload } from '../support/assets.ts'
 import { designOf, exportHashOf, screenPoint, writeOutput } from '../support/editor.ts'
-import { click, fillList, openStage, press, read, strokeList } from '../support/stage.ts'
+import { click, fillList, openStage, press, read, strokeList, openCard } from '../support/stage.ts'
 
 test.describe.configure({ timeout: 120_000 })
 
@@ -63,7 +63,7 @@ test('a gradient over a photo: added on top, a stop edited, the two reordered, o
 
   // + puts a see-through colour on top; the list shows it first.
   // A photo's fills are in its Colour card, + in the card's header.
-  await page.getByTestId('fill-card').getByRole('button', { name: 'Add fill' }).click()
+  await (await openCard(page, 'fill-card')).getByRole('button', { name: 'Add fill' }).click()
   await expect.poll(async () => (await fillsOf(page)).map((f) => f.type)).toEqual(['image', 'solid'])
   await expect(card.locator('[data-row="1"]')).toHaveAttribute('data-item', 'fills-1')
   await expect(card.locator('[data-row="1"] [data-paint]')).toHaveAttribute('data-paint', 'solid')
