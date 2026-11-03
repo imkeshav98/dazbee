@@ -10,6 +10,9 @@ export interface ImageHeader {
 
 const ascii = (bytes: Uint8Array, at: number, length: number) => String.fromCharCode(...bytes.subarray(at, at + length))
 
+const sized = (contentType: ImageType, width: number, height: number): ImageHeader | null =>
+  width > 0 && height > 0 && width <= 16_384 && height <= 16_384 ? { contentType, width, height } : null
+
 export function readImageHeader(bytes: Uint8Array): ImageHeader | null {
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
   const has = (n: number) => bytes.length >= n
@@ -56,6 +59,3 @@ export function readImageHeader(bytes: Uint8Array): ImageHeader | null {
   }
   return null
 }
-
-const sized = (contentType: ImageType, width: number, height: number): ImageHeader | null =>
-  width > 0 && height > 0 && width <= 16_384 && height <= 16_384 ? { contentType, width, height } : null

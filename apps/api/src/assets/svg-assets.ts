@@ -10,18 +10,6 @@ import { SVG_TYPE, SvgError, svgMarkup, svgToLayers } from '@dazbee/svg'
 
 import type { ImageHeader } from './images.ts'
 
-/** The bytes as SVG markup: UTF-8 text whose first element is <svg>. Null for anything else. */
-function svgText(bytes: Uint8Array): string | null {
-  if (bytes.length > MAX_SVG_BYTES) return null
-  let text: string
-  try {
-    text = new TextDecoder('utf-8', { fatal: true }).decode(bytes)
-  } catch {
-    return null
-  }
-  return svgMarkup(text)
-}
-
 /** An SVG file's type and size, its sides rounded up to whole pixels; null when it isn't one we can read as layers. */
 export async function readSvgHeader(bytes: Uint8Array): Promise<ImageHeader | null> {
   const text = svgText(bytes)
@@ -71,4 +59,16 @@ export async function svgThumbnail(bytes: Uint8Array, size: number): Promise<Uin
     fallbackFamilies: [...FALLBACK_FAMILIES],
     images: {},
   }).png
+}
+
+/** The bytes as SVG markup: UTF-8 text whose first element is <svg>. Null for anything else. */
+function svgText(bytes: Uint8Array): string | null {
+  if (bytes.length > MAX_SVG_BYTES) return null
+  let text: string
+  try {
+    text = new TextDecoder('utf-8', { fatal: true }).decode(bytes)
+  } catch {
+    return null
+  }
+  return svgMarkup(text)
 }

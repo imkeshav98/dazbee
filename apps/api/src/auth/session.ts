@@ -15,15 +15,6 @@ export interface Session {
 /** Finds the session of a request, or null when it has none. */
 export type SessionOf = (request: Request) => Session | null | Promise<Session | null>
 
-export const DEV_WORKSPACE = { id: 'dev-workspace', name: 'Development agency', kind: 'agency' as const }
-export const DEV_BRANDS = [
-  { id: 'dev-brand-coffee', name: 'Harbour Coffee' },
-  { id: 'dev-brand-cycles', name: 'Northline Cycles' },
-]
-
-/** Every request is the one development user of the development workspace. Never on in production. */
-export const devSession: SessionOf = () => ({ userId: 'dev-user', workspaceId: DEV_WORKSPACE.id })
-
 // Session tokens are base64url(JSON payload) "." base64url(HMAC-SHA256 of that text), keyed by
 // SESSION_SECRET, which only the API has. The web app keeps one in an httpOnly cookie.
 
@@ -34,8 +25,19 @@ export interface SessionTokenPayload extends Session {
   expiresAt: number
 }
 
+export const DEV_WORKSPACE = { id: 'dev-workspace', name: 'Development agency', kind: 'agency' as const }
+export const DEV_BRANDS = [
+  { id: 'dev-brand-coffee', name: 'Harbour Coffee' },
+  { id: 'dev-brand-cycles', name: 'Northline Cycles' },
+]
+
+/** Every request is the one development user of the development workspace. Never on in production. */
+export const devSession: SessionOf = () => ({ userId: 'dev-user', workspaceId: DEV_WORKSPACE.id })
+
 /** How long a session lasts before the person signs in again. */
 export const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000
+
+const sign = (secret: string, text: string) => createHmac('sha256', secret).update(text).digest('base64url')
 
 /** The session secret from the environment; refuses one too short to be a real key. */
 export function sessionSecret(env: NodeJS.ProcessEnv = process.env): string {
@@ -43,8 +45,6 @@ export function sessionSecret(env: NodeJS.ProcessEnv = process.env): string {
   if (!secret || secret.length < 32) throw new Error('SESSION_SECRET must be set to at least 32 characters')
   return secret
 }
-
-const sign = (secret: string, text: string) => createHmac('sha256', secret).update(text).digest('base64url')
 
 export function signSessionToken(
   secret: string,

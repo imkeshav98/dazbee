@@ -46,15 +46,6 @@ const toSummary = (row: Omit<AssetSummary, 'createdAt'> & { createdAt: Date }): 
 const literal = (text: string) => text.replace(/[\\%_]/g, (c) => `\\${c}`)
 
 /**
- * One search word matches an asset whose name has it anywhere, or which has a tag that starts with
- * it, ignoring case: "sum" finds "Summer sale.jpg" and the tag "summer".
- */
-function matches(word: string): SQL {
-  const lower = word.toLowerCase()
-  return sql`(${assets.name} ILIKE ${`%${literal(word)}%`} OR EXISTS (SELECT 1 FROM unnest(${assets.tags}) AS tag WHERE tag LIKE ${`${literal(lower)}%`}))`
-}
-
-/**
  * The brand's assets, newest first. With a query, only those that match every word of it, by name
  * or tag (#52).
  */
@@ -73,63 +64,6 @@ export async function listAssets(db: Db, workspaceId: string, brandId: string, q
     )
     .orderBy(desc(assets.createdAt), desc(assets.id))
   return rows.map(toSummary)
-}
-
-/**
- * What of the brand shows the asset: its designs as they are stored, the templates saved from it
- * (whose images are its assets), and its logo. Only the brand's own, since an asset is one brand's.
- */
-async function assetUses(db: Db, workspaceId: string, brandId: string, id: string): Promise<AssetUse[]> {
-  const uses: AssetUse[] = []
-  // Only designs whose stored state holds the id's bytes can show it; each of those is read to be sure.
-  const brandDesigns = await db
-    .select({ id: designs.id, name: designs.name })
-    .from(designs)
-    .innerJoin(designStates, eq(designStates.designId, designs.id))
-    .where(
-      and(
-        eq(designs.workspaceId, workspaceId),
-        eq(designs.brandId, brandId),
-        sql`position(${Buffer.from(id, 'utf8')} in ${designStates.state}) > 0`,
-      ),
-    )
-    .orderBy(designs.name, designs.id)
-  for (const design of brandDesigns) {
-    const content = await storedDesign(db, design.id)
-    if (content && imageAssetIds(content).includes(id)) uses.push({ kind: 'design', id: design.id, name: design.name })
-  }
-  const saved = await db
-    .select({ id: templates.id, name: templates.name, content: templates.content })
-    .from(templates)
-    .where(and(eq(templates.workspaceId, workspaceId), eq(templates.fromBrandId, brandId)))
-    .orderBy(templates.name, templates.id)
-  for (const template of saved) {
-    const parsed = parseDesign(template.content)
-    if (parsed.success && imageAssetIds(parsed.design).includes(id))
-      uses.push({ kind: 'template', id: template.id, name: template.name })
-  }
-  const [kit] = await db
-    .select({ logo: brandKits.logoAssetId })
-    .from(brandKits)
-    .where(and(eq(brandKits.workspaceId, workspaceId), eq(brandKits.brandId, brandId)))
-  if (kit?.logo === id) uses.push({ kind: 'logo', id: brandId, name: '' })
-  return uses
-}
-
-/** Whether the brand has the asset in its library: recorded and not deleted. */
-async function listed(db: Db, workspaceId: string, brandId: string, id: string) {
-  const [row] = await db
-    .select({ id: assets.id })
-    .from(assets)
-    .where(
-      and(
-        eq(assets.id, id),
-        eq(assets.workspaceId, workspaceId),
-        eq(assets.brandId, brandId),
-        isNull(assets.deletedAt),
-      ),
-    )
-  return Boolean(row)
 }
 
 /** What of the brand shows the asset, or null when its library has no such asset. */
@@ -286,4 +220,70 @@ export async function startUpload(
   })
   // Browsers set content-length from the body themselves; it is signed, so it must match byteSize.
   return { asset: null, upload: { url, headers: { 'content-type': upload.contentType }, expiresAt } }
+}
+
+/**
+ * One search word matches an asset whose name has it anywhere, or which has a tag that starts with
+ * it, ignoring case: "sum" finds "Summer sale.jpg" and the tag "summer".
+ */
+function matches(word: string): SQL {
+  const lower = word.toLowerCase()
+  return sql`(${assets.name} ILIKE ${`%${literal(word)}%`} OR EXISTS (SELECT 1 FROM unnest(${assets.tags}) AS tag WHERE tag LIKE ${`${literal(lower)}%`}))`
+}
+
+/** Whether the brand has the asset in its library: recorded and not deleted. */
+async function listed(db: Db, workspaceId: string, brandId: string, id: string) {
+  const [row] = await db
+    .select({ id: assets.id })
+    .from(assets)
+    .where(
+      and(
+        eq(assets.id, id),
+        eq(assets.workspaceId, workspaceId),
+        eq(assets.brandId, brandId),
+        isNull(assets.deletedAt),
+      ),
+    )
+  return Boolean(row)
+}
+
+/**
+ * What of the brand shows the asset: its designs as they are stored, the templates saved from it
+ * (whose images are its assets), and its logo. Only the brand's own, since an asset is one brand's.
+ */
+async function assetUses(db: Db, workspaceId: string, brandId: string, id: string): Promise<AssetUse[]> {
+  const uses: AssetUse[] = []
+  // Only designs whose stored state holds the id's bytes can show it; each of those is read to be sure.
+  const brandDesigns = await db
+    .select({ id: designs.id, name: designs.name })
+    .from(designs)
+    .innerJoin(designStates, eq(designStates.designId, designs.id))
+    .where(
+      and(
+        eq(designs.workspaceId, workspaceId),
+        eq(designs.brandId, brandId),
+        sql`position(${Buffer.from(id, 'utf8')} in ${designStates.state}) > 0`,
+      ),
+    )
+    .orderBy(designs.name, designs.id)
+  for (const design of brandDesigns) {
+    const content = await storedDesign(db, design.id)
+    if (content && imageAssetIds(content).includes(id)) uses.push({ kind: 'design', id: design.id, name: design.name })
+  }
+  const saved = await db
+    .select({ id: templates.id, name: templates.name, content: templates.content })
+    .from(templates)
+    .where(and(eq(templates.workspaceId, workspaceId), eq(templates.fromBrandId, brandId)))
+    .orderBy(templates.name, templates.id)
+  for (const template of saved) {
+    const parsed = parseDesign(template.content)
+    if (parsed.success && imageAssetIds(parsed.design).includes(id))
+      uses.push({ kind: 'template', id: template.id, name: template.name })
+  }
+  const [kit] = await db
+    .select({ logo: brandKits.logoAssetId })
+    .from(brandKits)
+    .where(and(eq(brandKits.workspaceId, workspaceId), eq(brandKits.brandId, brandId)))
+  if (kit?.logo === id) uses.push({ kind: 'logo', id: brandId, name: '' })
+  return uses
 }

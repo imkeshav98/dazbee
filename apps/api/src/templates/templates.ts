@@ -24,15 +24,6 @@ import { renderFirstPage } from '../drawing/render.ts'
 import { templateThumbnailKey } from '../storage-keys.ts'
 import { createDesign, InvalidContent } from '../workspace/designs.ts'
 
-const summary = {
-  id: templates.id,
-  name: templates.name,
-  brandId: templates.brandId,
-  kind: templates.kind,
-  width: templates.width,
-  height: templates.height,
-  createdAt: templates.createdAt,
-}
 type Row = {
   id: string
   name: string
@@ -42,6 +33,17 @@ type Row = {
   height: number
   createdAt: Date
 }
+
+const summary = {
+  id: templates.id,
+  name: templates.name,
+  brandId: templates.brandId,
+  kind: templates.kind,
+  width: templates.width,
+  height: templates.height,
+  createdAt: templates.createdAt,
+}
+
 const toSummary = (row: Row): TemplateSummary => ({
   ...row,
   scope: row.brandId ? 'brand' : 'workspace',
@@ -60,14 +62,6 @@ export async function listTemplates(db: Db, workspaceId: string, brandId: string
     .where(visibleTo(workspaceId, brandId))
     .orderBy(desc(templates.createdAt), desc(templates.id))
   return rows.map(toSummary)
-}
-
-async function visibleTemplate(db: Db, workspaceId: string, brandId: string, id: string) {
-  const [row] = await db
-    .select()
-    .from(templates)
-    .where(and(eq(templates.id, id), visibleTo(workspaceId, brandId)))
-  return row ?? null
 }
 
 /** Renames a template the brand can see; null when it can't. */
@@ -144,6 +138,34 @@ export async function saveTemplate(
   return toSummary(row)
 }
 
+/** A new design of the brand from the template, sharing no ids with it; null without such a template. */
+export async function startFromTemplate(
+  db: Db,
+  workspaceId: string,
+  brandId: string,
+  templateId: string,
+  name?: string,
+): Promise<DesignSummary | null> {
+  const row = await visibleTemplate(db, workspaceId, brandId, templateId)
+  if (!row) return null
+  const parsed = parseDesign(row.content)
+  if (!parsed.success) throw new Error(`template ${row.id} is not a valid design: ${parsed.errors[0]}`)
+  const fresh = withFreshIds(parsed.design)
+  const mapped =
+    row.fromBrandId === brandId
+      ? new Map<string, string>()
+      : await assetsFor(db, workspaceId, row.fromBrandId, brandId, imageAssetIds(fresh))
+  return createDesign(db, workspaceId, brandId, name ?? row.name, withAssets(fresh, mapped))
+}
+
+async function visibleTemplate(db: Db, workspaceId: string, brandId: string, id: string) {
+  const [row] = await db
+    .select()
+    .from(templates)
+    .where(and(eq(templates.id, id), visibleTo(workspaceId, brandId)))
+  return row ?? null
+}
+
 /**
  * The brand's asset for each image the template names, made from the same stored original where
  * the brand has none: asset ids by the template's ids.
@@ -191,24 +213,4 @@ function withAssets(design: Design, mapped: Map<string, string>): unknown {
   for (const [from, to] of mapped)
     if (from !== to) json = json.replaceAll(`"assetId":${JSON.stringify(from)}`, `"assetId":${JSON.stringify(to)}`)
   return JSON.parse(json)
-}
-
-/** A new design of the brand from the template, sharing no ids with it; null without such a template. */
-export async function startFromTemplate(
-  db: Db,
-  workspaceId: string,
-  brandId: string,
-  templateId: string,
-  name?: string,
-): Promise<DesignSummary | null> {
-  const row = await visibleTemplate(db, workspaceId, brandId, templateId)
-  if (!row) return null
-  const parsed = parseDesign(row.content)
-  if (!parsed.success) throw new Error(`template ${row.id} is not a valid design: ${parsed.errors[0]}`)
-  const fresh = withFreshIds(parsed.design)
-  const mapped =
-    row.fromBrandId === brandId
-      ? new Map<string, string>()
-      : await assetsFor(db, workspaceId, row.fromBrandId, brandId, imageAssetIds(fresh))
-  return createDesign(db, workspaceId, brandId, name ?? row.name, withAssets(fresh, mapped))
 }
