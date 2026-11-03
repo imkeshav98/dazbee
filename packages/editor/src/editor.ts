@@ -321,6 +321,21 @@ function live(
   let camera: Camera = { x: 0, y: 0, zoom: 1 }
   let tool: Tool = 'select'
   let selection: Selection | null = null
+  /**
+   * The page a click on its background picked: outlined dashed in every size, its labels lit. No
+   * layer is selected meanwhile, so the layers' keys do nothing to it; a layer selected, Esc, or a
+   * click or drag elsewhere lets it go.
+   */
+  let pickedPage: string | null = null
+  const pageListeners = new Set<(pageId: string | null) => void>()
+  function pickPage(pageId: string | null) {
+    const next = pageId && design.pages[pageId] && grid.frames.some((f) => f.pageId === pageId) ? pageId : null
+    if (next === pickedPage) return
+    pickedPage = next
+    if (next) selection = null
+    drawOverlay()
+    for (const listener of pageListeners) listener(pickedPage)
+  }
   /** The group or frame double-clicked into: a click then picks what is directly inside it (#41). */
   let entered: string | null = null
   /** What the drag in progress snapped to, shown as guides and equal gaps (#42). */
@@ -884,7 +899,7 @@ function live(
     const label = document.createElement('div')
     label.className = 'frame-label'
     label.dataset.frame = frame.key
-    if (selection?.frame === frame.key || editing?.frame === frame.key) label.dataset.active = ''
+    if (selection?.frame === frame.key || editing?.frame === frame.key || pickedPage === frame.pageId) label.dataset.active = ''
     const at = toScreen(camera, frame)
     // A frame running off the stage's start keeps its label in view, along the part still showing.
     const left = Math.max(at.x, LABEL_INSET)
@@ -1033,10 +1048,16 @@ function live(
 
   let drawnFrames: Frame[] = []
   function drawOverlay() {
+    // A layer selected, or the page's frames gone (a page deleted, a size shown alone), lets the page go.
+    const pageGone = pickedPage !== null && (selection !== null || !design.pages[pickedPage] || !grid.frames.some((f) => f.pageId === pickedPage))
+    if (pageGone) pickedPage = null
     const parts: Element[] = []
     for (const frame of drawnFrames) {
       const label = frameLabel(frame, drawnFrames)
       if (label) parts.push(label)
+    }
+    for (const frame of drawnFrames) {
+      if (frame.pageId === pickedPage) parts.push(outline('page-picked', frame, { x: 0, y: 0, width: frame.width, height: frame.height, rotation: 0 }))
     }
     const enteredFrame = entered && frameOf(selection?.frame)
     const enteredBox = enteredFrame && entered && drawnBoxOf(enteredFrame, entered, design)
@@ -1099,6 +1120,7 @@ function live(
       lastSelection = now
       for (const listener of selectionListeners) listener(selection?.ids ?? [])
     }
+    if (pageGone) for (const listener of pageListeners) listener(null)
   }
 
   const SVG = 'http://www.w3.org/2000/svg'
@@ -2502,15 +2524,18 @@ function live(
       hug(gesture.roots)
       gesture.end()
     }
-    // A click on a locked layer, not a drag, selects it.
-    if (gesture?.kind === 'marquee' && lockedClick && Math.hypot(gesture.to.x - gesture.from.x, gesture.to.y - gesture.from.y) * camera.zoom < CLICK_SLOP) {
-      select([lockedClick.id], lockedClick.frame)
-    }
+    // A click on a locked layer, not a drag, selects it; a click on no layer picks the page under
+    // it, and a click off every page or a drag lets the page go.
+    const clicked = gesture?.kind === 'marquee' && Math.hypot(gesture.to.x - gesture.from.x, gesture.to.y - gesture.from.y) * camera.zoom < CLICK_SLOP
+    if (clicked && lockedClick) select([lockedClick.id], lockedClick.frame)
+    else if (gesture?.kind === 'marquee') pickPage(clicked && !selection ? frameAt(grid.frames, gesture.from)?.pageId ?? null : null)
     lockedClick = null
     if (clickedAlone !== null && selection) {
       // A click that picks a layer outside the group gone into, or nothing, leaves it.
       if (entered && (!clickedAlone || !insideEntered(clickedAlone))) entered = null
       select(clickedAlone ? [clickedAlone] : [], selection.frame)
+      // A click inside the selection's box on no layer picks the page there.
+      if (!clickedAlone && pressedAt) pickPage(frameAt(grid.frames, toWorld(camera, pressedAt))?.pageId ?? null)
     }
     clickedAlone = null
     pressedAt = null
@@ -2783,6 +2808,11 @@ function live(
         stopEditing()
       }
       viewAction()
+      return true
+    }
+    // Esc lets the picked page go; the layers' other keys do nothing to it.
+    if (action === 'deselect' && !selection && pickedPage) {
+      pickPage(null)
       return true
     }
     const frame = selection && frameOf(selection.frame)
@@ -3553,6 +3583,15 @@ function live(
       selectionListeners.add(listener)
       return () => selectionListeners.delete(listener)
     },
+    /** The page a click on its background picked, or null; no layer is selected while one is. */
+    pickedPage: () => pickedPage,
+    /** Picks a page as a click on its background does, clearing the selection; null lets it go. */
+    pickPage,
+    /** Calls back with the picked page, or null, whenever it changes. */
+    onPagePick(listener: (pageId: string | null) => void) {
+      pageListeners.add(listener)
+      return () => pageListeners.delete(listener)
+    },
     /** Whether the rulers along the stage's edges show. */
     rulers: () => rulers,
     /** Whether a drag snaps to layers and the frame. */
@@ -3865,6 +3904,7 @@ function live(
       cancelAnimationFrame(pending)
       drawListeners.clear()
       selectionListeners.clear()
+      pageListeners.clear()
       noticeListeners.clear()
       toolListeners.clear()
       doc.off('update', redraw)

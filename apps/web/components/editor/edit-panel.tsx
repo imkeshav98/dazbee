@@ -9,7 +9,7 @@ import {
   ArrowDownIcon, ArrowLineDownIcon, ArrowLineUpIcon, ArrowsOutLineHorizontalIcon, ArrowsOutLineVerticalIcon, ArrowUpIcon, XIcon, type Icon,
 } from '@phosphor-icons/react'
 import type { Editor, ShortcutAction } from '@dazbee/editor'
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from 'react'
 import { cn } from '../../lib/cn.ts'
 import { useMessages } from '../../lib/i18n/client.tsx'
 import { format } from '../../lib/i18n/index.ts'
@@ -160,13 +160,17 @@ function Panel({ id, target, design, brandId }: { id: LayerPanelId; target: Targ
  * Closes the open panel; with `back`, the focus goes back to the item that opened it at once,
  * before the panel goes: later, it could take the focus from whatever the next click or key opened.
  */
-function closePanel(id: PanelId, back: boolean) {
-  if (back) document.querySelector<HTMLElement>(`[data-opens="${id}"]`)?.focus()
+function closePanel(id: PanelId, back: boolean, opener: Element | null = null) {
+  if (back) openerOf(id, opener)?.focus()
   setOpen(null)
 }
 
+/** The item that opened panel `id`: the one that had the focus as it opened, else the first that opens it. */
+const openerOf = (id: PanelId, opener: Element | null) =>
+  opener instanceof HTMLElement && opener.isConnected && opener.dataset.opens === id ? opener : document.querySelector<HTMLElement>(`[data-opens="${id}"]`)
+
 /**
- * The edit panel's frame, for a layer's panels and the design's own (Sizes): its title, a note and
+ * The edit panel's frame, for a layer's panels and the design's own (Sizes, Pages, Background): its title, a note and
  * an action beside it, ✕, and a body that scrolls. It floats at the stage's end side under the top
  * bar's row, only as tall as what it holds; on a phone it is a sheet at the bottom. Esc or ✕ closes
  * it, and the focus goes back to the item that opened it when closed from inside it.
@@ -179,6 +183,8 @@ export function PanelFrame({ id, title, note, action, children }: { id: PanelId;
   const body = useRef<HTMLDivElement>(null)
   const bodyRef = useOverlayScroll(body)
   const scroll = useScrollEdges(body)
+  // Sizes opens from the header pill and from the page's bar: the focus goes back to the one used.
+  const [opener] = useState(() => document.activeElement)
   // Under the top bar while it shows; with nothing selected, under the row kept for it.
   const [rowBottom, setRowBottom] = useState(0)
   useLayoutEffect(() => {
@@ -197,13 +203,13 @@ export function PanelFrame({ id, title, note, action, children }: { id: PanelId;
       if (at instanceof HTMLElement && panel.current?.contains(at) && (at.tagName === 'INPUT' || at.tagName === 'TEXTAREA' || at.tagName === 'SELECT')) {
         setOpen(null)
         requestAnimationFrame(() => {
-          if (document.activeElement === document.body || document.activeElement === null) document.querySelector<HTMLElement>(`[data-opens="${id}"]`)?.focus()
+          if (document.activeElement === document.body || document.activeElement === null) openerOf(id, opener)?.focus()
         })
         return
       }
       event.stopImmediatePropagation()
       event.preventDefault()
-      closePanel(id, panel.current?.contains(at) ?? false)
+      closePanel(id, panel.current?.contains(at) ?? false, opener)
     }
     window.addEventListener('keydown', onKey, true)
     return () => window.removeEventListener('keydown', onKey, true)
@@ -241,10 +247,11 @@ export function PanelFrame({ id, title, note, action, children }: { id: PanelId;
       data-testid={`bar-${id}-menu`}
       data-panel={id}
       // The panel takes the focus as it opens but is no control itself, so it shows no focus ring.
-      style={{ outline: 'none', ...(phone ? {} : { top, maxHeight: `calc(100% - ${top}px - 4.5rem)` }) }}
+      style={{ outline: 'none', ...(phone ? {} : { top, '--panel-top': `${top}px` } as CSSProperties) }}
       className={cn(
         'pop-in absolute z-20 flex flex-col overflow-hidden rounded-[16px] surface-frost outline-none',
-        'end-3 w-[300px]',
+        // Clear of the zoom pill below it, and on a tablet of Pages stacked over the zoom pill too.
+        'end-3 w-[300px] max-h-[calc(100%-var(--panel-top)-4.5rem)] sm:max-lg:max-h-[calc(100%-var(--panel-top)-7.5rem)]',
         'max-sm:inset-x-2 max-sm:end-2 max-sm:top-auto max-sm:bottom-2 max-sm:max-h-[46%] max-sm:w-auto max-sm:rounded-[22px]',
       )}
     >
@@ -252,7 +259,7 @@ export function PanelFrame({ id, title, note, action, children }: { id: PanelId;
         <h2 id="edit-panel-title" className="min-w-0 flex-1 truncate font-display text-[15px] font-bold tracking-tight">{title}</h2>
         {note && <span data-testid="edit-panel-note" className="min-w-0 max-w-[50%] shrink-0 truncate pe-0.5 text-[11px] font-medium text-muted">{note}</span>}
         {action}
-        <button type="button" aria-label={t.editor.closePanel} data-testid="edit-panel-close" onClick={() => closePanel(id, true)} className="grid size-7 shrink-0 cursor-pointer place-items-center rounded-full text-subtle hover:bg-hover hover:text-text">
+        <button type="button" aria-label={t.editor.closePanel} data-testid="edit-panel-close" onClick={() => closePanel(id, true, opener)} className="grid size-7 shrink-0 cursor-pointer place-items-center rounded-full text-subtle hover:bg-hover hover:text-text">
           <XIcon size={14} aria-hidden />
         </button>
       </div>

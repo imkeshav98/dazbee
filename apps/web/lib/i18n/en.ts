@@ -314,6 +314,7 @@ export const en = {
     page: {
       title: 'Page',
       background: 'Background',
+      backgroundColour: 'Background colour',
       brandColors: 'Brand colours',
       hex: 'Hex',
       layers: 'Background layers',
@@ -323,6 +324,10 @@ export const en = {
     },
     pages: {
       title: 'Pages',
+      button: 'Pages {n}/{total}',
+      buttonShort: '{n}/{total}',
+      buttonLabel: 'Pages: page {n} of {total}',
+      more: 'More for {name}',
       add: 'Add page',
       addShort: 'Page',
       numbered: '{n}. {name}',

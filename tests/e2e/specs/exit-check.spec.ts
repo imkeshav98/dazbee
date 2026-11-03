@@ -21,7 +21,7 @@ import { expect, test, type Page } from '../support/test.ts'
 import { photo } from '../support/assets.ts'
 import { designOf, OUTPUT, screenPoint, writeOutput } from '../support/editor.ts'
 import { newBrand } from '../support/seed.ts'
-import { barMenu, press, sizesPanel } from '../support/stage.ts'
+import { backgroundPanel, barMenu, press, sizesPanel } from '../support/stage.ts'
 
 test.describe.configure({ timeout: 600_000 })
 
@@ -116,9 +116,8 @@ test('an ad set rebuilt in 5 formats through real input exports PNG, JPG, PDF an
   await page.keyboard.press('Escape')
   await drawn(page)
 
-  // The page takes the brand colour from the Page card.
-  await page.mouse.click(40, 900)
-  await page.getByTestId('page-brand-colors').getByRole('button', { name: new RegExp(`^${colour}`) }).click()
+  // The page takes the brand colour from its Background panel, the page picked by a click on it.
+  await (await backgroundPanel(page, 30, 30)).getByTestId('brand-colours').getByRole('button', { name: colour }).click()
   await expect.poll(async () => (await stored(page)).pages.p1?.fills).toEqual([{ type: 'solid', color: '#1F7A4DFF' }])
 
   // A badge drawn with the rectangle tool, in the brand colour from the kit.

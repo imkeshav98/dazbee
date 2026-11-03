@@ -1,7 +1,5 @@
-// Floating property cards (#83): no inspector column, the canvas runs full width, and the cards
-// float at the top end, each as tall as its content. The stage fits the ads between the capsule
-// and the cards. With nothing selected the Page card paints the page; a selection shows Arrange.
-// On phones the cards are a bottom sheet opened from the tab bar.
+// The stage without cards: the canvas runs full width and the stage fits the ads between the
+// capsule and its end edge. A selection shows the top bar, and nothing selected leaves no bar.
 import { expect, test, type Page } from '../support/test.ts'
 import { designOf, editorPath, screenPoint, writeOutput } from '../support/editor.ts'
 import { liveDesign, seed } from '../support/seed.ts'
@@ -13,7 +11,6 @@ const box = async (page: Page, testId: string) => {
   if (!found) throw new Error(`no ${testId}`)
   return found
 }
-const pageFill = async (page: Page) => (JSON.parse(await designOf(page)) as { pages: Record<string, { fills: { color: string }[] }> }).pages.p1?.fills[0]?.color
 
 async function open(page: Page) {
   const designId = await seed(liveDesign())
@@ -24,38 +21,23 @@ async function open(page: Page) {
 
 test.use({ viewport: { width: 1440, height: 900 } })
 
-test('the cards float over a full-width canvas and the ads fit between the capsule and them', async ({ page }) => {
+test('the canvas runs full width and the ads fit between the capsule and the stage end', async ({ page }) => {
   await open(page)
   const stage = await box(page, 'stage')
-  const cards = await box(page, 'cards')
   const rail = await box(page, 'rail')
-  // No inspector column: the canvas runs the whole width, and the cards sit at its top end.
   expect(stage.width).toBeGreaterThan(1430)
-  expect(stage.x + stage.width - (cards.x + cards.width)).toBeLessThan(16)
-  // Below the end island (#110).
-  expect(cards.y - stage.y).toBeLessThan(96)
-  expect(await page.getByTestId('cards').evaluate((el) => getComputedStyle(el).backgroundColor)).toBe('rgba(0, 0, 0, 0)')
-  for (const card of ['page-card', 'pages']) await expect(page.getByTestId(card)).toBeVisible()
-  // The sizes are in the Sizes panel, from the header pill.
-  await expect(page.getByTestId('formats')).toHaveCount(0)
-  // Each card is as tall as what it holds, and frosted.
-  const pageCard = page.getByTestId('page-card')
-  // The brand's own colours, when its kit has any, add a row of their own above the fixed set.
-  const brandRow = pageCard.getByTestId('page-brand-colors')
-  const brandRowHeight = (await brandRow.count()) > 0 ? (await brandRow.boundingBox())?.height ?? 0 : 0
-  // Its colours, its hex and its one background layer, open.
-  expect((await box(page, 'page-card')).height).toBeLessThan(270 + brandRowHeight)
-  expect(await pageCard.evaluate((el) => getComputedStyle(el).backdropFilter)).toContain('blur(18px)')
-
-  // The square, fitted, sits wholly between the capsule and the cards, centred in that gap: as
-  // it opens (the editor is ready only once it is), and again from Zoom to fit.
+  // No cards: with nothing selected the design's sizes and pages are behind their buttons.
+  await expect(page.getByTestId('cards')).toHaveCount(0)
+  await expect(page.getByTestId('top-bar')).toHaveCount(0)
+  // The square, fitted, sits wholly between the capsule and the stage's end, centred in that gap:
+  // as it opens (the editor is ready only once it is), and again from Zoom to fit.
   const between = async () => {
     await page.evaluate(() => window.dazbee?.drawn())
     const left = (await screenPoint(page, 0, 0)).x
     const right = (await screenPoint(page, 1080, 1080)).x
     expect(left).toBeGreaterThan(rail.x + rail.width)
-    expect(right).toBeLessThan(cards.x)
-    expect(Math.abs((left + right) / 2 - (rail.x + rail.width + cards.x) / 2)).toBeLessThan(12)
+    expect(right).toBeLessThan(stage.x + stage.width)
+    expect(Math.abs((left + right) / 2 - (rail.x + rail.width + stage.x + stage.width) / 2)).toBeLessThan(12)
   }
   await between()
   await page.evaluate(() => window.dazbee?.setCamera({ x: 0, y: 0, zoom: 1 }))
@@ -65,35 +47,12 @@ test('the cards float over a full-width canvas and the ads fit between the capsu
   await shoot(page, 'design')
 })
 
-test('the Page card paints the page, and its hex takes any colour', async ({ page }) => {
-  await open(page)
-  const card = page.getByTestId('page-card')
-  expect(await pageFill(page)).toBe('#FFF8F0FF')
-  await card.getByRole('button', { name: '#FF48B0' }).click()
-  await expect.poll(() => pageFill(page)).toBe('#FF48B0FF')
-  await expect(card.getByRole('button', { name: '#FF48B0' })).toHaveAttribute('aria-pressed', 'true')
-  await shoot(page, 'page-pink')
-  // One undo step takes the colour back.
-  await page.keyboard.press('Control+z')
-  await expect.poll(() => pageFill(page)).toBe('#FFF8F0FF')
-  await expect(card.getByRole('button', { name: '#FF48B0' })).toHaveAttribute('aria-pressed', 'false')
-
-  const hex = card.getByRole('textbox', { name: 'Hex', exact: true })
-  await expect(hex).toHaveValue('#FFF8F0')
-  await hex.fill('3d6bff')
-  await hex.press('Enter')
-  await expect.poll(() => pageFill(page)).toBe('#3D6BFFFF')
-  await shoot(page, 'page-fine-tune')
-})
-
-test('a selection swaps the design cards for the top bar; several layers line up and spread out from it and group from the small menu', async ({ page }) => {
+test('a selection shows the top bar; several layers line up and spread out from it and group from the small menu', async ({ page }) => {
   await open(page)
   const at = await screenPoint(page, 200, 180)
   await page.mouse.click(at.x, at.y)
   const arrange = page.getByTestId('arrange')
   await expect((await openCard(page, 'layout-card'))).toBeVisible()
-  await expect(page.getByTestId('page-card')).toHaveCount(0)
-  await expect(page.getByTestId('formats')).toHaveCount(0)
   // One layer lines up with its format from the full menu.
   await expect(arrange).toHaveCount(0)
   await expect(page.getByTestId('bar-line-up')).toHaveCount(0)
@@ -114,28 +73,8 @@ test('a selection swaps the design cards for the top bar; several layers line up
   await expect.poll(async () => Object.values(JSON.parse(await designOf(page)).nodes as Record<string, { type: string }>).filter((n) => n.type === 'group').length).toBe(1)
   expect(Object.keys(JSON.parse(await designOf(page)).nodes).length).toBe(before + 1)
 
-  // Escape clears the selection and the design cards come back.
+  // Escape clears the selection and the bar goes.
   await page.keyboard.press('Escape')
   await page.keyboard.press('Escape')
-  await expect(page.getByTestId('page-card')).toBeVisible()
-})
-
-test('on a phone the cards are a bottom sheet opened from the tab bar', async ({ browser }) => {
-  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true })
-  const page = await context.newPage()
-  await open(page)
-  // Closed, the cards leave the canvas to the design.
-  await expect(page.getByTestId('cards')).toBeHidden()
-  await page.getByRole('button', { name: 'Inspector' }).tap()
-  const cards = await box(page, 'cards')
-  const rail = await box(page, 'rail')
-  expect(cards.x).toBeGreaterThanOrEqual(0)
-  expect(cards.x + cards.width).toBeLessThanOrEqual(390)
-  expect(cards.width).toBeGreaterThan(360)
-  expect(cards.y + cards.height).toBeLessThanOrEqual(rail.y)
-  await expect(page.getByTestId('flyout')).toHaveCount(0)
-  await shoot(page, 'phone-sheet')
-  await page.getByRole('button', { name: 'Inspector' }).tap()
-  await expect(page.getByTestId('cards')).toBeHidden()
-  await context.close()
+  await expect(page.getByTestId('top-bar')).toHaveCount(0)
 })

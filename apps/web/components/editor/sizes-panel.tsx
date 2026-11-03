@@ -8,7 +8,7 @@ import * as Popover from '@radix-ui/react-popover'
 import { DotsThreeIcon, EyeIcon, FrameCornersIcon, StarIcon } from '@phosphor-icons/react'
 import type { Editor } from '@dazbee/editor'
 import { FORMAT_PRESETS, type Design } from '@dazbee/schema'
-import { useState } from 'react'
+import { Fragment, useState } from 'react'
 import { cn } from '../../lib/cn.ts'
 import { useMessages } from '../../lib/i18n/client.tsx'
 import { format } from '../../lib/i18n/index.ts'
@@ -24,8 +24,10 @@ const COMMON = ['feed-portrait', 'story', 'link-image', 'medium-rectangle'] as c
 const sizeOf = ({ width, height }: { width: number; height: number }) => `${width} × ${height}`
 /** A size as a chip shows it, short. */
 const shortSizeOf = ({ width, height }: { width: number; height: number }) => `${width}×${height}`
-/** A size's own button on its card: a 44 px target on a phone. */
-const CARD_BUTTON = cn(ICON_BUTTON, 'max-sm:size-10')
+/** A size's or a page's own button on its card: a 44 px target on a phone. */
+export const CARD_BUTTON = cn(ICON_BUTTON, 'max-sm:size-10')
+/** A size's or a page's card in its panel's list. */
+export const CARD_ROW = 'flex items-center gap-2.5 rounded-[10px] border border-line bg-surface p-2'
 const ordered = (design: Design) =>
   Object.entries(design.formats).sort(([a, x], [b, y]) => (x.order < y.order ? -1 : x.order > y.order ? 1 : a < b ? -1 : 1))
 /** A size's picture in its proportions, its long side 34. */
@@ -94,7 +96,7 @@ function SizeList({ editor, onRemoved }: { editor: Editor; onRemoved: (message: 
       {formats.map(([id, size], i) => {
         const primary = design.meta.primaryFormatId === id
         return (
-          <li key={id} data-format={id} data-focused={focused === id ? '' : undefined} className="flex items-center gap-2.5 rounded-[10px] border border-line bg-surface p-2 data-[focused]:border-accent data-[focused]:bg-accent-soft">
+          <li key={id} data-format={id} data-focused={focused === id ? '' : undefined} className={cn(CARD_ROW, 'data-[focused]:border-accent data-[focused]:bg-accent-soft')}>
             <span aria-hidden className="grid size-[34px] shrink-0 place-items-center">
               <span className="rounded-[3px] border border-line-strong bg-hover" style={{ ...thumbOf(size), backgroundColor: background }} />
             </span>
@@ -129,18 +131,22 @@ function SizeList({ editor, onRemoved }: { editor: Editor; onRemoved: (message: 
             <button type="button" aria-label={focused === id ? f.exitFocus : f.focus} title={focused === id ? f.exitFocus : f.focus} aria-pressed={focused === id} onClick={() => editor.focus(focused === id ? null : id)} className={cn(CARD_BUTTON, focused === id && 'text-accent-text')}>
               <EyeIcon size={15} aria-hidden />
             </button>
-            <SizeMenu
-              name={size.name}
-              first={i === 0}
-              last={i === formats.length - 1}
-              removable={!primary && formats.length > 1}
-              onRename={() => setRenaming(id)}
-              onUp={() => run('format.update', { id, before: formats[i - 1]?.[0] ?? null })}
-              onDown={() => run('format.update', { id, before: formats[i + 2]?.[0] ?? null })}
-              onRemove={() => {
-                run('format.remove', { id })
-                onRemoved(format(f.removed, { name: size.name }))
-              }}
+            <CardMenu
+              label={format(f.more, { name: size.name })}
+              items={[
+                { label: f.rename, run: () => setRenaming(id) },
+                { label: f.moveUp, disabled: i === 0, run: () => run('format.update', { id, before: formats[i - 1]?.[0] ?? null }) },
+                { label: f.moveDown, disabled: i === formats.length - 1, run: () => run('format.update', { id, before: formats[i + 2]?.[0] ?? null }) },
+                {
+                  label: f.remove,
+                  disabled: primary || formats.length === 1,
+                  danger: true,
+                  run: () => {
+                    run('format.remove', { id })
+                    onRemoved(format(f.removed, { name: size.name }))
+                  },
+                },
+              ]}
             />
           </li>
         )
@@ -149,40 +155,39 @@ function SizeList({ editor, onRemoved }: { editor: Editor; onRemoved: (message: 
   )
 }
 
-/** A size's menu: rename, move up, move down and remove, which a toast undoes. */
-function SizeMenu({ name, first, last, removable, onRename, onUp, onDown, onRemove }: {
-  name: string
-  first: boolean
-  last: boolean
-  removable: boolean
-  onRename: () => void
-  onUp: () => void
-  onDown: () => void
-  onRemove: () => void
-}) {
-  const t = useMessages()
-  const f = t.editor.formats
+/** One item of a card's menu; a `danger` one, last, removes, which a toast undoes. */
+export interface CardMenuItem { label: string; run: () => void; disabled?: boolean; danger?: boolean }
+
+/** A size's or a page's menu behind ⋯ on its card; a line goes before the item that removes it. */
+export function CardMenu({ label, items }: { label: string; items: CardMenuItem[] }) {
   const [open, setMenuOpen] = useState(false)
   const focus = useMenuFocus()
-  const act = (run: () => void) => () => {
-    setMenuOpen(false)
-    run()
-  }
   return (
     <Popover.Root open={open} onOpenChange={setMenuOpen}>
       <Popover.Trigger asChild>
-        <button ref={focus.button} type="button" aria-label={format(f.more, { name })} title={format(f.more, { name })} className={CARD_BUTTON}>
+        <button ref={focus.button} type="button" aria-label={label} title={label} className={CARD_BUTTON}>
           <DotsThreeIcon size={16} weight="bold" aria-hidden />
         </button>
       </Popover.Trigger>
       <Popover.Portal>
-        <Popover.Content side="bottom" align="end" sideOffset={6} collisionPadding={12} {...focus.content} aria-label={format(f.more, { name })} onKeyDown={(e) => e.stopPropagation()} className={cn(MENU, 'min-w-44')}>
+        <Popover.Content side="bottom" align="end" sideOffset={6} collisionPadding={12} {...focus.content} aria-label={label} onKeyDown={(e) => e.stopPropagation()} className={cn(MENU, 'min-w-44')}>
           {focus.back}
-          <button type="button" onClick={act(onRename)} className={MENU_ITEM}>{f.rename}</button>
-          <button type="button" disabled={first} onClick={act(onUp)} className={MENU_ITEM}>{f.moveUp}</button>
-          <button type="button" disabled={last} onClick={act(onDown)} className={MENU_ITEM}>{f.moveDown}</button>
-          <div className={MENU_DIVIDER} />
-          <button type="button" disabled={!removable} onClick={act(onRemove)} className={cn(MENU_ITEM, 'text-danger')}>{f.remove}</button>
+          {items.map((item) => (
+            <Fragment key={item.label}>
+              {item.danger && <div className={MENU_DIVIDER} />}
+              <button
+                type="button"
+                disabled={item.disabled}
+                onClick={() => {
+                  setMenuOpen(false)
+                  item.run()
+                }}
+                className={cn(MENU_ITEM, item.danger && 'text-danger')}
+              >
+                {item.label}
+              </button>
+            </Fragment>
+          ))}
         </Popover.Content>
       </Popover.Portal>
     </Popover.Root>

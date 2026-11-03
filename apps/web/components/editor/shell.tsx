@@ -1,13 +1,12 @@
 'use client'
 
-// The editor's chrome (#51): no top bar, but two islands floating at the top (#110); a capsule
-// floating over the canvas whose buttons open flyouts (Layers, Assets, AI, Brand; #82); property
-// cards floating at the top end (#83); a bottom tool dock and a slot for the mini bar above the
-// selection. The canvas runs edge to edge under all of it; the stage is the editor itself, told
+// The editor's chrome (#51): two islands floating at the top (#110); a capsule floating over the
+// canvas whose buttons open flyouts (Layers, Assets, AI, Brand; #82); a bottom tool dock and a slot
+// for the mini bar above the selection. The canvas runs edge to edge under all of it; the stage is the editor itself, told
 // which edges the chrome covers so it fits the ads between.
 import {
   CloudArrowUpIcon, CloudCheckIcon, CloudSlashIcon, CursorIcon, FrameCornersIcon, HandIcon, ImageIcon, ImagesIcon, PaletteIcon, PenNibIcon, ShapesIcon,
-  SlidersHorizontalIcon, SparkleIcon, StackIcon, TextTIcon, XIcon, type Icon,
+  SparkleIcon, StackIcon, TextTIcon, XIcon, type Icon,
 } from '@phosphor-icons/react'
 import type { ShapeTool } from '@dazbee/editor'
 import type { Placeable } from '../../lib/place-asset.ts'
@@ -19,23 +18,20 @@ import { useLocale, useMessages } from '../../lib/i18n/client.tsx'
 import { dirOf, format } from '../../lib/i18n/index.ts'
 import { useValue, type ValueStore } from '../../lib/value-store.ts'
 import { BrandMark } from '../brand-mark.tsx'
-import { useOverlayScroll } from '../ui/overlay-scroll.ts'
 import { Tooltip } from '../ui/tooltip.tsx'
 import { ImageTool } from './image-tool.tsx'
 import { isPanel, setFlyoutEnd, setOpen, useEditState } from './edit-store.ts'
 import { ShapeTools } from './shape-menu.tsx'
 import { BAR_ROW, BAR_ROW_HEIGHT, dockTool } from './styles.ts'
 
-export type Panel = 'layers' | 'assets' | 'ai' | 'brand' | 'properties'
+export type Panel = 'layers' | 'assets' | 'ai' | 'brand'
 export type Tool = 'select' | 'frame' | 'shape' | 'text' | 'pen' | 'image' | 'hand'
 
-const PANELS: { id: Panel; icon: Icon; phone?: true }[] = [
+const PANELS: { id: Panel; icon: Icon }[] = [
   { id: 'layers', icon: StackIcon },
   { id: 'assets', icon: ImagesIcon },
   { id: 'ai', icon: SparkleIcon },
   { id: 'brand', icon: PaletteIcon },
-  // On phones the property cards are a bottom sheet, opened from the tab bar.
-  { id: 'properties', icon: SlidersHorizontalIcon, phone: true },
 ]
 const TOOLS: { id: Tool; icon: Icon; key: string }[] = [
   { id: 'select', icon: CursorIcon, key: 'V' },
@@ -156,7 +152,7 @@ function SaveStatus({ status, fitted }: { status: ValueStore<string>; fitted: bo
 export interface ChromeInsets { top: number; right: number; bottom: number; left: number }
 
 /**
- * Measures how much of the stage the islands, the capsule, the cards and the dock cover. The
+ * Measures how much of the stage the islands, the capsule and the dock cover. The
  * islands at the top (#110) cover the top. Of the other pieces, one in the stage's lower part covers
  * the bottom (the dock, and the capsule when it is the phones' tab bar); one on the left or right of
  * the middle covers that side. The phones' open sheet spans the stage, so fitting around it would
@@ -231,7 +227,7 @@ function DesignName({ name, onRename }: { name: string; onRename?: ((name: strin
   )
 }
 
-export function EditorShell({ brandId, brandName, designName, onRename, status, sizes, history, tool: shownTool, shape = 'rect', onToolChange, image, onInsets, fitted = true, inspector, actions, account, panels, children }: {
+export function EditorShell({ brandId, brandName, designName, onRename, status, sizes, history, tool: shownTool, shape = 'rect', onToolChange, image, onInsets, fitted = true, actions, account, panels, children }: {
   brandId: string
   brandName: string
   designName: string
@@ -239,9 +235,9 @@ export function EditorShell({ brandId, brandName, designName, onRename, status, 
   onRename?: (name: string) => Promise<void>
   /** The editor's save state, or what it is doing before it opens. */
   status: ValueStore<string>
-  /** Undo and redo, after the save state in the header pill. */
   /** The design's sizes button, after its name. */
   sizes?: ReactNode
+  /** Undo and redo, after the save state in the header pill. */
   history?: ReactNode
   /** The tool in use, when the editor decides it (a key, or drawing a shape ends); the dock keeps its own otherwise. */
   tool?: Tool
@@ -250,12 +246,10 @@ export function EditorShell({ brandId, brandName, designName, onRename, status, 
   onToolChange?: (tool: Tool, shape: ShapeTool) => void
   /** The image tool: whether it is waiting for an image to be picked, and what to do with the one picked. */
   image?: { picking: boolean; onPick: (asset: Placeable) => void }
-  /** Called with the stage's edges the chrome covers, whenever they change; `withCards` once the cards are in. */
-  onInsets?: (insets: ChromeInsets, withCards: boolean) => void
+  /** Called with the stage's edges the always-on chrome covers, once it is first measured and whenever they change. */
+  onInsets?: (insets: ChromeInsets) => void
   /** False until the stage has fitted the design between the chrome: the editor is not ready before. */
   fitted?: boolean
-  /** The property cards, once the design is open. */
-  inspector?: ReactNode
   /** The design's one action at the header's end: Share, holding Export and Save as template. */
   actions?: ReactNode
   /** The account avatar after it, with language, theme, settings and sign out. */
@@ -275,10 +269,9 @@ export function EditorShell({ brandId, brandName, designName, onRename, status, 
   const note = flyoutNote?.text ?? null
   const [ownTool, setTool] = useState<Tool>('select')
   const tool = shownTool ?? ownTool
-  const panelTitle = (id: Panel) => (id === 'properties' ? t.editor.inspector : t.editor[id])
+  const panelTitle = (id: Panel) => t.editor[id]
   const panelEmpty = { layers: t.editor.layersEmpty, assets: t.editor.assetsEmpty, ai: t.editor.aiEmpty, brand: t.editor.brandEmpty }
-  const flyout = panel === 'properties' ? null : panel
-  const hasCards = Boolean(inspector)
+  const flyout = panel
   // What the top bar has open: on a phone an edit panel is a sheet, which hides the tab bar and the
   // dock, and a sheet and a rail flyout close each other.
   const edit = useEditState()
@@ -286,10 +279,6 @@ export function EditorShell({ brandId, brandName, designName, onRename, status, 
   useEffect(() => {
     if (sheet) setPanel((now) => (now === null ? now : null))
   }, [sheet])
-  // With something selected the top bar holds its settings, so the phones' cards sheet has nothing to show.
-  useEffect(() => {
-    if (edit.bar) setPanel((now) => (now === 'properties' ? null : now))
-  }, [edit.bar])
   const flyoutEl = useRef<HTMLElement>(null)
   useLayoutEffect(() => {
     const el = flyoutEl.current
@@ -316,8 +305,6 @@ export function EditorShell({ brandId, brandName, designName, onRename, status, 
   const startIsland = useRef<HTMLDivElement>(null)
   const endIsland = useRef<HTMLDivElement>(null)
   const rail = useRef<HTMLElement>(null)
-  const cards = useRef<HTMLElement>(null)
-  const cardsRef = useOverlayScroll(cards)
   const dock = useRef<HTMLDivElement>(null)
   const barRow = useRef<HTMLDivElement>(null)
   const reported = useRef('')
@@ -327,20 +314,20 @@ export function EditorShell({ brandId, brandName, designName, onRename, status, 
     const measure = () => {
       if (!stage.current) return
       const box = stage.current.getBoundingClientRect()
-      // On a phone the zoom pill sits under the end island, so the ads start below it.
-      const zoom = box.width < 640 ? stage.current.querySelector('[data-zoom]') : null
+      // On a phone the zoom pill and Pages sit under the islands, so the ads start below them.
+      const phoneTops = box.width < 640 ? [stage.current.querySelector('[data-zoom]'), stage.current.querySelector('[data-pages]')] : []
       // The top bar's row is kept clear whether or not the bar shows, so selecting never covers the design.
-      const insets = measureInsets(box, [startIsland.current, endIsland.current, zoom, barRow.current], [rail.current, cards.current, dock.current])
-      const key = JSON.stringify([insets, hasCards])
+      const insets = measureInsets(box, [startIsland.current, endIsland.current, ...phoneTops, barRow.current], [rail.current, dock.current])
+      const key = JSON.stringify(insets)
       if (key === reported.current) return
       reported.current = key
-      report.current?.(insets, hasCards)
+      report.current?.(insets)
     }
     const watch = new ResizeObserver(measure)
-    for (const el of [stage.current, startIsland.current, endIsland.current, rail.current, cards.current, dock.current, stage.current?.querySelector('[data-zoom]')]) if (el) watch.observe(el)
+    for (const el of [stage.current, startIsland.current, endIsland.current, rail.current, dock.current, stage.current?.querySelector('[data-zoom]'), stage.current?.querySelector('[data-pages]')]) if (el) watch.observe(el)
     measure()
     return () => watch.disconnect()
-  }, [hasCards])
+  }, [])
 
   return (
     <MotionConfig reducedMotion="user">
@@ -382,7 +369,7 @@ export function EditorShell({ brandId, brandName, designName, onRename, status, 
                 sheet && 'max-sm:hidden',
               )}
             >
-              {PANELS.map(({ id, icon: PanelIcon, phone: phoneOnly }) => {
+              {PANELS.map(({ id, icon: PanelIcon }) => {
                 const open = panel === id
                 const ai = id === 'ai'
                 return (
@@ -391,7 +378,7 @@ export function EditorShell({ brandId, brandName, designName, onRename, status, 
                       type="button"
                       aria-label={panelTitle(id)}
                       aria-expanded={open}
-                      aria-controls={id === 'properties' ? 'editor-cards' : 'editor-flyout'}
+                      aria-controls="editor-flyout"
                       data-panel={id}
                       onClick={() => {
                         setPanel(open ? null : id)
@@ -399,8 +386,6 @@ export function EditorShell({ brandId, brandName, designName, onRename, status, 
                       }}
                       className={cn(
                         'relative grid size-11 sm:size-13 cursor-pointer place-items-center rounded-full transition-colors duration-[var(--chrome-fast)]',
-                        phoneOnly && 'sm:hidden',
-                        phoneOnly && edit.bar && 'hidden',
                         open ? 'text-on-accent' : 'text-subtle hover:bg-hover hover:text-text',
                         ai && !open && 'text-accent-text',
                       )}
@@ -460,7 +445,7 @@ export function EditorShell({ brandId, brandName, designName, onRename, status, 
             <main ref={stage} data-bar={edit.bar ? '' : undefined} className="group/stage canvas-dots relative min-w-0 flex-1 overflow-clip">
               <div ref={barRow} aria-hidden data-bar-row className={cn('pointer-events-none invisible absolute inset-x-0', BAR_ROW, BAR_ROW_HEIGHT)} />
               {children}
-              <div ref={dock} role="toolbar" aria-label={t.editor.tools} data-dock className={cn('absolute inset-x-0 bottom-4 z-10 mx-auto flex w-max max-sm:bottom-[5.25rem] items-center gap-1 rounded-[18px] surface-frost p-1.5', (panel === 'properties' || sheet) && 'max-sm:hidden')}>
+              <div ref={dock} role="toolbar" aria-label={t.editor.tools} data-dock className={cn('absolute inset-x-0 bottom-4 z-10 mx-auto flex w-max max-sm:bottom-[5.25rem] items-center gap-1 rounded-[18px] surface-frost p-1.5', sheet && 'max-sm:hidden')}>
                 {TOOLS.map(({ id, icon: ToolIcon, key }) => {
                   if (id === 'shape') {
                     return (
@@ -517,25 +502,6 @@ export function EditorShell({ brandId, brandName, designName, onRename, status, 
               </div>
             </main>
 
-            {hasCards && (
-              <aside
-                ref={cardsRef}
-                id="editor-cards"
-                aria-label={t.editor.inspector}
-                data-testid="cards"
-                data-open={panel === 'properties' ? '' : undefined}
-                className={cn(
-                  // A stack at the top end, below the end island, each card only as tall as its content;
-                  // past the room above the zoom pill the stack scrolls. Its gaps let clicks through.
-                  'pointer-events-none absolute end-3 top-20 z-20 flex max-h-[calc(100%-9.5rem)] w-72 flex-col gap-2.5 overflow-y-auto overscroll-contain [&>*:not(.os-scrollbar)]:pointer-events-auto',
-                  // On phones, one sheet with a grab handle above the tab bar, opened from it; the dock
-                  // steps aside while it is open (see .editor-cards).
-                  'editor-cards max-sm:surface-frost max-sm:rounded-[22px] max-sm:pointer-events-auto max-sm:inset-x-2 max-sm:top-auto max-sm:bottom-[5rem] max-sm:max-h-[55%] max-sm:w-auto max-sm:gap-0 max-sm:not-data-[open]:hidden',
-                )}
-              >
-                {inspector}
-              </aside>
-            )}
           </div>
         </div>
     </MotionConfig>

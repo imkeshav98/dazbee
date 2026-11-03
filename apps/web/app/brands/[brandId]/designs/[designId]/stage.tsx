@@ -9,7 +9,7 @@ import { useLocale, useMessages } from '../../../../../lib/i18n/client.tsx'
 import { format } from '../../../../../lib/i18n/index.ts'
 import { placeAsset } from '../../../../../lib/place-asset.ts'
 import { carriesFiles, dragFills, dropAt, isAssetFile, placeDroppedFiles } from '../../../../../lib/drop-files.ts'
-import { PropertyCards } from '../../../../../components/editor/property-cards.tsx'
+import { BackgroundPanel, PagesButton, PagesPanel } from '../../../../../components/editor/pages-panel.tsx'
 import { ZoomControl } from '../../../../../components/editor/zoom-control.tsx'
 import { StageMenu } from '../../../../../components/editor/layer-actions.tsx'
 import { TopBar } from '../../../../../components/editor/top-bar.tsx'
@@ -83,11 +83,14 @@ async function keepForOffline() {
   registration.active?.postMessage({ type: 'keep', urls })
 }
 
-/** The zoom pill, reading the zoom from the store. */
+/** The zoom pill, reading the zoom from the store, and Pages beside it. */
 function StageZoom({ editor, store }: { editor: Editor | null; store: ValueStore<number | null> }) {
   const zoom = useValue(store)
   return (
-    <ZoomControl zoom={editor ? zoom : null} editor={editor} />
+    <>
+      <ZoomControl zoom={editor ? zoom : null} editor={editor} />
+      <PagesButton editor={editor} />
+    </>
   )
 }
 
@@ -179,18 +182,17 @@ export function EditorStage({ designId, designName, brandId, brandName, everyBra
     })
   }
 
-  // The stage's edges the capsule, cards and dock cover (#83): the editor fits the ads between
-  // them. The first time they are known the design is fitted again, since it opened fitted to the
-  // whole stage. The editor counts as ready only after that, so nothing set on its camera (or
-  // read from it) before then is undone by the fit.
-  const [chrome, setChrome] = useState<{ insets: ChromeInsets; withCards: boolean } | null>(null)
-  const onInsets = useCallback((insets: ChromeInsets, withCards: boolean) => setChrome({ insets, withCards }), [])
+  // The stage's edges the always-on chrome covers (#83): the editor fits the ads between them. The
+  // first time the editor and they are both known the design is fitted again, since it opened
+  // fitted to the whole stage. The editor counts as ready only after that, so nothing set on its
+  // camera (or read from it) before then is undone by the fit.
+  const [chrome, setChrome] = useState<ChromeInsets | null>(null)
+  const onInsets = useCallback((insets: ChromeInsets) => setChrome(insets), [])
   const [fittedTo, setFittedTo] = useState<Editor | null>(null)
   useEffect(() => {
     if (!editor || !chrome) return
-    editor.setInsets(chrome.insets)
-    // Measured before the cards were in, the insets would fit the design under them.
-    if (chrome.withCards && fittedTo !== editor) {
+    editor.setInsets(chrome)
+    if (fittedTo !== editor) {
       editor.fitAll()
       setFittedTo(editor)
     }
@@ -279,7 +281,6 @@ export function EditorStage({ designId, designName, brandId, brandName, everyBra
       actions={editor ? <ShareMenu editor={editor} brandId={brandId} brandName={brandName} designName={name} everyBrand={everyBrand} /> : undefined}
       account={account}
       panels={editor ? { layers: <LayersPanel editor={editor} />, assets: <AssetLibrary editor={editor} brandId={brandId} changed={uploaded} />, brand: <BrandKitPanel editor={editor} brandId={brandId} /> } : {}}
-      inspector={editor ? <PropertyCards editor={editor} brandId={brandId} onRemoved={setRemoved} /> : undefined}
     >
       {/* The design is a picture, so it never mirrors: the stage stays left to right in Arabic too. */}
       {/* An asset dragged from the library lands where it is dropped (#52): into the shape it is
@@ -337,6 +338,8 @@ export function EditorStage({ designId, designName, brandId, brandName, everyBra
       {editor && <SmallMenu editor={editor} rightClick={menuAt !== null} />}
       {editor && <EditPanel editor={editor} brandId={brandId} />}
       {editor && <SizesPanel editor={editor} onRemoved={setRemoved} />}
+      {editor && <PagesPanel editor={editor} onRemoved={setRemoved} />}
+      {editor && <BackgroundPanel editor={editor} brandId={brandId} />}
       <div data-slot="mini-bar" style={{ top: bar ? barBottom + 8 : 16 }} className="pointer-events-none absolute inset-x-0 z-10 flex justify-center">
         {editor && <FocusChip editor={editor} />}
       </div>

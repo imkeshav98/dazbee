@@ -2,12 +2,12 @@
 // and see the layer change, with the design itself untouched; another design bound to the same
 // colour opens in the new one, and one undo lets the layer go of the brand again. The flyout opens
 // as a picker: its colour tiles and font rows apply the kit, each one undo step that redo brings
-// back and there after a reload, and the Page card shows the colours.
+// back and there after a reload, and the page's Background panel shows the colours.
 import { expect, test, type Page } from '../support/test.ts'
 import type { DesignInput } from '@dazbee/schema'
 import { editorPath, reloads, writeOutput } from '../support/editor.ts'
 import { getKit, newBrand, putKit, seed } from '../support/seed.ts'
-import { openStage, read } from '../support/stage.ts'
+import { backgroundPanel, openStage, read } from '../support/stage.ts'
 
 test.describe.configure({ timeout: 120_000 })
 
@@ -98,7 +98,7 @@ test('a layer bound to a brand colour changes when the brand colour does', async
   expect(errors).toEqual([])
 })
 
-test('the picker applies a colour tile and a font row, and the Page card shows the colours', async ({ browser }) => {
+test('the picker applies a colour tile and a font row, and the page Background panel shows the colours', async ({ browser }) => {
   const brandId = await newBrand('e2e brand-kit')
   await putKit(brandId, { colors: [{ token: 'sun', name: 'Sun', value: '#FF8A3DFF' }, { token: 'roast', name: 'Roast', value: '#2A140AFF' }], fonts: [{ token: 'body', name: 'Body', family: 'Noto Sans' }] })
   const content = design()
@@ -108,12 +108,14 @@ test('the picker applies a colour tile and a font row, and the Page card shows t
   } as DesignInput['nodes'][string]
   const { page, errors } = await openStage(browser, content, { brandId })
 
-  // With nothing selected, the Page card offers the brand's colours before the fixed set.
-  const brandRow = page.getByTestId('page-brand-colors')
+  // The page picked, its Background panel offers the brand's colours in place of the fixed set.
+  const brandRow = (await backgroundPanel(page)).getByTestId('brand-colours')
   await expect(brandRow.getByRole('button')).toHaveCount(2)
-  await brandRow.getByRole('button', { name: 'Sun #FF8A3D' }).click()
+  await brandRow.getByRole('button', { name: 'Sun' }).click()
   await expect.poll(async () => ((await read(page)) as unknown as { pages: Record<string, { fills: unknown[] }> }).pages.p1?.fills).toEqual([{ type: 'solid', color: '#FF8A3DFF' }])
 
+  await page.keyboard.press('Escape')
+  await page.keyboard.press('Escape')
   await page.locator('[data-panel="brand"]').click()
   const picker = page.getByTestId('brand-kit')
   await expect(picker).toHaveAttribute('data-mode', 'pick')
