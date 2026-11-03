@@ -2,10 +2,11 @@
 // the dock, its menu and its keys, Shift-draw a square, combine two shapes from the inspector and by
 // shortcut, then enter the boolean, drag one shape inside it and see the boolean follow.
 import type { DesignInput } from '@dazbee/schema'
-import { expect, test, type Page } from '../support/test.ts'
+
 import { exportHashOf, screenPoint, writeOutput } from '../support/editor.ts'
 import { liveDesign } from '../support/seed.ts'
-import { barMenu, click, drag, openStage, press, read, selection, type Design } from '../support/stage.ts'
+import { barMenu, click, type Design, drag, openStage, press, read, selection } from '../support/stage.ts'
+import { expect, type Page, test } from '../support/test.ts'
 
 test.describe.configure({ timeout: 120_000 })
 
@@ -19,13 +20,22 @@ const box = (d: Design, id: string): Placed => {
   const p = { ...d.nodes[id]?.props, ...d.overrides['format:sq']?.[id] } as Partial<Placed>
   return { x: p.x ?? 0, y: p.y ?? 0, width: p.width ?? 0, height: p.height ?? 0, rotation: p.rotation ?? 0 }
 }
-const kids = (d: Design, id: string) => Object.entries(d.nodes).filter(([, n]) => n.parentId === id)
-  .sort(([, a], [, b]) => (a.index < b.index ? -1 : 1)).map(([child]) => child)
+const kids = (d: Design, id: string) =>
+  Object.entries(d.nodes)
+    .filter(([, n]) => n.parentId === id)
+    .sort(([, a], [, b]) => (a.index < b.index ? -1 : 1))
+    .map(([child]) => child)
 const toolOf = (page: Page) => page.evaluate(() => window.dazbee?.tool())
-const pressed = (page: Page, tool: string) => expect(page.locator(`[role="toolbar"] [data-tool="${tool}"]`)).toHaveAttribute('aria-pressed', 'true')
+const pressed = (page: Page, tool: string) =>
+  expect(page.locator(`[role="toolbar"] [data-tool="${tool}"]`)).toHaveAttribute('aria-pressed', 'true')
 
 /** Draws with a real drag and returns the one layer it made, which is selected, with the tool back at select. */
-async function draw(page: Page, from: { x: number; y: number }, to: { x: number; y: number }, modifiers: 'Shift'[] = []) {
+async function draw(
+  page: Page,
+  from: { x: number; y: number },
+  to: { x: number; y: number },
+  modifiers: 'Shift'[] = [],
+) {
   const before = new Set(Object.keys((await read(page)).nodes))
   await drag(page, from, to, modifiers)
   const d = await read(page)
@@ -51,7 +61,12 @@ test('every shape draws with real input: the dock, its menu, its keys, and Shift
   await pressed(page, 'shape')
   expect(await toolOf(page)).toBe('rect')
   const rect = await draw(page, { x: 100, y: 820 }, { x: 220, y: 900 })
-  expect(rect.node).toMatchObject({ type: 'graphic', parentId: 'p1', name: 'Rectangle', props: { shape: { kind: 'rect' } } })
+  expect(rect.node).toMatchObject({
+    type: 'graphic',
+    parentId: 'p1',
+    name: 'Rectangle',
+    props: { shape: { kind: 'rect' } },
+  })
   expect(rect.box).toEqual({ x: 100, y: 820, width: 120, height: 80, rotation: 0 })
 
   // R, then a drag with Shift held part way: a square as wide as the longer side.
@@ -129,7 +144,11 @@ test('two shapes combine into a live boolean that follows a shape dragged inside
   await page.evaluate(() => window.dazbee?.drawn())
   let d = await read(page)
   const [cut = ''] = await selection(page)
-  expect(d.nodes[cut]).toMatchObject({ type: 'boolean', parentId: 'p1', props: { op: 'subtract', fills: back.node.props.fills } })
+  expect(d.nodes[cut]).toMatchObject({
+    type: 'boolean',
+    parentId: 'p1',
+    props: { op: 'subtract', fills: back.node.props.fills },
+  })
   expect(kids(d, cut)).toEqual([back.id, front.id])
   expect(box(d, cut)).toEqual({ x: 100, y: 820, width: 220, height: 160, rotation: 0 })
   const subtracted = await exportHashOf(page)

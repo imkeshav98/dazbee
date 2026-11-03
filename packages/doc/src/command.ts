@@ -1,6 +1,8 @@
-import type { Design } from '@dazbee/schema'
 import type { z } from 'zod'
-import { root, type DesignDoc } from './design-doc.ts'
+
+import type { Design } from '@dazbee/schema'
+
+import { type DesignDoc, root } from './design-doc.ts'
 
 export interface CommandContext {
   doc: DesignDoc

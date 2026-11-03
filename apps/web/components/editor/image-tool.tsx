@@ -6,13 +6,15 @@
 // its picker without a pick goes back to the select tool.
 import { ImageIcon, UploadSimpleIcon } from '@phosphor-icons/react'
 import * as Popover from '@radix-ui/react-popover'
+import { type ReactNode, useEffect, useRef, useState } from 'react'
+
 import { AssetSummary, isVectorAsset } from '@dazbee/schema'
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+
 import { cn } from '../../lib/cn.ts'
 import { useLocale, useMessages } from '../../lib/i18n/client.tsx'
 import { dirOf, format } from '../../lib/i18n/index.ts'
-import { ASSET_ACCEPT, IMAGE_ACCEPT, sendAsset } from '../../lib/upload-asset.ts'
 import type { Placeable } from '../../lib/place-asset.ts'
+import { ASSET_ACCEPT, IMAGE_ACCEPT, sendAsset } from '../../lib/upload-asset.ts'
 import { overlayScroll } from '../ui/overlay-scroll.ts'
 import { Tooltip } from '../ui/tooltip.tsx'
 import { useMenuFocus } from './bar-popover.tsx'
@@ -27,7 +29,21 @@ const PANEL = cn(POPOVER, 'flex max-h-[min(26rem,60dvh)] w-72 flex-col')
  * that ends after the picker closed picks nothing.
  */
 /** The brand's images to pick from, and an upload. SVG files are offered only with `vectors`, where they are placed as layers; a fill takes images alone. */
-function ImagePickerPanel({ brandId, open, title, hint, vectors = false, onPick }: { brandId: string; open: boolean; title: string; hint?: string; vectors?: boolean; onPick: (asset: Placeable) => void }) {
+function ImagePickerPanel({
+  brandId,
+  open,
+  title,
+  hint,
+  vectors = false,
+  onPick,
+}: {
+  brandId: string
+  open: boolean
+  title: string
+  hint?: string
+  vectors?: boolean
+  onPick: (asset: Placeable) => void
+}) {
   const t = useMessages().editor
   const [assets, setAssets] = useState<AssetSummary[] | null>(null)
   const [upload, setUpload] = useState<{ name: string; progress: number; error?: string; notice?: string } | null>(null)
@@ -44,7 +60,12 @@ function ImagePickerPanel({ brandId, open, title, hint, vectors = false, onPick 
     const ask = new AbortController()
     fetch(base(brandId), { signal: ask.signal })
       .then(async (response) => {
-        if (response.ok) setAssets(AssetSummary.array().parse(await response.json()).filter((asset) => vectors || !isVectorAsset(asset)))
+        if (response.ok)
+          setAssets(
+            AssetSummary.array()
+              .parse(await response.json())
+              .filter((asset) => vectors || !isVectorAsset(asset)),
+          )
       })
       // Offline: the picker keeps what it had, and an upload still works once back.
       .catch(() => undefined)
@@ -63,7 +84,9 @@ function ImagePickerPanel({ brandId, open, title, hint, vectors = false, onPick 
         setUpload(null)
         if (showing.current) onPick(asset)
       })
-      .catch((error: unknown) => setUpload({ name: file.name, progress: 0, error: error instanceof Error ? error.message : String(error) }))
+      .catch((error: unknown) =>
+        setUpload({ name: file.name, progress: 0, error: error instanceof Error ? error.message : String(error) }),
+      )
   }
 
   return (
@@ -85,22 +108,29 @@ function ImagePickerPanel({ brandId, open, title, hint, vectors = false, onPick 
             }}
           />
         </label>
-        {upload && (
-          upload.notice || upload.error
-            ? <p role="alert" className="text-xs text-danger">{upload.notice ?? format(t.imageTool.failed, { name: upload.name, reason: upload.error ?? '' })}</p>
-            : (
+        {upload &&
+          (upload.notice || upload.error ? (
+            <p role="alert" className="text-xs text-danger">
+              {upload.notice ?? format(t.imageTool.failed, { name: upload.name, reason: upload.error ?? '' })}
+            </p>
+          ) : (
+            <div
+              role="progressbar"
+              aria-label={format(t.imageTool.uploading, { name: upload.name })}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={Math.round(upload.progress * 100)}
+              className="h-1 overflow-hidden rounded-full bg-hover"
+            >
               <div
-                role="progressbar"
-                aria-label={format(t.imageTool.uploading, { name: upload.name })}
-                aria-valuemin={0}
-                aria-valuemax={100}
-                aria-valuenow={Math.round(upload.progress * 100)}
-                className="h-1 overflow-hidden rounded-full bg-hover"
-              >
-                <div className={cn('h-full rounded-full bg-accent-solid transition-[width]', upload.progress >= 1 && 'animate-pulse')} style={{ width: `${Math.max(4, upload.progress * 100)}%` }} />
-              </div>
-            )
-        )}
+                className={cn(
+                  'h-full rounded-full bg-accent-solid transition-[width]',
+                  upload.progress >= 1 && 'animate-pulse',
+                )}
+                style={{ width: `${Math.max(4, upload.progress * 100)}%` }}
+              />
+            </div>
+          ))}
         {hint && <p className="text-[11px] text-subtle">{hint}</p>}
       </div>
       <div ref={overlayScroll} className="min-h-0 flex-1 overflow-y-auto px-3 pb-3">
@@ -118,7 +148,15 @@ function ImagePickerPanel({ brandId, open, title, hint, vectors = false, onPick 
                     onClick={() => onPick(asset)}
                     className={cn(ASSET_TILE, FOCUS_RING, 'w-full cursor-pointer hover:border-accent')}
                   >
-                    <img src={`${base(brandId)}/${encodeURIComponent(asset.id)}/thumbnail`} alt="" width={asset.width} height={asset.height} draggable={false} loading="lazy" className="size-full object-contain" />
+                    <img
+                      src={`${base(brandId)}/${encodeURIComponent(asset.id)}/thumbnail`}
+                      alt=""
+                      width={asset.width}
+                      height={asset.height}
+                      draggable={false}
+                      loading="lazy"
+                      className="size-full object-contain"
+                    />
                   </button>
                 </li>
               )
@@ -131,7 +169,14 @@ function ImagePickerPanel({ brandId, open, title, hint, vectors = false, onPick 
 }
 
 /** The image tool's dock button and its picker, open while the tool waits for an image. */
-export function ImageTool({ brandId, active, open, onPress, onPick, onClose }: {
+export function ImageTool({
+  brandId,
+  active,
+  open,
+  onPress,
+  onPick,
+  onClose,
+}: {
   brandId: string
   /** The image tool is the one in use. */
   active: boolean
@@ -147,20 +192,29 @@ export function ImageTool({ brandId, active, open, onPress, onPick, onClose }: {
     <Popover.Root open={open} onOpenChange={(next) => (next ? onPress() : onClose())}>
       <Tooltip label={`${label} · I`}>
         <Popover.Trigger asChild>
-          <button
-            type="button"
-            aria-label={label}
-            aria-pressed={active}
-            data-tool="image"
-            className={dockTool(active)}
-          >
+          <button type="button" aria-label={label} aria-pressed={active} data-tool="image" className={dockTool(active)}>
             <ImageIcon size={20} weight={active ? 'fill' : 'regular'} aria-hidden />
           </button>
         </Popover.Trigger>
       </Tooltip>
       <Popover.Portal>
-        <Popover.Content side="top" align="center" sideOffset={10} aria-label={t.imageTool.title} data-testid="image-picker" onKeyDown={(e) => e.stopPropagation()} className={PANEL}>
-          <ImagePickerPanel brandId={brandId} open={open} title={t.imageTool.title} hint={t.imageTool.hint} vectors onPick={onPick} />
+        <Popover.Content
+          side="top"
+          align="center"
+          sideOffset={10}
+          aria-label={t.imageTool.title}
+          data-testid="image-picker"
+          onKeyDown={(e) => e.stopPropagation()}
+          className={PANEL}
+        >
+          <ImagePickerPanel
+            brandId={brandId}
+            open={open}
+            title={t.imageTool.title}
+            hint={t.imageTool.hint}
+            vectors
+            onPick={onPick}
+          />
         </Popover.Content>
       </Popover.Portal>
     </Popover.Root>
@@ -168,7 +222,17 @@ export function ImageTool({ brandId, active, open, onPress, onPick, onClose }: {
 }
 
 /** A button in a card that opens the picker beside it; the image picked goes to `onPick` and the picker closes. */
-export function ImagePickerButton({ brandId, title, testId, className, children, onPick, below = false, open: shown, onOpen }: {
+export function ImagePickerButton({
+  brandId,
+  title,
+  testId,
+  className,
+  children,
+  onPick,
+  below = false,
+  open: shown,
+  onOpen,
+}: {
   brandId: string
   /** Opens under the button and is one of the bar's buttons, for the bar by the selection. */
   below?: boolean
@@ -192,10 +256,29 @@ export function ImagePickerButton({ brandId, title, testId, className, children,
   return (
     <Popover.Root open={open} onOpenChange={setOpen}>
       <Popover.Trigger asChild>
-        <button ref={focus.button} type="button" aria-label={title} data-testid={testId} data-bar-item={below || undefined} className={className}>{children}</button>
+        <button
+          ref={focus.button}
+          type="button"
+          aria-label={title}
+          data-testid={testId}
+          data-bar-item={below || undefined}
+          className={className}
+        >
+          {children}
+        </button>
       </Popover.Trigger>
       <Popover.Portal>
-        <Popover.Content side={side} align="start" sideOffset={12} collisionPadding={12} aria-label={title} data-testid={`${testId}-picker`} onKeyDown={(e) => e.stopPropagation()} {...focus.content} className={PANEL}>
+        <Popover.Content
+          side={side}
+          align="start"
+          sideOffset={12}
+          collisionPadding={12}
+          aria-label={title}
+          data-testid={`${testId}-picker`}
+          onKeyDown={(e) => e.stopPropagation()}
+          {...focus.content}
+          className={PANEL}
+        >
           {focus.back}
           <ImagePickerPanel
             brandId={brandId}

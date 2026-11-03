@@ -1,7 +1,9 @@
 // The auto layout solver (#46), through scene building, with text measured by a stand-in: each
 // character 10 wide, lines 20 tall, words wrapped at the width given.
-import { parseDesign, type DesignInput } from '@dazbee/schema'
 import { describe, expect, it } from 'vitest'
+
+import { type DesignInput, parseDesign } from '@dazbee/schema'
+
 import type { MeasureText } from './layout.ts'
 import { render, type SceneLayer } from './scene.ts'
 
@@ -28,9 +30,27 @@ const measure: MeasureText = (props, width) => {
 type Node = DesignInput['nodes'][string]
 const box = (x: number, y: number, width: number, height: number) => ({ x, y, width, height })
 const rect = (parentId: string, index: string, props: Record<string, unknown>): Node =>
-  ({ type: 'graphic', parentId, index, name: index, props: { ...box(0, 0, 10, 10), shape: { kind: 'rect' }, ...props } }) as Node
+  ({
+    type: 'graphic',
+    parentId,
+    index,
+    name: index,
+    props: { ...box(0, 0, 10, 10), shape: { kind: 'rect' }, ...props },
+  }) as Node
 const text = (parentId: string, index: string, value: string, props: Record<string, unknown> = {}): Node =>
-  ({ type: 'text', parentId, index, name: index, props: { ...box(0, 0, 10, 10), text: value, style: { fontFamily: 'Noto Sans', fontSize: 16, color: '#000000FF' }, boxMode: 'autoWidth', ...props } }) as Node
+  ({
+    type: 'text',
+    parentId,
+    index,
+    name: index,
+    props: {
+      ...box(0, 0, 10, 10),
+      text: value,
+      style: { fontFamily: 'Noto Sans', fontSize: 16, color: '#000000FF' },
+      boxMode: 'autoWidth',
+      ...props,
+    },
+  }) as Node
 const frame = (parentId: string, index: string, props: Record<string, unknown>): Node =>
   ({ type: 'frame', parentId, index, name: index, props: { ...box(0, 0, 100, 100), ...props } }) as Node
 
@@ -44,7 +64,11 @@ function scene(nodes: Record<string, Node>) {
   })
   if (!result.success) throw new Error(result.errors.join('\n'))
   const all = new Map<string, SceneLayer>()
-  const walk = (layers: SceneLayer[]) => layers.forEach((l) => { all.set(l.id, l); walk(l.children) })
+  const walk = (layers: SceneLayer[]) =>
+    layers.forEach((l) => {
+      all.set(l.id, l)
+      walk(l.children)
+    })
   walk(render(result.design, 'p1', 'sq', undefined, measure).layers)
   return (id: string) => {
     const l = all.get(id)
@@ -76,12 +100,19 @@ describe('auto layout (#46)', () => {
 
   it('sizes children fixed, hugging their text or filling what is left, and the frame hugging them', () => {
     const get = scene({
-      f: frame('p1', 'a0', { ...box(0, 0, 500, 100), layout: layout({ gap: 10, padding: { top: 5, right: 5, bottom: 5, left: 5 } }) }),
+      f: frame('p1', 'a0', {
+        ...box(0, 0, 500, 100),
+        layout: layout({ gap: 10, padding: { top: 5, right: 5, bottom: 5, left: 5 } }),
+      }),
       fixed: rect('f', 'a0', box(0, 0, 50, 30)),
       label: text('f', 'a1', 'Buy now'),
       grow: rect('f', 'a2', { ...box(0, 0, 10, 10), sizing: { width: 'fill', height: 'fill' } }),
       grow2: rect('f', 'a3', { ...box(0, 0, 10, 10), sizing: { width: 'fill', height: 'fixed' } }),
-      btn: frame('p1', 'a1', { ...box(0, 200, 10, 10), sizing: { width: 'hug', height: 'hug' }, layout: layout({ padding: { top: 8, right: 16, bottom: 8, left: 16 } }) }),
+      btn: frame('p1', 'a1', {
+        ...box(0, 200, 10, 10),
+        sizing: { width: 'hug', height: 'hug' },
+        layout: layout({ padding: { top: 8, right: 16, bottom: 8, left: 16 } }),
+      }),
       btnLabel: text('btn', 'a0', 'Shop the sale'),
     })
     expect(get('label')).toEqual(box(65, 5, 70, 20))
@@ -93,19 +124,30 @@ describe('auto layout (#46)', () => {
   })
 
   it('lines children up along the flow and across it', () => {
-    const at = (justify: string, align: string) => scene({
-      f: frame('p1', 'a0', { ...box(0, 0, 300, 100), layout: layout({ gap: 10, justify, align }) }),
-      a: rect('f', 'a0', box(0, 0, 50, 20)),
-      b: rect('f', 'a1', box(0, 0, 50, 40)),
-    })
-    expect([at('center', 'center')('a'), at('center', 'center')('b')]).toEqual([box(95, 40, 50, 20), box(155, 30, 50, 40)])
+    const at = (justify: string, align: string) =>
+      scene({
+        f: frame('p1', 'a0', { ...box(0, 0, 300, 100), layout: layout({ gap: 10, justify, align }) }),
+        a: rect('f', 'a0', box(0, 0, 50, 20)),
+        b: rect('f', 'a1', box(0, 0, 50, 40)),
+      })
+    expect([at('center', 'center')('a'), at('center', 'center')('b')]).toEqual([
+      box(95, 40, 50, 20),
+      box(155, 30, 50, 40),
+    ])
     expect([at('end', 'end')('a'), at('end', 'end')('b')]).toEqual([box(190, 80, 50, 20), box(250, 60, 50, 40)])
-    expect([at('space-between', 'start')('a'), at('space-between', 'start')('b')]).toEqual([box(0, 0, 50, 20), box(250, 0, 50, 40)])
+    expect([at('space-between', 'start')('a'), at('space-between', 'start')('b')]).toEqual([
+      box(0, 0, 50, 20),
+      box(250, 0, 50, 40),
+    ])
   })
 
   it('takes negative gaps and paddings, so children overlap and spill out', () => {
     const get = scene({
-      f: frame('p1', 'a0', { ...box(100, 100, 10, 10), sizing: { width: 'hug', height: 'hug' }, layout: layout({ gap: -20, padding: { top: -5, right: 0, bottom: 0, left: -10 } }) }),
+      f: frame('p1', 'a0', {
+        ...box(100, 100, 10, 10),
+        sizing: { width: 'hug', height: 'hug' },
+        layout: layout({ gap: -20, padding: { top: -5, right: 0, bottom: 0, left: -10 } }),
+      }),
       a: rect('f', 'a0', box(0, 0, 50, 50)),
       b: rect('f', 'a1', box(0, 0, 50, 50)),
     })
@@ -116,7 +158,11 @@ describe('auto layout (#46)', () => {
 
   it('wraps onto more lines, lineGap apart, and a hugging frame grows to hold them', () => {
     const get = scene({
-      f: frame('p1', 'a0', { ...box(0, 0, 130, 10), sizing: { width: 'fixed', height: 'hug' }, layout: layout({ gap: 10, wrap: true, lineGap: 5 }) }),
+      f: frame('p1', 'a0', {
+        ...box(0, 0, 130, 10),
+        sizing: { width: 'fixed', height: 'hug' },
+        layout: layout({ gap: 10, wrap: true, lineGap: 5 }),
+      }),
       a: rect('f', 'a0', box(0, 0, 60, 20)),
       b: rect('f', 'a1', box(0, 0, 60, 30)),
       c: rect('f', 'a2', box(0, 0, 60, 20)),
@@ -127,11 +173,22 @@ describe('auto layout (#46)', () => {
     expect(get('f')).toEqual(box(0, 0, 130, 55))
   })
 
-  it('nests: a card hugs a column of a title that wraps at the card\'s width and a button that hugs its label', () => {
+  it("nests: a card hugs a column of a title that wraps at the card's width and a button that hugs its label", () => {
     const get = scene({
-      card: frame('p1', 'a0', { ...box(100, 100, 200, 10), sizing: { width: 'fixed', height: 'hug' }, layout: layout({ direction: 'column', gap: 12, padding: { top: 20, right: 20, bottom: 20, left: 20 } }) }),
-      title: text('card', 'a0', 'Fresh roast every morning', { boxMode: 'autoHeight', sizing: { width: 'fill', height: 'hug' } }),
-      btn: frame('card', 'a1', { ...box(0, 0, 10, 10), sizing: { width: 'hug', height: 'hug' }, layout: layout({ padding: { top: 8, right: 16, bottom: 8, left: 16 } }) }),
+      card: frame('p1', 'a0', {
+        ...box(100, 100, 200, 10),
+        sizing: { width: 'fixed', height: 'hug' },
+        layout: layout({ direction: 'column', gap: 12, padding: { top: 20, right: 20, bottom: 20, left: 20 } }),
+      }),
+      title: text('card', 'a0', 'Fresh roast every morning', {
+        boxMode: 'autoHeight',
+        sizing: { width: 'fill', height: 'hug' },
+      }),
+      btn: frame('card', 'a1', {
+        ...box(0, 0, 10, 10),
+        sizing: { width: 'hug', height: 'hug' },
+        layout: layout({ padding: { top: 8, right: 16, bottom: 8, left: 16 } }),
+      }),
       label: text('btn', 'a0', 'Order'),
       badge: rect('card', 'a2', { ...box(280, 90, 30, 30), absolute: true }),
     })

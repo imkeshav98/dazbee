@@ -3,8 +3,17 @@
 // centre. Commands that keep layers where they are on screen (group, ungroup, hug) and the
 // editor's transforms share it.
 
-export interface Point { x: number; y: number }
-export interface Box { x: number; y: number; width: number; height: number; rotation: number }
+export interface Point {
+  x: number
+  y: number
+}
+export interface Box {
+  x: number
+  y: number
+  width: number
+  height: number
+  rotation: number
+}
 
 const rad = (deg: number) => (deg * Math.PI) / 180
 export const centreOf = (b: Box): Point => ({ x: b.x + b.width / 2, y: b.y + b.height / 2 })
@@ -22,7 +31,10 @@ export function turn(p: Point, about: Point, deg: number): Point {
 export function cornersOf(b: Box): Point[] {
   const c = centreOf(b)
   return [
-    { x: b.x, y: b.y }, { x: b.x + b.width, y: b.y }, { x: b.x + b.width, y: b.y + b.height }, { x: b.x, y: b.y + b.height },
+    { x: b.x, y: b.y },
+    { x: b.x + b.width, y: b.y },
+    { x: b.x + b.width, y: b.y + b.height },
+    { x: b.x, y: b.y + b.height },
   ].map((p) => turn(p, c, b.rotation))
 }
 

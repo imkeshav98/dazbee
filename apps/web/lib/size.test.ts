@@ -1,5 +1,6 @@
 // A layer's width or height set with its ratio kept: the other side follows, so the box keeps its shape.
 import { describe, expect, it } from 'vitest'
+
 import { sizeTo } from './size.ts'
 
 describe('a size set with the ratio kept', () => {

@@ -1,7 +1,7 @@
 // The geometry of moving, resizing and rotating layers (#40), kept free of the editor so it can be
 // tested on its own. Boxes are in one page's design pixels; a box's rotation turns it about its
 // centre, as the renderer draws it.
-import { centreOf, turn, type Box, type Point } from '@dazbee/doc'
+import { type Box, centreOf, type Point, turn } from '@dazbee/doc'
 
 export { boundsOf, centreOf, cornersOf, normalAngle, round, turn, type Box } from '@dazbee/doc'
 export type Handle = 'n' | 's' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw'
@@ -113,4 +113,3 @@ export const snapAngle = (deg: number) => Math.round(deg / ANGLE_STEP) * ANGLE_S
 
 /** The angle of a point about a centre, in degrees. */
 export const angleOf = (p: Point, about: Point) => (Math.atan2(p.y - about.y, p.x - about.x) * 180) / Math.PI
-

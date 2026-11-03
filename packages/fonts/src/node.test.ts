@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+
 import { FONT_FACES } from './index.ts'
 import { loadFontFiles } from './node.ts'
 

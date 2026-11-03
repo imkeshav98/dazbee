@@ -1,6 +1,7 @@
 // The Brands page (ADR-0011, ADR-0013), as in the final mock: a card per brand in its own colours,
 // with its latest design and how many it has, and a last card that adds one.
 import { redirect } from 'next/navigation'
+
 import { BrandCard, type BrandCardData } from '../components/brand-cards.tsx'
 import { LibraryShell } from '../components/library-shell.tsx'
 import { NewBrandCard } from '../components/new-brand-card.tsx'
@@ -19,18 +20,27 @@ export default async function HomePage() {
   const opening = openingBrand(brands)
   if (opening) redirect(`/brands/${opening.id}`)
 
-  const cards: BrandCardData[] = await Promise.all(brands.map(async (brand) => {
-    const [designs, kit] = await Promise.all([listDesigns(brand.id), getBrandKit(brand.id).catch(() => null)])
-    const latest = designs[0]
-    const cover = latest ? await designCover(brand.id, latest.id).catch(() => null) : null
-    return {
-      ...brand,
-      designCount: designs.length,
-      colors: (kit?.colors ?? []).map((c) => c.value.slice(0, 7)),
-      latest: latest && cover ? { src: `/brands/${brand.id}/designs/${latest.id}/thumbnail?v=${encodeURIComponent(latest.updatedAt)}`, ...cover } : null,
-    }
-  }))
-  const count = (n: number) => (n === 0 ? t.library.noDesignsCount : n === 1 ? t.library.oneDesign : format(t.library.designCount, { n }))
+  const cards: BrandCardData[] = await Promise.all(
+    brands.map(async (brand) => {
+      const [designs, kit] = await Promise.all([listDesigns(brand.id), getBrandKit(brand.id).catch(() => null)])
+      const latest = designs[0]
+      const cover = latest ? await designCover(brand.id, latest.id).catch(() => null) : null
+      return {
+        ...brand,
+        designCount: designs.length,
+        colors: (kit?.colors ?? []).map((c) => c.value.slice(0, 7)),
+        latest:
+          latest && cover
+            ? {
+                src: `/brands/${brand.id}/designs/${latest.id}/thumbnail?v=${encodeURIComponent(latest.updatedAt)}`,
+                ...cover,
+              }
+            : null,
+      }
+    }),
+  )
+  const count = (n: number) =>
+    n === 0 ? t.library.noDesignsCount : n === 1 ? t.library.oneDesign : format(t.library.designCount, { n })
 
   return (
     <LibraryShell t={t} words={words} workspace={workspace} brands={brands} place="brands">
@@ -43,7 +53,19 @@ export default async function HomePage() {
           </li>
         ))}
         <li className="rise min-w-0" style={{ animationDelay: `${Math.min(cards.length, 12) * 40}ms` }}>
-          <NewBrandCard action={addBrand} words={{ add: words.add, start: t.library.start, placeholder: t.library.startPlaceholder, callIt: t.library.callIt, change: t.library.change, name: words.name, create: t.library.create, cancel: t.library.cancel }} />
+          <NewBrandCard
+            action={addBrand}
+            words={{
+              add: words.add,
+              start: t.library.start,
+              placeholder: t.library.startPlaceholder,
+              callIt: t.library.callIt,
+              change: t.library.change,
+              name: words.name,
+              create: t.library.create,
+              cancel: t.library.cancel,
+            }}
+          />
         </li>
       </ul>
     </LibraryShell>

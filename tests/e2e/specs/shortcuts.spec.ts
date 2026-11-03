@@ -1,11 +1,12 @@
 // The keyboard shortcuts list (#158) in Chromium: it opens with ? and from the View card's keyboard
 // button, lists every shortcut of the editor's table in its groups, never opens while typing, and
 // closes with Esc.
-import { expect, test } from '../support/test.ts'
 import { SHORTCUTS } from '@dazbee/editor'
 import type { DesignInput } from '@dazbee/schema'
+
 import { writeOutput } from '../support/editor.ts'
 import { backgroundPanel, openStage } from '../support/stage.ts'
+import { expect, test } from '../support/test.ts'
 
 test.describe.configure({ timeout: 120_000 })
 

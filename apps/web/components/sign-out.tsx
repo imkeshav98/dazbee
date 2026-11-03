@@ -1,8 +1,9 @@
 // Signs the person out (#58); shown only while there is a session to end.
 import { SignOutIcon } from '@phosphor-icons/react/ssr'
 import { cookies } from 'next/headers'
-import { SESSION_COOKIE } from '../lib/sign-in.ts'
+
 import { getMessages } from '../lib/i18n/server.ts'
+import { SESSION_COOKIE } from '../lib/sign-in.ts'
 import { buttonStyles } from './ui/button.tsx'
 
 export async function SignOut() {

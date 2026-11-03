@@ -4,10 +4,12 @@
 // right-click menu: copy, paste, duplicate and delete; order and line up with the size as menus
 // beside their rows, and the turn; group, box, mask and ungroup; lock and hide; text direction.
 // Every row runs the same editor action as its shortcut.
-import * as Popover from '@radix-ui/react-popover'
 import { CaretRightIcon } from '@phosphor-icons/react'
+import * as Popover from '@radix-ui/react-popover'
+import { type ReactNode, useEffect, useState } from 'react'
+
 import type { Editor, ShortcutAction } from '@dazbee/editor'
-import { useEffect, useState, type ReactNode } from 'react'
+
 import { cn } from '../../lib/cn.ts'
 import { useLocale, useMessages } from '../../lib/i18n/client.tsx'
 import { dirOf, format } from '../../lib/i18n/index.ts'
@@ -23,7 +25,15 @@ export function AlignRow({ editor }: { editor: Editor }) {
   return (
     <div dir="ltr" role="group" aria-label={t.editor.arrange.align} className="grid grid-cols-6 gap-0.5">
       {ALIGN.map(({ action, icon: Icon }) => (
-        <button key={action} type="button" aria-label={t.editor.arrange[action]} title={format(t.editor.arrange.withKey, { label: t.editor.arrange[action], key: keyOf(action) })} data-action={action} onClick={() => editor.perform(action)} className={ICON_BUTTON}>
+        <button
+          key={action}
+          type="button"
+          aria-label={t.editor.arrange[action]}
+          title={format(t.editor.arrange.withKey, { label: t.editor.arrange[action], key: keyOf(action) })}
+          data-action={action}
+          onClick={() => editor.perform(action)}
+          className={ICON_BUTTON}
+        >
           <Icon size={16} aria-hidden />
         </button>
       ))}
@@ -102,7 +112,14 @@ export function LayerActions({ editor, ids, onDone }: { editor: Editor; ids: str
     onDone()
   }
   const row = (action: ShortcutAction, label: string, pressed?: boolean) => (
-    <button key={action} type="button" data-action={action} aria-pressed={pressed} onClick={() => run(action)} className={MENU_ITEM}>
+    <button
+      key={action}
+      type="button"
+      data-action={action}
+      aria-pressed={pressed}
+      onClick={() => run(action)}
+      className={MENU_ITEM}
+    >
       {label}
       <kbd className={MENU_KEY}>{keyOf(action)}</kbd>
     </button>
@@ -113,7 +130,11 @@ export function LayerActions({ editor, ids, onDone }: { editor: Editor; ids: str
   const nodes = target.ids.map((id) => design.nodes[id])
   const locked = nodes.every((node) => node?.lock && Object.values(node.lock).some(Boolean))
   const hidden = target.props.every((pr) => pr.visible === false)
-  const hiddenEverywhere = target.ids.every((id) => Object.keys(design.formats).every((f) => (design.overrides[`format:${f}`]?.[id]?.visible ?? design.nodes[id]?.props.visible) === false))
+  const hiddenEverywhere = target.ids.every((id) =>
+    Object.keys(design.formats).every(
+      (f) => (design.overrides[`format:${f}`]?.[id]?.visible ?? design.nodes[id]?.props.visible) === false,
+    ),
+  )
   const masks = target.props.every((pr) => Boolean(pr.mask))
   const sized = target.types.every((type) => type !== 'group' && type !== 'boolean')
   const texts = target.types.every((type) => type === 'text')
@@ -132,7 +153,16 @@ export function LayerActions({ editor, ids, onDone }: { editor: Editor; ids: str
         {b.copy}
         <kbd className={MENU_KEY}>{copyKey}</kbd>
       </button>
-      <button type="button" data-action="paste" disabled={!editor.canPasteLayers()} onClick={() => { editor.pasteLayers(); onDone() }} className={MENU_ITEM}>
+      <button
+        type="button"
+        data-action="paste"
+        disabled={!editor.canPasteLayers()}
+        onClick={() => {
+          editor.pasteLayers()
+          onDone()
+        }}
+        className={MENU_ITEM}
+      >
         {b.paste}
         <kbd className={MENU_KEY}>{pasteKey}</kbd>
       </button>
@@ -147,18 +177,36 @@ export function LayerActions({ editor, ids, onDone }: { editor: Editor; ids: str
           <AlignRow editor={editor} />
         </SubMenu>
       )}
-      {sized && <div className="px-1.5 py-1"><RotationField target={target} p={p} /></div>}
+      {sized && (
+        <div className="px-1.5 py-1">
+          <RotationField target={target} p={p} />
+        </div>
+      )}
       <div className={MENU_DIVIDER} />
       {ids.length > 1 && row('group', t.editor.arrange.group)}
       {row('frameSelection', b.putInBox)}
       {row('mask', t.editor.arrange.mask, masks)}
       {target.types.some((type) => type === 'group') && row('ungroup', t.editor.arrange.ungroup)}
       <div className={MENU_DIVIDER} />
-      <button type="button" onClick={() => { editor.setLocked(target.ids, !locked); onDone() }} className={MENU_ITEM}>
+      <button
+        type="button"
+        onClick={() => {
+          editor.setLocked(target.ids, !locked)
+          onDone()
+        }}
+        className={MENU_ITEM}
+      >
         {locked ? b.unlock : b.lock}
         <kbd className={MENU_KEY}>{keyOf('lock')}</kbd>
       </button>
-      <button type="button" onClick={() => { editor.setHidden(target.ids, !hidden, target.pageId, target.formatId); onDone() }} className={MENU_ITEM}>
+      <button
+        type="button"
+        onClick={() => {
+          editor.setHidden(target.ids, !hidden, target.pageId, target.formatId)
+          onDone()
+        }}
+        className={MENU_ITEM}
+      >
         {hidden ? b.showHere : b.hideHere}
         <kbd className={MENU_KEY}>{keyOf('hide')}</kbd>
       </button>
@@ -168,7 +216,17 @@ export function LayerActions({ editor, ids, onDone }: { editor: Editor; ids: str
           <div className={MENU_DIVIDER} />
           <SubMenu label={b.textDirection} testId="text-direction">
             {(['auto', 'ltr', 'rtl'] as const).map((to) => (
-              <button key={to} type="button" aria-pressed={direction === to} data-direction={to} onClick={() => { set({ ...target, everyFormat: true }, () => ({ direction: to })); onDone() }} className={MENU_ITEM}>
+              <button
+                key={to}
+                type="button"
+                aria-pressed={direction === to}
+                data-direction={to}
+                onClick={() => {
+                  set({ ...target, everyFormat: true }, () => ({ direction: to }))
+                  onDone()
+                }}
+                className={MENU_ITEM}
+              >
                 {b.textDirections[to]}
               </button>
             ))}
@@ -180,7 +238,15 @@ export function LayerActions({ editor, ids, onDone }: { editor: Editor; ids: str
 }
 
 /** The layer actions at a right-click on the stage, for what it picked; it closes once the selection changes. */
-export function StageMenu({ editor, at, onClose }: { editor: Editor; at: { x: number; y: number }; onClose: () => void }) {
+export function StageMenu({
+  editor,
+  at,
+  onClose,
+}: {
+  editor: Editor
+  at: { x: number; y: number }
+  onClose: () => void
+}) {
   const t = useMessages()
   const ids = useSelection(editor)
   const { barBottom } = useEditState()
@@ -204,7 +270,9 @@ export function StageMenu({ editor, at, onClose }: { editor: Editor; at: { x: nu
           // A click elsewhere or Esc closes it; focus given back to a button that just closed does not.
           onFocusOutside={(event) => event.preventDefault()}
           aria-label={t.editor.bar.actions}
-          data-testid="stage-menu" className={cn(MENU, 'max-h-[var(--radix-popover-content-available-height)] w-80 overflow-y-auto')}>
+          data-testid="stage-menu"
+          className={cn(MENU, 'max-h-[var(--radix-popover-content-available-height)] w-80 overflow-y-auto')}
+        >
           <LayerActions editor={editor} ids={ids} onDone={onClose} />
         </Popover.Content>
       </Popover.Portal>

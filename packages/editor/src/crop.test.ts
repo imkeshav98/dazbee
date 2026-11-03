@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+
 import { coverCrop, cropOf, imageRect, panned, scaled } from './crop.ts'
 
 const image = { width: 2000, height: 1000 }
@@ -28,7 +29,9 @@ describe('crop', () => {
     const bigger = scaled(rect, box, 2, { x: -100 + 1200, y: 100 + 600 })
     expect(bigger).toEqual({ x: -100, y: 100, width: 1200, height: 600 })
     const crop = cropOf(bigger, image, box)
-    expect([crop.x, crop.y, crop.width, crop.height].map((v) => v.toFixed(6))).toEqual([1000 / 3, 0, 2000 / 3, 2000 / 3].map((v) => v.toFixed(6)))
+    expect([crop.x, crop.y, crop.width, crop.height].map((v) => v.toFixed(6))).toEqual(
+      [1000 / 3, 0, 2000 / 3, 2000 / 3].map((v) => v.toFixed(6)),
+    )
     // Dragged in past the box, it stops at the least size that still covers it.
     expect(scaled(rect, box, 2, { x: 0, y: 0 })).toEqual(rect)
     // The top start corner, dragged out: the bottom end corner stays.

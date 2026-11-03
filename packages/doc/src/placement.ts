@@ -1,8 +1,10 @@
-import type { Design } from '@dazbee/schema'
 import type * as Y from 'yjs'
+
+import type { Design } from '@dazbee/schema'
+
 import type { CommandContext } from './command.ts'
 import { overrideKey } from './design-doc.ts'
-import { round, type Box } from './geometry.ts'
+import { type Box, round } from './geometry.ts'
 
 /** Where a layer is in one scope, and whether it shows there. */
 export type Placed = Box & { visible: boolean }
@@ -11,7 +13,8 @@ type Path = keyof Placed
 /** `base`, or `format:<id>` for one format's overrides. */
 export type ScopeKey = 'base' | `format:${string}`
 
-const same = (a: unknown, b: unknown) => (typeof a === 'number' && typeof b === 'number' ? Math.abs(a - b) < 0.005 : a === b)
+const same = (a: unknown, b: unknown) =>
+  typeof a === 'number' && typeof b === 'number' ? Math.abs(a - b) < 0.005 : a === b
 
 /**
  * Plans where layers should be in every scope, then writes the plan as base values plus only the
@@ -35,7 +38,14 @@ export class Placement {
   private shown(scope: ScopeKey, id: string): Placed {
     const node = this.design.nodes[id]
     const p = { ...node?.props, ...(scope === 'base' ? {} : this.design.overrides[scope]?.[id]) } as Partial<Placed>
-    return { x: p.x ?? 0, y: p.y ?? 0, width: p.width ?? 0, height: p.height ?? 0, rotation: p.rotation ?? 0, visible: p.visible ?? true }
+    return {
+      x: p.x ?? 0,
+      y: p.y ?? 0,
+      width: p.width ?? 0,
+      height: p.height ?? 0,
+      rotation: p.rotation ?? 0,
+      visible: p.visible ?? true,
+    }
   }
 
   /** A layer in a scope, with what has been planned for it so far. */
@@ -59,7 +69,8 @@ export class Placement {
     const base = this.want.get('base') ?? new Map<string, Partial<Placed>>()
     for (const [id, patch] of base) {
       const props = r.nodes.get(id)?.get('props') as Y.Map<unknown> | undefined
-      for (const [path, value] of Object.entries(patch)) if (!same(this.shown('base', id)[path as Path], value)) props?.set(path, value)
+      for (const [path, value] of Object.entries(patch))
+        if (!same(this.shown('base', id)[path as Path], value)) props?.set(path, value)
     }
     for (const scope of this.scopes) {
       if (scope === 'base') continue

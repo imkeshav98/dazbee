@@ -1,5 +1,6 @@
 import { readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
+
 import { REFERENCE_DIR } from './pixels.ts'
 
 /** How far the WebGL stage drew from the CPU export for one page in one format. */
@@ -35,10 +36,14 @@ export function driftProblem(drift: Drift, baseline: DriftBaseline | undefined):
   if (!baseline) return 'no baseline; record one with UPDATE_DRIFT_BASELINES=1 and commit it'
   const problems = []
   if (drift.percent > baseline.limit.percent) {
-    problems.push(`${drift.percent.toFixed(3)}% of pixels differ, limit ${baseline.limit.percent}% (baseline ${baseline.percent.toFixed(3)}%)`)
+    problems.push(
+      `${drift.percent.toFixed(3)}% of pixels differ, limit ${baseline.limit.percent}% (baseline ${baseline.percent.toFixed(3)}%)`,
+    )
   }
   if (drift.maxDelta > baseline.limit.maxDelta) {
-    problems.push(`a channel differs by ${drift.maxDelta}, limit ${baseline.limit.maxDelta} (baseline ${baseline.maxDelta})`)
+    problems.push(
+      `a channel differs by ${drift.maxDelta}, limit ${baseline.limit.maxDelta} (baseline ${baseline.maxDelta})`,
+    )
   }
   return problems.length > 0 ? problems.join('; ') : undefined
 }
@@ -53,7 +58,10 @@ export function readDriftBaselines(): Record<string, DriftBaseline> {
 
 /** Records one case's baseline, keeping the others; cases stay sorted so diffs are readable. */
 export function recordDriftBaseline(name: string, drift: Drift) {
-  const all = { ...readDriftBaselines(), [name]: { ...drift, percent: Number(drift.percent.toFixed(3)), limit: limitFor(drift) } }
+  const all = {
+    ...readDriftBaselines(),
+    [name]: { ...drift, percent: Number(drift.percent.toFixed(3)), limit: limitFor(drift) },
+  }
   const sorted = Object.fromEntries(Object.entries(all).sort(([a], [b]) => (a < b ? -1 : 1)))
   writeFileSync(DRIFT_BASELINES, `${JSON.stringify(sorted, null, 2)}\n`)
 }

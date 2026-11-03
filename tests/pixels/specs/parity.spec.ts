@@ -1,22 +1,32 @@
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
+
 import { expect } from '@playwright/test'
+
 import { renderDesign } from '@dazbee/renderer'
 import { loadCanvasKit } from '@dazbee/renderer/node'
 import { parseDesign } from '@dazbee/schema'
+
+import { driftProblem, readDriftBaselines, recordDriftBaseline } from '../src/drift.ts'
 import { loadFixtures } from '../src/fixtures.ts'
 import { comparePixels, encodePng, fixtureResources, type Pixels } from '../src/pixels.ts'
 import { test } from './support/harness.ts'
-import { driftProblem, readDriftBaselines, recordDriftBaseline } from '../src/drift.ts'
 import { BROWSER_OUT, saveDriftRow } from './support/report.ts'
 
 /** Every page in every format of every fixture. */
 const cases = loadFixtures().flatMap(({ name, json }) => {
   const parsed = parseDesign(json)
   if (!parsed.success) throw new Error(parsed.errors.join('\n'))
-  const assetIds = [...new Set(JSON.stringify(json).match(/"assetId":"[^"]+"/g)?.map((m) => m.slice(11, -1)) ?? [])]
+  const assetIds = [
+    ...new Set(
+      JSON.stringify(json)
+        .match(/"assetId":"[^"]+"/g)
+        ?.map((m) => m.slice(11, -1)) ?? [],
+    ),
+  ]
   return Object.keys(parsed.design.pages).flatMap((pageId) =>
-    Object.keys(parsed.design.formats).map((formatId) => ({ name, json, pageId, formatId, assetIds })))
+    Object.keys(parsed.design.formats).map((formatId) => ({ name, json, pageId, formatId, assetIds })),
+  )
 })
 
 function maxDelta(a: Pixels, b: Pixels) {
@@ -54,7 +64,12 @@ for (const c of cases) {
     if (process.env.UPDATE_DRIFT_BASELINES) recordDriftBaseline(label, drift)
     const baseline = readDriftBaselines()[label]
     const problem = driftProblem(drift, baseline)
-    saveDriftRow({ case: label, ...drift, ...(baseline ? { limit: baseline.limit } : {}), ...(problem ? { problem } : {}) })
+    saveDriftRow({
+      case: label,
+      ...drift,
+      ...(baseline ? { limit: baseline.limit } : {}),
+      ...(problem ? { problem } : {}),
+    })
     expect(problem, 'WebGL stage drifted from the CPU export').toBeUndefined()
   })
 }

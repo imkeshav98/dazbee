@@ -2,15 +2,13 @@
 
 // Adding a size to the design: every preset grouped by shape, or a size of your own, checked
 // against the sizes the formats allow; and the design as the editor holds it, kept current.
-import {
-  ArrowsInSimpleIcon, InfoIcon, PlusIcon, TrashIcon,
-} from '@phosphor-icons/react'
+import { ArrowsInSimpleIcon, InfoIcon, PlusIcon, TrashIcon } from '@phosphor-icons/react'
 import * as Popover from '@radix-ui/react-popover'
+import { type FormEvent, useEffect, useId, useState } from 'react'
+
 import type { Editor } from '@dazbee/editor'
-import {
-  FORMAT_LIMITS, FORMAT_PRESETS, FORMAT_SHAPES, formatSizeIssue, shapeOf,
-} from '@dazbee/schema'
-import { useEffect, useId, useState, type FormEvent } from 'react'
+import { FORMAT_LIMITS, FORMAT_PRESETS, FORMAT_SHAPES, formatSizeIssue, shapeOf } from '@dazbee/schema'
+
 import { cn } from '../../lib/cn.ts'
 import { useMessages } from '../../lib/i18n/client.tsx'
 import { format } from '../../lib/i18n/index.ts'
@@ -41,7 +39,10 @@ export function Proportion({ width, height, className }: { width: number; height
   const scale = 14 / Math.max(width, height)
   return (
     <span aria-hidden className={cn('grid size-4 shrink-0 place-items-center', className)}>
-      <span className="rounded-[2px] border-[1.5px] border-current" style={{ width: Math.max(4, width * scale), height: Math.max(4, height * scale) }} />
+      <span
+        className="rounded-[2px] border-[1.5px] border-current"
+        style={{ width: Math.max(4, width * scale), height: Math.max(4, height * scale) }}
+      />
     </span>
   )
 }
@@ -69,7 +70,8 @@ export function AddFormat({ editor }: { editor: Editor }) {
     e.preventDefault()
     if (typed && !issue) add(sizeOf({ width: w, height: h }), w, h)
   }
-  const issueText = issue && format(t.editor.formats.issue[issue], { min: FORMAT_LIMITS.minShortSide, max: FORMAT_LIMITS.maxSide })
+  const issueText =
+    issue && format(t.editor.formats.issue[issue], { min: FORMAT_LIMITS.minShortSide, max: FORMAT_LIMITS.maxSide })
 
   return (
     <Popover.Root open={open} onOpenChange={setOpen}>
@@ -87,14 +89,24 @@ export function AddFormat({ editor }: { editor: Editor }) {
           sideOffset={12}
           aria-label={t.editor.formats.add}
           onKeyDown={(e) => e.stopPropagation()}
-          className={cn(POPOVER, 'flex max-h-[min(560px,var(--radix-popover-content-available-height))] w-72 flex-col overflow-hidden')}
+          className={cn(
+            POPOVER,
+            'flex max-h-[min(560px,var(--radix-popover-content-available-height))] w-72 flex-col overflow-hidden',
+          )}
         >
-          <div ref={overlayScroll} className="min-h-0 flex-1 overflow-y-auto py-1" role="group" aria-label={t.editor.formats.presets}>
+          <div
+            ref={overlayScroll}
+            className="min-h-0 flex-1 overflow-y-auto py-1"
+            role="group"
+            aria-label={t.editor.formats.presets}
+          >
             {FORMAT_SHAPES.map((shape) => {
               const presets = FORMAT_PRESETS.filter((p) => shapeOf(p.width, p.height) === shape)
               return (
                 <div key={shape} role="group" aria-label={t.editor.formats.shape[shape]}>
-                  <h4 className="px-4 pt-2 pb-1 text-[11px] font-semibold tracking-wide text-subtle">{t.editor.formats.shape[shape]}</h4>
+                  <h4 className="px-4 pt-2 pb-1 text-[11px] font-semibold tracking-wide text-subtle">
+                    {t.editor.formats.shape[shape]}
+                  </h4>
                   {presets.map((preset) => {
                     const name = t.editor.formats.preset[preset.id] ?? preset.id
                     return (
@@ -107,9 +119,7 @@ export function AddFormat({ editor }: { editor: Editor }) {
                       >
                         <Proportion width={preset.width} height={preset.height} className="text-muted" />
                         <span className="min-w-0 flex-1 truncate">{name}</span>
-                        <span className="font-mono text-[11px] text-subtle tabular-nums">
-                          {sizeOf(preset)}
-                        </span>
+                        <span className="font-mono text-[11px] text-subtle tabular-nums">{sizeOf(preset)}</span>
                       </button>
                     )
                   })}
@@ -121,13 +131,19 @@ export function AddFormat({ editor }: { editor: Editor }) {
             <h4 className="pb-2 text-[11px] font-semibold tracking-wide text-subtle">{t.editor.formats.custom}</h4>
             <div className="flex items-end gap-2">
               {(['width', 'height'] as const).map((side) => (
-                <label key={side} htmlFor={ids[side]} className="flex min-w-0 flex-1 flex-col gap-1 text-[11px] text-muted">
+                <label
+                  key={side}
+                  htmlFor={ids[side]}
+                  className="flex min-w-0 flex-1 flex-col gap-1 text-[11px] text-muted"
+                >
                   {t.editor.formats[side]}
                   <input
                     id={ids[side]}
                     inputMode="numeric"
                     value={side === 'width' ? width : height}
-                    onChange={(e) => (side === 'width' ? setWidth : setHeight)(e.currentTarget.value.replace(/[^\d]/g, ''))}
+                    onChange={(e) =>
+                      (side === 'width' ? setWidth : setHeight)(e.currentTarget.value.replace(/[^\d]/g, ''))
+                    }
                     aria-invalid={issue ? true : undefined}
                     aria-describedby={issue ? ids.issue : undefined}
                     className={cn(
@@ -137,9 +153,13 @@ export function AddFormat({ editor }: { editor: Editor }) {
                   />
                 </label>
               ))}
-              <Button type="submit" variant="primary" disabled={!typed || Boolean(issue)}>{t.editor.formats.addCustom}</Button>
+              <Button type="submit" variant="primary" disabled={!typed || Boolean(issue)}>
+                {t.editor.formats.addCustom}
+              </Button>
             </div>
-            <p id={ids.issue} role="alert" className="min-h-4 pt-1.5 text-[11px] text-danger">{issueText}</p>
+            <p id={ids.issue} role="alert" className="min-h-4 pt-1.5 text-[11px] text-danger">
+              {issueText}
+            </p>
           </form>
         </Popover.Content>
       </Popover.Portal>
@@ -154,10 +174,16 @@ export function FocusChip({ editor }: { editor: Editor }) {
   const name = focused ? design.formats[focused]?.name : undefined
   if (!focused || name === undefined) return null
   return (
-    <div role="status" data-testid="focus-chip" className="pointer-events-auto flex h-9 items-center gap-1 rounded-full surface-frost ps-3.5 pe-1 text-[13px]">
+    <div
+      role="status"
+      data-testid="focus-chip"
+      className="pointer-events-auto flex h-9 items-center gap-1 rounded-full surface-frost ps-3.5 pe-1 text-[13px]"
+    >
       <ArrowsInSimpleIcon size={14} aria-hidden className="text-accent-text" />
       <span className="ms-1">{format(t.editor.formats.focusing, { name })}</span>
-      <Button variant="ghost" className="ms-1 h-7 rounded-full px-2.5 text-xs" onClick={() => editor.focus(null)}>{t.editor.formats.exitFocus}</Button>
+      <Button variant="ghost" className="ms-1 h-7 rounded-full px-2.5 text-xs" onClick={() => editor.focus(null)}>
+        {t.editor.formats.exitFocus}
+      </Button>
     </div>
   )
 }
@@ -182,7 +208,8 @@ export function UndoToast({ editor, message, onDone }: { editor: Editor; message
       onPointerLeave={() => setHeld(false)}
       onFocus={() => setHeld(true)}
       onBlur={() => setHeld(false)}
-      className={TOAST}>
+      className={TOAST}
+    >
       <TrashIcon size={14} aria-hidden className="text-subtle" />
       <span>{message}</span>
       <Button
@@ -203,7 +230,15 @@ export function UndoToast({ editor, message, onDone }: { editor: Editor; message
  * Says why a gesture did nothing, such as a nudge auto layout decides; it goes after a few seconds.
  * A `lasting` one, such as files uploading, stays until its message changes or it is taken away.
  */
-export function NoticeToast({ message, onDone, lasting = false }: { message: string; onDone: () => void; lasting?: boolean }) {
+export function NoticeToast({
+  message,
+  onDone,
+  lasting = false,
+}: {
+  message: string
+  onDone: () => void
+  lasting?: boolean
+}) {
   useEffect(() => {
     if (lasting) return
     const timer = setTimeout(onDone, TOAST_MS)

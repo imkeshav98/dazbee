@@ -5,11 +5,22 @@
 import type { Point } from './hit-test.ts'
 import { round } from './transform.ts'
 
-export interface Anchor { x: number; y: number; in?: Point; out?: Point }
-export interface Contour { anchors: Anchor[]; closed: boolean }
+export interface Anchor {
+  x: number
+  y: number
+  in?: Point
+  out?: Point
+}
+export interface Contour {
+  anchors: Anchor[]
+  closed: boolean
+}
 export type PenPath = Contour[]
 /** One anchor of a path. */
-export interface AnchorRef { contour: number; index: number }
+export interface AnchorRef {
+  contour: number
+  index: number
+}
 export type Side = 'in' | 'out'
 /** The four points of a cubic Bézier segment. */
 export type Cubic = [Point, Point, Point, Point]
@@ -114,7 +125,8 @@ export function parsePath(d: string): PenPath {
           command = rel ? 'l' : 'L'
           break
         }
-        case 'L': lineTo(pt(number(), number()))
+        case 'L':
+          lineTo(pt(number(), number()))
           break
         case 'H': {
           const x = number()
@@ -140,8 +152,14 @@ export function parsePath(d: string): PenPath {
           cubic = c2
           break
         }
-        case 'Q': case 'T': {
-          const q: Point = upper === 'Q' ? pt(number(), number()) : lastQuad ? { x: 2 * at.x - lastQuad.x, y: 2 * at.y - lastQuad.y } : at
+        case 'Q':
+        case 'T': {
+          const q: Point =
+            upper === 'Q'
+              ? pt(number(), number())
+              : lastQuad
+                ? { x: 2 * at.x - lastQuad.x, y: 2 * at.y - lastQuad.y }
+                : at
           const from = at
           const p = pt(number(), number())
           // A quadratic is the cubic with its controls two thirds of the way to the quadratic's.
@@ -159,7 +177,8 @@ export function parsePath(d: string): PenPath {
           for (const [, c1, c2, to] of arcToCubics(at, rx, ry, rotation, large, sweep, p)) cubicTo(c1, c2, to)
           break
         }
-        default: throw new Error(`path data: unknown command "${command}" in "${d}"`)
+        default:
+          throw new Error(`path data: unknown command "${command}" in "${d}"`)
       }
       lastCubic = cubic
       lastQuad = quad
@@ -180,7 +199,15 @@ function close(contour: Contour) {
 }
 
 /** An SVG elliptical arc as cubics, each spanning at most a quarter turn. */
-function arcToCubics(from: Point, rx: number, ry: number, degrees: number, large: boolean, sweep: boolean, to: Point): Cubic[] {
+function arcToCubics(
+  from: Point,
+  rx: number,
+  ry: number,
+  degrees: number,
+  large: boolean,
+  sweep: boolean,
+  to: Point,
+): Cubic[] {
   if (near(from, to)) return []
   rx = Math.abs(rx)
   ry = Math.abs(ry)
@@ -213,8 +240,14 @@ function arcToCubics(from: Point, rx: number, ry: number, degrees: number, large
   const parts = Math.ceil(Math.abs(sweepAngle) / (Math.PI / 2) - 1e-9)
   const step = sweepAngle / parts
   const kappa = (4 / 3) * Math.tan(step / 4)
-  const on = (t: number): Point => ({ x: cx + rx * Math.cos(t) * cos - ry * Math.sin(t) * sin, y: cy + rx * Math.cos(t) * sin + ry * Math.sin(t) * cos })
-  const along = (t: number): Point => ({ x: -rx * Math.sin(t) * cos - ry * Math.cos(t) * sin, y: -rx * Math.sin(t) * sin + ry * Math.cos(t) * cos })
+  const on = (t: number): Point => ({
+    x: cx + rx * Math.cos(t) * cos - ry * Math.sin(t) * sin,
+    y: cy + rx * Math.cos(t) * sin + ry * Math.sin(t) * cos,
+  })
+  const along = (t: number): Point => ({
+    x: -rx * Math.sin(t) * cos - ry * Math.cos(t) * sin,
+    y: -rx * Math.sin(t) * sin + ry * Math.cos(t) * cos,
+  })
   const cubics: Cubic[] = []
   for (let n = 0; n < parts; n++) {
     const a = start + n * step
@@ -223,7 +256,12 @@ function arcToCubics(from: Point, rx: number, ry: number, degrees: number, large
     const p3 = n === parts - 1 ? to : on(b)
     const da = along(a)
     const db = along(b)
-    cubics.push([p0, { x: p0.x + kappa * da.x, y: p0.y + kappa * da.y }, { x: p3.x - kappa * db.x, y: p3.y - kappa * db.y }, p3])
+    cubics.push([
+      p0,
+      { x: p0.x + kappa * da.x, y: p0.y + kappa * da.y },
+      { x: p3.x - kappa * db.x, y: p3.y - kappa * db.y },
+      p3,
+    ])
   }
   return cubics
 }
@@ -300,7 +338,8 @@ export function pathBounds(path: PenPath): { x: number; y: number; width: number
     for (const [from, to] of segmentsOf(contour)) {
       const cubic = cubicOf(contour.anchors[from] as Anchor, contour.anchors[to] as Anchor)
       const [p0, p1, p2, p3] = cubic
-      for (const t of [...turningPoints(p0.x, p1.x, p2.x, p3.x), ...turningPoints(p0.y, p1.y, p2.y, p3.y)]) points.push(pointAt(cubic, t))
+      for (const t of [...turningPoints(p0.x, p1.x, p2.x, p3.x), ...turningPoints(p0.y, p1.y, p2.y, p3.y)])
+        points.push(pointAt(cubic, t))
     }
   }
   if (points.length === 0) return null
@@ -360,16 +399,20 @@ export function hitPath(path: PenPath, p: Point, reach: number, shown: AnchorRef
   }
   if (control) return control.hit
   let anchor: { hit: PathHit; dist: number } | null = null
-  path.forEach((contour, c) => contour.anchors.forEach((a, index) => {
-    const dist = distance(a, p)
-    if (dist <= reach && (!anchor || dist < anchor.dist)) anchor = { hit: { kind: 'anchor', ref: { contour: c, index } }, dist }
-  }))
+  path.forEach((contour, c) =>
+    contour.anchors.forEach((a, index) => {
+      const dist = distance(a, p)
+      if (dist <= reach && (!anchor || dist < anchor.dist))
+        anchor = { hit: { kind: 'anchor', ref: { contour: c, index } }, dist }
+    }),
+  )
   if (anchor) return (anchor as { hit: PathHit }).hit
   let segment: { hit: PathHit; dist: number } | null = null
   path.forEach((contour, c) => {
     for (const [from, to] of segmentsOf(contour)) {
       const near = nearestOnCubic(cubicOf(contour.anchors[from] as Anchor, contour.anchors[to] as Anchor), p)
-      if (near.distance <= reach && (!segment || near.distance < segment.dist)) segment = { hit: { kind: 'segment', contour: c, from, t: near.t }, dist: near.distance }
+      if (near.distance <= reach && (!segment || near.distance < segment.dist))
+        segment = { hit: { kind: 'segment', contour: c, from, t: near.t }, dist: near.distance }
     }
   })
   return segment ? (segment as { hit: PathHit }).hit : null
@@ -378,16 +421,27 @@ export function hitPath(path: PenPath, p: Point, reach: number, shown: AnchorRef
 export const anchorOf = (path: PenPath, ref: AnchorRef): Anchor | undefined => path[ref.contour]?.anchors[ref.index]
 export const sameRef = (a: AnchorRef, b: AnchorRef) => a.contour === b.contour && a.index === b.index
 
-const copy = (path: PenPath): PenPath => path.map((c) => ({
-  closed: c.closed,
-  anchors: c.anchors.map((a) => ({ x: a.x, y: a.y, ...(a.in && { in: { ...a.in } }), ...(a.out && { out: { ...a.out } }) })),
-}))
+const copy = (path: PenPath): PenPath =>
+  path.map((c) => ({
+    closed: c.closed,
+    anchors: c.anchors.map((a) => ({
+      x: a.x,
+      y: a.y,
+      ...(a.in && { in: { ...a.in } }),
+      ...(a.out && { out: { ...a.out } }),
+    })),
+  }))
 
 /**
  * Adds an anchor on a segment at `t` without changing the path's outline: the curve is split in
  * two (de Casteljau), and the anchors either side get the shorter handles that split gives.
  */
-export function splitSegment(path: PenPath, contour: number, from: number, t: number): { path: PenPath; ref: AnchorRef } {
+export function splitSegment(
+  path: PenPath,
+  contour: number,
+  from: number,
+  t: number,
+): { path: PenPath; ref: AnchorRef } {
   const next = copy(path)
   const c = next[contour]
   if (!c) throw new Error(`no contour ${contour}`)
@@ -422,7 +476,10 @@ export function splitSegment(path: PenPath, contour: number, from: number, t: nu
 /** Takes anchors out. A contour left with fewer than two anchors goes too. */
 export function deleteAnchors(path: PenPath, refs: AnchorRef[]): PenPath {
   return copy(path)
-    .map((c, contour) => ({ ...c, anchors: c.anchors.filter((_, index) => !refs.some((r) => sameRef(r, { contour, index }))) }))
+    .map((c, contour) => ({
+      ...c,
+      anchors: c.anchors.filter((_, index) => !refs.some((r) => sameRef(r, { contour, index }))),
+    }))
     .filter((c) => c.anchors.length >= 2)
 }
 
@@ -483,11 +540,20 @@ export function scalePath(path: PenPath, sx: number, sy: number): PenPath {
   const at = (p: Point) => ({ x: p.x * sx, y: p.y * sy })
   return path.map((c) => ({
     ...c,
-    anchors: c.anchors.map((a) => ({ ...at(a), ...(a.in ? { in: at(a.in) } : {}), ...(a.out ? { out: at(a.out) } : {}) })),
+    anchors: c.anchors.map((a) => ({
+      ...at(a),
+      ...(a.in ? { in: at(a.in) } : {}),
+      ...(a.out ? { out: at(a.out) } : {}),
+    })),
   }))
 }
 
 /** The whole path moved by an offset. */
 export function offsetPath(path: PenPath, dx: number, dy: number): PenPath {
-  return moveAnchors(path, path.flatMap((c, contour) => c.anchors.map((_, index) => ({ contour, index }))), dx, dy)
+  return moveAnchors(
+    path,
+    path.flatMap((c, contour) => c.anchors.map((_, index) => ({ contour, index }))),
+    dx,
+    dy,
+  )
 }

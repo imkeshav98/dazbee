@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+
 import { signSyncToken, SYNC_TOKEN_TTL_MS, syncTokenSecret, verifySyncToken } from './index.ts'
 
 const secret = 'a'.repeat(32)
@@ -31,7 +32,10 @@ describe('sync tokens', () => {
 
   it('refuses tokens that are not tokens', () => {
     for (const token of ['', 'abc', 'a.b.c', '.sig']) {
-      expect(verifySyncToken(secret, token, 'design-1')).toEqual({ ok: false, reason: expect.stringMatching(/malformed|bad signature/) })
+      expect(verifySyncToken(secret, token, 'design-1')).toEqual({
+        ok: false,
+        reason: expect.stringMatching(/malformed|bad signature/),
+      })
     }
   })
 

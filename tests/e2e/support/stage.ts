@@ -1,11 +1,13 @@
 // Driving the editor stage with real pointer and keyboard input, for the selection and group
 // checks (#40, #41): drags with modifiers pressed as a hand would, shortcut presses from the one
 // table, and reading layers back from the document.
+import { type Browser, expect, type Locator, type Page } from '@playwright/test'
+
 import { pressFor, type ShortcutAction } from '@dazbee/editor/shortcuts'
 import type { DesignInput } from '@dazbee/schema'
-import { expect, type Browser, type Locator, type Page } from '@playwright/test'
+
 import { designOf, openTabs, placed, screenPoint } from './editor.ts'
-import { DEV_BRAND, seed, type InBrand } from './seed.ts'
+import { DEV_BRAND, type InBrand, seed } from './seed.ts'
 
 /**
  * Opens a fresh copy of a design in one tab, 1440 × 1000, with the camera where design pixels in
@@ -22,31 +24,57 @@ export async function openStage(browser: Browser, content: DesignInput, { brandI
 }
 
 export interface Design {
-  nodes: Record<string, { parentId: string; index: string; lock?: Record<string, boolean>; props: Record<string, unknown> }>
+  nodes: Record<
+    string,
+    { parentId: string; index: string; lock?: Record<string, boolean>; props: Record<string, unknown> }
+  >
   overrides: Record<string, Record<string, Record<string, unknown>>>
 }
 export const read = async (page: Page) => JSON.parse(await designOf(page)) as Design
-export const props = async (page: Page, id: string) => placed(await read(page), id, 'sq') as { x: number; y: number; width: number; height: number; rotation?: number; visible?: boolean }
+export const props = async (page: Page, id: string) =>
+  placed(await read(page), id, 'sq') as {
+    x: number
+    y: number
+    width: number
+    height: number
+    rotation?: number
+    visible?: boolean
+  }
 export const selection = (page: Page) => page.evaluate(() => window.dazbee?.selection() ?? [])
 /** Presses an action's shortcut and waits for the redraw, so the handles stand where the box now is. */
 export const press = async (page: Page, action: ShortcutAction) => {
   await page.keyboard.press(pressFor(action))
   await page.evaluate(() => window.dazbee?.drawn())
 }
-export const order = async (page: Page) => Object.entries((await read(page)).nodes)
-  .filter(([, n]) => n.parentId === 'p1').sort(([a, x], [b, y]) => (x.index < y.index ? -1 : x.index > y.index ? 1 : a < b ? -1 : 1)).map(([id]) => id)
+export const order = async (page: Page) =>
+  Object.entries((await read(page)).nodes)
+    .filter(([, n]) => n.parentId === 'p1')
+    .sort(([a, x], [b, y]) => (x.index < y.index ? -1 : x.index > y.index ? 1 : a < b ? -1 : 1))
+    .map(([id]) => id)
 
 /**
  * Drags with the mouse between two design pixels of the square, in a few steps like a hand would.
  * Modifier keys go down once the drag has started, as a designer presses Shift mid-drag; with
  * `before` they are held from the press, as for a Shift marquee that adds to the selection.
  */
-export async function drag(page: Page, from: { x: number; y: number }, to: { x: number; y: number }, modifiers: ('Shift' | 'Alt')[] = [], before = false) {
+export async function drag(
+  page: Page,
+  from: { x: number; y: number },
+  to: { x: number; y: number },
+  modifiers: ('Shift' | 'Alt')[] = [],
+  before = false,
+) {
   const a = await screenPoint(page, from.x, from.y)
   const b = await screenPoint(page, to.x, to.y)
   await dragScreen(page, a, b, modifiers, before)
 }
-export async function dragScreen(page: Page, a: { x: number; y: number }, b: { x: number; y: number }, modifiers: ('Shift' | 'Alt')[] = [], before = false) {
+export async function dragScreen(
+  page: Page,
+  a: { x: number; y: number },
+  b: { x: number; y: number },
+  modifiers: ('Shift' | 'Alt')[] = [],
+  before = false,
+) {
   await page.mouse.move(a.x, a.y)
   if (before) for (const key of modifiers) await page.keyboard.down(key)
   await page.mouse.down()
@@ -106,7 +134,8 @@ export async function barMenu(page: Page, id: string) {
   const menu = page.getByTestId(`bar-${id}-menu`)
   if (await menu.isVisible()) return menu
   const item = page.getByTestId(`bar-${id}`)
-  if (!(await item.isVisible()) && (await page.getByTestId('bar-overflow').isVisible())) await page.getByTestId('bar-overflow').click()
+  if (!(await item.isVisible()) && (await page.getByTestId('bar-overflow').isVisible()))
+    await page.getByTestId('bar-overflow').click()
   await item.click()
   await expect(menu).toBeVisible()
   return menu
@@ -212,10 +241,26 @@ export async function moreSubmenu(page: Page, id: string) {
 
 /** Where each of the selection's cards is now: the top bar's pop-up or edit panel that holds it. */
 const HOLDER: Record<string, string> = {
-  'layout-card': 'position', 'flow-card': 'position', 'appearance-card': 'transparency', 'spacing-card': 'spacing', 'text-box-card': 'spacing',
-  'frame-card': 'box', 'auto-layout-card': 'stack', 'combine-card': 'combine-op', 'mask-card': 'mask', 'adjust-card': 'edit', 'look-card': 'edit',
-  'photos-card': 'edit', 'text-fit-card': 'spacing', 'stroke-look': 'outline', 'stroke-card': 'outline',
-  'effect-tiles': 'effects', 'effects-card': 'effects', 'brand-colours': 'colour', 'design-colours': 'colour', 'auto-layout-advanced': 'stack',
+  'layout-card': 'position',
+  'flow-card': 'position',
+  'appearance-card': 'transparency',
+  'spacing-card': 'spacing',
+  'text-box-card': 'spacing',
+  'frame-card': 'box',
+  'auto-layout-card': 'stack',
+  'combine-card': 'combine-op',
+  'mask-card': 'mask',
+  'adjust-card': 'edit',
+  'look-card': 'edit',
+  'photos-card': 'edit',
+  'text-fit-card': 'spacing',
+  'stroke-look': 'outline',
+  'stroke-card': 'outline',
+  'effect-tiles': 'effects',
+  'effects-card': 'effects',
+  'brand-colours': 'colour',
+  'design-colours': 'colour',
+  'auto-layout-advanced': 'stack',
 }
 
 /**
@@ -225,10 +270,18 @@ const HOLDER: Record<string, string> = {
  */
 export async function openCard(page: Page, testId: string) {
   const has = async (id: string) => (await page.getByTestId(`bar-${id}`).count()) > 0
-  const holder = testId === 'fill-card' ? ((await has('colour')) ? 'colour' : 'edit')
-    : testId === 'shape-card' ? ((await has('shape')) ? 'shape' : 'corners')
-      : testId === 'frame-card' && !(await has('box')) ? 'corners'
-        : HOLDER[testId]
+  const holder =
+    testId === 'fill-card'
+      ? (await has('colour'))
+        ? 'colour'
+        : 'edit'
+      : testId === 'shape-card'
+        ? (await has('shape'))
+          ? 'shape'
+          : 'corners'
+        : testId === 'frame-card' && !(await has('box'))
+          ? 'corners'
+          : HOLDER[testId]
   if (!holder) throw new Error(`no top bar item holds ${testId}`)
   return (await barMenu(page, holder)).getByTestId(testId)
 }

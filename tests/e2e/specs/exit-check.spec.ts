@@ -7,26 +7,31 @@
 // The numbers go to output/exit-check.json.
 import { readFileSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
+
 import { PDFiumLibrary } from '@hyzyla/pdfium'
+
+import type { CanvasKit } from '@dazbee/canvaskit'
 import { exportDesign, readZip } from '@dazbee/export'
 import { FALLBACK_FAMILIES } from '@dazbee/fonts'
 import { loadFontFiles } from '@dazbee/fonts/node'
-import type { CanvasKit } from '@dazbee/canvaskit'
 import { decodePng, encodePng, type Pixels } from '@dazbee/pixels/pixels'
 import { overWhite, rasterisePdf, rasteriseSvg, vectorDifference } from '@dazbee/pixels/vector'
 import { renderDesign } from '@dazbee/renderer'
 import { loadCanvasKit } from '@dazbee/renderer/node'
 import type { ExportType } from '@dazbee/schema'
-import { expect, test, type Page } from '../support/test.ts'
+
 import { photo } from '../support/assets.ts'
 import { designOf, OUTPUT, screenPoint, writeOutput } from '../support/editor.ts'
 import { newBrand } from '../support/seed.ts'
 import { backgroundPanel, barMenu, press, sizesPanel } from '../support/stage.ts'
+import { expect, type Page, test } from '../support/test.ts'
 
 test.describe.configure({ timeout: 600_000 })
 
 const run = crypto.randomUUID().slice(0, 6)
-const righteous = new Uint8Array(readFileSync(join(import.meta.dirname, '..', 'assets', 'fonts', 'Righteous-Regular.ttf')))
+const righteous = new Uint8Array(
+  readFileSync(join(import.meta.dirname, '..', 'assets', 'fonts', 'Righteous-Regular.ttf')),
+)
 /** The most a PDF or SVG of this ad may differ from the CPU render, in percent of its pixels. */
 const EXIT_VECTOR_LIMIT = 1
 
@@ -34,7 +39,14 @@ interface Stored {
   meta: { name: string }
   formats: Record<string, { name: string; width: number; height: number }>
   pages: Record<string, { fills: { type: string; color?: string }[] }>
-  nodes: Record<string, { type: string; bindings?: Record<string, string>; props: Record<string, unknown> & { fills?: { type: string; assetId?: string }[] } }>
+  nodes: Record<
+    string,
+    {
+      type: string
+      bindings?: Record<string, string>
+      props: Record<string, unknown> & { fills?: { type: string; assetId?: string }[] }
+    }
+  >
   overrides: Record<string, Record<string, Record<string, unknown>>>
 }
 const stored = async (page: Page) => JSON.parse(await designOf(page)) as Stored
@@ -42,34 +54,47 @@ const drawn = (page: Page) => page.evaluate(() => window.dazbee?.drawn())
 const shot = async (page: Page, name: string) => writeOutput(`exit-check-${name}.png`, await page.screenshot())
 
 /** An SVG file as Chromium's own SVG decoder draws it in the page, at the format's size over white. */
-async function drawnByChromium(page: Page, ck: CanvasKit, file: Uint8Array, width: number, height: number): Promise<Pixels> {
-  const png = await page.evaluate(async ({ text, width, height }) => {
-    const url = URL.createObjectURL(new Blob([text], { type: 'image/svg+xml' }))
-    try {
-      const image = new Image()
-      image.src = url
-      await image.decode()
-      const canvas = new OffscreenCanvas(width, height)
-      const context = canvas.getContext('2d')
-      if (!context) throw new Error('no 2d context')
-      context.fillStyle = '#FFFFFF'
-      context.fillRect(0, 0, width, height)
-      context.drawImage(image, 0, 0, width, height)
-      const bytes = new Uint8Array(await (await canvas.convertToBlob({ type: 'image/png' })).arrayBuffer())
-      let binary = ''
-      for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000))
-      return btoa(binary)
-    } finally {
-      URL.revokeObjectURL(url)
-    }
-  }, { text: new TextDecoder().decode(file), width, height })
+async function drawnByChromium(
+  page: Page,
+  ck: CanvasKit,
+  file: Uint8Array,
+  width: number,
+  height: number,
+): Promise<Pixels> {
+  const png = await page.evaluate(
+    async ({ text, width, height }) => {
+      const url = URL.createObjectURL(new Blob([text], { type: 'image/svg+xml' }))
+      try {
+        const image = new Image()
+        image.src = url
+        await image.decode()
+        const canvas = new OffscreenCanvas(width, height)
+        const context = canvas.getContext('2d')
+        if (!context) throw new Error('no 2d context')
+        context.fillStyle = '#FFFFFF'
+        context.fillRect(0, 0, width, height)
+        context.drawImage(image, 0, 0, width, height)
+        const bytes = new Uint8Array(await (await canvas.convertToBlob({ type: 'image/png' })).arrayBuffer())
+        let binary = ''
+        for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000))
+        return btoa(binary)
+      } finally {
+        URL.revokeObjectURL(url)
+      }
+    },
+    { text: new TextDecoder().decode(file), width, height },
+  )
   return decodePng(ck, new Uint8Array(Buffer.from(png, 'base64')))
 }
 
-test('an ad set rebuilt in 5 formats through real input exports PNG, JPG, PDF and SVG that match Node', async ({ browser }) => {
+test('an ad set rebuilt in 5 formats through real input exports PNG, JPG, PDF and SVG that match Node', async ({
+  browser,
+}) => {
   const brandId = await newBrand('e2e exit-check')
   const context = await browser.newContext({
-    viewport: { width: 1440, height: 1000 }, acceptDownloads: true, recordVideo: { dir: join(OUTPUT, 'exit-check-video'), size: { width: 1440, height: 1000 } },
+    viewport: { width: 1440, height: 1000 },
+    acceptDownloads: true,
+    recordVideo: { dir: join(OUTPUT, 'exit-check-video'), size: { width: 1440, height: 1000 } },
   })
   const page = await context.newPage()
   const errors: string[] = []
@@ -89,7 +114,10 @@ test('an ad set rebuilt in 5 formats through real input exports PNG, JPG, PDF an
   await page.locator('[data-panel="brand"]').click()
   const kit = page.getByTestId('brand-kit')
   await kit.getByRole('button', { name: 'Edit', exact: true }).click()
-  for (const [named, hex] of [[colour, '1F7A4D'], [accent, 'FFB627']] as const) {
+  for (const [named, hex] of [
+    [colour, '1F7A4D'],
+    [accent, 'FFB627'],
+  ] as const) {
     await kit.getByRole('button', { name: 'Add colour' }).click()
     const row = kit.locator('li[data-token]').last()
     await row.getByRole('textbox', { name: /^Name of colour/ }).fill(named)
@@ -105,14 +133,23 @@ test('an ad set rebuilt in 5 formats through real input exports PNG, JPG, PDF an
   const library = page.getByTestId('asset-library')
   const name = `Sneaker ${run}`
   // Bytes after the JPEG's end make each run's file its own, since assets are stored by hash.
-  await library.locator('input[type="file"]').setInputFiles({ name: `${name}.jpg`, mimeType: 'image/jpeg', buffer: Buffer.concat([photo, Buffer.from(run)]) })
+  await library
+    .locator('input[type="file"]')
+    .setInputFiles({ name: `${name}.jpg`, mimeType: 'image/jpeg', buffer: Buffer.concat([photo, Buffer.from(run)]) })
   const item = library.locator('li[data-asset]').filter({ hasText: name })
   await expect(item).toBeVisible({ timeout: 30_000 })
   const stage = page.getByTestId('stage')
   const box = await stage.boundingBox()
   const drop = await screenPoint(page, 600, 420)
-  await item.getByRole('button', { name: `Place ${name} on the design` }).dragTo(stage, { targetPosition: { x: drop.x - (box?.x ?? 0), y: drop.y - (box?.y ?? 0) } })
-  await expect.poll(async () => Object.values((await stored(page)).nodes).filter((n) => n.props.fills?.some((f) => f.type === 'image')).length).toBe(1)
+  await item
+    .getByRole('button', { name: `Place ${name} on the design` })
+    .dragTo(stage, { targetPosition: { x: drop.x - (box?.x ?? 0), y: drop.y - (box?.y ?? 0) } })
+  await expect
+    .poll(
+      async () =>
+        Object.values((await stored(page)).nodes).filter((n) => n.props.fills?.some((f) => f.type === 'image')).length,
+    )
+    .toBe(1)
   await page.keyboard.press('Escape')
   await drawn(page)
 
@@ -138,7 +175,12 @@ test('an ad set rebuilt in 5 formats through real input exports PNG, JPG, PDF an
   await drawn(page)
   await page.locator('[data-panel="brand"]').click()
   await kit.getByRole('button', { name: `Apply ${accent} to the selection` }).click()
-  await expect.poll(async () => Object.values((await stored(page)).nodes).filter((n) => n.bindings?.fill?.startsWith('brand:')).length).toBe(1)
+  await expect
+    .poll(
+      async () =>
+        Object.values((await stored(page)).nodes).filter((n) => n.bindings?.fill?.startsWith('brand:')).length,
+    )
+    .toBe(1)
   await page.keyboard.press('Escape')
 
   // A headline typed with the text tool, then set in an uploaded font.
@@ -154,13 +196,19 @@ test('an ad set rebuilt in 5 formats through real input exports PNG, JPG, PDF an
   expect(await page.evaluate(() => window.dazbee?.selection())).toEqual([headline])
   await barMenu(page, 'font')
   // An upload from the list joins the brand's fonts and is set at once.
-  await page.getByTestId('font-upload').setInputFiles({ name: 'Righteous-Regular.ttf', mimeType: 'font/ttf', buffer: Buffer.from(righteous) })
-  await expect.poll(async () => ((await stored(page)).nodes[headline]?.props.style as { fontFamily: string }).fontFamily).toBe('Righteous')
+  await page
+    .getByTestId('font-upload')
+    .setInputFiles({ name: 'Righteous-Regular.ttf', mimeType: 'font/ttf', buffer: Buffer.from(righteous) })
+  await expect
+    .poll(async () => ((await stored(page)).nodes[headline]?.props.style as { fontFamily: string }).fontFamily)
+    .toBe('Righteous')
   // The size is a field on the top bar: a click selects it, ready to type over; 140, typed.
   await page.getByTestId('bar-size-field').click()
   await page.keyboard.type('140')
   await page.keyboard.press('Enter')
-  await expect.poll(async () => ((await stored(page)).nodes[headline]?.props.style as { fontSize: number }).fontSize).toBe(140)
+  await expect
+    .poll(async () => ((await stored(page)).nodes[headline]?.props.style as { fontSize: number }).fontSize)
+    .toBe(140)
   // A click on the empty canvas leaves nothing selected, so the cards show the Sizes card.
   await page.mouse.click(40, 900)
   await expect.poll(() => page.evaluate(() => window.dazbee?.selection())).toEqual([])
@@ -185,12 +233,23 @@ test('an ad set rebuilt in 5 formats through real input exports PNG, JPG, PDF an
   await drawn(page)
 
   // The headline moves down in the story only, into the tall format's lower third.
-  const before = { ...design.nodes[headline]?.props, ...design.overrides[`format:${story}`]?.[headline] } as { x: number; y: number; width: number; height: number }
+  const before = { ...design.nodes[headline]?.props, ...design.overrides[`format:${story}`]?.[headline] } as {
+    x: number
+    y: number
+    width: number
+    height: number
+  }
   // Nothing selected, so no bar by a selection floats over the story's headline.
   await page.keyboard.press('Escape')
   await press(page, 'toolSelect')
-  const grab = await screenPoint(page, before.x + before.width / 2, before.y + before.height / 2, { pageId: 'p1', formatId: story })
-  const lift = await screenPoint(page, before.x + before.width / 2, before.y + before.height / 2 + 600, { pageId: 'p1', formatId: story })
+  const grab = await screenPoint(page, before.x + before.width / 2, before.y + before.height / 2, {
+    pageId: 'p1',
+    formatId: story,
+  })
+  const lift = await screenPoint(page, before.x + before.width / 2, before.y + before.height / 2 + 600, {
+    pageId: 'p1',
+    formatId: story,
+  })
   await page.mouse.move(grab.x, grab.y)
   await page.mouse.down()
   await page.mouse.move(lift.x, lift.y, { steps: 8 })
@@ -219,10 +278,16 @@ test('an ad set rebuilt in 5 formats through real input exports PNG, JPG, PDF an
   // Node exports the same design from the same files.
   const final = await stored(page)
   const json = JSON.parse(await designOf(page)) as unknown
-  const assetId = Object.values(final.nodes).flatMap((n) => n.props.fills ?? []).find((f) => f.type === 'image')?.assetId ?? ''
+  const assetId =
+    Object.values(final.nodes)
+      .flatMap((n) => n.props.fills ?? [])
+      .find((f) => f.type === 'image')?.assetId ?? ''
   const image = new Uint8Array(await (await page.request.get(`/brands/${brandId}/assets/${assetId}`)).body())
   const bytes = {
-    fonts: [...loadFontFiles().map((f) => ({ family: f.family, bytes: f.bytes })), { family: 'Righteous', bytes: righteous }],
+    fonts: [
+      ...loadFontFiles().map((f) => ({ family: f.family, bytes: f.bytes })),
+      { family: 'Righteous', bytes: righteous },
+    ],
     fallbackFamilies: [...FALLBACK_FAMILIES],
     images: { [assetId]: image },
   }
@@ -233,15 +298,24 @@ test('an ad set rebuilt in 5 formats through real input exports PNG, JPG, PDF an
     const result: Record<string, unknown> = { format: format.name, size: `${format.width}×${format.height}` }
     for (const type of ['png', 'jpg', 'pdf', 'svg'] as const) {
       const node = exportDesign(ck, json, { pageIds: ['p1'], formatIds: [formatId], type }, bytes).bytes
-      const entry = [...(files[type] ?? new Map<string, Uint8Array>()).entries()].find(([path]) => path.startsWith(`${format.name}/`))
+      const entry = [...(files[type] ?? new Map<string, Uint8Array>()).entries()].find(([path]) =>
+        path.startsWith(`${format.name}/`),
+      )
       expect(entry, `${type} for ${format.name} is in the zip`).toBeDefined()
       const browserFile = entry?.[1] ?? new Uint8Array()
-      expect(Buffer.from(browserFile).equals(Buffer.from(node)), `${format.name} ${type} is Node's, byte for byte`).toBe(true)
+      expect(
+        Buffer.from(browserFile).equals(Buffer.from(node)),
+        `${format.name} ${type} is Node's, byte for byte`,
+      ).toBe(true)
       result[type] = { bytes: browserFile.length, identicalToNode: true }
     }
     const cpu = overWhite(renderDesign(ck, json, 'p1', formatId, bytes))
-    const pdf = await rasterisePdf(pdfium, files.pdf?.get([...files.pdf.keys()].find((p) => p.startsWith(`${format.name}/`)) ?? '') ?? new Uint8Array())
-    const svgFile = files.svg?.get([...files.svg.keys()].find((p) => p.startsWith(`${format.name}/`)) ?? '') ?? new Uint8Array()
+    const pdf = await rasterisePdf(
+      pdfium,
+      files.pdf?.get([...files.pdf.keys()].find((p) => p.startsWith(`${format.name}/`)) ?? '') ?? new Uint8Array(),
+    )
+    const svgFile =
+      files.svg?.get([...files.svg.keys()].find((p) => p.startsWith(`${format.name}/`)) ?? '') ?? new Uint8Array()
     const svg = rasteriseSvg(svgFile)
     const chromium = await drawnByChromium(page, ck, svgFile, format.width, format.height)
     const vector = {
@@ -253,13 +327,18 @@ test('an ad set rebuilt in 5 formats through real input exports PNG, JPG, PDF an
     writeOutput(`exit-check-4-${formatId}-pdf.png`, Buffer.from(encodePng(ck, pdf)))
     writeOutput(`exit-check-4-${formatId}-svg.png`, Buffer.from(encodePng(ck, svg)))
     writeOutput(`exit-check-4-${formatId}-svg-chromium.png`, Buffer.from(encodePng(ck, chromium)))
-    expect(vector.svgInChromium, `${format.name} SVG drawn by Chromium, % of pixels differing`).toBeLessThanOrEqual(EXIT_VECTOR_LIMIT)
+    expect(vector.svgInChromium, `${format.name} SVG drawn by Chromium, % of pixels differing`).toBeLessThanOrEqual(
+      EXIT_VECTOR_LIMIT,
+    )
     expect(vector.pdf, `${format.name} PDF, % of pixels differing`).toBeLessThanOrEqual(EXIT_VECTOR_LIMIT)
     expect(vector.svg, `${format.name} SVG, % of pixels differing`).toBeLessThanOrEqual(EXIT_VECTOR_LIMIT)
     results.push(result)
   }
   pdfium.destroy()
-  writeOutput('exit-check.json', JSON.stringify({ design: final.meta.name, layers: Object.keys(final.nodes).length, formats: results }, null, 2))
+  writeOutput(
+    'exit-check.json',
+    JSON.stringify({ design: final.meta.name, layers: Object.keys(final.nodes).length, formats: results }, null, 2),
+  )
   expect(errors).toEqual([])
   await context.close()
   const video = await page.video()?.path()

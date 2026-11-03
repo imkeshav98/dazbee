@@ -122,7 +122,9 @@ export function parseXml(text: string): XmlElement {
       }
       const name = attr[1] ?? ''
       // xlink:href and href both name what an element refers to.
-      element.attrs[name === 'xlink:href' ? 'href' : name.startsWith('xmlns') ? name : localName(name)] = decode(attr[3] ?? attr[4] ?? '')
+      element.attrs[name === 'xlink:href' ? 'href' : name.startsWith('xmlns') ? name : localName(name)] = decode(
+        attr[3] ?? attr[4] ?? '',
+      )
       i += attr[0].length
     }
   }

@@ -2,12 +2,14 @@
 // drafts, alone. The capsule's Recent, Templates and Brand kit are pages of their own, Settings is in
 // the account menu, and on a phone the capsule is a tab bar; Recent shows every design as the
 // earlier mock's masonry, each picture in its own shape.
-import { expect, test, type Page } from '../support/test.ts'
 import type { DesignInput } from '@dazbee/schema'
+
 import { writeOutput } from '../support/editor.ts'
 import { newBrand, seed } from '../support/seed.ts'
+import { expect, type Page, test } from '../support/test.ts'
 
-const shoot = async (page: Page, name: string, fullPage = false) => writeOutput(`home-${name}.png`, await page.screenshot({ fullPage, animations: 'disabled' }))
+const shoot = async (page: Page, name: string, fullPage = false) =>
+  writeOutput(`home-${name}.png`, await page.screenshot({ fullPage, animations: 'disabled' }))
 
 /** A design in one format with a coloured page and a block, so its picture is easy to tell apart. */
 const poster = (name: string, width: number, height: number, page: string, block: string): DesignInput => ({
@@ -16,8 +18,18 @@ const poster = (name: string, width: number, height: number, page: string, block
   pages: { p1: { name: 'Page 1', order: 'a0', fills: [{ type: 'solid', color: page }] } },
   nodes: {
     block: {
-      type: 'graphic', parentId: 'p1', index: 'a0', name: 'Block',
-      props: { x: width * 0.1, y: height * 0.1, width: width * 0.5, height: height * 0.3, shape: { kind: 'rect', cornerRadius: 24 }, fills: [{ type: 'solid', color: block }] },
+      type: 'graphic',
+      parentId: 'p1',
+      index: 'a0',
+      name: 'Block',
+      props: {
+        x: width * 0.1,
+        y: height * 0.1,
+        width: width * 0.5,
+        height: height * 0.3,
+        shape: { kind: 'rect', cornerRadius: 24 },
+        fills: [{ type: 'solid', color: block }],
+      },
     },
   },
   overrides: {},
@@ -37,11 +49,15 @@ test('Recent is a page of real pictures, each in its shape, filtered by shape', 
   await expect(page.getByTestId('library-capsule').locator('[data-lit]')).toHaveAttribute('data-entry', 'recent')
 
   const list = page.getByRole('list', { name: 'Recent' })
-  const tile = (name: string) => list.getByTestId('design-tile').filter({ has: page.getByRole('link', { name: new RegExp(name) }) })
+  const tile = (name: string) =>
+    list.getByTestId('design-tile').filter({ has: page.getByRole('link', { name: new RegExp(name) }) })
   // Newest first: the square, made last, leads.
   await expect(list.getByTestId('design-tile').first()).toContainText(`Square ${run}`)
   // Each picture keeps its shape: a story tall, a banner wide.
-  const frame = async (name: string) => tile(name).locator('img').evaluate((el) => (el.parentElement as HTMLElement).getBoundingClientRect().toJSON() as DOMRect)
+  const frame = async (name: string) =>
+    tile(name)
+      .locator('img')
+      .evaluate((el) => (el.parentElement as HTMLElement).getBoundingClientRect().toJSON() as DOMRect)
   const story = await frame(`Story ${run}`)
   const banner = await frame(`Banner ${run}`)
   const square = await frame(`Square ${run}`)
@@ -50,13 +66,22 @@ test('Recent is a page of real pictures, each in its shape, filtered by shape', 
   expect(Math.abs(square.width - square.height)).toBeLessThan(3)
 
   // Each picture is the design itself, drawn by the API, and fills its tile.
-  for (const [name, colour] of [[`Square ${run}`, [255, 72, 176]], [`Story ${run}`, [61, 107, 255]], [`Banner ${run}`, [26, 20, 32]]] as const) {
+  for (const [name, colour] of [
+    [`Square ${run}`, [255, 72, 176]],
+    [`Story ${run}`, [61, 107, 255]],
+    [`Banner ${run}`, [26, 20, 32]],
+  ] as const) {
     const img = tile(name).locator('img')
-    await expect.poll(() => img.evaluate((el: HTMLImageElement) => el.complete && el.naturalWidth), { timeout: 20_000 }).toBeGreaterThan(100)
+    await expect
+      .poll(() => img.evaluate((el: HTMLImageElement) => el.complete && el.naturalWidth), { timeout: 20_000 })
+      .toBeGreaterThan(100)
     const fit = await img.evaluate((el: HTMLImageElement) => {
       const box = el.getBoundingClientRect()
       const parent = (el.parentElement as HTMLElement).getBoundingClientRect()
-      return { fills: Math.abs(box.width - parent.width) < 3 && Math.abs(box.height - parent.height) < 3, fit: getComputedStyle(el).objectFit }
+      return {
+        fills: Math.abs(box.width - parent.width) < 3 && Math.abs(box.height - parent.height) < 3,
+        fit: getComputedStyle(el).objectFit,
+      }
     })
     expect(fit).toEqual({ fills: true, fit: 'cover' })
     // The page's colour, near the picture's lower right corner (the block sits top left).
@@ -66,9 +91,12 @@ test('Recent is a page of real pictures, each in its shape, filtered by shape', 
       canvas.height = el.naturalHeight
       const ctx = canvas.getContext('2d') as CanvasRenderingContext2D
       ctx.drawImage(el, 0, 0)
-      return [...ctx.getImageData(Math.floor(el.naturalWidth * 0.9), Math.floor(el.naturalHeight * 0.9), 1, 1).data].slice(0, 3)
+      return [
+        ...ctx.getImageData(Math.floor(el.naturalWidth * 0.9), Math.floor(el.naturalHeight * 0.9), 1, 1).data,
+      ].slice(0, 3)
     })
-    for (const [i, c] of colour.entries()) expect(Math.abs((pixel[i] ?? 0) - c), `${name} channel ${i}`).toBeLessThanOrEqual(2)
+    for (const [i, c] of colour.entries())
+      expect(Math.abs((pixel[i] ?? 0) - c), `${name} channel ${i}`).toBeLessThanOrEqual(2)
   }
   await shoot(page, 'recent', true)
 
@@ -79,7 +107,9 @@ test('Recent is a page of real pictures, each in its shape, filtered by shape', 
   await expect(tile(`Banner ${run}`)).toHaveCount(0)
 })
 
-test('the brief is alone on the home, and the capsule goes to Recent, Templates and Brand kit pages, Settings to the account menu', async ({ page }) => {
+test('the brief is alone on the home, and the capsule goes to Recent, Templates and Brand kit pages, Settings to the account menu', async ({
+  page,
+}) => {
   await page.goto('/brands/dev-brand-coffee')
   const capsule = page.getByTestId('library-capsule')
   // A tall capsule at the start edge, Home lit.
@@ -93,14 +123,20 @@ test('the brief is alone on the home, and the capsule goes to Recent, Templates 
   // the account avatar), no list beside the page.
   await expect(brief).toHaveText('What are we making today?')
   expect((await brief.boundingBox())?.height).toBeLessThan(70)
-  expect(await brief.getByText('today').evaluate((el) => getComputedStyle(el).backgroundImage)).toContain('linear-gradient')
+  expect(await brief.getByText('today').evaluate((el) => getComputedStyle(el).backgroundImage)).toContain(
+    'linear-gradient',
+  )
   await expect(page.getByTestId('brand-switcher')).toContainText('Harbour Coffee')
   await expect(page.getByTestId('account-open')).toBeVisible()
   await expect(page.getByRole('list', { name: 'Recent' })).toHaveCount(0)
   await expect(capsule.locator('[data-lit]')).toHaveAttribute('data-entry', 'home')
   await shoot(page, 'brief-alone')
 
-  for (const [entry, name, path, heading] of [['recent', 'Recent', 'designs', 'Recent'], ['templates', 'Templates', 'templates', 'Templates'], ['kit', 'Brand kit', 'kit', 'Brand kit']] as const) {
+  for (const [entry, name, path, heading] of [
+    ['recent', 'Recent', 'designs', 'Recent'],
+    ['templates', 'Templates', 'templates', 'Templates'],
+    ['kit', 'Brand kit', 'kit', 'Brand kit'],
+  ] as const) {
     await capsule.getByRole('link', { name }).click()
     await expect(page).toHaveURL(new RegExp(`/brands/dev-brand-coffee/${path}$`))
     await expect(page.getByRole('heading', { level: 1 })).toHaveText(heading)
@@ -133,7 +169,9 @@ test('a size under the brief opens a blank design in that size', async ({ page }
   expect(Object.values(design?.formats ?? {}).map((f) => [f.width, f.height])).toEqual([[1080, 1920]])
 })
 
-test('the Formats dropdown keeps one format picked, and Make drafts opens a design in the formats picked, named by the brief', async ({ page }) => {
+test('the Formats dropdown keeps one format picked, and Make drafts opens a design in the formats picked, named by the brief', async ({
+  page,
+}) => {
   // The home, then the editor opening, which alone may take its 30 s on a busy runner.
   test.setTimeout(60_000)
   await page.goto('/brands/dev-brand-coffee')
@@ -162,11 +200,16 @@ test('the Formats dropdown keeps one format picked, and Make drafts opens a desi
   await expect(page.getByTestId('status')).toHaveAttribute('data-ready', '', { timeout: 30_000 })
   const design = await page.evaluate(() => window.dazbee?.design())
   expect(design?.meta.name).toBe(brief)
-  expect(Object.values(design?.formats ?? {}).map((f) => [f.name, f.width, f.height])).toEqual([['Feed square', 1080, 1080], ['Story', 1080, 1920]])
+  expect(Object.values(design?.formats ?? {}).map((f) => [f.name, f.width, f.height])).toEqual([
+    ['Feed square', 1080, 1080],
+    ['Story', 1080, 1920],
+  ])
   expect(design?.meta.primaryFormatId).toBe('f1')
 })
 
-test('on a phone the brief and the Recent page fit the screen, and the capsule is a tab bar at the bottom', async ({ browser }) => {
+test('on a phone the brief and the Recent page fit the screen, and the capsule is a tab bar at the bottom', async ({
+  browser,
+}) => {
   const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true })
   const page = await context.newPage()
   await page.goto('/brands/dev-brand-coffee')

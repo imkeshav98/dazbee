@@ -10,5 +10,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ bra
   if (!link) return new Response('No picture for this design', { status: 404 })
   const stored = await fetch(link.url, { cache: 'no-store' })
   if (!stored.ok) return new Response('Storage did not answer', { status: 502 })
-  return new Response(stored.body, { headers: { 'content-type': 'image/png', 'cache-control': 'private, max-age=86400' } })
+  return new Response(stored.body, {
+    headers: { 'content-type': 'image/png', 'cache-control': 'private, max-age=86400' },
+  })
 }

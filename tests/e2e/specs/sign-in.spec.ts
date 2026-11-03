@@ -2,8 +2,9 @@
 // does not match the sign-in this browser started, and signing out. CI's API has no WorkOS
 // settings, so it says sign-in is not set up; signing in against WorkOS test mode is its own run.
 import { join } from 'node:path'
-import { expect, test } from '../support/test.ts'
+
 import { OUTPUT } from '../support/editor.ts'
+import { expect, test } from '../support/test.ts'
 
 const SESSION_COOKIE = 'dazbee_session'
 
@@ -15,7 +16,8 @@ test('the sign-in page offers one button, and says when sign-in is not set up', 
     Object.assign(window, { signInTimes: times })
     new PerformanceObserver((list) => {
       for (const entry of list.getEntries() as PerformanceResourceTiming[]) {
-        if (entry.initiatorType === 'fetch' && new URL(entry.name).pathname === '/login') times.answer ??= entry.responseEnd
+        if (entry.initiatorType === 'fetch' && new URL(entry.name).pathname === '/login')
+          times.answer ??= entry.responseEnd
       }
     }).observe({ type: 'resource' })
     new MutationObserver(() => {
@@ -30,11 +32,19 @@ test('the sign-in page offers one button, and says when sign-in is not set up', 
   // blur; the aurora holds still there, so the page has time for the click's answer.
   await expect(page.locator('html')).toHaveAttribute('data-render', 'software')
   const aurora = await page.locator('.signin-aurora > div').evaluate((el) => el.getAnimations().map((a) => a.playState))
-  expect(aurora.every((state) => state !== 'running'), `the aurora's animations: ${aurora.join(', ')}`).toBe(true)
+  expect(
+    aurora.every((state) => state !== 'running'),
+    `the aurora's animations: ${aurora.join(', ')}`,
+  ).toBe(true)
   // The click starts the server action whose answer sends the page to the notice.
-  await Promise.all([page.waitForURL(/\/login\?unavailable=1$/, { timeout: 20_000 }), page.getByTestId('sign-in').click()])
+  await Promise.all([
+    page.waitForURL(/\/login\?unavailable=1$/, { timeout: 20_000 }),
+    page.getByTestId('sign-in').click(),
+  ])
   await expect(page.getByTestId('sign-in-notice')).toHaveText('Sign-in is not set up on this server yet.')
-  const times = await page.evaluate(() => (window as unknown as { signInTimes: { answer?: number; notice?: number } }).signInTimes)
+  const times = await page.evaluate(
+    () => (window as unknown as { signInTimes: { answer?: number; notice?: number } }).signInTimes,
+  )
   expect(times.answer, 'the sign-in action answered').toBeDefined()
   const answerToNotice = (times.notice ?? Infinity) - (times.answer ?? 0)
   test.info().annotations.push({ type: 'answer to notice', description: `${Math.round(answerToNotice)} ms` })
@@ -52,7 +62,15 @@ test('a callback refuses a state this browser did not start with, and keeps no s
 test('signing out forgets the session and lands on the sign-in page', async ({ page, context }) => {
   await page.goto('/')
   await expect(page.getByTestId('sign-out')).toHaveCount(0)
-  await context.addCookies([{ name: SESSION_COOKIE, value: 'a-session-token', url: new URL(page.url()).origin, httpOnly: true, sameSite: 'Lax' }])
+  await context.addCookies([
+    {
+      name: SESSION_COOKIE,
+      value: 'a-session-token',
+      url: new URL(page.url()).origin,
+      httpOnly: true,
+      sameSite: 'Lax',
+    },
+  ])
   await page.reload()
   await page.getByTestId('account-open').click()
   await page.getByTestId('sign-out').click()

@@ -1,14 +1,17 @@
 // Sign-in (#58) against Postgres from Docker Compose, with a stand-in for WorkOS that never calls out.
 // Signing in against WorkOS itself is the Playwright suite's (tests/e2e/specs/sign-in.spec.ts).
 import { randomUUID } from 'node:crypto'
+
+import { and, eq } from 'drizzle-orm'
+import { afterAll, describe, expect, it } from 'vitest'
+
 import { memberships, openDatabase, users, workspaces } from '@dazbee/db'
 import { ApiError, SignedIn, SignedOut, SignInLink, WorkspaceSummary } from '@dazbee/schema'
 import { openStorage, storageSettings } from '@dazbee/storage'
-import { and, eq } from 'drizzle-orm'
-import { afterAll, describe, expect, it } from 'vitest'
+
 import { createApp } from './app.ts'
 import { bearerToken, readSessionToken, SESSION_TTL_MS, signSessionToken, tokenSession } from './session.ts'
-import { accessTokenSessionId, workosSettings, type SignedInPerson, type SignInProvider } from './sign-in.ts'
+import { accessTokenSessionId, type SignedInPerson, type SignInProvider, workosSettings } from './sign-in.ts'
 
 const DATABASE_URL = process.env.DATABASE_URL ?? 'postgres://razzlr:razzlr-local@127.0.0.1:55432/razzlr'
 const { db, close } = openDatabase(DATABASE_URL)
@@ -17,7 +20,10 @@ const secret = 'test-session-secret-'.padEnd(32, 'x')
 
 /** WorkOS as far as the API sees it: codes name people, and it remembers what it was asked to make. */
 function fakeWorkos(people: Record<string, SignedInPerson>) {
-  const made = { organizations: [] as { id: string; name: string; workspaceId: string }[], members: [] as { organizationId: string; userId: string }[] }
+  const made = {
+    organizations: [] as { id: string; name: string; workspaceId: string }[],
+    members: [] as { organizationId: string; userId: string }[],
+  }
   const provider: SignInProvider = {
     signInUrl: (state) => `https://auth.example.test/authorize?state=${state}`,
     authenticate: (code) => {
@@ -38,24 +44,44 @@ function fakeWorkos(people: Record<string, SignedInPerson>) {
   return { provider, made }
 }
 
-const ada: SignedInPerson = { user: { id: `user_ada_${run}`, email: `ada-${run}@example.com`, name: 'Ada Lovelace' }, organizationId: null, sessionId: `session_ada_${run}` }
-const bo: SignedInPerson = { user: { id: `user_bo_${run}`, email: `bo-${run}@example.com`, name: '' }, organizationId: null, sessionId: null }
+const ada: SignedInPerson = {
+  user: { id: `user_ada_${run}`, email: `ada-${run}@example.com`, name: 'Ada Lovelace' },
+  organizationId: null,
+  sessionId: `session_ada_${run}`,
+}
+const bo: SignedInPerson = {
+  user: { id: `user_bo_${run}`, email: `bo-${run}@example.com`, name: '' },
+  organizationId: null,
+  sessionId: null,
+}
 const workos = fakeWorkos({ [`code-ada-${run}`]: ada, [`code-bo-${run}`]: bo })
-const storage = openStorage(storageSettings({
-  STORAGE_ENDPOINT: 'http://127.0.0.1:59000',
-  STORAGE_BUCKET: 'razzlr-test',
-  STORAGE_ACCESS_KEY_ID: 'razzlr',
-  STORAGE_SECRET_ACCESS_KEY: 'razzlr-local-secret',
-  STORAGE_REGION: 'us-east-1',
-  ...process.env,
-}))
-const app = createApp({ db, storage, sessionOf: tokenSession(db, secret), syncSecret: 'test-secret-'.padEnd(32, 'x'), signIn: { provider: workos.provider, secret } })
+const storage = openStorage(
+  storageSettings({
+    STORAGE_ENDPOINT: 'http://127.0.0.1:59000',
+    STORAGE_BUCKET: 'razzlr-test',
+    STORAGE_ACCESS_KEY_ID: 'razzlr',
+    STORAGE_SECRET_ACCESS_KEY: 'razzlr-local-secret',
+    STORAGE_REGION: 'us-east-1',
+    ...process.env,
+  }),
+)
+const app = createApp({
+  db,
+  storage,
+  sessionOf: tokenSession(db, secret),
+  syncSecret: 'test-secret-'.padEnd(32, 'x'),
+  signIn: { provider: workos.provider, secret },
+})
 
 async function call(method: string, path: string, { body, token }: { body?: unknown; token?: string } = {}) {
   const headers: Record<string, string> = { 'content-type': 'application/json' }
   if (token) headers.authorization = `Bearer ${token}`
-  const response = await app.request(path, { method, headers, ...(body === undefined ? {} : { body: JSON.stringify(body) }) })
-  return { status: response.status, json: await response.json() as unknown }
+  const response = await app.request(path, {
+    method,
+    headers,
+    ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+  })
+  return { status: response.status, json: (await response.json()) as unknown }
 }
 const signIn = async (code: string) => SignedIn.parse((await call('POST', '/auth/callback', { body: { code } })).json)
 
@@ -64,7 +90,9 @@ afterAll(close)
 describe('signing in (#58)', () => {
   it('gives the WorkOS sign-in link for a good state only', async () => {
     const state = randomUUID()
-    expect(SignInLink.parse((await call('GET', `/auth/sign-in-url?state=${state}`)).json).url).toBe(`https://auth.example.test/authorize?state=${state}`)
+    expect(SignInLink.parse((await call('GET', `/auth/sign-in-url?state=${state}`)).json).url).toBe(
+      `https://auth.example.test/authorize?state=${state}`,
+    )
     expect((await call('GET', '/auth/sign-in-url?state=short')).status).toBe(400)
     expect((await call('GET', '/auth/sign-in-url')).status).toBe(400)
   })
@@ -78,10 +106,19 @@ describe('signing in (#58)', () => {
     expect(organization).toMatchObject({ name: 'Ada Lovelace' })
     expect(workspace).toMatchObject({ name: 'Ada Lovelace', kind: 'agency', workosOrganizationId: organization?.id })
     expect(workos.made.members).toContainEqual({ organizationId: organization?.id, userId: ada.user.id })
-    expect(await db.select({ role: memberships.role }).from(memberships).where(eq(memberships.userId, user?.id ?? ''))).toEqual([{ role: 'owner' }])
+    expect(
+      await db
+        .select({ role: memberships.role })
+        .from(memberships)
+        .where(eq(memberships.userId, user?.id ?? '')),
+    ).toEqual([{ role: 'owner' }])
 
     // The session is good for that workspace, and for as long as a session lasts.
-    expect(WorkspaceSummary.parse((await call('GET', '/workspace', { token: first.token })).json)).toEqual({ id: first.workspaceId, name: 'Ada Lovelace', kind: 'agency' })
+    expect(WorkspaceSummary.parse((await call('GET', '/workspace', { token: first.token })).json)).toEqual({
+      id: first.workspaceId,
+      name: 'Ada Lovelace',
+      kind: 'agency',
+    })
     expect(first.expiresAt - Date.now()).toBeGreaterThan(SESSION_TTL_MS - 60_000)
   })
 
@@ -113,7 +150,9 @@ describe('signing in (#58)', () => {
 
   it('ends a session’s WorkOS session on sign-out, when it has one', async () => {
     const adas = await signIn(`code-ada-${run}`)
-    expect(SignedOut.parse((await call('POST', '/auth/sign-out', { token: adas.token })).json).logoutUrl).toBe(`https://auth.example.test/logout?session_id=${ada.sessionId}`)
+    expect(SignedOut.parse((await call('POST', '/auth/sign-out', { token: adas.token })).json).logoutUrl).toBe(
+      `https://auth.example.test/logout?session_id=${ada.sessionId}`,
+    )
     const bos = await signIn(`code-bo-${run}`)
     expect(SignedOut.parse((await call('POST', '/auth/sign-out', { token: bos.token })).json).logoutUrl).toBeNull()
     expect(SignedOut.parse((await call('POST', '/auth/sign-out')).json).logoutUrl).toBeNull()
@@ -122,7 +161,9 @@ describe('signing in (#58)', () => {
   it('stops honouring a session once its person leaves the workspace', async () => {
     const adas = await signIn(`code-ada-${run}`)
     const [user] = await db.select({ id: users.id }).from(users).where(eq(users.workosUserId, ada.user.id))
-    await db.delete(memberships).where(and(eq(memberships.workspaceId, adas.workspaceId), eq(memberships.userId, user?.id ?? '')))
+    await db
+      .delete(memberships)
+      .where(and(eq(memberships.workspaceId, adas.workspaceId), eq(memberships.userId, user?.id ?? '')))
     expect((await call('GET', '/workspace', { token: adas.token })).status).toBe(401)
   })
 })
@@ -140,7 +181,9 @@ describe('session tokens', () => {
     const { token } = signSessionToken(secret, session)
     expect(readSessionToken('another-secret-'.padEnd(32, 'y'), token)).toBeNull()
     const [text, signature] = token.split('.')
-    const changed = Buffer.from(JSON.stringify({ ...session, workspaceId: 'other', expiresAt: Date.now() + 60_000 })).toString('base64url')
+    const changed = Buffer.from(
+      JSON.stringify({ ...session, workspaceId: 'other', expiresAt: Date.now() + 60_000 }),
+    ).toString('base64url')
     expect(readSessionToken(secret, `${changed}.${signature}`)).toBeNull()
     expect(readSessionToken(secret, text ?? '')).toBeNull()
     expect(readSessionToken(secret, `${token}.more`)).toBeNull()
@@ -157,8 +200,13 @@ describe('WorkOS settings', () => {
   it('are all given or none, and never default', () => {
     expect(workosSettings({})).toBeNull()
     expect(() => workosSettings({ WORKOS_API_KEY: 'k' })).toThrow(/together/)
-    expect(workosSettings({ WORKOS_API_KEY: 'k', WORKOS_CLIENT_ID: 'c', WORKOS_REDIRECT_URI: 'http://localhost:3000/callback' }))
-      .toEqual({ apiKey: 'k', clientId: 'c', redirectUri: 'http://localhost:3000/callback' })
+    expect(
+      workosSettings({
+        WORKOS_API_KEY: 'k',
+        WORKOS_CLIENT_ID: 'c',
+        WORKOS_REDIRECT_URI: 'http://localhost:3000/callback',
+      }),
+    ).toEqual({ apiKey: 'k', clientId: 'c', redirectUri: 'http://localhost:3000/callback' })
   })
 
   it('reads the session id from a WorkOS access token', () => {

@@ -1,7 +1,7 @@
 // Image uploads (#35): an image uploaded to one brand is served to that brand's editor only.
-import { expect, test } from '../support/test.ts'
 import { photo, upload } from '../support/assets.ts'
 import { DEV_BRAND } from '../support/seed.ts'
+import { expect, test } from '../support/test.ts'
 
 test('the editor cannot read another brand’s image', async ({ page }) => {
   const asset = await upload(photo)

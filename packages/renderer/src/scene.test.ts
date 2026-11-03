@@ -1,5 +1,7 @@
-import { parseDesign, type Design, type DesignInput } from '@dazbee/schema'
 import { describe, expect, it } from 'vitest'
+
+import { type Design, type DesignInput, parseDesign } from '@dazbee/schema'
+
 import { render, sceneMemo } from './scene.ts'
 
 const input = (): DesignInput => ({
@@ -13,21 +15,53 @@ const input = (): DesignInput => ({
     p2: { name: 'Page 2', order: 'a1' },
   },
   nodes: {
-    frame: { type: 'frame', parentId: 'p1', index: 'a1', name: 'Frame', props: { x: 0, y: 0, width: 500, height: 500 } },
+    frame: {
+      type: 'frame',
+      parentId: 'p1',
+      index: 'a1',
+      name: 'Frame',
+      props: { x: 0, y: 0, width: 500, height: 500 },
+    },
     box: {
-      type: 'graphic', parentId: 'frame', index: 'a0', name: 'Box',
-      props: { x: 100, y: 100, width: 200, height: 100, shape: { kind: 'rect' }, fills: [{ type: 'solid', color: '#FF5A36FF' }] },
+      type: 'graphic',
+      parentId: 'frame',
+      index: 'a0',
+      name: 'Box',
+      props: {
+        x: 100,
+        y: 100,
+        width: 200,
+        height: 100,
+        shape: { kind: 'rect' },
+        fills: [{ type: 'solid', color: '#FF5A36FF' }],
+      },
     },
     hidden: {
-      type: 'graphic', parentId: 'frame', index: 'a1', name: 'Hidden',
+      type: 'graphic',
+      parentId: 'frame',
+      index: 'a1',
+      name: 'Hidden',
       props: { x: 0, y: 0, width: 10, height: 10, visible: false, shape: { kind: 'ellipse' } },
     },
     headline: {
-      type: 'text', parentId: 'p1', index: 'a0', name: 'Headline',
-      props: { x: 60, y: 600, width: 960, height: 100, text: 'Summer sale', style: { fontFamily: 'Noto Sans', fontSize: 84, color: '#111111FF' } },
+      type: 'text',
+      parentId: 'p1',
+      index: 'a0',
+      name: 'Headline',
+      props: {
+        x: 60,
+        y: 600,
+        width: 960,
+        height: 100,
+        text: 'Summer sale',
+        style: { fontFamily: 'Noto Sans', fontSize: 84, color: '#111111FF' },
+      },
     },
     other: {
-      type: 'graphic', parentId: 'p2', index: 'a0', name: 'Other page',
+      type: 'graphic',
+      parentId: 'p2',
+      index: 'a0',
+      name: 'Other page',
       props: { x: 0, y: 0, width: 10, height: 10, shape: { kind: 'rect' } },
     },
   },

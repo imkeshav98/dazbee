@@ -2,10 +2,21 @@
 // the same bytes gets its own asset, so a brand never sees another brand's assets. Each brand names
 // and tags its own, and finds them by those (#52).
 import { createHash, randomUUID } from 'node:crypto'
-import { assets, brandKits, designs, designStates, templates, type Db } from '@dazbee/db'
-import { imageAssetIds, parseDesign, type AssetSummary, type AssetUse, type ImageType, type UpdateAsset, type UploadTicket } from '@dazbee/schema'
+
+import { and, desc, eq, isNull, type SQL, sql } from 'drizzle-orm'
+
+import { assets, brandKits, type Db, designs, designStates, templates } from '@dazbee/db'
+import {
+  type AssetSummary,
+  type AssetUse,
+  imageAssetIds,
+  type ImageType,
+  parseDesign,
+  type UpdateAsset,
+  type UploadTicket,
+} from '@dazbee/schema'
 import type { Storage } from '@dazbee/storage'
-import { and, desc, eq, isNull, sql, type SQL } from 'drizzle-orm'
+
 import { storedDesign } from './design-thumbnails.ts'
 import { readImageHeader } from './images.ts'
 import { readSvgHeader } from './svg-assets.ts'
@@ -19,10 +30,21 @@ export const originalKey = (workspaceId: string, sha256: string) => `workspaces/
 export const thumbnailKey = (workspaceId: string, sha256: string) => `workspaces/${workspaceId}/thumbnails/${sha256}`
 
 const summary = {
-  id: assets.id, brandId: assets.brandId, sha256: assets.sha256, contentType: assets.contentType,
-  byteSize: assets.byteSize, width: assets.width, height: assets.height, name: assets.name, tags: assets.tags, createdAt: assets.createdAt,
+  id: assets.id,
+  brandId: assets.brandId,
+  sha256: assets.sha256,
+  contentType: assets.contentType,
+  byteSize: assets.byteSize,
+  width: assets.width,
+  height: assets.height,
+  name: assets.name,
+  tags: assets.tags,
+  createdAt: assets.createdAt,
 }
-const toSummary = (row: Omit<AssetSummary, 'createdAt'> & { createdAt: Date }): AssetSummary => ({ ...row, createdAt: row.createdAt.toISOString() })
+const toSummary = (row: Omit<AssetSummary, 'createdAt'> & { createdAt: Date }): AssetSummary => ({
+  ...row,
+  createdAt: row.createdAt.toISOString(),
+})
 
 /** A LIKE pattern that matches `text` literally. */
 const literal = (text: string) => text.replace(/[\\%_]/g, (c) => `\\${c}`)
@@ -42,8 +64,17 @@ function matches(word: string): SQL {
  */
 export async function listAssets(db: Db, workspaceId: string, brandId: string, query = ''): Promise<AssetSummary[]> {
   const words = query.trim().split(/\s+/).filter(Boolean)
-  const rows = await db.select(summary).from(assets)
-    .where(and(eq(assets.workspaceId, workspaceId), eq(assets.brandId, brandId), isNull(assets.deletedAt), ...words.map(matches)))
+  const rows = await db
+    .select(summary)
+    .from(assets)
+    .where(
+      and(
+        eq(assets.workspaceId, workspaceId),
+        eq(assets.brandId, brandId),
+        isNull(assets.deletedAt),
+        ...words.map(matches),
+      ),
+    )
     .orderBy(desc(assets.createdAt), desc(assets.id))
   return rows.map(toSummary)
 }
@@ -55,22 +86,35 @@ export async function listAssets(db: Db, workspaceId: string, brandId: string, q
 export async function assetUses(db: Db, workspaceId: string, brandId: string, id: string): Promise<AssetUse[]> {
   const uses: AssetUse[] = []
   // Only designs whose stored state holds the id's bytes can show it; each of those is read to be sure.
-  const brandDesigns = await db.select({ id: designs.id, name: designs.name }).from(designs)
+  const brandDesigns = await db
+    .select({ id: designs.id, name: designs.name })
+    .from(designs)
     .innerJoin(designStates, eq(designStates.designId, designs.id))
-    .where(and(eq(designs.workspaceId, workspaceId), eq(designs.brandId, brandId), sql`position(${Buffer.from(id, 'utf8')} in ${designStates.state}) > 0`))
+    .where(
+      and(
+        eq(designs.workspaceId, workspaceId),
+        eq(designs.brandId, brandId),
+        sql`position(${Buffer.from(id, 'utf8')} in ${designStates.state}) > 0`,
+      ),
+    )
     .orderBy(designs.name, designs.id)
   for (const design of brandDesigns) {
     const content = await storedDesign(db, design.id)
     if (content && imageAssetIds(content).includes(id)) uses.push({ kind: 'design', id: design.id, name: design.name })
   }
-  const saved = await db.select({ id: templates.id, name: templates.name, content: templates.content }).from(templates)
+  const saved = await db
+    .select({ id: templates.id, name: templates.name, content: templates.content })
+    .from(templates)
     .where(and(eq(templates.workspaceId, workspaceId), eq(templates.fromBrandId, brandId)))
     .orderBy(templates.name, templates.id)
   for (const template of saved) {
     const parsed = parseDesign(template.content)
-    if (parsed.success && imageAssetIds(parsed.design).includes(id)) uses.push({ kind: 'template', id: template.id, name: template.name })
+    if (parsed.success && imageAssetIds(parsed.design).includes(id))
+      uses.push({ kind: 'template', id: template.id, name: template.name })
   }
-  const [kit] = await db.select({ logo: brandKits.logoAssetId }).from(brandKits)
+  const [kit] = await db
+    .select({ logo: brandKits.logoAssetId })
+    .from(brandKits)
     .where(and(eq(brandKits.workspaceId, workspaceId), eq(brandKits.brandId, brandId)))
   if (kit?.logo === id) uses.push({ kind: 'logo', id: brandId, name: '' })
   return uses
@@ -78,13 +122,27 @@ export async function assetUses(db: Db, workspaceId: string, brandId: string, id
 
 /** Whether the brand has the asset in its library: recorded and not deleted. */
 async function listed(db: Db, workspaceId: string, brandId: string, id: string) {
-  const [row] = await db.select({ id: assets.id }).from(assets)
-    .where(and(eq(assets.id, id), eq(assets.workspaceId, workspaceId), eq(assets.brandId, brandId), isNull(assets.deletedAt)))
+  const [row] = await db
+    .select({ id: assets.id })
+    .from(assets)
+    .where(
+      and(
+        eq(assets.id, id),
+        eq(assets.workspaceId, workspaceId),
+        eq(assets.brandId, brandId),
+        isNull(assets.deletedAt),
+      ),
+    )
   return Boolean(row)
 }
 
 /** What of the brand shows the asset, or null when its library has no such asset. */
-export async function listedAssetUses(db: Db, workspaceId: string, brandId: string, id: string): Promise<AssetUse[] | null> {
+export async function listedAssetUses(
+  db: Db,
+  workspaceId: string,
+  brandId: string,
+  id: string,
+): Promise<AssetUse[] | null> {
   return (await listed(db, workspaceId, brandId, id)) ? assetUses(db, workspaceId, brandId, id) : null
 }
 
@@ -94,19 +152,43 @@ export async function listedAssetUses(db: Db, workspaceId: string, brandId: stri
  * is only marked, so a design that names the asset again (undo, a tab not yet saved) still draws
  * it; the bytes stay in storage, which other brands' assets of them may share.
  */
-export async function deleteAsset(db: Db, workspaceId: string, brandId: string, id: string): Promise<{ deleted: true } | { usedIn: AssetUse[] } | null> {
+export async function deleteAsset(
+  db: Db,
+  workspaceId: string,
+  brandId: string,
+  id: string,
+): Promise<{ deleted: true } | { usedIn: AssetUse[] } | null> {
   const usedIn = await listedAssetUses(db, workspaceId, brandId, id)
   if (!usedIn) return null
   if (usedIn.length > 0) return { usedIn }
-  await db.update(assets).set({ deletedAt: sql`now()` })
-    .where(and(eq(assets.id, id), eq(assets.workspaceId, workspaceId), eq(assets.brandId, brandId), isNull(assets.deletedAt)))
+  await db
+    .update(assets)
+    .set({ deletedAt: sql`now()` })
+    .where(
+      and(
+        eq(assets.id, id),
+        eq(assets.workspaceId, workspaceId),
+        eq(assets.brandId, brandId),
+        isNull(assets.deletedAt),
+      ),
+    )
   return { deleted: true }
 }
 
 /** Renames the brand's asset or sets its tags; null when the brand has no such asset. */
-export async function updateAsset(db: Db, workspaceId: string, brandId: string, id: string, update: UpdateAsset): Promise<AssetSummary | null> {
-  const [row] = await db.update(assets)
-    .set({ ...(update.name === undefined ? {} : { name: update.name }), ...(update.tags === undefined ? {} : { tags: update.tags }) })
+export async function updateAsset(
+  db: Db,
+  workspaceId: string,
+  brandId: string,
+  id: string,
+  update: UpdateAsset,
+): Promise<AssetSummary | null> {
+  const [row] = await db
+    .update(assets)
+    .set({
+      ...(update.name === undefined ? {} : { name: update.name }),
+      ...(update.tags === undefined ? {} : { tags: update.tags }),
+    })
     .where(and(eq(assets.id, id), eq(assets.workspaceId, workspaceId), eq(assets.brandId, brandId)))
     .returning(summary)
   return row ? toSummary(row) : null
@@ -126,11 +208,20 @@ export async function ensureThumbnail(storage: Storage, workspaceId: string, ass
   return key
 }
 
-export async function findAsset(db: Db, workspaceId: string, brandId: string, by: { id: string } | { sha256: string }): Promise<AssetSummary | null> {
+export async function findAsset(
+  db: Db,
+  workspaceId: string,
+  brandId: string,
+  by: { id: string } | { sha256: string },
+): Promise<AssetSummary | null> {
   const match = 'id' in by ? eq(assets.id, by.id) : eq(assets.sha256, by.sha256)
   const where = and(match, eq(assets.workspaceId, workspaceId), eq(assets.brandId, brandId))
   // Found by its bytes, as an upload or a template's copy finds it, a deleted asset is back in the library.
-  if ('sha256' in by) await db.update(assets).set({ deletedAt: null }).where(and(where, sql`${assets.deletedAt} IS NOT NULL`))
+  if ('sha256' in by)
+    await db
+      .update(assets)
+      .set({ deletedAt: null })
+      .where(and(where, sql`${assets.deletedAt} IS NOT NULL`))
   const [row] = await db.select(summary).from(assets).where(where)
   return row ? toSummary(row) : null
 }
@@ -142,7 +233,14 @@ export class InvalidUpload extends Error {}
  * the bytes hash to it, are an image CanvasKit decodes or an SVG file read as layers, and makes its thumbnail. Recording
  * the same bytes again gives back the same asset, under the name it has.
  */
-export async function recordAsset(db: Db, storage: Storage, workspaceId: string, brandId: string, sha256: string, name = ''): Promise<AssetSummary> {
+export async function recordAsset(
+  db: Db,
+  storage: Storage,
+  workspaceId: string,
+  brandId: string,
+  sha256: string,
+  name = '',
+): Promise<AssetSummary> {
   const existing = await findAsset(db, workspaceId, brandId, { sha256 })
   if (existing) return existing
   const key = originalKey(workspaceId, sha256)
@@ -153,8 +251,9 @@ export async function recordAsset(db: Db, storage: Storage, workspaceId: string,
     await storage.delete(key)
     return new InvalidUpload(message)
   }
-  if (createHash('sha256').update(bytes).digest('hex') !== sha256) throw await refuse('The uploaded bytes do not match their SHA-256')
-  const header = readImageHeader(bytes) ?? await readSvgHeader(bytes)
+  if (createHash('sha256').update(bytes).digest('hex') !== sha256)
+    throw await refuse('The uploaded bytes do not match their SHA-256')
+  const header = readImageHeader(bytes) ?? (await readSvgHeader(bytes))
   if (!header) throw await refuse('The upload is not a PNG, JPEG or WebP image, or an SVG file we can read')
   const thumbnail = thumbnailKey(workspaceId, sha256)
   if (!(await storage.exists(thumbnail))) {
@@ -166,14 +265,23 @@ export async function recordAsset(db: Db, storage: Storage, workspaceId: string,
     }
     await storage.put(thumbnail, made.bytes, made.contentType)
   }
-  await db.insert(assets).values({ id: randomUUID(), workspaceId, brandId, sha256, byteSize: bytes.length, name, ...header }).onConflictDoNothing()
+  await db
+    .insert(assets)
+    .values({ id: randomUUID(), workspaceId, brandId, sha256, byteSize: bytes.length, name, ...header })
+    .onConflictDoNothing()
   const recorded = await findAsset(db, workspaceId, brandId, { sha256 })
   if (!recorded) throw new Error('asset vanished after insert')
   return recorded
 }
 
 /** The asset when these bytes are already stored for the workspace; otherwise a signed URL to upload them. */
-export async function startUpload(db: Db, storage: Storage, workspaceId: string, brandId: string, upload: { sha256: string; byteSize: number; contentType: ImageType; name?: string | undefined }): Promise<UploadTicket> {
+export async function startUpload(
+  db: Db,
+  storage: Storage,
+  workspaceId: string,
+  brandId: string,
+  upload: { sha256: string; byteSize: number; contentType: ImageType; name?: string | undefined },
+): Promise<UploadTicket> {
   const existing = await findAsset(db, workspaceId, brandId, { sha256: upload.sha256 })
   if (existing) return { asset: existing, upload: null }
   const key = originalKey(workspaceId, upload.sha256)

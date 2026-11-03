@@ -2,7 +2,11 @@
 // claims to be before recording it. Decoding stays with CanvasKit in the renderer.
 import type { ImageType } from '@dazbee/schema'
 
-export interface ImageHeader { contentType: ImageType; width: number; height: number }
+export interface ImageHeader {
+  contentType: ImageType
+  width: number
+  height: number
+}
 
 const ascii = (bytes: Uint8Array, at: number, length: number) => String.fromCharCode(...bytes.subarray(at, at + length))
 
@@ -10,7 +14,12 @@ export function readImageHeader(bytes: Uint8Array): ImageHeader | null {
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
   const has = (n: number) => bytes.length >= n
   // PNG: signature, then IHDR with width and height.
-  if (has(24) && view.getUint32(0) === 0x89504e47 && view.getUint32(4) === 0x0d0a1a0a && ascii(bytes, 12, 4) === 'IHDR') {
+  if (
+    has(24) &&
+    view.getUint32(0) === 0x89504e47 &&
+    view.getUint32(4) === 0x0d0a1a0a &&
+    ascii(bytes, 12, 4) === 'IHDR'
+  ) {
     return sized('image/png', view.getUint32(16), view.getUint32(20))
   }
   // JPEG: walk the markers to the first start-of-frame.
@@ -33,7 +42,8 @@ export function readImageHeader(bytes: Uint8Array): ImageHeader | null {
   // WebP: RIFF container with a VP8, VP8L or VP8X chunk.
   if (has(30) && ascii(bytes, 0, 4) === 'RIFF' && ascii(bytes, 8, 4) === 'WEBP') {
     const chunk = ascii(bytes, 12, 4)
-    if (chunk === 'VP8 ') return sized('image/webp', view.getUint16(26, true) & 0x3fff, view.getUint16(28, true) & 0x3fff)
+    if (chunk === 'VP8 ')
+      return sized('image/webp', view.getUint16(26, true) & 0x3fff, view.getUint16(28, true) & 0x3fff)
     if (chunk === 'VP8L') {
       const b = view.getUint32(21, true)
       return sized('image/webp', (b & 0x3fff) + 1, ((b >> 14) & 0x3fff) + 1)

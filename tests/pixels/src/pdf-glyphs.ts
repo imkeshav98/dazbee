@@ -17,9 +17,12 @@ type Matrix = [number, number, number, number, number, number]
 const IDENTITY: Matrix = [1, 0, 0, 1, 0, 0]
 /** a then b, in PDF's row-vector order. */
 const times = (a: Matrix, b: Matrix): Matrix => [
-  a[0] * b[0] + a[1] * b[2], a[0] * b[1] + a[1] * b[3],
-  a[2] * b[0] + a[3] * b[2], a[2] * b[1] + a[3] * b[3],
-  a[4] * b[0] + a[5] * b[2] + b[4], a[4] * b[1] + a[5] * b[3] + b[5],
+  a[0] * b[0] + a[1] * b[2],
+  a[0] * b[1] + a[1] * b[3],
+  a[2] * b[0] + a[3] * b[2],
+  a[2] * b[1] + a[3] * b[3],
+  a[4] * b[0] + a[5] * b[2] + b[4],
+  a[4] * b[1] + a[5] * b[3] + b[5],
 ]
 
 const DELIMITER = /[\s()<>[\]{}/%]/
@@ -36,11 +39,31 @@ function* tokens(text: string): Generator<Value | { op: string }> {
   }
   while (i < text.length) {
     const c = text[i] as string
-    if (/\s/.test(c)) { i++; continue }
-    if (c === '%') { while (i < text.length && text[i] !== '\n') i++; continue }
-    if (c === '[') { stack.push([]); i++; continue }
-    if (c === ']') { const done = stack.pop() ?? []; i++; yield* emit(done); continue }
-    if (text.startsWith('<<', i)) { dicts.push(stack.length); stack.push([]); i += 2; continue }
+    if (/\s/.test(c)) {
+      i++
+      continue
+    }
+    if (c === '%') {
+      while (i < text.length && text[i] !== '\n') i++
+      continue
+    }
+    if (c === '[') {
+      stack.push([])
+      i++
+      continue
+    }
+    if (c === ']') {
+      const done = stack.pop() ?? []
+      i++
+      yield* emit(done)
+      continue
+    }
+    if (text.startsWith('<<', i)) {
+      dicts.push(stack.length)
+      stack.push([])
+      i += 2
+      continue
+    }
     if (text.startsWith('>>', i)) {
       dicts.pop()
       const flat = stack.pop() ?? []
@@ -50,12 +73,20 @@ function* tokens(text: string): Generator<Value | { op: string }> {
       yield* emit(dict)
       continue
     }
-    if (c === '<') { const end = text.indexOf('>', i); yield* emit({ hex: text.slice(i + 1, end).replace(/\s/g, '') }); i = end + 1; continue }
+    if (c === '<') {
+      const end = text.indexOf('>', i)
+      yield* emit({ hex: text.slice(i + 1, end).replace(/\s/g, '') })
+      i = end + 1
+      continue
+    }
     if (c === '(') {
       let depth = 0
       let j = i
       for (; j < text.length; j++) {
-        if (text[j] === '\\') { j++; continue }
+        if (text[j] === '\\') {
+          j++
+          continue
+        }
         if (text[j] === '(') depth++
         if (text[j] === ')' && --depth === 0) break
       }
@@ -67,8 +98,14 @@ function* tokens(text: string): Generator<Value | { op: string }> {
     while (j < text.length && !DELIMITER.test(text[j] as string)) j++
     const word = text.slice(i, j)
     i = j
-    if (c === '/') { yield* emit(word); continue }
-    if (/^[+-]?(\d+\.?\d*|\.\d+)$/.test(word)) { yield* emit(Number(word)); continue }
+    if (c === '/') {
+      yield* emit(word)
+      continue
+    }
+    if (/^[+-]?(\d+\.?\d*|\.\d+)$/.test(word)) {
+      yield* emit(Number(word))
+      continue
+    }
     if (word === 'R' && stack.length > 0) {
       // "n 0 R" inside an array or dictionary: a reference.
       const top = stack.at(-1) as Value[]
@@ -76,12 +113,18 @@ function* tokens(text: string): Generator<Value | { op: string }> {
       top.push({ ref: top.pop() as number })
       continue
     }
-    if (stack.length > 0) { yield* emit(word); continue }
+    if (stack.length > 0) {
+      yield* emit(word)
+      continue
+    }
     yield { op: word }
   }
 }
 
-interface PdfObject { dict: Dict; stream?: string }
+interface PdfObject {
+  dict: Dict
+  stream?: string
+}
 
 /** Every object in a PDF Skia wrote, by number, with its stream inflated. */
 function objects(bytes: Uint8Array): Map<number, PdfObject> {
@@ -93,9 +136,16 @@ function objects(bytes: Uint8Array): Map<number, PdfObject> {
     let depth = 0
     let end = start
     for (; end < text.length; end++) {
-      if (text.startsWith('<<', end)) { depth++; end++; continue }
+      if (text.startsWith('<<', end)) {
+        depth++
+        end++
+        continue
+      }
       if (text.startsWith('>>', end)) {
-        if (--depth === 0) { end += 2; break }
+        if (--depth === 0) {
+          end += 2
+          break
+        }
         end++
       }
     }
@@ -169,18 +219,36 @@ export function pdfGlyphs(bytes: Uint8Array): PdfGlyph[] {
       const args = operands.splice(0)
       const n = (k: number) => Number(args[k])
       switch (token.op) {
-        case 'q': saved.push(ctm); break
-        case 'Q': ctm = saved.pop() ?? IDENTITY; break
-        case 'cm': ctm = times([n(0), n(1), n(2), n(3), n(4), n(5)], ctm); break
-        case 'BT': tm = IDENTITY; line = IDENTITY; break
-        case 'Tm': tm = [n(0), n(1), n(2), n(3), n(4), n(5)]; line = tm; break
-        case 'Td': line = times([1, 0, 0, 1, n(0), n(1)], line); tm = line; break
+        case 'q':
+          saved.push(ctm)
+          break
+        case 'Q':
+          ctm = saved.pop() ?? IDENTITY
+          break
+        case 'cm':
+          ctm = times([n(0), n(1), n(2), n(3), n(4), n(5)], ctm)
+          break
+        case 'BT':
+          tm = IDENTITY
+          line = IDENTITY
+          break
+        case 'Tm':
+          tm = [n(0), n(1), n(2), n(3), n(4), n(5)]
+          line = tm
+          break
+        case 'Td':
+          line = times([1, 0, 0, 1, n(0), n(1)], line)
+          tm = line
+          break
         case 'Tf': {
-          const dict = resolve((resolve(resources.Font) as Dict | undefined)?.[String(args[0]).slice(1)]) as Dict | undefined
+          const dict = resolve((resolve(resources.Font) as Dict | undefined)?.[String(args[0]).slice(1)]) as
+            Dict | undefined
           font = dict ? { size: n(1), twoByte: dict.Subtype === '/Type0', ...widthsOf(dict, resolve) } : null
           break
         }
-        case 'Tj': show((args[0] as { hex: string }).hex ?? ''); break
+        case 'Tj':
+          show((args[0] as { hex: string }).hex ?? '')
+          break
         case 'TJ':
           for (const part of args[0] as Value[]) {
             if (typeof part === 'number') tm = times([1, 0, 0, 1, (-part / 1000) * (font?.size ?? 0), 0], tm)
@@ -188,7 +256,8 @@ export function pdfGlyphs(bytes: Uint8Array): PdfGlyph[] {
           }
           break
         case 'Do': {
-          const ref = (resolve(resources.XObject) as Dict | undefined)?.[String(args[0]).slice(1)] as { ref: number } | undefined
+          const ref = (resolve(resources.XObject) as Dict | undefined)?.[String(args[0]).slice(1)] as
+            { ref: number } | undefined
           const form = ref && all.get(ref.ref)
           if (form?.stream && form.dict.Subtype === '/Form') {
             const matrix = (resolve(form.dict.Matrix) as number[] | undefined) ?? IDENTITY

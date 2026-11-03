@@ -2,8 +2,10 @@
 // bearer token; a development session can stand in locally and in CI, and every route checks
 // workspace and brand against whichever it is.
 import { createHmac, timingSafeEqual } from 'node:crypto'
-import { memberships, type Db } from '@dazbee/db'
+
 import { and, eq } from 'drizzle-orm'
+
+import { type Db, memberships } from '@dazbee/db'
 
 export interface Session {
   userId: string
@@ -44,9 +46,15 @@ export function sessionSecret(env: NodeJS.ProcessEnv = process.env): string {
 
 const sign = (secret: string, text: string) => createHmac('sha256', secret).update(text).digest('base64url')
 
-export function signSessionToken(secret: string, session: Omit<SessionTokenPayload, 'expiresAt'>, now = Date.now()): { token: string; expiresAt: number } {
+export function signSessionToken(
+  secret: string,
+  session: Omit<SessionTokenPayload, 'expiresAt'>,
+  now = Date.now(),
+): { token: string; expiresAt: number } {
   const expiresAt = now + SESSION_TTL_MS
-  const text = Buffer.from(JSON.stringify({ ...session, expiresAt } satisfies SessionTokenPayload)).toString('base64url')
+  const text = Buffer.from(JSON.stringify({ ...session, expiresAt } satisfies SessionTokenPayload)).toString(
+    'base64url',
+  )
   return { token: `${text}.${sign(secret, text)}`, expiresAt }
 }
 
@@ -84,7 +92,9 @@ export function tokenSession(db: Db, secret: string): SessionOf {
     const token = bearerToken(request)
     const payload = token ? readSessionToken(secret, token) : null
     if (!payload) return null
-    const [member] = await db.select({ userId: memberships.userId }).from(memberships)
+    const [member] = await db
+      .select({ userId: memberships.userId })
+      .from(memberships)
       .where(and(eq(memberships.workspaceId, payload.workspaceId), eq(memberships.userId, payload.userId)))
     return member ? { userId: payload.userId, workspaceId: payload.workspaceId } : null
   }

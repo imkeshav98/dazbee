@@ -1,9 +1,11 @@
-import type { Design } from '@dazbee/schema'
-import { z } from 'zod'
 import * as Y from 'yjs'
+import { z } from 'zod'
+
+import type { Design } from '@dazbee/schema'
+
 import { CommandError } from './command.ts'
-import { COMMANDS, type CommandName } from './commands.ts'
-import { root, type DesignDoc } from './design-doc.ts'
+import { type CommandName, COMMANDS } from './commands.ts'
+import { type DesignDoc, root } from './design-doc.ts'
 import { designView } from './design-view.ts'
 import { migrateDoc } from './migrate.ts'
 
@@ -40,7 +42,8 @@ export function openSession(doc: DesignDoc) {
       for (const [key, change] of event.changes.keys) {
         // A key the step added is recorded too, so a gesture that adds a key and then changes it
         // doesn't put its own in-between value back after undo deletes the key.
-        const restore = change.action !== 'add' && change.oldValue !== undefined && !(change.oldValue instanceof Y.AbstractType)
+        const restore =
+          change.action !== 'add' && change.oldValue !== undefined && !(change.oldValue instanceof Y.AbstractType)
         pending.push({ map: event.target, key, oldValue: change.oldValue, restore })
       }
     }
@@ -68,7 +71,8 @@ export function openSession(doc: DesignDoc) {
     step()
     // `_item` is the map's place in the doc; a map removed by this step has nothing to restore into.
     const missing = restore.filter(({ map, key, restore }) => restore && !map.has(key) && !map._item?.deleted)
-    if (missing.length > 0) doc.transact(() => missing.forEach(({ map, key, oldValue }) => map.set(key, oldValue)), repairOrigin)
+    if (missing.length > 0)
+      doc.transact(() => missing.forEach(({ map, key, oldValue }) => map.set(key, oldValue)), repairOrigin)
   }
 
   function run<N extends CommandName>(name: N, input: InputOf<N>): ResultOf<N> {

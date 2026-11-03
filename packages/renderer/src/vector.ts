@@ -1,6 +1,19 @@
-import type { Paint } from '@dazbee/schema'
 import type { Canvas, CanvasKit } from '@dazbee/canvaskit'
-import { drawLayers, drawScene, fillPath, framePath, layerReach, outset, rectPath, strokePath, strokeReach, type Box, type Resources } from './draw.ts'
+import type { Paint } from '@dazbee/schema'
+
+import {
+  type Box,
+  drawLayers,
+  drawScene,
+  fillPath,
+  framePath,
+  layerReach,
+  outset,
+  rectPath,
+  type Resources,
+  strokePath,
+  strokeReach,
+} from './draw.ts'
 import type { Scene, SceneLayer } from './scene.ts'
 
 /** The vector file a page is drawn into. */
@@ -17,8 +30,19 @@ export type VectorTarget = 'pdf' | 'svg'
  *   image of itself; a blend mode or background blur, which mix with what is behind, as an image of
  *   the page as drawn up to it.
  */
-export function drawVectorPage(ck: CanvasKit, canvas: Canvas, scene: Scene, resources: Resources, target: VectorTarget, scale = 1) {
-  const raster: Resources = { fonts: resources.fonts, fallbackFamilies: resources.fallbackFamilies, images: resources.images }
+export function drawVectorPage(
+  ck: CanvasKit,
+  canvas: Canvas,
+  scene: Scene,
+  resources: Resources,
+  target: VectorTarget,
+  scale = 1,
+) {
+  const raster: Resources = {
+    fonts: resources.fonts,
+    fallbackFamilies: resources.fallbackFamilies,
+    images: resources.images,
+  }
   const vector: Resources = { ...raster, vector: true }
   const page = { x: 0, y: 0, width: scene.width, height: scene.height }
   canvas.save()
@@ -58,7 +82,15 @@ function maskUnits(layers: readonly SceneLayer[]): SceneLayer[][] {
   return units
 }
 
-function drawUnit(ck: CanvasKit, canvas: Canvas, unit: SceneLayer[], target: VectorTarget, vector: Resources, raster: Resources, scale: number) {
+function drawUnit(
+  ck: CanvasKit,
+  canvas: Canvas,
+  unit: SceneLayer[],
+  target: VectorTarget,
+  vector: Resources,
+  raster: Resources,
+  scale: number,
+) {
   const [first] = unit
   if (!first) return
   if (target === 'pdf' || unit.every((layer) => svgSafe(layer))) {
@@ -76,7 +108,14 @@ function drawUnit(ck: CanvasKit, canvas: Canvas, unit: SceneLayer[], target: Vec
  * A group or frame drawn by its children alone, as drawLayer would without an offscreen layer,
  * so each child that SVG can hold stays vectors.
  */
-function drawContainer(ck: CanvasKit, canvas: Canvas, layer: SceneLayer, vector: Resources, raster: Resources, scale: number) {
+function drawContainer(
+  ck: CanvasKit,
+  canvas: Canvas,
+  layer: SceneLayer,
+  vector: Resources,
+  raster: Resources,
+  scale: number,
+) {
   const { props } = layer
   canvas.save()
   if (props.rotation !== 0) canvas.rotate(props.rotation, props.x + props.width / 2, props.y + props.height / 2)
@@ -84,7 +123,10 @@ function drawContainer(ck: CanvasKit, canvas: Canvas, layer: SceneLayer, vector:
     const path = framePath(ck, layer.props)
     const fills = layer.props.fills
     if (fills.every(svgPaint)) for (const fill of fills) fillPath(ck, canvas, path, fill, props, vector)
-    else drawImage(ck, canvas, props, scale, (into) => { for (const fill of fills) fillPath(ck, into, path, fill, props, raster) })
+    else
+      drawImage(ck, canvas, props, scale, (into) => {
+        for (const fill of fills) fillPath(ck, into, path, fill, props, raster)
+      })
     canvas.save()
     if (layer.props.clip) canvas.clipPath(path, ck.ClipOp.Intersect, true)
     for (const unit of maskUnits(layer.children)) drawUnit(ck, canvas, unit, 'svg', vector, raster, scale)
@@ -93,7 +135,10 @@ function drawContainer(ck: CanvasKit, canvas: Canvas, layer: SceneLayer, vector:
     // turned already, so a picture of them covers the frame's own box and their reach.
     const { strokes } = layer.props
     if (strokes.every((s) => svgPaint(s.paint))) strokePath(ck, canvas, path, layer.props, vector, null)
-    else drawImage(ck, canvas, outset(layer.props, strokeReach(strokes, false)), scale, (into) => strokePath(ck, into, path, layer.props, raster, null))
+    else
+      drawImage(ck, canvas, outset(layer.props, strokeReach(strokes, false)), scale, (into) =>
+        strokePath(ck, into, path, layer.props, raster, null),
+      )
     path.delete()
   } else {
     for (const unit of maskUnits(layer.children)) drawUnit(ck, canvas, unit, 'svg', vector, raster, scale)
@@ -135,7 +180,12 @@ function drawImage(ck: CanvasKit, canvas: Canvas, box: Box, scale: number, draw:
     draw(into)
     const image = surface.makeImageSnapshot()
     const paint = new ck.Paint()
-    canvas.drawImageRect(image, ck.XYWHRect(0, 0, width, height), ck.LTRBRect(left, top, left + width / scale, top + height / scale), paint)
+    canvas.drawImageRect(
+      image,
+      ck.XYWHRect(0, 0, width, height),
+      ck.LTRBRect(left, top, left + width / scale, top + height / scale),
+      paint,
+    )
     paint.delete()
     image.delete()
   } finally {
@@ -156,8 +206,13 @@ function svgPaint(paint: Paint): boolean {
 /** A group or frame whose own drawing adds nothing an offscreen layer would change. */
 function plainContainer(layer: SceneLayer): boolean {
   const { props } = layer
-  return (layer.type === 'group' || layer.type === 'frame') && props.opacity === 1 && props.effects.length === 0
-    && (props.blendMode === 'normal' || props.blendMode === 'pass-through') && !props.mask
+  return (
+    (layer.type === 'group' || layer.type === 'frame') &&
+    props.opacity === 1 &&
+    props.effects.length === 0 &&
+    (props.blendMode === 'normal' || props.blendMode === 'pass-through') &&
+    !props.mask
+  )
 }
 
 /** Whether Skia's SVG writer draws a layer and everything in it exactly as the CPU does. */

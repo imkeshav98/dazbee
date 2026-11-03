@@ -7,11 +7,12 @@
 // and a rename finished or Delete pressed off the tree leaving the focus where it was; and 300
 // layers scrolling with only the rows in view in the page, the focused row staying focused and
 // reachable by Tab when it scrolls away.
-import { expect, test, type Locator, type Page } from '../support/test.ts'
 import type { DesignInput } from '@dazbee/schema'
+
 import { reloads, screenPoint, writeOutput } from '../support/editor.ts'
 import { PERF, report, spread } from '../support/perf.ts'
 import { click, openStage, order, props, read } from '../support/stage.ts'
+import { expect, type Locator, type Page, test } from '../support/test.ts'
 
 test.describe.configure({ timeout: 120_000 })
 
@@ -20,37 +21,94 @@ const ROW = 36
 /** How far one turn of the wheel scrolls the 300 layers, in pixels. */
 const WHEEL = 420
 
-const rect = (x: number, y: number, width: number, height: number, color: string) =>
-  ({ x, y, width, height, shape: { kind: 'rect' as const, cornerRadius: 16 }, fills: [{ type: 'solid' as const, color }] })
+const rect = (x: number, y: number, width: number, height: number, color: string) => ({
+  x,
+  y,
+  width,
+  height,
+  shape: { kind: 'rect' as const, cornerRadius: 16 },
+  fills: [{ type: 'solid' as const, color }],
+})
 
 const design = (): DesignInput => ({
-  meta: { schemaVersion: 5, designId: 'replaced-by-the-api', name: 'Layers panel', kind: 'single', primaryFormatId: 'sq' },
+  meta: {
+    schemaVersion: 5,
+    designId: 'replaced-by-the-api',
+    name: 'Layers panel',
+    kind: 'single',
+    primaryFormatId: 'sq',
+  },
   formats: { sq: { name: 'Square', width: 1080, height: 1080, order: 'a0' } },
   pages: { p1: { name: 'Page 1', order: 'a0', fills: [{ type: 'solid', color: '#FFFFFFFF' }] } },
   nodes: {
-    backdrop: { type: 'graphic', parentId: 'p1', index: 'a0', name: 'Backdrop', props: rect(40, 40, 1000, 1000, '#F4EDE4FF') },
-    card: { type: 'group', parentId: 'p1', index: 'a1', name: 'Card', props: { x: 120, y: 620, width: 520, height: 300 } },
-    c1: { type: 'graphic', parentId: 'card', index: 'a0', name: 'Card back', props: rect(120, 620, 520, 300, '#14213DFF') },
-    c2: { type: 'graphic', parentId: 'card', index: 'a1', name: 'Card stripe', props: rect(160, 660, 440, 60, '#FCA311FF') },
+    backdrop: {
+      type: 'graphic',
+      parentId: 'p1',
+      index: 'a0',
+      name: 'Backdrop',
+      props: rect(40, 40, 1000, 1000, '#F4EDE4FF'),
+    },
+    card: {
+      type: 'group',
+      parentId: 'p1',
+      index: 'a1',
+      name: 'Card',
+      props: { x: 120, y: 620, width: 520, height: 300 },
+    },
+    c1: {
+      type: 'graphic',
+      parentId: 'card',
+      index: 'a0',
+      name: 'Card back',
+      props: rect(120, 620, 520, 300, '#14213DFF'),
+    },
+    c2: {
+      type: 'graphic',
+      parentId: 'card',
+      index: 'a1',
+      name: 'Card stripe',
+      props: rect(160, 660, 440, 60, '#FCA311FF'),
+    },
     box: { type: 'graphic', parentId: 'p1', index: 'a2', name: 'Box', props: rect(120, 120, 400, 300, '#E0262BFF') },
-    dot: { type: 'graphic', parentId: 'p1', index: 'a3', name: 'Dot', props: { ...rect(700, 680, 200, 200, '#1F9D55FF'), shape: { kind: 'ellipse' as const } } },
+    dot: {
+      type: 'graphic',
+      parentId: 'p1',
+      index: 'a3',
+      name: 'Dot',
+      props: { ...rect(700, 680, 200, 200, '#1F9D55FF'), shape: { kind: 'ellipse' as const } },
+    },
   },
   overrides: {},
 })
 
 const tree = (page: Page) => page.getByRole('tree')
-const row = (page: Page, name: string) => tree(page).getByRole('treeitem').filter({ has: page.locator(`[data-testid="layer-name"]:text-is("${name}")`) })
+const row = (page: Page, name: string) =>
+  tree(page)
+    .getByRole('treeitem')
+    .filter({ has: page.locator(`[data-testid="layer-name"]:text-is("${name}")`) })
 /** The rows' names as the panel lists them, top to bottom. */
-const listed = (page: Page) => tree(page).getByRole('treeitem').evaluateAll((rows) => rows
-  .sort((a, b) => Number.parseFloat((a as HTMLElement).style.top) - Number.parseFloat((b as HTMLElement).style.top))
-  .map((r) => `${'  '.repeat(Number(r.getAttribute('aria-level')) - 1)}${r.textContent}`))
-const node = async (page: Page, id: string) => (await read(page)).nodes[id] as unknown as { parentId: string; name: string; lock?: Record<string, boolean> }
+const listed = (page: Page) =>
+  tree(page)
+    .getByRole('treeitem')
+    .evaluateAll((rows) =>
+      rows
+        .sort(
+          (a, b) => Number.parseFloat((a as HTMLElement).style.top) - Number.parseFloat((b as HTMLElement).style.top),
+        )
+        .map((r) => `${'  '.repeat(Number(r.getAttribute('aria-level')) - 1)}${r.textContent}`),
+    )
+const node = async (page: Page, id: string) =>
+  (await read(page)).nodes[id] as unknown as { parentId: string; name: string; lock?: Record<string, boolean> }
 /** The colour the export render draws at a design pixel. */
-const colourAt = (page: Page, x: number, y: number) => page.evaluate(([x, y]) => {
-  const pixels = window.dazbee?.exportPixels()
-  const at = (y * 1080 + x) * 4
-  return pixels ? [pixels[at], pixels[at + 1], pixels[at + 2]] : null
-}, [x, y] as const)
+const colourAt = (page: Page, x: number, y: number) =>
+  page.evaluate(
+    ([x, y]) => {
+      const pixels = window.dazbee?.exportPixels()
+      const at = (y * 1080 + x) * 4
+      return pixels ? [pixels[at], pixels[at + 1], pixels[at + 2]] : null
+    },
+    [x, y] as const,
+  )
 
 async function openLayers(page: Page) {
   await page.getByRole('button', { name: 'Layers', exact: true }).click()
@@ -98,7 +156,9 @@ test('the panel and the stage select together; drag into a group, rename, lock a
   expect(await page.evaluate(() => window.dazbee?.boxOf('card'))).toEqual(before)
   await page.evaluate(() => window.dazbee?.perform('redo'))
   await expect.soft.poll(async () => (await node(page, 'dot')).parentId).toBe('card')
-  await expect.soft.poll(() => listed(page)).toEqual(['Box', 'Card', '  Dot', '  Card stripe', '  Card back', 'Backdrop'])
+  await expect.soft
+    .poll(() => listed(page))
+    .toEqual(['Box', 'Card', '  Dot', '  Card stripe', '  Card back', 'Backdrop'])
   expect.soft(await page.evaluate(() => window.dazbee?.boxOf('card'))).toEqual(after)
   await page.evaluate(() => window.dazbee?.perform('undo'))
   await expect.poll(async () => (await node(page, 'dot')).parentId).toBe('p1')
@@ -132,8 +192,13 @@ test('the panel and the stage select together; drag into a group, rename, lock a
   // Lock: every flag, shown on the row; dragging the box on the stage leaves it where it was.
   await row(page, 'Hero panel').hover()
   await row(page, 'Hero panel').getByRole('button', { name: 'Lock Hero panel' }).click()
-  await expect.poll(async () => (await node(page, 'box')).lock).toEqual({ move: true, resize: true, content: true, style: true, delete: true })
-  await expect(row(page, 'Hero panel').getByRole('button', { name: 'Unlock Hero panel' })).toHaveAttribute('aria-pressed', 'true')
+  await expect
+    .poll(async () => (await node(page, 'box')).lock)
+    .toEqual({ move: true, resize: true, content: true, style: true, delete: true })
+  await expect(row(page, 'Hero panel').getByRole('button', { name: 'Unlock Hero panel' })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  )
 
   // Hide: the stage no longer draws it; Show brings it back.
   expect(await colourAt(page, 300, 200)).toEqual([224, 38, 43])
@@ -149,17 +214,27 @@ test('the panel and the stage select together; drag into a group, rename, lock a
   await reloads(page)
   await openLayers(page)
   await row(page, 'Hero panel').hover()
-  await expect(row(page, 'Hero panel').getByRole('button', { name: 'Unlock Hero panel' })).toHaveAttribute('aria-pressed', 'true')
+  await expect(row(page, 'Hero panel').getByRole('button', { name: 'Unlock Hero panel' })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  )
   expect(errors).toEqual([])
 })
 
-test('keyboard only: move through the tree, select, rename, lock, hide and move a layer into a group', async ({ browser }) => {
+test('keyboard only: move through the tree, select, rename, lock, hide and move a layer into a group', async ({
+  browser,
+}) => {
   const { page, errors } = await openStage(browser, design())
   await page.getByRole('button', { name: 'Layers', exact: true }).focus()
   await page.keyboard.press('Enter')
   await expect(tree(page)).toBeVisible()
   // Tab into the tree: it is one stop, on the first row.
-  for (let i = 0; i < 8 && !(await page.evaluate(() => document.activeElement?.getAttribute('role') === 'treeitem')); i++) await page.keyboard.press('Tab')
+  for (
+    let i = 0;
+    i < 8 && !(await page.evaluate(() => document.activeElement?.getAttribute('role') === 'treeitem'));
+    i++
+  )
+    await page.keyboard.press('Tab')
   await expect(row(page, 'Dot')).toBeFocused()
 
   // Down selects the next row as it moves there.
@@ -198,7 +273,10 @@ test('keyboard only: move through the tree, select, rename, lock, hide and move 
   await expect.poll(async () => (await node(page, 'box')).lock).toBeUndefined()
   await page.keyboard.press('ControlOrMeta+Shift+H')
   await expect.poll(() => colourAt(page, 300, 200)).toEqual([244, 237, 228])
-  await expect(row(page, 'Headline plate').getByRole('button', { name: 'Show Headline plate' })).toHaveAttribute('aria-pressed', 'true')
+  await expect(row(page, 'Headline plate').getByRole('button', { name: 'Show Headline plate' })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  )
   await page.keyboard.press('ControlOrMeta+Shift+H')
   await expect.poll(() => colourAt(page, 300, 200)).toEqual([224, 38, 43])
 
@@ -214,20 +292,26 @@ test('keyboard only: move through the tree, select, rename, lock, hide and move 
   await expect.poll(() => listed(page)).toEqual(['Dot', 'Card', 'Headline plate', 'Backdrop'])
   await page.keyboard.press('Alt+ArrowRight')
   await expect.poll(async () => (await node(page, 'box')).parentId).toBe('card')
-  await expect.poll(() => listed(page)).toEqual(['Dot', 'Card', '  Headline plate', '  Card stripe', '  Card back', 'Backdrop'])
+  await expect
+    .poll(() => listed(page))
+    .toEqual(['Dot', 'Card', '  Headline plate', '  Card stripe', '  Card back', 'Backdrop'])
   await expect(row(page, 'Headline plate')).toBeFocused()
   writeOutput('layers-4-keyboard.png', await page.screenshot())
   // Alt+Left takes it out again, just above the group.
   await page.keyboard.press('Alt+ArrowLeft')
   await expect.poll(async () => (await node(page, 'box')).parentId).toBe('p1')
-  await expect.poll(() => listed(page)).toEqual(['Dot', 'Headline plate', 'Card', '  Card stripe', '  Card back', 'Backdrop'])
+  await expect
+    .poll(() => listed(page))
+    .toEqual(['Dot', 'Headline plate', 'Card', '  Card stripe', '  Card back', 'Backdrop'])
   // Delete, from the panel, deletes the selected layer like on the stage.
   await page.keyboard.press('Delete')
   await expect.poll(async () => Object.keys((await read(page)).nodes)).not.toContain('box')
   expect(errors).toEqual([])
 })
 
-test('keyboard only: a key pressed just after the panel redraws on its own still moves the focus', async ({ browser }) => {
+test('keyboard only: a key pressed just after the panel redraws on its own still moves the focus', async ({
+  browser,
+}) => {
   const { page, errors } = await openStage(browser, design())
   await openLayers(page)
   await page.evaluate(() => window.dazbee?.select(['c2']))
@@ -238,18 +322,23 @@ test('keyboard only: a key pressed just after the panel redraws on its own still
   // Selecting Card back from outside the panel redraws it at normal priority, as the rows' pictures
   // do when they arrive. Once that redraw is in the page, before React runs its effects, ArrowLeft is
   // pressed on Card stripe: it selects Card, and the focus goes with it.
-  const pressedOn = await page.evaluate(() => new Promise<string | null>((resolve) => {
-    const list = document.querySelector('[role=tree]')
-    if (!list) return resolve(null)
-    const redrawn = new MutationObserver(() => {
-      redrawn.disconnect()
-      const on = document.activeElement
-      on?.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', code: 'ArrowLeft', bubbles: true, cancelable: true }))
-      resolve(on?.getAttribute('data-layer') ?? null)
-    })
-    redrawn.observe(list, { attributes: true, attributeFilter: ['aria-selected'], subtree: true })
-    window.dazbee?.select(['c1'])
-  }))
+  const pressedOn = await page.evaluate(
+    () =>
+      new Promise<string | null>((resolve) => {
+        const list = document.querySelector('[role=tree]')
+        if (!list) return resolve(null)
+        const redrawn = new MutationObserver(() => {
+          redrawn.disconnect()
+          const on = document.activeElement
+          on?.dispatchEvent(
+            new KeyboardEvent('keydown', { key: 'ArrowLeft', code: 'ArrowLeft', bubbles: true, cancelable: true }),
+          )
+          resolve(on?.getAttribute('data-layer') ?? null)
+        })
+        redrawn.observe(list, { attributes: true, attributeFilter: ['aria-selected'], subtree: true })
+        window.dazbee?.select(['c1'])
+      }),
+  )
   expect(pressedOn).toBe('c2')
   await expect(row(page, 'Card')).toHaveAttribute('aria-selected', 'true')
   await expect(row(page, 'Card')).toBeFocused()
@@ -260,19 +349,49 @@ test('keyboard only: a key pressed just after the panel redraws on its own still
 const crowd = (): DesignInput => {
   const nodes: DesignInput['nodes'] = {
     note: {
-      type: 'text', parentId: 'p1', index: 'a0', name: 'Note',
-      props: { x: 560, y: 80, width: 460, height: 90, text: 'Fresh roast', style: { fontFamily: 'Noto Sans', fontSize: 64, color: '#1F2329FF' } },
+      type: 'text',
+      parentId: 'p1',
+      index: 'a0',
+      name: 'Note',
+      props: {
+        x: 560,
+        y: 80,
+        width: 460,
+        height: 90,
+        text: 'Fresh roast',
+        style: { fontFamily: 'Noto Sans', fontSize: 64, color: '#1F2329FF' },
+      },
     },
-    crowd: { type: 'group', parentId: 'p1', index: 'a1', name: 'Crowd', props: { x: 40, y: 300, width: 990, height: 200 } },
-    mover: { type: 'graphic', parentId: 'p1', index: 'a2', name: 'Mover', props: rect(600, 800, 200, 200, '#1F9D55FF') },
+    crowd: {
+      type: 'group',
+      parentId: 'p1',
+      index: 'a1',
+      name: 'Crowd',
+      props: { x: 40, y: 300, width: 990, height: 200 },
+    },
+    mover: {
+      type: 'graphic',
+      parentId: 'p1',
+      index: 'a2',
+      name: 'Mover',
+      props: rect(600, 800, 200, 200, '#1F9D55FF'),
+    },
   }
   for (let i = 0; i < 60; i++) {
-    nodes[`k${i}`] = { type: 'graphic', parentId: 'crowd', index: `a${String(i).padStart(2, '0')}`, name: `Crowd ${i + 1}`, props: rect(40 + (i % 20) * 50, 300 + Math.floor(i / 20) * 70, 40, 60, '#14213DFF') }
+    nodes[`k${i}`] = {
+      type: 'graphic',
+      parentId: 'crowd',
+      index: `a${String(i).padStart(2, '0')}`,
+      name: `Crowd ${i + 1}`,
+      props: rect(40 + (i % 20) * 50, 300 + Math.floor(i / 20) * 70, 40, 60, '#14213DFF'),
+    }
   }
   return { ...design(), nodes }
 }
 
-test('keyboard only: a layer moved past a big open group keeps the focus, and typing on the canvas after keeps it there', async ({ browser }) => {
+test('keyboard only: a layer moved past a big open group keeps the focus, and typing on the canvas after keeps it there', async ({
+  browser,
+}) => {
   const { page, errors } = await openStage(browser, crowd())
   await openLayers(page)
   await page.evaluate(() => window.dazbee?.select(['k0']))
@@ -309,10 +428,17 @@ const focusInTree = (page: Page) => tree(page).evaluate((list) => list.contains(
 /** Tabs from the Layers button until the focus is on a row, at most eight times. */
 async function tabIntoTree(page: Page) {
   await page.getByRole('button', { name: 'Layers', exact: true }).focus()
-  for (let i = 0; i < 8 && !(await page.evaluate(() => document.activeElement?.getAttribute('role') === 'treeitem')); i++) await page.keyboard.press('Tab')
+  for (
+    let i = 0;
+    i < 8 && !(await page.evaluate(() => document.activeElement?.getAttribute('role') === 'treeitem'));
+    i++
+  )
+    await page.keyboard.press('Tab')
 }
 
-test('keyboard only: deleting the focused row moves the focus to the row in its place, and undo gives it back', async ({ browser }) => {
+test('keyboard only: deleting the focused row moves the focus to the row in its place, and undo gives it back', async ({
+  browser,
+}) => {
   const { page, errors } = await openStage(browser, design())
   await openLayers(page)
   await row(page, 'Box').click()
@@ -342,7 +468,9 @@ test('keyboard only: deleting the focused row moves the focus to the row in its 
   expect(errors).toEqual([])
 })
 
-test('keyboard: Tab into the tree lands on the layer selected on the canvas, not the row focused before', async ({ browser }) => {
+test('keyboard: Tab into the tree lands on the layer selected on the canvas, not the row focused before', async ({
+  browser,
+}) => {
   const { page, errors } = await openStage(browser, design())
   await openLayers(page)
   await row(page, 'Box').click()
@@ -362,7 +490,9 @@ test('keyboard: Tab into the tree lands on the layer selected on the canvas, not
   expect(errors).toEqual([])
 })
 
-test('a rename finished by clicking the canvas keeps the name and leaves the focus where the click put it', async ({ browser }) => {
+test('a rename finished by clicking the canvas keeps the name and leaves the focus where the click put it', async ({
+  browser,
+}) => {
   const { page, errors } = await openStage(browser, design())
   await openLayers(page)
   await row(page, 'Box').dblclick()
@@ -372,7 +502,9 @@ test('a rename finished by clicking the canvas keeps the name and leaves the foc
 
   // An empty part of the page, right of the backdrop: the click lands on the canvas and picks nothing.
   const at = await screenPoint(page, 1060, 500)
-  expect(await page.evaluate(([x, y]) => document.elementFromPoint(x, y)?.tagName, [at.x, at.y] as const)).toBe('CANVAS')
+  expect(await page.evaluate(([x, y]) => document.elementFromPoint(x, y)?.tagName, [at.x, at.y] as const)).toBe(
+    'CANVAS',
+  )
   await click(page, 1060, 500)
   await expect.poll(async () => (await node(page, 'box')).name).toBe('Hero panel')
   expect(await page.evaluate(() => window.dazbee?.selection())).toEqual([])
@@ -394,7 +526,9 @@ const focusedLayer = (page: Page) => page.evaluate(() => document.activeElement?
 /** The ids of the layers in the document. */
 const layerIds = async (page: Page) => Object.keys((await read(page)).nodes)
 
-test('keyboard only: the row that takes the focus after a delete is selected, so Delete again deletes it', async ({ browser }) => {
+test('keyboard only: the row that takes the focus after a delete is selected, so Delete again deletes it', async ({
+  browser,
+}) => {
   const { page, errors } = await openStage(browser, design())
   await openLayers(page)
   await row(page, 'Box').click()
@@ -411,7 +545,9 @@ test('keyboard only: the row that takes the focus after a delete is selected, so
   expect(errors).toEqual([])
 })
 
-test('keyboard only: undo after a delete selects the row it gives the focus back to, so Delete acts on that row', async ({ browser }) => {
+test('keyboard only: undo after a delete selects the row it gives the focus back to, so Delete acts on that row', async ({
+  browser,
+}) => {
   const { page, errors } = await openStage(browser, design())
   await openLayers(page)
   await row(page, 'Box').click()
@@ -433,7 +569,9 @@ test('keyboard only: undo after a delete selects the row it gives the focus back
   expect(errors).toEqual([])
 })
 
-test('keyboard only: grouping from the tree puts the focus on the new group, and undo on a selected row', async ({ browser }) => {
+test('keyboard only: grouping from the tree puts the focus on the new group, and undo on a selected row', async ({
+  browser,
+}) => {
   const { page, errors } = await openStage(browser, design())
   await openLayers(page)
   await row(page, 'Dot').click()
@@ -451,15 +589,19 @@ test('keyboard only: grouping from the tree puts the focus on the new group, and
   // Undo takes the group away: the focus is on a row that is selected.
   await page.keyboard.press('ControlOrMeta+Z')
   await expect.poll(() => layerIds(page)).not.toContain(group)
-  await expect.poll(async () => {
-    const on = await focusedLayer(page)
-    return on !== null && (await selectionOf(page)).includes(on)
-  }).toBe(true)
+  await expect
+    .poll(async () => {
+      const on = await focusedLayer(page)
+      return on !== null && (await selectionOf(page)).includes(on)
+    })
+    .toBe(true)
   expect(errors).toEqual([])
 })
 
 test('keyboard only: deleting the only layer and undoing puts the focus back on its row', async ({ browser }) => {
-  const only: DesignInput['nodes'] = { box: { type: 'graphic', parentId: 'p1', index: 'a0', name: 'Box', props: rect(120, 120, 400, 300, '#E0262BFF') } }
+  const only: DesignInput['nodes'] = {
+    box: { type: 'graphic', parentId: 'p1', index: 'a0', name: 'Box', props: rect(120, 120, 400, 300, '#E0262BFF') },
+  }
   const { page, errors } = await openStage(browser, { ...design(), nodes: only })
   await openLayers(page)
   await row(page, 'Box').click()
@@ -474,10 +616,15 @@ test('keyboard only: deleting the only layer and undoing puts the focus back on 
   expect(errors).toEqual([])
 })
 
-test('keyboard: the tree has one tab stop, the row the focus is on, even when that row is not selected', async ({ browser }) => {
+test('keyboard: the tree has one tab stop, the row the focus is on, even when that row is not selected', async ({
+  browser,
+}) => {
   const { page, errors } = await openStage(browser, design())
   await openLayers(page)
-  const stops = () => tree(page).locator('[role=treeitem][tabindex="0"]').evaluateAll((rows) => rows.map((r) => r.getAttribute('data-layer')))
+  const stops = () =>
+    tree(page)
+      .locator('[role=treeitem][tabindex="0"]')
+      .evaluateAll((rows) => rows.map((r) => r.getAttribute('data-layer')))
   await row(page, 'Box').click()
   await row(page, 'Card').click({ modifiers: ['ControlOrMeta'] })
   await row(page, 'Card').click({ modifiers: ['ControlOrMeta'] })
@@ -520,7 +667,13 @@ const threeHundred = (): DesignInput => {
   const nodes: DesignInput['nodes'] = {}
   for (let i = 0; i < 300; i++) {
     const index = `a${String(i).padStart(3, '0')}`
-    nodes[`n${i}`] = { type: 'graphic', parentId: 'p1', index, name: `Layer ${i + 1}`, props: rect(20 + (i % 20) * 52, 20 + Math.floor(i / 20) * 70, 44, 60, i % 2 ? '#14213DFF' : '#FCA311FF') }
+    nodes[`n${i}`] = {
+      type: 'graphic',
+      parentId: 'p1',
+      index,
+      name: `Layer ${i + 1}`,
+      props: rect(20 + (i % 20) * 52, 20 + Math.floor(i / 20) * 70, 44, 60, i % 2 ? '#14213DFF' : '#FCA311FF'),
+    }
   }
   return { ...design(), nodes }
 }
@@ -538,19 +691,20 @@ async function wheel(page: Page, scroller: Locator, dy: number) {
  * holds, and how far the panel can scroll. The row Tab lands on stays in the page wherever the
  * list is scrolled, so it counts for the first only when it is next to the other rows.
  */
-const mounted = (scroller: Locator) => scroller.evaluate((el, row) => {
-  const rows = [...el.querySelectorAll<HTMLElement>('[role=treeitem]')]
-  const places = rows.map((r) => Number(r.getAttribute('aria-posinset')) - 1)
-  const tab = rows.findIndex((r) => r.tabIndex === 0)
-  const run = places.filter((at, i) => i !== tab || places.includes(at - 1) || places.includes(at + 1))
-  return {
-    count: rows.length,
-    first: Math.min(...run),
-    inView: Math.floor(el.scrollTop / row),
-    fits: Math.ceil(el.clientHeight / row),
-    range: el.scrollHeight - el.clientHeight,
-  }
-}, ROW)
+const mounted = (scroller: Locator) =>
+  scroller.evaluate((el, row) => {
+    const rows = [...el.querySelectorAll<HTMLElement>('[role=treeitem]')]
+    const places = rows.map((r) => Number(r.getAttribute('aria-posinset')) - 1)
+    const tab = rows.findIndex((r) => r.tabIndex === 0)
+    const run = places.filter((at, i) => i !== tab || places.includes(at - 1) || places.includes(at + 1))
+    return {
+      count: rows.length,
+      first: Math.min(...run),
+      inView: Math.floor(el.scrollTop / row),
+      fits: Math.ceil(el.clientHeight / row),
+      range: el.scrollHeight - el.clientHeight,
+    }
+  }, ROW)
 
 test('300 layers: only the rows in view are in the page, and they follow the scroll', async ({ browser }) => {
   const { page, errors } = await openStage(browser, threeHundred())
@@ -570,10 +724,12 @@ test('300 layers: only the rows in view are in the page, and they follow the scr
   await scroller.hover()
   for (let i = 0; i < 40; i++) {
     await wheel(page, scroller, i < 20 ? WHEEL : -WHEEL)
-    await expect.poll(async () => {
-      const { first, inView } = await mounted(scroller)
-      return { first, inView, followed: first <= inView && first >= inView - overscan }
-    }).toMatchObject({ followed: true })
+    await expect
+      .poll(async () => {
+        const { first, inView } = await mounted(scroller)
+        return { first, inView, followed: first <= inView && first >= inView - overscan }
+      })
+      .toMatchObject({ followed: true })
     expect((await mounted(scroller)).count).toBeLessThan(60)
   }
   // Back at the top, the first row shows.
@@ -606,7 +762,9 @@ async function clickThenScrollAway(page: Page) {
   expect(await scroller.evaluate((el) => el.scrollTop)).toBeGreaterThan(133 * ROW)
 }
 
-test('300 layers: the arrows keep moving through the tree after the focused row scrolls out of view', async ({ browser }) => {
+test('300 layers: the arrows keep moving through the tree after the focused row scrolls out of view', async ({
+  browser,
+}) => {
   const { page, errors } = await openStage(browser, threeHundred())
   await openLayers(page)
   await clickThenScrollAway(page)
@@ -681,11 +839,12 @@ test('300 layers: what scrolling the panel takes', PERF, async ({ browser }) => 
       }
       requestAnimationFrame(tick)
     })
-    return () => page.evaluate(() => {
-      const state = (window as unknown as { frameTimes: { frames: number[]; recording: boolean } }).frameTimes
-      state.recording = false
-      return state.frames.slice(1)
-    })
+    return () =>
+      page.evaluate(() => {
+        const state = (window as unknown as { frameTimes: { frames: number[]; recording: boolean } }).frameTimes
+        state.recording = false
+        return state.frames.slice(1)
+      })
   }
   // The page at rest with the panel open: what this machine's frames take with nothing moving. In
   // headless Chromium the frosted panels are composited in software, which is most of a frame here.
@@ -699,7 +858,8 @@ test('300 layers: what scrolling the panel takes', PERF, async ({ browser }) => 
     const seen: number[] = []
     ;(window as unknown as { scripts: number[] }).scripts = seen
     new PerformanceObserver((list) => {
-      for (const frame of list.getEntries() as unknown as { scripts: { duration: number }[] }[]) seen.push(frame.scripts.reduce((sum, s) => sum + s.duration, 0))
+      for (const frame of list.getEntries() as unknown as { scripts: { duration: number }[] }[])
+        seen.push(frame.scripts.reduce((sum, s) => sum + s.duration, 0))
     }).observe({ type: 'long-animation-frame' })
   })
   // Then scroll top to bottom and back with the wheel.

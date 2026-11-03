@@ -1,11 +1,20 @@
 // Ranges and style keys inside text (#47), on English, Hindi and Arabic.
-import { TextProps } from '@dazbee/schema'
 import { describe, expect, it } from 'vitest'
+
+import { TextProps } from '@dazbee/schema'
+
 import { paragraphAt, step, toggled, wordAt } from './text-edit.ts'
 
-const props = (text: string, runs: unknown[] = [], weight = 400) => TextProps.parse({
-  x: 0, y: 0, width: 100, height: 20, text, runs, style: { fontFamily: 'Noto Sans', fontSize: 16, fontWeight: weight, color: '#000000FF' },
-})
+const props = (text: string, runs: unknown[] = [], weight = 400) =>
+  TextProps.parse({
+    x: 0,
+    y: 0,
+    width: 100,
+    height: 20,
+    text,
+    runs,
+    style: { fontFamily: 'Noto Sans', fontSize: 16, fontWeight: weight, color: '#000000FF' },
+  })
 
 describe('text editing', () => {
   it('steps a grapheme at a time, a Devanagari conjunct whole', () => {

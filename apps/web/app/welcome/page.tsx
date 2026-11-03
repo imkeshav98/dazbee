@@ -3,6 +3,7 @@
 // workspace has a brand. It looks like the final mock's onboarding: the library's top bar, a bold
 // headline, and the website in one wide field with its button at the end.
 import { redirect } from 'next/navigation'
+
 import { BrandStartForm } from '../../components/brand-start-form.tsx'
 import { TopBar } from '../../components/library-shell.tsx'
 import { createBrand, getWorkspace } from '../../lib/api.ts'
@@ -12,7 +13,8 @@ import { getMessages } from '../../lib/i18n/server.ts'
 
 export const dynamic = 'force-dynamic'
 
-const HEADLINE = 'text-center font-display text-3xl font-bold tracking-tight text-balance md:text-[2.75rem] md:leading-tight'
+const HEADLINE =
+  'text-center font-display text-3xl font-bold tracking-tight text-balance md:text-[2.75rem] md:leading-tight'
 const LEAD = 'mx-auto mt-3 max-w-xl text-center text-muted text-balance'
 
 export default async function WelcomePage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
@@ -30,7 +32,12 @@ export default async function WelcomePage({ searchParams }: { searchParams: Prom
 
   return (
     <div className="relative isolate flex min-h-dvh flex-col overflow-x-clip bg-bg">
-      <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[34rem] overflow-hidden opacity-70 [mask-image:linear-gradient(to_bottom,black_45%,transparent)]"><div className="aurora" /></div>
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[34rem] overflow-hidden opacity-70 [mask-image:linear-gradient(to_bottom,black_45%,transparent)]"
+      >
+        <div className="aurora" />
+      </div>
       <TopBar t={t} workspace={workspace}>
         <span className="truncate px-1.5 font-semibold text-text">{w.place}</span>
       </TopBar>
@@ -39,7 +46,14 @@ export default async function WelcomePage({ searchParams }: { searchParams: Prom
         <p className={LEAD}>{w.websiteLead}</p>
         <BrandStartForm
           action={startBrand}
-          words={{ start: t.library.start, placeholder: t.library.startPlaceholder, open: w.open, callIt: t.library.callIt, change: t.library.change, name: brandWords(t).name }}
+          words={{
+            start: t.library.start,
+            placeholder: t.library.startPlaceholder,
+            open: w.open,
+            callIt: t.library.callIt,
+            change: t.library.change,
+            name: brandWords(t).name,
+          }}
           error={error === 'name' ? w.needName : null}
         />
       </main>

@@ -25,7 +25,9 @@ const orderOf = (page: unknown) => String((page as { order?: unknown } | undefin
 export function repair<S extends Snapshot>(snapshot: S): { snapshot: S; repairs: string[] } {
   const s = snapshot
   const repairs: string[] = []
-  const firstPage = Object.entries(s.pages).sort(([a, x], [b, y]) => byCodeUnits(orderOf(x), orderOf(y)) || byCodeUnits(a, b))[0]?.[0]
+  const firstPage = Object.entries(s.pages).sort(
+    ([a, x], [b, y]) => byCodeUnits(orderOf(x), orderOf(y)) || byCodeUnits(a, b),
+  )[0]?.[0]
   if (!firstPage) return { snapshot: s, repairs }
 
   // 1. Drop layers that can't be read at all, before anyone looks for parents among them.
@@ -71,20 +73,28 @@ export function repair<S extends Snapshot>(snapshot: S): { snapshot: S; repairs:
 
   // 4. Overrides of layers or formats that no longer exist mean nothing. A format removed while
   // another tab copied layers into it, say, leaves values in its scope.
-  const formatGone = (scope: string) => scope.startsWith('format:') && !Object.hasOwn(s.formats, scope.slice('format:'.length))
-  const orphaned = Object.entries(s.overrides).some(([scope, byNode]) => formatGone(scope) || Object.keys(byNode as Json).some((id) => !nodes.has(id)))
+  const formatGone = (scope: string) =>
+    scope.startsWith('format:') && !Object.hasOwn(s.formats, scope.slice('format:'.length))
+  const orphaned = Object.entries(s.overrides).some(
+    ([scope, byNode]) => formatGone(scope) || Object.keys(byNode as Json).some((id) => !nodes.has(id)),
+  )
   if (repairs.length === 0 && !orphaned) return { snapshot: s, repairs }
   const live = Object.entries(s.overrides).filter(([scope]) => {
     if (!formatGone(scope)) return true
     repairs.push(`dropped ${scope} overrides of a removed format`)
     return false
   })
-  const overrides = Object.fromEntries(live.map(([scope, byNode]) => [scope, Object.fromEntries(
-    Object.entries(byNode as Json).filter(([id]) => {
-      if (nodes.has(id)) return true
-      repairs.push(`dropped ${scope} overrides of deleted layer "${id}"`)
-      return false
-    }),
-  )]))
+  const overrides = Object.fromEntries(
+    live.map(([scope, byNode]) => [
+      scope,
+      Object.fromEntries(
+        Object.entries(byNode as Json).filter(([id]) => {
+          if (nodes.has(id)) return true
+          repairs.push(`dropped ${scope} overrides of deleted layer "${id}"`)
+          return false
+        }),
+      ),
+    ]),
+  )
   return { snapshot: { ...s, nodes: Object.fromEntries(nodes), overrides }, repairs }
 }

@@ -25,7 +25,10 @@ export function sendAsset(brandId: string, file: File, onProgress: (share: numbe
         // Not JSON: the status says what went wrong.
       }
       if (request.status === 201) return resolve(AssetSummary.parse(body))
-      const reason = body && typeof body === 'object' && 'error' in body && typeof body.error === 'string' ? body.error : `${request.status}`
+      const reason =
+        body && typeof body === 'object' && 'error' in body && typeof body.error === 'string'
+          ? body.error
+          : `${request.status}`
       reject(new Error(reason))
     }
     request.onerror = () => reject(new Error('no connection'))
@@ -34,4 +37,3 @@ export function sendAsset(brandId: string, file: File, onProgress: (share: numbe
     request.send(form)
   })
 }
-

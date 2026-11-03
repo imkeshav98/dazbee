@@ -67,7 +67,12 @@ export type ShortcutAction = (typeof SHORTCUTS)[number]['action']
 export const NUDGE = 1
 export const NUDGE_FAR = 10
 
-interface Parsed { mod: boolean; shift: boolean; alt: boolean; key: string }
+interface Parsed {
+  mod: boolean
+  shift: boolean
+  alt: boolean
+  key: string
+}
 const parse = (spec: string): Parsed => {
   const parts = spec.split('+')
   const key = parts.at(-1) ?? ''
@@ -78,7 +83,9 @@ const isLetter = (key: string) => /^[A-Z]$/.test(key)
 const byAction = SHORTCUTS.flatMap(({ action, keys }) => keys.map((spec) => ({ action, ...parse(spec) })))
 
 /** The action a key press asks for, if any. */
-export function shortcutFor(e: Pick<KeyboardEvent, 'key' | 'code' | 'ctrlKey' | 'metaKey' | 'shiftKey' | 'altKey'>): ShortcutAction | null {
+export function shortcutFor(
+  e: Pick<KeyboardEvent, 'key' | 'code' | 'ctrlKey' | 'metaKey' | 'shiftKey' | 'altKey'>,
+): ShortcutAction | null {
   const mod = e.ctrlKey || e.metaKey
   for (const s of byAction) {
     if (s.mod !== mod || s.shift !== e.shiftKey || s.alt !== e.altKey) continue
@@ -92,5 +99,8 @@ export function shortcutFor(e: Pick<KeyboardEvent, 'key' | 'code' | 'ctrlKey' | 
 /** The first key of an action, as Playwright's keyboard.press spells it, for tests. */
 export function pressFor(action: ShortcutAction, mod: 'Control' | 'Meta' = 'Control') {
   const spec = SHORTCUTS.find((s) => s.action === action)?.keys[0] ?? ''
-  return spec.split('+').map((part) => (part === 'Mod' ? mod : isLetter(part) ? `Key${part}` : part)).join('+')
+  return spec
+    .split('+')
+    .map((part) => (part === 'Mod' ? mod : isLetter(part) ? `Key${part}` : part))
+    .join('+')
 }

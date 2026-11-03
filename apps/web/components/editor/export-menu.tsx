@@ -3,9 +3,11 @@
 // Export: pick the pages, the sizes (formats) as tiles, PNG, JPG, PDF or SVG and the file names,
 // and the editor's export worker draws them while the stage stays responsive. One file downloads
 // as itself, more as a zip with a folder per format.
+import { useState } from 'react'
+
 import type { Editor } from '@dazbee/editor'
 import { DEFAULT_EXPORT_NAME, type Design, type ExportType } from '@dazbee/schema'
-import { useState } from 'react'
+
 import { cn } from '../../lib/cn.ts'
 import { useMessages } from '../../lib/i18n/client.tsx'
 import { format } from '../../lib/i18n/index.ts'
@@ -43,7 +45,12 @@ export function ExportForm({ id, editor, design }: { id: string; editor: Editor;
   const selectionPage = editor.selectedFrame()?.split('/')[0]
   const [allPages, setAllPages] = useState(true)
   const [chosen, setChosen] = useState<string | null>(null)
-  const thisPage = chosen && design.pages[chosen] ? chosen : selectionPage && design.pages[selectionPage] ? selectionPage : pages[0]?.[0] ?? ''
+  const thisPage =
+    chosen && design.pages[chosen]
+      ? chosen
+      : selectionPage && design.pages[selectionPage]
+        ? selectionPage
+        : (pages[0]?.[0] ?? '')
   const everyFormat = () => new Set(formats.map(([formatId]) => formatId))
   const [name, setName] = useState(DEFAULT_EXPORT_NAME)
   const [picked, setPicked] = useState<Set<string>>(everyFormat)
@@ -66,7 +73,10 @@ export function ExportForm({ id, editor, design }: { id: string; editor: Editor;
     setError(null)
     setProgress({ done: 0, total: count })
     try {
-      const file = await editor.exportFiles({ pageIds, formatIds, type, quality, name: name.trim() || DEFAULT_EXPORT_NAME }, (done, total) => setProgress({ done, total }))
+      const file = await editor.exportFiles(
+        { pageIds, formatIds, type, quality, name: name.trim() || DEFAULT_EXPORT_NAME },
+        (done, total) => setProgress({ done, total }),
+      )
       download(file.name, file.type, file.bytes as Uint8Array<ArrayBuffer>)
     } catch (reason) {
       setError(format(t.editor.exports.failed, { reason: reason instanceof Error ? reason.message : String(reason) }))
@@ -86,10 +96,24 @@ export function ExportForm({ id, editor, design }: { id: string; editor: Editor;
       <div className="flex flex-col gap-1.5">
         <span className={LABEL}>{t.editor.exports.pages}</span>
         <div role="radiogroup" aria-label={t.editor.exports.pages} className={SEGMENTS}>
-          <button type="button" role="radio" aria-checked={allPages} onClick={() => setAllPages(true)} data-pages="all" className={SEGMENT}>
+          <button
+            type="button"
+            role="radio"
+            aria-checked={allPages}
+            onClick={() => setAllPages(true)}
+            data-pages="all"
+            className={SEGMENT}
+          >
             {format(t.editor.exports.allPages, { n: pages.length })}
           </button>
-          <button type="button" role="radio" aria-checked={!allPages} onClick={() => setAllPages(false)} data-pages="one" className={SEGMENT}>
+          <button
+            type="button"
+            role="radio"
+            aria-checked={!allPages}
+            onClick={() => setAllPages(false)}
+            data-pages="one"
+            className={SEGMENT}
+          >
             {t.editor.exports.thisPage}
           </button>
         </div>
@@ -146,7 +170,15 @@ export function ExportForm({ id, editor, design }: { id: string; editor: Editor;
         <span className={LABEL}>{t.editor.exports.type}</span>
         <div role="radiogroup" aria-label={t.editor.exports.type} className={SEGMENTS}>
           {(['png', 'jpg', 'pdf', 'svg'] as const).map((value) => (
-            <button key={value} type="button" role="radio" aria-checked={type === value} onClick={() => setType(value)} data-type={value} className={cn(SEGMENT, 'uppercase')}>
+            <button
+              key={value}
+              type="button"
+              role="radio"
+              aria-checked={type === value}
+              onClick={() => setType(value)}
+              data-type={value}
+              className={cn(SEGMENT, 'uppercase')}
+            >
               {value}
             </button>
           ))}
@@ -181,12 +213,23 @@ export function ExportForm({ id, editor, design }: { id: string; editor: Editor;
         />
       </label>
 
-      <Button variant="primary" disabled={count === 0 || progress !== null} onClick={() => void run()} data-testid="export-run">
+      <Button
+        variant="primary"
+        disabled={count === 0 || progress !== null}
+        onClick={() => void run()}
+        data-testid="export-run"
+      >
         {progress
           ? format(t.editor.exports.making, { done: progress.done, total: progress.total })
-          : count === 1 ? t.editor.exports.runOne : format(t.editor.exports.run, { n: count })}
+          : count === 1
+            ? t.editor.exports.runOne
+            : format(t.editor.exports.run, { n: count })}
       </Button>
-      {error && <p role="alert" className="text-xs text-danger">{error}</p>}
+      {error && (
+        <p role="alert" className="text-xs text-danger">
+          {error}
+        </p>
+      )}
     </div>
   )
 }

@@ -1,6 +1,14 @@
 export { CommandError, defineCommand, type Command } from './command.ts'
 export { childrenOf, COMMANDS, type CommandName } from './commands.ts'
-export { anchorOffset, loadDesign, readDesign, snapshot, textAnchor, type DesignDoc, type TextAnchor } from './design-doc.ts'
+export {
+  anchorOffset,
+  loadDesign,
+  readDesign,
+  snapshot,
+  textAnchor,
+  type DesignDoc,
+  type TextAnchor,
+} from './design-doc.ts'
 export { compact, COMPACTION } from './compact.ts'
 export { migrateDoc } from './migrate.ts'
 export { openSession, type Session } from './session.ts'

@@ -1,10 +1,39 @@
-import { BINDING_TARGETS, BooleanOp, boundFillIndex, canBind, canHold, fitsTarget, Paint, VariableRef, Format, LayerTree, FormatId, formatIdOf, formatSizeProblem, Layer, LAYER_PROPS, LayerLock, LOCK_FLAGS, type Layer as LayerT, NodeId, Page, PageId, parseLayer, parseOverrideValues, RunStyle, Scope as FormatScope, type Design } from '@dazbee/schema'
 import { generateKeyBetween } from 'fractional-indexing'
 import { nanoid } from 'nanoid'
-import { z } from 'zod'
-import { childrenOf } from './children.ts'
-import { defineCommand, type CommandContext } from './command.ts'
 import * as Y from 'yjs'
+import { z } from 'zod'
+
+import {
+  BINDING_TARGETS,
+  BooleanOp,
+  boundFillIndex,
+  canBind,
+  canHold,
+  type Design,
+  fitsTarget,
+  Format,
+  FormatId,
+  formatIdOf,
+  formatSizeProblem,
+  Layer,
+  type Layer as LayerT,
+  LAYER_PROPS,
+  LayerLock,
+  LayerTree,
+  LOCK_FLAGS,
+  NodeId,
+  Page,
+  PageId,
+  Paint,
+  parseLayer,
+  parseOverrideValues,
+  RunStyle,
+  Scope as FormatScope,
+  VariableRef,
+} from '@dazbee/schema'
+
+import { childrenOf } from './children.ts'
+import { type CommandContext, defineCommand } from './command.ts'
 import { DELETED, overrideKey, splitOverrideKey, toYMap, toYNode } from './design-doc.ts'
 import { boundsOf, centreOf, normalAngle, round, turn } from './geometry.ts'
 import { inferLayout } from './infer-layout.ts'
@@ -18,7 +47,12 @@ export { childrenOf }
  * then it falls back to the nearest key it can make, and id order settles any remaining tie.
  */
 export function indexBetween(before: string | null, after: string | null): string {
-  const attempts: [string | null, string | null][] = [[before, after], [before, null], [null, after], [null, null]]
+  const attempts: [string | null, string | null][] = [
+    [before, after],
+    [before, null],
+    [null, after],
+    [null, null],
+  ]
   for (const [a, b] of attempts) {
     try {
       return generateKeyBetween(a, b)
@@ -29,7 +63,8 @@ export function indexBetween(before: string | null, after: string | null): strin
   return 'a0'
 }
 
-const topIndex = (design: Design, parentId: string) => indexBetween(childrenOf(design, parentId).at(-1)?.[1].index ?? null, null)
+const topIndex = (design: Design, parentId: string) =>
+  indexBetween(childrenOf(design, parentId).at(-1)?.[1].index ?? null, null)
 
 /** Ids of deleted layers stay taken: their tombstones still hold the data an undo brings back. */
 const idProblem = ({ r }: CommandContext, id: string | undefined) =>
@@ -100,7 +135,8 @@ export const nodeUpdate = defineCommand({
         if (!Object.hasOwn(LAYER_PROPS[node.type].shape, path)) return `a ${node.type} has no property "${path}"`
         const locked = lockProblem(id, node, lockFor(path))
         if (locked) return locked
-        if (scope === 'base' && node.type === 'text' && (path === 'text' || path === 'runs')) return 'change text with text.edit'
+        if (scope === 'base' && node.type === 'text' && (path === 'text' || path === 'runs'))
+          return 'change text with text.edit'
       }
       if (scope !== 'base') {
         const values = parseOverrideValues(scope, node, { ...design.overrides[scope]?.[id], ...patch })
@@ -154,7 +190,8 @@ export const overrideReset = defineCommand({
   },
   apply: ({ r, design }, { ids, scope, paths }) => {
     for (const id of ids) {
-      for (const path of paths ?? Object.keys(design.overrides[scope]?.[id] ?? {})) r.overrides.delete(overrideKey(scope, id, path))
+      for (const path of paths ?? Object.keys(design.overrides[scope]?.[id] ?? {}))
+        r.overrides.delete(overrideKey(scope, id, path))
     }
   },
 })
@@ -180,7 +217,12 @@ const isInside = (design: Design, id: string, maybeAncestor: string) => {
 export const nodeMove = defineCommand({
   name: 'node.move',
   /** `keepDrawn` false leaves the layer's box as stored, for a caller that places it itself. */
-  input: z.object({ id: NodeId, parentId: z.union([PageId, NodeId]), before: NodeId.optional(), keepDrawn: z.boolean().default(true) }),
+  input: z.object({
+    id: NodeId,
+    parentId: z.union([PageId, NodeId]),
+    before: NodeId.optional(),
+    keepDrawn: z.boolean().default(true),
+  }),
   check: ({ design }, { id, parentId, before }) => {
     const node = design.nodes[id]
     if (!node) return `no layer "${id}"`
@@ -219,7 +261,8 @@ function keepDrawnPlace(r: CommandContext['r'], design: Design, id: string, pare
   if (!node || node.parentId === parentId) return
   // A layer an auto layout places is drawn where the layout puts it, not where it is stored, and is
   // placed again by the one it enters: there is nothing to keep.
-  const flows = (container: string) => (design.nodes[container]?.props as { layout?: unknown } | undefined)?.layout !== undefined && !node.props.absolute
+  const flows = (container: string) =>
+    (design.nodes[container]?.props as { layout?: unknown } | undefined)?.layout !== undefined && !node.props.absolute
   if (flows(node.parentId) || flows(parentId)) return
   const leaving = ancestorsOf(design, node.parentId)
   const entering = ancestorsOf(design, parentId)
@@ -258,7 +301,9 @@ export const nodeDelete = defineCommand({
     for (const id of ids) {
       const node = design.nodes[id]
       if (!node) return `no layer "${id}"`
-      const locked = [id, ...descendants(design, id)].map((inner) => lockProblem(inner, design.nodes[inner] as LayerT, 'delete')).find(Boolean)
+      const locked = [id, ...descendants(design, id)]
+        .map((inner) => lockProblem(inner, design.nodes[inner] as LayerT, 'delete'))
+        .find(Boolean)
       if (locked) return locked
     }
     return undefined
@@ -290,7 +335,10 @@ export const nodeRename = defineCommand({
 /** Sets some of layers' lock flags, keeping the others; a layer with nothing locked loses the field. */
 export const nodeLock = defineCommand({
   name: 'node.lock',
-  input: z.object({ ids: NodeId.array().min(1), lock: z.object(Object.fromEntries(LOCK_FLAGS.map((flag) => [flag, z.boolean().optional()]))) }),
+  input: z.object({
+    ids: NodeId.array().min(1),
+    lock: z.object(Object.fromEntries(LOCK_FLAGS.map((flag) => [flag, z.boolean().optional()]))),
+  }),
   check: ({ design }, { ids }) => ids.map((id) => (design.nodes[id] ? undefined : `no layer "${id}"`)).find(Boolean),
   apply: ({ r, design }, { ids, lock }) => {
     for (const id of ids) {
@@ -309,10 +357,16 @@ export const nodeLock = defineCommand({
  */
 export const nodeBind = defineCommand({
   name: 'node.bind',
-  input: z.object({ ids: NodeId.array().min(1), target: z.enum(BINDING_TARGETS), ref: VariableRef.nullable(), value: z.string().optional() }),
+  input: z.object({
+    ids: NodeId.array().min(1),
+    target: z.enum(BINDING_TARGETS),
+    ref: VariableRef.nullable(),
+    value: z.string().optional(),
+  }),
   check: ({ design }, { ids, target, ref, value }) => {
     if (ref && value === undefined) return 'binding needs the value the token has now'
-    if (value !== undefined && !fitsTarget(target, value)) return target === 'fontFamily' ? 'a font family needs a name' : 'colours are #RRGGBBAA'
+    if (value !== undefined && !fitsTarget(target, value))
+      return target === 'fontFamily' ? 'a font family needs a name' : 'colours are #RRGGBBAA'
     for (const id of ids) {
       const node = design.nodes[id]
       if (!node) return `no layer "${id}"`
@@ -335,7 +389,12 @@ export const nodeBind = defineCommand({
       if (target === 'fill') {
         const fills = (props.get('fills') ?? []) as z.infer<typeof Paint>[]
         const at = boundFillIndex(fills)
-        props.set('fills', at < 0 ? [...fills, { type: 'solid', color: value }] : fills.map((f, i) => (i === at ? { ...f, color: value } : f)))
+        props.set(
+          'fills',
+          at < 0
+            ? [...fills, { type: 'solid', color: value }]
+            : fills.map((f, i) => (i === at ? { ...f, color: value } : f)),
+        )
       } else {
         const key = target === 'textColor' ? 'color' : 'fontFamily'
         props.set('style', { ...(props.get('style') as Record<string, unknown>), [key]: value })
@@ -401,7 +460,11 @@ export const nodeReorder = defineCommand({
     for (const parentId of parents) {
       const before = childrenOf(design, parentId)
       const indexOf = new Map(before.map(([id, node]) => [id, node.index]))
-      const after = restack(before.map(([id]) => id), moving, to)
+      const after = restack(
+        before.map(([id]) => id),
+        moving,
+        to,
+      )
       // Runs of moved layers get indexes between the unmoved neighbours around them, unless the
       // ones they have already sit in order there.
       for (let i = 0; i < after.length; i++) {
@@ -409,11 +472,12 @@ export const nodeReorder = defineCommand({
         let end = i
         while (end + 1 < after.length && moving.has(after[end + 1] as string)) end++
         const run = after.slice(i, end + 1)
-        const low = i > 0 ? indexOf.get(after[i - 1] as string) ?? null : null
-        const high = end + 1 < after.length ? indexOf.get(after[end + 1] as string) ?? null : null
+        const low = i > 0 ? (indexOf.get(after[i - 1] as string) ?? null) : null
+        const high = end + 1 < after.length ? (indexOf.get(after[end + 1] as string) ?? null) : null
         const current = run.map((id) => indexOf.get(id) as string)
-        const fits = current.every((index, k) => (k === 0 ? low === null || index > low : index > (current[k - 1] as string)))
-          && (high === null || (current.at(-1) as string) < high)
+        const fits =
+          current.every((index, k) => (k === 0 ? low === null || index > low : index > (current[k - 1] as string))) &&
+          (high === null || (current.at(-1) as string) < high)
         if (!fits) {
           let at = low
           for (const id of run) {
@@ -432,16 +496,24 @@ export const nodeReorder = defineCommand({
  * Copies layers with fresh ids, each with every layer under it and their overrides in every
  * format; `place` says where each copied root goes. Returns the old id to new id map.
  */
-function copyLayers(r: CommandContext['r'], design: Design, roots: string[], place: (root: string) => { parentId: string; index: string }) {
+function copyLayers(
+  r: CommandContext['r'],
+  design: Design,
+  roots: string[],
+  place: (root: string) => { parentId: string; index: string },
+) {
   const ids = new Map<string, string>()
   for (const root of roots) for (const old of [root, ...descendants(design, root)]) ids.set(old, nanoid())
   for (const [old, fresh] of ids) {
     const node = design.nodes[old]
     if (!node) continue
-    const placed = roots.includes(old) ? place(old) : { parentId: ids.get(node.parentId) ?? node.parentId, index: node.index }
+    const placed = roots.includes(old)
+      ? place(old)
+      : { parentId: ids.get(node.parentId) ?? node.parentId, index: node.index }
     r.nodes.set(fresh, toYNode({ ...node, ...placed }))
     for (const [scope, byNode] of Object.entries(design.overrides)) {
-      for (const [path, value] of Object.entries(byNode[old] ?? {})) r.overrides.set(overrideKey(scope, fresh, path), value)
+      for (const [path, value] of Object.entries(byNode[old] ?? {}))
+        r.overrides.set(overrideKey(scope, fresh, path), value)
     }
   }
   return ids
@@ -472,8 +544,14 @@ export const nodeDuplicate = defineCommand({
  */
 export const designPlace = defineCommand({
   name: 'design.place',
-  input: z.object({ parentId: z.union([PageId, NodeId]), tree: LayerTree, dx: z.number().default(0), dy: z.number().default(0) }),
-  check: ({ design }, { parentId, tree }) => tree.roots.map((root) => parentProblem(design, parentId, tree.nodes[root]?.type ?? '')).find(Boolean),
+  input: z.object({
+    parentId: z.union([PageId, NodeId]),
+    tree: LayerTree,
+    dx: z.number().default(0),
+    dy: z.number().default(0),
+  }),
+  check: ({ design }, { parentId, tree }) =>
+    tree.roots.map((root) => parentProblem(design, parentId, tree.nodes[root]?.type ?? '')).find(Boolean),
   apply: ({ r, design }, { parentId, tree, dx, dy }) => {
     const ids = new Map(Object.keys(tree.nodes).map((id) => [id, nanoid()]))
     let index = childrenOf(design, parentId).at(-1)?.[1].index ?? null
@@ -502,7 +580,8 @@ function wrapProblem(ctx: CommandContext, ids: string[], id: string | undefined,
   const { design } = ctx
   const missing = ids.map((layer) => (design.nodes[layer] ? undefined : `no layer "${layer}"`)).find(Boolean)
   if (missing) return missing
-  if (new Set(ids.map((layer) => design.nodes[layer]?.parentId)).size > 1) return `layers to ${type === 'boolean' ? 'combine' : type} must share a parent`
+  if (new Set(ids.map((layer) => design.nodes[layer]?.parentId)).size > 1)
+    return `layers to ${type === 'boolean' ? 'combine' : type} must share a parent`
   const parentId = design.nodes[ids[0] as string]?.parentId as string
   return parentProblem(design, parentId, type) ?? idProblem(ctx, id)
 }
@@ -511,7 +590,10 @@ function wrapProblem(ctx: CommandContext, ids: string[], id: string | undefined,
  * Where layers are drawn, by scope, as the caller sees them: inside an auto layout frame the flow
  * places them, not their stored boxes, and only the renderer lays the flow out.
  */
-const DrawnBoxes = z.record(z.string().refine((s) => formatIdOf(s) !== undefined, 'drawn boxes are by format:<id>'), z.record(NodeId, z.object({ x: z.number(), y: z.number(), width: z.number().min(0), height: z.number().min(0) })))
+const DrawnBoxes = z.record(
+  z.string().refine((s) => formatIdOf(s) !== undefined, 'drawn boxes are by format:<id>'),
+  z.record(NodeId, z.object({ x: z.number(), y: z.number(), width: z.number().min(0), height: z.number().min(0) })),
+)
 type DrawnBoxes = z.infer<typeof DrawnBoxes>
 
 /**
@@ -521,7 +603,13 @@ type DrawnBoxes = z.infer<typeof DrawnBoxes>
  * as drawn and takes the room they took in a flow. In a format where they all keep where they are
  * in a flow, the new layer keeps where it is there too.
  */
-function wrap({ r, design }: CommandContext, ids: string[], id: string, layer: { type: 'group' | 'frame' | 'boolean'; name: string; props?: Record<string, unknown> }, drawn: DrawnBoxes = {}) {
+function wrap(
+  { r, design }: CommandContext,
+  ids: string[],
+  id: string,
+  layer: { type: 'group' | 'frame' | 'boolean'; name: string; props?: Record<string, unknown> },
+  drawn: DrawnBoxes = {},
+) {
   const parentId = design.nodes[ids[0] as string]?.parentId as string
   const inside = childrenOf(design, parentId).filter(([child]) => ids.includes(child))
   const top = inside.at(-1)?.[1] as LayerT
@@ -539,17 +627,34 @@ function wrap({ r, design }: CommandContext, ids: string[], id: string, layer: {
     }
   }
   place.write(r)
-  const keptIn = (scope: string) => inside.every(([child, node]) => ({ ...node.props, ...(scope === 'base' ? {} : design.overrides[scope]?.[child]) } as { absolute?: boolean }).absolute)
+  const keptIn = (scope: string) =>
+    inside.every(
+      ([child, node]) =>
+        (({ ...node.props, ...(scope === 'base' ? {} : design.overrides[scope]?.[child]) }) as { absolute?: boolean })
+          .absolute,
+    )
   const absolute = keptIn('base')
   const boxIn = (scope: Parameters<Placement['get']>[0]) => boundsOf(inside.map(([child]) => place.get(scope, child)))
   const base = boxIn('base')
   const box = { x: round(base.x), y: round(base.y), width: round(base.width), height: round(base.height) }
-  r.nodes.set(id, toYNode(Layer.parse({ type: layer.type, name: layer.name, parentId, index: top.index, props: { ...layer.props, ...box, ...(absolute ? { absolute } : {}) } })))
+  r.nodes.set(
+    id,
+    toYNode(
+      Layer.parse({
+        type: layer.type,
+        name: layer.name,
+        parentId,
+        index: top.index,
+        props: { ...layer.props, ...box, ...(absolute ? { absolute } : {}) },
+      }),
+    ),
+  )
   for (const scope of place.scopes) {
     if (scope === 'base') continue
     const b = boxIn(scope)
     for (const [path, value] of Object.entries({ x: b.x, y: b.y, width: b.width, height: b.height })) {
-      if (Math.abs(round(value) - box[path as keyof typeof box]) >= 0.005) r.overrides.set(overrideKey(scope, id, path), round(value))
+      if (Math.abs(round(value) - box[path as keyof typeof box]) >= 0.005)
+        r.overrides.set(overrideKey(scope, id, path), round(value))
     }
     if (keptIn(scope) !== absolute) r.overrides.set(overrideKey(scope, id, 'absolute'), keptIn(scope))
   }
@@ -564,7 +669,12 @@ function wrap({ r, design }: CommandContext, ids: string[], id: string, layer: {
  */
 export const nodeGroup = defineCommand({
   name: 'node.group',
-  input: z.object({ ids: NodeId.array().min(1), id: NodeId.optional(), name: z.string().default('Group'), drawn: DrawnBoxes.optional() }),
+  input: z.object({
+    ids: NodeId.array().min(1),
+    id: NodeId.optional(),
+    name: z.string().default('Group'),
+    drawn: DrawnBoxes.optional(),
+  }),
   check: (ctx, { ids, id }) => wrapProblem(ctx, ids, id, 'group'),
   apply: (ctx, { ids, id = nanoid(), name, drawn }) => wrap(ctx, ids, id, { type: 'group', name }, drawn),
 })
@@ -576,9 +686,15 @@ export const nodeGroup = defineCommand({
  */
 export const nodeFrame = defineCommand({
   name: 'node.frame',
-  input: z.object({ ids: NodeId.array().min(1), id: NodeId.optional(), name: z.string().default('Frame'), drawn: DrawnBoxes.optional() }),
+  input: z.object({
+    ids: NodeId.array().min(1),
+    id: NodeId.optional(),
+    name: z.string().default('Frame'),
+    drawn: DrawnBoxes.optional(),
+  }),
   check: (ctx, { ids, id }) => wrapProblem(ctx, ids, id, 'frame'),
-  apply: (ctx, { ids, id = nanoid(), name, drawn }) => wrap(ctx, ids, id, { type: 'frame', name, props: { clip: false } }, drawn),
+  apply: (ctx, { ids, id = nanoid(), name, drawn }) =>
+    wrap(ctx, ids, id, { type: 'frame', name, props: { clip: false } }, drawn),
 })
 
 /**
@@ -614,7 +730,12 @@ export const nodeEnclose = defineCommand({
       const now = boundsOf(ids.map((layer) => place.get(other, layer)))
       const kx = was.width > 0 ? now.width / was.width : 1
       const ky = was.height > 0 ? now.height / was.height : 1
-      place.set(other, id, { x: now.x + (drawn.x - was.x) * kx, y: now.y + (drawn.y - was.y) * ky, width: drawn.width * kx, height: drawn.height * ky })
+      place.set(other, id, {
+        x: now.x + (drawn.x - was.x) * kx,
+        y: now.y + (drawn.y - was.y) * ky,
+        width: drawn.width * kx,
+        height: drawn.height * ky,
+      })
     }
     place.write(r)
     // Their indexes already order them; they only change parent.
@@ -629,18 +750,28 @@ export const nodeEnclose = defineCommand({
  */
 export const nodeBoolean = defineCommand({
   name: 'node.boolean',
-  input: z.object({ ids: NodeId.array().min(2), op: BooleanOp, id: NodeId.optional(), name: z.string().optional(), drawn: DrawnBoxes.optional() }),
+  input: z.object({
+    ids: NodeId.array().min(2),
+    op: BooleanOp,
+    id: NodeId.optional(),
+    name: z.string().optional(),
+    drawn: DrawnBoxes.optional(),
+  }),
   check: (ctx, { ids, id }) => {
     for (const layer of ids) {
       const type = ctx.design.nodes[layer]?.type
-      if (type && type !== 'graphic' && type !== 'boolean') return `"${layer}" is a ${type}; only shapes and booleans combine`
+      if (type && type !== 'graphic' && type !== 'boolean')
+        return `"${layer}" is a ${type}; only shapes and booleans combine`
     }
     return wrapProblem(ctx, ids, id, 'boolean')
   },
   apply: (ctx, { ids, op, id = nanoid(), name, drawn }) => {
     const parentId = ctx.design.nodes[ids[0] as string]?.parentId as string
     const bottom = childrenOf(ctx.design, parentId).find(([child]) => ids.includes(child))?.[1]
-    const paint = bottom && (bottom.type === 'graphic' || bottom.type === 'boolean') ? { fills: bottom.props.fills, strokes: bottom.props.strokes } : {}
+    const paint =
+      bottom && (bottom.type === 'graphic' || bottom.type === 'boolean')
+        ? { fills: bottom.props.fills, strokes: bottom.props.strokes }
+        : {}
     const names = { union: 'Union', subtract: 'Subtract', intersect: 'Intersect', exclude: 'Exclude' } as const
     return wrap(ctx, ids, id, { type: 'boolean', name: name ?? names[op], props: { op, ...paint } }, drawn)
   },
@@ -679,7 +810,11 @@ export const nodeUngroup = defineCommand({
             const to = turn(c, centreOf(group), group.rotation)
             const dx = to.x - c.x
             const dy = to.y - c.y
-            place.set(scope, kid, { x: was.x + dx, y: was.y + dy, rotation: normalAngle(was.rotation + group.rotation) })
+            place.set(scope, kid, {
+              x: was.x + dx,
+              y: was.y + dy,
+              rotation: normalAngle(was.rotation + group.rotation),
+            })
             for (const inner of descendants(design, kid)) {
               const at = place.get(scope, inner)
               place.set(scope, inner, { x: at.x + dx, y: at.y + dy })
@@ -762,7 +897,12 @@ export const nodeHug = defineCommand({
 export const nodeReshape = defineCommand({
   name: 'node.reshape',
   input: z.object({
-    id: NodeId, d: z.string().min(1), dx: z.number(), dy: z.number(), width: z.number().min(0), height: z.number().min(0),
+    id: NodeId,
+    d: z.string().min(1),
+    dx: z.number(),
+    dy: z.number(),
+    width: z.number().min(0),
+    height: z.number().min(0),
     scope: Scope,
   }),
   check: ({ design }, { id }) => {
@@ -789,7 +929,10 @@ export const nodeReshape = defineCommand({
       const kx = ratio(was.width, from.width)
       const ky = ratio(was.height, from.height)
       const next = { x: was.x + dx * kx, y: was.y + dy * ky, width: width * kx, height: height * ky }
-      const v = { x: centreOf({ ...next, rotation: 0 }).x - centreOf(was).x, y: centreOf({ ...next, rotation: 0 }).y - centreOf(was).y }
+      const v = {
+        x: centreOf({ ...next, rotation: 0 }).x - centreOf(was).x,
+        y: centreOf({ ...next, rotation: 0 }).y - centreOf(was).y,
+      }
       const turned = turn(v, { x: 0, y: 0 }, was.rotation)
       place.set(scope, id, { ...next, x: next.x + turned.x - v.x, y: next.y + turned.y - v.y })
     }
@@ -822,7 +965,11 @@ export const nodeAutoLayout = defineCommand({
     }
     const place = new Placement(design)
     const flow = childrenOf(design, id).filter(([, node]) => !node.props.absolute)
-    const inferIn = (scope: 'base' | `format:${string}`) => inferLayout(place.get(scope, id), flow.map(([kid]) => [kid, place.get(scope, kid)]))
+    const inferIn = (scope: 'base' | `format:${string}`) =>
+      inferLayout(
+        place.get(scope, id),
+        flow.map(([kid]) => [kid, place.get(scope, kid)]),
+      )
     const { order, layout } = inferIn('base')
     props.set('layout', layout)
     for (const scope of scopes) {
@@ -841,7 +988,12 @@ export const nodeAutoLayout = defineCommand({
 const TextOp = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('insert'), at: z.number().int().min(0), text: z.string().min(1) }),
   z.object({ kind: z.literal('delete'), at: z.number().int().min(0), length: z.number().int().positive() }),
-  z.object({ kind: z.literal('style'), at: z.number().int().min(0), length: z.number().int().positive(), style: RunStyle }),
+  z.object({
+    kind: z.literal('style'),
+    at: z.number().int().min(0),
+    length: z.number().int().positive(),
+    style: RunStyle,
+  }),
 ])
 
 /** Offsets count UTF-16 units. Inserted text takes the style of the character before it. */
@@ -855,7 +1007,8 @@ export const textEdit = defineCommand({
     const locked = lockProblem(id, node, op.kind === 'style' ? 'style' : 'content')
     if (locked) return locked
     const end = op.at + (op.kind === 'insert' ? 0 : op.length)
-    if (end > node.props.text.length) return `the range ${op.at}–${end} runs past the end of the text (${node.props.text.length})`
+    if (end > node.props.text.length)
+      return `the range ${op.at}–${end} runs past the end of the text (${node.props.text.length})`
     return undefined
   },
   apply: ({ r, design }, { id, op }) => {
@@ -869,7 +1022,8 @@ export const textEdit = defineCommand({
       const own = byNode[id]
       if (!own || 'text' in own || !Array.isArray(own.runs)) continue
       const runs = (own.runs as { start: number; end: number; style: unknown }[]).flatMap((run) => {
-        const moved = op.kind === 'insert' ? insertedInto(run, op.at, op.text.length) : deletedFrom(run, op.at, op.length)
+        const moved =
+          op.kind === 'insert' ? insertedInto(run, op.at, op.text.length) : deletedFrom(run, op.at, op.length)
         return moved.end > moved.start ? [moved] : []
       })
       r.overrides.set(overrideKey(scope, id, 'runs'), runs)
@@ -896,12 +1050,17 @@ function deletedFrom<T extends { start: number; end: number }>(run: T, at: numbe
  */
 export const textFit = defineCommand({
   name: 'text.fit',
-  input: z.object({ id: NodeId, sizes: z.record(z.string(), z.object({ width: z.number().min(0), height: z.number().min(0) })) }),
+  input: z.object({
+    id: NodeId,
+    sizes: z.record(z.string(), z.object({ width: z.number().min(0), height: z.number().min(0) })),
+  }),
   check: ({ design }, { id, sizes }) => {
     const node = design.nodes[id]
     if (!node) return `no layer "${id}"`
     if (node.type !== 'text') return `"${id}" is a ${node.type}, not a text layer`
-    return Object.keys(sizes).map((f) => (design.formats[f] ? undefined : `no format "${f}"`)).find(Boolean)
+    return Object.keys(sizes)
+      .map((f) => (design.formats[f] ? undefined : `no format "${f}"`))
+      .find(Boolean)
   },
   apply: ({ r, design }, { id, sizes }) => {
     const place = new Placement(design)
@@ -912,7 +1071,11 @@ export const textFit = defineCommand({
   },
 })
 
-const lastOrder = (entries: { order: string }[]) => entries.map((e) => e.order).sort().at(-1) ?? null
+const lastOrder = (entries: { order: string }[]) =>
+  entries
+    .map((e) => e.order)
+    .sort()
+    .at(-1) ?? null
 
 export const pageAdd = defineCommand({
   name: 'page.add',
@@ -925,7 +1088,9 @@ export const pageAdd = defineCommand({
 })
 
 const pagesInOrder = (design: Design) =>
-  Object.entries(design.pages).sort(([a, x], [b, y]) => (x.order < y.order ? -1 : x.order > y.order ? 1 : a < b ? -1 : 1))
+  Object.entries(design.pages).sort(([a, x], [b, y]) =>
+    x.order < y.order ? -1 : x.order > y.order ? 1 : a < b ? -1 : 1,
+  )
 
 /** Every layer under a page or layer, parents before children. */
 function descendants(design: Design, parentId: string): string[] {
@@ -958,7 +1123,12 @@ export const pageDuplicate = defineCommand({
     const pages = pagesInOrder(design)
     const next = pages[pages.findIndex(([other]) => other === id) + 1]?.[1].order ?? null
     r.pages.set(newId, toYMap(Page.parse({ ...page, name: name ?? page.name, order: indexBetween(page.order, next) })))
-    copyLayers(r, design, childrenOf(design, id).map(([child]) => child), (root) => ({ parentId: newId, index: (design.nodes[root] as LayerT).index }))
+    copyLayers(
+      r,
+      design,
+      childrenOf(design, id).map(([child]) => child),
+      (root) => ({ parentId: newId, index: (design.nodes[root] as LayerT).index }),
+    )
     return newId
   },
 })
@@ -996,7 +1166,9 @@ export const pageDelete = defineCommand({
 })
 
 const byOrder = (design: Design) =>
-  Object.entries(design.formats).sort(([a, x], [b, y]) => (x.order < y.order ? -1 : x.order > y.order ? 1 : a < b ? -1 : 1))
+  Object.entries(design.formats).sort(([a, x], [b, y]) =>
+    x.order < y.order ? -1 : x.order > y.order ? 1 : a < b ? -1 : 1,
+  )
 
 /**
  * Adds a format. Its layout starts as the primary format's, scaled to fit and centred, written
@@ -1004,7 +1176,12 @@ const byOrder = (design: Design) =>
  */
 export const formatAdd = defineCommand({
   name: 'format.add',
-  input: z.object({ id: FormatId.optional(), name: z.string(), width: Format.shape.width, height: Format.shape.height }),
+  input: z.object({
+    id: FormatId.optional(),
+    name: z.string(),
+    width: Format.shape.width,
+    height: Format.shape.height,
+  }),
   check: (ctx, { id, width, height }) => idProblem(ctx, id) ?? formatSizeProblem(width, height),
   apply: ({ r, design }, { id = nanoid(), ...format }) => {
     r.formats.set(id, toYMap({ ...format, order: indexBetween(lastOrder(Object.values(design.formats)), null) }))
@@ -1017,13 +1194,23 @@ export const formatAdd = defineCommand({
     const round = (n: number) => Math.round(n * 100) / 100
     const from = design.overrides[`format:${primaryId}`] ?? {}
     for (const [nodeId, node] of Object.entries(design.nodes)) {
-      const props = { ...node.props, ...from[nodeId] } as Record<string, unknown> & { x: number; y: number; width: number; height: number }
+      const props = { ...node.props, ...from[nodeId] } as Record<string, unknown> & {
+        x: number
+        y: number
+        width: number
+        height: number
+      }
       const scaled: Record<string, unknown> = {
-        x: round(props.x * scale + dx), y: round(props.y * scale + dy), width: round(props.width * scale), height: round(props.height * scale),
+        x: round(props.x * scale + dx),
+        y: round(props.y * scale + dy),
+        width: round(props.width * scale),
+        height: round(props.height * scale),
       }
       // What the primary format turns or hides, this one does too.
-      for (const path of ['rotation', 'visible']) if (from[nodeId]?.[path] !== undefined) scaled[path] = from[nodeId][path]
-      for (const [path, value] of Object.entries(scaled)) r.overrides.set(overrideKey(`format:${id}`, nodeId, path), value)
+      for (const path of ['rotation', 'visible'])
+        if (from[nodeId]?.[path] !== undefined) scaled[path] = from[nodeId][path]
+      for (const [path, value] of Object.entries(scaled))
+        r.overrides.set(overrideKey(`format:${id}`, nodeId, path), value)
     }
     return id
   },
@@ -1033,14 +1220,19 @@ export const formatAdd = defineCommand({
 export const formatUpdate = defineCommand({
   name: 'format.update',
   input: z.object({
-    id: FormatId, name: z.string().optional(), width: Format.shape.width.optional(), height: Format.shape.height.optional(),
+    id: FormatId,
+    name: z.string().optional(),
+    width: Format.shape.width.optional(),
+    height: Format.shape.height.optional(),
     before: FormatId.nullable().optional(),
   }),
   check: ({ design }, { id, width, height, before }) => {
     const format = design.formats[id]
     if (!format) return `no format "${id}"`
     if (before && (before === id || !design.formats[before])) return `no other format "${before}" to go before`
-    return width === undefined && height === undefined ? undefined : formatSizeProblem(width ?? format.width, height ?? format.height)
+    return width === undefined && height === undefined
+      ? undefined
+      : formatSizeProblem(width ?? format.width, height ?? format.height)
   },
   apply: ({ r, design }, { id, before, ...change }) => {
     const yformat = r.formats.get(id)

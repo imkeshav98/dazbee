@@ -4,17 +4,23 @@
 // editor capsule's pink blob under the lit entry; Settings is in the account menu, as in the final
 // mock. Each page renders its own capsule, so the tab remembers the last lit entry (sessionStorage)
 // and the blob slides from there when the next page opens.
-import { ClockIcon, HouseIcon, PaletteIcon, SquaresFourIcon, type Icon } from '@phosphor-icons/react'
+import { ClockIcon, HouseIcon, type Icon, PaletteIcon, SquaresFourIcon } from '@phosphor-icons/react'
 import { animate, useReducedMotion } from 'motion/react'
 import Link from 'next/link'
-import { useCallback, useLayoutEffect, useRef, useState, type MouseEvent } from 'react'
+import { type MouseEvent, useCallback, useLayoutEffect, useRef, useState } from 'react'
+
 import { cn } from '../lib/cn.ts'
 
 export type CapsuleEntry = 'home' | 'recent' | 'templates' | 'kit'
 
 export type CapsuleLink = { entry: CapsuleEntry; href: string; label: string; badge?: number | undefined }
 
-const ICONS: Record<CapsuleEntry, Icon> = { home: HouseIcon, recent: ClockIcon, templates: SquaresFourIcon, kit: PaletteIcon }
+const ICONS: Record<CapsuleEntry, Icon> = {
+  home: HouseIcon,
+  recent: ClockIcon,
+  templates: SquaresFourIcon,
+  kit: PaletteIcon,
+}
 
 const LIT_KEY = 'dazbee.library-capsule'
 
@@ -40,7 +46,11 @@ const saveLit = (entry: CapsuleEntry) => {
   }
 }
 
-export function LibraryCapsule({ label, links, current }: {
+export function LibraryCapsule({
+  label,
+  links,
+  current,
+}: {
   /** The capsule's accessible name. */
   label: string
   links: CapsuleLink[]
@@ -56,19 +66,23 @@ export function LibraryCapsule({ label, links, current }: {
   const fill = useRef<HTMLSpanElement>(null)
   const last = useRef<string | null>(null)
 
-  const rectOf = (entry: string) => nav.current?.querySelector(`[data-entry="${entry}"]`)?.getBoundingClientRect() ?? null
+  const rectOf = (entry: string) =>
+    nav.current?.querySelector(`[data-entry="${entry}"]`)?.getBoundingClientRect() ?? null
 
-  const slideFrom = useCallback((from: DOMRect | null) => {
-    const element = blob.current
-    if (!from || !element || reduced) return
-    const to = element.getBoundingClientRect()
-    const x = from.left - to.left
-    const y = from.top - to.top
-    if (!x && !y) return
-    const [scaleX, scaleY] = Math.abs(x) > Math.abs(y) ? SQUISH.wide : SQUISH.tall
-    animate(element, { x: [x, 0], y: [y, 0] }, BLOB)
-    if (fill.current) animate(fill.current, { scaleX: [scaleX, 1], scaleY: [scaleY, 1] }, BLOB)
-  }, [reduced])
+  const slideFrom = useCallback(
+    (from: DOMRect | null) => {
+      const element = blob.current
+      if (!from || !element || reduced) return
+      const to = element.getBoundingClientRect()
+      const x = from.left - to.left
+      const y = from.top - to.top
+      if (!x && !y) return
+      const [scaleX, scaleY] = Math.abs(x) > Math.abs(y) ? SQUISH.wide : SQUISH.tall
+      animate(element, { x: [x, 0], y: [y, 0] }, BLOB)
+      if (fill.current) animate(fill.current, { scaleX: [scaleX, 1], scaleY: [scaleY, 1] }, BLOB)
+    },
+    [reduced],
+  )
 
   // The blob slides from the entry lit before: on this page, or on the last page of this tab.
   useLayoutEffect(() => {
@@ -115,12 +129,18 @@ export function LibraryCapsule({ label, links, current }: {
           >
             {on && (
               <span ref={blob} aria-hidden data-testid="capsule-blob" className="absolute inset-0">
-                <span ref={fill} className="absolute inset-0 rounded-full bg-accent-solid shadow-[0_6px_18px_-6px_rgb(194_16_108/0.7)]" />
+                <span
+                  ref={fill}
+                  className="absolute inset-0 rounded-full bg-accent-solid shadow-[0_6px_18px_-6px_rgb(194_16_108/0.7)]"
+                />
               </span>
             )}
             <LinkIcon size={22} weight={on ? 'fill' : 'regular'} aria-hidden className="relative" />
             {badge !== undefined && badge > 0 && !on && (
-              <span aria-hidden className="absolute -end-0.5 -top-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-accent-solid px-1 text-[10px] font-bold text-on-accent tabular-nums">
+              <span
+                aria-hidden
+                className="absolute -end-0.5 -top-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-accent-solid px-1 text-[10px] font-bold text-on-accent tabular-nums"
+              >
                 {badge > 99 ? '99+' : badge}
               </span>
             )}

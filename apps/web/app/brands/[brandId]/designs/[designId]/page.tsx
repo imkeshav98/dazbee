@@ -1,5 +1,6 @@
 import { cookies } from 'next/headers'
 import { notFound } from 'next/navigation'
+
 import { AccountMenu } from '../../../../../components/account-menu.tsx'
 import { findDesign, getWorkspace } from '../../../../../lib/api.ts'
 import { brandWords } from '../../../../../lib/i18n/index.ts'
@@ -9,13 +10,21 @@ import { EditorStage } from './stage.tsx'
 
 export const metadata = { title: 'Dazbee editor' }
 
-export default async function EditPage({ params, searchParams }: {
+export default async function EditPage({
+  params,
+  searchParams,
+}: {
   params: Promise<{ brandId: string; designId: string }>
   searchParams: Promise<{ format?: string }>
 }) {
   const { brandId, designId } = await params
   const { format } = await searchParams
-  const [found, workspace, t, jar] = await Promise.all([findDesign(brandId, designId), getWorkspace(), getMessages(), cookies()])
+  const [found, workspace, t, jar] = await Promise.all([
+    findDesign(brandId, designId),
+    getWorkspace(),
+    getMessages(),
+    cookies(),
+  ])
   if (!found) notFound()
   return (
     <EditorStage

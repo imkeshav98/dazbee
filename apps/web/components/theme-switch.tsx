@@ -1,12 +1,15 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+
 import { useMessages } from '../lib/i18n/client.tsx'
-import { THEMES, themeOf, type ThemePick } from '../lib/theme.ts'
+import { themeOf, type ThemePick, THEMES } from '../lib/theme.ts'
 import { segment, SEGMENTED } from './ui/segmented.tsx'
 
 declare global {
-  interface Window { __applyTheme?: () => void }
+  interface Window {
+    __applyTheme?: () => void
+  }
 }
 
 /** System, light or dark; only the tokens change. */
@@ -25,7 +28,14 @@ export function ThemeSwitch() {
   return (
     <div role="radiogroup" aria-label={t.label} className={SEGMENTED}>
       {THEMES.map((theme) => (
-        <button key={theme} type="button" role="radio" aria-checked={pick === theme} onClick={() => choose(theme)} className={segment(pick === theme)}>
+        <button
+          key={theme}
+          type="button"
+          role="radio"
+          aria-checked={pick === theme}
+          onClick={() => choose(theme)}
+          className={segment(pick === theme)}
+        >
           {t[theme]}
         </button>
       ))}

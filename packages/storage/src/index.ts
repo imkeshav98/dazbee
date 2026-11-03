@@ -46,7 +46,12 @@ export class StorageError extends Error {
 export type Storage = ReturnType<typeof openStorage>
 
 export function openStorage(settings: StorageSettings) {
-  const client = new AwsClient({ accessKeyId: settings.accessKeyId, secretAccessKey: settings.secretAccessKey, service: 's3', region: settings.region })
+  const client = new AwsClient({
+    accessKeyId: settings.accessKeyId,
+    secretAccessKey: settings.secretAccessKey,
+    service: 's3',
+    region: settings.region,
+  })
   const path = (key: string) => `${settings.bucket}/${key.split('/').map(encodeURIComponent).join('/')}`
   const objectUrl = (key: string) => `${settings.endpoint}/${path(key)}`
   const publicUrl = (key: string) => `${settings.publicEndpoint ?? settings.endpoint}/${path(key)}`
@@ -54,13 +59,21 @@ export function openStorage(settings: StorageSettings) {
   async function send(url: string, init: RequestInit = {}) {
     const response = await client.fetch(url, init)
     if (!response.ok && response.status !== 404) {
-      throw new StorageError(response.status, `storage answered ${response.status} to ${init.method ?? 'GET'}: ${(await response.text()).slice(0, 200)}`)
+      throw new StorageError(
+        response.status,
+        `storage answered ${response.status} to ${init.method ?? 'GET'}: ${(await response.text()).slice(0, 200)}`,
+      )
     }
     return response
   }
 
   /** A URL that lets its holder do one method on one key until it expires; nothing else. */
-  async function sign(method: 'GET' | 'PUT', key: string, expiresInSeconds: number, headers: Record<string, string> = {}) {
+  async function sign(
+    method: 'GET' | 'PUT',
+    key: string,
+    expiresInSeconds: number,
+    headers: Record<string, string> = {},
+  ) {
     const url = new URL(publicUrl(key))
     url.searchParams.set('X-Amz-Expires', String(expiresInSeconds))
     // allHeaders: sign content-type and content-length too, which aws4fetch leaves out by default.

@@ -1,7 +1,8 @@
 // WorkOS sends the person back here after sign-in (#58): check the state is the one this browser
 // started with, swap the code for a session at the API, and keep its token in an httpOnly cookie.
 import { cookies } from 'next/headers'
-import { NextResponse, type NextRequest } from 'next/server'
+import { type NextRequest, NextResponse } from 'next/server'
+
 import { completeSignIn } from '../../lib/api.ts'
 import { cookieOptions, SESSION_COOKIE, STATE_COOKIE } from '../../lib/sign-in.ts'
 
@@ -19,6 +20,9 @@ export async function GET(request: NextRequest) {
   } catch {
     return failed()
   }
-  jar.set(SESSION_COOKIE, session.token, { ...cookieOptions(request.nextUrl.origin), expires: new Date(session.expiresAt) })
+  jar.set(SESSION_COOKIE, session.token, {
+    ...cookieOptions(request.nextUrl.origin),
+    expires: new Date(session.expiresAt),
+  })
   return NextResponse.redirect(new URL('/', request.url), 303)
 }

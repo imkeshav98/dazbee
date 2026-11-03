@@ -1,4 +1,5 @@
 import { z } from 'zod'
+
 import { AssetId, Color, Point } from './primitives.ts'
 
 const GradientStop = z.object({ offset: z.number().min(0).max(1), color: Color })
@@ -78,4 +79,6 @@ export type Paint = z.infer<typeof Paint>
  * fill that shows. -1 when there is none.
  */
 export const boundFillIndex = (fills: readonly unknown[]) =>
-  fills.findLastIndex((f) => (f as { type?: unknown } | null)?.type === 'solid' && (f as { visible?: unknown }).visible !== false)
+  fills.findLastIndex(
+    (f) => (f as { type?: unknown } | null)?.type === 'solid' && (f as { visible?: unknown }).visible !== false,
+  )

@@ -3,11 +3,14 @@
 // Runs against Postgres from Docker Compose, like the API's seam tests.
 import { randomUUID } from 'node:crypto'
 import type { AddressInfo } from 'node:net'
+
 import { HocuspocusProvider } from '@hocuspocus/provider'
-import { brands, designs, designStates, migrateDatabase, openDatabase, workspaces, readDesignState } from '@dazbee/db'
-import { signSyncToken } from '@dazbee/sync-token'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import * as Y from 'yjs'
+
+import { brands, designs, designStates, migrateDatabase, openDatabase, readDesignState, workspaces } from '@dazbee/db'
+import { signSyncToken } from '@dazbee/sync-token'
+
 import { createSyncServer } from './server.ts'
 
 const DATABASE_URL = process.env.DATABASE_URL ?? 'postgres://razzlr:razzlr-local@127.0.0.1:55432/razzlr'
@@ -26,7 +29,15 @@ beforeAll(async () => {
   await migrateDatabase(db)
   await db.insert(workspaces).values({ id: who.workspaceId, name: 'Workspace' })
   await db.insert(brands).values({ id: `brand-${run}`, workspaceId: who.workspaceId, name: 'Brand' })
-  await db.insert(designs).values([design, other, tidy].map((id) => ({ id, workspaceId: who.workspaceId, brandId: `brand-${run}`, name: id, kind: 'single' as const })))
+  await db.insert(designs).values(
+    [design, other, tidy].map((id) => ({
+      id,
+      workspaceId: who.workspaceId,
+      brandId: `brand-${run}`,
+      name: id,
+      kind: 'single' as const,
+    })),
+  )
   const doc = new Y.Doc()
   doc.getMap('meta').set('name', 'stored')
   await db.insert(designStates).values([
@@ -44,7 +55,10 @@ afterAll(async () => {
 /** A design's layers as the doc keeps them: one live, one deleted, each with an override. */
 function withDeletedLayer() {
   const doc = new Y.Doc()
-  const layer = (deleted: boolean) => new Y.Map<unknown>(Object.entries({ type: 'graphic', parentId: 'p1', index: 'a0', name: 'Box', ...(deleted && { deleted }) }))
+  const layer = (deleted: boolean) =>
+    new Y.Map<unknown>(
+      Object.entries({ type: 'graphic', parentId: 'p1', index: 'a0', name: 'Box', ...(deleted && { deleted }) }),
+    )
   doc.transact(() => {
     doc.getMap('nodes').set('live', layer(false))
     doc.getMap('nodes').set('gone', layer(true))
@@ -59,7 +73,10 @@ function connect(name: string, token: string | null) {
   const document = new Y.Doc()
   return new Promise<{ outcome: 'synced' | 'refused'; document: Y.Doc }>((resolve) => {
     const provider = new HocuspocusProvider({
-      url, name, document, token,
+      url,
+      name,
+      document,
+      token,
       onSynced: () => finish('synced'),
       onAuthenticationFailed: () => finish('refused'),
     })
@@ -105,7 +122,13 @@ describe('compaction', () => {
   function open() {
     const document = new Y.Doc()
     return new Promise<{ document: Y.Doc; leave: () => void }>((resolve) => {
-      const provider = new HocuspocusProvider({ url, name: tidy, document, token: token(), onSynced: () => resolve({ document, leave: () => provider.destroy() }) })
+      const provider = new HocuspocusProvider({
+        url,
+        name: tidy,
+        document,
+        token: token(),
+        onSynced: () => resolve({ document, leave: () => provider.destroy() }),
+      })
     })
   }
   const keys = (doc: Y.Doc, name: string) => [...doc.getMap(name).keys()].sort()
@@ -138,7 +161,12 @@ describe('compaction', () => {
     // Coming back, a tab sees the same live layer.
     const again = await open()
     expect(keys(again.document, 'nodes')).toEqual(['live'])
-    expect(again.document.getMap<Y.Map<unknown>>('nodes').get('live')?.toJSON()).toEqual({ type: 'graphic', parentId: 'p1', index: 'a0', name: 'Box' })
+    expect(again.document.getMap<Y.Map<unknown>>('nodes').get('live')?.toJSON()).toEqual({
+      type: 'graphic',
+      parentId: 'p1',
+      index: 'a0',
+      name: 'Box',
+    })
     again.leave()
   })
 })

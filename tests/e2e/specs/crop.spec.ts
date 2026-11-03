@@ -2,15 +2,17 @@
 // moves the image inside its shape and a corner drag scales it, each one undo step, and the
 // cropped export matches Node's pixel for pixel; and two layers made a mask in one key press.
 import { createHash } from 'node:crypto'
-import { expect, test, type Page } from '../support/test.ts'
+
 import { FALLBACK_FAMILIES } from '@dazbee/fonts'
 import { loadFontFiles } from '@dazbee/fonts/node'
 import { renderDesign } from '@dazbee/renderer'
 import { loadCanvasKit } from '@dazbee/renderer/node'
 import type { DesignInput } from '@dazbee/schema'
+
 import { photo, upload } from '../support/assets.ts'
 import { designOf, exportHashOf, screenPoint, writeOutput } from '../support/editor.ts'
 import { click, drag, dragScreen, openStage, press, read, selection } from '../support/stage.ts'
+import { expect, type Page, test } from '../support/test.ts'
 
 test.describe.configure({ timeout: 120_000 })
 
@@ -21,17 +23,47 @@ const design = (assetId: string): DesignInput => ({
   nodes: {
     // A 1920 × 1200 photo filling a 600 square: shown at half size, 360 cut off each side.
     photo: {
-      type: 'graphic', parentId: 'p1', index: 'a0', name: 'Photo',
-      props: { x: 140, y: 140, width: 600, height: 600, shape: { kind: 'rect', cornerRadius: 40 }, fills: [{ type: 'image', assetId, fit: 'fill' }] },
+      type: 'graphic',
+      parentId: 'p1',
+      index: 'a0',
+      name: 'Photo',
+      props: {
+        x: 140,
+        y: 140,
+        width: 600,
+        height: 600,
+        shape: { kind: 'rect', cornerRadius: 40 },
+        fills: [{ type: 'image', assetId, fit: 'fill' }],
+      },
     },
     // A disc under a poster, for the mask.
     disc: {
-      type: 'graphic', parentId: 'p1', index: 'a1', name: 'Disc',
-      props: { x: 800, y: 800, width: 200, height: 200, shape: { kind: 'ellipse' }, fills: [{ type: 'solid', color: '#15121AFF' }] },
+      type: 'graphic',
+      parentId: 'p1',
+      index: 'a1',
+      name: 'Disc',
+      props: {
+        x: 800,
+        y: 800,
+        width: 200,
+        height: 200,
+        shape: { kind: 'ellipse' },
+        fills: [{ type: 'solid', color: '#15121AFF' }],
+      },
     },
     poster: {
-      type: 'graphic', parentId: 'p1', index: 'a2', name: 'Poster',
-      props: { x: 780, y: 780, width: 280, height: 280, shape: { kind: 'rect' }, fills: [{ type: 'image', assetId, fit: 'fill', filter: 'vivid' }] },
+      type: 'graphic',
+      parentId: 'p1',
+      index: 'a2',
+      name: 'Poster',
+      props: {
+        x: 780,
+        y: 780,
+        width: 280,
+        height: 280,
+        shape: { kind: 'rect' },
+        fills: [{ type: 'image', assetId, fit: 'fill', filter: 'vivid' }],
+      },
     },
   },
   overrides: {},
@@ -48,7 +80,9 @@ const cornerHandle = async (page: Page, i: number) => {
 }
 const undo = async (page: Page) => press(page, 'undo')
 
-test('Enter crops a photo: a drag moves it, a corner scales it, each one undo step, and the export matches Node; a double click crops too, and a click outside ends it', async ({ browser }) => {
+test('Enter crops a photo: a drag moves it, a corner scales it, each one undo step, and the export matches Node; a double click crops too, and a click outside ends it', async ({
+  browser,
+}) => {
   const asset = await upload(photo)
   const { page, errors } = await openStage(browser, design(asset.id))
   const before = await exportHashOf(page)
@@ -87,7 +121,9 @@ test('Enter crops a photo: a drag moves it, a corner scales it, each one undo st
   const ck = await loadCanvasKit()
   const stored = new Uint8Array(await (await page.request.get(`/brands/dev-brand-coffee/assets/${asset.id}`)).body())
   const node = renderDesign(ck, JSON.parse(await designOf(page)), 'p1', 'sq', {
-    fonts: loadFontFiles().map((f) => ({ family: f.family, bytes: f.bytes })), fallbackFamilies: [...FALLBACK_FAMILIES], images: { [asset.id]: stored },
+    fonts: loadFontFiles().map((f) => ({ family: f.family, bytes: f.bytes })),
+    fallbackFamilies: [...FALLBACK_FAMILIES],
+    images: { [asset.id]: stored },
   })
   expect(await exportHashOf(page)).toBe(createHash('sha256').update(node.pixels).digest('hex'))
 

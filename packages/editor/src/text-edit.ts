@@ -8,13 +8,19 @@ type Style = TextNode['props']['style']
 export type RunStyle = Partial<Style>
 
 /** A range of the text; `start` is never after `end`. */
-export interface TextRange { start: number; end: number }
+export interface TextRange {
+  start: number
+  end: number
+}
 
 const graphemes = new Intl.Segmenter(undefined, { granularity: 'grapheme' })
 const words = new Intl.Segmenter(undefined, { granularity: 'word' })
 
 /** Every offset a caret can stand at: the edges of Unicode's graphemes. */
-export const graphemeEdges = (text: string) => [0, ...[...graphemes.segment(text)].map((g) => g.index + g.segment.length)]
+export const graphemeEdges = (text: string) => [
+  0,
+  ...[...graphemes.segment(text)].map((g) => g.index + g.segment.length),
+]
 
 /** The offset one grapheme on, or back. */
 export function step(text: string, offset: number, forward: boolean): number {
@@ -28,10 +34,11 @@ export function step(text: string, offset: number, forward: boolean): number {
  */
 export function wordAt(text: string, offset: number): TextRange {
   const segments = [...words.segment(text)]
-  const inside = segments.find((s) => offset >= s.index && offset < s.index + s.segment.length && s.isWordLike)
-    ?? segments.find((s) => offset === s.index + s.segment.length && s.isWordLike)
-    ?? segments.find((s) => offset >= s.index && offset < s.index + s.segment.length)
-    ?? segments.at(-1)
+  const inside =
+    segments.find((s) => offset >= s.index && offset < s.index + s.segment.length && s.isWordLike) ??
+    segments.find((s) => offset === s.index + s.segment.length && s.isWordLike) ??
+    segments.find((s) => offset >= s.index && offset < s.index + s.segment.length) ??
+    segments.at(-1)
   return inside ? { start: inside.index, end: inside.index + inside.segment.length } : { start: offset, end: offset }
 }
 

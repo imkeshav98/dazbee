@@ -1,7 +1,8 @@
-import { parseDesign } from '@dazbee/schema'
 import type { CanvasKit, Surface } from '@dazbee/canvaskit'
+import { parseDesign } from '@dazbee/schema'
+
 import { drawScene, type Resources } from './draw.ts'
-import { resourceCache, type ResourceBytes, type ResourceCache } from './resources.ts'
+import { type ResourceBytes, type ResourceCache, resourceCache } from './resources.ts'
 import { render, type Scene } from './scene.ts'
 import { textMeasure } from './text.ts'
 import { drawVectorPage, type VectorTarget } from './vector.ts'
@@ -20,7 +21,12 @@ export interface Rendered {
  * images are decoded once. Auto layout measures text with the same fonts the draw uses (#46).
  */
 function withScene<T>(
-  ck: CanvasKit, json: unknown, pageId: string, formatId: string, bytes: ResourceBytes, cache: ResourceCache | undefined,
+  ck: CanvasKit,
+  json: unknown,
+  pageId: string,
+  formatId: string,
+  bytes: ResourceBytes,
+  cache: ResourceCache | undefined,
   draw: (scene: Scene, resources: Resources) => T,
 ): T {
   const parsed = parseDesign(json)
@@ -35,7 +41,15 @@ function withScene<T>(
   }
 }
 
-function drawOn(ck: CanvasKit, surface: Surface, json: unknown, pageId: string, formatId: string, bytes: ResourceBytes, cache?: ResourceCache): Scene {
+function drawOn(
+  ck: CanvasKit,
+  surface: Surface,
+  json: unknown,
+  pageId: string,
+  formatId: string,
+  bytes: ResourceBytes,
+  cache?: ResourceCache,
+): Scene {
   return withScene(ck, json, pageId, formatId, bytes, cache, (scene, resources) => {
     drawScene(ck, surface.getCanvas(), scene, resources)
     surface.flush()
@@ -48,7 +62,13 @@ function drawOn(ck: CanvasKit, surface: Surface, json: unknown, pageId: string, 
  * surface. Returns the page size.
  */
 export function drawDesign(
-  ck: CanvasKit, surface: Surface, json: unknown, pageId: string, formatId: string, bytes: ResourceBytes, cache?: ResourceCache,
+  ck: CanvasKit,
+  surface: Surface,
+  json: unknown,
+  pageId: string,
+  formatId: string,
+  bytes: ResourceBytes,
+  cache?: ResourceCache,
 ): { width: number; height: number } {
   const scene = drawOn(ck, surface, json, pageId, formatId, bytes, cache)
   return { width: scene.width, height: scene.height }
@@ -59,7 +79,11 @@ function readSurface(ck: CanvasKit, surface: Surface, width: number, height: num
   const image = surface.makeImageSnapshot()
   try {
     const pixels = image.readPixels(0, 0, {
-      width, height, colorType: ck.ColorType.RGBA_8888, alphaType: ck.AlphaType.Unpremul, colorSpace: ck.ColorSpace.SRGB,
+      width,
+      height,
+      colorType: ck.ColorType.RGBA_8888,
+      alphaType: ck.AlphaType.Unpremul,
+      colorSpace: ck.ColorSpace.SRGB,
     })
     const png = image.encodeToBytes()
     if (!(pixels instanceof Uint8Array) || !png) throw new Error('CanvasKit could not read back the rendered pixels')
@@ -74,7 +98,12 @@ function readSurface(ck: CanvasKit, surface: Surface, width: number, height: num
  * (ADR-0005), in Node and in the browser alike.
  */
 export function renderDesign(
-  ck: CanvasKit, json: unknown, pageId: string, formatId: string, bytes: ResourceBytes, cache?: ResourceCache,
+  ck: CanvasKit,
+  json: unknown,
+  pageId: string,
+  formatId: string,
+  bytes: ResourceBytes,
+  cache?: ResourceCache,
 ): Rendered {
   const parsed = parseDesign(json)
   const format = parsed.success ? parsed.design.formats[formatId] : undefined
@@ -107,15 +136,26 @@ export interface VectorOptions {
  * because an SVG names fonts the app that opens it may not have and shapes Hindi and Arabic itself.
  */
 export function renderVector(
-  ck: CanvasKit, json: unknown, pageId: string, formatId: string, bytes: ResourceBytes, target: VectorTarget,
-  cache?: ResourceCache, options: VectorOptions = {},
+  ck: CanvasKit,
+  json: unknown,
+  pageId: string,
+  formatId: string,
+  bytes: ResourceBytes,
+  target: VectorTarget,
+  cache?: ResourceCache,
+  options: VectorOptions = {},
 ): Uint8Array {
   return withScene(ck, json, pageId, formatId, bytes, cache, (scene, resources) => {
     if (target === 'pdf') {
       const pdf = new ck.PDFDocument({
-        title: options.title ?? '', author: '', creator: '', producer: '', lang: options.lang ?? '',
+        title: options.title ?? '',
+        author: '',
+        creator: '',
+        producer: '',
+        lang: options.lang ?? '',
         // One raster pixel to a unit: blurs and shadows come at the export's own resolution.
-        rasterDPI: 72, encodingQuality: 101,
+        rasterDPI: 72,
+        encodingQuality: 101,
       })
       try {
         const canvas = pdf.beginPage(scene.width, scene.height)

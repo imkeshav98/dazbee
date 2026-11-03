@@ -4,10 +4,21 @@
 // so a page binds it, and the page draws again with the change.
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
-import { deleteDesign, deleteTemplate, duplicateDesign, renameDesign, renameTemplate, startFromTemplate } from '../../../lib/api.ts'
+
+import {
+  deleteDesign,
+  deleteTemplate,
+  duplicateDesign,
+  renameDesign,
+  renameTemplate,
+  startFromTemplate,
+} from '../../../lib/api.ts'
 
 /** The name a rename form sends, trimmed to what the API takes. */
-const nameOf = (form: FormData) => String(form.get('name') ?? '').trim().slice(0, 120)
+const nameOf = (form: FormData) =>
+  String(form.get('name') ?? '')
+    .trim()
+    .slice(0, 120)
 
 const changed = (brandId: string) => revalidatePath(`/brands/${brandId}`, 'layout')
 

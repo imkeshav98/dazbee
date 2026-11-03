@@ -6,9 +6,14 @@ type TextProps = Extract<SceneLayer, { type: 'text' }>['props']
 type Style = TextProps['style']
 type Run = TextProps['runs'][number]
 /** The sizes a style may hold. */
-type Sized = { fontSize?: number | undefined; letterSpacing?: number | undefined; outline?: Style['outline'] | undefined }
+type Sized = {
+  fontSize?: number | undefined
+  letterSpacing?: number | undefined
+  outline?: Style['outline'] | undefined
+}
 /** What scaling a text changes; line height is a multiple of the size, so it stays. */
-export type ScaledText = Pick<TextProps, 'style' | 'runs'> & Partial<Pick<TextProps, 'paragraphSpacing' | 'shrinkToFit'>>
+export type ScaledText = Pick<TextProps, 'style' | 'runs'> &
+  Partial<Pick<TextProps, 'paragraphSpacing' | 'shrinkToFit'>>
 
 /** Every size in a style scaled: its font size, letter spacing and outline width. */
 export function scaled<T extends Sized>(style: T, scale: number, round: (n: number) => number = (n) => n): T {
@@ -32,11 +37,16 @@ export function scaleText(props: ScaledText, factor: number): ScaledText {
     runs: props.runs.map((run): Run => ({ ...run, style: scaled(run.style, factor, tenth) })),
   }
   if (props.paragraphSpacing !== undefined) out.paragraphSpacing = tenth(props.paragraphSpacing * factor)
-  if (props.shrinkToFit) out.shrinkToFit = { min: tenth(props.shrinkToFit.min * factor), max: tenth(props.shrinkToFit.max * factor) }
+  if (props.shrinkToFit)
+    out.shrinkToFit = { min: tenth(props.shrinkToFit.min * factor), max: tenth(props.shrinkToFit.max * factor) }
   return out
 }
 
 /** The smallest font size the text has anywhere: its own, a run's, or shrink to fit's smallest. */
 export function smallestSize(props: ScaledText): number {
-  return Math.min(props.style.fontSize, ...props.runs.flatMap((run) => (run.style.fontSize === undefined ? [] : [run.style.fontSize])), props.shrinkToFit?.min ?? Infinity)
+  return Math.min(
+    props.style.fontSize,
+    ...props.runs.flatMap((run) => (run.style.fontSize === undefined ? [] : [run.style.fontSize])),
+    props.shrinkToFit?.min ?? Infinity,
+  )
 }

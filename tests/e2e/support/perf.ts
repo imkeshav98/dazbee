@@ -3,6 +3,7 @@
 // runner drawing WebGL on the CPU times the machine as much as the editor. Each measurement goes
 // to output/perf-*.json and, on CI, into the job's summary as a table.
 import { appendFileSync } from 'node:fs'
+
 import { writeOutput } from './editor.ts'
 import { test } from './test.ts'
 
@@ -19,7 +20,13 @@ export function spread(ms: number[]) {
 
 /** Reports one measurement: a row per step, each with its numbers. */
 export function report(name: string, rows: Record<string, Record<string, number>>) {
-  writeOutput(`perf-${name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}.json`, JSON.stringify(rows, null, 2))
+  writeOutput(
+    `perf-${name
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '')}.json`,
+    JSON.stringify(rows, null, 2),
+  )
   console.log(name, JSON.stringify(rows))
   test.info().annotations.push({ type: name, description: JSON.stringify(rows) })
   const summary = process.env.GITHUB_STEP_SUMMARY
@@ -30,7 +37,9 @@ export function report(name: string, rows: Record<string, Record<string, number>
     '',
     `| | ${columns.join(' | ')} |`,
     `| --- | ${columns.map(() => '---:').join(' | ')} |`,
-    ...Object.entries(rows).map(([step, row]) => `| ${step} | ${columns.map((column) => row[column] ?? '').join(' | ')} |`),
+    ...Object.entries(rows).map(
+      ([step, row]) => `| ${step} | ${columns.map((column) => row[column] ?? '').join(' | ')} |`,
+    ),
     '',
     '',
   ]

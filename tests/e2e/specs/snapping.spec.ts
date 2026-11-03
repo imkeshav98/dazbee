@@ -4,16 +4,23 @@
 // and a drag among 300 layers works out what it can snap to once, then measures each pointer move
 // against every layer once.
 import type { DesignInput } from '@dazbee/schema'
-import { expect, test, type Page } from '../support/test.ts'
+
 import { screenPoint, writeOutput } from '../support/editor.ts'
 import { PERF, report, spread } from '../support/perf.ts'
 import { liveDesign } from '../support/seed.ts'
 import { barMenu, click, openStage, press, props, selection, zoomMenu } from '../support/stage.ts'
+import { expect, type Page, test } from '../support/test.ts'
 
 test.describe.configure({ timeout: 120_000 })
 
-const rect = (x: number, y: number, width: number, height: number, color: string) =>
-  ({ x, y, width, height, shape: { kind: 'rect' as const, cornerRadius: 12 }, fills: [{ type: 'solid' as const, color }] })
+const rect = (x: number, y: number, width: number, height: number, color: string) => ({
+  x,
+  y,
+  width,
+  height,
+  shape: { kind: 'rect' as const, cornerRadius: 12 },
+  fills: [{ type: 'solid' as const, color }],
+})
 
 /** The live design plus a tag between the box and the dot. */
 const design = (): DesignInput => {
@@ -21,7 +28,10 @@ const design = (): DesignInput => {
   return {
     ...base,
     meta: { ...base.meta, name: 'Snapping' },
-    nodes: { ...base.nodes, tag: { type: 'graphic', parentId: 'p1', index: 'a4', name: 'Tag', props: rect(470, 150, 120, 60, '#00A889FF') } },
+    nodes: {
+      ...base.nodes,
+      tag: { type: 'graphic', parentId: 'p1', index: 'a4', name: 'Tag', props: rect(470, 150, 120, 60, '#00A889FF') },
+    },
   }
 }
 
@@ -40,7 +50,8 @@ async function release(page: Page, keys: string[] = []) {
   for (const key of keys) await page.keyboard.up(key)
   await page.evaluate(() => window.dazbee?.drawn())
 }
-const guides = (page: Page) => page.locator('.stage-overlay .guide').evaluateAll((els) => els.map((el) => (el as HTMLElement).dataset.axis))
+const guides = (page: Page) =>
+  page.locator('.stage-overlay .guide').evaluateAll((els) => els.map((el) => (el as HTMLElement).dataset.axis))
 
 test('a drag snaps to another layer with a guide, and not with Ctrl held or Snap off', async ({ browser }) => {
   const { page, errors } = await openStage(browser, design())
@@ -83,7 +94,7 @@ test('a drag snaps to another layer with a guide, and not with Ctrl held or Snap
   expect(errors).toEqual([])
 })
 
-test('the bar\'s Line up aligns and distributes three layers, one undo step each', async ({ browser }) => {
+test("the bar's Line up aligns and distributes three layers, one undo step each", async ({ browser }) => {
   const { page, errors } = await openStage(browser, design())
   const arrange = page.getByTestId('bar-line-up-menu')
 
@@ -96,11 +107,15 @@ test('the bar\'s Line up aligns and distributes three layers, one undo step each
 
   await arrange.locator('[data-action="alignTop"]').click()
   await page.evaluate(() => window.dazbee?.drawn())
-  expect([(await props(page, 'box')).y, (await props(page, 'tag')).y, (await props(page, 'dot')).y]).toEqual([80, 80, 80])
+  expect([(await props(page, 'box')).y, (await props(page, 'tag')).y, (await props(page, 'dot')).y]).toEqual([
+    80, 80, 80,
+  ])
   // Box 80–380, tag 120 wide, dot 700–940: 860 across, 660 of it layers, so 100 between each.
   await arrange.locator('[data-action="distributeHorizontal"]').click()
   await page.evaluate(() => window.dazbee?.drawn())
-  expect([(await props(page, 'box')).x, (await props(page, 'tag')).x, (await props(page, 'dot')).x]).toEqual([80, 480, 700])
+  expect([(await props(page, 'box')).x, (await props(page, 'tag')).x, (await props(page, 'dot')).x]).toEqual([
+    80, 480, 700,
+  ])
   writeOutput('snapping-2-aligned-distributed.png', await page.screenshot())
 
   await press(page, 'undo')
@@ -116,7 +131,9 @@ test('the bar\'s Line up aligns and distributes three layers, one undo step each
   expect(errors).toEqual([])
 })
 
-test('rulers are off until asked for, count design pixels from the frame, mark the selection, and hide with Shift+R', async ({ browser }) => {
+test('rulers are off until asked for, count design pixels from the frame, mark the selection, and hide with Shift+R', async ({
+  browser,
+}) => {
   const { page, errors } = await openStage(browser, design())
   const top = page.locator('.stage-overlay .ruler[data-axis="x"]')
   // Off as the editor opens, as in the final mock; Rulers in the zoom menu turns them on.
@@ -132,7 +149,10 @@ test('rulers are off until asked for, count design pixels from the frame, mark t
   expect(ticks).toEqual(expect.arrayContaining(['0', '100', '500', '1000']))
   await click(page, 820, 240)
   expect(await top.locator('.ruler-end').allTextContents()).toEqual(['700', '940'])
-  expect(await page.locator('.stage-overlay .ruler[data-axis="y"] .ruler-end').allTextContents()).toEqual(['120', '360'])
+  expect(await page.locator('.stage-overlay .ruler[data-axis="y"] .ruler-end').allTextContents()).toEqual([
+    '120',
+    '360',
+  ])
   writeOutput('snapping-3-rulers.png', await page.screenshot())
   await press(page, 'toggleRulers')
   await expect(top).toHaveCount(0)
@@ -148,7 +168,13 @@ const threeHundred = (): DesignInput => {
   for (let i = 0; i < 300; i++) {
     const x = 20 + (i % 20) * 52
     const y = 420 + Math.floor(i / 20) * 42
-    nodes[`r${i}`] = { type: 'graphic', parentId: 'p1', index: `b${String(i).padStart(3, '0')}`, name: `R${i}`, props: rect(x, y, 40, 30, '#9AA4B2FF') }
+    nodes[`r${i}`] = {
+      type: 'graphic',
+      parentId: 'p1',
+      index: `b${String(i).padStart(3, '0')}`,
+      name: `R${i}`,
+      props: rect(x, y, 40, 30, '#9AA4B2FF'),
+    }
   }
   return { ...base, meta: { ...base.meta, name: '300 layers' }, nodes }
 }
@@ -165,14 +191,22 @@ async function dragDot(page: Page) {
   await page.mouse.up()
 }
 
-test('dragging among 300 layers works out what to snap to once, and each move measures against every layer once', async ({ browser }) => {
+test('dragging among 300 layers works out what to snap to once, and each move measures against every layer once', async ({
+  browser,
+}) => {
   const content = threeHundred()
   const { page, errors } = await openStage(browser, content)
   await click(page, 820, 240)
   // The pointer moves the stage gets with the button down.
   await page.evaluate(() => {
     const moves = { pressed: 0 }
-    window.addEventListener('pointermove', (e) => { if (e.buttons & 1) moves.pressed++ }, { capture: true })
+    window.addEventListener(
+      'pointermove',
+      (e) => {
+        if (e.buttons & 1) moves.pressed++
+      },
+      { capture: true },
+    )
     ;(window as unknown as { moves: typeof moves }).moves = moves
   })
   const before = await page.evaluate(() => window.dazbee?.snapWork())
@@ -184,8 +218,11 @@ test('dragging among 300 layers works out what to snap to once, and each move me
   // Gathered once at the press, each pointer move snapping once against what was gathered: every
   // layer on the page but the dot, and the format.
   const boxes = Object.keys(content.nodes).filter((id) => id !== 'dot').length + 1
-  expect({ gathered: after.gathered - before.gathered, moves: after.moves - before.moves, targets: after.targets })
-    .toEqual({ gathered: 1, moves, targets: boxes })
+  expect({
+    gathered: after.gathered - before.gathered,
+    moves: after.moves - before.moves,
+    targets: after.targets,
+  }).toEqual({ gathered: 1, moves, targets: boxes })
   expect(errors).toEqual([])
 })
 
@@ -196,8 +233,16 @@ test('dragging among 300 layers: what a pointer move takes', PERF, async ({ brow
   await page.evaluate(() => {
     const times = { handle: [] as number[], draw: [] as number[] }
     let started = 0
-    window.addEventListener('pointermove', () => { started = performance.now() }, { capture: true })
-    window.addEventListener('pointermove', () => { times.handle.push(performance.now() - started) })
+    window.addEventListener(
+      'pointermove',
+      () => {
+        started = performance.now()
+      },
+      { capture: true },
+    )
+    window.addEventListener('pointermove', () => {
+      times.handle.push(performance.now() - started)
+    })
     window.dazbee?.onDraw((_design, _at, info) => times.draw.push(info.ms))
     ;(window as unknown as { times: typeof times }).times = times
   })

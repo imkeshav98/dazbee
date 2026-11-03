@@ -3,15 +3,35 @@
 // Inside a turned group a drag and the arrow keys move a layer along the page as it is drawn.
 import { boundsOf, centreOf, turn } from '@dazbee/doc'
 import type { DesignInput } from '@dazbee/schema'
-import { expect, test, type Page } from '../support/test.ts'
+
 import { screenPoint, writeOutput } from '../support/editor.ts'
 import { liveDesign } from '../support/seed.ts'
-import { click, drag, dragScreen, handle, openStage, order, press, read, selection, zoomOf, type Design } from '../support/stage.ts'
+import {
+  click,
+  type Design,
+  drag,
+  dragScreen,
+  handle,
+  openStage,
+  order,
+  press,
+  read,
+  selection,
+  zoomOf,
+} from '../support/stage.ts'
+import { expect, type Page, test } from '../support/test.ts'
 
 test.describe.configure({ timeout: 120_000 })
 
-const rect = (x: number, y: number, width: number, height: number, color: string, rotation = 0) =>
-  ({ x, y, width, height, rotation, shape: { kind: 'rect' as const, cornerRadius: 12 }, fills: [{ type: 'solid' as const, color }] })
+const rect = (x: number, y: number, width: number, height: number, color: string, rotation = 0) => ({
+  x,
+  y,
+  width,
+  height,
+  rotation,
+  shape: { kind: 'rect' as const, cornerRadius: 12 },
+  fills: [{ type: 'solid' as const, color }],
+})
 
 /** The live design plus a tag, and a group turned 30° holding two layers. */
 const design = (): DesignInput => {
@@ -22,9 +42,27 @@ const design = (): DesignInput => {
     nodes: {
       ...base.nodes,
       tag: { type: 'graphic', parentId: 'p1', index: 'a4', name: 'Tag', props: rect(420, 300, 160, 80, '#00A889FF') },
-      turned: { type: 'group', parentId: 'p1', index: 'a5', name: 'Turned', props: { x: 560, y: 800, width: 400, height: 160, rotation: 30 } },
-      t1: { type: 'graphic', parentId: 'turned', index: 'a0', name: 'T1', props: rect(560, 800, 160, 160, '#8E44FFFF') },
-      t2: { type: 'graphic', parentId: 'turned', index: 'a1', name: 'T2', props: rect(800, 800, 160, 160, '#FFB020FF') },
+      turned: {
+        type: 'group',
+        parentId: 'p1',
+        index: 'a5',
+        name: 'Turned',
+        props: { x: 560, y: 800, width: 400, height: 160, rotation: 30 },
+      },
+      t1: {
+        type: 'graphic',
+        parentId: 'turned',
+        index: 'a0',
+        name: 'T1',
+        props: rect(560, 800, 160, 160, '#8E44FFFF'),
+      },
+      t2: {
+        type: 'graphic',
+        parentId: 'turned',
+        index: 'a1',
+        name: 'T2',
+        props: rect(800, 800, 160, 160, '#FFB020FF'),
+      },
     },
   }
 }
@@ -34,12 +72,16 @@ const box = (d: Design, id: string): Placed => {
   const p = { ...d.nodes[id]?.props, ...d.overrides['format:sq']?.[id] } as Partial<Placed>
   return { x: p.x ?? 0, y: p.y ?? 0, width: p.width ?? 0, height: p.height ?? 0, rotation: p.rotation ?? 0 }
 }
-const kids = (d: Design, id: string) => Object.entries(d.nodes).filter(([, n]) => n.parentId === id)
-  .sort(([, a], [, b]) => (a.index < b.index ? -1 : 1)).map(([child]) => child)
+const kids = (d: Design, id: string) =>
+  Object.entries(d.nodes)
+    .filter(([, n]) => n.parentId === id)
+    .sort(([, a], [, b]) => (a.index < b.index ? -1 : 1))
+    .map(([child]) => child)
 /** A layer's centre on the page as drawn, after the groups around it turn it. */
 function drawnCentre(d: Design, id: string) {
   let c = centreOf(box(d, id))
-  for (let up = d.nodes[id]?.parentId; up && d.nodes[up]; up = d.nodes[up]?.parentId) c = turn(c, centreOf(box(d, up)), box(d, up).rotation)
+  for (let up = d.nodes[id]?.parentId; up && d.nodes[up]; up = d.nodes[up]?.parentId)
+    c = turn(c, centreOf(box(d, up)), box(d, up).rotation)
   return c
 }
 /** A group's box is the box around what it holds, as drawn inside it. */
@@ -54,7 +96,9 @@ const dblclick = async (page: Page, x: number, y: number) => {
   await page.evaluate(() => window.dazbee?.drawn())
 }
 
-test('group three layers, resize the group, enter it and move one, ungroup, and undo each step', async ({ browser }) => {
+test('group three layers, resize the group, enter it and move one, ungroup, and undo each step', async ({
+  browser,
+}) => {
   const { page, errors } = await openStage(browser, design())
   const zoom = await zoomOf(page)
   const start = await read(page)
@@ -78,7 +122,7 @@ test('group three layers, resize the group, enter it and move one, ungroup, and 
   await dragScreen(page, se, { x: se.x + 100 * zoom, y: se.y + 30 * zoom })
   now = await read(page)
   expect(box(now, group)).toMatchObject({ x: 80, y: 80, width: 960, height: 330 })
-  expect(box(now, 'box').width).toBeCloseTo(300 * 960 / 860, 1)
+  expect(box(now, 'box').width).toBeCloseTo((300 * 960) / 860, 1)
   expect(box(now, 'dot').y).toBeCloseTo(80 + 40 * 1.1, 1)
   expectHugs(now, group)
   writeOutput('groups-1-resized.png', await page.screenshot())
@@ -97,7 +141,10 @@ test('group three layers, resize the group, enter it and move one, ungroup, and 
   // Move the tag down past the group's edge: only it moves, and the group grows to hold it.
   await drag(page, tag, { x: tag.x + 60, y: tag.y + 100 })
   now = await read(page)
-  expect(box(now, 'tag')).toMatchObject({ x: Math.round(box(resized, 'tag').x + 60), y: Math.round(box(resized, 'tag').y + 100) })
+  expect(box(now, 'tag')).toMatchObject({
+    x: Math.round(box(resized, 'tag').x + 60),
+    y: Math.round(box(resized, 'tag').y + 100),
+  })
   expect(box(now, 'dot')).toEqual(box(resized, 'dot'))
   expect(box(now, group).height).toBeGreaterThan(330)
   expectHugs(now, group)

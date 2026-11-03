@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
+
 import { FONT_FACES, type FontFile } from './index.ts'
 
 export const FONT_FILES_DIR = join(import.meta.dirname, '..', 'files')

@@ -21,5 +21,9 @@ const subscribe = (listener: () => void) => {
 }
 
 export function useEveryFormat() {
-  return useSyncExternalStore(subscribe, () => everyFormat, () => false)
+  return useSyncExternalStore(
+    subscribe,
+    () => everyFormat,
+    () => false,
+  )
 }

@@ -12,10 +12,12 @@ const fresh = (path) => EDITOR_PAGE.test(path) || ASSET.test(path)
 
 self.addEventListener('install', () => self.skipWaiting())
 self.addEventListener('activate', (event) => {
-  event.waitUntil((async () => {
-    for (const name of await caches.keys()) if (name !== CACHE) await caches.delete(name)
-    await self.clients.claim()
-  })())
+  event.waitUntil(
+    (async () => {
+      for (const name of await caches.keys()) if (name !== CACHE) await caches.delete(name)
+      await self.clients.claim()
+    })(),
+  )
 })
 
 self.addEventListener('fetch', (event) => {
@@ -26,7 +28,8 @@ self.addEventListener('fetch', (event) => {
   if (immutable(url.pathname)) event.respondWith(cacheFirst(request))
   // Only whole-page loads of an editor page: Next's in-app navigations fetch the same path for a
   // different payload, which must never stand in for the page.
-  else if (EDITOR_PAGE.test(url.pathname) ? request.mode === 'navigate' : ASSET.test(url.pathname)) event.respondWith(networkFirst(request))
+  else if (EDITOR_PAGE.test(url.pathname) ? request.mode === 'navigate' : ASSET.test(url.pathname))
+    event.respondWith(networkFirst(request))
 })
 
 // The page names what it loaded before this worker was in charge, so the first visit is enough.
@@ -37,17 +40,19 @@ self.addEventListener('message', (event) => {
 
 async function keep(urls) {
   const cache = await caches.open(CACHE)
-  await Promise.all(urls.map(async (href) => {
-    const url = new URL(href, self.location.origin)
-    if (url.origin !== self.location.origin || !(immutable(url.pathname) || fresh(url.pathname))) return
-    if (immutable(url.pathname) && (await cache.match(url.href))) return
-    try {
-      const response = await fetch(url.href, { credentials: 'same-origin' })
-      if (response.ok) await cache.put(url.href, response)
-    } catch {
-      // Offline already: nothing to keep this time.
-    }
-  }))
+  await Promise.all(
+    urls.map(async (href) => {
+      const url = new URL(href, self.location.origin)
+      if (url.origin !== self.location.origin || !(immutable(url.pathname) || fresh(url.pathname))) return
+      if (immutable(url.pathname) && (await cache.match(url.href))) return
+      try {
+        const response = await fetch(url.href, { credentials: 'same-origin' })
+        if (response.ok) await cache.put(url.href, response)
+      } catch {
+        // Offline already: nothing to keep this time.
+      }
+    }),
+  )
 }
 
 async function cacheFirst(request) {

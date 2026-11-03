@@ -24,7 +24,15 @@ function drawScene(canvas) {
 const failures = []
 const check = (ok, what) => (ok ? console.log(`ok   ${what}`) : failures.push(what) && console.log(`FAIL ${what}`))
 
-const pdf = new ck.PDFDocument({ title: 'Smoke', author: '', creator: '', producer: '', lang: 'en', rasterDPI: 300, encodingQuality: 101 })
+const pdf = new ck.PDFDocument({
+  title: 'Smoke',
+  author: '',
+  creator: '',
+  producer: '',
+  lang: 'en',
+  rasterDPI: 300,
+  encodingQuality: 101,
+})
 drawScene(pdf.beginPage(256, 256))
 pdf.endPage()
 const pdfBytes = pdf.close()
@@ -45,7 +53,11 @@ writeFileSync(join(dir, 'smoke.svg'), svgText)
 const surface = ck.MakeSurface(64, 64)
 drawScene(surface.getCanvas())
 const image = surface.makeImageSnapshot()
-for (const [name, format] of [['PNG', ck.ImageFormat.PNG], ['JPEG', ck.ImageFormat.JPEG], ['WebP', ck.ImageFormat.WEBP]]) {
+for (const [name, format] of [
+  ['PNG', ck.ImageFormat.PNG],
+  ['JPEG', ck.ImageFormat.JPEG],
+  ['WebP', ck.ImageFormat.WEBP],
+]) {
   check((image.encodeToBytes(format, 90)?.length ?? 0) > 0, `encodes ${name}`)
 }
 image.delete()

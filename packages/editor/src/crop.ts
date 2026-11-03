@@ -3,8 +3,16 @@
 // editor so it can be tested on its own.
 
 /** A rectangle, unturned. */
-export interface Rect { x: number; y: number; width: number; height: number }
-export interface Size { width: number; height: number }
+export interface Rect {
+  x: number
+  y: number
+  width: number
+  height: number
+}
+export interface Size {
+  width: number
+  height: number
+}
 
 /** The crop that shows what fill shows: the image covering the box, centred. */
 export function coverCrop(image: Size, box: Size): Rect {
@@ -62,5 +70,8 @@ export function scaled(rect: Rect, box: Rect, corner: number, p: { x: number; y:
 
 /** A rect's corners in the order `scaled` numbers them. */
 export const cornersOfRect = (r: Rect) => [
-  { x: r.x, y: r.y }, { x: r.x + r.width, y: r.y }, { x: r.x + r.width, y: r.y + r.height }, { x: r.x, y: r.y + r.height },
+  { x: r.x, y: r.y },
+  { x: r.x + r.width, y: r.y },
+  { x: r.x + r.width, y: r.y + r.height },
+  { x: r.x, y: r.y + r.height },
 ]

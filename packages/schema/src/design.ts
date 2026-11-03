@@ -1,4 +1,5 @@
 import { z } from 'zod'
+
 import { canHold, LAYER_PROPS, type LayerType } from './layers.ts'
 import { migrateDesign, SCHEMA_VERSION } from './migrate.ts'
 import { Paint } from './paint.ts'
@@ -24,9 +25,21 @@ const nodeBase = {
   parentId: z.union([PageId, NodeId]),
   index: FractionalIndex,
   name: z.string(),
-  role: z.enum([
-    'headline', 'subhead', 'body', 'price', 'cta', 'logo', 'product', 'person', 'background', 'badge', 'decoration',
-  ]).optional(),
+  role: z
+    .enum([
+      'headline',
+      'subhead',
+      'body',
+      'price',
+      'cta',
+      'logo',
+      'product',
+      'person',
+      'background',
+      'badge',
+      'decoration',
+    ])
+    .optional(),
   /** Left out while nothing is locked. */
   lock: LayerLock.optional(),
   /** Properties that follow brand kit tokens (#53); left out while nothing is bound. */
@@ -37,7 +50,11 @@ const layerOf = <T extends LayerType>(type: T) =>
   z.object({ type: z.literal(type), ...nodeBase, props: LAYER_PROPS[type] })
 
 export const Layer = z.discriminatedUnion('type', [
-  layerOf('frame'), layerOf('group'), layerOf('graphic'), layerOf('text'), layerOf('boolean'),
+  layerOf('frame'),
+  layerOf('group'),
+  layerOf('graphic'),
+  layerOf('text'),
+  layerOf('boolean'),
 ])
 export type Layer = z.infer<typeof Layer>
 
@@ -181,9 +198,12 @@ function checkStructure(d: Pick<DesignShape, 'meta' | 'formats' | 'pages' | 'nod
     if (!d.pages[node.parentId] && !parent) {
       fail(['nodes', id, 'parentId'], `parent "${node.parentId}" is neither a page nor a layer`)
     } else if (parent && !canHold(parent.type, node.type)) {
-      fail(['nodes', id, 'parentId'], parent.type === 'boolean'
-        ? `parent "${node.parentId}" is a boolean, which holds only shapes and booleans`
-        : `parent "${node.parentId}" is a ${parent.type}, which can't hold layers`)
+      fail(
+        ['nodes', id, 'parentId'],
+        parent.type === 'boolean'
+          ? `parent "${node.parentId}" is a boolean, which holds only shapes and booleans`
+          : `parent "${node.parentId}" is a ${parent.type}, which can't hold layers`,
+      )
     }
     // Walk up towards the page. Reaching this layer again means it is inside itself; reaching
     // another repeat means a cycle above it, which is reported for the layers in that cycle.
@@ -199,13 +219,20 @@ function checkStructure(d: Pick<DesignShape, 'meta' | 'formats' | 'pages' | 'nod
 }
 
 /** One layer's overrides in one scope, against the layer they override. */
-function checkOverride(scope: string, nodeId: string, node: Layer | undefined, props: Record<string, unknown>, fail: Fail) {
+function checkOverride(
+  scope: string,
+  nodeId: string,
+  node: Layer | undefined,
+  props: Record<string, unknown>,
+  fail: Fail,
+) {
   if (!node) {
     fail(['overrides', scope, nodeId], `no layer "${nodeId}"`)
     return
   }
   const merged = propsInScope(node, props)
-  for (const path of merged.unknownPaths) fail(['overrides', scope, nodeId, path], `a ${node.type} has no property "${path}"`)
+  for (const path of merged.unknownPaths)
+    fail(['overrides', scope, nodeId, path], `a ${node.type} has no property "${path}"`)
   for (const issue of merged.success ? [] : merged.error.issues) {
     fail(['overrides', scope, nodeId, ...issue.path], issue.message)
   }
@@ -243,18 +270,23 @@ function overrideDefaults(node: Layer, props: Record<string, unknown>) {
 
 /** Gives override values the same defaults as base values, so a renderer never sees a half-filled paint or effect. */
 function withOverrideDefaults(d: DesignShape): DesignShape {
-  const overrides = Object.fromEntries(Object.entries(d.overrides).map(([scope, byNode]) => [scope, Object.fromEntries(
-    Object.entries(byNode).map(([nodeId, props]) => {
-      const node = d.nodes[nodeId]
-      return [nodeId, node ? overrideDefaults(node, props) : props]
-    }),
-  )]))
+  const overrides = Object.fromEntries(
+    Object.entries(d.overrides).map(([scope, byNode]) => [
+      scope,
+      Object.fromEntries(
+        Object.entries(byNode).map(([nodeId, props]) => {
+          const node = d.nodes[nodeId]
+          return [nodeId, node ? overrideDefaults(node, props) : props]
+        }),
+      ),
+    ]),
+  )
   return { ...d, overrides }
 }
 
-export const Design = DesignShape
-  .superRefine((d, ctx) => checkDesign(d, (path, message) => ctx.addIssue({ code: 'custom', path, message })))
-  .transform(withOverrideDefaults)
+export const Design = DesignShape.superRefine((d, ctx) =>
+  checkDesign(d, (path, message) => ctx.addIssue({ code: 'custom', path, message })),
+).transform(withOverrideDefaults)
 export type Design = z.infer<typeof Design>
 export type DesignInput = z.input<typeof Design>
 
@@ -343,7 +375,9 @@ function parsePair(scope: string, nodeId: string, node: Layer | undefined, props
     validIds.add(nodeId)
   }
   let failed = false
-  checkOverride(scope, nodeId, node, props, () => { failed = true })
+  checkOverride(scope, nodeId, node, props, () => {
+    failed = true
+  })
   if (failed) return undefined
   const filled = overrideDefaults(node, props)
   pairCache.set(props, { node, filled })
@@ -356,7 +390,8 @@ export function parseLayer(input: unknown): { success: true; layer: Layer } | { 
   const cached = isRecord(input) ? layerCache.get(input) : undefined
   if (cached) return { success: true, layer: cached }
   const parsed = Layer.safeParse(input)
-  if (!parsed.success) return { success: false, errors: parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`) }
+  if (!parsed.success)
+    return { success: false, errors: parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`) }
   const layer = deepFreeze(parsed.data)
   if (isRecord(input)) layerCache.set(input, layer)
   layerCache.set(layer, layer)
@@ -368,7 +403,9 @@ export function parseLayer(input: unknown): { success: true; layer: Layer } | { 
  * them and filled with the same defaults. The scope itself is not checked against the formats.
  */
 export function parseOverrideValues(
-  scope: string, layer: Layer, values: Record<string, unknown>,
+  scope: string,
+  layer: Layer,
+  values: Record<string, unknown>,
 ): { success: true; values: Record<string, unknown> } | { success: false; errors: string[] } {
   const errors: string[] = []
   checkOverride(scope, '', layer, values, (path, message) => errors.push(`${path.slice(3).join('.')}: ${message}`))
@@ -382,7 +419,10 @@ export function parseOverrideValues(
  * result and checks only those layers again.
  */
 function parseScope(
-  scope: string, byNode: Record<string, unknown>, nodes: Record<string, Layer>, changed: Set<string> | undefined,
+  scope: string,
+  byNode: Record<string, unknown>,
+  nodes: Record<string, Layer>,
+  changed: Set<string> | undefined,
 ): ScopeResult | undefined {
   const prev = lastScopes.get(scope)
   const own = (id: string) => (Object.hasOwn(nodes, id) ? nodes[id] : undefined)
@@ -412,7 +452,8 @@ function parseScope(
  * replace an object instead. Anything invalid goes through `parseDesign` for its exact errors.
  */
 export function parseDesignIncrementally(input: unknown): ParseResult {
-  if (!isRecord(input) || !isRecord(input.nodes) || !(input.overrides === undefined || isRecord(input.overrides))) return parseDesign(input)
+  if (!isRecord(input) || !isRecord(input.nodes) || !(input.overrides === undefined || isRecord(input.overrides)))
+    return parseDesign(input)
   const head = parseHead(input)
   if (!head) return parseDesign(input)
 
@@ -440,7 +481,9 @@ export function parseDesignIncrementally(input: unknown): ParseResult {
   const changed = last && last.head === head ? changedLayers(last.nodes, nodes) : undefined
   if (!changed || changed.structural) {
     let failed = false
-    checkStructure({ ...head, nodes }, () => { failed = true })
+    checkStructure({ ...head, nodes }, () => {
+      failed = true
+    })
     if (failed) return parseDesign(input)
   }
 

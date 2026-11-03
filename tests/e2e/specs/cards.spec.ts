@@ -1,11 +1,12 @@
 // The stage without cards: the canvas runs full width and the stage fits the ads between the
 // capsule and its end edge. A selection shows the top bar, and nothing selected leaves no bar.
-import { expect, test, type Page } from '../support/test.ts'
 import { designOf, editorPath, screenPoint, writeOutput } from '../support/editor.ts'
 import { liveDesign, seed } from '../support/seed.ts'
 import { barMenu, moreSubmenu, openCard } from '../support/stage.ts'
+import { expect, type Page, test } from '../support/test.ts'
 
-const shoot = async (page: Page, name: string) => writeOutput(`cards-${name}.png`, await page.screenshot({ animations: 'disabled' }))
+const shoot = async (page: Page, name: string) =>
+  writeOutput(`cards-${name}.png`, await page.screenshot({ animations: 'disabled' }))
 const box = async (page: Page, testId: string) => {
   const found = await page.getByTestId(testId).boundingBox()
   if (!found) throw new Error(`no ${testId}`)
@@ -47,12 +48,14 @@ test('the canvas runs full width and the ads fit between the capsule and the sta
   await shoot(page, 'design')
 })
 
-test('a selection shows the top bar; several layers line up and spread out from it and group from the small menu', async ({ page }) => {
+test('a selection shows the top bar; several layers line up and spread out from it and group from the small menu', async ({
+  page,
+}) => {
   await open(page)
   const at = await screenPoint(page, 200, 180)
   await page.mouse.click(at.x, at.y)
   const arrange = page.getByTestId('arrange')
-  await expect((await openCard(page, 'layout-card'))).toBeVisible()
+  await expect(await openCard(page, 'layout-card')).toBeVisible()
   // One layer lines up with its format from the full menu.
   await expect(arrange).toHaveCount(0)
   await expect(page.getByTestId('bar-line-up')).toHaveCount(0)
@@ -70,7 +73,14 @@ test('a selection shows the top bar; several layers line up and spread out from 
   await page.keyboard.press('Escape')
   const before = Object.keys(JSON.parse(await designOf(page)).nodes).length
   await page.getByTestId('small-group').click()
-  await expect.poll(async () => Object.values(JSON.parse(await designOf(page)).nodes as Record<string, { type: string }>).filter((n) => n.type === 'group').length).toBe(1)
+  await expect
+    .poll(
+      async () =>
+        Object.values(JSON.parse(await designOf(page)).nodes as Record<string, { type: string }>).filter(
+          (n) => n.type === 'group',
+        ).length,
+    )
+    .toBe(1)
   expect(Object.keys(JSON.parse(await designOf(page)).nodes).length).toBe(before + 1)
 
   // Escape clears the selection and the bar goes.

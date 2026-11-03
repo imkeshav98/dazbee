@@ -1,16 +1,35 @@
-import { loadDesign, readDesign } from '@dazbee/doc'
-import { parseDesign } from '@dazbee/schema'
-import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
+
+import { describe, expect, it } from 'vitest'
+
+import { loadDesign, readDesign } from '@dazbee/doc'
+import { parseDesign } from '@dazbee/schema'
+
 import { FIXTURES_DIR, loadFixtures } from './fixtures.ts'
 
 const fixtures = loadFixtures()
 
 describe('pixel fixtures', () => {
-  it('are the spike spec\'s (#1) designs plus the layer bounds ones (#18, #31) and the later features ones', () => {
+  it("are the spike spec's (#1) designs plus the layer bounds ones (#18, #31) and the later features ones", () => {
     expect(fixtures.map((f) => f.name)).toEqual([
-      'arabic-ad', 'auto-layout', 'carousel', 'english-sale-ad', 'fill-stacks', 'frame-corners', 'frame-strokes', 'groups-and-frames', 'hindi-ad', 'image-fills', 'layer-bounds', 'shapes-and-booleans', 'shapes-and-effects', 'stress', 'strokes-and-effects', 'text-and-group-bounds', 'text-styles',
+      'arabic-ad',
+      'auto-layout',
+      'carousel',
+      'english-sale-ad',
+      'fill-stacks',
+      'frame-corners',
+      'frame-strokes',
+      'groups-and-frames',
+      'hindi-ad',
+      'image-fills',
+      'layer-bounds',
+      'shapes-and-booleans',
+      'shapes-and-effects',
+      'stress',
+      'strokes-and-effects',
+      'text-and-group-bounds',
+      'text-styles',
     ])
   })
 

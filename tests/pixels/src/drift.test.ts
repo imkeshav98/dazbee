@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { driftProblem, limitFor, readDriftBaselines, type Drift } from './drift.ts'
+
+import { type Drift, driftProblem, limitFor, readDriftBaselines } from './drift.ts'
 import { loadFixtures } from './fixtures.ts'
 
 const baseline = (drift: Drift) => ({ ...drift, limit: limitFor(drift) })
@@ -12,12 +13,18 @@ describe('WebGL drift limits', () => {
   })
 
   it('fails when more pixels differ than the limit allows', () => {
-    const problem = driftProblem({ differing: 2000, percent: 20, maxDelta: 42 }, baseline({ differing: 1000, percent: 13.4, maxDelta: 42 }))
+    const problem = driftProblem(
+      { differing: 2000, percent: 20, maxDelta: 42 },
+      baseline({ differing: 1000, percent: 13.4, maxDelta: 42 }),
+    )
     expect(problem).toBe('20.000% of pixels differ, limit 16.8% (baseline 13.400%)')
   })
 
   it('fails when one channel moves too far, even on few pixels', () => {
-    const problem = driftProblem({ differing: 10, percent: 0.001, maxDelta: 40 }, baseline({ differing: 252, percent: 0.022, maxDelta: 1 }))
+    const problem = driftProblem(
+      { differing: 10, percent: 0.001, maxDelta: 40 },
+      baseline({ differing: 252, percent: 0.022, maxDelta: 1 }),
+    )
     expect(problem).toBe('a channel differs by 40, limit 17 (baseline 1)')
   })
 

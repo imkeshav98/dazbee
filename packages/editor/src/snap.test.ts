@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest'
+
 import { align, distribute } from './arrange.ts'
-import { boundsOf } from './transform.ts'
 import { rulerStep } from './rulers.ts'
 import { SNAP_DISTANCE, snapMove, snapResize, snapTargets } from './snap.ts'
+import { boundsOf } from './transform.ts'
 
 const format = { x: 0, y: 0, width: 1080, height: 1080 }
 const a = { x: 100, y: 100, width: 200, height: 100 }
@@ -52,15 +53,26 @@ describe('snapping a move', () => {
     // Centred between them, 100 from each.
     const centred = snapMove({ x: 297, y: 520, width: 100, height: 60 }, targets, 6)
     expect(centred.dx).toBe(3)
-    expect(centred.gaps.map((g) => [g.from, g.to])).toEqual([[200, 300], [400, 500]])
+    expect(centred.gaps.map((g) => [g.from, g.to])).toEqual([
+      [200, 300],
+      [400, 500],
+    ])
     // Past the right one at the same 300 gap the other two have.
     const after = snapMove({ x: 896, y: 520, width: 100, height: 60 }, targets, 6)
     expect(after.dx).toBe(4)
-    expect(after.gaps.map((g) => [g.from, g.to])).toEqual([[200, 500], [600, 900]])
+    expect(after.gaps.map((g) => [g.from, g.to])).toEqual([
+      [200, 500],
+      [600, 900],
+    ])
   })
 
   it('stays put with nothing in reach', () => {
-    expect(snapMove({ x: 830, y: 820, width: 50, height: 50 }, snapTargets([a, b], format), 6)).toEqual({ dx: 0, dy: 0, guides: [], gaps: [] })
+    expect(snapMove({ x: 830, y: 820, width: 50, height: 50 }, snapTargets([a, b], format), 6)).toEqual({
+      dx: 0,
+      dy: 0,
+      guides: [],
+      gaps: [],
+    })
   })
 })
 
@@ -89,7 +101,11 @@ describe('snapping a resize', () => {
 })
 
 describe('align and distribute', () => {
-  const boxes = [{ x: 100, y: 100, width: 100, height: 50 }, { x: 300, y: 220, width: 50, height: 100 }, { x: 600, y: 160, width: 80, height: 80 }]
+  const boxes = [
+    { x: 100, y: 100, width: 100, height: 50 },
+    { x: 300, y: 220, width: 50, height: 100 },
+    { x: 600, y: 160, width: 80, height: 80 },
+  ]
 
   it('lines several layers up with the box around them', () => {
     expect(align(boxes, 'left', format).map((o) => o.dx)).toEqual([0, -200, -500])
@@ -106,8 +122,15 @@ describe('align and distribute', () => {
 
   it('spaces three or more out evenly between the first and the last', () => {
     // 680 - 100 = 580 across, 230 of it boxes: gaps of 175.
-    expect(distribute(boxes, 'horizontal')).toEqual([{ dx: 0, dy: 0 }, { dx: 75, dy: 0 }, { dx: 0, dy: 0 }])
-    expect(distribute(boxes.slice(0, 2), 'vertical')).toEqual([{ dx: 0, dy: 0 }, { dx: 0, dy: 0 }])
+    expect(distribute(boxes, 'horizontal')).toEqual([
+      { dx: 0, dy: 0 },
+      { dx: 75, dy: 0 },
+      { dx: 0, dy: 0 },
+    ])
+    expect(distribute(boxes.slice(0, 2), 'vertical')).toEqual([
+      { dx: 0, dy: 0 },
+      { dx: 0, dy: 0 },
+    ])
   })
 })
 

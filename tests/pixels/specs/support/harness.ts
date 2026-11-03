@@ -1,11 +1,14 @@
 import { readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { join } from 'node:path'
-import { test as base, type Page } from '@playwright/test'
+
+import { type Page, test as base } from '@playwright/test'
+import { build } from 'esbuild'
+
 import { FONT_FACES } from '@dazbee/fonts'
 import { FONT_FILES_DIR } from '@dazbee/fonts/node'
 import type { ExportType } from '@dazbee/schema'
-import { build } from 'esbuild'
+
 import { ASSETS_DIR, type Pixels } from '../../src/pixels.ts'
 
 const ORIGIN = 'http://parity.test'
@@ -20,7 +23,11 @@ export interface Harness {
 async function files() {
   const bundle = await build({
     entryPoints: [join(import.meta.dirname, '..', '..', 'browser', 'harness.ts')],
-    bundle: true, write: false, format: 'esm', platform: 'browser', target: 'es2022',
+    bundle: true,
+    write: false,
+    format: 'esm',
+    platform: 'browser',
+    target: 'es2022',
     // Emscripten's Node branch, never taken in the browser.
     external: ['fs', 'path'],
   })
@@ -30,7 +37,8 @@ async function files() {
     '/harness.js': ['text/javascript', bundle.outputFiles[0]?.text ?? ''],
     '/canvaskit.wasm': ['application/wasm', wasm],
   }
-  for (const face of FONT_FACES) served[`/fonts/${face.file}`] = ['font/ttf', readFileSync(join(FONT_FILES_DIR, face.file))]
+  for (const face of FONT_FACES)
+    served[`/fonts/${face.file}`] = ['font/ttf', readFileSync(join(FONT_FILES_DIR, face.file))]
   return served
 }
 
@@ -50,27 +58,40 @@ async function openHarness(page: Page) {
 
 /** Chromium with the renderer loaded, shared by every test in the worker. */
 export const test = base.extend<object, { harness: Harness }>({
-  harness: [async ({ browser }, use) => {
-    const page = await browser.newPage()
-    await openHarness(page)
-    await use({
-      async render(json, pageId, formatId, surface, assetIds) {
-        const out = await page.evaluate(
-          ([j, p, f, s, a]) =>
-            (globalThis as unknown as { renderFixture: (...args: unknown[]) => Promise<{ width: number; height: number; pixels: string }> })
-              .renderFixture(j, p, f, s, a),
-          [json, pageId, formatId, surface, assetIds] as const,
-        )
-        return { width: out.width, height: out.height, pixels: new Uint8Array(Buffer.from(out.pixels, 'base64')) }
-      },
-      async exportFile(json, pageId, formatId, type, assetIds) {
-        const out = await page.evaluate(
-          ([j, p, f, t, a]) => (globalThis as unknown as { exportFixture: (...args: unknown[]) => Promise<string> }).exportFixture(j, p, f, t, a),
-          [json, pageId, formatId, type, assetIds] as const,
-        )
-        return new Uint8Array(Buffer.from(out, 'base64'))
-      },
-    })
-    await page.close()
-  }, { scope: 'worker' }],
+  harness: [
+    async ({ browser }, use) => {
+      const page = await browser.newPage()
+      await openHarness(page)
+      await use({
+        async render(json, pageId, formatId, surface, assetIds) {
+          const out = await page.evaluate(
+            ([j, p, f, s, a]) =>
+              (
+                globalThis as unknown as {
+                  renderFixture: (...args: unknown[]) => Promise<{ width: number; height: number; pixels: string }>
+                }
+              ).renderFixture(j, p, f, s, a),
+            [json, pageId, formatId, surface, assetIds] as const,
+          )
+          return { width: out.width, height: out.height, pixels: new Uint8Array(Buffer.from(out.pixels, 'base64')) }
+        },
+        async exportFile(json, pageId, formatId, type, assetIds) {
+          const out = await page.evaluate(
+            ([j, p, f, t, a]) =>
+              (globalThis as unknown as { exportFixture: (...args: unknown[]) => Promise<string> }).exportFixture(
+                j,
+                p,
+                f,
+                t,
+                a,
+              ),
+            [json, pageId, formatId, type, assetIds] as const,
+          )
+          return new Uint8Array(Buffer.from(out, 'base64'))
+        },
+      })
+      await page.close()
+    },
+    { scope: 'worker' },
+  ],
 })

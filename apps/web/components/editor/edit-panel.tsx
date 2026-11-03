@@ -5,21 +5,43 @@
 // phone it is a sheet at the bottom. It closes on ✕, Esc, another selection or a pop-up opening,
 // and gives the focus back to its bar item when closed from inside it.
 import {
-  AlignBottomIcon, AlignCenterHorizontalIcon, AlignCenterVerticalIcon, AlignLeftIcon, AlignRightIcon, AlignTopIcon,
-  ArrowDownIcon, ArrowLineDownIcon, ArrowLineUpIcon, ArrowsOutLineHorizontalIcon, ArrowsOutLineVerticalIcon, ArrowUpIcon, XIcon, type Icon,
+  AlignBottomIcon,
+  AlignCenterHorizontalIcon,
+  AlignCenterVerticalIcon,
+  AlignLeftIcon,
+  AlignRightIcon,
+  AlignTopIcon,
+  ArrowDownIcon,
+  ArrowLineDownIcon,
+  ArrowLineUpIcon,
+  ArrowsOutLineHorizontalIcon,
+  ArrowsOutLineVerticalIcon,
+  ArrowUpIcon,
+  type Icon,
+  XIcon,
 } from '@phosphor-icons/react'
+import { type CSSProperties, type ReactNode, type RefObject, useEffect, useLayoutEffect, useRef, useState } from 'react'
+
 import type { Editor, ShortcutAction } from '@dazbee/editor'
-import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from 'react'
+
 import { cn } from '../../lib/cn.ts'
 import { useMessages } from '../../lib/i18n/client.tsx'
 import { format } from '../../lib/i18n/index.ts'
+import { useOverlayScroll } from '../ui/overlay-scroll.ts'
 import { ALIGN, keyOf, useSelection } from './arrange-panel.tsx'
-import { isLayerPanel, setOpen, setSheetTop, useEditState, usePhone, type LayerPanelId, type PanelId } from './edit-store.ts'
+import {
+  isLayerPanel,
+  type LayerPanelId,
+  type PanelId,
+  setOpen,
+  setSheetTop,
+  useEditState,
+  usePhone,
+} from './edit-store.ts'
 import { FontChooser, useFontCatalog } from './font-panel.tsx'
 import { ORDER } from './layer-actions.tsx'
-import { factsOf, PanelContent, useTarget, type Target } from './selection-cards.tsx'
+import { factsOf, PanelContent, type Target, useTarget } from './selection-cards.tsx'
 import { PANEL_BUTTON, PANEL_HEADING, PANEL_PART } from './styles.ts'
-import { useOverlayScroll } from '../ui/overlay-scroll.ts'
 
 /** The four moves along the stack, two to a row: a step forward and back, then all the way. */
 const MOVES: { action: (typeof ORDER)[number]; icon: Icon }[] = [
@@ -59,49 +81,81 @@ function ArrangePart({ target, placed }: { target: Target; placed: boolean }) {
   const spreads = target.ids.length >= 3
   return (
     <section aria-labelledby="arrange-part-title" className={PANEL_PART} data-testid="arrange-part">
-      <h3 id="arrange-part-title" className={PANEL_HEADING}>{placing.arrange}</h3>
+      <h3 id="arrange-part-title" className={PANEL_HEADING}>
+        {placing.arrange}
+      </h3>
       <div className="grid grid-cols-2 gap-1.5">
         {MOVES.map(({ action, icon: Icon }) => (
-          <button key={action} type="button" data-action={action} title={tip(a[action], action)} onClick={() => run(action)} className={PANEL_BUTTON}>
+          <button
+            key={action}
+            type="button"
+            data-action={action}
+            title={tip(a[action], action)}
+            onClick={() => run(action)}
+            className={PANEL_BUTTON}
+          >
             <Icon size={14} aria-hidden className="shrink-0" />
             <span>{placing[action]}</span>
           </button>
         ))}
       </div>
-      {several
-        ? (
-          <>
-            <h3 className={PANEL_HEADING}>{placing.lineUpSelection}</h3>
-            <div dir="ltr" className="grid grid-cols-3 gap-1.5">
-              {ALIGN.map(({ action, icon: Icon }) => (
-                <button key={action} type="button" data-action={action} aria-label={a[action]} title={tip(a[action], action)} onClick={() => run(action)} className={cn(PANEL_BUTTON, 'justify-center')}>
-                  <Icon size={16} aria-hidden />
-                </button>
-              ))}
-            </div>
-            <div className="grid gap-1.5">
-              {SPREAD.map(({ action, icon: Icon }) => (
-                <button key={action} type="button" data-action={action} disabled={!spreads} title={spreads ? tip(a[action], action) : placing.needsThree} onClick={() => run(action)} className={PANEL_BUTTON}>
-                  <Icon size={14} aria-hidden className="shrink-0" />
-                  <span>{placing[action]}</span>
-                </button>
-              ))}
-            </div>
-          </>
-        )
-        : !placed && (
+      {several ? (
+        <>
+          <h3 className={PANEL_HEADING}>{placing.lineUpSelection}</h3>
+          <div dir="ltr" className="grid grid-cols-3 gap-1.5">
+            {ALIGN.map(({ action, icon: Icon }) => (
+              <button
+                key={action}
+                type="button"
+                data-action={action}
+                aria-label={a[action]}
+                title={tip(a[action], action)}
+                onClick={() => run(action)}
+                className={cn(PANEL_BUTTON, 'justify-center')}
+              >
+                <Icon size={16} aria-hidden />
+              </button>
+            ))}
+          </div>
+          <div className="grid gap-1.5">
+            {SPREAD.map(({ action, icon: Icon }) => (
+              <button
+                key={action}
+                type="button"
+                data-action={action}
+                disabled={!spreads}
+                title={spreads ? tip(a[action], action) : placing.needsThree}
+                onClick={() => run(action)}
+                className={PANEL_BUTTON}
+              >
+                <Icon size={14} aria-hidden className="shrink-0" />
+                <span>{placing[action]}</span>
+              </button>
+            ))}
+          </div>
+        </>
+      ) : (
+        !placed && (
           <>
             <h3 className={PANEL_HEADING}>{placing.lineUpSize}</h3>
             <div className="grid grid-cols-2 gap-1.5">
               {SIZE_ALIGN.map(({ action, icon: Icon }) => (
-                <button key={action} type="button" data-action={action} title={tip(a[action], action)} onClick={() => run(action)} className={PANEL_BUTTON}>
+                <button
+                  key={action}
+                  type="button"
+                  data-action={action}
+                  title={tip(a[action], action)}
+                  onClick={() => run(action)}
+                  className={PANEL_BUTTON}
+                >
                   <Icon size={15} aria-hidden className="shrink-0" />
                   <span>{placing[action]}</span>
                 </button>
               ))}
             </div>
           </>
-        )}
+        )
+      )}
     </section>
   )
 }
@@ -138,20 +192,44 @@ export function EditPanel({ editor, brandId }: { editor: Editor; brandId: string
   return <Panel key={open} id={open} target={selected.target} design={selected.design} brandId={brandId} />
 }
 
-function Panel({ id, target, design, brandId }: { id: LayerPanelId; target: Target; design: Parameters<typeof PanelContent>[0]['design']; brandId: string }) {
+function Panel({
+  id,
+  target,
+  design,
+  brandId,
+}: {
+  id: LayerPanelId
+  target: Target
+  design: Parameters<typeof PanelContent>[0]['design']
+  brandId: string
+}) {
   const t = useMessages()
   const { catalog, refresh } = useFontCatalog(brandId)
-  const note = target.ids.length > 1 ? format(t.editor.props.layers, { n: target.ids.length }) : target.names[0] || t.editor.props.layer
+  const note =
+    target.ids.length > 1
+      ? format(t.editor.props.layers, { n: target.ids.length })
+      : target.names[0] || t.editor.props.layer
   return (
     <PanelFrame id={id} title={t.editor.bar.panels[id]} note={note}>
-      {id === 'font'
-        ? <FontChooser editor={target.editor} brandId={brandId} catalog={catalog} refresh={refresh} onDone={() => closePanel(id, true)} />
-        : (
-          <>
-            {id === 'position' && <ArrangePart target={target} placed={factsOf(target, design).inFlow && target.props.every((pr) => pr.absolute !== true)} />}
-            <PanelContent panel={id} target={target} design={design} brandId={brandId} />
-          </>
-        )}
+      {id === 'font' ? (
+        <FontChooser
+          editor={target.editor}
+          brandId={brandId}
+          catalog={catalog}
+          refresh={refresh}
+          onDone={() => closePanel(id, true)}
+        />
+      ) : (
+        <>
+          {id === 'position' && (
+            <ArrangePart
+              target={target}
+              placed={factsOf(target, design).inFlow && target.props.every((pr) => pr.absolute !== true)}
+            />
+          )}
+          <PanelContent panel={id} target={target} design={design} brandId={brandId} />
+        </>
+      )}
     </PanelFrame>
   )
 }
@@ -167,7 +245,9 @@ function closePanel(id: PanelId, back: boolean, opener: Element | null = null) {
 
 /** The item that opened panel `id`: the one that had the focus as it opened, else the first that opens it. */
 const openerOf = (id: PanelId, opener: Element | null) =>
-  opener instanceof HTMLElement && opener.isConnected && opener.dataset.opens === id ? opener : document.querySelector<HTMLElement>(`[data-opens="${id}"]`)
+  opener instanceof HTMLElement && opener.isConnected && opener.dataset.opens === id
+    ? opener
+    : document.querySelector<HTMLElement>(`[data-opens="${id}"]`)
 
 /**
  * The edit panel's frame, for a layer's panels and the design's own (Sizes, Pages, Background): its title, a note and
@@ -175,7 +255,19 @@ const openerOf = (id: PanelId, opener: Element | null) =>
  * bar's row, only as tall as what it holds; on a phone it is a sheet at the bottom. Esc or ✕ closes
  * it, and the focus goes back to the item that opened it when closed from inside it.
  */
-export function PanelFrame({ id, title, note, action, children }: { id: PanelId; title: string; note?: string; action?: ReactNode; children: ReactNode }) {
+export function PanelFrame({
+  id,
+  title,
+  note,
+  action,
+  children,
+}: {
+  id: PanelId
+  title: string
+  note?: string
+  action?: ReactNode
+  children: ReactNode
+}) {
   const t = useMessages()
   const { barBottom } = useEditState()
   const phone = usePhone()
@@ -204,8 +296,16 @@ export function PanelFrame({ id, title, note, action, children }: { id: PanelId;
       if (event.key !== 'Escape' || event.defaultPrevented) return
       const at = document.activeElement
       // A list of the panel's own, a select's or a pop-up's, closes first.
-      if (at instanceof Element && (at.closest('[data-radix-popper-content-wrapper]') || at.getAttribute('aria-expanded') === 'true')) return
-      if (at instanceof HTMLElement && panel.current?.contains(at) && (at.tagName === 'INPUT' || at.tagName === 'TEXTAREA' || at.tagName === 'SELECT')) {
+      if (
+        at instanceof Element &&
+        (at.closest('[data-radix-popper-content-wrapper]') || at.getAttribute('aria-expanded') === 'true')
+      )
+        return
+      if (
+        at instanceof HTMLElement &&
+        panel.current?.contains(at) &&
+        (at.tagName === 'INPUT' || at.tagName === 'TEXTAREA' || at.tagName === 'SELECT')
+      ) {
         setOpen(null)
         requestAnimationFrame(() => {
           if (document.activeElement === document.body || document.activeElement === null) openerOf(id, opener)?.focus()
@@ -252,7 +352,7 @@ export function PanelFrame({ id, title, note, action, children }: { id: PanelId;
       data-testid={`bar-${id}-menu`}
       data-panel={id}
       // The panel takes the focus as it opens but is no control itself, so it shows no focus ring.
-      style={{ outline: 'none', ...(phone ? {} : { top, '--panel-top': `${top}px` } as CSSProperties) }}
+      style={{ outline: 'none', ...(phone ? {} : ({ top, '--panel-top': `${top}px` } as CSSProperties)) }}
       className={cn(
         'pop-in absolute z-20 flex flex-col overflow-hidden rounded-[16px] surface-frost outline-none',
         // Clear of the zoom pill below it, and on a tablet of Pages stacked over the zoom pill too.
@@ -260,15 +360,42 @@ export function PanelFrame({ id, title, note, action, children }: { id: PanelId;
         'max-sm:inset-x-2 max-sm:end-2 max-sm:top-auto max-sm:bottom-2 max-sm:max-h-[46%] max-sm:w-auto max-sm:rounded-[22px]',
       )}
     >
-      <div className={cn('flex h-12 shrink-0 items-center gap-2 border-b ps-4 pe-2 transition-colors', scroll.down ? 'border-line' : 'border-transparent')}>
-        <h2 id="edit-panel-title" className="min-w-0 flex-1 truncate font-display text-[15px] font-bold tracking-tight">{title}</h2>
-        {note && <span data-testid="edit-panel-note" className="min-w-0 max-w-[50%] shrink-0 truncate pe-0.5 text-[11px] font-medium text-muted">{note}</span>}
+      <div
+        className={cn(
+          'flex h-12 shrink-0 items-center gap-2 border-b ps-4 pe-2 transition-colors',
+          scroll.down ? 'border-line' : 'border-transparent',
+        )}
+      >
+        <h2 id="edit-panel-title" className="min-w-0 flex-1 truncate font-display text-[15px] font-bold tracking-tight">
+          {title}
+        </h2>
+        {note && (
+          <span
+            data-testid="edit-panel-note"
+            className="min-w-0 max-w-[50%] shrink-0 truncate pe-0.5 text-[11px] font-medium text-muted"
+          >
+            {note}
+          </span>
+        )}
         {action}
-        <button type="button" aria-label={t.editor.closePanel} data-testid="edit-panel-close" onClick={() => closePanel(id, true, opener)} className="grid size-7 shrink-0 cursor-pointer place-items-center rounded-full text-subtle hover:bg-hover hover:text-text">
+        <button
+          type="button"
+          aria-label={t.editor.closePanel}
+          data-testid="edit-panel-close"
+          onClick={() => closePanel(id, true, opener)}
+          className="grid size-7 shrink-0 cursor-pointer place-items-center rounded-full text-subtle hover:bg-hover hover:text-text"
+        >
           <XIcon size={14} aria-hidden />
         </button>
       </div>
-      <div ref={bodyRef} onScroll={scroll.measure} className={cn('flex min-h-0 flex-col gap-3 overflow-y-auto overscroll-contain px-4 pb-4 [&>*]:shrink-0', scroll.more && '[mask-image:linear-gradient(to_bottom,black_calc(100%-28px),transparent)]')}>
+      <div
+        ref={bodyRef}
+        onScroll={scroll.measure}
+        className={cn(
+          'flex min-h-0 flex-col gap-3 overflow-y-auto overscroll-contain px-4 pb-4 [&>*]:shrink-0',
+          scroll.more && '[mask-image:linear-gradient(to_bottom,black_calc(100%-28px),transparent)]',
+        )}
+      >
         {children}
       </div>
     </section>

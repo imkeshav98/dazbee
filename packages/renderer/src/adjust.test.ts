@@ -1,10 +1,18 @@
 import { describe, expect, it } from 'vitest'
-import { after, imageColorMatrix, type ColorMatrix } from './adjust.ts'
+
+import { after, type ColorMatrix, imageColorMatrix } from './adjust.ts'
 
 const none = { exposure: 0, contrast: 0, saturation: 0, temperature: 0, tint: 0 }
 /** A colour in 0…1 through a matrix, alpha 1. */
 const apply = (m: ColorMatrix, [r, g, b]: [number, number, number]) =>
-  [0, 1, 2].map((row) => (m[row * 5] ?? 0) * r + (m[row * 5 + 1] ?? 0) * g + (m[row * 5 + 2] ?? 0) * b + (m[row * 5 + 3] ?? 0) + (m[row * 5 + 4] ?? 0))
+  [0, 1, 2].map(
+    (row) =>
+      (m[row * 5] ?? 0) * r +
+      (m[row * 5 + 1] ?? 0) * g +
+      (m[row * 5 + 2] ?? 0) * b +
+      (m[row * 5 + 3] ?? 0) +
+      (m[row * 5 + 4] ?? 0),
+  )
 
 describe('image colour matrix', () => {
   it('is null when nothing is pushed and no filter is set', () => {
@@ -42,7 +50,11 @@ describe('image colour matrix', () => {
 
   it('keeps alpha as it is', () => {
     for (const filter of ['mono', 'sepia', 'vivid', 'fade', 'warm', 'cool'] as const) {
-      expect(imageColorMatrix({ exposure: 40, contrast: -20, saturation: 30, temperature: 10, tint: -10 }, filter)?.slice(15)).toEqual([0, 0, 0, 1, 0])
+      expect(
+        imageColorMatrix({ exposure: 40, contrast: -20, saturation: 30, temperature: 10, tint: -10 }, filter)?.slice(
+          15,
+        ),
+      ).toEqual([0, 0, 0, 1, 0])
     }
   })
 })

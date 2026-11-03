@@ -6,5 +6,16 @@ export { render, sceneMemo, type Scene, type SceneLayer, type SceneMemo } from '
 export { drawDesign, renderDesign, renderVector, type Rendered, type VectorOptions } from './seam.ts'
 export { drawVectorPage, type VectorTarget } from './vector.ts'
 export { applyLayout, sizingOf, type MeasureText } from './layout.ts'
-export { caretAt, caretPosition, layoutText, paragraphCache, selectionBoxes, textMeasure, type ParagraphCache, type SelectionBox, type TextBlock, type TextLayout } from './text.ts'
+export {
+  caretAt,
+  caretPosition,
+  layoutText,
+  paragraphCache,
+  selectionBoxes,
+  textMeasure,
+  type ParagraphCache,
+  type SelectionBox,
+  type TextBlock,
+  type TextLayout,
+} from './text.ts'
 export { scaleText, smallestSize, type ScaledText } from './text-scale.ts'

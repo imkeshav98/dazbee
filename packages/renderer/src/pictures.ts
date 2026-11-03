@@ -1,4 +1,5 @@
 import type { Canvas, CanvasKit, SkPicture as Picture } from '@dazbee/canvaskit'
+
 import type { Resources } from './draw.ts'
 import type { SceneLayer } from './scene.ts'
 
@@ -21,7 +22,11 @@ export function layerPictures(limit = 4000) {
   }
   return {
     picture(ck: CanvasKit, layer: SceneLayer, resources: Resources, draw: (canvas: Canvas) => void): Picture {
-      if (drawnWith?.fonts !== resources.fonts || drawnWith.images !== resources.images || drawnWith.fallbackFamilies !== resources.fallbackFamilies) {
+      if (
+        drawnWith?.fonts !== resources.fonts ||
+        drawnWith.images !== resources.images ||
+        drawnWith.fallbackFamilies !== resources.fallbackFamilies
+      ) {
         clear()
         drawnWith = resources
       }

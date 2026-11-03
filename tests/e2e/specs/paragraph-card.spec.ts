@@ -1,22 +1,35 @@
 // The Text box and Spacing cards and the bar's text popovers in Chromium, with real input: box mode,
 // max lines and lifting the limit, paragraph spacing, lists, underline and strikethrough, shrinking
 // to fit with its sizes, and an outline with its width and colour.
-import { expect, test, type Locator, type Page } from '../support/test.ts'
 import type { DesignInput } from '@dazbee/schema'
+
 import { writeOutput } from '../support/editor.ts'
-import { barMenu, openStage, openCard } from '../support/stage.ts'
+import { barMenu, openCard, openStage } from '../support/stage.ts'
+import { expect, type Locator, type Page, test } from '../support/test.ts'
 
 test.describe.configure({ timeout: 120_000 })
 
 const design = (): DesignInput => ({
-  meta: { schemaVersion: 5, designId: 'replaced-by-the-api', name: 'Paragraphs', kind: 'single', primaryFormatId: 'sq' },
+  meta: {
+    schemaVersion: 5,
+    designId: 'replaced-by-the-api',
+    name: 'Paragraphs',
+    kind: 'single',
+    primaryFormatId: 'sq',
+  },
   formats: { sq: { name: 'Square', width: 1080, height: 1080, order: 'a0' } },
   pages: { p1: { name: 'Page 1', order: 'a0', fills: [{ type: 'solid', color: '#FFF8F0FF' }] } },
   nodes: {
     copy: {
-      type: 'text', parentId: 'p1', index: 'a0', name: 'Copy',
+      type: 'text',
+      parentId: 'p1',
+      index: 'a0',
+      name: 'Copy',
       props: {
-        x: 80, y: 80, width: 920, height: 600,
+        x: 80,
+        y: 80,
+        width: 920,
+        height: 600,
         text: 'Cold brew is back\nOat milk on the house\nEvery weekend this summer',
         style: { fontFamily: 'Noto Sans', fontSize: 72, fontWeight: 800, color: '#1A1420FF' },
       },
@@ -32,22 +45,27 @@ const enter = async (field: Locator, value: string) => {
   await field.press('Enter')
 }
 
-test('the Text box card sets the box, lines and fit; the bar sets lists, decoration and the outline', async ({ browser }) => {
+test('the Text box card sets the box, lines and fit; the bar sets lists, decoration and the outline', async ({
+  browser,
+}) => {
   const { page, errors } = await openStage(browser, design())
   await page.evaluate(() => window.dazbee?.select(['copy']))
-  const card = async () => (await openCard(page, 'text-box-card'))
-  const fit = async () => (await openCard(page, 'text-fit-card'))
-  const spacing = async () => (await openCard(page, 'spacing-card'))
-  await expect((await card())).toBeVisible()
+  const card = async () => await openCard(page, 'text-box-card')
+  const fit = async () => await openCard(page, 'text-fit-card')
+  const spacing = async () => await openCard(page, 'spacing-card')
+  await expect(await card()).toBeVisible()
   const effects = () => barMenu(page, 'effects')
-  const list = async (to: string) => (await barMenu(page, 'list')).getByRole('radiogroup', { name: 'List' }).locator(`[data-value="${to}"]`).click()
+  const list = async (to: string) =>
+    (await barMenu(page, 'list')).getByRole('radiogroup', { name: 'List' }).locator(`[data-value="${to}"]`).click()
 
   await (await card()).getByRole('radiogroup', { name: 'Box' }).locator('[data-value="fixed"]').click()
   await list('bullet')
   await page.keyboard.press('Escape')
   await enter((await spacing()).getByRole('spinbutton', { name: 'Paragraph spacing' }), '24')
   await enter((await fit()).getByRole('spinbutton', { name: 'Max lines' }), '2')
-  await expect.poll(() => copy(page)).toMatchObject({ boxMode: 'fixed', list: 'bullet', paragraphSpacing: 24, maxLines: 2 })
+  await expect
+    .poll(() => copy(page))
+    .toMatchObject({ boxMode: 'fixed', list: 'bullet', paragraphSpacing: 24, maxLines: 2 })
 
   await page.getByTestId('bar-underline').click()
   await page.getByTestId('bar-strikethrough').click()
@@ -77,10 +95,12 @@ test('the Text box card sets the box, lines and fit; the bar sets lists, decorat
   await (await fit()).getByRole('switch', { name: 'Shrink to fit' }).click()
   await (await effects()).locator('[data-tile="outline"]').click()
   await page.keyboard.press('Escape')
-  await expect.poll(async () => {
-    const props = await copy(page)
-    return [props.maxLines, props.list, props.shrinkToFit, props.style.outline]
-  }).toEqual([undefined, undefined, undefined, undefined])
+  await expect
+    .poll(async () => {
+      const props = await copy(page)
+      return [props.maxLines, props.list, props.shrinkToFit, props.style.outline]
+    })
+    .toEqual([undefined, undefined, undefined, undefined])
   await expect((await fit()).getByRole('spinbutton', { name: 'Max lines' })).toHaveValue('')
 
   // One undo takes the outline back.
@@ -125,7 +145,12 @@ test('with shrink to fit on, the size on the bar is the largest size, so the tex
   expect((await copy(page)).style.fontSize).toBe(59)
 
   // In a fixed box too: a bigger size is the largest, and the text shrinks to fit the box under it.
-  await (await openCard(page, 'text-box-card')).getByRole('radiogroup', { name: 'Box' }).locator('[data-value="fixed"]').click()
+  await (
+    await openCard(page, 'text-box-card')
+  )
+    .getByRole('radiogroup', { name: 'Box' })
+    .locator('[data-value="fixed"]')
+    .click()
   await page.keyboard.press('Escape')
   const fixed = await height()
   await enter(page.getByTestId('bar-size-field'), '300')

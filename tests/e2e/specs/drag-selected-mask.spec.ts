@@ -1,21 +1,61 @@
 // A press inside a selected layer drags it, with real input (#234): a mask, which isn't drawn, is
 // picked in the layers panel and dragged on the stage; what it masks stays put; one undo step. A
 // click there without a drag still picks the layer under the pointer.
-import { expect, test, type Page } from '../support/test.ts'
 import type { DesignInput } from '@dazbee/schema'
+
 import { placed, screenPoint, writeOutput } from '../support/editor.ts'
 import { openStage, press, read, selection } from '../support/stage.ts'
+import { expect, type Page, test } from '../support/test.ts'
 
 test.describe.configure({ timeout: 120_000 })
 
 const design: DesignInput = {
-  meta: { schemaVersion: 5, designId: 'replaced-by-the-api', name: 'Drag a mask', kind: 'single', primaryFormatId: 'sq' },
+  meta: {
+    schemaVersion: 5,
+    designId: 'replaced-by-the-api',
+    name: 'Drag a mask',
+    kind: 'single',
+    primaryFormatId: 'sq',
+  },
   formats: { sq: { name: 'Square', width: 1080, height: 1080, order: 'a0' } },
   pages: { p1: { name: 'Page 1', order: 'a0', fills: [{ type: 'solid', color: '#FFFFFFFF' }] } },
   nodes: {
-    group: { type: 'group', parentId: 'p1', index: 'a0', name: 'Masked', props: { x: 200, y: 200, width: 400, height: 300 } },
-    mask: { type: 'graphic', parentId: 'group', index: 'a0', name: 'Mask', props: { x: 200, y: 200, width: 400, height: 300, shape: { kind: 'ellipse' }, fills: [{ type: 'solid', color: '#000000FF' }], mask: 'alpha' } },
-    photo: { type: 'graphic', parentId: 'group', index: 'a1', name: 'Photo', props: { x: 200, y: 200, width: 400, height: 300, shape: { kind: 'rect' }, fills: [{ type: 'solid', color: '#00A88AFF' }] } },
+    group: {
+      type: 'group',
+      parentId: 'p1',
+      index: 'a0',
+      name: 'Masked',
+      props: { x: 200, y: 200, width: 400, height: 300 },
+    },
+    mask: {
+      type: 'graphic',
+      parentId: 'group',
+      index: 'a0',
+      name: 'Mask',
+      props: {
+        x: 200,
+        y: 200,
+        width: 400,
+        height: 300,
+        shape: { kind: 'ellipse' },
+        fills: [{ type: 'solid', color: '#000000FF' }],
+        mask: 'alpha',
+      },
+    },
+    photo: {
+      type: 'graphic',
+      parentId: 'group',
+      index: 'a1',
+      name: 'Photo',
+      props: {
+        x: 200,
+        y: 200,
+        width: 400,
+        height: 300,
+        shape: { kind: 'rect' },
+        fills: [{ type: 'solid', color: '#00A88AFF' }],
+      },
+    },
   },
   overrides: {},
 }
@@ -23,9 +63,15 @@ const box = async (page: Page, id: string) => {
   const p = placed(await read(page), id, 'sq') as { x: number; y: number; width: number; height: number }
   return { x: p.x, y: p.y, width: p.width, height: p.height }
 }
-const row = (page: Page, name: string) => page.getByRole('tree').getByRole('treeitem').filter({ has: page.locator(`[data-testid="layer-name"]:text-is("${name}")`) })
+const row = (page: Page, name: string) =>
+  page
+    .getByRole('tree')
+    .getByRole('treeitem')
+    .filter({ has: page.locator(`[data-testid="layer-name"]:text-is("${name}")`) })
 
-test('a mask picked in the layers panel is dragged on the stage, and what it masks stays; a click there without a drag picks what is under the pointer', async ({ browser }) => {
+test('a mask picked in the layers panel is dragged on the stage, and what it masks stays; a click there without a drag picks what is under the pointer', async ({
+  browser,
+}) => {
   const { page, errors } = await openStage(browser, design)
   await page.locator('[data-panel="layers"]').click()
   if (!(await row(page, 'Mask').isVisible())) {

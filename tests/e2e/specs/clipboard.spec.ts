@@ -1,12 +1,13 @@
 // Copy and paste across designs (#49), with real keys: a group with a photo, text and a shape
 // copied in one design and pasted into another draws the same pixels there; pasting twice gives
 // two copies; each paste is one undo step; Mod+Shift+V puts it where the pointer is.
-import { expect, test, type Page } from '../support/test.ts'
 import type { DesignInput } from '@dazbee/schema'
+
 import { photo, upload } from '../support/assets.ts'
 import { editorPath, exportHashOf, screenPoint, writeOutput } from '../support/editor.ts'
 import { seed } from '../support/seed.ts'
 import { click, openStage, press, read, selection } from '../support/stage.ts'
+import { expect, type Page, test } from '../support/test.ts'
 
 test.describe.configure({ timeout: 120_000 })
 
@@ -19,27 +20,96 @@ const shell = (name: string, nodes: Record<string, Node>): DesignInput => ({
   nodes,
   overrides: {},
 })
-const source = (assetId: string) => shell('Source', {
-  card: { type: 'group', parentId: 'p1', index: 'a0', name: 'Card', props: { x: 100, y: 100, width: 500, height: 400 } },
-  tile: {
-    type: 'graphic', parentId: 'card', index: 'a0', name: 'Photo',
-    props: { x: 100, y: 100, width: 500, height: 400, rotation: -4, shape: { kind: 'rect', cornerRadius: 32 }, fills: [{ type: 'image', assetId, fit: 'fill', filter: 'warm' }] },
-  },
-  label: {
-    type: 'text', parentId: 'card', index: 'a1', name: 'Label',
-    props: { x: 140, y: 380, width: 420, height: 90, text: 'Fresh drop', style: { fontFamily: 'Noto Sans', fontSize: 64, fontWeight: 800, color: '#FFFFFFFF', outline: { width: 3, color: '#15121AFF' } } },
-  },
-  badge: {
-    type: 'graphic', parentId: 'card', index: 'a2', name: 'Badge',
-    props: { x: 480, y: 120, width: 100, height: 100, shape: { kind: 'star', points: 8, innerRadius: 0.7 }, fills: [{ type: 'solid', color: '#FF48B0FF' }] },
-  },
-  other: {
-    type: 'graphic', parentId: 'p1', index: 'a1', name: 'Other', props: { x: 700, y: 700, width: 200, height: 200, shape: { kind: 'ellipse' }, fills: [{ type: 'solid', color: '#3D6BFFFF' }] },
-  },
-})
-const target = () => shell('Target', {
-  stripe: { type: 'graphic', parentId: 'p1', index: 'a0', name: 'Stripe', props: { x: 0, y: 900, width: 1080, height: 120, shape: { kind: 'rect' }, fills: [{ type: 'solid', color: '#15121AFF' }] } },
-})
+const source = (assetId: string) =>
+  shell('Source', {
+    card: {
+      type: 'group',
+      parentId: 'p1',
+      index: 'a0',
+      name: 'Card',
+      props: { x: 100, y: 100, width: 500, height: 400 },
+    },
+    tile: {
+      type: 'graphic',
+      parentId: 'card',
+      index: 'a0',
+      name: 'Photo',
+      props: {
+        x: 100,
+        y: 100,
+        width: 500,
+        height: 400,
+        rotation: -4,
+        shape: { kind: 'rect', cornerRadius: 32 },
+        fills: [{ type: 'image', assetId, fit: 'fill', filter: 'warm' }],
+      },
+    },
+    label: {
+      type: 'text',
+      parentId: 'card',
+      index: 'a1',
+      name: 'Label',
+      props: {
+        x: 140,
+        y: 380,
+        width: 420,
+        height: 90,
+        text: 'Fresh drop',
+        style: {
+          fontFamily: 'Noto Sans',
+          fontSize: 64,
+          fontWeight: 800,
+          color: '#FFFFFFFF',
+          outline: { width: 3, color: '#15121AFF' },
+        },
+      },
+    },
+    badge: {
+      type: 'graphic',
+      parentId: 'card',
+      index: 'a2',
+      name: 'Badge',
+      props: {
+        x: 480,
+        y: 120,
+        width: 100,
+        height: 100,
+        shape: { kind: 'star', points: 8, innerRadius: 0.7 },
+        fills: [{ type: 'solid', color: '#FF48B0FF' }],
+      },
+    },
+    other: {
+      type: 'graphic',
+      parentId: 'p1',
+      index: 'a1',
+      name: 'Other',
+      props: {
+        x: 700,
+        y: 700,
+        width: 200,
+        height: 200,
+        shape: { kind: 'ellipse' },
+        fills: [{ type: 'solid', color: '#3D6BFFFF' }],
+      },
+    },
+  })
+const target = () =>
+  shell('Target', {
+    stripe: {
+      type: 'graphic',
+      parentId: 'p1',
+      index: 'a0',
+      name: 'Stripe',
+      props: {
+        x: 0,
+        y: 900,
+        width: 1080,
+        height: 120,
+        shape: { kind: 'rect' },
+        fills: [{ type: 'solid', color: '#15121AFF' }],
+      },
+    },
+  })
 
 /** SHA-256 of the export's pixels inside a rect of the 1080 wide square. */
 const regionHash = (page: Page, r: { x: number; y: number; width: number; height: number }) =>
@@ -47,7 +117,8 @@ const regionHash = (page: Page, r: { x: number; y: number; width: number; height
     const pixels = window.dazbee?.exportPixels()
     if (!pixels) throw new Error('no editor')
     const rows: Uint8Array[] = []
-    for (let y = r.y; y < r.y + r.height; y++) rows.push(pixels.slice((y * 1080 + r.x) * 4, (y * 1080 + r.x + r.width) * 4))
+    for (let y = r.y; y < r.y + r.height; y++)
+      rows.push(pixels.slice((y * 1080 + r.x) * 4, (y * 1080 + r.x + r.width) * 4))
     const all = new Uint8Array(rows.reduce((n, row) => n + row.length, 0))
     let at = 0
     for (const row of rows) {
@@ -70,9 +141,14 @@ const keys = async (page: Page, key: string) => {
   await page.keyboard.press(key)
   await page.evaluate(() => window.dazbee?.drawn())
 }
-const layersUnder = async (page: Page, parentId: string) => Object.entries((await read(page)).nodes).filter(([, n]) => n.parentId === parentId).map(([id]) => id)
+const layersUnder = async (page: Page, parentId: string) =>
+  Object.entries((await read(page)).nodes)
+    .filter(([, n]) => n.parentId === parentId)
+    .map(([id]) => id)
 
-test('a group copied in one design pastes into another with the same pixels, twice for two copies, each one undo', async ({ browser }) => {
+test('a group copied in one design pastes into another with the same pixels, twice for two copies, each one undo', async ({
+  browser,
+}) => {
   const asset = await upload(photo)
   const { page, errors } = await openStage(browser, source(asset.id))
   const targetId = await seed(target())
@@ -93,11 +169,15 @@ test('a group copied in one design pastes into another with the same pixels, twi
   // Where it was, the size it was.
   expect(d.nodes[first]?.props).toMatchObject({ x: card?.x, y: card?.y, width: card?.width, height: card?.height })
   // Fresh ids, the children in their order, the photo's asset the same.
-  const inside = (await layersUnder(page, first)).sort((a, b) => ((d.nodes[a]?.index ?? '') < (d.nodes[b]?.index ?? '') ? -1 : 1))
+  const inside = (await layersUnder(page, first)).sort((a, b) =>
+    (d.nodes[a]?.index ?? '') < (d.nodes[b]?.index ?? '') ? -1 : 1,
+  )
   expect(inside).toHaveLength(3)
   expect(inside.some((id) => ['tile', 'label', 'badge'].includes(id))).toBe(false)
   expect(inside.map((id) => (d.nodes[id] as unknown as { name: string }).name)).toEqual(['Photo', 'Label', 'Badge'])
-  expect(d.nodes[inside[0] ?? '']?.props.fills).toEqual([{ type: 'image', assetId: asset.id, fit: 'fill', filter: 'warm', opacity: 1 }])
+  expect(d.nodes[inside[0] ?? '']?.props.fills).toEqual([
+    { type: 'image', assetId: asset.id, fit: 'fill', filter: 'warm', opacity: 1 },
+  ])
   // The photo's bytes load for this design too: the pasted card draws exactly as it did.
   await expect.poll(() => regionHash(page, CARD), { timeout: 15_000 }).toBe(copied)
   writeOutput('clipboard-1-pasted.png', await page.screenshot({ animations: 'disabled' }))
@@ -119,7 +199,9 @@ test('a group copied in one design pastes into another with the same pixels, twi
   expect(errors).toEqual([])
 })
 
-test('Mod+Shift+V pastes centred on the pointer, and cut takes the layers away in one undo step', async ({ browser }) => {
+test('Mod+Shift+V pastes centred on the pointer, and cut takes the layers away in one undo step', async ({
+  browser,
+}) => {
   const asset = await upload(photo)
   const { page, errors } = await openStage(browser, source(asset.id))
   await click(page, 800, 800)

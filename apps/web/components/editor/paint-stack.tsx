@@ -7,13 +7,15 @@
 // centre. A row hides its paint without deleting it, and a gradient or image has its own opacity.
 import { DotsSixVerticalIcon, EyeIcon, EyeSlashIcon, ImageIcon, MinusIcon, PlusIcon } from '@phosphor-icons/react'
 import * as Popover from '@radix-ui/react-popover'
+import { type CSSProperties, type KeyboardEvent, type ReactNode, useEffect, useRef, useState } from 'react'
+
 import type { Editor } from '@dazbee/editor'
 import type { Paint } from '@dazbee/schema'
-import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from 'react'
+
 import { cn } from '../../lib/cn.ts'
 import { useLocale, useMessages } from '../../lib/i18n/client.tsx'
 import { dirOf, format, type Messages } from '../../lib/i18n/index.ts'
-import { SEGMENTED, segment } from '../ui/segmented.tsx'
+import { segment, SEGMENTED } from '../ui/segmented.tsx'
 import { useMenuFocus } from './bar-popover.tsx'
 import { PICKED_RING } from './card.tsx'
 import { Choice, clamp, ColorField, NumberField, tidy } from './fields.tsx'
@@ -24,19 +26,28 @@ import { useBrandKit } from './use-brand-kit.ts'
 type P = Messages['editor']['props']
 type Gradient = Extract<Paint, { type: 'linear' | 'radial' | 'angular' }>
 type Stop = Gradient['stops'][number]
-const isGradient = (paint: Paint): paint is Gradient => paint.type === 'linear' || paint.type === 'radial' || paint.type === 'angular'
+const isGradient = (paint: Paint): paint is Gradient =>
+  paint.type === 'linear' || paint.type === 'radial' || paint.type === 'angular'
 /** What a paint keeps whatever its kind: its own opacity and whether it shows. */
-const keepOf = (paint: Paint) => ({ ...(paint.opacity === undefined ? {} : { opacity: paint.opacity }), ...(paint.visible === undefined ? {} : { visible: paint.visible }) })
+const keepOf = (paint: Paint) => ({
+  ...(paint.opacity === undefined ? {} : { opacity: paint.opacity }),
+  ...(paint.visible === undefined ? {} : { visible: paint.visible }),
+})
 export const PAINT_TYPES = ['solid', 'linear', 'radial', 'angular', 'image'] as const
 type PaintType = (typeof PAINT_TYPES)[number]
 
 /** A gradient's stops in order, as the renderer needs them. */
 const sorted = (stops: Stop[]) => [...stops].sort((a, b) => a.offset - b.offset)
 /** An image asset's small picture, as the API serves it. */
-export const assetThumbnail = (brandId: string, assetId: string) => `/brands/${encodeURIComponent(brandId)}/assets/${encodeURIComponent(assetId)}/thumbnail`
-const stopsCss = (stops: Stop[], unit: 'percent' | 'degrees') => sorted(stops).map((s) => `${s.color} ${tidy(s.offset * (unit === 'percent' ? 100 : 360))}${unit === 'percent' ? '%' : 'deg'}`).join(', ')
+export const assetThumbnail = (brandId: string, assetId: string) =>
+  `/brands/${encodeURIComponent(brandId)}/assets/${encodeURIComponent(assetId)}/thumbnail`
+const stopsCss = (stops: Stop[], unit: 'percent' | 'degrees') =>
+  sorted(stops)
+    .map((s) => `${s.color} ${tidy(s.offset * (unit === 'percent' ? 100 : 360))}${unit === 'percent' ? '%' : 'deg'}`)
+    .join(', ')
 /** A linear gradient's direction in degrees, clockwise from pointing right, as drawn in a square. */
-const angleOf = (g: Extract<Paint, { type: 'linear' }>) => Math.round((Math.atan2(g.to.y - g.from.y, g.to.x - g.from.x) * 180) / Math.PI)
+const angleOf = (g: Extract<Paint, { type: 'linear' }>) =>
+  Math.round((Math.atan2(g.to.y - g.from.y, g.to.x - g.from.x) * 180) / Math.PI)
 /** A linear gradient across the whole unit box at an angle, through its middle. */
 const linearAt = (deg: number) => {
   const r = (deg * Math.PI) / 180
@@ -47,11 +58,16 @@ const linearAt = (deg: number) => {
 /** A paint as a CSS background, close to what the renderer draws in the layer's box. */
 export function paintBackground(paint: Paint, brandId: string): string {
   switch (paint.type) {
-    case 'solid': return `linear-gradient(${paint.color}, ${paint.color})`
-    case 'linear': return `linear-gradient(${angleOf(paint) + 90}deg, ${stopsCss(paint.stops, 'percent')})`
-    case 'radial': return `radial-gradient(${tidy(paint.radius * 100)}% ${tidy(paint.radius * 100)}% at ${tidy(paint.center.x * 100)}% ${tidy(paint.center.y * 100)}%, ${stopsCss(paint.stops, 'percent')})`
-    case 'angular': return `conic-gradient(from ${paint.angle + 90}deg at ${tidy(paint.center.x * 100)}% ${tidy(paint.center.y * 100)}%, ${stopsCss(paint.stops, 'degrees')})`
-    case 'image': return `url("${assetThumbnail(brandId, paint.assetId)}") center / cover no-repeat`
+    case 'solid':
+      return `linear-gradient(${paint.color}, ${paint.color})`
+    case 'linear':
+      return `linear-gradient(${angleOf(paint) + 90}deg, ${stopsCss(paint.stops, 'percent')})`
+    case 'radial':
+      return `radial-gradient(${tidy(paint.radius * 100)}% ${tidy(paint.radius * 100)}% at ${tidy(paint.center.x * 100)}% ${tidy(paint.center.y * 100)}%, ${stopsCss(paint.stops, 'percent')})`
+    case 'angular':
+      return `conic-gradient(from ${paint.angle + 90}deg at ${tidy(paint.center.x * 100)}% ${tidy(paint.center.y * 100)}%, ${stopsCss(paint.stops, 'degrees')})`
+    case 'image':
+      return `url("${assetThumbnail(brandId, paint.assetId)}") center / cover no-repeat`
   }
 }
 
@@ -61,18 +77,35 @@ export function paintBackground(paint: Paint, brandId: string): string {
  */
 function convert(now: Paint, type: Exclude<PaintType, 'image'>): Paint {
   const keep = keepOf(now)
-  const stops: Stop[] = now.type === 'solid'
-    ? [{ offset: 0, color: now.color }, { offset: 1, color: `${now.color.slice(0, 7)}00` }]
-    : now.type === 'image' ? [{ offset: 0, color: '#000000FF' }, { offset: 1, color: '#FFFFFFFF' }] : now.stops
+  const stops: Stop[] =
+    now.type === 'solid'
+      ? [
+          { offset: 0, color: now.color },
+          { offset: 1, color: `${now.color.slice(0, 7)}00` },
+        ]
+      : now.type === 'image'
+        ? [
+            { offset: 0, color: '#000000FF' },
+            { offset: 1, color: '#FFFFFFFF' },
+          ]
+        : now.stops
   switch (type) {
     case 'solid': {
-      const color = now.type === 'solid' ? now.color : now.type === 'image' ? '#D9D9D9FF' : stops[0]?.color ?? '#D9D9D9FF'
+      const color =
+        now.type === 'solid' ? now.color : now.type === 'image' ? '#D9D9D9FF' : (stops[0]?.color ?? '#D9D9D9FF')
       const alpha = Math.round(Number.parseInt(color.slice(7, 9) || 'FF', 16) * (now.opacity ?? 1))
-      return { type, color: `${color.slice(0, 7)}${alpha.toString(16).padStart(2, '0').toUpperCase()}`, ...(now.visible === undefined ? {} : { visible: now.visible }) }
+      return {
+        type,
+        color: `${color.slice(0, 7)}${alpha.toString(16).padStart(2, '0').toUpperCase()}`,
+        ...(now.visible === undefined ? {} : { visible: now.visible }),
+      }
     }
-    case 'linear': return { type, ...linearAt(90), stops, ...keep }
-    case 'radial': return { type, center: { x: 0.5, y: 0.5 }, radius: 0.5, stops, ...keep }
-    case 'angular': return { type, center: { x: 0.5, y: 0.5 }, angle: 0, stops, ...keep }
+    case 'linear':
+      return { type, ...linearAt(90), stops, ...keep }
+    case 'radial':
+      return { type, center: { x: 0.5, y: 0.5 }, radius: 0.5, stops, ...keep }
+    case 'angular':
+      return { type, center: { x: 0.5, y: 0.5 }, angle: 0, stops, ...keep }
   }
 }
 
@@ -87,7 +120,10 @@ function colourAt(stops: Stop[], at: number): string {
   const channel = (i: number) => {
     const x = Number.parseInt(a.color.slice(i, i + 2), 16)
     const y = Number.parseInt(b.color.slice(i, i + 2), 16)
-    return Math.round(x + (y - x) * t).toString(16).padStart(2, '0').toUpperCase()
+    return Math.round(x + (y - x) * t)
+      .toString(16)
+      .padStart(2, '0')
+      .toUpperCase()
   }
   return `#${channel(1)}${channel(3)}${channel(5)}${channel(7)}`
 }
@@ -95,8 +131,14 @@ function colourAt(stops: Stop[], at: number): string {
 /** A paint's swatch over a checkerboard, so a see-through paint shows as one. */
 export function PaintSwatch({ paint, brandId, className }: { paint: Paint; brandId: string; className?: string }) {
   return (
-    <span aria-hidden className={cn('checker relative block overflow-hidden rounded-row border border-line-strong', className)}>
-      <span className="absolute inset-0" style={{ background: paintBackground(paint, brandId), opacity: paint.opacity ?? 1 }} />
+    <span
+      aria-hidden
+      className={cn('checker relative block overflow-hidden rounded-row border border-line-strong', className)}
+    >
+      <span
+        className="absolute inset-0"
+        style={{ background: paintBackground(paint, brandId), opacity: paint.opacity ?? 1 }}
+      />
     </span>
   )
 }
@@ -126,7 +168,14 @@ function BrandColours({ brandId, label, onPick }: { brandId: string; label: stri
  * A gradient's stops on a bar: a click on the bar adds one there in the colour the gradient has,
  * a drag moves one (one undo step), the arrow keys move the focused one, Delete removes it.
  */
-function GradientBar({ paint, picked, onPick, editor, p, onSet }: {
+function GradientBar({
+  paint,
+  picked,
+  onPick,
+  editor,
+  p,
+  onSet,
+}: {
   paint: Gradient
   picked: number
   onPick: (i: number) => void
@@ -140,7 +189,11 @@ function GradientBar({ paint, picked, onPick, editor, p, onSet }: {
     const box = bar.current?.getBoundingClientRect()
     return box ? tidy(clamp((clientX - box.left) / box.width, 0, 1)) : 0
   }
-  const move = (i: number, offset: number) => onSet((now) => ({ ...now, stops: now.stops.map((s, j) => (j === i ? { ...s, offset: tidy(clamp(offset, 0, 1)) } : s)) }))
+  const move = (i: number, offset: number) =>
+    onSet((now) => ({
+      ...now,
+      stops: now.stops.map((s, j) => (j === i ? { ...s, offset: tidy(clamp(offset, 0, 1)) } : s)),
+    }))
   /** Puts the stops in order again, the stop at `i` still picked. */
   const settle = (i: number) => {
     let picked = i
@@ -191,7 +244,10 @@ function GradientBar({ paint, picked, onPick, editor, p, onSet }: {
         }}
         className="checker relative h-6 cursor-copy rounded-row border border-line-strong"
       >
-        <span className="pointer-events-none absolute inset-0 rounded-[inherit]" style={{ background: `linear-gradient(90deg, ${stopsCss(sorted(paint.stops), 'percent')})` }} />
+        <span
+          className="pointer-events-none absolute inset-0 rounded-[inherit]"
+          style={{ background: `linear-gradient(90deg, ${stopsCss(sorted(paint.stops), 'percent')})` }}
+        />
         {paint.stops.map((stop, i) => (
           <button
             key={i}
@@ -219,14 +275,17 @@ function GradientBar({ paint, picked, onPick, editor, p, onSet }: {
                 move(i, stop.offset + (e.key === 'ArrowRight' ? step : -step))
                 settle(i)
                 end()
-              }
-              else if (e.key === 'Delete' || e.key === 'Backspace') remove(i)
+              } else if (e.key === 'Delete' || e.key === 'Backspace') remove(i)
               else return
               e.preventDefault()
               e.stopPropagation()
             }}
             style={{ left: `${stop.offset * 100}%`, backgroundColor: stop.color }}
-            className={cn('absolute top-1/2 size-4 -translate-1/2 cursor-grab rounded-full border-2 border-white shadow-[0_0_0_1px_rgb(0_0_0/0.35)] active:cursor-grabbing', FOCUS_RING, picked === i && PICKED_RING)}
+            className={cn(
+              'absolute top-1/2 size-4 -translate-1/2 cursor-grab rounded-full border-2 border-white shadow-[0_0_0_1px_rgb(0_0_0/0.35)] active:cursor-grabbing',
+              FOCUS_RING,
+              picked === i && PICKED_RING,
+            )}
           />
         ))}
       </div>
@@ -235,11 +294,29 @@ function GradientBar({ paint, picked, onPick, editor, p, onSet }: {
 }
 
 /** One paint's editor: its type, then a solid's colour, a gradient's stops and shape, or an image. */
-export function PaintEditor({ paint, brandId, editor, p, onSet }: { paint: Paint; brandId: string; editor: Editor; p: P; onSet: (to: (now: Paint) => Paint) => void }) {
+export function PaintEditor({
+  paint,
+  brandId,
+  editor,
+  p,
+  onSet,
+}: {
+  paint: Paint
+  brandId: string
+  editor: Editor
+  p: P
+  onSet: (to: (now: Paint) => Paint) => void
+}) {
   const [picked, setPicked] = useState(0)
   const stop = isGradient(paint) ? paint.stops[Math.min(picked, paint.stops.length - 1)] : undefined
   const setGradient = (to: (now: Gradient) => Gradient) => onSet((now) => (isGradient(now) ? to(now) : now))
-  const setStopColour = (color: (now: string | undefined) => string) => setGradient((now) => ({ ...now, stops: now.stops.map((s, j) => (j === Math.min(picked, now.stops.length - 1) ? { ...s, color: color(s.color) } : s)) }))
+  const setStopColour = (color: (now: string | undefined) => string) =>
+    setGradient((now) => ({
+      ...now,
+      stops: now.stops.map((s, j) =>
+        j === Math.min(picked, now.stops.length - 1) ? { ...s, color: color(s.color) } : s,
+      ),
+    }))
   const pct = (n: number) => tidy(n * 100)
   return (
     <div className="flex flex-col gap-3 p-3" data-testid="paint-editor">
@@ -249,13 +326,31 @@ export function PaintEditor({ paint, brandId, editor, p, onSet }: { paint: Paint
           const label = type === 'solid' ? p.solid : p.paint[type]
           if (type === 'image' && !on) {
             return (
-              <ImagePickerButton key={type} brandId={brandId} title={p.paint.image} testId="paint-image" className={segment(false)} onPick={(asset) => onSet((now) => ({ type: 'image', assetId: asset.id, fit: 'fill', opacity: 1, ...keepOf(now) }))}>
+              <ImagePickerButton
+                key={type}
+                brandId={brandId}
+                title={p.paint.image}
+                testId="paint-image"
+                className={segment(false)}
+                onPick={(asset) =>
+                  onSet((now) => ({ type: 'image', assetId: asset.id, fit: 'fill', opacity: 1, ...keepOf(now) }))
+                }
+              >
                 <span aria-hidden>{p.paintShort.image}</span>
               </ImagePickerButton>
             )
           }
           return (
-            <button key={type} type="button" role="radio" aria-checked={on} aria-label={label} data-paint-type={type} onClick={() => type !== 'image' && !on && onSet((now) => convert(now, type))} className={segment(on)}>
+            <button
+              key={type}
+              type="button"
+              role="radio"
+              aria-checked={on}
+              aria-label={label}
+              data-paint-type={type}
+              onClick={() => type !== 'image' && !on && onSet((now) => convert(now, type))}
+              className={segment(on)}
+            >
               <span aria-hidden>{p.paintShort[type]}</span>
             </button>
           )
@@ -263,22 +358,37 @@ export function PaintEditor({ paint, brandId, editor, p, onSet }: { paint: Paint
       </div>
       {paint.type === 'solid' && (
         <>
-          <ColorField name={p.paintColour} value={paint.color} onSet={(to) => onSet((now) => (now.type === 'solid' ? { ...now, color: to(now.color) } : now))} />
-          <BrandColours brandId={brandId} label={p.brandColours} onPick={(color) => onSet((now) => (now.type === 'solid' ? { ...now, color } : now))} />
+          <ColorField
+            name={p.paintColour}
+            value={paint.color}
+            onSet={(to) => onSet((now) => (now.type === 'solid' ? { ...now, color: to(now.color) } : now))}
+          />
+          <BrandColours
+            brandId={brandId}
+            label={p.brandColours}
+            onPick={(color) => onSet((now) => (now.type === 'solid' ? { ...now, color } : now))}
+          />
         </>
       )}
       {isGradient(paint) && (
         <>
           <GradientBar paint={paint} picked={picked} onPick={setPicked} editor={editor} p={p} onSet={setGradient} />
           <div className="flex items-center gap-1">
-            <ColorField name={format(p.stopColour, { n: Math.min(picked, paint.stops.length - 1) + 1 })} value={stop?.color} onSet={setStopColour} />
+            <ColorField
+              name={format(p.stopColour, { n: Math.min(picked, paint.stops.length - 1) + 1 })}
+              value={stop?.color}
+              onSet={setStopColour}
+            />
             <button
               type="button"
               aria-label={p.removeStop}
               title={p.removeStop}
               disabled={paint.stops.length <= 2}
               onClick={() => {
-                setGradient((now) => ({ ...now, stops: now.stops.filter((_, j) => j !== Math.min(picked, now.stops.length - 1)) }))
+                setGradient((now) => ({
+                  ...now,
+                  stops: now.stops.filter((_, j) => j !== Math.min(picked, now.stops.length - 1)),
+                }))
                 setPicked(Math.max(0, picked - 1))
               }}
               className={ICON_BUTTON}
@@ -289,19 +399,94 @@ export function PaintEditor({ paint, brandId, editor, p, onSet }: { paint: Paint
           <BrandColours brandId={brandId} label={p.brandColours} onPick={(color) => setStopColour(() => color)} />
           <div className={KNOBS}>
             {paint.type === 'linear' && (
-              <NumberField label="∠" name={p.gradientAngle} value={angleOf(paint)} unit="°" editor={editor} onSet={(v) => setGradient((now) => ({ ...now, ...linearAt(v) }))} onShift={(by) => setGradient((now) => (now.type === 'linear' ? { ...now, ...linearAt(angleOf(now) + by) } : now))} />
+              <NumberField
+                label="∠"
+                name={p.gradientAngle}
+                value={angleOf(paint)}
+                unit="°"
+                editor={editor}
+                onSet={(v) => setGradient((now) => ({ ...now, ...linearAt(v) }))}
+                onShift={(by) =>
+                  setGradient((now) => (now.type === 'linear' ? { ...now, ...linearAt(angleOf(now) + by) } : now))
+                }
+              />
             )}
             {(paint.type === 'radial' || paint.type === 'angular') && (
               <>
-                <NumberField label="X" name={p.gradientX} value={pct(paint.center.x)} min={0} max={100} unit="%" editor={editor} onSet={(v) => setGradient((now) => (now.type === 'linear' ? now : { ...now, center: { ...now.center, x: tidy(v / 100) } }))} onShift={(by) => setGradient((now) => (now.type === 'linear' ? now : { ...now, center: { ...now.center, x: tidy(clamp(now.center.x + by / 100, 0, 1)) } }))} />
-                <NumberField label="Y" name={p.gradientY} value={pct(paint.center.y)} min={0} max={100} unit="%" editor={editor} onSet={(v) => setGradient((now) => (now.type === 'linear' ? now : { ...now, center: { ...now.center, y: tidy(v / 100) } }))} onShift={(by) => setGradient((now) => (now.type === 'linear' ? now : { ...now, center: { ...now.center, y: tidy(clamp(now.center.y + by / 100, 0, 1)) } }))} />
+                <NumberField
+                  label="X"
+                  name={p.gradientX}
+                  value={pct(paint.center.x)}
+                  min={0}
+                  max={100}
+                  unit="%"
+                  editor={editor}
+                  onSet={(v) =>
+                    setGradient((now) =>
+                      now.type === 'linear' ? now : { ...now, center: { ...now.center, x: tidy(v / 100) } },
+                    )
+                  }
+                  onShift={(by) =>
+                    setGradient((now) =>
+                      now.type === 'linear'
+                        ? now
+                        : { ...now, center: { ...now.center, x: tidy(clamp(now.center.x + by / 100, 0, 1)) } },
+                    )
+                  }
+                />
+                <NumberField
+                  label="Y"
+                  name={p.gradientY}
+                  value={pct(paint.center.y)}
+                  min={0}
+                  max={100}
+                  unit="%"
+                  editor={editor}
+                  onSet={(v) =>
+                    setGradient((now) =>
+                      now.type === 'linear' ? now : { ...now, center: { ...now.center, y: tidy(v / 100) } },
+                    )
+                  }
+                  onShift={(by) =>
+                    setGradient((now) =>
+                      now.type === 'linear'
+                        ? now
+                        : { ...now, center: { ...now.center, y: tidy(clamp(now.center.y + by / 100, 0, 1)) } },
+                    )
+                  }
+                />
               </>
             )}
             {paint.type === 'radial' && (
-              <NumberField label="R" name={p.gradientSize} value={pct(paint.radius)} min={1} unit="%" editor={editor} onSet={(v) => setGradient((now) => (now.type === 'radial' ? { ...now, radius: tidy(Math.max(1, v) / 100) } : now))} onShift={(by) => setGradient((now) => (now.type === 'radial' ? { ...now, radius: tidy(Math.max(0.01, now.radius + by / 100)) } : now))} />
+              <NumberField
+                label="R"
+                name={p.gradientSize}
+                value={pct(paint.radius)}
+                min={1}
+                unit="%"
+                editor={editor}
+                onSet={(v) =>
+                  setGradient((now) => (now.type === 'radial' ? { ...now, radius: tidy(Math.max(1, v) / 100) } : now))
+                }
+                onShift={(by) =>
+                  setGradient((now) =>
+                    now.type === 'radial' ? { ...now, radius: tidy(Math.max(0.01, now.radius + by / 100)) } : now,
+                  )
+                }
+              />
             )}
             {paint.type === 'angular' && (
-              <NumberField label="∠" name={p.gradientAngle} value={paint.angle} unit="°" editor={editor} onSet={(v) => setGradient((now) => (now.type === 'angular' ? { ...now, angle: v } : now))} onShift={(by) => setGradient((now) => (now.type === 'angular' ? { ...now, angle: now.angle + by } : now))} />
+              <NumberField
+                label="∠"
+                name={p.gradientAngle}
+                value={paint.angle}
+                unit="°"
+                editor={editor}
+                onSet={(v) => setGradient((now) => (now.type === 'angular' ? { ...now, angle: v } : now))}
+                onShift={(by) =>
+                  setGradient((now) => (now.type === 'angular' ? { ...now, angle: now.angle + by } : now))
+                }
+              />
             )}
           </div>
         </>
@@ -310,11 +495,23 @@ export function PaintEditor({ paint, brandId, editor, p, onSet }: { paint: Paint
         <div className="flex items-center gap-2">
           <PaintSwatch paint={paint} brandId={brandId} className="size-12 shrink-0" />
           <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-            <ImagePickerButton brandId={brandId} title={p.replaceImageTitle} testId="paint-replace-image" className={cn(CHIP, FOCUS_RING, 'self-start')} onPick={(asset) => onSet((now) => (now.type === 'image' ? { ...now, assetId: asset.id } : now))}>
+            <ImagePickerButton
+              brandId={brandId}
+              title={p.replaceImageTitle}
+              testId="paint-replace-image"
+              className={cn(CHIP, FOCUS_RING, 'self-start')}
+              onPick={(asset) => onSet((now) => (now.type === 'image' ? { ...now, assetId: asset.id } : now))}
+            >
               <ImageIcon size={12} aria-hidden />
               <span aria-hidden>{p.replaceImage}</span>
             </ImagePickerButton>
-            <Choice name={p.fit} value={paint.fit} options={['fill', 'fit', 'crop', 'tile'] as const} labels={p.fits} onSet={(fit) => onSet((now) => (now.type === 'image' ? { ...now, fit } : now))} />
+            <Choice
+              name={p.fit}
+              value={paint.fit}
+              options={['fill', 'fit', 'crop', 'tile'] as const}
+              labels={p.fits}
+              onSet={(fit) => onSet((now) => (now.type === 'image' ? { ...now, fit } : now))}
+            />
           </div>
         </div>
       )}
@@ -326,7 +523,21 @@ export function PaintEditor({ paint, brandId, editor, p, onSet }: { paint: Paint
  * One paint in a list: its swatch, which opens its editor, then a solid's colour, or a gradient's
  * or image's name and opacity, and a button that hides it or shows it again.
  */
-export function PaintRow({ paint, name, brandId, editor, p, onSet }: { paint: Paint; name: string; brandId: string; editor: Editor; p: P; onSet: (to: (now: Paint) => Paint) => void }) {
+export function PaintRow({
+  paint,
+  name,
+  brandId,
+  editor,
+  p,
+  onSet,
+}: {
+  paint: Paint
+  name: string
+  brandId: string
+  editor: Editor
+  p: P
+  onSet: (to: (now: Paint) => Paint) => void
+}) {
   const side = dirOf(useLocale()) === 'rtl' ? 'right' : 'left'
   const hidden = paint.visible === false
   const focus = useMenuFocus()
@@ -334,48 +545,69 @@ export function PaintRow({ paint, name, brandId, editor, p, onSet }: { paint: Pa
     <div className={cn('flex min-w-0 flex-1 items-center gap-1', hidden && 'opacity-50')} data-paint={paint.type}>
       <Popover.Root>
         <Popover.Trigger asChild>
-          <button ref={focus.button} type="button" aria-label={format(p.editPaint, { name })} data-testid="paint-swatch" className={cn('shrink-0 cursor-pointer rounded-[7px]', FOCUS_RING)}>
+          <button
+            ref={focus.button}
+            type="button"
+            aria-label={format(p.editPaint, { name })}
+            data-testid="paint-swatch"
+            className={cn('shrink-0 cursor-pointer rounded-[7px]', FOCUS_RING)}
+          >
             <PaintSwatch paint={paint} brandId={brandId} className="size-7" />
           </button>
         </Popover.Trigger>
         <Popover.Portal>
-          <Popover.Content side={side} align="start" sideOffset={12} collisionPadding={12} aria-label={format(p.editPaint, { name })} {...focus.content} className={cn(POPOVER, 'w-80')}>
+          <Popover.Content
+            side={side}
+            align="start"
+            sideOffset={12}
+            collisionPadding={12}
+            aria-label={format(p.editPaint, { name })}
+            {...focus.content}
+            className={cn(POPOVER, 'w-80')}
+          >
             {focus.back}
             <PaintEditor paint={paint} brandId={brandId} editor={editor} p={p} onSet={onSet} />
           </Popover.Content>
         </Popover.Portal>
       </Popover.Root>
-      {paint.type === 'solid'
-        ? <ColorField name={name} value={paint.color} swatch={false} onSet={(to) => onSet((now) => (now.type === 'solid' ? { ...now, color: to(now.color) } : now))} />
-        : (
-          <>
-            <span className="min-w-0 flex-1 truncate text-xs text-muted">{p.paint[paint.type]}</span>
-            <div className="w-[4.5rem] shrink-0">
-              <NumberField
-                label="%"
-                name={format(p.alpha, { name })}
-                value={paint.opacity ?? 1}
-                scale={100}
-                min={0}
-                max={1}
-                editor={editor}
-                onSet={(v) => onSet((now) => ({ ...now, opacity: tidy(v) }))}
-                onShift={(by) => onSet((now) => ({ ...now, opacity: tidy(clamp((now.opacity ?? 1) + by, 0, 1)) }))}
-              />
-            </div>
-          </>
-        )}
+      {paint.type === 'solid' ? (
+        <ColorField
+          name={name}
+          value={paint.color}
+          swatch={false}
+          onSet={(to) => onSet((now) => (now.type === 'solid' ? { ...now, color: to(now.color) } : now))}
+        />
+      ) : (
+        <>
+          <span className="min-w-0 flex-1 truncate text-xs text-muted">{p.paint[paint.type]}</span>
+          <div className="w-[4.5rem] shrink-0">
+            <NumberField
+              label="%"
+              name={format(p.alpha, { name })}
+              value={paint.opacity ?? 1}
+              scale={100}
+              min={0}
+              max={1}
+              editor={editor}
+              onSet={(v) => onSet((now) => ({ ...now, opacity: tidy(v) }))}
+              onShift={(by) => onSet((now) => ({ ...now, opacity: tidy(clamp((now.opacity ?? 1) + by, 0, 1)) }))}
+            />
+          </div>
+        </>
+      )}
       <button
         type="button"
         aria-label={format(hidden ? p.showPaint : p.hidePaint, { name })}
         title={format(hidden ? p.showPaint : p.hidePaint, { name })}
         data-testid="paint-visible"
-        onClick={() => onSet((now) => {
-          if (now.visible !== false) return { ...now, visible: false }
-          const shown: Paint = { ...now }
-          delete shown.visible
-          return shown
-        })}
+        onClick={() =>
+          onSet((now) => {
+            if (now.visible !== false) return { ...now, visible: false }
+            const shown: Paint = { ...now }
+            delete shown.visible
+            return shown
+          })
+        }
         className={ICON_BUTTON}
       >
         {hidden ? <EyeSlashIcon size={14} aria-hidden /> : <EyeIcon size={14} aria-hidden />}
@@ -389,7 +621,14 @@ export function PaintRow({ paint, name, brandId, editor, p, onSet }: { paint: Pa
  * `topFirst` the last item, the one drawn on top, is the first row, and rows can be dragged by
  * their grip, or moved with its arrow keys, into another order.
  */
-export function Stack<T>({ items, field, topFirst = false, removeLabel, onWrite, render }: {
+export function Stack<T>({
+  items,
+  field,
+  topFirst = false,
+  removeLabel,
+  onWrite,
+  render,
+}: {
   items: T[]
   /** What the list holds, for each row's `data-item`, `<field>-<index>`. */
   field: string
@@ -422,7 +661,10 @@ export function Stack<T>({ items, field, topFirst = false, removeLabel, onWrite,
       {shown.map((i, row) => {
         const item = items[i] as T
         const n = row + 1
-        const style: CSSProperties | undefined = over === i && dragging !== null && dragging !== i ? { boxShadow: `inset 0 ${(dragging < i) === topFirst ? 2 : -2}px 0 var(--accent)` } : undefined
+        const style: CSSProperties | undefined =
+          over === i && dragging !== null && dragging !== i
+            ? { boxShadow: `inset 0 ${dragging < i === topFirst ? 2 : -2}px 0 var(--accent)` }
+            : undefined
         return (
           // Paints have no ids; their place in the list is what they are.
           <div
@@ -473,7 +715,10 @@ export function Stack<T>({ items, field, topFirst = false, removeLabel, onWrite,
                   // The grip goes with its paint, so the next press moves it on.
                   requestAnimationFrame(() => grips.current.get(to)?.focus())
                 }}
-                className={cn('grid w-4 shrink-0 cursor-grab place-items-center self-stretch text-subtle hover:text-text active:cursor-grabbing', FOCUS_RING)}
+                className={cn(
+                  'grid w-4 shrink-0 cursor-grab place-items-center self-stretch text-subtle hover:text-text active:cursor-grabbing',
+                  FOCUS_RING,
+                )}
               >
                 <DotsSixVerticalIcon size={14} weight="bold" aria-hidden />
               </button>

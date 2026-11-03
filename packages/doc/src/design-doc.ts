@@ -1,5 +1,7 @@
-import { parseDesign, type Design } from '@dazbee/schema'
 import * as Y from 'yjs'
+
+import { type Design, parseDesign } from '@dazbee/schema'
+
 import { repair } from './repair.ts'
 
 /**
@@ -57,7 +59,8 @@ export function fromYText(ytext: Y.Text) {
   let at = 0
   for (const op of ytext.toDelta() as { insert: string; attributes?: Json }[]) {
     const end = at + op.insert.length
-    if (op.attributes && Object.keys(op.attributes).length > 0) runs.push({ start: at, end, style: { ...op.attributes } })
+    if (op.attributes && Object.keys(op.attributes).length > 0)
+      runs.push({ start: at, end, style: { ...op.attributes } })
     at = end
   }
   return { text: ytext.toString(), runs }
@@ -112,12 +115,15 @@ export function nodeToJson(ynode: Y.Map<unknown>): Json {
 /** The doc as plain JSON, before validation. */
 export function snapshot(doc: DesignDoc) {
   const r = root(doc)
-  const mapOf = <T>(m: Y.Map<T>, f: (v: T) => unknown) => Object.fromEntries([...m.entries()].map(([k, v]) => [k, f(v)]))
+  const mapOf = <T>(m: Y.Map<T>, f: (v: T) => unknown) =>
+    Object.fromEntries([...m.entries()].map(([k, v]) => [k, f(v)]))
   return {
     meta: r.meta.toJSON(),
     formats: mapOf(r.formats, (f) => f.toJSON()),
     pages: mapOf(r.pages, (p) => p.toJSON()),
-    nodes: Object.fromEntries([...r.nodes.entries()].filter(([, n]) => n.get(DELETED) !== true).map(([id, n]) => [id, nodeToJson(n)])),
+    nodes: Object.fromEntries(
+      [...r.nodes.entries()].filter(([, n]) => n.get(DELETED) !== true).map(([id, n]) => [id, nodeToJson(n)]),
+    ),
     overrides: nestOverrides(r.overrides),
   }
 }
@@ -133,7 +139,12 @@ function nestOverrides(flat: Y.Map<unknown>) {
     byNode.set(nodeId, props)
     props.set(path, value)
   }
-  return Object.fromEntries([...nested].map(([scope, byNode]) => [scope, Object.fromEntries([...byNode].map(([id, props]) => [id, Object.fromEntries(props)]))]))
+  return Object.fromEntries(
+    [...nested].map(([scope, byNode]) => [
+      scope,
+      Object.fromEntries([...byNode].map(([id, props]) => [id, Object.fromEntries(props)])),
+    ]),
+  )
 }
 
 /**
@@ -149,7 +160,10 @@ export function readDesign(doc: DesignDoc, onRepair?: (repairs: string[]) => voi
 }
 
 /** A place in a text layer's text that follows edits from any tab, such as the caret while typing. */
-export interface TextAnchor { id: string; position: Y.RelativePosition }
+export interface TextAnchor {
+  id: string
+  position: Y.RelativePosition
+}
 
 const liveText = (doc: DesignDoc, id: string) => {
   const node = root(doc).nodes.get(id)

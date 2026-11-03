@@ -3,7 +3,8 @@
 // the way an asset dragged from the library does. An SVG file is placed from its own bytes, read
 // as text by the editor, never by the browser's image decoder.
 import type { Editor, Point, Spot } from '@dazbee/editor'
-import { isVectorAsset, type AssetSummary } from '@dazbee/schema'
+import { type AssetSummary, isVectorAsset } from '@dazbee/schema'
+
 import { IMAGE_ACCEPT, sendAsset } from './upload-asset.ts'
 
 /** The image types a fill takes. */
@@ -35,7 +36,12 @@ const fillsByTypes = (types: string[]) => {
 }
 
 /** Whether a drag of files would fill the shape under it, so the shape lights up. */
-export const dragFills = (transfer: DataTransfer) => fillsByTypes(Array.from(transfer.items).filter((item) => item.kind === 'file').map((item) => item.type))
+export const dragFills = (transfer: DataTransfer) =>
+  fillsByTypes(
+    Array.from(transfer.items)
+      .filter((item) => item.kind === 'file')
+      .map((item) => item.type),
+  )
 
 /** Where a drop goes, read when it lands, so a pan or zoom while the files upload doesn't move it. */
 export interface Drop {
@@ -83,16 +89,27 @@ async function settled(editor: Editor): Promise<boolean> {
  * point and the rest cascading from it. Placing waits for any gesture open on the editor to end,
  * and ends typing, so everything placed is one undo step of its own, and selected.
  */
-export async function placeDroppedFiles(editor: Editor, brandId: string, files: File[], drop: Drop): Promise<DropResult> {
-  const sent = await Promise.allSettled(files.map(async (file) => {
-    const asset = await sendAsset(brandId, file, () => undefined)
-    return { asset, svg: isVectorAsset(asset) ? await file.text() : null }
-  }))
+export async function placeDroppedFiles(
+  editor: Editor,
+  brandId: string,
+  files: File[],
+  drop: Drop,
+): Promise<DropResult> {
+  const sent = await Promise.allSettled(
+    files.map(async (file) => {
+      const asset = await sendAsset(brandId, file, () => undefined)
+      return { asset, svg: isVectorAsset(asset) ? await file.text() : null }
+    }),
+  )
   const failed: DropResult['failed'] = []
   const done: { asset: AssetSummary; svg: string | null }[] = []
   sent.forEach((result, i) => {
     if (result.status === 'fulfilled') done.push(result.value)
-    else failed.push({ name: files[i]?.name ?? '', reason: result.reason instanceof Error ? result.reason.message : String(result.reason) })
+    else
+      failed.push({
+        name: files[i]?.name ?? '',
+        reason: result.reason instanceof Error ? result.reason.message : String(result.reason),
+      })
   })
   const { spot, into, step } = drop
   if (!spot || done.length === 0) return { failed, unplaced: done.length }
@@ -106,7 +123,8 @@ export async function placeDroppedFiles(editor: Editor, brandId: string, files: 
   const [only] = done
   const end = editor.beginGesture()
   try {
-    if (into && only && done.length === 1 && !only.svg && editor.fillWithImage(into, only.asset, spot.frame)) return { failed, unplaced }
+    if (into && only && done.length === 1 && !only.svg && editor.fillWithImage(into, only.asset, spot.frame))
+      return { failed, unplaced }
     done.forEach(({ asset, svg }, i) => {
       const next = { frame: spot.frame, x: spot.x + i * step, y: spot.y + i * step }
       const at = next.x <= frame.width && next.y <= frame.height ? next : spot

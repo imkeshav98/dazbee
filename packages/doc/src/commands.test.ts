@@ -1,7 +1,9 @@
-import { LayerTree, parseDesign } from '@dazbee/schema'
 import { describe, expect, it } from 'vitest'
 import * as Y from 'yjs'
 import type { z } from 'zod'
+
+import { LayerTree, parseDesign } from '@dazbee/schema'
+
 import { childrenOf, loadDesign, openSession, readDesign } from './index.ts'
 import { testDesign } from './test-design.ts'
 
@@ -14,7 +16,14 @@ const freshDoc = () => {
 const badge = {
   type: 'graphic',
   name: 'Badge',
-  props: { x: 900, y: 40, width: 120, height: 120, shape: { kind: 'ellipse' }, fills: [{ type: 'solid', color: '#FFC400FF' }] },
+  props: {
+    x: 900,
+    y: 40,
+    width: 120,
+    height: 120,
+    shape: { kind: 'ellipse' },
+    fills: [{ type: 'solid', color: '#FFC400FF' }],
+  },
 } as const
 
 describe('commands', () => {
@@ -26,7 +35,9 @@ describe('commands', () => {
 
     const design = readDesign(doc)
     expect(design.nodes[id]).toMatchObject({ type: 'graphic', parentId: 'p1', name: 'Badge' })
-    const siblings = Object.values(design.nodes).filter((n) => n.parentId === 'p1').map((n) => n.index)
+    const siblings = Object.values(design.nodes)
+      .filter((n) => n.parentId === 'p1')
+      .map((n) => n.index)
     expect(design.nodes[id]?.index).toBe(siblings.sort().at(-1))
 
     tab.undo()
@@ -38,10 +49,12 @@ describe('commands', () => {
     const before = Y.encodeStateVector(doc)
     const tab = openSession(doc)
 
-    expect(() => tab.run('node.create', { parentId: 'p1', layer: { ...badge, props: { ...badge.props, opacity: 3 } } }))
-      .toThrow(/node.create: layer.props.opacity/)
-    expect(() => tab.run('node.create', { parentId: 'nowhere', layer: badge }))
-      .toThrow(/node.create: parent "nowhere" is neither a page nor a layer/)
+    expect(() =>
+      tab.run('node.create', { parentId: 'p1', layer: { ...badge, props: { ...badge.props, opacity: 3 } } }),
+    ).toThrow(/node.create: layer.props.opacity/)
+    expect(() => tab.run('node.create', { parentId: 'nowhere', layer: badge })).toThrow(
+      /node.create: parent "nowhere" is neither a page nor a layer/,
+    )
     expect(Y.encodeStateVector(doc)).toEqual(before)
   })
 
@@ -79,13 +92,18 @@ describe('commands', () => {
   it('node.update refuses a patch that would make the layer invalid', () => {
     const tab = openSession(freshDoc())
     expect(() => tab.run('node.update', { ids: ['box'], patch: { opacity: 2 } })).toThrow(/node.update: box.opacity/)
-    expect(() => tab.run('node.update', { ids: ['box'], patch: { text: 'x' } })).toThrow(/node.update: a graphic has no property "text"/)
+    expect(() => tab.run('node.update', { ids: ['box'], patch: { text: 'x' } })).toThrow(
+      /node.update: a graphic has no property "text"/,
+    )
   })
 
   it('node.move changes parent and order, and refuses to put a layer inside itself', () => {
     const doc = freshDoc()
     const tab = openSession(doc)
-    const group = tab.run('node.create', { parentId: 'p1', layer: { type: 'group', name: 'G', props: { x: 0, y: 0, width: 10, height: 10 } } })
+    const group = tab.run('node.create', {
+      parentId: 'p1',
+      layer: { type: 'group', name: 'G', props: { x: 0, y: 0, width: 10, height: 10 } },
+    })
 
     tab.run('node.move', { id: 'box', parentId: group })
     expect(readDesign(doc).nodes.box?.parentId).toBe(group)
@@ -95,14 +113,22 @@ describe('commands', () => {
     expect(order).toEqual([group, 'headline'])
 
     expect(() => tab.run('node.move', { id: group, parentId: 'box' })).toThrow(/parent "box" is a graphic/)
-    const inner = tab.run('node.create', { parentId: group, layer: { type: 'group', name: 'Inner', props: { x: 0, y: 0, width: 5, height: 5 } } })
-    expect(() => tab.run('node.move', { id: group, parentId: inner })).toThrow(/node.move: can't move "\S+" inside itself/)
+    const inner = tab.run('node.create', {
+      parentId: group,
+      layer: { type: 'group', name: 'Inner', props: { x: 0, y: 0, width: 5, height: 5 } },
+    })
+    expect(() => tab.run('node.move', { id: group, parentId: inner })).toThrow(
+      /node.move: can't move "\S+" inside itself/,
+    )
   })
 
   it('node.delete removes layers, their children and their overrides', () => {
     const doc = freshDoc()
     const tab = openSession(doc)
-    const group = tab.run('node.create', { parentId: 'p1', layer: { type: 'group', name: 'G', props: { x: 0, y: 0, width: 10, height: 10 } } })
+    const group = tab.run('node.create', {
+      parentId: 'p1',
+      layer: { type: 'group', name: 'G', props: { x: 0, y: 0, width: 10, height: 10 } },
+    })
     tab.run('node.move', { id: 'headline', parentId: group })
 
     tab.run('node.delete', { ids: [group] })
@@ -132,8 +158,12 @@ describe('commands', () => {
       { start: 4, end: 5, style: { fontWeight: 800 } },
     ])
 
-    expect(() => tab.run('text.edit', { id: 'box', op: { kind: 'delete', at: 0, length: 1 } })).toThrow(/"box" is a graphic, not a text layer/)
-    expect(() => tab.run('text.edit', { id: 'headline', op: { kind: 'delete', at: 3, length: 9 } })).toThrow(/runs past the end/)
+    expect(() => tab.run('text.edit', { id: 'box', op: { kind: 'delete', at: 0, length: 1 } })).toThrow(
+      /"box" is a graphic, not a text layer/,
+    )
+    expect(() => tab.run('text.edit', { id: 'headline', op: { kind: 'delete', at: 3, length: 9 } })).toThrow(
+      /runs past the end/,
+    )
   })
 
   it("text.edit keeps a format's own runs on their characters as text is typed and deleted, and leaves a format with its own text be", () => {
@@ -141,7 +171,14 @@ describe('commands', () => {
       ...testDesign(),
       overrides: {
         // The square's own runs: "Summer" bigger, "sale" in pink.
-        'format:sq': { headline: { runs: [{ start: 0, end: 6, style: { fontSize: 120 } }, { start: 7, end: 11, style: { color: '#FF3D6EFF' } }] } },
+        'format:sq': {
+          headline: {
+            runs: [
+              { start: 0, end: 6, style: { fontSize: 120 } },
+              { start: 7, end: 11, style: { color: '#FF3D6EFF' } },
+            ],
+          },
+        },
         'format:banner': { headline: { text: 'Sale', runs: [{ start: 0, end: 4, style: { fontWeight: 800 } }] } },
       },
     })
@@ -151,28 +188,45 @@ describe('commands', () => {
     const own = () => readDesign(doc).overrides['format:sq']?.headline?.runs
     // Before every run: both move along.
     tab.run('text.edit', { id: 'headline', op: { kind: 'insert', at: 0, text: 'Hot ' } })
-    expect(own()).toEqual([{ start: 4, end: 10, style: { fontSize: 120 } }, { start: 11, end: 15, style: { color: '#FF3D6EFF' } }])
+    expect(own()).toEqual([
+      { start: 4, end: 10, style: { fontSize: 120 } },
+      { start: 11, end: 15, style: { color: '#FF3D6EFF' } },
+    ])
     // Inside a run, and at its end, as the text takes the character before's style: it grows.
     tab.run('text.edit', { id: 'headline', op: { kind: 'insert', at: 7, text: 'mmm' } })
     tab.run('text.edit', { id: 'headline', op: { kind: 'insert', at: 18, text: '!' } })
     expect(readDesign(doc).nodes.headline?.props).toMatchObject({ text: 'Hot Summmmmer sale!' })
-    expect(own()).toEqual([{ start: 4, end: 13, style: { fontSize: 120 } }, { start: 14, end: 19, style: { color: '#FF3D6EFF' } }])
+    expect(own()).toEqual([
+      { start: 4, end: 13, style: { fontSize: 120 } },
+      { start: 14, end: 19, style: { color: '#FF3D6EFF' } },
+    ])
     // A delete across a run's edge trims it; one across a whole run removes it.
     tab.run('text.edit', { id: 'headline', op: { kind: 'delete', at: 10, length: 5 } })
-    expect(own()).toEqual([{ start: 4, end: 10, style: { fontSize: 120 } }, { start: 10, end: 14, style: { color: '#FF3D6EFF' } }])
+    expect(own()).toEqual([
+      { start: 4, end: 10, style: { fontSize: 120 } },
+      { start: 10, end: 14, style: { color: '#FF3D6EFF' } },
+    ])
     tab.run('text.edit', { id: 'headline', op: { kind: 'delete', at: 9, length: 5 } })
     expect(own()).toEqual([{ start: 4, end: 9, style: { fontSize: 120 } }])
     // The banner's own text has its own runs, which the base's typing never moves.
-    expect(readDesign(doc).overrides['format:banner']?.headline?.runs).toEqual([{ start: 0, end: 4, style: { fontWeight: 800 } }])
+    expect(readDesign(doc).overrides['format:banner']?.headline?.runs).toEqual([
+      { start: 0, end: 4, style: { fontWeight: 800 } },
+    ])
     // Each edit is one undo step, its runs with it.
     tab.undo()
-    expect(own()).toEqual([{ start: 4, end: 10, style: { fontSize: 120 } }, { start: 10, end: 14, style: { color: '#FF3D6EFF' } }])
+    expect(own()).toEqual([
+      { start: 4, end: 10, style: { fontSize: 120 } },
+      { start: 10, end: 14, style: { color: '#FF3D6EFF' } },
+    ])
   })
 
   it('text.fit sizes a text box in each format, base from the primary, one undo step', () => {
     const doc = freshDoc()
     const tab = openSession(doc)
-    tab.run('text.fit', { id: 'headline', sizes: { sq: { width: 300, height: 90 }, banner: { width: 120, height: 40 } } })
+    tab.run('text.fit', {
+      id: 'headline',
+      sizes: { sq: { width: 300, height: 90 }, banner: { width: 120, height: 40 } },
+    })
     const d = readDesign(doc)
     expect(d.nodes.headline?.props).toMatchObject({ width: 300, height: 90 })
     expect(d.overrides['format:banner']?.headline).toMatchObject({ width: 120, height: 40 })
@@ -180,7 +234,9 @@ describe('commands', () => {
     tab.undo()
     expect(readDesign(doc).nodes.headline?.props).not.toMatchObject({ width: 300, height: 90 })
     expect(() => tab.run('text.fit', { id: 'box', sizes: {} })).toThrow(/"box" is a graphic, not a text layer/)
-    expect(() => tab.run('text.fit', { id: 'headline', sizes: { story: { width: 1, height: 1 } } })).toThrow(/no format "story"/)
+    expect(() => tab.run('text.fit', { id: 'headline', sizes: { story: { width: 1, height: 1 } } })).toThrow(
+      /no format "story"/,
+    )
   })
 
   it('page.add and format.add extend the design', () => {
@@ -214,7 +270,13 @@ describe('commands', () => {
 
     // Half the square's size, with room to spare across: scale 0.5, centred both ways.
     tab.run('format.add', { id: 'small', name: 'Small', width: 600, height: 540 })
-    expect(readDesign(doc).overrides['format:small']?.box).toEqual({ x: 100, y: 50, width: 100, height: 50, rotation: 15 })
+    expect(readDesign(doc).overrides['format:small']?.box).toEqual({
+      x: 100,
+      y: 50,
+      width: 100,
+      height: 50,
+      rotation: 15,
+    })
   })
 
   it('format.add and format.update refuse sizes outside 1:3 to 3:1 or under the short side', () => {
@@ -232,7 +294,10 @@ describe('commands', () => {
     tab.run('format.add', { id: 'story', name: 'Story', width: 1080, height: 1920 })
     tab.run('format.update', { id: 'story', name: 'Reel', width: 1080, height: 1350 })
     tab.run('format.update', { id: 'story', before: 'sq' })
-    const order = (d = readDesign(doc)) => Object.entries(d.formats).sort(([, a], [, b]) => (a.order < b.order ? -1 : 1)).map(([id]) => id)
+    const order = (d = readDesign(doc)) =>
+      Object.entries(d.formats)
+        .sort(([, a], [, b]) => (a.order < b.order ? -1 : 1))
+        .map(([id]) => id)
     expect(readDesign(doc).formats.story).toMatchObject({ name: 'Reel', width: 1080, height: 1350 })
     expect(order()).toEqual(['story', 'sq', 'banner'])
     tab.run('format.update', { id: 'story', before: null })
@@ -267,20 +332,32 @@ describe('commands', () => {
     const doc = freshDoc()
     const tab = openSession(doc)
     tab.run('page.add', { id: 'p2', name: 'Card 2' })
-    tab.run('node.create', { id: 'g', parentId: 'p1', layer: { type: 'group', name: 'G', props: { x: 0, y: 0, width: 10, height: 10 } } })
+    tab.run('node.create', {
+      id: 'g',
+      parentId: 'p1',
+      layer: { type: 'group', name: 'G', props: { x: 0, y: 0, width: 10, height: 10 } },
+    })
     tab.run('node.create', { id: 'dot', parentId: 'g', layer: badge })
 
     const copy = tab.run('page.duplicate', { id: 'p1', name: 'Card 1 copy' })
 
     const design = readDesign(doc)
-    const order = Object.entries(design.pages).sort(([, a], [, b]) => (a.order < b.order ? -1 : 1)).map(([id]) => id)
+    const order = Object.entries(design.pages)
+      .sort(([, a], [, b]) => (a.order < b.order ? -1 : 1))
+      .map(([id]) => id)
     expect(order).toEqual(['p1', copy, 'p2'])
     expect(design.pages[copy]).toMatchObject({ name: 'Card 1 copy', fills: design.pages.p1?.fills })
-    const copied = Object.entries(design.nodes).filter(([, n]) => n.parentId === copy).map(([id, n]) => ({ id, name: n.name }))
+    const copied = Object.entries(design.nodes)
+      .filter(([, n]) => n.parentId === copy)
+      .map(([id, n]) => ({ id, name: n.name }))
     expect(copied.map((c) => c.name).sort()).toEqual(['Box', 'G', 'Headline'])
     expect(copied.every((c) => !['box', 'headline', 'g'].includes(c.id))).toBe(true)
     const group = copied.find((c) => c.name === 'G')?.id ?? ''
-    expect(Object.values(design.nodes).filter((n) => n.parentId === group).map((n) => n.name)).toEqual(['Badge'])
+    expect(
+      Object.values(design.nodes)
+        .filter((n) => n.parentId === group)
+        .map((n) => n.name),
+    ).toEqual(['Badge'])
     const headline = copied.find((c) => c.name === 'Headline')?.id ?? ''
     expect(design.overrides['format:banner']?.[headline]).toEqual(design.overrides['format:banner']?.headline)
     expect(design.nodes[headline]).toMatchObject({ props: { text: 'Summer sale' } })
@@ -295,7 +372,10 @@ describe('commands', () => {
     const tab = openSession(doc)
     tab.run('page.add', { id: 'p2', name: 'Card 2' })
     tab.run('page.add', { id: 'p3', name: 'Card 3' })
-    const order = () => Object.entries(readDesign(doc).pages).sort(([, a], [, b]) => (a.order < b.order ? -1 : 1)).map(([id]) => id)
+    const order = () =>
+      Object.entries(readDesign(doc).pages)
+        .sort(([, a], [, b]) => (a.order < b.order ? -1 : 1))
+        .map(([id]) => id)
     tab.run('page.move', { id: 'p3', before: 'p1' })
     expect(order()).toEqual(['p3', 'p1', 'p2'])
     tab.run('page.move', { id: 'p3', before: null })
@@ -341,7 +421,9 @@ describe('commands', () => {
 
   it('node.move refuses to place a layer before itself', () => {
     const tab = openSession(freshDoc())
-    expect(() => tab.run('node.move', { id: 'box', parentId: 'p1', before: 'box' })).toThrow(/node.move: can't place "box" before itself/)
+    expect(() => tab.run('node.move', { id: 'box', parentId: 'p1', before: 'box' })).toThrow(
+      /node.move: can't place "box" before itself/,
+    )
   })
 
   it('node.move and node.create work among siblings with tied or non-canonical indexes', () => {
@@ -357,7 +439,11 @@ describe('commands', () => {
     const id = tab.run('node.create', { parentId: 'p1', layer: badge })
     tab.run('node.move', { id, parentId: 'p1', before: 'headline' })
 
-    expect(childrenOf(readDesign(doc), 'p1').map(([n]) => n).at(-1)).not.toBe(id)
+    expect(
+      childrenOf(readDesign(doc), 'p1')
+        .map(([n]) => n)
+        .at(-1),
+    ).not.toBe(id)
   })
 
   describe('z-order', () => {
@@ -400,7 +486,11 @@ describe('commands', () => {
 
     it('node.reorder works within each parent', () => {
       const { doc, tab, order } = stacked()
-      tab.run('node.create', { id: 'g', parentId: 'p1', layer: { type: 'group', name: 'G', props: { x: 0, y: 0, width: 10, height: 10 } } })
+      tab.run('node.create', {
+        id: 'g',
+        parentId: 'p1',
+        layer: { type: 'group', name: 'G', props: { x: 0, y: 0, width: 10, height: 10 } },
+      })
       tab.run('node.create', { id: 'in1', parentId: 'g', layer: badge })
       tab.run('node.create', { id: 'in2', parentId: 'g', layer: badge })
       tab.run('node.reorder', { ids: ['in1', 'a'], to: 'front' })
@@ -412,7 +502,11 @@ describe('commands', () => {
   it('node.duplicate copies layers right above themselves, with what is inside them and their overrides', () => {
     const doc = freshDoc()
     const tab = openSession(doc)
-    tab.run('node.create', { id: 'g', parentId: 'p1', layer: { type: 'group', name: 'G', props: { x: 0, y: 0, width: 10, height: 10 } } })
+    tab.run('node.create', {
+      id: 'g',
+      parentId: 'p1',
+      layer: { type: 'group', name: 'G', props: { x: 0, y: 0, width: 10, height: 10 } },
+    })
     tab.run('node.create', { id: 'dot', parentId: 'g', layer: badge })
     tab.run('node.update', { ids: ['dot'], scope: 'format:banner', patch: { x: 3 } })
 
@@ -467,40 +561,87 @@ describe('commands', () => {
     let design = readDesign(doc)
     expect(design.nodes.box?.bindings).toEqual({ fill: 'brand:primary' })
     // The token's value is stored too, for drawing without the brand kit.
-    expect(design.nodes.box?.type === 'graphic' && design.nodes.box.props.fills.at(-1)).toMatchObject({ type: 'solid', color: '#E0262BFF' })
+    expect(design.nodes.box?.type === 'graphic' && design.nodes.box.props.fills.at(-1)).toMatchObject({
+      type: 'solid',
+      color: '#E0262BFF',
+    })
     tab.run('node.bind', { ids: ['headline'], target: 'fontFamily', ref: 'brand:heading', value: 'Playfair Display' })
     tab.run('node.bind', { ids: ['headline'], target: 'textColor', ref: 'brand:primary', value: '#E0262BFF' })
     design = readDesign(doc)
     expect(design.nodes.headline?.bindings).toEqual({ fontFamily: 'brand:heading', textColor: 'brand:primary' })
-    expect(design.nodes.headline?.type === 'text' && design.nodes.headline.props.style).toMatchObject({ fontFamily: 'Playfair Display', color: '#E0262BFF' })
+    expect(design.nodes.headline?.type === 'text' && design.nodes.headline.props.style).toMatchObject({
+      fontFamily: 'Playfair Display',
+      color: '#E0262BFF',
+    })
     // Unbinding keeps the value; the last binding gone, the key goes.
     tab.run('node.bind', { ids: ['box'], target: 'fill', ref: null })
     design = readDesign(doc)
     expect(design.nodes.box).not.toHaveProperty('bindings')
-    expect(design.nodes.box?.type === 'graphic' && design.nodes.box.props.fills.at(-1)).toMatchObject({ color: '#E0262BFF' })
+    expect(design.nodes.box?.type === 'graphic' && design.nodes.box.props.fills.at(-1)).toMatchObject({
+      color: '#E0262BFF',
+    })
     tab.undo()
     expect(readDesign(doc).nodes.box?.bindings).toEqual({ fill: 'brand:primary' })
     tab.undo()
     tab.undo()
     expect(readDesign(doc).nodes.headline).not.toHaveProperty('bindings')
     // A text layer has no fill, a binding needs the value, and a locked style can't be bound.
-    expect(() => tab.run('node.bind', { ids: ['headline'], target: 'fill', ref: 'brand:primary', value: '#E0262BFF' })).toThrow(/a text has no fill/)
-    expect(() => tab.run('node.bind', { ids: ['box'], target: 'fill', ref: 'brand:primary' })).toThrow(/needs the value/)
-    expect(() => tab.run('node.bind', { ids: ['box'], target: 'fill', ref: 'brand:primary', value: 'red' })).toThrow(/#RRGGBBAA/)
+    expect(() =>
+      tab.run('node.bind', { ids: ['headline'], target: 'fill', ref: 'brand:primary', value: '#E0262BFF' }),
+    ).toThrow(/a text has no fill/)
+    expect(() => tab.run('node.bind', { ids: ['box'], target: 'fill', ref: 'brand:primary' })).toThrow(
+      /needs the value/,
+    )
+    expect(() => tab.run('node.bind', { ids: ['box'], target: 'fill', ref: 'brand:primary', value: 'red' })).toThrow(
+      /#RRGGBBAA/,
+    )
     tab.run('node.lock', { ids: ['box'], lock: { style: true } })
     expect(() => tab.run('node.bind', { ids: ['box'], target: 'fill', ref: null })).toThrow(/locked \(style\)/)
   })
 
   describe('design.place', () => {
     // A group holding a box and a text, as a copy puts it on the clipboard.
-    const tree = () => ({
-      roots: ['g'],
-      nodes: {
-        g: { type: 'group', parentId: 'elsewhere', index: 'a5', name: 'Card', props: { x: 10, y: 20, width: 300, height: 200 } },
-        tile: { type: 'graphic', parentId: 'g', index: 'a0', name: 'Tile', props: { x: 10, y: 20, width: 300, height: 200, shape: { kind: 'rect' }, fills: [{ type: 'solid', color: '#2F6BFFFF' }] } },
-        label: { type: 'text', parentId: 'g', index: 'a1', name: 'Label', props: { x: 30, y: 40, width: 200, height: 60, text: 'Hi', style: { fontFamily: 'Noto Sans', fontSize: 40, color: '#FFFFFFFF' } } },
-      },
-    }) satisfies z.input<typeof LayerTree>
+    const tree = () =>
+      ({
+        roots: ['g'],
+        nodes: {
+          g: {
+            type: 'group',
+            parentId: 'elsewhere',
+            index: 'a5',
+            name: 'Card',
+            props: { x: 10, y: 20, width: 300, height: 200 },
+          },
+          tile: {
+            type: 'graphic',
+            parentId: 'g',
+            index: 'a0',
+            name: 'Tile',
+            props: {
+              x: 10,
+              y: 20,
+              width: 300,
+              height: 200,
+              shape: { kind: 'rect' },
+              fills: [{ type: 'solid', color: '#2F6BFFFF' }],
+            },
+          },
+          label: {
+            type: 'text',
+            parentId: 'g',
+            index: 'a1',
+            name: 'Label',
+            props: {
+              x: 30,
+              y: 40,
+              width: 200,
+              height: 60,
+              text: 'Hi',
+              style: { fontFamily: 'Noto Sans', fontSize: 40, color: '#FFFFFFFF' },
+            },
+          },
+        },
+      }) satisfies z.input<typeof LayerTree>
 
     it('places a tree with fresh ids on top, moved by the offset, in one undo step', () => {
       const doc = freshDoc()
@@ -532,12 +673,32 @@ describe('commands', () => {
     it('refuses a tree that is not whole, holds a layer its parent cannot, loops, or does not fit where it goes', () => {
       const tab = openSession(freshDoc())
       const t = tree()
-      expect(() => tab.run('design.place', { parentId: 'p1', tree: { ...t, roots: ['nope'] } })).toThrow(/root "nope" is not in the tree/)
-      expect(() => tab.run('design.place', { parentId: 'p1', tree: { ...t, nodes: { ...t.nodes, label: { ...t.nodes.label, parentId: 'gone' } } } })).toThrow(/"label" is neither a root nor inside one/)
-      expect(() => tab.run('design.place', { parentId: 'p1', tree: { ...t, nodes: { ...t.nodes, label: { ...t.nodes.label, parentId: 'tile' } } } })).toThrow(/a graphic, which can't hold "label"/)
-      const loop = { roots: ['tile'], nodes: { tile: t.nodes.tile, a: { ...t.nodes.g, parentId: 'b' }, b: { ...t.nodes.g, parentId: 'a' } } }
+      expect(() => tab.run('design.place', { parentId: 'p1', tree: { ...t, roots: ['nope'] } })).toThrow(
+        /root "nope" is not in the tree/,
+      )
+      expect(() =>
+        tab.run('design.place', {
+          parentId: 'p1',
+          tree: { ...t, nodes: { ...t.nodes, label: { ...t.nodes.label, parentId: 'gone' } } },
+        }),
+      ).toThrow(/"label" is neither a root nor inside one/)
+      expect(() =>
+        tab.run('design.place', {
+          parentId: 'p1',
+          tree: { ...t, nodes: { ...t.nodes, label: { ...t.nodes.label, parentId: 'tile' } } },
+        }),
+      ).toThrow(/a graphic, which can't hold "label"/)
+      const loop = {
+        roots: ['tile'],
+        nodes: { tile: t.nodes.tile, a: { ...t.nodes.g, parentId: 'b' }, b: { ...t.nodes.g, parentId: 'a' } },
+      }
       expect(() => tab.run('design.place', { parentId: 'p1', tree: loop })).toThrow(/is inside itself/)
-      expect(() => tab.run('design.place', { parentId: 'p1', tree: { ...t, nodes: { ...t.nodes, tile: { ...t.nodes.tile, props: { ...t.nodes.tile.props, width: -1 } } } } })).toThrow(/width/)
+      expect(() =>
+        tab.run('design.place', {
+          parentId: 'p1',
+          tree: { ...t, nodes: { ...t.nodes, tile: { ...t.nodes.tile, props: { ...t.nodes.tile.props, width: -1 } } } },
+        }),
+      ).toThrow(/width/)
       expect(() => tab.run('design.place', { parentId: 'box', tree: t })).toThrow(/a graphic, which can't hold layers/)
       expect(() => tab.run('design.place', { parentId: 'nowhere', tree: t })).toThrow(/neither a page nor a layer/)
     })
@@ -548,7 +709,13 @@ describe('commands', () => {
       const doc = freshDoc()
       const tab = openSession(doc)
       tab.run('node.lock', { ids: ['box'], lock: { move: true } })
-      expect(readDesign(doc).nodes.box?.lock).toEqual({ move: true, resize: false, content: false, style: false, delete: false })
+      expect(readDesign(doc).nodes.box?.lock).toEqual({
+        move: true,
+        resize: false,
+        content: false,
+        style: false,
+        delete: false,
+      })
       tab.run('node.lock', { ids: ['box'], lock: { delete: true } })
       expect(readDesign(doc).nodes.box?.lock).toMatchObject({ move: true, delete: true })
       tab.run('node.lock', { ids: ['box'], lock: { move: false, delete: false } })
@@ -563,15 +730,21 @@ describe('commands', () => {
       const all = { move: true, resize: true, content: true, style: true, delete: true }
       tab.run('node.lock', { ids: ['box', 'headline'], lock: { move: true } })
       expect(() => tab.run('node.update', { ids: ['box'], patch: { x: 1 } })).toThrow(/"box" is locked \(move\)/)
-      expect(() => tab.run('node.update', { ids: ['box'], scope: 'format:banner', patch: { y: 1 } })).toThrow(/locked \(move\)/)
+      expect(() => tab.run('node.update', { ids: ['box'], scope: 'format:banner', patch: { y: 1 } })).toThrow(
+        /locked \(move\)/,
+      )
       tab.run('node.update', { ids: ['box'], patch: { width: 50, opacity: 0.5 } })
       tab.run('node.update', { ids: ['box'], scope: 'format:banner', patch: { visible: false } })
 
       tab.run('node.lock', { ids: ['box', 'headline'], lock: all })
       expect(() => tab.run('node.update', { ids: ['box'], patch: { rotation: 15 } })).toThrow(/locked \(resize\)/)
       expect(() => tab.run('node.update', { ids: ['box'], patch: { opacity: 1 } })).toThrow(/locked \(style\)/)
-      expect(() => tab.run('text.edit', { id: 'headline', op: { kind: 'insert', at: 0, text: 'Big ' } })).toThrow(/locked \(content\)/)
-      expect(() => tab.run('text.edit', { id: 'headline', op: { kind: 'style', at: 0, length: 3, style: { fontWeight: 700 } } })).toThrow(/locked \(style\)/)
+      expect(() => tab.run('text.edit', { id: 'headline', op: { kind: 'insert', at: 0, text: 'Big ' } })).toThrow(
+        /locked \(content\)/,
+      )
+      expect(() =>
+        tab.run('text.edit', { id: 'headline', op: { kind: 'style', at: 0, length: 3, style: { fontWeight: 700 } } }),
+      ).toThrow(/locked \(style\)/)
       expect(() => tab.run('node.delete', { ids: ['box'] })).toThrow(/locked \(delete\)/)
       // Hiding is not locked, z-order and copies aren't either.
       tab.run('node.update', { ids: ['box'], patch: { visible: false } })
@@ -580,10 +753,14 @@ describe('commands', () => {
       expect(readDesign(doc).nodes.box?.props).toMatchObject({ width: 50, opacity: 0.5, visible: false })
     })
 
-    it('a group with a delete-locked layer inside can\'t be deleted', () => {
+    it("a group with a delete-locked layer inside can't be deleted", () => {
       const doc = freshDoc()
       const tab = openSession(doc)
-      tab.run('node.create', { id: 'g', parentId: 'p1', layer: { type: 'group', name: 'G', props: { x: 0, y: 0, width: 10, height: 10 } } })
+      tab.run('node.create', {
+        id: 'g',
+        parentId: 'p1',
+        layer: { type: 'group', name: 'G', props: { x: 0, y: 0, width: 10, height: 10 } },
+      })
       tab.run('node.create', { id: 'dot', parentId: 'g', layer: badge })
       tab.run('node.lock', { ids: ['dot'], lock: { delete: true } })
       expect(() => tab.run('node.delete', { ids: ['g'] })).toThrow(/"dot" is locked \(delete\)/)
@@ -595,7 +772,9 @@ describe('commands', () => {
 describe('node.visibleEverywhere', () => {
   const visibleIn = (doc: Y.Doc, id: string) => {
     const design = readDesign(doc)
-    return Object.keys(design.formats).map((f) => (design.overrides[`format:${f}`]?.[id]?.visible ?? design.nodes[id]?.props.visible) !== false)
+    return Object.keys(design.formats).map(
+      (f) => (design.overrides[`format:${f}`]?.[id]?.visible ?? design.nodes[id]?.props.visible) !== false,
+    )
   }
 
   it('hides a layer in every format, then shows it, one undo step each, and leaves its other own values', () => {

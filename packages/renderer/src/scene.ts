@@ -1,5 +1,6 @@
 import { childrenOf } from '@dazbee/doc'
 import { bindProps, type Design, type Layer, type Paint, type Variables } from '@dazbee/schema'
+
 import { applyLayout, type MeasureText } from './layout.ts'
 
 /** One layer as a scene draws it: its props with the format's overrides applied, and its visible children. */
@@ -26,7 +27,10 @@ export interface Scene {
  * back the same layer object while its node, its override in the format and its children are the
  * same objects, so a cache can know an unchanged layer by identity alone.
  */
-export type SceneMemo = Map<string, WeakMap<object, { override: unknown; variables: Variables | undefined; layer: SceneLayer }>>
+export type SceneMemo = Map<
+  string,
+  WeakMap<object, { override: unknown; variables: Variables | undefined; layer: SceneLayer }>
+>
 export const sceneMemo = (): SceneMemo => new Map()
 
 const sameLayers = (a: SceneLayer[], b: SceneLayer[]) => a.length === b.length && a.every((layer, i) => layer === b[i])
@@ -36,7 +40,14 @@ const sameLayers = (a: SceneLayer[], b: SceneLayer[]) => a.length === b.length &
  * read. Without `measure`, text in an auto layout keeps the size its box says. Bound properties take
  * their values from `variables`, the brand kit's (#53), or stay as stored without one.
  */
-export function render(design: Design, pageId: string, formatId: string, memo?: SceneMemo, measure?: MeasureText, variables?: Variables): Scene {
+export function render(
+  design: Design,
+  pageId: string,
+  formatId: string,
+  memo?: SceneMemo,
+  measure?: MeasureText,
+  variables?: Variables,
+): Scene {
   const page = design.pages[pageId]
   if (!page) throw new Error(`no page "${pageId}"`)
   const format = design.formats[formatId]
@@ -54,11 +65,30 @@ export function render(design: Design, pageId: string, formatId: string, memo?: 
       // Only a bound layer depends on the variables, so a brand change rebuilds only those.
       const used = node.bindings ? variables : undefined
       const before = built?.get(node)
-      if (before && before.override === override && before.variables === used && before.layer.id === id && sameLayers(before.layer.children, children)) return [before.layer]
-      const layer = { id, type: node.type, props: bindProps(node.type, props, node.bindings, used), children } as SceneLayer
+      if (
+        before &&
+        before.override === override &&
+        before.variables === used &&
+        before.layer.id === id &&
+        sameLayers(before.layer.children, children)
+      )
+        return [before.layer]
+      const layer = {
+        id,
+        type: node.type,
+        props: bindProps(node.type, props, node.bindings, used),
+        children,
+      } as SceneLayer
       built?.set(node, { override, variables: used, layer })
       return [layer]
     })
 
-  return { pageId, formatId, width: format.width, height: format.height, fills: page.fills, layers: applyLayout(layersUnder(pageId), measure) }
+  return {
+    pageId,
+    formatId,
+    width: format.width,
+    height: format.height,
+    fills: page.fills,
+    layers: applyLayout(layersUnder(pageId), measure),
+  }
 }

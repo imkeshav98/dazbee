@@ -1,7 +1,9 @@
-import { parseDesign } from '@dazbee/schema'
 import { describe, expect, it } from 'vitest'
 import * as Y from 'yjs'
-import { compact, loadDesign, openSession, readDesign, type DesignDoc } from './index.ts'
+
+import { parseDesign } from '@dazbee/schema'
+
+import { compact, type DesignDoc, loadDesign, openSession, readDesign } from './index.ts'
 import { testDesign } from './test-design.ts'
 
 const freshDoc = () => {
@@ -10,11 +12,19 @@ const freshDoc = () => {
   return loadDesign(result.design)
 }
 const sizeOf = (doc: DesignDoc) => Y.encodeStateAsUpdate(doc).byteLength
-const badge = (x: number) => ({
-  type: 'graphic',
-  name: 'Badge',
-  props: { x, y: 40, width: 120, height: 120, shape: { kind: 'ellipse' }, fills: [{ type: 'solid', color: '#FFC400FF' }] },
-} as const)
+const badge = (x: number) =>
+  ({
+    type: 'graphic',
+    name: 'Badge',
+    props: {
+      x,
+      y: 40,
+      width: 120,
+      height: 120,
+      shape: { kind: 'ellipse' },
+      fills: [{ type: 'solid', color: '#FFC400FF' }],
+    },
+  }) as const
 
 /** 50 layers that stay, made with commands, and with `deletes` more made, overridden and deleted. */
 function edited(deletes: number) {

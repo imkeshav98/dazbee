@@ -1,7 +1,7 @@
 // The Brands page (ADR-0011, ADR-0013) as in the final mock: a card per brand in its kit's colours,
 // with how many designs it has, and a last card that adds a brand and opens its home.
-import { expect, test } from '../support/test.ts'
 import { writeOutput } from '../support/editor.ts'
+import { expect, test } from '../support/test.ts'
 
 test('each brand has a card with its design count, and New brand adds one', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 })

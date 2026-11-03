@@ -8,5 +8,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ bra
   if (!link) return new Response('No such font', { status: 404 })
   const stored = await fetch(link.previewUrl, { cache: 'no-store' })
   if (!stored.ok) return new Response('Storage did not answer', { status: 502 })
-  return new Response(stored.body, { headers: { 'content-type': 'image/png', 'cache-control': 'private, max-age=86400' } })
+  return new Response(stored.body, {
+    headers: { 'content-type': 'image/png', 'cache-control': 'private, max-age=86400' },
+  })
 }

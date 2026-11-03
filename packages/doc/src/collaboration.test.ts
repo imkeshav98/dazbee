@@ -1,7 +1,18 @@
-import { parseDesign, type Design } from '@dazbee/schema'
 import { describe, expect, it } from 'vitest'
 import * as Y from 'yjs'
-import { anchorOffset, childrenOf, loadDesign, openSession, readDesign, textAnchor, type DesignDoc, type Session } from './index.ts'
+
+import { type Design, parseDesign } from '@dazbee/schema'
+
+import {
+  anchorOffset,
+  childrenOf,
+  type DesignDoc,
+  loadDesign,
+  openSession,
+  readDesign,
+  type Session,
+  textAnchor,
+} from './index.ts'
 import { testDesign } from './test-design.ts'
 
 /** Two tabs on one design, each with its own doc, exchanging updates like the sync server would. */
@@ -125,7 +136,10 @@ describe('two tabs', () => {
 
   it('undoing an edit that won over a concurrent edit restores the old value instead of leaving it unset', () => {
     // Yjs alone deletes the key here: the old value was overwritten by both tabs, so its undo has nothing to restore.
-    for (const [first, second] of [['a', 'b'], ['b', 'a']] as const) {
+    for (const [first, second] of [
+      ['a', 'b'],
+      ['b', 'a'],
+    ] as const) {
       const tabs = twoTabs()
       const tab = { a: tabs.tabA, b: tabs.tabB }
       tab[first].run('node.update', { ids: ['box'], patch: { x: 1 } })
@@ -195,7 +209,8 @@ describe('two tabs', () => {
   it('undoing a drag that first overrode a layer in a format removes the override whole', () => {
     const { a, b, tabA, sync } = twoTabs()
     tabA.gesture(() => {
-      for (let i = 1; i <= 5; i++) tabA.run('node.update', { ids: ['box'], scope: 'format:banner', patch: { x: 100 + i, y: 100 + i } })
+      for (let i = 1; i <= 5; i++)
+        tabA.run('node.update', { ids: ['box'], scope: 'format:banner', patch: { x: 100 + i, y: 100 + i } })
     })
     sync()
     tabA.undo()
@@ -211,7 +226,8 @@ describe('two tabs', () => {
     tabB.run('node.update', { ids: ['box'], scope: 'format:story', patch: { y: 2 } })
     sync()
     // The new format was seeded with the box's whole scaled layout; both tabs' changes land on it.
-    for (const doc of [a, b]) expect(readDesign(doc).overrides['format:story']?.box).toEqual({ x: 1, y: 2, width: 200, height: 100 })
+    for (const doc of [a, b])
+      expect(readDesign(doc).overrides['format:story']?.box).toEqual({ x: 1, y: 2, width: 200, height: 100 })
   })
 
   it('a move in a format another tab removed at once leaves no overrides behind', () => {
@@ -221,7 +237,10 @@ describe('two tabs', () => {
     tabA.run('format.remove', { id: 'story' })
     tabB.run('node.update', { ids: ['box'], scope: 'format:story', patch: { x: 5 } })
     sync()
-    for (const [doc, tab] of [[a, tabA], [b, tabB]] as const) {
+    for (const [doc, tab] of [
+      [a, tabA],
+      [b, tabB],
+    ] as const) {
       expect(readDesign(doc).formats.story).toBeUndefined()
       expect(readDesign(doc).overrides['format:story']).toBeUndefined()
       expect(tab.design().overrides['format:story']).toBeUndefined()
@@ -235,7 +254,10 @@ describe('two tabs', () => {
     tabA.run('format.remove', { id: 'story' })
     const [copy = ''] = tabB.run('node.duplicate', { ids: ['box'] })
     sync()
-    for (const [doc, tab] of [[a, tabA], [b, tabB]] as const) {
+    for (const [doc, tab] of [
+      [a, tabA],
+      [b, tabB],
+    ] as const) {
       const design = readDesign(doc)
       expect(design.overrides['format:story']).toBeUndefined()
       expect(design.nodes[copy]).toBeDefined()
@@ -259,33 +281,41 @@ describe('two tabs', () => {
     expect([designA.nodes.g1?.parentId, designA.nodes.g2?.parentId].sort()).toEqual(['g1', 'p1'])
   })
 
-  it.each([1, 7, 42, 2026, 31337])('200 random commands from each tab end in the same valid design on both (seed %i)', (seed) => {
-    const { a, b, tabA, tabB, sync } = twoTabs()
-    const random = seeded(seed)
-    for (let i = 0; i < 200; i++) {
-      randomCommand(tabA, a, random)
-      randomCommand(tabB, b, random)
-      if (random() < 0.3) sync()
-    }
-    sync()
-    expect(readDesign(b)).toEqual(readDesign(a))
-  }, FUZZ_TIMEOUT)
-
-  it.each(process.env.MANY_SEEDS ? Array.from({ length: 300 }, (_, i) => i + 1000) : [3, 99, 4242])("each tab's session view equals a full read after every command, sync and repair (seed %i)", (seed) => {
-    const { a, b, tabA, tabB, sync } = twoTabs()
-    const random = seeded(seed)
-    for (let i = 0; i < 200; i++) {
-      randomCommand(tabA, a, random)
-      expectFullRead(tabA, a)
-      randomCommand(tabB, b, random)
-      expectFullRead(tabB, b)
-      if (random() < 0.3) {
-        sync()
-        expectFullRead(tabA, a)
-        expectFullRead(tabB, b)
+  it.each([1, 7, 42, 2026, 31337])(
+    '200 random commands from each tab end in the same valid design on both (seed %i)',
+    (seed) => {
+      const { a, b, tabA, tabB, sync } = twoTabs()
+      const random = seeded(seed)
+      for (let i = 0; i < 200; i++) {
+        randomCommand(tabA, a, random)
+        randomCommand(tabB, b, random)
+        if (random() < 0.3) sync()
       }
-    }
-  }, FUZZ_TIMEOUT)
+      sync()
+      expect(readDesign(b)).toEqual(readDesign(a))
+    },
+    FUZZ_TIMEOUT,
+  )
+
+  it.each(process.env.MANY_SEEDS ? Array.from({ length: 300 }, (_, i) => i + 1000) : [3, 99, 4242])(
+    "each tab's session view equals a full read after every command, sync and repair (seed %i)",
+    (seed) => {
+      const { a, b, tabA, tabB, sync } = twoTabs()
+      const random = seeded(seed)
+      for (let i = 0; i < 200; i++) {
+        randomCommand(tabA, a, random)
+        expectFullRead(tabA, a)
+        randomCommand(tabB, b, random)
+        expectFullRead(tabB, b)
+        if (random() < 0.3) {
+          sync()
+          expectFullRead(tabA, a)
+          expectFullRead(tabB, b)
+        }
+      }
+    },
+    FUZZ_TIMEOUT,
+  )
 })
 
 /** A session's live design equals a full read of its document, layer order under every parent included. */
@@ -293,14 +323,19 @@ function expectFullRead(tab: Session, doc: DesignDoc) {
   const full = readDesign(doc)
   const view = tab.design()
   expect(view).toEqual(full)
-  const order = (design: Design) => Object.fromEntries([...Object.keys(design.pages), ...Object.keys(design.nodes)]
-    .map((id) => [id, childrenOf(design, id).map(([child]) => child)]))
+  const order = (design: Design) =>
+    Object.fromEntries(
+      [...Object.keys(design.pages), ...Object.keys(design.nodes)].map((id) => [
+        id,
+        childrenOf(design, id).map(([child]) => child),
+      ]),
+    )
   expect(order(view)).toEqual(order(full))
 }
 
 function seeded(seed: number) {
   let s = seed
-  return () => ((s = (s * 1664525 + 1013904223) % 2 ** 32) / 2 ** 32)
+  return () => (s = (s * 1664525 + 1013904223) % 2 ** 32) / 2 ** 32
 }
 
 /** One plausible edit through the tab's commands; refused commands are part of the test too. */
@@ -308,37 +343,66 @@ function randomCommand(tab: Session, doc: DesignDoc, random: () => number) {
   const design = readDesign(doc)
   const ids = Object.keys(design.nodes)
   const pick = <T>(xs: T[]) => xs[Math.floor(random() * xs.length)] as T
-  const containers = [...Object.keys(design.pages), ...ids.filter((id) => ['group', 'frame'].includes(design.nodes[id]?.type ?? ''))]
+  const containers = [
+    ...Object.keys(design.pages),
+    ...ids.filter((id) => ['group', 'frame'].includes(design.nodes[id]?.type ?? '')),
+  ]
   const roll = random()
   try {
     if (roll < 0.2 || ids.length === 0) {
       tab.run('node.create', {
         parentId: pick(containers),
-        layer: random() < 0.3
-          ? { type: 'group', name: 'G', props: { x: 0, y: 0, width: 50, height: 50 } }
-          : { type: 'graphic', name: 'R', props: { x: random() * 1000, y: random() * 1000, width: 40, height: 40, shape: { kind: 'rect' } } },
+        layer:
+          random() < 0.3
+            ? { type: 'group', name: 'G', props: { x: 0, y: 0, width: 50, height: 50 } }
+            : {
+                type: 'graphic',
+                name: 'R',
+                props: { x: random() * 1000, y: random() * 1000, width: 40, height: 40, shape: { kind: 'rect' } },
+              },
       })
     } else if (roll < 0.5) {
-      tab.run('node.update', { ids: [pick(ids)], scope: random() < 0.5 ? 'base' : 'format:banner', patch: { x: Math.round(random() * 1000) } })
+      tab.run('node.update', {
+        ids: [pick(ids)],
+        scope: random() < 0.5 ? 'base' : 'format:banner',
+        patch: { x: Math.round(random() * 1000) },
+      })
     } else if (roll < 0.65) {
       const parentId = pick(containers)
       const under = ids.filter((id) => design.nodes[id]?.parentId === parentId)
-      tab.run('node.move', { id: pick(ids), parentId, ...(under.length && random() < 0.5 ? { before: pick(under) } : {}) })
+      tab.run('node.move', {
+        id: pick(ids),
+        parentId,
+        ...(under.length && random() < 0.5 ? { before: pick(under) } : {}),
+      })
     } else if (roll < 0.75) {
       tab.run('node.delete', { ids: [pick(ids)] })
     } else if (roll < 0.9 && design.nodes.headline?.type === 'text') {
       const length = design.nodes.headline.props.text.length
-      tab.run('text.edit', random() < 0.6 || length < 2
-        ? { id: 'headline', op: { kind: 'insert', at: Math.floor(random() * (length + 1)), text: pick(['a', 'ब', 'ع', '!']) } }
-        : { id: 'headline', op: { kind: 'delete', at: Math.floor(random() * (length - 1)), length: 1 } })
+      tab.run(
+        'text.edit',
+        random() < 0.6 || length < 2
+          ? {
+              id: 'headline',
+              op: { kind: 'insert', at: Math.floor(random() * (length + 1)), text: pick(['a', 'ब', 'ع', '!']) },
+            }
+          : { id: 'headline', op: { kind: 'delete', at: Math.floor(random() * (length - 1)), length: 1 } },
+      )
     } else if (roll < 0.93) {
       if (random() < 0.5) tab.run('page.add', { name: 'P' })
       else tab.run('format.add', { name: 'F', width: 100 + Math.floor(random() * 900), height: 100 })
     } else if (roll < 0.96 && design.nodes.headline?.type === 'text' && design.nodes.headline.props.text.length > 1) {
-      tab.run('text.edit', { id: 'headline', op: { kind: 'style', at: 0, length: 1, style: { fontWeight: pick([400, 700]) } } })
+      tab.run('text.edit', {
+        id: 'headline',
+        op: { kind: 'style', at: 0, length: 1, style: { fontWeight: pick([400, 700]) } },
+      })
     } else if (roll < 0.985) {
       const which = random()
-      if (which < 0.4) tab.run('node.reorder', { ids: [pick(ids), pick(ids)], to: pick(['forward', 'backward', 'front', 'back'] as const) })
+      if (which < 0.4)
+        tab.run('node.reorder', {
+          ids: [pick(ids), pick(ids)],
+          to: pick(['forward', 'backward', 'front', 'back'] as const),
+        })
       else if (which < 0.55) tab.run('node.duplicate', { ids: [pick(ids)] })
       else if (which < 0.7) tab.run('node.lock', { ids: [pick(ids)], lock: { move: random() < 0.5 } })
       else if (which < 0.8) {
@@ -358,7 +422,7 @@ function randomCommand(tab: Session, doc: DesignDoc, random: () => number) {
 }
 
 describe('a text anchor', () => {
-  it("keeps a caret on the same character while the other tab edits the text around it", () => {
+  it('keeps a caret on the same character while the other tab edits the text around it', () => {
     const { a, tabB, sync } = twoTabs()
     const anchor = textAnchor(a, 'headline', 6)
     tabB.run('text.edit', { id: 'headline', op: { kind: 'insert', at: 0, text: 'Big ' } })
@@ -381,10 +445,12 @@ describe('a text anchor', () => {
 describe("a session's design view", () => {
   it('is current inside a transaction: a command after a delete in the same transaction is refused', () => {
     const { a, tabA } = twoTabs()
-    expect(() => a.transact(() => {
-      tabA.run('node.delete', { ids: ['box'] })
-      tabA.run('node.update', { ids: ['box'], patch: { x: 1 } })
-    })).toThrow('no layer "box"')
+    expect(() =>
+      a.transact(() => {
+        tabA.run('node.delete', { ids: ['box'] })
+        tabA.run('node.update', { ids: ['box'], patch: { x: 1 } })
+      }),
+    ).toThrow('no layer "box"')
   })
 
   it('is current for any observer of the document, called before or after its own', () => {
@@ -398,7 +464,11 @@ describe("a session's design view", () => {
     a.getMap('nodes').observeDeep(look('deep'))
     tabA.design()
     tabA.run('node.update', { ids: ['box'], patch: { x: 7 } })
-    tabA.run('node.create', { id: 'c1', parentId: 'p1', layer: { type: 'group', name: 'G', props: { x: 0, y: 0, width: 1, height: 1 } } })
+    tabA.run('node.create', {
+      id: 'c1',
+      parentId: 'p1',
+      layer: { type: 'group', name: 'G', props: { x: 0, y: 0, width: 1, height: 1 } },
+    })
     expect(seen).toEqual(['deep: x 7, no c1', 'shallow: x 7, has c1', 'deep: x 7, has c1'])
   })
 
@@ -419,8 +489,12 @@ describe("a session's design view", () => {
   it('hands out a design that cannot be changed, so no caller can corrupt what later reads reuse', () => {
     const { tabA } = twoTabs()
     const design = tabA.design()
-    expect(() => { (design.nodes.box as { props: { width: number } }).props.width = -50 }).toThrow()
-    expect(() => { (design.nodes as Record<string, unknown>).ghost = {} }).toThrow()
+    expect(() => {
+      ;(design.nodes.box as { props: { width: number } }).props.width = -50
+    }).toThrow()
+    expect(() => {
+      ;(design.nodes as Record<string, unknown>).ghost = {}
+    }).toThrow()
     expect(tabA.design().nodes.box?.props.width).toBe(200)
   })
 })

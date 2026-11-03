@@ -1,6 +1,7 @@
 // The brand's font catalog for the editor, and font uploads (#50). An upload passes through here to
 // the API and storage, so the browser needs no storage address or credentials.
-import { MAX_FONT_BYTES, type FontType } from '@dazbee/schema'
+import { type FontType, MAX_FONT_BYTES } from '@dazbee/schema'
+
 import { ApiFailure, listFonts, uploadFont } from '../../../../lib/api.ts'
 
 export async function GET(_request: Request, { params }: { params: Promise<{ brandId: string }> }) {
@@ -25,7 +26,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ bra
   const { brandId } = await params
   const form = await request.formData().catch(() => null)
   const file = form?.get('file')
-  if (!(file instanceof File)) return Response.json({ error: 'Send the font as the form field "file"' }, { status: 400 })
+  if (!(file instanceof File))
+    return Response.json({ error: 'Send the font as the form field "file"' }, { status: 400 })
   if (file.size > MAX_FONT_BYTES) return Response.json({ error: 'The font is larger than 30 MB' }, { status: 400 })
   const bytes = new Uint8Array(await file.arrayBuffer())
   const type = fontType(bytes)
@@ -33,7 +35,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ bra
   try {
     return Response.json(await uploadFont(brandId, bytes, type), { status: 201 })
   } catch (e) {
-    if (e instanceof ApiFailure && (e.status === 400 || e.status === 404)) return Response.json({ error: e.message }, { status: e.status })
+    if (e instanceof ApiFailure && (e.status === 400 || e.status === 404))
+      return Response.json({ error: e.message }, { status: e.status })
     throw e
   }
 }

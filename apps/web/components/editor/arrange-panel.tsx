@@ -4,13 +4,39 @@
 // each with its shortcut. Several layers line up with each other; one layer lines up with the
 // format, or the group or frame it is in. Two or more shapes combine into a live boolean.
 import {
-  AlignBottomIcon, AlignCenterHorizontalIcon, AlignCenterVerticalIcon, AlignLeftIcon, AlignRightIcon, AlignTopIcon, ArrowsHorizontalIcon, ArrowsVerticalIcon,
-  ExcludeSquareIcon, IntersectSquareIcon, SubtractSquareIcon, UniteSquareIcon, type Icon,
+  AlignBottomIcon,
+  AlignCenterHorizontalIcon,
+  AlignCenterVerticalIcon,
+  AlignLeftIcon,
+  AlignRightIcon,
+  AlignTopIcon,
+  ArrowsHorizontalIcon,
+  ArrowsVerticalIcon,
+  ExcludeSquareIcon,
+  type Icon,
+  IntersectSquareIcon,
+  SubtractSquareIcon,
+  UniteSquareIcon,
 } from '@phosphor-icons/react'
-import { SHORTCUTS, type Editor, type ShortcutAction } from '@dazbee/editor'
 import { useEffect, useState } from 'react'
 
-export type Action = Extract<ShortcutAction, `align${string}` | `distribute${string}` | `boolean${string}` | 'group' | 'frameSelection' | 'ungroup' | 'duplicate' | 'mask' | 'bringToFront' | 'bringForward' | 'sendBackward' | 'sendToBack'>
+import { type Editor, type ShortcutAction, SHORTCUTS } from '@dazbee/editor'
+
+export type Action = Extract<
+  ShortcutAction,
+  | `align${string}`
+  | `distribute${string}`
+  | `boolean${string}`
+  | 'group'
+  | 'frameSelection'
+  | 'ungroup'
+  | 'duplicate'
+  | 'mask'
+  | 'bringToFront'
+  | 'bringForward'
+  | 'sendBackward'
+  | 'sendToBack'
+>
 export const ALIGN: { action: Action; icon: Icon }[] = [
   { action: 'alignLeft', icon: AlignLeftIcon },
   { action: 'alignCentre', icon: AlignCenterHorizontalIcon },

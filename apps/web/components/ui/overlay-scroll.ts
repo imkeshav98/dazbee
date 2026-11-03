@@ -4,7 +4,7 @@
 // in globals.css). The area stays its own viewport, so its children, scroll events and scrollTop are
 // those of a plain scrolling element.
 import { OverlayScrollbars, type PartialOptions } from 'overlayscrollbars'
-import { useCallback, useEffect, type RefObject } from 'react'
+import { type RefObject, useCallback, useEffect } from 'react'
 
 const OPTIONS: PartialOptions = {
   scrollbars: { theme: 'os-theme-dazbee', autoHide: 'leave', autoHideDelay: 800, clickScroll: true },

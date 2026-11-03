@@ -2,25 +2,38 @@
 // around layers takes them in without moving them; Mod+Alt+G and the Arrange card frame the
 // selection; Shift+A on shapes wraps them in an auto layout frame where they stand; I opens the
 // image picker, and the image picked lands where the stage is clicked, one undo step.
-import { expect, test, type Page } from '../support/test.ts'
 import type { DesignInput } from '@dazbee/schema'
+
 import { photo } from '../support/assets.ts'
 import { writeOutput } from '../support/editor.ts'
 import { click, drag, moreAction, openStage, press, read, selection } from '../support/stage.ts'
+import { expect, type Page, test } from '../support/test.ts'
 
 test.describe.configure({ timeout: 120_000 })
 
 type Node = DesignInput['nodes'][string]
 const rect = (name: string, index: string, x: number, y: number, width: number, height: number, color: string): Node =>
-  ({ type: 'graphic', parentId: 'p1', index, name, props: { x, y, width, height, shape: { kind: 'rect', cornerRadius: 12 }, fills: [{ type: 'solid', color }] } }) as Node
+  ({
+    type: 'graphic',
+    parentId: 'p1',
+    index,
+    name,
+    props: { x, y, width, height, shape: { kind: 'rect', cornerRadius: 12 }, fills: [{ type: 'solid', color }] },
+  }) as Node
 
 const design = (): DesignInput => ({
   meta: { schemaVersion: 5, designId: 'replaced-by-the-api', name: 'Frames', kind: 'single', primaryFormatId: 'sq' },
-  formats: { sq: { name: 'Square', width: 1080, height: 1080, order: 'a0' }, wide: { name: 'Wide', width: 1920, height: 1080, order: 'a1' } },
+  formats: {
+    sq: { name: 'Square', width: 1080, height: 1080, order: 'a0' },
+    wide: { name: 'Wide', width: 1920, height: 1080, order: 'a1' },
+  },
   pages: { p1: { name: 'Page 1', order: 'a0', fills: [{ type: 'solid', color: '#FFF8F0FF' }] } },
   nodes: {
     a: rect('A', 'a0', 100, 100, 160, 120, '#FF2E7EFF'),
-    b: { ...rect('B', 'a1', 300, 140, 120, 120, '#2F6BFFFF'), props: { ...rect('B', 'a1', 300, 140, 120, 120, '#2F6BFFFF').props, rotation: 15 } } as Node,
+    b: {
+      ...rect('B', 'a1', 300, 140, 120, 120, '#2F6BFFFF'),
+      props: { ...rect('B', 'a1', 300, 140, 120, 120, '#2F6BFFFF').props, rotation: 15 },
+    } as Node,
     c: rect('C', 'a2', 600, 100, 140, 140, '#FFB020FF'),
     d: rect('D', 'a3', 780, 160, 160, 100, '#00A88AFF'),
     // A row, tops lined up, 40 apart: auto layout reads it as it stands.
@@ -34,17 +47,22 @@ const design = (): DesignInput => ({
 type Box = { x: number; y: number; width: number; height: number }
 const boxOf = (page: Page, id: string) => page.evaluate((id) => window.dazbee?.boxOf(id), id) as Promise<Box>
 const near = (a: Box, b: Box) => {
-  for (const k of ['x', 'y', 'width', 'height'] as const) expect(Math.abs(a[k] - b[k]), `${k}: ${a[k]} vs ${b[k]}`).toBeLessThanOrEqual(0.5)
+  for (const k of ['x', 'y', 'width', 'height'] as const)
+    expect(Math.abs(a[k] - b[k]), `${k}: ${a[k]} vs ${b[k]}`).toBeLessThanOrEqual(0.5)
 }
-const wideBoxOf = (page: Page, id: string) => page.evaluate((id) => window.dazbee?.boxOf(id, 'p1', 'wide'), id) as Promise<Box>
+const wideBoxOf = (page: Page, id: string) =>
+  page.evaluate((id) => window.dazbee?.boxOf(id, 'p1', 'wide'), id) as Promise<Box>
 const holds = (outer: Box, inner: Box) => {
   expect(inner.x).toBeGreaterThanOrEqual(outer.x - 0.5)
   expect(inner.y).toBeGreaterThanOrEqual(outer.y - 0.5)
   expect(inner.x + inner.width).toBeLessThanOrEqual(outer.x + outer.width + 0.5)
   expect(inner.y + inner.height).toBeLessThanOrEqual(outer.y + outer.height + 0.5)
 }
-const childrenOf = async (page: Page, parentId: string) => Object.entries((await read(page)).nodes)
-  .filter(([, n]) => n.parentId === parentId).sort(([, x], [, y]) => (x.index < y.index ? -1 : 1)).map(([id]) => id)
+const childrenOf = async (page: Page, parentId: string) =>
+  Object.entries((await read(page)).nodes)
+    .filter(([, n]) => n.parentId === parentId)
+    .sort(([, x], [, y]) => (x.index < y.index ? -1 : 1))
+    .map(([id]) => id)
 const undo = async (page: Page) => {
   await press(page, 'undo')
   await page.evaluate(() => window.dazbee?.drawn())
@@ -96,9 +114,16 @@ test('F draws a frame; a frame drawn around layers takes them in without moving 
   expect(errors).toEqual([])
 })
 
-test('Mod+Alt+G and the Arrange card frame the selection; Shift+A wraps shapes in auto layout without moving them', async ({ browser }) => {
+test('Mod+Alt+G and the Arrange card frame the selection; Shift+A wraps shapes in auto layout without moving them', async ({
+  browser,
+}) => {
   const { page, errors } = await openStage(browser, design())
-  const before = { c: await boxOf(page, 'c'), d: await boxOf(page, 'd'), e: await boxOf(page, 'e'), f: await boxOf(page, 'f') }
+  const before = {
+    c: await boxOf(page, 'c'),
+    d: await boxOf(page, 'd'),
+    e: await boxOf(page, 'e'),
+    f: await boxOf(page, 'f'),
+  }
 
   await click(page, 660, 160)
   await click(page, 860, 210, ['Shift'])
@@ -106,7 +131,9 @@ test('Mod+Alt+G and the Arrange card frame the selection; Shift+A wraps shapes i
   await press(page, 'frameSelection')
   const [framed] = await selection(page)
   let now = await read(page)
-  expect(now.nodes[framed ?? '']).toMatchObject({ props: { x: 600, y: 100, width: 340, height: 160, clip: false, fills: [] } })
+  expect(now.nodes[framed ?? '']).toMatchObject({
+    props: { x: 600, y: 100, width: 340, height: 160, clip: false, fills: [] },
+  })
   expect(await childrenOf(page, framed ?? '')).toEqual(['c', 'd'])
   near(await boxOf(page, 'c'), before.c)
   near(await boxOf(page, 'd'), before.d)
@@ -128,7 +155,10 @@ test('Mod+Alt+G and the Arrange card frame the selection; Shift+A wraps shapes i
   await press(page, 'autoLayout')
   const [auto] = await selection(page)
   now = await read(page)
-  expect(now.nodes[auto ?? '']?.props).toMatchObject({ layout: { direction: 'row', gap: 40, align: 'start' }, sizing: { width: 'hug', height: 'hug' } })
+  expect(now.nodes[auto ?? '']?.props).toMatchObject({
+    layout: { direction: 'row', gap: 40, align: 'start' },
+    sizing: { width: 'hug', height: 'hug' },
+  })
   expect(await childrenOf(page, auto ?? '')).toEqual(['e', 'f'])
   near(await boxOf(page, 'e'), before.e)
   near(await boxOf(page, 'f'), before.f)
@@ -149,14 +179,18 @@ test('Mod+Alt+G and the Arrange card frame the selection; Shift+A wraps shapes i
   expect(errors).toEqual([])
 })
 
-test('I opens the image picker; the image uploaded there lands where the stage is clicked, one undo step', async ({ browser }) => {
+test('I opens the image picker; the image uploaded there lands where the stage is clicked, one undo step', async ({
+  browser,
+}) => {
   const { page, errors } = await openStage(browser, design())
   await press(page, 'toolImage')
   const picker = page.getByTestId('image-picker')
   await expect(picker).toBeVisible()
   await expect(page.locator('[data-tool="image"]')).toHaveAttribute('aria-pressed', 'true')
   writeOutput('image-1-picker.png', await page.screenshot({ animations: 'disabled' }))
-  await picker.locator('input[type="file"]').setInputFiles({ name: 'sneaker.jpg', mimeType: 'image/jpeg', buffer: Buffer.from(photo) })
+  await picker
+    .locator('input[type="file"]')
+    .setInputFiles({ name: 'sneaker.jpg', mimeType: 'image/jpeg', buffer: Buffer.from(photo) })
   // Picked: the picker goes and the stage waits for a click.
   await expect(picker).toBeHidden({ timeout: 30_000 })
   expect(await page.evaluate(() => window.dazbee?.imageArmed())).toBe(true)
@@ -164,7 +198,9 @@ test('I opens the image picker; the image uploaded there lands where the stage i
 
   await click(page, 540, 800)
   const [placed] = await selection(page)
-  const node = (await read(page)).nodes[placed ?? ''] as unknown as { props: { x: number; y: number; width: number; height: number; fills: { type: string; assetId?: string }[] } }
+  const node = (await read(page)).nodes[placed ?? ''] as unknown as {
+    props: { x: number; y: number; width: number; height: number; fills: { type: string; assetId?: string }[] }
+  }
   const uploaded = node.props.fills[0]?.assetId ?? ''
   expect(node.props.fills[0]?.type).toBe('image')
   // Centred on the click, at most half the format across.
@@ -186,7 +222,9 @@ test('I opens the image picker; the image uploaded there lands where the stage i
   await expect(picker).toBeHidden()
   await drag(page, { x: 100, y: 850 }, { x: 400, y: 1000 })
   const [dragged] = await selection(page)
-  expect((await read(page)).nodes[dragged ?? '']).toMatchObject({ props: { x: 100, y: 850, width: 300, height: 150, fills: [{ type: 'image', fit: 'fill' }] } })
+  expect((await read(page)).nodes[dragged ?? '']).toMatchObject({
+    props: { x: 100, y: 850, width: 300, height: 150, fills: [{ type: 'image', fit: 'fill' }] },
+  })
   writeOutput('image-3-dragged.png', await page.screenshot({ animations: 'disabled' }))
   await undo(page)
 

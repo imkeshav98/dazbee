@@ -1,19 +1,78 @@
 // The API's routes. /workspace and every route below /brands need a session, and reads and writes only that
 // session's workspace; a brand or design of another workspace is answered as if it didn't exist.
-import type { Db } from '@dazbee/db'
-import { BrandKit, CompleteSignIn, CreateBrand, CreateDesign, DuplicateDesign, Rename, SaveTemplate, StartFromTemplate, RecordAsset, RecordFont, StartFontUpload, StartUpload, UpdateAsset, UpdateWorkspace, type ApiError, type AssetInUse, type AssetLink, type DesignCover, type DesignThumbnail, type SignedIn, type SignedLink, type SignedOut, type SignInLink, type SyncToken } from '@dazbee/schema'
-import type { Storage } from '@dazbee/storage'
-import { signSyncToken } from '@dazbee/sync-token'
 import { Hono, type MiddlewareHandler } from 'hono'
 import type { z } from 'zod'
+
+import type { Db } from '@dazbee/db'
+import {
+  type ApiError,
+  type AssetInUse,
+  type AssetLink,
+  BrandKit,
+  CompleteSignIn,
+  CreateBrand,
+  CreateDesign,
+  type DesignCover,
+  type DesignThumbnail,
+  DuplicateDesign,
+  RecordAsset,
+  RecordFont,
+  Rename,
+  SaveTemplate,
+  type SignedIn,
+  type SignedLink,
+  type SignedOut,
+  type SignInLink,
+  StartFontUpload,
+  StartFromTemplate,
+  StartUpload,
+  type SyncToken,
+  UpdateAsset,
+  UpdateWorkspace,
+} from '@dazbee/schema'
+import type { Storage } from '@dazbee/storage'
+import { signSyncToken } from '@dazbee/sync-token'
+
+import {
+  deleteAsset,
+  ensureThumbnail,
+  findAsset,
+  InvalidUpload,
+  listAssets,
+  listedAssetUses,
+  originalKey,
+  recordAsset,
+  SIGNED_URL_SECONDS,
+  startUpload,
+  updateAsset,
+} from './assets.ts'
 import { getBrandKit, InvalidKit, saveBrandKit } from './brand-kits.ts'
-import { deleteTemplate, findTemplate, listTemplates, renameTemplate, saveTemplate, startFromTemplate, templateThumbnailKey } from './templates.ts'
-import { deleteAsset, ensureThumbnail, listedAssetUses, findAsset, InvalidUpload, listAssets, originalKey, recordAsset, SIGNED_URL_SECONDS, startUpload, updateAsset } from './assets.ts'
 import { designCover, ensureDesignThumbnail, storedDesign } from './design-thumbnails.ts'
+import {
+  createBrand,
+  createDesign,
+  deleteDesign,
+  findBrand,
+  findDesign,
+  findWorkspace,
+  InvalidContent,
+  listBrands,
+  listDesigns,
+  renameDesign,
+  updateWorkspace,
+} from './designs.ts'
 import { fontLink, InvalidFont, listFonts, recordFont, startFontUpload } from './fonts.ts'
-import { createBrand, createDesign, deleteDesign, findBrand, findDesign, findWorkspace, InvalidContent, listBrands, listDesigns, renameDesign, updateWorkspace } from './designs.ts'
 import { bearerToken, readSessionToken, type Session, type SessionOf } from './session.ts'
 import { completeSignIn, type SignedInPerson, type SignInProvider } from './sign-in.ts'
+import {
+  deleteTemplate,
+  findTemplate,
+  listTemplates,
+  renameTemplate,
+  saveTemplate,
+  startFromTemplate,
+  templateThumbnailKey,
+} from './templates.ts'
 
 type Env = { Variables: { session: Session } }
 
@@ -25,7 +84,19 @@ export interface SignInSettings {
   secret: string
 }
 
-export function createApp({ db, storage, sessionOf, syncSecret, signIn = null }: { db: Db; storage: Storage; sessionOf: SessionOf; syncSecret: string; signIn?: SignInSettings | null }) {
+export function createApp({
+  db,
+  storage,
+  sessionOf,
+  syncSecret,
+  signIn = null,
+}: {
+  db: Db
+  storage: Storage
+  sessionOf: SessionOf
+  syncSecret: string
+  signIn?: SignInSettings | null
+}) {
   const app = new Hono<Env>()
 
   app.get('/health', (c) => c.json({ ok: true }))
@@ -48,14 +119,14 @@ export function createApp({ db, storage, sessionOf, syncSecret, signIn = null }:
     } catch {
       return c.json(error('That sign-in did not work; try again'), 400)
     }
-    return c.json(await completeSignIn(db, signIn.provider, signIn.secret, person) satisfies SignedIn)
+    return c.json((await completeSignIn(db, signIn.provider, signIn.secret, person)) satisfies SignedIn)
   })
 
   // Signing out forgets the token in the web app; this says where to end the WorkOS session too.
   app.post('/auth/sign-out', (c) => {
     const token = bearerToken(c.req.raw)
     const payload = signIn && token ? readSessionToken(signIn.secret, token) : null
-    const logoutUrl = payload?.workosSessionId ? signIn?.provider.signOutUrl(payload.workosSessionId) ?? null : null
+    const logoutUrl = payload?.workosSessionId ? (signIn?.provider.signOutUrl(payload.workosSessionId) ?? null) : null
     return c.json({ logoutUrl } satisfies SignedOut)
   })
 
@@ -78,7 +149,11 @@ export function createApp({ db, storage, sessionOf, syncSecret, signIn = null }:
       return Response.json(error('The body is not JSON'), { status: 400 })
     }
     const parsed = schema.safeParse(json)
-    if (!parsed.success) return Response.json(error(parsed.error.issues.map((i) => `${i.path.join('.') || 'body'}: ${i.message}`).join('; ')), { status: 400 })
+    if (!parsed.success)
+      return Response.json(
+        error(parsed.error.issues.map((i) => `${i.path.join('.') || 'body'}: ${i.message}`).join('; ')),
+        { status: 400 },
+      )
     return parsed.data
   }
 
@@ -134,7 +209,13 @@ export function createApp({ db, storage, sessionOf, syncSecret, signIn = null }:
   app.patch('/brands/:brandId/designs/:designId', async (c) => {
     const input = await body(c.req.raw, Rename)
     if (input instanceof Response) return input
-    const design = await renameDesign(db, c.var.session.workspaceId, c.req.param('brandId'), c.req.param('designId'), input.name)
+    const design = await renameDesign(
+      db,
+      c.var.session.workspaceId,
+      c.req.param('brandId'),
+      c.req.param('designId'),
+      input.name,
+    )
     return design ? c.json(design) : c.json(error('No such design'), 404)
   })
 
@@ -147,7 +228,16 @@ export function createApp({ db, storage, sessionOf, syncSecret, signIn = null }:
     if (input instanceof Response) return input
     const content = await storedDesign(db, original.id)
     if (!content) return c.json(error('This design has nothing stored to copy yet'), 409)
-    return c.json(await createDesign(db, workspaceId, original.brandId, input.name ?? `${original.name} copy`.slice(0, 120), content), 201)
+    return c.json(
+      await createDesign(
+        db,
+        workspaceId,
+        original.brandId,
+        input.name ?? `${original.name} copy`.slice(0, 120),
+        content,
+      ),
+      201,
+    )
   })
 
   app.delete('/brands/:brandId/designs/:designId', async (c) => {
@@ -171,7 +261,12 @@ export function createApp({ db, storage, sessionOf, syncSecret, signIn = null }:
     const cover = await ensureDesignThumbnail(db, storage, workspaceId, design)
     if (!cover) return c.json(error('This design has nothing to show yet'), 404)
     const url = await storage.signedGet(cover.key, SIGNED_URL_SECONDS)
-    return c.json({ url, width: cover.width, height: cover.height, expiresAt: new Date(Date.now() + SIGNED_URL_SECONDS * 1000).toISOString() } satisfies DesignThumbnail)
+    return c.json({
+      url,
+      width: cover.width,
+      height: cover.height,
+      expiresAt: new Date(Date.now() + SIGNED_URL_SECONDS * 1000).toISOString(),
+    } satisfies DesignThumbnail)
   })
 
   app.post('/brands/:brandId/designs/:designId/sync-token', async (c) => {
@@ -221,7 +316,11 @@ export function createApp({ db, storage, sessionOf, syncSecret, signIn = null }:
     const asset = await findAsset(db, workspaceId, c.req.param('brandId'), { id: c.req.param('assetId') })
     if (!asset) return c.json(error('No such asset'), 404)
     const url = await storage.signedGet(originalKey(workspaceId, asset.sha256), SIGNED_URL_SECONDS)
-    return c.json({ asset, url, expiresAt: new Date(Date.now() + SIGNED_URL_SECONDS * 1000).toISOString() } satisfies AssetLink)
+    return c.json({
+      asset,
+      url,
+      expiresAt: new Date(Date.now() + SIGNED_URL_SECONDS * 1000).toISOString(),
+    } satisfies AssetLink)
   })
 
   app.patch('/brands/:brandId/assets/:assetId', async (c) => {
@@ -246,7 +345,8 @@ export function createApp({ db, storage, sessionOf, syncSecret, signIn = null }:
     const { workspaceId } = c.var.session
     const result = await deleteAsset(db, workspaceId, c.req.param('brandId'), c.req.param('assetId'))
     if (!result) return c.json(error('No such asset'), 404)
-    if ('usedIn' in result) return c.json({ ...error('The image is in use'), usedIn: result.usedIn } satisfies AssetInUse, 409)
+    if ('usedIn' in result)
+      return c.json({ ...error('The image is in use'), usedIn: result.usedIn } satisfies AssetInUse, 409)
     return c.body(null, 204)
   })
 
@@ -255,7 +355,10 @@ export function createApp({ db, storage, sessionOf, syncSecret, signIn = null }:
     const asset = await findAsset(db, workspaceId, c.req.param('brandId'), { id: c.req.param('assetId') })
     if (!asset) return c.json(error('No such asset'), 404)
     const url = await storage.signedGet(await ensureThumbnail(storage, workspaceId, asset), SIGNED_URL_SECONDS)
-    return c.json({ url, expiresAt: new Date(Date.now() + SIGNED_URL_SECONDS * 1000).toISOString() } satisfies SignedLink)
+    return c.json({
+      url,
+      expiresAt: new Date(Date.now() + SIGNED_URL_SECONDS * 1000).toISOString(),
+    } satisfies SignedLink)
   })
 
   // Templates (#54): the workspace's and the brand's, a design saved to start others from.
@@ -283,12 +386,24 @@ export function createApp({ db, storage, sessionOf, syncSecret, signIn = null }:
   app.patch('/brands/:brandId/templates/:templateId', async (c) => {
     const input = await body(c.req.raw, Rename)
     if (input instanceof Response) return input
-    const template = await renameTemplate(db, c.var.session.workspaceId, c.req.param('brandId'), c.req.param('templateId'), input.name)
+    const template = await renameTemplate(
+      db,
+      c.var.session.workspaceId,
+      c.req.param('brandId'),
+      c.req.param('templateId'),
+      input.name,
+    )
     return template ? c.json(template) : c.json(error('No such template'), 404)
   })
 
   app.delete('/brands/:brandId/templates/:templateId', async (c) => {
-    const deleted = await deleteTemplate(db, storage, c.var.session.workspaceId, c.req.param('brandId'), c.req.param('templateId'))
+    const deleted = await deleteTemplate(
+      db,
+      storage,
+      c.var.session.workspaceId,
+      c.req.param('brandId'),
+      c.req.param('templateId'),
+    )
     return deleted ? c.body(null, 204) : c.json(error('No such template'), 404)
   })
 
@@ -297,7 +412,10 @@ export function createApp({ db, storage, sessionOf, syncSecret, signIn = null }:
     const template = await findTemplate(db, workspaceId, c.req.param('brandId'), c.req.param('templateId'))
     if (!template) return c.json(error('No such template'), 404)
     const url = await storage.signedGet(templateThumbnailKey(workspaceId, template.id), SIGNED_URL_SECONDS)
-    return c.json({ url, expiresAt: new Date(Date.now() + SIGNED_URL_SECONDS * 1000).toISOString() } satisfies SignedLink)
+    return c.json({
+      url,
+      expiresAt: new Date(Date.now() + SIGNED_URL_SECONDS * 1000).toISOString(),
+    } satisfies SignedLink)
   })
 
   app.post('/brands/:brandId/templates/:templateId/designs', async (c) => {

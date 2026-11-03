@@ -2,6 +2,7 @@
 // Prints each run and the median; the first run includes warming up CanvasKit's code paths.
 import { renderDesign } from '@dazbee/renderer'
 import { loadCanvasKit } from '@dazbee/renderer/node'
+
 import { loadFixtures } from '../src/fixtures.ts'
 import { fixtureResources } from '../src/pixels.ts'
 
@@ -18,4 +19,6 @@ for (let i = 0; i < Number(runs); i++) {
   console.log(`run ${i + 1}: ${times[i]?.toFixed(0)} ms`)
 }
 const sorted = [...times].sort((a, b) => a - b)
-console.log(`${name} ${page}.${format}: median ${sorted[Math.floor(sorted.length / 2)]?.toFixed(0)} ms over ${runs} runs`)
+console.log(
+  `${name} ${page}.${format}: median ${sorted[Math.floor(sorted.length / 2)]?.toFixed(0)} ms over ${runs} runs`,
+)

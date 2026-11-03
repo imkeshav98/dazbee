@@ -1,15 +1,19 @@
 // The library (#88, ADR-0013): every workspace lists its brands as brands, the development
 // workspace's two included, and settings names the workspace.
-import { expect, test, type Page } from '../support/test.ts'
 import { writeOutput } from '../support/editor.ts'
 import { API_URL } from '../support/seed.ts'
+import { expect, type Page, test } from '../support/test.ts'
 
 const shoot = async (page: Page, name: string) => writeOutput(`welcome-${name}.png`, await page.screenshot())
 
 test('the web app lists the brands of the development workspace', async ({ page }) => {
   await page.goto('/')
   await expect(page).toHaveTitle('Dazbee')
-  for (const link of ['link[rel="icon"][type="image/svg+xml"]', 'link[rel="apple-touch-icon"]', 'link[rel="manifest"]']) {
+  for (const link of [
+    'link[rel="icon"][type="image/svg+xml"]',
+    'link[rel="apple-touch-icon"]',
+    'link[rel="manifest"]',
+  ]) {
     const href = await page.locator(link).first().getAttribute('href')
     expect((await page.request.get(href ?? '')).ok(), link).toBe(true)
   }
@@ -47,6 +51,10 @@ test('settings renames the workspace', async ({ page }) => {
   expect(await nameNow()).toBe('Harbour Studio')
   await expect(field).toHaveValue('Harbour Studio')
   await shoot(page, 'settings-renamed')
-  const restored = await fetch(`${API_URL}/workspace`, { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name: before }) })
+  const restored = await fetch(`${API_URL}/workspace`, {
+    method: 'PATCH',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ name: before }),
+  })
   expect(restored.ok).toBe(true)
 })

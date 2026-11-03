@@ -3,7 +3,9 @@
 import { migrateDatabase, openDatabase } from '@dazbee/db'
 
 export async function setup() {
-  const { db, close } = openDatabase(process.env.DATABASE_URL ?? 'postgres://razzlr:razzlr-local@127.0.0.1:55432/razzlr')
+  const { db, close } = openDatabase(
+    process.env.DATABASE_URL ?? 'postgres://razzlr:razzlr-local@127.0.0.1:55432/razzlr',
+  )
   try {
     await migrateDatabase(db)
   } finally {

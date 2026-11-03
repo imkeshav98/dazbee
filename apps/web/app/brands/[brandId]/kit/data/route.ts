@@ -1,10 +1,12 @@
 // The brand's kit for the editor and the Brand kit page (#53), at /brands/[brand]/kit/data: read
 // it, and save it whole.
 import { BrandKit } from '@dazbee/schema'
+
 import { ApiFailure, getBrandKit, saveBrandKit } from '../../../../../lib/api.ts'
 
 const failure = (e: unknown) => {
-  if (e instanceof ApiFailure && (e.status === 400 || e.status === 404)) return Response.json({ error: e.message }, { status: e.status })
+  if (e instanceof ApiFailure && (e.status === 400 || e.status === 404))
+    return Response.json({ error: e.message }, { status: e.status })
   throw e
 }
 

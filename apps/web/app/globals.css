@@ -189,10 +189,14 @@ body {
    aurora, which made software-rendered pages (CI) slow to draw. .ai-glow fills AI controls (Make
    drafts); .ai-edge is the brief composer's gradient edge. The element needs a position. */
 @keyframes ai-slide {
-  to { transform: translateX(-50%); }
+  to {
+    transform: translateX(-50%);
+  }
 }
 @keyframes ai-slide-rtl {
-  to { transform: translateX(50%); }
+  to {
+    transform: translateX(50%);
+  }
 }
 .ai-glow,
 .ai-edge {
@@ -230,12 +234,22 @@ body {
    child span, as both pseudo-elements are taken, and it moves by transform only, for the reason
    above: no background-position, nothing that repaints what blurs behind the control. */
 @keyframes ai-sheen {
-  0% { transform: translateX(-100%); }
-  45%, 100% { transform: translateX(350%); }
+  0% {
+    transform: translateX(-100%);
+  }
+  45%,
+  100% {
+    transform: translateX(350%);
+  }
 }
 @keyframes ai-sheen-rtl {
-  0% { transform: translateX(100%); }
-  45%, 100% { transform: translateX(-350%); }
+  0% {
+    transform: translateX(100%);
+  }
+  45%,
+  100% {
+    transform: translateX(-350%);
+  }
 }
 .ai-sheen {
   position: absolute;
@@ -311,16 +325,27 @@ body {
   }
 }
 
-
 @keyframes tooltip-in {
-  from { opacity: 0; transform: scale(0.96); }
-  to { opacity: 1; transform: scale(1); }
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 /* Lists rise in, a few items at a time; chrome motion stays under 200 ms. */
 @keyframes rise {
-  from { opacity: 0; transform: translateY(6px); }
-  to { opacity: 1; transform: none; }
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 .rise {
   animation: rise var(--chrome) var(--ease-out) both;
@@ -331,7 +356,10 @@ body {
 
 /* Menus and popovers pop in with a slight overshoot, from the corner they hang from (popin). */
 @keyframes pop-in {
-  from { opacity: 0; transform: translateY(-4px) scale(0.96); }
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.96);
+  }
 }
 .pop-in,
 .pop-in-start,
@@ -339,14 +367,25 @@ body {
   transform-origin: var(--radix-popover-content-transform-origin, top center);
   animation: pop-in var(--chrome) var(--ease-pop) backwards;
 }
-.pop-in-start { transform-origin: top left; }
-[dir='rtl'] .pop-in-start { transform-origin: top right; }
-.pop-in-end { transform-origin: top right; }
-[dir='rtl'] .pop-in-end { transform-origin: top left; }
+.pop-in-start {
+  transform-origin: top left;
+}
+[dir='rtl'] .pop-in-start {
+  transform-origin: top right;
+}
+.pop-in-end {
+  transform-origin: top right;
+}
+[dir='rtl'] .pop-in-end {
+  transform-origin: top left;
+}
 
 /* Dialogs rise and settle (modalin): the Share menu's Export and Save as template forms. */
 @keyframes modal-in {
-  from { opacity: 0; transform: translateY(10px) scale(0.97); }
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.97);
+  }
 }
 .modal-in {
   transform-origin: top center;
@@ -355,7 +394,10 @@ body {
 
 /* Toasts come up from below with a little bounce (toastin). */
 @keyframes toast-in {
-  from { opacity: 0; transform: translateY(12px); }
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
 }
 .toast-in {
   animation: toast-in var(--enter) var(--ease-pop) backwards;
@@ -451,11 +493,17 @@ body {
   animation: drop-breathe 1.1s ease-in-out infinite alternate;
 }
 @keyframes drop-breathe {
-  from { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 45%, transparent); }
-  to { box-shadow: 0 0 0 6px color-mix(in srgb, var(--accent) 0%, transparent); }
+  from {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 45%, transparent);
+  }
+  to {
+    box-shadow: 0 0 0 6px color-mix(in srgb, var(--accent) 0%, transparent);
+  }
 }
 @media (prefers-reduced-motion: reduce) {
-  .stage-overlay .drop-target { animation: none; }
+  .stage-overlay .drop-target {
+    animation: none;
+  }
 }
 /* The group or frame double-clicked into, while working inside it. */
 .stage-overlay .entered {
@@ -662,7 +710,11 @@ body {
   background: var(--accent);
   animation: blink 1s steps(1) infinite;
 }
-@keyframes blink { 50% { opacity: 0; } }
+@keyframes blink {
+  50% {
+    opacity: 0;
+  }
+}
 /* The selected range inside text being typed into (#47). */
 .stage-overlay .text-selection {
   position: absolute;
@@ -674,7 +726,9 @@ body {
    34 high (in viewport widths), centred just above the headline, at 45%, turning once in 14 s. The
    blob is a circle squashed into the ellipse; the circle turns by transform, so it never repaints. */
 @keyframes aurora-turn {
-  to { transform: rotate(1turn); }
+  to {
+    transform: rotate(1turn);
+  }
 }
 .aurora {
   position: absolute;
@@ -770,11 +824,20 @@ body {
   filter: blur(72px);
 }
 @keyframes signin-aurora-turn {
-  to { transform: rotate(1turn); }
+  to {
+    transform: rotate(1turn);
+  }
 }
 @keyframes ad-fan {
-  0%, 10%, 100% { transform: none; }
-  35%, 85% { transform: translateX(var(--fan-x)) rotate(var(--fan-r)); }
+  0%,
+  10%,
+  100% {
+    transform: none;
+  }
+  35%,
+  85% {
+    transform: translateX(var(--fan-x)) rotate(var(--fan-r));
+  }
 }
 .ad-fan {
   --card: clamp(11rem, 15vw, 17rem);
@@ -798,11 +861,32 @@ body {
   font-size: calc(var(--card) / 21);
   transform: translateX(var(--fan-x)) rotate(var(--fan-r));
 }
-.sample-ad[data-variant='teal'] { --a1: #0f6e66; --a2: #7be0b4; --badge: #fff07a; --fan-x: calc(var(--card) * -0.53); --fan-r: -14deg; }
-.sample-ad[data-variant='sunset'] { --fan-x: 0px; --fan-r: 0deg; z-index: 1; }
-.sample-ad[data-variant='violet'] { --a1: #5b2bd6; --a2: #ff6fb0; --fan-x: calc(var(--card) * 0.53); --fan-r: 14deg; }
-[dir='rtl'] .sample-ad[data-variant='teal'] { --fan-x: calc(var(--card) * 0.53); --fan-r: 14deg; }
-[dir='rtl'] .sample-ad[data-variant='violet'] { --fan-x: calc(var(--card) * -0.53); --fan-r: -14deg; }
+.sample-ad[data-variant='teal'] {
+  --a1: #0f6e66;
+  --a2: #7be0b4;
+  --badge: #fff07a;
+  --fan-x: calc(var(--card) * -0.53);
+  --fan-r: -14deg;
+}
+.sample-ad[data-variant='sunset'] {
+  --fan-x: 0px;
+  --fan-r: 0deg;
+  z-index: 1;
+}
+.sample-ad[data-variant='violet'] {
+  --a1: #5b2bd6;
+  --a2: #ff6fb0;
+  --fan-x: calc(var(--card) * 0.53);
+  --fan-r: 14deg;
+}
+[dir='rtl'] .sample-ad[data-variant='teal'] {
+  --fan-x: calc(var(--card) * 0.53);
+  --fan-r: 14deg;
+}
+[dir='rtl'] .sample-ad[data-variant='violet'] {
+  --fan-x: calc(var(--card) * -0.53);
+  --fan-r: -14deg;
+}
 .sample-ad > span {
   position: absolute;
   inset-inline-start: 7%;
@@ -820,7 +904,9 @@ body {
   font: 800 2.6em / 0.95 var(--font-display);
   letter-spacing: -0.02em;
   /* The riso misprint: cobalt and pink a hair off register. */
-  text-shadow: 0.065em 0.055em 0 rgb(61 107 255 / 0.75), -0.055em -0.03em 0 rgb(255 72 176 / 0.75);
+  text-shadow:
+    0.065em 0.055em 0 rgb(61 107 255 / 0.75),
+    -0.055em -0.03em 0 rgb(255 72 176 / 0.75);
 }
 .sample-ad-price {
   inset-block-end: 9%;
@@ -903,7 +989,8 @@ body {
 
 /* A see-through paint's swatch shows over a checkerboard, as design tools draw one. */
 @utility checker {
-  background: repeating-conic-gradient(color-mix(in srgb, var(--text) 14%, transparent) 0 25%, transparent 0 50%) 0 0 / 8px 8px;
+  background: repeating-conic-gradient(color-mix(in srgb, var(--text) 14%, transparent) 0 25%, transparent 0 50%) 0 0 /
+    8px 8px;
 }
 
 /* A drag in an auto layout flow: the layers following the pointer, the line where they would go,

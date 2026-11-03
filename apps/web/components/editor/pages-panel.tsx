@@ -6,9 +6,11 @@
 // one, and Add page adds one. A click on a page's background picks it, and its Background panel
 // paints it in every size. Every change is a command, so it is one undo step and reaches the other tabs.
 import { FilesIcon, PlusIcon } from '@phosphor-icons/react'
+import { type CSSProperties, type ReactNode, useEffect, useLayoutEffect, useRef, useState } from 'react'
+
 import type { Editor } from '@dazbee/editor'
 import type { Design } from '@dazbee/schema'
-import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
+
 import { cn } from '../../lib/cn.ts'
 import { useMessages } from '../../lib/i18n/client.tsx'
 import { format } from '../../lib/i18n/index.ts'
@@ -22,7 +24,9 @@ import { BackgroundBody } from './selection-cards.tsx'
 import { DROP_LINE, FOCUS_RING, PANEL_BUTTON } from './styles.ts'
 
 export const orderedPages = (design: Design) =>
-  Object.entries(design.pages).sort(([a, x], [b, y]) => (x.order < y.order ? -1 : x.order > y.order ? 1 : a < b ? -1 : 1))
+  Object.entries(design.pages).sort(([a, x], [b, y]) =>
+    x.order < y.order ? -1 : x.order > y.order ? 1 : a < b ? -1 : 1,
+  )
 
 /** The page last brought into view, from the Pages panel or by picking it on the stage. */
 const shownPage = valueStore<string | null>(null)
@@ -47,16 +51,22 @@ export function usePickedPage(editor: Editor) {
 /** The page in view: the one last shown or picked while it is still there, else the first. */
 function useCurrentPage(design: Design) {
   const shown = useValue(shownPage)
-  return shown && design.pages[shown] ? shown : orderedPages(design)[0]?.[0] ?? null
+  return shown && design.pages[shown] ? shown : (orderedPages(design)[0]?.[0] ?? null)
 }
 
 /** Each page's picture in the primary format, drawn once the stage settles and again once its fonts and images arrive. */
 function usePagePictures(editor: Editor): Record<string, string | null> {
   const [pictures, setPictures] = useState<Record<string, string | null>>({})
-  useEffect(() => afterDraws(editor, () => {
-    const next = Object.fromEntries(Object.keys(editor.session.design().pages).map((id) => [id, editor.pageThumbnail(id, 72)]))
-    setPictures((now) => (sameUrls(now, next) ? now : next))
-  }), [editor])
+  useEffect(
+    () =>
+      afterDraws(editor, () => {
+        const next = Object.fromEntries(
+          Object.keys(editor.session.design().pages).map((id) => [id, editor.pageThumbnail(id, 72)]),
+        )
+        setPictures((now) => (sameUrls(now, next) ? now : next))
+      }),
+    [editor],
+  )
   return pictures
 }
 
@@ -66,7 +76,12 @@ function usePagePictures(editor: Editor): Record<string, string | null> {
  */
 export function PagesButton({ editor }: { editor: Editor | null }) {
   const t = useMessages()
-  if (!editor) return <PagesFrame label={t.editor.pages.title} disabled><span>{t.editor.pages.title}</span></PagesFrame>
+  if (!editor)
+    return (
+      <PagesFrame label={t.editor.pages.title} disabled>
+        <span>{t.editor.pages.title}</span>
+      </PagesFrame>
+    )
   return <LivePages editor={editor} />
 }
 
@@ -82,8 +97,12 @@ function LivePages({ editor }: { editor: Editor }) {
   const counts = { n: Math.max(1, pages.findIndex(([id]) => id === current) + 1), total: pages.length }
   return (
     <PagesFrame label={format(t.editor.pages.buttonLabel, counts)}>
-      <span aria-hidden className="tabular-nums max-sm:hidden">{format(t.editor.pages.button, counts)}</span>
-      <span aria-hidden className="font-mono tabular-nums sm:hidden">{format(t.editor.pages.buttonShort, counts)}</span>
+      <span aria-hidden className="tabular-nums max-sm:hidden">
+        {format(t.editor.pages.button, counts)}
+      </span>
+      <span aria-hidden className="font-mono tabular-nums sm:hidden">
+        {format(t.editor.pages.buttonShort, counts)}
+      </span>
     </PagesFrame>
   )
 }
@@ -103,7 +122,11 @@ function PagesFrame({ label, disabled = false, children }: { label: string; disa
     return () => watch.disconnect()
   }, [])
   // As tall as the zoom pill beside it.
-  const place = { '--zoom-width': `${zoom.width}px`, '--zoom-height': `${zoom.height}px`, ...(zoom.height > 0 ? { height: zoom.height } : {}) } as CSSProperties
+  const place = {
+    '--zoom-width': `${zoom.width}px`,
+    '--zoom-height': `${zoom.height}px`,
+    ...(zoom.height > 0 ? { height: zoom.height } : {}),
+  } as CSSProperties
   return (
     <button
       ref={button}
@@ -202,7 +225,12 @@ function PageList({ editor, onRemoved }: { editor: Editor; onRemoved: (message: 
   const formatCount = Object.keys(design.formats).length
   const primary = design.formats[design.meta.primaryFormatId]
   // Each page's picture in the primary format, its long side 34, on its background until one is drawn.
-  const tile = primary ? { width: Math.max(8, Math.round(34 * Math.min(1, primary.width / primary.height))), height: Math.max(8, Math.round(34 * Math.min(1, primary.height / primary.width))) } : { width: 34, height: 34 }
+  const tile = primary
+    ? {
+        width: Math.max(8, Math.round(34 * Math.min(1, primary.width / primary.height))),
+        height: Math.max(8, Math.round(34 * Math.min(1, primary.height / primary.width))),
+      }
+    : { width: 34, height: 34 }
 
   return (
     <>
@@ -237,10 +265,15 @@ function PageList({ editor, onRemoved }: { editor: Editor; onRemoved: (message: 
                 setDragging(null)
                 setLanding(null)
               }}
-              className={cn(CARD_ROW, 'relative cursor-grab active:cursor-grabbing aria-[current]:border-accent aria-[current]:bg-accent-soft data-[dragging]:opacity-40')}
+              className={cn(
+                CARD_ROW,
+                'relative cursor-grab active:cursor-grabbing aria-[current]:border-accent aria-[current]:bg-accent-soft data-[dragging]:opacity-40',
+              )}
             >
               {moves && landing?.before === id && <span aria-hidden className={cn(DROP_LINE, '-top-[4px]')} />}
-              {moves && landing?.before === null && i === pages.length - 1 && <span aria-hidden className={cn(DROP_LINE, '-bottom-[4px]')} />}
+              {moves && landing?.before === null && i === pages.length - 1 && (
+                <span aria-hidden className={cn(DROP_LINE, '-bottom-[4px]')} />
+              )}
               <span aria-hidden className="grid size-[34px] shrink-0 place-items-center">
                 <span
                   data-testid="page-thumbnail"
@@ -273,19 +306,37 @@ function PageList({ editor, onRemoved }: { editor: Editor; onRemoved: (message: 
                   onDoubleClick={() => setRenaming(id)}
                   onKeyDown={(e) => e.key === 'F2' && setRenaming(id)}
                   aria-label={format(g.show, { name: page.name })}
-                  className={cn('flex min-w-0 flex-1 cursor-pointer flex-col items-start rounded-[6px] text-start', FOCUS_RING)}
+                  className={cn(
+                    'flex min-w-0 flex-1 cursor-pointer flex-col items-start rounded-[6px] text-start',
+                    FOCUS_RING,
+                  )}
                 >
-                  <span className="w-full truncate text-[13px] font-semibold text-text">{format(g.numbered, { n: i + 1, name: page.name })}</span>
-                  <span className="w-full truncate text-[11px] text-subtle">{format(formatCount === 1 ? g.formatsOne : g.formatsMany, { n: formatCount })}</span>
+                  <span className="w-full truncate text-[13px] font-semibold text-text">
+                    {format(g.numbered, { n: i + 1, name: page.name })}
+                  </span>
+                  <span className="w-full truncate text-[11px] text-subtle">
+                    {format(formatCount === 1 ? g.formatsOne : g.formatsMany, { n: formatCount })}
+                  </span>
                 </button>
               )}
               <CardMenu
                 label={format(g.more, { name: page.name })}
                 items={[
                   { label: g.rename, run: () => setRenaming(id) },
-                  { label: g.duplicate, run: () => show(run('page.duplicate', { id, name: format(g.copyName, { name: page.name }) })) },
-                  { label: g.moveUp, disabled: i === 0, run: () => run('page.move', { id, before: pages[i - 1]?.[0] ?? null }) },
-                  { label: g.moveDown, disabled: i === pages.length - 1, run: () => run('page.move', { id, before: pages[i + 2]?.[0] ?? null }) },
+                  {
+                    label: g.duplicate,
+                    run: () => show(run('page.duplicate', { id, name: format(g.copyName, { name: page.name }) })),
+                  },
+                  {
+                    label: g.moveUp,
+                    disabled: i === 0,
+                    run: () => run('page.move', { id, before: pages[i - 1]?.[0] ?? null }),
+                  },
+                  {
+                    label: g.moveDown,
+                    disabled: i === pages.length - 1,
+                    run: () => run('page.move', { id, before: pages[i + 2]?.[0] ?? null }),
+                  },
                   {
                     label: g.remove,
                     disabled: pages.length === 1,

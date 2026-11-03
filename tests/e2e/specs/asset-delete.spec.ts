@@ -2,12 +2,14 @@
 // first; one nothing uses goes once confirmed; one the open design uses, or another design does,
 // can't be deleted and the panel says where it is used.
 import { randomUUID } from 'node:crypto'
-import { expect, test, type Page } from '../support/test.ts'
+
 import type { DesignInput } from '@dazbee/schema'
+
 import { api, photo, upload } from '../support/assets.ts'
 import { writeOutput } from '../support/editor.ts'
 import { API_URL, DEV_BRAND } from '../support/seed.ts'
 import { openStage } from '../support/stage.ts'
+import { expect, type Page, test } from '../support/test.ts'
 
 test.describe.configure({ timeout: 120_000 })
 
@@ -15,16 +17,38 @@ const run = randomUUID().slice(0, 8)
 /** The sneaker photo with bytes of its own after its end, so each is a new image. */
 const unique = (tag: string) => new Uint8Array(Buffer.concat([Buffer.from(photo), Buffer.from(`${run}-${tag}`)]))
 const design = (assetId?: string): DesignInput => ({
-  meta: { schemaVersion: 5, designId: 'replaced-by-the-api', name: 'Delete images', kind: 'single', primaryFormatId: 'sq' },
+  meta: {
+    schemaVersion: 5,
+    designId: 'replaced-by-the-api',
+    name: 'Delete images',
+    kind: 'single',
+    primaryFormatId: 'sq',
+  },
   formats: { sq: { name: 'Square', width: 1080, height: 1080, order: 'a0' } },
   pages: { p1: { name: 'Page 1', order: 'a0', fills: [{ type: 'solid', color: '#FFF8F0FF' }] } },
   nodes: assetId
-    ? { photo: { type: 'graphic', parentId: 'p1', index: 'a0', name: 'Photo', props: { x: 100, y: 100, width: 600, height: 400, shape: { kind: 'rect' }, fills: [{ type: 'image', assetId, fit: 'fill' }] } } }
+    ? {
+        photo: {
+          type: 'graphic',
+          parentId: 'p1',
+          index: 'a0',
+          name: 'Photo',
+          props: {
+            x: 100,
+            y: 100,
+            width: 600,
+            height: 400,
+            shape: { kind: 'rect' },
+            fills: [{ type: 'image', assetId, fit: 'fill' }],
+          },
+        },
+      }
     : {},
   overrides: {},
 })
 /** Whether the library lists the asset. */
-const listed = async (id: string) => ((await (await fetch(`${API_URL}/brands/${DEV_BRAND}/assets`)).json()) as { id: string }[]).some((a) => a.id === id)
+const listed = async (id: string) =>
+  ((await (await fetch(`${API_URL}/brands/${DEV_BRAND}/assets`)).json()) as { id: string }[]).some((a) => a.id === id)
 
 /** Opens the library, finds the asset and presses Delete on its tile. */
 async function deleteFromLibrary(page: Page, id: string, name: string) {
@@ -40,7 +64,11 @@ async function deleteFromLibrary(page: Page, id: string, name: string) {
 test('an image nothing uses is deleted once Delete is confirmed', async ({ browser }) => {
   const asset = await upload(unique('unused'))
   const name = `Unused ${run}`
-  await fetch(`${API_URL}/brands/${DEV_BRAND}/assets/${asset.id}`, { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name }) })
+  await fetch(`${API_URL}/brands/${DEV_BRAND}/assets/${asset.id}`, {
+    method: 'PATCH',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ name }),
+  })
   const { page, errors } = await openStage(browser, design())
   const { tile, details } = await deleteFromLibrary(page, asset.id, name)
   await expect(details.getByTestId('asset-delete-confirm')).toHaveText(`Delete ${name}`)
@@ -54,7 +82,11 @@ test('an image nothing uses is deleted once Delete is confirmed', async ({ brows
 test('an image the open design uses stays, and the panel says so', async ({ browser }) => {
   const asset = await upload(unique('here'))
   const name = `Here ${run}`
-  await fetch(`${API_URL}/brands/${DEV_BRAND}/assets/${asset.id}`, { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name }) })
+  await fetch(`${API_URL}/brands/${DEV_BRAND}/assets/${asset.id}`, {
+    method: 'PATCH',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ name }),
+  })
   const { page, errors } = await openStage(browser, design(asset.id))
   const { tile, details } = await deleteFromLibrary(page, asset.id, name)
   await expect(details.getByTestId('asset-in-use')).toHaveText('Used in this design')
@@ -68,7 +100,11 @@ test('an image the open design uses stays, and the panel says so', async ({ brow
 test('an image another design uses stays, and the panel names that design', async ({ browser }) => {
   const asset = await upload(unique('elsewhere'))
   const name = `Elsewhere ${run}`
-  await fetch(`${API_URL}/brands/${DEV_BRAND}/assets/${asset.id}`, { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name }) })
+  await fetch(`${API_URL}/brands/${DEV_BRAND}/assets/${asset.id}`, {
+    method: 'PATCH',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ name }),
+  })
   await api('/designs', { name: `Shop window ${run}`, content: design(asset.id) })
   const { page, errors } = await openStage(browser, design())
   const { tile, details } = await deleteFromLibrary(page, asset.id, name)

@@ -1,10 +1,11 @@
 // Renaming, copying and deleting in the library (#159) in Chromium: a design tile's menu renames,
 // duplicates and deletes it (asking first); a template tile's menu renames and deletes it; and the
 // editor's crumb renames the design open in it.
-import { expect, test } from '../support/test.ts'
-import { DesignSummary, TemplateSummary, type DesignInput } from '@dazbee/schema'
+import { type DesignInput, DesignSummary, TemplateSummary } from '@dazbee/schema'
+
 import { editorPath, writeOutput } from '../support/editor.ts'
 import { API_URL, DEV_BRAND, seed } from '../support/seed.ts'
+import { expect, test } from '../support/test.ts'
 
 test.describe.configure({ timeout: 120_000 })
 
@@ -15,8 +16,10 @@ const content = (name: string): DesignInput => ({
   nodes: {},
   overrides: {},
 })
-const designs = async () => DesignSummary.array().parse(await (await fetch(`${API_URL}/brands/${DEV_BRAND}/designs`)).json())
-const templates = async () => TemplateSummary.array().parse(await (await fetch(`${API_URL}/brands/${DEV_BRAND}/templates`)).json())
+const designs = async () =>
+  DesignSummary.array().parse(await (await fetch(`${API_URL}/brands/${DEV_BRAND}/designs`)).json())
+const templates = async () =>
+  TemplateSummary.array().parse(await (await fetch(`${API_URL}/brands/${DEV_BRAND}/templates`)).json())
 
 test('a design tile renames, duplicates and deletes its design', async ({ page }) => {
   const run = crypto.randomUUID().slice(0, 6)
@@ -60,7 +63,9 @@ test('a design tile renames, duplicates and deletes its design', async ({ page }
 test('a template tile renames and deletes its template', async ({ page }) => {
   const run = crypto.randomUUID().slice(0, 6)
   const saved = await fetch(`${API_URL}/brands/${DEV_BRAND}/templates`, {
-    method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name: `Offer ${run}`, scope: 'brand', content: content(`Offer ${run}`) }),
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ name: `Offer ${run}`, scope: 'brand', content: content(`Offer ${run}`) }),
   })
   expect(saved.status).toBe(201)
   const template = TemplateSummary.parse(await saved.json())

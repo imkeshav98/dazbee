@@ -7,30 +7,88 @@
 // When the items don't fit, the last ones go into ⋯, which opens a second row under the bar;
 // on a phone the bar scrolls sideways instead.
 import {
-  ArrowsClockwiseIcon, CircleHalfIcon, LockSimpleIcon, LockSimpleOpenIcon, CornersOutIcon, CropIcon, DotsThreeIcon, FadersIcon, FrameCornersIcon, ListBulletsIcon, ListNumbersIcon, MaskHappyIcon, MinusIcon, PlusIcon,
-  RowsIcon, SparkleIcon, StarIcon, TextAaIcon, TextAlignCenterIcon, TextAlignJustifyIcon, TextAlignLeftIcon, TextAlignRightIcon, TextBIcon, TextItalicIcon, TextStrikethroughIcon,
-  TextUnderlineIcon, AlignLeftIcon, UniteSquareIcon,
+  AlignLeftIcon,
+  ArrowsClockwiseIcon,
+  CircleHalfIcon,
+  CornersOutIcon,
+  CropIcon,
+  DotsThreeIcon,
+  FadersIcon,
+  FrameCornersIcon,
+  ListBulletsIcon,
+  ListNumbersIcon,
+  LockSimpleIcon,
+  LockSimpleOpenIcon,
+  MaskHappyIcon,
+  MinusIcon,
+  PlusIcon,
+  RowsIcon,
+  SparkleIcon,
+  StarIcon,
+  TextAaIcon,
+  TextAlignCenterIcon,
+  TextAlignJustifyIcon,
+  TextAlignLeftIcon,
+  TextAlignRightIcon,
+  TextBIcon,
+  TextItalicIcon,
+  TextStrikethroughIcon,
+  TextUnderlineIcon,
+  UniteSquareIcon,
 } from '@phosphor-icons/react'
-import { shortcutFor, withImage, type Editor, type ShortcutAction } from '@dazbee/editor'
+import { type ReactNode, useEffect, useLayoutEffect, useRef, useState } from 'react'
+
+import { type Editor, type ShortcutAction, shortcutFor, withImage } from '@dazbee/editor'
 import { boundFillIndex, type Design, type Paint } from '@dazbee/schema'
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
+
 import { cn } from '../../lib/cn.ts'
-import { LIMITS } from '../../lib/limits.ts'
 import { useMessages } from '../../lib/i18n/client.tsx'
 import { format } from '../../lib/i18n/index.ts'
+import { LIMITS } from '../../lib/limits.ts'
 import { COMBINE, DISTRIBUTE, keyOf, useSelection } from './arrange-panel.tsx'
-import { usePickedPage } from './pages-panel.tsx'
 import { arrowAlong, BarPopover, useRovingTab } from './bar-popover.tsx'
-import { editState, isLayerPanel, isPanel, setBar, setOpen, useEditState, usePhone, type PanelId } from './edit-store.ts'
+import {
+  editState,
+  isLayerPanel,
+  isPanel,
+  type PanelId,
+  setBar,
+  setOpen,
+  useEditState,
+  usePhone,
+} from './edit-store.ts'
 import { nearest, useFontCatalog, weightsOf } from './font-panel.tsx'
 import { ImagePickerButton } from './image-tool.tsx'
 import { AlignRow } from './layer-actions.tsx'
+import { usePickedPage } from './pages-panel.tsx'
 import { setEveryFormat } from './scope-store.ts'
-import { useLiveDesign } from './use-live-design.ts'
 import {
-  factsOf, imageFillOf, kindOf, PopupContent, ScopeChip, set, setTextFlag, shared, textFlag, textStyle, useTarget, type Style, type Target,
+  factsOf,
+  imageFillOf,
+  kindOf,
+  PopupContent,
+  ScopeChip,
+  set,
+  setTextFlag,
+  shared,
+  type Style,
+  type Target,
+  textFlag,
+  textStyle,
+  useTarget,
 } from './selection-cards.tsx'
-import { BAR_BUTTON, BAR_DIVIDER, BAR_ROW, BAR_TOGGLE, FOCUS_RING, MENU_DIVIDER, MENU_ITEM, MENU_KEY, MIXED_COLOUR } from './styles.ts'
+import {
+  BAR_BUTTON,
+  BAR_DIVIDER,
+  BAR_ROW,
+  BAR_TOGGLE,
+  FOCUS_RING,
+  MENU_DIVIDER,
+  MENU_ITEM,
+  MENU_KEY,
+  MIXED_COLOUR,
+} from './styles.ts'
+import { useLiveDesign } from './use-live-design.ts'
 
 /** Bold from this weight up, as type designers name their weights. */
 const BOLD = 600
@@ -51,7 +109,11 @@ const ALIGN_ICON = {
 
 /** A swatch on a bar button: the colour, or a rainbow where the layers have different ones. */
 const Dot = ({ colour }: { colour: string | null | 'mixed' }) => (
-  <span aria-hidden className="size-4 rounded-full border border-line-strong" style={{ background: colour === 'mixed' || colour === null ? MIXED_COLOUR : colour }} />
+  <span
+    aria-hidden
+    className="size-4 rounded-full border border-line-strong"
+    style={{ background: colour === 'mixed' || colour === null ? MIXED_COLOUR : colour }}
+  />
 )
 
 /** One item of the bar: a button, a pop-up's button or a divider, by a key that names it. */
@@ -89,12 +151,25 @@ function SizeStepper({ target }: { target: Target }) {
   const [draft, setDraft] = useState<string | null>(null)
   const commit = (text: string) => {
     const n = Number(text)
-    if (text.trim() !== '' && Number.isFinite(n) && n >= 1) setStyle('fontSize', Math.round(Math.min(n, LIMITS.fontSize) * 10) / 10)
+    if (text.trim() !== '' && Number.isFinite(n) && n >= 1)
+      setStyle('fontSize', Math.round(Math.min(n, LIMITS.fontSize) * 10) / 10)
     setDraft(null)
   }
   return (
-    <div role="group" aria-label={t.editor.props.fontSize} data-testid="bar-size" className="flex h-[30px] shrink-0 items-center rounded-row border border-line">
-      <button type="button" data-bar-item aria-label={t.editor.bar.smaller} title={t.editor.bar.smaller} onClick={() => shiftStyle('fontSize', -1, 1, 0, LIMITS.fontSize)} className="grid h-full w-6 cursor-pointer place-items-center rounded-s-row text-muted hover:bg-hover hover:text-text">
+    <div
+      role="group"
+      aria-label={t.editor.props.fontSize}
+      data-testid="bar-size"
+      className="flex h-[30px] shrink-0 items-center rounded-row border border-line"
+    >
+      <button
+        type="button"
+        data-bar-item
+        aria-label={t.editor.bar.smaller}
+        title={t.editor.bar.smaller}
+        onClick={() => shiftStyle('fontSize', -1, 1, 0, LIMITS.fontSize)}
+        className="grid h-full w-6 cursor-pointer place-items-center rounded-s-row text-muted hover:bg-hover hover:text-text"
+      >
         <MinusIcon size={12} aria-hidden />
       </button>
       <input
@@ -120,13 +195,29 @@ function SizeStepper({ target }: { target: Target }) {
           if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
             event.preventDefault()
             setDraft(null)
-            shiftStyle('fontSize', (event.key === 'ArrowUp' ? 1 : -1) * (event.shiftKey ? 10 : 1), 1, 0, LIMITS.fontSize)
+            shiftStyle(
+              'fontSize',
+              (event.key === 'ArrowUp' ? 1 : -1) * (event.shiftKey ? 10 : 1),
+              1,
+              0,
+              LIMITS.fontSize,
+            )
           }
         }}
         onBlur={(event) => draft !== null && commit(event.currentTarget.value)}
-        className={cn('h-full w-10 bg-transparent text-center font-mono text-[12px] tabular-nums text-text outline-none', FOCUS_RING)}
+        className={cn(
+          'h-full w-10 bg-transparent text-center font-mono text-[12px] tabular-nums text-text outline-none',
+          FOCUS_RING,
+        )}
       />
-      <button type="button" data-bar-item aria-label={t.editor.bar.bigger} title={t.editor.bar.bigger} onClick={() => shiftStyle('fontSize', 1, 1, 0, LIMITS.fontSize)} className="grid h-full w-6 cursor-pointer place-items-center rounded-e-row text-muted hover:bg-hover hover:text-text">
+      <button
+        type="button"
+        data-bar-item
+        aria-label={t.editor.bar.bigger}
+        title={t.editor.bar.bigger}
+        onClick={() => shiftStyle('fontSize', 1, 1, 0, LIMITS.fontSize)}
+        className="grid h-full w-6 cursor-pointer place-items-center rounded-e-row text-muted hover:bg-hover hover:text-text"
+      >
         <PlusIcon size={12} aria-hidden />
       </button>
     </div>
@@ -147,40 +238,80 @@ function useItems(target: Target, design: Design, brandId: string): Item[] {
   const items: Item[] = []
   const add = (key: string, node: ReactNode) => items.push({ key, node })
   const divider = () => add(`divider-${items.length}`, <span aria-hidden className={BAR_DIVIDER} />)
-  const pop = (id: string, label: string, children: ReactNode, look: { face?: ReactNode; icon?: ReactNode; testId?: string; className?: string } = {}) =>
-    add(id, (
-      <BarPopover id={id} open={open} onOpen={setOpen} label={label} face={look.face} icon={look.icon} testId={look.testId ?? id} className={look.className ?? 'w-auto'}>
+  const pop = (
+    id: string,
+    label: string,
+    children: ReactNode,
+    look: { face?: ReactNode; icon?: ReactNode; testId?: string; className?: string } = {},
+  ) =>
+    add(
+      id,
+      <BarPopover
+        id={id}
+        open={open}
+        onOpen={setOpen}
+        label={label}
+        face={look.face}
+        icon={look.icon}
+        testId={look.testId ?? id}
+        className={look.className ?? 'w-auto'}
+      >
         {children}
-      </BarPopover>
-    ))
+      </BarPopover>,
+    )
   const popup = (id: string) => <PopupContent popup={id} target={target} design={design} />
 
   // A locked layer's settings would all be refused: its bar says it is locked, and unlocks it.
   const locked = target.ids.filter((id) => Object.values(design.nodes[id]?.lock ?? {}).some(Boolean))
   if (locked.length > 0) {
-    add('locked', (
+    add(
+      'locked',
       <span data-testid="bar-locked" className="flex items-center gap-1 ps-2 text-[12.5px] font-medium text-muted">
         <LockSimpleIcon size={15} weight="fill" aria-hidden />
         {b.locked}
-        <button type="button" data-bar-item data-testid="bar-unlock" onClick={() => target.editor.setLocked(locked, false)} className={cn(BAR_BUTTON, 'ms-1')}>
+        <button
+          type="button"
+          data-bar-item
+          data-testid="bar-unlock"
+          onClick={() => target.editor.setLocked(locked, false)}
+          className={cn(BAR_BUTTON, 'ms-1')}
+        >
           <LockSimpleOpenIcon size={15} aria-hidden />
           {b.unlock}
         </button>
-      </span>
-    ))
+      </span>,
+    )
     return items
   }
 
   if (Object.keys(design.formats).length > 1) {
-    add('scope', <ScopeChip target={target} design={design} open={open === 'scope'} onOpen={(to) => setOpen(to ? 'scope' : null)} />)
+    add(
+      'scope',
+      <ScopeChip
+        target={target}
+        design={design}
+        open={open === 'scope'}
+        onOpen={(to) => setOpen(to ? 'scope' : null)}
+      />,
+    )
     divider()
   }
 
   // Text: its font, size and colour, its styles, and its paragraph's alignment, list, case and spacing.
-  const texts = kind === 'text' ? textStyle(target).styles : target.props.flatMap((pr, i) => (target.types[i] === 'text' ? [pr.style as Style] : []))
+  const texts =
+    kind === 'text'
+      ? textStyle(target).styles
+      : target.props.flatMap((pr, i) => (target.types[i] === 'text' ? [pr.style as Style] : []))
   if (texts.length > 0) {
     const family = shared(texts.map((s) => s.fontFamily))
-    add('font', <PanelButton id="font" label={b.font} face={<span className="max-w-28 truncate">{family === 'mixed' ? t.editor.fonts.mixed : family}</span>} />)
+    add(
+      'font',
+      <PanelButton
+        id="font"
+        label={b.font}
+        face={<span className="max-w-28 truncate">{family === 'mixed' ? t.editor.fonts.mixed : family}</span>}
+      />,
+    )
   }
   if (kind === 'text') {
     const color = shared(texts.map((s) => s.color))
@@ -210,14 +341,94 @@ function useItems(target: Target, design: Design, brandId: string): Item[] {
     }
     const flag = (key: 'underline' | 'strikethrough') => textFlag(target, key)
     add('size', <SizeStepper target={target} />)
-    add('colour', <PanelButton id="colour" label={p.textColour} face={<span aria-hidden className="flex flex-col items-center font-display text-[13px] leading-none font-bold">{COLOUR_MARK}<span className="mt-0.5 h-[3px] w-3.5 rounded-full" style={{ background: color === 'mixed' ? MIXED_COLOUR : color.slice(0, 7) }} /></span>} />)
-    add('bold', <button type="button" data-bar-item aria-label={b.bold} title={b.bold} aria-pressed={bold} disabled={!canBold} onClick={toggleBold} data-testid="bar-bold" className={BAR_TOGGLE}><TextBIcon size={16} weight="bold" aria-hidden /></button>)
-    add('italic', <button type="button" data-bar-item aria-label={b.italic} title={b.italic} aria-pressed={italic} onClick={() => textStyle(target).setStyle('fontStyle', italic === true ? 'normal' : 'italic')} data-testid="bar-italic" className={BAR_TOGGLE}><TextItalicIcon size={16} weight="bold" aria-hidden /></button>)
-    add('underline', <button type="button" data-bar-item aria-label={b.underline} title={b.underline} aria-pressed={flag('underline')} onClick={() => setTextFlag(target, 'underline', flag('underline') !== true)} data-testid="bar-underline" className={BAR_TOGGLE}><TextUnderlineIcon size={16} weight="bold" aria-hidden /></button>)
-    add('strikethrough', <button type="button" data-bar-item aria-label={b.strikethrough} title={b.strikethrough} aria-pressed={flag('strikethrough')} onClick={() => setTextFlag(target, 'strikethrough', flag('strikethrough') !== true)} data-testid="bar-strikethrough" className={BAR_TOGGLE}><TextStrikethroughIcon size={16} weight="bold" aria-hidden /></button>)
+    add(
+      'colour',
+      <PanelButton
+        id="colour"
+        label={p.textColour}
+        face={
+          <span aria-hidden className="flex flex-col items-center font-display text-[13px] leading-none font-bold">
+            {COLOUR_MARK}
+            <span
+              className="mt-0.5 h-[3px] w-3.5 rounded-full"
+              style={{ background: color === 'mixed' ? MIXED_COLOUR : color.slice(0, 7) }}
+            />
+          </span>
+        }
+      />,
+    )
+    add(
+      'bold',
+      <button
+        type="button"
+        data-bar-item
+        aria-label={b.bold}
+        title={b.bold}
+        aria-pressed={bold}
+        disabled={!canBold}
+        onClick={toggleBold}
+        data-testid="bar-bold"
+        className={BAR_TOGGLE}
+      >
+        <TextBIcon size={16} weight="bold" aria-hidden />
+      </button>,
+    )
+    add(
+      'italic',
+      <button
+        type="button"
+        data-bar-item
+        aria-label={b.italic}
+        title={b.italic}
+        aria-pressed={italic}
+        onClick={() => textStyle(target).setStyle('fontStyle', italic === true ? 'normal' : 'italic')}
+        data-testid="bar-italic"
+        className={BAR_TOGGLE}
+      >
+        <TextItalicIcon size={16} weight="bold" aria-hidden />
+      </button>,
+    )
+    add(
+      'underline',
+      <button
+        type="button"
+        data-bar-item
+        aria-label={b.underline}
+        title={b.underline}
+        aria-pressed={flag('underline')}
+        onClick={() => setTextFlag(target, 'underline', flag('underline') !== true)}
+        data-testid="bar-underline"
+        className={BAR_TOGGLE}
+      >
+        <TextUnderlineIcon size={16} weight="bold" aria-hidden />
+      </button>,
+    )
+    add(
+      'strikethrough',
+      <button
+        type="button"
+        data-bar-item
+        aria-label={b.strikethrough}
+        title={b.strikethrough}
+        aria-pressed={flag('strikethrough')}
+        onClick={() => setTextFlag(target, 'strikethrough', flag('strikethrough') !== true)}
+        data-testid="bar-strikethrough"
+        className={BAR_TOGGLE}
+      >
+        <TextStrikethroughIcon size={16} weight="bold" aria-hidden />
+      </button>,
+    )
     pop('align', b.align, popup('align'), { face: ALIGN_ICON[align === 'mixed' ? 'start' : align] })
-    pop('list', b.list, popup('list'), { face: list === 'number' ? <ListNumbersIcon size={16} aria-hidden /> : <ListBulletsIcon size={16} aria-hidden /> })
-    pop('case', b.textCase, popup('case'), { face: <span aria-hidden className="text-[13px] font-semibold">{CASE_MARK}</span> })
+    pop('list', b.list, popup('list'), {
+      face: list === 'number' ? <ListNumbersIcon size={16} aria-hidden /> : <ListBulletsIcon size={16} aria-hidden />,
+    })
+    pop('case', b.textCase, popup('case'), {
+      face: (
+        <span aria-hidden className="text-[13px] font-semibold">
+          {CASE_MARK}
+        </span>
+      ),
+    })
     add('spacing', <PanelButton id="spacing" label={b.spacing} icon={<TextAaIcon size={16} aria-hidden />} />)
   }
 
@@ -225,7 +436,8 @@ function useItems(target: Target, design: Design, brandId: string): Item[] {
   const photo = kind === 'photo' ? imageFillOf(target) : null
   if (photo) {
     add('edit', <PanelButton id="edit" label={b.edit} icon={<FadersIcon size={15} aria-hidden />} />)
-    add('replace', (
+    add(
+      'replace',
       <ImagePickerButton
         brandId={brandId}
         title={p.replaceImageTitle}
@@ -238,11 +450,28 @@ function useItems(target: Target, design: Design, brandId: string): Item[] {
       >
         <ArrowsClockwiseIcon size={15} aria-hidden />
         <span aria-hidden>{b.replace}</span>
-      </ImagePickerButton>
-    ))
-    if (!several) add('crop', <button type="button" data-bar-item data-testid="bar-crop" onClick={() => target.editor.perform('editPoints')} className={BAR_BUTTON}><CropIcon size={15} aria-hidden />{b.crop}</button>)
+      </ImagePickerButton>,
+    )
+    if (!several)
+      add(
+        'crop',
+        <button
+          type="button"
+          data-bar-item
+          data-testid="bar-crop"
+          onClick={() => target.editor.perform('editPoints')}
+          className={BAR_BUTTON}
+        >
+          <CropIcon size={15} aria-hidden />
+          {b.crop}
+        </button>,
+      )
     // A photo in a box keeps the box's own settings, whose Box pop-up holds its corners.
-    if (!facts.frames && facts.ownShape === 'rect') pop('corners', b.corners, popup('corners'), { icon: <CornersOutIcon size={16} aria-hidden />, className: 'w-72 p-2.5' })
+    if (!facts.frames && facts.ownShape === 'rect')
+      pop('corners', b.corners, popup('corners'), {
+        icon: <CornersOutIcon size={16} aria-hidden />,
+        className: 'w-72 p-2.5',
+      })
     if (facts.frames) {
       add('stack', <PanelButton id="stack" label={b.autoLayout} icon={<RowsIcon size={15} aria-hidden />} />)
       pop('box', b.box, popup('box'), { icon: <FrameCornersIcon size={15} aria-hidden />, className: 'w-72 p-2.5' })
@@ -258,62 +487,101 @@ function useItems(target: Target, design: Design, brandId: string): Item[] {
 
   // A shape or a box: its colour, outline, and its shape's or box's own settings.
   if (kind === 'shape' || kind === 'box') {
-    const colour = shared(target.props.map((pr) => {
-      const fills = (pr.fills ?? []) as Paint[]
-      const fill = fills[boundFillIndex(fills)]
-      return fill?.type === 'solid' ? fill.color.slice(0, 7) : null
-    }))
+    const colour = shared(
+      target.props.map((pr) => {
+        const fills = (pr.fills ?? []) as Paint[]
+        const fill = fills[boundFillIndex(fills)]
+        return fill?.type === 'solid' ? fill.color.slice(0, 7) : null
+      }),
+    )
     if (!facts.lines) add('colour', <PanelButton id="colour" label={b.fill} face={<Dot colour={colour} />} />)
     add('outline', <PanelButton id="outline" label={b.outline} />)
-    if (kind === 'shape' && facts.booleans && !several) pop('combine', p.combine, popup('combine'), { icon: <UniteSquareIcon size={15} aria-hidden />, className: 'w-72 p-2.5', testId: 'combine-op' })
-    else if (kind === 'shape' && facts.ownShape) pop('shape', b.shape, popup('shape'), { icon: <StarIcon size={15} aria-hidden />, className: 'w-72 p-2.5' })
+    if (kind === 'shape' && facts.booleans && !several)
+      pop('combine', p.combine, popup('combine'), {
+        icon: <UniteSquareIcon size={15} aria-hidden />,
+        className: 'w-72 p-2.5',
+        testId: 'combine-op',
+      })
+    else if (kind === 'shape' && facts.ownShape)
+      pop('shape', b.shape, popup('shape'), { icon: <StarIcon size={15} aria-hidden />, className: 'w-72 p-2.5' })
     if (kind === 'box') {
       add('stack', <PanelButton id="stack" label={b.autoLayout} icon={<RowsIcon size={15} aria-hidden />} />)
       pop('box', b.box, popup('box'), { icon: <FrameCornersIcon size={15} aria-hidden />, className: 'w-72 p-2.5' })
     }
   }
 
-  if (facts.masks) pop('mask', b.mask, popup('mask'), { icon: <MaskHappyIcon size={15} aria-hidden />, className: 'w-72 p-2.5' })
+  if (facts.masks)
+    pop('mask', b.mask, popup('mask'), { icon: <MaskHappyIcon size={15} aria-hidden />, className: 'w-72 p-2.5' })
 
   // Every selection: its effects, how much it shows through, and where it is.
   divider()
   add('effects', <PanelButton id="effects" label={p.effects} icon={<SparkleIcon size={15} aria-hidden />} />)
-  pop('transparency', b.transparency, popup('transparency'), { face: <CircleHalfIcon size={17} aria-hidden />, className: 'w-72 p-2.5' })
+  pop('transparency', b.transparency, popup('transparency'), {
+    face: <CircleHalfIcon size={17} aria-hidden />,
+    className: 'w-72 p-2.5',
+  })
   add('position', <PanelButton id="position" label={b.position} />)
 
   // Several layers: lining them up and spreading them, combining shapes, and stacking them.
   if (several) {
     const act = (action: ShortcutAction) => target.editor.perform(action)
     divider()
-    pop('line-up', b.lineUp, (
+    pop(
+      'line-up',
+      b.lineUp,
       <>
         <AlignRow editor={target.editor} />
         <div className={MENU_DIVIDER} />
         {DISTRIBUTE.map(({ action }) => (
-          <button key={action} type="button" data-action={action} disabled={target.ids.length < 3} onClick={() => act(action)} className={MENU_ITEM}>
+          <button
+            key={action}
+            type="button"
+            data-action={action}
+            disabled={target.ids.length < 3}
+            onClick={() => act(action)}
+            className={MENU_ITEM}
+          >
             {a[action]}
             <kbd className={MENU_KEY}>{keyOf(action)}</kbd>
           </button>
         ))}
-      </>
-    ), { icon: <AlignLeftIcon size={15} aria-hidden />, className: 'min-w-56' })
+      </>,
+      { icon: <AlignLeftIcon size={15} aria-hidden />, className: 'min-w-56' },
+    )
     if (kind === 'shape') {
-      pop('combine', b.combine, (
+      pop(
+        'combine',
+        b.combine,
         <>
           {COMBINE.map(({ action, icon: Icon }) => (
             <button key={action} type="button" data-action={action} onClick={() => act(action)} className={MENU_ITEM}>
-              <span className="flex items-center gap-2"><Icon size={16} aria-hidden />{a[action]}</span>
+              <span className="flex items-center gap-2">
+                <Icon size={16} aria-hidden />
+                {a[action]}
+              </span>
               <kbd className={MENU_KEY}>{keyOf(action)}</kbd>
             </button>
           ))}
-        </>
-      ), { icon: <UniteSquareIcon size={15} aria-hidden />, className: 'min-w-56' })
+        </>,
+        { icon: <UniteSquareIcon size={15} aria-hidden />, className: 'min-w-56' },
+      )
     }
-    add('autoLayout', <button type="button" data-bar-item data-action="autoLayout" onClick={() => act('autoLayout')} className={BAR_BUTTON}><RowsIcon size={15} aria-hidden />{kind === 'box' ? b.stackTogether : b.autoLayout}</button>)
+    add(
+      'autoLayout',
+      <button
+        type="button"
+        data-bar-item
+        data-action="autoLayout"
+        onClick={() => act('autoLayout')}
+        className={BAR_BUTTON}
+      >
+        <RowsIcon size={15} aria-hidden />
+        {kind === 'box' ? b.stackTogether : b.autoLayout}
+      </button>,
+    )
   }
   return items
 }
-
 
 /**
  * How many of the items fit on the bar's row; the rest go in the second row behind ⋯. Every item
@@ -331,7 +599,9 @@ function useFit(row: HTMLElement | null, extra: HTMLElement | null, keys: string
       // The bar's own padding and border take 8 px; each item has 2 px of gap after it; ⋯ is 34 px.
       const room = (wrapper?.clientWidth ?? window.innerWidth) - SIDE * 2 - 8
       // Each item's wrapper draws nothing of its own (display: contents); its button has the width.
-      const widths = [...row.children, ...extra.children].filter((el) => el instanceof HTMLElement && el.dataset.item !== undefined).map((el) => ((el.firstElementChild as HTMLElement | null)?.offsetWidth ?? 0) + 2)
+      const widths = [...row.children, ...extra.children]
+        .filter((el) => el instanceof HTMLElement && el.dataset.item !== undefined)
+        .map((el) => ((el.firstElementChild as HTMLElement | null)?.offsetWidth ?? 0) + 2)
       const total = widths.reduce((sum, w) => sum + w, 0)
       if (total <= room) return setFit(Infinity)
       const more = 34
@@ -361,7 +631,21 @@ function usePageItems(pageId: string, design: Design): Item[] {
   const colour = top?.type === 'solid' ? top.color : top && 'stops' in top ? top.stops[0]?.color : undefined
   const sizes = format(t.editor.formats.button, { n: Object.keys(design.formats).length })
   return [
-    { key: 'background', node: <PanelButton id="background" label={t.editor.page.backgroundColour} face={<><Dot colour={colour?.slice(0, 7) ?? 'mixed'} />{t.editor.page.background}</>} /> },
+    {
+      key: 'background',
+      node: (
+        <PanelButton
+          id="background"
+          label={t.editor.page.backgroundColour}
+          face={
+            <>
+              <Dot colour={colour?.slice(0, 7) ?? 'mixed'} />
+              {t.editor.page.background}
+            </>
+          }
+        />
+      ),
+    },
     { key: 'sizes', node: <PanelButton id="sizes" label={sizes} icon={<FrameCornersIcon size={15} aria-hidden />} /> },
   ]
 }
@@ -384,10 +668,13 @@ export function TopBar({ editor, brandId }: { editor: Editor; brandId: string })
   useEffect(() => {
     if (ids.length === 0) setEveryFormat(false)
   }, [ids.length])
-  useEffect(() => () => {
-    setBar(false)
-    setOpen(null)
-  }, [])
+  useEffect(
+    () => () => {
+      setBar(false)
+      setOpen(null)
+    },
+    [],
+  )
   if (selected) return <LayerBar target={selected.target} design={selected.design} brandId={brandId} />
   if (picked) return <PageBar editor={editor} pageId={picked} />
   return <BarGone />
@@ -401,7 +688,9 @@ function BarGone() {
 
 function LayerBar({ target, design, brandId }: { target: Target; design: Design; brandId: string }) {
   const items = useItems(target, design, brandId)
-  return <Bar items={items} label={useMessages().editor.bar.topBar} named={{ 'data-selection': target.ids.join(' ') }} />
+  return (
+    <Bar items={items} label={useMessages().editor.bar.topBar} named={{ 'data-selection': target.ids.join(' ') }} />
+  )
 }
 
 function PageBar({ editor, pageId }: { editor: Editor; pageId: string }) {
@@ -411,7 +700,15 @@ function PageBar({ editor, pageId }: { editor: Editor; pageId: string }) {
 }
 
 /** The bar for what it acts on, which `named` names on it: the selected layers, or the page. */
-function Bar({ items, label, named }: { items: Item[]; label: string; named: { 'data-selection': string } | { 'data-page': string } }) {
+function Bar({
+  items,
+  label,
+  named,
+}: {
+  items: Item[]
+  label: string
+  named: { 'data-selection': string } | { 'data-page': string }
+}) {
   const t = useMessages()
   const { open, flyoutEnd } = useEditState()
   const phone = usePhone()
@@ -437,7 +734,10 @@ function Bar({ items, label, named }: { items: Item[]; label: string; named: { '
   useLayoutEffect(() => {
     const measure = () => {
       if (!row) return
-      const bottom = Math.round((overflowOpen && extra ? extra.offsetTop + extra.offsetHeight : 0) || row.offsetTop + row.offsetHeight) + (bar?.offsetTop ?? 0)
+      const bottom =
+        Math.round(
+          (overflowOpen && extra ? extra.offsetTop + extra.offsetHeight : 0) || row.offsetTop + row.offsetHeight,
+        ) + (bar?.offsetTop ?? 0)
       if (bottom === reported.current) return
       reported.current = bottom
       setBar(true, bottom)
@@ -479,7 +779,11 @@ function Bar({ items, label, named }: { items: Item[]; label: string; named: { '
     window.addEventListener('keydown', onKey, true)
     return () => window.removeEventListener('keydown', onKey, true)
   }, [rowOpen])
-  const item = ({ key, node }: Item) => <span key={key} data-item={key} className="contents [&>*]:shrink-0">{node}</span>
+  const item = ({ key, node }: Item) => (
+    <span key={key} data-item={key} className="contents [&>*]:shrink-0">
+      {node}
+    </span>
+  )
   return (
     <div
       ref={setBarEl}
@@ -490,9 +794,16 @@ function Bar({ items, label, named }: { items: Item[]; label: string; named: { '
       onKeyDown={arrowAlong}
       onFocus={focused}
       style={{ insetInlineStart: startAt }}
-      className={cn('pointer-events-none absolute end-0 z-20 flex flex-col items-center gap-1.5 px-4 max-sm:px-2', BAR_ROW)}
+      className={cn(
+        'pointer-events-none absolute end-0 z-20 flex flex-col items-center gap-1.5 px-4 max-sm:px-2',
+        BAR_ROW,
+      )}
     >
-      <div ref={setRow} className={cn(TOP_BAR, 'pointer-events-auto max-w-full', phone && 'no-scrollbar overflow-x-auto')} data-testid="top-bar-row">
+      <div
+        ref={setRow}
+        className={cn(TOP_BAR, 'pointer-events-auto max-w-full', phone && 'no-scrollbar overflow-x-auto')}
+        data-testid="top-bar-row"
+      >
         {first.map(item)}
         {overflowing && (
           <button
@@ -509,10 +820,18 @@ function Bar({ items, label, named }: { items: Item[]; label: string; named: { '
           </button>
         )}
       </div>
-      <div ref={setExtra} data-testid="top-bar-overflow" className={cn(TOP_BAR, 'pointer-events-auto max-w-full flex-wrap justify-center', !overflowOpen && 'invisible absolute', !overflowing && 'hidden')}>
+      <div
+        ref={setExtra}
+        data-testid="top-bar-overflow"
+        className={cn(
+          TOP_BAR,
+          'pointer-events-auto max-w-full flex-wrap justify-center',
+          !overflowOpen && 'invisible absolute',
+          !overflowing && 'hidden',
+        )}
+      >
         {rest.map(item)}
       </div>
     </div>
   )
 }
-
