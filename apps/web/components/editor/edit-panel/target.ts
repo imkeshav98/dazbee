@@ -33,7 +33,7 @@ export type Style = Record<string, unknown> & {
   textCase?: string
 }
 
-/** What the cards act on: the layers, the frame they are shown in, and where changes go. */
+/** What the edit panels act on: the layers, the frame they are shown in, and where changes go. */
 export interface Target {
   editor: Editor
   ids: string[]
@@ -43,7 +43,7 @@ export interface Target {
   /** Each layer's values in the frame: its own, with its format's overrides on top. */
   props: Props[]
   types: string[]
-  /** The layers' names, for a card's note. */
+  /** The layers' names, for a panel part's note. */
   names: string[]
   /** Each character's style in the selected range while that one text layer is being edited: what text styling then changes. */
   range?: Style[] | undefined
@@ -79,8 +79,12 @@ export const set = (target: Target, to: (now: Props, i: number) => Patch | null)
 
 export const num = (props: Props, key: string) => props[key] as number
 
+/** Turns a style flag on or off for the selected text, or the selected run while editing. */
+export const setTextFlag = (target: Target, key: 'underline' | 'strikethrough', on: boolean) =>
+  textStyle(target).setStyle(key, on)
+
 /**
- * The selected layers as the cards and the bar act on them, in the frame they are selected in: like a
+ * The selected layers as the edit panels and the bar act on them, in the frame they are selected in: like a
  * drag on the canvas, a change goes to the format shown unless every format is asked for. Null when
  * none of them is in the design.
  */
@@ -193,10 +197,6 @@ export function textFlag(target: Target, key: 'underline' | 'strikethrough'): bo
   const on = textStyle(target).style(key)
   return on === 'mixed' ? 'mixed' : on === true
 }
-
-/** Turns a style flag on or off for the selected text, or the selected run while editing. */
-export const setTextFlag = (target: Target, key: 'underline' | 'strikethrough', on: boolean) =>
-  textStyle(target).setStyle(key, on)
 
 /** The topmost image fill, the one showing, when every selected layer has the same fills; null otherwise. */
 export function imageFillOf(target: Target): { index: number; paint: ImageFill } | null {

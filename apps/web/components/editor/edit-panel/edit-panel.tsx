@@ -30,7 +30,7 @@ import { AutoLayoutPanel } from './auto-layout-panel.tsx'
 import { ColourPanel } from './colour-panel.tsx'
 import { EffectsPanel } from './effects-panel.tsx'
 import { ImagePanel } from './image-panel.tsx'
-import { OutlinePanel } from './outline-panel.tsx'
+import { StrokePanel } from './outline-panel.tsx'
 import { PositionPanel } from './position-panel.tsx'
 import { SpacingPanel } from './spacing-panel.tsx'
 import { type PanelProps, useTarget } from './target.ts'
@@ -43,7 +43,7 @@ const PANELS: Record<LayerPanelId, (props: PanelProps) => ReactNode> = {
   effects: EffectsPanel,
   position: PositionPanel,
   edit: ImagePanel,
-  outline: OutlinePanel,
+  outline: StrokePanel,
   stack: AutoLayoutPanel,
 }
 

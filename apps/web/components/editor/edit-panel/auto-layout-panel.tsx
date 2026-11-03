@@ -1,5 +1,8 @@
 'use client'
 
+// The Stack panel: auto layout on or off, its direction, wrapping and room between, then under
+// Advanced the line-up pad, the room around and how the frame sizes; and the sizing fields a layer
+// in an auto layout has in the Position panel.
 import { FIELD_LABEL, KNOBS, PANEL_BUTTON, PANEL_HEADING } from '@/components/editor/styles.ts'
 import { FOCUS_RING } from '@/components/ui/looks.ts'
 import { cn } from '@/lib/cn.ts'

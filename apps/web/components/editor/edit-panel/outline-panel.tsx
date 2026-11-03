@@ -68,7 +68,7 @@ function parseDashes(text: string): number[] | null {
  * stroke, then each stroke's own settings under Advanced. Picking solid or dashed gives a layer
  * without a stroke a new one.
  */
-export function OutlinePanel({ target, brandId }: PanelProps) {
+export function StrokePanel({ target, brandId }: PanelProps) {
   const t = useMessages()
   const p = t.editor.props
   const b = t.editor.bar
