@@ -5,6 +5,9 @@ name: Browser tests on demand
 # --grep @gesture-matrix-sq. They are split at spaces and quotes are not honoured, so a --grep with a
 # space writes it as \s. When they include specs/live-editing.spec.ts, add --workers=1: its restart
 # test (@sync-restart) restarts the one sync server that every other worker's tabs are connected to.
+# The tests are split into four parts that run side by side, each on its own machine with its own
+# time limit, as CI's e2e jobs are; a part left with no tests passes. Each test's result is printed
+# as it finishes, so a part cut off at its time limit still shows what ran.
 on:
   workflow_dispatch:
     inputs:
@@ -15,9 +18,13 @@ on:
 
 jobs:
   on-demand:
-    name: browser tests on demand
+    name: browser tests on demand (${{ matrix.part }})
     runs-on: ubuntu-24.04
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        part: [1, 2, 3, 4]
     steps:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
@@ -31,15 +38,16 @@ jobs:
       - run: pnpm turbo run build --filter=@dazbee/web
       # The arguments reach the shell through the environment, so they are split into words but never
       # run as code; set -f keeps a * or ? in them from matching file names.
-      - run: set -f; pnpm --filter @dazbee/e2e exec playwright test $ARGS
+      - run: set -f; pnpm --filter @dazbee/e2e exec playwright test $ARGS --shard=${{ matrix.part }}/4 --pass-with-no-tests --reporter=list,html
         env:
           ARGS: ${{ inputs.args }}
+          PLAYWRIGHT_HTML_OPEN: never
       - if: failure()
         run: docker compose logs api sync
       - if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: e2e-on-demand
+          name: e2e-on-demand-${{ matrix.part }}
           path: |
             tests/e2e/playwright-report
             tests/e2e/output
