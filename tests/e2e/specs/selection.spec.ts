@@ -255,7 +255,8 @@ test('nudge, duplicate, z-order, lock, hide and delete from the keyboard', async
   await press(page, 'hide')
   expect(await props(page, 'dot')).toMatchObject({ visible: true })
 
-  // Lock: every flag on, then the layer can't be picked or deleted; the same keys unlock it.
+  // Lock: every flag on, then the layer can't be deleted; a click selects it again, and the same
+  // keys unlock it.
   await click(page, 230, 180)
   await press(page, 'lock')
   expect((await read(page)).nodes.box?.lock).toEqual({ move: true, resize: true, content: true, style: true, delete: true })
@@ -263,8 +264,7 @@ test('nudge, duplicate, z-order, lock, hide and delete from the keyboard', async
   expect((await read(page)).nodes.box).toBeDefined()
   await press(page, 'deselect')
   await click(page, 230, 180)
-  expect(await selection(page)).toEqual([])
-  await page.evaluate(() => window.dazbee?.select(['box']))
+  expect(await selection(page)).toEqual(['box'])
   await press(page, 'lock')
   expect((await read(page)).nodes.box?.lock).toBeUndefined()
 
