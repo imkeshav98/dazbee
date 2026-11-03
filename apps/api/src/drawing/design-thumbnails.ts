@@ -8,10 +8,10 @@ import type { Db } from '@dazbee/db'
 import type { Design, DesignCover, DesignSummary } from '@dazbee/schema'
 import type { Storage } from '@dazbee/storage'
 
-import { storedDesign } from './designs.ts'
+import { designThumbnailKey } from '../storage-keys.ts'
+import { storedDesign } from '../workspace/designs.ts'
 import type { DrawJob, DrawResult } from './draw-worker.ts'
 import { brandResourcesFor, firstPageId } from './render.ts'
-import { designThumbnailKey } from './storage-keys.ts'
 
 /** The longest side of a design's picture: the bento's big tile on a 2× screen. */
 const DESIGN_THUMBNAIL_SIZE = 640

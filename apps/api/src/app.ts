@@ -41,9 +41,22 @@ import {
   recordAsset,
   startUpload,
   updateAsset,
-} from './assets.ts'
-import { getBrandKit, InvalidKit, saveBrandKit } from './brand-kits.ts'
-import { designCover, ensureDesignThumbnail } from './design-thumbnails.ts'
+} from './assets/assets.ts'
+import { bearerToken, readSessionToken, type SessionOf } from './auth/session.ts'
+import { completeSignIn, type SignedInPerson, type SignInSettings } from './auth/sign-in.ts'
+import { getBrandKit, InvalidKit, saveBrandKit } from './brand-kits/brand-kits.ts'
+import { designCover, ensureDesignThumbnail } from './drawing/design-thumbnails.ts'
+import { fontLink, InvalidFont, listFonts, recordFont, startFontUpload } from './fonts/fonts.ts'
+import { body, type Env, error, requireSession } from './http.ts'
+import { originalKey, signedLink, templateThumbnailKey } from './storage-keys.ts'
+import {
+  deleteTemplate,
+  findTemplate,
+  listTemplates,
+  renameTemplate,
+  saveTemplate,
+  startFromTemplate,
+} from './templates/templates.ts'
 import {
   createBrand,
   createDesign,
@@ -57,20 +70,7 @@ import {
   renameDesign,
   storedDesign,
   updateWorkspace,
-} from './designs.ts'
-import { fontLink, InvalidFont, listFonts, recordFont, startFontUpload } from './fonts.ts'
-import { body, type Env, error, requireSession } from './http.ts'
-import { bearerToken, readSessionToken, type SessionOf } from './session.ts'
-import { completeSignIn, type SignedInPerson, type SignInSettings } from './sign-in.ts'
-import { originalKey, signedLink, templateThumbnailKey } from './storage-keys.ts'
-import {
-  deleteTemplate,
-  findTemplate,
-  listTemplates,
-  renameTemplate,
-  saveTemplate,
-  startFromTemplate,
-} from './templates.ts'
+} from './workspace/designs.ts'
 
 export function createApp({
   db,

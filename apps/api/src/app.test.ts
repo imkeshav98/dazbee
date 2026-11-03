@@ -28,11 +28,11 @@ import {
 } from '@dazbee/schema'
 import { verifySyncToken } from '@dazbee/sync-token'
 
-import { coverOf } from './design-thumbnails.ts'
-import { fontFiles } from './fonts.ts'
-import { importGoogleFamily } from './fonts-google.ts'
-import { readImageHeader } from './images.ts'
-import { renderFirstPage } from './render.ts'
+import { readImageHeader } from './assets/images.ts'
+import { coverOf } from './drawing/design-thumbnails.ts'
+import { renderFirstPage } from './drawing/render.ts'
+import { fontFiles } from './fonts/fonts.ts'
+import { importGoogleFamily } from './fonts/google.ts'
 import {
   app,
   authorization,

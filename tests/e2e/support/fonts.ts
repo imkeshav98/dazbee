@@ -16,7 +16,7 @@ const COMPOSE_STORE = {
  * docker compose stack, or off CI the suite's own (support/local-servers.ts).
  */
 export function importGoogleFonts(families: string[]) {
-  execFileSync('node', ['apps/api/src/import-google-fonts.ts', ...families], {
+  execFileSync('node', ['apps/api/src/scripts/import-google-fonts.ts', ...families], {
     cwd: join(import.meta.dirname, '..', '..', '..'),
     stdio: 'pipe',
     env: process.env.CI ? { ...COMPOSE_STORE, ...process.env } : { ...process.env, ...SUITE_STORE },

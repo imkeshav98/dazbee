@@ -7,9 +7,9 @@ import { type Db, fontFaces } from '@dazbee/db'
 import { googleCssUrl, googleFaces, type GoogleFamily } from '@dazbee/fonts'
 import type { Storage } from '@dazbee/storage'
 
+import { googleFontKey, previewKey } from '../storage-keys.ts'
 import { fontPreview } from './font-file.ts'
 import { replaceFace } from './fonts.ts'
-import { googleFontKey, previewKey } from './storage-keys.ts'
 
 /**
  * Copies one Google Fonts family into our storage: every weight and style the catalog lists,

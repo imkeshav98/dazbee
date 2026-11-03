@@ -16,8 +16,8 @@ import {
 } from '@dazbee/schema'
 import type { Storage } from '@dazbee/storage'
 
+import { checkUpload, googleFontKey, previewKey, signedLink, signedUpload, uploadedFontKey } from '../storage-keys.ts'
 import { fontPreview, readFontInfo } from './font-file.ts'
-import { checkUpload, googleFontKey, previewKey, signedLink, signedUpload, uploadedFontKey } from './storage-keys.ts'
 
 export class InvalidFont extends Error {}
 

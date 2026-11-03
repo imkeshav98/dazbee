@@ -3,8 +3,8 @@ import { join } from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
+import { png } from '../test-files.ts'
 import { readImageHeader } from './images.ts'
-import { png } from './test-files.ts'
 
 describe('image headers', () => {
   it('reads a PNG', () => {
@@ -12,7 +12,7 @@ describe('image headers', () => {
   })
 
   it('reads a JPEG past its other markers', () => {
-    const jpeg = new Uint8Array(readFileSync(join(import.meta.dirname, '../../../tests/pixels/assets/sneaker.jpg')))
+    const jpeg = new Uint8Array(readFileSync(join(import.meta.dirname, '../../../../tests/pixels/assets/sneaker.jpg')))
     expect(readImageHeader(jpeg)).toMatchObject({
       contentType: 'image/jpeg',
       width: expect.any(Number),

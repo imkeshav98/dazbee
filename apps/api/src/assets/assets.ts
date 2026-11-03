@@ -17,9 +17,9 @@ import {
 } from '@dazbee/schema'
 import type { Storage } from '@dazbee/storage'
 
-import { storedDesign } from './designs.ts'
+import { assetThumbnailKey, checkUpload, originalKey, signedUpload } from '../storage-keys.ts'
+import { storedDesign } from '../workspace/designs.ts'
 import { readImageHeader } from './images.ts'
-import { assetThumbnailKey, checkUpload, originalKey, signedUpload } from './storage-keys.ts'
 import { readSvgHeader } from './svg-assets.ts'
 import { makeThumbnail } from './thumbnails.ts'
 

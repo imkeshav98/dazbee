@@ -18,11 +18,11 @@ import {
 } from '@dazbee/schema'
 import type { Storage } from '@dazbee/storage'
 
-import { findAsset } from './assets.ts'
-import { createDesign, InvalidContent } from './designs.ts'
-import { renderFirstPage } from './render.ts'
-import { templateThumbnailKey } from './storage-keys.ts'
-import { makeThumbnail } from './thumbnails.ts'
+import { findAsset } from '../assets/assets.ts'
+import { makeThumbnail } from '../assets/thumbnails.ts'
+import { renderFirstPage } from '../drawing/render.ts'
+import { templateThumbnailKey } from '../storage-keys.ts'
+import { createDesign, InvalidContent } from '../workspace/designs.ts'
 
 const summary = {
   id: templates.id,

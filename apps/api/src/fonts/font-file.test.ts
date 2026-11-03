@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 
+import { readImageHeader } from '../assets/images.ts'
+import { fontFile } from '../test-files.ts'
 import { fontPreview, readFontInfo } from './font-file.ts'
-import { readImageHeader } from './images.ts'
-import { fontFile } from './test-files.ts'
 
 describe('readFontInfo', () => {
   it('reads the family, weight and style from the font’s own tables', () => {

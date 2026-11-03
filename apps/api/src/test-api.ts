@@ -10,7 +10,7 @@ import { AssetSummary, UploadTicket } from '@dazbee/schema'
 import { openStorage, storageSettings } from '@dazbee/storage'
 
 import { createApp } from './app.ts'
-import { type Session, signSessionToken, tokenSession } from './session.ts'
+import { type Session, signSessionToken, tokenSession } from './auth/session.ts'
 import { DATABASE_URL } from './test-database.ts'
 import { sha256 } from './test-files.ts'
 

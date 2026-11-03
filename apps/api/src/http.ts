@@ -5,7 +5,7 @@ import type { z } from 'zod'
 
 import type { ApiError } from '@dazbee/schema'
 
-import type { Session, SessionOf } from './session.ts'
+import type { Session, SessionOf } from './auth/session.ts'
 
 /** A route's context: the session `requireSession` found. */
 export type Env = { Variables: { session: Session } }
