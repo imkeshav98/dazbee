@@ -39,8 +39,6 @@ import { boundsOf, centreOf, normalAngle, round, turn } from './geometry.ts'
 import { inferLayout } from './infer-layout.ts'
 import { Placement } from './placement.ts'
 
-export { childrenOf }
-
 /**
  * A fractional index between two neighbours that never throws. Neighbours can tie (two tabs
  * inserting at once) or use keys the library rejects (hand-written fixtures such as `a000`);
