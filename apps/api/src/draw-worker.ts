@@ -24,7 +24,7 @@ export interface DrawJob {
 }
 export type DrawResult = { id: number; png: Uint8Array } | { id: number; error: string }
 
-const shipped = loadFontFiles().map(({ family, bytes }) => ({ family, bytes }))
+const shipped = loadFontFiles()
 let cache: ResourceCache | undefined
 
 async function draw(job: DrawJob): Promise<Uint8Array> {

@@ -13,8 +13,6 @@ import { findAsset, originalKey } from './assets.ts'
 import { getBrandKit } from './brand-kits.ts'
 import { fontFiles } from './fonts.ts'
 
-let shipped: { family: string; bytes: Uint8Array }[] | undefined
-
 /**
  * What drawing the design for this brand needs beyond the fonts we ship: the brand's catalog
  * families, the originals of its images and its brand kit's values. An image the brand has no
@@ -71,7 +69,6 @@ async function resourcesFor(
   brandId: string,
   design: Design,
 ): Promise<ResourceBytes> {
-  shipped ??= loadFontFiles().map(({ family, bytes }) => ({ family, bytes }))
   const resources = await brandResourcesFor(db, storage, workspaceId, brandId, design)
-  return { ...resources, fonts: [...shipped, ...resources.fonts] }
+  return { ...resources, fonts: [...loadFontFiles(), ...resources.fonts] }
 }

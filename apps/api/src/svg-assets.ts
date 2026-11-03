@@ -10,8 +10,6 @@ import { SVG_TYPE, SvgError, svgMarkup, svgToLayers } from '@dazbee/svg'
 
 import type { ImageHeader } from './images.ts'
 
-let shipped: { family: string; bytes: Uint8Array }[] | undefined
-
 /** The bytes as SVG markup: UTF-8 text whose first element is <svg>. Null for anything else. */
 function svgText(bytes: Uint8Array): string | null {
   if (bytes.length > MAX_SVG_BYTES) return null
@@ -68,7 +66,9 @@ export async function svgThumbnail(bytes: Uint8Array, size: number): Promise<Uin
     pages: { page: { name: 'Page', order: 'a0' } },
     nodes,
   }
-  shipped ??= loadFontFiles().map(({ family, bytes: font }) => ({ family, bytes: font }))
-  return renderDesign(ck, design, 'page', 'f', { fonts: shipped, fallbackFamilies: [...FALLBACK_FAMILIES], images: {} })
-    .png
+  return renderDesign(ck, design, 'page', 'f', {
+    fonts: loadFontFiles(),
+    fallbackFamilies: [...FALLBACK_FAMILIES],
+    images: {},
+  }).png
 }
