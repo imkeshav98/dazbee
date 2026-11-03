@@ -15,7 +15,7 @@ import { useLocale, useMessages } from '../../lib/i18n/client.tsx'
 import { dirOf, format } from '../../lib/i18n/index.ts'
 import { keyOf, useSelection } from './arrange-panel.tsx'
 import { arrowAlong, useMenuFocus, useRovingTab } from './bar-popover.tsx'
-import { editState, isPanel, setOpen, useEditState } from './edit-store.ts'
+import { editState, isPanel, setOpen, useEditState, usePhone } from './edit-store.ts'
 import { LayerActions } from './layer-actions.tsx'
 import { useTarget } from './selection-cards.tsx'
 import { BAR_BUTTON, BAR_TOGGLE, MENU } from './styles.ts'
@@ -127,6 +127,8 @@ export function SmallMenu({ editor, rightClick }: { editor: Editor; rightClick: 
   const { open } = useEditState()
   const moreFocus = useMenuFocus()
   const rtl = dirOf(useLocale()) === 'rtl'
+  const phone = usePhone()
+  const { barBottom } = useEditState()
   const focused = useRovingTab(menu)
   if (!selected) return null
   const { target, design } = selected
@@ -169,10 +171,11 @@ export function SmallMenu({ editor, rightClick }: { editor: Editor; rightClick: 
         </Popover.Trigger>
         <Popover.Portal>
           <Popover.Content
-            side={rtl ? 'left' : 'right'}
-            align="start"
+            // Beside the small menu, or under it on a phone, kept between the top bar and the bottom controls.
+            side={phone ? 'bottom' : rtl ? 'left' : 'right'}
+            align={phone ? 'center' : 'start'}
             sideOffset={8}
-            collisionPadding={{ top: 140, bottom: 72 }}
+            collisionPadding={{ top: barBottom + 8, bottom: phone ? 150 : 72, left: 8, right: 8 }}
             {...moreFocus.content}
             aria-label={b.more}
             data-testid="bar-more-menu"

@@ -1492,8 +1492,9 @@ export function PanelContent({ panel, target, design, brandId }: { panel: string
       case 'position':
         return (
           <>
-            <HeaderCard target={target} p={p} scope={null} title={t.editor.bar.position} />
-            {facts.sized && <RotationField target={target} p={p} />}
+            <HeaderCard target={target} p={p} scope={null} title={t.editor.bar.sizeAndPlace}>
+              {facts.sized && <RotationField target={target} p={p} />}
+            </HeaderCard>
             {facts.inFlow && <FlowCard target={target} p={p} />}
           </>
         )

@@ -6,12 +6,12 @@
 // and gives the focus back to its bar item when closed from inside it.
 import { XIcon } from '@phosphor-icons/react'
 import type { Editor, ShortcutAction } from '@dazbee/editor'
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef } from 'react'
 import { cn } from '../../lib/cn.ts'
 import { useMessages } from '../../lib/i18n/client.tsx'
 import { format } from '../../lib/i18n/index.ts'
 import { keyOf, useSelection } from './arrange-panel.tsx'
-import { isPanel, setOpen, setSheetTop, useEditState, type PanelId } from './edit-store.ts'
+import { isPanel, setOpen, setSheetTop, useEditState, usePhone, type PanelId } from './edit-store.ts'
 import { FontChooser, useFontCatalog } from './font-panel.tsx'
 import { AlignRow, ORDER } from './layer-actions.tsx'
 import { PanelContent, useTarget, type Target } from './selection-cards.tsx'
@@ -25,10 +25,10 @@ function ArrangePart({ target }: { target: Target }) {
   return (
     <section aria-labelledby="arrange-part-title" className={PANEL_PART} data-testid="arrange-part">
       <h3 id="arrange-part-title" className="flex h-8 items-center text-[13px] font-semibold text-text">{t.editor.bar.order}</h3>
-      <div className="grid grid-cols-2 gap-1">
+      <div className="flex flex-col">
         {ORDER.map((action) => (
-          <button key={action} type="button" data-action={action} onClick={() => run(action)} className={cn(MENU_ITEM, 'h-8 rounded-row border border-line px-2 text-[12px]')}>
-            <span className="truncate">{t.editor.arrange[action]}</span>
+          <button key={action} type="button" data-action={action} onClick={() => run(action)} className={cn(MENU_ITEM, 'h-8 px-2')}>
+            {t.editor.arrange[action]}
             <kbd className={MENU_KEY}>{keyOf(action)}</kbd>
           </button>
         ))}
@@ -43,18 +43,6 @@ function ArrangePart({ target }: { target: Target }) {
   )
 }
 
-/** Under 640 px wide the editor is laid out for a phone, where the panel is a sheet. */
-function usePhone() {
-  const [phone, setPhone] = useState(false)
-  useEffect(() => {
-    const query = window.matchMedia('(max-width: 639px)')
-    const update = () => setPhone(query.matches)
-    update()
-    query.addEventListener('change', update)
-    return () => query.removeEventListener('change', update)
-  }, [])
-  return phone
-}
 
 export function EditPanel({ editor, brandId }: { editor: Editor; brandId: string }) {
   const { open } = useEditState()
@@ -78,10 +66,10 @@ function Panel({ id, target, design, brandId }: { id: PanelId; target: Target; d
     setOpen(null)
     if (back) requestAnimationFrame(() => document.querySelector<HTMLElement>(`[data-testid="bar-${id}"]`)?.focus())
   }
-  // The focus moves into the panel as it opens, on its first control.
+  // The focus moves into the panel as it opens, onto the panel itself: Tab goes on to its
+  // controls, and no field takes the focus, so a phone's keyboard stays down.
   useEffect(() => {
-    const first = body.current?.querySelector<HTMLElement>('button:not(:disabled), input, select, [tabindex="0"]')
-    ;(first ?? panel.current)?.focus({ preventScroll: true })
+    panel.current?.focus({ preventScroll: true })
   }, [])
   // On a phone the sheet's top edge is known, so what sits at the bottom start can stand above it.
   useLayoutEffect(() => {
@@ -130,7 +118,7 @@ function Panel({ id, target, design, brandId }: { id: PanelId; target: Target; d
           <XIcon size={14} aria-hidden />
         </button>
       </div>
-      <div ref={bodyRef} className="flex min-h-0 flex-col gap-3 overflow-y-auto overscroll-contain px-4 pb-4">
+      <div ref={bodyRef} className="flex min-h-0 flex-col gap-3 overflow-y-auto overscroll-contain px-4 pb-4 [&>*]:shrink-0">
         {id === 'font'
           ? <FontChooser editor={target.editor} brandId={brandId} catalog={catalog} refresh={refresh} onDone={() => close(true)} />
           : (

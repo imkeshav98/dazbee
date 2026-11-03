@@ -251,6 +251,7 @@ export const ar: Messages = {
       effects: 'التأثيرات',
       transparency: 'الشفافية',
       position: 'الموضع',
+      sizeAndPlace: 'الحجم والموضع',
       edit: 'تعديل',
       editImage: 'تعديل الصورة',
       replace: 'استبدال',

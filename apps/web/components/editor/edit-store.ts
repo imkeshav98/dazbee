@@ -3,7 +3,7 @@
 // What the top bar has open: one pop-up, the full menu or one edit panel, never two at once, since
 // they share this one value. Opening any of them closes what was open. The shell reads it too: on a
 // phone an edit panel is a sheet, and a rail flyout and a sheet close each other.
-import { useSyncExternalStore } from 'react'
+import { useEffect, useState, useSyncExternalStore } from 'react'
 
 /** The top bar's items that open the edit panel; every other id is a pop-up or the full menu. */
 export const PANELS = ['font', 'colour', 'spacing', 'effects', 'position', 'edit', 'outline', 'stack'] as const
@@ -51,4 +51,17 @@ const subscribe = (listener: () => void) => {
 /** What the top bar has open and where it sits, re-rendering the caller when that changes. */
 export function useEditState() {
   return useSyncExternalStore(subscribe, () => state, () => state)
+}
+
+/** Under 640 px wide the editor is laid out for a phone: the edit panel is a sheet and the top bar scrolls. */
+export function usePhone() {
+  const [phone, setPhone] = useState(false)
+  useEffect(() => {
+    const query = window.matchMedia('(max-width: 639px)')
+    const update = () => setPhone(query.matches)
+    update()
+    query.addEventListener('change', update)
+    return () => query.removeEventListener('change', update)
+  }, [])
+  return phone
 }

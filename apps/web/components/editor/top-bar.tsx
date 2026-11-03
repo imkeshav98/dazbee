@@ -17,7 +17,7 @@ import { cn } from '../../lib/cn.ts'
 import { useMessages } from '../../lib/i18n/client.tsx'
 import { COMBINE, DISTRIBUTE, keyOf, useSelection } from './arrange-panel.tsx'
 import { arrowAlong, BarPopover, useRovingTab } from './bar-popover.tsx'
-import { isPanel, setBar, setOpen, useEditState, type PanelId } from './edit-store.ts'
+import { isPanel, setBar, setOpen, useEditState, usePhone, type PanelId } from './edit-store.ts'
 import { nearest, useFontCatalog, weightsOf } from './font-panel.tsx'
 import { ImagePickerButton } from './image-tool.tsx'
 import { AlignRow } from './layer-actions.tsx'
@@ -278,18 +278,6 @@ function useItems(target: Target, design: Design, brandId: string): Item[] {
   return items
 }
 
-/** Under 640 px wide the editor is laid out for a phone. */
-function usePhone() {
-  const [phone, setPhone] = useState(false)
-  useEffect(() => {
-    const query = window.matchMedia('(max-width: 639px)')
-    const update = () => setPhone(query.matches)
-    update()
-    query.addEventListener('change', update)
-    return () => query.removeEventListener('change', update)
-  }, [])
-  return phone
-}
 
 /**
  * How many of the items fit on the bar's row; the rest go in the second row behind ⋯. Every item
@@ -305,7 +293,8 @@ function useFit(row: HTMLElement | null, extra: HTMLElement | null, keys: string
     const stage = row.parentElement
     const measure = () => {
       const room = (stage?.clientWidth ?? window.innerWidth) - SIDE * 2 - 8
-      const widths = [...row.children, ...extra.children].filter((el) => el instanceof HTMLElement && el.dataset.item !== undefined).map((el) => (el as HTMLElement).offsetWidth + 2)
+      // Each item's wrapper draws nothing of its own (display: contents); its button has the width.
+      const widths = [...row.children, ...extra.children].filter((el) => el instanceof HTMLElement && el.dataset.item !== undefined).map((el) => ((el.firstElementChild as HTMLElement | null)?.offsetWidth ?? 0) + 2)
       const total = widths.reduce((sum, w) => sum + w, 0)
       if (total <= room) return setFit(Infinity)
       const more = 34
@@ -321,7 +310,7 @@ function useFit(row: HTMLElement | null, extra: HTMLElement | null, keys: string
     measure()
     const watch = new ResizeObserver(measure)
     if (stage) watch.observe(stage)
-    for (const el of [...row.children, ...extra.children]) watch.observe(el)
+    for (const el of [...row.children, ...extra.children]) watch.observe(el.firstElementChild ?? el)
     return () => watch.disconnect()
   }, [row, extra, keys, off])
   return fit

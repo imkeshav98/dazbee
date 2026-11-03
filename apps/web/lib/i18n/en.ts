@@ -262,6 +262,7 @@ export const en = {
       effects: 'Effects',
       transparency: 'Transparency',
       position: 'Position',
+      sizeAndPlace: 'Size and place',
       edit: 'Edit',
       editImage: 'Edit image',
       replace: 'Replace',
