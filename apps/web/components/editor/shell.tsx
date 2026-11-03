@@ -254,7 +254,7 @@ export function EditorShell({
   designName,
   onRename,
   status,
-  sizes,
+  formats,
   history,
   tool: shownTool,
   shape = 'rect',
@@ -274,8 +274,8 @@ export function EditorShell({
   onRename?: (name: string) => Promise<void>
   /** The editor's save state, or what it is doing before it opens. */
   status: ValueStore<string>
-  /** The design's sizes button, after its name. */
-  sizes?: ReactNode
+  /** The button for the design's formats (Sizes on screen), after its name. */
+  formats?: ReactNode
   /** Undo and redo, after the save state in the header pill. */
   history?: ReactNode
   /** The tool in use, when the editor decides it (a key, or drawing a shape ends); the dock keeps its own otherwise. */
@@ -421,7 +421,7 @@ export function EditorShell({
                 </span>
                 <DesignName name={designName} onRename={onRename} />
               </nav>
-              {sizes}
+              {formats}
               <SaveStatus status={status} fitted={fitted} />
               {history}
             </div>

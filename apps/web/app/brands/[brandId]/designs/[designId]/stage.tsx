@@ -288,7 +288,7 @@ export function EditorStage({
       designName={name}
       onRename={async (next) => setName(await renameFromEditor(brandId, designId, next))}
       status={status}
-      sizes={editor ? <FormatsButton editor={editor} /> : undefined}
+      formats={editor ? <FormatsButton editor={editor} /> : undefined}
       history={editor ? <HistoryButtons editor={editor} /> : undefined}
       tool={dockTool}
       shape={shape}
