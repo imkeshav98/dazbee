@@ -1,4 +1,4 @@
-import preset from '@dazbee/config/eslint'
+import preset, { adr0001Pattern } from '@dazbee/config/eslint'
 
 export default [
   ...preset,
@@ -6,13 +6,13 @@ export default [
     // Specs take `test` from support/test.ts, which fails a test on page errors, console errors and failed requests.
     files: ['specs/**/*.ts'],
     rules: {
-      'no-restricted-imports': ['error', {
-        paths: [{ name: '@playwright/test', message: "Import test and expect from '../support/test.ts'." }],
-        patterns: [{
-          regex: '^(\\.\\./)+(apps|packages|tests)/',
-          message: 'Import another workspace by its package name and declare it in package.json.',
-        }],
-      }],
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [{ name: '@playwright/test', message: "Import test and expect from '../support/test.ts'." }],
+          patterns: [adr0001Pattern],
+        },
+      ],
     },
   },
 ]

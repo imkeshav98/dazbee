@@ -58,10 +58,13 @@ export function exportSvg(ck: CanvasKit, design: Design, pageId: string, formatI
   return renderVector(ck, design, pageId, formatId, bytes, 'svg', cache)
 }
 
+/** Path separators, the characters some file systems reserve, and control characters. */
+// eslint-disable-next-line no-control-regex
+const UNSAFE_IN_NAMES = /[/\\:*?"<>|\u0000-\u001f]/g
+
 /** A name safe on every file system: no path separators or reserved characters, never empty. */
 function safe(part: string) {
-  // eslint-disable-next-line no-control-regex
-  const cleaned = part.replace(/[/\\:*?"<>|\u0000-\u001f]/g, '-').replace(/\s+/g, ' ').trim().replace(/^\.+/, '')
+  const cleaned = part.replace(UNSAFE_IN_NAMES, '-').replace(/\s+/g, ' ').trim().replace(/^\.+/, '')
   return cleaned || 'untitled'
 }
 

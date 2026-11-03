@@ -1,10 +1,84 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+
+import type { Linter } from 'eslint'
 import { afterEach, describe, expect, it } from 'vitest'
-import { checkRepo, findViolations, type WorkspacePackage } from './dependency-direction.ts'
+
+import { adr0001Pattern, webAliasPatterns } from '../eslint.config.js'
+import { checkRepo, findImportRuleGaps, findViolations, type WorkspacePackage } from './dependency-direction.ts'
 
 const workspacePackage = (name: string, dir: string, deps: string[] = []): WorkspacePackage => ({ name, dir, deps })
+const importRule = (...patterns: object[]): Linter.Config => ({
+  rules: { 'no-restricted-imports': ['error', { patterns }] },
+})
+
+describe('checkRepo', () => {
+  let root: string
+  const repo = (workspaceYaml: string) => {
+    root = mkdtempSync(join(tmpdir(), 'dazbee-deps-'))
+    writeFileSync(join(root, 'pnpm-workspace.yaml'), workspaceYaml)
+  }
+  const pkg = (dir: string, json: object) => {
+    mkdirSync(join(root, dir), { recursive: true })
+    writeFileSync(join(root, dir, 'package.json'), JSON.stringify(json))
+  }
+  const eslintConfig = (dir: string, config: Linter.Config[]) => {
+    writeFileSync(join(root, dir, 'eslint.config.js'), `export default ${JSON.stringify(config)}\n`)
+  }
+  afterEach(() => rmSync(root, { recursive: true, force: true }))
+
+  it('reads every workspace listed in pnpm-workspace.yaml and checks all dependency fields', async () => {
+    repo('packages:\n  - apps/*\n  - packages/*\n')
+    pkg('apps/web', { name: '@dazbee/web' })
+    pkg('packages/doc', { name: '@dazbee/doc', devDependencies: { '@dazbee/web': 'workspace:*' } })
+
+    expect(await checkRepo(root)).toEqual(['@dazbee/doc (a package) depends on @dazbee/web (an app)'])
+  })
+
+  it('fails instead of passing when a workspace pattern is not understood', async () => {
+    repo('packages:\n  - apps/*\n  - packages/**\n')
+    pkg('apps/web', { name: '@dazbee/web' })
+
+    expect(await checkRepo(root)).toEqual(['pnpm-workspace.yaml: cannot check the pattern "packages/**"; use "dir/*"'])
+  })
+
+  it('fails instead of passing when no workspace packages are found', async () => {
+    repo('packages:\n  - apps/*\n')
+
+    expect(await checkRepo(root)).toEqual(['pnpm-workspace.yaml: no workspace packages found'])
+  })
+
+  it('fails when a workspace package has no name', async () => {
+    repo('packages:\n  - apps/*\n')
+    pkg('apps/web', {})
+
+    expect(await checkRepo(root)).toEqual(['apps/web/package.json: missing "name"'])
+  })
+
+  it('fails when a block of a workspace ESLint config sets no-restricted-imports without adr0001Pattern', async () => {
+    repo('packages:\n  - packages/*\n')
+    pkg('packages/doc', { name: '@dazbee/doc', type: 'module' })
+    eslintConfig('packages/doc', [
+      importRule(adr0001Pattern),
+      { files: ['src/**/*.ts'], rules: { 'no-restricted-imports': ['error', { paths: ['yjs'] }] } },
+    ])
+
+    expect(await checkRepo(root)).toEqual([
+      'packages/doc/eslint.config.js: block 1 (src/**/*.ts) sets no-restricted-imports without adr0001Pattern from @dazbee/config/eslint',
+    ])
+  })
+
+  it('fails when a block of the web ESLint config sets no-restricted-imports without the ../ and subfolder ban', async () => {
+    repo('packages:\n  - apps/*\n')
+    pkg('apps/web', { name: '@dazbee/web', type: 'module' })
+    eslintConfig('apps/web', [importRule(adr0001Pattern, ...webAliasPatterns), importRule(adr0001Pattern)])
+
+    expect(await checkRepo(root)).toEqual([
+      'apps/web/eslint.config.js: block 1 sets no-restricted-imports without webAliasPatterns from @dazbee/config/eslint',
+    ])
+  })
+})
 
 describe('dependency direction', () => {
   it('flags a package that depends on an app', () => {
@@ -47,43 +121,32 @@ describe('dependency direction', () => {
   })
 })
 
-describe('checkRepo', () => {
-  let root: string
-  const repo = (workspaceYaml: string) => {
-    root = mkdtempSync(join(tmpdir(), 'dazbee-deps-'))
-    writeFileSync(join(root, 'pnpm-workspace.yaml'), workspaceYaml)
-  }
-  const pkg = (dir: string, json: object) => {
-    mkdirSync(join(root, dir), { recursive: true })
-    writeFileSync(join(root, dir, 'package.json'), JSON.stringify(json))
-  }
-  afterEach(() => rmSync(root, { recursive: true, force: true }))
+describe('findImportRuleGaps', () => {
+  it('passes blocks that hold the patterns their workspace needs, and holds the preset to ADR-0001 only', () => {
+    const preset = importRule(adr0001Pattern)
+    const editorRules: Linter.RulesRecord = {
+      'no-restricted-imports': ['error', { paths: ['yjs'], patterns: [adr0001Pattern] }],
+    }
+    const editor = [preset, { files: ['src/**'], rules: editorRules }]
+    const web = [preset, importRule(adr0001Pattern, ...webAliasPatterns)]
 
-  it('reads every workspace listed in pnpm-workspace.yaml and checks all dependency fields', () => {
-    repo('packages:\n  - apps/*\n  - packages/*\n')
-    pkg('apps/web', { name: '@dazbee/web' })
-    pkg('packages/doc', { name: '@dazbee/doc', devDependencies: { '@dazbee/web': 'workspace:*' } })
-
-    expect(checkRepo(root)).toEqual(['@dazbee/doc (a package) depends on @dazbee/web (an app)'])
+    expect(findImportRuleGaps('packages/editor', editor, new Set([preset]))).toEqual([])
+    expect(findImportRuleGaps('apps/web', web, new Set([preset]))).toEqual([])
   })
 
-  it('fails instead of passing when a workspace pattern is not understood', () => {
-    repo('packages:\n  - apps/*\n  - packages/**\n')
-    pkg('apps/web', { name: '@dazbee/web' })
+  it('fails the web config when no block of its own sets webAliasPatterns', () => {
+    const preset = importRule(adr0001Pattern)
 
-    expect(checkRepo(root)).toEqual(['pnpm-workspace.yaml: cannot check the pattern "packages/**"; use "dir/*"'])
+    expect(findImportRuleGaps('apps/web', [preset], new Set([preset]))).toEqual([
+      'apps/web/eslint.config.js: no block of its own sets no-restricted-imports with webAliasPatterns from @dazbee/config/eslint',
+    ])
   })
 
-  it('fails instead of passing when no workspace packages are found', () => {
-    repo('packages:\n  - apps/*\n')
+  it('fails a block that sets no-restricted-imports below error', () => {
+    const rules: Linter.RulesRecord = { 'no-restricted-imports': ['warn', { patterns: [adr0001Pattern] }] }
 
-    expect(checkRepo(root)).toEqual(['pnpm-workspace.yaml: no workspace packages found'])
-  })
-
-  it('fails when a workspace package has no name', () => {
-    repo('packages:\n  - apps/*\n')
-    pkg('apps/web', {})
-
-    expect(checkRepo(root)).toEqual(['apps/web/package.json: missing "name"'])
+    expect(findImportRuleGaps('packages/doc', [{ rules }], new Set())).toEqual([
+      'packages/doc/eslint.config.js: block 0 sets no-restricted-imports below error',
+    ])
   })
 })

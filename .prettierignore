@@ -1,0 +1,12 @@
+# Generated, vendored, built or hashed files, which Prettier leaves as they are. It also skips what .gitignore lists.
+packages/db/migrations/**
+packages/canvaskit/types/canvaskit.d.ts
+packages/canvaskit/bin/**
+packages/canvaskit/build/**
+packages/canvaskit/.skia/**
+**/.next/**
+**/dist/**
+tests/pixels/output/**
+tests/e2e/output/**
+**/playwright-report/**
+**/test-results/**
