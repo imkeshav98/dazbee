@@ -1,10 +1,11 @@
 // Every edit panel at desktop, tablet and phone size, for each kind that has it: simple choices
 // first and the numbers under Advanced, last; a picture of each for review.
-import { expect, test, type Page } from '../support/test.ts'
+import { expect, test, type Locator, type Page } from '../support/test.ts'
 import type { DesignInput } from '@dazbee/schema'
 import { photo, upload } from '../support/assets.ts'
 import { writeOutput } from '../support/editor.ts'
 import { barMenu, openStage } from '../support/stage.ts'
+import { choose } from '../support/select.ts'
 
 test.describe.configure({ timeout: 240_000 })
 
@@ -66,3 +67,105 @@ for (const [width, height] of [[1280, 760], [820, 1180], [390, 844]] as const) {
     expect(errors).toEqual([])
   })
 }
+
+/** The layer's props as the document holds them. */
+const propsOf = (page: Page, id: string) => page.evaluate((id) => window.dazbee?.design().nodes[id]?.props, id) as Promise<Record<string, unknown>>
+const enter = async (field: Locator, value: string) => {
+  await field.fill(value)
+  await field.press('Enter')
+}
+
+test.describe('found by QA', () => {
+  test('the Colour panel\'s + edits the fill that shows, gradient or not, and never stacks a new one', async ({ browser }) => {
+    const asset = await upload(photo)
+    const { page, errors } = await openStage(browser, design(asset.id))
+    await select(page, ['badge'])
+    const panel = await barMenu(page, 'colour')
+    await panel.getByTestId('colour-pick').click()
+    const picker = panel.getByTestId('colour-picker')
+    await picker.getByRole('radio', { name: 'Circle gradient' }).click()
+    await expect.poll(async () => ((await propsOf(page, 'badge')).fills as { type: string }[]).map((f) => f.type)).toEqual(['radial'])
+    await expect(picker.getByRole('radio', { name: 'Circle gradient' })).toHaveAttribute('aria-checked', 'true')
+    await expect(picker.getByTestId('gradient-bar')).toBeVisible()
+    await picker.getByRole('radio', { name: 'Line gradient' }).click()
+    await expect.poll(async () => ((await propsOf(page, 'badge')).fills as { type: string }[]).map((f) => f.type)).toEqual(['linear'])
+    expect(errors).toEqual([])
+  })
+
+  test('a panel whose item leaves the top bar closes: Colour, once a shape becomes a photo', async ({ browser }) => {
+    const asset = await upload(photo)
+    const { page, errors } = await openStage(browser, design(asset.id))
+    await select(page, ['badge'])
+    await barMenu(page, 'colour')
+    await page.evaluate((assetId) => window.dazbee?.session.run('node.update', { ids: ['badge'], patch: { fills: [{ type: 'image', assetId, fit: 'fill' }] } }), asset.id)
+    await expect(page.getByTestId('bar-edit')).toBeVisible()
+    await expect(page.locator('#edit-panel')).toHaveCount(0)
+    expect(errors).toEqual([])
+  })
+
+  test('a layer in a stack has no Line up with the size: the stack places it', async ({ browser }) => {
+    const asset = await upload(photo)
+    const { page, errors } = await openStage(browser, design(asset.id))
+    await select(page, ['label'])
+    const panel = await barMenu(page, 'position')
+    await expect(panel.getByTestId('arrange-part').getByRole('heading')).toHaveText(['Arrange'])
+    expect(errors).toEqual([])
+  })
+
+  test('text\'s outline under Advanced has its own remove button, and a width below the least keeps it on', async ({ browser }) => {
+    const asset = await upload(photo)
+    const { page, errors } = await openStage(browser, design(asset.id))
+    await select(page, ['headline'])
+    const panel = await barMenu(page, 'effects')
+    await panel.locator('[data-tile="outline"]').click()
+    const outline = async () => ((await propsOf(page, 'headline')).style as { outline?: { width: number } }).outline
+    await expect.poll(outline).toMatchObject({ width: 2 })
+    await enter(panel.getByRole('spinbutton', { name: 'Outline width' }), '-3')
+    await expect.poll(outline).toMatchObject({ width: 0.5 })
+    await expect(panel.getByRole('spinbutton', { name: 'Outline width' })).toBeVisible()
+    await panel.getByRole('button', { name: /^Remove outline/ }).click()
+    await expect.poll(outline).toBeUndefined()
+    expect(errors).toEqual([])
+  })
+
+  test('the Font panel stays open for a pick, and Esc closes its weight list first', async ({ browser }) => {
+    const asset = await upload(photo)
+    const { page, errors } = await openStage(browser, design(asset.id))
+    await select(page, ['headline'])
+    const panel = await barMenu(page, 'font')
+    await panel.getByTestId('font-weight').click()
+    const weights = page.getByRole('listbox', { name: 'Weight' })
+    await expect(weights).toBeVisible()
+    await page.keyboard.press('Escape')
+    await expect(weights).toHaveCount(0)
+    await expect(panel).toBeVisible()
+    await panel.getByRole('option', { name: 'Noto Sans Devanagari' }).click()
+    await expect.poll(async () => ((await propsOf(page, 'headline')).style as { fontFamily: string }).fontFamily).toBe('Noto Sans Devanagari')
+    await expect(panel).toBeVisible()
+    expect(errors).toEqual([])
+  })
+
+  test('emptying Max lines lifts the limit', async ({ browser }) => {
+    const asset = await upload(photo)
+    const { page, errors } = await openStage(browser, design(asset.id))
+    await select(page, ['headline'])
+    const field = (await barMenu(page, 'spacing')).getByRole('spinbutton', { name: 'Max lines' })
+    await enter(field, '3')
+    await expect.poll(async () => (await propsOf(page, 'headline')).maxLines).toBe(3)
+    await enter(field, '')
+    await expect.poll(async () => (await propsOf(page, 'headline')).maxLines).toBeUndefined()
+    expect(errors).toEqual([])
+  })
+
+  test('two effects of a type each have colour fields of their own name', async ({ browser }) => {
+    const asset = await upload(photo)
+    const { page, errors } = await openStage(browser, design(asset.id))
+    await select(page, ['badge'])
+    const panel = await barMenu(page, 'effects')
+    await panel.locator('[data-tile="dropShadow"]').click()
+    await choose(panel.getByRole('combobox', { name: 'Add another' }), 'dropShadow')
+    await expect(panel.getByRole('textbox', { name: 'Drop shadow 1 hex' })).toHaveCount(1)
+    await expect(panel.getByRole('textbox', { name: 'Drop shadow 2 hex' })).toHaveCount(1)
+    expect(errors).toEqual([])
+  })
+})
