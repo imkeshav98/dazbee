@@ -162,7 +162,7 @@ No workspace has a value-import cycle, and a change adds none. A cycle made only
 pnpm dlx madge --circular --extensions ts,tsx <source folder>
 ```
 
-For `apps/web`, run `pnpm dlx madge --circular --extensions ts,tsx --ts-config tsconfig.json .` inside `apps/web`, because madge resolves `@/` imports from the folder it runs in; it still finds the root `.madgerc`.
+For `apps/web`, run `pnpm dlx madge --circular --extensions ts,tsx --ts-config tsconfig.json app components lib scripts` inside `apps/web`, because madge resolves `@/` imports from the folder it runs in; it still finds the root `.madgerc`.
 
 ## The editor package
 
