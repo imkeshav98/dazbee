@@ -1,12 +1,23 @@
 'use client'
 
-// The property cards' fields, shared by every card that edits a value: a number that types, nudges
-// and scrubs, a colour with its hex and opacity, and a choice from a list.
-import { type CSSProperties, useEffect, useRef, useState } from 'react'
+// The edit panels' fields and parts: a number that types, nudges and scrubs, a colour with its hex
+// and opacity, a choice from a list, a part of a panel under its heading, a switch, and a row of
+// segments.
+import { type CSSProperties, type ReactNode, useEffect, useRef, useState } from 'react'
 
 import { type Editor, shortcutFor } from '@dazbee/editor'
 
-import { FIELD, KNOB, SELECT, VALUE_TEXT } from '@/components/editor/styles.ts'
+import {
+  FIELD,
+  KNOB,
+  PANEL_PART,
+  SEGMENT,
+  SEGMENTS,
+  SELECT,
+  SWITCH,
+  SWITCH_ROW,
+  VALUE_TEXT,
+} from '@/components/editor/styles.ts'
 import { Select } from '@/components/ui/select.tsx'
 import { cn } from '@/lib/cn.ts'
 import { fillOf } from '@/lib/editor/fill.ts'
@@ -17,6 +28,15 @@ import { format } from '@/lib/i18n/index.ts'
 
 export const clamp = (n: number, min = Number.NEGATIVE_INFINITY, max = Number.POSITIVE_INFINITY) =>
   Math.min(max, Math.max(min, n))
+
+/** A colour as #RRGGBBAA: one part changed, the other as the document holds it now. */
+const withHex = (hex: string) => (now: string | undefined) => `${hex}${now?.slice(7, 9) || 'FF'}`
+
+const withOpacity = (alpha: number) => (now: string | undefined) =>
+  `${now?.slice(0, 7) || '#000000'}${Math.round(clamp(alpha, 0, 1) * 255)
+    .toString(16)
+    .padStart(2, '0')
+    .toUpperCase()}`
 
 /**
  * What is being typed into a field, null when nothing is: `typed.current` has it as soon as it is
@@ -219,14 +239,6 @@ export function NumberField({
   )
 }
 
-/** A colour as #RRGGBBAA: one part changed, the other as the document holds it now. */
-const withHex = (hex: string) => (now: string | undefined) => `${hex}${now?.slice(7, 9) || 'FF'}`
-const withOpacity = (alpha: number) => (now: string | undefined) =>
-  `${now?.slice(0, 7) || '#000000'}${Math.round(clamp(alpha, 0, 1) * 255)
-    .toString(16)
-    .padStart(2, '0')
-    .toUpperCase()}`
-
 /**
  * A colour: a swatch that opens the system picker (unless `swatch` is off, where a swatch beside it
  * does more), the hex, and its opacity as a percentage. A
@@ -328,5 +340,114 @@ export function Choice<T extends string>({
       onChange={(next) => onSet(next as T)}
       className={SELECT}
     />
+  )
+}
+
+/** A part of an edit panel or pop-up: its heading, an action at the end, its controls. Advanced's heading is `strong`. */
+export function PanelPart({
+  id,
+  title,
+  note,
+  action,
+  strong = false,
+  children,
+}: {
+  id: string
+  title: string
+  note?: string
+  action?: ReactNode
+  strong?: boolean
+  children?: ReactNode
+}) {
+  return (
+    <section aria-labelledby={`${id}-title`} className={PANEL_PART} data-testid={id}>
+      <div className="flex h-7 items-center gap-2">
+        <h3
+          id={`${id}-title`}
+          className={cn('min-w-0 flex-1 truncate text-xs font-semibold', strong ? 'text-text' : 'text-muted')}
+        >
+          {title}
+        </h3>
+        {note && <span className="min-w-0 max-w-[60%] truncate text-[11px] font-medium text-muted">{note}</span>}
+        {action}
+      </div>
+      {children}
+    </section>
+  )
+}
+
+/** A switch on its own, named by `label`, or with its name beside it as `children`. */
+export function Switch({
+  on,
+  onSet,
+  label,
+  className,
+  children,
+}: {
+  on: boolean | 'mixed'
+  onSet: (on: boolean) => void
+  label?: string
+  className: string
+  children?: ReactNode
+}) {
+  return (
+    // A switch has no mixed state: while the layers differ it is a checkbox that says so.
+    <button
+      type="button"
+      role={on === 'mixed' ? 'checkbox' : 'switch'}
+      aria-checked={on}
+      aria-label={label}
+      onClick={() => onSet(on !== true)}
+      className={className}
+    >
+      {children}
+      <span aria-hidden className={SWITCH} />
+    </button>
+  )
+}
+
+/** A row that turns something on or off: its name, then a switch. */
+export function SwitchRow({ name, on, onSet }: { name: string; on: boolean | 'mixed'; onSet: (on: boolean) => void }) {
+  return (
+    <Switch on={on} onSet={onSet} className={SWITCH_ROW}>
+      {name}
+    </Switch>
+  )
+}
+
+/** A row of choices of which one is on; `marks` shows a short mark in place of a choice's name. */
+export function Segments<T extends string>({
+  name,
+  value,
+  options,
+  labels,
+  marks,
+  onSet,
+}: {
+  name: string
+  value: T | 'mixed'
+  options: readonly T[]
+  labels: Record<T, string>
+  marks?: Record<T, string>
+  onSet: (to: T) => void
+}) {
+  return (
+    <div role="radiogroup" aria-label={name} className={SEGMENTS}>
+      {options.map((option) => (
+        <button
+          key={option}
+          type="button"
+          role="radio"
+          aria-checked={value === option}
+          aria-label={marks ? labels[option] : undefined}
+          title={marks ? labels[option] : undefined}
+          data-value={option}
+          onClick={() => onSet(option)}
+          className={SEGMENT}
+        >
+          {marks?.[option] ?? labels[option]}
+        </button>
+      ))}
+    </div>
   )
 }
