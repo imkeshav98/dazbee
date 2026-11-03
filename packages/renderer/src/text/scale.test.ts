@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { scaled, scaleText, smallestSize } from './text-scale.ts'
+import { scaled, scaleText, smallestSize } from './scale.ts'
 
 const style = {
   fontFamily: 'Noto Sans',

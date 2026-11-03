@@ -1,21 +1,18 @@
-export { imageColorMatrix, type ColorMatrix } from './adjust.ts'
-export { drawPage, drawScene, type Resources } from './draw.ts'
+export { imageColorMatrix, type ColorMatrix } from './draw/adjust.ts'
+export { drawPage, drawScene } from './draw/draw.ts'
+export { drawVectorPage, type VectorTarget } from './draw/vector.ts'
+export { applyLayout, sizingOf, type MeasureText } from './layout.ts'
 export { layerPictures, type LayerPictures } from './pictures.ts'
-export { makeResources, resourceCache, type ResourceBytes, type ResourceCache } from './resources.ts'
+export { makeResources, resourceCache, type ResourceBytes, type ResourceCache, type Resources } from './resources.ts'
 export { render, sceneMemo, type Scene, type SceneLayer, type SceneMemo } from './scene.ts'
 export { drawDesign, renderDesign, renderVector, type Rendered, type VectorOptions } from './seam.ts'
-export { drawVectorPage, type VectorTarget } from './vector.ts'
-export { applyLayout, sizingOf, type MeasureText } from './layout.ts'
+export { caretAt, caretPosition, selectionBoxes, type SelectionBox } from './text/caret.ts'
 export {
-  caretAt,
-  caretPosition,
   layoutText,
   paragraphCache,
-  selectionBoxes,
   textMeasure,
   type ParagraphCache,
-  type SelectionBox,
   type TextBlock,
   type TextLayout,
-} from './text.ts'
-export { scaleText, smallestSize, type ScaledText } from './text-scale.ts'
+} from './text/layout.ts'
+export { scaleText, smallestSize, type ScaledText } from './text/scale.ts'

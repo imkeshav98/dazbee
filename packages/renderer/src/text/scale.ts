@@ -2,6 +2,10 @@
 // writes its sizes scaled by the box's factor.
 import type { TextProps } from '@dazbee/schema'
 
+/** What scaling a text changes; line height is a multiple of the size, so it stays. */
+export type ScaledText = Pick<TextProps, 'style' | 'runs'> &
+  Partial<Pick<TextProps, 'paragraphSpacing' | 'shrinkToFit'>>
+
 type Style = TextProps['style']
 type Run = TextProps['runs'][number]
 /** The sizes a style may hold. */
@@ -10,9 +14,6 @@ type Sized = {
   letterSpacing?: number | undefined
   outline?: Style['outline'] | undefined
 }
-/** What scaling a text changes; line height is a multiple of the size, so it stays. */
-export type ScaledText = Pick<TextProps, 'style' | 'runs'> &
-  Partial<Pick<TextProps, 'paragraphSpacing' | 'shrinkToFit'>>
 
 /** Every size in a style scaled: its font size, letter spacing and outline width. */
 export function scaled<T extends Sized>(style: T, scale: number, round: (n: number) => number = (n) => n): T {
@@ -23,8 +24,6 @@ export function scaled<T extends Sized>(style: T, scale: number, round: (n: numb
   if (out.outline) out.outline = { ...out.outline, width: round(out.outline.width * scale) }
   return out
 }
-
-const tenth = (n: number) => Math.round(n * 10) / 10
 
 /**
  * A text's sizes scaled by `factor`, as a corner drag scales them: the style's and each run's,
@@ -48,4 +47,8 @@ export function smallestSize(props: ScaledText): number {
     ...props.runs.flatMap((run) => (run.style.fontSize === undefined ? [] : [run.style.fontSize])),
     props.shrinkToFit?.min ?? Infinity,
   )
+}
+
+function tenth(n: number) {
+  return Math.round(n * 10) / 10
 }
