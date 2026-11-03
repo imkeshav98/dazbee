@@ -169,8 +169,7 @@ body {
   .pop-in-start,
   .pop-in-end,
   .modal-in,
-  .toast-in,
-  .card-rise {
+  .toast-in {
     animation: none !important;
   }
   .ai-sheen {
@@ -288,34 +287,6 @@ body {
   }
 }
 
-/* On phones the property cards are one frosted sheet with a grab handle (#125): the sheet takes
-   surface-frost, and the cards inside drop their own surface and are parted by hairlines. */
-@media (max-width: 639px) {
-  .editor-cards::before {
-    content: '';
-    position: sticky;
-    top: 0;
-    z-index: 1;
-    flex-shrink: 0;
-    align-self: center;
-    width: 40px;
-    height: 4px;
-    margin-block: 8px 2px;
-    border-radius: 9px;
-    background: var(--line-strong);
-  }
-  .editor-cards > * {
-    border-width: 0;
-    border-radius: 0;
-    background: none;
-    box-shadow: none;
-    backdrop-filter: none;
-  }
-  .editor-cards > * + * {
-    border-top: 1px solid var(--line);
-  }
-}
-
 /*
  * Glass (#81): the one frosted surface, for chrome that floats over the canvas or a page (dock,
  * zoom, islands, flyouts, cards, menus, dialogs). Glass is defined here and nowhere else: a surface
@@ -390,19 +361,6 @@ body {
   animation: toast-in var(--enter) var(--ease-pop) backwards;
 }
 
-/* The property cards rise in a short stagger as they appear (cardin). Translate and opacity only:
-   the frosted cards are layers of their own, and one whose scale was animated can stay drawn at
-   that scale after it ends, which shifts its edges by a fraction of a pixel. */
-@keyframes card-rise {
-  from { opacity: 0; transform: translateY(8px); }
-}
-.card-rise {
-  animation: card-rise var(--enter) var(--ease-out) backwards;
-}
-.card-rise:nth-child(2) { animation-delay: 40ms; }
-.card-rise:nth-child(3) { animation-delay: 80ms; }
-.card-rise:nth-child(n + 4) { animation-delay: 120ms; }
-
 /* Tiles lift on hover, with a deeper shadow under them (lift); in a .group, hovering the group
    lifts its .lift child, as a template's picture lifts while its name stays. */
 .lift {
@@ -474,6 +432,11 @@ body {
 .stage-overlay .selection-member {
   outline: 1px solid var(--accent);
   opacity: 0.7;
+}
+/* The page picked by a click on its background: each of its sizes outlined, dashed. */
+.stage-overlay .page-picked {
+  position: absolute;
+  outline: 2px dashed var(--accent);
 }
 .stage-overlay .hover {
   outline: 1.5px solid var(--accent);

@@ -15,7 +15,7 @@ const CHROME = {
   capsule: '[data-testid="rail"]',
   dock: '[data-dock]',
   zoom: '[data-zoom]',
-  cards: '[data-testid="cards"]',
+  pages: '[data-pages]',
 }
 
 /** The design's name in the start island, which the next test checks on its own. */

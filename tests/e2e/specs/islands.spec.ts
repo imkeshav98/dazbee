@@ -79,8 +79,7 @@ test('the editor has no top bar: two islands float over the canvas and the ads f
   await below()
   await writeOutput('islands-editor-dark.png', await page.screenshot())
 
-  // The cards and a flyout start below the end island.
-  expect((await box(page, 'cards')).y).toBeGreaterThan(end.y + end.height)
+  // A flyout starts below the start island.
   await page.getByRole('button', { name: 'Layers', exact: true }).click()
   expect((await box(page, 'flyout')).y).toBeGreaterThan(start.y + start.height)
 })

@@ -1,12 +1,13 @@
 'use client'
 
 // The top bar: fixed at the top centre of the stage while something is selected, its items set by
-// what is selected (text, a photo, a shape, a box, a group, or several). An item with ▾ opens a
-// pop-up under the bar; a panel item opens the one edit panel at the stage's end; the rest act at
-// once. When the items don't fit, the last ones go into ⋯, which opens a second row under the bar;
+// what is selected (text, a photo, a shape, a box, a group, or several, or the page: its Background
+// and Sizes); a locked layer's bar says it is locked and unlocks it. An item with ▾ opens a pop-up
+// under the bar; a panel item opens the one edit panel at the stage's end; the rest act at once.
+// When the items don't fit, the last ones go into ⋯, which opens a second row under the bar;
 // on a phone the bar scrolls sideways instead.
 import {
-  ArrowsClockwiseIcon, CircleHalfIcon, CornersOutIcon, CropIcon, DotsThreeIcon, FadersIcon, FrameCornersIcon, ListBulletsIcon, ListNumbersIcon, MaskHappyIcon, MinusIcon, PlusIcon,
+  ArrowsClockwiseIcon, CircleHalfIcon, LockSimpleIcon, LockSimpleOpenIcon, CornersOutIcon, CropIcon, DotsThreeIcon, FadersIcon, FrameCornersIcon, ListBulletsIcon, ListNumbersIcon, MaskHappyIcon, MinusIcon, PlusIcon,
   RowsIcon, SparkleIcon, StarIcon, TextAaIcon, TextAlignCenterIcon, TextAlignJustifyIcon, TextAlignLeftIcon, TextAlignRightIcon, TextBIcon, TextItalicIcon, TextStrikethroughIcon,
   TextUnderlineIcon, AlignLeftIcon, UniteSquareIcon,
 } from '@phosphor-icons/react'
@@ -16,13 +17,16 @@ import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 're
 import { cn } from '../../lib/cn.ts'
 import { LIMITS } from '../../lib/limits.ts'
 import { useMessages } from '../../lib/i18n/client.tsx'
+import { format } from '../../lib/i18n/index.ts'
 import { COMBINE, DISTRIBUTE, keyOf, useSelection } from './arrange-panel.tsx'
+import { usePickedPage } from './pages-panel.tsx'
 import { arrowAlong, BarPopover, useRovingTab } from './bar-popover.tsx'
-import { editState, isPanel, setBar, setOpen, useEditState, usePhone, type PanelId } from './edit-store.ts'
+import { editState, isLayerPanel, isPanel, setBar, setOpen, useEditState, usePhone, type PanelId } from './edit-store.ts'
 import { nearest, useFontCatalog, weightsOf } from './font-panel.tsx'
 import { ImagePickerButton } from './image-tool.tsx'
 import { AlignRow } from './layer-actions.tsx'
 import { setEveryFormat } from './scope-store.ts'
+import { useLiveDesign } from './use-live-design.ts'
 import {
   factsOf, imageFillOf, kindOf, PopupContent, ScopeChip, set, setTextFlag, shared, textFlag, textStyle, useTarget, type Style, type Target,
 } from './selection-cards.tsx'
@@ -150,6 +154,22 @@ function useItems(target: Target, design: Design, brandId: string): Item[] {
       </BarPopover>
     ))
   const popup = (id: string) => <PopupContent popup={id} target={target} design={design} />
+
+  // A locked layer's settings would all be refused: its bar says it is locked, and unlocks it.
+  const locked = target.ids.filter((id) => Object.values(design.nodes[id]?.lock ?? {}).some(Boolean))
+  if (locked.length > 0) {
+    add('locked', (
+      <span data-testid="bar-locked" className="flex items-center gap-1 ps-2 text-[12.5px] font-medium text-muted">
+        <LockSimpleIcon size={15} weight="fill" aria-hidden />
+        {b.locked}
+        <button type="button" data-bar-item data-testid="bar-unlock" onClick={() => target.editor.setLocked(locked, false)} className={cn(BAR_BUTTON, 'ms-1')}>
+          <LockSimpleOpenIcon size={15} aria-hidden />
+          {b.unlock}
+        </button>
+      </span>
+    ))
+    return items
+  }
 
   if (Object.keys(design.formats).length > 1) {
     add('scope', <ScopeChip target={target} design={design} open={open === 'scope'} onOpen={(to) => setOpen(to ? 'scope' : null)} />)
@@ -333,16 +353,33 @@ function useFit(row: HTMLElement | null, extra: HTMLElement | null, keys: string
   return fit
 }
 
+/** The picked page's items: its Background, and the design's Sizes. */
+function usePageItems(pageId: string, design: Design): Item[] {
+  const t = useMessages()
+  const fills = design.pages[pageId]?.fills ?? []
+  const top = fills.findLast((f) => f.visible !== false)
+  const colour = top?.type === 'solid' ? top.color : top && 'stops' in top ? top.stops[0]?.color : undefined
+  const sizes = format(t.editor.formats.button, { n: Object.keys(design.formats).length })
+  return [
+    { key: 'background', node: <PanelButton id="background" label={t.editor.page.backgroundColour} face={<><Dot colour={colour?.slice(0, 7) ?? 'mixed'} />{t.editor.page.background}</>} /> },
+    { key: 'sizes', node: <PanelButton id="sizes" label={sizes} icon={<FrameCornersIcon size={15} aria-hidden />} /> },
+  ]
+}
+
 export function TopBar({ editor, brandId }: { editor: Editor; brandId: string }) {
   const ids = useSelection(editor)
   const selected = useTarget(editor, ids)
-  // A pop-up or panel belongs to the selection it was opened for.
-  const opened = useRef(ids)
+  const picked = usePickedPage(editor)
+  // A pop-up or panel belongs to the selection it was opened for, and Background to the page
+  // picked: another page brought into view from Pages leaves Pages and Sizes open.
+  const opened = useRef({ ids, picked })
   useLayoutEffect(() => {
-    if (opened.current === ids) return
-    opened.current = ids
-    setOpen(null)
-  }, [ids])
+    const was = opened.current
+    if (was.ids === ids && was.picked === picked) return
+    opened.current = { ids, picked }
+    const now = editState().open
+    if (was.ids !== ids || now === 'background' || !isPanel(now) || isLayerPanel(now)) setOpen(null)
+  }, [ids, picked])
   // Once nothing is selected, changes go to the format shown again.
   useEffect(() => {
     if (ids.length === 0) setEveryFormat(false)
@@ -351,8 +388,9 @@ export function TopBar({ editor, brandId }: { editor: Editor; brandId: string })
     setBar(false)
     setOpen(null)
   }, [])
-  if (!selected) return <BarGone />
-  return <Bar target={selected.target} design={selected.design} brandId={brandId} />
+  if (selected) return <LayerBar target={selected.target} design={selected.design} brandId={brandId} />
+  if (picked) return <PageBar editor={editor} pageId={picked} />
+  return <BarGone />
 }
 
 /** With nothing selected there is no bar. */
@@ -361,9 +399,20 @@ function BarGone() {
   return null
 }
 
-function Bar({ target, design, brandId }: { target: Target; design: Design; brandId: string }) {
-  const t = useMessages()
+function LayerBar({ target, design, brandId }: { target: Target; design: Design; brandId: string }) {
   const items = useItems(target, design, brandId)
+  return <Bar items={items} label={useMessages().editor.bar.topBar} named={{ 'data-selection': target.ids.join(' ') }} />
+}
+
+function PageBar({ editor, pageId }: { editor: Editor; pageId: string }) {
+  const { design } = useLiveDesign(editor)
+  const items = usePageItems(pageId, design)
+  return <Bar items={items} label={useMessages().editor.page.title} named={{ 'data-page': pageId }} />
+}
+
+/** The bar for what it acts on, which `named` names on it: the selected layers, or the page. */
+function Bar({ items, label, named }: { items: Item[]; label: string; named: { 'data-selection': string } | { 'data-page': string } }) {
+  const t = useMessages()
   const { open, flyoutEnd } = useEditState()
   const phone = usePhone()
   // Beside an open rail flyout, the bar is centred in the room left at the end side.
@@ -400,14 +449,14 @@ function Bar({ target, design, brandId }: { target: Target; design: Design; bran
   }, [bar, row, extra, overflowOpen])
   useLayoutEffect(() => () => setBar(false), [])
   // Each selection's bar starts at its first item, on a phone too, where the bar scrolls sideways.
-  const selectionKey = target.ids.join(' ')
+  const selectionKey = Object.values(named).join(' ')
   useLayoutEffect(() => {
     if (row) row.scrollLeft = 0
     setRowOpen(false)
   }, [row, selectionKey])
   // A panel whose item has left the bar closes, as a shape's Colour does once it holds a photo.
   useLayoutEffect(() => {
-    if (isPanel(open) && !items.some((item) => item.key === open)) setOpen(null)
+    if (isLayerPanel(open) && !items.some((item) => item.key === open)) setOpen(null)
   }, [open, keys])
   // A pop-up hangs from its item: once the window changes size the item may have moved, so it closes.
   useEffect(() => {
@@ -435,9 +484,9 @@ function Bar({ target, design, brandId }: { target: Target; design: Design; bran
     <div
       ref={setBarEl}
       role="toolbar"
-      aria-label={t.editor.bar.topBar}
+      aria-label={label}
       data-testid="top-bar"
-      data-selection={target.ids.join(' ')}
+      {...named}
       onKeyDown={arrowAlong}
       onFocus={focused}
       style={{ insetInlineStart: startAt }}

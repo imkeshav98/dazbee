@@ -3,7 +3,7 @@
 import { expect, test, type Page } from '../support/test.ts'
 import type { DesignInput } from '@dazbee/schema'
 import { designOf, writeOutput } from '../support/editor.ts'
-import { drag, openStage, props } from '../support/stage.ts'
+import { backgroundPanel, drag, openStage, props } from '../support/stage.ts'
 
 test.describe.configure({ timeout: 120_000 })
 
@@ -30,7 +30,7 @@ async function undoAndRedo(page: Page, before: string, after: string) {
   }
 }
 
-test('Mod+Shift+Z and Mod+Y redo what Mod+Z undid, for a drag on the canvas and a colour picked in the Page card', async ({ browser }) => {
+test('Mod+Shift+Z and Mod+Y redo what Mod+Z undid, for a drag on the canvas and a colour picked in the page Background panel', async ({ browser }) => {
   const { page, errors } = await openStage(browser, design())
 
   // On the canvas: the box dragged by 100 × 50.
@@ -41,15 +41,19 @@ test('Mod+Shift+Z and Mod+Y redo what Mod+Z undid, for a drag on the canvas and 
   await undoAndRedo(page, start, dragged)
   writeOutput('redo-keys-0-drag.png', await page.screenshot())
 
-  // In a panel: with nothing selected, the Page card paints the page pink.
+  // In a panel: the page picked, its Background panel paints it pink; Esc closes the panel and
+  // leaves the focus on Background.
   await page.keyboard.press('Escape')
-  const card = page.getByTestId('page-card')
-  await expect(card).toBeVisible()
-  await card.getByRole('button', { name: '#FF48B0' }).click()
+  const panel = await backgroundPanel(page)
+  await panel.getByTestId('colour-pick').click()
+  const hex = panel.getByTestId('colour-picker').getByRole('textbox', { name: 'Colour hex' })
+  await hex.fill('FF48B0')
+  await hex.press('Enter')
+  await page.keyboard.press('Escape')
+  await expect(panel).toBeHidden()
   await expect.poll(async () => (JSON.parse(await designOf(page)) as { pages: Record<string, { fills: { color: string }[] }> }).pages.p1?.fills[0]?.color).toBe('#FF48B0FF')
   const painted = await designOf(page)
   await undoAndRedo(page, dragged, painted)
-  await expect(card.getByRole('button', { name: '#FF48B0' })).toHaveAttribute('aria-pressed', 'true')
   writeOutput('redo-keys-1-page.png', await page.screenshot())
   expect(errors).toEqual([])
 })

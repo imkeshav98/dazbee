@@ -34,13 +34,10 @@ export const editorPath = (designId: string, { brandId = DEV_BRAND }: InBrand = 
  * button's glow is always moving, so two shots of the same design would otherwise differ there.
  */
 export const stageShot = (page: Page) =>
-  // The canvas alone: the chrome floating over it is left out, the capsule and the islands masked
-  // and the property cards hidden. The cards follow the selection and the brand kit as the tab last
-  // fetched it, and change height with them, so a mask the size of them would differ as well.
+  // The canvas alone: the chrome floating over it is left out, the capsule and the islands masked.
   page.getByTestId('stage').screenshot({
     animations: 'disabled',
     mask: [page.getByTestId('rail'), page.getByTestId('island-start'), page.getByTestId('island-end')],
-    style: '[data-testid="cards"] { visibility: hidden; }',
   })
 
 /** The design as the tab's document holds it now, as JSON with sorted keys so two tabs compare equal. */

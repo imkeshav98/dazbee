@@ -108,7 +108,7 @@ const wrapped = (page: Page) => page.evaluate(() => {
 /** What the selection's top bar opens: every item with a pop-up or panel, by its test id, and the full menu. */
 const openers = (page: Page) => page.evaluate(() => {
   const items = [...document.querySelectorAll<HTMLElement>('[data-testid="top-bar"] [data-testid^="bar-"]')]
-  return items.map((el) => el.dataset.testid ?? '').filter((id) => ['bar-overflow', 'bar-size', 'bar-bold', 'bar-italic', 'bar-underline', 'bar-strikethrough', 'bar-crop', 'bar-replace', 'bar-size-field'].indexOf(id) < 0)
+  return items.map((el) => el.dataset.testid ?? '').filter((id) => ['bar-overflow', 'bar-size', 'bar-bold', 'bar-italic', 'bar-underline', 'bar-strikethrough', 'bar-crop', 'bar-replace', 'bar-size-field', 'bar-locked', 'bar-unlock'].indexOf(id) < 0)
 })
 
 for (const [width, height] of SIZES) {
@@ -411,8 +411,6 @@ test('on a phone a panel is a sheet that hides the tab bar and dock, and it and 
   await page.getByTestId('edit-panel-close').click()
   await page.locator('[data-panel="layers"]').click()
   await expect(page.getByTestId('flyout')).toBeVisible()
-  // The phones' properties tab has nothing to show while something is selected.
-  await expect(page.locator('[data-panel="properties"]')).toBeHidden()
   await select(page, [])
   await expect(page.locator('[data-zoom]')).toBeVisible()
   expect(errors).toEqual([])
