@@ -72,7 +72,7 @@ test('click, shift-click and marquee select; locked and hidden layers are not pi
   await press(page, 'selectAll')
   expect((await selection(page)).sort()).toEqual(['arabic', 'box', 'dot', 'g', 'headline', 'tilt'])
 
-  // A locked layer can't be picked or dragged: the press starts a marquee instead.
+  // A drag from a locked layer neither picks nor moves it: it draws a marquee.
   await press(page, 'deselect')
   await drag(page, { x: 970, y: 970 }, { x: 1000, y: 1000 })
   expect(await selection(page)).toEqual([])
@@ -80,6 +80,27 @@ test('click, shift-click and marquee select; locked and hidden layers are not pi
   // A hidden layer draws nothing and can't be hit.
   await click(page, 480, 400)
   expect(await selection(page)).toEqual([])
+  expect(errors).toEqual([])
+})
+
+test('a click on a locked layer selects it, without handles, so the small menu can unlock it; a drag from it still draws a marquee', async ({ browser }) => {
+  const { page, errors } = await open(browser)
+  await click(page, 970, 970)
+  expect(await selection(page)).toEqual(['locked'])
+  await expect(page.locator('.selection[data-layer="locked"] .handle')).toHaveCount(0)
+  // Locked in place, it stays put under a drag, which draws a marquee as before.
+  await drag(page, { x: 970, y: 970 }, { x: 1000, y: 1000 })
+  expect(await props(page, 'locked')).toMatchObject({ x: 900, y: 900 })
+  // Clicked again, it is selected again, and the small menu's lock, pressed, unlocks it.
+  await click(page, 970, 970)
+  expect(await selection(page)).toEqual(['locked'])
+  const lock = page.getByTestId('small-lock')
+  await expect(lock).toHaveAttribute('aria-pressed', 'true')
+  await lock.click()
+  await expect.poll(async () => (await read(page)).nodes.locked?.lock).toBeUndefined()
+  await expect(page.locator('.selection[data-layer="locked"] .handle')).toHaveCount(8)
+  await drag(page, { x: 970, y: 970 }, { x: 1010, y: 970 })
+  expect(await props(page, 'locked')).toMatchObject({ x: 940, y: 900 })
   expect(errors).toEqual([])
 })
 
