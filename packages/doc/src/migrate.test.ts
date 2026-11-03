@@ -3,17 +3,11 @@
 import { describe, expect, it } from 'vitest'
 import * as Y from 'yjs'
 
-import { type DesignInput, parseDesign, SCHEMA_VERSION } from '@dazbee/schema'
+import { SCHEMA_VERSION } from '@dazbee/schema'
 
 import { root } from './design-doc.ts'
-import { loadDesign, migrateDoc, openSession, readDesign } from './index.ts'
-import { testDesign } from './test-design.ts'
-
-const freshDoc = (design: DesignInput = testDesign()) => {
-  const result = parseDesign(design)
-  if (!result.success) throw new Error(result.errors.join('\n'))
-  return loadDesign(result.design)
-}
+import { migrateDoc, openSession, readDesign } from './index.ts'
+import { testDesign, testDoc } from './test-design.ts'
 
 const stops = [
   { offset: 0, color: '#FF0000FF' },
@@ -22,7 +16,7 @@ const stops = [
 
 describe('node.update sets each new property', () => {
   it('angular gradients, and strokes with dashes, caps, joins and a miter limit', () => {
-    const doc = freshDoc()
+    const doc = testDoc()
     const tab = openSession(doc)
     tab.run('node.update', {
       ids: ['box'],
@@ -76,7 +70,7 @@ describe('node.update sets each new property', () => {
   })
 
   it('inner shadow, glow and background blur', () => {
-    const doc = freshDoc()
+    const doc = testDoc()
     const tab = openSession(doc)
     const effects = [
       { type: 'innerShadow', x: 1, y: 2, blur: 3, spread: 1, color: '#00000080' },
@@ -94,7 +88,7 @@ describe('node.update sets each new property', () => {
   })
 
   it('pass-through and normal on groups and frames, never on other layers', () => {
-    const doc = freshDoc()
+    const doc = testDoc()
     const tab = openSession(doc)
     const group = tab.run('node.group', { ids: ['box', 'headline'] })
     expect(readDesign(doc).nodes[group]?.props.blendMode).toBe('pass-through')
@@ -113,7 +107,7 @@ const version1Doc = () => {
   const design = testDesign()
   const box = design.nodes.box
   if (!box) throw new Error('no box')
-  const doc = freshDoc({
+  const doc = testDoc({
     ...design,
     nodes: {
       ...design.nodes,

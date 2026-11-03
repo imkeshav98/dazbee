@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest'
 
 import { parseDesign } from '@dazbee/schema'
 
+import { testDesign } from '../test-design.ts'
 import { mergedProps } from './placement.ts'
-import { testDesign } from './test-design.ts'
 
 const design = () => {
   const parsed = parseDesign(testDesign())

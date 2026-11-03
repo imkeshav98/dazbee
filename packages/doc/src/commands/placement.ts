@@ -2,9 +2,9 @@ import type * as Y from 'yjs'
 
 import { type AnyScope, type Design, formatScope } from '@dazbee/schema'
 
-import type { CommandContext } from './command.ts'
-import { overrideKey } from './design-doc.ts'
-import { type Box, round } from './geometry.ts'
+import { overrideKey } from '../design-doc.ts'
+import { type Box, round } from '../geometry.ts'
+import type { CommandContext } from './define.ts'
 
 /** Where a layer is in one scope, and whether it shows there. */
 export type Placed = Box & { visible: boolean }
