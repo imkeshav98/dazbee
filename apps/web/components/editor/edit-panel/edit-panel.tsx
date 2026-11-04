@@ -5,7 +5,7 @@
 // phone it is a sheet at the bottom. It closes on ✕, Esc, another selection or a pop-up opening,
 // and gives the focus back to its bar item when closed from inside it.
 import { XIcon } from '@phosphor-icons/react'
-import { type CSSProperties, type ReactNode, type RefObject, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { type CSSProperties, type ReactNode, useEffect, useLayoutEffect, useRef, useState } from 'react'
 
 import type { Editor } from '@dazbee/editor'
 
@@ -22,6 +22,7 @@ import {
 import { useSelection } from '@/components/editor/editor-hooks.ts'
 import { FontChooser } from '@/components/editor/flyouts/font-panel.tsx'
 import { useOverlayScroll } from '@/components/ui/overlay-scroll.ts'
+import { useScrollEdges } from '@/components/ui/scroll-edges.ts'
 import { cn } from '@/lib/cn.ts'
 import { useMessages } from '@/lib/i18n/client.tsx'
 import { format } from '@/lib/i18n/index.ts'
@@ -60,30 +61,6 @@ const openerOf = (id: PanelId, opener: Element | null) =>
 function closePanel(id: PanelId, back: boolean, opener: Element | null = null) {
   if (back) openerOf(id, opener)?.focus()
   setOpen(null)
-}
-
-/**
- * Whether a scrolling body has been scrolled down from its top, and whether more of it is below:
- * the panel then draws a line under its title, and fades its last lines out.
- */
-function useScrollEdges(body: RefObject<HTMLElement | null>) {
-  const [edges, setEdges] = useState({ down: false, more: false })
-  const measure = () => {
-    const el = body.current
-    if (!el) return
-    const next = { down: el.scrollTop > 0, more: el.scrollTop + el.clientHeight < el.scrollHeight - 1 }
-    setEdges((now) => (now.down === next.down && now.more === next.more ? now : next))
-  }
-  useLayoutEffect(() => {
-    const el = body.current
-    if (!el) return
-    measure()
-    const watch = new ResizeObserver(measure)
-    watch.observe(el)
-    for (const child of el.children) watch.observe(child)
-    return () => watch.disconnect()
-  })
-  return { ...edges, measure }
 }
 
 export function EditPanel({ editor, brandId }: { editor: Editor; brandId: string }) {
