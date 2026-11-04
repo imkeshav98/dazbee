@@ -61,7 +61,7 @@ const brightAd = (): DesignInput => ({
     circle: shape('Circle', 'a2', { x: 560, y: 260, width: 520, height: 520 }, '#FF48B0FF', 'ellipse'),
     headline,
     stack: {
-      type: 'frame',
+      type: 'box',
       parentId: 'p1',
       index: 'a4',
       name: 'Stack',
