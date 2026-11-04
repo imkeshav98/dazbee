@@ -12,6 +12,12 @@
 @import './styles/sign-in.css';
 
 @custom-variant dark (&:where([data-theme=dark], [data-theme=dark] *));
+/*
+ * Pressed: under a mouse press (:active), or holding the mark a finger or pen press leaves on what it
+ * holds (`data-pressed`, set by lib/press.ts), which phones don't reliably show as :active. As with
+ * :active, an element is pressed while anything inside it is.
+ */
+@custom-variant active (&:is(:active, [data-pressed], :has([data-pressed])));
 
 html,
 body {

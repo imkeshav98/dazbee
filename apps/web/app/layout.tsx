@@ -5,6 +5,7 @@ import { cookies } from 'next/headers'
 import type { ReactNode } from 'react'
 
 import { PageScroll } from '@/components/ui/overlay-scroll.ts'
+import { PressMarks } from '@/components/ui/press-marks.tsx'
 import { RenderProbe } from '@/components/ui/render-probe.tsx'
 import { TooltipProvider } from '@/components/ui/tooltip.tsx'
 import { fontVariables } from '@/lib/fonts.ts'
@@ -34,6 +35,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
         <I18nProvider locale={locale}>
           <TooltipProvider>{children}</TooltipProvider>
           <RenderProbe />
+          <PressMarks />
           <PageScroll />
         </I18nProvider>
       </body>
