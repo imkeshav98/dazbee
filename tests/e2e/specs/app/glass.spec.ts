@@ -141,7 +141,7 @@ test('the Pages button keeps its glass while open, lit by the pressed tint, its 
     expect(await look(button)).toMatchObject({ fill: glass.fill, image: laid(glass.pressed) })
     expect((await look(button.locator('svg'))).colour).toBe(glass.accentText)
     const current = card.locator('[data-page][aria-current="page"]')
-    expect((await look(current.getByText('1 size'))).colour).toBe(glass.text)
+    expect((await look(current.getByText('1 frame'))).colour).toBe(glass.text)
     expect(errors).toEqual([])
     await page.context().close()
   }

@@ -97,15 +97,16 @@ test('at 1280×760 the right-click menu on a layer already selected shows that i
   const asset = await upload(photo)
   const { page, errors } = await openStage(browser, topBarDesign(asset.id))
   await fitSettled(page)
-  await selectLayers(page, ['photo'])
-  // The photo in the middle of the stage, where the menu has room for less than all its rows either way.
+  await selectLayers(page, ['headline'])
+  // The headline in the middle of the stage, where its menu, a text's being the longest, has room for
+  // less than all its rows either way.
   await page.evaluate(() => window.dazbee?.fitSelection())
   await drawn(page)
-  const at = await screenPoint(page, 210, 870)
+  const at = await screenPoint(page, 200, 85)
   await page.mouse.click(at.x, at.y, { button: 'right' })
   const menu = page.getByTestId('stage-menu')
   await expect(menu).toBeVisible()
-  expect(await page.evaluate(() => window.dazbee?.selection())).toEqual(['photo'])
+  expect(await page.evaluate(() => window.dazbee?.selection())).toEqual(['headline'])
   await expect.poll(async () => (await scrolling(menu)).scrolls).toBe(true)
   await expect.poll(async () => (await scrolling(menu)).fade).toContain('gradient')
   expect(errors).toEqual([])
@@ -116,7 +117,8 @@ test.describe('on a phone, 390×844', () => {
     const asset = await upload(photo)
     const { page, errors } = await openStage(browser, topBarDesign(asset.id))
     await page.setViewportSize({ width: 390, height: 844 })
-    await selectLayers(page, ['box'], { bar: true })
+    // A text's bar, the longest, is wider than the phone.
+    await selectLayers(page, ['headline'], { bar: true })
     const row = page.getByTestId('top-bar-row')
     expect(await row.evaluate((el) => [el.scrollWidth > el.clientWidth, getComputedStyle(el).scrollbarWidth])).toEqual([
       true,
