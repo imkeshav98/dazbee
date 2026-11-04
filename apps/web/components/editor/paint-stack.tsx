@@ -29,6 +29,9 @@ import { CHIP, ICON_BUTTON, KNOBS, POPOVER, SWATCH } from './styles.ts'
 /** An image asset's small picture, as the API serves it. */
 export const assetThumbnail = (brandId: string, assetId: string) =>
   `/brands/${encodeURIComponent(brandId)}/assets/${encodeURIComponent(assetId)}/thumbnail`
+const PAINT_TYPES = ['solid', 'linear', 'radial', 'angular', 'image'] as const
+type PaintType = (typeof PAINT_TYPES)[number]
+
 const isGradient = (paint: Paint): paint is Gradient =>
   paint.type === 'linear' || paint.type === 'radial' || paint.type === 'angular'
 /** What a paint keeps whatever its kind: its own opacity and whether it shows. */
@@ -36,9 +39,6 @@ const keepOf = (paint: Paint) => ({
   ...(paint.opacity === undefined ? {} : { opacity: paint.opacity }),
   ...(paint.visible === undefined ? {} : { visible: paint.visible }),
 })
-const PAINT_TYPES = ['solid', 'linear', 'radial', 'angular', 'image'] as const
-type PaintType = (typeof PAINT_TYPES)[number]
-
 /** A paint as a CSS background, close to what the renderer draws in the layer's box. */
 function paintBackground(paint: Paint, brandId: string): string {
   switch (paint.type) {

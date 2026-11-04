@@ -1,5 +1,7 @@
 'use client'
 
+// A gradient's stops on a bar in the paint editor, and what the paint swatch also reads from a
+// gradient: its stops as CSS, a linear gradient's angle, and a linear gradient at an angle.
 import { type KeyboardEvent, useEffect, useRef } from 'react'
 
 import type { Editor } from '@dazbee/editor'

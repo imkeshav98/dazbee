@@ -70,7 +70,7 @@ import { AlignRow } from './layer-actions.tsx'
 import { SizeStepper } from './size-stepper.tsx'
 
 /** One item of the bar: a button, a pop-up's button or a divider, by a key that names it. */
-export type Item = { key: string; node: ReactNode }
+export type BarItem = { key: string; node: ReactNode }
 
 /** Bold from this weight up, as type designers name their weights. */
 const BOLD = 600
@@ -86,7 +86,7 @@ const ALIGN_ICON = {
 }
 
 /** The items of the top bar for the selection, in order. */
-export function useItems(target: Target, design: Design, brandId: string): Item[] {
+export function useSelectionItems(target: Target, design: Design, brandId: string): BarItem[] {
   const t = useMessages()
   const p = t.editor.props
   const b = t.editor.bar
@@ -96,7 +96,7 @@ export function useItems(target: Target, design: Design, brandId: string): Item[
   const kind = kindOf(target)
   const facts = factsOf(target, design)
   const several = target.ids.length > 1
-  const items: Item[] = []
+  const items: BarItem[] = []
   const add = (key: string, node: ReactNode) => items.push({ key, node })
   const divider = () => add(`divider-${items.length}`, <span aria-hidden className={BAR_DIVIDER} />)
   const pop = (
@@ -445,7 +445,7 @@ export function useItems(target: Target, design: Design, brandId: string): Item[
 }
 
 /** The picked page's items: its Background, and the design's Sizes. */
-export function usePageItems(pageId: string, design: Design): Item[] {
+export function usePageItems(pageId: string, design: Design): BarItem[] {
   const t = useMessages()
   const fills = design.pages[pageId]?.fills ?? []
   const top = fills.findLast((f) => f.visible !== false)

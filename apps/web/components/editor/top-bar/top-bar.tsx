@@ -30,7 +30,7 @@ import { cn } from '@/lib/cn.ts'
 import { useMessages } from '@/lib/i18n/client.tsx'
 
 import { arrowAlong, useRovingTab } from './bar-popover.tsx'
-import { type Item, useItems, usePageItems } from './top-bar-items.tsx'
+import { type BarItem, usePageItems, useSelectionItems } from './top-bar-items.tsx'
 
 /** Room kept between the bar and the stage's sides. */
 const SIDE = 16
@@ -108,7 +108,7 @@ export function TopBar({ editor, brandId }: { editor: Editor; brandId: string })
 }
 
 function LayerBar({ target, design, brandId }: { target: Target; design: Design; brandId: string }) {
-  const items = useItems(target, design, brandId)
+  const items = useSelectionItems(target, design, brandId)
   return (
     <Bar items={items} label={useMessages().editor.bar.topBar} named={{ 'data-selection': target.ids.join(' ') }} />
   )
@@ -132,7 +132,7 @@ function Bar({
   label,
   named,
 }: {
-  items: Item[]
+  items: BarItem[]
   label: string
   named: { 'data-selection': string } | { 'data-page': string }
 }) {
@@ -206,7 +206,7 @@ function Bar({
     window.addEventListener('keydown', onKey, true)
     return () => window.removeEventListener('keydown', onKey, true)
   }, [rowOpen])
-  const item = ({ key, node }: Item) => (
+  const item = ({ key, node }: BarItem) => (
     <span key={key} data-item={key} className="contents [&>*]:shrink-0">
       {node}
     </span>
