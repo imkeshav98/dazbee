@@ -1,7 +1,7 @@
 import { fileURLToPath } from 'node:url'
 
 import { ESLint } from 'eslint'
-import { describe, expect, it } from 'vitest'
+import { beforeAll, describe, expect, it } from 'vitest'
 
 // The preset is this package's own ESLint config.
 const eslint = new ESLint({
@@ -20,6 +20,11 @@ const linesOfCode = (count: number) =>
   Array.from({ length: count }, (_, i) => `export const v${i} = ${i}`).join('\n') + '\n'
 
 describe('preset', () => {
+  // The first lint loads the config, its plugins and the TypeScript parser: past 5 s on a cold CI runner.
+  beforeAll(async () => {
+    await ruleIds('')
+  }, 60_000)
+
   describe('no-use-before-define', () => {
     it('fails a constant, a class or a type used above its declaration', async () => {
       const code = [
