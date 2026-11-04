@@ -28,15 +28,17 @@ export function repair<S extends Snapshot>(snapshot: S): { snapshot: S; repairs:
   const repairs: string[] = []
   // 0. A design keeps a page: with none left it gets one empty page, at an id no layer has.
   let s = snapshot
-  if (Object.keys(s.pages).length === 0) {
-    let id = 'page'
-    for (let n = 2; Object.hasOwn(s.nodes, id); n++) id = `page-${n}`
-    repairs.push(`no page was left; added the empty page "${id}"`)
-    s = { ...s, pages: { [id]: EMPTY_PAGE } }
-  }
-  const firstPage = Object.entries(s.pages).sort(
+  const [first] = Object.entries(s.pages).sort(
     ([a, x], [b, y]) => byCodeUnits(orderOf(x), orderOf(y)) || byCodeUnits(a, b),
-  )[0]?.[0] as string
+  )
+  let firstPage: string
+  if (first) firstPage = first[0]
+  else {
+    firstPage = 'page'
+    for (let n = 2; Object.hasOwn(s.nodes, firstPage); n++) firstPage = `page-${n}`
+    repairs.push(`no page was left; added the empty page "${firstPage}"`)
+    s = { ...s, pages: { [firstPage]: EMPTY_PAGE } }
+  }
 
   // 1. Drop layers that can't be read at all, before anyone looks for parents among them.
   const nodes = new Map<string, NodeJson>()
