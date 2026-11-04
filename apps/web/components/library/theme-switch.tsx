@@ -2,7 +2,9 @@
 
 import { useEffect, useState } from 'react'
 
+import { TOUCH_ROW } from '@/components/ui/looks.ts'
 import { segment, SEGMENTED } from '@/components/ui/segmented.tsx'
+import { cn } from '@/lib/cn.ts'
 import { useMessages } from '@/lib/i18n/client.tsx'
 import { themeOf, type ThemePick, THEMES } from '@/lib/theme.ts'
 
@@ -12,7 +14,7 @@ declare global {
   }
 }
 
-/** System, light or dark; only the tokens change. */
+/** System, light or dark; only the tokens change. On a phone each is a touch target. */
 export function ThemeSwitch() {
   const t = useMessages().theme
   const [pick, setPick] = useState<ThemePick>('system')
@@ -34,7 +36,7 @@ export function ThemeSwitch() {
           role="radio"
           aria-checked={pick === theme}
           onClick={() => choose(theme)}
-          className={segment(pick === theme)}
+          className={cn(segment(pick === theme), TOUCH_ROW)}
         >
           {t[theme]}
         </button>

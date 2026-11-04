@@ -242,6 +242,9 @@ export const ar: Messages = {
       showHere: 'إظهار في هذا المقاس',
       hideEverywhere: 'إخفاء في كل المقاسات',
       showEverywhere: 'إظهار في كل المقاسات',
+      releaseMask: 'إلغاء القناع',
+      showHidden: 'إظهار الطبقات المخفية',
+      canvasMenu: 'إجراءات اللوحة',
       rotate: 'تدوير',
       underline: 'تسطير',
       strikethrough: 'يتوسطه خط',
@@ -695,7 +698,7 @@ export const ar: Messages = {
     },
     assetLibrary: {
       delete: 'حذف',
-      deleteNamed: 'حذف {name}',
+      deleteConfirm: 'حذف «{name}» نهائيًا؟ لا يمكن التراجع عن ذلك.',
       keep: 'إبقاء',
       inUse: 'مستخدمة في {n} مواضع: {places}',
       inUseOnce: 'مستخدمة في {places}',

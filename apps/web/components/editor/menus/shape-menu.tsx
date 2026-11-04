@@ -20,6 +20,7 @@ import { type KeyboardEvent, useRef, useState } from 'react'
 import type { ShapeMenuTool } from '@dazbee/editor'
 
 import { DOCK_BUTTON, DOCK_OFF, DOCK_ON, POPOVER } from '@/components/editor/styles.ts'
+import { TOUCH_ROW } from '@/components/ui/looks.ts'
 import { Tooltip } from '@/components/ui/tooltip.tsx'
 import { cn } from '@/lib/cn.ts'
 import { useMessages } from '@/lib/i18n/client.tsx'
@@ -132,6 +133,7 @@ export function ShapeTools({
                   }}
                   className={cn(
                     'flex h-8 w-full cursor-pointer items-center gap-2.5 rounded-row px-2 text-[13px] outline-none transition-colors duration-[var(--chrome-fast)] hover:bg-hover focus-visible:bg-hover',
+                    TOUCH_ROW,
                     id === shape ? 'text-text' : 'text-muted',
                   )}
                 >

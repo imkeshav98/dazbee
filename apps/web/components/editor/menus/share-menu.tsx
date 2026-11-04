@@ -2,9 +2,11 @@
 
 // The editor's one action at the top end, as in the final mock: a pink Share button. Its menu
 // holds what leaves the editor, Export (#55) and Save as template (#54), and each opens its form
-// in the same place.
+// in the same place. The menu opens with the focus on its first item, which the arrows move
+// through; a form, on its first control. They stand over the edit panel: Esc closes them first,
+// giving the focus back to Share when it was in them, and never clears the selection.
 import { BookmarkSimpleIcon, CaretRightIcon, DownloadSimpleIcon, ShareFatIcon } from '@phosphor-icons/react'
-import { useEffect, useId, useRef, useState } from 'react'
+import { type KeyboardEvent as ReactKeyboardEvent, useEffect, useId, useRef, useState } from 'react'
 
 import type { Editor } from '@dazbee/editor'
 
@@ -17,8 +19,24 @@ import { TemplateForm } from './template-menu.tsx'
 
 type Open = 'menu' | 'export' | 'template' | null
 
+/** The controls of a form the focus can go to. */
+const FOCUSABLE =
+  'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+
+/** A menu row; on a phone 48 px tall, past the 44 px a finger needs. */
 const ROW =
-  'flex min-h-12 py-1.5 w-full cursor-pointer items-center gap-3 rounded-row px-3 text-start text-[13px] font-medium transition-colors duration-[var(--chrome-fast)] hover:bg-hover focus-visible:bg-hover focus-visible:outline-none'
+  'flex min-h-12 max-sm:min-h-[48px] py-1.5 w-full cursor-pointer items-center gap-3 rounded-row px-3 text-start text-[13px] font-medium transition-colors duration-[var(--chrome-fast)] hover:bg-hover focus-visible:bg-hover focus-visible:outline-none'
+
+/** Moves the focus through a menu's items with the arrows, Home and End, round from the ends. */
+function arrowThrough(event: ReactKeyboardEvent<HTMLElement>) {
+  const items = [...event.currentTarget.querySelectorAll<HTMLElement>('[role="menuitem"]')]
+  const at = items.indexOf(document.activeElement as HTMLElement)
+  const last = items.length - 1
+  const next = { ArrowDown: at >= last ? 0 : at + 1, ArrowUp: at <= 0 ? last : at - 1, Home: 0, End: last }[event.key]
+  if (next === undefined) return
+  event.preventDefault()
+  items[next]?.focus()
+}
 
 export function ShareMenu({
   editor,
@@ -38,24 +56,44 @@ export function ShareMenu({
   const { design } = useEditorDesign(editor)
   const [open, setOpen] = useState<Open>(null)
   const box = useRef<HTMLDivElement>(null)
+  const button = useRef<HTMLButtonElement>(null)
   const id = useId()
 
-  // Closes on Escape or a press outside.
+  // Closes on Escape or a press outside. Esc is the menu's or form's before anything under them,
+  // the edit panel and the stage's selection included, unless a list open in the form, as a
+  // select's, takes it to close first. It gives the focus back to Share when it was in them, or nowhere.
   useEffect(() => {
     if (!open) return
-    const onKey = (event: KeyboardEvent) => event.key === 'Escape' && setOpen(null)
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape' || event.defaultPrevented) return
+      const at = document.activeElement
+      if (at !== button.current && at?.getAttribute('aria-expanded') === 'true') return
+      event.stopImmediatePropagation()
+      event.preventDefault()
+      if (!at || at === document.body || box.current?.contains(at)) button.current?.focus()
+      setOpen(null)
+    }
     const onPress = (event: PointerEvent) => !box.current?.contains(event.target as Node) && setOpen(null)
-    window.addEventListener('keydown', onKey)
+    window.addEventListener('keydown', onKey, true)
     window.addEventListener('pointerdown', onPress)
     return () => {
-      window.removeEventListener('keydown', onKey)
+      window.removeEventListener('keydown', onKey, true)
       window.removeEventListener('pointerdown', onPress)
     }
   }, [open])
+  // The menu takes the focus as it opens, on its first item; a form, on its first control.
+  useEffect(() => {
+    if (!open) return
+    box.current
+      ?.querySelector<HTMLElement>(`#${CSS.escape(id)}`)
+      ?.querySelector<HTMLElement>(open === 'menu' ? '[role="menuitem"]' : FOCUSABLE)
+      ?.focus()
+  }, [open, id])
 
   return (
-    <div ref={box} className="relative">
+    <div ref={box} data-over-panel={open ? '' : undefined} className="relative">
       <Button
+        ref={button}
         variant="primary"
         aria-haspopup="menu"
         aria-expanded={open !== null}
@@ -72,6 +110,7 @@ export function ShareMenu({
           id={id}
           role="menu"
           aria-label={t.editor.share.title}
+          onKeyDown={arrowThrough}
           className="pop-in-end absolute end-0 top-full z-30 mt-2 flex w-80 flex-col rounded-card surface-frost p-1.5"
         >
           {/* "Share" and the design's name, then each item. */}

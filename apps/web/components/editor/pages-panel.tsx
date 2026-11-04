@@ -254,14 +254,23 @@ function PageList({ editor, onRemoved }: { editor: Editor; onRemoved: (message: 
               {moves && landing?.before === null && i === pages.length - 1 && (
                 <span aria-hidden className={cn(DROP_LINE, '-bottom-[4px]')} />
               )}
-              <span aria-hidden className="grid size-[34px] shrink-0 place-items-center">
+              <span aria-hidden className="relative grid size-[34px] shrink-0 place-items-center">
+                {/* The page's picture on a white page, as the canvas draws it, under its colour while the
+                    picture is drawn. */}
                 <span
                   data-testid="page-thumbnail"
-                  className="relative grid place-items-center overflow-hidden rounded-[3px] border border-line-strong bg-hover font-mono text-[10px] font-semibold text-white tabular-nums [text-shadow:0_1px_2px_rgb(0_0_0/0.6)]"
+                  className="relative grid place-items-center overflow-hidden rounded-[3px] border border-line-strong bg-white"
                   style={{ ...tile, backgroundColor: fill?.type === 'solid' ? fill.color : undefined }}
                 >
                   {picture && <img src={picture} alt="" draggable={false} className="absolute inset-0 size-full" />}
-                  {!picture && i + 1}
+                </span>
+                {/* The page's number on a dark chip, readable over any picture or page colour and whole over a
+                    thin tile. */}
+                <span
+                  data-testid="page-number"
+                  className="absolute inset-0 m-auto size-fit rounded-[4px] bg-black/60 px-1 font-mono text-[10px] leading-[14px] font-semibold text-white tabular-nums"
+                >
+                  {i + 1}
                 </span>
               </span>
               {renaming === id ? (

@@ -18,6 +18,7 @@ import {
   press,
   read,
   selection,
+  selectLayers,
 } from '../../support/stage.ts'
 import { expect, type Page, test } from '../../support/test.ts'
 import { barMenu } from '../../support/top-bar.ts'
@@ -138,6 +139,77 @@ test('every shape draws with real input: the dock, its menu, its keys, and Shift
   await page.evaluate(() => window.dazbee?.session.undo())
   expect((await read(page)).nodes[clicked]).toBeUndefined()
   expect(await exportHashOf(page)).not.toBe(all)
+  expect(errors).toEqual([])
+})
+
+test('Space presses a dock button reached by keyboard as Enter does: More shapes opens its menu, Text takes its tool', async ({
+  browser,
+}) => {
+  const { page, errors } = await openStage(browser, design())
+  const camera = await page.evaluate(() => window.dazbee?.camera())
+  // Tab from the shape button reaches More shapes, then Text, as a keyboard does.
+  await page.locator('[role="toolbar"] [data-tool="shape"]').focus()
+  await page.keyboard.press('Tab')
+  await expect(page.getByTestId('shape-menu')).toBeFocused()
+  await page.keyboard.press('Space')
+  await expect(page.getByRole('menu')).toBeVisible()
+  await page.keyboard.press('Escape')
+  await expect(page.getByRole('menu')).toBeHidden()
+  await expect(page.getByTestId('shape-menu')).toBeFocused()
+  await page.keyboard.press('Tab')
+  await expect(page.locator('[role="toolbar"] [data-tool="text"]')).toBeFocused()
+  await page.keyboard.press('Space')
+  await pressed(page, 'text')
+  expect(await toolOf(page)).toBe('text')
+  // The key went to the button, not to the canvas's pan.
+  expect(await page.evaluate(() => window.dazbee?.camera())).toEqual(camera)
+  expect(errors).toEqual([])
+})
+
+test('after a pick from More shapes with the mouse, Space over the canvas pans, and the menu stays shut', async ({
+  browser,
+}) => {
+  const { page, errors } = await openStage(browser, design())
+  await page.getByTestId('shape-menu').click()
+  await page.locator('[role="menu"] [data-shape="polygon"]').click()
+  await expect(page.getByRole('menu')).toBeHidden()
+  // The menu gives the focus back to its button, which the mouse used.
+  await expect(page.getByTestId('shape-menu')).toBeFocused()
+  const before = await page.evaluate(() => window.dazbee?.camera())
+  // Over the canvas beside the frame, clear of the chrome.
+  const from = { x: 220, y: 560 }
+  await page.mouse.move(from.x, from.y)
+  await page.keyboard.down('Space')
+  await page.mouse.down()
+  await page.mouse.move(from.x - 120, from.y - 60, { steps: 6 })
+  await page.mouse.up()
+  await page.keyboard.up('Space')
+  await expect(page.getByRole('menu')).toHaveCount(0)
+  const after = await page.evaluate(() => window.dazbee?.camera())
+  expect(after?.x).toBeCloseTo((before?.x ?? 0) - 120, 0)
+  expect(after?.y).toBeCloseTo((before?.y ?? 0) - 60, 0)
+  expect(errors).toEqual([])
+})
+
+test('with the focus in the edit panel, Space over the canvas pans', async ({ browser }) => {
+  const { page, errors } = await openStage(browser, design())
+  await selectLayers(page, ['box'], { bar: true })
+  const panel = await barMenu(page, 'colour')
+  await expect.poll(() => page.evaluate(() => document.activeElement?.closest('#edit-panel') !== null)).toBe(true)
+  const before = await page.evaluate(() => window.dazbee?.camera())
+  // Over the canvas beside the frame, clear of the chrome and the panel.
+  const from = { x: 220, y: 560 }
+  await page.mouse.move(from.x, from.y)
+  await page.keyboard.down('Space')
+  await page.mouse.down()
+  await page.mouse.move(from.x - 120, from.y - 60, { steps: 6 })
+  await page.mouse.up()
+  await page.keyboard.up('Space')
+  const after = await page.evaluate(() => window.dazbee?.camera())
+  expect(after?.x).toBeCloseTo((before?.x ?? 0) - 120, 0)
+  expect(after?.y).toBeCloseTo((before?.y ?? 0) - 60, 0)
+  await expect(panel).toBeVisible()
+  expect(await selection(page)).toEqual(['box'])
   expect(errors).toEqual([])
 })
 
