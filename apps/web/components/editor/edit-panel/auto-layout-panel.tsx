@@ -3,8 +3,8 @@
 // The Stack panel: auto layout on or off, its direction, wrapping and room between, then under
 // Advanced the line-up pad, the room around and how the box sizes; and the sizing fields a layer
 // in an auto layout has in the Position panel.
-import { FIELD_LABEL, KNOBS, PANEL_HEADING, SEGMENT, SEGMENTS } from '@/components/editor/styles.ts'
-import { FOCUS_RING } from '@/components/ui/looks.ts'
+import { FIELD_LABEL, KNOBS, PANEL_HEADING } from '@/components/editor/styles.ts'
+import { FOCUS_RING, SEGMENT, SEGMENTS } from '@/components/ui/looks.ts'
 import { cn } from '@/lib/cn.ts'
 import { tidy } from '@/lib/editor/size.ts'
 import { useMessages } from '@/lib/i18n/client.tsx'

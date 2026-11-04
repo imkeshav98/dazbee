@@ -84,14 +84,6 @@ export const SELECT = 'h-8 w-full bg-surface px-1.5 text-[12px]'
 export const KNOB = `relative flex h-8 min-w-0 cursor-ew-resize touch-pan-y select-none items-center gap-2 overflow-hidden rounded-row border border-line bg-surface px-2.5 text-[12px] font-semibold text-muted transition-colors duration-[var(--chrome-fast)] hover:border-line-strong focus-within:border-accent before:pointer-events-none before:absolute before:inset-y-0 before:start-[var(--fill-from,0%)] before:w-[var(--fill,0%)] before:bg-accent-soft before:transition-[width] before:duration-75 data-ranged:after:pointer-events-none data-ranged:after:absolute data-ranged:after:inset-y-1.5 data-ranged:after:start-[clamp(4px,var(--fill-at),calc(100%-6px))] data-ranged:after:w-0.5 data-ranged:after:-translate-x-1/2 data-ranged:after:rounded-full data-ranged:after:bg-accent data-ranged:after:shadow-[0_0_8px_rgb(255_72_176/0.7)] rtl:data-ranged:after:translate-x-1/2`
 /** Knobs two to a row; a lone last one takes the whole row. */
 export const KNOBS = 'grid grid-cols-2 gap-1.5 [&>:last-child:nth-child(odd)]:col-span-2'
-/**
- * A row of choices that look as one control, one of them on, in a sunken well: each as wide as its
- * words need, sharing what is left. Muted text in the well takes the well's shade.
- */
-export const SEGMENTS =
-  'grid auto-cols-auto grid-flow-col gap-0.5 rounded-[10px] bg-well p-[3px] [--text-muted:var(--glass-well-muted)] [&>*]:min-w-max'
-/** One choice of SEGMENTS, aria-checked (or aria-pressed) while it is the one: on a chip, in the text colour. */
-export const SEGMENT = `h-7 min-w-0 cursor-pointer truncate rounded-[7px] px-2 text-[12px] font-semibold text-muted transition-colors duration-[var(--chrome-fast)] hover:text-text aria-checked:bg-chip aria-checked:text-text aria-pressed:bg-chip aria-pressed:text-text ${FOCUS_RING}`
 
 /** A row of a menu: its words at the start, a shortcut or a switch at the end. */
 export const MENU_ITEM = `group flex h-9 w-full shrink-0 cursor-pointer items-center justify-between gap-3 rounded-row px-2.5 text-start text-[13px] font-medium text-text transition-colors duration-[var(--chrome-fast)] ${LIT_ROW} ${DISABLED} ${FOCUS_RING}`

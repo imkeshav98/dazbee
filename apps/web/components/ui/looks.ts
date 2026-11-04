@@ -10,5 +10,14 @@ export const FOCUS_RING = 'focus-visible:outline-2 focus-visible:outline-offset-
  */
 export const LIT_ROW = 'hover:bg-hover hover:lit active:bg-pressed active:lit'
 
+/**
+ * A row of choices that look as one control, one of them on, in a sunken well: each as wide as its
+ * words need, sharing what is left. Muted text in the well takes the well's shade.
+ */
+export const SEGMENTS =
+  'grid auto-cols-auto grid-flow-col gap-0.5 rounded-[10px] bg-well p-[3px] [--text-muted:var(--glass-well-muted)] [&>*]:min-w-max'
+/** One choice of SEGMENTS, aria-checked (or aria-pressed) while it is the one: on a chip, in the text colour. */
+export const SEGMENT = `h-7 min-w-0 cursor-pointer truncate rounded-[7px] px-2 text-[12px] font-semibold text-muted transition-colors duration-[var(--chrome-fast)] hover:text-text aria-checked:bg-chip aria-checked:text-text aria-pressed:bg-chip aria-pressed:text-text ${FOCUS_RING}`
+
 /** A dashed button that adds something or takes an upload: Add image, Upload, a kit's Add. */
 export const DASHED_BUTTON = `flex h-8 cursor-pointer items-center justify-center gap-1.5 rounded-[10px] border border-dashed border-line-strong text-xs font-semibold text-muted transition-colors duration-[var(--chrome-fast)] hover:border-accent hover:text-text focus-within:border-accent focus-within:text-text ${FOCUS_RING}`
