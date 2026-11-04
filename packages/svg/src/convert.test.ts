@@ -43,35 +43,39 @@ const elementsRead = (text: string, limit: number) => {
     reads.limit = Number.POSITIVE_INFINITY
   }
 }
+/** The conversion's work budget: it reads at most this many elements of a file, then refuses it. */
+const WORK_BUDGET = 100_000
 
 /**
- * How many times longer the conversion takes on `large` than on `small`, from the fastest of
- * several runs of each taken in turn, so a busy machine slows both alike. For an input ten times as
- * long, it is about 10 when the time grows linearly and about 100 when it grows quadratically.
- * The runs stop early once `large` has taken a quarter of a second in all, so a slow machine or
- * slow code still finishes soon.
+ * What the conversion makes of `large`, and how many times longer it takes on `large` than on
+ * `small`, from the fastest of up to 5 runs of each taken in turn, so a busy machine slows both
+ * alike. For an input ten times as long, `times` is about 10 when the time grows linearly and about
+ * 100 when it grows quadratically. The runs stop early once `large` has taken 250 ms in all, so a
+ * slow machine or slow code still finishes soon.
  */
 const growth = (small: string, large: string) => {
   const timed = (text: string) => {
     const started = performance.now()
-    problem(text)
-    return performance.now() - started
+    const outcome = problem(text)
+    return { outcome, took: performance.now() - started }
   }
   // A first run of the small input, untimed, so the code it runs is compiled before it is timed.
   problem(small)
   let fastestSmall = Number.POSITIVE_INFINITY
   let fastestLarge = Number.POSITIVE_INFINITY
+  let outcome = ''
   let spent = 0
   for (let run = 0; run < 5 && spent < 250; run++) {
-    fastestSmall = Math.min(fastestSmall, timed(small))
-    const took = timed(large)
-    fastestLarge = Math.min(fastestLarge, took)
-    spent += took
+    fastestSmall = Math.min(fastestSmall, timed(small).took)
+    const ran = timed(large)
+    fastestLarge = Math.min(fastestLarge, ran.took)
+    outcome = ran.outcome
+    spent += ran.took
   }
-  return fastestLarge / fastestSmall
+  return { problem: outcome, times: fastestLarge / fastestSmall }
 }
-/** The most `growth` may be for an input ten times as long: well above linear, well below quadratic. */
-const LINEAR = 30
+/** The most `growth` may give for an input ten times as long: well above linear, well below quadratic. */
+const MAX_GROWTH = 30
 
 describe('svgToLayers', () => {
   it('makes a path layer for each shape, in one group, with its box in the design', () => {
@@ -226,13 +230,13 @@ describe('svgToLayers with hostile files', () => {
     const fan = (id: string, to: string) =>
       `<g id="${id}">${Array.from({ length: 10 }, () => `<use href="#${to}"/>`).join('')}</g>`
     const levels = Array.from({ length: 30 }, (_, i) => fan(`e${i + 1}`, `e${i}`)).join('')
-    // The conversion's work budget: it reads at most this many elements, then refuses the file.
-    const read = elementsRead(
+    // Stopped at twice the budget, so a fan that runs away fails at once.
+    const fan30 = elementsRead(
       svg(`<defs><g id="e0"/>${levels}</defs><rect width="5" height="5"/><use href="#e30"/>`),
-      100_000,
+      2 * WORK_BUDGET,
     )
-    expect(read.problem).toBe('too-big')
-    expect(read.count).toBeLessThanOrEqual(100_000)
+    expect(fan30.problem).toBe('too-big')
+    expect(fan30.count).toBeLessThanOrEqual(WORK_BUDGET)
   })
 
   it('leaves out a mask that masks itself, or two that mask each other', () => {
@@ -257,15 +261,25 @@ describe('svgToLayers with hostile files', () => {
   })
 
   it('reads a flood of comments or a style sheet with no braces in linear time', () => {
-    const comments = (n: number) => `${'<!--a-->'.repeat(n)}x`
-    const noBraces = (n: number) => svg(`<style>${'a'.repeat(n)}</style><rect width="5" height="5"/>`)
-    const openComments = (n: number) => svg(`<style>${'/*'.repeat(n)}</style><rect width="5" height="5"/>`)
-    expect(problem(comments(500))).toBe('unreadable')
-    expect(problem(noBraces(20_000))).toBe('none')
-    expect(problem(openComments(5_000))).toBe('none')
-    expect(growth(comments(500), comments(5_000))).toBeLessThan(LINEAR)
-    expect(growth(noBraces(20_000), noBraces(200_000))).toBeLessThan(LINEAR)
-    expect(growth(openComments(5_000), openComments(50_000))).toBeLessThan(LINEAR)
+    const floods = [
+      { file: (n: number) => `${'<!--a-->'.repeat(n)}x`, tenth: 500, problem: 'unreadable' },
+      {
+        file: (n: number) => svg(`<style>${'a'.repeat(n)}</style><rect width="5" height="5"/>`),
+        tenth: 20_000,
+        problem: 'none',
+      },
+      {
+        file: (n: number) => svg(`<style>${'/*'.repeat(n)}</style><rect width="5" height="5"/>`),
+        tenth: 5_000,
+        problem: 'none',
+      },
+    ]
+    for (const flood of floods) {
+      expect(problem(flood.file(flood.tenth))).toBe(flood.problem)
+      const grown = growth(flood.file(flood.tenth), flood.file(flood.tenth * 10))
+      expect(grown.problem).toBe(flood.problem)
+      expect(grown.times).toBeLessThan(MAX_GROWTH)
+    }
   })
 
   it('refuses what is not an SVG, or not well formed, or draws nothing', () => {
