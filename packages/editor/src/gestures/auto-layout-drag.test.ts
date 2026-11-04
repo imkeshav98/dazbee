@@ -8,7 +8,6 @@ import { hug } from '../layers/hug.ts'
 import { sessionOf, testBoxes } from '../layers/test-boxes.ts'
 import { editorSelection } from '../selection.ts'
 import { type AutoLayoutDragDeps, editorAutoLayoutDrag } from './auto-layout-drag.ts'
-import { editorTransformDrag } from './transform-drag.ts'
 
 const square = (parentId: string, index: string) => ({
   type: 'graphic' as const,
@@ -48,23 +47,9 @@ function harness() {
   const log: string[] = []
   const selection = editorSelection({ drawn: () => session.design(), frames: () => frames, changed: () => {} })
   const boxes = testBoxes(session, selection, frames)
-  const transformDrag = editorTransformDrag({
-    canvas: {} as HTMLCanvasElement,
-    session,
-    scenes: { scene: () => ({ layers: [] }) as never },
-    selection,
-    typing: { editing: () => null, fitText: () => {} },
-    boxes,
-    camera: () => ({ x: 0, y: 0, zoom: 1 }),
-    frames: () => frames,
-    hug: () => {},
-    notify: () => {},
-    placeBox: () => {},
-  })
   const deps: AutoLayoutDragDeps = {
     session,
     boxes,
-    transformDrag,
     camera: () => ({ x: 0, y: 0, zoom: 1 }),
     hug: (ids) => {
       log.push(`hug ${ids.join(',')}`)

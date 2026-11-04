@@ -58,7 +58,7 @@ import { exportClient } from './export/export-client.ts'
 import { editorAutoLayoutDrag, type ReorderDrag } from './gestures/auto-layout-drag.ts'
 import { type CropDrag, editorCropping } from './gestures/cropping.ts'
 import { isDrawTool, newImage, withImage } from './gestures/draw-tools.ts'
-import { editorDrawing, type ImageBoxDrag, type ShapeDrag, type TextBoxDrag } from './gestures/drawing.ts'
+import { editorDrawing, type ImageBoxDrag, isDrawing, type ShapeDrag, type TextBoxDrag } from './gestures/drawing.ts'
 import { editorPen, type PathDrag } from './gestures/pen.ts'
 import { CLICK_SLOP, HANDLE_SIZE } from './gestures/press.ts'
 import {
@@ -672,7 +672,6 @@ function live(
   const autoLayoutDrag = editorAutoLayoutDrag({
     session,
     boxes,
-    transformDrag,
     camera: () => camera,
     hug,
     notify,
@@ -822,8 +821,7 @@ function live(
       ...cropping.parts(),
       ...autoLayoutDrag.parts(gesture?.kind === 'reorder' ? gesture : null),
     )
-    if (gesture?.kind === 'draw' || gesture?.kind === 'textBox' || gesture?.kind === 'imageBox')
-      parts.push(...drawing.parts(gesture))
+    if (isDrawing(gesture)) parts.push(...drawing.parts(gesture))
     parts.push(...transformDrag.parts(gesture?.kind === 'marquee' ? gesture : null))
     if (rulers) {
       const origin = frameOf(selection.current()?.frame) ?? frameOf(selection.hovered()?.frame) ?? drawnFrames[0]
@@ -1262,7 +1260,7 @@ function live(
         drawOverlay()
         return
       }
-      if (gesture.kind === 'draw' || gesture.kind === 'textBox' || gesture.kind === 'imageBox') {
+      if (isDrawing(gesture)) {
         drawing.drag(gesture, p, e.shiftKey, e.altKey)
         return
       }
@@ -1288,11 +1286,12 @@ function live(
 
   const endDrag = () => {
     pressing = false
+    transformDrag.clearGuides()
     if (pen.drawing() && !pan) {
       pen.up()
       return
     }
-    if (gesture?.kind === 'draw' || gesture?.kind === 'textBox' || gesture?.kind === 'imageBox') {
+    if (isDrawing(gesture)) {
       drawing.release(gesture)
       gesture = null
       showCursor()
@@ -1475,7 +1474,7 @@ function live(
     offsets: (boxes: Rect[], within: Rect) => Offset[],
     now: Design,
   ) {
-    const start = transformDrag.startBoxes(frame, ids)
+    const start = boxes.startBoxes(frame, ids)
     // One layer lines up with what holds it: its group or frame, or the format.
     const parent = now.nodes[ids[0] ?? '']?.parentId
     const holder = parent && now.nodes[parent] ? boxes.boxIn(frame, parent, now) : null
@@ -1512,7 +1511,7 @@ function live(
       autoLayoutDrag.nudge(frame, ids, dx, dy, now)
       return
     }
-    const start = transformDrag.startBoxes(frame, ids)
+    const start = boxes.startBoxes(frame, ids)
     // Arrows move along the page as drawn, also inside a turned group.
     const around = boxes.selectionBox()?.around ?? []
     const step = localTo(

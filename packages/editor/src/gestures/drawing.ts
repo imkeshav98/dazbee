@@ -50,6 +50,10 @@ export interface ImageBoxDrag {
 /** A drag that draws a new layer. */
 export type DrawingDrag = ShapeDrag | TextBoxDrag | ImageBoxDrag
 
+/** Whether a gesture is one that draws a new layer. */
+export const isDrawing = (g: { kind: string } | null): g is DrawingDrag =>
+  g?.kind === 'draw' || g?.kind === 'textBox' || g?.kind === 'imageBox'
+
 export interface DrawingDeps {
   canvas: HTMLCanvasElement
   session: Session
@@ -239,12 +243,12 @@ export function editorDrawing({
     const inside = childrenOf(now, parent).flatMap(([child, node]) => {
       const b = child !== id && !node.lock?.move && boxIn(frame, child, now)
       if (!b) return []
-      const drawn = boundsOf([b])
+      const shown = boundsOf([b])
       const fits =
-        drawn.x >= box.x &&
-        drawn.y >= box.y &&
-        drawn.x + drawn.width <= box.x + box.width &&
-        drawn.y + drawn.height <= box.y + box.height
+        shown.x >= box.x &&
+        shown.y >= box.y &&
+        shown.x + shown.width <= box.x + box.width &&
+        shown.y + shown.height <= box.y + box.height
       return fits && canHold('frame', now.nodes[child]?.type ?? '') ? [child] : []
     })
     if (inside.length > 0) runQuietly(() => session.run('node.enclose', { id, ids: inside, scope: scope(frame) }))

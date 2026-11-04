@@ -83,7 +83,7 @@ function harness() {
     if (!outer || !grabbed) throw new Error('no handle there')
     return drag.pressHandle(pointer, screen, grabbed, outer)
   }
-  return { drag, session, selection, log, frame, boxOf, pressSelection }
+  return { drag, session, selection, log, frame, boxOf, pressSelection, boxes: deps.boxes }
 }
 
 describe('editorTransformDrag', () => {
@@ -110,6 +110,46 @@ describe('editorTransformDrag', () => {
       const { drag, selection, frame } = harness()
       selection.select(['pin'], frame.key)
       expect(drag.handleUnder({ x: 750, y: 750 })).toBeNull()
+    })
+  })
+
+  describe('pressHandle and resize', () => {
+    it('resizes from the handle grabbed, as one undo step', () => {
+      const { drag, session, selection, frame, boxOf, pressSelection } = harness()
+      selection.select(['a'], frame.key)
+      const resize = pressSelection({ x: 200, y: 150 })
+      expect(resize).toMatchObject({ kind: 'resize', handle: 'e', roots: ['a'] })
+      expect(drag.snapWork().gathered).toBe(1)
+      if (resize.kind !== 'resize') throw new Error('not a resize')
+      drag.drag(resize, { x: 250, y: 150 }, false, false, false)
+      expect(boxOf('a')).toMatchObject({ x: 100, y: 100, width: 150, height: 100 })
+      drag.drag(resize, { x: 250, y: 150 }, false, true, false)
+      expect(boxOf('a')).toMatchObject({ x: 50, width: 200 })
+      drag.release(resize)
+      session.undo()
+      expect(boxOf('a')).toMatchObject({ x: 100, width: 100 })
+    })
+
+    it('keeps the shape with Shift on a corner', () => {
+      const { drag, selection, frame, boxOf, pressSelection } = harness()
+      selection.select(['a'], frame.key)
+      const resize = pressSelection({ x: 200, y: 200 })
+      drag.drag(resize, { x: 300, y: 220 }, true, false, false)
+      expect(boxOf('a')).toMatchObject({ width: 200, height: 200 })
+    })
+  })
+
+  describe('pressHandle and rotate', () => {
+    it('turns the layer about its centre from outside a corner, in 15° steps with Shift', () => {
+      const { drag, selection, frame, boxOf, pressSelection } = harness()
+      selection.select(['a'], frame.key)
+      const rotate = pressSelection({ x: 210, y: 210 })
+      expect(rotate).toMatchObject({ kind: 'rotate', roots: ['a'] })
+      // From the bottom right corner to straight below the centre: an eighth of a turn.
+      drag.drag(rotate, { x: 150, y: 220 }, false, false, false)
+      expect(boxOf('a').rotation).toBe(45)
+      drag.drag(rotate, { x: 160, y: 220 }, true, false, false)
+      expect(boxOf('a').rotation % 15).toBe(0)
     })
   })
 
@@ -166,50 +206,10 @@ describe('editorTransformDrag', () => {
     })
   })
 
-  describe('pressHandle and resize', () => {
-    it('resizes from the handle grabbed, as one undo step', () => {
-      const { drag, session, selection, frame, boxOf, pressSelection } = harness()
-      selection.select(['a'], frame.key)
-      const resize = pressSelection({ x: 200, y: 150 })
-      expect(resize).toMatchObject({ kind: 'resize', handle: 'e', roots: ['a'] })
-      expect(drag.snapWork().gathered).toBe(1)
-      if (resize.kind !== 'resize') throw new Error('not a resize')
-      drag.drag(resize, { x: 250, y: 150 }, false, false, false)
-      expect(boxOf('a')).toMatchObject({ x: 100, y: 100, width: 150, height: 100 })
-      drag.drag(resize, { x: 250, y: 150 }, false, true, false)
-      expect(boxOf('a')).toMatchObject({ x: 50, width: 200 })
-      drag.release(resize)
-      session.undo()
-      expect(boxOf('a')).toMatchObject({ x: 100, width: 100 })
-    })
-
-    it('keeps the shape with Shift on a corner', () => {
-      const { drag, selection, frame, boxOf, pressSelection } = harness()
-      selection.select(['a'], frame.key)
-      const resize = pressSelection({ x: 200, y: 200 })
-      drag.drag(resize, { x: 300, y: 220 }, true, false, false)
-      expect(boxOf('a')).toMatchObject({ width: 200, height: 200 })
-    })
-  })
-
-  describe('pressHandle and rotate', () => {
-    it('turns the layer about its centre from outside a corner, in 15° steps with Shift', () => {
-      const { drag, selection, frame, boxOf, pressSelection } = harness()
-      selection.select(['a'], frame.key)
-      const rotate = pressSelection({ x: 210, y: 210 })
-      expect(rotate).toMatchObject({ kind: 'rotate', roots: ['a'] })
-      // From the bottom right corner to straight below the centre: an eighth of a turn.
-      drag.drag(rotate, { x: 150, y: 220 }, false, false, false)
-      expect(boxOf('a').rotation).toBe(45)
-      drag.drag(rotate, { x: 160, y: 220 }, true, false, false)
-      expect(boxOf('a').rotation % 15).toBe(0)
-    })
-  })
-
   describe('writeBoxes', () => {
     it('writes only what changed from the start, and a change put back', () => {
-      const { drag, session, frame } = harness()
-      const start = drag.startBoxes(frame, ['a'])
+      const { drag, session, frame, boxes } = harness()
+      const start = boxes.startBoxes(frame, ['a'])
       const was = start.get('a')
       if (!was) throw new Error('no box')
       drag.writeBoxes(frame, start, new Map([['a', { ...was, x: 120 }]]))

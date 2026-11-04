@@ -1,6 +1,6 @@
 // Moving, resizing and turning the selection on the stage, and the marquee: the handles a press
 // grabs, the boxes a drag writes, what it snaps to, and the marquee and snap guides the overlay draws.
-import { childrenOf, descendants, type Session } from '@dazbee/doc'
+import { descendants, type Session } from '@dazbee/doc'
 import { type ScaledText, scaleText, smallestSize } from '@dazbee/renderer'
 import type { Point, Rect } from '@dazbee/schema'
 
@@ -8,7 +8,7 @@ import { type Camera, toScreen, toWorld } from '../canvas/camera.ts'
 import { type Frame, frameAt, intersects, scope } from '../canvas/grid.ts'
 import { px } from '../canvas/rulers.ts'
 import type { FrameScenes } from '../canvas/scenes.ts'
-import { inFlow, placedInside } from '../layers/auto-layout.ts'
+import { inFlow } from '../layers/auto-layout.ts'
 import type { EditorBoxes, SelectionBox } from '../layers/boxes.ts'
 import { resizedBoxes, scalingTexts, switchSizing } from '../layers/resize.ts'
 import { type Gap, type Guide, SNAP_DISTANCE, snapMove, snapResize, snapTargets, type Targets } from '../layers/snap.ts'
@@ -95,7 +95,7 @@ export interface TransformDragDeps {
   typing: Pick<EditorTyping, 'editing' | 'fitText'>
   boxes: Pick<
     EditorBoxes,
-    'boxIn' | 'pickable' | 'roots' | 'selectionBox' | 'lockedSelection' | 'handlesFor' | 'snapBoxes'
+    'boxIn' | 'startBoxes' | 'pickable' | 'roots' | 'selectionBox' | 'lockedSelection' | 'handlesFor' | 'snapBoxes'
   >
   camera: () => Camera
   /** The frames of the grid as last drawn. */
@@ -115,8 +115,6 @@ export interface EditorTransformDrag {
    * drag gathered `targets` boxes.
    */
   snapWork(): { gathered: number; moves: number; targets: number }
-  /** The boxes a transform of layers changes, as they are now: the layers and those under them that no flow places. */
-  startBoxes(frame: Frame, ids: string[]): Map<string, Box>
   /** The selection's handle under a point on the stage, or the zone outside a corner that turns it. */
   handleUnder(screen: Point): Grab | null
   /** The marquee being dragged, then the snap guides and equal gaps of the drag in progress, as the overlay shows them. */
@@ -133,6 +131,8 @@ export interface EditorTransformDrag {
   marquee(g: MarqueeDrag): void
   /** Ends a move, resize or turn: the groups around the layers fit them again, closing its undo step. */
   release(g: TransformDrag): void
+  /** Lets the snap guides go; every press calls it as it ends. */
+  clearGuides(): void
 }
 
 /** How far outside a corner a press turns the selection. */
@@ -144,7 +144,7 @@ export function editorTransformDrag({
   scenes,
   selection,
   typing,
-  boxes: { boxIn, pickable, roots, selectionBox, lockedSelection, handlesFor, snapBoxes },
+  boxes: { boxIn, startBoxes, pickable, roots, selectionBox, lockedSelection, handlesFor, snapBoxes },
   camera,
   frames,
   hug,
@@ -153,29 +153,13 @@ export function editorTransformDrag({
 }: TransformDragDeps): EditorTransformDrag {
   /** What the drag in progress snapped to, shown as guides and equal gaps (#42). */
   let snapped: { frame: Frame; guides: Guide[]; gaps: Gap[] } | null = null
-  /**
-   * Snapping's work since the editor opened: how often a drag gathered what it can snap to, the
-   * pointer moves of a drag that snapped, and how many boxes the last drag gathered to snap to.
-   */
+  /** Snapping's work since the editor opened: drags that gathered targets, moves that snapped, the last drag's targets. */
   const snapWork = { gathered: 0, moves: 0, targets: 0 }
   /** What each gesture has written so far, by its start boxes: `<id>|<property>`. */
   const written = new WeakMap<Map<string, Box>, Set<string>>()
-
-  /**
-   * The boxes a transform changes: each root and every layer under it, as they are now. A layer
-   * auto layout places inside a root is left out: its frame puts it where it goes.
-   */
-  function startBoxes(frame: Frame, ids: string[]) {
-    const now = session.design()
-    const boxes = new Map<string, Box>()
-    const add = (id: string, root: string) => {
-      if (id !== root && placedInside(frame, id, root, now)) return
-      const box = boxIn(frame, id, now)
-      if (box) boxes.set(id, box)
-      for (const [child] of childrenOf(now, id)) add(child, root)
-    }
-    for (const id of ids) add(id, id)
-    return boxes
+  /** Snapping's work so far, as a copy. */
+  function snapWorkSoFar() {
+    return { ...snapWork }
   }
   /** What a drag of layers in a frame can snap to: the boxes around them, and the format. Counted in `snapWork`. */
   function targetsFor(frame: Frame, ids: string[], around: Box[]): Targets | null {
@@ -266,6 +250,10 @@ export function editorTransformDrag({
     return parts
   }
 
+  /** Lets the guides of the drag that snapped go, as every press ends. */
+  function clearGuides() {
+    snapped = null
+  }
   /** A press on one of the selection's handles: a drag that resizes or turns it, one undo step. */
   function pressHandle(e: PointerEvent, screen: Point, grabbed: Grab, outer: SelectionBox): ResizeDrag | RotateDrag {
     canvas.setPointerCapture(e.pointerId)
@@ -526,14 +514,12 @@ export function editorTransformDrag({
   }
   /** Ends a move, resize or turn: the groups around the layers fit them again, closing its undo step. */
   function release(g: TransformDrag) {
-    snapped = null
     hug(g.roots)
     g.end()
   }
 
   return {
-    snapWork: () => ({ ...snapWork }),
-    startBoxes,
+    snapWork: snapWorkSoFar,
     handleUnder,
     parts: dragParts,
     pressHandle,
@@ -542,5 +528,6 @@ export function editorTransformDrag({
     writeBoxes,
     marquee: marqueeSelect,
     release,
+    clearGuides,
   }
 }

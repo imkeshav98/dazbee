@@ -6,7 +6,7 @@ import { type Frame, frameGrid } from '../canvas/grid.ts'
 import { hug } from '../layers/hug.ts'
 import { sessionOf, testBoxes } from '../layers/test-boxes.ts'
 import { editorSelection } from '../selection.ts'
-import { type DrawingDeps, editorDrawing } from './drawing.ts'
+import { type DrawingDeps, editorDrawing, isDrawing } from './drawing.ts'
 
 /** One page in one format, with a rect and a dot beside each other, and a group a new layer can go into. */
 const DESIGN: DesignInput = {
@@ -68,6 +68,16 @@ function harness() {
   const props = (id: string) => session.design().nodes[id]?.props as Record<string, unknown> | undefined
   return { drawing, session, selection, log, at, made, props }
 }
+
+describe('isDrawing', () => {
+  it('says whether a gesture draws a new layer', () => {
+    expect(isDrawing({ kind: 'draw' })).toBe(true)
+    expect(isDrawing({ kind: 'textBox' })).toBe(true)
+    expect(isDrawing({ kind: 'imageBox' })).toBe(true)
+    expect(isDrawing({ kind: 'move' })).toBe(false)
+    expect(isDrawing(null)).toBe(false)
+  })
+})
 
 describe('editorDrawing', () => {
   describe('a shape', () => {

@@ -10,7 +10,6 @@ import type { EditorBoxes } from '../layers/boxes.ts'
 import { type Box, drawnFrom, localTo, pageFrom, undrawn } from '../layers/transform.ts'
 import { runQuietly } from '../run-quietly.ts'
 import { CLICK_SLOP } from './press.ts'
-import type { EditorTransformDrag } from './transform-drag.ts'
 
 /** A drag of layers in a flow, from the press until it ends: where they would go in it, or out of it. One undo step. */
 export interface ReorderDrag {
@@ -31,8 +30,7 @@ export interface ReorderDrag {
 
 export interface AutoLayoutDragDeps {
   session: Session
-  boxes: Pick<EditorBoxes, 'boxIn' | 'containersOf' | 'drawnContains'>
-  transformDrag: Pick<EditorTransformDrag, 'startBoxes'>
+  boxes: Pick<EditorBoxes, 'boxIn' | 'containersOf' | 'drawnContains' | 'startBoxes'>
   camera: () => Camera
   /** Groups fit what they hold again after a change inside them, in the same undo step. */
   hug: (ids: string[]) => void
@@ -57,8 +55,7 @@ export interface EditorAutoLayoutDrag {
 
 export function editorAutoLayoutDrag({
   session,
-  boxes: { boxIn, containersOf, drawnContains },
-  transformDrag: { startBoxes },
+  boxes: { boxIn, containersOf, drawnContains, startBoxes },
   camera,
   hug,
   notify,

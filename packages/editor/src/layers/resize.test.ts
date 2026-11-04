@@ -75,47 +75,6 @@ function harness() {
   return { session, frame, prop }
 }
 
-describe('scalingTexts', () => {
-  it('gives the text a corner scales, selected or in a group, with its sizes in the frame', () => {
-    const { session, frame } = harness()
-    const texts = scalingTexts(session.design(), frame, ['group', 'grows', 'card'], 'se')
-    expect([...texts.keys()]).toEqual(['grouped', 'grows'])
-    expect(texts.get('grows')).toMatchObject({ style: STYLE, runs: [] })
-  })
-
-  it('gives none for an edge, or for text whose style is locked', () => {
-    const { session, frame } = harness()
-    expect(scalingTexts(session.design(), frame, ['grows'], 'e').size).toBe(0)
-    expect(scalingTexts(session.design(), frame, ['styled'], 'se').size).toBe(0)
-  })
-})
-
-describe('switchSizing', () => {
-  it("fixes the axes a resize drags, in the frame's format: text that grows with its words gets a box", () => {
-    const { session, frame, prop } = harness()
-    switchSizing(session, frame, ['grows'], 'e', session.design(), new Map())
-    expect(prop('grows', 'boxMode')).toBe('autoHeight')
-    expect(session.design().nodes.grows?.props).toMatchObject({ boxMode: 'autoWidth' })
-    switchSizing(session, frame, ['grows'], 's', session.design(), new Map())
-    expect(prop('grows', 'boxMode')).toBe('fixed')
-  })
-
-  it('leaves the box mode of text a corner scales', () => {
-    const { session, frame, prop } = harness()
-    switchSizing(session, frame, ['grows'], 'se', session.design(), new Map([['grows', {}]]))
-    expect(prop('grows', 'boxMode')).toBe('autoWidth')
-  })
-
-  it('fixes the sizing of a layer in a flow, and of an auto layout frame, on the axes dragged', () => {
-    const { session, frame, prop } = harness()
-    session.run('node.update', { ids: ['flowing', 'row'], patch: { sizing: { width: 'fill', height: 'hug' } } })
-    switchSizing(session, frame, ['flowing', 'row'], 'e', session.design(), new Map())
-    expect(prop('flowing', 'sizing')).toEqual({ width: 'fixed', height: 'hug' })
-    expect(prop('row', 'sizing')).toEqual({ width: 'fixed', height: 'hug' })
-    expect(session.design().nodes.row?.props).toMatchObject({ sizing: { width: 'fill', height: 'hug' } })
-  })
-})
-
 describe('resizedBoxes', () => {
   it('gives one root the new box itself, and scales several within it', () => {
     const { session, frame } = harness()
@@ -197,5 +156,46 @@ describe('resizedBoxes', () => {
     )
     expect(next.get('card')).toEqual(box(100, 0, 100, 100))
     expect(next.get('framed')).toEqual(box(110, 10, 50, 24))
+  })
+})
+
+describe('scalingTexts', () => {
+  it('gives the text a corner scales, selected or in a group, with its sizes in the frame', () => {
+    const { session, frame } = harness()
+    const texts = scalingTexts(session.design(), frame, ['group', 'grows', 'card'], 'se')
+    expect([...texts.keys()]).toEqual(['grouped', 'grows'])
+    expect(texts.get('grows')).toMatchObject({ style: STYLE, runs: [] })
+  })
+
+  it('gives none for an edge, or for text whose style is locked', () => {
+    const { session, frame } = harness()
+    expect(scalingTexts(session.design(), frame, ['grows'], 'e').size).toBe(0)
+    expect(scalingTexts(session.design(), frame, ['styled'], 'se').size).toBe(0)
+  })
+})
+
+describe('switchSizing', () => {
+  it("fixes the axes a resize drags, in the frame's format: text that grows with its words gets a box", () => {
+    const { session, frame, prop } = harness()
+    switchSizing(session, frame, ['grows'], 'e', session.design(), new Map())
+    expect(prop('grows', 'boxMode')).toBe('autoHeight')
+    expect(session.design().nodes.grows?.props).toMatchObject({ boxMode: 'autoWidth' })
+    switchSizing(session, frame, ['grows'], 's', session.design(), new Map())
+    expect(prop('grows', 'boxMode')).toBe('fixed')
+  })
+
+  it('leaves the box mode of text a corner scales', () => {
+    const { session, frame, prop } = harness()
+    switchSizing(session, frame, ['grows'], 'se', session.design(), new Map([['grows', {}]]))
+    expect(prop('grows', 'boxMode')).toBe('autoWidth')
+  })
+
+  it('fixes the sizing of a layer in a flow, and of an auto layout frame, on the axes dragged', () => {
+    const { session, frame, prop } = harness()
+    session.run('node.update', { ids: ['flowing', 'row'], patch: { sizing: { width: 'fill', height: 'hug' } } })
+    switchSizing(session, frame, ['flowing', 'row'], 'e', session.design(), new Map())
+    expect(prop('flowing', 'sizing')).toEqual({ width: 'fixed', height: 'hug' })
+    expect(prop('row', 'sizing')).toEqual({ width: 'fixed', height: 'hug' })
+    expect(session.design().nodes.row?.props).toMatchObject({ sizing: { width: 'fill', height: 'hug' } })
   })
 })

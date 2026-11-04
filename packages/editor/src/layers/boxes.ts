@@ -21,7 +21,7 @@ import { coverCrop, imageRect, type Size } from '../gestures/crop.ts'
 import { offsetPath, parsePath, type PenPath, scalePath } from '../gestures/path.ts'
 import type { EditorResources } from '../resources.ts'
 import type { EditorSelection } from '../selection.ts'
-import { laidOut, propIn } from './auto-layout.ts'
+import { laidOut, placedInside, propIn } from './auto-layout.ts'
 import { boundsOf, type Box, centreOf, drawnFrom, type Handle, HANDLES, turn } from './transform.ts'
 
 /**
@@ -72,6 +72,8 @@ export interface EditorBoxes {
   drawnBoxOf(frame: Frame, id: string, from?: Design): Box | null
   /** Whether a point on the page is inside a layer as it is drawn in a frame. */
   drawnContains(frame: Frame, id: string, p: Point, from: Design): boolean
+  /** The boxes a transform of layers changes, as they are now: the layers and those under them that no flow places. */
+  startBoxes(frame: Frame, ids: string[]): Map<string, Box>
   /** The box the selection's handles go on, with where it is drawn and its containers; null with nothing selected. */
   selectionBox(): SelectionBox | null
   /** The selected layers that aren't inside another selected one: the ones a transform moves. */
@@ -182,6 +184,22 @@ export function editorBoxes({ session, scenes, resources, selection, drawn, fram
     const inside = (id: string) => ancestorsOf(from, from.nodes[id]?.parentId ?? '').some((up) => ids.includes(up))
     return ids.filter((id) => from.nodes[id] && !inside(id))
   }
+  /**
+   * The boxes a transform changes: each root and every layer under it, as they are now. A layer
+   * auto layout places inside a root is left out: its frame puts it where it goes.
+   */
+  function startBoxes(frame: Frame, ids: string[]) {
+    const now = session.design()
+    const boxes = new Map<string, Box>()
+    const add = (id: string, root: string) => {
+      if (id !== root && placedInside(frame, id, root, now)) return
+      const box = boxIn(frame, id, now)
+      if (box) boxes.set(id, box)
+      for (const [child] of childrenOf(now, id)) add(child, root)
+    }
+    for (const id of ids) add(id, id)
+    return boxes
+  }
   /** The box the handles go on, with where it is drawn and its containers. */
   function selectionBox(): SelectionBox | null {
     const current = selection.current()
@@ -283,11 +301,11 @@ export function editorBoxes({ session, scenes, resources, selection, drawn, fram
     const now = session.design()
     const parentId = now.nodes[ids[0] ?? '']?.parentId ?? ''
     const parent = now.nodes[parentId]
-    const laidOut =
+    const inLayout =
       parent?.type === 'frame' &&
       Object.keys(now.formats).some((f) => mergedProps(now, formatScope(f), parentId).layout)
-    if (!laidOut) return undefined
-    const drawn: Record<string, Record<string, Omit<Box, 'rotation'>>> = {}
+    if (!inLayout) return undefined
+    const byFormat: Record<string, Record<string, Omit<Box, 'rotation'>>> = {}
     for (const formatId of Object.keys(now.formats)) {
       const boxes: Record<string, Omit<Box, 'rotation'>> = {}
       const walk = (layers: SceneLayer[]) => {
@@ -298,9 +316,9 @@ export function editorBoxes({ session, scenes, resources, selection, drawn, fram
         }
       }
       walk(render(now, pageId, formatId, undefined, scenes.measure(), resources.bytes().variables).layers)
-      drawn[formatScope(formatId)] = boxes
+      byFormat[formatScope(formatId)] = boxes
     }
-    return drawn
+    return byFormat
   }
   /** Whether a point on the page is inside a layer as it is drawn in a frame. */
   function drawnContains(frame: Frame, id: string, p: Point, from: Design) {
@@ -315,6 +333,7 @@ export function editorBoxes({ session, scenes, resources, selection, drawn, fram
     containersOf,
     drawnBoxOf,
     drawnContains,
+    startBoxes,
     selectionBox,
     roots,
     pickable,

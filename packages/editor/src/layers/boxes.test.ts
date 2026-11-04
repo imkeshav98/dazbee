@@ -153,6 +153,15 @@ describe('editorBoxes', () => {
     })
   })
 
+  describe('startBoxes', () => {
+    it('gives the boxes of layers and of those under them, leaving out layers a flow inside them places', () => {
+      const { boxes, square } = harness()
+      expect([...boxes.startBoxes(square, ['card']).keys()]).toEqual(['card', 'dot', 'tag'])
+      expect([...boxes.startBoxes(square, ['row']).keys()]).toEqual(['row'])
+      expect([...boxes.startBoxes(square, ['a']).keys()]).toEqual(['a'])
+    })
+  })
+
   describe('selectionBox', () => {
     it("is one layer's own box, or the box around several, with where it is drawn and its containers", () => {
       const { selection, boxes, square } = harness()
@@ -206,6 +215,33 @@ describe('editorBoxes', () => {
       expect(boxes.handlesFor()).toEqual(['nw', 'ne', 'e', 'se', 'sw', 'w'])
       selection.select(['pin'], square.key)
       expect(boxes.handlesFor()).toEqual([])
+    })
+  })
+
+  describe('snapBoxes', () => {
+    it('gives the other layers on the page as drawn, leaving out those holding the dragged ones', () => {
+      const { boxes, square } = harness()
+      const besideZig = boxes.snapBoxes(square, ['zig'], [])
+      expect(besideZig).toHaveLength(6)
+      expect(besideZig).toContainEqual({ x: 100, y: 100, width: 400, height: 300, rotation: 0 })
+      expect(besideZig).not.toContainEqual({ x: 100, y: 700, width: 100, height: 100, rotation: 0 })
+    })
+
+    it('inside a group or frame, adds the container and the layers beside the dragged ones that show in the frame', () => {
+      const { boxes, square, wide } = harness()
+      const dot = { x: 110, y: 120, width: 30, height: 40, rotation: 0 }
+      const inSquare = boxes.snapBoxes(square, ['tag'], [])
+      expect(inSquare).toHaveLength(8)
+      expect(inSquare?.slice(-2)).toEqual([{ x: 100, y: 100, width: 400, height: 300, rotation: 0 }, dot])
+      expect(boxes.snapBoxes(wide, ['tag'], [])).toHaveLength(7)
+      expect(boxes.snapBoxes(wide, ['tag'], [])).not.toContainEqual({ ...dot, x: 150 })
+    })
+
+    it('gives none inside a turned container, whose lines do not run along the page', () => {
+      const { boxes, square } = harness()
+      expect(
+        boxes.snapBoxes(square, ['inside'], [{ x: 600, y: 100, width: 200, height: 200, rotation: 90 }]),
+      ).toBeNull()
     })
   })
 
@@ -264,33 +300,6 @@ describe('editorBoxes', () => {
       expect(boxes.parentFor(square, 'graphic', session.design())).toBe('card')
       selection.enter('zig')
       expect(boxes.parentFor(square, 'graphic', session.design())).toBe('p1')
-    })
-  })
-
-  describe('snapBoxes', () => {
-    it('gives the other layers on the page as drawn, leaving out those holding the dragged ones', () => {
-      const { boxes, square } = harness()
-      const besideZig = boxes.snapBoxes(square, ['zig'], [])
-      expect(besideZig).toHaveLength(6)
-      expect(besideZig).toContainEqual({ x: 100, y: 100, width: 400, height: 300, rotation: 0 })
-      expect(besideZig).not.toContainEqual({ x: 100, y: 700, width: 100, height: 100, rotation: 0 })
-    })
-
-    it('inside a group or frame, adds the container and the layers beside the dragged ones that show in the frame', () => {
-      const { boxes, square, wide } = harness()
-      const dot = { x: 110, y: 120, width: 30, height: 40, rotation: 0 }
-      const inSquare = boxes.snapBoxes(square, ['tag'], [])
-      expect(inSquare).toHaveLength(8)
-      expect(inSquare?.slice(-2)).toEqual([{ x: 100, y: 100, width: 400, height: 300, rotation: 0 }, dot])
-      expect(boxes.snapBoxes(wide, ['tag'], [])).toHaveLength(7)
-      expect(boxes.snapBoxes(wide, ['tag'], [])).not.toContainEqual({ ...dot, x: 150 })
-    })
-
-    it('gives none inside a turned container, whose lines do not run along the page', () => {
-      const { boxes, square } = harness()
-      expect(
-        boxes.snapBoxes(square, ['inside'], [{ x: 600, y: 100, width: 200, height: 200, rotation: 90 }]),
-      ).toBeNull()
     })
   })
 })
