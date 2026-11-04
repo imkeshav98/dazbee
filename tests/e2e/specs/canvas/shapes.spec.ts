@@ -200,6 +200,42 @@ test('the shape menu holds Box after Rectangle and Ellipse, and Box draws a box 
   expect(errors).toEqual([])
 })
 
+test("the shape menu's caret shows its tooltip on hover and keyboard focus, not when a pointer pick hands focus back", async ({
+  browser,
+}) => {
+  const { page, errors } = await openStage(browser, design())
+  const caret = page.getByTestId('shape-menu')
+  const tooltip = page.getByRole('tooltip')
+
+  // Picked with the pointer: the menu closes, focus goes back to the caret, and no tooltip shows.
+  await pick(page, 'ellipse')
+  await expect(caret).toBeFocused()
+  await nextFrame(page)
+  await expect(tooltip).toHaveCount(0)
+
+  // Reached with the keyboard, the caret and the button beside it show theirs.
+  await page.keyboard.press('Shift+Tab')
+  await expect(tooltip.filter({ hasText: 'Ellipse · O' })).toHaveCount(1)
+  await page.keyboard.press('Tab')
+  await expect(caret).toBeFocused()
+  await expect(tooltip.filter({ hasText: 'More shapes' })).toHaveCount(1)
+
+  // Picked with the keyboard, focus comes back as keyboard focus, so the tooltip shows.
+  await page.keyboard.press('Enter')
+  await expect(page.getByRole('menu')).toBeVisible()
+  await page.keyboard.press('ArrowDown')
+  await page.keyboard.press('Enter')
+  await expect(page.getByRole('menu')).toBeHidden()
+  await expect(caret).toBeFocused()
+  await expect(tooltip.filter({ hasText: 'More shapes' })).toHaveCount(1)
+
+  // Under the pointer, a button shows its tooltip.
+  await page.keyboard.press('Escape')
+  await page.locator('[role="toolbar"] [data-tool="text"]').hover()
+  await expect(tooltip.filter({ hasText: 'Text · T' })).toHaveCount(1)
+  expect(errors).toEqual([])
+})
+
 for (const [width, height] of SCREEN_SIZES) {
   test(`the open shape menu at ${width}×${height}`, { tag: '@evidence' }, async ({ browser }) => {
     const { page, errors } = await openStage(browser, design())
