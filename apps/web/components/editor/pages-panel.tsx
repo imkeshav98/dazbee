@@ -123,7 +123,7 @@ function PagesFrame({ label, disabled = false, children }: { label: string; disa
       onClick={() => setOpen(open === 'pages' ? null : 'pages')}
       style={place}
       className={cn(
-        'absolute z-10 flex h-9 cursor-pointer items-center gap-1.5 rounded-card surface-frost px-3 text-[12px] font-semibold text-text transition-colors hover:text-accent-text disabled:cursor-default disabled:opacity-40 aria-expanded:bg-accent-soft aria-expanded:text-accent-text',
+        'absolute z-10 flex h-9 cursor-pointer items-center gap-1.5 rounded-card surface-frost px-3 text-[12px] font-semibold text-text transition-colors hover:text-accent-text disabled:cursor-default disabled:opacity-40 aria-expanded:glass-open aria-expanded:text-text',
         'end-[calc(1.5rem+var(--zoom-width))] bottom-4 max-lg:end-4 max-lg:bottom-[calc(1.5rem+var(--zoom-height))]',
         'max-sm:start-4 max-sm:end-auto max-sm:top-20 max-sm:bottom-auto max-sm:group-data-[bar]/stage:hidden',
         FOCUS_RING,
@@ -247,7 +247,7 @@ function PageList({ editor, onRemoved }: { editor: Editor; onRemoved: (message: 
               }}
               className={cn(
                 CARD_ROW,
-                'relative cursor-grab active:cursor-grabbing aria-[current]:border-accent aria-[current]:bg-accent-soft data-[dragging]:opacity-40',
+                'relative cursor-grab active:cursor-grabbing aria-[current]:border-accent aria-[current]:bg-accent-soft aria-[current]:lit data-[dragging]:opacity-40',
               )}
             >
               {moves && landing?.before === id && <span aria-hidden className={cn(DROP_LINE, '-top-[4px]')} />}
@@ -257,7 +257,7 @@ function PageList({ editor, onRemoved }: { editor: Editor; onRemoved: (message: 
               <span aria-hidden className="grid size-[34px] shrink-0 place-items-center">
                 <span
                   data-testid="page-thumbnail"
-                  className="relative grid place-items-center overflow-hidden rounded-[3px] border border-line-strong bg-hover font-mono text-[10px] font-semibold text-white tabular-nums [text-shadow:0_1px_2px_rgb(0_0_0/0.6)]"
+                  className="relative grid place-items-center overflow-hidden rounded-[3px] border border-line-strong bg-well font-mono text-[10px] font-semibold text-white tabular-nums [text-shadow:0_1px_2px_rgb(0_0_0/0.6)]"
                   style={{ ...tile, backgroundColor: fill?.type === 'solid' ? fill.color : undefined }}
                 >
                   {picture && <img src={picture} alt="" draggable={false} className="absolute inset-0 size-full" />}

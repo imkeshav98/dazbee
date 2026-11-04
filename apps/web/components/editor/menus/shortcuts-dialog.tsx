@@ -139,7 +139,7 @@ export function ShortcutsButton({ className }: { className: string }) {
               type="button"
               aria-label={t.close}
               onClick={() => dialog.current?.close()}
-              className="grid size-8 cursor-pointer place-items-center rounded-full text-subtle hover:bg-hover hover:text-text"
+              className="grid size-8 cursor-pointer place-items-center rounded-full text-subtle hover:bg-hover hover:text-text active:bg-pressed"
             >
               <XIcon size={16} aria-hidden />
             </button>

@@ -18,7 +18,7 @@ import { useLocale, useMessages } from '@/lib/i18n/client.tsx'
 import { ShortcutsButton } from './shortcuts-dialog.tsx'
 
 const BUTTON =
-  'grid h-8 min-w-8 cursor-pointer place-items-center rounded-row px-1.5 text-muted transition-colors duration-[var(--chrome-fast)] hover:bg-hover hover:text-text disabled:cursor-default disabled:opacity-40'
+  'grid h-8 min-w-8 cursor-pointer place-items-center rounded-row px-1.5 text-muted transition-colors duration-[var(--chrome-fast)] hover:bg-hover hover:text-text active:bg-pressed disabled:cursor-default disabled:opacity-40'
 
 const viewOf = (editor: Editor | null) => ({ rulers: editor?.rulers() ?? false, snapping: editor?.snapping() ?? true })
 

@@ -207,7 +207,8 @@ test('a menu row is lit by the hover tint and, while pressed, the pressed tint, 
     expect((await look(key)).colour).toBe(glass.text)
     expect((await look(row)).outline).toBe('none')
     await pressedFill(page, row, glass.pressed)
-    // The press zooms in and closes the menu. Opened from the keyboard, the menu's first row has the focus, and the ring shows.
+    // The press zooms in and closes the menu. Opened from the keyboard, the menu's first row has the
+    // focus, and the ring shows.
     await page.keyboard.press('Escape')
     await expect(menu).toBeHidden()
     await page.getByTestId('zoom').focus()

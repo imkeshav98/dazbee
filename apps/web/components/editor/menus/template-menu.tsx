@@ -10,13 +10,14 @@ import type { Editor } from '@dazbee/editor'
 import { type TemplateScope, TemplateSummary } from '@dazbee/schema'
 
 import { Button } from '@/components/ui/button.tsx'
+import { LIT_ROW } from '@/components/ui/looks.ts'
 import { brandPath, readJson } from '@/lib/brand-routes.ts'
 import { cn } from '@/lib/cn.ts'
 import { useMessages } from '@/lib/i18n/client.tsx'
 import { format } from '@/lib/i18n/index.ts'
 
 const LABEL = 'text-xs font-semibold tracking-wide text-muted'
-const CHOICE = 'flex min-h-8 cursor-pointer items-center gap-2 rounded-row px-2 text-[13px] hover:bg-hover'
+const CHOICE = `flex min-h-8 cursor-pointer items-center gap-2 rounded-row px-2 text-[13px] ${LIT_ROW}`
 
 /** The Save as template form (#54), opened from the Share menu. */
 export function TemplateForm({

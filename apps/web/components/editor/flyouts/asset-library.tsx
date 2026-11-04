@@ -153,7 +153,7 @@ export function AssetLibrary({ editor, brandId, changed = 0 }: { editor: Editor;
                       type="button"
                       aria-label={t.done}
                       onClick={() => setUploads((all) => all.filter((x) => x.key !== u.key))}
-                      className="grid size-5 cursor-pointer place-items-center rounded-row text-subtle hover:bg-hover hover:text-text"
+                      className="grid size-5 cursor-pointer place-items-center rounded-row text-subtle hover:bg-hover hover:text-text active:bg-pressed"
                     >
                       <XIcon size={12} aria-hidden />
                     </button>
@@ -166,7 +166,7 @@ export function AssetLibrary({ editor, brandId, changed = 0 }: { editor: Editor;
                     aria-valuemin={0}
                     aria-valuemax={100}
                     aria-valuenow={Math.round(u.progress * 100)}
-                    className="h-1 overflow-hidden rounded-full bg-hover"
+                    className="h-1 overflow-hidden rounded-full bg-well"
                   >
                     <div
                       className={cn(

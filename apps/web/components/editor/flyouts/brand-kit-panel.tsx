@@ -182,7 +182,7 @@ export function BrandKitPanel({ editor, brandId }: { editor: Editor; brandId: st
                       aria-pressed={on}
                       disabled={!textSelected}
                       onClick={() => apply('font', f.token)}
-                      className="flex min-h-12 w-full cursor-pointer items-center gap-3 rounded-[8px] py-2 text-start enabled:hover:bg-hover disabled:cursor-default aria-pressed:text-accent-text"
+                      className="flex min-h-12 w-full cursor-pointer items-center gap-3 rounded-[8px] py-2 text-start enabled:hover:bg-hover enabled:hover:lit enabled:active:bg-pressed enabled:active:lit disabled:cursor-default aria-pressed:text-accent-text"
                     >
                       <span className="min-w-0 flex-1">
                         {family ? (

@@ -2,7 +2,7 @@
 // editor control that looks like one of these takes it from here instead of spelling its classes again.
 // Looks that controls outside the editor share live in components/ui/looks.ts.
 
-import { FOCUS_RING } from '@/components/ui/looks.ts'
+import { FOCUS_RING, LIT_ROW } from '@/components/ui/looks.ts'
 
 /** A disabled control: faded and not clickable. */
 const DISABLED = 'disabled:pointer-events-none disabled:opacity-40'
@@ -12,14 +12,14 @@ export const CHIP = `inline-flex h-7 cursor-pointer items-center gap-1 rounded-f
 
 /** A small square icon button in a card's row. */
 export const ICON_BUTTON =
-  'grid size-7 shrink-0 cursor-pointer place-items-center rounded-row text-subtle transition-colors duration-[var(--chrome-fast)] hover:bg-hover hover:text-text disabled:pointer-events-none disabled:opacity-30'
+  'grid size-7 shrink-0 cursor-pointer place-items-center rounded-row text-subtle transition-colors duration-[var(--chrome-fast)] hover:bg-hover hover:text-text active:bg-pressed disabled:pointer-events-none disabled:opacity-30'
 
 /** A chip in pink, for a choice that is set: the header card's sizes. */
 export const CHIP_ACCENT = `${CHIP} border-transparent bg-accent-soft text-accent-text hover:border-transparent hover:text-accent-text`
 /** A word-sized button that acts at once, in pink: a menu row's Reset. */
-export const LINK_BUTTON = `shrink-0 cursor-pointer rounded-row px-1.5 text-[12px] font-semibold text-accent-text hover:bg-hover ${FOCUS_RING}`
+export const LINK_BUTTON = `shrink-0 cursor-pointer rounded-row px-1.5 text-[12px] font-semibold text-accent-text ${LIT_ROW} ${FOCUS_RING}`
 /** A button with words and no box until hovered, as a panel's Done or Delete. */
-export const QUIET_BUTTON = `flex h-8 cursor-pointer items-center gap-1.5 rounded-row px-3 text-[13px] font-medium text-muted hover:bg-hover hover:text-text disabled:pointer-events-none disabled:opacity-50 ${FOCUS_RING}`
+export const QUIET_BUTTON = `flex h-8 cursor-pointer items-center gap-1.5 rounded-row px-3 text-[13px] font-medium text-muted hover:bg-hover hover:text-text active:bg-pressed disabled:pointer-events-none disabled:opacity-50 ${FOCUS_RING}`
 
 /** A square tile showing one image asset's thumbnail, in the asset library and the image picker. */
 export const ASSET_TILE =
@@ -34,7 +34,7 @@ export const MENU = `${POPOVER} flex flex-col p-1.5`
 export const DOCK_BUTTON = `grid h-10 cursor-pointer place-items-center rounded-[12px] transition-colors duration-[var(--chrome-fast)] ${FOCUS_RING}`
 /** The dock's colours for the tool in use, and for the others. */
 export const DOCK_ON = 'bg-accent-solid text-on-accent'
-export const DOCK_OFF = 'text-muted hover:bg-hover hover:text-text'
+export const DOCK_OFF = 'text-muted hover:bg-hover hover:text-text active:bg-pressed active:text-text'
 /** One tool's square dock button, lit while the tool is in use. */
 export const dockTool = (on: boolean) => `${DOCK_BUTTON} w-10 ${on ? DOCK_ON : DOCK_OFF}`
 
@@ -84,13 +84,17 @@ export const SELECT = 'h-8 w-full bg-surface px-1.5 text-[12px]'
 export const KNOB = `relative flex h-8 min-w-0 cursor-ew-resize touch-pan-y select-none items-center gap-2 overflow-hidden rounded-row border border-line bg-surface px-2.5 text-[12px] font-semibold text-muted transition-colors duration-[var(--chrome-fast)] hover:border-line-strong focus-within:border-accent before:pointer-events-none before:absolute before:inset-y-0 before:start-[var(--fill-from,0%)] before:w-[var(--fill,0%)] before:bg-accent-soft before:transition-[width] before:duration-75 data-ranged:after:pointer-events-none data-ranged:after:absolute data-ranged:after:inset-y-1.5 data-ranged:after:start-[clamp(4px,var(--fill-at),calc(100%-6px))] data-ranged:after:w-0.5 data-ranged:after:-translate-x-1/2 data-ranged:after:rounded-full data-ranged:after:bg-accent data-ranged:after:shadow-[0_0_8px_rgb(255_72_176/0.7)] rtl:data-ranged:after:translate-x-1/2`
 /** Knobs two to a row; a lone last one takes the whole row. */
 export const KNOBS = 'grid grid-cols-2 gap-1.5 [&>:last-child:nth-child(odd)]:col-span-2'
-/** A row of choices that look as one control, one of them on: each as wide as its words need, sharing what is left. */
-export const SEGMENTS = 'grid auto-cols-auto grid-flow-col gap-0.5 rounded-[10px] bg-hover p-[3px] [&>*]:min-w-max'
-/** One choice of SEGMENTS, aria-checked while it is the one. */
-export const SEGMENT = `h-7 min-w-0 cursor-pointer truncate rounded-[7px] px-2 text-[12px] font-semibold text-muted transition-colors duration-[var(--chrome-fast)] hover:text-text aria-checked:bg-accent-soft aria-checked:text-accent-text ${FOCUS_RING}`
+/**
+ * A row of choices that look as one control, one of them on, in a sunken well: each as wide as its
+ * words need, sharing what is left. Muted text in the well takes the well's shade.
+ */
+export const SEGMENTS =
+  'grid auto-cols-auto grid-flow-col gap-0.5 rounded-[10px] bg-well p-[3px] [--text-muted:var(--glass-well-muted)] [&>*]:min-w-max'
+/** One choice of SEGMENTS, aria-checked (or aria-pressed) while it is the one: on a chip, in the text colour. */
+export const SEGMENT = `h-7 min-w-0 cursor-pointer truncate rounded-[7px] px-2 text-[12px] font-semibold text-muted transition-colors duration-[var(--chrome-fast)] hover:text-text aria-checked:bg-chip aria-checked:text-text aria-pressed:bg-chip aria-pressed:text-text ${FOCUS_RING}`
 
 /** A row of a menu: its words at the start, a shortcut or a switch at the end. */
-export const MENU_ITEM = `group flex h-9 w-full shrink-0 cursor-pointer items-center justify-between gap-3 rounded-row px-2.5 text-start text-[13px] font-medium text-text transition-colors duration-[var(--chrome-fast)] hover:bg-hover ${DISABLED} ${FOCUS_RING}`
+export const MENU_ITEM = `group flex h-9 w-full shrink-0 cursor-pointer items-center justify-between gap-3 rounded-row px-2.5 text-start text-[13px] font-medium text-text transition-colors duration-[var(--chrome-fast)] ${LIT_ROW} ${DISABLED} ${FOCUS_RING}`
 /** The hairline between a menu's groups of rows. */
 export const MENU_DIVIDER = 'mx-1.5 my-1 border-t border-line'
 /** A shortcut shown in a menu row. */
@@ -114,6 +118,8 @@ export const PANEL_PART = 'flex flex-col gap-2.5 border-t border-line pt-3 first
 export const PANEL_HEADING = 'text-xs font-semibold text-muted'
 /** A boxed button of an edit panel that acts at once: its icon, then its words, or its icon alone. */
 export const PANEL_BUTTON = `flex h-[34px] min-w-0 cursor-pointer items-center gap-2 rounded-row border border-line bg-surface px-2.5 text-[12.5px] font-medium whitespace-nowrap text-text transition-colors duration-[var(--chrome-fast)] hover:bg-hover disabled:cursor-not-allowed disabled:opacity-45 [&>span]:truncate ${FOCUS_RING}`
+/** An edit panel's button among many that act at once, as Position's moves: unfilled, lit by the tints. */
+export const PANEL_ACTION = `flex h-[34px] min-w-0 cursor-pointer items-center gap-2 rounded-row px-2.5 text-[12.5px] font-medium whitespace-nowrap text-text transition-colors duration-[var(--chrome-fast)] hover:bg-hover active:bg-pressed disabled:cursor-not-allowed disabled:opacity-45 [&>span]:truncate ${FOCUS_RING}`
 /** A switch shaped as a knob, its name at the start: Lock ratio among the size fields. */
 export const KNOB_SWITCH = `group flex h-8 min-w-0 cursor-pointer items-center justify-between gap-2 rounded-row border border-line bg-surface px-2.5 text-[12px] font-semibold whitespace-nowrap text-muted transition-colors duration-[var(--chrome-fast)] hover:border-line-strong aria-checked:text-text ${FOCUS_RING}`
 
@@ -122,7 +128,7 @@ export const BAR_ROW = 'top-[90px] max-sm:top-[72px]'
 /** The top bar's height, for the room the fit keeps. */
 export const BAR_ROW_HEIGHT = 'h-[38px]'
 /** One button of the bar: words or an icon, lit while its popover is open. */
-export const BAR_BUTTON = `flex h-[30px] min-w-[30px] shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-row px-2 text-[12px] font-semibold whitespace-nowrap text-text transition-colors duration-[var(--chrome-fast)] hover:bg-hover aria-expanded:bg-hover ${FOCUS_RING}`
+export const BAR_BUTTON = `flex h-[30px] min-w-[30px] shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-row px-2 text-[12px] font-semibold whitespace-nowrap text-text transition-colors duration-[var(--chrome-fast)] hover:bg-hover active:bg-pressed aria-expanded:bg-hover ${FOCUS_RING}`
 /** A button of the bar that turns something on or off, such as bold: lit while it is on. */
 export const BAR_TOGGLE = `${BAR_BUTTON} aria-pressed:bg-accent-soft aria-pressed:text-accent-text ${DISABLED}`
 /** The swatch a bar button shows for a colour the selected layers don't share. */

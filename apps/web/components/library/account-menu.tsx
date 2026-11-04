@@ -13,7 +13,7 @@ import { LocaleSwitch } from './locale-switch.tsx'
 import { ThemeSwitch } from './theme-switch.tsx'
 
 const ROW =
-  'flex h-10 w-full cursor-pointer items-center gap-3 rounded-row px-3 text-start text-[13px] font-medium transition-colors duration-[var(--chrome-fast)] hover:bg-hover focus-visible:bg-hover focus-visible:outline-none'
+  'flex h-10 w-full cursor-pointer items-center gap-3 rounded-row px-3 text-start text-[13px] font-medium transition-colors duration-[var(--chrome-fast)] hover:bg-hover hover:lit active:bg-pressed active:lit focus-visible:bg-hover focus-visible:lit focus-visible:outline-none'
 
 export function AccountMenu({
   name,

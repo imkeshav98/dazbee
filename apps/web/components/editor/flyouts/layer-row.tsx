@@ -25,6 +25,7 @@ import { type DragEvent, type KeyboardEvent, memo } from 'react'
 import { type Design, LOCK_FLAGS } from '@dazbee/schema'
 
 import { DROP_LINE, LAYER_PICTURE, LAYER_PICTURE_PICKED } from '@/components/editor/styles.ts'
+import { LIT_ROW } from '@/components/ui/looks.ts'
 import { RenameField } from '@/components/ui/rename-field.tsx'
 import { cn } from '@/lib/cn.ts'
 import { useMessages } from '@/lib/i18n/client.tsx'
@@ -152,7 +153,7 @@ export const LayerRow = memo(function LayerRow({
         'group absolute inset-x-1 flex cursor-default items-center gap-1.5 rounded-[8px] pe-1 text-[13px] font-medium outline-none select-none',
         'focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-inset',
         // The selected row is tinted pink, its type tile solid pink, as in the mock.
-        selected ? 'bg-accent/20 text-text' : 'hover:bg-hover',
+        selected ? 'bg-accent/20 text-text lit' : LIT_ROW,
         drop === 'into' && 'ring-2 ring-accent ring-inset',
         hidden && 'text-subtle',
       )}
@@ -278,7 +279,7 @@ function RowToggle({
         onToggle(event.altKey)
       }}
       className={cn(
-        'grid size-6 shrink-0 cursor-pointer place-items-center rounded-[6px] text-subtle hover:bg-hover hover:text-text',
+        'grid size-6 shrink-0 cursor-pointer place-items-center rounded-[6px] text-subtle hover:bg-hover hover:text-text active:bg-pressed',
         !on && !stay && 'opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100',
       )}
     >

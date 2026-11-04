@@ -170,7 +170,7 @@ export function AssetDetails({
                   type="button"
                   aria-label={format(t.removeTag, { tag: x })}
                   onClick={() => commit({ tags: asset.tags.filter((y) => y !== x) })}
-                  className="grid size-5 cursor-pointer place-items-center rounded-full hover:bg-hover"
+                  className="grid size-5 cursor-pointer place-items-center rounded-full hover:bg-hover active:bg-pressed"
                 >
                   <XIcon size={10} aria-hidden />
                 </button>

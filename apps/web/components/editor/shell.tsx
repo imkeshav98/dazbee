@@ -278,7 +278,7 @@ export function EditorShell({
               <Link
                 href="/"
                 aria-label={t.library.home}
-                className="grid size-9 shrink-0 place-items-center rounded-row hover:bg-hover"
+                className="grid size-9 shrink-0 place-items-center rounded-row hover:bg-hover active:bg-pressed"
               >
                 <DazbeeMark size={28} />
               </Link>
@@ -336,7 +336,9 @@ export function EditorShell({
                     }}
                     className={cn(
                       'relative grid size-11 sm:size-13 cursor-pointer place-items-center rounded-full transition-colors duration-[var(--chrome-fast)]',
-                      open ? 'text-on-accent' : 'text-subtle hover:bg-hover hover:text-text',
+                      open
+                        ? 'text-on-accent'
+                        : 'text-subtle hover:bg-hover hover:text-text active:bg-pressed active:text-text',
                       ai && !open && 'text-accent-text',
                     )}
                   >
@@ -399,7 +401,7 @@ export function EditorShell({
                   <h2
                     className={cn(
                       'min-w-0 flex-1 truncate font-display text-[17px] font-bold tracking-tight',
-                      flyout === 'ai' && 'bg-[image:var(--ai-gradient)] bg-clip-text text-transparent',
+                      flyout === 'ai' && 'text-accent-text',
                     )}
                   >
                     {flyoutTitle(flyout)}
@@ -416,7 +418,7 @@ export function EditorShell({
                     type="button"
                     aria-label={t.editor.closePanel}
                     onClick={() => setFlyout(null)}
-                    className="grid size-7 shrink-0 cursor-pointer place-items-center rounded-full text-subtle hover:bg-hover hover:text-text"
+                    className="grid size-7 shrink-0 cursor-pointer place-items-center rounded-full text-subtle hover:bg-hover hover:text-text active:bg-pressed"
                   >
                     <XIcon size={14} aria-hidden />
                   </button>

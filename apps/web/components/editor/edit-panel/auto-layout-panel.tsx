@@ -3,7 +3,7 @@
 // The Stack panel: auto layout on or off, its direction, wrapping and room between, then under
 // Advanced the line-up pad, the room around and how the frame sizes; and the sizing fields a layer
 // in an auto layout has in the Position panel.
-import { FIELD_LABEL, KNOBS, PANEL_BUTTON, PANEL_HEADING } from '@/components/editor/styles.ts'
+import { FIELD_LABEL, KNOBS, PANEL_HEADING, SEGMENT, SEGMENTS } from '@/components/editor/styles.ts'
 import { FOCUS_RING } from '@/components/ui/looks.ts'
 import { cn } from '@/lib/cn.ts'
 import { tidy } from '@/lib/editor/size.ts'
@@ -143,7 +143,7 @@ function AutoLayoutCard({
           onSet={(wrap) => setLayout(() => ({ wrap }))}
         />
         <span className={PANEL_HEADING}>{p.gap}</span>
-        <div role="group" aria-label={p.gap} className="grid grid-cols-4 gap-1.5">
+        <div role="group" aria-label={p.gap} className={SEGMENTS}>
           {GAPS.map((to) => (
             <button
               key={to}
@@ -151,10 +151,7 @@ function AutoLayoutCard({
               aria-pressed={gap === to}
               data-gap={to}
               onClick={() => setLayout(() => ({ gap: to }))}
-              className={cn(
-                PANEL_BUTTON,
-                'justify-center font-mono tabular-nums aria-pressed:border-accent aria-pressed:bg-accent-soft aria-pressed:text-accent-text',
-              )}
+              className={cn(SEGMENT, 'font-mono tabular-nums')}
             >
               {to}
             </button>
@@ -189,7 +186,7 @@ function AutoLayoutCard({
             role="group"
             aria-label={p.lineUp}
             dir="ltr"
-            className="grid size-[84px] shrink-0 grid-cols-3 gap-[3px] rounded-[10px] bg-hover p-[5px]"
+            className="grid size-[84px] shrink-0 grid-cols-3 gap-[3px] rounded-[10px] bg-well p-[5px]"
           >
             {PLACES.map((y) =>
               PLACES.map((x) => {
@@ -213,7 +210,7 @@ function AutoLayoutCard({
                       })
                     }
                     className={cn(
-                      'grid cursor-pointer place-items-center rounded-[5px] hover:bg-surface after:size-1 after:rounded-full after:bg-subtle aria-pressed:after:h-1.5 aria-pressed:after:w-4 aria-pressed:after:rounded-[2px] aria-pressed:after:bg-accent',
+                      'grid cursor-pointer place-items-center rounded-[5px] hover:bg-hover active:bg-pressed after:size-1 after:rounded-full after:bg-subtle aria-pressed:after:h-1.5 aria-pressed:after:w-4 aria-pressed:after:rounded-[2px] aria-pressed:after:bg-accent',
                       FOCUS_RING,
                     )}
                   />
