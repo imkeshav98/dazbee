@@ -8,9 +8,9 @@
 import type { DesignInput } from '@dazbee/schema'
 
 import { shoot, writeOutput } from '../../support/editor.ts'
-import { hovered, laid, look, openDesignIn, pressed, THEMES } from '../../support/glass.ts'
+import { hovered, laid, look, openDesignIn, openIn, pressed, THEMES } from '../../support/glass.ts'
 import { SCREEN_SIZES } from '../../support/layout.ts'
-import { liveDesign, seed } from '../../support/seed.ts'
+import { DEV_BRAND, liveDesign, seed } from '../../support/seed.ts'
 import { drawn, fitSettled, nextFrame, selectLayers } from '../../support/stage.ts'
 import { expect, type Page, test } from '../../support/test.ts'
 import { barMenu, moreMenu, pagesPanel } from '../../support/top-bar.ts'
@@ -215,6 +215,22 @@ test('an open rail button keeps the rail’s glass, lit by the pressed tint, its
         .toBe(glass.pressed)
       await expect.poll(async () => (await look(button)).colour).toBe(glass.accentText)
     }
+    expect(errors).toEqual([])
+    await page.context().close()
+  }
+})
+
+test('the library’s capsule lights the page shown as the editor’s rail does: the pressed tint, its icon in the glass pink', async ({
+  browser,
+}) => {
+  for (const theme of THEMES) {
+    const { page, errors, glass } = await openIn(browser, `/brands/${DEV_BRAND}/designs`, theme)
+    const lit = page.getByTestId('library-capsule').locator('[data-lit]')
+    await expect(lit).toHaveAttribute('data-entry', 'recent')
+    await expect
+      .poll(async () => (await look(page.getByTestId('capsule-blob').locator('span'))).fill)
+      .toBe(glass.pressed)
+    await expect.poll(async () => (await look(lit)).colour).toBe(glass.accentText)
     expect(errors).toEqual([])
     await page.context().close()
   }

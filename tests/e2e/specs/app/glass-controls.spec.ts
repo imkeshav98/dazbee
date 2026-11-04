@@ -34,14 +34,54 @@ const openAccount = (page: Page) =>
       }),
   )
 
+/**
+ * Counts the elements a press marks pressed (`data-pressed`) while `act` runs, and for a while after:
+ * longer than a press is held before it is marked, and than a tap's mark lasts.
+ */
+async function marksDuring(page: Page, act: () => Promise<void>) {
+  await page.evaluate(() => {
+    const root = document.documentElement
+    root.dataset.marks = '0'
+    new MutationObserver((records) => {
+      const marked = records.filter((record) => record.oldValue === null).length
+      root.dataset.marks = String(Number(root.dataset.marks) + marked)
+    }).observe(document.body, {
+      attributes: true,
+      attributeFilter: ['data-pressed'],
+      attributeOldValue: true,
+      subtree: true,
+    })
+  })
+  await act()
+  return page.evaluate(
+    () =>
+      new Promise<number>((resolve) => setTimeout(() => resolve(Number(document.documentElement.dataset.marks)), 400)),
+  )
+}
+
 /** Puts a finger down on a control and holds it there, as on a phone, until it is lifted: a tap. */
 async function hold(page: Page, control: Locator) {
-  const box = await control.boundingBox()
-  if (!box) throw new Error('the control to hold is not on screen')
-  const finger = await page.context().newCDPSession(page)
-  const at = { x: box.x + box.width / 2, y: box.y + box.height / 2 }
+  const { finger, at } = await fingerOn(page, control)
   await finger.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [at] })
   return { lift: () => finger.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] }) }
+}
+
+/** Puts a finger down on a control and at once slides it 40px up the screen, as a scroll starts, then lifts it. */
+async function swipe(page: Page, control: Locator) {
+  const { finger, at } = await fingerOn(page, control)
+  const touch = (type: 'touchStart' | 'touchMove', up: number) =>
+    finger.send('Input.dispatchTouchEvent', { type, touchPoints: [{ x: at.x, y: at.y - up }] })
+  // Sent together, so the finger has moved before a press held still would be marked.
+  await Promise.all([touch('touchStart', 0), touch('touchMove', 20), touch('touchMove', 40)])
+  await finger.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
+}
+
+/** A finger for the page, and the middle of a control on screen, where it goes down. */
+async function fingerOn(page: Page, control: Locator) {
+  const box = await control.boundingBox()
+  if (!box) throw new Error('the control to touch is not on screen')
+  const finger = await page.context().newCDPSession(page)
+  return { finger, at: { x: box.x + box.width / 2, y: box.y + box.height / 2 } }
 }
 
 test('a toggle that is on reads in the text colour on its pink tint; an open top bar button takes the pressed tint while pressed', async ({
@@ -70,7 +110,7 @@ test('a toggle that is on reads in the text colour on its pink tint; an open top
   }
 })
 
-test('the account menu’s language and theme, and the colour pop-up’s kinds of paint, are choices in a well', async ({
+test('the account menu’s language and theme, and the colour pop-up’s kinds of paint, are choices in a well; the pop-up sits clear of the Colour panel', async ({
   browser,
 }) => {
   const designId = await seed(liveDesign())
@@ -95,7 +135,25 @@ test('the account menu’s language and theme, and the colour pop-up’s kinds o
     const kinds = page.getByTestId('paint-editor').getByRole('radiogroup', { name: 'Kind of paint' })
     expect(await look(kinds)).toMatchObject(well)
     expect(await look(kinds.getByRole('radio', { checked: true }))).toMatchObject(chosen)
+    // The pop-up opens beside the panel, a gap from its edge, not over it.
+    const panel = await page.getByTestId('bar-colour-menu').boundingBox()
+    const popUp = page.getByTestId('paint-editor').locator('..')
+    await expect
+      .poll(async () => {
+        const box = await popUp.boundingBox()
+        return box && panel ? panel.x - (box.x + box.width) : null
+      })
+      .toBeGreaterThanOrEqual(8)
     await shoot(page, `glass-${theme}-paint`)
+    await page.keyboard.press('Escape')
+
+    // A theme picked in the menu is the chosen one when the menu opens again.
+    const other = theme === 'dark' ? 'Light' : 'Dark'
+    await openAccount(page)
+    await account.getByRole('radiogroup', { name: 'Theme' }).getByRole('radio', { name: other }).click()
+    await page.keyboard.press('Escape')
+    await expect(account).toBeHidden()
+    expect(await openAccount(page)).toBe(other)
     expect(errors).toEqual([])
     await page.context().close()
   }
@@ -143,7 +201,7 @@ test('glass buttons and rows take the hover tint and, while pressed, the pressed
   }
 })
 
-test('on a phone, a glass button and a card’s row show the pressed tint while a finger is held on them', async ({
+test('on a phone, a glass button and a card’s row show the pressed tint while a finger is held on them, and not when it starts a scroll', async ({
   browser,
 }) => {
   const designId = await seed(liveDesign())
@@ -166,6 +224,8 @@ test('on a phone, a glass button and a card’s row show the pressed tint while 
       await finger.lift()
       await expect.poll(async () => (await look(lit)).image).toBe('none')
     }
+    // A finger that slides away at once is scrolling: nothing it went down on is marked pressed.
+    expect(await marksDuring(page, () => swipe(page, row.getByRole('button').first()))).toBe(0)
     expect(errors).toEqual([])
     await page.context().close()
   }
@@ -186,9 +246,13 @@ test('a design’s delete is confirmed on a solid red button in white; its red m
     await remove.click()
     const confirm = tile.getByRole('button', { name: 'Delete', exact: true })
     await expect(confirm).toBeVisible()
-    expect(await look(confirm)).toMatchObject({ fill: glass.dangerSolid, colour: glass.onAccent })
-    await hovered(confirm, { fill: glass.dangerSolidHover, colour: glass.onAccent })
+    // Its picture shows it at rest, with the pointer off it, and the page at its top: Playwright
+    // scrolls a control to the top of the window when it retries a pointer action on it.
+    await page.mouse.move(2, 2)
+    await page.evaluate(() => window.scrollTo(0, 0))
+    await expect.poll(async () => look(confirm)).toMatchObject({ fill: glass.dangerSolid, colour: glass.onAccent })
     await shoot(page, `glass-${theme}-design-delete`)
+    await hovered(confirm, { fill: glass.dangerSolidHover, colour: glass.onAccent })
     const cancel = tile.getByRole('button', { name: 'Cancel' })
     await hovered(cancel, { fill: glass.hover, colour: glass.text })
     await pressed(page, cancel, { fill: glass.pressed, colour: glass.text })
@@ -230,11 +294,12 @@ test('asset details on glass: a tag reads in the text colour on its pink tint, a
     await remove.click()
     const confirm = details.getByTestId('asset-delete-confirm')
     await expect(confirm).toBeVisible()
-    // It takes the place of Delete, under the pointer, which moves off it to see it at rest.
+    // It takes the place of Delete, under the pointer, which moves off it to see it, and take its
+    // picture, at rest.
     await page.mouse.move(2, 2)
     await expect.poll(async () => look(confirm)).toMatchObject({ fill: glass.dangerSolid, colour: glass.onAccent })
-    await hovered(confirm, { fill: glass.dangerSolidHover, colour: glass.onAccent })
     await shoot(page, `glass-${theme}-asset-delete`)
+    await hovered(confirm, { fill: glass.dangerSolidHover, colour: glass.onAccent })
     await pressed(page, details.getByRole('button', { name: 'Keep' }), { fill: glass.pressed })
     await expect(confirm).toHaveCount(0)
     expect(errors).toEqual([])
