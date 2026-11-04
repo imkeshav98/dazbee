@@ -5,9 +5,10 @@ import { loadDesign, mergedProps, openSession } from '@dazbee/doc'
 import { type DesignInput, type Paint, parseDesign } from '@dazbee/schema'
 
 import type { Frame } from '../canvas/grid.ts'
+import type { CropTarget } from '../layers/boxes.ts'
 import { editorSelection } from '../selection.ts'
 import { coverCrop, imageRect } from './crop.ts'
-import { type CroppingDeps, type CropTarget, editorCropping } from './cropping.ts'
+import { type CroppingDeps, editorCropping } from './cropping.ts'
 
 /** A box 200 × 100 filled with a square image, which covers it: the image's whole sits 200 × 200 around it. */
 const DESIGN: DesignInput = {

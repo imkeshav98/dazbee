@@ -1,33 +1,18 @@
 // Cropping an image fill on the stage: a press on the image or one of its corners, the drag
 // that pans or scales it, and the whole image with its corner handles as the overlay draws it.
-import type { Image } from '@dazbee/canvaskit'
 import type { Session } from '@dazbee/doc'
-import type { ImagePaint, Paint, Point, Rect } from '@dazbee/schema'
+import type { Point } from '@dazbee/schema'
 
 import { type Camera, toScreen, toWorld } from '../canvas/camera.ts'
 import { type Frame, scope } from '../canvas/grid.ts'
 import type { ThumbnailCache } from '../canvas/thumbnails.ts'
+import type { CropTarget } from '../layers/boxes.ts'
 import { type Box, drawnFrom, localTo, pageFrom, round } from '../layers/transform.ts'
 import { runQuietly } from '../run-quietly.ts'
 import type { EditorSelection } from '../selection.ts'
-import { cornersOfRect, cropOf, panned, scaled, type Size } from './crop.ts'
+import { cornersOfRect, cropOf, panned, scaled } from './crop.ts'
 import { HANDLE_REACH } from './press.ts'
 
-/**
- * The image fill a crop works on (#48): the topmost of a layer's fills in a frame, with where the
- * whole image sits for the crop it shows now, the image and its size, and the layer's box with
- * its containers, the box last.
- */
-export interface CropTarget {
-  fills: Paint[]
-  index: number
-  fill: ImagePaint
-  image: Image
-  size: Size
-  box: Box
-  rect: Rect
-  around: Box[]
-}
 /** A drag of the image being cropped, or of one of its corners, from the press until it ends: one undo step. */
 export interface CropDrag {
   kind: 'crop'
