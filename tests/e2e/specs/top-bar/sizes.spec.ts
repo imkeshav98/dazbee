@@ -7,7 +7,7 @@ import { layoutProblems, SCREEN_SIZES, wrapped } from '../../support/layout.ts'
 import { nextFrame, openStage, selectLayers } from '../../support/stage.ts'
 import { expect, type Page, test } from '../../support/test.ts'
 import { barMenu, moreMenu, PIECES, UNCUT } from '../../support/top-bar.ts'
-import { design } from '../../support/top-bar-design.ts'
+import { topBarDesign } from '../../support/top-bar-design.ts'
 
 test.describe.configure({ timeout: 240_000 })
 
@@ -67,7 +67,7 @@ for (const [width, height] of SCREEN_SIZES) {
     browser,
   }) => {
     const asset = await upload(photo)
-    const { page, errors } = await openStage(browser, design(asset.id))
+    const { page, errors } = await openStage(browser, topBarDesign(asset.id))
     await page.setViewportSize({ width, height })
     await page.evaluate(() => {
       window.dazbee?.select([])

@@ -3,8 +3,9 @@
 // API and the sync server: `docker compose up -d --wait`.
 import type { Camera, DrawInfo } from '@dazbee/editor'
 import { framesInView } from '@dazbee/editor/camera'
+import type { DesignInput } from '@dazbee/schema'
 
-import { carousel, fiveFormats, open } from '../../support/canvas.ts'
+import { filler, fiveFormats, FORMATS, heroes, merge, open } from '../../support/canvas.ts'
 import { writeOutput } from '../../support/editor.ts'
 import { PERF, report, spread } from '../../support/perf.ts'
 import { drawn } from '../../support/stage.ts'
@@ -20,6 +21,33 @@ interface Redraw extends DrawInfo {
 
 const FIVE_FORMATS = { pan: { dx: 6, dy: 3 }, dragId: 'p1-box', textId: 'p1-headline' }
 const CAROUSEL = { pan: { dx: 0, dy: 24 }, dragId: 'c3-box', textId: 'c3-headline' }
+
+/** A carousel of `cards` pages in five formats. */
+const carousel = (cards: number): DesignInput => {
+  const pages: DesignInput['pages'] = {}
+  const parts = []
+  for (let i = 0; i < cards; i++) {
+    const id = `c${i}`
+    pages[id] = {
+      name: `Card ${i + 1}`,
+      order: `a${String(i).padStart(2, '0')}`,
+      fills: [{ type: 'solid', color: i % 2 ? '#F2F6FFFF' : '#FFF8F0FF' }],
+    }
+    parts.push(heroes(id, `Card ${i + 1}`), { nodes: filler(id, 10, i * 10) })
+  }
+  return {
+    meta: {
+      schemaVersion: 5,
+      designId: 'replaced-by-the-api',
+      name: 'Carousel',
+      kind: 'carousel',
+      primaryFormatId: 'sq',
+    },
+    formats: FORMATS,
+    pages,
+    ...merge(...parts),
+  }
+}
 
 /**
  * Waits until the fonts and images the design asked for are here, then for the redraw that follows:

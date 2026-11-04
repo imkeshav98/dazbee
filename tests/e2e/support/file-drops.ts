@@ -7,7 +7,7 @@ import { read } from './stage.ts'
 import type { Page } from './test.ts'
 
 /** A square design with one white page, and any more formats and pages given. */
-export const design = (
+export const dropDesign = (
   nodes: DesignInput['nodes'] = {},
   more: Partial<Pick<DesignInput, 'formats' | 'pages'>> = {},
 ): DesignInput => ({

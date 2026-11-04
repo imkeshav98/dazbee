@@ -9,8 +9,8 @@ import type { DesignInput } from '@dazbee/schema'
 import { screenPoint, writeOutput } from '../../support/editor.ts'
 import {
   colourAt,
-  design,
   layerIds,
+  layersDesign,
   listed,
   node,
   openLayers,
@@ -65,7 +65,7 @@ const crowd = (): DesignInput => {
       props: rect(40 + (i % 20) * 50, 300 + Math.floor(i / 20) * 70, 40, 60, '#14213DFF'),
     }
   }
-  return { ...design(), nodes }
+  return { ...layersDesign(), nodes }
 }
 
 /** Whether the focus is in the layers tree. */
@@ -77,7 +77,7 @@ const focusedLayer = (page: Page) => page.evaluate(() => document.activeElement?
 test('keyboard only: move through the tree, select, rename, lock, hide and move a layer into a group', async ({
   browser,
 }) => {
-  const { page, errors } = await openStage(browser, design())
+  const { page, errors } = await openStage(browser, layersDesign())
   await page.getByRole('button', { name: 'Layers', exact: true }).focus()
   await page.keyboard.press('Enter')
   await expect(tree(page)).toBeVisible()
@@ -165,7 +165,7 @@ test('keyboard only: move through the tree, select, rename, lock, hide and move 
 test('keyboard only: a key pressed just after the panel redraws on its own still moves the focus', async ({
   browser,
 }) => {
-  const { page, errors } = await openStage(browser, design())
+  const { page, errors } = await openStage(browser, layersDesign())
   await openLayers(page)
   await page.evaluate(() => window.dazbee?.select(['c2']))
   await expect(row(page, 'Card stripe')).toHaveAttribute('aria-selected', 'true')
@@ -234,7 +234,7 @@ test('keyboard only: a layer moved past a big open group keeps the focus, and ty
 test('keyboard only: deleting the focused row moves the focus to the row in its place, and undo gives it back', async ({
   browser,
 }) => {
-  const { page, errors } = await openStage(browser, design())
+  const { page, errors } = await openStage(browser, layersDesign())
   await openLayers(page)
   await row(page, 'Box').click()
   await expect(row(page, 'Box')).toBeFocused()
@@ -266,7 +266,7 @@ test('keyboard only: deleting the focused row moves the focus to the row in its 
 test('keyboard: Tab into the tree lands on the layer selected on the canvas, not the row focused before', async ({
   browser,
 }) => {
-  const { page, errors } = await openStage(browser, design())
+  const { page, errors } = await openStage(browser, layersDesign())
   await openLayers(page)
   await row(page, 'Box').click()
   await expect(row(page, 'Box')).toBeFocused()
@@ -288,7 +288,7 @@ test('keyboard: Tab into the tree lands on the layer selected on the canvas, not
 test('a rename finished by clicking the canvas keeps the name and leaves the focus where the click put it', async ({
   browser,
 }) => {
-  const { page, errors } = await openStage(browser, design())
+  const { page, errors } = await openStage(browser, layersDesign())
   await openLayers(page)
   await row(page, 'Box').dblclick()
   const field = tree(page).getByRole('textbox', { name: 'Name of Box' })
@@ -317,7 +317,7 @@ test('a rename finished by clicking the canvas keeps the name and leaves the foc
 test('keyboard only: the row that takes the focus after a delete is selected, so Delete again deletes it', async ({
   browser,
 }) => {
-  const { page, errors } = await openStage(browser, design())
+  const { page, errors } = await openStage(browser, layersDesign())
   await openLayers(page)
   await row(page, 'Box').click()
   await page.keyboard.press('Delete')
@@ -336,7 +336,7 @@ test('keyboard only: the row that takes the focus after a delete is selected, so
 test('keyboard only: undo after a delete selects the row it gives the focus back to, so Delete acts on that row', async ({
   browser,
 }) => {
-  const { page, errors } = await openStage(browser, design())
+  const { page, errors } = await openStage(browser, layersDesign())
   await openLayers(page)
   await row(page, 'Box').click()
   await page.keyboard.press('Delete')
@@ -360,7 +360,7 @@ test('keyboard only: undo after a delete selects the row it gives the focus back
 test('keyboard only: grouping from the tree puts the focus on the new group, and undo on a selected row', async ({
   browser,
 }) => {
-  const { page, errors } = await openStage(browser, design())
+  const { page, errors } = await openStage(browser, layersDesign())
   await openLayers(page)
   await row(page, 'Dot').click()
   await row(page, 'Box').click({ modifiers: ['ControlOrMeta'] })
@@ -390,7 +390,7 @@ test('keyboard only: deleting the only layer and undoing puts the focus back on 
   const only: DesignInput['nodes'] = {
     box: { type: 'graphic', parentId: 'p1', index: 'a0', name: 'Box', props: rect(120, 120, 400, 300, '#E0262BFF') },
   }
-  const { page, errors } = await openStage(browser, { ...design(), nodes: only })
+  const { page, errors } = await openStage(browser, { ...layersDesign(), nodes: only })
   await openLayers(page)
   await row(page, 'Box').click()
   await page.keyboard.press('Delete')
@@ -407,7 +407,7 @@ test('keyboard only: deleting the only layer and undoing puts the focus back on 
 test('keyboard: the tree has one tab stop, the row the focus is on, even when that row is not selected', async ({
   browser,
 }) => {
-  const { page, errors } = await openStage(browser, design())
+  const { page, errors } = await openStage(browser, layersDesign())
   await openLayers(page)
   const stops = () =>
     tree(page)
@@ -433,7 +433,7 @@ test('keyboard: the tree has one tab stop, the row the focus is on, even when th
 })
 
 test('Delete pressed on the canvas after the tree had the focus leaves the focus off the tree', async ({ browser }) => {
-  const { page, errors } = await openStage(browser, design())
+  const { page, errors } = await openStage(browser, layersDesign())
   await openLayers(page)
   await row(page, 'Box').click()
   await expect(row(page, 'Box')).toBeFocused()

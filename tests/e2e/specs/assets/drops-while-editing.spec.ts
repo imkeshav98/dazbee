@@ -7,7 +7,7 @@ import type { DesignInput } from '@dazbee/schema'
 
 import { card1, card2, figmaBadge } from '../../support/assets.ts'
 import { screenPoint, writeOutput } from '../../support/editor.ts'
-import { assetsOf, design, dropFiles, images, routeUploads } from '../../support/file-drops.ts'
+import { assetsOf, dropDesign, dropFiles, images, routeUploads } from '../../support/file-drops.ts'
 import { newBrand } from '../../support/seed.ts'
 import { openStage, props, read } from '../../support/stage.ts'
 import { expect, test } from '../../support/test.ts'
@@ -32,7 +32,7 @@ test('images that finish uploading while a text is typed into end the typing and
       style: { fontFamily: 'Noto Sans', fontSize: 40, color: '#111111FF' },
     },
   }
-  const { page, errors } = await openStage(browser, design({ title }), { brandId })
+  const { page, errors } = await openStage(browser, dropDesign({ title }), { brandId })
   const release = await routeUploads(page, brandId, { hold: true })
   const text = async () =>
     ((await read(page)).nodes as unknown as Record<string, { props: { text: string } }>).title?.props.text
@@ -66,7 +66,7 @@ test('images that finish uploading while a pen path is open go on within a few s
   browser,
 }) => {
   const brandId = await newBrand('e2e dropped files')
-  const { page, errors } = await openStage(browser, design(), { brandId })
+  const { page, errors } = await openStage(browser, dropDesign(), { brandId })
   const release = await routeUploads(page, brandId, { hold: true })
   const paths = async () =>
     Object.entries((await read(page)).nodes as unknown as Record<string, { props: { shape?: { kind: string } } }>)
@@ -126,7 +126,7 @@ test('images that finish uploading while a layer is dragged on the canvas go on 
       fills: [{ type: 'solid', color: '#2F6BFFFF' }],
     },
   }
-  const { page, errors } = await openStage(browser, design({ square }), { brandId })
+  const { page, errors } = await openStage(browser, dropDesign({ square }), { brandId })
   const release = await routeUploads(page, brandId, { hold: true })
   // Where the square is in the square format: a drag on the stage writes that format's override.
   const x = async () => (await props(page, 'square')).x
@@ -165,7 +165,7 @@ test('an SVG file whose format goes while it uploads is not placed, and the noti
   const brandId = await newBrand('e2e dropped files')
   const { page, errors } = await openStage(
     browser,
-    design({}, { formats: { wide: { name: 'Wide', width: 1920, height: 1080, order: 'a1' } } }),
+    dropDesign({}, { formats: { wide: { name: 'Wide', width: 1920, height: 1080, order: 'a1' } } }),
     { brandId },
   )
   await page.evaluate(() => window.dazbee?.setCamera({ x: 40, y: 80, zoom: 0.35 }))

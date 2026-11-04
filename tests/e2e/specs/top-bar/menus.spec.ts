@@ -8,7 +8,7 @@ import { layoutProblems } from '../../support/layout.ts'
 import { nextFrame, openStage, selectLayers } from '../../support/stage.ts'
 import { expect, test } from '../../support/test.ts'
 import { barMenu, moreAction, moreMenu, moreSubmenu, PIECES, UNCUT } from '../../support/top-bar.ts'
-import { design } from '../../support/top-bar-design.ts'
+import { topBarDesign } from '../../support/top-bar-design.ts'
 
 test.describe.configure({ timeout: 240_000 })
 
@@ -16,7 +16,7 @@ test('each kind gets its own top bar; several layers add Line up, Combine for sh
   browser,
 }) => {
   const asset = await upload(photo)
-  const { page, errors } = await openStage(browser, design(asset.id))
+  const { page, errors } = await openStage(browser, topBarDesign(asset.id))
   const items = async (ids: string[]) => {
     await selectLayers(page, ids)
     await nextFrame(page)
@@ -186,7 +186,7 @@ test('text: bold turns on and off as one undo step each, the size steps and take
   browser,
 }) => {
   const asset = await upload(photo)
-  const { page, errors } = await openStage(browser, design(asset.id))
+  const { page, errors } = await openStage(browser, topBarDesign(asset.id))
   // With two formats a change goes to the one shown, as a drag does: Square's own values over the base.
   const style = () =>
     page.evaluate(() => {
@@ -232,7 +232,7 @@ test('a panel closes when another layer is picked or its layer is removed, and t
   browser,
 }) => {
   const asset = await upload(photo)
-  const { page, errors } = await openStage(browser, design(asset.id))
+  const { page, errors } = await openStage(browser, topBarDesign(asset.id))
   await selectLayers(page, ['box'])
   await barMenu(page, 'position')
   await selectLayers(page, ['star'])
@@ -257,7 +257,7 @@ test('undo and redo in the header pill: off with nothing to do, each a step, and
   browser,
 }) => {
   const asset = await upload(photo)
-  const { page, errors } = await openStage(browser, design(asset.id))
+  const { page, errors } = await openStage(browser, topBarDesign(asset.id))
   const undo = page.getByTestId('undo')
   const redo = page.getByTestId('redo')
   await expect(undo).toBeDisabled()
@@ -293,7 +293,7 @@ test('the small menu locks, duplicates and deletes; the full menu copies, pastes
   browser,
 }) => {
   const asset = await upload(photo)
-  const { page, errors } = await openStage(browser, design(asset.id))
+  const { page, errors } = await openStage(browser, topBarDesign(asset.id))
   const nodes = () => page.evaluate(() => Object.keys(window.dazbee?.design().nodes ?? {}).length)
   await page.evaluate(() => localStorage.removeItem('dazbee.copiedLayers'))
   await selectLayers(page, ['box'])
@@ -350,7 +350,7 @@ test('the small menu keeps out of a drag, and over a selection filling a phone i
   browser,
 }) => {
   const asset = await upload(photo)
-  const { page, errors } = await openStage(browser, design(asset.id))
+  const { page, errors } = await openStage(browser, topBarDesign(asset.id))
   const small = page.getByTestId('small-menu')
   await selectLayers(page, ['box'])
   const from = await screenPoint(page, 160, 280)
@@ -381,7 +381,7 @@ test('beside an open Layers flyout the top bar centres in the room left, and a r
   browser,
 }) => {
   const asset = await upload(photo)
-  const { page, errors } = await openStage(browser, design(asset.id))
+  const { page, errors } = await openStage(browser, topBarDesign(asset.id))
   await page.setViewportSize({ width: 1280, height: 760 })
   await page.locator('[data-panel="layers"]').click()
   await selectLayers(page, ['headline'])
@@ -409,7 +409,7 @@ test("the full menu opens clear of the small menu, also flipped at the stage's e
   browser,
 }) => {
   const asset = await upload(photo)
-  const { page, errors } = await openStage(browser, design(asset.id))
+  const { page, errors } = await openStage(browser, topBarDesign(asset.id))
   await page.setViewportSize({ width: 1280, height: 760 })
   await selectLayers(page, ['turned'])
   // The selection by the stage's end edge, so the full menu has no room beside the small menu there.

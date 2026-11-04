@@ -1,5 +1,5 @@
-// The designs the canvas specs open, one page in five formats or a carousel of cards, and opening
-// one at 1440×900.
+// The design builders the canvas specs share: the five formats, one page in all of them, a page's
+// box and headline and the layers under them, and opening a design at 1440×900.
 import { expect, type Page } from '@playwright/test'
 
 import type { DesignInput } from '@dazbee/schema'
@@ -16,7 +16,8 @@ export const FORMATS = {
 }
 const COLORS = ['#FF5A36FF', '#2F6BFFFF', '#FFC400FF', '#1B9E77FF', '#7E57C2FF', '#111111FF']
 
-const merge = (...parts: Pick<DesignInput, 'nodes' | 'overrides'>[]) => {
+/** One design's layers and overrides, joined from parts of it. */
+export const merge = (...parts: Pick<DesignInput, 'nodes' | 'overrides'>[]) => {
   const nodes: DesignInput['nodes'] = {}
   const overrides: Record<string, Record<string, Record<string, unknown>>> = {}
   for (const part of parts) {
@@ -41,33 +42,6 @@ export const fiveFormats = (fill: number): DesignInput => ({
   ...merge(heroes('p1', 'Summer sale'), { nodes: filler('p1', fill) }),
 })
 
-/** A carousel of `cards` pages in five formats. */
-export const carousel = (cards: number): DesignInput => {
-  const pages: DesignInput['pages'] = {}
-  const parts = []
-  for (let i = 0; i < cards; i++) {
-    const id = `c${i}`
-    pages[id] = {
-      name: `Card ${i + 1}`,
-      order: `a${String(i).padStart(2, '0')}`,
-      fills: [{ type: 'solid', color: i % 2 ? '#F2F6FFFF' : '#FFF8F0FF' }],
-    }
-    parts.push(heroes(id, `Card ${i + 1}`), { nodes: filler(id, 10, i * 10) })
-  }
-  return {
-    meta: {
-      schemaVersion: 5,
-      designId: 'replaced-by-the-api',
-      name: 'Carousel',
-      kind: 'carousel',
-      primaryFormatId: 'sq',
-    },
-    formats: FORMATS,
-    pages,
-    ...merge(...parts),
-  }
-}
-
 /** Seeds the design and opens it in the page at 1440×900; its id and the errors the page throws from then on. */
 export async function open(page: Page, design: DesignInput) {
   const id = await seed(design)
@@ -80,7 +54,7 @@ export async function open(page: Page, design: DesignInput) {
 }
 
 /** The box and headline of a page, with the headline placed so every format shows it. */
-function heroes(pageId: string, text: string): Pick<DesignInput, 'nodes' | 'overrides'> {
+export function heroes(pageId: string, text: string): Pick<DesignInput, 'nodes' | 'overrides'> {
   return {
     nodes: {
       [`${pageId}-box`]: {
@@ -139,7 +113,7 @@ function heroes(pageId: string, text: string): Pick<DesignInput, 'nodes' | 'over
 }
 
 /** Filler layers under the box and headline: shapes, translucent and shadowed ones, and short texts. */
-function filler(pageId: string, count: number, seedAt = 0) {
+export function filler(pageId: string, count: number, seedAt = 0) {
   const nodes: DesignInput['nodes'] = {}
   for (let i = 0; i < count; i++) {
     const n = i + seedAt

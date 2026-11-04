@@ -4,7 +4,7 @@
 import type { DesignInput } from '@dazbee/schema'
 
 import { writeOutput } from '../../support/editor.ts'
-import { design, layerIds, openLayers, rect, ROW, row, tabIntoTree, tree } from '../../support/layers-panel.ts'
+import { layerIds, layersDesign, openLayers, rect, ROW, row, tabIntoTree, tree } from '../../support/layers-panel.ts'
 import { PERF, report, spread } from '../../support/perf.ts'
 import { openStage, props, selection } from '../../support/stage.ts'
 import { expect, type Locator, type Page, test } from '../../support/test.ts'
@@ -27,7 +27,7 @@ const threeHundred = (): DesignInput => {
       props: rect(20 + (i % 20) * 52, 20 + Math.floor(i / 20) * 70, 44, 60, i % 2 ? '#14213DFF' : '#FCA311FF'),
     }
   }
-  return { ...design(), nodes }
+  return { ...layersDesign(), nodes }
 }
 
 /**

@@ -2,14 +2,14 @@
 // selection both ways, a layer dragged into a group (the stage redraws it there, one undo step,
 // which redo brings back), rename, lock and hide, all there after a reload.
 import { reloads, writeOutput } from '../../support/editor.ts'
-import { colourAt, design, listed, node, openLayers, ROW, row, tree } from '../../support/layers-panel.ts'
+import { colourAt, layersDesign, listed, node, openLayers, ROW, row, tree } from '../../support/layers-panel.ts'
 import { click, openStage } from '../../support/stage.ts'
 import { expect, test } from '../../support/test.ts'
 
 test.describe.configure({ timeout: 120_000 })
 
 test('the panel and the stage select together; drag into a group, rename, lock and hide', async ({ browser }) => {
-  const { page, errors } = await openStage(browser, design())
+  const { page, errors } = await openStage(browser, layersDesign())
   await openLayers(page)
   expect(await listed(page)).toEqual(['Dot', 'Box', 'Card', 'Backdrop'])
   await expect(row(page, 'Card')).toHaveAttribute('aria-expanded', 'false')

@@ -9,7 +9,7 @@ import { layoutProblems } from '../../support/layout.ts'
 import { openStage, read, selection, selectLayers } from '../../support/stage.ts'
 import { expect, type Page, test } from '../../support/test.ts'
 import { barMenu, moreMenu, moreSubmenu, PIECES, UNCUT } from '../../support/top-bar.ts'
-import { design } from '../../support/top-bar-design.ts'
+import { topBarDesign } from '../../support/top-bar-design.ts'
 
 test.describe.configure({ timeout: 240_000 })
 
@@ -17,7 +17,7 @@ test('Tab reaches the top bar once and the arrows move along it; a panel takes t
   browser,
 }) => {
   const asset = await upload(photo)
-  const { page, errors } = await openStage(browser, design(asset.id))
+  const { page, errors } = await openStage(browser, topBarDesign(asset.id))
   await selectLayers(page, ['box'])
   const bar = page.getByTestId('top-bar')
   await expect(bar.locator('[data-bar-item][tabindex="0"]')).toHaveCount(1)
@@ -50,7 +50,7 @@ test("Esc closes the bar's second row and keeps the selection; the arrows and En
   browser,
 }) => {
   const asset = await upload(photo)
-  const { page, errors } = await openStage(browser, design(asset.id))
+  const { page, errors } = await openStage(browser, topBarDesign(asset.id))
   await page.setViewportSize({ width: 820, height: 1180 })
   await selectLayers(page, ['headline'])
   const more = page.getByTestId('bar-overflow')
@@ -74,7 +74,7 @@ test('the size field steps with the arrows; a pop-up closes when the window chan
   browser,
 }) => {
   const asset = await upload(photo)
-  const { page, errors } = await openStage(browser, design(asset.id))
+  const { page, errors } = await openStage(browser, topBarDesign(asset.id))
   const size = () =>
     page.evaluate(() => {
       const d = window.dazbee?.design()
@@ -108,7 +108,7 @@ test('⋯ on the top bar leaves an open panel open, and Esc closes the panel fir
   browser,
 }) => {
   const asset = await upload(photo)
-  const { page, errors } = await openStage(browser, design(asset.id))
+  const { page, errors } = await openStage(browser, topBarDesign(asset.id))
   await page.setViewportSize({ width: 820, height: 1180 })
   await selectLayers(page, ['headline'])
   await barMenu(page, 'font')

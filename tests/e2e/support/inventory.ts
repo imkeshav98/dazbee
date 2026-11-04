@@ -74,7 +74,7 @@ export const style = async (page: Page, id: string) => (await props(page, id)).s
 export const fills = async (page: Page, id: string) => (await props(page, id)).fills ?? []
 
 /** SHA-256 of the Square's PNG export, which waits for every image and font it draws. */
-export const picture = (page: Page) =>
+const picture = (page: Page) =>
   page.evaluate(async () => {
     const file = await window.dazbee?.exportFiles({ pageIds: ['p1'], formatIds: ['sq'], type: 'png' })
     if (!file) throw new Error('no editor')

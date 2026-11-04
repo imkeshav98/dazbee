@@ -8,7 +8,7 @@ import { seed } from '../../support/seed.ts'
 import { nextFrame, openStage, selectLayers } from '../../support/stage.ts'
 import { expect, test } from '../../support/test.ts'
 import { barMenu, PIECES, UNCUT } from '../../support/top-bar.ts'
-import { design } from '../../support/top-bar-design.ts'
+import { topBarDesign } from '../../support/top-bar-design.ts'
 
 test.describe.configure({ timeout: 240_000 })
 
@@ -16,7 +16,7 @@ test('on a phone a panel is a sheet that hides the tab bar and dock, and it and 
   browser,
 }) => {
   const asset = await upload(photo)
-  const { page, errors } = await openStage(browser, design(asset.id))
+  const { page, errors } = await openStage(browser, topBarDesign(asset.id))
   await page.setViewportSize({ width: 390, height: 844 })
   await selectLayers(page, ['box'])
   await expect(page.locator('[data-zoom]')).toBeHidden()
@@ -45,7 +45,7 @@ test('in Arabic the edit panel opens at the start of the screen, which is its en
   browser,
 }) => {
   const asset = await upload(photo)
-  const designId = await seed(design(asset.id))
+  const designId = await seed(topBarDesign(asset.id))
   const context = await browser.newContext({ viewport: { width: 1280, height: 760 } })
   const page = await context.newPage()
   await setCookies(page, { locale: 'ar' })
@@ -74,7 +74,7 @@ test("at tablet size with a flyout open, the bar's second row and its pop-ups an
   browser,
 }) => {
   const asset = await upload(photo)
-  const { page, errors } = await openStage(browser, design(asset.id))
+  const { page, errors } = await openStage(browser, topBarDesign(asset.id))
   await page.setViewportSize({ width: 820, height: 1180 })
   await page.locator('[data-panel="layers"]').click()
   await selectLayers(page, ['headline'])

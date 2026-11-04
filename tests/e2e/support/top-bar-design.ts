@@ -18,7 +18,7 @@ const rect = (
   props: { x, y, width: 200, height: 160, shape: { kind: 'rect' as const }, fills: solid('#14213DFF'), ...extra },
 })
 
-export const design = (assetId: string): DesignInput => ({
+export const topBarDesign = (assetId: string): DesignInput => ({
   meta: { schemaVersion: 5, designId: 'replaced-by-the-api', name: 'Top bar', kind: 'single', primaryFormatId: 'sq' },
   formats: {
     sq: { name: 'Square', width: 1080, height: 1080, order: 'a0' },

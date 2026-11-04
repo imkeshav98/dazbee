@@ -17,7 +17,7 @@ export const rect = (x: number, y: number, width: number, height: number, color:
   fills: [{ type: 'solid' as const, color }],
 })
 
-export const design = (): DesignInput => ({
+export const layersDesign = (): DesignInput => ({
   meta: {
     schemaVersion: 5,
     designId: 'replaced-by-the-api',

@@ -7,7 +7,7 @@ import type { DesignInput } from '@dazbee/schema'
 
 import { card1, card2, card3, figmaBadge } from '../../support/assets.ts'
 import { screenPoint, writeOutput } from '../../support/editor.ts'
-import { assetsOf, design, dropFiles, images, routeUploads } from '../../support/file-drops.ts'
+import { assetsOf, dropDesign, dropFiles, images, routeUploads } from '../../support/file-drops.ts'
 import { newBrand } from '../../support/seed.ts'
 import { openStage, read, selection } from '../../support/stage.ts'
 import { expect, type Page, test } from '../../support/test.ts'
@@ -61,7 +61,7 @@ test('an image dropped from the computer on the asset library uploads once and s
   browser,
 }) => {
   const brandId = await newBrand('e2e dropped files')
-  const { page, errors } = await openStage(browser, design(), { brandId })
+  const { page, errors } = await openStage(browser, dropDesign(), { brandId })
   const uploads = watchUploads(page, brandId)
   await page.locator('[data-panel="assets"]').click()
   const library = page.getByTestId('asset-library')
@@ -95,7 +95,7 @@ test('an image dropped from the computer on the canvas uploads once and is place
   browser,
 }) => {
   const brandId = await newBrand('e2e dropped files')
-  const { page, errors } = await openStage(browser, design(), { brandId })
+  const { page, errors } = await openStage(browser, dropDesign(), { brandId })
   const uploads = watchUploads(page, brandId)
 
   const name = `Dropped ${randomUUID().slice(0, 8)}`
@@ -126,7 +126,7 @@ test('several images dropped on the canvas upload once each and go on cascading 
   browser,
 }) => {
   const brandId = await newBrand('e2e dropped files')
-  const { page, errors } = await openStage(browser, design(), { brandId })
+  const { page, errors } = await openStage(browser, dropDesign(), { brandId })
   const uploads = watchUploads(page, brandId)
 
   const names = [`Dropped ${randomUUID().slice(0, 8)}`, `Dropped ${randomUUID().slice(0, 8)}`]
@@ -166,7 +166,7 @@ test('an image dropped with a text file on a frame in the second format lights t
   const brandId = await newBrand('e2e dropped files')
   const { page, errors } = await openStage(
     browser,
-    design({ box }, { formats: { wide: { name: 'Wide', width: 1920, height: 1080, order: 'a1' } } }),
+    dropDesign({ box }, { formats: { wide: { name: 'Wide', width: 1920, height: 1080, order: 'a1' } } }),
     { brandId },
   )
   // Both formats in view, clear of the cards on the right.
@@ -210,7 +210,7 @@ test('a file that is not an image is left out with a notice, while the image dro
   browser,
 }) => {
   const brandId = await newBrand('e2e dropped files')
-  const { page, errors } = await openStage(browser, design(), { brandId })
+  const { page, errors } = await openStage(browser, dropDesign(), { brandId })
   const uploads = watchUploads(page, brandId)
 
   // A photo of its own at each size: the library keeps one asset for the same bytes.
@@ -259,7 +259,7 @@ test('images dropped on the second page at another zoom go where they were dropp
   const brandId = await newBrand('e2e dropped files')
   const { page, errors } = await openStage(
     browser,
-    design({}, { pages: { p2: { name: 'Page 2', order: 'a1', fills: [{ type: 'solid', color: '#FFF8F0FF' }] } } }),
+    dropDesign({}, { pages: { p2: { name: 'Page 2', order: 'a1', fills: [{ type: 'solid', color: '#FFF8F0FF' }] } } }),
     { brandId },
   )
   await page.evaluate(() => window.dazbee?.setCamera({ x: 60, y: 60, zoom: 0.4 }))
@@ -305,7 +305,7 @@ test('files that don’t upload are each named with why, beside the file left ou
   browser,
 }) => {
   const brandId = await newBrand('e2e dropped files')
-  const { page, errors } = await openStage(browser, design(), { brandId })
+  const { page, errors } = await openStage(browser, dropDesign(), { brandId })
   await routeUploads(page, brandId)
 
   const name = `Dropped ${randomUUID().slice(0, 8)}`
@@ -333,7 +333,7 @@ test('an SVG file dropped on the canvas uploads once, goes on as layers centred 
   browser,
 }) => {
   const brandId = await newBrand('e2e dropped files')
-  const { page, errors } = await openStage(browser, design(), { brandId })
+  const { page, errors } = await openStage(browser, dropDesign(), { brandId })
   const uploads = watchUploads(page, brandId)
   await page.locator('[data-panel="assets"]').click()
   const library = page.getByTestId('asset-library')
