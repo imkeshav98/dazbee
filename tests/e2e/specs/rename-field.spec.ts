@@ -12,7 +12,8 @@ import { expect, type Locator, type Page, test } from '../support/test.ts'
 
 test.describe.configure({ timeout: 120_000 })
 
-const SIZES = [
+/** The screen sizes the @evidence tests run at. */
+const SCREENS = [
   [1280, 760],
   [820, 1180],
   [390, 844],
@@ -92,6 +93,8 @@ interface Subject {
   name: (page: Page) => Promise<string | null | undefined>
   /** Whether undo and redo reach the name: the design's name is the library's, outside the document. */
   undoable: boolean
+  /** What takes the focus back when the field ends from the keyboard, for a field that gives it back. */
+  keyFocus?: (page: Page) => Locator
 }
 
 /** The four fields, in the order they appear on screen: the header, the rail, the bottom. */
@@ -137,6 +140,7 @@ const SUBJECTS: Subject[] = [
     },
     name: async (page) => (await stored(page)).nodes.box?.name,
     undoable: true,
+    keyFocus: (page) => page.getByRole('tree').locator('[data-layer="box"]'),
   },
   {
     id: 'page',
@@ -155,14 +159,7 @@ const SUBJECTS: Subject[] = [
   },
 ]
 
-const subject = (id: string) => {
-  const found = SUBJECTS.find((s) => s.id === id)
-  if (!found) throw new Error(`no subject ${id}`)
-  return found
-}
-
-for (const id of ['size', 'page']) {
-  const s = subject(id)
+for (const s of SUBJECTS.filter(({ id }) => id === 'size' || id === 'page')) {
   test(`a ${s.id}'s name: Enter, then a blur before the field closes, renames it once, as one undo step`, async ({
     browser,
   }) => {
@@ -192,7 +189,7 @@ for (const id of ['size', 'page']) {
   })
 }
 
-for (const [width, height] of SIZES) {
+for (const [width, height] of SCREENS) {
   for (const s of SUBJECTS) {
     test(
       `at ${width}×${height} the ${s.id} name field: Enter, Escape, Escape then blur, Tab, Enter then blur, undo and redo`,
@@ -227,6 +224,7 @@ for (const [width, height] of SIZES) {
         await closed()
         await expect.poll(() => s.name(page)).toBe('Spring offer')
         focus.enter = await focusOf(page)
+        if (s.keyFocus) await expect(s.keyFocus(page)).toBeFocused()
         await shot('2-enter')
         // Undo brings the old name back and redo the new one, each in one step.
         if (s.undoable) {
@@ -252,6 +250,7 @@ for (const [width, height] of SIZES) {
         await expect.poll(() => s.name(page)).toBe('Spring offer')
         expect(sentWith('Never kept')).toBe(0)
         focus.escape = await focusOf(page)
+        if (s.keyFocus) await expect(s.keyFocus(page)).toBeFocused()
         await shot('3-escape')
 
         // Escape, then a blur before the field closes: the old name stays.
