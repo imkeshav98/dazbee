@@ -237,8 +237,11 @@ test('a gradient stop removed while it is dragged ends the drag and its undo ste
   expect(await offsets()).toEqual(left)
   await expect.poll(() => page.evaluate(() => window.dazbee?.gesturing())).toBe(false)
 
-  // The last stop, with a third stop again, the pointer let go away from the bar.
-  await page.mouse.click(bar.x + bar.width * 0.5, bar.y + bar.height / 2)
+  // The last stop, with a third stop again, the pointer let go away from the bar. The bar is
+  // measured again: the panel may have moved since.
+  const now = await editor.getByTestId('gradient-bar').boundingBox()
+  if (!now) throw new Error('no bar')
+  await page.mouse.click(now.x + now.width * 0.5, now.y + now.height / 2)
   await expect.poll(stops).toBe(3)
   const last = await editor.locator('[data-stop="2"]').boundingBox()
   if (!last) throw new Error('no stop')

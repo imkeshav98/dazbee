@@ -355,14 +355,10 @@ test('an ad built in one frame, duplicated and added at 4 more sizes, exports ev
       svgInChromium: Number(vectorDifference(cpu, chromium).toFixed(3)),
     }
     result.vectorPercentDiffering = vector
+    writeOutput(`exit-check-4-${i + 1}-cpu.png`, Buffer.from(encodePng(ck, cpu)))
     writeOutput(`exit-check-4-${i + 1}-pdf.png`, Buffer.from(encodePng(ck, pdf)))
     writeOutput(`exit-check-4-${i + 1}-svg.png`, Buffer.from(encodePng(ck, svg)))
     writeOutput(`exit-check-4-${i + 1}-svg-chromium.png`, Buffer.from(encodePng(ck, chromium)))
-    expect(vector.svgInChromium, `${frameId} SVG drawn by Chromium, % of pixels differing`).toBeLessThanOrEqual(
-      EXIT_VECTOR_LIMIT,
-    )
-    expect(vector.pdf, `${frameId} PDF, % of pixels differing`).toBeLessThanOrEqual(EXIT_VECTOR_LIMIT)
-    expect(vector.svg, `${frameId} SVG, % of pixels differing`).toBeLessThanOrEqual(EXIT_VECTOR_LIMIT)
     results.push(result)
   }
   pdfium.destroy()
@@ -370,6 +366,18 @@ test('an ad built in one frame, duplicated and added at 4 more sizes, exports ev
     'exit-check.json',
     JSON.stringify({ design: final.meta.name, layers: Object.keys(final.nodes).length, frames: results }, null, 2),
   )
+  for (const { name, size, vectorPercentDiffering } of results as {
+    name: string
+    size: string
+    vectorPercentDiffering: { pdf: number; svg: number; svgInChromium: number }
+  }[]) {
+    const { pdf, svg, svgInChromium } = vectorPercentDiffering
+    expect
+      .soft(svgInChromium, `${name} ${size} SVG drawn by Chromium, % of pixels differing`)
+      .toBeLessThanOrEqual(EXIT_VECTOR_LIMIT)
+    expect.soft(pdf, `${name} ${size} PDF, % of pixels differing`).toBeLessThanOrEqual(EXIT_VECTOR_LIMIT)
+    expect.soft(svg, `${name} ${size} SVG, % of pixels differing`).toBeLessThanOrEqual(EXIT_VECTOR_LIMIT)
+  }
   expect(errors).toEqual([])
   await context.close()
   const video = await page.video()?.path()

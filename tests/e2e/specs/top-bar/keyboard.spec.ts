@@ -7,12 +7,25 @@ import type { DesignInput } from '@dazbee/schema'
 import { photo, upload } from '../../support/assets.ts'
 import { layoutProblems } from '../../support/layout.ts'
 import { frameDesign } from '../../support/seed.ts'
-import { openStage, read, selection, selectLayers } from '../../support/stage.ts'
+import { nextFrame, openStage, read, selection, selectLayers } from '../../support/stage.ts'
 import { expect, type Page, test } from '../../support/test.ts'
 import { barMenu, moreMenu, moreSubmenu, PIECES, UNCUT } from '../../support/top-bar.ts'
 import { topBarDesign } from '../../support/top-bar-design.ts'
 
 test.describe.configure({ timeout: 240_000 })
+
+/**
+ * Narrows the window from a tablet's 820 px, 20 px at a time down to 640, until the bar of the
+ * selection has more items than fit and so a second row behind its ⋯. Returns the width.
+ */
+async function narrowUntilSecondRow(page: Page) {
+  for (let width = 820; width >= 640; width -= 20) {
+    await page.setViewportSize({ width, height: 1180 })
+    await nextFrame(page)
+    if (await page.getByTestId('bar-overflow').isVisible()) return width
+  }
+  throw new Error('the bar fits in one row at every tablet width')
+}
 
 test('Tab reaches the top bar once and the arrows move along it; a panel takes the focus, Esc gives it back, and a second Esc clears the selection', async ({
   browser,
@@ -54,6 +67,7 @@ test("Esc closes the bar's second row and keeps the selection; the arrows and En
   const { page, errors } = await openStage(browser, topBarDesign(asset.id))
   await page.setViewportSize({ width: 820, height: 1180 })
   await selectLayers(page, ['headline'])
+  await narrowUntilSecondRow(page)
   const more = page.getByTestId('bar-overflow')
   await expect(more).toBeVisible()
   const row = page.getByTestId('top-bar-row')
@@ -109,6 +123,7 @@ test('⋯ on the top bar leaves an open panel open, and Esc closes the panel fir
   const { page, errors } = await openStage(browser, topBarDesign(asset.id))
   await page.setViewportSize({ width: 820, height: 1180 })
   await selectLayers(page, ['headline'])
+  await narrowUntilSecondRow(page)
   await barMenu(page, 'font')
   await page.getByTestId('bar-overflow').click()
   await expect(page.getByTestId('top-bar-overflow')).toBeVisible()

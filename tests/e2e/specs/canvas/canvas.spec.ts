@@ -187,7 +187,8 @@ test.describe('pages of frames', () => {
         const { page, errors } = await openStage(browser, pages())
         await page.setViewportSize({ width, height })
         await fitSettled(page)
-        await expect(page.locator('.frame-label')).toHaveCount(5)
+        const shown = () => page.evaluate(() => window.dazbee?.frames().map((frame) => frame.key))
+        expect(await shown()).toEqual(['sq', 'story', 'land', 'mpu', 'leader'])
         await shot(page, '2-linked-frames')
         // A layer selected in one frame; its copies stay as they are.
         await selectLayers(page, ['p1-headline'], { bar: true })
@@ -200,7 +201,7 @@ test.describe('pages of frames', () => {
         await expect(panel).toBeHidden()
         await page.evaluate(() => window.dazbee?.showPage('p2'))
         await fitSettled(page)
-        await expect(page.locator('.frame-label')).toHaveCount(1)
+        expect(await shown()).toEqual(['p2-sq'])
         await shot(page, '5-second-page')
         await page.evaluate(() => window.dazbee?.showPage('p3'))
         await fitSettled(page)
