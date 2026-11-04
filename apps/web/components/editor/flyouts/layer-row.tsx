@@ -20,11 +20,12 @@ import {
   TextTIcon,
   UniteIcon,
 } from '@phosphor-icons/react'
-import { type DragEvent, type KeyboardEvent, memo, useRef, useState } from 'react'
+import { type DragEvent, type KeyboardEvent, memo } from 'react'
 
 import { type Design, LOCK_FLAGS } from '@dazbee/schema'
 
 import { DROP_LINE, LAYER_PICTURE, LAYER_PICTURE_PICKED } from '@/components/editor/styles.ts'
+import { RenameField } from '@/components/ui/rename-field.tsx'
 import { cn } from '@/lib/cn.ts'
 import { useMessages } from '@/lib/i18n/client.tsx'
 import { format } from '@/lib/i18n/index.ts'
@@ -201,6 +202,9 @@ export const LayerRow = memo(function LayerRow({
         <RenameField
           name={node.name}
           label={format(t.editor.layersPanel.rename, { name: node.name })}
+          inputName="layer-name"
+          maxLength={120}
+          className="h-6 min-w-0 flex-1 rounded-row border border-accent bg-raised px-1.5 text-[13px] outline-none"
           onDone={(name, byKey) => api.renamed(id, name, node.name, byKey)}
         />
       ) : (
@@ -237,48 +241,6 @@ export const LayerRow = memo(function LayerRow({
     </div>
   )
 })
-
-/**
- * The name as a field: Enter or leaving it keeps the new name, Escape keeps the old one. `onDone`
- * hears whether it ended from the keyboard.
- */
-function RenameField({
-  name,
-  label,
-  onDone,
-}: {
-  name: string
-  label: string
-  onDone: (name: string | null, byKey: boolean) => void
-}) {
-  const [value, setValue] = useState(name)
-  const done = useRef(false)
-  const finish = (next: string | null, byKey: boolean) => {
-    if (done.current) return
-    done.current = true
-    onDone(next, byKey)
-  }
-  return (
-    <input
-      name="layer-name"
-      // Focused as it opens: the person asked to rename this layer.
-      autoFocus
-      aria-label={label}
-      value={value}
-      maxLength={120}
-      onChange={(event) => setValue(event.target.value)}
-      onFocus={(event) => event.currentTarget.select()}
-      onClick={(event) => event.stopPropagation()}
-      onKeyDown={(event) => {
-        event.stopPropagation()
-        if (event.key === 'Enter') finish(value, true)
-        else if (event.key === 'Escape') finish(null, true)
-      }}
-      onBlur={() => finish(value, false)}
-      className="h-6 min-w-0 flex-1 rounded-row border border-accent bg-raised px-1.5 text-[13px] outline-none"
-    />
-  )
-}
 
 /** Lock or hide on a row: shown while the row is hovered or focused, and always while it is on. `onToggle` hears whether Alt was held. */
 function RowToggle({

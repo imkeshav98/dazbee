@@ -12,6 +12,7 @@ import { type Design, FORMAT_PRESETS, inOrder } from '@dazbee/schema'
 
 import { PanelFrame } from '@/components/editor/edit-panel/edit-panel.tsx'
 import { FOCUS_RING } from '@/components/ui/looks.ts'
+import { RenameField } from '@/components/ui/rename-field.tsx'
 import { cn } from '@/lib/cn.ts'
 import { shortSizeOf, sizeOf } from '@/lib/editor/size.ts'
 import { useMessages } from '@/lib/i18n/client.tsx'
@@ -88,9 +89,9 @@ function SizeList({ editor, onRemoved }: { editor: Editor; onRemoved: (message: 
   const formats = inOrder(design.formats)
   const background = backgroundOf(design)
   const [renaming, setRenaming] = useState<string | null>(null)
-  const rename = (id: string, name: string) => {
+  const rename = (id: string, name: string | null) => {
     setRenaming(null)
-    const trimmed = name.trim()
+    const trimmed = name?.trim()
     if (trimmed && trimmed !== design.formats[id]?.name) run('format.update', { id, name: trimmed })
   }
   return (
@@ -112,19 +113,12 @@ function SizeList({ editor, onRemoved }: { editor: Editor; onRemoved: (message: 
             </span>
             <span className="flex min-w-0 flex-1 flex-col">
               {renaming === id ? (
-                <input
-                  name="format-name"
-                  aria-label={f.rename}
-                  defaultValue={size.name}
-                  autoFocus
-                  onFocus={(e) => e.currentTarget.select()}
-                  onBlur={(e) => rename(id, e.currentTarget.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') rename(id, e.currentTarget.value)
-                    if (e.key === 'Escape') setRenaming(null)
-                    e.stopPropagation()
-                  }}
+                <RenameField
+                  name={size.name}
+                  label={f.rename}
+                  inputName="format-name"
                   className="h-6 min-w-0 rounded-[6px] border border-accent bg-surface px-1.5 text-[13px] outline-none"
+                  onDone={(name) => rename(id, name)}
                 />
               ) : (
                 <button
