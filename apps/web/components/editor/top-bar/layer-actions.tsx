@@ -23,79 +23,6 @@ import { dirOf, format } from '@/lib/i18n/index.ts'
 
 import { useMenuFocus } from './bar-popover.tsx'
 
-/** The six ways to line up the selection, as icons: left, centre, right, top, middle, bottom. */
-export function AlignRow({ editor }: { editor: Editor }) {
-  const t = useMessages()
-  return (
-    <div dir="ltr" role="group" aria-label={t.editor.arrange.align} className="grid grid-cols-6 gap-0.5">
-      {ALIGN.map(({ action, icon: Icon }) => (
-        <button
-          key={action}
-          type="button"
-          aria-label={t.editor.arrange[action]}
-          title={format(t.editor.arrange.withKey, { label: t.editor.arrange[action], key: keyOf(action) })}
-          data-action={action}
-          onClick={() => editor.perform(action)}
-          className={ICON_BUTTON}
-        >
-          <Icon size={16} aria-hidden />
-        </button>
-      ))}
-    </div>
-  )
-}
-
-/** A row of the menu that opens a short menu beside it: Enter or the arrow towards it opens it, the arrow back or Esc closes it. */
-function SubMenu({ label, testId, children }: { label: string; testId: string; children: ReactNode }) {
-  const [open, setOpen] = useState(false)
-  const rtl = dirOf(useLocale()) === 'rtl'
-  const [toward, back] = rtl ? ['ArrowLeft', 'ArrowRight'] : ['ArrowRight', 'ArrowLeft']
-  const focus = useMenuFocus()
-  return (
-    <Popover.Root open={open} onOpenChange={setOpen}>
-      <Popover.Trigger asChild>
-        <button
-          ref={focus.button}
-          type="button"
-          aria-haspopup="dialog"
-          data-testid={`more-${testId}`}
-          onKeyDown={(event) => {
-            if (event.key !== toward) return
-            event.preventDefault()
-            setOpen(true)
-          }}
-          className={MENU_ITEM}
-        >
-          {label}
-          <CaretRightIcon size={12} weight="bold" aria-hidden className="text-subtle rtl:-scale-x-100" />
-        </button>
-      </Popover.Trigger>
-      <Popover.Portal>
-        <Popover.Content
-          side={rtl ? 'left' : 'right'}
-          align="start"
-          sideOffset={8}
-          collisionPadding={12}
-          // A click elsewhere, Esc or the arrow back closes it; focus moving as the menu opens does not.
-          onFocusOutside={(event) => event.preventDefault()}
-          {...focus.content}
-          aria-label={label}
-          data-testid={`more-${testId}-menu`}
-          onKeyDown={(event) => {
-            if (event.key !== back) return
-            event.preventDefault()
-            setOpen(false)
-          }}
-          className={cn(MENU, 'min-w-52')}
-        >
-          {focus.back}
-          {children}
-        </Popover.Content>
-      </Popover.Portal>
-    </Popover.Root>
-  )
-}
-
 /** The four moves along the stack: to the front, forward, backward, to the back. */
 export const ORDER = ['bringToFront', 'bringForward', 'sendBackward', 'sendToBack'] as const
 
@@ -278,6 +205,79 @@ export function StageMenu({
           className={cn(MENU, 'max-h-[var(--radix-popover-content-available-height)] w-80 overflow-y-auto')}
         >
           <LayerActions editor={editor} ids={ids} onDone={onClose} />
+        </Popover.Content>
+      </Popover.Portal>
+    </Popover.Root>
+  )
+}
+
+/** The six ways to line up the selection, as icons: left, centre, right, top, middle, bottom. */
+export function AlignRow({ editor }: { editor: Editor }) {
+  const t = useMessages()
+  return (
+    <div dir="ltr" role="group" aria-label={t.editor.arrange.align} className="grid grid-cols-6 gap-0.5">
+      {ALIGN.map(({ action, icon: Icon }) => (
+        <button
+          key={action}
+          type="button"
+          aria-label={t.editor.arrange[action]}
+          title={format(t.editor.arrange.withKey, { label: t.editor.arrange[action], key: keyOf(action) })}
+          data-action={action}
+          onClick={() => editor.perform(action)}
+          className={ICON_BUTTON}
+        >
+          <Icon size={16} aria-hidden />
+        </button>
+      ))}
+    </div>
+  )
+}
+
+/** A row of the menu that opens a short menu beside it: Enter or the arrow towards it opens it, the arrow back or Esc closes it. */
+function SubMenu({ label, testId, children }: { label: string; testId: string; children: ReactNode }) {
+  const [open, setOpen] = useState(false)
+  const rtl = dirOf(useLocale()) === 'rtl'
+  const [toward, back] = rtl ? ['ArrowLeft', 'ArrowRight'] : ['ArrowRight', 'ArrowLeft']
+  const focus = useMenuFocus()
+  return (
+    <Popover.Root open={open} onOpenChange={setOpen}>
+      <Popover.Trigger asChild>
+        <button
+          ref={focus.button}
+          type="button"
+          aria-haspopup="dialog"
+          data-testid={`more-${testId}`}
+          onKeyDown={(event) => {
+            if (event.key !== toward) return
+            event.preventDefault()
+            setOpen(true)
+          }}
+          className={MENU_ITEM}
+        >
+          {label}
+          <CaretRightIcon size={12} weight="bold" aria-hidden className="text-subtle rtl:-scale-x-100" />
+        </button>
+      </Popover.Trigger>
+      <Popover.Portal>
+        <Popover.Content
+          side={rtl ? 'left' : 'right'}
+          align="start"
+          sideOffset={8}
+          collisionPadding={12}
+          // A click elsewhere, Esc or the arrow back closes it; focus moving as the menu opens does not.
+          onFocusOutside={(event) => event.preventDefault()}
+          {...focus.content}
+          aria-label={label}
+          data-testid={`more-${testId}-menu`}
+          onKeyDown={(event) => {
+            if (event.key !== back) return
+            event.preventDefault()
+            setOpen(false)
+          }}
+          className={cn(MENU, 'min-w-52')}
+        >
+          {focus.back}
+          {children}
         </Popover.Content>
       </Popover.Portal>
     </Popover.Root>

@@ -1,14 +1,14 @@
 // The solid colours a design already uses, in its pages' and layers' fills, outlines and text, each
 // once, as #RRGGBB in the order they are found: the Colour panel's "In this design" row.
 
-/** How many fit the row, two lines in a panel. */
-export const DESIGN_COLOURS_SHOWN = 14
-
 type Paint = { type: string; color?: string }
 type Shape = {
   pages: Record<string, { fills?: readonly unknown[] }>
   nodes: Record<string, { props: object }>
 }
+
+/** How many fit the row, two lines in a panel. */
+export const DESIGN_COLOURS_SHOWN = 14
 
 export function designColours(design: Shape): string[] {
   const found = new Set<string>()

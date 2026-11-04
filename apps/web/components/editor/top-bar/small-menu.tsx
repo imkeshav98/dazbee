@@ -31,13 +31,13 @@ import { dirOf, format } from '@/lib/i18n/index.ts'
 import { arrowAlong, useMenuFocus, useRovingTab } from './bar-popover.tsx'
 import { LayerActions } from './layer-actions.tsx'
 
+type Place = { left: number; top: number }
+type Box = { left: number; top: number; right: number; bottom: number }
+
 /** Pixels between the selection and the menu, clear of the turn handles round its corners. */
 const GAP = 28
 /** Pixels kept between the menu and anything it keeps off. */
 const CLEAR = 8
-
-type Place = { left: number; top: number }
-type Box = { left: number; top: number; right: number; bottom: number }
 
 /**
  * `value` kept between `low` and `high`. When `low` is above `high`, as on a phone narrower than the

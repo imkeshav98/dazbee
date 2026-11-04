@@ -6,13 +6,6 @@ import { type AssetSummary, isVectorAsset } from '@dazbee/schema'
 
 export type Placeable = Pick<AssetSummary, 'id' | 'name' | 'width' | 'height' | 'contentType'>
 
-/** An SVG asset's markup. */
-async function svgOf(brandId: string, assetId: string): Promise<string> {
-  const response = await fetch(`/brands/${encodeURIComponent(brandId)}/assets/${encodeURIComponent(assetId)}`)
-  if (!response.ok) throw new Error(`the SVG didn't load (${response.status})`)
-  return response.text()
-}
-
 /** Places the asset centred at `client`, or in the middle of the frame in view. */
 export function placeAsset(editor: Editor, brandId: string, asset: Placeable, client?: Point) {
   if (!isVectorAsset(asset)) {
@@ -24,4 +17,11 @@ export function placeAsset(editor: Editor, brandId: string, asset: Placeable, cl
     (text) => editor.placeSvg(text, asset.name || 'SVG', client),
     () => undefined,
   )
+}
+
+/** An SVG asset's markup. */
+async function svgOf(brandId: string, assetId: string): Promise<string> {
+  const response = await fetch(`/brands/${encodeURIComponent(brandId)}/assets/${encodeURIComponent(assetId)}`)
+  if (!response.ok) throw new Error(`the SVG didn't load (${response.status})`)
+  return response.text()
 }

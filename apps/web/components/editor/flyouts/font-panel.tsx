@@ -19,6 +19,8 @@ import { cn } from '@/lib/cn.ts'
 import { useMessages } from '@/lib/i18n/client.tsx'
 import { format } from '@/lib/i18n/index.ts'
 
+const GROUPS = ['upload', 'google', 'builtin'] as const
+
 /** The one value every entry has, or null. */
 const same = <T,>(values: T[]) => (values.every((v) => v === values[0]) ? (values[0] ?? null) : null)
 
@@ -164,8 +166,6 @@ export function FontChooser({
     </div>
   )
 }
-
-const GROUPS = ['upload', 'google', 'builtin'] as const
 
 function FontList({
   id,

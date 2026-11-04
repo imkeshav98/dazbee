@@ -13,16 +13,6 @@ import { getWorkspace, listBrands, updateWorkspace } from '@/lib/server/api.ts'
 
 export const dynamic = 'force-dynamic'
 
-/** A short note that a section's change was saved. */
-function Saved({ label }: { label: string }) {
-  return (
-    <span role="status" className="inline-flex items-center gap-1.5 text-sm text-muted">
-      <CheckIcon size={16} weight="bold" aria-hidden className="text-success" />
-      {label}
-    </span>
-  )
-}
-
 export default async function SettingsPage({ searchParams }: { searchParams: Promise<{ saved?: string }> }) {
   const { saved } = await searchParams
   const [t, workspace, brands] = await Promise.all([getMessages(), getWorkspace(), listBrands()])
@@ -88,5 +78,15 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
         </section>
       </div>
     </LibraryShell>
+  )
+}
+
+/** A short note that a section's change was saved. */
+function Saved({ label }: { label: string }) {
+  return (
+    <span role="status" className="inline-flex items-center gap-1.5 text-sm text-muted">
+      <CheckIcon size={16} weight="bold" aria-hidden className="text-success" />
+      {label}
+    </span>
   )
 }

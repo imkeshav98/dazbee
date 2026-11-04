@@ -13,23 +13,6 @@ import { format } from '@/lib/i18n/index.ts'
 
 type Step = 'menu' | 'rename' | 'delete'
 
-function Submit({ label, danger = false }: { label: string; danger?: boolean }) {
-  const { pending } = useFormStatus()
-  return (
-    <button
-      type="submit"
-      disabled={pending}
-      className={cn(
-        buttonStyles({ variant: danger ? 'secondary' : 'primary' }),
-        'h-8 px-3 font-semibold',
-        danger && 'border-danger/60 text-danger hover:border-danger hover:bg-danger/10',
-      )}
-    >
-      {label}
-    </button>
-  )
-}
-
 export function TileMenu({
   name,
   rename,
@@ -153,5 +136,22 @@ export function TileMenu({
         </form>
       )}
     </div>
+  )
+}
+
+function Submit({ label, danger = false }: { label: string; danger?: boolean }) {
+  const { pending } = useFormStatus()
+  return (
+    <button
+      type="submit"
+      disabled={pending}
+      className={cn(
+        buttonStyles({ variant: danger ? 'secondary' : 'primary' }),
+        'h-8 px-3 font-semibold',
+        danger && 'border-danger/60 text-danger hover:border-danger hover:bg-danger/10',
+      )}
+    >
+      {label}
+    </button>
   )
 }

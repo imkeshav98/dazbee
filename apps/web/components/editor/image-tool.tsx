@@ -22,9 +22,136 @@ import { ASSET_ACCEPT, IMAGE_ACCEPT, sendAsset } from '@/lib/upload-asset.ts'
 
 import { ASSET_TILE, dockTool, POPOVER } from './styles.ts'
 
+const PANEL = cn(POPOVER, 'flex max-h-[min(26rem,60dvh)] w-72 flex-col')
+
 const base = (brandId: string) => `/brands/${encodeURIComponent(brandId)}/assets`
 
-const PANEL = cn(POPOVER, 'flex max-h-[min(26rem,60dvh)] w-72 flex-col')
+/** The image tool's dock button and its picker, open while the tool waits for an image. */
+export function ImageTool({
+  brandId,
+  active,
+  open,
+  onPress,
+  onPick,
+  onClose,
+}: {
+  brandId: string
+  /** The image tool is the one in use. */
+  active: boolean
+  /** The picker shows: the tool is in use and has no image to place yet. */
+  open: boolean
+  onPress: () => void
+  onPick: (asset: Placeable) => void
+  onClose: () => void
+}) {
+  const t = useMessages().editor
+  const label = t.toolImage
+  return (
+    <Popover.Root open={open} onOpenChange={(next) => (next ? onPress() : onClose())}>
+      <Tooltip label={`${label} · I`}>
+        <Popover.Trigger asChild>
+          <button type="button" aria-label={label} aria-pressed={active} data-tool="image" className={dockTool(active)}>
+            <ImageIcon size={20} weight={active ? 'fill' : 'regular'} aria-hidden />
+          </button>
+        </Popover.Trigger>
+      </Tooltip>
+      <Popover.Portal>
+        <Popover.Content
+          side="top"
+          align="center"
+          sideOffset={10}
+          aria-label={t.imageTool.title}
+          data-testid="image-picker"
+          onKeyDown={(e) => e.stopPropagation()}
+          className={PANEL}
+        >
+          <ImagePickerPanel
+            brandId={brandId}
+            open={open}
+            title={t.imageTool.title}
+            hint={t.imageTool.hint}
+            vectors
+            onPick={onPick}
+          />
+        </Popover.Content>
+      </Popover.Portal>
+    </Popover.Root>
+  )
+}
+
+/** A button in a card that opens the picker beside it; the image picked goes to `onPick` and the picker closes. */
+export function ImagePickerButton({
+  brandId,
+  title,
+  testId,
+  className,
+  children,
+  onPick,
+  below = false,
+  open: shown,
+  onOpen,
+}: {
+  brandId: string
+  /** Opens under the button and is one of the bar's buttons, for the bar by the selection. */
+  below?: boolean
+  /** Whether it is open, when its owner keeps that, as the bar does for its popovers. */
+  open?: boolean
+  onOpen?: (open: boolean) => void
+  /** The picker's heading, and the button's name. */
+  title: string
+  testId: string
+  className: string
+  children: ReactNode
+  onPick: (asset: Placeable) => void
+}) {
+  const [own, setOwn] = useState(false)
+  const open = shown ?? own
+  const setOpen = (to: boolean) => (onOpen ? onOpen(to) : setOwn(to))
+  // The cards sit at the stage's end, so the picker opens towards its middle.
+  const toward = dirOf(useLocale()) === 'rtl' ? 'right' : 'left'
+  const side = below ? 'bottom' : toward
+  const focus = useMenuFocus()
+  return (
+    <Popover.Root open={open} onOpenChange={setOpen}>
+      <Popover.Trigger asChild>
+        <button
+          ref={focus.button}
+          type="button"
+          aria-label={title}
+          data-testid={testId}
+          data-bar-item={below || undefined}
+          className={className}
+        >
+          {children}
+        </button>
+      </Popover.Trigger>
+      <Popover.Portal>
+        <Popover.Content
+          side={side}
+          align="start"
+          sideOffset={12}
+          collisionPadding={12}
+          aria-label={title}
+          data-testid={`${testId}-picker`}
+          onKeyDown={(e) => e.stopPropagation()}
+          {...focus.content}
+          className={PANEL}
+        >
+          {focus.back}
+          <ImagePickerPanel
+            brandId={brandId}
+            open={open}
+            title={title}
+            onPick={(asset) => {
+              setOpen(false)
+              onPick(asset)
+            }}
+          />
+        </Popover.Content>
+      </Popover.Portal>
+    </Popover.Root>
+  )
+}
 
 /**
  * The picker's own content: an upload and the brand's images, fetched while it shows. An upload
@@ -167,132 +294,5 @@ function ImagePickerPanel({
         )}
       </div>
     </>
-  )
-}
-
-/** The image tool's dock button and its picker, open while the tool waits for an image. */
-export function ImageTool({
-  brandId,
-  active,
-  open,
-  onPress,
-  onPick,
-  onClose,
-}: {
-  brandId: string
-  /** The image tool is the one in use. */
-  active: boolean
-  /** The picker shows: the tool is in use and has no image to place yet. */
-  open: boolean
-  onPress: () => void
-  onPick: (asset: Placeable) => void
-  onClose: () => void
-}) {
-  const t = useMessages().editor
-  const label = t.toolImage
-  return (
-    <Popover.Root open={open} onOpenChange={(next) => (next ? onPress() : onClose())}>
-      <Tooltip label={`${label} · I`}>
-        <Popover.Trigger asChild>
-          <button type="button" aria-label={label} aria-pressed={active} data-tool="image" className={dockTool(active)}>
-            <ImageIcon size={20} weight={active ? 'fill' : 'regular'} aria-hidden />
-          </button>
-        </Popover.Trigger>
-      </Tooltip>
-      <Popover.Portal>
-        <Popover.Content
-          side="top"
-          align="center"
-          sideOffset={10}
-          aria-label={t.imageTool.title}
-          data-testid="image-picker"
-          onKeyDown={(e) => e.stopPropagation()}
-          className={PANEL}
-        >
-          <ImagePickerPanel
-            brandId={brandId}
-            open={open}
-            title={t.imageTool.title}
-            hint={t.imageTool.hint}
-            vectors
-            onPick={onPick}
-          />
-        </Popover.Content>
-      </Popover.Portal>
-    </Popover.Root>
-  )
-}
-
-/** A button in a card that opens the picker beside it; the image picked goes to `onPick` and the picker closes. */
-export function ImagePickerButton({
-  brandId,
-  title,
-  testId,
-  className,
-  children,
-  onPick,
-  below = false,
-  open: shown,
-  onOpen,
-}: {
-  brandId: string
-  /** Opens under the button and is one of the bar's buttons, for the bar by the selection. */
-  below?: boolean
-  /** Whether it is open, when its owner keeps that, as the bar does for its popovers. */
-  open?: boolean
-  onOpen?: (open: boolean) => void
-  /** The picker's heading, and the button's name. */
-  title: string
-  testId: string
-  className: string
-  children: ReactNode
-  onPick: (asset: Placeable) => void
-}) {
-  const [own, setOwn] = useState(false)
-  const open = shown ?? own
-  const setOpen = (to: boolean) => (onOpen ? onOpen(to) : setOwn(to))
-  // The cards sit at the stage's end, so the picker opens towards its middle.
-  const toward = dirOf(useLocale()) === 'rtl' ? 'right' : 'left'
-  const side = below ? 'bottom' : toward
-  const focus = useMenuFocus()
-  return (
-    <Popover.Root open={open} onOpenChange={setOpen}>
-      <Popover.Trigger asChild>
-        <button
-          ref={focus.button}
-          type="button"
-          aria-label={title}
-          data-testid={testId}
-          data-bar-item={below || undefined}
-          className={className}
-        >
-          {children}
-        </button>
-      </Popover.Trigger>
-      <Popover.Portal>
-        <Popover.Content
-          side={side}
-          align="start"
-          sideOffset={12}
-          collisionPadding={12}
-          aria-label={title}
-          data-testid={`${testId}-picker`}
-          onKeyDown={(e) => e.stopPropagation()}
-          {...focus.content}
-          className={PANEL}
-        >
-          {focus.back}
-          <ImagePickerPanel
-            brandId={brandId}
-            open={open}
-            title={title}
-            onPick={(asset) => {
-              setOpen(false)
-              onPick(asset)
-            }}
-          />
-        </Popover.Content>
-      </Popover.Portal>
-    </Popover.Root>
   )
 }

@@ -10,11 +10,6 @@ import { cn } from '@/lib/cn.ts'
 
 import { ICON_BUTTON, MENU, MENU_DIVIDER, MENU_ITEM } from './styles.ts'
 
-/** A size's or a page's own button on its card: a 44 px target on a phone. */
-export const CARD_BUTTON = cn(ICON_BUTTON, 'max-sm:size-10')
-/** A size's or a page's card in its panel's list. */
-export const CARD_ROW = 'flex items-center gap-2.5 rounded-[10px] border border-line bg-surface p-2'
-
 /** One item of a card's menu; a `danger` one, last, removes, which a toast undoes. */
 export interface CardMenuItem {
   label: string
@@ -22,6 +17,11 @@ export interface CardMenuItem {
   disabled?: boolean
   danger?: boolean
 }
+
+/** A size's or a page's own button on its card: a 44 px target on a phone. */
+export const CARD_BUTTON = cn(ICON_BUTTON, 'max-sm:size-10')
+/** A size's or a page's card in its panel's list. */
+export const CARD_ROW = 'flex items-center gap-2.5 rounded-[10px] border border-line bg-surface p-2'
 
 /** A size's or a page's menu behind ⋯ on its card; a line goes before the item that removes it. */
 export function CardMenu({ label, items }: { label: string; items: CardMenuItem[] }) {

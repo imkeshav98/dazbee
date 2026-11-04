@@ -5,9 +5,6 @@
 // above the selection. The canvas runs edge to edge under all of it; the stage is the editor itself, told
 // which edges the chrome covers so it fits the ads between.
 import {
-  CloudArrowUpIcon,
-  CloudCheckIcon,
-  CloudSlashIcon,
   CursorIcon,
   FrameCornersIcon,
   HandIcon,
@@ -33,16 +30,28 @@ import { DazbeeMark } from '@/components/ui/dazbee-mark.tsx'
 import { Tooltip } from '@/components/ui/tooltip.tsx'
 import { cn } from '@/lib/cn.ts'
 import type { Placeable } from '@/lib/editor/place-asset.ts'
-import { useValue, type ValueStore } from '@/lib/editor/value-store.ts'
+import type { ValueStore } from '@/lib/editor/value-store.ts'
 import { useLocale, useMessages } from '@/lib/i18n/client.tsx'
-import { dirOf, format } from '@/lib/i18n/index.ts'
+import { dirOf } from '@/lib/i18n/index.ts'
 
+import { DesignName } from './design-name.tsx'
 import { isPanel, setFlyoutEnd, setOpen, useEditState, usePhone } from './edit-store.ts'
 import { ImageTool } from './image-tool.tsx'
+import { SaveStatus } from './save-status.tsx'
 import { BAR_ROW, BAR_ROW_HEIGHT, dockTool } from './styles.ts'
 
 export type Flyout = 'layers' | 'assets' | 'ai' | 'brand'
 export type Tool = 'select' | 'frame' | 'shape' | 'text' | 'pen' | 'image' | 'hand'
+
+/** The stage's edges the floating chrome covers, in CSS pixels, left and right as on screen. */
+export interface ChromeInsets {
+  top: number
+  right: number
+  bottom: number
+  left: number
+}
+
+type Note = { owner: object; text: string } | null
 
 const FLYOUTS: { id: Flyout; icon: Icon }[] = [
   { id: 'layers', icon: StackIcon },
@@ -70,101 +79,8 @@ const SQUISH = {
   still: { scaleX: 1, scaleY: 1 },
 }
 
-/**
- * The design's save state (#37) and how it shows: a small muted cloud while all is well (#110), so
- * it never competes with the work; Offline (and an error) colour it and say so in words.
- */
-const SAVE: Record<string, { icon: Icon; tone: string; words?: boolean }> = {
-  Saved: { icon: CloudCheckIcon, tone: 'text-subtle' },
-  Saving: { icon: CloudArrowUpIcon, tone: 'text-subtle' },
-  Offline: { icon: CloudSlashIcon, tone: 'text-warning', words: true },
-}
-/** Saving stays up at least this long, so a quick edit doesn't flicker the badge. */
-const SAVING_HOLD_MS = 600
-
 /** Lets the open flyout's content set the small grey note in its title row, as Layers does with its page and format. */
-type Note = { owner: object; text: string } | null
 const FlyoutNote = createContext<(change: (now: Note) => Note) => void>(() => undefined)
-
-/**
- * Shows a note at the end of the open flyout's title row while the caller is mounted. A flyout
- * fading out clears only its own note, never the next one's.
- */
-export function useFlyoutNote(text: string | null) {
-  const setNote = useContext(FlyoutNote)
-  const [owner] = useState(() => ({}))
-  useEffect(() => {
-    setNote(() => (text ? { owner, text } : null))
-    return () => setNote((now) => (now?.owner === owner ? null : now))
-  }, [setNote, owner, text])
-}
-
-/**
- * The status to show: the editor's own, except that Saving lingers a moment before Saved, so a
- * stream of edits reads as one save rather than a blink per keystroke.
- */
-function useShownStatus(status: string) {
-  const [shown, setShown] = useState(status)
-  const [savingSince, setSavingSince] = useState(0)
-  useEffect(() => {
-    if (status === 'Saving' && shown !== 'Saving') {
-      setSavingSince(Date.now())
-      setShown(status)
-      return
-    }
-    if (status === 'Saved' && shown === 'Saving') {
-      const wait = savingSince + SAVING_HOLD_MS - Date.now()
-      if (wait > 0) {
-        const timer = setTimeout(() => setShown(status), wait)
-        return () => clearTimeout(timer)
-      }
-    }
-    setShown(status)
-  }, [status, shown, savingSince])
-  return shown
-}
-
-/** The design's save state at the end of the start island, read from the status store. */
-function SaveStatus({ status, fitted }: { status: ValueStore<string>; fitted: boolean }) {
-  const t = useMessages()
-  const current = useValue(status)
-  const shown = useShownStatus(current)
-  const save = SAVE[shown]
-  const failed = shown.startsWith('Error')
-  return (
-    <span
-      role="status"
-      aria-atomic="true"
-      aria-label={t.editor.status}
-      data-testid="status"
-      data-status={current}
-      data-ready={save && fitted ? '' : undefined}
-      title={save ? t.editor.statusHint[shown] : undefined}
-      className={cn(
-        'flex h-7 shrink-0 items-center gap-1.5 text-xs font-medium transition-colors duration-[var(--chrome)]',
-        failed ? 'text-danger' : save ? save.tone : 'text-subtle',
-      )}
-    >
-      {save ? (
-        <save.icon size={17} aria-hidden className={cn(shown === 'Saving' && 'animate-pulse')} />
-      ) : (
-        <span aria-hidden className={cn('size-1.5 rounded-full', failed ? 'bg-danger' : 'animate-pulse bg-subtle')} />
-      )}
-      <span className={cn(!(failed || save?.words) && 'sr-only')}>{t.editor.statusText[shown] ?? shown}</span>
-      {shown === 'Offline' && (
-        <span className="hidden font-normal text-muted md:inline">{t.editor.statusHint.Offline}</span>
-      )}
-    </span>
-  )
-}
-
-/** The stage's edges the floating chrome covers, in CSS pixels, left and right as on screen. */
-export interface ChromeInsets {
-  top: number
-  right: number
-  bottom: number
-  left: number
-}
 
 /**
  * Measures how much of the stage the islands, the capsule and the dock cover. The
@@ -193,59 +109,16 @@ function measureInsets(stage: DOMRect, tops: (Element | null)[], pieces: (Elemen
 }
 
 /**
- * The design's name in the crumb (#159): a click or Enter on it makes it a field; Enter or leaving
- * the field saves a new name, Esc keeps the old one.
+ * Shows a note at the end of the open flyout's title row while the caller is mounted. A flyout
+ * fading out clears only its own note, never the next one's.
  */
-function DesignName({ name, onRename }: { name: string; onRename?: ((name: string) => Promise<void>) | undefined }) {
-  const t = useMessages()
-  const [editing, setEditing] = useState(false)
-  const done = useRef(false)
-  const title = 'font-display text-sm font-semibold tracking-tight'
-  if (!onRename) return <h1 className={cn(title, 'truncate')}>{name}</h1>
-  if (!editing) {
-    // The button's hover fill reaches past the words on both sides, so the heading is pulled out by
-    // as much; the button, not the heading, ends the name in "…" when the crumb has no room for it.
-    return (
-      <h1 className={cn(title, '-mx-1 min-w-0')}>
-        <button
-          type="button"
-          title={format(t.library.renameDesign, { name })}
-          onClick={() => setEditing(true)}
-          className="max-w-full cursor-text truncate rounded-[6px] px-1 hover:bg-hover"
-        >
-          {name}
-        </button>
-      </h1>
-    )
-  }
-  const finish = (field: HTMLInputElement, save: boolean) => {
-    if (done.current) return
-    done.current = true
-    const next = field.value.trim()
-    setEditing(false)
-    if (save && next && next !== name) void onRename(next)
-  }
-  return (
-    <input
-      name="design-name"
-      aria-label={format(t.library.renameDesign, { name })}
-      defaultValue={name}
-      maxLength={120}
-      autoFocus
-      onFocus={(event) => {
-        done.current = false
-        event.currentTarget.select()
-      }}
-      onBlur={(event) => finish(event.currentTarget, true)}
-      onKeyDown={(event) => {
-        // Keys typed into the name are the name's, not the stage's.
-        event.stopPropagation()
-        if (event.key === 'Enter') finish(event.currentTarget, true)
-        else if (event.key === 'Escape') finish(event.currentTarget, false)
-      }}
-      className="h-7 w-48 min-w-0 rounded-[6px] border border-accent bg-bg px-1.5 font-display text-sm font-semibold tracking-tight outline-none"
-    />
-  )
+export function useFlyoutNote(text: string | null) {
+  const setNote = useContext(FlyoutNote)
+  const [owner] = useState(() => ({}))
+  useEffect(() => {
+    setNote(() => (text ? { owner, text } : null))
+    return () => setNote((now) => (now?.owner === owner ? null : now))
+  }, [setNote, owner, text])
 }
 
 export function EditorShell({
@@ -322,6 +195,7 @@ export function EditorShell({
   useEffect(() => {
     if (sheet) setFlyout((now) => (now === null ? now : null))
   }, [sheet])
+  const stage = useRef<HTMLElement>(null)
   const flyoutEl = useRef<HTMLElement>(null)
   useLayoutEffect(() => {
     const el = flyoutEl.current
@@ -344,7 +218,6 @@ export function EditorShell({
     }
   }, [flyout, phone, rtl])
 
-  const stage = useRef<HTMLElement>(null)
   const startIsland = useRef<HTMLDivElement>(null)
   const endIsland = useRef<HTMLDivElement>(null)
   const rail = useRef<HTMLElement>(null)

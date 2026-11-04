@@ -18,22 +18,6 @@ export async function GET(request: Request, { params }: { params: Promise<{ bran
   }
 }
 
-/** An image's type by its first bytes: the PNG, JPEG and WebP the editor decodes, or an SVG file's markup. */
-function imageType(bytes: Uint8Array): ImageType | null {
-  const ascii = (at: number, length: number) => String.fromCharCode(...bytes.subarray(at, at + length))
-  if (ascii(0, 8) === '\x89PNG\r\n\x1a\n') return 'image/png'
-  if (bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return 'image/jpeg'
-  if (ascii(0, 4) === 'RIFF' && ascii(8, 4) === 'WEBP') return 'image/webp'
-  if (bytes.length <= MAX_SVG_BYTES && svgMarkup(new TextDecoder().decode(bytes))) return SVG_TYPE
-  return null
-}
-
-/** What an upload is called at first: its file name without the extension. */
-function assetName(fileName: string) {
-  const name = fileName.replace(/\.[^.]+$/, '').trim() || fileName.trim()
-  return (name || 'Image').slice(0, 120)
-}
-
 export async function POST(request: Request, { params }: { params: Promise<{ brandId: string }> }) {
   const { brandId } = await params
   const form = await request.formData().catch(() => null)
@@ -55,4 +39,20 @@ export async function POST(request: Request, { params }: { params: Promise<{ bra
       return Response.json({ error: e.message }, { status: e.status })
     throw e
   }
+}
+
+/** An image's type by its first bytes: the PNG, JPEG and WebP the editor decodes, or an SVG file's markup. */
+function imageType(bytes: Uint8Array): ImageType | null {
+  const ascii = (at: number, length: number) => String.fromCharCode(...bytes.subarray(at, at + length))
+  if (ascii(0, 8) === '\x89PNG\r\n\x1a\n') return 'image/png'
+  if (bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return 'image/jpeg'
+  if (ascii(0, 4) === 'RIFF' && ascii(8, 4) === 'WEBP') return 'image/webp'
+  if (bytes.length <= MAX_SVG_BYTES && svgMarkup(new TextDecoder().decode(bytes))) return SVG_TYPE
+  return null
+}
+
+/** What an upload is called at first: its file name without the extension. */
+function assetName(fileName: string) {
+  const name = fileName.replace(/\.[^.]+$/, '').trim() || fileName.trim()
+  return (name || 'Image').slice(0, 120)
 }

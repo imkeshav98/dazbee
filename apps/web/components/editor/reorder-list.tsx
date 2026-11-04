@@ -1,15 +1,18 @@
 'use client'
 
-// A list of fills or strokes in an edit panel: the rows the selected layers share, with + to add one
-// on top; when the layers' lists differ, a way to give them all one.
-import { type ReactNode } from 'react'
+// Lists in an edit panel: rows of fills, strokes or effects, each with a remove button, that can be
+// put in another order by their grips; and the fills or strokes the selected layers share, with + to
+// add one on top and, when the layers' lists differ, a way to give them all one.
+import { DotsSixVerticalIcon, MinusIcon, PlusIcon } from '@phosphor-icons/react'
+import { type CSSProperties, type ReactNode, useRef, useState } from 'react'
 
 import { type P, set, shared, type Target } from '@/components/editor/edit-panel/target.ts'
+import { FOCUS_RING } from '@/components/ui/looks.ts'
 import { cn } from '@/lib/cn.ts'
+import { useMessages } from '@/lib/i18n/client.tsx'
 import { format } from '@/lib/i18n/index.ts'
 
-import { AddButton, Stack } from './paint-stack.tsx'
-import { FIELD_LABEL } from './styles.ts'
+import { FIELD_LABEL, ICON_BUTTON } from './styles.ts'
 
 /** A list of fills or strokes: the rows the selected layers share, and adding one on top. */
 function useList<T>(target: Target, field: string, fresh: T, onTop: T, topFirst: boolean) {
@@ -18,6 +21,122 @@ function useList<T>(target: Target, field: string, fresh: T, onTop: T, topFirst:
   const add = () =>
     write((now) => (list === 'mixed' && !topFirst ? [fresh] : [...now, now.length === 0 ? fresh : onTop]))
   return { list, write, add }
+}
+
+/**
+ * Rows of a list the cards edit (fills, strokes, effects): each with a remove button. With
+ * `topFirst` the last item, the one drawn on top, is the first row, and rows can be dragged by
+ * their grip, or moved with its arrow keys, into another order.
+ */
+export function ReorderList<T>({
+  items,
+  field,
+  topFirst = false,
+  removeLabel,
+  onWrite,
+  render,
+}: {
+  items: T[]
+  /** What the list holds, for each row's `data-item`, `<field>-<index>`. */
+  field: string
+  topFirst?: boolean
+  /** The remove button's name for the row at a place, counted from 1 in the order shown. */
+  removeLabel: (n: number) => string
+  onWrite: (to: (now: T[]) => T[]) => void
+  /** A row's content; `n` is its place in the order shown, from 1. */
+  render: (item: T, n: number, change: (to: (now: T) => T) => void) => ReactNode
+}) {
+  const t = useMessages()
+  const [dragging, setDragging] = useState<number | null>(null)
+  const [over, setOver] = useState<number | null>(null)
+  const grips = useRef(new Map<number, HTMLButtonElement>())
+  const shown = items.map((_, i) => i)
+  if (topFirst) shown.reverse()
+  /** Moves the item at `from` to where the item at `to` is, as the document holds them. */
+  const reorder = (from: number, to: number) => {
+    if (from === to) return
+    onWrite((now) => {
+      const next = [...now]
+      const [moved] = next.splice(from, 1)
+      if (moved === undefined) return now
+      next.splice(to, 0, moved)
+      return next
+    })
+  }
+  return (
+    <>
+      {shown.map((i, row) => {
+        const item = items[i] as T
+        const n = row + 1
+        const style: CSSProperties | undefined =
+          over === i && dragging !== null && dragging !== i
+            ? { boxShadow: `inset 0 ${dragging < i === topFirst ? 2 : -2}px 0 var(--accent)` }
+            : undefined
+        return (
+          // Paints have no ids; their place in the list is what they are.
+          <div
+            key={i}
+            className="flex items-center gap-1 rounded-row"
+            style={style}
+            data-item={`${field}-${i}`}
+            data-row={n}
+            draggable={topFirst}
+            onDragStart={(e) => {
+              setDragging(i)
+              e.dataTransfer.effectAllowed = 'move'
+            }}
+            onDragOver={(e) => {
+              if (dragging === null) return
+              e.preventDefault()
+              setOver(i)
+            }}
+            onDrop={(e) => {
+              e.preventDefault()
+              if (dragging !== null) reorder(dragging, i)
+              setDragging(null)
+              setOver(null)
+            }}
+            onDragEnd={() => {
+              setDragging(null)
+              setOver(null)
+            }}
+          >
+            {topFirst && (
+              <button
+                type="button"
+                aria-label={format(t.editor.props.moveRow, { n })}
+                title={t.editor.props.moveHint}
+                data-testid="row-grip"
+                ref={(el) => {
+                  if (el) grips.current.set(i, el)
+                  else grips.current.delete(i)
+                }}
+                onKeyDown={(e) => {
+                  // Up moves a row towards the top coat, which is the end of the list.
+                  const to = e.key === 'ArrowUp' ? i + 1 : e.key === 'ArrowDown' ? i - 1 : null
+                  if (to === null) return
+                  e.preventDefault()
+                  e.stopPropagation()
+                  if (to < 0 || to >= items.length) return
+                  reorder(i, to)
+                  // The grip goes with its paint, so the next press moves it on.
+                  requestAnimationFrame(() => grips.current.get(to)?.focus())
+                }}
+                className={cn(
+                  'grid w-4 shrink-0 cursor-grab place-items-center self-stretch text-subtle hover:text-text active:cursor-grabbing',
+                  FOCUS_RING,
+                )}
+              >
+                <DotsSixVerticalIcon size={14} weight="bold" aria-hidden />
+              </button>
+            )}
+            {render(item, n, (to) => onWrite((now) => now.map((x, j) => (j === i ? to(x) : x))))}
+            <RemoveButton label={removeLabel(n)} onClick={() => onWrite((now) => now.filter((_, j) => j !== i))} />
+          </div>
+        )
+      })}
+    </>
+  )
 }
 
 export function ListBody<T>({
@@ -71,7 +190,7 @@ export function ListBody<T>({
           </button>
         </div>
       ) : (
-        <Stack
+        <ReorderList
           items={list}
           field={field}
           topFirst={topFirst}
@@ -81,5 +200,23 @@ export function ListBody<T>({
         />
       )}
     </div>
+  )
+}
+
+/** Takes one item out of a list the cards edit. */
+export function RemoveButton({ label, onClick }: { label: string; onClick: () => void }) {
+  return (
+    <button type="button" aria-label={label} title={label} onClick={onClick} className={ICON_BUTTON}>
+      <MinusIcon size={14} aria-hidden />
+    </button>
+  )
+}
+
+/** Adds an item to a list the cards edit. */
+export function AddButton({ label, onClick }: { label: string; onClick: () => void }) {
+  return (
+    <button type="button" aria-label={label} title={label} onClick={onClick} className={ICON_BUTTON}>
+      <PlusIcon size={14} aria-hidden />
+    </button>
   )
 }

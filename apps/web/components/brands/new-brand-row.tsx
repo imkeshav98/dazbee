@@ -12,19 +12,6 @@ import { cn } from '@/lib/cn.ts'
 
 import { BrandNaming, type NamingWords } from './brand-naming.tsx'
 
-function Create({ label }: { label: string }) {
-  const { pending } = useFormStatus()
-  return (
-    <button
-      type="submit"
-      disabled={pending}
-      className={cn(buttonStyles({ variant: 'primary' }), 'h-9 px-4 font-semibold')}
-    >
-      {label}
-    </button>
-  )
-}
-
 export function NewBrandRow({
   action,
   words,
@@ -76,5 +63,18 @@ export function NewBrandRow({
       </div>
       <BrandNaming start={start} words={words} />
     </form>
+  )
+}
+
+function Create({ label }: { label: string }) {
+  const { pending } = useFormStatus()
+  return (
+    <button
+      type="submit"
+      disabled={pending}
+      className={cn(buttonStyles({ variant: 'primary' }), 'h-9 px-4 font-semibold')}
+    >
+      {label}
+    </button>
   )
 }

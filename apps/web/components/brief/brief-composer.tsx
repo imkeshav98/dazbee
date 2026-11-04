@@ -7,20 +7,6 @@ import type { Messages } from '@/lib/i18n/index.ts'
 
 import { BriefForm, type BriefReference } from './brief-form.tsx'
 
-/** The heading with one word in the AI gradient: "What are we making today?". */
-function Prompt({ template, word }: { template: string; word: string }) {
-  const [before, after = ''] = template.split('{today}')
-  return (
-    <>
-      {before}
-      <span className="bg-[image:var(--ai-gradient)] bg-clip-text text-transparent [-webkit-box-decoration-break:clone] [box-decoration-break:clone]">
-        {word}
-      </span>
-      {after}
-    </>
-  )
-}
-
 export function BriefComposer({
   t,
   brandId,
@@ -52,5 +38,19 @@ export function BriefComposer({
         <BriefForm brandId={brandId} brandName={brandName} kit={kit} references={references} action={action} />
       </div>
     </section>
+  )
+}
+
+/** The heading with one word in the AI gradient: "What are we making today?". */
+function Prompt({ template, word }: { template: string; word: string }) {
+  const [before, after = ''] = template.split('{today}')
+  return (
+    <>
+      {before}
+      <span className="bg-[image:var(--ai-gradient)] bg-clip-text text-transparent [-webkit-box-decoration-break:clone] [box-decoration-break:clone]">
+        {word}
+      </span>
+      {after}
+    </>
   )
 }
