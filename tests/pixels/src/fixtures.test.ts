@@ -3,8 +3,8 @@ import { join } from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
-import { loadDesign, readDesign } from '@dazbee/doc'
-import { parseDesign } from '@dazbee/schema'
+import { childrenOf, loadDesign, readDesign } from '@dazbee/doc'
+import { framesOf, inOrder, parseDesign } from '@dazbee/schema'
 
 import { FIXTURES_DIR, loadFixtures } from './fixtures.ts'
 
@@ -44,13 +44,22 @@ describe('pixel fixtures', () => {
     expect(readDesign(loadDesign(result.design))).toEqual(result.design)
   })
 
-  it('the carousel has three pages in two formats with format overrides', () => {
+  it('the carousel has three pages of two linked frames each, the portrait copies with their own layout', () => {
     const carousel = fixtures.find((f) => f.name === 'carousel')
     const result = parseDesign(carousel?.json)
     if (!result.success) throw new Error(result.errors.join('\n'))
-    expect(Object.keys(result.design.pages)).toHaveLength(3)
-    expect(Object.keys(result.design.formats)).toHaveLength(2)
-    expect(Object.keys(result.design.overrides['format:pt'] ?? {})).not.toHaveLength(0)
+    const { design } = result
+    expect(inOrder(design.pages).map(([pageId]) => pageId)).toEqual(['p1', 'p2', 'p3'])
+    for (const [pageId] of inOrder(design.pages)) {
+      const frames = framesOf(design, pageId)
+      expect(frames.map(([, frame]) => [frame.name, frame.width, frame.height])).toEqual([
+        ['Square 1:1', 1080, 1080],
+        ['Portrait 4:5', 1080, 1350],
+      ])
+      const [square = [], portrait = []] = frames.map(([frameId]) => childrenOf(design, frameId))
+      expect(portrait.map(([, layer]) => layer.link)).toEqual(square.map(([, layer]) => layer.link))
+      expect(portrait.map(([, layer]) => layer.props.y)).not.toEqual(square.map(([, layer]) => layer.props.y))
+    }
   })
 
   it('the stress design has 300 layers', () => {
@@ -74,7 +83,7 @@ describe('pixel fixtures', () => {
       success: false,
       errors: [
         'nodes.box.props.fills.0.color: colours are #RRGGBBAA',
-        'nodes.box.parentId: parent "missing-page" is neither a page nor a layer',
+        'nodes.box.parentId: parent "missing-page" is neither a frame nor a layer',
       ],
     })
   })

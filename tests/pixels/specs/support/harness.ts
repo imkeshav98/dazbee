@@ -13,9 +13,9 @@ import { ASSETS_DIR, type Pixels } from '../../src/pixels.ts'
 
 type Surface = 'cpu' | 'webgl'
 export interface Harness {
-  render(json: unknown, pageId: string, formatId: string, surface: Surface, assetIds: string[]): Promise<Pixels>
+  render(json: unknown, frameId: string, surface: Surface, assetIds: string[]): Promise<Pixels>
   /** The file the browser's export makes: PNG, JPG at quality 85, PDF or SVG (#55, #56). */
-  exportFile(json: unknown, pageId: string, formatId: string, type: ExportType, assetIds: string[]): Promise<Uint8Array>
+  exportFile(json: unknown, frameId: string, type: ExportType, assetIds: string[]): Promise<Uint8Array>
 }
 
 /** Chromium with the renderer loaded, shared by every test in the worker. */
@@ -25,29 +25,28 @@ export const test = base.extend<object, { harness: Harness }>({
       const page = await browser.newPage()
       await openHarness(page)
       await use({
-        async render(json, pageId, formatId, surface, assetIds) {
+        async render(json, frameId, surface, assetIds) {
           const out = await page.evaluate(
-            ([j, p, f, s, a]) =>
+            ([j, f, s, a]) =>
               (
                 globalThis as unknown as {
                   renderFixture: (...args: unknown[]) => Promise<{ width: number; height: number; pixels: string }>
                 }
-              ).renderFixture(j, p, f, s, a),
-            [json, pageId, formatId, surface, assetIds] as const,
+              ).renderFixture(j, f, s, a),
+            [json, frameId, surface, assetIds] as const,
           )
           return { width: out.width, height: out.height, pixels: new Uint8Array(Buffer.from(out.pixels, 'base64')) }
         },
-        async exportFile(json, pageId, formatId, type, assetIds) {
+        async exportFile(json, frameId, type, assetIds) {
           const out = await page.evaluate(
-            ([j, p, f, t, a]) =>
+            ([j, f, t, a]) =>
               (globalThis as unknown as { exportFixture: (...args: unknown[]) => Promise<string> }).exportFixture(
                 j,
-                p,
                 f,
                 t,
                 a,
               ),
-            [json, pageId, formatId, type, assetIds] as const,
+            [json, frameId, type, assetIds] as const,
           )
           return new Uint8Array(Buffer.from(out, 'base64'))
         },

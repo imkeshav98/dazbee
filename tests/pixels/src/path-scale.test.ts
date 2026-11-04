@@ -1,5 +1,5 @@
 // A path in a box of another size than it was drawn in is drawn scaled to fit (#278): the same
-// pixels as its data drawn at that size, in each format, on the CPU surface and in the PDF and SVG.
+// pixels as its data drawn at that size, in each frame, on the CPU surface and in the PDF and SVG.
 // A path with no box it was drawn in is drawn at its own size, as before.
 import { afterAll, describe, expect, it } from 'vitest'
 
@@ -34,65 +34,69 @@ const paint = {
   ],
   strokes: [{ paint: { type: 'solid', color: '#1F2329FF' }, width: 6 }],
 }
+const white = [{ type: 'solid', color: '#FFFFFFFF' }]
+/** Two frames holding a blob and its linked copy, the copy in the box `wide` when given. */
 const design = (
   shape: Record<string, unknown>,
   box: { width: number; height: number },
   wide?: { width: number; height: number },
-) => ({
-  meta: { designId: 'd', name: 'Path scale', kind: 'single', primaryFormatId: 'f' },
-  formats: {
-    f: { name: 'F', width: 400, height: 200, order: 'a0' },
-    w: { name: 'W', width: 400, height: 200, order: 'a1' },
-  },
-  pages: { p1: { name: 'Page', order: 'a0', fills: [{ type: 'solid', color: '#FFFFFFFF' }] } },
-  nodes: {
-    blob: {
-      type: 'graphic',
-      parentId: 'p1',
-      index: 'a0',
-      name: 'Blob',
-      props: { x: 50, y: 50, ...box, shape: { kind: 'path', fillRule: 'evenodd', ...shape }, ...paint },
+) => {
+  const blob = {
+    type: 'graphic',
+    link: 'blob',
+    index: 'a0',
+    name: 'Blob',
+    props: { x: 50, y: 50, ...box, shape: { kind: 'path', fillRule: 'evenodd', ...shape }, ...paint },
+  }
+  return {
+    meta: { designId: 'd', name: 'Path scale' },
+    pages: { p1: { name: 'Page', order: 'a0' } },
+    frames: {
+      f: { pageId: 'p1', name: 'F', width: 400, height: 200, x: 0, y: 0, fills: white, order: 'a0' },
+      w: { pageId: 'p1', name: 'W', width: 400, height: 200, x: 600, y: 0, fills: white, order: 'a1' },
     },
-  },
-  overrides: wide ? { 'format:w': { blob: wide } } : {},
-})
+    nodes: {
+      blob: { ...blob, parentId: 'f' },
+      'w-blob': { ...blob, parentId: 'w', props: { ...blob.props, ...wide } },
+    },
+  }
+}
 
 describe('path scale', () => {
   it('draws a path scaled to its box as its data drawn at that size, on the CPU and in PDF and SVG', () => {
     const scaled = design({ d: D, drawnIn: { width: 100, height: 50 } }, { width: 300, height: 100 })
     const drawnAtSize = design({ d: D_SCALED }, { width: 300, height: 100 })
-    const a = renderDesign(ck, scaled, 'p1', 'f', bytes)
-    const b = renderDesign(ck, drawnAtSize, 'p1', 'f', bytes)
+    const a = renderDesign(ck, scaled, 'f', bytes)
+    const b = renderDesign(ck, drawnAtSize, 'f', bytes)
     expect(comparePixels(b, a).differing).toBe(0)
   })
 
-  it('scales each format by its own box', () => {
+  it('scales each frame’s copy by its own box', () => {
     const json = design(
       { d: D, drawnIn: { width: 100, height: 50 } },
       { width: 100, height: 50 },
       { width: 300, height: 100 },
     )
-    const base = renderDesign(ck, json, 'p1', 'f', bytes)
-    const wide = renderDesign(ck, json, 'p1', 'w', bytes)
+    const base = renderDesign(ck, json, 'f', bytes)
+    const wide = renderDesign(ck, json, 'w', bytes)
     expect(
-      comparePixels(renderDesign(ck, design({ d: D }, { width: 100, height: 50 }), 'p1', 'f', bytes), base).differing,
+      comparePixels(renderDesign(ck, design({ d: D }, { width: 100, height: 50 }), 'f', bytes), base).differing,
     ).toBe(0)
     expect(
-      comparePixels(renderDesign(ck, design({ d: D_SCALED }, { width: 300, height: 100 }), 'p1', 'f', bytes), wide)
-        .differing,
+      comparePixels(renderDesign(ck, design({ d: D_SCALED }, { width: 300, height: 100 }), 'f', bytes), wide).differing,
     ).toBe(0)
   })
 
   it('exports a scaled path as it is drawn, in PDF and SVG', async () => {
     const json = design({ d: D, drawnIn: { width: 100, height: 50 } }, { width: 300, height: 100 })
-    const { cpu, pdf, svg } = await renderThreeWays(ck, pdfium, json, 'p1', 'f', bytes)
+    const { cpu, pdf, svg } = await renderThreeWays(ck, pdfium, json, 'f', bytes)
     expect(vectorDifference(cpu, pdf)).toBeLessThan(1)
     expect(vectorDifference(cpu, svg)).toBeLessThan(1)
   })
 
   it('draws a path with no box it was drawn in at its own size, whatever its box', () => {
-    const unsized = renderDesign(ck, design({ d: D }, { width: 300, height: 100 }), 'p1', 'f', bytes)
-    const atOwnSize = renderDesign(ck, design({ d: D }, { width: 100, height: 50 }), 'p1', 'f', bytes)
+    const unsized = renderDesign(ck, design({ d: D }, { width: 300, height: 100 }), 'f', bytes)
+    const atOwnSize = renderDesign(ck, design({ d: D }, { width: 100, height: 50 }), 'f', bytes)
     // The gradient spans the box, so only the outline is compared: where each draws anything at all.
     const ink = (r: { pixels: Uint8Array }) =>
       Array.from(

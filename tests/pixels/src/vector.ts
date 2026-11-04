@@ -18,7 +18,7 @@ export interface VectorBaseline {
   svg: { percent: number; limit: number }
 }
 
-/** One page drawn on the CPU surface and from its PDF and SVG exports, each over white. */
+/** One frame drawn on the CPU surface and from its PDF and SVG exports, each over white. */
 export interface ThreeWays {
   cpu: Pixels
   pdf: Pixels
@@ -40,18 +40,17 @@ export async function startPdfium(after: (free: () => void) => void): Promise<PD
   return pdfium
 }
 
-/** Draws one page on the CPU surface and exports it as PDF and SVG, each drawn over white to compare. */
+/** Draws one frame on the CPU surface and exports it as PDF and SVG, each drawn over white to compare. */
 export async function renderThreeWays(
   ck: CanvasKit,
   pdfium: PDFiumLibrary,
   json: unknown,
-  pageId: string,
-  formatId: string,
+  frameId: string,
   bytes: ResourceBytes,
 ): Promise<ThreeWays> {
-  const cpu = overWhite(renderDesign(ck, json, pageId, formatId, bytes))
-  const pdf = await rasterisePdf(pdfium, renderVector(ck, json, pageId, formatId, bytes, 'pdf'))
-  const svg = rasteriseSvg(renderVector(ck, json, pageId, formatId, bytes, 'svg'))
+  const cpu = overWhite(renderDesign(ck, json, frameId, bytes))
+  const pdf = await rasterisePdf(pdfium, renderVector(ck, json, frameId, bytes, 'pdf'))
+  const svg = rasteriseSvg(renderVector(ck, json, frameId, bytes, 'svg'))
   return { cpu, pdf, svg }
 }
 
