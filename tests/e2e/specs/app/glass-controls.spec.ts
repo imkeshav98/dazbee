@@ -152,12 +152,13 @@ test('on a phone, a glass button and a card’s row show the pressed tint while 
     const card = await pagesPanel(page)
     const row = card.locator('[data-page]').first()
     // A page's row, lit while the finger on its button is held, then Add page.
-    for (const [control, lit] of [
-      [row.getByRole('button').first(), row],
-      [card.getByTestId('add-page'), card.getByTestId('add-page')],
+    for (const [name, control, lit] of [
+      ['row', row.getByRole('button').first(), row],
+      ['add', card.getByTestId('add-page'), card.getByTestId('add-page')],
     ] as const) {
       const finger = await hold(page, control)
       await expect.poll(async () => (await look(lit)).image).toBe(laid(glass.pressed))
+      await shoot(page, `glass-${theme}-phone-held-${name}`)
       await finger.lift()
       await expect.poll(async () => (await look(lit)).image).toBe('none')
     }
