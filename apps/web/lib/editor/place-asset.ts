@@ -4,6 +4,8 @@
 import type { Editor, Point } from '@dazbee/editor'
 import { type AssetSummary, isVectorAsset } from '@dazbee/schema'
 
+import { brandPath } from '@/lib/brand-routes.ts'
+
 export type Placeable = Pick<AssetSummary, 'id' | 'name' | 'width' | 'height' | 'contentType'>
 
 /** Places the asset centred at `client`, or in the middle of the frame in view. */
@@ -21,7 +23,7 @@ export function placeAsset(editor: Editor, brandId: string, asset: Placeable, cl
 
 /** An SVG asset's markup. */
 async function svgOf(brandId: string, assetId: string): Promise<string> {
-  const response = await fetch(`/brands/${encodeURIComponent(brandId)}/assets/${encodeURIComponent(assetId)}`)
+  const response = await fetch(brandPath(brandId, 'assets', assetId))
   if (!response.ok) throw new Error(`the SVG didn't load (${response.status})`)
   return response.text()
 }

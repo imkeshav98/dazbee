@@ -29,6 +29,7 @@ import { useBrandKit } from '@/components/brand-kit/use-brand-kit.ts'
 import { buttonStyles } from '@/components/ui/button.tsx'
 import { overlayScroll } from '@/components/ui/overlay-scroll.ts'
 import { Tooltip } from '@/components/ui/tooltip.tsx'
+import { brandPath } from '@/lib/brand-routes.ts'
 import { BRIEF_FORMATS, type BriefFormat } from '@/lib/brief.ts'
 import { cn } from '@/lib/cn.ts'
 import { useMessages } from '@/lib/i18n/client.tsx'
@@ -65,9 +66,8 @@ const ROW =
 const LABEL = 'px-1 pt-3 pb-1.5 text-[10px] font-bold tracking-[0.08em] text-subtle uppercase'
 
 const designThumbnail = (brandId: string, design: BriefReference) =>
-  `/brands/${encodeURIComponent(brandId)}/designs/${encodeURIComponent(design.id)}/thumbnail?v=${Date.parse(design.updatedAt)}`
-const assetThumbnail = (brandId: string, assetId: string) =>
-  `/brands/${encodeURIComponent(brandId)}/assets/${encodeURIComponent(assetId)}/thumbnail`
+  `${brandPath(brandId, 'designs', design.id, 'thumbnail')}?v=${Date.parse(design.updatedAt)}`
+const assetThumbnail = (brandId: string, assetId: string) => brandPath(brandId, 'assets', assetId, 'thumbnail')
 
 export function BriefForm({
   brandId,

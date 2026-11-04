@@ -14,6 +14,7 @@ import { useMenuFocus } from '@/components/editor/top-bar/bar-popover.tsx'
 import { DASHED_BUTTON, FOCUS_RING } from '@/components/ui/looks.ts'
 import { overlayScroll } from '@/components/ui/overlay-scroll.ts'
 import { Tooltip } from '@/components/ui/tooltip.tsx'
+import { brandPath } from '@/lib/brand-routes.ts'
 import { cn } from '@/lib/cn.ts'
 import type { Placeable } from '@/lib/editor/place-asset.ts'
 import { useLocale, useMessages } from '@/lib/i18n/client.tsx'
@@ -23,8 +24,6 @@ import { ASSET_ACCEPT, IMAGE_ACCEPT, sendAsset } from '@/lib/upload-asset.ts'
 import { ASSET_TILE, dockTool, POPOVER } from './styles.ts'
 
 const PANEL = cn(POPOVER, 'flex max-h-[min(26rem,60dvh)] w-72 flex-col')
-
-const base = (brandId: string) => `/brands/${encodeURIComponent(brandId)}/assets`
 
 /** The image tool's dock button and its picker, open while the tool waits for an image. */
 export function ImageTool({
@@ -187,7 +186,7 @@ function ImagePickerPanel({
   useEffect(() => {
     if (!open) return
     const ask = new AbortController()
-    fetch(base(brandId), { signal: ask.signal })
+    fetch(brandPath(brandId, 'assets'), { signal: ask.signal })
       .then(async (response) => {
         if (response.ok)
           setAssets(
@@ -278,7 +277,7 @@ function ImagePickerPanel({
                     className={cn(ASSET_TILE, FOCUS_RING, 'w-full cursor-pointer hover:border-accent')}
                   >
                     <img
-                      src={`${base(brandId)}/${encodeURIComponent(asset.id)}/thumbnail`}
+                      src={brandPath(brandId, 'assets', asset.id, 'thumbnail')}
                       alt=""
                       width={asset.width}
                       height={asset.height}

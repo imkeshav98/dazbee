@@ -6,53 +6,34 @@ import { type KeyboardEvent, useEffect, useRef, useState } from 'react'
 import { AssetInUse, AssetSummary, AssetUse, type UpdateAsset } from '@dazbee/schema'
 
 import { QUIET_BUTTON } from '@/components/editor/styles.ts'
+import { brandPath, readJson, RouteError } from '@/lib/brand-routes.ts'
 import { cn } from '@/lib/cn.ts'
 import { useMessages } from '@/lib/i18n/client.tsx'
 import { format } from '@/lib/i18n/index.ts'
 
-const base = (brandId: string) => `/brands/${encodeURIComponent(brandId)}/assets`
-
 async function save(brandId: string, id: string, update: UpdateAsset): Promise<AssetSummary> {
-  const response = await fetch(`${base(brandId)}/${encodeURIComponent(id)}`, {
+  const response = await fetch(brandPath(brandId, 'assets', id), {
     method: 'PATCH',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(update),
   })
-  const body: unknown = await response.json().catch(() => null)
-  if (!response.ok)
-    throw new Error(
-      body && typeof body === 'object' && 'error' in body && typeof body.error === 'string'
-        ? body.error
-        : `${response.status}`,
-    )
-  return AssetSummary.parse(body)
+  return AssetSummary.parse(await readJson(response))
 }
 
 /** What of the brand shows the asset. */
 async function usesOf(brandId: string, id: string): Promise<AssetUse[]> {
-  const response = await fetch(`${base(brandId)}/${encodeURIComponent(id)}/uses`)
-  const body: unknown = await response.json().catch(() => null)
-  if (!response.ok)
-    throw new Error(
-      body && typeof body === 'object' && 'error' in body && typeof body.error === 'string'
-        ? body.error
-        : `${response.status}`,
-    )
-  return AssetUse.array().parse(body)
+  const response = await fetch(brandPath(brandId, 'assets', id, 'uses'))
+  return AssetUse.array().parse(await readJson(response))
 }
 
 /** Deletes the brand's asset; what still uses it when the API refuses. */
 async function remove(brandId: string, id: string): Promise<AssetUse[] | null> {
-  const response = await fetch(`${base(brandId)}/${encodeURIComponent(id)}`, { method: 'DELETE' })
+  const response = await fetch(brandPath(brandId, 'assets', id), { method: 'DELETE' })
   if (response.status === 204) return null
   const body: unknown = await response.json().catch(() => null)
   const used = AssetInUse.safeParse(body)
   if (response.status === 409 && used.success) return used.data.usedIn
-  throw new Error(
-    body && typeof body === 'object' && 'error' in body && typeof body.error === 'string'
-      ? body.error
-      : `${response.status}`,
-  )
+  throw RouteError.fromBody(response.status, body)
 }
 
 /**

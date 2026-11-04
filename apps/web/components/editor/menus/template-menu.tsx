@@ -7,9 +7,10 @@ import Link from 'next/link'
 import { useState } from 'react'
 
 import type { Editor } from '@dazbee/editor'
-import { ApiError, type TemplateScope, TemplateSummary } from '@dazbee/schema'
+import { type TemplateScope, TemplateSummary } from '@dazbee/schema'
 
 import { Button } from '@/components/ui/button.tsx'
+import { brandPath, readJson } from '@/lib/brand-routes.ts'
 import { cn } from '@/lib/cn.ts'
 import { useMessages } from '@/lib/i18n/client.tsx'
 import { format } from '@/lib/i18n/index.ts'
@@ -44,14 +45,12 @@ export function TemplateForm({
     setError(null)
     setSaving(true)
     try {
-      const response = await fetch(`/brands/${encodeURIComponent(brandId)}/templates/save`, {
+      const response = await fetch(brandPath(brandId, 'templates', 'save'), {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ name: name.trim(), scope, content: editor.design() }),
       })
-      const json: unknown = await response.json().catch(() => null)
-      if (!response.ok) throw new Error(ApiError.safeParse(json).data?.error ?? String(response.status))
-      setSaved(TemplateSummary.parse(json))
+      setSaved(TemplateSummary.parse(await readJson(response)))
     } catch (reason) {
       setError(format(t.editor.templates.failed, { reason: reason instanceof Error ? reason.message : String(reason) }))
     } finally {
@@ -73,7 +72,7 @@ export function TemplateForm({
             {format(t.editor.templates.saved, { name: saved.name })}
           </p>
           <Link
-            href={`/brands/${encodeURIComponent(brandId)}/templates`}
+            href={brandPath(brandId, 'templates')}
             className="text-[13px] font-medium text-accent-text hover:underline"
           >
             {t.editor.templates.see}

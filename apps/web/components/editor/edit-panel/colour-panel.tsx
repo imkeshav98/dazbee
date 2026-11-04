@@ -15,6 +15,7 @@ import { AddButton, ListBody, ReorderList } from '@/components/editor/reorder-li
 import { FIELD_LABEL, PANEL_BUTTON, PICKED_RING, SWATCH, SWATCHES } from '@/components/editor/styles.ts'
 import { FOCUS_RING } from '@/components/ui/looks.ts'
 import { cn } from '@/lib/cn.ts'
+import { hexChange, hexOf } from '@/lib/colour.ts'
 import { designColours } from '@/lib/editor/design-colours.ts'
 import { useMessages } from '@/lib/i18n/client.tsx'
 import { format, type Messages } from '@/lib/i18n/index.ts'
@@ -173,9 +174,9 @@ function TextColourPanel({
   const first = (target.range?.[0]?.color as string | undefined) ?? ''
   const paint = (hex: string) =>
     target.range
-      ? setStyle('color', `${hex}${first.slice(7, 9) || 'FF'}`)
+      ? setStyle('color', hexChange(hex)(first))
       : set(target, (now) => ({
-          style: { ...(now.style as Style), color: `${hex}${((now.style as Style).color ?? '').slice(7, 9) || 'FF'}` },
+          style: { ...(now.style as Style), color: hexChange(hex)((now.style as Style).color) },
         }))
   return (
     <ColourChoices
@@ -304,7 +305,7 @@ function ColourChoices({
 }) {
   const [picking, setPicking] = useState(false)
   const kit = (useBrandKit(brandId)?.colors.length ?? 0) > 0
-  const now = current && current !== 'mixed' ? current.slice(0, 7).toUpperCase() : null
+  const now = current && current !== 'mixed' ? hexOf(current).toUpperCase() : null
   return (
     <>
       <PanelPart id="brand-colours" title={kit ? b.colourPanel.brandKit : p.colours}>
@@ -358,10 +359,10 @@ function Swatches({
   onBrand?: ((token: string, hex: string) => void) | undefined
 }) {
   const kit = useBrandKit(brandId)
-  const now = current && current !== 'mixed' ? current.slice(0, 7).toUpperCase() : null
+  const now = current && current !== 'mixed' ? hexOf(current).toUpperCase() : null
   const colors = kit?.colors ?? []
   // The colour it has now leads the row when the row does not hold it, as in the mock.
-  const offered = colors.length > 0 ? colors.map((c) => c.value.slice(0, 7).toUpperCase()) : [...SWATCHES]
+  const offered = colors.length > 0 ? colors.map((c) => hexOf(c.value).toUpperCase()) : [...SWATCHES]
   return (
     <div
       role="group"
@@ -375,10 +376,10 @@ function Swatches({
         ? colors.map((c) => (
             <Swatch
               key={c.token}
-              color={c.value.slice(0, 7)}
+              color={hexOf(c.value)}
               label={c.name}
-              on={now === c.value.slice(0, 7).toUpperCase()}
-              onPick={() => (onBrand ? onBrand(c.token, c.value.slice(0, 7)) : paint(c.value.slice(0, 7)))}
+              on={now === hexOf(c.value).toUpperCase()}
+              onPick={() => (onBrand ? onBrand(c.token, hexOf(c.value)) : paint(hexOf(c.value)))}
             />
           ))
         : SWATCHES.map((hex) => (

@@ -14,6 +14,7 @@ import { carryAsset } from '@/components/editor/asset-drag.ts'
 import { ASSET_TILE } from '@/components/editor/styles.ts'
 import { DASHED_BUTTON } from '@/components/ui/looks.ts'
 import { overlayScroll } from '@/components/ui/overlay-scroll.ts'
+import { brandPath } from '@/lib/brand-routes.ts'
 import { cn } from '@/lib/cn.ts'
 import { placeAsset } from '@/lib/editor/place-asset.ts'
 import { useMessages } from '@/lib/i18n/client.tsx'
@@ -31,8 +32,6 @@ interface Upload {
 
 /** How long typing pauses before the library searches. */
 const SEARCH_DELAY_MS = 150
-
-const base = (brandId: string) => `/brands/${encodeURIComponent(brandId)}/assets`
 
 /** `changed` counts uploads made elsewhere, such as files dropped on the stage; each change lists the assets again. */
 export function AssetLibrary({ editor, brandId, changed = 0 }: { editor: Editor; brandId: string; changed?: number }) {
@@ -52,7 +51,7 @@ export function AssetLibrary({ editor, brandId, changed = 0 }: { editor: Editor;
     const timer = setTimeout(
       () => {
         const q = query.trim()
-        fetch(`${base(brandId)}${q ? `?q=${encodeURIComponent(q)}` : ''}`, { signal: ask.signal })
+        fetch(`${brandPath(brandId, 'assets')}${q ? `?q=${encodeURIComponent(q)}` : ''}`, { signal: ask.signal })
           .then(async (response) => {
             if (response.ok) setAssets(AssetSummary.array().parse(await response.json()))
           })
@@ -231,7 +230,7 @@ export function AssetLibrary({ editor, brandId, changed = 0 }: { editor: Editor;
                     )}
                   >
                     <img
-                      src={`${base(brandId)}/${encodeURIComponent(asset.id)}/thumbnail`}
+                      src={brandPath(brandId, 'assets', asset.id, 'thumbnail')}
                       alt=""
                       width={asset.width}
                       height={asset.height}
