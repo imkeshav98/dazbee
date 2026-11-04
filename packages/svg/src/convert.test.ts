@@ -254,6 +254,7 @@ describe('svgToLayers with hostile files', () => {
     for (const flood of floods) {
       expect(problem(flood.file(flood.tenth)), flood.name).toBe(flood.problem)
       const grown = growth(problem, flood.file(flood.tenth), flood.file(flood.tenth * 10))
+      console.log(`[growth-log] ${flood.name}: ${grown.times.toFixed(2)}`)
       expect(grown.result, flood.name).toBe(flood.problem)
       expect(grown.times, flood.name).toBeLessThan(MAX_GROWTH)
     }
