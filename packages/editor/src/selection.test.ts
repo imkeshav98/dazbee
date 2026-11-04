@@ -122,10 +122,23 @@ describe('editorSelection', () => {
       selection.editPath({ id: 'path', frame: 'p1/f1' })
       selection.selectKeepingModes({ ids: ['child'], frame: 'p1/f2' })
       expect(selection.current()).toEqual({ ids: ['child'], frame: 'p1/f2' })
-      selection.selectKeepingModes(null)
-      expect(selection.current()).toBeNull()
       expect(selection.cropping()).toEqual({ id: 'rect', frame: 'p1/f1' })
       expect(selection.pathEditing()).toEqual({ id: 'path', frame: 'p1/f1', selected: [] })
+      expect(log).toEqual([])
+    })
+
+    it('with none, lets a crop and a path edit go with the selection, keeping the group gone into', () => {
+      const { selection, log } = harness()
+      selection.enter('group')
+      selection.select(['path'], 'p1/f1')
+      selection.crop({ id: 'path', frame: 'p1/f1' })
+      selection.editPath({ id: 'path', frame: 'p1/f1' })
+      log.length = 0
+      selection.selectKeepingModes(null)
+      expect(selection.current()).toBeNull()
+      expect(selection.cropping()).toBeNull()
+      expect(selection.pathEditing()).toBeNull()
+      expect(selection.entered()).toBe('group')
       expect(log).toEqual([])
     })
   })
@@ -196,16 +209,16 @@ describe('editorSelection', () => {
       expect(selection.cropping()).toBeNull()
     })
 
-    it('with nothing selected, leaves the group gone into, a crop and a path edit be', () => {
+    it('with nothing selected, ends a crop and a path edit, and leaves the group gone into be', () => {
       const { selection, remove } = harness()
       selection.enter('group')
       selection.crop({ id: 'rect', frame: 'p1/f1' })
       selection.editPath({ id: 'path', frame: 'p1/f1' })
-      remove('group', 'rect', 'path')
+      remove('group', 'child')
       selection.keep()
       expect(selection.entered()).toBe('group')
-      expect(selection.cropping()).toEqual({ id: 'rect', frame: 'p1/f1' })
-      expect(selection.pathEditing()).toEqual({ id: 'path', frame: 'p1/f1', selected: [] })
+      expect(selection.cropping()).toBeNull()
+      expect(selection.pathEditing()).toBeNull()
     })
 
     it('shows nothing and tells no one', () => {
@@ -219,7 +232,7 @@ describe('editorSelection', () => {
   })
 
   describe('dropOffGrid', () => {
-    it('lets the selection go when its frame is gone, keeping a crop, a path edit and the group gone into', () => {
+    it('lets the selection go when its frame is gone, with its crop and path edit, keeping the group gone into', () => {
       const { selection, log, world } = harness()
       selection.enter('group')
       selection.select(['rect'], 'p1/f2')
@@ -227,12 +240,19 @@ describe('editorSelection', () => {
       log.length = 0
       selection.dropOffGrid()
       expect(selection.current()).toEqual({ ids: ['rect'], frame: 'p1/f2' })
+      expect(selection.cropping()).toEqual({ id: 'rect', frame: 'p1/f2' })
       world.frames = [frame('p1', 'f1')]
       selection.dropOffGrid()
       expect(selection.current()).toBeNull()
-      expect(selection.cropping()).toEqual({ id: 'rect', frame: 'p1/f2' })
+      expect(selection.cropping()).toBeNull()
       expect(selection.entered()).toBe('group')
       expect(log).toEqual([])
+
+      selection.select(['path'], 'p1/f1')
+      selection.editPath({ id: 'path', frame: 'p1/f1' })
+      world.frames = [frame('p1', 'f2')]
+      selection.dropOffGrid()
+      expect(selection.pathEditing()).toBeNull()
     })
   })
 

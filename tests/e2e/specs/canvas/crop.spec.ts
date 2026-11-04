@@ -10,8 +10,9 @@ import type { DesignInput } from '@dazbee/schema'
 
 import { photo, upload } from '../../support/assets.ts'
 import { designOf, exportHashOf, screenPoint, writeOutput } from '../../support/editor.ts'
-import { click, drag, dragScreen, openStage, press, read, selection } from '../../support/stage.ts'
+import { click, drag, dragScreen, drawn, openStage, press, read, selection } from '../../support/stage.ts'
 import { expect, type Page, test } from '../../support/test.ts'
+import { sizesPanel } from '../../support/top-bar.ts'
 
 test.describe.configure({ timeout: 120_000 })
 
@@ -148,6 +149,38 @@ test('Enter crops a photo: a drag moves it, a corner scales it, each one undo st
   await expect(page.locator('.crop-image')).toBeVisible()
   await click(page, 400, 900)
   await expect(page.locator('.crop-image')).toHaveCount(0)
+  expect(errors).toEqual([])
+})
+
+test('showing another size alone lets the crop go with the selection: showing every size again brings back no crop, and the drag is the one undo step', async ({
+  browser,
+}) => {
+  const asset = await upload(photo)
+  const content = design(asset.id)
+  const wide = { name: 'Wide', width: 1920, height: 1080, order: 'a1' }
+  const { page, errors } = await openStage(browser, { ...content, formats: { ...content.formats, wide } })
+  await click(page, 400, 400)
+  await press(page, 'editPoints')
+  await expect(page.locator('.crop-image')).toBeVisible()
+  await drag(page, { x: 400, y: 400 }, { x: 500, y: 400 })
+  expect(await fillOf(page, 'photo')).toMatchObject({ fit: 'crop', crop: { x: 160 } })
+
+  await (await sizesPanel(page)).locator('[data-format="wide"]').getByRole('button', { name: 'Show alone' }).click()
+  await expect(page.getByTestId('focus-chip')).toBeVisible()
+  await drawn(page)
+  expect(await selection(page)).toEqual([])
+  await page.getByTestId('focus-chip').getByRole('button', { name: 'Show all formats' }).click()
+  await expect(page.getByTestId('focus-chip')).toBeHidden()
+  await drawn(page)
+  expect(await page.evaluate(() => window.dazbee?.frames().length)).toBe(2)
+  await expect(page.locator('.crop-image')).toHaveCount(0)
+  expect(await selection(page)).toEqual([])
+
+  // The crop's drag is the only undo step: one undo takes it back and leaves nothing to undo.
+  await press(page, 'undo')
+  expect(await fillOf(page, 'photo')).toMatchObject({ fit: 'fill' })
+  expect(await fillOf(page, 'photo')).not.toHaveProperty('crop')
+  expect(await page.evaluate(() => window.dazbee?.canUndo())).toBe(false)
   expect(errors).toEqual([])
 })
 
