@@ -89,3 +89,18 @@ test("at tablet size with a flyout open, the bar's second row and its pop-ups an
   }
   expect(errors).toEqual([])
 })
+
+test.describe('on a phone, 390×844', () => {
+  test('the top bar scrolls sideways with no classic scrollbar', async ({ browser }) => {
+    const asset = await upload(photo)
+    const { page, errors } = await openStage(browser, topBarDesign(asset.id))
+    await page.setViewportSize({ width: 390, height: 844 })
+    await selectLayers(page, ['box'], { bar: true })
+    const row = page.getByTestId('top-bar-row')
+    expect(await row.evaluate((el) => [el.scrollWidth > el.clientWidth, getComputedStyle(el).scrollbarWidth])).toEqual([
+      true,
+      'none',
+    ])
+    expect(errors).toEqual([])
+  })
+})

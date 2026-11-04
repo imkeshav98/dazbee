@@ -1,5 +1,5 @@
 /*
- * The app's global styles: the base styles and motion, the AI controls' glow, the overlay scrollbars,
+ * The app's global styles: the base styles and motion, the AI controls' glow, the overlay scrollbars and strips without one,
  * the glass and checkerboard utilities, the canvas backdrop and the home's aurora. The theme tokens, the stage overlay and the sign-in page's showcase are
  * partials in styles/, imported below. CSS takes @import only before every other rule, so they come
  * first, ahead of the rules in this file.
@@ -178,6 +178,14 @@ body {
   .os-theme-dazbee,
   .os-theme-dazbee .os-scrollbar-handle {
     transition: none;
+  }
+}
+
+/* A strip that scrolls sideways with no scrollbar of its own: the top bar on a phone. */
+@utility no-scrollbar {
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
   }
 }
 
