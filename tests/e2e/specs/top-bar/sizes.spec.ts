@@ -37,6 +37,12 @@ const SELECTIONS: Record<string, string[]> = {
 }
 
 const camera = (page: Page) => page.evaluate(() => window.dazbee?.camera())
+/** Fits every format and reads the camera the fit gave. */
+const fitted = (page: Page) =>
+  page.evaluate(() => {
+    window.dazbee?.fitAll()
+    return JSON.stringify(window.dazbee?.camera())
+  })
 
 /** What the selection's top bar opens: every item with a pop-up or panel, by its test id, and the full menu. */
 const openers = (page: Page) =>
@@ -69,10 +75,17 @@ for (const [width, height] of SCREEN_SIZES) {
     const asset = await upload(photo)
     const { page, errors } = await openStage(browser, topBarDesign(asset.id))
     await page.setViewportSize({ width, height })
-    await page.evaluate(() => {
-      window.dazbee?.select([])
-      window.dazbee?.fitAll()
-    })
+    await page.evaluate(() => window.dazbee?.select([]))
+    // The chrome's insets for the new size reach the editor a frame or more after the resize, and a
+    // fit made before then keeps clear of the old size's chrome; once two fits a frame apart agree,
+    // the editor has them.
+    await expect
+      .poll(async () => {
+        const first = await fitted(page)
+        await nextFrame(page)
+        return (await fitted(page)) === first
+      })
+      .toBe(true)
     await nextFrame(page)
     const still = await camera(page)
     const problems: string[] = []
