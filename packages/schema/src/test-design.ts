@@ -1,12 +1,24 @@
-/** The smallest valid design: one page, one format, one rectangle. */
+/** The smallest valid design: one page holding one frame, which holds one rectangle. */
 export const minimal = () => ({
-  meta: { designId: 'd1', name: 'Minimal', kind: 'single', primaryFormatId: 'sq' },
-  formats: { sq: { name: 'Square', width: 1080, height: 1080, order: 'a0' } },
-  pages: { p1: { name: 'Page 1', order: 'a0', fills: [{ type: 'solid', color: '#FFFFFFFF' }] } },
+  meta: { designId: 'd1', name: 'Minimal' },
+  pages: { p1: { name: 'Page 1', order: 'a0' } },
+  frames: {
+    sq: {
+      pageId: 'p1',
+      name: 'Feed square',
+      width: 1080,
+      height: 1080,
+      x: 0,
+      y: 0,
+      fills: [{ type: 'solid', color: '#FFFFFFFF' }],
+      order: 'a0',
+    },
+  },
   nodes: {
     r1: {
       type: 'graphic',
-      parentId: 'p1',
+      parentId: 'sq',
+      link: 'r1',
       index: 'a0',
       name: 'Box',
       props: {
@@ -19,5 +31,4 @@ export const minimal = () => ({
       },
     },
   },
-  overrides: {},
 })

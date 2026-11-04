@@ -11,8 +11,11 @@ export const NodeId = Id
 export type NodeId = z.infer<typeof NodeId>
 export const PageId = Id
 export type PageId = z.infer<typeof PageId>
-export const FormatId = Id
-export type FormatId = z.infer<typeof FormatId>
+export const FrameId = Id
+export type FrameId = z.infer<typeof FrameId>
+/** The id linked copies share: one layer in each of several frames of a page. */
+export const LinkId = Id
+export type LinkId = z.infer<typeof LinkId>
 export const AssetId = Id
 export type AssetId = z.infer<typeof AssetId>
 
@@ -66,7 +69,7 @@ export type ContainerBlendMode = z.infer<typeof ContainerBlendMode>
 /** Code-unit order, the same on every device (unlike localeCompare) and the order fractional indexes use. */
 export const byCodeUnits = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0)
 
-/** A record of pages or formats as `[id, item]` pairs, by order, ties broken by id. */
+/** A record of pages or frames as `[id, item]` pairs, by order, ties broken by id. */
 export const inOrder = <T extends { readonly order: string }>(record: Readonly<Record<string, T>>): [string, T][] =>
   Object.entries(record).sort(([a, x], [b, y]) => byCodeUnits(x.order, y.order) || byCodeUnits(a, b))
 

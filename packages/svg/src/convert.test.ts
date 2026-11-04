@@ -155,6 +155,22 @@ describe('svgToLayers', () => {
     })
   })
 
+  it('gives every layer its own id as its link id', () => {
+    const { tree, list } = layers(
+      svg(`
+      <clipPath id="c"><circle cx="50" cy="50" r="20"/></clipPath>
+      <mask id="m"><rect width="50" height="50" fill="white"/></mask>
+      <g><rect width="10" height="10"/><circle cx="20" cy="20" r="5"/></g>
+      <rect width="100" height="100" clip-path="url(#c)"/>
+      <rect width="80" height="80" mask="url(#m)"/>
+      <text x="10" y="40" font-size="20">Sale</text>`),
+    )
+    expect(list.some((n) => n.type === 'group' && n.props.mask === 'luminance')).toBe(true)
+    expect(list.some((n) => n.type === 'graphic' && n.props.mask === 'alpha')).toBe(true)
+    expect(list.some((n) => n.type === 'text')).toBe(true)
+    for (const [id, node] of Object.entries(tree.nodes)) expect(node.link, id).toBe(id)
+  })
+
   it('names what it leaves out', () => {
     const out = layers(
       svg(`

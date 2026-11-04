@@ -1,13 +1,13 @@
 import { z } from 'zod'
 
 import { canHold, Layer } from './layers.ts'
-import { NodeId } from './primitives.ts'
+import { FrameId, NodeId, PageId } from './primitives.ts'
 
 /**
- * Layers to place in a design (#49): a flat tree like a design's nodes, each layer's props as the
- * format it was copied from showed them. `roots` are the top layers, bottom to top; their own
- * `parentId` and `index` are replaced where they are placed. Every other layer's parent is in the
- * tree and can hold it, so the tree is whole on its own.
+ * Layers to place in a design: a flat tree like a design's nodes, each layer with its link id and
+ * its props as its frame has them. `roots` are the top layers, bottom to top; their own `parentId`
+ * and `index` are replaced where they are placed. Every other layer's parent is in the tree and can
+ * hold it, so the tree is whole on its own.
  */
 export const LayerTree = z
   .object({
@@ -48,6 +48,9 @@ export const LayerClipboard = z.object({
   kind: z.literal('dazbee.layers'),
   /** The design they were copied from. */
   designId: z.string(),
+  /** The page and frame the layers were copied from: a paste onto another frame of that page may keep their link ids. */
+  pageId: PageId,
+  frameId: FrameId,
   tree: LayerTree,
 })
 export type LayerClipboard = z.infer<typeof LayerClipboard>

@@ -2,13 +2,10 @@ import { z } from 'zod'
 
 import { Effect } from './effects.ts'
 import { Paint } from './paint.ts'
-import { BlendMode, Color, ContainerBlendMode, FractionalIndex, NodeId, PageId } from './primitives.ts'
+import { BlendMode, Color, ContainerBlendMode, FractionalIndex, FrameId, LinkId, NodeId } from './primitives.ts'
 import { Bindings } from './variables.ts'
 
-/**
- * Properties every layer has. Any property can be overridden per format (#1); the
- * per-format ones below are also the ones adapt computes for a format that has no value yet.
- */
+/** Properties every layer has. */
 const commonProps = {
   x: z.number(),
   y: z.number(),
@@ -95,8 +92,8 @@ export const Shape = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('line'), start: LineEnd.default('none'), end: LineEnd.default('none') }),
   /**
    * SVG path data in the layer's own box; evenodd lets a path have holes. `drawnIn` is the width and
-   * height of the box the data was drawn in: a box of another size draws it scaled to fit, as each
-   * format's own box does. Left out, the data is drawn at its own size whatever the box.
+   * height of the box the data was drawn in: a box of another size draws it scaled to fit, as a
+   * resized or laid-out copy's box does. Left out, the data is drawn at its own size whatever the box.
    */
   z.object({
     kind: z.literal('path'),
@@ -154,10 +151,7 @@ export const BoxProps = z.object({
   ...commonProps,
   blendMode: ContainerBlendMode.default('pass-through'),
   clip: z.boolean().default(true),
-  /**
-   * The box's corners: one radius for all, or each corner's own from the top left clockwise. One
-   * value, so a format that has its own corners replaces both forms.
-   */
+  /** The box's corners: one radius for all, or each corner's own from the top left clockwise. */
   cornerRadius: z.union([Radius, z.tuple([Radius, Radius, Radius, Radius])]).default(0),
   fills: Paint.array().default([]),
   /** Strokes along the box's edge, drawn over what is inside it and never cut by its clip. */
@@ -297,7 +291,10 @@ export type LayerLock = z.infer<typeof LayerLock>
 export const LOCK_FLAGS = ['move', 'resize', 'content', 'style', 'delete'] as const satisfies (keyof LayerLock)[]
 
 const nodeBase = {
-  parentId: z.union([PageId, NodeId]),
+  /** The frame the layer sits in at the top level, or the layer holding it. */
+  parentId: z.union([FrameId, NodeId]),
+  /** Shared by the layer's linked copies in the other frames of its page; a frame holds no two layers with one link id. */
+  link: LinkId,
   index: FractionalIndex,
   name: z.string(),
   role: z

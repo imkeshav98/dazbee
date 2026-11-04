@@ -1,6 +1,15 @@
 import { describe, expect, it } from 'vitest'
 
-import { fontFamilies, imageAssetIds, parseDesign } from './design.ts'
+import {
+  checkStructure,
+  coverFrame,
+  fontFamilies,
+  FRAME_GAP,
+  framesOf,
+  imageAssetIds,
+  newFramePosition,
+  parseDesign,
+} from './design.ts'
 import { parseDesignIncrementally } from './parse-incremental.ts'
 import { minimal } from './test-design.ts'
 
@@ -16,6 +25,38 @@ const parse = (input: unknown) => {
   return full
 }
 
+const errorsFor = (mutate: (d: ReturnType<typeof minimal>) => void) => {
+  const d = minimal()
+  mutate(d)
+  const result = parse(d)
+  return result.success ? [] : result.errors
+}
+
+const white = [{ type: 'solid', color: '#FFFFFFFF' }]
+
+/** The frame `banner` beside `sq` on `p1`, placed by the frame rule. */
+const banner = { pageId: 'p1', name: 'Banner', width: 320, height: 50, x: 1280, y: 0, fills: white, order: 'a1' }
+
+const group = (parentId: string, link: string) => ({
+  type: 'group',
+  parentId,
+  link,
+  index: 'a0',
+  name: 'G',
+  props: { x: 0, y: 0, width: 10, height: 10 },
+})
+
+const frame = (pageId: string, order: string) => ({
+  pageId,
+  name: 'F',
+  width: 100,
+  height: 100,
+  x: 0,
+  y: 0,
+  fills: [],
+  order,
+})
+
 describe('parseDesign', () => {
   it('accepts a minimal design and fills in defaults', () => {
     const result = parse(minimal())
@@ -25,36 +66,23 @@ describe('parseDesign', () => {
     expect(box?.props.opacity).toBe(1)
     expect(box?.props.rotation).toBe(0)
     expect(box?.props.visible).toBe(true)
+    expect(box?.link).toBe('r1')
   })
 
-  const errorsFor = (mutate: (d: ReturnType<typeof minimal>) => void) => {
+  it('gives a frame without fills an empty background', () => {
     const d = minimal()
-    mutate(d)
-    const result = parse(d)
-    return result.success ? [] : result.errors
-  }
-
-  const withBanner = (d: ReturnType<typeof minimal>) =>
-    Object.assign(d.formats, { banner: { name: 'Banner', width: 320, height: 50, order: 'a1' } })
-
-  it('accepts format overrides of per-format and shared properties, and fills in their defaults', () => {
-    const d = minimal()
-    withBanner(d)
-    Object.assign(d.overrides, {
-      'format:banner': {
-        r1: {
-          x: 4,
-          width: 60,
-          visible: false,
-          effects: [{ type: 'dropShadow', x: 0, y: 2, blur: 4, color: '#00000080' }],
-        },
-      },
-    })
+    delete (d.frames.sq as { fills?: unknown }).fills
     const result = parse(d)
     if (!result.success) throw new Error(result.errors.join('\n'))
-    expect(result.design.overrides['format:banner']?.r1?.effects).toEqual([
-      { type: 'dropShadow', x: 0, y: 2, blur: 4, spread: 0, color: '#00000080' },
-    ])
+    expect(result.design.frames.sq?.fills).toEqual([])
+  })
+
+  it('rejects a frame whose size is not whole pixels', () => {
+    expect(
+      errorsFor((d) => {
+        d.frames.sq.width = 100.5
+      }),
+    ).toEqual(['frames.sq.width: Invalid input: expected int, received number'])
   })
 
   it('rejects colours that are not #RRGGBBAA', () => {
@@ -65,44 +93,12 @@ describe('parseDesign', () => {
     ).toEqual(['nodes.r1.props.fills.0.color: colours are #RRGGBBAA'])
   })
 
-  it('rejects a layer whose parent does not exist', () => {
+  it('rejects a layer without a link id', () => {
     expect(
       errorsFor((d) => {
-        d.nodes.r1.parentId = 'ghost'
+        delete (d.nodes.r1 as { link?: string }).link
       }),
-    ).toEqual(['nodes.r1.parentId: parent "ghost" is neither a page nor a layer'])
-  })
-
-  it('rejects a layer inside a graphic', () => {
-    expect(
-      errorsFor((d) => {
-        Object.assign(d.nodes, { r2: { ...d.nodes.r1, parentId: 'r1' } })
-      }),
-    ).toEqual(['nodes.r2.parentId: parent "r1" is a graphic, which can\'t hold layers'])
-  })
-
-  const group = (parentId: string) => ({
-    type: 'group',
-    parentId,
-    index: 'a0',
-    name: 'G',
-    props: { x: 0, y: 0, width: 10, height: 10 },
-  })
-
-  it('rejects groups that contain each other', () => {
-    expect(
-      errorsFor((d) => {
-        Object.assign(d.nodes, { g1: group('g2'), g2: group('g1') })
-      }),
-    ).toEqual(['nodes.g1.parentId: "g1" is inside itself', 'nodes.g2.parentId: "g2" is inside itself'])
-  })
-
-  it('names only the layers in a cycle, not a layer hanging below it', () => {
-    expect(
-      errorsFor((d) => {
-        Object.assign(d.nodes, { g0: group('g1'), g1: group('g2'), g2: group('g1') })
-      }),
-    ).toEqual(['nodes.g1.parentId: "g1" is inside itself', 'nodes.g2.parentId: "g2" is inside itself'])
+    ).toEqual(['nodes.r1.link: Invalid input: expected string, received undefined'])
   })
 
   it('rejects a text run that ends past the text', () => {
@@ -111,7 +107,8 @@ describe('parseDesign', () => {
         Object.assign(d.nodes, {
           t1: {
             type: 'text',
-            parentId: 'p1',
+            parentId: 'sq',
+            link: 't1',
             index: 'a1',
             name: 'Headline',
             props: {
@@ -128,48 +125,6 @@ describe('parseDesign', () => {
       }),
     ).toEqual(['nodes.t1.props.runs.0.end: run ends at 9 but the text is 4 UTF-16 units long'])
   })
-
-  it('rejects a format override of text that leaves a style run past its end', () => {
-    expect(
-      errorsFor((d) => {
-        withBanner(d)
-        Object.assign(d.nodes, {
-          t1: {
-            type: 'text',
-            parentId: 'p1',
-            index: 'a1',
-            name: 'Headline',
-            props: {
-              x: 0,
-              y: 0,
-              width: 500,
-              height: 80,
-              text: 'Summer sale',
-              style: { fontFamily: 'Noto Sans', fontSize: 64, color: '#000000FF' },
-              runs: [{ start: 7, end: 11, style: { fontWeight: 700 } }],
-            },
-          },
-        })
-        Object.assign(d.overrides, { 'format:banner': { t1: { text: 'Sale' } } })
-      }),
-    ).toEqual(['overrides.format:banner.t1.runs.0.end: run ends at 11 but the text is 4 UTF-16 units long'])
-  })
-
-  it('rejects overrides for unknown formats, layers and properties, and invalid values', () => {
-    expect(
-      errorsFor((d) => {
-        Object.assign(d.overrides, {
-          'format:nope': { r1: { x: 1 } },
-          'format:sq': { ghost: { x: 1 }, r1: { text: 'hi', opacity: 2 } },
-        })
-      }),
-    ).toEqual([
-      'overrides.format:nope: no format "nope"',
-      'overrides.format:sq.ghost: no layer "ghost"',
-      'overrides.format:sq.r1.text: a graphic has no property "text"',
-      'overrides.format:sq.r1.opacity: Too big: expected number to be <=1',
-    ])
-  })
 })
 
 describe('text runs', () => {
@@ -177,7 +132,8 @@ describe('text runs', () => {
     const d = minimal() as ReturnType<typeof minimal> & { nodes: Record<string, unknown> }
     d.nodes.t1 = {
       type: 'text',
-      parentId: 'p1',
+      parentId: 'sq',
+      link: 't1',
       index: 'a1',
       name: 'Headline',
       props: {
@@ -198,19 +154,29 @@ describe('text runs', () => {
 })
 
 describe('imageAssetIds', () => {
-  it('finds image fills on pages, layers and format overrides, once each', () => {
+  it('finds image fills on frames and layers, once each', () => {
     const image = (assetId: string) => ({ type: 'image', assetId })
     const parsed = parseDesign({
-      meta: { designId: 'd', name: 'D', kind: 'single', primaryFormatId: 'sq' },
-      formats: {
-        sq: { name: 'Square', width: 100, height: 100, order: 'a0' },
-        st: { name: 'Story', width: 100, height: 200, order: 'a1' },
+      meta: { designId: 'd', name: 'D' },
+      pages: { p1: { name: 'P', order: 'a0' } },
+      frames: {
+        sq: { pageId: 'p1', name: 'Square', width: 100, height: 100, x: 0, y: 0, fills: [image('sq-bg')], order: 'a0' },
+        st: {
+          pageId: 'p1',
+          name: 'Story',
+          width: 100,
+          height: 200,
+          x: 300,
+          y: 0,
+          fills: [image('st-bg')],
+          order: 'a1',
+        },
       },
-      pages: { p1: { name: 'P', order: 'a0', fills: [image('page-bg')] } },
       nodes: {
         g: {
           type: 'graphic',
-          parentId: 'p1',
+          parentId: 'sq',
+          link: 'g',
           index: 'a0',
           name: 'G',
           props: {
@@ -224,21 +190,29 @@ describe('imageAssetIds', () => {
         },
         h: {
           type: 'graphic',
-          parentId: 'p1',
+          parentId: 'sq',
+          link: 'h',
           index: 'a1',
           name: 'H',
           props: { x: 0, y: 0, width: 10, height: 10, shape: { kind: 'rect' }, fills: [image('photo')] },
         },
+        'st-g': {
+          type: 'graphic',
+          parentId: 'st',
+          link: 'g',
+          index: 'a0',
+          name: 'G',
+          props: { x: 0, y: 0, width: 10, height: 20, shape: { kind: 'rect' }, fills: [image('story-photo')] },
+        },
       },
-      overrides: { 'format:st': { g: { fills: [image('story-photo')] } } },
     })
     if (!parsed.success) throw new Error(parsed.errors.join('\n'))
-    expect(imageAssetIds(parsed.design)).toEqual(['page-bg', 'photo', 'story-photo'])
+    expect(imageAssetIds(parsed.design)).toEqual(['photo', 'sq-bg', 'st-bg', 'story-photo'])
   })
 })
 
 describe('fontFamilies', () => {
-  it('finds the families of base styles, runs and format overrides, once each', () => {
+  it('finds the families of base styles and runs, once each', () => {
     const text = (fontFamily: string, runs: unknown[] = []) => ({
       x: 0,
       y: 0,
@@ -249,16 +223,17 @@ describe('fontFamilies', () => {
       runs,
     })
     const parsed = parseDesign({
-      meta: { designId: 'd', name: 'D', kind: 'single', primaryFormatId: 'sq' },
-      formats: {
-        sq: { name: 'Square', width: 100, height: 100, order: 'a0' },
-        st: { name: 'Story', width: 100, height: 200, order: 'a1' },
-      },
+      meta: { designId: 'd', name: 'D' },
       pages: { p1: { name: 'P', order: 'a0' } },
+      frames: {
+        sq: { pageId: 'p1', name: 'Square', width: 100, height: 100, x: 0, y: 0, fills: white, order: 'a0' },
+        st: { pageId: 'p1', name: 'Story', width: 100, height: 200, x: 300, y: 0, fills: white, order: 'a1' },
+      },
       nodes: {
         a: {
           type: 'text',
-          parentId: 'p1',
+          parentId: 'sq',
+          link: 'a',
           index: 'a0',
           name: 'A',
           props: text('Inter', [
@@ -266,18 +241,163 @@ describe('fontFamilies', () => {
             { start: 5, end: 8, style: { fontWeight: 700 } },
           ]),
         },
-        b: { type: 'text', parentId: 'p1', index: 'a1', name: 'B', props: text('Inter') },
+        b: { type: 'text', parentId: 'sq', link: 'b', index: 'a1', name: 'B', props: text('Inter') },
+        'st-b': { type: 'text', parentId: 'st', link: 'b', index: 'a1', name: 'B', props: text('Bebas Neue') },
         g: {
           type: 'graphic',
-          parentId: 'p1',
+          parentId: 'sq',
+          link: 'g',
           index: 'a2',
           name: 'G',
           props: { x: 0, y: 0, width: 10, height: 10, shape: { kind: 'rect' } },
         },
       },
-      overrides: { 'format:st': { b: { style: { fontFamily: 'Bebas Neue', fontSize: 30, color: '#000000FF' } } } },
     })
     if (!parsed.success) throw new Error(parsed.errors.join('\n'))
     expect(fontFamilies(parsed.design)).toEqual(['Bebas Neue', 'Inter', 'Lobster'])
+  })
+})
+
+describe('framesOf', () => {
+  it("lists a page's frames by order, ties broken by id", () => {
+    const frames = {
+      c: frame('p1', 'a2'),
+      other: frame('p2', 'a0'),
+      b2: frame('p1', 'a1'),
+      a: frame('p1', 'a0'),
+      b1: frame('p1', 'a1'),
+    }
+    expect(framesOf({ frames }, 'p1').map(([id]) => id)).toEqual(['a', 'b1', 'b2', 'c'])
+    expect(framesOf({ frames }, 'p2')).toEqual([['other', frames.other]])
+    expect(framesOf({ frames }, 'p3')).toEqual([])
+  })
+})
+
+describe('coverFrame', () => {
+  it('is the first frame of the first page', () => {
+    const pages = { p2: { name: 'Two', order: 'a1' }, p1: { name: 'One', order: 'a0' } }
+    const frames = { late: frame('p1', 'a1'), first: frame('p1', 'a0'), two: frame('p2', 'a0') }
+    expect(coverFrame({ pages, frames })).toEqual(['first', frames.first])
+  })
+
+  it('skips pages with no frame, and is undefined when no page has one', () => {
+    const pages = { p1: { name: 'One', order: 'a0' }, p2: { name: 'Two', order: 'a1' } }
+    const two = frame('p2', 'a0')
+    expect(coverFrame({ pages, frames: { two } })).toEqual(['two', two])
+    expect(coverFrame({ pages, frames: {} })).toBeUndefined()
+  })
+})
+
+describe('newFramePosition', () => {
+  it('puts the first frame at 0, 0', () => {
+    expect(newFramePosition([])).toEqual({ x: 0, y: 0 })
+  })
+
+  it("puts a frame 200 px right of the page's rightmost frame, its top aligned with that frame's", () => {
+    expect(FRAME_GAP).toBe(200)
+    const frames = [
+      { x: 0, y: 40, width: 1080 },
+      { x: 600, y: -300, width: 728 },
+      { x: 1200, y: 90, width: 100 },
+    ]
+    expect(newFramePosition(frames)).toEqual({ x: 1528, y: -300 })
+  })
+
+  it('takes the first in the list of frames whose right edges tie', () => {
+    const frames = [
+      { x: 0, y: 10, width: 500 },
+      { x: 400, y: 20, width: 100 },
+    ]
+    expect(newFramePosition(frames)).toEqual({ x: 700, y: 10 })
+  })
+})
+
+describe('checkStructure', () => {
+  it('passes a design with linked copies in two frames of a page', () => {
+    const d = minimal()
+    Object.assign(d.frames, { banner })
+    Object.assign(d.nodes, { 'banner-r1': { ...d.nodes.r1, parentId: 'banner', link: 'r1' } })
+    const result = parse(d)
+    if (!result.success) throw new Error(result.errors.join('\n'))
+    const errors: string[] = []
+    checkStructure(result.design, (path, message) => errors.push(`${path.join('.')}: ${message}`))
+    expect(errors).toEqual([])
+  })
+
+  it('rejects a design with no page', () => {
+    expect(
+      errorsFor((d) => {
+        Object.assign(d, { pages: {}, frames: {}, nodes: {} })
+      }),
+    ).toEqual(['pages: a design needs a page'])
+  })
+
+  it('rejects a frame whose page is missing', () => {
+    expect(
+      errorsFor((d) => {
+        Object.assign(d.frames, { banner: { ...banner, pageId: 'ghost' } })
+      }),
+    ).toEqual(['frames.banner.pageId: no page "ghost"'])
+  })
+
+  it('rejects a layer id that is also a frame id', () => {
+    expect(
+      errorsFor((d) => {
+        Object.assign(d.frames, { banner })
+        Object.assign(d.nodes, { banner: { ...d.nodes.r1, link: 'banner' } })
+      }),
+    ).toEqual(['nodes.banner: "banner" is both a frame and a layer'])
+  })
+
+  it('rejects a layer whose parent is neither a frame nor a layer, a page included', () => {
+    expect(
+      errorsFor((d) => {
+        d.nodes.r1.parentId = 'ghost'
+      }),
+    ).toEqual(['nodes.r1.parentId: parent "ghost" is neither a frame nor a layer'])
+    expect(
+      errorsFor((d) => {
+        d.nodes.r1.parentId = 'p1'
+      }),
+    ).toEqual(['nodes.r1.parentId: parent "p1" is neither a frame nor a layer'])
+  })
+
+  it('rejects a layer inside a graphic', () => {
+    expect(
+      errorsFor((d) => {
+        Object.assign(d.nodes, { r2: { ...d.nodes.r1, parentId: 'r1', link: 'r2' } })
+      }),
+    ).toEqual(['nodes.r2.parentId: parent "r1" is a graphic, which can\'t hold layers'])
+  })
+
+  it('rejects groups that contain each other, with no link error for the layers in the loop', () => {
+    expect(
+      errorsFor((d) => {
+        Object.assign(d.nodes, { g1: group('g2', 'g'), g2: group('g1', 'g') })
+      }),
+    ).toEqual(['nodes.g1.parentId: "g1" is inside itself', 'nodes.g2.parentId: "g2" is inside itself'])
+  })
+
+  it('names only the layers in a cycle, not a layer hanging below it', () => {
+    expect(
+      errorsFor((d) => {
+        Object.assign(d.nodes, { g0: group('g1', 'g0'), g1: group('g2', 'g1'), g2: group('g1', 'g2') })
+      }),
+    ).toEqual(['nodes.g1.parentId: "g1" is inside itself', 'nodes.g2.parentId: "g2" is inside itself'])
+  })
+
+  it('rejects a frame holding one link id twice, naming the second and later holders', () => {
+    expect(
+      errorsFor((d) => {
+        Object.assign(d.nodes, {
+          g: group('sq', 'g'),
+          r2: { ...d.nodes.r1, parentId: 'g', link: 'r1' },
+          r3: { ...d.nodes.r1, index: 'a1', link: 'r1' },
+        })
+      }),
+    ).toEqual([
+      'nodes.r2.link: frame "sq" holds link "r1" twice, also on "r1"',
+      'nodes.r3.link: frame "sq" holds link "r1" twice, also on "r1"',
+    ])
   })
 })
