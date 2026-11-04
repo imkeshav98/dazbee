@@ -4,28 +4,12 @@
 // bar, only as tall as what it holds and scrolling past the room above the bottom controls. On a
 // phone it is a sheet at the bottom. It closes on ✕, Esc, another selection or a pop-up opening,
 // and gives the focus back to its bar item when closed from inside it.
-import {
-  AlignBottomIcon,
-  AlignCenterHorizontalIcon,
-  AlignCenterVerticalIcon,
-  AlignLeftIcon,
-  AlignRightIcon,
-  AlignTopIcon,
-  ArrowDownIcon,
-  ArrowLineDownIcon,
-  ArrowLineUpIcon,
-  ArrowsOutLineHorizontalIcon,
-  ArrowsOutLineVerticalIcon,
-  ArrowUpIcon,
-  type Icon,
-  XIcon,
-} from '@phosphor-icons/react'
+import { XIcon } from '@phosphor-icons/react'
 import { type CSSProperties, type ReactNode, type RefObject, useEffect, useLayoutEffect, useRef, useState } from 'react'
 
-import type { Editor, ShortcutAction } from '@dazbee/editor'
+import type { Editor } from '@dazbee/editor'
 
 import { useFontCatalog } from '@/components/brand-kit/font-catalog.ts'
-import { ALIGN, keyOf } from '@/components/editor/arrange-actions.ts'
 import {
   isLayerPanel,
   type LayerPanelId,
@@ -37,129 +21,45 @@ import {
 } from '@/components/editor/edit-store.ts'
 import { useSelection } from '@/components/editor/editor-hooks.ts'
 import { FontChooser } from '@/components/editor/flyouts/font-panel.tsx'
-import { factsOf, PanelContent, type Target, useTarget } from '@/components/editor/selection-cards.tsx'
-import { PANEL_BUTTON, PANEL_HEADING, PANEL_PART } from '@/components/editor/styles.ts'
-import { ORDER } from '@/components/editor/top-bar/layer-actions.tsx'
 import { useOverlayScroll } from '@/components/ui/overlay-scroll.ts'
 import { cn } from '@/lib/cn.ts'
 import { useMessages } from '@/lib/i18n/client.tsx'
 import { format } from '@/lib/i18n/index.ts'
 
-/** The four moves along the stack, two to a row: a step forward and back, then all the way. */
-const MOVES: { action: (typeof ORDER)[number]; icon: Icon }[] = [
-  { action: 'bringForward', icon: ArrowUpIcon },
-  { action: 'sendBackward', icon: ArrowDownIcon },
-  { action: 'bringToFront', icon: ArrowLineUpIcon },
-  { action: 'sendToBack', icon: ArrowLineDownIcon },
-]
-/** One layer lines up with its size by these, two to a row: each up-down one beside its across one. */
-const SIZE_ALIGN = [
-  { action: 'alignTop', icon: AlignTopIcon },
-  { action: 'alignLeft', icon: AlignLeftIcon },
-  { action: 'alignMiddle', icon: AlignCenterVerticalIcon },
-  { action: 'alignCentre', icon: AlignCenterHorizontalIcon },
-  { action: 'alignBottom', icon: AlignBottomIcon },
-  { action: 'alignRight', icon: AlignRightIcon },
-] as const satisfies readonly { action: ShortcutAction; icon: Icon }[]
-/** Three or more layers spread out evenly, across or down. */
-const SPREAD = [
-  { action: 'distributeHorizontal', icon: ArrowsOutLineHorizontalIcon },
-  { action: 'distributeVertical', icon: ArrowsOutLineVerticalIcon },
-] as const satisfies readonly { action: ShortcutAction; icon: Icon }[]
+import { AutoLayoutPanel } from './auto-layout-panel.tsx'
+import { ColourPanel } from './colour-panel.tsx'
+import { EffectsPanel } from './effects-panel.tsx'
+import { ImagePanel } from './image-panel.tsx'
+import { StrokePanel } from './outline-panel.tsx'
+import { PositionPanel } from './position-panel.tsx'
+import { SpacingPanel } from './spacing-panel.tsx'
+import { type PanelProps, useTarget } from './target.ts'
+
+/** What each layer panel holds for the selection, by the panel's id. */
+const PANELS: Record<LayerPanelId, (props: PanelProps) => ReactNode> = {
+  font: FontPanel,
+  colour: ColourPanel,
+  spacing: SpacingPanel,
+  effects: EffectsPanel,
+  position: PositionPanel,
+  edit: ImagePanel,
+  outline: StrokePanel,
+  stack: AutoLayoutPanel,
+}
+
+/** The item that opened panel `id`: the one that had the focus as it opened, else the first that opens it. */
+const openerOf = (id: PanelId, opener: Element | null) =>
+  opener instanceof HTMLElement && opener.isConnected && opener.dataset.opens === id
+    ? opener
+    : document.querySelector<HTMLElement>(`[data-opens="${id}"]`)
 
 /**
- * The Position panel's simple choices: the four moves along the stack, then lining up. One layer
- * lines up with its size, by name, unless an auto layout places it (`placed`); several line up
- * with each other, by icon, and three or more spread out evenly. Each button runs its shortcut's action, and its tooltip names the shortcut.
+ * Closes the open panel; with `back`, the focus goes back to the item that opened it at once,
+ * before the panel goes: later, it could take the focus from whatever the next click or key opened.
  */
-function ArrangePart({ target, placed }: { target: Target; placed: boolean }) {
-  const t = useMessages()
-  const a = t.editor.arrange
-  const placing = t.editor.bar.placing
-  const run = (action: ShortcutAction) => target.editor.perform(action)
-  const tip = (label: string, action: ShortcutAction) => format(a.withKey, { label, key: keyOf(action) })
-  const several = target.ids.length > 1
-  // Spreading needs a layer between the two at the ends.
-  const spreads = target.ids.length >= 3
-  return (
-    <section aria-labelledby="arrange-part-title" className={PANEL_PART} data-testid="arrange-part">
-      <h3 id="arrange-part-title" className={PANEL_HEADING}>
-        {placing.arrange}
-      </h3>
-      <div className="grid grid-cols-2 gap-1.5">
-        {MOVES.map(({ action, icon: Icon }) => (
-          <button
-            key={action}
-            type="button"
-            data-action={action}
-            title={tip(a[action], action)}
-            onClick={() => run(action)}
-            className={PANEL_BUTTON}
-          >
-            <Icon size={14} aria-hidden className="shrink-0" />
-            <span>{placing[action]}</span>
-          </button>
-        ))}
-      </div>
-      {several ? (
-        <>
-          <h3 className={PANEL_HEADING}>{placing.lineUpSelection}</h3>
-          <div dir="ltr" className="grid grid-cols-3 gap-1.5">
-            {ALIGN.map(({ action, icon: Icon }) => (
-              <button
-                key={action}
-                type="button"
-                data-action={action}
-                aria-label={a[action]}
-                title={tip(a[action], action)}
-                onClick={() => run(action)}
-                className={cn(PANEL_BUTTON, 'justify-center')}
-              >
-                <Icon size={16} aria-hidden />
-              </button>
-            ))}
-          </div>
-          <div className="grid gap-1.5">
-            {SPREAD.map(({ action, icon: Icon }) => (
-              <button
-                key={action}
-                type="button"
-                data-action={action}
-                disabled={!spreads}
-                title={spreads ? tip(a[action], action) : placing.needsThree}
-                onClick={() => run(action)}
-                className={PANEL_BUTTON}
-              >
-                <Icon size={14} aria-hidden className="shrink-0" />
-                <span>{placing[action]}</span>
-              </button>
-            ))}
-          </div>
-        </>
-      ) : (
-        !placed && (
-          <>
-            <h3 className={PANEL_HEADING}>{placing.lineUpSize}</h3>
-            <div className="grid grid-cols-2 gap-1.5">
-              {SIZE_ALIGN.map(({ action, icon: Icon }) => (
-                <button
-                  key={action}
-                  type="button"
-                  data-action={action}
-                  title={tip(a[action], action)}
-                  onClick={() => run(action)}
-                  className={PANEL_BUTTON}
-                >
-                  <Icon size={15} aria-hidden className="shrink-0" />
-                  <span>{placing[action]}</span>
-                </button>
-              ))}
-            </div>
-          </>
-        )
-      )}
-    </section>
-  )
+function closePanel(id: PanelId, back: boolean, opener: Element | null = null) {
+  if (back) openerOf(id, opener)?.focus()
+  setOpen(null)
 }
 
 /**
@@ -193,63 +93,6 @@ export function EditPanel({ editor, brandId }: { editor: Editor; brandId: string
   if (!isLayerPanel(open) || !selected) return null
   return <Panel key={open} id={open} target={selected.target} design={selected.design} brandId={brandId} />
 }
-
-function Panel({
-  id,
-  target,
-  design,
-  brandId,
-}: {
-  id: LayerPanelId
-  target: Target
-  design: Parameters<typeof PanelContent>[0]['design']
-  brandId: string
-}) {
-  const t = useMessages()
-  const { catalog, refresh } = useFontCatalog(brandId)
-  const note =
-    target.ids.length > 1
-      ? format(t.editor.props.layers, { n: target.ids.length })
-      : target.names[0] || t.editor.props.layer
-  return (
-    <PanelFrame id={id} title={t.editor.bar.panels[id]} note={note}>
-      {id === 'font' ? (
-        <FontChooser
-          editor={target.editor}
-          brandId={brandId}
-          catalog={catalog}
-          refresh={refresh}
-          onDone={() => closePanel(id, true)}
-        />
-      ) : (
-        <>
-          {id === 'position' && (
-            <ArrangePart
-              target={target}
-              placed={factsOf(target, design).inFlow && target.props.every((pr) => pr.absolute !== true)}
-            />
-          )}
-          <PanelContent panel={id} target={target} design={design} brandId={brandId} />
-        </>
-      )}
-    </PanelFrame>
-  )
-}
-
-/**
- * Closes the open panel; with `back`, the focus goes back to the item that opened it at once,
- * before the panel goes: later, it could take the focus from whatever the next click or key opened.
- */
-function closePanel(id: PanelId, back: boolean, opener: Element | null = null) {
-  if (back) openerOf(id, opener)?.focus()
-  setOpen(null)
-}
-
-/** The item that opened panel `id`: the one that had the focus as it opened, else the first that opens it. */
-const openerOf = (id: PanelId, opener: Element | null) =>
-  opener instanceof HTMLElement && opener.isConnected && opener.dataset.opens === id
-    ? opener
-    : document.querySelector<HTMLElement>(`[data-opens="${id}"]`)
 
 /**
  * The edit panel's frame, for a layer's panels and the design's own (Sizes, Pages, Background): its title, a note and
@@ -401,5 +244,34 @@ export function PanelFrame({
         {children}
       </div>
     </section>
+  )
+}
+
+function Panel({ id, ...props }: PanelProps & { id: LayerPanelId }) {
+  const t = useMessages()
+  const { target } = props
+  const Content = PANELS[id]
+  const note =
+    target.ids.length > 1
+      ? format(t.editor.props.layers, { n: target.ids.length })
+      : target.names[0] || t.editor.props.layer
+  return (
+    <PanelFrame id={id} title={t.editor.bar.panels[id]} note={note}>
+      <Content {...props} />
+    </PanelFrame>
+  )
+}
+
+/** The Font panel: the brand's fonts to pick from; picking one closes the panel. */
+function FontPanel({ target, brandId }: PanelProps) {
+  const { catalog, refresh } = useFontCatalog(brandId)
+  return (
+    <FontChooser
+      editor={target.editor}
+      brandId={brandId}
+      catalog={catalog}
+      refresh={refresh}
+      onDone={() => closePanel('font', true)}
+    />
   )
 }

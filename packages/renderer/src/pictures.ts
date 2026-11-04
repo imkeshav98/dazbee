@@ -1,7 +1,10 @@
 import type { Canvas, CanvasKit, SkPicture as Picture } from '@dazbee/canvaskit'
 
-import type { Resources } from './draw.ts'
+import { lru } from './lru.ts'
+import type { Resources } from './resources.ts'
 import type { SceneLayer } from './scene.ts'
+
+export type LayerPictures = ReturnType<typeof layerPictures>
 
 /** Wide enough for any layer on any page: playback never clips to it, the page clip does. */
 const ANYWHERE = 1e6
@@ -14,45 +17,33 @@ const ANYWHERE = 1e6
  * pictures go past `limit`.
  */
 export function layerPictures(limit = 4000) {
-  const entries = new Map<SceneLayer, Picture>()
+  // The recorded pictures by layer, least recently used first.
+  const entries = lru<SceneLayer, Picture>(limit, (picture) => picture.delete())
+  // The fonts, images and fallback families the kept pictures were drawn with.
   let drawnWith: Pick<Resources, 'fonts' | 'images' | 'fallbackFamilies'> | null = null
-  const clear = () => {
-    for (const picture of entries.values()) picture.delete()
-    entries.clear()
+
+  function picture(ck: CanvasKit, layer: SceneLayer, resources: Resources, draw: (canvas: Canvas) => void): Picture {
+    if (
+      drawnWith?.fonts !== resources.fonts ||
+      drawnWith.images !== resources.images ||
+      drawnWith.fallbackFamilies !== resources.fallbackFamilies
+    ) {
+      entries.clear()
+      drawnWith = resources
+    }
+    return entries.get(layer, () => record(ck, draw))
   }
-  return {
-    picture(ck: CanvasKit, layer: SceneLayer, resources: Resources, draw: (canvas: Canvas) => void): Picture {
-      if (
-        drawnWith?.fonts !== resources.fonts ||
-        drawnWith.images !== resources.images ||
-        drawnWith.fallbackFamilies !== resources.fallbackFamilies
-      ) {
-        clear()
-        drawnWith = resources
-      }
-      const hit = entries.get(layer)
-      if (hit) {
-        entries.delete(layer)
-        entries.set(layer, hit)
-        return hit
-      }
-      const recorder = new ck.PictureRecorder()
-      let picture: Picture
-      try {
-        draw(recorder.beginRecording(ck.XYWHRect(-ANYWHERE, -ANYWHERE, 2 * ANYWHERE, 2 * ANYWHERE)))
-        picture = recorder.finishRecordingAsPicture()
-      } finally {
-        recorder.delete()
-      }
-      entries.set(layer, picture)
-      for (const [oldest, old] of entries) {
-        if (entries.size <= limit) break
-        entries.delete(oldest)
-        old.delete()
-      }
-      return picture
-    },
-    delete: clear,
+
+  return { picture, delete: entries.clear }
+}
+
+/** What `draw` draws, recorded as a picture. */
+function record(ck: CanvasKit, draw: (canvas: Canvas) => void): Picture {
+  const recorder = new ck.PictureRecorder()
+  try {
+    draw(recorder.beginRecording(ck.XYWHRect(-ANYWHERE, -ANYWHERE, 2 * ANYWHERE, 2 * ANYWHERE)))
+    return recorder.finishRecordingAsPicture()
+  } finally {
+    recorder.delete()
   }
 }
-export type LayerPictures = ReturnType<typeof layerPictures>

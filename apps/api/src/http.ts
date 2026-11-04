@@ -1,14 +1,19 @@
 // What every area's routes share: the context they run in, the error body, reading a request's body,
-// and the check that a request has a session.
+// the check that a request has a session, and the brand a brand route is for.
 import type { MiddlewareHandler } from 'hono'
 import type { z } from 'zod'
 
-import type { ApiError } from '@dazbee/schema'
+import type { Db } from '@dazbee/db'
+import type { ApiError, BrandSummary } from '@dazbee/schema'
 
-import type { Session, SessionOf } from './session.ts'
+import type { Session, SessionOf } from './sign-in/session.ts'
+import { findBrand } from './workspace/workspace.ts'
 
-/** A route's context: the session `requireSession` found. */
-export type Env = { Variables: { session: Session } }
+/**
+ * A route's context: the session `requireSession` found and, on every `/brands/:brandId/*` route, the
+ * brand `brandScope` found in that session's workspace.
+ */
+export type Env = { Variables: { session: Session; brand: BrandSummary } }
 
 /** The body of every error answer. */
 export const error = (message: string): ApiError => ({ error: message })
@@ -36,6 +41,19 @@ export function requireSession(sessionOf: SessionOf): MiddlewareHandler<Env> {
     const session = await sessionOf(c.req.raw)
     if (!session) return c.json(error('Sign in first'), 401)
     c.set('session', session)
+    await next()
+  }
+}
+
+/**
+ * Answers 404 "No such brand" when the route's `:brandId` is not a brand of the session's workspace;
+ * otherwise puts the brand on the context. It runs after `requireSession`.
+ */
+export function brandScope(db: Db): MiddlewareHandler<Env> {
+  return async (c, next) => {
+    const brand = await findBrand(db, c.var.session.workspaceId, c.req.param('brandId') ?? '')
+    if (!brand) return c.json(error('No such brand'), 404)
+    c.set('brand', brand)
     await next()
   }
 }

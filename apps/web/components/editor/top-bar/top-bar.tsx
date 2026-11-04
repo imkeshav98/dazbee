@@ -43,6 +43,21 @@ import { boundFillIndex, type Design, type Paint } from '@dazbee/schema'
 
 import { nearest, useFontCatalog, weightsOf } from '@/components/brand-kit/font-catalog.ts'
 import { COMBINE, DISTRIBUTE, keyOf } from '@/components/editor/arrange-actions.ts'
+import { PopupContent } from '@/components/editor/edit-panel/popups.tsx'
+import { ScopeChip } from '@/components/editor/edit-panel/scope-chip.tsx'
+import {
+  factsOf,
+  imageFillOf,
+  kindOf,
+  set,
+  setTextFlag,
+  shared,
+  type Style,
+  type Target,
+  textFlag,
+  textStyle,
+  useTarget,
+} from '@/components/editor/edit-panel/target.ts'
 import {
   editState,
   isLayerPanel,
@@ -56,21 +71,6 @@ import {
 } from '@/components/editor/edit-store.ts'
 import { usePickedPage, useSelection } from '@/components/editor/editor-hooks.ts'
 import { ImagePickerButton } from '@/components/editor/image-tool.tsx'
-import {
-  factsOf,
-  imageFillOf,
-  kindOf,
-  PopupContent,
-  ScopeChip,
-  set,
-  setTextFlag,
-  shared,
-  type Style,
-  type Target,
-  textFlag,
-  textStyle,
-  useTarget,
-} from '@/components/editor/selection-cards.tsx'
 import {
   BAR_BUTTON,
   BAR_DIVIDER,
