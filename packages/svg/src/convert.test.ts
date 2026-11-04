@@ -1,8 +1,9 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 import { loadCanvasKit } from '@dazbee/renderer/node'
 
 import { SvgError, svgToLayers } from './convert.ts'
+import { growth, MAX_GROWTH } from './test-growth.ts'
 
 const ck = await loadCanvasKit()
 const svg = (body: string, attrs = 'width="100" height="100"') =>
@@ -19,6 +20,32 @@ const problem = (text: string) => {
   }
   return 'none'
 }
+
+/** The elements the conversion has read, while `limit` is set: past it, the next read throws. */
+const reads = vi.hoisted(() => ({ count: 0, limit: Number.POSITIVE_INFINITY }))
+vi.mock('./style.ts', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./style.ts')>()
+  return {
+    ...actual,
+    // The conversion works out the style of each element it reads, so this counts the reads.
+    styleOf: (...args: Parameters<typeof actual.styleOf>) => {
+      if (++reads.count > reads.limit) throw new Error(`read more than ${reads.limit} elements`)
+      return actual.styleOf(...args)
+    },
+  }
+})
+/** What the conversion makes of `text`, and how many elements it read, stopping it past `limit`. */
+const elementsRead = (text: string, limit: number) => {
+  reads.count = 0
+  reads.limit = limit
+  try {
+    return { problem: problem(text), count: reads.count }
+  } finally {
+    reads.limit = Number.POSITIVE_INFINITY
+  }
+}
+/** The conversion's work budget: it reads at most this many elements of a file, then refuses it. */
+const WORK_BUDGET = 100_000
 
 describe('svgToLayers', () => {
   it('makes a path layer for each shape, in one group, with its box in the design', () => {
@@ -173,11 +200,13 @@ describe('svgToLayers with hostile files', () => {
     const fan = (id: string, to: string) =>
       `<g id="${id}">${Array.from({ length: 10 }, () => `<use href="#${to}"/>`).join('')}</g>`
     const levels = Array.from({ length: 30 }, (_, i) => fan(`e${i + 1}`, `e${i}`)).join('')
-    const started = performance.now()
-    expect(problem(svg(`<defs><g id="e0"/>${levels}</defs><rect width="5" height="5"/><use href="#e30"/>`))).toBe(
-      'too-big',
+    // Stopped at twice the budget, so a fan that runs away fails at once.
+    const fan30 = elementsRead(
+      svg(`<defs><g id="e0"/>${levels}</defs><rect width="5" height="5"/><use href="#e30"/>`),
+      2 * WORK_BUDGET,
     )
-    expect(performance.now() - started).toBeLessThan(2_000)
+    expect(fan30.problem).toBe('too-big')
+    expect(fan30.count).toBeLessThanOrEqual(WORK_BUDGET)
   })
 
   it('leaves out a mask that masks itself, or two that mask each other', () => {
@@ -201,12 +230,34 @@ describe('svgToLayers with hostile files', () => {
     expect(problem(svg(`<defs><rect id="c0" width="1" height="1"/>${chain}</defs><use href="#c30"/>`))).toBe('too-big')
   })
 
-  it('reads a flood of comments or a style sheet with no braces in a moment', () => {
-    const started = performance.now()
-    expect(problem(`${'<!--a-->'.repeat(5_000)}x`)).toBe('unreadable')
-    expect(problem(svg(`<style>${'a'.repeat(200_000)}</style><rect width="5" height="5"/>`))).toBe('none')
-    expect(problem(svg(`<style>${'/*'.repeat(50_000)}</style><rect width="5" height="5"/>`))).toBe('none')
-    expect(performance.now() - started).toBeLessThan(2_000)
+  it('reads a flood of comments or a style sheet with no braces in linear time', () => {
+    const floods = [
+      {
+        name: 'a flood of comments',
+        file: (n: number) => `${'<!--a-->'.repeat(n)}x`,
+        tenth: 500,
+        problem: 'unreadable',
+      },
+      {
+        name: 'a style sheet with no braces',
+        file: (n: number) => svg(`<style>${'a'.repeat(n)}</style><rect width="5" height="5"/>`),
+        tenth: 20_000,
+        problem: 'none',
+      },
+      {
+        name: 'a style sheet of open comments',
+        file: (n: number) => svg(`<style>${'/*'.repeat(n)}</style><rect width="5" height="5"/>`),
+        tenth: 5_000,
+        problem: 'none',
+      },
+    ]
+    for (const flood of floods) {
+      expect(problem(flood.file(flood.tenth)), flood.name).toBe(flood.problem)
+      const grown = growth(problem, flood.file(flood.tenth), flood.file(flood.tenth * 10))
+      console.log(`[growth-log] ${flood.name}: ${grown.times.toFixed(2)}`)
+      expect(grown.result, flood.name).toBe(flood.problem)
+      expect(grown.times, flood.name).toBeLessThan(MAX_GROWTH)
+    }
   })
 
   it('refuses what is not an SVG, or not well formed, or draws nothing', () => {

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { svgMarkup } from './sniff.ts'
+import { growth, MAX_GROWTH } from './test-growth.ts'
 
 describe('svgMarkup', () => {
   it('takes markup that opens with <svg after a declaration, comments and a doctype', () => {
@@ -27,10 +28,17 @@ describe('svgMarkup', () => {
     }
   })
 
-  it('checks a flood of comments in a moment', () => {
-    const started = performance.now()
-    expect(svgMarkup(`${'<!--a-->'.repeat(100_000)}x`)).toBeNull()
-    expect(svgMarkup(`${'<!--a-->'.repeat(100_000)}<svg/>`)).not.toBeNull()
-    expect(performance.now() - started).toBeLessThan(1_000)
+  it('checks a flood of comments in linear time', () => {
+    const floods = [
+      { name: 'a flood of comments before text', after: 'x', isSvg: false },
+      { name: 'a flood of comments before <svg/>', after: '<svg/>', isSvg: true },
+    ]
+    for (const flood of floods) {
+      const file = (n: number) => `${'<!--a-->'.repeat(n)}${flood.after}`
+      const grown = growth(svgMarkup, file(1_000), file(10_000))
+      console.log(`[growth-log] ${flood.name}: ${grown.times.toFixed(2)}`)
+      expect(grown.result !== null, flood.name).toBe(flood.isSvg)
+      expect(grown.times, flood.name).toBeLessThan(MAX_GROWTH)
+    }
   })
 })
