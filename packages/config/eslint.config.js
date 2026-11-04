@@ -47,4 +47,21 @@ export default tseslint.config(
       'simple-import-sort/imports': ['error', { groups: IMPORT_GROUPS }],
     },
   },
+  {
+    // Everything is declared above its first use, except a function declaration a function body calls.
+    files: ['**/*.ts', '**/*.tsx', '**/*.mts', '**/*.cts'],
+    rules: {
+      '@typescript-eslint/no-use-before-define': [
+        'error',
+        { functions: false, classes: true, variables: true, typedefs: true, ignoreTypeReferences: false },
+      ],
+    },
+  },
+  {
+    // A TypeScript file, tests included, holds at most 500 lines of code. apps/web exempts its message
+    // catalogs. Generated files sit in the ignores above, and vendored TypeScript only in packages/canvaskit,
+    // which has no ESLint config.
+    files: ['**/*.ts', '**/*.tsx', '**/*.mts', '**/*.cts'],
+    rules: { 'max-lines': ['error', { max: 500, skipBlankLines: true, skipComments: true }] },
+  },
 )

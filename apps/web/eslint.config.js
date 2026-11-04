@@ -59,6 +59,11 @@ export default [
   },
   ...FOLDERS.map(([files, paths]) => mayImport(files, paths)),
   {
+    // The message catalogs hold one entry per string the UI shows, so they have no size limit.
+    files: ['lib/i18n/**'],
+    rules: { 'max-lines': 'off' },
+  },
+  {
     // The offline worker (#37) runs in a service worker, not a page.
     files: ['public/sw.js'],
     languageOptions: { globals: globals.serviceworker },
