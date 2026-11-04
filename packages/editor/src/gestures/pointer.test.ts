@@ -244,6 +244,20 @@ describe('editorPointer', () => {
       expect(cursor()).toBe('')
       expect(log).toEqual(['prevent Space', 'camera 20 15', 'release press', 'draw overlay', 'prevent Space'])
     })
+
+    it('lets Space reach a focused control instead of panning', () => {
+      const { pointer, log } = harness()
+      // Tab to a dock button and press Space: the browser presses the button.
+      const focused = { closest: () => null }
+      const button = {
+        closest: (selector: string) => (selector.includes('button') ? focused : null),
+      }
+      expect(pointer.keyDown(key('Space', log, { target: button }))).toBe(false)
+      expect(log).toEqual([])
+      // With the focus back on the page (no control), Space pans again.
+      expect(pointer.keyDown(key('Space', log, { target: null }))).toBe(true)
+      expect(log).toEqual(['prevent Space'])
+    })
   })
 
   describe('wheel', () => {

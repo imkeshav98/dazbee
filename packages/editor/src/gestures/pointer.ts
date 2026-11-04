@@ -215,6 +215,12 @@ export function editorPointer({
 
   function keyDown(e: KeyboardEvent) {
     if (e.code !== 'Space' || e.metaKey || e.ctrlKey) return false
+    // Space pans only while no other control holds the focus: a focused dock
+    // button must get its own Space press, so the browser keeps the key.
+    const target = e.target as { closest?: (selector: string) => Element | null } | undefined
+    if (target?.closest?.('button, a, input, textarea, select, [contenteditable="true"], [role="button"]')) {
+      return false
+    }
     e.preventDefault()
     if (!spaceHeld) {
       spaceHeld = true
