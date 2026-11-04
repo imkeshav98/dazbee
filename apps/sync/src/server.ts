@@ -1,6 +1,7 @@
 // The sync server: Hocuspocus relaying Yjs updates between tabs, with Postgres keeping each design.
 // A connection opens a design only with a sync token the API issued for that design (#34). When the
-// last connection leaves, deleted layers are compacted away before the design is stored (#57).
+// last connection leaves, deleted layers and layers left in no frame are compacted away before the
+// design is stored (#57).
 import { Database } from '@hocuspocus/extension-database'
 import { Server } from '@hocuspocus/server'
 

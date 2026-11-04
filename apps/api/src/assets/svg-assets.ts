@@ -23,37 +23,32 @@ export async function readSvgHeader(bytes: Uint8Array): Promise<ImageHeader | nu
   }
 }
 
-/** The file's layers drawn on a see-through page, `size` pixels on the longer side, as a PNG. */
+/** The file's layers drawn in a see-through frame, `size` pixels on the longer side, as a PNG. */
 export async function svgThumbnail(bytes: Uint8Array, size: number): Promise<Uint8Array> {
   const text = svgText(bytes)
   if (!text) throw new Error('not an SVG file')
   const ck = await loadCanvasKit()
   const { tree, root, width, height } = svgToLayers(ck, text, { fit: size })
   const nodes = Object.fromEntries(
-    Object.entries(tree.nodes).map(([id, node]) => [
-      id,
-      id === root ? { ...node, parentId: 'page', index: 'a0' } : node,
-    ]),
+    Object.entries(tree.nodes).map(([id, node]) => [id, id === root ? { ...node, parentId: 'f', index: 'a0' } : node]),
   )
   const design = {
-    meta: {
-      designId: 'thumbnail',
-      name: 'Thumbnail',
-      kind: 'single',
-      primaryFormatId: 'f',
-    },
-    formats: {
+    meta: { designId: 'thumbnail', name: 'Thumbnail' },
+    pages: { page: { name: 'Page', order: 'a0' } },
+    frames: {
       f: {
+        pageId: 'page',
         name: 'Thumbnail',
         width: Math.max(1, Math.round(width)),
         height: Math.max(1, Math.round(height)),
+        x: 0,
+        y: 0,
         order: 'a0',
       },
     },
-    pages: { page: { name: 'Page', order: 'a0' } },
     nodes,
   }
-  return renderDesign(ck, design, 'page', 'f', {
+  return renderDesign(ck, design, 'f', {
     fonts: loadFontFiles(),
     fallbackFamilies: [...FALLBACK_FAMILIES],
     images: {},

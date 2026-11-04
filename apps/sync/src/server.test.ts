@@ -35,7 +35,6 @@ beforeAll(async () => {
       workspaceId: who.workspaceId,
       brandId: `brand-${run}`,
       name: id,
-      kind: 'single' as const,
     })),
   )
   const doc = new Y.Doc()
@@ -52,18 +51,26 @@ afterAll(async () => {
   await close()
 })
 
-/** A design's layers as the doc keeps them: one live, one deleted, each with an override. */
+/** A box's props, as a layer's `props` map keeps them. */
+const BOX = { x: 10, y: 10, width: 40, height: 40, shape: { kind: 'rect' } }
+
+/** A page with one frame `f`, and layers as the doc keeps them: one live in `f`, one deleted, one whose frame is gone. */
 function withDeletedLayer() {
   const doc = new Y.Doc()
-  const layer = (deleted: boolean) =>
-    new Y.Map<unknown>(
-      Object.entries({ type: 'graphic', parentId: 'p1', index: 'a0', name: 'Box', ...(deleted && { deleted }) }),
-    )
+  const map = (json: Record<string, unknown>) => new Y.Map<unknown>(Object.entries(json))
+  const layer = (id: string, parentId: string, deleted: boolean) => {
+    const node = map({ type: 'graphic', parentId, link: id, index: 'a0', name: 'Box', ...(deleted && { deleted }) })
+    node.set('props', map(BOX))
+    return node
+  }
   doc.transact(() => {
-    doc.getMap('nodes').set('live', layer(false))
-    doc.getMap('nodes').set('gone', layer(true))
-    doc.getMap('overrides').set('format:f|live|x', 1)
-    doc.getMap('overrides').set('format:f|gone|x', 2)
+    doc.getMap('pages').set('p1', map({ name: 'Page 1', order: 'a0' }))
+    doc
+      .getMap('frames')
+      .set('f', map({ pageId: 'p1', name: 'Square', width: 100, height: 100, x: 0, y: 0, fills: [], order: 'a0' }))
+    doc.getMap('nodes').set('live', layer('live', 'f', false))
+    doc.getMap('nodes').set('gone', layer('gone', 'f', true))
+    doc.getMap('nodes').set('lost', layer('lost', 'deleted-frame', false))
   })
   return doc
 }
@@ -142,30 +149,33 @@ describe('compaction', () => {
     for (let i = 0; i < 100 && !(await ok()); i++) await new Promise((r) => setTimeout(r, 50))
   }
 
-  it('waits while anyone is connected, then drops deleted layers and stores the result', async () => {
+  it('waits while anyone is connected, then drops deleted layers and layers in no frame, and stores the result', async () => {
     const first = await open()
     const second = await open()
-    expect(keys(second.document, 'nodes')).toEqual(['gone', 'live'])
+    expect(keys(second.document, 'nodes')).toEqual(['gone', 'live', 'lost'])
     first.leave()
     // The other tab is still here, so nothing changes under it.
     await new Promise((r) => setTimeout(r, 800))
-    expect(keys(second.document, 'nodes')).toEqual(['gone', 'live'])
-    expect(keys(await stored(), 'nodes')).toEqual(['gone', 'live'])
+    expect(keys(second.document, 'nodes')).toEqual(['gone', 'live', 'lost'])
+    expect(keys(await stored(), 'nodes')).toEqual(['gone', 'live', 'lost'])
 
     second.leave()
     await until(async () => keys(await stored(), 'nodes').length === 1)
     const after = await stored()
     expect(keys(after, 'nodes')).toEqual(['live'])
-    expect(keys(after, 'overrides')).toEqual(['format:f|live|x'])
+    expect(keys(after, 'pages')).toEqual(['p1'])
+    expect(keys(after, 'frames')).toEqual(['f'])
 
     // Coming back, a tab sees the same live layer.
     const again = await open()
     expect(keys(again.document, 'nodes')).toEqual(['live'])
     expect(again.document.getMap<Y.Map<unknown>>('nodes').get('live')?.toJSON()).toEqual({
       type: 'graphic',
-      parentId: 'p1',
+      parentId: 'f',
+      link: 'live',
       index: 'a0',
       name: 'Box',
+      props: BOX,
     })
     again.leave()
   })

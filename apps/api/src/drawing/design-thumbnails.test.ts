@@ -12,19 +12,40 @@ import { brand, call, db, sibling } from '../test-api.ts'
 
 // A design's picture for the home's bento (#84), drawn with CanvasKit like an export.
 describe('design thumbnails', { timeout: 30_000 }, () => {
+  /**
+   * A first page with no frame, then a page whose first frame by order is a story, listed after a
+   * square: the cover frame is the story.
+   */
   const story = (color: string) => ({
-    meta: { designId: 'ignored', name: 'Story', kind: 'single', primaryFormatId: 'st' },
-    formats: {
-      sq: { name: 'Square', width: 1080, height: 1080, order: 'a0' },
-      st: { name: 'Story', width: 1080, height: 1920, order: 'a1' },
+    meta: { designId: 'ignored', name: 'Story' },
+    pages: { p1: { name: 'Empty', order: 'a0' }, p2: { name: 'Page 2', order: 'a1' } },
+    frames: {
+      sq: {
+        pageId: 'p2',
+        name: 'Square',
+        width: 1080,
+        height: 1080,
+        x: 1280,
+        y: 0,
+        fills: [{ type: 'solid', color }],
+        order: 'a1',
+      },
+      st: {
+        pageId: 'p2',
+        name: 'Story',
+        width: 1080,
+        height: 1920,
+        x: 0,
+        y: 0,
+        fills: [{ type: 'solid', color }],
+        order: 'a0',
+      },
     },
-    pages: { p1: { name: 'Page 1', order: 'a0', fills: [{ type: 'solid', color }] } },
     nodes: {},
-    overrides: {},
   })
   const keyOf = (url: string) => new URL(url).pathname
 
-  it('draws the first page in the primary format, at most 640 a side, once per version', async () => {
+  it('draws the cover frame, at most 640 a side, once per version', async () => {
     const { json } = await call('a', 'POST', `/brands/${brand.id}/designs`, {
       name: 'Story',
       content: story('#FF48B0FF'),
@@ -33,8 +54,12 @@ describe('design thumbnails', { timeout: 30_000 }, () => {
     const first = DesignThumbnail.parse(
       (await call('a', 'GET', `/brands/${brand.id}/designs/${design.id}/thumbnail`)).json,
     )
-    // The format's own size, so a tile can be tall before the picture loads.
+    // The cover frame's own size, so a tile can be tall before the picture loads.
     expect([first.width, first.height]).toEqual([1080, 1920])
+    expect((await call('a', 'GET', `/brands/${brand.id}/designs/${design.id}/cover`)).json).toEqual({
+      width: 1080,
+      height: 1920,
+    })
     const bytes = new Uint8Array(await (await fetch(first.url)).arrayBuffer())
     expect(readImageHeader(bytes)).toEqual({ contentType: 'image/png', width: 360, height: 640 })
     // Asked again, the same stored picture.
@@ -59,5 +84,26 @@ describe('design thumbnails', { timeout: 30_000 }, () => {
     const design = DesignSummary.parse((await call('a', 'POST', `/brands/${brand.id}/designs`, { name: 'Mine' })).json)
     expect((await call('a', 'GET', `/brands/${sibling.id}/designs/${design.id}/thumbnail`)).status).toBe(404)
     expect((await call('b', 'GET', `/brands/${brand.id}/designs/${design.id}/thumbnail`)).status).toBe(404)
+  })
+
+  it('has no picture or cover for a design with no frame on any page', async () => {
+    const content = { meta: { designId: 'ignored', name: 'Empty' }, pages: { p1: { name: 'Page 1', order: 'a0' } } }
+    const design = DesignSummary.parse(
+      (
+        await call('a', 'POST', `/brands/${brand.id}/designs`, {
+          name: 'Empty',
+          content: { ...content, frames: {}, nodes: {} },
+        })
+      ).json,
+    )
+    const nothing = { error: 'This design has nothing to show yet' }
+    expect(await call('a', 'GET', `/brands/${brand.id}/designs/${design.id}/thumbnail`)).toEqual({
+      status: 404,
+      json: nothing,
+    })
+    expect(await call('a', 'GET', `/brands/${brand.id}/designs/${design.id}/cover`)).toEqual({
+      status: 404,
+      json: nothing,
+    })
   })
 })

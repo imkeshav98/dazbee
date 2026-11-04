@@ -6,7 +6,7 @@ import { FALLBACK_FAMILIES } from '@dazbee/fonts'
 import { loadFontFiles } from '@dazbee/fonts/node'
 import { renderDesign, type Rendered, type ResourceBytes } from '@dazbee/renderer'
 import { loadCanvasKit } from '@dazbee/renderer/node'
-import { brandVariables, type Design, fontFamilies, imageAssetIds, inOrder } from '@dazbee/schema'
+import { brandVariables, coverFrame, type Design, fontFamilies, imageAssetIds } from '@dazbee/schema'
 import type { Storage } from '@dazbee/storage'
 
 import { findAsset } from '../assets/assets.ts'
@@ -40,8 +40,8 @@ export async function brandResourcesFor(
   return { fonts, fallbackFamilies: [...FALLBACK_FAMILIES], images: Object.fromEntries(images.flat()), variables }
 }
 
-/** The first page in the primary format, as an export draws it. */
-export async function renderFirstPage(
+/** The design's cover frame (see `coverFrame`), as an export draws it. */
+export async function renderCover(
   db: Db,
   storage: Storage,
   workspaceId: string,
@@ -49,20 +49,9 @@ export async function renderFirstPage(
   design: Design,
 ): Promise<Rendered> {
   const ck = await loadCanvasKit()
-  const pageId = firstPageId(design)
-  if (!pageId) throw new Error('the design has no page')
-  return renderDesign(
-    ck,
-    design,
-    pageId,
-    design.meta.primaryFormatId,
-    await resourcesFor(db, storage, workspaceId, brandId, design),
-  )
-}
-
-/** The design's first page: first by order, ties broken by id. Undefined when it has no page. */
-export function firstPageId(design: Design): string | undefined {
-  return inOrder(design.pages)[0]?.[0]
+  const cover = coverFrame(design)
+  if (!cover) throw new Error('the design has no frame')
+  return renderDesign(ck, design, cover[0], await resourcesFor(db, storage, workspaceId, brandId, design))
 }
 
 /** What drawing the design for this brand needs, the shipped fonts included. */

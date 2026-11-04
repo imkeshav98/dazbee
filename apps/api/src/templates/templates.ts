@@ -9,6 +9,7 @@ import { and, desc, eq, isNull, or } from 'drizzle-orm'
 import { assets, type Db, templates } from '@dazbee/db'
 import { withFreshIds } from '@dazbee/doc'
 import {
+  coverFrame,
   type Design,
   type DesignSummary,
   imageAssetIds,
@@ -20,7 +21,7 @@ import type { Storage } from '@dazbee/storage'
 
 import { findAsset } from '../assets/assets.ts'
 import { makeThumbnail } from '../assets/thumbnails.ts'
-import { renderFirstPage } from '../drawing/render.ts'
+import { renderCover } from '../drawing/render.ts'
 import { templateThumbnailKey } from '../storage-keys.ts'
 import { createDesign, InvalidContent } from '../workspace/designs.ts'
 
@@ -28,7 +29,6 @@ type Row = {
   id: string
   name: string
   brandId: string | null
-  kind: TemplateSummary['kind']
   width: number
   height: number
   createdAt: Date
@@ -38,7 +38,6 @@ const summary = {
   id: templates.id,
   name: templates.name,
   brandId: templates.brandId,
-  kind: templates.kind,
   width: templates.width,
   height: templates.height,
   createdAt: templates.createdAt,
@@ -97,8 +96,8 @@ export async function findTemplate(db: Db, workspaceId: string, brandId: string,
 }
 
 /**
- * Saves `content`, a design of the brand, as a template with its thumbnail. Every image it names
- * has to be an asset of the brand.
+ * Saves `content`, a design of the brand, as a template with its thumbnail and its cover frame's
+ * size. Every image it names has to be an asset of the brand, and it needs a frame to show.
  */
 export async function saveTemplate(
   db: Db,
@@ -114,10 +113,10 @@ export async function saveTemplate(
     if (!(await findAsset(db, workspaceId, brandId, { id: assetId })))
       throw new InvalidContent(`the image "${assetId}" is not an asset of this brand`)
   }
-  const format = design.formats[design.meta.primaryFormatId]
-  if (!format) throw new InvalidContent('the design has no primary format')
+  const cover = coverFrame(design)?.[1]
+  if (!cover) throw new InvalidContent('the design has no frame')
   const id = randomUUID()
-  const rendered = await renderFirstPage(db, storage, workspaceId, brandId, design)
+  const rendered = await renderCover(db, storage, workspaceId, brandId, design)
   const thumbnail = await makeThumbnail(rendered.png, 'image/png')
   await storage.put(templateThumbnailKey(workspaceId, id), thumbnail.bytes, thumbnail.contentType)
   const [row] = await db
@@ -128,10 +127,9 @@ export async function saveTemplate(
       brandId: input.scope === 'brand' ? brandId : null,
       fromBrandId: brandId,
       name: input.name,
-      kind: design.meta.kind,
       content: design,
-      width: format.width,
-      height: format.height,
+      width: cover.width,
+      height: cover.height,
     })
     .returning(summary)
   if (!row) throw new Error('insert returned no template')

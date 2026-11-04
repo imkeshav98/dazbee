@@ -10,14 +10,13 @@ import { drawDesign, type ResourceBytes, type ResourceCache, resourceCache } fro
 import { loadCanvasKit } from '@dazbee/renderer/node'
 import type { Design } from '@dazbee/schema'
 
-/** One picture to draw: the page in the format, scaled to the picture's size. */
+/** One picture to draw: a frame of the design, scaled to the picture's size. */
 export interface DrawJob {
   id: number
   design: Design
-  pageId: string
-  formatId: string
-  /** The format's size, and the picture's. */
-  format: { width: number; height: number }
+  frameId: string
+  /** The frame's size, and the picture's. */
+  frame: { width: number; height: number }
   size: { width: number; height: number }
   /** What the design needs beyond the fonts we ship. */
   resources: ResourceBytes
@@ -51,13 +50,13 @@ async function draw(job: DrawJob): Promise<Uint8Array> {
     throw new Error(`CanvasKit could not make a ${job.size.width}×${job.size.height} surface for a design picture`)
   try {
     // Drawn straight at the small size: a story is a 360×640 draw, not a 1080×1920 one.
-    surface.getCanvas().scale(job.size.width / job.format.width, job.size.height / job.format.height)
+    surface.getCanvas().scale(job.size.width / job.frame.width, job.size.height / job.frame.height)
     const resources = {
       ...job.resources,
       fonts: [...shipped, ...job.resources.fonts],
       fallbackFamilies: [...FALLBACK_FAMILIES],
     }
-    drawDesign(ck, surface, job.design, job.pageId, job.formatId, resources, cache)
+    drawDesign(ck, surface, job.design, job.frameId, resources, cache)
     const snapshot = surface.makeImageSnapshot()
     try {
       const png = snapshot.encodeToBytes()
