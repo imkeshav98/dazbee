@@ -3,14 +3,15 @@
 // the format or the group or frame it is in.
 import type { Rect } from '@dazbee/schema'
 
-export const ALIGNMENTS = ['left', 'centre', 'right', 'top', 'middle', 'bottom'] as const
-export type Alignment = (typeof ALIGNMENTS)[number]
 export type Distribution = 'horizontal' | 'vertical'
 
 export interface Offset {
   dx: number
   dy: number
 }
+
+export const ALIGNMENTS = ['left', 'centre', 'right', 'top', 'middle', 'bottom'] as const
+export type Alignment = (typeof ALIGNMENTS)[number]
 
 const around = (boxes: Rect[]): Rect => {
   const x = Math.min(...boxes.map((b) => b.x))

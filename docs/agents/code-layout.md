@@ -189,35 +189,44 @@ For `apps/web`, run `pnpm dlx madge --circular --extensions ts,tsx --ts-config t
 
 | Layer | Modules, in build order | State owned |
 |---|---|---|
-| 1. No in-memory state | `canvaskit` (the one CanvasKit loader), `canvas/{camera grid hit-test rulers cursors}`, `layers/{transform snap arrange auto-layout}`, `gestures/{draw-tools path crop}`, `text/text-edit`, `clipboard` (uses `localStorage` and the system clipboard) | none |
-| 2. State owners | `save-state`, `resources`, `canvas/scenes`, `canvas/view`, `tools`, `selection` | see the table below |
-| 3. Queries | `layers/boxes`, `canvas/thumbnails` | thumbnail caches |
-| 4. Behaviours | `text/typing`, `gestures/{pen cropping drawing transform-drag auto-layout-drag}`, `actions`, `place`, `brand-kit` | the text being edited and its caret; pen state; snapped guides and snap work; drop target; paste point |
-| 5. Routers | `canvas/overlay`, `gestures/pointer` | drawn canvas frames; the current gesture and press state |
-| 6. Wiring | `editor.ts` | only the listener sets of the `Editor`'s public events that several modules raise (draw info, notices, text selection). It creates them first and passes each module the `emit` function it needs. It also keeps the frame callback `draw()` (which stops typing when its text is gone, re-checks the hover, draws the scene and calls the overlay), the keyboard listeners with `onKey` routing, and returns the `Editor` object |
+| 1. No in-memory state | `canvaskit` (the one CanvasKit loader), `run-quietly`, `shortcuts`, `canvas/{camera grid hit-test rulers cursors}`, `layers/{transform snap arrange auto-layout resize}`, `gestures/{press draw-tools path crop}`, `text/text-edit`, `clipboard` (uses `localStorage` and the system clipboard) | none |
+| 2. State owners | `save-state`, `canvas/view`, `resources`, `canvas/scenes`, `tools`, `selection` | see the table below |
+| 3. Queries | `layers/{boxes hug}`, `canvas/thumbnails`, `export/exports` (with `export/export-client`, its side of the export worker `export/export-worker`) | thumbnail caches; the export worker |
+| 4. Behaviours | `text/typing`, `gestures/{pen cropping drawing transform-drag auto-layout-drag select-press}`, `actions`, `place`, `brand-kit`, `layer-edits` | the text being edited and its caret; pen state; snapped guides, snap work and what each drag has written; what a press may still select as a click; drop target; paste point |
+| 5. Routers | `gestures/pointer`, `canvas/overlay` | the current gesture, whether a press is held, the pointer, pan, space held and the hover cursor |
+| 6. Wiring | `editor.ts` | only the listener sets of the `Editor`'s public events that several modules raise (draw info, notices, text selection). It creates them first and passes each module the `emit` function it needs. It also keeps the frame callback `draw()` (which stops typing when its text is gone, re-checks the hover, draws the scene and calls the overlay), the keyboard and clipboard listeners with `onKey` routing, the first draw, and the `Editor` object, one line per member. The few members that tie modules of several layers together are short functions beside `onKey`: `perform` (undo and redo end the drag first), `select`, `focus`, `stopEditing` and `settle` |
+
+`canvas/view` comes first among the state owners: `scenes`, `selection`, `boxes`, `thumbnails` and the behaviours read the design as last drawn, which it owns, and it needs no other module. `gestures/pointer` comes before `canvas/overlay` because the overlay reads the gesture to draw its parts. The types `startEditor` takes and resolves to (`Editor`, `EditorOptions`, `Notice`, `DrawInfo`) are in `editor-interface.ts`. `canvas/test-design` and `layers/test-boxes` are test-only.
 
 Each piece of the editor's state has one owner:
 
 | Module | State |
 |---|---|
 | `save-state` | the provider's connection, the shown save state, the offline timer |
+| `canvas/view` | the WebGL `gl`, the surface, `dpr`, viewport, insets, camera, rulers, the last drawn `design` snapshot, `grid`, the focused format, the canvas frames last drawn (`inView()`, which `place` and the overlay read), the view listeners, the redraw schedule |
 | `resources` | resource bytes, resources, the fonts asked for, family loads, what is loading, placeholders |
 | `canvas/scenes` | canvas frames, pictures, paragraphs, scenes, layers, the recording counts |
-| `canvas/view` | the WebGL `gl`, the surface, `dpr`, viewport, insets, camera, rulers, the last drawn `design` snapshot, `grid`, the focused format, the view listeners, the redraw schedule |
 | `tools` | the tool, the image to place, snapping, the tool listeners; `setTool` |
 | `selection` | selection, entered group, picked page, crop, path edit, last selection, `hovered`, the selection and page listeners |
+| `canvas/thumbnails` | the layer and page thumbnails, the crop's faint images |
+| `export/exports` | the export worker's client |
 | `text/typing` | the text being edited, caret and range |
 | `gestures/pen` | pen state |
-| `gestures/transform-drag` | snapped guides, snap work |
+| `gestures/transform-drag` | snapped guides, snap work, and what each drag has written so far (`written`) |
+| `gestures/select-press` | what a press may still select as a click: the layer clicked alone, the locked layer under a marquee's press, where the press went down |
 | `place` | the drop target, the paste point |
-| `canvas/overlay` | drawn canvas frames |
-| `gestures/pointer` | the gesture, press state, pointer, pan, space held, hover cursor |
+| `gestures/pointer` | the gesture, whether a press is held, the pointer, pan, space held, hover cursor |
 
-- **The gesture lifecycle.** `gestures/pointer` routes pointer events to the behaviour that owns the gesture. Each behaviour module calls both `beginGesture` and its end (ADR-0004).
+`canvas/overlay` owns no state: it draws from what the modules above own, in a fixed order.
+
+- **The gesture lifecycle.** `gestures/pointer` routes pointer events to the behaviour that owns the gesture. Each behaviour module calls both `beginGesture` and its end (ADR-0004). One exception: `gestures/drawing` begins the step that makes a text box, and `text/typing` ends it when typing stops, so the new box and its first words are one undo step.
 - **Late binding** is allowed only for:
   - `view.redraw`, which state owners call when they change;
-  - the overlay's `draw`, which behaviours and `gestures/pointer` call to show their parts;
-  - the frame callback `draw()`, which `canvas/view` receives when it is built and calls from its animation-frame schedule.
+  - the overlay's `draw`, which `selection`, the behaviours and `gestures/pointer` call to show their parts;
+  - the frame callback `draw()`, which `canvas/view` receives when it is built and calls from its animation-frame schedule;
+  - `tools`' `finish` and `changed`, which end the pen's path and show the pointer's cursor when the tool changes.
+
+  In `editor.ts`, each late-bound call is a function declaration below the module it calls (`drawOverlay`, `showCursor`, `finishPath`), so it is declared before use.
 - **The CPU surface.** `canvas/thumbnails` and the export code draw on the CPU surface, so they never receive `gl` or the WebGL surface (ADR-0005).
 
 ## What checks the rules

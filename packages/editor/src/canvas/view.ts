@@ -17,7 +17,7 @@ import {
   type Viewport,
   zoomAt,
 } from './camera.ts'
-import { type Frame, frameAt, frameGrid } from './grid.ts'
+import { type Frame, frameAt, frameGrid, frameKey } from './grid.ts'
 import { px } from './rulers.ts'
 
 /** A point on the design: a frame, as `<pageId>/<formatId>`, and a point in it in design pixels. */
@@ -62,6 +62,10 @@ export interface EditorView {
   pointAt(client: Point): { frame: Frame; p: Point } | null
   /** The spot under a point on screen, in client coordinates: the frame there and the point in it. */
   spotAt(client: Point): Spot | null
+  /** The frame of a page in a format; the first page and the primary format by default. Throws when there is none. */
+  defaultFrame(pageId?: string, formatId?: string): Frame
+  /** Where a design pixel of a frame is on screen now, in client coordinates; the first page and the primary format by default. */
+  screenPoint(x: number, y: number, pageId?: string, formatId?: string): Point
   /** Whether a redraw is waiting for the next animation frame. */
   scheduled(): boolean
   /** Puts an overlay element over a box in a frame, in design pixels. */
@@ -196,6 +200,19 @@ export function editorView({ ck, canvas, session, onZoom, draw }: ViewDeps): Edi
   function spotAt(client: Point): Spot | null {
     const at = pointAt(client)
     return at ? { frame: at.frame.key, x: at.p.x, y: at.p.y } : null
+  }
+  const defaultFrame = (pageId?: string, formatId?: string) => {
+    const page = pageId ?? firstPage()
+    const format = formatId ?? drawn().meta.primaryFormatId
+    const found = frameOf(frameKey(page, format))
+    if (!found) throw new Error(`no frame for page "${page}" in format "${format}"`)
+    return found
+  }
+  function screenPoint(x: number, y: number, pageId?: string, formatId?: string): Point {
+    const frame = defaultFrame(pageId, formatId)
+    const at = toScreen(camera, { x: frame.x + x, y: frame.y + y })
+    const rect = canvas.getBoundingClientRect()
+    return { x: rect.left + at.x, y: rect.top + at.y }
   }
   function scheduled() {
     return pending !== 0
@@ -351,6 +368,8 @@ export function editorView({ ck, canvas, session, onZoom, draw }: ViewDeps): Edi
     pointAt,
     spotAt,
     scheduled,
+    defaultFrame,
+    screenPoint,
     placeBox,
     outline,
     update,

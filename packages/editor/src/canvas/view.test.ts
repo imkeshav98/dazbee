@@ -144,6 +144,20 @@ describe('editorView', () => {
     })
   })
 
+  describe('defaultFrame and screenPoint', () => {
+    it('finds a page in a format, the first page in the primary format by default, and where its pixels are on screen', () => {
+      const { view } = harness()
+      expect(view.defaultFrame()).toMatchObject({ pageId: 'one', formatId: 'sq' })
+      expect(view.defaultFrame('two', 'mpu').key).toBe('two/mpu')
+      expect(() => view.defaultFrame('two', 'gone')).toThrow('no frame for page "two" in format "gone"')
+      view.setCamera({ x: 100, y: 50, zoom: 2 })
+      const { x, y } = view.defaultFrame('two', 'mpu')
+      expect(view.screenPoint(5, 6, 'two', 'mpu')).toEqual({ x: 10 + 100 + (x + 5) * 2, y: 10 + 50 + (y + 6) * 2 })
+      const first = view.defaultFrame()
+      expect(view.screenPoint(0, 0)).toEqual({ x: 10 + 100 + first.x * 2, y: 10 + 50 + first.y * 2 })
+    })
+  })
+
   describe('scheduled and redraw', () => {
     it('draws once at the next animation frame however often it is asked', () => {
       const { view, log } = harness()

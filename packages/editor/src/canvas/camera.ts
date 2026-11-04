@@ -14,10 +14,24 @@ export interface Viewport {
   height: number
 }
 
+/** Screen pixels at each edge of the stage that floating chrome covers (#83). */
+export interface Insets {
+  top: number
+  right: number
+  bottom: number
+  left: number
+}
+
 export const MIN_ZOOM = 0.01
 export const MAX_ZOOM = 64
+export const NO_INSETS: Insets = { top: 0, right: 0, bottom: 0, left: 0 }
 /** Fitting never zooms in past this, so a 320×50 banner doesn't fill the screen. */
 const MAX_FIT_ZOOM = 4
+
+/** Narrower than this, the stage is a phone's (#125). */
+const PHONE_WIDTH = 640
+/** On a phone, the room kept above the ads for their frame labels. */
+const PHONE_TOP = 32
 
 const clampZoom = (zoom: number) => Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, zoom))
 
@@ -30,20 +44,6 @@ export function zoomAt(c: Camera, at: Point, zoom: number): Camera {
   const world = toWorld(c, at)
   return { zoom: next, x: at.x - world.x * next, y: at.y - world.y * next }
 }
-
-/** Screen pixels at each edge of the stage that floating chrome covers (#83). */
-export interface Insets {
-  top: number
-  right: number
-  bottom: number
-  left: number
-}
-export const NO_INSETS: Insets = { top: 0, right: 0, bottom: 0, left: 0 }
-
-/** Narrower than this, the stage is a phone's (#125). */
-const PHONE_WIDTH = 640
-/** On a phone, the room kept above the ads for their frame labels. */
-const PHONE_TOP = 32
 
 /**
  * The camera that shows the whole rect, centred in the part of the viewport the insets leave

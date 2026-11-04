@@ -1,18 +1,6 @@
 import type { SceneLayer } from '@dazbee/renderer'
 import type { Point } from '@dazbee/schema'
 
-/** The point as seen from inside a layer: un-rotated about the layer's centre. */
-function unrotate(p: Point, layer: SceneLayer): Point {
-  const { x, y, width, height, rotation } = layer.props
-  if (rotation === 0) return p
-  const cx = x + width / 2
-  const cy = y + height / 2
-  const a = (-rotation * Math.PI) / 180
-  const dx = p.x - cx
-  const dy = p.y - cy
-  return { x: cx + dx * Math.cos(a) - dy * Math.sin(a), y: cy + dx * Math.sin(a) + dy * Math.cos(a) }
-}
-
 /** How near a line a click picks it, in design pixels, beyond half its stroke. */
 const LINE_REACH = 4
 
@@ -64,4 +52,16 @@ export function hitTest(
     if (inside(q, layer)) return layer
   }
   return null
+}
+
+/** The point as seen from inside a layer: un-rotated about the layer's centre. */
+function unrotate(p: Point, layer: SceneLayer): Point {
+  const { x, y, width, height, rotation } = layer.props
+  if (rotation === 0) return p
+  const cx = x + width / 2
+  const cy = y + height / 2
+  const a = (-rotation * Math.PI) / 180
+  const dx = p.x - cx
+  const dy = p.y - cy
+  return { x: cx + dx * Math.cos(a) - dy * Math.sin(a), y: cy + dx * Math.sin(a) + dy * Math.cos(a) }
 }
