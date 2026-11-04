@@ -16,6 +16,7 @@ import {
 } from '@dazbee/schema'
 
 import { type Frame, scope } from '../canvas/grid.ts'
+import { hitTest } from '../canvas/hit-test.ts'
 import { findLayer, type FrameScenes } from '../canvas/scenes.ts'
 import { coverCrop, imageRect, type Size } from '../gestures/crop.ts'
 import { offsetPath, parsePath, type PenPath, scalePath } from '../gestures/path.ts'
@@ -94,6 +95,12 @@ export interface EditorBoxes {
   drawnInFlow(ids: string[], pageId: string): Record<string, Record<string, Omit<Box, 'rotation'>>> | undefined
   /** Where a new layer of a type that a tool makes in a frame goes: the group or frame gone into, or the page. */
   parentFor(frame: Frame, type: string, now: Design): string
+  /** The layer locked in place that a press at a point lands on, the one a click there would select; null when it is not locked. */
+  lockedAt(frame: Frame, p: Point): string | null
+  /** What a press on a layer picks: a selected layer it is in, what is directly in the group gone into, or else the layer on the page that holds it. */
+  target(hitId: string, frame: string): string
+  /** Whether a layer is inside the group or frame gone into, not the container itself. */
+  insideEntered(id: string): boolean
 }
 
 /** Whether a layer shows in a frame: its format's own visibility, or the base. */
@@ -328,6 +335,34 @@ export function editorBoxes({ session, scenes, resources, selection, drawn, fram
     return q.x >= box.x && q.y >= box.y && q.x <= box.x + box.width && q.y <= box.y + box.height
   }
 
+  /**
+   * The locked in place layer a press at `p` lands on, the one a click would select: the topmost
+   * layer there, as a click picks it, when that one is locked. A click selects it, so its lock can
+   * be undone; a drag from it draws a marquee and moves nothing, it or what lies beneath.
+   */
+  function lockedAt(frame: Frame, p: Point): string | null {
+    const top = hitTest(scenes.scene(frame).layers, p)
+    const id = top ? target(top.id, frame.key) : null
+    return id && drawn().nodes[id]?.lock?.move ? id : null
+  }
+  /**
+   * What a press on a layer picks: a selected layer it is in, so the selection moves whole; inside
+   * the group or frame double-clicked into, what is directly in it; or else the layer on the page
+   * that holds it, so a click on a group's child picks the group.
+   */
+  function target(hitId: string, frame: string) {
+    const chain = ancestorsOf(drawn(), hitId)
+    const current = selection.current()
+    const selected = current?.frame === frame ? chain.find((id) => current?.ids.includes(id)) : undefined
+    const entered = selection.entered()
+    const at = entered ? chain.indexOf(entered) : -1
+    return selected ?? (at > 0 ? chain[at - 1] : chain.at(-1)) ?? hitId
+  }
+  /** Whether a layer is inside the entered group or frame, not the container itself. */
+  function insideEntered(id: string) {
+    return ancestorsOf(drawn(), drawn().nodes[id]?.parentId ?? '').some((up) => up === selection.entered())
+  }
+
   return {
     boxIn,
     containersOf,
@@ -344,5 +379,8 @@ export function editorBoxes({ session, scenes, resources, selection, drawn, fram
     cropTarget,
     drawnInFlow,
     parentFor,
+    lockedAt,
+    target,
+    insideEntered,
   }
 }

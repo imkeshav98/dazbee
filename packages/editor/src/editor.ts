@@ -43,6 +43,7 @@ import { editorCropping } from './gestures/cropping.ts'
 import { editorDrawing } from './gestures/drawing.ts'
 import { editorPen } from './gestures/pen.ts'
 import { editorPointer } from './gestures/pointer.ts'
+import { editorSelectPress } from './gestures/select-press.ts'
 import { editorTransformDrag } from './gestures/transform-drag.ts'
 import { editorBoxes } from './layers/boxes.ts'
 import { hug as hugIn } from './layers/hug.ts'
@@ -598,6 +599,7 @@ function live(
     drawOverlay: () => drawOverlay(),
   })
   const brandKit = editorBrandKit({ session, resources, view, selection, typing, signal: listening.signal })
+  const selectPress = editorSelectPress({ canvas, view, selection, boxes, typing, transformDrag, autoLayoutDrag })
   const pointer = editorPointer({
     canvas,
     session,
@@ -612,6 +614,7 @@ function live(
     drawing,
     transformDrag,
     autoLayoutDrag,
+    selectPress,
     signal: listening.signal,
     drawOverlay: () => drawOverlay(),
   })
