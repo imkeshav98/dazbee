@@ -188,7 +188,8 @@ export const LayerRow = memo(function LayerRow({
         data-testid="layer-picture"
         className={cn(
           'grid size-[22px] shrink-0 place-items-center overflow-hidden rounded-[5px] transition-colors duration-[var(--chrome-fast)]',
-          picture ? LAYER_PICTURE : selected ? 'bg-accent-solid text-on-accent' : 'bg-text/10 text-muted',
+          picture || !selected ? LAYER_PICTURE : 'bg-accent-solid text-on-accent',
+          !picture && !selected && 'text-muted',
           picture && selected && LAYER_PICTURE_PICKED,
         )}
       >

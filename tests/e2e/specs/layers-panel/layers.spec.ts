@@ -1,10 +1,12 @@
 // The layers panel (#59) in Chromium, with the real mouse: the tree in step with the stage's
 // selection both ways, a layer dragged into a group (the stage redraws it there, one undo step,
 // which redo brings back), rename, lock and hide, all there after a reload.
-import { reloads, writeOutput } from '../../support/editor.ts'
+import type { DesignInput } from '@dazbee/schema'
+
+import { reloads, setCookies, writeOutput } from '../../support/editor.ts'
 import { colourAt, layersDesign, listed, node, openLayers, ROW, row, tree } from '../../support/layers-panel.ts'
 import { click, openStage } from '../../support/stage.ts'
-import { expect, test } from '../../support/test.ts'
+import { expect, type Page, test } from '../../support/test.ts'
 
 test.describe.configure({ timeout: 120_000 })
 
@@ -112,4 +114,57 @@ test('the panel and the stage select together; drag into a group, rename, lock a
     'true',
   )
   expect(errors).toEqual([])
+})
+
+test.describe('row pictures in dark and light theme', () => {
+  const text = (index: string, name: string, y: number, color: string) => ({
+    type: 'text' as const,
+    parentId: 'p1',
+    index,
+    name,
+    props: {
+      x: 80,
+      y,
+      width: 600,
+      height: 90,
+      text: name,
+      style: { fontFamily: 'Noto Sans', fontSize: 64, color },
+    },
+  })
+  const design = (): DesignInput => ({
+    ...layersDesign(),
+    nodes: {
+      ...layersDesign().nodes,
+      ink: text('b0', 'Ink', 60, '#111111FF'),
+      chalk: text('b1', 'Chalk', 160, '#FFFFFFFF'),
+    },
+  })
+  /** How a row's picture tile looks: what it holds, its fill and its ink. */
+  const tile = (page: Page, name: string) =>
+    row(page, name)
+      .getByTestId('layer-picture')
+      .evaluate((el) => ({
+        holds: el.querySelector('img') ? 'picture' : el.querySelector('svg') ? 'icon' : 'nothing',
+        fill: getComputedStyle(el).backgroundColor,
+        ink: getComputedStyle(el).color,
+      }))
+
+  for (const theme of ['dark', 'light'] as const) {
+    test(`in ${theme} theme every text row shows the same text icon, whatever its text's colour`, async ({
+      browser,
+    }) => {
+      const { page, errors } = await openStage(browser, design())
+      await setCookies(page, { theme })
+      await page.reload()
+      await expect(page.getByTestId('status')).toHaveAttribute('data-ready', '', { timeout: 30_000 })
+      await openLayers(page)
+      // The other rows' pictures are drawn first, so a text row's tile is what it will stay.
+      await expect(row(page, 'Box').getByTestId('layer-picture').locator('img')).toHaveCount(1)
+      const ink = await tile(page, 'Ink')
+      expect(ink.holds).toBe('icon')
+      expect(await tile(page, 'Chalk')).toEqual(ink)
+      writeOutput(`layers-text-rows-${theme}.png`, await page.screenshot({ animations: 'disabled' }))
+      expect(errors).toEqual([])
+    })
+  }
 })
