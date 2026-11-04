@@ -2,7 +2,8 @@
 
 // The editor's one action at the top end, as in the final mock: a pink Share button. Its menu
 // holds what leaves the editor, Export (#55) and Save as template (#54), and each opens its form
-// in the same place.
+// in the same place, with the focus on its first control. Esc closes them, giving the focus back to
+// Share when it was in them.
 import { BookmarkSimpleIcon, CaretRightIcon, DownloadSimpleIcon, ShareFatIcon } from '@phosphor-icons/react'
 import { useEffect, useId, useRef, useState } from 'react'
 
@@ -17,6 +18,10 @@ import { ExportForm } from './export-menu.tsx'
 import { TemplateForm } from './template-menu.tsx'
 
 type Open = 'menu' | 'export' | 'template' | null
+
+/** The controls of a form the focus can go to. */
+const FOCUSABLE =
+  'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
 
 const ROW = `flex min-h-12 py-1.5 w-full cursor-pointer items-center gap-3 rounded-row px-3 text-start text-[13px] font-medium transition-colors duration-[var(--chrome-fast)] hover:bg-hover focus-visible:bg-hover focus-visible:outline-none ${TOUCH_ROW}`
 
@@ -38,12 +43,19 @@ export function ShareMenu({
   const { design } = useEditorDesign(editor)
   const [open, setOpen] = useState<Open>(null)
   const box = useRef<HTMLDivElement>(null)
+  const button = useRef<HTMLButtonElement>(null)
   const id = useId()
 
-  // Closes on Escape or a press outside.
+  // Closes on Escape or a press outside. Esc gives the focus back to Share when it was in the menu or
+  // its form, or nowhere.
   useEffect(() => {
     if (!open) return
-    const onKey = (event: KeyboardEvent) => event.key === 'Escape' && setOpen(null)
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return
+      const at = document.activeElement
+      if (!at || at === document.body || box.current?.contains(at)) button.current?.focus()
+      setOpen(null)
+    }
     const onPress = (event: PointerEvent) => !box.current?.contains(event.target as Node) && setOpen(null)
     window.addEventListener('keydown', onKey)
     window.addEventListener('pointerdown', onPress)
@@ -52,10 +64,19 @@ export function ShareMenu({
       window.removeEventListener('pointerdown', onPress)
     }
   }, [open])
+  // A form takes the focus as it opens, on its first control.
+  useEffect(() => {
+    if (open !== 'export' && open !== 'template') return
+    box.current
+      ?.querySelector<HTMLElement>(`#${CSS.escape(id)}`)
+      ?.querySelector<HTMLElement>(FOCUSABLE)
+      ?.focus()
+  }, [open, id])
 
   return (
     <div ref={box} className="relative">
       <Button
+        ref={button}
         variant="primary"
         aria-haspopup="menu"
         aria-expanded={open !== null}

@@ -272,6 +272,33 @@ async function nodeExport(page: Page, assetId: string) {
     exportDesign(ck, json, request, bytes).bytes
 }
 
+test('Export opened from Share, by pointer or keyboard, takes the focus onto its first control, and Esc gives it back to Share', async ({
+  browser,
+}) => {
+  const asset = await upload(photo)
+  const { page, errors } = await openStage(browser, design(asset.id))
+  const share = page.getByTestId('share-open')
+  const dialog = page.getByTestId('export')
+  const first = dialog.locator('[data-pages="all"]')
+  await share.click()
+  await page.getByTestId('export-open').click()
+  await expect(first).toBeFocused()
+  await page.keyboard.press('Escape')
+  await expect(dialog).toBeHidden()
+  await expect(share).toBeFocused()
+
+  // Enter opens the menu, Tab goes on to Export, and Enter opens it.
+  await page.keyboard.press('Enter')
+  await page.keyboard.press('Tab')
+  await expect(page.getByTestId('export-open')).toBeFocused()
+  await page.keyboard.press('Enter')
+  await expect(first).toBeFocused()
+  await page.keyboard.press('Escape')
+  await expect(dialog).toBeHidden()
+  await expect(share).toBeFocused()
+  expect(errors).toEqual([])
+})
+
 test('every format of a page as PNG is one zip whose files are what Node exports, drawn in the export worker, named by the File names field', async ({
   browser,
 }) => {
