@@ -1,7 +1,7 @@
 // The top bar by keyboard (#287): Tab and the arrows along the bar, Esc giving the focus back and
 // clearing the selection, Esc closing the second row, the size field's arrows, and Esc closing a
-// panel first wherever the focus is; and the focus as a menu of the bar closes with the next input
-// coming at once.
+// panel first wherever the focus is, after what stands over it: a dialog, the Share menu or its
+// card; and the focus as a menu of the bar closes with the next input coming at once.
 import type { DesignInput } from '@dazbee/schema'
 
 import { photo, upload } from '../../support/assets.ts'
@@ -70,6 +70,31 @@ test("Esc closes the bar's second row and keeps the selection; the arrows and En
   expect(errors).toEqual([])
 })
 
+test("Esc closes the keyboard shortcuts dialog over the bar's second row first, and leaves the row open", async ({
+  browser,
+}) => {
+  const asset = await upload(photo)
+  const { page, errors } = await openStage(browser, topBarDesign(asset.id))
+  await page.setViewportSize({ width: 820, height: 1180 })
+  await selectLayers(page, ['headline'])
+  await page.getByTestId('bar-overflow').click()
+  const row = page.getByTestId('top-bar-overflow')
+  await expect(row).toBeVisible()
+  await page.getByRole('button', { name: 'Keyboard shortcuts', exact: true }).click()
+  const dialog = page.getByTestId('shortcuts')
+  await expect(dialog).toBeVisible()
+
+  await page.keyboard.press('Escape')
+  await expect(dialog).toBeHidden()
+  await expect(row).toBeVisible()
+  expect(await selection(page)).toEqual(['headline'])
+  // The next Esc closes the row.
+  await page.keyboard.press('Escape')
+  await expect(row).toBeHidden()
+  expect(await selection(page)).toEqual(['headline'])
+  expect(errors).toEqual([])
+})
+
 test('the size field steps with the arrows; a pop-up closes when the window changes size; a new selection shows the phone bar from its start', async ({
   browser,
 }) => {
@@ -121,6 +146,90 @@ test('⋯ on the top bar leaves an open panel open, and Esc closes the panel fir
   await page.keyboard.press('Escape')
   await expect(page.locator('#edit-panel')).toHaveCount(0)
   expect(await page.evaluate(() => window.dazbee?.selection())).toEqual(['headline'])
+  expect(errors).toEqual([])
+})
+
+test('Esc closes the keyboard shortcuts dialog over the Colour panel first, and leaves the panel open', async ({
+  browser,
+}) => {
+  const asset = await upload(photo)
+  const { page, errors } = await openStage(browser, topBarDesign(asset.id))
+  await selectLayers(page, ['box'])
+  const panel = await barMenu(page, 'colour')
+  await page.getByRole('button', { name: 'Keyboard shortcuts', exact: true }).click()
+  const dialog = page.getByTestId('shortcuts')
+  await expect(dialog).toBeVisible()
+
+  await page.keyboard.press('Escape')
+  await expect(dialog).toBeHidden()
+  await expect(panel).toBeVisible()
+  expect(await selection(page)).toEqual(['box'])
+  // The next Esc closes the panel.
+  await page.keyboard.press('Escape')
+  await expect(panel).toBeHidden()
+  expect(errors).toEqual([])
+})
+
+test('the Share menu opens with the focus on its first item and the arrows move through it; Esc closes only it, over the Colour panel or not, and never clears the selection', async ({
+  browser,
+}) => {
+  const asset = await upload(photo)
+  const { page, errors } = await openStage(browser, topBarDesign(asset.id))
+  await selectLayers(page, ['headline'])
+  const panel = await barMenu(page, 'colour')
+  const share = page.getByTestId('share-open')
+  const [exportItem, templateItem] = [page.getByTestId('export-open'), page.getByTestId('template-open')]
+  await share.click()
+  await expect(exportItem).toBeFocused()
+  await page.keyboard.press('ArrowDown')
+  await expect(templateItem).toBeFocused()
+  await page.keyboard.press('ArrowDown')
+  await expect(exportItem).toBeFocused()
+  await page.keyboard.press('ArrowUp')
+  await expect(templateItem).toBeFocused()
+  await page.keyboard.press('Home')
+  await expect(exportItem).toBeFocused()
+  await page.keyboard.press('End')
+  await expect(templateItem).toBeFocused()
+
+  await page.keyboard.press('Escape')
+  await expect(exportItem).toBeHidden()
+  await expect(share).toBeFocused()
+  await expect(panel).toBeVisible()
+  expect(await selection(page)).toEqual(['headline'])
+  // The next Esc closes the panel, and keeps the selection.
+  await page.keyboard.press('Escape')
+  await expect(panel).toBeHidden()
+  expect(await selection(page)).toEqual(['headline'])
+
+  // With no panel under it, the menu's Esc still keeps the selection.
+  await share.click()
+  await expect(exportItem).toBeFocused()
+  await page.keyboard.press('Escape')
+  await expect(exportItem).toBeHidden()
+  await expect(share).toBeFocused()
+  expect(await selection(page)).toEqual(['headline'])
+  expect(errors).toEqual([])
+})
+
+test('Esc closes the Export card over the Position panel first, and the next Esc the panel', async ({ browser }) => {
+  const asset = await upload(photo)
+  const { page, errors } = await openStage(browser, topBarDesign(asset.id))
+  await selectLayers(page, ['headline'])
+  const panel = await barMenu(page, 'position')
+  await page.getByTestId('share-open').click()
+  await page.getByTestId('export-open').click()
+  const card = page.getByTestId('export')
+  await expect(card).toBeVisible()
+
+  await page.keyboard.press('Escape')
+  await expect(card).toBeHidden()
+  await expect(page.getByTestId('share-open')).toBeFocused()
+  await expect(panel).toBeVisible()
+  expect(await selection(page)).toEqual(['headline'])
+  await page.keyboard.press('Escape')
+  await expect(panel).toBeHidden()
+  expect(await selection(page)).toEqual(['headline'])
   expect(errors).toEqual([])
 })
 

@@ -255,6 +255,9 @@ export const en = {
       showHere: 'Show in this size',
       hideEverywhere: 'Hide in every size',
       showEverywhere: 'Show in every size',
+      releaseMask: 'Release mask',
+      showHidden: 'Show hidden layers',
+      canvasMenu: 'Canvas actions',
       rotate: 'Rotate',
       underline: 'Underline',
       strikethrough: 'Strikethrough',
@@ -717,7 +720,7 @@ export const en = {
     },
     assetLibrary: {
       delete: 'Delete',
-      deleteNamed: 'Delete {name}',
+      deleteConfirm: 'Delete “{name}” for good? This can’t be undone.',
       keep: 'Keep',
       inUse: 'Used in {n} places: {places}',
       inUseOnce: 'Used in {places}',

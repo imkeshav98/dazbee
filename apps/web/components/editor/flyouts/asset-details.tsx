@@ -92,6 +92,11 @@ export function AssetDetails({
       .catch((e: unknown) => setDeleteError(e instanceof Error ? e.message : String(e)))
       .finally(() => setBusy(false))
   }
+  /** Keeps the asset: the question goes, and the focus goes back to Delete. */
+  const keep = () => {
+    setAsking(false)
+    setTimeout(() => deleteButton.current?.focus())
+  }
   const confirmDelete = () => {
     setAsking(false)
     setBusy(true)
@@ -205,26 +210,37 @@ export function AssetDetails({
           {format(usedIn.length === 1 ? t.inUseOnce : t.inUse, { n: usedIn.length, places: usedIn.join(', ') })}
         </p>
       )}
+      {asking && (
+        <p
+          id={`delete-ask-${asset.id}`}
+          data-testid="asset-delete-ask"
+          className="text-[13px] leading-snug break-words"
+        >
+          {format(t.deleteConfirm, { name: asset.name || t.untitled })}
+        </p>
+      )}
       <div className="flex items-center justify-between gap-2">
         {asking ? (
-          <span className="flex items-center gap-1">
+          // The question opens with the focus on Keep, so a key pressed by habit keeps the asset; Esc keeps it too.
+          <span
+            className="flex items-center gap-1"
+            onKeyDown={(event) => {
+              if (event.key !== 'Escape') return
+              event.stopPropagation()
+              event.preventDefault()
+              keep()
+            }}
+          >
             <button
               type="button"
-              autoFocus
+              aria-describedby={`delete-ask-${asset.id}`}
               onClick={confirmDelete}
               data-testid="asset-delete-confirm"
-              className={cn(QUIET_BUTTON, DANGER_SOLID)}
+              className={cn(QUIET_BUTTON, DANGER_SOLID, 'whitespace-nowrap')}
             >
-              {format(t.deleteNamed, { name: asset.name || t.untitled })}
+              {t.delete}
             </button>
-            <button
-              type="button"
-              onClick={() => {
-                setAsking(false)
-                setTimeout(() => deleteButton.current?.focus())
-              }}
-              className={QUIET_BUTTON}
-            >
+            <button type="button" autoFocus onClick={keep} className={QUIET_BUTTON}>
               {t.keep}
             </button>
           </span>

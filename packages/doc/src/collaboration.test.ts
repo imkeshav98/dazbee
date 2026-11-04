@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
 
-import { type Design, parseDesign } from '@dazbee/schema'
+import { type Design, inOrder, parseDesign } from '@dazbee/schema'
 
 import { childrenOf, type DesignDoc, loadDesign, openSession, readDesign, type Session } from './index.ts'
-import { testDesign, twoTabs } from './test-design.ts'
+import { badge, testDesign, twoTabs } from './test-design.ts'
 
 /** A fuzz run makes hundreds of commands and full reads; a cold CI runner needs more than vitest's 5 s. */
 const FUZZ_TIMEOUT = 30_000
@@ -255,6 +255,48 @@ describe('two tabs', () => {
     const designA = readDesign(a)
     expect(readDesign(b)).toEqual(designA)
     expect([designA.nodes.g1?.parentId, designA.nodes.g2?.parentId].sort()).toEqual(['g1', 'p1'])
+  })
+
+  it('two tabs deleting the last two pages at once leave one empty page on both', () => {
+    const { a, b, tabA, tabB, sync } = twoTabs()
+    tabA.run('page.add', { id: 'p2', name: 'Page 2' })
+    sync()
+
+    tabA.run('page.delete', { id: 'p1' })
+    tabB.run('page.delete', { id: 'p2' })
+    sync()
+
+    const design = readDesign(a)
+    expect(readDesign(b)).toEqual(design)
+    expect(Object.values(design.pages)).toEqual([{ name: 'Page 1', order: 'a0', fills: [] }])
+    expect(design.nodes).toEqual({})
+    expectFullRead(tabA, a)
+    expectFullRead(tabB, b)
+  })
+
+  it('edits after both tabs deleted the last two pages land on the page repair brought back', () => {
+    const { a, b, tabA, tabB, sync } = twoTabs()
+    tabA.run('page.add', { id: 'p2', name: 'Page 2' })
+    sync()
+    tabA.run('page.delete', { id: 'p1' })
+    tabB.run('page.delete', { id: 'p2' })
+    sync()
+    const [page = ''] = Object.keys(tabA.design().pages)
+
+    tabA.run('page.update', { id: page, name: 'Cover' })
+    tabA.run('node.create', { id: 'dot', parentId: page, layer: badge })
+    sync()
+    const added = tabB.run('page.add', { name: 'Page 2' })
+    sync()
+
+    for (const doc of [a, b]) {
+      const design = readDesign(doc)
+      expect(inOrder(design.pages).map(([id, p]) => [id, p.name])).toEqual([
+        [page, 'Cover'],
+        [added, 'Page 2'],
+      ])
+      expect(design.nodes.dot?.parentId).toBe(page)
+    }
   })
 
   it.each([1, 7, 42, 2026, 31337])(

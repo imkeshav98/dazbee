@@ -1,8 +1,9 @@
 'use client'
 
 // One row of the layers panel's tree: its layer's picture or icon, name and kind, and its hide and
-// lock toggles. The panel hands every row one set of handlers, so a row renders again only when what
-// it shows changes.
+// lock toggles. A picture about the colour of its tile in a theme shows on a backdrop that sets it off
+// there. The panel hands every row one set of handlers, so a row renders again only when what it
+// shows changes.
 import {
   BoundingBoxIcon,
   CaretRightIcon,
@@ -20,7 +21,7 @@ import {
   TextTIcon,
   UniteIcon,
 } from '@phosphor-icons/react'
-import { type DragEvent, type KeyboardEvent, memo } from 'react'
+import { type DragEvent, type KeyboardEvent, memo, useState } from 'react'
 
 import { type Design, LOCK_FLAGS } from '@dazbee/schema'
 
@@ -63,6 +64,18 @@ export interface RowApi {
 export const LAYER_ROW = 36
 const INDENT = 16
 const DRAG_TYPE = 'application/x-dazbee-layer'
+/**
+ * The mean luminance of a picture under which it nearly vanishes on the dark theme's tile, and over
+ * which on the light theme's: under 2:1 contrast with each (#1b1621 and #ffffff, the `--surface` of
+ * styles/tokens.css).
+ */
+const DARK_CLOSE = 0.069
+const LIGHT_CLOSE = 0.475
+/** A picture's backdrop in the theme its colour is close to: the text colour, inset round it. */
+const BACKDROP = {
+  dark: 'dark:bg-text dark:p-[3px]',
+  light: '[[data-theme=light]_&]:bg-text [[data-theme=light]_&]:p-[3px]',
+}
 
 const isLocked = (node: Layer) => LOCK_FLAGS.some((flag) => node.lock?.[flag])
 
@@ -76,6 +89,35 @@ function iconOf(node: Layer): Icon {
   if (props.shape?.kind === 'ellipse') return CircleIcon
   if (props.shape?.kind === 'path') return PenNibIcon
   return SquareIcon
+}
+
+/**
+ * Which theme's tile a drawn picture is about the colour of, by the mean colour of its pixels; null
+ * when it reads on both.
+ */
+function closeTheme(img: HTMLImageElement): keyof typeof BACKDROP | null {
+  const paint = document.createElement('canvas')
+  const scale = Math.min(1, 32 / Math.max(img.naturalWidth, img.naturalHeight, 1))
+  paint.width = Math.max(1, Math.round(img.naturalWidth * scale))
+  paint.height = Math.max(1, Math.round(img.naturalHeight * scale))
+  const g = paint.getContext('2d', { willReadFrequently: true })
+  if (!g) return null
+  g.drawImage(img, 0, 0, paint.width, paint.height)
+  const data = g.getImageData(0, 0, paint.width, paint.height).data
+  const sum = [0, 0, 0]
+  let weight = 0
+  for (let i = 0; i < data.length; i += 4) {
+    const a = (data[i + 3] ?? 0) / 255
+    for (let c = 0; c < 3; c++) sum[c] = (sum[c] ?? 0) + (data[i + c] ?? 0) * a
+    weight += a
+  }
+  if (weight === 0) return null
+  const [r = 0, gr = 0, b = 0] = sum.map((c) => {
+    const v = c / weight / 255
+    return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4
+  })
+  const luminance = 0.2126 * r + 0.7152 * gr + 0.0722 * b
+  return luminance < DARK_CLOSE ? 'dark' : luminance > LIGHT_CLOSE ? 'light' : null
 }
 
 /** One row of the tree. Rendered again only when something it shows changes. */
@@ -105,6 +147,8 @@ export const LayerRow = memo(function LayerRow({
   api: RowApi
 }) {
   const t = useMessages()
+  // The theme whose tile the picture is about the colour of, read once it has loaded.
+  const [close, setClose] = useState<keyof typeof BACKDROP | null>(null)
   const { id, node, depth } = row
   const locked = isLocked(node)
   const LayerIcon = iconOf(node)
@@ -189,12 +233,20 @@ export const LayerRow = memo(function LayerRow({
         data-testid="layer-picture"
         className={cn(
           'grid size-[22px] shrink-0 place-items-center overflow-hidden rounded-[5px] transition-colors duration-[var(--chrome-fast)]',
-          picture ? LAYER_PICTURE : selected ? 'bg-accent-solid text-on-accent' : 'bg-text/10 text-muted',
+          picture || !selected ? LAYER_PICTURE : 'bg-accent-solid text-on-accent',
+          !picture && !selected && 'text-muted',
           picture && selected && LAYER_PICTURE_PICKED,
+          picture && close && BACKDROP[close],
         )}
       >
         {picture ? (
-          <img src={picture} alt="" draggable={false} className="size-full object-contain" />
+          <img
+            src={picture}
+            alt=""
+            draggable={false}
+            onLoad={(event) => setClose(closeTheme(event.currentTarget))}
+            className="size-full object-contain"
+          />
         ) : (
           <LayerIcon size={13} weight={selected ? 'bold' : 'regular'} />
         )}

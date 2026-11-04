@@ -5,7 +5,8 @@
 // phone an edit panel is a sheet, and a rail flyout and a sheet close each other. Also where the
 // panels' and the bar's changes go when a design has more than one format: the format shown, as a
 // canvas drag does, or every format. That is one choice for the header card's chip and the bar's
-// menus, kept while the selection changes until nothing is selected.
+// menus, kept while the selection changes until nothing is selected. And whether something stands
+// over the edit panel and the bar's second row, which Esc closes first.
 import { useEffect, useState, useSyncExternalStore } from 'react'
 
 import { useValue, valueStore } from '@/lib/editor/value-store.ts'
@@ -54,6 +55,12 @@ export const setBar = (bar: boolean, barBottom = 0) => update({ bar, barBottom: 
 export const setSheetTop = (sheetTop: number | null) => update({ sheetTop })
 export const setFlyoutEnd = (flyoutEnd: number | null) => update({ flyoutEnd })
 export const editState = () => state
+/**
+ * Whether something stands over the edit panel and the bar's second row, so Esc closes it first: a
+ * modal dialog, such as Keyboard shortcuts, or what marks itself `data-over-panel`, as the Share
+ * menu and its cards do.
+ */
+export const overPanel = () => document.querySelector('dialog:modal, [data-over-panel]') !== null
 
 /** What the top bar has open and where it sits, re-rendering the caller when that changes. */
 export function useEditState() {

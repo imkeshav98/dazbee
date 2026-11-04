@@ -19,7 +19,7 @@ import { BackgroundPanel, PagesButton, PagesPanel } from '@/components/editor/pa
 import { type ChromeInsets, EditorShell } from '@/components/editor/shell.tsx'
 import { NoticeToast, UndoToast } from '@/components/editor/toasts.tsx'
 import { HistoryButtons } from '@/components/editor/top-bar/history-buttons.tsx'
-import { StageMenu } from '@/components/editor/top-bar/layer-actions.tsx'
+import { hiddenAt, type HiddenLayers, StageMenu } from '@/components/editor/top-bar/layer-actions.tsx'
 import { SmallMenu } from '@/components/editor/top-bar/small-menu.tsx'
 import { TopBar } from '@/components/editor/top-bar/top-bar.tsx'
 import { carriesFiles, dragFills, dropAt, isAssetFile, placeDroppedFiles } from '@/lib/editor/drop-files.ts'
@@ -77,7 +77,7 @@ export function EditorStage({
   const locale = useLocale()
   const [notice, setNotice] = useState<{ text: string; at: number; lasting?: boolean } | null>(null)
   // A right-click on a layer: where, for the menu of its actions, and a count so each right-click opens its own.
-  const [menuAt, setMenuAt] = useState<{ x: number; y: number; n: number } | null>(null)
+  const [menuAt, setMenuAt] = useState<{ x: number; y: number; n: number; hidden: HiddenLayers | null } | null>(null)
   const dismissNotice = useCallback(() => setNotice(null), [])
   // Where the top bar ends and, on a phone, where the open sheet starts: the show-alone chip sits
   // under the bar, and the toasts above the sheet.
@@ -285,10 +285,16 @@ export function EditorStage({
         onContextMenu={(e) => {
           if (!editor || e.target !== canvas.current) return
           e.preventDefault()
-          const ids = editor.selectAt({ x: e.clientX, y: e.clientY })
+          const client = { x: e.clientX, y: e.clientY }
+          const ids = editor.selectAt(client)
+          // On empty canvas, in a frame or outside every one, the menu only offers to show the hidden
+          // layers of the frame there or nearest, when it has some.
+          const hidden = ids.length > 0 ? null : hiddenAt(editor, client)
           const box = e.currentTarget.getBoundingClientRect()
           setMenuAt((now) =>
-            ids.length > 0 ? { x: e.clientX - box.left, y: e.clientY - box.top, n: (now?.n ?? 0) + 1 } : null,
+            ids.length > 0 || hidden
+              ? { x: client.x - box.left, y: client.y - box.top, n: (now?.n ?? 0) + 1, hidden }
+              : null,
           )
         }}
         onDragOver={(e) => {
@@ -326,7 +332,15 @@ export function EditorStage({
       >
         <canvas ref={canvas} className="block size-full touch-none" data-testid="stage" />
         <div ref={overlay} className="stage-overlay pointer-events-none absolute inset-0 overflow-hidden" aria-hidden />
-        {editor && menuAt && <StageMenu key={menuAt.n} editor={editor} at={menuAt} onClose={() => setMenuAt(null)} />}
+        {editor && menuAt && (
+          <StageMenu
+            key={menuAt.n}
+            editor={editor}
+            at={menuAt}
+            hidden={menuAt.hidden}
+            onClose={() => setMenuAt(null)}
+          />
+        )}
       </div>
       {/* The top bar, the small menu and the edit panel follow the page's direction, so they mirror in Arabic. */}
       {editor && <TopBar editor={editor} brandId={brandId} />}

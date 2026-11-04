@@ -2,7 +2,7 @@
 // editor control that looks like one of these takes it from here instead of spelling its classes again.
 // Looks that controls outside the editor share live in components/ui/looks.ts.
 
-import { FOCUS_RING, LIT_ROW } from '@/components/ui/looks.ts'
+import { FOCUS_RING, LIT_ROW, TOUCH_ROW } from '@/components/ui/looks.ts'
 
 /** A disabled control: faded and not clickable. */
 const DISABLED = 'disabled:pointer-events-none disabled:opacity-40'
@@ -86,7 +86,7 @@ export const KNOB = `relative flex h-8 min-w-0 cursor-ew-resize touch-pan-y sele
 export const KNOBS = 'grid grid-cols-2 gap-1.5 [&>:last-child:nth-child(odd)]:col-span-2'
 
 /** A row of a menu: its words at the start, a shortcut or a switch at the end. */
-export const MENU_ITEM = `group flex h-9 w-full shrink-0 cursor-pointer items-center justify-between gap-3 rounded-row px-2.5 text-start text-[13px] font-medium text-text transition-colors duration-[var(--chrome-fast)] ${LIT_ROW} ${DISABLED} ${FOCUS_RING}`
+export const MENU_ITEM = `group flex h-9 w-full shrink-0 cursor-pointer items-center justify-between gap-3 rounded-row px-2.5 text-start text-[13px] font-medium text-text transition-colors duration-[var(--chrome-fast)] ${LIT_ROW} ${TOUCH_ROW} ${DISABLED} ${FOCUS_RING}`
 /** The hairline between a menu's groups of rows. */
 export const MENU_DIVIDER = 'mx-1.5 my-1 border-t border-line'
 /** A shortcut shown in a menu row. */

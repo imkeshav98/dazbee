@@ -1,6 +1,7 @@
 'use client'
 
-// The layers panel (#59): the page's layer tree, topmost first, in step with the stage's selection.
+// The layers panel (#59): the page's layer tree, topmost first, in step with the stage's selection;
+// with nothing selected, the page in view's.
 // Drag a row to reorder it or drop it into a group; rename, lock and hide; expand groups. Every
 // change is an editor call, so each is one undo step. Only the rows in view are in the page, so a
 // page of hundreds of layers scrolls as smoothly as one of ten.
@@ -19,10 +20,11 @@ import { ancestorsOf, childrenOf } from '@dazbee/doc'
 import type { Editor } from '@dazbee/editor'
 import { canHold, type Design, formatScope, inOrder } from '@dazbee/schema'
 
-import { useSelectionWithFrame } from '@/components/editor/editor-hooks.ts'
+import { shownPage, useSelectionWithFrame } from '@/components/editor/editor-hooks.ts'
 import { useFlyoutNote } from '@/components/editor/shell.tsx'
 import { useLiveDesign } from '@/components/editor/use-live-design.ts'
 import { useOverlayScroll } from '@/components/ui/overlay-scroll.ts'
+import { useValue } from '@/lib/editor/value-store.ts'
 import { useLocale, useMessages } from '@/lib/i18n/client.tsx'
 import { dirOf, format } from '@/lib/i18n/index.ts'
 
@@ -54,8 +56,12 @@ export function LayersPanel({ editor }: { editor: Editor }) {
   const selection = useSelectionWithFrame(editor)
   const selected = useMemo(() => new Set(selection.ids), [selection.ids])
 
-  // The frame the panel shows: the selection's, or the first page in the primary format.
-  const [framePage, frameFormat] = selection.frame?.split('/') ?? []
+  // The frame the panel shows: the selection's; with nothing selected, the page in view (shown from
+  // the Pages panel or picked on the stage), an empty one too, else the last selection's; else the
+  // first page. In the selection's format, else the primary one.
+  const inView = useValue(shownPage)
+  const [selectedPage, frameFormat] = selection.frame?.split('/') ?? []
+  const framePage = selection.ids.length === 0 && inView ? inView : selectedPage
   const pageId = framePage && design.pages[framePage] ? framePage : (inOrder(design.pages)[0]?.[0] ?? '')
   const formatId = frameFormat && design.formats[frameFormat] ? frameFormat : design.meta.primaryFormatId
   const page = design.pages[pageId]
@@ -391,10 +397,12 @@ export function LayersPanel({ editor }: { editor: Editor }) {
     if (at !== undefined) places.add(at)
   }
   const shown = [...places].sort((a, b) => a - b).flatMap((i) => (rows[i] ? [{ row: rows[i], i }] : []))
+  // A text's row shows the text icon, as every text row does: a picture of its words in their own
+  // colour can vanish against the panel.
   const pictures = useLayerPictures(
     editor,
     `${pageId}/${formatId}`,
-    shown.map(({ row }) => row.id),
+    shown.flatMap(({ row }) => (row.node.type === 'text' ? [] : [row.id])),
     scrolledAt,
   )
   return (
