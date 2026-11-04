@@ -8,10 +8,41 @@ import { setCookies, shoot } from '../../support/editor.ts'
 import { hovered, laid, look, openIn, pressed, pressedFill, servedGlass, THEMES } from '../../support/glass.ts'
 import { API_URL, DEV_BRAND, liveDesign, seed } from '../../support/seed.ts'
 import { selectLayers } from '../../support/stage.ts'
-import { expect, test } from '../../support/test.ts'
+import { expect, type Locator, type Page, test } from '../../support/test.ts'
 import { barMenu, fillList, moreMenu, pagesPanel, sizesPanel } from '../../support/top-bar.ts'
 
 test.describe.configure({ timeout: 180_000 })
+
+const PHONE = { width: 390, height: 844 }
+
+/**
+ * Opens the account menu, and reads which theme its Theme choice shows as chosen once the menu is
+ * first in the page, before anything set after it could slide into place.
+ */
+const openAccount = (page: Page) =>
+  page.evaluate(
+    () =>
+      new Promise<string | null>((resolve) => {
+        const drawn = new MutationObserver(() => {
+          const chosen = document.querySelector('[data-testid="account"] [aria-label="Theme"] [aria-checked="true"]')
+          if (!chosen) return
+          drawn.disconnect()
+          resolve(chosen.textContent)
+        })
+        drawn.observe(document.body, { childList: true, subtree: true })
+        document.querySelector<HTMLElement>('[data-testid="account-open"]')?.click()
+      }),
+  )
+
+/** Puts a finger down on a control and holds it there, as on a phone, until it is lifted: a tap. */
+async function hold(page: Page, control: Locator) {
+  const box = await control.boundingBox()
+  if (!box) throw new Error('the control to hold is not on screen')
+  const finger = await page.context().newCDPSession(page)
+  const at = { x: box.x + box.width / 2, y: box.y + box.height / 2 }
+  await finger.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [at] })
+  return { lift: () => finger.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] }) }
+}
 
 test('a toggle that is on reads in the text colour on its pink tint; an open top bar button takes the pressed tint while pressed', async ({
   browser,
@@ -47,7 +78,8 @@ test('the account menu’s language and theme, and the colour pop-up’s kinds o
     const { page, errors, glass } = await openIn(browser, designId, theme)
     const well = { fill: glass.well, border: '0px' }
     const chosen = { fill: glass.chip, colour: glass.text }
-    await page.getByTestId('account-open').click()
+    // The theme in use is the chosen one as the menu is first drawn, so no choice slides into place.
+    expect(await openAccount(page)).toBe(theme === 'dark' ? 'Dark' : 'Light')
     const account = page.getByTestId('account')
     for (const name of ['Language', 'Theme']) {
       const choices = account.getByRole('radiogroup', { name })
@@ -111,23 +143,24 @@ test('glass buttons and rows take the hover tint and, while pressed, the pressed
   }
 })
 
-test('on touch, a press on a glass button shows the pressed tint', async ({ browser }) => {
+test('on a phone, a glass button and a card’s row show the pressed tint while a finger is held on them', async ({
+  browser,
+}) => {
   const designId = await seed(liveDesign())
   for (const theme of THEMES) {
-    const { page, errors, glass } = await openIn(browser, designId, theme, undefined, { hasTouch: true })
-    const add = (await pagesPanel(page)).getByTestId('add-page')
-    const box = await add.boundingBox()
-    if (!box) throw new Error('missing Add page')
-    // A finger held on it for a while, through the browser's own gesture handling, as a phone's is.
-    const touch = await page.context().newCDPSession(page)
-    const held = touch.send('Input.synthesizeTapGesture', {
-      x: box.x + box.width / 2,
-      y: box.y + box.height / 2,
-      duration: 3000,
-      gestureSourceType: 'touch',
-    })
-    await expect.poll(async () => (await look(add)).image, { timeout: 2500 }).toBe(laid(glass.pressed))
-    await held
+    const { page, errors, glass } = await openIn(browser, designId, theme, PHONE, { hasTouch: true, isMobile: true })
+    const card = await pagesPanel(page)
+    const row = card.locator('[data-page]').first()
+    // A page's row, lit while the finger on its button is held, then Add page.
+    for (const [control, lit] of [
+      [row.getByRole('button').first(), row],
+      [card.getByTestId('add-page'), card.getByTestId('add-page')],
+    ] as const) {
+      const finger = await hold(page, control)
+      await expect.poll(async () => (await look(lit)).image).toBe(laid(glass.pressed))
+      await finger.lift()
+      await expect.poll(async () => (await look(lit)).image).toBe('none')
+    }
     expect(errors).toEqual([])
     await page.context().close()
   }
