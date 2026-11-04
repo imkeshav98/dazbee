@@ -1,9 +1,11 @@
+// The layers panel specs' design and helpers: the tree and its rows, what the panel lists, the
+// layers in the document, and Tab into the tree.
 import type { DesignInput } from '@dazbee/schema'
 
 import { read } from './stage.ts'
 import { expect, type Page } from './test.ts'
 
-/** A row's height in the panel, in pixels (LAYER_ROW in components/editor/flyouts/layers-panel.tsx). */
+/** A row's height in the panel, in pixels (LAYER_ROW in components/editor/flyouts/layer-row.tsx). */
 export const ROW = 36
 
 export const rect = (x: number, y: number, width: number, height: number, color: string) => ({
@@ -111,7 +113,5 @@ export async function tabIntoTree(page: Page) {
     await page.keyboard.press('Tab')
 }
 
-/** The selected layers' ids. */
-export const selectionOf = (page: Page) => page.evaluate(() => window.dazbee?.selection() ?? [])
 /** The ids of the layers in the document. */
 export const layerIds = async (page: Page) => Object.keys((await read(page)).nodes)

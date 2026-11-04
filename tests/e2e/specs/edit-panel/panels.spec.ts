@@ -12,6 +12,15 @@ import { barMenu } from '../../support/top-bar.ts'
 
 test.describe.configure({ timeout: 240_000 })
 
+/** Each kind's panels, by the top bar item that opens them. */
+const PANELS: [string, string[], string[]][] = [
+  ['text', ['headline'], ['font', 'colour', 'spacing', 'effects', 'position']],
+  ['shape', ['badge'], ['colour', 'outline', 'effects']],
+  ['photo', ['photo'], ['edit', 'outline', 'effects']],
+  ['stack', ['button'], ['colour', 'stack']],
+  ['in a stack', ['label'], ['position']],
+]
+
 const solid = (color: string) => [{ type: 'solid' as const, color }]
 const design = (assetId: string): DesignInput => ({
   meta: { schemaVersion: 5, designId: 'replaced-by-the-api', name: 'Panels', kind: 'single', primaryFormatId: 'sq' },
@@ -96,14 +105,9 @@ const design = (assetId: string): DesignInput => ({
   overrides: {},
 })
 
-/** Each kind's panels, by the top bar item that opens them. */
-const PANELS: [string, string[], string[]][] = [
-  ['text', ['headline'], ['font', 'colour', 'spacing', 'effects', 'position']],
-  ['shape', ['badge'], ['colour', 'outline', 'effects']],
-  ['photo', ['photo'], ['edit', 'outline', 'effects']],
-  ['stack', ['button'], ['colour', 'stack']],
-  ['in a stack', ['label'], ['position']],
-]
+/** The layer's props as the document holds them. */
+const propsOf = (page: Page, id: string) =>
+  page.evaluate((id) => window.dazbee?.design().nodes[id]?.props, id) as Promise<Record<string, unknown>>
 
 for (const [width, height] of SCREEN_SIZES) {
   // The panel is as wide at every size but the phone's, so CI checks it at desktop size; the other
@@ -152,10 +156,6 @@ for (const [width, height] of SCREEN_SIZES) {
     },
   )
 }
-
-/** The layer's props as the document holds them. */
-const propsOf = (page: Page, id: string) =>
-  page.evaluate((id) => window.dazbee?.design().nodes[id]?.props, id) as Promise<Record<string, unknown>>
 
 test.describe('found by QA', () => {
   test('number fields stop at limits a design never needs to pass', async ({ browser }) => {

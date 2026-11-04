@@ -115,6 +115,97 @@ const design = (assetId: string): DesignInput => ({
   },
 })
 
+/** A carousel of three pages in one format, each its own picture: a photo and words, words on dark, a badge on pink. */
+const carousel = (assetId: string): DesignInput => ({
+  meta: {
+    schemaVersion: 5,
+    designId: 'replaced-by-the-api',
+    name: 'Spring carousel',
+    kind: 'carousel',
+    primaryFormatId: 'pt',
+  },
+  formats: { pt: FORMATS.pt },
+  pages: {
+    s1: { name: 'Slide 1', order: 'a0', fills: [{ type: 'solid', color: '#FFF6E8FF' }] },
+    s2: { name: 'Slide 2', order: 'a1', fills: [{ type: 'solid', color: '#15121AFF' }] },
+    s3: { name: 'Slide 3', order: 'a2', fills: [{ type: 'solid', color: '#FF48B0FF' }] },
+  },
+  nodes: {
+    photo: {
+      type: 'graphic',
+      parentId: 's1',
+      index: 'a0',
+      name: 'Photo',
+      props: {
+        x: 80,
+        y: 80,
+        width: 920,
+        height: 760,
+        shape: { kind: 'rect', cornerRadius: 40 },
+        fills: [{ type: 'image', assetId, fit: 'fill' }],
+      },
+    },
+    title: {
+      type: 'text',
+      parentId: 's1',
+      index: 'a1',
+      name: 'Title',
+      role: 'headline',
+      props: {
+        x: 80,
+        y: 960,
+        width: 920,
+        height: 140,
+        text: 'Spring drop',
+        style: { fontFamily: 'Noto Sans', fontSize: 110, fontWeight: 800, color: '#15121AFF' },
+      },
+    },
+    offer: {
+      type: 'text',
+      parentId: 's2',
+      index: 'a0',
+      name: 'Offer',
+      props: {
+        x: 80,
+        y: 600,
+        width: 920,
+        height: 140,
+        text: '30% off',
+        style: { fontFamily: 'Noto Sans', fontSize: 120, fontWeight: 800, color: '#FFFFFFFF' },
+      },
+    },
+    badge: {
+      type: 'graphic',
+      parentId: 's3',
+      index: 'a0',
+      name: 'Badge',
+      props: {
+        x: 340,
+        y: 300,
+        width: 400,
+        height: 400,
+        shape: { kind: 'star', points: 10, innerRadius: 0.75 },
+        fills: [{ type: 'solid', color: '#FFD23FFF' }],
+      },
+    },
+    cta: {
+      type: 'text',
+      parentId: 's3',
+      index: 'a1',
+      name: 'Call to action',
+      props: {
+        x: 80,
+        y: 900,
+        width: 920,
+        height: 120,
+        text: 'Shop now',
+        style: { fontFamily: 'Noto Sans', fontSize: 96, fontWeight: 700, color: '#15121AFF' },
+      },
+    },
+  },
+  overrides: {},
+})
+
 type LongTasks = { longTasks: number[]; longTaskWatch: PerformanceObserver }
 /** Records every task that blocks the main thread for more than 50 ms, from now on. */
 const watchLongTasks = (page: Page) =>
@@ -283,97 +374,6 @@ test(
     })
   },
 )
-
-/** A carousel of three pages in one format, each its own picture: a photo and words, words on dark, a badge on pink. */
-const carousel = (assetId: string): DesignInput => ({
-  meta: {
-    schemaVersion: 5,
-    designId: 'replaced-by-the-api',
-    name: 'Spring carousel',
-    kind: 'carousel',
-    primaryFormatId: 'pt',
-  },
-  formats: { pt: FORMATS.pt },
-  pages: {
-    s1: { name: 'Slide 1', order: 'a0', fills: [{ type: 'solid', color: '#FFF6E8FF' }] },
-    s2: { name: 'Slide 2', order: 'a1', fills: [{ type: 'solid', color: '#15121AFF' }] },
-    s3: { name: 'Slide 3', order: 'a2', fills: [{ type: 'solid', color: '#FF48B0FF' }] },
-  },
-  nodes: {
-    photo: {
-      type: 'graphic',
-      parentId: 's1',
-      index: 'a0',
-      name: 'Photo',
-      props: {
-        x: 80,
-        y: 80,
-        width: 920,
-        height: 760,
-        shape: { kind: 'rect', cornerRadius: 40 },
-        fills: [{ type: 'image', assetId, fit: 'fill' }],
-      },
-    },
-    title: {
-      type: 'text',
-      parentId: 's1',
-      index: 'a1',
-      name: 'Title',
-      role: 'headline',
-      props: {
-        x: 80,
-        y: 960,
-        width: 920,
-        height: 140,
-        text: 'Spring drop',
-        style: { fontFamily: 'Noto Sans', fontSize: 110, fontWeight: 800, color: '#15121AFF' },
-      },
-    },
-    offer: {
-      type: 'text',
-      parentId: 's2',
-      index: 'a0',
-      name: 'Offer',
-      props: {
-        x: 80,
-        y: 600,
-        width: 920,
-        height: 140,
-        text: '30% off',
-        style: { fontFamily: 'Noto Sans', fontSize: 120, fontWeight: 800, color: '#FFFFFFFF' },
-      },
-    },
-    badge: {
-      type: 'graphic',
-      parentId: 's3',
-      index: 'a0',
-      name: 'Badge',
-      props: {
-        x: 340,
-        y: 300,
-        width: 400,
-        height: 400,
-        shape: { kind: 'star', points: 10, innerRadius: 0.75 },
-        fills: [{ type: 'solid', color: '#FFD23FFF' }],
-      },
-    },
-    cta: {
-      type: 'text',
-      parentId: 's3',
-      index: 'a1',
-      name: 'Call to action',
-      props: {
-        x: 80,
-        y: 900,
-        width: 920,
-        height: 120,
-        text: 'Shop now',
-        style: { fontFamily: 'Noto Sans', fontSize: 96, fontWeight: 700, color: '#15121AFF' },
-      },
-    },
-  },
-  overrides: {},
-})
 
 test('every page of a carousel as PNG is one zip whose files are each what Node exports of that page', async ({
   browser,

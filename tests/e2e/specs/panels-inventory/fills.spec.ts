@@ -1,3 +1,6 @@
+// The panels inventory's rows 29 to 34 (support/inventory.ts): a shape's fills. Swatches and brand
+// colours, the fill list, each paint's kind, gradient stops, hex and opacity, and an image into a
+// shape.
 import { reloads } from '../../support/editor.ts'
 import { enter } from '../../support/fields.ts'
 import { assets, doc, fills, setupInventory, step } from '../../support/inventory.ts'
@@ -7,7 +10,7 @@ import { barMenu, fillList } from '../../support/top-bar.ts'
 
 const row = setupInventory()
 
-test.describe('shapes and frames', () => {
+test.describe('fills', () => {
   row(29, 'fill swatches and brand colours', async (open) => {
     const page = await open()
     await selectLayers(page, ['dot'], { bar: true })

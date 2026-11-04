@@ -1,3 +1,7 @@
+// The top bar by keyboard (#287): Tab and the arrows along the bar, Esc giving the focus back and
+// clearing the selection, Esc closing the second row, the size field's arrows, and Esc closing a
+// panel first wherever the focus is; and the focus as a menu of the bar closes with the next input
+// coming at once.
 import type { DesignInput } from '@dazbee/schema'
 
 import { photo, upload } from '../../support/assets.ts'
@@ -128,7 +132,8 @@ test('⋯ on the top bar leaves an open panel open, and Esc closes the panel fir
 test.describe('the focus as a menu of the bar closes', () => {
   test.describe.configure({ timeout: 120_000 })
 
-  const design = (): DesignInput => ({
+  /** One page in one format, holding the layer A. */
+  const oneLayer = (): DesignInput => ({
     meta: {
       schemaVersion: 5,
       designId: 'replaced-by-the-api',
@@ -187,7 +192,7 @@ test.describe('the focus as a menu of the bar closes', () => {
   test('Esc in one popover of the bar and a click on another at once: the new one stays open with the focus', async ({
     browser,
   }) => {
-    const { page, errors } = await openStage(browser, design())
+    const { page, errors } = await openStage(browser, oneLayer())
     await selectLayers(page, ['a'])
     await barMenu(page, 'colour')
 
@@ -204,7 +209,7 @@ test.describe('the focus as a menu of the bar closes', () => {
   test('Esc twice at once in the menu beside Order: the first closes it, the second ⋯ More, and the layer stays selected', async ({
     browser,
   }) => {
-    const { page, errors } = await openStage(browser, design())
+    const { page, errors } = await openStage(browser, oneLayer())
     await selectLayers(page, ['a'])
     const order = await moreSubmenu(page, 'order')
     expect(await order.evaluate((menu) => menu.contains(document.activeElement))).toBe(true)
@@ -222,7 +227,7 @@ test.describe('the focus as a menu of the bar closes', () => {
   test('the arrow back out of the menu beside Order, then Esc at once: ⋯ More closes and the layer stays selected', async ({
     browser,
   }) => {
-    const { page, errors } = await openStage(browser, design())
+    const { page, errors } = await openStage(browser, oneLayer())
     await selectLayers(page, ['a'])
     const order = await moreSubmenu(page, 'order')
     expect(await order.evaluate((menu) => menu.contains(document.activeElement))).toBe(true)
@@ -239,7 +244,7 @@ test.describe('the focus as a menu of the bar closes', () => {
   test('Esc in a number field of ⋯ More throws away what was typed: the menu closes and the layer keeps its rotation', async ({
     browser,
   }) => {
-    const { page, errors } = await openStage(browser, design())
+    const { page, errors } = await openStage(browser, oneLayer())
     await selectLayers(page, ['a'])
     const more = await moreMenu(page)
     const rotation = more.getByRole('spinbutton', { name: 'Rotation in degrees' })

@@ -1,6 +1,106 @@
-import { type DesignInput } from '@dazbee/schema'
+// The gesture matrix's design (support/gesture-matrix.ts) and the tables that name its layers: the
+// subjects, what each container holds, each path's colour, each layer auto layout places, the two
+// layers beside each subject, and the leaves.
+import type { DesignInput } from '@dazbee/schema'
 
 type Node = DesignInput['nodes'][string]
+
+/** The layers the matrix acts on, each selected alone (or with two beside it, to distribute). */
+export const SUBJECTS = [
+  'shape',
+  'group',
+  'gA',
+  'frame',
+  'fInner',
+  'auto',
+  'aFixed',
+  'aFill',
+  'aHug',
+  'aAbs',
+  'col',
+  'colA',
+  'bool',
+  'mask',
+  'masked',
+  'tWide',
+  'tTall',
+  'tFixed',
+  'photo',
+  'turned',
+  'tInner',
+  'autoTurned',
+  'atA',
+  'pen',
+  'paths',
+] as const
+export type Subject = (typeof SUBJECTS)[number]
+/** What each container holds. */
+export const HOLDS: Record<string, readonly string[]> = {
+  group: ['gA', 'gB'],
+  bool: ['bA', 'bB'],
+  maskGroup: ['mask', 'masked'],
+  frame: ['fInner'],
+  auto: ['aFixed', 'aFill', 'aHug', 'aAbs'],
+  aHug: ['aHugIn'],
+  turned: ['tInner'],
+  col: ['colA', 'colB'],
+  autoTurned: ['atA', 'atB'],
+  paths: ['pA', 'pB'],
+}
+/** Each path's colour, to find where its drawing is in an export. */
+export const PATH_INK: Record<string, [number, number, number]> = {
+  pen: [0x13, 0xc4, 0xa3],
+  pA: [0xc4, 0x13, 0x90],
+  pB: [0x7a, 0x13, 0xc4],
+}
+/** Each layer auto layout places, by the frame whose flow it is in. */
+export const FLOW: Record<string, string> = {
+  aFixed: 'auto',
+  aFill: 'auto',
+  aHug: 'auto',
+  colA: 'col',
+  colB: 'col',
+  atA: 'autoTurned',
+  atB: 'autoTurned',
+}
+/** Two layers beside each subject that can be distributed with it. */
+export const BESIDE: Record<string, [string, string]> = {
+  shape: ['group', 'frame'],
+  group: ['shape', 'frame'],
+  frame: ['shape', 'group'],
+  bool: ['shape', 'group'],
+  photo: ['shape', 'group'],
+  aFixed: ['aFill', 'aHug'],
+  aFill: ['aFixed', 'aHug'],
+  aHug: ['aFixed', 'aFill'],
+}
+export const LEAVES = [
+  'shape',
+  'gA',
+  'gB',
+  'fInner',
+  'aFixed',
+  'aFill',
+  'aHugIn',
+  'aAbs',
+  'colA',
+  'colB',
+  'bA',
+  'bB',
+  'mask',
+  'masked',
+  'tWide',
+  'tTall',
+  'tFixed',
+  'photo',
+  'tInner',
+  'atA',
+  'atB',
+  'pen',
+  'pA',
+  'pB',
+]
+
 const rect = (
   name: string,
   parentId: string,
@@ -275,99 +375,3 @@ export const matrixDesign = (assetId: string): DesignInput => ({
   },
   overrides: {},
 })
-
-/** The layers the matrix acts on, each selected alone (or with two beside it, to distribute). */
-export const SUBJECTS = [
-  'shape',
-  'group',
-  'gA',
-  'frame',
-  'fInner',
-  'auto',
-  'aFixed',
-  'aFill',
-  'aHug',
-  'aAbs',
-  'col',
-  'colA',
-  'bool',
-  'mask',
-  'masked',
-  'tWide',
-  'tTall',
-  'tFixed',
-  'photo',
-  'turned',
-  'tInner',
-  'autoTurned',
-  'atA',
-  'pen',
-  'paths',
-] as const
-export type Subject = (typeof SUBJECTS)[number]
-/** What each container holds. */
-export const HOLDS: Record<string, readonly string[]> = {
-  group: ['gA', 'gB'],
-  bool: ['bA', 'bB'],
-  maskGroup: ['mask', 'masked'],
-  frame: ['fInner'],
-  auto: ['aFixed', 'aFill', 'aHug', 'aAbs'],
-  aHug: ['aHugIn'],
-  turned: ['tInner'],
-  col: ['colA', 'colB'],
-  autoTurned: ['atA', 'atB'],
-  paths: ['pA', 'pB'],
-}
-/** Each path's colour, to find where its drawing is in an export. */
-export const PATH_INK: Record<string, [number, number, number]> = {
-  pen: [0x13, 0xc4, 0xa3],
-  pA: [0xc4, 0x13, 0x90],
-  pB: [0x7a, 0x13, 0xc4],
-}
-/** Each layer auto layout places, by the frame whose flow it is in. */
-export const FLOW: Record<string, string> = {
-  aFixed: 'auto',
-  aFill: 'auto',
-  aHug: 'auto',
-  colA: 'col',
-  colB: 'col',
-  atA: 'autoTurned',
-  atB: 'autoTurned',
-}
-/** Two layers beside each subject that can be distributed with it. */
-export const BESIDE: Record<string, [string, string]> = {
-  shape: ['group', 'frame'],
-  group: ['shape', 'frame'],
-  frame: ['shape', 'group'],
-  bool: ['shape', 'group'],
-  photo: ['shape', 'group'],
-  aFixed: ['aFill', 'aHug'],
-  aFill: ['aFixed', 'aHug'],
-  aHug: ['aFixed', 'aFill'],
-}
-export const LEAVES = [
-  'shape',
-  'gA',
-  'gB',
-  'fInner',
-  'aFixed',
-  'aFill',
-  'aHugIn',
-  'aAbs',
-  'colA',
-  'colB',
-  'bA',
-  'bB',
-  'mask',
-  'masked',
-  'tWide',
-  'tTall',
-  'tFixed',
-  'photo',
-  'tInner',
-  'atA',
-  'atB',
-  'pen',
-  'pA',
-  'pB',
-]

@@ -22,24 +22,6 @@ test.describe.configure({ timeout: 180_000 })
 
 const GOOGLE = ['Inter', 'Playfair Display', 'Lobster']
 
-/** Uploads a font for the development brand the way the web app does: ask, PUT to the signed URL, record. */
-async function uploadFont(bytes: Uint8Array<ArrayBuffer>) {
-  const sha256 = createHash('sha256').update(bytes).digest('hex')
-  const ticket = FontUploadTicket.parse(
-    await api('/fonts/uploads', { sha256, byteSize: bytes.length, contentType: 'font/ttf' }),
-  )
-  if (ticket.face) return ticket.face
-  expect((await fetch(ticket.upload.url, { method: 'PUT', body: bytes, headers: ticket.upload.headers })).status).toBe(
-    200,
-  )
-  return FontFace.parse(await api('/fonts', { sha256 }))
-}
-
-test.beforeAll(async () => {
-  importGoogleFonts(GOOGLE)
-  await uploadFont(righteous)
-})
-
 const text = (y: number, fontFamily: string, fontWeight: number, words: string) => ({
   x: 80,
   y,
@@ -124,6 +106,31 @@ async function filesOf(families: FontFamily[], names: string[]) {
   )
 }
 
+const style = async (page: Page, id: string) =>
+  (
+    JSON.parse(await designOf(page)) as {
+      nodes: Record<string, { props: { style: { fontFamily: string; fontWeight: number } } }>
+    }
+  ).nodes[id]?.props.style
+
+/** Uploads a font for the development brand the way the web app does: ask, PUT to the signed URL, record. */
+async function uploadFont(bytes: Uint8Array<ArrayBuffer>) {
+  const sha256 = createHash('sha256').update(bytes).digest('hex')
+  const ticket = FontUploadTicket.parse(
+    await api('/fonts/uploads', { sha256, byteSize: bytes.length, contentType: 'font/ttf' }),
+  )
+  if (ticket.face) return ticket.face
+  expect((await fetch(ticket.upload.url, { method: 'PUT', body: bytes, headers: ticket.upload.headers })).status).toBe(
+    200,
+  )
+  return FontFace.parse(await api('/fonts', { sha256 }))
+}
+
+test.beforeAll(async () => {
+  importGoogleFonts(GOOGLE)
+  await uploadFont(righteous)
+})
+
 test('a design with a Google font and an uploaded font loads only those files, and exports what Node draws', async ({
   browser,
 }) => {
@@ -190,13 +197,6 @@ test('a design with a Google font and an uploaded font loads only those files, a
   expect(errors).toEqual([])
   await context.close()
 })
-
-const style = async (page: Page, id: string) =>
-  (
-    JSON.parse(await designOf(page)) as {
-      nodes: Record<string, { props: { style: { fontFamily: string; fontWeight: number } } }>
-    }
-  ).nodes[id]?.props.style
 
 test('the font picker on the bar shows families as pictures of their names, searches, picks, sets the weight and uploads', async ({
   browser,

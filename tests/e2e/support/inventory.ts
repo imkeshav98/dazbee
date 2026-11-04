@@ -1,11 +1,12 @@
-// Every control in the editor's panels (#235), one test per row of the inventory, in Chromium with
-// real input. Each control is used and the design checked: the document holds the change, the
-// export draws it, one undo takes it back and redo brings it again, and it is there after a reload.
-// The panel redesign runs the same list, so a control that goes missing fails here. Rows 64 to 68
-// (snap and rulers, the layers, assets and brand panels, export) are checked by their own specs:
-// snapping, layers, assets with image-into-shape, brand-kit and export. Rows known to fail have
-// their bug in KNOWN; such a test is expected to fail, and passes once the bug is fixed.
-import { type DesignInput } from '@dazbee/schema'
+// The panels inventory (#235): every control in the editor's panels, one test per row, in Chromium
+// with real input. Each spec in specs/panels-inventory holds a group of rows and calls
+// setupInventory() at its top. Each control is used and the design checked: the document holds the
+// change, the export draws it, one undo takes it back and redo brings it again, and it is there
+// after a reload. The panel redesign runs the same list, so a control that goes missing fails here.
+// Rows 64 to 68 (snap and rulers, the layers, assets and brand panels, export) are checked by their
+// own specs: snapping, layers, assets with image-into-shape, brand-kit and export. Rows known to
+// fail have their bug in KNOWN; such a test is expected to fail, and passes once the bug is fixed.
+import type { DesignInput } from '@dazbee/schema'
 
 import { photo, tile, upload } from './assets.ts'
 import { designOf, placed, writeOutput } from './editor.ts'

@@ -1,19 +1,12 @@
+// The layers panel (#59) with 300 layers: only the rows in view are in the page as it scrolls, the
+// focused row stays focused and reachable by Tab when it scrolls away, and what scrolling the panel
+// takes.
 import type { DesignInput } from '@dazbee/schema'
 
 import { writeOutput } from '../../support/editor.ts'
-import {
-  design,
-  layerIds,
-  openLayers,
-  rect,
-  ROW,
-  row,
-  selectionOf,
-  tabIntoTree,
-  tree,
-} from '../../support/layers-panel.ts'
+import { design, layerIds, openLayers, rect, ROW, row, tabIntoTree, tree } from '../../support/layers-panel.ts'
 import { PERF, report, spread } from '../../support/perf.ts'
-import { openStage, props } from '../../support/stage.ts'
+import { openStage, props, selection } from '../../support/stage.ts'
 import { expect, type Locator, type Page, test } from '../../support/test.ts'
 
 test.describe.configure({ timeout: 120_000 })
@@ -164,7 +157,7 @@ test('300 layers: the bottom row deleted and brought back by undo is focused and
   await page.keyboard.press('Delete')
   await expect.poll(() => layerIds(page)).not.toContain('n0')
   await expect(row(page, 'Layer 2')).toBeFocused()
-  await expect.poll(() => selectionOf(page)).toEqual(['n1'])
+  await expect.poll(() => selection(page)).toEqual(['n1'])
   await page.keyboard.press('ArrowUp')
   await expect(row(page, 'Layer 3')).toBeFocused()
 
@@ -172,7 +165,7 @@ test('300 layers: the bottom row deleted and brought back by undo is focused and
   await page.keyboard.press('ControlOrMeta+Z')
   await expect.poll(() => layerIds(page)).toContain('n0')
   await expect(row(page, 'Layer 1')).toBeFocused()
-  await expect.poll(() => selectionOf(page)).toEqual(['n0'])
+  await expect.poll(() => selection(page)).toEqual(['n0'])
   await page.keyboard.press('Delete')
   await expect.poll(() => layerIds(page)).not.toContain('n0')
   expect(await layerIds(page)).toContain('n2')

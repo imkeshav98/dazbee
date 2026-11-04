@@ -1,3 +1,6 @@
+// The top bar (#287) on a phone, right to left and at tablet size: the phone's sheet, the edit
+// panel and the bar mirrored in Arabic, and the second row and its pop-ups with a flyout open at
+// tablet size.
 import { photo, upload } from '../../support/assets.ts'
 import { editorPath, setCookies, writeOutput } from '../../support/editor.ts'
 import { layoutProblems } from '../../support/layout.ts'

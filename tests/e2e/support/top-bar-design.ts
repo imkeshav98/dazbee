@@ -1,3 +1,5 @@
+// The design the top bar specs open: a layer of each kind the bar has items for, alone and several,
+// turned, grouped, in auto layout, masked, locked and hidden, in a Square and a Story.
 import type { DesignInput } from '@dazbee/schema'
 
 const solid = (color: string) => [{ type: 'solid' as const, color }]

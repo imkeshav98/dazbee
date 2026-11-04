@@ -1,12 +1,6 @@
-// The layers panel (#59) in Chromium, with real pointer and keyboard input: the tree in step with the
-// stage's selection both ways, a layer dragged into a group (the stage redraws it there, one undo
-// step, which redo brings back), rename, lock and hide, all there after a reload; the same by
-// keyboard alone, with the focus following a key pressed just after the panel redraws and a layer
-// moved past a big open group, going to the next row (and selecting it) when the focused one is
-// deleted or grouped and back on undo, Tab landing on the selected row, one tab stop in the tree,
-// and a rename finished or Delete pressed off the tree leaving the focus where it was; and 300
-// layers scrolling with only the rows in view in the page, the focused row staying focused and
-// reachable by Tab when it scrolls away.
+// The layers panel (#59) in Chromium, with the real mouse: the tree in step with the stage's
+// selection both ways, a layer dragged into a group (the stage redraws it there, one undo step,
+// which redo brings back), rename, lock and hide, all there after a reload.
 import { reloads, writeOutput } from '../../support/editor.ts'
 import { colourAt, design, listed, node, openLayers, ROW, row, tree } from '../../support/layers-panel.ts'
 import { click, openStage } from '../../support/stage.ts'

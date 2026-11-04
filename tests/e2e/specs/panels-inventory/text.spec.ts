@@ -1,3 +1,6 @@
+// The panels inventory's rows 12 to 27 (support/inventory.ts): a text's font, weight, size, colour,
+// line height, letter and paragraph spacing, alignment, case, underline and strikethrough, lists,
+// outline, box mode, shrink to fit and lines at most.
 import { righteous } from '../../support/assets.ts'
 import { designOf, reloads } from '../../support/editor.ts'
 import { choose, enter } from '../../support/fields.ts'

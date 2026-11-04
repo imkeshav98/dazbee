@@ -1,3 +1,5 @@
+// The panels inventory's rows 35 to 42 (support/inventory.ts): strokes on a shape and a box,
+// corners, polygon and star options, a line's ends, and combine.
 import { reloads } from '../../support/editor.ts'
 import { choose, enter } from '../../support/fields.ts'
 import { doc, props, setupInventory, step } from '../../support/inventory.ts'

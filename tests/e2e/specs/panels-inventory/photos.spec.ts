@@ -1,3 +1,5 @@
+// The panels inventory's rows 43 to 49 (support/inventory.ts): a photo's replace, crop, fit,
+// filter, adjust, opacity and use as mask.
 import { reloads } from '../../support/editor.ts'
 import { enter } from '../../support/fields.ts'
 import { assets, fills, props, setupInventory, step } from '../../support/inventory.ts'

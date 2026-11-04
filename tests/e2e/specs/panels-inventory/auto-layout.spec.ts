@@ -1,3 +1,6 @@
+// The panels inventory's rows 50 to 58 (support/inventory.ts): frames and auto layout. Adding it,
+// direction and wrap, gap, padding, distribute, align, the frame's own sizing, a child's sizing,
+// and a child kept out of the flow.
 import { reloads } from '../../support/editor.ts'
 import { choose, enter } from '../../support/fields.ts'
 import { props, setupInventory, step } from '../../support/inventory.ts'

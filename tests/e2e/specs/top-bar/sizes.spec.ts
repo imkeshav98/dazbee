@@ -1,3 +1,6 @@
+// The top bar, the small menu by the selection and the edit panel (#287) at desktop, tablet and
+// phone sizes: for every kind of selection, every pop-up, panel and the full menu open with nothing
+// drawn over anything else, no label wrapping, and the canvas never moving.
 import { photo, upload } from '../../support/assets.ts'
 import { writeOutput } from '../../support/editor.ts'
 import { layoutProblems, SCREEN_SIZES, wrapped } from '../../support/layout.ts'

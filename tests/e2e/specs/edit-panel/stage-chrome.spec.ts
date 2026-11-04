@@ -5,6 +5,8 @@ import { liveDesign, seed } from '../../support/seed.ts'
 import { expect, type Page, test } from '../../support/test.ts'
 import { barMenu, moreSubmenu, openCard } from '../../support/top-bar.ts'
 
+test.use({ viewport: { width: 1440, height: 900 } })
+
 const box = async (page: Page, testId: string) => {
   const found = await page.getByTestId(testId).boundingBox()
   if (!found) throw new Error(`no ${testId}`)
@@ -17,8 +19,6 @@ async function open(page: Page) {
   await page.goto(editorPath(designId))
   await expect(page.getByTestId('status')).toHaveAttribute('data-ready', '', { timeout: 30_000 })
 }
-
-test.use({ viewport: { width: 1440, height: 900 } })
 
 test('the canvas runs full width and the ads fit between the capsule and the stage end', async ({ page }) => {
   await open(page)

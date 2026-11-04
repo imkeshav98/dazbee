@@ -13,6 +13,9 @@ test.describe.configure({ timeout: 120_000 })
 
 type Node = DesignInput['nodes'][string]
 const BACKGROUND = [{ type: 'solid', color: '#FFF6E8FF' }] as const
+// Wide enough for the turned photo and the outlined text.
+const CARD = { x: 60, y: 60, width: 580, height: 480 }
+
 const shell = (name: string, nodes: Record<string, Node>): DesignInput => ({
   meta: { schemaVersion: 5, designId: 'replaced-by-the-api', name, kind: 'single', primaryFormatId: 'sq' },
   formats: { sq: { name: 'Square', width: 1080, height: 1080, order: 'a0' } },
@@ -128,8 +131,6 @@ const regionHash = (page: Page, r: { x: number; y: number; width: number; height
     const digest = await crypto.subtle.digest('SHA-256', all)
     return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('')
   }, r)
-// Wide enough for the turned photo and the outlined text.
-const CARD = { x: 60, y: 60, width: 580, height: 480 }
 
 async function goTo(page: Page, designId: string) {
   await page.goto(editorPath(designId))

@@ -1,3 +1,5 @@
+// Files dropped from the computer, as the browser hands them over: the design they are dropped on,
+// the drop itself, the uploads held or failed, and the images placed and stored.
 import { AssetSummary, type DesignInput } from '@dazbee/schema'
 
 import { callApi } from './seed.ts'

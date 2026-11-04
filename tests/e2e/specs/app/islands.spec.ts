@@ -1,9 +1,10 @@
-// Floating islands (#110): the editor has no top bar. The design's name and save state float at
-// the start, its actions at the end, below the rulers and over the canvas, and the ads fit below
-// them.
+// Floating islands (#110): the design's name and save state float at the start, its actions at the
+// end, below the rulers and over the canvas, and the ads fit below them.
 import { editorPath, screenPoint, setCookies, writeOutput } from '../../support/editor.ts'
 import { liveDesign, seed } from '../../support/seed.ts'
 import { expect, type Page, test } from '../../support/test.ts'
+
+test.use({ viewport: { width: 1440, height: 900 } })
 
 const box = async (page: Page, testId: string) => {
   const found = await page.getByTestId(testId).boundingBox()
@@ -17,8 +18,6 @@ async function open(page: Page) {
   await page.goto(editorPath(designId))
   await expect(page.getByTestId('status')).toHaveAttribute('data-ready', '', { timeout: 30_000 })
 }
-
-test.use({ viewport: { width: 1440, height: 900 } })
 
 test('the editor has no top bar: two islands float over the canvas and the ads fit below them', async ({ page }) => {
   await open(page)

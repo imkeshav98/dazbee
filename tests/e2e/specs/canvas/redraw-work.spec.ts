@@ -1,9 +1,13 @@
+// What each redraw of the infinite canvas (#36) draws and records, for five formats of a 120-layer
+// page and a 20-card carousel, panned, dragged and typed into; and what a redraw takes. Needs the
+// API and the sync server: `docker compose up -d --wait`.
 import type { Camera, DrawInfo } from '@dazbee/editor'
 import { framesInView } from '@dazbee/editor/camera'
 
-import { carousel, fiveFormats, nextDraw, open } from '../../support/canvas.ts'
+import { carousel, fiveFormats, open } from '../../support/canvas.ts'
 import { writeOutput } from '../../support/editor.ts'
 import { PERF, report, spread } from '../../support/perf.ts'
+import { drawn } from '../../support/stage.ts'
 import { expect, type Page, test } from '../../support/test.ts'
 
 test.describe.configure({ timeout: 180_000 })
@@ -147,7 +151,7 @@ async function openCarousel(page: Page) {
   await settled(page)
   writeOutput('canvas-4-carousel-fit-all.png', await page.screenshot())
   await page.evaluate(() => window.dazbee?.fitFrame('c3', 'story'))
-  await nextDraw(page)
+  await drawn(page)
   return opened
 }
 

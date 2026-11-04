@@ -6,7 +6,7 @@ import { expect, type Page, test } from '../../support/test.ts'
 
 test.use({ viewport: { width: 1440, height: 900 } })
 
-/** How long chrome moves, in ms (--chrome in globals.css, CHROME in components/editor/shell.tsx). */
+/** How long chrome moves, in ms (--chrome in app/styles/tokens.css, CHROME in components/editor/shell.tsx). */
 const CHROME_MS = 180
 
 /**
@@ -40,6 +40,85 @@ const animations = (page: Page) =>
   page.evaluate(
     () => (window as unknown as { animations: { on: string | null; properties: string[]; ms: number }[] }).animations,
   )
+
+const centre = (box: { x: number; y: number; width: number; height: number } | null) => {
+  if (!box) throw new Error('missing box')
+  return { x: box.x + box.width / 2, y: box.y + box.height / 2 }
+}
+
+/**
+ * The blob's centre and vertical scale on every frame and style change from clicking the named
+ * panel button until the blob rests on it, round, and the vertical scale the blob starts from when
+ * it lands (read as it mounts, since a slow machine may draw no frame before it settles). The slide
+ * is a spring Motion runs frame by frame, with no duration to read, so the watch lasts until it
+ * ends however slow the machine is; 10 s without resting ends it too, for the checks to report.
+ */
+async function blobPath(page: Page, name: string) {
+  const path = page.evaluate(
+    (name) =>
+      new Promise<{ landing: number; frames: { y: number; scaleY: number }[] }>((resolve) => {
+        const seen: { y: number; scaleY: number }[] = []
+        let landing = 1
+        const rail = document.querySelector('[data-testid=rail]')
+        const button = rail?.querySelector(`button[aria-label="${name}"]`)
+        if (!rail || !button) throw new Error(`no ${name} button in the capsule`)
+        const target = button.getBoundingClientRect()
+        /** Where the blob is now and how stretched, recorded; null with no blob. */
+        const look = () => {
+          const blob = document.querySelector('[data-testid=rail-blob]')
+          const squish = blob?.firstElementChild
+          if (!blob || !(squish instanceof HTMLElement)) return null
+          const box = blob.getBoundingClientRect()
+          const at = {
+            y: box.y + box.height / 2,
+            scaleY: new DOMMatrix(getComputedStyle(squish).transform).d,
+            on: blob.closest('button') === button,
+          }
+          seen.push({ y: at.y, scaleY: at.scaleY })
+          return at
+        }
+        // Motion writes the blob's style on each step of the slide, so this also sees the steps a busy
+        // machine draws no frame for.
+        let moved = true
+        const watch = new MutationObserver(() => {
+          moved = true
+          const squish = document.querySelector('[data-testid=rail-blob]')?.firstElementChild
+          if (squish instanceof HTMLElement)
+            landing = Math.max(landing, new DOMMatrix(squish.style.transform || 'none').d)
+          look()
+        })
+        watch.observe(rail, { childList: true, subtree: true, attributes: true, attributeFilter: ['style'] })
+        let finished = false
+        const finish = () => {
+          finished = true
+          watch.disconnect()
+          resolve({ landing, frames: seen })
+        }
+        const giveUp = setTimeout(finish, 10_000)
+        // At rest: on the button, round, and not moved since the last frame, which a spring passing
+        // through its end on the way back would be.
+        const tick = () => {
+          if (finished) return
+          const at = look()
+          const still = !moved
+          moved = false
+          if (
+            still &&
+            at?.on &&
+            Math.abs(at.y - (target.y + target.height / 2)) < 1 &&
+            Math.abs(at.scaleY - 1) < 0.001
+          ) {
+            clearTimeout(giveUp)
+            finish()
+          } else requestAnimationFrame(tick)
+        }
+        requestAnimationFrame(tick)
+      }),
+    name,
+  )
+  await page.getByRole('button', { name }).click()
+  return path
+}
 
 test('the system theme is followed until a pick is made, and dark and light change only the tokens', async ({
   page,
@@ -190,84 +269,6 @@ test('floating chrome is frosted with grain in both themes', async ({ page }) =>
 
 // The floating capsule (#82): it floats over the canvas, a pink blob slides between its buttons,
 // flyouts are only as tall as their content, and on phones it is a tab bar at the bottom.
-const centre = (box: { x: number; y: number; width: number; height: number } | null) => {
-  if (!box) throw new Error('missing box')
-  return { x: box.x + box.width / 2, y: box.y + box.height / 2 }
-}
-
-/**
- * The blob's centre and vertical scale on every frame and style change from clicking the named
- * panel button until the blob rests on it, round, and the vertical scale the blob starts from when
- * it lands (read as it mounts, since a slow machine may draw no frame before it settles). The slide
- * is a spring Motion runs frame by frame, with no duration to read, so the watch lasts until it
- * ends however slow the machine is; 10 s without resting ends it too, for the checks to report.
- */
-async function blobPath(page: Page, name: string) {
-  const path = page.evaluate(
-    (name) =>
-      new Promise<{ landing: number; frames: { y: number; scaleY: number }[] }>((resolve) => {
-        const seen: { y: number; scaleY: number }[] = []
-        let landing = 1
-        const rail = document.querySelector('[data-testid=rail]')
-        const button = rail?.querySelector(`button[aria-label="${name}"]`)
-        if (!rail || !button) throw new Error(`no ${name} button in the capsule`)
-        const target = button.getBoundingClientRect()
-        /** Where the blob is now and how stretched, recorded; null with no blob. */
-        const look = () => {
-          const blob = document.querySelector('[data-testid=rail-blob]')
-          const squish = blob?.firstElementChild
-          if (!blob || !(squish instanceof HTMLElement)) return null
-          const box = blob.getBoundingClientRect()
-          const at = {
-            y: box.y + box.height / 2,
-            scaleY: new DOMMatrix(getComputedStyle(squish).transform).d,
-            on: blob.closest('button') === button,
-          }
-          seen.push({ y: at.y, scaleY: at.scaleY })
-          return at
-        }
-        // Motion writes the blob's style on each step of the slide, so this also sees the steps a busy
-        // machine draws no frame for.
-        let moved = true
-        const watch = new MutationObserver(() => {
-          moved = true
-          const squish = document.querySelector('[data-testid=rail-blob]')?.firstElementChild
-          if (squish instanceof HTMLElement)
-            landing = Math.max(landing, new DOMMatrix(squish.style.transform || 'none').d)
-          look()
-        })
-        watch.observe(rail, { childList: true, subtree: true, attributes: true, attributeFilter: ['style'] })
-        let finished = false
-        const finish = () => {
-          finished = true
-          watch.disconnect()
-          resolve({ landing, frames: seen })
-        }
-        const giveUp = setTimeout(finish, 10_000)
-        // At rest: on the button, round, and not moved since the last frame, which a spring passing
-        // through its end on the way back would be.
-        const tick = () => {
-          if (finished) return
-          const at = look()
-          const still = !moved
-          moved = false
-          if (
-            still &&
-            at?.on &&
-            Math.abs(at.y - (target.y + target.height / 2)) < 1 &&
-            Math.abs(at.scaleY - 1) < 0.001
-          ) {
-            clearTimeout(giveUp)
-            finish()
-          } else requestAnimationFrame(tick)
-        }
-        requestAnimationFrame(tick)
-      }),
-    name,
-  )
-  await page.getByRole('button', { name }).click()
-  return path
-}
 
 test('the panels live in a capsule floating over the canvas', async ({ page }) => {
   const designId = await seed(liveDesign())

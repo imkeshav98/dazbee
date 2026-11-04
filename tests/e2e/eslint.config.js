@@ -9,7 +9,7 @@ export default [
       'no-restricted-imports': [
         'error',
         {
-          paths: [{ name: '@playwright/test', message: "Import test and expect from '../support/test.ts'." }],
+          paths: [{ name: '@playwright/test', message: "Import test and expect from '../../support/test.ts'." }],
           patterns: [adr0001Pattern],
         },
       ],

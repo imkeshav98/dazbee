@@ -15,6 +15,13 @@ import { designOf, screenPoint } from './editor.ts'
 import { BESIDE, FLOW, HOLDS, LEAVES, matrixDesign, PATH_INK, type Subject } from './gesture-matrix-design.ts'
 import { drawn, openStage, press, selectLayers } from './stage.ts'
 
+type Box = { x: number; y: number; width: number; height: number }
+type Boxes = Record<string, Box | null>
+type Doc = {
+  nodes: Record<string, { parentId: string; index: string; props: Record<string, unknown> }>
+  overrides: Record<string, Record<string, Record<string, unknown>>>
+}
+
 const AUTO = new Set(['auto', 'aHug', 'col', 'autoTurned'])
 const TEXT = new Set(['tWide', 'tTall', 'tFixed'])
 /** Layers turned on the page as drawn, by degrees: a handle dragged along the page sizes them by the part along their side. */
@@ -48,13 +55,6 @@ const GESTURES = [
 
 /** Failures that have their own ticket: `subject gesture format` → issue number. */
 const KNOWN: Record<string, number> = Object.fromEntries([])
-
-type Box = { x: number; y: number; width: number; height: number }
-type Boxes = Record<string, Box | null>
-type Doc = {
-  nodes: Record<string, { parentId: string; index: string; props: Record<string, unknown> }>
-  overrides: Record<string, Record<string, Record<string, unknown>>>
-}
 
 const boxesIn = (page: Page, formatId: string): Promise<Boxes> =>
   page.evaluate(

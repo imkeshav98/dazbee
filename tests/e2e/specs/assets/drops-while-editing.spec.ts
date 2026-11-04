@@ -1,3 +1,6 @@
+// Images dropped from the computer whose uploads finish while something else goes on: a text being
+// typed into, an open pen path, a drag on the canvas, or the format they were dropped on going
+// away.
 import { randomUUID } from 'node:crypto'
 
 import type { DesignInput } from '@dazbee/schema'

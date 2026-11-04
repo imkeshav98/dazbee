@@ -1,3 +1,5 @@
+// The designs the canvas specs open, one page in five formats or a carousel of cards, and opening
+// one at 1440×900.
 import { expect, type Page } from '@playwright/test'
 
 import type { DesignInput } from '@dazbee/schema'
@@ -14,49 +16,67 @@ export const FORMATS = {
 }
 const COLORS = ['#FF5A36FF', '#2F6BFFFF', '#FFC400FF', '#1B9E77FF', '#7E57C2FF', '#111111FF']
 
-/** Filler layers under the box and headline: shapes, translucent and shadowed ones, and short texts. */
-function filler(pageId: string, count: number, seedAt = 0) {
+const merge = (...parts: Pick<DesignInput, 'nodes' | 'overrides'>[]) => {
   const nodes: DesignInput['nodes'] = {}
-  for (let i = 0; i < count; i++) {
-    const n = i + seedAt
-    const x = (n * 97) % 980
-    const y = (n * 61) % 1700
-    const color = COLORS[n % COLORS.length] as string
-    const index = `Z${String(i).padStart(4, '0')}`
-    nodes[`${pageId}-f${i}`] =
-      i % 6 === 5
-        ? {
-            type: 'text',
-            parentId: pageId,
-            index,
-            name: `Note ${i}`,
-            props: {
-              x,
-              y,
-              width: 300,
-              height: 48,
-              text: `Line ${n}`,
-              style: { fontFamily: 'Noto Sans', fontSize: 32, color },
-            },
-          }
-        : {
-            type: 'graphic',
-            parentId: pageId,
-            index,
-            name: `Shape ${i}`,
-            props: {
-              x,
-              y,
-              width: 40 + (n % 7) * 20,
-              height: 30 + (n % 5) * 20,
-              shape: i % 2 ? { kind: 'ellipse' } : { kind: 'rect', cornerRadius: 8 },
-              fills: [{ type: 'solid', color }],
-              opacity: i % 4 === 3 ? 0.6 : 1,
-              ...(i % 10 === 9 ? { effects: [{ type: 'dropShadow', x: 0, y: 6, blur: 12, color: '#00000055' }] } : {}),
-            },
-          }
+  const overrides: Record<string, Record<string, Record<string, unknown>>> = {}
+  for (const part of parts) {
+    Object.assign(nodes, part.nodes)
+    for (const [scope, byNode] of Object.entries(part.overrides ?? {}))
+      overrides[scope] = { ...overrides[scope], ...byNode }
   }
-  return nodes
+  return { nodes, overrides }
+}
+
+/** One page in five formats: the box, the headline and `fill` layers under them. */
+export const fiveFormats = (fill: number): DesignInput => ({
+  meta: {
+    schemaVersion: 5,
+    designId: 'replaced-by-the-api',
+    name: 'Five formats',
+    kind: 'single',
+    primaryFormatId: 'sq',
+  },
+  formats: FORMATS,
+  pages: { p1: { name: 'Page 1', order: 'a0', fills: [{ type: 'solid', color: '#FFF8F0FF' }] } },
+  ...merge(heroes('p1', 'Summer sale'), { nodes: filler('p1', fill) }),
+})
+
+/** A carousel of `cards` pages in five formats. */
+export const carousel = (cards: number): DesignInput => {
+  const pages: DesignInput['pages'] = {}
+  const parts = []
+  for (let i = 0; i < cards; i++) {
+    const id = `c${i}`
+    pages[id] = {
+      name: `Card ${i + 1}`,
+      order: `a${String(i).padStart(2, '0')}`,
+      fills: [{ type: 'solid', color: i % 2 ? '#F2F6FFFF' : '#FFF8F0FF' }],
+    }
+    parts.push(heroes(id, `Card ${i + 1}`), { nodes: filler(id, 10, i * 10) })
+  }
+  return {
+    meta: {
+      schemaVersion: 5,
+      designId: 'replaced-by-the-api',
+      name: 'Carousel',
+      kind: 'carousel',
+      primaryFormatId: 'sq',
+    },
+    formats: FORMATS,
+    pages,
+    ...merge(...parts),
+  }
+}
+
+/** Seeds the design and opens it in the page at 1440×900; its id and the errors the page throws from then on. */
+export async function open(page: Page, design: DesignInput) {
+  const id = await seed(design)
+  const errors: string[] = []
+  page.on('pageerror', (error) => errors.push(error.message))
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await page.goto(editorPath(id))
+  await expect(page.getByTestId('status')).toHaveAttribute('data-ready', '', { timeout: 60_000 })
+  return { id, errors }
 }
 
 /** The box and headline of a page, with the headline placed so every format shows it. */
@@ -118,67 +138,47 @@ function heroes(pageId: string, text: string): Pick<DesignInput, 'nodes' | 'over
   }
 }
 
-const merge = (...parts: Pick<DesignInput, 'nodes' | 'overrides'>[]) => {
+/** Filler layers under the box and headline: shapes, translucent and shadowed ones, and short texts. */
+function filler(pageId: string, count: number, seedAt = 0) {
   const nodes: DesignInput['nodes'] = {}
-  const overrides: Record<string, Record<string, Record<string, unknown>>> = {}
-  for (const part of parts) {
-    Object.assign(nodes, part.nodes)
-    for (const [scope, byNode] of Object.entries(part.overrides ?? {}))
-      overrides[scope] = { ...overrides[scope], ...byNode }
+  for (let i = 0; i < count; i++) {
+    const n = i + seedAt
+    const x = (n * 97) % 980
+    const y = (n * 61) % 1700
+    const color = COLORS[n % COLORS.length] as string
+    const index = `Z${String(i).padStart(4, '0')}`
+    nodes[`${pageId}-f${i}`] =
+      i % 6 === 5
+        ? {
+            type: 'text',
+            parentId: pageId,
+            index,
+            name: `Note ${i}`,
+            props: {
+              x,
+              y,
+              width: 300,
+              height: 48,
+              text: `Line ${n}`,
+              style: { fontFamily: 'Noto Sans', fontSize: 32, color },
+            },
+          }
+        : {
+            type: 'graphic',
+            parentId: pageId,
+            index,
+            name: `Shape ${i}`,
+            props: {
+              x,
+              y,
+              width: 40 + (n % 7) * 20,
+              height: 30 + (n % 5) * 20,
+              shape: i % 2 ? { kind: 'ellipse' } : { kind: 'rect', cornerRadius: 8 },
+              fills: [{ type: 'solid', color }],
+              opacity: i % 4 === 3 ? 0.6 : 1,
+              ...(i % 10 === 9 ? { effects: [{ type: 'dropShadow', x: 0, y: 6, blur: 12, color: '#00000055' }] } : {}),
+            },
+          }
   }
-  return { nodes, overrides }
+  return nodes
 }
-
-/** One page in five formats: the box, the headline and `fill` layers under them. */
-export const fiveFormats = (fill: number): DesignInput => ({
-  meta: {
-    schemaVersion: 5,
-    designId: 'replaced-by-the-api',
-    name: 'Five formats',
-    kind: 'single',
-    primaryFormatId: 'sq',
-  },
-  formats: FORMATS,
-  pages: { p1: { name: 'Page 1', order: 'a0', fills: [{ type: 'solid', color: '#FFF8F0FF' }] } },
-  ...merge(heroes('p1', 'Summer sale'), { nodes: filler('p1', fill) }),
-})
-
-/** A carousel of `cards` pages in five formats. */
-export const carousel = (cards: number): DesignInput => {
-  const pages: DesignInput['pages'] = {}
-  const parts = []
-  for (let i = 0; i < cards; i++) {
-    const id = `c${i}`
-    pages[id] = {
-      name: `Card ${i + 1}`,
-      order: `a${String(i).padStart(2, '0')}`,
-      fills: [{ type: 'solid', color: i % 2 ? '#F2F6FFFF' : '#FFF8F0FF' }],
-    }
-    parts.push(heroes(id, `Card ${i + 1}`), { nodes: filler(id, 10, i * 10) })
-  }
-  return {
-    meta: {
-      schemaVersion: 5,
-      designId: 'replaced-by-the-api',
-      name: 'Carousel',
-      kind: 'carousel',
-      primaryFormatId: 'sq',
-    },
-    formats: FORMATS,
-    pages,
-    ...merge(...parts),
-  }
-}
-
-export async function open(page: Page, design: DesignInput) {
-  const id = await seed(design)
-  const errors: string[] = []
-  page.on('pageerror', (error) => errors.push(error.message))
-  await page.setViewportSize({ width: 1440, height: 900 })
-  await page.goto(editorPath(id))
-  await expect(page.getByTestId('status')).toHaveAttribute('data-ready', '', { timeout: 60_000 })
-  return { id, errors }
-}
-
-/** Waits until the screen shows the latest camera and design. */
-export const nextDraw = (page: Page) => page.evaluate(() => window.dazbee?.drawn())

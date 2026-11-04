@@ -1,5 +1,6 @@
-// Opening what the editor's top bar, its menus and the pills over the stage open, as a person
-// does: each opener clicks its item unless what it opens shows, and gives it once it shows.
+// Opening what the editor's top bar, its menus and the pills over the stage open, as a person does:
+// each opener clicks its item unless what it opens shows, and gives it once it shows. And the
+// pieces of the editor the top bar specs check never meet.
 import { expect, type Locator, type Page } from '@playwright/test'
 
 import { EDITOR_CHROME } from './layout.ts'

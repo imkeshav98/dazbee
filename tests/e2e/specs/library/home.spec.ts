@@ -8,6 +8,8 @@ import { setCookies, shoot } from '../../support/editor.ts'
 import { newBrand, seed } from '../../support/seed.ts'
 import { expect, test } from '../../support/test.ts'
 
+test.use({ viewport: { width: 1440, height: 900 } })
+
 /** A design in one format with a coloured page and a block, so its picture is easy to tell apart. */
 const poster = (name: string, width: number, height: number, page: string, block: string): DesignInput => ({
   meta: { schemaVersion: 5, designId: 'replaced-by-the-api', name, kind: 'single', primaryFormatId: 'f' },
@@ -31,8 +33,6 @@ const poster = (name: string, width: number, height: number, page: string, block
   },
   overrides: {},
 })
-
-test.use({ viewport: { width: 1440, height: 900 } })
 
 test('Recent is a page of real pictures, each in its shape, filtered by shape', async ({ page }) => {
   const run = crypto.randomUUID().slice(0, 6)

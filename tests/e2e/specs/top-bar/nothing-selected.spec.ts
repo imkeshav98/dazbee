@@ -15,6 +15,12 @@ import { barMenu, pagesPanel, sizesPanel } from '../../support/top-bar.ts'
 
 test.describe.configure({ timeout: 120_000 })
 
+const PIECES = {
+  ...EDITOR_CHROME,
+  'edit panel': '#edit-panel',
+  'top bar': '[data-testid="top-bar-row"]',
+}
+
 const solid = (color: string) => [{ type: 'solid' as const, color }]
 const design = (): DesignInput => ({
   meta: {
@@ -49,11 +55,6 @@ const design = (): DesignInput => ({
   overrides: {},
 })
 
-const PIECES = {
-  ...EDITOR_CHROME,
-  'edit panel': '#edit-panel',
-  'top bar': '[data-testid="top-bar-row"]',
-}
 /** Where each size of the page is on screen: the ads, which the chrome keeps clear of at a fit. */
 const ads = async (page: Page) => {
   const frames = await page.evaluate(() => window.dazbee?.frames() ?? [])

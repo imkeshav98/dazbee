@@ -1,3 +1,9 @@
+// The layers panel (#59) by keyboard, and where the focus goes: moving through the tree, selecting,
+// renaming, locking, hiding and moving a layer into a group by keyboard alone; the focus following
+// a key pressed just after the panel redraws and a layer moved past a big open group, going to the
+// next row (and selecting it) when the focused one is deleted or grouped and back on undo, Tab
+// landing on the selected row, one tab stop in the tree, and a rename finished or Delete pressed
+// off the tree leaving the focus where it was.
 import type { DesignInput } from '@dazbee/schema'
 
 import { screenPoint, writeOutput } from '../../support/editor.ts'
@@ -10,11 +16,10 @@ import {
   openLayers,
   rect,
   row,
-  selectionOf,
   tabIntoTree,
   tree,
 } from '../../support/layers-panel.ts'
-import { click, openStage, order, read } from '../../support/stage.ts'
+import { click, openStage, order, read, selection } from '../../support/stage.ts'
 import { expect, type Page, test } from '../../support/test.ts'
 
 test.describe.configure({ timeout: 120_000 })
@@ -318,13 +323,13 @@ test('keyboard only: the row that takes the focus after a delete is selected, so
   await page.keyboard.press('Delete')
   await expect.poll(() => layerIds(page)).not.toContain('box')
   await expect(row(page, 'Card')).toBeFocused()
-  await expect.poll(() => selectionOf(page)).toEqual(['card'])
+  await expect.poll(() => selection(page)).toEqual(['card'])
   await expect(row(page, 'Card')).toHaveAttribute('aria-selected', 'true')
 
   await page.keyboard.press('Delete')
   await expect.poll(() => layerIds(page)).not.toContain('card')
   await expect(row(page, 'Backdrop')).toBeFocused()
-  await expect.poll(() => selectionOf(page)).toEqual(['backdrop'])
+  await expect.poll(() => selection(page)).toEqual(['backdrop'])
   expect(errors).toEqual([])
 })
 
@@ -338,13 +343,13 @@ test('keyboard only: undo after a delete selects the row it gives the focus back
   await expect.poll(() => layerIds(page)).not.toContain('box')
   await page.keyboard.press('ArrowDown')
   await expect(row(page, 'Backdrop')).toBeFocused()
-  expect(await selectionOf(page)).toEqual(['backdrop'])
+  expect(await selection(page)).toEqual(['backdrop'])
 
   // Undo brings Box back with the focus and the selection on it.
   await page.keyboard.press('ControlOrMeta+Z')
   await expect.poll(() => layerIds(page)).toContain('box')
   await expect(row(page, 'Box')).toBeFocused()
-  await expect.poll(() => selectionOf(page)).toEqual(['box'])
+  await expect.poll(() => selection(page)).toEqual(['box'])
   // Delete again deletes Box, the row that looks current, and leaves Backdrop.
   await page.keyboard.press('Delete')
   await expect.poll(() => layerIds(page)).not.toContain('box')
@@ -360,11 +365,11 @@ test('keyboard only: grouping from the tree puts the focus on the new group, and
   await row(page, 'Dot').click()
   await row(page, 'Box').click({ modifiers: ['ControlOrMeta'] })
   await expect(row(page, 'Box')).toBeFocused()
-  expect(await selectionOf(page)).toEqual(['dot', 'box'])
+  expect(await selection(page)).toEqual(['dot', 'box'])
 
   await page.keyboard.press('ControlOrMeta+G')
-  await expect.poll(async () => (await selectionOf(page)).filter((id) => id !== 'dot' && id !== 'box').length).toBe(1)
-  const [group] = await selectionOf(page)
+  await expect.poll(async () => (await selection(page)).filter((id) => id !== 'dot' && id !== 'box').length).toBe(1)
+  const [group] = await selection(page)
   if (!group) throw new Error('no group selected')
   await expect.poll(() => focusedLayer(page)).toBe(group)
   writeOutput('layers-12-grouped-focus.png', await page.screenshot())
@@ -375,7 +380,7 @@ test('keyboard only: grouping from the tree puts the focus on the new group, and
   await expect
     .poll(async () => {
       const on = await focusedLayer(page)
-      return on !== null && (await selectionOf(page)).includes(on)
+      return on !== null && (await selection(page)).includes(on)
     })
     .toBe(true)
   expect(errors).toEqual([])
@@ -395,7 +400,7 @@ test('keyboard only: deleting the only layer and undoing puts the focus back on 
   await page.keyboard.press('ControlOrMeta+Z')
   await expect.poll(() => layerIds(page)).toContain('box')
   await expect(row(page, 'Box')).toBeFocused()
-  await expect.poll(() => selectionOf(page)).toEqual(['box'])
+  await expect.poll(() => selection(page)).toEqual(['box'])
   expect(errors).toEqual([])
 })
 
@@ -412,7 +417,7 @@ test('keyboard: the tree has one tab stop, the row the focus is on, even when th
   await row(page, 'Card').click({ modifiers: ['ControlOrMeta'] })
   await row(page, 'Card').click({ modifiers: ['ControlOrMeta'] })
   await expect(row(page, 'Card')).toBeFocused()
-  expect(await selectionOf(page)).toEqual(['box'])
+  expect(await selection(page)).toEqual(['box'])
   expect(await stops()).toEqual(['card'])
   // Shift+Tab leaves the tree instead of stopping on Box.
   await page.keyboard.press('Shift+Tab')
@@ -422,7 +427,7 @@ test('keyboard: the tree has one tab stop, the row the focus is on, even when th
   await row(page, 'Dot').hover()
   await row(page, 'Dot').getByRole('button', { name: 'Lock Dot' }).click()
   await expect.poll(async () => (await node(page, 'dot')).lock?.move).toBe(true)
-  expect(await selectionOf(page)).toEqual(['box'])
+  expect(await selection(page)).toEqual(['box'])
   expect(await stops()).toEqual(['dot'])
   expect(errors).toEqual([])
 })
@@ -433,7 +438,7 @@ test('Delete pressed on the canvas after the tree had the focus leaves the focus
   await row(page, 'Box').click()
   await expect(row(page, 'Box')).toBeFocused()
   await click(page, 480, 380)
-  expect(await selectionOf(page)).toEqual(['box'])
+  expect(await selection(page)).toEqual(['box'])
   expect(await focusInTree(page)).toBe(false)
 
   await page.keyboard.press('Delete')
@@ -441,6 +446,6 @@ test('Delete pressed on the canvas after the tree had the focus leaves the focus
   await page.evaluate(() => window.dazbee?.drawn())
   expect(await focusInTree(page)).toBe(false)
   expect(await page.evaluate(() => document.activeElement === document.body)).toBe(true)
-  expect(await selectionOf(page)).toEqual([])
+  expect(await selection(page)).toEqual([])
   expect(errors).toEqual([])
 })

@@ -1,3 +1,5 @@
+// The panels inventory's rows 59 to 63 (support/inventory.ts): with nothing selected, the page
+// background, background layers, formats and pages.
 import { inOrder } from '@dazbee/schema'
 
 import { designOf, openTabs, reloads, settle } from '../../support/editor.ts'

@@ -36,6 +36,27 @@ const design = (): DesignInput => {
   }
 }
 
+/** The snapping design and 300 more layers in rows under it. */
+const threeHundred = (): DesignInput => {
+  const base = design()
+  const nodes: DesignInput['nodes'] = { ...base.nodes }
+  for (let i = 0; i < 300; i++) {
+    const x = 20 + (i % 20) * 52
+    const y = 420 + Math.floor(i / 20) * 42
+    nodes[`r${i}`] = {
+      type: 'graphic',
+      parentId: 'p1',
+      index: `b${String(i).padStart(3, '0')}`,
+      name: `R${i}`,
+      props: rect(x, y, 40, 30, '#9AA4B2FF'),
+    }
+  }
+  return { ...base, meta: { ...base.meta, name: '300 layers' }, nodes }
+}
+
+const guides = (page: Page) =>
+  page.locator('.stage-overlay .guide').evaluateAll((els) => els.map((el) => (el as HTMLElement).dataset.axis))
+
 /** Presses on a design pixel and moves to another in steps, leaving the button down. */
 async function hold(page: Page, from: { x: number; y: number }, to: { x: number; y: number }, keys: string[] = []) {
   const a = await screenPoint(page, from.x, from.y)
@@ -51,8 +72,18 @@ async function release(page: Page, keys: string[] = []) {
   for (const key of keys) await page.keyboard.up(key)
   await page.evaluate(() => window.dazbee?.drawn())
 }
-const guides = (page: Page) =>
-  page.locator('.stage-overlay .guide').evaluateAll((els) => els.map((el) => (el as HTMLElement).dataset.axis))
+
+/** Drags the dot with the mouse in 60 steps, waiting for the redraw after each. */
+async function dragDot(page: Page) {
+  const a = await screenPoint(page, 820, 240)
+  await page.mouse.move(a.x, a.y)
+  await page.mouse.down()
+  for (let i = 1; i <= 60; i++) {
+    await page.mouse.move(a.x - i * 4, a.y + i * 5)
+    await page.evaluate(() => window.dazbee?.drawn())
+  }
+  await page.mouse.up()
+}
 
 test('a drag snaps to another layer with a guide, and not with Ctrl held or Snap off', async ({ browser }) => {
   const { page, errors } = await openStage(browser, design())
@@ -161,36 +192,6 @@ test('rulers are off until asked for, count design pixels from the frame, mark t
   await expect((await zoomMenu(page)).getByRole('switch', { name: 'Rulers' })).toHaveAttribute('aria-checked', 'false')
   expect(errors).toEqual([])
 })
-
-/** The snapping design and 300 more layers in rows under it. */
-const threeHundred = (): DesignInput => {
-  const base = design()
-  const nodes: DesignInput['nodes'] = { ...base.nodes }
-  for (let i = 0; i < 300; i++) {
-    const x = 20 + (i % 20) * 52
-    const y = 420 + Math.floor(i / 20) * 42
-    nodes[`r${i}`] = {
-      type: 'graphic',
-      parentId: 'p1',
-      index: `b${String(i).padStart(3, '0')}`,
-      name: `R${i}`,
-      props: rect(x, y, 40, 30, '#9AA4B2FF'),
-    }
-  }
-  return { ...base, meta: { ...base.meta, name: '300 layers' }, nodes }
-}
-
-/** Drags the dot with the mouse in 60 steps, waiting for the redraw after each. */
-async function dragDot(page: Page) {
-  const a = await screenPoint(page, 820, 240)
-  await page.mouse.move(a.x, a.y)
-  await page.mouse.down()
-  for (let i = 1; i <= 60; i++) {
-    await page.mouse.move(a.x - i * 4, a.y + i * 5)
-    await page.evaluate(() => window.dazbee?.drawn())
-  }
-  await page.mouse.up()
-}
 
 test('dragging among 300 layers works out what to snap to once, and each move measures against every layer once', async ({
   browser,

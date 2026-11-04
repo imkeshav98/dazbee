@@ -1,3 +1,5 @@
+// The panels inventory's rows 69 to 76 (support/inventory.ts): the controls reached from the top
+// bar, its pop-ups and the full menu.
 import { reloads } from '../../support/editor.ts'
 import { assets, doc, fills, props, setupInventory, step, style } from '../../support/inventory.ts'
 import { selectLayers } from '../../support/stage.ts'

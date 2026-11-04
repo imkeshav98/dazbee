@@ -1,3 +1,6 @@
+// The panels inventory's rows 1 to 11 (support/inventory.ts): what every selection has. This size
+// or all sizes and its own changes, X, Y, W and H, rotation, opacity, blend mode, mixed values, the
+// effects, and the arrange actions.
 import { reloads } from '../../support/editor.ts'
 import { choose, enter } from '../../support/fields.ts'
 import { doc, fills, props, setupInventory, solid, step, style } from '../../support/inventory.ts'

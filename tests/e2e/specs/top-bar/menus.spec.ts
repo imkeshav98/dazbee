@@ -1,3 +1,7 @@
+// The top bar's items, pop-ups and panels and the small menu by the selection (#287): each kind's
+// own bar, the text items, a panel closing when the selection changes, undo and redo in the header
+// pill, the small menu's actions and the full menu's Copy and Paste, the small menu clear of a
+// drag, the bar beside an open flyout, and the full and right-click menus clear of the rest.
 import { photo, upload } from '../../support/assets.ts'
 import { screenPoint } from '../../support/editor.ts'
 import { layoutProblems } from '../../support/layout.ts'

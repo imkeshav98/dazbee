@@ -11,6 +11,9 @@ import { test } from './test.ts'
 /** Where the live editing checks leave their screenshots and numbers; CI uploads it. */
 export const OUTPUT = join(import.meta.dirname, '..', 'output')
 
+export const editorPath = (designId: string, { brandId = DEV_BRAND }: InBrand = {}) =>
+  `/brands/${brandId}/designs/${designId}`
+
 /**
  * Opens a design of a brand in `count` tabs, each in its own browser context, all live. Without a
  * design id it creates a fresh one; with one it opens what the sync server already has.
@@ -34,9 +37,6 @@ export async function openTabs(
   }
   return { designId, tabs, errors }
 }
-
-export const editorPath = (designId: string, { brandId = DEV_BRAND }: InBrand = {}) =>
-  `/brands/${brandId}/designs/${designId}`
 
 /**
  * What the stage shows, with the panel capsule masked: it floats over the canvas (#82) and the AI
