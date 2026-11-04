@@ -15,26 +15,6 @@ const SERVER = 'postgres://razzlr:razzlr-local@127.0.0.1:55432'
 /** The suite's own database, on docker compose's Postgres server. */
 export const DATABASE = 'razzlr_e2e'
 
-/** Makes the suite's database once; the API brings it up to the latest migration as it starts. */
-async function ensureDatabase() {
-  // pg comes with @dazbee/db; the suite doesn't depend on it directly.
-  const pg = createRequire(new URL('../../../packages/db/package.json', import.meta.url))('pg') as {
-    Client: new (options: { connectionString: string }) => {
-      connect(): Promise<void>
-      query(text: string, values?: unknown[]): Promise<{ rowCount: number | null }>
-      end(): Promise<void>
-    }
-  }
-  const client = new pg.Client({ connectionString: `${SERVER}/razzlr` })
-  await client.connect()
-  try {
-    const found = await client.query('SELECT 1 FROM pg_database WHERE datname = $1', [DATABASE])
-    if (found.rowCount === 0) await client.query(`CREATE DATABASE ${DATABASE}`)
-  } finally {
-    await client.end()
-  }
-}
-
 /** The suite's own database and storage bucket. */
 export const SUITE_STORE = {
   DATABASE_URL: `${SERVER}/${DATABASE}`,
@@ -57,37 +37,6 @@ const env = {
 }
 
 const stopWithChild = (code: number | null) => process.exit(code ?? 1)
-
-/** Starts a server from the checkout and stops this process when it stops. */
-function run(script: string) {
-  const child = spawn(process.execPath, [script], { cwd: ROOT, env, stdio: 'inherit' })
-  child.on('exit', stopWithChild)
-  return child
-}
-
-/** Waits up to a minute for a server to answer `url`; whether it did. */
-async function answers(url: string) {
-  for (let i = 0; i < 120; i++) {
-    if (
-      await fetch(url).then(
-        (r) => r.ok,
-        () => false,
-      )
-    )
-      return true
-    await new Promise((resolve) => setTimeout(resolve, 500))
-  }
-  return false
-}
-
-/** Stops the sync server and starts a new one in its place. */
-async function restartSync(sync: ChildProcess) {
-  sync.off('exit', stopWithChild)
-  const stopped = new Promise((resolve) => sync.once('exit', resolve))
-  sync.kill()
-  await stopped
-  return run('apps/sync/src/main.ts')
-}
 
 /**
  * Restarts the sync server the specs' tabs talk to and waits until it answers again: on CI docker
@@ -127,6 +76,57 @@ function query(sql: string) {
     ['compose', 'exec', '-T', 'postgres', 'psql', '-U', 'razzlr', '-d', database, '-tAc', sql],
     { cwd: ROOT, encoding: 'utf8' },
   ).trim()
+}
+
+/** Makes the suite's database once; the API brings it up to the latest migration as it starts. */
+async function ensureDatabase() {
+  // pg comes with @dazbee/db; the suite doesn't depend on it directly.
+  const pg = createRequire(new URL('../../../packages/db/package.json', import.meta.url))('pg') as {
+    Client: new (options: { connectionString: string }) => {
+      connect(): Promise<void>
+      query(text: string, values?: unknown[]): Promise<{ rowCount: number | null }>
+      end(): Promise<void>
+    }
+  }
+  const client = new pg.Client({ connectionString: `${SERVER}/razzlr` })
+  await client.connect()
+  try {
+    const found = await client.query('SELECT 1 FROM pg_database WHERE datname = $1', [DATABASE])
+    if (found.rowCount === 0) await client.query(`CREATE DATABASE ${DATABASE}`)
+  } finally {
+    await client.end()
+  }
+}
+
+/** Starts a server from the checkout and stops this process when it stops. */
+function run(script: string) {
+  const child = spawn(process.execPath, [script], { cwd: ROOT, env, stdio: 'inherit' })
+  child.on('exit', stopWithChild)
+  return child
+}
+
+/** Waits up to a minute for a server to answer `url`; whether it did. */
+async function answers(url: string) {
+  for (let i = 0; i < 120; i++) {
+    if (
+      await fetch(url).then(
+        (r) => r.ok,
+        () => false,
+      )
+    )
+      return true
+    await new Promise((resolve) => setTimeout(resolve, 500))
+  }
+  return false
+}
+
+/** Stops the sync server and starts a new one in its place. */
+async function restartSync(sync: ChildProcess) {
+  sync.off('exit', stopWithChild)
+  const stopped = new Promise((resolve) => sync.once('exit', resolve))
+  sync.kill()
+  await stopped
+  return run('apps/sync/src/main.ts')
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
