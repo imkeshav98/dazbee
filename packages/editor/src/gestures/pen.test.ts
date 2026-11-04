@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest'
 
-import { loadDesign, mergedProps, openSession } from '@dazbee/doc'
-import { type Design, type DesignInput, parseDesign, pathScale } from '@dazbee/schema'
+import { loadDesign, openSession } from '@dazbee/doc'
+import { type DesignInput, parseDesign } from '@dazbee/schema'
 
 import type { Frame } from '../canvas/grid.ts'
+import { testBoxes } from '../layers/test-boxes.ts'
 import { editorSelection } from '../selection.ts'
-import { offsetPath, parsePath, scalePath } from './path.ts'
 import { editorPen, type PenDeps } from './pen.ts'
 
 /** One page in a square and a wide format, beside each other, with a path of three anchors. */
@@ -41,16 +41,7 @@ function harness() {
   const log: string[] = []
   const frameOf = (key: string | undefined) => FRAMES.find((f) => f.key === key)
   const selection = editorSelection({ drawn: () => session.design(), frames: () => FRAMES, changed: () => {} })
-  /** A path layer's path in a frame, on the page, as the editor reads it; its box is all that turns it. */
-  const pathIn = (frame: Frame, id: string, from: Design = session.design()) => {
-    const node = from.nodes[id]
-    if (node?.type !== 'graphic') return null
-    const props = mergedProps(from, `format:${frame.formatId}`, id) as typeof node.props
-    if (props.shape.kind !== 'path') return null
-    const box = { x: props.x, y: props.y, width: props.width, height: props.height, rotation: props.rotation }
-    const { sx, sy } = pathScale(props.shape, box.width, box.height)
-    return { path: offsetPath(scalePath(parsePath(props.shape.d), sx || 1, sy || 1), box.x, box.y), box, around: [box] }
-  }
+  const boxes = testBoxes(session, selection, FRAMES)
   const deps: PenDeps = {
     canvas: { setPointerCapture: () => {} } as unknown as HTMLCanvasElement,
     session,
@@ -60,9 +51,7 @@ function harness() {
     camera: () => ({ x: 0, y: 0, zoom: 1 }),
     drawn: () => session.design(),
     frameOf,
-    containersOf: () => [],
-    pathIn,
-    parentFor: (frame) => frame.pageId,
+    boxes,
     hug: (ids) => log.push(`hug ${ids.join(',')}`),
     drawOverlay: () => log.push('draw'),
   }
@@ -74,7 +63,7 @@ function harness() {
   }
   const made = () => Object.keys(session.design().nodes).filter((id) => id !== 'zig')
   /** A layer's anchors on the page in the square. */
-  const anchors = (id: string) => pathIn(SQUARE, id)?.path[0]?.anchors
+  const anchors = (id: string) => boxes.pathIn(SQUARE, id)?.path[0]?.anchors
   /** Edits the zig's points, none selected. */
   const editZig = () => {
     selection.select(['zig'], 'p1/sq')

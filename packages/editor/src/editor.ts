@@ -9,16 +9,7 @@ import type { CanvasKit, GrDirectContext, Surface } from '@dazbee/canvaskit'
 import { ancestorsOf, childrenOf, descendants, mergedProps, openSession, readDesign, type Session } from '@dazbee/doc'
 import type { ExportedFile } from '@dazbee/export'
 import { FALLBACK_FAMILIES } from '@dazbee/fonts'
-import {
-  render,
-  renderDesign,
-  type ResourceCache,
-  resourceCache,
-  type ScaledText,
-  scaleText,
-  type SceneLayer,
-  smallestSize,
-} from '@dazbee/renderer'
+import { renderDesign, type ResourceCache, resourceCache, scaleText } from '@dazbee/renderer'
 import {
   type BindingTarget,
   boundFillIndex,
@@ -35,7 +26,6 @@ import {
   type LayerTree,
   LOCK_FLAGS,
   type Paint,
-  pathScale,
   type Point,
   type Rect,
   SCHEMA_VERSION,
@@ -57,67 +47,32 @@ import {
   zoomAt,
 } from './canvas/camera.ts'
 import { resizeCursor, ROTATE_CURSOR } from './canvas/cursors.ts'
-import { type Frame, frameAt, frameGrid, frameKey, intersects, scope } from './canvas/grid.ts'
+import { type Frame, frameAt, frameGrid, frameKey, scope } from './canvas/grid.ts'
 import { hitTest } from './canvas/hit-test.ts'
 import { px, rulerParts } from './canvas/rulers.ts'
-import { findLayer, frameScenes } from './canvas/scenes.ts'
+import { frameScenes } from './canvas/scenes.ts'
 import { thumbnailCache } from './canvas/thumbnails.ts'
 import { loadCanvasKit } from './canvaskit.ts'
 import { keepCopy, layersOnClipboard, putOnClipboard, rememberedLayers } from './clipboard.ts'
 import { exportClient } from './export/export-client.ts'
-import { coverCrop, imageRect } from './gestures/crop.ts'
-import { type CropDrag, type CropTarget, editorCropping } from './gestures/cropping.ts'
-import {
-  clickedBox,
-  drawnBox,
-  type DrawTool,
-  imageIn,
-  isDrawTool,
-  keepRatio,
-  newDrawn,
-  newImage,
-  newText,
-  withImage,
-} from './gestures/draw-tools.ts'
-import { offsetPath, parsePath, scalePath } from './gestures/path.ts'
+import { editorAutoLayoutDrag, type ReorderDrag } from './gestures/auto-layout-drag.ts'
+import { type CropDrag, editorCropping } from './gestures/cropping.ts'
+import { isDrawTool, newImage, withImage } from './gestures/draw-tools.ts'
+import { editorDrawing, type ImageBoxDrag, isDrawing, type ShapeDrag, type TextBoxDrag } from './gestures/drawing.ts'
 import { editorPen, type PathDrag } from './gestures/pen.ts'
-import { CLICK_SLOP, HANDLE_REACH, HANDLE_SIZE } from './gestures/press.ts'
+import { CLICK_SLOP, HANDLE_SIZE } from './gestures/press.ts'
+import {
+  editorTransformDrag,
+  type MarqueeDrag,
+  type MoveDrag,
+  type ResizeDrag,
+  type RotateDrag,
+} from './gestures/transform-drag.ts'
 import { align, type Alignment, distribute, type Distribution, type Offset } from './layers/arrange.ts'
-import {
-  type AutoLayoutOf,
-  flowSiblings,
-  inFlow,
-  laidOut,
-  layoutIn,
-  placedInside,
-  propIn,
-  rowIn,
-} from './layers/auto-layout.ts'
-import { type Gap, type Guide, SNAP_DISTANCE, snapMove, snapResize, snapTargets, type Targets } from './layers/snap.ts'
-import {
-  angleOf,
-  boundsOf,
-  type Box,
-  boxAt,
-  carry,
-  centreOf,
-  cornersOf,
-  drawnFrom,
-  type Handle,
-  handleAt,
-  HANDLES,
-  isCorner,
-  keptOnScreen,
-  localTo,
-  normalAngle,
-  pageFrom,
-  resize as resizeBox,
-  round,
-  scaleWithin,
-  snapAngle,
-  turn,
-  undrawn,
-} from './layers/transform.ts'
+import { inFlow } from './layers/auto-layout.ts'
+import { editorBoxes, visibleIn } from './layers/boxes.ts'
+import { hug as hugIn } from './layers/hug.ts'
+import { boundsOf, type Box, cornersOf, handleAt, localTo, round } from './layers/transform.ts'
 import {
   editorResources,
   loadFonts,
@@ -175,14 +130,9 @@ const LABEL_INSET = 8
 const SIZE_CLEARANCE = 72
 /** The room the selection's size label takes, in screen pixels. */
 const SIZE_LABEL_HEIGHT = 20
-/** How far outside a corner a press turns the selection. */
-const ROTATE_REACH = 24
 
 /** Something the page should say: why a gesture did nothing, or how placing an SVG went. */
 export type Notice = 'placedByLayout' | 'flowEnd' | 'svgLeftOut' | 'svgUnreadable'
-
-/** A layer's sizing, as the schema has it. */
-type SizingOf = NonNullable<Layer['props']['sizing']>
 
 /** What one redraw did, for the checks that count a redraw's work. */
 export interface DrawInfo {
@@ -461,10 +411,6 @@ const inField = (target: EventTarget | null) =>
 /** Keys pressed in a popover or dialog, such as Escape to close it, are its own, not the stage's; undo and redo still are. */
 const inDialog = (target: EventTarget | null) =>
   target instanceof Element && target.closest('[role="dialog"], dialog') !== null
-const visibleIn = (now: Design, frame: Frame, id: string) => {
-  const value = now.overrides[scope(frame)]?.[id]?.visible ?? now.nodes[id]?.props.visible
-  return value !== false
-}
 /** Text properties that change how big its words are, so an auto-sized box fits them again. */
 const SIZES_TEXT = new Set([
   'text',
@@ -594,13 +540,6 @@ function live(
   let grid = frameGrid(design, focused)
   let camera: Camera = { x: 0, y: 0, zoom: 1 }
   const scenes = frameScenes({ ck, resources, drawn: () => design })
-  /** What the drag in progress snapped to, shown as guides and equal gaps (#42). */
-  let snapped: { frame: Frame; guides: Guide[]; gaps: Gap[] } | null = null
-  /**
-   * Snapping's work since the editor opened: how often a drag gathered what it can snap to, the
-   * pointer moves of a drag that snapped, and how many boxes the last drag gathered to snap to.
-   */
-  const snapWork = { gathered: 0, moves: 0, targets: 0 }
   /** The rulers are off until asked for (Shift+R or the View card): the stage is for the ads. */
   let rulers = false
   /** Told when the rulers or snapping turn on or off, so the View card follows a shortcut too. */
@@ -636,81 +575,9 @@ function live(
 
   const frameOf = (key: string | undefined) => grid.frames.find((f) => f.key === key)
   const firstPage = () => grid.frames[0]?.pageId ?? ''
+  const hug = (ids: string[]) => hugIn(session, ids)
+  const boxes = editorBoxes({ session, scenes, resources, selection, drawn: () => design, frameOf })
 
-  /**
-   * A layer's box in one frame, read from the document: the base with the format's overrides.
-   * Hidden layers have one too, so they move with a group and stay selected.
-   */
-  function boxIn(frame: Frame, id: string, from: Design = session.design()): Box | null {
-    const node = from.nodes[id]
-    if (!node) return null
-    // Auto layout places and sizes a layer as the scene is built (#46): its box is the scene's.
-    if (laidOut(id, from)) {
-      const shown = findLayer(scenes.scene(frame).layers, id)
-      if (shown)
-        return {
-          x: shown.props.x,
-          y: shown.props.y,
-          width: shown.props.width,
-          height: shown.props.height,
-          rotation: shown.props.rotation,
-        }
-    }
-    const p = mergedProps(from, scope(frame), id) as {
-      x: number
-      y: number
-      width: number
-      height: number
-      rotation?: number
-    }
-    return { x: p.x, y: p.y, width: p.width, height: p.height, rotation: p.rotation ?? 0 }
-  }
-
-  /**
-   * Where a new layer of `type` that a tool makes in a frame goes: into the group, frame or boolean
-   * double-clicked into if it can hold it, otherwise onto the frame's page.
-   */
-  function parentFor(frame: Frame, type: string, now: Design) {
-    const entered = selection.entered()
-    const inside = entered ? now.nodes[entered] : undefined
-    return entered && inside && canHold(inside.type, type) ? entered : frame.pageId
-  }
-  /** The groups and frames a layer is inside, outermost first, as boxes in a frame. */
-  function containersOf(frame: Frame, parentId: string | undefined, from: Design = session.design()): Box[] {
-    const boxes: Box[] = []
-    for (const up of ancestorsOf(from, parentId ?? '')) {
-      const box = boxIn(frame, up, from)
-      if (box) boxes.unshift(box)
-    }
-    return boxes
-  }
-  /** A layer's box as it is drawn in a frame. */
-  function drawnBoxOf(frame: Frame, id: string, from: Design = session.design()) {
-    const box = boxIn(frame, id, from)
-    return box && drawnFrom(box, containersOf(frame, from.nodes[id]?.parentId, from))
-  }
-  /** Locked in place layers are left out where layers are gathered: select all and a marquee. */
-  const pickable = (layer: SceneLayer) => !design.nodes[layer.id]?.lock?.move
-  /** Whether the selection is locked in place: it shows no handles and a press can't move it. */
-  const lockedSelection = () => Boolean(selection.current()?.ids.some((id) => design.nodes[id]?.lock?.move))
-  /**
-   * The handles the selection has: none while it is locked in place; one text that grows with its
-   * words has no top or bottom ones, since only a fixed box has a height of its own.
-   */
-  function handlesFor(): readonly Handle[] {
-    const current = selection.current()
-    const frame = frameOf(current?.frame)
-    if (!current || !frame || lockedSelection()) return []
-    const [only] = current.ids
-    if (
-      current.ids.length === 1 &&
-      only &&
-      design.nodes[only]?.type === 'text' &&
-      propIn(frame, only, 'boxMode', design) !== 'fixed'
-    )
-      return HANDLES.filter((h) => h !== 'n' && h !== 's')
-    return HANDLES
-  }
   /**
    * The locked in place layer a press at `p` lands on, the one a click would select: the topmost
    * layer there, as a click picks it, when that one is locked. A click selects it, so its lock can
@@ -720,28 +587,6 @@ function live(
     const top = hitTest(scenes.scene(frame).layers, p)
     const id = top ? target(top.id, frame.key) : null
     return id && design.nodes[id]?.lock?.move ? id : null
-  }
-  /** Selected layers that aren't inside another selected layer: the ones a transform moves. */
-  function roots(from: Design = session.design()) {
-    const ids = selection.current()?.ids ?? []
-    const inside = (id: string) => ancestorsOf(from, from.nodes[id]?.parentId ?? '').some((up) => ids.includes(up))
-    return ids.filter((id) => from.nodes[id] && !inside(id))
-  }
-  /**
-   * The box the handles go on: a single layer's own, turned with it, or the unturned box around
-   * several. `box` is as the layers inside their containers see it, which gestures work in;
-   * `drawn` is where it is on the page once the containers turn it; `around` are the containers.
-   */
-  function selectionBox(): { frame: Frame; box: Box; drawn: Box; around: Box[] } | null {
-    const current = selection.current()
-    const frame = current && frameOf(current.frame)
-    if (!frame || !current) return null
-    const now = session.design()
-    const boxes = current.ids.map((id) => boxIn(frame, id, now)).filter((b): b is Box => b !== null)
-    if (boxes.length === 0) return null
-    const box = boxes.length === 1 ? (boxes[0] as Box) : boundsOf(boxes)
-    const around = containersOf(frame, now.nodes[current.ids[0] ?? '']?.parentId, now)
-    return { frame, box, drawn: drawnFrom(box, around), around }
   }
   /**
    * What a press on a layer picks: a selected layer it is in, so the selection moves whole; inside
@@ -761,58 +606,6 @@ function live(
     return ancestorsOf(design, design.nodes[id]?.parentId ?? '').some((up) => up === selection.entered())
   }
 
-  /**
-   * A path layer's path in one frame, in the coordinates of its parent before the layer turns it
-   * (#45), with its box and what turns it: its containers, then the layer itself.
-   */
-  function pathIn(frame: Frame, id: string, from: Design = session.design()) {
-    const node = from.nodes[id]
-    const box = boxIn(frame, id, from)
-    if (node?.type !== 'graphic' || !box) return null
-    const { shape } = mergedProps(from, scope(frame), id) as typeof node.props
-    if (shape.kind !== 'path') return null
-    try {
-      // As it is drawn: scaled from the box it was drawn in to this one. A box squashed flat on an
-      // axis keeps the data's length there, so editing it never loses the points.
-      const scale = pathScale(shape, box.width, box.height)
-      const sx = scale.sx || 1
-      const sy = scale.sy || 1
-      return {
-        path: offsetPath(scalePath(parsePath(shape.d), sx, sy), box.x, box.y),
-        box,
-        around: [...containersOf(frame, node.parentId, from), box],
-      }
-    } catch {
-      return null
-    }
-  }
-  /**
-   * The image fill a crop works on (#48): the topmost of a layer's fills in a frame, with where the
-   * whole image sits for the crop it shows now (fill's when it has none of its own), the image and
-   * its size, and the layer's box with its containers, the box last.
-   */
-  function cropTarget(frame: Frame, id: string, from: Design = session.design()): CropTarget | null {
-    const node = from.nodes[id]
-    const box = boxIn(frame, id, from)
-    if (!node || !box || !('fills' in node.props)) return null
-    const { fills } = mergedProps(from, scope(frame), id) as { fills: Paint[] }
-    const index = fills.findLastIndex((f) => f.type === 'image')
-    const fill = fills[index]
-    const image = fill?.type === 'image' ? resources.resources().images.get(fill.assetId) : undefined
-    if (fill?.type !== 'image' || !image) return null
-    const size = { width: image.width(), height: image.height() }
-    const crop = fill.fit === 'crop' && fill.crop ? fill.crop : coverCrop(size, box)
-    return {
-      fills,
-      index,
-      fill,
-      image,
-      size,
-      box,
-      rect: imageRect(crop, size, box),
-      around: [...containersOf(frame, node.parentId, from), box],
-    }
-  }
   const thumbnails = thumbnailCache({ ck, scenes, resources, current: () => session.design(), drawn: () => design })
   const typing = editorTyping({
     ck,
@@ -835,9 +628,7 @@ function live(
     camera: () => camera,
     drawn: () => design,
     frameOf,
-    containersOf,
-    pathIn,
-    parentFor,
+    boxes,
     hug,
     drawOverlay: () => drawOverlay(),
   })
@@ -848,9 +639,43 @@ function live(
     thumbnails,
     camera: () => camera,
     frameOf,
-    cropTarget,
+    boxes,
     outline,
     drawOverlay: () => drawOverlay(),
+  })
+  const drawing = editorDrawing({
+    canvas,
+    session,
+    selection,
+    tools,
+    typing,
+    boxes,
+    camera: () => camera,
+    drawn: () => design,
+    hug,
+    placeBox,
+    drawOverlay: () => drawOverlay(),
+  })
+  const transformDrag = editorTransformDrag({
+    canvas,
+    session,
+    scenes,
+    selection,
+    typing,
+    boxes,
+    camera: () => camera,
+    frames: () => grid.frames,
+    hug,
+    notify,
+    placeBox,
+  })
+  const autoLayoutDrag = editorAutoLayoutDrag({
+    session,
+    boxes,
+    camera: () => camera,
+    hug,
+    notify,
+    outline,
   })
 
   /** A design-pixel box in a frame, as CSS on the overlay. */
@@ -912,50 +737,9 @@ function live(
     return el
   }
 
-  /**
-   * A drag in a flow: the layers following the pointer, and inside the frame a line where they would
-   * go; outside it, the frame outlined, since a drop there takes them out.
-   */
-  function reorderParts() {
-    const g = gesture
-    if (g?.kind !== 'reorder' || !g.moved) return []
-    const now = session.design()
-    const parts: HTMLElement[] = []
-    const dx = g.to.x - g.from.x
-    const dy = g.to.y - g.from.y
-    for (const id of g.roots) {
-      const b = g.boxes.get(id)
-      if (b) parts.push(outline('reorder-ghost', g.frame, drawnFrom({ ...b, x: b.x + dx, y: b.y + dy }, g.around)))
-    }
-    const holder = boxIn(g.frame, g.parentId, now)
-    if (!holder) return parts
-    if (g.outside) {
-      parts.push(outline('reorder-leave', g.frame, drawnFrom(holder, g.around.slice(0, -1))))
-      return parts
-    }
-    const row = rowIn(g.frame, g.parentId, now)
-    const gap = (propIn(g.frame, g.parentId, 'layout', now) as AutoLayoutOf | undefined)?.gap ?? 0
-    const near = g.near && boxIn(g.frame, g.near.id, now)
-    const thick = 2 / camera.zoom
-    // Halfway into the gap beside the nearest sibling; at the frame's start when the flow is empty.
-    const edge = !near
-      ? row
-        ? holder.x
-        : holder.y
-      : g.near?.after
-        ? (row ? near.x + near.width : near.y + near.height) + gap / 2
-        : (row ? near.x : near.y) - gap / 2
-    const span = near ?? holder
-    const line = row
-      ? { x: edge - thick / 2, y: span.y, width: thick, height: span.height, rotation: 0 }
-      : { x: span.x, y: edge - thick / 2, width: span.width, height: thick, rotation: 0 }
-    parts.push(outline('reorder-line', g.frame, drawnFrom(line, g.around)))
-    return parts
-  }
-
   /** Each selected layer's outline, then the box with its handles and the size under it. */
   function selectionParts() {
-    const outer = selectionBox()
+    const outer = boxes.selectionBox()
     const current = selection.current()
     if (!outer || !current) return []
     const { frame, drawn: box } = outer
@@ -963,7 +747,7 @@ function live(
     const several = current.ids.length > 1
     if (several) {
       for (const id of current.ids) {
-        const b = drawnBoxOf(frame, id, design)
+        const b = boxes.drawnBoxOf(frame, id, design)
         if (!b) continue
         const member = outline('selection-member', frame, b)
         member.dataset.layer = id
@@ -976,7 +760,7 @@ function live(
     if (!several) el.dataset.layer = current.ids[0]
     // Handles only once the box is big enough on screen to grab them apart, and not on a locked one.
     if (!typing.editing() && Math.min(box.width, box.height) * camera.zoom >= 2 * HANDLE_SIZE) {
-      for (const h of handlesFor()) {
+      for (const h of boxes.handlesFor()) {
         const handle = document.createElement('div')
         handle.className = 'handle'
         handle.dataset.handle = h
@@ -1020,53 +804,28 @@ function live(
     }
     const entered = selection.entered()
     const enteredFrame = entered && frameOf(selection.current()?.frame)
-    const enteredBox = enteredFrame && entered && drawnBoxOf(enteredFrame, entered, design)
+    const enteredBox = enteredFrame && entered && boxes.drawnBoxOf(enteredFrame, entered, design)
     if (enteredFrame && enteredBox) parts.push(outline('entered', enteredFrame, enteredBox))
     const hovered = selection.hovered()
     const hover = !gesture && hovered && !selection.current()?.ids.includes(hovered.id) ? hovered : null
     const hoverFrame = hover && frameOf(hover.frame)
-    const hoverBox = hoverFrame && hover && drawnBoxOf(hoverFrame, hover.id, design)
+    const hoverBox = hoverFrame && hover && boxes.drawnBoxOf(hoverFrame, hover.id, design)
     if (hoverFrame && hoverBox) parts.push(outline('hover', hoverFrame, hoverBox))
     // The layer an image dragged over the stage would go into.
     const dropFrame = dropTarget && frameOf(dropTarget.frame)
-    const dropBox = dropFrame && dropTarget && drawnBoxOf(dropFrame, dropTarget.id, design)
+    const dropBox = dropFrame && dropTarget && boxes.drawnBoxOf(dropFrame, dropTarget.id, design)
     if (dropFrame && dropBox) parts.push(outline('drop-target', dropFrame, dropBox))
     parts.push(
       ...(selection.pathEditing() || selection.cropping() ? [] : selectionParts()),
       ...pen.parts(),
       ...cropping.parts(),
-      ...reorderParts(),
+      ...autoLayoutDrag.parts(gesture?.kind === 'reorder' ? gesture : null),
     )
-    if (gesture?.kind === 'textBox' || gesture?.kind === 'imageBox') {
-      // The box the text tool (#47) or the image tool is drawing, drawn as a marquee is.
-      const box = document.createElement('div')
-      box.className = 'marquee'
-      box.dataset[gesture.kind] = ''
-      placeBox(box, gesture.frame, {
-        x: Math.min(gesture.from.x, gesture.to.x),
-        y: Math.min(gesture.from.y, gesture.to.y),
-        width: Math.abs(gesture.to.x - gesture.from.x),
-        height: Math.abs(gesture.to.y - gesture.from.y),
-      })
-      parts.push(box)
-    }
-    if (gesture?.kind === 'marquee') {
-      const marquee = document.createElement('div')
-      marquee.className = 'marquee'
-      const from = toScreen(camera, gesture.from)
-      const to = toScreen(camera, gesture.to)
-      Object.assign(marquee.style, {
-        left: px(Math.min(from.x, to.x)),
-        top: px(Math.min(from.y, to.y)),
-        width: px(Math.abs(to.x - from.x)),
-        height: px(Math.abs(to.y - from.y)),
-      })
-      parts.push(marquee)
-    }
-    if (snapped) parts.push(...snapParts(snapped))
+    if (isDrawing(gesture)) parts.push(...drawing.parts(gesture))
+    parts.push(...transformDrag.parts(gesture?.kind === 'marquee' ? gesture : null))
     if (rulers) {
       const origin = frameOf(selection.current()?.frame) ?? frameOf(selection.hovered()?.frame) ?? drawnFrames[0]
-      const outer = selectionBox()
+      const outer = boxes.selectionBox()
       if (origin)
         parts.push(
           ...rulerParts(
@@ -1080,41 +839,6 @@ function live(
     parts.push(...typing.parts())
     overlay.replaceChildren(...parts)
     selection.tellListeners(pageGone)
-  }
-
-  /** Snap guides as lines across the page, and equal gaps as marked spans with their size. */
-  function snapParts({ frame, guides, gaps }: NonNullable<typeof snapped>) {
-    const parts: HTMLElement[] = []
-    for (const g of guides) {
-      const line = document.createElement('div')
-      line.className = 'guide'
-      line.dataset.axis = g.axis
-      placeBox(
-        line,
-        frame,
-        g.axis === 'x'
-          ? { x: g.at, y: g.from, width: 0, height: g.to - g.from }
-          : { x: g.from, y: g.at, width: g.to - g.from, height: 0 },
-      )
-      parts.push(line)
-    }
-    for (const g of gaps) {
-      const span = document.createElement('div')
-      span.className = 'gap'
-      span.dataset.axis = g.axis
-      placeBox(
-        span,
-        frame,
-        g.axis === 'x'
-          ? { x: g.from, y: g.at, width: g.to - g.from, height: 0 }
-          : { x: g.at, y: g.from, width: 0, height: g.to - g.from },
-      )
-      const size = document.createElement('span')
-      size.textContent = String(round(g.to - g.from, 0))
-      span.append(size)
-      parts.push(span)
-    }
-    return parts
   }
 
   const backing = new ck.Paint()
@@ -1210,7 +934,7 @@ function live(
     if (frame) setCamera(fit(frame, viewport, undefined, insets))
   }
   function fitSelection() {
-    const outer = selectionBox()
+    const outer = boxes.selectionBox()
     if (!outer) return fitAll()
     const { frame, box } = outer
     const b = boundsOf([box])
@@ -1251,74 +975,16 @@ function live(
 
   /** What a drag on the stage is doing, from pointer down to up. */
   type Gesture =
-    | {
-        kind: 'move'
-        frame: Frame
-        around: Box[]
-        from: Point
-        roots: string[]
-        boxes: Map<string, Box>
-        targets: Targets | null
-        end: () => void
-      }
-    | {
-        kind: 'resize'
-        frame: Frame
-        around: Box[]
-        handle: Handle
-        outer: Box
-        grab: Point
-        roots: string[]
-        boxes: Map<string, Box>
-        targets: Targets | null
-        switched: boolean
-        /** The text a corner scales, with its sizes in the frame as the drag began; how much, and the least it may. */
-        texts: Map<string, ScaledText>
-        factor: number
-        floor: number
-        end: () => void
-      }
-    | {
-        kind: 'reorder'
-        frame: Frame
-        around: Box[]
-        parentId: string
-        roots: string[]
-        boxes: Map<string, Box>
-        from: Point
-        to: Point
-        moved: boolean
-        slot: number
-        near: { id: string; after: boolean } | null
-        outside: boolean
-        end: () => void
-      }
-    | {
-        kind: 'rotate'
-        frame: Frame
-        around: Box[]
-        outer: Box
-        from: number
-        roots: string[]
-        boxes: Map<string, Box>
-        end: () => void
-      }
-    | { kind: 'marquee'; from: Point; to: Point; base: string[]; baseFrame: string | null }
+    | MoveDrag
+    | ResizeDrag
+    | ReorderDrag
+    | RotateDrag
+    | MarqueeDrag
     | { kind: 'textSelect'; frame: Frame; around: Box[] }
-    | { kind: 'textBox'; frame: Frame; around: Box[]; parentId: string; from: Point; to: Point }
-    | { kind: 'imageBox'; frame: Frame; around: Box[]; parentId: string; from: Point; to: Point; asset: PlacedAsset }
+    | TextBoxDrag
+    | ImageBoxDrag
     | CropDrag
-    | {
-        kind: 'draw'
-        tool: DrawTool
-        frame: Frame
-        around: Box[]
-        from: Point
-        id: string
-        moved: boolean
-        roots: string[]
-        end: () => void
-      }
+    | ShapeDrag
     | PathDrag
   let gesture: Gesture | null = null
   /**
@@ -1334,511 +1000,6 @@ function live(
   let pan: { from: Point; camera: Camera } | null = null
   let spaceHeld = false
   const panning = () => tools.tool() === 'hand' || spaceHeld
-
-  /**
-   * The boxes a transform changes: each root and every layer under it, as they are now. A layer
-   * auto layout places inside a root is left out: its frame puts it where it goes.
-   */
-  function startBoxes(frame: Frame, ids: string[]) {
-    const now = session.design()
-    const boxes = new Map<string, Box>()
-    const add = (id: string, root: string) => {
-      if (id !== root && placedInside(frame, id, root, now)) return
-      const box = boxIn(frame, id, now)
-      if (box) boxes.set(id, box)
-      for (const [child] of childrenOf(now, id)) add(child, root)
-    }
-    for (const id of ids) add(id, id)
-    return boxes
-  }
-  /** What each gesture has written so far, by its start boxes: `<id>|<property>`. */
-  const written = new WeakMap<Map<string, Box>, Set<string>>()
-  /**
-   * Writes new boxes as this format's overrides: the properties the gesture changes from where it
-   * started, including one it changed and has now put back. The rest is left to other tabs.
-   */
-  function writeBoxes(frame: Frame, start: Map<string, Box>, next: Map<string, Box>) {
-    const now = session.design()
-    const wrote = written.get(start) ?? new Set<string>()
-    written.set(start, wrote)
-    // One update for the whole step, not one per layer: a drag of many layers sends and stores once a move.
-    session.batch(() => {
-      for (const [id, box] of next) {
-        const was = start.get(id)
-        const current = boxIn(frame, id, now)
-        const patch: Partial<Box> = {}
-        for (const key of ['x', 'y', 'width', 'height', 'rotation'] as const) {
-          if ((box[key] !== was?.[key] || wrote.has(`${id}|${key}`)) && box[key] !== current?.[key])
-            patch[key] = box[key]
-        }
-        for (const key of Object.keys(patch)) wrote.add(`${id}|${key}`)
-        // Another tab may delete or lock a layer mid-drag; the drag then just leaves it be.
-        if (Object.keys(patch).length > 0)
-          runQuietly(() => session.run('node.update', { ids: [id], scope: scope(frame), patch }))
-      }
-    })
-  }
-  /**
-   * Where layers inside a frame that has auto layout in any format are drawn, in every format of
-   * their page (shown or not), for a command that wraps them; none for layers in no flow.
-   */
-  function drawnInFlow(
-    ids: string[],
-    pageId: string,
-  ): Record<string, Record<string, Omit<Box, 'rotation'>>> | undefined {
-    const now = session.design()
-    const parentId = now.nodes[ids[0] ?? '']?.parentId ?? ''
-    const parent = now.nodes[parentId]
-    const laidOut =
-      parent?.type === 'frame' &&
-      Object.keys(now.formats).some((f) => mergedProps(now, formatScope(f), parentId).layout)
-    if (!laidOut) return undefined
-    const drawn: Record<string, Record<string, Omit<Box, 'rotation'>>> = {}
-    for (const formatId of Object.keys(now.formats)) {
-      const boxes: Record<string, Omit<Box, 'rotation'>> = {}
-      const walk = (layers: SceneLayer[]) => {
-        for (const l of layers) {
-          if (ids.includes(l.id))
-            boxes[l.id] = { x: l.props.x, y: l.props.y, width: l.props.width, height: l.props.height }
-          walk(l.children)
-        }
-      }
-      walk(render(now, pageId, formatId, undefined, scenes.measure(), resources.bytes().variables).layers)
-      drawn[formatScope(formatId)] = boxes
-    }
-    return drawn
-  }
-  function moveTo(g: Extract<Gesture, { kind: 'move' }>, p: Point, axisLock: boolean, snap: boolean) {
-    let dx = p.x - g.from.x
-    let dy = p.y - g.from.y
-    // Shift keeps a move to one axis, whichever it has gone further along.
-    if (axisLock) {
-      if (Math.abs(dx) > Math.abs(dy)) dy = 0
-      else dx = 0
-    }
-    // A move lands on whole pixels, unless it snapped to a line that isn't on one.
-    let toX = Math.round
-    let toY = Math.round
-    snapped = null
-    const moving = g.roots.map((id) => g.boxes.get(id)).filter((b): b is Box => b !== undefined)
-    if (snap && g.targets && moving.length > 0) {
-      snapWork.moves++
-      const from = boundsOf(moving)
-      const s = snapMove(
-        { ...from, x: Math.round(from.x + dx), y: Math.round(from.y + dy) },
-        g.targets,
-        SNAP_DISTANCE / camera.zoom,
-        { x: axisLock && dx === 0, y: axisLock && dy === 0 },
-      )
-      if (s.dx !== 0) {
-        dx = Math.round(from.x + dx) + s.dx - from.x
-        toX = (n) => round(n)
-      }
-      if (s.dy !== 0) {
-        dy = Math.round(from.y + dy) + s.dy - from.y
-        toY = (n) => round(n)
-      }
-      snapped = { frame: g.frame, guides: s.guides, gaps: s.gaps }
-    }
-    const next = new Map([...g.boxes].map(([id, b]) => [id, { ...b, x: toX(b.x + dx), y: toY(b.y + dy) }]))
-    writeBoxes(g.frame, g.boxes, next)
-  }
-
-  /**
-   * What a drag in a frame can snap to: the layers on the page as drawn and, inside a group or
-   * frame, the layers beside the selection and the container itself; and the format. Nothing
-   * inside a turned container snaps, since its lines don't run along the page.
-   */
-  function targetsFor(frame: Frame, ids: string[], around: Box[]): Targets | null {
-    if (around.some((b) => b.rotation !== 0)) return null
-    const now = session.design()
-    const format = now.formats[frame.formatId]
-    if (!format) return null
-    const holds = (id: string) => ids.some((selected) => ancestorsOf(now, selected).includes(id))
-    const others = scenes
-      .scene(frame)
-      .layers.filter((layer) => !holds(layer.id))
-      .map((layer) => boundsOf([layer.props]))
-    const parent = now.nodes[ids[0] ?? '']?.parentId
-    if (parent && now.nodes[parent]) {
-      const box = boxIn(frame, parent, now)
-      if (box) others.push(box)
-      for (const [id] of childrenOf(now, parent)) {
-        const sibling = !ids.includes(id) && visibleIn(now, frame, id) && boxIn(frame, id, now)
-        if (sibling) others.push(boundsOf([sibling]))
-      }
-    }
-    const targets = snapTargets(others, { x: 0, y: 0, width: format.width, height: format.height })
-    snapWork.gathered++
-    snapWork.targets = targets.boxes.length
-    return targets
-  }
-
-  function resizeTo(
-    g: Extract<Gesture, { kind: 'resize' }>,
-    p: Point,
-    keepRatio: boolean,
-    fromCentre: boolean,
-    snap: boolean,
-  ) {
-    // The handle follows the pointer from where it was grabbed, so a press off its centre doesn't jump.
-    const at = handleAt(g.handle)
-    const handle = turn(
-      { x: g.outer.x + at.x * g.outer.width, y: g.outer.y + at.y * g.outer.height },
-      centreOf(g.outer),
-      g.outer.rotation,
-    )
-    const to = { x: handle.x + p.x - g.grab.x, y: handle.y + p.y - g.grab.y }
-    // A corner that scales text keeps the box's shape, so the text scales as one.
-    const scales = g.texts.size > 0
-    const ratio = keepRatio || scales
-    let outer = resizeBox(g.outer, g.handle, to, { keepRatio: ratio, fromCentre })
-    snapped = null
-    // The dragged edges snap; a turned box has none that run along the page. With the shape kept,
-    // the edge nearest a guide snaps and the other follows.
-    if (snap && g.targets && outer.rotation === 0) {
-      const corner = isCorner(g.handle)
-      const s = snapResize(outer, g.handle, g.targets, SNAP_DISTANCE / camera.zoom, ratio && corner)
-      if (ratio && corner && (s.dx !== 0 || s.dy !== 0) && g.outer.width > 0 && g.outer.height > 0) {
-        // From the centre both edges move, so the box grows by twice what the dragged edge does.
-        const grows = fromCentre ? 2 : 1
-        const factor =
-          s.dx !== 0
-            ? (outer.width + grows * (g.handle.includes('e') ? s.dx : -s.dx)) / g.outer.width
-            : (outer.height + grows * (g.handle.includes('s') ? s.dy : -s.dy)) / g.outer.height
-        outer = boxAt(g.outer, g.handle, factor, fromCentre)
-      } else if (s.dx !== 0 || s.dy !== 0)
-        outer = resizeBox(g.outer, g.handle, { x: to.x + s.dx, y: to.y + s.dy }, { keepRatio: ratio, fromCentre })
-      snapped = { frame: g.frame, guides: s.guides, gaps: [] }
-    }
-    if (scales) {
-      g.factor =
-        g.outer.width > 0 ? outer.width / g.outer.width : g.outer.height > 0 ? outer.height / g.outer.height : 1
-      if (g.factor < g.floor) {
-        g.factor = g.floor
-        outer = boxAt(g.outer, g.handle, g.factor, fromCentre)
-      }
-    }
-    const next = new Map<string, Box>()
-    const now = session.design()
-    if (!g.switched) {
-      g.switched = true
-      switchSizing(g.frame, g.roots, g.handle, now, g.texts)
-    }
-    for (const root of g.roots) {
-      const was = g.boxes.get(root)
-      if (!was) continue
-      const box = g.roots.length === 1 ? outer : scaleWithin(was, g.outer, outer)
-      // Auto layout places a layer in its flow: a resize gives it a size, never a place.
-      next.set(root, inFlow(g.frame, root, now) ? { ...box, x: was.x, y: was.y, rotation: was.rotation } : box)
-      const type = now.nodes[root]?.type
-      if (type === 'group' || type === 'boolean') {
-        // Layers inside a group or boolean keep their place in it, scaled with it.
-        for (const id of descendants(now, root)) {
-          const inner = g.boxes.get(id)
-          if (inner) next.set(id, carry(inner, was, box))
-        }
-      } else if (type === 'frame') {
-        // A frame changes its own size only: what it holds stays as it is, where it is on screen;
-        // with several layers it moves along with its frame.
-        const shift = g.roots.length === 1 ? keptOnScreen(was, box) : { x: box.x - was.x, y: box.y - was.y }
-        for (const id of descendants(now, root)) {
-          const inner = g.boxes.get(id)
-          if (inner) next.set(id, { ...inner, x: inner.x + shift.x, y: inner.y + shift.y })
-        }
-      }
-    }
-    writeBoxes(
-      g.frame,
-      g.boxes,
-      new Map(
-        [...next].map(([id, b]) => [
-          id,
-          { ...b, x: round(b.x), y: round(b.y), width: round(b.width), height: round(b.height) },
-        ]),
-      ),
-    )
-    // The text a corner scales takes its sizes scaled from where they were, in this format.
-    for (const [id, start] of g.texts) {
-      // Text without runs gets none of this format's own.
-      const { runs, ...sized } = scaleText(start, g.factor)
-      runQuietly(() =>
-        session.run('node.update', {
-          ids: [id],
-          scope: scope(g.frame),
-          patch: start.runs.length > 0 ? { ...sized, runs } : sized,
-        }),
-      )
-    }
-    // Text that grows with its words takes the size its new width and sizes give it.
-    for (const id of new Set([...g.roots.filter((root) => now.nodes[root]?.type === 'text'), ...g.texts.keys()]))
-      typing.fitText(id, g.frame.formatId)
-  }
-
-  /**
-   * The text a corner drag on `roots` scales, with its sizes in the frame now: each text whose box
-   * scales with the drag, selected itself or in a group, not one in a frame, whose text keeps its
-   * size. A text whose style is locked isn't scaled.
-   */
-  function scalingTexts(frame: Frame, roots: string[], handle: Handle): Map<string, ScaledText> {
-    const texts = new Map<string, ScaledText>()
-    if (!isCorner(handle)) return texts
-    const now = session.design()
-    const add = (id: string) => {
-      const node = now.nodes[id]
-      if (node?.type !== 'text' || node.lock?.style) return
-      const props = mergedProps(now, scope(frame), id) as typeof node.props
-      texts.set(id, {
-        style: props.style,
-        runs: props.runs,
-        ...(props.paragraphSpacing === undefined ? {} : { paragraphSpacing: props.paragraphSpacing }),
-        ...(props.shrinkToFit ? { shrinkToFit: props.shrinkToFit } : {}),
-      })
-    }
-    const walk = (id: string) => {
-      const type = now.nodes[id]?.type
-      if (type === 'text') add(id)
-      else if (type === 'group' || type === 'boolean') for (const [child] of childrenOf(now, id)) walk(child)
-    }
-    for (const id of roots) walk(id)
-    return texts
-  }
-
-  /**
-   * At the start of a resize, the axes it drags stop following their content, as in Figma: an auto
-   * layout frame or a layer in a flow becomes fixed there (from hug or fill), and text that grows
-   * with its words gets a fixed box there, wrapping inside a width given to it, unless a corner
-   * scales it.
-   */
-  function switchSizing(
-    frame: Frame,
-    ids: string[],
-    handle: Handle,
-    from: Design,
-    scaled: ReadonlyMap<string, unknown>,
-  ) {
-    const across = handle.includes('e') || handle.includes('w')
-    const down = handle.includes('n') || handle.includes('s')
-    for (const id of ids) {
-      const node = from.nodes[id]
-      if (!node) continue
-      const patch: Record<string, unknown> = {}
-      const boxMode = propIn(frame, id, 'boxMode', from)
-      // Text a corner scales keeps its box mode: it grows with its words still.
-      if (node.type === 'text' && boxMode !== 'fixed' && !scaled.has(id)) {
-        const next = down ? 'fixed' : boxMode === 'autoWidth' && across ? 'autoHeight' : boxMode
-        if (next !== boxMode) patch.boxMode = next
-      }
-      const sizing = propIn(frame, id, 'sizing', from) as SizingOf | undefined
-      // Text without sizing of its own follows its box mode, changed above; with its own, the
-      // axes its new box mode fixes are fixed too.
-      if ((inFlow(frame, id, from) || layoutIn(frame, id, from)) && (sizing || node.type !== 'text')) {
-        const was: SizingOf = sizing ?? { width: 'fixed', height: 'fixed' }
-        const mode = patch.boxMode ?? boxMode
-        const fixedW = across || (node.type === 'text' && mode !== 'autoWidth')
-        const fixedH = down || (node.type === 'text' && mode === 'fixed')
-        const next: SizingOf = { width: fixedW ? 'fixed' : was.width, height: fixedH ? 'fixed' : was.height }
-        if (next.width !== was.width || next.height !== was.height) patch.sizing = next
-      }
-      if (Object.keys(patch).length > 0)
-        runQuietly(() => session.run('node.update', { ids: [id], scope: scope(frame), patch }))
-    }
-  }
-
-  /**
-   * Where in a flow a point puts layers being moved: next to the sibling nearest it (on its line,
-   * when the flow wraps), before it or after it as the point is before or past its middle along the
-   * flow. The slot is the index of the sibling they go before; the list's length is the end.
-   */
-  function slotAt(g: Extract<Gesture, { kind: 'reorder' }>, p: Point) {
-    const now = session.design()
-    const row = rowIn(g.frame, g.parentId, now)
-    const siblings = flowSiblings(g.frame, g.parentId, g.roots, now)
-    let best: { i: number; d: number; after: boolean } | null = null
-    siblings.forEach((id, i) => {
-      const b = boxIn(g.frame, id, now)
-      if (!b) return
-      const dx = Math.max(b.x - p.x, 0, p.x - (b.x + b.width))
-      const dy = Math.max(b.y - p.y, 0, p.y - (b.y + b.height))
-      const d = Math.hypot(dx, dy)
-      const after = row ? p.x > b.x + b.width / 2 : p.y > b.y + b.height / 2
-      if (!best || d < best.d) best = { i, d, after }
-    })
-    const near = best as { i: number; d: number; after: boolean } | null
-    g.near = near ? { id: siblings[near.i] as string, after: near.after } : null
-    return near ? near.i + (near.after ? 1 : 0) : 0
-  }
-  /** Follows a drag of layers in a flow: where they would go in it, or out of it. */
-  function reorderTo(g: Extract<Gesture, { kind: 'reorder' }>, p: Point) {
-    if (!g.moved && Math.hypot(p.x - g.from.x, p.y - g.from.y) * camera.zoom < CLICK_SLOP) return
-    g.moved = true
-    g.to = p
-    const holder = boxIn(g.frame, g.parentId)
-    g.outside =
-      !holder || p.x < holder.x || p.y < holder.y || p.x > holder.x + holder.width || p.y > holder.y + holder.height
-    g.slot = slotAt(g, p)
-  }
-  /**
-   * Drops layers dragged in a flow, one undo step: inside their frame, into the place the line
-   * showed; outside it, out of the frame into what holds it, where they were dropped in this
-   * format and where the flow had them in the others.
-   */
-  function finishReorder(g: Extract<Gesture, { kind: 'reorder' }>) {
-    if (!g.moved) return
-    const now = session.design()
-    if (!g.outside) {
-      const siblings = flowSiblings(g.frame, g.parentId, g.roots, now)
-      const before = siblings[g.slot]
-      const flow = childrenOf(now, g.parentId).map(([id]) => id)
-      const moving = flow.filter((id) => g.roots.includes(id))
-      const next = siblings.flatMap((id) => (id === before ? [...moving, id] : [id]))
-      if (!before) next.push(...moving)
-      // Dropped where they were: nothing to write.
-      if (next.join() === flow.filter((id) => next.includes(id)).join()) return
-      for (const id of moving)
-        runQuietly(() => session.run('node.move', { id, parentId: g.parentId, ...(before ? { before } : {}) }))
-      return
-    }
-    if (!now.nodes[g.parentId]) return
-    const dx = g.to.x - g.from.x
-    const dy = g.to.y - g.from.y
-    // The container the drop point is in, among those holding the frame, nearest first; or the page.
-    const point = pageFrom(g.to, g.around)
-    let branch = g.parentId
-    let target = now.nodes[g.parentId]?.parentId ?? g.frame.pageId
-    while (
-      now.nodes[target] &&
-      !(canHold(now.nodes[target]?.type ?? '', 'graphic') && drawnContains(g.frame, target, point, now))
-    ) {
-      branch = target
-      target = now.nodes[target]?.parentId ?? g.frame.pageId
-    }
-    // Above the part of the container that held them.
-    const order = childrenOf(now, target).map(([id]) => id)
-    const before = order[order.indexOf(branch) + 1]
-    // Each format's box as its flow placed it, before the layers leave it.
-    const others = frameGrid(now, null).frames.filter((f) => f.pageId === g.frame.pageId && f.key !== g.frame.key)
-    const placed = new Map(others.map((f) => [f, new Map(g.roots.map((id) => [id, boxIn(f, id, now)]))]))
-    for (const id of g.roots) {
-      const box = g.boxes.get(id)
-      if (!box) continue
-      // Placed below as it is drawn, in every format.
-      runQuietly(() =>
-        session.run('node.move', { id, parentId: target, keepDrawn: false, ...(before ? { before } : {}) }),
-      )
-      const drawn = drawnFrom({ ...box, x: box.x + dx, y: box.y + dy }, g.around)
-      runQuietly(() =>
-        session.run('node.update', {
-          ids: [id],
-          scope: scope(g.frame),
-          patch: { ...undrawn(drawn, containersOf(g.frame, target, now)) },
-        }),
-      )
-      for (const [f, boxes] of placed) {
-        const there = boxes.get(id)
-        if (!there) continue
-        const drawnThere = drawnFrom(there, containersOf(f, g.parentId, now))
-        runQuietly(() =>
-          session.run('node.update', {
-            ids: [id],
-            scope: scope(f),
-            patch: { ...undrawn(drawnThere, containersOf(f, target, now)) },
-          }),
-        )
-      }
-    }
-  }
-  /** Whether a point on the page is inside a layer as it is drawn in a frame. */
-  function drawnContains(frame: Frame, id: string, p: Point, from: Design) {
-    const box = drawnBoxOf(frame, id, from)
-    if (!box) return false
-    const q = turn(p, centreOf(box), -box.rotation)
-    return q.x >= box.x && q.y >= box.y && q.x <= box.x + box.width && q.y <= box.y + box.height
-  }
-
-  function rotateTo(g: Extract<Gesture, { kind: 'rotate' }>, p: Point, snap: boolean) {
-    const centre = centreOf(g.outer)
-    const turned = angleOf(p, centre) - g.from
-    const next = new Map<string, Box>()
-    const now = session.design()
-    if (g.roots.length === 1) {
-      // One layer: its own angle snaps with shift. What is inside it turns with it as it is drawn.
-      const root = g.roots[0] as string
-      const angle = g.outer.rotation + turned
-      next.set(root, { ...g.outer, rotation: round(normalAngle(snap ? snapAngle(angle) : angle)) })
-    } else {
-      // Several: each turns about the selection's centre, by an angle that snaps with shift.
-      const delta = snap ? snapAngle(turned) : turned
-      for (const root of g.roots) {
-        const was = g.boxes.get(root)
-        if (!was) continue
-        const c = centreOf(was)
-        const moved = turn(c, centre, delta)
-        const dx = moved.x - c.x
-        const dy = moved.y - c.y
-        next.set(root, {
-          ...was,
-          x: round(was.x + dx),
-          y: round(was.y + dy),
-          rotation: round(normalAngle(was.rotation + delta)),
-        })
-        for (const id of descendants(now, root)) {
-          const inner = g.boxes.get(id)
-          if (inner) next.set(id, { ...inner, x: round(inner.x + dx), y: round(inner.y + dy) })
-        }
-      }
-    }
-    writeBoxes(g.frame, g.boxes, next)
-  }
-
-  /** Top-level layers the marquee touches on the page it covers, with what was selected before. */
-  function marqueeSelect(g: Extract<Gesture, { kind: 'marquee' }>) {
-    const rect = {
-      x: Math.min(g.from.x, g.to.x),
-      y: Math.min(g.from.y, g.to.y),
-      width: Math.abs(g.to.x - g.from.x),
-      height: Math.abs(g.to.y - g.from.y),
-    }
-    const frame = frameAt(grid.frames, g.from) ?? grid.frames.find((f) => intersects(f, rect))
-    if (!frame) return
-    const local = { x: rect.x - frame.x, y: rect.y - frame.y, width: rect.width, height: rect.height }
-    const hits = scenes
-      .scene(frame)
-      .layers.filter((layer) => pickable(layer) && intersects(boundsOf([{ ...layer.props }]), local))
-      .map((layer) => layer.id)
-    const base = g.baseFrame === frame.key ? g.base : []
-    selection.selectKeepingModes(
-      hits.length + base.length > 0
-        ? { frame: frame.key, ids: [...base, ...hits.filter((id) => !base.includes(id))] }
-        : null,
-    )
-  }
-
-  /** The handle under a screen point: one to resize by, or the zone outside a corner to turn by. */
-  function handleUnder(screen: Point): { kind: 'resize'; handle: Handle } | { kind: 'rotate'; corner: number } | null {
-    const outer = selectionBox()
-    if (!outer || typing.editing() || selection.pathEditing() || lockedSelection()) return null
-    const { frame, drawn: box } = outer
-    const onScreen = (p: Point) => toScreen(camera, { x: frame.x + p.x, y: frame.y + p.y })
-    const c = centreOf(box)
-    const dist = (p: Point) => Math.hypot(p.x - screen.x, p.y - screen.y)
-    if (Math.min(box.width, box.height) * camera.zoom >= 2 * HANDLE_SIZE) {
-      for (const handle of handlesFor()) {
-        const at = handleAt(handle)
-        if (
-          dist(onScreen(turn({ x: box.x + at.x * box.width, y: box.y + at.y * box.height }, c, box.rotation))) <=
-          HANDLE_REACH
-        )
-          return { kind: 'resize', handle }
-      }
-    }
-    const world = toWorld(camera, screen)
-    const local = turn({ x: world.x - frame.x, y: world.y - frame.y }, c, -box.rotation)
-    const inside = local.x >= box.x && local.x <= box.x + box.width && local.y >= box.y && local.y <= box.y + box.height
-    if (inside) return null
-    const corner = cornersOf(box).findIndex((p) => dist(onScreen(p)) <= ROTATE_REACH)
-    return corner === -1 ? null : { kind: 'rotate', corner }
-  }
 
   let hoverCursor = ''
   const showCursor = () => {
@@ -1862,8 +1023,8 @@ function live(
       showCursor()
       return
     }
-    const under = handleUnder(screen)
-    const rotation = selectionBox()?.drawn.rotation ?? 0
+    const under = transformDrag.handleUnder(screen)
+    const rotation = boxes.selectionBox()?.drawn.rotation ?? 0
     hoverCursor = !under ? '' : under.kind === 'rotate' ? ROTATE_CURSOR : resizeCursor(under.handle, rotation)
     showCursor()
   }
@@ -1887,12 +1048,13 @@ function live(
       const at = pointIn(e)
       const tool = tools.tool()
       if (isDrawTool(tool)) {
-        if (at) startDrawing(e, tool, at)
+        const drag = at && drawing.pressShape(e, tool, at)
+        if (drag) gesture = drag
         return
       }
       if (tool === 'image') {
         const imageToPlace = tools.imageToPlace()
-        if (at && imageToPlace) startImageBox(e, at, imageToPlace)
+        if (at && imageToPlace) gesture = drawing.pressImage(e, at, imageToPlace)
         return
       }
       if (tool === 'pen') {
@@ -1900,7 +1062,7 @@ function live(
         return
       }
       if (tool === 'text') {
-        if (at) startTextBox(e, at)
+        if (at) gesture = drawing.pressText(e, at)
         return
       }
       if (selection.pathEditing()) {
@@ -1918,7 +1080,7 @@ function live(
           return
         }
       }
-      const deepest = at && hitTest(scenes.scene(at.frame).layers, at.p, pickable)
+      const deepest = at && hitTest(scenes.scene(at.frame).layers, at.p, boxes.pickable)
       const editing = typing.editing()
       if (at && editing && deepest?.id === editing.id && editing.frame === at.frame.key) {
         // In the text being edited (#47): a press puts the caret there, Shift extends the range to
@@ -1940,47 +1102,10 @@ function live(
       typing.stop()
       clickedAlone = null
       pressedAt = screen
-      const grabbed = handleUnder(screen)
-      const outer = selectionBox()
+      const grabbed = transformDrag.handleUnder(screen)
+      const outer = boxes.selectionBox()
       if (grabbed && outer && selection.current()) {
-        canvas.setPointerCapture(e.pointerId)
-        const ids = roots()
-        const boxes = startBoxes(outer.frame, ids)
-        const end = session.beginGesture()
-        const world = toWorld(camera, screen)
-        const { around } = outer
-        const grab = localTo({ x: world.x - outer.frame.x, y: world.y - outer.frame.y }, around)
-        if (grabbed.kind === 'resize') {
-          const texts = scalingTexts(outer.frame, ids, grabbed.handle)
-          // Scaled down, the smallest size anywhere in the text stops at 1 px.
-          const floor = Math.max(0, ...[...texts.values()].map((t) => 1 / smallestSize(t)))
-          gesture = {
-            kind: 'resize',
-            frame: outer.frame,
-            around,
-            handle: grabbed.handle,
-            outer: outer.box,
-            grab,
-            roots: ids,
-            boxes,
-            targets: targetsFor(outer.frame, ids, around),
-            switched: false,
-            texts,
-            factor: 1,
-            floor,
-            end,
-          }
-        } else
-          gesture = {
-            kind: 'rotate',
-            frame: outer.frame,
-            around,
-            outer: outer.box,
-            from: angleOf(grab, centreOf(outer.box)),
-            roots: ids,
-            boxes,
-            end,
-          }
+        gesture = transformDrag.pressHandle(e, screen, grabbed, outer)
         drawOverlay()
         return
       }
@@ -1992,7 +1117,7 @@ function live(
       const inner = at && outer && localTo(at.p, outer.around)
       // A selection that can't move leaves the press to what is under it.
       const current = selection.current()
-      const movable = current && !lockedSelection()
+      const movable = current && !boxes.lockedSelection()
       const inOuter =
         inner &&
         outer &&
@@ -2052,47 +1177,17 @@ function live(
         clickedAlone = ''
       }
       const frame = at && frameOf(selection.current()?.frame)
-      const around = selectionBox()?.around ?? []
+      const around = boxes.selectionBox()?.around ?? []
       if (!at || !frame) return
       canvas.setPointerCapture(e.pointerId)
-      const ids = roots()
-      const now = session.design()
-      const parents = new Set(ids.map((id) => now.nodes[id]?.parentId))
-      const [flowParent] = parents
-      if (flowParent && parents.size === 1 && ids.every((id) => inFlow(frame, id, now))) {
-        // Auto layout places these: a drag moves them along the flow, or out of the frame.
-        const from = localTo(at.p, around)
-        gesture = {
-          kind: 'reorder',
-          frame,
-          around,
-          parentId: flowParent,
-          roots: ids,
-          boxes: startBoxes(frame, ids),
-          from,
-          to: from,
-          moved: false,
-          slot: 0,
-          near: null,
-          outside: false,
-          end: session.beginGesture(),
-        }
+      const ids = boxes.roots()
+      const reorder = autoLayoutDrag.press(frame, around, at.p, ids)
+      if (reorder) {
+        gesture = reorder
         drawOverlay()
         return
       }
-      // Layers in a flow among others stay in it: auto layout places them.
-      const free = ids.filter((id) => !inFlow(frame, id, now))
-      if (free.length < ids.length) notify('placedByLayout')
-      gesture = {
-        kind: 'move',
-        frame,
-        around,
-        from: localTo(at.p, around),
-        roots: free,
-        boxes: startBoxes(frame, free),
-        targets: targetsFor(frame, free, around),
-        end: session.beginGesture(),
-      }
+      gesture = transformDrag.pressMove(frame, around, at.p, ids)
       drawOverlay()
     },
     on,
@@ -2107,7 +1202,7 @@ function live(
    */
   function imageTargetAt(client: Point): Picked | null {
     const at = pointAt(client)
-    const hit = at && hitTest(scenes.scene(at.frame).layers, at.p, pickable)
+    const hit = at && hitTest(scenes.scene(at.frame).layers, at.p, boxes.pickable)
     if (!at || !hit) return null
     let id = hit.id
     for (const up of ancestorsOf(design, design.nodes[id]?.parentId ?? ''))
@@ -2151,7 +1246,7 @@ function live(
       const world = toWorld(camera, screen)
       if (gesture.kind === 'marquee') {
         gesture.to = world
-        marqueeSelect(gesture)
+        transformDrag.marquee(gesture)
         drawOverlay()
         return
       }
@@ -2165,13 +1260,8 @@ function live(
         drawOverlay()
         return
       }
-      if (gesture.kind === 'textBox' || gesture.kind === 'imageBox') {
-        gesture.to = gesture.kind === 'imageBox' && e.shiftKey ? keepRatio(gesture.from, p, gesture.asset) : p
-        drawOverlay()
-        return
-      }
-      if (gesture.kind === 'draw') {
-        drawTo(gesture, p, e.shiftKey, e.altKey)
+      if (isDrawing(gesture)) {
+        drawing.drag(gesture, p, e.shiftKey, e.altKey)
         return
       }
       if (gesture.kind === 'path') {
@@ -2185,194 +1275,24 @@ function live(
       // Holding Ctrl (⌘ on a Mac) turns snapping off for as long as it is held.
       const snap = tools.snapping() && !(e.ctrlKey || e.metaKey)
       if (gesture.kind === 'reorder') {
-        reorderTo(gesture, p)
+        autoLayoutDrag.drag(gesture, p)
         drawOverlay()
         return
       }
-      if (gesture.kind === 'move') moveTo(gesture, p, e.shiftKey, snap)
-      else if (gesture.kind === 'resize') resizeTo(gesture, p, e.shiftKey, e.altKey, snap)
-      else rotateTo(gesture, p, e.shiftKey)
+      transformDrag.drag(gesture, p, e.shiftKey, e.altKey, snap)
     },
     on,
   )
 
-  /**
-   * Starts drawing a shape (#44) or a frame where the pointer went down: inside the group, frame or
-   * boolean double-clicked into if the press is in it and it can hold it, otherwise on the page.
-   * The new layer and every change the drag makes to it are one undo step.
-   */
-  function startDrawing(e: PointerEvent, shape: DrawTool, at: { frame: Frame; p: Point }) {
-    typing.stop()
-    const now = session.design()
-    const parentId = parentFor(at.frame, shape === 'frame' ? 'frame' : 'graphic', now)
-    const around = containersOf(at.frame, parentId, now)
-    const from = localTo(at.p, around)
-    const end = session.beginGesture()
-    let id = ''
-    if (
-      !runQuietly(() => {
-        id = session.run('node.create', { parentId, layer: newDrawn(shape) })
-      })
-    ) {
-      end()
-      return
-    }
-    canvas.setPointerCapture(e.pointerId)
-    gesture = { kind: 'draw', tool: shape, frame: at.frame, around, from, id, moved: false, roots: [id], end }
-    runQuietly(() => session.run('node.update', { ids: [id], patch: drawnBox(shape, from, from, false, false) }))
-  }
-
-  /** A press with the text tool (#47): a click makes text that grows as it is typed, a drag a box of that size. */
-  function startTextBox(e: PointerEvent, at: { frame: Frame; p: Point }) {
-    typing.stop()
-    canvas.setPointerCapture(e.pointerId)
-    gesture = { kind: 'textBox', ...boxStart(at, 'text') }
-  }
-  /**
-   * Where a box a tool drags out starts: in the group or frame double-clicked into if it can hold
-   * a layer of `type`, otherwise on the page, at the press as layers there see it.
-   */
-  function boxStart(at: { frame: Frame; p: Point }, type: 'text' | 'graphic') {
-    const now = session.design()
-    const parentId = parentFor(at.frame, type, now)
-    const around = containersOf(at.frame, parentId, now)
-    const from = localTo(at.p, around)
-    return { frame: at.frame, around, parentId, from, to: from }
-  }
-  /** The box a text or image box gesture dragged, or null when the press stayed a click. */
-  function draggedBox(g: { from: Point; to: Point }) {
-    const dragged = Math.max(Math.abs(g.to.x - g.from.x), Math.abs(g.to.y - g.from.y)) * camera.zoom >= CLICK_SLOP
-    return dragged
-      ? {
-          x: Math.min(g.from.x, g.to.x),
-          y: Math.min(g.from.y, g.to.y),
-          width: Math.abs(g.to.x - g.from.x),
-          height: Math.abs(g.to.y - g.from.y),
-        }
-      : null
-  }
-  /**
-   * A press with the image tool once its image is picked: a click places the image at its own size
-   * (at most half the format's), centred there; a drag places it covering the box dragged, which
-   * Shift keeps to the image's shape. In the group or frame double-clicked into if it can hold it.
-   */
-  function startImageBox(e: PointerEvent, at: { frame: Frame; p: Point }, asset: PlacedAsset) {
-    typing.stop()
-    canvas.setPointerCapture(e.pointerId)
-    gesture = { kind: 'imageBox', ...boxStart(at, 'graphic'), asset }
-  }
-  /** Places the image the image tool drew, one undo step; it is selected and the select tool comes back. */
-  function finishImageBox(g: Extract<Gesture, { kind: 'imageBox' }>) {
-    const box = draggedBox(g)
-    const format = design.formats[g.frame.formatId] ?? g.frame
-    const layer = box
-      ? imageIn(g.asset, {
-          x: round(box.x),
-          y: round(box.y),
-          width: Math.max(1, round(box.width)),
-          height: Math.max(1, round(box.height)),
-        })
-      : newImage(g.asset, g.from, format)
-    let id = ''
-    if (
-      !runQuietly(() =>
-        session.gesture(() => {
-          id = session.run('node.create', { parentId: g.parentId, layer })
-          hug([id])
-        }),
-      )
-    )
-      return
-    tools.setTool('select')
-    selection.select([id], g.frame.key)
-  }
-
-  /** Makes the text layer the text tool drew and starts typing into it, one undo step with the typing. */
-  function finishTextBox(g: Extract<Gesture, { kind: 'textBox' }>) {
-    const box = draggedBox(g)
-    const end = session.beginGesture()
-    let id = ''
-    if (
-      !runQuietly(() => {
-        id = session.run('node.create', {
-          parentId: g.parentId,
-          layer: newText(
-            round(g.from.x),
-            round(g.from.y),
-            box && { width: round(box.width), height: round(box.height), x: round(box.x), y: round(box.y) },
-          ),
-        })
-      })
-    ) {
-      end()
-      return
-    }
-    tools.setTool('select')
-    selection.select([id], g.frame.key)
-    typing.start(id, g.frame.key, 0, end, true)
-  }
-
-  /** Grows the shape being drawn to the pointer; a few screen pixels count as a click still. */
-  function drawTo(g: Extract<Gesture, { kind: 'draw' }>, p: Point, shift: boolean, alt: boolean) {
-    if (!g.moved && Math.hypot(p.x - g.from.x, p.y - g.from.y) * camera.zoom < CLICK_SLOP) return
-    g.moved = true
-    runQuietly(() => session.run('node.update', { ids: [g.id], patch: drawnBox(g.tool, g.from, p, shift, alt) }))
-  }
-
-  /**
-   * A click draws the shape at its usual size; either way the new shape is selected and the select
-   * tool comes back. A frame dragged around layers beside it takes them in, in the same undo step.
-   */
-  function finishDrawing(g: Extract<Gesture, { kind: 'draw' }>) {
-    if (!g.moved) runQuietly(() => session.run('node.update', { ids: [g.id], patch: clickedBox(g.tool, g.from) }))
-    if (g.tool === 'frame' && g.moved) enclose(g.frame, g.id)
-    hug([g.id])
-    g.end()
-    selection.select([g.id], g.frame.key)
-    tools.setTool('select')
-  }
-
-  /**
-   * Moves the layers beside a new frame that lie wholly inside it, as drawn in this frame, into it.
-   * Layers locked in place stay where they are, and so does everything in an auto layout frame,
-   * where the layout, not the drag, places the new frame.
-   */
-  function enclose(frame: Frame, id: string) {
-    const now = session.design()
-    const parent = now.nodes[id]?.parentId ?? ''
-    const box = boxIn(frame, id, now)
-    if (!box || laidOut(id, now)) return
-    const inside = childrenOf(now, parent).flatMap(([child, node]) => {
-      const b = child !== id && !node.lock?.move && boxIn(frame, child, now)
-      if (!b) return []
-      const drawn = boundsOf([b])
-      const fits =
-        drawn.x >= box.x &&
-        drawn.y >= box.y &&
-        drawn.x + drawn.width <= box.x + box.width &&
-        drawn.y + drawn.height <= box.y + box.height
-      return fits && canHold('frame', now.nodes[child]?.type ?? '') ? [child] : []
-    })
-    if (inside.length > 0) runQuietly(() => session.run('node.enclose', { id, ids: inside, scope: scope(frame) }))
-  }
-
   const endDrag = () => {
     pressing = false
-    snapped = null
+    transformDrag.clearGuides()
     if (pen.drawing() && !pan) {
       pen.up()
       return
     }
-    if (gesture?.kind === 'draw') {
-      finishDrawing(gesture)
-      gesture = null
-      showCursor()
-      drawOverlay()
-      return
-    }
-    if (gesture?.kind === 'textBox' || gesture?.kind === 'imageBox') {
-      if (gesture.kind === 'textBox') finishTextBox(gesture)
-      else finishImageBox(gesture)
+    if (isDrawing(gesture)) {
+      drawing.release(gesture)
       gesture = null
       showCursor()
       drawOverlay()
@@ -2382,13 +1302,10 @@ function live(
       gesture = null
       return
     }
-    if (gesture?.kind === 'reorder') finishReorder(gesture)
-    if (gesture?.kind === 'path') pen.releasePoints(gesture)
+    if (gesture?.kind === 'reorder') autoLayoutDrag.release(gesture)
+    else if (gesture?.kind === 'path') pen.releasePoints(gesture)
     else if (gesture?.kind === 'crop') cropping.release(gesture)
-    else if (gesture && gesture.kind !== 'marquee') {
-      hug(gesture.roots)
-      gesture.end()
-    }
+    else if (gesture && gesture.kind !== 'marquee') transformDrag.release(gesture)
     // A click on a locked layer, not a drag, selects it; a click on no layer picks the page under
     // it, and a click off every page or a drag lets the page go.
     const clicked =
@@ -2444,7 +1361,7 @@ function live(
     (e) => {
       if (panning()) return
       const at = pointIn(e)
-      const hit = at && hitTest(scenes.scene(at.frame).layers, at.p, pickable)
+      const hit = at && hitTest(scenes.scene(at.frame).layers, at.p, boxes.pickable)
       if (!at || !hit || lockedAt(at.frame, at.p)) return
       const editing = typing.editing()
       if (editing && hit.id === editing.id && editing.frame === at.frame.key) {
@@ -2464,7 +1381,7 @@ function live(
         selection.select([target(hit.id, at.frame.key)], at.frame.key)
         return
       }
-      if (cropTarget(at.frame, hit.id) && !design.nodes[hit.id]?.lock?.style) {
+      if (boxes.cropTarget(at.frame, hit.id) && !design.nodes[hit.id]?.lock?.style) {
         // Into cropping its image fill (#48).
         typing.stop()
         selection.select([hit.id], at.frame.key)
@@ -2510,13 +1427,6 @@ function live(
     { ...on, passive: false },
   )
 
-  /** Groups fit what they hold again after a change inside them, in the same undo step (#41). */
-  function hug(ids: string[]) {
-    const now = session.design()
-    const live = ids.filter((id) => now.nodes[id])
-    if (live.length > 0) runQuietly(() => session.run('node.hug', { ids: live }))
-  }
-
   /** Hides layers in every format, or shows them in every one: the base, with each format's own visibility gone. One undo step. */
   function hideInEveryFormat(ids: string[], hidden: boolean) {
     return runQuietly(() => session.run('node.visibleEverywhere', { ids, visible: !hidden }))
@@ -2530,7 +1440,11 @@ function live(
     let id = ''
     if (
       runQuietly(() => {
-        id = session.run('node.boolean', { ids: roots(), op, drawn: drawnInFlow(roots(), frame.pageId) })
+        id = session.run('node.boolean', {
+          ids: boxes.roots(),
+          op,
+          drawn: boxes.drawnInFlow(boxes.roots(), frame.pageId),
+        })
       })
     )
       selection.select([id], frame.key)
@@ -2546,7 +1460,7 @@ function live(
     const format = frame && design.formats[frame.formatId]
     if (!frame || !format) return false
     const now = session.design()
-    const ids = roots(now)
+    const ids = boxes.roots(now)
     if (ids.some((id) => inFlow(frame, id, now))) notify('placedByLayout')
     const free = ids.filter((id) => !inFlow(frame, id, now))
     if (free.length === 0) return true
@@ -2560,25 +1474,25 @@ function live(
     offsets: (boxes: Rect[], within: Rect) => Offset[],
     now: Design,
   ) {
-    const boxes = startBoxes(frame, ids)
+    const start = boxes.startBoxes(frame, ids)
     // One layer lines up with what holds it: its group or frame, or the format.
     const parent = now.nodes[ids[0] ?? '']?.parentId
-    const holder = parent && now.nodes[parent] ? boxIn(frame, parent, now) : null
+    const holder = parent && now.nodes[parent] ? boxes.boxIn(frame, parent, now) : null
     const within = holder ?? { x: 0, y: 0, width: format.width, height: format.height }
     const moves = offsets(
-      ids.map((id) => boundsOf([boxes.get(id) as Box])),
+      ids.map((id) => boundsOf([start.get(id) as Box])),
       within,
     )
     const next = new Map<string, Box>()
     ids.forEach((id, i) => {
       const { dx, dy } = moves[i] ?? { dx: 0, dy: 0 }
       for (const inner of [id, ...descendants(now, id)]) {
-        const b = boxes.get(inner)
+        const b = start.get(inner)
         if (b) next.set(inner, { ...b, x: round(b.x + dx), y: round(b.y + dy) })
       }
     })
     session.gesture(() => {
-      writeBoxes(frame, boxes, next)
+      transformDrag.writeBoxes(frame, start, next)
       hug(ids)
     })
     return true
@@ -2591,66 +1505,27 @@ function live(
     const current = selection.current()
     const frame = current && frameOf(current.frame)
     if (!frame) return
-    const ids = roots()
+    const ids = boxes.roots()
     const now = session.design()
     if (ids.some((id) => inFlow(frame, id, now))) {
-      nudgeInFlow(frame, ids, dx, dy, now)
+      autoLayoutDrag.nudge(frame, ids, dx, dy, now)
       return
     }
-    const boxes = startBoxes(frame, ids)
+    const start = boxes.startBoxes(frame, ids)
     // Arrows move along the page as drawn, also inside a turned group.
-    const around = selectionBox()?.around ?? []
+    const around = boxes.selectionBox()?.around ?? []
     const step = localTo(
       { x: dx, y: dy },
       around.map((b) => ({ ...b, x: -b.width / 2, y: -b.height / 2 })),
     )
     session.gesture(() => {
-      writeBoxes(
+      transformDrag.writeBoxes(
         frame,
-        boxes,
-        new Map([...boxes].map(([id, b]) => [id, { ...b, x: round(b.x + step.x), y: round(b.y + step.y) }])),
+        start,
+        new Map([...start].map(([id, b]) => [id, { ...b, x: round(b.x + step.x), y: round(b.y + step.y) }])),
       )
       hug(ids)
     })
-  }
-
-  /**
-   * The arrow keys on layers in a flow: along it they move them one place earlier or later, one
-   * undo step; across it, or for layers in different flows, auto layout decides, and the page says so.
-   */
-  function nudgeInFlow(frame: Frame, ids: string[], dx: number, dy: number, now: Design) {
-    const parents = new Set(ids.map((id) => now.nodes[id]?.parentId))
-    const [parentId] = parents
-    const row = parentId && rowIn(frame, parentId, now)
-    const along = row ? dx : dy
-    if (
-      !parentId ||
-      parents.size > 1 ||
-      !ids.every((id) => inFlow(frame, id, now)) ||
-      along === 0 ||
-      (row ? dy : dx) !== 0
-    ) {
-      notify('placedByLayout')
-      return
-    }
-    const flow = childrenOf(now, parentId)
-      .map(([id]) => id)
-      .filter((id) => inFlow(frame, id, now))
-    const places = ids.map((id) => flow.indexOf(id)).sort((a, b) => a - b)
-    const first = places[0] ?? 0
-    const last = places.at(-1) ?? 0
-    // Earlier: before the layer ahead of the first; later: past the layer after the last.
-    const before = along < 0 ? flow[first - 1] : flow[last + 2]
-    if (along < 0 ? first === 0 : last === flow.length - 1) {
-      notify('flowEnd')
-      return
-    }
-    const moving = flow.filter((id) => ids.includes(id))
-    runQuietly(() =>
-      session.gesture(() => {
-        for (const id of moving) session.run('node.move', { id, parentId, ...(before ? { before } : {}) })
-      }),
-    )
   }
 
   /** The top-level layers of the selection's page, or the first page's, that can be picked. */
@@ -2663,7 +1538,7 @@ function live(
     selection.select(
       scenes
         .scene(frame)
-        .layers.filter(pickable)
+        .layers.filter(boxes.pickable)
         .map((layer) => layer.id),
       frame.key,
     )
@@ -2740,7 +1615,7 @@ function live(
     const current = selection.current()
     const frame = current && frameOf(current.frame)
     if (!current || !frame) return false
-    const ids = roots()
+    const ids = boxes.roots()
     const nodes = session.design().nodes
     const far = action.endsWith('Far') ? NUDGE_FAR : NUDGE
     switch (action) {
@@ -2769,7 +1644,7 @@ function live(
         let group = ''
         if (
           runQuietly(() => {
-            group = session.run('node.group', { ids, drawn: drawnInFlow(ids, frame.pageId) })
+            group = session.run('node.group', { ids, drawn: boxes.drawnInFlow(ids, frame.pageId) })
           })
         )
           selection.select([group], frame.key)
@@ -2803,7 +1678,7 @@ function live(
         // Enter on one layer with an image fill crops it (#48); on one path, it goes into its points (#45).
         const [only] = current.ids
         if (current.ids.length !== 1 || !only || nodes[only]?.lock?.style) return false
-        if (cropTarget(frame, only)) selection.crop({ id: only, frame: frame.key })
+        if (boxes.cropTarget(frame, only)) selection.crop({ id: only, frame: frame.key })
         else if (isPath(session.design(), only)) selection.editPath({ id: only, frame: frame.key })
         else return false
         break
@@ -2820,7 +1695,7 @@ function live(
         if (
           runQuietly(() =>
             session.gesture(() => {
-              group = session.run('node.group', { ids, drawn: drawnInFlow(ids, frame.pageId) })
+              group = session.run('node.group', { ids, drawn: boxes.drawnInFlow(ids, frame.pageId) })
               const [[bottom] = []] = childrenOf(session.design(), group)
               if (bottom) session.run('node.mask', { ids: [bottom], mask: 'alpha' })
             }),
@@ -2833,7 +1708,7 @@ function live(
         let framed = ''
         if (
           runQuietly(() => {
-            framed = session.run('node.frame', { ids, drawn: drawnInFlow(ids, frame.pageId) })
+            framed = session.run('node.frame', { ids, drawn: boxes.drawnInFlow(ids, frame.pageId) })
           })
         )
           selection.select([framed], frame.key)
@@ -2861,7 +1736,7 @@ function live(
         if (
           runQuietly(() =>
             session.gesture(() => {
-              framed = session.run('node.frame', { ids, drawn: drawnInFlow(ids, frame.pageId) })
+              framed = session.run('node.frame', { ids, drawn: boxes.drawnInFlow(ids, frame.pageId) })
               session.run('node.autoLayout', { id: framed, on: true })
               session.run('node.update', { ids: [framed], patch: { sizing: { width: 'hug', height: 'hug' } } })
             }),
@@ -3013,12 +1888,12 @@ function live(
       }
     }
     walk(frame.pageId)
-    const tops = roots(now).sort((a, b) => stacked.indexOf(a) - stacked.indexOf(b))
+    const tops = boxes.roots(now).sort((a, b) => stacked.indexOf(a) - stacked.indexOf(b))
     if (tops.length === 0) return null
     const nodes: Record<string, Layer> = {}
     const add = (id: string) => {
       const node = now.nodes[id]
-      const box = boxIn(frame, id, now)
+      const box = boxes.boxIn(frame, id, now)
       if (!node || !box) return
       nodes[id] = { ...node, props: { ...mergedProps(now, scope(frame), id), ...box } } as Layer
       for (const [child] of childrenOf(now, id)) add(child)
@@ -3050,7 +1925,7 @@ function live(
     let dx = 0
     let dy = 0
     if (atPointer && under?.frame.key === frame.key) {
-      const p = localTo(under.p, containersOf(frame, parentId, now))
+      const p = localTo(under.p, boxes.containersOf(frame, parentId, now))
       const b = boundsOf(
         tree.roots.flatMap((root) => {
           const props = tree.nodes[root]?.props
@@ -3396,7 +2271,7 @@ function live(
       return () => noticeListeners.delete(listener)
     },
     selectionRect(): Rect | null {
-      const outer = selectionBox()
+      const outer = boxes.selectionBox()
       if (!outer) return null
       const { frame, drawn } = outer
       const corners = cornersOf(drawn).map((p) => toScreen(camera, { x: frame.x + p.x, y: frame.y + p.y }))
@@ -3438,7 +2313,7 @@ function live(
     onPagePick: (listener: (pageId: string | null) => void) => selection.onPagePick(listener),
     rulers: () => rulers,
     snapping: () => tools.snapping(),
-    snapWork: () => ({ ...snapWork }),
+    snapWork: () => transformDrag.snapWork(),
     setSnapping: (on: boolean) => tools.setSnapping(on),
     onView(listener: () => void) {
       viewListeners.add(listener)
@@ -3493,7 +2368,7 @@ function live(
       return { x: rect.left + at.x, y: rect.top + at.y }
     },
     boxOf(id: string, pageId?: string, formatId?: string) {
-      const box = drawnBoxOf(defaultFrame(pageId, formatId), id)
+      const box = boxes.drawnBoxOf(defaultFrame(pageId, formatId), id)
       return box && { x: box.x, y: box.y, width: box.width, height: box.height }
     },
     loaded: () => resources.loaded(),
