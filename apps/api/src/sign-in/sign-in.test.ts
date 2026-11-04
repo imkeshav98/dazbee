@@ -11,7 +11,13 @@ import { ApiError, SignedIn, SignedOut, SignInLink, WorkspaceSummary } from '@da
 import { createApp } from '../app.ts'
 import { db, storage, syncSecret } from '../test-api.ts'
 import { bearerToken, readSessionToken, SESSION_TTL_MS, signSessionToken, tokenSession } from './session.ts'
-import { accessTokenSessionId, type SignedInPerson, type SignInProvider, workosSettings } from './sign-in.ts'
+import {
+  accessTokenSessionId,
+  type SignedInPerson,
+  type SignInProvider,
+  workosProvider,
+  workosSettings,
+} from './sign-in.ts'
 
 const run = randomUUID().slice(0, 8)
 const secret = 'test-session-secret-'.padEnd(32, 'x')
@@ -198,5 +204,16 @@ describe('WorkOS settings', () => {
     const claims = Buffer.from(JSON.stringify({ sid: 'session_1', sub: 'user_1' })).toString('base64url')
     expect(accessTokenSessionId(`header.${claims}.signature`)).toBe('session_1')
     expect(accessTokenSessionId('not a token')).toBeNull()
+  })
+
+  it('sends a signed-out person back to the /login beside the callback', () => {
+    const provider = workosProvider({
+      apiKey: 'sk_test_k',
+      clientId: 'client_c',
+      redirectUri: 'http://localhost:3100/callback',
+    })
+    const url = new URL(provider.signOutUrl('session_1'))
+    expect(url.searchParams.get('session_id')).toBe('session_1')
+    expect(url.searchParams.get('return_to')).toBe('http://localhost:3100/login')
   })
 })

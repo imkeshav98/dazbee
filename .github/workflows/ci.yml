@@ -120,6 +120,44 @@ jobs:
           if-no-files-found: ignore
           retention-days: 30
 
+  # Signing in and out against WorkOS test mode, as the test user of WorkOS's staging environment.
+  # It is not a required check, since it needs WorkOS to be up. The API turns WorkOS sign-in on only
+  # when all three of its settings are given; without the secrets (a fork's pull request) the spec
+  # skips itself. With the check and e2e jobs it is the 20th job GitHub runs at once.
+  workos-sign-in:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      WORKOS_API_KEY: ${{ secrets.WORKOS_API_KEY }}
+      WORKOS_CLIENT_ID: ${{ secrets.WORKOS_CLIENT_ID }}
+      WORKOS_TEST_EMAIL: ${{ secrets.WORKOS_TEST_EMAIL }}
+      WORKOS_TEST_PASSWORD: ${{ secrets.WORKOS_TEST_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: |
+          if [ -n "$WORKOS_API_KEY" ]; then export WORKOS_REDIRECT_URI=http://localhost:3100/callback; fi
+          docker compose up -d --wait
+      - run: pnpm --filter @dazbee/e2e exec playwright install --with-deps chromium
+      - run: pnpm turbo run build --filter=@dazbee/web
+      - run: pnpm --filter @dazbee/e2e exec playwright test specs/library/workos-sign-in.spec.ts
+      - if: failure()
+        run: docker compose logs api
+      - if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: workos-sign-in
+          path: |
+            tests/e2e/playwright-report
+            tests/e2e/output/workos-*.png
+          if-no-files-found: ignore
+          retention-days: 7
+
   # The speed report: the editor's timings (the tests tagged @perf) on each push to main, one test
   # at a time, in this job's summary. A shared runner drawing WebGL on the CPU times the machine as
   # much as the editor, so the numbers are there to watch and never fail the run; the other tests

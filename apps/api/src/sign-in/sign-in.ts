@@ -28,6 +28,7 @@ export interface SignInProvider {
   /** A new organization for a workspace, returning its WorkOS id. */
   createOrganization(name: string, workspaceId: string): Promise<string>
   addMember(organizationId: string, workosUserId: string): Promise<void>
+  /** Where to end a WorkOS session; WorkOS then sends the person to the web app's /login. */
   signOutUrl(sessionId: string): string
 }
 
@@ -90,7 +91,9 @@ export function workosProvider({ apiKey, clientId, redirectUri }: WorkosSettings
       // Roles are ours (memberships.role); WorkOS only needs to know the person belongs.
       await workos.userManagement.createOrganizationMembership({ organizationId, userId })
     },
-    signOutUrl: (sessionId) => workos.userManagement.getLogoutUrl({ sessionId }),
+    // WorkOS sends the person back to the web app's /login, on the same site as its /callback.
+    signOutUrl: (sessionId) =>
+      workos.userManagement.getLogoutUrl({ sessionId, returnTo: new URL('/login', redirectUri).href }),
   }
 }
 
