@@ -5,7 +5,7 @@
 // is room neither side, as when the selection fills the stage. It keeps off the top bar, the edit
 // panel, the rail and its flyout, the bottom controls and the show-alone chip, and hides while a
 // gesture runs, a top bar pop-up or the right-click menu is open, or the selection is off the stage.
-// ⋯ opens the full menu beside it.
+// ⋯ opens the full menu beside it, clear of the rail and its flyout.
 import {
   CopyIcon,
   DotsThreeIcon,
@@ -15,7 +15,7 @@ import {
   TrashIcon,
 } from '@phosphor-icons/react'
 import * as Popover from '@radix-ui/react-popover'
-import { useEffect, useState } from 'react'
+import { useEffect, useLayoutEffect, useState } from 'react'
 
 import type { Editor } from '@dazbee/editor'
 
@@ -33,11 +33,18 @@ import { LayerActions } from './layer-actions.tsx'
 
 type Place = { left: number; top: number }
 type Box = { left: number; top: number; right: number; bottom: number }
+/**
+ * Where the full menu opens: beside the small menu on its end or start side, or under it; and how
+ * far from the window's start edge it keeps, past the rail and its open flyout.
+ */
+type FullMenuPlace = { side: 'end' | 'start' | 'under'; startInset: number }
 
 /** Pixels between the selection and the menu, clear of the turn handles round its corners. */
 const GAP = 28
 /** Pixels kept between the menu and anything it keeps off. */
 const CLEAR = 8
+/** Pixels between the small menu and the full menu. */
+const MENU_GAP = 8
 
 /**
  * `value` kept between `low` and `high`. When `low` is above `high`, as on a phone narrower than the
@@ -45,6 +52,13 @@ const CLEAR = 8
  */
 const clampInto = (value: number, low: number, high: number) => Math.max(low, Math.min(value, high))
 const meets = (a: Box, b: Box) => a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom
+
+/** The element's box in the window, or null while it doesn't show. */
+function shownBox(el: Element | null): DOMRect | null {
+  const box = el?.getBoundingClientRect()
+  if (!el || !box || box.width === 0 || box.height === 0 || getComputedStyle(el).visibility === 'hidden') return null
+  return box
+}
 
 /** The pieces of chrome the menu keeps off, in the stage's pixels: what shows of them now. */
 function obstacles(stage: HTMLElement): Box[] {
@@ -65,8 +79,8 @@ function obstacles(stage: HTMLElement): Box[] {
   return selectors
     .flatMap((selector) => [...document.querySelectorAll(selector)])
     .flatMap((el) => {
-      const box = el.getBoundingClientRect()
-      if (box.width === 0 || box.height === 0 || getComputedStyle(el).visibility === 'hidden') return []
+      const box = shownBox(el)
+      if (!box) return []
       return [
         {
           left: box.left - origin.left - CLEAR,
@@ -162,18 +176,61 @@ function usePlace(editor: Editor, menu: HTMLElement | null, rightClick: boolean)
   return place
 }
 
+/**
+ * Where the full menu opens: beside the small menu on its end side, else on its start side, kept off
+ * the rail and its open flyout; under it when neither side has room, and always on a phone. Under
+ * it, the menu keeps off the flyout only when the room past the flyout holds it, and off the rail
+ * always. Measured once the full menu shows, and again as the small menu, the flyout or the window
+ * changes.
+ */
+function useFullMenuPlace(
+  menu: HTMLElement | null,
+  content: HTMLElement | null,
+  place: Place | null,
+  phone: boolean,
+  rtl: boolean,
+): FullMenuPlace {
+  const [at, setAt] = useState<FullMenuPlace>({ side: 'end', startInset: CLEAR })
+  const { flyoutEnd } = useEditState()
+  useLayoutEffect(() => {
+    if (!menu || !content || phone) return
+    const update = () => {
+      const width = document.documentElement.clientWidth
+      const reach = (selector: string) => {
+        const box = shownBox(document.querySelector(selector))
+        return box ? Math.round(rtl ? width - box.left : box.right) + CLEAR : CLEAR
+      }
+      const rail = reach('[data-testid="rail"]')
+      const past = Math.max(rail, reach('#editor-flyout'))
+      const anchor = menu.getBoundingClientRect()
+      const need = content.offsetWidth + MENU_GAP
+      const endRoom = rtl ? anchor.left - CLEAR : width - CLEAR - anchor.right
+      const startRoom = rtl ? width - past - anchor.right : anchor.left - past
+      const side = endRoom >= need ? 'end' : startRoom >= need ? 'start' : 'under'
+      const startInset = side !== 'under' || width - CLEAR - past >= content.offsetWidth ? past : rail
+      setAt((now) => (now.side === side && now.startInset === startInset ? now : { side, startInset }))
+    }
+    update()
+    window.addEventListener('resize', update)
+    return () => window.removeEventListener('resize', update)
+  }, [menu, content, place, phone, rtl, flyoutEnd])
+  return phone ? { side: 'under', startInset: CLEAR } : at
+}
+
 export function SmallMenu({ editor, rightClick }: { editor: Editor; rightClick: boolean }) {
   const t = useMessages()
   const b = t.editor.bar
   const ids = useSelection(editor)
   const selected = useTarget(editor, ids)
   const [menu, setMenu] = useState<HTMLDivElement | null>(null)
+  const [content, setContent] = useState<HTMLDivElement | null>(null)
   const place = usePlace(editor, menu, rightClick)
   const { open, barBottom } = useEditState()
   const moreFocus = useMenuFocus()
   const rtl = dirOf(useLocale()) === 'rtl'
   const phone = usePhone()
   const focused = useRovingTab(menu)
+  const fullMenu = useFullMenuPlace(menu, content, place, phone, rtl)
   if (!selected) return null
   const { target, design } = selected
   const locked = target.ids.every((id) => {
@@ -183,6 +240,7 @@ export function SmallMenu({ editor, rightClick }: { editor: Editor; rightClick: 
   const several = target.ids.length > 1
   const withKey = (label: string, action: Parameters<typeof keyOf>[0]) =>
     format(t.editor.arrange.withKey, { label, key: keyOf(action) })
+  const under = fullMenu.side === 'under'
   return (
     <Popover.Root open={open === 'more'} onOpenChange={(to) => setOpen(to ? 'more' : null)}>
       <Popover.Anchor asChild>
@@ -265,13 +323,21 @@ export function SmallMenu({ editor, rightClick }: { editor: Editor; rightClick: 
           </Popover.Trigger>
           <Popover.Portal>
             <Popover.Content
-              // Beside the small menu, or under it on a phone, kept between the top bar and the bottom controls.
-              side={phone ? 'bottom' : rtl ? 'left' : 'right'}
-              align={phone ? 'center' : 'start'}
-              sideOffset={8}
-              // Wholly inside the room between the top bar and the bottom controls, even moving off its button.
+              ref={setContent}
+              // Beside the small menu, or under it on a phone or with no room beside it, kept between the
+              // top bar and the bottom controls.
+              side={under ? 'bottom' : rtl !== (fullMenu.side === 'start') ? 'left' : 'right'}
+              align={under ? 'center' : 'start'}
+              sideOffset={MENU_GAP}
+              // Wholly inside the room between the top bar, the bottom controls and the rail with its
+              // flyout, even moving off its button.
               sticky="always"
-              collisionPadding={{ top: barBottom + 8, bottom: phone ? 150 : 72, left: 8, right: 8 }}
+              collisionPadding={{
+                top: barBottom + 8,
+                bottom: phone ? 150 : 72,
+                left: rtl ? CLEAR : fullMenu.startInset,
+                right: rtl ? fullMenu.startInset : CLEAR,
+              }}
               {...moreFocus.content}
               aria-label={b.more}
               data-testid="bar-more-menu"
