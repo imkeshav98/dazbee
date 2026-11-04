@@ -1,0 +1,245 @@
+// The overlay over the stage: the frame labels, the picked page, the outlines of the group gone
+// into, the hovered layer and the drop target, the selection with its handles and size, what each
+// gesture shows, the rulers and the caret, drawn in that order.
+import { scaleText } from '@dazbee/renderer'
+import type { Rect } from '@dazbee/schema'
+
+import type { EditorAutoLayoutDrag } from '../gestures/auto-layout-drag.ts'
+import type { EditorCropping } from '../gestures/cropping.ts'
+import { type EditorDrawing, isDrawing } from '../gestures/drawing.ts'
+import type { EditorPen } from '../gestures/pen.ts'
+import type { EditorPointer } from '../gestures/pointer.ts'
+import { HANDLE_SIZE } from '../gestures/press.ts'
+import type { EditorTransformDrag } from '../gestures/transform-drag.ts'
+import type { EditorBoxes } from '../layers/boxes.ts'
+import { boundsOf, cornersOf, handleAt, round } from '../layers/transform.ts'
+import type { EditorPlace } from '../place.ts'
+import type { EditorSelection } from '../selection.ts'
+import type { EditorTyping } from '../text/typing.ts'
+import { toScreen } from './camera.ts'
+import type { Frame } from './grid.ts'
+import { px, rulerParts } from './rulers.ts'
+import type { EditorView } from './view.ts'
+
+export interface OverlayDeps {
+  /** The element laid over the canvas that holds what the overlay draws. */
+  overlay: HTMLElement
+  view: EditorView
+  selection: EditorSelection
+  boxes: EditorBoxes
+  typing: EditorTyping
+  pen: EditorPen
+  cropping: EditorCropping
+  drawing: EditorDrawing
+  transformDrag: EditorTransformDrag
+  autoLayoutDrag: EditorAutoLayoutDrag
+  place: EditorPlace
+  pointer: Pick<EditorPointer, 'gesture'>
+}
+
+export interface EditorOverlay {
+  /** Draws the overlay from what each module shows now, then tells the selection's listeners. */
+  draw(): void
+  /**
+   * Where the selection is drawn on the stage, in pixels from the stage's top start corner: the
+   * upright box round it, turned or not, and its size label under or over it. Null with nothing
+   * selected.
+   */
+  selectionRect(): Rect | null
+}
+
+/** Screen pixels a frame needs before it gets a label. */
+const MIN_LABEL_WIDTH = 56
+/** How far a label stays from the stage's start edge when its frame runs past it. */
+const LABEL_INSET = 8
+/** Room the tool dock takes along the bottom of the stage, which the size label stays out of. */
+const SIZE_CLEARANCE = 72
+/** The room the selection's size label takes, in screen pixels. */
+const SIZE_LABEL_HEIGHT = 20
+
+export function editorOverlay({
+  overlay,
+  view,
+  selection,
+  boxes,
+  typing,
+  pen,
+  cropping,
+  drawing,
+  transformDrag,
+  autoLayoutDrag,
+  place,
+  pointer,
+}: OverlayDeps): EditorOverlay {
+  const { frameOf, outline } = view
+
+  function selectionRect(): Rect | null {
+    const outer = boxes.selectionBox()
+    if (!outer) return null
+    const { frame, drawn } = outer
+    const corners = cornersOf(drawn).map((p) => toScreen(view.camera(), { x: frame.x + p.x, y: frame.y + p.y }))
+    const xs = corners.map((c) => c.x)
+    const ys = corners.map((c) => c.y)
+    if (!typing.editing()) {
+      const label = sizeLabelTop(ys)
+      ys.push(label, label + SIZE_LABEL_HEIGHT)
+    }
+    return {
+      x: Math.min(...xs),
+      y: Math.min(...ys),
+      width: Math.max(...xs) - Math.min(...xs),
+      height: Math.max(...ys) - Math.min(...ys),
+    }
+  }
+
+  function frameLabel(frame: Frame, drawnFrames: Frame[]) {
+    const format = view.design().formats[frame.formatId]
+    const page = view.design().pages[frame.pageId]
+    if (!format || !page) return null
+    const label = document.createElement('div')
+    label.className = 'frame-label'
+    label.dataset.frame = frame.key
+    if (
+      selection.current()?.frame === frame.key ||
+      typing.editing()?.frame === frame.key ||
+      selection.pickedPage() === frame.pageId
+    )
+      label.dataset.active = ''
+    const at = toScreen(view.camera(), frame)
+    // A frame running off the stage's start keeps its label in view, along the part still showing.
+    const left = Math.max(at.x, LABEL_INSET)
+    const width = at.x + frame.width * view.camera().zoom - left
+    // Too narrow to read even a cut name: zoomed far out, the frames speak for themselves.
+    if (width < MIN_LABEL_WIDTH) return null
+    Object.assign(label.style, { left: px(left), top: px(at.y), width: px(width) })
+    const name = document.createElement('span')
+    name.className = 'frame-name'
+    const pages = new Set(drawnFrames.map((f) => f.pageId)).size > 1 || Object.keys(view.design().pages).length > 1
+    name.textContent = pages ? `${page.name} · ${format.name}` : format.name
+    label.append(name)
+    if (width >= 120) {
+      const size = document.createElement('span')
+      size.className = 'frame-size'
+      size.textContent = `${format.width} × ${format.height}`
+      label.append(size)
+    }
+    return label
+  }
+
+  /** Where the size label's top goes for a box spanning `ys` on screen: under it, or over it when the tool dock along the stage's bottom would cover it. */
+  function sizeLabelTop(ys: number[]) {
+    const below = Math.max(...ys) + 8
+    return below + 24 > view.viewport().height - SIZE_CLEARANCE ? Math.min(...ys) - 26 : below
+  }
+
+  /** Each selected layer's outline, then the box with its handles and the size under it. */
+  function selectionParts() {
+    const gesture = pointer.gesture()
+    const outer = boxes.selectionBox()
+    const current = selection.current()
+    if (!outer || !current) return []
+    const { frame, drawn: box } = outer
+    const parts: HTMLElement[] = []
+    const several = current.ids.length > 1
+    if (several) {
+      for (const id of current.ids) {
+        const b = boxes.drawnBoxOf(frame, id, view.design())
+        if (!b) continue
+        const member = outline('selection-member', frame, b)
+        member.dataset.layer = id
+        parts.push(member)
+      }
+    }
+    const el = outline('selection', frame, box)
+    el.dataset.frame = frame.key
+    el.dataset.count = String(current.ids.length)
+    if (!several) el.dataset.layer = current.ids[0]
+    // Handles only once the box is big enough on screen to grab them apart, and not on a locked one.
+    if (!typing.editing() && Math.min(box.width, box.height) * view.camera().zoom >= 2 * HANDLE_SIZE) {
+      for (const h of boxes.handlesFor()) {
+        const handle = document.createElement('div')
+        handle.className = 'handle'
+        handle.dataset.handle = h
+        const at = handleAt(h)
+        Object.assign(handle.style, { left: `${at.x * 100}%`, top: `${at.y * 100}%` })
+        el.append(handle)
+      }
+    }
+    parts.push(el)
+    if (!typing.editing()) {
+      const corners = cornersOf(box).map((p) => toScreen(view.camera(), { x: frame.x + p.x, y: frame.y + p.y }))
+      const size = document.createElement('div')
+      size.className = 'selection-size'
+      size.textContent = `${round(box.width, 0)} × ${round(box.height, 0)}`
+      // A corner scaling one text says its size too, from where it was.
+      const g = gesture?.kind === 'resize' ? gesture : null
+      const text = g && !several ? g.texts.get(current.ids[0] ?? '') : undefined
+      if (g && text) size.textContent += ` · ${text.style.fontSize} → ${scaleText(text, g.factor).style.fontSize}`
+      const top = sizeLabelTop(corners.map((c) => c.y))
+      Object.assign(size.style, {
+        left: px((Math.min(...corners.map((c) => c.x)) + Math.max(...corners.map((c) => c.x))) / 2),
+        top: px(top),
+      })
+      parts.push(size)
+    }
+    return parts
+  }
+
+  function drawOverlay() {
+    const gesture = pointer.gesture()
+    // A layer selected, or the page's frames gone (a page deleted, a size shown alone), lets the page go.
+    const pageGone = selection.dropGonePage()
+    const parts: Element[] = []
+    for (const frame of view.inView()) {
+      const label = frameLabel(frame, view.inView())
+      if (label) parts.push(label)
+    }
+    for (const frame of view.inView()) {
+      if (frame.pageId === selection.pickedPage())
+        parts.push(outline('page-picked', frame, { x: 0, y: 0, width: frame.width, height: frame.height, rotation: 0 }))
+    }
+    const entered = selection.entered()
+    const enteredFrame = entered && frameOf(selection.current()?.frame)
+    const enteredBox = enteredFrame && entered && boxes.drawnBoxOf(enteredFrame, entered, view.design())
+    if (enteredFrame && enteredBox) parts.push(outline('entered', enteredFrame, enteredBox))
+    const hovered = selection.hovered()
+    const hover = !gesture && hovered && !selection.current()?.ids.includes(hovered.id) ? hovered : null
+    const hoverFrame = hover && frameOf(hover.frame)
+    const hoverBox = hoverFrame && hover && boxes.drawnBoxOf(hoverFrame, hover.id, view.design())
+    if (hoverFrame && hoverBox) parts.push(outline('hover', hoverFrame, hoverBox))
+    // The layer an image dragged over the stage would go into.
+    const dropTarget = place.dropTarget()
+    const dropFrame = dropTarget && frameOf(dropTarget.frame)
+    const dropBox = dropFrame && dropTarget && boxes.drawnBoxOf(dropFrame, dropTarget.id, view.design())
+    if (dropFrame && dropBox) parts.push(outline('drop-target', dropFrame, dropBox))
+    parts.push(
+      ...(selection.pathEditing() || selection.cropping() ? [] : selectionParts()),
+      ...pen.parts(),
+      ...cropping.parts(),
+      ...autoLayoutDrag.parts(gesture?.kind === 'reorder' ? gesture : null),
+    )
+    if (isDrawing(gesture)) parts.push(...drawing.parts(gesture))
+    parts.push(...transformDrag.parts(gesture?.kind === 'marquee' ? gesture : null))
+    if (view.rulers()) {
+      const origin = frameOf(selection.current()?.frame) ?? frameOf(selection.hovered()?.frame) ?? view.inView()[0]
+      const outer = boxes.selectionBox()
+      if (origin)
+        parts.push(
+          ...rulerParts(
+            view.camera(),
+            view.viewport(),
+            origin,
+            outer && outer.frame.key === origin.key ? boundsOf([outer.drawn]) : null,
+          ),
+        )
+    }
+    parts.push(...typing.parts())
+    overlay.replaceChildren(...parts)
+    selection.tellListeners(pageGone)
+  }
+
+  return {
+    draw: drawOverlay,
+    selectionRect,
+  }
+}
