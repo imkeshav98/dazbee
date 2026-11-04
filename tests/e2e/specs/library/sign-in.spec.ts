@@ -1,6 +1,7 @@
 // Sign-in (#58) in Chromium, as far as it goes without WorkOS: the sign-in page, a callback that
 // does not match the sign-in this browser started, and signing out. CI's API has no WorkOS
-// settings, so it says sign-in is not set up; signing in against WorkOS test mode is its own run.
+// settings, so it says sign-in is not set up; signing in against WorkOS test mode is
+// workos-sign-in.spec.ts.
 import { join } from 'node:path'
 
 import { OUTPUT } from '../../support/editor.ts'
@@ -9,6 +10,7 @@ import { expect, test } from '../../support/test.ts'
 const SESSION_COOKIE = 'dazbee_session'
 
 test('the sign-in page offers one button, and says when sign-in is not set up', async ({ page }) => {
+  test.skip(!!process.env.WORKOS_API_KEY, 'sign-in is set up on this run')
   // Notes, in the page's own clock, when the sign-in action's answer has arrived and when the notice
   // is first in the page.
   await page.addInitScript(() => {

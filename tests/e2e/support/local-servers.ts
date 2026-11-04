@@ -29,11 +29,14 @@ const env = {
   ...process.env,
   ...SUITE_STORE,
   SYNC_TOKEN_SECRET: 'local-only-sync-token-secret-0000',
+  SESSION_SECRET: 'local-only-session-secret-0000000',
   DAZBEE_DEV_SESSION: 'on',
   API_PORT: String(LOCAL.api),
   SYNC_PORT: String(LOCAL.sync),
   STORAGE_PUBLIC_ENDPOINT: 'http://127.0.0.1:59000',
   STORAGE_CREATE_BUCKET: 'on',
+  // With WorkOS keys in the shell, WorkOS sends sign-ins back to the suite's own web app.
+  ...(process.env.WORKOS_API_KEY ? { WORKOS_REDIRECT_URI: `http://localhost:${LOCAL.web}/callback` } : {}),
 }
 
 const stopWithChild = (code: number | null) => process.exit(code ?? 1)
