@@ -44,6 +44,9 @@ export interface Look {
 
 export const THEMES = ['dark', 'light'] as const
 
+/** The desktop size a tab opens at unless told otherwise. */
+const DESKTOP = { width: 1440, height: 900 }
+
 /** Reads the glass of the page's theme from a probe element that takes the glass utility. */
 export const servedGlass = (page: Page): Promise<ServedGlass> =>
   page.evaluate(() => {
@@ -95,29 +98,33 @@ export const look = (el: Locator): Promise<Look> =>
 export const laid = (tint: string) => `linear-gradient(${tint}, ${tint})`
 
 /**
- * Opens a design in a tab of its own in a theme, and gives the tab, its errors and its glass; a tab
- * with `hasTouch` takes touches.
+ * Opens a page of the app in a tab of its own in a theme, at a desktop size unless the context says
+ * otherwise (a phone's size and touch, say), and gives the tab, its errors and its glass.
  */
 export async function openIn(
   browser: Browser,
-  designId: string,
+  path: string,
   theme: (typeof THEMES)[number],
-  viewport = { width: 1440, height: 900 },
-  options: BrowserContextOptions = {},
+  context: BrowserContextOptions = {},
 ) {
-  const context = await browser.newContext({ ...options, viewport })
-  const page = await context.newPage()
+  const page = await (await browser.newContext({ viewport: DESKTOP, ...context })).newPage()
   const errors: string[] = []
   page.on('pageerror', (error) => errors.push(error.message))
   await setCookies(page, { theme })
-  await page.goto(editorPath(designId))
-  await expect(page.getByTestId('status')).toHaveAttribute('data-ready', '', { timeout: 30_000 })
+  await page.goto(path)
   return { page, errors, glass: await servedGlass(page) }
 }
 
-/** Holds the mouse down on a control until its fill is the one expected, then lets go: a click. */
-export async function pressedFill(page: Page, control: Locator, expected: string) {
-  await pressed(page, control, { fill: expected })
+/** Opens a design in the editor as openIn does, once the editor is ready. */
+export async function openDesignIn(
+  browser: Browser,
+  designId: string,
+  theme: (typeof THEMES)[number],
+  context: BrowserContextOptions = {},
+) {
+  const opened = await openIn(browser, editorPath(designId), theme, context)
+  await expect(opened.page.getByTestId('status')).toHaveAttribute('data-ready', '', { timeout: 30_000 })
+  return opened
 }
 
 /**

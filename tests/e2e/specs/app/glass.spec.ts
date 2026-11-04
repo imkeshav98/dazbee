@@ -1,13 +1,14 @@
 // Glass in Chromium, in dark and light: every floating surface is the one glass the app serves; a
 // row on it is lit by a see-through tint under the pointer and while pressed, and reads its muted
 // text in the text colour while lit; an open glass button keeps its glass, its icon pink; segmented
-// choices sit in a well; coloured text and dialogs take their glass shades, and keys are keycaps. And, for the PR's evidence, glass over a
-// bright ad and a white one at desktop, tablet and phone sizes. The bright ad has a white and a black
-// block on its yellow, and a pink circle, so each picture shows the glass over all four.
+// choices sit in a well; coloured text and dialogs take their glass shades, and keys are keycaps.
+// And, for the PR's evidence, glass over a bright ad and a white one at desktop, tablet and phone
+// sizes. The bright ad has a white and a black block on its yellow, and a pink circle, so each
+// picture shows the glass over all four.
 import type { DesignInput } from '@dazbee/schema'
 
 import { shoot, writeOutput } from '../../support/editor.ts'
-import { hovered, laid, look, openIn, pressedFill, THEMES } from '../../support/glass.ts'
+import { hovered, laid, look, openDesignIn, pressed, THEMES } from '../../support/glass.ts'
 import { SCREEN_SIZES } from '../../support/layout.ts'
 import { liveDesign, seed } from '../../support/seed.ts'
 import { drawn, fitSettled, nextFrame, selectLayers } from '../../support/stage.ts'
@@ -102,7 +103,7 @@ async function shot(page: Page, name: string) {
 test('floating chrome is the glass the app serves, with nothing painted over its fill', async ({ browser }) => {
   const designId = await seed(liveDesign())
   for (const theme of THEMES) {
-    const { page, errors, glass } = await openIn(browser, designId, theme)
+    const { page, errors, glass } = await openDesignIn(browser, designId, theme)
     expect(glass.filter).not.toBe('none')
     await page.getByRole('button', { name: 'Layers', exact: true }).click()
     await expect(page.getByTestId('flyout')).toBeVisible()
@@ -133,7 +134,7 @@ test('the Pages button keeps its glass while open, lit by the pressed tint, its 
 }) => {
   const designId = await seed(liveDesign())
   for (const theme of THEMES) {
-    const { page, errors, glass } = await openIn(browser, designId, theme)
+    const { page, errors, glass } = await openDesignIn(browser, designId, theme)
     const button = page.getByTestId('pages-button')
     expect((await look(button)).fill).toBe(glass.fill)
     const card = await pagesPanel(page)
@@ -153,7 +154,7 @@ test('a menu row is lit by the hover tint and, while pressed, the pressed tint, 
 }) => {
   const designId = await seed(liveDesign())
   for (const theme of THEMES) {
-    const { page, errors, glass } = await openIn(browser, designId, theme)
+    const { page, errors, glass } = await openDesignIn(browser, designId, theme)
     await page.getByTestId('zoom').click()
     const menu = page.getByTestId('zoom-menu')
     await expect(menu).toBeVisible()
@@ -164,7 +165,7 @@ test('a menu row is lit by the hover tint and, while pressed, the pressed tint, 
     await expect.poll(async () => (await look(row)).fill).toBe(glass.hover)
     expect((await look(key)).colour).toBe(glass.text)
     expect((await look(row)).outline).toBe('none')
-    await pressedFill(page, row, glass.pressed)
+    await pressed(page, row, { fill: glass.pressed })
     // The press zooms in and closes the menu. Opened from the keyboard, the menu's first row has the
     // focus, and the ring shows.
     await page.keyboard.press('Escape')
@@ -182,7 +183,7 @@ test('a menu row is lit by the hover tint and, while pressed, the pressed tint, 
 test('dock and rail buttons and a layer row take the pressed tint while pressed', async ({ browser }) => {
   const designId = await seed(liveDesign())
   for (const theme of THEMES) {
-    const { page, errors, glass } = await openIn(browser, designId, theme)
+    const { page, errors, glass } = await openDesignIn(browser, designId, theme)
     await page.getByRole('button', { name: 'Layers', exact: true }).click()
     await expect(page.getByTestId('flyout')).toBeVisible()
     // In this order, as each press ends in a click: the layer is selected, the Text tool picked, and
@@ -192,7 +193,7 @@ test('dock and rail buttons and a layer row take the pressed tint while pressed'
       page.locator('[role="toolbar"] [data-tool="text"]'),
       page.getByRole('button', { name: 'Brand', exact: true }),
     ]) {
-      await pressedFill(page, control, glass.pressed)
+      await pressed(page, control, { fill: glass.pressed })
     }
     expect(errors).toEqual([])
     await page.context().close()
@@ -204,7 +205,7 @@ test('an open rail button keeps the rail’s glass, lit by the pressed tint, its
 }) => {
   const designId = await seed(liveDesign())
   for (const theme of THEMES) {
-    const { page, errors, glass } = await openIn(browser, designId, theme)
+    const { page, errors, glass } = await openDesignIn(browser, designId, theme)
     for (const name of ['Layers', 'AI']) {
       const button = page.getByRole('button', { name, exact: true })
       await button.click()
@@ -222,7 +223,7 @@ test('an open rail button keeps the rail’s glass, lit by the pressed tint, its
 test('coloured text on glass takes its glass shade: the AI flyout heading and a menu’s Delete', async ({ browser }) => {
   const designId = await seed(liveDesign())
   for (const theme of THEMES) {
-    const { page, errors, glass } = await openIn(browser, designId, theme)
+    const { page, errors, glass } = await openDesignIn(browser, designId, theme)
     await page.getByRole('button', { name: 'AI', exact: true }).click()
     expect((await look(page.getByTestId('flyout').getByRole('heading'))).colour).toBe(glass.accentText)
     const card = await pagesPanel(page)
@@ -236,7 +237,7 @@ test('coloured text on glass takes its glass shade: the AI flyout heading and a 
 test('the Position panel’s actions are unfilled with no outline, lit by the hover tint', async ({ browser }) => {
   const designId = await seed(brightAd())
   for (const theme of THEMES) {
-    const { page, errors, glass } = await openIn(browser, designId, theme)
+    const { page, errors, glass } = await openDesignIn(browser, designId, theme)
     await selectLayers(page, ['headline'], { bar: true })
     const action = (await barMenu(page, 'position')).getByTestId('arrange-part').getByRole('button').first()
     expect(await look(action)).toMatchObject({ fill: 'rgba(0, 0, 0, 0)', border: '0px' })
@@ -252,7 +253,7 @@ test('segmented choices on glass sit in a well, the chosen one on a chip in the 
 }) => {
   const designId = await seed(brightAd())
   for (const theme of THEMES) {
-    const { page, errors, glass } = await openIn(browser, designId, theme)
+    const { page, errors, glass } = await openDesignIn(browser, designId, theme)
     await selectLayers(page, ['stack'], { bar: true })
     const panel = await barMenu(page, 'stack')
     const chosen = { fill: glass.chip, colour: glass.text }
@@ -283,7 +284,7 @@ test('segmented choices on glass sit in a well, the chosen one on a chip in the 
     const choice = exports.locator('[data-type="pdf"]')
     await expect(choice).toHaveAttribute('aria-checked', 'false')
     await hovered(choice, { fill: glass.hover, colour: glass.text })
-    await pressedFill(page, choice, glass.pressed)
+    await pressed(page, choice, { fill: glass.pressed })
     await expect(choice).toHaveAttribute('aria-checked', 'true')
     await hovered(choice, chosen)
     expect(errors).toEqual([])
@@ -296,7 +297,7 @@ test('a glass dialog dims the page behind it with its theme’s backdrop; the sh
 }) => {
   const designId = await seed(liveDesign())
   for (const theme of THEMES) {
-    const { page, errors, glass } = await openIn(browser, designId, theme)
+    const { page, errors, glass } = await openDesignIn(browser, designId, theme)
     await page.keyboard.press('?')
     const dialog = page.getByTestId('shortcuts')
     await expect(dialog).toBeVisible()
@@ -319,7 +320,7 @@ for (const [width, height] of SCREEN_SIZES) {
       const bright = await seed(brightAd())
       const white = await seed(whiteAd())
       for (const theme of THEMES) {
-        const { page, errors } = await openIn(browser, bright, theme, { width, height })
+        const { page, errors } = await openDesignIn(browser, bright, theme, { viewport: { width, height } })
         await fillWithAd(page, width, height)
         await selectLayers(page, ['headline'], { bar: true })
 
@@ -351,7 +352,7 @@ for (const [width, height] of SCREEN_SIZES) {
         expect(errors).toEqual([])
         await page.context().close()
 
-        const plain = await openIn(browser, white, theme, { width, height })
+        const plain = await openDesignIn(browser, white, theme, { viewport: { width, height } })
         await fillWithAd(plain.page, width, height)
         await selectLayers(plain.page, ['headline'], { bar: true })
         await (await moreMenu(plain.page)).getByRole('button', { name: /^Duplicate/ }).hover()

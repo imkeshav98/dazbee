@@ -4,8 +4,8 @@
 // menu's and the colour pop-up's choices sit in a well; a delete is confirmed on a solid red button in
 // white, and a red row reads in the text colour while lit.
 import { photo, upload } from '../../support/assets.ts'
-import { setCookies, shoot } from '../../support/editor.ts'
-import { hovered, laid, look, openIn, pressed, pressedFill, servedGlass, THEMES } from '../../support/glass.ts'
+import { shoot } from '../../support/editor.ts'
+import { hovered, laid, look, openDesignIn, openIn, pressed, THEMES } from '../../support/glass.ts'
 import { API_URL, DEV_BRAND, liveDesign, seed } from '../../support/seed.ts'
 import { selectLayers } from '../../support/stage.ts'
 import { expect, type Locator, type Page, test } from '../../support/test.ts'
@@ -49,7 +49,7 @@ test('a toggle that is on reads in the text colour on its pink tint; an open top
 }) => {
   const designId = await seed(liveDesign())
   for (const theme of THEMES) {
-    const { page, errors, glass } = await openIn(browser, designId, theme)
+    const { page, errors, glass } = await openDesignIn(browser, designId, theme)
     await selectLayers(page, ['headline'], { bar: true })
     const bold = page.getByTestId('bar-bold')
     await expect(bold).toHaveAttribute('aria-pressed', 'true')
@@ -63,7 +63,7 @@ test('a toggle that is on reads in the text colour on its pink tint; an open top
       await open()
       const button = page.getByTestId(id)
       await expect(button).toHaveAttribute('aria-expanded', 'true')
-      await pressedFill(page, button, glass.pressed)
+      await pressed(page, button, { fill: glass.pressed })
     }
     expect(errors).toEqual([])
     await page.context().close()
@@ -75,7 +75,7 @@ test('the account menu’s language and theme, and the colour pop-up’s kinds o
 }) => {
   const designId = await seed(liveDesign())
   for (const theme of THEMES) {
-    const { page, errors, glass } = await openIn(browser, designId, theme)
+    const { page, errors, glass } = await openDesignIn(browser, designId, theme)
     const well = { fill: glass.well, border: '0px' }
     const chosen = { fill: glass.chip, colour: glass.text }
     // The theme in use is the chosen one as the menu is first drawn, so no choice slides into place.
@@ -106,7 +106,7 @@ test('glass buttons and rows take the hover tint and, while pressed, the pressed
 }) => {
   const designId = await seed(liveDesign())
   for (const theme of THEMES) {
-    const { page, errors, glass } = await openIn(browser, designId, theme)
+    const { page, errors, glass } = await openDesignIn(browser, designId, theme)
     // The Pages card's rows and Add page keep their fill, with the tint laid over it.
     const card = await pagesPanel(page)
     const row = card.locator('[data-page]').first()
@@ -130,14 +130,14 @@ test('glass buttons and rows take the hover tint and, while pressed, the pressed
     // The Sizes card's chips.
     const chip = (await sizesPanel(page)).locator('button[data-preset]:visible').first()
     await hovered(chip, { fill: glass.hover })
-    await pressedFill(page, chip, glass.pressed)
+    await pressed(page, chip, { fill: glass.pressed })
     await page.keyboard.press('Escape')
 
     // The Brand flyout's Edit.
     await page.getByRole('button', { name: 'Brand', exact: true }).click()
     const edit = page.getByTestId('flyout').getByRole('button', { name: 'Edit', exact: true })
     await hovered(edit, { fill: glass.hover, colour: glass.text })
-    await pressedFill(page, edit, glass.pressed)
+    await pressed(page, edit, { fill: glass.pressed })
     expect(errors).toEqual([])
     await page.context().close()
   }
@@ -148,7 +148,11 @@ test('on a phone, a glass button and a card’s row show the pressed tint while 
 }) => {
   const designId = await seed(liveDesign())
   for (const theme of THEMES) {
-    const { page, errors, glass } = await openIn(browser, designId, theme, PHONE, { hasTouch: true, isMobile: true })
+    const { page, errors, glass } = await openDesignIn(browser, designId, theme, {
+      viewport: PHONE,
+      hasTouch: true,
+      isMobile: true,
+    })
     const card = await pagesPanel(page)
     const row = card.locator('[data-page]').first()
     // A page's row, lit while the finger on its button is held, then Add page.
@@ -173,13 +177,7 @@ test('a design’s delete is confirmed on a solid red button in white; its red m
   const name = `Glass delete ${crypto.randomUUID().slice(0, 6)}`
   const designId = await seed({ ...liveDesign(), meta: { ...liveDesign().meta, name } })
   for (const theme of THEMES) {
-    const context = await browser.newContext({ viewport: { width: 1440, height: 900 } })
-    const page = await context.newPage()
-    const errors: string[] = []
-    page.on('pageerror', (error) => errors.push(error.message))
-    await setCookies(page, { theme })
-    await page.goto(`/brands/${DEV_BRAND}/designs`)
-    const glass = await servedGlass(page)
+    const { page, errors, glass } = await openIn(browser, `/brands/${DEV_BRAND}/designs`, theme)
     const tile = page.locator(`[data-design="${designId}"]`)
     await tile.hover()
     await tile.getByRole('button', { name: `More for ${name}` }).click()
@@ -196,7 +194,7 @@ test('a design’s delete is confirmed on a solid red button in white; its red m
     await pressed(page, cancel, { fill: glass.pressed, colour: glass.text })
     await expect(confirm).toHaveCount(0)
     expect(errors).toEqual([])
-    await context.close()
+    await page.context().close()
   }
 })
 
@@ -215,7 +213,7 @@ test('asset details on glass: a tag reads in the text colour on its pink tint, a
   expect(named.ok).toBe(true)
   const designId = await seed(liveDesign())
   for (const theme of THEMES) {
-    const { page, errors, glass } = await openIn(browser, designId, theme)
+    const { page, errors, glass } = await openDesignIn(browser, designId, theme)
     await page.locator('[data-panel="assets"]').click()
     const library = page.getByTestId('asset-library')
     await library.getByRole('searchbox', { name: 'Search by name or tag' }).fill(name)
@@ -237,7 +235,7 @@ test('asset details on glass: a tag reads in the text colour on its pink tint, a
     await expect.poll(async () => look(confirm)).toMatchObject({ fill: glass.dangerSolid, colour: glass.onAccent })
     await hovered(confirm, { fill: glass.dangerSolidHover, colour: glass.onAccent })
     await shoot(page, `glass-${theme}-asset-delete`)
-    await pressedFill(page, details.getByRole('button', { name: 'Keep' }), glass.pressed)
+    await pressed(page, details.getByRole('button', { name: 'Keep' }), { fill: glass.pressed })
     await expect(confirm).toHaveCount(0)
     expect(errors).toEqual([])
     await page.context().close()
