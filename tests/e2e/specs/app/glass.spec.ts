@@ -4,11 +4,11 @@
 // each picture shows the glass over all four.
 import type { DesignInput } from '@dazbee/schema'
 
-import { editorPath, setCookies, writeOutput } from '../../support/editor.ts'
+import { editorPath, setCookies, shoot, writeOutput } from '../../support/editor.ts'
 import { SCREEN_SIZES } from '../../support/layout.ts'
-import { seed } from '../../support/seed.ts'
+import { liveDesign, seed } from '../../support/seed.ts'
 import { drawn, fitSettled, nextFrame, selectLayers } from '../../support/stage.ts'
-import { expect, type Page, test } from '../../support/test.ts'
+import { expect, type Locator, type Page, test } from '../../support/test.ts'
 import { barMenu, moreMenu } from '../../support/top-bar.ts'
 
 test.describe.configure({ timeout: 180_000 })
@@ -70,6 +70,58 @@ async function shot(page: Page, name: string) {
   await nextFrame(page)
   writeOutput(`${name}.png`, await page.screenshot({ animations: 'disabled' }))
 }
+
+// Smooth glass: floating chrome blurs what is under it through a see-through fill with no grain, and
+// a menu row under the pointer is lit by a see-through tint, in both themes; close-ups of the dock,
+// zoom pill and flyout go to output/ for the PR.
+test('floating chrome is smooth glass with a see-through hover in both themes', async ({ page }) => {
+  test.setTimeout(90_000)
+  const designId = await seed(liveDesign())
+  const glass = (surface: Locator) =>
+    surface.evaluate((el) => {
+      const s = getComputedStyle(el)
+      return { filter: s.backdropFilter, image: s.backgroundImage }
+    })
+  for (const [theme, tint] of [
+    ['dark', 'rgba(255, 255, 255, 0.07)'],
+    ['light', 'rgba(26, 20, 32, 0.05)'],
+  ] as const) {
+    await setCookies(page, { theme })
+    await page.goto(editorPath(designId))
+    await expect(page.getByTestId('status')).toHaveAttribute('data-ready', '', { timeout: 30_000 })
+    await page.getByRole('button', { name: 'Layers', exact: true }).click()
+    await expect(page.getByTestId('flyout')).toBeVisible()
+    for (const surface of [
+      page.getByTestId('island-start'),
+      page.getByTestId('rail'),
+      page.getByRole('toolbar'),
+      page.getByRole('group', { name: 'Zoom' }),
+      page.getByTestId('flyout'),
+    ]) {
+      expect(await glass(surface)).toEqual({ filter: 'blur(26px) saturate(1.2)', image: 'none' })
+    }
+    // A menu is glass too, and its row under the pointer takes the tint rather than a solid colour.
+    await page.getByTestId('zoom').click()
+    const menu = page.getByTestId('zoom-menu')
+    await expect(menu).toBeVisible()
+    expect(await glass(menu)).toEqual({ filter: 'blur(26px) saturate(1.2)', image: 'none' })
+    const row = menu.getByRole('button').first()
+    await row.hover()
+    await expect.poll(() => row.evaluate((el) => getComputedStyle(el).backgroundColor)).toBe(tint)
+    await page.keyboard.press('Escape')
+    await expect(menu).toBeHidden()
+    await shoot(page, `ui-${theme}-frost`)
+    const dock = await page.getByRole('toolbar').boundingBox()
+    const zoom = await page.getByRole('group', { name: 'Zoom' }).boundingBox()
+    if (!dock || !zoom) throw new Error('missing dock or zoom')
+    writeOutput(
+      `ui-${theme}-frost-dock.png`,
+      await page.screenshot({
+        clip: { x: dock.x - 40, y: dock.y - 40, width: zoom.x + zoom.width - dock.x + 80, height: dock.height + 80 },
+      }),
+    )
+  }
+})
 
 for (const [width, height] of SCREEN_SIZES) {
   test(
