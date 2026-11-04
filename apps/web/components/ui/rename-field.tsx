@@ -3,6 +3,26 @@
 import { useRef, useState } from 'react'
 
 /**
+ * Gives the focus back to the control that opened a rename field when the field ends from the
+ * keyboard. `mark(key)` marks the control as the field ends; `ref(key)` on the control focuses it as
+ * it takes the field's place. A field that ends by a click elsewhere marks nothing, so the focus
+ * stays where the click put it.
+ */
+export function useFocusBack() {
+  const marked = useRef<string | null>(null)
+  return {
+    mark: (key: string) => {
+      marked.current = key
+    },
+    ref: (key: string) => (el: HTMLElement | null) => {
+      if (!el || marked.current !== key) return
+      marked.current = null
+      el.focus()
+    },
+  }
+}
+
+/**
  * A name as a field, focused with the name selected as it opens: Enter or leaving it keeps the new
  * name, Escape keeps the old one. It ends once, so a blur after Enter or Escape keeps nothing again.
  * `onDone` hears the name typed (null after Escape) and whether it ended from the keyboard; the
@@ -45,8 +65,12 @@ export function RenameField({
       onKeyDown={(event) => {
         // Keys typed into the name are the name's, not the stage's or the panel's.
         event.stopPropagation()
-        if (event.key === 'Enter') finish(value, true)
-        else if (event.key === 'Escape') finish(null, true)
+        if (event.key === 'Enter') {
+          // The control that takes the focus back as the field ends would otherwise get the Enter's
+          // keypress and be clicked by it.
+          event.preventDefault()
+          finish(value, true)
+        } else if (event.key === 'Escape') finish(null, true)
       }}
       onBlur={() => finish(value, false)}
       className={className}

@@ -2,8 +2,10 @@
 // panel, a layer's name in the layers panel and a page's name in the Pages panel. Enter keeps the
 // new name and Escape the old one; leaving the field keeps the new name. A field ends once: Enter
 // followed by a blur before the field closes renames once, as one undo step, and Escape followed by
-// a blur keeps the old name. The @evidence tests go through every way out of each field at the three
-// screen sizes, with undo and redo, and record where the focus goes.
+// a blur keeps the old name. Enter, and Escape in the design's name, give the focus back to the
+// control that opened the field; Escape in a panel's field closes the panel too, and the focus goes
+// to the item that opened the panel. The @evidence tests go through every way out of each field at
+// the three screen sizes, with undo and redo, and record where the focus goes.
 import type { DesignInput } from '@dazbee/schema'
 
 import { shoot, writeOutput } from '../../support/editor.ts'
@@ -81,8 +83,13 @@ interface Subject {
   name: (page: Page) => Promise<string | null | undefined>
   /** Whether undo and redo reach the name: the design's name is the library's, outside the document. */
   undoable: boolean
-  /** What takes the focus back when the field ends from the keyboard, for a field that gives it back. */
-  keyFocus?: (page: Page) => Locator
+  /** What takes the focus back when the field ends with Enter: the control that opened it. */
+  keyFocus: (page: Page) => Locator
+  /**
+   * What has the focus after Escape: the control that opened the field, or, where Escape closes the
+   * panel the field is in as well, the item that opened the panel.
+   */
+  escapeFocus: (page: Page) => Locator
 }
 
 /** The four fields, in the order they appear on screen: the header, the rail, the bottom. */
@@ -98,6 +105,8 @@ const SUBJECTS: Subject[] = [
     },
     name: (page) => page.getByRole('heading', { level: 1 }).textContent(),
     undoable: false,
+    keyFocus: (page) => page.getByRole('heading', { level: 1 }).getByRole('button'),
+    escapeFocus: (page) => page.getByRole('heading', { level: 1 }).getByRole('button'),
   },
   {
     id: 'size',
@@ -113,6 +122,12 @@ const SUBJECTS: Subject[] = [
     },
     name: async (page) => (await read(page)).formats.story?.name,
     undoable: true,
+    keyFocus: (page) =>
+      page
+        .getByTestId('bar-sizes-menu')
+        .locator('[data-format="story"]')
+        .getByRole('button', { name: /^Rename: / }),
+    escapeFocus: (page) => page.getByTestId('sizes-button'),
   },
   {
     id: 'layer',
@@ -129,6 +144,7 @@ const SUBJECTS: Subject[] = [
     name: async (page) => (await read(page)).nodes.box?.name,
     undoable: true,
     keyFocus: (page) => page.getByRole('tree').locator('[data-layer="box"]'),
+    escapeFocus: (page) => page.getByRole('tree').locator('[data-layer="box"]'),
   },
   {
     id: 'page',
@@ -144,6 +160,12 @@ const SUBJECTS: Subject[] = [
     },
     name: async (page) => (await read(page)).pages.p1?.name,
     undoable: true,
+    keyFocus: (page) =>
+      page
+        .getByTestId('bar-pages-menu')
+        .locator('[data-page="p1"]')
+        .getByRole('button', { name: /^Show / }),
+    escapeFocus: (page) => page.getByTestId('pages-button'),
   },
 ]
 
@@ -172,6 +194,32 @@ for (const s of SUBJECTS.filter(({ id }) => id === 'size' || id === 'page')) {
     await keyThenBlur(field, 'Escape')
     await expect(field).toHaveCount(0)
     await page.evaluate(() => window.dazbee?.drawn())
+    expect(await s.name(page)).toBe(s.first)
+    expect(errors).toEqual([])
+  })
+}
+
+for (const s of SUBJECTS.filter(({ id }) => id !== 'layer')) {
+  test(`the ${s.id}'s name: Enter gives the focus back to the control that opened the field`, async ({ browser }) => {
+    const { page, errors } = await openStage(browser, design())
+    const field = await s.open(page)
+    await field.fill('Offer')
+    await field.press('Enter')
+    await expect(field).toHaveCount(0)
+    await expect.poll(() => s.name(page)).toBe('Offer')
+    await expect(s.keyFocus(page)).toBeFocused()
+    expect(errors).toEqual([])
+  })
+}
+
+for (const s of SUBJECTS.filter(({ id }) => id === 'design')) {
+  test(`the ${s.id}'s name: Escape gives the focus back to the control that opened the field`, async ({ browser }) => {
+    const { page, errors } = await openStage(browser, design())
+    const field = await s.open(page)
+    await field.fill('Never kept')
+    await field.press('Escape')
+    await expect(field).toHaveCount(0)
+    await expect(s.escapeFocus(page)).toBeFocused()
     expect(await s.name(page)).toBe(s.first)
     expect(errors).toEqual([])
   })
@@ -211,7 +259,7 @@ for (const [width, height] of SCREEN_SIZES) {
         await closed()
         await expect.poll(() => s.name(page)).toBe('Spring offer')
         focus.enter = await focusOf(page)
-        if (s.keyFocus) await expect(s.keyFocus(page)).toBeFocused()
+        await expect(s.keyFocus(page)).toBeFocused()
         await shot('2-enter')
         // Undo brings the old name back and redo the new one, each in one step.
         if (s.undoable) {
@@ -237,7 +285,7 @@ for (const [width, height] of SCREEN_SIZES) {
         await expect.poll(() => s.name(page)).toBe('Spring offer')
         expect(sentWith('Never kept')).toBe(0)
         focus.escape = await focusOf(page)
-        if (s.keyFocus) await expect(s.keyFocus(page)).toBeFocused()
+        await expect(s.escapeFocus(page)).toBeFocused()
         await shot('3-escape')
 
         // Escape, then a blur before the field closes: the old name stays.
