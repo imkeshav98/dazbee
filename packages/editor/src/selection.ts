@@ -137,7 +137,7 @@ export function editorSelection({ drawn, frames, changed }: SelectionDeps): Edit
   function selectKeepingModes(next: Selection | null) {
     selection = next
   }
-  function keepSelection() {
+  function keep() {
     if (!selection) return
     const design = drawn()
     const ids = selection.ids.filter((id) => design.nodes[id])
@@ -175,9 +175,9 @@ export function editorSelection({ drawn, frames, changed }: SelectionDeps): Edit
     if (pathEditing) pathEditing.selected = refs
   }
   function hover(next: Picked | null) {
-    const changed = next?.id !== hovered?.id || next?.frame !== hovered?.frame
+    const moved = next?.id !== hovered?.id || next?.frame !== hovered?.frame
     hovered = next
-    return changed
+    return moved
   }
 
   function dropGonePage() {
@@ -219,7 +219,7 @@ export function editorSelection({ drawn, frames, changed }: SelectionDeps): Edit
     hovered: hoveredLayer,
     select,
     selectKeepingModes,
-    keep: keepSelection,
+    keep,
     dropOffGrid,
     pickPage,
     enter,
