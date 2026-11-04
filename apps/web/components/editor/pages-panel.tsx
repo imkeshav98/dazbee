@@ -255,23 +255,23 @@ function PageList({ editor, onRemoved }: { editor: Editor; onRemoved: (message: 
                 <span aria-hidden className={cn(DROP_LINE, '-bottom-[4px]')} />
               )}
               <span aria-hidden className="relative grid size-[34px] shrink-0 place-items-center">
+                {/* The page's picture on a white page, as the canvas draws it, under its colour while the
+                    picture is drawn. */}
                 <span
                   data-testid="page-thumbnail"
-                  className="relative grid place-items-center overflow-hidden rounded-[3px] border border-line-strong bg-hover"
+                  className="relative grid place-items-center overflow-hidden rounded-[3px] border border-line-strong bg-white"
                   style={{ ...tile, backgroundColor: fill?.type === 'solid' ? fill.color : undefined }}
                 >
                   {picture && <img src={picture} alt="" draggable={false} className="absolute inset-0 size-full" />}
                 </span>
-                {/* Until its picture is drawn, the page's number on a dark chip, readable over any page colour and
-                    whole over a thin tile. */}
-                {!picture && (
-                  <span
-                    data-testid="page-number"
-                    className="absolute inset-0 m-auto size-fit rounded-[4px] bg-black/60 px-1 font-mono text-[10px] leading-[14px] font-semibold text-white tabular-nums"
-                  >
-                    {i + 1}
-                  </span>
-                )}
+                {/* The page's number on a dark chip, readable over any picture or page colour and whole over a
+                    thin tile. */}
+                <span
+                  data-testid="page-number"
+                  className="absolute inset-0 m-auto size-fit rounded-[4px] bg-black/60 px-1 font-mono text-[10px] leading-[14px] font-semibold text-white tabular-nums"
+                >
+                  {i + 1}
+                </span>
               </span>
               {renaming === id ? (
                 <RenameField

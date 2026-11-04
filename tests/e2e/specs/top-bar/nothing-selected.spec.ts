@@ -221,6 +221,33 @@ test("a page's number on its tile, before its picture is drawn, reads over a whi
   expect(errors).toEqual([])
 })
 
+test("in dark theme a page's tile shows its picture on a white page, as the canvas does, with its number over it", async ({
+  browser,
+}) => {
+  const { page, errors } = await openStage(browser, {
+    ...design(),
+    pages: {
+      p1: { name: 'White', order: 'a0', fills: solid('#FFFFFFFF') },
+      p2: { name: 'Bare', order: 'a1', fills: [] },
+    },
+  })
+  await setCookies(page, { theme: 'dark' })
+  await page.reload()
+  await expect(page.getByTestId('status')).toHaveAttribute('data-ready', '', { timeout: 30_000 })
+  const panel = await pagesPanel(page)
+  const pages = panel.getByTestId('pages').getByRole('listitem')
+  await expect(pages).toHaveCount(2)
+  await expect(panel.getByTestId('page-thumbnail').locator('img')).toHaveCount(2)
+  for (const i of [0, 1]) {
+    const tile = pages.nth(i)
+    await expect(tile.getByTestId('page-thumbnail')).toHaveCSS('background-color', 'rgb(255, 255, 255)')
+    await expect(tile.getByTestId('page-number')).toHaveText(String(i + 1))
+    expect(await numberContrast(tile, i + 1)).toBeGreaterThanOrEqual(4.5)
+  }
+  writeOutput('pages-tiles-dark.png', await page.screenshot({ animations: 'disabled' }))
+  expect(errors).toEqual([])
+})
+
 test('a click on the page picks it: a dashed outline, pink labels, and a bar of Background and Sizes; Background paints it in every size', async ({
   browser,
 }) => {
