@@ -9,7 +9,7 @@ import { api, photo, upload } from '../../support/assets.ts'
 import { writeOutput } from '../../support/editor.ts'
 import { API_URL, DEV_BRAND } from '../../support/seed.ts'
 import { openStage } from '../../support/stage.ts'
-import { expect, type Page, test } from '../../support/test.ts'
+import { expect, type Locator, type Page, test } from '../../support/test.ts'
 
 test.describe.configure({ timeout: 120_000 })
 
@@ -49,6 +49,14 @@ const design = (assetId?: string): DesignInput => ({
 const listed = async (id: string) =>
   ((await (await fetch(`${API_URL}/brands/${DEV_BRAND}/assets`)).json()) as { id: string }[]).some((a) => a.id === id)
 
+/** How many lines a control's words take up. */
+const lines = (control: Locator) =>
+  control.evaluate((el) => {
+    const range = document.createRange()
+    range.selectNodeContents(el)
+    return new Set([...range.getClientRects()].filter((r) => r.width > 0).map((r) => Math.round(r.top))).size
+  })
+
 /** Opens the library, finds the asset and presses Delete on its tile. */
 async function deleteFromLibrary(page: Page, id: string, name: string) {
   await page.locator('[data-panel="assets"]').click()
@@ -70,7 +78,10 @@ test('an image nothing uses is deleted once Delete is confirmed', async ({ brows
   })
   const { page, errors } = await openStage(browser, design())
   const { tile, details } = await deleteFromLibrary(page, asset.id, name)
-  await expect(details.getByTestId('asset-delete-confirm')).toHaveText(`Delete ${name}`)
+  // The button reads Delete on one line; the asset's name is in the question above it.
+  await expect(details.getByTestId('asset-delete-ask')).toHaveText(`Delete “${name}” for good? This can’t be undone.`)
+  await expect(details.getByTestId('asset-delete-confirm')).toHaveText('Delete')
+  expect(await lines(details.getByTestId('asset-delete-confirm'))).toBe(1)
   writeOutput('asset-delete-confirm.png', await page.screenshot())
   await details.getByTestId('asset-delete-confirm').click()
   await expect(tile).toHaveCount(0)

@@ -204,17 +204,27 @@ export function AssetDetails({
           {format(usedIn.length === 1 ? t.inUseOnce : t.inUse, { n: usedIn.length, places: usedIn.join(', ') })}
         </p>
       )}
+      {asking && (
+        <p
+          id={`delete-ask-${asset.id}`}
+          data-testid="asset-delete-ask"
+          className="text-[13px] leading-snug break-words"
+        >
+          {format(t.deleteConfirm, { name: asset.name || t.untitled })}
+        </p>
+      )}
       <div className="flex items-center justify-between gap-2">
         {asking ? (
           <span className="flex items-center gap-1">
             <button
               type="button"
               autoFocus
+              aria-describedby={`delete-ask-${asset.id}`}
               onClick={confirmDelete}
               data-testid="asset-delete-confirm"
-              className={cn(QUIET_BUTTON, 'bg-danger/10 text-danger hover:bg-danger/20')}
+              className={cn(QUIET_BUTTON, 'bg-danger/10 whitespace-nowrap text-danger hover:bg-danger/20')}
             >
-              {format(t.deleteNamed, { name: asset.name || t.untitled })}
+              {t.delete}
             </button>
             <button
               type="button"

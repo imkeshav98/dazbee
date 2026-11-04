@@ -716,7 +716,7 @@ export const en = {
     },
     assetLibrary: {
       delete: 'Delete',
-      deleteNamed: 'Delete {name}',
+      deleteConfirm: 'Delete “{name}” for good? This can’t be undone.',
       keep: 'Keep',
       inUse: 'Used in {n} places: {places}',
       inUseOnce: 'Used in {places}',
