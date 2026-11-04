@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs'
 
 import { describe, expect, it } from 'vitest'
 
-const css = readFileSync(new URL('../app/globals.css', import.meta.url), 'utf8')
+const css = readFileSync(new URL('../app/styles/tokens.css', import.meta.url), 'utf8')
 
 function tokens(selector: string): Record<string, string> {
   const at = css.indexOf(selector)
