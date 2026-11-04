@@ -1,4 +1,4 @@
-// Cropping an image fill on the stage (#48): a press on the image or one of its corners, the drag
+// Cropping an image fill on the stage: a press on the image or one of its corners, the drag
 // that pans or scales it, and the whole image with its corner handles as the overlay draws it.
 import type { Image } from '@dazbee/canvaskit'
 import type { Session } from '@dazbee/doc'
@@ -58,7 +58,7 @@ export interface CroppingDeps {
 
 export interface EditorCropping {
   /**
-   * A press while cropping (#48): on a corner of the image, a drag that scales it; on the image,
+   * A press while cropping: on a corner of the image, a drag that scales it; on the image,
    * one that moves it. Each drag is one undo step. Anywhere else ends the crop and returns null,
    * so the press does what a press does.
    */

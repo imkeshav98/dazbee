@@ -1,4 +1,4 @@
-// The pen (#45): a path drawn a press at a time until it closes or is finished, and a path's points
+// The pen: a path drawn a press at a time until it closes or is finished, and a path's points
 // edited, with the outline, anchors and handles the overlay draws for both.
 import type { Session } from '@dazbee/doc'
 import type { Design, Point } from '@dazbee/schema'
@@ -70,7 +70,7 @@ export interface PenDeps {
   pathIn: (frame: Frame, id: string, from?: Design) => { path: PenPath; box: Box; around: Box[] } | null
   /** Where a new layer of a type that a tool makes in a frame goes. */
   parentFor: (frame: Frame, type: string, now: Design) => string
-  /** Groups fit what they hold again after a change inside them, in the same undo step (#41). */
+  /** Groups fit what they hold again after a change inside them, in the same undo step. */
   hug: (ids: string[]) => void
   /** Draws the overlay. */
   drawOverlay: () => void
@@ -109,6 +109,25 @@ export interface EditorPen {
   parts(): Element[]
 }
 
+/**
+ * The path the pen is drawing (#45), from its first click until it closes or is finished: its
+ * anchors in its parent's coordinates, the one a drag is pulling handles from, and the layer
+ * once there are two anchors to draw.
+ */
+interface OpenPath {
+  frame: Frame
+  around: Box[]
+  parentId: string
+  anchors: Anchor[]
+  closing: boolean
+  dragging: number | null
+  from: Point
+  moved: boolean
+  hover: Point | null
+  layer: Reshaping | null
+  end: () => void
+}
+
 /** How near, in screen pixels, a press picks a path's point, handle or segment (#45). */
 const POINT_REACH = 6
 /** The SVG namespace, for the outline of a path being drawn or edited. */
@@ -129,24 +148,8 @@ export function editorPen({
   hug,
   drawOverlay,
 }: PenDeps): EditorPen {
-  /**
-   * The path the pen is drawing (#45), from its first click until it closes or is finished: its
-   * anchors in its parent's coordinates, the one a drag is pulling handles from, and the layer
-   * once there are two anchors to draw.
-   */
-  let pen: {
-    frame: Frame
-    around: Box[]
-    parentId: string
-    anchors: Anchor[]
-    closing: boolean
-    dragging: number | null
-    from: Point
-    moved: boolean
-    hover: Point | null
-    layer: Reshaping | null
-    end: () => void
-  } | null = null
+  /** The path the pen is drawing, or null. */
+  let pen: OpenPath | null = null
 
   /** Whether the pen is drawing a path. */
   function drawing() {

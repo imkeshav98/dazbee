@@ -1,4 +1,4 @@
-// Typing into a text layer on the stage (#47): the text being edited with its caret and selected
+// Typing into a text layer on the stage: the text being edited with its caret and selected
 // range, the keys that type, delete and move the caret, the text copied, cut and pasted, and the
 // caret or range as the overlay draws it.
 import type { CanvasKit } from '@dazbee/canvaskit'
@@ -21,7 +21,7 @@ export interface TypingDeps {
   scenes: Pick<FrameScenes, 'scene' | 'measure' | 'layout'>
   /** The frame of the grid as last drawn with a key, if there is one. */
   frameOf: (key: string | undefined) => Frame | undefined
-  /** Groups fit what they hold again after a change inside them, in the same undo step (#41). */
+  /** Groups fit what they hold again after a change inside them, in the same undo step. */
   hug: (ids: string[]) => void
   /** Puts an overlay element over a box in a frame, in design pixels. */
   placeBox: (el: HTMLElement, frame: Frame, box: Rect) => void
@@ -62,7 +62,7 @@ export interface EditorTyping {
   /** Styles the selected range of the text being edited; false when no range is selected. */
   styleSelectedText(style: RunStyle): boolean
   /**
-   * Keeps the box of text that grows the size of its words in every format (#47), or in `only` that
+   * Keeps the box of text that grows the size of its words in every format, or in `only` that
    * one, and the groups around it fitted, in the step the edit is in.
    */
   fitText(id: string, only?: string): void
@@ -154,7 +154,7 @@ export function editorTyping({
   function clipboardText() {
     const node = editing && session.design().nodes[editing.id]
     const range = textRange()
-    return node?.type === 'text' && range ? { id: node, text: node.props.text, range } : null
+    return node?.type === 'text' && range ? { text: node.props.text, range } : null
   }
   /** The selected range, one box per run of one direction on one line, or else the caret. */
   function textParts() {
