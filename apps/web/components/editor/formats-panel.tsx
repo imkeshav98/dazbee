@@ -12,7 +12,7 @@ import { type Design, FORMAT_PRESETS, inOrder } from '@dazbee/schema'
 
 import { PanelFrame } from '@/components/editor/edit-panel/edit-panel.tsx'
 import { FOCUS_RING } from '@/components/ui/looks.ts'
-import { RenameField } from '@/components/ui/rename-field.tsx'
+import { RenameField, useFocusBack } from '@/components/ui/rename-field.tsx'
 import { cn } from '@/lib/cn.ts'
 import { shortSizeOf, sizeOf } from '@/lib/editor/size.ts'
 import { useMessages } from '@/lib/i18n/client.tsx'
@@ -89,7 +89,9 @@ function SizeList({ editor, onRemoved }: { editor: Editor; onRemoved: (message: 
   const formats = inOrder(design.formats)
   const background = backgroundOf(design)
   const [renaming, setRenaming] = useState<string | null>(null)
-  const rename = (id: string, name: string | null) => {
+  const focus = useFocusBack()
+  const rename = (id: string, name: string | null, byKey: boolean) => {
+    if (byKey) focus.back(id)
     setRenaming(null)
     const trimmed = name?.trim()
     if (trimmed && trimmed !== design.formats[id]?.name) run('format.update', { id, name: trimmed })
@@ -118,10 +120,11 @@ function SizeList({ editor, onRemoved }: { editor: Editor; onRemoved: (message: 
                   label={f.rename}
                   inputName="format-name"
                   className="h-6 min-w-0 rounded-[6px] border border-accent bg-surface px-1.5 text-[13px] outline-none"
-                  onDone={(name) => rename(id, name)}
+                  onDone={(name, byKey) => rename(id, name, byKey)}
                 />
               ) : (
                 <button
+                  ref={focus.ref(id)}
                   type="button"
                   onDoubleClick={() => setRenaming(id)}
                   onKeyDown={(e) => e.key === 'Enter' && setRenaming(id)}
