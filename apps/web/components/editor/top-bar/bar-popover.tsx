@@ -4,12 +4,38 @@
 // one is open, so only one is open at a time.
 import { CaretDownIcon } from '@phosphor-icons/react'
 import * as Popover from '@radix-ui/react-popover'
-import { type FocusEvent, type KeyboardEvent, type ReactNode, type RefObject, useEffect, useRef, useState } from 'react'
+import {
+  type FocusEvent,
+  type KeyboardEvent,
+  type ReactNode,
+  type RefObject,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from 'react'
 
+import { useEditState } from '@/components/editor/edit-store.ts'
 import { BAR_BUTTON, POPOVER } from '@/components/editor/styles.ts'
 import { cn } from '@/lib/cn.ts'
 
+/** The room between the bar's last row that shows and a popover under it, in pixels. */
+const GAP = 8
+
 const nowhere = () => document.activeElement === null || document.activeElement === document.body
+
+/**
+ * How far under its button a popover hangs to clear the whole bar: GAP under the bar's last row
+ * that shows, which is its second row when that is open, even when the button is in the first row
+ * or on the first line of a second row that wraps.
+ */
+function offsetUnder(button: HTMLElement | null) {
+  const bar = button?.closest('[role="toolbar"]')
+  if (!button || !bar) return GAP
+  const rows = [...bar.children].filter((row) => row.checkVisibility({ visibilityProperty: true }))
+  const end = Math.max(...rows.map((row) => row.getBoundingClientRect().bottom))
+  return Math.max(GAP, Math.round(end - button.getBoundingClientRect().bottom) + GAP)
+}
 
 /** A toolbar's buttons that can be used and show, in order: a closed second row's are left out. */
 const itemsOf = (bar: HTMLElement) =>
@@ -113,8 +139,15 @@ export function BarPopover({
   className?: string
 }) {
   const focus = useMenuFocus()
+  const shown = open === id
+  // Measured as it opens, and again when the bar's bottom moves, as when its second row opens.
+  const { barBottom } = useEditState()
+  const [below, setBelow] = useState(GAP)
+  useLayoutEffect(() => {
+    if (shown) setBelow(offsetUnder(focus.button.current))
+  }, [shown, barBottom, focus.button])
   return (
-    <Popover.Root open={open === id} onOpenChange={(to) => onOpen(to ? id : null)}>
+    <Popover.Root open={shown} onOpenChange={(to) => onOpen(to ? id : null)}>
       <Popover.Trigger asChild>
         <button
           ref={focus.button}
@@ -134,7 +167,7 @@ export function BarPopover({
         <Popover.Content
           side="bottom"
           align="center"
-          sideOffset={8}
+          sideOffset={below}
           collisionPadding={12}
           {...focus.content}
           aria-label={label}
