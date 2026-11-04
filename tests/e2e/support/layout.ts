@@ -154,3 +154,25 @@ export function layoutProblems(
     { pieces, scrolls, uncut },
   )
 }
+
+/** Labels of the top bar, its menus and the panel's title that run onto a second line: a run of words drawn on more than one line. */
+export const wrapped = (page: Page) =>
+  page.evaluate(() => {
+    const found: string[] = []
+    const roots = document.querySelectorAll(
+      '[data-testid="top-bar"] button, [data-testid="bar-more-menu"] button, [data-testid="small-menu"] button, #edit-panel h2, #edit-panel button, [data-radix-popper-content-wrapper] button',
+    )
+    for (const el of roots) {
+      if (!el.checkVisibility({ visibilityProperty: true })) continue
+      const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT)
+      for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+        if (!(node.textContent ?? '').trim()) continue
+        const range = document.createRange()
+        range.selectNodeContents(node)
+        const rects = [...range.getClientRects()].filter((r) => r.width > 0)
+        const first = rects[0]
+        if (first && rects.some((r) => r.top > first.top + first.height / 2)) found.push((el.textContent ?? '').trim())
+      }
+    }
+    return [...new Set(found)]
+  })

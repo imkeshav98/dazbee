@@ -4,7 +4,7 @@
 import type { DesignInput } from '@dazbee/schema'
 
 import { exportHashOf, writeOutput } from '../support/editor.ts'
-import { click, openStage, press, read, selection } from '../support/stage.ts'
+import { boxOf, click, openStage, press, read, selection } from '../support/stage.ts'
 import { expect, type Page, test } from '../support/test.ts'
 
 test.describe.configure({ timeout: 120_000 })
@@ -99,13 +99,6 @@ const design = (): DesignInput => ({
   overrides: {},
 })
 
-const boxOf = (page: Page, id: string) =>
-  page.evaluate((id) => window.dazbee?.boxOf(id), id) as Promise<{
-    x: number
-    y: number
-    width: number
-    height: number
-  }>
 const undo = async (page: Page) => {
   await press(page, 'undo')
   await page.evaluate(() => window.dazbee?.drawn())

@@ -9,19 +9,9 @@ import type { DesignInput } from '@dazbee/schema'
 import { designOf, editorPath, screenPoint, writeOutput } from '../support/editor.ts'
 import { layoutProblems } from '../support/layout.ts'
 import { seed } from '../support/seed.ts'
-import {
-  backgroundPanel,
-  barMenu,
-  click,
-  drag,
-  openStage,
-  pagesPanel,
-  pickPage,
-  press,
-  selection,
-  sizesPanel,
-} from '../support/stage.ts'
+import { backgroundPanel, click, drag, openStage, pickPage, press, selection } from '../support/stage.ts'
 import { expect, type Page, test } from '../support/test.ts'
+import { barMenu, pagesPanel, sizesPanel } from '../support/top-bar.ts'
 
 test.describe.configure({ timeout: 120_000 })
 

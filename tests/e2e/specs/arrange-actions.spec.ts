@@ -3,8 +3,9 @@
 import type { DesignInput } from '@dazbee/schema'
 
 import { screenPoint, writeOutput } from '../support/editor.ts'
-import { closeBarMenu, moreAction, moreMenu, moreSubmenu, openStage } from '../support/stage.ts'
+import { openStage } from '../support/stage.ts'
 import { expect, type Page, test } from '../support/test.ts'
+import { closeBarMenu, moreAction, moreMenu, moreSubmenu } from '../support/top-bar.ts'
 
 test.describe.configure({ timeout: 120_000 })
 

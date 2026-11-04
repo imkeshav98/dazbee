@@ -23,8 +23,9 @@ import { type ExportType, formatScope } from '@dazbee/schema'
 import { photo } from '../support/assets.ts'
 import { designOf, OUTPUT, screenPoint, writeOutput } from '../support/editor.ts'
 import { newBrand } from '../support/seed.ts'
-import { backgroundPanel, barMenu, press, sizesPanel } from '../support/stage.ts'
+import { backgroundPanel, press } from '../support/stage.ts'
 import { expect, type Page, test } from '../support/test.ts'
+import { barMenu, sizesPanel } from '../support/top-bar.ts'
 
 test.describe.configure({ timeout: 600_000 })
 

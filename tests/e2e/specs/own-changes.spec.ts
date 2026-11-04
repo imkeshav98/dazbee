@@ -4,8 +4,9 @@
 import type { DesignInput } from '@dazbee/schema'
 
 import { writeOutput } from '../support/editor.ts'
-import { fillList, openCard, openStage, scopeMenu } from '../support/stage.ts'
+import { openStage } from '../support/stage.ts'
 import { expect, type Locator, type Page, test } from '../support/test.ts'
+import { fillList, openCard, scopeMenu } from '../support/top-bar.ts'
 
 test.describe.configure({ timeout: 120_000 })
 

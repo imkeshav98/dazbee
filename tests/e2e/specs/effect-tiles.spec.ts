@@ -6,9 +6,10 @@ import type { DesignInput } from '@dazbee/schema'
 
 import { photo, upload } from '../support/assets.ts'
 import { writeOutput } from '../support/editor.ts'
-import { choose } from '../support/select.ts'
-import { barMenu, openStage } from '../support/stage.ts'
+import { choose } from '../support/fields.ts'
+import { openStage } from '../support/stage.ts'
 import { expect, type Page, test } from '../support/test.ts'
+import { barMenu } from '../support/top-bar.ts'
 
 test.describe.configure({ timeout: 120_000 })
 

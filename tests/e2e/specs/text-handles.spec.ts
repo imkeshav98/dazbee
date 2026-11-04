@@ -5,8 +5,9 @@
 import { type DesignInput, formatScope } from '@dazbee/schema'
 
 import { writeOutput } from '../support/editor.ts'
-import { barMenu, dragScreen, handle, openStage, press, read } from '../support/stage.ts'
+import { dragScreen, handle, openStage, press, read } from '../support/stage.ts'
 import { expect, type Page, test } from '../support/test.ts'
+import { barMenu } from '../support/top-bar.ts'
 
 test.describe.configure({ timeout: 120_000 })
 

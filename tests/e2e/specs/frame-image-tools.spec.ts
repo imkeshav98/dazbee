@@ -6,8 +6,9 @@ import type { DesignInput } from '@dazbee/schema'
 
 import { photo } from '../support/assets.ts'
 import { writeOutput } from '../support/editor.ts'
-import { click, drag, moreAction, openStage, press, read, selection } from '../support/stage.ts'
+import { click, drag, openStage, press, read, selection } from '../support/stage.ts'
 import { expect, type Page, test } from '../support/test.ts'
+import { moreAction } from '../support/top-bar.ts'
 
 test.describe.configure({ timeout: 120_000 })
 

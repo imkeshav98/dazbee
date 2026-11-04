@@ -2,8 +2,8 @@
 // capsule and its end edge. A selection shows the top bar, and nothing selected leaves no bar.
 import { designOf, editorPath, screenPoint, writeOutput } from '../support/editor.ts'
 import { liveDesign, seed } from '../support/seed.ts'
-import { barMenu, moreSubmenu, openCard } from '../support/stage.ts'
 import { expect, type Page, test } from '../support/test.ts'
+import { barMenu, moreSubmenu, openCard } from '../support/top-bar.ts'
 
 const shoot = async (page: Page, name: string) =>
   writeOutput(`cards-${name}.png`, await page.screenshot({ animations: 'disabled' }))

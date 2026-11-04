@@ -6,3 +6,9 @@ export async function choose(field: Locator, value: string) {
   await field.click()
   await field.page().locator(`[role="listbox"] [role="option"][data-value="${value}"]`).click()
 }
+
+/** Types a value into a field and presses Enter. */
+export const enter = async (field: Locator, value: string) => {
+  await field.fill(value)
+  await field.press('Enter')
+}

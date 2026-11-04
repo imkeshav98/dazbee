@@ -13,8 +13,8 @@ import type { DesignInput } from '@dazbee/schema'
 
 import { photo, upload } from '../support/assets.ts'
 import { designOf, writeOutput } from '../support/editor.ts'
+import { choose } from '../support/fields.ts'
 import { PERF, report } from '../support/perf.ts'
-import { choose } from '../support/select.ts'
 import { openStage } from '../support/stage.ts'
 import { expect, type Page, test } from '../support/test.ts'
 

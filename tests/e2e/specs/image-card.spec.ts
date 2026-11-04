@@ -4,8 +4,9 @@ import type { DesignInput } from '@dazbee/schema'
 
 import { photo, upload } from '../support/assets.ts'
 import { writeOutput } from '../support/editor.ts'
-import { barMenu, openCard, openStage } from '../support/stage.ts'
+import { openStage } from '../support/stage.ts'
 import { expect, type Locator, type Page, test } from '../support/test.ts'
+import { barMenu, openCard } from '../support/top-bar.ts'
 
 test.describe.configure({ timeout: 120_000 })
 

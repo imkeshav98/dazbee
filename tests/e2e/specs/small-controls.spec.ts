@@ -3,8 +3,9 @@
 import type { DesignInput } from '@dazbee/schema'
 
 import { writeOutput } from '../support/editor.ts'
-import { moreSubmenu, openCard, openStage, read } from '../support/stage.ts'
+import { openStage, read } from '../support/stage.ts'
 import { expect, type Page, test } from '../support/test.ts'
+import { moreSubmenu, openCard } from '../support/top-bar.ts'
 
 test.describe.configure({ timeout: 180_000 })
 

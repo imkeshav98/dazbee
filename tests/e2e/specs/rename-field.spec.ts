@@ -7,8 +7,9 @@
 import type { DesignInput } from '@dazbee/schema'
 
 import { designOf, writeOutput } from '../support/editor.ts'
-import { openStage, pagesPanel, press, sizesPanel } from '../support/stage.ts'
+import { openStage, press } from '../support/stage.ts'
 import { expect, type Locator, type Page, test } from '../support/test.ts'
+import { pagesPanel, sizesPanel } from '../support/top-bar.ts'
 
 test.describe.configure({ timeout: 120_000 })
 

@@ -7,8 +7,8 @@ import { join } from 'node:path'
 import type { DesignInput } from '@dazbee/schema'
 
 import { editorPath, writeOutput } from '../support/editor.ts'
+import { choose } from '../support/fields.ts'
 import { getKit, newBrand, seed } from '../support/seed.ts'
-import { choose } from '../support/select.ts'
 import { expect, type Page, test } from '../support/test.ts'
 
 test.describe.configure({ timeout: 120_000 })

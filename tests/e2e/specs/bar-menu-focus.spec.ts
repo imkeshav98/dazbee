@@ -5,8 +5,9 @@
 // page is busy. Esc in a field of a menu still throws away what was typed.
 import type { DesignInput } from '@dazbee/schema'
 
-import { barMenu, moreMenu, moreSubmenu, openStage, read, selection } from '../support/stage.ts'
+import { openStage, read, selection } from '../support/stage.ts'
 import { expect, type Page, test } from '../support/test.ts'
+import { barMenu, moreMenu, moreSubmenu } from '../support/top-bar.ts'
 
 test.describe.configure({ timeout: 120_000 })
 

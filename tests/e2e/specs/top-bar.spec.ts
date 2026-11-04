@@ -7,10 +7,11 @@ import type { DesignInput } from '@dazbee/schema'
 
 import { photo, upload } from '../support/assets.ts'
 import { editorPath, screenPoint, writeOutput } from '../support/editor.ts'
-import { layoutProblems } from '../support/layout.ts'
+import { layoutProblems, wrapped } from '../support/layout.ts'
 import { seed } from '../support/seed.ts'
-import { barMenu, moreAction, moreMenu, moreSubmenu, openStage } from '../support/stage.ts'
+import { openStage } from '../support/stage.ts'
 import { expect, type Page, test } from '../support/test.ts'
+import { barMenu, moreAction, moreMenu, moreSubmenu } from '../support/top-bar.ts'
 
 test.describe.configure({ timeout: 240_000 })
 
@@ -243,28 +244,6 @@ const select = (page: Page, ids: string[]) => page.evaluate((ids) => window.dazb
 const camera = (page: Page) => page.evaluate(() => window.dazbee?.camera())
 const settle = (page: Page) =>
   page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))))
-
-/** Labels of the top bar, its menus and the panel's title that run onto a second line: a run of words drawn on more than one line. */
-const wrapped = (page: Page) =>
-  page.evaluate(() => {
-    const found: string[] = []
-    const roots = document.querySelectorAll(
-      '[data-testid="top-bar"] button, [data-testid="bar-more-menu"] button, [data-testid="small-menu"] button, #edit-panel h2, #edit-panel button, [data-radix-popper-content-wrapper] button',
-    )
-    for (const el of roots) {
-      if (!el.checkVisibility({ visibilityProperty: true })) continue
-      const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT)
-      for (let node = walker.nextNode(); node; node = walker.nextNode()) {
-        if (!(node.textContent ?? '').trim()) continue
-        const range = document.createRange()
-        range.selectNodeContents(node)
-        const rects = [...range.getClientRects()].filter((r) => r.width > 0)
-        const first = rects[0]
-        if (first && rects.some((r) => r.top > first.top + first.height / 2)) found.push((el.textContent ?? '').trim())
-      }
-    }
-    return [...new Set(found)]
-  })
 
 /** What the selection's top bar opens: every item with a pop-up or panel, by its test id, and the full menu. */
 const openers = (page: Page) =>

@@ -1,17 +1,11 @@
 // The UI foundation (#51): themes change only tokens, Arabic mirrors the chrome but not the design,
 // reduced motion turns chrome animation off. Screenshots go to output/ for the PR.
-import { editorPath, writeOutput } from '../support/editor.ts'
+import { editorPath, setCookies, writeOutput } from '../support/editor.ts'
 import { liveDesign, seed } from '../support/seed.ts'
 import { expect, type Page, test } from '../support/test.ts'
 
 const shoot = async (page: Page, name: string) =>
   writeOutput(`ui-${name}.png`, await page.screenshot({ animations: 'disabled' }))
-
-async function setCookies(page: Page, cookies: Record<string, string>) {
-  await page
-    .context()
-    .addCookies(Object.entries(cookies).map(([name, value]) => ({ name, value, url: 'http://localhost:3100' })))
-}
 
 test.use({ viewport: { width: 1440, height: 900 } })
 

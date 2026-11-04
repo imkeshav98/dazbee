@@ -4,7 +4,7 @@
 import type { DesignInput } from '@dazbee/schema'
 
 import { exportHashOf, writeOutput } from '../support/editor.ts'
-import { openStage, press, read, selection } from '../support/stage.ts'
+import { drawn, openStage, press, read, selection } from '../support/stage.ts'
 import { expect, type Page, test } from '../support/test.ts'
 
 test.describe.configure({ timeout: 120_000 })
@@ -49,7 +49,6 @@ const design = (): DesignInput => ({
 type Rect = { x: number; y: number; width: number; height: number }
 const textRuns = async (page: Page, id: string) => ((await read(page)).nodes[id]?.props as { runs: unknown[] }).runs
 const textOf = async (page: Page, id: string) => ((await read(page)).nodes[id]?.props as { text: string }).text
-const drawn = (page: Page) => page.evaluate(() => window.dazbee?.drawn())
 const at = (page: Page, x: number, y: number) =>
   page.evaluate(({ x, y }) => window.dazbee?.screenPoint(x, y), { x, y }) as Promise<{ x: number; y: number }>
 const boxes = async (page: Page) =>

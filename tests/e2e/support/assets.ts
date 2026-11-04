@@ -30,3 +30,7 @@ export async function upload(bytes: Uint8Array<ArrayBuffer>, { brandId = DEV_BRA
   expect(put.status).toBe(200)
   return AssetSummary.parse(await api('/assets', { sha256 }, { brandId }))
 }
+
+export const righteous = new Uint8Array(
+  readFileSync(join(import.meta.dirname, '..', 'assets', 'fonts', 'Righteous-Regular.ttf')),
+)

@@ -3,8 +3,6 @@
 // draws from the same files fetched through the API. The font picker lists families as pictures of
 // their names, searches, picks, sets the weight and uploads, each pick one undo step.
 import { createHash } from 'node:crypto'
-import { readFileSync } from 'node:fs'
-import { join } from 'node:path'
 
 import { exportDesign } from '@dazbee/export'
 import { FALLBACK_FAMILIES } from '@dazbee/fonts'
@@ -12,20 +10,18 @@ import { loadFontFiles } from '@dazbee/fonts/node'
 import { loadCanvasKit } from '@dazbee/renderer/node'
 import { type DesignInput, FontFace, FontFamily, FontLink, FontUploadTicket } from '@dazbee/schema'
 
-import { api } from '../support/assets.ts'
+import { api, righteous } from '../support/assets.ts'
 import { designOf, editorPath, writeOutput } from '../support/editor.ts'
+import { choose } from '../support/fields.ts'
 import { importGoogleFonts } from '../support/fonts.ts'
 import { API_URL, DEV_BRAND, seed } from '../support/seed.ts'
-import { choose } from '../support/select.ts'
-import { barMenu, openStage } from '../support/stage.ts'
+import { openStage } from '../support/stage.ts'
 import { expect, type Page, type Request, test } from '../support/test.ts'
+import { barMenu } from '../support/top-bar.ts'
 
 test.describe.configure({ timeout: 180_000 })
 
 const GOOGLE = ['Inter', 'Playfair Display', 'Lobster']
-const righteous = new Uint8Array(
-  readFileSync(join(import.meta.dirname, '..', 'assets', 'fonts', 'Righteous-Regular.ttf')),
-)
 
 /** Uploads a font for the development brand the way the web app does: ask, PUT to the signed URL, record. */
 async function uploadFont(bytes: Uint8Array<ArrayBuffer>) {

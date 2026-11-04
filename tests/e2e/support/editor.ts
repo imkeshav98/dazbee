@@ -1,4 +1,3 @@
-import { execFileSync } from 'node:child_process'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 
@@ -6,7 +5,6 @@ import { type Browser, expect, type Page } from '@playwright/test'
 
 import { formatScope } from '@dazbee/schema'
 
-import { DATABASE, LOCAL } from './local-servers.ts'
 import { DEV_BRAND, type InBrand, liveDesign, seed } from './seed.ts'
 
 /** Where the live editing checks leave their screenshots and numbers; CI uploads it. */
@@ -130,44 +128,8 @@ export function writeOutput(name: string, content: string | Buffer) {
   writeFileSync(join(OUTPUT, name), content)
 }
 
-const ROOT = join(import.meta.dirname, '..', '..', '..')
-
-/**
- * Restarts the sync server the specs' tabs talk to and waits until it answers again: on CI docker
- * compose's container, off CI the suite's own (support/local-servers.ts).
- */
-export async function restartSyncServer() {
-  if (!process.env.CI) {
-    const response = await fetch(`http://127.0.0.1:${LOCAL.control}/restart-sync`, { method: 'POST' })
-    if (!response.ok) throw new Error(`the suite's sync server did not answer after restarting (${response.status})`)
-    return
-  }
-  execFileSync('docker', ['compose', 'restart', 'sync'], { cwd: ROOT, stdio: 'pipe' })
-  execFileSync('docker', ['compose', 'up', '-d', '--wait', 'sync'], { cwd: ROOT, stdio: 'pipe' })
-}
-
-/** Runs a query in the sync server's database: on CI docker compose's, off CI the suite's own. */
-function query(sql: string) {
-  const database = process.env.CI ? 'razzlr' : DATABASE
-  return execFileSync(
-    'docker',
-    ['compose', 'exec', '-T', 'postgres', 'psql', '-U', 'razzlr', '-d', database, '-tAc', sql],
-    { cwd: ROOT, encoding: 'utf8' },
-  ).trim()
-}
-
-/** Whether the sync server has stored the design's state since `since` (packages/db's design_states). */
-export function storedAfter(designId: string, since: Date) {
-  return (
-    query(
-      `select count(*) from design_states where design_id = '${designId.replace(/'/g, "''")}' and updated_at > '${since.toISOString()}'`,
-    ) === '1'
-  )
-}
-
-/** How many bytes the sync server last stored for the design (packages/db's design_states). */
-export function storedSize(designId: string) {
-  return Number(
-    query(`select octet_length(state) from design_states where design_id = '${designId.replace(/'/g, "''")}'`),
-  )
+export async function setCookies(page: Page, cookies: Record<string, string>) {
+  await page
+    .context()
+    .addCookies(Object.entries(cookies).map(([name, value]) => ({ name, value, url: 'http://localhost:3100' })))
 }

@@ -12,26 +12,24 @@ import { type DesignInput, inOrder } from '@dazbee/schema'
 
 import { photo, upload } from '../support/assets.ts'
 import { designOf, openTabs, placed, reloads, settle, writeOutput } from '../support/editor.ts'
+import { choose } from '../support/fields.ts'
 import { importGoogleFonts } from '../support/fonts.ts'
 import { newBrand, putKit } from '../support/seed.ts'
-import { choose } from '../support/select.ts'
+import { backgroundPanel, drag, openStage } from '../support/stage.ts'
+import { type Browser, expect, type Locator, type Page, test } from '../support/test.ts'
 import {
-  backgroundPanel,
   barMenu,
-  drag,
   fillList,
   moreAction,
   moreMenu,
   moreSubmenu,
   openCard,
-  openStage,
   pagesPanel,
   scopeMenu,
   sizesPanel,
   strokeList,
   textColourHex,
-} from '../support/stage.ts'
-import { type Browser, expect, type Locator, type Page, test } from '../support/test.ts'
+} from '../support/top-bar.ts'
 
 // Each row opens its own design, so CI spreads the rows over its shards.
 test.describe.configure({ mode: 'parallel', timeout: 180_000 })

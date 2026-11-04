@@ -12,8 +12,9 @@ import { AssetLink, type DesignInput } from '@dazbee/schema'
 
 import { api, photo, upload } from '../support/assets.ts'
 import { designOf, exportHashOf, screenPoint, writeOutput } from '../support/editor.ts'
-import { backgroundPanel, click, fillList, openCard, openStage, press, read, strokeList } from '../support/stage.ts'
+import { backgroundPanel, click, openStage, press, read } from '../support/stage.ts'
 import { expect, type Page, test } from '../support/test.ts'
+import { fillList, openCard, strokeList } from '../support/top-bar.ts'
 
 test.describe.configure({ timeout: 120_000 })
 

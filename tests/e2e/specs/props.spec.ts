@@ -4,19 +4,19 @@
 import type { DesignInput } from '@dazbee/schema'
 
 import { writeOutput } from '../support/editor.ts'
-import { choose } from '../support/select.ts'
+import { choose, enter } from '../support/fields.ts'
+import { openStage } from '../support/stage.ts'
+import { expect, type Page, test } from '../support/test.ts'
 import {
   barMenu,
   closeBarMenu,
   fillList,
   moreMenu,
   openCard,
-  openStage,
   scopeMenu,
   strokeList,
   textColourHex,
-} from '../support/stage.ts'
-import { expect, type Locator, type Page, test } from '../support/test.ts'
+} from '../support/top-bar.ts'
 
 test.describe.configure({ timeout: 120_000 })
 
@@ -112,11 +112,6 @@ const props = async (page: Page, id: string) => ({
 const select = async (page: Page, ids: string[]) => {
   await page.evaluate((ids) => window.dazbee?.select(ids), ids)
   await expect(await openCard(page, 'layout-card')).toBeVisible()
-}
-/** Types a value into a field and presses Enter. */
-const enter = async (field: Locator, value: string) => {
-  await field.fill(value)
-  await field.press('Enter')
 }
 
 test('one layer: position, size, turn, opacity, blend, fill, stroke and effects', async ({ browser }) => {

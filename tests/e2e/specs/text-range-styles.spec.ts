@@ -4,8 +4,9 @@
 import type { DesignInput } from '@dazbee/schema'
 
 import { writeOutput } from '../support/editor.ts'
-import { barMenu, closeBarMenu, openStage, read, textColourHex } from '../support/stage.ts'
+import { openStage, read } from '../support/stage.ts'
 import { expect, type Page, test } from '../support/test.ts'
+import { barMenu, closeBarMenu, textColourHex } from '../support/top-bar.ts'
 
 test.describe.configure({ timeout: 180_000 })
 
