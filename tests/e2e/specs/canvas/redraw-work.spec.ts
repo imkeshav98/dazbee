@@ -37,7 +37,6 @@ const carousel = (cards: number): DesignInput => {
   }
   return {
     meta: {
-      schemaVersion: 5,
       designId: 'replaced-by-the-api',
       name: 'Carousel',
       kind: 'carousel',

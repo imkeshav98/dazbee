@@ -116,7 +116,6 @@ const rect = (x: number, y: number, width: number, height: number, color: string
 /** One of each kind of layer the panels have cards for, in a Square format, and a Story with `withStory`. */
 const design = (withStory = false): DesignInput => ({
   meta: {
-    schemaVersion: 5,
     designId: 'replaced-by-the-api',
     name: 'Panels inventory',
     kind: 'single',

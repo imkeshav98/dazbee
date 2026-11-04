@@ -27,7 +27,7 @@ const STYLE = { fontFamily: 'Noto Sans', fontSize: 20, color: '#000000FF' }
  * with an image fill over a solid one, a layer locked in place, and a text that grows with its words.
  */
 const DESIGN: DesignInput = {
-  meta: { schemaVersion: 5, designId: 'd', name: 'D', kind: 'single', primaryFormatId: 'sq' },
+  meta: { designId: 'd', name: 'D', kind: 'single', primaryFormatId: 'sq' },
   formats: {
     sq: { name: 'Square', width: 1080, height: 1080, order: 'a0' },
     wide: { name: 'Wide', width: 1200, height: 628, order: 'a1' },

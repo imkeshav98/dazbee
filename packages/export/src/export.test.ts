@@ -20,7 +20,7 @@ const bytes = {
 }
 
 const design = {
-  meta: { schemaVersion: 5, designId: 'd', name: 'Summer: sale', kind: 'single', primaryFormatId: 'sq' },
+  meta: { designId: 'd', name: 'Summer: sale', kind: 'single', primaryFormatId: 'sq' },
   formats: {
     sq: { name: 'Square', width: 120, height: 120, order: 'a0' },
     story: { name: 'Story 9:16', width: 90, height: 160, order: 'a1' },

@@ -24,7 +24,7 @@ const rect = (parentId: string, index: string, box: { x: number; y: number; widt
  * row laid out by auto layout holding one square.
  */
 const DESIGN: DesignInput = {
-  meta: { schemaVersion: 5, designId: 'd', name: 'D', kind: 'single', primaryFormatId: 'sq' },
+  meta: { designId: 'd', name: 'D', kind: 'single', primaryFormatId: 'sq' },
   formats: { sq: { name: 'Square', width: 1080, height: 1080, order: 'a0' } },
   pages: { p1: { name: 'One', order: 'a0' } },
   nodes: {

@@ -11,17 +11,17 @@ import { fileURLToPath } from 'node:url'
 
 export const LOCAL = { api: 8797, sync: 1244, web: 3110, control: 1245 } as const
 const ROOT = fileURLToPath(new URL('../../../', import.meta.url))
-const SERVER = 'postgres://razzlr:razzlr-local@127.0.0.1:55432'
+const SERVER = 'postgres://dazbee:dazbee-local@127.0.0.1:55432'
 /** The suite's own database, on docker compose's Postgres server. */
-export const DATABASE = 'razzlr_e2e'
+export const DATABASE = 'dazbee_e2e'
 
 /** The suite's own database and storage bucket. */
 export const SUITE_STORE = {
   DATABASE_URL: `${SERVER}/${DATABASE}`,
   STORAGE_ENDPOINT: 'http://127.0.0.1:59000',
-  STORAGE_BUCKET: 'razzlr-e2e',
-  STORAGE_ACCESS_KEY_ID: 'razzlr',
-  STORAGE_SECRET_ACCESS_KEY: 'razzlr-local-secret',
+  STORAGE_BUCKET: 'dazbee-e2e',
+  STORAGE_ACCESS_KEY_ID: 'dazbee',
+  STORAGE_SECRET_ACCESS_KEY: 'dazbee-local-secret',
   STORAGE_REGION: 'us-east-1',
 }
 
@@ -70,10 +70,10 @@ export function storedSize(designId: string) {
 
 /** Runs a query in the sync server's database: on CI docker compose's, off CI the suite's own. */
 function query(sql: string) {
-  const database = process.env.CI ? 'razzlr' : DATABASE
+  const database = process.env.CI ? 'dazbee' : DATABASE
   return execFileSync(
     'docker',
-    ['compose', 'exec', '-T', 'postgres', 'psql', '-U', 'razzlr', '-d', database, '-tAc', sql],
+    ['compose', 'exec', '-T', 'postgres', 'psql', '-U', 'dazbee', '-d', database, '-tAc', sql],
     { cwd: ROOT, encoding: 'utf8' },
   ).trim()
 }
@@ -88,7 +88,7 @@ async function ensureDatabase() {
       end(): Promise<void>
     }
   }
-  const client = new pg.Client({ connectionString: `${SERVER}/razzlr` })
+  const client = new pg.Client({ connectionString: `${SERVER}/dazbee` })
   await client.connect()
   try {
     const found = await client.query('SELECT 1 FROM pg_database WHERE datname = $1', [DATABASE])

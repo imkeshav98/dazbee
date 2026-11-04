@@ -44,7 +44,7 @@ const rect = (index: string, props: Record<string, unknown>, parentId = 'p1'): N
   props: { x: 0, y: 0, width: 100, height: 100, shape: { kind: 'rect' }, ...props },
 })
 const design = (nodes: Record<string, Node>) => ({
-  meta: { schemaVersion: 5, designId: 'd', name: 'Image fills', kind: 'single', primaryFormatId: 'f' },
+  meta: { designId: 'd', name: 'Image fills', kind: 'single', primaryFormatId: 'f' },
   formats: { f: { name: 'F', width: 100, height: 100, order: 'a0' } },
   pages: { p1: { name: 'Page', order: 'a0', fills: [{ type: 'solid', color: '#FFFFFFFF' }] } },
   nodes,

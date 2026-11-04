@@ -1,5 +1,5 @@
 {
-  "meta": { "schemaVersion": 1, "designId": "broken", "name": "Broken", "kind": "single", "primaryFormatId": "sq" },
+  "meta": { "designId": "broken", "name": "Broken", "kind": "single", "primaryFormatId": "sq" },
   "formats": { "sq": { "name": "Square 1:1", "width": 1080, "height": 1080, "order": "a0" } },
   "pages": { "p1": { "name": "Page 1", "order": "a0", "fills": [] } },
   "nodes": {

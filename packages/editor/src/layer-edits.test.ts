@@ -21,7 +21,7 @@ const rect = (parentId: string, index: string, x: number, y: number, extra: Reco
  * brand's colour, a text, and an empty frame.
  */
 const DESIGN: DesignInput = {
-  meta: { schemaVersion: 5, designId: 'd', name: 'D', kind: 'single', primaryFormatId: 'sq' },
+  meta: { designId: 'd', name: 'D', kind: 'single', primaryFormatId: 'sq' },
   formats: {
     sq: { name: 'Square', width: 1080, height: 1080, order: 'a0' },
     wide: { name: 'Wide', width: 1200, height: 628, order: 'a1' },

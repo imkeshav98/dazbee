@@ -1,7 +1,5 @@
 # Dazbee
 
-Formerly Razzlr. The local Postgres and storage (user, database, bucket and keys in `docker-compose.yml`) and the browser's offline copy of each design (IndexedDB `razzlr-design-<id>`) keep the old name, so data made before the rename still opens.
-
 ## Develop
 
 Needs Node 22.18 or later (CI and docker compose run Node 26) and pnpm 12 (`npm install -g pnpm@12`).
@@ -15,7 +13,7 @@ pnpm test        # Vitest
 pnpm build && pnpm e2e   # Playwright (run `pnpm --filter @dazbee/e2e exec playwright install chromium` once)
 ```
 
-Off CI, `pnpm e2e` starts its own API (8797), sync server (1244) and web app (3110) over a `razzlr_e2e` database and a `razzlr-e2e` bucket, next to docker compose's Postgres and storage, so a run never writes into the workspace of your local site.
+Off CI, `pnpm e2e` starts its own API (8797), sync server (1244) and web app (3110) over a `dazbee_e2e` database and a `dazbee-e2e` bucket, next to docker compose's Postgres and storage, so a run never writes into the workspace of your local site.
 
 ## Layout
 

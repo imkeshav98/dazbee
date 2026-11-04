@@ -19,8 +19,8 @@ export const db = database.db
 
 // Two workspaces with a brand each, fresh for every run so runs never see each other's rows.
 export const run = randomUUID().slice(0, 8)
-export const workspace = { id: `workspace-a-${run}`, name: 'Agency A', kind: 'agency' as const }
-export const other = { id: `workspace-b-${run}`, name: 'Studio B', kind: 'solo' as const }
+export const workspace = { id: `workspace-a-${run}`, name: 'Agency A' }
+export const other = { id: `workspace-b-${run}`, name: 'Studio B' }
 export const brand = { id: `brand-a-${run}`, workspaceId: workspace.id, name: 'Brand A' }
 export const sibling = { id: `brand-a2-${run}`, workspaceId: workspace.id, name: 'Brand A2' }
 export const otherBrand = { id: `brand-b-${run}`, workspaceId: other.id, name: 'Brand B' }
@@ -45,9 +45,9 @@ export const syncSecret = 'test-secret-'.padEnd(32, 'x')
 export const storage = openStorage(
   storageSettings({
     STORAGE_ENDPOINT: 'http://127.0.0.1:59000',
-    STORAGE_BUCKET: 'razzlr-test',
-    STORAGE_ACCESS_KEY_ID: 'razzlr',
-    STORAGE_SECRET_ACCESS_KEY: 'razzlr-local-secret',
+    STORAGE_BUCKET: 'dazbee-test',
+    STORAGE_ACCESS_KEY_ID: 'dazbee',
+    STORAGE_SECRET_ACCESS_KEY: 'dazbee-local-secret',
     STORAGE_REGION: 'us-east-1',
     ...process.env,
   }),

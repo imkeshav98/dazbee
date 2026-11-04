@@ -10,7 +10,7 @@ import { expect, type Page, test } from '../../support/test.ts'
 test.describe.configure({ timeout: 120_000 })
 
 const design = (): DesignInput => ({
-  meta: { schemaVersion: 5, designId: 'replaced-by-the-api', name: 'Rich text', kind: 'single', primaryFormatId: 'sq' },
+  meta: { designId: 'replaced-by-the-api', name: 'Rich text', kind: 'single', primaryFormatId: 'sq' },
   formats: { sq: { name: 'Square', width: 1080, height: 1080, order: 'a0' } },
   pages: { p1: { name: 'Page 1', order: 'a0', fills: [{ type: 'solid', color: '#FFF8F0FF' }] } },
   nodes: {
@@ -38,7 +38,7 @@ const design = (): DesignInput => ({
         y: 300,
         width: 920,
         height: 130,
-        text: 'خصم Razzlr اليوم',
+        text: 'خصم Dazbee اليوم',
         style: { fontFamily: 'Noto Naskh Arabic', fontSize: 80, color: '#1F2329FF' },
       },
     },
@@ -113,40 +113,40 @@ test('a range across an Arabic and Latin boundary has a box for each direction, 
   browser,
 }) => {
   const { page, errors } = await openStage(browser, design())
-  // "خصم Razzlr اليوم": Arabic 0–3, a space, "Razzlr" 4–10, a space, Arabic 11–16.
+  // "خصم Dazbee اليوم": Arabic 0–3, a space, "Dazbee" 4–10, a space, Arabic 11–16.
   await dblclick(page, 900, 360)
   await expect(page.locator('.caret')).toBeVisible()
-  // Where the carets inside each word are: after "خ" (1), after "Raz" (7), and at Razzlr's end (10).
+  // Where the carets inside each word are: after "خ" (1), after "Daz" (7), and at Dazbee's end (10).
   await caretAtOffset(page, 1)
   const afterKha = await caretX(page)
   await caretAtOffset(page, 7)
-  const afterRaz = await caretX(page)
+  const afterDaz = await caretX(page)
   await caretAtOffset(page, 10)
-  const razzlrEnd = await caretX(page)
-  // A double click on Razzlr (just left of the caret after "Raz") selects just it: one
+  const dazbeeEnd = await caretX(page)
+  // A double click on Dazbee (just left of the caret after "Daz") selects just it: one
   // left-to-right box ending where its caret is.
   const line = await page.locator('.caret').boundingBox()
   if (!line) throw new Error('no caret')
-  await page.mouse.dblclick(afterRaz - 6, line.y + line.height / 2)
+  await page.mouse.dblclick(afterDaz - 6, line.y + line.height / 2)
   await drawn(page)
   const word = await boxes(page)
   expect(word).toHaveLength(1)
-  const razzlr = word[0] as Rect
-  expect(razzlr.x + razzlr.width).toBeCloseTo(razzlrEnd, 0)
-  expect(razzlr.x).toBeLessThan(afterRaz)
+  const dazbee = word[0] as Rect
+  expect(dazbee.x + dazbee.width).toBeCloseTo(dazbeeEnd, 0)
+  expect(dazbee.x).toBeLessThan(afterDaz)
 
-  // From after "خ", Shift+Right six times: "صم", the space, then "Raz".
+  // From after "خ", Shift+Right six times: "صم", the space, then "Daz".
   await caretAtOffset(page, 1)
   await keys(page, ...Array<string>(6).fill('Shift+ArrowRight'))
   const range = await boxes(page)
   writeOutput('text-2-bidi.png', await page.screenshot({ animations: 'disabled' }))
   expect(range).toHaveLength(2)
   const [latin, arabic] = range as [Rect, Rect]
-  // The Latin box starts where Razzlr starts and ends after "Raz"; the Arabic one runs from the
-  // end of Razzlr, over the space, to after "خ". They meet and don't overlap.
-  expect(latin.x).toBeCloseTo(razzlr.x, 0)
-  expect(latin.x + latin.width).toBeCloseTo(afterRaz, 0)
-  expect(arabic.x).toBeCloseTo(razzlrEnd, 0)
+  // The Latin box starts where Dazbee starts and ends after "Daz"; the Arabic one runs from the
+  // end of Dazbee, over the space, to after "خ". They meet and don't overlap.
+  expect(latin.x).toBeCloseTo(dazbee.x, 0)
+  expect(latin.x + latin.width).toBeCloseTo(afterDaz, 0)
+  expect(arabic.x).toBeCloseTo(dazbeeEnd, 0)
   expect(arabic.x + arabic.width).toBeCloseTo(afterKha, 0)
   expect(latin.x + latin.width).toBeLessThanOrEqual(arabic.x + 0.5)
   // Bold on it reaches exactly those characters.

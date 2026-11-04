@@ -11,7 +11,7 @@ test.describe.configure({ timeout: 180_000 })
 
 const solid = (color: string) => [{ type: 'solid' as const, color }]
 const design = (): DesignInput => ({
-  meta: { schemaVersion: 5, designId: 'replaced-by-the-api', name: 'Controls', kind: 'single', primaryFormatId: 'sq' },
+  meta: { designId: 'replaced-by-the-api', name: 'Controls', kind: 'single', primaryFormatId: 'sq' },
   formats: {
     sq: { name: 'Square', width: 1080, height: 1080, order: 'a0' },
     st: { name: 'Story', width: 1080, height: 1920, order: 'a1' },

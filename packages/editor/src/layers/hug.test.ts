@@ -14,7 +14,7 @@ const square = (parentId: string, index: string, x: number) => ({
 /** A group holding two squares, fitted to them. */
 function harness() {
   return sessionOf({
-    meta: { schemaVersion: 5, designId: 'd', name: 'D', kind: 'single', primaryFormatId: 'sq' },
+    meta: { designId: 'd', name: 'D', kind: 'single', primaryFormatId: 'sq' },
     formats: { sq: { name: 'Square', width: 1080, height: 1080, order: 'a0' } },
     pages: { p1: { name: 'One', order: 'a0' } },
     nodes: {

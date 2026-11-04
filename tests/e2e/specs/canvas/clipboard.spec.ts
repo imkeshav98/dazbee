@@ -17,7 +17,7 @@ const BACKGROUND = [{ type: 'solid', color: '#FFF6E8FF' }] as const
 const CARD = { x: 60, y: 60, width: 580, height: 480 }
 
 const shell = (name: string, nodes: Record<string, Node>): DesignInput => ({
-  meta: { schemaVersion: 5, designId: 'replaced-by-the-api', name, kind: 'single', primaryFormatId: 'sq' },
+  meta: { designId: 'replaced-by-the-api', name, kind: 'single', primaryFormatId: 'sq' },
   formats: { sq: { name: 'Square', width: 1080, height: 1080, order: 'a0' } },
   pages: { p1: { name: 'Page 1', order: 'a0', fills: [...BACKGROUND] } },
   nodes,

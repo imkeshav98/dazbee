@@ -201,7 +201,7 @@ describe('imageAssetIds', () => {
   it('finds image fills on pages, layers and format overrides, once each', () => {
     const image = (assetId: string) => ({ type: 'image', assetId })
     const parsed = parseDesign({
-      meta: { schemaVersion: 5, designId: 'd', name: 'D', kind: 'single', primaryFormatId: 'sq' },
+      meta: { designId: 'd', name: 'D', kind: 'single', primaryFormatId: 'sq' },
       formats: {
         sq: { name: 'Square', width: 100, height: 100, order: 'a0' },
         st: { name: 'Story', width: 100, height: 200, order: 'a1' },
@@ -249,7 +249,7 @@ describe('fontFamilies', () => {
       runs,
     })
     const parsed = parseDesign({
-      meta: { schemaVersion: 5, designId: 'd', name: 'D', kind: 'single', primaryFormatId: 'sq' },
+      meta: { designId: 'd', name: 'D', kind: 'single', primaryFormatId: 'sq' },
       formats: {
         sq: { name: 'Square', width: 100, height: 100, order: 'a0' },
         st: { name: 'Story', width: 100, height: 200, order: 'a1' },

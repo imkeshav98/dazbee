@@ -36,7 +36,7 @@ function draw(text: string) {
     Object.entries(tree.nodes).map(([id, node]) => [id, id === root ? { ...node, parentId: 'p1', index: 'a0' } : node]),
   )
   const design = {
-    meta: { schemaVersion: 5, designId: 'd', name: 'Logo', kind: 'single', primaryFormatId: 'f' },
+    meta: { designId: 'd', name: 'Logo', kind: 'single', primaryFormatId: 'f' },
     formats: { f: { name: 'Logo', width: Math.round(width), height: Math.round(height), order: 'a0' } },
     pages: { p1: { name: 'Page', order: 'a0', fills: [{ type: 'solid', color: '#FFFFFFFF' }] } },
     nodes,

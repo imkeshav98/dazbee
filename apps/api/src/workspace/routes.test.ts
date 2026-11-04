@@ -24,18 +24,9 @@ import {
 } from '../test-api.ts'
 
 describe('the workspace', () => {
-  it('answers with the session’s own workspace and its kind', async () => {
+  it('answers with the session’s own workspace', async () => {
     expect(WorkspaceSummary.parse((await call('a', 'GET', '/workspace')).json)).toEqual(workspace)
     expect(WorkspaceSummary.parse((await call('b', 'GET', '/workspace')).json)).toEqual(other)
-  })
-
-  it('changes the kind of the session’s workspace only, and refuses one it does not know', async () => {
-    const changed = await call('b', 'PATCH', '/workspace', { kind: 'company' })
-    expect(WorkspaceSummary.parse(changed.json)).toEqual({ ...other, kind: 'company' })
-    expect(WorkspaceSummary.parse((await call('a', 'GET', '/workspace')).json).kind).toBe('agency')
-    const refused = await call('b', 'PATCH', '/workspace', { kind: 'enterprise' })
-    expect(refused.status).toBe(400)
-    await call('b', 'PATCH', '/workspace', { kind: 'solo' })
   })
 
   it('renames the session’s workspace only, trimmed, and refuses an empty name or an empty change', async () => {
@@ -81,7 +72,7 @@ describe('designs per brand', () => {
 
   it('starts a design from given content, under its own id and name', async () => {
     const content = {
-      meta: { schemaVersion: 5, designId: 'ignored', name: 'Ignored', kind: 'carousel', primaryFormatId: 'pt' },
+      meta: { designId: 'ignored', name: 'Ignored', kind: 'carousel', primaryFormatId: 'pt' },
       formats: { pt: { name: 'Portrait', width: 1080, height: 1350, order: 'a0' } },
       pages: { p1: { name: 'Card 1', order: 'a0' }, p2: { name: 'Card 2', order: 'a1' } },
       nodes: {},

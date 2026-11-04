@@ -1,7 +1,6 @@
 import { z } from 'zod'
 
 import { canHold, Layer } from './layers.ts'
-import { SCHEMA_VERSION } from './migrate.ts'
 import { NodeId } from './primitives.ts'
 
 /**
@@ -44,10 +43,9 @@ export type LayerTree = z.infer<typeof LayerTree>
 /** The clipboard's custom type: layers copied in the editor, pasted into the same design or another. */
 export const LAYER_CLIPBOARD_TYPE = 'application/x-dazbee-layers'
 
-/** What a copy puts on the clipboard: layers, in this schema version, from a client's design. */
+/** What a copy puts on the clipboard: layers from a client's design. */
 export const LayerClipboard = z.object({
   kind: z.literal('dazbee.layers'),
-  schemaVersion: z.literal(SCHEMA_VERSION),
   /** The design they were copied from. */
   designId: z.string(),
   tree: LayerTree,

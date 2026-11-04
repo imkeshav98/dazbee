@@ -7,8 +7,8 @@ import { SUITE_STORE } from './local-servers.ts'
 /** docker compose's database and bucket, which CI's API uses: the same server and storage as the suite's. */
 const COMPOSE_STORE = {
   ...SUITE_STORE,
-  DATABASE_URL: 'postgres://razzlr:razzlr-local@127.0.0.1:55432/razzlr',
-  STORAGE_BUCKET: 'razzlr',
+  DATABASE_URL: 'postgres://dazbee:dazbee-local@127.0.0.1:55432/dazbee',
+  STORAGE_BUCKET: 'dazbee',
 }
 
 /**

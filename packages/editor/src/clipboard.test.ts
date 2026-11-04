@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { LAYER_CLIPBOARD_TYPE, LayerClipboard, SCHEMA_VERSION } from '@dazbee/schema'
+import { LAYER_CLIPBOARD_TYPE, LayerClipboard } from '@dazbee/schema'
 
 import { keepCopy, layersOnClipboard, putOnClipboard, rememberedLayers } from './clipboard.ts'
 
@@ -16,7 +16,6 @@ const rect = (name: string, index: string) => ({
 })
 const copied = LayerClipboard.parse({
   kind: 'dazbee.layers',
-  schemaVersion: SCHEMA_VERSION,
   designId: 'd1',
   tree: { nodes: { a: rect('Logo', 'a0'), b: rect('', 'a1') }, roots: ['a', 'b'] },
 })

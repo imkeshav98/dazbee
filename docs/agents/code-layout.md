@@ -1,6 +1,6 @@
 # Code layout
 
-Where code goes, the order inside each file, and the imports each folder may make. Lint checks some of these rules and `/code-review` checks the rest on every PR (see [What checks the rules](#what-checks-the-rules)).
+Where code goes, how the schema and tables change, the order inside each file, and the imports each folder may make. Lint checks some of these rules and `/code-review` checks the rest on every PR (see [What checks the rules](#what-checks-the-rules)).
 
 ## Adding or moving code
 
@@ -39,7 +39,7 @@ The PR body says which commits are moves.
 
 - Name files and exports after what they hold, in `GLOSSARY.md`'s terms.
 - When a file no longer holds what its name says, rename it.
-- Stored and wire names never change: IndexedDB names, `localStorage` and `sessionStorage` keys, cookies, the service worker's cache name, the Yjs root map names, and drag and clipboard MIME types.
+- Once Dazbee has real users, stored and wire names never change (until then, see [Data](#data)): IndexedDB names, `localStorage` and `sessionStorage` keys, cookies, the service worker's cache name, the Yjs root map names, and drag and clipboard MIME types.
 
 **Size.**
 
@@ -56,6 +56,14 @@ The PR body says which commits are moves.
 - A browser test helper that two or more spec files use goes in `tests/e2e/support/`. A helper that one spec uses stays at the top of that spec, or at the top of the `describe` it belongs to.
 - Specs live in area folders under `tests/e2e/specs/` (`library/`, `canvas/`, `top-bar/` …).
 - A runner collects only the files its config matches: the `include` of the workspace's Vitest config (the packages share `src/**/*.test.ts` from `packages/config/vitest.preset.js`), and `testDir` in `tests/e2e/playwright.config.ts`. A test moved outside them stops running while CI stays green. Count before and after a move, with `pnpm --filter <workspace> exec vitest list` for each touched workspace and `pnpm --filter @dazbee/e2e exec playwright test --list`; the counts match. A move across a config's glob updates the glob.
+
+## Data
+
+Until Dazbee has real users, no code migrates or keeps old data: no schema version on a design, no step that upgrades a saved one, and no migration that carries rows over. Change the schema or the tables, then reset the databases.
+
+- **The design schema.** Change it in `packages/schema` and in everything that writes it. A design saved before the change may stop opening; that is expected.
+- **The tables.** Change `packages/db/src/tables.ts`, delete `packages/db/migrations`, and run `pnpm --filter @dazbee/db migration`. It writes the one initial migration, `0000_init`, from `tables.ts` alone, without a database. Never add a second migration.
+- **The reset.** Recreate the local databases and storage with `docker compose down -v`, then `docker compose up -d`. CI starts fresh on every run. The deployed API's database needs the same reset before the change is deployed there, and that needs Keshav's OK.
 
 ## Order inside a file
 

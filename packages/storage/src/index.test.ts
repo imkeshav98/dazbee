@@ -8,9 +8,9 @@ import { openStorage, storageSettings } from './index.ts'
 const storage = openStorage(
   storageSettings({
     STORAGE_ENDPOINT: 'http://127.0.0.1:59000',
-    STORAGE_BUCKET: 'razzlr-test',
-    STORAGE_ACCESS_KEY_ID: 'razzlr',
-    STORAGE_SECRET_ACCESS_KEY: 'razzlr-local-secret',
+    STORAGE_BUCKET: 'dazbee-test',
+    STORAGE_ACCESS_KEY_ID: 'dazbee',
+    STORAGE_SECRET_ACCESS_KEY: 'dazbee-local-secret',
     STORAGE_REGION: 'us-east-1',
     ...process.env,
   }),

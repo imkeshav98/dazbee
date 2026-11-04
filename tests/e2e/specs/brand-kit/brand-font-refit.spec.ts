@@ -16,7 +16,6 @@ const heading = { fontFamily: 'brand:heading' as const }
 const style = { fontFamily: 'Noto Sans', fontSize: 72, fontWeight: 400, color: '#111111FF' }
 const design = (): DesignInput => ({
   meta: {
-    schemaVersion: 5,
     designId: 'replaced-by-the-api',
     name: 'Brand font',
     kind: 'single',

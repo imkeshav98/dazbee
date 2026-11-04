@@ -1,5 +1,5 @@
 {
-  "meta": { "schemaVersion": 1, "designId": "layer-bounds", "name": "Layer bounds", "kind": "single", "primaryFormatId": "sq" },
+  "meta": { "designId": "layer-bounds", "name": "Layer bounds", "kind": "single", "primaryFormatId": "sq" },
   "formats": { "sq": { "name": "Square 1:1", "width": 1080, "height": 1080, "order": "a0" } },
   "pages": { "p1": { "name": "Page 1", "order": "a0", "fills": [{ "type": "solid", "color": "#FFF8E1FF" }] } },
   "nodes": {
@@ -31,7 +31,7 @@
     },
     "group": {
       "type": "frame", "parentId": "p1", "index": "a3", "name": "Turned frame with a shadowed child",
-      "props": { "x": 600, "y": 480, "width": 300, "height": 200, "opacity": 0.8, "rotation": 20, "clip": false }
+      "props": { "blendMode": "pass-through", "x": 600, "y": 480, "width": 300, "height": 200, "opacity": 0.8, "rotation": 20, "clip": false }
     },
     "card": {
       "type": "graphic", "parentId": "group", "index": "a0", "name": "Card",

@@ -73,7 +73,7 @@ export const signOutLink = async () =>
 
 export const getWorkspace = () => call(WorkspaceSummary, '/workspace')
 
-/** Saves who the workspace is for (#109), which changes only words and defaults (ADR-0011), or its name. */
+/** Renames the workspace. */
 export const updateWorkspace = (patch: UpdateWorkspace) =>
   call(WorkspaceSummary, '/workspace', { method: 'PATCH', body: patch })
 

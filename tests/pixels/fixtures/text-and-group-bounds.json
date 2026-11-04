@@ -1,5 +1,5 @@
 {
-  "meta": { "schemaVersion": 1, "designId": "text-and-group-bounds", "name": "Text and group bounds", "kind": "single", "primaryFormatId": "sq" },
+  "meta": { "designId": "text-and-group-bounds", "name": "Text and group bounds", "kind": "single", "primaryFormatId": "sq" },
   "formats": { "sq": { "name": "Square 1:1", "width": 1080, "height": 1080, "order": "a0" } },
   "pages": { "p1": { "name": "Page 1", "order": "a0", "fills": [{ "type": "solid", "color": "#E8F5E9FF" }] } },
   "nodes": {
@@ -36,7 +36,7 @@
     },
     "badge": {
       "type": "group", "parentId": "p1", "index": "a4", "name": "Translucent turned group",
-      "props": { "x": 120, "y": 640, "width": 380, "height": 300, "opacity": 0.7, "rotation": -12,
+      "props": { "blendMode": "pass-through", "x": 120, "y": 640, "width": 380, "height": 300, "opacity": 0.7, "rotation": -12,
         "effects": [{ "type": "dropShadow", "x": 0, "y": 20, "blur": 40, "spread": 6, "color": "#4A148CAA" }] }
     },
     "badge-bg": {
@@ -54,11 +54,11 @@
     },
     "nest": {
       "type": "group", "parentId": "p1", "index": "a5", "name": "Blurred group with a nested group",
-      "props": { "x": 600, "y": 660, "width": 400, "height": 320, "effects": [{ "type": "layerBlur", "radius": 10 }] }
+      "props": { "blendMode": "pass-through", "x": 600, "y": 660, "width": 400, "height": 320, "effects": [{ "type": "layerBlur", "radius": 10 }] }
     },
     "nest-inner": {
       "type": "group", "parentId": "nest", "index": "a0", "name": "Inner translucent group",
-      "props": { "x": 620, "y": 680, "width": 360, "height": 280, "opacity": 0.5, "rotation": 20 }
+      "props": { "blendMode": "pass-through", "x": 620, "y": 680, "width": 360, "height": 280, "opacity": 0.5, "rotation": 20 }
     },
     "nest-square": {
       "type": "graphic", "parentId": "nest-inner", "index": "a0", "name": "Square",

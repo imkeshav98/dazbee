@@ -1,6 +1,6 @@
 // The database's tables. Every row has a workspace, and every design and asset a brand of that
-// workspace (ADR-0011); the API scopes every query by them. Change these, then write a migration with
-// `pnpm --filter @dazbee/db migration`.
+// workspace (ADR-0011); the API scopes every query by them. After a change, regenerate the one initial
+// migration (docs/agents/code-layout.md, Data).
 import { sql } from 'drizzle-orm'
 import {
   check,
@@ -28,11 +28,7 @@ const updatedAt = () => timestamp('updated_at', { withTimezone: true }).notNull(
 export const workspaces = pgTable('workspaces', {
   id: text().primaryKey(),
   name: text().notNull(),
-  /** Who the workspace is for; it changes defaults and words only, never what is stored. */
-  kind: text({ enum: ['solo', 'company', 'agency'] })
-    .notNull()
-    .default('agency'),
-  /** Its WorkOS organization (#58); null for a workspace made before sign-in, such as the development one. */
+  /** Its WorkOS organization (#58); null for the development workspace. */
   workosOrganizationId: text('workos_organization_id').unique(),
   createdAt: createdAt(),
 })

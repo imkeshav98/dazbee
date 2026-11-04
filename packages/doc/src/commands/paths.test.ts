@@ -7,7 +7,7 @@ import { type Box, centreOf, turn } from '../geometry.ts'
 import { loadDesign, openSession, readDesign } from '../index.ts'
 
 const design = (): DesignInput => ({
-  meta: { schemaVersion: 5, designId: 'd1', name: 'Paths', kind: 'single', primaryFormatId: 'sq' },
+  meta: { designId: 'd1', name: 'Paths', kind: 'single', primaryFormatId: 'sq' },
   formats: {
     sq: { name: 'Square', width: 1080, height: 1080, order: 'a0' },
     wide: { name: 'Wide', width: 1200, height: 628, order: 'a1' },

@@ -90,7 +90,7 @@ describe('signing in (#58)', () => {
     const [workspace] = await db.select().from(workspaces).where(eq(workspaces.id, first.workspaceId))
     const organization = workos.made.organizations.find((o) => o.workspaceId === first.workspaceId)
     expect(organization).toMatchObject({ name: 'Ada Lovelace' })
-    expect(workspace).toMatchObject({ name: 'Ada Lovelace', kind: 'agency', workosOrganizationId: organization?.id })
+    expect(workspace).toMatchObject({ name: 'Ada Lovelace', workosOrganizationId: organization?.id })
     expect(workos.made.members).toContainEqual({ organizationId: organization?.id, userId: ada.user.id })
     expect(
       await db
@@ -103,7 +103,6 @@ describe('signing in (#58)', () => {
     expect(WorkspaceSummary.parse((await call('GET', '/workspace', { token: first.token })).json)).toEqual({
       id: first.workspaceId,
       name: 'Ada Lovelace',
-      kind: 'agency',
     })
     expect(first.expiresAt - Date.now()).toBeGreaterThan(SESSION_TTL_MS - 60_000)
   })

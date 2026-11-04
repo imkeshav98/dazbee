@@ -53,7 +53,6 @@ const rect = (
 
 const design = (): DesignInput => ({
   meta: {
-    schemaVersion: 5,
     designId: 'replaced-by-the-api',
     name: 'Gestures and layout',
     kind: 'single',

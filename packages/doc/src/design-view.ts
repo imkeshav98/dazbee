@@ -9,7 +9,6 @@ import {
   parseDesignIncrementally,
   parseLayer,
   parseOverrideValues,
-  SCHEMA_VERSION,
 } from '@dazbee/schema'
 
 import { buildChildIndex, registerChildIndex, siblingOrder } from './children.ts'
@@ -161,8 +160,7 @@ export function designView(doc: DesignDoc) {
    * or the last whole read repaired a layer's place, which a later change can undo.
    */
   function readChanges(): boolean {
-    // A document saved at an older schema version is migrated as a whole each time it is read.
-    if (!head || r.meta.get('schemaVersion') !== SCHEMA_VERSION) return false
+    if (!head) return false
     const pages = head.pages
     const staged = new Map<string, Layer>()
     const removed = new Set<string>()

@@ -38,8 +38,7 @@ export function workspaceRoutes({
     return workspace ? c.json(workspace) : c.json(error('No such workspace'), 404)
   })
 
-  // Onboarding asks who Dazbee is for; the answer only changes defaults and words (ADR-0011).
-  // Settings also renames the workspace.
+  // Settings renames the workspace.
   app.patch('/workspace', async (c) => {
     const input = await body(c.req.raw, UpdateWorkspace)
     if (input instanceof Response) return input

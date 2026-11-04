@@ -29,7 +29,6 @@ const FORMATS = {
 
 const design = (assetId: string): DesignInput => ({
   meta: {
-    schemaVersion: 5,
     designId: 'replaced-by-the-api',
     name: 'Spring drop',
     kind: 'single',
@@ -118,7 +117,6 @@ const design = (assetId: string): DesignInput => ({
 /** A carousel of three pages in one format, each its own picture: a photo and words, words on dark, a badge on pink. */
 const carousel = (assetId: string): DesignInput => ({
   meta: {
-    schemaVersion: 5,
     designId: 'replaced-by-the-api',
     name: 'Spring carousel',
     kind: 'carousel',

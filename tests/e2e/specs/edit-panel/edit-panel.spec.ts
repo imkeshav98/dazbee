@@ -31,7 +31,6 @@ const rect = (x: number, y: number, width: number, height: number, color: string
 
 const design = (): DesignInput => ({
   meta: {
-    schemaVersion: 5,
     designId: 'replaced-by-the-api',
     name: 'Properties',
     kind: 'single',

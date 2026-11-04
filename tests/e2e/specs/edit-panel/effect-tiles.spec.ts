@@ -34,7 +34,6 @@ const shape = (
 
 const design = (assetId: string): DesignInput => ({
   meta: {
-    schemaVersion: 5,
     designId: 'replaced-by-the-api',
     name: 'Effect tiles',
     kind: 'single',

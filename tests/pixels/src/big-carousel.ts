@@ -153,7 +153,7 @@ export function bigCarousel(cards = 20): DesignInput {
     }
   }
   return {
-    meta: { schemaVersion: 5, designId: 'big-carousel', name: 'Big carousel', kind: 'carousel', primaryFormatId: 'sq' },
+    meta: { designId: 'big-carousel', name: 'Big carousel', kind: 'carousel', primaryFormatId: 'sq' },
     formats,
     pages,
     nodes,

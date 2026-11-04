@@ -157,7 +157,6 @@ const row = (direction: 'row' | 'column', gap = 20, pad = 20) => ({
 /** One page holding a layer of each kind, spread out so each can be pressed on its own. */
 export const matrixDesign = (assetId: string): DesignInput => ({
   meta: {
-    schemaVersion: 5,
     designId: 'replaced-by-the-api',
     name: 'Gesture matrix',
     kind: 'single',

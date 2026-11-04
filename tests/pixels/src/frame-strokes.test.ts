@@ -15,7 +15,7 @@ const pdfium = await startPdfium(afterAll)
 const solid = (color: string) => [{ type: 'solid', color }]
 /** A 300 square page: a blue frame at 50,50, 200 square, clipping a red square that fills it and more, stroked in black. */
 const design = (align: 'inside' | 'center' | 'outside', frame: Record<string, unknown> = {}) => ({
-  meta: { schemaVersion: 5, designId: 'd', name: 'Outlines', kind: 'single', primaryFormatId: 'f' },
+  meta: { designId: 'd', name: 'Outlines', kind: 'single', primaryFormatId: 'f' },
   formats: { f: { name: 'F', width: 300, height: 300, order: 'a0' } },
   pages: { p1: { name: 'Page', order: 'a0', fills: solid('#FFFFFFFF') } },
   nodes: {

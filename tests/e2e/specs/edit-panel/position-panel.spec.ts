@@ -31,7 +31,7 @@ const rect = (
 })
 
 const design = (): DesignInput => ({
-  meta: { schemaVersion: 5, designId: 'replaced-by-the-api', name: 'Position', kind: 'single', primaryFormatId: 'sq' },
+  meta: { designId: 'replaced-by-the-api', name: 'Position', kind: 'single', primaryFormatId: 'sq' },
   formats: { sq: { name: 'Square', width: 1080, height: 1080, order: 'a0' } },
   pages: { p1: { name: 'Page 1', order: 'a0', fills: solid('#FFF8F0FF') } },
   nodes: {

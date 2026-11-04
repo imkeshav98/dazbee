@@ -12,7 +12,6 @@ export const dropDesign = (
   more: Partial<Pick<DesignInput, 'formats' | 'pages'>> = {},
 ): DesignInput => ({
   meta: {
-    schemaVersion: 5,
     designId: 'replaced-by-the-api',
     name: 'Dropped files',
     kind: 'single',

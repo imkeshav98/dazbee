@@ -5,7 +5,7 @@ import { type Design, type DesignInput, parseDesign } from '@dazbee/schema'
 import { render, sceneMemo } from './scene.ts'
 
 const input = (): DesignInput => ({
-  meta: { schemaVersion: 5, designId: 'd1', name: 'Test', kind: 'single', primaryFormatId: 'sq' },
+  meta: { designId: 'd1', name: 'Test', kind: 'single', primaryFormatId: 'sq' },
   formats: {
     sq: { name: 'Square', width: 1080, height: 1080, order: 'a0' },
     banner: { name: 'Banner', width: 320, height: 50, order: 'a1' },

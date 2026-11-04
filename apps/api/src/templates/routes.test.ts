@@ -16,7 +16,7 @@ import { png } from '../test-files.ts'
 describe('templates (#54)', { timeout: 60_000 }, () => {
   /** A design with a shape, text and one of the brand's images, in two formats. */
   const content = (assetId: string) => ({
-    meta: { schemaVersion: 5, designId: 'any', name: 'Sale', kind: 'single', primaryFormatId: 'sq' },
+    meta: { designId: 'any', name: 'Sale', kind: 'single', primaryFormatId: 'sq' },
     formats: {
       sq: { name: 'Square', width: 400, height: 400, order: 'a0' },
       wide: { name: 'Wide', width: 800, height: 400, order: 'a1' },
@@ -127,7 +127,7 @@ describe('templates (#54)', { timeout: 60_000 }, () => {
   it("draws a template's thumbnail from the page a design's picture shows, when two pages share an order", async () => {
     // Two pages at the same order: the one listed first is not the one first by id.
     const parsed = parseDesign({
-      meta: { schemaVersion: 5, designId: 'any', name: 'Tie', kind: 'single', primaryFormatId: 'sq' },
+      meta: { designId: 'any', name: 'Tie', kind: 'single', primaryFormatId: 'sq' },
       formats: { sq: { name: 'Square', width: 40, height: 40, order: 'a0' } },
       pages: {
         pb: { name: 'Red', order: 'a0', fills: [{ type: 'solid', color: '#E0262BFF' }] },

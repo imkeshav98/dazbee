@@ -10,24 +10,16 @@ import { brandRef, BrandToken, type Variables } from './variables.ts'
 export const RecordId = z.string().regex(/^[\w-]{1,64}$/, 'ids are 1–64 letters, digits, _ and -')
 export type RecordId = z.infer<typeof RecordId>
 
-/** Who a workspace is for (ADR-0011). It changes defaults and words only: an agency's brands are its clients. */
-export const WorkspaceKind = z.enum(['solo', 'company', 'agency'])
-export type WorkspaceKind = z.infer<typeof WorkspaceKind>
-
 export const WorkspaceSummary = z.object({
   id: RecordId,
   name: z.string(),
-  kind: WorkspaceKind,
 })
 export type WorkspaceSummary = z.infer<typeof WorkspaceSummary>
 
-/** Who the workspace is for, its name, or both. */
-export const UpdateWorkspace = z
-  .object({
-    kind: WorkspaceKind.optional(),
-    name: z.string().trim().min(1).max(120).optional(),
-  })
-  .refine((input) => input.kind !== undefined || input.name !== undefined, 'give a kind, a name or both')
+/** The workspace's new name. */
+export const UpdateWorkspace = z.object({
+  name: z.string().trim().min(1).max(120),
+})
 export type UpdateWorkspace = z.infer<typeof UpdateWorkspace>
 
 export const BrandSummary = z.object({

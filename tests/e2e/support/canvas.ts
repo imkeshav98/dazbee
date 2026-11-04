@@ -31,7 +31,6 @@ export const merge = (...parts: Pick<DesignInput, 'nodes' | 'overrides'>[]) => {
 /** One page in five formats: the box, the headline and `fill` layers under them. */
 export const fiveFormats = (fill: number): DesignInput => ({
   meta: {
-    schemaVersion: 5,
     designId: 'replaced-by-the-api',
     name: 'Five formats',
     kind: 'single',

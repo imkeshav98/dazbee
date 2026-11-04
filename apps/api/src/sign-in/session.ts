@@ -25,7 +25,7 @@ export interface SessionTokenPayload extends Session {
   expiresAt: number
 }
 
-export const DEV_WORKSPACE = { id: 'dev-workspace', name: 'Development agency', kind: 'agency' as const }
+export const DEV_WORKSPACE = { id: 'dev-workspace', name: 'Development agency' }
 export const DEV_BRANDS = [
   { id: 'dev-brand-coffee', name: 'Harbour Coffee' },
   { id: 'dev-brand-cycles', name: 'Northline Cycles' },

@@ -8,7 +8,7 @@
   "scripts": {
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
-    "migration": "drizzle-kit generate"
+    "migration": "drizzle-kit generate --name init"
   },
   "dependencies": {
     "drizzle-orm": "^0.45.4",
