@@ -10,7 +10,7 @@ import type { DesignInput } from '@dazbee/schema'
 
 import { shoot, writeOutput } from '../../support/editor.ts'
 import { SCREEN_SIZES } from '../../support/layout.ts'
-import { nextFrame, openStage, press, read } from '../../support/stage.ts'
+import { fitSettled, openStage, press, read } from '../../support/stage.ts'
 import { expect, type Locator, type Page, test } from '../../support/test.ts'
 import { pagesPanel, sizesPanel } from '../../support/top-bar.ts'
 
@@ -233,8 +233,7 @@ for (const [width, height] of SCREEN_SIZES) {
       async ({ browser }) => {
         const { page, errors } = await openStage(browser, design())
         await page.setViewportSize({ width, height })
-        await nextFrame(page)
-        await page.evaluate(() => window.dazbee?.fitAll())
+        await fitSettled(page)
         await page.evaluate(() => window.dazbee?.drawn())
         // The renames the design's name sends to the server, by the name they send.
         const sent: string[] = []

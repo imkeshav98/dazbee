@@ -9,7 +9,17 @@ import type { DesignInput } from '@dazbee/schema'
 import { designOf, editorPath, screenPoint, setCookies, writeOutput } from '../../support/editor.ts'
 import { EDITOR_CHROME, layoutProblems, SCREEN_SIZES } from '../../support/layout.ts'
 import { seed } from '../../support/seed.ts'
-import { backgroundPanel, click, drag, nextFrame, openStage, pickPage, press, selection } from '../../support/stage.ts'
+import {
+  backgroundPanel,
+  click,
+  drag,
+  fitSettled,
+  nextFrame,
+  openStage,
+  pickPage,
+  press,
+  selection,
+} from '../../support/stage.ts'
 import { expect, type Page, test } from '../../support/test.ts'
 import { barMenu, pagesPanel, sizesPanel } from '../../support/top-bar.ts'
 
@@ -246,8 +256,7 @@ for (const [width, height] of SCREEN_SIZES) {
   }) => {
     const { page, errors } = await openStage(browser, design())
     await page.setViewportSize({ width, height })
-    await nextFrame(page)
-    await page.evaluate(() => window.dazbee?.fitAll())
+    await fitSettled(page)
     await nextFrame(page)
     const still = await camera(page)
     // No properties button on the phones' tab bar.

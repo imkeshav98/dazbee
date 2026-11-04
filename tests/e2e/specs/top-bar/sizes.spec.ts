@@ -4,7 +4,7 @@
 import { photo, upload } from '../../support/assets.ts'
 import { writeOutput } from '../../support/editor.ts'
 import { layoutProblems, SCREEN_SIZES, wrapped } from '../../support/layout.ts'
-import { nextFrame, openStage, selectLayers } from '../../support/stage.ts'
+import { fitSettled, nextFrame, openStage, selectLayers } from '../../support/stage.ts'
 import { expect, type Page, test } from '../../support/test.ts'
 import { barMenu, moreMenu, PIECES, UNCUT } from '../../support/top-bar.ts'
 import { topBarDesign } from '../../support/top-bar-design.ts'
@@ -69,10 +69,8 @@ for (const [width, height] of SCREEN_SIZES) {
     const asset = await upload(photo)
     const { page, errors } = await openStage(browser, topBarDesign(asset.id))
     await page.setViewportSize({ width, height })
-    await page.evaluate(() => {
-      window.dazbee?.select([])
-      window.dazbee?.fitAll()
-    })
+    await page.evaluate(() => window.dazbee?.select([]))
+    await fitSettled(page)
     await nextFrame(page)
     const still = await camera(page)
     const problems: string[] = []
