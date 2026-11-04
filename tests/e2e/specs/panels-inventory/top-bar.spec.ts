@@ -2,6 +2,7 @@
 // bar, its pop-ups and the full menu.
 import { reloads } from '../../support/editor.ts'
 import { assets, doc, fills, props, setupInventory, step, style } from '../../support/inventory.ts'
+import { copyIn } from '../../support/seed.ts'
 import { selectLayers } from '../../support/stage.ts'
 import { expect, test } from '../../support/test.ts'
 import { barMenu, moreAction, moreSubmenu, openCard } from '../../support/top-bar.ts'
@@ -65,7 +66,7 @@ test.describe('top bar and full menu', () => {
     await reloads(page)
   })
 
-  row(72, 'lock and hide in this size from the full menu', async (open) => {
+  row(72, 'lock and hide in this frame from the full menu', async (open) => {
     const page = await open(true)
     await selectLayers(page, ['box'], { bar: true })
     await step(
@@ -78,10 +79,11 @@ test.describe('top bar and full menu', () => {
     )
     await step(
       page,
-      async () => moreAction(page, 'Hide in this size'),
+      async () => moreAction(page, 'Hide'),
       async () => {
         await expect.poll(async () => (await props(page, 'box')).visible).toBe(false)
-        await expect.poll(async () => (await doc(page)).nodes.box?.props.visible).not.toBe(false)
+        // Its linked copy in the Story frame still shows.
+        await expect.poll(async () => (await props(page, copyIn('story', 'box'))).visible).not.toBe(false)
       },
     )
     await reloads(page)

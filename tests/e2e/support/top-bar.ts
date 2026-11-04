@@ -14,7 +14,6 @@ export const PIECES = {
   'small menu': '[data-testid="small-menu"]',
   'edit panel': '#edit-panel',
   flyout: '#editor-flyout',
-  'show-alone chip': '[data-testid="focus-chip"]',
   toasts: '[data-toasts] > *',
 }
 /** The design's name and the font's name end in "…" by design when there is no room. */
@@ -45,13 +44,6 @@ const HOLDER: Record<string, string> = {
   'brand-colours': 'colour',
   'design-colours': 'colour',
   'auto-layout-advanced': 'stack',
-}
-
-/** Opens the top bar's scope menu, unless it is open: all sizes or only this one, and its own changes. */
-export async function scopeMenu(page: Page) {
-  const menu = page.getByTestId('scope-menu')
-  if (!(await menu.isVisible())) await page.getByTestId('scope-chip').click()
-  return menu
 }
 
 /** Opens the zoom pill's menu: the zooms, the rulers and snapping. */
@@ -102,14 +94,6 @@ export async function closeBarMenu(page: Page, button: string) {
 export const fillList = async (page: Page) => {
   const panel = await barMenu(page, (await page.getByTestId('bar-colour').count()) > 0 ? 'colour' : 'edit')
   return panel.getByTestId('fill-list')
-}
-
-/** The Sizes panel, opened from the header pill unless it is open. */
-export async function sizesPanel(page: Page) {
-  const panel = page.getByTestId('bar-sizes-menu')
-  if (!(await panel.isVisible())) await page.getByTestId('sizes-button').click()
-  await expect(panel).toBeVisible()
-  return panel
 }
 
 /** The Pages panel, from Pages by the zoom pill: opened. */

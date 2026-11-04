@@ -1,5 +1,5 @@
-// The four rename fields in Chromium: the design's name in the crumb, a size's name in the Sizes
-// panel, a layer's name in the layers panel and a page's name in the Pages panel. Enter keeps the
+// The three rename fields in Chromium: the design's name in the crumb, a layer's name in the
+// layers panel and a page's name in the Pages panel. Enter keeps the
 // new name and Escape the old one; leaving the field keeps the new name. A field ends once: Enter
 // followed by a blur before the field closes renames once, as one undo step, and Escape followed by
 // a blur keeps the old name. Enter, and Escape in the design's name, give the focus back to the
@@ -10,42 +10,34 @@ import type { DesignInput } from '@dazbee/schema'
 
 import { shoot, writeOutput } from '../../support/editor.ts'
 import { SCREEN_SIZES } from '../../support/layout.ts'
+import { frameDesign } from '../../support/seed.ts'
 import { fitSettled, openStage, press, read } from '../../support/stage.ts'
 import { expect, type Locator, type Page, test } from '../../support/test.ts'
-import { pagesPanel, sizesPanel } from '../../support/top-bar.ts'
+import { pagesPanel } from '../../support/top-bar.ts'
 
 test.describe.configure({ timeout: 120_000 })
 
-const design = (): DesignInput => ({
-  meta: {
-    designId: 'replaced-by-the-api',
+const design = (): DesignInput =>
+  frameDesign({
     name: 'Rename fields',
-    kind: 'single',
-    primaryFormatId: 'sq',
-  },
-  formats: {
-    sq: { name: 'Square', width: 1080, height: 1080, order: 'a0' },
-    story: { name: 'Story', width: 1080, height: 1920, order: 'a1' },
-  },
-  pages: { p1: { name: 'Page 1', order: 'a0', fills: [{ type: 'solid', color: '#FFF8F0FF' }] } },
-  nodes: {
-    box: {
-      type: 'graphic',
-      parentId: 'p1',
-      index: 'a0',
-      name: 'Box',
-      props: {
-        x: 120,
-        y: 120,
-        width: 400,
-        height: 300,
-        shape: { kind: 'rect', cornerRadius: 16 },
-        fills: [{ type: 'solid', color: '#E0262BFF' }],
+    fills: [{ type: 'solid', color: '#FFF8F0FF' }],
+    nodes: {
+      box: {
+        type: 'graphic',
+        parentId: 'sq',
+        index: 'a0',
+        name: 'Box',
+        props: {
+          x: 120,
+          y: 120,
+          width: 400,
+          height: 300,
+          shape: { kind: 'rect', cornerRadius: 16 },
+          fills: [{ type: 'solid', color: '#E0262BFF' }],
+        },
       },
     },
-  },
-  overrides: {},
-})
+  })
 
 /** What has the focus: "the page" when nothing does, else the element's tag, role and name. */
 const focusOf = (page: Page) =>
@@ -108,27 +100,6 @@ const SUBJECTS: Subject[] = [
     escapeFocus: (page) => page.getByRole('heading', { level: 1 }).getByRole('button'),
   },
   {
-    id: 'size',
-    first: 'Story',
-    input: 'format-name',
-    open: async (page) => {
-      const panel = await sizesPanel(page)
-      await panel
-        .locator('[data-format="story"]')
-        .getByRole('button', { name: /^Rename: / })
-        .dblclick()
-      return panel.locator('input[name="format-name"]')
-    },
-    name: async (page) => (await read(page)).formats.story?.name,
-    undoable: true,
-    keyFocus: (page) =>
-      page
-        .getByTestId('bar-sizes-menu')
-        .locator('[data-format="story"]')
-        .getByRole('button', { name: /^Rename: / }),
-    escapeFocus: (page) => page.getByTestId('sizes-button'),
-  },
-  {
     id: 'layer',
     first: 'Box',
     input: 'layer-name',
@@ -168,7 +139,7 @@ const SUBJECTS: Subject[] = [
   },
 ]
 
-for (const s of SUBJECTS.filter(({ id }) => id === 'size' || id === 'page')) {
+for (const s of SUBJECTS.filter(({ id }) => id === 'page')) {
   test(`a ${s.id}'s name: Enter, then a blur before the field closes, renames it once, as one undo step`, async ({
     browser,
   }) => {

@@ -4,54 +4,48 @@
 import type { DesignInput } from '@dazbee/schema'
 
 import { writeOutput } from '../../support/editor.ts'
-import { newBrand, putKit } from '../../support/seed.ts'
+import { frameDesign, newBrand, putKit } from '../../support/seed.ts'
 import { openStage } from '../../support/stage.ts'
 import { expect, type Page, test } from '../../support/test.ts'
 import { barMenu, openCard } from '../../support/top-bar.ts'
 
 test.describe.configure({ timeout: 120_000 })
 
-const design = (): DesignInput => ({
-  meta: {
-    designId: 'replaced-by-the-api',
+const design = (): DesignInput =>
+  frameDesign({
     name: 'Look cards',
-    kind: 'single',
-    primaryFormatId: 'sq',
-  },
-  formats: { sq: { name: 'Square', width: 1080, height: 1080, order: 'a0' } },
-  pages: { p1: { name: 'Page 1', order: 'a0', fills: [{ type: 'solid', color: '#FF8A3DFF' }] } },
-  nodes: {
-    headline: {
-      type: 'text',
-      parentId: 'p1',
-      index: 'a0',
-      name: 'Headline',
-      props: {
-        x: 76,
-        y: 162,
-        width: 610,
-        height: 204,
-        text: 'Cold brew is back',
-        style: { fontFamily: 'Noto Sans', fontSize: 96, fontWeight: 800, color: '#FFFFFFFF' },
+    fills: [{ type: 'solid', color: '#FF8A3DFF' }],
+    nodes: {
+      headline: {
+        type: 'text',
+        parentId: 'sq',
+        index: 'a0',
+        name: 'Headline',
+        props: {
+          x: 76,
+          y: 162,
+          width: 610,
+          height: 204,
+          text: 'Cold brew is back',
+          style: { fontFamily: 'Noto Sans', fontSize: 96, fontWeight: 800, color: '#FFFFFFFF' },
+        },
+      },
+      badge: {
+        type: 'graphic',
+        parentId: 'sq',
+        index: 'a1',
+        name: 'Badge',
+        props: {
+          x: 80,
+          y: 700,
+          width: 280,
+          height: 280,
+          shape: { kind: 'ellipse' },
+          fills: [{ type: 'solid', color: '#FFE14DFF' }],
+        },
       },
     },
-    badge: {
-      type: 'graphic',
-      parentId: 'p1',
-      index: 'a1',
-      name: 'Badge',
-      props: {
-        x: 80,
-        y: 700,
-        width: 280,
-        height: 280,
-        shape: { kind: 'ellipse' },
-        fills: [{ type: 'solid', color: '#FFE14DFF' }],
-      },
-    },
-  },
-  overrides: {},
-})
+  })
 
 type Node = { bindings?: Record<string, string>; props: Record<string, unknown> & { style?: Record<string, unknown> } }
 const node = (page: Page, id: string) => page.evaluate((id) => window.dazbee?.design().nodes[id], id) as Promise<Node>

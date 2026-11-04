@@ -1,10 +1,11 @@
-// Phase 1's exit check (#61) in Chromium, through real input only: a designer starts a design from
-// the brief, sets up the brand kit, uploads a photo and a font, builds an ad in the square, adds
-// four more formats and moves the headline in one of them, then exports every format as PNG, JPG,
-// PDF and SVG through the Export menu. Each file is byte for byte what Node exports from the same
-// design and files; PNG and JPG are pixel for pixel Node's render, and PDF and SVG, drawn by pdfium
-// and resvg, stay within EXIT_VECTOR_LIMIT of it, as does the SVG drawn by Chromium's own decoder.
-// The numbers go to output/exit-check.json.
+// Phase 1's exit check (#61) in Chromium: a designer starts a design from the brief, sets up the
+// brand kit, uploads a photo and a font and builds an ad in its one frame, all through real input.
+// Commands then duplicate the frame and add it at four more sizes, laid out to fit; the headline is
+// dragged in one frame, and every other frame keeps its copy as it was. Every frame of the page is
+// exported as PNG, JPG, PDF and SVG through the Export menu. Each file is byte for byte what Node
+// exports of the same frame from the same design and files; PNG and JPG are pixel for pixel Node's
+// render, and PDF and SVG, drawn by pdfium and resvg, stay within EXIT_VECTOR_LIMIT of it, as does
+// the SVG drawn by Chromium's own decoder. The numbers go to output/exit-check.json.
 import { readFileSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 
@@ -16,38 +17,63 @@ import { decodePng, encodePng, fixtureResources, type Pixels } from '@dazbee/pix
 import { overWhite, rasterisePdf, rasteriseSvg, vectorDifference } from '@dazbee/pixels/vector'
 import { renderDesign } from '@dazbee/renderer'
 import { loadCanvasKit } from '@dazbee/renderer/node'
-import { type ExportType, formatScope } from '@dazbee/schema'
+import type { ExportType } from '@dazbee/schema'
 
 import { photo, righteous } from '../../support/assets.ts'
 import { designOf, OUTPUT, screenPoint, shoot, writeOutput } from '../../support/editor.ts'
 import { newBrand } from '../../support/seed.ts'
-import { backgroundPanel, drawn, press } from '../../support/stage.ts'
+import { drawn, press } from '../../support/stage.ts'
 import { expect, type Page, test } from '../../support/test.ts'
-import { barMenu, sizesPanel } from '../../support/top-bar.ts'
+import { barMenu } from '../../support/top-bar.ts'
 
 test.describe.configure({ timeout: 600_000 })
 
 const run = crypto.randomUUID().slice(0, 6)
 /** The most a PDF or SVG of this ad may differ from the CPU render, in percent of its pixels. */
 const EXIT_VECTOR_LIMIT = 1
+/** The sizes the ad is added at after its duplicate, as Add size would add them. */
+const SIZES = [
+  { name: 'Story and Reel', width: 1080, height: 1920 },
+  { name: 'Medium rectangle', width: 300, height: 250 },
+  { name: 'Leaderboard', width: 728, height: 90 },
+  { name: 'Link image', width: 1200, height: 628 },
+]
 
 interface Stored {
   meta: { name: string }
-  formats: Record<string, { name: string; width: number; height: number }>
-  pages: Record<string, { fills: { type: string; color?: string }[] }>
+  frames: Record<string, { pageId: string; name: string; width: number; height: number; order: string }>
   nodes: Record<
     string,
     {
       type: string
+      parentId: string
+      link: string
       bindings?: Record<string, string>
       props: Record<string, unknown> & { fills?: { type: string; assetId?: string }[] }
     }
   >
-  overrides: Record<string, Record<string, Record<string, unknown>>>
 }
 const stored = async (page: Page) => JSON.parse(await designOf(page)) as Stored
+/** The page's frames by order, as Export lists them. */
+const framesOf = (design: Stored) =>
+  Object.entries(design.frames)
+    .filter(([, frame]) => frame.pageId === 'p1')
+    .sort(([a, x], [b, y]) => (x.order < y.order ? -1 : x.order > y.order ? 1 : a < b ? -1 : 1))
+/** The layer each frame holds with this link, by frame. */
+const copiesOf = (design: Stored, link: string) => {
+  const frameOf = (id: string) => {
+    let at = id
+    for (let i = 0; design.nodes[at] && i < 50; i++) at = design.nodes[at]?.parentId ?? ''
+    return at
+  }
+  return Object.fromEntries(
+    Object.entries(design.nodes)
+      .filter(([, node]) => node.link === link)
+      .map(([id, node]) => [frameOf(id), { id, ...node }]),
+  )
+}
 
-/** An SVG file as Chromium's own SVG decoder draws it in the page, at the format's size over white. */
+/** An SVG file as Chromium's own SVG decoder draws it in the page, at the frame's size over white. */
 async function drawnByChromium(
   page: Page,
   ck: CanvasKit,
@@ -81,7 +107,7 @@ async function drawnByChromium(
   return decodePng(ck, new Uint8Array(Buffer.from(png, 'base64')))
 }
 
-test('an ad set rebuilt in 5 formats through real input exports PNG, JPG, PDF and SVG that match Node', async ({
+test('an ad built in one frame, duplicated and added at 4 more sizes, exports every frame as PNG, JPG, PDF and SVG that match Node', async ({
   browser,
 }) => {
   const brandId = await newBrand('e2e exit-check')
@@ -94,11 +120,13 @@ test('an ad set rebuilt in 5 formats through real input exports PNG, JPG, PDF an
   const errors: string[] = []
   page.on('pageerror', (error) => errors.push(error.message))
 
-  // The brief opens a blank square.
+  // The brief opens a design of one blank square frame.
   await page.goto(`/brands/${brandId}`)
   await page.getByLabel('Brief').fill(`Trail days ${run}`)
   await page.getByRole('button', { name: 'Make drafts' }).click()
   await expect(page.getByTestId('status')).toHaveAttribute('data-ready', '', { timeout: 30_000 })
+  const [[square = '', squareFrame] = []] = framesOf(await stored(page))
+  expect(squareFrame).toMatchObject({ name: 'Feed square', width: 1080, height: 1080 })
   await page.evaluate(() => window.dazbee?.setCamera({ x: 120, y: 80, zoom: 0.7 }))
   await drawn(page)
 
@@ -122,7 +150,7 @@ test('an ad set rebuilt in 5 formats through real input exports PNG, JPG, PDF an
   }
   await shoot(page, 'exit-check-0-brand-kit')
 
-  // A photo goes into the brand's assets and is dragged onto the square.
+  // A photo goes into the brand's assets and is dragged onto the frame.
   await page.locator('[data-panel="assets"]').click()
   const library = page.getByTestId('asset-library')
   const name = `Sneaker ${run}`
@@ -145,18 +173,9 @@ test('an ad set rebuilt in 5 formats through real input exports PNG, JPG, PDF an
     )
     .toBe(1)
   await page.keyboard.press('Escape')
-  await drawn(page)
-
-  // The page takes the brand colour from its Background panel, the page picked by a click on it
-  // once the library is closed, which covers the page's start.
   await page.locator('[data-panel="assets"]').click()
   await expect(page.getByTestId('flyout')).toHaveCount(0)
-  await (await backgroundPanel(page, 30, 30)).getByTestId('brand-colours').getByRole('button', { name: colour }).click()
-  await expect.poll(async () => (await stored(page)).pages.p1?.fills).toEqual([{ type: 'solid', color: '#1F7A4DFF' }])
-  // Esc closes the panel, then lets the page go.
-  await page.keyboard.press('Escape')
-  await page.keyboard.press('Escape')
-  await expect(page.getByTestId('top-bar')).toHaveCount(0)
+  await drawn(page)
 
   // A badge drawn with the rectangle tool, in the brand colour from the kit.
   await press(page, 'toolRect')
@@ -203,73 +222,91 @@ test('an ad set rebuilt in 5 formats through real input exports PNG, JPG, PDF an
   await expect
     .poll(async () => ((await stored(page)).nodes[headline]?.props.style as { fontSize: number }).fontSize)
     .toBe(140)
-  // A click on the empty canvas leaves nothing selected, so the cards show the Sizes card.
+  // A click on the empty canvas leaves nothing selected.
   await page.mouse.click(40, 900)
   await expect.poll(() => page.evaluate(() => window.dazbee?.selection())).toEqual([])
   await page.locator('[data-panel="brand"]').click()
   await expect(kit).toBeHidden()
   await drawn(page)
   await shoot(page, 'exit-check-1-square')
+  const built = await stored(page)
+  const layers = Object.keys(built.nodes).length
+  expect(layers).toBe(3)
 
-  // Four more formats from presets, each starting from the square's layout scaled to fit; each is in
-  // the design and its menu closed before the next is added.
-  const presets = page.getByRole('dialog', { name: 'Add format' })
-  await sizesPanel(page)
-  for (const [i, preset] of ['feed-portrait', 'story', 'link-image', 'medium-rectangle'].entries()) {
-    await page.getByRole('button', { name: 'Add format' }).click()
-    await presets.locator(`[data-preset=${preset}]`).click()
-    await expect(presets).toBeHidden()
-    await expect.poll(async () => Object.keys((await stored(page)).formats).length).toBe(i + 2)
-  }
+  // The frame duplicated, then added at four more sizes: each one command and one undo step, a
+  // linked copy of every layer in each new frame.
+  const copies = await page.evaluate(
+    ({ square, sizes }) => {
+      const session = window.dazbee?.session
+      if (!session) throw new Error('no editor')
+      return [
+        session.run('frame.duplicate', { frameId: square }),
+        ...sizes.map(({ width, height }) => session.run('frame.addSize', { frameId: square, width, height })),
+      ]
+    },
+    { square, sizes: SIZES },
+  )
+  await expect.poll(async () => Object.keys((await stored(page)).nodes).length).toBe(layers * 6)
   const design = await stored(page)
-  const story = Object.entries(design.formats).find(([, f]) => f.height === 1920)?.[0] ?? ''
+  const frames = framesOf(design)
+  expect(frames.map(([id]) => id)).toEqual([square, ...copies])
+  // Duplicate and Add size keep the frame's name.
+  expect(frames.map(([, f]) => [f.name, f.width, f.height])).toEqual([
+    ['Feed square', 1080, 1080],
+    ['Feed square', 1080, 1080],
+    ...SIZES.map((size) => ['Feed square', size.width, size.height]),
+  ])
+  const headlines = copiesOf(design, design.nodes[headline]?.link ?? '')
+  expect(Object.keys(headlines).sort()).toEqual(frames.map(([id]) => id).sort())
+  const story = copies[1] ?? ''
   await page.evaluate(() => window.dazbee?.fitAll())
   await drawn(page)
 
-  // The headline moves down in the story only, into the tall format's lower third.
-  const before = { ...design.nodes[headline]?.props, ...design.overrides[formatScope(story)]?.[headline] } as {
-    x: number
-    y: number
-    width: number
-    height: number
+  // The headline dragged up in the story only: laid out to fit put it low in the tall frame.
+  const inStory = headlines[story] as unknown as {
+    id: string
+    props: { x: number; y: number; width: number; height: number }
   }
+  const before = inStory.props
   // Nothing selected, so no bar by a selection floats over the story's headline.
   await page.keyboard.press('Escape')
   await press(page, 'toolSelect')
-  const grab = await screenPoint(page, before.x + before.width / 2, before.y + before.height / 2, {
-    pageId: 'p1',
-    formatId: story,
-  })
-  const lift = await screenPoint(page, before.x + before.width / 2, before.y + before.height / 2 + 600, {
-    pageId: 'p1',
-    formatId: story,
-  })
+  await page.evaluate((story) => window.dazbee?.fitFrame(story), story)
+  await drawn(page)
+  const grab = await screenPoint(page, before.x + before.width / 2, before.y + before.height / 2, story)
+  const lift = await screenPoint(page, before.x + before.width / 2, before.y + before.height / 2 - 600, story)
   await page.mouse.move(grab.x, grab.y)
   await page.mouse.down()
   await page.mouse.move(lift.x, lift.y, { steps: 8 })
   await page.mouse.up()
   await drawn(page)
   const after = await stored(page)
-  expect((after.overrides[formatScope(story)]?.[headline] as { y: number }).y).toBeGreaterThan(before.y + 500)
-  expect(after.nodes[headline]?.props.y).toBe(design.nodes[headline]?.props.y)
+  expect(after.nodes[inStory.id]?.props.y as number).toBeLessThan(before.y - 500)
+  // Every other frame keeps its headline, and every other layer, as it was.
+  for (const [frameId] of frames.filter(([id]) => id !== story)) {
+    const id = headlines[frameId]?.id ?? ''
+    expect(after.nodes[id], `the headline in ${frameId}`).toEqual(design.nodes[id])
+  }
+  for (const [id, node] of Object.entries(design.nodes))
+    if (id !== inStory.id) expect(after.nodes[id], `layer ${id}`).toEqual(node)
   await page.keyboard.press('Escape')
+  await page.evaluate(() => window.dazbee?.fitAll())
   await drawn(page)
-  await shoot(page, 'exit-check-2-five-formats')
+  await shoot(page, 'exit-check-2-six-frames')
 
-  // Every format as each file type, through the Export menu.
-  const files: Partial<Record<ExportType, Map<string, Uint8Array>>> = {}
+  // Every frame of the page as each file type, through the Export menu: one flat zip each.
+  const files: Partial<Record<ExportType, { path: string; bytes: Uint8Array }[]>> = {}
   for (const type of ['png', 'jpg', 'pdf', 'svg'] as const) {
     await page.getByRole('button', { name: 'Share' }).click()
     await page.getByText('Export', { exact: true }).click()
     await page.locator(`[data-type="${type}"]`).click()
     if (type === 'png') await shoot(page, 'exit-check-3-export')
     const [download] = await Promise.all([page.waitForEvent('download'), page.getByTestId('export-run').click()])
-    const zip = new Uint8Array(readFileSync(await download.path()))
-    files[type] = new Map(readZip(zip).map((entry) => [entry.path, entry.bytes]))
+    files[type] = readZip(new Uint8Array(readFileSync(await download.path())))
     await page.keyboard.press('Escape')
   }
 
-  // Node exports the same design from the same files.
+  // Node exports the same frames of the same design from the same files.
   const final = await stored(page)
   const json = JSON.parse(await designOf(page)) as unknown
   const assetId =
@@ -284,52 +321,54 @@ test('an ad set rebuilt in 5 formats through real input exports PNG, JPG, PDF an
     images: { [assetId]: image },
   }
   const ck = await loadCanvasKit()
+  const frameIds = framesOf(final).map(([id]) => id)
+  for (const type of ['png', 'jpg', 'pdf', 'svg'] as const) {
+    // Named after the frames, the repeats numbered, in the page's order.
+    const names = readZip(exportDesign(ck, json, { frameIds, type }, bytes).bytes).map((entry) => entry.path)
+    expect(
+      (files[type] ?? []).map((entry) => entry.path),
+      `the ${type} zip's files`,
+    ).toEqual(names)
+    expect(names[0]).toBe(`Feed square.${type}`)
+    expect(names[1]).toBe(`Feed square 2.${type}`)
+  }
   const pdfium = await PDFiumLibrary.init()
   const results: Record<string, unknown>[] = []
-  for (const [formatId, format] of Object.entries(final.formats)) {
-    const result: Record<string, unknown> = { format: format.name, size: `${format.width}×${format.height}` }
+  for (const [i, [frameId, frame]] of framesOf(final).entries()) {
+    const result: Record<string, unknown> = { frame: frameId, name: frame.name, size: `${frame.width}×${frame.height}` }
+    const fileOf = (type: ExportType) => files[type]?.[i]?.bytes ?? new Uint8Array()
     for (const type of ['png', 'jpg', 'pdf', 'svg'] as const) {
-      const node = exportDesign(ck, json, { pageIds: ['p1'], formatIds: [formatId], type }, bytes).bytes
-      const entry = [...(files[type] ?? new Map<string, Uint8Array>()).entries()].find(([path]) =>
-        path.startsWith(`${format.name}/`),
+      const node = exportDesign(ck, json, { frameIds: [frameId], type }, bytes).bytes
+      const browserFile = fileOf(type)
+      expect(Buffer.from(browserFile).equals(Buffer.from(node)), `${frameId} ${type} is Node's, byte for byte`).toBe(
+        true,
       )
-      expect(entry, `${type} for ${format.name} is in the zip`).toBeDefined()
-      const browserFile = entry?.[1] ?? new Uint8Array()
-      expect(
-        Buffer.from(browserFile).equals(Buffer.from(node)),
-        `${format.name} ${type} is Node's, byte for byte`,
-      ).toBe(true)
       result[type] = { bytes: browserFile.length, identicalToNode: true }
     }
-    const cpu = overWhite(renderDesign(ck, json, 'p1', formatId, bytes))
-    const pdf = await rasterisePdf(
-      pdfium,
-      files.pdf?.get([...files.pdf.keys()].find((p) => p.startsWith(`${format.name}/`)) ?? '') ?? new Uint8Array(),
-    )
-    const svgFile =
-      files.svg?.get([...files.svg.keys()].find((p) => p.startsWith(`${format.name}/`)) ?? '') ?? new Uint8Array()
-    const svg = rasteriseSvg(svgFile)
-    const chromium = await drawnByChromium(page, ck, svgFile, format.width, format.height)
+    const cpu = overWhite(renderDesign(ck, json, frameId, bytes))
+    const pdf = await rasterisePdf(pdfium, fileOf('pdf'))
+    const svg = rasteriseSvg(fileOf('svg'))
+    const chromium = await drawnByChromium(page, ck, fileOf('svg'), frame.width, frame.height)
     const vector = {
       pdf: Number(vectorDifference(cpu, pdf).toFixed(3)),
       svg: Number(vectorDifference(cpu, svg).toFixed(3)),
       svgInChromium: Number(vectorDifference(cpu, chromium).toFixed(3)),
     }
     result.vectorPercentDiffering = vector
-    writeOutput(`exit-check-4-${formatId}-pdf.png`, Buffer.from(encodePng(ck, pdf)))
-    writeOutput(`exit-check-4-${formatId}-svg.png`, Buffer.from(encodePng(ck, svg)))
-    writeOutput(`exit-check-4-${formatId}-svg-chromium.png`, Buffer.from(encodePng(ck, chromium)))
-    expect(vector.svgInChromium, `${format.name} SVG drawn by Chromium, % of pixels differing`).toBeLessThanOrEqual(
+    writeOutput(`exit-check-4-${i + 1}-pdf.png`, Buffer.from(encodePng(ck, pdf)))
+    writeOutput(`exit-check-4-${i + 1}-svg.png`, Buffer.from(encodePng(ck, svg)))
+    writeOutput(`exit-check-4-${i + 1}-svg-chromium.png`, Buffer.from(encodePng(ck, chromium)))
+    expect(vector.svgInChromium, `${frameId} SVG drawn by Chromium, % of pixels differing`).toBeLessThanOrEqual(
       EXIT_VECTOR_LIMIT,
     )
-    expect(vector.pdf, `${format.name} PDF, % of pixels differing`).toBeLessThanOrEqual(EXIT_VECTOR_LIMIT)
-    expect(vector.svg, `${format.name} SVG, % of pixels differing`).toBeLessThanOrEqual(EXIT_VECTOR_LIMIT)
+    expect(vector.pdf, `${frameId} PDF, % of pixels differing`).toBeLessThanOrEqual(EXIT_VECTOR_LIMIT)
+    expect(vector.svg, `${frameId} SVG, % of pixels differing`).toBeLessThanOrEqual(EXIT_VECTOR_LIMIT)
     results.push(result)
   }
   pdfium.destroy()
   writeOutput(
     'exit-check.json',
-    JSON.stringify({ design: final.meta.name, layers: Object.keys(final.nodes).length, formats: results }, null, 2),
+    JSON.stringify({ design: final.meta.name, layers: Object.keys(final.nodes).length, frames: results }, null, 2),
   )
   expect(errors).toEqual([])
   await context.close()

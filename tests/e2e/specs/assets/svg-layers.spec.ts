@@ -8,7 +8,7 @@ import { randomUUID } from 'node:crypto'
 import type { DesignInput } from '@dazbee/schema'
 
 import { screenPoint, writeOutput } from '../../support/editor.ts'
-import { DEV_BRAND, getKit, newBrand } from '../../support/seed.ts'
+import { DEV_BRAND, frameDesign, getKit, newBrand } from '../../support/seed.ts'
 import { type Design, openStage, press, read, selection } from '../../support/stage.ts'
 import { expect, type Page, test } from '../../support/test.ts'
 import { fillList } from '../../support/top-bar.ts'
@@ -16,18 +16,11 @@ import { fillList } from '../../support/top-bar.ts'
 test.describe.configure({ timeout: 120_000 })
 
 const run = randomUUID().slice(0, 8)
-const design: DesignInput = {
-  meta: {
-    designId: 'replaced-by-the-api',
-    name: 'SVG layers',
-    kind: 'single',
-    primaryFormatId: 'sq',
-  },
-  formats: { sq: { name: 'Square', width: 1080, height: 1080, order: 'a0' } },
-  pages: { p1: { name: 'Page 1', order: 'a0', fills: [{ type: 'solid', color: '#FFF8F0FF' }] } },
+const design: DesignInput = frameDesign({
+  name: 'SVG layers',
+  fills: [{ type: 'solid', color: '#FFF8F0FF' }],
   nodes: {},
-  overrides: {},
-}
+})
 /** A logo as a design tool writes one: a gradient badge, a dot and a bar, and a blurred shadow no layer can show. */
 const logo = (tag: string) => `<svg xmlns="http://www.w3.org/2000/svg" width="300" height="200" viewBox="0 0 300 200">
   <!-- ${run} ${tag} -->
@@ -57,11 +50,11 @@ const exported = (page: Page, x: number, y: number) =>
     { x, y },
   )
 
-/** Checks the placed logo: one group on the page holding the four shapes as path layers, the badge keeping its gradient. */
+/** Checks the placed logo: one group in the square holding the four shapes as path layers, the badge keeping its gradient. */
 async function expectPlacedLogo(page: Page, groupName: string) {
   const all = await nodes(page)
   const group = all.find(([, n]) => n.type === 'group' && n.name === groupName)
-  expect(group?.[1].parentId).toBe('p1')
+  expect(group?.[1].parentId).toBe('sq')
   const shapes = all.filter(([, n]) => n.parentId === group?.[0])
   expect(shapes.map(([, n]) => n.name)).toEqual(expect.arrayContaining(['Shadow', 'Badge', 'Dot', 'Bar']))
   for (const [, n] of shapes) expect(n.props.shape).toMatchObject({ kind: 'path' })

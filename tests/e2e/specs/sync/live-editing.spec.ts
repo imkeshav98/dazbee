@@ -63,7 +63,7 @@ const randomEdits = (page: Page, seed: number, count: number, interleave = false
           else if (kind === 'redo') editor.session.redo()
           else if (kind === 'node.create') {
             editor.session.run('node.create', {
-              parentId: 'p1',
+              parentId: 'sq',
               layer: {
                 type: 'graphic',
                 name: 'R',
@@ -88,7 +88,7 @@ const randomEdits = (page: Page, seed: number, count: number, interleave = false
           } else if (kind === 'node.move') {
             editor.session.run('node.move', {
               id: pick(ids),
-              parentId: 'p1',
+              parentId: 'sq',
               ...(random() < 0.5 ? { before: pick(ids) } : {}),
             })
           } else if (kind === 'node.delete') {
@@ -179,7 +179,7 @@ test('two tabs make 200 random edits each and end with the same document and the
   await a.evaluate(() =>
     window.dazbee?.session.run('node.create', {
       id: 'gone',
-      parentId: 'p1',
+      parentId: 'sq',
       layer: {
         type: 'graphic',
         name: 'Gone',
@@ -249,8 +249,8 @@ test('a real mouse drag and real typing in one tab show up in the other, and und
   writeOutput('real-input-1-dragging.png', await a.screenshot())
   await a.mouse.up()
   await settle(tabs)
-  // A drag moves the layer in the format it was dragged in: that format's override.
-  const dragged = placed(JSON.parse(await designOf(b)), 'box', 'sq') as { x: number; y: number }
+  // A drag moves the layer in its frame.
+  const dragged = placed(JSON.parse(await designOf(b)), 'box') as { x: number; y: number }
   expect(Math.abs(dragged.x - 280)).toBeLessThanOrEqual(1)
   expect(Math.abs(dragged.y - 180)).toBeLessThanOrEqual(1)
   writeOutput('real-input-2-dragged-tab-b.png', await b.screenshot())
@@ -294,7 +294,7 @@ test('a real mouse drag and real typing in one tab show up in the other, and und
     expect({
       arabic: nodes.arabic.props.text,
       headline: nodes.headline.props.text,
-      x: Math.round(placed(design, 'box', 'sq').x as number),
+      x: Math.round(placed(design, 'box')?.x as number),
     }).toEqual(expected)
   }
   // Tab B's 'Hot ' stays through all of them.

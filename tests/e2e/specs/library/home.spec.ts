@@ -1,38 +1,41 @@
-// The brand's home (#84): "What are we making today?" as a brief with Format chips and Make
+// The brand's home (#84): "What are we making today?" as a brief with a Sizes dropdown and Make
 // drafts, alone. The capsule's Recent, Templates and Brand kit are pages of their own, Settings is in
 // the account menu, and on a phone the capsule is a tab bar; Recent shows every design as the
 // earlier mock's masonry, each picture in its own shape.
 import type { DesignInput } from '@dazbee/schema'
 
 import { setCookies, shoot } from '../../support/editor.ts'
-import { newBrand, seed } from '../../support/seed.ts'
+import { frameDesign, newBrand, seed } from '../../support/seed.ts'
 import { expect, test } from '../../support/test.ts'
 
 test.use({ viewport: { width: 1440, height: 900 } })
 
-/** A design in one format with a coloured page and a block, so its picture is easy to tell apart. */
-const poster = (name: string, width: number, height: number, page: string, block: string): DesignInput => ({
-  meta: { designId: 'replaced-by-the-api', name, kind: 'single', primaryFormatId: 'f' },
-  formats: { f: { name: 'Format', width, height, order: 'a0' } },
-  pages: { p1: { name: 'Page 1', order: 'a0', fills: [{ type: 'solid', color: page }] } },
-  nodes: {
-    block: {
-      type: 'graphic',
-      parentId: 'p1',
-      index: 'a0',
-      name: 'Block',
-      props: {
-        x: width * 0.1,
-        y: height * 0.1,
-        width: width * 0.5,
-        height: height * 0.3,
-        shape: { kind: 'rect', cornerRadius: 24 },
-        fills: [{ type: 'solid', color: block }],
+/** A design of one coloured frame holding a block, so its picture is easy to tell apart. */
+const poster = (name: string, width: number, height: number, fill: string, block: string): DesignInput =>
+  frameDesign({
+    name,
+    frameId: 'f',
+    frameName: 'Poster',
+    width,
+    height,
+    fills: [{ type: 'solid', color: fill }],
+    nodes: {
+      block: {
+        type: 'graphic',
+        parentId: 'f',
+        index: 'a0',
+        name: 'Block',
+        props: {
+          x: width * 0.1,
+          y: height * 0.1,
+          width: width * 0.5,
+          height: height * 0.3,
+          shape: { kind: 'rect', cornerRadius: 24 },
+          fills: [{ type: 'solid', color: block }],
+        },
       },
     },
-  },
-  overrides: {},
-})
+  })
 
 test('Recent is a page of real pictures, each in its shape, filtered by shape', async ({ page }) => {
   const run = crypto.randomUUID().slice(0, 6)
@@ -163,10 +166,12 @@ test('a size under the brief opens a blank design in that size', async ({ page }
   await expect(page.getByTestId('status')).toHaveAttribute('data-ready', '', { timeout: 30_000 })
   const design = await page.evaluate(() => window.dazbee?.design())
   expect(design?.meta.name).toBe('Untitled design')
-  expect(Object.values(design?.formats ?? {}).map((f) => [f.width, f.height])).toEqual([[1080, 1920]])
+  // One page holding one frame of that size.
+  expect(Object.keys(design?.pages ?? {})).toHaveLength(1)
+  expect(Object.values(design?.frames ?? {}).map((f) => [f.width, f.height])).toEqual([[1080, 1920]])
 })
 
-test('the Formats dropdown keeps one format picked, and Make drafts opens a design in the formats picked, named by the brief', async ({
+test('the Sizes dropdown keeps one size picked, and Make drafts opens a design of one frame per size picked in a row, named by the brief', async ({
   page,
 }) => {
   // The home, then the editor opening, which alone may take its 30 s on a busy runner.
@@ -175,18 +180,18 @@ test('the Formats dropdown keeps one format picked, and Make drafts opens a desi
   const brief = `Autumn roast launch ${crypto.randomUUID().slice(0, 6)}`
   await page.getByLabel('Brief').fill(`${brief}\nWarm, cosy, a cup on a wooden table`)
   // Feed square is picked from the start, and as the only one picked it stays; add Story.
-  const button = page.getByTestId('brief-formats')
-  const dropdown = page.getByRole('dialog', { name: 'Formats' })
-  await expect(button).toHaveText(/1 format/)
-  await expect(page.getByTestId('brief-format-feed-square')).toBeChecked()
+  const button = page.getByTestId('brief-sizes')
+  const dropdown = page.getByRole('dialog', { name: 'Sizes' })
+  await expect(button).toHaveText(/1 size/)
+  await expect(page.getByTestId('brief-size-feed-square')).toBeChecked()
   await button.click()
-  await expect(page.getByTestId('brief-format-feed-square')).toBeChecked()
+  await expect(page.getByTestId('brief-size-feed-square')).toBeChecked()
   await dropdown.getByText('Square', { exact: true }).click()
-  await expect(page.getByTestId('brief-format-feed-square')).toBeChecked()
+  await expect(page.getByTestId('brief-size-feed-square')).toBeChecked()
   await dropdown.getByText('Story', { exact: true }).click()
-  await expect(page.getByTestId('brief-format-story')).toBeChecked()
-  await expect(button).toHaveText(/2 formats/)
-  await shoot(page, 'home-formats')
+  await expect(page.getByTestId('brief-size-story')).toBeChecked()
+  await expect(button).toHaveText(/2 sizes/)
+  await shoot(page, 'home-sizes')
   // Esc closes the dropdown and gives the focus back to its button.
   await page.keyboard.press('Escape')
   await expect(dropdown).toBeHidden()
@@ -197,11 +202,20 @@ test('the Formats dropdown keeps one format picked, and Make drafts opens a desi
   await expect(page.getByTestId('status')).toHaveAttribute('data-ready', '', { timeout: 30_000 })
   const design = await page.evaluate(() => window.dazbee?.design())
   expect(design?.meta.name).toBe(brief)
-  expect(Object.values(design?.formats ?? {}).map((f) => [f.name, f.width, f.height])).toEqual([
-    ['Feed square', 1080, 1080],
-    ['Story', 1080, 1920],
+  // One page, a frame per size named after it, in a row by the frame rule: the first at 0, 0, the
+  // next 200 px right of it, tops aligned.
+  expect(Object.keys(design?.pages ?? {})).toEqual(['p1'])
+  expect(
+    Object.entries(design?.frames ?? {})
+      .sort(([, a], [, b]) => (a.order < b.order ? -1 : 1))
+      .map(([id, f]) => [id, f.pageId, f.name, f.width, f.height, f.x, f.y]),
+  ).toEqual([
+    ['f1', 'p1', 'Feed square', 1080, 1080, 0, 0],
+    ['f2', 'p1', 'Story and Reel', 1080, 1920, 1280, 0],
   ])
-  expect(design?.meta.primaryFormatId).toBe('f1')
+  // Both frames start empty, and the canvas shows the two.
+  expect(design?.nodes).toEqual({})
+  await expect(page.locator('.frame-label[data-frame]')).toHaveCount(2)
 })
 
 test('on a phone the brief and the Recent page fit the screen, and the capsule is a tab bar at the bottom', async ({

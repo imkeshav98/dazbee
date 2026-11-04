@@ -1,12 +1,11 @@
-// The panels inventory's rows 1 to 11 (support/inventory.ts): what every selection has. This size
-// or all sizes and its own changes, X, Y, W and H, rotation, opacity, blend mode, mixed values, the
-// effects, and the arrange actions.
+// The panels inventory's rows 3 to 11 (support/inventory.ts): what every selection has. X, Y, W
+// and H, rotation, opacity, blend mode, mixed values, the effects, and the arrange actions.
 import { reloads } from '../../support/editor.ts'
 import { choose, enter } from '../../support/fields.ts'
 import { doc, fills, props, setupInventory, solid, step, style } from '../../support/inventory.ts'
 import { perform, selectLayers } from '../../support/stage.ts'
 import { expect, type Page, test } from '../../support/test.ts'
-import { barMenu, fillList, moreAction, moreMenu, openCard, scopeMenu } from '../../support/top-bar.ts'
+import { barMenu, fillList, moreAction, moreMenu, openCard } from '../../support/top-bar.ts'
 
 const row = setupInventory()
 
@@ -17,61 +16,6 @@ const children = async (page: Page, parentId: string) =>
     .map(([id]) => id)
 
 test.describe('every selection', () => {
-  row(1, 'apply changes to this format or all formats', async (open) => {
-    const page = await open(true)
-    await selectLayers(page, ['box'], { bar: true })
-    const x = async () => (await openCard(page, 'layout-card')).getByRole('spinbutton', { name: 'X position' })
-    await expect((await scopeMenu(page)).getByRole('radio', { name: 'Only Square' })).toHaveAttribute(
-      'aria-checked',
-      'true',
-    )
-    await page.keyboard.press('Escape')
-    await step(
-      page,
-      async () => enter(await x(), '500'),
-      async () => {
-        await expect.poll(async () => (await doc(page)).overrides['format:sq']?.box?.x).toBe(500)
-        expect((await doc(page)).nodes.box?.props.x).toBe(80)
-      },
-    )
-    await (await scopeMenu(page)).getByRole('radio', { name: 'All sizes' }).click()
-    await page.keyboard.press('Escape')
-    await step(
-      page,
-      async () => enter(await x(), '200'),
-      async () => {
-        await expect.poll(async () => (await doc(page)).nodes.box?.props.x).toBe(200)
-        expect((await doc(page)).overrides['format:sq']?.box ?? {}).not.toHaveProperty('x')
-      },
-    )
-    await reloads(page)
-  })
-
-  row(2, 'own changes: reset one, reset all', async (open) => {
-    const page = await open(true)
-    await selectLayers(page, ['box'], { bar: true })
-    await enter((await openCard(page, 'layout-card')).getByRole('spinbutton', { name: 'X position' }), '200')
-    await enter((await fillList(page)).getByRole('textbox', { name: 'Colour 1 hex' }), '14213d')
-    const own = (await scopeMenu(page)).getByTestId('own-changes')
-    await expect(own.getByRole('listitem').locator('span')).toHaveText(['Position and size', 'Fill'])
-    const sq = async () => Object.keys((await doc(page)).overrides['format:sq']?.box ?? {}).sort()
-    await step(
-      page,
-      async () => own.getByRole('button', { name: 'Reset Fill to follow the other sizes' }).click(),
-      async () => {
-        await expect.poll(sq).toEqual(['x'])
-      },
-    )
-    await step(
-      page,
-      async () => own.getByRole('button', { name: 'Reset all' }).click(),
-      async () => {
-        await expect.poll(sq).toEqual([])
-      },
-    )
-    await reloads(page)
-  })
-
   row(3, 'X, Y, W, H', async (open) => {
     const page = await open()
     await selectLayers(page, ['box'], { bar: true })
@@ -326,13 +270,13 @@ test.describe('every selection', () => {
       page,
       async () => more('Duplicate'),
       async () => {
-        await expect.poll(async () => (await children(page, 'p1')).length).toBe(10)
+        await expect.poll(async () => (await children(page, 'sq')).length).toBe(10)
       },
     )
     await perform(page, 'undo')
     await selectLayers(page, ['box'], { bar: true })
     // The box overlaps nothing, so its place in the order changes only the document.
-    const at = async () => (await children(page, 'p1')).indexOf('box')
+    const at = async () => (await children(page, 'sq')).indexOf('box')
     await step(
       page,
       async () => more('Bring to front'),
@@ -378,7 +322,7 @@ test.describe('every selection', () => {
       page,
       async () => small.getByTestId('small-group').click(),
       async () => {
-        await expect.poll(async () => (await doc(page)).nodes.box?.parentId).not.toBe('p1')
+        await expect.poll(async () => (await doc(page)).nodes.box?.parentId).not.toBe('sq')
       },
       { draws: false },
     )
@@ -388,7 +332,7 @@ test.describe('every selection', () => {
       page,
       async () => more('Ungroup'),
       async () => {
-        await expect.poll(async () => (await doc(page)).nodes.box?.parentId).toBe('p1')
+        await expect.poll(async () => (await doc(page)).nodes.box?.parentId).toBe('sq')
       },
       { draws: false },
     )

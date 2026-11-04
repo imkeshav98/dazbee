@@ -3,6 +3,7 @@
 import type { DesignInput } from '@dazbee/schema'
 
 import { screenPoint, writeOutput } from '../../support/editor.ts'
+import { frameDesign } from '../../support/seed.ts'
 import { openStage, selectLayers } from '../../support/stage.ts'
 import { expect, type Page, test } from '../../support/test.ts'
 import { closeBarMenu, moreAction, moreMenu, moreSubmenu } from '../../support/top-bar.ts'
@@ -11,7 +12,7 @@ test.describe.configure({ timeout: 120_000 })
 
 const square = (name: string, index: string, x: number, color: string) => ({
   type: 'graphic' as const,
-  parentId: 'p1',
+  parentId: 'sq',
   index,
   name,
   props: {
@@ -24,32 +25,25 @@ const square = (name: string, index: string, x: number, color: string) => ({
   },
 })
 
-const design = (): DesignInput => ({
-  meta: {
-    designId: 'replaced-by-the-api',
+const design = (): DesignInput =>
+  frameDesign({
     name: 'Layer actions',
-    kind: 'single',
-    primaryFormatId: 'sq',
-  },
-  formats: { sq: { name: 'Square', width: 1080, height: 1080, order: 'a0' } },
-  pages: { p1: { name: 'Page 1', order: 'a0', fills: [{ type: 'solid', color: '#FFFFFFFF' }] } },
-  nodes: {
-    a: square('A', 'a0', 100, '#FCA311FF'),
-    b: square('B', 'a1', 300, '#14213DFF'),
-    c: square('C', 'a2', 500, '#E0262BFF'),
-  },
-  overrides: {},
-})
+    nodes: {
+      a: square('A', 'a0', 100, '#FCA311FF'),
+      b: square('B', 'a1', 300, '#14213DFF'),
+      c: square('C', 'a2', 500, '#E0262BFF'),
+    },
+  })
 
 type Nodes = Record<
   string,
   { parentId: string; index: string; type: string; name: string; props: Record<string, unknown> }
 >
 const nodes = (page: Page) => page.evaluate(() => window.dazbee?.design().nodes) as Promise<Nodes>
-/** The page's layers from back to front, by name. */
+/** The square frame's top layers from back to front, by name. */
 const order = async (page: Page) =>
   Object.values(await nodes(page))
-    .filter((n) => n.parentId === 'p1')
+    .filter((n) => n.parentId === 'sq')
     .sort((x, y) => (x.index < y.index ? -1 : 1))
     .map((n) => n.name)
 

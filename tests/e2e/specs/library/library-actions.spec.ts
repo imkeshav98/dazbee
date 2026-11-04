@@ -4,18 +4,13 @@
 import { type DesignInput, DesignSummary, TemplateSummary } from '@dazbee/schema'
 
 import { editorPath, writeOutput } from '../../support/editor.ts'
-import { API_URL, DEV_BRAND, seed } from '../../support/seed.ts'
+import { API_URL, DEV_BRAND, frameDesign, seed } from '../../support/seed.ts'
 import { expect, test } from '../../support/test.ts'
 
 test.describe.configure({ timeout: 120_000 })
 
-const content = (name: string): DesignInput => ({
-  meta: { designId: 'replaced-by-the-api', name, kind: 'single', primaryFormatId: 'sq' },
-  formats: { sq: { name: 'Square', width: 1080, height: 1080, order: 'a0' } },
-  pages: { p1: { name: 'Page 1', order: 'a0', fills: [{ type: 'solid', color: '#0F6E66FF' }] } },
-  nodes: {},
-  overrides: {},
-})
+const content = (name: string): DesignInput =>
+  frameDesign({ name, fills: [{ type: 'solid', color: '#0F6E66FF' }], nodes: {} })
 const designs = async () =>
   DesignSummary.array().parse(await (await fetch(`${API_URL}/brands/${DEV_BRAND}/designs`)).json())
 const templates = async () =>

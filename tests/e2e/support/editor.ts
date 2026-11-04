@@ -3,8 +3,6 @@ import { join } from 'node:path'
 
 import { type Browser, expect, type Page } from '@playwright/test'
 
-import { formatScope } from '@dazbee/schema'
-
 import { DEV_BRAND, type InBrand, liveDesign, seed } from './seed.ts'
 import { test } from './test.ts'
 
@@ -100,28 +98,22 @@ export async function settle(tabs: Page[]) {
 }
 
 /**
- * A design pixel of one frame as a point on screen, as the tab's camera shows it now: the first
- * page in the primary format by default.
+ * A design pixel of a frame of the shown page as a point on screen, as the tab's camera shows it
+ * now: the page's first frame by default.
  */
-export async function screenPoint(page: Page, x: number, y: number, frame?: { pageId: string; formatId: string }) {
-  const point = await page.evaluate(
-    ({ x, y, frame }) => window.dazbee?.screenPoint(x, y, frame?.pageId, frame?.formatId),
-    { x, y, frame },
-  )
+export async function screenPoint(page: Page, x: number, y: number, frameId?: string) {
+  const point = await page.evaluate(({ x, y, frameId }) => window.dazbee?.screenPoint(x, y, frameId), {
+    x,
+    y,
+    frameId,
+  })
   if (!point) throw new Error('no editor')
   return point
 }
 
-/** A layer's props as one format shows them: the base with that format's overrides on top. */
-export function placed(
-  design: {
-    nodes: Record<string, { props: Record<string, unknown> }>
-    overrides?: Record<string, Record<string, Record<string, unknown>>>
-  },
-  id: string,
-  formatId: string,
-) {
-  return { ...design.nodes[id]?.props, ...design.overrides?.[formatScope(formatId)]?.[id] }
+/** A layer's props as the design holds them. */
+export function placed(design: { nodes: Record<string, { props: Record<string, unknown> }> }, id: string) {
+  return design.nodes[id]?.props
 }
 
 export function writeOutput(name: string, content: string | Buffer) {

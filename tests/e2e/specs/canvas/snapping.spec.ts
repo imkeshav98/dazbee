@@ -31,7 +31,14 @@ const design = (): DesignInput => {
     meta: { ...base.meta, name: 'Snapping' },
     nodes: {
       ...base.nodes,
-      tag: { type: 'graphic', parentId: 'p1', index: 'a4', name: 'Tag', props: rect(470, 150, 120, 60, '#00A889FF') },
+      tag: {
+        type: 'graphic',
+        parentId: 'sq',
+        link: 'tag',
+        index: 'a4',
+        name: 'Tag',
+        props: rect(470, 150, 120, 60, '#00A889FF'),
+      },
     },
   }
 }
@@ -45,7 +52,8 @@ const threeHundred = (): DesignInput => {
     const y = 420 + Math.floor(i / 20) * 42
     nodes[`r${i}`] = {
       type: 'graphic',
-      parentId: 'p1',
+      parentId: 'sq',
+      link: `r${i}`,
       index: `b${String(i).padStart(3, '0')}`,
       name: `R${i}`,
       props: rect(x, y, 40, 30, '#9AA4B2FF'),
@@ -156,7 +164,7 @@ test("the bar's Line up aligns and distributes three layers, one undo step each"
   await press(page, 'undo')
   expect((await props(page, 'tag')).y).toBe(150)
 
-  // One layer lines up with the format: Alt+H centres the dot on the page.
+  // One layer lines up with its frame: Alt+H centres the dot in the square.
   await click(page, 820, 240)
   await press(page, 'alignCentre')
   expect((await props(page, 'dot')).x).toBe(420)
@@ -218,7 +226,7 @@ test('dragging among 300 layers works out what to snap to once, and each move me
   if (!before || !after) throw new Error('no editor')
   expect(moves).toBeGreaterThanOrEqual(60)
   // Gathered once at the press, each pointer move snapping once against what was gathered: every
-  // layer on the page but the dot, and the format.
+  // layer in the frame but the dot, and the frame.
   const boxes = Object.keys(content.nodes).filter((id) => id !== 'dot').length + 1
   expect({
     gathered: after.gathered - before.gathered,

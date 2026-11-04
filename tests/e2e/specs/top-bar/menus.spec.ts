@@ -27,7 +27,6 @@ test('each kind gets its own top bar; several layers add Line up, Combine for sh
     )
   }
   expect(await items(['headline'])).toEqual([
-    'scope',
     'font',
     'size',
     'colour',
@@ -43,30 +42,12 @@ test('each kind gets its own top bar; several layers add Line up, Combine for sh
     'transparency',
     'position',
   ])
-  expect(await items(['box'])).toEqual(['scope', 'colour', 'outline', 'shape', 'effects', 'transparency', 'position'])
-  expect(await items(['line'])).toEqual(['scope', 'outline', 'shape', 'effects', 'transparency', 'position'])
-  expect(await items(['combo'])).toEqual([
-    'scope',
-    'colour',
-    'outline',
-    'combine',
-    'effects',
-    'transparency',
-    'position',
-  ])
-  expect(await items(['card'])).toEqual([
-    'scope',
-    'colour',
-    'outline',
-    'stack',
-    'box',
-    'effects',
-    'transparency',
-    'position',
-  ])
-  expect(await items(['group'])).toEqual(['scope', 'effects', 'transparency', 'position'])
+  expect(await items(['box'])).toEqual(['colour', 'outline', 'shape', 'effects', 'transparency', 'position'])
+  expect(await items(['line'])).toEqual(['outline', 'shape', 'effects', 'transparency', 'position'])
+  expect(await items(['combo'])).toEqual(['colour', 'outline', 'combine', 'effects', 'transparency', 'position'])
+  expect(await items(['card'])).toEqual(['colour', 'outline', 'stack', 'box', 'effects', 'transparency', 'position'])
+  expect(await items(['group'])).toEqual(['effects', 'transparency', 'position'])
   expect(await items(['photo'])).toEqual([
-    'scope',
     'edit',
     'replace',
     'crop',
@@ -77,7 +58,6 @@ test('each kind gets its own top bar; several layers add Line up, Combine for sh
     'position',
   ])
   expect(await items(['photoBox'])).toEqual([
-    'scope',
     'edit',
     'replace',
     'crop',
@@ -88,18 +68,8 @@ test('each kind gets its own top bar; several layers add Line up, Combine for sh
     'transparency',
     'position',
   ])
-  expect(await items(['cutter'])).toEqual([
-    'scope',
-    'colour',
-    'outline',
-    'shape',
-    'mask',
-    'effects',
-    'transparency',
-    'position',
-  ])
+  expect(await items(['cutter'])).toEqual(['colour', 'outline', 'shape', 'mask', 'effects', 'transparency', 'position'])
   expect(await items(['box', 'star'])).toEqual([
-    'scope',
     'colour',
     'outline',
     'effects',
@@ -110,7 +80,6 @@ test('each kind gets its own top bar; several layers add Line up, Combine for sh
     'autoLayout',
   ])
   expect(await items(['headline', 'box'])).toEqual([
-    'scope',
     'font',
     'effects',
     'transparency',
@@ -119,7 +88,6 @@ test('each kind gets its own top bar; several layers add Line up, Combine for sh
     'autoLayout',
   ])
   expect(await items(['box', 'card'])).toEqual([
-    'scope',
     'colour',
     'outline',
     'effects',
@@ -130,7 +98,6 @@ test('each kind gets its own top bar; several layers add Line up, Combine for sh
   ])
   // Several booleans make one new boolean of them; several photos combine into nothing.
   expect(await items(['combo', 'comboB'])).toEqual([
-    'scope',
     'colour',
     'outline',
     'effects',
@@ -141,7 +108,6 @@ test('each kind gets its own top bar; several layers add Line up, Combine for sh
     'autoLayout',
   ])
   expect(await items(['photo', 'photoB'])).toEqual([
-    'scope',
     'edit',
     'replace',
     'corners',
@@ -154,7 +120,6 @@ test('each kind gets its own top bar; several layers add Line up, Combine for sh
   ])
   // Several boxes have their own Stack panel, and the action that puts them in one stack is named apart.
   expect(await items(['card', 'cardB'])).toEqual([
-    'scope',
     'colour',
     'outline',
     'stack',
@@ -166,19 +131,20 @@ test('each kind gets its own top bar; several layers add Line up, Combine for sh
     'autoLayout',
   ])
   await expect(page.getByTestId('top-bar').locator('[data-action="autoLayout"]')).toHaveText('Stack together')
-  // Several layers put in a stack from the bar.
+  // Several layers put in a stack from the bar: the square gains a second box with a layout, its
+  // Story copies none.
   await selectLayers(page, ['box', 'star'])
   await page.getByTestId('top-bar').locator('[data-action="autoLayout"]').click()
-  await expect
-    .poll(() =>
-      page.evaluate(
-        () =>
-          Object.values(window.dazbee?.design().nodes ?? {}).filter(
-            (n) => n.type === 'box' && (n.props as { layout?: unknown }).layout !== undefined,
-          ).length,
-      ),
+  const stacks = (frameId: string) =>
+    page.evaluate(
+      (frameId) =>
+        Object.values(window.dazbee?.design().nodes ?? {}).filter(
+          (n) => n.type === 'box' && n.parentId === frameId && (n.props as { layout?: unknown }).layout !== undefined,
+        ).length,
+      frameId,
     )
-    .toBe(2)
+  await expect.poll(() => stacks('sq')).toBe(2)
+  expect(await stacks('st')).toBe(1)
   expect(errors).toEqual([])
 })
 
@@ -187,14 +153,8 @@ test('text: bold turns on and off as one undo step each, the size steps and take
 }) => {
   const asset = await upload(photo)
   const { page, errors } = await openStage(browser, topBarDesign(asset.id))
-  // With two formats a change goes to the one shown, as a drag does: Square's own values over the base.
   const style = () =>
-    page.evaluate(() => {
-      const d = window.dazbee?.design()
-      return (
-        { ...d?.nodes.headline?.props, ...d?.overrides['format:sq']?.headline } as { style: Record<string, unknown> }
-      ).style
-    })
+    page.evaluate(() => (window.dazbee?.design().nodes.headline?.props as { style: Record<string, unknown> }).style)
   await selectLayers(page, ['headline'])
   await expect(page.getByTestId('bar-font')).toHaveText('Noto Sans')
   await expect(page.getByTestId('bar-size-field')).toHaveValue('64')
@@ -228,9 +188,7 @@ test('text: bold turns on and off as one undo step each, the size steps and take
   expect(errors).toEqual([])
 })
 
-test('a panel closes when another layer is picked or its layer is removed, and the scope goes back to this size once nothing is selected', async ({
-  browser,
-}) => {
+test('a panel closes when another layer is picked or its layer is removed', async ({ browser }) => {
   const asset = await upload(photo)
   const { page, errors } = await openStage(browser, topBarDesign(asset.id))
   await selectLayers(page, ['box'])
@@ -240,16 +198,6 @@ test('a panel closes when another layer is picked or its layer is removed, and t
   await barMenu(page, 'position')
   await page.evaluate(() => window.dazbee?.session.run('node.delete', { ids: ['star'] }))
   await expect(page.locator('#edit-panel')).toHaveCount(0)
-
-  await selectLayers(page, ['box'])
-  await expect(page.getByTestId('scope-chip')).toHaveText(/Only Square/)
-  await page.getByTestId('scope-chip').click()
-  await page.getByTestId('scope-menu').getByRole('radio', { name: 'All sizes' }).click()
-  await expect(page.getByTestId('scope-chip')).toHaveText(/all sizes/i)
-  await page.keyboard.press('Escape')
-  await selectLayers(page, [])
-  await selectLayers(page, ['box'])
-  await expect(page.getByTestId('scope-chip')).toHaveText(/Only Square/)
   expect(errors).toEqual([])
 })
 
@@ -263,10 +211,7 @@ test('undo and redo in the header pill: off with nothing to do, each a step, and
   await expect(undo).toBeDisabled()
   await expect(redo).toBeDisabled()
   const opacity = () =>
-    page.evaluate(() => {
-      const d = window.dazbee?.design()
-      return ({ ...d?.nodes.box?.props, ...d?.overrides['format:sq']?.box } as { opacity?: number }).opacity ?? 1
-    })
+    page.evaluate(() => (window.dazbee?.design().nodes.box?.props as { opacity?: number }).opacity ?? 1)
   await selectLayers(page, ['box'])
   const menu = await barMenu(page, 'transparency')
   const field = menu.locator('[data-scrub="Opacity"]')
@@ -289,7 +234,7 @@ test('undo and redo in the header pill: off with nothing to do, each a step, and
   expect(errors).toEqual([])
 })
 
-test('the small menu locks, duplicates and deletes; the full menu copies, pastes, hides in every size and keeps its menus beside', async ({
+test('the small menu locks, duplicates and deletes; the full menu copies, pastes and keeps its menus beside', async ({
   browser,
 }) => {
   const asset = await upload(photo)
@@ -318,19 +263,8 @@ test('the small menu locks, duplicates and deletes; the full menu copies, pastes
   await moreAction(page, 'Paste')
   await expect.poll(nodes).toBe(before + 1)
 
-  await selectLayers(page, ['box'])
-  await moreAction(page, 'Hide in every size')
-  await expect
-    .poll(() =>
-      page.evaluate(() => {
-        const d = window.dazbee?.design()
-        return ['sq', 'st'].map(
-          (f) => (({ ...d?.nodes.box?.props, ...d?.overrides[`format:${f}`]?.box }) as { visible?: boolean }).visible,
-        )
-      }),
-    )
-    .toEqual([false, false])
   // Order opens beside its row with the arrow and closes with the arrow back.
+  await selectLayers(page, ['box'])
   const full = await moreMenu(page)
   await full.getByTestId('more-order').focus()
   await page.keyboard.press('ArrowRight')

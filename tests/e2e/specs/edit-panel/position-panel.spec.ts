@@ -6,6 +6,7 @@ import type { DesignInput } from '@dazbee/schema'
 import { writeOutput } from '../../support/editor.ts'
 import { enter } from '../../support/fields.ts'
 import { SCREEN_SIZES } from '../../support/layout.ts'
+import { frameDesign } from '../../support/seed.ts'
 import { fitSettled, nextFrame, openStage, order, perform, props, selectLayers } from '../../support/stage.ts'
 import { expect, type Page, test } from '../../support/test.ts'
 import { barMenu } from '../../support/top-bar.ts'
@@ -21,7 +22,7 @@ const rect = (
   width: number,
   height: number,
   color: string,
-  parentId = 'p1',
+  parentId = 'sq',
 ) => ({
   type: 'graphic' as const,
   parentId,
@@ -30,53 +31,52 @@ const rect = (
   props: { x, y, width, height, shape: { kind: 'rect' as const, cornerRadius: 12 }, fills: solid(color) },
 })
 
-const design = (): DesignInput => ({
-  meta: { designId: 'replaced-by-the-api', name: 'Position', kind: 'single', primaryFormatId: 'sq' },
-  formats: { sq: { name: 'Square', width: 1080, height: 1080, order: 'a0' } },
-  pages: { p1: { name: 'Page 1', order: 'a0', fills: solid('#FFF8F0FF') } },
-  nodes: {
-    headline: {
-      type: 'text',
-      parentId: 'p1',
-      index: 'a0',
-      name: 'Headline',
-      props: {
-        x: 120,
-        y: 80,
-        width: 640,
-        height: 90,
-        boxMode: 'autoHeight',
-        text: 'Summer sale',
-        style: { fontFamily: 'Noto Sans', fontSize: 64, fontWeight: 400, color: '#111111FF' },
+const design = (): DesignInput =>
+  frameDesign({
+    name: 'Position',
+    fills: solid('#FFF8F0FF'),
+    nodes: {
+      headline: {
+        type: 'text',
+        parentId: 'sq',
+        index: 'a0',
+        name: 'Headline',
+        props: {
+          x: 120,
+          y: 80,
+          width: 640,
+          height: 90,
+          boxMode: 'autoHeight',
+          text: 'Summer sale',
+          style: { fontFamily: 'Noto Sans', fontSize: 64, fontWeight: 400, color: '#111111FF' },
+        },
       },
+      one: rect('One', 'a1', 120, 300, 200, 100, '#FCA311FF'),
+      two: rect('Two', 'a2', 400, 340, 160, 160, '#14213DFF'),
+      three: rect('Three', 'a3', 700, 380, 120, 120, '#E0262BFF'),
+      group: {
+        type: 'group',
+        parentId: 'sq',
+        index: 'a4',
+        name: 'Group',
+        props: { x: 120, y: 700, width: 400, height: 200 },
+      },
+      g1: rect('G1', 'a0', 120, 700, 180, 200, '#2A9D8FFF', 'group'),
+      g2: rect('G2', 'a1', 340, 700, 180, 200, '#E0157FFF', 'group'),
     },
-    one: rect('One', 'a1', 120, 300, 200, 100, '#FCA311FF'),
-    two: rect('Two', 'a2', 400, 340, 160, 160, '#14213DFF'),
-    three: rect('Three', 'a3', 700, 380, 120, 120, '#E0262BFF'),
-    group: {
-      type: 'group',
-      parentId: 'p1',
-      index: 'a4',
-      name: 'Group',
-      props: { x: 120, y: 700, width: 400, height: 200 },
-    },
-    g1: rect('G1', 'a0', 120, 700, 180, 200, '#2A9D8FFF', 'group'),
-    g2: rect('G2', 'a1', 340, 700, 180, 200, '#E0157FFF', 'group'),
-  },
-  overrides: {},
-})
+  })
 
 const panel = (page: Page) => barMenu(page, 'position')
 const button = async (page: Page, name: string | RegExp) =>
   (await panel(page)).getByRole('button', { name, exact: typeof name === 'string' })
 
-test('one layer: the moves along the stack, lining up with the size by name, and the numbers under Advanced', async ({
+test('one layer: the moves along the stack, lining up with the frame by name, and the numbers under Advanced', async ({
   browser,
 }) => {
   const { page, errors } = await openStage(browser, design())
   await selectLayers(page, ['one'], { bar: true })
   const part = (await panel(page)).getByTestId('arrange-part')
-  await expect(part.getByRole('heading')).toHaveText(['Arrange', 'Line up with the size'])
+  await expect(part.getByRole('heading')).toHaveText(['Arrange', 'Line up with the frame'])
   await expect(part.getByRole('button')).toHaveText([
     'Forward',
     'Backward',
@@ -103,7 +103,7 @@ test('one layer: the moves along the stack, lining up with the size by name, and
   await perform(page, 'undo')
   await expect.poll(() => order(page)).toEqual(['one', 'headline', 'two', 'three', 'group'])
 
-  // One layer lines up with the size it is in.
+  // One layer lines up with the frame it is in.
   await (await button(page, 'Right')).click()
   await expect.poll(async () => (await props(page, 'one')).x).toBe(880)
   await (await button(page, 'Bottom')).click()

@@ -4,8 +4,9 @@
 import type { DesignInput } from '@dazbee/schema'
 
 import { writeOutput } from '../../support/editor.ts'
-import { layerIds, layersDesign, openLayers, rect, ROW, row, tabIntoTree, tree } from '../../support/layers-panel.ts'
+import { layerIds, openLayers, rect, ROW, row, tabIntoTree, tree } from '../../support/layers-panel.ts'
 import { PERF, report, spread } from '../../support/perf.ts'
+import { frameDesign, type Seeded } from '../../support/seed.ts'
 import { openStage, props, selection } from '../../support/stage.ts'
 import { expect, type Locator, type Page, test } from '../../support/test.ts'
 
@@ -16,18 +17,18 @@ const WHEEL = 420
 
 /** A design of 300 layers. */
 const threeHundred = (): DesignInput => {
-  const nodes: DesignInput['nodes'] = {}
+  const nodes: Record<string, Seeded> = {}
   for (let i = 0; i < 300; i++) {
     const index = `a${String(i).padStart(3, '0')}`
     nodes[`n${i}`] = {
       type: 'graphic',
-      parentId: 'p1',
+      parentId: 'sq',
       index,
       name: `Layer ${i + 1}`,
       props: rect(20 + (i % 20) * 52, 20 + Math.floor(i / 20) * 70, 44, 60, i % 2 ? '#14213DFF' : '#FCA311FF'),
     }
   }
-  return { ...layersDesign(), nodes }
+  return frameDesign({ name: 'Layers panel', nodes })
 }
 
 /**

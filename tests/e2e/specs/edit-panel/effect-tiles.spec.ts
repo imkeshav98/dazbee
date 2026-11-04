@@ -7,13 +7,14 @@ import type { DesignInput } from '@dazbee/schema'
 import { photo, upload } from '../../support/assets.ts'
 import { writeOutput } from '../../support/editor.ts'
 import { choose } from '../../support/fields.ts'
+import { frameDesign, type Seeded } from '../../support/seed.ts'
 import { openStage, perform, selectLayers } from '../../support/stage.ts'
 import { expect, type Page, test } from '../../support/test.ts'
 import { barMenu } from '../../support/top-bar.ts'
 
 test.describe.configure({ timeout: 120_000 })
 
-type Node = DesignInput['nodes'][string]
+type Node = Seeded
 const shape = (
   name: string,
   index: string,
@@ -32,65 +33,59 @@ const shape = (
     props: { x, y, width: 260, height: 260, shape: { kind, ...extra }, fills: [{ type: 'solid', color }] },
   }) as Node
 
-const design = (assetId: string): DesignInput => ({
-  meta: {
-    designId: 'replaced-by-the-api',
+const design = (assetId: string): DesignInput =>
+  frameDesign({
     name: 'Effect tiles',
-    kind: 'single',
-    primaryFormatId: 'sq',
-  },
-  formats: { sq: { name: 'Square', width: 1080, height: 1080, order: 'a0' } },
-  pages: { p1: { name: 'Page 1', order: 'a0', fills: [{ type: 'solid', color: '#FFF8F0FF' }] } },
-  nodes: {
-    star: shape('Star', 'a0', 'p1', 120, 120, 'star', '#FF2E7EFF', { points: 5 }),
-    photo: {
-      type: 'graphic',
-      parentId: 'p1',
-      index: 'a1',
-      name: 'Photo',
-      props: {
-        x: 640,
-        y: 120,
-        width: 320,
-        height: 260,
-        shape: { kind: 'rect', cornerRadius: 24 },
-        fills: [{ type: 'image', assetId, fit: 'fill' }],
+    fills: [{ type: 'solid', color: '#FFF8F0FF' }],
+    nodes: {
+      star: shape('Star', 'a0', 'sq', 120, 120, 'star', '#FF2E7EFF', { points: 5 }),
+      photo: {
+        type: 'graphic',
+        parentId: 'sq',
+        index: 'a1',
+        name: 'Photo',
+        props: {
+          x: 640,
+          y: 120,
+          width: 320,
+          height: 260,
+          shape: { kind: 'rect', cornerRadius: 24 },
+          fills: [{ type: 'image', assetId, fit: 'fill' }],
+        },
+      },
+      headline: {
+        type: 'text',
+        parentId: 'sq',
+        index: 'a2',
+        name: 'Headline',
+        props: {
+          x: 120,
+          y: 520,
+          width: 400,
+          height: 80,
+          text: 'Run lighter',
+          boxMode: 'autoWidth',
+          style: { fontFamily: 'Noto Sans', fontSize: 64, fontWeight: 800, color: '#2F6BFFFF' },
+        },
+      },
+      pair: {
+        type: 'group',
+        parentId: 'sq',
+        index: 'a3',
+        name: 'Pair',
+        props: { x: 600, y: 600, width: 400, height: 260 },
+      },
+      left: shape('Left', 'a0', 'pair', 600, 600, 'ellipse', '#00A88AFF'),
+      right: shape('Right', 'a1', 'pair', 740, 600, 'rect', '#FFB020FF'),
+      card: {
+        type: 'box',
+        parentId: 'sq',
+        index: 'a4',
+        name: 'Card',
+        props: { x: 120, y: 760, width: 300, height: 200, fills: [{ type: 'solid', color: '#14213DFF' }] },
       },
     },
-    headline: {
-      type: 'text',
-      parentId: 'p1',
-      index: 'a2',
-      name: 'Headline',
-      props: {
-        x: 120,
-        y: 520,
-        width: 400,
-        height: 80,
-        text: 'Run lighter',
-        boxMode: 'autoWidth',
-        style: { fontFamily: 'Noto Sans', fontSize: 64, fontWeight: 800, color: '#2F6BFFFF' },
-      },
-    },
-    pair: {
-      type: 'group',
-      parentId: 'p1',
-      index: 'a3',
-      name: 'Pair',
-      props: { x: 600, y: 600, width: 400, height: 260 },
-    },
-    left: shape('Left', 'a0', 'pair', 600, 600, 'ellipse', '#00A88AFF'),
-    right: shape('Right', 'a1', 'pair', 740, 600, 'rect', '#FFB020FF'),
-    card: {
-      type: 'box',
-      parentId: 'p1',
-      index: 'a4',
-      name: 'Card',
-      props: { x: 120, y: 760, width: 300, height: 200, fills: [{ type: 'solid', color: '#14213DFF' }] },
-    },
-  },
-  overrides: {},
-})
+  })
 
 const panel = (page: Page) => barMenu(page, 'effects')
 const tiles = async (page: Page) => (await panel(page)).locator('[data-tile]')

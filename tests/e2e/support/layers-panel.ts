@@ -2,6 +2,7 @@
 // layers in the document, and Tab into the tree.
 import type { DesignInput } from '@dazbee/schema'
 
+import { frameDesign } from './seed.ts'
 import { read } from './stage.ts'
 import { expect, type Page } from './test.ts'
 
@@ -17,55 +18,48 @@ export const rect = (x: number, y: number, width: number, height: number, color:
   fills: [{ type: 'solid' as const, color }],
 })
 
-export const layersDesign = (): DesignInput => ({
-  meta: {
-    designId: 'replaced-by-the-api',
+export const layersDesign = (): DesignInput =>
+  frameDesign({
     name: 'Layers panel',
-    kind: 'single',
-    primaryFormatId: 'sq',
-  },
-  formats: { sq: { name: 'Square', width: 1080, height: 1080, order: 'a0' } },
-  pages: { p1: { name: 'Page 1', order: 'a0', fills: [{ type: 'solid', color: '#FFFFFFFF' }] } },
-  nodes: {
-    backdrop: {
-      type: 'graphic',
-      parentId: 'p1',
-      index: 'a0',
-      name: 'Backdrop',
-      props: rect(40, 40, 1000, 1000, '#F4EDE4FF'),
+    nodes: {
+      backdrop: {
+        type: 'graphic',
+        parentId: 'sq',
+        index: 'a0',
+        name: 'Backdrop',
+        props: rect(40, 40, 1000, 1000, '#F4EDE4FF'),
+      },
+      card: {
+        type: 'group',
+        parentId: 'sq',
+        index: 'a1',
+        name: 'Card',
+        props: { x: 120, y: 620, width: 520, height: 300 },
+      },
+      c1: {
+        type: 'graphic',
+        parentId: 'card',
+        index: 'a0',
+        name: 'Card back',
+        props: rect(120, 620, 520, 300, '#14213DFF'),
+      },
+      c2: {
+        type: 'graphic',
+        parentId: 'card',
+        index: 'a1',
+        name: 'Card stripe',
+        props: rect(160, 660, 440, 60, '#FCA311FF'),
+      },
+      box: { type: 'graphic', parentId: 'sq', index: 'a2', name: 'Box', props: rect(120, 120, 400, 300, '#E0262BFF') },
+      dot: {
+        type: 'graphic',
+        parentId: 'sq',
+        index: 'a3',
+        name: 'Dot',
+        props: { ...rect(700, 680, 200, 200, '#1F9D55FF'), shape: { kind: 'ellipse' as const } },
+      },
     },
-    card: {
-      type: 'group',
-      parentId: 'p1',
-      index: 'a1',
-      name: 'Card',
-      props: { x: 120, y: 620, width: 520, height: 300 },
-    },
-    c1: {
-      type: 'graphic',
-      parentId: 'card',
-      index: 'a0',
-      name: 'Card back',
-      props: rect(120, 620, 520, 300, '#14213DFF'),
-    },
-    c2: {
-      type: 'graphic',
-      parentId: 'card',
-      index: 'a1',
-      name: 'Card stripe',
-      props: rect(160, 660, 440, 60, '#FCA311FF'),
-    },
-    box: { type: 'graphic', parentId: 'p1', index: 'a2', name: 'Box', props: rect(120, 120, 400, 300, '#E0262BFF') },
-    dot: {
-      type: 'graphic',
-      parentId: 'p1',
-      index: 'a3',
-      name: 'Dot',
-      props: { ...rect(700, 680, 200, 200, '#1F9D55FF'), shape: { kind: 'ellipse' as const } },
-    },
-  },
-  overrides: {},
-})
+  })
 
 export const tree = (page: Page) => page.getByRole('tree')
 export const row = (page: Page, name: string) =>
@@ -85,7 +79,7 @@ export const listed = (page: Page) =>
     )
 export const node = async (page: Page, id: string) =>
   (await read(page)).nodes[id] as unknown as { parentId: string; name: string; lock?: Record<string, boolean> }
-/** The colour the export render draws at a design pixel. */
+/** The colour the export render draws at a design pixel of the square. */
 export const colourAt = (page: Page, x: number, y: number) =>
   page.evaluate(
     ([x, y]) => {

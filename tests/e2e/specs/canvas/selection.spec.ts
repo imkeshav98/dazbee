@@ -51,23 +51,40 @@ const design = (): DesignInput => {
       ...base.nodes,
       tilt: {
         type: 'graphic',
-        parentId: 'p1',
+        parentId: 'sq',
+        link: 'tilt',
         index: 'a4',
         name: 'Tilt',
         props: rect(560, 820, 300, 120, '#8E44FFFF', { rotation: 30 }),
       },
       g: {
         type: 'group',
-        parentId: 'p1',
+        parentId: 'sq',
+        link: 'g',
         index: 'a5',
         name: 'Group',
         props: { x: 120, y: 860, width: 200, height: 160 },
       },
-      g1: { type: 'graphic', parentId: 'g', index: 'a0', name: 'G1', props: rect(120, 860, 90, 160, '#00A889FF') },
-      g2: { type: 'graphic', parentId: 'g', index: 'a1', name: 'G2', props: rect(230, 860, 90, 160, '#FFB020FF') },
+      g1: {
+        type: 'graphic',
+        parentId: 'g',
+        link: 'g1',
+        index: 'a0',
+        name: 'G1',
+        props: rect(120, 860, 90, 160, '#00A889FF'),
+      },
+      g2: {
+        type: 'graphic',
+        parentId: 'g',
+        link: 'g2',
+        index: 'a1',
+        name: 'G2',
+        props: rect(230, 860, 90, 160, '#FFB020FF'),
+      },
       locked: {
         type: 'graphic',
-        parentId: 'p1',
+        parentId: 'sq',
+        link: 'locked',
         index: 'a6',
         name: 'Locked',
         props: rect(900, 900, 140, 140, '#444444FF'),
@@ -75,7 +92,8 @@ const design = (): DesignInput => {
       },
       ghost: {
         type: 'graphic',
-        parentId: 'p1',
+        parentId: 'sq',
+        link: 'ghost',
         index: 'a7',
         name: 'Ghost',
         props: rect(420, 360, 120, 80, '#FF00FFFF', { visible: false }),
@@ -324,10 +342,10 @@ test('nudge, duplicate, z-order, lock, hide and delete from the keyboard', async
   for (let i = 0; i < 4; i++) await press(page, 'undo')
   expect(await order(page)).toEqual(start)
 
-  // Hide in this format: the layer stays selected so it can be shown again, and can't be hit meanwhile.
+  // Hide: the layer stays selected so it can be shown again, and can't be hit meanwhile.
   await click(page, 820, 240)
   await press(page, 'hide')
-  expect((await read(page)).overrides['format:sq']?.dot?.visible).toBe(false)
+  expect((await read(page)).nodes.dot?.props.visible).toBe(false)
   expect(await selection(page)).toEqual(['dot'])
   writeOutput('selection-6-hidden.png', await page.screenshot())
   await press(page, 'deselect')

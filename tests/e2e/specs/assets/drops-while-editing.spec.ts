@@ -1,14 +1,12 @@
 // Images dropped from the computer whose uploads finish while something else goes on: a text being
-// typed into, an open pen path, a drag on the canvas, or the format they were dropped on going
-// away.
+// typed into, an open pen path, a drag on the canvas, or the frame they were dropped on being
+// deleted.
 import { randomUUID } from 'node:crypto'
-
-import type { DesignInput } from '@dazbee/schema'
 
 import { card1, card2, figmaBadge } from '../../support/assets.ts'
 import { screenPoint, writeOutput } from '../../support/editor.ts'
 import { assetsOf, dropDesign, dropFiles, images, routeUploads } from '../../support/file-drops.ts'
-import { newBrand } from '../../support/seed.ts'
+import { linkedFrames, newBrand, type Seeded } from '../../support/seed.ts'
 import { openStage, props, read } from '../../support/stage.ts'
 import { expect, test } from '../../support/test.ts'
 
@@ -18,9 +16,9 @@ test('images that finish uploading while a text is typed into end the typing and
   browser,
 }) => {
   const brandId = await newBrand('e2e dropped files')
-  const title: DesignInput['nodes'][string] = {
+  const title: Seeded = {
     type: 'text',
-    parentId: 'p1',
+    parentId: 'sq',
     index: 'a0',
     name: 'Title',
     props: {
@@ -112,9 +110,9 @@ test('images that finish uploading while a layer is dragged on the canvas go on 
   browser,
 }) => {
   const brandId = await newBrand('e2e dropped files')
-  const square: DesignInput['nodes'][string] = {
+  const square: Seeded = {
     type: 'graphic',
-    parentId: 'p1',
+    parentId: 'sq',
     index: 'a0',
     name: 'Square',
     props: {
@@ -128,7 +126,7 @@ test('images that finish uploading while a layer is dragged on the canvas go on 
   }
   const { page, errors } = await openStage(browser, dropDesign({ square }), { brandId })
   const release = await routeUploads(page, brandId, { hold: true })
-  // Where the square is in the square format: a drag on the stage writes that format's override.
+  // Where the square is in its frame: a drag on the stage moves it there.
   const x = async () => (await props(page, 'square')).x
 
   const files = [
@@ -159,13 +157,13 @@ test('images that finish uploading while a layer is dragged on the canvas go on 
   expect(errors).toEqual([])
 })
 
-test('an SVG file whose format goes while it uploads is not placed, and the notice says it is in the library', async ({
+test('an SVG file whose frame is deleted while it uploads is not placed, and the notice says it is in the library', async ({
   browser,
 }) => {
   const brandId = await newBrand('e2e dropped files')
   const { page, errors } = await openStage(
     browser,
-    dropDesign({}, { formats: { wide: { name: 'Wide', width: 1920, height: 1080, order: 'a1' } } }),
+    linkedFrames(dropDesign(), [{ id: 'wide', name: 'Wide', width: 1920, height: 1080 }]),
     { brandId },
   )
   await page.evaluate(() => window.dazbee?.setCamera({ x: 40, y: 80, zoom: 0.35 }))
@@ -174,16 +172,17 @@ test('an SVG file whose format goes while it uploads is not placed, and the noti
 
   const name = `Badge ${randomUUID().slice(0, 8)}`
   expect(
-    await dropFiles(page, await screenPoint(page, 500, 500, { pageId: 'p1', formatId: 'wide' }), [
+    await dropFiles(page, await screenPoint(page, 500, 500, 'wide'), [
       { name: `${name}.svg`, type: 'image/svg+xml', bytes: figmaBadge },
     ]),
   ).toBe(true)
-  await page.evaluate(() => window.dazbee?.session.run('format.remove', { id: 'wide' }))
+  await page.evaluate(() => window.dazbee?.session.run('frame.delete', { frameId: 'wide' }))
   release()
 
   await expect(page.getByTestId('notice-toast')).toContainText('Uploaded to the library', { timeout: 30_000 })
   expect(Object.values((await read(page)).nodes)).toEqual([])
   expect((await assetsOf(brandId)).map((a) => a.name)).toEqual([name])
-  writeOutput('dropped-files-9-format-gone.png', await page.screenshot())
+  expect(Object.keys((await read(page)).frames)).toEqual(['sq'])
+  writeOutput('dropped-files-9-frame-gone.png', await page.screenshot())
   expect(errors).toEqual([])
 })

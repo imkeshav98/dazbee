@@ -5,39 +5,34 @@ import type { DesignInput } from '@dazbee/schema'
 
 import { writeOutput } from '../../support/editor.ts'
 import { enter } from '../../support/fields.ts'
+import { frameDesign } from '../../support/seed.ts'
 import { openStage } from '../../support/stage.ts'
 import { expect, type Page, test } from '../../support/test.ts'
 import { barMenu, openCard } from '../../support/top-bar.ts'
 
 test.describe.configure({ timeout: 120_000 })
 
-const design = (): DesignInput => ({
-  meta: {
-    designId: 'replaced-by-the-api',
+const design = (): DesignInput =>
+  frameDesign({
     name: 'Paragraphs',
-    kind: 'single',
-    primaryFormatId: 'sq',
-  },
-  formats: { sq: { name: 'Square', width: 1080, height: 1080, order: 'a0' } },
-  pages: { p1: { name: 'Page 1', order: 'a0', fills: [{ type: 'solid', color: '#FFF8F0FF' }] } },
-  nodes: {
-    copy: {
-      type: 'text',
-      parentId: 'p1',
-      index: 'a0',
-      name: 'Copy',
-      props: {
-        x: 80,
-        y: 80,
-        width: 920,
-        height: 600,
-        text: 'Cold brew is back\nOat milk on the house\nEvery weekend this summer',
-        style: { fontFamily: 'Noto Sans', fontSize: 72, fontWeight: 800, color: '#1A1420FF' },
+    fills: [{ type: 'solid', color: '#FFF8F0FF' }],
+    nodes: {
+      copy: {
+        type: 'text',
+        parentId: 'sq',
+        index: 'a0',
+        name: 'Copy',
+        props: {
+          x: 80,
+          y: 80,
+          width: 920,
+          height: 600,
+          text: 'Cold brew is back\nOat milk on the house\nEvery weekend this summer',
+          style: { fontFamily: 'Noto Sans', fontSize: 72, fontWeight: 800, color: '#1A1420FF' },
+        },
       },
     },
-  },
-  overrides: {},
-})
+  })
 
 type TextProps = Record<string, unknown> & { style: Record<string, unknown> }
 const copy = (page: Page) => page.evaluate(() => window.dazbee?.design().nodes.copy?.props) as Promise<TextProps>

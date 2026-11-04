@@ -31,7 +31,7 @@ const design = (): DesignInput => {
 
 type Placed = { x: number; y: number; width: number; height: number; rotation: number }
 const rectOf = (d: Design, id: string): Placed => {
-  const p = { ...d.nodes[id]?.props, ...d.overrides['format:sq']?.[id] } as Partial<Placed>
+  const p = { ...d.nodes[id]?.props } as Partial<Placed>
   return { x: p.x ?? 0, y: p.y ?? 0, width: p.width ?? 0, height: p.height ?? 0, rotation: p.rotation ?? 0 }
 }
 const kids = (d: Design, id: string) =>
@@ -77,7 +77,7 @@ test('every shape draws with real input: the dock, its menu, its keys, and Shift
   const rectangle = await draw(page, { x: 100, y: 820 }, { x: 220, y: 900 })
   expect(rectangle.node).toMatchObject({
     type: 'graphic',
-    parentId: 'p1',
+    parentId: 'sq',
     name: 'Rectangle',
     props: { shape: { kind: 'rect' } },
   })
@@ -172,7 +172,7 @@ test('the shape menu holds Box after Rectangle and Ellipse, and Box draws a box 
   const lone = await draw(page, { x: 100, y: 820 }, { x: 300, y: 960 })
   expect(lone.node).toMatchObject({
     type: 'box',
-    parentId: 'p1',
+    parentId: 'sq',
     name: 'Box',
     props: { fills: [{ type: 'solid', color: '#FFFFFFFF' }] },
   })
@@ -192,7 +192,7 @@ test('the shape menu holds Box after Rectangle and Ellipse, and Box draws a box 
   await press(page, 'undo')
   d = await read(page)
   expect(d.nodes[around.id]).toBeUndefined()
-  expect(d.nodes.dot?.parentId).toBe('p1')
+  expect(d.nodes.dot?.parentId).toBe('sq')
   await press(page, 'redo')
   d = await read(page)
   expect(d.nodes[around.id]).toMatchObject({ type: 'box', name: 'Box' })
@@ -280,7 +280,7 @@ test('two shapes combine into a live boolean that follows a shape dragged inside
   const [cut = ''] = await selection(page)
   expect(d.nodes[cut]).toMatchObject({
     type: 'boolean',
-    parentId: 'p1',
+    parentId: 'sq',
     props: { op: 'subtract', fills: back.node.props.fills },
   })
   expect(kids(d, cut)).toEqual([back.id, front.id])

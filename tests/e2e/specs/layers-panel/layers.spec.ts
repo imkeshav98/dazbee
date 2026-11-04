@@ -45,7 +45,7 @@ test('the panel and the stage select together; drag into a group, rename, lock a
   expect(await colourAt(page, 800, 780)).toEqual([31, 157, 85])
   // One undo puts it back; redo puts it in again, and the panel follows both.
   await page.evaluate(() => window.dazbee?.perform('undo'))
-  await expect.poll(async () => (await node(page, 'dot')).parentId).toBe('p1')
+  await expect.poll(async () => (await node(page, 'dot')).parentId).toBe('sq')
   expect(await page.evaluate(() => window.dazbee?.boxOf('card'))).toEqual(before)
   await page.evaluate(() => window.dazbee?.perform('redo'))
   await expect.soft.poll(async () => (await node(page, 'dot')).parentId).toBe('card')
@@ -54,7 +54,7 @@ test('the panel and the stage select together; drag into a group, rename, lock a
     .toEqual(['Box', 'Card', '  Dot', '  Card stripe', '  Card back', 'Backdrop'])
   expect.soft(await page.evaluate(() => window.dazbee?.boxOf('card'))).toEqual(after)
   await page.evaluate(() => window.dazbee?.perform('undo'))
-  await expect.poll(async () => (await node(page, 'dot')).parentId).toBe('p1')
+  await expect.poll(async () => (await node(page, 'dot')).parentId).toBe('sq')
 
   // Drag Backdrop above Box: reordered among its siblings.
   const box = await row(page, 'Box').boundingBox()

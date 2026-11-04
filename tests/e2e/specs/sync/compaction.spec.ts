@@ -3,31 +3,19 @@
 // opens it next sees the same design and the same export.
 import { designOf, exportHashOf, openTabs, settle, writeOutput } from '../../support/editor.ts'
 import { storedSize } from '../../support/local-servers.ts'
-import { liveDesign, seed } from '../../support/seed.ts'
+import { linkedFrames, liveDesign, seed } from '../../support/seed.ts'
 import { expect, type Page, test } from '../../support/test.ts'
 
 test.describe.configure({ timeout: 120_000 })
 
-/**
- * The design as JSON, without override scopes left empty: a scope whose layers were all deleted
- * reads as `{}` until compaction removes its keys, and then not at all. Both mean the same.
- */
-const designWithoutEmptyScopes = async (page: Page) => {
-  const design = JSON.parse(await designOf(page)) as { overrides: Record<string, object> }
-  design.overrides = Object.fromEntries(
-    Object.entries(design.overrides).filter(([, byNode]) => Object.keys(byNode).length > 0),
-  )
-  return design
-}
-
-/** Makes `count` layers, overrides each in the banner format and deletes it, as commands in the tab. */
+/** Makes `count` layers in the banner frame, moves each there and deletes it, as commands in the tab. */
 const makeAndDelete = (page: Page, count: number) =>
   page.evaluate((count) => {
     const editor = window.dazbee
     if (!editor) throw new Error('no editor')
     for (let i = 0; i < count; i++) {
       const id = editor.session.run('node.create', {
-        parentId: 'p1',
+        parentId: 'banner',
         layer: {
           type: 'graphic',
           name: `Try ${i}`,
@@ -41,11 +29,7 @@ const makeAndDelete = (page: Page, count: number) =>
           },
         },
       })
-      editor.session.run('node.update', {
-        ids: [id],
-        scope: 'format:banner',
-        patch: { x: 8, y: 4, width: 40, height: 40 },
-      })
+      editor.session.run('node.update', { ids: [id], patch: { x: 8, y: 4, width: 40, height: 40 } })
       editor.session.run('node.delete', { ids: [id] })
     }
   }, count)
@@ -53,11 +37,7 @@ const makeAndDelete = (page: Page, count: number) =>
 test('undo of a delete still works with another tab connected; once both leave the design is compacted and reopens the same', async ({
   browser,
 }) => {
-  const live = liveDesign()
-  const designId = await seed({
-    ...live,
-    formats: { ...live.formats, banner: { name: 'Banner', width: 1200, height: 628, order: 'a1' } },
-  })
+  const designId = await seed(linkedFrames(liveDesign(), [{ id: 'banner', name: 'Banner', width: 1200, height: 628 }]))
   const { tabs, errors } = await openTabs(browser, 2, designId)
   const [a, b] = tabs as [Page, Page]
 
@@ -67,7 +47,7 @@ test('undo of a delete still works with another tab connected; once both leave t
     const editor = window.dazbee
     if (!editor) throw new Error('no editor')
     const id = editor.session.run('node.create', {
-      parentId: 'p1',
+      parentId: 'sq',
       layer: {
         type: 'graphic',
         name: 'Kept',
@@ -87,7 +67,7 @@ test('undo of a delete still works with another tab connected; once both leave t
   })
   await settle([a, b])
   expect(JSON.parse(await designOf(a)).nodes[kept]).toMatchObject({ name: 'Kept' })
-  const design = await designWithoutEmptyScopes(a)
+  const design = JSON.parse(await designOf(a)) as unknown
   const hash = await exportHashOf(a)
   await expect.poll(() => storedSize(designId), { timeout: 30_000 }).toBeGreaterThan(0)
   // Stored with the deleted layers still in it, while anyone is connected. The size holding for
@@ -118,7 +98,7 @@ test('undo of a delete still works with another tab connected; once both leave t
     errors: againErrors,
   } = await openTabs(browser, 1, designId)
   if (!again) throw new Error('no tab')
-  expect(await designWithoutEmptyScopes(again)).toEqual(design)
+  expect(JSON.parse(await designOf(again))).toEqual(design)
   expect(await exportHashOf(again)).toBe(hash)
   writeOutput('compaction-sizes.json', JSON.stringify({ deletes: 300, before, after }, null, 2))
   writeOutput('compaction-0-reopened.png', await again.screenshot())

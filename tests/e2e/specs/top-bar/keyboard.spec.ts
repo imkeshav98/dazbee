@@ -6,6 +6,7 @@ import type { DesignInput } from '@dazbee/schema'
 
 import { photo, upload } from '../../support/assets.ts'
 import { layoutProblems } from '../../support/layout.ts'
+import { frameDesign } from '../../support/seed.ts'
 import { openStage, read, selection, selectLayers } from '../../support/stage.ts'
 import { expect, type Page, test } from '../../support/test.ts'
 import { barMenu, moreMenu, moreSubmenu, PIECES, UNCUT } from '../../support/top-bar.ts'
@@ -76,12 +77,9 @@ test('the size field steps with the arrows; a pop-up closes when the window chan
   const asset = await upload(photo)
   const { page, errors } = await openStage(browser, topBarDesign(asset.id))
   const size = () =>
-    page.evaluate(() => {
-      const d = window.dazbee?.design()
-      return (
-        { ...d?.nodes.headline?.props, ...d?.overrides['format:sq']?.headline } as { style: { fontSize: number } }
-      ).style.fontSize
-    })
+    page.evaluate(
+      () => (window.dazbee?.design().nodes.headline?.props as { style: { fontSize: number } }).style.fontSize,
+    )
   await selectLayers(page, ['headline'])
   await page.getByTestId('bar-size-field').click()
   await page.keyboard.press('ArrowUp')
@@ -132,34 +130,27 @@ test('⋯ on the top bar leaves an open panel open, and Esc closes the panel fir
 test.describe('the focus as a menu of the bar closes', () => {
   test.describe.configure({ timeout: 120_000 })
 
-  /** One page in one format, holding the layer A. */
-  const oneLayer = (): DesignInput => ({
-    meta: {
-      designId: 'replaced-by-the-api',
+  /** One frame holding the layer A. */
+  const oneLayer = (): DesignInput =>
+    frameDesign({
       name: 'Bar menu focus',
-      kind: 'single',
-      primaryFormatId: 'sq',
-    },
-    formats: { sq: { name: 'Square', width: 1080, height: 1080, order: 'a0' } },
-    pages: { p1: { name: 'Page 1', order: 'a0', fills: [{ type: 'solid', color: '#FFFFFFFF' }] } },
-    nodes: {
-      a: {
-        type: 'graphic',
-        parentId: 'p1',
-        index: 'a0',
-        name: 'A',
-        props: {
-          x: 300,
-          y: 400,
-          width: 300,
-          height: 300,
-          shape: { kind: 'rect' },
-          fills: [{ type: 'solid', color: '#14213DFF' }],
+      nodes: {
+        a: {
+          type: 'graphic',
+          parentId: 'sq',
+          index: 'a0',
+          name: 'A',
+          props: {
+            x: 300,
+            y: 400,
+            width: 300,
+            height: 300,
+            shape: { kind: 'rect' },
+            fills: [{ type: 'solid', color: '#14213DFF' }],
+          },
         },
       },
-    },
-    overrides: {},
-  })
+    })
 
   /** Lets the page's timers run: one set now runs after every timer set before it. */
   const timers = (page: Page) => page.evaluate(() => new Promise((r) => setTimeout(r, 50)))

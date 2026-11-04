@@ -19,6 +19,7 @@ import {
   tabIntoTree,
   tree,
 } from '../../support/layers-panel.ts'
+import { frameDesign, type Seeded } from '../../support/seed.ts'
 import { click, openStage, order, read, selection } from '../../support/stage.ts'
 import { expect, type Page, test } from '../../support/test.ts'
 
@@ -26,10 +27,10 @@ test.describe.configure({ timeout: 120_000 })
 
 /** A layer on top of a group of 60 layers, with a text under them all. */
 const crowd = (): DesignInput => {
-  const nodes: DesignInput['nodes'] = {
+  const nodes: Record<string, Seeded> = {
     note: {
       type: 'text',
-      parentId: 'p1',
+      parentId: 'sq',
       index: 'a0',
       name: 'Note',
       props: {
@@ -43,14 +44,14 @@ const crowd = (): DesignInput => {
     },
     crowd: {
       type: 'group',
-      parentId: 'p1',
+      parentId: 'sq',
       index: 'a1',
       name: 'Crowd',
       props: { x: 40, y: 300, width: 990, height: 200 },
     },
     mover: {
       type: 'graphic',
-      parentId: 'p1',
+      parentId: 'sq',
       index: 'a2',
       name: 'Mover',
       props: rect(600, 800, 200, 200, '#1F9D55FF'),
@@ -65,7 +66,7 @@ const crowd = (): DesignInput => {
       props: rect(40 + (i % 20) * 50, 300 + Math.floor(i / 20) * 70, 40, 60, '#14213DFF'),
     }
   }
-  return { ...layersDesign(), nodes }
+  return frameDesign({ name: 'Layers panel', nodes })
 }
 
 /** Whether the focus is in the layers tree. */
@@ -152,7 +153,7 @@ test('keyboard only: move through the tree, select, rename, lock, hide and move 
   writeOutput('layers-4-keyboard.png', await page.screenshot())
   // Alt+Left takes it out again, just above the group.
   await page.keyboard.press('Alt+ArrowLeft')
-  await expect.poll(async () => (await node(page, 'box')).parentId).toBe('p1')
+  await expect.poll(async () => (await node(page, 'box')).parentId).toBe('sq')
   await expect
     .poll(() => listed(page))
     .toEqual(['Dot', 'Headline plate', 'Card', '  Card stripe', '  Card back', 'Backdrop'])
@@ -387,10 +388,10 @@ test('keyboard only: grouping from the tree puts the focus on the new group, and
 })
 
 test('keyboard only: deleting the only layer and undoing puts the focus back on its row', async ({ browser }) => {
-  const only: DesignInput['nodes'] = {
-    box: { type: 'graphic', parentId: 'p1', index: 'a0', name: 'Box', props: rect(120, 120, 400, 300, '#E0262BFF') },
+  const only: Record<string, Seeded> = {
+    box: { type: 'graphic', parentId: 'sq', index: 'a0', name: 'Box', props: rect(120, 120, 400, 300, '#E0262BFF') },
   }
-  const { page, errors } = await openStage(browser, { ...layersDesign(), nodes: only })
+  const { page, errors } = await openStage(browser, frameDesign({ name: 'Layers panel', nodes: only }))
   await openLayers(page)
   await row(page, 'Box').click()
   await page.keyboard.press('Delete')

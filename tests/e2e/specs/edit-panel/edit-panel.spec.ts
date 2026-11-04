@@ -1,10 +1,11 @@
 // The properties cards (#60) in Chromium, with real input: change each property of one layer and of
-// several, see mixed values, write a change to the format shown only, as a canvas drag does (and an
-// every-format one as the base, with the override gone), and scrub a number as one undo step.
+// several, see mixed values, the change kept to the layer's own frame while its linked copy stays as
+// it was, and scrub a number as one undo step.
 import type { DesignInput } from '@dazbee/schema'
 
 import { writeOutput } from '../../support/editor.ts'
 import { choose, enter } from '../../support/fields.ts'
+import { copyIn, frameDesign, linkedFrames } from '../../support/seed.ts'
 import { openStage, selectLayers } from '../../support/stage.ts'
 import { expect, type Page, test } from '../../support/test.ts'
 import {
@@ -13,7 +14,6 @@ import {
   fillList,
   moreMenu,
   openCard,
-  scopeMenu,
   strokeList,
   textColourHex,
 } from '../../support/top-bar.ts'
@@ -29,85 +29,71 @@ const rect = (x: number, y: number, width: number, height: number, color: string
   fills: [{ type: 'solid' as const, color }],
 })
 
-const design = (): DesignInput => ({
-  meta: {
-    designId: 'replaced-by-the-api',
-    name: 'Properties',
-    kind: 'single',
-    primaryFormatId: 'sq',
-  },
-  formats: {
-    sq: { name: 'Square', width: 1080, height: 1080, order: 'a0' },
-    story: { name: 'Story', width: 1080, height: 1920, order: 'a1' },
-  },
-  pages: { p1: { name: 'Page 1', order: 'a0', fills: [{ type: 'solid', color: '#FFFFFFFF' }] } },
-  nodes: {
-    box: { type: 'graphic', parentId: 'p1', index: 'a0', name: 'Box', props: rect(80, 80, 300, 200, '#E0262BFF') },
-    dot: {
-      type: 'graphic',
-      parentId: 'p1',
-      index: 'a1',
-      name: 'Dot',
-      props: { ...rect(700, 120, 240, 240, '#2F6BFFFF'), shape: { kind: 'ellipse' as const } },
-    },
-    headline: {
-      type: 'text',
-      parentId: 'p1',
-      index: 'a2',
-      name: 'Headline',
-      props: {
-        x: 80,
-        y: 480,
-        width: 920,
-        height: 120,
-        text: 'Summer sale',
-        style: { fontFamily: 'Noto Sans', fontSize: 96, fontWeight: 800, color: '#111111FF' },
+/** A square frame of layers and a Story frame holding their linked copies. */
+const design = (): DesignInput =>
+  linkedFrames(
+    frameDesign({
+      name: 'Properties',
+      nodes: {
+        box: { type: 'graphic', parentId: 'sq', index: 'a0', name: 'Box', props: rect(80, 80, 300, 200, '#E0262BFF') },
+        dot: {
+          type: 'graphic',
+          parentId: 'sq',
+          index: 'a1',
+          name: 'Dot',
+          props: { ...rect(700, 120, 240, 240, '#2F6BFFFF'), shape: { kind: 'ellipse' as const } },
+        },
+        headline: {
+          type: 'text',
+          parentId: 'sq',
+          index: 'a2',
+          name: 'Headline',
+          props: {
+            x: 80,
+            y: 480,
+            width: 920,
+            height: 120,
+            text: 'Summer sale',
+            style: { fontFamily: 'Noto Sans', fontSize: 96, fontWeight: 800, color: '#111111FF' },
+          },
+        },
+        stack: {
+          type: 'box',
+          parentId: 'sq',
+          index: 'a3',
+          name: 'Stack',
+          props: {
+            x: 80,
+            y: 700,
+            width: 600,
+            height: 160,
+            fills: [{ type: 'solid', color: '#F4EDE4FF' }],
+            layout: { direction: 'row', gap: 16, padding: { top: 20, right: 20, bottom: 20, left: 20 } },
+          },
+        },
+        chip1: {
+          type: 'graphic',
+          parentId: 'stack',
+          index: 'a0',
+          name: 'Chip 1',
+          props: rect(100, 720, 120, 120, '#FCA311FF'),
+        },
+        chip2: {
+          type: 'graphic',
+          parentId: 'stack',
+          index: 'a1',
+          name: 'Chip 2',
+          props: rect(236, 720, 120, 120, '#14213DFF'),
+        },
       },
-    },
-    stack: {
-      type: 'box',
-      parentId: 'p1',
-      index: 'a3',
-      name: 'Stack',
-      props: {
-        x: 80,
-        y: 700,
-        width: 600,
-        height: 160,
-        fills: [{ type: 'solid', color: '#F4EDE4FF' }],
-        layout: { direction: 'row', gap: 16, padding: { top: 20, right: 20, bottom: 20, left: 20 } },
-      },
-    },
-    chip1: {
-      type: 'graphic',
-      parentId: 'stack',
-      index: 'a0',
-      name: 'Chip 1',
-      props: rect(100, 720, 120, 120, '#FCA311FF'),
-    },
-    chip2: {
-      type: 'graphic',
-      parentId: 'stack',
-      index: 'a1',
-      name: 'Chip 2',
-      props: rect(236, 720, 120, 120, '#14213DFF'),
-    },
-  },
-  overrides: {},
-})
+    }),
+    [{ id: 'story', name: 'Story', width: 1080, height: 1920 }],
+  )
 
 type Node = { props: Record<string, unknown> }
 const nodes = (page: Page) => page.evaluate(() => window.dazbee?.design().nodes) as Promise<Record<string, Node>>
-const base = async (page: Page, id: string) => (await nodes(page))[id]?.props ?? {}
-const overrides = (page: Page) =>
-  page.evaluate(() => JSON.parse(JSON.stringify(window.dazbee?.design().overrides ?? {}))) as Promise<
-    Record<string, Record<string, Record<string, unknown>>>
-  >
-/** A layer's props as the Square format shows them: the base with Square's own on top. */
-const props = async (page: Page, id: string) => ({
-  ...(await base(page, id)),
-  ...(await overrides(page))['format:sq']?.[id],
-})
+/** A layer's props as the design holds them. */
+const props = async (page: Page, id: string) => (await nodes(page))[id]?.props ?? {}
 
 test('one layer: position, size, turn, opacity, blend, fill, stroke and effects', async ({ browser }) => {
   const { page, errors } = await openStage(browser, design())
@@ -169,10 +155,15 @@ test('one layer: position, size, turn, opacity, blend, fill, stroke and effects'
   await enter(effects.getByRole('spinbutton', { name: 'Drop shadow 1 Blur' }), '40')
   await expect.poll(async () => (await props(page, 'box')).effects).toMatchObject([{ type: 'dropShadow', blur: 40 }])
 
-  // Like a drag, every change is Square's own: the base and Story are as they were.
-  const o = await overrides(page)
-  expect(o['format:sq']?.box).toMatchObject({ x: 140, width: 311, rotation: 15, opacity: 0.5, blendMode: 'multiply' })
-  expect(await base(page, 'box')).toMatchObject({
+  // Like a drag, every change stays in the square: the box's copy in Story is as it was.
+  expect(await props(page, 'box')).toMatchObject({
+    x: 140,
+    width: 311,
+    rotation: 15,
+    opacity: 0.5,
+    blendMode: 'multiply',
+  })
+  expect(await props(page, copyIn('story', 'box'))).toMatchObject({
     ...rect(80, 80, 300, 200, '#E0262BFF'),
     rotation: 0,
     opacity: 1,
@@ -180,7 +171,6 @@ test('one layer: position, size, turn, opacity, blend, fill, stroke and effects'
     strokes: [],
     effects: [],
   })
-  expect(o['format:story']?.box ?? {}).toEqual({})
   await page.evaluate(() => window.dazbee?.drawn())
   writeOutput('props-0-one-layer.png', await page.screenshot())
   expect(errors).toEqual([])
@@ -265,44 +255,6 @@ test('several layers: mixed values, set together or each from its own; text and 
     .toMatchObject({ direction: 'column', gap: 32, padding: { left: 40, top: 20 } })
   await page.evaluate(() => window.dazbee?.drawn())
   writeOutput('props-3-auto-layout.png', await page.screenshot())
-  expect(errors).toEqual([])
-})
-
-test('a change goes to the format shown, like a drag; all formats writes the base and clears it', async ({
-  browser,
-}) => {
-  const { page, errors } = await openStage(browser, design())
-  await selectLayers(page, ['box'], { card: 'layout-card' })
-  const chip = page.getByTestId('scope-chip')
-  await expect(chip).toHaveText('Only Square')
-  await expect((await scopeMenu(page)).getByRole('radio', { name: 'Only Square' })).toHaveAttribute(
-    'aria-checked',
-    'true',
-  )
-  await page.keyboard.press('Escape')
-  const x = async () => (await openCard(page, 'layout-card')).getByRole('spinbutton', { name: 'X position' })
-  await enter(await x(), '500')
-  await enter((await fillList(page)).getByRole('textbox', { name: 'Colour 1 hex' }), '00A889')
-  await expect
-    .poll(async () => (await overrides(page))['format:sq']?.box)
-    .toMatchObject({ x: 500, fills: [{ type: 'solid', color: '#00A889FF' }] })
-  // The base and the other format are as they were.
-  expect((await base(page, 'box')).x).toBe(80)
-  expect((await base(page, 'box')).fills).toEqual([{ type: 'solid', color: '#E0262BFF' }])
-  expect((await overrides(page))['format:story']?.box ?? {}).toEqual({})
-  await expect(await x()).toHaveValue('500')
-  writeOutput('props-4-this-format.png', await page.screenshot())
-
-  // All formats: the value goes to the base and this format's override of it goes.
-  await (await scopeMenu(page)).getByRole('radio', { name: 'All sizes' }).click()
-  await page.keyboard.press('Escape')
-  await expect(chip).toHaveText('For all sizes')
-  await enter(await x(), '200')
-  await expect.poll(async () => (await base(page, 'box')).x).toBe(200)
-  const after = (await overrides(page))['format:sq']?.box ?? {}
-  expect(after).not.toHaveProperty('x')
-  // The fill override stays: only the property changed is made the same everywhere.
-  expect(after).toHaveProperty('fills')
   expect(errors).toEqual([])
 })
 

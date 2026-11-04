@@ -9,16 +9,34 @@ import type { DesignInput } from '@dazbee/schema'
 
 import { designOf, openTabs, placed, screenPoint } from './editor.ts'
 import { DEV_BRAND, type InBrand, seed } from './seed.ts'
-import { barMenu, openCard } from './top-bar.ts'
+import { openCard } from './top-bar.ts'
 
 export interface Design {
-  formats: Record<string, { name: string }>
-  pages: Record<string, { name: string }>
+  pages: Record<string, { name: string; order: string }>
+  frames: Record<
+    string,
+    {
+      pageId: string
+      name: string
+      width: number
+      height: number
+      x: number
+      y: number
+      fills: Record<string, unknown>[]
+      order: string
+    }
+  >
   nodes: Record<
     string,
-    { parentId: string; index: string; name: string; lock?: Record<string, boolean>; props: Record<string, unknown> }
+    {
+      parentId: string
+      link: string
+      index: string
+      name: string
+      lock?: Record<string, boolean>
+      props: Record<string, unknown>
+    }
   >
-  overrides: Record<string, Record<string, Record<string, unknown>>>
 }
 
 /** A layer's box in design pixels. */
@@ -35,8 +53,6 @@ export interface SelectLayers {
   bar?: boolean
   /** Opens the card with this test id, in the top bar's pop-up or panel that holds it. */
   card?: string
-  /** Selects in this format of the first page, and waits for the redraw. */
-  format?: string
 }
 
 /**
@@ -59,7 +75,7 @@ export const drawn = (page: Page) => page.evaluate(() => window.dazbee?.drawn())
 export const nextFrame = (page: Page) =>
   page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))))
 /**
- * Fits every format once the editor has the chrome's insets for the page's size. After a resize
+ * Fits the shown page's frames once the editor has the chrome's insets for the page's size. After a resize
  * they reach the editor a frame or more later, and a fit made before then keeps clear of the old
  * size's chrome; once two fits two frames apart agree, the editor has them. The editor does not
  * expose its insets, so this relies on each step of their update landing within two frames.
@@ -80,7 +96,7 @@ export async function fitSettled(page: Page) {
 }
 export const read = async (page: Page) => JSON.parse(await designOf(page)) as Design
 export const props = async (page: Page, id: string) =>
-  placed(await read(page), id, 'sq') as {
+  placed(await read(page), id) as {
     x: number
     y: number
     width: number
@@ -88,12 +104,8 @@ export const props = async (page: Page, id: string) =>
     rotation?: number
     visible?: boolean
   }
-/** A layer's box as drawn in one frame, auto layout solved: the first page in the primary format by default. */
-export const boxOf = (page: Page, id: string, frame?: { pageId: string; formatId: string }) =>
-  page.evaluate(({ id, frame }) => window.dazbee?.boxOf(id, frame?.pageId, frame?.formatId), {
-    id,
-    frame,
-  }) as Promise<Box>
+/** A layer's box as drawn in its frame, auto layout solved. */
+export const boxOf = (page: Page, id: string) => page.evaluate((id) => window.dazbee?.boxOf(id), id) as Promise<Box>
 export const selection = (page: Page) => page.evaluate(() => window.dazbee?.selection() ?? [])
 /** Presses an action's shortcut and waits for the redraw, so the handles stand where the box now is. */
 export const press = async (page: Page, action: ShortcutAction) => {
@@ -105,26 +117,24 @@ export const perform = async (page: Page, action: ShortcutAction) => {
   await page.evaluate((action) => window.dazbee?.perform(action), action)
   await drawn(page)
 }
-export const order = async (page: Page) =>
+/** The layers at the top of a frame, the square `sq` by default, back to front. */
+export const order = async (page: Page, frameId = 'sq') =>
   Object.entries((await read(page)).nodes)
-    .filter(([, n]) => n.parentId === 'p1')
+    .filter(([, n]) => n.parentId === frameId)
     .sort(([a, x], [b, y]) => (x.index < y.index ? -1 : x.index > y.index ? 1 : a < b ? -1 : 1))
     .map(([id]) => id)
 
-/**
- * Selects layers through the page's editor, in the primary format of the first page unless
- * `format` names another, then waits as the options say.
- */
-export async function selectLayers(page: Page, ids: string[], { bar = false, card, format }: SelectLayers = {}) {
-  await page.evaluate(({ ids, format }) => window.dazbee?.select(ids, undefined, format), { ids, format })
-  if (format) await drawn(page)
+/** Selects layers through the page's editor, in the frame of the first, then waits as the options say. */
+export async function selectLayers(page: Page, ids: string[], { bar = false, card }: SelectLayers = {}) {
+  await page.evaluate((ids) => window.dazbee?.select(ids), ids)
   if (bar && ids.length > 0) await expect(page.getByTestId('top-bar')).toHaveAttribute('data-selection', ids.join(' '))
   else if (bar) await expect(page.getByTestId('top-bar')).toHaveCount(0)
   if (card) await expect(await openCard(page, card)).toBeVisible()
 }
 
 /**
- * Drags with the mouse between two design pixels of the square, in a few steps like a hand would.
+ * Drags with the mouse between two design pixels of the shown page's first frame, in a few steps
+ * like a hand would.
  * Modifier keys go down once the drag has started, as a designer presses Shift mid-drag; with
  * `before` they are held from the press, as for a Shift marquee that adds to the selection.
  */
@@ -172,16 +182,10 @@ export async function handle(page: Page, which: string) {
 export const zoomOf = (page: Page) => page.evaluate(() => window.dazbee?.camera().zoom ?? 1)
 
 /**
- * Picks the page by a click on its background at a design pixel of the first page's primary size
- * (`x`, `y`, on no layer), and waits for its top bar.
+ * Picks the page by a click on its background at a design pixel of its first frame (`x`, `y`, on
+ * no layer), and waits until the editor has it picked.
  */
 export async function pickPage(page: Page, x = 4, y = 4) {
   await click(page, x, y)
-  await expect(page.getByTestId('top-bar')).toHaveAttribute('data-page', /.+/)
-}
-
-/** The picked page's Background panel, picking the page at (`x`, `y`) first when no page is picked. */
-export async function backgroundPanel(page: Page, x = 4, y = 4) {
-  if (!(await page.getByTestId('bar-background').isVisible())) await pickPage(page, x, y)
-  return barMenu(page, 'background')
+  await expect.poll(() => page.evaluate(() => window.dazbee?.pickedPage() ?? null)).not.toBeNull()
 }

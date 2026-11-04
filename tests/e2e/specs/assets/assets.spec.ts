@@ -8,7 +8,7 @@ import { crc32, deflateSync } from 'node:zlib'
 import { AssetSummary, type DesignInput } from '@dazbee/schema'
 
 import { reloads, screenPoint, writeOutput } from '../../support/editor.ts'
-import { API_URL, DEV_BRAND } from '../../support/seed.ts'
+import { API_URL, DEV_BRAND, frameDesign } from '../../support/seed.ts'
 import { openStage, read } from '../../support/stage.ts'
 import { expect, type Page, test } from '../../support/test.ts'
 
@@ -58,18 +58,7 @@ function photo(from: [number, number, number], to: [number, number, number]) {
   ])
 }
 
-const design = (): DesignInput => ({
-  meta: {
-    designId: 'replaced-by-the-api',
-    name: 'Asset library',
-    kind: 'single',
-    primaryFormatId: 'sq',
-  },
-  formats: { sq: { name: 'Square', width: 1080, height: 1080, order: 'a0' } },
-  pages: { p1: { name: 'Page 1', order: 'a0', fills: [{ type: 'solid', color: '#FFFFFFFF' }] } },
-  nodes: {},
-  overrides: {},
-})
+const design = (): DesignInput => frameDesign({ name: 'Asset library', nodes: {} })
 
 /** The graphics on the page filled with an image, and the asset each shows. */
 async function images(page: Page) {
@@ -89,7 +78,7 @@ async function images(page: Page) {
 const exportedAt = (page: Page, x: number, y: number) =>
   page.evaluate(
     async ({ x, y }) => {
-      const file = await window.dazbee?.exportFiles({ pageIds: ['p1'], formatIds: ['sq'], type: 'png' })
+      const file = await window.dazbee?.exportFiles({ frameIds: ['sq'], type: 'png' })
       const bitmap = await createImageBitmap(new Blob([new Uint8Array(file?.bytes ?? [])], { type: 'image/png' }))
       const canvas = new OffscreenCanvas(bitmap.width, bitmap.height)
       const context = canvas.getContext('2d')

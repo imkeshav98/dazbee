@@ -1,45 +1,68 @@
-// The design builders the canvas specs share: the five formats, one page in all of them, a page's
+// The design builders the canvas specs share: five sizes, one page of five linked frames, a frame's
 // box and headline and the layers under them, and opening a design at 1440×900.
 import { expect, type Page } from '@playwright/test'
 
 import type { DesignInput } from '@dazbee/schema'
 
 import { editorPath } from './editor.ts'
-import { seed } from './seed.ts'
+import { frameDesign, linkedFrames, seed,type Seeded } from './seed.ts'
 
-export const FORMATS = {
-  sq: { name: 'Square', width: 1080, height: 1080, order: 'a0' },
-  story: { name: 'Story', width: 1080, height: 1920, order: 'a1' },
-  land: { name: 'Landscape', width: 1200, height: 628, order: 'a2' },
-  mpu: { name: 'MPU', width: 300, height: 250, order: 'a3' },
-  leader: { name: 'Leaderboard', width: 728, height: 90, order: 'a4' },
+/** The five frames of `fiveFrames`, by id, the first one holding the layers the others copy. */
+export const FRAMES = {
+  sq: { name: 'Square', width: 1080, height: 1080 },
+  story: { name: 'Story', width: 1080, height: 1920 },
+  land: { name: 'Landscape', width: 1200, height: 628 },
+  mpu: { name: 'MPU', width: 300, height: 250 },
+  leader: { name: 'Leaderboard', width: 728, height: 90 },
 }
+export type FrameKey = keyof typeof FRAMES
 const COLORS = ['#FF5A36FF', '#2F6BFFFF', '#FFC400FF', '#1B9E77FF', '#7E57C2FF', '#111111FF']
+export const CREAM = [{ type: 'solid' as const, color: '#FFF8F0FF' }]
 
-/** One design's layers and overrides, joined from parts of it. */
-export const merge = (...parts: Pick<DesignInput, 'nodes' | 'overrides'>[]) => {
-  const nodes: DesignInput['nodes'] = {}
-  const overrides: Record<string, Record<string, Record<string, unknown>>> = {}
+/** Layers of one frame and their copies' own values in the other frames, as `heroes` gives them. */
+export interface Part {
+  nodes: Record<string, Seeded>
+  values?: Partial<Record<FrameKey, Record<string, Record<string, unknown>>>>
+}
+
+/** One frame's layers and the copies' values, joined from parts of it. */
+export const merge = (...parts: Part[]) => {
+  const nodes: Record<string, Seeded> = {}
+  const values: NonNullable<Part['values']> = {}
   for (const part of parts) {
     Object.assign(nodes, part.nodes)
-    for (const [scope, byNode] of Object.entries(part.overrides ?? {}))
-      overrides[scope] = { ...overrides[scope], ...byNode }
+    for (const [key, byNode] of Object.entries(part.values ?? {}) as [
+      FrameKey,
+      Record<string, Record<string, unknown>>,
+    ][])
+      values[key] = { ...values[key], ...byNode }
   }
-  return { nodes, overrides }
+  return { nodes, values }
 }
 
-/** One page in five formats: the box, the headline and `fill` layers under them. */
-export const fiveFormats = (fill: number): DesignInput => ({
-  meta: {
-    designId: 'replaced-by-the-api',
-    name: 'Five formats',
-    kind: 'single',
-    primaryFormatId: 'sq',
-  },
-  formats: FORMATS,
-  pages: { p1: { name: 'Page 1', order: 'a0', fills: [{ type: 'solid', color: '#FFF8F0FF' }] } },
-  ...merge(heroes('p1', 'Summer sale'), { nodes: filler('p1', fill) }),
-})
+/**
+ * Adds the four other frames of FRAMES to a page whose first frame holds `part`'s layers, each with
+ * a linked copy of every layer and the part's values for that frame: `<frame>-<id>` on page p1,
+ * `<page>-<frame>-<id>` on another.
+ */
+export function withFrames(design: DesignInput, part: Part, pageId = 'p1'): DesignInput {
+  const others = (Object.entries(FRAMES) as [FrameKey, (typeof FRAMES)[FrameKey]][]).filter(([key]) => key !== 'sq')
+  return linkedFrames(
+    design,
+    others.map(([key, frame]) => ({
+      id: pageId === 'p1' ? key : `${pageId}-${key}`,
+      ...frame,
+      values: part.values?.[key],
+    })),
+    pageId,
+  )
+}
+
+/** One page of five linked frames: the box, the headline and `fill` layers under them in the square, copied into the others. */
+export const fiveFrames = (fill: number): DesignInput => {
+  const part = merge(heroes('p1', 'sq', 'Summer sale'), { nodes: filler('p1', 'sq', fill) })
+  return withFrames(frameDesign({ name: 'Five frames', fills: CREAM, nodes: part.nodes }), part)
+}
 
 /** Seeds the design and opens it in the page at 1440×900; its id and the errors the page throws from then on. */
 export async function open(page: Page, design: DesignInput) {
@@ -52,13 +75,17 @@ export async function open(page: Page, design: DesignInput) {
   return { id, errors }
 }
 
-/** The box and headline of a page, with the headline placed so every format shows it. */
-export function heroes(pageId: string, text: string): Pick<DesignInput, 'nodes' | 'overrides'> {
+/**
+ * A box and a headline in a frame, ids `<prefix>-box` and `<prefix>-headline`, with the headline's
+ * copies placed so every other frame of FRAMES shows it.
+ */
+export function heroes(prefix: string, frameId: string, text: string): Part {
+  const headline = `${prefix}-headline`
   return {
     nodes: {
-      [`${pageId}-box`]: {
+      [`${prefix}-box`]: {
         type: 'graphic',
-        parentId: pageId,
+        parentId: frameId,
         index: 'a0',
         name: 'Box',
         props: {
@@ -70,9 +97,9 @@ export function heroes(pageId: string, text: string): Pick<DesignInput, 'nodes' 
           fills: [{ type: 'solid', color: '#FF2E7EFF' }],
         },
       },
-      [`${pageId}-headline`]: {
+      [headline]: {
         type: 'text',
-        parentId: pageId,
+        parentId: frameId,
         index: 'a1',
         name: 'Headline',
         role: 'headline',
@@ -86,11 +113,11 @@ export function heroes(pageId: string, text: string): Pick<DesignInput, 'nodes' 
         },
       },
     },
-    overrides: {
-      'format:story': { [`${pageId}-headline`]: { y: 900 } },
-      'format:land': { [`${pageId}-headline`]: { x: 360, y: 260, width: 800 } },
-      'format:mpu': {
-        [`${pageId}-headline`]: {
+    values: {
+      story: { [headline]: { y: 900 } },
+      land: { [headline]: { x: 360, y: 260, width: 800 } },
+      mpu: {
+        [headline]: {
           x: 10,
           y: 150,
           width: 280,
@@ -98,8 +125,8 @@ export function heroes(pageId: string, text: string): Pick<DesignInput, 'nodes' 
           style: { fontFamily: 'Noto Sans', fontSize: 28, fontWeight: 800, color: '#111111FF' },
         },
       },
-      'format:leader': {
-        [`${pageId}-headline`]: {
+      leader: {
+        [headline]: {
           x: 220,
           y: 20,
           width: 500,
@@ -111,20 +138,23 @@ export function heroes(pageId: string, text: string): Pick<DesignInput, 'nodes' 
   }
 }
 
-/** Filler layers under the box and headline: shapes, translucent and shadowed ones, and short texts. */
-export function filler(pageId: string, count: number, seedAt = 0) {
-  const nodes: DesignInput['nodes'] = {}
+/**
+ * Filler layers in a frame under the box and headline, ids `<prefix>-f<n>`: shapes, translucent and
+ * shadowed ones, and short texts.
+ */
+export function filler(prefix: string, frameId: string, count: number, seedAt = 0) {
+  const nodes: Record<string, Seeded> = {}
   for (let i = 0; i < count; i++) {
     const n = i + seedAt
     const x = (n * 97) % 980
     const y = (n * 61) % 1700
     const color = COLORS[n % COLORS.length] as string
     const index = `Z${String(i).padStart(4, '0')}`
-    nodes[`${pageId}-f${i}`] =
+    nodes[`${prefix}-f${i}`] =
       i % 6 === 5
         ? {
             type: 'text',
-            parentId: pageId,
+            parentId: frameId,
             index,
             name: `Note ${i}`,
             props: {
@@ -138,7 +168,7 @@ export function filler(pageId: string, count: number, seedAt = 0) {
           }
         : {
             type: 'graphic',
-            parentId: pageId,
+            parentId: frameId,
             index,
             name: `Shape ${i}`,
             props: {

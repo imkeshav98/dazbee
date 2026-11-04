@@ -5,18 +5,35 @@ import { SHORTCUTS } from '@dazbee/editor'
 import type { DesignInput } from '@dazbee/schema'
 
 import { writeOutput } from '../../support/editor.ts'
-import { backgroundPanel, openStage } from '../../support/stage.ts'
+import { frameDesign } from '../../support/seed.ts'
+import { openStage, selectLayers } from '../../support/stage.ts'
 import { expect, test } from '../../support/test.ts'
+import { fillList } from '../../support/top-bar.ts'
 
 test.describe.configure({ timeout: 120_000 })
 
-const design = (): DesignInput => ({
-  meta: { designId: 'replaced-by-the-api', name: 'Shortcuts', kind: 'single', primaryFormatId: 'sq' },
-  formats: { sq: { name: 'Square', width: 1080, height: 1080, order: 'a0' } },
-  pages: { p1: { name: 'Page 1', order: 'a0', fills: [{ type: 'solid', color: '#FFFFFFFF' }] } },
-  nodes: {},
-  overrides: {},
-})
+const design = (): DesignInput =>
+  frameDesign({
+    name: 'Shortcuts',
+    nodes: {
+      box: {
+        type: 'graphic',
+        parentId: 'sq',
+        index: 'a0',
+        name: 'Box',
+        props: {
+          x: 80,
+          y: 80,
+          width: 300,
+          height: 200,
+          shape: { kind: 'rect' },
+          fills: [{ type: 'solid', color: '#E0262BFF' }],
+        },
+      },
+    },
+  })
+/** The shortcuts the dialog lists: every one but hideEverywhere, which does nothing yet. */
+const LISTED = SHORTCUTS.filter((s) => s.action !== 'hideEverywhere')
 
 test('? and the keyboard button list every shortcut, F, I and Mod+Alt+G among them', async ({ browser }) => {
   const { page, errors } = await openStage(browser, design())
@@ -26,7 +43,8 @@ test('? and the keyboard button list every shortcut, F, I and Mod+Alt+G among th
   await page.keyboard.press('Shift+Slash')
   await expect(list).toBeVisible()
   await expect(list.getByRole('heading', { level: 2 })).toHaveText('Keyboard shortcuts')
-  await expect(list.locator('[data-shortcut]')).toHaveCount(SHORTCUTS.length)
+  await expect(list.locator('[data-shortcut]')).toHaveCount(LISTED.length)
+  await expect(list.locator('[data-shortcut="hideEverywhere"]')).toHaveCount(0)
   await expect(list.locator('[data-shortcut="bringForward"] kbd')).toHaveText(['Ctrl', ']'])
   await expect(list.locator('[data-shortcut="toolFrame"]')).toContainText('F')
   await expect(list.locator('[data-shortcut="toolImage"]')).toContainText('I')
@@ -36,10 +54,9 @@ test('? and the keyboard button list every shortcut, F, I and Mod+Alt+G among th
   await page.keyboard.press('Escape')
   await expect(list).toBeHidden()
 
-  // Typing ? into a field types it.
-  const panel = await backgroundPanel(page)
-  await panel.getByTestId('colour-pick').click()
-  const hex = panel.getByTestId('colour-picker').getByRole('textbox', { name: 'Colour hex' })
+  // Typing ? into a field types it: the box's fill hex, in its Colour panel.
+  await selectLayers(page, ['box'], { bar: true })
+  const hex = (await fillList(page)).getByRole('textbox', { name: 'Colour 1 hex' })
   await hex.fill('')
   await hex.press('Shift+Slash')
   await expect(hex).toHaveValue('?')

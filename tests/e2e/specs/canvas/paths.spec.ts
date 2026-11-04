@@ -12,7 +12,7 @@ import { expect, type Page, test } from '../../support/test.ts'
 test.describe.configure({ timeout: 120_000 })
 
 type Placed = { x: number; y: number; width: number; height: number; shape: { kind: string; d: string } }
-const placed = (d: Design, id: string) => ({ ...d.nodes[id]?.props, ...d.overrides['format:sq']?.[id] }) as Placed
+const placed = (d: Design, id: string) => d.nodes[id]?.props as Placed
 /** A layer's path in page coordinates. */
 const pathOf = (d: Design, id: string): PenPath => {
   const p = placed(d, id)
@@ -63,7 +63,7 @@ test('the pen draws a closed curved path, a point of it is dragged, and undo tak
   const [id = ''] = Object.keys(d.nodes).filter((n) => !before.has(n))
   expect(d.nodes[id]).toMatchObject({
     type: 'graphic',
-    parentId: 'p1',
+    parentId: 'sq',
     name: 'Path',
     props: { shape: { kind: 'path' }, strokes: [{ width: 2 }] },
   })

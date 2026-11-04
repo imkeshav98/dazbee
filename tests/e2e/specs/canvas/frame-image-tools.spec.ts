@@ -1,60 +1,72 @@
-// The frame and image tools, with real pointer and keyboard input: F draws a box, and one drawn
-// around layers takes them in without moving them; Mod+Alt+G and the Arrange card box the
-// selection; Shift+A on shapes wraps them in an auto layout box where they stand; I opens the
-// image picker, and the image picked lands where the stage is clicked, one undo step.
+// The frame, box and image tools, with real pointer and keyboard input: F draws an empty frame
+// where it is dragged; the shape menu's Box draws a box, and one drawn around layers takes them in
+// without moving them, their copies in the wide frame staying as they were; Mod+Alt+G and the
+// Arrange card box the selection; Shift+A on shapes wraps them in an auto layout box where they
+// stand; I opens the image picker, and the image picked lands where the stage is clicked, one undo
+// step.
 import type { DesignInput } from '@dazbee/schema'
 
 import { photo } from '../../support/assets.ts'
 import { writeOutput } from '../../support/editor.ts'
+import { copyIn, frameDesign, linkedFrames, type Seeded } from '../../support/seed.ts'
 import { type Box, boxOf, click, drag, openStage, press, read, selection } from '../../support/stage.ts'
 import { expect, type Page, test } from '../../support/test.ts'
 import { moreAction } from '../../support/top-bar.ts'
 
 test.describe.configure({ timeout: 120_000 })
 
-type Node = DesignInput['nodes'][string]
+type Node = Seeded
 const rect = (name: string, index: string, x: number, y: number, width: number, height: number, color: string): Node =>
   ({
     type: 'graphic',
-    parentId: 'p1',
+    parentId: 'sq',
     index,
     name,
     props: { x, y, width, height, shape: { kind: 'rect', cornerRadius: 12 }, fills: [{ type: 'solid', color }] },
   }) as Node
 
-const design = (): DesignInput => ({
-  meta: { designId: 'replaced-by-the-api', name: 'Frames', kind: 'single', primaryFormatId: 'sq' },
-  formats: {
-    sq: { name: 'Square', width: 1080, height: 1080, order: 'a0' },
-    wide: { name: 'Wide', width: 1920, height: 1080, order: 'a1' },
-  },
-  pages: { p1: { name: 'Page 1', order: 'a0', fills: [{ type: 'solid', color: '#FFF8F0FF' }] } },
-  nodes: {
-    a: rect('A', 'a0', 100, 100, 160, 120, '#FF2E7EFF'),
-    b: {
-      ...rect('B', 'a1', 300, 140, 120, 120, '#2F6BFFFF'),
-      props: { ...rect('B', 'a1', 300, 140, 120, 120, '#2F6BFFFF').props, rotation: 15 },
-    } as Node,
-    c: rect('C', 'a2', 600, 100, 140, 140, '#FFB020FF'),
-    d: rect('D', 'a3', 780, 160, 160, 100, '#00A88AFF'),
-    // A row, tops lined up, 40 apart: auto layout reads it as it stands.
-    e: rect('E', 'a4', 120, 600, 200, 160, '#9747FFFF'),
-    f: rect('F', 'a5', 360, 600, 120, 100, '#1F2329FF'),
-  },
-  // The wide format moves A and B apart and makes A smaller: a box drawn around them in the square holds them there too.
-  overrides: { 'format:wide': { a: { x: 900, y: 500, width: 80, height: 60 }, b: { x: 1300, y: 600 } } },
-})
+/** A square frame of layers, and a wide frame of their linked copies, with A and B apart and A smaller there. */
+const design = (): DesignInput =>
+  linkedFrames(
+    frameDesign({
+      name: 'Frames',
+      fills: [{ type: 'solid', color: '#FFF8F0FF' }],
+      nodes: {
+        a: rect('A', 'a0', 100, 100, 160, 120, '#FF2E7EFF'),
+        b: {
+          ...rect('B', 'a1', 300, 140, 120, 120, '#2F6BFFFF'),
+          props: { ...rect('B', 'a1', 300, 140, 120, 120, '#2F6BFFFF').props, rotation: 15 },
+        } as Node,
+        c: rect('C', 'a2', 600, 100, 140, 140, '#FFB020FF'),
+        d: rect('D', 'a3', 780, 160, 160, 100, '#00A88AFF'),
+        // A row, tops lined up, 40 apart: auto layout reads it as it stands.
+        e: rect('E', 'a4', 120, 600, 200, 160, '#9747FFFF'),
+        f: rect('F', 'a5', 360, 600, 120, 100, '#1F2329FF'),
+      },
+    }),
+    [
+      {
+        id: 'wide',
+        name: 'Wide',
+        width: 1920,
+        height: 1080,
+        values: { a: { x: 900, y: 500, width: 80, height: 60 }, b: { x: 1300, y: 600 } },
+      },
+    ],
+  )
 
 const near = (a: Box, b: Box) => {
   for (const k of ['x', 'y', 'width', 'height'] as const)
     expect(Math.abs(a[k] - b[k]), `${k}: ${a[k]} vs ${b[k]}`).toBeLessThanOrEqual(0.5)
 }
-const wideBoxOf = (page: Page, id: string) => boxOf(page, id, { pageId: 'p1', formatId: 'wide' })
-const holds = (outer: Box, inner: Box) => {
-  expect(inner.x).toBeGreaterThanOrEqual(outer.x - 0.5)
-  expect(inner.y).toBeGreaterThanOrEqual(outer.y - 0.5)
-  expect(inner.x + inner.width).toBeLessThanOrEqual(outer.x + outer.width + 0.5)
-  expect(inner.y + inner.height).toBeLessThanOrEqual(outer.y + outer.height + 0.5)
+/** The wide frame's layers as the design stores them. */
+const wideLayers = async (page: Page) =>
+  Object.entries((await read(page)).nodes).filter(([, n]) => n.parentId === 'wide' || n.parentId.startsWith('wide-'))
+const frameIds = async (page: Page) => Object.keys((await read(page)).frames).sort()
+/** Picks a tool from the dock's shape menu. */
+const pick = async (page: Page, shape: string) => {
+  await page.getByTestId('shape-menu').click()
+  await page.locator(`[role="menu"] [data-shape="${shape}"]`).click()
 }
 const childrenOf = async (page: Page, parentId: string) =>
   Object.entries((await read(page)).nodes)
@@ -62,53 +74,74 @@ const childrenOf = async (page: Page, parentId: string) =>
     .sort(([, x], [, y]) => (x.index < y.index ? -1 : 1))
     .map(([id]) => id)
 
-test('F draws a box; a box drawn around layers takes them in without moving them', async ({ browser }) => {
+test('F draws an empty frame where dragged and a click adds none; the Box tool draws a box, and one drawn around layers takes them in without moving them', async ({
+  browser,
+}) => {
   const { page, errors } = await openStage(browser, design())
   const before = { a: await boxOf(page, 'a'), b: await boxOf(page, 'b') }
+  const layers = Object.keys((await read(page)).nodes).length
 
-  // A box on empty space: a white box named Box, drawn where dragged, selected, and the select tool comes back.
+  // F and a drag: an empty white frame named Frame on the page, where dragged; nothing is
+  // selected, and the select tool comes back.
   await press(page, 'toolFrame')
   await expect(page.locator('[data-tool="frame"]')).toHaveAttribute('aria-pressed', 'true')
   await drag(page, { x: 600, y: 400 }, { x: 900, y: 520 })
-  const [lone] = await selection(page)
-  const loneNode = (await read(page)).nodes[lone ?? '']
-  expect(loneNode).toMatchObject({
-    type: 'box',
-    parentId: 'p1',
-    name: 'Box',
-    props: { x: 600, y: 400, width: 300, height: 120, fills: [{ type: 'solid', color: '#FFFFFFFF' }] },
+  const [drawnFrame = ''] = (await frameIds(page)).filter((id) => id !== 'sq' && id !== 'wide')
+  expect((await read(page)).frames[drawnFrame]).toMatchObject({
+    pageId: 'p1',
+    name: 'Frame',
+    x: 600,
+    y: 400,
+    width: 300,
+    height: 120,
+    fills: [{ type: 'solid', color: '#FFFFFFFF' }],
   })
+  expect(Object.keys((await read(page)).nodes)).toHaveLength(layers)
+  expect(await selection(page)).toEqual([])
   expect(await page.evaluate(() => window.dazbee?.tool())).toBe('select')
   await expect(page.locator('[data-tool="select"]')).toHaveAttribute('aria-pressed', 'true')
+  await expect(page.locator(`.frame-label[data-frame="${drawnFrame}"]`)).toContainText('Frame')
   writeOutput('frame-1-drawn.png', await page.screenshot({ animations: 'disabled' }))
   // One undo step takes it away.
   await press(page, 'undo')
-  expect((await read(page)).nodes[lone ?? '']).toBeUndefined()
+  expect(await frameIds(page)).toEqual(['sq', 'wide'])
 
-  // A click draws a box of the default size, centred on it.
+  // A click with the Frame tool adds nothing, and the select tool comes back.
   await press(page, 'toolFrame')
   await click(page, 700, 800)
+  expect(await frameIds(page)).toEqual(['sq', 'wide'])
+  expect(Object.keys((await read(page)).nodes)).toHaveLength(layers)
+  expect(await page.evaluate(() => window.dazbee?.tool())).toBe('select')
+
+  // A click with the Box tool draws a box of the default size, centred on it.
+  await pick(page, 'box')
+  await click(page, 700, 800)
   const [clicked] = await selection(page)
-  expect((await read(page)).nodes[clicked ?? '']).toMatchObject({ props: { x: 600, y: 700, width: 200, height: 200 } })
+  expect((await read(page)).nodes[clicked ?? '']).toMatchObject({
+    type: 'box',
+    parentId: 'sq',
+    name: 'Box',
+    props: { x: 600, y: 700, width: 200, height: 200, fills: [{ type: 'solid', color: '#FFFFFFFF' }] },
+  })
   await press(page, 'undo')
-  const wideBefore = { a: await wideBoxOf(page, 'a'), b: await wideBoxOf(page, 'b') }
+  const wideBefore = await wideLayers(page)
 
   // Around A and the turned B: both go inside it, and neither moves on the stage.
-  await press(page, 'toolFrame')
+  await pick(page, 'box')
   await drag(page, { x: 80, y: 80 }, { x: 460, y: 300 })
   const [box] = await selection(page)
   expect(await childrenOf(page, box ?? '')).toEqual(['a', 'b'])
   near(await boxOf(page, 'a'), before.a)
   near(await boxOf(page, 'b'), before.b)
-  // C, outside it, stays on the page.
-  expect((await read(page)).nodes.c?.parentId).toBe('p1')
-  // In the wide format, where A and B are elsewhere, they don't move either, and the box holds them.
-  near(await wideBoxOf(page, 'a'), wideBefore.a)
-  holds(await wideBoxOf(page, box ?? ''), wideBefore.a)
-  holds(await wideBoxOf(page, box ?? ''), { x: 1300, y: 600, width: 120, height: 120 })
+  // C, outside it, stays at the top of the square.
+  expect((await read(page)).nodes.c?.parentId).toBe('sq')
+  // The box is the square's only: the wide frame's copies of A and B stay as they were.
+  expect((await read(page)).nodes[box ?? '']?.parentId).toBe('sq')
+  expect(await wideLayers(page)).toEqual(wideBefore)
+  expect((await read(page)).nodes[copyIn('wide', 'a')]?.parentId).toBe('wide')
   writeOutput('frame-2-around.png', await page.screenshot({ animations: 'disabled' }))
   await press(page, 'undo')
-  expect((await read(page)).nodes.a?.parentId).toBe('p1')
+  expect((await read(page)).nodes.a?.parentId).toBe('sq')
   expect((await read(page)).nodes[box ?? '']).toBeUndefined()
   expect(errors).toEqual([])
 })
@@ -140,7 +173,7 @@ test('Mod+Alt+G and the Arrange card box the selection; Shift+A wraps shapes in 
   near(await boxOf(page, 'd'), before.d)
   writeOutput('frame-3-selection.png', await page.screenshot({ animations: 'disabled' }))
   await press(page, 'undo')
-  expect((await read(page)).nodes.c?.parentId).toBe('p1')
+  expect((await read(page)).nodes.c?.parentId).toBe('sq')
 
   // The same from the full menu's Put in a box; undo and redo take the box away and back in one step.
   await click(page, 660, 160)
@@ -152,7 +185,7 @@ test('Mod+Alt+G and the Arrange card box the selection; Shift+A wraps shapes in 
   await press(page, 'undo')
   now = await read(page)
   expect(now.nodes[carded ?? '']).toBeUndefined()
-  expect([now.nodes.c?.parentId, now.nodes.d?.parentId]).toEqual(['p1', 'p1'])
+  expect([now.nodes.c?.parentId, now.nodes.d?.parentId]).toEqual(['sq', 'sq'])
   await press(page, 'redo')
   expect((await read(page)).nodes[carded ?? '']).toMatchObject({ type: 'box', name: 'Box' })
   expect(await childrenOf(page, carded ?? '')).toEqual(['c', 'd'])
@@ -175,18 +208,18 @@ test('Mod+Alt+G and the Arrange card box the selection; Shift+A wraps shapes in 
   near(await boxOf(page, 'f'), before.f)
   near(await boxOf(page, auto ?? ''), { x: 120, y: 600, width: 360, height: 160 })
   writeOutput('frame-4-auto-layout.png', await page.screenshot({ animations: 'disabled' }))
-  // With a box among the selection, Shift+A switches that box's auto layout instead: off here, and C stays on the page.
+  // With a box among the selection, Shift+A switches that box's auto layout instead: off here, and C stays at the top of the square.
   await click(page, 660, 160, ['Shift'])
   expect(await selection(page)).toEqual([auto, 'c'])
   await press(page, 'autoLayout')
   now = await read(page)
   expect(now.nodes[auto ?? '']?.props.layout).toBeUndefined()
-  expect(now.nodes.c?.parentId).toBe('p1')
+  expect(now.nodes.c?.parentId).toBe('sq')
   await press(page, 'undo')
   // One undo step for the whole wrap.
   await press(page, 'undo')
   expect((await read(page)).nodes[auto ?? '']).toBeUndefined()
-  expect((await read(page)).nodes.e?.parentId).toBe('p1')
+  expect((await read(page)).nodes.e?.parentId).toBe('sq')
   expect(errors).toEqual([])
 })
 
@@ -214,7 +247,7 @@ test('I opens the image picker; the image uploaded there lands where the stage i
   }
   const uploaded = node.props.fills[0]?.assetId ?? ''
   expect(node.props.fills[0]?.type).toBe('image')
-  // Centred on the click, at most half the format across.
+  // Centred on the click, at most half the frame across.
   expect(Math.abs(node.props.x + node.props.width / 2 - 540)).toBeLessThanOrEqual(1)
   expect(Math.abs(node.props.y + node.props.height / 2 - 800)).toBeLessThanOrEqual(1)
   expect(node.props.width).toBeLessThanOrEqual(540)

@@ -5,29 +5,24 @@ import type { DesignInput } from '@dazbee/schema'
 
 import { photo, upload } from '../../support/assets.ts'
 import { editorPath, exportHashOf, screenPoint, writeOutput } from '../../support/editor.ts'
-import { seed } from '../../support/seed.ts'
+import { frameDesign, seed,type Seeded } from '../../support/seed.ts'
 import { click, openStage, press, read, selection } from '../../support/stage.ts'
 import { expect, type Page, test } from '../../support/test.ts'
 
 test.describe.configure({ timeout: 120_000 })
 
-type Node = DesignInput['nodes'][string]
+type Node = Seeded
 const BACKGROUND = [{ type: 'solid', color: '#FFF6E8FF' }] as const
 // Wide enough for the turned photo and the outlined text.
 const CARD = { x: 60, y: 60, width: 580, height: 480 }
 
-const shell = (name: string, nodes: Record<string, Node>): DesignInput => ({
-  meta: { designId: 'replaced-by-the-api', name, kind: 'single', primaryFormatId: 'sq' },
-  formats: { sq: { name: 'Square', width: 1080, height: 1080, order: 'a0' } },
-  pages: { p1: { name: 'Page 1', order: 'a0', fills: [...BACKGROUND] } },
-  nodes,
-  overrides: {},
-})
+const shell = (name: string, nodes: Record<string, Node>): DesignInput =>
+  frameDesign({ name, fills: [...BACKGROUND], nodes })
 const source = (assetId: string) =>
   shell('Source', {
     card: {
       type: 'group',
-      parentId: 'p1',
+      parentId: 'sq',
       index: 'a0',
       name: 'Card',
       props: { x: 100, y: 100, width: 500, height: 400 },
@@ -83,7 +78,7 @@ const source = (assetId: string) =>
     },
     other: {
       type: 'graphic',
-      parentId: 'p1',
+      parentId: 'sq',
       index: 'a1',
       name: 'Other',
       props: {
@@ -100,7 +95,7 @@ const target = () =>
   shell('Target', {
     stripe: {
       type: 'graphic',
-      parentId: 'p1',
+      parentId: 'sq',
       index: 'a0',
       name: 'Stripe',
       props: {
@@ -166,7 +161,7 @@ test('a group copied in one design pastes into another with the same pixels, twi
   await keys(page, 'ControlOrMeta+V')
   const [first = ''] = await selection(page)
   const d = await read(page)
-  expect(d.nodes[first]?.parentId).toBe('p1')
+  expect(d.nodes[first]?.parentId).toBe('sq')
   // Where it was, the size it was.
   expect(d.nodes[first]?.props).toMatchObject({ x: card?.x, y: card?.y, width: card?.width, height: card?.height })
   // Fresh ids, the children in their order, the photo's asset the same.
@@ -187,7 +182,7 @@ test('a group copied in one design pastes into another with the same pixels, twi
   await keys(page, 'ControlOrMeta+V')
   const [second = ''] = await selection(page)
   expect(second).not.toBe(first)
-  expect(await layersUnder(page, 'p1')).toEqual(expect.arrayContaining(['stripe', first, second]))
+  expect(await layersUnder(page, 'sq')).toEqual(expect.arrayContaining(['stripe', first, second]))
   expect(Object.keys((await read(page)).nodes)).toHaveLength(1 + 2 * 4)
 
   // One undo per paste.
