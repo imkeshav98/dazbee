@@ -1,9 +1,9 @@
 // The top bar by keyboard (#287): Tab and the arrows along the bar, Esc giving the focus back and
 // clearing the selection, Esc closing the second row, the size field's arrows, and Esc closing a
 // panel first wherever the focus is, after what stands over it: a dialog, the Share menu or its
-// card, the account menu, the zoom menu or the shape menu; a field outside the panel throwing away
-// what was typed as the panel closes; and the focus as a menu of the bar closes with the next input
-// coming at once.
+// card, the account menu, the zoom menu or the shape menu, a pop-up opened over one of those menus
+// first; a field outside the panel throwing away what was typed and leaving the panel open; and the
+// focus as a menu of the bar closes with the next input coming at once.
 import type { DesignInput } from '@dazbee/schema'
 
 import { photo, upload } from '../../support/assets.ts'
@@ -288,7 +288,48 @@ test('Esc closes the account menu over the Colour panel first, wherever the focu
   expect(errors).toEqual([])
 })
 
-test("Esc in a field outside the panel, the design's name or the bar's size, throws away what was typed, and the panel closes with it", async ({
+test('a zoom or shape pop-up opened from the keyboard over the Share or account menu closes first on Esc, then the menu, then the Colour panel', async ({
+  browser,
+}) => {
+  const asset = await upload(photo)
+  const { page, errors } = await openStage(browser, topBarDesign(asset.id))
+  await selectLayers(page, ['box'])
+  const panel = await barMenu(page, 'colour')
+  const exportItem = page.getByTestId('export-open')
+  const account = page.getByTestId('account')
+  const zoom = page.getByTestId('zoom-menu')
+  const shapes = page.getByRole('menu', { name: 'Shapes' })
+
+  await page.getByTestId('share-open').click()
+  await expect(exportItem).toBeFocused()
+  await page.getByTestId('zoom').focus()
+  await page.keyboard.press('Enter')
+  await expect(zoom).toBeVisible()
+  await page.keyboard.press('Escape')
+  await expect(zoom).toBeHidden()
+  await expect(exportItem).toBeVisible()
+  await page.keyboard.press('Escape')
+  await expect(exportItem).toBeHidden()
+  await expect(panel).toBeVisible()
+
+  await page.getByTestId('account-open').click()
+  await expect(account).toBeVisible()
+  await page.getByTestId('shape-menu').focus()
+  await page.keyboard.press('Enter')
+  await expect(shapes).toBeVisible()
+  await page.keyboard.press('Escape')
+  await expect(shapes).toBeHidden()
+  await expect(account).toBeVisible()
+  await page.keyboard.press('Escape')
+  await expect(account).toBeHidden()
+  await expect(panel).toBeVisible()
+  await page.keyboard.press('Escape')
+  await expect(panel).toBeHidden()
+  expect(await selection(page)).toEqual(['box'])
+  expect(errors).toEqual([])
+})
+
+test("Esc in a field outside the panel, the design's name or the bar's size, throws away what was typed and leaves the field, and the next Esc closes the panel", async ({
   browser,
 }) => {
   const asset = await upload(photo)
@@ -310,6 +351,8 @@ test("Esc in a field outside the panel, the design's name or the bar's size, thr
   await expect(nameField).toHaveCount(0)
   await expect(name).toHaveText('Top bar')
   await expect(name).toBeFocused()
+  await expect(panel).toBeVisible()
+  await page.keyboard.press('Escape')
   await expect(panel).toBeHidden()
   expect(await selection(page)).toEqual(['headline'])
 
@@ -318,15 +361,17 @@ test("Esc in a field outside the panel, the design's name or the bar's size, thr
   await size.fill('99')
   await page.keyboard.press('Escape')
   await expect(size).toHaveValue('64')
+  await expect(size).not.toBeFocused()
+  await expect(panel).toBeVisible()
+  expect(await fontSize()).toBe(64)
+  await page.keyboard.press('Escape')
   await expect(panel).toBeHidden()
-  // Nothing typed is left for the field to keep as it lets the focus go.
-  await size.blur()
   expect(await fontSize()).toBe(64)
   expect(await selection(page)).toEqual(['headline'])
   expect(errors).toEqual([])
 })
 
-test('Esc closes the zoom menu and the shape menu over the Colour panel first, and never clears the selection', async ({
+test('the zoom menu and the shape menu keep closing on their own Esc over the Colour panel, which stays open with the selection', async ({
   browser,
 }) => {
   const asset = await upload(photo)
