@@ -5,7 +5,7 @@ import type { Resources } from '../resources.ts'
 import type { Scene, SceneLayer } from '../scene.ts'
 import { drawLayers, drawScene } from './draw.ts'
 import { fillPath } from './paint.ts'
-import { framePath, rectPath } from './paths.ts'
+import { boxPath, rectPath } from './paths.ts'
 import { layerReach, outset } from './reach.ts'
 import { strokePath, strokeReach } from './strokes.ts'
 
@@ -174,18 +174,18 @@ function svgSafe(layer: SceneLayer): boolean {
   const { props } = layer
   if (props.mask || props.opacity !== 1 || props.effects.length > 0) return false
   if (props.blendMode !== 'normal' && props.blendMode !== 'pass-through') return false
-  // A group or frame in normal mode draws its children into a layer of its own, which SVG drops.
-  if ((layer.type === 'group' || layer.type === 'frame') && props.blendMode === 'normal') return false
+  // A group or box in normal mode draws its children into a layer of its own, which SVG drops.
+  if ((layer.type === 'group' || layer.type === 'box') && props.blendMode === 'normal') return false
   if ('fills' in props && !props.fills.every(svgPaint)) return false
   if ('strokes' in props && !props.strokes.every((s) => svgPaint(s.paint))) return false
   return layer.children.every(svgSafe)
 }
 
-/** A group or frame whose own drawing adds nothing an offscreen layer would change. */
+/** A group or box whose own drawing adds nothing an offscreen layer would change. */
 function plainContainer(layer: SceneLayer): boolean {
   const { props } = layer
   return (
-    (layer.type === 'group' || layer.type === 'frame') &&
+    (layer.type === 'group' || layer.type === 'box') &&
     props.opacity === 1 &&
     props.effects.length === 0 &&
     (props.blendMode === 'normal' || props.blendMode === 'pass-through') &&
@@ -194,7 +194,7 @@ function plainContainer(layer: SceneLayer): boolean {
 }
 
 /**
- * A group or frame drawn by its children alone, as drawLayer would without an offscreen layer,
+ * A group or box drawn by its children alone, as drawLayer would without an offscreen layer,
  * so each child that SVG can hold stays vectors.
  */
 function drawContainer(
@@ -208,8 +208,8 @@ function drawContainer(
   const { props } = layer
   canvas.save()
   if (props.rotation !== 0) canvas.rotate(props.rotation, props.x + props.width / 2, props.y + props.height / 2)
-  if (layer.type === 'frame') {
-    const path = framePath(ck, layer.props)
+  if (layer.type === 'box') {
+    const path = boxPath(ck, layer.props)
     const fills = layer.props.fills
     if (fills.every(svgPaint)) for (const fill of fills) fillPath(ck, canvas, path, fill, props, vector)
     else
@@ -221,7 +221,7 @@ function drawContainer(
     for (const unit of maskUnits(layer.children)) drawUnit(ck, canvas, unit, 'svg', vector, raster, scale)
     canvas.restore()
     // The strokes over what is inside, outside the clip, as drawContent draws them. The canvas is
-    // turned already, so a picture of them covers the frame's own box and their reach.
+    // turned already, so a picture of them covers the box layer's own rect and their reach.
     const { strokes } = layer.props
     if (strokes.every((s) => svgPaint(s.paint))) strokePath(ck, canvas, path, layer.props, vector, null)
     else

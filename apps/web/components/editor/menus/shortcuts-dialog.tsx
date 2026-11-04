@@ -37,7 +37,7 @@ const GROUPS: [Group, ShortcutAction[]][] = [
     [
       'group',
       'ungroup',
-      'frameSelection',
+      'boxSelection',
       'bringForward',
       'sendBackward',
       'bringToFront',

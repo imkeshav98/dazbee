@@ -72,7 +72,7 @@ const design = (assetId: string): DesignInput => ({
       },
     },
     button: {
-      type: 'frame',
+      type: 'box',
       parentId: 'p1',
       index: 'a3',
       name: 'Button',

@@ -103,7 +103,7 @@ export function editorSelectPress({
       inner.x <= outer.box.x + outer.box.width &&
       inner.y >= outer.box.y &&
       inner.y <= outer.box.y + outer.box.height
-    // A press outside the group or frame double-clicked into leaves it.
+    // A press outside the group or box double-clicked into leaves it.
     if (
       selection.entered() &&
       !inOuter &&

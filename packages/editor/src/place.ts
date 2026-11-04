@@ -109,7 +109,7 @@ export function editorPlace({
   }
   /**
    * The layer under a point, in client coordinates, that an image dropped there goes into as its
-   * fill: a shape, frame or boolean (a shape inside a boolean gives the boolean, whose paint shows),
+   * fill: a shape, box or boolean (a shape inside a boolean gives the boolean, whose paint shows),
    * not a line, and not one whose style is locked. Null over text, a group's gaps or empty space.
    */
   function imageTargetAt(client: Point): Picked | null {
@@ -122,9 +122,7 @@ export function editorPlace({
       if (design.nodes[up]?.type === 'boolean') id = up
     const node = design.nodes[id]
     const takes =
-      node?.type === 'frame' ||
-      node?.type === 'boolean' ||
-      (node?.type === 'graphic' && node.props.shape.kind !== 'line')
+      node?.type === 'box' || node?.type === 'boolean' || (node?.type === 'graphic' && node.props.shape.kind !== 'line')
     return takes && !node.lock?.style ? { id, frame: at.frame.key } : null
   }
 
@@ -169,7 +167,7 @@ export function editorPlace({
   }
   /**
    * Pastes layers (#49) into the frame the selection is in, or else the one under the pointer: in
-   * the group or frame double-clicked into when it can hold them, otherwise on the page, where they
+   * the group or box double-clicked into when it can hold them, otherwise on the page, where they
    * were or centred on the pointer. One undo step; the pasted layers end up selected.
    */
   function pasteTree(tree: LayerTree, atPointer: boolean, pointer: Point | null) {

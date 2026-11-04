@@ -6,7 +6,7 @@ import { normalAngle, round } from '../layers/transform.ts'
 
 /** A layer as node.create takes it. */
 export interface NewLayer {
-  type: 'graphic' | 'frame'
+  type: 'graphic' | 'box'
   name: string
   props: Record<string, unknown>
 }
@@ -15,13 +15,13 @@ export type Drawn = { x: number; y: number; width: number; height: number; rotat
 
 export const SHAPE_TOOLS = ['rect', 'ellipse', 'polygon', 'star', 'line', 'arrow'] as const
 export type ShapeTool = (typeof SHAPE_TOOLS)[number]
-/** What a drag draws: a shape, or a frame. */
+/** What a drag draws: a shape, or a box with the Frame tool. */
 export type DrawTool = ShapeTool | 'frame'
 
 /** The size a click without a drag draws, in design pixels. */
 const CLICK_SIZE = 100
-/** A frame clicked without a drag is bigger: room for what goes in it. */
-const FRAME_CLICK_SIZE = 200
+/** A box clicked without a drag is bigger: room for what goes in it. */
+const BOX_CLICK_SIZE = 200
 /** New shapes are a neutral grey until a style is picked; lines a near-black stroke. */
 const FILL = '#C9CED6FF'
 const INK = '#1F2329FF'
@@ -34,18 +34,18 @@ const PLACED_SHARE = 0.5
 
 const isShapeTool = (tool: string): tool is ShapeTool => (SHAPE_TOOLS as readonly string[]).includes(tool)
 
-/** A new frame for the frame tool, at no size yet: white, as frames start in most design tools. */
-const newFrame = (): NewLayer => ({
-  type: 'frame',
-  name: 'Frame',
+/** A new box for the Frame tool, at no size yet: white, as frames start in most design tools. */
+const newBox = (): NewLayer => ({
+  type: 'box',
+  name: 'Box',
   props: { x: 0, y: 0, width: 0, height: 0, fills: [{ type: 'solid', color: '#FFFFFFFF' }] },
 })
 
-/** Whether a tool draws with a drag: a shape tool or the frame tool. */
+/** Whether a tool draws with a drag: a shape tool or the Frame tool. */
 export const isDrawTool = (tool: string): tool is DrawTool => tool === 'frame' || isShapeTool(tool)
 
 /** A new layer for a drawing tool, at no size yet. */
-export const newDrawn = (tool: DrawTool): NewLayer => (tool === 'frame' ? newFrame() : newShape(tool))
+export const newDrawn = (tool: DrawTool): NewLayer => (tool === 'frame' ? newBox() : newShape(tool))
 
 /** A new layer for a shape tool, at no size yet. */
 export function newShape(tool: ShapeTool): NewLayer {
@@ -121,11 +121,11 @@ export function drawnBox(tool: DrawTool, from: Point, to: Point, shift: boolean,
   }
 }
 
-/** What a click without a drag draws: CLICK_SIZE across (a frame FRAME_CLICK_SIZE), centred where it landed. */
+/** What a click without a drag draws: CLICK_SIZE across (a box BOX_CLICK_SIZE), centred where it landed. */
 export function clickedBox(tool: DrawTool, at: Point): Drawn {
   if (tool === 'line' || tool === 'arrow')
     return { x: round(at.x - CLICK_SIZE / 2), y: round(at.y), width: CLICK_SIZE, height: 0, rotation: 0 }
-  const size = tool === 'frame' ? FRAME_CLICK_SIZE : CLICK_SIZE
+  const size = tool === 'frame' ? BOX_CLICK_SIZE : CLICK_SIZE
   return { x: round(at.x - size / 2), y: round(at.y - size / 2), width: size, height: size, rotation: 0 }
 }
 

@@ -146,7 +146,7 @@
       "role": "body"
     },
     "price-frame": {
-      "type": "frame",
+      "type": "box",
       "parentId": "p1",
       "index": "a4",
       "name": "Price block",

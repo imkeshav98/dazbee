@@ -17,14 +17,14 @@ const rect = (parentId: string, index: string, box: { x: number; y: number; widt
   name: 'Rect',
   props: { rotation: 0, ...box, shape: { kind: 'rect' as const } },
 })
-/** A frame holding a dot, a box beside it, and a pin locked in place, on one page in a square. */
+/** A box holding a dot, a square beside it, and a pin locked in place, on one page in a square. */
 const DESIGN: DesignInput = {
   meta: { designId: 'd', name: 'D', kind: 'single', primaryFormatId: 'sq' },
   formats: { sq: { name: 'Square', width: 1080, height: 1080, order: 'a0' } },
   pages: { p1: { name: 'One', order: 'a0' } },
   nodes: {
     card: {
-      type: 'frame',
+      type: 'box',
       parentId: 'p1',
       index: 'a0',
       name: 'Card',

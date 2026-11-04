@@ -74,7 +74,7 @@
     animation: none;
   }
 }
-/* The group or frame double-clicked into, while working inside it. */
+/* The group or box double-clicked into, while working inside it. */
 .stage-overlay .entered {
   outline: 1px dashed var(--accent);
   opacity: 0.8;
@@ -292,7 +292,7 @@
 }
 
 /* A drag in an auto layout flow: the layers following the pointer, the line where they would go,
-   and the frame outlined when a drop would take them out of it. */
+   and the box outlined when a drop would take them out of it. */
 .stage-overlay .reorder-ghost,
 .stage-overlay .reorder-line,
 .stage-overlay .reorder-leave {

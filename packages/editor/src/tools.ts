@@ -3,7 +3,7 @@ import type { ShapeTool } from './gestures/draw-tools.ts'
 
 /**
  * What a drag on the stage does: select and move, pan with the hand, draw a shape (#44), a path
- * (#45), a text box (#47) or a frame, or place the image picked for the image tool.
+ * (#45), a text box (#47) or a box, or place the image picked for the image tool.
  */
 export type Tool = 'select' | 'hand' | 'pen' | 'text' | 'frame' | 'image' | ShapeTool
 /** An image asset as the editor places it. */

@@ -119,9 +119,9 @@ export function useTarget(editor: Editor, ids: string[]): { target: Target; desi
 export function kindOf(target: Target): Kind {
   const all = (...kinds: string[]) => target.types.every((type) => kinds.includes(type))
   if (all('text')) return 'text'
-  if (all('graphic', 'frame', 'boolean') && imageFillOf(target)) return 'photo'
+  if (all('graphic', 'box', 'boolean') && imageFillOf(target)) return 'photo'
   if (all('graphic', 'boolean')) return 'shape'
-  if (all('frame')) return 'box'
+  if (all('box')) return 'box'
   if (all('group', 'instance', 'lottie')) return 'group'
   return 'mixed'
 }
@@ -140,17 +140,17 @@ export function factsOf(target: Target, design: Design) {
     (shapeKind === 'rect' || shapeKind === 'polygon' || shapeKind === 'star' || shapeKind === 'line')
       ? shapeKind
       : null
-  // Children of an auto layout frame, every one of them.
+  // Children of an auto layout box, every one of them.
   const inFlow = target.ids.every((id) => {
     const parent = design.nodes[design.nodes[id]?.parentId ?? '']
-    return parent?.type === 'frame' && parent.props.layout !== undefined
+    return parent?.type === 'box' && parent.props.layout !== undefined
   })
   return {
     ownShape,
     inFlow,
     lines: ownShape === 'line',
     booleans: target.types.every((type) => type === 'boolean'),
-    frames: target.types.every((type) => type === 'frame'),
+    boxes: target.types.every((type) => type === 'box'),
     masks: target.props.every((pr) => Boolean(pr.mask)),
     sized: target.types.every((type) => type !== 'group' && type !== 'boolean'),
   }

@@ -1,6 +1,6 @@
-// The frame and image tools, with real pointer and keyboard input: F draws a frame, and one drawn
-// around layers takes them in without moving them; Mod+Alt+G and the Arrange card frame the
-// selection; Shift+A on shapes wraps them in an auto layout frame where they stand; I opens the
+// The frame and image tools, with real pointer and keyboard input: F draws a box, and one drawn
+// around layers takes them in without moving them; Mod+Alt+G and the Arrange card box the
+// selection; Shift+A on shapes wraps them in an auto layout box where they stand; I opens the
 // image picker, and the image picked lands where the stage is clicked, one undo step.
 import type { DesignInput } from '@dazbee/schema'
 
@@ -41,7 +41,7 @@ const design = (): DesignInput => ({
     e: rect('E', 'a4', 120, 600, 200, 160, '#9747FFFF'),
     f: rect('F', 'a5', 360, 600, 120, 100, '#1F2329FF'),
   },
-  // The wide format moves A and B apart and makes A smaller: a frame drawn around them in the square holds them there too.
+  // The wide format moves A and B apart and makes A smaller: a box drawn around them in the square holds them there too.
   overrides: { 'format:wide': { a: { x: 900, y: 500, width: 80, height: 60 }, b: { x: 1300, y: 600 } } },
 })
 
@@ -62,17 +62,22 @@ const childrenOf = async (page: Page, parentId: string) =>
     .sort(([, x], [, y]) => (x.index < y.index ? -1 : 1))
     .map(([id]) => id)
 
-test('F draws a frame; a frame drawn around layers takes them in without moving them', async ({ browser }) => {
+test('F draws a box; a box drawn around layers takes them in without moving them', async ({ browser }) => {
   const { page, errors } = await openStage(browser, design())
   const before = { a: await boxOf(page, 'a'), b: await boxOf(page, 'b') }
 
-  // A frame on empty space: drawn where dragged, selected, and the select tool comes back.
+  // A box on empty space: a white box named Box, drawn where dragged, selected, and the select tool comes back.
   await press(page, 'toolFrame')
   await expect(page.locator('[data-tool="frame"]')).toHaveAttribute('aria-pressed', 'true')
   await drag(page, { x: 600, y: 400 }, { x: 900, y: 520 })
   const [lone] = await selection(page)
   const loneNode = (await read(page)).nodes[lone ?? '']
-  expect(loneNode).toMatchObject({ parentId: 'p1', props: { x: 600, y: 400, width: 300, height: 120 } })
+  expect(loneNode).toMatchObject({
+    type: 'box',
+    parentId: 'p1',
+    name: 'Box',
+    props: { x: 600, y: 400, width: 300, height: 120, fills: [{ type: 'solid', color: '#FFFFFFFF' }] },
+  })
   expect(await page.evaluate(() => window.dazbee?.tool())).toBe('select')
   await expect(page.locator('[data-tool="select"]')).toHaveAttribute('aria-pressed', 'true')
   writeOutput('frame-1-drawn.png', await page.screenshot({ animations: 'disabled' }))
@@ -80,7 +85,7 @@ test('F draws a frame; a frame drawn around layers takes them in without moving 
   await press(page, 'undo')
   expect((await read(page)).nodes[lone ?? '']).toBeUndefined()
 
-  // A click draws a frame of the default size, centred on it.
+  // A click draws a box of the default size, centred on it.
   await press(page, 'toolFrame')
   await click(page, 700, 800)
   const [clicked] = await selection(page)
@@ -91,24 +96,24 @@ test('F draws a frame; a frame drawn around layers takes them in without moving 
   // Around A and the turned B: both go inside it, and neither moves on the stage.
   await press(page, 'toolFrame')
   await drag(page, { x: 80, y: 80 }, { x: 460, y: 300 })
-  const [frame] = await selection(page)
-  expect(await childrenOf(page, frame ?? '')).toEqual(['a', 'b'])
+  const [box] = await selection(page)
+  expect(await childrenOf(page, box ?? '')).toEqual(['a', 'b'])
   near(await boxOf(page, 'a'), before.a)
   near(await boxOf(page, 'b'), before.b)
   // C, outside it, stays on the page.
   expect((await read(page)).nodes.c?.parentId).toBe('p1')
-  // In the wide format, where A and B are elsewhere, they don't move either, and the frame holds them.
+  // In the wide format, where A and B are elsewhere, they don't move either, and the box holds them.
   near(await wideBoxOf(page, 'a'), wideBefore.a)
-  holds(await wideBoxOf(page, frame ?? ''), wideBefore.a)
-  holds(await wideBoxOf(page, frame ?? ''), { x: 1300, y: 600, width: 120, height: 120 })
+  holds(await wideBoxOf(page, box ?? ''), wideBefore.a)
+  holds(await wideBoxOf(page, box ?? ''), { x: 1300, y: 600, width: 120, height: 120 })
   writeOutput('frame-2-around.png', await page.screenshot({ animations: 'disabled' }))
   await press(page, 'undo')
   expect((await read(page)).nodes.a?.parentId).toBe('p1')
-  expect((await read(page)).nodes[frame ?? '']).toBeUndefined()
+  expect((await read(page)).nodes[box ?? '']).toBeUndefined()
   expect(errors).toEqual([])
 })
 
-test('Mod+Alt+G and the Arrange card frame the selection; Shift+A wraps shapes in auto layout without moving them', async ({
+test('Mod+Alt+G and the Arrange card box the selection; Shift+A wraps shapes in auto layout without moving them', async ({
   browser,
 }) => {
   const { page, errors } = await openStage(browser, design())
@@ -122,28 +127,40 @@ test('Mod+Alt+G and the Arrange card frame the selection; Shift+A wraps shapes i
   await click(page, 660, 160)
   await click(page, 860, 210, ['Shift'])
   expect(await selection(page)).toEqual(['c', 'd'])
-  await press(page, 'frameSelection')
-  const [framed] = await selection(page)
+  await press(page, 'boxSelection')
+  const [boxed] = await selection(page)
   let now = await read(page)
-  expect(now.nodes[framed ?? '']).toMatchObject({
+  expect(now.nodes[boxed ?? '']).toMatchObject({
+    type: 'box',
+    name: 'Box',
     props: { x: 600, y: 100, width: 340, height: 160, clip: false, fills: [] },
   })
-  expect(await childrenOf(page, framed ?? '')).toEqual(['c', 'd'])
+  expect(await childrenOf(page, boxed ?? '')).toEqual(['c', 'd'])
   near(await boxOf(page, 'c'), before.c)
   near(await boxOf(page, 'd'), before.d)
   writeOutput('frame-3-selection.png', await page.screenshot({ animations: 'disabled' }))
   await press(page, 'undo')
   expect((await read(page)).nodes.c?.parentId).toBe('p1')
 
-  // The same from the full menu's Put in a box.
+  // The same from the full menu's Put in a box; undo and redo take the box away and back in one step.
   await click(page, 660, 160)
   await click(page, 860, 210, ['Shift'])
   await moreAction(page, 'Put in a box')
   const [carded] = await selection(page)
+  expect((await read(page)).nodes[carded ?? '']).toMatchObject({ type: 'box', name: 'Box' })
   expect(await childrenOf(page, carded ?? '')).toEqual(['c', 'd'])
   await press(page, 'undo')
+  now = await read(page)
+  expect(now.nodes[carded ?? '']).toBeUndefined()
+  expect([now.nodes.c?.parentId, now.nodes.d?.parentId]).toEqual(['p1', 'p1'])
+  await press(page, 'redo')
+  expect((await read(page)).nodes[carded ?? '']).toMatchObject({ type: 'box', name: 'Box' })
+  expect(await childrenOf(page, carded ?? '')).toEqual(['c', 'd'])
+  near(await boxOf(page, 'c'), before.c)
+  near(await boxOf(page, 'd'), before.d)
+  await press(page, 'undo')
 
-  // Shift+A on two shapes: an auto layout frame that hugs them, laid out as they stand.
+  // Shift+A on two shapes: an auto layout box that hugs them, laid out as they stand.
   await click(page, 220, 680)
   await click(page, 420, 650, ['Shift'])
   await press(page, 'autoLayout')
@@ -158,7 +175,7 @@ test('Mod+Alt+G and the Arrange card frame the selection; Shift+A wraps shapes i
   near(await boxOf(page, 'f'), before.f)
   near(await boxOf(page, auto ?? ''), { x: 120, y: 600, width: 360, height: 160 })
   writeOutput('frame-4-auto-layout.png', await page.screenshot({ animations: 'disabled' }))
-  // With a frame among the selection, Shift+A switches that frame's auto layout instead: off here, and C stays on the page.
+  // With a box among the selection, Shift+A switches that box's auto layout instead: off here, and C stays on the page.
   await click(page, 660, 160, ['Shift'])
   expect(await selection(page)).toEqual([auto, 'c'])
   await press(page, 'autoLayout')

@@ -1,7 +1,7 @@
 // Auto layout (#46), solved while a scene is built so the editor, exports and the server lay out
-// alike, per format. A frame with `layout` places the children in its flow, in a row or a column,
+// alike, per format. A box with `layout` places the children in its flow, in a row or a column,
 // sizing each one fixed, hugging what it holds or filling the room left; children marked
-// `absolute` stay where they are put. Boxes stay in page space and unturned: a turned frame turns
+// `absolute` stay where they are put. Boxes stay in page space and unturned: a turned box turns
 // its laid-out children about its centre when drawn, as it does any child.
 import type { AutoLayout, TextProps } from '@dazbee/schema'
 
@@ -15,7 +15,7 @@ type Size = { width: number; height: number }
  */
 export type MeasureText = (props: TextProps, width: number | null) => Size
 
-type FrameLayer = Extract<SceneLayer, { type: 'frame' }>
+type BoxLayer = Extract<SceneLayer, { type: 'box' }>
 
 type Sizing = 'fixed' | 'hug' | 'fill'
 
@@ -27,10 +27,10 @@ interface Item {
   fillCross: boolean
 }
 
-/** Layers solved before, by the layer as built and the measure used, so an unchanged frame is laid out once. */
+/** Layers solved before, by the layer as built and the measure used, so an unchanged box is laid out once. */
 const solved = new WeakMap<SceneLayer, { measure: MeasureText | undefined; layer: SceneLayer }>()
 
-/** Lays out every auto layout frame among `layers` and inside them; layers with none inside come back as they were. */
+/** Lays out every auto layout box among `layers` and inside them; layers with none inside come back as they were. */
 export function applyLayout(layers: SceneLayer[], measure?: MeasureText): SceneLayer[] {
   let changed = false
   const next = layers.map((layer) => {
@@ -57,7 +57,7 @@ function layoutOne(layer: SceneLayer, measure?: MeasureText): SceneLayer {
   if (before && before.measure === measure) return before.layer
   let out: SceneLayer
   if (hasLayout(layer)) {
-    out = solveFrame(layer, {}, measure)
+    out = solveBox(layer, {}, measure)
   } else {
     const children = applyLayout(layer.children, measure)
     out = children === layer.children ? layer : ({ ...layer, children } as SceneLayer)
@@ -66,28 +66,28 @@ function layoutOne(layer: SceneLayer, measure?: MeasureText): SceneLayer {
   return out
 }
 
-function hasLayout(layer: SceneLayer): layer is FrameLayer & { props: { layout: AutoLayout } } {
-  return layer.type === 'frame' && layer.props.layout !== undefined
+function hasLayout(layer: SceneLayer): layer is BoxLayer & { props: { layout: AutoLayout } } {
+  return layer.type === 'box' && layer.props.layout !== undefined
 }
 
 /**
- * Lays out an auto layout frame: its own size where `given` says (its parent's flow decided it)
- * or where it hugs, then each child's size and place. Returns the frame with its new size and
+ * Lays out an auto layout box: its own size where `given` says (its parent's flow decided it)
+ * or where it hugs, then each child's size and place. Returns the box with its new size and
  * children; absolute children are only laid out inside.
  */
-function solveFrame(
-  frame: FrameLayer & { props: { layout: AutoLayout } },
+function solveBox(
+  outer: BoxLayer & { props: { layout: AutoLayout } },
   given: Partial<Size>,
   measure?: MeasureText,
 ): SceneLayer {
-  const { layout } = frame.props
+  const { layout } = outer.props
   const { padding: pad } = layout
   const row = layout.direction === 'row'
-  const own = sizingOf(frame)
+  const own = sizingOf(outer)
   const hugW = given.width === undefined && own.width === 'hug'
   const hugH = given.height === undefined && own.height === 'hug'
-  let width = given.width ?? frame.props.width
-  let height = given.height ?? frame.props.height
+  let width = given.width ?? outer.props.width
+  let height = given.height ?? outer.props.height
   const hugMain = row ? hugW : hugH
   const hugCross = row ? hugH : hugW
   const padMain = row ? pad.left + pad.right : pad.top + pad.bottom
@@ -95,7 +95,7 @@ function solveFrame(
   const innerCross = () => (row ? height : width) - padCross
 
   // Each child's size: widths first, since text that hugs its height needs its width.
-  const flow = frame.children.filter((c) => !c.props.absolute)
+  const flow = outer.children.filter((c) => !c.props.absolute)
   const items: Item[] = flow.map((layer) => {
     const s = sizingOf(layer)
     const fillW = s.width === 'fill' && !(row ? hugMain : hugCross)
@@ -103,7 +103,7 @@ function solveFrame(
     const natural = () => {
       if (layer.type === 'text') return textSize(layer, s.width === 'hug' ? null : layer.props.width, measure)
       if (hasLayout(layer)) {
-        const inner = solveFrame(layer, {}, measure)
+        const inner = solveBox(layer, {}, measure)
         return { width: inner.props.width, height: inner.props.height }
       }
       return { width: layer.props.width, height: layer.props.height }
@@ -126,7 +126,7 @@ function solveFrame(
     else i.width = v
   }
 
-  // Lines: one, or as many as wrapping takes at the frame's size along the flow.
+  // Lines: one, or as many as wrapping takes at the box's size along the flow.
   const innerMain = () => (row ? width : height) - padMain
   const lines: Item[][] = []
   if (layout.wrap && !hugMain) {
@@ -147,8 +147,8 @@ function solveFrame(
     lines.push(items)
   }
 
-  // Fill across the flow takes the line's room: the frame's, or the tallest in a wrapped line.
-  // Text whose width that sets hugs its height at it. Known up front for one line in a frame
+  // Fill across the flow takes the line's room: the box's, or the tallest in a wrapped line.
+  // Text whose width that sets hugs its height at it. Known up front for one line in a box
   // that doesn't hug across, so a column can hug text that wraps at the width it fills.
   const lineCross = (line: Item[]) => Math.max(0, ...line.filter((i) => !i.fillCross).map(crossOf))
   const fillAcross = (line: Item[], room: number) => {
@@ -195,8 +195,8 @@ function solveFrame(
 
   // Places: along the flow by justify, across it by align, line after line.
   const placed = new Map<SceneLayer, SceneLayer>()
-  const startMain = row ? frame.props.x + pad.left : frame.props.y + pad.top
-  let crossAt = row ? frame.props.y + pad.top : frame.props.x + pad.left
+  const startMain = row ? outer.props.x + pad.left : outer.props.y + pad.top
+  let crossAt = row ? outer.props.y + pad.top : outer.props.x + pad.left
   for (const line of lines) {
     const used = lineMain(line)
     const free = innerMain() - used
@@ -218,10 +218,10 @@ function solveFrame(
     crossAt += room + layout.lineGap
   }
 
-  const children = frame.children.map(
+  const children = outer.children.map(
     (c) => placed.get(c) ?? ({ ...c, children: applyLayout(c.children, measure) } as SceneLayer),
   )
-  return { ...frame, props: { ...frame.props, width, height }, children } as SceneLayer
+  return { ...outer, props: { ...outer.props, width, height }, children } as SceneLayer
 }
 
 /** A text layer's size where it hugs: natural, or at the width it was given. */
@@ -231,8 +231,8 @@ function textSize(layer: Extract<SceneLayer, { type: 'text' }>, width: number | 
 }
 
 /**
- * A layer placed by its frame at a box: an auto layout frame laid out at that size, text at its
- * width, and any other layer moved there with what it holds (a group or plain frame keeps its
+ * A layer placed by its box at a rect: an auto layout box laid out at that size, text at its
+ * width, and any other layer moved there with what it holds (a group or plain box keeps its
  * own size: only auto layout reaches inside).
  */
 function place(
@@ -241,7 +241,7 @@ function place(
   measure?: MeasureText,
 ): SceneLayer {
   if (hasLayout(layer))
-    return solveFrame(
+    return solveBox(
       { ...layer, props: { ...layer.props, x: box.x, y: box.y } },
       { width: box.width, height: box.height },
       measure,

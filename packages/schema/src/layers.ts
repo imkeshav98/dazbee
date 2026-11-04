@@ -20,12 +20,12 @@ const commonProps = {
   blendMode: BlendMode.default('normal'),
   effects: Effect.array().default([]),
   /**
-   * How the layer sizes along each axis inside an auto layout frame, or, for such a frame and for
+   * How the layer sizes along each axis inside an auto layout box, or, for such a box and for
    * text, on its own (#46): fixed at its width or height, hugging what it holds, or filling the
    * room its auto layout parent leaves. Left out, text hugs as its box mode says and the rest is fixed.
    */
   sizing: z.object({ width: z.enum(['fixed', 'hug', 'fill']), height: z.enum(['fixed', 'hug', 'fill']) }).optional(),
-  /** Inside an auto layout frame, stays where it is put instead of taking its turn in the flow (#46). */
+  /** Inside an auto layout box, stays where it is put instead of taking its turn in the flow (#46). */
   absolute: z.boolean().optional(),
   /**
    * Makes the layer a mask (#48): it is not drawn, and the layers after it in the same parent, up
@@ -133,7 +133,7 @@ export const GraphicProps = z.object({
 export type GraphicProps = z.infer<typeof GraphicProps>
 
 /**
- * A frame's auto layout (#46): its children in a row or a column, `gap` apart, inside its
+ * A box's auto layout (#46): its children in a row or a column, `gap` apart, inside its
  * paddings, lined up along the flow (`justify`) and across it (`align`). Gaps and paddings may be
  * negative, so children overlap. With `wrap`, a row or column runs on into more, `lineGap` apart.
  */
@@ -150,7 +150,7 @@ export const AutoLayout = z.object({
 })
 export type AutoLayout = z.infer<typeof AutoLayout>
 
-export const FrameProps = z.object({
+export const BoxProps = z.object({
   ...commonProps,
   blendMode: ContainerBlendMode.default('pass-through'),
   clip: z.boolean().default(true),
@@ -160,12 +160,12 @@ export const FrameProps = z.object({
    */
   cornerRadius: z.union([Radius, z.tuple([Radius, Radius, Radius, Radius])]).default(0),
   fills: Paint.array().default([]),
-  /** Strokes along the frame's edge, drawn over what is inside it and never cut by its clip. */
+  /** Strokes along the box's edge, drawn over what is inside it and never cut by its clip. */
   strokes: Stroke.array().default([]),
-  /** Lays out the frame's children (#46); left out, they stay where they are put. */
+  /** Lays out the box's children (#46); left out, they stay where they are put. */
   layout: AutoLayout.optional(),
 })
-export type FrameProps = z.infer<typeof FrameProps>
+export type BoxProps = z.infer<typeof BoxProps>
 
 export const GroupProps = z.object({ ...commonProps, blendMode: ContainerBlendMode.default('pass-through') })
 export type GroupProps = z.infer<typeof GroupProps>
@@ -273,7 +273,7 @@ export type TextProps = z.infer<typeof TextProps>
 
 /** Five of the seven layer types in ADR-0006: boolean arrived with #44; instance and lottie come later. */
 export const LAYER_PROPS = {
-  frame: FrameProps,
+  box: BoxProps,
   group: GroupProps,
   graphic: GraphicProps,
   text: TextProps,
@@ -325,7 +325,7 @@ const layerOf = <T extends LayerType>(type: T) =>
   z.object({ type: z.literal(type), ...nodeBase, props: LAYER_PROPS[type] })
 
 export const Layer = z.discriminatedUnion('type', [
-  layerOf('frame'),
+  layerOf('box'),
   layerOf('group'),
   layerOf('graphic'),
   layerOf('text'),
@@ -335,8 +335,8 @@ export type Layer = z.infer<typeof Layer>
 
 /** Layer types that hold other layers, and which types each can hold. */
 export const CONTAINERS = {
-  frame: ['frame', 'group', 'graphic', 'text', 'boolean'],
-  group: ['frame', 'group', 'graphic', 'text', 'boolean'],
+  box: ['box', 'group', 'graphic', 'text', 'boolean'],
+  group: ['box', 'group', 'graphic', 'text', 'boolean'],
   boolean: ['graphic', 'boolean'],
 } as const satisfies Partial<Record<LayerType, readonly LayerType[]>>
 

@@ -60,10 +60,10 @@ describe('pixel fixtures', () => {
     expect(Object.keys(result.design.nodes)).toHaveLength(300)
   })
 
-  it('the English sale ad nests its price in a group inside a clipping frame', () => {
+  it('the English sale ad nests its price in a group inside a clipping box', () => {
     const ad = parseDesign(fixtures.find((f) => f.name === 'english-sale-ad')?.json)
     if (!ad.success) throw new Error(ad.errors.join('\n'))
-    expect(ad.design.nodes['price-frame']?.type).toBe('frame')
+    expect(ad.design.nodes['price-frame']?.type).toBe('box')
     expect(ad.design.nodes['price-group']).toMatchObject({ type: 'group', parentId: 'price-frame' })
     expect(ad.design.nodes.price?.parentId).toBe('price-group')
   })

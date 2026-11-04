@@ -12,7 +12,7 @@ export const SHORTCUTS = [
   { action: 'duplicate', keys: ['Mod+D'] },
   { action: 'group', keys: ['Mod+G'] },
   { action: 'ungroup', keys: ['Mod+Shift+G'] },
-  { action: 'frameSelection', keys: ['Mod+Alt+G'] },
+  { action: 'boxSelection', keys: ['Mod+Alt+G'] },
   { action: 'bringForward', keys: ['Mod+BracketRight'] },
   { action: 'sendBackward', keys: ['Mod+BracketLeft'] },
   { action: 'bringToFront', keys: ['Mod+Shift+BracketRight'] },

@@ -374,7 +374,7 @@ export function editorPen({
    * A press with the pen (#45): a click adds a corner, a drag pulls out smooth handles, Shift turns
    * the new segment to 45°, and a press on the first anchor closes the path. The first press
    * starts one undo step that lasts until the path is closed or finished; the layer appears with
-   * the second anchor, inside the group, frame or boolean double-clicked into if it can hold it.
+   * the second anchor, inside the group, box or boolean double-clicked into if it can hold it.
    */
   function penDown(e: PointerEvent, at: { frame: Frame; p: Point }) {
     typing.stop()

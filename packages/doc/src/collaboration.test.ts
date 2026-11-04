@@ -321,7 +321,7 @@ function randomCommand(tab: Session, doc: DesignDoc, random: () => number) {
   const pick = <T>(xs: T[]) => xs[Math.floor(random() * xs.length)] as T
   const containers = [
     ...Object.keys(design.pages),
-    ...ids.filter((id) => ['group', 'frame'].includes(design.nodes[id]?.type ?? '')),
+    ...ids.filter((id) => ['group', 'box'].includes(design.nodes[id]?.type ?? '')),
   ]
   const roll = random()
   try {

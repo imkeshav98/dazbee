@@ -117,7 +117,7 @@ describe('editorDrawing', () => {
       expect(props(made()[0] as string)).toMatchObject({ x: 450, y: 450, width: 100, height: 100 })
     })
 
-    it('goes into the group or frame gone into, when it can hold it', () => {
+    it('goes into the group or box gone into, when it can hold it', () => {
       const { drawing, session, selection, at, made } = harness()
       session.run('node.group', { ids: ['rect'] })
       const group = session.design().nodes.rect?.parentId as string

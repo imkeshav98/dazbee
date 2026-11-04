@@ -18,7 +18,7 @@ const rect = (parentId: string, index: string, x: number, y: number, extra: Reco
 })
 /**
  * One page in a square and a wide format: a group holding a dot and a tag, a box filled with the
- * brand's colour, a text, and an empty frame.
+ * brand's colour, a text, and an empty box.
  */
 const DESIGN: DesignInput = {
   meta: { designId: 'd', name: 'D', kind: 'single', primaryFormatId: 'sq' },
@@ -49,7 +49,7 @@ const DESIGN: DesignInput = {
       props: { x: 0, y: 700, width: 200, height: 40, text: 'Hello', boxMode: 'fixed', style: STYLE },
     },
     holder: {
-      type: 'frame',
+      type: 'box',
       parentId: 'p1',
       index: 'a3',
       name: 'Holder',
@@ -97,7 +97,7 @@ function harness() {
 
 describe('editorLayerEdits', () => {
   describe('moveLayer', () => {
-    it('moves a layer into a frame as one undo step, the group it left fitting what it holds again', () => {
+    it('moves a layer into a box as one undo step, the group it left fitting what it holds again', () => {
       const { edits, session } = harness()
       expect(edits.moveLayer('tag', 'holder')).toBe(true)
       const { nodes } = session.design()

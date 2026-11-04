@@ -197,7 +197,7 @@ const design = (withStory = false): DesignInput => ({
       },
     },
     stack: {
-      type: 'frame',
+      type: 'box',
       parentId: 'p1',
       index: 'a7',
       name: 'Stack',
@@ -225,7 +225,7 @@ const design = (withStory = false): DesignInput => ({
       props: rect(236, 780, 120, 120, '#14213DFF'),
     },
     plain: {
-      type: 'frame',
+      type: 'box',
       parentId: 'p1',
       index: 'a8',
       name: 'Plain',

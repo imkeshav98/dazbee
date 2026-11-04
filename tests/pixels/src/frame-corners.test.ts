@@ -1,4 +1,4 @@
-// Rounded boxes: a frame's fills, its clip and its shadow follow its corners, one radius or each
+// Rounded boxes: a box's fills, its clip and its shadow follow its corners, one radius or each
 // corner's own, on the CPU surface and in the PDF and SVG exports alike.
 import { afterAll, describe, expect, it } from 'vitest'
 
@@ -14,17 +14,17 @@ const pdfium = await startPdfium(afterAll)
 
 const solid = (color: string) => [{ type: 'solid', color }]
 /** A 300 square page: a blue box at 20,20, 160 square, holding a red square that reaches past it. */
-const design = (frame: Record<string, unknown>) => ({
+const design = (boxProps: Record<string, unknown>) => ({
   meta: { designId: 'd', name: 'Corners', kind: 'single', primaryFormatId: 'f' },
   formats: { f: { name: 'F', width: 300, height: 300, order: 'a0' } },
   pages: { p1: { name: 'Page', order: 'a0', fills: solid('#FFFFFFFF') } },
   nodes: {
     box: {
-      type: 'frame',
+      type: 'box',
       parentId: 'p1',
       index: 'a0',
       name: 'Box',
-      props: { x: 20, y: 20, width: 160, height: 160, fills: solid('#2050E0FF'), ...frame },
+      props: { x: 20, y: 20, width: 160, height: 160, fills: solid('#2050E0FF'), ...boxProps },
     },
     inner: {
       type: 'graphic',
@@ -69,10 +69,14 @@ describe('rounded boxes', () => {
   })
 
   it('draw the same in the PDF and the SVG as on the CPU', async () => {
-    for (const frame of [{ cornerRadius: 40 }, { cornerRadius: [0, 60, 10, 80] }, { cornerRadius: 40, clip: false }]) {
-      const { cpu, pdf, svg } = await renderThreeWays(ck, pdfium, design(frame), 'p1', 'f', bytes)
-      expect(vectorDifference(cpu, pdf), `PDF ${JSON.stringify(frame)}`).toBeLessThan(1)
-      expect(vectorDifference(cpu, svg), `SVG ${JSON.stringify(frame)}`).toBeLessThan(1)
+    for (const boxProps of [
+      { cornerRadius: 40 },
+      { cornerRadius: [0, 60, 10, 80] },
+      { cornerRadius: 40, clip: false },
+    ]) {
+      const { cpu, pdf, svg } = await renderThreeWays(ck, pdfium, design(boxProps), 'p1', 'f', bytes)
+      expect(vectorDifference(cpu, pdf), `PDF ${JSON.stringify(boxProps)}`).toBeLessThan(1)
+      expect(vectorDifference(cpu, svg), `SVG ${JSON.stringify(boxProps)}`).toBeLessThan(1)
     }
   })
 })

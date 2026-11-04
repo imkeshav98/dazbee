@@ -1,7 +1,7 @@
 'use client'
 
 // The Stack panel: auto layout on or off, its direction, wrapping and room between, then under
-// Advanced the line-up pad, the room around and how the frame sizes; and the sizing fields a layer
+// Advanced the line-up pad, the room around and how the box sizes; and the sizing fields a layer
 // in an auto layout has in the Position panel.
 import { FIELD_LABEL, KNOBS, PANEL_BUTTON, PANEL_HEADING } from '@/components/editor/styles.ts'
 import { FOCUS_RING } from '@/components/ui/looks.ts'
@@ -44,7 +44,7 @@ function sizingOf(type: string, props: Props): { width: Sizing; height: Sizing }
   return { width: 'fixed', height: 'fixed' }
 }
 
-/** The Stack panel. A frame inside another auto layout sets its sizing in the Position panel, so this one leaves it out. */
+/** The Stack panel. A box inside another auto layout sets its sizing in the Position panel, so this one leaves it out. */
 export function AutoLayoutPanel({ target, design }: PanelProps) {
   const t = useMessages()
   return (
@@ -89,7 +89,7 @@ export function SizingFields({
  * The Stack panel: auto layout on or off by the switch in its heading; then its direction and
  * wrapping, the room between, at a tap or by number, and together or spread out. Under Advanced, a
  * 3×3 pad that lines up what is inside along both axes at once, the room around and each side's,
- * and, when `ownSizing`, how the frame sizes.
+ * and, when `ownSizing`, how the box sizes.
  */
 function AutoLayoutCard({
   target,

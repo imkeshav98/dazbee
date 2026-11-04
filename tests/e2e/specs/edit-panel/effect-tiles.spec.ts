@@ -82,7 +82,7 @@ const design = (assetId: string): DesignInput => ({
     left: shape('Left', 'a0', 'pair', 600, 600, 'ellipse', '#00A88AFF'),
     right: shape('Right', 'a1', 'pair', 740, 600, 'rect', '#FFB020FF'),
     card: {
-      type: 'frame',
+      type: 'box',
       parentId: 'p1',
       index: 'a4',
       name: 'Card',

@@ -18,7 +18,7 @@ const rect = (x: number, y: number, width: number, height: number, rotation = 0)
 })
 
 /**
- * Two loose layers, and a turned frame holding a layer and a turned group: a square and a banner,
+ * Two loose layers, and a turned box holding a layer and a turned group: a square and a banner,
  * where the banner moves, turns back and hides some of them.
  */
 const design = (): DesignInput => ({
@@ -32,7 +32,7 @@ const design = (): DesignInput => ({
     a: { type: 'graphic', parentId: 'p1', index: 'a0', name: 'A', props: rect(100, 100, 200, 100, 20) },
     b: { type: 'graphic', parentId: 'p1', index: 'a1', name: 'B', props: rect(400, 150, 120, 120) },
     f: {
-      type: 'frame',
+      type: 'box',
       parentId: 'p1',
       index: 'a2',
       name: 'F',
@@ -121,7 +121,7 @@ describe('node.group', () => {
     const after = readDesign(doc)
     expect(after.nodes[id]).toMatchObject({ type: 'group', parentId: 'p1', name: 'Group' })
     expect(childrenOf(after, id).map(([child]) => child)).toEqual(['a', 'b'])
-    // In the layer order, the group stands where B, the topmost, was: under the frame.
+    // In the layer order, the group stands where B, the topmost, was: under the box.
     expect(childrenOf(after, 'p1').map(([child]) => child)).toEqual([id, 'f'])
     for (const scope of SCOPES) {
       const hug = boundsOf([boxOf(after, scope, 'a'), boxOf(after, scope, 'b')])
@@ -138,31 +138,31 @@ describe('node.group', () => {
     expect(undone.nodes.a?.parentId).toBe('p1')
   })
 
-  it('refuses what it can not do, as node.frame, node.enclose and node.ungroup do', () => {
+  it('refuses what it can not do, as node.box, node.enclose and node.ungroup do', () => {
     const tab = openSession(fresh())
-    expect(() => tab.run('node.frame', { ids: ['a', 'c'] })).toThrow(/frame must share a parent/)
-    expect(() => tab.run('node.enclose', { id: 'g2', ids: ['d'], scope: 'format:sq' })).toThrow(/not a frame/)
+    expect(() => tab.run('node.box', { ids: ['a', 'c'] })).toThrow(/box must share a parent/)
+    expect(() => tab.run('node.enclose', { id: 'g2', ids: ['d'], scope: 'format:sq' })).toThrow(/not a box/)
     expect(() => tab.run('node.enclose', { id: 'f', ids: ['c'], scope: 'format:sq' })).toThrow(/not beside/)
     expect(() => tab.run('node.group', { ids: ['a', 'c'] })).toThrow(/share a parent/)
-    expect(() => tab.run('node.ungroup', { ids: ['f'] })).toThrow(/frame, not a group/)
+    expect(() => tab.run('node.ungroup', { ids: ['f'] })).toThrow(/box, not a group/)
     tab.run('node.lock', { ids: ['g2'], lock: { delete: true } })
     expect(() => tab.run('node.ungroup', { ids: ['g2'] })).toThrow(/locked/)
   })
 })
 
-describe('node.frame', () => {
-  it('wraps layers in a frame that hugs them in each format, without a fill or clipping, and nothing moves', () => {
+describe('node.box', () => {
+  it('wraps layers in a box that hugs them in each format, without a fill or clipping, and nothing moves', () => {
     const doc = fresh()
     const tab = openSession(doc)
     const before = drawnAll(readDesign(doc), LEAVES)
 
-    const id = tab.run('node.frame', { ids: ['c', 'g2'] })
+    const id = tab.run('node.box', { ids: ['c', 'g2'] })
 
     const after = readDesign(doc)
     expect(after.nodes[id]).toMatchObject({
-      type: 'frame',
+      type: 'box',
       parentId: 'f',
-      name: 'Frame',
+      name: 'Box',
       props: { clip: false, fills: [] },
     })
     expect(childrenOf(after, id).map(([child]) => child)).toEqual(['c', 'g2'])
@@ -181,13 +181,13 @@ describe('node.frame', () => {
 })
 
 describe('node.enclose', () => {
-  it('moves layers into a frame drawn around them, placing the frame around them in every format', () => {
+  it('moves layers into a box drawn around them, placing the box around them in every format', () => {
     const doc = fresh()
     const tab = openSession(doc)
-    // A frame drawn in the square around A and B, 20 px clear of them.
+    // A box drawn in the square around A and B, 20 px clear of them.
     const square = boundsOf([boxOf(readDesign(doc), 'format:sq', 'a'), boxOf(readDesign(doc), 'format:sq', 'b')])
     const drawnBox = { x: square.x - 20, y: square.y - 20, width: square.width + 40, height: square.height + 40 }
-    const id = tab.run('node.create', { parentId: 'p1', layer: { type: 'frame', name: 'Frame', props: drawnBox } })
+    const id = tab.run('node.create', { parentId: 'p1', layer: { type: 'box', name: 'Box', props: drawnBox } })
     const before = drawnAll(readDesign(doc), LEAVES)
 
     tab.run('node.enclose', { id, ids: ['b', 'a'], scope: 'format:sq' })
@@ -317,7 +317,7 @@ describe('node.ungroup', () => {
     const tab = openSession(doc)
     const before = drawnAll(readDesign(doc), LEAVES)
 
-    // Inside the turned frame: C and the turned group G2 together.
+    // Inside the turned box: C and the turned group G2 together.
     const outer = tab.run('node.group', { ids: ['c', 'g2'] })
     expectSame(drawnAll(readDesign(doc), LEAVES), before)
 

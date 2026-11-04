@@ -31,7 +31,7 @@ export interface SelectionDeps {
 
 export interface EditorSelection {
   current(): Selection | null
-  /** The group or frame double-clicked into: a click then picks what is directly inside it (#41). */
+  /** The group or box double-clicked into: a click then picks what is directly inside it (#41). */
   entered(): string | null
   /**
    * The page a click on its background picked: outlined dashed in every size, its labels lit. No
@@ -57,7 +57,7 @@ export interface EditorSelection {
   dropOffGrid(): void
   /** Picks a page that has a frame, or none, letting the selection go; shows it and tells the page listeners. */
   pickPage(pageId: string | null): void
-  /** Goes into a group or frame, or out of every one with null. */
+  /** Goes into a group or box, or out of every one with null. */
   enter(id: string | null): void
   /** Starts cropping a layer's image fill, or ends the crop with null. */
   crop(target: Picked | null): void
@@ -94,7 +94,7 @@ export function editorSelection({ drawn, frames, changed }: SelectionDeps): Edit
   let selection: Selection | null = null
   /** The page a click on its background picked; a layer selected, Esc, or a click or drag elsewhere lets it go. */
   let pickedPage: string | null = null
-  /** The group or frame double-clicked into. */
+  /** The group or box double-clicked into. */
   let entered: string | null = null
   /** The selection the selection listeners last heard of, as `<frame>|<ids>`. */
   let lastSelection = ''

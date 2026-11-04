@@ -30,7 +30,7 @@ test('? and the keyboard button list every shortcut, F, I and Mod+Alt+G among th
   await expect(list.locator('[data-shortcut="bringForward"] kbd')).toHaveText(['Ctrl', ']'])
   await expect(list.locator('[data-shortcut="toolFrame"]')).toContainText('F')
   await expect(list.locator('[data-shortcut="toolImage"]')).toContainText('I')
-  await expect(list.locator('[data-shortcut="frameSelection"]')).toContainText('G')
+  await expect(list.locator('[data-shortcut="boxSelection"]')).toContainText('G')
   writeOutput('shortcuts.png', await page.screenshot())
   await page.keyboard.press('Escape')
   await expect(list).toBeHidden()

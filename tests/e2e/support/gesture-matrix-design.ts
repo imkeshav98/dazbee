@@ -10,8 +10,8 @@ export const SUBJECTS = [
   'shape',
   'group',
   'gA',
-  'frame',
-  'fInner',
+  'box',
+  'boxInner',
   'auto',
   'aFixed',
   'aFill',
@@ -39,7 +39,7 @@ export const HOLDS: Record<string, readonly string[]> = {
   group: ['gA', 'gB'],
   bool: ['bA', 'bB'],
   maskGroup: ['mask', 'masked'],
-  frame: ['fInner'],
+  box: ['boxInner'],
   auto: ['aFixed', 'aFill', 'aHug', 'aAbs'],
   aHug: ['aHugIn'],
   turned: ['tInner'],
@@ -53,7 +53,7 @@ export const PATH_INK: Record<string, [number, number, number]> = {
   pA: [0xc4, 0x13, 0x90],
   pB: [0x7a, 0x13, 0xc4],
 }
-/** Each layer auto layout places, by the frame whose flow it is in. */
+/** Each layer auto layout places, by the box whose flow it is in. */
 export const FLOW: Record<string, string> = {
   aFixed: 'auto',
   aFill: 'auto',
@@ -65,9 +65,9 @@ export const FLOW: Record<string, string> = {
 }
 /** Two layers beside each subject that can be distributed with it. */
 export const BESIDE: Record<string, [string, string]> = {
-  shape: ['group', 'frame'],
-  group: ['shape', 'frame'],
-  frame: ['shape', 'group'],
+  shape: ['group', 'box'],
+  group: ['shape', 'box'],
+  box: ['shape', 'group'],
   bool: ['shape', 'group'],
   photo: ['shape', 'group'],
   aFixed: ['aFill', 'aHug'],
@@ -78,7 +78,7 @@ export const LEAVES = [
   'shape',
   'gA',
   'gB',
-  'fInner',
+  'boxInner',
   'aFixed',
   'aFill',
   'aHugIn',
@@ -178,16 +178,16 @@ export const matrixDesign = (assetId: string): DesignInput => ({
     },
     gA: rect('Group A', 'group', 'a0', 200, 40, 90, 120, '#2F6BFFFF'),
     gB: rect('Group B', 'group', 'a1', 310, 40, 90, 120, '#FFB020FF'),
-    frame: {
-      type: 'frame',
+    box: {
+      type: 'box',
       parentId: 'p1',
       index: 'a2',
-      name: 'Frame',
+      name: 'Box',
       props: { x: 440, y: 40, width: 200, height: 140, fills: [{ type: 'solid', color: '#EEF1F6FF' }] },
     },
-    fInner: rect('Frame inner', 'frame', 'a0', 460, 60, 100, 80, '#9747FFFF'),
+    boxInner: rect('Box inner', 'box', 'a0', 460, 60, 100, 80, '#9747FFFF'),
     auto: {
-      type: 'frame',
+      type: 'box',
       parentId: 'p1',
       index: 'a3',
       name: 'Auto layout',
@@ -204,7 +204,7 @@ export const matrixDesign = (assetId: string): DesignInput => ({
     aFixed: rect('Flow fixed', 'auto', 'a0', 0, 0, 120, 120, '#00A88AFF'),
     aFill: rect('Flow fill', 'auto', 'a1', 0, 0, 100, 120, '#1F2329FF', { sizing: { width: 'fill', height: 'fixed' } }),
     aHug: {
-      type: 'frame',
+      type: 'box',
       parentId: 'auto',
       index: 'a2',
       name: 'Flow hug',
@@ -221,7 +221,7 @@ export const matrixDesign = (assetId: string): DesignInput => ({
     aHugIn: rect('Hug inner', 'aHug', 'a0', 0, 0, 60, 60, '#FF2E7EFF'),
     aAbs: rect('Flow absolute', 'auto', 'a3', 520, 330, 60, 60, '#2F6BFFFF', { absolute: true }),
     col: {
-      type: 'frame',
+      type: 'box',
       parentId: 'p1',
       index: 'a4',
       name: 'Column',
@@ -329,10 +329,10 @@ export const matrixDesign = (assetId: string): DesignInput => ({
       },
     },
     turned: {
-      type: 'frame',
+      type: 'box',
       parentId: 'p1',
       index: 'b1',
-      name: 'Turned frame',
+      name: 'Turned box',
       props: {
         x: 800,
         y: 600,
@@ -345,7 +345,7 @@ export const matrixDesign = (assetId: string): DesignInput => ({
     },
     tInner: rect('Turned inner', 'turned', 'a0', 830, 630, 90, 60, '#9747FFFF'),
     autoTurned: {
-      type: 'frame',
+      type: 'box',
       parentId: 'p1',
       index: 'b2',
       name: 'Turned auto layout',

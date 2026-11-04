@@ -20,8 +20,8 @@ const inside = (p: Point, layer: SceneLayer) => {
 }
 
 /**
- * The topmost layer under a page point, by layer boxes. Clicking inside a group, frame or boolean picks
- * the child under the point, so the spike can move single layers; a clipping frame hides what
+ * The topmost layer under a page point, by layer boxes. Clicking inside a group, box or boolean picks
+ * the child under the point, so the spike can move single layers; a clipping box hides what
  * lies outside it. A layer that isn't `pickable` (locked) is passed over with everything in it,
  * so the click reaches what lies beneath. A mask is never picked here, and what it masks only inside its box.
  */
@@ -42,11 +42,11 @@ export function hitTest(
     const masked = maskOf[i]
     if (layer.props.mask || !pickable(layer) || (masked && !inside(unrotate(p, masked), masked))) continue
     const q = unrotate(p, layer)
-    if (layer.type === 'frame' || layer.type === 'group' || layer.type === 'boolean') {
-      if (layer.type === 'frame' && layer.props.clip && !inside(q, layer)) continue
+    if (layer.type === 'box' || layer.type === 'group' || layer.type === 'boolean') {
+      if (layer.type === 'box' && layer.props.clip && !inside(q, layer)) continue
       const child = hitTest(layer.children, q, pickable)
       if (child) return child
-      if (layer.type === 'frame' && inside(q, layer)) return layer
+      if (layer.type === 'box' && inside(q, layer)) return layer
       continue
     }
     if (inside(q, layer)) return layer
