@@ -46,11 +46,14 @@ export interface EditorSelection {
   hovered(): Picked | null
   /** Selects layers in one frame, or none; a crop or path edit stays only on that one layer there. Shows it. */
   select(ids: string[], frame: string): void
-  /** Sets the selection and nothing else: a crop or path edit stays, and nothing is shown. */
+  /** Sets the selection and shows nothing: a crop or path edit stays while a layer is selected, and ends with none. */
   selectKeepingModes(next: Selection | null): void
-  /** Drops selected layers that are gone, and the selection once none are left or its frame is. */
+  /**
+   * Drops selected layers that are gone, and the selection once none are left or its frame is;
+   * with nothing selected, a crop or path edit ends.
+   */
   keep(): void
-  /** Lets the selection go when its frame is no longer in the grid; a crop or path edit stays. */
+  /** Lets the selection go when its frame is no longer in the grid, with a crop or path edit. */
   dropOffGrid(): void
   /** Picks a page that has a frame, or none, letting the selection go; shows it and tells the page listeners. */
   pickPage(pageId: string | null): void
@@ -134,11 +137,18 @@ export function editorSelection({ drawn, frames, changed }: SelectionDeps): Edit
     if (cropping && (ids.length !== 1 || ids[0] !== cropping.id || frame !== cropping.frame)) cropping = null
     changed()
   }
+  /** With nothing selected there is no crop and no path edit. */
+  function endModesWhenNone() {
+    if (selection) return
+    cropping = null
+    pathEditing = null
+  }
   function selectKeepingModes(next: Selection | null) {
     selection = next
+    endModesWhenNone()
   }
   function keep() {
-    if (!selection) return
+    if (!selection) return endModesWhenNone()
     const design = drawn()
     const ids = selection.ids.filter((id) => design.nodes[id])
     selection = ids.length > 0 && frameOf(selection.frame) ? { ...selection, ids } : null
@@ -148,6 +158,7 @@ export function editorSelection({ drawn, frames, changed }: SelectionDeps): Edit
   }
   function dropOffGrid() {
     if (selection && !frameOf(selection.frame)) selection = null
+    endModesWhenNone()
   }
   function pickPage(pageId: string | null) {
     const design = drawn()
