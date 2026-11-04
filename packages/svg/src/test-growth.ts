@@ -16,8 +16,8 @@ let clock: (() => number) | undefined
  * as long and a crowded machine slows both alike, and the fastest of up to 5 samples of each counts.
  * The time is the process's CPU time, which leaves out the time the machine pauses it, where that
  * clock steps by less than a millisecond; on Windows it steps by 15.6 ms, so the wall clock times
- * the runs there. The samples stop once they have taken 250 ms in all, so slow code still finishes
- * soon.
+ * the runs there. The samples stop once they have taken 1 s in all, so quadratic code fails after
+ * about one sample.
  */
 export function growth<T>(read: (text: string) => T, small: string, large: string): { result: T; times: number } {
   clock ??= cpuSteps() < 1 ? cpuTime : () => performance.now()
@@ -37,7 +37,7 @@ export function growth<T>(read: (text: string) => T, small: string, large: strin
   let fastestLarge = Number.POSITIVE_INFINITY
   let result: T | undefined
   let spent = 0
-  for (let sample = 0; sample < 5 && spent < 250; sample++) {
+  for (let sample = 0; sample < 5 && spent < 1_000; sample++) {
     const ten = timed(tenSmall).took
     const ran = timed(() => read(large))
     fastestTen = Math.min(fastestTen, ten)
