@@ -9,7 +9,7 @@ import { card1, card2, card3, figmaBadge } from '../../support/assets.ts'
 import { screenPoint, writeOutput } from '../../support/editor.ts'
 import { assetsOf, dropDesign, dropFiles, images, routeUploads } from '../../support/file-drops.ts'
 import { newBrand } from '../../support/seed.ts'
-import { openStage, read, selection } from '../../support/stage.ts'
+import { fitSettled, openStage, read, selection } from '../../support/stage.ts'
 import { expect, type Page, test } from '../../support/test.ts'
 
 test.describe.configure({ timeout: 120_000 })
@@ -221,7 +221,7 @@ test('a file that is not an image is left out with a notice, while the image dro
     [{ width: 390, height: 844 }, card3],
   ] as const) {
     await page.setViewportSize(size)
-    await page.evaluate(() => window.dazbee?.fitAll())
+    await fitSettled(page)
     await page.evaluate(() => window.dazbee?.drawn())
     const name = `Dropped ${randomUUID().slice(0, 8)}`
     const files = [

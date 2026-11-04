@@ -6,7 +6,7 @@ import { photo, upload } from '../../support/assets.ts'
 import { writeOutput } from '../../support/editor.ts'
 import { choose, enter } from '../../support/fields.ts'
 import { SCREEN_SIZES } from '../../support/layout.ts'
-import { nextFrame, openStage, selectLayers } from '../../support/stage.ts'
+import { fitSettled, nextFrame, openStage, selectLayers } from '../../support/stage.ts'
 import { expect, type Page, test } from '../../support/test.ts'
 import { barMenu } from '../../support/top-bar.ts'
 
@@ -119,9 +119,7 @@ for (const [width, height] of SCREEN_SIZES) {
       const asset = await upload(photo)
       const { page, errors } = await openStage(browser, design(asset.id))
       await page.setViewportSize({ width, height })
-      // The stage takes its new size before the design is fitted to it.
-      await nextFrame(page)
-      await page.evaluate(() => window.dazbee?.fitAll())
+      await fitSettled(page)
       await page.evaluate(() => window.dazbee?.drawn())
       for (const [kind, ids, panels] of PANELS) {
         await selectLayers(page, ids, { bar: true })

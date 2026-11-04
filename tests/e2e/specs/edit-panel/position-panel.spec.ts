@@ -6,7 +6,7 @@ import type { DesignInput } from '@dazbee/schema'
 import { writeOutput } from '../../support/editor.ts'
 import { enter } from '../../support/fields.ts'
 import { SCREEN_SIZES } from '../../support/layout.ts'
-import { nextFrame, openStage, order, perform, props, selectLayers } from '../../support/stage.ts'
+import { fitSettled, nextFrame, openStage, order, perform, props, selectLayers } from '../../support/stage.ts'
 import { expect, type Page, test } from '../../support/test.ts'
 import { barMenu } from '../../support/top-bar.ts'
 
@@ -179,7 +179,7 @@ for (const [width, height] of SCREEN_SIZES) {
   test(`screenshots at ${width}×${height}: one layer and several`, { tag: '@evidence' }, async ({ browser }) => {
     const { page, errors } = await openStage(browser, design())
     await page.setViewportSize({ width, height })
-    await page.evaluate(() => window.dazbee?.fitAll())
+    await fitSettled(page)
     for (const [name, ids] of [
       ['one', ['headline']],
       ['several', ['one', 'two', 'three']],

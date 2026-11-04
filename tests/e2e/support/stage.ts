@@ -58,6 +58,26 @@ export const drawn = (page: Page) => page.evaluate(() => window.dazbee?.drawn())
 /** Waits two animation frames, so what the page laid out after a change has been drawn. */
 export const nextFrame = (page: Page) =>
   page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))))
+/**
+ * Fits every format once the editor has the chrome's insets for the page's size, and returns the
+ * camera. After a resize they reach the editor a frame or more later, and a fit made before then
+ * keeps clear of the old size's chrome; once two fits a frame apart agree, the editor has them.
+ */
+export async function fitSettled(page: Page) {
+  const fit = () =>
+    page.evaluate(() => {
+      window.dazbee?.fitAll()
+      return JSON.stringify(window.dazbee?.camera())
+    })
+  await expect
+    .poll(async () => {
+      const first = await fit()
+      await nextFrame(page)
+      return (await fit()) === first
+    })
+    .toBe(true)
+  return page.evaluate(() => window.dazbee?.camera())
+}
 export const read = async (page: Page) => JSON.parse(await designOf(page)) as Design
 export const props = async (page: Page, id: string) =>
   placed(await read(page), id, 'sq') as {
