@@ -1,10 +1,12 @@
 // The UI's fixed rules (#51), checked over the real source.
+import { join } from 'node:path'
+
 import { ESLint } from 'eslint'
 import { describe, expect, it } from 'vitest'
 
 import { physicalSides } from './check-logical.ts'
 
-const eslint = new ESLint({ cwd: new URL('..', import.meta.url).pathname })
+const eslint = new ESLint({ cwd: join(import.meta.dirname, '..') })
 
 describe('message catalogs', () => {
   // Lints every page and component with the app's whole config: about 2 s here, past 5 s on a cold CI runner.
