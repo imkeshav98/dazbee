@@ -212,7 +212,7 @@ test('an open rail button keeps the rail’s glass, lit by the pressed tint, its
       await expect
         .poll(async () => (await look(page.getByTestId('rail-blob').locator('span'))).fill)
         .toBe(glass.pressed)
-      expect((await look(button)).colour).toBe(glass.accentText)
+      await expect.poll(async () => (await look(button)).colour).toBe(glass.accentText)
     }
     expect(errors).toEqual([])
     await page.context().close()

@@ -59,7 +59,7 @@ test('the account menu’s language and theme, and the colour pop-up’s kinds o
     await expect(account).toBeHidden()
 
     await selectLayers(page, ['box'], { bar: true })
-    await (await fillList(page)).locator('[data-row="0"]').getByTestId('paint-swatch').click()
+    await (await fillList(page)).locator('[data-row="1"]').getByTestId('paint-swatch').click()
     const kinds = page.getByTestId('paint-editor').getByRole('radiogroup', { name: 'Kind of paint' })
     expect(await look(kinds)).toMatchObject(well)
     expect(await look(kinds.getByRole('radio', { checked: true }))).toMatchObject(chosen)
@@ -118,13 +118,16 @@ test('on touch, a press on a glass button shows the pressed tint', async ({ brow
     const add = (await pagesPanel(page)).getByTestId('add-page')
     const box = await add.boundingBox()
     if (!box) throw new Error('missing Add page')
+    // A finger held on it for a while, through the browser's own gesture handling, as a phone's is.
     const touch = await page.context().newCDPSession(page)
-    await touch.send('Input.dispatchTouchEvent', {
-      type: 'touchStart',
-      touchPoints: [{ x: box.x + box.width / 2, y: box.y + box.height / 2 }],
+    const held = touch.send('Input.synthesizeTapGesture', {
+      x: box.x + box.width / 2,
+      y: box.y + box.height / 2,
+      duration: 3000,
+      gestureSourceType: 'touch',
     })
-    await expect.poll(async () => (await look(add)).image).toBe(laid(glass.pressed))
-    await touch.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
+    await expect.poll(async () => (await look(add)).image, { timeout: 2500 }).toBe(laid(glass.pressed))
+    await held
     expect(errors).toEqual([])
     await page.context().close()
   }
@@ -195,7 +198,9 @@ test('asset details on glass: a tag reads in the text colour on its pink tint, a
     await remove.click()
     const confirm = details.getByTestId('asset-delete-confirm')
     await expect(confirm).toBeVisible()
-    expect(await look(confirm)).toMatchObject({ fill: glass.dangerSolid, colour: glass.onAccent })
+    // It takes the place of Delete, under the pointer, which moves off it to see it at rest.
+    await page.mouse.move(2, 2)
+    await expect.poll(async () => look(confirm)).toMatchObject({ fill: glass.dangerSolid, colour: glass.onAccent })
     await hovered(confirm, { fill: glass.dangerSolidHover, colour: glass.onAccent })
     await shoot(page, `glass-${theme}-asset-delete`)
     await pressedFill(page, details.getByRole('button', { name: 'Keep' }), glass.pressed)
