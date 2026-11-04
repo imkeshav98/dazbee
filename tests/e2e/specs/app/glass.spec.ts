@@ -6,19 +6,18 @@
 // block on its yellow, and a pink circle, so each picture shows the glass over all four.
 import type { DesignInput } from '@dazbee/schema'
 
-import { editorPath, setCookies, shoot, writeOutput } from '../../support/editor.ts'
-import { servedGlass } from '../../support/glass.ts'
+import { shoot, writeOutput } from '../../support/editor.ts'
+import { look, openIn, pressedFill, THEMES } from '../../support/glass.ts'
 import { SCREEN_SIZES } from '../../support/layout.ts'
 import { liveDesign, seed } from '../../support/seed.ts'
 import { drawn, fitSettled, nextFrame, selectLayers } from '../../support/stage.ts'
-import { type Browser, expect, type Locator, type Page, test } from '../../support/test.ts'
+import { expect, type Page, test } from '../../support/test.ts'
 import { barMenu, moreMenu, pagesPanel } from '../../support/top-bar.ts'
 
 test.describe.configure({ timeout: 180_000 })
 
 /** The ad's side, in design pixels. */
 const SIDE = 1080
-const THEMES = ['dark', 'light'] as const
 
 const solid = (color: string) => [{ type: 'solid' as const, color }]
 const shape = (
@@ -86,37 +85,6 @@ const whiteAd = (): DesignInput => ({
   nodes: { headline },
 })
 
-/** How an element looks, as computed: its glass, fill, layered image, text colour, outline and border. */
-const look = (el: Locator) =>
-  el.evaluate((e) => {
-    const s = getComputedStyle(e)
-    return {
-      filter: s.backdropFilter,
-      fill: s.backgroundColor,
-      image: s.backgroundImage,
-      colour: s.color,
-      outline: s.outlineStyle,
-      border: s.borderTopWidth,
-    }
-  })
-
-/** Opens a design in a tab of its own in a theme, and gives the tab, its errors and its glass. */
-async function openIn(
-  browser: Browser,
-  designId: string,
-  theme: (typeof THEMES)[number],
-  viewport = { width: 1440, height: 900 },
-) {
-  const context = await browser.newContext({ viewport })
-  const page = await context.newPage()
-  const errors: string[] = []
-  page.on('pageerror', (error) => errors.push(error.message))
-  await setCookies(page, { theme })
-  await page.goto(editorPath(designId))
-  await expect(page.getByTestId('status')).toHaveAttribute('data-ready', '', { timeout: 30_000 })
-  return { page, errors, glass: await servedGlass(page) }
-}
-
 /** Zooms so the ad covers the whole window, centred, so every piece of glass floats over it. */
 async function fillWithAd(page: Page, width: number, height: number) {
   await fitSettled(page)
@@ -124,14 +92,6 @@ async function fillWithAd(page: Page, width: number, height: number) {
   const camera = { x: (width - SIDE * zoom) / 2, y: (height - SIDE * zoom) / 2, zoom }
   await page.evaluate((camera) => window.dazbee?.setCamera(camera), camera)
   await drawn(page)
-}
-
-/** Holds the mouse down on a control until its fill is the one expected, then lets go: a click. */
-async function pressedFill(page: Page, control: Locator, expected: string) {
-  await control.hover()
-  await page.mouse.down()
-  await expect.poll(async () => (await look(control)).fill).toBe(expected)
-  await page.mouse.up()
 }
 
 async function shot(page: Page, name: string) {
