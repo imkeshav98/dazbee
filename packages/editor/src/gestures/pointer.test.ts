@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { SceneLayer } from '@dazbee/renderer'
 
@@ -223,7 +223,32 @@ describe('editorPointer', () => {
     })
   })
 
-  describe('keyDown, keyUp and blur', () => {
+  describe('keyDown, keyUp, blur and input', () => {
+    /** The page's own elements, of which the fields take keys. */
+    class Element {
+      readonly tagName: string
+      readonly role: string | null
+      readonly isContentEditable = false
+      constructor(tagName: string, role: string | null = null) {
+        this.tagName = tagName
+        this.role = role
+      }
+      getAttribute(name: string) {
+        return name === 'role' ? this.role : null
+      }
+    }
+    beforeEach(() => {
+      vi.stubGlobal('HTMLElement', Element)
+    })
+    afterEach(() => {
+      vi.unstubAllGlobals()
+    })
+    /** The focus moving to a control after a key press, as Tab moves it, or after a pointer press. */
+    const focusAfter = (pointer: ReturnType<typeof harness>['pointer'], by: 'keydown' | 'pointerdown') => {
+      pointer.input({ type: by } as Event)
+      pointer.input({ type: 'focusin' } as Event)
+    }
+
     it('holds space to pan with a drag, until it is let go or the window loses focus', () => {
       const { pointer, send, log, cursor } = harness()
       expect(pointer.keyDown(key('KeyA', log))).toBe(false)
@@ -245,17 +270,30 @@ describe('editorPointer', () => {
       expect(log).toEqual(['prevent Space', 'camera 20 15', 'release press', 'draw overlay', 'prevent Space'])
     })
 
-    it('leaves space to a focused control, which it presses: space pans only while the canvas has the focus', () => {
+    it('leaves space to a field, and to a control the keys moved the focus to, which it presses', () => {
       const { pointer, log, cursor } = harness()
-      expect(pointer.keyDown(key('Space', log, { target: { tagName: 'BUTTON' } }))).toBe(false)
+      expect(pointer.keyDown(key('Space', log, { target: new Element('INPUT') }))).toBe(false)
+      focusAfter(pointer, 'keydown')
+      expect(pointer.keyDown(key('Space', log, { target: new Element('BUTTON') }))).toBe(false)
+      expect(pointer.keyDown(key('Space', log, { target: new Element('DIV', 'treeitem') }))).toBe(false)
       expect(cursor()).toBe('')
       expect(log).toEqual([])
-      const row = { tagName: 'DIV', getAttribute: (name: string) => (name === 'role' ? 'treeitem' : null) }
-      expect(pointer.keyDown(key('Space', log, { target: row }))).toBe(false)
-      expect(log).toEqual([])
-      // The edit panel takes the focus as it opens, and is no control.
-      const panel = { tagName: 'SECTION', getAttribute: (name: string) => (name === 'role' ? 'dialog' : null) }
-      expect(pointer.keyDown(key('Space', log, { target: panel }))).toBe(true)
+    })
+
+    it('pans with space from a control a pointer press moved the focus to, as a menu gives its button back after a pick', () => {
+      const { pointer, log, cursor } = harness()
+      focusAfter(pointer, 'pointerdown')
+      // A key pressed since does not move the focus.
+      pointer.input({ type: 'keydown' } as Event)
+      expect(pointer.keyDown(key('Space', log, { target: new Element('BUTTON') }))).toBe(true)
+      expect(cursor()).toBe('grab')
+      expect(log).toEqual(['prevent Space'])
+    })
+
+    it('pans with space from the edit panel, which takes the focus as it opens and is no control', () => {
+      const { pointer, log, cursor } = harness()
+      focusAfter(pointer, 'keydown')
+      expect(pointer.keyDown(key('Space', log, { target: new Element('SECTION', 'dialog') }))).toBe(true)
       expect(cursor()).toBe('grab')
     })
   })

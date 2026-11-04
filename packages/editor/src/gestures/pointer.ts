@@ -12,6 +12,7 @@ import type { EditorView } from '../canvas/view.ts'
 import type { EditorBoxes } from '../layers/boxes.ts'
 import { type Box, localTo } from '../layers/transform.ts'
 import { type EditorSelection, isPath } from '../selection.ts'
+import { inField } from '../shortcuts.ts'
 import { paragraphAt, wordAt } from '../text/text-edit.ts'
 import type { EditorTyping } from '../text/typing.ts'
 import type { EditorTools } from '../tools.ts'
@@ -79,18 +80,24 @@ export interface EditorPointer {
    */
   selectAt(client: Point): string[]
   /**
-   * Space held pans with a drag while the canvas has the focus: a focused control takes space as a
-   * press. Returns whether the key was the pointer's, so nothing else acts on it.
+   * Space held pans with a drag, unless a field has the focus, or a control the keys moved the focus
+   * to, which takes space as a press. Returns whether the key was the pointer's, so nothing else acts on it.
    */
   keyDown(e: KeyboardEvent): boolean
   /** Space let go stops the pan it held. */
   keyUp(e: KeyboardEvent): void
   /** The window losing focus lets go of space. */
   blur(): void
+  /**
+   * Follows how the focus moves, from the window's key presses, pointer presses and focus moves
+   * anywhere on the page: a control the focus moved to after a key takes space; one it moved to
+   * after a press, such as a menu's button given the focus back after a pick, leaves space to pan.
+   */
+  input(e: Event): void
 }
 
-/** The elements and roles of controls that space presses, ticks or types into. */
-const CONTROL_TAGS = new Set(['A', 'BUTTON', 'INPUT', 'SELECT', 'SUMMARY', 'TEXTAREA'])
+/** The elements and roles of controls that space presses or ticks; fields are `inField`'s. */
+const CONTROL_TAGS = new Set(['A', 'BUTTON', 'SUMMARY'])
 const CONTROL_ROLES = new Set([
   'button',
   'checkbox',
@@ -140,6 +147,9 @@ export function editorPointer({
   let pointer: MouseEvent | null = null
   /** The cursor the handle under the pointer asks for, shown when the tool and a pan don't ask for another. */
   let hoverCursor = ''
+  /** Whether the page's last key or pointer press was a key, and whether the focus last moved after one. */
+  let keyed = false
+  let focusByKey = false
   const on = { signal }
 
   function currentGesture() {
@@ -236,7 +246,8 @@ export function editorPointer({
   }
 
   function keyDown(e: KeyboardEvent) {
-    if (e.code !== 'Space' || e.metaKey || e.ctrlKey || !onCanvas(e.target)) return false
+    if (e.code !== 'Space' || e.metaKey || e.ctrlKey || inField(e.target) || (focusByKey && isControl(e.target)))
+      return false
     e.preventDefault()
     if (!spaceHeld) {
       spaceHeld = true
@@ -252,6 +263,11 @@ export function editorPointer({
   function blur() {
     spaceHeld = false
     showCursor()
+  }
+  function input(e: Event) {
+    if (e.type === 'keydown') keyed = true
+    else if (e.type === 'pointerdown') keyed = false
+    else if (e.type === 'focusin') focusByKey = keyed
   }
 
   canvas.addEventListener(
@@ -493,20 +509,13 @@ export function editorPointer({
     keyDown,
     keyUp,
     blur,
+    input,
   }
 }
 
-/**
- * Whether a key goes to the canvas: no control that space presses, ticks or types into has the
- * focus. The canvas takes no focus itself, and the edit panel takes it as it opens without being one.
- */
-function onCanvas(target: EventTarget | null) {
-  const el = target as {
-    tagName?: unknown
-    isContentEditable?: boolean
-    getAttribute?: (name: string) => string | null
-  } | null
-  if (typeof el?.tagName !== 'string') return true
-  if (CONTROL_TAGS.has(el.tagName) || el.isContentEditable) return false
-  return !CONTROL_ROLES.has(el.getAttribute?.('role') ?? '')
+/** Whether an element is a control that space presses or ticks, by its tag or its role. */
+function isControl(target: EventTarget | null) {
+  const el = target as { tagName?: unknown; getAttribute?: (name: string) => string | null } | null
+  if (typeof el?.tagName !== 'string') return false
+  return CONTROL_TAGS.has(el.tagName) || CONTROL_ROLES.has(el.getAttribute?.('role') ?? '')
 }
