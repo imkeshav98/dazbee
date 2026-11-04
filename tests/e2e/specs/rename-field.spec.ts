@@ -1,8 +1,9 @@
 // The four rename fields in Chromium: the design's name in the crumb, a size's name in the Sizes
 // panel, a layer's name in the layers panel and a page's name in the Pages panel. Enter keeps the
-// new name and Escape the old one; leaving the field keeps the new name; Enter followed by a blur
-// before the field closes renames once, as one undo step. The @evidence tests go through every way
-// out of each field at the three screen sizes, with undo and redo, and record where the focus goes.
+// new name and Escape the old one; leaving the field keeps the new name. A field ends once: Enter
+// followed by a blur before the field closes renames once, as one undo step, and Escape followed by
+// a blur keeps the old name. The @evidence tests go through every way out of each field at the three
+// screen sizes, with undo and redo, and record where the focus goes.
 import type { DesignInput } from '@dazbee/schema'
 
 import { designOf, writeOutput } from '../support/editor.ts'
@@ -67,14 +68,14 @@ const focusOf = (page: Page) =>
   })
 
 /**
- * Presses Enter in a field and takes the focus out of it in the same task, before React redraws,
+ * Presses a key in a field and takes the focus out of it in the same task, before React redraws,
  * so the blur reaches the field while it is still open.
  */
-const enterThenBlur = (field: Locator) =>
-  field.evaluate((input: HTMLInputElement) => {
-    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', bubbles: true, cancelable: true }))
+const keyThenBlur = (field: Locator, key: 'Enter' | 'Escape') =>
+  field.evaluate((input: HTMLInputElement, key) => {
+    input.dispatchEvent(new KeyboardEvent('keydown', { key, code: key, bubbles: true, cancelable: true }))
     input.blur()
-  })
+  }, key)
 
 interface Subject {
   /** The field's name in test titles and file names. */
@@ -169,7 +170,7 @@ for (const id of ['size', 'page']) {
     const field = await s.open(page)
     await expect(field).toBeFocused()
     await field.fill('Offer')
-    await enterThenBlur(field)
+    await keyThenBlur(field, 'Enter')
     await expect(field).toHaveCount(0)
     await expect.poll(() => s.name(page)).toBe('Offer')
     await press(page, 'undo')
@@ -178,12 +179,23 @@ for (const id of ['size', 'page']) {
     await expect.poll(() => s.name(page)).toBe('Offer')
     expect(errors).toEqual([])
   })
+
+  test(`a ${s.id}'s name: Escape, then a blur before the field closes, keeps the old name`, async ({ browser }) => {
+    const { page, errors } = await openStage(browser, design())
+    const field = await s.open(page)
+    await field.fill('Never kept')
+    await keyThenBlur(field, 'Escape')
+    await expect(field).toHaveCount(0)
+    await page.evaluate(() => window.dazbee?.drawn())
+    expect(await s.name(page)).toBe(s.first)
+    expect(errors).toEqual([])
+  })
 }
 
 for (const [width, height] of SIZES) {
   for (const s of SUBJECTS) {
     test(
-      `at ${width}×${height} the ${s.id} name field: Enter, Escape, Tab, Enter then blur, undo and redo`,
+      `at ${width}×${height} the ${s.id} name field: Enter, Escape, Escape then blur, Tab, Enter then blur, undo and redo`,
       { tag: '@evidence' },
       async ({ browser }) => {
         const { page, errors } = await openStage(browser, design())
@@ -242,6 +254,16 @@ for (const [width, height] of SIZES) {
         focus.escape = await focusOf(page)
         await shot('3-escape')
 
+        // Escape, then a blur before the field closes: the old name stays.
+        field = await s.open(page)
+        await field.fill('Never kept')
+        await keyThenBlur(field, 'Escape')
+        await closed()
+        await page.evaluate(() => window.dazbee?.drawn())
+        expect(await s.name(page)).toBe('Spring offer')
+        expect(sentWith('Never kept')).toBe(0)
+        focus.escapeThenBlur = await focusOf(page)
+
         // Leaving the field with Tab keeps the new name.
         field = await s.open(page)
         await field.fill('Summer offer')
@@ -254,7 +276,7 @@ for (const [width, height] of SIZES) {
         // Enter, then a blur before the field closes: renamed once, as one undo step.
         field = await s.open(page)
         await field.fill('Autumn offer')
-        await enterThenBlur(field)
+        await keyThenBlur(field, 'Enter')
         await closed()
         await expect.poll(() => s.name(page)).toBe('Autumn offer')
         focus.enterThenBlur = await focusOf(page)
