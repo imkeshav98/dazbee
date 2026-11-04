@@ -145,7 +145,7 @@
       },
       "role": "body"
     },
-    "price-frame": {
+    "price-box": {
       "type": "box",
       "parentId": "p1",
       "index": "a4",
@@ -168,7 +168,7 @@
     },
     "price-group": {
       "type": "group",
-      "parentId": "price-frame",
+      "parentId": "price-box",
       "index": "a0",
       "name": "Price and was-price",
       "props": {

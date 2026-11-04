@@ -1,6 +1,6 @@
 {
   "meta": {
-    "designId": "fixture-frame-corners",
+    "designId": "fixture-box-corners",
     "name": "Box corners",
     "kind": "single",
     "primaryFormatId": "square"
