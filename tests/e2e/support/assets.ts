@@ -1,17 +1,34 @@
-// Uploading images the way the browser does, for the checks that need an asset (#35, #48).
+// The files the checks put into the app, and uploading images the way the browser does, for the
+// checks that need an asset (#35, #48). The pictures are the pixel tests' fixtures.
 import { createHash } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
 import { expect } from '@playwright/test'
 
+import { ASSETS_DIR } from '@dazbee/pixels/pixels'
 import { AssetSummary, UploadTicket } from '@dazbee/schema'
 
 import { callApi, DEV_BRAND, type InBrand } from './seed.ts'
 
+/** A file of the pixel tests' fixtures, by its path in their assets folder. */
+function fixture(...path: string[]) {
+  return new Uint8Array(readFileSync(join(ASSETS_DIR, ...path)))
+}
+
 /** A stand-in photo from the pixel fixtures, 1920 × 1200. */
-export const photo = new Uint8Array(
-  readFileSync(join(import.meta.dirname, '..', '..', 'pixels', 'assets', 'sneaker.jpg')),
+export const photo = fixture('sneaker.jpg')
+/** Three photos of cards, each a picture of its own, so each uploads as an asset of its own. */
+export const card1 = fixture('card-1.jpg')
+export const card2 = fixture('card-2.jpg')
+export const card3 = fixture('card-3.jpg')
+/** A small photo. */
+export const tile = fixture('tile.jpg')
+/** A badge as Figma exports it to SVG. */
+export const figmaBadge = fixture('svg', 'figma-badge.svg')
+/** The font the checks upload as a brand's own, from this suite's assets (assets/fonts/README.md). */
+export const righteous = new Uint8Array(
+  readFileSync(join(import.meta.dirname, '..', 'assets', 'fonts', 'Righteous-Regular.ttf')),
 )
 
 /** Calls a route of a brand: a GET, or a POST of `body`. */
@@ -30,7 +47,3 @@ export async function upload(bytes: Uint8Array<ArrayBuffer>, { brandId = DEV_BRA
   expect(put.status).toBe(200)
   return AssetSummary.parse(await api('/assets', { sha256 }, { brandId }))
 }
-
-export const righteous = new Uint8Array(
-  readFileSync(join(import.meta.dirname, '..', 'assets', 'fonts', 'Righteous-Regular.ttf')),
-)

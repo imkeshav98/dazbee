@@ -1,12 +1,10 @@
 // The stage without cards: the canvas runs full width and the stage fits the ads between the
 // capsule and its end edge. A selection shows the top bar, and nothing selected leaves no bar.
-import { designOf, editorPath, screenPoint, writeOutput } from '../support/editor.ts'
+import { designOf, editorPath, screenPoint, setCookies, shoot } from '../support/editor.ts'
 import { liveDesign, seed } from '../support/seed.ts'
 import { expect, type Page, test } from '../support/test.ts'
 import { barMenu, moreSubmenu, openCard } from '../support/top-bar.ts'
 
-const shoot = async (page: Page, name: string) =>
-  writeOutput(`cards-${name}.png`, await page.screenshot({ animations: 'disabled' }))
 const box = async (page: Page, testId: string) => {
   const found = await page.getByTestId(testId).boundingBox()
   if (!found) throw new Error(`no ${testId}`)
@@ -15,7 +13,7 @@ const box = async (page: Page, testId: string) => {
 
 async function open(page: Page) {
   const designId = await seed(liveDesign())
-  await page.context().addCookies([{ name: 'theme', value: 'dark', url: test.info().project.use.baseURL ?? '' }])
+  await setCookies(page, { theme: 'dark' })
   await page.goto(editorPath(designId))
   await expect(page.getByTestId('status')).toHaveAttribute('data-ready', '', { timeout: 30_000 })
 }
@@ -45,7 +43,7 @@ test('the canvas runs full width and the ads fit between the capsule and the sta
   await page.getByTestId('zoom').click()
   await page.getByTestId('zoom-menu').getByRole('button', { name: 'Zoom to fit' }).click()
   await between()
-  await shoot(page, 'design')
+  await shoot(page, 'cards-design')
 })
 
 test('a selection shows the top bar; several layers line up and spread out from it and group from the small menu', async ({
@@ -69,7 +67,7 @@ test('a selection shows the top bar; several layers line up and spread out from 
   const lineUp = await barMenu(page, 'line-up')
   await expect(lineUp.getByRole('button', { name: 'Align left' })).toBeEnabled()
   await expect(lineUp.getByRole('button', { name: /^Distribute horizontally/ })).toBeEnabled()
-  await shoot(page, 'arrange')
+  await shoot(page, 'cards-arrange')
   await page.keyboard.press('Escape')
   const before = Object.keys(JSON.parse(await designOf(page)).nodes).length
   await page.getByTestId('small-group').click()

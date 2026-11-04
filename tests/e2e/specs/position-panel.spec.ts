@@ -4,8 +4,10 @@
 import type { DesignInput } from '@dazbee/schema'
 
 import { writeOutput } from '../support/editor.ts'
-import { openStage, order, props } from '../support/stage.ts'
-import { expect, type Locator, type Page, test } from '../support/test.ts'
+import { enter } from '../support/fields.ts'
+import { SCREEN_SIZES } from '../support/layout.ts'
+import { nextFrame, openStage, order, perform, props, selectLayers } from '../support/stage.ts'
+import { expect, type Page, test } from '../support/test.ts'
 import { barMenu } from '../support/top-bar.ts'
 
 test.describe.configure({ timeout: 120_000 })
@@ -64,15 +66,6 @@ const design = (): DesignInput => ({
   overrides: {},
 })
 
-const select = async (page: Page, ids: string[]) => {
-  await page.evaluate((ids) => window.dazbee?.select(ids), ids)
-  await expect(page.getByTestId('top-bar')).toHaveAttribute('data-selection', ids.join(' '))
-}
-const undo = (page: Page) => page.evaluate(() => window.dazbee?.perform('undo'))
-const enter = async (field: Locator, value: string) => {
-  await field.fill(value)
-  await field.press('Enter')
-}
 const panel = (page: Page) => barMenu(page, 'position')
 const button = async (page: Page, name: string | RegExp) =>
   (await panel(page)).getByRole('button', { name, exact: typeof name === 'string' })
@@ -81,7 +74,7 @@ test('one layer: the moves along the stack, lining up with the size by name, and
   browser,
 }) => {
   const { page, errors } = await openStage(browser, design())
-  await select(page, ['one'])
+  await selectLayers(page, ['one'], { bar: true })
   const part = (await panel(page)).getByTestId('arrange-part')
   await expect(part.getByRole('heading')).toHaveText(['Arrange', 'Line up with the size'])
   await expect(part.getByRole('button')).toHaveText([
@@ -107,7 +100,7 @@ test('one layer: the moves along the stack, lining up with the size by name, and
   await expect.poll(() => order(page)).toEqual(['one', 'headline', 'two', 'three', 'group'])
   await (await button(page, 'Forward')).click()
   await expect.poll(() => order(page)).toEqual(['headline', 'one', 'two', 'three', 'group'])
-  await undo(page)
+  await perform(page, 'undo')
   await expect.poll(() => order(page)).toEqual(['one', 'headline', 'two', 'three', 'group'])
 
   // One layer lines up with the size it is in.
@@ -117,7 +110,7 @@ test('one layer: the moves along the stack, lining up with the size by name, and
   await expect.poll(async () => (await props(page, 'one')).y).toBe(980)
   await (await button(page, 'Centre')).click()
   await expect.poll(async () => (await props(page, 'one')).x).toBe(440)
-  await undo(page)
+  await perform(page, 'undo')
   await expect.poll(async () => (await props(page, 'one')).x).toBe(880)
 
   // Advanced: width and height, then where it sits, then its turn and Lock ratio.
@@ -139,7 +132,7 @@ test('one layer: the moves along the stack, lining up with the size by name, and
   await expect.poll(() => props(page, 'one')).toMatchObject({ width: 150, height: 50 })
   await enter(advanced.getByRole('spinbutton', { name: 'Height' }), '80')
   await expect.poll(() => props(page, 'one')).toMatchObject({ width: 240, height: 80 })
-  await undo(page)
+  await perform(page, 'undo')
   await expect.poll(() => props(page, 'one')).toMatchObject({ width: 150, height: 50 })
   await lock.click()
   await enter(advanced.getByRole('spinbutton', { name: 'Height' }), '120')
@@ -149,7 +142,7 @@ test('one layer: the moves along the stack, lining up with the size by name, and
 
 test('several layers line up with each other by icon, and spread out once there are three', async ({ browser }) => {
   const { page, errors } = await openStage(browser, design())
-  await select(page, ['one', 'two'])
+  await selectLayers(page, ['one', 'two'], { bar: true })
   const part = (await panel(page)).getByTestId('arrange-part')
   await expect(part.getByRole('heading')).toHaveText(['Arrange', 'Line up the selection'])
   await expect(part.getByRole('button', { name: 'Top', exact: true })).toHaveCount(0)
@@ -157,11 +150,11 @@ test('several layers line up with each other by icon, and spread out once there 
   await expect(part.getByRole('button', { name: 'Spread across' })).toHaveAttribute('title', 'Needs 3 or more layers')
   await (await button(page, 'Align top')).click()
   await expect.poll(async () => [(await props(page, 'one')).y, (await props(page, 'two')).y]).toEqual([300, 300])
-  await undo(page)
+  await perform(page, 'undo')
   await expect.poll(async () => (await props(page, 'two')).y).toBe(340)
 
   // Three spread across: the gaps between them even out, the ends stay.
-  await select(page, ['one', 'two', 'three'])
+  await selectLayers(page, ['one', 'two', 'three'], { bar: true })
   await expect(await button(page, 'Spread across')).toBeEnabled()
   await (await button(page, 'Spread across')).click()
   // From 120 to 820, 200 + 160 + 120 wide, leaves two gaps of 110.
@@ -173,7 +166,7 @@ test('several layers line up with each other by icon, and spread out once there 
 
 test('a group takes its size from what it holds, so its Advanced has only where it sits', async ({ browser }) => {
   const { page, errors } = await openStage(browser, design())
-  await select(page, ['group'])
+  await selectLayers(page, ['group'], { bar: true })
   const advanced = (await panel(page)).getByTestId('layout-card')
   await expect(advanced.getByRole('spinbutton')).toHaveCount(2)
   await expect(advanced.getByRole('switch', { name: 'Lock ratio' })).toHaveCount(0)
@@ -182,11 +175,7 @@ test('a group takes its size from what it holds, so its Advanced has only where 
   expect(errors).toEqual([])
 })
 
-for (const [width, height] of [
-  [1280, 760],
-  [820, 1180],
-  [390, 844],
-] as const) {
+for (const [width, height] of SCREEN_SIZES) {
   test(`screenshots at ${width}×${height}: one layer and several`, { tag: '@evidence' }, async ({ browser }) => {
     const { page, errors } = await openStage(browser, design())
     await page.setViewportSize({ width, height })
@@ -195,9 +184,9 @@ for (const [width, height] of [
       ['one', ['headline']],
       ['several', ['one', 'two', 'three']],
     ] as const) {
-      await select(page, [...ids])
+      await selectLayers(page, [...ids], { bar: true })
       await panel(page)
-      await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))))
+      await nextFrame(page)
       writeOutput(`position-${width}-${name}.png`, await page.screenshot({ animations: 'disabled' }))
       // On a phone the sheet scrolls: the second picture shows Advanced.
       if (width === 390) {

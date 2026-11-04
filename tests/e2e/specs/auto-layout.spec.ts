@@ -5,7 +5,7 @@ import type { DesignInput } from '@dazbee/schema'
 
 import { exportHashOf, writeOutput } from '../support/editor.ts'
 import { boxOf, click, openStage, press, read, selection } from '../support/stage.ts'
-import { expect, type Page, test } from '../support/test.ts'
+import { expect, test } from '../support/test.ts'
 
 test.describe.configure({ timeout: 120_000 })
 
@@ -99,11 +99,6 @@ const design = (): DesignInput => ({
   overrides: {},
 })
 
-const undo = async (page: Page) => {
-  await press(page, 'undo')
-  await page.evaluate(() => window.dazbee?.drawn())
-}
-
 test("typing into a button's label grows the button and moves the tile after it along", async ({ browser }) => {
   const { page, errors } = await openStage(browser, design())
   const before = { btn: await boxOf(page, 'btn'), label: await boxOf(page, 'label'), tile: await boxOf(page, 'tile') }
@@ -147,7 +142,7 @@ test("typing into a button's label grows the button and moves the tile after it 
   writeOutput('auto-layout-2-typed.png', await page.screenshot({ animations: 'disabled' }))
 
   // The typing is one undo step, and with it the layout goes back too.
-  await undo(page)
+  await press(page, 'undo')
   expect(await boxOf(page, 'btn')).toEqual(before.btn)
   expect(await boxOf(page, 'tile')).toEqual(before.tile)
   expect(await exportHashOf(page)).toBe(startHash)
@@ -189,10 +184,10 @@ test("Shift+A turns a frame into auto layout without moving anything, and a dele
   writeOutput('auto-layout-4-deleted.png', await page.screenshot({ animations: 'disabled' }))
 
   // One undo puts the tile back, and the last one returns to where it was.
-  await undo(page)
+  await press(page, 'undo')
   expect(await placedBy()).toEqual(before)
   // One more takes auto layout off again.
-  await undo(page)
+  await press(page, 'undo')
   expect((await read(page)).nodes.shelf?.props).not.toHaveProperty('layout')
   expect(errors).toEqual([])
 })

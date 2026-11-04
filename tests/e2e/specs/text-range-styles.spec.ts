@@ -4,7 +4,7 @@
 import type { DesignInput } from '@dazbee/schema'
 
 import { writeOutput } from '../support/editor.ts'
-import { openStage, read } from '../support/stage.ts'
+import { drawn, openStage, perform, read } from '../support/stage.ts'
 import { expect, type Page, test } from '../support/test.ts'
 import { barMenu, closeBarMenu, textColourHex } from '../support/top-bar.ts'
 
@@ -62,7 +62,6 @@ const runOver = async (page: Page, id: string, start: number, end: number) =>
     {},
     ...(await textProps(page, id)).runs.filter((r) => r.start <= start && r.end >= end).map((r) => r.style),
   ) as Record<string, unknown>
-const drawn = (page: Page) => page.evaluate(() => window.dazbee?.drawn())
 const at = (page: Page, x: number, y: number) =>
   page.evaluate(({ x, y }) => window.dazbee?.screenPoint(x, y), { x, y }) as Promise<{ x: number; y: number }>
 async function dblclick(page: Page, x: number, y: number) {
@@ -70,7 +69,6 @@ async function dblclick(page: Page, x: number, y: number) {
   await page.mouse.dblclick(p.x, p.y)
   await drawn(page)
 }
-const undo = (page: Page) => page.evaluate(() => window.dazbee?.perform('undo'))
 
 test('one word made pink, larger and another font from the bar; the rest keeps its style; each one undo step', async ({
   browser,
@@ -118,13 +116,13 @@ test('one word made pink, larger and another font from the bar; the rest keeps i
     expect(run.end, JSON.stringify(run)).toBeLessThanOrEqual(11)
   }
   // Each change is one undo step: the font goes, then the size, then the colour.
-  await undo(page)
+  await perform(page, 'undo')
   await expect.poll(() => runOver(page, 'body', 6, 11)).not.toHaveProperty('fontFamily')
   expect(await runOver(page, 'body', 6, 11)).toMatchObject({ fontSize: 96, color: '#FF48B0FF' })
-  await undo(page)
+  await perform(page, 'undo')
   await expect.poll(() => runOver(page, 'body', 6, 11)).not.toHaveProperty('fontSize')
   expect(await runOver(page, 'body', 6, 11)).toMatchObject({ color: '#FF48B0FF' })
-  await undo(page)
+  await perform(page, 'undo')
   await expect.poll(async () => (await textProps(page, 'body')).runs).toEqual([])
   expect(errors).toEqual([])
 })

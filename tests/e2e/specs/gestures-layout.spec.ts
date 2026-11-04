@@ -7,7 +7,7 @@ import type { DesignInput } from '@dazbee/schema'
 
 import { writeOutput } from '../support/editor.ts'
 import { screenPoint } from '../support/editor.ts'
-import { click, dragScreen, handle, openStage, press, read, selection } from '../support/stage.ts'
+import { type Box, boxOf, click, dragScreen, handle, openStage, press, read, selection } from '../support/stage.ts'
 import { expect, type Page, test } from '../support/test.ts'
 
 test.describe.configure({ timeout: 120_000 })
@@ -143,9 +143,6 @@ const design = (): DesignInput => ({
   overrides: {},
 })
 
-type Box = { x: number; y: number; width: number; height: number }
-const boxOf = (page: Page, id: string, formatId = 'sq') =>
-  page.evaluate(({ id, formatId }) => window.dazbee?.boxOf(id, 'p1', formatId), { id, formatId }) as Promise<Box>
 const near = (a: Box, b: Box, what: string) => {
   for (const k of ['x', 'y', 'width', 'height'] as const)
     expect(Math.abs(a[k] - b[k]), `${what} ${k}: ${a[k]} vs ${b[k]}`).toBeLessThanOrEqual(0.5)
@@ -155,10 +152,6 @@ const order = async (page: Page, parentId: string) =>
     .filter(([, n]) => n.parentId === parentId)
     .sort(([, a], [, b]) => (a.index < b.index ? -1 : 1))
     .map(([id]) => id)
-const undo = async (page: Page) => {
-  await press(page, 'undo')
-  await page.evaluate(() => window.dazbee?.drawn())
-}
 /** Drags the selection's handle by a distance in design pixels. */
 async function dragHandle(page: Page, which: string, dx: number, dy: number) {
   const from = await handle(page, which)
@@ -202,8 +195,12 @@ test("an auto layout frame resized from its handle keeps its circles' size and r
   expect(row?.width).toBe(320)
   writeOutput('layout-resize-1-reflowed.png', await page.screenshot({ animations: 'disabled' }))
   // The other format is as it was.
-  near(await boxOf(page, 'row', 'wide'), { x: 60, y: 60, width: 520, height: 140 }, 'row in wide')
-  await undo(page)
+  near(
+    await boxOf(page, 'row', { pageId: 'p1', formatId: 'wide' }),
+    { x: 60, y: 60, width: 520, height: 140 },
+    'row in wide',
+  )
+  await press(page, 'undo')
   near(await boxOf(page, 'row'), { x: 60, y: 60, width: 520, height: 140 }, 'row after undo')
   expect(errors).toEqual([])
 })
@@ -248,13 +245,13 @@ test('a child of auto layout: a resize fixes its size and the flow moves up; a d
   expect((await boxOf(page, 'c1')).x).toBe(260)
   // Its place is the flow's: the resize wrote no position.
   expect((await read(page)).overrides['format:sq']?.c0?.x).toBeUndefined()
-  await undo(page)
+  await press(page, 'undo')
 
   // Dragged past C2: it goes after it, a line showing where.
   await dragDesign(page, { x: 130, y: 130 }, { x: 375, y: 130 }, 'layout-move-1-line.png')
   expect(await order(page, 'row')).toEqual(['c1', 'c2', 'c0', 'c3'])
   expect((await boxOf(page, 'c0')).x).toBe(320)
-  await undo(page)
+  await press(page, 'undo')
   expect(await order(page, 'row')).toEqual(['c0', 'c1', 'c2', 'c3'])
 
   // Dragged out of the frame: it leaves it, and lands where it was dropped.
@@ -262,10 +259,14 @@ test('a child of auto layout: a resize fixes its size and the flow moves up; a d
   expect((await read(page)).nodes.c0?.parentId).toBe('p1')
   near(await boxOf(page, 'c0'), { x: 280, y: 780, width: 100, height: 100 }, 'c0 out')
   // In the other format it stays where its flow had it.
-  near(await boxOf(page, 'c0', 'wide'), { x: 80, y: 80, width: 100, height: 100 }, 'c0 out in wide')
+  near(
+    await boxOf(page, 'c0', { pageId: 'p1', formatId: 'wide' }),
+    { x: 80, y: 80, width: 100, height: 100 },
+    'c0 out in wide',
+  )
   expect((await boxOf(page, 'c1')).x).toBe(80)
   writeOutput('layout-move-3-left.png', await page.screenshot({ animations: 'disabled' }))
-  await undo(page)
+  await press(page, 'undo')
   expect((await read(page)).nodes.c0?.parentId).toBe('row')
   expect(errors).toEqual([])
 })
@@ -304,7 +305,7 @@ test('a fill child grows with its frame; in a wrapped flow a drag lands next to 
   await dragHandle(page, 'e', 100, 0)
   expect((await boxOf(page, 'c1')).width).toBeCloseTo(fill + 100, 0)
   for (const id of ['c0', 'c2', 'c3']) expect((await boxOf(page, id)).width).toBe(100)
-  await undo(page)
+  await press(page, 'undo')
   expect(errors).toEqual([])
 })
 

@@ -4,7 +4,7 @@
 import { type DesignInput, formatScope } from '@dazbee/schema'
 
 import { writeOutput } from '../support/editor.ts'
-import { openStage, read } from '../support/stage.ts'
+import { openStage, perform, read } from '../support/stage.ts'
 import { expect, type Page, test } from '../support/test.ts'
 
 test.describe.configure({ timeout: 120_000 })
@@ -62,7 +62,6 @@ const visible = async (page: Page, id: string) => {
     (f) => (d.overrides[formatScope(f)]?.[id]?.visible ?? d.nodes[id]?.props.visible) !== false,
   )
 }
-const undo = (page: Page) => page.evaluate(() => window.dazbee?.perform('undo'))
 /** How many of Story's pixels are the badge's pink, as the export draws it. */
 const pinkInStory = (page: Page) =>
   page.evaluate(() => {
@@ -111,7 +110,7 @@ test('a plain click hides in the format shown; Alt-click and Alt+Mod+Shift+H hid
   expect(await pinkInStory(page)).toBe(0)
   await page.evaluate(() => window.dazbee?.drawn())
   writeOutput('hide-2-everywhere.png', await page.screenshot())
-  await undo(page)
+  await perform(page, 'undo')
   await expect.poll(() => visible(page, 'badge')).toEqual([false, true])
   await eye('Badge').click({ modifiers: ['Alt'] })
   await expect.poll(() => visible(page, 'badge')).toEqual([false, false])
@@ -127,10 +126,10 @@ test('a plain click hides in the format shown; Alt-click and Alt+Mod+Shift+H hid
   await expect.poll(() => visible(page, 'bar')).toEqual([false, false])
   await page.keyboard.press('Alt+Control+Shift+KeyH')
   await expect.poll(() => visible(page, 'bar')).toEqual([true, true])
-  await undo(page)
+  await perform(page, 'undo')
   await expect.poll(() => visible(page, 'bar')).toEqual([false, false])
   // Mod+Shift+H still hides in the format shown only; then, hidden in some, the shortcut hides it in every one, as Alt-click does.
-  await undo(page)
+  await perform(page, 'undo')
   await page.keyboard.press('Control+Shift+KeyH')
   await expect.poll(() => visible(page, 'bar')).toEqual([false, true])
   await page.keyboard.press('Alt+Control+Shift+KeyH')

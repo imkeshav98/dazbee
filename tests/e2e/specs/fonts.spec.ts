@@ -5,8 +5,7 @@
 import { createHash } from 'node:crypto'
 
 import { exportDesign } from '@dazbee/export'
-import { FALLBACK_FAMILIES } from '@dazbee/fonts'
-import { loadFontFiles } from '@dazbee/fonts/node'
+import { fixtureResources } from '@dazbee/pixels/pixels'
 import { loadCanvasKit } from '@dazbee/renderer/node'
 import { type DesignInput, FontFace, FontFamily, FontLink, FontUploadTicket } from '@dazbee/schema'
 
@@ -165,14 +164,14 @@ test('a design with a Google font and an uploaded font loads only those files, a
   )
   const ck = await loadCanvasKit()
   const json = JSON.parse(await designOf(page)) as unknown
-  const shipped = loadFontFiles().map((f) => ({ family: f.family, bytes: f.bytes }))
+  const { fonts: shipped, fallbackFamilies } = fixtureResources()
   const node = (fonts: { family: string; bytes: Uint8Array }[]) =>
     Buffer.from(
       exportDesign(
         ck,
         json,
         { pageIds: ['p1'], formatIds: ['sq'], type: 'png' },
-        { fonts, fallbackFamilies: [...FALLBACK_FAMILIES], images: {} },
+        { fonts, fallbackFamilies, images: {} },
       ).bytes,
     )
   const nodePng = node([...shipped, ...(await filesOf(families, ['Inter', 'Righteous']))])

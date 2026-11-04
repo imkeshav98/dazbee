@@ -1,6 +1,7 @@
 // Driving the editor stage with real pointer and keyboard input, for the selection and group
 // checks (#40, #41): drags with modifiers pressed as a hand would, shortcut presses from the one
-// table, and reading layers back from the document.
+// table, editor actions and selections through the page's editor, and reading layers and boxes
+// back from the document.
 import { type Browser, expect, type Page } from '@playwright/test'
 
 import { pressFor, type ShortcutAction } from '@dazbee/editor/shortcuts'
@@ -8,7 +9,35 @@ import type { DesignInput } from '@dazbee/schema'
 
 import { designOf, openTabs, placed, screenPoint } from './editor.ts'
 import { DEV_BRAND, type InBrand, seed } from './seed.ts'
-import { barMenu } from './top-bar.ts'
+import { barMenu, openCard } from './top-bar.ts'
+
+export interface Design {
+  formats: Record<string, { name: string }>
+  pages: Record<string, { name: string }>
+  nodes: Record<
+    string,
+    { parentId: string; index: string; name: string; lock?: Record<string, boolean>; props: Record<string, unknown> }
+  >
+  overrides: Record<string, Record<string, Record<string, unknown>>>
+}
+
+/** A layer's box in design pixels. */
+export interface Box {
+  x: number
+  y: number
+  width: number
+  height: number
+}
+
+/** What `selectLayers` does once the layers are selected. */
+export interface SelectLayers {
+  /** Waits until the top bar shows the selection, or until there is no top bar when it is empty. */
+  bar?: boolean
+  /** Opens the card with this test id, in the top bar's pop-up or panel that holds it. */
+  card?: string
+  /** Selects in this format of the first page, and waits for the redraw. */
+  format?: string
+}
 
 /**
  * Opens a fresh copy of a design in one tab, 1440 × 1000, with the camera where design pixels in
@@ -24,13 +53,11 @@ export async function openStage(browser: Browser, content: DesignInput, { brandI
   return { page, errors }
 }
 
-export interface Design {
-  nodes: Record<
-    string,
-    { parentId: string; index: string; lock?: Record<string, boolean>; props: Record<string, unknown> }
-  >
-  overrides: Record<string, Record<string, Record<string, unknown>>>
-}
+/** Waits until what the screen shows is up to date: after the pending redraw, if there is one. */
+export const drawn = (page: Page) => page.evaluate(() => window.dazbee?.drawn())
+/** Waits two animation frames, so what the page laid out after a change has been drawn. */
+export const nextFrame = (page: Page) =>
+  page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))))
 export const read = async (page: Page) => JSON.parse(await designOf(page)) as Design
 export const props = async (page: Page, id: string) =>
   placed(await read(page), id, 'sq') as {
@@ -41,17 +68,40 @@ export const props = async (page: Page, id: string) =>
     rotation?: number
     visible?: boolean
   }
+/** A layer's box as drawn in one frame, auto layout solved: the first page in the primary format by default. */
+export const boxOf = (page: Page, id: string, frame?: { pageId: string; formatId: string }) =>
+  page.evaluate(({ id, frame }) => window.dazbee?.boxOf(id, frame?.pageId, frame?.formatId), {
+    id,
+    frame,
+  }) as Promise<Box>
 export const selection = (page: Page) => page.evaluate(() => window.dazbee?.selection() ?? [])
 /** Presses an action's shortcut and waits for the redraw, so the handles stand where the box now is. */
 export const press = async (page: Page, action: ShortcutAction) => {
   await page.keyboard.press(pressFor(action))
-  await page.evaluate(() => window.dazbee?.drawn())
+  await drawn(page)
+}
+/** Does what an action's shortcut does through the page's editor, without a key, and waits for the redraw. */
+export const perform = async (page: Page, action: ShortcutAction) => {
+  await page.evaluate((action) => window.dazbee?.perform(action), action)
+  await drawn(page)
 }
 export const order = async (page: Page) =>
   Object.entries((await read(page)).nodes)
     .filter(([, n]) => n.parentId === 'p1')
     .sort(([a, x], [b, y]) => (x.index < y.index ? -1 : x.index > y.index ? 1 : a < b ? -1 : 1))
     .map(([id]) => id)
+
+/**
+ * Selects layers through the page's editor, in the primary format of the first page unless
+ * `format` names another, then waits as the options say.
+ */
+export async function selectLayers(page: Page, ids: string[], { bar = false, card, format }: SelectLayers = {}) {
+  await page.evaluate(({ ids, format }) => window.dazbee?.select(ids, undefined, format), { ids, format })
+  if (format) await drawn(page)
+  if (bar && ids.length > 0) await expect(page.getByTestId('top-bar')).toHaveAttribute('data-selection', ids.join(' '))
+  else if (bar) await expect(page.getByTestId('top-bar')).toHaveCount(0)
+  if (card) await expect(await openCard(page, card)).toBeVisible()
+}
 
 /**
  * Drags with the mouse between two design pixels of the square, in a few steps like a hand would.
@@ -84,14 +134,14 @@ export async function dragScreen(
   await page.mouse.move(b.x, b.y, { steps: 6 })
   await page.mouse.up()
   for (const key of modifiers) await page.keyboard.up(key)
-  await page.evaluate(() => window.dazbee?.drawn())
+  await drawn(page)
 }
 export async function click(page: Page, x: number, y: number, modifiers: 'Shift'[] = []) {
   const at = await screenPoint(page, x, y)
   for (const key of modifiers) await page.keyboard.down(key)
   await page.mouse.click(at.x, at.y)
   for (const key of modifiers) await page.keyboard.up(key)
-  await page.evaluate(() => window.dazbee?.drawn())
+  await drawn(page)
 }
 /** Where a handle of the selection box is on screen now. */
 export async function handle(page: Page, which: string) {
@@ -115,13 +165,3 @@ export async function backgroundPanel(page: Page, x = 4, y = 4) {
   if (!(await page.getByTestId('bar-background').isVisible())) await pickPage(page, x, y)
   return barMenu(page, 'background')
 }
-
-export const drawn = (page: Page) => page.evaluate(() => window.dazbee?.drawn())
-
-export const boxOf = (page: Page, id: string) =>
-  page.evaluate((id) => window.dazbee?.boxOf(id), id) as Promise<{
-    x: number
-    y: number
-    width: number
-    height: number
-  }>

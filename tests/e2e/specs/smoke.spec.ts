@@ -1,10 +1,8 @@
 // The library (#88, ADR-0013): every workspace lists its brands as brands, the development
 // workspace's two included, and settings names the workspace.
-import { writeOutput } from '../support/editor.ts'
+import { shoot, writeOutput } from '../support/editor.ts'
 import { API_URL } from '../support/seed.ts'
-import { expect, type Page, test } from '../support/test.ts'
-
-const shoot = async (page: Page, name: string) => writeOutput(`welcome-${name}.png`, await page.screenshot())
+import { expect, test } from '../support/test.ts'
 
 test('the web app lists the brands of the development workspace', async ({ page }) => {
   await page.goto('/')
@@ -50,7 +48,7 @@ test('settings renames the workspace', async ({ page }) => {
   await expect(section.getByRole('status')).toHaveText('Saved')
   expect(await nameNow()).toBe('Harbour Studio')
   await expect(field).toHaveValue('Harbour Studio')
-  await shoot(page, 'settings-renamed')
+  await shoot(page, 'welcome-settings-renamed')
   const restored = await fetch(`${API_URL}/workspace`, {
     method: 'PATCH',
     headers: { 'content-type': 'application/json' },

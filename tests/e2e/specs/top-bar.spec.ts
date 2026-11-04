@@ -6,10 +6,10 @@
 import type { DesignInput } from '@dazbee/schema'
 
 import { photo, upload } from '../support/assets.ts'
-import { editorPath, screenPoint, writeOutput } from '../support/editor.ts'
-import { layoutProblems, wrapped } from '../support/layout.ts'
+import { editorPath, screenPoint, setCookies, writeOutput } from '../support/editor.ts'
+import { EDITOR_CHROME, layoutProblems, SCREEN_SIZES, wrapped } from '../support/layout.ts'
 import { seed } from '../support/seed.ts'
-import { openStage } from '../support/stage.ts'
+import { nextFrame, openStage, selectLayers } from '../support/stage.ts'
 import { expect, type Page, test } from '../support/test.ts'
 import { barMenu, moreAction, moreMenu, moreSubmenu } from '../support/top-bar.ts'
 
@@ -217,33 +217,20 @@ const SELECTIONS: Record<string, string[]> = {
 
 /** The editor's chrome and the pieces of the top bar, small menu and edit panel that must never meet. */
 const PIECES = {
-  'header pill': '[data-testid="island-start"]',
-  'end island': '[data-testid="island-end"]',
+  ...EDITOR_CHROME,
   'top bar': '[data-testid="top-bar-row"]',
   'second row': '[data-testid="top-bar-overflow"]',
   'pop-up': '[data-radix-popper-content-wrapper]',
   'small menu': '[data-testid="small-menu"]',
   'edit panel': '#edit-panel',
-  rail: '[data-testid="rail"]',
   flyout: '#editor-flyout',
-  dock: '[data-dock]',
-  zoom: '[data-zoom]',
   'show-alone chip': '[data-testid="focus-chip"]',
   toasts: '[data-toasts] > *',
 }
 /** The design's name and the font's name end in "…" by design when there is no room. */
 const UNCUT = 'h1, [data-testid="bar-font"], [data-testid="edit-panel-note"]'
 
-const SIZES = [
-  [1280, 760],
-  [820, 1180],
-  [390, 844],
-] as const
-
-const select = (page: Page, ids: string[]) => page.evaluate((ids) => window.dazbee?.select(ids), ids)
 const camera = (page: Page) => page.evaluate(() => window.dazbee?.camera())
-const settle = (page: Page) =>
-  page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))))
 
 /** What the selection's top bar opens: every item with a pop-up or panel, by its test id, and the full menu. */
 const openers = (page: Page) =>
@@ -269,7 +256,7 @@ const openers = (page: Page) =>
       )
   })
 
-for (const [width, height] of SIZES) {
+for (const [width, height] of SCREEN_SIZES) {
   test(`at ${width}×${height} every selection's pop-ups, panels and full menu open clear of everything else, with no label wrapping and the canvas still`, async ({
     browser,
   }) => {
@@ -280,17 +267,17 @@ for (const [width, height] of SIZES) {
       window.dazbee?.select([])
       window.dazbee?.fitAll()
     })
-    await settle(page)
+    await nextFrame(page)
     const still = await camera(page)
     const problems: string[] = []
     const check = async (where: string) => {
-      await settle(page)
+      await nextFrame(page)
       for (const p of await layoutProblems(page, { pieces: PIECES, uncut: UNCUT })) problems.push(`${where}: ${p}`)
       for (const w of await wrapped(page)) problems.push(`${where}: "${w}" wraps`)
       if (JSON.stringify(await camera(page)) !== JSON.stringify(still)) problems.push(`${where}: the canvas moved`)
     }
     for (const [name, ids] of Object.entries(SELECTIONS)) {
-      await select(page, ids)
+      await selectLayers(page, ids)
       await expect(page.getByTestId('top-bar-row')).toBeVisible()
       await check(name)
       for (const id of await openers(page)) {
@@ -313,7 +300,7 @@ for (const [width, height] of SIZES) {
       if (name === 'text' || name === 'photo')
         writeOutput(`top-bar-${width}-${name}.png`, await page.screenshot({ animations: 'disabled' }))
     }
-    await select(page, [])
+    await selectLayers(page, [])
     await check('nothing selected')
     expect(problems).toEqual([])
     expect(errors).toEqual([])
@@ -326,8 +313,8 @@ test('each kind gets its own top bar; several layers add Line up, Combine for sh
   const asset = await upload(photo)
   const { page, errors } = await openStage(browser, design(asset.id))
   const items = async (ids: string[]) => {
-    await select(page, ids)
-    await settle(page)
+    await selectLayers(page, ids)
+    await nextFrame(page)
     return page.evaluate(() =>
       [...document.querySelectorAll<HTMLElement>('[data-testid="top-bar"] [data-item]')]
         .map((el) => el.dataset.item)
@@ -475,7 +462,7 @@ test('each kind gets its own top bar; several layers add Line up, Combine for sh
   ])
   await expect(page.getByTestId('top-bar').locator('[data-action="autoLayout"]')).toHaveText('Stack together')
   // Several layers put in a stack from the bar.
-  await select(page, ['box', 'star'])
+  await selectLayers(page, ['box', 'star'])
   await page.getByTestId('top-bar').locator('[data-action="autoLayout"]').click()
   await expect
     .poll(() =>
@@ -503,7 +490,7 @@ test('text: bold turns on and off as one undo step each, the size steps and take
         { ...d?.nodes.headline?.props, ...d?.overrides['format:sq']?.headline } as { style: Record<string, unknown> }
       ).style
     })
-  await select(page, ['headline'])
+  await selectLayers(page, ['headline'])
   await expect(page.getByTestId('bar-font')).toHaveText('Noto Sans')
   await expect(page.getByTestId('bar-size-field')).toHaveValue('64')
   const bold = page.getByTestId('bar-bold')
@@ -541,7 +528,7 @@ test('Tab reaches the top bar once and the arrows move along it; a panel takes t
 }) => {
   const asset = await upload(photo)
   const { page, errors } = await openStage(browser, design(asset.id))
-  await select(page, ['box'])
+  await selectLayers(page, ['box'])
   const bar = page.getByTestId('top-bar')
   await expect(bar.locator('[data-bar-item][tabindex="0"]')).toHaveCount(1)
   const items = bar.locator('[data-bar-item]')
@@ -574,22 +561,22 @@ test('a panel closes when another layer is picked or its layer is removed, and t
 }) => {
   const asset = await upload(photo)
   const { page, errors } = await openStage(browser, design(asset.id))
-  await select(page, ['box'])
+  await selectLayers(page, ['box'])
   await barMenu(page, 'position')
-  await select(page, ['star'])
+  await selectLayers(page, ['star'])
   await expect(page.locator('#edit-panel')).toHaveCount(0)
   await barMenu(page, 'position')
   await page.evaluate(() => window.dazbee?.session.run('node.delete', { ids: ['star'] }))
   await expect(page.locator('#edit-panel')).toHaveCount(0)
 
-  await select(page, ['box'])
+  await selectLayers(page, ['box'])
   await expect(page.getByTestId('scope-chip')).toHaveText(/Only Square/)
   await page.getByTestId('scope-chip').click()
   await page.getByTestId('scope-menu').getByRole('radio', { name: 'All sizes' }).click()
   await expect(page.getByTestId('scope-chip')).toHaveText(/all sizes/i)
   await page.keyboard.press('Escape')
-  await select(page, [])
-  await select(page, ['box'])
+  await selectLayers(page, [])
+  await selectLayers(page, ['box'])
   await expect(page.getByTestId('scope-chip')).toHaveText(/Only Square/)
   expect(errors).toEqual([])
 })
@@ -608,7 +595,7 @@ test('undo and redo in the header pill: off with nothing to do, each a step, and
       const d = window.dazbee?.design()
       return ({ ...d?.nodes.box?.props, ...d?.overrides['format:sq']?.box } as { opacity?: number }).opacity ?? 1
     })
-  await select(page, ['box'])
+  await selectLayers(page, ['box'])
   const menu = await barMenu(page, 'transparency')
   const field = menu.locator('[data-scrub="Opacity"]')
   const box = await field.boundingBox()
@@ -637,7 +624,7 @@ test('the small menu locks, duplicates and deletes; the full menu copies, pastes
   const { page, errors } = await openStage(browser, design(asset.id))
   const nodes = () => page.evaluate(() => Object.keys(window.dazbee?.design().nodes ?? {}).length)
   await page.evaluate(() => localStorage.removeItem('dazbee.copiedLayers'))
-  await select(page, ['box'])
+  await selectLayers(page, ['box'])
   const small = page.getByTestId('small-menu')
   await expect(small).toBeVisible()
   const lock = page.getByTestId('small-lock')
@@ -651,7 +638,7 @@ test('the small menu locks, duplicates and deletes; the full menu copies, pastes
   await page.getByTestId('small-delete').click()
   await expect.poll(nodes).toBe(before)
 
-  await select(page, ['box'])
+  await selectLayers(page, ['box'])
   const menu = await moreMenu(page)
   await expect(menu.getByRole('button', { name: /^Paste/ })).toBeDisabled()
   await moreAction(page, 'Copy')
@@ -659,7 +646,7 @@ test('the small menu locks, duplicates and deletes; the full menu copies, pastes
   await moreAction(page, 'Paste')
   await expect.poll(nodes).toBe(before + 1)
 
-  await select(page, ['box'])
+  await selectLayers(page, ['box'])
   await moreAction(page, 'Hide in every size')
   await expect
     .poll(() =>
@@ -693,7 +680,7 @@ test('the small menu keeps out of a drag, and over a selection filling a phone i
   const asset = await upload(photo)
   const { page, errors } = await openStage(browser, design(asset.id))
   const small = page.getByTestId('small-menu')
-  await select(page, ['box'])
+  await selectLayers(page, ['box'])
   const from = await screenPoint(page, 160, 280)
   await page.mouse.move(from.x, from.y)
   await page.mouse.down()
@@ -703,12 +690,12 @@ test('the small menu keeps out of a drag, and over a selection filling a phone i
   await expect(small).toBeVisible()
 
   await page.setViewportSize({ width: 390, height: 844 })
-  await select(page, ['photo'])
+  await selectLayers(page, ['photo'])
   await page.evaluate(() => {
     window.dazbee?.perform('zoomToSelection')
     for (let i = 0; i < 3; i++) window.dazbee?.zoomIn()
   })
-  await settle(page)
+  await nextFrame(page)
   await expect(small).toBeVisible()
   const bar = await page.getByTestId('top-bar-row').boundingBox()
   const at = await small.boundingBox()
@@ -724,7 +711,7 @@ test('on a phone a panel is a sheet that hides the tab bar and dock, and it and 
   const asset = await upload(photo)
   const { page, errors } = await openStage(browser, design(asset.id))
   await page.setViewportSize({ width: 390, height: 844 })
-  await select(page, ['box'])
+  await selectLayers(page, ['box'])
   await expect(page.locator('[data-zoom]')).toBeHidden()
   await barMenu(page, 'effects')
   const sheet = page.locator('#edit-panel')
@@ -742,7 +729,7 @@ test('on a phone a panel is a sheet that hides the tab bar and dock, and it and 
   await page.getByTestId('edit-panel-close').click()
   await page.locator('[data-panel="layers"]').click()
   await expect(page.getByTestId('flyout')).toBeVisible()
-  await select(page, [])
+  await selectLayers(page, [])
   await expect(page.locator('[data-zoom]')).toBeVisible()
   expect(errors).toEqual([])
 })
@@ -754,16 +741,16 @@ test('beside an open Layers flyout the top bar centres in the room left, and a r
   const { page, errors } = await openStage(browser, design(asset.id))
   await page.setViewportSize({ width: 1280, height: 760 })
   await page.locator('[data-panel="layers"]').click()
-  await select(page, ['headline'])
+  await selectLayers(page, ['headline'])
   const flyout = await page.getByTestId('flyout').boundingBox()
   const bar = await page.getByTestId('top-bar-row').boundingBox()
   expect(flyout && bar && bar.x >= flyout.x + flyout.width).toBe(true)
   expect(await layoutProblems(page, { pieces: PIECES, uncut: UNCUT })).toEqual([])
   await page.locator('[data-panel="layers"]').click()
 
-  await select(page, ['box'])
+  await selectLayers(page, ['box'])
   await moreAction(page, 'Lock')
-  await select(page, [])
+  await selectLayers(page, [])
   const at = await screenPoint(page, 160, 280)
   await page.mouse.click(at.x, at.y, { button: 'right' })
   const menu = page.getByTestId('stage-menu')
@@ -781,14 +768,14 @@ test('in Arabic the edit panel opens at the start of the screen, which is its en
   const asset = await upload(photo)
   const designId = await seed(design(asset.id))
   const context = await browser.newContext({ viewport: { width: 1280, height: 760 } })
-  await context.addCookies([{ name: 'locale', value: 'ar', url: 'http://localhost' }])
   const page = await context.newPage()
+  await setCookies(page, { locale: 'ar' })
   const errors: string[] = []
   page.on('pageerror', (error) => errors.push(error.message))
   await page.goto(editorPath(designId))
   await expect(page.getByTestId('status')).toHaveAttribute('data-ready', '', { timeout: 30_000 })
   await expect(page.locator('html')).toHaveAttribute('dir', 'rtl')
-  await select(page, ['box'])
+  await selectLayers(page, ['box'])
   await barMenu(page, 'effects')
   const panel = await page.locator('#edit-panel').boundingBox()
   expect(panel && panel.x <= 16).toBe(true)
@@ -811,12 +798,12 @@ test("at tablet size with a flyout open, the bar's second row and its pop-ups an
   const { page, errors } = await openStage(browser, design(asset.id))
   await page.setViewportSize({ width: 820, height: 1180 })
   await page.locator('[data-panel="layers"]').click()
-  await select(page, ['headline'])
+  await selectLayers(page, ['headline'])
   const scrolled = () =>
     page.evaluate(() => [document.querySelector('main')?.scrollLeft, document.querySelector('main')?.scrollTop])
   for (const id of ['transparency', 'position', 'font', 'effects']) {
     await barMenu(page, id)
-    await settle(page)
+    await nextFrame(page)
     expect(await scrolled()).toEqual([0, 0])
     await expect.poll(() => layoutProblems(page, { pieces: PIECES, uncut: UNCUT })).toEqual([])
     await page.keyboard.press('Escape')
@@ -830,7 +817,7 @@ test("the full menu opens clear of the small menu, also flipped at the stage's e
   const asset = await upload(photo)
   const { page, errors } = await openStage(browser, design(asset.id))
   await page.setViewportSize({ width: 1280, height: 760 })
-  await select(page, ['turned'])
+  await selectLayers(page, ['turned'])
   // The selection by the stage's end edge, so the full menu has no room beside the small menu there.
   await page.evaluate(() => {
     const camera = window.dazbee?.camera()
@@ -838,14 +825,14 @@ test("the full menu opens clear of the small menu, also flipped at the stage's e
     if (camera && box)
       window.dazbee?.setCamera({ ...camera, x: camera.x - (1150 - (box.x + box.width / 2)) / camera.zoom })
   })
-  await settle(page)
+  await nextFrame(page)
   await moreMenu(page)
   await expect.poll(() => layoutProblems(page, { pieces: PIECES, uncut: UNCUT })).toEqual([])
   await page.keyboard.press('Escape')
 
-  await select(page, [])
+  await selectLayers(page, [])
   await page.evaluate(() => window.dazbee?.fitAll())
-  await settle(page)
+  await nextFrame(page)
   const at = await screenPoint(page, 410, 290)
   await page.mouse.click(at.x, at.y, { button: 'right' })
   await expect(page.getByTestId('stage-menu')).toBeVisible()
@@ -860,7 +847,7 @@ test("Esc closes the bar's second row and keeps the selection; the arrows and En
   const asset = await upload(photo)
   const { page, errors } = await openStage(browser, design(asset.id))
   await page.setViewportSize({ width: 820, height: 1180 })
-  await select(page, ['headline'])
+  await selectLayers(page, ['headline'])
   const more = page.getByTestId('bar-overflow')
   await expect(more).toBeVisible()
   const row = page.getByTestId('top-bar-row')
@@ -890,7 +877,7 @@ test('the size field steps with the arrows; a pop-up closes when the window chan
         { ...d?.nodes.headline?.props, ...d?.overrides['format:sq']?.headline } as { style: { fontSize: number } }
       ).style.fontSize
     })
-  await select(page, ['headline'])
+  await selectLayers(page, ['headline'])
   await page.getByTestId('bar-size-field').click()
   await page.keyboard.press('ArrowUp')
   await page.keyboard.press('ArrowUp')
@@ -907,7 +894,7 @@ test('the size field steps with the arrows; a pop-up closes when the window chan
     el.scrollLeft = el.scrollWidth
   })
   await expect.poll(() => row.evaluate((el) => el.scrollLeft)).toBeGreaterThan(0)
-  await select(page, ['box'])
+  await selectLayers(page, ['box'])
   await expect.poll(() => row.evaluate((el) => el.scrollLeft)).toBe(0)
   expect(errors).toEqual([])
 })
@@ -918,7 +905,7 @@ test('⋯ on the top bar leaves an open panel open, and Esc closes the panel fir
   const asset = await upload(photo)
   const { page, errors } = await openStage(browser, design(asset.id))
   await page.setViewportSize({ width: 820, height: 1180 })
-  await select(page, ['headline'])
+  await selectLayers(page, ['headline'])
   await barMenu(page, 'font')
   await page.getByTestId('bar-overflow').click()
   await expect(page.getByTestId('top-bar-overflow')).toBeVisible()

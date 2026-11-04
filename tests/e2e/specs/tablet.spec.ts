@@ -1,22 +1,12 @@
 // The app on a tablet, 820 × 1180: the brand's home, and the editor as it opens and with a layer
 // selected, show every piece whole and inside the window, nothing drawn over anything else.
 import { editorPath, screenPoint, writeOutput } from '../support/editor.ts'
-import { layoutProblems } from '../support/layout.ts'
+import { EDITOR_CHROME, layoutProblems } from '../support/layout.ts'
 import { liveDesign, seed } from '../support/seed.ts'
 import { click } from '../support/stage.ts'
 import { expect, type Page, test } from '../support/test.ts'
 
 test.use({ viewport: { width: 820, height: 1180 } })
-
-/** The editor's chrome, floating over the canvas. */
-const CHROME = {
-  'start island': '[data-testid="island-start"]',
-  'end island': '[data-testid="island-end"]',
-  capsule: '[data-testid="rail"]',
-  dock: '[data-dock]',
-  zoom: '[data-zoom]',
-  pages: '[data-pages]',
-}
 
 /** The design's name in the start island, which the next test checks on its own. */
 const NAME = '[data-testid="island-start"] h1'
@@ -29,7 +19,7 @@ const LAYERS = [
 
 /** The chrome with the bar by the selection and the selected layer's box on the stage. */
 const selected = (id: string) => ({
-  ...CHROME,
+  ...EDITOR_CHROME,
   'top bar': '[data-testid="top-bar-row"]',
   'small menu': '[data-testid="small-menu"]',
   'selected layer': `.stage-overlay .selection[data-layer="${id}"]`,
@@ -80,7 +70,7 @@ test('on a tablet the home and the editor, with a layer selected, show everythin
   const far = await screenPoint(page, 1080, 1080)
   const ad = { x: corner.x, y: corner.y, width: far.x - corner.x, height: far.y - corner.y }
   expect(ad.width).toBeGreaterThan(200)
-  await expect.poll(() => layoutProblems(page, { pieces: { ...CHROME, ad }, uncut: NAME })).toEqual([])
+  await expect.poll(() => layoutProblems(page, { pieces: { ...EDITOR_CHROME, ad }, uncut: NAME })).toEqual([])
   writeOutput('tablet-1-editor.png', await page.screenshot({ animations: 'disabled' }))
 
   // The bar by the selection and the selection's cards come, and the layer stays in sight.

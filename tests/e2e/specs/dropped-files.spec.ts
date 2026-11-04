@@ -2,11 +2,10 @@
 // passes over and drops on the page. On the asset library the image uploads once and shows in the
 // library; on the canvas it uploads once and is placed where it was dropped.
 import { randomUUID } from 'node:crypto'
-import { readFileSync } from 'node:fs'
-import { join } from 'node:path'
 
 import { AssetSummary, type DesignInput } from '@dazbee/schema'
 
+import { card1, card2, card3, figmaBadge } from '../support/assets.ts'
 import { screenPoint, writeOutput } from '../support/editor.ts'
 import { callApi, newBrand } from '../support/seed.ts'
 import { openStage, props, read, selection } from '../support/stage.ts'
@@ -14,14 +13,7 @@ import { expect, type Page, test } from '../support/test.ts'
 
 test.describe.configure({ timeout: 120_000 })
 
-/** A photo from the pixel fixtures; each test drops it into a brand of its own, whose library starts empty. */
-const card = readFileSync(join(import.meta.dirname, '..', '..', 'pixels', 'assets', 'card-1.jpg'))
-
-const second = readFileSync(join(import.meta.dirname, '..', '..', 'pixels', 'assets', 'card-2.jpg'))
-const third = readFileSync(join(import.meta.dirname, '..', '..', 'pixels', 'assets', 'card-3.jpg'))
 const notes = Buffer.from('Not a picture.\n')
-
-const svgBadge = readFileSync(join(import.meta.dirname, '..', '..', 'pixels', 'assets', 'svg', 'figma-badge.svg'))
 
 /** A square design with one white page, and any more formats and pages given. */
 const design = (
@@ -55,7 +47,11 @@ const box: DesignInput['nodes'][string] = {
  * passes over the element there, and drops only if the page took it on the way over (otherwise
  * the browser would open the file). Says whether the page took it.
  */
-function dropFiles(page: Page, at: { x: number; y: number }, files: { name: string; type: string; bytes: Buffer }[]) {
+function dropFiles(
+  page: Page,
+  at: { x: number; y: number },
+  files: { name: string; type: string; bytes: Uint8Array }[],
+) {
   return page.evaluate(
     ({ at, files }) => {
       const transfer = new DataTransfer()
@@ -81,7 +77,7 @@ function dropFiles(page: Page, at: { x: number; y: number }, files: { name: stri
       if (taken) fire('drop')
       return taken
     },
-    { at, files: files.map((f) => ({ name: f.name, type: f.type, base64: f.bytes.toString('base64') })) },
+    { at, files: files.map((f) => ({ name: f.name, type: f.type, base64: Buffer.from(f.bytes).toString('base64') })) },
   )
 }
 
@@ -173,7 +169,7 @@ test('an image dropped from the computer on the asset library uploads once and s
   const name = `Dropped ${randomUUID().slice(0, 8)}`
   expect(
     await dropFiles(page, { x: box.x + box.width / 2, y: box.y + box.height / 2 }, [
-      { name: `${name}.jpg`, type: 'image/jpeg', bytes: card },
+      { name: `${name}.jpg`, type: 'image/jpeg', bytes: card1 },
     ]),
   ).toBe(true)
   const item = library.locator('li[data-asset]').filter({ hasText: name })
@@ -202,7 +198,7 @@ test('an image dropped from the computer on the canvas uploads once and is place
   const name = `Dropped ${randomUUID().slice(0, 8)}`
   expect(
     await dropFiles(page, await screenPoint(page, 760, 360), [
-      { name: `${name}.jpg`, type: 'image/jpeg', bytes: card },
+      { name: `${name}.jpg`, type: 'image/jpeg', bytes: card1 },
     ]),
   ).toBe(true)
   await expect.poll(async () => (await images(page)).length, { timeout: 30_000 }).toBe(1)
@@ -232,8 +228,8 @@ test('several images dropped on the canvas upload once each and go on cascading 
 
   const names = [`Dropped ${randomUUID().slice(0, 8)}`, `Dropped ${randomUUID().slice(0, 8)}`]
   const files = [
-    { name: `${names[0]}.jpg`, type: 'image/jpeg', bytes: card },
-    { name: `${names[1]}.jpg`, type: 'image/jpeg', bytes: second },
+    { name: `${names[0]}.jpg`, type: 'image/jpeg', bytes: card1 },
+    { name: `${names[1]}.jpg`, type: 'image/jpeg', bytes: card2 },
   ]
   expect(await dropFiles(page, await screenPoint(page, 540, 540), files)).toBe(true)
   await expect.poll(async () => (await images(page)).length, { timeout: 30_000 }).toBe(2)
@@ -277,7 +273,7 @@ test('an image dropped with a text file on a frame in the second format lights t
 
   const name = `Dropped ${randomUUID().slice(0, 8)}`
   const files = [
-    { name: `${name}.jpg`, type: 'image/jpeg', bytes: card },
+    { name: `${name}.jpg`, type: 'image/jpeg', bytes: card1 },
     { name: 'notes.txt', type: 'text/plain', bytes: notes },
   ]
   const at = await screenPoint(page, 300, 300, { pageId: 'p1', formatId: 'wide' })
@@ -317,9 +313,9 @@ test('a file that is not an image is left out with a notice, while the image dro
   // A photo of its own at each size: the library keeps one asset for the same bytes.
   let count = 0
   for (const [size, bytes] of [
-    [{ width: 1280, height: 760 }, card],
-    [{ width: 820, height: 1180 }, second],
-    [{ width: 390, height: 844 }, third],
+    [{ width: 1280, height: 760 }, card1],
+    [{ width: 820, height: 1180 }, card2],
+    [{ width: 390, height: 844 }, card3],
   ] as const) {
     await page.setViewportSize(size)
     await page.evaluate(() => window.dazbee?.fitAll())
@@ -369,8 +365,8 @@ test('images dropped on the second page at another zoom go where they were dropp
 
   const names = [`Dropped ${randomUUID().slice(0, 8)}`, `Dropped ${randomUUID().slice(0, 8)}`]
   const files = [
-    { name: `${names[0]}.jpg`, type: 'image/jpeg', bytes: card },
-    { name: `${names[1]}.jpg`, type: 'image/jpeg', bytes: second },
+    { name: `${names[0]}.jpg`, type: 'image/jpeg', bytes: card1 },
+    { name: `${names[1]}.jpg`, type: 'image/jpeg', bytes: card2 },
   ]
   expect(await dropFiles(page, await screenPoint(page, 300, 400, { pageId: 'p2', formatId: 'sq' }), files)).toBe(true)
   const toast = page.getByTestId('notice-toast')
@@ -411,9 +407,9 @@ test('files that don’t upload are each named with why, beside the file left ou
 
   const name = `Dropped ${randomUUID().slice(0, 8)}`
   const files = [
-    { name: `${name}.jpg`, type: 'image/jpeg', bytes: card },
-    { name: 'fail-one.jpg', type: 'image/jpeg', bytes: second },
-    { name: 'fail-two.png', type: 'image/png', bytes: third },
+    { name: `${name}.jpg`, type: 'image/jpeg', bytes: card1 },
+    { name: 'fail-one.jpg', type: 'image/jpeg', bytes: card2 },
+    { name: 'fail-two.png', type: 'image/png', bytes: card3 },
     { name: 'notes.txt', type: 'text/plain', bytes: notes },
   ]
   expect(await dropFiles(page, await screenPoint(page, 540, 540), files)).toBe(true)
@@ -443,7 +439,7 @@ test('an SVG file dropped on the canvas uploads once, goes on as layers centred 
   const name = `Badge ${randomUUID().slice(0, 8)}`
   expect(
     await dropFiles(page, await screenPoint(page, 760, 540), [
-      { name: `${name}.svg`, type: 'image/svg+xml', bytes: svgBadge },
+      { name: `${name}.svg`, type: 'image/svg+xml', bytes: figmaBadge },
     ]),
   ).toBe(true)
   const group = async () =>
@@ -492,8 +488,8 @@ test('images that finish uploading while a text is typed into end the typing and
     ((await read(page)).nodes as unknown as Record<string, { props: { text: string } }>).title?.props.text
 
   const files = [
-    { name: `Dropped ${randomUUID().slice(0, 8)}.jpg`, type: 'image/jpeg', bytes: card },
-    { name: `Dropped ${randomUUID().slice(0, 8)}.jpg`, type: 'image/jpeg', bytes: second },
+    { name: `Dropped ${randomUUID().slice(0, 8)}.jpg`, type: 'image/jpeg', bytes: card1 },
+    { name: `Dropped ${randomUUID().slice(0, 8)}.jpg`, type: 'image/jpeg', bytes: card2 },
   ]
   expect(await dropFiles(page, await screenPoint(page, 540, 700), files)).toBe(true)
   await expect(page.getByTestId('notice-toast')).toContainText('Uploading 2 images')
@@ -528,8 +524,8 @@ test('images that finish uploading while a pen path is open go on within a few s
       .map(([id]) => id)
 
   const files = [
-    { name: `Dropped ${randomUUID().slice(0, 8)}.jpg`, type: 'image/jpeg', bytes: card },
-    { name: `Dropped ${randomUUID().slice(0, 8)}.jpg`, type: 'image/jpeg', bytes: second },
+    { name: `Dropped ${randomUUID().slice(0, 8)}.jpg`, type: 'image/jpeg', bytes: card1 },
+    { name: `Dropped ${randomUUID().slice(0, 8)}.jpg`, type: 'image/jpeg', bytes: card2 },
   ]
   expect(await dropFiles(page, await screenPoint(page, 540, 700), files)).toBe(true)
   await expect(page.getByTestId('notice-toast')).toContainText('Uploading 2 images')
@@ -586,8 +582,8 @@ test('images that finish uploading while a layer is dragged on the canvas go on 
   const x = async () => (await props(page, 'square')).x
 
   const files = [
-    { name: `Dropped ${randomUUID().slice(0, 8)}.jpg`, type: 'image/jpeg', bytes: card },
-    { name: `Dropped ${randomUUID().slice(0, 8)}.jpg`, type: 'image/jpeg', bytes: second },
+    { name: `Dropped ${randomUUID().slice(0, 8)}.jpg`, type: 'image/jpeg', bytes: card1 },
+    { name: `Dropped ${randomUUID().slice(0, 8)}.jpg`, type: 'image/jpeg', bytes: card2 },
   ]
   expect(await dropFiles(page, await screenPoint(page, 540, 800), files)).toBe(true)
   // The square is pressed and dragged, and still held when the uploads finish, for longer than the pen path's limit.
@@ -629,7 +625,7 @@ test('an SVG file whose format goes while it uploads is not placed, and the noti
   const name = `Badge ${randomUUID().slice(0, 8)}`
   expect(
     await dropFiles(page, await screenPoint(page, 500, 500, { pageId: 'p1', formatId: 'wide' }), [
-      { name: `${name}.svg`, type: 'image/svg+xml', bytes: svgBadge },
+      { name: `${name}.svg`, type: 'image/svg+xml', bytes: figmaBadge },
     ]),
   ).toBe(true)
   await page.evaluate(() => window.dazbee?.session.run('format.remove', { id: 'wide' }))

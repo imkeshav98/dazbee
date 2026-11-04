@@ -5,17 +5,14 @@
 // (snap and rulers, the layers, assets and brand panels, export) are checked by their own specs:
 // snapping, layers, assets with image-into-shape, brand-kit and export. Rows known to fail have
 // their bug in KNOWN; such a test is expected to fail, and passes once the bug is fixed.
-import { readFileSync } from 'node:fs'
-import { join } from 'node:path'
-
 import { type DesignInput, inOrder } from '@dazbee/schema'
 
-import { photo, upload } from '../support/assets.ts'
+import { photo, righteous, tile, upload } from '../support/assets.ts'
 import { designOf, openTabs, placed, reloads, settle, writeOutput } from '../support/editor.ts'
-import { choose } from '../support/fields.ts'
+import { choose, enter } from '../support/fields.ts'
 import { importGoogleFonts } from '../support/fonts.ts'
 import { newBrand, putKit } from '../support/seed.ts'
-import { backgroundPanel, drag, openStage } from '../support/stage.ts'
+import { backgroundPanel, drag, nextFrame, openStage, perform, selectLayers } from '../support/stage.ts'
 import { type Browser, expect, type Locator, type Page, test } from '../support/test.ts'
 import {
   barMenu,
@@ -39,10 +36,6 @@ test.use({ actionTimeout: 15_000 })
 /** Rows that fail today, with the bug filed for each. */
 const KNOWN: Record<number, number> = {}
 
-const righteous = new Uint8Array(
-  readFileSync(join(import.meta.dirname, '..', 'assets', 'fonts', 'Righteous-Regular.ttf')),
-)
-const tile = new Uint8Array(readFileSync(join(import.meta.dirname, '..', '..', 'pixels', 'assets', 'tile.jpg')))
 const KIT = {
   colors: [
     { token: 'berry', name: 'Berry', value: '#FF3D6EFF' },
@@ -255,13 +248,6 @@ const children = async (page: Page, parentId: string) =>
     .sort(([, a], [, b]) => (a.index < b.index ? -1 : 1))
     .map(([id]) => id)
 
-const perform = (page: Page, action: 'undo' | 'redo') =>
-  page.evaluate((action) => window.dazbee?.perform(action), action)
-const enter = async (field: Locator, value: string) => {
-  await field.fill(value)
-  await field.press('Enter')
-}
-
 /** SHA-256 of the Square's PNG export, which waits for every image and font it draws. */
 const picture = (page: Page) =>
   page.evaluate(async () => {
@@ -290,14 +276,7 @@ async function step(page: Page, act: () => Promise<unknown>, check: () => Promis
   await perform(page, 'redo')
   await expect.poll(() => designOf(page), { message: 'redo brings it again' }).toBe(after)
   // The panels draw the redone design before the next control is used.
-  await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))))
-}
-
-const select = async (page: Page, ids: string[]) => {
-  await page.evaluate((ids) => window.dazbee?.select(ids), ids)
-  // Once the top bar shows these layers, so what opens next belongs to them.
-  if (ids.length > 0) await expect(page.getByTestId('top-bar')).toHaveAttribute('data-selection', ids.join(' '))
-  else await expect(page.getByTestId('top-bar')).toHaveCount(0)
+  await nextFrame(page)
 }
 
 /**
@@ -326,7 +305,7 @@ function row(n: number, title: string, body: (open: (withStory?: boolean) => Pro
 test.describe('every selection', () => {
   row(1, 'apply changes to this format or all formats', async (open) => {
     const page = await open(true)
-    await select(page, ['box'])
+    await selectLayers(page, ['box'], { bar: true })
     const x = async () => (await openCard(page, 'layout-card')).getByRole('spinbutton', { name: 'X position' })
     await expect((await scopeMenu(page)).getByRole('radio', { name: 'Only Square' })).toHaveAttribute(
       'aria-checked',
@@ -356,7 +335,7 @@ test.describe('every selection', () => {
 
   row(2, 'own changes: reset one, reset all', async (open) => {
     const page = await open(true)
-    await select(page, ['box'])
+    await selectLayers(page, ['box'], { bar: true })
     await enter((await openCard(page, 'layout-card')).getByRole('spinbutton', { name: 'X position' }), '200')
     await enter((await fillList(page)).getByRole('textbox', { name: 'Colour 1 hex' }), '14213d')
     const own = (await scopeMenu(page)).getByTestId('own-changes')
@@ -381,7 +360,7 @@ test.describe('every selection', () => {
 
   row(3, 'X, Y, W, H', async (open) => {
     const page = await open()
-    await select(page, ['box'])
+    await selectLayers(page, ['box'], { bar: true })
     const card = async () => await openCard(page, 'layout-card')
     for (const [name, key, value] of [
       ['X position', 'x', 140],
@@ -402,7 +381,7 @@ test.describe('every selection', () => {
 
   row(4, 'rotation', async (open) => {
     const page = await open()
-    await select(page, ['box'])
+    await selectLayers(page, ['box'], { bar: true })
     await step(
       page,
       async () => enter((await moreMenu(page)).getByRole('spinbutton', { name: 'Rotation in degrees' }), '15'),
@@ -415,7 +394,7 @@ test.describe('every selection', () => {
 
   row(5, 'opacity', async (open) => {
     const page = await open()
-    await select(page, ['box'])
+    await selectLayers(page, ['box'], { bar: true })
     await step(
       page,
       async () => enter((await openCard(page, 'appearance-card')).getByRole('spinbutton', { name: 'Opacity' }), '50'),
@@ -428,7 +407,7 @@ test.describe('every selection', () => {
 
   row(6, 'blend mode, pass-through for groups and frames', async (open) => {
     const page = await open()
-    await select(page, ['box'])
+    await selectLayers(page, ['box'], { bar: true })
     const blend = async () => (await openCard(page, 'appearance-card')).getByRole('combobox', { name: 'Blend mode' })
     await step(
       page,
@@ -441,7 +420,7 @@ test.describe('every selection', () => {
     await expect(page.locator('[role="listbox"] [role="option"]')).toHaveCount(16)
     await page.keyboard.press('Escape')
     // A frame starts as pass-through, which only groups and frames are offered.
-    await select(page, ['stack'])
+    await selectLayers(page, ['stack'], { bar: true })
     await expect(await blend()).toHaveAttribute('data-value', 'pass-through')
     await (await blend()).click()
     await expect(page.locator('[role="listbox"] [role="option"]')).toHaveCount(17)
@@ -468,7 +447,7 @@ test.describe('every selection', () => {
 
   row(7, 'mixed values on a multi-selection', async (open) => {
     const page = await open()
-    await select(page, ['box', 'dot'])
+    await selectLayers(page, ['box', 'dot'], { bar: true })
     const x = async () => (await openCard(page, 'layout-card')).getByRole('spinbutton', { name: 'X position' })
     await expect(await x()).toHaveValue('')
     await expect(await x()).toHaveAttribute('placeholder', 'Mixed')
@@ -494,7 +473,7 @@ test.describe('every selection', () => {
 
   row(8, 'effect tiles: none, shadow, glow, blur, outline', async (open) => {
     const page = await open()
-    await select(page, ['box'])
+    await selectLayers(page, ['box'], { bar: true })
     const tiles = await barMenu(page, 'effects')
     const types = async () => ((await props(page, 'box')).effects ?? []).map((e) => e.type)
     await step(
@@ -526,7 +505,7 @@ test.describe('every selection', () => {
       },
     )
     // Text has its tiles in the bar's Effects.
-    await select(page, ['headline'])
+    await selectLayers(page, ['headline'], { bar: true })
     await step(
       page,
       async () => (await barMenu(page, 'effects')).locator('[data-tile="outline"]').click(),
@@ -539,7 +518,7 @@ test.describe('every selection', () => {
 
   row(9, 'add effect: drop shadow, inner shadow, glow, layer blur, background blur', async (open) => {
     const page = await open()
-    await select(page, ['box'])
+    await selectLayers(page, ['box'], { bar: true })
     const card = await barMenu(page, 'effects')
     const added: string[] = []
     for (const type of ['dropShadow', 'innerShadow', 'glow', 'layerBlur', 'backgroundBlur']) {
@@ -560,7 +539,7 @@ test.describe('every selection', () => {
 
   row(10, 'each effect: X, Y, blur, spread, radius, colour, remove, several', async (open) => {
     const page = await open()
-    await select(page, ['box'])
+    await selectLayers(page, ['box'], { bar: true })
     const card = await barMenu(page, 'effects')
     const effects = async () => (await props(page, 'box')).effects ?? []
     await choose(card.getByRole('combobox', { name: /^Add (effect|another)$/ }), 'dropShadow')
@@ -624,7 +603,7 @@ test.describe('every selection', () => {
 
   row(11, 'arrange: duplicate, order, group, ungroup, frame selection, use as mask', async (open) => {
     const page = await open()
-    await select(page, ['box'])
+    await selectLayers(page, ['box'], { bar: true })
     // Several layers group from the small menu and go in a box from the full menu.
     const small = page.getByTestId('small-menu')
     // One layer's actions are in the full menu.
@@ -637,7 +616,7 @@ test.describe('every selection', () => {
       },
     )
     await perform(page, 'undo')
-    await select(page, ['box'])
+    await selectLayers(page, ['box'], { bar: true })
     // The box overlaps nothing, so its place in the order changes only the document.
     const at = async () => (await children(page, 'p1')).indexOf('box')
     await step(
@@ -680,7 +659,7 @@ test.describe('every selection', () => {
       },
     )
     await perform(page, 'undo')
-    await select(page, ['box', 'poly'])
+    await selectLayers(page, ['box', 'poly'], { bar: true })
     await step(
       page,
       async () => small.getByTestId('small-group').click(),
@@ -690,7 +669,7 @@ test.describe('every selection', () => {
       { draws: false },
     )
     const group = (await doc(page)).nodes.box?.parentId ?? ''
-    await select(page, [group])
+    await selectLayers(page, [group], { bar: true })
     await step(
       page,
       async () => more('Ungroup'),
@@ -699,7 +678,7 @@ test.describe('every selection', () => {
       },
       { draws: false },
     )
-    await select(page, ['box', 'poly'])
+    await selectLayers(page, ['box', 'poly'], { bar: true })
     await step(
       page,
       async () => more('Put in a box'),
@@ -721,7 +700,7 @@ test.describe('text', () => {
   row(12, 'font: search, Google Fonts, built in, brand fonts, upload', async (open) => {
     importGoogleFonts(['Playfair Display'])
     const page = await open()
-    await select(page, ['headline'])
+    await selectLayers(page, ['headline'], { bar: true })
     const family = async () => (await style(page, 'headline')).fontFamily
     await step(
       page,
@@ -798,7 +777,7 @@ test.describe('text', () => {
 
   row(13, 'weight', async (open) => {
     const page = await open()
-    await select(page, ['headline'])
+    await selectLayers(page, ['headline'], { bar: true })
     // The family's lightest and heaviest weights, and back to regular.
     const weight = async () => (await barMenu(page, 'font')).getByTestId('font-weight')
     const field = await weight()
@@ -826,7 +805,7 @@ test.describe('text', () => {
 
   row(14, 'size', async (open) => {
     const page = await open()
-    await select(page, ['headline'])
+    await selectLayers(page, ['headline'], { bar: true })
     const size = async () => page.getByTestId('bar-size-field')
     await step(
       page,
@@ -857,7 +836,7 @@ test.describe('text', () => {
 
   row(15, 'text colour: brand colours and hex', async (open) => {
     const page = await open()
-    await select(page, ['headline'])
+    await selectLayers(page, ['headline'], { bar: true })
     await step(
       page,
       async () =>
@@ -883,7 +862,7 @@ test.describe('text', () => {
 
   row(16, 'line height, and back to Auto', async (open) => {
     const page = await open()
-    await select(page, ['headline'])
+    await selectLayers(page, ['headline'], { bar: true })
     const field = async () => (await openCard(page, 'spacing-card')).getByRole('spinbutton', { name: 'Line height' })
     await step(
       page,
@@ -920,10 +899,10 @@ test.describe('text', () => {
     await expect.poll(async () => (await style(page, 'headline')).lineHeight).toBe(1.6)
     await moreAction(page, 'Duplicate')
     const copy = (await page.evaluate(() => window.dazbee?.selection() ?? []))[0] ?? ''
-    await select(page, [copy])
+    await selectLayers(page, [copy], { bar: true })
     await expect(await field()).toHaveValue('1.6')
     await enter(await field(), '')
-    await select(page, ['headline', copy])
+    await selectLayers(page, ['headline', copy], { bar: true })
     await expect(await field()).toHaveAttribute('placeholder', 'Mixed')
     await (await field()).press('Enter')
     expect((await style(page, 'headline')).lineHeight).toBe(1.6)
@@ -940,7 +919,7 @@ test.describe('text', () => {
           .toEqual([undefined, undefined])
       },
     )
-    await select(page, ['headline'])
+    await selectLayers(page, ['headline'], { bar: true })
     // A field with no unset value keeps its number when emptied.
     const before = await designOf(page)
     const spacing = async () =>
@@ -953,7 +932,7 @@ test.describe('text', () => {
 
   row(17, 'letter spacing', async (open) => {
     const page = await open()
-    await select(page, ['headline'])
+    await selectLayers(page, ['headline'], { bar: true })
     await step(
       page,
       async () =>
@@ -978,7 +957,7 @@ test.describe('text', () => {
 
   row(18, 'paragraph spacing', async (open) => {
     const page = await open()
-    await select(page, ['headline'])
+    await selectLayers(page, ['headline'], { bar: true })
     await step(
       page,
       async () =>
@@ -992,7 +971,7 @@ test.describe('text', () => {
 
   row(19, 'alignment: start, centre, end, justify', async (open) => {
     const page = await open()
-    await select(page, ['headline'])
+    await selectLayers(page, ['headline'], { bar: true })
     const pick = async (align: string) =>
       (await barMenu(page, 'align'))
         .getByRole('radiogroup', { name: 'Alignment', exact: true })
@@ -1014,7 +993,7 @@ test.describe('text', () => {
 
   row(20, 'vertical alignment: top, middle, bottom', async (open) => {
     const page = await open()
-    await select(page, ['headline'])
+    await selectLayers(page, ['headline'], { bar: true })
     // Up and down in the box is in the bar's Align, under the alignment.
     const pick = async (to: string) =>
       (await barMenu(page, 'align'))
@@ -1035,7 +1014,7 @@ test.describe('text', () => {
 
   row(21, 'case: as typed, upper, lower, title', async (open) => {
     const page = await open()
-    await select(page, ['headline'])
+    await selectLayers(page, ['headline'], { bar: true })
     const pick = async (textCase: string) =>
       (await barMenu(page, 'case'))
         .getByRole('radiogroup', { name: 'Case' })
@@ -1055,7 +1034,7 @@ test.describe('text', () => {
 
   row(22, 'underline, strikethrough', async (open) => {
     const page = await open()
-    await select(page, ['headline'])
+    await selectLayers(page, ['headline'], { bar: true })
     const toggle = async (name: string) =>
       page.getByTestId('top-bar').getByRole('button', { name, exact: true }).click()
     await step(
@@ -1077,7 +1056,7 @@ test.describe('text', () => {
 
   row(23, 'list: none, bullets, numbers', async (open) => {
     const page = await open()
-    await select(page, ['headline'])
+    await selectLayers(page, ['headline'], { bar: true })
     const pick = async (list: string) =>
       (await barMenu(page, 'list')).getByRole('radiogroup', { name: 'List' }).locator(`[data-value="${list}"]`).click()
     for (const list of ['bullet', 'number', 'none']) {
@@ -1094,7 +1073,7 @@ test.describe('text', () => {
 
   row(24, 'outline on and off, width', async (open) => {
     const page = await open()
-    await select(page, ['headline'])
+    await selectLayers(page, ['headline'], { bar: true })
     const effects = () => barMenu(page, 'effects')
     await step(
       page,
@@ -1122,7 +1101,7 @@ test.describe('text', () => {
 
   row(25, 'box mode: auto width, auto height, fixed', async (open) => {
     const page = await open()
-    await select(page, ['headline'])
+    await selectLayers(page, ['headline'], { bar: true })
     const box = async () => (await openCard(page, 'text-box-card')).getByRole('radiogroup', { name: 'Box' })
     const size = async () => {
       const p = await props(page, 'headline')
@@ -1162,7 +1141,7 @@ test.describe('text', () => {
 
   row(26, 'shrink to fit, smallest and largest size', async (open) => {
     const page = await open()
-    await select(page, ['headline'])
+    await selectLayers(page, ['headline'], { bar: true })
     const card = async () => await openCard(page, 'text-fit-card')
     // The text fits its box at 72 already, so turning it on changes nothing drawn.
     await step(
@@ -1192,7 +1171,7 @@ test.describe('text', () => {
 
   row(27, 'lines at most', async (open) => {
     const page = await open()
-    await select(page, ['headline'])
+    await selectLayers(page, ['headline'], { bar: true })
     await step(
       page,
       async () => enter((await openCard(page, 'text-fit-card')).getByRole('spinbutton', { name: 'Max lines' }), '1'),
@@ -1207,7 +1186,7 @@ test.describe('text', () => {
 test.describe('shapes and frames', () => {
   row(29, 'fill swatches and brand colours', async (open) => {
     const page = await open()
-    await select(page, ['dot'])
+    await selectLayers(page, ['dot'], { bar: true })
     await step(
       page,
       async () =>
@@ -1219,7 +1198,7 @@ test.describe('shapes and frames', () => {
         await expect.poll(async () => (await doc(page)).nodes.dot?.bindings).toMatchObject({ fill: 'brand:roast' })
       },
     )
-    await select(page, ['box'])
+    await selectLayers(page, ['box'], { bar: true })
     await step(
       page,
       async () =>
@@ -1236,7 +1215,7 @@ test.describe('shapes and frames', () => {
 
   row(30, 'fill list: add, remove, reorder, hide and show', async (open) => {
     const page = await open()
-    await select(page, ['box'])
+    await selectLayers(page, ['box'], { bar: true })
     const card = await fillList(page)
     await step(
       page,
@@ -1284,7 +1263,7 @@ test.describe('shapes and frames', () => {
 
   row(31, 'paint kind: solid, linear, radial, angular, image', async (open) => {
     const page = await open()
-    await select(page, ['box'])
+    await selectLayers(page, ['box'], { bar: true })
     await (await fillList(page)).locator('[data-row="1"]').getByTestId('paint-swatch').click()
     const editor = page.getByTestId('paint-editor')
     for (const [name, type] of [
@@ -1318,7 +1297,7 @@ test.describe('shapes and frames', () => {
 
   row(32, 'gradient stops, angle, centre and size', async (open) => {
     const page = await open()
-    await select(page, ['box'])
+    await selectLayers(page, ['box'], { bar: true })
     await (await fillList(page)).locator('[data-row="1"]').getByTestId('paint-swatch').click()
     const editor = page.getByTestId('paint-editor')
     await editor.getByRole('radio', { name: 'Line gradient' }).click()
@@ -1395,7 +1374,7 @@ test.describe('shapes and frames', () => {
 
   row(33, 'colour hex and opacity of each paint', async (open) => {
     const page = await open()
-    await select(page, ['box'])
+    await selectLayers(page, ['box'], { bar: true })
     const card = await fillList(page)
     await step(
       page,
@@ -1426,7 +1405,7 @@ test.describe('shapes and frames', () => {
 
   row(34, 'add an image into a shape', async (open) => {
     const page = await open()
-    await select(page, ['dot'])
+    await selectLayers(page, ['dot'], { bar: true })
     await step(
       page,
       async () => {
@@ -1444,7 +1423,7 @@ test.describe('shapes and frames', () => {
 
   row(35, 'stroke list: add, remove, reorder, several, on a shape and a box', async (open) => {
     const page = await open()
-    await select(page, ['box'])
+    await selectLayers(page, ['box'], { bar: true })
     const card = await strokeList(page)
     const strokes = async () => (await props(page, 'box')).strokes ?? []
     await step(
@@ -1495,7 +1474,7 @@ test.describe('shapes and frames', () => {
     )
     // A box's stroke list works the same.
     await page.keyboard.press('Escape')
-    await select(page, ['plain'])
+    await selectLayers(page, ['plain'], { bar: true })
     const boxList = await strokeList(page)
     const boxStrokes = async () => (await props(page, 'plain')).strokes ?? []
     await step(
@@ -1527,7 +1506,7 @@ test.describe('shapes and frames', () => {
 
   row(36, 'stroke paint, width, position, on a shape and a box', async (open) => {
     const page = await open()
-    await select(page, ['box'])
+    await selectLayers(page, ['box'], { bar: true })
     const card = await strokeList(page)
     await card.getByRole('button', { name: 'Add outline' }).click()
     const stroke = async () => (await props(page, 'box')).strokes?.[0] ?? {}
@@ -1556,7 +1535,7 @@ test.describe('shapes and frames', () => {
     }
     // A box takes strokes too, from its bar's Outline.
     await page.keyboard.press('Escape')
-    await select(page, ['plain'])
+    await selectLayers(page, ['plain'], { bar: true })
     const outline = await strokeList(page)
     const boxStroke = async () => (await props(page, 'plain')).strokes?.[0] ?? {}
     await step(
@@ -1587,7 +1566,7 @@ test.describe('shapes and frames', () => {
 
   row(37, 'dashes, dash offset, ends, corners, on a shape and a box', async (open) => {
     const page = await open()
-    await select(page, ['poly'])
+    await selectLayers(page, ['poly'], { bar: true })
     const card = await strokeList(page)
     await card.getByRole('button', { name: 'Add outline' }).click()
     await enter(card.getByRole('spinbutton', { name: 'Outline 1 width' }), '16')
@@ -1626,7 +1605,7 @@ test.describe('shapes and frames', () => {
     }
     // A box's stroke takes dashes and corners the same.
     await page.keyboard.press('Escape')
-    await select(page, ['plain'])
+    await selectLayers(page, ['plain'], { bar: true })
     const boxList = await strokeList(page)
     await boxList.getByRole('button', { name: 'Add outline' }).click()
     const boxStroke = async () => (await props(page, 'plain')).strokes?.[0] ?? {}
@@ -1649,7 +1628,7 @@ test.describe('shapes and frames', () => {
 
   row(38, 'rectangle and box corners, each corner its own', async (open) => {
     const page = await open()
-    await select(page, ['box'])
+    await selectLayers(page, ['box'], { bar: true })
     const card = async () => await openCard(page, 'shape-card')
     await expect.soft((await card()).getByRole('heading')).toHaveText('Rectangle')
     const shape = async () => (await props(page, 'box')).shape as Record<string, unknown>
@@ -1699,7 +1678,7 @@ test.describe('shapes and frames', () => {
       },
     )
     // A box has the same corners, in its Box card.
-    await select(page, ['plain'])
+    await selectLayers(page, ['plain'], { bar: true })
     const box = async () => await openCard(page, 'frame-card')
     await step(
       page,
@@ -1736,7 +1715,7 @@ test.describe('shapes and frames', () => {
 
   row(39, 'polygon sides and corners', async (open) => {
     const page = await open()
-    await select(page, ['poly'])
+    await selectLayers(page, ['poly'], { bar: true })
     const card = async () => await openCard(page, 'shape-card')
     await expect.soft((await card()).getByRole('heading')).toHaveText('Polygon')
     const shape = async () => (await props(page, 'poly')).shape
@@ -1767,7 +1746,7 @@ test.describe('shapes and frames', () => {
 
   row(40, 'star points, inner, corners', async (open) => {
     const page = await open()
-    await select(page, ['star'])
+    await selectLayers(page, ['star'], { bar: true })
     const card = async () => await openCard(page, 'shape-card')
     const shape = async () => (await props(page, 'star')).shape
     await step(
@@ -1807,14 +1786,14 @@ test.describe('shapes and frames', () => {
       },
     )
     // A rectangle and a star selected together have no Shape pop-up.
-    await select(page, ['box', 'star'])
+    await selectLayers(page, ['box', 'star'], { bar: true })
     await expect.soft(page.getByTestId('bar-shape')).toHaveCount(0)
     await reloads(page)
   })
 
   row(41, 'line start and end', async (open) => {
     const page = await open()
-    await select(page, ['rule'])
+    await selectLayers(page, ['rule'], { bar: true })
     const card = async () => await openCard(page, 'shape-card')
     const shape = async () => (await props(page, 'rule')).shape
     for (const end of ['arrow', 'triangle', 'circle']) {
@@ -1846,7 +1825,7 @@ test.describe('shapes and frames', () => {
   row(42, 'combine: union, subtract, intersect, exclude', async (open) => {
     const page = await open()
     for (const op of ['union', 'subtract', 'intersect', 'exclude']) {
-      await select(page, ['box', 'poly'])
+      await selectLayers(page, ['box', 'poly'], { bar: true })
       // A union of two shapes that don't overlap draws the same two shapes.
       // Combine is on the bar by several layers.
       await step(
@@ -1877,7 +1856,7 @@ test.describe('photos', () => {
 
   row(43, 'replace the image', async (open) => {
     const page = await open()
-    await select(page, ['photo'])
+    await selectLayers(page, ['photo'], { bar: true })
     await step(
       page,
       async () => {
@@ -1893,7 +1872,7 @@ test.describe('photos', () => {
 
   row(44, 'crop on the canvas', async (open) => {
     const page = await open()
-    await select(page, ['photo'])
+    await selectLayers(page, ['photo'], { bar: true })
     await page.getByTestId('bar-crop').click()
     await expect(page.locator('.crop-image')).toBeVisible()
     await step(
@@ -1910,7 +1889,7 @@ test.describe('photos', () => {
 
   row(45, 'fit: fill, fit inside, crop, tile', async (open) => {
     const page = await open()
-    await select(page, ['photo'])
+    await selectLayers(page, ['photo'], { bar: true })
     // The fit is a part of the Edit image panel.
     const field = async () => (await openCard(page, 'fill-card')).getByRole('radiogroup', { name: 'Fit' })
     for (const fit of ['fit', 'tile', 'crop', 'fill']) {
@@ -1929,7 +1908,7 @@ test.describe('photos', () => {
 
   row(46, 'filter', async (open) => {
     const page = await open()
-    await select(page, ['photo'])
+    await selectLayers(page, ['photo'], { bar: true })
     const filters = async () => (await openCard(page, 'look-card')).getByRole('radiogroup', { name: 'Filter' })
     for (const [name, filter] of [
       ['Mono', 'mono'],
@@ -1953,7 +1932,7 @@ test.describe('photos', () => {
 
   row(47, 'adjust: exposure, contrast, saturation, temperature, tint', async (open) => {
     const page = await open()
-    await select(page, ['photo'])
+    await selectLayers(page, ['photo'], { bar: true })
     const card = async () => await openCard(page, 'adjust-card')
     for (const [name, key] of [
       ['Light', 'exposure'],
@@ -1977,7 +1956,7 @@ test.describe('photos', () => {
 
   row(48, 'image opacity', async (open) => {
     const page = await open()
-    await select(page, ['photo'])
+    await selectLayers(page, ['photo'], { bar: true })
     const card = async () => await openCard(page, 'adjust-card')
     await step(
       page,
@@ -1991,7 +1970,7 @@ test.describe('photos', () => {
 
   row(49, 'use as mask', async (open) => {
     const page = await open()
-    await select(page, ['photo'])
+    await selectLayers(page, ['photo'], { bar: true })
     const mask = () => moreAction(page, 'Use as mask')
     await step(page, mask, async () => {
       await expect.poll(async () => (await props(page, 'photo')).mask).toBe('alpha')
@@ -2012,7 +1991,7 @@ test.describe('frames and auto layout', () => {
 
   row(50, 'add auto layout', async (open) => {
     const page = await open()
-    await select(page, ['plain'])
+    await selectLayers(page, ['plain'], { bar: true })
     await step(
       page,
       async () => (await openCard(page, 'auto-layout-card')).getByRole('switch', { name: 'Stack' }).click(),
@@ -2025,7 +2004,7 @@ test.describe('frames and auto layout', () => {
 
   row(51, 'direction and wrap', async (open) => {
     const page = await open()
-    await select(page, ['stack'])
+    await selectLayers(page, ['stack'], { bar: true })
     const card = async () => await openCard(page, 'auto-layout-card')
     await step(
       page,
@@ -2048,7 +2027,7 @@ test.describe('frames and auto layout', () => {
 
   row(52, 'gap', async (open) => {
     const page = await open()
-    await select(page, ['stack'])
+    await selectLayers(page, ['stack'], { bar: true })
     await step(
       page,
       async () =>
@@ -2062,7 +2041,7 @@ test.describe('frames and auto layout', () => {
 
   row(53, 'padding, four sides', async (open) => {
     const page = await open()
-    await select(page, ['stack'])
+    await selectLayers(page, ['stack'], { bar: true })
     const card = async () => await openCard(page, 'auto-layout-advanced')
     for (const side of ['top', 'right', 'bottom', 'left']) {
       // The stack is wider than its row: padding on the end side moves nothing.
@@ -2080,7 +2059,7 @@ test.describe('frames and auto layout', () => {
 
   row(54, 'distribute: start, centre, end, space between', async (open) => {
     const page = await open()
-    await select(page, ['stack'])
+    await selectLayers(page, ['stack'], { bar: true })
     const { align } = (await layout(page)) ?? {}
     for (const justify of ['center', 'end']) {
       await step(
@@ -2113,7 +2092,7 @@ test.describe('frames and auto layout', () => {
 
   row(55, 'align: start, centre, end', async (open) => {
     const page = await open()
-    await select(page, ['stack'])
+    await selectLayers(page, ['stack'], { bar: true })
     const card = async () => await openCard(page, 'auto-layout-advanced')
     await enter((await card()).getByRole('spinbutton', { name: 'Room at the top' }), '0')
     await enter((await card()).getByRole('spinbutton', { name: 'Room at the bottom' }), '0')
@@ -2132,7 +2111,7 @@ test.describe('frames and auto layout', () => {
 
   row(56, "the frame's own sizing", async (open) => {
     const page = await open()
-    await select(page, ['stack'])
+    await selectLayers(page, ['stack'], { bar: true })
     const card = async () => await openCard(page, 'auto-layout-advanced')
     await step(
       page,
@@ -2163,7 +2142,7 @@ test.describe('frames and auto layout', () => {
 
   row(57, "a child's sizing", async (open) => {
     const page = await open()
-    await select(page, ['chip1'])
+    await selectLayers(page, ['chip1'], { bar: true })
     const card = async () => await openCard(page, 'flow-card')
     const pick = async (axis: 'Width' | 'Height', sizing: string) =>
       choose((await card()).getByRole('combobox', { name: `${axis} sizing` }), sizing)
@@ -2199,7 +2178,7 @@ test.describe('frames and auto layout', () => {
 
   row(58, 'a child kept where it is, out of the flow', async (open) => {
     const page = await open()
-    await select(page, ['chip1'])
+    await selectLayers(page, ['chip1'], { bar: true })
     const box = async () => (await openCard(page, 'flow-card')).getByRole('switch', { name: 'Keep where I put it' })
     // Out of the flow, Chip 2 moves up to where Chip 1 was.
     await step(
@@ -2573,7 +2552,7 @@ test.describe('nothing selected', () => {
 test.describe('top bar and full menu', () => {
   row(69, 'bold and italic on the top bar', async (open) => {
     const page = await open()
-    await select(page, ['headline'])
+    await selectLayers(page, ['headline'], { bar: true })
     await step(
       page,
       async () => page.getByTestId('bar-bold').click(),
@@ -2593,7 +2572,7 @@ test.describe('top bar and full menu', () => {
 
   row(70, 'text direction in the full menu', async (open) => {
     const page = await open()
-    await select(page, ['headline'])
+    await selectLayers(page, ['headline'], { bar: true })
     await step(
       page,
       async () => (await moreSubmenu(page, 'text-direction')).getByRole('button', { name: 'Right to left' }).click(),
@@ -2606,7 +2585,7 @@ test.describe('top bar and full menu', () => {
 
   row(71, 'line up and spread selected layers from the top bar', async (open) => {
     const page = await open()
-    await select(page, ['box', 'dot'])
+    await selectLayers(page, ['box', 'dot'], { bar: true })
     await step(
       page,
       async () => (await barMenu(page, 'line-up')).getByRole('button', { name: 'Align left' }).click(),
@@ -2616,7 +2595,7 @@ test.describe('top bar and full menu', () => {
     )
     await page.keyboard.press('Escape')
     // The hexagon between the box and the star moves to leave the same room each side: (900 - 380 - 160) / 2.
-    await select(page, ['box', 'poly', 'star'])
+    await selectLayers(page, ['box', 'poly', 'star'], { bar: true })
     await step(
       page,
       async () => (await barMenu(page, 'line-up')).getByRole('button', { name: /^Distribute horizontally/ }).click(),
@@ -2629,7 +2608,7 @@ test.describe('top bar and full menu', () => {
 
   row(72, 'lock and hide in this size from the full menu', async (open) => {
     const page = await open(true)
-    await select(page, ['box'])
+    await selectLayers(page, ['box'], { bar: true })
     await step(
       page,
       async () => moreAction(page, 'Lock'),
@@ -2651,7 +2630,7 @@ test.describe('top bar and full menu', () => {
 
   row(73, 'frame clipping from the Box pop-up', async (open) => {
     const page = await open()
-    await select(page, ['plain'])
+    await selectLayers(page, ['plain'], { bar: true })
     // Its tiles lie inside it, so the drawing is the same either way.
     await step(
       page,
@@ -2666,7 +2645,7 @@ test.describe('top bar and full menu', () => {
 
   row(74, 'mask by brightness from the Mask pop-up', async (open) => {
     const page = await open()
-    await select(page, ['box'])
+    await selectLayers(page, ['box'], { bar: true })
     await moreAction(page, 'Use as mask')
     await expect.poll(async () => (await props(page, 'box')).mask).toBe('alpha')
     // Nothing in this design sits under the box for it to mask, so the drawing stays the same.
@@ -2692,7 +2671,7 @@ test.describe('top bar and full menu', () => {
         }),
       assets.photo,
     )
-    await select(page, ['photo', 'box'])
+    await selectLayers(page, ['photo', 'box'], { bar: true })
     const card = async () => await openCard(page, 'photos-card')
     const filters = async () => [(await fills(page, 'photo')).at(-1)?.filter, (await fills(page, 'box')).at(-1)?.filter]
     await step(
@@ -2720,11 +2699,11 @@ test.describe('top bar and full menu', () => {
 
   row(75, "a boolean's operation from its Combine pop-up", async (open) => {
     const page = await open()
-    await select(page, ['box', 'poly'])
+    await selectLayers(page, ['box', 'poly'], { bar: true })
     await (await barMenu(page, 'combine')).getByRole('button', { name: /^Union/ }).click()
     const made = async () => Object.entries((await doc(page)).nodes).find(([, n]) => n.type === 'boolean')?.[0] ?? ''
     await expect.poll(made).not.toBe('')
-    await select(page, [await made()])
+    await selectLayers(page, [await made()], { bar: true })
     await step(
       page,
       async () => (await openCard(page, 'combine-card')).getByRole('radio', { name: 'Subtract' }).click(),

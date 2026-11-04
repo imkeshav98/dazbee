@@ -4,8 +4,9 @@
 import type { DesignInput } from '@dazbee/schema'
 
 import { writeOutput } from '../support/editor.ts'
+import { enter } from '../support/fields.ts'
 import { openStage } from '../support/stage.ts'
-import { expect, type Locator, type Page, test } from '../support/test.ts'
+import { expect, type Page, test } from '../support/test.ts'
 import { barMenu, openCard } from '../support/top-bar.ts'
 
 test.describe.configure({ timeout: 120_000 })
@@ -41,10 +42,6 @@ const design = (): DesignInput => ({
 
 type TextProps = Record<string, unknown> & { style: Record<string, unknown> }
 const copy = (page: Page) => page.evaluate(() => window.dazbee?.design().nodes.copy?.props) as Promise<TextProps>
-const enter = async (field: Locator, value: string) => {
-  await field.fill(value)
-  await field.press('Enter')
-}
 
 test('the Text box card sets the box, lines and fit; the bar sets lists, decoration and the outline', async ({
   browser,

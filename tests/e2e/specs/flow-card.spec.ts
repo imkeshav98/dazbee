@@ -5,7 +5,7 @@ import type { DesignInput } from '@dazbee/schema'
 
 import { writeOutput } from '../support/editor.ts'
 import { choose } from '../support/fields.ts'
-import { openStage } from '../support/stage.ts'
+import { boxOf, openStage, selectLayers } from '../support/stage.ts'
 import { expect, type Page, test } from '../support/test.ts'
 import { barMenu, openCard } from '../support/top-bar.ts'
 
@@ -71,30 +71,19 @@ const design = (): DesignInput => ({
   overrides: {},
 })
 
-const boxOf = (page: Page, id: string) =>
-  page.evaluate((id) => window.dazbee?.boxOf(id), id) as Promise<{
-    x: number
-    y: number
-    width: number
-    height: number
-  }>
 const propsOf = (page: Page, id: string) =>
   page.evaluate((id) => window.dazbee?.design().nodes[id]?.props, id) as Promise<Record<string, unknown>>
-const select = async (page: Page, ids: string[]) => {
-  await page.evaluate((ids) => window.dazbee?.select(ids), ids)
-  await expect(await openCard(page, 'layout-card')).toBeVisible()
-}
 
 test('a child of an auto layout fills, hugs or keeps its size, and can leave the flow', async ({ browser }) => {
   const { page, errors } = await openStage(browser, design())
   const card = async () => await openCard(page, 'flow-card')
 
   // A layer out of any flow has no In the stack part in its Position panel.
-  await select(page, ['loose'])
+  await selectLayers(page, ['loose'], { card: 'layout-card' })
   await expect((await barMenu(page, 'position')).getByTestId('flow-card')).toHaveCount(0)
   await page.keyboard.press('Escape')
 
-  await select(page, ['two'])
+  await selectLayers(page, ['two'], { card: 'layout-card' })
   const width = (await card()).getByRole('combobox', { name: 'Width sizing' })
   await expect((await card()).getByRole('heading')).toHaveText('In the stack')
   await expect(width).toHaveAttribute('data-value', 'fixed')
@@ -114,11 +103,11 @@ test('a child of an auto layout fills, hugs or keeps its size, and can leave the
   await expect.poll(async () => (await propsOf(page, 'two')).absolute).toBeUndefined()
 
   // The frame itself hugs its children, so it shrinks to them: its sizing is in the Stack card.
-  await select(page, ['stack'])
+  await selectLayers(page, ['stack'], { card: 'layout-card' })
   await expect(await card()).toHaveCount(0)
-  await select(page, ['two'])
+  await selectLayers(page, ['two'], { card: 'layout-card' })
   await choose(width, 'fixed')
-  await select(page, ['stack'])
+  await selectLayers(page, ['stack'], { card: 'layout-card' })
   await choose((await openCard(page, 'auto-layout-advanced')).getByRole('combobox', { name: 'Width sizing' }), 'hug')
   await expect.poll(async () => (await propsOf(page, 'stack')).sizing).toEqual({ width: 'hug', height: 'fixed' })
   // 20 + 160 + 20 + 160 + 20.

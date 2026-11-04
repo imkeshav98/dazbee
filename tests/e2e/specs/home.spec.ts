@@ -4,12 +4,9 @@
 // earlier mock's masonry, each picture in its own shape.
 import type { DesignInput } from '@dazbee/schema'
 
-import { writeOutput } from '../support/editor.ts'
+import { setCookies, shoot } from '../support/editor.ts'
 import { newBrand, seed } from '../support/seed.ts'
-import { expect, type Page, test } from '../support/test.ts'
-
-const shoot = async (page: Page, name: string, fullPage = false) =>
-  writeOutput(`home-${name}.png`, await page.screenshot({ fullPage, animations: 'disabled' }))
+import { expect, test } from '../support/test.ts'
 
 /** A design in one format with a coloured page and a block, so its picture is easy to tell apart. */
 const poster = (name: string, width: number, height: number, page: string, block: string): DesignInput => ({
@@ -43,7 +40,7 @@ test('Recent is a page of real pictures, each in its shape, filtered by shape', 
   await seed(poster(`Story ${run}`, 1080, 1920, '#3D6BFFFF', '#FFD23FFF'), { brandId })
   await seed(poster(`Banner ${run}`, 1500, 500, '#1A1420FF', '#FF48B0FF'), { brandId })
   await seed(poster(`Square ${run}`, 1080, 1080, '#FF48B0FF', '#FFFFFFFF'), { brandId })
-  await page.context().addCookies([{ name: 'theme', value: 'dark', url: 'http://localhost:3100' }])
+  await setCookies(page, { theme: 'dark' })
   await page.goto(`/brands/${brandId}/designs`)
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Recent')
   await expect(page.getByTestId('library-capsule').locator('[data-lit]')).toHaveAttribute('data-entry', 'recent')
@@ -98,7 +95,7 @@ test('Recent is a page of real pictures, each in its shape, filtered by shape', 
     for (const [i, c] of colour.entries())
       expect(Math.abs((pixel[i] ?? 0) - c), `${name} channel ${i}`).toBeLessThanOrEqual(2)
   }
-  await shoot(page, 'recent', true)
+  await shoot(page, 'home-recent', { fullPage: true })
 
   // The Story chip keeps only the tall ones.
   await page.getByRole('navigation', { name: 'Filters' }).getByRole('link', { name: 'Story' }).click()
@@ -130,7 +127,7 @@ test('the brief is alone on the home, and the capsule goes to Recent, Templates 
   await expect(page.getByTestId('account-open')).toBeVisible()
   await expect(page.getByRole('list', { name: 'Recent' })).toHaveCount(0)
   await expect(capsule.locator('[data-lit]')).toHaveAttribute('data-entry', 'home')
-  await shoot(page, 'brief-alone')
+  await shoot(page, 'home-brief-alone')
 
   for (const [entry, name, path, heading] of [
     ['recent', 'Recent', 'designs', 'Recent'],
@@ -189,12 +186,12 @@ test('the Formats dropdown keeps one format picked, and Make drafts opens a desi
   await dropdown.getByText('Story', { exact: true }).click()
   await expect(page.getByTestId('brief-format-story')).toBeChecked()
   await expect(button).toHaveText(/2 formats/)
-  await shoot(page, 'formats')
+  await shoot(page, 'home-formats')
   // Esc closes the dropdown and gives the focus back to its button.
   await page.keyboard.press('Escape')
   await expect(dropdown).toBeHidden()
   await expect(button).toBeFocused()
-  await shoot(page, 'brief')
+  await shoot(page, 'home-brief')
   await page.getByRole('button', { name: 'Make drafts' }).click()
   await expect(page).toHaveURL(/\/brands\/dev-brand-coffee\/designs\/[\w-]+$/, { timeout: 20_000 })
   await expect(page.getByTestId('status')).toHaveAttribute('data-ready', '', { timeout: 30_000 })
@@ -219,11 +216,11 @@ test('on a phone the brief and the Recent page fit the screen, and the capsule i
   const bar = await page.getByTestId('library-capsule').boundingBox()
   expect(bar?.width).toBeGreaterThan(bar?.height ?? 0)
   expect(844 - ((bar?.y ?? 0) + (bar?.height ?? 0))).toBeLessThan(24)
-  await shoot(page, 'phone', true)
+  await shoot(page, 'home-phone', { fullPage: true })
 
   await page.getByTestId('library-capsule').getByRole('link', { name: 'Recent' }).click()
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Recent')
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390)
-  await shoot(page, 'phone-recent')
+  await shoot(page, 'home-phone-recent')
   await context.close()
 })

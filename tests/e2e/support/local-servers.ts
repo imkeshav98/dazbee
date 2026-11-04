@@ -2,7 +2,8 @@
 // their own ports, over a database and a storage bucket of their own, so a run on a developer's
 // machine never writes into the workspace their local site shows. CI's servers are thrown away
 // after each run, so it uses docker compose's as before. A POST to /restart-sync on the control port
-// restarts the suite's sync server and answers once the new one is listening.
+// restarts the suite's sync server and answers once the new one is listening. The specs restart the
+// sync server and read what it stored through the helpers here, which reach CI's servers as well.
 import { type ChildProcess, execFileSync, spawn } from 'node:child_process'
 import { createServer } from 'node:http'
 import { createRequire } from 'node:module'
@@ -90,7 +91,7 @@ async function restartSync(sync: ChildProcess) {
 
 /**
  * Restarts the sync server the specs' tabs talk to and waits until it answers again: on CI docker
- * compose's container, off CI the suite's own (support/local-servers.ts).
+ * compose's container, off CI the suite's own, through the control port above.
  */
 export async function restartSyncServer() {
   if (!process.env.CI) {

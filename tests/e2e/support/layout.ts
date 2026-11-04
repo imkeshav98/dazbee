@@ -1,6 +1,7 @@
 // What a person would see wrong with a page's layout at a screen size: pieces of the page drawn over
 // each other, controls drawn over each other, anything reaching past the window or cut short by
-// what holds it, and words cut short by their box.
+// what holds it, words cut short by their box, and labels that run onto a second line; with the
+// editor's chrome and the screen sizes the checks run at.
 import type { Page } from '@playwright/test'
 
 /** A box on screen, in CSS pixels from the window's top left corner. */
@@ -10,6 +11,23 @@ export interface Rect {
   width: number
   height: number
 }
+
+/** The editor's chrome that floats over the canvas, as pieces for `layoutProblems`. */
+export const EDITOR_CHROME = {
+  'header pill': '[data-testid="island-start"]',
+  'end island': '[data-testid="island-end"]',
+  rail: '[data-testid="rail"]',
+  dock: '[data-dock]',
+  zoom: '[data-zoom]',
+  pages: '[data-pages]',
+}
+
+/** The screen sizes the layout checks run at, width by height: a laptop, a tablet and a phone. */
+export const SCREEN_SIZES = [
+  [1280, 760],
+  [820, 1180],
+  [390, 844],
+] as const
 
 /**
  * The layout problems on the page now, one line each; an empty list when there are none.

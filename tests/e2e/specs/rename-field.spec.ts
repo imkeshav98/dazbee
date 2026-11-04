@@ -6,19 +6,13 @@
 // screen sizes, with undo and redo, and record where the focus goes.
 import type { DesignInput } from '@dazbee/schema'
 
-import { designOf, writeOutput } from '../support/editor.ts'
-import { openStage, press } from '../support/stage.ts'
+import { shoot, writeOutput } from '../support/editor.ts'
+import { SCREEN_SIZES } from '../support/layout.ts'
+import { nextFrame, openStage, press, read } from '../support/stage.ts'
 import { expect, type Locator, type Page, test } from '../support/test.ts'
 import { pagesPanel, sizesPanel } from '../support/top-bar.ts'
 
 test.describe.configure({ timeout: 120_000 })
-
-/** The screen sizes the @evidence tests run at. */
-const SCREENS = [
-  [1280, 760],
-  [820, 1180],
-  [390, 844],
-] as const
 
 const design = (): DesignInput => ({
   meta: {
@@ -51,13 +45,6 @@ const design = (): DesignInput => ({
   },
   overrides: {},
 })
-
-interface Stored {
-  formats: Record<string, { name: string }>
-  pages: Record<string, { name: string }>
-  nodes: Record<string, { name: string }>
-}
-const stored = async (page: Page) => JSON.parse(await designOf(page)) as Stored
 
 /** What has the focus: "the page" when nothing does, else the element's tag, role and name. */
 const focusOf = (page: Page) =>
@@ -124,7 +111,7 @@ const SUBJECTS: Subject[] = [
         .dblclick()
       return panel.locator('input[name="format-name"]')
     },
-    name: async (page) => (await stored(page)).formats.story?.name,
+    name: async (page) => (await read(page)).formats.story?.name,
     undoable: true,
   },
   {
@@ -139,7 +126,7 @@ const SUBJECTS: Subject[] = [
       await tree.locator('[data-layer="box"] [data-testid="layer-name"]').dblclick()
       return tree.locator('input[name="layer-name"]')
     },
-    name: async (page) => (await stored(page)).nodes.box?.name,
+    name: async (page) => (await read(page)).nodes.box?.name,
     undoable: true,
     keyFocus: (page) => page.getByRole('tree').locator('[data-layer="box"]'),
   },
@@ -155,7 +142,7 @@ const SUBJECTS: Subject[] = [
         .dblclick()
       return panel.locator('input[name="page-name"]')
     },
-    name: async (page) => (await stored(page)).pages.p1?.name,
+    name: async (page) => (await read(page)).pages.p1?.name,
     undoable: true,
   },
 ]
@@ -190,7 +177,7 @@ for (const s of SUBJECTS.filter(({ id }) => id === 'size' || id === 'page')) {
   })
 }
 
-for (const [width, height] of SCREENS) {
+for (const [width, height] of SCREEN_SIZES) {
   for (const s of SUBJECTS) {
     test(
       `at ${width}×${height} the ${s.id} name field: Enter, Escape, Escape then blur, Tab, Enter then blur, undo and redo`,
@@ -198,7 +185,7 @@ for (const [width, height] of SCREENS) {
       async ({ browser }) => {
         const { page, errors } = await openStage(browser, design())
         await page.setViewportSize({ width, height })
-        await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))))
+        await nextFrame(page)
         await page.evaluate(() => window.dazbee?.fitAll())
         await page.evaluate(() => window.dazbee?.drawn())
         // The renames the design's name sends to the server, by the name they send.
@@ -209,8 +196,7 @@ for (const [width, height] of SCREENS) {
         })
         const sentWith = (name: string) => sent.filter((body) => body.includes(name)).length
         const focus: Record<string, string> = {}
-        const shot = async (step: string) =>
-          writeOutput(`rename-field-${width}-${s.id}-${step}.png`, await page.screenshot({ animations: 'disabled' }))
+        const shot = (step: string) => shoot(page, `rename-field-${width}-${s.id}-${step}`)
         const closed = () => expect(page.locator(`input[name="${s.input}"]`)).toHaveCount(0)
 
         // Enter keeps the new name.

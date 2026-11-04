@@ -6,6 +6,7 @@ import { type Browser, expect, type Page } from '@playwright/test'
 import { formatScope } from '@dazbee/schema'
 
 import { DEV_BRAND, type InBrand, liveDesign, seed } from './seed.ts'
+import { test } from './test.ts'
 
 /** Where the live editing checks leave their screenshots and numbers; CI uploads it. */
 export const OUTPUT = join(import.meta.dirname, '..', 'output')
@@ -128,8 +129,13 @@ export function writeOutput(name: string, content: string | Buffer) {
   writeFileSync(join(OUTPUT, name), content)
 }
 
+/** Writes a screenshot of the page, with animations off, to `<name>.png` in the output folder. */
+export async function shoot(page: Page, name: string, { fullPage = false }: { fullPage?: boolean } = {}) {
+  writeOutput(`${name}.png`, await page.screenshot({ fullPage, animations: 'disabled' }))
+}
+
+/** Sets cookies by name for the web app the specs open, at the suite's base URL. */
 export async function setCookies(page: Page, cookies: Record<string, string>) {
-  await page
-    .context()
-    .addCookies(Object.entries(cookies).map(([name, value]) => ({ name, value, url: 'http://localhost:3100' })))
+  const url = test.info().project.use.baseURL ?? ''
+  await page.context().addCookies(Object.entries(cookies).map(([name, value]) => ({ name, value, url })))
 }

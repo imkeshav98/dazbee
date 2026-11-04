@@ -1,11 +1,8 @@
 // The UI foundation (#51): themes change only tokens, Arabic mirrors the chrome but not the design,
 // reduced motion turns chrome animation off. Screenshots go to output/ for the PR.
-import { editorPath, setCookies, writeOutput } from '../support/editor.ts'
+import { editorPath, setCookies, shoot, writeOutput } from '../support/editor.ts'
 import { liveDesign, seed } from '../support/seed.ts'
 import { expect, type Page, test } from '../support/test.ts'
-
-const shoot = async (page: Page, name: string) =>
-  writeOutput(`ui-${name}.png`, await page.screenshot({ animations: 'disabled' }))
 
 test.use({ viewport: { width: 1440, height: 900 } })
 
@@ -63,14 +60,14 @@ test('the system theme is followed until a pick is made, and dark and light chan
     await setCookies(page, { theme })
     await page.goto('/')
     await expect(page.locator('html')).toHaveAttribute('data-theme', theme)
-    await shoot(page, `${theme}-brands`)
+    await shoot(page, `ui-${theme}-brands`)
     await page.goto('/brands/dev-brand-coffee')
-    await shoot(page, `${theme}-designs`)
+    await shoot(page, `ui-${theme}-designs`)
     await page.goto(editorPath(designId))
     await expect(page.getByTestId('status')).toHaveAttribute('data-ready', '', { timeout: 30_000 })
     await page.getByRole('button', { name: 'AI', exact: true }).click()
     await expect(page.getByTestId('flyout')).toBeVisible()
-    await shoot(page, `${theme}-editor`)
+    await shoot(page, `ui-${theme}-editor`)
   }
   // Same markup in both themes: only custom properties differ.
   const backgrounds: string[] = []
@@ -91,7 +88,7 @@ test('in Arabic the chrome mirrors and reads right to left, the islands too, the
   await page.goto('/brands/dev-brand-coffee')
   await expect(page.locator('html')).toHaveAttribute('dir', 'rtl')
   await expect(page.getByRole('button', { name: 'اصنع المسودات' })).toBeVisible()
-  await shoot(page, 'arabic-designs')
+  await shoot(page, 'ui-arabic-designs')
 
   await page.goto(editorPath(designId))
   await expect(page.getByTestId('status')).toHaveAttribute('data-ready', '', { timeout: 30_000 })
@@ -111,7 +108,7 @@ test('in Arabic the chrome mirrors and reads right to left, the islands too, the
   expect(end.x).toBeGreaterThanOrEqual(20)
   expect(1440 - (start.x + start.width)).toBeLessThan(48)
   await page.getByRole('button', { name: 'الطبقات' }).click()
-  await shoot(page, 'arabic-editor')
+  await shoot(page, 'ui-arabic-editor')
 })
 
 test('reduced motion turns chrome animation off: the flyout appears outright and the blob jumps without sliding or squishing', async ({
@@ -178,7 +175,7 @@ test('floating chrome is frosted with grain in both themes', async ({ page }) =>
       expect(style.filter).toContain('blur(18px)')
       expect(style.image).toContain('feTurbulence')
     }
-    await shoot(page, `${theme}-frost`)
+    await shoot(page, `ui-${theme}-frost`)
     const dock = await page.getByRole('toolbar').boundingBox()
     const zoom = await page.getByRole('group', { name: 'Zoom' }).boundingBox()
     if (!dock || !zoom) throw new Error('missing dock or zoom')
@@ -298,7 +295,7 @@ test('the panels live in a capsule floating over the canvas', async ({ page }) =
   await expect
     .poll(async () => Math.abs(centre(await page.getByTestId('rail-blob').boundingBox()).y - layers.y))
     .toBeLessThan(1)
-  await shoot(page, 'capsule-layers')
+  await shoot(page, 'ui-capsule-layers')
   const { landing, frames: path } = await blobPath(page, 'Brand')
   const brand = centre(await page.getByRole('button', { name: 'Brand', exact: true }).boundingBox())
   // A slide, not a jump: the blob is seen on its way, between the two buttons. A jump is never
@@ -332,7 +329,7 @@ test('the panels live in a capsule floating over the canvas', async ({ page }) =
   // the brand kit. Brand's flyout leaves first, then AI's settles at its height.
   await expect(page.getByTestId('flyout')).toHaveCount(1)
   await expect.poll(async () => (await page.getByTestId('flyout').boundingBox())?.height).toBeLessThan(stage.height / 2)
-  await shoot(page, 'capsule-ai')
+  await shoot(page, 'ui-capsule-ai')
   await page.keyboard.press('Enter')
   await expect(ai).toHaveAttribute('aria-expanded', 'false')
   await expect(page.getByTestId('flyout')).toHaveCount(0)
@@ -342,7 +339,7 @@ test('on a phone the capsule is a tab bar at the bottom', async ({ browser }) =>
   const designId = await seed(liveDesign())
   const context = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true })
   const page = await context.newPage()
-  await context.addCookies([{ name: 'theme', value: 'dark', url: 'http://localhost:3100' }])
+  await setCookies(page, { theme: 'dark' })
   await page.goto(editorPath(designId))
   await expect(page.getByTestId('status')).toHaveAttribute('data-ready', '', { timeout: 30_000 })
   const rail = await page.getByTestId('rail').boundingBox()
@@ -355,13 +352,13 @@ test('on a phone the capsule is a tab bar at the bottom', async ({ browser }) =>
   // The dock sits above the tab bar and the zoom pill moves to the top, so nothing overlaps.
   expect(dock.y + dock.height).toBeLessThanOrEqual(rail.y)
   expect(zoom.y + zoom.height).toBeLessThan(dock.y)
-  await shoot(page, 'capsule-phone')
+  await shoot(page, 'ui-capsule-phone')
   await page.getByRole('button', { name: 'Layers', exact: true }).tap()
   const flyout = await page.getByTestId('flyout').boundingBox()
   if (!flyout) throw new Error('missing flyout')
   expect(flyout.y + flyout.height).toBeLessThanOrEqual(dock.y)
   expect(flyout.x).toBeGreaterThanOrEqual(0)
   expect(flyout.x + flyout.width).toBeLessThanOrEqual(390)
-  await shoot(page, 'capsule-phone-layers')
+  await shoot(page, 'ui-capsule-phone-layers')
   await context.close()
 })

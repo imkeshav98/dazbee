@@ -5,7 +5,7 @@
 // page is busy. Esc in a field of a menu still throws away what was typed.
 import type { DesignInput } from '@dazbee/schema'
 
-import { openStage, read, selection } from '../support/stage.ts'
+import { openStage, read, selection, selectLayers } from '../support/stage.ts'
 import { expect, type Page, test } from '../support/test.ts'
 import { barMenu, moreMenu, moreSubmenu } from '../support/top-bar.ts'
 
@@ -40,7 +40,6 @@ const design = (): DesignInput => ({
   overrides: {},
 })
 
-const select = (page: Page, ids: string[]) => page.evaluate((ids) => window.dazbee?.select(ids), ids)
 /** Lets the page's timers run: one set now runs after every timer set before it. */
 const timers = (page: Page) => page.evaluate(() => new Promise((r) => setTimeout(r, 50)))
 
@@ -72,7 +71,7 @@ test('Esc in one popover of the bar and a click on another at once: the new one 
   browser,
 }) => {
   const { page, errors } = await openStage(browser, design())
-  await select(page, ['a'])
+  await selectLayers(page, ['a'])
   await barMenu(page, 'colour')
 
   await keyThen(page, { key: 'Escape', closed: 'bar-colour-menu', next: 'bar-outline', then: 'bar-outline-menu' })
@@ -89,7 +88,7 @@ test('Esc twice at once in the menu beside Order: the first closes it, the secon
   browser,
 }) => {
   const { page, errors } = await openStage(browser, design())
-  await select(page, ['a'])
+  await selectLayers(page, ['a'])
   const order = await moreSubmenu(page, 'order')
   expect(await order.evaluate((menu) => menu.contains(document.activeElement))).toBe(true)
 
@@ -107,7 +106,7 @@ test('the arrow back out of the menu beside Order, then Esc at once: ⋯ More cl
   browser,
 }) => {
   const { page, errors } = await openStage(browser, design())
-  await select(page, ['a'])
+  await selectLayers(page, ['a'])
   const order = await moreSubmenu(page, 'order')
   expect(await order.evaluate((menu) => menu.contains(document.activeElement))).toBe(true)
 
@@ -124,7 +123,7 @@ test('Esc in a number field of ⋯ More throws away what was typed: the menu clo
   browser,
 }) => {
   const { page, errors } = await openStage(browser, design())
-  await select(page, ['a'])
+  await selectLayers(page, ['a'])
   const more = await moreMenu(page)
   const rotation = more.getByRole('spinbutton', { name: 'Rotation in degrees' })
   await rotation.fill('45')

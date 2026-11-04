@@ -4,8 +4,9 @@
 import type { DesignInput } from '@dazbee/schema'
 
 import { writeOutput } from '../support/editor.ts'
+import { enter } from '../support/fields.ts'
 import { openStage } from '../support/stage.ts'
-import { expect, type Locator, type Page, test } from '../support/test.ts'
+import { expect, type Page, test } from '../support/test.ts'
 import { fillList, openCard, scopeMenu } from '../support/top-bar.ts'
 
 test.describe.configure({ timeout: 120_000 })
@@ -46,10 +47,6 @@ const squareOwn = (page: Page) =>
   page.evaluate(() => JSON.parse(JSON.stringify(window.dazbee?.design().overrides['format:sq']?.box ?? {}))) as Promise<
     Record<string, unknown>
   >
-const enter = async (field: Locator, value: string) => {
-  await field.fill(value)
-  await field.press('Enter')
-}
 
 test('the scope card lists what this format has of its own and resets it', async ({ browser }) => {
   const { page, errors } = await openStage(browser, design())

@@ -3,7 +3,7 @@
 import type { DesignInput } from '@dazbee/schema'
 
 import { writeOutput } from '../support/editor.ts'
-import { openStage, read } from '../support/stage.ts'
+import { openStage, press, read, selectLayers } from '../support/stage.ts'
 import { expect, type Page, test } from '../support/test.ts'
 import { moreSubmenu, openCard } from '../support/top-bar.ts'
 
@@ -96,12 +96,10 @@ const props = async (page: Page, id: string) => {
   const design = await read(page)
   return { ...design.nodes[id]?.props, ...design.overrides['format:sq']?.[id] } as Record<string, unknown>
 }
-const select = (page: Page, ids: string[]) => page.evaluate((ids) => window.dazbee?.select(ids), ids)
-const undo = (page: Page) => page.keyboard.press('ControlOrMeta+Z')
 
 test("a boolean's operation and a mask's type change in place, one undo step each", async ({ browser }) => {
   const { page, errors } = await openStage(browser, design())
-  await select(page, ['combo'])
+  await selectLayers(page, ['combo'])
   const combine = async () => await openCard(page, 'combine-card')
   for (const op of ['subtract', 'intersect', 'exclude', 'union']) {
     await (await combine()).locator(`[data-value="${op}"]`).click()
@@ -121,12 +119,12 @@ test("a boolean's operation and a mask's type change in place, one undo step eac
   writeOutput('controls-combine.png', await page.screenshot())
   await page.mouse.click(5, 400)
   // One undo step each: back to union, then to exclude.
-  await undo(page)
+  await press(page, 'undo')
   await expect.poll(async () => (await props(page, 'combo')).op).toBe('union')
-  await undo(page)
+  await press(page, 'undo')
   await expect.poll(async () => (await props(page, 'combo')).op).toBe('exclude')
 
-  await select(page, ['cutter'])
+  await selectLayers(page, ['cutter'])
   const mask = async () => await openCard(page, 'mask-card')
   await expect((await mask()).locator('[data-value="alpha"]')).toHaveAttribute('aria-checked', 'true')
   await (await mask()).locator('[data-value="luminance"]').click()
@@ -137,21 +135,21 @@ test("a boolean's operation and a mask's type change in place, one undo step eac
   await page.evaluate(() => window.dazbee?.drawn())
   writeOutput('controls-mask.png', await page.screenshot())
   await page.mouse.click(5, 400)
-  await undo(page)
+  await press(page, 'undo')
   await expect.poll(async () => (await props(page, 'cutter')).mask).toBe('alpha')
   expect(errors).toEqual([])
 })
 
 test("a text's direction from ⋯ More, one undo step", async ({ browser }) => {
   const { page, errors } = await openStage(browser, design())
-  await select(page, ['words'])
+  await selectLayers(page, ['words'])
   const menu = await moreSubmenu(page, 'text-direction')
   await expect(menu.locator('[data-direction="auto"]')).toHaveAttribute('aria-pressed', 'true')
   await menu.locator('[data-direction="rtl"]').click()
   await expect.poll(async () => (await props(page, 'words')).direction).toBe('rtl')
   await page.evaluate(() => window.dazbee?.drawn())
   writeOutput('controls-direction.png', await page.screenshot())
-  await select(page, ['words'])
+  await selectLayers(page, ['words'])
   await expect((await moreSubmenu(page, 'text-direction')).locator('[data-direction="rtl"]')).toHaveAttribute(
     'aria-pressed',
     'true',
@@ -159,7 +157,7 @@ test("a text's direction from ⋯ More, one undo step", async ({ browser }) => {
   expect((await read(page)).nodes.words?.props.direction).toBe('rtl')
   await page.keyboard.press('Escape')
   await page.keyboard.press('Escape')
-  await undo(page)
+  await press(page, 'undo')
   await expect.poll(async () => (await props(page, 'words')).direction).toBe('auto')
   expect(errors).toEqual([])
 })

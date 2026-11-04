@@ -1,5 +1,6 @@
-// Picking from the app's own dropdowns (components/ui/select.tsx), as a person does: open the field,
-// then press the option. The list is drawn over the page, outside the field.
+// Filling the app's fields as a person does: typing a value and pressing Enter, and picking from the
+// app's own dropdowns (components/ui/select.tsx) by opening the field, then pressing the option. The
+// list is drawn over the page, outside the field.
 import type { Locator } from '@playwright/test'
 
 export async function choose(field: Locator, value: string) {

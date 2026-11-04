@@ -6,10 +6,10 @@
 // sizes, and the canvas never moves.
 import type { DesignInput } from '@dazbee/schema'
 
-import { designOf, editorPath, screenPoint, writeOutput } from '../support/editor.ts'
-import { layoutProblems } from '../support/layout.ts'
+import { designOf, editorPath, screenPoint, setCookies, writeOutput } from '../support/editor.ts'
+import { EDITOR_CHROME, layoutProblems, SCREEN_SIZES } from '../support/layout.ts'
 import { seed } from '../support/seed.ts'
-import { backgroundPanel, click, drag, openStage, pickPage, press, selection } from '../support/stage.ts'
+import { backgroundPanel, click, drag, nextFrame, openStage, pickPage, press, selection } from '../support/stage.ts'
 import { expect, type Page, test } from '../support/test.ts'
 import { barMenu, pagesPanel, sizesPanel } from '../support/top-bar.ts'
 
@@ -50,14 +50,9 @@ const design = (): DesignInput => ({
 })
 
 const PIECES = {
-  'header pill': '[data-testid="island-start"]',
-  'end island': '[data-testid="island-end"]',
+  ...EDITOR_CHROME,
   'edit panel': '#edit-panel',
   'top bar': '[data-testid="top-bar-row"]',
-  rail: '[data-testid="rail"]',
-  dock: '[data-dock]',
-  zoom: '[data-zoom]',
-  pages: '[data-pages]',
 }
 /** Where each size of the page is on screen: the ads, which the chrome keeps clear of at a fit. */
 const ads = async (page: Page) => {
@@ -71,8 +66,6 @@ const ads = async (page: Page) => {
   )
 }
 const camera = (page: Page) => page.evaluate(() => window.dazbee?.camera())
-const settle = (page: Page) =>
-  page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))))
 const fills = async (page: Page) =>
   (JSON.parse(await designOf(page)) as { pages: Record<string, { fills: { type: string; color?: string }[] }> }).pages
     .p1?.fills
@@ -246,19 +239,15 @@ test("Sizes on the page's bar opens the Sizes panel, and the focus goes back to 
   expect(errors).toEqual([])
 })
 
-for (const [width, height] of [
-  [1280, 760],
-  [820, 1180],
-  [390, 844],
-] as const) {
+for (const [width, height] of SCREEN_SIZES) {
   test(`at ${width}×${height} Sizes, Pages and the page's Background sit clear of everything, and the canvas stays`, async ({
     browser,
   }) => {
     const { page, errors } = await openStage(browser, design())
     await page.setViewportSize({ width, height })
-    await settle(page)
+    await nextFrame(page)
     await page.evaluate(() => window.dazbee?.fitAll())
-    await settle(page)
+    await nextFrame(page)
     const still = await camera(page)
     // No properties button on the phones' tab bar.
     await expect(page.locator('[data-panel="properties"]')).toHaveCount(0)
@@ -267,7 +256,7 @@ for (const [width, height] of [
       await expect(page.getByTestId('pages-button').locator('span:visible')).toHaveText('1/1')
     }
     const check = async (name: string) => {
-      await settle(page)
+      await nextFrame(page)
       expect(
         await layoutProblems(page, { pieces: PIECES, uncut: 'h1, [data-testid="edit-panel-note"]' }),
         name,
@@ -294,8 +283,8 @@ for (const [width, height] of [
 test("in Arabic Sizes, Pages and the page's Background mirror and sit clear of everything", async ({ browser }) => {
   const designId = await seed(design())
   const context = await browser.newContext({ viewport: { width: 1280, height: 760 } })
-  await context.addCookies([{ name: 'locale', value: 'ar', url: 'http://localhost' }])
   const page = await context.newPage()
+  await setCookies(page, { locale: 'ar' })
   const errors: string[] = []
   page.on('pageerror', (error) => errors.push(error.message))
   await page.goto(editorPath(designId))

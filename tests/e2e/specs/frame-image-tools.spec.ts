@@ -6,7 +6,7 @@ import type { DesignInput } from '@dazbee/schema'
 
 import { photo } from '../support/assets.ts'
 import { writeOutput } from '../support/editor.ts'
-import { click, drag, openStage, press, read, selection } from '../support/stage.ts'
+import { type Box, boxOf, click, drag, openStage, press, read, selection } from '../support/stage.ts'
 import { expect, type Page, test } from '../support/test.ts'
 import { moreAction } from '../support/top-bar.ts'
 
@@ -45,14 +45,11 @@ const design = (): DesignInput => ({
   overrides: { 'format:wide': { a: { x: 900, y: 500, width: 80, height: 60 }, b: { x: 1300, y: 600 } } },
 })
 
-type Box = { x: number; y: number; width: number; height: number }
-const boxOf = (page: Page, id: string) => page.evaluate((id) => window.dazbee?.boxOf(id), id) as Promise<Box>
 const near = (a: Box, b: Box) => {
   for (const k of ['x', 'y', 'width', 'height'] as const)
     expect(Math.abs(a[k] - b[k]), `${k}: ${a[k]} vs ${b[k]}`).toBeLessThanOrEqual(0.5)
 }
-const wideBoxOf = (page: Page, id: string) =>
-  page.evaluate((id) => window.dazbee?.boxOf(id, 'p1', 'wide'), id) as Promise<Box>
+const wideBoxOf = (page: Page, id: string) => boxOf(page, id, { pageId: 'p1', formatId: 'wide' })
 const holds = (outer: Box, inner: Box) => {
   expect(inner.x).toBeGreaterThanOrEqual(outer.x - 0.5)
   expect(inner.y).toBeGreaterThanOrEqual(outer.y - 0.5)
@@ -64,10 +61,6 @@ const childrenOf = async (page: Page, parentId: string) =>
     .filter(([, n]) => n.parentId === parentId)
     .sort(([, x], [, y]) => (x.index < y.index ? -1 : 1))
     .map(([id]) => id)
-const undo = async (page: Page) => {
-  await press(page, 'undo')
-  await page.evaluate(() => window.dazbee?.drawn())
-}
 
 test('F draws a frame; a frame drawn around layers takes them in without moving them', async ({ browser }) => {
   const { page, errors } = await openStage(browser, design())
@@ -84,7 +77,7 @@ test('F draws a frame; a frame drawn around layers takes them in without moving 
   await expect(page.locator('[data-tool="select"]')).toHaveAttribute('aria-pressed', 'true')
   writeOutput('frame-1-drawn.png', await page.screenshot({ animations: 'disabled' }))
   // One undo step takes it away.
-  await undo(page)
+  await press(page, 'undo')
   expect((await read(page)).nodes[lone ?? '']).toBeUndefined()
 
   // A click draws a frame of the default size, centred on it.
@@ -92,7 +85,7 @@ test('F draws a frame; a frame drawn around layers takes them in without moving 
   await click(page, 700, 800)
   const [clicked] = await selection(page)
   expect((await read(page)).nodes[clicked ?? '']).toMatchObject({ props: { x: 600, y: 700, width: 200, height: 200 } })
-  await undo(page)
+  await press(page, 'undo')
   const wideBefore = { a: await wideBoxOf(page, 'a'), b: await wideBoxOf(page, 'b') }
 
   // Around A and the turned B: both go inside it, and neither moves on the stage.
@@ -109,7 +102,7 @@ test('F draws a frame; a frame drawn around layers takes them in without moving 
   holds(await wideBoxOf(page, frame ?? ''), wideBefore.a)
   holds(await wideBoxOf(page, frame ?? ''), { x: 1300, y: 600, width: 120, height: 120 })
   writeOutput('frame-2-around.png', await page.screenshot({ animations: 'disabled' }))
-  await undo(page)
+  await press(page, 'undo')
   expect((await read(page)).nodes.a?.parentId).toBe('p1')
   expect((await read(page)).nodes[frame ?? '']).toBeUndefined()
   expect(errors).toEqual([])
@@ -139,7 +132,7 @@ test('Mod+Alt+G and the Arrange card frame the selection; Shift+A wraps shapes i
   near(await boxOf(page, 'c'), before.c)
   near(await boxOf(page, 'd'), before.d)
   writeOutput('frame-3-selection.png', await page.screenshot({ animations: 'disabled' }))
-  await undo(page)
+  await press(page, 'undo')
   expect((await read(page)).nodes.c?.parentId).toBe('p1')
 
   // The same from the full menu's Put in a box.
@@ -148,7 +141,7 @@ test('Mod+Alt+G and the Arrange card frame the selection; Shift+A wraps shapes i
   await moreAction(page, 'Put in a box')
   const [carded] = await selection(page)
   expect(await childrenOf(page, carded ?? '')).toEqual(['c', 'd'])
-  await undo(page)
+  await press(page, 'undo')
 
   // Shift+A on two shapes: an auto layout frame that hugs them, laid out as they stand.
   await click(page, 220, 680)
@@ -172,9 +165,9 @@ test('Mod+Alt+G and the Arrange card frame the selection; Shift+A wraps shapes i
   now = await read(page)
   expect(now.nodes[auto ?? '']?.props.layout).toBeUndefined()
   expect(now.nodes.c?.parentId).toBe('p1')
-  await undo(page)
+  await press(page, 'undo')
   // One undo step for the whole wrap.
-  await undo(page)
+  await press(page, 'undo')
   expect((await read(page)).nodes[auto ?? '']).toBeUndefined()
   expect((await read(page)).nodes.e?.parentId).toBe('p1')
   expect(errors).toEqual([])
@@ -212,7 +205,7 @@ test('I opens the image picker; the image uploaded there lands where the stage i
   await page.evaluate(() => window.dazbee?.drawn())
   writeOutput('image-2-placed.png', await page.screenshot({ animations: 'disabled' }))
 
-  await undo(page)
+  await press(page, 'undo')
   expect((await read(page)).nodes[placed ?? '']).toBeUndefined()
   expect(Object.keys((await read(page)).nodes).length).toBe(layers)
 
@@ -227,7 +220,7 @@ test('I opens the image picker; the image uploaded there lands where the stage i
     props: { x: 100, y: 850, width: 300, height: 150, fills: [{ type: 'image', fit: 'fill' }] },
   })
   writeOutput('image-3-dragged.png', await page.screenshot({ animations: 'disabled' }))
-  await undo(page)
+  await press(page, 'undo')
 
   // Pressing I again and closing the picker goes back to the select tool.
   await press(page, 'toolImage')
