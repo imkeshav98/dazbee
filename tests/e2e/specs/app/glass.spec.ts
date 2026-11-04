@@ -345,6 +345,8 @@ for (const [width, height] of SCREEN_SIZES) {
         await expect(page.getByTestId('flyout')).toBeVisible()
         await shot(page, `glass-${theme}-${width}-flyout`)
 
+        // On a phone the Pages button gives way to the top bar, so nothing is selected for it.
+        await selectLayers(page, [], { bar: true })
         await pagesPanel(page)
         await shot(page, `glass-${theme}-${width}-pages`)
         await page.keyboard.press('Escape')
