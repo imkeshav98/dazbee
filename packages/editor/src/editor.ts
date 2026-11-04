@@ -465,6 +465,13 @@ function live(
   // Removes every listener the editor adds, on destroy.
   const listening = new AbortController()
   const on = { signal: listening.signal }
+  const view = editorView({
+    ck,
+    canvas,
+    session,
+    onZoom: (zoom) => options.onZoom?.(zoom),
+    draw: () => draw(),
+  })
   const resources = editorResources({
     ck,
     cache,
@@ -478,14 +485,6 @@ function live(
     signal: listening.signal,
   })
 
-  const view = editorView({
-    ck,
-    canvas,
-    session,
-    onZoom: (zoom) => options.onZoom?.(zoom),
-    changed: () => drawOverlay(),
-    draw: () => draw(),
-  })
   const scenes = frameScenes({ ck, resources, drawn: view.design })
   /** Told when the text being edited, or its selected range, changes. */
   const textSelectionListeners = new Set<() => void>()
@@ -1513,9 +1512,9 @@ function live(
     snapping: () => tools.snapping(),
     snapWork: () => transformDrag.snapWork(),
     setSnapping: (on: boolean) => tools.setSnapping(on),
-    onView: (listener: () => void) => view.onView(listener),
+    onView: view.onView,
     frames: () => frameGrid(session.design(), view.focused()).frames,
-    focused: () => view.focused(),
+    focused: view.focused,
     focus(formatId: string | null) {
       view.focus(formatId)
       selection.dropOffGrid()
@@ -1526,14 +1525,14 @@ function live(
     camera: view.camera,
     viewport: view.viewport,
     setCamera: view.setCamera,
-    setInsets: (next: Insets) => view.setInsets(next),
+    setInsets: view.setInsets,
     zoomTo: view.zoomTo,
     zoomIn: view.zoomIn,
     zoomOut: view.zoomOut,
     fitAll: view.fitAll,
     fitSelection: actions.fitSelection,
     fitFrame: (pageId: string, formatId: string) => view.fitArea(defaultFrame(pageId, formatId)),
-    fitPage: (pageId: string) => view.fitPage(pageId),
+    fitPage: view.fitPage,
     setTool: (next: Tool) => tools.setTool(next),
     tool: () => tools.tool(),
     armImage: (asset: PlacedAsset | null) => tools.setTool(asset ? 'image' : tools.tool(), asset),

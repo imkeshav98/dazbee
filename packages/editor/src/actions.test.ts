@@ -90,6 +90,7 @@ function harness(penDrawing = false) {
       zoomIn: () => log.push('zoomIn'),
       zoomOut: () => log.push('zoomOut'),
       toggleRulers: () => log.push('toggleRulers'),
+      viewChanged: () => log.push('viewChanged'),
     },
     tools: { setTool: (tool) => log.push(`tool ${tool}`) },
     selection,
@@ -124,7 +125,7 @@ describe('editorActions', () => {
       expect(actions.perform('zoomIn')).toBe(true)
       expect(actions.perform('toggleRulers')).toBe(true)
       expect(actions.perform('toolPen')).toBe(true)
-      expect(log).toEqual(['fitAll', 'zoomTo 1', 'zoomIn', 'toggleRulers', 'tool pen'])
+      expect(log).toEqual(['fitAll', 'zoomTo 1', 'zoomIn', 'toggleRulers', 'overlay', 'viewChanged', 'tool pen'])
     })
 
     it('leaves undo and redo to the editor, which ends what is open first', () => {

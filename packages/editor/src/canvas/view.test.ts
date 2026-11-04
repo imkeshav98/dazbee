@@ -100,7 +100,6 @@ function harness(start: Design = design) {
     canvas: fakeCanvas(1000, 800) as unknown as HTMLCanvasElement,
     session: { design: () => now },
     onZoom: (zoom) => log.push(`zoom ${zoom}`),
-    changed: () => log.push('changed'),
     draw: () => log.push('draw'),
   }
   const view = editorView(deps)
@@ -301,15 +300,17 @@ describe('editorView', () => {
   })
 
   describe('toggleRulers, viewChanged and onView', () => {
-    it('turns the rulers on and off, showing it before the view listeners hear', () => {
+    it('turns the rulers on and off, and tells the view listeners until they stop listening', () => {
       const { view, log } = harness()
       const stop = view.onView(() => log.push(`listener ${view.rulers()}`))
       expect(view.rulers()).toBe(false)
       view.toggleRulers()
+      expect(log).toEqual([])
       view.viewChanged()
       stop()
       view.toggleRulers()
-      expect(log).toEqual(['changed', 'listener true', 'listener true', 'changed'])
+      view.viewChanged()
+      expect(log).toEqual(['listener true'])
       expect(view.rulers()).toBe(false)
     })
   })
@@ -334,7 +335,7 @@ describe('editorView', () => {
       view.destroy()
       runFrames()
       expect(observed).toEqual(['observe', 'disconnect'])
-      expect(log).toEqual(['surface 2000×1600', 'delete paint', 'delete paint', 'delete surface', 'delete gl'])
+      expect(log).toEqual(['surface 2000×1600', 'delete surface', 'delete paint', 'delete paint', 'delete gl'])
     })
   })
 })

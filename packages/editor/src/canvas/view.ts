@@ -33,8 +33,6 @@ export interface ViewDeps {
   session: Pick<Session, 'design'>
   /** Told with the zoom (1 is 100%) whenever it changes. */
   onZoom: (zoom: number) => void
-  /** Shows that the rulers turned on or off: draws the overlay. */
-  changed: () => void
   /** The frame callback: draws the stage, called from the animation-frame schedule. */
   draw: () => void
 }
@@ -95,7 +93,7 @@ export interface EditorView {
   fitPage(pageId: string): void
   /** Shows one format alone, or every format again with null; a format the design doesn't have shows every one. */
   focus(formatId: string | null): void
-  /** Turns the rulers on or off, shows it and tells the view listeners. */
+  /** Turns the rulers on or off; the view listeners hear of it from `viewChanged`. */
   toggleRulers(): void
   /** Tells the view listeners that the rulers or snapping turned on or off. */
   viewChanged(): void
@@ -112,7 +110,7 @@ const ZOOM_STEP = 2
 /** Room around the frames when the focus view fits them, past the chip over the stage. */
 const FOCUS_PADDING = 104
 
-export function editorView({ ck, canvas, session, onZoom, changed, draw }: ViewDeps): EditorView {
+export function editorView({ ck, canvas, session, onZoom, draw }: ViewDeps): EditorView {
   const maybeGl = ck.MakeWebGLContext(ck.GetWebGLContext(canvas))
   if (!maybeGl) throw new Error('this browser has no WebGL')
   /** The WebGL context the stage draws with. */
@@ -295,8 +293,6 @@ export function editorView({ ck, canvas, session, onZoom, changed, draw }: ViewD
   }
   function toggleRulers() {
     rulers = !rulers
-    changed()
-    viewChanged()
   }
   function viewChanged() {
     for (const listener of viewListeners) listener()
@@ -331,12 +327,12 @@ export function editorView({ ck, canvas, session, onZoom, changed, draw }: ViewD
   }
 
   function destroy() {
-    resized.disconnect()
     cancelAnimationFrame(pending)
-    viewListeners.clear()
-    backing.delete()
-    edge.delete()
     surface?.delete()
+    resized.disconnect()
+    edge.delete()
+    backing.delete()
+    viewListeners.clear()
     gl.delete()
   }
 

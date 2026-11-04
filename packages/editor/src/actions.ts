@@ -33,6 +33,7 @@ export interface ActionsDeps {
     | 'zoomIn'
     | 'zoomOut'
     | 'toggleRulers'
+    | 'viewChanged'
   >
   tools: Pick<EditorTools, 'setTool'>
   selection: Pick<
@@ -79,7 +80,19 @@ export interface EditorActions {
 
 export function editorActions({
   session,
-  view: { design: drawn, frames, frameOf, firstPage, fitAll, fitArea, zoomTo, zoomIn, zoomOut, toggleRulers },
+  view: {
+    design: drawn,
+    frames,
+    frameOf,
+    firstPage,
+    fitAll,
+    fitArea,
+    zoomTo,
+    zoomIn,
+    zoomOut,
+    toggleRulers,
+    viewChanged,
+  },
   tools,
   selection,
   scenes,
@@ -219,14 +232,18 @@ export function editorActions({
    * on the selection do nothing without one.
    */
   function perform(action: ShortcutAction): boolean {
-    const view: Partial<Record<ShortcutAction, () => void>> = {
+    const withoutSelection: Partial<Record<ShortcutAction, () => void>> = {
       zoomToFit: fitAll,
       zoomToSelection: fitSelection,
       zoomTo100: () => zoomTo(1),
       zoomIn,
       zoomOut,
       selectAll,
-      toggleRulers,
+      toggleRulers: () => {
+        toggleRulers()
+        drawOverlay()
+        viewChanged()
+      },
       toolSelect: () => tools.setTool('select'),
       toolHand: () => tools.setTool('hand'),
       toolRect: () => tools.setTool('rect'),
@@ -261,9 +278,9 @@ export function editorActions({
         return true
       }
     }
-    const viewAction = view[action]
-    if (viewAction) {
-      viewAction()
+    const anytime = withoutSelection[action]
+    if (anytime) {
+      anytime()
       return true
     }
     // Esc lets the picked page go; the layers' other keys do nothing to it.
@@ -376,15 +393,15 @@ export function editorActions({
       case 'autoLayout': {
         // Selected frames: auto layout on, or off when every one has it already (#46).
         if (ids.length === 0) return false
-        const frames = ids.filter((id) => nodes[id]?.type === 'frame')
-        if (frames.length > 0) {
-          const on = !frames.every((id) => {
+        const frameIds = ids.filter((id) => nodes[id]?.type === 'frame')
+        if (frameIds.length > 0) {
+          const on = !frameIds.every((id) => {
             const node = nodes[id]
             return node?.type === 'frame' && node.props.layout !== undefined
           })
           runQuietly(() =>
             session.gesture(() => {
-              for (const id of frames) session.run('node.autoLayout', { id, on })
+              for (const id of frameIds) session.run('node.autoLayout', { id, on })
             }),
           )
           break
