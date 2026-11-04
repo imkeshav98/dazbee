@@ -302,4 +302,47 @@ describe('editorBoxes', () => {
       expect(boxes.parentFor(square, 'graphic', session.design())).toBe('p1')
     })
   })
+
+  describe('lockedAt', () => {
+    it('gives the layer locked in place that a press lands on, and none on a layer that moves', () => {
+      const { boxes, square } = harness()
+      expect(boxes.lockedAt(square, { x: 605, y: 705 })).toBe('pin')
+      expect(boxes.lockedAt(square, { x: 115, y: 125 })).toBeNull()
+      expect(boxes.lockedAt(square, { x: 1000, y: 1000 })).toBeNull()
+    })
+  })
+
+  describe('target', () => {
+    it('picks the layer on the page, a selected layer the press is in, or what is directly in the group gone into', () => {
+      const { selection, boxes, square, wide } = harness()
+      expect(boxes.target('dot', square.key)).toBe('card')
+      selection.select(['dot'], square.key)
+      expect(boxes.target('dot', square.key)).toBe('dot')
+      expect(boxes.target('dot', wide.key)).toBe('card')
+      selection.select([], square.key)
+      selection.enter('card')
+      expect(boxes.target('dot', square.key)).toBe('dot')
+      expect(boxes.target('inside', square.key)).toBe('turned')
+    })
+  })
+
+  describe('insideEntered', () => {
+    it('says whether a layer is inside the group or frame gone into, not the container itself', () => {
+      const { selection, boxes } = harness()
+      expect(boxes.insideEntered('dot')).toBe(false)
+      selection.enter('card')
+      expect(boxes.insideEntered('dot')).toBe(true)
+      expect(boxes.insideEntered('card')).toBe(false)
+      expect(boxes.insideEntered('zig')).toBe(false)
+    })
+  })
+
+  describe('drawnRect', () => {
+    it("gives a layer's box as drawn in a frame without its turn, and none for a layer that is gone", () => {
+      const { boxes, square, wide } = harness()
+      expect(boxes.drawnRect(square, 'dot')).toEqual({ x: 110, y: 120, width: 30, height: 40 })
+      expect(boxes.drawnRect(wide, 'dot')).toEqual({ x: 150, y: 120, width: 30, height: 40 })
+      expect(boxes.drawnRect(square, 'gone')).toBeNull()
+    })
+  })
 })
