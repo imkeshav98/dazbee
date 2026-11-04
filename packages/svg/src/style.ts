@@ -127,7 +127,7 @@ function ruleBlocks(css: string): { selectors: string; body: string }[] {
 }
 
 /** The rules of every <style> sheet in the file, in the order they apply. */
-export function readSheets(root: XmlElement, textOf: (e: XmlElement) => string): Rule[] {
+export function readSheets(root: XmlElement): Rule[] {
   const rules: Rule[] = []
   const visit = (element: XmlElement) => {
     if (element.name === 'style') {

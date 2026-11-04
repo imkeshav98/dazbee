@@ -6,7 +6,7 @@
 import { generateKeyBetween } from 'fractional-indexing'
 
 import type { CanvasKit, Path } from '@dazbee/canvaskit'
-import { LayerTree, MAX_SVG_BYTES, type Rect } from '@dazbee/schema'
+import { type BlendMode, LayerTree, MAX_SVG_BYTES, type Rect } from '@dazbee/schema'
 
 import { clamp01, length, numbers } from './lengths.ts'
 import { boundsOf, pathData, transformed } from './path-data.ts'
@@ -14,8 +14,8 @@ import { BLEND_MODES, nameOf, outline, shape, SHAPES } from './shapes.ts'
 import { readSheets, type Style, styleOf, styleText } from './style.ts'
 import { textLayer } from './text.ts'
 import { type Matrix, multiply, parseTransform, scale, translate, viewBoxMatrix } from './transform.ts'
-import type { Context, LayerInput, Piece, Skipped } from './types.ts'
-import { parseXml, textOf, type XmlElement, XmlError } from './xml.ts'
+import type { Context, LayerInput, Piece, PropsOf, Skipped } from './types.ts'
+import { parseXml, type XmlElement, XmlError } from './xml.ts'
 
 export interface Converted {
   tree: LayerTree
@@ -108,7 +108,7 @@ export function svgToLayers(ck: CanvasKit, text: string, options: ConvertOptions
     for (const child of element.children) if (typeof child !== 'string') index(child)
   }
   index(root)
-  const rules = readSheets(root, textOf)
+  const rules = readSheets(root)
   const skipped = new Set<Skipped>()
   if (/@font-face/i.test(styleText(root))) skipped.add('embedded-font')
 
@@ -148,7 +148,7 @@ export function svgToLayers(ck: CanvasKit, text: string, options: ConvertOptions
     }
   }
 
-  const group = (name: string, pieces: Piece[], style: Style, extra: Record<string, unknown> = {}): Piece => {
+  const group = (name: string, pieces: Piece[], style: Style, extra: Partial<PropsOf<'group'>> = {}): Piece => {
     const id = newId()
     const box = union(pieces.map((p) => p.box))
     const opacity = clamp01(Number.parseFloat(style.opacity ?? '1'))
@@ -161,10 +161,10 @@ export function svgToLayers(ck: CanvasKit, text: string, options: ConvertOptions
       props: {
         ...box,
         ...(opacity < 1 ? { opacity } : {}),
-        ...(blend && BLEND_MODES.has(blend) ? { blendMode: blend } : {}),
+        ...(blend && BLEND_MODES.has(blend) ? { blendMode: blend as BlendMode } : {}),
         ...extra,
       },
-    } as LayerInput
+    }
     adopt(id, pieces)
     return { id, box }
   }
@@ -251,7 +251,7 @@ export function svgToLayers(ck: CanvasKit, text: string, options: ConvertOptions
         shape: { kind: 'path', d, drawnIn: { width: box.width, height: box.height } },
         fills: [{ type: 'solid', color: '#000000FF' }],
       },
-    } as LayerInput
+    }
     return { id: maskId, box }
   }
 

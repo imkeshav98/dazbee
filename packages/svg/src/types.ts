@@ -1,8 +1,10 @@
 // What the files that turn an SVG's elements into layers share: the layers they make, and the
 // reading state of the one file they work on.
 
+import type { z } from 'zod'
+
 import type { CanvasKit } from '@dazbee/canvaskit'
-import type { Rect } from '@dazbee/schema'
+import type { Layer, LayerType, Rect } from '@dazbee/schema'
 
 import type { Rule } from './style.ts'
 import type { XmlElement } from './xml.ts'
@@ -19,7 +21,10 @@ export type Skipped =
   | 'text-path'
   | 'external-reference'
 
-export type LayerInput = { type: string; parentId: string; index: string; name: string; props: Record<string, unknown> }
+/** A layer as convert writes it, before LayerTree.parse fills in its defaults. */
+export type LayerInput = z.input<typeof Layer>
+/** The props a layer of one type is written with. */
+export type PropsOf<T extends LayerType> = Extract<LayerInput, { type: T }>['props']
 
 /** A layer made from an element: its id and its box in design pixels. */
 export interface Piece {

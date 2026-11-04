@@ -5,7 +5,7 @@ import { length, numbers } from './lengths.ts'
 import { paintOf } from './shapes.ts'
 import type { Style } from './style.ts'
 import { apply, lengthScale, type Matrix } from './transform.ts'
-import type { Context, LayerInput, Piece } from './types.ts'
+import type { Context, Piece } from './types.ts'
 import type { XmlElement } from './xml.ts'
 
 export function textLayer(context: Context, element: XmlElement, style: Style, m: Matrix): Piece | null {
@@ -116,6 +116,6 @@ export function textLayer(context: Context, element: XmlElement, style: Style, m
       align: anchor === 'middle' ? 'center' : anchor === 'end' ? 'end' : 'start',
       boxMode: 'autoWidth',
     },
-  } as LayerInput
+  }
   return { id, box }
 }

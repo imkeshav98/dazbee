@@ -2,7 +2,7 @@
 // its fill and stroke paints.
 
 import type { Path } from '@dazbee/canvaskit'
-import type { Paint, Rect } from '@dazbee/schema'
+import type { BlendMode, Paint, Rect } from '@dazbee/schema'
 
 import { parsePaint } from './color.ts'
 import { gradientPaint } from './gradients.ts'
@@ -10,7 +10,7 @@ import { clamp01, length, numbers } from './lengths.ts'
 import { boundsOf, pathData, transformed } from './path-data.ts'
 import type { Style } from './style.ts'
 import { lengthScale, type Matrix } from './transform.ts'
-import type { Context, LayerInput, Piece } from './types.ts'
+import type { Context, Piece, PropsOf } from './types.ts'
 import type { XmlElement } from './xml.ts'
 
 const DEFAULT_NAMES: Record<string, string> = {
@@ -66,7 +66,7 @@ export function shape(context: Context, element: XmlElement, style: Style, m: Ma
   const fill = paintOf(context, style.fill ?? 'black', style['fill-opacity'], style, m, user, box)
   // A line has no inside to fill.
   if (fill && element.name !== 'line') fills.push(fill)
-  const strokes: Record<string, unknown>[] = []
+  const strokes: NonNullable<PropsOf<'graphic'>['strokes']> = []
   const strokeWidth =
     length(style['stroke-width'], Math.hypot(viewport.width, viewport.height) / Math.SQRT2, 1) * lengthScale(m)
   const strokePaint = paintOf(context, style.stroke, style['stroke-opacity'], style, m, user, box)
@@ -76,8 +76,8 @@ export function shape(context: Context, element: XmlElement, style: Style, m: Ma
       paint: strokePaint,
       width: strokeWidth,
       ...(dashes.some((n) => n > 0) ? { dashes, dashOffset: length(style['stroke-dashoffset']) * lengthScale(m) } : {}),
-      cap: oneOf(style['stroke-linecap'], ['butt', 'round', 'square'], 'butt'),
-      join: oneOf(style['stroke-linejoin'], ['miter', 'round', 'bevel'], 'miter'),
+      cap: oneOf(style['stroke-linecap'], ['butt', 'round', 'square'] as const, 'butt'),
+      join: oneOf(style['stroke-linejoin'], ['miter', 'round', 'bevel'] as const, 'miter'),
       miterLimit: Math.max(1, Number.parseFloat(style['stroke-miterlimit'] ?? '4') || 4),
     })
   }
@@ -108,9 +108,9 @@ export function shape(context: Context, element: XmlElement, style: Style, m: Ma
       fills,
       strokes,
       ...(opacity < 1 ? { opacity } : {}),
-      ...(blend && BLEND_MODES.has(blend) ? { blendMode: blend } : {}),
+      ...(blend && BLEND_MODES.has(blend) ? { blendMode: blend as BlendMode } : {}),
     },
-  } as LayerInput
+  }
   return { id, box }
 }
 
@@ -202,7 +202,7 @@ export function paintOf(
   const target = ids.get(paint.url)
   if (target?.name === 'linearGradient' || target?.name === 'radialGradient') {
     const gradient = gradientPaint(context, target, m, user, box)
-    return gradient ? ({ ...gradient, ...extra } as Paint) : null
+    return gradient ? { ...gradient, ...extra } : null
   }
   if (target?.name === 'pattern') skipped.add('pattern')
   return paint.fallback ? { type: 'solid', color: paint.fallback, ...extra } : null

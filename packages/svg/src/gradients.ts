@@ -1,7 +1,7 @@
 // SVG gradients as the design's paints. A gradient follows its href to the gradients it builds on,
 // and its stops, ends and centre are carried from the gradient's own space into the layer's box.
 
-import type { Rect } from '@dazbee/schema'
+import type { Paint, Rect } from '@dazbee/schema'
 
 import { parseColor, withOpacity } from './color.ts'
 import { clamp01, length } from './lengths.ts'
@@ -26,7 +26,7 @@ export function gradientPaint(
   m: Matrix,
   user: Rect,
   box: Rect,
-): Record<string, unknown> | null {
+): Paint | null {
   const { rules, viewport } = context
   const { attrs, stops: stopElements } = gradientOf(context, element)
   let last = 0
@@ -42,7 +42,7 @@ export function gradientPaint(
     return { offset, color: withOpacity(color, Number.parseFloat(style['stop-opacity'] ?? '1')) }
   })
   if (stops.length === 0) return null
-  const solid = { type: 'solid', color: (stops.at(-1) ?? stops[0])?.color }
+  const solid: Paint = { type: 'solid', color: (stops.at(-1) ?? stops[0])?.color as string }
   if (stops.length === 1 || !(box.width > 0 && box.height > 0)) return solid
 
   const bounding = attrs.gradientUnits !== 'userSpaceOnUse'
