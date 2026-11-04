@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one deep module: one form whose state is one FormData contract */
 'use client'
 
 // The brief's form (#136), as in the final mock: a few words, then a chat-style toolbar. + adds a
