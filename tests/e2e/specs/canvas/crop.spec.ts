@@ -152,7 +152,7 @@ test('Enter crops a photo: a drag moves it, a corner scales it, each one undo st
   expect(errors).toEqual([])
 })
 
-test('showing another size alone lets the crop go with the selection: showing every size again brings back no crop, and the drag is the one undo step', async ({
+test('showing another format alone lets the crop go with the selection: showing every format again brings back no crop, and the drag is the one undo step', async ({
   browser,
 }) => {
   const asset = await upload(photo)
