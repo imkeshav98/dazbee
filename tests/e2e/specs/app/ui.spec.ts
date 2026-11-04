@@ -1,6 +1,7 @@
 // The UI foundation (#51): themes change only tokens, Arabic mirrors the chrome but not the design,
 // reduced motion turns chrome animation off. Screenshots go to output/ for the PR.
 import { editorPath, setCookies, shoot } from '../../support/editor.ts'
+import { servedGlass } from '../../support/glass.ts'
 import { liveDesign, seed } from '../../support/seed.ts'
 import { expect, type Page, test } from '../../support/test.ts'
 
@@ -251,7 +252,7 @@ test('the panels live in a capsule floating over the canvas', async ({ page }) =
   expect(
     Number.parseFloat(await rail.evaluate((el) => getComputedStyle(el).borderTopLeftRadius)),
   ).toBeGreaterThanOrEqual(box.width / 2)
-  expect(await rail.evaluate((el) => getComputedStyle(el).backdropFilter)).toContain('blur(26px)')
+  expect(await rail.evaluate((el) => getComputedStyle(el).backdropFilter)).toBe((await servedGlass(page)).filter)
 
   // The blob lands on the open panel's button and slides there, stretched, when another opens.
   await expect(page.getByTestId('rail-blob')).toHaveCount(0)
