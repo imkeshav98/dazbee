@@ -16,8 +16,8 @@ let clock: (() => number) | undefined
  * as long and a crowded machine slows both alike, and the fastest of up to 5 samples of each counts.
  * The time is the process's CPU time, which leaves out the time the machine pauses it, where that
  * clock steps by less than a millisecond; on Windows it steps by 15.6 ms, so the wall clock times
- * the runs there. The samples stop once `large` has taken 250 ms in all, so slow code still
- * finishes soon.
+ * the runs there. The samples stop once they have taken 250 ms in all, so slow code still finishes
+ * soon.
  */
 export function growth<T>(read: (text: string) => T, small: string, large: string): { result: T; times: number } {
   clock ??= cpuSteps() < 1 ? cpuTime : () => performance.now()
@@ -31,18 +31,19 @@ export function growth<T>(read: (text: string) => T, small: string, large: strin
     for (let run = 1; run < 10; run++) read(small)
     return read(small)
   }
-  // An untimed first sample, so the code the runs take is compiled before they are timed.
-  tenSmall()
+  // An untimed first run, so the code the runs take is compiled before they are timed.
+  read(small)
   let fastestTen = Number.POSITIVE_INFINITY
   let fastestLarge = Number.POSITIVE_INFINITY
   let result: T | undefined
   let spent = 0
   for (let sample = 0; sample < 5 && spent < 250; sample++) {
-    fastestTen = Math.min(fastestTen, timed(tenSmall).took)
+    const ten = timed(tenSmall).took
     const ran = timed(() => read(large))
+    fastestTen = Math.min(fastestTen, ten)
     fastestLarge = Math.min(fastestLarge, ran.took)
     result = ran.result
-    spent += ran.took
+    spent += ten + ran.took
   }
   // The first sample always runs, so `result` is what `read` made of `large`.
   return { result: result as T, times: (10 * fastestLarge) / fastestTen }

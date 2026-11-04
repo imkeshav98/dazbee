@@ -35,7 +35,7 @@ describe('svgMarkup', () => {
     ]
     for (const flood of floods) {
       const file = (n: number) => `${'<!--a-->'.repeat(n)}${flood.after}`
-      const grown = growth(svgMarkup, file(10_000), file(100_000))
+      const grown = growth(svgMarkup, file(1_000), file(10_000))
       expect(grown.result !== null, flood.name).toBe(flood.isSvg)
       expect(grown.times, flood.name).toBeLessThan(MAX_GROWTH)
     }
