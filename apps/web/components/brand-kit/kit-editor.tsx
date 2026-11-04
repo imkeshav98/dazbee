@@ -12,6 +12,7 @@ import { AssetSummary, type BrandColor, type BrandFont, type BrandKit } from '@d
 import { DASHED_BUTTON } from '@/components/ui/looks.ts'
 import { Select } from '@/components/ui/select.tsx'
 import { cn } from '@/lib/cn.ts'
+import { parseHex, shown } from '@/lib/colour.ts'
 import { useMessages } from '@/lib/i18n/client.tsx'
 import { format } from '@/lib/i18n/index.ts'
 import { ASSET_ACCEPT, sendAsset } from '@/lib/upload-asset.ts'
@@ -30,15 +31,6 @@ interface KitBinding {
 
 /** How long a run of changes (a colour picker's drag) waits before it is saved. */
 const SAVE_DELAY_MS = 400
-
-/** A colour as people type it: #RRGGBB, with the alpha only when it isn't opaque. */
-export const shown = (value: string) =>
-  (value.slice(7).toUpperCase() === 'FF' ? value.slice(0, 7) : value).toUpperCase()
-/** A typed hex colour as the design stores it, #RRGGBBAA, or null when it isn't one. */
-function parseHex(text: string): string | null {
-  const match = /^#?([0-9a-f]{6})([0-9a-f]{2})?$/i.exec(text.trim())
-  return match ? `#${match[1]}${match[2] ?? 'FF'}`.toUpperCase() : null
-}
 
 /** A token not yet in the kit, from a name: "Colour 3" gives colour-3. */
 function newToken(kit: BrandKit, name: string) {
