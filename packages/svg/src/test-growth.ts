@@ -49,13 +49,7 @@ export function growth<T>(read: (text: string) => T, small: string, large: strin
   return { result: result as T, times: (10 * fastestLarge) / fastestTen }
 }
 
-/** The process's CPU time so far, user and system, in milliseconds. */
-function cpuTime() {
-  const { user, system } = process.cpuUsage()
-  return (user + system) / 1000
-}
-
-/** The step the CPU clock moves by, in milliseconds, from two steps watched in a busy loop. */
+/** The step the CPU clock moves by, in milliseconds: the longest of three steps watched in a busy loop. */
 function cpuSteps() {
   const stepAfter = (from: number) => {
     const until = performance.now() + 100
@@ -63,7 +57,18 @@ function cpuSteps() {
     while (at === from && performance.now() < until) at = cpuTime()
     return at
   }
-  const first = stepAfter(cpuTime())
-  const second = stepAfter(first)
-  return second > first ? second - first : Number.POSITIVE_INFINITY
+  let at = stepAfter(cpuTime())
+  let longest = 0
+  for (let step = 0; step < 3; step++) {
+    const next = stepAfter(at)
+    longest = Math.max(longest, next > at ? next - at : Number.POSITIVE_INFINITY)
+    at = next
+  }
+  return longest
+}
+
+/** The process's CPU time so far, user and system, in milliseconds. */
+function cpuTime() {
+  const { user, system } = process.cpuUsage()
+  return (user + system) / 1000
 }
