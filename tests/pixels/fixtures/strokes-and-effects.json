@@ -1,34 +1,23 @@
 {
-  "meta": {
-    "designId": "strokes-and-effects",
-    "name": "Strokes and effects",
-    "kind": "single",
-    "primaryFormatId": "sq"
-  },
-  "formats": {
+  "meta": { "designId": "strokes-and-effects", "name": "Strokes and effects" },
+  "pages": { "p1": { "name": "Page 1", "order": "a0" } },
+  "frames": {
     "sq": {
+      "pageId": "p1",
       "name": "Square 1:1",
       "width": 1080,
       "height": 1080,
+      "x": 0,
+      "y": 0,
+      "fills": [{ "type": "solid", "color": "#ECEFF1FF" }],
       "order": "a0"
-    }
-  },
-  "pages": {
-    "p1": {
-      "name": "Page 1",
-      "order": "a0",
-      "fills": [
-        {
-          "type": "solid",
-          "color": "#ECEFF1FF"
-        }
-      ]
     }
   },
   "nodes": {
     "sweep": {
       "type": "graphic",
-      "parentId": "p1",
+      "parentId": "sq",
+      "link": "sweep",
       "index": "a0",
       "name": "Angular gradient rect",
       "props": {
@@ -36,38 +25,17 @@
         "y": 60,
         "width": 280,
         "height": 220,
-        "shape": {
-          "kind": "rect",
-          "cornerRadius": 24
-        },
+        "shape": { "kind": "rect", "cornerRadius": 24 },
         "fills": [
           {
             "type": "angular",
-            "center": {
-              "x": 0.5,
-              "y": 0.5
-            },
+            "center": { "x": 0.5, "y": 0.5 },
             "stops": [
-              {
-                "offset": 0,
-                "color": "#FF1744FF"
-              },
-              {
-                "offset": 0.25,
-                "color": "#FFEA00FF"
-              },
-              {
-                "offset": 0.5,
-                "color": "#00E676FF"
-              },
-              {
-                "offset": 0.75,
-                "color": "#2979FFFF"
-              },
-              {
-                "offset": 1,
-                "color": "#FF1744FF"
-              }
+              { "offset": 0, "color": "#FF1744FF" },
+              { "offset": 0.25, "color": "#FFEA00FF" },
+              { "offset": 0.5, "color": "#00E676FF" },
+              { "offset": 0.75, "color": "#2979FFFF" },
+              { "offset": 1, "color": "#FF1744FF" }
             ]
           }
         ]
@@ -75,7 +43,8 @@
     },
     "dial": {
       "type": "graphic",
-      "parentId": "p1",
+      "parentId": "sq",
+      "link": "dial",
       "index": "a1",
       "name": "Turned angular gradient ellipse",
       "props": {
@@ -83,30 +52,16 @@
         "y": 60,
         "width": 240,
         "height": 240,
-        "shape": {
-          "kind": "ellipse"
-        },
+        "shape": { "kind": "ellipse" },
         "fills": [
           {
             "type": "angular",
-            "center": {
-              "x": 0.35,
-              "y": 0.4
-            },
+            "center": { "x": 0.35, "y": 0.4 },
             "angle": 90,
             "stops": [
-              {
-                "offset": 0,
-                "color": "#311B92FF"
-              },
-              {
-                "offset": 0.6,
-                "color": "#FF2E7EFF"
-              },
-              {
-                "offset": 1,
-                "color": "#FFAB4000"
-              }
+              { "offset": 0, "color": "#311B92FF" },
+              { "offset": 0.6, "color": "#FF2E7EFF" },
+              { "offset": 1, "color": "#FFAB4000" }
             ]
           }
         ],
@@ -114,20 +69,11 @@
           {
             "paint": {
               "type": "angular",
-              "center": {
-                "x": 0.5,
-                "y": 0.5
-              },
+              "center": { "x": 0.5, "y": 0.5 },
               "angle": -45,
               "stops": [
-                {
-                  "offset": 0,
-                  "color": "#000000FF"
-                },
-                {
-                  "offset": 1,
-                  "color": "#FFFFFFFF"
-                }
+                { "offset": 0, "color": "#000000FF" },
+                { "offset": 1, "color": "#FFFFFFFF" }
               ]
             },
             "width": 10
@@ -137,7 +83,8 @@
     },
     "dashed": {
       "type": "graphic",
-      "parentId": "p1",
+      "parentId": "sq",
+      "link": "dashed",
       "index": "a2",
       "name": "Dashed rounded rect",
       "props": {
@@ -145,28 +92,14 @@
         "y": 60,
         "width": 320,
         "height": 220,
-        "shape": {
-          "kind": "rect",
-          "cornerRadius": 30
-        },
-        "strokes": [
-          {
-            "paint": {
-              "type": "solid",
-              "color": "#263238FF"
-            },
-            "width": 8,
-            "dashes": [
-              24,
-              12
-            ]
-          }
-        ]
+        "shape": { "kind": "rect", "cornerRadius": 30 },
+        "strokes": [{ "paint": { "type": "solid", "color": "#263238FF" }, "width": 8, "dashes": [24, 12] }]
       }
     },
     "miter": {
       "type": "graphic",
-      "parentId": "p1",
+      "parentId": "sq",
+      "link": "miter",
       "index": "a3",
       "name": "Mitred zigzag, butt caps",
       "props": {
@@ -174,26 +107,14 @@
         "y": 340,
         "width": 360,
         "height": 100,
-        "shape": {
-          "kind": "path",
-          "d": "M0 90 L90 10 L180 90 L270 10 L360 90"
-        },
-        "strokes": [
-          {
-            "paint": {
-              "type": "solid",
-              "color": "#D84315FF"
-            },
-            "width": 22,
-            "join": "miter",
-            "cap": "butt"
-          }
-        ]
+        "shape": { "kind": "path", "d": "M0 90 L90 10 L180 90 L270 10 L360 90" },
+        "strokes": [{ "paint": { "type": "solid", "color": "#D84315FF" }, "width": 22, "join": "miter", "cap": "butt" }]
       }
     },
     "round": {
       "type": "graphic",
-      "parentId": "p1",
+      "parentId": "sq",
+      "link": "round",
       "index": "a4",
       "name": "Round zigzag, round caps, dashed",
       "props": {
@@ -201,23 +122,14 @@
         "y": 460,
         "width": 360,
         "height": 100,
-        "shape": {
-          "kind": "path",
-          "d": "M0 90 L90 10 L180 90 L270 10 L360 90"
-        },
+        "shape": { "kind": "path", "d": "M0 90 L90 10 L180 90 L270 10 L360 90" },
         "strokes": [
           {
-            "paint": {
-              "type": "solid",
-              "color": "#00897BFF"
-            },
+            "paint": { "type": "solid", "color": "#00897BFF" },
             "width": 22,
             "join": "round",
             "cap": "round",
-            "dashes": [
-              40,
-              30
-            ],
+            "dashes": [40, 30],
             "dashOffset": 20
           }
         ]
@@ -225,7 +137,8 @@
     },
     "bevel": {
       "type": "graphic",
-      "parentId": "p1",
+      "parentId": "sq",
+      "link": "bevel",
       "index": "a5",
       "name": "Bevelled zigzag, square caps, low miter limit",
       "props": {
@@ -233,35 +146,17 @@
         "y": 580,
         "width": 360,
         "height": 100,
-        "shape": {
-          "kind": "path",
-          "d": "M0 90 L90 10 L180 90 L270 10 L360 90"
-        },
+        "shape": { "kind": "path", "d": "M0 90 L90 10 L180 90 L270 10 L360 90" },
         "strokes": [
-          {
-            "paint": {
-              "type": "solid",
-              "color": "#5E35B1FF"
-            },
-            "width": 22,
-            "join": "bevel",
-            "cap": "square"
-          },
-          {
-            "paint": {
-              "type": "solid",
-              "color": "#FFFFFFFF"
-            },
-            "width": 6,
-            "join": "miter",
-            "miterLimit": 1
-          }
+          { "paint": { "type": "solid", "color": "#5E35B1FF" }, "width": 22, "join": "bevel", "cap": "square" },
+          { "paint": { "type": "solid", "color": "#FFFFFFFF" }, "width": 6, "join": "miter", "miterLimit": 1 }
         ]
       }
     },
     "ring": {
       "type": "graphic",
-      "parentId": "p1",
+      "parentId": "sq",
+      "link": "ring",
       "index": "a6",
       "name": "Inside dashes from an odd list",
       "props": {
@@ -269,26 +164,14 @@
         "y": 360,
         "width": 200,
         "height": 200,
-        "shape": {
-          "kind": "ellipse"
-        },
-        "fills": [
-          {
-            "type": "solid",
-            "color": "#FFF3E0FF"
-          }
-        ],
+        "shape": { "kind": "ellipse" },
+        "fills": [{ "type": "solid", "color": "#FFF3E0FF" }],
         "strokes": [
           {
-            "paint": {
-              "type": "solid",
-              "color": "#EF6C00FF"
-            },
+            "paint": { "type": "solid", "color": "#EF6C00FF" },
             "width": 14,
             "align": "inside",
-            "dashes": [
-              30
-            ],
+            "dashes": [30],
             "cap": "round",
             "dashOffset": 15
           }
@@ -297,7 +180,8 @@
     },
     "ticket": {
       "type": "graphic",
-      "parentId": "p1",
+      "parentId": "sq",
+      "link": "ticket",
       "index": "a7",
       "name": "Outside dash pattern",
       "props": {
@@ -305,29 +189,14 @@
         "y": 360,
         "width": 280,
         "height": 200,
-        "shape": {
-          "kind": "rect"
-        },
-        "fills": [
-          {
-            "type": "solid",
-            "color": "#E3F2FDFF"
-          }
-        ],
+        "shape": { "kind": "rect" },
+        "fills": [{ "type": "solid", "color": "#E3F2FDFF" }],
         "strokes": [
           {
-            "paint": {
-              "type": "solid",
-              "color": "#1565C0FF"
-            },
+            "paint": { "type": "solid", "color": "#1565C0FF" },
             "width": 10,
             "align": "outside",
-            "dashes": [
-              40,
-              10,
-              5,
-              10
-            ],
+            "dashes": [40, 10, 5, 10],
             "cap": "butt"
           }
         ]
@@ -335,7 +204,8 @@
     },
     "well": {
       "type": "graphic",
-      "parentId": "p1",
+      "parentId": "sq",
+      "link": "well",
       "index": "a8",
       "name": "Inner shadows",
       "props": {
@@ -343,38 +213,18 @@
         "y": 600,
         "width": 200,
         "height": 180,
-        "shape": {
-          "kind": "rect",
-          "cornerRadius": 28
-        },
-        "fills": [
-          {
-            "type": "solid",
-            "color": "#FFFFFFFF"
-          }
-        ],
+        "shape": { "kind": "rect", "cornerRadius": 28 },
+        "fills": [{ "type": "solid", "color": "#FFFFFFFF" }],
         "effects": [
-          {
-            "type": "innerShadow",
-            "x": 8,
-            "y": 12,
-            "blur": 20,
-            "spread": 4,
-            "color": "#0000008C"
-          },
-          {
-            "type": "innerShadow",
-            "x": -6,
-            "y": -6,
-            "blur": 0,
-            "color": "#FF2E7EFF"
-          }
+          { "type": "innerShadow", "x": 8, "y": 12, "blur": 20, "spread": 4, "color": "#0000008C" },
+          { "type": "innerShadow", "x": -6, "y": -6, "blur": 0, "color": "#FF2E7EFF" }
         ]
       }
     },
     "orb": {
       "type": "graphic",
-      "parentId": "p1",
+      "parentId": "sq",
+      "link": "orb",
       "index": "a9",
       "name": "Glow",
       "props": {
@@ -382,28 +232,15 @@
         "y": 730,
         "width": 160,
         "height": 160,
-        "shape": {
-          "kind": "ellipse"
-        },
-        "fills": [
-          {
-            "type": "solid",
-            "color": "#7C4DFFFF"
-          }
-        ],
-        "effects": [
-          {
-            "type": "glow",
-            "blur": 40,
-            "spread": 6,
-            "color": "#E040FBCC"
-          }
-        ]
+        "shape": { "kind": "ellipse" },
+        "fills": [{ "type": "solid", "color": "#7C4DFFFF" }],
+        "effects": [{ "type": "glow", "blur": 40, "spread": 6, "color": "#E040FBCC" }]
       }
     },
     "stripe0": {
       "type": "graphic",
-      "parentId": "p1",
+      "parentId": "sq",
+      "link": "stripe0",
       "index": "aA",
       "name": "Stripe 1",
       "props": {
@@ -411,20 +248,14 @@
         "y": 600,
         "width": 40,
         "height": 300,
-        "shape": {
-          "kind": "rect"
-        },
-        "fills": [
-          {
-            "type": "solid",
-            "color": "#F44336FF"
-          }
-        ]
+        "shape": { "kind": "rect" },
+        "fills": [{ "type": "solid", "color": "#F44336FF" }]
       }
     },
     "stripe1": {
       "type": "graphic",
-      "parentId": "p1",
+      "parentId": "sq",
+      "link": "stripe1",
       "index": "aB",
       "name": "Stripe 2",
       "props": {
@@ -432,20 +263,14 @@
         "y": 600,
         "width": 40,
         "height": 300,
-        "shape": {
-          "kind": "rect"
-        },
-        "fills": [
-          {
-            "type": "solid",
-            "color": "#FFC107FF"
-          }
-        ]
+        "shape": { "kind": "rect" },
+        "fills": [{ "type": "solid", "color": "#FFC107FF" }]
       }
     },
     "stripe2": {
       "type": "graphic",
-      "parentId": "p1",
+      "parentId": "sq",
+      "link": "stripe2",
       "index": "aC",
       "name": "Stripe 3",
       "props": {
@@ -453,20 +278,14 @@
         "y": 600,
         "width": 40,
         "height": 300,
-        "shape": {
-          "kind": "rect"
-        },
-        "fills": [
-          {
-            "type": "solid",
-            "color": "#4CAF50FF"
-          }
-        ]
+        "shape": { "kind": "rect" },
+        "fills": [{ "type": "solid", "color": "#4CAF50FF" }]
       }
     },
     "stripe3": {
       "type": "graphic",
-      "parentId": "p1",
+      "parentId": "sq",
+      "link": "stripe3",
       "index": "aD",
       "name": "Stripe 4",
       "props": {
@@ -474,20 +293,14 @@
         "y": 600,
         "width": 40,
         "height": 300,
-        "shape": {
-          "kind": "rect"
-        },
-        "fills": [
-          {
-            "type": "solid",
-            "color": "#03A9F4FF"
-          }
-        ]
+        "shape": { "kind": "rect" },
+        "fills": [{ "type": "solid", "color": "#03A9F4FF" }]
       }
     },
     "stripe4": {
       "type": "graphic",
-      "parentId": "p1",
+      "parentId": "sq",
+      "link": "stripe4",
       "index": "aE",
       "name": "Stripe 5",
       "props": {
@@ -495,20 +308,14 @@
         "y": 600,
         "width": 40,
         "height": 300,
-        "shape": {
-          "kind": "rect"
-        },
-        "fills": [
-          {
-            "type": "solid",
-            "color": "#9C27B0FF"
-          }
-        ]
+        "shape": { "kind": "rect" },
+        "fills": [{ "type": "solid", "color": "#9C27B0FF" }]
       }
     },
     "stripe5": {
       "type": "graphic",
-      "parentId": "p1",
+      "parentId": "sq",
+      "link": "stripe5",
       "index": "aF",
       "name": "Stripe 6",
       "props": {
@@ -516,20 +323,14 @@
         "y": 600,
         "width": 40,
         "height": 300,
-        "shape": {
-          "kind": "rect"
-        },
-        "fills": [
-          {
-            "type": "solid",
-            "color": "#212121FF"
-          }
-        ]
+        "shape": { "kind": "rect" },
+        "fills": [{ "type": "solid", "color": "#212121FF" }]
       }
     },
     "stripe6": {
       "type": "graphic",
-      "parentId": "p1",
+      "parentId": "sq",
+      "link": "stripe6",
       "index": "aG",
       "name": "Stripe 7",
       "props": {
@@ -537,20 +338,14 @@
         "y": 600,
         "width": 40,
         "height": 300,
-        "shape": {
-          "kind": "rect"
-        },
-        "fills": [
-          {
-            "type": "solid",
-            "color": "#FFFFFFFF"
-          }
-        ]
+        "shape": { "kind": "rect" },
+        "fills": [{ "type": "solid", "color": "#FFFFFFFF" }]
       }
     },
     "stripe7": {
       "type": "graphic",
-      "parentId": "p1",
+      "parentId": "sq",
+      "link": "stripe7",
       "index": "aH",
       "name": "Stripe 8",
       "props": {
@@ -558,20 +353,14 @@
         "y": 600,
         "width": 40,
         "height": 300,
-        "shape": {
-          "kind": "rect"
-        },
-        "fills": [
-          {
-            "type": "solid",
-            "color": "#FF5722FF"
-          }
-        ]
+        "shape": { "kind": "rect" },
+        "fills": [{ "type": "solid", "color": "#FF5722FF" }]
       }
     },
     "glass": {
       "type": "graphic",
-      "parentId": "p1",
+      "parentId": "sq",
+      "link": "glass",
       "index": "aI",
       "name": "Frosted glass",
       "props": {
@@ -580,37 +369,16 @@
         "width": 240,
         "height": 200,
         "rotation": -8,
-        "shape": {
-          "kind": "rect",
-          "cornerRadius": 24
-        },
-        "fills": [
-          {
-            "type": "solid",
-            "color": "#FFFFFF33"
-          }
-        ],
-        "strokes": [
-          {
-            "paint": {
-              "type": "solid",
-              "color": "#FFFFFF99"
-            },
-            "width": 2,
-            "align": "inside"
-          }
-        ],
-        "effects": [
-          {
-            "type": "backgroundBlur",
-            "radius": 24
-          }
-        ]
+        "shape": { "kind": "rect", "cornerRadius": 24 },
+        "fills": [{ "type": "solid", "color": "#FFFFFF33" }],
+        "strokes": [{ "paint": { "type": "solid", "color": "#FFFFFF99" }, "width": 2, "align": "inside" }],
+        "effects": [{ "type": "backgroundBlur", "radius": 24 }]
       }
     },
     "label": {
       "type": "text",
-      "parentId": "p1",
+      "parentId": "sq",
+      "link": "label",
       "index": "aJ",
       "name": "Text with glow and inner shadow",
       "props": {
@@ -619,32 +387,18 @@
         "width": 400,
         "height": 90,
         "text": "Glow",
-        "style": {
-          "fontFamily": "Noto Sans",
-          "fontWeight": 700,
-          "fontSize": 80,
-          "color": "#FFEB3BFF"
-        },
+        "style": { "fontFamily": "Noto Sans", "fontWeight": 700, "fontSize": 80, "color": "#FFEB3BFF" },
         "boxMode": "fixed",
         "effects": [
-          {
-            "type": "glow",
-            "blur": 16,
-            "color": "#FF6D00FF"
-          },
-          {
-            "type": "innerShadow",
-            "x": 3,
-            "y": 4,
-            "blur": 4,
-            "color": "#BF360CFF"
-          }
+          { "type": "glow", "blur": 16, "color": "#FF6D00FF" },
+          { "type": "innerShadow", "x": 3, "y": 4, "blur": 4, "color": "#BF360CFF" }
         ]
       }
     },
     "band": {
       "type": "graphic",
-      "parentId": "p1",
+      "parentId": "sq",
+      "link": "band",
       "index": "aK",
       "name": "Band",
       "props": {
@@ -652,29 +406,15 @@
         "y": 920,
         "width": 1000,
         "height": 140,
-        "shape": {
-          "kind": "rect"
-        },
+        "shape": { "kind": "rect" },
         "fills": [
           {
             "type": "linear",
-            "from": {
-              "x": 0,
-              "y": 0
-            },
-            "to": {
-              "x": 1,
-              "y": 0
-            },
+            "from": { "x": 0, "y": 0 },
+            "to": { "x": 1, "y": 0 },
             "stops": [
-              {
-                "offset": 0,
-                "color": "#00BCD4FF"
-              },
-              {
-                "offset": 1,
-                "color": "#FFEB3BFF"
-              }
+              { "offset": 0, "color": "#00BCD4FF" },
+              { "offset": 1, "color": "#FFEB3BFF" }
             ]
           }
         ]
@@ -682,21 +422,16 @@
     },
     "through": {
       "type": "group",
-      "parentId": "p1",
+      "parentId": "sq",
+      "link": "through",
       "index": "aL",
       "name": "Pass-through: circles multiply with the band",
-      "props": {
-        "x": 90,
-        "y": 930,
-        "width": 220,
-        "height": 120,
-        "blendMode": "pass-through",
-        "opacity": 1
-      }
+      "props": { "x": 90, "y": 930, "width": 220, "height": 120, "blendMode": "pass-through", "opacity": 1 }
     },
     "through0": {
       "type": "graphic",
       "parentId": "through",
+      "link": "through0",
       "index": "a0",
       "name": "Circle 1",
       "props": {
@@ -704,21 +439,15 @@
         "y": 930,
         "width": 120,
         "height": 120,
-        "shape": {
-          "kind": "ellipse"
-        },
+        "shape": { "kind": "ellipse" },
         "blendMode": "multiply",
-        "fills": [
-          {
-            "type": "solid",
-            "color": "#E91E63FF"
-          }
-        ]
+        "fills": [{ "type": "solid", "color": "#E91E63FF" }]
       }
     },
     "through1": {
       "type": "graphic",
       "parentId": "through",
+      "link": "through1",
       "index": "a1",
       "name": "Circle 2",
       "props": {
@@ -726,21 +455,15 @@
         "y": 930,
         "width": 120,
         "height": 120,
-        "shape": {
-          "kind": "ellipse"
-        },
+        "shape": { "kind": "ellipse" },
         "blendMode": "multiply",
-        "fills": [
-          {
-            "type": "solid",
-            "color": "#3F51B5FF"
-          }
-        ]
+        "fills": [{ "type": "solid", "color": "#3F51B5FF" }]
       }
     },
     "through2": {
       "type": "graphic",
       "parentId": "through",
+      "link": "through2",
       "index": "a2",
       "name": "Circle 3",
       "props": {
@@ -748,35 +471,23 @@
         "y": 930,
         "width": 120,
         "height": 120,
-        "shape": {
-          "kind": "ellipse"
-        },
+        "shape": { "kind": "ellipse" },
         "blendMode": "multiply",
-        "fills": [
-          {
-            "type": "solid",
-            "color": "#FF9800FF"
-          }
-        ]
+        "fills": [{ "type": "solid", "color": "#FF9800FF" }]
       }
     },
     "isolated": {
       "type": "group",
-      "parentId": "p1",
+      "parentId": "sq",
+      "link": "isolated",
       "index": "aM",
       "name": "Normal: circles multiply only with each other",
-      "props": {
-        "x": 410,
-        "y": 930,
-        "width": 220,
-        "height": 120,
-        "blendMode": "normal",
-        "opacity": 1
-      }
+      "props": { "x": 410, "y": 930, "width": 220, "height": 120, "blendMode": "normal", "opacity": 1 }
     },
     "isolated0": {
       "type": "graphic",
       "parentId": "isolated",
+      "link": "isolated0",
       "index": "a0",
       "name": "Circle 1",
       "props": {
@@ -784,21 +495,15 @@
         "y": 930,
         "width": 120,
         "height": 120,
-        "shape": {
-          "kind": "ellipse"
-        },
+        "shape": { "kind": "ellipse" },
         "blendMode": "multiply",
-        "fills": [
-          {
-            "type": "solid",
-            "color": "#E91E63FF"
-          }
-        ]
+        "fills": [{ "type": "solid", "color": "#E91E63FF" }]
       }
     },
     "isolated1": {
       "type": "graphic",
       "parentId": "isolated",
+      "link": "isolated1",
       "index": "a1",
       "name": "Circle 2",
       "props": {
@@ -806,21 +511,15 @@
         "y": 930,
         "width": 120,
         "height": 120,
-        "shape": {
-          "kind": "ellipse"
-        },
+        "shape": { "kind": "ellipse" },
         "blendMode": "multiply",
-        "fills": [
-          {
-            "type": "solid",
-            "color": "#3F51B5FF"
-          }
-        ]
+        "fills": [{ "type": "solid", "color": "#3F51B5FF" }]
       }
     },
     "isolated2": {
       "type": "graphic",
       "parentId": "isolated",
+      "link": "isolated2",
       "index": "a2",
       "name": "Circle 3",
       "props": {
@@ -828,35 +527,23 @@
         "y": 930,
         "width": 120,
         "height": 120,
-        "shape": {
-          "kind": "ellipse"
-        },
+        "shape": { "kind": "ellipse" },
         "blendMode": "multiply",
-        "fills": [
-          {
-            "type": "solid",
-            "color": "#FF9800FF"
-          }
-        ]
+        "fills": [{ "type": "solid", "color": "#FF9800FF" }]
       }
     },
     "faded": {
       "type": "group",
-      "parentId": "p1",
+      "parentId": "sq",
+      "link": "faded",
       "index": "aN",
       "name": "Pass-through at 60%: drawn together, then faded",
-      "props": {
-        "x": 730,
-        "y": 930,
-        "width": 220,
-        "height": 120,
-        "blendMode": "pass-through",
-        "opacity": 0.6
-      }
+      "props": { "x": 730, "y": 930, "width": 220, "height": 120, "blendMode": "pass-through", "opacity": 0.6 }
     },
     "faded0": {
       "type": "graphic",
       "parentId": "faded",
+      "link": "faded0",
       "index": "a0",
       "name": "Circle 1",
       "props": {
@@ -864,21 +551,15 @@
         "y": 930,
         "width": 120,
         "height": 120,
-        "shape": {
-          "kind": "ellipse"
-        },
+        "shape": { "kind": "ellipse" },
         "blendMode": "multiply",
-        "fills": [
-          {
-            "type": "solid",
-            "color": "#E91E63FF"
-          }
-        ]
+        "fills": [{ "type": "solid", "color": "#E91E63FF" }]
       }
     },
     "faded1": {
       "type": "graphic",
       "parentId": "faded",
+      "link": "faded1",
       "index": "a1",
       "name": "Circle 2",
       "props": {
@@ -886,21 +567,15 @@
         "y": 930,
         "width": 120,
         "height": 120,
-        "shape": {
-          "kind": "ellipse"
-        },
+        "shape": { "kind": "ellipse" },
         "blendMode": "multiply",
-        "fills": [
-          {
-            "type": "solid",
-            "color": "#3F51B5FF"
-          }
-        ]
+        "fills": [{ "type": "solid", "color": "#3F51B5FF" }]
       }
     },
     "faded2": {
       "type": "graphic",
       "parentId": "faded",
+      "link": "faded2",
       "index": "a2",
       "name": "Circle 3",
       "props": {
@@ -908,18 +583,10 @@
         "y": 930,
         "width": 120,
         "height": 120,
-        "shape": {
-          "kind": "ellipse"
-        },
+        "shape": { "kind": "ellipse" },
         "blendMode": "multiply",
-        "fills": [
-          {
-            "type": "solid",
-            "color": "#FF9800FF"
-          }
-        ]
+        "fills": [{ "type": "solid", "color": "#FF9800FF" }]
       }
     }
-  },
-  "overrides": {}
+  }
 }

@@ -1,80 +1,222 @@
 {
-  "meta": {
-    "designId": "fixture-frame-strokes",
-    "name": "Box strokes",
-    "kind": "single",
-    "primaryFormatId": "square"
-  },
-  "formats": {
-    "square": { "name": "Square", "width": 1080, "height": 1080, "order": "a0" }
-  },
-  "pages": {
-    "p1": { "name": "Page 1", "order": "a0", "fills": [{ "type": "solid", "color": "#F4EDE4FF" }] }
+  "meta": { "designId": "fixture-frame-strokes", "name": "Box strokes" },
+  "pages": { "p1": { "name": "Page 1", "order": "a0" } },
+  "frames": {
+    "square": {
+      "pageId": "p1",
+      "name": "Square",
+      "width": 1080,
+      "height": 1080,
+      "x": 0,
+      "y": 0,
+      "fills": [{ "type": "solid", "color": "#F4EDE4FF" }],
+      "order": "a0"
+    }
   },
   "nodes": {
     "inside": {
-      "type": "box", "parentId": "p1", "index": "a0", "name": "Inside, clipping",
+      "type": "box",
+      "parentId": "square",
+      "link": "inside",
+      "index": "a0",
+      "name": "Inside, clipping",
       "props": {
-        "x": 60, "y": 60, "width": 440, "height": 300, "cornerRadius": 48, "fills": [{ "type": "solid", "color": "#1F3A5FFF" }],
+        "x": 60,
+        "y": 60,
+        "width": 440,
+        "height": 300,
+        "cornerRadius": 48,
+        "fills": [{ "type": "solid", "color": "#1F3A5FFF" }],
         "strokes": [{ "paint": { "type": "solid", "color": "#FFD23FFF" }, "width": 16, "align": "inside" }]
       }
     },
     "inside-band": {
-      "type": "graphic", "parentId": "inside", "index": "a0", "name": "Band under the outline",
-      "props": { "x": 0, "y": 220, "width": 600, "height": 80, "shape": { "kind": "rect" }, "fills": [{ "type": "solid", "color": "#E0157FFF" }] }
+      "type": "graphic",
+      "parentId": "inside",
+      "link": "inside-band",
+      "index": "a0",
+      "name": "Band under the outline",
+      "props": {
+        "x": 0,
+        "y": 220,
+        "width": 600,
+        "height": 80,
+        "shape": { "kind": "rect" },
+        "fills": [{ "type": "solid", "color": "#E0157FFF" }]
+      }
     },
     "center": {
-      "type": "box", "parentId": "p1", "index": "a1", "name": "Centre, each corner its own",
+      "type": "box",
+      "parentId": "square",
+      "link": "center",
+      "index": "a1",
+      "name": "Centre, each corner its own",
       "props": {
-        "x": 580, "y": 60, "width": 440, "height": 300, "cornerRadius": [0, 100, 24, 140], "fills": [{ "type": "solid", "color": "#FFFFFFFF" }],
-        "strokes": [{ "paint": { "type": "linear", "from": { "x": 0, "y": 0 }, "to": { "x": 1, "y": 1 }, "stops": [{ "offset": 0, "color": "#E0157FFF" }, { "offset": 1, "color": "#3D6BFFFF" }] }, "width": 20, "align": "center" }]
+        "x": 580,
+        "y": 60,
+        "width": 440,
+        "height": 300,
+        "cornerRadius": [0, 100, 24, 140],
+        "fills": [{ "type": "solid", "color": "#FFFFFFFF" }],
+        "strokes": [
+          {
+            "paint": {
+              "type": "linear",
+              "from": { "x": 0, "y": 0 },
+              "to": { "x": 1, "y": 1 },
+              "stops": [
+                { "offset": 0, "color": "#E0157FFF" },
+                { "offset": 1, "color": "#3D6BFFFF" }
+              ]
+            },
+            "width": 20,
+            "align": "center"
+          }
+        ]
       }
     },
     "center-dot": {
-      "type": "graphic", "parentId": "center", "index": "a0", "name": "Dot in the round corner",
-      "props": { "x": 900, "y": 40, "width": 160, "height": 160, "shape": { "kind": "ellipse" }, "fills": [{ "type": "solid", "color": "#0F7246FF" }] }
+      "type": "graphic",
+      "parentId": "center",
+      "link": "center-dot",
+      "index": "a0",
+      "name": "Dot in the round corner",
+      "props": {
+        "x": 900,
+        "y": 40,
+        "width": 160,
+        "height": 160,
+        "shape": { "kind": "ellipse" },
+        "fills": [{ "type": "solid", "color": "#0F7246FF" }]
+      }
     },
     "outside": {
-      "type": "box", "parentId": "p1", "index": "a2", "name": "Outside, clipping",
+      "type": "box",
+      "parentId": "square",
+      "link": "outside",
+      "index": "a2",
+      "name": "Outside, clipping",
       "props": {
-        "x": 100, "y": 480, "width": 360, "height": 260, "cornerRadius": 60, "fills": [{ "type": "solid", "color": "#FF8A3DFF" }],
+        "x": 100,
+        "y": 480,
+        "width": 360,
+        "height": 260,
+        "cornerRadius": 60,
+        "fills": [{ "type": "solid", "color": "#FF8A3DFF" }],
         "strokes": [{ "paint": { "type": "solid", "color": "#3A1E14FF" }, "width": 24, "align": "outside" }]
       }
     },
     "outside-chip": {
-      "type": "graphic", "parentId": "outside", "index": "a0", "name": "Chip cut by the clip, not the outline",
-      "props": { "x": 360, "y": 640, "width": 160, "height": 160, "shape": { "kind": "rect" }, "fills": [{ "type": "solid", "color": "#1F3A5FFF" }] }
+      "type": "graphic",
+      "parentId": "outside",
+      "link": "outside-chip",
+      "index": "a0",
+      "name": "Chip cut by the clip, not the outline",
+      "props": {
+        "x": 360,
+        "y": 640,
+        "width": 160,
+        "height": 160,
+        "shape": { "kind": "rect" },
+        "fills": [{ "type": "solid", "color": "#1F3A5FFF" }]
+      }
     },
     "dashed": {
-      "type": "box", "parentId": "p1", "index": "a3", "name": "Dashed, turned, shows what is outside",
+      "type": "box",
+      "parentId": "square",
+      "link": "dashed",
+      "index": "a3",
+      "name": "Dashed, turned, shows what is outside",
       "props": {
-        "x": 600, "y": 500, "width": 380, "height": 240, "rotation": 6, "clip": false, "cornerRadius": 32, "fills": [{ "type": "solid", "color": "#FFFFFFFF" }],
+        "x": 600,
+        "y": 500,
+        "width": 380,
+        "height": 240,
+        "rotation": 6,
+        "clip": false,
+        "cornerRadius": 32,
+        "fills": [{ "type": "solid", "color": "#FFFFFFFF" }],
         "strokes": [
-          { "paint": { "type": "solid", "color": "#E0157FFF" }, "width": 8, "align": "outside", "dashes": [24, 12], "cap": "round" },
+          {
+            "paint": { "type": "solid", "color": "#E0157FFF" },
+            "width": 8,
+            "align": "outside",
+            "dashes": [24, 12],
+            "cap": "round"
+          },
           { "paint": { "type": "solid", "color": "#1A1420FF" }, "width": 4, "align": "inside" }
         ]
       }
     },
     "dashed-tag": {
-      "type": "graphic", "parentId": "dashed", "index": "a0", "name": "Tag past the edge",
-      "props": { "x": 900, "y": 680, "width": 140, "height": 100, "shape": { "kind": "rect", "cornerRadius": 20 }, "fills": [{ "type": "solid", "color": "#FFD23FFF" }] }
+      "type": "graphic",
+      "parentId": "dashed",
+      "link": "dashed-tag",
+      "index": "a0",
+      "name": "Tag past the edge",
+      "props": {
+        "x": 900,
+        "y": 680,
+        "width": 140,
+        "height": 100,
+        "shape": { "kind": "rect", "cornerRadius": 20 },
+        "fills": [{ "type": "solid", "color": "#FFD23FFF" }]
+      }
     },
     "stack": {
-      "type": "box", "parentId": "p1", "index": "a4", "name": "Outlined stack",
+      "type": "box",
+      "parentId": "square",
+      "link": "stack",
+      "index": "a4",
+      "name": "Outlined stack",
       "props": {
-        "x": 100, "y": 840, "width": 600, "height": 160, "cornerRadius": 80, "fills": [{ "type": "solid", "color": "#FFFFFFFF" }],
+        "x": 100,
+        "y": 840,
+        "width": 600,
+        "height": 160,
+        "cornerRadius": 80,
+        "fills": [{ "type": "solid", "color": "#FFFFFFFF" }],
         "strokes": [{ "paint": { "type": "solid", "color": "#0F7246FF" }, "width": 6, "align": "center" }],
-        "layout": { "direction": "row", "gap": 20, "padding": { "top": 30, "right": 40, "bottom": 30, "left": 40 }, "justify": "start", "align": "center", "wrap": false, "lineGap": 0 }
+        "layout": {
+          "direction": "row",
+          "gap": 20,
+          "padding": { "top": 30, "right": 40, "bottom": 30, "left": 40 },
+          "justify": "start",
+          "align": "center",
+          "wrap": false,
+          "lineGap": 0
+        }
       }
     },
     "pill-1": {
-      "type": "graphic", "parentId": "stack", "index": "a0", "name": "Pill 1",
-      "props": { "x": 0, "y": 0, "width": 160, "height": 100, "shape": { "kind": "rect", "cornerRadius": 50 }, "fills": [{ "type": "solid", "color": "#E0157FFF" }] }
+      "type": "graphic",
+      "parentId": "stack",
+      "link": "pill-1",
+      "index": "a0",
+      "name": "Pill 1",
+      "props": {
+        "x": 0,
+        "y": 0,
+        "width": 160,
+        "height": 100,
+        "shape": { "kind": "rect", "cornerRadius": 50 },
+        "fills": [{ "type": "solid", "color": "#E0157FFF" }]
+      }
     },
     "pill-2": {
-      "type": "graphic", "parentId": "stack", "index": "a1", "name": "Pill 2",
-      "props": { "x": 0, "y": 0, "width": 160, "height": 100, "shape": { "kind": "rect", "cornerRadius": 50 }, "fills": [{ "type": "solid", "color": "#3D6BFFFF" }] }
+      "type": "graphic",
+      "parentId": "stack",
+      "link": "pill-2",
+      "index": "a1",
+      "name": "Pill 2",
+      "props": {
+        "x": 0,
+        "y": 0,
+        "width": 160,
+        "height": 100,
+        "shape": { "kind": "rect", "cornerRadius": 50 },
+        "fills": [{ "type": "solid", "color": "#3D6BFFFF" }]
+      }
     }
-  },
-  "overrides": {}
+  }
 }

@@ -1,34 +1,23 @@
 {
-  "meta": {
-    "designId": "english-sale-ad",
-    "name": "English sale ad",
-    "kind": "single",
-    "primaryFormatId": "sq"
-  },
-  "formats": {
+  "meta": { "designId": "english-sale-ad", "name": "English sale ad" },
+  "pages": { "p1": { "name": "Page 1", "order": "a0" } },
+  "frames": {
     "sq": {
+      "pageId": "p1",
       "name": "Square 1:1",
       "width": 1080,
       "height": 1080,
+      "x": 0,
+      "y": 0,
+      "fills": [{ "type": "solid", "color": "#FFF4E6FF" }],
       "order": "a0"
-    }
-  },
-  "pages": {
-    "p1": {
-      "name": "Page 1",
-      "order": "a0",
-      "fills": [
-        {
-          "type": "solid",
-          "color": "#FFF4E6FF"
-        }
-      ]
     }
   },
   "nodes": {
     "photo": {
       "type": "graphic",
-      "parentId": "p1",
+      "parentId": "sq",
+      "link": "photo",
       "index": "a0",
       "name": "Product photo",
       "props": {
@@ -36,20 +25,13 @@
         "y": 0,
         "width": 1080,
         "height": 640,
-        "shape": {
-          "kind": "rect"
-        },
+        "shape": { "kind": "rect" },
         "fills": [
           {
             "type": "image",
             "assetId": "sneaker",
             "fit": "crop",
-            "crop": {
-              "x": 120,
-              "y": 80,
-              "width": 1600,
-              "height": 948
-            }
+            "crop": { "x": 120, "y": 80, "width": 1600, "height": 948 }
           }
         ]
       },
@@ -57,7 +39,8 @@
     },
     "band": {
       "type": "graphic",
-      "parentId": "p1",
+      "parentId": "sq",
+      "link": "band",
       "index": "a1",
       "name": "Coral band",
       "props": {
@@ -65,29 +48,15 @@
         "y": 600,
         "width": 1080,
         "height": 140,
-        "shape": {
-          "kind": "rect"
-        },
+        "shape": { "kind": "rect" },
         "fills": [
           {
             "type": "linear",
-            "from": {
-              "x": 0,
-              "y": 0.5
-            },
-            "to": {
-              "x": 1,
-              "y": 0.5
-            },
+            "from": { "x": 0, "y": 0.5 },
+            "to": { "x": 1, "y": 0.5 },
             "stops": [
-              {
-                "offset": 0,
-                "color": "#FF5A36FF"
-              },
-              {
-                "offset": 1,
-                "color": "#FFB443FF"
-              }
+              { "offset": 0, "color": "#FF5A36FF" },
+              { "offset": 1, "color": "#FFB443FF" }
             ]
           }
         ]
@@ -96,7 +65,8 @@
     },
     "headline": {
       "type": "text",
-      "parentId": "p1",
+      "parentId": "sq",
+      "link": "headline",
       "index": "a2",
       "name": "Headline",
       "props": {
@@ -117,7 +87,8 @@
     },
     "body": {
       "type": "text",
-      "parentId": "p1",
+      "parentId": "sq",
+      "link": "body",
       "index": "a3",
       "name": "Body",
       "props": {
@@ -133,21 +104,14 @@
           "fontWeight": 400,
           "lineHeight": 1.3
         },
-        "runs": [
-          {
-            "start": 4,
-            "end": 23,
-            "style": {
-              "fontWeight": 700
-            }
-          }
-        ]
+        "runs": [{ "start": 4, "end": 23, "style": { "fontWeight": 700 } }]
       },
       "role": "body"
     },
     "price-frame": {
       "type": "box",
-      "parentId": "p1",
+      "parentId": "sq",
+      "link": "price-frame",
       "index": "a4",
       "name": "Price block",
       "role": "price",
@@ -158,30 +122,21 @@
         "width": 220,
         "height": 120,
         "clip": true,
-        "fills": [
-          {
-            "type": "solid",
-            "color": "#FFFFFFFF"
-          }
-        ]
+        "fills": [{ "type": "solid", "color": "#FFFFFFFF" }]
       }
     },
     "price-group": {
       "type": "group",
       "parentId": "price-frame",
+      "link": "price-group",
       "index": "a0",
       "name": "Price and was-price",
-      "props": {
-        "blendMode": "pass-through",
-        "x": 60,
-        "y": 930,
-        "width": 600,
-        "height": 90
-      }
+      "props": { "blendMode": "pass-through", "x": 60, "y": 930, "width": 600, "height": 90 }
     },
     "price": {
       "type": "text",
       "parentId": "price-group",
+      "link": "price",
       "index": "a0",
       "name": "Price",
       "props": {
@@ -190,26 +145,10 @@
         "width": 600,
         "height": 90,
         "text": "$89  $129",
-        "style": {
-          "fontFamily": "Noto Sans",
-          "fontSize": 64,
-          "color": "#FF5A36FF",
-          "fontWeight": 800
-        },
-        "runs": [
-          {
-            "start": 5,
-            "end": 9,
-            "style": {
-              "fontSize": 40,
-              "fontWeight": 400,
-              "color": "#8A7F7AFF"
-            }
-          }
-        ]
+        "style": { "fontFamily": "Noto Sans", "fontSize": 64, "color": "#FF5A36FF", "fontWeight": 800 },
+        "runs": [{ "start": 5, "end": 9, "style": { "fontSize": 40, "fontWeight": 400, "color": "#8A7F7AFF" } }]
       },
       "role": "price"
     }
-  },
-  "overrides": {}
+  }
 }

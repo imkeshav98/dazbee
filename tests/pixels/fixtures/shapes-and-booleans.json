@@ -1,34 +1,23 @@
 {
-  "meta": {
-    "designId": "shapes-and-booleans",
-    "name": "Shapes and booleans",
-    "kind": "single",
-    "primaryFormatId": "sq"
-  },
-  "formats": {
+  "meta": { "designId": "shapes-and-booleans", "name": "Shapes and booleans" },
+  "pages": { "p1": { "name": "Page 1", "order": "a0" } },
+  "frames": {
     "sq": {
+      "pageId": "p1",
       "name": "Square 1:1",
       "width": 1080,
       "height": 1080,
+      "x": 0,
+      "y": 0,
+      "fills": [{ "type": "solid", "color": "#FAFAFAFF" }],
       "order": "a0"
-    }
-  },
-  "pages": {
-    "p1": {
-      "name": "Page 1",
-      "order": "a0",
-      "fills": [
-        {
-          "type": "solid",
-          "color": "#FAFAFAFF"
-        }
-      ]
     }
   },
   "nodes": {
     "corners": {
       "type": "graphic",
-      "parentId": "p1",
+      "parentId": "sq",
+      "link": "corners",
       "index": "a0",
       "name": "Rect with its own corners",
       "props": {
@@ -36,26 +25,14 @@
         "y": 40,
         "width": 200,
         "height": 160,
-        "shape": {
-          "kind": "rect",
-          "corners": [
-            0,
-            24,
-            60,
-            8
-          ]
-        },
-        "fills": [
-          {
-            "type": "solid",
-            "color": "#FF7043FF"
-          }
-        ]
+        "shape": { "kind": "rect", "corners": [0, 24, 60, 8] },
+        "fills": [{ "type": "solid", "color": "#FF7043FF" }]
       }
     },
     "pill": {
       "type": "graphic",
-      "parentId": "p1",
+      "parentId": "sq",
+      "link": "pill",
       "index": "a1",
       "name": "Corners larger than fit",
       "props": {
@@ -63,35 +40,15 @@
         "y": 60,
         "width": 200,
         "height": 120,
-        "shape": {
-          "kind": "rect",
-          "corners": [
-            100,
-            100,
-            10,
-            100
-          ]
-        },
-        "fills": [
-          {
-            "type": "solid",
-            "color": "#26A69AFF"
-          }
-        ],
-        "strokes": [
-          {
-            "paint": {
-              "type": "solid",
-              "color": "#004D40FF"
-            },
-            "width": 6
-          }
-        ]
+        "shape": { "kind": "rect", "corners": [100, 100, 10, 100] },
+        "fills": [{ "type": "solid", "color": "#26A69AFF" }],
+        "strokes": [{ "paint": { "type": "solid", "color": "#004D40FF" }, "width": 6 }]
       }
     },
     "triangle": {
       "type": "graphic",
-      "parentId": "p1",
+      "parentId": "sq",
+      "link": "triangle",
       "index": "a2",
       "name": "Triangle",
       "props": {
@@ -99,21 +56,14 @@
         "y": 40,
         "width": 160,
         "height": 160,
-        "shape": {
-          "kind": "polygon",
-          "sides": 3
-        },
-        "fills": [
-          {
-            "type": "solid",
-            "color": "#5C6BC0FF"
-          }
-        ]
+        "shape": { "kind": "polygon", "sides": 3 },
+        "fills": [{ "type": "solid", "color": "#5C6BC0FF" }]
       }
     },
     "hexagon": {
       "type": "graphic",
-      "parentId": "p1",
+      "parentId": "sq",
+      "link": "hexagon",
       "index": "a3",
       "name": "Rounded hexagon",
       "props": {
@@ -121,32 +71,15 @@
         "y": 40,
         "width": 180,
         "height": 160,
-        "shape": {
-          "kind": "polygon",
-          "sides": 6,
-          "cornerRadius": 24
-        },
-        "fills": [
-          {
-            "type": "solid",
-            "color": "#FFCA28FF"
-          }
-        ],
-        "strokes": [
-          {
-            "paint": {
-              "type": "solid",
-              "color": "#E65100FF"
-            },
-            "width": 6,
-            "align": "inside"
-          }
-        ]
+        "shape": { "kind": "polygon", "sides": 6, "cornerRadius": 24 },
+        "fills": [{ "type": "solid", "color": "#FFCA28FF" }],
+        "strokes": [{ "paint": { "type": "solid", "color": "#E65100FF" }, "width": 6, "align": "inside" }]
       }
     },
     "pentagon": {
       "type": "graphic",
-      "parentId": "p1",
+      "parentId": "sq",
+      "link": "pentagon",
       "index": "a4",
       "name": "Turned pentagon",
       "props": {
@@ -155,20 +88,14 @@
         "width": 140,
         "height": 140,
         "rotation": 20,
-        "shape": {
-          "kind": "polygon"
-        },
-        "fills": [
-          {
-            "type": "solid",
-            "color": "#AB47BCFF"
-          }
-        ]
+        "shape": { "kind": "polygon" },
+        "fills": [{ "type": "solid", "color": "#AB47BCFF" }]
       }
     },
     "star": {
       "type": "graphic",
-      "parentId": "p1",
+      "parentId": "sq",
+      "link": "star",
       "index": "a5",
       "name": "Five-point star",
       "props": {
@@ -176,30 +103,15 @@
         "y": 260,
         "width": 180,
         "height": 180,
-        "shape": {
-          "kind": "star"
-        },
-        "fills": [
-          {
-            "type": "solid",
-            "color": "#FFD600FF"
-          }
-        ],
-        "strokes": [
-          {
-            "paint": {
-              "type": "solid",
-              "color": "#F57F17FF"
-            },
-            "width": 4,
-            "join": "round"
-          }
-        ]
+        "shape": { "kind": "star" },
+        "fills": [{ "type": "solid", "color": "#FFD600FF" }],
+        "strokes": [{ "paint": { "type": "solid", "color": "#F57F17FF" }, "width": 4, "join": "round" }]
       }
     },
     "burst": {
       "type": "graphic",
-      "parentId": "p1",
+      "parentId": "sq",
+      "link": "burst",
       "index": "a6",
       "name": "Rounded burst",
       "props": {
@@ -207,23 +119,14 @@
         "y": 260,
         "width": 200,
         "height": 180,
-        "shape": {
-          "kind": "star",
-          "points": 12,
-          "innerRadius": 0.75,
-          "cornerRadius": 6
-        },
-        "fills": [
-          {
-            "type": "solid",
-            "color": "#EF5350FF"
-          }
-        ]
+        "shape": { "kind": "star", "points": 12, "innerRadius": 0.75, "cornerRadius": 6 },
+        "fills": [{ "type": "solid", "color": "#EF5350FF" }]
       }
     },
     "sparkle": {
       "type": "graphic",
-      "parentId": "p1",
+      "parentId": "sq",
+      "link": "sparkle",
       "index": "a7",
       "name": "Four-point sparkle",
       "props": {
@@ -231,31 +134,15 @@
         "y": 260,
         "width": 140,
         "height": 180,
-        "shape": {
-          "kind": "star",
-          "points": 4,
-          "innerRadius": 0.25
-        },
+        "shape": { "kind": "star", "points": 4, "innerRadius": 0.25 },
         "fills": [
           {
             "type": "linear",
-            "from": {
-              "x": 0,
-              "y": 0
-            },
-            "to": {
-              "x": 1,
-              "y": 1
-            },
+            "from": { "x": 0, "y": 0 },
+            "to": { "x": 1, "y": 1 },
             "stops": [
-              {
-                "offset": 0,
-                "color": "#00B0FFFF"
-              },
-              {
-                "offset": 1,
-                "color": "#7C4DFFFF"
-              }
+              { "offset": 0, "color": "#00B0FFFF" },
+              { "offset": 1, "color": "#7C4DFFFF" }
             ]
           }
         ]
@@ -263,7 +150,8 @@
     },
     "badge": {
       "type": "graphic",
-      "parentId": "p1",
+      "parentId": "sq",
+      "link": "badge",
       "index": "a8",
       "name": "Dashed star outline",
       "props": {
@@ -271,31 +159,16 @@
         "y": 260,
         "width": 180,
         "height": 180,
-        "shape": {
-          "kind": "star",
-          "points": 7,
-          "innerRadius": 0.55,
-          "cornerRadius": 10
-        },
+        "shape": { "kind": "star", "points": 7, "innerRadius": 0.55, "cornerRadius": 10 },
         "strokes": [
-          {
-            "paint": {
-              "type": "solid",
-              "color": "#37474FFF"
-            },
-            "width": 5,
-            "dashes": [
-              14,
-              8
-            ],
-            "cap": "round"
-          }
+          { "paint": { "type": "solid", "color": "#37474FFF" }, "width": 5, "dashes": [14, 8], "cap": "round" }
         ]
       }
     },
     "hept": {
       "type": "graphic",
-      "parentId": "p1",
+      "parentId": "sq",
+      "link": "hept",
       "index": "a9",
       "name": "Many-sided polygon",
       "props": {
@@ -303,22 +176,14 @@
         "y": 270,
         "width": 160,
         "height": 160,
-        "shape": {
-          "kind": "polygon",
-          "sides": 9,
-          "cornerRadius": 8
-        },
-        "fills": [
-          {
-            "type": "solid",
-            "color": "#8D6E63FF"
-          }
-        ]
+        "shape": { "kind": "polygon", "sides": 9, "cornerRadius": 8 },
+        "fills": [{ "type": "solid", "color": "#8D6E63FF" }]
       }
     },
     "plain": {
       "type": "graphic",
-      "parentId": "p1",
+      "parentId": "sq",
+      "link": "plain",
       "index": "aA",
       "name": "Line",
       "props": {
@@ -326,23 +191,14 @@
         "y": 500,
         "width": 220,
         "height": 0,
-        "shape": {
-          "kind": "line"
-        },
-        "strokes": [
-          {
-            "paint": {
-              "type": "solid",
-              "color": "#263238FF"
-            },
-            "width": 4
-          }
-        ]
+        "shape": { "kind": "line" },
+        "strokes": [{ "paint": { "type": "solid", "color": "#263238FF" }, "width": 4 }]
       }
     },
     "arrow": {
       "type": "graphic",
-      "parentId": "p1",
+      "parentId": "sq",
+      "link": "arrow",
       "index": "aB",
       "name": "Arrow",
       "props": {
@@ -350,26 +206,14 @@
         "y": 550,
         "width": 220,
         "height": 0,
-        "shape": {
-          "kind": "line",
-          "end": "arrow"
-        },
-        "strokes": [
-          {
-            "paint": {
-              "type": "solid",
-              "color": "#1E88E5FF"
-            },
-            "width": 5,
-            "cap": "round",
-            "join": "round"
-          }
-        ]
+        "shape": { "kind": "line", "end": "arrow" },
+        "strokes": [{ "paint": { "type": "solid", "color": "#1E88E5FF" }, "width": 5, "cap": "round", "join": "round" }]
       }
     },
     "both": {
       "type": "graphic",
-      "parentId": "p1",
+      "parentId": "sq",
+      "link": "both",
       "index": "aC",
       "name": "Triangles at both ends",
       "props": {
@@ -377,25 +221,14 @@
         "y": 610,
         "width": 220,
         "height": 0,
-        "shape": {
-          "kind": "line",
-          "start": "triangle",
-          "end": "triangle"
-        },
-        "strokes": [
-          {
-            "paint": {
-              "type": "solid",
-              "color": "#D81B60FF"
-            },
-            "width": 6
-          }
-        ]
+        "shape": { "kind": "line", "start": "triangle", "end": "triangle" },
+        "strokes": [{ "paint": { "type": "solid", "color": "#D81B60FF" }, "width": 6 }]
       }
     },
     "dots": {
       "type": "graphic",
-      "parentId": "p1",
+      "parentId": "sq",
+      "link": "dots",
       "index": "aD",
       "name": "Circle to arrow, dashed",
       "props": {
@@ -404,29 +237,14 @@
         "width": 260,
         "height": 0,
         "rotation": -20,
-        "shape": {
-          "kind": "line",
-          "start": "circle",
-          "end": "arrow"
-        },
-        "strokes": [
-          {
-            "paint": {
-              "type": "solid",
-              "color": "#43A047FF"
-            },
-            "width": 6,
-            "dashes": [
-              16,
-              10
-            ]
-          }
-        ]
+        "shape": { "kind": "line", "start": "circle", "end": "arrow" },
+        "strokes": [{ "paint": { "type": "solid", "color": "#43A047FF" }, "width": 6, "dashes": [16, 10] }]
       }
     },
     "thick": {
       "type": "graphic",
-      "parentId": "p1",
+      "parentId": "sq",
+      "link": "thick",
       "index": "aE",
       "name": "Thick round line in a tall box",
       "props": {
@@ -435,25 +253,14 @@
         "width": 180,
         "height": 120,
         "rotation": 35,
-        "shape": {
-          "kind": "line",
-          "end": "circle"
-        },
-        "strokes": [
-          {
-            "paint": {
-              "type": "solid",
-              "color": "#6D4C41FF"
-            },
-            "width": 14,
-            "cap": "round"
-          }
-        ]
+        "shape": { "kind": "line", "end": "circle" },
+        "strokes": [{ "paint": { "type": "solid", "color": "#6D4C41FF" }, "width": 14, "cap": "round" }]
       }
     },
     "thin": {
       "type": "graphic",
-      "parentId": "p1",
+      "parentId": "sq",
+      "link": "thin",
       "index": "aF",
       "name": "Thin line with a triangle",
       "props": {
@@ -462,24 +269,14 @@
         "width": 200,
         "height": 0,
         "rotation": 180,
-        "shape": {
-          "kind": "line",
-          "end": "triangle"
-        },
-        "strokes": [
-          {
-            "paint": {
-              "type": "solid",
-              "color": "#000000FF"
-            },
-            "width": 2
-          }
-        ]
+        "shape": { "kind": "line", "end": "triangle" },
+        "strokes": [{ "paint": { "type": "solid", "color": "#000000FF" }, "width": 2 }]
       }
     },
     "union": {
       "type": "boolean",
-      "parentId": "p1",
+      "parentId": "sq",
+      "link": "union",
       "index": "aG",
       "name": "Union",
       "props": {
@@ -488,17 +285,13 @@
         "width": 220,
         "height": 180,
         "op": "union",
-        "fills": [
-          {
-            "type": "solid",
-            "color": "#3949ABFF"
-          }
-        ]
+        "fills": [{ "type": "solid", "color": "#3949ABFF" }]
       }
     },
     "unionA": {
       "type": "graphic",
       "parentId": "union",
+      "link": "unionA",
       "index": "a0",
       "name": "Operand unionA",
       "props": {
@@ -507,21 +300,14 @@
         "width": 150,
         "height": 150,
         "rotation": 0,
-        "shape": {
-          "kind": "rect",
-          "cornerRadius": 16
-        },
-        "fills": [
-          {
-            "type": "solid",
-            "color": "#9E9E9EFF"
-          }
-        ]
+        "shape": { "kind": "rect", "cornerRadius": 16 },
+        "fills": [{ "type": "solid", "color": "#9E9E9EFF" }]
       }
     },
     "unionB": {
       "type": "graphic",
       "parentId": "union",
+      "link": "unionB",
       "index": "a1",
       "name": "Operand unionB",
       "props": {
@@ -530,20 +316,14 @@
         "width": 150,
         "height": 150,
         "rotation": 0,
-        "shape": {
-          "kind": "ellipse"
-        },
-        "fills": [
-          {
-            "type": "solid",
-            "color": "#9E9E9EFF"
-          }
-        ]
+        "shape": { "kind": "ellipse" },
+        "fills": [{ "type": "solid", "color": "#9E9E9EFF" }]
       }
     },
     "subtract": {
       "type": "boolean",
-      "parentId": "p1",
+      "parentId": "sq",
+      "link": "subtract",
       "index": "aH",
       "name": "Subtract",
       "props": {
@@ -552,27 +332,14 @@
         "width": 220,
         "height": 180,
         "op": "subtract",
-        "fills": [
-          {
-            "type": "solid",
-            "color": "#E53935FF"
-          }
-        ],
-        "strokes": [
-          {
-            "paint": {
-              "type": "solid",
-              "color": "#212121FF"
-            },
-            "width": 4,
-            "join": "round"
-          }
-        ]
+        "fills": [{ "type": "solid", "color": "#E53935FF" }],
+        "strokes": [{ "paint": { "type": "solid", "color": "#212121FF" }, "width": 4, "join": "round" }]
       }
     },
     "subtractA": {
       "type": "graphic",
       "parentId": "subtract",
+      "link": "subtractA",
       "index": "a0",
       "name": "Operand subtractA",
       "props": {
@@ -581,21 +348,14 @@
         "width": 150,
         "height": 150,
         "rotation": 0,
-        "shape": {
-          "kind": "rect",
-          "cornerRadius": 16
-        },
-        "fills": [
-          {
-            "type": "solid",
-            "color": "#9E9E9EFF"
-          }
-        ]
+        "shape": { "kind": "rect", "cornerRadius": 16 },
+        "fills": [{ "type": "solid", "color": "#9E9E9EFF" }]
       }
     },
     "subtractB": {
       "type": "graphic",
       "parentId": "subtract",
+      "link": "subtractB",
       "index": "a1",
       "name": "Operand subtractB",
       "props": {
@@ -604,20 +364,14 @@
         "width": 150,
         "height": 150,
         "rotation": 0,
-        "shape": {
-          "kind": "ellipse"
-        },
-        "fills": [
-          {
-            "type": "solid",
-            "color": "#9E9E9EFF"
-          }
-        ]
+        "shape": { "kind": "ellipse" },
+        "fills": [{ "type": "solid", "color": "#9E9E9EFF" }]
       }
     },
     "intersect": {
       "type": "boolean",
-      "parentId": "p1",
+      "parentId": "sq",
+      "link": "intersect",
       "index": "aI",
       "name": "Intersect",
       "props": {
@@ -626,17 +380,13 @@
         "width": 220,
         "height": 180,
         "op": "intersect",
-        "fills": [
-          {
-            "type": "solid",
-            "color": "#00897BFF"
-          }
-        ]
+        "fills": [{ "type": "solid", "color": "#00897BFF" }]
       }
     },
     "intersectA": {
       "type": "graphic",
       "parentId": "intersect",
+      "link": "intersectA",
       "index": "a0",
       "name": "Operand intersectA",
       "props": {
@@ -645,21 +395,14 @@
         "width": 150,
         "height": 150,
         "rotation": 0,
-        "shape": {
-          "kind": "rect",
-          "cornerRadius": 16
-        },
-        "fills": [
-          {
-            "type": "solid",
-            "color": "#9E9E9EFF"
-          }
-        ]
+        "shape": { "kind": "rect", "cornerRadius": 16 },
+        "fills": [{ "type": "solid", "color": "#9E9E9EFF" }]
       }
     },
     "intersectB": {
       "type": "graphic",
       "parentId": "intersect",
+      "link": "intersectB",
       "index": "a1",
       "name": "Operand intersectB",
       "props": {
@@ -668,20 +411,14 @@
         "width": 150,
         "height": 150,
         "rotation": 0,
-        "shape": {
-          "kind": "ellipse"
-        },
-        "fills": [
-          {
-            "type": "solid",
-            "color": "#9E9E9EFF"
-          }
-        ]
+        "shape": { "kind": "ellipse" },
+        "fills": [{ "type": "solid", "color": "#9E9E9EFF" }]
       }
     },
     "exclude": {
       "type": "boolean",
-      "parentId": "p1",
+      "parentId": "sq",
+      "link": "exclude",
       "index": "aJ",
       "name": "Exclude",
       "props": {
@@ -690,17 +427,13 @@
         "width": 220,
         "height": 180,
         "op": "exclude",
-        "fills": [
-          {
-            "type": "solid",
-            "color": "#FB8C00FF"
-          }
-        ]
+        "fills": [{ "type": "solid", "color": "#FB8C00FF" }]
       }
     },
     "excludeA": {
       "type": "graphic",
       "parentId": "exclude",
+      "link": "excludeA",
       "index": "a0",
       "name": "Operand excludeA",
       "props": {
@@ -709,21 +442,14 @@
         "width": 150,
         "height": 150,
         "rotation": 0,
-        "shape": {
-          "kind": "rect",
-          "cornerRadius": 16
-        },
-        "fills": [
-          {
-            "type": "solid",
-            "color": "#9E9E9EFF"
-          }
-        ]
+        "shape": { "kind": "rect", "cornerRadius": 16 },
+        "fills": [{ "type": "solid", "color": "#9E9E9EFF" }]
       }
     },
     "excludeB": {
       "type": "graphic",
       "parentId": "exclude",
+      "link": "excludeB",
       "index": "a1",
       "name": "Operand excludeB",
       "props": {
@@ -732,20 +458,14 @@
         "width": 150,
         "height": 150,
         "rotation": 0,
-        "shape": {
-          "kind": "ellipse"
-        },
-        "fills": [
-          {
-            "type": "solid",
-            "color": "#9E9E9EFF"
-          }
-        ]
+        "shape": { "kind": "ellipse" },
+        "fills": [{ "type": "solid", "color": "#9E9E9EFF" }]
       }
     },
     "turned": {
       "type": "boolean",
-      "parentId": "p1",
+      "parentId": "sq",
+      "link": "turned",
       "index": "aK",
       "name": "Turned subtract with a turned cutter",
       "props": {
@@ -758,23 +478,11 @@
         "fills": [
           {
             "type": "linear",
-            "from": {
-              "x": 0,
-              "y": 0
-            },
-            "to": {
-              "x": 1,
-              "y": 0
-            },
+            "from": { "x": 0, "y": 0 },
+            "to": { "x": 1, "y": 0 },
             "stops": [
-              {
-                "offset": 0,
-                "color": "#8E24AAFF"
-              },
-              {
-                "offset": 1,
-                "color": "#F06292FF"
-              }
+              { "offset": 0, "color": "#8E24AAFF" },
+              { "offset": 1, "color": "#F06292FF" }
             ]
           }
         ]
@@ -783,6 +491,7 @@
     "turnedA": {
       "type": "graphic",
       "parentId": "turned",
+      "link": "turnedA",
       "index": "a0",
       "name": "Operand turnedA",
       "props": {
@@ -791,21 +500,14 @@
         "width": 240,
         "height": 160,
         "rotation": 0,
-        "shape": {
-          "kind": "rect",
-          "cornerRadius": 20
-        },
-        "fills": [
-          {
-            "type": "solid",
-            "color": "#9E9E9EFF"
-          }
-        ]
+        "shape": { "kind": "rect", "cornerRadius": 20 },
+        "fills": [{ "type": "solid", "color": "#9E9E9EFF" }]
       }
     },
     "turnedB": {
       "type": "graphic",
       "parentId": "turned",
+      "link": "turnedB",
       "index": "a1",
       "name": "Operand turnedB",
       "props": {
@@ -814,21 +516,14 @@
         "width": 100,
         "height": 100,
         "rotation": 15,
-        "shape": {
-          "kind": "star",
-          "points": 5
-        },
-        "fills": [
-          {
-            "type": "solid",
-            "color": "#9E9E9EFF"
-          }
-        ]
+        "shape": { "kind": "star", "points": 5 },
+        "fills": [{ "type": "solid", "color": "#9E9E9EFF" }]
       }
     },
     "turnedC": {
       "type": "graphic",
       "parentId": "turned",
+      "link": "turnedC",
       "index": "a2",
       "name": "Operand turnedC",
       "props": {
@@ -837,21 +532,14 @@
         "width": 200,
         "height": 0,
         "rotation": 0,
-        "shape": {
-          "kind": "line",
-          "end": "arrow"
-        },
-        "fills": [
-          {
-            "type": "solid",
-            "color": "#9E9E9EFF"
-          }
-        ]
+        "shape": { "kind": "line", "end": "arrow" },
+        "fills": [{ "type": "solid", "color": "#9E9E9EFF" }]
       }
     },
     "nested": {
       "type": "boolean",
-      "parentId": "p1",
+      "parentId": "sq",
+      "link": "nested",
       "index": "aL",
       "name": "Exclude of a union and a star",
       "props": {
@@ -860,39 +548,22 @@
         "width": 200,
         "height": 180,
         "op": "exclude",
-        "fills": [
-          {
-            "type": "solid",
-            "color": "#00ACC1FF"
-          }
-        ],
-        "effects": [
-          {
-            "type": "dropShadow",
-            "x": 6,
-            "y": 8,
-            "blur": 12,
-            "color": "#00000066"
-          }
-        ]
+        "fills": [{ "type": "solid", "color": "#00ACC1FF" }],
+        "effects": [{ "type": "dropShadow", "x": 6, "y": 8, "blur": 12, "color": "#00000066" }]
       }
     },
     "inner": {
       "type": "boolean",
       "parentId": "nested",
+      "link": "inner",
       "index": "a0",
       "name": "Union inside",
-      "props": {
-        "x": 420,
-        "y": 880,
-        "width": 200,
-        "height": 180,
-        "op": "union"
-      }
+      "props": { "x": 420, "y": 880, "width": 200, "height": 180, "op": "union" }
     },
     "innerA": {
       "type": "graphic",
       "parentId": "inner",
+      "link": "innerA",
       "index": "a0",
       "name": "Operand innerA",
       "props": {
@@ -901,20 +572,14 @@
         "width": 120,
         "height": 120,
         "rotation": 0,
-        "shape": {
-          "kind": "ellipse"
-        },
-        "fills": [
-          {
-            "type": "solid",
-            "color": "#9E9E9EFF"
-          }
-        ]
+        "shape": { "kind": "ellipse" },
+        "fills": [{ "type": "solid", "color": "#9E9E9EFF" }]
       }
     },
     "innerB": {
       "type": "graphic",
       "parentId": "inner",
+      "link": "innerB",
       "index": "a1",
       "name": "Operand innerB",
       "props": {
@@ -923,20 +588,14 @@
         "width": 120,
         "height": 120,
         "rotation": 0,
-        "shape": {
-          "kind": "ellipse"
-        },
-        "fills": [
-          {
-            "type": "solid",
-            "color": "#9E9E9EFF"
-          }
-        ]
+        "shape": { "kind": "ellipse" },
+        "fills": [{ "type": "solid", "color": "#9E9E9EFF" }]
       }
     },
     "nestedC": {
       "type": "graphic",
       "parentId": "nested",
+      "link": "nestedC",
       "index": "a1",
       "name": "Operand nestedC",
       "props": {
@@ -945,22 +604,14 @@
         "width": 120,
         "height": 120,
         "rotation": 0,
-        "shape": {
-          "kind": "star",
-          "points": 6,
-          "innerRadius": 0.5
-        },
-        "fills": [
-          {
-            "type": "solid",
-            "color": "#9E9E9EFF"
-          }
-        ]
+        "shape": { "kind": "star", "points": 6, "innerRadius": 0.5 },
+        "fills": [{ "type": "solid", "color": "#9E9E9EFF" }]
       }
     },
     "hidden": {
       "type": "boolean",
-      "parentId": "p1",
+      "parentId": "sq",
+      "link": "hidden",
       "index": "aM",
       "name": "Union with a hidden operand",
       "props": {
@@ -969,18 +620,14 @@
         "width": 300,
         "height": 140,
         "op": "union",
-        "fills": [
-          {
-            "type": "solid",
-            "color": "#7CB342FF"
-          }
-        ],
+        "fills": [{ "type": "solid", "color": "#7CB342FF" }],
         "opacity": 0.8
       }
     },
     "hiddenA": {
       "type": "graphic",
       "parentId": "hidden",
+      "link": "hiddenA",
       "index": "a0",
       "name": "Operand hiddenA",
       "props": {
@@ -989,21 +636,14 @@
         "width": 140,
         "height": 140,
         "rotation": 0,
-        "shape": {
-          "kind": "polygon",
-          "sides": 3
-        },
-        "fills": [
-          {
-            "type": "solid",
-            "color": "#9E9E9EFF"
-          }
-        ]
+        "shape": { "kind": "polygon", "sides": 3 },
+        "fills": [{ "type": "solid", "color": "#9E9E9EFF" }]
       }
     },
     "hiddenB": {
       "type": "graphic",
       "parentId": "hidden",
+      "link": "hiddenB",
       "index": "a1",
       "name": "Operand hiddenB",
       "props": {
@@ -1012,21 +652,15 @@
         "width": 140,
         "height": 140,
         "rotation": 0,
-        "shape": {
-          "kind": "ellipse"
-        },
-        "fills": [
-          {
-            "type": "solid",
-            "color": "#9E9E9EFF"
-          }
-        ],
+        "shape": { "kind": "ellipse" },
+        "fills": [{ "type": "solid", "color": "#9E9E9EFF" }],
         "visible": false
       }
     },
     "hiddenC": {
       "type": "graphic",
       "parentId": "hidden",
+      "link": "hiddenC",
       "index": "a2",
       "name": "Operand hiddenC",
       "props": {
@@ -1035,17 +669,9 @@
         "width": 120,
         "height": 100,
         "rotation": 0,
-        "shape": {
-          "kind": "rect"
-        },
-        "fills": [
-          {
-            "type": "solid",
-            "color": "#9E9E9EFF"
-          }
-        ]
+        "shape": { "kind": "rect" },
+        "fills": [{ "type": "solid", "color": "#9E9E9EFF" }]
       }
     }
-  },
-  "overrides": {}
+  }
 }
