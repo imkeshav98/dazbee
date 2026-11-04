@@ -2,7 +2,7 @@
 // reduced motion turns chrome animation off. Screenshots go to output/ for the PR.
 import { editorPath, setCookies, shoot, writeOutput } from '../../support/editor.ts'
 import { liveDesign, seed } from '../../support/seed.ts'
-import { expect, type Page, test } from '../../support/test.ts'
+import { expect, type Locator, type Page, test } from '../../support/test.ts'
 
 test.use({ viewport: { width: 1440, height: 900 } })
 
@@ -231,29 +231,45 @@ test('reduced motion turns chrome animation off: the flyout appears outright and
   }
 })
 
-// Riso Pop and frosted surfaces (#81): floating chrome blurs what is under it and carries grain,
-// in both themes; close-ups of the dock, zoom pill and flyout go to output/ for the PR.
-test('floating chrome is frosted with grain in both themes', async ({ page }) => {
+// Smooth glass: floating chrome blurs what is under it through a see-through fill with no grain, and
+// a menu row under the pointer is lit by a see-through tint, in both themes; close-ups of the dock,
+// zoom pill and flyout go to output/ for the PR.
+test('floating chrome is smooth glass with a see-through hover in both themes', async ({ page }) => {
   test.setTimeout(90_000)
   const designId = await seed(liveDesign())
-  for (const theme of ['dark', 'light'] as const) {
+  const glass = (surface: Locator) =>
+    surface.evaluate((el) => {
+      const s = getComputedStyle(el)
+      return { filter: s.backdropFilter, image: s.backgroundImage }
+    })
+  for (const [theme, tint] of [
+    ['dark', 'rgba(255, 255, 255, 0.07)'],
+    ['light', 'rgba(26, 20, 32, 0.05)'],
+  ] as const) {
     await setCookies(page, { theme })
     await page.goto(editorPath(designId))
     await expect(page.getByTestId('status')).toHaveAttribute('data-ready', '', { timeout: 30_000 })
     await page.getByRole('button', { name: 'Layers', exact: true }).click()
     await expect(page.getByTestId('flyout')).toBeVisible()
     for (const surface of [
+      page.getByTestId('island-start'),
+      page.getByTestId('rail'),
       page.getByRole('toolbar'),
       page.getByRole('group', { name: 'Zoom' }),
       page.getByTestId('flyout'),
     ]) {
-      const style = await surface.evaluate((el) => {
-        const s = getComputedStyle(el)
-        return { filter: s.backdropFilter, image: s.backgroundImage }
-      })
-      expect(style.filter).toContain('blur(18px)')
-      expect(style.image).toContain('feTurbulence')
+      expect(await glass(surface)).toEqual({ filter: 'blur(26px) saturate(1.2)', image: 'none' })
     }
+    // A menu is glass too, and its row under the pointer takes the tint rather than a solid colour.
+    await page.getByTestId('zoom').click()
+    const menu = page.getByTestId('zoom-menu')
+    await expect(menu).toBeVisible()
+    expect(await glass(menu)).toEqual({ filter: 'blur(26px) saturate(1.2)', image: 'none' })
+    const row = menu.getByRole('button').first()
+    await row.hover()
+    await expect.poll(() => row.evaluate((el) => getComputedStyle(el).backgroundColor)).toBe(tint)
+    await page.keyboard.press('Escape')
+    await expect(menu).toBeHidden()
     await shoot(page, `ui-${theme}-frost`)
     const dock = await page.getByRole('toolbar').boundingBox()
     const zoom = await page.getByRole('group', { name: 'Zoom' }).boundingBox()
@@ -287,7 +303,7 @@ test('the panels live in a capsule floating over the canvas', async ({ page }) =
   expect(
     Number.parseFloat(await rail.evaluate((el) => getComputedStyle(el).borderTopLeftRadius)),
   ).toBeGreaterThanOrEqual(box.width / 2)
-  expect(await rail.evaluate((el) => getComputedStyle(el).backdropFilter)).toContain('blur(18px)')
+  expect(await rail.evaluate((el) => getComputedStyle(el).backdropFilter)).toContain('blur(26px)')
 
   // The blob lands on the open panel's button and slides there, stretched, when another opens.
   await expect(page.getByTestId('rail-blob')).toHaveCount(0)

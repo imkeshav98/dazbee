@@ -38,7 +38,7 @@ test('the editor has no top bar: two islands float over the canvas and the ads f
   // The start island sits on a small frosted pill, so the design's name reads over an ad under it;
   // the end island has no surface of its own.
   expect(await page.getByTestId('island-start').evaluate((el) => getComputedStyle(el).backdropFilter)).toContain(
-    'blur(18px)',
+    'blur(26px)',
   )
   expect(start.height).toBeLessThan(48)
   expect(await page.getByTestId('island-end').evaluate((el) => getComputedStyle(el).backgroundColor)).toBe(
