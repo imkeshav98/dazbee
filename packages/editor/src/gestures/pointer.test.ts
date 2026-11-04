@@ -244,6 +244,20 @@ describe('editorPointer', () => {
       expect(cursor()).toBe('')
       expect(log).toEqual(['prevent Space', 'camera 20 15', 'release press', 'draw overlay', 'prevent Space'])
     })
+
+    it('leaves space to a focused control, which it presses: space pans only while the canvas has the focus', () => {
+      const { pointer, log, cursor } = harness()
+      expect(pointer.keyDown(key('Space', log, { target: { tagName: 'BUTTON' } }))).toBe(false)
+      expect(cursor()).toBe('')
+      expect(log).toEqual([])
+      const row = { tagName: 'DIV', getAttribute: (name: string) => (name === 'role' ? 'treeitem' : null) }
+      expect(pointer.keyDown(key('Space', log, { target: row }))).toBe(false)
+      expect(log).toEqual([])
+      // The edit panel takes the focus as it opens, and is no control.
+      const panel = { tagName: 'SECTION', getAttribute: (name: string) => (name === 'role' ? 'dialog' : null) }
+      expect(pointer.keyDown(key('Space', log, { target: panel }))).toBe(true)
+      expect(cursor()).toBe('grab')
+    })
   })
 
   describe('wheel', () => {

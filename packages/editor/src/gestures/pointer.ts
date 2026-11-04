@@ -78,13 +78,35 @@ export interface EditorPointer {
    * is on it, else the layer there, selected, locked or not. Returns the selected layers.
    */
   selectAt(client: Point): string[]
-  /** Space held pans with a drag. Returns whether the key was the pointer's, so nothing else acts on it. */
+  /**
+   * Space held pans with a drag while the canvas has the focus: a focused control takes space as a
+   * press. Returns whether the key was the pointer's, so nothing else acts on it.
+   */
   keyDown(e: KeyboardEvent): boolean
   /** Space let go stops the pan it held. */
   keyUp(e: KeyboardEvent): void
   /** The window losing focus lets go of space. */
   blur(): void
 }
+
+/** The elements and roles of controls that space presses, ticks or types into. */
+const CONTROL_TAGS = new Set(['A', 'BUTTON', 'INPUT', 'SELECT', 'SUMMARY', 'TEXTAREA'])
+const CONTROL_ROLES = new Set([
+  'button',
+  'checkbox',
+  'combobox',
+  'link',
+  'menuitem',
+  'menuitemcheckbox',
+  'menuitemradio',
+  'option',
+  'radio',
+  'slider',
+  'spinbutton',
+  'switch',
+  'tab',
+  'treeitem',
+])
 
 export function editorPointer({
   canvas,
@@ -214,7 +236,7 @@ export function editorPointer({
   }
 
   function keyDown(e: KeyboardEvent) {
-    if (e.code !== 'Space' || e.metaKey || e.ctrlKey) return false
+    if (e.code !== 'Space' || e.metaKey || e.ctrlKey || !onCanvas(e.target)) return false
     e.preventDefault()
     if (!spaceHeld) {
       spaceHeld = true
@@ -472,4 +494,19 @@ export function editorPointer({
     keyUp,
     blur,
   }
+}
+
+/**
+ * Whether a key goes to the canvas: no control that space presses, ticks or types into has the
+ * focus. The canvas takes no focus itself, and the edit panel takes it as it opens without being one.
+ */
+function onCanvas(target: EventTarget | null) {
+  const el = target as {
+    tagName?: unknown
+    isContentEditable?: boolean
+    getAttribute?: (name: string) => string | null
+  } | null
+  if (typeof el?.tagName !== 'string') return true
+  if (CONTROL_TAGS.has(el.tagName) || el.isContentEditable) return false
+  return !CONTROL_ROLES.has(el.getAttribute?.('role') ?? '')
 }

@@ -128,6 +128,25 @@ test('every shape draws with real input: the dock, its menu, its keys, and Shift
   expect(errors).toEqual([])
 })
 
+test('Space presses a focused dock button as Enter does: More shapes opens its menu, Text takes its tool', async ({
+  browser,
+}) => {
+  const { page, errors } = await openStage(browser, design())
+  const camera = await page.evaluate(() => window.dazbee?.camera())
+  await page.getByTestId('shape-menu').focus()
+  await page.keyboard.press('Space')
+  await expect(page.getByRole('menu')).toBeVisible()
+  await page.keyboard.press('Escape')
+  await expect(page.getByRole('menu')).toBeHidden()
+  await page.locator('[role="toolbar"] [data-tool="text"]').focus()
+  await page.keyboard.press('Space')
+  await pressed(page, 'text')
+  expect(await toolOf(page)).toBe('text')
+  // The key went to the button, not to the canvas's pan.
+  expect(await page.evaluate(() => window.dazbee?.camera())).toEqual(camera)
+  expect(errors).toEqual([])
+})
+
 test('two shapes combine into a live boolean that follows a shape dragged inside it', async ({ browser }) => {
   const { page, errors } = await openStage(browser, design())
   await press(page, 'toolRect')
