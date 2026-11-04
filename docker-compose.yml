@@ -3,6 +3,8 @@
 # The API runs the migrations on start, so the sync server waits for it.
 # Health checks run every second while a service starts, then every 30 s, so that once up they
 # stop starting a node process every 2 s beside the browser the e2e suites measure (#36).
+name: dazbee
+
 services:
   postgres:
     image: postgres:16-alpine
