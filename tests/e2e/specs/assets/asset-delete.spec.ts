@@ -89,6 +89,32 @@ test('an image nothing uses is deleted once Delete is confirmed', async ({ brows
   expect(errors).toEqual([])
 })
 
+test('the confirm opens with the focus on Keep: Esc keeps the image, and so does Enter', async ({ browser }) => {
+  const asset = await upload(unique('kept'))
+  const name = `Kept ${run}`
+  await fetch(`${API_URL}/brands/${DEV_BRAND}/assets/${asset.id}`, {
+    method: 'PATCH',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ name }),
+  })
+  const { page, errors } = await openStage(browser, design())
+  const { tile, details } = await deleteFromLibrary(page, asset.id, name)
+  const keep = details.getByRole('button', { name: 'Keep' })
+  await expect(keep).toBeFocused()
+  await page.keyboard.press('Escape')
+  await expect(details.getByTestId('asset-delete-confirm')).toHaveCount(0)
+  await expect(details.getByTestId('asset-delete')).toBeFocused()
+
+  // Enter on the details' Delete asks again, and Enter then keeps the image.
+  await page.keyboard.press('Enter')
+  await expect(keep).toBeFocused()
+  await page.keyboard.press('Enter')
+  await expect(details.getByTestId('asset-delete-confirm')).toHaveCount(0)
+  await expect(tile).toHaveCount(1)
+  expect(await listed(asset.id)).toBe(true)
+  expect(errors).toEqual([])
+})
+
 test('an image the open design uses stays, and the panel says so', async ({ browser }) => {
   const asset = await upload(unique('here'))
   const name = `Here ${run}`
