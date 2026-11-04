@@ -5,7 +5,7 @@ import type { DesignInput } from '@dazbee/schema'
 
 import { photo, upload } from '../../support/assets.ts'
 import { editorPath, exportHashOf, screenPoint, writeOutput } from '../../support/editor.ts'
-import { frameDesign, seed,type Seeded } from '../../support/seed.ts'
+import { frameDesign, seed, type Seeded } from '../../support/seed.ts'
 import { click, openStage, press, read, selection } from '../../support/stage.ts'
 import { expect, type Page, test } from '../../support/test.ts'
 

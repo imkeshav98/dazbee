@@ -5,7 +5,7 @@ import { expect, type Page } from '@playwright/test'
 import type { DesignInput } from '@dazbee/schema'
 
 import { editorPath } from './editor.ts'
-import { frameDesign, linkedFrames, seed,type Seeded } from './seed.ts'
+import { frameDesign, linkedFrames, seed, type Seeded } from './seed.ts'
 
 /** The five frames of `fiveFrames`, by id, the first one holding the layers the others copy. */
 export const FRAMES = {
