@@ -202,6 +202,9 @@ export const LayerRow = memo(function LayerRow({
         <RenameField
           name={node.name}
           label={format(t.editor.layersPanel.rename, { name: node.name })}
+          inputName="layer-name"
+          maxLength={120}
+          className="h-6 min-w-0 flex-1 rounded-row border border-accent bg-raised px-1.5 text-[13px] outline-none"
           onDone={(name, byKey) => api.renamed(id, name, node.name, byKey)}
         />
       ) : (

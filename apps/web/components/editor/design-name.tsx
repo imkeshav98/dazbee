@@ -1,7 +1,8 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useState } from 'react'
 
+import { RenameField } from '@/components/ui/rename-field.tsx'
 import { cn } from '@/lib/cn.ts'
 import { useMessages } from '@/lib/i18n/client.tsx'
 import { format } from '@/lib/i18n/index.ts'
@@ -19,7 +20,6 @@ export function DesignName({
 }) {
   const t = useMessages()
   const [editing, setEditing] = useState(false)
-  const done = useRef(false)
   const title = 'font-display text-sm font-semibold tracking-tight'
   if (!onRename) return <h1 className={cn(title, 'truncate')}>{name}</h1>
   if (!editing) {
@@ -38,32 +38,18 @@ export function DesignName({
       </h1>
     )
   }
-  const finish = (field: HTMLInputElement, save: boolean) => {
-    if (done.current) return
-    done.current = true
-    const next = field.value.trim()
-    setEditing(false)
-    if (save && next && next !== name) void onRename(next)
-  }
   return (
-    <input
-      name="design-name"
-      aria-label={format(t.library.renameDesign, { name })}
-      defaultValue={name}
+    <RenameField
+      name={name}
+      label={format(t.library.renameDesign, { name })}
+      inputName="design-name"
       maxLength={120}
-      autoFocus
-      onFocus={(event) => {
-        done.current = false
-        event.currentTarget.select()
-      }}
-      onBlur={(event) => finish(event.currentTarget, true)}
-      onKeyDown={(event) => {
-        // Keys typed into the name are the name's, not the stage's.
-        event.stopPropagation()
-        if (event.key === 'Enter') finish(event.currentTarget, true)
-        else if (event.key === 'Escape') finish(event.currentTarget, false)
-      }}
       className="h-7 w-48 min-w-0 rounded-[6px] border border-accent bg-bg px-1.5 font-display text-sm font-semibold tracking-tight outline-none"
+      onDone={(next) => {
+        setEditing(false)
+        const trimmed = next?.trim()
+        if (trimmed && trimmed !== name) void onRename(trimmed)
+      }}
     />
   )
 }

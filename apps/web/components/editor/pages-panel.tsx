@@ -14,6 +14,7 @@ import { type Design, inOrder } from '@dazbee/schema'
 import { BackgroundBody } from '@/components/editor/edit-panel/colour-panel.tsx'
 import { PanelFrame } from '@/components/editor/edit-panel/edit-panel.tsx'
 import { FOCUS_RING } from '@/components/ui/looks.ts'
+import { RenameField } from '@/components/ui/rename-field.tsx'
 import { cn } from '@/lib/cn.ts'
 import { useValue } from '@/lib/editor/value-store.ts'
 import { useMessages } from '@/lib/i18n/client.tsx'
@@ -177,9 +178,9 @@ function PageList({ editor, onRemoved }: { editor: Editor; onRemoved: (message: 
     // After the command's redraw, so a new page's row is in the grid already.
     requestAnimationFrame(() => editor.fitPage(id))
   }
-  const rename = (id: string, name: string) => {
+  const rename = (id: string, name: string | null) => {
     setRenaming(null)
-    const trimmed = name.trim()
+    const trimmed = name?.trim()
     if (trimmed && trimmed !== design.pages[id]?.name) run('page.update', { id, name: trimmed })
   }
   // Landing just before or after the dragged page leaves the order as it is.
@@ -262,19 +263,12 @@ function PageList({ editor, onRemoved }: { editor: Editor; onRemoved: (message: 
                 </span>
               </span>
               {renaming === id ? (
-                <input
-                  name="page-name"
-                  aria-label={g.rename}
-                  defaultValue={page.name}
-                  autoFocus
-                  onFocus={(e) => e.currentTarget.select()}
-                  onBlur={(e) => rename(id, e.currentTarget.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') rename(id, e.currentTarget.value)
-                    if (e.key === 'Escape') setRenaming(null)
-                    e.stopPropagation()
-                  }}
+                <RenameField
+                  name={page.name}
+                  label={g.rename}
+                  inputName="page-name"
                   className="h-7 min-w-0 flex-1 rounded-[6px] border border-accent bg-surface px-1.5 text-[13px] outline-none"
+                  onDone={(name) => rename(id, name)}
                 />
               ) : (
                 <button
