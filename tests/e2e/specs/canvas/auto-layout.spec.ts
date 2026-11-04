@@ -1,5 +1,5 @@
 // Auto layout (#46), with real pointer and keyboard input: typing into a button's label grows the
-// button and pushes what follows it along the row; and Shift+A turns a frame laid out by hand into
+// button and pushes what follows it along the row; and Shift+A turns a box laid out by hand into
 // auto layout without moving anything, after which deleting a child closes the gap.
 import type { DesignInput } from '@dazbee/schema'
 
@@ -39,7 +39,7 @@ const design = (): DesignInput => ({
   nodes: {
     // A row: a button that hugs its label, then a tile, 24 apart, centred across.
     bar: {
-      type: 'frame',
+      type: 'box',
       parentId: 'p1',
       index: 'a0',
       name: 'Bar',
@@ -53,7 +53,7 @@ const design = (): DesignInput => ({
       },
     },
     btn: {
-      type: 'frame',
+      type: 'box',
       parentId: 'bar',
       index: 'a0',
       name: 'Button',
@@ -83,9 +83,9 @@ const design = (): DesignInput => ({
       },
     },
     tile: rect('bar', 'a1', 0, 0, 120, 120, '#2F6BFFFF'),
-    // Laid out by hand: three tiles in a row, 20 apart, 30 in from the frame's top and left.
+    // Laid out by hand: three tiles in a row, 20 apart, 30 in from the box's top and left.
     shelf: {
-      type: 'frame',
+      type: 'box',
       parentId: 'p1',
       index: 'a1',
       name: 'Shelf',
@@ -148,7 +148,7 @@ test("typing into a button's label grows the button and moves the tile after it 
   expect(errors).toEqual([])
 })
 
-test("Shift+A turns a frame into auto layout without moving anything, and a deleted child's gap closes", async ({
+test("Shift+A turns a box into auto layout without moving anything, and a deleted child's gap closes", async ({
   browser,
 }) => {
   const { page, errors } = await openStage(browser, design())

@@ -2,7 +2,7 @@
 import { designPlace, nodeDuplicate, nodeMove, nodeReorder } from './arrange.ts'
 import { nodeAutoLayout } from './auto-layout.ts'
 import { formatAdd, formatRemove, formatSetPrimary, formatUpdate } from './formats.ts'
-import { nodeBoolean, nodeEnclose, nodeFrame, nodeGroup, nodeHug, nodeUngroup } from './groups.ts'
+import { nodeBoolean, nodeBox, nodeEnclose, nodeGroup, nodeHug, nodeUngroup } from './groups.ts'
 import {
   nodeBind,
   nodeCreate,
@@ -33,7 +33,7 @@ export const COMMANDS = {
   'node.duplicate': nodeDuplicate,
   'design.place': designPlace,
   'node.group': nodeGroup,
-  'node.frame': nodeFrame,
+  'node.box': nodeBox,
   'node.enclose': nodeEnclose,
   'node.boolean': nodeBoolean,
   'node.ungroup': nodeUngroup,

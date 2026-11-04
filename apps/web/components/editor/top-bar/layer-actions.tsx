@@ -115,7 +115,7 @@ export function LayerActions({ editor, ids, onDone }: { editor: Editor; ids: str
       )}
       <div className={MENU_DIVIDER} />
       {ids.length > 1 && row('group', t.editor.arrange.group)}
-      {row('frameSelection', b.putInBox)}
+      {row('boxSelection', b.putInBox)}
       {row('mask', t.editor.arrange.mask, masks)}
       {target.types.some((type) => type === 'group') && row('ungroup', t.editor.arrange.ungroup)}
       <div className={MENU_DIVIDER} />

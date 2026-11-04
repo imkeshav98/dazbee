@@ -1,7 +1,7 @@
 // Text resizes as in Canva: a corner scales the text, its box keeping its shape; a side changes
 // the width; only a fixed box has top and bottom handles. A drag changes the size shown only, runs
 // and shrink to fit included, in one undo step, and stops at 1 px. Text in a group scales with it,
-// text in a frame doesn't, and text whose style is locked resizes its box only.
+// text in a box doesn't, and text whose style is locked resizes its box only.
 import { type DesignInput, formatScope } from '@dazbee/schema'
 
 import { writeOutput } from '../../support/editor.ts'
@@ -176,7 +176,7 @@ test("a side changes the width and the size stays; shrink to fit's sizes scale w
   expect(errors).toEqual([])
 })
 
-test('a corner on a group scales the text in it; text in a frame keeps its size; style-locked text resizes its box only', async ({
+test('a corner on a group scales the text in it; text in a box keeps its size; style-locked text resizes its box only', async ({
   browser,
 }) => {
   const { page, errors } = await openStage(
@@ -191,7 +191,7 @@ test('a corner on a group scales the text in it; text in a frame keeps its size;
       },
       inGroup: { ...text('inGroup', {}), parentId: 'group' },
       box: {
-        type: 'frame',
+        type: 'box',
         parentId: 'p1',
         index: 'a1',
         name: 'Box',
@@ -200,7 +200,7 @@ test('a corner on a group scales the text in it; text in a frame keeps its size;
       inBox: { ...text('inBox', { y: 420 }), parentId: 'box' },
       locked: text('locked', { y: 700 }, { lock: { style: true } }),
       boxInGroup: {
-        type: 'frame',
+        type: 'box',
         parentId: 'group',
         index: 'a9',
         name: 'Box in group',

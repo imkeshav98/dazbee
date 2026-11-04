@@ -23,7 +23,7 @@ import { AnimatePresence, motion, MotionConfig, useReducedMotion } from 'motion/
 import Link from 'next/link'
 import { createContext, type ReactNode, useContext, useEffect, useLayoutEffect, useRef, useState } from 'react'
 
-import type { ShapeTool } from '@dazbee/editor'
+import type { ShapeMenuTool } from '@dazbee/editor'
 
 import { ShapeTools } from '@/components/editor/menus/shape-menu.tsx'
 import { DazbeeMark } from '@/components/ui/dazbee-mark.tsx'
@@ -154,8 +154,8 @@ export function EditorShell({
   /** The tool in use, when the editor decides it (a key, or drawing a shape ends); the dock keeps its own otherwise. */
   tool?: Tool
   /** The shape the shape tool draws (#44). */
-  shape?: ShapeTool
-  onToolChange?: (tool: Tool, shape: ShapeTool) => void
+  shape?: ShapeMenuTool
+  onToolChange?: (tool: Tool, shape: ShapeMenuTool) => void
   /** The image tool: whether it is waiting for an image to be picked, and what to do with the one picked. */
   image?: { picking: boolean; onPick: (asset: Placeable) => void }
   /** Called with the stage's edges the always-on chrome covers, once it is first measured and whenever they change. */

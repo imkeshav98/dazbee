@@ -1,7 +1,7 @@
 // Canvas gestures follow the container they act on, with real pointer and keyboard input: an auto
-// layout frame resized from its handle keeps its circles' size and reflows them; a plain frame
+// layout box resized from its handle keeps its circles' size and reflows them; a plain box
 // keeps what it holds as it is while a group scales it; a child of auto layout resized gets a fixed
-// size and its siblings move up; a child dragged moves along the flow, or out of the frame; the
+// size and its siblings move up; a child dragged moves along the flow, or out of the box; the
 // arrow keys reorder along the flow and explain across it; auto text resized keeps the size given.
 import type { DesignInput } from '@dazbee/schema'
 
@@ -64,9 +64,9 @@ const design = (): DesignInput => ({
   },
   pages: { p1: { name: 'Page 1', order: 'a0', fills: [{ type: 'solid', color: '#FFF8F0FF' }] } },
   nodes: {
-    // Four circles in a row that wraps, the frame as tall as they need.
+    // Four circles in a row that wraps, the box as tall as they need.
     row: {
-      type: 'frame',
+      type: 'box',
       parentId: 'p1',
       index: 'a0',
       name: 'Row',
@@ -91,7 +91,7 @@ const design = (): DesignInput => ({
     c2: circle('C2', 'a2'),
     c3: circle('C3', 'a3'),
     plain: {
-      type: 'frame',
+      type: 'box',
       parentId: 'p1',
       index: 'a1',
       name: 'Plain',
@@ -108,7 +108,7 @@ const design = (): DesignInput => ({
     g0: rect('G0', 'grp', 'a0', 660, 360, 120, 120, '#FF2E7EFF'),
     g1: rect('G1', 'grp', 'a1', 840, 360, 120, 120, '#2F6BFFFF'),
     turned: {
-      type: 'frame',
+      type: 'box',
       parentId: 'p1',
       index: 'a3',
       name: 'Turned',
@@ -169,7 +169,7 @@ async function dragDesign(page: Page, from: { x: number; y: number }, to: { x: n
   await page.evaluate(() => window.dazbee?.drawn())
 }
 
-test("an auto layout frame resized from its handle keeps its circles' size and reflows them; one undo step", async ({
+test("an auto layout box resized from its handle keeps its circles' size and reflows them; one undo step", async ({
   browser,
 }) => {
   const { page, errors } = await openStage(browser, design())
@@ -204,7 +204,7 @@ test("an auto layout frame resized from its handle keeps its circles' size and r
   expect(errors).toEqual([])
 })
 
-test('a plain frame keeps what it holds as it is, also turned; a group still scales it', async ({ browser }) => {
+test('a plain box keeps what it holds as it is, also turned; a group still scales it', async ({ browser }) => {
   const { page, errors } = await openStage(browser, design())
   const inner = await boxOf(page, 'inner')
   await click(page, 960, 260)
@@ -253,7 +253,7 @@ test('a child of auto layout: a resize fixes its size and the flow moves up; a d
   await press(page, 'undo')
   expect(await order(page, 'row')).toEqual(['c0', 'c1', 'c2', 'c3'])
 
-  // Dragged out of the frame: it leaves it, and lands where it was dropped.
+  // Dragged out of the box: it leaves it, and lands where it was dropped.
   await dragDesign(page, { x: 130, y: 130 }, { x: 330, y: 830 }, 'layout-move-2-out.png')
   expect((await read(page)).nodes.c0?.parentId).toBe('p1')
   near(await boxOf(page, 'c0'), { x: 280, y: 780, width: 100, height: 100 }, 'c0 out')
@@ -287,7 +287,7 @@ test('auto width text resized takes the size given instead of snapping back', as
   expect(errors).toEqual([])
 })
 
-test('a fill child grows with its frame; in a wrapped flow a drag lands next to the layer it is dropped by', async ({
+test('a fill child grows with its box; in a wrapped flow a drag lands next to the layer it is dropped by', async ({
   browser,
 }) => {
   const content = design()

@@ -1,6 +1,6 @@
-// The In the stack card in Chromium, with real input: a child of an auto layout frame
+// The In the stack card in Chromium, with real input: a child of an auto layout box
 // fills the room, fits its content or keeps its own size on each axis, and can be kept where it is put;
-// the frame itself hugs its children. A layer outside any auto layout has no such card.
+// the box itself hugs its children. A layer outside any auto layout has no such card.
 import type { DesignInput } from '@dazbee/schema'
 
 import { writeOutput } from '../../support/editor.ts'
@@ -37,7 +37,7 @@ const design = (): DesignInput => ({
   pages: { p1: { name: 'Page 1', order: 'a0', fills: [{ type: 'solid', color: '#FFFFFFFF' }] } },
   nodes: {
     stack: {
-      type: 'frame',
+      type: 'box',
       parentId: 'p1',
       index: 'a0',
       name: 'Stack',
@@ -101,7 +101,7 @@ test('a child of an auto layout fills, hugs or keeps its size, and can leave the
   await keep.click()
   await expect.poll(async () => (await propsOf(page, 'two')).absolute).toBeUndefined()
 
-  // The frame itself hugs its children, so it shrinks to them: its sizing is in the Stack card.
+  // The box itself hugs its children, so it shrinks to them: its sizing is in the Stack card.
   await selectLayers(page, ['stack'], { card: 'layout-card' })
   await expect(await card()).toHaveCount(0)
   await selectLayers(page, ['two'], { card: 'layout-card' })

@@ -117,7 +117,7 @@ describe('editorDrawing', () => {
       expect(props(made()[0] as string)).toMatchObject({ x: 450, y: 450, width: 100, height: 100 })
     })
 
-    it('goes into the group or frame gone into, when it can hold it', () => {
+    it('goes into the group or box gone into, when it can hold it', () => {
       const { drawing, session, selection, at, made } = harness()
       session.run('node.group', { ids: ['rect'] })
       const group = session.design().nodes.rect?.parentId as string
@@ -128,18 +128,32 @@ describe('editorDrawing', () => {
     })
   })
 
-  describe('a frame', () => {
-    it('takes in the layers wholly inside it, in the same undo step', () => {
+  // The shape menu's Box and the Frame tool both draw a box.
+  describe.each(['box', 'frame'] as const)('a box drawn with the %s tool', (tool) => {
+    it('is a white box named Box that takes in the layers wholly inside it, in the same undo step', () => {
       const { drawing, session, at, made } = harness()
-      const drag = drawing.pressShape(pointer, 'frame', at(50, 50))
+      const drag = drawing.pressShape(pointer, tool, at(50, 50))
       if (!drag) throw new Error('no drag')
       drawing.drag(drag, { x: 300, y: 300 }, false, false)
       drawing.release(drag)
+      expect(session.design().nodes[drag.id]).toMatchObject({
+        type: 'box',
+        name: 'Box',
+        props: { fills: [{ type: 'solid', color: '#FFFFFFFF' }] },
+      })
       expect(session.design().nodes.rect?.parentId).toBe(drag.id)
       expect(session.design().nodes.dot?.parentId).toBe('p1')
       session.undo()
       expect(made()).toEqual([])
       expect(session.design().nodes.rect?.parentId).toBe('p1')
+    })
+
+    it('draws a click 200 across, centred where it landed', () => {
+      const { drawing, at, made, props } = harness()
+      const drag = drawing.pressShape(pointer, tool, at(500, 500))
+      if (!drag) throw new Error('no drag')
+      drawing.release(drag)
+      expect(props(made()[0] as string)).toMatchObject({ x: 400, y: 400, width: 200, height: 200 })
     })
   })
 

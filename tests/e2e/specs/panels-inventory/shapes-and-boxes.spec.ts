@@ -9,7 +9,7 @@ import { barMenu, openCard, strokeList } from '../../support/top-bar.ts'
 
 const row = setupInventory()
 
-test.describe('shapes and frames', () => {
+test.describe('shapes and boxes', () => {
   row(35, 'stroke list: add, remove, reorder, several, on a shape and a box', async (open) => {
     const page = await open()
     await selectLayers(page, ['box'], { bar: true })
@@ -268,7 +268,7 @@ test.describe('shapes and frames', () => {
     )
     // A box has the same corners, in its Box card.
     await selectLayers(page, ['plain'], { bar: true })
-    const box = async () => await openCard(page, 'frame-card')
+    const box = async () => await openCard(page, 'box-card')
     await step(
       page,
       async () => enter((await box()).getByRole('spinbutton', { name: 'Corners' }), '50'),

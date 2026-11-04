@@ -109,7 +109,7 @@ export interface Editor {
    * and that format's overrides); null leaves it be. In this format only (`everyFormat` false)
    * the values become overrides of the frame's format, as a drag on the stage does. In every
    * format they become the base values and the layers' overrides of those properties go, so every
-   * format shows what this one does. X and Y of a group or frame carry what it holds along;
+   * format shows what this one does. X and Y of a group or box carry what it holds along;
    * groups fit what they hold again. A fill, text colour or font set by hand no longer follows
    * the brand. False when a change isn't allowed, such as on a locked layer.
    */

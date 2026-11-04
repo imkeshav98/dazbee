@@ -1,4 +1,4 @@
-// Commands that put layers in a new group, frame or boolean without moving them on screen, take them out
+// Commands that put layers in a new group, box or boolean without moving them on screen, take them out
 // again, and fit groups to what they hold.
 import { nanoid } from 'nanoid'
 import { z } from 'zod'
@@ -14,7 +14,7 @@ import { mergedProps, Placement } from './placement.ts'
 import { depthOf, indexBetween } from './tree.ts'
 
 /**
- * Where layers are drawn, by scope, as the caller sees them: inside an auto layout frame the flow
+ * Where layers are drawn, by scope, as the caller sees them: inside an auto layout box the flow
  * places them, not their stored boxes, and only the renderer lays the flow out.
  */
 const DrawnBoxes = z.record(
@@ -40,26 +40,26 @@ export const nodeGroup = defineCommand({
 })
 
 /**
- * Wraps layers that share a parent in a new frame where the topmost of them was, without changing
- * anything on screen: its box hugs them in each format, it has no fill, and it doesn't clip, so a
- * stroke or shadow past a layer's box still shows. Returns the frame's id.
+ * Wraps layers that share a parent in a new box where the topmost of them was, without changing
+ * anything on screen: it hugs them in each format, it has no fill, and it doesn't clip, so a
+ * stroke or shadow past a layer's box still shows. Returns the box's id.
  */
-export const nodeFrame = defineCommand({
-  name: 'node.frame',
+export const nodeBox = defineCommand({
+  name: 'node.box',
   input: z.object({
     ids: NodeId.array().min(1),
     id: NodeId.optional(),
-    name: z.string().default('Frame'),
+    name: z.string().default('Box'),
     drawn: DrawnBoxes.optional(),
   }),
-  check: (ctx, { ids, id }) => wrapProblem(ctx, ids, id, 'frame'),
+  check: (ctx, { ids, id }) => wrapProblem(ctx, ids, id, 'box'),
   apply: (ctx, { ids, id = nanoid(), name, drawn }) =>
-    wrap(ctx, ids, id, { type: 'frame', name, props: { clip: false } }, drawn),
+    wrap(ctx, ids, id, { type: 'box', name, props: { clip: false } }, drawn),
 })
 
 /**
- * Moves layers into a frame beside them, as when a frame is drawn around them, without moving them
- * on screen. The frame was drawn in one format (`scope`); in every other scope it is placed around
+ * Moves layers into a box beside them, as when a box is drawn around them, without moving them
+ * on screen. The box was drawn in one format (`scope`); in every other scope it is placed around
  * the layers as they are there, as far from them and as large against them as where it was drawn,
  * so it holds them in every format. They keep their order inside it.
  */
@@ -67,16 +67,16 @@ export const nodeEnclose = defineCommand({
   name: 'node.enclose',
   input: z.object({ id: NodeId, ids: NodeId.array().min(1), scope: Scope }),
   check: ({ design }, { id, ids, scope }) => {
-    const frame = design.nodes[id]
-    if (!frame) return missingLayer(design, [id])
-    if (frame.type !== 'frame') return `"${id}" is a ${frame.type}, not a frame`
+    const box = design.nodes[id]
+    if (!box) return missingLayer(design, [id])
+    if (box.type !== 'box') return `"${id}" is a ${box.type}, not a box`
     if (!design.formats[formatIdOf(scope) ?? '']) return `no format "${formatIdOf(scope) ?? scope}"`
     for (const layer of ids) {
       const node = design.nodes[layer]
       if (!node) return missingLayer(design, [layer])
       if (layer === id) return `can't put "${id}" inside itself`
-      if (node.parentId !== frame.parentId) return `"${layer}" is not beside "${id}"`
-      if (!canHold('frame', node.type)) return `a frame can't hold a ${node.type}`
+      if (node.parentId !== box.parentId) return `"${layer}" is not beside "${id}"`
+      if (!canHold('box', node.type)) return `a box can't hold a ${node.type}`
     }
     return undefined
   },
@@ -245,8 +245,8 @@ export const nodeHug = defineCommand({
   },
 })
 
-/** What wrapping layers in a new group, frame or boolean checks: they exist, share a parent, and the parent can hold the wrapper. */
-function wrapProblem(ctx: CommandContext, ids: string[], id: string | undefined, type: 'group' | 'frame' | 'boolean') {
+/** What wrapping layers in a new group, box or boolean checks: they exist, share a parent, and the parent can hold the wrapper. */
+function wrapProblem(ctx: CommandContext, ids: string[], id: string | undefined, type: 'group' | 'box' | 'boolean') {
   const { design } = ctx
   const missing = missingLayer(design, ids)
   if (missing) return missing
@@ -267,7 +267,7 @@ function wrap(
   { r, design }: CommandContext,
   ids: string[],
   id: string,
-  layer: { type: 'group' | 'frame' | 'boolean'; name: string; props?: Record<string, unknown> },
+  layer: { type: 'group' | 'box' | 'boolean'; name: string; props?: Record<string, unknown> },
   drawn: DrawnBoxes = {},
 ) {
   const parentId = design.nodes[ids[0] as string]?.parentId as string

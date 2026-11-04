@@ -1,5 +1,5 @@
 // Dragging layers that auto layout places: along their flow to a new place in it, or out of its
-// frame; the arrow keys moving them a place at a time; and the ghosts and line the overlay draws.
+// box; the arrow keys moving them a place at a time; and the ghosts and line the overlay draws.
 import { childrenOf, type Session } from '@dazbee/doc'
 import { canHold, type Design, type Point } from '@dazbee/schema'
 
@@ -41,9 +41,9 @@ export interface AutoLayoutDragDeps {
 }
 
 export interface EditorAutoLayoutDrag {
-  /** A drag in a flow as the overlay shows it: the layers following the pointer, and the line where they would go or their frame outlined. */
+  /** A drag in a flow as the overlay shows it: the layers following the pointer, and the line where they would go or their box outlined. */
   parts(g: ReorderDrag | null): HTMLElement[]
-  /** A press on layers auto layout places, all in one flow: a drag along it or out of its frame, one undo step until it is released. Null for any others. */
+  /** A press on layers auto layout places, all in one flow: a drag along it or out of its box, one undo step until it is released. Null for any others. */
   press(frame: Frame, around: Box[], p: Point, ids: string[]): ReorderDrag | null
   /** Follows the pointer, once past the click slop: where in the flow the layers would go, or whether they leave it. */
   drag(g: ReorderDrag, p: Point): void
@@ -62,8 +62,8 @@ export function editorAutoLayoutDrag({
   outline,
 }: AutoLayoutDragDeps): EditorAutoLayoutDrag {
   /**
-   * A drag in a flow: the layers following the pointer, and inside the frame a line where they would
-   * go; outside it, the frame outlined, since a drop there takes them out.
+   * A drag in a flow: the layers following the pointer, and inside the box a line where they would
+   * go; outside it, the box outlined, since a drop there takes them out.
    */
   function reorderParts(g: ReorderDrag | null) {
     if (!g?.moved) return []
@@ -85,7 +85,7 @@ export function editorAutoLayoutDrag({
     const gap = (propIn(g.frame, g.parentId, 'layout', now) as AutoLayoutOf | undefined)?.gap ?? 0
     const near = g.near && boxIn(g.frame, g.near.id, now)
     const thick = 2 / camera().zoom
-    // Halfway into the gap beside the nearest sibling; at the frame's start when the flow is empty.
+    // Halfway into the gap beside the nearest sibling; at the box's start when the flow is empty.
     const edge = !near
       ? row
         ? holder.x
@@ -103,14 +103,14 @@ export function editorAutoLayoutDrag({
 
   /**
    * A press on layers that auto layout places, all in one flow: a drag that moves them along it,
-   * or out of its frame. Null for layers that aren't.
+   * or out of its box. Null for layers that aren't.
    */
   function press(frame: Frame, around: Box[], p: Point, ids: string[]): ReorderDrag | null {
     const now = session.design()
     const parents = new Set(ids.map((id) => now.nodes[id]?.parentId))
     const [flowParent] = parents
     if (flowParent && parents.size === 1 && ids.every((id) => inFlow(frame, id, now))) {
-      // Auto layout places these: a drag moves them along the flow, or out of the frame.
+      // Auto layout places these: a drag moves them along the flow, or out of the box.
       const from = localTo(p, around)
       return {
         kind: 'reorder',
@@ -170,8 +170,8 @@ export function editorAutoLayoutDrag({
     g.end()
   }
   /**
-   * Drops layers dragged in a flow, one undo step: inside their frame, into the place the line
-   * showed; outside it, out of the frame into what holds it, where they were dropped in this
+   * Drops layers dragged in a flow, one undo step: inside their box, into the place the line
+   * showed; outside it, out of the box into what holds it, where they were dropped in this
    * format and where the flow had them in the others.
    */
   function finishReorder(g: ReorderDrag) {
@@ -193,7 +193,7 @@ export function editorAutoLayoutDrag({
     if (!now.nodes[g.parentId]) return
     const dx = g.to.x - g.from.x
     const dy = g.to.y - g.from.y
-    // The container the drop point is in, among those holding the frame, nearest first; or the page.
+    // The container the drop point is in, among those holding the box, nearest first; or the page.
     const point = pageFrom(g.to, g.around)
     let branch = g.parentId
     let target = now.nodes[g.parentId]?.parentId ?? g.frame.pageId

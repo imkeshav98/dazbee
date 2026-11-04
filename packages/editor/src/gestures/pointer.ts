@@ -407,7 +407,7 @@ export function editorPointer({
       const picked = target(hit.id, at.frame.key)
       const container = view.design().nodes[picked]
       if (picked !== hit.id && container && isContainer(container.type)) {
-        // Into the group, frame or boolean: what is directly inside it under the pointer gets picked.
+        // Into the group, box or boolean: what is directly inside it under the pointer gets picked.
         typing.stop()
         selection.enter(picked)
         selection.selectKeepingModes(null)

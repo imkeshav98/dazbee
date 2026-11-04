@@ -16,9 +16,9 @@ test.describe.configure({ timeout: 120_000 })
 
 const notes = Buffer.from('Not a picture.\n')
 
-/** A frame with a solid fill, 100 in from the page's top and left, 400 square. */
+/** A box with a solid fill, 100 in from the page's top and left, 400 square. */
 const box: DesignInput['nodes'][string] = {
-  type: 'frame',
+  type: 'box',
   parentId: 'p1',
   index: 'a0',
   name: 'Box',
@@ -160,7 +160,7 @@ test('several images dropped on the canvas upload once each and go on cascading 
   expect(errors).toEqual([])
 })
 
-test('an image dropped with a text file on a frame in the second format lights the frame, fills it and selects it in that format, as one undo step', async ({
+test('an image dropped with a text file on a box in the second format lights the box, fills it and selects it in that format, as one undo step', async ({
   browser,
 }) => {
   const brandId = await newBrand('e2e dropped files')
@@ -180,7 +180,7 @@ test('an image dropped with a text file on a frame in the second format lights t
     { name: 'notes.txt', type: 'text/plain', bytes: notes },
   ]
   const at = await screenPoint(page, 300, 300, { pageId: 'p1', formatId: 'wide' })
-  // The text file will be left out, so the one image lights the frame it would fill.
+  // The text file will be left out, so the one image lights the box it would fill.
   await dragFilesOver(page, at, files)
   await expect(page.locator('.stage-overlay .drop-target')).toHaveCount(1)
   expect(await dropFiles(page, at, files)).toBe(true)
@@ -188,11 +188,11 @@ test('an image dropped with a text file on a frame in the second format lights t
   const fills = async () =>
     ((await read(page)).nodes as unknown as Record<string, { props: { fills: { type: string; assetId?: string }[] } }>)
       .box?.props.fills
-  // The image goes on top of the frame's colour.
+  // The image goes on top of the box's colour.
   await expect.poll(async () => (await fills())?.map((f) => f.type), { timeout: 30_000 }).toEqual(['solid', 'image'])
   const [asset] = await assetsOf(brandId)
   expect((await fills())?.[1]?.assetId).toBe(asset?.id)
-  // No new layer: the frame took the image, and it is selected where it was dropped.
+  // No new layer: the box took the image, and it is selected where it was dropped.
   expect(Object.keys((await read(page)).nodes)).toEqual(['box'])
   expect(await selection(page)).toEqual(['box'])
   expect(await page.evaluate(() => window.dazbee?.selectedFrame())).toBe('p1/wide')

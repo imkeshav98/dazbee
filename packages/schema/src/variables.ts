@@ -18,7 +18,7 @@ export const VariableRef = z.templateLiteral(['brand:', BrandToken])
 export type VariableRef = z.infer<typeof VariableRef>
 
 /**
- * What a layer can bind (#53): the colour of its topmost solid fill (a graphic, frame or boolean),
+ * What a layer can bind (#53): the colour of its topmost solid fill (a graphic, box or boolean),
  * or its text's base colour and font family. Runs that set their own colour or font keep it.
  */
 export const BINDING_TARGETS = ['fill', 'textColor', 'fontFamily'] as const
@@ -37,7 +37,7 @@ export const brandRef = (token: string): VariableRef => `brand:${token}` as Vari
 
 /** Whether a layer of this type has the property a target binds. */
 export const canBind = (type: string, target: BindingTarget) =>
-  target === 'fill' ? type === 'graphic' || type === 'frame' || type === 'boolean' : type === 'text'
+  target === 'fill' ? type === 'graphic' || type === 'box' || type === 'boolean' : type === 'text'
 
 /** Whether a value suits a target: a colour for a fill or text colour, a family name for a font. */
 export const fitsTarget = (target: BindingTarget, value: string) =>

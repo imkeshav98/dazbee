@@ -70,14 +70,14 @@ export const topBarDesign = (assetId: string): DesignInput => ({
         strokes: [{ paint: { type: 'solid', color: '#111111FF' }, width: 4, align: 'center' }],
       },
     },
-    frame: {
-      type: 'frame',
+    card: {
+      type: 'box',
       parentId: 'p1',
       index: 'a4',
       name: 'Card',
       props: { x: 60, y: 440, width: 300, height: 200, fills: solid('#EEF1F6FF'), cornerRadius: 16 },
     },
-    inFrame: rect('In card', 'a0', 80, 460, { width: 80, height: 60 }, 'frame'),
+    inCard: rect('In card', 'a0', 80, 460, { width: 80, height: 60 }, 'card'),
     group: {
       type: 'group',
       parentId: 'p1',
@@ -109,15 +109,15 @@ export const topBarDesign = (assetId: string): DesignInput => ({
       props: { x: 820, y: 440, width: 200, height: 200, shape: { kind: 'ellipse' } },
     },
     photo: rect('Photo', 'a7', 60, 720, { width: 300, height: 300, fills: [{ type: 'image', assetId, fit: 'fill' }] }),
-    photoFrame: {
-      type: 'frame',
+    photoBox: {
+      type: 'box',
       parentId: 'p1',
       index: 'a8',
       name: 'Photo box',
       props: { x: 400, y: 720, width: 300, height: 300, fills: [{ type: 'image', assetId, fit: 'fill' }] },
     },
     stack: {
-      type: 'frame',
+      type: 'box',
       parentId: 'p1',
       index: 'a9',
       name: 'Stack',
@@ -145,8 +145,8 @@ export const topBarDesign = (assetId: string): DesignInput => ({
       height: 80,
       fills: [{ type: 'image', assetId, fit: 'fill' }],
     }),
-    frameB: {
-      type: 'frame',
+    cardB: {
+      type: 'box',
       parentId: 'p1',
       index: 'b5',
       name: 'Card B',

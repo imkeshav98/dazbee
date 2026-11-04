@@ -28,7 +28,7 @@ const text = (parentId: string, index: string, boxMode: 'fixed' | 'autoWidth') =
   props: { x: 0, y: 0, width: 100, height: 24, text: 'Hi', boxMode, style: STYLE },
 })
 /**
- * One page in one format: a group holding a text and a rect, a frame holding a text, a row laid out
+ * One page in one format: a group holding a text and a rect, a box holding a text, a row laid out
  * by auto layout holding a rect, a text that grows with its words, and one whose style is locked.
  */
 const DESIGN: DesignInput = {
@@ -45,10 +45,10 @@ const DESIGN: DesignInput = {
     },
     grouped: text('group', 'a0', 'fixed'),
     inGroup: rect('group', 'a1', { x: 50, y: 50, width: 50, height: 50 }),
-    card: { type: 'frame', parentId: 'p1', index: 'a1', name: 'Card', props: { x: 0, y: 0, width: 100, height: 100 } },
+    card: { type: 'box', parentId: 'p1', index: 'a1', name: 'Card', props: { x: 0, y: 0, width: 100, height: 100 } },
     framed: text('card', 'a0', 'fixed'),
     row: {
-      type: 'frame',
+      type: 'box',
       parentId: 'p1',
       index: 'a2',
       name: 'Row',
@@ -110,7 +110,7 @@ describe('resizedBoxes', () => {
     expect(next.get('flowing')).toEqual(box(0, 200, 60, 60))
   })
 
-  it("scales a group's layers with it, and keeps a frame's where they are", () => {
+  it("scales a group's layers with it, and keeps a box's where they are", () => {
     const { session, frame } = harness()
     const group = resizedBoxes(
       session.design(),
@@ -139,7 +139,7 @@ describe('resizedBoxes', () => {
     expect(card.get('framed')).toEqual(box(10, 10, 50, 24))
   })
 
-  it("moves a frame's layers along with it when several layers are resized", () => {
+  it("moves a box's layers along with it when several layers are resized", () => {
     const { session, frame } = harness()
     const start = new Map([
       ['card', box(0, 0, 100, 100)],
@@ -190,7 +190,7 @@ describe('switchSizing', () => {
     expect(prop('grows', 'boxMode')).toBe('autoWidth')
   })
 
-  it('fixes the sizing of a layer in a flow, and of an auto layout frame, on the axes dragged', () => {
+  it('fixes the sizing of a layer in a flow, and of an auto layout box, on the axes dragged', () => {
     const { session, frame, prop } = harness()
     session.run('node.update', { ids: ['flowing', 'row'], patch: { sizing: { width: 'fill', height: 'hug' } } })
     switchSizing(session, frame, ['flowing', 'row'], 'e', session.design(), new Map())

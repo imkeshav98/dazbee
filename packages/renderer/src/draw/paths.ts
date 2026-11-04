@@ -1,4 +1,4 @@
-// Layers' outlines as CanvasKit paths: boxes, frames with their corners, shapes and booleans.
+// Layers' outlines as CanvasKit paths: rects, boxes with their corners, shapes and booleans.
 import type { CanvasKit, Path } from '@dazbee/canvaskit'
 import { pathScale, type Rect } from '@dazbee/schema'
 
@@ -14,11 +14,11 @@ export const rectPath = (ck: CanvasKit, box: Rect) =>
   new ck.PathBuilder().addRect(ck.XYWHRect(box.x, box.y, box.width, box.height)).detachAndDelete()
 
 /**
- * A frame's outline, its fills and its clip: its box with its corners. Each corner's own radius is
+ * A box layer's outline, its fills and its clip: its rect with its corners. Each corner's own radius is
  * scaled down with the others where two would overlap, as CSS does, and built from arcs rather than
  * as an RRect: Skia's SVG writer clips to an RRect as a <rect> with the first corner's radius.
  */
-export function framePath(
+export function boxPath(
   ck: CanvasKit,
   props: Rect & { cornerRadius: number | readonly [number, number, number, number] },
 ): Path {
@@ -135,7 +135,7 @@ export function booleanPath(ck: CanvasKit, layer: BooleanLayer): Path {
 export function outlineOf(ck: CanvasKit, layer: SceneLayer): Path {
   if (layer.type === 'graphic') return shapePath(ck, layer)
   if (layer.type === 'boolean') return booleanPath(ck, layer)
-  if (layer.type === 'frame') return framePath(ck, layer.props)
+  if (layer.type === 'box') return boxPath(ck, layer.props)
   return rectPath(ck, layer.props)
 }
 

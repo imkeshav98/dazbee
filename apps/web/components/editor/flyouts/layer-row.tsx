@@ -4,13 +4,13 @@
 // lock toggles. The panel hands every row one set of handlers, so a row renders again only when what
 // it shows changes.
 import {
+  BoundingBoxIcon,
   CaretRightIcon,
   CircleIcon,
   EyeClosedIcon,
   EyeIcon,
   EyeSlashIcon,
   FolderSimpleIcon,
-  FrameCornersIcon,
   type Icon,
   ImageIcon,
   LockSimpleIcon,
@@ -69,7 +69,7 @@ const isLocked = (node: Layer) => LOCK_FLAGS.some((flag) => node.lock?.[flag])
 function iconOf(node: Layer): Icon {
   if (node.type === 'text') return TextTIcon
   if (node.type === 'group') return FolderSimpleIcon
-  if (node.type === 'frame') return FrameCornersIcon
+  if (node.type === 'box') return BoundingBoxIcon
   if (node.type === 'boolean') return UniteIcon
   const props = node.props as { shape?: { kind?: string }; fills?: { type: string }[] }
   if (props.fills?.some((f) => f.type === 'image')) return ImageIcon
@@ -108,9 +108,9 @@ export const LayerRow = memo(function LayerRow({
   const { id, node, depth } = row
   const locked = isLocked(node)
   const LayerIcon = iconOf(node)
-  // A frame says whether it is a plain box or stacks what it holds.
+  // A box says whether it is plain or stacks what it holds.
   const kind =
-    node.type === 'frame'
+    node.type === 'box'
       ? (node.props as { layout?: unknown }).layout
         ? t.editor.layersPanel.stack
         : t.editor.layersPanel.box

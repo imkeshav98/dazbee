@@ -6,7 +6,7 @@ import { ancestorsOf, childrenOf, descendants, isInside } from './children.ts'
 
 const rect = { x: 0, y: 0, width: 10, height: 10, shape: { kind: 'rect' as const } }
 
-/** Page p1 holds a frame `f` with a group `g` inside, which holds `a` and `b`; `c` sits on p1 above `f`. Page p2 holds `d`. */
+/** Page p1 holds a box `f` with a group `g` inside, which holds `a` and `b`; `c` sits on p1 above `f`. Page p2 holds `d`. */
 const design = () => {
   const input: DesignInput = {
     meta: { designId: 'd1', name: 'Tree', kind: 'single', primaryFormatId: 'sq' },
@@ -14,7 +14,7 @@ const design = () => {
     pages: { p1: { name: 'Page 1', order: 'a0' }, p2: { name: 'Page 2', order: 'a1' } },
     nodes: {
       c: { type: 'graphic', parentId: 'p1', index: 'a1', name: 'C', props: rect },
-      f: { type: 'frame', parentId: 'p1', index: 'a0', name: 'F', props: rect },
+      f: { type: 'box', parentId: 'p1', index: 'a0', name: 'F', props: rect },
       g: { type: 'group', parentId: 'f', index: 'a0', name: 'G', props: rect },
       b: { type: 'graphic', parentId: 'g', index: 'a1', name: 'B', props: rect },
       a: { type: 'graphic', parentId: 'g', index: 'a0', name: 'A', props: rect },

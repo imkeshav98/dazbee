@@ -119,7 +119,7 @@ test.describe('every selection', () => {
     await reloads(page)
   })
 
-  row(6, 'blend mode, pass-through for groups and frames', async (open) => {
+  row(6, 'blend mode, pass-through for groups and boxes', async (open) => {
     const page = await open()
     await selectLayers(page, ['box'], { bar: true })
     const blend = async () => (await openCard(page, 'appearance-card')).getByRole('combobox', { name: 'Blend mode' })
@@ -133,7 +133,7 @@ test.describe('every selection', () => {
     await (await blend()).click()
     await expect(page.locator('[role="listbox"] [role="option"]')).toHaveCount(16)
     await page.keyboard.press('Escape')
-    // A frame starts as pass-through, which only groups and frames are offered.
+    // A box starts as pass-through, which only groups and boxes are offered.
     await selectLayers(page, ['stack'], { bar: true })
     await expect(await blend()).toHaveAttribute('data-value', 'pass-through')
     await (await blend()).click()
@@ -315,7 +315,7 @@ test.describe('every selection', () => {
     await reloads(page)
   })
 
-  row(11, 'arrange: duplicate, order, group, ungroup, frame selection, use as mask', async (open) => {
+  row(11, 'arrange: duplicate, order, group, ungroup, put in a box, use as mask', async (open) => {
     const page = await open()
     await selectLayers(page, ['box'], { bar: true })
     // Several layers group from the small menu and go in a box from the full menu.
@@ -402,7 +402,7 @@ test.describe('every selection', () => {
             const d = await doc(page)
             return d.nodes[d.nodes.box?.parentId ?? '']?.type
           })
-          .toBe('frame')
+          .toBe('box')
       },
       { draws: false },
     )

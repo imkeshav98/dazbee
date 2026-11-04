@@ -1,10 +1,10 @@
 {
-  "meta": { "designId": "groups-and-frames", "name": "Groups and frames", "kind": "single", "primaryFormatId": "sq" },
+  "meta": { "designId": "groups-and-boxes", "name": "Groups and boxes", "kind": "single", "primaryFormatId": "sq" },
   "formats": { "sq": { "name": "Square 1:1", "width": 1080, "height": 1080, "order": "a0" } },
   "pages": { "p1": { "name": "Page 1", "order": "a0", "fills": [{ "type": "solid", "color": "#F4F1FBFF" }] } },
   "nodes": {
     "clipper": {
-      "type": "frame", "parentId": "p1", "index": "a0", "name": "Turned clipping frame",
+      "type": "box", "parentId": "p1", "index": "a0", "name": "Turned clipping box",
       "props": {
         "blendMode": "pass-through",
         "x": 80, "y": 120, "width": 460, "height": 360, "rotation": 12, "clip": true,
@@ -24,7 +24,7 @@
       "props": { "x": 40, "y": 360, "width": 420, "height": 90, "shape": { "kind": "rect", "cornerRadius": 45 }, "fills": [{ "type": "solid", "color": "#FF2E7EFF" }] }
     },
     "inner": {
-      "type": "frame", "parentId": "tilted", "index": "a1", "name": "Nested clipping frame",
+      "type": "box", "parentId": "tilted", "index": "a1", "name": "Nested clipping box",
       "props": {
         "blendMode": "pass-through",
         "x": 120, "y": 300, "width": 160, "height": 240, "clip": true,
@@ -32,11 +32,11 @@
       }
     },
     "dot": {
-      "type": "graphic", "parentId": "inner", "index": "a0", "name": "Ellipse cut by the nested frame",
+      "type": "graphic", "parentId": "inner", "index": "a0", "name": "Ellipse cut by the nested box",
       "props": { "x": 60, "y": 380, "width": 200, "height": 200, "shape": { "kind": "ellipse" }, "fills": [{ "type": "solid", "color": "#7C5CFFFF" }] }
     },
     "open": {
-      "type": "frame", "parentId": "p1", "index": "a1", "name": "Frame that does not clip",
+      "type": "box", "parentId": "p1", "index": "a1", "name": "Box that does not clip",
       "props": {
         "blendMode": "pass-through",
         "x": 620, "y": 140, "width": 340, "height": 260, "rotation": -10, "clip": false,
@@ -44,7 +44,7 @@
       }
     },
     "spill": {
-      "type": "graphic", "parentId": "open", "index": "a0", "name": "Square past its frame",
+      "type": "graphic", "parentId": "open", "index": "a0", "name": "Square past its box",
       "props": { "x": 840, "y": 300, "width": 200, "height": 200, "rotation": 30, "shape": { "kind": "rect", "cornerRadius": 24 }, "fills": [{ "type": "solid", "color": "#00A889FF" }] }
     },
     "faded": {

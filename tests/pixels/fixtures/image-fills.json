@@ -542,7 +542,7 @@
    }
   },
   "vignette": {
-   "type": "frame",
+   "type": "box",
    "parentId": "p1",
    "index": "aG",
    "name": "Vignette",
