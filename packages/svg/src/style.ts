@@ -7,6 +7,15 @@ import { textOf, type XmlElement } from './xml.ts'
 
 export type Style = Record<string, string>
 
+export interface Rule {
+  tag?: string | undefined
+  id?: string | undefined
+  classes: string[]
+  specificity: number
+  order: number
+  declarations: Style
+}
+
 /** Properties a child takes from its parent unless it sets its own. */
 const INHERITED = new Set([
   'fill',
@@ -45,44 +54,53 @@ const PROPERTIES = new Set([
   'mix-blend-mode',
 ])
 
-export interface Rule {
-  tag?: string | undefined
-  id?: string | undefined
-  classes: string[]
-  specificity: number
-  order: number
-  declarations: Style
-}
-
-/** The declarations in a style attribute or a rule's braces. */
-function parseDeclarations(text: string): Style {
-  const out: Style = {}
-  for (const part of text.split(';')) {
-    const colon = part.indexOf(':')
-    if (colon < 0) continue
-    const name = part.slice(0, colon).trim().toLowerCase()
-    const value = part
-      .slice(colon + 1)
-      .replace(/!important/i, '')
-      .trim()
-    if (name && value) out[name] = value
-  }
-  return out
-}
-
-function parseSelector(text: string) {
-  const match = /^(\*|[a-zA-Z][\w-]*)?((?:[.#][\w-]+)*)$/.exec(text.trim())
-  if (!match) return null
-  const tag = match[1] && match[1] !== '*' ? match[1] : undefined
-  const parts = match[2]?.match(/[.#][\w-]+/g) ?? []
-  const ids = parts.filter((p) => p.startsWith('#')).map((p) => p.slice(1))
-  if (ids.length > 1) return null
-  const classes = parts.filter((p) => p.startsWith('.')).map((p) => p.slice(1))
-  return { tag, id: ids[0], classes, specificity: (ids.length ? 100 : 0) + classes.length * 10 + (tag ? 1 : 0) }
-}
-
 /** More rules than this are left out: every element is matched against each one. */
 const MAX_RULES = 1_000
+
+/** The rules of every <style> sheet in the file, in the order they apply. */
+export function readSheets(root: XmlElement): Rule[] {
+  const rules: Rule[] = []
+  const visit = (element: XmlElement) => {
+    if (element.name === 'style') {
+      for (const { selectors, body } of ruleBlocks(textOf(element))) {
+        const declarations = parseDeclarations(body)
+        for (const text of selectors.split(',')) {
+          const selector = parseSelector(text)
+          if (selector && rules.length < MAX_RULES) rules.push({ ...selector, order: rules.length, declarations })
+        }
+      }
+    }
+    for (const child of element.children) if (typeof child !== 'string') visit(child)
+  }
+  visit(root)
+  return rules.sort((a, b) => a.specificity - b.specificity || a.order - b.order)
+}
+
+/** The element's style, given its parent's. */
+export function styleOf(element: XmlElement, parent: Style, rules: readonly Rule[]): Style {
+  const style: Style = {}
+  for (const [name, value] of Object.entries(parent)) if (INHERITED.has(name)) style[name] = value
+  const set = (declarations: Style) => {
+    for (const [name, value] of Object.entries(declarations)) {
+      if (!PROPERTIES.has(name)) continue
+      if (value === 'inherit') {
+        if (parent[name] !== undefined) style[name] = parent[name]
+      } else {
+        style[name] = value
+      }
+    }
+  }
+  set(element.attrs)
+  for (const rule of rules) if (matches(rule, element)) set(rule.declarations)
+  if (element.attrs.style) set(parseDeclarations(element.attrs.style))
+  return style
+}
+
+/** Every <style> sheet's text in the file. */
+export function styleText(element: XmlElement): string {
+  if (element.name === 'style') return textOf(element)
+  return element.children.map((c) => (typeof c === 'string' ? '' : styleText(c))).join('')
+}
 
 /**
  * A sheet's plain rules, their selectors and the text in their braces, read in one pass. Comments
@@ -126,55 +144,37 @@ function ruleBlocks(css: string): { selectors: string; body: string }[] {
   return blocks
 }
 
-/** The rules of every <style> sheet in the file, in the order they apply. */
-export function readSheets(root: XmlElement): Rule[] {
-  const rules: Rule[] = []
-  const visit = (element: XmlElement) => {
-    if (element.name === 'style') {
-      for (const { selectors, body } of ruleBlocks(textOf(element))) {
-        const declarations = parseDeclarations(body)
-        for (const text of selectors.split(',')) {
-          const selector = parseSelector(text)
-          if (selector && rules.length < MAX_RULES) rules.push({ ...selector, order: rules.length, declarations })
-        }
-      }
-    }
-    for (const child of element.children) if (typeof child !== 'string') visit(child)
+/** The declarations in a style attribute or a rule's braces. */
+function parseDeclarations(text: string): Style {
+  const out: Style = {}
+  for (const part of text.split(';')) {
+    const colon = part.indexOf(':')
+    if (colon < 0) continue
+    const name = part.slice(0, colon).trim().toLowerCase()
+    const value = part
+      .slice(colon + 1)
+      .replace(/!important/i, '')
+      .trim()
+    if (name && value) out[name] = value
   }
-  visit(root)
-  return rules.sort((a, b) => a.specificity - b.specificity || a.order - b.order)
+  return out
 }
 
-const matches = (rule: Rule, element: XmlElement) => {
+function parseSelector(text: string) {
+  const match = /^(\*|[a-zA-Z][\w-]*)?((?:[.#][\w-]+)*)$/.exec(text.trim())
+  if (!match) return null
+  const tag = match[1] && match[1] !== '*' ? match[1] : undefined
+  const parts = match[2]?.match(/[.#][\w-]+/g) ?? []
+  const ids = parts.filter((p) => p.startsWith('#')).map((p) => p.slice(1))
+  if (ids.length > 1) return null
+  const classes = parts.filter((p) => p.startsWith('.')).map((p) => p.slice(1))
+  return { tag, id: ids[0], classes, specificity: (ids.length ? 100 : 0) + classes.length * 10 + (tag ? 1 : 0) }
+}
+
+function matches(rule: Rule, element: XmlElement) {
   if (rule.tag && rule.tag !== element.name) return false
   if (rule.id && rule.id !== element.attrs.id) return false
   if (rule.classes.length === 0) return true
   const own = new Set((element.attrs.class ?? '').split(/\s+/))
   return rule.classes.every((c) => own.has(c))
-}
-
-/** The element's style, given its parent's. */
-export function styleOf(element: XmlElement, parent: Style, rules: readonly Rule[]): Style {
-  const style: Style = {}
-  for (const [name, value] of Object.entries(parent)) if (INHERITED.has(name)) style[name] = value
-  const set = (declarations: Style) => {
-    for (const [name, value] of Object.entries(declarations)) {
-      if (!PROPERTIES.has(name)) continue
-      if (value === 'inherit') {
-        if (parent[name] !== undefined) style[name] = parent[name]
-      } else {
-        style[name] = value
-      }
-    }
-  }
-  set(element.attrs)
-  for (const rule of rules) if (matches(rule, element)) set(rule.declarations)
-  if (element.attrs.style) set(parseDeclarations(element.attrs.style))
-  return style
-}
-
-/** Every <style> sheet's text in the file. */
-export function styleText(element: XmlElement): string {
-  if (element.name === 'style') return textOf(element)
-  return element.children.map((c) => (typeof c === 'string' ? '' : styleText(c))).join('')
 }

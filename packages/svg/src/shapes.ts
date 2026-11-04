@@ -13,16 +13,6 @@ import { lengthScale, type Matrix } from './transform.ts'
 import type { Context, Piece, PropsOf } from './types.ts'
 import type { XmlElement } from './xml.ts'
 
-const DEFAULT_NAMES: Record<string, string> = {
-  path: 'Path',
-  rect: 'Rectangle',
-  circle: 'Ellipse',
-  ellipse: 'Ellipse',
-  line: 'Line',
-  polyline: 'Line',
-  polygon: 'Polygon',
-}
-export const SHAPES = new Set(Object.keys(DEFAULT_NAMES))
 export const BLEND_MODES = new Set([
   'multiply',
   'screen',
@@ -41,11 +31,19 @@ export const BLEND_MODES = new Set([
   'luminosity',
 ])
 
+const DEFAULT_NAMES: Record<string, string> = {
+  path: 'Path',
+  rect: 'Rectangle',
+  circle: 'Ellipse',
+  ellipse: 'Ellipse',
+  line: 'Line',
+  polyline: 'Line',
+  polygon: 'Polygon',
+}
+export const SHAPES = new Set(Object.keys(DEFAULT_NAMES))
+
 const oneOf = <T extends string>(value: string | undefined, options: readonly T[], fallback: T): T =>
   options.includes(value as T) ? (value as T) : fallback
-
-export const nameOf = (element: XmlElement, fallback: string) =>
-  element.attrs['data-name'] ?? element.attrs.label ?? element.attrs.id ?? fallback
 
 export function shape(context: Context, element: XmlElement, style: Style, m: Matrix): Piece | null {
   const { ck, viewport, nodes, skipped, newId } = context
@@ -206,4 +204,8 @@ export function paintOf(
   }
   if (target?.name === 'pattern') skipped.add('pattern')
   return paint.fallback ? { type: 'solid', color: paint.fallback, ...extra } : null
+}
+
+export function nameOf(element: XmlElement, fallback: string) {
+  return element.attrs['data-name'] ?? element.attrs.label ?? element.attrs.id ?? fallback
 }
