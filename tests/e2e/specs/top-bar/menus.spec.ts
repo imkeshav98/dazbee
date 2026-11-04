@@ -3,9 +3,9 @@
 // pill, the small menu's actions and the full menu's Copy and Paste, the small menu clear of a
 // drag, the bar beside an open flyout, and the full and right-click menus clear of the rest.
 import { photo, upload } from '../../support/assets.ts'
-import { screenPoint } from '../../support/editor.ts'
+import { screenPoint, writeOutput } from '../../support/editor.ts'
 import { layoutProblems } from '../../support/layout.ts'
-import { nextFrame, openStage, selectLayers } from '../../support/stage.ts'
+import { fitSettled, nextFrame, openStage, selectLayers } from '../../support/stage.ts'
 import { expect, test } from '../../support/test.ts'
 import { barMenu, moreAction, moreMenu, moreSubmenu, PIECES, UNCUT } from '../../support/top-bar.ts'
 import { topBarDesign } from '../../support/top-bar-design.ts'
@@ -431,6 +431,37 @@ test("the full menu opens clear of the small menu, also flipped at the stage's e
   await page.mouse.click(at.x, at.y, { button: 'right' })
   await expect(page.getByTestId('stage-menu')).toBeVisible()
   // The right-click menu is one of the pop-ups the check keeps clear of everything else.
+  await expect.poll(() => layoutProblems(page, { pieces: PIECES, uncut: UNCUT })).toEqual([])
+  expect(errors).toEqual([])
+})
+
+test('at 820×1180 the full menu flipped to the start side keeps clear of the rail', async ({ browser }) => {
+  const asset = await upload(photo)
+  const { page, errors } = await openStage(browser, topBarDesign(asset.id))
+  await page.setViewportSize({ width: 820, height: 1180 })
+  await fitSettled(page)
+  await selectLayers(page, ['box', 'star'])
+  // The small menu centred at x 451, with no room for the full menu at its end side, and the full
+  // menu at its start side reaching down past the rail's top.
+  await page.evaluate(() => {
+    const camera = window.dazbee?.camera()
+    const box = window.dazbee?.selectionRect()
+    if (camera && box)
+      window.dazbee?.setCamera({
+        ...camera,
+        x: camera.x - (451 - (box.x + box.width / 2)) / camera.zoom,
+        y: camera.y - (300 - box.y) / camera.zoom,
+      })
+  })
+  await nextFrame(page)
+  const menu = await moreMenu(page)
+  await nextFrame(page)
+  writeOutput('top-bar-820-full-menu-by-rail.png', await page.screenshot({ animations: 'disabled' }))
+  const rail = await page.getByTestId('rail').boundingBox()
+  const full = await menu.boundingBox()
+  expect(rail && full).toBeTruthy()
+  if (!rail || !full) return
+  expect(full.x >= rail.x + rail.width || full.y >= rail.y + rail.height || full.y + full.height <= rail.y).toBe(true)
   await expect.poll(() => layoutProblems(page, { pieces: PIECES, uncut: UNCUT })).toEqual([])
   expect(errors).toEqual([])
 })
