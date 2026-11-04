@@ -441,16 +441,16 @@ test('at 820×1180 the full menu flipped to the start side keeps clear of the ra
   await page.setViewportSize({ width: 820, height: 1180 })
   await fitSettled(page)
   await selectLayers(page, ['box', 'star'])
-  // The small menu centred at x 451, with no room for the full menu at its end side, and the full
-  // menu at its start side reaching down past the rail's top.
+  // The small menu centred at x 451 (stage and window share their origin), with no room for the full
+  // menu at its end side, and the full menu at its start side reaching down past the rail's top.
   await page.evaluate(() => {
     const camera = window.dazbee?.camera()
     const box = window.dazbee?.selectionRect()
     if (camera && box)
       window.dazbee?.setCamera({
         ...camera,
-        x: camera.x - (451 - (box.x + box.width / 2)) / camera.zoom,
-        y: camera.y - (300 - box.y) / camera.zoom,
+        x: camera.x + 451 - (box.x + box.width / 2),
+        y: camera.y + 300 - box.y,
       })
   })
   await nextFrame(page)
@@ -461,6 +461,9 @@ test('at 820×1180 the full menu flipped to the start side keeps clear of the ra
   const full = await menu.boundingBox()
   expect(rail && full).toBeTruthy()
   if (!rail || !full) return
+  const small = await page.getByTestId('small-menu').boundingBox()
+  // No room at the end side, so the full menu has to go elsewhere.
+  expect(small && small.x + small.width + 8 + full.width > 820 - 8).toBe(true)
   expect(full.x >= rail.x + rail.width || full.y >= rail.y + rail.height || full.y + full.height <= rail.y).toBe(true)
   await expect.poll(() => layoutProblems(page, { pieces: PIECES, uncut: UNCUT })).toEqual([])
   expect(errors).toEqual([])
