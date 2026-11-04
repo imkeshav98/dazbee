@@ -1,6 +1,6 @@
-// Signing in and out against WorkOS test mode (#58), as the test user of WorkOS's staging
-// environment. It runs where WORKOS_API_KEY, WORKOS_TEST_EMAIL and WORKOS_TEST_PASSWORD are set and
-// the API has WorkOS sign-in on: CI's workos-sign-in job, or a run on the PC with them exported.
+// Signing in and out against WorkOS test mode, as the test user of WorkOS's staging environment.
+// It runs where WORKOS_API_KEY, WORKOS_CLIENT_ID, WORKOS_TEST_EMAIL and WORKOS_TEST_PASSWORD are set,
+// so the API has WorkOS sign-in on: CI's workos-sign-in job, or a run on the PC with them exported.
 // Each first sign-in makes a WorkOS organization, which the run deletes again.
 import { join } from 'node:path'
 
@@ -10,12 +10,28 @@ import { OUTPUT } from '../../support/editor.ts'
 import { API_URL } from '../../support/seed.ts'
 import { expect, type Page, test } from '../../support/test.ts'
 
-const { WORKOS_API_KEY: apiKey, WORKOS_TEST_EMAIL: email, WORKOS_TEST_PASSWORD: password } = process.env
+const {
+  WORKOS_API_KEY: apiKey,
+  WORKOS_CLIENT_ID: clientId,
+  WORKOS_TEST_EMAIL: email,
+  WORKOS_TEST_PASSWORD: password,
+} = process.env
+
+test.skip(!apiKey || !clientId || !email || !password, 'needs the WorkOS keys and test user')
+
 const SESSION_COOKIE = 'dazbee_session'
 /** A run takes about a minute; an organization of the test user's older than this was left by a stopped run. */
 const STALE_MS = 15 * 60_000
 
-test.skip(!apiKey || !email || !password, 'needs the WorkOS API key and test user')
+/** The workspace this run signed in to, whose WorkOS organization it deletes at the end. */
+let workspaceId: string | null = null
+
+/** A WorkOS organization, as far as the clean-up reads it. */
+interface WorkosOrganization {
+  /** The workspace id, on organizations Dazbee made. */
+  external_id: string | null
+  created_at: string
+}
 
 /** Calls the WorkOS API with the staging key; a GET answers JSON, a DELETE only its status. */
 async function workos(path: string, method: 'GET' | 'DELETE' = 'GET') {
@@ -28,7 +44,7 @@ async function workos(path: string, method: 'GET' | 'DELETE' = 'GET') {
 }
 
 /** Deletes the WorkOS organizations Dazbee made for the test user's workspaces that `keep` refuses. */
-async function deleteTestOrganizations(keep: (org: { external_id: string | null; created_at: string }) => boolean) {
+async function deleteTestOrganizations(keep: (org: WorkosOrganization) => boolean) {
   const users = (await workos(`/user_management/users?email=${encodeURIComponent(email ?? '')}`)) as {
     data: { id: string }[]
   }
@@ -37,7 +53,7 @@ async function deleteTestOrganizations(keep: (org: { external_id: string | null;
       data: { organization_id: string }[]
     }
     for (const { organization_id: id } of memberships.data) {
-      const org = (await workos(`/organizations/${id}`)) as { external_id: string | null; created_at: string }
+      const org = (await workos(`/organizations/${id}`)) as WorkosOrganization
       // Only organizations Dazbee made carry a workspace id.
       if (org.external_id && !keep(org)) await workos(`/organizations/${id}`, 'DELETE')
     }
@@ -57,14 +73,13 @@ async function signInAtWorkos(page: Page) {
   await page.waitForURL((url) => url.origin !== origin || url.pathname === '/organization-selection', {
     timeout: 30_000,
   })
-  // A person in several organizations picks one; another run's organization can make it two.
+  // A person in several organizations picks one; another run's organization can make it two. Every
+  // workspace of the test user's is named after them.
   if (new URL(page.url()).pathname === '/organization-selection') {
-    await page.getByRole('button').first().click()
+    await page.getByRole('button', { name: 'Dazbee E2E' }).first().click()
     await page.waitForURL((url) => url.origin !== origin, { timeout: 30_000 })
   }
 }
-
-let workspaceId: string | null = null
 
 test.beforeAll(async () => {
   await deleteTestOrganizations((org) => Date.now() - Date.parse(org.created_at) < STALE_MS)

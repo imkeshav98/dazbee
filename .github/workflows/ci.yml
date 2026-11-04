@@ -49,12 +49,12 @@ jobs:
 
   # The browser suite runs in jobs side by side, each against its own API and sync server: twelve
   # shards of every spec but the canvas gesture matrix, the slowest spec, and three jobs per format of
-  # it. With the check job that is 19 of the 20 jobs GitHub runs at once; an on-demand run's four parts
-  # wait for room while it runs. Tests that only take a PR's pictures (@evidence) run on demand only.
-  # The speed report's tests (@perf) run in the perf job below, on main only. The sync server restart
-  # test (@sync-restart) drops every tab connected to the server, so it runs on its own at the end of
-  # shard 11's job, once that job's other tests are done, whether they passed or not, with an HTML
-  # report of its own uploaded beside the shard's.
+  # it. With the check and workos-sign-in jobs that is all 20 jobs GitHub runs at once; an on-demand
+  # run's four parts wait for room while it runs. Tests that only take a PR's pictures (@evidence) run
+  # on demand only. The speed report's tests (@perf) run in the perf job below, on main only. The sync
+  # server restart test (@sync-restart) drops every tab connected to the server, so it runs on its own
+  # at the end of shard 11's job, once that job's other tests are done, whether they passed or not,
+  # with an HTML report of its own uploaded beside the shard's.
   e2e:
     name: e2e (${{ matrix.part }})
     runs-on: ubuntu-24.04
@@ -121,10 +121,10 @@ jobs:
           retention-days: 30
 
   # Signing in and out against WorkOS test mode, as the test user of WorkOS's staging environment.
-  # It is not a required check, since it needs WorkOS to be up. The API turns WorkOS sign-in on only
-  # when all three of its settings are given; without the secrets (a fork's pull request) the spec
-  # skips itself. With the check and e2e jobs it is the 20th job GitHub runs at once.
+  # It is not a required check, since it needs WorkOS to be up. A fork's pull request gets no
+  # secrets, so the job doesn't run there; anywhere else it fails when a secret is missing.
   workos-sign-in:
+    if: ${{ github.event_name == 'push' || !github.event.pull_request.head.repo.fork }}
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     env:
@@ -139,10 +139,14 @@ jobs:
         with:
           node-version-file: .nvmrc
           cache: pnpm
-      - run: pnpm install --frozen-lockfile
       - run: |
-          if [ -n "$WORKOS_API_KEY" ]; then export WORKOS_REDIRECT_URI=http://localhost:3100/callback; fi
-          docker compose up -d --wait
+          for name in WORKOS_API_KEY WORKOS_CLIENT_ID WORKOS_TEST_EMAIL WORKOS_TEST_PASSWORD; do
+            if [ -z "${!name}" ]; then echo "::error::The repository secret $name is not set"; exit 1; fi
+          done
+      - run: pnpm install --frozen-lockfile
+      - run: docker compose up -d --wait
+        env:
+          WORKOS_REDIRECT_URI: http://localhost:3100/callback
       - run: pnpm --filter @dazbee/e2e exec playwright install --with-deps chromium
       - run: pnpm turbo run build --filter=@dazbee/web
       - run: pnpm --filter @dazbee/e2e exec playwright test specs/library/workos-sign-in.spec.ts

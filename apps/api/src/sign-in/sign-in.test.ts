@@ -205,7 +205,9 @@ describe('WorkOS settings', () => {
     expect(accessTokenSessionId(`header.${claims}.signature`)).toBe('session_1')
     expect(accessTokenSessionId('not a token')).toBeNull()
   })
+})
 
+describe('the WorkOS provider', () => {
   it('sends a signed-out person back to the /login beside the callback', () => {
     const provider = workosProvider({
       apiKey: 'sk_test_k',
