@@ -128,7 +128,7 @@ describe('editorDrawing', () => {
     })
   })
 
-  // The shape menu's Box and, until it adds frames, the Frame tool both draw a box.
+  // The shape menu's Box and the Frame tool both draw a box.
   describe.each(['box', 'frame'] as const)('a box drawn with the %s tool', (tool) => {
     it('is a white box named Box that takes in the layers wholly inside it, in the same undo step', () => {
       const { drawing, session, at, made } = harness()

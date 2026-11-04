@@ -13,8 +13,8 @@ import type { EditorSelection } from '../selection.ts'
 import type { EditorTyping } from '../text/typing.ts'
 import type { EditorTools, PlacedAsset } from '../tools.ts'
 import {
-  clickedBox,
-  drawnBox,
+  clickedRect,
+  draggedRect,
   drawsBox,
   type DrawTool,
   imageIn,
@@ -188,7 +188,7 @@ export function editorDrawing({
       roots: [id],
       end,
     }
-    runQuietly(() => session.run('node.update', { ids: [id], patch: drawnBox(shape, from, from, false, false) }))
+    runQuietly(() => session.run('node.update', { ids: [id], patch: draggedRect(shape, from, from, false, false) }))
     return gesture
   }
   /** A press with the text tool (#47): a click makes text that grows as it is typed, a drag a box of that size. */
@@ -207,7 +207,7 @@ export function editorDrawing({
     canvas.setPointerCapture(e.pointerId)
     return { kind: 'imageBox', ...boxStart(at, 'graphic'), asset }
   }
-  /** Follows the pointer: a shape grows to it, Shift and Alt as `drawnBox` takes them; a box's corner goes to it, Shift keeping an image's shape. */
+  /** Follows the pointer: a shape grows to it, Shift and Alt as `draggedRect` takes them; a box's corner goes to it, Shift keeping an image's shape. */
   function drag(g: DrawingDrag, p: Point, shift: boolean, alt: boolean) {
     if (g.kind === 'draw') {
       drawTo(g, p, shift, alt)
@@ -220,7 +220,7 @@ export function editorDrawing({
   function drawTo(g: ShapeDrag, p: Point, shift: boolean, alt: boolean) {
     if (!g.moved && Math.hypot(p.x - g.from.x, p.y - g.from.y) * camera().zoom < CLICK_SLOP) return
     g.moved = true
-    runQuietly(() => session.run('node.update', { ids: [g.id], patch: drawnBox(g.tool, g.from, p, shift, alt) }))
+    runQuietly(() => session.run('node.update', { ids: [g.id], patch: draggedRect(g.tool, g.from, p, shift, alt) }))
   }
   /** Ends a drawing gesture: makes or finishes its layer, which is selected, and the select tool comes back. */
   function release(g: DrawingDrag) {
@@ -233,7 +233,7 @@ export function editorDrawing({
    * tool comes back. A box dragged around layers beside it takes them in, in the same undo step.
    */
   function finishDrawing(g: ShapeDrag) {
-    if (!g.moved) runQuietly(() => session.run('node.update', { ids: [g.id], patch: clickedBox(g.tool, g.from) }))
+    if (!g.moved) runQuietly(() => session.run('node.update', { ids: [g.id], patch: clickedRect(g.tool, g.from) }))
     if (drawsBox(g.tool) && g.moved) enclose(g.frame, g.id)
     hug([g.id])
     g.end()
