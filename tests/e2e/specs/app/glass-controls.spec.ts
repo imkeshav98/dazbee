@@ -9,7 +9,7 @@ import { hovered, laid, look, openDesignIn, openIn, pressed, THEMES } from '../.
 import { API_URL, DEV_BRAND, liveDesign, seed } from '../../support/seed.ts'
 import { selectLayers } from '../../support/stage.ts'
 import { expect, type Locator, type Page, test } from '../../support/test.ts'
-import { barMenu, fillList, moreMenu, pagesPanel, sizesPanel } from '../../support/top-bar.ts'
+import { barMenu, closeBarMenu, fillList, moreMenu, pagesPanel, sizesPanel } from '../../support/top-bar.ts'
 
 test.describe.configure({ timeout: 180_000 })
 
@@ -146,6 +146,7 @@ test('the account menu’s language and theme, and the colour pop-up’s kinds o
       .toBeGreaterThanOrEqual(8)
     await shoot(page, `glass-${theme}-paint`)
     await page.keyboard.press('Escape')
+    await closeBarMenu(page, 'bar-colour')
 
     // A theme picked in the menu is the chosen one when the menu opens again.
     const other = theme === 'dark' ? 'Light' : 'Dark'
