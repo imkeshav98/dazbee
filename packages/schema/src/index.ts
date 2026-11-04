@@ -12,7 +12,7 @@ export {
 } from './design.ts'
 export * from './effects.ts'
 export * from './export.ts'
-export * from './formats.ts'
+export * from './sizes.ts'
 export { deepFreeze } from './json.ts'
 export * from './layers.ts'
 export { AnyScope, formatIdOf, formatScope, parseOverrideValues, Scope } from './overrides.ts'

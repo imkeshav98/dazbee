@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { FORMAT_PRESETS, FORMAT_SHAPES, formatSizeProblem, shapeOf } from './formats.ts'
+import { FORMAT_PRESETS, FORMAT_SHAPES, formatSizeProblem, shapeOf } from './sizes.ts'
 
 describe('FORMAT_PRESETS', () => {
   it('offers presets inside the limits, at least one of every shape', () => {

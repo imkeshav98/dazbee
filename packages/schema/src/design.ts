@@ -1,10 +1,10 @@
 import { z } from 'zod'
 
-import { Format } from './formats.ts'
 import { canHold, Layer } from './layers.ts'
 import { checkOverride, type Fail, formatIdOf, Overrides, withOverrideDefaults } from './overrides.ts'
 import { Paint } from './paint.ts'
 import { FormatId, FractionalIndex, NodeId, PageId } from './primitives.ts'
+import { Format } from './sizes.ts'
 import type { Variables } from './variables.ts'
 
 export const Page = z.object({
