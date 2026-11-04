@@ -103,7 +103,6 @@ function harness(penDrawing = false) {
     },
     transformDrag,
     autoLayoutDrag,
-    hug: hugAll,
     notify: (notice) => log.push(notice),
     drawOverlay: () => log.push('overlay'),
   }

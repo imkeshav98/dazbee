@@ -13,6 +13,7 @@ import type { EditorTransformDrag } from './gestures/transform-drag.ts'
 import { align, type Alignment, distribute, type Distribution, type Offset } from './layers/arrange.ts'
 import { inFlow } from './layers/auto-layout.ts'
 import { type EditorBoxes, visibleIn } from './layers/boxes.ts'
+import { hug as hugIn } from './layers/hug.ts'
 import { boundsOf, type Box, localTo, round } from './layers/transform.ts'
 import { runQuietly } from './run-quietly.ts'
 import { type EditorSelection, isPath } from './selection.ts'
@@ -57,8 +58,6 @@ export interface ActionsDeps {
   pen: Pick<EditorPen, 'drawing' | 'finish' | 'deletePoints'>
   transformDrag: Pick<EditorTransformDrag, 'writeBoxes'>
   autoLayoutDrag: Pick<EditorAutoLayoutDrag, 'nudge'>
-  /** Groups fit what they hold again after a change inside them, in the same undo step. */
-  hug: (ids: string[]) => void
   /** Tells the page that auto layout places some of the layers an align or distribute would move. */
   notify: (notice: 'placedByLayout') => void
   /** Draws the overlay. */
@@ -100,10 +99,11 @@ export function editorActions({
   pen,
   transformDrag,
   autoLayoutDrag,
-  hug,
   notify,
   drawOverlay,
 }: ActionsDeps): EditorActions {
+  /** Groups fit what they hold again after a change inside them, in the same undo step. */
+  const hug = (ids: string[]) => hugIn(session, ids)
   function fitSelection() {
     const outer = boxes.selectionBox()
     if (!outer) return fitAll()

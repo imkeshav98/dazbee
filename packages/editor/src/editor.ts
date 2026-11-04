@@ -625,7 +625,6 @@ function live(
     pen,
     transformDrag,
     autoLayoutDrag,
-    hug,
     notify,
     drawOverlay: () => drawOverlay(),
   })
@@ -640,7 +639,6 @@ function live(
     boxes,
     typing,
     actions,
-    hug,
     notify,
     signal: listening.signal,
     drawOverlay: () => drawOverlay(),

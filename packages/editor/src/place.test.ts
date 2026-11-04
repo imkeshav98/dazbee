@@ -6,7 +6,6 @@ import { loadCanvasKit } from '@dazbee/renderer/node'
 import { type DesignInput, LAYER_CLIPBOARD_TYPE } from '@dazbee/schema'
 
 import { type Frame, frameAt, frameGrid } from './canvas/grid.ts'
-import { hug } from './layers/hug.ts'
 import { measure, sessionOf, testBoxes } from './layers/test-boxes.ts'
 import { editorPlace, type PlaceDeps } from './place.ts'
 import { editorSelection } from './selection.ts'
@@ -148,7 +147,6 @@ function harness(typed = false) {
       paste: () => log.push('typing paste'),
     },
     actions: { perform: (action) => (log.push(action), true) },
-    hug: (ids) => hug(session, ids),
     notify: (notice, parts) => log.push(parts?.length ? `${notice} ${parts.length}` : notice),
     signal: new AbortController().signal,
     drawOverlay: () => log.push('overlay'),

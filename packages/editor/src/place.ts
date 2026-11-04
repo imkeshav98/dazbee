@@ -22,6 +22,7 @@ import type { EditorView, Spot } from './canvas/view.ts'
 import { keepCopy, layersOnClipboard, putOnClipboard, rememberedLayers } from './clipboard.ts'
 import { newImage, withImage } from './gestures/draw-tools.ts'
 import type { EditorBoxes } from './layers/boxes.ts'
+import { hug as hugIn } from './layers/hug.ts'
 import { boundsOf, localTo, round } from './layers/transform.ts'
 import { runQuietly } from './run-quietly.ts'
 import type { EditorSelection, Picked } from './selection.ts'
@@ -41,8 +42,6 @@ export interface PlaceDeps {
   boxes: Pick<EditorBoxes, 'roots' | 'boxIn' | 'containersOf' | 'pickable'>
   typing: Pick<EditorTyping, 'editing' | 'stop' | 'fitText' | 'copy' | 'cut' | 'paste'>
   actions: Pick<EditorActions, 'perform'>
-  /** Groups fit what they hold again after a change inside them, in the same undo step. */
-  hug: (ids: string[]) => void
   /** Tells the page that an SVG can't be read, or had parts no layer shows, which come as `parts`. */
   notify: (notice: 'svgUnreadable' | 'svgLeftOut', parts?: readonly Skipped[]) => void
   /** Aborted when the editor is destroyed: a file read after that places nothing. */
@@ -95,11 +94,12 @@ export function editorPlace({
   boxes,
   typing,
   actions,
-  hug,
   notify,
   signal,
   drawOverlay,
 }: PlaceDeps): EditorPlace {
+  /** Groups fit what they hold again after a change inside them, in the same undo step. */
+  const hug = (ids: string[]) => hugIn(session, ids)
   /** The layer an image dragged over the stage would be put into, outlined while it is over it. */
   let dropTarget: Picked | null = null
   /** Whether the paste being made goes where the pointer is (Mod+Shift+V), not where the layers were. */
