@@ -3,20 +3,23 @@
 // How a menu opened from its own button closes, as the Share menu and the account menu do: on Esc or
 // a press outside it. While it is open it stands over the edit panel, the bar's second row and the
 // stage's selection, so Esc closes it before them, and closes the menu opened last before one opened
-// earlier.
+// earlier; a pop-up opened over it, with the focus in it, closes before it.
 import { useEffect, useEffectEvent, useRef } from 'react'
 
 /** What stands over the edit panel, the bar's second row and the selection, so Esc closes it first. */
 export const OVER_PANEL = '[data-over-panel]'
+
+/** Where a pop-up drawn over the page sits, as Radix draws the editor's. */
+const POP_UP = '[data-radix-popper-content-wrapper]'
 
 /** The menus open now, the one opened last at the end. */
 const shown: object[] = []
 
 /**
  * Closes a menu on Esc or a press outside `box`, which holds its `button` and the menu. Esc is the
- * menu's before anything under it, unless a list open in the menu, as a select's, takes it to close
- * first; it gives the focus back to the button when it was in the menu, or nowhere. `over` goes on
- * `box`, marking it while the menu is open.
+ * menu's before anything under it, unless a pop-up with the focus in it, or a list open in the menu,
+ * as a select's, takes it to close first; it gives the focus back to the button when it was in the
+ * menu, or nowhere. `over` goes on `box`, marking it while the menu is open.
  */
 export function useMenuClose(open: boolean, close: () => void) {
   const box = useRef<HTMLDivElement>(null)
@@ -30,7 +33,7 @@ export function useMenuClose(open: boolean, close: () => void) {
       if (event.key !== 'Escape' || event.defaultPrevented || shown.at(-1) !== menu) return
       const at = document.activeElement
       const inMenu = at !== null && box.current?.contains(at) === true
-      if (inMenu && at !== button.current && at.getAttribute('aria-expanded') === 'true') return
+      if (inPopUp(at) || (inMenu && at !== button.current && at.getAttribute('aria-expanded') === 'true')) return
       event.stopImmediatePropagation()
       event.preventDefault()
       if (inMenu || !at || at === document.body) button.current?.focus()
@@ -46,4 +49,9 @@ export function useMenuClose(open: boolean, close: () => void) {
     }
   }, [open])
   return { box, button, over: { 'data-over-panel': open ? '' : undefined } }
+}
+
+/** Whether the focus is in a pop-up drawn over the page, which closes first, on its own Esc. */
+export function inPopUp(at: Element | null) {
+  return at?.closest(POP_UP) != null
 }

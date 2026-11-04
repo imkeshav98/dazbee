@@ -22,6 +22,7 @@ import {
 } from '@/components/editor/edit-store.ts'
 import { useSelection } from '@/components/editor/editor-hooks.ts'
 import { FontChooser } from '@/components/editor/flyouts/font-panel.tsx'
+import { inPopUp } from '@/components/ui/menu-close.ts'
 import { useOverlayScroll } from '@/components/ui/overlay-scroll.ts'
 import { useScrollEdges } from '@/components/ui/scroll-edges.ts'
 import { cn } from '@/lib/cn.ts'
@@ -124,11 +125,7 @@ export function PanelFrame({
       if (overPanel()) return
       const at = document.activeElement
       // A list of the panel's own, a select's or a pop-up's, closes first.
-      if (
-        at instanceof Element &&
-        (at.closest('[data-radix-popper-content-wrapper]') || at.getAttribute('aria-expanded') === 'true')
-      )
-        return
+      if (inPopUp(at) || at?.getAttribute('aria-expanded') === 'true') return
       if (
         at instanceof HTMLElement &&
         (at.tagName === 'INPUT' || at.tagName === 'TEXTAREA' || at.tagName === 'SELECT')
