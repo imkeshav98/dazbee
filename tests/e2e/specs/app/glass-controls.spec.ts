@@ -4,7 +4,7 @@
 // menu's and the colour pop-up's choices sit in a well; a delete is confirmed on a solid red button in
 // white, and a red row reads in the text colour while lit.
 import { photo, upload } from '../../support/assets.ts'
-import { setCookies } from '../../support/editor.ts'
+import { setCookies, shoot } from '../../support/editor.ts'
 import { hovered, laid, look, openIn, pressed, pressedFill, servedGlass, THEMES } from '../../support/glass.ts'
 import { API_URL, DEV_BRAND, liveDesign, seed } from '../../support/seed.ts'
 import { selectLayers } from '../../support/stage.ts'
@@ -54,6 +54,7 @@ test('the account menu’s language and theme, and the colour pop-up’s kinds o
       expect(await look(choices)).toMatchObject(well)
       expect(await look(choices.getByRole('radio', { checked: true }))).toMatchObject(chosen)
     }
+    await shoot(page, `glass-${theme}-account`)
     await page.keyboard.press('Escape')
     await expect(account).toBeHidden()
 
@@ -62,6 +63,7 @@ test('the account menu’s language and theme, and the colour pop-up’s kinds o
     const kinds = page.getByTestId('paint-editor').getByRole('radiogroup', { name: 'Kind of paint' })
     expect(await look(kinds)).toMatchObject(well)
     expect(await look(kinds.getByRole('radio', { checked: true }))).toMatchObject(chosen)
+    await shoot(page, `glass-${theme}-paint`)
     expect(errors).toEqual([])
     await page.context().close()
   }
@@ -151,6 +153,7 @@ test('a design’s delete is confirmed on a solid red button in white; its red m
     await expect(confirm).toBeVisible()
     expect(await look(confirm)).toMatchObject({ fill: glass.dangerSolid, colour: glass.onAccent })
     await hovered(confirm, { fill: glass.dangerSolidHover, colour: glass.onAccent })
+    await shoot(page, `glass-${theme}-design-delete`)
     const cancel = tile.getByRole('button', { name: 'Cancel' })
     await hovered(cancel, { fill: glass.hover, colour: glass.text })
     await pressed(page, cancel, { fill: glass.pressed, colour: glass.text })
@@ -194,6 +197,7 @@ test('asset details on glass: a tag reads in the text colour on its pink tint, a
     await expect(confirm).toBeVisible()
     expect(await look(confirm)).toMatchObject({ fill: glass.dangerSolid, colour: glass.onAccent })
     await hovered(confirm, { fill: glass.dangerSolidHover, colour: glass.onAccent })
+    await shoot(page, `glass-${theme}-asset-delete`)
     await pressedFill(page, details.getByRole('button', { name: 'Keep' }), glass.pressed)
     await expect(confirm).toHaveCount(0)
     expect(errors).toEqual([])
