@@ -196,6 +196,9 @@ test.describe('pages of frames', () => {
         await selectLayers(page, [])
         const panel = await pagesPanel(page)
         await expect(panel.getByTestId('pages').locator('li')).toHaveCount(3)
+        // Each page with a frame shows a picture of its first frame once the stage settles; the empty page its number.
+        await expect(panel.getByTestId('page-thumbnail').locator('img')).toHaveCount(2)
+        await expect(panel.getByTestId('page-thumbnail').nth(2)).toHaveText('3')
         await shot(page, '4-pages')
         await page.keyboard.press('Escape')
         await expect(panel).toBeHidden()
