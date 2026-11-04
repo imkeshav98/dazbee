@@ -101,6 +101,8 @@ export interface EditorBoxes {
   target(hitId: string, frame: string): string
   /** Whether a layer is inside the group or frame gone into, not the container itself. */
   insideEntered(id: string): boolean
+  /** A layer's box as it is drawn in a frame, in design pixels, without its turn; null when it has none. */
+  drawnRect(frame: Frame, id: string): Rect | null
 }
 
 /** Whether a layer shows in a frame: its format's own visibility, or the base. */
@@ -363,6 +365,11 @@ export function editorBoxes({ session, scenes, resources, selection, drawn, fram
     return ancestorsOf(drawn(), drawn().nodes[id]?.parentId ?? '').some((up) => up === selection.entered())
   }
 
+  function drawnRect(frame: Frame, id: string): Rect | null {
+    const box = drawnBoxOf(frame, id)
+    return box && { x: box.x, y: box.y, width: box.width, height: box.height }
+  }
+
   return {
     boxIn,
     containersOf,
@@ -382,5 +389,6 @@ export function editorBoxes({ session, scenes, resources, selection, drawn, fram
     lockedAt,
     target,
     insideEntered,
+    drawnRect,
   }
 }

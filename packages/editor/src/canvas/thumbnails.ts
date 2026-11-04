@@ -6,7 +6,8 @@ import type { Design } from '@dazbee/schema'
 
 import { boundsOf } from '../layers/transform.ts'
 import type { EditorResources } from '../resources.ts'
-import type { Frame } from './grid.ts'
+import type { EditorSelection } from '../selection.ts'
+import { type Frame, frameKey } from './grid.ts'
 import { findLayer, type FrameScenes } from './scenes.ts'
 
 export interface ThumbnailsDeps {
@@ -17,23 +18,39 @@ export interface ThumbnailsDeps {
   current: () => Design
   /** The design as last drawn. */
   drawn: () => Design
+  selection: Pick<EditorSelection, 'current'>
+  /** The frame of the grid as last drawn with a key, if there is one. */
+  frameOf: (key: string | undefined) => Frame | undefined
+  /** The first page of the grid as last drawn. */
+  firstPage: () => string
 }
 
 export interface ThumbnailCache {
   /**
    * A small picture of one layer as a frame shows it, without its own effects (the tiles show
    * those): a PNG object URL, `size` pixels square. Text is "Aa" in its look, outlined with no
-   * fill when asked. Null when the layer isn't in the frame or draws nothing there.
+   * fill when asked. Null when the layer isn't in the frame or draws nothing there. The frame is
+   * `inFrame`, as `<pageId>/<formatId>`, else the one the selection is in, else the first page in
+   * the primary format.
    */
-  layer(frame: Frame, id: string, size: number, outlined: boolean): string | null
-  /** A small picture of a page in one format, as the stage draws it, `size` pixels on its longer side. */
-  page(frame: Frame, size: number): string | null
+  layer(id: string, size?: number, outlined?: boolean, inFrame?: string): string | null
+  /** A small picture of a page in its primary format, as the stage draws it, `size` pixels on its longer side. */
+  page(pageId: string, size?: number): string | null
   /** An image as a URL, for the crop's faint whole image. */
   ghost(image: Image): string
   destroy(): void
 }
 
-export function thumbnailCache({ ck, scenes, resources, current, drawn }: ThumbnailsDeps): ThumbnailCache {
+export function thumbnailCache({
+  ck,
+  scenes,
+  resources,
+  current,
+  drawn,
+  selection,
+  frameOf,
+  firstPage,
+}: ThumbnailsDeps): ThumbnailCache {
   /**
    * Each layer's preview for the effect tiles, with what it was drawn from: its scene layer and the
    * fonts and images there were then, so one that arrives later draws it again.
@@ -186,6 +203,16 @@ export function thumbnailCache({ ck, scenes, resources, current, drawn }: Thumbn
     return url
   }
 
+  function pageOf(pageId: string, size = 72): string | null {
+    const frame = frameOf(frameKey(pageId, drawn().meta.primaryFormatId))
+    return frame ? pageThumbnail(frame, size) : null
+  }
+  function layerIn(id: string, size = 96, outlined = false, inFrame?: string): string | null {
+    const frame =
+      frameOf(inFrame ?? selection.current()?.frame) ?? frameOf(frameKey(firstPage(), drawn().meta.primaryFormatId))
+    return frame ? layerThumbnail(frame, id, size, outlined) : null
+  }
+
   function destroy() {
     for (const { url } of pageThumbnails.values()) URL.revokeObjectURL(url)
     pageThumbnails.clear()
@@ -194,8 +221,8 @@ export function thumbnailCache({ ck, scenes, resources, current, drawn }: Thumbn
   }
 
   return {
-    layer: layerThumbnail,
-    page: pageThumbnail,
+    layer: layerIn,
+    page: pageOf,
     ghost: ghostOf,
     destroy,
   }

@@ -1,4 +1,5 @@
-export { startEditor, type DrawInfo, type Editor, type EditorOptions, type Notice } from './editor.ts'
+export { type DrawInfo, type Editor, type EditorOptions, type Notice } from './editor-interface.ts'
+export { startEditor } from './editor.ts'
 export { type Spot } from './canvas/view.ts'
 export { SAVE_STATES, type SaveState } from './save-state.ts'
 export { type PlacedAsset, type Tool } from './tools.ts'
