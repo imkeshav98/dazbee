@@ -49,7 +49,6 @@ export default tseslint.config(
   },
   {
     // Everything is declared above its first use, except a function declaration a function body calls.
-    files: ['**/*.ts', '**/*.tsx', '**/*.mts', '**/*.cts'],
     rules: {
       '@typescript-eslint/no-use-before-define': [
         'error',
