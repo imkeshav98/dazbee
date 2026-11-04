@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type * as Y from 'yjs'
 import type { z } from 'zod'
 
-import { LayerTree, parseDesign } from '@dazbee/schema'
+import { type Layer, LayerTree, parseDesign } from '@dazbee/schema'
 
 import { childrenOf, loadDesign, readDesign } from '../index.ts'
 import { badge, openTestSession, testDesign, testDoc } from '../test-design.ts'
@@ -261,6 +261,55 @@ describe('design.place', () => {
     expect(childrenOf(design, 'banner').map(([id]) => id)).toEqual(['banner-box', 'banner-headline', c])
     expect(Object.keys(design.nodes)).toHaveLength(4 + 9)
     expect(new Set(Object.values(design.nodes).map((n) => n.link)).size).toBe(2 + 9)
+  })
+
+  it('with keepLinks, keeps each link id the frame it goes into holds on no layer', () => {
+    const doc = testDoc()
+    const tab = openTestSession(doc)
+    // The square's box and headline, as a copy in the square puts them on the clipboard.
+    const square = readDesign(doc).nodes
+    const copied = {
+      roots: ['box', 'headline'],
+      nodes: { box: square.box as Layer, headline: square.headline as Layer },
+    }
+    tab.run('node.delete', { ids: ['banner-headline'] })
+
+    const [box, headline] = tab.run('design.place', { parentId: 'banner', tree: copied, keepLinks: true })
+
+    const design = readDesign(doc)
+    // The banner still holds a copy of the box, so that one is a new layer; its headline was deleted.
+    expect(design.nodes[headline ?? '']?.link).toBe('headline')
+    expect(design.nodes[box ?? '']?.link).not.toBe('box')
+    expect(design.nodes['banner-box']?.link).toBe('box')
+  })
+
+  it('with keepLinks, keeps a link id once in a frame: a second layer with it, or a second place, makes new ones', () => {
+    const doc = testDoc()
+    const tab = openTestSession(doc)
+    tab.run('frame.add', { id: 'f2', pageId: 'p1', name: 'Frame', width: 600, height: 500 })
+    tab.run('node.create', {
+      id: 'holder',
+      parentId: 'f2',
+      layer: { type: 'group', name: 'G', props: { x: 0, y: 0, width: 300, height: 300 } },
+    })
+    const t = tree()
+    const twice = { ...t, nodes: { ...t.nodes, label: { ...t.nodes.label, link: 'tile' } } }
+
+    const [first] = tab.run('design.place', { parentId: 'holder', tree: twice, keepLinks: true })
+    const [second] = tab.run('design.place', { parentId: 'f2', tree: t, keepLinks: true })
+
+    const links = (root: string) => {
+      const design = readDesign(doc)
+      return [root, ...childrenOf(design, root).map(([id]) => id)].map((id) => design.nodes[id]?.link)
+    }
+    const [g, tile, label] = links(first ?? '')
+    expect([g, tile]).toEqual(['g', 'tile'])
+    expect(label).not.toBe('tile')
+    const again = links(second ?? '')
+    expect(again.filter((link) => ['g', 'tile', 'label'].includes(link ?? ''))).toEqual(['label'])
+    // Another frame of the page holds none of them.
+    const [third] = tab.run('design.place', { parentId: 'sq', tree: t, keepLinks: true })
+    expect(links(third ?? '')).toEqual(['g', 'tile', 'label'])
   })
 
   it('refuses a tree that is not whole, holds a layer its parent cannot, loops, or does not fit where it goes', () => {

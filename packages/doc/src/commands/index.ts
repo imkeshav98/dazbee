@@ -1,6 +1,7 @@
 // Every command, by the name a session runs it with.
 import { designPlace, nodeDuplicate, nodeMove, nodeReorder } from './arrange.ts'
 import { nodeAutoLayout } from './auto-layout.ts'
+import { frameAdd, frameAddSize, frameDelete, frameDuplicate, frameUpdate } from './frames.ts'
 import { nodeBoolean, nodeBox, nodeEnclose, nodeGroup, nodeHug, nodeUngroup } from './groups.ts'
 import { nodeBind, nodeCreate, nodeDelete, nodeLock, nodeMask, nodeRename, nodeUpdate } from './layers.ts'
 import { pageAdd, pageDelete, pageDuplicate, pageMove, pageUpdate } from './pages.ts'
@@ -34,5 +35,10 @@ export const COMMANDS = {
   'page.duplicate': pageDuplicate,
   'page.move': pageMove,
   'page.delete': pageDelete,
+  'frame.add': frameAdd,
+  'frame.update': frameUpdate,
+  'frame.duplicate': frameDuplicate,
+  'frame.addSize': frameAddSize,
+  'frame.delete': frameDelete,
 } as const
 export type CommandName = keyof typeof COMMANDS

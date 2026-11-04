@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
 
-import { type Design, parseDesign } from '@dazbee/schema'
+import { type Design, framesOf, type Layer, parseDesign } from '@dazbee/schema'
 
-import { childrenOf, type DesignDoc, frameIdOf, loadDesign, readDesign, type Session } from './index.ts'
-import { openTestSession, testDesign, twoTabs } from './test-design.ts'
+import { childrenOf, descendants, type DesignDoc, frameIdOf, loadDesign, readDesign, type Session } from './index.ts'
+import { badge, openTestSession, testDesign, twoTabs } from './test-design.ts'
 
 /** A fuzz run makes hundreds of commands and full reads; a cold CI runner needs more than vitest's 5 s. */
 const FUZZ_TIMEOUT = 30_000
@@ -214,6 +214,87 @@ describe('two tabs', () => {
     expect([designA.nodes.g1?.parentId, designA.nodes.g2?.parentId].sort()).toEqual(['g1', 'sq'])
   })
 
+  it('a frame deleted in one tab while the other pastes into it: the paste goes with it, and undoing the delete brings both back', () => {
+    const { a, b, tabA, tabB, sync } = twoTabs()
+    const tree = { roots: ['box'], nodes: { box: tabB.design().nodes.box as Layer } }
+    tabA.run('frame.delete', { frameId: 'banner' })
+    const [pasted = ''] = tabB.run('design.place', { parentId: 'banner', tree, keepLinks: true })
+    sync()
+    expectFullRead(tabA, a)
+    expectFullRead(tabB, b)
+    expect(tabB.design()).toEqual(tabA.design())
+    expect(tabA.design().frames.banner).toBeUndefined()
+    expect(tabA.design().nodes[pasted]).toBeUndefined()
+
+    tabA.undo()
+    sync()
+    for (const [tab, doc] of [
+      [tabA, a],
+      [tabB, b],
+    ] as const) {
+      expectFullRead(tab, doc)
+      expect(tab.design().frames.banner).toBeDefined()
+      expect(childrenOf(tab.design(), 'banner').map(([id]) => id)).toEqual(['banner-box', 'banner-headline', pasted])
+    }
+    expect(tabB.design()).toEqual(tabA.design())
+  })
+
+  it('both tabs pasting one link id into a frame: the layer whose id sorts first keeps it, the other takes its own id', () => {
+    const { a, b, tabA, tabB, sync } = twoTabs()
+    tabA.run('frame.add', { id: 'f2', pageId: 'p1', name: 'Frame', width: 600, height: 500 })
+    sync()
+    const tree = { roots: ['box'], nodes: { box: tabA.design().nodes.box as Layer } }
+    const [fromA = ''] = tabA.run('design.place', { parentId: 'f2', tree, keepLinks: true })
+    const [fromB = ''] = tabB.run('design.place', { parentId: 'f2', tree, keepLinks: true })
+    expect([tabA.design().nodes[fromA]?.link, tabB.design().nodes[fromB]?.link]).toEqual(['box', 'box'])
+    sync()
+    const [keeper = '', other = ''] = [fromA, fromB].sort()
+    for (const [tab, doc] of [
+      [tabA, a],
+      [tabB, b],
+    ] as const) {
+      expectFullRead(tab, doc)
+      expect(tab.design().nodes[keeper]?.link).toBe('box')
+      expect(tab.design().nodes[other]?.link).toBe(other)
+    }
+    expect(tabB.design()).toEqual(tabA.design())
+  })
+
+  it('a page deleted in one tab while the other adds a frame to it: the frame goes with it, and undo brings both back', () => {
+    const { a, b, tabA, tabB, sync } = twoTabs()
+    tabA.run('page.add', {
+      id: 'p2',
+      name: 'Card 2',
+      frame: { id: 'p2-sq', name: 'Square', width: 1080, height: 1080 },
+    })
+    sync()
+    tabA.run('page.delete', { id: 'p2' })
+    tabB.run('frame.add', { id: 'p2-mpu', pageId: 'p2', name: 'Medium rectangle', width: 300, height: 250 })
+    tabB.run('node.create', { id: 'dot', parentId: 'p2-mpu', layer: badge })
+    sync()
+    for (const [tab, doc] of [
+      [tabA, a],
+      [tabB, b],
+    ] as const) {
+      expectFullRead(tab, doc)
+      expect(Object.keys(tab.design().pages)).toEqual(['p1'])
+      expect(Object.keys(tab.design().frames).sort()).toEqual(['banner', 'sq'])
+      expect(tab.design().nodes.dot).toBeUndefined()
+    }
+    expect(tabB.design()).toEqual(tabA.design())
+
+    tabA.undo()
+    sync()
+    for (const [tab, doc] of [
+      [tabA, a],
+      [tabB, b],
+    ] as const) {
+      expectFullRead(tab, doc)
+      expect(framesOf(tab.design(), 'p2').map(([id]) => id)).toEqual(['p2-sq', 'p2-mpu'])
+      expect(tab.design().nodes.dot?.parentId).toBe('p2-mpu')
+    }
+  })
+
   it.each([1, 7, 42, 2026, 31337])(
     '200 random commands from each tab end in the same valid design on both (seed %i)',
     (seed) => {
@@ -306,7 +387,7 @@ function randomCommand(tab: Session, doc: DesignDoc, random: () => number) {
       tab.run('node.move', { id, parentId, ...(under.length && random() < 0.5 ? { before: pick(under) } : {}) })
     } else if (roll < 0.75) {
       tab.run('node.delete', { ids: [pick(ids)] })
-    } else if (roll < 0.9 && texts.length > 0) {
+    } else if (roll < 0.86 && texts.length > 0) {
       const id = pick(texts)
       const node = design.nodes[id]
       const length = node?.type === 'text' ? node.props.text.length : 0
@@ -316,7 +397,7 @@ function randomCommand(tab: Session, doc: DesignDoc, random: () => number) {
           ? { id, op: { kind: 'insert', at: Math.floor(random() * (length + 1)), text: pick(['a', 'ब', 'ع', '!']) } }
           : { id, op: { kind: 'delete', at: Math.floor(random() * (length - 1)), length: 1 } },
       )
-    } else if (roll < 0.93) {
+    } else if (roll < 0.89) {
       const which = random()
       const pages = Object.keys(design.pages)
       if (which < 0.4)
@@ -327,6 +408,29 @@ function randomCommand(tab: Session, doc: DesignDoc, random: () => number) {
       else if (which < 0.7) tab.run('page.duplicate', { id: pick(pages) })
       // p1 stays: two tabs deleting the last pages at once would leave none, which repair doesn't handle.
       else tab.run('page.delete', { id: pick(pages.filter((id) => id !== 'p1')) ?? 'p1' })
+    } else if (roll < 0.92) {
+      const which = random()
+      const frames = Object.keys(design.frames)
+      const side = () => 100 + Math.floor(random() * 900)
+      if (which < 0.3 || frames.length === 0)
+        tab.run('frame.add', { pageId: pick(Object.keys(design.pages)), name: 'F', width: side(), height: side() })
+      else if (which < 0.45)
+        tab.run('frame.update', {
+          frameId: pick(frames),
+          ...(random() < 0.5 ? { x: Math.round(random() * 3000) } : { width: side(), height: side() }),
+        })
+      else if (which < 0.65) tab.run('frame.duplicate', { frameId: pick(frames) })
+      else if (which < 0.8) tab.run('frame.addSize', { frameId: pick(frames), width: side(), height: side() })
+      else tab.run('frame.delete', { frameId: pick(frames) })
+    } else if (roll < 0.94 && ids.length > 0) {
+      // A paste of a layer and what is in it, copied from a frame, onto a frame of the same page.
+      const root = pick(ids)
+      const from = frameIdOf(design, root) ?? ''
+      const onPage = framesOf(design, design.frames[from]?.pageId ?? '').map(([id]) => id)
+      const nodes = Object.fromEntries(
+        [root, ...descendants(design, root)].map((id) => [id, design.nodes[id] as Layer]),
+      )
+      tab.run('design.place', { parentId: pick(onPage), tree: { roots: [root], nodes }, keepLinks: true })
     } else if (roll < 0.96 && texts.length > 0) {
       const id = pick(texts)
       const node = design.nodes[id]

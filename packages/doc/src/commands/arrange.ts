@@ -114,8 +114,9 @@ export const nodeDuplicate = defineCommand({
 
 /**
  * Places a tree of layers, such as the clipboard's, in a frame or container (#49): every layer gets
- * a fresh id and a new link id, the roots go on top in their order, and everything moves by `dx`,
- * `dy`. Placing the same tree twice gives two copies. Returns the new roots' ids, bottom to top.
+ * a fresh id and, unless `keepLinks` keeps its own, a new link id; the roots go on top in their
+ * order, and everything moves by `dx`, `dy`. Placing the same tree twice gives two copies. Returns
+ * the new roots' ids, bottom to top.
  */
 export const designPlace = defineCommand({
   name: 'design.place',
@@ -124,10 +125,25 @@ export const designPlace = defineCommand({
     tree: LayerTree,
     dx: z.number().default(0),
     dy: z.number().default(0),
+    /**
+     * Each layer, in the tree's order, keeps its link id where the frame it goes into holds no
+     * layer with it and no layer placed before it kept it, so it is a linked copy; the rest get new ones.
+     */
+    keepLinks: z.boolean().default(false),
   }),
   check: ({ design }, { parentId, tree }) =>
     tree.roots.map((root) => parentProblem(design, parentId, tree.nodes[root]?.type ?? '')).find(Boolean),
-  apply: ({ r, design }, { parentId, tree, dx, dy }) => {
+  apply: ({ r, design }, { parentId, tree, dx, dy, keepLinks }) => {
+    const frameId = frameIdOf(design, parentId)
+    /** The link ids the frame holds, and those this place has kept so far. */
+    const held = new Set(
+      keepLinks && frameId !== undefined ? descendants(design, frameId).map((id) => design.nodes[id]?.link) : [],
+    )
+    const linkOf = (link: string) => {
+      if (!keepLinks || frameId === undefined || held.has(link)) return nanoid()
+      held.add(link)
+      return link
+    }
     const ids = new Map(Object.keys(tree.nodes).map((id) => [id, nanoid()]))
     let index = childrenOf(design, parentId).at(-1)?.[1].index ?? null
     const placed = new Map<string, { parentId: string; index: string }>()
@@ -138,7 +154,7 @@ export const designPlace = defineCommand({
     for (const [old, node] of Object.entries(tree.nodes)) {
       const where = placed.get(old) ?? { parentId: ids.get(node.parentId) as string, index: node.index }
       const props = { ...node.props, x: node.props.x + dx, y: node.props.y + dy }
-      r.nodes.set(ids.get(old) as string, toYNode(Layer.parse({ ...node, ...where, link: nanoid(), props })))
+      r.nodes.set(ids.get(old) as string, toYNode(Layer.parse({ ...node, ...where, link: linkOf(node.link), props })))
     }
     return tree.roots.map((root) => ids.get(root) as string)
   },

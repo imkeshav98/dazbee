@@ -1,26 +1,14 @@
 import { nanoid } from 'nanoid'
 import { z } from 'zod'
 
-import {
-  Frame,
-  FrameId,
-  framesOf,
-  inOrder,
-  type Layer as LayerT,
-  Page,
-  PageId,
-  type Paint,
-  sizeProblem,
-} from '@dazbee/schema'
+import { Frame, FrameId, framesOf, inOrder, type Layer as LayerT, Page, PageId, sizeProblem } from '@dazbee/schema'
 
-import { childrenOf, descendants } from '../children.ts'
-import { DELETED, toYMap } from '../design-doc.ts'
+import { childrenOf } from '../children.ts'
+import { toYMap } from '../design-doc.ts'
 import { idProblem } from './checks.ts'
 import { defineCommand } from './define.ts'
+import { deleteFrame, FrameName, WHITE } from './frames.ts'
 import { copyLayers, indexBetween, lastOrder } from './tree.ts'
-
-/** A new frame's background. */
-const WHITE: Paint[] = [{ type: 'solid', color: '#FFFFFFFF' }]
 
 /**
  * Adds a page after the last one, holding one empty white frame at 0, 0 of the given name and
@@ -33,7 +21,7 @@ export const pageAdd = defineCommand({
     name: z.string(),
     frame: z.object({
       id: FrameId.optional(),
-      name: z.string().trim().min(1).max(120),
+      name: FrameName,
       width: Frame.shape.width,
       height: Frame.shape.height,
     }),
@@ -121,11 +109,7 @@ export const pageDelete = defineCommand({
     return undefined
   },
   apply: ({ r, design }, { id }) => {
-    for (const [frameId] of framesOf(design, id)) {
-      // Layers get the same tombstone node.delete gives them, so undo and other tabs' edits behave alike.
-      for (const node of descendants(design, frameId)) r.nodes.get(node)?.set(DELETED, true)
-      r.frames.delete(frameId)
-    }
+    for (const [frameId] of framesOf(design, id)) deleteFrame(r, design, frameId)
     r.pages.delete(id)
   },
 })
