@@ -55,14 +55,14 @@ One ad, post or other piece of creative at one size, placed on a page. It has it
 _Avoid_: Artboard, slide
 
 **Size**:
-A frame's width × height, such as 1080×1080, shown in its label; the Add a frame card offers named ones by channel (Meta, Google, LinkedIn and X), such as Feed square. Add size makes a new frame of another size from a frame, with a linked copy of each of its layers laid out to fit: each copy keeps its shape and its place in proportion.
+A frame's width × height, such as 1080×1080, shown in its label. Add size makes a new frame of another size from a frame, holding linked copies of its layers.
 _Avoid_: Format, dimensions
 
 **Link id**:
-The id a layer shares with its linked copies. Duplicating a frame, Add size, a paste onto another frame of the same page and Copy to other frames ▸ Layer keep it; every other way of making a layer gives it a new one. A frame holds at most one layer with each link id (a paste that would add a second gives it a new one), and link ids never cross pages.
+The id a layer shares with the layers made from it in other frames of its page. See ADR-0014.
 
 **Linked copies**:
-Layers made from one another, in different frames of one page, that share a link id. Each copy is a layer of its own: an edit to one leaves the others as they were. Only Copy to other frames and the full menu's "in all frames" items reach them.
+Layers made from one another, in different frames of one page, that share a link id. Each copy is a layer of its own: an edit to one leaves the others as they were.
 _Avoid_: Instances (an instance is a layer type), clones, synced layers
 
 **Linked frames**:
@@ -95,7 +95,7 @@ The list the small menu's ⋯ opens, and a right-click on a layer shows: copy, c
 _Avoid_: More menu, context menu
 
 **Copy to other frames**:
-The full menu's items that send a layer's style, its text or the layer itself into the frames linked to its own, each as one undo step. Style and Text go into every linked copy; Layer goes into each linked frame that has no copy of it, laid out to fit. Style is a layer's fills, outlines, effects, transparency, corners, font, weight, colour and spacing, with their brand bindings; never its font size, position, width, height or rotation.
+The full menu's items that send a layer's style, its text or the layer itself into the frames linked to its own.
 _Avoid_: Sync, propagate, apply to all
 
 **Transparency**:
@@ -205,10 +205,10 @@ _Avoid_: Data source, CSV
 A typed condition over variables that sets a layer property, such as "show the badge when discount > 0". Never free code.
 
 **Override**:
-A sparse change to one property of a layer, or of all its linked copies, for a variant, laid over the layer's own value. Only variants have overrides: each frame's layers are its own, so frames need none. Overrides never copy layers.
+A sparse change to one property of a layer, or of all its linked copies, for a variant, laid over the layer's own value. Overrides come later, with variants; frames have none, since each frame owns its layers.
 
 **Scope**:
-Where an override applies. In resolution order, most specific first: a variant within one frame, then the variant. A variant's value for all of a layer's linked copies is keyed by link id.
+Where an override applies, most specific first: a variant within one frame, then the variant across all of a layer's linked copies.
 
 **Resolve**:
 Picking a property's value for one layer in one variant by walking the scopes in order, down to the layer's own value.

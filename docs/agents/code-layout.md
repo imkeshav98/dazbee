@@ -211,11 +211,11 @@ Each piece of the editor's state has one owner:
 | Module | State |
 |---|---|
 | `save-state` | the provider's connection, the shown save state, the offline timer |
-| `canvas/view` | the WebGL `gl`, the surface, `dpr`, viewport, insets, camera, rulers, the last drawn `design` snapshot, `grid`, the frames last drawn (`inView()`, which `place` and the overlay read), the view listeners, the redraw schedule |
+| `canvas/view` | the WebGL `gl`, the surface, `dpr`, viewport, insets, camera, rulers, the last drawn `design` snapshot, `grid`, the focused size, the canvas frames last drawn (`inView()`, which `place` and the overlay read), the view listeners, the redraw schedule |
 | `resources` | resource bytes, resources, the fonts asked for, family loads, what is loading, placeholders |
-| `canvas/scenes` | frames, pictures, paragraphs, scenes, layers, the recording counts |
+| `canvas/scenes` | canvas frames, pictures, paragraphs, scenes, layers, the recording counts |
 | `tools` | the tool, the image to place, snapping, the tool listeners; `setTool` |
-| `selection` | selection, entered group, picked frame, crop, path edit, last selection, `hovered`, the selection and picked frame listeners |
+| `selection` | selection, entered group, picked page, crop, path edit, last selection, `hovered`, the selection and page listeners |
 | `canvas/thumbnails` | the layer and page thumbnails, the crop's faint images |
 | `export/exports` | the export worker's client |
 | `text/typing` | the text being edited, caret and range |
