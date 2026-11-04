@@ -2,12 +2,12 @@
 // panel and the bar mirrored in Arabic, and the second row and its pop-ups with a flyout open at
 // tablet size.
 import { photo, upload } from '../../support/assets.ts'
-import { editorPath, setCookies, writeOutput } from '../../support/editor.ts'
+import { editorPath, screenPoint, setCookies, writeOutput } from '../../support/editor.ts'
 import { layoutProblems } from '../../support/layout.ts'
 import { seed } from '../../support/seed.ts'
-import { nextFrame, openStage, selectLayers } from '../../support/stage.ts'
-import { expect, test } from '../../support/test.ts'
-import { barMenu, PIECES, UNCUT } from '../../support/top-bar.ts'
+import { fitSettled, nextFrame, openStage, selectLayers } from '../../support/stage.ts'
+import { expect, type Locator, test } from '../../support/test.ts'
+import { barMenu, moreMenu, PIECES, UNCUT, zoomMenu } from '../../support/top-bar.ts'
 import { topBarDesign } from '../../support/top-bar-design.ts'
 
 test.describe.configure({ timeout: 240_000 })
@@ -91,6 +91,10 @@ test("at tablet size with a flyout open, the bar's second row and its pop-ups an
 })
 
 test.describe('on a phone, 390×844', () => {
+  /** The heights of the rows a menu holds, by a selector inside it. */
+  const rowHeights = (menu: Locator, rows: string) =>
+    menu.locator(rows).evaluateAll((els) => els.map((el) => Math.round(el.getBoundingClientRect().height)))
+
   test('the top bar scrolls sideways with no classic scrollbar', async ({ browser }) => {
     const asset = await upload(photo)
     const { page, errors } = await openStage(browser, topBarDesign(asset.id))
@@ -101,6 +105,38 @@ test.describe('on a phone, 390×844', () => {
       true,
       'none',
     ])
+    expect(errors).toEqual([])
+  })
+
+  test('every menu row is at least 44 px tall: the full, right-click, shape and zoom menus', async ({ browser }) => {
+    const asset = await upload(photo)
+    const { page, errors } = await openStage(browser, topBarDesign(asset.id))
+    await page.setViewportSize({ width: 390, height: 844 })
+    await fitSettled(page)
+    await selectLayers(page, ['box'], { bar: true })
+    const full = await moreMenu(page)
+    for (const height of await rowHeights(full, ':scope > button')) expect(height).toBeGreaterThanOrEqual(44)
+    await page.keyboard.press('Escape')
+
+    await selectLayers(page, [])
+    const at = await screenPoint(page, 160, 280)
+    await page.mouse.click(at.x, at.y, { button: 'right' })
+    const right = page.getByTestId('stage-menu')
+    await expect(right).toBeVisible()
+    for (const height of await rowHeights(right, ':scope > button')) expect(height).toBeGreaterThanOrEqual(44)
+    await page.keyboard.press('Escape')
+    await expect(right).toBeHidden()
+
+    await selectLayers(page, [])
+    await page.getByTestId('shape-menu').click()
+    const shapes = page.getByRole('menu')
+    await expect(shapes).toBeVisible()
+    for (const height of await rowHeights(shapes, '[data-shape]')) expect(height).toBeGreaterThanOrEqual(44)
+    await page.keyboard.press('Escape')
+
+    const zoom = await zoomMenu(page)
+    for (const height of await rowHeights(zoom, 'button')) expect(height).toBeGreaterThanOrEqual(44)
+    await page.keyboard.press('Escape')
     expect(errors).toEqual([])
   })
 })

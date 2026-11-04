@@ -7,6 +7,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useFormStatus } from 'react-dom'
 
 import { buttonStyles } from '@/components/ui/button.tsx'
+import { TOUCH_ROW } from '@/components/ui/looks.ts'
 import { cn } from '@/lib/cn.ts'
 import { useMessages } from '@/lib/i18n/client.tsx'
 import { format } from '@/lib/i18n/index.ts'
@@ -40,8 +41,7 @@ export function TileMenu({
       window.removeEventListener('pointerdown', onPress)
     }
   }, [step])
-  const row =
-    'flex h-9 w-full cursor-pointer items-center rounded-row px-3 text-start text-[13px] font-medium hover:bg-hover'
+  const row = `flex h-9 w-full cursor-pointer items-center rounded-row px-3 text-start text-[13px] font-medium hover:bg-hover ${TOUCH_ROW}`
   return (
     <div ref={box} className="absolute end-2 top-2 z-10" data-testid="tile-menu">
       <button

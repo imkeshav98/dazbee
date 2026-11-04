@@ -10,6 +10,7 @@ import type { Editor } from '@dazbee/editor'
 
 import { useEditorDesign } from '@/components/editor/editor-hooks.ts'
 import { Button } from '@/components/ui/button.tsx'
+import { TOUCH_ROW } from '@/components/ui/looks.ts'
 import { useMessages } from '@/lib/i18n/client.tsx'
 
 import { ExportForm } from './export-menu.tsx'
@@ -17,8 +18,7 @@ import { TemplateForm } from './template-menu.tsx'
 
 type Open = 'menu' | 'export' | 'template' | null
 
-const ROW =
-  'flex min-h-12 py-1.5 w-full cursor-pointer items-center gap-3 rounded-row px-3 text-start text-[13px] font-medium transition-colors duration-[var(--chrome-fast)] hover:bg-hover focus-visible:bg-hover focus-visible:outline-none'
+const ROW = `flex min-h-12 py-1.5 w-full cursor-pointer items-center gap-3 rounded-row px-3 text-start text-[13px] font-medium transition-colors duration-[var(--chrome-fast)] hover:bg-hover focus-visible:bg-hover focus-visible:outline-none ${TOUCH_ROW}`
 
 export function ShareMenu({
   editor,
