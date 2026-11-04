@@ -1,11 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { mergedProps } from '@dazbee/doc'
 import { render } from '@dazbee/renderer'
 import { loadCanvasKit } from '@dazbee/renderer/node'
 import { type DesignInput, LAYER_CLIPBOARD_TYPE } from '@dazbee/schema'
 
-import { type Frame, frameAt, frameGrid } from './canvas/frames.ts'
+import { type Frame, frameAt, pageFrames } from './canvas/frames.ts'
 import { measure, sessionOf, testBoxes } from './layers/test-boxes.ts'
 import { editorPlace, type PlaceDeps } from './place.ts'
 import { editorSelection } from './selection.ts'
@@ -20,52 +19,70 @@ const rect = (parentId: string, index: string, box: { x: number; y: number; widt
   name: 'Rect',
   props: { ...box, shape: { kind: 'rect' as const }, fills: [RED] },
 })
+const BLUE = { type: 'solid' as const, color: '#0000FFFF' }
+/** The square frame's layers: a square, a square whose style is locked, a line, a text and a box holding a square. */
+const SQUARE_LAYERS: DesignInput['nodes'] = {
+  a: { ...rect('sq', 'a0', { x: 100, y: 100, width: 100, height: 100 }), link: 'a' },
+  styled: { ...rect('sq', 'a1', { x: 300, y: 100, width: 100, height: 100 }), link: 'styled', lock: { style: true } },
+  line: {
+    type: 'graphic',
+    parentId: 'sq',
+    link: 'line',
+    index: 'a2',
+    name: 'Line',
+    props: { x: 500, y: 100, width: 100, height: 100, shape: { kind: 'line' } },
+  },
+  words: {
+    type: 'text',
+    parentId: 'sq',
+    link: 'words',
+    index: 'a3',
+    name: 'Words',
+    props: {
+      x: 700,
+      y: 100,
+      width: 200,
+      height: 40,
+      text: 'Hello',
+      boxMode: 'fixed',
+      style: { fontFamily: 'Noto Sans', fontSize: 20, color: '#000000FF' },
+    },
+  },
+  box: {
+    type: 'box',
+    parentId: 'sq',
+    link: 'box',
+    index: 'a4',
+    name: 'Box',
+    props: { x: 100, y: 500, width: 300, height: 300 },
+  },
+  inside: { ...rect('box', 'a0', { x: 0, y: 0, width: 50, height: 50 }), link: 'inside' },
+}
 /**
- * One page in a square and a wide format: a square with a fill of its own in the wide format, a
- * square whose style is locked, a line, a text and a box holding a square.
+ * One page with a square frame holding SQUARE_LAYERS and a wide one holding a copy of each,
+ * `wide-<id>`, linked to it, the first square's copy filled blue.
  */
 const DESIGN: DesignInput = {
-  meta: { designId: 'd', name: 'D', kind: 'single', primaryFormatId: 'sq' },
-  formats: {
-    sq: { name: 'Square', width: 1080, height: 1080, order: 'a0' },
-    wide: { name: 'Wide', width: 1200, height: 628, order: 'a1' },
-  },
+  meta: { designId: 'd', name: 'D' },
   pages: { p1: { name: 'One', order: 'a0' } },
-  nodes: {
-    a: rect('p1', 'a0', { x: 100, y: 100, width: 100, height: 100 }),
-    styled: { ...rect('p1', 'a1', { x: 300, y: 100, width: 100, height: 100 }), lock: { style: true } },
-    line: {
-      type: 'graphic',
-      parentId: 'p1',
-      index: 'a2',
-      name: 'Line',
-      props: { x: 500, y: 100, width: 100, height: 100, shape: { kind: 'line' } },
-    },
-    words: {
-      type: 'text',
-      parentId: 'p1',
-      index: 'a3',
-      name: 'Words',
-      props: {
-        x: 700,
-        y: 100,
-        width: 200,
-        height: 40,
-        text: 'Hello',
-        boxMode: 'fixed',
-        style: { fontFamily: 'Noto Sans', fontSize: 20, color: '#000000FF' },
-      },
-    },
-    box: {
-      type: 'box',
-      parentId: 'p1',
-      index: 'a4',
-      name: 'Box',
-      props: { x: 100, y: 500, width: 300, height: 300 },
-    },
-    inside: rect('box', 'a0', { x: 0, y: 0, width: 50, height: 50 }),
+  frames: {
+    sq: { pageId: 'p1', name: 'Square', width: 1080, height: 1080, x: 0, y: 0, order: 'a0' },
+    wide: { pageId: 'p1', name: 'Wide', width: 1200, height: 628, x: 1280, y: 0, order: 'a1' },
   },
-  overrides: { 'format:wide': { a: { fills: [{ type: 'solid', color: '#0000FFFF' }] } } },
+  nodes: {
+    ...SQUARE_LAYERS,
+    ...Object.fromEntries(
+      Object.entries(SQUARE_LAYERS).map(([id, node]) => [
+        `wide-${id}`,
+        { ...node, parentId: node.parentId === 'sq' ? 'wide' : `wide-${node.parentId}` },
+      ]),
+    ),
+    'wide-a': {
+      ...rect('wide', 'a0', { x: 100, y: 100, width: 100, height: 100 }),
+      link: 'a',
+      props: { x: 100, y: 100, width: 100, height: 100, shape: { kind: 'rect' }, fills: [BLUE] },
+    },
+  },
 }
 const PHOTO = { id: 'photo', name: 'Photo', width: 400, height: 200 }
 const SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="100" height="50"><rect width="100" height="50"/></svg>'
@@ -108,7 +125,7 @@ function clipboardEvent(data: DataTransfer) {
  */
 function harness(typed = false) {
   const session = sessionOf(DESIGN)
-  const frames = frameGrid(session.design()).frames
+  const frames = pageFrames(session.design(), 'p1').frames
   const [square, wide] = frames as [Frame, Frame]
   const log: string[] = []
   const selection = editorSelection({ drawn: () => session.design(), frames: () => frames, changed: () => {} })
@@ -136,7 +153,7 @@ function harness(typed = false) {
     },
     tools: { setTool: (tool) => log.push(`tool ${tool}`) },
     selection,
-    scenes: { scene: (f) => render(session.design(), f.pageId, f.formatId, undefined, measure) },
+    scenes: { scene: (f) => render(session.design(), f.key, undefined, measure) },
     boxes,
     typing: {
       editing: () => (typed ? { id: 'words', frame: square.key } : null),
@@ -152,13 +169,13 @@ function harness(typed = false) {
     drawOverlay: () => log.push('overlay'),
   }
   const place = editorPlace(deps)
-  /** A layer's box in a frame's format. */
-  const boxOf = (id: string, frame = square) => {
-    const p = mergedProps(session.design(), `format:${frame.formatId}`, id) as Record<string, number>
+  /** A layer's box. */
+  const boxOf = (id: string) => {
+    const p = session.design().nodes[id]?.props as unknown as Record<string, number>
     return { x: p.x, y: p.y, width: p.width, height: p.height }
   }
-  /** The fills of a layer in a frame's format. */
-  const fillsOf = (id: string, frame = square) => mergedProps(session.design(), `format:${frame.formatId}`, id).fills
+  /** A layer's fills. */
+  const fillsOf = (id: string) => (session.design().nodes[id]?.props as { fills?: unknown }).fills
   /** A client point over a point of a frame. */
   const client = (frame: Frame, x: number, y: number) => ({ x: frame.x + x, y: frame.y + y })
   return { place, session, selection, square, wide, log, boxOf, fillsOf, client }
@@ -197,16 +214,22 @@ describe('editorPlace', () => {
   })
 
   describe('copy, cut and paste', () => {
-    it('copies the selected layers onto the clipboard, as the format shows them', () => {
+    it('copies the selected layers onto the clipboard as they are, with their link ids and the page and frame they came from', () => {
       const { place, selection, wide } = harness()
-      selection.select(['a'], wide.key)
+      selection.select(['wide-a'], wide.key)
       const data = transfer()
       const e = clipboardEvent(data)
       place.copy(e)
       expect(e.taken).toBe(true)
       const copied = JSON.parse(data.getData(LAYER_CLIPBOARD_TYPE))
-      expect(copied).toMatchObject({ kind: 'dazbee.layers', designId: 'd', tree: { roots: ['a'] } })
-      expect(copied.tree.nodes.a.props.fills).toEqual([{ type: 'solid', color: '#0000FFFF' }])
+      expect(copied).toMatchObject({
+        kind: 'dazbee.layers',
+        designId: 'd',
+        pageId: 'p1',
+        frameId: 'wide',
+        tree: { roots: ['wide-a'] },
+      })
+      expect(copied.tree.nodes['wide-a']).toMatchObject({ link: 'a', props: { fills: [BLUE] } })
       expect(data.getData('text/plain')).toBe('Rect')
     })
 
@@ -239,6 +262,9 @@ describe('editorPlace', () => {
       expect(pasted).toBeDefined()
       expect(pasted).not.toBe('a')
       expect(boxOf(pasted ?? '')).toEqual(boxOf('a'))
+      // A new layer in the frame, with a link id of its own.
+      expect(session.design().nodes[pasted ?? '']?.parentId).toBe('sq')
+      expect(session.design().nodes[pasted ?? '']?.link).not.toBe('a')
       session.undo()
       expect(session.design().nodes[pasted ?? '']).toBeUndefined()
     })
@@ -301,7 +327,7 @@ describe('editorPlace', () => {
       const { place, session, selection, square, boxOf, log } = harness()
       const id = place.placeSvg(SVG, 'Logo', { frame: square.key, x: 500, y: 500 })
       expect(id).not.toBeNull()
-      expect(session.design().nodes[id ?? '']).toMatchObject({ type: 'group', name: 'Logo', parentId: 'p1' })
+      expect(session.design().nodes[id ?? '']).toMatchObject({ type: 'group', name: 'Logo', parentId: 'sq' })
       expect(boxOf(id ?? '')).toEqual({ x: 450, y: 475, width: 100, height: 50 })
       expect(selection.current()).toEqual({ ids: [id], frame: square.key })
       expect(log).toEqual(['typing stop', 'tool select'])
@@ -341,18 +367,17 @@ describe('editorPlace', () => {
   })
 
   describe('fillWithImage', () => {
-    it('puts the image on top of the fills in every format, as one undo step, the layer selected where it was dropped', () => {
-      const { place, session, selection, square, wide, fillsOf, client } = harness()
-      place.imageTarget(client(wide, 150, 150))
-      expect(place.fillWithImage('a', PHOTO)).toBe(true)
+    it("puts the image on top of the layer's fills, as one undo step, selected in its frame; its copy keeps its own", () => {
+      const { place, session, selection, wide, fillsOf, client } = harness()
+      expect(place.imageTarget(client(wide, 150, 150))).toBe('wide-a')
+      expect(place.fillWithImage('wide-a', PHOTO)).toBe(true)
       const image = { type: 'image', assetId: 'photo', fit: 'fill', opacity: 1 }
-      expect(fillsOf('a', square)).toEqual([RED, image])
-      expect(fillsOf('a', wide)).toEqual([{ type: 'solid', color: '#0000FFFF' }, image])
-      expect(selection.current()).toEqual({ ids: ['a'], frame: wide.key })
+      expect(fillsOf('wide-a')).toEqual([BLUE, image])
+      expect(fillsOf('a')).toEqual([RED])
+      expect(selection.current()).toEqual({ ids: ['wide-a'], frame: wide.key })
       expect(place.dropTarget()).toBeNull()
       session.undo()
-      expect(fillsOf('a', square)).toEqual([RED])
-      expect(fillsOf('a', wide)).toEqual([{ type: 'solid', color: '#0000FFFF' }])
+      expect(fillsOf('wide-a')).toEqual([BLUE])
     })
 
     it('can’t fill a layer whose style is locked', () => {
@@ -361,7 +386,7 @@ describe('editorPlace', () => {
       expect(session.canUndo()).toBe(false)
     })
 
-    it('selects the layer in its page’s main format when it was dropped nowhere', () => {
+    it('selects the layer in its own frame when it was dropped nowhere', () => {
       const { place, selection, square } = harness()
       place.fillWithImage('inside', PHOTO)
       expect(selection.current()).toEqual({ ids: ['inside'], frame: square.key })

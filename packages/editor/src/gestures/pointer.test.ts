@@ -10,7 +10,7 @@ import type { Tool } from '../tools.ts'
 import { editorPointer, type PointerDeps } from './pointer.ts'
 import type { MoveDrag } from './transform-drag.ts'
 
-const SQUARE = { key: 'one/sq', pageId: 'one', formatId: 'sq', x: 0, y: 0, width: 1080, height: 1080 } as Frame
+const SQUARE: Frame = { key: 'one-sq', pageId: 'one', name: 'Square', x: 0, y: 0, width: 1080, height: 1080 }
 /** A scene layer of a type over the first 100 pixels of the frame each way. */
 const sceneLayer = (id: string, type: string) =>
   ({
@@ -40,7 +40,8 @@ const key = (code: string, log: string[], extra: Record<string, unknown> = {}) =
 
 /**
  * The pointer on a canvas that keeps its listeners, over a stage where client points are design
- * pixels of the square frame at zoom 1, with a real selection; every behaviour logs what it is asked.
+ * pixels of the square frame at zoom 1, off every frame past 1100 across, with a real selection;
+ * every behaviour logs what it is asked.
  */
 function harness(tool: Tool = 'select', under: SceneLayer = UNDER) {
   const log: string[] = []
@@ -60,7 +61,7 @@ function harness(tool: Tool = 'select', under: SceneLayer = UNDER) {
       camera: () => camera,
       design: () => design,
       onStage: (client) => client,
-      pointAt: (client) => ({ frame: SQUARE, p: client }),
+      pointAt: (client) => (client.x > 1100 ? null : { frame: SQUARE, p: client }),
       setCamera: (next) => {
         camera = next
         log.push(`camera ${next.x} ${next.y}`)
@@ -100,8 +101,16 @@ function harness(tool: Tool = 'select', under: SceneLayer = UNDER) {
       pressShape: () => null,
       pressImage: () => ({ kind: 'imageBox' }) as ReturnType<PointerDeps['drawing']['pressImage']>,
       pressText: () => ({ kind: 'textBox' }) as ReturnType<PointerDeps['drawing']['pressText']>,
-      drag: () => {},
-      release: () => {},
+      pressFrame: (_e, world) => {
+        log.push(`frame from ${world.x} ${world.y}`)
+        return { kind: 'frameDraw', from: world, to: world }
+      },
+      drag: (g, p) => {
+        if (g.kind === 'frameDraw') log.push(`frame to ${p.x} ${p.y}`)
+      },
+      release: (g) => {
+        if (g.kind === 'frameDraw') log.push('frame drawn')
+      },
     },
     transformDrag: {
       handleUnder: () => null,
@@ -177,6 +186,19 @@ describe('editorPointer', () => {
       expect(text.pointer.gesture()).toEqual({ kind: 'textBox' })
       expect(pointer.gesture()).toBeNull()
     })
+
+    it('sends a press of the Frame tool anywhere on the stage to drawing a frame, the drag in world units', () => {
+      const { pointer, send, log, cursor } = harness('frame')
+      send('wheel', event(0, 0, { deltaX: -100, deltaY: -50 }))
+      pointer.showCursor()
+      expect(cursor()).toBe('crosshair')
+      send('pointerdown', event(1300, 70))
+      expect(pointer.gesture()).toMatchObject({ kind: 'frameDraw' })
+      send('pointermove', event(1500, 250))
+      send('pointerup')
+      expect(pointer.gesture()).toBeNull()
+      expect(log).toEqual(['camera 100 50', 'frame from 1200 20', 'frame to 1400 200', 'frame drawn', 'draw overlay'])
+    })
   })
 
   describe('pointerAt and rehover', () => {
@@ -185,7 +207,7 @@ describe('editorPointer', () => {
       expect(pointer.pointerAt()).toBeNull()
       send('pointermove', event(5, 6))
       expect(pointer.pointerAt()).toEqual({ x: 5, y: 6 })
-      expect(selection.hovered()).toEqual({ id: 'under picked', frame: 'one/sq' })
+      expect(selection.hovered()).toEqual({ id: 'under picked', frame: 'one-sq' })
       expect(log).toEqual(['draw overlay'])
       expect(pointer.rehover()).toBe(false)
       send('pointerleave')
@@ -218,7 +240,7 @@ describe('editorPointer', () => {
     it('selects what a press under a client point picks, keeping a selection it is in', () => {
       const { pointer, selection } = harness()
       expect(pointer.selectAt({ x: 5, y: 5 })).toEqual(['under picked'])
-      selection.select(['under picked', 'other'], 'one/sq')
+      selection.select(['under picked', 'other'], 'one-sq')
       expect(pointer.selectAt({ x: 5, y: 5 })).toEqual(['under picked', 'other'])
     })
   })
@@ -260,8 +282,8 @@ describe('editorPointer', () => {
     it('starts typing into the text under the pointer, selecting it', () => {
       const { selection, send, log } = harness('select', sceneLayer('words', 'text'))
       send('dblclick', event(10, 10))
-      expect(selection.current()).toEqual({ ids: ['words'], frame: 'one/sq' })
-      expect(log).toEqual(['type into words in one/sq', 'draw overlay'])
+      expect(selection.current()).toEqual({ ids: ['words'], frame: 'one-sq' })
+      expect(log).toEqual(['type into words in one-sq', 'draw overlay'])
     })
 
     it('does nothing while panning', () => {

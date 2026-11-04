@@ -1,5 +1,5 @@
 // Drawing shapes with a drag (#44): what each shape tool makes, and the rect a drag gives it. Kept
-// free of the editor so the geometry can be tested on its own. Points are a page's design pixels.
+// free of the editor so the geometry can be tested on its own. Points are a frame's design pixels.
 import type { Paint, Point, Rect } from '@dazbee/schema'
 
 import { normalAngle, round } from '../layers/transform.ts'
@@ -18,8 +18,8 @@ export const SHAPE_MENU_TOOLS = ['rect', 'ellipse', 'box', 'polygon', 'star', 'l
 export type ShapeMenuTool = (typeof SHAPE_MENU_TOOLS)[number]
 /** The tools of the shape menu that draw a shape: every one but Box. */
 export type ShapeTool = Exclude<ShapeMenuTool, 'box'>
-/** What a drag draws: a shape, or a box with Box or the Frame tool. */
-export type DrawTool = ShapeMenuTool | 'frame'
+/** What a drag with a tool of the shape menu draws: a shape, or a box with Box. */
+export type DrawTool = ShapeMenuTool
 
 /** The size a click without a drag draws, in design pixels. */
 const CLICK_SIZE = 100
@@ -37,18 +37,18 @@ const PLACED_SHARE = 0.5
 
 const isShapeMenuTool = (tool: string): tool is ShapeMenuTool => (SHAPE_MENU_TOOLS as readonly string[]).includes(tool)
 
-/** A new box for the Box and Frame tools, at no size yet: white, as in most design tools. */
+/** A new box for the Box tool, at no size yet: white, as in most design tools. */
 const newBox = (): NewLayer => ({
   type: 'box',
   name: 'Box',
   props: { x: 0, y: 0, width: 0, height: 0, fills: [{ type: 'solid', color: '#FFFFFFFF' }] },
 })
 
-/** Whether a tool draws with a drag: a tool of the shape menu or the Frame tool. */
-export const isDrawTool = (tool: string): tool is DrawTool => tool === 'frame' || isShapeMenuTool(tool)
+/** Whether a tool draws a layer with a drag: a tool of the shape menu. */
+export const isDrawTool = (tool: string): tool is DrawTool => isShapeMenuTool(tool)
 
-/** Whether a drawing tool draws a box: the shape menu's Box, or the Frame tool. */
-export const drawsBox = (tool: DrawTool): tool is 'box' | 'frame' => tool === 'box' || tool === 'frame'
+/** Whether a drawing tool draws a box: the shape menu's Box. */
+export const drawsBox = (tool: DrawTool): tool is 'box' => tool === 'box'
 
 /** A new layer for a drawing tool, at no size yet. */
 export const newDrawn = (tool: DrawTool): NewLayer => (drawsBox(tool) ? newBox() : newShape(tool))

@@ -1,12 +1,12 @@
-// The editor: one infinite canvas per design with every page in every format as a frame (#36),
-// click to select, drag to move, typing into text, pan and zoom. It has no framework in it; the
-// page only hands it a canvas and an overlay the size of the stage.
+// The editor: a design's pages, each an infinite canvas with its frames where they were placed,
+// shown one page at a time (#36); click to select, drag to move, typing into text, pan and zoom.
+// It has no framework in it; the page only hands it a canvas and an overlay the size of the stage.
 import { HocuspocusProvider } from '@hocuspocus/provider'
 import { IndexeddbPersistence } from 'y-indexeddb'
 import * as Y from 'yjs'
 
 import type { CanvasKit } from '@dazbee/canvaskit'
-import { openSession, readDesign, type Session } from '@dazbee/doc'
+import { frameIdOf, openSession, readDesign, type Session } from '@dazbee/doc'
 import { FALLBACK_FAMILIES } from '@dazbee/fonts'
 import { renderDesign, type ResourceCache, resourceCache } from '@dazbee/renderer'
 import { type Design, fontFamilies, imageAssetIds, type Point, type VariableRef, type Variables } from '@dazbee/schema'
@@ -14,7 +14,7 @@ import type { Skipped } from '@dazbee/svg'
 
 import { editorActions } from './actions.ts'
 import { editorBrandKit } from './brand-kit.ts'
-import { frameGrid, frameKey } from './canvas/frames.ts'
+import { frameIn } from './canvas/frames.ts'
 import { editorOverlay } from './canvas/overlay.ts'
 import { frameScenes } from './canvas/scenes.ts'
 import { thumbnailCache } from './canvas/thumbnails.ts'
@@ -117,7 +117,7 @@ export async function startEditor(options: EditorOptions) {
 function live(
   ck: CanvasKit,
   cache: ResourceCache,
-  firstBytes: Parameters<typeof renderDesign>[4],
+  firstBytes: Parameters<typeof renderDesign>[3],
   doc: Y.Doc,
   provider: HocuspocusProvider,
   local: IndexeddbPersistence,
@@ -144,7 +144,7 @@ function live(
   const saving = watchSaveState({ provider, onSaveState: (state) => status(state) })
   const session: Session = openSession(doc)
   const view = editorView({ ck, canvas, session, onZoom: (zoom) => options.onZoom?.(zoom), draw })
-  const { frameOf, firstPage, placeBox, outline, camera, design: drawn, frames } = view
+  const { frameOf, placeBox, outline, camera, design: drawn, frames } = view
   const resources = editorResources({
     ck,
     cache,
@@ -164,16 +164,7 @@ function live(
   // Layer 3: the queries.
   const boxes = editorBoxes({ session, scenes, resources, selection, drawn, frameOf })
   const hug = (ids: string[]) => hugIn(session, ids)
-  const thumbnails = thumbnailCache({
-    ck,
-    scenes,
-    resources,
-    selection,
-    current: () => session.design(),
-    drawn,
-    frameOf,
-    firstPage,
-  })
+  const thumbnails = thumbnailCache({ ck, scenes, resources, current: () => session.design(), drawn })
   const exporting = editorExports({ ck, cache, session, resources, view })
 
   // Layer 4: the behaviours.
@@ -209,7 +200,7 @@ function live(
     typing,
     boxes,
     camera,
-    drawn,
+    page: view.page,
     hug,
     placeBox,
     drawOverlay,
@@ -258,7 +249,7 @@ function live(
     drawOverlay,
   })
   const brandKit = editorBrandKit({ session, resources, view, selection, typing, signal })
-  const layerEdits = editorLayerEdits({ session, view, selection, resources, typing, actions, signal })
+  const layerEdits = editorLayerEdits({ session, selection, resources, typing, signal })
 
   // Layer 5: the routers.
   const pointer = editorPointer({
@@ -366,21 +357,52 @@ function live(
     }
     typing.key(e)
   }
-  /** Selects layers in one frame, as the page asks, ending typing first. */
-  function select(ids: string[], pageId?: string, formatId?: string) {
+  /**
+   * Selects layers in the frame of the first of them, as the app asks, ending typing first: any in
+   * other frames are left out, and that frame's page is shown first when another is. None clears it.
+   */
+  function select(ids: string[]) {
     typing.stop()
+    const now = session.design()
+    const live = ids.filter((id) => now.nodes[id])
+    const frameId = live[0] === undefined ? undefined : frameIdOf(now, live[0])
+    const pageId = frameId === undefined ? undefined : now.frames[frameId]?.pageId
+    if (frameId === undefined || pageId === undefined) {
+      selection.select([], '')
+      return
+    }
+    if (pageId !== view.page()) showPage(pageId)
     selection.select(
-      ids.filter((id) => session.design().nodes[id]),
-      view.defaultFrame(pageId, formatId).key,
+      live.filter((id) => frameIdOf(now, id) === frameId),
+      frameId,
     )
   }
-  /** Shows one format alone, or every one with null, letting go of a selection or text no longer shown. */
-  function focus(formatId: string | null) {
-    view.focus(formatId)
-    selection.dropOffGrid()
+  /**
+   * Shows a page, its frames fitted: a selection, crop, path edit, pen path or typing on another
+   * page lets go, and so does the picked page.
+   */
+  function showPage(pageId: string) {
+    pen.finish()
+    view.showPage(pageId)
+    selection.dropOffPage()
     const editing = typing.editing()
     if (editing && !frameOf(editing.frame)) typing.stop()
-    view.fitAll()
+    selection.pickPage(null)
+    drawOverlay()
+  }
+  /** Fits a frame in view, showing its page first when another is shown. */
+  function fitFrame(frameId: string) {
+    const now = session.design()
+    const pageId = Object.hasOwn(now.frames, frameId) ? now.frames[frameId]?.pageId : undefined
+    if (pageId !== undefined && pageId !== view.page()) showPage(pageId)
+    view.fitArea(view.defaultFrame(frameId))
+  }
+  /** A layer's box as drawn in its frame, shown or not. */
+  function boxOf(id: string) {
+    const now = session.design()
+    const frameId = frameIdOf(now, id)
+    const frame = frameId === undefined ? undefined : frameIn(now, frameId)
+    return frame ? boxes.drawnRect(frame, id) : null
   }
   function stopEditing() {
     if (!typing.editing()) return
@@ -405,9 +427,7 @@ function live(
   window.addEventListener('blur', pointer.blur, on)
 
   view.resize()
-  const firstFormat = options.formatId ? frameOf(frameKey(firstPage(), options.formatId)) : undefined
-  if (firstFormat) view.fitArea(firstFormat)
-  else view.fitAll()
+  view.fitAll()
   options.onZoom?.(view.camera().zoom)
   draw()
   saving.start()
@@ -453,9 +473,9 @@ function live(
     snapWork: () => transformDrag.snapWork(),
     setSnapping: (on: boolean) => tools.setSnapping(on),
     onView: view.onView,
-    frames: () => frameGrid(session.design(), view.focused()).frames,
-    focused: view.focused,
-    focus,
+    frames: view.frames,
+    shownPage: view.page,
+    showPage,
     camera: view.camera,
     viewport: view.viewport,
     setCamera: view.setCamera,
@@ -465,21 +485,19 @@ function live(
     zoomOut: view.zoomOut,
     fitAll: view.fitAll,
     fitSelection: actions.fitSelection,
-    fitFrame: (pageId: string, formatId: string) => view.fitArea(view.defaultFrame(pageId, formatId)),
-    fitPage: view.fitPage,
+    fitFrame,
     setTool: (next: Tool) => tools.setTool(next),
     tool: () => tools.tool(),
     armImage: (asset: PlacedAsset | null) => tools.setTool(asset ? 'image' : tools.tool(), asset),
     imageArmed: () => tools.imageToPlace() !== null,
     onTool: (listener: (tool: Tool) => void) => tools.onTool(listener),
     screenPoint: view.screenPoint,
-    boxOf: (id: string, pageId?: string, formatId?: string) => boxes.drawnRect(view.defaultFrame(pageId, formatId), id),
+    boxOf,
     loaded: () => resources.loaded(),
     drawn: () => (view.scheduled() ? draws.next() : Promise.resolve()),
     onDraw: draws.on,
     exportPixels: exporting.pixels,
     exportFiles: exporting.files,
-    resetOwn: layerEdits.resetOwn,
     loadedFamilies: () => resources.families(),
     setFont: layerEdits.setFont,
     variables: () => resources.bytes().variables ?? {},
@@ -492,7 +510,7 @@ function live(
     settle,
     destroyed: () => signal.aborted,
     imageTarget: (client: Point | null) => place.imageTarget(client),
-    fillWithImage: (id: string, asset: PlacedAsset, inFrame?: string) => place.fillWithImage(id, asset, inFrame),
+    fillWithImage: (id: string, asset: PlacedAsset) => place.fillWithImage(id, asset),
     pageThumbnail: thumbnails.page,
     layerThumbnail: thumbnails.layer,
     synced: () => provider.synced && provider.unsyncedChanges === 0,

@@ -8,29 +8,32 @@ import { sessionOf } from './layers/test-boxes.ts'
 import { editorSelection } from './selection.ts'
 
 const STYLE = { fontFamily: 'Noto Sans', fontSize: 20, color: '#000000FF' }
-/** One page in one format: a square, a text, and a text bound to the brand's heading font. */
+/** One page with one frame: a square, a text, and a text bound to the brand's heading font. */
 const DESIGN: DesignInput = {
-  meta: { designId: 'd', name: 'D', kind: 'single', primaryFormatId: 'sq' },
-  formats: { sq: { name: 'Square', width: 1080, height: 1080, order: 'a0' } },
+  meta: { designId: 'd', name: 'D' },
   pages: { p1: { name: 'One', order: 'a0' } },
+  frames: { sq: { pageId: 'p1', name: 'Square', width: 1080, height: 1080, x: 0, y: 0, order: 'a0' } },
   nodes: {
     a: {
       type: 'graphic',
-      parentId: 'p1',
+      parentId: 'sq',
+      link: 'a',
       index: 'a0',
       name: 'Square',
       props: { x: 0, y: 0, width: 100, height: 100, shape: { kind: 'rect' }, fills: [] },
     },
     words: {
       type: 'text',
-      parentId: 'p1',
+      parentId: 'sq',
+      link: 'words',
       index: 'a1',
       name: 'Words',
       props: { x: 0, y: 200, width: 200, height: 40, text: 'Hello', boxMode: 'fixed', style: STYLE },
     },
     heading: {
       type: 'text',
-      parentId: 'p1',
+      parentId: 'sq',
+      link: 'heading',
       index: 'a2',
       name: 'Heading',
       props: { x: 0, y: 300, width: 200, height: 40, text: 'Title', boxMode: 'fixed', style: STYLE },
@@ -82,7 +85,7 @@ function harness(failing: string[] = []) {
     signal: new AbortController().signal,
   }
   const kit = editorBrandKit(deps)
-  const select = (ids: string[]) => selection.select(ids, 'p1/sq')
+  const select = (ids: string[]) => selection.select(ids, 'sq')
   return { kit, session, log, select, arrive }
 }
 

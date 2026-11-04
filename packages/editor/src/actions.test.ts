@@ -1,11 +1,10 @@
 import { describe, expect, it } from 'vitest'
 
-import { mergedProps } from '@dazbee/doc'
 import { render } from '@dazbee/renderer'
 import type { DesignInput } from '@dazbee/schema'
 
 import { type ActionsDeps, editorActions } from './actions.ts'
-import { type Frame, frameGrid } from './canvas/frames.ts'
+import { type Frame, pageFrames } from './canvas/frames.ts'
 import { editorAutoLayoutDrag } from './gestures/auto-layout-drag.ts'
 import { editorTransformDrag } from './gestures/transform-drag.ts'
 import { hug } from './layers/hug.ts'
@@ -20,38 +19,44 @@ const rect = (parentId: string, index: string, box: { x: number; y: number; widt
   props: { ...box, shape: { kind: 'rect' as const } },
 })
 /**
- * One page in one format: three squares in a row with uneven gaps, a layer locked in place, and a
- * row laid out by auto layout holding one square.
+ * One page with a square frame and a wide one. The square holds three squares in a row with uneven
+ * gaps, a layer locked in place, and a row laid out by auto layout holding one square; the wide
+ * frame holds a copy of the first square.
  */
 const DESIGN: DesignInput = {
-  meta: { designId: 'd', name: 'D', kind: 'single', primaryFormatId: 'sq' },
-  formats: { sq: { name: 'Square', width: 1080, height: 1080, order: 'a0' } },
+  meta: { designId: 'd', name: 'D' },
   pages: { p1: { name: 'One', order: 'a0' } },
+  frames: {
+    sq: { pageId: 'p1', name: 'Square', width: 1080, height: 1080, x: 0, y: 0, order: 'a0' },
+    wide: { pageId: 'p1', name: 'Wide', width: 1200, height: 628, x: 1280, y: 0, order: 'a1' },
+  },
   nodes: {
-    a: rect('p1', 'a0', { x: 100, y: 100, width: 100, height: 100 }),
-    b: rect('p1', 'a1', { x: 250, y: 300, width: 100, height: 100 }),
-    c: rect('p1', 'a2', { x: 700, y: 120, width: 100, height: 100 }),
-    pin: { ...rect('p1', 'a3', { x: 700, y: 700, width: 50, height: 50 }), lock: { move: true } },
+    a: { ...rect('sq', 'a0', { x: 100, y: 100, width: 100, height: 100 }), link: 'a' },
+    b: { ...rect('sq', 'a1', { x: 250, y: 300, width: 100, height: 100 }), link: 'b' },
+    c: { ...rect('sq', 'a2', { x: 700, y: 120, width: 100, height: 100 }), link: 'c' },
+    pin: { ...rect('sq', 'a3', { x: 700, y: 700, width: 50, height: 50 }), link: 'pin', lock: { move: true } },
     row: {
       type: 'box',
-      parentId: 'p1',
+      parentId: 'sq',
+      link: 'row',
       index: 'a4',
       name: 'Row',
       props: { x: 100, y: 500, width: 300, height: 100, layout: { direction: 'row' } },
     },
-    inRow: rect('row', 'a0', { x: 0, y: 0, width: 50, height: 50 }),
+    inRow: { ...rect('row', 'a0', { x: 0, y: 0, width: 50, height: 50 }), link: 'inRow' },
+    'wide-a': { ...rect('wide', 'a0', { x: 100, y: 100, width: 100, height: 100 }), link: 'a' },
   },
 }
 
-/** The actions on a real session, selection and drags over the one frame, logging what they ask of the view, the tools and the pen. */
+/** The actions on a real session, selection and drags over the page's frames, logging what they ask of the view, the tools and the pen. */
 function harness(penDrawing = false) {
   const session = sessionOf(DESIGN)
-  const frames = frameGrid(session.design()).frames
-  const frame = frames[0] as Frame
+  const frames = pageFrames(session.design(), 'p1').frames
+  const [frame, wide] = frames as [Frame, Frame]
   const log: string[] = []
   const selection = editorSelection({ drawn: () => session.design(), frames: () => frames, changed: () => {} })
   const boxes = testBoxes(session, selection, frames)
-  const scenes = { scene: (f: Frame) => render(session.design(), f.pageId, f.formatId, undefined, measure) }
+  const scenes = { scene: (f: Frame) => render(session.design(), f.key, undefined, measure) }
   const hugAll = (ids: string[]) => hug(session, ids)
   const camera = () => ({ x: 0, y: 0, zoom: 1 })
   const transformDrag = editorTransformDrag({
@@ -83,7 +88,6 @@ function harness(penDrawing = false) {
       design: () => session.design(),
       frames: () => frames,
       frameOf: (key) => frames.find((f) => f.key === key),
-      firstPage: () => 'p1',
       fitAll: () => log.push('fitAll'),
       fitArea: (area) => log.push(`fitArea ${JSON.stringify(area)}`),
       zoomTo: (zoom) => log.push(`zoomTo ${zoom}`),
@@ -107,12 +111,12 @@ function harness(penDrawing = false) {
     drawOverlay: () => log.push('overlay'),
   }
   const actions = editorActions(deps)
-  /** A layer's x and y in the frame's format. */
+  /** A layer's x and y. */
   const at = (id: string) => {
-    const p = mergedProps(session.design(), 'format:sq', id) as { x: number; y: number }
+    const p = session.design().nodes[id]?.props as { x: number; y: number }
     return { x: p.x, y: p.y }
   }
-  return { actions, session, selection, frame, log, at }
+  return { actions, session, selection, frame, wide, log, at }
 }
 
 describe('editorActions', () => {
@@ -184,7 +188,7 @@ describe('editorActions', () => {
       expect(at('b')).toEqual({ x: 250, y: 300 })
     })
 
-    it('aligns one layer to the format', () => {
+    it('aligns one layer to its frame', () => {
       const { actions, selection, frame, at } = harness()
       selection.select(['a'], frame.key)
       actions.perform('alignRight')
@@ -227,10 +231,13 @@ describe('editorActions', () => {
       expect(log).toContain('flowEnd')
     })
 
-    it('selects every top-level layer of the page that can be picked', () => {
-      const { actions, selection, frame } = harness()
+    it("selects every top-level layer that can be picked of the selection's frame, else of the first frame", () => {
+      const { actions, selection, frame, wide } = harness()
       actions.perform('selectAll')
       expect(selection.current()).toEqual({ frame: frame.key, ids: ['a', 'b', 'c', 'row'] })
+      selection.select(['wide-a'], wide.key)
+      actions.perform('selectAll')
+      expect(selection.current()).toEqual({ frame: wide.key, ids: ['wide-a'] })
     })
 
     it('locks the selected layers, then unlocks them when every one is locked', () => {
@@ -242,12 +249,16 @@ describe('editorActions', () => {
       expect(session.design().nodes.a?.lock?.move).toBeFalsy()
     })
 
-    it('hides the selected layers in this format only, keeping them selected', () => {
+    it('hides the selected layers, keeping them selected, their copies in the other frame left as they are; again shows them', () => {
       const { actions, session, selection, frame } = harness()
+      const copy = session.design().nodes['wide-a']
       selection.select(['a'], frame.key)
       actions.perform('hide')
-      expect(session.design().overrides['format:sq']?.a).toEqual({ visible: false })
+      expect(session.design().nodes.a?.props.visible).toBe(false)
+      expect(session.design().nodes['wide-a']).toEqual(copy)
       expect(selection.current()?.ids).toEqual(['a'])
+      actions.perform('hide')
+      expect(session.design().nodes.a?.props.visible).toBe(true)
     })
 
     it('draws the overlay after a change to the layers', () => {
@@ -259,7 +270,7 @@ describe('editorActions', () => {
   })
 
   describe('fitSelection', () => {
-    it('fits the box around the selection, or every frame with none', () => {
+    it("fits the box around the selection, or the shown page's frames with none", () => {
       const { actions, selection, frame, log } = harness()
       actions.fitSelection()
       selection.select(['a', 'b'], frame.key)
@@ -268,16 +279,6 @@ describe('editorActions', () => {
         'fitAll',
         `fitArea ${JSON.stringify({ x: frame.x + 100, y: frame.y + 100, width: 250, height: 300 })}`,
       ])
-    })
-  })
-
-  describe('hideInEveryFormat', () => {
-    it('hides layers in every format as one undo step, and shows them again', () => {
-      const { actions, session } = harness()
-      expect(actions.hideInEveryFormat(['a'], true)).toBe(true)
-      expect(session.design().nodes.a?.props.visible).toBe(false)
-      actions.hideInEveryFormat(['a'], false)
-      expect(session.design().nodes.a?.props.visible).not.toBe(false)
     })
   })
 })

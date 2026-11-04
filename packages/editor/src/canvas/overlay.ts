@@ -95,10 +95,7 @@ export function editorOverlay({
     }
   }
 
-  function frameLabel(frame: Frame, drawnFrames: Frame[]) {
-    const format = view.design().formats[frame.formatId]
-    const page = view.design().pages[frame.pageId]
-    if (!format || !page) return null
+  function frameLabel(frame: Frame) {
     const label = document.createElement('div')
     label.className = 'frame-label'
     label.dataset.frame = frame.key
@@ -117,13 +114,12 @@ export function editorOverlay({
     Object.assign(label.style, { left: px(left), top: px(at.y), width: px(width) })
     const name = document.createElement('span')
     name.className = 'frame-name'
-    const pages = new Set(drawnFrames.map((f) => f.pageId)).size > 1 || Object.keys(view.design().pages).length > 1
-    name.textContent = pages ? `${page.name} · ${format.name}` : format.name
+    name.textContent = frame.name
     label.append(name)
     if (width >= 120) {
       const size = document.createElement('span')
       size.className = 'frame-size'
-      size.textContent = `${format.width} × ${format.height}`
+      size.textContent = `${frame.width} × ${frame.height}`
       label.append(size)
     }
     return label
@@ -190,11 +186,11 @@ export function editorOverlay({
 
   function drawOverlay() {
     const gesture = pointer.gesture()
-    // A layer selected, or the page's frames gone (a page deleted, a size shown alone), lets the page go.
+    // A layer selected, or the page's frames no longer shown (the page deleted, another page shown), lets the page go.
     const pageGone = selection.dropGonePage()
     const parts: Element[] = []
     for (const frame of view.inView()) {
-      const label = frameLabel(frame, view.inView())
+      const label = frameLabel(frame)
       if (label) parts.push(label)
     }
     for (const frame of view.inView()) {

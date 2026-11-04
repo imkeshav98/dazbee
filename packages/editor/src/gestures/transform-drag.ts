@@ -2,10 +2,10 @@
 // grabs, the boxes a drag writes, what it snaps to, and the marquee and snap guides the overlay draws.
 import { descendants, type Session } from '@dazbee/doc'
 import { type ScaledText, scaleText, smallestSize } from '@dazbee/renderer'
-import type { Point, Rect } from '@dazbee/schema'
+import type { Point, Rect, RunStyle } from '@dazbee/schema'
 
 import { type Camera, toScreen, toWorld } from '../canvas/camera.ts'
-import { type Frame, frameAt, intersects, scope } from '../canvas/frames.ts'
+import { type Frame, frameAt, intersects } from '../canvas/frames.ts'
 import { px } from '../canvas/rulers.ts'
 import type { FrameScenes } from '../canvas/scenes.ts'
 import { inFlow } from '../layers/auto-layout.ts'
@@ -57,7 +57,7 @@ export interface ResizeDrag {
   boxes: Map<string, Box>
   targets: Targets | null
   switched: boolean
-  /** The text a corner scales, with its sizes in the frame as the drag began; how much, and the least it may. */
+  /** The text a corner scales, with its sizes as the drag began; how much, and the least it may. */
   texts: Map<string, ScaledText>
   factor: number
   floor: number
@@ -98,11 +98,11 @@ export interface TransformDragDeps {
     'boxIn' | 'startBoxes' | 'pickable' | 'roots' | 'selectionBox' | 'lockedSelection' | 'handlesFor' | 'snapBoxes'
   >
   camera: () => Camera
-  /** The frames of the grid as last drawn. */
+  /** The shown page's frames as last drawn. */
   frames: () => Frame[]
   /** Groups fit what they hold again after a change inside them, in the same undo step. */
   hug: (ids: string[]) => void
-  /** Tells the page that auto layout places some of the layers a drag would move. */
+  /** Tells the app that auto layout places some of the layers a drag would move. */
   notify: (notice: 'placedByLayout') => void
   /** Puts an overlay element over a box in a frame, in design pixels. */
   placeBox: (el: HTMLElement, frame: Frame, box: Rect) => void
@@ -121,13 +121,13 @@ export interface EditorTransformDrag {
   parts(marquee: MarqueeDrag | null): HTMLElement[]
   /** A press on a handle the selection's box `outer` has: a drag that resizes or turns it, one undo step until it is released. */
   pressHandle(e: PointerEvent, screen: Point, grabbed: Grab, outer: SelectionBox): ResizeDrag | RotateDrag
-  /** A press that moves layers: a drag of those no flow places, one undo step until it is released; the page hears when some are. */
+  /** A press that moves layers: a drag of those no flow places, one undo step until it is released; the app hears when some are. */
   pressMove(frame: Frame, around: Box[], p: Point, ids: string[]): MoveDrag
   /** Follows the pointer: Shift keeps a move to one axis, a resize to its shape, a turn to 15° steps; Alt resizes about the centre. */
   drag(g: TransformDrag, p: Point, shift: boolean, alt: boolean, snap: boolean): void
-  /** Writes new boxes as this format's own: what changed from `start`, and what a gesture changed and put back. */
+  /** Writes new boxes: what changed from `start`, and what a gesture changed and put back. */
   writeBoxes(frame: Frame, start: Map<string, Box>, next: Map<string, Box>): void
-  /** Selects the layers a marquee touches on the page it covers, with what was selected before it. */
+  /** Selects the layers a marquee touches in the frame it covers, with what was selected before it. */
   marquee(g: MarqueeDrag): void
   /** Ends a move, resize or turn: the groups around the layers fit them again, closing its undo step. */
   release(g: TransformDrag): void
@@ -161,12 +161,11 @@ export function editorTransformDrag({
   function snapWorkSoFar() {
     return { ...snapWork }
   }
-  /** What a drag of layers in a frame can snap to: the boxes around them, and the format. Counted in `snapWork`. */
+  /** What a drag of layers in a frame can snap to: the boxes around them, and the frame. Counted in `snapWork`. */
   function targetsFor(frame: Frame, ids: string[], around: Box[]): Targets | null {
-    const format = session.design().formats[frame.formatId]
-    const others = format && snapBoxes(frame, ids, around)
-    if (!format || !others) return null
-    const targets = snapTargets(others, { x: 0, y: 0, width: format.width, height: format.height })
+    const others = snapBoxes(frame, ids, around)
+    if (!others) return null
+    const targets = snapTargets(others, { x: 0, y: 0, width: frame.width, height: frame.height })
     snapWork.gathered++
     snapWork.targets = targets.boxes.length
     return targets
@@ -215,7 +214,7 @@ export function editorTransformDrag({
     if (snapped) parts.push(...snapParts(snapped))
     return parts
   }
-  /** Snap guides as lines across the page, and equal gaps as marked spans with their size. */
+  /** Snap guides as lines across the frame, and equal gaps as marked spans with their size. */
   function snapParts({ frame, guides, gaps }: NonNullable<typeof snapped>) {
     const parts: HTMLElement[] = []
     for (const g of guides) {
@@ -264,7 +263,7 @@ export function editorTransformDrag({
     const { around } = outer
     const grab = localTo({ x: world.x - outer.frame.x, y: world.y - outer.frame.y }, around)
     if (grabbed.kind === 'resize') {
-      const texts = scalingTexts(session.design(), outer.frame, ids, grabbed.handle)
+      const texts = scalingTexts(session.design(), ids, grabbed.handle)
       // Scaled down, the smallest size anywhere in the text stops at 1 px.
       const floor = Math.max(0, ...[...texts.values()].map((t) => 1 / smallestSize(t)))
       return {
@@ -299,7 +298,7 @@ export function editorTransformDrag({
   function pressMove(frame: Frame, around: Box[], p: Point, ids: string[]): MoveDrag {
     const now = session.design()
     // Layers in a flow among others stay in it: auto layout places them.
-    const free = ids.filter((id) => !inFlow(frame, id, now))
+    const free = ids.filter((id) => !inFlow(id, now))
     if (free.length < ids.length) notify('placedByLayout')
     return {
       kind: 'move',
@@ -373,7 +372,7 @@ export function editorTransformDrag({
     const ratio = keepRatio || scales
     let outer = resizeBox(g.outer, g.handle, to, { keepRatio: ratio, fromCentre })
     snapped = null
-    // The dragged edges snap; a turned box has none that run along the page. With the shape kept,
+    // The dragged edges snap; a turned box has none that run along the frame. With the shape kept,
     // the edge nearest a guide snaps and the other follows.
     if (snap && g.targets && outer.rotation === 0) {
       const corner = isCorner(g.handle)
@@ -401,9 +400,9 @@ export function editorTransformDrag({
     const now = session.design()
     if (!g.switched) {
       g.switched = true
-      switchSizing(session, g.frame, g.roots, g.handle, now, g.texts)
+      switchSizing(session, g.roots, g.handle, now, g.texts)
     }
-    const next = resizedBoxes(now, g.frame, g.roots, g.boxes, g.outer, outer)
+    const next = resizedBoxes(now, g.roots, g.boxes, g.outer, outer)
     writeBoxes(
       g.frame,
       g.boxes,
@@ -414,21 +413,22 @@ export function editorTransformDrag({
         ]),
       ),
     )
-    // The text a corner scales takes its sizes scaled from where they were, in this format.
+    // The text a corner scales takes its sizes scaled from where they were: its style's, and each
+    // of its own runs' on that run's characters.
     for (const [id, start] of g.texts) {
-      // Text without runs gets none of this format's own.
       const { runs, ...sized } = scaleText(start, g.factor)
-      runQuietly(() =>
-        session.run('node.update', {
-          ids: [id],
-          scope: scope(g.frame),
-          patch: start.runs.length > 0 ? { ...sized, runs } : sized,
-        }),
-      )
+      runQuietly(() => session.run('node.update', { ids: [id], patch: sized }))
+      for (const run of runs) {
+        const style = sizesOf(run.style)
+        if (Object.keys(style).length > 0)
+          runQuietly(() =>
+            session.run('text.edit', { id, op: { kind: 'style', at: run.start, length: run.end - run.start, style } }),
+          )
+      }
     }
     // Text that grows with its words takes the size its new width and sizes give it.
     for (const id of new Set([...g.roots.filter((root) => now.nodes[root]?.type === 'text'), ...g.texts.keys()]))
-      typing.fitText(id, g.frame.formatId)
+      typing.fitText(id)
   }
   /** Turns the layers about the selection's centre by the angle the pointer has turned through. */
   function rotateTo(g: RotateDrag, p: Point, snap: boolean) {
@@ -466,8 +466,8 @@ export function editorTransformDrag({
     writeBoxes(g.frame, g.boxes, next)
   }
   /**
-   * Writes new boxes as this format's overrides: the properties the gesture changes from where it
-   * started, including one it changed and has now put back. The rest is left to other tabs.
+   * Writes new boxes: the properties the gesture changes from where it started, including one it
+   * changed and has now put back. The rest is left to other tabs.
    */
   function writeBoxes(frame: Frame, start: Map<string, Box>, next: Map<string, Box>) {
     const now = session.design()
@@ -485,12 +485,11 @@ export function editorTransformDrag({
         }
         for (const key of Object.keys(patch)) wrote.add(`${id}|${key}`)
         // Another tab may delete or lock a layer mid-drag; the drag then just leaves it be.
-        if (Object.keys(patch).length > 0)
-          runQuietly(() => session.run('node.update', { ids: [id], scope: scope(frame), patch }))
+        if (Object.keys(patch).length > 0) runQuietly(() => session.run('node.update', { ids: [id], patch }))
       }
     })
   }
-  /** Top-level layers the marquee touches on the page it covers, with what was selected before. */
+  /** Top-level layers the marquee touches in the frame it covers, with what was selected before. */
   function marqueeSelect(g: MarqueeDrag) {
     const rect = {
       x: Math.min(g.from.x, g.to.x),
@@ -530,4 +529,13 @@ export function editorTransformDrag({
     release,
     clearGuides,
   }
+}
+
+/** The sizes a run's style sets, which a corner scales: its font size, letter spacing and outline. */
+function sizesOf(style: RunStyle): RunStyle {
+  const sizes: RunStyle = {}
+  if (style.fontSize !== undefined) sizes.fontSize = style.fontSize
+  if (style.letterSpacing !== undefined) sizes.letterSpacing = style.letterSpacing
+  if (style.outline !== undefined) sizes.outline = style.outline
+  return sizes
 }

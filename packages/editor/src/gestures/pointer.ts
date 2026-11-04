@@ -18,7 +18,14 @@ import type { EditorTools } from '../tools.ts'
 import type { EditorAutoLayoutDrag, ReorderDrag } from './auto-layout-drag.ts'
 import type { CropDrag, EditorCropping } from './cropping.ts'
 import { isDrawTool } from './draw-tools.ts'
-import { type EditorDrawing, type ImageBoxDrag, isDrawing, type ShapeDrag, type TextBoxDrag } from './drawing.ts'
+import {
+  type EditorDrawing,
+  type FrameDrag,
+  type ImageBoxDrag,
+  isDrawing,
+  type ShapeDrag,
+  type TextBoxDrag,
+} from './drawing.ts'
 import type { EditorPen, PathDrag } from './pen.ts'
 import type { EditorSelectPress } from './select-press.ts'
 import type { EditorTransformDrag, MarqueeDrag, MoveDrag, ResizeDrag, RotateDrag } from './transform-drag.ts'
@@ -35,6 +42,7 @@ export type Gesture =
   | ImageBoxDrag
   | CropDrag
   | ShapeDrag
+  | FrameDrag
   | PathDrag
 
 export interface PointerDeps {
@@ -51,7 +59,7 @@ export interface PointerDeps {
   typing: Pick<EditorTyping, 'editing' | 'caretFromPoint' | 'caretTo' | 'selectText' | 'start' | 'stop'>
   pen: Pick<EditorPen, 'drawing' | 'down' | 'move' | 'up' | 'pressPoints' | 'dragPoints' | 'releasePoints'>
   cropping: Pick<EditorCropping, 'press' | 'drag' | 'release'>
-  drawing: Pick<EditorDrawing, 'pressShape' | 'pressImage' | 'pressText' | 'drag' | 'release'>
+  drawing: Pick<EditorDrawing, 'pressShape' | 'pressImage' | 'pressText' | 'pressFrame' | 'drag' | 'release'>
   transformDrag: Pick<EditorTransformDrag, 'handleUnder' | 'marquee' | 'drag' | 'release' | 'clearGuides'>
   autoLayoutDrag: Pick<EditorAutoLayoutDrag, 'drag' | 'release'>
   /** What the select tool's press picks, and what it selects once it ends as a click. */
@@ -125,7 +133,7 @@ export function editorPointer({
   }
   // Screen points are CSS pixels from the canvas's corner.
   const screenOf = (e: MouseEvent): Point => view.onStage({ x: e.clientX, y: e.clientY })
-  /** The frame under the pointer and the point in its page's design pixels. */
+  /** The frame under the pointer and the point in its design pixels. */
   function pointIn(e: MouseEvent) {
     return pointAt({ x: e.clientX, y: e.clientY })
   }
@@ -135,7 +143,7 @@ export function editorPointer({
 
   const showCursor = () => {
     const tool = tools.tool()
-    const drawing = isDrawTool(tool) || tool === 'pen' || (tool === 'image' && tools.imageToPlace())
+    const drawing = isDrawTool(tool) || tool === 'frame' || tool === 'pen' || (tool === 'image' && tools.imageToPlace())
     canvas.style.cursor = pan
       ? 'grabbing'
       : panning()
@@ -248,6 +256,11 @@ export function editorPointer({
       const screen = screenOf(e)
       const at = pointIn(e)
       const tool = tools.tool()
+      // The Frame tool draws a frame anywhere on the stage, not only on a frame.
+      if (tool === 'frame') {
+        gesture = drawing.pressFrame(e, toWorld(view.camera(), screen))
+        return
+      }
       if (isDrawTool(tool)) {
         const drag = at && drawing.pressShape(e, tool, at)
         if (drag) gesture = drag
@@ -337,6 +350,10 @@ export function editorPointer({
         gesture.to = world
         transformDrag.marquee(gesture)
         drawOverlay()
+        return
+      }
+      if (gesture.kind === 'frameDraw') {
+        drawing.drag(gesture, world, e.shiftKey, e.altKey)
         return
       }
       if (!selectPress.moved(screen)) return

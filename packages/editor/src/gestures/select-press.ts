@@ -167,8 +167,8 @@ export function editorSelectPress({
     return true
   }
   function release(gesture: MarqueeDrag | null) {
-    // A click on a locked layer, not a drag, selects it; a click on no layer picks the page under
-    // it, and a click off every page or a drag lets the page go.
+    // A click on a locked layer, not a drag, selects it; a click on no layer picks the page of the
+    // frame under it, and a click off every frame or a drag lets the page go.
     const clicked =
       gesture?.kind === 'marquee' &&
       Math.hypot(gesture.to.x - gesture.from.x, gesture.to.y - gesture.from.y) * view.camera().zoom < CLICK_SLOP

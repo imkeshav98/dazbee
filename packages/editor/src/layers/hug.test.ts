@@ -14,19 +14,20 @@ const square = (parentId: string, index: string, x: number) => ({
 /** A group holding two squares, fitted to them. */
 function harness() {
   return sessionOf({
-    meta: { designId: 'd', name: 'D', kind: 'single', primaryFormatId: 'sq' },
-    formats: { sq: { name: 'Square', width: 1080, height: 1080, order: 'a0' } },
+    meta: { designId: 'd', name: 'D' },
     pages: { p1: { name: 'One', order: 'a0' } },
+    frames: { sq: { pageId: 'p1', name: 'Square', width: 1080, height: 1080, x: 0, y: 0, order: 'a0' } },
     nodes: {
       group: {
         type: 'group',
-        parentId: 'p1',
+        parentId: 'sq',
+        link: 'group',
         index: 'a0',
         name: 'Group',
         props: { x: 0, y: 0, width: 150, height: 50 },
       },
-      left: square('group', 'a0', 0),
-      right: square('group', 'a1', 100),
+      left: { ...square('group', 'a0', 0), link: 'left' },
+      right: { ...square('group', 'a1', 100), link: 'right' },
     },
   })
 }

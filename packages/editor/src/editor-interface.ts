@@ -2,16 +2,7 @@
 // it tells the page of.
 import type { DesignDoc, Session } from '@dazbee/doc'
 import type { ExportedFile } from '@dazbee/export'
-import type {
-  Design,
-  ExportRequestInput,
-  formatScope,
-  Point,
-  Rect,
-  TextStyle,
-  VariableRef,
-  Variables,
-} from '@dazbee/schema'
+import type { Design, ExportRequestInput, Point, Rect, TextStyle, VariableRef, Variables } from '@dazbee/schema'
 import type { Skipped } from '@dazbee/svg'
 
 import type { Camera, Insets, Viewport } from './canvas/camera.ts'
@@ -32,8 +23,6 @@ export interface EditorOptions extends ResourceSources {
   syncToken: () => Promise<string>
   /** The brand kit's values that bound properties take (#53), until `setVariables` changes them. */
   variables?: Variables
-  /** The format to show first, zoomed to fit on the first page; every frame when left out. */
-  formatId?: string
   /**
    * Loading steps, then once the design is open its save state (#37): Saving while the sync server
    * has not yet got every edit, Saved once it has, Offline (kept on this device) without it.
@@ -69,10 +58,13 @@ export interface Editor {
   selected: () => string | null
   /** Every selected layer, in the order they were picked. */
   selection: () => string[]
-  /** The frame the selection is in, as `<pageId>/<formatId>`. */
+  /** The frame the selection is in, by its id, or null. */
   selectedFrame: () => string | null
-  /** Selects layers in one frame, the first page in the primary format by default; none clears it. */
-  select(ids: string[], pageId?: string, formatId?: string): void
+  /**
+   * Selects layers in the frame of the first of them, leaving out any in other frames, and shows
+   * that frame's page first when another is shown; none clears the selection.
+   */
+  select(ids: string[]): void
   /** Does what a shortcut does, as if its key was pressed on the stage. */
   perform: (action: ShortcutAction) => boolean
   /** Whether this tab has a change of its own to undo, or an undone one to redo. */
@@ -91,9 +83,9 @@ export interface Editor {
   /** Pastes the layers last copied in Dazbee on this device, as Mod+V does; false with none kept. */
   pasteLayers(): boolean
   /**
-   * Moves a layer under a page or container, before a sibling or on top (#59), as one undo step;
-   * groups it leaves and enters fit what they hold again. False when the move isn't allowed, such
-   * as into itself or into a layer that can't hold it.
+   * Moves a layer to the top level of its frame or into a container there, before a sibling or on
+   * top (#59), as one undo step; groups it leaves and enters fit what they hold again. False when the
+   * move isn't allowed, such as into itself, into another frame or into a layer that can't hold it.
    */
   moveLayer(id: string, parentId: string, before?: string): boolean
   /**
@@ -105,30 +97,22 @@ export interface Editor {
   gesturing: () => boolean
   /**
    * Sets properties of layers as the properties panel does (#60), as one undo step, or as part of
-   * the gesture open. `to` gives a layer's patch from the values it has in the frame now (base
-   * and that format's overrides); null leaves it be. In this format only (`everyFormat` false)
-   * the values become overrides of the frame's format, as a drag on the stage does. In every
-   * format they become the base values and the layers' overrides of those properties go, so every
-   * format shows what this one does. X and Y of a group or box carry what it holds along;
-   * groups fit what they hold again. A fill, text colour or font set by hand no longer follows
-   * the brand. False when a change isn't allowed, such as on a locked layer.
+   * the gesture open. `to` gives a layer's patch from its props now; null leaves it be. The change
+   * stays on these layers: their linked copies in other frames keep their own values. X and Y of a
+   * group or box carry what it holds along; groups fit what they hold again. A fill, text colour or
+   * font set by hand no longer follows the brand. False when a change isn't allowed, such as on a
+   * locked layer.
    */
   setProps(
     ids: string[],
-    to: (id: string, now: Readonly<Record<string, unknown>>) => Record<string, unknown> | null,
-    everyFormat: boolean,
-    pageId?: string,
-    formatId?: string,
+    to: (id: string, props: Readonly<Record<string, unknown>>) => Record<string, unknown> | null,
   ): boolean
   /** Renames a layer (#59), as one undo step; false for an empty name. */
   renameLayer: (id: string, name: string) => boolean
   /** Locks layers completely, or unlocks them (#59), as one undo step. */
   setLocked: (ids: string[], locked: boolean) => boolean
-  /**
-   * Hides layers in one frame's format, or shows them (#59), as one undo step: like the Hide
-   * shortcut, in that format only. The first page in the primary format by default.
-   */
-  setHidden(ids: string[], hidden: boolean, pageId?: string, formatId?: string, everyFormat?: boolean): boolean
+  /** Hides layers, or shows them (#59), as one undo step, like the Hide shortcut: their linked copies stay as they are. */
+  setHidden(ids: string[], hidden: boolean): boolean
   /** Calls back with what the editor tells the person, such as a nudge auto layout decides. */
   onNotice(listener: (notice: Notice, parts: readonly Skipped[]) => void): () => boolean
   /**
@@ -175,11 +159,15 @@ export interface Editor {
   setSnapping(on: boolean): void
   /** Calls back whenever the rulers or snapping turn on or off. */
   onView(listener: () => void): () => boolean
+  /** The shown page's frames as last drawn, by order, each at its stored place. */
   frames: () => Frame[]
-  /** The format the focus view shows alone, or null when every format shows. */
-  focused: () => string | null
-  /** Shows one format alone, fitted, or every format again with null. */
-  focus(formatId: string | null): void
+  /** The page the canvas shows: the first page when the editor opens, and when the shown page is deleted. */
+  shownPage: () => string
+  /**
+   * Shows a page, its frames fitted; the first page for one the design lacks. A selection, crop,
+   * path edit, pen path or typing on another page and the picked page let go.
+   */
+  showPage(pageId: string): void
   camera: () => Camera
   viewport: () => Viewport
   setCamera: (next: Camera) => void
@@ -190,9 +178,8 @@ export interface Editor {
   zoomOut: () => void
   fitAll: () => void
   fitSelection: () => void
-  fitFrame: (pageId: string, formatId: string) => void
-  /** Brings one page's row into view: every format of that page, fitted. */
-  fitPage(pageId: string): void
+  /** Fits a frame in view, showing its page first when another is shown. Throws for a frame the design lacks. */
+  fitFrame(frameId: string): void
   setTool: (next: Tool) => void
   tool: () => Tool
   /**
@@ -204,10 +191,10 @@ export interface Editor {
   imageArmed: () => boolean
   /** Calls back with the tool whenever it changes, by a key or after drawing a shape. */
   onTool(listener: (tool: Tool) => void): () => boolean
-  /** Where a design pixel of one frame is on screen now, in client coordinates; the first page and the primary format by default. */
-  screenPoint(x: number, y: number, pageId?: string, formatId?: string): Point
-  /** A layer's box as drawn in one frame, in design pixels, auto layout solved; the first page and the primary format by default. */
-  boxOf(id: string, pageId?: string, formatId?: string): Rect | null
+  /** Where a design pixel of a frame of the shown page is on screen now, in client coordinates; its first frame by default. */
+  screenPoint(x: number, y: number, frameId?: string): Point
+  /** A layer's box as drawn in its frame, in design pixels, auto layout solved; null for a layer in no frame. */
+  boxOf(id: string): Rect | null
   /**
    * Resolves once the fonts and images the design has asked for so far are here or failed to
    * come. One arriving drops every frame's picture, so the next redraw records them again.
@@ -216,19 +203,13 @@ export interface Editor {
   /** Resolves once what the screen shows is up to date: after the pending redraw, if there is one. */
   drawn: () => Promise<void>
   onDraw(listener: (design: Design, at: number, info: DrawInfo) => void): () => boolean
-  /** The export render of one frame as this tab holds it now, on the CPU surface, as RGBA; the first page in the primary format by default. */
-  exportPixels(pageId?: string, formatId?: string): Uint8Array
+  /** The export render of a frame, shown or not, as this tab holds it now, on the CPU surface, as RGBA; the shown page's first frame by default. */
+  exportPixels(frameId?: string): Uint8Array
   /**
-   * Exports pages in formats as PNG or JPG, as this tab holds the design now, drawn in the export
+   * Exports the frames a request names, as this tab holds the design now, drawn in the export
    * worker so the stage stays responsive (#55). One file comes as itself, more as one zip.
    */
   exportFiles(request: ExportRequestInput, progress?: (done: number, total: number) => void): Promise<ExportedFile>
-  /**
-   * Gives layers back the values every format has, in one format (`scope`, `format:<id>`): the
-   * properties in `paths`, or all of them. Text that grows the size of its words fits them again
-   * there, in the same undo step.
-   */
-  resetOwn(ids: string[], scope: ReturnType<typeof formatScope>, paths?: string[]): boolean
   /** The families whose files the editor has, shipped ones included (#50). */
   loadedFamilies: () => string[]
   /**
@@ -277,23 +258,22 @@ export interface Editor {
    */
   imageTarget(client: Point | null): string | null
   /**
-   * Puts an image into a layer as its fill, in every format, as one undo step: in place of its
-   * topmost image fill (keeping its fit, adjustments and filter, the crop reset), or on top of its
-   * fills when it has none. A format with fills of its own gets the image in them too, keeping its
-   * colours; a fill bound to a brand colour stays bound. The layer is selected, in `inFrame` when
-   * given, as `<pageId>/<formatId>`. False when it can't take one, such as a layer whose style is
+   * Puts an image into a layer as its fill, as one undo step: in place of its topmost image fill
+   * (keeping its fit, adjustments and filter, the crop reset), or on top of its fills when it has
+   * none; a fill bound to a brand colour stays bound. Its linked copies keep their own fills. The
+   * layer is selected in its frame. False when it can't take one, such as a layer whose style is
    * locked.
    */
-  fillWithImage(id: string, asset: PlacedAsset, inFrame?: string): boolean
-  /** A page's picture in its main format, `size` pixels on its longer side, for the Pages card. Null when it has none. */
+  fillWithImage(id: string, asset: PlacedAsset): boolean
+  /** A picture of a page's first frame, shown or not, `size` pixels on its longer side, for the Pages card. Null for a page with no frames. */
   pageThumbnail(pageId: string, size?: number): string | null
   /**
    * A small picture of a layer for the effect tiles and the layers panel: drawn by the renderer
-   * without the layer's own effects, in `frameKey` (the frame the selection is in, else the first
-   * page in the primary format), and kept until the layer or what it is drawn with changes. Text
-   * is "Aa" in its look, outlined with no fill when asked. A PNG object URL, or null.
+   * without the layer's own effects, in its own frame, and kept until the layer or what it is
+   * drawn with changes. Text is "Aa" in its look, outlined with no fill when asked. A PNG object
+   * URL, or null.
    */
-  layerThumbnail(id: string, size?: number, outlined?: boolean, frameKey?: string): string | null
+  layerThumbnail(id: string, size?: number, outlined?: boolean): string | null
   synced: () => boolean
   destroy(): void
 }

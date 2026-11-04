@@ -2,9 +2,9 @@
 // range, the keys that type, delete and move the caret, the text copied, cut and pasted, and the
 // caret or range as the overlay draws it.
 import type { CanvasKit } from '@dazbee/canvaskit'
-import { anchorOffset, type DesignDoc, mergedProps, type Session, type TextAnchor, textAnchor } from '@dazbee/doc'
+import { anchorOffset, type DesignDoc, type Session, type TextAnchor, textAnchor } from '@dazbee/doc'
 import { caretAt, caretPosition, selectionBoxes } from '@dazbee/renderer'
-import { formatScope, type Point, type Rect, type TextStyle } from '@dazbee/schema'
+import type { Point, Rect, TextStyle } from '@dazbee/schema'
 
 import type { Frame } from '../canvas/frames.ts'
 import { findLayer, type FrameScenes } from '../canvas/scenes.ts'
@@ -19,7 +19,7 @@ export interface TypingDeps {
   session: Session
   resources: Pick<EditorResources, 'bytes'>
   scenes: Pick<FrameScenes, 'scene' | 'measure' | 'layout'>
-  /** The frame of the grid as last drawn with a key, if there is one. */
+  /** The shown page's frame with an id, as last drawn, if there is one. */
   frameOf: (key: string | undefined) => Frame | undefined
   /** Groups fit what they hold again after a change inside them, in the same undo step. */
   hug: (ids: string[]) => void
@@ -61,11 +61,8 @@ export interface EditorTyping {
   styleRange(selected: { id: string; range: TextRange }, style: RunStyle): void
   /** Styles the selected range of the text being edited; false when no range is selected. */
   styleSelectedText(style: RunStyle): boolean
-  /**
-   * Keeps the box of text that grows the size of its words in every format, or in `only` that
-   * one, and the groups around it fitted, in the step the edit is in.
-   */
-  fitText(id: string, only?: string): void
+  /** Keeps the box of text that grows the size of its words, and the groups around it, fitted, in the step the edit is in. */
+  fitText(id: string): void
   /** A key pressed while typing: types, deletes, moves the caret or styles the range; other keys are the page's. */
   key(e: KeyboardEvent): void
   /** Copies the selected range as plain text; true while typing, so the layers aren't copied instead. */
@@ -134,15 +131,12 @@ export function editorTyping({
     const range = textRange()
     return editing && range && range.end > range.start ? { id: editing.id, range } : null
   }
-  /** Each character's style in the selected range, with the overrides of the format it is typed in. */
+  /** Each character's style in the selected range. */
   function textSelectionStyles() {
     const selected = selectedText()
-    const now = session.design()
-    const node = selected && now.nodes[selected.id]
-    if (!selected || !editing || node?.type !== 'text') return null
-    const own = now.overrides[formatScope(String(frameOf(editing.frame)?.formatId))]?.[selected.id]?.style as
-      Partial<typeof node.props.style> | undefined
-    return stylesIn({ ...node.props, style: { ...node.props.style, ...own } }, selected.range)
+    const node = selected && session.design().nodes[selected.id]
+    if (!selected || node?.type !== 'text') return null
+    return stylesIn(node.props, selected.range)
   }
   /** The offset nearest a point in the frame the text is typed in. */
   function caretFromPoint(p: Point) {
@@ -234,26 +228,18 @@ export function editorTyping({
     textSelectionChanged()
   }
   /**
-   * Keeps the box of text that grows the size of its words in every format (#47), or in `only` that
-   * one, and the groups around it fitted, in the step the edit is in.
+   * Keeps the box of text that grows the size of its words (#47), and the groups around it, fitted,
+   * in the step the edit is in: it measures the layer once and sets its size.
    */
-  function fitText(id: string, only?: string) {
-    const now = session.design()
-    const node = now.nodes[id]
-    if (node?.type !== 'text') return
-    const measure = scenes.measure()
-    const sizes: Record<string, { width: number; height: number }> = {}
+  function fitText(id: string) {
+    const node = session.design().nodes[id]
+    if (node?.type !== 'text' || node.props.boxMode === 'fixed') return
     // Text bound to a brand font is drawn, so measured, in the family the kit gives it.
     const bound = node.bindings?.fontFamily ? resources.bytes().variables?.[node.bindings.fontFamily] : undefined
-    for (const formatId of only ? [only] : Object.keys(now.formats)) {
-      const own = mergedProps(now, formatScope(formatId), id) as typeof node.props
-      const props = bound ? { ...own, style: { ...own.style, fontFamily: bound } } : own
-      if (props.boxMode === 'fixed') continue
-      const size = measure(props, props.boxMode === 'autoWidth' ? null : props.width)
-      sizes[formatId] = { width: props.boxMode === 'autoWidth' ? size.width : props.width, height: size.height }
-    }
-    if (Object.keys(sizes).length === 0) return
-    runQuietly(() => session.run('text.fit', { id, sizes }))
+    const props = bound ? { ...node.props, style: { ...node.props.style, fontFamily: bound } } : node.props
+    const auto = props.boxMode === 'autoWidth'
+    const size = scenes.measure()(props, auto ? null : props.width)
+    runQuietly(() => session.run('text.fit', { id, width: auto ? size.width : props.width, height: size.height }))
     hug([id])
   }
   /**
@@ -335,7 +321,7 @@ export function editorTyping({
     } else if (mod && key === 'a') {
       selectText({ start: 0, end: text.length })
     } else if ((mod && ['b', 'i', 'u'].includes(key)) || (mod && e.shiftKey && key === 'x')) {
-      // Style keys (#47) style the selected range, in the base, so every format shows it.
+      // Style keys (#47) style the selected range.
       const toggle: StyleToggle =
         key === 'b' ? 'bold' : key === 'i' ? 'italic' : key === 'u' ? 'underline' : 'strikethrough'
       if (selected)
@@ -370,7 +356,6 @@ export function editorTyping({
     } else if (e.key === 'Enter') {
       replace('\n')
     } else if (e.key.length > 0 && [...e.key].length === 1 && !mod) {
-      // Text is shared by every format, so typing writes the base.
       replace(e.key)
     } else {
       // Copy, cut and paste come as their own events; anything else is the page's.

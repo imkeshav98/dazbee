@@ -1,9 +1,9 @@
 // The stage's view of the canvas: the WebGL surface it draws on, the camera, the stage's size and
-// the edges chrome covers, the frames of the design as last drawn, the format shown alone, the
-// rulers, and the animation-frame schedule that redraws it.
+// the edges chrome covers, the page it shows and that page's frames as last drawn, the rulers, and
+// the animation-frame schedule that redraws it.
 import type { CanvasKit, GrDirectContext, SkPicture, Surface } from '@dazbee/canvaskit'
 import type { Session } from '@dazbee/doc'
-import type { Design, Point, Rect } from '@dazbee/schema'
+import { type Design, inOrder, type Point, type Rect } from '@dazbee/schema'
 
 import type { Box } from '../layers/transform.ts'
 import {
@@ -17,10 +17,10 @@ import {
   type Viewport,
   zoomAt,
 } from './camera.ts'
-import { type Frame, frameAt, frameGrid, frameKey } from './frames.ts'
+import { type Frame, frameAt, pageFrames } from './frames.ts'
 import { px } from './rulers.ts'
 
-/** A point on the design: a frame, as `<pageId>/<formatId>`, and a point in it in design pixels. */
+/** A point on the design: a frame, by its id, and a point in it in design pixels. */
 export interface Spot {
   frame: string
   x: number
@@ -42,30 +42,28 @@ export interface EditorView {
   viewport(): Viewport
   /** The design as last drawn. */
   design(): Design
-  /** The frames of the grid as last drawn. */
+  /** The shown page's frames as last drawn, by order. */
   frames(): Frame[]
-  /** The frame of the grid as last drawn with a key, if there is one. */
+  /** The shown page's frame with an id, as last drawn, if there is one. */
   frameOf(key: string | undefined): Frame | undefined
-  /** The first page of the grid as last drawn, or '' with none. */
-  firstPage(): string
+  /** The page the canvas shows. */
+  page(): string
   /** The frames the last redraw drew: the ones in view then. */
   inView(): Frame[]
   /** The frame in the middle of the view, if one is there. */
   middleFrame(): Frame | undefined
-  /** The format the focus view shows alone, or null when every format shows. */
-  focused(): string | null
   /** Whether the rulers along the stage's edges show. */
   rulers(): boolean
   /** A point in client coordinates as a point on the stage. */
   onStage(client: Point): Point
-  /** The frame under a point on screen, in client coordinates, and the point in its page's design pixels. */
+  /** The frame under a point on screen, in client coordinates, and the point in its design pixels. */
   pointAt(client: Point): { frame: Frame; p: Point } | null
   /** The spot under a point on screen, in client coordinates: the frame there and the point in it. */
   spotAt(client: Point): Spot | null
-  /** The frame of a page in a format; the first page and the primary format by default. Throws when there is none. */
-  defaultFrame(pageId?: string, formatId?: string): Frame
-  /** Where a design pixel of a frame is on screen now, in client coordinates; the first page and the primary format by default. */
-  screenPoint(x: number, y: number, pageId?: string, formatId?: string): Point
+  /** The shown page's frame with an id, its first by default. Throws when the shown page has no such frame. */
+  defaultFrame(frameId?: string): Frame
+  /** Where a design pixel of a frame of the shown page is on screen now, in client coordinates; its first frame by default. */
+  screenPoint(x: number, y: number, frameId?: string): Point
   /** Whether a redraw is waiting for the next animation frame. */
   scheduled(): boolean
   /** Puts an overlay element over a box in a frame, in design pixels. */
@@ -73,12 +71,12 @@ export interface EditorView {
   /** A box on the overlay with a class, turned as the layer is. */
   outline(className: string, frame: Frame, box: Box): HTMLElement
   /**
-   * Reads the design for a redraw: a format shown alone that is gone shows every format again, and
-   * the frames are laid out again.
+   * Reads the design for a redraw: a shown page that is gone shows the first page again, and the
+   * shown page's frames are laid out again.
    */
   update(): void
   /**
-   * Draws the frames in view at the camera, each picture on a white page with a hairline edge, and
+   * Draws the frames in view at the camera, each picture over white with a hairline edge, and
    * shows them; `record` gives the pictures of the frames in view. False, drawing nothing, before
    * the stage has a surface.
    */
@@ -89,14 +87,12 @@ export interface EditorView {
   zoomTo(zoom: number, at?: Point): void
   zoomIn(): void
   zoomOut(): void
-  /** Fits every frame in view, clear of the chip over the stage when a format shows alone. */
+  /** Shows a page, the first page for one the design lacks: reads the design, lays out its frames at once and fits them. */
+  showPage(pageId: string): void
+  /** Fits the shown page's frames in view; on a page with none, puts the page's origin in the middle at 100%. */
   fitAll(): void
   /** Fits a part of the canvas in view, in world units; nothing without one. */
   fitArea(area: Rect | undefined): void
-  /** Brings one page's row into view: every format of that page, fitted. */
-  fitPage(pageId: string): void
-  /** Shows one format alone, or every format again with null; a format the design doesn't have shows every one. */
-  focus(formatId: string | null): void
   /** Turns the rulers on or off; the view listeners hear of it from `viewChanged`. */
   toggleRulers(): void
   /** Tells the view listeners that the rulers or snapping turned on or off. */
@@ -111,8 +107,6 @@ export interface EditorView {
 }
 
 const ZOOM_STEP = 2
-/** Room around the frames when the focus view fits them, past the chip over the stage. */
-const FOCUS_PADDING = 104
 
 export function editorView({ ck, canvas, session, onZoom, draw }: ViewDeps): EditorView {
   const maybeGl = ck.MakeWebGLContext(ck.GetWebGLContext(canvas))
@@ -129,10 +123,10 @@ export function editorView({ ck, canvas, session, onZoom, draw }: ViewDeps): Edi
   let insets = NO_INSETS
   /** The design as last drawn. */
   let design: Design = session.design()
-  /** The one format the focus view shows, or null for every format. */
-  let focused: string | null = null
-  /** The frames of the design as last drawn, and the box around them. */
-  let grid = frameGrid(design, focused)
+  /** The page the canvas shows: the first page by order, until another is shown. */
+  let shown = firstPageOf(design)
+  /** The shown page's frames as last drawn, and the box round them. */
+  let laid = pageFrames(design, shown)
   /** Where the canvas is on the stage, and its zoom. */
   let camera: Camera = { x: 0, y: 0, zoom: 1 }
   /** The rulers are off until asked for (Shift+R or the View card): the stage is for the ads. */
@@ -164,13 +158,13 @@ export function editorView({ ck, canvas, session, onZoom, draw }: ViewDeps): Edi
     return design
   }
   function frames() {
-    return grid.frames
+    return laid.frames
   }
   function frameOf(key: string | undefined) {
-    return grid.frames.find((f) => f.key === key)
+    return laid.frames.find((f) => f.key === key)
   }
-  function firstPage() {
-    return grid.frames[0]?.pageId ?? ''
+  function shownPage() {
+    return shown
   }
   function inView() {
     return drawnFrames
@@ -179,10 +173,7 @@ export function editorView({ ck, canvas, session, onZoom, draw }: ViewDeps): Edi
     return { x: viewport.width / 2, y: viewport.height / 2 }
   }
   function middleFrame() {
-    return frameAt(grid.frames, toWorld(camera, centre()))
-  }
-  function focusedFormat() {
-    return focused
+    return frameAt(laid.frames, toWorld(camera, centre()))
   }
   function rulersShown() {
     return rulers
@@ -194,22 +185,20 @@ export function editorView({ ck, canvas, session, onZoom, draw }: ViewDeps): Edi
   }
   function pointAt(client: Point) {
     const world = toWorld(camera, onStage(client))
-    const frame = frameAt(grid.frames, world)
+    const frame = frameAt(laid.frames, world)
     return frame ? { frame, p: { x: world.x - frame.x, y: world.y - frame.y } } : null
   }
   function spotAt(client: Point): Spot | null {
     const at = pointAt(client)
     return at ? { frame: at.frame.key, x: at.p.x, y: at.p.y } : null
   }
-  const defaultFrame = (pageId?: string, formatId?: string) => {
-    const page = pageId ?? firstPage()
-    const format = formatId ?? drawn().meta.primaryFormatId
-    const found = frameOf(frameKey(page, format))
-    if (!found) throw new Error(`no frame for page "${page}" in format "${format}"`)
-    return found
+  const defaultFrame = (frameId?: string) => {
+    const found = frameId === undefined ? laid.frames[0] : frameOf(frameId)
+    if (found) return found
+    throw new Error(frameId === undefined ? 'the shown page has no frames' : `no frame "${frameId}" on the shown page`)
   }
-  function screenPoint(x: number, y: number, pageId?: string, formatId?: string): Point {
-    const frame = defaultFrame(pageId, formatId)
+  function screenPoint(x: number, y: number, frameId?: string): Point {
+    const frame = defaultFrame(frameId)
     const at = toScreen(camera, { x: frame.x + x, y: frame.y + y })
     const rect = canvas.getBoundingClientRect()
     return { x: rect.left + at.x, y: rect.top + at.y }
@@ -238,12 +227,12 @@ export function editorView({ ck, canvas, session, onZoom, draw }: ViewDeps): Edi
 
   function update() {
     design = session.design()
-    if (focused && !design.formats[focused]) focused = null
-    grid = frameGrid(design, focused)
+    if (!Object.hasOwn(design.pages, shown)) shown = firstPageOf(design)
+    laid = pageFrames(design, shown)
   }
   function paint(record: (inView: Frame[]) => readonly { frame: Frame; picture: SkPicture }[]) {
     if (!surface) return false
-    drawnFrames = framesInView(grid.frames, camera, viewport)
+    drawnFrames = framesInView(laid.frames, camera, viewport)
     const pictures = record(drawnFrames)
     const c = surface.getCanvas()
     c.clear(ck.TRANSPARENT)
@@ -282,31 +271,17 @@ export function editorView({ ck, canvas, session, onZoom, draw }: ViewDeps): Edi
   function zoomOut() {
     zoomTo(camera.zoom / ZOOM_STEP)
   }
+  function showPage(pageId: string) {
+    shown = pageId
+    update()
+    fitAll()
+  }
   function fitAll() {
-    // The focus view's chip sits over the stage's top edge: leave it room above the frame's label.
-    setCamera(fit(grid.bounds, viewport, focused ? FOCUS_PADDING : undefined, insets))
+    if (laid.bounds) setCamera(fit(laid.bounds, viewport, undefined, insets))
+    else setCamera({ ...centre(), zoom: 1 })
   }
   function fitArea(area: Rect | undefined) {
     if (area) setCamera(fit(area, viewport, undefined, insets))
-  }
-  function fitPage(pageId: string) {
-    const row = grid.frames.filter((f) => f.pageId === pageId)
-    const first = row[0]
-    if (!first) return
-    const right = Math.max(...row.map((f) => f.x + f.width))
-    const bottom = Math.max(...row.map((f) => f.y + f.height))
-    setCamera(
-      fit(
-        { x: first.x, y: first.y, width: right - first.x, height: bottom - first.y },
-        viewport,
-        focused ? FOCUS_PADDING : undefined,
-        insets,
-      ),
-    )
-  }
-  function focus(formatId: string | null) {
-    focused = formatId && design.formats[formatId] ? formatId : null
-    grid = frameGrid(design, focused)
   }
   function toggleRulers() {
     rulers = !rulers
@@ -359,10 +334,9 @@ export function editorView({ ck, canvas, session, onZoom, draw }: ViewDeps): Edi
     design: drawn,
     frames,
     frameOf,
-    firstPage,
+    page: shownPage,
     inView,
     middleFrame,
-    focused: focusedFormat,
     rulers: rulersShown,
     onStage,
     pointAt,
@@ -379,10 +353,9 @@ export function editorView({ ck, canvas, session, onZoom, draw }: ViewDeps): Edi
     zoomTo,
     zoomIn,
     zoomOut,
+    showPage,
     fitAll,
     fitArea,
-    fitPage,
-    focus,
     toggleRulers,
     viewChanged,
     onView,
@@ -390,4 +363,9 @@ export function editorView({ ck, canvas, session, onZoom, draw }: ViewDeps): Edi
     redraw,
     destroy,
   }
+}
+
+/** The design's first page by order, or '' with none. */
+function firstPageOf(design: Design) {
+  return inOrder(design.pages)[0]?.[0] ?? ''
 }

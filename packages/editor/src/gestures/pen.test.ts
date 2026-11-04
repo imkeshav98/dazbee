@@ -8,26 +8,22 @@ import { testBoxes } from '../layers/test-boxes.ts'
 import { editorSelection } from '../selection.ts'
 import { editorPen, type PenDeps } from './pen.ts'
 
-/** One page in a square and a wide format, beside each other, with a path of three anchors. */
+const ZIG = { x: 100, y: 100, width: 100, height: 100, shape: { kind: 'path' as const, d: 'M0 0 L100 0 L100 100' } }
+/** One page with a square and a wide frame, beside each other, each with its copy of a path of three anchors. */
 const DESIGN: DesignInput = {
-  meta: { designId: 'd', name: 'D', kind: 'single', primaryFormatId: 'sq' },
-  formats: {
-    sq: { name: 'Square', width: 1080, height: 1080, order: 'a0' },
-    wide: { name: 'Wide', width: 1200, height: 628, order: 'a1' },
-  },
+  meta: { designId: 'd', name: 'D' },
   pages: { p1: { name: 'One', order: 'a0' } },
+  frames: {
+    sq: { pageId: 'p1', name: 'Square', width: 1080, height: 1080, x: 0, y: 0, order: 'a0' },
+    wide: { pageId: 'p1', name: 'Wide', width: 1200, height: 628, x: 1280, y: 0, order: 'a1' },
+  },
   nodes: {
-    zig: {
-      type: 'graphic',
-      parentId: 'p1',
-      index: 'a0',
-      name: 'Zig',
-      props: { x: 100, y: 100, width: 100, height: 100, shape: { kind: 'path', d: 'M0 0 L100 0 L100 100' } },
-    },
+    zig: { type: 'graphic', parentId: 'sq', link: 'zig', index: 'a0', name: 'Zig', props: ZIG },
+    'wide-zig': { type: 'graphic', parentId: 'wide', link: 'zig', index: 'a0', name: 'Zig', props: ZIG },
   },
 }
-const SQUARE = { key: 'p1/sq', pageId: 'p1', formatId: 'sq', x: 0, y: 0, width: 1080, height: 1080 } as Frame
-const WIDE = { key: 'p1/wide', pageId: 'p1', formatId: 'wide', x: 1200, y: 0, width: 1200, height: 628 } as Frame
+const SQUARE: Frame = { key: 'sq', pageId: 'p1', name: 'Square', x: 0, y: 0, width: 1080, height: 1080 }
+const WIDE: Frame = { key: 'wide', pageId: 'p1', name: 'Wide', x: 1280, y: 0, width: 1200, height: 628 }
 const FRAMES = [SQUARE, WIDE]
 
 /** A press or move of the pointer, Shift held or not. */
@@ -61,13 +57,13 @@ function harness() {
     pen.down(pointer(), { frame, p: { x, y } })
     pen.up()
   }
-  const made = () => Object.keys(session.design().nodes).filter((id) => id !== 'zig')
-  /** A layer's anchors on the page in the square. */
+  const made = () => Object.keys(session.design().nodes).filter((id) => id !== 'zig' && id !== 'wide-zig')
+  /** A layer's anchors in the square frame. */
   const anchors = (id: string) => boxes.pathIn(SQUARE, id)?.path[0]?.anchors
   /** Edits the zig's points, none selected. */
   const editZig = () => {
-    selection.select(['zig'], 'p1/sq')
-    selection.editPath({ id: 'zig', frame: 'p1/sq' })
+    selection.select(['zig'], 'sq')
+    selection.editPath({ id: 'zig', frame: 'sq' })
   }
   return { pen, session, selection, log, click, made, anchors, editZig }
 }
@@ -76,7 +72,7 @@ describe('editorPen', () => {
   describe('drawing a path', () => {
     it('stops typing and lets the selection go, then makes the layer at the second anchor', () => {
       const { pen, session, selection, log, click, made, anchors } = harness()
-      selection.select(['zig'], 'p1/sq')
+      selection.select(['zig'], 'sq')
       click(100, 300)
       expect(pen.drawing()).toBe(true)
       expect(log[0]).toBe('stop typing')
@@ -98,7 +94,7 @@ describe('editorPen', () => {
       pen.finish()
       const [id] = made()
       expect(pen.drawing()).toBe(false)
-      expect(selection.current()).toEqual({ ids: [id], frame: 'p1/sq' })
+      expect(selection.current()).toEqual({ ids: [id], frame: 'sq' })
       expect(log).toContain(`hug ${id}`)
       expect(log.at(-2)).toBe('tool select')
       session.undo()
@@ -172,6 +168,7 @@ describe('editorPen', () => {
   describe("editing a path's points", () => {
     it('selects the anchor pressed and drags the selected anchors past a click, as one undo step', () => {
       const { pen, session, selection, log, editZig, anchors } = harness()
+      const copy = session.design().nodes['wide-zig']
       editZig()
       const drag = pen.pressPoints(pointer(), { frame: SQUARE, p: { x: 200, y: 100 } })
       expect(drag?.kind).toBe('path')
@@ -181,6 +178,8 @@ describe('editorPen', () => {
       expect(anchors('zig')?.[1]).toEqual({ x: 200, y: 100 })
       pen.dragPoints(drag, { x: 230, y: 110 }, false, false)
       expect(anchors('zig')?.[1]).toEqual({ x: 230, y: 110 })
+      // The copy in the wide frame stays as it was.
+      expect(session.design().nodes['wide-zig']).toEqual(copy)
       pen.releasePoints(drag)
       expect(log).toContain('hug zig')
       session.undo()
@@ -223,7 +222,7 @@ describe('editorPen', () => {
       editZig()
       expect(pen.pressPoints(pointer(), { frame: SQUARE, p: { x: 600, y: 600 } })).toBeNull()
       expect(selection.pathEditing()).toBeNull()
-      expect(selection.current()).toEqual({ ids: ['zig'], frame: 'p1/sq' })
+      expect(selection.current()).toEqual({ ids: ['zig'], frame: 'sq' })
       expect(log).toEqual(['draw'])
       expect(pen.pressPoints(pointer(), null)).toBeNull()
     })

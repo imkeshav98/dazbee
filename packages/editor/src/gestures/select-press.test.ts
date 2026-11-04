@@ -17,25 +17,26 @@ const rect = (parentId: string, index: string, box: { x: number; y: number; widt
   name: 'Rect',
   props: { rotation: 0, ...box, shape: { kind: 'rect' as const } },
 })
-/** A box holding a dot, a square beside it, and a pin locked in place, on one page in a square. */
+/** A box holding a dot, a square beside it, and a pin locked in place, in one square frame. */
 const DESIGN: DesignInput = {
-  meta: { designId: 'd', name: 'D', kind: 'single', primaryFormatId: 'sq' },
-  formats: { sq: { name: 'Square', width: 1080, height: 1080, order: 'a0' } },
+  meta: { designId: 'd', name: 'D' },
   pages: { p1: { name: 'One', order: 'a0' } },
+  frames: { sq: { pageId: 'p1', name: 'Square', width: 1080, height: 1080, x: 0, y: 0, order: 'a0' } },
   nodes: {
     card: {
       type: 'box',
-      parentId: 'p1',
+      parentId: 'sq',
+      link: 'card',
       index: 'a0',
       name: 'Card',
       props: { x: 100, y: 100, width: 400, height: 300 },
     },
-    dot: rect('card', 'a0', { x: 110, y: 120, width: 30, height: 40 }),
-    box: rect('p1', 'a1', { x: 600, y: 100, width: 100, height: 100 }),
-    pin: { ...rect('p1', 'a2', { x: 600, y: 700, width: 10, height: 10 }), lock: { move: true } },
+    dot: { ...rect('card', 'a0', { x: 110, y: 120, width: 30, height: 40 }), link: 'dot' },
+    box: { ...rect('sq', 'a1', { x: 600, y: 100, width: 100, height: 100 }), link: 'box' },
+    pin: { ...rect('sq', 'a2', { x: 600, y: 700, width: 10, height: 10 }), link: 'pin', lock: { move: true } },
   },
 }
-const SQUARE = { key: 'p1/sq', pageId: 'p1', formatId: 'sq', x: 0, y: 0, width: 1080, height: 1080 } as Frame
+const SQUARE: Frame = { key: 'sq', pageId: 'p1', name: 'Square', x: 0, y: 0, width: 1080, height: 1080 }
 
 /**
  * The select tool's press over the design on a real session, selection and box queries, at zoom 1
@@ -73,7 +74,7 @@ function harness(handle: ResizeDrag['handle'] | null = null) {
   const select = editorSelectPress(deps)
   /** A press at a point, with Shift held when asked, on the layer a press there finds. */
   const press = (p: Point, shiftKey = false) => {
-    const deepest = hitTest(render(session.design(), 'p1', 'sq', undefined, measure).layers, p, boxes.pickable)
+    const deepest = hitTest(render(session.design(), 'sq', undefined, measure).layers, p, boxes.pickable)
     return select.press({ pointerId: 1, shiftKey } as PointerEvent, p, { frame: SQUARE, p }, deepest)
   }
   return { select, selection, press, log }
@@ -81,10 +82,10 @@ function harness(handle: ResizeDrag['handle'] | null = null) {
 
 describe('editorSelectPress', () => {
   describe('press', () => {
-    it('selects the layer on the page under the press, ending typing, and starts moving it', () => {
+    it('selects the top-level layer under the press, ending typing, and starts moving it', () => {
       const { selection, press, log } = harness()
       expect(press({ x: 115, y: 125 })).toEqual({ kind: 'move' })
-      expect(selection.current()).toEqual({ ids: ['card'], frame: 'p1/sq' })
+      expect(selection.current()).toEqual({ ids: ['card'], frame: 'sq' })
       expect(log).toEqual(['stop typing', 'capture', 'press move card'])
     })
 
@@ -149,7 +150,7 @@ describe('editorSelectPress', () => {
       select.release(press({ x: 900, y: 900 }) as MarqueeDrag)
       expect(selection.pickedPage()).toBe('p1')
       select.release(press({ x: 605, y: 705 }) as MarqueeDrag)
-      expect(selection.current()).toEqual({ ids: ['pin'], frame: 'p1/sq' })
+      expect(selection.current()).toEqual({ ids: ['pin'], frame: 'sq' })
     })
 
     it('lets the page go after a marquee that was dragged', () => {

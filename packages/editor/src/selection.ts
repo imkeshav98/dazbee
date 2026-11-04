@@ -23,7 +23,7 @@ export interface PathEditing extends Picked {
 export interface SelectionDeps {
   /** The design as last drawn. */
   drawn: () => Design
-  /** The frames of the grid as last drawn. */
+  /** The shown page's frames as last drawn. */
   frames: () => readonly Frame[]
   /** Shows that the selection changed: draws the overlay. */
   changed: () => void
@@ -34,8 +34,8 @@ export interface EditorSelection {
   /** The group or box double-clicked into: a click then picks what is directly inside it (#41). */
   entered(): string | null
   /**
-   * The page a click on its background picked: outlined dashed in every size, its labels lit. No
-   * layer is selected meanwhile, so the layers' keys do nothing to it.
+   * The page a click on a frame's background picked: its frames outlined dashed, their labels lit.
+   * No layer is selected meanwhile, so the layers' keys do nothing to it.
    */
   pickedPage(): string | null
   /** The layer whose image fill is being cropped on the stage (#48). */
@@ -49,13 +49,13 @@ export interface EditorSelection {
   /** Sets the selection and shows nothing: a crop or path edit stays while a layer is selected, and ends with none. */
   selectKeepingModes(next: Selection | null): void
   /**
-   * Drops selected layers that are gone, and the selection once none are left or its frame is;
-   * with nothing selected, a crop or path edit ends.
+   * Drops selected layers that are gone, and the selection once none are left or its frame is not
+   * on the shown page; with nothing selected, a crop or path edit ends.
    */
   keep(): void
-  /** Lets the selection go when its frame is no longer in the grid, with a crop or path edit. */
-  dropOffGrid(): void
-  /** Picks a page that has a frame, or none, letting the selection go; shows it and tells the page listeners. */
+  /** Lets the selection go when its frame is not on the shown page, with a crop or path edit. */
+  dropOffPage(): void
+  /** Picks a page that has a frame shown, or none, letting the selection go; shows it and tells the page listeners. */
   pickPage(pageId: string | null): void
   /** Goes into a group or box, or out of every one with null. */
   enter(id: string | null): void
@@ -68,8 +68,8 @@ export interface EditorSelection {
   /** Sets the layer under the pointer; returns whether it changed. */
   hover(next: Picked | null): boolean
   /**
-   * Lets the picked page go once a layer is selected or the page's frames are gone (a page
-   * deleted, a size shown alone); returns whether it did. The overlay calls it as it starts to draw.
+   * Lets the picked page go once a layer is selected or the page's frames are no longer shown (the
+   * page deleted, another page shown); returns whether it did. The overlay calls it as it starts to draw.
    */
   dropGonePage(): boolean
   /**
@@ -156,7 +156,7 @@ export function editorSelection({ drawn, frames, changed }: SelectionDeps): Edit
     if (pathEditing && (!selection?.ids.includes(pathEditing.id) || !isPath(design, pathEditing.id))) pathEditing = null
     if (cropping && (!selection?.ids.includes(cropping.id) || selection.frame !== cropping.frame)) cropping = null
   }
-  function dropOffGrid() {
+  function dropOffPage() {
     if (selection && !frameOf(selection.frame)) selection = null
     endModesWhenNone()
   }
@@ -231,7 +231,7 @@ export function editorSelection({ drawn, frames, changed }: SelectionDeps): Edit
     select,
     selectKeepingModes,
     keep,
-    dropOffGrid,
+    dropOffPage,
     pickPage,
     enter,
     crop,

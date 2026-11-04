@@ -1,12 +1,9 @@
-// What the edit panel and the layers panel change on layers, each as one undo step: properties in
-// one format or every one, the font, a reset to what every format has, the name, the lock, hiding
-// and the place in the layer tree.
-import { descendants, mergedProps, type Session } from '@dazbee/doc'
-import { type BindingTarget, boundFillIndex, formatScope, isContainer, LOCK_FLAGS } from '@dazbee/schema'
+// What the edit panel and the layers panel change on layers, each as one undo step: their
+// properties, the font, the name, the lock, hiding and the place in the layer tree. Each change
+// stays on the layers given; their linked copies in other frames keep their own values.
+import { descendants, type Session } from '@dazbee/doc'
+import { type BindingTarget, boundFillIndex, isContainer, LOCK_FLAGS } from '@dazbee/schema'
 
-import type { EditorActions } from './actions.ts'
-import { scope } from './canvas/frames.ts'
-import type { EditorView } from './canvas/view.ts'
 import { hug as hugIn } from './layers/hug.ts'
 import { round } from './layers/transform.ts'
 import type { EditorResources } from './resources.ts'
@@ -16,11 +13,9 @@ import type { EditorTyping } from './text/typing.ts'
 
 export interface LayerEditsDeps {
   session: Session
-  view: Pick<EditorView, 'defaultFrame'>
   selection: Pick<EditorSelection, 'current'>
   resources: Pick<EditorResources, 'loadFamilies'>
   typing: Pick<EditorTyping, 'fitText' | 'selectedText' | 'styleRange'>
-  actions: Pick<EditorActions, 'hideInEveryFormat'>
   /** Aborted once the editor is destroyed: a font that arrives after that is not set. */
   signal: AbortSignal
 }
@@ -30,15 +25,11 @@ export interface EditorLayerEdits {
   moveLayer(id: string, parentId: string, before?: string): boolean
   setProps(
     ids: string[],
-    to: (id: string, now: Readonly<Record<string, unknown>>) => Record<string, unknown> | null,
-    everyFormat: boolean,
-    pageId?: string,
-    formatId?: string,
+    to: (id: string, props: Readonly<Record<string, unknown>>) => Record<string, unknown> | null,
   ): boolean
   renameLayer(id: string, name: string): boolean
   setLocked(ids: string[], locked: boolean): boolean
-  setHidden(ids: string[], hidden: boolean, pageId?: string, formatId?: string, everyFormat?: boolean): boolean
-  resetOwn(ids: string[], scope: ReturnType<typeof formatScope>, paths?: string[]): boolean
+  setHidden(ids: string[], hidden: boolean): boolean
   setFont(fontFamily: string, fontWeight?: number): Promise<void>
 }
 
@@ -56,16 +47,7 @@ const SIZES_TEXT = new Set([
   'direction',
 ])
 
-export function editorLayerEdits({
-  session,
-  view,
-  selection,
-  resources,
-  typing,
-  actions,
-  signal,
-}: LayerEditsDeps): EditorLayerEdits {
-  const { defaultFrame } = view
+export function editorLayerEdits({ session, selection, resources, typing, signal }: LayerEditsDeps): EditorLayerEdits {
   const hug = (ids: string[]) => hugIn(session, ids)
 
   function moveLayer(id: string, parentId: string, before?: string) {
@@ -79,17 +61,12 @@ export function editorLayerEdits({
   }
   function setProps(
     ids: string[],
-    to: (id: string, now: Readonly<Record<string, unknown>>) => Record<string, unknown> | null,
-    everyFormat: boolean,
-    pageId?: string,
-    formatId?: string,
+    to: (id: string, props: Readonly<Record<string, unknown>>) => Record<string, unknown> | null,
   ) {
-    const frame = defaultFrame(pageId, formatId)
-    const here = scope(frame)
     return runQuietly(() =>
       session.gesture(() => {
         const now = session.design()
-        const placedProps = (id: string) => mergedProps(now, here, id)
+        const placedProps = (id: string): Readonly<Record<string, unknown>> => now.nodes[id]?.props ?? {}
         const writes = new Map<string, Record<string, unknown>>()
         for (const id of ids) {
           const node = now.nodes[id]
@@ -128,20 +105,11 @@ export function editorLayerEdits({
               : []),
           ]
           for (const target of unbind) session.run('node.bind', { ids: [id], target, ref: null })
-          if (!everyFormat) {
-            session.run('node.update', { ids: [id], scope: here, patch })
-            continue
-          }
-          session.run('node.update', { ids: [id], scope: 'base', patch })
-          for (const [other, byNode] of Object.entries(session.design().overrides)) {
-            const paths = Object.keys(patch).filter((path) => byNode[id] && path in byNode[id])
-            if (paths.length > 0) session.run('override.reset', { ids: [id], scope: other, paths })
-          }
+          session.run('node.update', { ids: [id], patch })
         }
-        // Text that grows the size of its words fits them again, in the formats the change reached.
+        // Text that grows the size of its words fits them again.
         for (const [id, patch] of writes) {
-          if (Object.keys(patch).some((key) => SIZES_TEXT.has(key)))
-            typing.fitText(id, everyFormat ? undefined : frame.formatId)
+          if (Object.keys(patch).some((key) => SIZES_TEXT.has(key))) typing.fitText(id)
         }
         hug([...writes.keys()])
       }),
@@ -152,19 +120,8 @@ export function editorLayerEdits({
     runQuietly(() =>
       session.run('node.lock', { ids, lock: Object.fromEntries(LOCK_FLAGS.map((flag) => [flag, locked])) }),
     )
-  function setHidden(ids: string[], hidden: boolean, pageId?: string, formatId?: string, everyFormat = false) {
-    if (everyFormat) return actions.hideInEveryFormat(ids, hidden)
-    const frame = defaultFrame(pageId, formatId)
-    return runQuietly(() => session.run('node.update', { ids, scope: scope(frame), patch: { visible: !hidden } }))
-  }
-  function resetOwn(ids: string[], scope: ReturnType<typeof formatScope>, paths?: string[]) {
-    return runQuietly(() =>
-      session.gesture(() => {
-        session.run('override.reset', { ids, scope, ...(paths ? { paths } : {}) })
-        for (const id of ids) typing.fitText(id, scope.slice('format:'.length))
-      }),
-    )
-  }
+  const setHidden = (ids: string[], hidden: boolean) =>
+    runQuietly(() => session.run('node.update', { ids, patch: { visible: !hidden } }))
   async function setFont(fontFamily: string, fontWeight?: number) {
     const ids = (selection.current()?.ids ?? []).filter((id) => session.design().nodes[id]?.type === 'text')
     const range = typing.selectedText()
@@ -198,7 +155,6 @@ export function editorLayerEdits({
     renameLayer,
     setLocked,
     setHidden,
-    resetOwn,
     setFont,
   }
 }

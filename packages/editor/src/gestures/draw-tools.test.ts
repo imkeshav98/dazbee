@@ -4,6 +4,7 @@ import {
   clickedRect,
   draggedRect,
   drawsBox,
+  isDrawTool,
   keepRatio,
   newDrawn,
   newImage,
@@ -19,22 +20,26 @@ describe('SHAPE_MENU_TOOLS', () => {
   })
 })
 
+describe('isDrawTool', () => {
+  it('holds for every tool of the shape menu, and not for the Frame tool, which draws frames', () => {
+    expect(SHAPE_MENU_TOOLS.every((tool) => isDrawTool(tool))).toBe(true)
+    for (const tool of ['frame', 'select', 'pen', 'text', 'image']) expect(isDrawTool(tool), tool).toBe(false)
+  })
+})
+
 describe('drawsBox', () => {
-  it('holds for Box and the Frame tool, and for no shape', () => {
-    expect(drawsBox('box')).toBe(true)
-    expect(drawsBox('frame')).toBe(true)
+  it('holds for Box, and for no shape', () => {
     expect(SHAPE_MENU_TOOLS.filter((tool) => drawsBox(tool))).toEqual(['box'])
   })
 })
 
 describe('newDrawn', () => {
-  it('makes a white box named Box for Box and the Frame tool, and a shape for a shape tool', () => {
-    for (const tool of ['box', 'frame'] as const)
-      expect(newDrawn(tool)).toMatchObject({
-        type: 'box',
-        name: 'Box',
-        props: { fills: [{ type: 'solid', color: '#FFFFFFFF' }] },
-      })
+  it('makes a white box named Box for Box, and a shape for a shape tool', () => {
+    expect(newDrawn('box')).toMatchObject({
+      type: 'box',
+      name: 'Box',
+      props: { fills: [{ type: 'solid', color: '#FFFFFFFF' }] },
+    })
     expect(newDrawn('ellipse')).toMatchObject({
       type: 'graphic',
       name: 'Ellipse',

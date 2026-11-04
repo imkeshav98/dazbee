@@ -1,63 +1,45 @@
-// Where each frame of the infinite canvas sits (#36): an auto grid with pages as rows and formats
-// as columns, so nothing about placement is stored and a new page or format slots in by itself.
-import { type Design, formatScope, inOrder, type Rect } from '@dazbee/schema'
+// The frames of a page as the canvas shows them: each stored frame where it was placed, keyed by
+// its frame id, in world units.
+import { type Design, framesOf, type Point, type Rect } from '@dazbee/schema'
 
-/** One page in one format, placed on the canvas in world units (design pixels at 100%). */
+/** A frame as the canvas shows it: the stored frame, by its id, in world units (design pixels at 100%) on its page. */
 export interface Frame {
+  /** The frame's id. */
   key: string
   pageId: string
-  formatId: string
-  row: number
-  column: number
+  name: string
   x: number
   y: number
   width: number
   height: number
 }
 
-/** Space between formats, and between pages, which also holds the frame labels. */
-export const COLUMN_GAP = 160
-export const ROW_GAP = 240
+/** The canvas frame of a stored frame, or undefined for an id the design lacks. */
+export function frameIn(design: Design, frameId: string): Frame | undefined {
+  if (!Object.hasOwn(design.frames, frameId)) return undefined
+  const stored = design.frames[frameId]
+  return stored && canvasFrame(frameId, stored)
+}
 
-export const frameKey = (pageId: string, formatId: string) => `${pageId}/${formatId}`
-/** Where edits made in a frame go: its format's overrides. */
-export const scope = (frame: Frame) => formatScope(frame.formatId)
-
-/**
- * Every frame of the design, row by row, and the box around them all. With `only`, the focus
- * view (#38): that one format's column alone.
- */
-export function frameGrid(design: Design, only?: string | null): { frames: Frame[]; bounds: Rect } {
-  const pages = inOrder(design.pages)
-  const formats = inOrder(design.formats).filter(([id]) => !only || !design.formats[only] || id === only)
-  const rowHeight = Math.max(0, ...formats.map(([, f]) => f.height))
-  const columns: number[] = []
-  let x = 0
-  for (const [, format] of formats) {
-    columns.push(x)
-    x += format.width + COLUMN_GAP
-  }
-  const frames = pages.flatMap(([pageId], row) =>
-    formats.map(([formatId, format], column) => ({
-      key: frameKey(pageId, formatId),
-      pageId,
-      formatId,
-      row,
-      column,
-      x: columns[column] ?? 0,
-      y: row * (rowHeight + ROW_GAP),
-      width: format.width,
-      height: format.height,
-    })),
-  )
-  const width = Math.max(0, x - COLUMN_GAP)
-  const height = Math.max(0, pages.length * (rowHeight + ROW_GAP) - ROW_GAP)
-  return { frames, bounds: { x: 0, y: 0, width, height } }
+/** A page's frames, by order, and the box round them; null bounds for a page with none. */
+export function pageFrames(design: Design, pageId: string): { frames: Frame[]; bounds: Rect | null } {
+  const frames = framesOf(design, pageId).map(([id, stored]) => canvasFrame(id, stored))
+  if (!frames.length) return { frames, bounds: null }
+  const left = Math.min(...frames.map((f) => f.x))
+  const top = Math.min(...frames.map((f) => f.y))
+  const right = Math.max(...frames.map((f) => f.x + f.width))
+  const bottom = Math.max(...frames.map((f) => f.y + f.height))
+  return { frames, bounds: { x: left, y: top, width: right - left, height: bottom - top } }
 }
 
 export const intersects = (a: Rect, b: Rect) =>
   a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height
 
-/** The frame under a world point, if any. */
-export const frameAt = (frames: Frame[], p: { x: number; y: number }) =>
-  frames.find((f) => p.x >= f.x && p.x <= f.x + f.width && p.y >= f.y && p.y <= f.y + f.height)
+/** The frame under a world point: the topmost (last by order) of those that hold it. */
+export const frameAt = (frames: readonly Frame[], p: Point) =>
+  frames.findLast((f) => p.x >= f.x && p.x <= f.x + f.width && p.y >= f.y && p.y <= f.y + f.height)
+
+function canvasFrame(id: string, stored: Design['frames'][string]): Frame {
+  const { pageId, name, x, y, width, height } = stored
+  return { key: id, pageId, name, x, y, width, height }
+}

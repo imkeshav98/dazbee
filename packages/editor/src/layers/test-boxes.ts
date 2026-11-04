@@ -36,7 +36,7 @@ export function testBoxes(
   return editorBoxes({
     session,
     scenes: {
-      scene: (frame) => render(session.design(), frame.pageId, frame.formatId, undefined, measure),
+      scene: (frame) => render(session.design(), frame.key, undefined, measure),
       measure: () => measure,
     },
     resources: {

@@ -4,7 +4,7 @@ import type { Session } from '@dazbee/doc'
 import type { Design, Point } from '@dazbee/schema'
 
 import { type Camera, toScreen, toWorld } from '../canvas/camera.ts'
-import { type Frame, scope } from '../canvas/frames.ts'
+import type { Frame } from '../canvas/frames.ts'
 import { px } from '../canvas/rulers.ts'
 import type { EditorBoxes } from '../layers/boxes.ts'
 import { type Box, localTo, pageFrom, round } from '../layers/transform.ts'
@@ -38,7 +38,6 @@ export interface Reshaping {
   id: string
   start: Box
   applied: Point
-  scope: string
 }
 /** A drag of a path's anchors or of one handle, from the press on it until it ends: one undo step. */
 export interface PathDrag {
@@ -63,7 +62,7 @@ export interface PenDeps {
   camera: () => Camera
   /** The design as last drawn. */
   drawn: () => Design
-  /** The frame of the grid as last drawn with a key, if there is one. */
+  /** The shown page's frame with an id, as last drawn, if there is one. */
   frameOf: (key: string | undefined) => Frame | undefined
   boxes: Pick<EditorBoxes, 'containersOf' | 'pathIn' | 'parentFor'>
   /** Groups fit what they hold again after a change inside them, in the same undo step. */
@@ -259,7 +258,6 @@ export function editorPen({
     const moved = { x: round(corner.x - layer.start.x), y: round(corner.y - layer.start.y) }
     const input = {
       id: layer.id,
-      scope: layer.scope,
       d: formatPath(path, corner),
       dx: round(moved.x - layer.applied.x),
       dy: round(moved.y - layer.applied.y),
@@ -286,7 +284,7 @@ export function editorPen({
       return null
     }
     let path = found.path
-    const layer: Reshaping = { id: editingPath.id, start: found.box, applied: { x: 0, y: 0 }, scope: scope(frame) }
+    const layer: Reshaping = { id: editingPath.id, start: found.box, applied: { x: 0, y: 0 } }
     const end = session.beginGesture()
     let drag: PathDrag['drag']
     if (hit.kind === 'control') {
@@ -363,7 +361,7 @@ export function editorPen({
     const parent = session.design().nodes[editingPath.id]?.parentId ?? ''
     session.gesture(() => {
       if (next.length === 0) runQuietly(() => session.run('node.delete', { ids: [editingPath.id] }))
-      else reshape({ id: editingPath.id, start: found.box, applied: { x: 0, y: 0 }, scope: scope(frame) }, next)
+      else reshape({ id: editingPath.id, start: found.box, applied: { x: 0, y: 0 } }, next)
       hug(session.design().nodes[parent] ? [parent] : next.length > 0 ? [editingPath.id] : [])
     })
     selection.pickAnchors([])
@@ -460,7 +458,7 @@ export function editorPen({
         id = session.run('node.create', { parentId, layer })
       })
     )
-      pen.layer = { id, start: box, applied: { x: 0, y: 0 }, scope: scope(pen.frame) }
+      pen.layer = { id, start: box, applied: { x: 0, y: 0 } }
   }
   /** Ends the pen's path, closed or open: the undo step ends, the new layer is selected, and the select tool comes back. */
   function finishPen() {

@@ -1,10 +1,10 @@
-// Scenes and pictures by frame. A frame is recorded again only when a layer it shows, an override
-// in its format, its page or its format changed: dragging in one format leaves the other formats'
-// pictures as they are, and panning records nothing.
+// Scenes and pictures by frame. A frame is recorded again only when a layer it shows or the frame
+// itself changed: dragging in one frame leaves the other frames' pictures as they are, and panning
+// records nothing.
 import type { CanvasKit, SkPicture } from '@dazbee/canvaskit'
 import { childrenOf } from '@dazbee/doc'
 import {
-  drawPage,
+  drawFrame,
   layerPictures,
   type MeasureText,
   type ParagraphCache,
@@ -20,7 +20,7 @@ import {
 import type { Design } from '@dazbee/schema'
 
 import type { EditorResources } from '../resources.ts'
-import { type Frame, scope } from './frames.ts'
+import type { Frame } from './frames.ts'
 
 export interface ScenesDeps {
   ck: CanvasKit
@@ -37,8 +37,9 @@ export interface FrameScenes {
   /** Text laid out as drawn, from the screen's cache, which owns it. */
   layout(props: Parameters<ParagraphCache['layout']>[1]): TextLayout
   /**
-   * The pictures of the frames in view for a redraw, `all` being every frame of the grid: each one
-   * recorded again where it changed, and how many were.
+   * The pictures of the frames in view for a redraw, `all` being every frame of the shown page: each
+   * one recorded again where it changed, and how many were. A frame off the shown page lets go of its
+   * picture and keeps its scene until the design has no such frame.
    */
   pictures(
     all: Frame[],
@@ -58,7 +59,7 @@ interface FrameCache {
 const sameDeps = (a: unknown[], b: unknown[]) => a.length === b.length && a.every((x, i) => x === b[i])
 
 export function frameScenes({ ck, resources, drawn }: ScenesDeps): FrameScenes {
-  /** Each frame's scene and picture, by frame key. */
+  /** Each frame's scene and picture, by frame id. */
   const frames = new Map<string, FrameCache>()
   /** The resources the pictures were recorded with; others record them all again. */
   let picturesFor: Resources | null = null
@@ -94,10 +95,14 @@ export function frameScenes({ ck, resources, drawn }: ScenesDeps): FrameScenes {
       picturesFor = screen
     }
     const kept = new Set(all.map((f) => f.key))
+    const design = drawn()
     for (const [key, entry] of frames) {
       if (kept.has(key)) continue
       entry.picture?.delete()
+      entry.picture = null
+      if (Object.hasOwn(design.frames, key)) continue
       frames.delete(key)
+      scenes.delete(key)
     }
 
     let recorded = 0
@@ -125,7 +130,7 @@ export function frameScenes({ ck, resources, drawn }: ScenesDeps): FrameScenes {
     entry?.picture?.delete()
     const fresh = {
       deps,
-      scene: render(drawn(), frame.pageId, frame.formatId, scenes, measure(), resources.bytes().variables),
+      scene: render(drawn(), frame.key, scenes, measure(), resources.bytes().variables),
       picture: null,
     }
     frames.set(frame.key, fresh)
@@ -133,22 +138,21 @@ export function frameScenes({ ck, resources, drawn }: ScenesDeps): FrameScenes {
   }
   function depsOf(frame: Frame) {
     const design = drawn()
-    const overrides = design.overrides[scope(frame)]
     // The brand kit's values too (#53): a change rebuilds the scene, reusing every unbound layer.
-    const deps: unknown[] = [design.pages[frame.pageId], design.formats[frame.formatId], resources.bytes().variables]
+    const deps: unknown[] = [design.frames[frame.key], resources.bytes().variables]
     const walk = (parentId: string) => {
       for (const [id, node] of childrenOf(design, parentId)) {
-        deps.push(id, node, overrides?.[id])
+        deps.push(id, node)
         walk(id)
       }
     }
-    walk(frame.pageId)
+    walk(frame.key)
     return deps
   }
-  function record(page: Scene, with_: Resources) {
+  function record(scene: Scene, with_: Resources) {
     const recorder = new ck.PictureRecorder()
     try {
-      drawPage(ck, recorder.beginRecording(ck.XYWHRect(0, 0, page.width, page.height)), page, with_)
+      drawFrame(ck, recorder.beginRecording(ck.XYWHRect(0, 0, scene.width, scene.height)), scene, with_)
       return recorder.finishRecordingAsPicture()
     } finally {
       recorder.delete()

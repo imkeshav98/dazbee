@@ -1,10 +1,11 @@
-// Drawing new layers with a tool: a shape or box dragged out, a text box and an image box, and
-// the box being dragged as the overlay shows it.
+// Drawing with a tool: a shape or box dragged out, a text box and an image box, a frame dragged
+// out with the Frame tool, and the box being dragged as the overlay shows it.
 import { childrenOf, type Session } from '@dazbee/doc'
-import { canHold, type Design, type Point, type Rect } from '@dazbee/schema'
+import { canHold, type Point, type Rect, SIZE_LIMITS } from '@dazbee/schema'
 
-import type { Camera } from '../canvas/camera.ts'
-import { type Frame, scope } from '../canvas/frames.ts'
+import { type Camera, toScreen } from '../canvas/camera.ts'
+import type { Frame } from '../canvas/frames.ts'
+import { px } from '../canvas/rulers.ts'
 import { laidOut } from '../layers/auto-layout.ts'
 import type { EditorBoxes } from '../layers/boxes.ts'
 import { boundsOf, type Box, localTo, round } from '../layers/transform.ts'
@@ -57,8 +58,15 @@ export interface ImageBoxDrag {
   asset: PlacedAsset
 }
 
-/** A drag that draws a new layer. */
-export type DrawingDrag = ShapeDrag | TextBoxDrag | ImageBoxDrag
+/** The frame the Frame tool is dragging out on the shown page, in world units, from the press until it ends. */
+export interface FrameDrag {
+  kind: 'frameDraw'
+  from: Point
+  to: Point
+}
+
+/** A drag that draws a new layer or frame. */
+export type DrawingDrag = ShapeDrag | TextBoxDrag | ImageBoxDrag | FrameDrag
 
 export interface DrawingDeps {
   canvas: HTMLCanvasElement
@@ -68,8 +76,8 @@ export interface DrawingDeps {
   typing: Pick<EditorTyping, 'stop' | 'start'>
   boxes: Pick<EditorBoxes, 'boxIn' | 'containersOf' | 'parentFor'>
   camera: () => Camera
-  /** The design as last drawn. */
-  drawn: () => Design
+  /** The page the canvas shows, which a frame drawn with the Frame tool goes on. */
+  page: () => string
   /** Groups fit what they hold again after a change inside them, in the same undo step. */
   hug: (ids: string[]) => void
   /** Puts an overlay element over a box in a frame, in design pixels. */
@@ -79,10 +87,10 @@ export interface DrawingDeps {
 }
 
 export interface EditorDrawing {
-  /** The box a text or image box drag is drawing, as the overlay shows it; nothing for a shape. */
+  /** The box a text, image box or frame drag is drawing, as the overlay shows it; nothing for a shape. */
   parts(g: DrawingDrag): HTMLElement[]
   /**
-   * A press with a shape tool or the Frame tool: the new layer, in the group or box gone into when it can
+   * A press with a tool of the shape menu: the new layer, in the group or box gone into when it can
    * hold it, and a drag that sizes it, one undo step until it is released. Null when it can't be made.
    */
   pressShape(e: PointerEvent, shape: DrawTool, at: { frame: Frame; p: Point }): ShapeDrag | null
@@ -90,19 +98,28 @@ export interface EditorDrawing {
   pressText(e: PointerEvent, at: { frame: Frame; p: Point }): TextBoxDrag
   /** A press with the image tool and its image: a drag of the box the image will cover, or a click for its own size. */
   pressImage(e: PointerEvent, at: { frame: Frame; p: Point }, asset: PlacedAsset): ImageBoxDrag
-  /** Follows the pointer: a shape grows to it; a box's corner goes to it, Shift keeping an image's shape. */
+  /** A press with the Frame tool, anywhere on the stage, at a world point: a drag of the frame it adds to the shown page. */
+  pressFrame(e: PointerEvent, world: Point): FrameDrag
+  /**
+   * Follows the pointer: a shape grows to it; a box's corner goes to it, Shift keeping an image's
+   * shape. A frame's point is in world units, the others' in their frame's design pixels.
+   */
   drag(g: DrawingDrag, p: Point, shift: boolean, alt: boolean): void
   /**
    * Ends a drawing gesture, its layer selected and the select tool back. A shape's undo step
    * closes; a text box's layer is made and typed into, one undo step until typing stops; an
-   * image box's layer is made, one undo step.
+   * image box's layer is made, one undo step. A frame dragged out is added, one undo step, with
+   * nothing selected; a click adds none.
    */
   release(g: DrawingDrag): void
 }
 
-/** Whether a gesture is one that draws a new layer. */
+/** The name a frame drawn with the Frame tool gets. */
+const FRAME_NAME = 'Frame'
+
+/** Whether a gesture is one that draws a new layer or frame. */
 export const isDrawing = (g: { kind: string } | null): g is DrawingDrag =>
-  g?.kind === 'draw' || g?.kind === 'textBox' || g?.kind === 'imageBox'
+  g?.kind === 'draw' || g?.kind === 'textBox' || g?.kind === 'imageBox' || g?.kind === 'frameDraw'
 
 export function editorDrawing({
   canvas,
@@ -112,14 +129,14 @@ export function editorDrawing({
   typing,
   boxes: { boxIn, containersOf, parentFor },
   camera,
-  drawn,
+  page,
   hug,
   placeBox,
   drawOverlay,
 }: DrawingDeps): EditorDrawing {
   /**
    * Where a box a tool drags out starts: in the group or box double-clicked into if it can hold
-   * a layer of `type`, otherwise on the page, at the press as layers there see it.
+   * a layer of `type`, otherwise in the frame, at the press as layers there see it.
    */
   function boxStart(at: { frame: Frame; p: Point }, type: 'text' | 'graphic') {
     const now = session.design()
@@ -140,24 +157,38 @@ export function editorDrawing({
         }
       : null
   }
-  /** The box the text tool (#47) or the image tool is drawing, drawn as a marquee is; nothing for a shape, which draws itself. */
+  /**
+   * The box the text tool (#47), the image tool or the Frame tool is drawing, drawn as a marquee is
+   * and marked with the gesture's kind; nothing for a shape, which draws itself.
+   */
   function boxParts(gesture: DrawingDrag) {
     if (gesture.kind === 'draw') return []
     const box = document.createElement('div')
     box.className = 'marquee'
     box.dataset[gesture.kind] = ''
-    placeBox(box, gesture.frame, {
+    const rect = {
       x: Math.min(gesture.from.x, gesture.to.x),
       y: Math.min(gesture.from.y, gesture.to.y),
       width: Math.abs(gesture.to.x - gesture.from.x),
       height: Math.abs(gesture.to.y - gesture.from.y),
+    }
+    if (gesture.kind !== 'frameDraw') {
+      placeBox(box, gesture.frame, rect)
+      return [box]
+    }
+    const at = toScreen(camera(), rect)
+    Object.assign(box.style, {
+      left: px(at.x),
+      top: px(at.y),
+      width: px(rect.width * camera().zoom),
+      height: px(rect.height * camera().zoom),
     })
     return [box]
   }
 
   /**
    * Starts drawing a shape (#44) or a box where the pointer went down: inside the group, box or
-   * boolean double-clicked into if the press is in it and it can hold it, otherwise on the page.
+   * boolean double-clicked into if the press is in it and it can hold it, otherwise in the frame.
    * The new layer and every change the drag makes to it are one undo step.
    */
   function startDrawing(e: PointerEvent, shape: DrawTool, at: { frame: Frame; p: Point }): ShapeDrag | null {
@@ -199,13 +230,19 @@ export function editorDrawing({
   }
   /**
    * A press with the image tool once its image is picked: a click places the image at its own size
-   * (at most half the format's), centred there; a drag places it covering the box dragged, which
+   * (at most half the frame's), centred there; a drag places it covering the box dragged, which
    * Shift keeps to the image's shape. In the group or box double-clicked into if it can hold it.
    */
   function startImageBox(e: PointerEvent, at: { frame: Frame; p: Point }, asset: PlacedAsset): ImageBoxDrag {
     typing.stop()
     canvas.setPointerCapture(e.pointerId)
     return { kind: 'imageBox', ...boxStart(at, 'graphic'), asset }
+  }
+  /** A press with the Frame tool: a drag of the frame it adds, from the press, in world units. */
+  function startFrame(e: PointerEvent, world: Point): FrameDrag {
+    typing.stop()
+    canvas.setPointerCapture(e.pointerId)
+    return { kind: 'frameDraw', from: world, to: world }
   }
   /** Follows the pointer: a shape grows to it, Shift and Alt as `draggedRect` takes them; a box's corner goes to it, Shift keeping an image's shape. */
   function drag(g: DrawingDrag, p: Point, shift: boolean, alt: boolean) {
@@ -226,7 +263,8 @@ export function editorDrawing({
   function release(g: DrawingDrag) {
     if (g.kind === 'draw') finishDrawing(g)
     else if (g.kind === 'textBox') finishTextBox(g)
-    else finishImageBox(g)
+    else if (g.kind === 'imageBox') finishImageBox(g)
+    else finishFrame(g)
   }
   /**
    * A click draws the shape at its usual size; either way the new shape is selected and the select
@@ -261,7 +299,7 @@ export function editorDrawing({
         shown.y + shown.height <= box.y + box.height
       return fits && canHold('box', now.nodes[child]?.type ?? '') ? [child] : []
     })
-    if (inside.length > 0) runQuietly(() => session.run('node.enclose', { id, ids: inside, scope: scope(frame) }))
+    if (inside.length > 0) runQuietly(() => session.run('node.enclose', { id, ids: inside }))
   }
   /** Makes the text layer the text tool drew and starts typing into it, one undo step with the typing. */
   function finishTextBox(g: TextBoxDrag) {
@@ -290,7 +328,6 @@ export function editorDrawing({
   /** Places the image the image tool drew, one undo step; it is selected and the select tool comes back. */
   function finishImageBox(g: ImageBoxDrag) {
     const box = draggedBox(g)
-    const format = drawn().formats[g.frame.formatId] ?? g.frame
     const layer = box
       ? imageIn(g.asset, {
           x: round(box.x),
@@ -298,7 +335,7 @@ export function editorDrawing({
           width: Math.max(1, round(box.width)),
           height: Math.max(1, round(box.height)),
         })
-      : newImage(g.asset, g.from, format)
+      : newImage(g.asset, g.from, g.frame)
     let id = ''
     if (
       !runQuietly(() =>
@@ -312,13 +349,42 @@ export function editorDrawing({
     tools.setTool('select')
     selection.select([id], g.frame.key)
   }
+  /**
+   * Adds the frame the Frame tool dragged out to the shown page, empty and named Frame, on whole
+   * pixels and held within the size limits, one undo step; a click adds none. Nothing is selected
+   * after, and the select tool comes back.
+   */
+  function finishFrame(g: FrameDrag) {
+    tools.setTool('select')
+    if (!draggedBox(g)) return
+    const x = Math.round(Math.min(g.from.x, g.to.x))
+    const y = Math.round(Math.min(g.from.y, g.to.y))
+    const size = withinSizeLimits(
+      Math.round(Math.max(g.from.x, g.to.x)) - x,
+      Math.round(Math.max(g.from.y, g.to.y)) - y,
+    )
+    if (runQuietly(() => session.run('frame.add', { pageId: page(), name: FRAME_NAME, x, y, ...size })))
+      selection.select([], '')
+  }
 
   return {
     parts: boxParts,
     pressShape: startDrawing,
     pressText: startTextBox,
     pressImage: startImageBox,
+    pressFrame: startFrame,
     drag,
     release,
   }
+}
+
+/** A frame's size pushed into the size limits: each side 50 to 8000 px, the short side grown until it is at most 12 times shorter. */
+function withinSizeLimits(width: number, height: number) {
+  const { minSide, maxSide, maxRatio } = SIZE_LIMITS
+  const side = (n: number) => Math.min(maxSide, Math.max(minSide, n))
+  const w = side(width)
+  const h = side(height)
+  if (w > h * maxRatio) return { width: w, height: Math.ceil(w / maxRatio) }
+  if (h > w * maxRatio) return { width: Math.ceil(h / maxRatio), height: h }
+  return { width: w, height: h }
 }

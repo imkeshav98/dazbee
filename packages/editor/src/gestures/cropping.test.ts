@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { loadDesign, mergedProps, openSession } from '@dazbee/doc'
+import { loadDesign, openSession } from '@dazbee/doc'
 import { type DesignInput, type Paint, parseDesign } from '@dazbee/schema'
 
 import type { Frame } from '../canvas/frames.ts'
@@ -10,13 +10,14 @@ import { type CroppingDeps, editorCropping } from './cropping.ts'
 
 /** A box 200 × 100 filled with a square image, which covers it: the image's whole sits 200 × 200 around it. */
 const DESIGN: DesignInput = {
-  meta: { designId: 'd', name: 'D', kind: 'single', primaryFormatId: 'sq' },
-  formats: { sq: { name: 'Square', width: 1080, height: 1080, order: 'a0' } },
+  meta: { designId: 'd', name: 'D' },
   pages: { p1: { name: 'One', order: 'a0' } },
+  frames: { sq: { pageId: 'p1', name: 'Square', width: 1080, height: 1080, x: 0, y: 0, order: 'a0' } },
   nodes: {
     photo: {
       type: 'graphic',
-      parentId: 'p1',
+      parentId: 'sq',
+      link: 'photo',
       index: 'a0',
       name: 'Photo',
       props: {
@@ -33,7 +34,7 @@ const DESIGN: DesignInput = {
     },
   },
 }
-const SQUARE = { key: 'p1/sq', pageId: 'p1', formatId: 'sq', x: 0, y: 0, width: 1080, height: 1080 } as Frame
+const SQUARE: Frame = { key: 'sq', pageId: 'p1', name: 'Square', x: 0, y: 0, width: 1080, height: 1080 }
 const IMAGE = { width: 400, height: 400 }
 const pointer = { pointerId: 1 } as PointerEvent
 
@@ -44,8 +45,8 @@ function harness() {
   const session = openSession(loadDesign(parsed.design))
   const log: string[] = []
   const selection = editorSelection({ drawn: () => session.design(), frames: () => [SQUARE], changed: () => {} })
-  /** The fills of the photo in the square. */
-  const fills = () => (mergedProps(session.design(), 'format:sq', 'photo') as { fills: Paint[] }).fills
+  /** The photo's fills. */
+  const fills = () => (session.design().nodes.photo?.props as { fills: Paint[] }).fills
   const deps: CroppingDeps = {
     canvas: { setPointerCapture: () => {} } as unknown as HTMLCanvasElement,
     session,
@@ -60,7 +61,7 @@ function harness() {
     drawOverlay: () => log.push('draw'),
   }
   const cropping = editorCropping(deps)
-  selection.crop({ id: 'photo', frame: 'p1/sq' })
+  selection.crop({ id: 'photo', frame: 'sq' })
   return { cropping, session, selection, log, fills }
 }
 
@@ -83,7 +84,7 @@ describe('editorCropping', () => {
 
     it('ends a crop whose layer has nothing left to crop', () => {
       const { cropping, selection, log } = harness()
-      selection.crop({ id: 'gone', frame: 'p1/sq' })
+      selection.crop({ id: 'gone', frame: 'sq' })
       expect(cropping.press(pointer, { x: 200, y: 150 })).toBeNull()
       expect(selection.cropping()).toBeNull()
       expect(log).toEqual([])
@@ -91,7 +92,7 @@ describe('editorCropping', () => {
   })
 
   describe('drag', () => {
-    it("pans the image, kept covering the box, as the fill's own crop in this format", () => {
+    it("pans the image, kept covering the box, as the fill's own crop", () => {
       const { cropping, fills, log } = harness()
       const drag = cropping.press(pointer, { x: 200, y: 150 })
       if (!drag) throw new Error('no drag')

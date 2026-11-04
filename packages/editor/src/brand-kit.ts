@@ -30,7 +30,7 @@ export interface EditorBrandKit {
   bindSelection(kind: 'color' | 'font', ref: VariableRef | null): number
   /**
    * Text bound to a brand font whose family the kit has changed since takes it once its files are
-   * here, its box fitting it in every format: a change no one undoes.
+   * here, its box fitting it: a change no one undoes.
    */
   refitBrandFonts(): Promise<void>
 }
@@ -69,7 +69,7 @@ export function editorBrandKit({ session, resources, view, selection, typing, si
   }
   /**
    * Text bound to a brand font whose family the kit has changed since: once that family's files are
-   * here, it takes it and its box fits it in every format. The kit lives outside the design, so this
+   * here, it takes it and its box fits it. The kit lives outside the design, so this
    * is a change no one undoes, as another tab's: undo could not put the kit back with it. Run when the
    * kit changes and when the design opens.
    */
