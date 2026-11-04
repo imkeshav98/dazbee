@@ -43,11 +43,16 @@ export interface AutoLayoutDragDeps {
 }
 
 export interface EditorAutoLayoutDrag {
-  press(frame: Frame, around: Box[], p: Point, ids: string[]): ReorderDrag | null
-  drag(g: ReorderDrag, p: Point): void
-  release(g: ReorderDrag): void
-  nudge(frame: Frame, ids: string[], dx: number, dy: number, now: Design): void
+  /** A drag in a flow as the overlay shows it: the layers following the pointer, and the line where they would go or their frame outlined. */
   parts(g: ReorderDrag | null): HTMLElement[]
+  /** A press on layers auto layout places, all in one flow: a drag along it or out of its frame, one undo step until it is released. Null for any others. */
+  press(frame: Frame, around: Box[], p: Point, ids: string[]): ReorderDrag | null
+  /** Follows the pointer, once past the click slop: where in the flow the layers would go, or whether they leave it. */
+  drag(g: ReorderDrag, p: Point): void
+  /** Drops the layers where the drag shows, the groups around them fitting them again, closing its undo step. */
+  release(g: ReorderDrag): void
+  /** The arrow keys on layers in a flow: one place along it, one undo step; the page hears why when it can't. */
+  nudge(frame: Frame, ids: string[], dx: number, dy: number, now: Design): void
 }
 
 export function editorAutoLayoutDrag({
@@ -59,6 +64,46 @@ export function editorAutoLayoutDrag({
   notify,
   outline,
 }: AutoLayoutDragDeps): EditorAutoLayoutDrag {
+  /**
+   * A drag in a flow: the layers following the pointer, and inside the frame a line where they would
+   * go; outside it, the frame outlined, since a drop there takes them out.
+   */
+  function reorderParts(g: ReorderDrag | null) {
+    if (!g?.moved) return []
+    const now = session.design()
+    const parts: HTMLElement[] = []
+    const dx = g.to.x - g.from.x
+    const dy = g.to.y - g.from.y
+    for (const id of g.roots) {
+      const b = g.boxes.get(id)
+      if (b) parts.push(outline('reorder-ghost', g.frame, drawnFrom({ ...b, x: b.x + dx, y: b.y + dy }, g.around)))
+    }
+    const holder = boxIn(g.frame, g.parentId, now)
+    if (!holder) return parts
+    if (g.outside) {
+      parts.push(outline('reorder-leave', g.frame, drawnFrom(holder, g.around.slice(0, -1))))
+      return parts
+    }
+    const row = rowIn(g.frame, g.parentId, now)
+    const gap = (propIn(g.frame, g.parentId, 'layout', now) as AutoLayoutOf | undefined)?.gap ?? 0
+    const near = g.near && boxIn(g.frame, g.near.id, now)
+    const thick = 2 / camera().zoom
+    // Halfway into the gap beside the nearest sibling; at the frame's start when the flow is empty.
+    const edge = !near
+      ? row
+        ? holder.x
+        : holder.y
+      : g.near?.after
+        ? (row ? near.x + near.width : near.y + near.height) + gap / 2
+        : (row ? near.x : near.y) - gap / 2
+    const span = near ?? holder
+    const line = row
+      ? { x: edge - thick / 2, y: span.y, width: thick, height: span.height, rotation: 0 }
+      : { x: span.x, y: edge - thick / 2, width: span.width, height: thick, rotation: 0 }
+    parts.push(outline('reorder-line', g.frame, drawnFrom(line, g.around)))
+    return parts
+  }
+
   /**
    * A press on layers that auto layout places, all in one flow: a drag that moves them along it,
    * or out of its frame. Null for layers that aren't.
@@ -88,7 +133,16 @@ export function editorAutoLayoutDrag({
     }
     return null
   }
-
+  /** Follows a drag of layers in a flow: where they would go in it, or out of it. */
+  function reorderTo(g: ReorderDrag, p: Point) {
+    if (!g.moved && Math.hypot(p.x - g.from.x, p.y - g.from.y) * camera().zoom < CLICK_SLOP) return
+    g.moved = true
+    g.to = p
+    const holder = boxIn(g.frame, g.parentId)
+    g.outside =
+      !holder || p.x < holder.x || p.y < holder.y || p.x > holder.x + holder.width || p.y > holder.y + holder.height
+    g.slot = slotAt(g, p)
+  }
   /**
    * Where in a flow a point puts layers being moved: next to the sibling nearest it (on its line,
    * when the flow wraps), before it or after it as the point is before or past its middle along the
@@ -112,15 +166,11 @@ export function editorAutoLayoutDrag({
     g.near = near ? { id: siblings[near.i] as string, after: near.after } : null
     return near ? near.i + (near.after ? 1 : 0) : 0
   }
-  /** Follows a drag of layers in a flow: where they would go in it, or out of it. */
-  function reorderTo(g: ReorderDrag, p: Point) {
-    if (!g.moved && Math.hypot(p.x - g.from.x, p.y - g.from.y) * camera().zoom < CLICK_SLOP) return
-    g.moved = true
-    g.to = p
-    const holder = boxIn(g.frame, g.parentId)
-    g.outside =
-      !holder || p.x < holder.x || p.y < holder.y || p.x > holder.x + holder.width || p.y > holder.y + holder.height
-    g.slot = slotAt(g, p)
+  /** Ends a drag in a flow: the drop, then the groups around the layers fit them again, closing its undo step. */
+  function release(g: ReorderDrag) {
+    finishReorder(g)
+    hug(g.roots)
+    g.end()
   }
   /**
    * Drops layers dragged in a flow, one undo step: inside their frame, into the place the line
@@ -192,13 +242,6 @@ export function editorAutoLayoutDrag({
       }
     }
   }
-  /** Ends a drag in a flow: the drop, then the groups around the layers fit them again, closing its undo step. */
-  function release(g: ReorderDrag) {
-    finishReorder(g)
-    hug(g.roots)
-    g.end()
-  }
-
   /**
    * The arrow keys on layers in a flow: along it they move them one place earlier or later, one
    * undo step; across it, or for layers in different flows, auto layout decides, and the page says so.
@@ -238,51 +281,11 @@ export function editorAutoLayoutDrag({
     )
   }
 
-  /**
-   * A drag in a flow: the layers following the pointer, and inside the frame a line where they would
-   * go; outside it, the frame outlined, since a drop there takes them out.
-   */
-  function reorderParts(g: ReorderDrag | null) {
-    if (g?.kind !== 'reorder' || !g.moved) return []
-    const now = session.design()
-    const parts: HTMLElement[] = []
-    const dx = g.to.x - g.from.x
-    const dy = g.to.y - g.from.y
-    for (const id of g.roots) {
-      const b = g.boxes.get(id)
-      if (b) parts.push(outline('reorder-ghost', g.frame, drawnFrom({ ...b, x: b.x + dx, y: b.y + dy }, g.around)))
-    }
-    const holder = boxIn(g.frame, g.parentId, now)
-    if (!holder) return parts
-    if (g.outside) {
-      parts.push(outline('reorder-leave', g.frame, drawnFrom(holder, g.around.slice(0, -1))))
-      return parts
-    }
-    const row = rowIn(g.frame, g.parentId, now)
-    const gap = (propIn(g.frame, g.parentId, 'layout', now) as AutoLayoutOf | undefined)?.gap ?? 0
-    const near = g.near && boxIn(g.frame, g.near.id, now)
-    const thick = 2 / camera().zoom
-    // Halfway into the gap beside the nearest sibling; at the frame's start when the flow is empty.
-    const edge = !near
-      ? row
-        ? holder.x
-        : holder.y
-      : g.near?.after
-        ? (row ? near.x + near.width : near.y + near.height) + gap / 2
-        : (row ? near.x : near.y) - gap / 2
-    const span = near ?? holder
-    const line = row
-      ? { x: edge - thick / 2, y: span.y, width: thick, height: span.height, rotation: 0 }
-      : { x: span.x, y: edge - thick / 2, width: span.width, height: thick, rotation: 0 }
-    parts.push(outline('reorder-line', g.frame, drawnFrom(line, g.around)))
-    return parts
-  }
-
   return {
+    parts: reorderParts,
     press,
     drag: reorderTo,
     release,
     nudge: nudgeInFlow,
-    parts: reorderParts,
   }
 }

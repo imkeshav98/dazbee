@@ -1,16 +1,55 @@
-// What a resize changes besides the boxes it drags: the text a corner scales, and the sizing of
-// the axes it drags, which stop following their content.
-import { childrenOf, mergedProps, type Session } from '@dazbee/doc'
+// What a resize of layers changes: their boxes and those of the layers under them, the text a
+// corner scales, and the sizing of the axes it drags, which stop following their content.
+import { childrenOf, descendants, mergedProps, type Session } from '@dazbee/doc'
 import type { ScaledText } from '@dazbee/renderer'
 import type { Design, Layer } from '@dazbee/schema'
 
 import { type Frame, scope } from '../canvas/grid.ts'
 import { runQuietly } from '../run-quietly.ts'
 import { inFlow, layoutIn, propIn } from './auto-layout.ts'
-import { type Handle, isCorner } from './transform.ts'
+import { type Box, carry, type Handle, isCorner, keptOnScreen, scaleWithin } from './transform.ts'
 
 /** A layer's sizing, as the schema has it. */
 type SizingOf = NonNullable<Layer['props']['sizing']>
+
+/**
+ * The boxes a resize from `from` to `to` gives `roots` and the layers under them, from their
+ * `boxes` as the resize began: one root takes `to`, several scale within it.
+ */
+export function resizedBoxes(
+  now: Design,
+  frame: Frame,
+  roots: string[],
+  boxes: Map<string, Box>,
+  from: Box,
+  to: Box,
+): Map<string, Box> {
+  const next = new Map<string, Box>()
+  for (const root of roots) {
+    const was = boxes.get(root)
+    if (!was) continue
+    const box = roots.length === 1 ? to : scaleWithin(was, from, to)
+    // Auto layout places a layer in its flow: a resize gives it a size, never a place.
+    next.set(root, inFlow(frame, root, now) ? { ...box, x: was.x, y: was.y, rotation: was.rotation } : box)
+    const type = now.nodes[root]?.type
+    if (type === 'group' || type === 'boolean') {
+      // Layers inside a group or boolean keep their place in it, scaled with it.
+      for (const id of descendants(now, root)) {
+        const inner = boxes.get(id)
+        if (inner) next.set(id, carry(inner, was, box))
+      }
+    } else if (type === 'frame') {
+      // A frame changes its own size only: what it holds stays as it is, where it is on screen;
+      // with several layers it moves along with its frame.
+      const shift = roots.length === 1 ? keptOnScreen(was, box) : { x: box.x - was.x, y: box.y - was.y }
+      for (const id of descendants(now, root)) {
+        const inner = boxes.get(id)
+        if (inner) next.set(id, { ...inner, x: inner.x + shift.x, y: inner.y + shift.y })
+      }
+    }
+  }
+  return next
+}
 
 /**
  * The text a corner drag on `roots` scales, with its sizes in the frame now: each text whose box

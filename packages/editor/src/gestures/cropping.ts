@@ -6,7 +6,7 @@ import type { Point } from '@dazbee/schema'
 import { type Camera, toScreen, toWorld } from '../canvas/camera.ts'
 import { type Frame, scope } from '../canvas/grid.ts'
 import type { ThumbnailCache } from '../canvas/thumbnails.ts'
-import type { CropTarget } from '../layers/boxes.ts'
+import type { CropTarget, EditorBoxes } from '../layers/boxes.ts'
 import { type Box, drawnFrom, localTo, pageFrom, round } from '../layers/transform.ts'
 import { runQuietly } from '../run-quietly.ts'
 import type { EditorSelection } from '../selection.ts'
@@ -33,8 +33,7 @@ export interface CroppingDeps {
   camera: () => Camera
   /** The frame of the grid as last drawn with a key, if there is one. */
   frameOf: (key: string | undefined) => Frame | undefined
-  /** The image fill a crop of a layer in a frame works on, or null when it has none to crop. */
-  cropTarget: (frame: Frame, id: string) => CropTarget | null
+  boxes: Pick<EditorBoxes, 'cropTarget'>
   /** A box on the overlay with a class, turned as the layer is. */
   outline: (className: string, frame: Frame, box: Box) => HTMLElement
   /** Draws the overlay. */
@@ -63,7 +62,7 @@ export function editorCropping({
   thumbnails,
   camera,
   frameOf,
-  cropTarget,
+  boxes: { cropTarget },
   outline,
   drawOverlay,
 }: CroppingDeps): EditorCropping {

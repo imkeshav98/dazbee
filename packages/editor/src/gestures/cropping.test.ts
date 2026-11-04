@@ -1,13 +1,11 @@
 import { describe, expect, it } from 'vitest'
 
-import type { Image } from '@dazbee/canvaskit'
 import { loadDesign, mergedProps, openSession } from '@dazbee/doc'
 import { type DesignInput, type Paint, parseDesign } from '@dazbee/schema'
 
 import type { Frame } from '../canvas/grid.ts'
-import type { CropTarget } from '../layers/boxes.ts'
+import { testBoxes } from '../layers/test-boxes.ts'
 import { editorSelection } from '../selection.ts'
-import { coverCrop, imageRect } from './crop.ts'
 import { type CroppingDeps, editorCropping } from './cropping.ts'
 
 /** A box 200 × 100 filled with a square image, which covers it: the image's whole sits 200 × 200 around it. */
@@ -48,19 +46,6 @@ function harness() {
   const selection = editorSelection({ drawn: () => session.design(), frames: () => [SQUARE], changed: () => {} })
   /** The fills of the photo in the square. */
   const fills = () => (mergedProps(session.design(), 'format:sq', 'photo') as { fills: Paint[] }).fills
-  /** The topmost image fill of a layer, as the editor reads it to crop. */
-  const cropTarget = (frame: Frame, id: string): CropTarget | null => {
-    const node = session.design().nodes[id]
-    if (!node || !('fills' in node.props)) return null
-    const props = mergedProps(session.design(), `format:${frame.formatId}`, id) as typeof node.props
-    const box = { x: props.x, y: props.y, width: props.width, height: props.height, rotation: props.rotation }
-    const index = props.fills.findLastIndex((f) => f.type === 'image')
-    const fill = props.fills[index]
-    if (fill?.type !== 'image') return null
-    const crop = fill.fit === 'crop' && fill.crop ? fill.crop : coverCrop(IMAGE, box)
-    const rect = imageRect(crop, IMAGE, box)
-    return { fills: props.fills, index, fill, image: {} as Image, size: IMAGE, box, rect, around: [box] }
-  }
   const deps: CroppingDeps = {
     canvas: { setPointerCapture: () => {} } as unknown as HTMLCanvasElement,
     session,
@@ -68,7 +53,7 @@ function harness() {
     thumbnails: { ghost: () => '' },
     camera: () => ({ x: 0, y: 0, zoom: 1 }),
     frameOf: (key) => (key === SQUARE.key ? SQUARE : undefined),
-    cropTarget,
+    boxes: testBoxes(session, selection, [SQUARE], { a1: IMAGE }),
     outline: () => {
       throw new Error('nothing is drawn in these tests')
     },

@@ -1,6 +1,6 @@
 // Moving, resizing and turning the selection on the stage, and the marquee: the handles a press
 // grabs, the boxes a drag writes, what it snaps to, and the marquee and snap guides the overlay draws.
-import { ancestorsOf, childrenOf, descendants, type Session } from '@dazbee/doc'
+import { childrenOf, descendants, type Session } from '@dazbee/doc'
 import { type ScaledText, scaleText, smallestSize } from '@dazbee/renderer'
 import type { Point, Rect } from '@dazbee/schema'
 
@@ -9,26 +9,23 @@ import { type Frame, frameAt, intersects, scope } from '../canvas/grid.ts'
 import { px } from '../canvas/rulers.ts'
 import type { FrameScenes } from '../canvas/scenes.ts'
 import { inFlow, placedInside } from '../layers/auto-layout.ts'
-import { type EditorBoxes, visibleIn } from '../layers/boxes.ts'
-import { scalingTexts, switchSizing } from '../layers/resize.ts'
+import type { EditorBoxes, SelectionBox } from '../layers/boxes.ts'
+import { resizedBoxes, scalingTexts, switchSizing } from '../layers/resize.ts'
 import { type Gap, type Guide, SNAP_DISTANCE, snapMove, snapResize, snapTargets, type Targets } from '../layers/snap.ts'
 import {
   angleOf,
   boundsOf,
   type Box,
   boxAt,
-  carry,
   centreOf,
   cornersOf,
   type Handle,
   handleAt,
   isCorner,
-  keptOnScreen,
   localTo,
   normalAngle,
   resize as resizeBox,
   round,
-  scaleWithin,
   snapAngle,
   turn,
 } from '../layers/transform.ts'
@@ -85,6 +82,8 @@ export interface MarqueeDrag {
   base: string[]
   baseFrame: string | null
 }
+/** A drag that moves, resizes or turns layers. */
+export type TransformDrag = MoveDrag | ResizeDrag | RotateDrag
 /** What a press on the selection's handles grabs: one to resize by, or the zone outside a corner to turn by. */
 export type Grab = { kind: 'resize'; handle: Handle } | { kind: 'rotate'; corner: number }
 
@@ -94,7 +93,10 @@ export interface TransformDragDeps {
   scenes: Pick<FrameScenes, 'scene'>
   selection: Pick<EditorSelection, 'current' | 'pathEditing' | 'selectKeepingModes'>
   typing: Pick<EditorTyping, 'editing' | 'fitText'>
-  boxes: Pick<EditorBoxes, 'boxIn' | 'pickable' | 'roots' | 'selectionBox' | 'lockedSelection' | 'handlesFor'>
+  boxes: Pick<
+    EditorBoxes,
+    'boxIn' | 'pickable' | 'roots' | 'selectionBox' | 'lockedSelection' | 'handlesFor' | 'snapBoxes'
+  >
   camera: () => Camera
   /** The frames of the grid as last drawn. */
   frames: () => Frame[]
@@ -107,23 +109,30 @@ export interface TransformDragDeps {
 }
 
 export interface EditorTransformDrag {
+  /**
+   * Snapping's work since the editor opened, for the checks that count it: `gathered` drags
+   * worked out what they can snap to, `moves` pointer moves of a drag snapped, and the last
+   * drag gathered `targets` boxes.
+   */
   snapWork(): { gathered: number; moves: number; targets: number }
-  handleUnder(screen: Point): Grab | null
-  pressHandle(
-    e: PointerEvent,
-    screen: Point,
-    grabbed: Grab,
-    outer: NonNullable<ReturnType<EditorBoxes['selectionBox']>>,
-  ): ResizeDrag | RotateDrag
-  pressMove(frame: Frame, around: Box[], p: Point, ids: string[]): MoveDrag
+  /** The boxes a transform of layers changes, as they are now: the layers and those under them that no flow places. */
   startBoxes(frame: Frame, ids: string[]): Map<string, Box>
-  writeBoxes(frame: Frame, start: Map<string, Box>, next: Map<string, Box>): void
-  move(g: MoveDrag, p: Point, axisLock: boolean, snap: boolean): void
-  resize(g: ResizeDrag, p: Point, keepRatio: boolean, fromCentre: boolean, snap: boolean): void
-  rotate(g: RotateDrag, p: Point, snap: boolean): void
-  marquee(g: MarqueeDrag): void
-  release(g: MoveDrag | ResizeDrag | RotateDrag): void
+  /** The selection's handle under a point on the stage, or the zone outside a corner that turns it. */
+  handleUnder(screen: Point): Grab | null
+  /** The marquee being dragged, then the snap guides and equal gaps of the drag in progress, as the overlay shows them. */
   parts(marquee: MarqueeDrag | null): HTMLElement[]
+  /** A press on a handle the selection's box `outer` has: a drag that resizes or turns it, one undo step until it is released. */
+  pressHandle(e: PointerEvent, screen: Point, grabbed: Grab, outer: SelectionBox): ResizeDrag | RotateDrag
+  /** A press that moves layers: a drag of those no flow places, one undo step until it is released; the page hears when some are. */
+  pressMove(frame: Frame, around: Box[], p: Point, ids: string[]): MoveDrag
+  /** Follows the pointer: Shift keeps a move to one axis, a resize to its shape, a turn to 15° steps; Alt resizes about the centre. */
+  drag(g: TransformDrag, p: Point, shift: boolean, alt: boolean, snap: boolean): void
+  /** Writes new boxes as this format's own: what changed from `start`, and what a gesture changed and put back. */
+  writeBoxes(frame: Frame, start: Map<string, Box>, next: Map<string, Box>): void
+  /** Selects the layers a marquee touches on the page it covers, with what was selected before it. */
+  marquee(g: MarqueeDrag): void
+  /** Ends a move, resize or turn: the groups around the layers fit them again, closing its undo step. */
+  release(g: TransformDrag): void
 }
 
 /** How far outside a corner a press turns the selection. */
@@ -135,7 +144,7 @@ export function editorTransformDrag({
   scenes,
   selection,
   typing,
-  boxes: { boxIn, pickable, roots, selectionBox, lockedSelection, handlesFor },
+  boxes: { boxIn, pickable, roots, selectionBox, lockedSelection, handlesFor, snapBoxes },
   camera,
   frames,
   hug,
@@ -168,250 +177,16 @@ export function editorTransformDrag({
     for (const id of ids) add(id, id)
     return boxes
   }
-  /**
-   * Writes new boxes as this format's overrides: the properties the gesture changes from where it
-   * started, including one it changed and has now put back. The rest is left to other tabs.
-   */
-  function writeBoxes(frame: Frame, start: Map<string, Box>, next: Map<string, Box>) {
-    const now = session.design()
-    const wrote = written.get(start) ?? new Set<string>()
-    written.set(start, wrote)
-    // One update for the whole step, not one per layer: a drag of many layers sends and stores once a move.
-    session.batch(() => {
-      for (const [id, box] of next) {
-        const was = start.get(id)
-        const current = boxIn(frame, id, now)
-        const patch: Partial<Box> = {}
-        for (const key of ['x', 'y', 'width', 'height', 'rotation'] as const) {
-          if ((box[key] !== was?.[key] || wrote.has(`${id}|${key}`)) && box[key] !== current?.[key])
-            patch[key] = box[key]
-        }
-        for (const key of Object.keys(patch)) wrote.add(`${id}|${key}`)
-        // Another tab may delete or lock a layer mid-drag; the drag then just leaves it be.
-        if (Object.keys(patch).length > 0)
-          runQuietly(() => session.run('node.update', { ids: [id], scope: scope(frame), patch }))
-      }
-    })
-  }
-  function moveTo(g: MoveDrag, p: Point, axisLock: boolean, snap: boolean) {
-    let dx = p.x - g.from.x
-    let dy = p.y - g.from.y
-    // Shift keeps a move to one axis, whichever it has gone further along.
-    if (axisLock) {
-      if (Math.abs(dx) > Math.abs(dy)) dy = 0
-      else dx = 0
-    }
-    // A move lands on whole pixels, unless it snapped to a line that isn't on one.
-    let toX = Math.round
-    let toY = Math.round
-    snapped = null
-    const moving = g.roots.map((id) => g.boxes.get(id)).filter((b): b is Box => b !== undefined)
-    if (snap && g.targets && moving.length > 0) {
-      snapWork.moves++
-      const from = boundsOf(moving)
-      const s = snapMove(
-        { ...from, x: Math.round(from.x + dx), y: Math.round(from.y + dy) },
-        g.targets,
-        SNAP_DISTANCE / camera().zoom,
-        { x: axisLock && dx === 0, y: axisLock && dy === 0 },
-      )
-      if (s.dx !== 0) {
-        dx = Math.round(from.x + dx) + s.dx - from.x
-        toX = (n) => round(n)
-      }
-      if (s.dy !== 0) {
-        dy = Math.round(from.y + dy) + s.dy - from.y
-        toY = (n) => round(n)
-      }
-      snapped = { frame: g.frame, guides: s.guides, gaps: s.gaps }
-    }
-    const next = new Map([...g.boxes].map(([id, b]) => [id, { ...b, x: toX(b.x + dx), y: toY(b.y + dy) }]))
-    writeBoxes(g.frame, g.boxes, next)
-  }
-
-  /**
-   * What a drag in a frame can snap to: the layers on the page as drawn and, inside a group or
-   * frame, the layers beside the selection and the container itself; and the format. Nothing
-   * inside a turned container snaps, since its lines don't run along the page.
-   */
+  /** What a drag of layers in a frame can snap to: the boxes around them, and the format. Counted in `snapWork`. */
   function targetsFor(frame: Frame, ids: string[], around: Box[]): Targets | null {
-    if (around.some((b) => b.rotation !== 0)) return null
-    const now = session.design()
-    const format = now.formats[frame.formatId]
-    if (!format) return null
-    const holds = (id: string) => ids.some((selected) => ancestorsOf(now, selected).includes(id))
-    const others = scenes
-      .scene(frame)
-      .layers.filter((layer) => !holds(layer.id))
-      .map((layer) => boundsOf([layer.props]))
-    const parent = now.nodes[ids[0] ?? '']?.parentId
-    if (parent && now.nodes[parent]) {
-      const box = boxIn(frame, parent, now)
-      if (box) others.push(box)
-      for (const [id] of childrenOf(now, parent)) {
-        const sibling = !ids.includes(id) && visibleIn(now, frame, id) && boxIn(frame, id, now)
-        if (sibling) others.push(boundsOf([sibling]))
-      }
-    }
+    const format = session.design().formats[frame.formatId]
+    const others = format && snapBoxes(frame, ids, around)
+    if (!format || !others) return null
     const targets = snapTargets(others, { x: 0, y: 0, width: format.width, height: format.height })
     snapWork.gathered++
     snapWork.targets = targets.boxes.length
     return targets
   }
-
-  function resizeTo(g: ResizeDrag, p: Point, keepRatio: boolean, fromCentre: boolean, snap: boolean) {
-    // The handle follows the pointer from where it was grabbed, so a press off its centre doesn't jump.
-    const at = handleAt(g.handle)
-    const handle = turn(
-      { x: g.outer.x + at.x * g.outer.width, y: g.outer.y + at.y * g.outer.height },
-      centreOf(g.outer),
-      g.outer.rotation,
-    )
-    const to = { x: handle.x + p.x - g.grab.x, y: handle.y + p.y - g.grab.y }
-    // A corner that scales text keeps the box's shape, so the text scales as one.
-    const scales = g.texts.size > 0
-    const ratio = keepRatio || scales
-    let outer = resizeBox(g.outer, g.handle, to, { keepRatio: ratio, fromCentre })
-    snapped = null
-    // The dragged edges snap; a turned box has none that run along the page. With the shape kept,
-    // the edge nearest a guide snaps and the other follows.
-    if (snap && g.targets && outer.rotation === 0) {
-      const corner = isCorner(g.handle)
-      const s = snapResize(outer, g.handle, g.targets, SNAP_DISTANCE / camera().zoom, ratio && corner)
-      if (ratio && corner && (s.dx !== 0 || s.dy !== 0) && g.outer.width > 0 && g.outer.height > 0) {
-        // From the centre both edges move, so the box grows by twice what the dragged edge does.
-        const grows = fromCentre ? 2 : 1
-        const factor =
-          s.dx !== 0
-            ? (outer.width + grows * (g.handle.includes('e') ? s.dx : -s.dx)) / g.outer.width
-            : (outer.height + grows * (g.handle.includes('s') ? s.dy : -s.dy)) / g.outer.height
-        outer = boxAt(g.outer, g.handle, factor, fromCentre)
-      } else if (s.dx !== 0 || s.dy !== 0)
-        outer = resizeBox(g.outer, g.handle, { x: to.x + s.dx, y: to.y + s.dy }, { keepRatio: ratio, fromCentre })
-      snapped = { frame: g.frame, guides: s.guides, gaps: [] }
-    }
-    if (scales) {
-      g.factor =
-        g.outer.width > 0 ? outer.width / g.outer.width : g.outer.height > 0 ? outer.height / g.outer.height : 1
-      if (g.factor < g.floor) {
-        g.factor = g.floor
-        outer = boxAt(g.outer, g.handle, g.factor, fromCentre)
-      }
-    }
-    const next = new Map<string, Box>()
-    const now = session.design()
-    if (!g.switched) {
-      g.switched = true
-      switchSizing(session, g.frame, g.roots, g.handle, now, g.texts)
-    }
-    for (const root of g.roots) {
-      const was = g.boxes.get(root)
-      if (!was) continue
-      const box = g.roots.length === 1 ? outer : scaleWithin(was, g.outer, outer)
-      // Auto layout places a layer in its flow: a resize gives it a size, never a place.
-      next.set(root, inFlow(g.frame, root, now) ? { ...box, x: was.x, y: was.y, rotation: was.rotation } : box)
-      const type = now.nodes[root]?.type
-      if (type === 'group' || type === 'boolean') {
-        // Layers inside a group or boolean keep their place in it, scaled with it.
-        for (const id of descendants(now, root)) {
-          const inner = g.boxes.get(id)
-          if (inner) next.set(id, carry(inner, was, box))
-        }
-      } else if (type === 'frame') {
-        // A frame changes its own size only: what it holds stays as it is, where it is on screen;
-        // with several layers it moves along with its frame.
-        const shift = g.roots.length === 1 ? keptOnScreen(was, box) : { x: box.x - was.x, y: box.y - was.y }
-        for (const id of descendants(now, root)) {
-          const inner = g.boxes.get(id)
-          if (inner) next.set(id, { ...inner, x: inner.x + shift.x, y: inner.y + shift.y })
-        }
-      }
-    }
-    writeBoxes(
-      g.frame,
-      g.boxes,
-      new Map(
-        [...next].map(([id, b]) => [
-          id,
-          { ...b, x: round(b.x), y: round(b.y), width: round(b.width), height: round(b.height) },
-        ]),
-      ),
-    )
-    // The text a corner scales takes its sizes scaled from where they were, in this format.
-    for (const [id, start] of g.texts) {
-      // Text without runs gets none of this format's own.
-      const { runs, ...sized } = scaleText(start, g.factor)
-      runQuietly(() =>
-        session.run('node.update', {
-          ids: [id],
-          scope: scope(g.frame),
-          patch: start.runs.length > 0 ? { ...sized, runs } : sized,
-        }),
-      )
-    }
-    // Text that grows with its words takes the size its new width and sizes give it.
-    for (const id of new Set([...g.roots.filter((root) => now.nodes[root]?.type === 'text'), ...g.texts.keys()]))
-      typing.fitText(id, g.frame.formatId)
-  }
-
-  function rotateTo(g: RotateDrag, p: Point, snap: boolean) {
-    const centre = centreOf(g.outer)
-    const turned = angleOf(p, centre) - g.from
-    const next = new Map<string, Box>()
-    const now = session.design()
-    if (g.roots.length === 1) {
-      // One layer: its own angle snaps with shift. What is inside it turns with it as it is drawn.
-      const root = g.roots[0] as string
-      const angle = g.outer.rotation + turned
-      next.set(root, { ...g.outer, rotation: round(normalAngle(snap ? snapAngle(angle) : angle)) })
-    } else {
-      // Several: each turns about the selection's centre, by an angle that snaps with shift.
-      const delta = snap ? snapAngle(turned) : turned
-      for (const root of g.roots) {
-        const was = g.boxes.get(root)
-        if (!was) continue
-        const c = centreOf(was)
-        const moved = turn(c, centre, delta)
-        const dx = moved.x - c.x
-        const dy = moved.y - c.y
-        next.set(root, {
-          ...was,
-          x: round(was.x + dx),
-          y: round(was.y + dy),
-          rotation: round(normalAngle(was.rotation + delta)),
-        })
-        for (const id of descendants(now, root)) {
-          const inner = g.boxes.get(id)
-          if (inner) next.set(id, { ...inner, x: round(inner.x + dx), y: round(inner.y + dy) })
-        }
-      }
-    }
-    writeBoxes(g.frame, g.boxes, next)
-  }
-
-  /** Top-level layers the marquee touches on the page it covers, with what was selected before. */
-  function marqueeSelect(g: MarqueeDrag) {
-    const rect = {
-      x: Math.min(g.from.x, g.to.x),
-      y: Math.min(g.from.y, g.to.y),
-      width: Math.abs(g.to.x - g.from.x),
-      height: Math.abs(g.to.y - g.from.y),
-    }
-    const frame = frameAt(frames(), g.from) ?? frames().find((f) => intersects(f, rect))
-    if (!frame) return
-    const local = { x: rect.x - frame.x, y: rect.y - frame.y, width: rect.width, height: rect.height }
-    const hits = scenes
-      .scene(frame)
-      .layers.filter((layer) => pickable(layer) && intersects(boundsOf([{ ...layer.props }]), local))
-      .map((layer) => layer.id)
-    const base = g.baseFrame === frame.key ? g.base : []
-    selection.selectKeepingModes(
-      hits.length + base.length > 0
-        ? { frame: frame.key, ids: [...base, ...hits.filter((id) => !base.includes(id))] }
-        : null,
-    )
-  }
-
   /** The handle under a screen point: one to resize by, or the zone outside a corner to turn by. */
   function handleUnder(screen: Point): Grab | null {
     const outer = selectionBox()
@@ -437,79 +212,8 @@ export function editorTransformDrag({
     const corner = cornersOf(box).findIndex((p) => dist(onScreen(p)) <= ROTATE_REACH)
     return corner === -1 ? null : { kind: 'rotate', corner }
   }
-
-  /** A press on one of the selection's handles: a drag that resizes or turns it, one undo step. */
-  function pressHandle(
-    e: PointerEvent,
-    screen: Point,
-    grabbed: Grab,
-    outer: NonNullable<ReturnType<typeof selectionBox>>,
-  ): ResizeDrag | RotateDrag {
-    canvas.setPointerCapture(e.pointerId)
-    const ids = roots()
-    const boxes = startBoxes(outer.frame, ids)
-    const end = session.beginGesture()
-    const world = toWorld(camera(), screen)
-    const { around } = outer
-    const grab = localTo({ x: world.x - outer.frame.x, y: world.y - outer.frame.y }, around)
-    if (grabbed.kind === 'resize') {
-      const texts = scalingTexts(session.design(), outer.frame, ids, grabbed.handle)
-      // Scaled down, the smallest size anywhere in the text stops at 1 px.
-      const floor = Math.max(0, ...[...texts.values()].map((t) => 1 / smallestSize(t)))
-      return {
-        kind: 'resize',
-        frame: outer.frame,
-        around,
-        handle: grabbed.handle,
-        outer: outer.box,
-        grab,
-        roots: ids,
-        boxes,
-        targets: targetsFor(outer.frame, ids, around),
-        switched: false,
-        texts,
-        factor: 1,
-        floor,
-        end,
-      }
-    } else
-      return {
-        kind: 'rotate',
-        frame: outer.frame,
-        around,
-        outer: outer.box,
-        from: angleOf(grab, centreOf(outer.box)),
-        roots: ids,
-        boxes,
-        end,
-      }
-  }
-  /** A press that moves the selection: a drag of the layers no flow places, one undo step. */
-  function pressMove(frame: Frame, around: Box[], p: Point, ids: string[]): MoveDrag {
-    const now = session.design()
-    // Layers in a flow among others stay in it: auto layout places them.
-    const free = ids.filter((id) => !inFlow(frame, id, now))
-    if (free.length < ids.length) notify('placedByLayout')
-    return {
-      kind: 'move',
-      frame,
-      around,
-      from: localTo(p, around),
-      roots: free,
-      boxes: startBoxes(frame, free),
-      targets: targetsFor(frame, free, around),
-      end: session.beginGesture(),
-    }
-  }
-  /** Ends a move, resize or turn: the groups around the layers fit them again, closing its undo step. */
-  function release(g: MoveDrag | ResizeDrag | RotateDrag) {
-    snapped = null
-    hug(g.roots)
-    g.end()
-  }
-
-  /** The marquee being dragged, then the snap guides as lines across the page, and equal gaps as marked spans with their size. */
-  function parts(marquee: MarqueeDrag | null) {
+  /** The marquee being dragged, then the snap guides and equal gaps of the drag in progress. */
+  function dragParts(marquee: MarqueeDrag | null) {
     const parts: HTMLElement[] = []
     if (marquee) {
       const el = document.createElement('div')
@@ -562,18 +266,281 @@ export function editorTransformDrag({
     return parts
   }
 
+  /** A press on one of the selection's handles: a drag that resizes or turns it, one undo step. */
+  function pressHandle(e: PointerEvent, screen: Point, grabbed: Grab, outer: SelectionBox): ResizeDrag | RotateDrag {
+    canvas.setPointerCapture(e.pointerId)
+    const ids = roots()
+    const boxes = startBoxes(outer.frame, ids)
+    const end = session.beginGesture()
+    const world = toWorld(camera(), screen)
+    const { around } = outer
+    const grab = localTo({ x: world.x - outer.frame.x, y: world.y - outer.frame.y }, around)
+    if (grabbed.kind === 'resize') {
+      const texts = scalingTexts(session.design(), outer.frame, ids, grabbed.handle)
+      // Scaled down, the smallest size anywhere in the text stops at 1 px.
+      const floor = Math.max(0, ...[...texts.values()].map((t) => 1 / smallestSize(t)))
+      return {
+        kind: 'resize',
+        frame: outer.frame,
+        around,
+        handle: grabbed.handle,
+        outer: outer.box,
+        grab,
+        roots: ids,
+        boxes,
+        targets: targetsFor(outer.frame, ids, around),
+        switched: false,
+        texts,
+        factor: 1,
+        floor,
+        end,
+      }
+    }
+    return {
+      kind: 'rotate',
+      frame: outer.frame,
+      around,
+      outer: outer.box,
+      from: angleOf(grab, centreOf(outer.box)),
+      roots: ids,
+      boxes,
+      end,
+    }
+  }
+  /** A press that moves the selection: a drag of the layers no flow places, one undo step. */
+  function pressMove(frame: Frame, around: Box[], p: Point, ids: string[]): MoveDrag {
+    const now = session.design()
+    // Layers in a flow among others stay in it: auto layout places them.
+    const free = ids.filter((id) => !inFlow(frame, id, now))
+    if (free.length < ids.length) notify('placedByLayout')
+    return {
+      kind: 'move',
+      frame,
+      around,
+      from: localTo(p, around),
+      roots: free,
+      boxes: startBoxes(frame, free),
+      targets: targetsFor(frame, free, around),
+      end: session.beginGesture(),
+    }
+  }
+  /**
+   * Follows the pointer in a move, resize or turn. Shift keeps a move to one axis, a resize to the
+   * box's shape and a turn to 15° steps; Alt resizes about the centre; `snap` snaps a move or
+   * resize to what is around it.
+   */
+  function drag(g: TransformDrag, p: Point, shift: boolean, alt: boolean, snap: boolean) {
+    if (g.kind === 'move') moveTo(g, p, shift, snap)
+    else if (g.kind === 'resize') resizeTo(g, p, shift, alt, snap)
+    else rotateTo(g, p, shift)
+  }
+  /** Moves the layers by the drag, on whole pixels unless they snapped to a line that isn't on one. */
+  function moveTo(g: MoveDrag, p: Point, axisLock: boolean, snap: boolean) {
+    let dx = p.x - g.from.x
+    let dy = p.y - g.from.y
+    // Shift keeps a move to one axis, whichever it has gone further along.
+    if (axisLock) {
+      if (Math.abs(dx) > Math.abs(dy)) dy = 0
+      else dx = 0
+    }
+    // A move lands on whole pixels, unless it snapped to a line that isn't on one.
+    let toX = Math.round
+    let toY = Math.round
+    snapped = null
+    const moving = g.roots.map((id) => g.boxes.get(id)).filter((b): b is Box => b !== undefined)
+    if (snap && g.targets && moving.length > 0) {
+      snapWork.moves++
+      const from = boundsOf(moving)
+      const s = snapMove(
+        { ...from, x: Math.round(from.x + dx), y: Math.round(from.y + dy) },
+        g.targets,
+        SNAP_DISTANCE / camera().zoom,
+        { x: axisLock && dx === 0, y: axisLock && dy === 0 },
+      )
+      if (s.dx !== 0) {
+        dx = Math.round(from.x + dx) + s.dx - from.x
+        toX = (n) => round(n)
+      }
+      if (s.dy !== 0) {
+        dy = Math.round(from.y + dy) + s.dy - from.y
+        toY = (n) => round(n)
+      }
+      snapped = { frame: g.frame, guides: s.guides, gaps: s.gaps }
+    }
+    const next = new Map([...g.boxes].map(([id, b]) => [id, { ...b, x: toX(b.x + dx), y: toY(b.y + dy) }]))
+    writeBoxes(g.frame, g.boxes, next)
+  }
+  /** Resizes the layers by the handle dragged, snapping its edges, scaling the text a corner scales. */
+  function resizeTo(g: ResizeDrag, p: Point, keepRatio: boolean, fromCentre: boolean, snap: boolean) {
+    // The handle follows the pointer from where it was grabbed, so a press off its centre doesn't jump.
+    const at = handleAt(g.handle)
+    const handle = turn(
+      { x: g.outer.x + at.x * g.outer.width, y: g.outer.y + at.y * g.outer.height },
+      centreOf(g.outer),
+      g.outer.rotation,
+    )
+    const to = { x: handle.x + p.x - g.grab.x, y: handle.y + p.y - g.grab.y }
+    // A corner that scales text keeps the box's shape, so the text scales as one.
+    const scales = g.texts.size > 0
+    const ratio = keepRatio || scales
+    let outer = resizeBox(g.outer, g.handle, to, { keepRatio: ratio, fromCentre })
+    snapped = null
+    // The dragged edges snap; a turned box has none that run along the page. With the shape kept,
+    // the edge nearest a guide snaps and the other follows.
+    if (snap && g.targets && outer.rotation === 0) {
+      const corner = isCorner(g.handle)
+      const s = snapResize(outer, g.handle, g.targets, SNAP_DISTANCE / camera().zoom, ratio && corner)
+      if (ratio && corner && (s.dx !== 0 || s.dy !== 0) && g.outer.width > 0 && g.outer.height > 0) {
+        // From the centre both edges move, so the box grows by twice what the dragged edge does.
+        const grows = fromCentre ? 2 : 1
+        const factor =
+          s.dx !== 0
+            ? (outer.width + grows * (g.handle.includes('e') ? s.dx : -s.dx)) / g.outer.width
+            : (outer.height + grows * (g.handle.includes('s') ? s.dy : -s.dy)) / g.outer.height
+        outer = boxAt(g.outer, g.handle, factor, fromCentre)
+      } else if (s.dx !== 0 || s.dy !== 0)
+        outer = resizeBox(g.outer, g.handle, { x: to.x + s.dx, y: to.y + s.dy }, { keepRatio: ratio, fromCentre })
+      snapped = { frame: g.frame, guides: s.guides, gaps: [] }
+    }
+    if (scales) {
+      g.factor =
+        g.outer.width > 0 ? outer.width / g.outer.width : g.outer.height > 0 ? outer.height / g.outer.height : 1
+      if (g.factor < g.floor) {
+        g.factor = g.floor
+        outer = boxAt(g.outer, g.handle, g.factor, fromCentre)
+      }
+    }
+    const now = session.design()
+    if (!g.switched) {
+      g.switched = true
+      switchSizing(session, g.frame, g.roots, g.handle, now, g.texts)
+    }
+    const next = resizedBoxes(now, g.frame, g.roots, g.boxes, g.outer, outer)
+    writeBoxes(
+      g.frame,
+      g.boxes,
+      new Map(
+        [...next].map(([id, b]) => [
+          id,
+          { ...b, x: round(b.x), y: round(b.y), width: round(b.width), height: round(b.height) },
+        ]),
+      ),
+    )
+    // The text a corner scales takes its sizes scaled from where they were, in this format.
+    for (const [id, start] of g.texts) {
+      // Text without runs gets none of this format's own.
+      const { runs, ...sized } = scaleText(start, g.factor)
+      runQuietly(() =>
+        session.run('node.update', {
+          ids: [id],
+          scope: scope(g.frame),
+          patch: start.runs.length > 0 ? { ...sized, runs } : sized,
+        }),
+      )
+    }
+    // Text that grows with its words takes the size its new width and sizes give it.
+    for (const id of new Set([...g.roots.filter((root) => now.nodes[root]?.type === 'text'), ...g.texts.keys()]))
+      typing.fitText(id, g.frame.formatId)
+  }
+  /** Turns the layers about the selection's centre by the angle the pointer has turned through. */
+  function rotateTo(g: RotateDrag, p: Point, snap: boolean) {
+    const centre = centreOf(g.outer)
+    const turned = angleOf(p, centre) - g.from
+    const next = new Map<string, Box>()
+    const now = session.design()
+    if (g.roots.length === 1) {
+      // One layer: its own angle snaps with shift. What is inside it turns with it as it is drawn.
+      const root = g.roots[0] as string
+      const angle = g.outer.rotation + turned
+      next.set(root, { ...g.outer, rotation: round(normalAngle(snap ? snapAngle(angle) : angle)) })
+    } else {
+      // Several: each turns about the selection's centre, by an angle that snaps with shift.
+      const delta = snap ? snapAngle(turned) : turned
+      for (const root of g.roots) {
+        const was = g.boxes.get(root)
+        if (!was) continue
+        const c = centreOf(was)
+        const moved = turn(c, centre, delta)
+        const dx = moved.x - c.x
+        const dy = moved.y - c.y
+        next.set(root, {
+          ...was,
+          x: round(was.x + dx),
+          y: round(was.y + dy),
+          rotation: round(normalAngle(was.rotation + delta)),
+        })
+        for (const id of descendants(now, root)) {
+          const inner = g.boxes.get(id)
+          if (inner) next.set(id, { ...inner, x: round(inner.x + dx), y: round(inner.y + dy) })
+        }
+      }
+    }
+    writeBoxes(g.frame, g.boxes, next)
+  }
+  /**
+   * Writes new boxes as this format's overrides: the properties the gesture changes from where it
+   * started, including one it changed and has now put back. The rest is left to other tabs.
+   */
+  function writeBoxes(frame: Frame, start: Map<string, Box>, next: Map<string, Box>) {
+    const now = session.design()
+    const wrote = written.get(start) ?? new Set<string>()
+    written.set(start, wrote)
+    // One update for the whole step, not one per layer: a drag of many layers sends and stores once a move.
+    session.batch(() => {
+      for (const [id, box] of next) {
+        const was = start.get(id)
+        const current = boxIn(frame, id, now)
+        const patch: Partial<Box> = {}
+        for (const key of ['x', 'y', 'width', 'height', 'rotation'] as const) {
+          if ((box[key] !== was?.[key] || wrote.has(`${id}|${key}`)) && box[key] !== current?.[key])
+            patch[key] = box[key]
+        }
+        for (const key of Object.keys(patch)) wrote.add(`${id}|${key}`)
+        // Another tab may delete or lock a layer mid-drag; the drag then just leaves it be.
+        if (Object.keys(patch).length > 0)
+          runQuietly(() => session.run('node.update', { ids: [id], scope: scope(frame), patch }))
+      }
+    })
+  }
+  /** Top-level layers the marquee touches on the page it covers, with what was selected before. */
+  function marqueeSelect(g: MarqueeDrag) {
+    const rect = {
+      x: Math.min(g.from.x, g.to.x),
+      y: Math.min(g.from.y, g.to.y),
+      width: Math.abs(g.to.x - g.from.x),
+      height: Math.abs(g.to.y - g.from.y),
+    }
+    const frame = frameAt(frames(), g.from) ?? frames().find((f) => intersects(f, rect))
+    if (!frame) return
+    const local = { x: rect.x - frame.x, y: rect.y - frame.y, width: rect.width, height: rect.height }
+    const hits = scenes
+      .scene(frame)
+      .layers.filter((layer) => pickable(layer) && intersects(boundsOf([{ ...layer.props }]), local))
+      .map((layer) => layer.id)
+    const base = g.baseFrame === frame.key ? g.base : []
+    selection.selectKeepingModes(
+      hits.length + base.length > 0
+        ? { frame: frame.key, ids: [...base, ...hits.filter((id) => !base.includes(id))] }
+        : null,
+    )
+  }
+  /** Ends a move, resize or turn: the groups around the layers fit them again, closing its undo step. */
+  function release(g: TransformDrag) {
+    snapped = null
+    hug(g.roots)
+    g.end()
+  }
+
   return {
     snapWork: () => ({ ...snapWork }),
+    startBoxes,
     handleUnder,
+    parts: dragParts,
     pressHandle,
     pressMove,
-    startBoxes,
+    drag,
     writeBoxes,
-    move: moveTo,
-    resize: resizeTo,
-    rotate: rotateTo,
     marquee: marqueeSelect,
     release,
-    parts,
   }
 }

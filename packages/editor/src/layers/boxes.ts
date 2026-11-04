@@ -1,8 +1,8 @@
 // Where layers are in a frame, read from the document: their boxes as layers see them and as
-// drawn, the containers around them, the selection's box, a path's points, the image fill a crop
-// works on, and the parent a new layer goes in.
+// drawn, the containers around them, the selection's box and handles, what a drag snaps to, a
+// path's points, the image fill a crop works on, and the parent a new layer goes in.
 import type { Image } from '@dazbee/canvaskit'
-import { ancestorsOf, mergedProps, type Session } from '@dazbee/doc'
+import { ancestorsOf, childrenOf, mergedProps, type Session } from '@dazbee/doc'
 import { render, type SceneLayer } from '@dazbee/renderer'
 import {
   canHold,
@@ -40,6 +40,18 @@ export interface CropTarget {
   around: Box[]
 }
 
+/**
+ * The box the handles go on: a single layer's own, turned with it, or the unturned box around
+ * several. `box` is as the layers inside their containers see it, which gestures work in;
+ * `drawn` is where it is on the page once the containers turn it; `around` are the containers.
+ */
+export interface SelectionBox {
+  frame: Frame
+  box: Box
+  drawn: Box
+  around: Box[]
+}
+
 export interface BoxesDeps {
   session: Session
   scenes: Pick<FrameScenes, 'scene' | 'measure'>
@@ -52,21 +64,37 @@ export interface BoxesDeps {
 }
 
 export interface EditorBoxes {
+  /** A layer's box in a frame, as layers inside its containers see it: auto layout's, or the base with the format's overrides. */
   boxIn(frame: Frame, id: string, from?: Design): Box | null
-  parentFor(frame: Frame, type: string, now: Design): string
+  /** The groups and frames a layer is inside, outermost first, as boxes in a frame. */
   containersOf(frame: Frame, parentId: string | undefined, from?: Design): Box[]
+  /** A layer's box as it is drawn on the page in a frame, turned by its containers. */
   drawnBoxOf(frame: Frame, id: string, from?: Design): Box | null
-  pickable(layer: SceneLayer): boolean
-  lockedSelection(): boolean
-  handlesFor(): readonly Handle[]
-  roots(from?: Design): string[]
-  selectionBox(): { frame: Frame; box: Box; drawn: Box; around: Box[] } | null
-  pathIn(frame: Frame, id: string, from?: Design): { path: PenPath; box: Box; around: Box[] } | null
-  cropTarget(frame: Frame, id: string, from?: Design): CropTarget | null
-  drawnInFlow(ids: string[], pageId: string): Record<string, Record<string, Omit<Box, 'rotation'>>> | undefined
+  /** Whether a point on the page is inside a layer as it is drawn in a frame. */
   drawnContains(frame: Frame, id: string, p: Point, from: Design): boolean
+  /** The box the selection's handles go on, with where it is drawn and its containers; null with nothing selected. */
+  selectionBox(): SelectionBox | null
+  /** The selected layers that aren't inside another selected one: the ones a transform moves. */
+  roots(from?: Design): string[]
+  /** Whether a layer can be gathered by select all or a marquee: it isn't locked in place. */
+  pickable(layer: SceneLayer): boolean
+  /** Whether the selection is locked in place: it shows no handles and a press can't move it. */
+  lockedSelection(): boolean
+  /** The handles the selection has. */
+  handlesFor(): readonly Handle[]
+  /** The boxes a drag of layers in a frame can snap to, besides the format; null inside a turned container. */
+  snapBoxes(frame: Frame, ids: string[], around: Box[]): Rect[] | null
+  /** A path layer's path in a frame, with its box and what turns it: its containers, then the layer. */
+  pathIn(frame: Frame, id: string, from?: Design): { path: PenPath; box: Box; around: Box[] } | null
+  /** The image fill a crop of a layer in a frame works on, or null when it has none to crop. */
+  cropTarget(frame: Frame, id: string, from?: Design): CropTarget | null
+  /** Where layers in a flow are drawn in every format of their page, for a command that wraps them; none in no flow. */
+  drawnInFlow(ids: string[], pageId: string): Record<string, Record<string, Omit<Box, 'rotation'>>> | undefined
+  /** Where a new layer of a type that a tool makes in a frame goes: the group or frame gone into, or the page. */
+  parentFor(frame: Frame, type: string, now: Design): string
 }
 
+/** Whether a layer shows in a frame: its format's own visibility, or the base. */
 export const visibleIn = (now: Design, frame: Frame, id: string) => {
   const value = now.overrides[scope(frame)]?.[id]?.visible ?? now.nodes[id]?.props.visible
   return value !== false
@@ -154,12 +182,8 @@ export function editorBoxes({ session, scenes, resources, selection, drawn, fram
     const inside = (id: string) => ancestorsOf(from, from.nodes[id]?.parentId ?? '').some((up) => ids.includes(up))
     return ids.filter((id) => from.nodes[id] && !inside(id))
   }
-  /**
-   * The box the handles go on: a single layer's own, turned with it, or the unturned box around
-   * several. `box` is as the layers inside their containers see it, which gestures work in;
-   * `drawn` is where it is on the page once the containers turn it; `around` are the containers.
-   */
-  function selectionBox(): { frame: Frame; box: Box; drawn: Box; around: Box[] } | null {
+  /** The box the handles go on, with where it is drawn and its containers. */
+  function selectionBox(): SelectionBox | null {
     const current = selection.current()
     const frame = current && frameOf(current.frame)
     if (!frame || !current) return null
@@ -169,6 +193,31 @@ export function editorBoxes({ session, scenes, resources, selection, drawn, fram
     const box = boxes.length === 1 ? (boxes[0] as Box) : boundsOf(boxes)
     const around = containersOf(frame, now.nodes[current.ids[0] ?? '']?.parentId, now)
     return { frame, box, drawn: drawnFrom(box, around), around }
+  }
+
+  /**
+   * What a drag in a frame can snap to besides the format: the layers on the page as drawn and,
+   * inside a group or frame, the layers beside the dragged ones that show there and the container
+   * itself. Nothing inside a turned container snaps, since its lines don't run along the page.
+   */
+  function snapBoxes(frame: Frame, ids: string[], around: Box[]): Rect[] | null {
+    if (around.some((b) => b.rotation !== 0)) return null
+    const now = session.design()
+    const holds = (id: string) => ids.some((selected) => ancestorsOf(now, selected).includes(id))
+    const others: Rect[] = scenes
+      .scene(frame)
+      .layers.filter((layer) => !holds(layer.id))
+      .map((layer) => boundsOf([layer.props]))
+    const parent = now.nodes[ids[0] ?? '']?.parentId
+    if (parent && now.nodes[parent]) {
+      const box = boxIn(frame, parent, now)
+      if (box) others.push(box)
+      for (const [id] of childrenOf(now, parent)) {
+        const sibling = !ids.includes(id) && visibleIn(now, frame, id) && boxIn(frame, id, now)
+        if (sibling) others.push(boundsOf([sibling]))
+      }
+    }
+    return others
   }
 
   /**
@@ -263,17 +312,18 @@ export function editorBoxes({ session, scenes, resources, selection, drawn, fram
 
   return {
     boxIn,
-    parentFor,
     containersOf,
     drawnBoxOf,
+    drawnContains,
+    selectionBox,
+    roots,
     pickable,
     lockedSelection,
     handlesFor,
-    roots,
-    selectionBox,
+    snapBoxes,
     pathIn,
     cropTarget,
     drawnInFlow,
-    drawnContains,
+    parentFor,
   }
 }

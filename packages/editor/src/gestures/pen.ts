@@ -6,6 +6,7 @@ import type { Design, Point } from '@dazbee/schema'
 import { type Camera, toScreen, toWorld } from '../canvas/camera.ts'
 import { type Frame, scope } from '../canvas/grid.ts'
 import { px } from '../canvas/rulers.ts'
+import type { EditorBoxes } from '../layers/boxes.ts'
 import { type Box, localTo, pageFrom, round } from '../layers/transform.ts'
 import { runQuietly } from '../run-quietly.ts'
 import type { EditorSelection } from '../selection.ts'
@@ -64,12 +65,7 @@ export interface PenDeps {
   drawn: () => Design
   /** The frame of the grid as last drawn with a key, if there is one. */
   frameOf: (key: string | undefined) => Frame | undefined
-  /** The groups and frames a layer is inside, outermost first, as boxes in a frame. */
-  containersOf: (frame: Frame, parentId: string | undefined, from?: Design) => Box[]
-  /** A path layer's path in a frame, with its box and what turns it: its containers, then the layer. */
-  pathIn: (frame: Frame, id: string, from?: Design) => { path: PenPath; box: Box; around: Box[] } | null
-  /** Where a new layer of a type that a tool makes in a frame goes. */
-  parentFor: (frame: Frame, type: string, now: Design) => string
+  boxes: Pick<EditorBoxes, 'containersOf' | 'pathIn' | 'parentFor'>
   /** Groups fit what they hold again after a change inside them, in the same undo step. */
   hug: (ids: string[]) => void
   /** Draws the overlay. */
@@ -142,9 +138,7 @@ export function editorPen({
   camera,
   drawn,
   frameOf,
-  containersOf,
-  pathIn,
-  parentFor,
+  boxes: { containersOf, pathIn, parentFor },
   hug,
   drawOverlay,
 }: PenDeps): EditorPen {

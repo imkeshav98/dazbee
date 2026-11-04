@@ -628,9 +628,7 @@ function live(
     camera: () => camera,
     drawn: () => design,
     frameOf,
-    containersOf: boxes.containersOf,
-    pathIn: boxes.pathIn,
-    parentFor: boxes.parentFor,
+    boxes,
     hug,
     drawOverlay: () => drawOverlay(),
   })
@@ -641,7 +639,7 @@ function live(
     thumbnails,
     camera: () => camera,
     frameOf,
-    cropTarget: boxes.cropTarget,
+    boxes,
     outline,
     drawOverlay: () => drawOverlay(),
   })
@@ -656,6 +654,7 @@ function live(
     drawn: () => design,
     hug,
     placeBox,
+    drawOverlay: () => drawOverlay(),
   })
   const transformDrag = editorTransformDrag({
     canvas,
@@ -823,7 +822,8 @@ function live(
       ...cropping.parts(),
       ...autoLayoutDrag.parts(gesture?.kind === 'reorder' ? gesture : null),
     )
-    if (gesture?.kind === 'textBox' || gesture?.kind === 'imageBox') parts.push(...drawing.parts(gesture))
+    if (gesture?.kind === 'draw' || gesture?.kind === 'textBox' || gesture?.kind === 'imageBox')
+      parts.push(...drawing.parts(gesture))
     parts.push(...transformDrag.parts(gesture?.kind === 'marquee' ? gesture : null))
     if (rulers) {
       const origin = frameOf(selection.current()?.frame) ?? frameOf(selection.hovered()?.frame) ?? drawnFrames[0]
@@ -1262,13 +1262,8 @@ function live(
         drawOverlay()
         return
       }
-      if (gesture.kind === 'textBox' || gesture.kind === 'imageBox') {
-        drawing.dragBox(gesture, p, e.shiftKey)
-        drawOverlay()
-        return
-      }
-      if (gesture.kind === 'draw') {
-        drawing.dragShape(gesture, p, e.shiftKey, e.altKey)
+      if (gesture.kind === 'draw' || gesture.kind === 'textBox' || gesture.kind === 'imageBox') {
+        drawing.drag(gesture, p, e.shiftKey, e.altKey)
         return
       }
       if (gesture.kind === 'path') {
@@ -1286,9 +1281,7 @@ function live(
         drawOverlay()
         return
       }
-      if (gesture.kind === 'move') transformDrag.move(gesture, p, e.shiftKey, snap)
-      else if (gesture.kind === 'resize') transformDrag.resize(gesture, p, e.shiftKey, e.altKey, snap)
-      else transformDrag.rotate(gesture, p, e.shiftKey)
+      transformDrag.drag(gesture, p, e.shiftKey, e.altKey, snap)
     },
     on,
   )
@@ -1299,16 +1292,8 @@ function live(
       pen.up()
       return
     }
-    if (gesture?.kind === 'draw') {
-      drawing.finishShape(gesture)
-      gesture = null
-      showCursor()
-      drawOverlay()
-      return
-    }
-    if (gesture?.kind === 'textBox' || gesture?.kind === 'imageBox') {
-      if (gesture.kind === 'textBox') drawing.finishText(gesture)
-      else drawing.finishImage(gesture)
+    if (gesture?.kind === 'draw' || gesture?.kind === 'textBox' || gesture?.kind === 'imageBox') {
+      drawing.release(gesture)
       gesture = null
       showCursor()
       drawOverlay()
