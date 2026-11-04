@@ -2,6 +2,23 @@
 // does: each opener clicks its item unless what it opens shows, and gives it once it shows.
 import { expect, type Locator, type Page } from '@playwright/test'
 
+import { EDITOR_CHROME } from './layout.ts'
+
+/** The editor's chrome and the pieces of the top bar, small menu and edit panel that must never meet. */
+export const PIECES = {
+  ...EDITOR_CHROME,
+  'top bar': '[data-testid="top-bar-row"]',
+  'second row': '[data-testid="top-bar-overflow"]',
+  'pop-up': '[data-radix-popper-content-wrapper]',
+  'small menu': '[data-testid="small-menu"]',
+  'edit panel': '#edit-panel',
+  flyout: '#editor-flyout',
+  'show-alone chip': '[data-testid="focus-chip"]',
+  toasts: '[data-toasts] > *',
+}
+/** The design's name and the font's name end in "…" by design when there is no room. */
+export const UNCUT = 'h1, [data-testid="bar-font"], [data-testid="edit-panel-note"]'
+
 /** The menus beside the full menu's rows, by their test ids. */
 const SUBMENUS = ['line-up', 'order']
 

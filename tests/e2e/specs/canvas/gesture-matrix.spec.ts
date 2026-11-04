@@ -3,7 +3,8 @@
 // share of the layers. CI runs the tests tagged @gesture-matrix in jobs of their own, three per
 // format tag. Each test writes its table of results to output/gesture-matrix-<format>-<part>.md.
 import { writeOutput } from '../../support/editor.ts'
-import { runMatrix, SUBJECTS } from '../../support/gesture-matrix.ts'
+import { runMatrix } from '../../support/gesture-matrix.ts'
+import { SUBJECTS } from '../../support/gesture-matrix-design.ts'
 import { expect, test } from '../../support/test.ts'
 
 test.describe.configure({ mode: 'parallel', timeout: 360_000 })
