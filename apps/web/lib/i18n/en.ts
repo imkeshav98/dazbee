@@ -665,7 +665,7 @@ export const en = {
         toolImage: 'Image',
         group: 'Group',
         ungroup: 'Ungroup',
-        boxSelection: 'Frame selection',
+        boxSelection: 'Put in a box',
         bringForward: 'Bring forward',
         sendBackward: 'Send backward',
         bringToFront: 'Bring to front',

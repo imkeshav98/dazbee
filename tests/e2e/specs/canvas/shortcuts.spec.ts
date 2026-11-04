@@ -31,6 +31,7 @@ test('? and the keyboard button list every shortcut, F, I and Mod+Alt+G among th
   await expect(list.locator('[data-shortcut="toolFrame"]')).toContainText('F')
   await expect(list.locator('[data-shortcut="toolImage"]')).toContainText('I')
   await expect(list.locator('[data-shortcut="boxSelection"]')).toContainText('G')
+  await expect(list.locator('[data-shortcut="boxSelection"]')).toContainText('Put in a box')
   writeOutput('shortcuts.png', await page.screenshot())
   await page.keyboard.press('Escape')
   await expect(list).toBeHidden()
