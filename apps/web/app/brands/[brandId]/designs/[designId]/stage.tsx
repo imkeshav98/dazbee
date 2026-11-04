@@ -287,7 +287,8 @@ export function EditorStage({
           e.preventDefault()
           const client = { x: e.clientX, y: e.clientY }
           const ids = editor.selectAt(client)
-          // On empty canvas the menu only offers to show the frame's hidden layers, when it has some.
+          // On empty canvas, in a frame or outside every one, the menu only offers to show the hidden
+          // layers of the frame there or nearest, when it has some.
           const hidden = ids.length > 0 ? null : hiddenAt(editor, client)
           const box = e.currentTarget.getBoundingClientRect()
           setMenuAt((now) =>

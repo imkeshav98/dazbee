@@ -244,7 +244,7 @@ export const ar: Messages = {
       showEverywhere: 'إظهار في كل المقاسات',
       releaseMask: 'إلغاء القناع',
       showHidden: 'إظهار الطبقات المخفية',
-      canvas: 'إجراءات اللوحة',
+      canvasMenu: 'إجراءات اللوحة',
       rotate: 'تدوير',
       underline: 'تسطير',
       strikethrough: 'يتوسطه خط',

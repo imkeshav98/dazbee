@@ -257,7 +257,7 @@ export const en = {
       showEverywhere: 'Show in every size',
       releaseMask: 'Release mask',
       showHidden: 'Show hidden layers',
-      canvas: 'Canvas actions',
+      canvasMenu: 'Canvas actions',
       rotate: 'Rotate',
       underline: 'Underline',
       strikethrough: 'Strikethrough',

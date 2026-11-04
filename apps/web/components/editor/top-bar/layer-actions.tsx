@@ -4,13 +4,14 @@
 // right-click menu: copy, paste, duplicate and delete; order and line up with the size as menus
 // beside their rows, and the turn; group, box, mask (or release the mask a layer is under) and
 // ungroup; lock and hide; text direction. Every row runs the same editor action as its shortcut.
-// A right-click on empty canvas offers to show the frame's hidden layers, when it has some.
+// A right-click on empty canvas offers to show the hidden layers of the frame there, or of the one
+// nearest it outside every frame, when it has some.
 import { CaretRightIcon } from '@phosphor-icons/react'
 import * as Popover from '@radix-ui/react-popover'
 import { type ReactNode, useEffect, useState } from 'react'
 
 import { childrenOf, descendants } from '@dazbee/doc'
-import type { Editor, ShortcutAction } from '@dazbee/editor'
+import { type Editor, type Frame, type Point, type ShortcutAction, visibleIn } from '@dazbee/editor'
 import { type Design, formatScope } from '@dazbee/schema'
 
 import { ALIGN, keyOf } from '@/components/editor/arrange-actions.ts'
@@ -35,16 +36,16 @@ export interface HiddenLayers {
 /** The four moves along the stack: to the front, forward, backward, to the back. */
 export const ORDER = ['bringToFront', 'bringForward', 'sendBackward', 'sendToBack'] as const
 
-/** The layers hidden in the frame at a client point; null when it has none, or no frame is there. */
-export function hiddenAt(editor: Editor, client: { x: number; y: number }): HiddenLayers | null {
+/**
+ * The layers hidden in the frame at a client point, or outside every frame in the one nearest it;
+ * null when that frame has none.
+ */
+export function hiddenAt(editor: Editor, client: Point): HiddenLayers | null {
   const spot = editor.spotAt(client)
-  const frame = spot && editor.frames().find((f) => f.key === spot.frame)
+  const frame = editor.frames().find((f) => f.key === spot?.frame) ?? nearestFrame(editor, client)
   if (!frame) return null
   const design = editor.design()
-  const scope = formatScope(frame.formatId)
-  const ids = descendants(design, frame.pageId).filter(
-    (id) => (design.overrides[scope]?.[id]?.visible ?? design.nodes[id]?.props.visible) === false,
-  )
+  const ids = descendants(design, frame.pageId).filter((id) => !visibleIn(design, frame, id))
   return ids.length > 0 ? { ids, pageId: frame.pageId, formatId: frame.formatId } : null
 }
 
@@ -67,6 +68,20 @@ function masksOver(design: Design, ids: readonly string[]): string[] | null {
     masks.add(mask[0])
   }
   return [...masks]
+}
+
+/** The frame nearest a client point, by the distance from the point to its edges on screen. */
+function nearestFrame(editor: Editor, client: Point) {
+  let nearest: { frame: Frame; far: number } | null = null
+  for (const frame of editor.frames()) {
+    const a = editor.screenPoint(0, 0, frame.pageId, frame.formatId)
+    const b = editor.screenPoint(frame.width, frame.height, frame.pageId, frame.formatId)
+    const dx = Math.max(Math.min(a.x, b.x) - client.x, 0, client.x - Math.max(a.x, b.x))
+    const dy = Math.max(Math.min(a.y, b.y) - client.y, 0, client.y - Math.max(a.y, b.y))
+    const far = Math.hypot(dx, dy)
+    if (!nearest || far < nearest.far) nearest = { frame, far }
+  }
+  return nearest?.frame ?? null
 }
 
 /**
@@ -240,7 +255,7 @@ export function StageMenu({
 }: {
   editor: Editor
   at: { x: number; y: number }
-  /** The hidden layers of the frame right-clicked where nothing was picked. */
+  /** The hidden layers of the frame right-clicked, or nearest the right-click, where nothing was picked. */
   hidden: HiddenLayers | null
   onClose: () => void
 }) {
@@ -268,7 +283,7 @@ export function StageMenu({
           collisionPadding={{ top: barBottom + 8, bottom: 72, left: 12, right: 12 }}
           // A click elsewhere or Esc closes it; focus given back to a button that just closed does not.
           onFocusOutside={(event) => event.preventDefault()}
-          aria-label={hidden ? b.canvas : b.actions}
+          aria-label={hidden ? b.canvasMenu : b.actions}
           data-testid="stage-menu"
           ref={scroll.ref}
           onScroll={scroll.onScroll}

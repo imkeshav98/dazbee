@@ -380,16 +380,16 @@ test('with a layer under a mask selected, the full and right-click menus release
   expect(errors).toEqual([])
 })
 
-test('a right-click on empty canvas offers to show the hidden layers when the page has some, one undo step', async ({
+test("a right-click on a frame's empty canvas, or outside every frame, offers to show the hidden layers of the frame there or nearest, one undo step", async ({
   browser,
 }) => {
   const asset = await upload(photo)
   const { page, errors } = await openStage(browser, topBarDesign(asset.id))
-  const visible = () =>
-    page.evaluate(() => {
+  const visible = (formatId = 'sq') =>
+    page.evaluate((f) => {
       const d = window.dazbee?.design()
-      return ({ ...d?.nodes.hidden?.props, ...d?.overrides['format:sq']?.hidden } as { visible?: boolean }).visible
-    })
+      return ({ ...d?.nodes.hidden?.props, ...d?.overrides[`format:${f}`]?.hidden } as { visible?: boolean }).visible
+    }, formatId)
   const empty = await screenPoint(page, 720, 680)
   await page.mouse.click(empty.x, empty.y, { button: 'right' })
   const menu = page.getByTestId('stage-menu')
@@ -397,12 +397,21 @@ test('a right-click on empty canvas offers to show the hidden layers when the pa
   writeOutput('stage-menu-show-hidden.png', await page.screenshot({ animations: 'disabled' }))
   await menu.getByRole('button', { name: 'Show hidden layers' }).click()
   await expect(menu).toBeHidden()
-  await expect.poll(visible).not.toBe(false)
+  await expect.poll(() => visible()).not.toBe(false)
   // With nothing hidden, no menu opens.
   await page.mouse.click(empty.x, empty.y, { button: 'right' })
   await expect(menu).toHaveCount(0)
   await page.evaluate(() => window.dazbee?.perform('undo'))
-  await expect.poll(visible).toBe(false)
+  await expect.poll(() => visible()).toBe(false)
+
+  // Between the Square and the Story, nearer the Square: the Square's hidden layers show.
+  const gap = await screenPoint(page, 1110, 300)
+  expect(await page.evaluate((at) => window.dazbee?.spotAt(at) ?? null, gap)).toBeNull()
+  await page.mouse.click(gap.x, gap.y, { button: 'right' })
+  await expect(menu.getByRole('button')).toHaveText(['Show hidden layers'])
+  await menu.getByRole('button', { name: 'Show hidden layers' }).click()
+  await expect.poll(() => visible()).not.toBe(false)
+  expect(await visible('st')).toBe(false)
   expect(errors).toEqual([])
 })
 
