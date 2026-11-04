@@ -178,11 +178,13 @@ test('the shape menu holds Box after Rectangle and Ellipse, and Box draws a box 
   expect(lone.box).toEqual({ x: 100, y: 820, width: 200, height: 140, rotation: 0 })
 
   // The dock's shape button now draws a box; drawn around the dot, it takes the dot in without
-  // moving it, and undo and redo take the box and the move away and back as one step.
+  // moving it, and undo and redo take the box and the move away and back as one step. Esc first
+  // lets the new box go, so the top bar over the page's top is gone; the drag starts below the dot.
+  await page.keyboard.press('Escape')
   await page.locator('[role="toolbar"] [data-tool="shape"]').click()
   expect(await toolOf(page)).toBe('box')
   const dot = box(await read(page), 'dot')
-  const around = await draw(page, { x: 660, y: 80 }, { x: 980, y: 400 })
+  const around = await draw(page, { x: 980, y: 400 }, { x: 660, y: 80 })
   let d = await read(page)
   expect(d.nodes.dot?.parentId).toBe(around.id)
   expect(box(d, 'dot')).toEqual(dot)
