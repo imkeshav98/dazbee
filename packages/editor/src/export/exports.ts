@@ -13,14 +13,16 @@ import { exportClient } from './export-client.ts'
 export interface ExportsDeps {
   ck: CanvasKit
   cache: ResourceCache
-  session: Session
-  resources: EditorResources
-  view: EditorView
+  session: Pick<Session, 'design'>
+  resources: Pick<EditorResources, 'bytes' | 'screen' | 'loaded'>
+  view: Pick<EditorView, 'defaultFrame'>
 }
 
+/** What the `Editor`'s `exportPixels` and `exportFiles` do. */
 export interface EditorExports {
   pixels(pageId?: string, formatId?: string): Uint8Array
   files(request: ExportRequestInput, progress?: (done: number, total: number) => void): Promise<ExportedFile>
+  /** Stops the export worker, if one started. */
   destroy(): void
 }
 

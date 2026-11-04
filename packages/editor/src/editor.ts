@@ -125,20 +125,26 @@ function live(
 ): Editor {
   const { canvas } = options
   const status = options.onStatus ?? (() => {})
-
-  const saving = watchSaveState({ provider, onSaveState: (state) => status(state) })
-
-  const session: Session = openSession(doc)
   // Removes every listener the editor adds, on destroy.
   const listening = new AbortController()
-  const on = { signal: listening.signal }
-  const view = editorView({
-    ck,
-    canvas,
-    session,
-    onZoom: (zoom) => options.onZoom?.(zoom),
-    draw: () => draw(),
-  })
+  const { signal } = listening
+  const on = { signal }
+  /** Told when the text being edited, or its selected range, changes. */
+  const textSelection = listenerSet<[]>()
+  /**
+   * Told when a gesture has nothing to do because auto layout decides it, so the page can say why,
+   * and when an SVG can't be read or had parts no layer shows, which come as `parts`.
+   */
+  const notices = listenerSet<[notice: Notice, parts: readonly Skipped[]]>()
+  const notify = (notice: Notice, parts: readonly Skipped[] = []) => notices.emit(notice, parts)
+  /** Called after every redraw with the design it drew; the two-tab test times edits with it. */
+  const draws = listenerSet<[design: Design, at: number, info: DrawInfo]>()
+
+  // Layer 2: the state owners.
+  const saving = watchSaveState({ provider, onSaveState: (state) => status(state) })
+  const session: Session = openSession(doc)
+  const view = editorView({ ck, canvas, session, onZoom: (zoom) => options.onZoom?.(zoom), draw })
+  const { frameOf, firstPage, placeBox, outline, camera, design: drawn, frames } = view
   const resources = editorResources({
     ck,
     cache,
@@ -149,51 +155,28 @@ function live(
     },
     connected: saving.connected,
     status,
-    signal: listening.signal,
+    signal,
   })
+  const scenes = frameScenes({ ck, resources, drawn })
+  const tools = editorTools({ finish: finishPath, changed: showCursor, onSnapping: view.viewChanged })
+  const selection = editorSelection({ drawn, frames, changed: drawOverlay })
 
-  const scenes = frameScenes({ ck, resources, drawn: view.design })
-  /** Told when the text being edited, or its selected range, changes. */
-  const textSelectionListeners = new Set<() => void>()
-  const textSelectionChanged = () => {
-    for (const listener of textSelectionListeners) listener()
-  }
-  /**
-   * Told when a gesture has nothing to do because auto layout decides it, so the page can say why,
-   * and when an SVG can't be read or had parts no layer shows, which come as `parts`.
-   */
-  const noticeListeners = new Set<(notice: Notice, parts: readonly Skipped[]) => void>()
-  const notify = (notice: Notice, parts: readonly Skipped[] = []) => {
-    for (const listener of noticeListeners) listener(notice, parts)
-  }
-  const tools = editorTools({
-    finish: () => pen.finish(),
-    changed: () => showCursor(),
-    onSnapping: view.viewChanged,
-  })
-  const selection = editorSelection({
-    drawn: view.design,
-    frames: view.frames,
-    changed: () => drawOverlay(),
-  })
-  /** Called after every redraw with the design it drew; the two-tab test times edits with it. */
-  const drawListeners = new Set<(design: Design, at: number, info: DrawInfo) => void>()
-
-  const { frameOf, firstPage, placeBox, outline } = view
+  // Layer 3: the queries.
   const hug = (ids: string[]) => hugIn(session, ids)
-  const boxes = editorBoxes({ session, scenes, resources, selection, drawn: view.design, frameOf })
-
+  const boxes = editorBoxes({ session, scenes, resources, selection, drawn, frameOf })
   const thumbnails = thumbnailCache({
     ck,
     scenes,
     resources,
     selection,
     current: () => session.design(),
-    drawn: view.design,
+    drawn,
     frameOf,
     firstPage,
   })
   const exporting = editorExports({ ck, cache, session, resources, view })
+
+  // Layer 4: the behaviours.
   const typing = editorTyping({
     ck,
     doc,
@@ -203,32 +186,20 @@ function live(
     frameOf,
     hug,
     placeBox,
-    textSelectionChanged,
-    drawOverlay: () => drawOverlay(),
+    textSelectionChanged: textSelection.emit,
+    drawOverlay,
   })
-  const pen = editorPen({
-    canvas,
-    session,
-    selection,
-    tools,
-    typing,
-    camera: view.camera,
-    drawn: view.design,
-    frameOf,
-    boxes,
-    hug,
-    drawOverlay: () => drawOverlay(),
-  })
+  const pen = editorPen({ canvas, session, selection, tools, typing, camera, drawn, frameOf, boxes, hug, drawOverlay })
   const cropping = editorCropping({
     canvas,
     session,
     selection,
     thumbnails,
-    camera: view.camera,
+    camera,
     frameOf,
     boxes,
     outline,
-    drawOverlay: () => drawOverlay(),
+    drawOverlay,
   })
   const drawing = editorDrawing({
     canvas,
@@ -237,11 +208,11 @@ function live(
     tools,
     typing,
     boxes,
-    camera: view.camera,
-    drawn: view.design,
+    camera,
+    drawn,
     hug,
     placeBox,
-    drawOverlay: () => drawOverlay(),
+    drawOverlay,
   })
   const transformDrag = editorTransformDrag({
     canvas,
@@ -250,20 +221,14 @@ function live(
     selection,
     typing,
     boxes,
-    camera: view.camera,
-    frames: view.frames,
+    camera,
+    frames,
     hug,
     notify,
     placeBox,
   })
-  const autoLayoutDrag = editorAutoLayoutDrag({
-    session,
-    boxes,
-    camera: view.camera,
-    hug,
-    notify,
-    outline,
-  })
+  const autoLayoutDrag = editorAutoLayoutDrag({ session, boxes, camera, hug, notify, outline })
+  const selectPress = editorSelectPress({ canvas, view, selection, boxes, typing, transformDrag, autoLayoutDrag })
   const actions = editorActions({
     session,
     view,
@@ -275,7 +240,7 @@ function live(
     transformDrag,
     autoLayoutDrag,
     notify,
-    drawOverlay: () => drawOverlay(),
+    drawOverlay,
   })
   const place = editorPlace({
     ck,
@@ -289,20 +254,13 @@ function live(
     typing,
     actions,
     notify,
-    signal: listening.signal,
-    drawOverlay: () => drawOverlay(),
+    signal,
+    drawOverlay,
   })
-  const brandKit = editorBrandKit({ session, resources, view, selection, typing, signal: listening.signal })
-  const layerEdits = editorLayerEdits({
-    session,
-    view,
-    selection,
-    resources,
-    typing,
-    actions,
-    signal: listening.signal,
-  })
-  const selectPress = editorSelectPress({ canvas, view, selection, boxes, typing, transformDrag, autoLayoutDrag })
+  const brandKit = editorBrandKit({ session, resources, view, selection, typing, signal })
+  const layerEdits = editorLayerEdits({ session, view, selection, resources, typing, actions, signal })
+
+  // Layer 5: the routers.
   const pointer = editorPointer({
     canvas,
     session,
@@ -318,8 +276,8 @@ function live(
     transformDrag,
     autoLayoutDrag,
     selectPress,
-    signal: listening.signal,
-    drawOverlay: () => drawOverlay(),
+    signal,
+    drawOverlay,
   })
   const overlay = editorOverlay({
     overlay: options.overlay,
@@ -335,13 +293,22 @@ function live(
     place,
     pointer,
   })
-  function drawOverlay() {
-    overlay.draw()
+
+  // Called late-bound by modules built before what they call.
+  function finishPath() {
+    pen.finish()
   }
   function showCursor() {
     pointer.showCursor()
   }
+  function drawOverlay() {
+    overlay.draw()
+  }
 
+  /**
+   * The frame callback: brings the view up to date, lets the selection and typing go when what
+   * they are on is gone, draws the scene, checks the hover again and draws the overlay.
+   */
   function draw() {
     const started = performance.now()
     view.update()
@@ -365,11 +332,8 @@ function live(
       recorded,
     }
     const at = performance.timeOrigin + performance.now()
-    for (const listener of drawListeners) listener(design, at, info)
+    draws.emit(design, at, info)
   }
-
-  doc.on('update', view.redraw)
-  resources.onArrive(() => view.redraw())
 
   /**
    * Does what a shortcut names, as the actions do; undo and redo first end what is open on the
@@ -384,7 +348,7 @@ function live(
     else session.redo()
     return true
   }
-
+  /** Sends a key to what it is for: undo and redo, the pointer's keys, the shortcuts, or the text being edited. */
   function onKey(e: KeyboardEvent) {
     if (inField(e.target)) return
     // The paste event that follows doesn't say whether Shift was down.
@@ -402,6 +366,37 @@ function live(
     }
     typing.key(e)
   }
+  /** Selects layers in one frame, as the page asks, ending typing first. */
+  function select(ids: string[], pageId?: string, formatId?: string) {
+    typing.stop()
+    selection.select(
+      ids.filter((id) => session.design().nodes[id]),
+      view.defaultFrame(pageId, formatId).key,
+    )
+  }
+  /** Shows one format alone, or every one with null, letting go of a selection or text no longer shown. */
+  function focus(formatId: string | null) {
+    view.focus(formatId)
+    selection.dropOffGrid()
+    const editing = typing.editing()
+    if (editing && !frameOf(editing.frame)) typing.stop()
+    view.fitAll()
+  }
+  function stopEditing() {
+    if (!typing.editing()) return
+    typing.stop()
+    drawOverlay()
+  }
+  function settle() {
+    if (!typing.editing() && !pen.drawing()) return
+    typing.stop()
+    pen.finish()
+    drawOverlay()
+  }
+
+  doc.on('update', view.redraw)
+  resources.onArrive(() => view.redraw())
+
   window.addEventListener('copy', place.copy, on)
   window.addEventListener('cut', place.cut, on)
   window.addEventListener('paste', (e) => place.paste(e, pointer.pointerAt), on)
@@ -426,13 +421,7 @@ function live(
     selected: () => selection.current()?.ids[0] ?? null,
     selection: () => [...(selection.current()?.ids ?? [])],
     selectedFrame: () => selection.current()?.frame ?? null,
-    select(ids: string[], pageId?: string, formatId?: string) {
-      typing.stop()
-      selection.select(
-        ids.filter((id) => session.design().nodes[id]),
-        view.defaultFrame(pageId, formatId).key,
-      )
-    },
+    select,
     perform,
     canUndo: () => session.canUndo(),
     canRedo: () => session.canRedo(),
@@ -440,27 +429,21 @@ function live(
     copyLayers: () => place.copyLayers(),
     canPasteLayers: () => place.canPasteLayers(),
     pasteLayers: () => place.pasteLayers(pointer.pointerAt),
-    moveLayer: (id: string, parentId: string, before?: string) => layerEdits.moveLayer(id, parentId, before),
+    moveLayer: layerEdits.moveLayer,
     beginGesture: () => session.beginGesture(),
     gesturing: () => pointer.gesture() !== null || session.inGesture(),
     setProps: layerEdits.setProps,
     renameLayer: layerEdits.renameLayer,
     setLocked: layerEdits.setLocked,
     setHidden: layerEdits.setHidden,
-    onNotice(listener: (notice: Notice, parts: readonly Skipped[]) => void) {
-      noticeListeners.add(listener)
-      return () => noticeListeners.delete(listener)
-    },
-    selectionRect: () => overlay.selectionRect(),
-    selectAt: (client: Point) => pointer.selectAt(client),
+    onNotice: notices.on,
+    selectionRect: overlay.selectionRect,
+    selectAt: pointer.selectAt,
     busy: () => pointer.gesture() !== null,
     textSelection: () => typing.selectedText(),
     textSelectionStyles: () => typing.selectionStyles(),
     styleTextSelection: (style: RunStyle) => typing.styleSelectedText(style),
-    onTextSelection(listener: () => void) {
-      textSelectionListeners.add(listener)
-      return () => textSelectionListeners.delete(listener)
-    },
+    onTextSelection: textSelection.on,
     onSelection: (listener: (ids: string[]) => void) => selection.onSelection(listener),
     pickedPage: () => selection.pickedPage(),
     pickPage: (pageId: string | null) => selection.pickPage(pageId),
@@ -472,13 +455,7 @@ function live(
     onView: view.onView,
     frames: () => frameGrid(session.design(), view.focused()).frames,
     focused: view.focused,
-    focus(formatId: string | null) {
-      view.focus(formatId)
-      selection.dropOffGrid()
-      const editing = typing.editing()
-      if (editing && !frameOf(editing.frame)) typing.stop()
-      view.fitAll()
-    },
+    focus,
     camera: view.camera,
     viewport: view.viewport,
     setCamera: view.setCamera,
@@ -498,19 +475,8 @@ function live(
     screenPoint: view.screenPoint,
     boxOf: (id: string, pageId?: string, formatId?: string) => boxes.drawnRect(view.defaultFrame(pageId, formatId), id),
     loaded: () => resources.loaded(),
-    drawn: () =>
-      new Promise<void>((resolve) => {
-        if (!view.scheduled()) return resolve()
-        const listener = () => {
-          drawListeners.delete(listener)
-          resolve()
-        }
-        drawListeners.add(listener)
-      }),
-    onDraw(listener: (design: Design, at: number, info: DrawInfo) => void) {
-      drawListeners.add(listener)
-      return () => drawListeners.delete(listener)
-    },
+    drawn: () => (view.scheduled() ? draws.next() : Promise.resolve()),
+    onDraw: draws.on,
     exportPixels: exporting.pixels,
     exportFiles: exporting.files,
     resetOwn: layerEdits.resetOwn,
@@ -522,18 +488,9 @@ function live(
     placeImage: (asset: PlacedAsset, where?: Point | Spot) => place.placeImage(asset, where),
     placeSvg: (text: string, name: string, where?: Point | Spot) => place.placeSvg(text, name, where),
     spotAt: view.spotAt,
-    stopEditing: () => {
-      if (!typing.editing()) return
-      typing.stop()
-      drawOverlay()
-    },
-    settle() {
-      if (!typing.editing() && !pen.drawing()) return
-      typing.stop()
-      pen.finish()
-      drawOverlay()
-    },
-    destroyed: () => listening.signal.aborted,
+    stopEditing,
+    settle,
+    destroyed: () => signal.aborted,
     imageTarget: (client: Point | null) => place.imageTarget(client),
     fillWithImage: (id: string, asset: PlacedAsset, inFrame?: string) => place.fillWithImage(id, asset, inFrame),
     pageThumbnail: thumbnails.page,
@@ -542,9 +499,9 @@ function live(
     destroy() {
       listening.abort()
       exporting.destroy()
-      drawListeners.clear()
+      draws.clear()
       selection.destroy()
-      noticeListeners.clear()
+      notices.clear()
       thumbnails.destroy()
       tools.destroy()
       doc.off('update', view.redraw)
@@ -559,4 +516,27 @@ function live(
       view.destroy()
     },
   }
+}
+
+/**
+ * The listeners to one of the Editor's events: `on` adds one and returns what takes it out again,
+ * `emit` tells each of them, and `next` resolves the next time they are told.
+ */
+function listenerSet<A extends unknown[]>() {
+  const listeners = new Set<(...args: A) => void>()
+  const on = (listener: (...args: A) => void) => {
+    listeners.add(listener)
+    return () => listeners.delete(listener)
+  }
+  const emit = (...args: A) => {
+    for (const listener of listeners) listener(...args)
+  }
+  const next = () =>
+    new Promise<void>((resolve) => {
+      const off = on(() => {
+        off()
+        resolve()
+      })
+    })
+  return { on, emit, next, clear: () => listeners.clear() }
 }

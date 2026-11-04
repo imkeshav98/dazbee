@@ -19,13 +19,13 @@ import type { EditorTransformDrag, MarqueeDrag, MoveDrag, ResizeDrag, RotateDrag
 export type SelectDrag = MoveDrag | ResizeDrag | RotateDrag | MarqueeDrag | ReorderDrag
 
 export interface SelectPressDeps {
-  canvas: HTMLCanvasElement
-  view: EditorView
-  selection: EditorSelection
-  boxes: EditorBoxes
-  typing: EditorTyping
-  transformDrag: EditorTransformDrag
-  autoLayoutDrag: EditorAutoLayoutDrag
+  canvas: Pick<HTMLCanvasElement, 'setPointerCapture'>
+  view: Pick<EditorView, 'camera' | 'frames' | 'frameOf'>
+  selection: Pick<EditorSelection, 'current' | 'entered' | 'enter' | 'select' | 'selectKeepingModes' | 'pickPage'>
+  boxes: Pick<EditorBoxes, 'selectionBox' | 'lockedSelection' | 'roots' | 'target' | 'lockedAt' | 'insideEntered'>
+  typing: Pick<EditorTyping, 'stop'>
+  transformDrag: Pick<EditorTransformDrag, 'handleUnder' | 'pressHandle' | 'pressMove'>
+  autoLayoutDrag: Pick<EditorAutoLayoutDrag, 'press'>
 }
 
 export interface EditorSelectPress {

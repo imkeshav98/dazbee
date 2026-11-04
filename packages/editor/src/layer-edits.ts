@@ -16,15 +16,16 @@ import type { EditorTyping } from './text/typing.ts'
 
 export interface LayerEditsDeps {
   session: Session
-  view: EditorView
-  selection: EditorSelection
-  resources: EditorResources
-  typing: EditorTyping
-  actions: EditorActions
+  view: Pick<EditorView, 'defaultFrame'>
+  selection: Pick<EditorSelection, 'current'>
+  resources: Pick<EditorResources, 'loadFamilies'>
+  typing: Pick<EditorTyping, 'fitText' | 'selectedText' | 'styleRange'>
+  actions: Pick<EditorActions, 'hideInEveryFormat'>
   /** Aborted once the editor is destroyed: a font that arrives after that is not set. */
   signal: AbortSignal
 }
 
+/** What the `Editor`'s members of the same names do. */
 export interface EditorLayerEdits {
   moveLayer(id: string, parentId: string, before?: string): boolean
   setProps(

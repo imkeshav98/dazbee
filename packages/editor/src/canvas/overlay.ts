@@ -24,16 +24,19 @@ import type { EditorView } from './view.ts'
 export interface OverlayDeps {
   /** The element laid over the canvas that holds what the overlay draws. */
   overlay: HTMLElement
-  view: EditorView
-  selection: EditorSelection
-  boxes: EditorBoxes
-  typing: EditorTyping
-  pen: EditorPen
-  cropping: EditorCropping
-  drawing: EditorDrawing
-  transformDrag: EditorTransformDrag
-  autoLayoutDrag: EditorAutoLayoutDrag
-  place: EditorPlace
+  view: Pick<EditorView, 'camera' | 'viewport' | 'design' | 'inView' | 'frameOf' | 'rulers' | 'outline'>
+  selection: Pick<
+    EditorSelection,
+    'current' | 'entered' | 'hovered' | 'pickedPage' | 'cropping' | 'pathEditing' | 'dropGonePage' | 'tellListeners'
+  >
+  boxes: Pick<EditorBoxes, 'selectionBox' | 'drawnBoxOf' | 'handlesFor'>
+  typing: Pick<EditorTyping, 'editing' | 'parts'>
+  pen: Pick<EditorPen, 'parts'>
+  cropping: Pick<EditorCropping, 'parts'>
+  drawing: Pick<EditorDrawing, 'parts'>
+  transformDrag: Pick<EditorTransformDrag, 'parts'>
+  autoLayoutDrag: Pick<EditorAutoLayoutDrag, 'parts'>
+  place: Pick<EditorPlace, 'dropTarget'>
   pointer: Pick<EditorPointer, 'gesture'>
 }
 

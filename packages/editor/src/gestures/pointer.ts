@@ -39,18 +39,22 @@ export type Gesture =
 
 export interface PointerDeps {
   canvas: HTMLCanvasElement
-  session: Session
-  view: EditorView
-  tools: EditorTools
-  selection: EditorSelection
-  scenes: FrameScenes
-  boxes: EditorBoxes
-  typing: EditorTyping
-  pen: EditorPen
-  cropping: EditorCropping
-  drawing: EditorDrawing
-  transformDrag: EditorTransformDrag
-  autoLayoutDrag: EditorAutoLayoutDrag
+  session: Pick<Session, 'design'>
+  view: Pick<EditorView, 'camera' | 'design' | 'onStage' | 'pointAt' | 'setCamera' | 'viewport' | 'zoomTo'>
+  tools: Pick<EditorTools, 'tool' | 'imageToPlace' | 'snapping'>
+  selection: Pick<
+    EditorSelection,
+    'current' | 'hover' | 'cropping' | 'pathEditing' | 'enter' | 'select' | 'selectKeepingModes' | 'crop' | 'editPath'
+  >
+  scenes: Pick<FrameScenes, 'scene'>
+  boxes: Pick<EditorBoxes, 'pickable' | 'selectionBox' | 'cropTarget' | 'target' | 'lockedAt'>
+  typing: Pick<EditorTyping, 'editing' | 'caretFromPoint' | 'caretTo' | 'selectText' | 'start' | 'stop'>
+  pen: Pick<EditorPen, 'drawing' | 'down' | 'move' | 'up' | 'pressPoints' | 'dragPoints' | 'releasePoints'>
+  cropping: Pick<EditorCropping, 'press' | 'drag' | 'release'>
+  drawing: Pick<EditorDrawing, 'pressShape' | 'pressImage' | 'pressText' | 'drag' | 'release'>
+  transformDrag: Pick<EditorTransformDrag, 'handleUnder' | 'marquee' | 'drag' | 'release' | 'clearGuides'>
+  autoLayoutDrag: Pick<EditorAutoLayoutDrag, 'drag' | 'release'>
+  /** What the select tool's press picks, and what it selects once it ends as a click. */
   selectPress: EditorSelectPress
   /** Removes the pointer's listeners once it aborts. */
   signal: AbortSignal
@@ -100,19 +104,26 @@ export function editorPointer({
   signal,
   drawOverlay,
 }: PointerDeps): EditorPointer {
-  const on = { signal }
+  const { pointAt } = view
   const { target, lockedAt } = boxes
+  /** The drag on the stage, from its press until it ends. */
   let gesture: Gesture | null = null
+  /** A pan by a drag: where it started on screen, and the camera then. */
   let pan: { from: Point; camera: Camera } | null = null
+  /** Whether space is held, which makes a drag pan. */
   let spaceHeld = false
   /** Whether a press on the stage is held, from its pointerdown until it ends. */
   let pressing = false
   /** Where the pointer last was over the stage, so the hover outline follows edits under it. */
   let pointer: MouseEvent | null = null
+  /** The cursor the handle under the pointer asks for, shown when the tool and a pan don't ask for another. */
   let hoverCursor = ''
+  const on = { signal }
 
-  // Pointer: screen points are CSS pixels from the canvas's corner.
-  const { pointAt } = view
+  function currentGesture() {
+    return gesture
+  }
+  // Screen points are CSS pixels from the canvas's corner.
   const screenOf = (e: MouseEvent): Point => view.onStage({ x: e.clientX, y: e.clientY })
   /** The frame under the pointer and the point in its page's design pixels. */
   function pointIn(e: MouseEvent) {
@@ -447,12 +458,8 @@ export function editorPointer({
     { ...on, passive: false },
   )
 
-  function current() {
-    return gesture
-  }
-
   return {
-    gesture: current,
+    gesture: currentGesture,
     pointerAt,
     rehover,
     showCursor,
