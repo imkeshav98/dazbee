@@ -10,7 +10,7 @@ export type SceneLayer = {
 
 /**
  * A resolved tree for one page and format, ready to draw on any surface.
- * Positions are in page space: a layer inside a frame or group keeps its own page coordinates,
+ * Positions are in page space: a layer inside a box or group keeps its own page coordinates,
  * and a container's rotation turns its children about the container's centre.
  */
 export interface Scene {

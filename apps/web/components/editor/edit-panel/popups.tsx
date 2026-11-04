@@ -1,7 +1,7 @@
 'use client'
 
 // The top bar's pop-ups for the selection: how much it shows through, a shape's own settings, the
-// corners, a frame's box, a boolean's operation, a mask, and text's alignment, list and case.
+// corners, a box's clip, a boolean's operation, a mask, and text's alignment, list and case.
 import { BlendMode, BooleanOp, ContainerBlendMode, type Design, LineEnd, type Shape } from '@dazbee/schema'
 
 import { COMBINE } from '@/components/editor/arrange-actions.ts'
@@ -25,7 +25,7 @@ import {
   textStyle,
 } from './target.ts'
 
-/** Corners as a rectangle and a frame keep them: one radius, or each corner's own. */
+/** Corners as a rectangle and a box keep them: one radius, or each corner's own. */
 type Corners = { cornerRadius?: number | undefined; corners?: readonly number[] | undefined }
 
 /** The corners as the shape stores them, from the top left clockwise. */
@@ -58,14 +58,14 @@ const shapeCorners = {
   }),
 }
 
-/** A frame keeps its corners in one prop: a number for all four, or each corner's own. */
-const frameCorners = {
+/** A box keeps its corners in one prop: a number for all four, or each corner's own. */
+const boxCorners = {
   read: (props: Props): Corners => {
     const value = props.cornerRadius as number | readonly number[] | undefined
     return typeof value === 'object' ? { cornerRadius: value[0], corners: value } : { cornerRadius: value ?? 0 }
   },
   write: (now: Props, next: Corners): Patch => {
-    const { cornerRadius = 0, corners } = { ...frameCorners.read(now), ...next }
+    const { cornerRadius = 0, corners } = { ...boxCorners.read(now), ...next }
     return { cornerRadius: corners ? [...corners] : cornerRadius }
   },
 }
@@ -82,13 +82,13 @@ export function PopupContent({ popup, target, design }: { popup: string; target:
       case 'shape':
         return facts.ownShape && <ShapeCard target={target} p={p} kind={facts.ownShape} />
       case 'corners':
-        return facts.frames ? (
-          <FrameCard target={target} p={p} />
+        return facts.boxes ? (
+          <BoxCard target={target} p={p} />
         ) : (
           facts.ownShape === 'rect' && <ShapeCard target={target} p={p} kind="rect" />
         )
       case 'box':
-        return <FrameCard target={target} p={p} />
+        return <BoxCard target={target} p={p} />
       case 'combine':
         return <CombineCard target={target} p={p} a={t.editor.arrange} />
       case 'mask':
@@ -108,7 +108,7 @@ export function PopupContent({ popup, target, design }: { popup: string; target:
 
 /** How much the layers show through, and how they blend with what is under them; last for every selection. */
 function SeeThroughCard({ target, p }: { target: Target; p: P }) {
-  const containers = target.types.every((type) => type === 'group' || type === 'frame')
+  const containers = target.types.every((type) => type === 'group' || type === 'box')
   const modes = containers ? ContainerBlendMode.options : BlendMode.options
   return (
     <PanelPart id="appearance-card" title={p.seeThrough}>
@@ -283,11 +283,11 @@ function CornerFields({
   )
 }
 
-/** A frame: whether what is inside shows past its edges. */
-function FrameCard({ target, p }: { target: Target; p: P }) {
+/** A box: whether what is inside shows past its edges. */
+function BoxCard({ target, p }: { target: Target; p: P }) {
   return (
-    <PanelPart id="frame-card" title={p.frame}>
-      <CornerFields target={target} p={p} {...frameCorners} />
+    <PanelPart id="box-card" title={p.box}>
+      <CornerFields target={target} p={p} {...boxCorners} />
       <SwitchRow
         name={p.clip}
         on={shared(target.props.map((pr) => pr.clip !== false))}

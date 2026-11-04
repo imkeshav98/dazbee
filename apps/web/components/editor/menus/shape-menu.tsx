@@ -1,10 +1,11 @@
 'use client'
 
 // The shape tool in the tool dock (#44): one button draws the last shape picked, and the caret
-// beside it opens a menu of every shape, each with its key. The menu is a list of radio items,
-// moved through with the arrow keys, Home and End; Escape closes it and returns focus.
+// beside it opens a menu of every shape and the box, each with its key. The menu is a list of radio
+// items, moved through with the arrow keys, Home and End; Escape closes it and returns focus.
 import {
   ArrowUpRightIcon,
+  BoundingBoxIcon,
   CaretUpIcon,
   CircleIcon,
   type Icon,
@@ -16,16 +17,17 @@ import {
 import * as Popover from '@radix-ui/react-popover'
 import { type KeyboardEvent, useRef, useState } from 'react'
 
-import type { ShapeTool } from '@dazbee/editor'
+import type { ShapeMenuTool } from '@dazbee/editor'
 
 import { DOCK_BUTTON, DOCK_OFF, DOCK_ON, POPOVER } from '@/components/editor/styles.ts'
 import { Tooltip } from '@/components/ui/tooltip.tsx'
 import { cn } from '@/lib/cn.ts'
 import { useMessages } from '@/lib/i18n/client.tsx'
 
-const SHAPES: { id: ShapeTool; icon: Icon; key?: string }[] = [
+const SHAPES: { id: ShapeMenuTool; icon: Icon; key?: string }[] = [
   { id: 'rect', icon: RectangleIcon, key: 'R' },
   { id: 'ellipse', icon: CircleIcon, key: 'O' },
+  { id: 'box', icon: BoundingBoxIcon },
   { id: 'polygon', icon: PentagonIcon },
   { id: 'star', icon: StarIcon },
   { id: 'line', icon: LineSegmentIcon, key: 'L' },
@@ -38,8 +40,8 @@ export function ShapeTools({
   onPick,
 }: {
   active: boolean
-  shape: ShapeTool
-  onPick: (shape: ShapeTool) => void
+  shape: ShapeMenuTool
+  onPick: (shape: ShapeMenuTool) => void
 }) {
   const t = useMessages()
   const [open, setOpen] = useState(false)

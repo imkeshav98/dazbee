@@ -65,7 +65,7 @@ const design = (): DesignInput => ({
       },
     },
     stack: {
-      type: 'frame',
+      type: 'box',
       parentId: 'p1',
       index: 'a3',
       name: 'Stack',

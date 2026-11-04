@@ -95,7 +95,7 @@ function drawnBounds(ck: CanvasKit, layer: SceneLayer, resources: Resources): Re
     }
     case 'text':
       return textBounds(ck, layer.props, resources)
-    case 'frame': {
+    case 'box': {
       const own = outset(layer.props, strokeReach(layer.props.strokes, false))
       return layer.props.clip ? own : childrenBounds(ck, layer, resources, own)
     }

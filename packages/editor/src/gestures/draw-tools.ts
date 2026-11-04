@@ -1,4 +1,4 @@
-// Drawing shapes with a drag (#44): what each shape tool makes, and the box a drag gives it. Kept
+// Drawing shapes with a drag (#44): what each shape tool makes, and the rect a drag gives it. Kept
 // free of the editor so the geometry can be tested on its own. Points are a page's design pixels.
 import type { Paint, Point, Rect } from '@dazbee/schema'
 
@@ -6,22 +6,25 @@ import { normalAngle, round } from '../layers/transform.ts'
 
 /** A layer as node.create takes it. */
 export interface NewLayer {
-  type: 'graphic' | 'frame'
+  type: 'graphic' | 'box'
   name: string
   props: Record<string, unknown>
 }
 
 export type Drawn = { x: number; y: number; width: number; height: number; rotation: number }
 
-export const SHAPE_TOOLS = ['rect', 'ellipse', 'polygon', 'star', 'line', 'arrow'] as const
-export type ShapeTool = (typeof SHAPE_TOOLS)[number]
-/** What a drag draws: a shape, or a frame. */
-export type DrawTool = ShapeTool | 'frame'
+/** The tools of the dock's shape menu, in its order: the shapes, and Box. */
+export const SHAPE_MENU_TOOLS = ['rect', 'ellipse', 'box', 'polygon', 'star', 'line', 'arrow'] as const
+export type ShapeMenuTool = (typeof SHAPE_MENU_TOOLS)[number]
+/** The tools of the shape menu that draw a shape: every one but Box. */
+export type ShapeTool = Exclude<ShapeMenuTool, 'box'>
+/** What a drag draws: a shape, or a box with Box or the Frame tool. */
+export type DrawTool = ShapeMenuTool | 'frame'
 
 /** The size a click without a drag draws, in design pixels. */
 const CLICK_SIZE = 100
-/** A frame clicked without a drag is bigger: room for what goes in it. */
-const FRAME_CLICK_SIZE = 200
+/** A box clicked without a drag is bigger: room for what goes in it. */
+const BOX_CLICK_SIZE = 200
 /** New shapes are a neutral grey until a style is picked; lines a near-black stroke. */
 const FILL = '#C9CED6FF'
 const INK = '#1F2329FF'
@@ -32,22 +35,25 @@ const PEN_STROKE = { paint: { type: 'solid', color: INK }, width: 2, cap: 'round
 /** The most of a frame's width or height an image placed from the asset library takes at first (#52). */
 const PLACED_SHARE = 0.5
 
-const isShapeTool = (tool: string): tool is ShapeTool => (SHAPE_TOOLS as readonly string[]).includes(tool)
+const isShapeMenuTool = (tool: string): tool is ShapeMenuTool => (SHAPE_MENU_TOOLS as readonly string[]).includes(tool)
 
-/** A new frame for the frame tool, at no size yet: white, as frames start in most design tools. */
-const newFrame = (): NewLayer => ({
-  type: 'frame',
-  name: 'Frame',
+/** A new box for the Box and Frame tools, at no size yet: white, as in most design tools. */
+const newBox = (): NewLayer => ({
+  type: 'box',
+  name: 'Box',
   props: { x: 0, y: 0, width: 0, height: 0, fills: [{ type: 'solid', color: '#FFFFFFFF' }] },
 })
 
-/** Whether a tool draws with a drag: a shape tool or the frame tool. */
-export const isDrawTool = (tool: string): tool is DrawTool => tool === 'frame' || isShapeTool(tool)
+/** Whether a tool draws with a drag: a tool of the shape menu or the Frame tool. */
+export const isDrawTool = (tool: string): tool is DrawTool => tool === 'frame' || isShapeMenuTool(tool)
+
+/** Whether a drawing tool draws a box: the shape menu's Box, or the Frame tool. */
+export const drawsBox = (tool: DrawTool): tool is 'box' | 'frame' => tool === 'box' || tool === 'frame'
 
 /** A new layer for a drawing tool, at no size yet. */
-export const newDrawn = (tool: DrawTool): NewLayer => (tool === 'frame' ? newFrame() : newShape(tool))
+export const newDrawn = (tool: DrawTool): NewLayer => (drawsBox(tool) ? newBox() : newShape(tool))
 
-/** A new layer for a shape tool, at no size yet. */
+/** A new graphic for a shape tool, at no size yet. */
 export function newShape(tool: ShapeTool): NewLayer {
   const at = { x: 0, y: 0, width: 0, height: 0 }
   const filled = (name: string, shape: Record<string, unknown>): NewLayer => ({
@@ -79,11 +85,11 @@ export function newShape(tool: ShapeTool): NewLayer {
 }
 
 /**
- * The box a drag from `from` to `to` draws. Shift keeps a shape's sides equal and turns a line in
- * steps of 45°; Alt draws a shape out from its centre. A line runs along its box's middle, so its
- * box is as long as the line, no taller than nothing, and turned to the line's angle.
+ * The rect a drag from `from` to `to` draws. Shift keeps a shape's sides equal and turns a line in
+ * steps of 45°; Alt draws a shape out from its centre. A line runs along its rect's middle, so its
+ * rect is as long as the line, no taller than nothing, and turned to the line's angle.
  */
-export function drawnBox(tool: DrawTool, from: Point, to: Point, shift: boolean, alt: boolean): Drawn {
+export function draggedRect(tool: DrawTool, from: Point, to: Point, shift: boolean, alt: boolean): Drawn {
   let dx = to.x - from.x
   let dy = to.y - from.y
   if (tool === 'line' || tool === 'arrow') {
@@ -121,11 +127,11 @@ export function drawnBox(tool: DrawTool, from: Point, to: Point, shift: boolean,
   }
 }
 
-/** What a click without a drag draws: CLICK_SIZE across (a frame FRAME_CLICK_SIZE), centred where it landed. */
-export function clickedBox(tool: DrawTool, at: Point): Drawn {
+/** What a click without a drag draws: CLICK_SIZE across (a box BOX_CLICK_SIZE), centred where it landed. */
+export function clickedRect(tool: DrawTool, at: Point): Drawn {
   if (tool === 'line' || tool === 'arrow')
     return { x: round(at.x - CLICK_SIZE / 2), y: round(at.y), width: CLICK_SIZE, height: 0, rotation: 0 }
-  const size = tool === 'frame' ? FRAME_CLICK_SIZE : CLICK_SIZE
+  const size = drawsBox(tool) ? BOX_CLICK_SIZE : CLICK_SIZE
   return { x: round(at.x - size / 2), y: round(at.y - size / 2), width: size, height: size, rotation: 0 }
 }
 

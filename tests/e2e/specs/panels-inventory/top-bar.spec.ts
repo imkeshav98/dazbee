@@ -87,13 +87,13 @@ test.describe('top bar and full menu', () => {
     await reloads(page)
   })
 
-  row(73, 'frame clipping from the Box pop-up', async (open) => {
+  row(73, 'box clipping from the Box pop-up', async (open) => {
     const page = await open()
     await selectLayers(page, ['plain'], { bar: true })
     // Its tiles lie inside it, so the drawing is the same either way.
     await step(
       page,
-      async () => (await openCard(page, 'frame-card')).getByRole('switch', { name: "Hide what's outside" }).click(),
+      async () => (await openCard(page, 'box-card')).getByRole('switch', { name: "Hide what's outside" }).click(),
       async () => {
         await expect.poll(async () => (await props(page, 'plain')).clip).toBe(false)
       },

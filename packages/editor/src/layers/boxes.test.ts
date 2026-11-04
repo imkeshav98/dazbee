@@ -22,7 +22,7 @@ const rect = (
 })
 const STYLE = { fontFamily: 'Noto Sans', fontSize: 20, color: '#000000FF' }
 /**
- * One page in a square and a wide format: a frame holding a dot (moved and hidden in the wide
+ * One page in a square and a wide format: a box holding a dot (moved and hidden in the wide
  * format) and a tag, a group turned 90° holding a square, a row laid out by auto layout, a path, a photo
  * with an image fill over a solid one, a layer locked in place, and a text that grows with its words.
  */
@@ -35,7 +35,7 @@ const DESIGN: DesignInput = {
   pages: { p1: { name: 'One', order: 'a0' } },
   nodes: {
     card: {
-      type: 'frame',
+      type: 'box',
       parentId: 'p1',
       index: 'a0',
       name: 'Card',
@@ -52,7 +52,7 @@ const DESIGN: DesignInput = {
     },
     inside: rect('turned', 'a0', { x: 600, y: 100, width: 20, height: 20 }),
     row: {
-      type: 'frame',
+      type: 'box',
       parentId: 'p1',
       index: 'a2',
       name: 'Row',
@@ -126,7 +126,7 @@ describe('editorBoxes', () => {
   })
 
   describe('containersOf', () => {
-    it('gives the groups and frames a layer is inside, outermost first, as boxes', () => {
+    it('gives the groups and boxes a layer is inside, outermost first, as boxes', () => {
       const { boxes, square } = harness()
       expect(boxes.containersOf(square, 'turned')).toEqual([{ x: 600, y: 100, width: 200, height: 200, rotation: 90 }])
       expect(boxes.containersOf(square, 'p1')).toEqual([])
@@ -227,7 +227,7 @@ describe('editorBoxes', () => {
       expect(besideZig).not.toContainEqual({ x: 100, y: 700, width: 100, height: 100, rotation: 0 })
     })
 
-    it('inside a group or frame, adds the container and the layers beside the dragged ones that show in the frame', () => {
+    it('inside a group or box, adds the container and the layers beside the dragged ones that show in the frame', () => {
       const { boxes, square, wide } = harness()
       const dot = { x: 110, y: 120, width: 30, height: 40, rotation: 0 }
       const inSquare = boxes.snapBoxes(square, ['tag'], [])
@@ -293,7 +293,7 @@ describe('editorBoxes', () => {
   })
 
   describe('parentFor', () => {
-    it('puts a new layer in the group or frame gone into when it can hold it, else on the page', () => {
+    it('puts a new layer in the group or box gone into when it can hold it, else on the page', () => {
       const { session, selection, boxes, square } = harness()
       expect(boxes.parentFor(square, 'graphic', session.design())).toBe('p1')
       selection.enter('card')
@@ -327,7 +327,7 @@ describe('editorBoxes', () => {
   })
 
   describe('insideEntered', () => {
-    it('says whether a layer is inside the group or frame gone into, not the container itself', () => {
+    it('says whether a layer is inside the group or box gone into, not the container itself', () => {
       const { selection, boxes } = harness()
       expect(boxes.insideEntered('dot')).toBe(false)
       selection.enter('card')

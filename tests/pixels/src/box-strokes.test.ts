@@ -1,4 +1,4 @@
-// Frame strokes: they follow the frame's corners, sit inside, on or outside its edge, go over what
+// Box strokes: they follow the box's corners, sit inside, on or outside its edge, go over what
 // is inside it and are never cut by its clip, on the CPU surface and in the PDF and SVG.
 import { afterAll, describe, expect, it } from 'vitest'
 
@@ -13,14 +13,14 @@ const bytes = fixtureResources()
 const pdfium = await startPdfium(afterAll)
 
 const solid = (color: string) => [{ type: 'solid', color }]
-/** A 300 square page: a blue frame at 50,50, 200 square, clipping a red square that fills it and more, stroked in black. */
-const design = (align: 'inside' | 'center' | 'outside', frame: Record<string, unknown> = {}) => ({
+/** A 300 square page: a blue box at 50,50, 200 square, clipping a red square that fills it and more, stroked in black. */
+const design = (align: 'inside' | 'center' | 'outside', boxProps: Record<string, unknown> = {}) => ({
   meta: { designId: 'd', name: 'Outlines', kind: 'single', primaryFormatId: 'f' },
   formats: { f: { name: 'F', width: 300, height: 300, order: 'a0' } },
   pages: { p1: { name: 'Page', order: 'a0', fills: solid('#FFFFFFFF') } },
   nodes: {
     box: {
-      type: 'frame',
+      type: 'box',
       parentId: 'p1',
       index: 'a0',
       name: 'Box',
@@ -31,7 +31,7 @@ const design = (align: 'inside' | 'center' | 'outside', frame: Record<string, un
         height: 200,
         fills: solid('#2050E0FF'),
         strokes: [{ paint: { type: 'solid', color: '#000000FF' }, width: 10, align }],
-        ...frame,
+        ...boxProps,
       },
     },
     inner: {
@@ -48,7 +48,7 @@ const WHITE = [255, 255, 255]
 const RED = [224, 32, 32]
 const BLACK = [0, 0, 0]
 
-describe('frame strokes', () => {
+describe('box strokes', () => {
   it('sit inside, on or outside the edge, over what is inside and past the clip', () => {
     const inside = renderDesign(ck, design('inside'), 'p1', 'f', bytes)
     expect(at(inside, 52, 150)).toEqual(BLACK)
@@ -67,9 +67,9 @@ describe('frame strokes', () => {
     expect(at(outside, 38, 150)).toEqual(WHITE)
   })
 
-  it("follow the frame's corners", () => {
+  it("follow the box's corners", () => {
     const r = renderDesign(ck, design('inside', { cornerRadius: 60 }), 'p1', 'f', bytes)
-    // The square corner's spot is outside the rounded frame; along the curve the stroke shows.
+    // The square corner's spot is outside the rounded box; along the curve the stroke shows.
     expect(at(r, 53, 53)).toEqual(WHITE)
     expect(at(r, 150, 53)).toEqual(BLACK)
     const each = renderDesign(ck, design('outside', { cornerRadius: [0, 80, 0, 80] }), 'p1', 'f', bytes)
@@ -96,13 +96,13 @@ describe('frame strokes', () => {
       ['center', { cornerRadius: [0, 60, 10, 80] }],
       ['outside', { cornerRadius: 40 }],
       ['outside', { cornerRadius: 40, clip: false }],
-      // A paint SVG can't hold is drawn as a picture, on a turned frame too.
+      // A paint SVG can't hold is drawn as a picture, on a turned box too.
       ['outside', { cornerRadius: 20, rotation: 90, height: 100, strokes: [angular] }],
     ] as const
-    for (const [align, frame] of cases) {
-      const { cpu, pdf, svg } = await renderThreeWays(ck, pdfium, design(align, frame), 'p1', 'f', bytes)
-      expect(vectorDifference(cpu, pdf), `PDF ${align} ${JSON.stringify(frame)}`).toBeLessThan(1)
-      expect(vectorDifference(cpu, svg), `SVG ${align} ${JSON.stringify(frame)}`).toBeLessThan(1)
+    for (const [align, boxProps] of cases) {
+      const { cpu, pdf, svg } = await renderThreeWays(ck, pdfium, design(align, boxProps), 'p1', 'f', bytes)
+      expect(vectorDifference(cpu, pdf), `PDF ${align} ${JSON.stringify(boxProps)}`).toBeLessThan(1)
+      expect(vectorDifference(cpu, svg), `SVG ${align} ${JSON.stringify(boxProps)}`).toBeLessThan(1)
     }
   })
 })

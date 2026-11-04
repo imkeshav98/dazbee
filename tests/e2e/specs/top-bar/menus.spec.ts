@@ -54,7 +54,7 @@ test('each kind gets its own top bar; several layers add Line up, Combine for sh
     'transparency',
     'position',
   ])
-  expect(await items(['frame'])).toEqual([
+  expect(await items(['card'])).toEqual([
     'scope',
     'colour',
     'outline',
@@ -76,7 +76,7 @@ test('each kind gets its own top bar; several layers add Line up, Combine for sh
     'transparency',
     'position',
   ])
-  expect(await items(['photoFrame'])).toEqual([
+  expect(await items(['photoBox'])).toEqual([
     'scope',
     'edit',
     'replace',
@@ -118,7 +118,7 @@ test('each kind gets its own top bar; several layers add Line up, Combine for sh
     'line-up',
     'autoLayout',
   ])
-  expect(await items(['box', 'frame'])).toEqual([
+  expect(await items(['box', 'card'])).toEqual([
     'scope',
     'colour',
     'outline',
@@ -153,7 +153,7 @@ test('each kind gets its own top bar; several layers add Line up, Combine for sh
     'autoLayout',
   ])
   // Several boxes have their own Stack panel, and the action that puts them in one stack is named apart.
-  expect(await items(['frame', 'frameB'])).toEqual([
+  expect(await items(['card', 'cardB'])).toEqual([
     'scope',
     'colour',
     'outline',
@@ -174,7 +174,7 @@ test('each kind gets its own top bar; several layers add Line up, Combine for sh
       page.evaluate(
         () =>
           Object.values(window.dazbee?.design().nodes ?? {}).filter(
-            (n) => n.type === 'frame' && (n.props as { layout?: unknown }).layout !== undefined,
+            (n) => n.type === 'box' && (n.props as { layout?: unknown }).layout !== undefined,
           ).length,
       ),
     )

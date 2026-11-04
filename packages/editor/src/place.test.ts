@@ -22,7 +22,7 @@ const rect = (parentId: string, index: string, box: { x: number; y: number; widt
 })
 /**
  * One page in a square and a wide format: a square with a fill of its own in the wide format, a
- * square whose style is locked, a line, a text and a frame holding a square.
+ * square whose style is locked, a line, a text and a box holding a square.
  */
 const DESIGN: DesignInput = {
   meta: { designId: 'd', name: 'D', kind: 'single', primaryFormatId: 'sq' },
@@ -57,7 +57,7 @@ const DESIGN: DesignInput = {
       },
     },
     box: {
-      type: 'frame',
+      type: 'box',
       parentId: 'p1',
       index: 'a4',
       name: 'Box',
@@ -175,7 +175,7 @@ afterEach(() => {
 
 describe('editorPlace', () => {
   describe('dropTarget and imageTarget', () => {
-    it('outlines the shape or frame an image dragged over the stage would go into', () => {
+    it('outlines the shape or box an image dragged over the stage would go into', () => {
       const { place, square, log, client } = harness()
       expect(place.imageTarget(client(square, 150, 150))).toBe('a')
       expect(place.dropTarget()).toEqual({ id: 'a', frame: square.key })

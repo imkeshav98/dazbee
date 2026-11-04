@@ -28,7 +28,7 @@ const design: Design = (() => {
     pages: { p1: { name: 'Page 1', order: 'a0' } },
     nodes: {
       row: {
-        type: 'frame',
+        type: 'box',
         parentId: 'p1',
         index: 'a0',
         name: 'Row',
@@ -38,7 +38,7 @@ const design: Design = (() => {
       b: rect('row', 'a1', { absolute: true }),
       g: { type: 'group', parentId: 'row', index: 'a2', name: 'Group', props: box },
       inner: rect('g', 'a0'),
-      col: { type: 'frame', parentId: 'p1', index: 'a1', name: 'Column', props: box },
+      col: { type: 'box', parentId: 'p1', index: 'a1', name: 'Column', props: box },
       c: rect('col', 'a0'),
       free: rect('p1', 'a2'),
     },
@@ -68,7 +68,7 @@ describe('rowIn', () => {
 })
 
 describe('layoutIn', () => {
-  it('holds for a frame with auto layout in the frame’s format', () => {
+  it('holds for a box with auto layout in the frame’s format', () => {
     expect(layoutIn(sq, 'row', design)).toBe(true)
     expect(layoutIn(sq, 'col', design)).toBe(false)
     expect(layoutIn(banner, 'col', design)).toBe(true)
@@ -93,7 +93,7 @@ describe('inFlow', () => {
 })
 
 describe('laidOut', () => {
-  it('holds for an auto layout frame in any format, and anything inside one', () => {
+  it('holds for an auto layout box in any format, and anything inside one', () => {
     for (const id of ['row', 'a', 'b', 'g', 'inner', 'col', 'c']) expect(laidOut(id, design), id).toBe(true)
     expect(laidOut('free', design)).toBe(false)
   })

@@ -7,7 +7,7 @@ import type { Scene, SceneLayer } from '../scene.ts'
 import { laidOut } from '../text/layout.ts'
 import { LUMA_TO_ALPHA } from './adjust.ts'
 import { fillPath } from './paint.ts'
-import { booleanPath, EVERYWHERE, framePath, outlineOf, rectPath, shapePath } from './paths.ts'
+import { booleanPath, boxPath, EVERYWHERE, outlineOf, rectPath, shapePath } from './paths.ts'
 import { layerReach, sigma, unturnedReach } from './reach.ts'
 import { drawShape, strokePath } from './strokes.ts'
 
@@ -107,8 +107,8 @@ function drawLayer(ck: CanvasKit, canvas: Canvas, layer: SceneLayer, resources: 
 
   const content = () => drawContent(ck, canvas, layer, resources)
   const own = props.effects.filter((e) => e.type !== 'backgroundBlur')
-  // A group or frame is drawn by itself first unless it passes through; other layers only for a mode that isn't normal.
-  const container = layer.type === 'group' || layer.type === 'frame'
+  // A group or box is drawn by itself first unless it passes through; other layers only for a mode that isn't normal.
+  const container = layer.type === 'group' || layer.type === 'box'
   const together = props.blendMode !== 'pass-through' && (props.blendMode !== 'normal' || container)
   const needsLayer = props.opacity < 1 || together || own.length > 0
   if (!needsLayer) {
@@ -189,9 +189,9 @@ function drawContent(ck: CanvasKit, canvas: Canvas, layer: SceneLayer, resources
     }
     case 'text':
       return drawText(ck, canvas, layer, resources)
-    case 'frame': {
+    case 'box': {
       const { props } = layer
-      const path = framePath(ck, props)
+      const path = boxPath(ck, props)
       for (const fill of props.fills) fillPath(ck, canvas, path, fill, props, resources)
       canvas.save()
       if (props.clip) canvas.clipPath(path, ck.ClipOp.Intersect, true)
