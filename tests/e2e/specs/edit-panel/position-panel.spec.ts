@@ -175,6 +175,39 @@ test('a group takes its size from what it holds, so its Advanced has only where 
   expect(errors).toEqual([])
 })
 
+test('on a phone the sheet shows that it scrolls, with its bar, and scrolls to the whole X and Y row', async ({
+  browser,
+}) => {
+  const { page, errors } = await openStage(browser, design())
+  await page.setViewportSize({ width: 390, height: 844 })
+  await fitSettled(page)
+  await selectLayers(page, ['headline'], { bar: true })
+  const sheet = await panel(page)
+  // The body under the title is what scrolls.
+  const body = sheet.locator(':scope > div').last()
+  // Away from the sheet, past the time an overlay bar takes to hide.
+  await page.mouse.move(4, 300)
+  await page.waitForTimeout(1_200)
+  expect(
+    await body.evaluate((el) => {
+      const bar = el.querySelector('.os-scrollbar-vertical')
+      return {
+        scrolls: el.scrollHeight > el.clientHeight + 1,
+        bar: Boolean(
+          bar?.classList.contains('os-scrollbar-visible') && !bar.classList.contains('os-scrollbar-auto-hide-hidden'),
+        ),
+      }
+    }),
+  ).toEqual({ scrolls: true, bar: true })
+  await body.evaluate((el) => el.scrollTo({ top: el.scrollHeight }))
+  const shown = await body.boundingBox()
+  for (const name of ['X position', 'Y position']) {
+    const field = await sheet.getByRole('spinbutton', { name }).boundingBox()
+    expect(shown && field && field.y >= shown.y && field.y + field.height <= shown.y + shown.height).toBe(true)
+  }
+  expect(errors).toEqual([])
+})
+
 for (const [width, height] of SCREEN_SIZES) {
   test(`screenshots at ${width}×${height}: one layer and several`, { tag: '@evidence' }, async ({ browser }) => {
     const { page, errors } = await openStage(browser, design())

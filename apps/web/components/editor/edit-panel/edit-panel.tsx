@@ -118,7 +118,8 @@ export function PanelFrame({
   const phone = usePhone()
   const panel = useRef<HTMLElement>(null)
   const body = useRef<HTMLDivElement>(null)
-  const bodyRef = useOverlayScroll(body)
+  // On a phone the sheet's bar stays shown while there is more to scroll to: no pointer hovers to show it.
+  const bodyRef = useOverlayScroll(body, { shown: phone })
   const scroll = useScrollEdges(body)
   // Sizes opens from the header pill and from the page's bar: the focus goes back to the one used.
   const [opener] = useState(() => document.activeElement)
