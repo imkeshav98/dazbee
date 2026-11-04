@@ -330,6 +330,7 @@ export const en = {
       more: 'More shapes',
       rect: 'Rectangle',
       ellipse: 'Ellipse',
+      box: 'Box',
       polygon: 'Polygon',
       star: 'Star',
       line: 'Line',

@@ -317,6 +317,7 @@ export const ar: Messages = {
       more: 'أشكال أخرى',
       rect: 'مستطيل',
       ellipse: 'شكل بيضاوي',
+      box: 'صندوق',
       polygon: 'مضلّع',
       star: 'نجمة',
       line: 'خط',

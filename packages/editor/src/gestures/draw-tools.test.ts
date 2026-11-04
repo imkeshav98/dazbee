@@ -1,6 +1,16 @@
 import { describe, expect, it } from 'vitest'
 
-import { clickedBox, drawnBox, keepRatio, newImage, newPath, newShape, withImage } from './draw-tools.ts'
+import {
+  clickedBox,
+  drawnBox,
+  keepRatio,
+  newDrawn,
+  newImage,
+  newPath,
+  newShape,
+  SHAPE_TOOLS,
+  withImage,
+} from './draw-tools.ts'
 
 describe('drawing a shape (#44)', () => {
   it('spans the drag in any direction, square with Shift, out from the centre with Alt', () => {
@@ -61,7 +71,12 @@ describe('drawing a shape (#44)', () => {
     expect(clickedBox('arrow', { x: 300, y: 200 })).toEqual({ x: 250, y: 200, width: 100, height: 0, rotation: 0 })
   })
 
+  it('lists Box among the shape tools, after Rectangle and Ellipse', () => {
+    expect(SHAPE_TOOLS).toEqual(['rect', 'ellipse', 'box', 'polygon', 'star', 'line', 'arrow'])
+  })
+
   it('makes each tool its own shape, with what it needs to show', () => {
+    expect(newDrawn('box')).toMatchObject({ type: 'box', name: 'Box', props: { fills: [{ color: '#FFFFFFFF' }] } })
     expect(newShape('star').props).toMatchObject({ shape: { kind: 'star' }, fills: [{ type: 'solid' }] })
     expect(newShape('arrow').props).toMatchObject({ shape: { kind: 'line', end: 'arrow' }, strokes: [{ width: 4 }] })
     expect(newShape('line').props).not.toHaveProperty('fills')

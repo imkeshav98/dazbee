@@ -1,10 +1,11 @@
 'use client'
 
 // The shape tool in the tool dock (#44): one button draws the last shape picked, and the caret
-// beside it opens a menu of every shape, each with its key. The menu is a list of radio items,
-// moved through with the arrow keys, Home and End; Escape closes it and returns focus.
+// beside it opens a menu of every shape and the box, each with its key. The menu is a list of radio
+// items, moved through with the arrow keys, Home and End; Escape closes it and returns focus.
 import {
   ArrowUpRightIcon,
+  BoundingBoxIcon,
   CaretUpIcon,
   CircleIcon,
   type Icon,
@@ -26,6 +27,7 @@ import { useMessages } from '@/lib/i18n/client.tsx'
 const SHAPES: { id: ShapeTool; icon: Icon; key?: string }[] = [
   { id: 'rect', icon: RectangleIcon, key: 'R' },
   { id: 'ellipse', icon: CircleIcon, key: 'O' },
+  { id: 'box', icon: BoundingBoxIcon },
   { id: 'polygon', icon: PentagonIcon },
   { id: 'star', icon: StarIcon },
   { id: 'line', icon: LineSegmentIcon, key: 'L' },

@@ -13,7 +13,8 @@ export interface NewLayer {
 
 export type Drawn = { x: number; y: number; width: number; height: number; rotation: number }
 
-export const SHAPE_TOOLS = ['rect', 'ellipse', 'polygon', 'star', 'line', 'arrow'] as const
+/** The tools of the dock's shape menu, in its order. */
+export const SHAPE_TOOLS = ['rect', 'ellipse', 'box', 'polygon', 'star', 'line', 'arrow'] as const
 export type ShapeTool = (typeof SHAPE_TOOLS)[number]
 /** What a drag draws: a shape, or a box with the Frame tool. */
 export type DrawTool = ShapeTool | 'frame'
@@ -34,7 +35,7 @@ const PLACED_SHARE = 0.5
 
 const isShapeTool = (tool: string): tool is ShapeTool => (SHAPE_TOOLS as readonly string[]).includes(tool)
 
-/** A new box for the Frame tool, at no size yet: white, as frames start in most design tools. */
+/** A new box for the Box and Frame tools, at no size yet: white, as frames start in most design tools. */
 const newBox = (): NewLayer => ({
   type: 'box',
   name: 'Box',
@@ -44,11 +45,14 @@ const newBox = (): NewLayer => ({
 /** Whether a tool draws with a drag: a shape tool or the Frame tool. */
 export const isDrawTool = (tool: string): tool is DrawTool => tool === 'frame' || isShapeTool(tool)
 
-/** A new layer for a drawing tool, at no size yet. */
-export const newDrawn = (tool: DrawTool): NewLayer => (tool === 'frame' ? newBox() : newShape(tool))
+/** Whether a drawing tool draws a box: the shape menu's Box, or the Frame tool. */
+export const drawsBox = (tool: DrawTool): tool is 'box' | 'frame' => tool === 'box' || tool === 'frame'
 
-/** A new layer for a shape tool, at no size yet. */
-export function newShape(tool: ShapeTool): NewLayer {
+/** A new layer for a drawing tool, at no size yet. */
+export const newDrawn = (tool: DrawTool): NewLayer => (drawsBox(tool) ? newBox() : newShape(tool))
+
+/** A new graphic for a shape tool, at no size yet. */
+export function newShape(tool: Exclude<ShapeTool, 'box'>): NewLayer {
   const at = { x: 0, y: 0, width: 0, height: 0 }
   const filled = (name: string, shape: Record<string, unknown>): NewLayer => ({
     type: 'graphic',
@@ -125,7 +129,7 @@ export function drawnBox(tool: DrawTool, from: Point, to: Point, shift: boolean,
 export function clickedBox(tool: DrawTool, at: Point): Drawn {
   if (tool === 'line' || tool === 'arrow')
     return { x: round(at.x - CLICK_SIZE / 2), y: round(at.y), width: CLICK_SIZE, height: 0, rotation: 0 }
-  const size = tool === 'frame' ? BOX_CLICK_SIZE : CLICK_SIZE
+  const size = drawsBox(tool) ? BOX_CLICK_SIZE : CLICK_SIZE
   return { x: round(at.x - size / 2), y: round(at.y - size / 2), width: size, height: size, rotation: 0 }
 }
 

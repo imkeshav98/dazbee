@@ -1,11 +1,23 @@
 // Preset shapes and live booleans (#44), with real pointer and keyboard input: draw every shape from
-// the dock, its menu and its keys, Shift-draw a square, combine two shapes from the inspector and by
-// shortcut, then enter the boolean, drag one shape inside it and see the boolean follow.
+// the dock, its menu and its keys, Shift-draw a square, draw a box with the menu's Box, combine two
+// shapes from the inspector and by shortcut, then enter the boolean, drag one shape inside it and see
+// the boolean follow.
 import type { DesignInput } from '@dazbee/schema'
 
 import { exportHashOf, screenPoint, writeOutput } from '../../support/editor.ts'
+import { SCREEN_SIZES } from '../../support/layout.ts'
 import { liveDesign } from '../../support/seed.ts'
-import { click, type Design, drag, openStage, press, read, selection } from '../../support/stage.ts'
+import {
+  click,
+  type Design,
+  drag,
+  fitSettled,
+  nextFrame,
+  openStage,
+  press,
+  read,
+  selection,
+} from '../../support/stage.ts'
 import { expect, type Page, test } from '../../support/test.ts'
 import { barMenu } from '../../support/top-bar.ts'
 
@@ -127,6 +139,81 @@ test('every shape draws with real input: the dock, its menu, its keys, and Shift
   expect(await exportHashOf(page)).not.toBe(all)
   expect(errors).toEqual([])
 })
+
+test('the shape menu holds Box after Rectangle and Ellipse, and Box draws a box that takes in what it is drawn around', async ({
+  browser,
+}) => {
+  const { page, errors } = await openStage(browser, design())
+
+  // Box is the third item, after Rectangle and Ellipse, with no key of its own.
+  await page.getByTestId('shape-menu').click()
+  const items = page.locator('[role="menu"] [data-shape]')
+  await expect(items).toHaveCount(7)
+  expect(await items.evaluateAll((els) => els.map((el) => el.getAttribute('data-shape')))).toEqual([
+    'rect',
+    'ellipse',
+    'box',
+    'polygon',
+    'star',
+    'line',
+    'arrow',
+  ])
+  await expect(items.nth(2)).toHaveText('Box')
+  await expect(items.nth(2)).toHaveAttribute('aria-checked', 'false')
+  await items.nth(2).click()
+  await expect(page.getByRole('menu')).toBeHidden()
+  await pressed(page, 'shape')
+  await expect(page.locator('[role="toolbar"] [data-tool="shape"]')).toHaveAttribute('data-shape', 'box')
+  await expect(page.locator('[role="toolbar"] [data-tool="frame"]')).toHaveAttribute('aria-pressed', 'false')
+  expect(await toolOf(page)).toBe('box')
+
+  // On an empty part of the page: a white box named Box, where it was dragged.
+  const lone = await draw(page, { x: 100, y: 820 }, { x: 300, y: 960 })
+  expect(lone.node).toMatchObject({
+    type: 'box',
+    parentId: 'p1',
+    name: 'Box',
+    props: { fills: [{ type: 'solid', color: '#FFFFFFFF' }] },
+  })
+  expect(lone.box).toEqual({ x: 100, y: 820, width: 200, height: 140, rotation: 0 })
+
+  // The dock's shape button now draws a box; drawn around the dot, it takes the dot in without
+  // moving it, and undo and redo take the box and the move away and back as one step.
+  await page.locator('[role="toolbar"] [data-tool="shape"]').click()
+  expect(await toolOf(page)).toBe('box')
+  const dot = box(await read(page), 'dot')
+  const around = await draw(page, { x: 660, y: 80 }, { x: 980, y: 400 })
+  let d = await read(page)
+  expect(d.nodes.dot?.parentId).toBe(around.id)
+  expect(box(d, 'dot')).toEqual(dot)
+  await press(page, 'undo')
+  d = await read(page)
+  expect(d.nodes[around.id]).toBeUndefined()
+  expect(d.nodes.dot?.parentId).toBe('p1')
+  await press(page, 'redo')
+  d = await read(page)
+  expect(d.nodes[around.id]).toMatchObject({ type: 'box', name: 'Box' })
+  expect(d.nodes.dot?.parentId).toBe(around.id)
+  expect(box(d, 'dot')).toEqual(dot)
+  expect(errors).toEqual([])
+})
+
+for (const [width, height] of SCREEN_SIZES) {
+  test(`the open shape menu at ${width}×${height}`, { tag: '@evidence' }, async ({ browser }) => {
+    const { page, errors } = await openStage(browser, design())
+    await page.setViewportSize({ width, height })
+    await fitSettled(page)
+    await page.getByTestId('shape-menu').click()
+    await expect(page.locator('[role="menu"] [data-shape="box"]')).toBeVisible()
+    await nextFrame(page)
+    writeOutput(`shape-menu-${width}-open.png`, await page.screenshot({ animations: 'disabled' }))
+    await page.locator('[role="menu"] [data-shape="box"]').click()
+    await expect(page.locator('[role="toolbar"] [data-tool="shape"]')).toHaveAttribute('data-shape', 'box')
+    await nextFrame(page)
+    writeOutput(`shape-menu-${width}-box-picked.png`, await page.screenshot({ animations: 'disabled' }))
+    expect(errors).toEqual([])
+  })
+}
 
 test('two shapes combine into a live boolean that follows a shape dragged inside it', async ({ browser }) => {
   const { page, errors } = await openStage(browser, design())

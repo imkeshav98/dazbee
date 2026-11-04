@@ -12,7 +12,17 @@ import { runQuietly } from '../run-quietly.ts'
 import type { EditorSelection } from '../selection.ts'
 import type { EditorTyping } from '../text/typing.ts'
 import type { EditorTools, PlacedAsset } from '../tools.ts'
-import { clickedBox, drawnBox, type DrawTool, imageIn, keepRatio, newDrawn, newImage, newText } from './draw-tools.ts'
+import {
+  clickedBox,
+  drawnBox,
+  drawsBox,
+  type DrawTool,
+  imageIn,
+  keepRatio,
+  newDrawn,
+  newImage,
+  newText,
+} from './draw-tools.ts'
 import { CLICK_SLOP } from './press.ts'
 
 /** A shape or box being drawn, from the press until it ends: the new layer and every change the drag makes to it are one undo step. */
@@ -153,7 +163,7 @@ export function editorDrawing({
   function startDrawing(e: PointerEvent, shape: DrawTool, at: { frame: Frame; p: Point }): ShapeDrag | null {
     typing.stop()
     const now = session.design()
-    const parentId = parentFor(at.frame, shape === 'frame' ? 'box' : 'graphic', now)
+    const parentId = parentFor(at.frame, drawsBox(shape) ? 'box' : 'graphic', now)
     const around = containersOf(at.frame, parentId, now)
     const from = localTo(at.p, around)
     const end = session.beginGesture()
@@ -224,7 +234,7 @@ export function editorDrawing({
    */
   function finishDrawing(g: ShapeDrag) {
     if (!g.moved) runQuietly(() => session.run('node.update', { ids: [g.id], patch: clickedBox(g.tool, g.from) }))
-    if (g.tool === 'frame' && g.moved) enclose(g.frame, g.id)
+    if (drawsBox(g.tool) && g.moved) enclose(g.frame, g.id)
     hug([g.id])
     g.end()
     selection.select([g.id], g.frame.key)
