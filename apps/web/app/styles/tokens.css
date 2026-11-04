@@ -29,6 +29,9 @@
   --accent-soft: rgb(255 72 176 / 0.16);
   --accent-2: #3d6bff;
   --danger: #ff5a5f;
+  /* The solid red of a button that confirms a delete, under white words. */
+  --danger-solid: #c42020;
+  --danger-solid-hover: #a51b1b;
   --success: #3dd68c;
   --warning: #f5b83d;
   --ring: #ff8acb;
@@ -78,6 +81,9 @@
   --accent-soft: rgb(194 16 108 / 0.1);
   --accent-2: #2f55e0;
   --danger: #c42020;
+  /* The solid red of a button that confirms a delete, under white words. */
+  --danger-solid: #c42020;
+  --danger-solid-hover: #a51b1b;
   --success: #0f7246;
   --warning: #8a5a00;
   --ring: #c2106c;
@@ -142,6 +148,8 @@
   --color-accent-soft: var(--accent-soft);
   --color-accent-2: var(--accent-2);
   --color-danger: var(--danger);
+  --color-danger-solid: var(--danger-solid);
+  --color-danger-solid-hover: var(--danger-solid-hover);
   --color-success: var(--success);
   --color-warning: var(--warning);
   --color-ring: var(--ring);

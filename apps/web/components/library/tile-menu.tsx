@@ -145,11 +145,7 @@ function Submit({ label, danger = false }: { label: string; danger?: boolean }) 
     <button
       type="submit"
       disabled={pending}
-      className={cn(
-        buttonStyles({ variant: danger ? 'secondary' : 'primary' }),
-        'h-8 px-3 font-semibold',
-        danger && 'border-danger/60 text-danger hover:border-danger hover:bg-danger/10',
-      )}
+      className={cn(buttonStyles({ variant: danger ? 'danger' : 'primary' }), 'h-8 px-3 font-semibold')}
     >
       {label}
     </button>

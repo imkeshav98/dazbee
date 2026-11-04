@@ -1,6 +1,7 @@
 import { cva, type VariantProps } from 'class-variance-authority'
 import type { ButtonHTMLAttributes } from 'react'
 
+import { DANGER_SOLID } from '@/components/ui/looks.ts'
 import { cn } from '@/lib/cn.ts'
 
 export const buttonStyles = cva(
@@ -13,7 +14,8 @@ export const buttonStyles = cva(
         primary:
           'bg-accent-solid text-on-accent shadow-[0_1px_0_rgb(255_255_255/0.18)_inset] hover:bg-accent-solid-hover',
         secondary: 'border border-line bg-raised text-text hover:border-line-strong hover:bg-hover',
-        ghost: 'text-muted hover:bg-hover hover:text-text',
+        ghost: 'text-muted hover:bg-hover hover:text-text active:bg-pressed active:text-text',
+        danger: `${DANGER_SOLID} shadow-[0_1px_0_rgb(255_255_255/0.18)_inset]`,
       },
       size: {
         md: 'h-[var(--row)] px-3 text-[13px]',

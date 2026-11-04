@@ -6,6 +6,7 @@ import { type KeyboardEvent, useEffect, useRef, useState } from 'react'
 import { AssetInUse, AssetSummary, AssetUse, type UpdateAsset } from '@dazbee/schema'
 
 import { QUIET_BUTTON } from '@/components/editor/styles.ts'
+import { DANGER_SOLID } from '@/components/ui/looks.ts'
 import { brandPath, readJson, RouteError } from '@/lib/brand-routes.ts'
 import { cn } from '@/lib/cn.ts'
 import { useMessages } from '@/lib/i18n/client.tsx'
@@ -163,7 +164,7 @@ export function AssetDetails({
             {asset.tags.map((x) => (
               <li
                 key={x}
-                className="flex h-6 items-center gap-0.5 rounded-full bg-accent-soft ps-2 pe-0.5 text-xs text-accent-text"
+                className="flex h-6 items-center gap-0.5 rounded-full bg-accent-soft ps-2 pe-0.5 text-xs text-text"
               >
                 {x}
                 <button
@@ -212,7 +213,7 @@ export function AssetDetails({
               autoFocus
               onClick={confirmDelete}
               data-testid="asset-delete-confirm"
-              className={cn(QUIET_BUTTON, 'bg-danger/10 text-danger hover:bg-danger/20')}
+              className={cn(QUIET_BUTTON, DANGER_SOLID)}
             >
               {format(t.deleteNamed, { name: asset.name || t.untitled })}
             </button>
@@ -235,7 +236,7 @@ export function AssetDetails({
             aria-busy={busy}
             onClick={askToDelete}
             data-testid="asset-delete"
-            className={cn(QUIET_BUTTON, 'hover:text-danger')}
+            className={QUIET_BUTTON}
           >
             <TrashIcon size={13} aria-hidden />
             {t.delete}

@@ -123,13 +123,14 @@ function PagesFrame({ label, disabled = false, children }: { label: string; disa
       onClick={() => setOpen(open === 'pages' ? null : 'pages')}
       style={place}
       className={cn(
-        'absolute z-10 flex h-9 cursor-pointer items-center gap-1.5 rounded-card surface-frost px-3 text-[12px] font-semibold text-text transition-colors hover:text-accent-text disabled:cursor-default disabled:opacity-40 aria-expanded:glass-open aria-expanded:text-text',
+        // Open, it keeps its glass under the pressed tint, its icon pink and its words in the text colour.
+        'group absolute z-10 flex h-9 cursor-pointer items-center gap-1.5 rounded-card surface-frost px-3 text-[12px] font-semibold text-text transition-colors hover:text-accent-text disabled:cursor-default disabled:opacity-40 aria-expanded:tint-pressed aria-expanded:text-text',
         'end-[calc(1.5rem+var(--zoom-width))] bottom-4 max-lg:end-4 max-lg:bottom-[calc(1.5rem+var(--zoom-height))]',
         'max-sm:start-4 max-sm:end-auto max-sm:top-20 max-sm:bottom-auto max-sm:group-data-[bar]/stage:hidden',
         FOCUS_RING,
       )}
     >
-      <FilesIcon size={15} aria-hidden />
+      <FilesIcon size={15} aria-hidden className="group-aria-expanded:text-accent-text" />
       {children}
     </button>
   )
@@ -247,7 +248,8 @@ function PageList({ editor, onRemoved }: { editor: Editor; onRemoved: (message: 
               }}
               className={cn(
                 CARD_ROW,
-                'relative cursor-grab active:cursor-grabbing aria-[current]:border-accent aria-[current]:bg-accent-soft aria-[current]:lit data-[dragging]:opacity-40',
+                // Lit by the tints laid over its fill under the pointer and while pressed.
+                'relative cursor-grab hover:tint-hover hover:lit active:cursor-grabbing active:tint-pressed active:lit aria-[current]:border-accent aria-[current]:bg-accent-soft aria-[current]:lit data-[dragging]:opacity-40',
               )}
             >
               {moves && landing?.before === id && <span aria-hidden className={cn(DROP_LINE, '-top-[4px]')} />}

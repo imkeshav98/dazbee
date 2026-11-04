@@ -70,7 +70,7 @@ const TOOLS: { id: Tool; icon: Icon; key: string }[] = [
 ]
 
 const CHROME = { duration: 0.18, ease: [0.2, 0.8, 0.2, 1] as const }
-/** The capsule's pink blob slides to the open panel on a spring, so it overshoots a little. */
+/** The capsule's blob, the pressed tint under the open panel's button, slides there on a spring, so it overshoots a little. */
 const BLOB = { type: 'spring', stiffness: 520, damping: 34, mass: 0.9 } as const
 /** On arrival the blob is stretched along its travel and settles round: the squish. */
 const SQUISH = {
@@ -312,7 +312,7 @@ export function EditorShell({
             aria-label={t.editor.tools}
             data-testid="rail"
             className={cn(
-              // Clipped, so the AI button's moving glow stays inside and never shows on the canvas.
+              // Clipped, so the AI button's soft gradient stays inside and never shows on the canvas.
               'absolute z-20 flex gap-2 overflow-hidden rounded-full surface-frost p-2',
               // A vertical capsule at the start edge; on phones a tab bar floating at the bottom.
               'start-5 top-1/2 -translate-y-1/2 flex-col sm:p-2.5 max-sm:start-1/2 max-sm:top-auto max-sm:bottom-3 max-sm:translate-y-0 max-sm:flex-row max-sm:-translate-x-1/2 max-sm:rtl:translate-x-1/2',
@@ -336,8 +336,9 @@ export function EditorShell({
                     }}
                     className={cn(
                       'relative grid size-11 sm:size-13 cursor-pointer place-items-center rounded-full transition-colors duration-[var(--chrome-fast)]',
+                      // Open, it keeps the rail's glass under the pressed tint, its icon pink.
                       open
-                        ? 'text-on-accent'
+                        ? 'text-accent-text'
                         : 'text-subtle hover:bg-hover hover:text-text active:bg-pressed active:text-text',
                       ai && !open && 'text-accent-text',
                     )}
@@ -356,10 +357,7 @@ export function EditorShell({
                           animate="still"
                           variants={SQUISH}
                           transition={BLOB}
-                          className={cn(
-                            'absolute inset-0 rounded-full shadow-[0_6px_18px_-6px_rgb(194_16_108/0.7)]',
-                            ai ? 'ai-glow' : 'bg-accent-solid',
-                          )}
+                          className="absolute inset-0 rounded-full bg-pressed"
                         />
                       </motion.span>
                     )}

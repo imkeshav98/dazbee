@@ -187,7 +187,8 @@ body {
  * should look frosted takes this utility, and a variant is a token or a modifier on it, never a
  * second copy. It is a see-through fill over a blur. Muted, faint, pink and red text on it take
  * their glass shades, which read whatever the ad behind it shows. Inside it, hover and pressed are
- * see-through tints (`bg-hover`, `bg-pressed`), so what lies behind shows through a lit row too.
+ * see-through tints (`bg-hover`, `bg-pressed`), so what lies behind shows through a lit row too; a
+ * control with a fill of its own takes them laid over it (`tint-hover`, `tint-pressed`).
  * Its backdrop filter sees only what is painted inside its nearest ancestor with a mask, filter,
  * opacity below 1, clip-path, blend mode or backdrop filter, so glass over the canvas has no such
  * ancestor.
@@ -222,8 +223,12 @@ body {
   --danger: var(--text);
 }
 
-/* A glass button that is open: the pressed tint laid over its glass, which stays. */
-@utility glass-open {
+/* The hover or pressed tint laid over a control's own fill, which stays: a card's row or boxed button
+   under the pointer or pressed, and a glass button that is open. */
+@utility tint-hover {
+  background-image: linear-gradient(var(--hover), var(--hover));
+}
+@utility tint-pressed {
   background-image: linear-gradient(var(--pressed), var(--pressed));
 }
 

@@ -7,19 +7,19 @@ import { FOCUS_RING, LIT_ROW } from '@/components/ui/looks.ts'
 /** A disabled control: faded and not clickable. */
 const DISABLED = 'disabled:pointer-events-none disabled:opacity-40'
 
-/** A small pill button, as the mock's chips under a list. */
-export const CHIP = `inline-flex h-7 cursor-pointer items-center gap-1 rounded-full border border-line px-3 text-xs font-semibold text-muted transition-colors duration-[var(--chrome-fast)] hover:border-line-strong hover:text-text ${DISABLED}`
+/** A small pill button, as the mock's chips under a list, lit by the tints under the pointer and while pressed. */
+export const CHIP = `inline-flex h-7 cursor-pointer items-center gap-1 rounded-full border border-line px-3 text-xs font-semibold text-muted transition-colors duration-[var(--chrome-fast)] hover:border-line-strong ${LIT_ROW} ${DISABLED}`
 
 /** A small square icon button in a card's row. */
 export const ICON_BUTTON =
   'grid size-7 shrink-0 cursor-pointer place-items-center rounded-row text-subtle transition-colors duration-[var(--chrome-fast)] hover:bg-hover hover:text-text active:bg-pressed disabled:pointer-events-none disabled:opacity-30'
 
-/** A chip in pink, for a choice that is set: the header card's sizes. */
-export const CHIP_ACCENT = `${CHIP} border-transparent bg-accent-soft text-accent-text hover:border-transparent hover:text-accent-text`
+/** A chip on a pink tint, for a choice that is set: the header card's sizes. Its words are in the text colour. */
+export const CHIP_ACCENT = `${CHIP} border-transparent bg-accent-soft text-text hover:border-transparent`
 /** A word-sized button that acts at once, in pink: a menu row's Reset. */
 export const LINK_BUTTON = `shrink-0 cursor-pointer rounded-row px-1.5 text-[12px] font-semibold text-accent-text ${LIT_ROW} ${FOCUS_RING}`
-/** A button with words and no box until hovered, as a panel's Done or Delete. */
-export const QUIET_BUTTON = `flex h-8 cursor-pointer items-center gap-1.5 rounded-row px-3 text-[13px] font-medium text-muted hover:bg-hover hover:text-text active:bg-pressed disabled:pointer-events-none disabled:opacity-50 ${FOCUS_RING}`
+/** A button with words and no box until hovered, as a panel's Done or Delete; its words are in the text colour while lit. */
+export const QUIET_BUTTON = `flex h-8 cursor-pointer items-center gap-1.5 rounded-row px-3 text-[13px] font-medium text-muted ${LIT_ROW} disabled:pointer-events-none disabled:opacity-50 ${FOCUS_RING}`
 
 /** A square tile showing one image asset's thumbnail, in the asset library and the image picker. */
 export const ASSET_TILE =
@@ -108,8 +108,11 @@ export const SWITCH_ROW = `group flex h-8 w-full cursor-pointer items-center jus
 export const PANEL_PART = 'flex flex-col gap-2.5 border-t border-line pt-3 first:border-t-0 first:pt-0'
 /** A small heading over a group of an edit panel's choices, as Line up with the size. */
 export const PANEL_HEADING = 'text-xs font-semibold text-muted'
-/** A boxed button of an edit panel that acts at once: its icon, then its words, or its icon alone. */
-export const PANEL_BUTTON = `flex h-[34px] min-w-0 cursor-pointer items-center gap-2 rounded-row border border-line bg-surface px-2.5 text-[12.5px] font-medium whitespace-nowrap text-text transition-colors duration-[var(--chrome-fast)] hover:bg-hover disabled:cursor-not-allowed disabled:opacity-45 [&>span]:truncate ${FOCUS_RING}`
+/**
+ * A boxed button of an edit panel that acts at once: its icon, then its words, or its icon alone. The
+ * hover and pressed tints are laid over its fill.
+ */
+export const PANEL_BUTTON = `flex h-[34px] min-w-0 cursor-pointer items-center gap-2 rounded-row border border-line bg-surface px-2.5 text-[12.5px] font-medium whitespace-nowrap text-text transition-colors duration-[var(--chrome-fast)] hover:tint-hover active:tint-pressed disabled:cursor-not-allowed disabled:opacity-45 [&>span]:truncate ${FOCUS_RING}`
 /** An edit panel's button among many that act at once, as Position's moves: unfilled, lit by the tints. */
 export const PANEL_ACTION = `flex h-[34px] min-w-0 cursor-pointer items-center gap-2 rounded-row px-2.5 text-[12.5px] font-medium whitespace-nowrap text-text transition-colors duration-[var(--chrome-fast)] hover:bg-hover active:bg-pressed disabled:cursor-not-allowed disabled:opacity-45 [&>span]:truncate ${FOCUS_RING}`
 /** A switch shaped as a knob, its name at the start: Lock ratio among the size fields. */
@@ -119,10 +122,10 @@ export const KNOB_SWITCH = `group flex h-8 min-w-0 cursor-pointer items-center j
 export const BAR_ROW = 'top-[90px] max-sm:top-[72px]'
 /** The top bar's height, for the room the fit keeps. */
 export const BAR_ROW_HEIGHT = 'h-[38px]'
-/** One button of the bar: words or an icon, lit while its popover is open. */
-export const BAR_BUTTON = `flex h-[30px] min-w-[30px] shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-row px-2 text-[12px] font-semibold whitespace-nowrap text-text transition-colors duration-[var(--chrome-fast)] hover:bg-hover active:bg-pressed aria-expanded:bg-hover ${FOCUS_RING}`
-/** A button of the bar that turns something on or off, such as bold: lit while it is on. */
-export const BAR_TOGGLE = `${BAR_BUTTON} aria-pressed:bg-accent-soft aria-pressed:text-accent-text ${DISABLED}`
+/** One button of the bar: words or an icon, lit while its popover is open, and pressed while pressed, open or not. */
+export const BAR_BUTTON = `flex h-[30px] min-w-[30px] shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-row px-2 text-[12px] font-semibold whitespace-nowrap text-text transition-colors duration-[var(--chrome-fast)] hover:bg-hover active:bg-pressed aria-expanded:bg-hover aria-expanded:active:bg-pressed ${FOCUS_RING}`
+/** A button of the bar that turns something on or off, such as bold: on a pink tint while it is on, its icon in the text colour. */
+export const BAR_TOGGLE = `${BAR_BUTTON} aria-pressed:bg-accent-soft aria-pressed:active:bg-pressed ${DISABLED}`
 /** The swatch a bar button shows for a colour the selected layers don't share. */
 export const MIXED_COLOUR = 'conic-gradient(red, yellow, lime, aqua, blue, magenta, red)'
 /** The upright hairline between the bar's groups of buttons. */

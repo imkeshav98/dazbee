@@ -168,9 +168,10 @@ export function ShortcutsButton({ className }: { className: string }) {
                             <span key={spec} className="flex items-center gap-0.5">
                               {n > 0 && <span className="pe-1 text-[11px] text-subtle">{t.or}</span>}
                               {keysOf(spec, mac).map((key, i) => (
+                                // A keycap: the well's tint with no outline, its key in the well's muted shade.
                                 <kbd
                                   key={i}
-                                  className="min-w-6 rounded-[6px] border border-line-strong bg-bg/50 px-1.5 py-0.5 text-center font-mono text-[11px] text-muted"
+                                  className="min-w-6 rounded-[6px] bg-well px-1.5 py-0.5 text-center font-mono text-[11px] text-muted [--text-muted:var(--glass-well-muted)]"
                                 >
                                   {key}
                                 </kbd>

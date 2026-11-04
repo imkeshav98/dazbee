@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 
-import { segment, SEGMENTED } from '@/components/ui/segmented.tsx'
+import { SEGMENT, SEGMENTS } from '@/components/ui/looks.ts'
 import { useMessages } from '@/lib/i18n/client.tsx'
 import { themeOf, type ThemePick, THEMES } from '@/lib/theme.ts'
 
@@ -26,7 +26,7 @@ export function ThemeSwitch() {
   }
 
   return (
-    <div role="radiogroup" aria-label={t.label} className={SEGMENTED}>
+    <div role="radiogroup" aria-label={t.label} className={SEGMENTS}>
       {THEMES.map((theme) => (
         <button
           key={theme}
@@ -34,7 +34,7 @@ export function ThemeSwitch() {
           role="radio"
           aria-checked={pick === theme}
           onClick={() => choose(theme)}
-          className={segment(pick === theme)}
+          className={SEGMENT}
         >
           {t[theme]}
         </button>
