@@ -9,7 +9,7 @@ import * as Popover from '@radix-ui/react-popover'
 import { useState } from 'react'
 
 import type { Editor } from '@dazbee/editor'
-import type { Paint } from '@dazbee/schema'
+import { type Paint, withAlpha } from '@dazbee/schema'
 
 import { useBrandKit } from '@/components/brand-kit/use-brand-kit.ts'
 import { Choice, clamp, ColorField, NumberField } from '@/components/editor/edit-panel/fields.tsx'
@@ -18,6 +18,7 @@ import { useMenuFocus } from '@/components/editor/top-bar/bar-popover.tsx'
 import { FOCUS_RING } from '@/components/ui/looks.ts'
 import { segment, SEGMENTED } from '@/components/ui/segmented.tsx'
 import { cn } from '@/lib/cn.ts'
+import { hexOf } from '@/lib/colour.ts'
 import { tidy } from '@/lib/editor/size.ts'
 import { useLocale } from '@/lib/i18n/client.tsx'
 import { dirOf, format } from '@/lib/i18n/index.ts'
@@ -65,7 +66,7 @@ function convert(now: Paint, type: Exclude<PaintType, 'image'>): Paint {
     now.type === 'solid'
       ? [
           { offset: 0, color: now.color },
-          { offset: 1, color: `${now.color.slice(0, 7)}00` },
+          { offset: 1, color: withAlpha(now.color, 0) },
         ]
       : now.type === 'image'
         ? [
@@ -80,7 +81,7 @@ function convert(now: Paint, type: Exclude<PaintType, 'image'>): Paint {
       const alpha = Math.round(Number.parseInt(color.slice(7, 9) || 'FF', 16) * (now.opacity ?? 1))
       return {
         type,
-        color: `${color.slice(0, 7)}${alpha.toString(16).padStart(2, '0').toUpperCase()}`,
+        color: `${hexOf(color)}${alpha.toString(16).padStart(2, '0').toUpperCase()}`,
         ...(now.visible === undefined ? {} : { visible: now.visible }),
       }
     }
@@ -441,7 +442,7 @@ function BrandColours({ brandId, label, onPick }: { brandId: string; label: stri
         <button
           key={c.token}
           type="button"
-          aria-label={`${c.name} ${c.value.slice(0, 7)}`}
+          aria-label={`${c.name} ${hexOf(c.value)}`}
           title={c.name}
           onClick={() => onPick(c.value)}
           style={{ backgroundColor: c.value }}

@@ -12,7 +12,7 @@ import { AssetSummary, type BrandColor, type BrandFont, type BrandKit } from '@d
 import { DASHED_BUTTON } from '@/components/ui/looks.ts'
 import { Select } from '@/components/ui/select.tsx'
 import { cn } from '@/lib/cn.ts'
-import { parseHex, shown } from '@/lib/colour.ts'
+import { hexOf, hexText, parseHex } from '@/lib/colour.ts'
 import { useMessages } from '@/lib/i18n/client.tsx'
 import { format } from '@/lib/i18n/index.ts'
 import { ASSET_ACCEPT, sendAsset } from '@/lib/upload-asset.ts'
@@ -164,7 +164,7 @@ export function KitEditor({
               <input
                 name="colour"
                 type="color"
-                value={c.value.slice(0, 7)}
+                value={hexOf(c.value)}
                 aria-label={format(t.pick, { name: c.name })}
                 onChange={(e) => setColor(i, { value: `${e.target.value}${c.value.slice(7)}`.toUpperCase() })}
                 className="h-16 w-12 shrink-0 cursor-pointer rounded-[12px] border border-line-strong bg-transparent p-0 [&::-webkit-color-swatch]:rounded-[11px] [&::-webkit-color-swatch]:border-0 [&::-webkit-color-swatch-wrapper]:p-0 [&::-moz-color-swatch]:rounded-[11px] [&::-moz-color-swatch]:border-0"
@@ -187,13 +187,13 @@ export function KitEditor({
                 <input
                   name="colour-hex"
                   key={`hex-${c.value}`}
-                  defaultValue={shown(c.value)}
+                  defaultValue={hexText(c.value)}
                   aria-label={format(t.colorValue, { name: c.name })}
                   spellCheck={false}
                   onBlur={(e) => {
                     const value = parseHex(e.target.value)
                     if (value && value !== c.value) setColor(i, { value })
-                    else e.target.value = shown(c.value)
+                    else e.target.value = hexText(c.value)
                   }}
                   onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
                   className={cn(field, 'h-7 font-mono text-xs uppercase')}

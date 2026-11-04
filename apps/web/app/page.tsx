@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation'
 import { BrandCard, type BrandCardData } from '@/components/brands/brand-cards.tsx'
 import { NewBrandCard } from '@/components/brands/new-brand-card.tsx'
 import { LibraryShell } from '@/components/library/library-shell.tsx'
+import { hexOf } from '@/lib/colour.ts'
 import { needsWelcome, openingBrand } from '@/lib/home.ts'
 import { brandWords, format } from '@/lib/i18n/index.ts'
 import { getMessages } from '@/lib/i18n/server.ts'
@@ -29,7 +30,7 @@ export default async function HomePage() {
       return {
         ...brand,
         designCount: designs.length,
-        colors: (kit?.colors ?? []).map((c) => c.value.slice(0, 7)),
+        colors: (kit?.colors ?? []).map((c) => hexOf(c.value)),
         latest:
           latest && cover
             ? {

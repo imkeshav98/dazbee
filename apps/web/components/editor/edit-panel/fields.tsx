@@ -6,6 +6,7 @@
 import { type CSSProperties, type ReactNode, useEffect, useRef, useState } from 'react'
 
 import { type Editor, shortcutFor } from '@dazbee/editor'
+import { alphaOf } from '@dazbee/schema'
 
 import {
   FIELD,
@@ -20,6 +21,7 @@ import {
 } from '@/components/editor/styles.ts'
 import { Select } from '@/components/ui/select.tsx'
 import { cn } from '@/lib/cn.ts'
+import { alphaChange, hexChange, hexOf } from '@/lib/colour.ts'
 import { fillOf } from '@/lib/editor/fill.ts'
 import { LIMITS } from '@/lib/editor/limits.ts'
 import { tidy } from '@/lib/editor/size.ts'
@@ -28,15 +30,6 @@ import { format } from '@/lib/i18n/index.ts'
 
 export const clamp = (n: number, min = Number.NEGATIVE_INFINITY, max = Number.POSITIVE_INFINITY) =>
   Math.min(max, Math.max(min, n))
-
-/** A colour as #RRGGBBAA: one part changed, the other as the document holds it now. */
-const withHex = (hex: string) => (now: string | undefined) => `${hex}${now?.slice(7, 9) || 'FF'}`
-
-const withOpacity = (alpha: number) => (now: string | undefined) =>
-  `${now?.slice(0, 7) || '#000000'}${Math.round(clamp(alpha, 0, 1) * 255)
-    .toString(16)
-    .padStart(2, '0')
-    .toUpperCase()}`
 
 /**
  * What is being typed into a field, null when nothing is: `typed.current` has it as soon as it is
@@ -258,13 +251,13 @@ export function ColorField({
 }) {
   const t = useMessages()
   const p = t.editor.props
-  const hex = value && value !== 'mixed' ? value.slice(0, 7).toUpperCase() : ''
-  const alpha = value && value !== 'mixed' ? Number.parseInt(value.slice(7, 9) || 'FF', 16) / 255 : undefined
+  const hex = value && value !== 'mixed' ? hexOf(value).toUpperCase() : ''
+  const alpha = value && value !== 'mixed' ? alphaOf(value) : undefined
   const [draft, setDraft, typedNow] = useDraft()
   const commitHex = (text: string) => {
     setDraft(null)
     const h = (text.startsWith('#') ? text : `#${text}`).toUpperCase()
-    if (/^#[0-9A-F]{6}$/.test(h) && h !== hex) onSet(withHex(h))
+    if (/^#[0-9A-F]{6}$/.test(h) && h !== hex) onSet(hexChange(h))
   }
   return (
     <div className="flex min-w-0 flex-1 items-center gap-1">
@@ -274,7 +267,7 @@ export function ColorField({
           type="color"
           aria-label={format(p.colourOf, { name })}
           value={hex || '#000000'}
-          onChange={(event) => onSet(withHex(event.target.value.toUpperCase()))}
+          onChange={(event) => onSet(hexChange(event.target.value.toUpperCase()))}
           className="size-7 shrink-0 cursor-pointer rounded-row border border-line bg-surface p-0.5"
         />
       )}
@@ -304,7 +297,7 @@ export function ColorField({
         placeholder={value === 'mixed' ? '–' : ''}
         onBlur={(event) => {
           const n = Number.parseFloat(event.target.value)
-          if (Number.isFinite(n) && hex && Math.round(n) !== Math.round((alpha ?? 1) * 100)) onSet(withOpacity(n / 100))
+          if (Number.isFinite(n) && hex && Math.round(n) !== Math.round((alpha ?? 1) * 100)) onSet(alphaChange(n / 100))
         }}
         onKeyDown={(event) => {
           if (event.key === 'Enter') event.currentTarget.blur()

@@ -17,7 +17,7 @@ import { loadKit, useBrandKit } from '@/components/brand-kit/use-brand-kit.ts'
 import { useEditorDesign, useSelection } from '@/components/editor/editor-hooks.ts'
 import { overlayScroll } from '@/components/ui/overlay-scroll.ts'
 import { cn } from '@/lib/cn.ts'
-import { shown } from '@/lib/colour.ts'
+import { hexOf, hexText } from '@/lib/colour.ts'
 import { placeAsset } from '@/lib/editor/place-asset.ts'
 import { useMessages } from '@/lib/i18n/client.tsx'
 import { format } from '@/lib/i18n/index.ts'
@@ -143,12 +143,12 @@ export function BrandKitPanel({ editor, brandId }: { editor: Editor; brandId: st
                       aria-label={format(on ? t.unbind : t.apply, { name: c.name })}
                       aria-pressed={on}
                       disabled={selection.length === 0}
-                      title={`${c.name} · ${shown(c.value)}`}
+                      title={`${c.name} · ${hexText(c.value)}`}
                       onClick={() => apply('color', c.token)}
                       className="group flex w-full cursor-pointer flex-col gap-1 text-start disabled:cursor-default"
                     >
                       <span
-                        style={{ backgroundColor: c.value.slice(0, 7) }}
+                        style={{ backgroundColor: hexOf(c.value) }}
                         className={cn(
                           'block aspect-square w-full rounded-[10px] border border-line-strong transition-transform duration-[var(--chrome-fast)] group-enabled:group-hover:scale-105',
                           // The followed colour is ringed in pink with a gap, a shape and not only a colour.

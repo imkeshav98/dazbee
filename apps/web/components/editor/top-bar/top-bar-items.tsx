@@ -62,6 +62,7 @@ import {
   MIXED_COLOUR,
 } from '@/components/editor/styles.ts'
 import { cn } from '@/lib/cn.ts'
+import { hexOf } from '@/lib/colour.ts'
 import { useMessages } from '@/lib/i18n/client.tsx'
 import { format } from '@/lib/i18n/index.ts'
 
@@ -212,7 +213,7 @@ export function useSelectionItems(target: Target, design: Design, brandId: strin
             {COLOUR_MARK}
             <span
               className="mt-0.5 h-[3px] w-3.5 rounded-full"
-              style={{ background: color === 'mixed' ? MIXED_COLOUR : color.slice(0, 7) }}
+              style={{ background: color === 'mixed' ? MIXED_COLOUR : hexOf(color) }}
             />
           </span>
         }
@@ -352,7 +353,7 @@ export function useSelectionItems(target: Target, design: Design, brandId: strin
       target.props.map((pr) => {
         const fills = (pr.fills ?? []) as Paint[]
         const fill = fills[boundFillIndex(fills)]
-        return fill?.type === 'solid' ? fill.color.slice(0, 7) : null
+        return fill?.type === 'solid' ? hexOf(fill.color) : null
       }),
     )
     if (!facts.lines) add('colour', <PanelButton id="colour" label={b.fill} face={<Dot colour={colour} />} />)
@@ -460,7 +461,7 @@ export function usePageItems(pageId: string, design: Design): BarItem[] {
           label={t.editor.page.backgroundColour}
           face={
             <>
-              <Dot colour={colour?.slice(0, 7) ?? 'mixed'} />
+              <Dot colour={colour === undefined ? 'mixed' : hexOf(colour)} />
               {t.editor.page.background}
             </>
           }
