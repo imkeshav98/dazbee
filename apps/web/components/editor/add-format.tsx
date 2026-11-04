@@ -87,7 +87,7 @@ export function AddFormat({ editor }: { editor: Editor }) {
                         type="button"
                         data-preset={preset.id}
                         onClick={() => add(name, preset.width, preset.height)}
-                        className="mx-1 flex h-[var(--row)] w-[calc(100%-8px)] cursor-pointer items-center gap-2 rounded-row px-3 text-start text-[13px] hover:bg-hover focus-visible:bg-hover"
+                        className="mx-1 flex h-[var(--row)] w-[calc(100%-8px)] cursor-pointer items-center gap-2 rounded-row px-3 text-start text-[13px] hover:bg-hover hover:lit active:bg-pressed active:lit focus-visible:bg-hover focus-visible:lit"
                       >
                         <Proportion width={preset.width} height={preset.height} className="text-muted" />
                         <span className="min-w-0 flex-1 truncate">{name}</span>

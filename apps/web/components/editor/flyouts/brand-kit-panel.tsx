@@ -15,6 +15,7 @@ import { useFontCatalog } from '@/components/brand-kit/font-catalog.ts'
 import { KitEditor, useKitSaver } from '@/components/brand-kit/kit-editor.tsx'
 import { loadKit, useBrandKit } from '@/components/brand-kit/use-brand-kit.ts'
 import { useEditorDesign, useSelection } from '@/components/editor/editor-hooks.ts'
+import { CHIP } from '@/components/editor/styles.ts'
 import { overlayScroll } from '@/components/ui/overlay-scroll.ts'
 import { brandPath } from '@/lib/brand-routes.ts'
 import { cn } from '@/lib/cn.ts'
@@ -58,8 +59,7 @@ export function BrandKitPanel({ editor, brandId }: { editor: Editor; brandId: st
   }
   // As the mock's flyouts: small spaced capitals over each part, quiet fields, round swatches.
   const heading = 'text-[11px] font-bold tracking-[0.08em] text-subtle uppercase'
-  const modeButton =
-    'flex h-8 shrink-0 cursor-pointer items-center gap-1.5 rounded-full border border-line px-3 text-xs font-semibold text-muted hover:border-line-strong hover:text-text'
+  const modeButton = cn(CHIP, 'h-8 shrink-0 gap-1.5')
   const textSelected = selection.some((id) => design.nodes[id]?.type === 'text')
 
   /** Puts the kit's logo on the design: an SVG file as layers, an image as a graphic filled with it. */
@@ -182,7 +182,7 @@ export function BrandKitPanel({ editor, brandId }: { editor: Editor; brandId: st
                       aria-pressed={on}
                       disabled={!textSelected}
                       onClick={() => apply('font', f.token)}
-                      className="flex min-h-12 w-full cursor-pointer items-center gap-3 rounded-[8px] py-2 text-start enabled:hover:bg-hover disabled:cursor-default aria-pressed:text-accent-text"
+                      className="flex min-h-12 w-full cursor-pointer items-center gap-3 rounded-[8px] py-2 text-start enabled:hover:bg-hover enabled:hover:lit enabled:active:bg-pressed enabled:active:lit disabled:cursor-default aria-pressed:text-accent-text"
                     >
                       <span className="min-w-0 flex-1">
                         {family ? (

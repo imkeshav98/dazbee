@@ -1,6 +1,7 @@
 // The UI foundation (#51): themes change only tokens, Arabic mirrors the chrome but not the design,
 // reduced motion turns chrome animation off. Screenshots go to output/ for the PR.
-import { editorPath, setCookies, shoot, writeOutput } from '../../support/editor.ts'
+import { editorPath, setCookies, shoot } from '../../support/editor.ts'
+import { servedGlass } from '../../support/glass.ts'
 import { liveDesign, seed } from '../../support/seed.ts'
 import { expect, type Page, test } from '../../support/test.ts'
 
@@ -231,42 +232,6 @@ test('reduced motion turns chrome animation off: the flyout appears outright and
   }
 })
 
-// Riso Pop and frosted surfaces (#81): floating chrome blurs what is under it and carries grain,
-// in both themes; close-ups of the dock, zoom pill and flyout go to output/ for the PR.
-test('floating chrome is frosted with grain in both themes', async ({ page }) => {
-  test.setTimeout(90_000)
-  const designId = await seed(liveDesign())
-  for (const theme of ['dark', 'light'] as const) {
-    await setCookies(page, { theme })
-    await page.goto(editorPath(designId))
-    await expect(page.getByTestId('status')).toHaveAttribute('data-ready', '', { timeout: 30_000 })
-    await page.getByRole('button', { name: 'Layers', exact: true }).click()
-    await expect(page.getByTestId('flyout')).toBeVisible()
-    for (const surface of [
-      page.getByRole('toolbar'),
-      page.getByRole('group', { name: 'Zoom' }),
-      page.getByTestId('flyout'),
-    ]) {
-      const style = await surface.evaluate((el) => {
-        const s = getComputedStyle(el)
-        return { filter: s.backdropFilter, image: s.backgroundImage }
-      })
-      expect(style.filter).toContain('blur(18px)')
-      expect(style.image).toContain('feTurbulence')
-    }
-    await shoot(page, `ui-${theme}-frost`)
-    const dock = await page.getByRole('toolbar').boundingBox()
-    const zoom = await page.getByRole('group', { name: 'Zoom' }).boundingBox()
-    if (!dock || !zoom) throw new Error('missing dock or zoom')
-    writeOutput(
-      `ui-${theme}-frost-dock.png`,
-      await page.screenshot({
-        clip: { x: dock.x - 40, y: dock.y - 40, width: zoom.x + zoom.width - dock.x + 80, height: dock.height + 80 },
-      }),
-    )
-  }
-})
-
 // The floating capsule (#82): it floats over the canvas, a pink blob slides between its buttons,
 // flyouts are only as tall as their content, and on phones it is a tab bar at the bottom.
 
@@ -287,7 +252,7 @@ test('the panels live in a capsule floating over the canvas', async ({ page }) =
   expect(
     Number.parseFloat(await rail.evaluate((el) => getComputedStyle(el).borderTopLeftRadius)),
   ).toBeGreaterThanOrEqual(box.width / 2)
-  expect(await rail.evaluate((el) => getComputedStyle(el).backdropFilter)).toContain('blur(18px)')
+  expect(await rail.evaluate((el) => getComputedStyle(el).backdropFilter)).toBe((await servedGlass(page)).filter)
 
   // The blob lands on the open panel's button and slides there, stretched, when another opens.
   await expect(page.getByTestId('rail-blob')).toHaveCount(0)

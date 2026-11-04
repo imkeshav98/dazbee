@@ -8,17 +8,8 @@ import { type CSSProperties, type ReactNode, useEffect, useRef, useState } from 
 import { type Editor, shortcutFor } from '@dazbee/editor'
 import { alphaOf } from '@dazbee/schema'
 
-import {
-  FIELD,
-  KNOB,
-  PANEL_PART,
-  SEGMENT,
-  SEGMENTS,
-  SELECT,
-  SWITCH,
-  SWITCH_ROW,
-  VALUE_TEXT,
-} from '@/components/editor/styles.ts'
+import { FIELD, KNOB, PANEL_PART, SELECT, SWITCH, SWITCH_ROW, VALUE_TEXT } from '@/components/editor/styles.ts'
+import { SEGMENT, SEGMENTS } from '@/components/ui/looks.ts'
 import { Select } from '@/components/ui/select.tsx'
 import { cn } from '@/lib/cn.ts'
 import { alphaChange, hexChange, hexOf } from '@/lib/colour.ts'

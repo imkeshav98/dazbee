@@ -25,7 +25,7 @@ const FOCUSABLE =
 
 /** A menu row; on a phone 48 px tall, past the 44 px a finger needs. */
 const ROW =
-  'flex min-h-12 max-sm:min-h-[48px] py-1.5 w-full cursor-pointer items-center gap-3 rounded-row px-3 text-start text-[13px] font-medium transition-colors duration-[var(--chrome-fast)] hover:bg-hover focus-visible:bg-hover focus-visible:outline-none'
+  'flex min-h-12 max-sm:min-h-[48px] py-1.5 w-full cursor-pointer items-center gap-3 rounded-row px-3 text-start text-[13px] font-medium transition-colors duration-[var(--chrome-fast)] hover:bg-hover hover:lit active:bg-pressed active:lit focus-visible:bg-hover focus-visible:lit focus-visible:outline-none'
 
 /** Moves the focus through a menu's items with the arrows, Home and End, round from the ends. */
 function arrowThrough(event: ReactKeyboardEvent<HTMLElement>) {

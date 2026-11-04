@@ -1,12 +1,10 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-
-import { TOUCH_ROW } from '@/components/ui/looks.ts'
-import { segment, SEGMENTED } from '@/components/ui/segmented.tsx'
+import { SEGMENT, SEGMENTS, TOUCH_ROW } from '@/components/ui/looks.ts'
 import { cn } from '@/lib/cn.ts'
 import { useMessages } from '@/lib/i18n/client.tsx'
-import { themeOf, type ThemePick, THEMES } from '@/lib/theme.ts'
+import { type ThemePick, THEMES } from '@/lib/theme.ts'
+import { useThemePick } from '@/lib/theme-pick.tsx'
 
 declare global {
   interface Window {
@@ -17,8 +15,7 @@ declare global {
 /** System, light or dark; only the tokens change. On a phone each is a touch target. */
 export function ThemeSwitch() {
   const t = useMessages().theme
-  const [pick, setPick] = useState<ThemePick>('system')
-  useEffect(() => setPick(themeOf(document.cookie.match(/(?:^|; )theme=(\w+)/)?.[1])), [])
+  const [pick, setPick] = useThemePick()
 
   function choose(next: ThemePick) {
     document.cookie = `theme=${next}; path=/; max-age=31536000; samesite=lax`
@@ -28,7 +25,7 @@ export function ThemeSwitch() {
   }
 
   return (
-    <div role="radiogroup" aria-label={t.label} className={SEGMENTED}>
+    <div role="radiogroup" aria-label={t.label} className={SEGMENTS}>
       {THEMES.map((theme) => (
         <button
           key={theme}
@@ -36,7 +33,7 @@ export function ThemeSwitch() {
           role="radio"
           aria-checked={pick === theme}
           onClick={() => choose(theme)}
-          className={cn(segment(pick === theme), TOUCH_ROW)}
+          className={cn(SEGMENT, TOUCH_ROW)}
         >
           {t[theme]}
         </button>

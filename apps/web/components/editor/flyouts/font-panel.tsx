@@ -296,7 +296,7 @@ function FontList({
                   data-active={i === active ? '' : undefined}
                   onPointerEnter={() => setActive(i)}
                   onClick={() => onPick(family)}
-                  className="mx-1 flex h-9 cursor-pointer items-center rounded-row px-2 data-[active]:not-aria-selected:bg-hover aria-selected:bg-accent-soft aria-selected:text-accent-text"
+                  className="mx-1 flex h-9 cursor-pointer items-center rounded-row px-2 data-[active]:not-aria-selected:bg-hover data-[active]:lit aria-selected:bg-accent-soft aria-selected:lit"
                 >
                   <FontPreview brandId={brandId} family={family} />
                 </div>

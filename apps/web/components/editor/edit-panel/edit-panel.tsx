@@ -209,7 +209,7 @@ export function PanelFrame({
           aria-label={t.editor.closePanel}
           data-testid="edit-panel-close"
           onClick={() => closePanel(id, true, opener)}
-          className="grid size-7 shrink-0 cursor-pointer place-items-center rounded-full text-subtle hover:bg-hover hover:text-text"
+          className="grid size-7 shrink-0 cursor-pointer place-items-center rounded-full text-subtle hover:bg-hover hover:text-text active:bg-pressed"
         >
           <XIcon size={14} aria-hidden />
         </button>

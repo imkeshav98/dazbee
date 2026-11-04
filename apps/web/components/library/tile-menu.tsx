@@ -7,7 +7,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useFormStatus } from 'react-dom'
 
 import { buttonStyles } from '@/components/ui/button.tsx'
-import { TOUCH_ROW } from '@/components/ui/looks.ts'
+import { LIT_ROW, TOUCH_ROW } from '@/components/ui/looks.ts'
 import { cn } from '@/lib/cn.ts'
 import { useMessages } from '@/lib/i18n/client.tsx'
 import { format } from '@/lib/i18n/index.ts'
@@ -41,7 +41,7 @@ export function TileMenu({
       window.removeEventListener('pointerdown', onPress)
     }
   }, [step])
-  const row = `flex h-9 w-full cursor-pointer items-center rounded-row px-3 text-start text-[13px] font-medium hover:bg-hover ${TOUCH_ROW}`
+  const row = `flex h-9 w-full cursor-pointer items-center rounded-row px-3 text-start text-[13px] font-medium ${LIT_ROW} ${TOUCH_ROW}`
   return (
     <div ref={box} className="absolute end-2 top-2 z-10" data-testid="tile-menu">
       <button
@@ -145,11 +145,7 @@ function Submit({ label, danger = false }: { label: string; danger?: boolean }) 
     <button
       type="submit"
       disabled={pending}
-      className={cn(
-        buttonStyles({ variant: danger ? 'secondary' : 'primary' }),
-        'h-8 px-3 font-semibold',
-        danger && 'border-danger/60 text-danger hover:border-danger hover:bg-danger/10',
-      )}
+      className={cn(buttonStyles({ variant: danger ? 'danger' : 'primary' }), 'h-8 px-3 font-semibold')}
     >
       {label}
     </button>

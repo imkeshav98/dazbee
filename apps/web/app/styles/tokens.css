@@ -1,10 +1,11 @@
 /*
- * Dazbee's design tokens (#51, restyled in #81: Riso Pop colours, frosted surfaces, dark by default).
+ * Dazbee's design tokens: Riso Pop colours, glass surfaces, dark by default.
  * Themes change only these variables, through html[data-theme]: a script in the layout sets it
  * from the person's pick or the system before first paint, and dark is the default. Components use the semantic names, never raw colours.
- * tokens.test.ts checks every text token against the surfaces it sits on at 4.5:1 or more.
+ * tokens.test.ts checks every text token against the surfaces it sits on at 4.5:1 or more, and text
+ * on glass, and on the tints laid on glass, over a white, a black and two bright ads.
  */
-/* Riso Pop (#81): warm ink, hot pink and cobalt, after risograph print. */
+/* Riso Pop: warm ink, hot pink and cobalt, after risograph print. */
 :root,
 [data-theme='dark'] {
   color-scheme: dark;
@@ -28,18 +29,33 @@
   --accent-soft: rgb(255 72 176 / 0.16);
   --accent-2: #3d6bff;
   --danger: #ff5a5f;
+  /* The solid red of a button that confirms a delete, under white words. */
+  --danger-solid: #c42020;
+  --danger-solid-hover: #a51b1b;
   --success: #3dd68c;
   --warning: #f5b83d;
   --ring: #ff8acb;
   --shadow: 0 1px 0 rgb(255 255 255 / 0.05) inset, 0 12px 32px -12px rgb(0 0 0 / 0.6);
-  /* The panel colour, darkened, over 28% of what lies behind: as clear as it goes while muted text
-     stays a visible step (about 1.5:1) from text and both read over a white ad, text at 6.9:1 and muted
-     at 4.6:1 (#138). A tint rather than a brightness() in the backdrop filter, which would cost a
-     pass on every frame. */
-  --glass: rgb(20 16 24 / 0.72);
-  /* Muted and faint text on glass: 4.6:1 even with a white ad behind it. */
+  /* Glass: a dark violet at 73% over what lies behind, the clearest fill on which muted text, a
+     visible step (1.5:1) from text, still reads over a white ad: text at 6.7:1, muted at 4.5:1. A
+     tint rather than a brightness() in the backdrop filter, which would cost a pass on every frame. */
+  --glass: rgb(26 21 32 / 0.73);
+  /* Muted and faint text on glass. */
   --glass-muted: #d1c7d8;
   --glass-line: rgb(255 255 255 / 0.1);
+  /* Hover and pressed on glass: see-through white over the glass. */
+  --glass-hover: rgb(255 255 255 / 0.07);
+  --glass-pressed: rgb(255 255 255 / 0.11);
+  /* The sunken track of a segmented choice or a progress bar on glass, the muted text in it, and the
+     chip under the chosen segment. */
+  --glass-well: rgb(0 0 0 / 0.25);
+  --glass-well-muted: #d1c7d8;
+  --glass-chip: rgb(255 255 255 / 0.1);
+  /* Pink and red text on glass: pale enough to read over a white ad at 4.5:1. */
+  --glass-accent-text: #ffb4de;
+  --glass-danger: #ffb8ba;
+  /* What a glass dialog lays over the page behind it. */
+  --glass-backdrop: rgb(0 0 0 / 0.4);
   --ai-3: #ffd23f;
 }
 
@@ -65,16 +81,33 @@
   --accent-soft: rgb(194 16 108 / 0.1);
   --accent-2: #2f55e0;
   --danger: #c42020;
+  /* The solid red of a button that confirms a delete, under white words. */
+  --danger-solid: #c42020;
+  --danger-solid-hover: #a51b1b;
   --success: #0f7246;
   --warning: #8a5a00;
   --ring: #c2106c;
   --shadow: 0 1px 2px rgb(60 30 60 / 0.06), 0 12px 32px -16px rgb(60 30 60 / 0.22);
-  /* White over 38% of what lies behind: as clear as it goes while muted text stays a visible step
-     (about 1.5:1) from text and both read over a black ad, text at 6.7:1 and muted at 4.6:1 (#138). */
-  --glass: rgb(255 255 255 / 0.62);
-  /* Muted and faint text on glass: 4.6:1 even with a black ad behind it. */
-  --glass-muted: #393141;
+  /* Glass: white at 60% over what lies behind. */
+  --glass: rgb(255 255 255 / 0.6);
+  /* Muted and faint text on glass: dark enough to read over a black ad at 4.5:1 (text at 6.3:1), a
+     visible step (1.4:1) from text. */
+  --glass-muted: #362e3e;
   --glass-line: rgb(26 20 32 / 0.08);
+  /* Hover and pressed on glass: see-through ink over the glass. */
+  --glass-hover: rgb(26 20 32 / 0.05);
+  --glass-pressed: rgb(26 20 32 / 0.08);
+  /* The sunken track of a segmented choice or a progress bar on glass; the muted text in it, darker
+     than on bare glass to read over a black ad; and the chip under the chosen segment. */
+  --glass-well: rgb(26 20 32 / 0.06);
+  --glass-well-muted: #2e2735;
+  --glass-chip: rgb(255 255 255 / 0.8);
+  /* Pink and red text on glass: dark enough to read over a black ad at 4.5:1. */
+  --glass-accent-text: #630837;
+  --glass-danger: #641010;
+  /* What a glass dialog lays over the page behind it: a light dim, so the dialog reads as white glass
+     as a menu does. */
+  --glass-backdrop: rgb(26 20 32 / 0.1);
   --ai-3: #ffc21a;
 }
 
@@ -83,7 +116,6 @@
   --ai-1: #ff48b0;
   --ai-2: #3d6bff;
   --ai-gradient: linear-gradient(115deg, var(--ai-1), var(--ai-2) 55%, var(--ai-3));
-  --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23n)' opacity='.22'/%3E%3C/svg%3E");
   --row: 32px;
   --radius: 8px;
   --radius-card: 12px;
@@ -116,9 +148,13 @@
   --color-accent-soft: var(--accent-soft);
   --color-accent-2: var(--accent-2);
   --color-danger: var(--danger);
+  --color-danger-solid: var(--danger-solid);
+  --color-danger-solid-hover: var(--danger-solid-hover);
   --color-success: var(--success);
   --color-warning: var(--warning);
   --color-ring: var(--ring);
+  --color-well: var(--glass-well);
+  --color-chip: var(--glass-chip);
   --font-sans: var(--font-figtree), var(--font-noto-arabic), system-ui, sans-serif;
   --font-display: var(--font-bricolage), var(--font-figtree), system-ui, sans-serif;
   --font-mono: var(--font-jetbrains), ui-monospace, monospace;

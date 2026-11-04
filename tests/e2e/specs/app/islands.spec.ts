@@ -1,6 +1,7 @@
 // Floating islands (#110): the design's name and save state float at the start, its actions at the
 // end, below the rulers and over the canvas, and the ads fit below them.
 import { editorPath, screenPoint, setCookies, writeOutput } from '../../support/editor.ts'
+import { servedGlass } from '../../support/glass.ts'
 import { liveDesign, seed } from '../../support/seed.ts'
 import { expect, type Page, test } from '../../support/test.ts'
 
@@ -35,10 +36,10 @@ test('the editor has no top bar: two islands float over the canvas and the ads f
   }
   expect(start.x).toBeLessThan(48)
   expect(1440 - (end.x + end.width)).toBeLessThan(16)
-  // The start island sits on a small frosted pill, so the design's name reads over an ad under it;
+  // The start island sits on a small glass pill, so the design's name reads over an ad under it;
   // the end island has no surface of its own.
-  expect(await page.getByTestId('island-start').evaluate((el) => getComputedStyle(el).backdropFilter)).toContain(
-    'blur(18px)',
+  expect(await page.getByTestId('island-start').evaluate((el) => getComputedStyle(el).backdropFilter)).toBe(
+    (await servedGlass(page)).filter,
   )
   expect(start.height).toBeLessThan(48)
   expect(await page.getByTestId('island-end').evaluate((el) => getComputedStyle(el).backgroundColor)).toBe(

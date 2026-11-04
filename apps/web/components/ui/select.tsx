@@ -223,7 +223,7 @@ export function Select({
                 className={cn(
                   'flex h-8 cursor-pointer items-center gap-2 rounded-[8px] px-2.5 text-[12.5px] text-text',
                   TOUCH_ROW,
-                  i === active && 'bg-hover',
+                  i === active && 'bg-hover lit',
                   i === picked && 'font-semibold text-accent-text',
                   option.disabled && 'cursor-default opacity-40',
                 )}

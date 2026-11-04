@@ -5,6 +5,7 @@ import { cookies } from 'next/headers'
 import type { ReactNode } from 'react'
 
 import { PageScroll } from '@/components/ui/overlay-scroll.ts'
+import { PressMarks } from '@/components/ui/press-marks.tsx'
 import { RenderProbe } from '@/components/ui/render-probe.tsx'
 import { TooltipProvider } from '@/components/ui/tooltip.tsx'
 import { fontVariables } from '@/lib/fonts.ts'
@@ -12,6 +13,7 @@ import { I18nProvider } from '@/lib/i18n/client.tsx'
 import { dirOf } from '@/lib/i18n/index.ts'
 import { getLocale } from '@/lib/i18n/server.ts'
 import { themeOf, themeScript } from '@/lib/theme.ts'
+import { ThemePickProvider } from '@/lib/theme-pick.tsx'
 
 export const metadata: Metadata = { title: 'Dazbee' }
 export const viewport: Viewport = { themeColor: '#0e0c11', colorScheme: 'dark light' }
@@ -32,8 +34,11 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
       </head>
       <body>
         <I18nProvider locale={locale}>
-          <TooltipProvider>{children}</TooltipProvider>
+          <ThemePickProvider pick={pick}>
+            <TooltipProvider>{children}</TooltipProvider>
+          </ThemePickProvider>
           <RenderProbe />
+          <PressMarks />
           <PageScroll />
         </I18nProvider>
       </body>
