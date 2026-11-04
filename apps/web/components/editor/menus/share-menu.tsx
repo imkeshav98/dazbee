@@ -56,7 +56,8 @@ export function ShareMenu({
   const t = useMessages()
   const { design } = useEditorDesign(editor)
   const [open, setOpen] = useState<Open>(null)
-  const { box, button } = useMenuClose(open !== null, () => setOpen(null))
+  // Closes on Esc, before what is under it, or a press outside, giving the focus back to Share.
+  const { box, button, over } = useMenuClose(open !== null, () => setOpen(null))
   const id = useId()
 
   // The menu takes the focus as it opens, on its first item; a form, on its first control.
@@ -69,7 +70,7 @@ export function ShareMenu({
   }, [open, id])
 
   return (
-    <div ref={box} data-over-panel={open ? '' : undefined} className="relative">
+    <div ref={box} {...over} className="relative">
       <Button
         ref={button}
         variant="primary"

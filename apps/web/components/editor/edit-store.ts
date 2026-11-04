@@ -9,6 +9,7 @@
 // over the edit panel and the bar's second row, which Esc closes first.
 import { useEffect, useState, useSyncExternalStore } from 'react'
 
+import { OVER_PANEL } from '@/components/ui/menu-close.ts'
 import { useValue, valueStore } from '@/lib/editor/value-store.ts'
 
 /** The top bar's items that open the edit panel for the selected layers. */
@@ -57,10 +58,10 @@ export const setFlyoutEnd = (flyoutEnd: number | null) => update({ flyoutEnd })
 export const editState = () => state
 /**
  * Whether something stands over the edit panel and the bar's second row, so Esc closes it first: a
- * modal dialog, such as Keyboard shortcuts, or what marks itself `data-over-panel`, as the Share
- * menu and its cards do.
+ * modal dialog, such as Keyboard shortcuts, or a menu that closes as `useMenuClose` says, as the
+ * Share menu with its cards and the account menu do.
  */
-export const overPanel = () => document.querySelector('dialog:modal, [data-over-panel]') !== null
+export const overPanel = () => document.querySelector(`dialog:modal, ${OVER_PANEL}`) !== null
 
 /** What the top bar has open and where it sits, re-rendering the caller when that changes. */
 export function useEditState() {

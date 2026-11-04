@@ -1,32 +1,49 @@
 'use client'
 
+// How a menu opened from its own button closes, as the Share menu and the account menu do: on Esc or
+// a press outside it. While it is open it stands over the edit panel, the bar's second row and the
+// stage's selection, so Esc closes it before them, and closes the menu opened last before one opened
+// earlier.
 import { useEffect, useEffectEvent, useRef } from 'react'
 
+/** What stands over the edit panel, the bar's second row and the selection, so Esc closes it first. */
+export const OVER_PANEL = '[data-over-panel]'
+
+/** The menus open now, the one opened last at the end. */
+const shown: object[] = []
+
+/**
+ * Closes a menu on Esc or a press outside `box`, which holds its `button` and the menu. Esc is the
+ * menu's before anything under it, unless a list open in the menu, as a select's, takes it to close
+ * first; it gives the focus back to the button when it was in the menu, or nowhere. `over` goes on
+ * `box`, marking it while the menu is open.
+ */
 export function useMenuClose(open: boolean, close: () => void) {
   const box = useRef<HTMLDivElement>(null)
   const button = useRef<HTMLButtonElement>(null)
   const onClose = useEffectEvent(close)
-  // Closes on Escape or a press outside. Esc is the menu's or form's before anything under them,
-  // the edit panel and the stage's selection included, unless a list open in the form, as a
-  // select's, takes it to close first. It gives the focus back to Share when it was in them, or nowhere.
   useEffect(() => {
     if (!open) return
+    const menu = {}
+    shown.push(menu)
     const onKey = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape' || event.defaultPrevented) return
+      if (event.key !== 'Escape' || event.defaultPrevented || shown.at(-1) !== menu) return
       const at = document.activeElement
-      if (at !== button.current && at?.getAttribute('aria-expanded') === 'true') return
+      const inMenu = at !== null && box.current?.contains(at) === true
+      if (inMenu && at !== button.current && at.getAttribute('aria-expanded') === 'true') return
       event.stopImmediatePropagation()
       event.preventDefault()
-      if (!at || at === document.body || box.current?.contains(at)) button.current?.focus()
+      if (inMenu || !at || at === document.body) button.current?.focus()
       onClose()
     }
     const onPress = (event: PointerEvent) => !box.current?.contains(event.target as Node) && onClose()
     window.addEventListener('keydown', onKey, true)
     window.addEventListener('pointerdown', onPress)
     return () => {
+      shown.splice(shown.indexOf(menu), 1)
       window.removeEventListener('keydown', onKey, true)
       window.removeEventListener('pointerdown', onPress)
     }
   }, [open])
-  return { box, button }
+  return { box, button, over: { 'data-over-panel': open ? '' : undefined } }
 }

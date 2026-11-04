@@ -112,9 +112,10 @@ export function PanelFrame({
     watch.observe(row)
     return () => watch.disconnect()
   }, [])
-  // Esc closes the panel before it clears the selection, wherever the focus is. In a field of the
-  // panel the field still takes the key, throwing away what was typed, and the panel closes with
-  // it; the focus goes back to the item that opened it once the field has let it go.
+  // Esc closes the panel before it clears the selection, wherever the focus is. In a field, the
+  // panel's or one outside it such as the design's name or the bar's size, the field still takes
+  // the key, throwing away what was typed, and the panel closes with it; when the field leaves the
+  // focus nowhere, it goes back to the item that opened the panel.
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.key !== 'Escape' || event.defaultPrevented) return
@@ -129,7 +130,6 @@ export function PanelFrame({
         return
       if (
         at instanceof HTMLElement &&
-        panel.current?.contains(at) &&
         (at.tagName === 'INPUT' || at.tagName === 'TEXTAREA' || at.tagName === 'SELECT')
       ) {
         setOpen(null)
