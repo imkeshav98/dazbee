@@ -44,7 +44,7 @@
   outline: 1px solid var(--accent);
   opacity: 0.7;
 }
-/* The page picked by a click on its background: each of its sizes outlined, dashed. */
+/* The page picked by a click on its background: each of its frames outlined, dashed. */
 .stage-overlay .page-picked {
   position: absolute;
   outline: 2px dashed var(--accent);
@@ -258,6 +258,10 @@
   position: absolute;
   border: 1px solid var(--accent);
   background: var(--accent-soft);
+}
+/* The frame the Frame tool's drag would add: dashed, as it is not on the page yet. */
+.stage-overlay .marquee[data-frame-draw] {
+  border-style: dashed;
 }
 .stage-overlay .selection-size {
   position: absolute;

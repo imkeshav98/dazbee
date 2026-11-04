@@ -18,12 +18,12 @@ const PICTURES_SLICE = 6
  */
 export function useLayerPictures(
   editor: Editor,
-  frameKey: string,
+  frameId: string,
   ids: readonly string[],
   scrolledAt: { current: number },
 ): Record<string, string | null> {
-  const [pictures, setPictures] = useState<{ frameKey: string; urls: Record<string, string | null> }>({
-    frameKey,
+  const [pictures, setPictures] = useState<{ frameId: string; urls: Record<string, string | null> }>({
+    frameId,
     urls: {},
   })
   const wanted = ids.join(' ')
@@ -43,11 +43,10 @@ export function useLayerPictures(
         }
         while (i < list.length && left() > 1) {
           const id = list[i++] ?? ''
-          next[id] = editor.layerThumbnail(id, 44, false, frameKey)
+          next[id] = editor.layerThumbnail(id, 44, false)
         }
         if (i < list.length) cancel = whenIdle(slice)
-        else
-          setPictures((now) => (now.frameKey === frameKey && sameUrls(now.urls, next) ? now : { frameKey, urls: next }))
+        else setPictures((now) => (now.frameId === frameId && sameUrls(now.urls, next) ? now : { frameId, urls: next }))
       }
       cancel = whenIdle(slice)
     })
@@ -55,9 +54,9 @@ export function useLayerPictures(
       cancel()
       stop()
     }
-  }, [editor, frameKey, wanted, scrolledAt])
+  }, [editor, frameId, wanted, scrolledAt])
   // Another frame's pictures are not this one's.
-  return pictures.frameKey === frameKey ? pictures.urls : {}
+  return pictures.frameId === frameId ? pictures.urls : {}
 }
 
 /** Runs `work` when the browser is idle, with how many ms it may take; returns the cancel. */

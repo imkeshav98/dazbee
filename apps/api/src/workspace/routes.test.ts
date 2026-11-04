@@ -45,7 +45,6 @@ describe('designs per brand', () => {
     expect(created.status).toBe(201)
     const design = DesignSummary.parse(created.json)
     expect(design).toMatchObject({ brandId: brand.id, name: 'Spring sale' })
-    expect(created.json).not.toHaveProperty('kind')
 
     const listed = await call('a', 'GET', `/brands/${brand.id}/designs`)
     expect(

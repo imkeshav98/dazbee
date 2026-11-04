@@ -2,18 +2,13 @@
 
 // What the top bar has open: one pop-up, the full menu or one edit panel, never two at once, since
 // they share this one value. Opening any of them closes what was open. The shell reads it too: on a
-// phone an edit panel is a sheet, and a rail flyout and a sheet close each other. Also where the
-// panels' and the bar's changes go when a design has more than one format: the format shown, as a
-// canvas drag does, or every format. That is one choice for the header card's chip and the bar's
-// menus, kept while the selection changes until nothing is selected.
+// phone an edit panel is a sheet, and a rail flyout and a sheet close each other.
 import { useEffect, useState, useSyncExternalStore } from 'react'
-
-import { useValue, valueStore } from '@/lib/editor/value-store.ts'
 
 /** The top bar's items that open the edit panel for the selected layers. */
 const LAYER_PANELS = ['font', 'colour', 'spacing', 'effects', 'position', 'edit', 'outline', 'stack'] as const
-/** The design's own panels: Sizes from the header pill, Pages from by the zoom, and the picked page's Background. */
-const DESIGN_PANELS = ['sizes', 'pages', 'background'] as const
+/** The design's own panel: Pages, from by the zoom. */
+const DESIGN_PANELS = ['pages'] as const
 /** Every id that opens the edit panel; every other id is a pop-up or the full menu. */
 const PANELS = [...LAYER_PANELS, ...DESIGN_PANELS] as const
 export type LayerPanelId = (typeof LAYER_PANELS)[number]
@@ -34,8 +29,6 @@ interface EditState {
 
 let state: EditState = { open: null, bar: false, barBottom: 0, sheetTop: null, flyoutEnd: null }
 const listeners = new Set<() => void>()
-/** Whether changes go to every format rather than the one shown. */
-const everyFormat = valueStore(false)
 
 const subscribe = (listener: () => void) => {
   listeners.add(listener)
@@ -62,16 +55,6 @@ export function useEditState() {
     () => state,
     () => state,
   )
-}
-
-/** Sends the panels' and the bar's changes to every format, or to the format shown. */
-export function setEveryFormat(every: boolean) {
-  everyFormat.set(every)
-}
-
-/** Whether changes go to every format, re-rendering the caller when that changes. */
-export function useEveryFormat() {
-  return useValue(everyFormat)
 }
 
 /** Under 640 px wide the editor is laid out for a phone: the edit panel is a sheet and the top bar scrolls. */

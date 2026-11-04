@@ -18,7 +18,7 @@ export interface DesignActions {
 }
 
 export interface MasonryDesign extends DesignSummary {
-  /** The primary format's size, when the design has a picture. */
+  /** The cover frame's size, when the design has a picture. */
   cover: { width: number; height: number } | null
 }
 

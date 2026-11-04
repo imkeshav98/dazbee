@@ -95,7 +95,7 @@ export function EditPanel({ editor, brandId }: { editor: Editor; brandId: string
 }
 
 /**
- * The edit panel's frame, for a layer's panels and the design's own (Sizes, Pages, Background): its title, a note and
+ * The edit panel's frame, for a layer's panels and the design's own (Pages): its title, a note and
  * an action beside it, ✕, and a body that scrolls. It floats at the stage's end side under the top
  * bar's row, only as tall as what it holds; on a phone it is a sheet at the bottom. Esc or ✕ closes
  * it, and the focus goes back to the item that opened it when closed from inside it.
@@ -120,7 +120,7 @@ export function PanelFrame({
   const body = useRef<HTMLDivElement>(null)
   const bodyRef = useOverlayScroll(body)
   const scroll = useScrollEdges(body)
-  // Sizes opens from the header pill and from the page's bar: the focus goes back to the one used.
+  // The focus goes back to what opened it: a top bar item, or Pages by the zoom pill.
   const [opener] = useState(() => document.activeElement)
   // Under the top bar while it shows; with nothing selected, under the row kept for it.
   const [rowBottom, setRowBottom] = useState(0)

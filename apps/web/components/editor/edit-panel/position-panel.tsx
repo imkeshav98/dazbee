@@ -42,8 +42,8 @@ const MOVES: { action: (typeof ORDER)[number]; icon: Icon }[] = [
   { action: 'sendToBack', icon: ArrowLineDownIcon },
 ]
 
-/** One layer lines up with its size by these, two to a row: each up-down one beside its across one. */
-const SIZE_ALIGN = [
+/** One layer lines up with its frame by these, two to a row: each up-down one beside its across one. */
+const FRAME_ALIGN = [
   { action: 'alignTop', icon: AlignTopIcon },
   { action: 'alignLeft', icon: AlignLeftIcon },
   { action: 'alignMiddle', icon: AlignCenterVerticalIcon },
@@ -95,7 +95,7 @@ export function RotationField({ target, p, label = '↻' }: { target: Target; p:
 
 /**
  * The Position panel's simple choices: the four moves along the stack, then lining up. One layer
- * lines up with its size, by name, unless an auto layout places it (`placed`); several line up
+ * lines up with its frame, by name, unless an auto layout places it (`placed`); several line up
  * with each other, by icon, and three or more spread out evenly. Each button runs its shortcut's action, and its tooltip names the shortcut.
  */
 function ArrangePart({ target, placed }: { target: Target; placed: boolean }) {
@@ -165,9 +165,9 @@ function ArrangePart({ target, placed }: { target: Target; placed: boolean }) {
       ) : (
         !placed && (
           <>
-            <h3 className={PANEL_HEADING}>{placing.lineUpSize}</h3>
+            <h3 className={PANEL_HEADING}>{placing.lineUpFrame}</h3>
             <div className="grid grid-cols-2 gap-1.5">
-              {SIZE_ALIGN.map(({ action, icon: Icon }) => (
+              {FRAME_ALIGN.map(({ action, icon: Icon }) => (
                 <button
                   key={action}
                   type="button"

@@ -3,10 +3,10 @@
 
 // The brief's form (#136), as in the final mock: a few words, then a chat-style toolbar. + adds a
 // reference ad (one of the brand's designs) or uploads images into the brand's assets, each shown
-// as a thumbnail above the brief; the Formats dropdown picks the formats to make; the Brand kit
+// as a thumbnail above the brief; the Sizes dropdown picks the sizes to make; the Brand kit
 // button opens the whole kit to pick from, and the brand's Brand kit page to set it up or change it
 // (#200). Every choice is a form field, so Make drafts sends it
-// with the brief. The format checkboxes are in the page from the start, so the form works before
+// with the brief. The size checkboxes are in the page from the start, so the form works before
 // any script loads.
 import {
   ArrowLeftIcon,
@@ -24,14 +24,14 @@ import * as Popover from '@radix-ui/react-popover'
 import { useRouter } from 'next/navigation'
 import { type ReactNode, useRef, useState } from 'react'
 
-import { type AssetSummary, type BrandKit, FORMAT_PRESETS } from '@dazbee/schema'
+import { type AssetSummary, type BrandKit, SIZE_PRESETS } from '@dazbee/schema'
 
 import { useBrandKit } from '@/components/brand-kit/use-brand-kit.ts'
 import { buttonStyles } from '@/components/ui/button.tsx'
 import { overlayScroll } from '@/components/ui/overlay-scroll.ts'
 import { Tooltip } from '@/components/ui/tooltip.tsx'
 import { brandPath } from '@/lib/brand-routes.ts'
-import { BRIEF_FORMATS, type BriefFormat } from '@/lib/brief.ts'
+import { BRIEF_SIZES, type BriefSize } from '@/lib/brief.ts'
 import { cn } from '@/lib/cn.ts'
 import { useMessages } from '@/lib/i18n/client.tsx'
 import { format } from '@/lib/i18n/index.ts'
@@ -45,7 +45,7 @@ export type BriefReference = {
   cover: { width: number; height: number } | null
 }
 
-type Popup = 'add' | 'formats' | 'kit'
+type Popup = 'add' | 'sizes' | 'kit'
 
 interface Upload {
   key: string
@@ -90,7 +90,7 @@ export function BriefForm({
   const kit = useBrandKit(brandId, first) ?? first
   const [open, setOpen] = useState<Popup | null>(null)
   const [adding, setAdding] = useState<'menu' | 'reference'>('menu')
-  const [formats, setFormats] = useState<BriefFormat[]>([BRIEF_FORMATS[0]])
+  const [sizes, setSizes] = useState<BriefSize[]>([BRIEF_SIZES[0]])
   const [reference, setReference] = useState<BriefReference | null>(null)
   const [uploads, setUploads] = useState<Upload[]>([])
   const [useKit, setUseKit] = useState(true)
@@ -120,11 +120,11 @@ export function BriefForm({
     return next
   }
 
-  const pickFormat = (id: BriefFormat, on: boolean) =>
-    setFormats((now) => {
-      // The last picked format stays: a brief makes at least one.
+  const pickSize = (id: BriefSize, on: boolean) =>
+    setSizes((now) => {
+      // The last picked size stays: a brief makes at least one.
       if (!on && now.length === 1) return now
-      return on ? BRIEF_FORMATS.filter((f) => f === id || now.includes(f)) : now.filter((f) => f !== id)
+      return on ? BRIEF_SIZES.filter((s) => s === id || now.includes(s)) : now.filter((s) => s !== id)
     })
 
   const upload = (picked: File[]) => {
@@ -139,23 +139,23 @@ export function BriefForm({
     }
   }
 
-  const formatFields = (
+  const sizeFields = (
     <fieldset>
-      <legend className="sr-only">{h.formats}</legend>
-      {BRIEF_FORMATS.map((id) => {
-        const on = formats.includes(id)
-        const last = on && formats.length === 1
+      <legend className="sr-only">{h.sizes}</legend>
+      {BRIEF_SIZES.map((id) => {
+        const on = sizes.includes(id)
+        const last = on && sizes.length === 1
         return (
-          <label key={id} className={cn(ROW, 'has-[:focus-visible]:bg-hover')} title={last ? h.lastFormat : undefined}>
+          <label key={id} className={cn(ROW, 'has-[:focus-visible]:bg-hover')} title={last ? h.lastSize : undefined}>
             <input
               type="checkbox"
-              name="format"
+              name="size"
               value={id}
               checked={on}
-              onChange={(e) => pickFormat(id, e.target.checked)}
-              aria-describedby={last ? 'brief-last-format' : undefined}
+              onChange={(e) => pickSize(id, e.target.checked)}
+              aria-describedby={last ? 'brief-last-size' : undefined}
               className="sr-only"
-              data-testid={`brief-format-${id}`}
+              data-testid={`brief-size-${id}`}
             />
             <Tick on={on} />
             <span className="grid w-5 shrink-0 place-items-center text-muted">
@@ -165,9 +165,9 @@ export function BriefForm({
           </label>
         )
       })}
-      {formats.length === 1 && (
-        <p id="brief-last-format" className="px-2.5 pt-1 pb-1.5 text-[11px] text-subtle">
-          {h.lastFormat}
+      {sizes.length === 1 && (
+        <p id="brief-last-size" className="px-2.5 pt-1 pb-1.5 text-[11px] text-subtle">
+          {h.lastSize}
         </p>
       )}
     </fieldset>
@@ -367,16 +367,16 @@ export function BriefForm({
           }}
         />
 
-        {/* Formats: the four everyday ones, at least one picked. */}
-        <Popover.Root open={open === 'formats'} onOpenChange={toggle('formats')}>
+        {/* Sizes: the four everyday ones, at least one picked. */}
+        <Popover.Root open={open === 'sizes'} onOpenChange={toggle('sizes')}>
           <Popover.Trigger asChild>
-            <button type="button" className={TOOL} data-testid="brief-formats">
+            <button type="button" className={TOOL} data-testid="brief-sizes">
               <span aria-hidden className="flex items-center gap-0.5">
-                {formats.slice(0, 3).map((id) => (
+                {sizes.slice(0, 3).map((id) => (
                   <Shape key={id} id={id} size={13} />
                 ))}
               </span>
-              {formats.length === 1 ? h.formatsOne : format(h.formatsMany, { n: formats.length })}
+              {sizes.length === 1 ? h.sizesOne : format(h.sizesMany, { n: sizes.length })}
               <CaretDownIcon size={12} weight="bold" aria-hidden />
             </button>
           </Popover.Trigger>
@@ -384,15 +384,15 @@ export function BriefForm({
             align="start"
             sideOffset={8}
             collisionPadding={16}
-            aria-label={h.formats}
+            aria-label={h.sizes}
             className={cn(PANEL, 'w-56')}
           >
-            {formatFields}
+            {sizeFields}
           </Popover.Content>
         </Popover.Root>
         {/* While the dropdown is closed the same checkboxes stay in the form, hidden, so the picked
-            formats are sent even before any script runs. */}
-        {open !== 'formats' && <div hidden>{formatFields}</div>}
+            sizes are sent even before any script runs. */}
+        {open !== 'sizes' && <div hidden>{sizeFields}</div>}
 
         {/* Brand kit: a ring in the kit's colours, pressed while the kit is in use. */}
         <Popover.Root open={open === 'kit'} onOpenChange={toggle('kit')}>
@@ -633,9 +633,9 @@ function Tick({ on }: { on: boolean }) {
   )
 }
 
-/** A format's outline in its proportions, at most `size` pixels on its long side. */
+/** A size's outline in its proportions, at most `size` pixels on its long side. */
 function Shape({ id, size }: { id: string; size: number }) {
-  const preset = FORMAT_PRESETS.find((p) => p.id === id)
+  const preset = SIZE_PRESETS.find((p) => p.id === id)
   if (!preset) return null
   const scale = size / Math.max(preset.width, preset.height)
   return (

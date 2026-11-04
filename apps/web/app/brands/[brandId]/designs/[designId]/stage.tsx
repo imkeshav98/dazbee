@@ -8,14 +8,13 @@ import { isVectorAsset } from '@dazbee/schema'
 import { ASSET_DRAG_TYPE, draggedAsset, VECTOR_DRAG_TYPE } from '@/components/editor/asset-drag.ts'
 import { EditPanel } from '@/components/editor/edit-panel/edit-panel.tsx'
 import { useEditState } from '@/components/editor/edit-store.ts'
+import { EmptyPageHint } from '@/components/editor/empty-page-hint.tsx'
 import { AssetLibrary } from '@/components/editor/flyouts/asset-library.tsx'
 import { BrandKitPanel } from '@/components/editor/flyouts/brand-kit-panel.tsx'
 import { LayersPanel } from '@/components/editor/flyouts/layers-panel.tsx'
-import { FocusChip } from '@/components/editor/focus-chip.tsx'
-import { FormatsButton, FormatsPanel } from '@/components/editor/formats-panel.tsx'
 import { ShareMenu } from '@/components/editor/menus/share-menu.tsx'
 import { ZoomControl } from '@/components/editor/menus/zoom-control.tsx'
-import { BackgroundPanel, PagesButton, PagesPanel } from '@/components/editor/pages-panel.tsx'
+import { PagesButton, PagesPanel } from '@/components/editor/pages-panel.tsx'
 import { type ChromeInsets, EditorShell } from '@/components/editor/shell.tsx'
 import { NoticeToast, UndoToast } from '@/components/editor/toasts.tsx'
 import { HistoryButtons } from '@/components/editor/top-bar/history-buttons.tsx'
@@ -46,7 +45,6 @@ export function EditorStage({
   brandId,
   brandName,
   everyBrand,
-  formatId,
   syncUrl,
   account,
 }: {
@@ -56,7 +54,6 @@ export function EditorStage({
   brandName: string
   /** How the workspace says "every brand", for a template's scope (#54). */
   everyBrand: string
-  formatId: string | undefined
   syncUrl: string
   /** The account avatar and its menu, at the top end after Share. */
   account?: ReactNode
@@ -79,9 +76,8 @@ export function EditorStage({
   // A right-click on a layer: where, for the menu of its actions, and a count so each right-click opens its own.
   const [menuAt, setMenuAt] = useState<{ x: number; y: number; n: number } | null>(null)
   const dismissNotice = useCallback(() => setNotice(null), [])
-  // Where the top bar ends and, on a phone, where the open sheet starts: the show-alone chip sits
-  // under the bar, and the toasts above the sheet.
-  const { bar, barBottom, sheetTop } = useEditState()
+  // Where the open sheet starts on a phone: the toasts sit above it.
+  const { sheetTop } = useEditState()
   useEffect(() => {
     if (!editor) return
     const stop = editor.onNotice((n, parts) => {
@@ -193,7 +189,6 @@ export function EditorStage({
           assetBytes: (assetId) => assetBytes(brandId, assetId),
           fontFiles: fontLoader(brandId),
           ...(variables ? { variables } : {}),
-          ...(formatId ? { formatId } : {}),
           onStatus: status.set,
           onZoom: zoom.set,
           signal: unmounted.signal,
@@ -217,7 +212,7 @@ export function EditorStage({
       setEditor(null)
       zoom.set(null)
     }
-  }, [brandId, designId, formatId, syncUrl, status, zoom])
+  }, [brandId, designId, syncUrl, status, zoom])
 
   return (
     <EditorShell
@@ -226,7 +221,6 @@ export function EditorStage({
       designName={name}
       onRename={async (next) => setName(await renameFromEditor(brandId, designId, next))}
       status={status}
-      formats={editor ? <FormatsButton editor={editor} /> : undefined}
       history={editor ? <HistoryButtons editor={editor} /> : undefined}
       tool={dockTool}
       shape={shape}
@@ -242,7 +236,7 @@ export function EditorStage({
       image={{
         picking: !imagePicked,
         onPick: (asset) => {
-          // An SVG file goes on the page at once, as layers; an image is placed by a click or a drag.
+          // An SVG file goes on the frame in view at once, as layers; an image is placed by a click or a drag.
           if (isVectorAsset(asset)) {
             if (editor) placeAsset(editor, brandId, asset)
             return
@@ -332,16 +326,8 @@ export function EditorStage({
       {editor && <TopBar editor={editor} brandId={brandId} />}
       {editor && <SmallMenu editor={editor} rightClick={menuAt !== null} />}
       {editor && <EditPanel editor={editor} brandId={brandId} />}
-      {editor && <FormatsPanel editor={editor} onRemoved={setRemoved} />}
       {editor && <PagesPanel editor={editor} onRemoved={setRemoved} />}
-      {editor && <BackgroundPanel editor={editor} brandId={brandId} />}
-      <div
-        data-slot="mini-bar"
-        style={{ top: bar ? barBottom + 8 : 16 }}
-        className="pointer-events-none absolute inset-x-0 z-10 flex justify-center"
-      >
-        {editor && <FocusChip editor={editor} />}
-      </div>
+      {editor && <EmptyPageHint editor={editor} />}
       <div
         data-toasts
         style={sheetTop === null ? undefined : { bottom: `calc(100% - ${sheetTop}px + 8px)` }}

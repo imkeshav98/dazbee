@@ -1,18 +1,18 @@
 'use client'
 
 // The Colour panel: the brand kit's and the design's colours, any paint by +, and every fill under
-// Advanced; and the page's Background panel, built the same way.
+// Advanced.
 import { ImageSquareIcon, PlusIcon } from '@phosphor-icons/react'
 import { type ReactNode, useState } from 'react'
 
-import { type Editor, withImage } from '@dazbee/editor'
+import { withImage } from '@dazbee/editor'
 import { boundFillIndex, brandRef, type Design, type Paint } from '@dazbee/schema'
 
 import { useBrandKit } from '@/components/brand-kit/use-brand-kit.ts'
 import { ImagePickerButton } from '@/components/editor/image-tool.tsx'
 import { PaintEditor, PaintRow } from '@/components/editor/paint-stack.tsx'
-import { AddButton, ListBody, ReorderList } from '@/components/editor/reorder-list.tsx'
-import { FIELD_LABEL, PANEL_BUTTON, PICKED_RING, SWATCH, SWATCHES } from '@/components/editor/styles.ts'
+import { ListBody } from '@/components/editor/reorder-list.tsx'
+import { PANEL_BUTTON, PICKED_RING, SWATCH, SWATCHES } from '@/components/editor/styles.ts'
 import { FOCUS_RING } from '@/components/ui/looks.ts'
 import { cn } from '@/lib/cn.ts'
 import { hexChange, hexOf } from '@/lib/colour.ts'
@@ -36,99 +36,6 @@ export function ColourPanel({ target, design, brandId }: PanelProps) {
     <TextColourPanel target={target} design={design} brandId={brandId} p={p} b={t.editor.bar} />
   ) : (
     <FillColourPanel target={target} design={design} brandId={brandId} p={p} b={t.editor.bar} />
-  )
-}
-
-/**
- * The picked page's Background panel: the kit's and the design's colours, which paint its top fill
- * that shows, + with any paint for it, then its background layers under Advanced. It changes the
- * page in every size, and has no brand binding: a kit colour paints as it is.
- */
-export function BackgroundBody({
-  editor,
-  design,
-  pageId,
-  brandId,
-}: {
-  editor: Editor
-  design: Design
-  pageId: string
-  brandId: string
-}) {
-  const t = useMessages()
-  const p = t.editor.props
-  const b = t.editor.bar
-  const g = t.editor.page
-  const fills = design.pages[pageId]?.fills ?? []
-  // Each change runs on the page's fills as the document holds them then.
-  const writeFills = (to: (now: Paint[]) => Paint[]) =>
-    editor.session.run('page.update', { id: pageId, fills: to(editor.design().pages[pageId]?.fills ?? []) })
-  const bound = fills[boundFillIndex(fills)]
-  const paint = (hex: string) =>
-    writeFills((now) => {
-      const i = boundFillIndex(now)
-      const solid: Paint = { type: 'solid', color: `${hex.toUpperCase()}FF` }
-      return i < 0
-        ? [...now, solid]
-        : now.map((f, j) => (j === i ? (f.type === 'solid' ? { ...f, color: solid.color } : solid) : f))
-    })
-  // The picker edits the topmost fill that shows, whatever its type, as the Colour panel's does.
-  const showing = (now: Paint[]) => now.findLastIndex((f) => f.visible !== false)
-  const pickFill = (to: (now: Paint) => Paint) =>
-    writeFills((now) => {
-      const i = showing(now)
-      return i < 0 ? [...now, to(NEW_FILL)] : now.map((f, j) => (j === i ? to(f) : f))
-    })
-  return (
-    <>
-      <ColourChoices
-        design={design}
-        brandId={brandId}
-        p={p}
-        b={b}
-        current={bound?.type === 'solid' ? bound.color : undefined}
-        paint={paint}
-        picker={
-          <PaintEditor
-            paint={fills[showing(fills)] ?? NEW_FILL}
-            brandId={brandId}
-            editor={editor}
-            p={p}
-            onSet={pickFill}
-          />
-        }
-      />
-      <PanelPart id="background-card" title={b.advanced} strong>
-        <div className="flex flex-col gap-2" data-testid="page-fills">
-          <div className={cn('flex items-center justify-between', FIELD_LABEL)}>
-            {g.layers}
-            <AddButton
-              label={g.addLayer}
-              onClick={() =>
-                writeFills((now) => [...now, now.length === 0 ? { type: 'solid', color: '#FFFFFFFF' } : FILL_ON_TOP])
-              }
-            />
-          </div>
-          <ReorderList
-            items={fills}
-            field="fills"
-            topFirst
-            removeLabel={(n) => format(p.remove, { name: g.layer, n })}
-            onWrite={writeFills}
-            render={(item, n, change) => (
-              <PaintRow
-                paint={item}
-                name={format(g.layerName, { n })}
-                brandId={brandId}
-                editor={editor}
-                p={p}
-                onSet={change}
-              />
-            )}
-          />
-        </div>
-      </PanelPart>
-    </>
   )
 }
 

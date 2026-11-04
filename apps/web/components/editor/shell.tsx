@@ -79,7 +79,7 @@ const SQUISH = {
   still: { scaleX: 1, scaleY: 1 },
 }
 
-/** Lets the open flyout's content set the small grey note in its title row, as Layers does with its page and format. */
+/** Lets the open flyout's content set the small grey note in its title row, as Layers does with its page and frame. */
 const FlyoutNote = createContext<(change: (now: Note) => Note) => void>(() => undefined)
 
 /**
@@ -127,7 +127,6 @@ export function EditorShell({
   designName,
   onRename,
   status,
-  formats,
   history,
   tool: shownTool,
   shape = 'rect',
@@ -147,8 +146,6 @@ export function EditorShell({
   onRename?: (name: string) => Promise<void>
   /** The editor's save state, or what it is doing before it opens. */
   status: ValueStore<string>
-  /** The button for the design's formats (Sizes on screen), after its name. */
-  formats?: ReactNode
   /** Undo and redo, after the save state in the header pill. */
   history?: ReactNode
   /** The tool in use, when the editor decides it (a key, or drawing a shape ends); the dock keeps its own otherwise. */
@@ -294,7 +291,6 @@ export function EditorShell({
                 </span>
                 <DesignName name={designName} onRename={onRename} />
               </nav>
-              {formats}
               <SaveStatus status={status} fitted={fitted} />
               {history}
             </div>
@@ -394,7 +390,7 @@ export function EditorShell({
                 data-testid="flyout"
                 className="absolute start-[7.25rem] top-20 z-10 flex max-h-[calc(100%-5.75rem)] w-[21.5rem] flex-col overflow-hidden rounded-[16px] surface-frost max-sm:inset-x-3 max-sm:start-3 max-sm:top-auto max-sm:bottom-[9rem] max-sm:max-h-[calc(100%-9rem-7.5rem)] max-sm:w-auto"
               >
-                {/* The title at the start and, as in the mock, a small grey note at the end: the brand, or the page and format. */}
+                {/* The title at the start and, as in the mock, a small grey note at the end: the brand, or the page and frame. */}
                 <div className="flex h-14 shrink-0 items-center gap-2 ps-[18px] pe-2">
                   <h2
                     className={cn(

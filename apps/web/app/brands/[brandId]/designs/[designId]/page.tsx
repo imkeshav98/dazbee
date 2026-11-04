@@ -11,15 +11,8 @@ import { EditorStage } from './stage.tsx'
 
 export const metadata = { title: 'Dazbee editor' }
 
-export default async function EditPage({
-  params,
-  searchParams,
-}: {
-  params: Promise<{ brandId: string; designId: string }>
-  searchParams: Promise<{ format?: string }>
-}) {
+export default async function EditPage({ params }: { params: Promise<{ brandId: string; designId: string }> }) {
   const { brandId, designId } = await params
-  const { format } = await searchParams
   const [found, workspace, t, jar] = await Promise.all([
     findDesign(brandId, designId),
     getWorkspace(),
@@ -34,7 +27,6 @@ export default async function EditPage({
       brandId={found.brand.id}
       brandName={found.brand.name}
       everyBrand={brandWords(t).all}
-      formatId={format}
       syncUrl={process.env.NEXT_PUBLIC_SYNC_URL ?? 'ws://localhost:1234'}
       account={<AccountMenu name={workspace.name} signedIn={jar.has(SESSION_COOKIE)} />}
     />

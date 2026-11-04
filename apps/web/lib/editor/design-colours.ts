@@ -1,11 +1,11 @@
-// The solid colours a design already uses, in its pages' and layers' fills, outlines and text, each
+// The solid colours a design already uses, in its frames' and layers' fills, outlines and text, each
 // once, as #RRGGBB in the order they are found: the Colour panel's "In this design" row.
 
 import { hexOf } from '@/lib/colour.ts'
 
 type Paint = { type: string; color?: string }
 type Shape = {
-  pages: Record<string, { fills?: readonly unknown[] }>
+  frames: Record<string, { fills?: readonly unknown[] }>
   nodes: Record<string, { props: object }>
 }
 
@@ -20,7 +20,7 @@ export function designColours(design: Shape): string[] {
   const paints = (list: unknown) => {
     for (const paint of (list ?? []) as Paint[]) if (paint.type === 'solid') add(paint.color)
   }
-  for (const page of Object.values(design.pages)) paints(page.fills)
+  for (const frame of Object.values(design.frames)) paints(frame.fills)
   for (const node of Object.values(design.nodes)) {
     const props = node.props as { fills?: unknown; strokes?: { paint: Paint }[]; style?: { color?: unknown } }
     paints(props.fills)

@@ -1,5 +1,5 @@
 // A brand's designs (Recent in the capsule), as the earlier mock's masonry page: the brand's name
-// with chips that filter by the primary format's shape, then every design in its own shape.
+// with chips that filter by the cover frame's shape, then every design in its own shape.
 import { notFound } from 'next/navigation'
 
 import { shapeOf } from '@dazbee/schema'

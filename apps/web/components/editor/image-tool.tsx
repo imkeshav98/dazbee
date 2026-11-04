@@ -2,7 +2,7 @@
 
 // Picking an image: a panel of the brand's images with an upload from the computer, shown by the
 // image tool in the tool dock (its button, or I), by the Image card's Replace and by a fill's Add
-// image. The tool places the image picked where the next click or drag on a format lands; closing
+// image. The tool places the image picked where the next click or drag on a frame lands; closing
 // its picker without a pick goes back to the select tool.
 import { ImageIcon, UploadSimpleIcon } from '@phosphor-icons/react'
 import * as Popover from '@radix-ui/react-popover'

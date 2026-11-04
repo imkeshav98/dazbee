@@ -1,17 +1,12 @@
 'use client'
 
-// The hooks that follow the editor: the selection, the design and the format shown alone, the picked
-// page, and the text being edited. Each re-renders its caller when what it follows changes.
+// The hooks that follow the editor: the selection, the design, the page the canvas shows and its
+// frames, and the text being edited. Each re-renders its caller when what it follows changes.
 import { useEffect, useState } from 'react'
 
-import type { Editor } from '@dazbee/editor'
-
-import { valueStore } from '@/lib/editor/value-store.ts'
+import type { Editor, Frame } from '@dazbee/editor'
 
 import { useLiveDesign } from './use-live-design.ts'
-
-/** The page last brought into view, from the Pages panel or by picking it on the stage. */
-export const shownPage = valueStore<string | null>(null)
 
 /** The selected layers, kept current. */
 export function useSelection(editor: Editor) {
@@ -40,31 +35,39 @@ export function useSelectionWithFrame(editor: Editor) {
 /** The design as the editor holds it, kept current: every redraw hands over the latest one. */
 export function useEditorDesign(editor: Editor) {
   const { design } = useLiveDesign(editor)
-  const [focused, setFocused] = useState(() => editor.focused())
-  useEffect(() => {
-    const stop = editor.onDraw(() => setFocused(editor.focused()))
-    return () => {
-      stop()
-    }
-  }, [editor])
-  return { design, focused }
+  return { design }
 }
 
-/** The page a click on its background picked, or null, following the stage; a picked page becomes `shownPage`. */
-export function usePickedPage(editor: Editor) {
-  const [picked, setPicked] = useState(() => editor.pickedPage())
+/** The page the canvas shows, kept current: it changes when another page is shown or the shown one is deleted. */
+export function useShownPage(editor: Editor) {
+  const [page, setPage] = useState(() => editor.shownPage())
   useEffect(() => {
-    const follow = (pageId: string | null) => {
-      setPicked(pageId)
-      if (pageId) shownPage.set(pageId)
-    }
-    follow(editor.pickedPage())
-    const stop = editor.onPagePick(follow)
+    const follow = () => setPage(editor.shownPage())
+    follow()
+    const stop = editor.onDraw(follow)
     return () => {
       stop()
     }
   }, [editor])
-  return picked
+  return page
+}
+
+/** The shown page's frames as last drawn, by order, kept current; the same array while none of them changed. */
+export function useShownFrames(editor: Editor) {
+  const [frames, setFrames] = useState(() => editor.frames())
+  useEffect(() => {
+    const follow = () =>
+      setFrames((now) => {
+        const next = editor.frames()
+        return sameFrames(now, next) ? now : next
+      })
+    follow()
+    const stop = editor.onDraw(follow)
+    return () => {
+      stop()
+    }
+  }, [editor])
+  return frames
 }
 
 /** Renders again whenever the text being edited, or its selected range, changes. */
@@ -77,4 +80,23 @@ export function useTextSelection(editor: Editor) {
     }
   }, [editor])
   return editor.textSelection()
+}
+
+function sameFrames(a: readonly Frame[], b: readonly Frame[]) {
+  return (
+    a.length === b.length &&
+    a.every((frame, i) => {
+      const other = b[i]
+      return (
+        other !== undefined &&
+        frame.key === other.key &&
+        frame.pageId === other.pageId &&
+        frame.name === other.name &&
+        frame.x === other.x &&
+        frame.y === other.y &&
+        frame.width === other.width &&
+        frame.height === other.height
+      )
+    })
+  )
 }

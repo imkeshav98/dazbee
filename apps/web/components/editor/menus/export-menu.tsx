@@ -1,21 +1,19 @@
 'use client'
 
-// Export: pick the pages, the sizes (formats) as tiles, PNG, JPG, PDF or SVG and the file names,
-// and the editor's export worker draws them while the stage stays responsive. One file downloads
-// as itself, more as a zip with a folder per format.
+// Export: every frame of this page or of every page, PNG, JPG, PDF or SVG, and the file names; the
+// editor's export worker draws them while the stage stays responsive. One file downloads as itself,
+// more as one zip.
 import { useState } from 'react'
 
 import type { Editor } from '@dazbee/editor'
-import { DEFAULT_EXPORT_NAME, type Design, type ExportType, inOrder } from '@dazbee/schema'
+import { DEFAULT_EXPORT_NAME, type Design, type ExportType, framesOf, inOrder } from '@dazbee/schema'
 
 import { NumberField } from '@/components/editor/edit-panel/fields.tsx'
-import { useSelection } from '@/components/editor/editor-hooks.ts'
-import { Proportion } from '@/components/editor/size-fields.tsx'
-import { FIELD, FIELD_LABEL, LINK_BUTTON, SEGMENT, SEGMENTS, TILE, TILE_FACE_WIDE } from '@/components/editor/styles.ts'
+import { useShownPage } from '@/components/editor/editor-hooks.ts'
+import { FIELD, FIELD_LABEL, SEGMENT, SEGMENTS } from '@/components/editor/styles.ts'
 import { Button } from '@/components/ui/button.tsx'
 import { Select } from '@/components/ui/select.tsx'
 import { cn } from '@/lib/cn.ts'
-import { sizeOf } from '@/lib/editor/size.ts'
 import { useMessages } from '@/lib/i18n/client.tsx'
 import { format } from '@/lib/i18n/index.ts'
 
@@ -35,43 +33,28 @@ function download(name: string, type: string, bytes: Uint8Array<ArrayBuffer>) {
 export function ExportForm({ id, editor, design }: { id: string; editor: Editor; design: Design }) {
   const t = useMessages()
   const pages = inOrder(design.pages)
-  const formats = inOrder(design.formats)
-  // This page: the one picked here while it exists, else the one the selection is on (as the layers
-  // panel shows it), else the first.
-  useSelection(editor)
-  const selectionPage = editor.selectedFrame()?.split('/')[0]
+  // This page: the one picked here while it exists, else the one the canvas shows.
+  const shown = useShownPage(editor)
   const [allPages, setAllPages] = useState(true)
   const [chosen, setChosen] = useState<string | null>(null)
-  const thisPage =
-    chosen && design.pages[chosen]
-      ? chosen
-      : selectionPage && design.pages[selectionPage]
-        ? selectionPage
-        : (pages[0]?.[0] ?? '')
-  const everyFormat = () => new Set(formats.map(([formatId]) => formatId))
+  const thisPage = chosen && Object.hasOwn(design.pages, chosen) ? chosen : shown
   const [name, setName] = useState(DEFAULT_EXPORT_NAME)
-  const [picked, setPicked] = useState<Set<string>>(everyFormat)
   const [type, setType] = useState<ExportType>('png')
   const [quality, setQuality] = useState(90)
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null)
   const [error, setError] = useState<string | null>(null)
 
-  const pageIds = allPages ? pages.map(([pageId]) => pageId) : [thisPage]
-  const formatIds = formats.map(([formatId]) => formatId).filter((formatId) => picked.has(formatId))
-  const count = pageIds.length * formatIds.length
-  const allPicked = formatIds.length === formats.length
-  const toggle = (formatId: string) => {
-    const next = new Set(picked)
-    if (!next.delete(formatId)) next.add(formatId)
-    setPicked(next)
-  }
+  // Every frame of the pages asked for, by page then by frame order.
+  const asked = allPages ? pages.map(([pageId]) => pageId) : [thisPage]
+  const frameIds = asked.flatMap((pageId) => framesOf(design, pageId).map(([frameId]) => frameId))
+  const count = frameIds.length
 
   const run = async () => {
     setError(null)
     setProgress({ done: 0, total: count })
     try {
       const file = await editor.exportFiles(
-        { pageIds, formatIds, type, quality, name: name.trim() || DEFAULT_EXPORT_NAME },
+        { frameIds, type, quality, name: name.trim() || DEFAULT_EXPORT_NAME },
         (done, total) => setProgress({ done, total }),
       )
       download(file.name, file.type, file.bytes as Uint8Array<ArrayBuffer>)
@@ -126,41 +109,6 @@ export function ExportForm({ id, editor, design }: { id: string; editor: Editor;
             className="h-8 bg-raised px-2 text-[13px]"
           />
         )}
-      </div>
-
-      <div className="flex flex-col gap-1.5">
-        <div className="flex items-center justify-between">
-          <span className={LABEL}>{t.editor.exports.formats}</span>
-          <button
-            type="button"
-            aria-pressed={allPicked}
-            aria-label={t.editor.exports.allFormatsName}
-            onClick={() => setPicked(allPicked ? new Set() : everyFormat())}
-            data-testid="export-all-formats"
-            className={LINK_BUTTON}
-          >
-            {t.editor.exports.allFormats}
-          </button>
-        </div>
-        <div role="group" aria-label={t.editor.exports.formats} className="grid grid-cols-3 gap-2">
-          {formats.map(([formatId, f]) => (
-            <button
-              key={formatId}
-              type="button"
-              aria-pressed={picked.has(formatId)}
-              aria-label={`${f.name}, ${sizeOf(f)}`}
-              title={`${f.name}, ${sizeOf(f)}`}
-              onClick={() => toggle(formatId)}
-              data-format={formatId}
-              className={TILE}
-            >
-              <span className={TILE_FACE_WIDE}>
-                <Proportion width={f.width} height={f.height} />
-              </span>
-              <span className="w-full truncate text-center">{f.name}</span>
-            </button>
-          ))}
-        </div>
       </div>
 
       <div className="flex flex-col gap-1.5">

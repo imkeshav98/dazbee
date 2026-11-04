@@ -3,8 +3,7 @@
 // The small menu by the selection: lock, duplicate, delete and ⋯, with Group first for several. It
 // sits above the selection, below it when there is no room above, and under the top bar when there
 // is room neither side, as when the selection fills the stage. It keeps off the top bar, the edit
-// panel, the rail and its flyout, the bottom controls and the show-alone chip, and hides while a
-// gesture runs, a top bar pop-up or the right-click menu is open, or the selection is off the stage.
+// panel, the rail and its flyout and the bottom controls, and hides while a gesture runs, a top bar pop-up or the right-click menu is open, or the selection is off the stage.
 // ⋯ opens the full menu beside it, clear of the rail and its flyout.
 import {
   CopyIcon,
@@ -71,7 +70,6 @@ function obstacles(stage: HTMLElement): Box[] {
     '#editor-flyout',
     '[data-dock]',
     '[data-zoom]',
-    '[data-testid="focus-chip"]',
     '[data-testid="island-start"]',
     '[data-testid="island-end"]',
     '[data-toasts] > *',
@@ -119,10 +117,8 @@ function usePlace(editor: Editor, menu: HTMLElement | null, rightClick: boolean)
       const blocked = obstacles(stage)
       const floor = (sheetTop ?? room.height) - CLEAR
       const centre = rect.x + rect.width / 2 - width / 2
-      // Under the top bar comes the bar's second row, then the show-alone chip, then this.
-      const chip = document.querySelector('[data-testid="focus-chip"]')?.getBoundingClientRect()
-      const chipBottom = chip && chip.height > 0 ? chip.bottom - stage.getBoundingClientRect().top + CLEAR : 0
-      const under = Math.max(editState().barBottom + CLEAR, chipBottom)
+      // Under the top bar comes the bar's second row, then this.
+      const under = editState().barBottom + CLEAR
       for (const wanted of [rect.y - height - GAP, rect.y + rect.height + GAP, under]) {
         const top = Math.round(wanted)
         if (top < 0 || top + height > floor) continue

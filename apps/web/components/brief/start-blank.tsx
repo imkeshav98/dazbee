@@ -1,12 +1,12 @@
 // Under the brand home's brief: "Or start blank" and a row of sizes, each drawn in its own shape
-// (Square, Portrait, Story, Banner), that open an empty design in that size, and a last tile for
+// (Square, Portrait, Story, Banner), that open a design of one empty frame in that size, and a last tile for
 // the brand's templates. Each size is a form, so it works before any script loads.
 import { SquaresFourIcon } from '@phosphor-icons/react/ssr'
 import Link from 'next/link'
 
-import { FORMAT_PRESETS } from '@dazbee/schema'
+import { SIZE_PRESETS } from '@dazbee/schema'
 
-import { BRIEF_FORMATS, type BriefFormat } from '@/lib/brief.ts'
+import { BRIEF_SIZES, type BriefSize } from '@/lib/brief.ts'
 import { format, type Messages } from '@/lib/i18n/index.ts'
 
 /** The longest side of a size's outline, in pixels. */
@@ -24,8 +24,8 @@ export function StartBlank({
 }: {
   t: Messages
   brandId: string
-  /** Makes an empty design in this size and opens it. */
-  start: (formatId: BriefFormat) => Promise<void>
+  /** Makes a design of one empty frame in this size and opens it. */
+  start: (sizeId: BriefSize) => Promise<void>
 }) {
   return (
     <section
@@ -37,8 +37,8 @@ export function StartBlank({
         {t.home.startBlank}
       </h2>
       <ul className="flex flex-wrap items-end justify-center gap-1 sm:gap-3 md:gap-5">
-        {BRIEF_FORMATS.map((id) => {
-          const preset = FORMAT_PRESETS.find((p) => p.id === id)
+        {BRIEF_SIZES.map((id) => {
+          const preset = SIZE_PRESETS.find((p) => p.id === id)
           if (!preset) return null
           const scale = OUTLINE / Math.max(preset.width, preset.height)
           const name = t.home.chips[id]

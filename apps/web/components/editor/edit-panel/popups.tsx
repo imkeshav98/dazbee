@@ -298,8 +298,8 @@ function BoxCard({ target, p }: { target: Target; p: P }) {
 }
 
 /**
- * A boolean's operation, changed in place for every format: its shapes added together, the rest
- * cut from the first, where they overlap, or where they don't.
+ * A boolean's operation, changed in place: its shapes added together, the rest cut from the first,
+ * where they overlap, or where they don't.
  */
 function CombineCard({ target, p, a }: { target: Target; p: P; a: Messages['editor']['arrange'] }) {
   const value = shared(target.props.map((pr) => pr.op as (typeof BooleanOp.options)[number]))
@@ -319,7 +319,7 @@ function CombineCard({ target, p, a }: { target: Target; p: P; a: Messages['edit
               aria-label={name}
               title={name}
               data-value={op}
-              onClick={() => set({ ...target, everyFormat: true }, () => ({ op }))}
+              onClick={() => set(target, () => ({ op }))}
               className={cn(SEGMENT, 'grid place-items-center')}
             >
               {Icon && <Icon size={16} aria-hidden />}
@@ -331,7 +331,7 @@ function CombineCard({ target, p, a }: { target: Target; p: P; a: Messages['edit
   )
 }
 
-/** A mask: by its shape (where it is opaque) or by its brightness. A mask is the same in every format. */
+/** A mask: by its shape (where it is opaque) or by its brightness. */
 function MaskCard({ target, p }: { target: Target; p: P }) {
   return (
     <PanelPart id="mask-card" title={p.mask}>

@@ -1,15 +1,13 @@
 'use client'
 
-// The selection as the edit panels, the pop-ups and the top bar act on it: its layers' values in
-// the frame they are selected in, read as the one value they share or as mixed, and set on every
-// layer at once. Setting a value gives them all the same one, and scrubbing or the arrow keys move
-// each from its own. With more than one format a change goes to every format or to the one shown
-// only. Each change is one undo step, and a drag on a number, however long, is one too.
-import { mergedProps } from '@dazbee/doc'
+// The selection as the edit panels, the pop-ups and the top bar act on it: its layers' own values,
+// read as the one value they share or as mixed, and set on every layer at once. Setting a value
+// gives them all the same one, and scrubbing or the arrow keys move each from its own. A change stays
+// on these layers: their linked copies in other frames keep their own values. Each change is one
+// undo step, and a drag on a number, however long, is one too.
 import { type Editor } from '@dazbee/editor'
-import { type Design, formatScope, type Paint } from '@dazbee/schema'
+import { type Design, type Paint } from '@dazbee/schema'
 
-import { useEveryFormat } from '@/components/editor/edit-store.ts'
 import { useTextSelection } from '@/components/editor/editor-hooks.ts'
 import { useLiveDesign } from '@/components/editor/use-live-design.ts'
 import { tidy } from '@/lib/editor/size.ts'
@@ -33,14 +31,11 @@ export type Style = Record<string, unknown> & {
   textCase?: string
 }
 
-/** What the edit panels act on: the layers, the frame they are shown in, and where changes go. */
+/** What the edit panels act on: the layers and their values. */
 export interface Target {
   editor: Editor
   ids: string[]
-  pageId: string
-  formatId: string
-  everyFormat: boolean
-  /** Each layer's values in the frame: its own, with its format's overrides on top. */
+  /** Each layer's own values. */
   props: Props[]
   types: string[]
   /** The layers' names, for a panel part's note. */
@@ -68,13 +63,7 @@ export type Kind = 'text' | 'photo' | 'shape' | 'box' | 'group' | 'mixed'
 
 export const set = (target: Target, to: (now: Props, i: number) => Patch | null) => {
   const index = new Map(target.ids.map((id, i) => [id, i]))
-  return target.editor.setProps(
-    target.ids,
-    (id, now) => to(now, index.get(id) ?? 0),
-    target.everyFormat,
-    target.pageId,
-    target.formatId,
-  )
+  return target.editor.setProps(target.ids, (id, now) => to(now, index.get(id) ?? 0))
 }
 
 export const num = (props: Props, key: string) => props[key] as number
@@ -84,28 +73,20 @@ export const setTextFlag = (target: Target, key: 'underline' | 'strikethrough', 
   textStyle(target).setStyle(key, on)
 
 /**
- * The selected layers as the edit panels and the bar act on them, in the frame they are selected in: like a
- * drag on the canvas, a change goes to the format shown unless every format is asked for. Null when
+ * The selected layers as the edit panels and the bar act on them, with their own values. Null when
  * none of them is in the design.
  */
 export function useTarget(editor: Editor, ids: string[]): { target: Target; design: Design } | null {
   const { design } = useLiveDesign(editor)
   const editing = useTextSelection(editor)
-  const everyFormat = useEveryFormat()
-  const [framePage, frameFormat] = editor.selectedFrame()?.split('/') ?? []
-  const formatId = frameFormat && design.formats[frameFormat] ? frameFormat : design.meta.primaryFormatId
   const live = ids.filter((id) => design.nodes[id])
   if (live.length === 0) return null
-  const placedIn = (id: string): Props => mergedProps(design, formatScope(formatId), id)
   return {
     design,
     target: {
       editor,
       ids: live,
-      pageId: framePage ?? '',
-      formatId,
-      everyFormat: everyFormat || Object.keys(design.formats).length === 1,
-      props: live.map(placedIn),
+      props: live.map((id): Props => design.nodes[id]?.props ?? {}),
       types: live.map((id) => design.nodes[id]?.type ?? ''),
       names: live.map((id) => design.nodes[id]?.name ?? ''),
       range:

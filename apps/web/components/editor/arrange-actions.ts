@@ -1,8 +1,8 @@
 'use client'
 
 // The actions that arrange the selection, for the bar by it and ⋯ More: align, distribute and combine,
-// each with its shortcut. Several layers line up with each other; one layer lines up with the
-// format, or the group or box it is in. Two or more shapes combine into a live boolean.
+// each with its shortcut. Several layers line up with each other; one layer lines up with its
+// frame, or the group or box it is in. Two or more shapes combine into a live boolean.
 import {
   AlignBottomIcon,
   AlignCenterHorizontalIcon,

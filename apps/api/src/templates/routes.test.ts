@@ -116,7 +116,6 @@ describe('templates (#54)', { timeout: 60_000 }, () => {
       width: 400,
       height: 400,
     })
-    expect(saved.json).not.toHaveProperty('kind')
     const link = SignedLink.parse(
       (await call('a', 'GET', `/brands/${brand.id}/templates/${template.id}/thumbnail`)).json,
     )

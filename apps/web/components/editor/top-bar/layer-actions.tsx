@@ -1,7 +1,7 @@
 'use client'
 
 // The selected layers' own actions, one list for the small menu's ⋯ (the full menu) and the
-// right-click menu: copy, paste, duplicate and delete; order and line up with the size as menus
+// right-click menu: copy, paste, duplicate and delete; order and line up with the frame as menus
 // beside their rows, and the turn; group, box, mask and ungroup; lock and hide; text direction.
 // Every row runs the same editor action as its shortcut.
 import { CaretRightIcon } from '@phosphor-icons/react'
@@ -9,7 +9,6 @@ import * as Popover from '@radix-ui/react-popover'
 import { type ReactNode, useEffect, useState } from 'react'
 
 import type { Editor, ShortcutAction } from '@dazbee/editor'
-import { formatScope } from '@dazbee/schema'
 
 import { ALIGN, keyOf } from '@/components/editor/arrange-actions.ts'
 import { RotationField } from '@/components/editor/edit-panel/position-panel.tsx'
@@ -61,11 +60,6 @@ export function LayerActions({ editor, ids, onDone }: { editor: Editor; ids: str
   const nodes = target.ids.map((id) => design.nodes[id])
   const locked = nodes.every((node) => node?.lock && Object.values(node.lock).some(Boolean))
   const hidden = target.props.every((pr) => pr.visible === false)
-  const hiddenEverywhere = target.ids.every((id) =>
-    Object.keys(design.formats).every(
-      (f) => (design.overrides[formatScope(f)]?.[id]?.visible ?? design.nodes[id]?.props.visible) === false,
-    ),
-  )
   const masks = target.props.every((pr) => Boolean(pr.mask))
   const sized = target.types.every((type) => type !== 'group' && type !== 'boolean')
   const texts = target.types.every((type) => type === 'text')
@@ -133,15 +127,14 @@ export function LayerActions({ editor, ids, onDone }: { editor: Editor; ids: str
       <button
         type="button"
         onClick={() => {
-          editor.setHidden(target.ids, !hidden, target.pageId, target.formatId)
+          editor.setHidden(target.ids, !hidden)
           onDone()
         }}
         className={MENU_ITEM}
       >
-        {hidden ? b.showHere : b.hideHere}
+        {hidden ? b.show : b.hide}
         <kbd className={MENU_KEY}>{keyOf('hide')}</kbd>
       </button>
-      {row('hideEverywhere', hiddenEverywhere ? b.showEverywhere : b.hideEverywhere)}
       {texts && (
         <>
           <div className={MENU_DIVIDER} />
@@ -153,7 +146,7 @@ export function LayerActions({ editor, ids, onDone }: { editor: Editor; ids: str
                 aria-pressed={direction === to}
                 data-direction={to}
                 onClick={() => {
-                  set({ ...target, everyFormat: true }, () => ({ direction: to }))
+                  set(target, () => ({ direction: to }))
                   onDone()
                 }}
                 className={MENU_ITEM}

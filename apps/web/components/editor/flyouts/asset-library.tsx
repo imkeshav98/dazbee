@@ -2,7 +2,7 @@
 
 // The brand's asset library, in the Assets flyout: upload several images at once and watch each
 // one's progress, name and tag them, find them by either, place one on the design by dragging it
-// onto a format or by clicking it, and delete one nothing uses. Thumbnails are small copies the API made and stored;
+// onto a frame or by clicking it, and delete one nothing uses. Thumbnails are small copies the API made and stored;
 // the design itself draws the original, decoded by CanvasKit.
 import { MagnifyingGlassIcon, PencilSimpleIcon, TrashIcon, UploadSimpleIcon, XIcon } from '@phosphor-icons/react'
 import { type DragEvent, useCallback, useEffect, useState } from 'react'
