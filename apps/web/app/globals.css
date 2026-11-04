@@ -182,10 +182,12 @@ body {
 }
 
 /*
- * Glass (#81): the one frosted surface, for chrome that floats over the canvas or a page (dock,
- * zoom, islands, flyouts, cards, menus, dialogs). Glass is defined here and nowhere else: a surface
- * that should look frosted takes this utility, and a variant is a token or a modifier on it, never
- * a second copy. Muted and faint text on it stays readable whatever the ad behind it shows.
+ * Glass: the one frosted surface, for chrome that floats over the canvas or a page (dock, zoom,
+ * islands, flyouts, cards, menus, dialogs). Glass is defined here and nowhere else: a surface that
+ * should look frosted takes this utility, and a variant is a token or a modifier on it, never a
+ * second copy. It is smooth: a see-through fill over a blur, with no texture. Muted and faint text
+ * on it stays readable whatever the ad behind it shows, and hover and pressed inside it are
+ * see-through tints, so what lies behind shows through a lit row too.
  * Its backdrop filter sees only what is painted inside its nearest ancestor with a mask, filter,
  * opacity below 1, clip-path, blend mode or backdrop filter, so glass over the canvas has no such
  * ancestor.
@@ -194,11 +196,12 @@ body {
 @utility surface-frost {
   --text-muted: var(--glass-muted);
   --text-subtle: var(--glass-muted);
+  --hover: var(--glass-hover);
+  --pressed: var(--glass-pressed);
   border: 1px solid var(--glass-line);
   background-color: var(--glass);
-  background-image: var(--grain);
   box-shadow: var(--shadow);
-  backdrop-filter: blur(18px) saturate(1.4);
+  backdrop-filter: blur(26px) saturate(1.2);
   &::backdrop {
     background: rgb(0 0 0 / 0.4);
     backdrop-filter: blur(2px);
