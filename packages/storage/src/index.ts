@@ -15,25 +15,7 @@ export interface StorageSettings {
   publicEndpoint?: string
 }
 
-/**
- * Settings from STORAGE_ENDPOINT, STORAGE_BUCKET, STORAGE_ACCESS_KEY_ID, STORAGE_SECRET_ACCESS_KEY,
- * STORAGE_REGION and STORAGE_PUBLIC_ENDPOINT.
- */
-export function storageSettings(env: NodeJS.ProcessEnv = process.env): StorageSettings {
-  const read = (name: string) => {
-    const value = env[name]
-    if (!value) throw new Error(`${name} is not set`)
-    return value
-  }
-  return {
-    endpoint: read('STORAGE_ENDPOINT').replace(/\/+$/, ''),
-    bucket: read('STORAGE_BUCKET'),
-    accessKeyId: read('STORAGE_ACCESS_KEY_ID'),
-    secretAccessKey: read('STORAGE_SECRET_ACCESS_KEY'),
-    region: env.STORAGE_REGION ?? 'auto',
-    ...(env.STORAGE_PUBLIC_ENDPOINT ? { publicEndpoint: env.STORAGE_PUBLIC_ENDPOINT.replace(/\/+$/, '') } : {}),
-  }
-}
+export type Storage = ReturnType<typeof openStorage>
 
 export class StorageError extends Error {
   readonly status: number
@@ -42,8 +24,6 @@ export class StorageError extends Error {
     this.status = status
   }
 }
-
-export type Storage = ReturnType<typeof openStorage>
 
 export function openStorage(settings: StorageSettings) {
   const client = new AwsClient({
@@ -81,32 +61,69 @@ export function openStorage(settings: StorageSettings) {
     return signed.url
   }
 
+  /** Creates the bucket when it is missing; for local and CI storage, where we own the server. */
+  async function ensureBucket() {
+    const url = `${settings.endpoint}/${settings.bucket}`
+    if ((await send(url, { method: 'HEAD' })).ok) return
+    await send(url, { method: 'PUT' })
+  }
+
+  async function put(key: string, bytes: Uint8Array, contentType: string) {
+    await send(objectUrl(key), { method: 'PUT', body: bytes, headers: { 'content-type': contentType } })
+  }
+
+  /** The object's bytes, or null when there is none. */
+  async function get(key: string): Promise<Uint8Array | null> {
+    const response = await send(objectUrl(key))
+    return response.status === 404 ? null : new Uint8Array(await response.arrayBuffer())
+  }
+
+  async function remove(key: string) {
+    await send(objectUrl(key), { method: 'DELETE' })
+  }
+
+  async function exists(key: string): Promise<boolean> {
+    return (await send(objectUrl(key), { method: 'HEAD' })).ok
+  }
+
+  /** A URL to upload one object of exactly this content type and size. */
+  function signedPut(key: string, contentType: string, byteSize: number, expiresInSeconds: number) {
+    return sign('PUT', key, expiresInSeconds, { 'content-type': contentType, 'content-length': String(byteSize) })
+  }
+
+  function signedGet(key: string, expiresInSeconds: number) {
+    return sign('GET', key, expiresInSeconds)
+  }
+
   return {
-    /** Creates the bucket when it is missing; for local and CI storage, where we own the server. */
-    async ensureBucket() {
-      const url = `${settings.endpoint}/${settings.bucket}`
-      if ((await send(url, { method: 'HEAD' })).ok) return
-      await send(url, { method: 'PUT' })
-    },
-    async put(key: string, bytes: Uint8Array, contentType: string) {
-      await send(objectUrl(key), { method: 'PUT', body: bytes, headers: { 'content-type': contentType } })
-    },
-    /** The object's bytes, or null when there is none. */
-    async get(key: string): Promise<Uint8Array | null> {
-      const response = await send(objectUrl(key))
-      return response.status === 404 ? null : new Uint8Array(await response.arrayBuffer())
-    },
-    async delete(key: string) {
-      await send(objectUrl(key), { method: 'DELETE' })
-    },
-    async exists(key: string): Promise<boolean> {
-      return (await send(objectUrl(key), { method: 'HEAD' })).ok
-    },
-    /** A URL to upload one object of exactly this content type and size. */
-    signedPut: (key: string, contentType: string, byteSize: number, expiresInSeconds: number) =>
-      sign('PUT', key, expiresInSeconds, { 'content-type': contentType, 'content-length': String(byteSize) }),
-    signedGet: (key: string, expiresInSeconds: number) => sign('GET', key, expiresInSeconds),
+    ensureBucket,
+    put,
+    get,
+    delete: remove,
+    exists,
+    signedPut,
+    signedGet,
     /** The unsigned public address of an object, which storage must refuse. */
     publicUrl,
+  }
+}
+
+/**
+ * Settings from STORAGE_ENDPOINT, STORAGE_BUCKET, STORAGE_ACCESS_KEY_ID, STORAGE_SECRET_ACCESS_KEY,
+ * STORAGE_REGION and STORAGE_PUBLIC_ENDPOINT.
+ */
+export function storageSettings(env: NodeJS.ProcessEnv = process.env): StorageSettings {
+  const read = (name: string) => {
+    const value = env[name]
+    if (!value) throw new Error(`${name} is not set`)
+    return value
+  }
+  return {
+    endpoint: read('STORAGE_ENDPOINT').replace(/\/+$/, ''),
+    bucket: read('STORAGE_BUCKET'),
+    accessKeyId: read('STORAGE_ACCESS_KEY_ID'),
+    secretAccessKey: read('STORAGE_SECRET_ACCESS_KEY'),
+    region: env.STORAGE_REGION ?? 'auto',
+    ...(env.STORAGE_PUBLIC_ENDPOINT ? { publicEndpoint: env.STORAGE_PUBLIC_ENDPOINT.replace(/\/+$/, '') } : {}),
   }
 }

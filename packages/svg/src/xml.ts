@@ -7,9 +7,8 @@ export interface XmlElement {
   /** The name without a namespace prefix: `svg:path` reads as `path`. */
   name: string
   attrs: Record<string, string>
-  children: XmlNode[]
+  children: (XmlElement | string)[]
 }
-type XmlNode = XmlElement | string
 
 export class XmlError extends Error {}
 
@@ -18,18 +17,6 @@ const MAX_ELEMENTS = 50_000
 const MAX_DEPTH = 256
 
 const NAMED: Record<string, string> = { lt: '<', gt: '>', amp: '&', quot: '"', apos: "'" }
-
-/** Text with its character references decoded; anything else that looks like an entity stays as written. */
-function decode(text: string) {
-  return text.replace(/&(#x[0-9a-fA-F]+|#[0-9]+|[a-zA-Z]+);/g, (whole, ref: string) => {
-    if (ref.startsWith('#x')) return codePoint(Number.parseInt(ref.slice(2), 16)) ?? whole
-    if (ref.startsWith('#')) return codePoint(Number.parseInt(ref.slice(1), 10)) ?? whole
-    return NAMED[ref] ?? whole
-  })
-}
-const codePoint = (n: number) => (Number.isInteger(n) && n > 0 && n <= 0x10ffff ? String.fromCodePoint(n) : null)
-
-const localName = (name: string) => name.slice(name.indexOf(':') + 1)
 
 /** The document's root element. Throws XmlError when the text is not well enough formed to read. */
 export function parseXml(text: string): XmlElement {
@@ -133,4 +120,21 @@ export function parseXml(text: string): XmlElement {
 /** The element's own text and its descendants', in order. */
 export function textOf(element: XmlElement): string {
   return element.children.map((c) => (typeof c === 'string' ? c : textOf(c))).join('')
+}
+
+/** Text with its character references decoded; anything else that looks like an entity stays as written. */
+function decode(text: string) {
+  return text.replace(/&(#x[0-9a-fA-F]+|#[0-9]+|[a-zA-Z]+);/g, (whole, ref: string) => {
+    if (ref.startsWith('#x')) return codePoint(Number.parseInt(ref.slice(2), 16)) ?? whole
+    if (ref.startsWith('#')) return codePoint(Number.parseInt(ref.slice(1), 10)) ?? whole
+    return NAMED[ref] ?? whole
+  })
+}
+
+function codePoint(n: number) {
+  return Number.isInteger(n) && n > 0 && n <= 0x10ffff ? String.fromCodePoint(n) : null
+}
+
+function localName(name: string) {
+  return name.slice(name.indexOf(':') + 1)
 }

@@ -16,7 +16,6 @@ export type BrandToken = z.infer<typeof BrandToken>
 /** What a bound property follows: a brand kit token, `brand:<token>`. */
 export const VariableRef = z.templateLiteral(['brand:', BrandToken])
 export type VariableRef = z.infer<typeof VariableRef>
-export const brandRef = (token: string): VariableRef => `brand:${token}` as VariableRef
 
 /**
  * What a layer can bind (#53): the colour of its topmost solid fill (a graphic, frame or boolean),
@@ -31,12 +30,14 @@ export const Bindings = z.object({
 })
 export type Bindings = z.infer<typeof Bindings>
 
+/** The values variables have where a design is drawn: a colour (#RRGGBBAA) or a font family, by ref. */
+export type Variables = Readonly<Record<string, string>>
+
+export const brandRef = (token: string): VariableRef => `brand:${token}` as VariableRef
+
 /** Whether a layer of this type has the property a target binds. */
 export const canBind = (type: string, target: BindingTarget) =>
   target === 'fill' ? type === 'graphic' || type === 'frame' || type === 'boolean' : type === 'text'
-
-/** The values variables have where a design is drawn: a colour (#RRGGBBAA) or a font family, by ref. */
-export type Variables = Readonly<Record<string, string>>
 
 /** Whether a value suits a target: a colour for a fill or text colour, a family name for a font. */
 export const fitsTarget = (target: BindingTarget, value: string) =>

@@ -1,3 +1,5 @@
+export * from './google.ts'
+
 /** One font file we ship. Fonts are loaded from these bytes, never from the system (CLAUDE.md). */
 export interface FontFile {
   family: string
@@ -26,4 +28,3 @@ export const FALLBACK_FAMILY = 'Noto Sans'
  * headline draws in a script's font instead of as empty boxes. Noto Sans comes first.
  */
 export const FALLBACK_FAMILIES: readonly string[] = [FALLBACK_FAMILY, 'Noto Sans Devanagari', 'Noto Naskh Arabic']
-export * from './google.ts'

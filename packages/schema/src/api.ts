@@ -85,14 +85,6 @@ export type SyncToken = z.infer<typeof SyncToken>
 export const ImageType = z.enum(['image/png', 'image/jpeg', 'image/webp', 'image/svg+xml'])
 export type ImageType = z.infer<typeof ImageType>
 
-/** Whether an asset is an SVG file, placed as layers rather than as an image fill. */
-export const isVectorAsset = (asset: { contentType: ImageType }) => asset.contentType === 'image/svg+xml'
-
-/** Largest original we accept, in bytes. */
-export const MAX_UPLOAD_BYTES = 30 * 1024 * 1024
-/** Largest SVG file we accept, in bytes: more is more than a logo or an icon needs. */
-export const MAX_SVG_BYTES = 5_000_000
-
 const Sha256 = z.string().regex(/^[0-9a-f]{64}$/, 'a SHA-256 is 64 lowercase hex digits')
 
 export const AssetSummary = z.object({
@@ -121,6 +113,11 @@ export type AssetUse = z.infer<typeof AssetUse>
 export const AssetInUse = ApiError.extend({ usedIn: AssetUse.array().min(1) })
 export type AssetInUse = z.infer<typeof AssetInUse>
 
+/** Largest original we accept, in bytes. */
+export const MAX_UPLOAD_BYTES = 30 * 1024 * 1024
+/** Largest SVG file we accept, in bytes: more is more than a logo or an icon needs. */
+export const MAX_SVG_BYTES = 5_000_000
+
 /** Asks to upload an original; the API answers with the asset when it already has those bytes. */
 export const StartUpload = z
   .object({
@@ -148,13 +145,14 @@ export type UploadTicket = z.infer<typeof UploadTicket>
 
 /** What a brand calls an asset (#52). */
 export const AssetName = z.string().trim().min(1).max(120)
+
+export const RecordAsset = z.object({ sha256: Sha256, name: AssetName.optional() })
+export type RecordAsset = z.infer<typeof RecordAsset>
+
 /** A word a brand finds assets by: lowercase, without spaces at either end (#52). */
 export const AssetTag = z.string().trim().toLowerCase().min(1).max(40)
 /** Most tags one asset has. */
 export const MAX_ASSET_TAGS = 20
-
-export const RecordAsset = z.object({ sha256: Sha256, name: AssetName.optional() })
-export type RecordAsset = z.infer<typeof RecordAsset>
 
 /** Renames an asset or sets its tags (#52); tags are kept once each, in the order given. */
 export const UpdateAsset = z
@@ -189,13 +187,6 @@ export const AssetLink = z.object({
 })
 export type AssetLink = z.infer<typeof AssetLink>
 
-/** Font files we accept: TrueType and OpenType outlines, which CanvasKit reads itself (#50). */
-export const FontType = z.enum(['font/ttf', 'font/otf'])
-export type FontType = z.infer<typeof FontType>
-
-/** Largest font file we accept, in bytes; a CJK family's face can be 20 MB. */
-export const MAX_FONT_BYTES = 30 * 1024 * 1024
-
 /** Where a family comes from: shipped with the app, copied from Google Fonts into our storage, or uploaded by a brand. */
 export const FontSource = z.enum(['builtin', 'google', 'upload'])
 export type FontSource = z.infer<typeof FontSource>
@@ -220,6 +211,13 @@ export const FontFamily = z.object({
   faces: FontFace.array().min(1),
 })
 export type FontFamily = z.infer<typeof FontFamily>
+
+/** Font files we accept: TrueType and OpenType outlines, which CanvasKit reads itself (#50). */
+export const FontType = z.enum(['font/ttf', 'font/otf'])
+export type FontType = z.infer<typeof FontType>
+
+/** Largest font file we accept, in bytes; a CJK family's face can be 20 MB. */
+export const MAX_FONT_BYTES = 30 * 1024 * 1024
 
 /** Asks to upload a font file; the API answers with the face when the brand already has those bytes. */
 export const StartFontUpload = z.object({
@@ -283,13 +281,6 @@ export const BrandKit = z
 export type BrandKit = z.infer<typeof BrandKit>
 export const EMPTY_BRAND_KIT: BrandKit = { colors: [], fonts: [], logoAssetId: null, voice: '' }
 
-/** The values a kit gives its tokens, for drawing designs bound to them. */
-export const brandVariables = (kit: BrandKit): Variables =>
-  Object.fromEntries([
-    ...kit.colors.map((c) => [brandRef(c.token), c.value]),
-    ...kit.fonts.map((f) => [brandRef(f.token), f.family]),
-  ])
-
 /**
  * Who can start from a template (#54): every brand of the workspace (an agency's own templates), or
  * only the brand it was saved for (a client's).
@@ -349,3 +340,13 @@ export type SignedIn = z.infer<typeof SignedIn>
 /** Where to send the person to end their WorkOS session too, when they had one. */
 export const SignedOut = z.object({ logoutUrl: z.url().nullable() })
 export type SignedOut = z.infer<typeof SignedOut>
+
+/** Whether an asset is an SVG file, placed as layers rather than as an image fill. */
+export const isVectorAsset = (asset: { contentType: ImageType }) => asset.contentType === 'image/svg+xml'
+
+/** The values a kit gives its tokens, for drawing designs bound to them. */
+export const brandVariables = (kit: BrandKit): Variables =>
+  Object.fromEntries([
+    ...kit.colors.map((c) => [brandRef(c.token), c.value]),
+    ...kit.fonts.map((f) => [brandRef(f.token), f.family]),
+  ])

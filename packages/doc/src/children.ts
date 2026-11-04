@@ -3,6 +3,9 @@ import { byCodeUnits, type Design, type Layer } from '@dazbee/schema'
 /** The ids of the layers directly under a page or layer, back to front. */
 export type ChildIndex = (parentId: string) => readonly string[]
 
+/** Child indexes by a design's `nodes` object. A design's layers are never changed in place, so an index stays right. */
+const indexes = new WeakMap<object, ChildIndex>()
+
 /** Ties in index break by id, the same on every device. */
 export const siblingOrder = (nodes: Readonly<Record<string, Layer>> | ReadonlyMap<string, Layer>) => {
   const get = (id: string) => (nodes instanceof Map ? nodes.get(id) : (nodes as Record<string, Layer>)[id])
@@ -21,9 +24,6 @@ export function buildChildIndex(nodes: ReadonlyMap<string, Layer>): Map<string, 
   for (const list of index.values()) list.sort(order)
   return index
 }
-
-/** Child indexes by a design's `nodes` object. A design's layers are never changed in place, so an index stays right. */
-const indexes = new WeakMap<object, ChildIndex>()
 
 /** Lets a design that keeps its own index (the live design view) hand it out instead of having one built. */
 export function registerChildIndex(nodes: object, index: ChildIndex) {

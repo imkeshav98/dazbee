@@ -22,8 +22,6 @@ export function syncTokenSecret(env: NodeJS.ProcessEnv = process.env): string {
   return secret
 }
 
-const sign = (secret: string, text: string) => createHmac('sha256', secret).update(text).digest('base64url')
-
 export function signSyncToken(
   secret: string,
   payload: Omit<SyncTokenPayload, 'expiresAt'>,
@@ -56,4 +54,8 @@ export function verifySyncToken(
   if (typeof payload.expiresAt !== 'number' || payload.expiresAt <= now) return { ok: false, reason: 'expired token' }
   if (payload.designId !== designId) return { ok: false, reason: 'token for another design' }
   return { ok: true, payload }
+}
+
+function sign(secret: string, text: string) {
+  return createHmac('sha256', secret).update(text).digest('base64url')
 }

@@ -36,12 +36,60 @@ export function designView(doc: DesignDoc) {
   const rawNodes = new Map<string, Json>()
   /** Override values by scope and layer as the document holds them; each set is replaced when one value changes. */
   const rawOverrides = new Map<string, Map<string, Json>>()
-
-  /** The validated design: layers, override values with defaults filled, and each parent's children. */
+  /** The validated design's layers. */
   const layers = new Map<string, Layer>()
+  /** The validated override values by scope and layer, with defaults filled. */
   const filled = new Map<string, Map<string, Json>>()
   /** One live record per scope in `filled`, handed out as `design.overrides[scope]`. */
   const scopeRecords = new Map<string, Record<string, Json>>()
+  /** Each parent's children, back to front. */
+  let children = new Map<string, string[]>()
+  /** The validated meta, formats and pages; null until the first whole read. */
+  let head: Head | null = null
+  /** Whether the last whole read moved a layer from where the document puts it, or gave it an index. */
+  let placesRepaired = false
+  /** Whether the whole design must be read again. */
+  let whole = true
+  /** The layers changed since the last read. */
+  const dirtyNodes = new Set<string>()
+  /** The override values changed since the last read, by scope and the layers they belong to. */
+  const dirtyPairs = new Map<string, Set<string>>()
+
+  const nodes = readOnlyRecord(() => {
+    refresh()
+    return layers
+  })
+  const overrides = readOnlyRecord(() => {
+    refresh()
+    return scopeRecords
+  })
+  const design = Object.freeze({
+    get meta() {
+      return current().meta
+    },
+    get formats() {
+      return current().formats
+    },
+    get pages() {
+      return current().pages
+    },
+    nodes,
+    overrides,
+  }) as unknown as Design
+
+  function current() {
+    refresh()
+    if (!head) throw new Error('the design view was read inside a transaction before its first read')
+    return head
+  }
+
+  function read(onRepair?: (repairs: string[]) => void): Design {
+    // Inside a transaction the changes so far haven't been reported yet: read them directly.
+    if (doc._transaction) return readDesign(doc, onRepair)
+    refresh(onRepair)
+    return design
+  }
+
   /** A scope the document still has values in stays, even empty: its values may all belong to deleted layers, as in `readDesign`. */
   const setScope = (scope: string, byNode: Map<string, Json> | undefined) => {
     if (!byNode || (byNode.size === 0 && !rawOverrides.has(scope))) {
@@ -59,16 +107,6 @@ export function designView(doc: DesignDoc) {
         }),
       )
   }
-  let children = new Map<string, string[]>()
-  let head: Head | null = null
-  /** Whether the last whole read moved a layer from where the document puts it, or gave it an index. */
-  let placesRepaired = false
-
-  /** Whether the whole design must be read again, and what changed since the last read otherwise. */
-  let whole = true
-  const dirtyNodes = new Set<string>()
-  const dirtyPairs = new Map<string, Set<string>>()
-
   const loadNode = (id: string) => {
     const ynode = r.nodes.get(id)
     if (!ynode || ynode.get(DELETED) === true) rawNodes.delete(id)
@@ -94,38 +132,6 @@ export function designView(doc: DesignDoc) {
     pairs.add(nodeId)
     dirtyPairs.set(scope, pairs)
   }
-  for (const id of r.nodes.keys()) loadNode(id)
-  for (const key of r.overrides.keys()) loadOverride(key)
-  dirtyPairs.clear()
-
-  // Every change is seen before any observer of the document runs, so an observer that reads the
-  // view gets the new design. The changed types name the touched layers and override keys.
-  const heads = new Set<unknown>([r.meta, r.formats, r.pages])
-  const onChange = (tr: Y.Transaction) => {
-    for (const [changed, keys] of tr.changed) {
-      const type: unknown = changed
-      if (heads.has(type)) {
-        whole = true
-        continue
-      }
-      if (type === r.overrides) {
-        for (const key of keys) if (key !== null) loadOverride(key)
-        continue
-      }
-      if (type === r.nodes) {
-        for (const id of keys) if (id !== null) dirtyNodes.add(id)
-        continue
-      }
-      // A change inside a layer or a head map: walk up to the root map it hangs from.
-      let item = changed._item
-      while (item && item.parent !== r.nodes && !heads.has(item.parent))
-        item = (item.parent as Y.AbstractType<unknown>)._item
-      if (!item) continue
-      if (item.parent === r.nodes && typeof item.parentSub === 'string') dirtyNodes.add(item.parentSub)
-      else whole = true
-    }
-  }
-  doc.on('beforeObserverCalls', onChange)
 
   /** Reads, repairs and validates the whole design, as `readDesign` does. */
   function readWhole(onRepair?: (repairs: string[]) => void) {
@@ -275,50 +281,49 @@ export function designView(doc: DesignDoc) {
     dirtyPairs.clear()
   }
 
-  const nodes = readOnlyRecord(() => {
-    refresh()
-    return layers
-  })
-  const overrides = readOnlyRecord(() => {
-    refresh()
-    return scopeRecords
-  })
-  const current = () => {
-    refresh()
-    if (!head) throw new Error('the design view was read inside a transaction before its first read')
-    return head
+  // The document as it is when the view opens.
+  for (const id of r.nodes.keys()) loadNode(id)
+  for (const key of r.overrides.keys()) loadOverride(key)
+  dirtyPairs.clear()
+
+  // Every change is seen before any observer of the document runs, so an observer that reads the
+  // view gets the new design. The changed types name the touched layers and override keys.
+  const heads = new Set<unknown>([r.meta, r.formats, r.pages])
+  const onChange = (tr: Y.Transaction) => {
+    for (const [changed, keys] of tr.changed) {
+      const type: unknown = changed
+      if (heads.has(type)) {
+        whole = true
+        continue
+      }
+      if (type === r.overrides) {
+        for (const key of keys) if (key !== null) loadOverride(key)
+        continue
+      }
+      if (type === r.nodes) {
+        for (const id of keys) if (id !== null) dirtyNodes.add(id)
+        continue
+      }
+      // A change inside a layer or a head map: walk up to the root map it hangs from.
+      let item = changed._item
+      while (item && item.parent !== r.nodes && !heads.has(item.parent))
+        item = (item.parent as Y.AbstractType<unknown>)._item
+      if (!item) continue
+      if (item.parent === r.nodes && typeof item.parentSub === 'string') dirtyNodes.add(item.parentSub)
+      else whole = true
+    }
   }
-  const design = Object.freeze({
-    get meta() {
-      return current().meta
-    },
-    get formats() {
-      return current().formats
-    },
-    get pages() {
-      return current().pages
-    },
-    nodes,
-    overrides,
-  }) as unknown as Design
+  doc.on('beforeObserverCalls', onChange)
   registerChildIndex(nodes, (parentId) => {
     refresh()
     return children.get(parentId) ?? []
   })
 
-  function read(onRepair?: (repairs: string[]) => void): Design {
-    // Inside a transaction the changes so far haven't been reported yet: read them directly.
-    if (doc._transaction) return readDesign(doc, onRepair)
-    refresh(onRepair)
-    return design
+  function destroy() {
+    doc.off('beforeObserverCalls', onChange)
   }
 
-  return {
-    read,
-    destroy() {
-      doc.off('beforeObserverCalls', onChange)
-    },
-  }
+  return { read, destroy }
 }
 
 /**

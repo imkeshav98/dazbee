@@ -19,10 +19,19 @@ import { repair } from './repair.ts'
  * it without the edits another tab made to it in the meantime, leaving required keys unset. Once
  * nobody is connected, compaction (compact.ts) drops them.
  */
-export const DELETED = 'deleted'
 export type DesignDoc = Y.Doc
 
+/** A place in a text layer's text that follows edits from any tab, such as the caret while typing. */
+export interface TextAnchor {
+  id: string
+  position: Y.RelativePosition
+}
+
 type Json = Record<string, unknown>
+
+export const DELETED = 'deleted'
+
+const SEP = '|'
 
 export const root = (doc: DesignDoc) => ({
   meta: doc.getMap<unknown>('meta'),
@@ -32,7 +41,6 @@ export const root = (doc: DesignDoc) => ({
   overrides: doc.getMap<unknown>('overrides'),
 })
 
-const SEP = '|'
 export const overrideKey = (scope: string, nodeId: string, path: string) => [scope, nodeId, path].join(SEP)
 export const splitOverrideKey = (key: string) => {
   const [scope = '', nodeId = '', ...path] = key.split(SEP)
@@ -43,27 +51,6 @@ export const toYMap = (json: Json) => {
   const map = new Y.Map<unknown>()
   for (const [k, v] of Object.entries(json)) if (v !== undefined) map.set(k, v)
   return map
-}
-
-/** A text layer's text and style runs as one Y.Text: run styles become formatting attributes. */
-function toYText(text: string, runs: { start: number; end: number; style: Json }[]) {
-  const ytext = new Y.Text()
-  ytext.insert(0, text)
-  for (const run of runs) ytext.format(run.start, run.end - run.start, run.style)
-  return ytext
-}
-
-/** The reverse of toYText. Adjacent ranges with the same style come back as one run. */
-function fromYText(ytext: Y.Text) {
-  const runs: { start: number; end: number; style: Json }[] = []
-  let at = 0
-  for (const op of ytext.toDelta() as { insert: string; attributes?: Json }[]) {
-    const end = at + op.insert.length
-    if (op.attributes && Object.keys(op.attributes).length > 0)
-      runs.push({ start: at, end, style: { ...op.attributes } })
-    at = end
-  }
-  return { text: ytext.toString(), runs }
 }
 
 export function toYNode(node: Design['nodes'][string]) {
@@ -128,6 +115,52 @@ export function snapshot(doc: DesignDoc) {
   }
 }
 
+/**
+ * Reads the doc as a validated design, after repairing what concurrent edits can break
+ * (see repair.ts). A doc that still fails validation is a bug in a command, so this throws.
+ */
+export function readDesign(doc: DesignDoc, onRepair?: (repairs: string[]) => void): Design {
+  const repaired = repair(snapshot(doc))
+  if (repaired.repairs.length > 0) onRepair?.(repaired.repairs)
+  const result = parseDesign(repaired.snapshot)
+  if (!result.success) throw new Error(`design document is invalid:\n${result.errors.join('\n')}`)
+  return result.design
+}
+
+/** Anchors a UTF-16 offset in a text layer. Reading only: an anchor never writes to the document. */
+export function textAnchor(doc: DesignDoc, id: string, offset: number): TextAnchor {
+  const ytext = liveText(doc, id)
+  if (!ytext) throw new Error(`"${id}" is not a text layer`)
+  return { id, position: Y.createRelativePositionFromTypeIndex(ytext, offset) }
+}
+
+/** Where an anchor is now, after whatever edits arrived; null once its layer is deleted. */
+export function anchorOffset(doc: DesignDoc, anchor: TextAnchor): number | null {
+  if (!liveText(doc, anchor.id)) return null
+  return Y.createAbsolutePositionFromRelativePosition(anchor.position, doc)?.index ?? null
+}
+
+/** A text layer's text and style runs as one Y.Text: run styles become formatting attributes. */
+function toYText(text: string, runs: { start: number; end: number; style: Json }[]) {
+  const ytext = new Y.Text()
+  ytext.insert(0, text)
+  for (const run of runs) ytext.format(run.start, run.end - run.start, run.style)
+  return ytext
+}
+
+/** The reverse of toYText. Adjacent ranges with the same style come back as one run. */
+function fromYText(ytext: Y.Text) {
+  const runs: { start: number; end: number; style: Json }[] = []
+  let at = 0
+  for (const op of ytext.toDelta() as { insert: string; attributes?: Json }[]) {
+    const end = at + op.insert.length
+    if (op.attributes && Object.keys(op.attributes).length > 0)
+      runs.push({ start: at, end, style: { ...op.attributes } })
+    at = end
+  }
+  return { text: ytext.toString(), runs }
+}
+
 /** Built through Maps: an id such as `__proto__` from another tab stays a plain key. */
 function nestOverrides(flat: Y.Map<unknown>) {
   const nested = new Map<string, Map<string, Map<string, unknown>>>()
@@ -147,39 +180,8 @@ function nestOverrides(flat: Y.Map<unknown>) {
   )
 }
 
-/**
- * Reads the doc as a validated design, after repairing what concurrent edits can break
- * (see repair.ts). A doc that still fails validation is a bug in a command, so this throws.
- */
-export function readDesign(doc: DesignDoc, onRepair?: (repairs: string[]) => void): Design {
-  const repaired = repair(snapshot(doc))
-  if (repaired.repairs.length > 0) onRepair?.(repaired.repairs)
-  const result = parseDesign(repaired.snapshot)
-  if (!result.success) throw new Error(`design document is invalid:\n${result.errors.join('\n')}`)
-  return result.design
-}
-
-/** A place in a text layer's text that follows edits from any tab, such as the caret while typing. */
-export interface TextAnchor {
-  id: string
-  position: Y.RelativePosition
-}
-
-const liveText = (doc: DesignDoc, id: string) => {
+function liveText(doc: DesignDoc, id: string) {
   const node = root(doc).nodes.get(id)
   if (!node || node.get(DELETED) || node.get('type') !== 'text') return null
   return (node.get('props') as Y.Map<unknown>).get('text') as Y.Text
-}
-
-/** Anchors a UTF-16 offset in a text layer. Reading only: an anchor never writes to the document. */
-export function textAnchor(doc: DesignDoc, id: string, offset: number): TextAnchor {
-  const ytext = liveText(doc, id)
-  if (!ytext) throw new Error(`"${id}" is not a text layer`)
-  return { id, position: Y.createRelativePositionFromTypeIndex(ytext, offset) }
-}
-
-/** Where an anchor is now, after whatever edits arrived; null once its layer is deleted. */
-export function anchorOffset(doc: DesignDoc, anchor: TextAnchor): number | null {
-  if (!liveText(doc, anchor.id)) return null
-  return Y.createAbsolutePositionFromRelativePosition(anchor.position, doc)?.index ?? null
 }

@@ -31,9 +31,6 @@ export type SceneMemo = Map<
   string,
   WeakMap<object, { override: unknown; variables: Variables | undefined; layer: SceneLayer }>
 >
-export const sceneMemo = (): SceneMemo => new Map()
-
-const sameLayers = (a: SceneLayer[], b: SceneLayer[]) => a.length === b.length && a.every((layer, i) => layer === b[i])
 
 /**
  * Builds the scene for one page in one format, auto layout solved (#46). Pure: the design is only
@@ -92,4 +89,10 @@ export function render(
     fills: page.fills,
     layers: applyLayout(layersUnder(pageId), measure),
   }
+}
+
+export const sceneMemo = (): SceneMemo => new Map()
+
+function sameLayers(a: SceneLayer[], b: SceneLayer[]) {
+  return a.length === b.length && a.every((layer, i) => layer === b[i])
 }
