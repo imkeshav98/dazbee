@@ -63,6 +63,13 @@ export const SHORTCUTS = [
 
 export type ShortcutAction = (typeof SHORTCUTS)[number]['action']
 
+interface Parsed {
+  mod: boolean
+  shift: boolean
+  alt: boolean
+  key: string
+}
+
 /** How far the arrow keys move the selection, in design pixels: 1, or 10 with Shift. */
 export const NUDGE = 1
 export const NUDGE_FAR = 10
@@ -71,13 +78,6 @@ export const NUDGE_FAR = 10
 export const inField = (target: EventTarget | null) =>
   target instanceof HTMLElement &&
   (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName))
-
-interface Parsed {
-  mod: boolean
-  shift: boolean
-  alt: boolean
-  key: string
-}
 const parse = (spec: string): Parsed => {
   const parts = spec.split('+')
   const key = parts.at(-1) ?? ''

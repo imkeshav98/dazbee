@@ -26,14 +26,31 @@ export type Side = 'in' | 'out'
 /** The four points of a cubic Bézier segment. */
 type Cubic = [Point, Point, Point, Point]
 
+/** What a press at `p` is on: a shown handle first, then an anchor, then a segment; null for none. */
+type PathHit =
+  | { kind: 'control'; ref: AnchorRef; side: Side }
+  | { kind: 'anchor'; ref: AnchorRef }
+  | { kind: 'segment'; contour: number; from: number; t: number }
+
 const near = (a: Point, b: Point, within = 1e-6) => Math.abs(a.x - b.x) <= within && Math.abs(a.y - b.y) <= within
 const lerp = (a: Point, b: Point, t: number): Point => ({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t })
 const distance = (a: Point, b: Point) => Math.hypot(a.x - b.x, a.y - b.y)
 
-/** A handle that sits on its anchor is no handle. */
-function handle(anchor: Point, at: Point): Point | undefined {
-  return near(anchor, at) ? undefined : { x: at.x, y: at.y }
+const num = (n: number) => {
+  const r = round(n)
+  return String(Object.is(r, -0) ? 0 : r)
 }
+
+const copy = (path: PenPath): PenPath =>
+  path.map((c) => ({
+    closed: c.closed,
+    anchors: c.anchors.map((a) => ({
+      x: a.x,
+      y: a.y,
+      ...(a.in && { in: { ...a.in } }),
+      ...(a.out && { out: { ...a.out } }),
+    })),
+  }))
 
 /** Reads SVG path data, every command, absolute or relative. Throws on data it can't read. */
 export function parsePath(d: string): PenPath {
@@ -188,90 +205,6 @@ export function parsePath(d: string): PenPath {
   return path
 }
 
-/** Closes a contour, joining an end anchor that lands on the start into it. */
-function close(contour: Contour) {
-  contour.closed = true
-  const first = contour.anchors[0]
-  const last = contour.anchors.at(-1)
-  if (contour.anchors.length > 1 && first && last && near(first, last)) {
-    if (last.in) first.in = last.in
-    contour.anchors.pop()
-  }
-}
-
-/** An SVG elliptical arc as cubics, each spanning at most a quarter turn. */
-function arcToCubics(
-  from: Point,
-  rx: number,
-  ry: number,
-  degrees: number,
-  large: boolean,
-  sweep: boolean,
-  to: Point,
-): Cubic[] {
-  if (near(from, to)) return []
-  rx = Math.abs(rx)
-  ry = Math.abs(ry)
-  if (rx === 0 || ry === 0) return [[from, from, to, to]]
-  const phi = (degrees * Math.PI) / 180
-  const cos = Math.cos(phi)
-  const sin = Math.sin(phi)
-  // The endpoint form to the centre form, as in the SVG spec's implementation notes.
-  const dx = (from.x - to.x) / 2
-  const dy = (from.y - to.y) / 2
-  const x1 = cos * dx + sin * dy
-  const y1 = -sin * dx + cos * dy
-  const scale = (x1 * x1) / (rx * rx) + (y1 * y1) / (ry * ry)
-  if (scale > 1) {
-    rx *= Math.sqrt(scale)
-    ry *= Math.sqrt(scale)
-  }
-  const num = rx * rx * ry * ry - rx * rx * y1 * y1 - ry * ry * x1 * x1
-  const den = rx * rx * y1 * y1 + ry * ry * x1 * x1
-  const k = (large === sweep ? -1 : 1) * Math.sqrt(Math.max(0, num / den))
-  const cx1 = (k * rx * y1) / ry
-  const cy1 = (-k * ry * x1) / rx
-  const cx = cos * cx1 - sin * cy1 + (from.x + to.x) / 2
-  const cy = sin * cx1 + cos * cy1 + (from.y + to.y) / 2
-  const angle = (ux: number, uy: number, vx: number, vy: number) => Math.atan2(ux * vy - uy * vx, ux * vx + uy * vy)
-  const start = angle(1, 0, (x1 - cx1) / rx, (y1 - cy1) / ry)
-  let sweepAngle = angle((x1 - cx1) / rx, (y1 - cy1) / ry, (-x1 - cx1) / rx, (-y1 - cy1) / ry)
-  if (!sweep && sweepAngle > 0) sweepAngle -= 2 * Math.PI
-  if (sweep && sweepAngle < 0) sweepAngle += 2 * Math.PI
-  const parts = Math.ceil(Math.abs(sweepAngle) / (Math.PI / 2) - 1e-9)
-  const step = sweepAngle / parts
-  const kappa = (4 / 3) * Math.tan(step / 4)
-  const on = (t: number): Point => ({
-    x: cx + rx * Math.cos(t) * cos - ry * Math.sin(t) * sin,
-    y: cy + rx * Math.cos(t) * sin + ry * Math.sin(t) * cos,
-  })
-  const along = (t: number): Point => ({
-    x: -rx * Math.sin(t) * cos - ry * Math.cos(t) * sin,
-    y: -rx * Math.sin(t) * sin + ry * Math.cos(t) * cos,
-  })
-  const cubics: Cubic[] = []
-  for (let n = 0; n < parts; n++) {
-    const a = start + n * step
-    const b = a + step
-    const p0 = n === 0 ? from : on(a)
-    const p3 = n === parts - 1 ? to : on(b)
-    const da = along(a)
-    const db = along(b)
-    cubics.push([
-      p0,
-      { x: p0.x + kappa * da.x, y: p0.y + kappa * da.y },
-      { x: p3.x - kappa * db.x, y: p3.y - kappa * db.y },
-      p3,
-    ])
-  }
-  return cubics
-}
-
-const num = (n: number) => {
-  const r = round(n)
-  return String(Object.is(r, -0) ? 0 : r)
-}
-
 /** Writes a path as SVG path data, its points less `origin`, to hundredths. */
 export function formatPath(path: PenPath, origin: Point = { x: 0, y: 0 }): string {
   const pt = (p: Point) => `${num(p.x - origin.x)} ${num(p.y - origin.y)}`
@@ -314,21 +247,6 @@ export function pointAt([p0, p1, p2, p3]: Cubic, t: number): Point {
   const c = 3 * u * t * t
   const d = t * t * t
   return { x: a * p0.x + b * p1.x + c * p2.x + d * p3.x, y: a * p0.y + b * p1.y + c * p2.y + d * p3.y }
-}
-
-/** Where along one axis a cubic turns back: the roots in (0, 1) of its derivative. */
-function turningPoints(p0: number, p1: number, p2: number, p3: number): number[] {
-  const a = -p0 + 3 * p1 - 3 * p2 + p3
-  const b = 2 * (p0 - 2 * p1 + p2)
-  const c = p1 - p0
-  const roots: number[] = []
-  if (Math.abs(a) < 1e-12) {
-    if (Math.abs(b) > 1e-12) roots.push(-c / b)
-  } else {
-    const disc = b * b - 4 * a * c
-    if (disc >= 0) roots.push((-b + Math.sqrt(disc)) / (2 * a), (-b - Math.sqrt(disc)) / (2 * a))
-  }
-  return roots.filter((t) => t > 0 && t < 1)
 }
 
 /** The box the path's outline fills, curves included, without its stroke; null for no anchors. */
@@ -378,11 +296,8 @@ export function nearestOnCubic(cubic: Cubic, p: Point): { t: number; point: Poin
   return { t: best, point: pointAt(cubic, best), distance: bestDistance }
 }
 
-/** What a press at `p` is on: a shown handle first, then an anchor, then a segment; null for none. */
-type PathHit =
-  | { kind: 'control'; ref: AnchorRef; side: Side }
-  | { kind: 'anchor'; ref: AnchorRef }
-  | { kind: 'segment'; contour: number; from: number; t: number }
+export const anchorOf = (path: PenPath, ref: AnchorRef): Anchor | undefined => path[ref.contour]?.anchors[ref.index]
+export const sameRef = (a: AnchorRef, b: AnchorRef) => a.contour === b.contour && a.index === b.index
 
 /**
  * Hit tests a path within `reach`: the handles of `shown` anchors, then anchors, then segments.
@@ -418,20 +333,6 @@ export function hitPath(path: PenPath, p: Point, reach: number, shown: AnchorRef
   })
   return segment ? (segment as { hit: PathHit }).hit : null
 }
-
-export const anchorOf = (path: PenPath, ref: AnchorRef): Anchor | undefined => path[ref.contour]?.anchors[ref.index]
-export const sameRef = (a: AnchorRef, b: AnchorRef) => a.contour === b.contour && a.index === b.index
-
-const copy = (path: PenPath): PenPath =>
-  path.map((c) => ({
-    closed: c.closed,
-    anchors: c.anchors.map((a) => ({
-      x: a.x,
-      y: a.y,
-      ...(a.in && { in: { ...a.in } }),
-      ...(a.out && { out: { ...a.out } }),
-    })),
-  }))
 
 /**
  * Adds an anchor on a segment at `t` without changing the path's outline: the curve is split in
@@ -557,4 +458,103 @@ export function offsetPath(path: PenPath, dx: number, dy: number): PenPath {
     dx,
     dy,
   )
+}
+
+/** A handle that sits on its anchor is no handle. */
+function handle(anchor: Point, at: Point): Point | undefined {
+  return near(anchor, at) ? undefined : { x: at.x, y: at.y }
+}
+
+/** Closes a contour, joining an end anchor that lands on the start into it. */
+function close(contour: Contour) {
+  contour.closed = true
+  const first = contour.anchors[0]
+  const last = contour.anchors.at(-1)
+  if (contour.anchors.length > 1 && first && last && near(first, last)) {
+    if (last.in) first.in = last.in
+    contour.anchors.pop()
+  }
+}
+
+/** An SVG elliptical arc as cubics, each spanning at most a quarter turn. */
+function arcToCubics(
+  from: Point,
+  rx: number,
+  ry: number,
+  degrees: number,
+  large: boolean,
+  sweep: boolean,
+  to: Point,
+): Cubic[] {
+  if (near(from, to)) return []
+  rx = Math.abs(rx)
+  ry = Math.abs(ry)
+  if (rx === 0 || ry === 0) return [[from, from, to, to]]
+  const phi = (degrees * Math.PI) / 180
+  const cos = Math.cos(phi)
+  const sin = Math.sin(phi)
+  // The endpoint form to the centre form, as in the SVG spec's implementation notes.
+  const dx = (from.x - to.x) / 2
+  const dy = (from.y - to.y) / 2
+  const x1 = cos * dx + sin * dy
+  const y1 = -sin * dx + cos * dy
+  const scale = (x1 * x1) / (rx * rx) + (y1 * y1) / (ry * ry)
+  if (scale > 1) {
+    rx *= Math.sqrt(scale)
+    ry *= Math.sqrt(scale)
+  }
+  const num = rx * rx * ry * ry - rx * rx * y1 * y1 - ry * ry * x1 * x1
+  const den = rx * rx * y1 * y1 + ry * ry * x1 * x1
+  const k = (large === sweep ? -1 : 1) * Math.sqrt(Math.max(0, num / den))
+  const cx1 = (k * rx * y1) / ry
+  const cy1 = (-k * ry * x1) / rx
+  const cx = cos * cx1 - sin * cy1 + (from.x + to.x) / 2
+  const cy = sin * cx1 + cos * cy1 + (from.y + to.y) / 2
+  const angle = (ux: number, uy: number, vx: number, vy: number) => Math.atan2(ux * vy - uy * vx, ux * vx + uy * vy)
+  const start = angle(1, 0, (x1 - cx1) / rx, (y1 - cy1) / ry)
+  let sweepAngle = angle((x1 - cx1) / rx, (y1 - cy1) / ry, (-x1 - cx1) / rx, (-y1 - cy1) / ry)
+  if (!sweep && sweepAngle > 0) sweepAngle -= 2 * Math.PI
+  if (sweep && sweepAngle < 0) sweepAngle += 2 * Math.PI
+  const parts = Math.ceil(Math.abs(sweepAngle) / (Math.PI / 2) - 1e-9)
+  const step = sweepAngle / parts
+  const kappa = (4 / 3) * Math.tan(step / 4)
+  const on = (t: number): Point => ({
+    x: cx + rx * Math.cos(t) * cos - ry * Math.sin(t) * sin,
+    y: cy + rx * Math.cos(t) * sin + ry * Math.sin(t) * cos,
+  })
+  const along = (t: number): Point => ({
+    x: -rx * Math.sin(t) * cos - ry * Math.cos(t) * sin,
+    y: -rx * Math.sin(t) * sin + ry * Math.cos(t) * cos,
+  })
+  const cubics: Cubic[] = []
+  for (let n = 0; n < parts; n++) {
+    const a = start + n * step
+    const b = a + step
+    const p0 = n === 0 ? from : on(a)
+    const p3 = n === parts - 1 ? to : on(b)
+    const da = along(a)
+    const db = along(b)
+    cubics.push([
+      p0,
+      { x: p0.x + kappa * da.x, y: p0.y + kappa * da.y },
+      { x: p3.x - kappa * db.x, y: p3.y - kappa * db.y },
+      p3,
+    ])
+  }
+  return cubics
+}
+
+/** Where along one axis a cubic turns back: the roots in (0, 1) of its derivative. */
+function turningPoints(p0: number, p1: number, p2: number, p3: number): number[] {
+  const a = -p0 + 3 * p1 - 3 * p2 + p3
+  const b = 2 * (p0 - 2 * p1 + p2)
+  const c = p1 - p0
+  const roots: number[] = []
+  if (Math.abs(a) < 1e-12) {
+    if (Math.abs(b) > 1e-12) roots.push(-c / b)
+  } else {
+    const disc = b * b - 4 * a * c
+    if (disc >= 0) roots.push((-b + Math.sqrt(disc)) / (2 * a), (-b - Math.sqrt(disc)) / (2 * a))
+  }
+  return roots.filter((t) => t > 0 && t < 1)
 }

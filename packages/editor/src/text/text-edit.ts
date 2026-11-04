@@ -13,6 +13,9 @@ export interface TextRange {
   end: number
 }
 
+/** What a style key toggles: bold, italic, underline or strikethrough. */
+export type StyleToggle = 'bold' | 'italic' | 'underline' | 'strikethrough'
+
 const graphemes = new Intl.Segmenter(undefined, { granularity: 'grapheme' })
 const words = new Intl.Segmenter(undefined, { granularity: 'word' })
 
@@ -56,9 +59,6 @@ export function stylesIn(props: TextNode['props'], range: TextRange): Style[] {
   }
   return out
 }
-
-/** What a style key toggles: bold, italic, underline or strikethrough. */
-export type StyleToggle = 'bold' | 'italic' | 'underline' | 'strikethrough'
 
 /**
  * The run style a toggle writes over a range: on everywhere unless it is on everywhere already,

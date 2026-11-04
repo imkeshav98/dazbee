@@ -50,10 +50,6 @@ export interface ImageBoxDrag {
 /** A drag that draws a new layer. */
 export type DrawingDrag = ShapeDrag | TextBoxDrag | ImageBoxDrag
 
-/** Whether a gesture is one that draws a new layer. */
-export const isDrawing = (g: { kind: string } | null): g is DrawingDrag =>
-  g?.kind === 'draw' || g?.kind === 'textBox' || g?.kind === 'imageBox'
-
 export interface DrawingDeps {
   canvas: HTMLCanvasElement
   session: Session
@@ -93,6 +89,10 @@ export interface EditorDrawing {
    */
   release(g: DrawingDrag): void
 }
+
+/** Whether a gesture is one that draws a new layer. */
+export const isDrawing = (g: { kind: string } | null): g is DrawingDrag =>
+  g?.kind === 'draw' || g?.kind === 'textBox' || g?.kind === 'imageBox'
 
 export function editorDrawing({
   canvas,

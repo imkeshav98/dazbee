@@ -4,11 +4,6 @@ import type { Paint, Point, Rect } from '@dazbee/schema'
 
 import { normalAngle, round } from '../layers/transform.ts'
 
-export const SHAPE_TOOLS = ['rect', 'ellipse', 'polygon', 'star', 'line', 'arrow'] as const
-export type ShapeTool = (typeof SHAPE_TOOLS)[number]
-/** What a drag draws: a shape, or a frame. */
-export type DrawTool = ShapeTool | 'frame'
-
 /** A layer as node.create takes it. */
 export interface NewLayer {
   type: 'graphic' | 'frame'
@@ -17,6 +12,11 @@ export interface NewLayer {
 }
 
 export type Drawn = { x: number; y: number; width: number; height: number; rotation: number }
+
+export const SHAPE_TOOLS = ['rect', 'ellipse', 'polygon', 'star', 'line', 'arrow'] as const
+export type ShapeTool = (typeof SHAPE_TOOLS)[number]
+/** What a drag draws: a shape, or a frame. */
+export type DrawTool = ShapeTool | 'frame'
 
 /** The size a click without a drag draws, in design pixels. */
 const CLICK_SIZE = 100

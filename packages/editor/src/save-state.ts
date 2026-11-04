@@ -3,7 +3,6 @@ import { type HocuspocusProvider, WebSocketStatus } from '@hocuspocus/provider'
 
 /** Where the design's edits are, once it is open. */
 export type SaveState = 'Saved' | 'Saving' | 'Offline'
-export const SAVE_STATES: readonly string[] = ['Saved', 'Saving', 'Offline'] satisfies SaveState[]
 
 export interface SaveStateDeps {
   provider: Pick<HocuspocusProvider, 'configuration' | 'hasUnsyncedChanges' | 'on' | 'off' | 'connect' | 'disconnect'>
@@ -19,6 +18,7 @@ export interface SaveStateWatch {
   start(): void
   destroy(): void
 }
+export const SAVE_STATES: readonly string[] = ['Saved', 'Saving', 'Offline'] satisfies SaveState[]
 
 /** How long the connection can be gone before the save state reads Offline. */
 const OFFLINE_AFTER_MS = 1500
@@ -36,6 +36,11 @@ export function watchSaveState({ provider, onSaveState: status }: SaveStateDeps)
 
   const connected = () => connection === WebSocketStatus.Connected
 
+  const show = (next: SaveState) => {
+    if (next === shown) return
+    shown = next
+    status(next)
+  }
   /**
    * Shows where the edits are: on the sync server, on their way, or only on this device. A lost
    * connection reads Offline after a moment, so a reconnect that takes a blink doesn't flash it.
@@ -58,11 +63,6 @@ export function watchSaveState({ provider, onSaveState: status }: SaveStateDeps)
       next = shown === 'Offline' ? 'Offline' : 'Saving'
     }
     show(next)
-  }
-  const show = (next: SaveState) => {
-    if (next === shown) return
-    shown = next
-    status(next)
   }
   const onConnection = ({ status: next }: { status: WebSocketStatus }) => {
     connection = next
