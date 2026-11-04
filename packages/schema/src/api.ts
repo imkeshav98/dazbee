@@ -8,6 +8,7 @@ import { brandRef, BrandToken, type Variables } from './variables.ts'
 
 /** Server-made ids of workspaces, brands and designs. Design ids double as Yjs document names. */
 export const RecordId = z.string().regex(/^[\w-]{1,64}$/, 'ids are 1–64 letters, digits, _ and -')
+export type RecordId = z.infer<typeof RecordId>
 
 /** Who a workspace is for (ADR-0011). It changes defaults and words only: an agency's brands are its clients. */
 export const WorkspaceKind = z.enum(['solo', 'company', 'agency'])
@@ -145,12 +146,14 @@ export type UploadTicket = z.infer<typeof UploadTicket>
 
 /** What a brand calls an asset (#52). */
 export const AssetName = z.string().trim().min(1).max(120)
+export type AssetName = z.infer<typeof AssetName>
 
 export const RecordAsset = z.object({ sha256: Sha256, name: AssetName.optional() })
 export type RecordAsset = z.infer<typeof RecordAsset>
 
 /** A word a brand finds assets by: lowercase, without spaces at either end (#52). */
 export const AssetTag = z.string().trim().toLowerCase().min(1).max(40)
+export type AssetTag = z.infer<typeof AssetTag>
 /** Most tags one asset has. */
 export const MAX_ASSET_TAGS = 20
 
