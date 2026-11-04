@@ -8,10 +8,10 @@ A **goldfish** is a subagent with a fresh context. Its brief names everything it
 
 1. The spec keeps a **decisions list**: every call Keshav made, with its date. Every mock and PR is checked against it. A change that would contradict a decision goes to Keshav first.
 2. Each ticket names its **test grid** before work starts:
-   - the layer types it touches: frame, group, graphic (with a shape, and with a photo fill), boolean, text, instance, lottie, and several selected;
-   - the states: rotated, inside a group, inside an auto layout frame, masked, locked, hidden;
-   - for text, each box mode (auto width, auto height, fixed) and shrink to fit on, since they change what the size and the handles do;
-   - one format and several formats, with overrides;
+   - the layer types it touches: box, group, graphic (with a shape, and with a photo fill), boolean, text, instance, lottie, and several selected;
+   - the states: rotated, inside a group, inside an auto layout box, masked, locked, hidden;
+   - for text, each box mode (auto width, auto height, fixed) and shrink to fit on, since they change what the width, height and handles do;
+   - one frame, linked frames, unlinked frames on one page, and two pages;
    - the screen sizes 1280×760, 820×1180 and 390×844;
    - undo and redo.
 3. Before any ticket starts, the spec and its tickets get an EGM review: the Elephant-Goldfish Model plugin, installed for Keshav's account and run as his personal CLAUDE.md says. Each finding goes to Keshav with a recommendation, and the accepted ones are written into the issues.

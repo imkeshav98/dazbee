@@ -1,5 +1,7 @@
 # Variants come from variables and axes, not feed columns
 
+The override scopes below were replaced on 2026-11-04 by a variant within a frame and the variant (ADR-0014); the rest stands.
+
 Layers bind properties to typed variables; a variant is one combination of values along axes (product, message, audience, language). A feed is just one source of axis values. Overrides resolve most specific first: format within a variant, variant, variable, page, format, base.
 
 ## Considered Options
