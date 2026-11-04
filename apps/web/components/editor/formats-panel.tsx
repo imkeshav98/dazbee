@@ -18,10 +18,10 @@ import { shortSizeOf, sizeOf } from '@/lib/editor/size.ts'
 import { useMessages } from '@/lib/i18n/client.tsx'
 import { format } from '@/lib/i18n/index.ts'
 
-import { AddFormat } from './add-format.tsx'
 import { CARD_BUTTON, CARD_ROW, CardMenu } from './card.tsx'
 import { setOpen, useEditState } from './edit-store.ts'
 import { useEditorDesign } from './editor-hooks.ts'
+import { AddFormat } from './size-fields.tsx'
 import { CHIP, PANEL_HEADING, PANEL_PART } from './styles.ts'
 
 /** The presets Add a size offers at a tap; the rest, and any size, are under More sizes. */
