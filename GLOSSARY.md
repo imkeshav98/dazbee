@@ -26,7 +26,7 @@ _Avoid_: Brand guide, theme, style
 
 **Binding**:
 A layer property that follows a variable, such as a fill bound to `brand:primary`. The layer also keeps the value it had, which it shows wherever the variable has none.
-_Avoid_: Link, sync, style reference
+_Avoid_: Link (see Link id), sync, style reference
 
 **Asset library**:
 A brand's uploaded images and SVG files, each with a name and tags it is found by. Placing an image on a design makes a graphic whose fill is that image; placing an SVG file makes a group of the layers it draws (paths, text, masks), and an SVG file is never a fill. The original is stored once per workspace, but each brand's asset, name and tags are its own.
@@ -43,66 +43,72 @@ _Avoid_: Client user, approver
 ## Design document
 
 **Design**:
-One editable piece of work, stored as one Yjs document: a grid of pages × formats plus its layers, variables and overrides.
+One editable piece of work, stored as one Yjs document: its pages, the frames on them and their layers, and its variables.
 _Avoid_: Project, file, canvas, document (in UI copy)
 
-**Design kind**:
-What a design is for: single, carousel, story or document.
-
 **Page**:
-One card of a carousel, one frame of a story, or the only canvas of a single ad. Every page is delivered in every format of its design.
-_Avoid_: Slide, artboard, card (in code)
+One infinite space of a design, holding frames wherever they were placed. A design lists its pages in order, each page has frames of its own, and the canvas shows one page at a time.
+_Avoid_: Sheet, tab, artboard (that is a frame)
 
-**Master**:
-A page whose layers appear on every page that uses it; a page can hide or change them through a page override.
-_Avoid_: Template, layout
+**Frame**:
+One ad, post or other piece of creative at one size, placed on a page. It has its own name, position, fills (its Background) and layers: every layer is in exactly one frame.
+_Avoid_: Artboard, slide
 
-**Format**:
-One delivered size of a design, such as 1080×1080 or 320×50. Formats share content and keep their own layout.
-Shown as: Sizes (the card), size
-_Avoid_ (in code and docs): Size, artboard, variant, ratio
+**Size**:
+A frame's width × height, such as 1080×1080, shown in its label. Add size makes a new frame of another size from a frame, holding linked copies of its layers.
+_Avoid_: Format, dimensions
 
-**Primary format**:
-The format whose layout seeds any format that has no stored value yet.
+**Link id**:
+The id a layer shares with the layers made from it in other frames of its page. See ADR-0014.
+
+**Linked copies**:
+Layers made from one another, in different frames of one page, that share a link id. Each copy is a layer of its own: an edit to one leaves the others as they were.
+_Avoid_: Instances (an instance is a layer type), clones, synced layers
+
+**Linked frames**:
+Frames of one page that share at least one link id, such as a frame and the ones Duplicate or Add size made from it. Copy to other frames writes into them.
 
 **Layer**:
-One element in a page's tree, stored in the flat `nodes` map with a parent id and fractional index. There are seven layer types: frame, group, graphic, boolean, text, instance, lottie.
+One element in a frame's tree, stored in the flat `nodes` map with a parent id and fractional index; a top-level layer's parent is its frame. There are seven layer types: box, group, graphic, boolean, text, instance, lottie.
 _Avoid_: Element, object, block, item
 
 **Layers panel**:
-The page's layers as a tree, topmost first: select, reorder, move into and out of groups, rename, lock and hide them. It selects in step with the stage.
+The page's frames and their layers as a tree, topmost first: select, reorder, move into and out of groups, rename, lock and hide them. It selects in step with the stage.
 _Avoid_: Outline, layer list
 
 **Top bar**:
-The bar fixed at the top centre of the stage while something is selected, or the page is picked; its items depend on what is selected, and for the picked page are Background and Sizes. A value the selected layers don't share shows as mixed. With more than one format its first item, the scope chip, picks where a change goes: the format shown only (an override), as a drag on the canvas does, or every format (the base, with that property's overrides cleared).
+The bar fixed at the top centre of the stage while layers are selected or a frame is picked. Its items depend on what is selected, and it ends with a ⋯ of its own: for layers, how they sit (order, line up, rotation, text direction); for a picked frame, the frame's actions. A change sets the value of each selected layer, in whatever frame it is, and a value they don't share shows as mixed.
 _Avoid_: toolbar, selection bar
 
 **Pop-up**:
 A short list that opens under the top bar from an item with ▾, such as Align or Transparency.
 
 **Edit panel**:
-The one panel a top bar item opens, at the stage's end side; on a phone, a sheet at the bottom. Opening a pop-up or another layer closes it. The design's own panels open in it too: Sizes from the header pill, Pages from by the zoom pill, and the picked page's Background.
+The one panel a top bar item opens, at the stage's end side; on a phone, a sheet at the bottom. Opening a pop-up or another layer closes it. The design's own cards open in it too: Pages from the Pages button by the zoom, Add a frame from the Frame tool, and a picked frame's Background.
 _Avoid_: properties panel, inspector
 
 **Small menu**:
-The pill by the selection: lock, duplicate, delete, and ⋯ for the full menu.
+The pill by the selection: lock, duplicate, delete and hide, which act on the selected layers only and never on their linked copies, and ⋯ for the full menu.
 
 **Full menu**:
-Every action of the selected layers, in one list: copy, paste, duplicate, delete, order, line up with the size, turn, group, box, mask, ungroup, lock, hide in this size or every size, and text direction. The small menu's ⋯ opens it, and a right-click shows the same list.
+The list the small menu's ⋯ opens, and a right-click on a layer shows: copy, copy style, paste, paste style, duplicate, Copy to other frames, put in a box, use as mask, and at the bottom lock, hide and delete in all frames, which act on the layer and its linked copies.
 _Avoid_: More menu, context menu
+
+**Copy to other frames**:
+The full menu's items that send a layer's style, its text or the layer itself into the frames linked to its own.
+_Avoid_: Sync, propagate, apply to all
 
 **Transparency**:
 How much a layer shows through (its opacity) and how it blends with what is under it, set from the top bar's Transparency pop-up.
 _Avoid_: See-through
 
-**Picked page**:
-The page a click on its background picks: dashed round each of its sizes, its labels pink, and no layer selected meanwhile. Its top bar's Background paints it in every size. Esc, a layer selected, or a click or drag elsewhere lets it go.
-_Avoid_: selected page, page selection (no layer is selected)
+**Picked frame**:
+A frame chosen as a whole, by clicking its name or its empty area: outlined, its label in the accent colour, and no layer selected meanwhile. Its top bar holds Background, and the top bar's ⋯ holds the frame's actions: duplicate, add size, rename, export and delete. Esc, a layer selected, or a click on empty canvas lets it go.
+_Avoid_: selected frame, frame selection (no layer is selected)
 
-**Frame**:
-A layer that holds other layers in a box of its own: it paints fills behind them and strokes over them, hides what reaches past its edges (never its own strokes) unless told not to, and can carry auto layout.
-Shown as: Box
-_Avoid_ (in code and docs): Container, board, box
+**Box**:
+A layer that holds other layers: it paints fills behind them and strokes over them, hides what reaches past its edges (never its own strokes) unless told not to, and can carry auto layout.
+_Avoid_: Container, board, frame (see Frame)
 
 **Graphic**:
 A layer made of a shape plus fills, strokes and effects. Photos and video are fills on a graphic, not layers of their own.
@@ -121,13 +127,13 @@ A point a path runs through. It may have a handle on each side that bends the se
 _Avoid_: Node (a node is a layer), vertex
 
 **Auto layout**:
-A frame setting that places the frame's children in a row or a column, a gap apart inside its padding, lined up along and across the flow, and optionally wrapping onto more lines. It is solved when a scene is built, per format, so the editor and every export lay out alike. A child marked absolute keeps its own place.
+A box setting that places the box's children in a row or a column, a gap apart inside its padding, lined up along and across the flow, and optionally wrapping onto more lines. It is solved when a scene is built, so the editor and every export lay out alike. A child marked absolute keeps its own place.
 Shown as: Stack
 _Avoid_ (in code and docs): Flexbox, stack, auto frame
 
 **Sizing**:
-How a layer in an auto layout frame takes its width and its height: fixed keeps its own size, hug fits what it holds (a text's words, a frame's children), and fill takes the room the frame has left.
-_Avoid_: Resizing, constraints (those pin a layer to its frame's edges)
+How a layer in an auto layout box takes its width and its height: fixed keeps the one it has, hug fits what it holds (a text's words, a box's children), and fill takes the room the box has left.
+_Avoid_: Resizing, constraints (those pin a layer to its parent's edges)
 
 **Run**:
 A range of a text layer's characters that changes some of its base style, such as bold, a colour, an outline, underline or case. Typed text takes the run of the character before it.
@@ -138,7 +144,7 @@ The text between two line breaks in a text layer. Lists, paragraph spacing and s
 _Avoid_: Block (that is the renderer's laid-out paragraph), line (a paragraph wraps onto lines)
 
 **Shrink to fit**:
-A text layer setting that picks the largest font size, between a least and a most, at which the text fits its box; every size in the text scales with it.
+A text layer setting that picks the largest font size, between a least and a most, at which the text fits inside the layer; every font size in the text scales with it.
 _Avoid_: Auto size, fit text
 
 **Font catalog**:
@@ -168,15 +174,12 @@ A layer that is not drawn itself: the layers after it in the same parent, up to 
 _Avoid_: Clipping mask, stencil
 
 **Pass-through**:
-How a group or frame blends by default: it adds no layer of its own, so each child blends with whatever is under the group. Any other blend mode first draws the children together, then blends the result.
+How a group or box blends by default: it adds no layer of its own, so each child blends with whatever is under the group. Any other blend mode first draws the children together, then blends the result.
 _Avoid_: Isolated (that is any other mode)
 
 **Role**:
 A layer's meaning in the ad (headline, price, logo, product, cta, …), used by AI, Ad check, adapt and feed binding.
 _Avoid_: Kind, tag, semantic type
-
-**Spanning layer**:
-A carousel layer that sits on the strip of all cards, so each card shows its own slice.
 
 **Property path**:
 The typed string that names one property of a layer, such as `x`, `fills` or `text.boxMode`. Commands, overrides, bindings and the assistant all address properties this way.
@@ -202,13 +205,13 @@ _Avoid_: Data source, CSV
 A typed condition over variables that sets a layer property, such as "show the badge when discount > 0". Never free code.
 
 **Override**:
-A sparse change to one property of one layer at a scope narrower than the base. Overrides never copy layers.
+A sparse change to one property of a layer, or of all its linked copies, for a variant, laid over the layer's own value. Overrides come later, with variants; frames have none, since each frame owns its layers.
 
 **Scope**:
-Where an override applies. In resolution order, most specific first: format within a variant, variant, variable, page, format, base.
+Where an override applies, most specific first: a variant within one frame, then the variant across all of a layer's linked copies.
 
 **Resolve**:
-Picking a property's value for one layer, page, format and variant by walking the scopes in order.
+Picking a property's value for one layer in one variant by walking the scopes in order, down to the layer's own value.
 
 ## Editing
 
@@ -225,24 +228,20 @@ A snapshot of a design, either named on purpose or taken automatically before AI
 _Avoid_: Revision, checkpoint (for named versions)
 
 **Compaction**:
-What the sync server does to a design when the last person leaves it: deleted layers, kept until then so undo could bring them back, are dropped with their overrides. The design looks the same afterwards.
+What the sync server does to a design when the last person leaves it: deleted layers, kept until then so undo could bring them back, are dropped. The design looks the same afterwards.
 _Avoid_: Cleanup, garbage collection (that is Yjs's own, which compaction relies on)
 
 ## Rendering
 
 **Scene**:
-The renderer's output for one page, format and variant: a resolved tree ready to draw. `render(design, pageId, formatId, variant?, translations?, assets) → scene` is a pure function.
+The renderer's output for one frame and variant: a resolved tree ready to draw. `render(design, frameId, …) → scene` is a pure function.
 
 **Surface**:
 Where a scene is drawn: the WebGL surface for the editor screen, or the CPU surface for every PNG and JPG export. A PDF or SVG export draws the scene on Skia's PDF or SVG canvas instead, with the parts the file can't hold as vectors drawn on the CPU surface as images.
 
 **Canvas**:
-The editor's one infinite view of a design: every page in every format, placed by an auto grid with pages as rows and formats as columns, so no position is stored.
+The editor's infinite view of one page: its frames, where they were placed. The Pages card switches the page it shows.
 _Avoid_: Board, workspace
-
-**Canvas frame**:
-One page in one format as the canvas shows it (`Frame` in `packages/editor`). Not the frame layer type, which is a layer inside a page.
-_Avoid_: Artboard, tile, cell
 
 **Export parity**:
 CPU renders of the same design in the browser and in Node being pixel-identical (0 differing pixels). PDF and SVG exports are byte-identical in both; drawn by pdfium and resvg, they match the CPU render within a recorded share of pixels (the vector baselines).
@@ -250,7 +249,7 @@ CPU renders of the same design in the browser and in Node being pixel-identical 
 ## AI flow
 
 **Brief**:
-A few words, up to four pictures and a format that start a tree.
+What starts a tree: a few words, up to four pictures and the sizes to make.
 
 **Tree**:
 Everything grown from one brief: its rounds and their drafts.
