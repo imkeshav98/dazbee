@@ -1,4 +1,5 @@
-export { startEditor, type DrawInfo, type Editor, type EditorOptions, type Notice, type Spot } from './editor.ts'
+export { startEditor, type DrawInfo, type Editor, type EditorOptions, type Notice } from './editor.ts'
+export { type Spot } from './canvas/view.ts'
 export { SAVE_STATES, type SaveState } from './save-state.ts'
 export { type PlacedAsset, type Tool } from './tools.ts'
 export { type Camera, type Insets } from './canvas/camera.ts'

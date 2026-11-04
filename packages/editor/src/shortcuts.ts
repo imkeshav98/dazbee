@@ -67,6 +67,11 @@ export type ShortcutAction = (typeof SHORTCUTS)[number]['action']
 export const NUDGE = 1
 export const NUDGE_FAR = 10
 
+/** Keys typed into the page's own fields belong to them. */
+export const inField = (target: EventTarget | null) =>
+  target instanceof HTMLElement &&
+  (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName))
+
 interface Parsed {
   mod: boolean
   shift: boolean
