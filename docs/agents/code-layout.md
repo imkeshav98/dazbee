@@ -197,12 +197,12 @@ For `apps/web`, run `pnpm dlx madge --circular --extensions ts,tsx --ts-config t
 
 | Layer | Modules, in build order | State owned |
 |---|---|---|
-| 1. No in-memory state | `canvaskit` (the one CanvasKit loader), `run-quietly`, `shortcuts`, `canvas/{camera grid hit-test rulers cursors}`, `layers/{transform snap arrange auto-layout resize}`, `gestures/{press draw-tools path crop}`, `text/text-edit`, `clipboard` (uses `localStorage` and the system clipboard) | none |
+| 1. No in-memory state | `canvaskit` (the one CanvasKit loader), `run-quietly`, `shortcuts`, `canvas/{camera frames hit-test rulers cursors}`, `layers/{transform snap arrange auto-layout resize}`, `gestures/{press draw-tools path crop}`, `text/text-edit`, `clipboard` (uses `localStorage` and the system clipboard) | none |
 | 2. State owners | `save-state`, `canvas/view`, `resources`, `canvas/scenes`, `tools`, `selection` | see the table below |
 | 3. Queries | `layers/{boxes hug}`, `canvas/thumbnails`, `export/exports` (with `export/export-client`, its side of the export worker `export/export-worker`) | thumbnail caches; the export worker |
 | 4. Behaviours | `text/typing`, `gestures/{pen cropping drawing transform-drag auto-layout-drag select-press}`, `actions`, `place`, `brand-kit`, `layer-edits` | the text being edited and its caret; pen state; snapped guides, snap work and what each drag has written; what a press may still select as a click; drop target; paste point |
 | 5. Routers | `gestures/pointer`, `canvas/overlay` | the current gesture, whether a press is held, the pointer, pan, space held and the hover cursor |
-| 6. Wiring | `editor.ts` | only the listener sets of the `Editor`'s public events that several modules raise (draw info, notices, text selection). It creates them first and passes each module the `emit` function it needs. It also keeps the animation-frame callback `draw()` (which stops typing when its text is gone, re-checks the hover, draws the scene and calls the overlay), the keyboard and clipboard listeners with `onKey` routing, the first draw, and the `Editor` object, one line per member. The few members that tie modules of several layers together are short functions beside `onKey`: `perform` (undo and redo end the drag first), `select`, `focus`, `stopEditing` and `settle` |
+| 6. Wiring | `editor.ts` | only the listener sets of the `Editor`'s public events that several modules raise (draw info, notices, text selection). It creates them first and passes each module the `emit` function it needs. It also keeps the animation-frame callback `draw()` (which stops typing when its text is gone, re-checks the hover, draws the scene and calls the overlay), the keyboard and clipboard listeners with `onKey` routing, the first draw, and the `Editor` object, one line per member. The few members that tie modules of several layers together are short functions beside `onKey`: `perform` (undo and redo end the drag first), `select`, `showPage`, `fitFrame`, `boxOf`, `stopEditing` and `settle` |
 
 `canvas/view` comes first among the state owners: `scenes`, `selection`, `boxes`, `thumbnails` and the behaviours read the design as last drawn, which it owns, and it needs no other module. `gestures/pointer` comes before `canvas/overlay` because the overlay reads the gesture to draw its parts. The types `startEditor` takes and resolves to (`Editor`, `EditorOptions`, `Notice`, `DrawInfo`) are in `editor-interface.ts`. `canvas/test-design` and `layers/test-boxes` are test-only.
 
@@ -211,7 +211,7 @@ Each piece of the editor's state has one owner:
 | Module | State |
 |---|---|
 | `save-state` | the provider's connection, the shown save state, the offline timer |
-| `canvas/view` | the WebGL `gl`, the surface, `dpr`, viewport, insets, camera, rulers, the last drawn `design` snapshot, `grid`, the focused size, the canvas frames last drawn (`inView()`, which `place` and the overlay read), the view listeners, the redraw schedule |
+| `canvas/view` | the WebGL `gl`, the surface, `dpr`, viewport, insets, camera, rulers, the last drawn `design` snapshot, the shown page and its frames as last drawn (`inView()`, which `place` and the overlay read), the view listeners, the redraw schedule |
 | `resources` | resource bytes, resources, the fonts asked for, family loads, what is loading, placeholders |
 | `canvas/scenes` | canvas frames, pictures, paragraphs, scenes, layers, the recording counts |
 | `tools` | the tool, the image to place, snapping, the tool listeners; `setTool` |
