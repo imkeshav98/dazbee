@@ -167,6 +167,7 @@ Each folder may import only what this table lists, plus npm packages and `@dazbe
 
 - Imports follow the build order under [The editor package](#the-editor-package): a module imports only modules built before it.
 - Only `editor.ts` and `save-state.ts` import `yjs`, `y-indexeddb` or `@hocuspocus/provider`; `no-restricted-imports` checks it. This guards one way of reaching the document without a command, and does not enforce ADR-0004 on its own: the `packages/doc` session and its commands hold the only write path.
+  - Test files (`*.test.ts`) are exempt, so a test may import them to fake a provider.
 
 ### Import rules in ESLint configs
 
