@@ -103,9 +103,9 @@ test.describe('on a phone, 390×844', () => {
         ),
       }
     })
-  /** The heights of the rows a menu holds, by a selector inside it. */
+  /** The heights of the rows a menu holds, by a selector inside it, as laid out: its opening animation scales none. */
   const rowHeights = (menu: Locator, rows: string) =>
-    menu.locator(rows).evaluateAll((els) => els.map((el) => Math.round(el.getBoundingClientRect().height)))
+    menu.locator(rows).evaluateAll((els) => els.map((el) => (el as HTMLElement).offsetHeight))
 
   test('the top bar scrolls sideways with no classic scrollbar', async ({ browser }) => {
     const asset = await upload(photo)
