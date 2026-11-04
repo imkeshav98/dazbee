@@ -1,11 +1,10 @@
 'use client'
 
+// Where a scrolling area is cut by its edges, so it can show that it scrolls: the edit panel draws a
+// line under its title and fades its last lines, and a menu fades the edges it is cut at.
 import { type RefObject, useLayoutEffect, useState } from 'react'
 
-/**
- * Whether a scrolling body has been scrolled down from its top, and whether more of it is below:
- * the panel then draws a line under its title, and fades its last lines out.
- */
+/** Whether a scrolling body has been scrolled down from its top, and whether more of it is below. */
 export function useScrollEdges(body: RefObject<HTMLElement | null>) {
   const [edges, setEdges] = useState({ down: false, more: false })
   const measure = () => {
@@ -24,4 +23,13 @@ export function useScrollEdges(body: RefObject<HTMLElement | null>) {
     return () => watch.disconnect()
   })
   return { ...edges, measure }
+}
+
+/** A scrolling area's cut edges faded out: its end while more is below, its start once scrolled down. */
+export function fadedEdges({ down, more }: { down: boolean; more: boolean }) {
+  if (down && more)
+    return '[mask-image:linear-gradient(to_bottom,transparent,black_28px,black_calc(100%-28px),transparent)]'
+  if (more) return '[mask-image:linear-gradient(to_bottom,black_calc(100%-28px),transparent)]'
+  if (down) return '[mask-image:linear-gradient(to_bottom,transparent,black_28px)]'
+  return ''
 }

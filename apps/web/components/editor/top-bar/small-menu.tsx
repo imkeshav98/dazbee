@@ -29,7 +29,7 @@ import { useLocale, useMessages } from '@/lib/i18n/client.tsx'
 import { dirOf, format } from '@/lib/i18n/index.ts'
 
 import { arrowAlong, useMenuFocus, useRovingTab } from './bar-popover.tsx'
-import { LayerActions } from './layer-actions.tsx'
+import { LayerActions, useScrollingMenu } from './layer-actions.tsx'
 
 type Place = { left: number; top: number }
 type Box = { left: number; top: number; right: number; bottom: number }
@@ -231,6 +231,7 @@ export function SmallMenu({ editor, rightClick }: { editor: Editor; rightClick: 
   const phone = usePhone()
   const focused = useRovingTab(menu)
   const fullMenu = useFullMenuPlace(menu, content, place, phone, rtl)
+  const scroll = useScrollingMenu(setContent)
   if (!selected) return null
   const { target, design } = selected
   const locked = target.ids.every((id) => {
@@ -323,7 +324,8 @@ export function SmallMenu({ editor, rightClick }: { editor: Editor; rightClick: 
           </Popover.Trigger>
           <Popover.Portal>
             <Popover.Content
-              ref={setContent}
+              ref={scroll.ref}
+              onScroll={scroll.onScroll}
               // Beside the small menu, or under it on a phone or with no room beside it, kept between the
               // top bar and the bottom controls.
               side={under ? 'bottom' : rtl !== (fullMenu.side === 'start') ? 'left' : 'right'}
@@ -341,7 +343,11 @@ export function SmallMenu({ editor, rightClick }: { editor: Editor; rightClick: 
               {...moreFocus.content}
               aria-label={b.more}
               data-testid="bar-more-menu"
-              className={cn(MENU, 'max-h-[var(--radix-popover-content-available-height)] w-80 overflow-y-auto')}
+              className={cn(
+                MENU,
+                'max-h-[var(--radix-popover-content-available-height)] w-80 overflow-y-auto',
+                scroll.className,
+              )}
             >
               {moreFocus.back}
               <LayerActions editor={editor} ids={ids} onDone={() => setOpen(null)} />

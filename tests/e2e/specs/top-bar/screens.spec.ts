@@ -91,6 +91,18 @@ test("at tablet size with a flyout open, the bar's second row and its pop-ups an
 })
 
 test.describe('on a phone, 390×844', () => {
+  /** A scrolling area's state: whether it scrolls, its fade, and whether its overlay bar shows. */
+  const scrolling = (area: Locator) =>
+    area.evaluate((el) => {
+      const bar = el.querySelector('.os-scrollbar-vertical')
+      return {
+        scrolls: el.scrollHeight > el.clientHeight + 1,
+        fade: getComputedStyle(el).maskImage,
+        bar: Boolean(
+          bar?.classList.contains('os-scrollbar-visible') && !bar.classList.contains('os-scrollbar-auto-hide-hidden'),
+        ),
+      }
+    })
   /** The heights of the rows a menu holds, by a selector inside it. */
   const rowHeights = (menu: Locator, rows: string) =>
     menu.locator(rows).evaluateAll((els) => els.map((el) => Math.round(el.getBoundingClientRect().height)))
@@ -105,6 +117,28 @@ test.describe('on a phone, 390×844', () => {
       true,
       'none',
     ])
+    expect(errors).toEqual([])
+  })
+
+  test('the full menu shows that it scrolls, with a fade at its cut edge and its bar, and every row can be reached', async ({
+    browser,
+  }) => {
+    const asset = await upload(photo)
+    const { page, errors } = await openStage(browser, topBarDesign(asset.id))
+    await page.setViewportSize({ width: 390, height: 844 })
+    await selectLayers(page, ['box'], { bar: true })
+    const menu = await moreMenu(page)
+    // Away from the menu, past the time an overlay bar takes to hide.
+    await page.mouse.move(4, 400)
+    await page.waitForTimeout(1_200)
+    const top = await scrolling(menu)
+    expect(top).toMatchObject({ scrolls: true, bar: true })
+    expect(top.fade).toContain('gradient')
+    await menu.evaluate((el) => el.scrollTo({ top: el.scrollHeight }))
+    await expect.poll(async () => (await scrolling(menu)).fade).not.toBe(top.fade)
+    const box = await menu.boundingBox()
+    const last = await menu.locator(':scope > button').last().boundingBox()
+    expect(box && last && last.y >= box.y && last.y + last.height <= box.y + box.height).toBe(true)
     expect(errors).toEqual([])
   })
 
@@ -139,4 +173,34 @@ test.describe('on a phone, 390×844', () => {
     await page.keyboard.press('Escape')
     expect(errors).toEqual([])
   })
+
+  test(
+    'screenshots: the top bar, the full menu at its top and end, and the shape and zoom menus',
+    { tag: '@evidence' },
+    async ({ browser }) => {
+      const asset = await upload(photo)
+      const { page, errors } = await openStage(browser, topBarDesign(asset.id))
+      await page.setViewportSize({ width: 390, height: 844 })
+      await fitSettled(page)
+      await selectLayers(page, ['box'], { bar: true })
+      await nextFrame(page)
+      writeOutput('phone-top-bar.png', await page.screenshot({ animations: 'disabled' }))
+      const menu = await moreMenu(page)
+      await page.mouse.move(4, 400)
+      await nextFrame(page)
+      writeOutput('phone-full-menu-top.png', await page.screenshot({ animations: 'disabled' }))
+      await menu.evaluate((el) => el.scrollTo({ top: el.scrollHeight }))
+      await nextFrame(page)
+      writeOutput('phone-full-menu-end.png', await page.screenshot({ animations: 'disabled' }))
+      await page.keyboard.press('Escape')
+      await selectLayers(page, [])
+      await page.getByTestId('shape-menu').click()
+      await expect(page.getByRole('menu')).toBeVisible()
+      writeOutput('phone-shape-menu.png', await page.screenshot({ animations: 'disabled' }))
+      await page.keyboard.press('Escape')
+      await zoomMenu(page)
+      writeOutput('phone-zoom-menu.png', await page.screenshot({ animations: 'disabled' }))
+      expect(errors).toEqual([])
+    },
+  )
 })
