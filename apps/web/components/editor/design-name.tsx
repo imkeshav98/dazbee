@@ -20,7 +20,7 @@ export function DesignName({
 }) {
   const t = useMessages()
   const [editing, setEditing] = useState(false)
-  const focus = useFocusBack()
+  const focusBack = useFocusBack()
   const title = 'font-display text-sm font-semibold tracking-tight'
   if (!onRename) return <h1 className={cn(title, 'truncate')}>{name}</h1>
   if (!editing) {
@@ -29,7 +29,7 @@ export function DesignName({
     return (
       <h1 className={cn(title, '-mx-1 min-w-0')}>
         <button
-          ref={focus.ref('name')}
+          ref={focusBack.ref('name')}
           type="button"
           title={format(t.library.renameDesign, { name })}
           onClick={() => setEditing(true)}
@@ -48,7 +48,7 @@ export function DesignName({
       maxLength={120}
       className="h-7 w-48 min-w-0 rounded-[6px] border border-accent bg-bg px-1.5 font-display text-sm font-semibold tracking-tight outline-none"
       onDone={(next, byKey) => {
-        if (byKey) focus.back('name')
+        if (byKey) focusBack.mark('name')
         setEditing(false)
         const trimmed = next?.trim()
         if (trimmed && trimmed !== name) void onRename(trimmed)

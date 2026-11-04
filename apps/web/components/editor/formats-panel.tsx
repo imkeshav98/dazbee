@@ -89,9 +89,9 @@ function SizeList({ editor, onRemoved }: { editor: Editor; onRemoved: (message: 
   const formats = inOrder(design.formats)
   const background = backgroundOf(design)
   const [renaming, setRenaming] = useState<string | null>(null)
-  const focus = useFocusBack()
+  const focusBack = useFocusBack()
   const rename = (id: string, name: string | null, byKey: boolean) => {
-    if (byKey) focus.back(id)
+    if (byKey) focusBack.mark(id)
     setRenaming(null)
     const trimmed = name?.trim()
     if (trimmed && trimmed !== design.formats[id]?.name) run('format.update', { id, name: trimmed })
@@ -124,7 +124,7 @@ function SizeList({ editor, onRemoved }: { editor: Editor; onRemoved: (message: 
                 />
               ) : (
                 <button
-                  ref={focus.ref(id)}
+                  ref={focusBack.ref(id)}
                   type="button"
                   onDoubleClick={() => setRenaming(id)}
                   onKeyDown={(e) => e.key === 'Enter' && setRenaming(id)}

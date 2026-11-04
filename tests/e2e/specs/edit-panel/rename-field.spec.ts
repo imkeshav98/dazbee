@@ -200,7 +200,7 @@ for (const s of SUBJECTS.filter(({ id }) => id === 'size' || id === 'page')) {
 }
 
 for (const s of SUBJECTS.filter(({ id }) => id !== 'layer')) {
-  test(`a ${s.id}'s name: Enter gives the focus back to the control that opened the field`, async ({ browser }) => {
+  test(`the ${s.id}'s name: Enter gives the focus back to the control that opened the field`, async ({ browser }) => {
     const { page, errors } = await openStage(browser, design())
     const field = await s.open(page)
     await field.fill('Offer')

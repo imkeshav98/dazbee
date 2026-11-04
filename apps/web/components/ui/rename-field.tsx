@@ -4,14 +4,14 @@ import { useRef, useState } from 'react'
 
 /**
  * Gives the focus back to the control that opened a rename field when the field ends from the
- * keyboard. `back(key)` marks the control as the field ends; `ref(key)` on the control focuses it as
+ * keyboard. `mark(key)` marks the control as the field ends; `ref(key)` on the control focuses it as
  * it takes the field's place. A field that ends by a click elsewhere marks nothing, so the focus
  * stays where the click put it.
  */
 export function useFocusBack() {
   const marked = useRef<string | null>(null)
   return {
-    back: (key: string) => {
+    mark: (key: string) => {
       marked.current = key
     },
     ref: (key: string) => (el: HTMLElement | null) => {

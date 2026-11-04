@@ -165,7 +165,7 @@ function PageList({ editor, onRemoved }: { editor: Editor; onRemoved: (message: 
   const pages = inOrder(design.pages)
   const current = useCurrentPage(design)
   const [renaming, setRenaming] = useState<string | null>(null)
-  const focus = useFocusBack()
+  const focusBack = useFocusBack()
   // The page being dragged, and the page it would land before (null for the end).
   const [dragging, setDragging] = useState<string | null>(null)
   const [landing, setLanding] = useState<{ before: string | null } | null>(null)
@@ -180,7 +180,7 @@ function PageList({ editor, onRemoved }: { editor: Editor; onRemoved: (message: 
     requestAnimationFrame(() => editor.fitPage(id))
   }
   const rename = (id: string, name: string | null, byKey: boolean) => {
-    if (byKey) focus.back(id)
+    if (byKey) focusBack.mark(id)
     setRenaming(null)
     const trimmed = name?.trim()
     if (trimmed && trimmed !== design.pages[id]?.name) run('page.update', { id, name: trimmed })
@@ -274,7 +274,7 @@ function PageList({ editor, onRemoved }: { editor: Editor; onRemoved: (message: 
                 />
               ) : (
                 <button
-                  ref={focus.ref(id)}
+                  ref={focusBack.ref(id)}
                   type="button"
                   onClick={() => show(id)}
                   onDoubleClick={() => setRenaming(id)}
