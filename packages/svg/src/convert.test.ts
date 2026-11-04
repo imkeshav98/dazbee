@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { loadCanvasKit } from '@dazbee/renderer/node'
 
 import { SvgError, svgToLayers } from './convert.ts'
+import { growth, MAX_GROWTH } from './test-growth.ts'
 
 const ck = await loadCanvasKit()
 const svg = (body: string, attrs = 'width="100" height="100"') =>
@@ -45,37 +46,6 @@ const elementsRead = (text: string, limit: number) => {
 }
 /** The conversion's work budget: it reads at most this many elements of a file, then refuses it. */
 const WORK_BUDGET = 100_000
-
-/**
- * What the conversion makes of `large`, and how many times longer it takes on `large` than on
- * `small`, from the fastest of up to 5 runs of each taken in turn, so a busy machine slows both
- * alike. For an input ten times as long, `times` is about 10 when the time grows linearly and about
- * 100 when it grows quadratically. The runs stop early once `large` has taken 250 ms in all, so a
- * slow machine or slow code still finishes soon.
- */
-const growth = (small: string, large: string) => {
-  const timed = (text: string) => {
-    const started = performance.now()
-    const outcome = problem(text)
-    return { outcome, took: performance.now() - started }
-  }
-  // A first run of the small input, untimed, so the code it runs is compiled before it is timed.
-  problem(small)
-  let fastestSmall = Number.POSITIVE_INFINITY
-  let fastestLarge = Number.POSITIVE_INFINITY
-  let outcome = ''
-  let spent = 0
-  for (let run = 0; run < 5 && spent < 250; run++) {
-    fastestSmall = Math.min(fastestSmall, timed(small).took)
-    const ran = timed(large)
-    fastestLarge = Math.min(fastestLarge, ran.took)
-    outcome = ran.outcome
-    spent += ran.took
-  }
-  return { problem: outcome, times: fastestLarge / fastestSmall }
-}
-/** The most `growth` may give for an input ten times as long: well above linear, well below quadratic. */
-const MAX_GROWTH = 30
 
 describe('svgToLayers', () => {
   it('makes a path layer for each shape, in one group, with its box in the design', () => {
@@ -262,23 +232,30 @@ describe('svgToLayers with hostile files', () => {
 
   it('reads a flood of comments or a style sheet with no braces in linear time', () => {
     const floods = [
-      { file: (n: number) => `${'<!--a-->'.repeat(n)}x`, tenth: 500, problem: 'unreadable' },
       {
+        name: 'a flood of comments',
+        file: (n: number) => `${'<!--a-->'.repeat(n)}x`,
+        tenth: 500,
+        problem: 'unreadable',
+      },
+      {
+        name: 'a style sheet with no braces',
         file: (n: number) => svg(`<style>${'a'.repeat(n)}</style><rect width="5" height="5"/>`),
         tenth: 20_000,
         problem: 'none',
       },
       {
+        name: 'a style sheet of open comments',
         file: (n: number) => svg(`<style>${'/*'.repeat(n)}</style><rect width="5" height="5"/>`),
         tenth: 5_000,
         problem: 'none',
       },
     ]
     for (const flood of floods) {
-      expect(problem(flood.file(flood.tenth))).toBe(flood.problem)
-      const grown = growth(flood.file(flood.tenth), flood.file(flood.tenth * 10))
-      expect(grown.problem).toBe(flood.problem)
-      expect(grown.times).toBeLessThan(MAX_GROWTH)
+      expect(problem(flood.file(flood.tenth)), flood.name).toBe(flood.problem)
+      const grown = growth(problem, flood.file(flood.tenth), flood.file(flood.tenth * 10))
+      expect(grown.result, flood.name).toBe(flood.problem)
+      expect(grown.times, flood.name).toBeLessThan(MAX_GROWTH)
     }
   })
 
