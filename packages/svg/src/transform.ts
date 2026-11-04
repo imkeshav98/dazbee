@@ -1,6 +1,8 @@
 // SVG transforms as 2D affine matrices [a, b, c, d, e, f]: a point (x, y) goes to
 // (a·x + c·y + e, b·x + d·y + f), as SVG writes matrix(a b c d e f).
 
+import { numbers } from './lengths.ts'
+
 export type Matrix = readonly [number, number, number, number, number, number]
 
 export const IDENTITY: Matrix = [1, 0, 0, 1, 0, 0]
@@ -61,4 +63,32 @@ export function parseTransform(text: string): Matrix {
     out = multiply(out, m)
   }
   return out
+}
+
+/** Where a viewBox lands in a viewport of `width` × `height`, as preserveAspectRatio says. */
+export function viewBoxMatrix(viewBox: string | undefined, width: number, height: number, aspect = ''): Matrix {
+  const [minX = 0, minY = 0, w = 0, h = 0] = numbers(viewBox)
+  if (!(w > 0 && h > 0)) return IDENTITY
+  const [align = 'xMidYMid', fit = 'meet'] = aspect.trim().split(/\s+/)
+  const origin = translate(-minX, -minY)
+  if (align === 'none') return multiply(scale(width / w, height / h), origin)
+  const s = fit === 'slice' ? Math.max(width / w, height / h) : Math.min(width / w, height / h)
+  const share = (key: string) => (align.includes(`${key}Min`) ? 0 : align.includes(`${key}Max`) ? 1 : 0.5)
+  return multiply(translate((width - w * s) * share('x'), (height - h * s) * share('Y')), multiply(scale(s), origin))
+}
+
+/** The 3×3 matrix CanvasKit takes, row by row, for an SVG matrix. */
+export const ckMatrix = (m: Matrix) => [m[0], m[2], m[4], m[1], m[3], m[5], 0, 0, 1]
+
+export const invert = (m: Matrix): Matrix | null => {
+  const det = m[0] * m[3] - m[1] * m[2]
+  if (!Number.isFinite(det) || Math.abs(det) < 1e-12) return null
+  return [
+    m[3] / det,
+    -m[1] / det,
+    -m[2] / det,
+    m[0] / det,
+    (m[2] * m[5] - m[3] * m[4]) / det,
+    (m[1] * m[4] - m[0] * m[5]) / det,
+  ]
 }

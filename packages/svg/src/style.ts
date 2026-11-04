@@ -3,7 +3,7 @@
 // Selectors are the simple ones logo files use: a tag, .class, #id, *, those joined (`path.a`),
 // and comma lists. Anything else in a sheet (@media, combinators, pseudo-classes) is left out.
 
-import type { XmlElement } from './xml.ts'
+import { textOf, type XmlElement } from './xml.ts'
 
 export type Style = Record<string, string>
 
@@ -45,7 +45,7 @@ const PROPERTIES = new Set([
   'mix-blend-mode',
 ])
 
-interface Rule {
+export interface Rule {
   tag?: string | undefined
   id?: string | undefined
   classes: string[]
@@ -171,4 +171,10 @@ export function styleOf(element: XmlElement, parent: Style, rules: readonly Rule
   for (const rule of rules) if (matches(rule, element)) set(rule.declarations)
   if (element.attrs.style) set(parseDeclarations(element.attrs.style))
   return style
+}
+
+/** Every <style> sheet's text in the file. */
+export function styleText(element: XmlElement): string {
+  if (element.name === 'style') return textOf(element)
+  return element.children.map((c) => (typeof c === 'string' ? '' : styleText(c))).join('')
 }
