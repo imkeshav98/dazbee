@@ -88,7 +88,7 @@ export function editorPlace({
   ck,
   session,
   designId,
-  view: { design: drawn, frames, frameOf, inView, middleFrame: frameInMiddle, pointAt, spotAt },
+  view: { design: drawn, frames, frameOf, inView, middleFrame, pointAt, spotAt },
   tools,
   selection,
   scenes,
@@ -105,7 +105,7 @@ export function editorPlace({
   /** Whether the paste being made goes where the pointer is (Mod+Shift+V), not where the layers were. */
   let pasteAtPointer = false
 
-  function target() {
+  function currentDropTarget() {
     return dropTarget
   }
   /**
@@ -130,8 +130,8 @@ export function editorPlace({
   }
 
   /** Where something placed with no point goes: the frame in the middle of the view, else the selection's or the first. */
-  function middleFrame() {
-    return frameInMiddle() ?? frameOf(selection.current()?.frame) ?? frames()[0]
+  function frameToPlaceIn() {
+    return middleFrame() ?? frameOf(selection.current()?.frame) ?? frames()[0]
   }
 
   /**
@@ -227,7 +227,7 @@ export function editorPlace({
     const spot = where.spot ?? (client && spotAt(client))
     // A point off every frame puts the file in the middle of the selection's frame; with no point,
     // it goes in the frame in the middle of the view.
-    const frame = spot ? frameOf(spot.frame) : client ? frameOf(selection.current()?.frame) : middleFrame()
+    const frame = spot ? frameOf(spot.frame) : client ? frameOf(selection.current()?.frame) : frameToPlaceIn()
     if (!frame) return null
     const at = spot ? { x: spot.x, y: spot.y } : { x: frame.width / 2, y: frame.height / 2 }
     let made: ReturnType<typeof svgToLayers>
@@ -346,7 +346,7 @@ export function editorPlace({
     // A point off every frame places nothing; with no point, it goes in the frame in the middle of the view.
     const spot = where && ('frame' in where ? where : spotAt(where))
     if (where && !spot) return null
-    const frame = spot ? frameOf(spot.frame) : middleFrame()
+    const frame = spot ? frameOf(spot.frame) : frameToPlaceIn()
     if (!frame) return null
     const at = spot ? { x: spot.x, y: spot.y } : { x: frame.width / 2, y: frame.height / 2 }
     typing.stop()
@@ -404,7 +404,7 @@ export function editorPlace({
   }
 
   return {
-    dropTarget: target,
+    dropTarget: currentDropTarget,
     copy,
     cut,
     paste,

@@ -623,13 +623,11 @@ function live(
     selection,
     scenes,
     boxes,
-    typing,
     pen,
     transformDrag,
     autoLayoutDrag,
     hug,
     notify,
-    endDrag: () => endDrag(),
     drawOverlay: () => drawOverlay(),
   })
   const place = editorPlace({
@@ -1275,6 +1273,20 @@ function live(
     { ...on, passive: false },
   )
 
+  /**
+   * Does what a shortcut names, as the actions do; undo and redo first end what is open on the
+   * stage: the pen's path, a drag and typing.
+   */
+  function perform(action: ShortcutAction) {
+    if (action !== 'undo' && action !== 'redo') return actions.perform(action)
+    pen.finish()
+    endDrag()
+    typing.stop()
+    if (action === 'undo') session.undo()
+    else session.redo()
+    return true
+  }
+
   function onKey(e: KeyboardEvent) {
     if (inField(e.target)) return
     // The paste event that follows doesn't say whether Shift was down.
@@ -1282,7 +1294,7 @@ function live(
     const action = shortcutFor(e)
     if (action === 'undo' || action === 'redo') {
       e.preventDefault()
-      actions.perform(action)
+      perform(action)
       return
     }
     if (inDialog(e.target)) return
@@ -1293,7 +1305,7 @@ function live(
           spaceHeld = true
           showCursor()
         }
-      } else if (action && actions.perform(action)) {
+      } else if (action && perform(action)) {
         e.preventDefault()
       }
       return
@@ -1354,7 +1366,7 @@ function live(
         defaultFrame(pageId, formatId).key,
       )
     },
-    perform: actions.perform,
+    perform,
     canUndo: () => session.canUndo(),
     canRedo: () => session.canRedo(),
     onHistory: (listener: () => void) => session.onHistory(listener),

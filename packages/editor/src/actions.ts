@@ -17,7 +17,6 @@ import { boundsOf, type Box, localTo, round } from './layers/transform.ts'
 import { runQuietly } from './run-quietly.ts'
 import { type EditorSelection, isPath } from './selection.ts'
 import { NUDGE, NUDGE_FAR, type ShortcutAction } from './shortcuts.ts'
-import type { EditorTyping } from './text/typing.ts'
 import type { EditorTools } from './tools.ts'
 
 export interface ActionsDeps {
@@ -54,7 +53,6 @@ export interface ActionsDeps {
     EditorBoxes,
     'roots' | 'startBoxes' | 'boxIn' | 'selectionBox' | 'pickable' | 'drawnInFlow' | 'cropTarget'
   >
-  typing: Pick<EditorTyping, 'stop'>
   pen: Pick<EditorPen, 'drawing' | 'finish' | 'deletePoints'>
   transformDrag: Pick<EditorTransformDrag, 'writeBoxes'>
   autoLayoutDrag: Pick<EditorAutoLayoutDrag, 'nudge'>
@@ -62,8 +60,6 @@ export interface ActionsDeps {
   hug: (ids: string[]) => void
   /** Tells the page that auto layout places some of the layers an align or distribute would move. */
   notify: (notice: 'placedByLayout') => void
-  /** Ends the drag on the stage, if one is running. */
-  endDrag: () => void
   /** Draws the overlay. */
   drawOverlay: () => void
 }
@@ -71,7 +67,8 @@ export interface ActionsDeps {
 export interface EditorActions {
   /**
    * Does what a shortcut names. Returns whether there was anything to do it to; the keys that act
-   * on the selection do nothing without one.
+   * on the selection do nothing without one. Undo and redo are the editor's, which ends what is
+   * open on the stage first: they do nothing here.
    */
   perform(action: ShortcutAction): boolean
   /** Fits the selection in view, or every frame with nothing selected. */
@@ -87,13 +84,11 @@ export function editorActions({
   selection,
   scenes,
   boxes,
-  typing,
   pen,
   transformDrag,
   autoLayoutDrag,
   hug,
   notify,
-  endDrag,
   drawOverlay,
 }: ActionsDeps): EditorActions {
   function fitSelection() {
@@ -225,8 +220,6 @@ export function editorActions({
    */
   function perform(action: ShortcutAction): boolean {
     const view: Partial<Record<ShortcutAction, () => void>> = {
-      undo: () => session.undo(),
-      redo: () => session.redo(),
       zoomToFit: fitAll,
       zoomToSelection: fitSelection,
       zoomTo100: () => zoomTo(1),
@@ -270,11 +263,6 @@ export function editorActions({
     }
     const viewAction = view[action]
     if (viewAction) {
-      if (action === 'undo' || action === 'redo') {
-        pen.finish()
-        endDrag()
-        typing.stop()
-      }
       viewAction()
       return true
     }
