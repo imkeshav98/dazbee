@@ -160,6 +160,7 @@ import {
   shippedFonts,
 } from './resources.ts'
 import { watchSaveState } from './save-state.ts'
+import { editorSelection, isPath, type Picked } from './selection.ts'
 import { NUDGE, NUDGE_FAR, type ShortcutAction, shortcutFor } from './shortcuts.ts'
 import {
   paragraphAt,
@@ -196,16 +197,6 @@ export interface EditorOptions extends ResourceSources {
   signal?: AbortSignal
 }
 
-/** A layer as one frame shows it: selection, dragging and typing all happen in one frame. */
-interface Picked {
-  id: string
-  frame: string
-}
-/** The selected layers, all in one frame, in the order they were picked. */
-interface Selection {
-  ids: string[]
-  frame: string
-}
 /**
  * The caret and the other end of the selected range (#47), anchored in the text so edits arriving
  * from other tabs carry them along; the same place when nothing is selected.
@@ -551,10 +542,6 @@ const inField = (target: EventTarget | null) =>
 /** Keys pressed in a popover or dialog, such as Escape to close it, are its own, not the stage's; undo and redo still are. */
 const inDialog = (target: EventTarget | null) =>
   target instanceof Element && target.closest('[role="dialog"], dialog') !== null
-const isPath = (from: Design, id: string) => {
-  const node = from.nodes[id]
-  return node?.type === 'graphic' && node.props.shape.kind === 'path'
-}
 const visibleIn = (now: Design, frame: Frame, id: string) => {
   const value = now.overrides[scope(frame)]?.[id]?.visible ?? now.nodes[id]?.props.visible
   return value !== false
@@ -688,28 +675,6 @@ function live(
   let grid = frameGrid(design, focused)
   let camera: Camera = { x: 0, y: 0, zoom: 1 }
   const scenes = frameScenes({ ck, resources, drawn: () => design })
-  let selection: Selection | null = null
-  /**
-   * The page a click on its background picked: outlined dashed in every size, its labels lit. No
-   * layer is selected meanwhile, so the layers' keys do nothing to it; a layer selected, Esc, or a
-   * click or drag elsewhere lets it go.
-   */
-  let pickedPage: string | null = null
-  const pageListeners = new Set<(pageId: string | null) => void>()
-  function pickPage(pageId: string | null) {
-    const next = pageId && design.pages[pageId] && grid.frames.some((f) => f.pageId === pageId) ? pageId : null
-    if (next === pickedPage) return
-    pickedPage = next
-    // Picking the page lets the selection go, with a crop or path edit on it and any group gone into.
-    if (next && selection) {
-      entered = null
-      select([], selection.frame)
-    }
-    drawOverlay()
-    for (const listener of pageListeners) listener(pickedPage)
-  }
-  /** The group or frame double-clicked into: a click then picks what is directly inside it (#41). */
-  let entered: string | null = null
   /** What the drag in progress snapped to, shown as guides and equal gaps (#42). */
   let snapped: { frame: Frame; guides: Guide[]; gaps: Gap[] } | null = null
   /**
@@ -724,8 +689,6 @@ function live(
   const viewChanged = () => {
     for (const listener of viewListeners) listener()
   }
-  /** Told when the selection changes, so panels can follow it. */
-  const selectionListeners = new Set<(ids: string[]) => void>()
   /** Told when the text being edited, or its selected range, changes. */
   const textSelectionListeners = new Set<() => void>()
   const textSelectionChanged = () => {
@@ -746,14 +709,12 @@ function live(
     changed: () => showCursor(),
     onSnapping: viewChanged,
   })
-  let lastSelection = ''
-  /** The layer under the pointer, outlined while nothing is being dragged. */
-  let hovered: Picked | null = null
+  const selection = editorSelection({
+    drawn: () => design,
+    frames: () => grid.frames,
+    changed: () => drawOverlay(),
+  })
   let editing: Editing | null = null
-  /** The path layer whose points are being edited (#45), and which of its anchors are selected. */
-  let pathEditing: { id: string; frame: string; selected: AnchorRef[] } | null = null
-  /** The layer whose image fill is being cropped on the stage (#48). */
-  let cropping: { id: string; frame: string } | null = null
   /**
    * The path the pen is drawing (#45), from its first click until it closes or is finished: its
    * anchors in its parent's coordinates, the one a drag is pulling handles from, and the layer
@@ -906,6 +867,7 @@ function live(
    * double-clicked into if it can hold it, otherwise onto the frame's page.
    */
   function parentFor(frame: Frame, type: string, now: Design) {
+    const entered = selection.entered()
     const inside = entered ? now.nodes[entered] : undefined
     return entered && inside && canHold(inside.type, type) ? entered : frame.pageId
   }
@@ -926,17 +888,18 @@ function live(
   /** Locked in place layers are left out where layers are gathered: select all and a marquee. */
   const pickable = (layer: SceneLayer) => !design.nodes[layer.id]?.lock?.move
   /** Whether the selection is locked in place: it shows no handles and a press can't move it. */
-  const lockedSelection = () => Boolean(selection?.ids.some((id) => design.nodes[id]?.lock?.move))
+  const lockedSelection = () => Boolean(selection.current()?.ids.some((id) => design.nodes[id]?.lock?.move))
   /**
    * The handles the selection has: none while it is locked in place; one text that grows with its
    * words has no top or bottom ones, since only a fixed box has a height of its own.
    */
   function handlesFor(): readonly Handle[] {
-    const frame = frameOf(selection?.frame)
-    if (!selection || !frame || lockedSelection()) return []
-    const [only] = selection.ids
+    const current = selection.current()
+    const frame = frameOf(current?.frame)
+    if (!current || !frame || lockedSelection()) return []
+    const [only] = current.ids
     if (
-      selection.ids.length === 1 &&
+      current.ids.length === 1 &&
       only &&
       design.nodes[only]?.type === 'text' &&
       propIn(frame, only, 'boxMode', design) !== 'fixed'
@@ -954,18 +917,9 @@ function live(
     const id = top ? target(top.id, frame.key) : null
     return id && design.nodes[id]?.lock?.move ? id : null
   }
-  /** Drops selected layers that are gone, and the selection once none are left or its frame is. */
-  function keepSelection() {
-    if (!selection) return
-    const ids = selection.ids.filter((id) => design.nodes[id])
-    selection = ids.length > 0 && frameOf(selection.frame) ? { ...selection, ids } : null
-    if (entered && !design.nodes[entered]) entered = null
-    if (pathEditing && (!selection?.ids.includes(pathEditing.id) || !isPath(design, pathEditing.id))) pathEditing = null
-    if (cropping && (!selection?.ids.includes(cropping.id) || selection.frame !== cropping.frame)) cropping = null
-  }
   /** Selected layers that aren't inside another selected layer: the ones a transform moves. */
   function roots(from: Design = session.design()) {
-    const ids = selection?.ids ?? []
+    const ids = selection.current()?.ids ?? []
     const inside = (id: string) => ancestorsOf(from, from.nodes[id]?.parentId ?? '').some((up) => ids.includes(up))
     return ids.filter((id) => from.nodes[id] && !inside(id))
   }
@@ -975,13 +929,14 @@ function live(
    * `drawn` is where it is on the page once the containers turn it; `around` are the containers.
    */
   function selectionBox(): { frame: Frame; box: Box; drawn: Box; around: Box[] } | null {
-    const frame = selection && frameOf(selection.frame)
-    if (!frame || !selection) return null
+    const current = selection.current()
+    const frame = current && frameOf(current.frame)
+    if (!frame || !current) return null
     const now = session.design()
-    const boxes = selection.ids.map((id) => boxIn(frame, id, now)).filter((b): b is Box => b !== null)
+    const boxes = current.ids.map((id) => boxIn(frame, id, now)).filter((b): b is Box => b !== null)
     if (boxes.length === 0) return null
     const box = boxes.length === 1 ? (boxes[0] as Box) : boundsOf(boxes)
-    const around = containersOf(frame, now.nodes[selection.ids[0] ?? '']?.parentId, now)
+    const around = containersOf(frame, now.nodes[current.ids[0] ?? '']?.parentId, now)
     return { frame, box, drawn: drawnFrom(box, around), around }
   }
   /**
@@ -991,20 +946,15 @@ function live(
    */
   function target(hitId: string, frame: string) {
     const chain = ancestorsOf(design, hitId)
-    const selected = selection?.frame === frame ? chain.find((id) => selection?.ids.includes(id)) : undefined
+    const current = selection.current()
+    const selected = current?.frame === frame ? chain.find((id) => current?.ids.includes(id)) : undefined
+    const entered = selection.entered()
     const at = entered ? chain.indexOf(entered) : -1
     return selected ?? (at > 0 ? chain[at - 1] : chain.at(-1)) ?? hitId
   }
   /** Whether a layer is inside the entered group or frame, not the container itself. */
   function insideEntered(id: string) {
-    return ancestorsOf(design, design.nodes[id]?.parentId ?? '').some((up) => up === entered)
-  }
-  function select(ids: string[], frame: string) {
-    selection = ids.length > 0 ? { ids, frame } : null
-    if (pathEditing && (ids.length !== 1 || ids[0] !== pathEditing.id || frame !== pathEditing.frame))
-      pathEditing = null
-    if (cropping && (ids.length !== 1 || ids[0] !== cropping.id || frame !== cropping.frame)) cropping = null
-    drawOverlay()
+    return ancestorsOf(design, design.nodes[id]?.parentId ?? '').some((up) => up === selection.entered())
   }
 
   /**
@@ -1101,7 +1051,11 @@ function live(
     const label = document.createElement('div')
     label.className = 'frame-label'
     label.dataset.frame = frame.key
-    if (selection?.frame === frame.key || editing?.frame === frame.key || pickedPage === frame.pageId)
+    if (
+      selection.current()?.frame === frame.key ||
+      editing?.frame === frame.key ||
+      selection.pickedPage() === frame.pageId
+    )
       label.dataset.active = ''
     const at = toScreen(camera, frame)
     // A frame running off the stage's start keeps its label in view, along the part still showing.
@@ -1182,12 +1136,13 @@ function live(
   /** Each selected layer's outline, then the box with its handles and the size under it. */
   function selectionParts() {
     const outer = selectionBox()
-    if (!outer || !selection) return []
+    const current = selection.current()
+    if (!outer || !current) return []
     const { frame, drawn: box } = outer
     const parts: HTMLElement[] = []
-    const several = selection.ids.length > 1
+    const several = current.ids.length > 1
     if (several) {
-      for (const id of selection.ids) {
+      for (const id of current.ids) {
         const b = drawnBoxOf(frame, id, design)
         if (!b) continue
         const member = outline('selection-member', frame, b)
@@ -1197,8 +1152,8 @@ function live(
     }
     const el = outline('selection', frame, box)
     el.dataset.frame = frame.key
-    el.dataset.count = String(selection.ids.length)
-    if (!several) el.dataset.layer = selection.ids[0]
+    el.dataset.count = String(current.ids.length)
+    if (!several) el.dataset.layer = current.ids[0]
     // Handles only once the box is big enough on screen to grab them apart, and not on a locked one.
     if (!editing && Math.min(box.width, box.height) * camera.zoom >= 2 * HANDLE_SIZE) {
       for (const h of handlesFor()) {
@@ -1218,7 +1173,7 @@ function live(
       size.textContent = `${round(box.width, 0)} × ${round(box.height, 0)}`
       // A corner scaling one text says its size too, from where it was.
       const g = gesture?.kind === 'resize' ? gesture : null
-      const text = g && !several ? g.texts.get(selection.ids[0] ?? '') : undefined
+      const text = g && !several ? g.texts.get(current.ids[0] ?? '') : undefined
       if (g && text) size.textContent += ` · ${text.style.fontSize} → ${scaleText(text, g.factor).style.fontSize}`
       const top = sizeLabelTop(corners.map((c) => c.y))
       Object.assign(size.style, {
@@ -1232,6 +1187,7 @@ function live(
 
   /** The crop being made (#48): the whole image, faint outside the layer, a handle on each corner. */
   function cropParts(): HTMLElement[] {
+    const cropping = selection.cropping()
     const frame = cropping && frameOf(cropping.frame)
     const target = frame && cropping && cropTarget(frame, cropping.id)
     if (!frame || !target) return []
@@ -1261,23 +1217,22 @@ function live(
   let drawnFrames: Frame[] = []
   function drawOverlay() {
     // A layer selected, or the page's frames gone (a page deleted, a size shown alone), lets the page go.
-    const pageGone =
-      pickedPage !== null &&
-      (selection !== null || !design.pages[pickedPage] || !grid.frames.some((f) => f.pageId === pickedPage))
-    if (pageGone) pickedPage = null
+    const pageGone = selection.dropGonePage()
     const parts: Element[] = []
     for (const frame of drawnFrames) {
       const label = frameLabel(frame, drawnFrames)
       if (label) parts.push(label)
     }
     for (const frame of drawnFrames) {
-      if (frame.pageId === pickedPage)
+      if (frame.pageId === selection.pickedPage())
         parts.push(outline('page-picked', frame, { x: 0, y: 0, width: frame.width, height: frame.height, rotation: 0 }))
     }
-    const enteredFrame = entered && frameOf(selection?.frame)
+    const entered = selection.entered()
+    const enteredFrame = entered && frameOf(selection.current()?.frame)
     const enteredBox = enteredFrame && entered && drawnBoxOf(enteredFrame, entered, design)
     if (enteredFrame && enteredBox) parts.push(outline('entered', enteredFrame, enteredBox))
-    const hover = !gesture && hovered && !selection?.ids.includes(hovered.id) ? hovered : null
+    const hovered = selection.hovered()
+    const hover = !gesture && hovered && !selection.current()?.ids.includes(hovered.id) ? hovered : null
     const hoverFrame = hover && frameOf(hover.frame)
     const hoverBox = hoverFrame && hover && drawnBoxOf(hoverFrame, hover.id, design)
     if (hoverFrame && hoverBox) parts.push(outline('hover', hoverFrame, hoverBox))
@@ -1285,7 +1240,12 @@ function live(
     const dropFrame = dropTarget && frameOf(dropTarget.frame)
     const dropBox = dropFrame && dropTarget && drawnBoxOf(dropFrame, dropTarget.id, design)
     if (dropFrame && dropBox) parts.push(outline('drop-target', dropFrame, dropBox))
-    parts.push(...(pathEditing || cropping ? [] : selectionParts()), ...pathParts(), ...cropParts(), ...reorderParts())
+    parts.push(
+      ...(selection.pathEditing() || selection.cropping() ? [] : selectionParts()),
+      ...pathParts(),
+      ...cropParts(),
+      ...reorderParts(),
+    )
     if (gesture?.kind === 'textBox' || gesture?.kind === 'imageBox') {
       // The box the text tool (#47) or the image tool is drawing, drawn as a marquee is.
       const box = document.createElement('div')
@@ -1314,7 +1274,7 @@ function live(
     }
     if (snapped) parts.push(...snapParts(snapped))
     if (rulers) {
-      const origin = frameOf(selection?.frame) ?? frameOf(hovered?.frame) ?? drawnFrames[0]
+      const origin = frameOf(selection.current()?.frame) ?? frameOf(selection.hovered()?.frame) ?? drawnFrames[0]
       const outer = selectionBox()
       if (origin)
         parts.push(
@@ -1356,12 +1316,7 @@ function live(
       parts.push(caret)
     }
     overlay.replaceChildren(...parts)
-    const now = selection ? `${selection.frame}|${selection.ids.join(',')}` : ''
-    if (now !== lastSelection) {
-      lastSelection = now
-      for (const listener of selectionListeners) listener(selection?.ids ?? [])
-    }
-    if (pageGone) for (const listener of pageListeners) listener(null)
+    selection.tellListeners(pageGone)
   }
 
   /**
@@ -1369,6 +1324,7 @@ function live(
    * the handles of the anchors in play, and, for the pen, the next segment to where the pointer is.
    */
   function pathParts(): Element[] {
+    const pathEditing = selection.pathEditing()
     let frame: Frame | undefined
     let path: PenPath
     let around: Box[]
@@ -1510,7 +1466,7 @@ function live(
     design = session.design()
     if (focused && !design.formats[focused]) focused = null
     grid = frameGrid(design, focused)
-    keepSelection()
+    selection.keep()
     if (editing && !pickedLayer(editing)) stopEditing()
     if (!surface) return
 
@@ -1617,7 +1573,7 @@ function live(
   }
   /** Where something placed with no point goes: the frame in the middle of the view, else the selection's or the first. */
   function middleFrame() {
-    return frameAt(grid.frames, toWorld(camera, centre())) ?? frameOf(selection?.frame) ?? grid.frames[0]
+    return frameAt(grid.frames, toWorld(camera, centre())) ?? frameOf(selection.current()?.frame) ?? grid.frames[0]
   }
   /** The spot under a point on screen, in client coordinates: the frame there and the point in it. */
   function spotAt(client: Point): Spot | null {
@@ -2238,16 +2194,17 @@ function live(
       .layers.filter((layer) => pickable(layer) && intersects(boundsOf([{ ...layer.props }]), local))
       .map((layer) => layer.id)
     const base = g.baseFrame === frame.key ? g.base : []
-    selection =
+    selection.selectKeepingModes(
       hits.length + base.length > 0
         ? { frame: frame.key, ids: [...base, ...hits.filter((id) => !base.includes(id))] }
-        : null
+        : null,
+    )
   }
 
   /** The handle under a screen point: one to resize by, or the zone outside a corner to turn by. */
   function handleUnder(screen: Point): { kind: 'resize'; handle: Handle } | { kind: 'rotate'; corner: number } | null {
     const outer = selectionBox()
-    if (!outer || editing || pathEditing || lockedSelection()) return null
+    if (!outer || editing || selection.pathEditing() || lockedSelection()) return null
     const { frame, drawn: box } = outer
     const onScreen = (p: Point) => toScreen(camera, { x: frame.x + p.x, y: frame.y + p.y })
     const c = centreOf(box)
@@ -2286,7 +2243,7 @@ function live(
   }
   function cursorFor(screen: Point) {
     if (gesture?.kind === 'resize' || gesture?.kind === 'rotate') return
-    if (cropping) {
+    if (selection.cropping()) {
       // Cropping, the image moves under the pointer; the box's handles are gone (#48).
       hoverCursor = 'move'
       showCursor()
@@ -2333,8 +2290,8 @@ function live(
         if (at) startTextBox(e, at)
         return
       }
-      if (pathEditing && startPathEdit(e, at)) return
-      if (cropping && startCrop(e, screen)) return
+      if (selection.pathEditing() && startPathEdit(e, at)) return
+      if (selection.cropping() && startCrop(e, screen)) return
       const deepest = at && hitTest(scenes.scene(at.frame).layers, at.p, pickable)
       if (at && editing && deepest?.id === editing.id && editing.frame === at.frame.key) {
         // In the text being edited (#47): a press puts the caret there, Shift extends the range to
@@ -2358,7 +2315,7 @@ function live(
       pressedAt = screen
       const grabbed = handleUnder(screen)
       const outer = selectionBox()
-      if (grabbed && outer && selection) {
+      if (grabbed && outer && selection.current()) {
         canvas.setPointerCapture(e.pointerId)
         const ids = roots()
         const boxes = startBoxes(outer.frame, ids)
@@ -2400,45 +2357,52 @@ function live(
         drawOverlay()
         return
       }
-      const inSelection = (id: string) => selection?.frame === at?.frame.key && selection?.ids.includes(id)
+      const inSelection = (id: string) =>
+        selection.current()?.frame === at?.frame.key && selection.current()?.ids.includes(id)
       const locked = at && !e.shiftKey ? lockedAt(at.frame, at.p) : null
       // Inside the selection's box, a press moves the selection, gaps and layers over it included:
       // a mask, which isn't drawn, or a layer under others, is dragged where it is.
       const inner = at && outer && localTo(at.p, outer.around)
       // A selection that can't move leaves the press to what is under it.
-      const movable = selection && !lockedSelection()
+      const current = selection.current()
+      const movable = current && !lockedSelection()
       const inOuter =
         inner &&
         outer &&
-        selection &&
+        current &&
         movable &&
-        selection.ids.length > 0 &&
+        current.ids.length > 0 &&
         outer.frame.key === at.frame.key &&
         inner.x >= outer.box.x &&
         inner.x <= outer.box.x + outer.box.width &&
         inner.y >= outer.box.y &&
         inner.y <= outer.box.y + outer.box.height
       // A press outside the group or frame double-clicked into leaves it.
-      if (entered && !inOuter && !(deepest && insideEntered(deepest.id)) && !(locked && insideEntered(locked)))
-        entered = null
+      if (
+        selection.entered() &&
+        !inOuter &&
+        !(deepest && insideEntered(deepest.id)) &&
+        !(locked && insideEntered(locked))
+      )
+        selection.enter(null)
       const hit = at && deepest && !(locked && !inOuter) ? { id: target(deepest.id, at.frame.key) } : null
       if (at && hit) {
         if (e.shiftKey) {
           // Shift adds a layer to the selection, or takes it out again.
-          if (inSelection(hit.id) && selection) {
-            select(
-              selection.ids.filter((id) => id !== hit.id),
-              selection.frame,
+          if (inSelection(hit.id) && current) {
+            selection.select(
+              current.ids.filter((id) => id !== hit.id),
+              current.frame,
             )
             return
           }
-          select(selection?.frame === at.frame.key ? [...selection.ids, hit.id] : [hit.id], at.frame.key)
+          selection.select(current?.frame === at.frame.key ? [...current.ids, hit.id] : [hit.id], at.frame.key)
         } else if (inSelection(hit.id)) {
-          if ((selection?.ids.length ?? 0) > 1) clickedAlone = hit.id
+          if ((selection.current()?.ids.length ?? 0) > 1) clickedAlone = hit.id
         } else if (inOuter) {
           clickedAlone = hit.id
         } else {
-          select([hit.id], at.frame.key)
+          selection.select([hit.id], at.frame.key)
         }
         // Inside the selection's box a drag still moves the selection; a click picks the locked layer
         // on top there.
@@ -2448,19 +2412,19 @@ function live(
         canvas.setPointerCapture(e.pointerId)
         lockedClick = at && locked ? { id: locked, frame: at.frame.key } : null
         const from = toWorld(camera, screen)
-        const base = e.shiftKey ? (selection?.ids ?? []) : []
-        const baseFrame = e.shiftKey ? (selection?.frame ?? null) : null
+        const base = e.shiftKey ? (selection.current()?.ids ?? []) : []
+        const baseFrame = e.shiftKey ? (selection.current()?.frame ?? null) : null
         // A press on a locked layer keeps the selection until it is a drag, so a click on the one
         // selected leaves it be.
-        if (!e.shiftKey && !locked) selection = null
-        if (!(locked && insideEntered(locked))) entered = null
+        if (!e.shiftKey && !locked) selection.selectKeepingModes(null)
+        if (!(locked && insideEntered(locked))) selection.enter(null)
         gesture = { kind: 'marquee', from, to: from, base, baseFrame }
         drawOverlay()
         return
       } else if (!e.shiftKey) {
         clickedAlone = ''
       }
-      const frame = at && frameOf(selection?.frame)
+      const frame = at && frameOf(selection.current()?.frame)
       const around = selectionBox()?.around ?? []
       if (!at || !frame) return
       canvas.setPointerCapture(e.pointerId)
@@ -2535,9 +2499,7 @@ function live(
     const at = pointer && !gesture && !panning() ? pointIn(pointer) : null
     const hit = at && hitTest(scenes.scene(at.frame).layers, at.p)
     const next = at && hit ? { id: target(hit.id, at.frame.key), frame: at.frame.key } : null
-    const changed = next?.id !== hovered?.id || next?.frame !== hovered?.frame
-    hovered = next
-    return changed
+    return selection.hover(next)
   }
 
   canvas.addEventListener(
@@ -2638,10 +2600,11 @@ function live(
    * and anywhere else it ends the crop and acts as a press does. Each drag is one undo step.
    */
   function startCrop(e: PointerEvent, screen: Point) {
+    const cropping = selection.cropping()
     const frame = cropping && frameOf(cropping.frame)
     const target = frame && cropping && cropTarget(frame, cropping.id)
     if (!frame || !target || !cropping) {
-      cropping = null
+      selection.crop(null)
       return false
     }
     const { rect, around } = target
@@ -2658,7 +2621,7 @@ function live(
     const onImage =
       grab.x >= rect.x && grab.x <= rect.x + rect.width && grab.y >= rect.y && grab.y <= rect.y + rect.height
     if (corner === -1 && !onImage) {
-      cropping = null
+      selection.crop(null)
       drawOverlay()
       return false
     }
@@ -2757,7 +2720,7 @@ function live(
     )
       return
     tools.setTool('select')
-    select([id], g.frame.key)
+    selection.select([id], g.frame.key)
   }
 
   /** Makes the text layer the text tool drew and starts typing into it, one undo step with the typing. */
@@ -2781,7 +2744,7 @@ function live(
       return
     }
     tools.setTool('select')
-    select([id], g.frame.key)
+    selection.select([id], g.frame.key)
     startEditing(id, g.frame.key, 0, end, true)
   }
 
@@ -2799,13 +2762,13 @@ function live(
    * and the press does what it would have done. Returns whether the press was the path's.
    */
   function startPathEdit(e: PointerEvent, at: { frame: Frame; p: Point } | null) {
-    const editingPath = pathEditing
+    const editingPath = selection.pathEditing()
     const frame = editingPath && frameOf(editingPath.frame)
     const found = frame && editingPath && pathIn(frame, editingPath.id)
     const q = found && at?.frame.key === frame.key ? localTo(at.p, found.around) : null
     const hit = found && q && hitPath(found.path, q, POINT_REACH / camera.zoom, editingPath.selected)
     if (!editingPath || !frame || !found || !q || !hit) {
-      pathEditing = null
+      selection.editPath(null)
       drawOverlay()
       return false
     }
@@ -2823,16 +2786,16 @@ function live(
     } else if (hit.kind === 'anchor') {
       const picked = editingPath.selected.some((r) => sameRef(r, hit.ref))
       if (e.shiftKey)
-        editingPath.selected = picked
-          ? editingPath.selected.filter((r) => !sameRef(r, hit.ref))
-          : [...editingPath.selected, hit.ref]
-      else if (!picked) editingPath.selected = [hit.ref]
+        selection.pickAnchors(
+          picked ? editingPath.selected.filter((r) => !sameRef(r, hit.ref)) : [...editingPath.selected, hit.ref],
+        )
+      else if (!picked) selection.pickAnchors([hit.ref])
       drag = { anchors: editingPath.selected }
     } else {
       const split = splitSegment(path, hit.contour, hit.from, hit.t)
       path = split.path
       reshape(layer, path)
-      editingPath.selected = [split.ref]
+      selection.pickAnchors([split.ref])
       drag = { anchors: [split.ref] }
     }
     canvas.setPointerCapture(e.pointerId)
@@ -2878,7 +2841,7 @@ function live(
 
   /** Takes the selected anchors out of the path being edited, or the layer once none would be left. One undo step. */
   function deletePoints() {
-    const editingPath = pathEditing
+    const editingPath = selection.pathEditing()
     const frame = editingPath && frameOf(editingPath.frame)
     const found = frame && editingPath && pathIn(frame, editingPath.id)
     if (!editingPath || !found || editingPath.selected.length === 0) return false
@@ -2889,7 +2852,7 @@ function live(
       else reshape({ id: editingPath.id, start: found.box, applied: { x: 0, y: 0 }, scope: scope(frame) }, next)
       hug(session.design().nodes[parent] ? [parent] : next.length > 0 ? [editingPath.id] : [])
     })
-    editingPath.selected = []
+    selection.pickAnchors([])
     return true
   }
 
@@ -2919,7 +2882,7 @@ function live(
         layer: null,
         end: session.beginGesture(),
       }
-      selection = null
+      selection.selectKeepingModes(null)
     }
     canvas.setPointerCapture(e.pointerId)
     const p = localTo(at.p, pen.around)
@@ -2996,7 +2959,7 @@ function live(
     pen = null
     if (done.layer) hug([done.layer.id])
     done.end()
-    if (done.layer && session.design().nodes[done.layer.id]) select([done.layer.id], done.frame.key)
+    if (done.layer && session.design().nodes[done.layer.id]) selection.select([done.layer.id], done.frame.key)
     tools.setTool('select')
     drawOverlay()
   }
@@ -3010,7 +2973,7 @@ function live(
     if (g.tool === 'frame' && g.moved) enclose(g.frame, g.id)
     hug([g.id])
     g.end()
-    select([g.id], g.frame.key)
+    selection.select([g.id], g.frame.key)
     tools.setTool('select')
   }
 
@@ -3074,16 +3037,18 @@ function live(
     const clicked =
       gesture?.kind === 'marquee' &&
       Math.hypot(gesture.to.x - gesture.from.x, gesture.to.y - gesture.from.y) * camera.zoom < CLICK_SLOP
-    if (clicked && lockedClick) select([lockedClick.id], lockedClick.frame)
+    if (clicked && lockedClick) selection.select([lockedClick.id], lockedClick.frame)
     else if (gesture?.kind === 'marquee')
-      pickPage(clicked && !selection ? (frameAt(grid.frames, gesture.from)?.pageId ?? null) : null)
+      selection.pickPage(clicked && !selection.current() ? (frameAt(grid.frames, gesture.from)?.pageId ?? null) : null)
     lockedClick = null
-    if (clickedAlone !== null && selection) {
+    const current = selection.current()
+    if (clickedAlone !== null && current) {
       // A click that picks a layer outside the group gone into, or nothing, leaves it.
-      if (entered && (!clickedAlone || !insideEntered(clickedAlone))) entered = null
-      select(clickedAlone ? [clickedAlone] : [], selection.frame)
+      if (selection.entered() && (!clickedAlone || !insideEntered(clickedAlone))) selection.enter(null)
+      selection.select(clickedAlone ? [clickedAlone] : [], current.frame)
       // A click inside the selection's box on no layer picks the page there.
-      if (!clickedAlone && pressedAt) pickPage(frameAt(grid.frames, toWorld(camera, pressedAt))?.pageId ?? null)
+      if (!clickedAlone && pressedAt)
+        selection.pickPage(frameAt(grid.frames, toWorld(camera, pressedAt))?.pageId ?? null)
     }
     clickedAlone = null
     pressedAt = null
@@ -3113,9 +3078,7 @@ function live(
     'pointerleave',
     () => {
       pointer = null
-      if (!hovered) return
-      hovered = null
-      drawOverlay()
+      if (selection.hover(null)) drawOverlay()
     },
     on,
   )
@@ -3138,30 +3101,30 @@ function live(
       if (picked !== hit.id && container && isContainer(container.type)) {
         // Into the group, frame or boolean: what is directly inside it under the pointer gets picked.
         stopEditing()
-        entered = picked
-        selection = null
-        select([target(hit.id, at.frame.key)], at.frame.key)
+        selection.enter(picked)
+        selection.selectKeepingModes(null)
+        selection.select([target(hit.id, at.frame.key)], at.frame.key)
         return
       }
       if (cropTarget(at.frame, hit.id) && !design.nodes[hit.id]?.lock?.style) {
         // Into cropping its image fill (#48).
         stopEditing()
-        select([hit.id], at.frame.key)
-        cropping = { id: hit.id, frame: at.frame.key }
+        selection.select([hit.id], at.frame.key)
+        selection.crop({ id: hit.id, frame: at.frame.key })
         drawOverlay()
         return
       }
       if (isPath(design, hit.id) && !design.nodes[hit.id]?.lock?.style) {
         // Into a path's points (#45).
         stopEditing()
-        select([hit.id], at.frame.key)
-        pathEditing = { id: hit.id, frame: at.frame.key, selected: [] }
+        selection.select([hit.id], at.frame.key)
+        selection.editPath({ id: hit.id, frame: at.frame.key })
         drawOverlay()
         return
       }
       if (hit.type !== 'text' || design.nodes[hit.id]?.lock?.content) return
       stopEditing()
-      selection = { ids: [hit.id], frame: at.frame.key }
+      selection.selectKeepingModes({ ids: [hit.id], frame: at.frame.key })
       startEditing(hit.id, at.frame.key, 0)
       caretTo(caretFromPoint(at.p))
       drawOverlay()
@@ -3203,7 +3166,8 @@ function live(
 
   /** Combines the selected shapes into a live boolean (#44) and selects it. One undo step. */
   function combine(op: 'union' | 'subtract' | 'intersect' | 'exclude') {
-    const frame = selection && frameOf(selection.frame)
+    const current = selection.current()
+    const frame = current && frameOf(current.frame)
     if (!frame) return
     let id = ''
     if (
@@ -3211,7 +3175,7 @@ function live(
         id = session.run('node.boolean', { ids: roots(), op, drawn: drawnInFlow(roots(), frame.pageId) })
       })
     )
-      select([id], frame.key)
+      selection.select([id], frame.key)
   }
 
   /**
@@ -3219,7 +3183,8 @@ function live(
    * around them as drawn: align and distribute (#42). One undo step.
    */
   function arrange(offsets: (boxes: Rect[], within: Rect) => Offset[]) {
-    const frame = selection && frameOf(selection.frame)
+    const current = selection.current()
+    const frame = current && frameOf(current.frame)
     const format = frame && design.formats[frame.formatId]
     if (!frame || !format) return false
     const now = session.design()
@@ -3265,7 +3230,8 @@ function live(
 
   /** Moves the selection by whole pixels in its format, one undo step per press. */
   function nudge(dx: number, dy: number) {
-    const frame = selection && frameOf(selection.frame)
+    const current = selection.current()
+    const frame = current && frameOf(current.frame)
     if (!frame) return
     const ids = roots()
     const now = session.design()
@@ -3332,9 +3298,11 @@ function live(
   /** The top-level layers of the selection's page, or the first page's, that can be picked. */
   function selectAll() {
     const frame =
-      frameOf(selection?.frame) ?? frameOf(frameKey(firstPage(), design.meta.primaryFormatId)) ?? grid.frames[0]
+      frameOf(selection.current()?.frame) ??
+      frameOf(frameKey(firstPage(), design.meta.primaryFormatId)) ??
+      grid.frames[0]
     if (!frame) return
-    select(
+    selection.select(
       scenes
         .scene(frame)
         .layers.filter(pickable)
@@ -3379,14 +3347,14 @@ function live(
       return true
     }
     // Enter or Escape ends a crop (#48).
-    if (cropping && (action === 'deselect' || action === 'editPoints')) {
-      cropping = null
+    if (selection.cropping() && (action === 'deselect' || action === 'editPoints')) {
+      selection.crop(null)
       drawOverlay()
       return true
     }
-    if (pathEditing) {
+    if (selection.pathEditing()) {
       if (action === 'deselect' || action === 'editPoints') {
-        pathEditing = null
+        selection.editPath(null)
         drawOverlay()
         return true
       }
@@ -3407,22 +3375,23 @@ function live(
       return true
     }
     // Esc lets the picked page go; the layers' other keys do nothing to it.
-    if (action === 'deselect' && !selection && pickedPage) {
-      pickPage(null)
+    if (action === 'deselect' && !selection.current() && selection.pickedPage()) {
+      selection.pickPage(null)
       return true
     }
-    const frame = selection && frameOf(selection.frame)
-    if (!selection || !frame) return false
+    const current = selection.current()
+    const frame = current && frameOf(current.frame)
+    if (!current || !frame) return false
     const ids = roots()
     const nodes = session.design().nodes
     const far = action.endsWith('Far') ? NUDGE_FAR : NUDGE
     switch (action) {
       case 'deselect': {
         // Out of a group or frame one level at a time: it gets selected, then the page.
-        const up = entered
+        const up = selection.entered()
         const parent = up ? design.nodes[up]?.parentId : undefined
-        entered = parent && design.nodes[parent] ? parent : null
-        select(up ? [up] : [], frame.key)
+        selection.enter(parent && design.nodes[parent] ? parent : null)
+        selection.select(up ? [up] : [], frame.key)
         break
       }
       case 'delete': {
@@ -3435,7 +3404,7 @@ function live(
             }),
           )
         )
-          select([], frame.key)
+          selection.select([], frame.key)
         break
       }
       case 'group': {
@@ -3445,7 +3414,7 @@ function live(
             group = session.run('node.group', { ids, drawn: drawnInFlow(ids, frame.pageId) })
           })
         )
-          select([group], frame.key)
+          selection.select([group], frame.key)
         break
       }
       case 'alignLeft':
@@ -3474,10 +3443,10 @@ function live(
         break
       case 'editPoints': {
         // Enter on one layer with an image fill crops it (#48); on one path, it goes into its points (#45).
-        const [only] = selection.ids
-        if (selection.ids.length !== 1 || !only || nodes[only]?.lock?.style) return false
-        if (cropTarget(frame, only)) cropping = { id: only, frame: frame.key }
-        else if (isPath(session.design(), only)) pathEditing = { id: only, frame: frame.key, selected: [] }
+        const [only] = current.ids
+        if (current.ids.length !== 1 || !only || nodes[only]?.lock?.style) return false
+        if (cropTarget(frame, only)) selection.crop({ id: only, frame: frame.key })
+        else if (isPath(session.design(), only)) selection.editPath({ id: only, frame: frame.key })
         else return false
         break
       }
@@ -3499,7 +3468,7 @@ function live(
             }),
           )
         )
-          select([group], frame.key)
+          selection.select([group], frame.key)
         break
       }
       case 'frameSelection': {
@@ -3509,7 +3478,7 @@ function live(
             framed = session.run('node.frame', { ids, drawn: drawnInFlow(ids, frame.pageId) })
           })
         )
-          select([framed], frame.key)
+          selection.select([framed], frame.key)
         break
       }
       case 'autoLayout': {
@@ -3540,7 +3509,7 @@ function live(
             }),
           )
         )
-          select([framed], frame.key)
+          selection.select([framed], frame.key)
         break
       }
       case 'booleanUnion':
@@ -3565,7 +3534,7 @@ function live(
             freed = session.run('node.ungroup', { ids: groups })
           })
         ) {
-          select([...ids.filter((id) => !groups.includes(id)), ...freed], frame.key)
+          selection.select([...ids.filter((id) => !groups.includes(id)), ...freed], frame.key)
         }
         break
       }
@@ -3576,7 +3545,7 @@ function live(
             copies = session.run('node.duplicate', { ids })
           })
         )
-          select(copies, frame.key)
+          selection.select(copies, frame.key)
         break
       }
       case 'bringForward':
@@ -3593,10 +3562,10 @@ function live(
         break
       case 'lock': {
         // Locks every flag, or unlocks them all when every selected layer is already locked.
-        const locked = selection.ids.every((id) => LOCK_FLAGS.every((flag) => nodes[id]?.lock?.[flag]))
+        const locked = current.ids.every((id) => LOCK_FLAGS.every((flag) => nodes[id]?.lock?.[flag]))
         runQuietly(() =>
           session.run('node.lock', {
-            ids: selection?.ids ?? [],
+            ids: current?.ids ?? [],
             lock: Object.fromEntries(LOCK_FLAGS.map((flag) => [flag, !locked])),
           }),
         )
@@ -3604,21 +3573,21 @@ function live(
       }
       case 'hide': {
         // Hidden in this format only, like a move; the layer stays selected so it can be shown again.
-        const shown = selection.ids.some((id) => visibleIn(session.design(), frame, id))
+        const shown = current.ids.some((id) => visibleIn(session.design(), frame, id))
         runQuietly(() =>
-          session.run('node.update', { ids: selection?.ids ?? [], scope: scope(frame), patch: { visible: !shown } }),
+          session.run('node.update', { ids: current?.ids ?? [], scope: scope(frame), patch: { visible: !shown } }),
         )
         break
       }
       case 'hideEverywhere': {
         // Shown in any format: hidden in every one; hidden in all of them: shown in every one.
         const now = session.design()
-        const shown = selection.ids.some((id) =>
+        const shown = current.ids.some((id) =>
           Object.keys(now.formats).some(
             (f) => (now.overrides[formatScope(f)]?.[id]?.visible ?? now.nodes[id]?.props.visible) !== false,
           ),
         )
-        hideInEveryFormat(selection.ids, shown)
+        hideInEveryFormat(current.ids, shown)
         break
       }
       case 'nudgeLeft':
@@ -3769,7 +3738,8 @@ function live(
    * them, each as the selection's format shows it: placed by auto layout, with the format's overrides.
    */
   function copiedLayers(): LayerClipboard | null {
-    const frame = selection && frameOf(selection.frame)
+    const current = selection.current()
+    const frame = current && frameOf(current.frame)
     if (!frame || editing) return null
     const now = session.design()
     const stacked: string[] = []
@@ -3807,12 +3777,13 @@ function live(
    */
   function pasteLayers(tree: LayerTree, atPointer: boolean) {
     const under = pointer ? pointIn(pointer) : null
-    const frame = frameOf(selection?.frame) ?? under?.frame ?? drawnFrames[0] ?? grid.frames[0]
+    const frame = frameOf(selection.current()?.frame) ?? under?.frame ?? drawnFrames[0] ?? grid.frames[0]
     if (!frame) return
     const now = session.design()
+    const entered = selection.entered()
     const inside = entered ? now.nodes[entered] : undefined
     const holds = inside && tree.roots.every((root) => canHold(inside.type, tree.nodes[root]?.type ?? ''))
-    const parentId = entered && holds && selection?.frame === frame.key ? entered : frame.pageId
+    const parentId = entered && holds && selection.current()?.frame === frame.key ? entered : frame.pageId
     let dx = 0
     let dy = 0
     if (atPointer && under?.frame.key === frame.key) {
@@ -3837,7 +3808,7 @@ function live(
         }),
       )
     )
-      select(pasted, frame.key)
+      selection.select(pasted, frame.key)
   }
 
   /**
@@ -3857,7 +3828,7 @@ function live(
     const spot = where.spot ?? (client && spotAt(client))
     // A point off every frame puts the file in the middle of the selection's frame; with no point,
     // it goes in the frame in the middle of the view.
-    const frame = spot ? frameOf(spot.frame) : client ? frameOf(selection?.frame) : middleFrame()
+    const frame = spot ? frameOf(spot.frame) : client ? frameOf(selection.current()?.frame) : middleFrame()
     if (!frame) return null
     const at = spot ? { x: spot.x, y: spot.y } : { x: frame.width / 2, y: frame.height / 2 }
     let made: ReturnType<typeof svgToLayers>
@@ -3894,7 +3865,7 @@ function live(
     const id = ids[0]
     if (!ok || !id) return null
     tools.setTool('select')
-    select([id], frame.key)
+    selection.select([id], frame.key)
     if (made.skipped.length > 0) notify('svgLeftOut', made.skipped)
     return id
   }
@@ -4068,12 +4039,12 @@ function live(
     session,
     doc,
     design: () => session.design(),
-    selected: () => selection?.ids[0] ?? null,
-    selection: () => [...(selection?.ids ?? [])],
-    selectedFrame: () => selection?.frame ?? null,
+    selected: () => selection.current()?.ids[0] ?? null,
+    selection: () => [...(selection.current()?.ids ?? [])],
+    selectedFrame: () => selection.current()?.frame ?? null,
     select(ids: string[], pageId?: string, formatId?: string) {
       stopEditing()
-      select(
+      selection.select(
         ids.filter((id) => session.design().nodes[id]),
         defaultFrame(pageId, formatId).key,
       )
@@ -4219,8 +4190,9 @@ function live(
       const deepest = hitTest(scenes.scene(frame).layers, at.p)
       if (!deepest) return []
       const id = target(deepest.id, frame.key)
-      if (!(selection?.frame === frame.key && selection.ids.includes(id))) select([id], frame.key)
-      return [...(selection?.ids ?? [])]
+      const current = selection.current()
+      if (!(current?.frame === frame.key && current.ids.includes(id))) selection.select([id], frame.key)
+      return [...(selection.current()?.ids ?? [])]
     },
     busy: () => gesture !== null,
     textSelection: () => selectedText(),
@@ -4238,16 +4210,10 @@ function live(
       textSelectionListeners.add(listener)
       return () => textSelectionListeners.delete(listener)
     },
-    onSelection(listener: (ids: string[]) => void) {
-      selectionListeners.add(listener)
-      return () => selectionListeners.delete(listener)
-    },
-    pickedPage: () => pickedPage,
-    pickPage,
-    onPagePick(listener: (pageId: string | null) => void) {
-      pageListeners.add(listener)
-      return () => pageListeners.delete(listener)
-    },
+    onSelection: (listener: (ids: string[]) => void) => selection.onSelection(listener),
+    pickedPage: () => selection.pickedPage(),
+    pickPage: (pageId: string | null) => selection.pickPage(pageId),
+    onPagePick: (listener: (pageId: string | null) => void) => selection.onPagePick(listener),
     rulers: () => rulers,
     snapping: () => tools.snapping(),
     snapWork: () => ({ ...snapWork }),
@@ -4261,7 +4227,7 @@ function live(
     focus(formatId: string | null) {
       focused = formatId && design.formats[formatId] ? formatId : null
       grid = frameGrid(design, focused)
-      if (selection && !frameOf(selection.frame)) selection = null
+      selection.dropOffGrid()
       if (editing && !frameOf(editing.frame)) stopEditing()
       fitAll()
     },
@@ -4341,7 +4307,7 @@ function live(
     },
     loadedFamilies: () => resources.families(),
     async setFont(fontFamily: string, fontWeight?: number) {
-      const ids = (selection?.ids ?? []).filter((id) => session.design().nodes[id]?.type === 'text')
+      const ids = (selection.current()?.ids ?? []).filter((id) => session.design().nodes[id]?.type === 'text')
       const range = selectedText()
       if (ids.length === 0 && !range) return
       await resources.loadFamilies([fontFamily])[0]
@@ -4377,7 +4343,7 @@ function live(
       const current = session.design()
       const value = ref ? resources.bytes().variables?.[ref] : undefined
       if (ref && value === undefined) return 0
-      const targets = (selection?.ids ?? []).flatMap((id) => {
+      const targets = (selection.current()?.ids ?? []).flatMap((id) => {
         const type = current.nodes[id]?.type ?? ''
         const target: BindingTarget = kind === 'font' ? 'fontFamily' : type === 'text' ? 'textColor' : 'fill'
         return canBind(type, target) ? [{ id, target }] : []
@@ -4417,7 +4383,7 @@ function live(
       )
         return null
       tools.setTool('select')
-      select([id], frame.key)
+      selection.select([id], frame.key)
       return id
     },
     placeSvg: (text: string, name: string, where?: Point | Spot) =>
@@ -4449,7 +4415,7 @@ function live(
       if (!node || !('fills' in node.props) || node.lock?.style) return false
       const fills = node.props.fills as Paint[]
       const page = pageOf(now, id)
-      const near = [inFrame, dropTarget?.id === id ? dropTarget.frame : undefined, selection?.frame]
+      const near = [inFrame, dropTarget?.id === id ? dropTarget.frame : undefined, selection.current()?.frame]
         .map(frameOf)
         .find((f) => f?.pageId === page)
       const frame = near ?? frameOf(frameKey(page, now.meta.primaryFormatId))
@@ -4469,7 +4435,7 @@ function live(
           }
         }),
       )
-      if (ok && frame) select([id], frame.key)
+      if (ok && frame) selection.select([id], frame.key)
       drawOverlay()
       return ok
     },
@@ -4478,7 +4444,8 @@ function live(
       return frame ? thumbnails.page(frame, size) : null
     },
     layerThumbnail(id: string, size = 96, outlined = false, inFrame?: string): string | null {
-      const frame = frameOf(inFrame ?? selection?.frame) ?? frameOf(frameKey(firstPage(), design.meta.primaryFormatId))
+      const frame =
+        frameOf(inFrame ?? selection.current()?.frame) ?? frameOf(frameKey(firstPage(), design.meta.primaryFormatId))
       return frame ? thumbnails.layer(frame, id, size, outlined) : null
     },
     synced: () => provider.synced && provider.unsyncedChanges === 0,
@@ -4488,8 +4455,7 @@ function live(
       resized.disconnect()
       cancelAnimationFrame(pending)
       drawListeners.clear()
-      selectionListeners.clear()
-      pageListeners.clear()
+      selection.destroy()
       noticeListeners.clear()
       thumbnails.destroy()
       tools.destroy()
