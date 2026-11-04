@@ -2,14 +2,16 @@
 
 // The selected layers' own actions, one list for the small menu's ⋯ (the full menu) and the
 // right-click menu: copy, paste, duplicate and delete; order and line up with the size as menus
-// beside their rows, and the turn; group, box, mask and ungroup; lock and hide; text direction.
-// Every row runs the same editor action as its shortcut.
+// beside their rows, and the turn; group, box, mask (or release the mask a layer is under) and
+// ungroup; lock and hide; text direction. Every row runs the same editor action as its shortcut.
+// A right-click on empty canvas offers to show the frame's hidden layers, when it has some.
 import { CaretRightIcon } from '@phosphor-icons/react'
 import * as Popover from '@radix-ui/react-popover'
 import { type ReactNode, useEffect, useState } from 'react'
 
+import { childrenOf, descendants } from '@dazbee/doc'
 import type { Editor, ShortcutAction } from '@dazbee/editor'
-import { formatScope } from '@dazbee/schema'
+import { type Design, formatScope } from '@dazbee/schema'
 
 import { ALIGN, keyOf } from '@/components/editor/arrange-actions.ts'
 import { RotationField } from '@/components/editor/edit-panel/position-panel.tsx'
@@ -23,8 +25,49 @@ import { dirOf, format } from '@/lib/i18n/index.ts'
 
 import { useMenuFocus } from './bar-popover.tsx'
 
+/** The layers hidden in one frame, which a right-click on its empty canvas offers to show. */
+export interface HiddenLayers {
+  ids: string[]
+  pageId: string
+  formatId: string
+}
+
 /** The four moves along the stack: to the front, forward, backward, to the back. */
 export const ORDER = ['bringToFront', 'bringForward', 'sendBackward', 'sendToBack'] as const
+
+/** The layers hidden in the frame at a client point; null when it has none, or no frame is there. */
+export function hiddenAt(editor: Editor, client: { x: number; y: number }): HiddenLayers | null {
+  const spot = editor.spotAt(client)
+  const frame = spot && editor.frames().find((f) => f.key === spot.frame)
+  if (!frame) return null
+  const design = editor.design()
+  const scope = formatScope(frame.formatId)
+  const ids = descendants(design, frame.pageId).filter(
+    (id) => (design.overrides[scope]?.[id]?.visible ?? design.nodes[id]?.props.visible) === false,
+  )
+  return ids.length > 0 ? { ids, pageId: frame.pageId, formatId: frame.formatId } : null
+}
+
+/**
+ * The masks the layers are under, each the nearest mask before it among its siblings; null unless
+ * every layer is under one and none is a mask itself.
+ */
+function masksOver(design: Design, ids: readonly string[]): string[] | null {
+  const masks = new Set<string>()
+  for (const id of ids) {
+    const node = design.nodes[id]
+    if (!node || node.props.mask) return null
+    const siblings = childrenOf(design, node.parentId)
+    const before = siblings.slice(
+      0,
+      siblings.findIndex(([sibling]) => sibling === id),
+    )
+    const mask = before.findLast(([, sibling]) => sibling.props.mask)
+    if (!mask) return null
+    masks.add(mask[0])
+  }
+  return [...masks]
+}
 
 /**
  * The layers' own actions in short groups with only what applies. Copy fires the same copy event as
@@ -67,6 +110,7 @@ export function LayerActions({ editor, ids, onDone }: { editor: Editor; ids: str
     ),
   )
   const masks = target.props.every((pr) => Boolean(pr.mask))
+  const over = masksOver(design, target.ids)
   const sized = target.types.every((type) => type !== 'group' && type !== 'boolean')
   const texts = target.types.every((type) => type === 'text')
   const direction = shared(target.props.map((pr) => (pr.direction ?? 'auto') as 'auto' | 'ltr' | 'rtl'))
@@ -116,7 +160,23 @@ export function LayerActions({ editor, ids, onDone }: { editor: Editor; ids: str
       <div className={MENU_DIVIDER} />
       {ids.length > 1 && row('group', t.editor.arrange.group)}
       {row('frameSelection', b.putInBox)}
-      {row('mask', t.editor.arrange.mask, masks)}
+      {over ? (
+        <button
+          type="button"
+          data-action="releaseMask"
+          disabled={over.some((id) => design.nodes[id]?.lock?.style)}
+          onClick={() => {
+            // The mask becomes a layer of its own again, in one undo step.
+            editor.session.run('node.mask', { ids: over, mask: null })
+            onDone()
+          }}
+          className={MENU_ITEM}
+        >
+          {b.releaseMask}
+        </button>
+      ) : (
+        row('mask', t.editor.arrange.mask, masks)
+      )}
       {target.types.some((type) => type === 'group') && row('ungroup', t.editor.arrange.ungroup)}
       <div className={MENU_DIVIDER} />
       <button
@@ -168,17 +228,24 @@ export function LayerActions({ editor, ids, onDone }: { editor: Editor; ids: str
   )
 }
 
-/** The layer actions at a right-click on the stage, for what it picked; it closes once the selection changes. */
+/**
+ * The layer actions at a right-click on the stage, for what it picked, or Show hidden layers at one
+ * on empty canvas; it closes once the selection changes.
+ */
 export function StageMenu({
   editor,
   at,
+  hidden,
   onClose,
 }: {
   editor: Editor
   at: { x: number; y: number }
+  /** The hidden layers of the frame right-clicked where nothing was picked. */
+  hidden: HiddenLayers | null
   onClose: () => void
 }) {
   const t = useMessages()
+  const b = t.editor.bar
   const ids = useSelection(editor)
   const { barBottom } = useEditState()
   const [openedFor] = useState(ids)
@@ -200,11 +267,28 @@ export function StageMenu({
           collisionPadding={{ top: barBottom + 8, bottom: 72, left: 12, right: 12 }}
           // A click elsewhere or Esc closes it; focus given back to a button that just closed does not.
           onFocusOutside={(event) => event.preventDefault()}
-          aria-label={t.editor.bar.actions}
+          aria-label={hidden ? b.canvas : b.actions}
           data-testid="stage-menu"
-          className={cn(MENU, 'max-h-[var(--radix-popover-content-available-height)] w-80 overflow-y-auto')}
+          className={cn(
+            MENU,
+            hidden ? 'min-w-52' : 'max-h-[var(--radix-popover-content-available-height)] w-80 overflow-y-auto',
+          )}
         >
-          <LayerActions editor={editor} ids={ids} onDone={onClose} />
+          {hidden ? (
+            <button
+              type="button"
+              data-action="showHidden"
+              onClick={() => {
+                editor.setHidden(hidden.ids, false, hidden.pageId, hidden.formatId)
+                onClose()
+              }}
+              className={MENU_ITEM}
+            >
+              {b.showHidden}
+            </button>
+          ) : (
+            <LayerActions editor={editor} ids={ids} onDone={onClose} />
+          )}
         </Popover.Content>
       </Popover.Portal>
     </Popover.Root>

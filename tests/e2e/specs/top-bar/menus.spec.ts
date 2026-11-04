@@ -346,6 +346,66 @@ test('the small menu locks, duplicates and deletes; the full menu copies, pastes
   expect(errors).toEqual([])
 })
 
+test('with a layer under a mask selected, the full and right-click menus release the mask, one undo step', async ({
+  browser,
+}) => {
+  const asset = await upload(photo)
+  const { page, errors } = await openStage(browser, topBarDesign(asset.id))
+  const mask = () =>
+    page.evaluate(() => (window.dazbee?.design().nodes.cutter?.props as { mask?: string }).mask ?? null)
+  await selectLayers(page, ['photoB'])
+  const full = await moreMenu(page)
+  await expect(full.getByRole('button', { name: /^Use as mask/ })).toHaveCount(0)
+  await expect(full.getByRole('button', { name: /^Release mask/ })).toBeVisible()
+  writeOutput('full-menu-release-mask.png', await page.screenshot({ animations: 'disabled' }))
+  await moreAction(page, 'Release mask')
+  await expect.poll(mask).toBeNull()
+  // The mask stays, a layer of its own, and undo masks again in one step.
+  expect(await page.evaluate(() => window.dazbee?.design().nodes.cutter?.name)).toBe('Cutter')
+  await page.evaluate(() => window.dazbee?.perform('undo'))
+  await expect.poll(mask).toBe('alpha')
+
+  // Photo B moved inside the mask, where it shows: a right-click picks it, and its menu releases the mask.
+  await page.evaluate(() => window.dazbee?.session.run('node.update', { ids: ['photoB'], patch: { x: 740, y: 880 } }))
+  await selectLayers(page, [])
+  const at = await screenPoint(page, 800, 920)
+  await page.mouse.click(at.x, at.y, { button: 'right' })
+  const menu = page.getByTestId('stage-menu')
+  await expect(menu).toBeVisible()
+  expect(await page.evaluate(() => window.dazbee?.selection())).toEqual(['photoB'])
+  await moreAction(page, 'Release mask', menu)
+  await expect.poll(mask).toBeNull()
+  await page.evaluate(() => window.dazbee?.perform('undo'))
+  await expect.poll(mask).toBe('alpha')
+  expect(errors).toEqual([])
+})
+
+test('a right-click on empty canvas offers to show the hidden layers when the page has some, one undo step', async ({
+  browser,
+}) => {
+  const asset = await upload(photo)
+  const { page, errors } = await openStage(browser, topBarDesign(asset.id))
+  const visible = () =>
+    page.evaluate(() => {
+      const d = window.dazbee?.design()
+      return ({ ...d?.nodes.hidden?.props, ...d?.overrides['format:sq']?.hidden } as { visible?: boolean }).visible
+    })
+  const empty = await screenPoint(page, 720, 680)
+  await page.mouse.click(empty.x, empty.y, { button: 'right' })
+  const menu = page.getByTestId('stage-menu')
+  await expect(menu.getByRole('button')).toHaveText(['Show hidden layers'])
+  writeOutput('stage-menu-show-hidden.png', await page.screenshot({ animations: 'disabled' }))
+  await menu.getByRole('button', { name: 'Show hidden layers' }).click()
+  await expect(menu).toBeHidden()
+  await expect.poll(visible).not.toBe(false)
+  // With nothing hidden, no menu opens.
+  await page.mouse.click(empty.x, empty.y, { button: 'right' })
+  await expect(menu).toHaveCount(0)
+  await page.evaluate(() => window.dazbee?.perform('undo'))
+  await expect.poll(visible).toBe(false)
+  expect(errors).toEqual([])
+})
+
 test('the small menu keeps out of a drag, and over a selection filling a phone it sits under the top bar with the full menu reachable', async ({
   browser,
 }) => {
