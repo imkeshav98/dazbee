@@ -6,14 +6,14 @@ import { GearSixIcon, SignOutIcon } from '@phosphor-icons/react'
 import Link from 'next/link'
 import { useEffect, useId, useRef, useState } from 'react'
 
+import { TOUCH_ROW } from '@/components/ui/looks.ts'
 import { useMessages } from '@/lib/i18n/client.tsx'
 import { initialsOf } from '@/lib/initials.ts'
 
 import { LocaleSwitch } from './locale-switch.tsx'
 import { ThemeSwitch } from './theme-switch.tsx'
 
-const ROW =
-  'flex h-10 w-full cursor-pointer items-center gap-3 rounded-row px-3 text-start text-[13px] font-medium transition-colors duration-[var(--chrome-fast)] hover:bg-hover focus-visible:bg-hover focus-visible:outline-none'
+const ROW = `flex h-10 w-full cursor-pointer items-center gap-3 rounded-row px-3 text-start text-[13px] font-medium transition-colors duration-[var(--chrome-fast)] hover:bg-hover hover:lit active:bg-pressed active:lit focus-visible:bg-hover focus-visible:lit focus-visible:outline-none ${TOUCH_ROW}`
 
 export function AccountMenu({
   name,

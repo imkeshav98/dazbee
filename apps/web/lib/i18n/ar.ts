@@ -238,6 +238,9 @@ export const ar: Messages = {
       copy: 'نسخ',
       paste: 'لصق',
       delete: 'حذف',
+      releaseMask: 'إلغاء القناع',
+      showHidden: 'إظهار الطبقات المخفية',
+      canvasMenu: 'إجراءات اللوحة',
       rotate: 'تدوير',
       underline: 'تسطير',
       strikethrough: 'يتوسطه خط',
@@ -659,7 +662,7 @@ export const ar: Messages = {
     },
     assetLibrary: {
       delete: 'حذف',
-      deleteNamed: 'حذف {name}',
+      deleteConfirm: 'حذف «{name}» نهائيًا؟ لا يمكن التراجع عن ذلك.',
       keep: 'إبقاء',
       inUse: 'مستخدمة في {n} مواضع: {places}',
       inUseOnce: 'مستخدمة في {places}',

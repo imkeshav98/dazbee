@@ -1,6 +1,7 @@
 // Templates (#54) in Chromium: save a design as a template from the editor, find it with its
 // thumbnail on the brand page, start a design from it (same pixels, no shared ids), edit that
-// design, and the template is unchanged: a second design started from it is the original again.
+// design, and the template is unchanged: a second design started from it is the original again. Save
+// as template takes the focus as it opens from Share, and gives it back on Esc.
 import { randomUUID } from 'node:crypto'
 
 import { type DesignInput, TemplateSummary } from '@dazbee/schema'
@@ -83,6 +84,32 @@ const named = async (page: Page, name: string) => {
   if (!found) throw new Error(`no layer ${name}`)
   return { id: found[0], ...(placed(design, found[0]) as { x: number; y: number }) }
 }
+
+test('Save as template opened from Share, by pointer or keyboard, takes the focus onto its name, and Esc gives it back to Share', async ({
+  browser,
+}) => {
+  const { page, errors } = await openStage(browser, design())
+  const share = page.getByTestId('share-open')
+  const dialog = page.getByTestId('template')
+  const name = dialog.getByRole('textbox', { name: 'Template name' })
+  await share.click()
+  await page.getByTestId('template-open').click()
+  await expect(name).toBeFocused()
+  await page.keyboard.press('Escape')
+  await expect(dialog).toBeHidden()
+  await expect(share).toBeFocused()
+
+  // Enter opens the menu, the arrow goes on to Save as template, and Enter opens it.
+  await page.keyboard.press('Enter')
+  await page.keyboard.press('ArrowDown')
+  await expect(page.getByTestId('template-open')).toBeFocused()
+  await page.keyboard.press('Enter')
+  await expect(name).toBeFocused()
+  await page.keyboard.press('Escape')
+  await expect(dialog).toBeHidden()
+  await expect(share).toBeFocused()
+  expect(errors).toEqual([])
+})
 
 test('save a template, start a design from it, edit that design, and the template is unchanged', async ({
   browser,

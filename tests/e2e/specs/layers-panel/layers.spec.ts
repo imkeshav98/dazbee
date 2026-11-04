@@ -1,10 +1,15 @@
 // The layers panel (#59) in Chromium, with the real mouse: the tree in step with the stage's
 // selection both ways, a layer dragged into a group (the stage redraws it there, one undo step,
-// which redo brings back), rename, lock and hide, all there after a reload.
-import { reloads, writeOutput } from '../../support/editor.ts'
-import { colourAt, layersDesign, listed, node, openLayers, ROW, row, tree } from '../../support/layers-panel.ts'
-import { click, openStage } from '../../support/stage.ts'
-import { expect, test } from '../../support/test.ts'
+// which redo brings back), rename, lock and hide, all there after a reload; with nothing selected,
+// the first frame of the page in view, an empty one too, or a page with no frames; and the rows'
+// pictures reading in both themes.
+import type { DesignInput } from '@dazbee/schema'
+
+import { reloads, setCookies, writeOutput } from '../../support/editor.ts'
+import { colourAt, layersDesign, listed, node, openLayers, rect, ROW, row, tree } from '../../support/layers-panel.ts'
+import { click, openStage, selectLayers } from '../../support/stage.ts'
+import { expect, type Page, test } from '../../support/test.ts'
+import { pagesPanel } from '../../support/top-bar.ts'
 
 test.describe.configure({ timeout: 120_000 })
 
@@ -112,4 +117,171 @@ test('the panel and the stage select together; drag into a group, rename, lock a
     'true',
   )
   expect(errors).toEqual([])
+})
+
+test('with nothing selected the panel shows the first frame of the page in view, an empty one too, or says a page has no frames', async ({
+  browser,
+}) => {
+  const { page, errors } = await openStage(browser, layersDesign())
+  await openLayers(page)
+  const note = page.getByTestId('flyout-note')
+  await selectLayers(page, ['box'])
+  await selectLayers(page, [])
+  await expect(note).toHaveText('Page 1 · Square')
+  // Add page brings the new page into view: the panel shows its one frame, with no layers.
+  const pages = await pagesPanel(page)
+  await pages.getByTestId('add-page').click()
+  await expect(note).toHaveText('Page 2 · Feed square')
+  await expect(page.getByTestId('layers')).toHaveText('No layers in this frame yet. Draw a shape or add text to start.')
+  // With that frame deleted the page has none, and the panel says how to add one.
+  await page.evaluate(() => {
+    const editor = window.dazbee
+    for (const frame of editor?.frames() ?? []) editor?.session.run('frame.delete', { frameId: frame.key })
+  })
+  await expect(note).toHaveCount(0)
+  await expect(page.getByTestId('layers')).toHaveText('Pick the Frame tool to add a frame')
+  await pages.getByRole('button', { name: 'Show Page 1' }).click()
+  await expect(note).toHaveText('Page 1 · Square')
+  await expect(row(page, 'Box')).toBeVisible()
+  expect(errors).toEqual([])
+})
+
+test.describe('row pictures in dark and light theme', () => {
+  const text = (link: string, index: string, name: string, y: number, color: string) => ({
+    type: 'text' as const,
+    parentId: 'sq',
+    link,
+    index,
+    name,
+    props: {
+      x: 80,
+      y,
+      width: 600,
+      height: 90,
+      text: name,
+      style: { fontFamily: 'Noto Sans', fontSize: 64, color },
+    },
+  })
+  const design = (): DesignInput => ({
+    ...layersDesign(),
+    nodes: {
+      ...layersDesign().nodes,
+      ink: text('ink', 'b0', 'Ink', 60, '#111111FF'),
+      chalk: text('chalk', 'b1', 'Chalk', 160, '#FFFFFFFF'),
+    },
+  })
+  /** How a row's picture tile looks: what it holds, its fill and its ink. */
+  const tile = (page: Page, name: string) =>
+    row(page, name)
+      .getByTestId('layer-picture')
+      .evaluate((el) => ({
+        holds: el.querySelector('img') ? 'picture' : el.querySelector('svg') ? 'icon' : 'nothing',
+        fill: getComputedStyle(el).backgroundColor,
+        ink: getComputedStyle(el).color,
+      }))
+
+  for (const theme of ['dark', 'light'] as const) {
+    test(`in ${theme} theme every text row shows the same text icon, whatever its text's colour`, async ({
+      browser,
+    }) => {
+      const { page, errors } = await openStage(browser, design())
+      await setCookies(page, { theme })
+      await page.reload()
+      await expect(page.getByTestId('status')).toHaveAttribute('data-ready', '', { timeout: 30_000 })
+      await openLayers(page)
+      // The other rows' pictures are drawn first, so a text row's tile is what it will stay.
+      await expect(row(page, 'Box').getByTestId('layer-picture').locator('img')).toHaveCount(1)
+      const ink = await tile(page, 'Ink')
+      expect(ink.holds).toBe('icon')
+      expect(await tile(page, 'Chalk')).toEqual(ink)
+      writeOutput(`layers-text-rows-${theme}.png`, await page.screenshot({ animations: 'disabled' }))
+      expect(errors).toEqual([])
+    })
+  }
+
+  /** A shape as dark as the dark theme's panel, and one as white as the light theme's. */
+  const shapes = (): DesignInput => ({
+    ...layersDesign(),
+    nodes: {
+      ...layersDesign().nodes,
+      night: {
+        type: 'graphic',
+        parentId: 'sq',
+        link: 'night',
+        index: 'b0',
+        name: 'Night box',
+        props: rect(80, 60, 300, 300, '#1A1420FF'),
+      },
+      snow: {
+        type: 'graphic',
+        parentId: 'sq',
+        link: 'snow',
+        index: 'b1',
+        name: 'Snow dot',
+        props: { ...rect(600, 60, 300, 200, '#FFFFFFFF'), shape: { kind: 'ellipse' as const } },
+      },
+    },
+  })
+  /**
+   * The contrast of a row's picture, its colour the mean of its drawn pixels, with what its tile
+   * shows round it, and whether the tile shows round it at all.
+   */
+  const swatch = async (page: Page, name: string) => {
+    const tile = row(page, name).getByTestId('layer-picture')
+    await expect(tile.locator('img')).toHaveCount(1)
+    return tile.evaluate(async (el) => {
+      const img = el.querySelector('img') as HTMLImageElement
+      await img.decode()
+      const paint = document.createElement('canvas')
+      paint.width = img.naturalWidth
+      paint.height = img.naturalHeight
+      const g = paint.getContext('2d', { willReadFrequently: true })
+      if (!g) return null
+      g.drawImage(img, 0, 0)
+      const data = g.getImageData(0, 0, paint.width, paint.height).data
+      const sum = [0, 0, 0, 0]
+      for (let i = 0; i < data.length; i += 4) {
+        const a = (data[i + 3] ?? 0) / 255
+        for (let c = 0; c < 3; c++) sum[c] = (sum[c] ?? 0) + (data[i + c] ?? 0) * a
+        sum[3] = (sum[3] ?? 0) + a
+      }
+      const picture = sum.slice(0, 3).map((c) => c / (sum[3] || 1))
+      paint.width = paint.height = 1
+      g.fillStyle = getComputedStyle(el).backgroundColor
+      g.fillRect(0, 0, 1, 1)
+      const back = [...g.getImageData(0, 0, 1, 1).data].slice(0, 3)
+      const lum = (rgb: number[]) => {
+        const [r = 0, gr = 0, b = 0] = rgb.map((c) => {
+          const s = c / 255
+          return s <= 0.04045 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4
+        })
+        return 0.2126 * r + 0.7152 * gr + 0.0722 * b
+      }
+      const [hi, lo] = [lum(picture), lum(back)].sort((x, y) => y - x)
+      const drawn = img.getBoundingClientRect()
+      const inner = el.getBoundingClientRect()
+      return {
+        contrast: ((hi ?? 0) + 0.05) / ((lo ?? 0) + 0.05),
+        // The tile shows round the picture: the picture is smaller than the tile inside its border.
+        round: drawn.width <= inner.width - 4 && drawn.height <= inner.height - 4,
+      }
+    })
+  }
+
+  for (const [theme, name] of [
+    ['dark', 'Night box'],
+    ['light', 'Snow dot'],
+  ] as const) {
+    test(`in ${theme} theme a shape the colour of the panel shows on a tile that sets it off`, async ({ browser }) => {
+      const { page, errors } = await openStage(browser, shapes())
+      await setCookies(page, { theme })
+      await page.reload()
+      await expect(page.getByTestId('status')).toHaveAttribute('data-ready', '', { timeout: 30_000 })
+      await openLayers(page)
+      await expect.poll(async () => (await swatch(page, name))?.round).toBe(true)
+      expect((await swatch(page, name))?.contrast).toBeGreaterThanOrEqual(3)
+      writeOutput(`layers-shape-rows-${theme}.png`, await page.screenshot({ animations: 'disabled' }))
+      expect(errors).toEqual([])
+    })
+  }
 })

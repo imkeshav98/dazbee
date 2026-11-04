@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { type Design, framesOf, type Layer, parseDesign } from '@dazbee/schema'
+import { type Design, framesOf, inOrder, type Layer, parseDesign } from '@dazbee/schema'
 
 import { childrenOf, descendants, type DesignDoc, frameIdOf, loadDesign, readDesign, type Session } from './index.ts'
 import { badge, openTestSession, testDesign, twoTabs } from './test-design.ts'
@@ -295,6 +295,62 @@ describe('two tabs', () => {
     }
   })
 
+  it('two tabs deleting the last two pages at once leave one empty page on both', () => {
+    const { a, b, tabA, tabB, sync } = twoTabs()
+    tabA.run('page.add', {
+      id: 'p2',
+      name: 'Page 2',
+      frame: { id: 'p2-sq', name: 'Square', width: 1080, height: 1080 },
+    })
+    sync()
+
+    tabA.run('page.delete', { id: 'p1' })
+    tabB.run('page.delete', { id: 'p2' })
+    sync()
+
+    const design = readDesign(a)
+    expect(readDesign(b)).toEqual(design)
+    expect(Object.values(design.pages)).toEqual([{ name: 'Page 1', order: 'a0' }])
+    expect(design.frames).toEqual({})
+    expect(design.nodes).toEqual({})
+    expectFullRead(tabA, a)
+    expectFullRead(tabB, b)
+  })
+
+  it('edits after both tabs deleted the last two pages land on the page repair brought back', () => {
+    const { a, b, tabA, tabB, sync } = twoTabs()
+    const square = { name: 'Square', width: 1080, height: 1080 }
+    tabA.run('page.add', { id: 'p2', name: 'Page 2', frame: { id: 'p2-sq', ...square } })
+    sync()
+    tabA.run('page.delete', { id: 'p1' })
+    tabB.run('page.delete', { id: 'p2' })
+    sync()
+    const [page = ''] = Object.keys(tabA.design().pages)
+
+    // A frame added before any page edit writes the page sits on the page repair brings back.
+    tabA.run('frame.add', { id: 'f1', pageId: page, ...square })
+    tabA.run('node.create', { id: 'dot', parentId: 'f1', layer: badge })
+    sync()
+    tabB.run('page.update', { id: page, name: 'Cover' })
+    sync()
+    const added = tabA.run('page.add', { name: 'Page 2', frame: square })
+    sync()
+
+    for (const [tab, doc] of [
+      [tabA, a],
+      [tabB, b],
+    ] as const) {
+      expectFullRead(tab, doc)
+      const design = readDesign(doc)
+      expect(inOrder(design.pages).map(([id, p]) => [id, p.name])).toEqual([
+        [page, 'Cover'],
+        [added, 'Page 2'],
+      ])
+      expect(framesOf(design, page).map(([id]) => id)).toEqual(['f1'])
+      expect(design.nodes.dot?.parentId).toBe('f1')
+    }
+  })
+
   it.each([1, 7, 42, 2026, 31337])(
     '200 random commands from each tab end in the same valid design on both (seed %i)',
     (seed) => {
@@ -406,8 +462,7 @@ function randomCommand(tab: Session, doc: DesignDoc, random: () => number) {
           frame: { name: 'F', width: 100 + Math.floor(random() * 900), height: 100 },
         })
       else if (which < 0.7) tab.run('page.duplicate', { id: pick(pages) })
-      // p1 stays: two tabs deleting the last pages at once would leave none, which repair doesn't handle.
-      else tab.run('page.delete', { id: pick(pages.filter((id) => id !== 'p1')) ?? 'p1' })
+      else tab.run('page.delete', { id: pick(pages) })
     } else if (roll < 0.92) {
       const which = random()
       const frames = Object.keys(design.frames)

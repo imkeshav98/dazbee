@@ -5,7 +5,7 @@
 // phone it is a sheet at the bottom. It closes on ✕, Esc, another selection or a pop-up opening,
 // and gives the focus back to its bar item when closed from inside it.
 import { XIcon } from '@phosphor-icons/react'
-import { type CSSProperties, type ReactNode, type RefObject, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { type CSSProperties, type ReactNode, useEffect, useLayoutEffect, useRef, useState } from 'react'
 
 import type { Editor } from '@dazbee/editor'
 
@@ -13,6 +13,7 @@ import { useFontCatalog } from '@/components/brand-kit/font-catalog.ts'
 import {
   isLayerPanel,
   type LayerPanelId,
+  overPanel,
   type PanelId,
   setOpen,
   setSheetTop,
@@ -22,6 +23,7 @@ import {
 import { useSelection } from '@/components/editor/editor-hooks.ts'
 import { FontChooser } from '@/components/editor/flyouts/font-panel.tsx'
 import { useOverlayScroll } from '@/components/ui/overlay-scroll.ts'
+import { useScrollEdges } from '@/components/ui/scroll-edges.ts'
 import { cn } from '@/lib/cn.ts'
 import { useMessages } from '@/lib/i18n/client.tsx'
 import { format } from '@/lib/i18n/index.ts'
@@ -62,30 +64,6 @@ function closePanel(id: PanelId, back: boolean, opener: Element | null = null) {
   setOpen(null)
 }
 
-/**
- * Whether a scrolling body has been scrolled down from its top, and whether more of it is below:
- * the panel then draws a line under its title, and fades its last lines out.
- */
-function useScrollEdges(body: RefObject<HTMLElement | null>) {
-  const [edges, setEdges] = useState({ down: false, more: false })
-  const measure = () => {
-    const el = body.current
-    if (!el) return
-    const next = { down: el.scrollTop > 0, more: el.scrollTop + el.clientHeight < el.scrollHeight - 1 }
-    setEdges((now) => (now.down === next.down && now.more === next.more ? now : next))
-  }
-  useLayoutEffect(() => {
-    const el = body.current
-    if (!el) return
-    measure()
-    const watch = new ResizeObserver(measure)
-    watch.observe(el)
-    for (const child of el.children) watch.observe(child)
-    return () => watch.disconnect()
-  })
-  return { ...edges, measure }
-}
-
 export function EditPanel({ editor, brandId }: { editor: Editor; brandId: string }) {
   const { open } = useEditState()
   const ids = useSelection(editor)
@@ -118,7 +96,8 @@ export function PanelFrame({
   const phone = usePhone()
   const panel = useRef<HTMLElement>(null)
   const body = useRef<HTMLDivElement>(null)
-  const bodyRef = useOverlayScroll(body)
+  // On a phone the sheet's bar stays shown while there is more to scroll to: no pointer hovers to show it.
+  const bodyRef = useOverlayScroll(body, { shown: phone })
   const scroll = useScrollEdges(body)
   // The focus goes back to what opened it: a top bar item, or Pages by the zoom pill.
   const [opener] = useState(() => document.activeElement)
@@ -139,6 +118,8 @@ export function PanelFrame({
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.key !== 'Escape' || event.defaultPrevented) return
+      // What stands over the panel, as Keyboard shortcuts or the Share menu, closes first, on its own Esc.
+      if (overPanel()) return
       const at = document.activeElement
       // A list of the panel's own, a select's or a pop-up's, closes first.
       if (
@@ -228,7 +209,7 @@ export function PanelFrame({
           aria-label={t.editor.closePanel}
           data-testid="edit-panel-close"
           onClick={() => closePanel(id, true, opener)}
-          className="grid size-7 shrink-0 cursor-pointer place-items-center rounded-full text-subtle hover:bg-hover hover:text-text"
+          className="grid size-7 shrink-0 cursor-pointer place-items-center rounded-full text-subtle hover:bg-hover hover:text-text active:bg-pressed"
         >
           <XIcon size={14} aria-hidden />
         </button>

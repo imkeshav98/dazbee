@@ -7,22 +7,34 @@ type Snapshot = { pages: Record<string, unknown>; frames: Record<string, unknown
 /** The longest part of a layer id a new link id keeps, so `-<n>` still fits in an id. */
 const LINK_STEM = 60
 
+/** The page a design with no page left gets; the page commands write it with their next edit. */
+const EMPTY_PAGE = { name: 'Page 1', order: 'a0' }
+
 const field = (value: unknown, key: string) => (value as Json | undefined)?.[key]
 const byOrder = ([a, x]: [string, unknown], [b, y]: [string, unknown]) =>
   byCodeUnits(String(field(x, 'order')), String(field(y, 'order'))) || byCodeUnits(a, b)
 
 /**
- * Concurrent edits can merge into a state no single command allows: a frame added to a page
- * another tab deleted, a layer added to a frame or group another tab deleted, two moves that put
- * layers inside each other, two layers of one frame with one link id, a key an undo left unset.
- * These rules turn any merged state into a valid one. They read only the merged state, so every
- * device repairs it the same way, and they never write: the next edit carries on from the
- * repaired view. The snapshot is not changed either: a repaired layer is a copy, and every other
- * object comes back as it was, so a reader can keep what it validated for them.
+ * Concurrent edits can merge into a state no single command allows: two tabs each deleting one
+ * of the last two pages, a frame added to a page another tab deleted, a layer added to a frame or
+ * group another tab deleted, two moves that put layers inside each other, two layers of one frame
+ * with one link id, a key an undo left unset. These rules turn any merged state into a valid one.
+ * They read only the merged state, so every device repairs it the same way, and they never write:
+ * the next edit carries on from the repaired view. The snapshot is not changed either: a repaired
+ * layer is a copy, and every other object comes back as it was, so a reader can keep what it
+ * validated for them.
  */
 export function repair<S extends Snapshot>(snapshot: S): { snapshot: S; repairs: string[] } {
-  const s = snapshot
+  let s = snapshot
   const repairs: string[] = []
+
+  // 0. A design keeps a page: with none left it gets one empty page, at an id no frame or layer has.
+  if (Object.keys(s.pages).length === 0) {
+    let id = 'page'
+    for (let n = 2; Object.hasOwn(s.frames, id) || Object.hasOwn(s.nodes, id); n++) id = `page-${n}`
+    repairs.push(`no page was left; added the empty page "${id}"`)
+    s = { ...s, pages: { [id]: EMPTY_PAGE } }
+  }
 
   // 1. A frame whose page is gone goes: a tab added it while another deleted the page.
   const frames = Object.entries(s.frames).filter(([id, frame]) => {

@@ -1,7 +1,8 @@
 'use client'
 
 // One button of the bar by the selection and the popover it opens under it. The bar keeps which
-// one is open, so only one is open at a time.
+// one is open, so only one is open at a time. Also the hooks the editor's menus share: the focus as a
+// popover opens and closes, Tab once into a toolbar, and a menu that shows it scrolls.
 import { CaretDownIcon } from '@phosphor-icons/react'
 import * as Popover from '@radix-ui/react-popover'
 import {
@@ -9,14 +10,17 @@ import {
   type KeyboardEvent,
   type ReactNode,
   type RefObject,
+  useCallback,
   useEffect,
   useLayoutEffect,
   useRef,
   useState,
 } from 'react'
 
-import { useEditState } from '@/components/editor/edit-store.ts'
+import { useEditState, usePhone } from '@/components/editor/edit-store.ts'
 import { BAR_BUTTON, POPOVER } from '@/components/editor/styles.ts'
+import { useOverlayScroll } from '@/components/ui/overlay-scroll.ts'
+import { fadedEdges, useScrollEdges } from '@/components/ui/scroll-edges.ts'
 import { cn } from '@/lib/cn.ts'
 
 /** The room between the bar's last row that shows and a popover under it, in pixels. */
@@ -113,6 +117,35 @@ export function useRovingTab(bar: HTMLElement | null) {
     const at = itemsOf(event.currentTarget).indexOf(event.target as HTMLElement)
     if (at >= 0) setCurrent(at)
   }
+}
+
+/**
+ * A menu that scrolls when it is longer than its room, and shows that it does: its overlay bar,
+ * kept shown on a phone, and its cut edges faded. The ref goes on the scrolling element, and
+ * `also` gets the element too.
+ */
+export function useScrollingMenu(also?: (element: HTMLDivElement | null) => void) {
+  const phone = usePhone()
+  const area = useRef<HTMLDivElement | null>(null)
+  // A portal puts the menu in the page after its owner has rendered: the owner renders again once
+  // it is there, so its edges are measured however the menu opened.
+  const [, setShown] = useState<HTMLDivElement | null>(null)
+  const bars = useOverlayScroll(area, { shown: phone })
+  const edges = useScrollEdges(area)
+  const ref = useCallback(
+    (element: HTMLDivElement | null) => {
+      also?.(element)
+      setShown(element)
+      const off = bars(element)
+      return () => {
+        off()
+        also?.(null)
+        setShown(null)
+      }
+    },
+    [bars, also],
+  )
+  return { ref, onScroll: edges.measure, className: fadedEdges(edges) }
 }
 
 export function BarPopover({

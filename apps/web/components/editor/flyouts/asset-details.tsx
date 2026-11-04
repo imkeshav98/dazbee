@@ -6,6 +6,7 @@ import { type KeyboardEvent, useEffect, useRef, useState } from 'react'
 import { AssetInUse, AssetSummary, AssetUse, type UpdateAsset } from '@dazbee/schema'
 
 import { QUIET_BUTTON } from '@/components/editor/styles.ts'
+import { DANGER_SOLID } from '@/components/ui/looks.ts'
 import { brandPath, readJson, RouteError } from '@/lib/brand-routes.ts'
 import { cn } from '@/lib/cn.ts'
 import { useMessages } from '@/lib/i18n/client.tsx'
@@ -91,6 +92,11 @@ export function AssetDetails({
       .catch((e: unknown) => setDeleteError(e instanceof Error ? e.message : String(e)))
       .finally(() => setBusy(false))
   }
+  /** Keeps the asset: the question goes, and the focus goes back to Delete. */
+  const keep = () => {
+    setAsking(false)
+    setTimeout(() => deleteButton.current?.focus())
+  }
   const confirmDelete = () => {
     setAsking(false)
     setBusy(true)
@@ -163,14 +169,14 @@ export function AssetDetails({
             {asset.tags.map((x) => (
               <li
                 key={x}
-                className="flex h-6 items-center gap-0.5 rounded-full bg-accent-soft ps-2 pe-0.5 text-xs text-accent-text"
+                className="flex h-6 items-center gap-0.5 rounded-full bg-accent-soft ps-2 pe-0.5 text-xs text-text"
               >
                 {x}
                 <button
                   type="button"
                   aria-label={format(t.removeTag, { tag: x })}
                   onClick={() => commit({ tags: asset.tags.filter((y) => y !== x) })}
-                  className="grid size-5 cursor-pointer place-items-center rounded-full hover:bg-hover"
+                  className="grid size-5 cursor-pointer place-items-center rounded-full hover:bg-hover active:bg-pressed"
                 >
                   <XIcon size={10} aria-hidden />
                 </button>
@@ -204,26 +210,37 @@ export function AssetDetails({
           {format(usedIn.length === 1 ? t.inUseOnce : t.inUse, { n: usedIn.length, places: usedIn.join(', ') })}
         </p>
       )}
+      {asking && (
+        <p
+          id={`delete-ask-${asset.id}`}
+          data-testid="asset-delete-ask"
+          className="text-[13px] leading-snug break-words"
+        >
+          {format(t.deleteConfirm, { name: asset.name || t.untitled })}
+        </p>
+      )}
       <div className="flex items-center justify-between gap-2">
         {asking ? (
-          <span className="flex items-center gap-1">
+          // The question opens with the focus on Keep, so a key pressed by habit keeps the asset; Esc keeps it too.
+          <span
+            className="flex items-center gap-1"
+            onKeyDown={(event) => {
+              if (event.key !== 'Escape') return
+              event.stopPropagation()
+              event.preventDefault()
+              keep()
+            }}
+          >
             <button
               type="button"
-              autoFocus
+              aria-describedby={`delete-ask-${asset.id}`}
               onClick={confirmDelete}
               data-testid="asset-delete-confirm"
-              className={cn(QUIET_BUTTON, 'bg-danger/10 text-danger hover:bg-danger/20')}
+              className={cn(QUIET_BUTTON, DANGER_SOLID, 'whitespace-nowrap')}
             >
-              {format(t.deleteNamed, { name: asset.name || t.untitled })}
+              {t.delete}
             </button>
-            <button
-              type="button"
-              onClick={() => {
-                setAsking(false)
-                setTimeout(() => deleteButton.current?.focus())
-              }}
-              className={QUIET_BUTTON}
-            >
+            <button type="button" autoFocus onClick={keep} className={QUIET_BUTTON}>
               {t.keep}
             </button>
           </span>
@@ -235,7 +252,7 @@ export function AssetDetails({
             aria-busy={busy}
             onClick={askToDelete}
             data-testid="asset-delete"
-            className={cn(QUIET_BUTTON, 'hover:text-danger')}
+            className={QUIET_BUTTON}
           >
             <TrashIcon size={13} aria-hidden />
             {t.delete}

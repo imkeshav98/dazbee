@@ -17,6 +17,7 @@ import {
   editState,
   isLayerPanel,
   isPanel,
+  overPanel,
   setBar,
   setOpen,
   useEditState,
@@ -175,8 +176,8 @@ function Bar({ items, label, named }: { items: BarItem[]; label: string; named: 
   useEffect(() => {
     if (!rowOpen) return
     const onKey = (event: KeyboardEvent) => {
-      // A pop-up or panel open from the row closes first, on its own Esc.
-      if (event.key !== 'Escape' || editState().open !== null) return
+      // A pop-up or panel open from the row, or what stands over it, closes first, on its own Esc.
+      if (event.key !== 'Escape' || editState().open !== null || overPanel()) return
       event.stopImmediatePropagation()
       setRowOpen(false)
     }

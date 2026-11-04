@@ -41,9 +41,9 @@ import type { RunStyle } from './text/text-edit.ts'
 import { editorTyping } from './text/typing.ts'
 import { editorTools, type PlacedAsset, type Tool } from './tools.ts'
 
-/** Keys pressed in a popover or dialog, such as Escape to close it, are its own, not the stage's; undo and redo still are. */
-const inDialog = (target: EventTarget | null) =>
-  target instanceof Element && target.closest('[role="dialog"], dialog') !== null
+/** The popover, menu or dialog a key was pressed in, if any. */
+const dialogOf = (target: EventTarget | null) =>
+  target instanceof Element ? target.closest('[role="dialog"], [role="menu"], dialog') : null
 export async function startEditor(options: EditorOptions) {
   const { designId, syncUrl } = options
   const status = options.onStatus ?? (() => {})
@@ -350,7 +350,14 @@ function live(
       perform(action)
       return
     }
-    if (inDialog(e.target)) return
+    // Keys pressed in a popover, menu or dialog, such as Escape to close it, are its own, not the
+    // stage's; undo and redo still are. Space still pans beside a dialog that says it is not modal,
+    // as the edit panel does.
+    const dialog = dialogOf(e.target)
+    if (dialog) {
+      if (dialog.getAttribute('aria-modal') === 'false') pointer.keyDown(e)
+      return
+    }
     if (!typing.editing()) {
       if (!pointer.keyDown(e) && action && perform(action)) e.preventDefault()
       return
@@ -372,10 +379,8 @@ function live(
       return
     }
     if (pageId !== view.page()) showPage(pageId)
-    selection.select(
-      live.filter((id) => frameIdOf(now, id) === frameId),
-      frameId,
-    )
+    const inFrame = live.filter((id) => frameIdOf(now, id) === frameId)
+    selection.select(inFrame, frameId)
   }
   /**
    * Shows a page, its frames fitted: a selection, crop, path edit, pen path or typing on another
@@ -424,6 +429,8 @@ function live(
   window.addEventListener('paste', (e) => place.paste(e, pointer.pointerAt), on)
   window.addEventListener('keydown', onKey, on)
   window.addEventListener('keyup', pointer.keyUp, on)
+  for (const type of ['keydown', 'pointerdown', 'focusin'])
+    window.addEventListener(type, pointer.input, { ...on, capture: true })
   window.addEventListener('blur', pointer.blur, on)
 
   view.resize()

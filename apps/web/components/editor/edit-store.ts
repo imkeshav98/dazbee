@@ -2,7 +2,8 @@
 
 // What the top bar has open: one pop-up, the full menu or one edit panel, never two at once, since
 // they share this one value. Opening any of them closes what was open. The shell reads it too: on a
-// phone an edit panel is a sheet, and a rail flyout and a sheet close each other.
+// phone an edit panel is a sheet, and a rail flyout and a sheet close each other. And whether
+// something stands over the edit panel and the bar's second row, which Esc closes first.
 import { useEffect, useState, useSyncExternalStore } from 'react'
 
 /** The top bar's items that open the edit panel for the selected layers. */
@@ -47,6 +48,12 @@ export const setBar = (bar: boolean, barBottom = 0) => update({ bar, barBottom: 
 export const setSheetTop = (sheetTop: number | null) => update({ sheetTop })
 export const setFlyoutEnd = (flyoutEnd: number | null) => update({ flyoutEnd })
 export const editState = () => state
+/**
+ * Whether something stands over the edit panel and the bar's second row, so Esc closes it first: a
+ * modal dialog, such as Keyboard shortcuts, or what marks itself `data-over-panel`, as the Share
+ * menu and its cards do.
+ */
+export const overPanel = () => document.querySelector('dialog:modal, [data-over-panel]') !== null
 
 /** What the top bar has open and where it sits, re-rendering the caller when that changes. */
 export function useEditState() {

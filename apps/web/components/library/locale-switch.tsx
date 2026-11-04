@@ -2,11 +2,12 @@
 
 import { useRouter } from 'next/navigation'
 
-import { segment, SEGMENTED } from '@/components/ui/segmented.tsx'
+import { SEGMENT, SEGMENTS, TOUCH_ROW } from '@/components/ui/looks.ts'
+import { cn } from '@/lib/cn.ts'
 import { useLocale, useMessages } from '@/lib/i18n/client.tsx'
 import { type Locale, LOCALE_NAMES, LOCALES } from '@/lib/i18n/index.ts'
 
-/** Picks the UI language, each named in itself; Arabic mirrors the whole UI. */
+/** Picks the UI language, each named in itself; Arabic mirrors the whole UI. On a phone each is a touch target. */
 export function LocaleSwitch() {
   const locale = useLocale()
   const t = useMessages().language
@@ -16,7 +17,7 @@ export function LocaleSwitch() {
     router.refresh()
   }
   return (
-    <div role="radiogroup" aria-label={t.label} className={SEGMENTED}>
+    <div role="radiogroup" aria-label={t.label} className={SEGMENTS}>
       {LOCALES.map((l) => (
         <button
           key={l}
@@ -25,7 +26,7 @@ export function LocaleSwitch() {
           aria-checked={l === locale}
           lang={l}
           onClick={() => l !== locale && choose(l)}
-          className={segment(l === locale)}
+          className={cn(SEGMENT, TOUCH_ROW)}
         >
           {LOCALE_NAMES[l]}
         </button>

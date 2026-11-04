@@ -22,7 +22,7 @@ import { type ReactNode, useState } from 'react'
 import { type ShortcutAction } from '@dazbee/editor'
 
 import { ALIGN, keyOf } from '@/components/editor/arrange-actions.ts'
-import { KNOB_SWITCH, KNOBS, PANEL_BUTTON, PANEL_HEADING, PANEL_PART } from '@/components/editor/styles.ts'
+import { KNOB_SWITCH, KNOBS, PANEL_ACTION, PANEL_HEADING, PANEL_PART } from '@/components/editor/styles.ts'
 import type { ORDER } from '@/components/editor/top-bar/layer-actions.tsx'
 import { cn } from '@/lib/cn.ts'
 import { LIMITS } from '@/lib/editor/limits.ts'
@@ -120,7 +120,7 @@ function ArrangePart({ target, placed }: { target: Target; placed: boolean }) {
             data-action={action}
             title={tip(a[action], action)}
             onClick={() => run(action)}
-            className={PANEL_BUTTON}
+            className={PANEL_ACTION}
           >
             <Icon size={14} aria-hidden className="shrink-0" />
             <span>{placing[action]}</span>
@@ -139,7 +139,7 @@ function ArrangePart({ target, placed }: { target: Target; placed: boolean }) {
                 aria-label={a[action]}
                 title={tip(a[action], action)}
                 onClick={() => run(action)}
-                className={cn(PANEL_BUTTON, 'justify-center')}
+                className={cn(PANEL_ACTION, 'justify-center')}
               >
                 <Icon size={16} aria-hidden />
               </button>
@@ -154,7 +154,7 @@ function ArrangePart({ target, placed }: { target: Target; placed: boolean }) {
                 disabled={!spreads}
                 title={spreads ? tip(a[action], action) : placing.needsThree}
                 onClick={() => run(action)}
-                className={PANEL_BUTTON}
+                className={PANEL_ACTION}
               >
                 <Icon size={14} aria-hidden className="shrink-0" />
                 <span>{placing[action]}</span>
@@ -174,7 +174,7 @@ function ArrangePart({ target, placed }: { target: Target; placed: boolean }) {
                   data-action={action}
                   title={tip(a[action], action)}
                   onClick={() => run(action)}
-                  className={PANEL_BUTTON}
+                  className={PANEL_ACTION}
                 >
                   <Icon size={15} aria-hidden className="shrink-0" />
                   <span>{placing[action]}</span>

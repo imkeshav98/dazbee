@@ -19,7 +19,7 @@ import {
   press,
   selection,
 } from '../../support/stage.ts'
-import { expect, type Page, test } from '../../support/test.ts'
+import { expect, type Locator, type Page, test } from '../../support/test.ts'
 import { barMenu, pagesPanel } from '../../support/top-bar.ts'
 
 test.describe.configure({ timeout: 120_000 })
@@ -77,6 +77,61 @@ const emptyThePage = (page: Page) =>
     const editor = window.dazbee
     for (const frame of editor?.frames() ?? []) editor?.session.run('frame.delete', { frameId: frame.key })
   })
+/** Page White, holding a square frame filled white, and a second page holding one square frame of its own. */
+const twoPages = (name: string, fills: DesignInput['frames'][string]['fills']): DesignInput => {
+  const first = frameDesign({ name: 'Tiles', fills: solid('#FFFFFFFF') })
+  return {
+    ...first,
+    pages: { p1: { name: 'White', order: 'a0' }, p2: { name, order: 'a1' } },
+    frames: {
+      ...first.frames,
+      'p2-sq': { pageId: 'p2', name: 'Square', width: 1080, height: 1080, x: 0, y: 0, fills, order: 'a0' },
+    },
+  }
+}
+/**
+ * The contrast of the page number on a page row's tile with what shows behind it there: every
+ * background under the number's middle, laid one over another, as WCAG counts contrast.
+ */
+const numberContrast = (row: Locator, n: number) =>
+  row.evaluate((el, n) => {
+    const paint = document.createElement('canvas').getContext('2d', { willReadFrequently: true })
+    const rgba = (css: string) => {
+      if (!paint) return [0, 0, 0, 0]
+      paint.clearRect(0, 0, 1, 1)
+      paint.fillStyle = css
+      paint.fillRect(0, 0, 1, 1)
+      const [r = 0, g = 0, b = 0, a = 0] = paint.getImageData(0, 0, 1, 1).data
+      return [r, g, b, a / 255]
+    }
+    const holder = [...el.querySelectorAll('*')].find((one) =>
+      [...one.childNodes].some((c) => c.nodeType === Node.TEXT_NODE && c.textContent?.trim() === String(n)),
+    )
+    if (!holder) return 0
+    const box = holder.getBoundingClientRect()
+    const under: number[][] = []
+    for (const one of document.elementsFromPoint(box.x + box.width / 2, box.y + box.height / 2)) {
+      const colour = rgba(getComputedStyle(one).backgroundColor)
+      under.push(colour)
+      if (colour[3] === 1) break
+    }
+    const behind = under
+      .reverse()
+      .reduce(
+        (below, [r = 0, g = 0, b = 0, a = 0]) => [r, g, b].map((c, i) => c * a + (below[i] ?? 0) * (1 - a)),
+        [255, 255, 255],
+      )
+    const lum = (rgb: number[]) => {
+      const [lr = 0, lg = 0, lb = 0] = rgb.map((c) => {
+        const s = c / 255
+        return s <= 0.04045 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4
+      })
+      return 0.2126 * lr + 0.7152 * lg + 0.0722 * lb
+    }
+    const ink = lum(rgba(getComputedStyle(holder).color).slice(0, 3))
+    const back = lum(behind)
+    return (Math.max(ink, back) + 0.05) / (Math.min(ink, back) + 0.05)
+  }, n)
 
 test('Pages opens from by the zoom pill: it counts the pages and their frames, adds one, shows one, and Esc gives the focus back', async ({
   browser,
@@ -134,6 +189,47 @@ test('a page with no frames says how to pick the Frame tool to add one, and Page
   await perform(page, 'undo')
   await expect.poll(() => page.evaluate(() => window.dazbee?.frames().length)).toBe(2)
   await expect(hint).toHaveCount(0)
+  expect(errors).toEqual([])
+})
+
+test("a page's number on its tile, before its picture is drawn, reads over a white frame and a yellow one", async ({
+  browser,
+}) => {
+  const { page, errors } = await openStage(browser, twoPages('Yellow', solid('#FFD23FFF')))
+  // No picture is drawn, so each tile shows its first frame's colour and the page's number.
+  await page.evaluate(() => {
+    if (window.dazbee) window.dazbee.pageThumbnail = () => null
+  })
+  const panel = await pagesPanel(page)
+  const pages = panel.getByTestId('pages').getByRole('listitem')
+  await expect(pages).toHaveCount(2)
+  for (const [i, colour] of ['rgb(255, 255, 255)', 'rgb(255, 210, 63)'].entries()) {
+    const tile = pages.nth(i)
+    await expect(tile.getByTestId('page-thumbnail')).toHaveCSS('background-color', colour)
+    expect(await numberContrast(tile, i + 1)).toBeGreaterThanOrEqual(4.5)
+  }
+  writeOutput('pages-numbers-white-yellow.png', await page.screenshot({ animations: 'disabled' }))
+  expect(errors).toEqual([])
+})
+
+test("in dark theme a page's tile shows its first frame's picture on white, as the canvas does, with its number over it", async ({
+  browser,
+}) => {
+  const { page, errors } = await openStage(browser, twoPages('Bare', []))
+  await setCookies(page, { theme: 'dark' })
+  await page.reload()
+  await expect(page.getByTestId('status')).toHaveAttribute('data-ready', '', { timeout: 30_000 })
+  const panel = await pagesPanel(page)
+  const pages = panel.getByTestId('pages').getByRole('listitem')
+  await expect(pages).toHaveCount(2)
+  await expect(panel.getByTestId('page-thumbnail').locator('img')).toHaveCount(2)
+  for (const i of [0, 1]) {
+    const tile = pages.nth(i)
+    await expect(tile.getByTestId('page-thumbnail')).toHaveCSS('background-color', 'rgb(255, 255, 255)')
+    await expect(tile.getByTestId('page-number')).toHaveText(String(i + 1))
+    expect(await numberContrast(tile, i + 1)).toBeGreaterThanOrEqual(4.5)
+  }
+  writeOutput('pages-tiles-dark.png', await page.screenshot({ animations: 'disabled' }))
   expect(errors).toEqual([])
 })
 

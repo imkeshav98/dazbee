@@ -342,9 +342,13 @@ test('keyboard only: undo after a delete selects the row it gives the focus back
   await row(page, 'Box').click()
   await page.keyboard.press('Delete')
   await expect.poll(() => layerIds(page)).not.toContain('box')
+  // The panel lists the delete at the next redraw, after the document has it: the arrow goes from
+  // the row the focus moves to then, Card, and not from Box while the panel still lists it.
+  await expect(row(page, 'Box')).toHaveCount(0)
+  await expect(row(page, 'Card')).toBeFocused()
   await page.keyboard.press('ArrowDown')
   await expect(row(page, 'Backdrop')).toBeFocused()
-  expect(await selection(page)).toEqual(['backdrop'])
+  await expect.poll(() => selection(page)).toEqual(['backdrop'])
 
   // Undo brings Box back with the focus and the selection on it.
   await page.keyboard.press('ControlOrMeta+Z')

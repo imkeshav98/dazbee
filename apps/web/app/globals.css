@@ -1,5 +1,5 @@
 /*
- * The app's global styles: the base styles and motion, the AI controls' glow, the overlay scrollbars,
+ * The app's global styles: the base styles and motion, the AI controls' glow, the overlay scrollbars and strips without one,
  * the glass and checkerboard utilities, the canvas backdrop and the home's aurora. The theme tokens, the stage overlay and the sign-in page's showcase are
  * partials in styles/, imported below. CSS takes @import only before every other rule, so they come
  * first, ahead of the rules in this file.
@@ -12,6 +12,12 @@
 @import './styles/sign-in.css';
 
 @custom-variant dark (&:where([data-theme=dark], [data-theme=dark] *));
+/*
+ * Pressed: under a mouse press (:active), or holding the mark a finger or pen press leaves on what it
+ * holds (`data-pressed`, set by lib/press.ts), which phones don't reliably show as :active. As with
+ * :active, an element is pressed while anything inside it is.
+ */
+@custom-variant active (&:is(:active, [data-pressed], :has([data-pressed])));
 
 html,
 body {
@@ -181,11 +187,22 @@ body {
   }
 }
 
+/* A strip that scrolls sideways with no scrollbar of its own: the top bar on a phone. */
+@utility no-scrollbar {
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
 /*
- * Glass (#81): the one frosted surface, for chrome that floats over the canvas or a page (dock,
- * zoom, islands, flyouts, cards, menus, dialogs). Glass is defined here and nowhere else: a surface
- * that should look frosted takes this utility, and a variant is a token or a modifier on it, never
- * a second copy. Muted and faint text on it stays readable whatever the ad behind it shows.
+ * Glass: the one frosted surface, for chrome that floats over the canvas or a page (dock, zoom,
+ * islands, flyouts, cards, menus, dialogs). Glass is defined here and nowhere else: a surface that
+ * should look frosted takes this utility, and a variant is a token or a modifier on it, never a
+ * second copy. It is a see-through fill over a blur. Muted, faint, pink and red text on it take
+ * their glass shades, which read whatever the ad behind it shows. Inside it, hover and pressed are
+ * see-through tints (`bg-hover`, `bg-pressed`), so what lies behind shows through a lit row too; a
+ * control with a fill of its own takes them laid over it (`tint-hover`, `tint-pressed`).
  * Its backdrop filter sees only what is painted inside its nearest ancestor with a mask, filter,
  * opacity below 1, clip-path, blend mode or backdrop filter, so glass over the canvas has no such
  * ancestor.
@@ -194,15 +211,39 @@ body {
 @utility surface-frost {
   --text-muted: var(--glass-muted);
   --text-subtle: var(--glass-muted);
+  --accent-text: var(--glass-accent-text);
+  --danger: var(--glass-danger);
+  --hover: var(--glass-hover);
+  --pressed: var(--glass-pressed);
   border: 1px solid var(--glass-line);
   background-color: var(--glass);
-  background-image: var(--grain);
   box-shadow: var(--shadow);
-  backdrop-filter: blur(18px) saturate(1.4);
+  backdrop-filter: blur(26px) saturate(1.2);
   &::backdrop {
-    background: rgb(0 0 0 / 0.4);
+    background: var(--glass-backdrop, rgb(0 0 0 / 0.4));
     backdrop-filter: blur(2px);
   }
+}
+
+/*
+ * A row on glass lit by a tint: under the pointer, pressed, or the current or chosen one. Its muted
+ * and coloured text reads in the text colour, as they fall below 4.5:1 on a tint over a bright ad.
+ * Rows take it with the tint's variant: `hover:bg-hover hover:lit`.
+ */
+@utility lit {
+  --text-muted: var(--text);
+  --text-subtle: var(--text);
+  --accent-text: var(--text);
+  --danger: var(--text);
+}
+
+/* The hover or pressed tint laid over a control's own fill, which stays: a card's row or boxed button
+   under the pointer or pressed, and a glass button that is open. */
+@utility tint-hover {
+  background-image: linear-gradient(var(--hover), var(--hover));
+}
+@utility tint-pressed {
+  background-image: linear-gradient(var(--pressed), var(--pressed));
 }
 
 @keyframes tooltip-in {

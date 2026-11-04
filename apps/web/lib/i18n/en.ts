@@ -251,6 +251,9 @@ export const en = {
       copy: 'Copy',
       paste: 'Paste',
       delete: 'Delete',
+      releaseMask: 'Release mask',
+      showHidden: 'Show hidden layers',
+      canvasMenu: 'Canvas actions',
       rotate: 'Rotate',
       underline: 'Underline',
       strikethrough: 'Strikethrough',
@@ -681,7 +684,7 @@ export const en = {
     },
     assetLibrary: {
       delete: 'Delete',
-      deleteNamed: 'Delete {name}',
+      deleteConfirm: 'Delete “{name}” for good? This can’t be undone.',
       keep: 'Keep',
       inUse: 'Used in {n} places: {places}',
       inUseOnce: 'Used in {places}',

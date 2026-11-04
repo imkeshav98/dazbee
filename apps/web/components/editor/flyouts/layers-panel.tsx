@@ -386,10 +386,12 @@ export function LayersPanel({ editor }: { editor: Editor }) {
     if (at !== undefined) places.add(at)
   }
   const shown = [...places].sort((a, b) => a - b).flatMap((i) => (rows[i] ? [{ row: rows[i], i }] : []))
+  // A text's row shows the text icon, as every text row does: a picture of its words in their own
+  // colour can vanish against the panel.
   const pictures = useLayerPictures(
     editor,
     frameId,
-    shown.map(({ row }) => row.id),
+    shown.flatMap(({ row }) => (row.node.type === 'text' ? [] : [row.id])),
     scrolledAt,
   )
   return (

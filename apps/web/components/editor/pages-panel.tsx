@@ -118,13 +118,14 @@ function PagesFrame({ label, disabled = false, children }: { label: string; disa
       onClick={() => setOpen(open === 'pages' ? null : 'pages')}
       style={place}
       className={cn(
-        'absolute z-10 flex h-9 cursor-pointer items-center gap-1.5 rounded-card surface-frost px-3 text-[12px] font-semibold text-text transition-colors hover:text-accent-text disabled:cursor-default disabled:opacity-40 aria-expanded:bg-accent-soft aria-expanded:text-accent-text',
+        // Open, it keeps its glass under the pressed tint, its icon pink and its words in the text colour.
+        'group absolute z-10 flex h-9 cursor-pointer items-center gap-1.5 rounded-card surface-frost px-3 text-[12px] font-semibold text-text transition-colors hover:text-accent-text disabled:cursor-default disabled:opacity-40 aria-expanded:tint-pressed aria-expanded:text-text',
         'end-[calc(1.5rem+var(--zoom-width))] bottom-4 max-lg:end-4 max-lg:bottom-[calc(1.5rem+var(--zoom-height))]',
         'max-sm:start-4 max-sm:end-auto max-sm:top-20 max-sm:bottom-auto max-sm:group-data-[bar]/stage:hidden',
         FOCUS_RING,
       )}
     >
-      <FilesIcon size={15} aria-hidden />
+      <FilesIcon size={15} aria-hidden className="group-aria-expanded:text-accent-text" />
       {children}
     </button>
   )
@@ -233,21 +234,34 @@ function PageList({ editor, onRemoved }: { editor: Editor; onRemoved: (message: 
               }}
               className={cn(
                 CARD_ROW,
-                'relative cursor-grab active:cursor-grabbing aria-[current]:border-accent aria-[current]:bg-accent-soft data-[dragging]:opacity-40',
+                // Lit by the tints laid over its fill under the pointer and while pressed.
+                'relative cursor-grab hover:tint-hover hover:lit active:cursor-grabbing active:tint-pressed active:lit aria-[current]:border-accent aria-[current]:bg-accent-soft aria-[current]:lit data-[dragging]:opacity-40',
               )}
             >
               {moves && landing?.before === id && <span aria-hidden className={cn(DROP_LINE, '-top-[4px]')} />}
               {moves && landing?.before === null && i === pages.length - 1 && (
                 <span aria-hidden className={cn(DROP_LINE, '-bottom-[4px]')} />
               )}
-              <span aria-hidden className="grid size-[34px] shrink-0 place-items-center">
+              <span aria-hidden className="relative grid size-[34px] shrink-0 place-items-center">
+                {/* The first frame's picture on white, as the canvas draws it, under the frame's colour while
+                    the picture is drawn; a page with no frames shows an empty well. */}
                 <span
                   data-testid="page-thumbnail"
-                  className="relative grid place-items-center overflow-hidden rounded-[3px] border border-line-strong bg-hover font-mono text-[10px] font-semibold text-white tabular-nums [text-shadow:0_1px_2px_rgb(0_0_0/0.6)]"
+                  className={cn(
+                    'relative grid place-items-center overflow-hidden rounded-[3px] border border-line-strong',
+                    first ? 'bg-white' : 'bg-well',
+                  )}
                   style={{ ...tile, backgroundColor: fill?.type === 'solid' ? fill.color : undefined }}
                 >
                   {picture && <img src={picture} alt="" draggable={false} className="absolute inset-0 size-full" />}
-                  {!picture && i + 1}
+                </span>
+                {/* The page's number on a dark chip, readable over any picture or page colour and whole over a
+                    thin tile. */}
+                <span
+                  data-testid="page-number"
+                  className="absolute inset-0 m-auto size-fit rounded-[4px] bg-black/60 px-1 font-mono text-[10px] leading-[14px] font-semibold text-white tabular-nums"
+                >
+                  {i + 1}
                 </span>
               </span>
               {renaming === id ? (

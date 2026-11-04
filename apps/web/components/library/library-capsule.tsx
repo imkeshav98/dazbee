@@ -1,9 +1,9 @@
 'use client'
 
 // The library's floating capsule: Home, Recent, Templates and Brand kit, each a page, with the
-// editor capsule's pink blob under the lit entry; Settings is in the account menu, as in the final
-// mock. Each page renders its own capsule, so the tab remembers the last lit entry (sessionStorage)
-// and the blob slides from there when the next page opens.
+// editor capsule's blob, the pressed tint, under the lit entry; Settings is in the account menu, as
+// in the final mock. Each page renders its own capsule, so the tab remembers the last lit entry
+// (sessionStorage) and the blob slides from there when the next page opens.
 import { ClockIcon, HouseIcon, type Icon, PaletteIcon, SquaresFourIcon } from '@phosphor-icons/react'
 import { animate, useReducedMotion } from 'motion/react'
 import Link from 'next/link'
@@ -124,15 +124,13 @@ export function LibraryCapsule({
             onClick={onClick(entry)}
             className={cn(
               'relative grid size-11 place-items-center rounded-full transition-colors duration-[var(--chrome-fast)] md:size-13',
-              on ? 'text-on-accent' : 'text-subtle hover:bg-hover hover:text-text',
+              // Lit, it keeps the capsule's glass under the pressed tint, its icon pink, as the editor's rail does.
+              on ? 'text-accent-text' : 'text-subtle hover:bg-hover hover:text-text active:bg-pressed active:text-text',
             )}
           >
             {on && (
               <span ref={blob} aria-hidden data-testid="capsule-blob" className="absolute inset-0">
-                <span
-                  ref={fill}
-                  className="absolute inset-0 rounded-full bg-accent-solid shadow-[0_6px_18px_-6px_rgb(194_16_108/0.7)]"
-                />
+                <span ref={fill} className="absolute inset-0 rounded-full bg-pressed" />
               </span>
             )}
             <LinkIcon size={22} weight={on ? 'fill' : 'regular'} aria-hidden className="relative" />

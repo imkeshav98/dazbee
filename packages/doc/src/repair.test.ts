@@ -67,6 +67,24 @@ describe('repair', () => {
     expect(out.repairs).toEqual([])
   })
 
+  it('gives a design with no page left one empty page, at an id no frame or layer has', () => {
+    const s = snap({ page: layer('graphic', 'p1-sq', 'page') })
+    s.pages = {}
+    s.frames['page-2'] = frame('p9', 0, 'a2')
+    const out = repaired(s)
+    expect(out.snapshot.pages).toEqual({ 'page-3': { name: 'Page 1', order: 'a0' } })
+    expect(out.snapshot.frames).toEqual({})
+    expect(out.nodes).toEqual({})
+    expect(out.repairs).toEqual([
+      'no page was left; added the empty page "page-3"',
+      'dropped frame "p1-sq", whose page "p1" is gone',
+      'dropped frame "p1-story", whose page "p1" is gone',
+      'dropped frame "p2-sq", whose page "p2" is gone',
+      'dropped frame "page-2", whose page "p9" is gone',
+      'dropped "page", which is in no frame',
+    ])
+  })
+
   it('drops a frame whose page is gone, and the layers in it, keeping every other object as it was', () => {
     const s = snap({ x: layer('graphic', 'gone-f', 'x'), y: layer('graphic', 'p1-sq', 'y') })
     s.frames['gone-f'] = frame('p9', 0, 'a0')

@@ -1,9 +1,10 @@
 // Renaming, copying and deleting in the library (#159) in Chromium: a design tile's menu renames,
-// duplicates and deletes it (asking first); a template tile's menu renames and deletes it; and the
-// editor's crumb renames the design open in it.
+// duplicates and deletes it (asking first), with rows a finger can hit on a phone; a template tile's
+// menu renames and deletes it; and the editor's crumb renames the design open in it.
 import { type DesignInput, DesignSummary, TemplateSummary } from '@dazbee/schema'
 
 import { editorPath, writeOutput } from '../../support/editor.ts'
+import { rowHeights } from '../../support/layout.ts'
 import { API_URL, DEV_BRAND, frameDesign, seed } from '../../support/seed.ts'
 import { expect, test } from '../../support/test.ts'
 
@@ -53,6 +54,18 @@ test('a design tile renames, duplicates and deletes its design', async ({ page }
   await renamed.getByRole('button', { name: 'Delete' }).click()
   await expect.poll(async () => (await designs()).some((d) => d.id === id)).toBe(false)
   await expect(renamed).toHaveCount(0)
+})
+
+test("on a phone a design tile's menu rows are at least 44 px tall", async ({ page }) => {
+  const run = crypto.randomUUID().slice(0, 6)
+  await seed(content(`Phone ${run}`))
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto(`/brands/${DEV_BRAND}/designs`)
+  const tile = page.getByTestId('design-tile').filter({ hasText: `Phone ${run}` })
+  await tile.getByRole('button', { name: `More for Phone ${run}` }).click()
+  const menu = tile.getByRole('menu')
+  await expect(menu.getByRole('menuitem')).toHaveText(['Rename', 'Duplicate', 'Delete'])
+  for (const height of await rowHeights(menu, '[role="menuitem"]')) expect(height).toBeGreaterThanOrEqual(44)
 })
 
 test('a template tile renames and deletes its template', async ({ page }) => {

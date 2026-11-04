@@ -63,7 +63,7 @@ const TOOL = cn(
 const ROUND = cn(TOOL, 'w-9 justify-center px-0')
 const PANEL = 'pop-in z-40 w-[min(18rem,calc(100vw-2rem))] rounded-card surface-frost p-1.5 outline-none'
 const ROW =
-  'flex w-full cursor-pointer items-center gap-3 rounded-row px-2.5 py-2 text-start text-[13px] text-text transition-colors duration-[var(--chrome-fast)] hover:bg-hover focus-visible:bg-hover focus-visible:outline-none'
+  'flex w-full cursor-pointer items-center gap-3 rounded-row px-2.5 py-2 text-start text-[13px] text-text transition-colors duration-[var(--chrome-fast)] hover:bg-hover hover:lit active:bg-pressed active:lit focus-visible:bg-hover focus-visible:lit focus-visible:outline-none'
 const LABEL = 'px-1 pt-3 pb-1.5 text-[10px] font-bold tracking-[0.08em] text-subtle uppercase'
 
 const designThumbnail = (brandId: string, design: BriefReference) =>
@@ -146,7 +146,11 @@ export function BriefForm({
         const on = sizes.includes(id)
         const last = on && sizes.length === 1
         return (
-          <label key={id} className={cn(ROW, 'has-[:focus-visible]:bg-hover')} title={last ? h.lastSize : undefined}>
+          <label
+            key={id}
+            className={cn(ROW, 'has-[:focus-visible]:bg-hover has-[:focus-visible]:lit')}
+            title={last ? h.lastSize : undefined}
+          >
             <input
               type="checkbox"
               name="size"
@@ -274,7 +278,7 @@ export function BriefForm({
             {adding === 'menu' ? (
               <div className="flex flex-col">
                 <button type="button" onClick={() => setAdding('reference')} className={ROW}>
-                  <span aria-hidden className="grid size-9 shrink-0 place-items-center rounded-row bg-hover text-muted">
+                  <span aria-hidden className="grid size-9 shrink-0 place-items-center rounded-row bg-well text-muted">
                     <LayoutIcon size={18} />
                   </span>
                   <span className="min-w-0">
@@ -290,7 +294,7 @@ export function BriefForm({
                   }}
                   className={ROW}
                 >
-                  <span aria-hidden className="grid size-9 shrink-0 place-items-center rounded-row bg-hover text-muted">
+                  <span aria-hidden className="grid size-9 shrink-0 place-items-center rounded-row bg-well text-muted">
                     <UploadSimpleIcon size={18} />
                   </span>
                   <span className="min-w-0">
@@ -306,7 +310,7 @@ export function BriefForm({
                     type="button"
                     aria-label={h.back}
                     onClick={() => setAdding('menu')}
-                    className="grid size-8 cursor-pointer place-items-center rounded-row text-subtle hover:bg-hover hover:text-text"
+                    className="grid size-8 cursor-pointer place-items-center rounded-row text-subtle hover:bg-hover hover:text-text active:bg-pressed"
                   >
                     <ArrowLeftIcon size={16} aria-hidden className="rtl:-scale-x-100" />
                   </button>
@@ -332,7 +336,7 @@ export function BriefForm({
                             setReference(design)
                             setOpen(null)
                           }}
-                          className="relative block aspect-square w-full cursor-pointer overflow-hidden rounded-[8px] border border-line bg-hover transition-colors hover:border-line-strong aria-pressed:border-accent"
+                          className="relative block aspect-square w-full cursor-pointer overflow-hidden rounded-[8px] border border-line bg-well transition-colors hover:border-line-strong aria-pressed:border-accent"
                         >
                           {design.cover && (
                             <img
@@ -487,7 +491,7 @@ export function BriefForm({
                     >
                       <span
                         className={cn(
-                          'size-10 shrink-0 overflow-hidden rounded-[8px] border bg-hover',
+                          'size-10 shrink-0 overflow-hidden rounded-[8px] border bg-well',
                           logo ? 'border-accent' : 'border-line',
                         )}
                       >

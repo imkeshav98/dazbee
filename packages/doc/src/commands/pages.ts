@@ -1,12 +1,22 @@
 import { nanoid } from 'nanoid'
 import { z } from 'zod'
 
-import { Frame, FrameId, framesOf, inOrder, type Layer as LayerT, Page, PageId, sizeProblem } from '@dazbee/schema'
+import {
+  type Design,
+  Frame,
+  FrameId,
+  framesOf,
+  inOrder,
+  type Layer as LayerT,
+  Page,
+  PageId,
+  sizeProblem,
+} from '@dazbee/schema'
 
 import { childrenOf } from '../children.ts'
 import { toYMap } from '../design-doc.ts'
 import { idProblem } from './checks.ts'
-import { defineCommand } from './define.ts'
+import { type CommandContext, defineCommand } from './define.ts'
 import { deleteFrame, FrameName, WHITE } from './frames.ts'
 import { copyLayers, indexBetween, lastOrder } from './tree.ts'
 
@@ -32,6 +42,7 @@ export const pageAdd = defineCommand({
     (id !== undefined && id === frame.id ? `id "${id}" is taken` : undefined) ??
     sizeProblem(frame.width, frame.height),
   apply: ({ r, design }, { id = nanoid(), name, frame: { id: frameId = nanoid(), ...frame } }) => {
+    writeRepairedPages(r, design)
     r.pages.set(id, toYMap(Page.parse({ name, order: indexBetween(lastOrder(Object.values(design.pages)), null) })))
     r.frames.set(
       frameId,
@@ -46,7 +57,8 @@ export const pageUpdate = defineCommand({
   name: 'page.update',
   input: z.object({ id: PageId, name: z.string().optional() }),
   check: ({ design }, { id }) => (design.pages[id] ? undefined : `no page "${id}"`),
-  apply: ({ r }, { id, name }) => {
+  apply: ({ r, design }, { id, name }) => {
+    writeRepairedPages(r, design)
     if (name !== undefined) r.pages.get(id)?.set('name', name)
   },
 })
@@ -64,6 +76,7 @@ export const pageDuplicate = defineCommand({
   apply: ({ r, design }, { id, newId = nanoid(), name }) => {
     const page = design.pages[id]
     if (!page) return newId
+    writeRepairedPages(r, design)
     const pages = inOrder(design.pages)
     const next = pages[pages.findIndex(([other]) => other === id) + 1]?.[1].order ?? null
     r.pages.set(newId, toYMap(Page.parse({ ...page, name: name ?? page.name, order: indexBetween(page.order, next) })))
@@ -93,6 +106,7 @@ export const pageMove = defineCommand({
     return undefined
   },
   apply: ({ r, design }, { id, before }) => {
+    writeRepairedPages(r, design)
     const others = inOrder(design.pages).filter(([other]) => other !== id)
     const at = before === null ? others.length : others.findIndex(([other]) => other === before)
     r.pages.get(id)?.set('order', indexBetween(others[at - 1]?.[1].order ?? null, others[at]?.[1].order ?? null))
@@ -113,3 +127,11 @@ export const pageDelete = defineCommand({
     r.pages.delete(id)
   },
 })
+
+/**
+ * Writes the page repair adds to a design whose last pages two tabs deleted at once, so a page
+ * edit lands on a page the document holds, and adding a page keeps that one.
+ */
+function writeRepairedPages(r: CommandContext['r'], design: Design) {
+  for (const [id, page] of Object.entries(design.pages)) if (!r.pages.has(id)) r.pages.set(id, toYMap(page))
+}

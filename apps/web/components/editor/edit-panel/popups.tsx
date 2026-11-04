@@ -5,7 +5,8 @@
 import { BlendMode, BooleanOp, ContainerBlendMode, type Design, LineEnd, type Shape } from '@dazbee/schema'
 
 import { COMBINE } from '@/components/editor/arrange-actions.ts'
-import { FIELD_LABEL, KNOBS, SEGMENT, SEGMENTS } from '@/components/editor/styles.ts'
+import { FIELD_LABEL, KNOBS } from '@/components/editor/styles.ts'
+import { SEGMENT, SEGMENTS } from '@/components/ui/looks.ts'
 import { cn } from '@/lib/cn.ts'
 import { tidy } from '@/lib/editor/size.ts'
 import { useMessages } from '@/lib/i18n/client.tsx'

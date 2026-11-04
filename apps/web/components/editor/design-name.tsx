@@ -33,7 +33,7 @@ export function DesignName({
           type="button"
           title={format(t.library.renameDesign, { name })}
           onClick={() => setEditing(true)}
-          className="max-w-full cursor-text truncate rounded-[6px] px-1 hover:bg-hover"
+          className="max-w-full cursor-text truncate rounded-[6px] px-1 hover:bg-hover active:bg-pressed"
         >
           {name}
         </button>

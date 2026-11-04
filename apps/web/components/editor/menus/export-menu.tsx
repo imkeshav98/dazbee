@@ -10,8 +10,9 @@ import { DEFAULT_EXPORT_NAME, type Design, type ExportType, framesOf, inOrder } 
 
 import { NumberField } from '@/components/editor/edit-panel/fields.tsx'
 import { useShownPage } from '@/components/editor/editor-hooks.ts'
-import { FIELD, FIELD_LABEL, SEGMENT, SEGMENTS } from '@/components/editor/styles.ts'
+import { FIELD, FIELD_LABEL } from '@/components/editor/styles.ts'
 import { Button } from '@/components/ui/button.tsx'
+import { SEGMENT, SEGMENTS } from '@/components/ui/looks.ts'
 import { Select } from '@/components/ui/select.tsx'
 import { cn } from '@/lib/cn.ts'
 import { useMessages } from '@/lib/i18n/client.tsx'
