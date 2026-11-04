@@ -12,6 +12,7 @@ import type { Editor } from '@dazbee/editor'
 import { type Paint, withAlpha } from '@dazbee/schema'
 
 import { useBrandKit } from '@/components/brand-kit/use-brand-kit.ts'
+import { useBesidePanel } from '@/components/editor/beside-panel.ts'
 import { Choice, clamp, ColorField, NumberField } from '@/components/editor/edit-panel/fields.tsx'
 import type { P } from '@/components/editor/edit-panel/target.ts'
 import { useMenuFocus } from '@/components/editor/top-bar/bar-popover.tsx'
@@ -20,8 +21,7 @@ import { brandPath } from '@/lib/brand-routes.ts'
 import { cn } from '@/lib/cn.ts'
 import { hexOf } from '@/lib/colour.ts'
 import { tidy } from '@/lib/editor/size.ts'
-import { useLocale } from '@/lib/i18n/client.tsx'
-import { dirOf, format } from '@/lib/i18n/index.ts'
+import { format } from '@/lib/i18n/index.ts'
 
 import { angleOf, type Gradient, GradientBar, linearAt, type Stop, stopsCss } from './gradient-bar.tsx'
 import { ImagePickerButton } from './image-tool.tsx'
@@ -112,12 +112,12 @@ export function PaintRow({
   p: P
   onSet: (to: (now: Paint) => Paint) => void
 }) {
-  const side = dirOf(useLocale()) === 'rtl' ? 'right' : 'left'
+  const beside = useBesidePanel()
   const hidden = paint.visible === false
   const focus = useMenuFocus()
   return (
     <div className={cn('flex min-w-0 flex-1 items-center gap-1', hidden && 'opacity-50')} data-paint={paint.type}>
-      <Popover.Root>
+      <Popover.Root onOpenChange={(open) => open && beside.measure(focus.button.current)}>
         <Popover.Trigger asChild>
           <button
             ref={focus.button}
@@ -131,9 +131,9 @@ export function PaintRow({
         </Popover.Trigger>
         <Popover.Portal>
           <Popover.Content
-            side={side}
+            side={beside.side}
             align="start"
-            sideOffset={12}
+            sideOffset={beside.sideOffset}
             collisionPadding={12}
             aria-label={format(p.editPaint, { name })}
             {...focus.content}

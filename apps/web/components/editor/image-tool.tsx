@@ -10,6 +10,7 @@ import { type ReactNode, useEffect, useRef, useState } from 'react'
 
 import { AssetSummary, isVectorAsset } from '@dazbee/schema'
 
+import { useBesidePanel } from '@/components/editor/beside-panel.ts'
 import { useMenuFocus } from '@/components/editor/top-bar/bar-popover.tsx'
 import { DASHED_BUTTON, FOCUS_RING } from '@/components/ui/looks.ts'
 import { overlayScroll } from '@/components/ui/overlay-scroll.ts'
@@ -17,8 +18,8 @@ import { Tooltip } from '@/components/ui/tooltip.tsx'
 import { brandPath } from '@/lib/brand-routes.ts'
 import { cn } from '@/lib/cn.ts'
 import type { Placeable } from '@/lib/editor/place-asset.ts'
-import { useLocale, useMessages } from '@/lib/i18n/client.tsx'
-import { dirOf, format } from '@/lib/i18n/index.ts'
+import { useMessages } from '@/lib/i18n/client.tsx'
+import { format } from '@/lib/i18n/index.ts'
 import { ASSET_ACCEPT, IMAGE_ACCEPT, sendAsset } from '@/lib/upload-asset.ts'
 
 import { ASSET_TILE, dockTool, POPOVER } from './styles.ts'
@@ -105,11 +106,14 @@ export function ImagePickerButton({
 }) {
   const [own, setOwn] = useState(false)
   const open = shown ?? own
-  const setOpen = (to: boolean) => (onOpen ? onOpen(to) : setOwn(to))
-  // The cards sit at the stage's end, so the picker opens towards its middle.
-  const toward = dirOf(useLocale()) === 'rtl' ? 'right' : 'left'
-  const side = below ? 'bottom' : toward
   const focus = useMenuFocus()
+  // The cards sit at the stage's end, so the picker opens towards its middle, clear of the card.
+  const beside = useBesidePanel()
+  const setOpen = (to: boolean) => {
+    if (to) beside.measure(focus.button.current)
+    if (onOpen) onOpen(to)
+    else setOwn(to)
+  }
   return (
     <Popover.Root open={open} onOpenChange={setOpen}>
       <Popover.Trigger asChild>
@@ -126,9 +130,9 @@ export function ImagePickerButton({
       </Popover.Trigger>
       <Popover.Portal>
         <Popover.Content
-          side={side}
+          side={below ? 'bottom' : beside.side}
           align="start"
-          sideOffset={12}
+          sideOffset={below ? 12 : beside.sideOffset}
           collisionPadding={12}
           aria-label={title}
           data-testid={`${testId}-picker`}
