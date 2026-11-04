@@ -14,14 +14,6 @@ export async function GET(_request: Request, { params }: { params: Promise<{ bra
   }
 }
 
-/** A font file's type by its first four bytes: TrueType outlines or CFF ones. */
-function fontType(bytes: Uint8Array): FontType | null {
-  const head = String.fromCharCode(...bytes.subarray(0, 4))
-  if (head === '\0\u0001\0\0' || head === 'true') return 'font/ttf'
-  if (head === 'OTTO') return 'font/otf'
-  return null
-}
-
 export async function POST(request: Request, { params }: { params: Promise<{ brandId: string }> }) {
   const { brandId } = await params
   const form = await request.formData().catch(() => null)
@@ -39,4 +31,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ bra
       return Response.json({ error: e.message }, { status: e.status })
     throw e
   }
+}
+
+/** A font file's type by its first four bytes: TrueType outlines or CFF ones. */
+function fontType(bytes: Uint8Array): FontType | null {
+  const head = String.fromCharCode(...bytes.subarray(0, 4))
+  if (head === '\0\u0001\0\0' || head === 'true') return 'font/ttf'
+  if (head === 'OTTO') return 'font/otf'
+  return null
 }

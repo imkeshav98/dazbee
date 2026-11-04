@@ -69,35 +69,6 @@ const designThumbnail = (brandId: string, design: BriefReference) =>
 const assetThumbnail = (brandId: string, assetId: string) =>
   `/brands/${encodeURIComponent(brandId)}/assets/${encodeURIComponent(assetId)}/thumbnail`
 
-/** A format's outline in its proportions, at most `size` pixels on its long side. */
-function Shape({ id, size }: { id: string; size: number }) {
-  const preset = FORMAT_PRESETS.find((p) => p.id === id)
-  if (!preset) return null
-  const scale = size / Math.max(preset.width, preset.height)
-  return (
-    <span
-      aria-hidden
-      className="block shrink-0 rounded-[2px] border-[1.5px] border-current"
-      style={{ width: Math.max(5, preset.width * scale), height: Math.max(5, preset.height * scale) }}
-    />
-  )
-}
-
-/** A tick that shows whether a part is picked, as a filled or empty box. */
-function Tick({ on }: { on: boolean }) {
-  return (
-    <span
-      aria-hidden
-      className={cn(
-        'grid size-4 shrink-0 place-items-center rounded-[4px] border-[1.5px]',
-        on ? 'border-accent-solid bg-accent-solid text-on-accent' : 'border-line-strong',
-      )}
-    >
-      {on && <CheckIcon size={10} weight="bold" />}
-    </span>
-  )
-}
-
 export function BriefForm({
   brandId,
   brandName,
@@ -646,13 +617,32 @@ export function BriefForm({
   )
 }
 
-/** One part of the kit: its small heading, then what can be picked. */
-function KitSection({ label, children }: { label: string; children: ReactNode }) {
+/** A tick that shows whether a part is picked, as a filled or empty box. */
+function Tick({ on }: { on: boolean }) {
   return (
-    <section aria-label={label}>
-      <h3 className={LABEL}>{label}</h3>
-      {children}
-    </section>
+    <span
+      aria-hidden
+      className={cn(
+        'grid size-4 shrink-0 place-items-center rounded-[4px] border-[1.5px]',
+        on ? 'border-accent-solid bg-accent-solid text-on-accent' : 'border-line-strong',
+      )}
+    >
+      {on && <CheckIcon size={10} weight="bold" />}
+    </span>
+  )
+}
+
+/** A format's outline in its proportions, at most `size` pixels on its long side. */
+function Shape({ id, size }: { id: string; size: number }) {
+  const preset = FORMAT_PRESETS.find((p) => p.id === id)
+  if (!preset) return null
+  const scale = size / Math.max(preset.width, preset.height)
+  return (
+    <span
+      aria-hidden
+      className="block shrink-0 rounded-[2px] border-[1.5px] border-current"
+      style={{ width: Math.max(5, preset.width * scale), height: Math.max(5, preset.height * scale) }}
+    />
   )
 }
 
@@ -700,5 +690,15 @@ function Attachment({
         <XIcon size={10} weight="bold" aria-hidden />
       </button>
     </li>
+  )
+}
+
+/** One part of the kit: its small heading, then what can be picked. */
+function KitSection({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <section aria-label={label}>
+      <h3 className={LABEL}>{label}</h3>
+      {children}
+    </section>
   )
 }

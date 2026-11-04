@@ -11,18 +11,27 @@ import { cn } from '@/lib/cn.ts'
 
 const nowhere = () => document.activeElement === null || document.activeElement === document.body
 
-/**
- * Inside a popover: once it is gone from the page, puts the focus back on its button, unless the
- * popover closed from a press or focus outside it, or the focus is already somewhere.
- */
-function FocusBack({ button, outside }: { button: RefObject<HTMLButtonElement | null>; outside: RefObject<boolean> }) {
-  useEffect(() => {
-    outside.current = false
-    return () => {
-      if (!outside.current && nowhere()) button.current?.focus()
-    }
-  }, [button, outside])
-  return null
+/** A toolbar's buttons that can be used and show, in order: a closed second row's are left out. */
+const itemsOf = (bar: HTMLElement) =>
+  [...bar.querySelectorAll<HTMLElement>('[data-bar-item]:not(:disabled)')].filter((item) =>
+    item.checkVisibility({ visibilityProperty: true }),
+  )
+
+/** Moves focus along a toolbar's buttons with the arrow keys, Home and End. */
+export function arrowAlong(event: KeyboardEvent<HTMLElement>) {
+  if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight' && event.key !== 'Home' && event.key !== 'End') return
+  const items = itemsOf(event.currentTarget)
+  const at = items.indexOf(document.activeElement as HTMLElement)
+  if (at < 0) return
+  event.preventDefault()
+  const forward = (event.key === 'ArrowRight') !== (getComputedStyle(event.currentTarget).direction === 'rtl')
+  const next =
+    event.key === 'Home'
+      ? 0
+      : event.key === 'End'
+        ? items.length - 1
+        : (at + (forward ? 1 : -1) + items.length) % items.length
+  items[next]?.focus()
 }
 
 /**
@@ -57,6 +66,27 @@ export function useMenuFocus() {
     },
   }
   return { button, content, back: <FocusBack button={button} outside={outside} /> }
+}
+
+/**
+ * Lets Tab reach a toolbar once, at the button last focused, as a toolbar should; the arrows move
+ * along it. Returns the focus handler to put on the toolbar.
+ */
+export function useRovingTab(bar: HTMLElement | null) {
+  const [current, setCurrent] = useState(0)
+  useEffect(() => {
+    if (!bar) return
+    const items = itemsOf(bar)
+    const at = Math.min(current, items.length - 1)
+    items.forEach((item, i) => {
+      item.tabIndex = i === at ? 0 : -1
+    })
+  })
+  return (event: FocusEvent<HTMLElement>) => {
+    if (!(event.currentTarget instanceof HTMLElement)) return
+    const at = itemsOf(event.currentTarget).indexOf(event.target as HTMLElement)
+    if (at >= 0) setCurrent(at)
+  }
 }
 
 export function BarPopover({
@@ -119,46 +149,16 @@ export function BarPopover({
   )
 }
 
-/** A toolbar's buttons that can be used and show, in order: a closed second row's are left out. */
-const itemsOf = (bar: HTMLElement) =>
-  [...bar.querySelectorAll<HTMLElement>('[data-bar-item]:not(:disabled)')].filter((item) =>
-    item.checkVisibility({ visibilityProperty: true }),
-  )
-
-/** Moves focus along a toolbar's buttons with the arrow keys, Home and End. */
-export function arrowAlong(event: KeyboardEvent<HTMLElement>) {
-  if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight' && event.key !== 'Home' && event.key !== 'End') return
-  const items = itemsOf(event.currentTarget)
-  const at = items.indexOf(document.activeElement as HTMLElement)
-  if (at < 0) return
-  event.preventDefault()
-  const forward = (event.key === 'ArrowRight') !== (getComputedStyle(event.currentTarget).direction === 'rtl')
-  const next =
-    event.key === 'Home'
-      ? 0
-      : event.key === 'End'
-        ? items.length - 1
-        : (at + (forward ? 1 : -1) + items.length) % items.length
-  items[next]?.focus()
-}
-
 /**
- * Lets Tab reach a toolbar once, at the button last focused, as a toolbar should; the arrows move
- * along it. Returns the focus handler to put on the toolbar.
+ * Inside a popover: once it is gone from the page, puts the focus back on its button, unless the
+ * popover closed from a press or focus outside it, or the focus is already somewhere.
  */
-export function useRovingTab(bar: HTMLElement | null) {
-  const [current, setCurrent] = useState(0)
+function FocusBack({ button, outside }: { button: RefObject<HTMLButtonElement | null>; outside: RefObject<boolean> }) {
   useEffect(() => {
-    if (!bar) return
-    const items = itemsOf(bar)
-    const at = Math.min(current, items.length - 1)
-    items.forEach((item, i) => {
-      item.tabIndex = i === at ? 0 : -1
-    })
-  })
-  return (event: FocusEvent<HTMLElement>) => {
-    if (!(event.currentTarget instanceof HTMLElement)) return
-    const at = itemsOf(event.currentTarget).indexOf(event.target as HTMLElement)
-    if (at >= 0) setCurrent(at)
-  }
+    outside.current = false
+    return () => {
+      if (!outside.current && nowhere()) button.current?.focus()
+    }
+  }, [button, outside])
+  return null
 }

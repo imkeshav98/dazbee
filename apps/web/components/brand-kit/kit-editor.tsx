@@ -19,6 +19,15 @@ import { ASSET_ACCEPT, sendAsset } from '@/lib/upload-asset.ts'
 import { useFontCatalog } from './font-catalog.ts'
 import { saveKit, showKit } from './use-brand-kit.ts'
 
+/** Binds the selected layers to a kit colour or font, in the editor. */
+interface KitBinding {
+  follows: (kind: 'color' | 'font', token: string) => boolean
+  apply: (kind: 'color' | 'font', token: string) => void
+  /** Whether anything is selected that can follow a colour, or a font. */
+  canColor: boolean
+  canFont: boolean
+}
+
 /** How long a run of changes (a colour picker's drag) waits before it is saved. */
 const SAVE_DELAY_MS = 400
 
@@ -93,15 +102,6 @@ export function useKitSaver(brandId: string, onShow?: (kit: BrandKit) => void) {
   )
 
   return { change, error }
-}
-
-/** Binds the selected layers to a kit colour or font, in the editor. */
-interface KitBinding {
-  follows: (kind: 'color' | 'font', token: string) => boolean
-  apply: (kind: 'color' | 'font', token: string) => void
-  /** Whether anything is selected that can follow a colour, or a font. */
-  canColor: boolean
-  canFont: boolean
 }
 
 export function KitEditor({

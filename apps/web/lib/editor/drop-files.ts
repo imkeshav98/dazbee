@@ -7,6 +7,23 @@ import { type AssetSummary, isVectorAsset } from '@dazbee/schema'
 
 import { IMAGE_ACCEPT, sendAsset } from '@/lib/upload-asset.ts'
 
+/** Where a drop goes, read when it lands, so a pan or zoom while the files upload doesn't move it. */
+export interface Drop {
+  /** The point on the design it was dropped on; null off every frame. */
+  spot: Spot | null
+  /** The layer the one image fills, lit while it was dragged over it; null for new layers. */
+  into: string | null
+  /** How far apart the new layers go, in design pixels. */
+  step: number
+}
+
+export interface DropResult {
+  /** The files that didn't upload, and why. */
+  failed: { name: string; reason: string }[]
+  /** How many uploaded but weren't placed, having been dropped on no page or one gone since. */
+  unplaced: number
+}
+
 /** The image types a fill takes. */
 const FILL_TYPES = IMAGE_ACCEPT.split(',')
 const SVG_TYPE = 'image/svg+xml'
@@ -42,46 +59,6 @@ export const dragFills = (transfer: DataTransfer) =>
       .filter((item) => item.kind === 'file')
       .map((item) => item.type),
   )
-
-/** Where a drop goes, read when it lands, so a pan or zoom while the files upload doesn't move it. */
-export interface Drop {
-  /** The point on the design it was dropped on; null off every frame. */
-  spot: Spot | null
-  /** The layer the one image fills, lit while it was dragged over it; null for new layers. */
-  into: string | null
-  /** How far apart the new layers go, in design pixels. */
-  step: number
-}
-
-/** Reads where `files`, every file dropped at `client`, go, and clears the lit shape. */
-export function dropAt(editor: Editor, client: Point, files: File[]): Drop {
-  const into = fillsByTypes(files.map((file) => file.type)) ? editor.imageTarget(client) : null
-  editor.imageTarget(null)
-  return { spot: editor.spotAt(client), into, step: CASCADE / editor.camera().zoom }
-}
-
-export interface DropResult {
-  /** The files that didn't upload, and why. */
-  failed: { name: string; reason: string }[]
-  /** How many uploaded but weren't placed, having been dropped on no page or one gone since. */
-  unplaced: number
-}
-
-/**
- * Resolves once no gesture is open on the editor, ending any typing. A drag or scrub ends when its
- * pointer is let go or its capture is lost; a pen path still open after PEN_LIMIT_MS is ended as
- * Enter ends it. False once the editor is destroyed.
- */
-async function settled(editor: Editor): Promise<boolean> {
-  const penUntil = Date.now() + PEN_LIMIT_MS
-  for (;;) {
-    if (editor.destroyed()) return false
-    editor.stopEditing()
-    if (Date.now() >= penUntil) editor.settle()
-    if (!editor.gesturing()) return true
-    await new Promise((resolve) => setTimeout(resolve, IDLE_CHECK_MS))
-  }
-}
 
 /**
  * Uploads the files and places what uploaded where `drop` says: one image dropped on a layer that
@@ -139,4 +116,27 @@ export async function placeDroppedFiles(
   const [pageId, formatId] = spot.frame.split('/')
   if (ids.length > 1) editor.select(ids, pageId, formatId)
   return { failed, unplaced }
+}
+
+/** Reads where `files`, every file dropped at `client`, go, and clears the lit shape. */
+export function dropAt(editor: Editor, client: Point, files: File[]): Drop {
+  const into = fillsByTypes(files.map((file) => file.type)) ? editor.imageTarget(client) : null
+  editor.imageTarget(null)
+  return { spot: editor.spotAt(client), into, step: CASCADE / editor.camera().zoom }
+}
+
+/**
+ * Resolves once no gesture is open on the editor, ending any typing. A drag or scrub ends when its
+ * pointer is let go or its capture is lost; a pen path still open after PEN_LIMIT_MS is ended as
+ * Enter ends it. False once the editor is destroyed.
+ */
+async function settled(editor: Editor): Promise<boolean> {
+  const penUntil = Date.now() + PEN_LIMIT_MS
+  for (;;) {
+    if (editor.destroyed()) return false
+    editor.stopEditing()
+    if (Date.now() >= penUntil) editor.settle()
+    if (!editor.gesturing()) return true
+    await new Promise((resolve) => setTimeout(resolve, IDLE_CHECK_MS))
+  }
 }

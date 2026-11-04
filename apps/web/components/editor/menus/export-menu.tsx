@@ -19,6 +19,8 @@ import { sizeOf } from '@/lib/editor/size.ts'
 import { useMessages } from '@/lib/i18n/client.tsx'
 import { format } from '@/lib/i18n/index.ts'
 
+const LABEL = FIELD_LABEL
+
 function download(name: string, type: string, bytes: Uint8Array<ArrayBuffer>) {
   const url = URL.createObjectURL(new Blob([bytes], { type }))
   const link = document.createElement('a')
@@ -28,8 +30,6 @@ function download(name: string, type: string, bytes: Uint8Array<ArrayBuffer>) {
   // The download has its own copy once it starts.
   setTimeout(() => URL.revokeObjectURL(url), 10_000)
 }
-
-const LABEL = FIELD_LABEL
 
 /** The export form, opened from the Share menu. */
 export function ExportForm({ id, editor, design }: { id: string; editor: Editor; design: Design }) {

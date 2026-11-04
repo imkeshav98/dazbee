@@ -62,25 +62,29 @@ export function PagesButton({ editor }: { editor: Editor | null }) {
   return <LivePages editor={editor} />
 }
 
-/** Pages once the design is open: which page is in view, of how many. */
-function LivePages({ editor }: { editor: Editor }) {
+export function PagesPanel({ editor, onRemoved }: { editor: Editor; onRemoved: (message: string) => void }) {
   const t = useMessages()
-  // Each design opens on its first page.
-  useEffect(() => () => shownPage.set(null), [editor])
-  const { design } = useEditorDesign(editor)
-  usePickedPage(editor)
-  const current = useCurrentPage(design)
-  const pages = inOrder(design.pages)
-  const counts = { n: Math.max(1, pages.findIndex(([id]) => id === current) + 1), total: pages.length }
+  const { open } = useEditState()
+  if (open !== 'pages') return null
   return (
-    <PagesFrame label={format(t.editor.pages.buttonLabel, counts)}>
-      <span aria-hidden className="tabular-nums max-sm:hidden">
-        {format(t.editor.pages.button, counts)}
-      </span>
-      <span aria-hidden className="font-mono tabular-nums sm:hidden">
-        {format(t.editor.pages.buttonShort, counts)}
-      </span>
-    </PagesFrame>
+    <PanelFrame id="pages" title={t.editor.pages.title}>
+      <PageList editor={editor} onRemoved={onRemoved} />
+    </PanelFrame>
+  )
+}
+
+/** The picked page's Background panel: the Colour panel's choices, for the page in every size. */
+export function BackgroundPanel({ editor, brandId }: { editor: Editor; brandId: string }) {
+  const t = useMessages()
+  const { open } = useEditState()
+  const { design } = useEditorDesign(editor)
+  const picked = usePickedPage(editor)
+  const page = picked ? design.pages[picked] : undefined
+  if (open !== 'background' || !picked || !page) return null
+  return (
+    <PanelFrame id="background" title={t.editor.page.backgroundColour} note={page.name}>
+      <BackgroundBody editor={editor} design={design} pageId={picked} brandId={brandId} />
+    </PanelFrame>
   )
 }
 
@@ -130,29 +134,25 @@ function PagesFrame({ label, disabled = false, children }: { label: string; disa
   )
 }
 
-export function PagesPanel({ editor, onRemoved }: { editor: Editor; onRemoved: (message: string) => void }) {
+/** Pages once the design is open: which page is in view, of how many. */
+function LivePages({ editor }: { editor: Editor }) {
   const t = useMessages()
-  const { open } = useEditState()
-  if (open !== 'pages') return null
-  return (
-    <PanelFrame id="pages" title={t.editor.pages.title}>
-      <PageList editor={editor} onRemoved={onRemoved} />
-    </PanelFrame>
-  )
-}
-
-/** The picked page's Background panel: the Colour panel's choices, for the page in every size. */
-export function BackgroundPanel({ editor, brandId }: { editor: Editor; brandId: string }) {
-  const t = useMessages()
-  const { open } = useEditState()
+  // Each design opens on its first page.
+  useEffect(() => () => shownPage.set(null), [editor])
   const { design } = useEditorDesign(editor)
-  const picked = usePickedPage(editor)
-  const page = picked ? design.pages[picked] : undefined
-  if (open !== 'background' || !picked || !page) return null
+  usePickedPage(editor)
+  const current = useCurrentPage(design)
+  const pages = inOrder(design.pages)
+  const counts = { n: Math.max(1, pages.findIndex(([id]) => id === current) + 1), total: pages.length }
   return (
-    <PanelFrame id="background" title={t.editor.page.backgroundColour} note={page.name}>
-      <BackgroundBody editor={editor} design={design} pageId={picked} brandId={brandId} />
-    </PanelFrame>
+    <PagesFrame label={format(t.editor.pages.buttonLabel, counts)}>
+      <span aria-hidden className="tabular-nums max-sm:hidden">
+        {format(t.editor.pages.button, counts)}
+      </span>
+      <span aria-hidden className="font-mono tabular-nums sm:hidden">
+        {format(t.editor.pages.buttonShort, counts)}
+      </span>
+    </PagesFrame>
   )
 }
 

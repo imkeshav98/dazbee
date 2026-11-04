@@ -70,6 +70,10 @@ const GROUPS: [Group, ShortcutAction[]][] = [
   ['view', ['zoomIn', 'zoomOut', 'zoomToFit', 'zoomToSelection', 'zoomTo100', 'toggleRulers']],
 ]
 
+const typing = (target: EventTarget | null) =>
+  target instanceof HTMLElement &&
+  (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName))
+
 /** How each key of a spec reads on this computer: ⌘ ⌥ ⇧ on a Mac, Ctrl Alt Shift elsewhere. */
 function keysOf(spec: string, mac: boolean) {
   const named: Record<string, string> = {
@@ -92,10 +96,6 @@ function keysOf(spec: string, mac: boolean) {
   }
   return spec.split('+').map((key) => named[key] ?? key.replace(/^Digit/, ''))
 }
-
-const typing = (target: EventTarget | null) =>
-  target instanceof HTMLElement &&
-  (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName))
 
 export function ShortcutsButton({ className }: { className: string }) {
   const t = useMessages().editor.shortcuts
