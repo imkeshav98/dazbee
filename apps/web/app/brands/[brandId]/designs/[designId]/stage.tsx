@@ -2,7 +2,7 @@
 
 import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react'
 
-import { type Editor, SHAPE_TOOLS, type ShapeTool, startEditor, type Tool } from '@dazbee/editor'
+import { type Editor, SHAPE_MENU_TOOLS, type ShapeMenuTool, startEditor, type Tool } from '@dazbee/editor'
 import { isVectorAsset } from '@dazbee/schema'
 
 import { ASSET_DRAG_TYPE, draggedAsset, VECTOR_DRAG_TYPE } from '@/components/editor/asset-drag.ts'
@@ -38,7 +38,7 @@ declare global {
 }
 
 /** The editor's tools that the dock shows as the one shape button. */
-const isShapeTool = (tool: Tool): tool is ShapeTool => (SHAPE_TOOLS as readonly string[]).includes(tool)
+const isShapeMenuTool = (tool: Tool): tool is ShapeMenuTool => (SHAPE_MENU_TOOLS as readonly string[]).includes(tool)
 
 export function EditorStage({
   designId,
@@ -94,7 +94,7 @@ export function EditorStage({
   }, [editor, notices, svgParts, locale])
   // The dock follows the editor's tool: a key picks one, and drawing a shape goes back to select.
   const [tool, setEditorTool] = useState<Tool>('select')
-  const [shape, setShape] = useState<ShapeTool>('rect')
+  const [shape, setShape] = useState<ShapeMenuTool>('rect')
   // The image tool's picker shows until an image is picked; any other tool forgets the pick.
   const [imagePicked, setImagePicked] = useState(false)
   useEffect(() => {
@@ -102,13 +102,13 @@ export function EditorStage({
     const stop = editor.onTool((next) => {
       setEditorTool(next)
       if (next !== 'image') setImagePicked(false)
-      if (isShapeTool(next)) setShape(next)
+      if (isShapeMenuTool(next)) setShape(next)
     })
     return () => {
       stop()
     }
   }, [editor])
-  const dockTool = isShapeTool(tool) ? 'shape' : tool
+  const dockTool = isShapeMenuTool(tool) ? 'shape' : tool
   const dismissRemoved = useCallback(() => setRemoved(null), [])
 
   // Files dropped from the computer: the images upload into the library and go where they were

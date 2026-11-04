@@ -33,7 +33,7 @@ const DESIGN: DesignInput = {
     c: rect('p1', 'a2', { x: 700, y: 120, width: 100, height: 100 }),
     pin: { ...rect('p1', 'a3', { x: 700, y: 700, width: 50, height: 50 }), lock: { move: true } },
     row: {
-      type: 'frame',
+      type: 'box',
       parentId: 'p1',
       index: 'a4',
       name: 'Row',

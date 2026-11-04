@@ -1,4 +1,4 @@
-// Switching a frame to auto layout at the commands seam (#46): node.autoLayout reads the settings
+// Switching a box to auto layout at the commands seam (#46): node.autoLayout reads the settings
 // off where the children are, so every child is where it was, in every format, once laid out.
 import { describe, expect, it } from 'vitest'
 
@@ -55,7 +55,7 @@ const design = (): DesignInput => ({
   nodes: {
     // A row centred across, 20 apart, its children out of order in the layer list.
     bar: {
-      type: 'frame',
+      type: 'box',
       parentId: 'p1',
       index: 'a0',
       name: 'Bar',
@@ -67,7 +67,7 @@ const design = (): DesignInput => ({
     badge: rect('bar', 'a3', 650, 90, 30, 30, { absolute: true }),
     // A column lined up at the end, 8 apart.
     list: {
-      type: 'frame',
+      type: 'box',
       parentId: 'p1',
       index: 'a1',
       name: 'List',
@@ -143,7 +143,7 @@ describe('node.autoLayout', () => {
     expect(readDesign(doc).nodes.bar?.props).not.toHaveProperty('layout')
     expect(readDesign(doc).overrides['format:wide']?.bar).not.toHaveProperty('layout')
     expect(() => tab.run('node.autoLayout', { id: 'big', on: true })).toThrow(
-      /"big" is a graphic; only frames have auto layout/,
+      /"big" is a graphic; only boxes have auto layout/,
     )
   })
 })

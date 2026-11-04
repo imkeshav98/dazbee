@@ -23,8 +23,8 @@ const box = (id: string, x: number, y: number, width: number, height: number, ro
     props: { ...props, x, y, width, height, rotation, shape: { kind: 'rect' }, strokes: [] },
     children: [],
   }) as unknown as SceneLayer
-const frame = (id: string, clip: boolean, children: SceneLayer[]) =>
-  ({ id, type: 'frame', props: { ...props, width: 200, height: 200, clip }, children }) as unknown as SceneLayer
+const boxLayer = (id: string, clip: boolean, children: SceneLayer[]) =>
+  ({ id, type: 'box', props: { ...props, width: 200, height: 200, clip }, children }) as unknown as SceneLayer
 
 describe('hitTest', () => {
   it('picks the topmost layer under the point, and nothing over empty page', () => {
@@ -41,17 +41,17 @@ describe('hitTest', () => {
     expect(hitTest(bar, { x: 180, y: 10 })).toBeNull()
   })
 
-  it('picks the child inside a frame, the frame on its empty part, and hides what a clipping frame cuts off', () => {
+  it('picks the child inside a box, the box on its empty part, and hides what a clipping box cuts off', () => {
     const child = box('child', 150, 150, 100, 100)
-    expect(hitTest([frame('f', true, [child])], { x: 160, y: 160 })?.id).toBe('child')
-    expect(hitTest([frame('f', true, [child])], { x: 20, y: 20 })?.id).toBe('f')
-    expect(hitTest([frame('f', true, [child])], { x: 240, y: 240 })).toBeNull()
-    expect(hitTest([frame('f', false, [child])], { x: 240, y: 240 })?.id).toBe('child')
+    expect(hitTest([boxLayer('f', true, [child])], { x: 160, y: 160 })?.id).toBe('child')
+    expect(hitTest([boxLayer('f', true, [child])], { x: 20, y: 20 })?.id).toBe('f')
+    expect(hitTest([boxLayer('f', true, [child])], { x: 240, y: 240 })).toBeNull()
+    expect(hitTest([boxLayer('f', false, [child])], { x: 240, y: 240 })?.id).toBe('child')
   })
 
   it('passes over a layer that is not pickable, and everything in it, to what lies beneath', () => {
     const under = box('under', 0, 0, 300, 300)
-    const locked = frame('f', true, [box('child', 150, 150, 100, 100)])
+    const locked = boxLayer('f', true, [box('child', 150, 150, 100, 100)])
     const unlocked = (layer: { id: string }) => layer.id !== 'f'
     expect(hitTest([under, locked], { x: 160, y: 160 }, unlocked)?.id).toBe('under')
     expect(hitTest([under, locked], { x: 160, y: 160 })?.id).toBe('child')

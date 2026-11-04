@@ -26,7 +26,7 @@ const DESIGN: DesignInput = {
   pages: { p1: { name: 'One', order: 'a0' } },
   nodes: {
     row: {
-      type: 'frame',
+      type: 'box',
       parentId: 'p1',
       index: 'a0',
       name: 'Row',
@@ -113,7 +113,7 @@ describe('editorAutoLayoutDrag', () => {
       expect(order()).toEqual(['one', 'two', 'three'])
     })
 
-    it('takes the layers out of the frame onto the page, where they were dropped and where the flow had them in the other formats', () => {
+    it('takes the layers out of the box onto the page, where they were dropped and where the flow had them in the other formats', () => {
       const { reorder, session, frame, order } = harness()
       const drag = reorder.press(frame, [], { x: 125, y: 125 }, ['one'])
       if (!drag) throw new Error('no drag')

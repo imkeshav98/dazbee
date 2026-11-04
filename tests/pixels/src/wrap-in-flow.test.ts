@@ -1,6 +1,6 @@
-// Grouping or framing layers inside an auto layout frame (#233), at the commands seam, with the
+// Grouping or boxing layers inside an auto layout box (#233), at the commands seam, with the
 // boxes the flow draws them at: a fixed, a filling, a hugging, a kept-in-place child and a group, each
-// wrapped in a group and in a frame, leaves every drawn box where it was in every format.
+// wrapped in a group and in a box, leaves every drawn box where it was in every format.
 import { describe, expect, it } from 'vitest'
 
 import { loadDesign, openSession, readDesign } from '@dazbee/doc'
@@ -38,7 +38,7 @@ const json = {
   pages: { p1: { name: 'Page', order: 'a0' } },
   nodes: {
     auto: {
-      type: 'frame',
+      type: 'box',
       parentId: 'p1',
       index: 'a0',
       name: 'Auto layout',
@@ -54,7 +54,7 @@ const json = {
     aFixed: rect('Flow fixed', 'auto', 'a0', 120, 120),
     aFill: rect('Flow fill', 'auto', 'a1', 100, 120, { sizing: { width: 'fill', height: 'fixed' } }),
     aHug: {
-      type: 'frame',
+      type: 'box',
       parentId: 'auto',
       index: 'a2',
       name: 'Flow hug',
@@ -78,7 +78,7 @@ const json = {
     },
     aGroupIn: rect('Group inner', 'aGroup', 'a0', 80, 80),
   },
-  // The wide format makes the frame wider, so the filling child is drawn wider there, and takes
+  // The wide format makes the box wider, so the filling child is drawn wider there, and takes
   // the kept-in-place child into the flow.
   overrides: { 'format:wide': { auto: { width: 900 }, aAbs: { absolute: false } } },
 }
@@ -98,7 +98,7 @@ function drawn(design: Design, formatId: string): Record<string, Box> {
 }
 
 describe('wrapping layers in a flow', () => {
-  for (const command of ['node.group', 'node.frame'] as const) {
+  for (const command of ['node.group', 'node.box'] as const) {
     for (const id of ['aFixed', 'aFill', 'aHug', 'aAbs', 'aGroup']) {
       it(`${command} on ${id} keeps every drawn box, in every format`, () => {
         const parsed = parseDesign(json)

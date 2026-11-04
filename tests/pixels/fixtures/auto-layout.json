@@ -27,7 +27,7 @@
   },
   "nodes": {
     "btnLong": {
-      "type": "frame",
+      "type": "box",
       "parentId": "p1",
       "index": "a0",
       "name": "btnLong",
@@ -101,7 +101,7 @@
       }
     },
     "btnShort": {
-      "type": "frame",
+      "type": "box",
       "parentId": "p1",
       "index": "a1",
       "name": "btnShort",
@@ -175,7 +175,7 @@
       }
     },
     "card": {
-      "type": "frame",
+      "type": "box",
       "parentId": "p1",
       "index": "a2",
       "name": "card",
@@ -308,7 +308,7 @@
       }
     },
     "cardBtn": {
-      "type": "frame",
+      "type": "box",
       "parentId": "card",
       "index": "a3",
       "name": "cardBtn",
@@ -383,7 +383,7 @@
       }
     },
     "stats": {
-      "type": "frame",
+      "type": "box",
       "parentId": "p1",
       "index": "a3",
       "name": "stats",
@@ -478,7 +478,7 @@
       }
     },
     "avatars": {
-      "type": "frame",
+      "type": "box",
       "parentId": "p1",
       "index": "a4",
       "name": "avatars",
@@ -625,7 +625,7 @@
       }
     },
     "tags": {
-      "type": "frame",
+      "type": "box",
       "parentId": "p1",
       "index": "a5",
       "name": "tags",
@@ -659,7 +659,7 @@
       }
     },
     "tag0": {
-      "type": "frame",
+      "type": "box",
       "parentId": "tags",
       "index": "a0",
       "name": "tag0",
@@ -710,7 +710,7 @@
       }
     },
     "tag1": {
-      "type": "frame",
+      "type": "box",
       "parentId": "tags",
       "index": "a1",
       "name": "tag1",
@@ -761,7 +761,7 @@
       }
     },
     "tag2": {
-      "type": "frame",
+      "type": "box",
       "parentId": "tags",
       "index": "a2",
       "name": "tag2",
@@ -812,7 +812,7 @@
       }
     },
     "tag3": {
-      "type": "frame",
+      "type": "box",
       "parentId": "tags",
       "index": "a3",
       "name": "tag3",
@@ -863,7 +863,7 @@
       }
     },
     "tag4": {
-      "type": "frame",
+      "type": "box",
       "parentId": "tags",
       "index": "a4",
       "name": "tag4",
@@ -914,7 +914,7 @@
       }
     },
     "tag5": {
-      "type": "frame",
+      "type": "box",
       "parentId": "tags",
       "index": "a5",
       "name": "tag5",
@@ -965,7 +965,7 @@
       }
     },
     "tag6": {
-      "type": "frame",
+      "type": "box",
       "parentId": "tags",
       "index": "a6",
       "name": "tag6",
@@ -1016,7 +1016,7 @@
       }
     },
     "turned": {
-      "type": "frame",
+      "type": "box",
       "parentId": "p1",
       "index": "a6",
       "name": "turned",

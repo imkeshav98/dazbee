@@ -51,8 +51,8 @@ const text = (parentId: string, index: string, value: string, props: Record<stri
       ...props,
     },
   }) as Node
-const frame = (parentId: string, index: string, props: Record<string, unknown>): Node =>
-  ({ type: 'frame', parentId, index, name: index, props: { ...box(0, 0, 100, 100), ...props } }) as Node
+const boxLayer = (parentId: string, index: string, props: Record<string, unknown>): Node =>
+  ({ type: 'box', parentId, index, name: index, props: { ...box(0, 0, 100, 100), ...props } }) as Node
 
 function scene(nodes: Record<string, Node>) {
   const result = parseDesign({
@@ -83,14 +83,17 @@ describe('auto layout (#46)', () => {
   it('runs children along a row or down a column, gap apart inside the paddings', () => {
     const padding = { top: 10, right: 20, bottom: 30, left: 40 }
     const row = scene({
-      f: frame('p1', 'a0', { ...box(100, 100, 400, 200), layout: layout({ gap: 12, padding }) }),
+      f: boxLayer('p1', 'a0', { ...box(100, 100, 400, 200), layout: layout({ gap: 12, padding }) }),
       a: rect('f', 'a0', box(0, 0, 50, 20)),
       b: rect('f', 'a1', box(999, 999, 60, 40)),
     })
     expect(row('a')).toEqual(box(140, 110, 50, 20))
     expect(row('b')).toEqual(box(202, 110, 60, 40))
     const column = scene({
-      f: frame('p1', 'a0', { ...box(100, 100, 400, 200), layout: layout({ direction: 'column', gap: 12, padding }) }),
+      f: boxLayer('p1', 'a0', {
+        ...box(100, 100, 400, 200),
+        layout: layout({ direction: 'column', gap: 12, padding }),
+      }),
       a: rect('f', 'a0', box(0, 0, 50, 20)),
       b: rect('f', 'a1', box(0, 0, 60, 40)),
     })
@@ -98,9 +101,9 @@ describe('auto layout (#46)', () => {
     expect(column('b')).toEqual(box(140, 142, 60, 40))
   })
 
-  it('sizes children fixed, hugging their text or filling what is left, and the frame hugging them', () => {
+  it('sizes children fixed, hugging their text or filling what is left, and the box hugging them', () => {
     const get = scene({
-      f: frame('p1', 'a0', {
+      f: boxLayer('p1', 'a0', {
         ...box(0, 0, 500, 100),
         layout: layout({ gap: 10, padding: { top: 5, right: 5, bottom: 5, left: 5 } }),
       }),
@@ -108,7 +111,7 @@ describe('auto layout (#46)', () => {
       label: text('f', 'a1', 'Buy now'),
       grow: rect('f', 'a2', { ...box(0, 0, 10, 10), sizing: { width: 'fill', height: 'fill' } }),
       grow2: rect('f', 'a3', { ...box(0, 0, 10, 10), sizing: { width: 'fill', height: 'fixed' } }),
-      btn: frame('p1', 'a1', {
+      btn: boxLayer('p1', 'a1', {
         ...box(0, 200, 10, 10),
         sizing: { width: 'hug', height: 'hug' },
         layout: layout({ padding: { top: 8, right: 16, bottom: 8, left: 16 } }),
@@ -126,7 +129,7 @@ describe('auto layout (#46)', () => {
   it('lines children up along the flow and across it', () => {
     const at = (justify: string, align: string) =>
       scene({
-        f: frame('p1', 'a0', { ...box(0, 0, 300, 100), layout: layout({ gap: 10, justify, align }) }),
+        f: boxLayer('p1', 'a0', { ...box(0, 0, 300, 100), layout: layout({ gap: 10, justify, align }) }),
         a: rect('f', 'a0', box(0, 0, 50, 20)),
         b: rect('f', 'a1', box(0, 0, 50, 40)),
       })
@@ -143,7 +146,7 @@ describe('auto layout (#46)', () => {
 
   it('takes negative gaps and paddings, so children overlap and spill out', () => {
     const get = scene({
-      f: frame('p1', 'a0', {
+      f: boxLayer('p1', 'a0', {
         ...box(100, 100, 10, 10),
         sizing: { width: 'hug', height: 'hug' },
         layout: layout({ gap: -20, padding: { top: -5, right: 0, bottom: 0, left: -10 } }),
@@ -156,9 +159,9 @@ describe('auto layout (#46)', () => {
     expect(get('f')).toEqual(box(100, 100, 70, 45))
   })
 
-  it('wraps onto more lines, lineGap apart, and a hugging frame grows to hold them', () => {
+  it('wraps onto more lines, lineGap apart, and a hugging box grows to hold them', () => {
     const get = scene({
-      f: frame('p1', 'a0', {
+      f: boxLayer('p1', 'a0', {
         ...box(0, 0, 130, 10),
         sizing: { width: 'fixed', height: 'hug' },
         layout: layout({ gap: 10, wrap: true, lineGap: 5 }),
@@ -175,7 +178,7 @@ describe('auto layout (#46)', () => {
 
   it("nests: a card hugs a column of a title that wraps at the card's width and a button that hugs its label", () => {
     const get = scene({
-      card: frame('p1', 'a0', {
+      card: boxLayer('p1', 'a0', {
         ...box(100, 100, 200, 10),
         sizing: { width: 'fixed', height: 'hug' },
         layout: layout({ direction: 'column', gap: 12, padding: { top: 20, right: 20, bottom: 20, left: 20 } }),
@@ -184,7 +187,7 @@ describe('auto layout (#46)', () => {
         boxMode: 'autoHeight',
         sizing: { width: 'fill', height: 'hug' },
       }),
-      btn: frame('card', 'a1', {
+      btn: boxLayer('card', 'a1', {
         ...box(0, 0, 10, 10),
         sizing: { width: 'hug', height: 'hug' },
         layout: layout({ padding: { top: 8, right: 16, bottom: 8, left: 16 } }),
@@ -201,12 +204,12 @@ describe('auto layout (#46)', () => {
     expect(get('badge')).toEqual(box(280, 90, 30, 30))
   })
 
-  it('moves what a group holds with it, and leaves frames without auto layout alone', () => {
+  it('moves what a group holds with it, and leaves boxes without auto layout alone', () => {
     const get = scene({
-      f: frame('p1', 'a0', { ...box(0, 0, 500, 100), layout: layout({ gap: 10 }) }),
+      f: boxLayer('p1', 'a0', { ...box(0, 0, 500, 100), layout: layout({ gap: 10 }) }),
       g: { type: 'group', parentId: 'f', index: 'a0', name: 'g', props: box(300, 300, 40, 40) } as Node,
       inG: rect('g', 'a0', box(310, 310, 20, 20)),
-      plain: frame('p1', 'a1', box(600, 600, 100, 100)),
+      plain: boxLayer('p1', 'a1', box(600, 600, 100, 100)),
       inPlain: rect('plain', 'a0', box(650, 650, 10, 10)),
     })
     expect(get('g')).toEqual(box(0, 0, 40, 40))

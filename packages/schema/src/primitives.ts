@@ -54,7 +54,7 @@ export const BlendMode = z.enum([
 export type BlendMode = z.infer<typeof BlendMode>
 
 /**
- * How a group or frame mixes with what is under it (#43). Pass-through, the default, adds no
+ * How a group or box mixes with what is under it (#43). Pass-through, the default, adds no
  * layer of its own: each child mixes with what is under the group as if it weren't grouped.
  * Any other mode first draws the children together, so their own modes mix only with each
  * other, then mixes the result. A pass-through group with opacity or effects is drawn

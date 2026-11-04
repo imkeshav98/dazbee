@@ -38,9 +38,9 @@ export function resizedBoxes(
         const inner = boxes.get(id)
         if (inner) next.set(id, carry(inner, was, box))
       }
-    } else if (type === 'frame') {
-      // A frame changes its own size only: what it holds stays as it is, where it is on screen;
-      // with several layers it moves along with its frame.
+    } else if (type === 'box') {
+      // A box changes its own size only: what it holds stays as it is, where it is on screen;
+      // with several layers it moves along with its box.
       const shift = roots.length === 1 ? keptOnScreen(was, box) : { x: box.x - was.x, y: box.y - was.y }
       for (const id of descendants(now, root)) {
         const inner = boxes.get(id)
@@ -53,7 +53,7 @@ export function resizedBoxes(
 
 /**
  * The text a corner drag on `roots` scales, with its sizes in the frame now: each text whose box
- * scales with the drag, selected itself or in a group, not one in a frame, whose text keeps its
+ * scales with the drag, selected itself or in a group, not one in a box, whose text keeps its
  * size. A text whose style is locked isn't scaled.
  */
 export function scalingTexts(now: Design, frame: Frame, roots: string[], handle: Handle): Map<string, ScaledText> {
@@ -81,7 +81,7 @@ export function scalingTexts(now: Design, frame: Frame, roots: string[], handle:
 
 /**
  * At the start of a resize, the axes it drags stop following their content, as in Figma: an auto
- * layout frame or a layer in a flow becomes fixed there (from hug or fill), and text that grows
+ * layout box or a layer in a flow becomes fixed there (from hug or fill), and text that grows
  * with its words gets a fixed box there, wrapping inside a width given to it, unless a corner
  * scales it.
  */

@@ -1,5 +1,5 @@
-// The panels inventory's rows 50 to 58 (support/inventory.ts): frames and auto layout. Adding it,
-// direction and wrap, gap, padding, distribute, align, the frame's own sizing, a child's sizing,
+// The panels inventory's rows 50 to 58 (support/inventory.ts): boxes and auto layout. Adding it,
+// direction and wrap, gap, padding, distribute, align, the box's own sizing, a child's sizing,
 // and a child kept out of the flow.
 import { reloads } from '../../support/editor.ts'
 import { choose, enter } from '../../support/fields.ts'
@@ -10,7 +10,7 @@ import { openCard } from '../../support/top-bar.ts'
 
 const row = setupInventory()
 
-test.describe('frames and auto layout', () => {
+test.describe('boxes and auto layout', () => {
   const layout = async (page: Page, id = 'stack') =>
     (await props(page, id)).layout as Record<string, unknown> | undefined
   /** The Line up pad's cell that lines up along the flow at `justify` and across it at `align`. */
@@ -137,7 +137,7 @@ test.describe('frames and auto layout', () => {
     await reloads(page)
   })
 
-  row(56, "the frame's own sizing", async (open) => {
+  row(56, "the box's own sizing", async (open) => {
     const page = await open()
     await selectLayers(page, ['stack'], { bar: true })
     const card = async () => await openCard(page, 'auto-layout-advanced')

@@ -1,6 +1,6 @@
 // Align and distribute (#42): where each selected layer moves to, by the box around it as drawn.
 // Several layers line up with the box around them all; one layer lines up with what holds it,
-// the format or the group or frame it is in.
+// the format or the group or box it is in.
 import type { Rect } from '@dazbee/schema'
 
 export type Distribution = 'horizontal' | 'vertical'

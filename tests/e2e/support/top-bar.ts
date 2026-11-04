@@ -30,7 +30,7 @@ const HOLDER: Record<string, string> = {
   'appearance-card': 'transparency',
   'spacing-card': 'spacing',
   'text-box-card': 'spacing',
-  'frame-card': 'box',
+  'box-card': 'box',
   'auto-layout-card': 'stack',
   'combine-card': 'combine-op',
   'mask-card': 'mask',
@@ -181,7 +181,7 @@ export async function openCard(page: Page, testId: string) {
         ? (await has('shape'))
           ? 'shape'
           : 'corners'
-        : testId === 'frame-card' && !(await has('box'))
+        : testId === 'box-card' && !(await has('box'))
           ? 'corners'
           : HOLDER[testId]
   if (!holder) throw new Error(`no top bar item holds ${testId}`)

@@ -154,7 +154,7 @@ export function undrawn(drawn: Box, around: Box[]): Box {
 }
 
 /**
- * How far a frame's layers move so they stay where they are drawn when the frame, turned, changes
+ * How far a box's layers move so they stay where they are drawn when the box, turned, changes
  * from `was` to `box`: it turns them about its centre, which has moved.
  */
 export function keptOnScreen(was: Box, box: Box): Point {

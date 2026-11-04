@@ -1,7 +1,7 @@
 // The canvas gesture matrix (#232): every canvas gesture against every kind of container, in one
 // format of a design that has two, with real pointer and keyboard input. Each gesture is checked
 // against what it should do: a move moves the layer by the drag, a resize sizes it from the handle
-// dragged (scaling a group's or boolean's layers, never a frame's) and a path's drawing with its
+// dragged (scaling a group's or boolean's layers, never a box's) and a path's drawing with its
 // box, and fixes the sizing of the axes it drags while the other keeps its own, a turn turns it,
 // align lines it up, the other format stays as it was, auto layout keeps placing its flow (a drag
 // or an arrow moves a layer along it, and what it decides is said), the gesture is one undo step,
@@ -48,7 +48,7 @@ const GESTURES = [
   'duplicate',
   'paste',
   'group',
-  'frame-selection',
+  'box-selection',
   'ungroup',
   'delete',
 ] as const
@@ -202,8 +202,8 @@ async function run(
     case gesture === 'group':
       await press(page, 'group')
       break
-    case gesture === 'frame-selection':
-      await press(page, 'frameSelection')
+    case gesture === 'box-selection':
+      await press(page, 'boxSelection')
       break
     case gesture === 'ungroup':
       await press(page, 'ungroup')
@@ -271,7 +271,7 @@ async function run(
     } else if (h.w && !close(b.width, wantW, 1.5)) problems.push(`width ${b.width}, not ${wantW}`)
     if (h.h && !TEXT.has(subject) && !turnBy && !close(b.height, box.height + h.h, 1.5))
       problems.push(`height ${b.height}, not ${box.height + h.h}`)
-    // A frame's layers keep their size; a group's or boolean's scale with it; a flow fills what it is given.
+    // A box's layers keep their size; a group's or boolean's scale with it; a flow fills what it is given.
     const scaled = subject === 'group' || subject === 'bool' || subject === 'paths'
     if (!scaled) {
       for (const id of inside(subject).filter((id) => id !== 'aFill'))
@@ -281,7 +281,7 @@ async function run(
           (!close((before[id] as Box).width, (after[id] as Box).width) ||
             !close((before[id] as Box).height, (after[id] as Box).height))
         )
-          problems.push(`${id} resized inside a frame`)
+          problems.push(`${id} resized inside a box`)
     }
     if (AUTO.has(subject)) {
       for (const id of inside(subject).filter((id) => FLOW[id])) {
@@ -295,10 +295,10 @@ async function run(
             kid.x + kid.width > b.x + b.width + 0.5 ||
             kid.y + kid.height > b.y + b.height + 0.5)
         )
-          problems.push(`${id} outside its frame`)
+          problems.push(`${id} outside its box`)
       }
     }
-    // The axes dragged become fixed; the other keeps its sizing, so a hugging frame made narrower
+    // The axes dragged become fixed; the other keeps its sizing, so a hugging box made narrower
     // still hugs its height.
     const sizingOf = (d: Doc) =>
       ({ ...d.nodes[subject]?.props, ...d.overrides[formatScope(formatId)]?.[subject] }).sizing as
@@ -356,12 +356,12 @@ async function run(
   if (gesture === 'distribute' && flowParent && !told) problems.push('a flow layer, and nothing said')
   if ((gesture === 'duplicate' || gesture === 'paste') && Object.keys(now.nodes).length <= count)
     problems.push('no copy')
-  if ((gesture === 'group' || gesture === 'frame-selection') && Object.keys(now.nodes).length !== count + 1)
+  if ((gesture === 'group' || gesture === 'box-selection') && Object.keys(now.nodes).length !== count + 1)
     problems.push('no new container')
   if (gesture === 'ungroup' && (subject === 'group' || subject === 'bool' || subject === 'paths') && now.nodes[subject])
     problems.push('still there')
   if (gesture === 'delete' && now.nodes[subject]) problems.push('not deleted')
-  if (['group', 'frame-selection', 'ungroup'].includes(gesture))
+  if (['group', 'box-selection', 'ungroup'].includes(gesture))
     for (const id of LEAVES) if (!same(before[id], after[id])) problems.push(`${id} moved`)
   // One undo step puts everything back.
   await press(page, 'undo')

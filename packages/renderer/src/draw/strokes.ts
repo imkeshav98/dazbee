@@ -24,7 +24,7 @@ export function drawShape(
 }
 
 /**
- * A shape's or a frame's strokes along `path`, inside, centred on or outside it; a line's along it,
+ * A shape's or a box's strokes along `path`, inside, centred on or outside it; a line's along it,
  * with its ends. An outside stroke is clipped to everywhere but the outline, worked out as one path
  * with the outline's own fill rule kept, which an SVG can hold where it can't hold a difference.
  */

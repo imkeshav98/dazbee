@@ -5,6 +5,7 @@
 import {
   AlignLeftIcon,
   ArrowsClockwiseIcon,
+  BoundingBoxIcon,
   CircleHalfIcon,
   CornersOutIcon,
   CropIcon,
@@ -329,20 +330,20 @@ export function useSelectionItems(target: Target, design: Design, brandId: strin
         </button>,
       )
     // A photo in a box keeps the box's own settings, whose Box pop-up holds its corners.
-    if (!facts.frames && facts.ownShape === 'rect')
+    if (!facts.boxes && facts.ownShape === 'rect')
       pop('corners', b.corners, popup('corners'), {
         icon: <CornersOutIcon size={16} aria-hidden />,
         className: 'w-72 p-2.5',
       })
-    if (facts.frames) {
+    if (facts.boxes) {
       add('stack', <PanelButton id="stack" label={b.autoLayout} icon={<RowsIcon size={15} aria-hidden />} />)
-      pop('box', b.box, popup('box'), { icon: <FrameCornersIcon size={15} aria-hidden />, className: 'w-72 p-2.5' })
+      pop('box', b.box, popup('box'), { icon: <BoundingBoxIcon size={15} aria-hidden />, className: 'w-72 p-2.5' })
     }
     add('outline', <PanelButton id="outline" label={b.outline} />)
   }
 
   // Shapes and boxes together keep their colour and outline.
-  if (kind === 'mixed' && target.types.every((type) => type === 'graphic' || type === 'frame' || type === 'boolean')) {
+  if (kind === 'mixed' && target.types.every((type) => type === 'graphic' || type === 'box' || type === 'boolean')) {
     add('colour', <PanelButton id="colour" label={b.fill} face={<Dot colour="mixed" />} />)
     add('outline', <PanelButton id="outline" label={b.outline} />)
   }
@@ -368,7 +369,7 @@ export function useSelectionItems(target: Target, design: Design, brandId: strin
       pop('shape', b.shape, popup('shape'), { icon: <StarIcon size={15} aria-hidden />, className: 'w-72 p-2.5' })
     if (kind === 'box') {
       add('stack', <PanelButton id="stack" label={b.autoLayout} icon={<RowsIcon size={15} aria-hidden />} />)
-      pop('box', b.box, popup('box'), { icon: <FrameCornersIcon size={15} aria-hidden />, className: 'w-72 p-2.5' })
+      pop('box', b.box, popup('box'), { icon: <BoundingBoxIcon size={15} aria-hidden />, className: 'w-72 p-2.5' })
     }
   }
 

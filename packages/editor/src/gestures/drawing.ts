@@ -1,4 +1,4 @@
-// Drawing new layers with a tool: a shape or frame dragged out, a text box and an image box, and
+// Drawing new layers with a tool: a shape or box dragged out, a text box and an image box, and
 // the box being dragged as the overlay shows it.
 import { childrenOf, type Session } from '@dazbee/doc'
 import { canHold, type Design, type Point, type Rect } from '@dazbee/schema'
@@ -12,10 +12,20 @@ import { runQuietly } from '../run-quietly.ts'
 import type { EditorSelection } from '../selection.ts'
 import type { EditorTyping } from '../text/typing.ts'
 import type { EditorTools, PlacedAsset } from '../tools.ts'
-import { clickedBox, drawnBox, type DrawTool, imageIn, keepRatio, newDrawn, newImage, newText } from './draw-tools.ts'
+import {
+  clickedRect,
+  draggedRect,
+  drawsBox,
+  type DrawTool,
+  imageIn,
+  keepRatio,
+  newDrawn,
+  newImage,
+  newText,
+} from './draw-tools.ts'
 import { CLICK_SLOP } from './press.ts'
 
-/** A shape or frame being drawn, from the press until it ends: the new layer and every change the drag makes to it are one undo step. */
+/** A shape or box being drawn, from the press until it ends: the new layer and every change the drag makes to it are one undo step. */
 export interface ShapeDrag {
   kind: 'draw'
   tool: DrawTool
@@ -72,7 +82,7 @@ export interface EditorDrawing {
   /** The box a text or image box drag is drawing, as the overlay shows it; nothing for a shape. */
   parts(g: DrawingDrag): HTMLElement[]
   /**
-   * A press with a shape or frame tool: the new layer, in the group or frame gone into when it can
+   * A press with a shape tool or the Frame tool: the new layer, in the group or box gone into when it can
    * hold it, and a drag that sizes it, one undo step until it is released. Null when it can't be made.
    */
   pressShape(e: PointerEvent, shape: DrawTool, at: { frame: Frame; p: Point }): ShapeDrag | null
@@ -108,7 +118,7 @@ export function editorDrawing({
   drawOverlay,
 }: DrawingDeps): EditorDrawing {
   /**
-   * Where a box a tool drags out starts: in the group or frame double-clicked into if it can hold
+   * Where a box a tool drags out starts: in the group or box double-clicked into if it can hold
    * a layer of `type`, otherwise on the page, at the press as layers there see it.
    */
   function boxStart(at: { frame: Frame; p: Point }, type: 'text' | 'graphic') {
@@ -146,14 +156,14 @@ export function editorDrawing({
   }
 
   /**
-   * Starts drawing a shape (#44) or a frame where the pointer went down: inside the group, frame or
+   * Starts drawing a shape (#44) or a box where the pointer went down: inside the group, box or
    * boolean double-clicked into if the press is in it and it can hold it, otherwise on the page.
    * The new layer and every change the drag makes to it are one undo step.
    */
   function startDrawing(e: PointerEvent, shape: DrawTool, at: { frame: Frame; p: Point }): ShapeDrag | null {
     typing.stop()
     const now = session.design()
-    const parentId = parentFor(at.frame, shape === 'frame' ? 'frame' : 'graphic', now)
+    const parentId = parentFor(at.frame, drawsBox(shape) ? 'box' : 'graphic', now)
     const around = containersOf(at.frame, parentId, now)
     const from = localTo(at.p, around)
     const end = session.beginGesture()
@@ -178,7 +188,7 @@ export function editorDrawing({
       roots: [id],
       end,
     }
-    runQuietly(() => session.run('node.update', { ids: [id], patch: drawnBox(shape, from, from, false, false) }))
+    runQuietly(() => session.run('node.update', { ids: [id], patch: draggedRect(shape, from, from, false, false) }))
     return gesture
   }
   /** A press with the text tool (#47): a click makes text that grows as it is typed, a drag a box of that size. */
@@ -190,14 +200,14 @@ export function editorDrawing({
   /**
    * A press with the image tool once its image is picked: a click places the image at its own size
    * (at most half the format's), centred there; a drag places it covering the box dragged, which
-   * Shift keeps to the image's shape. In the group or frame double-clicked into if it can hold it.
+   * Shift keeps to the image's shape. In the group or box double-clicked into if it can hold it.
    */
   function startImageBox(e: PointerEvent, at: { frame: Frame; p: Point }, asset: PlacedAsset): ImageBoxDrag {
     typing.stop()
     canvas.setPointerCapture(e.pointerId)
     return { kind: 'imageBox', ...boxStart(at, 'graphic'), asset }
   }
-  /** Follows the pointer: a shape grows to it, Shift and Alt as `drawnBox` takes them; a box's corner goes to it, Shift keeping an image's shape. */
+  /** Follows the pointer: a shape grows to it, Shift and Alt as `draggedRect` takes them; a box's corner goes to it, Shift keeping an image's shape. */
   function drag(g: DrawingDrag, p: Point, shift: boolean, alt: boolean) {
     if (g.kind === 'draw') {
       drawTo(g, p, shift, alt)
@@ -210,7 +220,7 @@ export function editorDrawing({
   function drawTo(g: ShapeDrag, p: Point, shift: boolean, alt: boolean) {
     if (!g.moved && Math.hypot(p.x - g.from.x, p.y - g.from.y) * camera().zoom < CLICK_SLOP) return
     g.moved = true
-    runQuietly(() => session.run('node.update', { ids: [g.id], patch: drawnBox(g.tool, g.from, p, shift, alt) }))
+    runQuietly(() => session.run('node.update', { ids: [g.id], patch: draggedRect(g.tool, g.from, p, shift, alt) }))
   }
   /** Ends a drawing gesture: makes or finishes its layer, which is selected, and the select tool comes back. */
   function release(g: DrawingDrag) {
@@ -220,20 +230,20 @@ export function editorDrawing({
   }
   /**
    * A click draws the shape at its usual size; either way the new shape is selected and the select
-   * tool comes back. A frame dragged around layers beside it takes them in, in the same undo step.
+   * tool comes back. A box dragged around layers beside it takes them in, in the same undo step.
    */
   function finishDrawing(g: ShapeDrag) {
-    if (!g.moved) runQuietly(() => session.run('node.update', { ids: [g.id], patch: clickedBox(g.tool, g.from) }))
-    if (g.tool === 'frame' && g.moved) enclose(g.frame, g.id)
+    if (!g.moved) runQuietly(() => session.run('node.update', { ids: [g.id], patch: clickedRect(g.tool, g.from) }))
+    if (drawsBox(g.tool) && g.moved) enclose(g.frame, g.id)
     hug([g.id])
     g.end()
     selection.select([g.id], g.frame.key)
     tools.setTool('select')
   }
   /**
-   * Moves the layers beside a new frame that lie wholly inside it, as drawn in this frame, into it.
-   * Layers locked in place stay where they are, and so does everything in an auto layout frame,
-   * where the layout, not the drag, places the new frame.
+   * Moves the layers beside a new box that lie wholly inside it, as drawn in this frame, into it.
+   * Layers locked in place stay where they are, and so does everything in an auto layout box,
+   * where the layout, not the drag, places the new box.
    */
   function enclose(frame: Frame, id: string) {
     const now = session.design()
@@ -249,7 +259,7 @@ export function editorDrawing({
         shown.y >= box.y &&
         shown.x + shown.width <= box.x + box.width &&
         shown.y + shown.height <= box.y + box.height
-      return fits && canHold('frame', now.nodes[child]?.type ?? '') ? [child] : []
+      return fits && canHold('box', now.nodes[child]?.type ?? '') ? [child] : []
     })
     if (inside.length > 0) runQuietly(() => session.run('node.enclose', { id, ids: inside, scope: scope(frame) }))
   }

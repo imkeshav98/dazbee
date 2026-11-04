@@ -1,11 +1,24 @@
 // Preset shapes and live booleans (#44), with real pointer and keyboard input: draw every shape from
-// the dock, its menu and its keys, Shift-draw a square, combine two shapes from the inspector and by
-// shortcut, then enter the boolean, drag one shape inside it and see the boolean follow.
+// the dock, its menu and its keys, Shift-draw a square, draw a box with the menu's Box, combine two
+// shapes from the inspector and by shortcut, then enter the boolean, drag one shape inside it and see
+// the boolean follow.
 import type { DesignInput } from '@dazbee/schema'
 
 import { exportHashOf, screenPoint, writeOutput } from '../../support/editor.ts'
+import { openLayers } from '../../support/layers-panel.ts'
+import { SCREEN_SIZES } from '../../support/layout.ts'
 import { liveDesign } from '../../support/seed.ts'
-import { click, type Design, drag, openStage, press, read, selection } from '../../support/stage.ts'
+import {
+  click,
+  type Design,
+  drag,
+  fitSettled,
+  nextFrame,
+  openStage,
+  press,
+  read,
+  selection,
+} from '../../support/stage.ts'
 import { expect, type Page, test } from '../../support/test.ts'
 import { barMenu } from '../../support/top-bar.ts'
 
@@ -17,7 +30,7 @@ const design = (): DesignInput => {
 }
 
 type Placed = { x: number; y: number; width: number; height: number; rotation: number }
-const box = (d: Design, id: string): Placed => {
+const rectOf = (d: Design, id: string): Placed => {
   const p = { ...d.nodes[id]?.props, ...d.overrides['format:sq']?.[id] } as Partial<Placed>
   return { x: p.x ?? 0, y: p.y ?? 0, width: p.width ?? 0, height: p.height ?? 0, rotation: p.rotation ?? 0 }
 }
@@ -46,7 +59,7 @@ async function draw(
   expect(await selection(page)).toEqual([id])
   expect(await toolOf(page)).toBe('select')
   await pressed(page, 'select')
-  return { id, node: d.nodes[id] as Design['nodes'][string] & { name: string }, box: box(d, id) }
+  return { id, node: d.nodes[id] as Design['nodes'][string] & { name: string }, rect: rectOf(d, id) }
 }
 
 const pick = async (page: Page, shape: string) => {
@@ -61,25 +74,25 @@ test('every shape draws with real input: the dock, its menu, its keys, and Shift
   await page.locator('[role="toolbar"] [data-tool="shape"]').click()
   await pressed(page, 'shape')
   expect(await toolOf(page)).toBe('rect')
-  const rect = await draw(page, { x: 100, y: 820 }, { x: 220, y: 900 })
-  expect(rect.node).toMatchObject({
+  const rectangle = await draw(page, { x: 100, y: 820 }, { x: 220, y: 900 })
+  expect(rectangle.node).toMatchObject({
     type: 'graphic',
     parentId: 'p1',
     name: 'Rectangle',
     props: { shape: { kind: 'rect' } },
   })
-  expect(rect.box).toEqual({ x: 100, y: 820, width: 120, height: 80, rotation: 0 })
+  expect(rectangle.rect).toEqual({ x: 100, y: 820, width: 120, height: 80, rotation: 0 })
 
   // R, then a drag with Shift held part way: a square as wide as the longer side.
   await press(page, 'toolRect')
   const square = await draw(page, { x: 260, y: 820 }, { x: 350, y: 880 }, ['Shift'])
-  expect(square.box).toEqual({ x: 260, y: 820, width: 90, height: 90, rotation: 0 })
+  expect(square.rect).toEqual({ x: 260, y: 820, width: 90, height: 90, rotation: 0 })
 
   // O draws an ellipse, dragged up and to the left.
   await press(page, 'toolEllipse')
   const ellipse = await draw(page, { x: 500, y: 960 }, { x: 390, y: 820 })
   expect(ellipse.node.props).toMatchObject({ shape: { kind: 'ellipse' } })
-  expect(ellipse.box).toEqual({ x: 390, y: 820, width: 110, height: 140, rotation: 0 })
+  expect(ellipse.rect).toEqual({ x: 390, y: 820, width: 110, height: 140, rotation: 0 })
 
   // The menu picks a polygon by pointer, and a star by keyboard; the dock then shows the star.
   await pick(page, 'polygon')
@@ -100,11 +113,11 @@ test('every shape draws with real input: the dock, its menu, its keys, and Shift
   await press(page, 'toolLine')
   const line = await draw(page, { x: 860, y: 820 }, { x: 1000, y: 820 })
   expect(line.node.props).toMatchObject({ shape: { kind: 'line', start: 'none', end: 'none' } })
-  expect(line.box).toEqual({ x: 860, y: 820, width: 140, height: 0, rotation: 0 })
+  expect(line.rect).toEqual({ x: 860, y: 820, width: 140, height: 0, rotation: 0 })
   await press(page, 'toolArrow')
   const arrow = await draw(page, { x: 860, y: 880 }, { x: 1000, y: 1000 }, ['Shift'])
   expect(arrow.node.props).toMatchObject({ shape: { kind: 'line', end: 'arrow' } })
-  expect(arrow.box.rotation).toBe(45)
+  expect(arrow.rect.rotation).toBe(45)
 
   // A click without a drag draws the usual size, centred where it landed.
   await press(page, 'toolRect')
@@ -114,7 +127,7 @@ test('every shape draws with real input: the dock, its menu, its keys, and Shift
   expect(await selection(page)).toEqual([clicked])
   expect(await toolOf(page)).toBe('select')
   await pressed(page, 'select')
-  expect(box(await read(page), clicked)).toEqual({ x: 110, y: 950, width: 100, height: 100, rotation: 0 })
+  expect(rectOf(await read(page), clicked)).toEqual({ x: 110, y: 950, width: 100, height: 100, rotation: 0 })
 
   // The stage shows them all, the export draws them, and each drawing is one undo step.
   await page.keyboard.press('Escape')
@@ -147,6 +160,126 @@ test('Space presses a focused dock button as Enter does: More shapes opens its m
   expect(errors).toEqual([])
 })
 
+test('the shape menu holds Box after Rectangle and Ellipse, and Box draws a box that takes in what it is drawn around', async ({
+  browser,
+}) => {
+  const { page, errors } = await openStage(browser, design())
+
+  // Box is the third item, after Rectangle and Ellipse, with no key of its own.
+  await page.getByTestId('shape-menu').click()
+  const items = page.locator('[role="menu"] [data-shape]')
+  await expect(items).toHaveCount(7)
+  expect(await items.evaluateAll((els) => els.map((el) => el.getAttribute('data-shape')))).toEqual([
+    'rect',
+    'ellipse',
+    'box',
+    'polygon',
+    'star',
+    'line',
+    'arrow',
+  ])
+  await expect(items.nth(2)).toHaveText('Box')
+  await expect(items.nth(2)).toHaveAttribute('aria-checked', 'false')
+  await items.nth(2).click()
+  await expect(page.getByRole('menu')).toBeHidden()
+  await pressed(page, 'shape')
+  await expect(page.locator('[role="toolbar"] [data-tool="shape"]')).toHaveAttribute('data-shape', 'box')
+  await expect(page.locator('[role="toolbar"] [data-tool="frame"]')).toHaveAttribute('aria-pressed', 'false')
+  expect(await toolOf(page)).toBe('box')
+
+  // On an empty part of the page: a white box named Box, where it was dragged.
+  const lone = await draw(page, { x: 100, y: 820 }, { x: 300, y: 960 })
+  expect(lone.node).toMatchObject({
+    type: 'box',
+    parentId: 'p1',
+    name: 'Box',
+    props: { fills: [{ type: 'solid', color: '#FFFFFFFF' }] },
+  })
+  expect(lone.rect).toEqual({ x: 100, y: 820, width: 200, height: 140, rotation: 0 })
+
+  // The dock's shape button now draws a box; drawn around the dot, it takes the dot in without
+  // moving it, and undo and redo take the box and the move away and back as one step. Esc first
+  // lets the new box go, so the top bar over the page's top is gone; the drag starts below the dot.
+  await page.keyboard.press('Escape')
+  await page.locator('[role="toolbar"] [data-tool="shape"]').click()
+  expect(await toolOf(page)).toBe('box')
+  const dot = rectOf(await read(page), 'dot')
+  const around = await draw(page, { x: 980, y: 400 }, { x: 660, y: 80 })
+  let d = await read(page)
+  expect(d.nodes.dot?.parentId).toBe(around.id)
+  expect(rectOf(d, 'dot')).toEqual(dot)
+  await press(page, 'undo')
+  d = await read(page)
+  expect(d.nodes[around.id]).toBeUndefined()
+  expect(d.nodes.dot?.parentId).toBe('p1')
+  await press(page, 'redo')
+  d = await read(page)
+  expect(d.nodes[around.id]).toMatchObject({ type: 'box', name: 'Box' })
+  expect(d.nodes.dot?.parentId).toBe(around.id)
+  expect(rectOf(d, 'dot')).toEqual(dot)
+  expect(errors).toEqual([])
+})
+
+test("the shape menu's caret shows its tooltip on hover and keyboard focus, not when a pointer pick hands focus back", async ({
+  browser,
+}) => {
+  const { page, errors } = await openStage(browser, design())
+  const caret = page.getByTestId('shape-menu')
+  const tooltip = page.getByRole('tooltip')
+
+  // Picked with the pointer: the menu closes, focus goes back to the caret, and no tooltip shows.
+  await pick(page, 'ellipse')
+  await expect(caret).toBeFocused()
+  await nextFrame(page)
+  await expect(tooltip).toHaveCount(0)
+
+  // Reached with the keyboard, the caret and the button beside it show theirs.
+  await page.keyboard.press('Shift+Tab')
+  await expect(tooltip.filter({ hasText: 'Ellipse · O' })).toHaveCount(1)
+  await page.keyboard.press('Tab')
+  await expect(caret).toBeFocused()
+  await expect(tooltip.filter({ hasText: 'More shapes' })).toHaveCount(1)
+
+  // Picked with the keyboard, focus comes back as keyboard focus, so the tooltip shows.
+  await page.keyboard.press('Enter')
+  await expect(page.getByRole('menu')).toBeVisible()
+  await page.keyboard.press('ArrowDown')
+  await page.keyboard.press('Enter')
+  await expect(page.getByRole('menu')).toBeHidden()
+  await expect(caret).toBeFocused()
+  await expect(tooltip.filter({ hasText: 'More shapes' })).toHaveCount(1)
+
+  // Under the pointer, a button shows its tooltip.
+  await page.keyboard.press('Escape')
+  await page.locator('[role="toolbar"] [data-tool="text"]').hover()
+  await expect(tooltip.filter({ hasText: 'Text · T' })).toHaveCount(1)
+  expect(errors).toEqual([])
+})
+
+for (const [width, height] of SCREEN_SIZES) {
+  test(`the shape menu and a box drawn with it at ${width}×${height}`, { tag: '@evidence' }, async ({ browser }) => {
+    const { page, errors } = await openStage(browser, design())
+    await page.setViewportSize({ width, height })
+    await fitSettled(page)
+    await page.getByTestId('shape-menu').click()
+    await expect(page.locator('[role="menu"] [data-shape="box"]')).toBeVisible()
+    await nextFrame(page)
+    writeOutput(`shape-menu-${width}-open.png`, await page.screenshot({ animations: 'disabled' }))
+    await page.keyboard.press('Escape')
+    await pick(page, 'box')
+    await expect(page.locator('[role="toolbar"] [data-tool="shape"]')).toHaveAttribute('data-shape', 'box')
+    await nextFrame(page)
+    writeOutput(`shape-menu-${width}-box-picked.png`, await page.screenshot({ animations: 'disabled' }))
+    // A box drawn: the top bar's Box button and its row in the layers panel show the Box tool's icon.
+    const lone = await draw(page, { x: 100, y: 800 }, { x: 400, y: 1000 })
+    expect(lone.node).toMatchObject({ type: 'box' })
+    await openLayers(page)
+    await nextFrame(page)
+    writeOutput(`shape-menu-${width}-box-drawn.png`, await page.screenshot({ animations: 'disabled' }))
+    expect(errors).toEqual([])
+  })
+}
+
 test('two shapes combine into a live boolean that follows a shape dragged inside it', async ({ browser }) => {
   const { page, errors } = await openStage(browser, design())
   await press(page, 'toolRect')
@@ -170,7 +303,7 @@ test('two shapes combine into a live boolean that follows a shape dragged inside
     props: { op: 'subtract', fills: back.node.props.fills },
   })
   expect(kids(d, cut)).toEqual([back.id, front.id])
-  expect(box(d, cut)).toEqual({ x: 100, y: 820, width: 220, height: 160, rotation: 0 })
+  expect(rectOf(d, cut)).toEqual({ x: 100, y: 820, width: 220, height: 160, rotation: 0 })
   const subtracted = await exportHashOf(page)
   expect(subtracted).not.toBe(shapes)
   writeOutput('shapes-2-subtract.png', await page.screenshot({ animations: 'disabled' }))
@@ -197,9 +330,9 @@ test('two shapes combine into a live boolean that follows a shape dragged inside
   await drag(page, { x: 290, y: 950 }, { x: 390, y: 950 })
   await page.keyboard.up('Control')
   d = await read(page)
-  expect(box(d, front.id)).toMatchObject({ x: 300, y: 860 })
+  expect(rectOf(d, front.id)).toMatchObject({ x: 300, y: 860 })
   expect(d.nodes[front.id]?.parentId).toBe(union)
-  expect(box(d, union)).toEqual({ x: 100, y: 820, width: 320, height: 160, rotation: 0 })
+  expect(rectOf(d, union)).toEqual({ x: 100, y: 820, width: 320, height: 160, rotation: 0 })
   expect(await exportHashOf(page)).not.toBe(united)
   writeOutput('shapes-3-edited.png', await page.screenshot({ animations: 'disabled' }))
 

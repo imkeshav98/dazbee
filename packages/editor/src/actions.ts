@@ -1,4 +1,4 @@
-// What the shortcuts and the menus do to the selection and the view: delete, group, mask, frame,
+// What the shortcuts and the menus do to the selection and the view: delete, group, mask, box,
 // auto layout, combine, reorder, lock and hide, align and distribute, nudge, select all, zoom and
 // the tools.
 import { childrenOf, descendants, type Session } from '@dazbee/doc'
@@ -160,7 +160,7 @@ export function editorActions({
     now: Design,
   ) {
     const start = boxes.startBoxes(frame, ids)
-    // One layer lines up with what holds it: its group or frame, or the format.
+    // One layer lines up with what holds it: its group or box, or the format.
     const parent = now.nodes[ids[0] ?? '']?.parentId
     const holder = parent && now.nodes[parent] ? boxes.boxIn(frame, parent, now) : null
     const within = holder ?? { x: 0, y: 0, width: format.width, height: format.height }
@@ -296,7 +296,7 @@ export function editorActions({
     const far = action.endsWith('Far') ? NUDGE_FAR : NUDGE
     switch (action) {
       case 'deselect': {
-        // Out of a group or frame one level at a time: it gets selected, then the page.
+        // Out of a group or box one level at a time: it gets selected, then the page.
         const up = selection.entered()
         const parent = up ? drawn().nodes[up]?.parentId : undefined
         selection.enter(parent && drawn().nodes[parent] ? parent : null)
@@ -380,45 +380,45 @@ export function editorActions({
           selection.select([group], frame.key)
         break
       }
-      case 'frameSelection': {
-        let framed = ''
+      case 'boxSelection': {
+        let boxed = ''
         if (
           runQuietly(() => {
-            framed = session.run('node.frame', { ids, drawn: boxes.drawnInFlow(ids, frame.pageId) })
+            boxed = session.run('node.box', { ids, drawn: boxes.drawnInFlow(ids, frame.pageId) })
           })
         )
-          selection.select([framed], frame.key)
+          selection.select([boxed], frame.key)
         break
       }
       case 'autoLayout': {
-        // Selected frames: auto layout on, or off when every one has it already (#46).
+        // Selected boxes: auto layout on, or off when every one has it already (#46).
         if (ids.length === 0) return false
-        const frameIds = ids.filter((id) => nodes[id]?.type === 'frame')
-        if (frameIds.length > 0) {
-          const on = !frameIds.every((id) => {
+        const boxIds = ids.filter((id) => nodes[id]?.type === 'box')
+        if (boxIds.length > 0) {
+          const on = !boxIds.every((id) => {
             const node = nodes[id]
-            return node?.type === 'frame' && node.props.layout !== undefined
+            return node?.type === 'box' && node.props.layout !== undefined
           })
           runQuietly(() =>
             session.gesture(() => {
-              for (const id of frameIds) session.run('node.autoLayout', { id, on })
+              for (const id of boxIds) session.run('node.autoLayout', { id, on })
             }),
           )
           break
         }
-        // Layers none of which is a frame are wrapped in a frame that hugs them, its layout read off
+        // Layers none of which is a box are wrapped in a box that hugs them, its layout read off
         // where they are: layers already in an even row or column don't move.
-        let framed = ''
+        let boxed = ''
         if (
           runQuietly(() =>
             session.gesture(() => {
-              framed = session.run('node.frame', { ids, drawn: boxes.drawnInFlow(ids, frame.pageId) })
-              session.run('node.autoLayout', { id: framed, on: true })
-              session.run('node.update', { ids: [framed], patch: { sizing: { width: 'hug', height: 'hug' } } })
+              boxed = session.run('node.box', { ids, drawn: boxes.drawnInFlow(ids, frame.pageId) })
+              session.run('node.autoLayout', { id: boxed, on: true })
+              session.run('node.update', { ids: [boxed], patch: { sizing: { width: 'hug', height: 'hug' } } })
             }),
           )
         )
-          selection.select([framed], frame.key)
+          selection.select([boxed], frame.key)
         break
       }
       case 'booleanUnion':

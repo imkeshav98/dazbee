@@ -67,7 +67,7 @@ export interface BoxesDeps {
 export interface EditorBoxes {
   /** A layer's box in a frame, as layers inside its containers see it: auto layout's, or the base with the format's overrides. */
   boxIn(frame: Frame, id: string, from?: Design): Box | null
-  /** The groups and frames a layer is inside, outermost first, as boxes in a frame. */
+  /** The groups and boxes a layer is inside, outermost first, each as its position, size and turn in a frame. */
   containersOf(frame: Frame, parentId: string | undefined, from?: Design): Box[]
   /** A layer's box as it is drawn on the page in a frame, turned by its containers. */
   drawnBoxOf(frame: Frame, id: string, from?: Design): Box | null
@@ -93,13 +93,13 @@ export interface EditorBoxes {
   cropTarget(frame: Frame, id: string, from?: Design): CropTarget | null
   /** Where layers in a flow are drawn in every format of their page, for a command that wraps them; none in no flow. */
   drawnInFlow(ids: string[], pageId: string): Record<string, Record<string, Omit<Box, 'rotation'>>> | undefined
-  /** Where a new layer of a type that a tool makes in a frame goes: the group or frame gone into, or the page. */
+  /** Where a new layer of a type that a tool makes in a frame goes: the group or box gone into, or the page. */
   parentFor(frame: Frame, type: string, now: Design): string
   /** The layer locked in place that a press at a point lands on, the one a click there would select; null when it is not locked. */
   lockedAt(frame: Frame, p: Point): string | null
   /** What a press on a layer picks: a selected layer it is in, what is directly in the group gone into, or else the layer on the page that holds it. */
   target(hitId: string, frame: string): string
-  /** Whether a layer is inside the group or frame gone into, not the container itself. */
+  /** Whether a layer is inside the group or box gone into, not the container itself. */
   insideEntered(id: string): boolean
   /** A layer's box as it is drawn in a frame, in design pixels, without its turn; null when it has none. */
   drawnRect(frame: Frame, id: string): Rect | null
@@ -142,7 +142,7 @@ export function editorBoxes({ session, scenes, resources, selection, drawn, fram
   }
 
   /**
-   * Where a new layer of `type` that a tool makes in a frame goes: into the group, frame or boolean
+   * Where a new layer of `type` that a tool makes in a frame goes: into the group, box or boolean
    * double-clicked into if it can hold it, otherwise onto the frame's page.
    */
   function parentFor(frame: Frame, type: string, now: Design) {
@@ -150,7 +150,7 @@ export function editorBoxes({ session, scenes, resources, selection, drawn, fram
     const inside = entered ? now.nodes[entered] : undefined
     return entered && inside && canHold(inside.type, type) ? entered : frame.pageId
   }
-  /** The groups and frames a layer is inside, outermost first, as boxes in a frame. */
+  /** The groups and boxes a layer is inside, outermost first, each as its position, size and turn in a frame. */
   function containersOf(frame: Frame, parentId: string | undefined, from: Design = session.design()): Box[] {
     const boxes: Box[] = []
     for (const up of ancestorsOf(from, parentId ?? '')) {
@@ -195,7 +195,7 @@ export function editorBoxes({ session, scenes, resources, selection, drawn, fram
   }
   /**
    * The boxes a transform changes: each root and every layer under it, as they are now. A layer
-   * auto layout places inside a root is left out: its frame puts it where it goes.
+   * auto layout places inside a root is left out: its box puts it where it goes.
    */
   function startBoxes(frame: Frame, ids: string[]) {
     const now = session.design()
@@ -224,7 +224,7 @@ export function editorBoxes({ session, scenes, resources, selection, drawn, fram
 
   /**
    * What a drag in a frame can snap to besides the format: the layers on the page as drawn and,
-   * inside a group or frame, the layers beside the dragged ones that show there and the container
+   * inside a group or box, the layers beside the dragged ones that show there and the container
    * itself. Nothing inside a turned container snaps, since its lines don't run along the page.
    */
   function snapBoxes(frame: Frame, ids: string[], around: Box[]): Rect[] | null {
@@ -300,7 +300,7 @@ export function editorBoxes({ session, scenes, resources, selection, drawn, fram
     }
   }
   /**
-   * Where layers inside a frame that has auto layout in any format are drawn, in every format of
+   * Where layers inside a box that has auto layout in any format are drawn, in every format of
    * their page (shown or not), for a command that wraps them; none for layers in no flow.
    */
   function drawnInFlow(
@@ -311,8 +311,7 @@ export function editorBoxes({ session, scenes, resources, selection, drawn, fram
     const parentId = now.nodes[ids[0] ?? '']?.parentId ?? ''
     const parent = now.nodes[parentId]
     const inLayout =
-      parent?.type === 'frame' &&
-      Object.keys(now.formats).some((f) => mergedProps(now, formatScope(f), parentId).layout)
+      parent?.type === 'box' && Object.keys(now.formats).some((f) => mergedProps(now, formatScope(f), parentId).layout)
     if (!inLayout) return undefined
     const byFormat: Record<string, Record<string, Omit<Box, 'rotation'>>> = {}
     for (const formatId of Object.keys(now.formats)) {
@@ -349,7 +348,7 @@ export function editorBoxes({ session, scenes, resources, selection, drawn, fram
   }
   /**
    * What a press on a layer picks: a selected layer it is in, so the selection moves whole; inside
-   * the group or frame double-clicked into, what is directly in it; or else the layer on the page
+   * the group or box double-clicked into, what is directly in it; or else the layer on the page
    * that holds it, so a click on a group's child picks the group.
    */
   function target(hitId: string, frame: string) {
@@ -360,7 +359,7 @@ export function editorBoxes({ session, scenes, resources, selection, drawn, fram
     const at = entered ? chain.indexOf(entered) : -1
     return selected ?? (at > 0 ? chain[at - 1] : chain.at(-1)) ?? hitId
   }
-  /** Whether a layer is inside the entered group or frame, not the container itself. */
+  /** Whether a layer is inside the entered group or box, not the container itself. */
   function insideEntered(id: string) {
     return ancestorsOf(drawn(), drawn().nodes[id]?.parentId ?? '').some((up) => up === selection.entered())
   }
