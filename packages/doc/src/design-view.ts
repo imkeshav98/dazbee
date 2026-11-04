@@ -38,13 +38,13 @@ export function designView(doc: DesignDoc) {
   const rawOverrides = new Map<string, Map<string, Json>>()
   /** The validated design's layers. */
   const layers = new Map<string, Layer>()
-  /** Its override values by scope and layer, with defaults filled. */
+  /** The validated override values by scope and layer, with defaults filled. */
   const filled = new Map<string, Map<string, Json>>()
   /** One live record per scope in `filled`, handed out as `design.overrides[scope]`. */
   const scopeRecords = new Map<string, Record<string, Json>>()
   /** Each parent's children, back to front. */
   let children = new Map<string, string[]>()
-  /** Its meta, formats and pages; null until the first whole read. */
+  /** The validated meta, formats and pages; null until the first whole read. */
   let head: Head | null = null
   /** Whether the last whole read moved a layer from where the document puts it, or gave it an index. */
   let placesRepaired = false
