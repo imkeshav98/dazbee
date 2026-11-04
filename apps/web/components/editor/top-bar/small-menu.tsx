@@ -28,8 +28,8 @@ import { cn } from '@/lib/cn.ts'
 import { useLocale, useMessages } from '@/lib/i18n/client.tsx'
 import { dirOf, format } from '@/lib/i18n/index.ts'
 
-import { arrowAlong, useMenuFocus, useRovingTab } from './bar-popover.tsx'
-import { LayerActions, useScrollingMenu } from './layer-actions.tsx'
+import { arrowAlong, useMenuFocus, useRovingTab, useScrollingMenu } from './bar-popover.tsx'
+import { LayerActions } from './layer-actions.tsx'
 
 type Place = { left: number; top: number }
 type Box = { left: number; top: number; right: number; bottom: number }

@@ -7,7 +7,7 @@
 // A right-click on empty canvas offers to show the frame's hidden layers, when it has some.
 import { CaretRightIcon } from '@phosphor-icons/react'
 import * as Popover from '@radix-ui/react-popover'
-import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react'
+import { type ReactNode, useEffect, useState } from 'react'
 
 import { childrenOf, descendants } from '@dazbee/doc'
 import type { Editor, ShortcutAction } from '@dazbee/editor'
@@ -16,16 +16,14 @@ import { type Design, formatScope } from '@dazbee/schema'
 import { ALIGN, keyOf } from '@/components/editor/arrange-actions.ts'
 import { RotationField } from '@/components/editor/edit-panel/position-panel.tsx'
 import { set, shared, useTarget } from '@/components/editor/edit-panel/target.ts'
-import { useEditState, usePhone } from '@/components/editor/edit-store.ts'
+import { useEditState } from '@/components/editor/edit-store.ts'
 import { useSelection } from '@/components/editor/editor-hooks.ts'
 import { ICON_BUTTON, MENU, MENU_DIVIDER, MENU_ITEM, MENU_KEY } from '@/components/editor/styles.ts'
-import { useOverlayScroll } from '@/components/ui/overlay-scroll.ts'
-import { fadedEdges, useScrollEdges } from '@/components/ui/scroll-edges.ts'
 import { cn } from '@/lib/cn.ts'
 import { useLocale, useMessages } from '@/lib/i18n/client.tsx'
 import { dirOf, format } from '@/lib/i18n/index.ts'
 
-import { useMenuFocus } from './bar-popover.tsx'
+import { useMenuFocus, useScrollingMenu } from './bar-popover.tsx'
 
 /** The layers hidden in one frame, which a right-click on its empty canvas offers to show. */
 export interface HiddenLayers {
@@ -69,30 +67,6 @@ function masksOver(design: Design, ids: readonly string[]): string[] | null {
     masks.add(mask[0])
   }
   return [...masks]
-}
-
-/**
- * A menu that scrolls when it is longer than its room, and shows that it does: its overlay bar,
- * kept shown on a phone, and its cut edges faded. The ref goes on the scrolling element, and
- * `also` gets the element too.
- */
-export function useScrollingMenu(also?: (element: HTMLDivElement | null) => void) {
-  const phone = usePhone()
-  const area = useRef<HTMLDivElement | null>(null)
-  const bars = useOverlayScroll(area, { shown: phone })
-  const edges = useScrollEdges(area)
-  const ref = useCallback(
-    (element: HTMLDivElement | null) => {
-      also?.(element)
-      const off = bars(element)
-      return () => {
-        off()
-        also?.(null)
-      }
-    },
-    [bars, also],
-  )
-  return { ref, onScroll: edges.measure, className: fadedEdges(edges) }
 }
 
 /**

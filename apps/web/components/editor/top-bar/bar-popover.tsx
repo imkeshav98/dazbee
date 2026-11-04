@@ -4,9 +4,21 @@
 // one is open, so only one is open at a time.
 import { CaretDownIcon } from '@phosphor-icons/react'
 import * as Popover from '@radix-ui/react-popover'
-import { type FocusEvent, type KeyboardEvent, type ReactNode, type RefObject, useEffect, useRef, useState } from 'react'
+import {
+  type FocusEvent,
+  type KeyboardEvent,
+  type ReactNode,
+  type RefObject,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from 'react'
 
+import { usePhone } from '@/components/editor/edit-store.ts'
 import { BAR_BUTTON, POPOVER } from '@/components/editor/styles.ts'
+import { useOverlayScroll } from '@/components/ui/overlay-scroll.ts'
+import { fadedEdges, useScrollEdges } from '@/components/ui/scroll-edges.ts'
 import { cn } from '@/lib/cn.ts'
 
 const nowhere = () => document.activeElement === null || document.activeElement === document.body
@@ -87,6 +99,30 @@ export function useRovingTab(bar: HTMLElement | null) {
     const at = itemsOf(event.currentTarget).indexOf(event.target as HTMLElement)
     if (at >= 0) setCurrent(at)
   }
+}
+
+/**
+ * A menu that scrolls when it is longer than its room, and shows that it does: its overlay bar,
+ * kept shown on a phone, and its cut edges faded. The ref goes on the scrolling element, and
+ * `also` gets the element too.
+ */
+export function useScrollingMenu(also?: (element: HTMLDivElement | null) => void) {
+  const phone = usePhone()
+  const area = useRef<HTMLDivElement | null>(null)
+  const bars = useOverlayScroll(area, { shown: phone })
+  const edges = useScrollEdges(area)
+  const ref = useCallback(
+    (element: HTMLDivElement | null) => {
+      also?.(element)
+      const off = bars(element)
+      return () => {
+        off()
+        also?.(null)
+      }
+    },
+    [bars, also],
+  )
+  return { ref, onScroll: edges.measure, className: fadedEdges(edges) }
 }
 
 export function BarPopover({
