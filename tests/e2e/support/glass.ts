@@ -1,8 +1,8 @@
 // The glass as the web app serves it, read in the page: the glass utility's backdrop filter and the
 // glass tokens of the theme in use, as computed values. Checks on glass surfaces compare with these
 // rather than repeat the values, which the token unit test (apps/web/lib/tokens.test.ts) holds to
-// the decisions.
-import { type Browser, expect, type Locator, type Page } from '@playwright/test'
+// the decisions. And how a control on glass looks, under the pointer and pressed, in a tab of its own.
+import { type Browser, type BrowserContextOptions, expect, type Locator, type Page } from '@playwright/test'
 
 import { editorPath, setCookies } from './editor.ts'
 
@@ -16,12 +16,30 @@ export interface ServedGlass {
   pressed: string
   /** The sunken track a segmented choice sits in. */
   well: string
+  /** Muted text in the well. */
+  wellMuted: string
   /** The chosen segment's fill on the well. */
   chip: string
   accentText: string
+  /** The pink tint of a chosen item, such as a toggle that is on or a tag. */
+  accentSoft: string
   danger: string
+  /** The solid red of a button that confirms a delete, at rest and under the pointer, and its words. */
+  dangerSolid: string
+  dangerSolidHover: string
+  onAccent: string
   /** What a glass dialog lays over the page behind it. */
   backdrop: string
+}
+
+/** How an element looks, as computed: its glass, fill, layered image, text colour, outline and border. */
+export interface Look {
+  filter: string
+  fill: string
+  image: string
+  colour: string
+  outline: string
+  border: string
 }
 
 export const THEMES = ['dark', 'light'] as const
@@ -45,17 +63,22 @@ export const servedGlass = (page: Page): Promise<ServedGlass> =>
       hover: colour('--glass-hover'),
       pressed: colour('--glass-pressed'),
       well: colour('--glass-well'),
+      wellMuted: colour('--glass-well-muted'),
       chip: colour('--glass-chip'),
       accentText: colour('--glass-accent-text'),
+      accentSoft: colour('--accent-soft'),
       danger: colour('--glass-danger'),
+      dangerSolid: colour('--danger-solid'),
+      dangerSolidHover: colour('--danger-solid-hover'),
+      onAccent: colour('--on-accent'),
       backdrop: colour('--glass-backdrop'),
     }
     probe.remove()
     return glass
   })
 
-/** How an element looks, as computed: its glass, fill, layered image, text colour, outline and border. */
-export const look = (el: Locator) =>
+/** How an element looks, as computed. */
+export const look = (el: Locator): Promise<Look> =>
   el.evaluate((e) => {
     const s = getComputedStyle(e)
     return {
@@ -68,14 +91,21 @@ export const look = (el: Locator) =>
     }
   })
 
-/** Opens a design in a tab of its own in a theme, and gives the tab, its errors and its glass. */
+/** A tint laid over a control's own fill, as its computed background image. */
+export const laid = (tint: string) => `linear-gradient(${tint}, ${tint})`
+
+/**
+ * Opens a design in a tab of its own in a theme, and gives the tab, its errors and its glass; a tab
+ * with `hasTouch` takes touches.
+ */
 export async function openIn(
   browser: Browser,
   designId: string,
   theme: (typeof THEMES)[number],
   viewport = { width: 1440, height: 900 },
+  options: BrowserContextOptions = {},
 ) {
-  const context = await browser.newContext({ viewport })
+  const context = await browser.newContext({ ...options, viewport })
   const page = await context.newPage()
   const errors: string[] = []
   page.on('pageerror', (error) => errors.push(error.message))
@@ -87,8 +117,22 @@ export async function openIn(
 
 /** Holds the mouse down on a control until its fill is the one expected, then lets go: a click. */
 export async function pressedFill(page: Page, control: Locator, expected: string) {
+  await pressed(page, control, { fill: expected })
+}
+
+/**
+ * Holds the mouse down on a control until it, or the row it sits in (`on`), looks as expected, then
+ * lets go: a click.
+ */
+export async function pressed(page: Page, control: Locator, expected: Partial<Look>, on = control) {
   await control.hover()
   await page.mouse.down()
-  await expect.poll(async () => (await look(control)).fill).toBe(expected)
+  await expect.poll(async () => look(on)).toMatchObject(expected)
   await page.mouse.up()
+}
+
+/** Moves the pointer onto a control and waits until it looks as expected. */
+export async function hovered(control: Locator, expected: Partial<Look>) {
+  await control.hover()
+  await expect.poll(async () => look(control)).toMatchObject(expected)
 }

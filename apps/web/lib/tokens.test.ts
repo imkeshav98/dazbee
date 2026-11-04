@@ -104,6 +104,15 @@ describe.each(THEMES)('%s theme', (_, selector) => {
       expect(contrast(t['on-accent'] ?? '', t[button] ?? '')).toBeGreaterThanOrEqual(4.5)
     }
   })
+
+  it.each(['danger-solid', 'danger-solid-hover'])(
+    'text on the red button that confirms a delete, %s, is at least 4.5:1',
+    (button) => {
+      const fill = t[button]
+      if (!fill) throw new Error(`missing token ${button}`)
+      expect(contrast(t['on-accent'] ?? '', fill)).toBeGreaterThanOrEqual(4.5)
+    },
+  )
 })
 
 describe.each(THEMES)('%s glass', (_, selector) => {
@@ -142,6 +151,14 @@ describe.each(THEMES)('%s glass', (_, selector) => {
     '%s on glass over a %s ad is at least 4.5:1',
     (text, ad) => {
       expect(readsOver(text, glassOver(ADS[ad as keyof typeof ADS]))).toBeGreaterThanOrEqual(4.5)
+    },
+  )
+
+  it.each(COLOURED_TEXT_ADS)(
+    'a pink icon on the pressed tint, as an open glass button shows it, over a %s ad is at least 3:1',
+    (ad) => {
+      const pressed = over(tint('glass-pressed'), glassOver(ADS[ad]))
+      expect(readsOver('glass-accent-text', pressed)).toBeGreaterThanOrEqual(3)
     },
   )
 

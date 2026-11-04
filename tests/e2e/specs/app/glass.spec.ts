@@ -1,13 +1,13 @@
 // Glass in Chromium, in dark and light: every floating surface is the one glass the app serves; a
 // row on it is lit by a see-through tint under the pointer and while pressed, and reads its muted
-// text in the text colour while lit; an open glass button keeps its glass; segmented choices sit in
-// a well; coloured text and dialogs take their glass shades. And, for the PR's evidence, glass over a
+// text in the text colour while lit; an open glass button keeps its glass, its icon pink; segmented
+// choices sit in a well; coloured text and dialogs take their glass shades, and keys are keycaps. And, for the PR's evidence, glass over a
 // bright ad and a white one at desktop, tablet and phone sizes. The bright ad has a white and a black
 // block on its yellow, and a pink circle, so each picture shows the glass over all four.
 import type { DesignInput } from '@dazbee/schema'
 
 import { shoot, writeOutput } from '../../support/editor.ts'
-import { look, openIn, pressedFill, THEMES } from '../../support/glass.ts'
+import { hovered, laid, look, openIn, pressedFill, THEMES } from '../../support/glass.ts'
 import { SCREEN_SIZES } from '../../support/layout.ts'
 import { liveDesign, seed } from '../../support/seed.ts'
 import { drawn, fitSettled, nextFrame, selectLayers } from '../../support/stage.ts'
@@ -128,7 +128,7 @@ test('floating chrome is the glass the app serves, with nothing painted over its
   }
 })
 
-test('the Pages button keeps its glass while open, lit by the pressed tint, and the current page reads in the text colour', async ({
+test('the Pages button keeps its glass while open, lit by the pressed tint, its icon pink and its words and the current page in the text colour', async ({
   browser,
 }) => {
   const designId = await seed(liveDesign())
@@ -139,10 +139,8 @@ test('the Pages button keeps its glass while open, lit by the pressed tint, and 
     const card = await pagesPanel(page)
     await page.mouse.move(2, 2)
     await expect.poll(async () => (await look(button)).colour).toBe(glass.text)
-    expect(await look(button)).toMatchObject({
-      fill: glass.fill,
-      image: `linear-gradient(${glass.pressed}, ${glass.pressed})`,
-    })
+    expect(await look(button)).toMatchObject({ fill: glass.fill, image: laid(glass.pressed) })
+    expect((await look(button.locator('svg'))).colour).toBe(glass.accentText)
     const current = card.locator('[data-page][aria-current="page"]')
     expect((await look(current.getByText('1 size'))).colour).toBe(glass.text)
     expect(errors).toEqual([])
@@ -201,6 +199,26 @@ test('dock and rail buttons and a layer row take the pressed tint while pressed'
   }
 })
 
+test('an open rail button keeps the rail’s glass, lit by the pressed tint, its icon in the glass pink', async ({
+  browser,
+}) => {
+  const designId = await seed(liveDesign())
+  for (const theme of THEMES) {
+    const { page, errors, glass } = await openIn(browser, designId, theme)
+    for (const name of ['Layers', 'AI']) {
+      const button = page.getByRole('button', { name, exact: true })
+      await button.click()
+      await expect(button).toHaveAttribute('aria-expanded', 'true')
+      await expect
+        .poll(async () => (await look(page.getByTestId('rail-blob').locator('span'))).fill)
+        .toBe(glass.pressed)
+      expect((await look(button)).colour).toBe(glass.accentText)
+    }
+    expect(errors).toEqual([])
+    await page.context().close()
+  }
+})
+
 test('coloured text on glass takes its glass shade: the AI flyout heading and a menu’s Delete', async ({ browser }) => {
   const designId = await seed(liveDesign())
   for (const theme of THEMES) {
@@ -229,7 +247,7 @@ test('the Position panel’s actions are unfilled with no outline, lit by the ho
   }
 })
 
-test('segmented choices on glass sit in a well, the chosen one on a chip in the text colour; line-up cells take the hover tint', async ({
+test('segmented choices on glass sit in a well, the chosen one on a chip in the text colour, the others lit by the tints; line-up cells take the hover tint', async ({
   browser,
 }) => {
   const designId = await seed(brightAd())
@@ -260,12 +278,22 @@ test('segmented choices on glass sit in a well, the chosen one on a chip in the 
       expect((await look(choices)).fill).toBe(glass.well)
       expect(await look(choices.getByRole('radio', { checked: true }))).toMatchObject(chosen)
     }
+    // Another choice is lit by the tints under the pointer and while pressed; once chosen, its chip
+    // stays under the pointer.
+    const choice = exports.locator('[data-type="pdf"]')
+    await expect(choice).toHaveAttribute('aria-checked', 'false')
+    await hovered(choice, { fill: glass.hover, colour: glass.text })
+    await pressedFill(page, choice, glass.pressed)
+    await expect(choice).toHaveAttribute('aria-checked', 'true')
+    await hovered(choice, chosen)
     expect(errors).toEqual([])
     await page.context().close()
   }
 })
 
-test('a glass dialog dims the page behind it with its theme’s backdrop', async ({ browser }) => {
+test('a glass dialog dims the page behind it with its theme’s backdrop; the shortcuts’ keys are tinted keycaps with no outline', async ({
+  browser,
+}) => {
   const designId = await seed(liveDesign())
   for (const theme of THEMES) {
     const { page, errors, glass } = await openIn(browser, designId, theme)
@@ -273,6 +301,11 @@ test('a glass dialog dims the page behind it with its theme’s backdrop', async
     const dialog = page.getByTestId('shortcuts')
     await expect(dialog).toBeVisible()
     expect(await dialog.evaluate((el) => getComputedStyle(el, '::backdrop').backgroundColor)).toBe(glass.backdrop)
+    expect(await look(dialog.locator('kbd').first())).toMatchObject({
+      fill: glass.well,
+      colour: glass.wellMuted,
+      border: '0px',
+    })
     expect(errors).toEqual([])
     await page.context().close()
   }
