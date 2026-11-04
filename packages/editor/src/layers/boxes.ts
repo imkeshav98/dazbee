@@ -15,7 +15,7 @@ import {
   type Rect,
 } from '@dazbee/schema'
 
-import { type Frame, scope } from '../canvas/grid.ts'
+import { type Frame, scope } from '../canvas/frames.ts'
 import { hitTest } from '../canvas/hit-test.ts'
 import { findLayer, type FrameScenes } from '../canvas/scenes.ts'
 import { coverCrop, imageRect, type Size } from '../gestures/crop.ts'

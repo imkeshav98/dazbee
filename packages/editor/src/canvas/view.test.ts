@@ -4,7 +4,7 @@ import type { CanvasKit, SkPicture } from '@dazbee/canvaskit'
 import type { Design } from '@dazbee/schema'
 
 import { fit } from './camera.ts'
-import { frameGrid } from './grid.ts'
+import { frameGrid } from './frames.ts'
 import { design } from './test-design.ts'
 import { editorView, type ViewDeps } from './view.ts'
 

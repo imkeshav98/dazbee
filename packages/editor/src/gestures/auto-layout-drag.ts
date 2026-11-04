@@ -4,7 +4,7 @@ import { childrenOf, type Session } from '@dazbee/doc'
 import { canHold, type Design, type Point } from '@dazbee/schema'
 
 import type { Camera } from '../canvas/camera.ts'
-import { type Frame, frameGrid, scope } from '../canvas/grid.ts'
+import { type Frame, frameGrid, scope } from '../canvas/frames.ts'
 import { type AutoLayoutOf, flowSiblings, inFlow, propIn, rowIn } from '../layers/auto-layout.ts'
 import type { EditorBoxes } from '../layers/boxes.ts'
 import { type Box, drawnFrom, localTo, pageFrom, undrawn } from '../layers/transform.ts'

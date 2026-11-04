@@ -5,7 +5,7 @@ import { loadDesign, openSession, type Session } from '@dazbee/doc'
 import { type MeasureText, render, type Resources } from '@dazbee/renderer'
 import { type DesignInput, parseDesign } from '@dazbee/schema'
 
-import type { Frame } from '../canvas/grid.ts'
+import type { Frame } from '../canvas/frames.ts'
 import type { Size } from '../gestures/crop.ts'
 import type { EditorSelection } from '../selection.ts'
 import { editorBoxes } from './boxes.ts'

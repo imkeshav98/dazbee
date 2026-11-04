@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { render } from '@dazbee/renderer'
 import type { DesignInput, Point } from '@dazbee/schema'
 
-import type { Frame } from '../canvas/grid.ts'
+import type { Frame } from '../canvas/frames.ts'
 import { hitTest } from '../canvas/hit-test.ts'
 import { measure, sessionOf, testBoxes } from '../layers/test-boxes.ts'
 import { editorSelection } from '../selection.ts'

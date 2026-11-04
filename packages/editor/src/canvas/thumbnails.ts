@@ -7,7 +7,7 @@ import type { Design } from '@dazbee/schema'
 import { boundsOf } from '../layers/transform.ts'
 import type { EditorResources } from '../resources.ts'
 import type { EditorSelection } from '../selection.ts'
-import { type Frame, frameKey } from './grid.ts'
+import { type Frame, frameKey } from './frames.ts'
 import { findLayer, type FrameScenes } from './scenes.ts'
 
 export interface ThumbnailsDeps {

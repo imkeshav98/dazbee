@@ -2,7 +2,7 @@
 // is world × zoom + (x, y); world units are design pixels.
 import type { Point, Rect } from '@dazbee/schema'
 
-import { intersects } from './grid.ts'
+import { intersects } from './frames.ts'
 
 export interface Camera {
   x: number

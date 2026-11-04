@@ -5,7 +5,7 @@ import { render } from '@dazbee/renderer'
 import type { DesignInput } from '@dazbee/schema'
 
 import { type ActionsDeps, editorActions } from './actions.ts'
-import { type Frame, frameGrid } from './canvas/grid.ts'
+import { type Frame, frameGrid } from './canvas/frames.ts'
 import { editorAutoLayoutDrag } from './gestures/auto-layout-drag.ts'
 import { editorTransformDrag } from './gestures/transform-drag.ts'
 import { hug } from './layers/hug.ts'

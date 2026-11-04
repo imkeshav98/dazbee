@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { mergedProps } from '@dazbee/doc'
 import type { DesignInput } from '@dazbee/schema'
 
-import type { Frame } from './canvas/grid.ts'
+import type { Frame } from './canvas/frames.ts'
 import { editorLayerEdits, type LayerEditsDeps } from './layer-edits.ts'
 import { sessionOf } from './layers/test-boxes.ts'
 import { editorSelection } from './selection.ts'

@@ -17,7 +17,7 @@ import {
   type Viewport,
   zoomAt,
 } from './camera.ts'
-import { type Frame, frameAt, frameGrid, frameKey } from './grid.ts'
+import { type Frame, frameAt, frameGrid, frameKey } from './frames.ts'
 import { px } from './rulers.ts'
 
 /** A point on the design: a frame, as `<pageId>/<formatId>`, and a point in it in design pixels. */

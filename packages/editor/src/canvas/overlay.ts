@@ -17,7 +17,7 @@ import type { EditorPlace } from '../place.ts'
 import type { EditorSelection } from '../selection.ts'
 import type { EditorTyping } from '../text/typing.ts'
 import { toScreen } from './camera.ts'
-import type { Frame } from './grid.ts'
+import type { Frame } from './frames.ts'
 import { px, rulerParts } from './rulers.ts'
 import type { EditorView } from './view.ts'
 

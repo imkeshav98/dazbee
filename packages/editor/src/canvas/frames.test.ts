@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { COLUMN_GAP, frameAt, frameGrid, ROW_GAP } from './grid.ts'
+import { COLUMN_GAP, frameAt, frameGrid, ROW_GAP } from './frames.ts'
 import { design } from './test-design.ts'
 
 describe('frameGrid', () => {

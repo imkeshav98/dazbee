@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import type { SceneLayer } from '@dazbee/renderer'
 
 import type { Camera } from '../canvas/camera.ts'
-import type { Frame } from '../canvas/grid.ts'
+import type { Frame } from '../canvas/frames.ts'
 import { design } from '../canvas/test-design.ts'
 import { editorSelection } from '../selection.ts'
 import type { Tool } from '../tools.ts'

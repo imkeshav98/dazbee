@@ -2,7 +2,7 @@
 // the pointer, with the rules that keep them in step and the listeners that follow them.
 import type { Design } from '@dazbee/schema'
 
-import type { Frame } from './canvas/grid.ts'
+import type { Frame } from './canvas/frames.ts'
 import type { AnchorRef } from './gestures/path.ts'
 
 /** A layer as one frame shows it: selection, dragging and typing all happen in one frame. */

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { fit, framesInView, toScreen, toWorld, visibleRect, zoomAt } from './camera.ts'
-import { COLUMN_GAP, frameGrid, intersects } from './grid.ts'
+import { COLUMN_GAP, frameGrid, intersects } from './frames.ts'
 import { design } from './test-design.ts'
 
 describe('zoomAt', () => {

@@ -4,7 +4,7 @@ import { childrenOf, descendants, mergedProps, type Session } from '@dazbee/doc'
 import type { ScaledText } from '@dazbee/renderer'
 import type { Design, Layer } from '@dazbee/schema'
 
-import { type Frame, scope } from '../canvas/grid.ts'
+import { type Frame, scope } from '../canvas/frames.ts'
 import { runQuietly } from '../run-quietly.ts'
 import { inFlow, layoutIn, propIn } from './auto-layout.ts'
 import { type Box, carry, type Handle, isCorner, keptOnScreen, scaleWithin } from './transform.ts'

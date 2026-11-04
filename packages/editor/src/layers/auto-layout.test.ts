@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import { type Design, parseDesign } from '@dazbee/schema'
 
-import { type Frame, frameGrid } from '../canvas/grid.ts'
+import { type Frame, frameGrid } from '../canvas/frames.ts'
 import { flowSiblings, inFlow, laidOut, layoutIn, placedInside, propIn, rowIn } from './auto-layout.ts'
 
 const box = { x: 0, y: 0, width: 100, height: 100 }

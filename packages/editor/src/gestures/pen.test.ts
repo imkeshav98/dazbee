@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { loadDesign, openSession } from '@dazbee/doc'
 import { type DesignInput, parseDesign } from '@dazbee/schema'
 
-import type { Frame } from '../canvas/grid.ts'
+import type { Frame } from '../canvas/frames.ts'
 import { testBoxes } from '../layers/test-boxes.ts'
 import { editorSelection } from '../selection.ts'
 import { editorPen, type PenDeps } from './pen.ts'

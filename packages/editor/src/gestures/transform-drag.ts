@@ -5,7 +5,7 @@ import { type ScaledText, scaleText, smallestSize } from '@dazbee/renderer'
 import type { Point, Rect } from '@dazbee/schema'
 
 import { type Camera, toScreen, toWorld } from '../canvas/camera.ts'
-import { type Frame, frameAt, intersects, scope } from '../canvas/grid.ts'
+import { type Frame, frameAt, intersects, scope } from '../canvas/frames.ts'
 import { px } from '../canvas/rulers.ts'
 import type { FrameScenes } from '../canvas/scenes.ts'
 import { inFlow } from '../layers/auto-layout.ts'

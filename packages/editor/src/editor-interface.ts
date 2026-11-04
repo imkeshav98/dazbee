@@ -15,7 +15,7 @@ import type {
 import type { Skipped } from '@dazbee/svg'
 
 import type { Camera, Insets, Viewport } from './canvas/camera.ts'
-import type { Frame } from './canvas/grid.ts'
+import type { Frame } from './canvas/frames.ts'
 import type { Spot } from './canvas/view.ts'
 import type { ResourceSources } from './resources.ts'
 import type { ShortcutAction } from './shortcuts.ts'

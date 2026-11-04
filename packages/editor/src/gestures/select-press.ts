@@ -5,7 +5,7 @@ import type { SceneLayer } from '@dazbee/renderer'
 import type { Point } from '@dazbee/schema'
 
 import { toWorld } from '../canvas/camera.ts'
-import { type Frame, frameAt } from '../canvas/grid.ts'
+import { type Frame, frameAt } from '../canvas/frames.ts'
 import type { EditorView } from '../canvas/view.ts'
 import type { EditorBoxes } from '../layers/boxes.ts'
 import { localTo } from '../layers/transform.ts'

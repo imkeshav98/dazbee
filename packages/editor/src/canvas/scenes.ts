@@ -20,7 +20,7 @@ import {
 import type { Design } from '@dazbee/schema'
 
 import type { EditorResources } from '../resources.ts'
-import { type Frame, scope } from './grid.ts'
+import { type Frame, scope } from './frames.ts'
 
 export interface ScenesDeps {
   ck: CanvasKit

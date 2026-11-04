@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import type { Design } from '@dazbee/schema'
 
-import type { Frame } from './canvas/grid.ts'
+import type { Frame } from './canvas/frames.ts'
 import { editorSelection, isPath } from './selection.ts'
 
 const graphic = (kind: string, parentId?: string) => ({

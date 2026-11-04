@@ -14,7 +14,7 @@ import type { Skipped } from '@dazbee/svg'
 
 import { editorActions } from './actions.ts'
 import { editorBrandKit } from './brand-kit.ts'
-import { frameGrid, frameKey } from './canvas/grid.ts'
+import { frameGrid, frameKey } from './canvas/frames.ts'
 import { editorOverlay } from './canvas/overlay.ts'
 import { frameScenes } from './canvas/scenes.ts'
 import { thumbnailCache } from './canvas/thumbnails.ts'

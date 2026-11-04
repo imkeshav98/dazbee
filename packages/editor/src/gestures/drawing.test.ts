@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import type { DesignInput } from '@dazbee/schema'
 
-import { type Frame, frameGrid } from '../canvas/grid.ts'
+import { type Frame, frameGrid } from '../canvas/frames.ts'
 import { hug } from '../layers/hug.ts'
 import { sessionOf, testBoxes } from '../layers/test-boxes.ts'
 import { editorSelection } from '../selection.ts'

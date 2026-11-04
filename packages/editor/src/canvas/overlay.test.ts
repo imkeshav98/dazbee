@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Gesture } from '../gestures/pointer.ts'
 import type { Box } from '../layers/transform.ts'
 import type { Picked } from '../selection.ts'
-import type { Frame } from './grid.ts'
+import type { Frame } from './frames.ts'
 import { editorOverlay, type OverlayDeps } from './overlay.ts'
 import { design } from './test-design.ts'
 

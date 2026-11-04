@@ -14,7 +14,7 @@ import {
 import { type Skipped, SVG_TYPE, SvgError, svgMarkup, svgToLayers } from '@dazbee/svg'
 
 import type { EditorActions } from './actions.ts'
-import { frameKey, scope } from './canvas/grid.ts'
+import { frameKey, scope } from './canvas/frames.ts'
 import { hitTest } from './canvas/hit-test.ts'
 import type { FrameScenes } from './canvas/scenes.ts'
 import type { EditorView, Spot } from './canvas/view.ts'

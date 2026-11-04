@@ -3,7 +3,7 @@
 import { ancestorsOf, childrenOf, mergedProps } from '@dazbee/doc'
 import type { Design, Layer } from '@dazbee/schema'
 
-import { type Frame, scope } from '../canvas/grid.ts'
+import { type Frame, scope } from '../canvas/frames.ts'
 
 /** A box's auto layout, as the schema has it. */
 export type AutoLayoutOf = NonNullable<Extract<Layer, { type: 'box' }>['props']['layout']>

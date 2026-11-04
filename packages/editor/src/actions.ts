@@ -4,7 +4,7 @@
 import { childrenOf, descendants, type Session } from '@dazbee/doc'
 import { type Design, formatScope, LOCK_FLAGS, type Rect } from '@dazbee/schema'
 
-import { type Frame, frameKey, scope } from './canvas/grid.ts'
+import { type Frame, frameKey, scope } from './canvas/frames.ts'
 import type { FrameScenes } from './canvas/scenes.ts'
 import type { EditorView } from './canvas/view.ts'
 import type { EditorAutoLayoutDrag } from './gestures/auto-layout-drag.ts'

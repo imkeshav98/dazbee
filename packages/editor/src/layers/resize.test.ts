@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { mergedProps } from '@dazbee/doc'
 import type { DesignInput } from '@dazbee/schema'
 
-import { type Frame, frameGrid } from '../canvas/grid.ts'
+import { type Frame, frameGrid } from '../canvas/frames.ts'
 import { resizedBoxes, scalingTexts, switchSizing } from './resize.ts'
 import { sessionOf } from './test-boxes.ts'
 import type { Box } from './transform.ts'

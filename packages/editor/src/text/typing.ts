@@ -6,7 +6,7 @@ import { anchorOffset, type DesignDoc, mergedProps, type Session, type TextAncho
 import { caretAt, caretPosition, selectionBoxes } from '@dazbee/renderer'
 import { formatScope, type Point, type Rect, type TextStyle } from '@dazbee/schema'
 
-import type { Frame } from '../canvas/grid.ts'
+import type { Frame } from '../canvas/frames.ts'
 import { findLayer, type FrameScenes } from '../canvas/scenes.ts'
 import type { EditorResources } from '../resources.ts'
 import { runQuietly } from '../run-quietly.ts'

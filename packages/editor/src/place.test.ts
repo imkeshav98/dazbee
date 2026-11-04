@@ -5,7 +5,7 @@ import { render } from '@dazbee/renderer'
 import { loadCanvasKit } from '@dazbee/renderer/node'
 import { type DesignInput, LAYER_CLIPBOARD_TYPE } from '@dazbee/schema'
 
-import { type Frame, frameAt, frameGrid } from './canvas/grid.ts'
+import { type Frame, frameAt, frameGrid } from './canvas/frames.ts'
 import { measure, sessionOf, testBoxes } from './layers/test-boxes.ts'
 import { editorPlace, type PlaceDeps } from './place.ts'
 import { editorSelection } from './selection.ts'

@@ -5,7 +5,7 @@ import { descendants, mergedProps, type Session } from '@dazbee/doc'
 import { type BindingTarget, boundFillIndex, formatScope, isContainer, LOCK_FLAGS } from '@dazbee/schema'
 
 import type { EditorActions } from './actions.ts'
-import { scope } from './canvas/grid.ts'
+import { scope } from './canvas/frames.ts'
 import type { EditorView } from './canvas/view.ts'
 import { hug as hugIn } from './layers/hug.ts'
 import { round } from './layers/transform.ts'

@@ -5,7 +5,7 @@ import { isContainer, type Point } from '@dazbee/schema'
 
 import { type Camera, toWorld } from '../canvas/camera.ts'
 import { resizeCursor, ROTATE_CURSOR } from '../canvas/cursors.ts'
-import type { Frame } from '../canvas/grid.ts'
+import type { Frame } from '../canvas/frames.ts'
 import { hitTest } from '../canvas/hit-test.ts'
 import type { FrameScenes } from '../canvas/scenes.ts'
 import type { EditorView } from '../canvas/view.ts'

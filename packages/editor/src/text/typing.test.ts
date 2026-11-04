@@ -5,7 +5,7 @@ import { loadDesign, openSession } from '@dazbee/doc'
 import type { Scene } from '@dazbee/renderer'
 import { type DesignInput, parseDesign } from '@dazbee/schema'
 
-import type { Frame } from '../canvas/grid.ts'
+import type { Frame } from '../canvas/frames.ts'
 import type { RunStyle } from './text-edit.ts'
 import { editorTyping, type TypingDeps } from './typing.ts'
 

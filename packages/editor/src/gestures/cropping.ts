@@ -4,7 +4,7 @@ import type { Session } from '@dazbee/doc'
 import type { Point } from '@dazbee/schema'
 
 import { type Camera, toScreen, toWorld } from '../canvas/camera.ts'
-import { type Frame, scope } from '../canvas/grid.ts'
+import { type Frame, scope } from '../canvas/frames.ts'
 import type { ThumbnailCache } from '../canvas/thumbnails.ts'
 import type { CropTarget, EditorBoxes } from '../layers/boxes.ts'
 import { type Box, drawnFrom, localTo, pageFrom, round } from '../layers/transform.ts'
