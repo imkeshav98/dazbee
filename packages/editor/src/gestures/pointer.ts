@@ -300,8 +300,11 @@ export function editorPointer({
         drawOverlay()
         return
       }
-      gesture = selectPress.press(e, screen, at, deepest)
-      if (gesture) drawOverlay()
+      // A press that starts no drag leaves the one held, if any, as it is.
+      const drag = selectPress.press(e, screen, at, deepest)
+      if (!drag) return
+      gesture = drag
+      drawOverlay()
     },
     on,
   )

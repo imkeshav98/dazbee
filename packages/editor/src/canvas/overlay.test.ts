@@ -16,8 +16,8 @@ interface Fake {
   children: Fake[]
   append(...more: Fake[]): void
 }
-const fake = (className = ''): Fake => ({
-  className,
+const fake = (name = ''): Fake => ({
+  className: name,
   dataset: {},
   style: {},
   textContent: '',

@@ -162,8 +162,8 @@ function live(
   const selection = editorSelection({ drawn, frames, changed: drawOverlay })
 
   // Layer 3: the queries.
-  const hug = (ids: string[]) => hugIn(session, ids)
   const boxes = editorBoxes({ session, scenes, resources, selection, drawn, frameOf })
+  const hug = (ids: string[]) => hugIn(session, ids)
   const thumbnails = thumbnailCache({
     ck,
     scenes,

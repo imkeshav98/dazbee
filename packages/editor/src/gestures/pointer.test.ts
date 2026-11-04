@@ -114,6 +114,8 @@ function harness(tool: Tool = 'select', under: SceneLayer = UNDER) {
     selectPress: {
       press: (_e, screen) => {
         log.push(`press ${screen.x} ${screen.y}`)
+        // Far along, a press starts no drag, as a Shift click that takes a layer out does.
+        if (screen.x > 500) return null
         pressed = { kind: 'move', frame: SQUARE, around: [] } as unknown as MoveDrag
         return pressed
       },
@@ -132,6 +134,22 @@ function harness(tool: Tool = 'select', under: SceneLayer = UNDER) {
 
 describe('editorPointer', () => {
   describe('gesture', () => {
+    it('keeps the drag held when another press starts none', () => {
+      const { pointer, send, log, pressed } = harness()
+      send('pointerdown', event(10, 10))
+      send('pointerdown', event(600, 10))
+      expect(pointer.gesture()).toBe(pressed())
+      send('pointerup')
+      expect(log).toEqual([
+        'press 10 10',
+        'draw overlay',
+        'press 600 10',
+        'release move',
+        'release press',
+        'draw overlay',
+      ])
+    })
+
     it("holds the select tool's drag from its press until the pointer goes up", () => {
       const { pointer, send, log, pressed } = harness()
       send('pointerdown', event(10, 10))
