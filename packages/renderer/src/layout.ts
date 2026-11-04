@@ -7,9 +7,7 @@ import type { AutoLayout, TextProps } from '@dazbee/schema'
 
 import type { SceneLayer } from './scene.ts'
 
-type FrameLayer = Extract<SceneLayer, { type: 'frame' }>
 type Size = { width: number; height: number }
-type Sizing = 'fixed' | 'hug' | 'fill'
 
 /**
  * Measures a text layer as it would draw: with `width` null, its natural width (each paragraph
@@ -17,28 +15,16 @@ type Sizing = 'fixed' | 'hug' | 'fill'
  */
 export type MeasureText = (props: TextProps, width: number | null) => Size
 
-/** How a layer sizes on each axis. Left unsaid, text hugs as its box mode says, and the rest is fixed. */
-export function sizingOf(layer: SceneLayer): { width: Sizing; height: Sizing } {
-  if (layer.props.sizing) return layer.props.sizing
-  if (layer.type === 'text')
-    return {
-      width: layer.props.boxMode === 'autoWidth' ? 'hug' : 'fixed',
-      height: layer.props.boxMode === 'fixed' ? 'fixed' : 'hug',
-    }
-  return { width: 'fixed', height: 'fixed' }
-}
+type FrameLayer = Extract<SceneLayer, { type: 'frame' }>
 
-const hasLayout = (layer: SceneLayer): layer is FrameLayer & { props: { layout: AutoLayout } } =>
-  layer.type === 'frame' && layer.props.layout !== undefined
+type Sizing = 'fixed' | 'hug' | 'fill'
 
-/** Moves a layer and everything inside it. */
-function shift(layer: SceneLayer, dx: number, dy: number): SceneLayer {
-  if (dx === 0 && dy === 0) return layer
-  return {
-    ...layer,
-    props: { ...layer.props, x: layer.props.x + dx, y: layer.props.y + dy },
-    children: layer.children.map((c) => shift(c, dx, dy)),
-  } as SceneLayer
+interface Item {
+  layer: SceneLayer
+  width: number
+  height: number
+  fillMain: boolean
+  fillCross: boolean
 }
 
 /** Layers solved before, by the layer as built and the measure used, so an unchanged frame is laid out once. */
@@ -55,6 +41,17 @@ export function applyLayout(layers: SceneLayer[], measure?: MeasureText): SceneL
   return changed ? next : layers
 }
 
+/** How a layer sizes on each axis. Left unsaid, text hugs as its box mode says, and the rest is fixed. */
+export function sizingOf(layer: SceneLayer): { width: Sizing; height: Sizing } {
+  if (layer.props.sizing) return layer.props.sizing
+  if (layer.type === 'text')
+    return {
+      width: layer.props.boxMode === 'autoWidth' ? 'hug' : 'fixed',
+      height: layer.props.boxMode === 'fixed' ? 'fixed' : 'hug',
+    }
+  return { width: 'fixed', height: 'fixed' }
+}
+
 function layoutOne(layer: SceneLayer, measure?: MeasureText): SceneLayer {
   const before = solved.get(layer)
   if (before && before.measure === measure) return before.layer
@@ -69,42 +66,8 @@ function layoutOne(layer: SceneLayer, measure?: MeasureText): SceneLayer {
   return out
 }
 
-/** A text layer's size where it hugs: natural, or at the width it was given. */
-function textSize(layer: Extract<SceneLayer, { type: 'text' }>, width: number | null, measure?: MeasureText): Size {
-  if (!measure) return { width: width ?? layer.props.width, height: layer.props.height }
-  return measure(layer.props, width)
-}
-
-/**
- * A layer placed by its frame at a box: an auto layout frame laid out at that size, text at its
- * width, and any other layer moved there with what it holds (a group or plain frame keeps its
- * own size: only auto layout reaches inside).
- */
-function place(
-  layer: SceneLayer,
-  box: { x: number; y: number; width: number; height: number },
-  measure?: MeasureText,
-): SceneLayer {
-  if (hasLayout(layer))
-    return solveFrame(
-      { ...layer, props: { ...layer.props, x: box.x, y: box.y } },
-      { width: box.width, height: box.height },
-      measure,
-    )
-  const moved = shift(layer, box.x - layer.props.x, box.y - layer.props.y)
-  const resized =
-    layer.type === 'group'
-      ? moved
-      : ({ ...moved, props: { ...moved.props, width: box.width, height: box.height } } as SceneLayer)
-  return { ...resized, children: applyLayout(resized.children, measure) } as SceneLayer
-}
-
-interface Item {
-  layer: SceneLayer
-  width: number
-  height: number
-  fillMain: boolean
-  fillCross: boolean
+function hasLayout(layer: SceneLayer): layer is FrameLayer & { props: { layout: AutoLayout } } {
+  return layer.type === 'frame' && layer.props.layout !== undefined
 }
 
 /**
@@ -259,4 +222,44 @@ function solveFrame(
     (c) => placed.get(c) ?? ({ ...c, children: applyLayout(c.children, measure) } as SceneLayer),
   )
   return { ...frame, props: { ...frame.props, width, height }, children } as SceneLayer
+}
+
+/** A text layer's size where it hugs: natural, or at the width it was given. */
+function textSize(layer: Extract<SceneLayer, { type: 'text' }>, width: number | null, measure?: MeasureText): Size {
+  if (!measure) return { width: width ?? layer.props.width, height: layer.props.height }
+  return measure(layer.props, width)
+}
+
+/**
+ * A layer placed by its frame at a box: an auto layout frame laid out at that size, text at its
+ * width, and any other layer moved there with what it holds (a group or plain frame keeps its
+ * own size: only auto layout reaches inside).
+ */
+function place(
+  layer: SceneLayer,
+  box: { x: number; y: number; width: number; height: number },
+  measure?: MeasureText,
+): SceneLayer {
+  if (hasLayout(layer))
+    return solveFrame(
+      { ...layer, props: { ...layer.props, x: box.x, y: box.y } },
+      { width: box.width, height: box.height },
+      measure,
+    )
+  const moved = shift(layer, box.x - layer.props.x, box.y - layer.props.y)
+  const resized =
+    layer.type === 'group'
+      ? moved
+      : ({ ...moved, props: { ...moved.props, width: box.width, height: box.height } } as SceneLayer)
+  return { ...resized, children: applyLayout(resized.children, measure) } as SceneLayer
+}
+
+/** Moves a layer and everything inside it. */
+function shift(layer: SceneLayer, dx: number, dy: number): SceneLayer {
+  if (dx === 0 && dy === 0) return layer
+  return {
+    ...layer,
+    props: { ...layer.props, x: layer.props.x + dx, y: layer.props.y + dy },
+    children: layer.children.map((c) => shift(c, dx, dy)),
+  } as SceneLayer
 }

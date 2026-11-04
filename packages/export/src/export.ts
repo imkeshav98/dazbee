@@ -33,6 +33,56 @@ const MIME: Record<ExportType | 'zip', string> = {
 // eslint-disable-next-line no-control-regex
 const UNSAFE_IN_NAMES = /[/\\:*?"<>|\u0000-\u001f]/g
 
+const TOKENS = new RegExp(`\\{(${EXPORT_NAME_TOKENS.join('|')})\\}`, 'g')
+
+/**
+ * The request's pages in its formats, each one file, named from the request's template. One
+ * file comes as itself; more come as one zip with a folder per format. `onFile` hears each file
+ * as it is made, so a caller can show progress.
+ */
+export function exportDesign(
+  ck: CanvasKit,
+  json: unknown,
+  input: unknown,
+  bytes: ResourceBytes,
+  cache?: ResourceCache,
+  onFile?: (done: number, total: number) => void,
+): ExportedFile {
+  const parsed = parseDesign(json)
+  if (!parsed.success) throw new Error(`invalid design:\n${parsed.errors.join('\n')}`)
+  const design = parsed.design
+  const request = ExportRequest.parse(input)
+  const jobs = request.formatIds.flatMap((formatId) => request.pageIds.map((pageId) => ({ pageId, formatId })))
+  const taken = new Set<string>()
+  const files = jobs.map(({ pageId, formatId }, i) => {
+    const page = design.pages[pageId]
+    const format = design.formats[formatId]
+    if (!page) throw new Error(`no page "${pageId}"`)
+    if (!format) throw new Error(`no format "${formatId}"`)
+    const image = {
+      png: () => exportPng(ck, design, pageId, formatId, bytes, cache),
+      jpg: () => exportJpg(ck, design, pageId, formatId, bytes, request.quality, cache),
+      pdf: () => exportPdf(ck, design, pageId, formatId, bytes, cache),
+      svg: () => exportSvg(ck, design, pageId, formatId, bytes, cache),
+    }[request.type]()
+    const base = fileName(request.name, { design: design.meta.name, page: page.name, format: format.name })
+    const folder = jobs.length > 1 ? `${safe(format.name)}/` : ''
+    // Two pages may share a name: the later ones get a number.
+    let name = `${folder}${base}.${request.type}`
+    for (let n = 2; taken.has(name.toLowerCase()); n++) name = `${folder}${base} ${n}.${request.type}`
+    taken.add(name.toLowerCase())
+    onFile?.(i + 1, jobs.length)
+    return { name, type: MIME[request.type], bytes: image }
+  })
+  const [only] = files
+  if (files.length === 1 && only) return only
+  return {
+    name: `${safe(design.meta.name)}.zip`,
+    type: MIME.zip,
+    bytes: zip(files.map((f) => ({ path: f.name, bytes: f.bytes }))),
+  }
+}
+
 /** One page in one format as a PNG, transparency kept. */
 export function exportPng(
   ck: CanvasKit,
@@ -111,64 +161,14 @@ export function exportSvg(
   return renderVector(ck, design, pageId, formatId, bytes, 'svg', cache)
 }
 
-/** A name safe on every file system: no path separators or reserved characters, never empty. */
-function safe(part: string) {
-  const cleaned = part.replace(UNSAFE_IN_NAMES, '-').replace(/\s+/g, ' ').trim().replace(/^\.+/, '')
-  return cleaned || 'untitled'
-}
-
-const TOKENS = new RegExp(`\\{(${EXPORT_NAME_TOKENS.join('|')})\\}`, 'g')
-
 /** A file name from the request's template, its tokens filled in: `{size}` and `{format}` both name the format. */
 export function fileName(template: string, values: { design: string; page: string; format: string }): string {
   const value: Record<ExportNameToken, string> = { ...values, size: values.format }
   return safe(template.replace(TOKENS, (_, token: ExportNameToken) => value[token]))
 }
 
-/**
- * The request's pages in its formats, each one file, named from the request's template. One
- * file comes as itself; more come as one zip with a folder per format. `onFile` hears each file
- * as it is made, so a caller can show progress.
- */
-export function exportDesign(
-  ck: CanvasKit,
-  json: unknown,
-  input: unknown,
-  bytes: ResourceBytes,
-  cache?: ResourceCache,
-  onFile?: (done: number, total: number) => void,
-): ExportedFile {
-  const parsed = parseDesign(json)
-  if (!parsed.success) throw new Error(`invalid design:\n${parsed.errors.join('\n')}`)
-  const design = parsed.design
-  const request = ExportRequest.parse(input)
-  const jobs = request.formatIds.flatMap((formatId) => request.pageIds.map((pageId) => ({ pageId, formatId })))
-  const taken = new Set<string>()
-  const files = jobs.map(({ pageId, formatId }, i) => {
-    const page = design.pages[pageId]
-    const format = design.formats[formatId]
-    if (!page) throw new Error(`no page "${pageId}"`)
-    if (!format) throw new Error(`no format "${formatId}"`)
-    const image = {
-      png: () => exportPng(ck, design, pageId, formatId, bytes, cache),
-      jpg: () => exportJpg(ck, design, pageId, formatId, bytes, request.quality, cache),
-      pdf: () => exportPdf(ck, design, pageId, formatId, bytes, cache),
-      svg: () => exportSvg(ck, design, pageId, formatId, bytes, cache),
-    }[request.type]()
-    const base = fileName(request.name, { design: design.meta.name, page: page.name, format: format.name })
-    const folder = jobs.length > 1 ? `${safe(format.name)}/` : ''
-    // Two pages may share a name: the later ones get a number.
-    let name = `${folder}${base}.${request.type}`
-    for (let n = 2; taken.has(name.toLowerCase()); n++) name = `${folder}${base} ${n}.${request.type}`
-    taken.add(name.toLowerCase())
-    onFile?.(i + 1, jobs.length)
-    return { name, type: MIME[request.type], bytes: image }
-  })
-  const [only] = files
-  if (files.length === 1 && only) return only
-  return {
-    name: `${safe(design.meta.name)}.zip`,
-    type: MIME.zip,
-    bytes: zip(files.map((f) => ({ path: f.name, bytes: f.bytes }))),
-  }
+/** A name safe on every file system: no path separators or reserved characters, never empty. */
+function safe(part: string) {
+  const cleaned = part.replace(UNSAFE_IN_NAMES, '-').replace(/\s+/g, ' ').trim().replace(/^\.+/, '')
+  return cleaned || 'untitled'
 }

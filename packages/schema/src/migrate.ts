@@ -4,10 +4,10 @@
 
 import { isRecord } from './json.ts'
 
+type Json = Record<string, unknown>
+
 /** The version every design is written at. */
 export const SCHEMA_VERSION = 5
-
-type Json = Record<string, unknown>
 
 /**
  * Version 2 gives groups and frames pass-through blending, and makes `normal` on them draw the

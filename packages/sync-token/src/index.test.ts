@@ -5,13 +5,23 @@ import { signSyncToken, SYNC_TOKEN_TTL_MS, syncTokenSecret, verifySyncToken } fr
 const secret = 'a'.repeat(32)
 const who = { designId: 'design-1', workspaceId: 'workspace-1', userId: 'user-1' }
 
-describe('sync tokens', () => {
+describe('syncTokenSecret', () => {
+  it('needs a secret of at least 32 characters from the environment', () => {
+    expect(() => syncTokenSecret({})).toThrow('SYNC_TOKEN_SECRET')
+    expect(() => syncTokenSecret({ SYNC_TOKEN_SECRET: 'short' })).toThrow('SYNC_TOKEN_SECRET')
+    expect(syncTokenSecret({ SYNC_TOKEN_SECRET: secret })).toBe(secret)
+  })
+})
+
+describe('signSyncToken', () => {
   it('accepts a fresh token for its design', () => {
     const { token, expiresAt } = signSyncToken(secret, who, 1_000)
     expect(expiresAt).toBe(1_000 + SYNC_TOKEN_TTL_MS)
     expect(verifySyncToken(secret, token, 'design-1', 2_000)).toEqual({ ok: true, payload: { ...who, expiresAt } })
   })
+})
 
+describe('verifySyncToken', () => {
   it('refuses an expired token', () => {
     const { token, expiresAt } = signSyncToken(secret, who, 1_000)
     expect(verifySyncToken(secret, token, 'design-1', expiresAt)).toEqual({ ok: false, reason: 'expired token' })
@@ -37,11 +47,5 @@ describe('sync tokens', () => {
         reason: expect.stringMatching(/malformed|bad signature/),
       })
     }
-  })
-
-  it('needs a secret of at least 32 characters from the environment', () => {
-    expect(() => syncTokenSecret({})).toThrow('SYNC_TOKEN_SECRET')
-    expect(() => syncTokenSecret({ SYNC_TOKEN_SECRET: 'short' })).toThrow('SYNC_TOKEN_SECRET')
-    expect(syncTokenSecret({ SYNC_TOKEN_SECRET: secret })).toBe(secret)
   })
 })

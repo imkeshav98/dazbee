@@ -19,7 +19,7 @@ const bytes = new Uint8Array([137, 80, 78, 71, 1, 2, 3])
 
 beforeAll(() => storage.ensureBucket())
 
-describe('storage', () => {
+describe('openStorage', () => {
   it('puts and gets bytes, and knows what it has', async () => {
     const key = `test/${randomUUID()}`
     expect(await storage.get(key)).toBeNull()

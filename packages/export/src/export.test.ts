@@ -77,7 +77,7 @@ const pixelAt = (encoded: Uint8Array, x: number, y: number) => {
   return { px: [...(px as Uint8Array)], size }
 }
 
-describe('export', () => {
+describe('exportDesign', () => {
   it('one page in one format is one PNG, named from the template, with its transparency', () => {
     const file = exportDesign(ck, design, { pageIds: ['p1'], formatIds: ['sq'], type: 'png' }, bytes)
     expect(file.name).toBe('Summer- sale - Hero - Square.png')
@@ -143,7 +143,9 @@ describe('export', () => {
       exportDesign(ck, design, { pageIds: ['p1'], formatIds: ['sq'], type: 'jpg', quality: 0 }, bytes),
     ).toThrow()
   })
+})
 
+describe('fileName', () => {
   it('names are safe on every file system', () => {
     expect(fileName('{design}/{page}', { design: 'A:B', page: '..x', format: 'f' })).toBe('A-B-..x')
     expect(fileName('{page}', { design: 'd', page: '   ', format: 'f' })).toBe('untitled')
@@ -158,10 +160,6 @@ describe('export', () => {
 })
 
 describe('zip', () => {
-  it('computes the standard CRC-32', () => {
-    expect(crc32(new TextEncoder().encode('123456789'))).toBe(0xcbf43926)
-  })
-
   it('writes a zip that unzip reads back, names in UTF-8', () => {
     const entries = [
       { path: 'Carré/a.txt', bytes: new TextEncoder().encode('hello') },
@@ -178,5 +176,11 @@ describe('zip', () => {
     expect(readFileSync(join(dir, 'x', 'Carré', 'a.txt'), 'utf8')).toBe('hello')
     expect([...readFileSync(join(dir, 'x', 'b.bin'))]).toEqual([0, 1, 2, 255])
     expect(readZip(zip(entries))).toEqual(entries)
+  })
+})
+
+describe('crc32', () => {
+  it('computes the standard CRC-32', () => {
+    expect(crc32(new TextEncoder().encode('123456789'))).toBe(0xcbf43926)
   })
 })

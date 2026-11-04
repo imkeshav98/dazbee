@@ -17,12 +17,6 @@ const CRC_TABLE = (() => {
   return table
 })()
 
-export function crc32(bytes: Uint8Array): number {
-  let crc = 0xffffffff
-  for (const byte of bytes) crc = (CRC_TABLE[(crc ^ byte) & 0xff] ?? 0) ^ (crc >>> 8)
-  return (crc ^ 0xffffffff) >>> 0
-}
-
 /** 1980-01-01 00:00, the first date a zip can hold. */
 const DOS_TIME = 0
 const DOS_DATE = (1 << 5) | 1
@@ -101,6 +95,12 @@ export function zip(entries: ZipEntry[]): Uint8Array {
   u32(central)
   u16(0)
   return out
+}
+
+export function crc32(bytes: Uint8Array): number {
+  let crc = 0xffffffff
+  for (const byte of bytes) crc = (CRC_TABLE[(crc ^ byte) & 0xff] ?? 0) ^ (crc >>> 8)
+  return (crc ^ 0xffffffff) >>> 0
 }
 
 /** The entries of a zip this module wrote, stored and not deflated; for checks of what it made. */

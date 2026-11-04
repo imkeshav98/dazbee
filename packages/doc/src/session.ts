@@ -22,7 +22,12 @@ export function openSession(doc: DesignDoc) {
   const origin = { session: Symbol('session') }
   /** Changes this tab makes that no one undoes, as another tab's: what the brand kit's change brings. */
   const untrackedOrigin = { session: Symbol('untracked') }
+  /** The origin this tab's commands are written with: `untrackedOrigin` inside `untracked`. */
   let writing = origin
+  /** Whether a gesture is open: its commands are gathered into one undo step. */
+  let inGesture = false
+  /** The design as the open batch found it, which its commands check and read; null outside a batch. */
+  let batched: Design | null = null
   const r = root(doc)
   const roots = [r.meta, r.formats, r.pages, r.nodes, r.overrides]
   migrateDoc(doc)
@@ -96,7 +101,6 @@ export function openSession(doc: DesignDoc) {
     return result as ResultOf<N>
   }
 
-  let inGesture = false
   /**
    * Starts one undo step that lasts until the returned function is called: every command run in
    * between, such as each move of a drag or each key typed into a text, is undone together.
@@ -144,7 +148,6 @@ export function openSession(doc: DesignDoc) {
    * the copy kept on this device get one update instead of one per command. Every command in it
    * still checks and reads the design as it was before the batch.
    */
-  let batched: Design | null = null
   function batch<T>(steps: () => T): T {
     if (batched) return steps()
     // Read once, before the transaction: inside it the view would read the whole design again for every command.

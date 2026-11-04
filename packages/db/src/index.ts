@@ -17,12 +17,12 @@ export interface Database {
   close(): Promise<void>
 }
 
+const MIGRATIONS = fileURLToPath(new URL('../migrations', import.meta.url))
+
 export function openDatabase(url: string, { max = 4 } = {}): Database {
   const pool = new pg.Pool({ connectionString: url, max })
   return { db: drizzle(pool, { schema: tables }), close: () => pool.end() }
 }
-
-const MIGRATIONS = fileURLToPath(new URL('../migrations', import.meta.url))
 
 /** Brings the database up to the latest migration; servers call it on start. */
 export async function migrateDatabase(db: Db): Promise<void> {
