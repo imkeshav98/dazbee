@@ -103,16 +103,6 @@ export async function restartSyncServer() {
   execFileSync('docker', ['compose', 'up', '-d', '--wait', 'sync'], { cwd: ROOT, stdio: 'pipe' })
 }
 
-/** Runs a query in the sync server's database: on CI docker compose's, off CI the suite's own. */
-function query(sql: string) {
-  const database = process.env.CI ? 'razzlr' : DATABASE
-  return execFileSync(
-    'docker',
-    ['compose', 'exec', '-T', 'postgres', 'psql', '-U', 'razzlr', '-d', database, '-tAc', sql],
-    { cwd: ROOT, encoding: 'utf8' },
-  ).trim()
-}
-
 /** Whether the sync server has stored the design's state since `since` (packages/db's design_states). */
 export function storedAfter(designId: string, since: Date) {
   return (
@@ -127,6 +117,16 @@ export function storedSize(designId: string) {
   return Number(
     query(`select octet_length(state) from design_states where design_id = '${designId.replace(/'/g, "''")}'`),
   )
+}
+
+/** Runs a query in the sync server's database: on CI docker compose's, off CI the suite's own. */
+function query(sql: string) {
+  const database = process.env.CI ? 'razzlr' : DATABASE
+  return execFileSync(
+    'docker',
+    ['compose', 'exec', '-T', 'postgres', 'psql', '-U', 'razzlr', '-d', database, '-tAc', sql],
+    { cwd: ROOT, encoding: 'utf8' },
+  ).trim()
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
