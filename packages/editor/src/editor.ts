@@ -6,24 +6,10 @@ import { IndexeddbPersistence } from 'y-indexeddb'
 import * as Y from 'yjs'
 
 import type { CanvasKit, GrDirectContext, Surface } from '@dazbee/canvaskit'
-import {
-  ancestorsOf,
-  anchorOffset,
-  childrenOf,
-  CommandError,
-  descendants,
-  mergedProps,
-  openSession,
-  readDesign,
-  type Session,
-  type TextAnchor,
-  textAnchor,
-} from '@dazbee/doc'
+import { ancestorsOf, childrenOf, descendants, mergedProps, openSession, readDesign, type Session } from '@dazbee/doc'
 import type { ExportedFile } from '@dazbee/export'
 import { FALLBACK_FAMILIES } from '@dazbee/fonts'
 import {
-  caretAt,
-  caretPosition,
   render,
   renderDesign,
   type ResourceCache,
@@ -31,7 +17,6 @@ import {
   type ScaledText,
   scaleText,
   type SceneLayer,
-  selectionBoxes,
   smallestSize,
 } from '@dazbee/renderer'
 import {
@@ -80,7 +65,8 @@ import { thumbnailCache } from './canvas/thumbnails.ts'
 import { loadCanvasKit } from './canvaskit.ts'
 import { keepCopy, layersOnClipboard, putOnClipboard, rememberedLayers } from './clipboard.ts'
 import { exportClient } from './export/export-client.ts'
-import { cornersOfRect, coverCrop, cropOf, imageRect, panned, scaled } from './gestures/crop.ts'
+import { coverCrop, imageRect } from './gestures/crop.ts'
+import { type CropDrag, type CropTarget, editorCropping } from './gestures/cropping.ts'
 import {
   clickedBox,
   drawnBox,
@@ -90,31 +76,12 @@ import {
   keepRatio,
   newDrawn,
   newImage,
-  newPath,
   newText,
   withImage,
 } from './gestures/draw-tools.ts'
-import {
-  type Anchor,
-  anchorOf,
-  type AnchorRef,
-  constrain,
-  deleteAnchors,
-  formatPath,
-  hitPath,
-  isSmooth,
-  moveAnchors,
-  moveControl,
-  offsetPath,
-  parsePath,
-  pathBounds,
-  type PenPath,
-  sameRef,
-  scalePath,
-  segmentsOf,
-  type Side,
-  splitSegment,
-} from './gestures/path.ts'
+import { offsetPath, parsePath, scalePath } from './gestures/path.ts'
+import { editorPen, type PathDrag } from './gestures/pen.ts'
+import { CLICK_SLOP, HANDLE_REACH, HANDLE_SIZE } from './gestures/press.ts'
 import { align, type Alignment, distribute, type Distribution, type Offset } from './layers/arrange.ts'
 import {
   type AutoLayoutOf,
@@ -159,19 +126,12 @@ import {
   SHIPPED_FAMILIES,
   shippedFonts,
 } from './resources.ts'
+import { runQuietly } from './run-quietly.ts'
 import { watchSaveState } from './save-state.ts'
 import { editorSelection, isPath, type Picked } from './selection.ts'
 import { NUDGE, NUDGE_FAR, type ShortcutAction, shortcutFor } from './shortcuts.ts'
-import {
-  paragraphAt,
-  type RunStyle,
-  step,
-  stylesIn,
-  type StyleToggle,
-  type TextRange,
-  toggled,
-  wordAt,
-} from './text/text-edit.ts'
+import { paragraphAt, type RunStyle, type TextRange, wordAt } from './text/text-edit.ts'
+import { editorTyping } from './text/typing.ts'
 import { editorTools, type PlacedAsset, type Tool } from './tools.ts'
 
 export interface EditorOptions extends ResourceSources {
@@ -197,16 +157,6 @@ export interface EditorOptions extends ResourceSources {
   signal?: AbortSignal
 }
 
-/**
- * The caret and the other end of the selected range (#47), anchored in the text so edits arriving
- * from other tabs carry them along; the same place when nothing is selected.
- */
-interface Editing extends Picked {
-  caret: TextAnchor
-  anchor: TextAnchor
-  endGesture: () => void
-  created: boolean
-}
 /** A point on the design: a frame, as `<pageId>/<formatId>`, and a point in it in design pixels. */
 export interface Spot {
   frame: string
@@ -217,10 +167,6 @@ export interface Spot {
 /** The share of a frame's shorter side a placed SVG may take before it is scaled down to it. */
 const SVG_ROOM = 0.6
 
-/** How far, in screen pixels, a press can wander and still draw a shape as a click does. */
-const CLICK_SLOP = 3
-/** How near, in screen pixels, a press picks a path's point, handle or segment (#45). */
-const POINT_REACH = 6
 /** Screen pixels a frame needs before it gets a label. */
 const MIN_LABEL_WIDTH = 56
 /** How far a label stays from the stage's start edge when its frame runs past it. */
@@ -229,21 +175,8 @@ const LABEL_INSET = 8
 const SIZE_CLEARANCE = 72
 /** The room the selection's size label takes, in screen pixels. */
 const SIZE_LABEL_HEIGHT = 20
-/** Screen size of a handle, and how far from it a press still grabs it. */
-const HANDLE_SIZE = 8
-const HANDLE_REACH = 7
 /** How far outside a corner a press turns the selection. */
 const ROTATE_REACH = 24
-/** The SVG namespace, for the outline of a path being drawn or edited. */
-const SVG = 'http://www.w3.org/2000/svg'
-
-/** A path layer being drawn or edited: the box it had when that began, which its points are relative to, and how far the box has moved since. */
-interface Reshaping {
-  id: string
-  start: Box
-  applied: Point
-  scope: string
-}
 
 /** Something the page should say: why a gesture did nothing, or how placing an SVG went. */
 export type Notice = 'placedByLayout' | 'flowEnd' | 'svgLeftOut' | 'svgUnreadable'
@@ -506,20 +439,6 @@ const ZOOM_STEP = 2
 const FOCUS_PADDING = 104
 
 /**
- * Runs a command that edits from other tabs may have made impossible, such as typing into a layer
- * just deleted elsewhere: it is refused whole and nothing happens. Returns whether it ran.
- */
-function runQuietly(run: () => unknown) {
-  try {
-    run()
-    return true
-  } catch (error) {
-    if (error instanceof CommandError) return false
-    throw error
-  }
-}
-
-/**
  * Whether two fill lists have the same topmost solid fill: the one a brand colour binding colours,
  * so a change that leaves it be (an image added or swapped) keeps the binding.
  */
@@ -703,9 +622,7 @@ function live(
     for (const listener of noticeListeners) listener(notice, parts)
   }
   const tools = editorTools({
-    finish: () => {
-      if (pen) finishPen()
-    },
+    finish: () => pen.finish(),
     changed: () => showCursor(),
     onSnapping: viewChanged,
   })
@@ -714,124 +631,11 @@ function live(
     frames: () => grid.frames,
     changed: () => drawOverlay(),
   })
-  let editing: Editing | null = null
-  /**
-   * The path the pen is drawing (#45), from its first click until it closes or is finished: its
-   * anchors in its parent's coordinates, the one a drag is pulling handles from, and the layer
-   * once there are two anchors to draw.
-   */
-  let pen: {
-    frame: Frame
-    around: Box[]
-    parentId: string
-    anchors: Anchor[]
-    closing: boolean
-    dragging: number | null
-    from: Point
-    moved: boolean
-    hover: Point | null
-    layer: Reshaping | null
-    end: () => void
-  } | null = null
   /** Called after every redraw with the design it drew; the two-tab test times edits with it. */
   const drawListeners = new Set<(design: Design, at: number, info: DrawInfo) => void>()
 
   const frameOf = (key: string | undefined) => grid.frames.find((f) => f.key === key)
   const firstPage = () => grid.frames[0]?.pageId ?? ''
-
-  /** The layer as a frame shows it now, with the frame. */
-  function pickedLayer(picked: Picked | null) {
-    const frame = picked && frameOf(picked.frame)
-    const layer = frame && findLayer(scenes.scene(frame).layers, picked.id)
-    return frame && layer ? { frame, layer } : null
-  }
-
-  /** The editing layer's text, laid out as drawn, from the screen's cache, which owns it. */
-  function editingText() {
-    const found = pickedLayer(editing)
-    if (found?.layer.type !== 'text') return null
-    return { ...found, layer: found.layer, laid: scenes.layout(found.layer.props) }
-  }
-  /** The selected range of the text being edited; empty at the caret when nothing is selected. */
-  function textRange(): TextRange | null {
-    if (!editing) return null
-    const caret = anchorOffset(doc, editing.caret)
-    const anchor = anchorOffset(doc, editing.anchor)
-    if (caret === null || caret === undefined) return null
-    const other = anchor ?? caret
-    return { start: Math.min(caret, other), end: Math.max(caret, other) }
-  }
-  /** Puts the caret at an offset; with `extend`, the other end of the range stays where it is. */
-  function caretTo(offset: number, extend = false) {
-    if (!editing) return
-    editing.caret = textAnchor(doc, editing.id, offset)
-    if (!extend) editing.anchor = editing.caret
-    textSelectionChanged()
-  }
-  /**
-   * Keeps the box of text that grows the size of its words in every format (#47), or in `only` that
-   * one, and the groups around it fitted, in the step the edit is in.
-   */
-  function fitText(id: string, only?: string) {
-    const now = session.design()
-    const node = now.nodes[id]
-    if (node?.type !== 'text') return
-    const measure = scenes.measure()
-    const sizes: Record<string, { width: number; height: number }> = {}
-    // Text bound to a brand font is drawn, so measured, in the family the kit gives it.
-    const bound = node.bindings?.fontFamily ? resources.bytes().variables?.[node.bindings.fontFamily] : undefined
-    for (const formatId of only ? [only] : Object.keys(now.formats)) {
-      const own = mergedProps(now, formatScope(formatId), id) as typeof node.props
-      const props = bound ? { ...own, style: { ...own.style, fontFamily: bound } } : own
-      if (props.boxMode === 'fixed') continue
-      const size = measure(props, props.boxMode === 'autoWidth' ? null : props.width)
-      sizes[formatId] = { width: props.boxMode === 'autoWidth' ? size.width : props.width, height: size.height }
-    }
-    if (Object.keys(sizes).length === 0) return
-    runQuietly(() => session.run('text.fit', { id, sizes }))
-    hug([id])
-  }
-  /** Selects a range, the caret at its end. */
-  function selectText(range: TextRange) {
-    if (!editing) return
-    editing.anchor = textAnchor(doc, editing.id, range.start)
-    editing.caret = textAnchor(doc, editing.id, range.end)
-    textSelectionChanged()
-  }
-  /** The selected range of the text being edited, when it holds a character or more. */
-  function selectedText(): { id: string; range: TextRange } | null {
-    const range = textRange()
-    return editing && range && range.end > range.start ? { id: editing.id, range } : null
-  }
-  /**
-   * Styles a range of a text layer with `style`, as one undo step of its own: while the layer is
-   * being edited, between the typing before and after it. A key left undefined changes nothing,
-   * since a run can't say "as the layer".
-   */
-  function styleRange({ id, range }: { id: string; range: TextRange }, style: RunStyle) {
-    const keys = Object.fromEntries(Object.entries(style).filter(([, value]) => value !== undefined)) as RunStyle
-    if (Object.keys(keys).length === 0) return
-    const typing = editing?.id === id ? editing : null
-    typing?.endGesture()
-    session.gesture(() => {
-      runQuietly(() =>
-        session.run('text.edit', {
-          id,
-          op: { kind: 'style', at: range.start, length: range.end - range.start, style: keys },
-        }),
-      )
-      fitText(id)
-    })
-    if (typing) typing.endGesture = session.beginGesture()
-    drawOverlay()
-  }
-  /** Styles the selected range of the text being edited; false when no range is selected. */
-  function styleSelectedText(style: RunStyle): boolean {
-    const selected = selectedText()
-    if (!selected) return false
-    styleRange(selected, style)
-    return true
-  }
 
   /**
    * A layer's box in one frame, read from the document: the base with the format's overrides.
@@ -983,32 +787,11 @@ function live(
     }
   }
   /**
-   * Writes a path drawn or edited in the coordinates its layer had when that began (#45): the data
-   * from the outline's corner, and the box moved by what the corner moved since the last write.
-   */
-  function reshape(layer: Reshaping, path: PenPath) {
-    const b = pathBounds(path)
-    if (!b) return
-    const corner = { x: round(b.x), y: round(b.y) }
-    const moved = { x: round(corner.x - layer.start.x), y: round(corner.y - layer.start.y) }
-    const input = {
-      id: layer.id,
-      scope: layer.scope,
-      d: formatPath(path, corner),
-      dx: round(moved.x - layer.applied.x),
-      dy: round(moved.y - layer.applied.y),
-      width: round(b.width),
-      height: round(b.height),
-    }
-    if (runQuietly(() => session.run('node.reshape', input))) layer.applied = moved
-  }
-
-  /**
    * The image fill a crop works on (#48): the topmost of a layer's fills in a frame, with where the
    * whole image sits for the crop it shows now (fill's when it has none of its own), the image and
    * its size, and the layer's box with its containers, the box last.
    */
-  function cropTarget(frame: Frame, id: string, from: Design = session.design()) {
+  function cropTarget(frame: Frame, id: string, from: Design = session.design()): CropTarget | null {
     const node = from.nodes[id]
     const box = boxIn(frame, id, from)
     if (!node || !box || !('fills' in node.props)) return null
@@ -1030,8 +813,45 @@ function live(
       around: [...containersOf(frame, node.parentId, from), box],
     }
   }
-  type CropTarget = NonNullable<ReturnType<typeof cropTarget>>
   const thumbnails = thumbnailCache({ ck, scenes, resources, current: () => session.design(), drawn: () => design })
+  const typing = editorTyping({
+    ck,
+    doc,
+    session,
+    resources,
+    scenes,
+    frameOf,
+    hug,
+    placeBox,
+    textSelectionChanged,
+    drawOverlay: () => drawOverlay(),
+  })
+  const pen = editorPen({
+    canvas,
+    session,
+    selection,
+    tools,
+    typing,
+    camera: () => camera,
+    drawn: () => design,
+    frameOf,
+    containersOf,
+    pathIn,
+    parentFor,
+    hug,
+    drawOverlay: () => drawOverlay(),
+  })
+  const cropping = editorCropping({
+    canvas,
+    session,
+    selection,
+    thumbnails,
+    camera: () => camera,
+    frameOf,
+    cropTarget,
+    outline,
+    drawOverlay: () => drawOverlay(),
+  })
 
   /** A design-pixel box in a frame, as CSS on the overlay. */
   function placeBox(el: HTMLElement, frame: Frame, box: Rect) {
@@ -1053,7 +873,7 @@ function live(
     label.dataset.frame = frame.key
     if (
       selection.current()?.frame === frame.key ||
-      editing?.frame === frame.key ||
+      typing.editing()?.frame === frame.key ||
       selection.pickedPage() === frame.pageId
     )
       label.dataset.active = ''
@@ -1155,7 +975,7 @@ function live(
     el.dataset.count = String(current.ids.length)
     if (!several) el.dataset.layer = current.ids[0]
     // Handles only once the box is big enough on screen to grab them apart, and not on a locked one.
-    if (!editing && Math.min(box.width, box.height) * camera.zoom >= 2 * HANDLE_SIZE) {
+    if (!typing.editing() && Math.min(box.width, box.height) * camera.zoom >= 2 * HANDLE_SIZE) {
       for (const h of handlesFor()) {
         const handle = document.createElement('div')
         handle.className = 'handle'
@@ -1166,7 +986,7 @@ function live(
       }
     }
     parts.push(el)
-    if (!editing) {
+    if (!typing.editing()) {
       const corners = cornersOf(box).map((p) => toScreen(camera, { x: frame.x + p.x, y: frame.y + p.y }))
       const size = document.createElement('div')
       size.className = 'selection-size'
@@ -1183,35 +1003,6 @@ function live(
       parts.push(size)
     }
     return parts
-  }
-
-  /** The crop being made (#48): the whole image, faint outside the layer, a handle on each corner. */
-  function cropParts(): HTMLElement[] {
-    const cropping = selection.cropping()
-    const frame = cropping && frameOf(cropping.frame)
-    const target = frame && cropping && cropTarget(frame, cropping.id)
-    if (!frame || !target) return []
-    const { box, rect, around } = target
-    const whole = outline('crop-image', frame, drawnFrom({ ...rect, rotation: 0 }, around))
-    const ghost = document.createElement('div')
-    ghost.className = 'crop-ghost'
-    ghost.style.backgroundImage = `url("${thumbnails.ghost(target.image)}")`
-    // Clear over the box, where the layer shows the image itself.
-    const [l, t, r, b] = [box.x - rect.x, box.y - rect.y, box.x + box.width - rect.x, box.y + box.height - rect.y].map(
-      (v, i) => `${(v / (i % 2 === 0 ? rect.width : rect.height)) * 100}%`,
-    )
-    ghost.style.clipPath = `polygon(evenodd, 0 0, 100% 0, 100% 100%, 0 100%, 0 0, ${l} ${t}, ${l} ${b}, ${r} ${b}, ${r} ${t}, ${l} ${t})`
-    whole.append(ghost)
-    for (const i of cornersOfRect(rect).keys()) {
-      const handle = document.createElement('div')
-      handle.className = 'handle'
-      handle.dataset.cropCorner = String(i)
-      Object.assign(handle.style, { left: `${i === 1 || i === 2 ? 100 : 0}%`, top: `${i >= 2 ? 100 : 0}%` })
-      whole.append(handle)
-    }
-    const shown = outline('selection', frame, drawnFrom(box, around.slice(0, -1)))
-    shown.dataset.cropping = cropping?.id
-    return [whole, shown]
   }
 
   let drawnFrames: Frame[] = []
@@ -1242,8 +1033,8 @@ function live(
     if (dropFrame && dropBox) parts.push(outline('drop-target', dropFrame, dropBox))
     parts.push(
       ...(selection.pathEditing() || selection.cropping() ? [] : selectionParts()),
-      ...pathParts(),
-      ...cropParts(),
+      ...pen.parts(),
+      ...cropping.parts(),
       ...reorderParts(),
     )
     if (gesture?.kind === 'textBox' || gesture?.kind === 'imageBox') {
@@ -1286,136 +1077,9 @@ function live(
           ),
         )
     }
-    const text = editingText()
-    const offset = editing && anchorOffset(doc, editing.caret)
-    const range = textRange()
-    if (text && range && range.end > range.start) {
-      // The selected range, one box per run of one direction on one line (#47).
-      for (const box of selectionBoxes(ck, text.laid, range.start, range.end)) {
-        const el = document.createElement('div')
-        el.className = 'text-selection'
-        placeBox(el, text.frame, {
-          x: text.layer.props.x + box.x,
-          y: text.layer.props.y + text.laid.dy + box.y,
-          width: box.width,
-          height: box.height,
-        })
-        parts.push(el)
-      }
-    } else if (text && offset !== null && offset !== undefined) {
-      const at = caretPosition(ck, text.laid, offset)
-      const caret = document.createElement('div')
-      caret.className = 'caret'
-      placeBox(caret, text.frame, {
-        x: text.layer.props.x + at.x,
-        y: text.layer.props.y + text.laid.dy + at.y,
-        width: 0,
-        height: at.height,
-      })
-      caret.style.width = ''
-      parts.push(caret)
-    }
+    parts.push(...typing.parts())
     overlay.replaceChildren(...parts)
     selection.tellListeners(pageGone)
-  }
-
-  /**
-   * The path the pen is drawing or whose points are being edited (#45): its outline, its anchors,
-   * the handles of the anchors in play, and, for the pen, the next segment to where the pointer is.
-   */
-  function pathParts(): Element[] {
-    const pathEditing = selection.pathEditing()
-    let frame: Frame | undefined
-    let path: PenPath
-    let around: Box[]
-    let shown: AnchorRef[]
-    let preview: [Anchor, Point] | null = null
-    if (pen) {
-      frame = pen.frame
-      path = [{ anchors: pen.anchors, closed: pen.closing }]
-      around = pen.around
-      const last = pen.anchors.length - 1
-      shown = [{ contour: 0, index: pen.dragging ?? last }]
-      const from = pen.anchors[last]
-      if (from && pen.hover && pen.dragging === null) preview = [from, pen.hover]
-    } else if (pathEditing) {
-      frame = frameOf(pathEditing.frame)
-      const found = frame && pathIn(frame, pathEditing.id, design)
-      if (!found) return []
-      ;({ path, around } = found)
-      shown = pathEditing.selected
-    } else {
-      return []
-    }
-    if (!frame) return []
-    const f = frame
-    const at = (q: Point) => {
-      const p = pageFrom(q, around)
-      return toScreen(camera, { x: f.x + p.x, y: f.y + p.y })
-    }
-    const xy = (q: Point) => {
-      const p = at(q)
-      return `${round(p.x)} ${round(p.y)}`
-    }
-    const svg = document.createElementNS(SVG, 'svg')
-    svg.setAttribute('class', 'path-edit')
-    const line = (className: string, d: string) => {
-      const el = document.createElementNS(SVG, 'path')
-      el.setAttribute('class', className)
-      el.setAttribute('d', d)
-      svg.append(el)
-    }
-    const outline: string[] = []
-    for (const contour of path) {
-      const [first] = contour.anchors
-      if (!first) continue
-      outline.push(`M${xy(first)}`)
-      for (const [from, to] of segmentsOf(contour)) {
-        const a = contour.anchors[from] as Anchor
-        const b = contour.anchors[to] as Anchor
-        outline.push(`C${xy(a.out ?? a)} ${xy(b.in ?? b)} ${xy(b)}`)
-      }
-    }
-    line('path-outline', outline.join(' '))
-    if (preview) {
-      const [from, to] = preview
-      line('pen-preview', `M${xy(from)} C${xy(from.out ?? from)} ${xy(to)} ${xy(to)}`)
-    }
-    const dots: HTMLElement[] = []
-    const dot = (className: string, q: Point, data: Record<string, string>) => {
-      const el = document.createElement('div')
-      el.className = className
-      const p = at(q)
-      Object.assign(el.style, { left: px(p.x), top: px(p.y) })
-      Object.assign(el.dataset, data)
-      dots.push(el)
-    }
-    for (const ref of shown) {
-      const anchor = anchorOf(path, ref)
-      for (const side of ['in', 'out'] as const) {
-        const h = anchor?.[side]
-        if (!anchor || !h) continue
-        line('path-handle-line', `M${xy(anchor)} L${xy(h)}`)
-        dot('path-control', h, { control: `${ref.contour}:${ref.index}:${side}` })
-      }
-    }
-    path.forEach((contour, c) =>
-      contour.anchors.forEach((a, i) => {
-        const data: Record<string, string> = { anchor: `${c}:${i}` }
-        if (shown.some((r) => sameRef(r, { contour: c, index: i })) && pathEditing) data.selected = ''
-        // The pen's first anchor shows when a click on it would close the path.
-        if (
-          pen &&
-          i === 0 &&
-          pen.anchors.length >= 2 &&
-          pen.hover &&
-          Math.hypot(pen.hover.x - a.x, pen.hover.y - a.y) * camera.zoom <= POINT_REACH
-        )
-          data.closing = ''
-        dot('path-anchor', a, data)
-      }),
-    )
-    return [svg, ...dots]
   }
 
   /** Snap guides as lines across the page, and equal gaps as marked spans with their size. */
@@ -1467,7 +1131,7 @@ function live(
     if (focused && !design.formats[focused]) focused = null
     grid = frameGrid(design, focused)
     selection.keep()
-    if (editing && !pickedLayer(editing)) stopEditing()
+    typing.stopWhenGone()
     if (!surface) return
 
     const screen = resources.screen(design)
@@ -1585,36 +1249,6 @@ function live(
     return pointAt({ x: e.clientX, y: e.clientY })
   }
 
-  function stopEditing() {
-    if (!editing) return
-    // A text box made with the text tool and left empty goes again, in the same undo step.
-    const { id } = editing
-    const node = session.design().nodes[id]
-    if (node?.type === 'text' && node.props.text === '' && editing.created)
-      runQuietly(() => session.run('node.delete', { ids: [id] }))
-    editing.endGesture()
-    editing = null
-    textSelectionChanged()
-  }
-  /** Starts typing into a text layer in a frame, in one undo step until typing stops. */
-  function startEditing(
-    id: string,
-    frame: string,
-    offset: number,
-    endGesture = session.beginGesture(),
-    created = false,
-  ) {
-    const at = textAnchor(doc, id, offset)
-    editing = { id, frame, caret: at, anchor: at, endGesture, created }
-    textSelectionChanged()
-  }
-
-  function caretFromPoint(p: Point) {
-    const text = editingText()
-    if (!text) return 0
-    return caretAt(ck, text.laid, p.x - text.layer.props.x, p.y - text.layer.props.y - text.laid.dy)
-  }
-
   /** What a drag on the stage is doing, from pointer down to up. */
   type Gesture =
     | {
@@ -1673,17 +1307,7 @@ function live(
     | { kind: 'textSelect'; frame: Frame; around: Box[] }
     | { kind: 'textBox'; frame: Frame; around: Box[]; parentId: string; from: Point; to: Point }
     | { kind: 'imageBox'; frame: Frame; around: Box[]; parentId: string; from: Point; to: Point; asset: PlacedAsset }
-    | {
-        kind: 'crop'
-        frame: Frame
-        around: Box[]
-        id: string
-        corner: number | null
-        grab: Point
-        start: CropTarget
-        roots: string[]
-        end: () => void
-      }
+    | CropDrag
     | {
         kind: 'draw'
         tool: DrawTool
@@ -1695,18 +1319,7 @@ function live(
         roots: string[]
         end: () => void
       }
-    | {
-        kind: 'path'
-        frame: Frame
-        around: Box[]
-        layer: Reshaping
-        path: PenPath
-        grab: Point
-        moved: boolean
-        roots: string[]
-        end: () => void
-        drag: { anchors: AnchorRef[] } | { ref: AnchorRef; side: Side; from: Point; mirror: boolean }
-      }
+    | PathDrag
   let gesture: Gesture | null = null
   /**
    * What a click selects alone when the pointer doesn't move first: one of several selected
@@ -1959,7 +1572,7 @@ function live(
     }
     // Text that grows with its words takes the size its new width and sizes give it.
     for (const id of new Set([...g.roots.filter((root) => now.nodes[root]?.type === 'text'), ...g.texts.keys()]))
-      fitText(id, g.frame.formatId)
+      typing.fitText(id, g.frame.formatId)
   }
 
   /**
@@ -2204,7 +1817,7 @@ function live(
   /** The handle under a screen point: one to resize by, or the zone outside a corner to turn by. */
   function handleUnder(screen: Point): { kind: 'resize'; handle: Handle } | { kind: 'rotate'; corner: number } | null {
     const outer = selectionBox()
-    if (!outer || editing || selection.pathEditing() || lockedSelection()) return null
+    if (!outer || typing.editing() || selection.pathEditing() || lockedSelection()) return null
     const { frame, drawn: box } = outer
     const onScreen = (p: Point) => toScreen(camera, { x: frame.x + p.x, y: frame.y + p.y })
     const c = centreOf(box)
@@ -2283,25 +1896,39 @@ function live(
         return
       }
       if (tool === 'pen') {
-        if (at) penDown(e, at)
+        if (at) pen.down(e, at)
         return
       }
       if (tool === 'text') {
         if (at) startTextBox(e, at)
         return
       }
-      if (selection.pathEditing() && startPathEdit(e, at)) return
-      if (selection.cropping() && startCrop(e, screen)) return
+      if (selection.pathEditing()) {
+        const drag = pen.pressPoints(e, at)
+        if (drag) {
+          gesture = drag
+          drawOverlay()
+          return
+        }
+      }
+      if (selection.cropping()) {
+        const drag = cropping.press(e, screen)
+        if (drag) {
+          gesture = drag
+          return
+        }
+      }
       const deepest = at && hitTest(scenes.scene(at.frame).layers, at.p, pickable)
+      const editing = typing.editing()
       if (at && editing && deepest?.id === editing.id && editing.frame === at.frame.key) {
         // In the text being edited (#47): a press puts the caret there, Shift extends the range to
         // it, a drag selects, and a third click selects the paragraph.
-        const offset = caretFromPoint(at.p)
+        const offset = typing.caretFromPoint(at.p)
         const node = session.design().nodes[editing.id]
         if (e.detail >= 3 && node?.type === 'text') {
-          selectText(paragraphAt(node.props.text, offset))
+          typing.selectText(paragraphAt(node.props.text, offset))
         } else {
-          caretTo(offset, e.shiftKey)
+          typing.caretTo(offset, e.shiftKey)
           if (e.detail <= 1) {
             canvas.setPointerCapture(e.pointerId)
             gesture = { kind: 'textSelect', frame: at.frame, around: [] }
@@ -2310,7 +1937,7 @@ function live(
         drawOverlay()
         return
       }
-      stopEditing()
+      typing.stop()
       clickedAlone = null
       pressedAt = screen
       const grabbed = handleUnder(screen)
@@ -2511,8 +2138,8 @@ function live(
         return
       }
       const screen = screenOf(e)
-      if (pen) {
-        penMove(e)
+      if (pen.drawing()) {
+        pen.move(e, screen)
         return
       }
       if (!gesture) {
@@ -2534,7 +2161,7 @@ function live(
       clickedAlone = null
       const p = localTo({ x: world.x - gesture.frame.x, y: world.y - gesture.frame.y }, gesture.around)
       if (gesture.kind === 'textSelect') {
-        caretTo(caretFromPoint(p), true)
+        typing.caretTo(typing.caretFromPoint(p), true)
         drawOverlay()
         return
       }
@@ -2548,11 +2175,11 @@ function live(
         return
       }
       if (gesture.kind === 'path') {
-        pathTo(gesture, p, e.shiftKey, e.altKey)
+        pen.dragPoints(gesture, p, e.shiftKey, e.altKey)
         return
       }
       if (gesture.kind === 'crop') {
-        cropTo(gesture, p)
+        cropping.drag(gesture, p)
         return
       }
       // Holding Ctrl (⌘ on a Mac) turns snapping off for as long as it is held.
@@ -2575,7 +2202,7 @@ function live(
    * The new layer and every change the drag makes to it are one undo step.
    */
   function startDrawing(e: PointerEvent, shape: DrawTool, at: { frame: Frame; p: Point }) {
-    stopEditing()
+    typing.stop()
     const now = session.design()
     const parentId = parentFor(at.frame, shape === 'frame' ? 'frame' : 'graphic', now)
     const around = containersOf(at.frame, parentId, now)
@@ -2595,72 +2222,9 @@ function live(
     runQuietly(() => session.run('node.update', { ids: [id], patch: drawnBox(shape, from, from, false, false) }))
   }
 
-  /**
-   * A press while cropping (#48): on a corner of the image it scales it, on the image it moves it,
-   * and anywhere else it ends the crop and acts as a press does. Each drag is one undo step.
-   */
-  function startCrop(e: PointerEvent, screen: Point) {
-    const cropping = selection.cropping()
-    const frame = cropping && frameOf(cropping.frame)
-    const target = frame && cropping && cropTarget(frame, cropping.id)
-    if (!frame || !target || !cropping) {
-      selection.crop(null)
-      return false
-    }
-    const { rect, around } = target
-    const onScreen = (q: Point) => {
-      const page = pageFrom(q, around)
-      return toScreen(camera, { x: frame.x + page.x, y: frame.y + page.y })
-    }
-    const corner = cornersOfRect(rect).findIndex((q) => {
-      const c = onScreen(q)
-      return Math.hypot(c.x - screen.x, c.y - screen.y) <= HANDLE_REACH
-    })
-    const world = toWorld(camera, screen)
-    const grab = localTo({ x: world.x - frame.x, y: world.y - frame.y }, around)
-    const onImage =
-      grab.x >= rect.x && grab.x <= rect.x + rect.width && grab.y >= rect.y && grab.y <= rect.y + rect.height
-    if (corner === -1 && !onImage) {
-      selection.crop(null)
-      drawOverlay()
-      return false
-    }
-    canvas.setPointerCapture(e.pointerId)
-    gesture = {
-      kind: 'crop',
-      frame,
-      around,
-      id: cropping.id,
-      corner: corner === -1 ? null : corner,
-      grab,
-      start: target,
-      roots: [],
-      end: session.beginGesture(),
-    }
-    return true
-  }
-  /** Writes the crop a drag gives, in this format, as the fill's own crop. */
-  function cropTo(g: Extract<Gesture, { kind: 'crop' }>, p: Point) {
-    const { start } = g
-    const rect =
-      g.corner === null
-        ? panned(start.rect, start.box, p.x - g.grab.x, p.y - g.grab.y)
-        : scaled(start.rect, start.box, g.corner, p)
-    const c = cropOf(rect, start.size, start.box)
-    const crop = {
-      x: Math.max(0, round(c.x)),
-      y: Math.max(0, round(c.y)),
-      width: round(c.width),
-      height: round(c.height),
-    }
-    const fills = start.fills.map((f, i) => (i === start.index ? { ...start.fill, fit: 'crop' as const, crop } : f))
-    runQuietly(() => session.run('node.update', { ids: [g.id], scope: scope(g.frame), patch: { fills } }))
-    drawOverlay()
-  }
-
   /** A press with the text tool (#47): a click makes text that grows as it is typed, a drag a box of that size. */
   function startTextBox(e: PointerEvent, at: { frame: Frame; p: Point }) {
-    stopEditing()
+    typing.stop()
     canvas.setPointerCapture(e.pointerId)
     gesture = { kind: 'textBox', ...boxStart(at, 'text') }
   }
@@ -2693,7 +2257,7 @@ function live(
    * Shift keeps to the image's shape. In the group or frame double-clicked into if it can hold it.
    */
   function startImageBox(e: PointerEvent, at: { frame: Frame; p: Point }, asset: PlacedAsset) {
-    stopEditing()
+    typing.stop()
     canvas.setPointerCapture(e.pointerId)
     gesture = { kind: 'imageBox', ...boxStart(at, 'graphic'), asset }
   }
@@ -2745,7 +2309,7 @@ function live(
     }
     tools.setTool('select')
     selection.select([id], g.frame.key)
-    startEditing(id, g.frame.key, 0, end, true)
+    typing.start(id, g.frame.key, 0, end, true)
   }
 
   /** Grows the shape being drawn to the pointer; a few screen pixels count as a click still. */
@@ -2753,215 +2317,6 @@ function live(
     if (!g.moved && Math.hypot(p.x - g.from.x, p.y - g.from.y) * camera.zoom < CLICK_SLOP) return
     g.moved = true
     runQuietly(() => session.run('node.update', { ids: [g.id], patch: drawnBox(g.tool, g.from, p, shift, alt) }))
-  }
-
-  /**
-   * A press while a path's points are being edited (#45): on a handle of a selected anchor, drag
-   * it; on an anchor, select it (Shift adds or takes it away) and drag the selected ones; on a
-   * segment, add an anchor there and drag it, all one undo step. Anywhere else leaves the path,
-   * and the press does what it would have done. Returns whether the press was the path's.
-   */
-  function startPathEdit(e: PointerEvent, at: { frame: Frame; p: Point } | null) {
-    const editingPath = selection.pathEditing()
-    const frame = editingPath && frameOf(editingPath.frame)
-    const found = frame && editingPath && pathIn(frame, editingPath.id)
-    const q = found && at?.frame.key === frame.key ? localTo(at.p, found.around) : null
-    const hit = found && q && hitPath(found.path, q, POINT_REACH / camera.zoom, editingPath.selected)
-    if (!editingPath || !frame || !found || !q || !hit) {
-      selection.editPath(null)
-      drawOverlay()
-      return false
-    }
-    let path = found.path
-    const layer: Reshaping = { id: editingPath.id, start: found.box, applied: { x: 0, y: 0 }, scope: scope(frame) }
-    const end = session.beginGesture()
-    let drag: Extract<Gesture, { kind: 'path' }>['drag']
-    if (hit.kind === 'control') {
-      drag = {
-        ref: hit.ref,
-        side: hit.side,
-        from: anchorOf(path, hit.ref)?.[hit.side] ?? q,
-        mirror: isSmooth(anchorOf(path, hit.ref) as Anchor),
-      }
-    } else if (hit.kind === 'anchor') {
-      const picked = editingPath.selected.some((r) => sameRef(r, hit.ref))
-      if (e.shiftKey)
-        selection.pickAnchors(
-          picked ? editingPath.selected.filter((r) => !sameRef(r, hit.ref)) : [...editingPath.selected, hit.ref],
-        )
-      else if (!picked) selection.pickAnchors([hit.ref])
-      drag = { anchors: editingPath.selected }
-    } else {
-      const split = splitSegment(path, hit.contour, hit.from, hit.t)
-      path = split.path
-      reshape(layer, path)
-      selection.pickAnchors([split.ref])
-      drag = { anchors: [split.ref] }
-    }
-    canvas.setPointerCapture(e.pointerId)
-    gesture = {
-      kind: 'path',
-      frame,
-      around: found.around,
-      layer,
-      path,
-      grab: q,
-      moved: false,
-      roots: [editingPath.id],
-      end,
-      drag,
-    }
-    drawOverlay()
-    return true
-  }
-
-  /** Drags anchors (Shift along one axis) or a handle (Shift in 45° steps; Alt lets a smooth anchor's other handle be). */
-  function pathTo(g: Extract<Gesture, { kind: 'path' }>, p: Point, shift: boolean, alt: boolean) {
-    if (!g.moved && Math.hypot(p.x - g.grab.x, p.y - g.grab.y) * camera.zoom < CLICK_SLOP) return
-    g.moved = true
-    let dx = p.x - g.grab.x
-    let dy = p.y - g.grab.y
-    if ('anchors' in g.drag) {
-      if (shift) {
-        if (Math.abs(dx) > Math.abs(dy)) dy = 0
-        else dx = 0
-      }
-      reshape(g.layer, moveAnchors(g.path, g.drag.anchors, round(dx), round(dy)))
-      return
-    }
-    const anchor = anchorOf(g.path, g.drag.ref)
-    if (!anchor) return
-    const to = { x: g.drag.from.x + dx, y: g.drag.from.y + dy }
-    const placed = shift ? constrain(anchor, to) : to
-    reshape(
-      g.layer,
-      moveControl(g.path, g.drag.ref, g.drag.side, { x: round(placed.x), y: round(placed.y) }, g.drag.mirror && !alt),
-    )
-  }
-
-  /** Takes the selected anchors out of the path being edited, or the layer once none would be left. One undo step. */
-  function deletePoints() {
-    const editingPath = selection.pathEditing()
-    const frame = editingPath && frameOf(editingPath.frame)
-    const found = frame && editingPath && pathIn(frame, editingPath.id)
-    if (!editingPath || !found || editingPath.selected.length === 0) return false
-    const next = deleteAnchors(found.path, editingPath.selected)
-    const parent = session.design().nodes[editingPath.id]?.parentId ?? ''
-    session.gesture(() => {
-      if (next.length === 0) runQuietly(() => session.run('node.delete', { ids: [editingPath.id] }))
-      else reshape({ id: editingPath.id, start: found.box, applied: { x: 0, y: 0 }, scope: scope(frame) }, next)
-      hug(session.design().nodes[parent] ? [parent] : next.length > 0 ? [editingPath.id] : [])
-    })
-    selection.pickAnchors([])
-    return true
-  }
-
-  /**
-   * A press with the pen (#45): a click adds a corner, a drag pulls out smooth handles, Shift turns
-   * the new segment to 45°, and a press on the first anchor closes the path. The first press
-   * starts one undo step that lasts until the path is closed or finished; the layer appears with
-   * the second anchor, inside the group, frame or boolean double-clicked into if it can hold it.
-   */
-  function penDown(e: PointerEvent, at: { frame: Frame; p: Point }) {
-    stopEditing()
-    if (pen && pen.frame.key !== at.frame.key) finishPen()
-    if (!pen) {
-      const now = session.design()
-      const parentId = parentFor(at.frame, 'graphic', now)
-      const around = containersOf(at.frame, parentId, now)
-      pen = {
-        frame: at.frame,
-        around,
-        parentId,
-        anchors: [],
-        closing: false,
-        dragging: null,
-        from: at.p,
-        moved: false,
-        hover: null,
-        layer: null,
-        end: session.beginGesture(),
-      }
-      selection.selectKeepingModes(null)
-    }
-    canvas.setPointerCapture(e.pointerId)
-    const p = localTo(at.p, pen.around)
-    const first = pen.anchors[0]
-    const last = pen.anchors.at(-1)
-    pen.from = p
-    pen.moved = false
-    if (first && pen.anchors.length >= 2 && Math.hypot(p.x - first.x, p.y - first.y) * camera.zoom <= POINT_REACH) {
-      pen.closing = true
-      pen.dragging = 0
-    } else {
-      const placed = e.shiftKey && last ? constrain(last, p) : p
-      pen.anchors.push({ x: round(placed.x), y: round(placed.y) })
-      pen.dragging = pen.anchors.length - 1
-    }
-    writePen()
-    drawOverlay()
-  }
-
-  /** Pulls the handles out of the anchor just placed (Shift in 45° steps, Alt only the one ahead), or shows the next segment to the pointer. */
-  function penMove(e: PointerEvent) {
-    if (!pen) return
-    const world = toWorld(camera, screenOf(e))
-    const p = localTo({ x: world.x - pen.frame.x, y: world.y - pen.frame.y }, pen.around)
-    const anchor = pen.dragging === null ? undefined : pen.anchors[pen.dragging]
-    if (!anchor) {
-      pen.hover = e.shiftKey && pen.anchors.at(-1) ? constrain(pen.anchors.at(-1) as Anchor, p) : p
-      drawOverlay()
-      return
-    }
-    if (!pen.moved && Math.hypot(p.x - pen.from.x, p.y - pen.from.y) * camera.zoom < CLICK_SLOP) return
-    pen.moved = true
-    const out = e.shiftKey ? constrain(anchor, p) : p
-    anchor.out = { x: round(out.x), y: round(out.y) }
-    if (!e.altKey) anchor.in = { x: round(2 * anchor.x - out.x), y: round(2 * anchor.y - out.y) }
-    writePen()
-    drawOverlay()
-  }
-
-  /** The press is over: a closing one finishes the path. */
-  function penUp() {
-    if (!pen) return
-    pen.dragging = null
-    if (pen.closing) finishPen()
-    else drawOverlay()
-  }
-
-  /** Writes the pen's path to its layer, making the layer at the second anchor. */
-  function writePen() {
-    if (!pen || pen.anchors.length < 2) return
-    const path: PenPath = [{ anchors: pen.anchors, closed: pen.closing }]
-    if (pen.layer) {
-      reshape(pen.layer, path)
-      return
-    }
-    const b = pathBounds(path)
-    if (!b) return
-    const box = { x: round(b.x), y: round(b.y), width: round(b.width), height: round(b.height), rotation: 0 }
-    const { parentId } = pen
-    let id = ''
-    const layer = newPath(formatPath(path, box), box)
-    if (
-      runQuietly(() => {
-        id = session.run('node.create', { parentId, layer })
-      })
-    )
-      pen.layer = { id, start: box, applied: { x: 0, y: 0 }, scope: scope(pen.frame) }
-  }
-
-  /** Ends the pen's path, closed or open: the undo step ends, the new layer is selected, and the select tool comes back. */
-  function finishPen() {
-    const done = pen
-    if (!done) return
-    pen = null
-    if (done.layer) hug([done.layer.id])
-    done.end()
-    if (done.layer && session.design().nodes[done.layer.id]) selection.select([done.layer.id], done.frame.key)
-    tools.setTool('select')
-    drawOverlay()
   }
 
   /**
@@ -3004,8 +2359,8 @@ function live(
   const endDrag = () => {
     pressing = false
     snapped = null
-    if (pen && !pan) {
-      penUp()
+    if (pen.drawing() && !pan) {
+      pen.up()
       return
     }
     if (gesture?.kind === 'draw') {
@@ -3028,7 +2383,9 @@ function live(
       return
     }
     if (gesture?.kind === 'reorder') finishReorder(gesture)
-    if (gesture && gesture.kind !== 'marquee') {
+    if (gesture?.kind === 'path') pen.releasePoints(gesture)
+    else if (gesture?.kind === 'crop') cropping.release(gesture)
+    else if (gesture && gesture.kind !== 'marquee') {
       hug(gesture.roots)
       gesture.end()
     }
@@ -3089,10 +2446,11 @@ function live(
       const at = pointIn(e)
       const hit = at && hitTest(scenes.scene(at.frame).layers, at.p, pickable)
       if (!at || !hit || lockedAt(at.frame, at.p)) return
+      const editing = typing.editing()
       if (editing && hit.id === editing.id && editing.frame === at.frame.key) {
         // A double click in the text being edited selects the word there (#47).
         const node = session.design().nodes[editing.id]
-        if (node?.type === 'text') selectText(wordAt(node.props.text, caretFromPoint(at.p)))
+        if (node?.type === 'text') typing.selectText(wordAt(node.props.text, typing.caretFromPoint(at.p)))
         drawOverlay()
         return
       }
@@ -3100,7 +2458,7 @@ function live(
       const container = design.nodes[picked]
       if (picked !== hit.id && container && isContainer(container.type)) {
         // Into the group, frame or boolean: what is directly inside it under the pointer gets picked.
-        stopEditing()
+        typing.stop()
         selection.enter(picked)
         selection.selectKeepingModes(null)
         selection.select([target(hit.id, at.frame.key)], at.frame.key)
@@ -3108,7 +2466,7 @@ function live(
       }
       if (cropTarget(at.frame, hit.id) && !design.nodes[hit.id]?.lock?.style) {
         // Into cropping its image fill (#48).
-        stopEditing()
+        typing.stop()
         selection.select([hit.id], at.frame.key)
         selection.crop({ id: hit.id, frame: at.frame.key })
         drawOverlay()
@@ -3116,17 +2474,17 @@ function live(
       }
       if (isPath(design, hit.id) && !design.nodes[hit.id]?.lock?.style) {
         // Into a path's points (#45).
-        stopEditing()
+        typing.stop()
         selection.select([hit.id], at.frame.key)
         selection.editPath({ id: hit.id, frame: at.frame.key })
         drawOverlay()
         return
       }
       if (hit.type !== 'text' || design.nodes[hit.id]?.lock?.content) return
-      stopEditing()
+      typing.stop()
       selection.selectKeepingModes({ ids: [hit.id], frame: at.frame.key })
-      startEditing(hit.id, at.frame.key, 0)
-      caretTo(caretFromPoint(at.p))
+      typing.start(hit.id, at.frame.key, 0)
+      typing.caretTo(typing.caretFromPoint(at.p))
       drawOverlay()
     },
     on,
@@ -3342,8 +2700,8 @@ function live(
       toolImage: () => tools.setTool('image'),
     }
     // The pen's path ends with Enter or Escape, open as it is (#45).
-    if (pen && (action === 'deselect' || action === 'editPoints')) {
-      finishPen()
+    if (pen.drawing() && (action === 'deselect' || action === 'editPoints')) {
+      pen.finish()
       return true
     }
     // Enter or Escape ends a crop (#48).
@@ -3359,7 +2717,7 @@ function live(
         return true
       }
       if (action === 'delete') {
-        deletePoints()
+        pen.deletePoints()
         drawOverlay()
         return true
       }
@@ -3367,9 +2725,9 @@ function live(
     const viewAction = view[action]
     if (viewAction) {
       if (action === 'undo' || action === 'redo') {
-        finishPen()
+        pen.finish()
         endDrag()
-        stopEditing()
+        typing.stop()
       }
       viewAction()
       return true
@@ -3624,7 +2982,7 @@ function live(
       return
     }
     if (inDialog(e.target)) return
-    if (!editing) {
+    if (!typing.editing()) {
       if (e.code === 'Space' && !(e.metaKey || e.ctrlKey)) {
         e.preventDefault()
         if (!spaceHeld) {
@@ -3636,102 +2994,7 @@ function live(
       }
       return
     }
-    const mod = e.metaKey || e.ctrlKey
-    // The document, not the last drawn scene: keys can come faster than redraws.
-    const node = session.design().nodes[editing.id]
-    if (node?.type !== 'text') return
-    const text = node.props.text
-    const range = textRange() ?? { start: 0, end: 0 }
-    const caret = Math.min(anchorOffset(doc, editing.caret) ?? 0, text.length)
-    const selected = range.end > range.start
-    const { id } = editing
-    const key = e.key.toLowerCase()
-    /** Replaces the selected range with text, or with nothing; the caret ends after what went in. */
-    const replace = (inserted: string) => {
-      const ok = runQuietly(() => {
-        if (selected)
-          session.run('text.edit', { id, op: { kind: 'delete', at: range.start, length: range.end - range.start } })
-        if (inserted) session.run('text.edit', { id, op: { kind: 'insert', at: range.start, text: inserted } })
-      })
-      // The anchor sits after the character before the caret, so inserting at the caret leaves it
-      // before the new text; it is moved past it.
-      if (ok) caretTo(range.start + inserted.length)
-      return ok
-    }
-    /** The caret's offset on the line above or below, or at the start or end of its line. */
-    const lineMove = (to: 'up' | 'down' | 'home' | 'end') => {
-      const laid = editingText()
-      if (!laid) return caret
-      const at = caretPosition(ck, laid.laid, caret)
-      if (to === 'home' || to === 'end') return caretAt(ck, laid.laid, to === 'home' ? -1e6 : 1e6, at.y + at.height / 2)
-      const y = to === 'up' ? at.y - at.height / 2 : at.y + at.height * 1.5
-      if (y < 0) return 0
-      if (y > laid.laid.height) return text.length
-      return caretAt(ck, laid.laid, at.x, y)
-    }
-    if (e.key === 'Escape') {
-      stopEditing()
-    } else if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
-      // Logical order: right-to-left text moves the other way on screen, as most editors do. With
-      // a range and no Shift, the caret goes to its near end.
-      const forward = e.key === 'ArrowRight'
-      if (selected && !e.shiftKey) caretTo(forward ? range.end : range.start)
-      else caretTo(step(text, caret, forward), e.shiftKey)
-    } else if (e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'Home' || e.key === 'End') {
-      caretTo(lineMove(({ ArrowUp: 'up', ArrowDown: 'down', Home: 'home', End: 'end' } as const)[e.key]), e.shiftKey)
-    } else if (mod && key === 'a') {
-      selectText({ start: 0, end: text.length })
-    } else if ((mod && ['b', 'i', 'u'].includes(key)) || (mod && e.shiftKey && key === 'x')) {
-      // Style keys (#47) style the selected range, in the base, so every format shows it.
-      const toggle: StyleToggle =
-        key === 'b' ? 'bold' : key === 'i' ? 'italic' : key === 'u' ? 'underline' : 'strikethrough'
-      if (selected)
-        runQuietly(() =>
-          session.run('text.edit', {
-            id,
-            op: {
-              kind: 'style',
-              at: range.start,
-              length: range.end - range.start,
-              style: toggled(node.props, range, toggle),
-            },
-          }),
-        )
-    } else if (e.key === 'Backspace' && (selected || caret > 0)) {
-      if (selected) replace('')
-      else if (
-        runQuietly(() =>
-          session.run('text.edit', {
-            id,
-            op: { kind: 'delete', at: step(text, caret, false), length: caret - step(text, caret, false) },
-          }),
-        )
-      )
-        caretTo(step(text, caret, false))
-    } else if (e.key === 'Delete' && (selected || caret < text.length)) {
-      if (selected) replace('')
-      else
-        runQuietly(() =>
-          session.run('text.edit', { id, op: { kind: 'delete', at: caret, length: step(text, caret, true) - caret } }),
-        )
-    } else if (e.key === 'Enter') {
-      replace('\n')
-    } else if (e.key.length > 0 && [...e.key].length === 1 && !mod) {
-      // Text is shared by every format, so typing writes the base.
-      replace(e.key)
-    } else {
-      // Copy, cut and paste come as their own events; anything else is the page's.
-      return
-    }
-    e.preventDefault()
-    if (session.design().nodes[id] !== node) fitText(id)
-    drawOverlay()
-  }
-  /** The text being edited and its selected range, for the clipboard. */
-  function clipboardText() {
-    const node = editing && session.design().nodes[editing.id]
-    const range = textRange()
-    return node?.type === 'text' && range ? { id: node, text: node.props.text, range } : null
+    typing.key(e)
   }
   /**
    * The selected layers as a tree for the clipboard (#49), bottom to top with everything inside
@@ -3740,7 +3003,7 @@ function live(
   function copiedLayers(): LayerClipboard | null {
     const current = selection.current()
     const frame = current && frameOf(current.frame)
-    if (!frame || editing) return null
+    if (!frame || typing.editing()) return null
     const now = session.design()
     const stacked: string[] = []
     const walk = (parentId: string) => {
@@ -3843,7 +3106,7 @@ function live(
     }
     const box = made.tree.nodes[made.root]?.props
     if (!box) return null
-    stopEditing()
+    typing.stop()
     let ids: string[] = []
     const ok = runQuietly(() =>
       session.gesture(() => {
@@ -3856,7 +3119,7 @@ function live(
         // Text is measured in its font, as the editor lays it out.
         const placed = session.design()
         const fitTexts = (id: string) => {
-          if (placed.nodes[id]?.type === 'text') fitText(id)
+          if (placed.nodes[id]?.type === 'text') typing.fitText(id)
           for (const [child] of childrenOf(placed, id)) fitTexts(child)
         }
         for (const root of ids) fitTexts(root)
@@ -3876,13 +3139,7 @@ function live(
     'copy',
     (e) => {
       if (inField(e.target) || !e.clipboardData) return
-      const at = clipboardText()
-      if (at) {
-        if (at.range.end === at.range.start) return
-        e.clipboardData.setData('text/plain', at.text.slice(at.range.start, at.range.end))
-        e.preventDefault()
-        return
-      }
+      if (typing.copy(e)) return
       const copied = copiedLayers()
       if (!copied) return
       putOnClipboard(e.clipboardData, copied)
@@ -3893,7 +3150,7 @@ function live(
   window.addEventListener(
     'cut',
     (e) => {
-      if (!editing && !inField(e.target) && e.clipboardData) {
+      if (!typing.editing() && !inField(e.target) && e.clipboardData) {
         const copied = copiedLayers()
         if (!copied) return
         putOnClipboard(e.clipboardData, copied)
@@ -3901,22 +3158,7 @@ function live(
         perform('delete')
         return
       }
-      const at = clipboardText()
-      if (!at || !editing || inField(e.target) || at.range.end === at.range.start) return
-      e.clipboardData?.setData('text/plain', at.text.slice(at.range.start, at.range.end))
-      e.preventDefault()
-      const { id } = editing
-      if (
-        runQuietly(() =>
-          session.run('text.edit', {
-            id,
-            op: { kind: 'delete', at: at.range.start, length: at.range.end - at.range.start },
-          }),
-        )
-      )
-        caretTo(at.range.start)
-      fitText(id)
-      drawOverlay()
+      if (!inField(e.target)) typing.cut(e)
     },
     on,
   )
@@ -3924,7 +3166,7 @@ function live(
     'paste',
     (e) => {
       if (inField(e.target)) return
-      if (!editing) {
+      if (!typing.editing()) {
         // Layers copied in this or another design, or an SVG file or its markup; anything else on the
         // clipboard isn't ours to paste.
         const tree = layersOnClipboard(e.clipboardData)
@@ -3948,19 +3190,7 @@ function live(
         pasteAtPointer = false
         return
       }
-      const at = clipboardText()
-      if (!at) return
-      const pasted = (e.clipboardData?.getData('text/plain') ?? '').replace(/\r\n?/g, '\n')
-      e.preventDefault()
-      const { id } = editing
-      const { start, end } = at.range
-      const ok = runQuietly(() => {
-        if (end > start) session.run('text.edit', { id, op: { kind: 'delete', at: start, length: end - start } })
-        if (pasted) session.run('text.edit', { id, op: { kind: 'insert', at: start, text: pasted } })
-      })
-      if (ok) caretTo(start + pasted.length)
-      fitText(id)
-      drawOverlay()
+      typing.paste(e)
     },
     on,
   )
@@ -4029,7 +3259,7 @@ function live(
         if (node.props.style.fontFamily === family || !here.has(family)) continue
         if (!runQuietly(() => session.run('node.bind', { ids: [id], target: 'fontFamily', ref, value: family })))
           continue
-        fitText(id)
+        typing.fitText(id)
       }
     })
   }
@@ -4043,7 +3273,7 @@ function live(
     selection: () => [...(selection.current()?.ids ?? [])],
     selectedFrame: () => selection.current()?.frame ?? null,
     select(ids: string[], pageId?: string, formatId?: string) {
-      stopEditing()
+      typing.stop()
       selection.select(
         ids.filter((id) => session.design().nodes[id]),
         defaultFrame(pageId, formatId).key,
@@ -4145,7 +3375,7 @@ function live(
           // Text that grows the size of its words fits them again, in the formats the change reached.
           for (const [id, patch] of writes) {
             if (Object.keys(patch).some((key) => SIZES_TEXT.has(key)))
-              fitText(id, everyFormat ? undefined : frame.formatId)
+              typing.fitText(id, everyFormat ? undefined : frame.formatId)
           }
           hug([...writes.keys()])
         }),
@@ -4172,7 +3402,7 @@ function live(
       const corners = cornersOf(drawn).map((p) => toScreen(camera, { x: frame.x + p.x, y: frame.y + p.y }))
       const xs = corners.map((c) => c.x)
       const ys = corners.map((c) => c.y)
-      if (!editing) {
+      if (!typing.editing()) {
         const label = sizeLabelTop(ys)
         ys.push(label, label + SIZE_LABEL_HEIGHT)
       }
@@ -4195,17 +3425,9 @@ function live(
       return [...(selection.current()?.ids ?? [])]
     },
     busy: () => gesture !== null,
-    textSelection: () => selectedText(),
-    textSelectionStyles() {
-      const selected = selectedText()
-      const now = session.design()
-      const node = selected && now.nodes[selected.id]
-      if (!selected || !editing || node?.type !== 'text') return null
-      const own = now.overrides[formatScope(String(frameOf(editing.frame)?.formatId))]?.[selected.id]?.style as
-        Partial<typeof node.props.style> | undefined
-      return stylesIn({ ...node.props, style: { ...node.props.style, ...own } }, selected.range)
-    },
-    styleTextSelection: (style: RunStyle) => styleSelectedText(style),
+    textSelection: () => typing.selectedText(),
+    textSelectionStyles: () => typing.selectionStyles(),
+    styleTextSelection: (style: RunStyle) => typing.styleSelectedText(style),
     onTextSelection(listener: () => void) {
       textSelectionListeners.add(listener)
       return () => textSelectionListeners.delete(listener)
@@ -4228,7 +3450,8 @@ function live(
       focused = formatId && design.formats[formatId] ? formatId : null
       grid = frameGrid(design, focused)
       selection.dropOffGrid()
-      if (editing && !frameOf(editing.frame)) stopEditing()
+      const editing = typing.editing()
+      if (editing && !frameOf(editing.frame)) typing.stop()
       fitAll()
     },
     camera: () => camera,
@@ -4301,21 +3524,21 @@ function live(
       return runQuietly(() =>
         session.gesture(() => {
           session.run('override.reset', { ids, scope, ...(paths ? { paths } : {}) })
-          for (const id of ids) fitText(id, scope.slice('format:'.length))
+          for (const id of ids) typing.fitText(id, scope.slice('format:'.length))
         }),
       )
     },
     loadedFamilies: () => resources.families(),
     async setFont(fontFamily: string, fontWeight?: number) {
       const ids = (selection.current()?.ids ?? []).filter((id) => session.design().nodes[id]?.type === 'text')
-      const range = selectedText()
+      const range = typing.selectedText()
       if (ids.length === 0 && !range) return
       await resources.loadFamilies([fontFamily])[0]
       if (listening.signal.aborted) return
       if (range) {
         const node = session.design().nodes[range.id]
         if (node?.type === 'text' && range.range.end <= node.props.text.length)
-          styleRange(range, { fontFamily, ...(fontWeight === undefined ? {} : { fontWeight }) })
+          typing.styleRange(range, { fontFamily, ...(fontWeight === undefined ? {} : { fontWeight }) })
         return
       }
       const current = session.design()
@@ -4328,7 +3551,7 @@ function live(
             runQuietly(() => session.run('node.bind', { ids: [id], target: 'fontFamily', ref: null }))
           const style = { ...node.props.style, fontFamily, ...(fontWeight === undefined ? {} : { fontWeight }) }
           runQuietly(() => session.run('node.update', { ids: [id], patch: { style } }))
-          fitText(id)
+          typing.fitText(id)
         }
       })
     },
@@ -4359,7 +3582,7 @@ function live(
           )
             continue
           changed++
-          if (target === 'fontFamily') fitText(id)
+          if (target === 'fontFamily') typing.fitText(id)
         }
       })
       return changed
@@ -4374,7 +3597,7 @@ function live(
       const frame = spot ? frameOf(spot.frame) : middleFrame()
       if (!frame) return null
       const at = spot ? { x: spot.x, y: spot.y } : { x: frame.width / 2, y: frame.height / 2 }
-      stopEditing()
+      typing.stop()
       let id = ''
       if (
         !runQuietly(() => {
@@ -4390,14 +3613,14 @@ function live(
       placeSvg(text, name, !where ? {} : 'frame' in where ? { spot: where } : { client: where }),
     spotAt,
     stopEditing: () => {
-      if (!editing) return
-      stopEditing()
+      if (!typing.editing()) return
+      typing.stop()
       drawOverlay()
     },
     settle() {
-      if (!editing && !pen) return
-      stopEditing()
-      finishPen()
+      if (!typing.editing() && !pen.drawing()) return
+      typing.stop()
+      pen.finish()
       drawOverlay()
     },
     destroyed: () => listening.signal.aborted,
@@ -4420,7 +3643,7 @@ function live(
         .find((f) => f?.pageId === page)
       const frame = near ?? frameOf(frameKey(page, now.meta.primaryFormatId))
       dropTarget = null
-      stopEditing()
+      typing.stop()
       const ok = runQuietly(() =>
         session.gesture(() => {
           session.run('node.update', { ids: [id], patch: { fills: withImage(fills, asset.id) } })
