@@ -6,8 +6,10 @@
 // earlier; a pop-up opened over it, with the focus in it, closes before it.
 import { useEffect, useEffectEvent, useRef } from 'react'
 
+/** The attribute that marks what stands over the edit panel, the bar's second row and the selection. */
+const MARK = 'data-over-panel'
 /** What stands over the edit panel, the bar's second row and the selection, so Esc closes it first. */
-export const OVER_PANEL = '[data-over-panel]'
+export const OVER_PANEL = `[${MARK}]`
 
 /** Where a pop-up drawn over the page sits, as Radix draws the editor's. */
 const POP_UP = '[data-radix-popper-content-wrapper]'
@@ -19,7 +21,8 @@ const shown: object[] = []
  * Closes a menu on Esc or a press outside `box`, which holds its `button` and the menu. Esc is the
  * menu's before anything under it, unless a pop-up with the focus in it, or a list open in the menu,
  * as a select's, takes it to close first; it gives the focus back to the button when it was in the
- * menu, or nowhere. `over` goes on `box`, marking it while the menu is open.
+ * menu, or nowhere. `overPanelMark` goes on `box`, marking it as standing over the panel while
+ * the menu is open.
  */
 export function useMenuClose(open: boolean, close: () => void) {
   const box = useRef<HTMLDivElement>(null)
@@ -48,7 +51,7 @@ export function useMenuClose(open: boolean, close: () => void) {
       window.removeEventListener('pointerdown', onPress)
     }
   }, [open])
-  return { box, button, over: { 'data-over-panel': open ? '' : undefined } }
+  return { box, button, overPanelMark: { [MARK]: open ? '' : undefined } }
 }
 
 /** Whether the focus is in a pop-up drawn over the page, which closes first, on its own Esc. */

@@ -29,11 +29,11 @@ export function AccountMenu({
   const t = useMessages()
   const [open, setOpen] = useState(false)
   // Closes on Esc, before what is under it, or a press outside, giving the focus back to the avatar.
-  const { box, button, over } = useMenuClose(open, () => setOpen(false))
+  const { box, button, overPanelMark } = useMenuClose(open, () => setOpen(false))
   const id = useId()
 
   return (
-    <div ref={box} {...over} className="relative">
+    <div ref={box} {...overPanelMark} className="relative">
       <button
         ref={button}
         type="button"
