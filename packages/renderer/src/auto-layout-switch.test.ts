@@ -1,5 +1,6 @@
 // Switching a box to auto layout at the commands seam (#46): node.autoLayout reads the settings
-// off where the children are, so every child is where it was, in every format, once laid out.
+// off where the children are, so every child is where it was once laid out, and the linked
+// copies in the other frame stay as they were.
 import { describe, expect, it } from 'vitest'
 
 import { loadDesign, openSession, readDesign } from '@dazbee/doc'
@@ -14,6 +15,7 @@ const measure: MeasureText = (props, width) => ({ width: width ?? props.text.len
 type Node = DesignInput['nodes'][string]
 const rect = (
   parentId: string,
+  link: string,
   index: string,
   x: number,
   y: number,
@@ -24,14 +26,16 @@ const rect = (
   ({
     type: 'graphic',
     parentId,
+    link,
     index,
     name: index,
     props: { x, y, width, height, shape: { kind: 'rect' }, ...more },
   }) as Node
-const label = (parentId: string, index: string, x: number, y: number, text: string): Node =>
+const label = (parentId: string, link: string, index: string, x: number, y: number, text: string): Node =>
   ({
     type: 'text',
     parentId,
+    link,
     index,
     name: text,
     props: {
@@ -46,49 +50,64 @@ const label = (parentId: string, index: string, x: number, y: number, text: stri
   }) as Node
 
 const design = (): DesignInput => ({
-  meta: { designId: 'd', name: 'Switch', kind: 'single', primaryFormatId: 'sq' },
-  formats: {
-    sq: { name: 'Square', width: 1080, height: 1080, order: 'a0' },
-    wide: { name: 'Wide', width: 1200, height: 628, order: 'a1' },
-  },
+  meta: { designId: 'd', name: 'Switch' },
   pages: { p1: { name: 'Page 1', order: 'a0' } },
+  frames: {
+    sq: { pageId: 'p1', name: 'Square', width: 1080, height: 1080, x: 0, y: 0, order: 'a0' },
+    wide: { pageId: 'p1', name: 'Wide', width: 1200, height: 628, x: 1280, y: 0, order: 'a1' },
+  },
   nodes: {
     // A row centred across, 20 apart, its children out of order in the layer list.
     bar: {
       type: 'box',
-      parentId: 'p1',
+      parentId: 'sq',
+      link: 'bar',
       index: 'a0',
       name: 'Bar',
       props: { x: 100, y: 100, width: 600, height: 200 },
     },
-    big: rect('bar', 'a0', 300, 120, 100, 100),
-    small: rect('bar', 'a1', 120, 140, 100, 60),
-    word: label('bar', 'a2', 240, 160, 'Sale'),
-    badge: rect('bar', 'a3', 650, 90, 30, 30, { absolute: true }),
+    big: rect('bar', 'big', 'a0', 300, 120, 100, 100),
+    small: rect('bar', 'small', 'a1', 120, 140, 100, 60),
+    word: label('bar', 'word', 'a2', 240, 160, 'Sale'),
+    badge: rect('bar', 'badge', 'a3', 650, 90, 30, 30, { absolute: true }),
     // A column lined up at the end, 8 apart.
     list: {
       type: 'box',
-      parentId: 'p1',
+      parentId: 'sq',
+      link: 'list',
       index: 'a1',
       name: 'List',
       props: { x: 100, y: 400, width: 300, height: 300 },
     },
-    one: rect('list', 'a0', 180, 420, 200, 40),
-    two: rect('list', 'a1', 280, 468, 100, 40),
-  },
-  // In the wide format the bar sits elsewhere and its children are spread wider.
-  overrides: {
-    'format:wide': {
-      bar: { x: 500, y: 300 },
-      big: { x: 740, y: 320 },
-      small: { x: 520, y: 340 },
-      word: { x: 660, y: 360 },
-      badge: { x: 1050, y: 290 },
+    one: rect('list', 'one', 'a0', 180, 420, 200, 40),
+    two: rect('list', 'two', 'a1', 280, 468, 100, 40),
+    // In the wide frame the bar's copy sits elsewhere and its children are spread wider.
+    'wide-bar': {
+      type: 'box',
+      parentId: 'wide',
+      link: 'bar',
+      index: 'a0',
+      name: 'Bar',
+      props: { x: 500, y: 300, width: 600, height: 200 },
     },
+    'wide-big': rect('wide-bar', 'big', 'a0', 740, 320, 100, 100),
+    'wide-small': rect('wide-bar', 'small', 'a1', 520, 340, 100, 60),
+    'wide-word': label('wide-bar', 'word', 'a2', 660, 360, 'Sale'),
+    'wide-badge': rect('wide-bar', 'badge', 'a3', 1050, 290, 30, 30, { absolute: true }),
+    'wide-list': {
+      type: 'box',
+      parentId: 'wide',
+      link: 'list',
+      index: 'a1',
+      name: 'List',
+      props: { x: 100, y: 400, width: 300, height: 300 },
+    },
+    'wide-one': rect('wide-list', 'one', 'a0', 180, 420, 200, 40),
+    'wide-two': rect('wide-list', 'two', 'a1', 280, 468, 100, 40),
   },
 })
 
-function boxes(json: unknown, formatId: string) {
+function boxes(json: unknown, frameId: string) {
   const parsed = parseDesign(json)
   if (!parsed.success) throw new Error(parsed.errors.join('\n'))
   const all = new Map<string, { x: number; y: number; width: number; height: number }>()
@@ -97,17 +116,28 @@ function boxes(json: unknown, formatId: string) {
       all.set(l.id, { x: l.props.x, y: l.props.y, width: l.props.width, height: l.props.height })
       walk(l.children)
     })
-  walk(render(parsed.design, 'p1', formatId, undefined, measure).layers)
+  walk(render(parsed.design, frameId, undefined, measure).layers)
   return all
 }
 
+/** Every layer of a frame within half a pixel of where it was. */
+function expectWhereTheyWere(json: unknown, frameId: string, before: ReturnType<typeof boxes>) {
+  const after = boxes(json, frameId)
+  for (const [id, was] of before) {
+    const now = after.get(id)
+    for (const key of ['x', 'y', 'width', 'height'] as const)
+      expect(Math.abs((now?.[key] ?? NaN) - was[key]), `${frameId} ${id}.${key}`).toBeLessThanOrEqual(0.5)
+  }
+}
+
 describe('node.autoLayout', () => {
-  it('lays the children out where they already were, in every format, within half a pixel', () => {
+  it('lays the children out where they already were, in the one frame, within half a pixel', () => {
     const parsed = parseDesign(design())
     if (!parsed.success) throw new Error(parsed.errors.join('\n'))
     const doc = loadDesign(parsed.design)
     const tab = openSession(doc)
-    const before = { sq: boxes(readDesign(doc), 'sq'), wide: boxes(readDesign(doc), 'wide') }
+    const before = readDesign(doc)
+    const was = { sq: boxes(before, 'sq'), wide: boxes(before, 'wide') }
     tab.gesture(() => {
       tab.run('node.autoLayout', { id: 'bar', on: true })
       tab.run('node.autoLayout', { id: 'list', on: true })
@@ -119,29 +149,33 @@ describe('node.autoLayout', () => {
     expect(d.nodes.list?.props).toMatchObject({
       layout: { direction: 'column', gap: 8, align: 'end', padding: { right: 20, top: 20 } },
     })
-    // The wide format's children are 40 apart there, so it gets its own gap.
-    expect(d.overrides['format:wide']?.bar?.layout).toMatchObject({ direction: 'row', gap: 40 })
-    // The flow's order is the children's order on the page; the absolute badge keeps its place.
+    // The flow's order is the children's order on the frame; the absolute badge keeps its place.
     const order = Object.entries(d.nodes)
       .filter(([, n]) => n.parentId === 'bar')
       .sort(([, a], [, b]) => (a.index < b.index ? -1 : 1))
       .map(([id]) => id)
     expect(order).toEqual(['small', 'word', 'big', 'badge'])
-    for (const formatId of ['sq', 'wide'] as const) {
-      const after = boxes(d, formatId)
-      for (const [id, was] of before[formatId]) {
-        const now = after.get(id)
-        for (const key of ['x', 'y', 'width', 'height'] as const)
-          expect(Math.abs((now?.[key] ?? NaN) - was[key]), `${formatId} ${id}.${key}`).toBeLessThanOrEqual(0.5)
-      }
-    }
-    // One undo step takes it off again; off removes it everywhere.
+    expectWhereTheyWere(d, 'sq', was.sq)
+    // The linked copies in the wide frame stay as they were.
+    for (const [id, node] of Object.entries(before.nodes)) if (id.startsWith('wide-')) expect(d.nodes[id]).toEqual(node)
+
+    // The wide frame's copy is switched on its own; its children are 40 apart there, so it gets its own gap.
+    tab.run('node.autoLayout', { id: 'wide-bar', on: true })
+    const wide = readDesign(doc)
+    expect(wide.nodes['wide-bar']?.props).toMatchObject({ layout: { direction: 'row', gap: 40 } })
+    expect(wide.nodes.bar?.props).toEqual(d.nodes.bar?.props)
+    expectWhereTheyWere(wide, 'wide', was.wide)
+
+    // One undo step takes each off again; off removes it from the one layer.
+    tab.undo()
+    expect(readDesign(doc).nodes['wide-bar']?.props).not.toHaveProperty('layout')
     tab.undo()
     expect(readDesign(doc).nodes.bar?.props).not.toHaveProperty('layout')
     tab.redo()
+    tab.redo()
     tab.run('node.autoLayout', { id: 'bar', on: false })
     expect(readDesign(doc).nodes.bar?.props).not.toHaveProperty('layout')
-    expect(readDesign(doc).overrides['format:wide']?.bar).not.toHaveProperty('layout')
+    expect(readDesign(doc).nodes['wide-bar']?.props).toHaveProperty('layout')
     expect(() => tab.run('node.autoLayout', { id: 'big', on: true })).toThrow(
       /"big" is a graphic; only boxes have auto layout/,
     )

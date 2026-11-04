@@ -7,7 +7,7 @@ import type { SceneLayer } from '../scene.ts'
 type GraphicLayer = Extract<SceneLayer, { type: 'graphic' }>
 type BooleanLayer = Extract<SceneLayer, { type: 'boolean' }>
 
-/** A clip wider than any page, so clipping to it changes nothing. */
+/** A clip wider than any frame, so clipping to it changes nothing. */
 export const EVERYWHERE = Float32Array.of(-1e6, -1e6, 1e6, 1e6)
 
 export const rectPath = (ck: CanvasKit, box: Rect) =>

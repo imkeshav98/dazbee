@@ -6,13 +6,13 @@ import type { SceneLayer } from './scene.ts'
 
 export type LayerPictures = ReturnType<typeof layerPictures>
 
-/** Wide enough for any layer on any page: playback never clips to it, the page clip does. */
+/** Wide enough for any layer in any frame: playback never clips to it, the frame clip does. */
 const ANYWHERE = 1e6
 
 /**
  * Each top-level layer recorded once and kept, for the editor's screen (#36): recording a frame
  * again replays the layers that didn't change, so typing in one layer costs one layer, not the
- * page. A layer is known by its object, which `render` with a `SceneMemo` keeps while nothing it
+ * frame. A layer is known by its object, which `render` with a `SceneMemo` keeps while nothing it
  * draws changes; the whole cache goes when the fonts or images it was drawn with do. The oldest
  * pictures go past `limit`.
  */
