@@ -1,6 +1,5 @@
 {
   "meta": {
-    "schemaVersion": 2,
     "designId": "text-styles",
     "name": "Text styles",
     "kind": "single",
@@ -387,7 +386,7 @@
         "y": 210,
         "width": 320,
         "height": 60,
-        "text": "नया razzlr ऑफ़र आज",
+        "text": "नया dazbee ऑफ़र आज",
         "style": {
           "fontFamily": "Noto Sans Devanagari",
           "fontSize": 32,
@@ -653,7 +652,7 @@
         "y": 210,
         "width": 320,
         "height": 60,
-        "text": "عرض razzlr اليوم",
+        "text": "عرض dazbee اليوم",
         "style": {
           "fontFamily": "Noto Naskh Arabic",
           "fontSize": 32,

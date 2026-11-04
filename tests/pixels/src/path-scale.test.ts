@@ -39,7 +39,7 @@ const design = (
   box: { width: number; height: number },
   wide?: { width: number; height: number },
 ) => ({
-  meta: { schemaVersion: 5, designId: 'd', name: 'Path scale', kind: 'single', primaryFormatId: 'f' },
+  meta: { designId: 'd', name: 'Path scale', kind: 'single', primaryFormatId: 'f' },
   formats: {
     f: { name: 'F', width: 400, height: 200, order: 'a0' },
     w: { name: 'W', width: 400, height: 200, order: 'a1' },

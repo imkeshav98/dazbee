@@ -13,7 +13,7 @@ import { brand, call, db, sibling } from '../test-api.ts'
 // A design's picture for the home's bento (#84), drawn with CanvasKit like an export.
 describe('design thumbnails', { timeout: 30_000 }, () => {
   const story = (color: string) => ({
-    meta: { schemaVersion: 5, designId: 'ignored', name: 'Story', kind: 'single', primaryFormatId: 'st' },
+    meta: { designId: 'ignored', name: 'Story', kind: 'single', primaryFormatId: 'st' },
     formats: {
       sq: { name: 'Square', width: 1080, height: 1080, order: 'a0' },
       st: { name: 'Story', width: 1080, height: 1920, order: 'a1' },

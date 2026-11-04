@@ -3,7 +3,7 @@
 // routes that copy stored content into a new design.
 import { describe, expect, it, vi } from 'vitest'
 
-import { DesignSummary, SCHEMA_VERSION, TemplateSummary } from '@dazbee/schema'
+import { DesignSummary, TemplateSummary } from '@dazbee/schema'
 
 import { brand, call } from './test-api.ts'
 import { createDesign, InvalidContent } from './workspace/designs.ts'
@@ -15,7 +15,7 @@ vi.mock('./workspace/designs.ts', async (importOriginal) => {
 
 /** One blank page. */
 const blank = {
-  meta: { schemaVersion: SCHEMA_VERSION, designId: 'any', name: 'Plain', kind: 'single', primaryFormatId: 'sq' },
+  meta: { designId: 'any', name: 'Plain', kind: 'single', primaryFormatId: 'sq' },
   formats: { sq: { name: 'Square', width: 200, height: 200, order: 'a0' } },
   pages: { p1: { name: 'Page 1', order: 'a0', fills: [{ type: 'solid', color: '#FFFFFFFF' }] } },
   nodes: {},

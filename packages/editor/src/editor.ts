@@ -63,7 +63,7 @@ export async function startEditor(options: EditorOptions) {
   const doc = new Y.Doc()
   // The design kept in this browser (#37): a crash, a closed tab or a reload without a connection
   // loses nothing, and edits made offline merge when the sync server is back.
-  const local = new IndexeddbPersistence(`razzlr-design-${designId}`, doc)
+  const local = new IndexeddbPersistence(`dazbee-design-${designId}`, doc)
   const provider = new HocuspocusProvider({
     url: syncUrl,
     name: designId,

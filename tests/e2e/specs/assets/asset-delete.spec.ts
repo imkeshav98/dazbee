@@ -18,7 +18,6 @@ const run = randomUUID().slice(0, 8)
 const unique = (tag: string) => new Uint8Array(Buffer.concat([Buffer.from(photo), Buffer.from(`${run}-${tag}`)]))
 const design = (assetId?: string): DesignInput => ({
   meta: {
-    schemaVersion: 5,
     designId: 'replaced-by-the-api',
     name: 'Delete images',
     kind: 'single',

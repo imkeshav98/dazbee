@@ -18,7 +18,7 @@ const stroke = (align: 'inside' | 'center' | 'outside') => [
 ]
 /** A 300 square page holding a 200 rounded rect, or a boolean of two overlapping squares, stroked 10 wide. */
 const design = (align: 'inside' | 'center' | 'outside', kind: 'shape' | 'boolean') => ({
-  meta: { schemaVersion: 5, designId: 'd', name: 'Outside strokes', kind: 'single', primaryFormatId: 'f' },
+  meta: { designId: 'd', name: 'Outside strokes', kind: 'single', primaryFormatId: 'f' },
   formats: { f: { name: 'F', width: 300, height: 300, order: 'a0' } },
   pages: { p1: { name: 'Page', order: 'a0', fills: solid('#FFFFFFFF') } },
   nodes:

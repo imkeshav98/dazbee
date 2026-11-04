@@ -19,7 +19,6 @@ export const rect = (x: number, y: number, width: number, height: number, color:
 
 export const layersDesign = (): DesignInput => ({
   meta: {
-    schemaVersion: 5,
     designId: 'replaced-by-the-api',
     name: 'Layers panel',
     kind: 'single',

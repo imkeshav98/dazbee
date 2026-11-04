@@ -20,7 +20,7 @@ const rect = (parentId: string, index: string, extra: Record<string, unknown> = 
  */
 const design: Design = (() => {
   const parsed = parseDesign({
-    meta: { schemaVersion: 5, designId: 'd', name: 'D', kind: 'single', primaryFormatId: 'sq' },
+    meta: { designId: 'd', name: 'D', kind: 'single', primaryFormatId: 'sq' },
     formats: {
       sq: { name: 'Square', width: 1080, height: 1080, order: 'a0' },
       banner: { name: 'Banner', width: 320, height: 50, order: 'a1' },

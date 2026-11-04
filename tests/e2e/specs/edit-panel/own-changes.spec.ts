@@ -13,7 +13,6 @@ test.describe.configure({ timeout: 120_000 })
 
 const design = (): DesignInput => ({
   meta: {
-    schemaVersion: 5,
     designId: 'replaced-by-the-api',
     name: 'Own changes',
     kind: 'single',

@@ -13,7 +13,7 @@ import { signSyncToken } from '@dazbee/sync-token'
 
 import { createSyncServer } from './server.ts'
 
-const DATABASE_URL = process.env.DATABASE_URL ?? 'postgres://razzlr:razzlr-local@127.0.0.1:55432/razzlr'
+const DATABASE_URL = process.env.DATABASE_URL ?? 'postgres://dazbee:dazbee-local@127.0.0.1:55432/dazbee'
 const { db, close } = openDatabase(DATABASE_URL)
 const secret = 'sync-test-secret-'.padEnd(32, 'x')
 const server = createSyncServer({ db, secret, port: 0 })

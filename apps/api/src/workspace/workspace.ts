@@ -6,7 +6,7 @@ import { and, asc, eq } from 'drizzle-orm'
 import { brands, type Db, workspaces } from '@dazbee/db'
 import type { BrandSummary, UpdateWorkspace, WorkspaceSummary } from '@dazbee/schema'
 
-const workspaceSummary = { id: workspaces.id, name: workspaces.name, kind: workspaces.kind }
+const workspaceSummary = { id: workspaces.id, name: workspaces.name }
 
 export async function findWorkspace(db: Db, workspaceId: string): Promise<WorkspaceSummary | null> {
   const [row] = await db.select(workspaceSummary).from(workspaces).where(eq(workspaces.id, workspaceId))
@@ -16,11 +16,11 @@ export async function findWorkspace(db: Db, workspaceId: string): Promise<Worksp
 export async function updateWorkspace(
   db: Db,
   workspaceId: string,
-  { kind, name }: UpdateWorkspace,
+  { name }: UpdateWorkspace,
 ): Promise<WorkspaceSummary | null> {
   const [row] = await db
     .update(workspaces)
-    .set({ ...(kind ? { kind } : {}), ...(name ? { name } : {}) })
+    .set({ name })
     .where(eq(workspaces.id, workspaceId))
     .returning(workspaceSummary)
   return row ?? null

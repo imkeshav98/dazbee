@@ -45,7 +45,7 @@ const rect = (
   },
 })
 const json = {
-  meta: { schemaVersion: 5, designId: 'd', name: 'Turned', kind: 'single', primaryFormatId: 'sq' },
+  meta: { designId: 'd', name: 'Turned', kind: 'single', primaryFormatId: 'sq' },
   formats: {
     sq: { name: 'Square', width: 400, height: 400, order: 'a0' },
     wide: { name: 'Wide', width: 800, height: 400, order: 'a1' },

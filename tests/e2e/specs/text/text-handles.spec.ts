@@ -31,7 +31,6 @@ const text = (id: string, props: Record<string, unknown>, extra: Record<string, 
 })
 const design = (nodes: Record<string, unknown>): DesignInput => ({
   meta: {
-    schemaVersion: 5,
     designId: 'replaced-by-the-api',
     name: 'Text handles',
     kind: 'single',

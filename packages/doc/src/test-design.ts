@@ -8,7 +8,7 @@ import { openSession } from './session.ts'
 
 /** A small design for tests: one page, a square and a banner, a box and a headline. */
 export const testDesign = (): DesignInput => ({
-  meta: { schemaVersion: 5, designId: 'd1', name: 'Test', kind: 'single', primaryFormatId: 'sq' },
+  meta: { designId: 'd1', name: 'Test', kind: 'single', primaryFormatId: 'sq' },
   formats: {
     sq: { name: 'Square', width: 1080, height: 1080, order: 'a0' },
     banner: { name: 'Banner', width: 320, height: 50, order: 'a1' },
@@ -51,7 +51,7 @@ export const testDesign = (): DesignInput => ({
 
 /** Three shapes (a rect with its own corners, a star, a triangle) and a text, in a square and a wide format. */
 export const shapesDesign = (): DesignInput => ({
-  meta: { schemaVersion: 5, designId: 'd1', name: 'Booleans', kind: 'single', primaryFormatId: 'sq' },
+  meta: { designId: 'd1', name: 'Booleans', kind: 'single', primaryFormatId: 'sq' },
   formats: {
     sq: { name: 'Square', width: 1080, height: 1080, order: 'a0' },
     wide: { name: 'Wide', width: 1200, height: 628, order: 'a1' },

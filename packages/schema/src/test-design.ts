@@ -1,8 +1,6 @@
-import { SCHEMA_VERSION } from './migrate.ts'
-
 /** The smallest valid design: one page, one format, one rectangle. */
 export const minimal = () => ({
-  meta: { schemaVersion: SCHEMA_VERSION, designId: 'd1', name: 'Minimal', kind: 'single', primaryFormatId: 'sq' },
+  meta: { designId: 'd1', name: 'Minimal', kind: 'single', primaryFormatId: 'sq' },
   formats: { sq: { name: 'Square', width: 1080, height: 1080, order: 'a0' } },
   pages: { p1: { name: 'Page 1', order: 'a0', fills: [{ type: 'solid', color: '#FFFFFFFF' }] } },
   nodes: {

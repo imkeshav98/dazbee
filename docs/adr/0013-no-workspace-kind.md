@@ -6,7 +6,7 @@ Now the app asks nothing about who it is for. Every workspace calls its brands b
 
 The rest of ADR-0011 stands: a workspace with brands inside, each brand a wall.
 
-The `kind` column and the API's `kind` field stay for now, unused by the web app, so no data is dropped; removing them is a later migration.
+The workspaces table has no `kind` column, and the API's workspace has no `kind` field.
 
 ## Considered
 

@@ -10,7 +10,6 @@ import {
   type LayerTree,
   type Paint,
   type Point,
-  SCHEMA_VERSION,
 } from '@dazbee/schema'
 import { type Skipped, SVG_TYPE, SvgError, svgMarkup, svgToLayers } from '@dazbee/svg'
 
@@ -164,7 +163,6 @@ export function editorPlace({
     for (const id of tops) add(id)
     return {
       kind: 'dazbee.layers',
-      schemaVersion: SCHEMA_VERSION,
       designId,
       tree: { nodes, roots: tops },
     }

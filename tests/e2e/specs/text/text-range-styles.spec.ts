@@ -12,7 +12,6 @@ test.describe.configure({ timeout: 180_000 })
 
 const design = (): DesignInput => ({
   meta: {
-    schemaVersion: 5,
     designId: 'replaced-by-the-api',
     name: 'Range styles',
     kind: 'single',
@@ -45,7 +44,7 @@ const design = (): DesignInput => ({
         y: 400,
         width: 920,
         height: 130,
-        text: 'خصم Razzlr اليوم',
+        text: 'خصم Dazbee اليوم',
         style: { fontFamily: 'Noto Naskh Arabic', fontSize: 80, color: '#1F2329FF' },
       },
     },
@@ -130,7 +129,7 @@ test('one word made pink, larger and another font from the bar; the rest keeps i
 test('bold and italic across an Arabic and Latin boundary, from the bar', async ({ browser }) => {
   const { page, errors } = await openStage(browser, design())
   await dblclick(page, 500, 460)
-  // From after "خص" across "م " into "Raz": offsets 2 to 7.
+  // From after "خص" across "م " into "Daz": offsets 2 to 7.
   await page.keyboard.press('ControlOrMeta+A')
   await page.keyboard.press('ArrowLeft')
   for (let i = 0; i < 2; i++) await page.keyboard.press('ArrowRight')
@@ -166,12 +165,12 @@ test('bold and italic across an Arabic and Latin boundary, from the bar', async 
   await page.keyboard.type('!')
   await expect
     .poll(async () => ((await read(page)).nodes.mixed?.props as { text: string }).text)
-    .toBe('خصم Razzlr اليوم!')
+    .toBe('خصم Dazbee اليوم!')
   await page.keyboard.press('Escape')
   await page.keyboard.press('ControlOrMeta+Z')
   await expect
     .poll(async () => ((await read(page)).nodes.mixed?.props as { text: string }).text)
-    .toBe('خصم Razzlr اليوم')
+    .toBe('خصم Dazbee اليوم')
   expect(await runOver(page, 'mixed', 2, 7)).toMatchObject({ color: '#E0157FFF' })
   await page.keyboard.press('ControlOrMeta+Z')
   await expect.poll(() => runOver(page, 'mixed', 2, 7)).not.toHaveProperty('color')

@@ -7,7 +7,6 @@ export const DEV_BRAND = 'dev-brand-coffee'
 /** A design for the live editing checks: shapes to drag, and English and Arabic text to type into. */
 export const liveDesign = (): DesignInput => ({
   meta: {
-    schemaVersion: 5,
     designId: 'replaced-by-the-api',
     name: 'Live editing',
     kind: 'single',

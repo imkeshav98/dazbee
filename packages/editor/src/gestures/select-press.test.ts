@@ -19,7 +19,7 @@ const rect = (parentId: string, index: string, box: { x: number; y: number; widt
 })
 /** A frame holding a dot, a box beside it, and a pin locked in place, on one page in a square. */
 const DESIGN: DesignInput = {
-  meta: { schemaVersion: 5, designId: 'd', name: 'D', kind: 'single', primaryFormatId: 'sq' },
+  meta: { designId: 'd', name: 'D', kind: 'single', primaryFormatId: 'sq' },
   formats: { sq: { name: 'Square', width: 1080, height: 1080, order: 'a0' } },
   pages: { p1: { name: 'One', order: 'a0' } },
   nodes: {

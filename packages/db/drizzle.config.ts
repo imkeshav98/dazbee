@@ -1,6 +1,6 @@
 import { defineConfig } from 'drizzle-kit'
 
-// `pnpm --filter @dazbee/db migration` writes a migration for schema changes; never edit one by hand.
+// `pnpm --filter @dazbee/db migration` writes the initial migration from tables.ts; never edit it by hand.
 export default defineConfig({
   dialect: 'postgresql',
   schema: './src/tables.ts',

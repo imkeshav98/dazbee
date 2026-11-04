@@ -7,13 +7,13 @@ services:
   postgres:
     image: postgres:16-alpine
     environment:
-      POSTGRES_USER: razzlr
-      POSTGRES_PASSWORD: razzlr-local
-      POSTGRES_DB: razzlr
+      POSTGRES_USER: dazbee
+      POSTGRES_PASSWORD: dazbee-local
+      POSTGRES_DB: dazbee
     ports:
       - '127.0.0.1:55432:5432'
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U razzlr -d razzlr']
+      test: ['CMD-SHELL', 'pg_isready -U dazbee -d dazbee']
       interval: 30s
       start_period: 60s
       start_interval: 1s
@@ -24,8 +24,8 @@ services:
   storage:
     image: rustfs/rustfs:1.0.4
     environment:
-      RUSTFS_ACCESS_KEY: razzlr
-      RUSTFS_SECRET_KEY: razzlr-local-secret
+      RUSTFS_ACCESS_KEY: dazbee
+      RUSTFS_SECRET_KEY: dazbee-local-secret
       RUSTFS_VOLUMES: /data
     ports:
       - '127.0.0.1:59000:9000'
@@ -42,7 +42,7 @@ services:
     working_dir: /repo
     command: ['node', 'apps/api/src/main.ts']
     environment:
-      DATABASE_URL: postgres://razzlr:razzlr-local@postgres:5432/razzlr
+      DATABASE_URL: postgres://dazbee:dazbee-local@postgres:5432/dazbee
       API_PORT: '8787'
       # A local-only key; deployed servers get their own from the environment.
       SYNC_TOKEN_SECRET: ${SYNC_TOKEN_SECRET:-local-only-sync-token-secret-0000}
@@ -54,9 +54,9 @@ services:
       WORKOS_REDIRECT_URI: ${WORKOS_REDIRECT_URI:-}
       SESSION_SECRET: ${SESSION_SECRET:-local-only-session-secret-0000000}
       STORAGE_ENDPOINT: http://storage:9000
-      STORAGE_BUCKET: razzlr
-      STORAGE_ACCESS_KEY_ID: razzlr
-      STORAGE_SECRET_ACCESS_KEY: razzlr-local-secret
+      STORAGE_BUCKET: dazbee
+      STORAGE_ACCESS_KEY_ID: dazbee
+      STORAGE_SECRET_ACCESS_KEY: dazbee-local-secret
       STORAGE_REGION: us-east-1
       # Signed upload URLs must name an address the browser and tests can reach.
       STORAGE_PUBLIC_ENDPOINT: http://127.0.0.1:59000
@@ -89,7 +89,7 @@ services:
     working_dir: /repo
     command: ['node', 'apps/sync/src/main.ts']
     environment:
-      DATABASE_URL: postgres://razzlr:razzlr-local@postgres:5432/razzlr
+      DATABASE_URL: postgres://dazbee:dazbee-local@postgres:5432/dazbee
       SYNC_PORT: '1234'
       SYNC_TOKEN_SECRET: ${SYNC_TOKEN_SECRET:-local-only-sync-token-secret-0000}
     volumes:

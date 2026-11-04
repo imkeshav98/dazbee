@@ -32,7 +32,6 @@ const text = (y: number, fontFamily: string, fontWeight: number, words: string) 
 })
 const design = (): DesignInput => ({
   meta: {
-    schemaVersion: 5,
     designId: 'replaced-by-the-api',
     name: 'Font check',
     kind: 'single',

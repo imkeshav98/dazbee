@@ -10,7 +10,7 @@ import { type CroppingDeps, editorCropping } from './cropping.ts'
 
 /** A box 200 × 100 filled with a square image, which covers it: the image's whole sits 200 × 200 around it. */
 const DESIGN: DesignInput = {
-  meta: { schemaVersion: 5, designId: 'd', name: 'D', kind: 'single', primaryFormatId: 'sq' },
+  meta: { designId: 'd', name: 'D', kind: 'single', primaryFormatId: 'sq' },
   formats: { sq: { name: 'Square', width: 1080, height: 1080, order: 'a0' } },
   pages: { p1: { name: 'One', order: 'a0' } },
   nodes: {

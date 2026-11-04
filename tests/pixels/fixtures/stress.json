@@ -1,6 +1,5 @@
 {
   "meta": {
-    "schemaVersion": 1,
     "designId": "stress",
     "name": "Stress",
     "kind": "single",

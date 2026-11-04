@@ -15,7 +15,6 @@ test.describe.configure({ timeout: 120_000 })
 const run = randomUUID().slice(0, 8)
 const design = (): DesignInput => ({
   meta: {
-    schemaVersion: 5,
     designId: 'replaced-by-the-api',
     name: `Autumn sale ${run}`,
     kind: 'single',

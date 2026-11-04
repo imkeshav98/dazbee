@@ -29,7 +29,6 @@ const rect = (
 
 const design = (): DesignInput => ({
   meta: {
-    schemaVersion: 5,
     designId: 'replaced-by-the-api',
     name: 'Auto layout',
     kind: 'single',

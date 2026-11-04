@@ -5,8 +5,8 @@ import { and, asc, desc, eq } from 'drizzle-orm'
 import * as Y from 'yjs'
 
 import { type Db, designs, designStates, readDesignState } from '@dazbee/db'
-import { loadDesign, migrateDoc, readDesign } from '@dazbee/doc'
-import { type Design, type DesignInput, type DesignSummary, parseDesign, SCHEMA_VERSION } from '@dazbee/schema'
+import { loadDesign, readDesign } from '@dazbee/doc'
+import { type Design, type DesignInput, type DesignSummary, parseDesign } from '@dazbee/schema'
 
 export class InvalidContent extends Error {}
 
@@ -29,7 +29,7 @@ const toSummary = (row: {
 
 /** One blank 1080×1080 page: what a design starts as when nothing else is given. */
 const blankDesign = (designId: string, name: string): DesignInput => ({
-  meta: { schemaVersion: SCHEMA_VERSION, designId, name, kind: 'single', primaryFormatId: 'sq' },
+  meta: { designId, name, kind: 'single', primaryFormatId: 'sq' },
   formats: { sq: { name: 'Square', width: 1080, height: 1080, order: 'a0' } },
   pages: { p1: { name: 'Page 1', order: 'a0', fills: [{ type: 'solid', color: '#FFFFFFFF' }] } },
   nodes: {},
@@ -116,7 +116,6 @@ export async function storedDesign(db: Db, designId: string): Promise<Design | n
   if (!state) return null
   const doc = new Y.Doc()
   Y.applyUpdate(doc, state)
-  migrateDoc(doc)
   return readDesign(doc)
 }
 

@@ -1,6 +1,5 @@
 {
   "meta": {
-    "schemaVersion": 1,
     "designId": "english-sale-ad",
     "name": "English sale ad",
     "kind": "single",
@@ -153,6 +152,7 @@
       "name": "Price block",
       "role": "price",
       "props": {
+        "blendMode": "pass-through",
         "x": 40,
         "y": 920,
         "width": 220,
@@ -172,6 +172,7 @@
       "index": "a0",
       "name": "Price and was-price",
       "props": {
+        "blendMode": "pass-through",
         "x": 60,
         "y": 930,
         "width": 600,

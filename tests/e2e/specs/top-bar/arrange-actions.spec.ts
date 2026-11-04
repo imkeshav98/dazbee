@@ -26,7 +26,6 @@ const square = (name: string, index: string, x: number, color: string) => ({
 
 const design = (): DesignInput => ({
   meta: {
-    schemaVersion: 5,
     designId: 'replaced-by-the-api',
     name: 'Layer actions',
     kind: 'single',

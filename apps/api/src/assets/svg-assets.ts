@@ -5,7 +5,7 @@ import { FALLBACK_FAMILIES } from '@dazbee/fonts'
 import { loadFontFiles } from '@dazbee/fonts/node'
 import { renderDesign } from '@dazbee/renderer'
 import { loadCanvasKit } from '@dazbee/renderer/node'
-import { MAX_SVG_BYTES, SCHEMA_VERSION } from '@dazbee/schema'
+import { MAX_SVG_BYTES } from '@dazbee/schema'
 import { SVG_TYPE, SvgError, svgMarkup, svgToLayers } from '@dazbee/svg'
 
 import type { ImageHeader } from './images.ts'
@@ -37,7 +37,6 @@ export async function svgThumbnail(bytes: Uint8Array, size: number): Promise<Uin
   )
   const design = {
     meta: {
-      schemaVersion: SCHEMA_VERSION,
       designId: 'thumbnail',
       name: 'Thumbnail',
       kind: 'single',

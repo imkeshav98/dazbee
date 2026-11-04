@@ -135,7 +135,6 @@ test.describe('the focus as a menu of the bar closes', () => {
   /** One page in one format, holding the layer A. */
   const oneLayer = (): DesignInput => ({
     meta: {
-      schemaVersion: 5,
       designId: 'replaced-by-the-api',
       name: 'Bar menu focus',
       kind: 'single',
