@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 import { loadCanvasKit } from '@dazbee/renderer/node'
 
@@ -19,6 +19,59 @@ const problem = (text: string) => {
   }
   return 'none'
 }
+
+/** The elements the conversion has read, while `limit` is set: past it, the next read throws. */
+const reads = vi.hoisted(() => ({ count: 0, limit: Number.POSITIVE_INFINITY }))
+vi.mock('./style.ts', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./style.ts')>()
+  return {
+    ...actual,
+    // The conversion works out the style of each element it reads, so this counts the reads.
+    styleOf: (...args: Parameters<typeof actual.styleOf>) => {
+      if (++reads.count > reads.limit) throw new Error(`read more than ${reads.limit} elements`)
+      return actual.styleOf(...args)
+    },
+  }
+})
+/** What the conversion makes of `text`, and how many elements it read, stopping it past `limit`. */
+const elementsRead = (text: string, limit: number) => {
+  reads.count = 0
+  reads.limit = limit
+  try {
+    return { problem: problem(text), count: reads.count }
+  } finally {
+    reads.limit = Number.POSITIVE_INFINITY
+  }
+}
+
+/**
+ * How many times longer the conversion takes on `large` than on `small`, from the fastest of
+ * several runs of each taken in turn, so a busy machine slows both alike. For an input ten times as
+ * long, it is about 10 when the time grows linearly and about 100 when it grows quadratically.
+ * The runs stop early once `large` has taken a quarter of a second in all, so a slow machine or
+ * slow code still finishes soon.
+ */
+const growth = (small: string, large: string) => {
+  const timed = (text: string) => {
+    const started = performance.now()
+    problem(text)
+    return performance.now() - started
+  }
+  // A first run of the small input, untimed, so the code it runs is compiled before it is timed.
+  problem(small)
+  let fastestSmall = Number.POSITIVE_INFINITY
+  let fastestLarge = Number.POSITIVE_INFINITY
+  let spent = 0
+  for (let run = 0; run < 5 && spent < 250; run++) {
+    fastestSmall = Math.min(fastestSmall, timed(small))
+    const took = timed(large)
+    fastestLarge = Math.min(fastestLarge, took)
+    spent += took
+  }
+  return fastestLarge / fastestSmall
+}
+/** The most `growth` may be for an input ten times as long: well above linear, well below quadratic. */
+const LINEAR = 30
 
 describe('svgToLayers', () => {
   it('makes a path layer for each shape, in one group, with its box in the design', () => {
@@ -173,11 +226,13 @@ describe('svgToLayers with hostile files', () => {
     const fan = (id: string, to: string) =>
       `<g id="${id}">${Array.from({ length: 10 }, () => `<use href="#${to}"/>`).join('')}</g>`
     const levels = Array.from({ length: 30 }, (_, i) => fan(`e${i + 1}`, `e${i}`)).join('')
-    const started = performance.now()
-    expect(problem(svg(`<defs><g id="e0"/>${levels}</defs><rect width="5" height="5"/><use href="#e30"/>`))).toBe(
-      'too-big',
+    // The conversion's work budget: it reads at most this many elements, then refuses the file.
+    const read = elementsRead(
+      svg(`<defs><g id="e0"/>${levels}</defs><rect width="5" height="5"/><use href="#e30"/>`),
+      100_000,
     )
-    expect(performance.now() - started).toBeLessThan(2_000)
+    expect(read.problem).toBe('too-big')
+    expect(read.count).toBeLessThanOrEqual(100_000)
   })
 
   it('leaves out a mask that masks itself, or two that mask each other', () => {
@@ -201,12 +256,16 @@ describe('svgToLayers with hostile files', () => {
     expect(problem(svg(`<defs><rect id="c0" width="1" height="1"/>${chain}</defs><use href="#c30"/>`))).toBe('too-big')
   })
 
-  it('reads a flood of comments or a style sheet with no braces in a moment', () => {
-    const started = performance.now()
-    expect(problem(`${'<!--a-->'.repeat(5_000)}x`)).toBe('unreadable')
-    expect(problem(svg(`<style>${'a'.repeat(200_000)}</style><rect width="5" height="5"/>`))).toBe('none')
-    expect(problem(svg(`<style>${'/*'.repeat(50_000)}</style><rect width="5" height="5"/>`))).toBe('none')
-    expect(performance.now() - started).toBeLessThan(2_000)
+  it('reads a flood of comments or a style sheet with no braces in linear time', () => {
+    const comments = (n: number) => `${'<!--a-->'.repeat(n)}x`
+    const noBraces = (n: number) => svg(`<style>${'a'.repeat(n)}</style><rect width="5" height="5"/>`)
+    const openComments = (n: number) => svg(`<style>${'/*'.repeat(n)}</style><rect width="5" height="5"/>`)
+    expect(problem(comments(500))).toBe('unreadable')
+    expect(problem(noBraces(20_000))).toBe('none')
+    expect(problem(openComments(5_000))).toBe('none')
+    expect(growth(comments(500), comments(5_000))).toBeLessThan(LINEAR)
+    expect(growth(noBraces(20_000), noBraces(200_000))).toBeLessThan(LINEAR)
+    expect(growth(openComments(5_000), openComments(50_000))).toBeLessThan(LINEAR)
   })
 
   it('refuses what is not an SVG, or not well formed, or draws nothing', () => {
