@@ -1,8 +1,9 @@
 // What a person would see wrong with a page's layout at a screen size: pieces of the page drawn over
 // each other, controls drawn over each other, anything reaching past the window or cut short by
 // what holds it, words cut short by their box, and labels that run onto a second line; with the
-// editor's chrome and the screen sizes the checks run at.
-import type { Page } from '@playwright/test'
+// editor's chrome and the screen sizes the checks run at. Also whether a scrolling area shows that it
+// scrolls, and how tall a menu's rows are.
+import type { Locator, Page } from '@playwright/test'
 
 /** A box on screen, in CSS pixels from the window's top left corner. */
 export interface Rect {
@@ -194,3 +195,20 @@ export const wrapped = (page: Page) =>
     }
     return [...new Set(found)]
   })
+
+/** A scrolling area's state: whether it scrolls, its fade, and whether its overlay bar shows. */
+export const scrolling = (area: Locator) =>
+  area.evaluate((el) => {
+    const bar = el.querySelector('.os-scrollbar-vertical')
+    return {
+      scrolls: el.scrollHeight > el.clientHeight + 1,
+      fade: getComputedStyle(el).maskImage,
+      bar: Boolean(
+        bar?.classList.contains('os-scrollbar-visible') && !bar.classList.contains('os-scrollbar-auto-hide-hidden'),
+      ),
+    }
+  })
+
+/** The heights of the rows a menu holds, by a selector inside it, as laid out: its opening animation scales none. */
+export const rowHeights = (menu: Locator, rows: string) =>
+  menu.locator(rows).evaluateAll((els) => els.map((el) => (el as HTMLElement).offsetHeight))

@@ -5,7 +5,7 @@ import type { DesignInput } from '@dazbee/schema'
 
 import { writeOutput } from '../../support/editor.ts'
 import { enter } from '../../support/fields.ts'
-import { SCREEN_SIZES } from '../../support/layout.ts'
+import { SCREEN_SIZES, scrolling } from '../../support/layout.ts'
 import { fitSettled, nextFrame, openStage, order, perform, props, selectLayers } from '../../support/stage.ts'
 import { expect, type Page, test } from '../../support/test.ts'
 import { barMenu } from '../../support/top-bar.ts'
@@ -188,17 +188,7 @@ test('on a phone the sheet shows that it scrolls, with its bar, and scrolls to t
   // Away from the sheet, past the time an overlay bar takes to hide.
   await page.mouse.move(4, 300)
   await page.waitForTimeout(1_200)
-  expect(
-    await body.evaluate((el) => {
-      const bar = el.querySelector('.os-scrollbar-vertical')
-      return {
-        scrolls: el.scrollHeight > el.clientHeight + 1,
-        bar: Boolean(
-          bar?.classList.contains('os-scrollbar-visible') && !bar.classList.contains('os-scrollbar-auto-hide-hidden'),
-        ),
-      }
-    }),
-  ).toEqual({ scrolls: true, bar: true })
+  expect(await scrolling(body)).toMatchObject({ scrolls: true, bar: true })
   await body.evaluate((el) => el.scrollTo({ top: el.scrollHeight }))
   const shown = await body.boundingBox()
   for (const name of ['X position', 'Y position']) {

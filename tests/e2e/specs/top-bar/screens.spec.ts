@@ -1,12 +1,13 @@
 // The top bar (#287) on a phone, right to left and at tablet size: the phone's sheet, the edit
 // panel and the bar mirrored in Arabic, and the second row and its pop-ups with a flyout open at
-// tablet size.
+// tablet size; menus that show they scroll, and on a phone menu rows a finger can hit and menus
+// beside a row kept inside the screen.
 import { photo, upload } from '../../support/assets.ts'
 import { editorPath, screenPoint, setCookies, writeOutput } from '../../support/editor.ts'
-import { layoutProblems } from '../../support/layout.ts'
+import { layoutProblems, rowHeights, scrolling } from '../../support/layout.ts'
 import { seed } from '../../support/seed.ts'
-import { fitSettled, nextFrame, openStage, selectLayers } from '../../support/stage.ts'
-import { expect, type Locator, test } from '../../support/test.ts'
+import { drawn, fitSettled, nextFrame, openStage, selectLayers } from '../../support/stage.ts'
+import { expect, test } from '../../support/test.ts'
 import { barMenu, moreMenu, PIECES, UNCUT, zoomMenu } from '../../support/top-bar.ts'
 import { topBarDesign } from '../../support/top-bar-design.ts'
 
@@ -90,23 +91,27 @@ test("at tablet size with a flyout open, the bar's second row and its pop-ups an
   expect(errors).toEqual([])
 })
 
-test.describe('on a phone, 390×844', () => {
-  /** A scrolling area's state: whether it scrolls, its fade, and whether its overlay bar shows. */
-  const scrolling = (area: Locator) =>
-    area.evaluate((el) => {
-      const bar = el.querySelector('.os-scrollbar-vertical')
-      return {
-        scrolls: el.scrollHeight > el.clientHeight + 1,
-        fade: getComputedStyle(el).maskImage,
-        bar: Boolean(
-          bar?.classList.contains('os-scrollbar-visible') && !bar.classList.contains('os-scrollbar-auto-hide-hidden'),
-        ),
-      }
-    })
-  /** The heights of the rows a menu holds, by a selector inside it, as laid out: its opening animation scales none. */
-  const rowHeights = (menu: Locator, rows: string) =>
-    menu.locator(rows).evaluateAll((els) => els.map((el) => (el as HTMLElement).offsetHeight))
+test('at 1280×760 the right-click menu on a layer already selected shows that it scrolls, with a fade at its cut edge', async ({
+  browser,
+}) => {
+  const asset = await upload(photo)
+  const { page, errors } = await openStage(browser, topBarDesign(asset.id))
+  await fitSettled(page)
+  await selectLayers(page, ['photo'])
+  // The photo in the middle of the stage, where the menu has room for less than all its rows either way.
+  await page.evaluate(() => window.dazbee?.fitSelection())
+  await drawn(page)
+  const at = await screenPoint(page, 210, 870)
+  await page.mouse.click(at.x, at.y, { button: 'right' })
+  const menu = page.getByTestId('stage-menu')
+  await expect(menu).toBeVisible()
+  expect(await page.evaluate(() => window.dazbee?.selection())).toEqual(['photo'])
+  await expect.poll(async () => (await scrolling(menu)).scrolls).toBe(true)
+  await expect.poll(async () => (await scrolling(menu)).fade).toContain('gradient')
+  expect(errors).toEqual([])
+})
 
+test.describe('on a phone, 390×844', () => {
   test('the top bar scrolls sideways with no classic scrollbar', async ({ browser }) => {
     const asset = await upload(photo)
     const { page, errors } = await openStage(browser, topBarDesign(asset.id))
@@ -142,14 +147,18 @@ test.describe('on a phone, 390×844', () => {
     expect(errors).toEqual([])
   })
 
-  test('every menu row is at least 44 px tall: the full, right-click, shape and zoom menus', async ({ browser }) => {
+  test('every menu row is at least 44 px tall, the turn field too: the full, right-click, shape and zoom menus', async ({
+    browser,
+  }) => {
     const asset = await upload(photo)
     const { page, errors } = await openStage(browser, topBarDesign(asset.id))
     await page.setViewportSize({ width: 390, height: 844 })
     await fitSettled(page)
     await selectLayers(page, ['box'], { bar: true })
     const full = await moreMenu(page)
-    for (const height of await rowHeights(full, ':scope > button')) expect(height).toBeGreaterThanOrEqual(44)
+    await expect(full.locator('[data-scrub]')).toHaveCount(1)
+    for (const height of await rowHeights(full, ':scope > button, [data-scrub]'))
+      expect(height).toBeGreaterThanOrEqual(44)
     await page.keyboard.press('Escape')
 
     await selectLayers(page, [])
@@ -157,7 +166,9 @@ test.describe('on a phone, 390×844', () => {
     await page.mouse.click(at.x, at.y, { button: 'right' })
     const right = page.getByTestId('stage-menu')
     await expect(right).toBeVisible()
-    for (const height of await rowHeights(right, ':scope > button')) expect(height).toBeGreaterThanOrEqual(44)
+    await expect(right.locator('[data-scrub]')).toHaveCount(1)
+    for (const height of await rowHeights(right, ':scope > button, [data-scrub]'))
+      expect(height).toBeGreaterThanOrEqual(44)
     await page.keyboard.press('Escape')
     await expect(right).toBeHidden()
 
@@ -171,6 +182,64 @@ test.describe('on a phone, 390×844', () => {
     const zoom = await zoomMenu(page)
     for (const height of await rowHeights(zoom, 'button')) expect(height).toBeGreaterThanOrEqual(44)
     await page.keyboard.press('Escape')
+    expect(errors).toEqual([])
+  })
+
+  test("the Share menu's rows are 48 px tall, and the account menu's rows and a select's options at least 44 px", async ({
+    browser,
+  }) => {
+    const asset = await upload(photo)
+    const { page, errors } = await openStage(browser, topBarDesign(asset.id))
+    await page.evaluate(() => window.dazbee?.session.run('page.add', { id: 'p2', name: 'Page 2' }))
+    await page.setViewportSize({ width: 390, height: 844 })
+    await fitSettled(page)
+    await page.getByTestId('share-open').click()
+    const share = page.getByRole('menu', { name: 'Share and export' })
+    await expect(share).toBeVisible()
+    const shareRows = await rowHeights(share, '[role="menuitem"]')
+    expect(shareRows).toHaveLength(2)
+    for (const height of shareRows) expect(height).toBeGreaterThanOrEqual(48)
+
+    // The Export card's page list, a select.
+    await page.getByTestId('export-open').click()
+    const card = page.getByTestId('export')
+    await card.locator('[data-pages="one"]').click()
+    await card.getByTestId('export-page').click()
+    const options = page.getByRole('listbox', { name: 'Page' })
+    await expect(options).toBeVisible()
+    const optionRows = await rowHeights(options, '[role="option"]')
+    expect(optionRows).toHaveLength(2)
+    for (const height of optionRows) expect(height).toBeGreaterThanOrEqual(44)
+    await page.keyboard.press('Escape')
+    await expect(options).toBeHidden()
+    await page.keyboard.press('Escape')
+    await expect(card).toBeHidden()
+
+    await page.getByTestId('account-open').click()
+    const account = page.getByTestId('account')
+    await expect(account).toBeVisible()
+    const accountRows = await rowHeights(account, 'a, button, [role="radio"]')
+    expect(accountRows.length).toBeGreaterThanOrEqual(6)
+    for (const height of accountRows) expect(height).toBeGreaterThanOrEqual(44)
+    expect(errors).toEqual([])
+  })
+
+  test("a menu beside a row of the full menu opens inside the screen: Order's every row shows whole", async ({
+    browser,
+  }) => {
+    const asset = await upload(photo)
+    const { page, errors } = await openStage(browser, topBarDesign(asset.id))
+    await page.setViewportSize({ width: 390, height: 844 })
+    await fitSettled(page)
+    await selectLayers(page, ['box'], { bar: true })
+    const full = await moreMenu(page)
+    await full.getByTestId('more-order').click()
+    const order = page.getByTestId('more-order-menu')
+    await expect(order).toBeVisible()
+    for (const row of await order.getByRole('button').all()) {
+      const box = await row.boundingBox()
+      expect(box && box.x >= 0 && box.x + box.width <= 390 && box.y >= 0 && box.y + box.height <= 844).toBe(true)
+    }
     expect(errors).toEqual([])
   })
 

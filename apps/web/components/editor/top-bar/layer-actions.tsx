@@ -17,7 +17,7 @@ import { type Design, formatScope } from '@dazbee/schema'
 import { ALIGN, keyOf } from '@/components/editor/arrange-actions.ts'
 import { RotationField } from '@/components/editor/edit-panel/position-panel.tsx'
 import { set, shared, useTarget } from '@/components/editor/edit-panel/target.ts'
-import { useEditState } from '@/components/editor/edit-store.ts'
+import { useEditState, usePhone } from '@/components/editor/edit-store.ts'
 import { useSelection } from '@/components/editor/editor-hooks.ts'
 import { ICON_BUTTON, MENU, MENU_DIVIDER, MENU_ITEM, MENU_KEY } from '@/components/editor/styles.ts'
 import { cn } from '@/lib/cn.ts'
@@ -168,7 +168,8 @@ export function LayerActions({ editor, ids, onDone }: { editor: Editor; ids: str
         </SubMenu>
       )}
       {sized && (
-        <div className="px-1.5 py-1">
+        // On a phone the turn field is as tall as a row, a touch target a finger can hit.
+        <div className="px-1.5 py-1 max-sm:[&_[data-scrub]]:min-h-[44px]">
           <RotationField target={target} p={p} />
         </div>
       )}
@@ -336,9 +337,13 @@ export function AlignRow({ editor }: { editor: Editor }) {
   )
 }
 
-/** A row of the menu that opens a short menu beside it: Enter or the arrow towards it opens it, the arrow back or Esc closes it. */
+/**
+ * A row of the menu that opens a short menu beside it, or under it on a phone, where the screen has
+ * no room beside the menu: Enter or the arrow towards it opens it, the arrow back or Esc closes it.
+ */
 function SubMenu({ label, testId, children }: { label: string; testId: string; children: ReactNode }) {
   const [open, setOpen] = useState(false)
+  const phone = usePhone()
   const rtl = dirOf(useLocale()) === 'rtl'
   const [toward, back] = rtl ? ['ArrowLeft', 'ArrowRight'] : ['ArrowRight', 'ArrowLeft']
   const focus = useMenuFocus()
@@ -363,9 +368,9 @@ function SubMenu({ label, testId, children }: { label: string; testId: string; c
       </Popover.Trigger>
       <Popover.Portal>
         <Popover.Content
-          side={rtl ? 'left' : 'right'}
+          side={phone ? 'bottom' : rtl ? 'left' : 'right'}
           align="start"
-          sideOffset={8}
+          sideOffset={phone ? 4 : 8}
           collisionPadding={12}
           // A click elsewhere, Esc or the arrow back closes it; focus moving as the menu opens does not.
           onFocusOutside={(event) => event.preventDefault()}
