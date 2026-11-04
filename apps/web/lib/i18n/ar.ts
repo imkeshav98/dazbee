@@ -643,7 +643,7 @@ export const ar: Messages = {
         toolImage: 'صورة',
         group: 'تجميع',
         ungroup: 'فك التجميع',
-        boxSelection: 'تأطير التحديد',
+        boxSelection: 'ضع في صندوق',
         bringForward: 'للأمام',
         sendBackward: 'للخلف',
         bringToFront: 'إلى المقدمة',

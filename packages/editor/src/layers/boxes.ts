@@ -67,7 +67,7 @@ export interface BoxesDeps {
 export interface EditorBoxes {
   /** A layer's box in a frame, as layers inside its containers see it: auto layout's, or the base with the format's overrides. */
   boxIn(frame: Frame, id: string, from?: Design): Box | null
-  /** The groups and boxes a layer is inside, outermost first, as boxes in a frame. */
+  /** The groups and boxes a layer is inside, outermost first, each as its position, size and turn in a frame. */
   containersOf(frame: Frame, parentId: string | undefined, from?: Design): Box[]
   /** A layer's box as it is drawn on the page in a frame, turned by its containers. */
   drawnBoxOf(frame: Frame, id: string, from?: Design): Box | null
@@ -150,7 +150,7 @@ export function editorBoxes({ session, scenes, resources, selection, drawn, fram
     const inside = entered ? now.nodes[entered] : undefined
     return entered && inside && canHold(inside.type, type) ? entered : frame.pageId
   }
-  /** The groups and boxes a layer is inside, outermost first, as boxes in a frame. */
+  /** The groups and boxes a layer is inside, outermost first, each as its position, size and turn in a frame. */
   function containersOf(frame: Frame, parentId: string | undefined, from: Design = session.design()): Box[] {
     const boxes: Box[] = []
     for (const up of ancestorsOf(from, parentId ?? '')) {

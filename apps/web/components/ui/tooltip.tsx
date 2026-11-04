@@ -1,7 +1,12 @@
 'use client'
 
 import * as RadixTooltip from '@radix-ui/react-tooltip'
-import type { ReactNode } from 'react'
+import type { FocusEvent, ReactNode } from 'react'
+
+/** Keeps Radix from opening the tooltip on focus the browser doesn't show as keyboard focus. */
+const keyboardFocusOnly = (e: FocusEvent<HTMLElement>) => {
+  if (!e.currentTarget.matches(':focus-visible')) e.preventDefault()
+}
 
 export const TooltipProvider = ({ children }: { children: ReactNode }) => (
   <RadixTooltip.Provider delayDuration={350} skipDelayDuration={150}>
@@ -9,7 +14,10 @@ export const TooltipProvider = ({ children }: { children: ReactNode }) => (
   </RadixTooltip.Provider>
 )
 
-/** A short label beside a control; the control must carry its own accessible name too. */
+/**
+ * A short label beside a control; the control must carry its own accessible name too. It shows on
+ * hover and on keyboard focus, not when a menu closed by the pointer hands focus back to the control.
+ */
 export function Tooltip({
   label,
   side = 'top',
@@ -21,7 +29,9 @@ export function Tooltip({
 }) {
   return (
     <RadixTooltip.Root>
-      <RadixTooltip.Trigger asChild>{children}</RadixTooltip.Trigger>
+      <RadixTooltip.Trigger asChild onFocus={keyboardFocusOnly}>
+        {children}
+      </RadixTooltip.Trigger>
       <RadixTooltip.Portal>
         <RadixTooltip.Content
           side={side}

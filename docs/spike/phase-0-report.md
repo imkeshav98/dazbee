@@ -16,21 +16,21 @@ Measured on 2026-10-30 at the merge of #18. "One core" means the cloud container
 | Undo never touches the other tab's edits | Never | Different keys, same key, text, drag and typing gestures, all through the sync server | **Pass** |
 | Edit latency, tab A command to tab B redraw | p95 ≤ 100 ms on one machine | median 11 ms, p95 28 ms (50 edits) | **Pass** |
 | Server render time | ≤ 1 s per 1080×1080 render on one core | 137–273 ms for the ad fixtures, 714 ms for the 300-layer stress page | **Pass** |
-| Server render, whole carousel | ≤ 60 s for a 20-card × 5-format carousel on one core | 100 renders: 251 ms median, 562 ms max, 24.9 s in all | **Pass** |
+| Server render, whole carousel | ≤ 60 s for a 20-card × 5-size carousel on one core | 100 renders: 251 ms median, 562 ms max, 24.9 s in all | **Pass** |
 | Server peak memory | ≤ 1 GB (the server also runs Postgres, Redis, API and sync in 3.8 GB) | 116 MB after start; 361 MB peak over all fixtures and the carousel | **Pass** |
-| Yjs size, 20-card × 5-format carousel | ≤ 1 MB | 152 KB (19 KB gzipped) fresh; 162 KB (22 KB gzipped) after 1,000 more edits. 120 layers, 2,020 override values | **Pass** |
+| Yjs size, 20-card × 5-size carousel | ≤ 1 MB | 152 KB (19 KB gzipped) fresh; 162 KB (22 KB gzipped) after 1,000 more edits. 120 layers, 2,020 override values | **Pass** |
 
 ## How each was measured
 
 - **Parity and drift:** `tests/pixels` Playwright suite (#6). Each fixture is rendered in Chromium on the CPU and on WebGL (SwiftShader), and compared with the Node render. The drift table goes to the CI summary and the `webgl-vs-cpu` artifact on every run.
 - **Shaping and caret:** `tests/pixels/src/shaping.test.ts` and `caret.test.ts` (#7) run against hb-shape 8.3.0.
 - **Live editing:** `tests/e2e/specs/live-editing.spec.ts` (#8), two Chromium contexts through Hocuspocus and Postgres in Docker Compose. Screenshots and `latency.json` are in the `live-editing` CI artifact.
-- **Server:** `taskset -c 0 node tests/pixels/scripts/measure-server.ts` renders every fixture page and format three times, plus all 100 carousel renders. Peak memory is the process's max RSS.
-- **Document:** `taskset -c 0 node tests/pixels/scripts/measure-doc.ts` builds the carousel (`tests/pixels/src/big-carousel.ts`), with six layers per card and every non-primary format overriding every layer's layout.
+- **Server:** `taskset -c 0 node tests/pixels/scripts/measure-server.ts` renders every fixture page in every size three times, plus all 100 carousel renders. Peak memory is the process's max RSS.
+- **Document:** `taskset -c 0 node tests/pixels/scripts/measure-doc.ts` builds the carousel (`tests/pixels/src/big-carousel.ts`), with six layers per card and every size but the first overriding every layer's layout.
 
 ## Server render times (one core)
 
-| Fixture page.format | Size | Render |
+| Fixture page.size | Pixels | Render |
 |---|---|---|
 | arabic-ad p1.sq | 1080×1080 | 230 ms |
 | english-sale-ad p1.sq | 1080×1080 | 204 ms |
@@ -38,7 +38,7 @@ Measured on 2026-10-30 at the merge of #18. "One core" means the cloud container
 | shapes-and-effects p1.sq | 1080×1080 | 273 ms |
 | carousel, 6 renders | 1080×1080 and 1080×1350 | 188–273 ms |
 | stress p1.sq (300 layers) | 1080×1080 | 714 ms (15.5 s before #18) |
-| big carousel, 100 renders | 5 formats | 251 ms median, 562 ms max |
+| big carousel, 100 renders | 5 sizes | 251 ms median, 562 ms max |
 
 Each render includes decoding all the fonts and every fixture image again, 55–70 ms of the time. A worker that keeps them between renders would be that much faster.
 

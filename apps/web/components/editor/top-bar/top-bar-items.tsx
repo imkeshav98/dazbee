@@ -5,6 +5,7 @@
 import {
   AlignLeftIcon,
   ArrowsClockwiseIcon,
+  BoundingBoxIcon,
   CircleHalfIcon,
   CornersOutIcon,
   CropIcon,
@@ -336,7 +337,7 @@ export function useSelectionItems(target: Target, design: Design, brandId: strin
       })
     if (facts.boxes) {
       add('stack', <PanelButton id="stack" label={b.autoLayout} icon={<RowsIcon size={15} aria-hidden />} />)
-      pop('box', b.box, popup('box'), { icon: <FrameCornersIcon size={15} aria-hidden />, className: 'w-72 p-2.5' })
+      pop('box', b.box, popup('box'), { icon: <BoundingBoxIcon size={15} aria-hidden />, className: 'w-72 p-2.5' })
     }
     add('outline', <PanelButton id="outline" label={b.outline} />)
   }
@@ -368,7 +369,7 @@ export function useSelectionItems(target: Target, design: Design, brandId: strin
       pop('shape', b.shape, popup('shape'), { icon: <StarIcon size={15} aria-hidden />, className: 'w-72 p-2.5' })
     if (kind === 'box') {
       add('stack', <PanelButton id="stack" label={b.autoLayout} icon={<RowsIcon size={15} aria-hidden />} />)
-      pop('box', b.box, popup('box'), { icon: <FrameCornersIcon size={15} aria-hidden />, className: 'w-72 p-2.5' })
+      pop('box', b.box, popup('box'), { icon: <BoundingBoxIcon size={15} aria-hidden />, className: 'w-72 p-2.5' })
     }
   }
 

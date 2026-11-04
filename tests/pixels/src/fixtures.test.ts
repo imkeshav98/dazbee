@@ -15,12 +15,12 @@ describe('pixel fixtures', () => {
     expect(fixtures.map((f) => f.name)).toEqual([
       'arabic-ad',
       'auto-layout',
+      'box-corners',
+      'box-strokes',
       'carousel',
       'english-sale-ad',
       'fill-stacks',
-      'frame-corners',
-      'frame-strokes',
-      'groups-and-frames',
+      'groups-and-boxes',
       'hindi-ad',
       'image-fills',
       'layer-bounds',
@@ -72,8 +72,8 @@ describe('pixel fixtures', () => {
   it('the English sale ad nests its price in a group inside a clipping box', () => {
     const ad = parseDesign(fixtures.find((f) => f.name === 'english-sale-ad')?.json)
     if (!ad.success) throw new Error(ad.errors.join('\n'))
-    expect(ad.design.nodes['price-frame']?.type).toBe('box')
-    expect(ad.design.nodes['price-group']).toMatchObject({ type: 'group', parentId: 'price-frame' })
+    expect(ad.design.nodes['price-box']?.type).toBe('box')
+    expect(ad.design.nodes['price-group']).toMatchObject({ type: 'group', parentId: 'price-box' })
     expect(ad.design.nodes.price?.parentId).toBe('price-group')
   })
 

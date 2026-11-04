@@ -1,5 +1,5 @@
 {
-  "meta": { "designId": "fixture-frame-strokes", "name": "Box strokes" },
+  "meta": { "designId": "fixture-box-strokes", "name": "Box strokes" },
   "pages": { "p1": { "name": "Page 1", "order": "a0" } },
   "frames": {
     "square": {

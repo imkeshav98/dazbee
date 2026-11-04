@@ -17,6 +17,24 @@
       "maxDelta": 90
     }
   },
+  "box-corners square": {
+    "differing": 36466,
+    "percent": 3.126,
+    "maxDelta": 62,
+    "limit": {
+      "percent": 3.958,
+      "maxDelta": 78
+    }
+  },
+  "box-strokes square": {
+    "differing": 7339,
+    "percent": 0.629,
+    "maxDelta": 58,
+    "limit": {
+      "percent": 0.837,
+      "maxDelta": 74
+    }
+  },
   "carousel p1-pt": {
     "differing": 4951,
     "percent": 0.34,
@@ -89,25 +107,7 @@
       "maxDelta": 60
     }
   },
-  "frame-corners square": {
-    "differing": 36466,
-    "percent": 3.126,
-    "maxDelta": 62,
-    "limit": {
-      "percent": 3.958,
-      "maxDelta": 78
-    }
-  },
-  "frame-strokes square": {
-    "differing": 7339,
-    "percent": 0.629,
-    "maxDelta": 58,
-    "limit": {
-      "percent": 0.837,
-      "maxDelta": 74
-    }
-  },
-  "groups-and-frames sq": {
+  "groups-and-boxes sq": {
     "differing": 5333,
     "percent": 0.457,
     "maxDelta": 70,

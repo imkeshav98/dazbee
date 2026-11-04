@@ -17,14 +17,14 @@ import {
 import * as Popover from '@radix-ui/react-popover'
 import { type KeyboardEvent, useRef, useState } from 'react'
 
-import type { ShapeTool } from '@dazbee/editor'
+import type { ShapeMenuTool } from '@dazbee/editor'
 
 import { DOCK_BUTTON, DOCK_OFF, DOCK_ON, POPOVER } from '@/components/editor/styles.ts'
 import { Tooltip } from '@/components/ui/tooltip.tsx'
 import { cn } from '@/lib/cn.ts'
 import { useMessages } from '@/lib/i18n/client.tsx'
 
-const SHAPES: { id: ShapeTool; icon: Icon; key?: string }[] = [
+const SHAPES: { id: ShapeMenuTool; icon: Icon; key?: string }[] = [
   { id: 'rect', icon: RectangleIcon, key: 'R' },
   { id: 'ellipse', icon: CircleIcon, key: 'O' },
   { id: 'box', icon: BoundingBoxIcon },
@@ -40,8 +40,8 @@ export function ShapeTools({
   onPick,
 }: {
   active: boolean
-  shape: ShapeTool
-  onPick: (shape: ShapeTool) => void
+  shape: ShapeMenuTool
+  onPick: (shape: ShapeMenuTool) => void
 }) {
   const t = useMessages()
   const [open, setOpen] = useState(false)

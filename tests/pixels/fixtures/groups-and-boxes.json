@@ -1,5 +1,5 @@
 {
-  "meta": { "designId": "groups-and-frames", "name": "Groups and boxes" },
+  "meta": { "designId": "groups-and-boxes", "name": "Groups and boxes" },
   "pages": { "p1": { "name": "Page 1", "order": "a0" } },
   "frames": {
     "sq": {

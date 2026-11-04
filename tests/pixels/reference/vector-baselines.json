@@ -19,6 +19,26 @@
       "limit": 0.425
     }
   },
+  "box-corners square": {
+    "pdf": {
+      "percent": 0.115,
+      "limit": 0.194
+    },
+    "svg": {
+      "percent": 0.033,
+      "limit": 0.092
+    }
+  },
+  "box-strokes square": {
+    "pdf": {
+      "percent": 0.097,
+      "limit": 0.171
+    },
+    "svg": {
+      "percent": 0.084,
+      "limit": 0.155
+    }
+  },
   "carousel p1-pt": {
     "pdf": {
       "percent": 0.086,
@@ -99,27 +119,7 @@
       "limit": 0.05
     }
   },
-  "frame-corners square": {
-    "pdf": {
-      "percent": 0.115,
-      "limit": 0.194
-    },
-    "svg": {
-      "percent": 0.033,
-      "limit": 0.092
-    }
-  },
-  "frame-strokes square": {
-    "pdf": {
-      "percent": 0.097,
-      "limit": 0.171
-    },
-    "svg": {
-      "percent": 0.084,
-      "limit": 0.155
-    }
-  },
-  "groups-and-frames sq": {
+  "groups-and-boxes sq": {
     "pdf": {
       "percent": 0.025,
       "limit": 0.081

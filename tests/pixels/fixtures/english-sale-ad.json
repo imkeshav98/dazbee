@@ -108,10 +108,10 @@
       },
       "role": "body"
     },
-    "price-frame": {
+    "price-box": {
       "type": "box",
       "parentId": "sq",
-      "link": "price-frame",
+      "link": "price-box",
       "index": "a4",
       "name": "Price block",
       "role": "price",
@@ -127,7 +127,7 @@
     },
     "price-group": {
       "type": "group",
-      "parentId": "price-frame",
+      "parentId": "price-box",
       "link": "price-group",
       "index": "a0",
       "name": "Price and was-price",
