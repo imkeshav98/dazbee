@@ -13,6 +13,7 @@ import { useFontCatalog } from '@/components/brand-kit/font-catalog.ts'
 import {
   isLayerPanel,
   type LayerPanelId,
+  overPanel,
   type PanelId,
   setOpen,
   setSheetTop,
@@ -117,8 +118,8 @@ export function PanelFrame({
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.key !== 'Escape' || event.defaultPrevented) return
-      // A dialog over the panel, as Keyboard shortcuts, closes first, on its own Esc.
-      if (document.querySelector('dialog:modal')) return
+      // What stands over the panel, as Keyboard shortcuts or the Share menu, closes first, on its own Esc.
+      if (overPanel()) return
       const at = document.activeElement
       // A list of the panel's own, a select's or a pop-up's, closes first.
       if (

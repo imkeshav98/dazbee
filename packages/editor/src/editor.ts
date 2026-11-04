@@ -41,9 +41,9 @@ import type { RunStyle } from './text/text-edit.ts'
 import { editorTyping } from './text/typing.ts'
 import { editorTools, type PlacedAsset, type Tool } from './tools.ts'
 
-/** Keys pressed in a popover or dialog, such as Escape to close it, are its own, not the stage's; undo and redo still are. */
+/** Keys pressed in a popover, menu or dialog, such as Escape to close it, are its own, not the stage's; undo and redo still are. */
 const inDialog = (target: EventTarget | null) =>
-  target instanceof Element && target.closest('[role="dialog"], dialog') !== null
+  target instanceof Element && target.closest('[role="dialog"], [role="menu"], dialog') !== null
 export async function startEditor(options: EditorOptions) {
   const { designId, syncUrl } = options
   const status = options.onStatus ?? (() => {})

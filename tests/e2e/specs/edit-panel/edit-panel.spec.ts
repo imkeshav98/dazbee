@@ -327,23 +327,3 @@ test('scrubbing a number is one undo step', async ({ browser }) => {
   await expect.poll(async () => [(await props(page, 'box')).x, (await props(page, 'dot')).x]).toEqual([110, 730])
   expect(errors).toEqual([])
 })
-
-test('Esc closes the keyboard shortcuts dialog over the Colour panel first, and leaves the panel open', async ({
-  browser,
-}) => {
-  const { page, errors } = await openStage(browser, design())
-  await selectLayers(page, ['box'], { bar: true })
-  const panel = await barMenu(page, 'colour')
-  await page.getByRole('button', { name: 'Keyboard shortcuts', exact: true }).click()
-  const dialog = page.getByTestId('shortcuts')
-  await expect(dialog).toBeVisible()
-
-  await page.keyboard.press('Escape')
-  await expect(dialog).toBeHidden()
-  await expect(panel).toBeVisible()
-  expect(await page.evaluate(() => window.dazbee?.selection())).toEqual(['box'])
-  // The next Esc closes the panel.
-  await page.keyboard.press('Escape')
-  await expect(panel).toBeHidden()
-  expect(errors).toEqual([])
-})

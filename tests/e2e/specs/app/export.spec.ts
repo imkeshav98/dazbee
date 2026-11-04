@@ -287,9 +287,8 @@ test('Export opened from Share, by pointer or keyboard, takes the focus onto its
   await expect(dialog).toBeHidden()
   await expect(share).toBeFocused()
 
-  // Enter opens the menu, Tab goes on to Export, and Enter opens it.
+  // Enter opens the menu with the focus on Export, and Enter opens it.
   await page.keyboard.press('Enter')
-  await page.keyboard.press('Tab')
   await expect(page.getByTestId('export-open')).toBeFocused()
   await page.keyboard.press('Enter')
   await expect(first).toBeFocused()

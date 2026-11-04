@@ -17,6 +17,7 @@ import {
   editState,
   isLayerPanel,
   isPanel,
+  overPanel,
   setBar,
   setEveryFormat,
   setOpen,
@@ -198,8 +199,8 @@ function Bar({
   useEffect(() => {
     if (!rowOpen) return
     const onKey = (event: KeyboardEvent) => {
-      // A pop-up or panel open from the row, or a dialog over it, closes first, on its own Esc.
-      if (event.key !== 'Escape' || editState().open !== null || document.querySelector('dialog:modal')) return
+      // A pop-up or panel open from the row, or what stands over it, closes first, on its own Esc.
+      if (event.key !== 'Escape' || editState().open !== null || overPanel()) return
       event.stopImmediatePropagation()
       setRowOpen(false)
     }
