@@ -28,7 +28,7 @@ const updatedAt = () => timestamp('updated_at', { withTimezone: true }).notNull(
 export const workspaces = pgTable('workspaces', {
   id: text().primaryKey(),
   name: text().notNull(),
-  /** Its WorkOS organization (#58); null for a workspace made before sign-in, such as the development one. */
+  /** Its WorkOS organization (#58); null for the development workspace. */
   workosOrganizationId: text('workos_organization_id').unique(),
   createdAt: createdAt(),
 })

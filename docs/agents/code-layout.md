@@ -39,7 +39,7 @@ The PR body says which commits are moves.
 
 - Name files and exports after what they hold, in `GLOSSARY.md`'s terms.
 - When a file no longer holds what its name says, rename it.
-- Stored and wire names never change: IndexedDB names, `localStorage` and `sessionStorage` keys, cookies, the service worker's cache name, the Yjs root map names, and drag and clipboard MIME types.
+- Once Dazbee has real users, stored and wire names never change (until then, see [Data](#data)): IndexedDB names, `localStorage` and `sessionStorage` keys, cookies, the service worker's cache name, the Yjs root map names, and drag and clipboard MIME types.
 
 **Size.**
 
