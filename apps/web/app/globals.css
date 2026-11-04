@@ -1,3 +1,9 @@
+/*
+ * The app's global styles: the base styles and motion, the AI controls' glow, the overlay scrollbars
+ * and the home's aurora. The theme tokens, the stage overlay and the sign-in page's showcase are
+ * partials in styles/, imported below. CSS takes @import only before every other rule, so they come
+ * first, ahead of the rules in this file.
+ */
 @import 'tailwindcss';
 /* Below the utilities, so a scrolling area keeps the position and overflow its classes give it. */
 @import 'overlayscrollbars/overlayscrollbars.css' layer(components);
