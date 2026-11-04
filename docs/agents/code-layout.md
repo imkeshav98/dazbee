@@ -202,7 +202,7 @@ For `apps/web`, run `pnpm dlx madge --circular --extensions ts,tsx --ts-config t
 | 3. Queries | `layers/{boxes hug}`, `canvas/thumbnails`, `export/exports` (with `export/export-client`, its side of the export worker `export/export-worker`) | thumbnail caches; the export worker |
 | 4. Behaviours | `text/typing`, `gestures/{pen cropping drawing transform-drag auto-layout-drag select-press}`, `actions`, `place`, `brand-kit`, `layer-edits` | the text being edited and its caret; pen state; snapped guides, snap work and what each drag has written; what a press may still select as a click; drop target; paste point |
 | 5. Routers | `gestures/pointer`, `canvas/overlay` | the current gesture, whether a press is held, the pointer, pan, space held and the hover cursor |
-| 6. Wiring | `editor.ts` | only the listener sets of the `Editor`'s public events that several modules raise (draw info, notices, text selection). It creates them first and passes each module the `emit` function it needs. It also keeps the frame callback `draw()` (which stops typing when its text is gone, re-checks the hover, draws the scene and calls the overlay), the keyboard and clipboard listeners with `onKey` routing, the first draw, and the `Editor` object, one line per member. The few members that tie modules of several layers together are short functions beside `onKey`: `perform` (undo and redo end the drag first), `select`, `focus`, `stopEditing` and `settle` |
+| 6. Wiring | `editor.ts` | only the listener sets of the `Editor`'s public events that several modules raise (draw info, notices, text selection). It creates them first and passes each module the `emit` function it needs. It also keeps the animation-frame callback `draw()` (which stops typing when its text is gone, re-checks the hover, draws the scene and calls the overlay), the keyboard and clipboard listeners with `onKey` routing, the first draw, and the `Editor` object, one line per member. The few members that tie modules of several layers together are short functions beside `onKey`: `perform` (undo and redo end the drag first), `select`, `focus`, `stopEditing` and `settle` |
 
 `canvas/view` comes first among the state owners: `scenes`, `selection`, `boxes`, `thumbnails` and the behaviours read the design as last drawn, which it owns, and it needs no other module. `gestures/pointer` comes before `canvas/overlay` because the overlay reads the gesture to draw its parts. The types `startEditor` takes and resolves to (`Editor`, `EditorOptions`, `Notice`, `DrawInfo`) are in `editor-interface.ts`. `canvas/test-design` and `layers/test-boxes` are test-only.
 
@@ -211,11 +211,11 @@ Each piece of the editor's state has one owner:
 | Module | State |
 |---|---|
 | `save-state` | the provider's connection, the shown save state, the offline timer |
-| `canvas/view` | the WebGL `gl`, the surface, `dpr`, viewport, insets, camera, rulers, the last drawn `design` snapshot, `grid`, the focused format, the canvas frames last drawn (`inView()`, which `place` and the overlay read), the view listeners, the redraw schedule |
+| `canvas/view` | the WebGL `gl`, the surface, `dpr`, viewport, insets, camera, rulers, the last drawn `design` snapshot, `grid`, the frames last drawn (`inView()`, which `place` and the overlay read), the view listeners, the redraw schedule |
 | `resources` | resource bytes, resources, the fonts asked for, family loads, what is loading, placeholders |
-| `canvas/scenes` | canvas frames, pictures, paragraphs, scenes, layers, the recording counts |
+| `canvas/scenes` | frames, pictures, paragraphs, scenes, layers, the recording counts |
 | `tools` | the tool, the image to place, snapping, the tool listeners; `setTool` |
-| `selection` | selection, entered group, picked page, crop, path edit, last selection, `hovered`, the selection and page listeners |
+| `selection` | selection, entered group, picked frame, crop, path edit, last selection, `hovered`, the selection and picked frame listeners |
 | `canvas/thumbnails` | the layer and page thumbnails, the crop's faint images |
 | `export/exports` | the export worker's client |
 | `text/typing` | the text being edited, caret and range |
@@ -231,7 +231,7 @@ Each piece of the editor's state has one owner:
 - **Late binding** is allowed only for:
   - `view.redraw`, which state owners call when they change;
   - the overlay's `draw`, which `selection`, the behaviours and `gestures/pointer` call to show their parts;
-  - the frame callback `draw()`, which `canvas/view` receives when it is built and calls from its animation-frame schedule;
+  - the animation-frame callback `draw()`, which `canvas/view` receives when it is built and calls from its animation-frame schedule;
   - `tools`' `finish` and `changed`, which end the pen's path and show the pointer's cursor when the tool changes.
 
   In `editor.ts`, each late-bound call is a function declaration below the module it calls (`drawOverlay`, `showCursor`, `finishPath`), so it is declared before use.
