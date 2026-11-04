@@ -1,10 +1,9 @@
 'use client'
 
-import { useState } from 'react'
-
 import { SEGMENT, SEGMENTS } from '@/components/ui/looks.ts'
 import { useMessages } from '@/lib/i18n/client.tsx'
-import { themeOf, type ThemePick, THEMES } from '@/lib/theme.ts'
+import { type ThemePick, THEMES } from '@/lib/theme.ts'
+import { useThemePick } from '@/lib/theme-pick.tsx'
 
 declare global {
   interface Window {
@@ -15,9 +14,7 @@ declare global {
 /** System, light or dark; only the tokens change. */
 export function ThemeSwitch() {
   const t = useMessages().theme
-  // The account menu shows the switch only once opened, in the browser, so the cookie is there to read
-  // as it is first drawn, and the theme in use is chosen from the start.
-  const [pick, setPick] = useState<ThemePick>(() => themeOf(document.cookie.match(/(?:^|; )theme=(\w+)/)?.[1]))
+  const [pick, setPick] = useThemePick()
 
   function choose(next: ThemePick) {
     document.cookie = `theme=${next}; path=/; max-age=31536000; samesite=lax`
