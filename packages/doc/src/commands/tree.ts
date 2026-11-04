@@ -1,11 +1,11 @@
-// Where layers, pages and formats go in their order, and copies of layers with fresh ids.
+// Where layers, pages and frames go in their order, and copies of layers with fresh ids.
 import { generateKeyBetween } from 'fractional-indexing'
 import { nanoid } from 'nanoid'
 
 import { type Design } from '@dazbee/schema'
 
 import { ancestorsOf, childrenOf, descendants } from '../children.ts'
-import { overrideKey, toYNode } from '../design-doc.ts'
+import { toYNode } from '../design-doc.ts'
 import type { CommandContext } from './define.ts'
 
 /**
@@ -34,15 +34,25 @@ export const topIndex = (design: Design, parentId: string) =>
   indexBetween(childrenOf(design, parentId).at(-1)?.[1].index ?? null, null)
 
 /**
- * Copies layers with fresh ids, each with every layer under it and their overrides in every
- * format; `place` says where each copied root goes. Returns the old id to new id map.
+ * Copies layers with fresh ids, each with every layer under it; `place` says where each copied
+ * root goes. Each copy gets a new link id (`links: 'new'`, the default), or with a map, one new
+ * link id per old one, filled as it goes, so copies made together stay linked to each other.
+ * Returns the old id to new id map.
  */
 export function copyLayers(
   r: CommandContext['r'],
   design: Design,
   roots: string[],
   place: (root: string) => { parentId: string; index: string },
+  options: { links?: 'new' | Map<string, string> } = {},
 ) {
+  const { links = 'new' } = options
+  const linkOf = (old: string) => {
+    if (links === 'new') return nanoid()
+    const fresh = links.get(old) ?? nanoid()
+    links.set(old, fresh)
+    return fresh
+  }
   const ids = new Map<string, string>()
   for (const root of roots) for (const old of [root, ...descendants(design, root)]) ids.set(old, nanoid())
   for (const [old, fresh] of ids) {
@@ -51,11 +61,7 @@ export function copyLayers(
     const placed = roots.includes(old)
       ? place(old)
       : { parentId: ids.get(node.parentId) ?? node.parentId, index: node.index }
-    r.nodes.set(fresh, toYNode({ ...node, ...placed }))
-    for (const [scope, byNode] of Object.entries(design.overrides)) {
-      for (const [path, value] of Object.entries(byNode[old] ?? {}))
-        r.overrides.set(overrideKey(scope, fresh, path), value)
-    }
+    r.nodes.set(fresh, toYNode({ ...node, ...placed, link: linkOf(node.link) }))
   }
   return ids
 }

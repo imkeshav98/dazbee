@@ -1,6 +1,6 @@
 import { byCodeUnits, type Design, type Layer } from '@dazbee/schema'
 
-/** The ids of the layers directly under a page or layer, back to front. */
+/** The ids of the layers directly under a frame or layer, back to front. */
 export type ChildIndex = (parentId: string) => readonly string[]
 
 /** Child indexes by a design's `nodes` object. A design's layers are never changed in place, so an index stays right. */
@@ -30,7 +30,7 @@ export function registerChildIndex(nodes: object, index: ChildIndex) {
   indexes.set(nodes, index)
 }
 
-/** The layers directly under a page or layer, back to front. Ties in index break by id, the same on every device. */
+/** The layers directly under a frame or layer, back to front. Ties in index break by id, the same on every device. */
 export function childrenOf(design: Design, parentId: string): [string, Layer][] {
   let index = indexes.get(design.nodes)
   if (!index) {
@@ -41,12 +41,12 @@ export function childrenOf(design: Design, parentId: string): [string, Layer][] 
   return index(parentId).map((id) => [id, design.nodes[id] as Layer])
 }
 
-/** Every layer under a page or layer, parents before children. */
+/** Every layer under a frame or layer, parents before children. */
 export function descendants(design: Design, parentId: string): string[] {
   return childrenOf(design, parentId).flatMap(([id]) => [id, ...descendants(design, id)])
 }
 
-/** The layers a layer sits in, its own parent first, up to the page. */
+/** The layers a layer sits in, its own parent first, up to its frame. */
 export const ancestorsOf = (design: Design, parentId: string): string[] => {
   const out: string[] = []
   for (let up: string | undefined = parentId; up && design.nodes[up]; up = design.nodes[up]?.parentId) out.push(up)
@@ -56,4 +56,15 @@ export const ancestorsOf = (design: Design, parentId: string): string[] => {
 export const isInside = (design: Design, id: string, maybeAncestor: string) => {
   for (let up: string | undefined = id; up; up = design.nodes[up]?.parentId) if (up === maybeAncestor) return true
   return false
+}
+
+/** The frame a layer is in, walking up its parents; a frame id gives itself. Undefined when the chain ends at no frame. */
+export function frameIdOf(design: Design, id: string): string | undefined {
+  const seen = new Set<string>()
+  for (let up: string | undefined = id; up !== undefined && !seen.has(up); up = design.nodes[up]?.parentId) {
+    if (Object.hasOwn(design.frames, up)) return up
+    if (!Object.hasOwn(design.nodes, up)) return undefined
+    seen.add(up)
+  }
+  return undefined
 }

@@ -1,31 +1,31 @@
 // Commands that put layers in a new group, box or boolean without moving them on screen, take them out
-// again, and fit groups to what they hold.
+// again, and fit groups to what they hold. Each acts in the layers' own frame.
 import { nanoid } from 'nanoid'
 import { z } from 'zod'
 
-import { AnyScope, BooleanOp, canHold, formatIdOf, Layer, type Layer as LayerT, NodeId, Scope } from '@dazbee/schema'
+import { BooleanOp, canHold, Layer, type Layer as LayerT, NodeId } from '@dazbee/schema'
 
 import { ancestorsOf, childrenOf, descendants, isInside } from '../children.ts'
-import { DELETED, overrideKey, toYNode } from '../design-doc.ts'
+import { DELETED, toYNode } from '../design-doc.ts'
 import { boundsOf, centreOf, normalAngle, round, turn } from '../geometry.ts'
+import { boxPlan } from './box-plan.ts'
 import { idProblem, lockProblem, missingLayer, parentProblem } from './checks.ts'
 import { type CommandContext, defineCommand } from './define.ts'
-import { mergedProps, Placement } from './placement.ts'
 import { depthOf, indexBetween } from './tree.ts'
 
 /**
- * Where layers are drawn, by scope, as the caller sees them: inside an auto layout box the flow
+ * Where layers are drawn, by layer, as the caller sees them: inside an auto layout box the flow
  * places them, not their stored boxes, and only the renderer lays the flow out.
  */
 const DrawnBoxes = z.record(
-  z.string().refine((s) => formatIdOf(s) !== undefined, 'drawn boxes are by format:<id>'),
-  z.record(NodeId, z.object({ x: z.number(), y: z.number(), width: z.number().min(0), height: z.number().min(0) })),
+  NodeId,
+  z.object({ x: z.number(), y: z.number(), width: z.number().min(0), height: z.number().min(0) }),
 )
 type DrawnBoxes = z.infer<typeof DrawnBoxes>
 
 /**
  * Wraps layers that share a parent in a new group where the topmost of them was, without moving
- * anything on screen. The group's box hugs them in each format. Returns the group's id.
+ * anything on screen. The group's box hugs them. Returns the group's id.
  */
 export const nodeGroup = defineCommand({
   name: 'node.group',
@@ -41,8 +41,8 @@ export const nodeGroup = defineCommand({
 
 /**
  * Wraps layers that share a parent in a new box where the topmost of them was, without changing
- * anything on screen: it hugs them in each format, it has no fill, and it doesn't clip, so a
- * stroke or shadow past a layer's box still shows. Returns the box's id.
+ * anything on screen: it hugs them, it has no fill, and it doesn't clip, so a stroke or shadow
+ * past a layer's box still shows. Returns the box's id.
  */
 export const nodeBox = defineCommand({
   name: 'node.box',
@@ -59,18 +59,15 @@ export const nodeBox = defineCommand({
 
 /**
  * Moves layers into a box beside them, as when a box is drawn around them, without moving them
- * on screen. The box was drawn in one format (`scope`); in every other scope it is placed around
- * the layers as they are there, as far from them and as large against them as where it was drawn,
- * so it holds them in every format. They keep their order inside it.
+ * on screen. They keep their order inside it.
  */
 export const nodeEnclose = defineCommand({
   name: 'node.enclose',
-  input: z.object({ id: NodeId, ids: NodeId.array().min(1), scope: Scope }),
-  check: ({ design }, { id, ids, scope }) => {
+  input: z.object({ id: NodeId, ids: NodeId.array().min(1) }),
+  check: ({ design }, { id, ids }) => {
     const box = design.nodes[id]
     if (!box) return missingLayer(design, [id])
     if (box.type !== 'box') return `"${id}" is a ${box.type}, not a box`
-    if (!design.formats[formatIdOf(scope) ?? '']) return `no format "${formatIdOf(scope) ?? scope}"`
     for (const layer of ids) {
       const node = design.nodes[layer]
       if (!node) return missingLayer(design, [layer])
@@ -80,23 +77,7 @@ export const nodeEnclose = defineCommand({
     }
     return undefined
   },
-  apply: ({ r, design }, { id, ids, scope }) => {
-    const place = new Placement(design)
-    const drawn = place.get(scope, id)
-    const was = boundsOf(ids.map((layer) => place.get(scope, layer)))
-    for (const other of place.scopes) {
-      if (other === scope) continue
-      const now = boundsOf(ids.map((layer) => place.get(other, layer)))
-      const kx = was.width > 0 ? now.width / was.width : 1
-      const ky = was.height > 0 ? now.height / was.height : 1
-      place.set(other, id, {
-        x: now.x + (drawn.x - was.x) * kx,
-        y: now.y + (drawn.y - was.y) * ky,
-        width: drawn.width * kx,
-        height: drawn.height * ky,
-      })
-    }
-    place.write(r)
+  apply: ({ r }, { id, ids }) => {
     // Their indexes already order them; they only change parent.
     for (const layer of ids) r.nodes.get(layer)?.set('parentId', id)
   },
@@ -138,8 +119,9 @@ export const nodeBoolean = defineCommand({
 
 /**
  * Takes the layers out of groups or booleans and removes them, without moving anything on
- * screen: a turned group's turn goes into each layer it held, and a group hidden in a format
- * hides them there. Shapes out of a boolean show their own paints again. The layers take the group's place among its siblings. Returns their ids, in order.
+ * screen: a turned group's turn goes into each layer it held, and a hidden group hides them.
+ * Shapes out of a boolean show their own paints again. The layers take the group's place among
+ * its siblings. Returns their ids, in order.
  */
 export const nodeUngroup = defineCommand({
   name: 'node.ungroup',
@@ -157,33 +139,26 @@ export const nodeUngroup = defineCommand({
   apply: ({ r, design }, { ids }) => {
     const freed: string[] = []
     const groups = ids.filter((id) => !ids.some((other) => other !== id && isInside(design, id, other)))
-    const place = new Placement(design)
+    const plan = boxPlan(design)
     for (const id of groups) {
-      const kids = childrenOf(design, id).map(([child]) => child)
-      for (const scope of place.scopes) {
-        const group = place.get(scope, id)
-        for (const kid of kids) {
-          const was = place.get(scope, kid)
-          if (group.rotation !== 0) {
-            const c = centreOf(was)
-            const to = turn(c, centreOf(group), group.rotation)
-            const dx = to.x - c.x
-            const dy = to.y - c.y
-            place.set(scope, kid, {
-              x: was.x + dx,
-              y: was.y + dy,
-              rotation: normalAngle(was.rotation + group.rotation),
-            })
-            for (const inner of descendants(design, kid)) {
-              const at = place.get(scope, inner)
-              place.set(scope, inner, { x: at.x + dx, y: at.y + dy })
-            }
+      const group = plan.get(id)
+      for (const [kid] of childrenOf(design, id)) {
+        const was = plan.get(kid)
+        if (group.rotation !== 0) {
+          const c = centreOf(was)
+          const to = turn(c, centreOf(group), group.rotation)
+          const dx = to.x - c.x
+          const dy = to.y - c.y
+          plan.set(kid, { x: was.x + dx, y: was.y + dy, rotation: normalAngle(was.rotation + group.rotation) })
+          for (const inner of descendants(design, kid)) {
+            const at = plan.get(inner)
+            plan.set(inner, { x: at.x + dx, y: at.y + dy })
           }
-          if (!group.visible) place.set(scope, kid, { visible: false })
         }
+        if (!group.visible) plan.set(kid, { visible: false })
       }
     }
-    place.write(r)
+    plan.write(r)
     for (const id of groups) {
       const group = design.nodes[id] as LayerT
       const siblings = childrenOf(design, group.parentId)
@@ -202,9 +177,9 @@ export const nodeUngroup = defineCommand({
 })
 
 /**
- * Fits groups and booleans to what they hold, in every format: each named one, and every one the
- * named layers are in, innermost first. A turned group's layers shift with its new centre so nothing
- * moves on screen. The editor runs it after a change to layers inside a group, in the same step.
+ * Fits groups and booleans to what they hold: each named one, and every one the named layers are
+ * in, innermost first. A turned group's layers shift with its new centre so nothing moves on
+ * screen. The editor runs it after a change to layers inside a group, in the same step.
  */
 export const nodeHug = defineCommand({
   name: 'node.hug',
@@ -218,30 +193,28 @@ export const nodeHug = defineCommand({
         if (type === 'group' || type === 'boolean') groups.add(up)
       }
     }
-    const place = new Placement(design)
+    const plan = boxPlan(design)
     for (const id of [...groups].sort((a, b) => depthOf(design, b) - depthOf(design, a))) {
       const kids = childrenOf(design, id).map(([child]) => child)
       if (kids.length === 0) continue
-      for (const scope of place.scopes) {
-        const group = place.get(scope, id)
-        const fit = boundsOf(kids.map((kid) => place.get(scope, kid)))
-        // Turned about its new centre instead of the old one, the group would draw its layers
-        // elsewhere; moving them and the box by d keeps every one where it was.
-        const v = { x: centreOf(group).x - centreOf(fit).x, y: centreOf(group).y - centreOf(fit).y }
-        const turned = turn(v, { x: 0, y: 0 }, group.rotation)
-        const d = { x: v.x - turned.x, y: v.y - turned.y }
-        const next = { x: fit.x + d.x, y: fit.y + d.y, width: fit.width, height: fit.height }
-        // Within what rounding to hundredths leaves, it already fits: fitting again changes nothing.
-        if ((['x', 'y', 'width', 'height'] as const).every((k) => Math.abs(next[k] - group[k]) < 0.02)) continue
-        place.set(scope, id, next)
-        if (Math.hypot(d.x, d.y) < 0.005) continue
-        for (const inner of descendants(design, id)) {
-          const at = place.get(scope, inner)
-          place.set(scope, inner, { x: at.x + d.x, y: at.y + d.y })
-        }
+      const group = plan.get(id)
+      const fit = boundsOf(kids.map((kid) => plan.get(kid)))
+      // Turned about its new centre instead of the old one, the group would draw its layers
+      // elsewhere; moving them and the box by d keeps every one where it was.
+      const v = { x: centreOf(group).x - centreOf(fit).x, y: centreOf(group).y - centreOf(fit).y }
+      const turned = turn(v, { x: 0, y: 0 }, group.rotation)
+      const d = { x: v.x - turned.x, y: v.y - turned.y }
+      const next = { x: fit.x + d.x, y: fit.y + d.y, width: fit.width, height: fit.height }
+      // Within what rounding to hundredths leaves, it already fits: fitting again changes nothing.
+      if ((['x', 'y', 'width', 'height'] as const).every((k) => Math.abs(next[k] - group[k]) < 0.02)) continue
+      plan.set(id, next)
+      if (Math.hypot(d.x, d.y) < 0.005) continue
+      for (const inner of descendants(design, id)) {
+        const at = plan.get(inner)
+        plan.set(inner, { x: at.x + d.x, y: at.y + d.y })
       }
     }
-    place.write(r)
+    plan.write(r)
   },
 })
 
@@ -258,10 +231,10 @@ function wrapProblem(ctx: CommandContext, ids: string[], id: string | undefined,
 
 /**
  * Puts layers that share a parent inside a new layer of `type` where the topmost of them was,
- * without moving anything on screen: its box hugs them in each format. Layers with `drawn` boxes
- * are first stored where they are drawn, what they hold moved with them, so the new layer hugs them
- * as drawn and takes the room they took in a flow. In a format where they all keep where they are
- * in a flow, the new layer keeps where it is there too.
+ * without moving anything on screen: its box hugs them, and it gets a link id of its own. Layers
+ * with `drawn` boxes are first stored where they are drawn, what they hold moved with them, so the
+ * new layer hugs them as drawn and takes the room they took in a flow. When they all keep where
+ * they are in a flow, the new layer keeps where it is too.
  */
 function wrap(
   { r, design }: CommandContext,
@@ -273,26 +246,21 @@ function wrap(
   const parentId = design.nodes[ids[0] as string]?.parentId as string
   const inside = childrenOf(design, parentId).filter(([child]) => ids.includes(child))
   const top = inside.at(-1)?.[1] as LayerT
-  const place = new Placement(design)
-  for (const scope of place.scopes) {
-    for (const [child, box] of Object.entries(drawn[scope] ?? {})) {
-      if (!ids.includes(child)) continue
-      const was = place.get(scope, child)
-      place.set(scope, child, box)
-      // What it holds is drawn where the flow put it too: it moves by as much.
-      for (const inner of descendants(design, child)) {
-        const at = place.get(scope, inner)
-        place.set(scope, inner, { x: at.x + box.x - was.x, y: at.y + box.y - was.y })
-      }
+  const plan = boxPlan(design)
+  for (const [child, box] of Object.entries(drawn)) {
+    if (!ids.includes(child)) continue
+    const was = plan.get(child)
+    plan.set(child, box)
+    // What it holds is drawn where the flow put it too: it moves by as much.
+    for (const inner of descendants(design, child)) {
+      const at = plan.get(inner)
+      plan.set(inner, { x: at.x + box.x - was.x, y: at.y + box.y - was.y })
     }
   }
-  place.write(r)
-  const keptIn = (scope: AnyScope) =>
-    inside.every(([child]) => (mergedProps(design, scope, child) as { absolute?: boolean }).absolute)
-  const absolute = keptIn('base')
-  const boxIn = (scope: AnyScope) => boundsOf(inside.map(([child]) => place.get(scope, child)))
-  const base = boxIn('base')
-  const box = { x: round(base.x), y: round(base.y), width: round(base.width), height: round(base.height) }
+  plan.write(r)
+  const absolute = inside.every(([, child]) => child.props.absolute)
+  const hug = boundsOf(inside.map(([child]) => plan.get(child)))
+  const box = { x: round(hug.x), y: round(hug.y), width: round(hug.width), height: round(hug.height) }
   r.nodes.set(
     id,
     toYNode(
@@ -300,20 +268,12 @@ function wrap(
         type: layer.type,
         name: layer.name,
         parentId,
+        link: nanoid(),
         index: top.index,
         props: { ...layer.props, ...box, ...(absolute ? { absolute } : {}) },
       }),
     ),
   )
-  for (const scope of place.scopes) {
-    if (scope === 'base') continue
-    const b = boxIn(scope)
-    for (const [path, value] of Object.entries({ x: b.x, y: b.y, width: b.width, height: b.height })) {
-      if (Math.abs(round(value) - box[path as keyof typeof box]) >= 0.005)
-        r.overrides.set(overrideKey(scope, id, path), round(value))
-    }
-    if (keptIn(scope) !== absolute) r.overrides.set(overrideKey(scope, id, 'absolute'), keptIn(scope))
-  }
   // Their indexes already order them; they only change parent.
   for (const [child] of inside) r.nodes.get(child)?.set('parentId', id)
   return id

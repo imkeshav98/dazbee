@@ -4,40 +4,43 @@ import { describe, expect, it } from 'vitest'
 import { type DesignInput, parseDesign, pathScale } from '@dazbee/schema'
 
 import { type Box, centreOf, turn } from '../geometry.ts'
-import { loadDesign, openSession, readDesign } from '../index.ts'
+import { loadDesign, readDesign } from '../index.ts'
+import { openTestSession } from '../test-design.ts'
 
+const zig = { x: 100, y: 100, width: 100, height: 50, shape: { kind: 'path' as const, d: 'M0 0 L100 50' } }
+const box = { x: 0, y: 0, width: 10, height: 10, shape: { kind: 'rect' as const } }
+
+/** A path and a box in a square frame, and their linked copies in a wide frame, where the path sits further right, and a tall one, where it is turned. */
 const design = (): DesignInput => ({
-  meta: { designId: 'd1', name: 'Paths', kind: 'single', primaryFormatId: 'sq' },
-  formats: {
-    sq: { name: 'Square', width: 1080, height: 1080, order: 'a0' },
-    wide: { name: 'Wide', width: 1200, height: 628, order: 'a1' },
-    tall: { name: 'Tall', width: 1080, height: 1920, order: 'a2' },
-  },
+  meta: { designId: 'd1', name: 'Paths' },
   pages: { p1: { name: 'Page 1', order: 'a0' } },
+  frames: {
+    sq: { pageId: 'p1', name: 'Square', width: 1080, height: 1080, x: 0, y: 0, order: 'a0' },
+    wide: { pageId: 'p1', name: 'Wide', width: 1200, height: 628, x: 1280, y: 0, order: 'a1' },
+    tall: { pageId: 'p1', name: 'Tall', width: 1080, height: 1920, x: 2680, y: 0, order: 'a2' },
+  },
   nodes: {
-    zig: {
+    zig: { type: 'graphic', parentId: 'sq', link: 'zig', index: 'a0', name: 'Zig', props: zig },
+    box: { type: 'graphic', parentId: 'sq', link: 'box', index: 'a1', name: 'Box', props: box },
+    'wide-zig': { type: 'graphic', parentId: 'wide', link: 'zig', index: 'a0', name: 'Zig', props: { ...zig, x: 400 } },
+    'wide-box': { type: 'graphic', parentId: 'wide', link: 'box', index: 'a1', name: 'Box', props: box },
+    'tall-zig': {
       type: 'graphic',
-      parentId: 'p1',
+      parentId: 'tall',
+      link: 'zig',
       index: 'a0',
       name: 'Zig',
-      props: { x: 100, y: 100, width: 100, height: 50, shape: { kind: 'path', d: 'M0 0 L100 50' } },
+      props: { ...zig, rotation: 90 },
     },
-    box: {
-      type: 'graphic',
-      parentId: 'p1',
-      index: 'a1',
-      name: 'Box',
-      props: { x: 0, y: 0, width: 10, height: 10, shape: { kind: 'rect' } },
-    },
+    'tall-box': { type: 'graphic', parentId: 'tall', link: 'box', index: 'a1', name: 'Box', props: box },
   },
-  overrides: { 'format:wide': { zig: { x: 400 } }, 'format:tall': { zig: { rotation: 90 } } },
 })
 
 const open = () => {
   const result = parseDesign(design())
   if (!result.success) throw new Error(result.errors.join('\n'))
   const doc = loadDesign(result.design)
-  return { doc, tab: openSession(doc) }
+  return { doc, tab: openTestSession(doc) }
 }
 
 type Props = {
@@ -48,49 +51,43 @@ type Props = {
   rotation: number
   shape: { d: string; drawnIn?: { width: number; height: number } }
 }
-const placed = (doc: ReturnType<typeof open>['doc'], scope: string) => {
-  const d = readDesign(doc)
-  return { ...d.nodes.zig?.props, ...d.overrides[scope]?.zig } as Props
-}
-/** Where a point of the path data is drawn on the page: scaled to the box, the box turned about its centre. */
+const placed = (doc: ReturnType<typeof open>['doc'], id: string) => readDesign(doc).nodes[id]?.props as Props
+/** Where a point of the path data is drawn in its frame: scaled to the box, the box turned about its centre. */
 const drawn = (p: Props, at: { x: number; y: number }) => {
   const { sx, sy } = pathScale(p.shape, p.width, p.height)
   return turn({ x: p.x + at.x * sx, y: p.y + at.y * sy }, centreOf(p as Box), p.rotation ?? 0)
 }
 
 describe('node.reshape', () => {
-  it("writes the path to every format, moving each format's box by the same amount, in one undo step", () => {
+  it('writes the path and moves its box by the same amount, in one undo step; its linked copies stay', () => {
     const { doc, tab } = open()
+    const copies = [placed(doc, 'wide-zig'), placed(doc, 'tall-zig')]
     // A new first point 20 to the left and 10 above: the outline now starts there.
     tab.run('node.reshape', { id: 'zig', d: 'M0 0 L20 10 L120 60', dx: -20, dy: -10, width: 120, height: 60 })
     // The new data is drawn in the new box, so that is its size.
-    expect(placed(doc, 'format:sq')).toMatchObject({
+    expect(placed(doc, 'zig')).toMatchObject({
       x: 80,
       y: 90,
       width: 120,
       height: 60,
       shape: { kind: 'path', d: 'M0 0 L20 10 L120 60', drawnIn: { width: 120, height: 60 } },
     })
-    expect(placed(doc, 'format:wide')).toMatchObject({ x: 380, y: 90, width: 120, height: 60 })
-    // The old points draw where they did in every format, the turned one included.
-    for (const scope of ['format:sq', 'format:wide', 'format:tall']) {
-      tab.undo()
-      const before = [drawn(placed(doc, scope), { x: 0, y: 0 }), drawn(placed(doc, scope), { x: 100, y: 50 })]
-      tab.redo()
-      const after = [drawn(placed(doc, scope), { x: 20, y: 10 }), drawn(placed(doc, scope), { x: 120, y: 60 })]
+    expect([placed(doc, 'wide-zig'), placed(doc, 'tall-zig')]).toEqual(copies)
+    tab.undo()
+    expect(placed(doc, 'zig')).toMatchObject({ x: 100, y: 100, width: 100, height: 50, shape: { d: 'M0 0 L100 50' } })
+  })
+
+  it('keeps the points that did not change where they are drawn, on a turned path too', () => {
+    for (const id of ['zig', 'tall-zig']) {
+      const { doc, tab } = open()
+      const before = [drawn(placed(doc, id), { x: 0, y: 0 }), drawn(placed(doc, id), { x: 100, y: 50 })]
+      tab.run('node.reshape', { id, d: 'M0 0 L20 10 L120 60', dx: -20, dy: -10, width: 120, height: 60 })
+      const after = [drawn(placed(doc, id), { x: 20, y: 10 }), drawn(placed(doc, id), { x: 120, y: 60 })]
       after.forEach((p, i) => {
-        expect(p.x, scope).toBeCloseTo(before[i]?.x ?? NaN, 1)
-        expect(p.y, scope).toBeCloseTo(before[i]?.y ?? NaN, 1)
+        expect(p.x, id).toBeCloseTo(before[i]?.x ?? NaN, 1)
+        expect(p.y, id).toBeCloseTo(before[i]?.y ?? NaN, 1)
       })
     }
-    tab.undo()
-    expect(placed(doc, 'format:sq')).toMatchObject({
-      x: 100,
-      y: 100,
-      width: 100,
-      height: 50,
-      shape: { d: 'M0 0 L100 50' },
-    })
   })
 
   it('reshapes only paths, and not a locked one', () => {
@@ -105,43 +102,20 @@ describe('node.reshape', () => {
     expect(() => tab.run('node.reshape', { id: 'zig', d: 'M0 0 L1 1', dx: 0, dy: 0, width: 1, height: 1 })).toThrow(
       /"zig" is locked \(style\)/,
     )
+    tab.run('node.reshape', { id: 'wide-zig', d: 'M0 0 L1 1', dx: 0, dy: 0, width: 1, height: 1 })
   })
 })
 
 describe('the box a path is drawn in', () => {
-  it('is the base box once a path with none first changes size, in the same undo step', () => {
+  it('is its box once a path with none first changes size, in the same undo step; its linked copies keep none', () => {
     const { doc, tab } = open()
-    tab.run('node.update', { ids: ['zig'], scope: 'format:wide', patch: { width: 200, height: 100 } })
-    expect(placed(doc, 'base').shape).toMatchObject({ drawnIn: { width: 100, height: 50 } })
+    tab.run('node.update', { ids: ['wide-zig'], patch: { width: 200, height: 100 } })
+    expect(placed(doc, 'wide-zig').shape).toMatchObject({ drawnIn: { width: 100, height: 50 } })
     // Wide draws the outline twice the size now; the square as before.
-    expect(drawn(placed(doc, 'format:wide'), { x: 100, y: 50 })).toEqual({ x: 600, y: 200 })
-    expect(drawn(placed(doc, 'format:sq'), { x: 100, y: 50 })).toEqual({ x: 200, y: 150 })
+    expect(drawn(placed(doc, 'wide-zig'), { x: 100, y: 50 })).toEqual({ x: 600, y: 200 })
+    expect(drawn(placed(doc, 'zig'), { x: 100, y: 50 })).toEqual({ x: 200, y: 150 })
+    expect(placed(doc, 'zig').shape).not.toHaveProperty('drawnIn')
     tab.undo()
-    expect(placed(doc, 'base').shape).not.toHaveProperty('drawnIn')
-  })
-
-  it("scales each format's box by its own size when points are edited in a format of another size", () => {
-    const { doc, tab } = open()
-    tab.run('node.update', { ids: ['zig'], scope: 'format:wide', patch: { width: 200, height: 100 } })
-    // In wide the end point moves 40 to the right of where it is drawn, so the outline there is 240 × 100.
-    tab.run('node.reshape', {
-      id: 'zig',
-      scope: 'format:wide',
-      d: 'M0 0 L240 100',
-      dx: 0,
-      dy: 0,
-      width: 240,
-      height: 100,
-    })
-    expect(placed(doc, 'format:wide')).toMatchObject({
-      x: 400,
-      width: 240,
-      height: 100,
-      shape: { drawnIn: { width: 240, height: 100 } },
-    })
-    // The square keeps half of wide's size, so it draws the same outline at half the size.
-    expect(placed(doc, 'format:sq')).toMatchObject({ x: 100, width: 120, height: 50 })
-    expect(drawn(placed(doc, 'format:sq'), { x: 240, y: 100 })).toEqual({ x: 220, y: 150 })
-    expect(drawn(placed(doc, 'format:wide'), { x: 240, y: 100 })).toEqual({ x: 640, y: 200 })
+    expect(placed(doc, 'wide-zig').shape).not.toHaveProperty('drawnIn')
   })
 })

@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest'
 
 import { type Design, parseDesign } from '@dazbee/schema'
 
-import { childrenOf, type DesignDoc, loadDesign, openSession, readDesign, type Session } from './index.ts'
-import { testDesign, twoTabs } from './test-design.ts'
+import { childrenOf, type DesignDoc, frameIdOf, loadDesign, readDesign, type Session } from './index.ts'
+import { openTestSession, testDesign, twoTabs } from './test-design.ts'
 
 /** A fuzz run makes hundreds of commands and full reads; a cold CI runner needs more than vitest's 5 s. */
 const FUZZ_TIMEOUT = 30_000
@@ -12,7 +12,7 @@ describe('changes no one undoes', () => {
   it('a change made untracked stays through undo and redo, and undo reverts the edit before it', () => {
     const result = parseDesign(testDesign())
     if (!result.success) throw new Error(result.errors.join('\n'))
-    const session = openSession(loadDesign(result.design))
+    const session = openTestSession(loadDesign(result.design))
     const [id] = Object.keys(session.design().nodes)
     if (!id) throw new Error('no layer')
     session.run('node.update', { ids: [id], patch: { x: 11 } })
@@ -31,7 +31,7 @@ describe('what undo and redo can do', () => {
   it('says whether there is a step to undo or redo, and calls back each time that may change', () => {
     const result = parseDesign(testDesign())
     if (!result.success) throw new Error(result.errors.join('\n'))
-    const session = openSession(loadDesign(result.design))
+    const session = openTestSession(loadDesign(result.design))
     const [id] = Object.keys(session.design().nodes)
     if (!id) throw new Error('no layer')
     let calls = 0
@@ -182,70 +182,27 @@ describe('two tabs', () => {
     for (const doc of [a, b]) expect(readDesign(doc).nodes.box?.props.x).toBeTypeOf('number')
   })
 
-  it('undoing a drag that first overrode a layer in a format removes the override whole', () => {
-    const { a, b, tabA, sync } = twoTabs()
-    tabA.gesture(() => {
-      for (let i = 1; i <= 5; i++)
-        tabA.run('node.update', { ids: ['box'], scope: 'format:banner', patch: { x: 100 + i, y: 100 + i } })
-    })
-    sync()
-    tabA.undo()
-    sync()
-    for (const doc of [a, b]) expect(readDesign(doc).overrides['format:banner']?.box).toBeUndefined()
-  })
-
-  it('two tabs overriding the same layer in a new format at once keep both changes', () => {
+  it('edits to linked copies in two tabs at once both land, each copy keeping its own', () => {
     const { a, b, tabA, tabB, sync } = twoTabs()
-    tabA.run('format.add', { id: 'story', name: 'Story', width: 1080, height: 1920 })
+    tabA.run('node.update', { ids: ['box'], patch: { x: 500 } })
+    tabB.run('node.update', { ids: ['banner-box'], patch: { x: 7 } })
+    tabA.run('text.edit', { id: 'headline', op: { kind: 'insert', at: 0, text: 'Big ' } })
+    tabB.run('text.edit', { id: 'banner-headline', op: { kind: 'insert', at: 4, text: '!' } })
     sync()
-    tabA.run('node.update', { ids: ['box'], scope: 'format:story', patch: { x: 1 } })
-    tabB.run('node.update', { ids: ['box'], scope: 'format:story', patch: { y: 2 } })
-    sync()
-    // The new format was seeded with the box's whole scaled layout; both tabs' changes land on it.
-    for (const doc of [a, b])
-      expect(readDesign(doc).overrides['format:story']?.box).toEqual({ x: 1, y: 2, width: 200, height: 100 })
-  })
-
-  it('a move in a format another tab removed at once leaves no overrides behind', () => {
-    const { a, b, tabA, tabB, sync } = twoTabs()
-    tabA.run('format.add', { id: 'story', name: 'Story', width: 1080, height: 1920 })
-    sync()
-    tabA.run('format.remove', { id: 'story' })
-    tabB.run('node.update', { ids: ['box'], scope: 'format:story', patch: { x: 5 } })
-    sync()
-    for (const [doc, tab] of [
-      [a, tabA],
-      [b, tabB],
-    ] as const) {
-      expect(readDesign(doc).formats.story).toBeUndefined()
-      expect(readDesign(doc).overrides['format:story']).toBeUndefined()
-      expect(tab.design().overrides['format:story']).toBeUndefined()
-    }
-  })
-
-  it('a layer copied into a format another tab removed at once leaves no overrides behind', () => {
-    const { a, b, tabA, tabB, sync } = twoTabs()
-    tabA.run('format.add', { id: 'story', name: 'Story', width: 1080, height: 1920 })
-    sync()
-    tabA.run('format.remove', { id: 'story' })
-    const [copy = ''] = tabB.run('node.duplicate', { ids: ['box'] })
-    sync()
-    for (const [doc, tab] of [
-      [a, tabA],
-      [b, tabB],
-    ] as const) {
+    for (const doc of [a, b]) {
       const design = readDesign(doc)
-      expect(design.overrides['format:story']).toBeUndefined()
-      expect(design.nodes[copy]).toBeDefined()
-      expect(tab.design().overrides['format:story']).toBeUndefined()
+      expect(design.nodes.box?.props.x).toBe(500)
+      expect(design.nodes['banner-box']?.props.x).toBe(7)
+      expect(design.nodes.headline?.props).toMatchObject({ text: 'Big Summer sale' })
+      expect(design.nodes['banner-headline']?.props).toMatchObject({ text: 'Sale!' })
     }
   })
 
   it('concurrent moves that would put two groups inside each other are repaired the same way in both tabs', () => {
     const { a, b, tabA, tabB, sync } = twoTabs()
     const group = { type: 'group', name: 'G', props: { x: 0, y: 0, width: 10, height: 10 } } as const
-    tabA.run('node.create', { id: 'g1', parentId: 'p1', layer: group })
-    tabA.run('node.create', { id: 'g2', parentId: 'p1', layer: group })
+    tabA.run('node.create', { id: 'g1', parentId: 'sq', layer: group })
+    tabA.run('node.create', { id: 'g2', parentId: 'sq', layer: group })
     sync()
 
     tabA.run('node.move', { id: 'g1', parentId: 'g2' })
@@ -254,7 +211,7 @@ describe('two tabs', () => {
 
     const designA = readDesign(a)
     expect(readDesign(b)).toEqual(designA)
-    expect([designA.nodes.g1?.parentId, designA.nodes.g2?.parentId].sort()).toEqual(['g1', 'p1'])
+    expect([designA.nodes.g1?.parentId, designA.nodes.g2?.parentId].sort()).toEqual(['g1', 'sq'])
   })
 
   it.each([1, 7, 42, 2026, 31337])(
@@ -301,7 +258,7 @@ function expectFullRead(tab: Session, doc: DesignDoc) {
   expect(view).toEqual(full)
   const order = (design: Design) =>
     Object.fromEntries(
-      [...Object.keys(design.pages), ...Object.keys(design.nodes)].map((id) => [
+      [...Object.keys(design.frames), ...Object.keys(design.nodes)].map((id) => [
         id,
         childrenOf(design, id).map(([child]) => child),
       ]),
@@ -320,9 +277,10 @@ function randomCommand(tab: Session, doc: DesignDoc, random: () => number) {
   const ids = Object.keys(design.nodes)
   const pick = <T>(xs: T[]) => xs[Math.floor(random() * xs.length)] as T
   const containers = [
-    ...Object.keys(design.pages),
+    ...Object.keys(design.frames),
     ...ids.filter((id) => ['group', 'box'].includes(design.nodes[id]?.type ?? '')),
   ]
+  const texts = ids.filter((id) => design.nodes[id]?.type === 'text')
   const roll = random()
   try {
     if (roll < 0.2 || ids.length === 0) {
@@ -338,40 +296,42 @@ function randomCommand(tab: Session, doc: DesignDoc, random: () => number) {
               },
       })
     } else if (roll < 0.5) {
-      tab.run('node.update', {
-        ids: [pick(ids)],
-        scope: random() < 0.5 ? 'base' : 'format:banner',
-        patch: { x: Math.round(random() * 1000) },
-      })
+      tab.run('node.update', { ids: [pick(ids)], patch: { x: Math.round(random() * 1000) } })
     } else if (roll < 0.65) {
-      const parentId = pick(containers)
-      const under = ids.filter((id) => design.nodes[id]?.parentId === parentId)
-      tab.run('node.move', {
-        id: pick(ids),
-        parentId,
-        ...(under.length && random() < 0.5 ? { before: pick(under) } : {}),
-      })
+      // Mostly within the layer's own frame; a move to another frame is refused.
+      const id = pick(ids)
+      const here = containers.filter((c) => frameIdOf(design, c) === frameIdOf(design, id))
+      const parentId = random() < 0.9 && here.length > 0 ? pick(here) : pick(containers)
+      const under = ids.filter((other) => design.nodes[other]?.parentId === parentId)
+      tab.run('node.move', { id, parentId, ...(under.length && random() < 0.5 ? { before: pick(under) } : {}) })
     } else if (roll < 0.75) {
       tab.run('node.delete', { ids: [pick(ids)] })
-    } else if (roll < 0.9 && design.nodes.headline?.type === 'text') {
-      const length = design.nodes.headline.props.text.length
+    } else if (roll < 0.9 && texts.length > 0) {
+      const id = pick(texts)
+      const node = design.nodes[id]
+      const length = node?.type === 'text' ? node.props.text.length : 0
       tab.run(
         'text.edit',
         random() < 0.6 || length < 2
-          ? {
-              id: 'headline',
-              op: { kind: 'insert', at: Math.floor(random() * (length + 1)), text: pick(['a', 'ब', 'ع', '!']) },
-            }
-          : { id: 'headline', op: { kind: 'delete', at: Math.floor(random() * (length - 1)), length: 1 } },
+          ? { id, op: { kind: 'insert', at: Math.floor(random() * (length + 1)), text: pick(['a', 'ब', 'ع', '!']) } }
+          : { id, op: { kind: 'delete', at: Math.floor(random() * (length - 1)), length: 1 } },
       )
     } else if (roll < 0.93) {
-      if (random() < 0.5) tab.run('page.add', { name: 'P' })
-      else tab.run('format.add', { name: 'F', width: 100 + Math.floor(random() * 900), height: 100 })
-    } else if (roll < 0.96 && design.nodes.headline?.type === 'text' && design.nodes.headline.props.text.length > 1) {
-      tab.run('text.edit', {
-        id: 'headline',
-        op: { kind: 'style', at: 0, length: 1, style: { fontWeight: pick([400, 700]) } },
-      })
+      const which = random()
+      const pages = Object.keys(design.pages)
+      if (which < 0.4)
+        tab.run('page.add', {
+          name: 'P',
+          frame: { name: 'F', width: 100 + Math.floor(random() * 900), height: 100 },
+        })
+      else if (which < 0.7) tab.run('page.duplicate', { id: pick(pages) })
+      // p1 stays: two tabs deleting the last pages at once would leave none, which repair doesn't handle.
+      else tab.run('page.delete', { id: pick(pages.filter((id) => id !== 'p1')) ?? 'p1' })
+    } else if (roll < 0.96 && texts.length > 0) {
+      const id = pick(texts)
+      const node = design.nodes[id]
+      if (node?.type === 'text' && node.props.text.length > 1)
+        tab.run('text.edit', { id, op: { kind: 'style', at: 0, length: 1, style: { fontWeight: pick([400, 700]) } } })
     } else if (roll < 0.985) {
       const which = random()
       if (which < 0.4)

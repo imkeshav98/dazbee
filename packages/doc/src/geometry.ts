@@ -1,4 +1,4 @@
-// Boxes on a page as the renderer draws them: in one page's design pixels, a box's rotation turns
+// Boxes in a frame as the renderer draws them: in the frame's design pixels, a box's rotation turns
 // it about its centre, and a container's rotation turns what is inside it about the container's
 // centre. Commands that keep layers where they are on screen (group, ungroup, hug) and the
 // editor's transforms share it.
@@ -25,7 +25,7 @@ export function turn(p: Point, about: Point, deg: number): Point {
   return { x: about.x + dx * Math.cos(a) - dy * Math.sin(a), y: about.y + dx * Math.sin(a) + dy * Math.cos(a) }
 }
 
-/** A box's four corners on the page, as drawn: nw, ne, se, sw. */
+/** A box's four corners in its frame, as drawn: nw, ne, se, sw. */
 export function cornersOf(b: Box): Point[] {
   const c = centreOf(b)
   return [

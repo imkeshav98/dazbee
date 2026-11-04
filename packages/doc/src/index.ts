@@ -1,5 +1,5 @@
 export { CommandError, defineCommand, type Command } from './commands/define.ts'
-export { ancestorsOf, childrenOf, descendants, isInside } from './children.ts'
+export { ancestorsOf, childrenOf, descendants, frameIdOf, isInside } from './children.ts'
 export { COMMANDS, type CommandName } from './commands/index.ts'
 export {
   anchorOffset,
@@ -14,4 +14,3 @@ export { compact, COMPACTION } from './compact.ts'
 export { openSession, type Session } from './session.ts'
 export { boundsOf, centreOf, cornersOf, normalAngle, round, turn, type Box, type Point } from './geometry.ts'
 export { withFreshIds } from './fresh-ids.ts'
-export { mergedProps } from './commands/placement.ts'
