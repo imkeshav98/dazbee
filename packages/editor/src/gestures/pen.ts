@@ -101,6 +101,8 @@ export interface EditorPen {
   pressPoints(e: PointerEvent, at: { frame: Frame; p: Point } | null): PathDrag | null
   /** Drags anchors (Shift along one axis) or a handle (Shift in 45° steps; Alt lets a smooth anchor's other handle be). */
   dragPoints(g: PathDrag, p: Point, shift: boolean, alt: boolean): void
+  /** Ends a drag of a path's points, closing its undo step; the groups around the path fit it again. */
+  releasePoints(g: PathDrag): void
   /** Takes the selected anchors out of the path being edited, or the layer once none would be left. One undo step. */
   deletePoints(): boolean
   /** The path the pen is drawing, or whose points are being edited, as the overlay shows it. */
@@ -146,31 +148,10 @@ export function editorPen({
     end: () => void
   } | null = null
 
+  /** Whether the pen is drawing a path. */
   function drawing() {
     return pen !== null
   }
-
-  /**
-   * Writes a path drawn or edited in the coordinates its layer had when that began (#45): the data
-   * from the outline's corner, and the box moved by what the corner moved since the last write.
-   */
-  function reshape(layer: Reshaping, path: PenPath) {
-    const b = pathBounds(path)
-    if (!b) return
-    const corner = { x: round(b.x), y: round(b.y) }
-    const moved = { x: round(corner.x - layer.start.x), y: round(corner.y - layer.start.y) }
-    const input = {
-      id: layer.id,
-      scope: layer.scope,
-      d: formatPath(path, corner),
-      dx: round(moved.x - layer.applied.x),
-      dy: round(moved.y - layer.applied.y),
-      width: round(b.width),
-      height: round(b.height),
-    }
-    if (runQuietly(() => session.run('node.reshape', input))) layer.applied = moved
-  }
-
   /**
    * The path the pen is drawing or whose points are being edited (#45): its outline, its anchors,
    * the handles of the anchors in play, and, for the pen, the next segment to where the pointer is.
@@ -271,6 +252,26 @@ export function editorPen({
   }
 
   /**
+   * Writes a path drawn or edited in the coordinates its layer had when that began (#45): the data
+   * from the outline's corner, and the box moved by what the corner moved since the last write.
+   */
+  function reshape(layer: Reshaping, path: PenPath) {
+    const b = pathBounds(path)
+    if (!b) return
+    const corner = { x: round(b.x), y: round(b.y) }
+    const moved = { x: round(corner.x - layer.start.x), y: round(corner.y - layer.start.y) }
+    const input = {
+      id: layer.id,
+      scope: layer.scope,
+      d: formatPath(path, corner),
+      dx: round(moved.x - layer.applied.x),
+      dy: round(moved.y - layer.applied.y),
+      width: round(b.width),
+      height: round(b.height),
+    }
+    if (runQuietly(() => session.run('node.reshape', input))) layer.applied = moved
+  }
+  /**
    * A press while a path's points are being edited (#45): on a handle of a selected anchor, drag
    * it; on an anchor, select it (Shift adds or takes it away) and drag the selected ones; on a
    * segment, add an anchor there and drag it, all one undo step. Anywhere else leaves the path,
@@ -327,7 +328,6 @@ export function editorPen({
       drag,
     }
   }
-
   /** Drags anchors (Shift along one axis) or a handle (Shift in 45° steps; Alt lets a smooth anchor's other handle be). */
   function pathTo(g: PathDrag, p: Point, shift: boolean, alt: boolean) {
     if (!g.moved && Math.hypot(p.x - g.grab.x, p.y - g.grab.y) * camera().zoom < CLICK_SLOP) return
@@ -351,7 +351,11 @@ export function editorPen({
       moveControl(g.path, g.drag.ref, g.drag.side, { x: round(placed.x), y: round(placed.y) }, g.drag.mirror && !alt),
     )
   }
-
+  /** Ends a drag of a path's points: the groups around it fit it again, and its undo step closes. */
+  function releasePoints(g: PathDrag) {
+    hug(g.roots)
+    g.end()
+  }
   /** Takes the selected anchors out of the path being edited, or the layer once none would be left. One undo step. */
   function deletePoints() {
     const editingPath = selection.pathEditing()
@@ -414,7 +418,6 @@ export function editorPen({
     writePen()
     drawOverlay()
   }
-
   /** Pulls the handles out of the anchor just placed (Shift in 45° steps, Alt only the one ahead), or shows the next segment to the pointer. */
   function penMove(e: PointerEvent, screen: Point) {
     if (!pen) return
@@ -434,7 +437,6 @@ export function editorPen({
     writePen()
     drawOverlay()
   }
-
   /** The press is over: a closing one finishes the path. */
   function penUp() {
     if (!pen) return
@@ -442,7 +444,6 @@ export function editorPen({
     if (pen.closing) finishPen()
     else drawOverlay()
   }
-
   /** Writes the pen's path to its layer, making the layer at the second anchor. */
   function writePen() {
     if (!pen || pen.anchors.length < 2) return
@@ -464,7 +465,6 @@ export function editorPen({
     )
       pen.layer = { id, start: box, applied: { x: 0, y: 0 }, scope: scope(pen.frame) }
   }
-
   /** Ends the pen's path, closed or open: the undo step ends, the new layer is selected, and the select tool comes back. */
   function finishPen() {
     const done = pen
@@ -485,6 +485,7 @@ export function editorPen({
     finish: finishPen,
     pressPoints: startPathEdit,
     dragPoints: pathTo,
+    releasePoints,
     deletePoints,
     parts: pathParts,
   }

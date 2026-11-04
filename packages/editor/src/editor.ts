@@ -622,9 +622,7 @@ function live(
     for (const listener of noticeListeners) listener(notice, parts)
   }
   const tools = editorTools({
-    finish: () => {
-      if (pen.drawing()) pen.finish()
-    },
+    finish: () => pen.finish(),
     changed: () => showCursor(),
     onSnapping: viewChanged,
   })
@@ -2385,7 +2383,9 @@ function live(
       return
     }
     if (gesture?.kind === 'reorder') finishReorder(gesture)
-    if (gesture && gesture.kind !== 'marquee') {
+    if (gesture?.kind === 'path') pen.releasePoints(gesture)
+    else if (gesture?.kind === 'crop') cropping.release(gesture)
+    else if (gesture && gesture.kind !== 'marquee') {
       hug(gesture.roots)
       gesture.end()
     }

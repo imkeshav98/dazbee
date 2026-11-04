@@ -104,6 +104,7 @@ export function editorTyping({
   /** The text layer being typed into, with the caret and the other end of its range. */
   let editing: Editing | null = null
 
+  /** The text layer being typed into, in its frame. */
   function editingNow() {
     return editing
   }
@@ -113,7 +114,6 @@ export function editorTyping({
     const layer = frame && findLayer(scenes.scene(frame).layers, picked.id)
     return frame && layer ? { frame, layer } : null
   }
-
   /** The editing layer's text, laid out as drawn, from the screen's cache, which owns it. */
   function editingText() {
     const found = pickedLayer(editing)
@@ -129,11 +129,108 @@ export function editorTyping({
     const other = anchor ?? caret
     return { start: Math.min(caret, other), end: Math.max(caret, other) }
   }
+  /** The selected range of the text being edited, when it holds a character or more. */
+  function selectedText(): { id: string; range: TextRange } | null {
+    const range = textRange()
+    return editing && range && range.end > range.start ? { id: editing.id, range } : null
+  }
+  /** Each character's style in the selected range, with the overrides of the format it is typed in. */
+  function textSelectionStyles() {
+    const selected = selectedText()
+    const now = session.design()
+    const node = selected && now.nodes[selected.id]
+    if (!selected || !editing || node?.type !== 'text') return null
+    const own = now.overrides[formatScope(String(frameOf(editing.frame)?.formatId))]?.[selected.id]?.style as
+      Partial<typeof node.props.style> | undefined
+    return stylesIn({ ...node.props, style: { ...node.props.style, ...own } }, selected.range)
+  }
+  /** The offset nearest a point in the frame the text is typed in. */
+  function caretFromPoint(p: Point) {
+    const text = editingText()
+    if (!text) return 0
+    return caretAt(ck, text.laid, p.x - text.layer.props.x, p.y - text.layer.props.y - text.laid.dy)
+  }
+  /** The text being edited and its selected range, for the clipboard. */
+  function clipboardText() {
+    const node = editing && session.design().nodes[editing.id]
+    const range = textRange()
+    return node?.type === 'text' && range ? { id: node, text: node.props.text, range } : null
+  }
+  /** The selected range, one box per run of one direction on one line, or else the caret. */
+  function textParts() {
+    const parts: HTMLElement[] = []
+    const text = editingText()
+    const offset = editing && anchorOffset(doc, editing.caret)
+    const range = textRange()
+    if (text && range && range.end > range.start) {
+      // The selected range, one box per run of one direction on one line (#47).
+      for (const box of selectionBoxes(ck, text.laid, range.start, range.end)) {
+        const el = document.createElement('div')
+        el.className = 'text-selection'
+        placeBox(el, text.frame, {
+          x: text.layer.props.x + box.x,
+          y: text.layer.props.y + text.laid.dy + box.y,
+          width: box.width,
+          height: box.height,
+        })
+        parts.push(el)
+      }
+    } else if (text && offset !== null && offset !== undefined) {
+      const at = caretPosition(ck, text.laid, offset)
+      const caret = document.createElement('div')
+      caret.className = 'caret'
+      placeBox(caret, text.frame, {
+        x: text.layer.props.x + at.x,
+        y: text.layer.props.y + text.laid.dy + at.y,
+        width: 0,
+        height: at.height,
+      })
+      caret.style.width = ''
+      parts.push(caret)
+    }
+    return parts
+  }
+
+  /** Starts typing into a text layer in a frame, in one undo step until typing stops. */
+  function startEditing(
+    id: string,
+    frame: string,
+    offset: number,
+    endGesture = session.beginGesture(),
+    created = false,
+  ) {
+    const at = textAnchor(doc, id, offset)
+    editing = { id, frame, caret: at, anchor: at, endGesture, created }
+    textSelectionChanged()
+  }
+  /** Ends typing, closing its undo step. */
+  function stopEditing() {
+    if (!editing) return
+    // A text box made with the text tool and left empty goes again, in the same undo step.
+    const { id } = editing
+    const node = session.design().nodes[id]
+    if (node?.type === 'text' && node.props.text === '' && editing.created)
+      runQuietly(() => session.run('node.delete', { ids: [id] }))
+    editing.endGesture()
+    editing = null
+    textSelectionChanged()
+  }
+  /** Ends typing when the text being edited is no longer in the scene of its frame. */
+  function stopWhenGone() {
+    if (editing && !pickedLayer(editing)) stopEditing()
+  }
   /** Puts the caret at an offset; with `extend`, the other end of the range stays where it is. */
   function caretTo(offset: number, extend = false) {
     if (!editing) return
     editing.caret = textAnchor(doc, editing.id, offset)
     if (!extend) editing.anchor = editing.caret
+    textSelectionChanged()
+  }
+  /** Selects a range, the caret at its end. */
+  function selectText(range: TextRange) {
+    if (!editing) return
+    editing.anchor = textAnchor(doc, editing.id, range.start)
+    editing.caret = textAnchor(doc, editing.id, range.end)
     textSelectionChanged()
   }
   /**
@@ -158,18 +255,6 @@ export function editorTyping({
     if (Object.keys(sizes).length === 0) return
     runQuietly(() => session.run('text.fit', { id, sizes }))
     hug([id])
-  }
-  /** Selects a range, the caret at its end. */
-  function selectText(range: TextRange) {
-    if (!editing) return
-    editing.anchor = textAnchor(doc, editing.id, range.start)
-    editing.caret = textAnchor(doc, editing.id, range.end)
-    textSelectionChanged()
-  }
-  /** The selected range of the text being edited, when it holds a character or more. */
-  function selectedText(): { id: string; range: TextRange } | null {
-    const range = textRange()
-    return editing && range && range.end > range.start ? { id: editing.id, range } : null
   }
   /**
    * Styles a range of a text layer with `style`, as one undo step of its own: while the layer is
@@ -200,49 +285,8 @@ export function editorTyping({
     styleRange(selected, style)
     return true
   }
-  function textSelectionStyles() {
-    const selected = selectedText()
-    const now = session.design()
-    const node = selected && now.nodes[selected.id]
-    if (!selected || !editing || node?.type !== 'text') return null
-    const own = now.overrides[formatScope(String(frameOf(editing.frame)?.formatId))]?.[selected.id]?.style as
-      Partial<typeof node.props.style> | undefined
-    return stylesIn({ ...node.props, style: { ...node.props.style, ...own } }, selected.range)
-  }
 
-  function stopEditing() {
-    if (!editing) return
-    // A text box made with the text tool and left empty goes again, in the same undo step.
-    const { id } = editing
-    const node = session.design().nodes[id]
-    if (node?.type === 'text' && node.props.text === '' && editing.created)
-      runQuietly(() => session.run('node.delete', { ids: [id] }))
-    editing.endGesture()
-    editing = null
-    textSelectionChanged()
-  }
-  /** Starts typing into a text layer in a frame, in one undo step until typing stops. */
-  function startEditing(
-    id: string,
-    frame: string,
-    offset: number,
-    endGesture = session.beginGesture(),
-    created = false,
-  ) {
-    const at = textAnchor(doc, id, offset)
-    editing = { id, frame, caret: at, anchor: at, endGesture, created }
-    textSelectionChanged()
-  }
-  function stopWhenGone() {
-    if (editing && !pickedLayer(editing)) stopEditing()
-  }
-
-  function caretFromPoint(p: Point) {
-    const text = editingText()
-    if (!text) return 0
-    return caretAt(ck, text.laid, p.x - text.layer.props.x, p.y - text.layer.props.y - text.laid.dy)
-  }
-
+  /** A key while typing: everything but copy, cut and paste, which come as their own events. */
   function onKey(e: KeyboardEvent) {
     if (!editing) return
     const mod = e.metaKey || e.ctrlKey
@@ -336,22 +380,16 @@ export function editorTyping({
     if (session.design().nodes[id] !== node) fitText(id)
     drawOverlay()
   }
-  /** The text being edited and its selected range, for the clipboard. */
-  function clipboardText() {
-    const node = editing && session.design().nodes[editing.id]
-    const range = textRange()
-    return node?.type === 'text' && range ? { id: node, text: node.props.text, range } : null
-  }
+  /** Copies the selected range as plain text; true while typing, with a range or not. */
   function copy(e: ClipboardEvent) {
     const at = clipboardText()
-    if (at) {
-      if (at.range.end === at.range.start) return true
-      e.clipboardData?.setData('text/plain', at.text.slice(at.range.start, at.range.end))
-      e.preventDefault()
-      return true
-    }
-    return false
+    if (!at) return false
+    if (at.range.end === at.range.start) return true
+    e.clipboardData?.setData('text/plain', at.text.slice(at.range.start, at.range.end))
+    e.preventDefault()
+    return true
   }
+  /** Cuts the selected range as plain text, the caret where it began. */
   function cut(e: ClipboardEvent) {
     const at = clipboardText()
     if (!at || !editing || at.range.end === at.range.start) return
@@ -370,6 +408,7 @@ export function editorTyping({
     fitText(id)
     drawOverlay()
   }
+  /** Pastes plain text over the selected range, the caret after it; line breaks become paragraphs. */
   function paste(e: ClipboardEvent) {
     const at = clipboardText()
     if (!at || !editing) return
@@ -384,40 +423,6 @@ export function editorTyping({
     if (ok) caretTo(start + pasted.length)
     fitText(id)
     drawOverlay()
-  }
-
-  function textParts() {
-    const parts: HTMLElement[] = []
-    const text = editingText()
-    const offset = editing && anchorOffset(doc, editing.caret)
-    const range = textRange()
-    if (text && range && range.end > range.start) {
-      // The selected range, one box per run of one direction on one line (#47).
-      for (const box of selectionBoxes(ck, text.laid, range.start, range.end)) {
-        const el = document.createElement('div')
-        el.className = 'text-selection'
-        placeBox(el, text.frame, {
-          x: text.layer.props.x + box.x,
-          y: text.layer.props.y + text.laid.dy + box.y,
-          width: box.width,
-          height: box.height,
-        })
-        parts.push(el)
-      }
-    } else if (text && offset !== null && offset !== undefined) {
-      const at = caretPosition(ck, text.laid, offset)
-      const caret = document.createElement('div')
-      caret.className = 'caret'
-      placeBox(caret, text.frame, {
-        x: text.layer.props.x + at.x,
-        y: text.layer.props.y + text.laid.dy + at.y,
-        width: 0,
-        height: at.height,
-      })
-      caret.style.width = ''
-      parts.push(caret)
-    }
-    return parts
   }
 
   return {

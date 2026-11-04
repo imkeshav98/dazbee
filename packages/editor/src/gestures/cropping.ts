@@ -37,7 +37,6 @@ export interface CropDrag {
   corner: number | null
   grab: Point
   start: CropTarget
-  roots: string[]
   end: () => void
 }
 
@@ -66,6 +65,8 @@ export interface EditorCropping {
   press(e: PointerEvent, screen: Point): CropDrag | null
   /** Writes the crop a drag gives, in this format, as the fill's own crop. */
   drag(g: CropDrag, p: Point): void
+  /** Ends a crop drag, closing its undo step. */
+  release(g: CropDrag): void
   /** The crop being made, as the overlay shows it. */
   parts(): HTMLElement[]
 }
@@ -149,7 +150,6 @@ export function editorCropping({
       corner: corner === -1 ? null : corner,
       grab,
       start: target,
-      roots: [],
       end: session.beginGesture(),
     }
   }
@@ -171,10 +171,15 @@ export function editorCropping({
     runQuietly(() => session.run('node.update', { ids: [g.id], scope: scope(g.frame), patch: { fills } }))
     drawOverlay()
   }
+  /** Ends a crop drag, closing its undo step. */
+  function release(g: CropDrag) {
+    g.end()
+  }
 
   return {
     press: startCrop,
     drag: cropTo,
+    release,
     parts: cropParts,
   }
 }
