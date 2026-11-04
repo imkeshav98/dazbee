@@ -38,10 +38,6 @@ async function dotAt(page: Page, kind: 'anchor' | 'control', key: string) {
   return { x: box.x + box.width / 2, y: box.y + box.height / 2 }
 }
 const toolOf = (page: Page) => page.evaluate(() => window.dazbee?.tool())
-const undo = async (page: Page) => {
-  await press(page, 'undo')
-  await page.evaluate(() => window.dazbee?.drawn())
-}
 
 test('the pen draws a closed curved path, a point of it is dragged, and undo takes the drag back in one step', async ({
   browser,
@@ -115,11 +111,11 @@ test('the pen draws a closed curved path, a point of it is dragged, and undo tak
   writeOutput('paths-2-edited.png', await page.screenshot({ animations: 'disabled' }))
 
   // One undo puts the path back exactly as drawn; one more takes the whole drawing away.
-  await undo(page)
+  await press(page, 'undo')
   expect(placed(await read(page), id)).toEqual(drawnBox)
   expect(pathOf(await read(page), id)).toEqual(drawn)
   expect(await exportHashOf(page)).toBe(closedHash)
-  await undo(page)
+  await press(page, 'undo')
   expect((await read(page)).nodes[id]).toBeUndefined()
   expect(await exportHashOf(page)).toBe(blank)
   expect(errors).toEqual([])
@@ -161,7 +157,7 @@ test("Shift keeps the pen to 45°, a click on a segment adds a point, a handle d
   writeOutput('paths-3-open.png', await page.screenshot({ animations: 'disabled' }))
 
   // Adding the point and dragging it were one undo step.
-  await undo(page)
+  await press(page, 'undo')
   expect(anchorsOf(await read(page), id)).toHaveLength(2)
   await press(page, 'redo')
   expect(anchorsOf(await read(page), id)).toHaveLength(3)
@@ -171,7 +167,7 @@ test("Shift keeps the pen to 45°, a click on a segment adds a point, a handle d
   d = await read(page)
   expect(anchorsOf(d, id)).toHaveLength(2)
   expect(placed(d, id).height).toBeCloseTo(0, 1)
-  await undo(page)
+  await press(page, 'undo')
   expect(anchorsOf(await read(page), id)).toHaveLength(3)
 
   // Escape leaves the points; the path stays selected.

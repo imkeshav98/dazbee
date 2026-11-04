@@ -2,8 +2,9 @@
 // their own ports, over a database and a storage bucket of their own, so a run on a developer's
 // machine never writes into the workspace their local site shows. CI's servers are thrown away
 // after each run, so it uses docker compose's as before. A POST to /restart-sync on the control port
-// restarts the suite's sync server and answers once the new one is listening.
-import { type ChildProcess, spawn } from 'node:child_process'
+// restarts the suite's sync server and answers once the new one is listening. The specs restart the
+// sync server and read what it stored through the helpers here, which reach CI's servers as well.
+import { type ChildProcess, execFileSync, spawn } from 'node:child_process'
 import { createServer } from 'node:http'
 import { createRequire } from 'node:module'
 import { fileURLToPath } from 'node:url'
@@ -86,6 +87,46 @@ async function restartSync(sync: ChildProcess) {
   sync.kill()
   await stopped
   return run('apps/sync/src/main.ts')
+}
+
+/**
+ * Restarts the sync server the specs' tabs talk to and waits until it answers again: on CI docker
+ * compose's container, off CI the suite's own, through the control port above.
+ */
+export async function restartSyncServer() {
+  if (!process.env.CI) {
+    const response = await fetch(`http://127.0.0.1:${LOCAL.control}/restart-sync`, { method: 'POST' })
+    if (!response.ok) throw new Error(`the suite's sync server did not answer after restarting (${response.status})`)
+    return
+  }
+  execFileSync('docker', ['compose', 'restart', 'sync'], { cwd: ROOT, stdio: 'pipe' })
+  execFileSync('docker', ['compose', 'up', '-d', '--wait', 'sync'], { cwd: ROOT, stdio: 'pipe' })
+}
+
+/** Whether the sync server has stored the design's state since `since` (packages/db's design_states). */
+export function storedAfter(designId: string, since: Date) {
+  return (
+    query(
+      `select count(*) from design_states where design_id = '${designId.replace(/'/g, "''")}' and updated_at > '${since.toISOString()}'`,
+    ) === '1'
+  )
+}
+
+/** How many bytes the sync server last stored for the design (packages/db's design_states). */
+export function storedSize(designId: string) {
+  return Number(
+    query(`select octet_length(state) from design_states where design_id = '${designId.replace(/'/g, "''")}'`),
+  )
+}
+
+/** Runs a query in the sync server's database: on CI docker compose's, off CI the suite's own. */
+function query(sql: string) {
+  const database = process.env.CI ? 'razzlr' : DATABASE
+  return execFileSync(
+    'docker',
+    ['compose', 'exec', '-T', 'postgres', 'psql', '-U', 'razzlr', '-d', database, '-tAc', sql],
+    { cwd: ROOT, encoding: 'utf8' },
+  ).trim()
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {

@@ -3,19 +3,15 @@
 // layer; the Image card's Replace swaps the picture, keeping its filter; a shape's Add image puts a
 // picture into a plain rectangle. Each is one undo step; redo brings a placed image back, and it is
 // there after a reload.
-import { readFileSync } from 'node:fs'
-import { join } from 'node:path'
-
 import type { DesignInput } from '@dazbee/schema'
 
-import { photo, upload } from '../support/assets.ts'
+import { card1, photo, upload } from '../support/assets.ts'
 import { placed, reloads, screenPoint, writeOutput } from '../support/editor.ts'
-import { barMenu, click, openCard, openStage, press, read, selection } from '../support/stage.ts'
+import { click, openStage, press, read, selection } from '../support/stage.ts'
 import { expect, type Page, test } from '../support/test.ts'
+import { barMenu, openCard } from '../support/top-bar.ts'
 
 test.describe.configure({ timeout: 120_000 })
-
-const card = new Uint8Array(readFileSync(join(import.meta.dirname, '..', '..', 'pixels', 'assets', 'card-1.jpg')))
 
 const design = (): DesignInput => ({
   meta: {
@@ -69,10 +65,6 @@ type Fill = { type: string; assetId?: string; fit?: string; filter?: string; cro
 const fillsOf = async (page: Page, id: string) => (placed(await read(page), id, 'sq').fills ?? []) as Fill[]
 const wideFillsOf = async (page: Page, id: string) =>
   ((await read(page)).overrides['format:wide']?.[id]?.fills ?? []) as Fill[]
-const undo = async (page: Page) => {
-  await press(page, 'undo')
-  await page.evaluate(() => window.dazbee?.drawn())
-}
 
 /** Drags an asset library tile to a design pixel of the square with the mouse, the shot taken mid-drag. */
 async function dragTile(page: Page, assetId: string, to: { x: number; y: number }, shot?: string) {
@@ -96,7 +88,7 @@ test('an image dragged onto a star goes into it, the Image card replaces it, and
   browser,
 }) => {
   const sneaker = await upload(photo)
-  const other = await upload(card)
+  const other = await upload(card1)
   const { page, errors } = await openStage(browser, design())
   await page.locator('[data-panel="assets"]').click()
   await expect(page.locator(`[data-testid="asset-library"] li[data-asset="${sneaker.id}"]`)).toBeVisible({
@@ -128,9 +120,9 @@ test('an image dragged onto a star goes into it, the Image card replaces it, and
   await page.evaluate(() => window.dazbee?.drawn())
   expect((await fillsOf(page, 'star')).at(-1)).toMatchObject({ type: 'image', assetId: other.id })
   // Each is one undo step: the first photo, then the star's own pink.
-  await undo(page)
+  await press(page, 'undo')
   expect((await fillsOf(page, 'star')).at(-1)).toMatchObject({ type: 'image', assetId: sneaker.id })
-  await undo(page)
+  await press(page, 'undo')
   expect(await fillsOf(page, 'star')).toEqual([{ type: 'solid', color: '#FF2E7EFF' }])
   expect(await wideFillsOf(page, 'star')).toEqual([{ type: 'solid', color: '#00A88AFF' }])
   // Redo puts the photo into the star again, in both formats.
@@ -143,7 +135,7 @@ test('an image dragged onto a star goes into it, the Image card replaces it, and
     { type: 'solid', color: '#00A88AFF' },
     { type: 'image', assetId: sneaker.id, fit: 'fill', opacity: 1 },
   ])
-  await undo(page)
+  await press(page, 'undo')
   expect(await fillsOf(page, 'star')).toEqual([{ type: 'solid', color: '#FF2E7EFF' }])
 
   // On empty space, a new layer as before.
@@ -153,7 +145,7 @@ test('an image dragged onto a star goes into it, the Image card replaces it, and
   const [made] = await selection(page)
   expect(made).not.toBe('star')
   expect((after[made ?? '']?.props.fills as Fill[])[0]).toMatchObject({ type: 'image', assetId: sneaker.id })
-  await undo(page)
+  await press(page, 'undo')
   expect(Object.keys((await read(page)).nodes)).toHaveLength(layers)
   // Redo brings the new layer back, and after a reload it is still there.
   await press(page, 'redo')
@@ -164,7 +156,7 @@ test('an image dragged onto a star goes into it, the Image card replaces it, and
 
 test('the bar replaces the picture, keeping its filter; Add image puts one into a plain shape', async ({ browser }) => {
   const sneaker = await upload(photo)
-  const other = await upload(card)
+  const other = await upload(card1)
   const { page, errors } = await openStage(browser, design())
   await page.evaluate(
     (id) => window.dazbee?.fillWithImage('star', { id, name: 'Sneaker', width: 1920, height: 1200 }),
@@ -200,7 +192,7 @@ test('the bar replaces the picture, keeping its filter; Add image puts one into 
   expect(image?.crop).toBeUndefined()
   writeOutput('into-shape-4-replaced.png', await page.screenshot({ animations: 'disabled' }))
   // One undo step puts the first picture back, still mono.
-  await undo(page)
+  await press(page, 'undo')
   expect((await fillsOf(page, 'star')).find((f) => f.type === 'image')).toMatchObject({
     assetId: sneaker.id,
     filter: 'mono',
@@ -220,7 +212,7 @@ test('the bar replaces the picture, keeping its filter; Add image puts one into 
   ])
   await expect(await openCard(page, 'adjust-card')).toBeVisible()
   writeOutput('into-shape-5-added.png', await page.screenshot({ animations: 'disabled' }))
-  await undo(page)
+  await press(page, 'undo')
   expect(await fillsOf(page, 'box')).toEqual([{ type: 'solid', color: '#2F6BFFFF' }])
   expect(errors).toEqual([])
 })

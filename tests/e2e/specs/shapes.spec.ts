@@ -5,8 +5,9 @@ import type { DesignInput } from '@dazbee/schema'
 
 import { exportHashOf, screenPoint, writeOutput } from '../support/editor.ts'
 import { liveDesign } from '../support/seed.ts'
-import { barMenu, click, type Design, drag, openStage, press, read, selection } from '../support/stage.ts'
+import { click, type Design, drag, openStage, press, read, selection } from '../support/stage.ts'
 import { expect, type Page, test } from '../support/test.ts'
+import { barMenu } from '../support/top-bar.ts'
 
 test.describe.configure({ timeout: 120_000 })
 

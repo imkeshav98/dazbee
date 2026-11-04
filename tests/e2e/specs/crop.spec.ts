@@ -3,8 +3,7 @@
 // cropped export matches Node's pixel for pixel; and two layers made a mask in one key press.
 import { createHash } from 'node:crypto'
 
-import { FALLBACK_FAMILIES } from '@dazbee/fonts'
-import { loadFontFiles } from '@dazbee/fonts/node'
+import { fixtureResources } from '@dazbee/pixels/pixels'
 import { renderDesign } from '@dazbee/renderer'
 import { loadCanvasKit } from '@dazbee/renderer/node'
 import type { DesignInput } from '@dazbee/schema'
@@ -78,7 +77,6 @@ const cornerHandle = async (page: Page, i: number) => {
   if (!box) throw new Error(`no crop corner ${i}`)
   return { x: box.x + box.width / 2, y: box.y + box.height / 2 }
 }
-const undo = async (page: Page) => press(page, 'undo')
 
 test('Enter crops a photo: a drag moves it, a corner scales it, each one undo step, and the export matches Node; a double click crops too, and a click outside ends it', async ({
   browser,
@@ -114,15 +112,14 @@ test('Enter crops a photo: a drag moves it, a corner scales it, each one undo st
   await dragScreen(page, await cornerHandle(page, 2), await screenPoint(page, 300, 300))
   const least = (await fillOf(page, 'photo'))?.crop as { width: number; height: number }
   expect(least.height).toBe(1200)
-  await undo(page)
+  await press(page, 'undo')
   writeOutput('crop-2-scaled.png', await page.screenshot({ animations: 'disabled' }))
 
   // The export of the cropped design is Node's, pixel for pixel.
   const ck = await loadCanvasKit()
   const stored = new Uint8Array(await (await page.request.get(`/brands/dev-brand-coffee/assets/${asset.id}`)).body())
   const node = renderDesign(ck, JSON.parse(await designOf(page)), 'p1', 'sq', {
-    fonts: loadFontFiles().map((f) => ({ family: f.family, bytes: f.bytes })),
-    fallbackFamilies: [...FALLBACK_FAMILIES],
+    ...fixtureResources(),
     images: { [asset.id]: stored },
   })
   expect(await exportHashOf(page)).toBe(createHash('sha256').update(node.pixels).digest('hex'))
@@ -135,10 +132,10 @@ test('Enter crops a photo: a drag moves it, a corner scales it, each one undo st
   writeOutput('crop-3-done.png', await page.screenshot({ animations: 'disabled' }))
 
   // One undo per drag: the corner, then the move, and the photo fills its shape again.
-  await undo(page)
+  await press(page, 'undo')
   expect(await fillOf(page, 'photo')).toMatchObject({ crop: { x: 160, width: 1200 } })
   expect(await exportHashOf(page)).toBe(moved)
-  await undo(page)
+  await press(page, 'undo')
   expect((await read(page)).overrides['format:sq']?.photo).toBeUndefined()
   expect(await exportHashOf(page)).toBe(before)
 
@@ -180,7 +177,7 @@ test('two layers become a mask and what it masks in one key press, and one undo'
   await click(page, 900, 900)
   expect(await selection(page)).toEqual([group])
 
-  await undo(page)
+  await press(page, 'undo')
   expect((await read(page)).nodes[group]).toBeUndefined()
   expect(await exportHashOf(page)).toBe(before)
   expect(errors).toEqual([])

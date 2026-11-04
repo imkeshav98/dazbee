@@ -1,21 +1,17 @@
 // The Brand kit page outside the editor: a brand's colour, font, logo and tone of voice set there
 // are saved and shown again after a reload, and a design bound to the brand colour opens in the
 // colour the page last gave it.
-import { readFileSync } from 'node:fs'
-import { join } from 'node:path'
-
 import type { DesignInput } from '@dazbee/schema'
 
+import { tile } from '../support/assets.ts'
 import { editorPath, writeOutput } from '../support/editor.ts'
+import { choose } from '../support/fields.ts'
 import { getKit, newBrand, seed } from '../support/seed.ts'
-import { choose } from '../support/select.ts'
 import { expect, type Page, test } from '../support/test.ts'
 
 test.describe.configure({ timeout: 120_000 })
 test.use({ viewport: { width: 1440, height: 900 } })
 
-/** A small photo from the pixel fixtures, for the logo. */
-const logo = readFileSync(join(import.meta.dirname, '..', '..', 'pixels', 'assets', 'tile.jpg'))
 const voice = 'Warm and plain, like a barista who knows your order.'
 
 /** A design whose box follows the brand's first colour, stored in the colour it had then. */
@@ -79,7 +75,7 @@ test('the colour, font, logo and voice set on the Brand kit page are kept after 
     page.waitForEvent('filechooser'),
     kit.getByRole('button', { name: 'Upload a logo' }).click(),
   ])
-  await chooser.setFiles({ name: 'Harbour logo.jpg', mimeType: 'image/jpeg', buffer: logo })
+  await chooser.setFiles({ name: 'Harbour logo.jpg', mimeType: 'image/jpeg', buffer: Buffer.from(tile) })
   await expect(kit.getByRole('combobox', { name: 'Logo', exact: true })).toHaveText('Harbour logo')
   // The tone of voice, taken as the field is left.
   await kit.getByRole('textbox', { name: 'Tone of voice' }).fill(voice)

@@ -3,8 +3,9 @@
 import type { DesignInput } from '@dazbee/schema'
 
 import { screenPoint, writeOutput } from '../support/editor.ts'
-import { closeBarMenu, moreAction, moreMenu, moreSubmenu, openStage } from '../support/stage.ts'
+import { openStage, selectLayers } from '../support/stage.ts'
 import { expect, type Page, test } from '../support/test.ts'
+import { closeBarMenu, moreAction, moreMenu, moreSubmenu } from '../support/top-bar.ts'
 
 test.describe.configure({ timeout: 120_000 })
 
@@ -52,7 +53,6 @@ const order = async (page: Page) =>
     .filter((n) => n.parentId === 'p1')
     .sort((x, y) => (x.index < y.index ? -1 : 1))
     .map((n) => n.name)
-const select = (page: Page, ids: string[]) => page.evaluate((ids) => window.dazbee?.select(ids), ids)
 
 test('one layer has its actions in the full menu and the right-click menu; several layers group from the small menu', async ({
   browser,
@@ -61,7 +61,7 @@ test('one layer has its actions in the full menu and the right-click menu; sever
   const more = (name: string) => moreAction(page, name)
 
   // One layer's actions are in the full menu, the order in the menu beside Order, each with its shortcut.
-  await select(page, ['a'])
+  await selectLayers(page, ['a'])
   const menu = await moreMenu(page)
   await expect((await moreSubmenu(page, 'order')).getByRole('button', { name: 'Bring forward' })).toContainText(
     'Ctrl+]',
@@ -87,16 +87,16 @@ test('one layer has its actions in the full menu and the right-click menu; sever
   await page.evaluate(() => window.dazbee?.perform('undo'))
 
   // Group two from the small menu, then ungroup them from the full menu.
-  await select(page, ['b', 'c'])
+  await selectLayers(page, ['b', 'c'])
   await page.getByTestId('small-group').click()
   await expect.poll(async () => Object.values(await nodes(page)).some((n) => n.type === 'group')).toBe(true)
   const group = Object.entries(await nodes(page)).find(([, n]) => n.type === 'group')?.[0] ?? ''
-  await select(page, [group])
+  await selectLayers(page, [group])
   await more('Ungroup')
   await expect.poll(async () => Object.values(await nodes(page)).some((n) => n.type === 'group')).toBe(false)
 
   // A right-click on A picks it and opens the same actions: it becomes a mask.
-  await select(page, [])
+  await selectLayers(page, [])
   const at = await screenPoint(page, 150, 350)
   await page.mouse.click(at.x, at.y, { button: 'right' })
   const stageMenu = page.getByTestId('stage-menu')

@@ -8,13 +8,12 @@ import {
   exportHashOf,
   openTabs,
   placed,
-  restartSyncServer,
   screenPoint,
   settle,
   stageShot,
-  storedAfter,
   writeOutput,
 } from '../support/editor.ts'
+import { restartSyncServer, storedAfter } from '../support/local-servers.ts'
 import { expect, type Page, test } from '../support/test.ts'
 
 test.describe.configure({ timeout: 120_000 })

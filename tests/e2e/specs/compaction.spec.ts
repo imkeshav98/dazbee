@@ -1,7 +1,8 @@
 // Compaction (#57): while a tab is connected, a deleted layer stays so undo can bring it back; once
 // everyone has left, the sync server drops deleted layers and stores a smaller design, and whoever
 // opens it next sees the same design and the same export.
-import { designOf, exportHashOf, openTabs, settle, storedSize, writeOutput } from '../support/editor.ts'
+import { designOf, exportHashOf, openTabs, settle, writeOutput } from '../support/editor.ts'
+import { storedSize } from '../support/local-servers.ts'
 import { liveDesign, seed } from '../support/seed.ts'
 import { expect, type Page, test } from '../support/test.ts'
 

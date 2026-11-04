@@ -8,8 +8,9 @@ import type { DesignInput } from '@dazbee/schema'
 import { screenPoint, writeOutput } from '../support/editor.ts'
 import { PERF, report, spread } from '../support/perf.ts'
 import { liveDesign } from '../support/seed.ts'
-import { barMenu, click, openStage, press, props, selection, zoomMenu } from '../support/stage.ts'
+import { click, openStage, press, props, selection } from '../support/stage.ts'
 import { expect, type Page, test } from '../support/test.ts'
+import { barMenu, zoomMenu } from '../support/top-bar.ts'
 
 test.describe.configure({ timeout: 120_000 })
 

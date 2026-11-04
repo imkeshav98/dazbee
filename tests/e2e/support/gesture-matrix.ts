@@ -8,12 +8,11 @@
 // and nothing logs an error. Failures that have a ticket of their own are listed in KNOWN.
 import type { Browser, Page } from '@playwright/test'
 
-import { pressFor, type ShortcutAction } from '@dazbee/editor/shortcuts'
 import { type DesignInput, formatScope } from '@dazbee/schema'
 
 import { photo, upload } from './assets.ts'
-import { designOf } from './editor.ts'
-import { openStage } from './stage.ts'
+import { designOf, screenPoint } from './editor.ts'
+import { drawn, openStage, press, selectLayers } from './stage.ts'
 
 type Node = DesignInput['nodes'][string]
 const rect = (
@@ -432,13 +431,6 @@ const boxesIn = (page: Page, formatId: string): Promise<Boxes> =>
     ({ formatId, ids }) => Object.fromEntries(ids.map((id) => [id, window.dazbee?.boxOf(id, 'p1', formatId) ?? null])),
     { formatId, ids: ALL },
   )
-const point = (page: Page, x: number, y: number, formatId: string) =>
-  page.evaluate(({ x, y, formatId }) => window.dazbee?.screenPoint(x, y, 'p1', formatId), {
-    x,
-    y,
-    formatId,
-  }) as Promise<{ x: number; y: number }>
-const drawn = (page: Page) => page.evaluate(() => window.dazbee?.drawn())
 /** Where a colour is drawn in a format's export: the box around its pixels, in design pixels, or null. */
 const inkOf = (page: Page, formatId: string, rgb: [number, number, number]) =>
   page.evaluate(
@@ -465,10 +457,6 @@ const inkOf = (page: Page, formatId: string, rgb: [number, number, number]) =>
     },
     { formatId, rgb },
   )
-const press = async (page: Page, action: ShortcutAction) => {
-  await page.keyboard.press(pressFor(action))
-  await drawn(page)
-}
 async function drag(page: Page, a: { x: number; y: number }, b: { x: number; y: number }) {
   await page.mouse.move(a.x, a.y)
   await page.mouse.down()
@@ -515,7 +503,7 @@ async function run(
   // A group's middle may be a gap between its layers: it is pressed on its first one.
   const grip =
     subject === 'group' || subject === 'bool' || subject === 'paths' ? (before[HOLDS[subject]?.[0] ?? ''] ?? box) : box
-  const centre = await point(page, grip.x + grip.width / 2, grip.y + grip.height / 2, formatId)
+  const centre = await screenPoint(page, grip.x + grip.width / 2, grip.y + grip.height / 2, { pageId: 'p1', formatId })
   const turnBy = ((TURNED[subject] ?? 0) * Math.PI) / 180
   const flowParent = FLOW[subject]
   switch (true) {
@@ -530,11 +518,11 @@ async function run(
         .at(isLast ? 0 : -1)
       // Past that sibling's far corner, so a row or a column takes it beyond it.
       const to = end
-        ? await point(
+        ? await screenPoint(
             page,
             isLast ? end.x + 2 : end.x + end.width - 2,
             isLast ? end.y + 2 : end.y + end.height - 2,
-            formatId,
+            { pageId: 'p1', formatId },
           )
         : { x: centre.x + 30 * zoom, y: centre.y + 20 * zoom }
       await drag(page, centre, to)
@@ -746,13 +734,11 @@ async function run(
   if (['group', 'frame-selection', 'ungroup'].includes(gesture))
     for (const id of LEAVES) if (!same(before[id], after[id])) problems.push(`${id} moved`)
   // One undo step puts everything back.
-  await page.keyboard.press(pressFor('undo'))
-  await drawn(page)
+  await press(page, 'undo')
   if ((await designOf(page)) !== json) {
     problems.push('one undo did not put it back')
     for (let i = 0; i < 5 && (await designOf(page)) !== json; i++) {
-      await page.keyboard.press(pressFor('undo'))
-      await drawn(page)
+      await press(page, 'undo')
     }
   }
   return problems.length > 0 ? problems.join('; ') : null
@@ -785,11 +771,7 @@ export async function runMatrix(browser: Browser, formatId: 'sq' | 'wide', subje
   const unexpected: string[] = []
   for (const subject of subjects) {
     for (const gesture of GESTURES) {
-      await page.evaluate(({ subject, formatId }) => window.dazbee?.select([subject], 'p1', formatId), {
-        subject,
-        formatId,
-      })
-      await drawn(page)
+      await selectLayers(page, [subject], { format: formatId })
       const errorsBefore = opened.errors.length
       const problem = await run(page, subject, gesture, formatId, other)
       const logged =

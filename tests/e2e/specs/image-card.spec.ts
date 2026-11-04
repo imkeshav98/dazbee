@@ -4,8 +4,10 @@ import type { DesignInput } from '@dazbee/schema'
 
 import { photo, upload } from '../support/assets.ts'
 import { writeOutput } from '../support/editor.ts'
-import { barMenu, openCard, openStage } from '../support/stage.ts'
-import { expect, type Locator, type Page, test } from '../support/test.ts'
+import { enter } from '../support/fields.ts'
+import { openStage } from '../support/stage.ts'
+import { expect, type Page, test } from '../support/test.ts'
+import { barMenu, openCard } from '../support/top-bar.ts'
 
 test.describe.configure({ timeout: 120_000 })
 
@@ -55,10 +57,6 @@ const design = (assetId: string): DesignInput => ({
 const imageOf = async (page: Page) =>
   ((await page.evaluate(() => window.dazbee?.design().nodes.photo?.props)) as { fills: Record<string, unknown>[] })
     .fills[0]
-const enter = async (field: Locator, value: string) => {
-  await field.fill(value)
-  await field.press('Enter')
-}
 
 test("the bar's Look sets the filter; the header card the fit; the Adjust card the opacity and the adjustments", async ({
   browser,

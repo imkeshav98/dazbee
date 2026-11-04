@@ -6,15 +6,14 @@
 import { readFileSync } from 'node:fs'
 
 import { exportDesign, readZip } from '@dazbee/export'
-import { FALLBACK_FAMILIES } from '@dazbee/fonts'
-import { loadFontFiles } from '@dazbee/fonts/node'
+import { fixtureResources } from '@dazbee/pixels/pixels'
 import { loadCanvasKit } from '@dazbee/renderer/node'
 import type { DesignInput } from '@dazbee/schema'
 
 import { photo, upload } from '../support/assets.ts'
 import { designOf, writeOutput } from '../support/editor.ts'
+import { choose } from '../support/fields.ts'
 import { PERF, report } from '../support/perf.ts'
-import { choose } from '../support/select.ts'
 import { openStage } from '../support/stage.ts'
 import { expect, type Page, test } from '../support/test.ts'
 
@@ -179,11 +178,7 @@ async function nodeExport(page: Page, assetId: string) {
   const ck = await loadCanvasKit()
   const json = JSON.parse(await designOf(page)) as unknown
   const stored = new Uint8Array(await (await page.request.get(`/brands/dev-brand-coffee/assets/${assetId}`)).body())
-  const bytes = {
-    fonts: loadFontFiles().map((f) => ({ family: f.family, bytes: f.bytes })),
-    fallbackFamilies: [...FALLBACK_FAMILIES],
-    images: { [assetId]: stored },
-  }
+  const bytes = { ...fixtureResources(), images: { [assetId]: stored } }
   return (request: { pageIds: string[]; formatIds: string[]; type: 'png' | 'jpg'; quality?: number }) =>
     exportDesign(ck, json, request, bytes).bytes
 }

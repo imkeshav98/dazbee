@@ -4,16 +4,16 @@
 // same, and the browser's export matches Node's to the pixel.
 import { createHash } from 'node:crypto'
 
-import { FALLBACK_FAMILIES } from '@dazbee/fonts'
-import { loadFontFiles } from '@dazbee/fonts/node'
+import { fixtureResources } from '@dazbee/pixels/pixels'
 import { renderDesign } from '@dazbee/renderer'
 import { loadCanvasKit } from '@dazbee/renderer/node'
 import { AssetLink, type DesignInput } from '@dazbee/schema'
 
 import { api, photo, upload } from '../support/assets.ts'
 import { designOf, exportHashOf, screenPoint, writeOutput } from '../support/editor.ts'
-import { backgroundPanel, click, fillList, openCard, openStage, press, read, strokeList } from '../support/stage.ts'
+import { backgroundPanel, click, openStage, press, read } from '../support/stage.ts'
 import { expect, type Page, test } from '../support/test.ts'
+import { fillList, openCard, strokeList } from '../support/top-bar.ts'
 
 test.describe.configure({ timeout: 120_000 })
 
@@ -48,10 +48,6 @@ const design = (assetId: string): DesignInput => ({
 
 type Fill = { type: string; color?: string; visible?: boolean; stops?: { offset: number; color: string }[] }
 const fillsOf = async (page: Page) => ((await read(page)).nodes.card?.props.fills ?? []) as Fill[]
-const undo = async (page: Page) => {
-  await press(page, 'undo')
-  await page.evaluate(() => window.dazbee?.drawn())
-}
 /** One pixel of the stage, and of the PNG the editor exports, at a design pixel of the square. */
 async function stageAndExport(page: Page, x: number, y: number) {
   const at = await screenPoint(page, x, y)
@@ -125,7 +121,7 @@ test('a gradient over a photo: added on top, a stop edited, the two reordered, o
   await page.mouse.move(bar.x + bar.width * 0.3, middle.y + middle.height / 2, { steps: 4 })
   await page.mouse.up()
   await expect.poll(async () => (await fillsOf(page))[1]?.stops?.[1]?.offset).toBeCloseTo(0.3, 1)
-  await undo(page)
+  await press(page, 'undo')
   await expect.poll(async () => (await fillsOf(page))[1]?.stops?.[1]?.offset).toBe(0.5)
   await expect(editor.locator('[data-stop]')).toHaveCount(3)
   writeOutput('fill-stack-1-gradient-editor.png', await page.screenshot({ animations: 'disabled' }))
@@ -174,14 +170,13 @@ test('a gradient over a photo: added on top, a stop edited, the two reordered, o
   const stored = new Uint8Array(await (await fetch(link.url)).arrayBuffer())
   const ck = await loadCanvasKit()
   const node = renderDesign(ck, doc, 'p1', 'sq', {
-    fonts: loadFontFiles().map((f) => ({ family: f.family, bytes: f.bytes })),
-    fallbackFamilies: [...FALLBACK_FAMILIES],
+    ...fixtureResources(),
     images: { [asset.id]: stored },
   })
   expect(createHash('sha256').update(node.pixels).digest('hex')).toBe(browserHash)
 
   // Each change was one undo step: show, hide, the two moves, the stop added, the colour, the gradient, the add.
-  for (let i = 0; i < 9; i++) await undo(page)
+  for (let i = 0; i < 9; i++) await press(page, 'undo')
   expect(await fillsOf(page)).toEqual([{ type: 'image', assetId: asset.id, fit: 'fill', opacity: 1 }])
   expect(errors).toEqual([])
 })

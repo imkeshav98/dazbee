@@ -4,9 +4,11 @@ import type { DesignInput } from '@dazbee/schema'
 
 import { photo, upload } from '../support/assets.ts'
 import { writeOutput } from '../support/editor.ts'
-import { choose } from '../support/select.ts'
-import { barMenu, openStage } from '../support/stage.ts'
-import { expect, type Locator, type Page, test } from '../support/test.ts'
+import { choose, enter } from '../support/fields.ts'
+import { SCREEN_SIZES } from '../support/layout.ts'
+import { nextFrame, openStage, selectLayers } from '../support/stage.ts'
+import { expect, type Page, test } from '../support/test.ts'
+import { barMenu } from '../support/top-bar.ts'
 
 test.describe.configure({ timeout: 240_000 })
 
@@ -103,16 +105,7 @@ const PANELS: [string, string[], string[]][] = [
   ['in a stack', ['label'], ['position']],
 ]
 
-const select = async (page: Page, ids: string[]) => {
-  await page.evaluate((ids) => window.dazbee?.select(ids), ids)
-  await expect(page.getByTestId('top-bar')).toHaveAttribute('data-selection', ids.join(' '))
-}
-
-for (const [width, height] of [
-  [1280, 760],
-  [820, 1180],
-  [390, 844],
-] as const) {
+for (const [width, height] of SCREEN_SIZES) {
   // The panel is as wide at every size but the phone's, so CI checks it at desktop size; the other
   // sizes take the pictures for review.
   test(
@@ -123,11 +116,11 @@ for (const [width, height] of [
       const { page, errors } = await openStage(browser, design(asset.id))
       await page.setViewportSize({ width, height })
       // The stage takes its new size before the design is fitted to it.
-      await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))))
+      await nextFrame(page)
       await page.evaluate(() => window.dazbee?.fitAll())
       await page.evaluate(() => window.dazbee?.drawn())
       for (const [kind, ids, panels] of PANELS) {
-        await select(page, ids)
+        await selectLayers(page, ids, { bar: true })
         for (const id of panels) {
           const panel = await barMenu(page, id)
           const headings = await panel.locator('h3').allTextContents()
@@ -146,7 +139,7 @@ for (const [width, height] of [
                 .map((el) => el.getAttribute('aria-label')),
             )
           expect(squeezed, `${kind} ${id}: values with no room`).toEqual([])
-          await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))))
+          await nextFrame(page)
           writeOutput(
             `panel-${width}-${kind.replaceAll(' ', '-')}-${id}.png`,
             await page.screenshot({ animations: 'disabled' }),
@@ -163,17 +156,13 @@ for (const [width, height] of [
 /** The layer's props as the document holds them. */
 const propsOf = (page: Page, id: string) =>
   page.evaluate((id) => window.dazbee?.design().nodes[id]?.props, id) as Promise<Record<string, unknown>>
-const enter = async (field: Locator, value: string) => {
-  await field.fill(value)
-  await field.press('Enter')
-}
 
 test.describe('found by QA', () => {
   test('number fields stop at limits a design never needs to pass', async ({ browser }) => {
     const asset = await upload(photo)
     const { page, errors } = await openStage(browser, design(asset.id))
     // An effect's numbers, and where a layer is.
-    await select(page, ['badge'])
+    await selectLayers(page, ['badge'], { bar: true })
     const effects = await barMenu(page, 'effects')
     await effects.locator('[data-tile="dropShadow"]').click()
     await enter(effects.getByRole('spinbutton', { name: 'Drop shadow 1 Blur' }), '99999')
@@ -196,7 +185,7 @@ test.describe('found by QA', () => {
     await enter(position.getByRole('spinbutton', { name: 'Height' }), '50000')
     await expect.poll(async () => (await propsOf(page, 'badge')).width).toBeLessThanOrEqual(100000)
     // Text's spacing and size, last, since text this large takes a while to draw.
-    await select(page, ['headline'])
+    await selectLayers(page, ['headline'], { bar: true })
     const spacing = await barMenu(page, 'spacing')
     await enter(spacing.getByRole('spinbutton', { name: 'Line height' }), '99999')
     await enter(spacing.getByRole('spinbutton', { name: 'Letter spacing' }), '100000')
@@ -216,7 +205,7 @@ test.describe('found by QA', () => {
   test('Ctrl+Z and Ctrl+Shift+Z in a number field not being typed in undo and redo the design', async ({ browser }) => {
     const asset = await upload(photo)
     const { page, errors } = await openStage(browser, design(asset.id))
-    await select(page, ['headline'])
+    await selectLayers(page, ['headline'], { bar: true })
     const field = (await barMenu(page, 'spacing')).getByRole('spinbutton', { name: 'Paragraph spacing' })
     const spacing = async () => (await propsOf(page, 'headline')).paragraphSpacing ?? 0
     await field.focus()
@@ -252,7 +241,7 @@ test.describe('found by QA', () => {
   }) => {
     const asset = await upload(photo)
     const { page, errors } = await openStage(browser, design(asset.id))
-    await select(page, ['badge'])
+    await selectLayers(page, ['badge'], { bar: true })
     const panel = await barMenu(page, 'colour')
     await panel.getByTestId('colour-pick').click()
     const picker = panel.getByTestId('colour-picker')
@@ -272,7 +261,7 @@ test.describe('found by QA', () => {
   test('a panel whose item leaves the top bar closes: Colour, once a shape becomes a photo', async ({ browser }) => {
     const asset = await upload(photo)
     const { page, errors } = await openStage(browser, design(asset.id))
-    await select(page, ['badge'])
+    await selectLayers(page, ['badge'], { bar: true })
     await barMenu(page, 'colour')
     await page.evaluate(
       (assetId) =>
@@ -290,7 +279,7 @@ test.describe('found by QA', () => {
   test('a layer in a stack has no Line up with the size: the stack places it', async ({ browser }) => {
     const asset = await upload(photo)
     const { page, errors } = await openStage(browser, design(asset.id))
-    await select(page, ['label'])
+    await selectLayers(page, ['label'], { bar: true })
     const panel = await barMenu(page, 'position')
     await expect(panel.getByTestId('arrange-part').getByRole('heading')).toHaveText(['Arrange'])
     expect(errors).toEqual([])
@@ -301,7 +290,7 @@ test.describe('found by QA', () => {
   }) => {
     const asset = await upload(photo)
     const { page, errors } = await openStage(browser, design(asset.id))
-    await select(page, ['headline'])
+    await selectLayers(page, ['headline'], { bar: true })
     const panel = await barMenu(page, 'effects')
     await panel.locator('[data-tile="outline"]').click()
     const outline = async () => ((await propsOf(page, 'headline')).style as { outline?: { width: number } }).outline
@@ -317,7 +306,7 @@ test.describe('found by QA', () => {
   test('the Font panel stays open for a pick, and Esc closes its weight list first', async ({ browser }) => {
     const asset = await upload(photo)
     const { page, errors } = await openStage(browser, design(asset.id))
-    await select(page, ['headline'])
+    await selectLayers(page, ['headline'], { bar: true })
     const panel = await barMenu(page, 'font')
     await panel.getByTestId('font-weight').click()
     const weights = page.getByRole('listbox', { name: 'Weight' })
@@ -336,7 +325,7 @@ test.describe('found by QA', () => {
   test('emptying Max lines lifts the limit', async ({ browser }) => {
     const asset = await upload(photo)
     const { page, errors } = await openStage(browser, design(asset.id))
-    await select(page, ['headline'])
+    await selectLayers(page, ['headline'], { bar: true })
     const field = (await barMenu(page, 'spacing')).getByRole('spinbutton', { name: 'Max lines' })
     await enter(field, '3')
     await expect.poll(async () => (await propsOf(page, 'headline')).maxLines).toBe(3)
@@ -350,7 +339,7 @@ test.describe('found by QA', () => {
   test('two effects of a type each have colour fields of their own name', async ({ browser }) => {
     const asset = await upload(photo)
     const { page, errors } = await openStage(browser, design(asset.id))
-    await select(page, ['badge'])
+    await selectLayers(page, ['badge'], { bar: true })
     const panel = await barMenu(page, 'effects')
     await panel.locator('[data-tile="dropShadow"]').click()
     await choose(panel.getByRole('combobox', { name: 'Add another' }), 'dropShadow')
@@ -364,7 +353,7 @@ test.describe('found by QA', () => {
     const asset = await upload(photo)
     const { page, errors } = await openStage(browser, design(asset.id))
     await page.evaluate(() => window.dazbee?.setLocked(['badge'], true))
-    await select(page, ['badge'])
+    await selectLayers(page, ['badge'], { bar: true })
     const items = page.getByTestId('top-bar').locator('[data-item]')
     await expect(items).toHaveCount(1)
     await expect(page.getByTestId('bar-locked')).toContainText('Locked')
@@ -393,7 +382,7 @@ test.describe('found by Keshav', () => {
         patch: { shape: { kind: 'rect', cornerRadius: 12 } },
       }),
     )
-    await select(page, ['badge'])
+    await selectLayers(page, ['badge'], { bar: true })
     const popup = await barMenu(page, 'shape')
     await expect(popup.getByRole('spinbutton').first()).toBeVisible()
     expect(await page.evaluate(() => document.activeElement?.tagName)).not.toBe('INPUT')
@@ -409,7 +398,7 @@ test.describe('found by Keshav', () => {
   }) => {
     const asset = await upload(photo)
     const { page, errors } = await openStage(browser, design(asset.id))
-    await select(page, ['headline'])
+    await selectLayers(page, ['headline'], { bar: true })
     const field = (await barMenu(page, 'spacing')).getByRole('spinbutton', { name: 'Line height' })
     await field.focus()
     await page.keyboard.press('ArrowUp')

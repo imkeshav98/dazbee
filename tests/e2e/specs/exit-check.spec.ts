@@ -12,26 +12,22 @@ import { PDFiumLibrary } from '@hyzyla/pdfium'
 
 import type { CanvasKit } from '@dazbee/canvaskit'
 import { exportDesign, readZip } from '@dazbee/export'
-import { FALLBACK_FAMILIES } from '@dazbee/fonts'
-import { loadFontFiles } from '@dazbee/fonts/node'
-import { decodePng, encodePng, type Pixels } from '@dazbee/pixels/pixels'
+import { decodePng, encodePng, fixtureResources, type Pixels } from '@dazbee/pixels/pixels'
 import { overWhite, rasterisePdf, rasteriseSvg, vectorDifference } from '@dazbee/pixels/vector'
 import { renderDesign } from '@dazbee/renderer'
 import { loadCanvasKit } from '@dazbee/renderer/node'
 import { type ExportType, formatScope } from '@dazbee/schema'
 
-import { photo } from '../support/assets.ts'
-import { designOf, OUTPUT, screenPoint, writeOutput } from '../support/editor.ts'
+import { photo, righteous } from '../support/assets.ts'
+import { designOf, OUTPUT, screenPoint, shoot, writeOutput } from '../support/editor.ts'
 import { newBrand } from '../support/seed.ts'
-import { backgroundPanel, barMenu, press, sizesPanel } from '../support/stage.ts'
+import { backgroundPanel, drawn, press } from '../support/stage.ts'
 import { expect, type Page, test } from '../support/test.ts'
+import { barMenu, sizesPanel } from '../support/top-bar.ts'
 
 test.describe.configure({ timeout: 600_000 })
 
 const run = crypto.randomUUID().slice(0, 6)
-const righteous = new Uint8Array(
-  readFileSync(join(import.meta.dirname, '..', 'assets', 'fonts', 'Righteous-Regular.ttf')),
-)
 /** The most a PDF or SVG of this ad may differ from the CPU render, in percent of its pixels. */
 const EXIT_VECTOR_LIMIT = 1
 
@@ -50,8 +46,6 @@ interface Stored {
   overrides: Record<string, Record<string, Record<string, unknown>>>
 }
 const stored = async (page: Page) => JSON.parse(await designOf(page)) as Stored
-const drawn = (page: Page) => page.evaluate(() => window.dazbee?.drawn())
-const shot = async (page: Page, name: string) => writeOutput(`exit-check-${name}.png`, await page.screenshot())
 
 /** An SVG file as Chromium's own SVG decoder draws it in the page, at the format's size over white. */
 async function drawnByChromium(
@@ -126,7 +120,7 @@ test('an ad set rebuilt in 5 formats through real input exports PNG, JPG, PDF an
     await row.getByRole('textbox', { name: `Hex value of ${named}` }).press('Enter')
     await expect(row.getByRole('textbox', { name: `Hex value of ${named}` })).toHaveValue(new RegExp(hex, 'i'))
   }
-  await shot(page, '0-brand-kit')
+  await shoot(page, 'exit-check-0-brand-kit')
 
   // A photo goes into the brand's assets and is dragged onto the square.
   await page.locator('[data-panel="assets"]').click()
@@ -215,7 +209,7 @@ test('an ad set rebuilt in 5 formats through real input exports PNG, JPG, PDF an
   await page.locator('[data-panel="brand"]').click()
   await expect(kit).toBeHidden()
   await drawn(page)
-  await shot(page, '1-square')
+  await shoot(page, 'exit-check-1-square')
 
   // Four more formats from presets, each starting from the square's layout scaled to fit; each is in
   // the design and its menu closed before the next is added.
@@ -260,7 +254,7 @@ test('an ad set rebuilt in 5 formats through real input exports PNG, JPG, PDF an
   expect(after.nodes[headline]?.props.y).toBe(design.nodes[headline]?.props.y)
   await page.keyboard.press('Escape')
   await drawn(page)
-  await shot(page, '2-five-formats')
+  await shoot(page, 'exit-check-2-five-formats')
 
   // Every format as each file type, through the Export menu.
   const files: Partial<Record<ExportType, Map<string, Uint8Array>>> = {}
@@ -268,7 +262,7 @@ test('an ad set rebuilt in 5 formats through real input exports PNG, JPG, PDF an
     await page.getByRole('button', { name: 'Share' }).click()
     await page.getByText('Export', { exact: true }).click()
     await page.locator(`[data-type="${type}"]`).click()
-    if (type === 'png') await shot(page, '3-export')
+    if (type === 'png') await shoot(page, 'exit-check-3-export')
     const [download] = await Promise.all([page.waitForEvent('download'), page.getByTestId('export-run').click()])
     const zip = new Uint8Array(readFileSync(await download.path()))
     files[type] = new Map(readZip(zip).map((entry) => [entry.path, entry.bytes]))
@@ -283,12 +277,10 @@ test('an ad set rebuilt in 5 formats through real input exports PNG, JPG, PDF an
       .flatMap((n) => n.props.fills ?? [])
       .find((f) => f.type === 'image')?.assetId ?? ''
   const image = new Uint8Array(await (await page.request.get(`/brands/${brandId}/assets/${assetId}`)).body())
+  const shipped = fixtureResources()
   const bytes = {
-    fonts: [
-      ...loadFontFiles().map((f) => ({ family: f.family, bytes: f.bytes })),
-      { family: 'Righteous', bytes: righteous },
-    ],
-    fallbackFamilies: [...FALLBACK_FAMILIES],
+    ...shipped,
+    fonts: [...shipped.fonts, { family: 'Righteous', bytes: righteous }],
     images: { [assetId]: image },
   }
   const ck = await loadCanvasKit()

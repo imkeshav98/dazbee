@@ -4,19 +4,19 @@
 import type { DesignInput } from '@dazbee/schema'
 
 import { writeOutput } from '../support/editor.ts'
-import { choose } from '../support/select.ts'
+import { choose, enter } from '../support/fields.ts'
+import { openStage, selectLayers } from '../support/stage.ts'
+import { expect, type Page, test } from '../support/test.ts'
 import {
   barMenu,
   closeBarMenu,
   fillList,
   moreMenu,
   openCard,
-  openStage,
   scopeMenu,
   strokeList,
   textColourHex,
-} from '../support/stage.ts'
-import { expect, type Locator, type Page, test } from '../support/test.ts'
+} from '../support/top-bar.ts'
 
 test.describe.configure({ timeout: 120_000 })
 
@@ -109,19 +109,10 @@ const props = async (page: Page, id: string) => ({
   ...(await base(page, id)),
   ...(await overrides(page))['format:sq']?.[id],
 })
-const select = async (page: Page, ids: string[]) => {
-  await page.evaluate((ids) => window.dazbee?.select(ids), ids)
-  await expect(await openCard(page, 'layout-card')).toBeVisible()
-}
-/** Types a value into a field and presses Enter. */
-const enter = async (field: Locator, value: string) => {
-  await field.fill(value)
-  await field.press('Enter')
-}
 
 test('one layer: position, size, turn, opacity, blend, fill, stroke and effects', async ({ browser }) => {
   const { page, errors } = await openStage(browser, design())
-  await select(page, ['box'])
+  await selectLayers(page, ['box'], { card: 'layout-card' })
   const layout = async () => await openCard(page, 'layout-card')
   await expect((await layout()).getByRole('spinbutton', { name: 'X position' })).toHaveValue('80')
 
@@ -198,7 +189,7 @@ test('one layer: position, size, turn, opacity, blend, fill, stroke and effects'
 
 test('several layers: mixed values, set together or each from its own; text and auto layout', async ({ browser }) => {
   const { page, errors } = await openStage(browser, design())
-  await select(page, ['box', 'dot'])
+  await selectLayers(page, ['box', 'dot'], { card: 'layout-card' })
   const layout = async () => await openCard(page, 'layout-card')
   const x = (await layout()).getByRole('spinbutton', { name: 'X position' })
   await expect(x).toHaveValue('')
@@ -226,7 +217,7 @@ test('several layers: mixed values, set together or each from its own; text and 
     .toEqual([0.75, 0.75])
 
   // Text.
-  await select(page, ['headline'])
+  await selectLayers(page, ['headline'], { card: 'layout-card' })
   const text = async () => await openCard(page, 'spacing-card')
   await enter(page.getByTestId('bar-size-field'), '120')
   await enter((await text()).getByRole('spinbutton', { name: 'Letter spacing' }), '2')
@@ -262,7 +253,7 @@ test('several layers: mixed values, set together or each from its own; text and 
   writeOutput('props-2-text.png', await page.screenshot())
 
   // Auto layout.
-  await select(page, ['stack'])
+  await selectLayers(page, ['stack'], { card: 'layout-card' })
   const auto = async () => await openCard(page, 'auto-layout-card')
   await enter((await auto()).getByRole('spinbutton', { name: 'Room between' }), '32')
   await (await auto()).getByRole('radio', { name: 'Column' }).click()
@@ -282,7 +273,7 @@ test('a change goes to the format shown, like a drag; all formats writes the bas
   browser,
 }) => {
   const { page, errors } = await openStage(browser, design())
-  await select(page, ['box'])
+  await selectLayers(page, ['box'], { card: 'layout-card' })
   const chip = page.getByTestId('scope-chip')
   await expect(chip).toHaveText('Only Square')
   await expect((await scopeMenu(page)).getByRole('radio', { name: 'Only Square' })).toHaveAttribute(
@@ -318,7 +309,7 @@ test('a change goes to the format shown, like a drag; all formats writes the bas
 
 test('scrubbing a number is one undo step', async ({ browser }) => {
   const { page, errors } = await openStage(browser, design())
-  await select(page, ['box', 'dot'])
+  await selectLayers(page, ['box', 'dot'], { card: 'layout-card' })
   const handle = async () => (await openCard(page, 'layout-card')).locator('[data-scrub="X position"]')
   const box = await (await handle()).boundingBox()
   if (!box) throw new Error('no scrub handle')

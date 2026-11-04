@@ -6,9 +6,10 @@ import type { DesignInput } from '@dazbee/schema'
 
 import { photo, upload } from '../support/assets.ts'
 import { writeOutput } from '../support/editor.ts'
-import { choose } from '../support/select.ts'
-import { barMenu, openStage } from '../support/stage.ts'
+import { choose } from '../support/fields.ts'
+import { openStage, perform, selectLayers } from '../support/stage.ts'
 import { expect, type Page, test } from '../support/test.ts'
+import { barMenu } from '../support/top-bar.ts'
 
 test.describe.configure({ timeout: 120_000 })
 
@@ -92,10 +93,6 @@ const design = (assetId: string): DesignInput => ({
   overrides: {},
 })
 
-const select = async (page: Page, ids: string[]) => {
-  await page.evaluate((ids) => window.dazbee?.select(ids), ids)
-  await expect(page.getByTestId('top-bar')).toHaveAttribute('data-selection', ids.join(' '))
-}
 const panel = (page: Page) => barMenu(page, 'effects')
 const tiles = async (page: Page) => (await panel(page)).locator('[data-tile]')
 const tile = async (page: Page, name: string) => (await panel(page)).locator(`[data-tile="${name}"]`)
@@ -105,14 +102,13 @@ const effectsOf = (page: Page, id: string) =>
       (window.dazbee?.design().nodes[id]?.props as { effects?: { type: string }[] }).effects?.map((e) => e.type) ?? [],
     id,
   )
-const undo = (page: Page) => page.evaluate(() => window.dazbee?.perform('undo'))
 
 test('each kind previews the effects on its own sample, never on the layer', async ({ browser }) => {
   const asset = await upload(photo)
   const { page, errors } = await openStage(browser, design(asset.id))
 
   // A shape: a rounded shape on every tile, six of them, no picture of the star.
-  await select(page, ['star'])
+  await selectLayers(page, ['star'], { bar: true })
   await expect(await tiles(page)).toHaveText([
     'None',
     'Drop shadow',
@@ -125,21 +121,21 @@ test('each kind previews the effects on its own sample, never on the layer', asy
   writeOutput('effect-tiles-1-shape.png', await (await panel(page)).screenshot())
 
   // A photo: the photo on every tile.
-  await select(page, ['photo'])
+  await selectLayers(page, ['photo'], { bar: true })
   await expect((await tiles(page)).locator('img')).toHaveCount(6)
   expect(await (await tile(page, 'glow')).locator('img').getAttribute('src')).toContain(`/assets/${asset.id}/thumbnail`)
   writeOutput('effect-tiles-2-photo.png', await (await panel(page)).screenshot())
 
   // A group and a box: the rounded shape, as for a shape.
   for (const ids of [['pair'], ['card'], ['star', 'card']]) {
-    await select(page, ids)
+    await selectLayers(page, ids, { bar: true })
     await expect(await tiles(page)).toHaveCount(6)
     await expect((await tiles(page)).locator('img')).toHaveCount(0)
     await expect(await tiles(page)).not.toContainText(['Ag'])
   }
 
   // Text: "Ag", with an Outline tile of its own.
-  await select(page, ['headline'])
+  await selectLayers(page, ['headline'], { bar: true })
   await expect(await tiles(page)).toHaveText([
     'AgNone',
     'AgDrop shadow',
@@ -158,7 +154,7 @@ test('a tile adds its effect and takes it off, None takes them all off, and Add 
 }) => {
   const asset = await upload(photo)
   const { page, errors } = await openStage(browser, design(asset.id))
-  await select(page, ['star'])
+  await selectLayers(page, ['star'], { bar: true })
   const advanced = async () => (await panel(page)).getByTestId('effects-card')
   await expect((await advanced()).getByRole('heading')).toHaveText('Advanced')
   await expect(await advanced()).toContainText('Pick one or more effects above')
@@ -179,7 +175,7 @@ test('a tile adds its effect and takes it off, None takes them all off, and Add 
   // The tile takes every drop shadow off, in one undo step.
   await (await tile(page, 'dropShadow')).click()
   await expect.poll(() => effectsOf(page, 'star')).toEqual(['innerShadow'])
-  await undo(page)
+  await perform(page, 'undo')
   await expect.poll(() => effectsOf(page, 'star')).toEqual(['dropShadow', 'innerShadow', 'dropShadow'])
   // None takes every effect off.
   await (await tile(page, 'none')).click()
@@ -187,7 +183,7 @@ test('a tile adds its effect and takes it off, None takes them all off, and Add 
   await expect(await tile(page, 'none')).toHaveAttribute('aria-pressed', 'true')
 
   // Text's Outline tile outlines the letters, with its width and colour under Advanced.
-  await select(page, ['headline'])
+  await selectLayers(page, ['headline'], { bar: true })
   await (await tile(page, 'outline')).click()
   await expect
     .poll(() =>

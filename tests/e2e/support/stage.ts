@@ -1,13 +1,43 @@
 // Driving the editor stage with real pointer and keyboard input, for the selection and group
 // checks (#40, #41): drags with modifiers pressed as a hand would, shortcut presses from the one
-// table, and reading layers back from the document.
-import { type Browser, expect, type Locator, type Page } from '@playwright/test'
+// table, editor actions and selections through the page's editor, and reading layers and boxes
+// back from the document.
+import { type Browser, expect, type Page } from '@playwright/test'
 
 import { pressFor, type ShortcutAction } from '@dazbee/editor/shortcuts'
 import type { DesignInput } from '@dazbee/schema'
 
 import { designOf, openTabs, placed, screenPoint } from './editor.ts'
 import { DEV_BRAND, type InBrand, seed } from './seed.ts'
+import { barMenu, openCard } from './top-bar.ts'
+
+export interface Design {
+  formats: Record<string, { name: string }>
+  pages: Record<string, { name: string }>
+  nodes: Record<
+    string,
+    { parentId: string; index: string; name: string; lock?: Record<string, boolean>; props: Record<string, unknown> }
+  >
+  overrides: Record<string, Record<string, Record<string, unknown>>>
+}
+
+/** A layer's box in design pixels. */
+export interface Box {
+  x: number
+  y: number
+  width: number
+  height: number
+}
+
+/** What `selectLayers` does once the layers are selected. */
+export interface SelectLayers {
+  /** Waits until the top bar shows the selection, or until there is no top bar when it is empty. */
+  bar?: boolean
+  /** Opens the card with this test id, in the top bar's pop-up or panel that holds it. */
+  card?: string
+  /** Selects in this format of the first page, and waits for the redraw. */
+  format?: string
+}
 
 /**
  * Opens a fresh copy of a design in one tab, 1440 × 1000, with the camera where design pixels in
@@ -23,13 +53,11 @@ export async function openStage(browser: Browser, content: DesignInput, { brandI
   return { page, errors }
 }
 
-export interface Design {
-  nodes: Record<
-    string,
-    { parentId: string; index: string; lock?: Record<string, boolean>; props: Record<string, unknown> }
-  >
-  overrides: Record<string, Record<string, Record<string, unknown>>>
-}
+/** Waits until what the screen shows is up to date: after the pending redraw, if there is one. */
+export const drawn = (page: Page) => page.evaluate(() => window.dazbee?.drawn())
+/** Waits two animation frames, so what the page laid out after a change has been drawn. */
+export const nextFrame = (page: Page) =>
+  page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))))
 export const read = async (page: Page) => JSON.parse(await designOf(page)) as Design
 export const props = async (page: Page, id: string) =>
   placed(await read(page), id, 'sq') as {
@@ -40,17 +68,40 @@ export const props = async (page: Page, id: string) =>
     rotation?: number
     visible?: boolean
   }
+/** A layer's box as drawn in one frame, auto layout solved: the first page in the primary format by default. */
+export const boxOf = (page: Page, id: string, frame?: { pageId: string; formatId: string }) =>
+  page.evaluate(({ id, frame }) => window.dazbee?.boxOf(id, frame?.pageId, frame?.formatId), {
+    id,
+    frame,
+  }) as Promise<Box>
 export const selection = (page: Page) => page.evaluate(() => window.dazbee?.selection() ?? [])
 /** Presses an action's shortcut and waits for the redraw, so the handles stand where the box now is. */
 export const press = async (page: Page, action: ShortcutAction) => {
   await page.keyboard.press(pressFor(action))
-  await page.evaluate(() => window.dazbee?.drawn())
+  await drawn(page)
+}
+/** Does what an action's shortcut does through the page's editor, without a key, and waits for the redraw. */
+export const perform = async (page: Page, action: ShortcutAction) => {
+  await page.evaluate((action) => window.dazbee?.perform(action), action)
+  await drawn(page)
 }
 export const order = async (page: Page) =>
   Object.entries((await read(page)).nodes)
     .filter(([, n]) => n.parentId === 'p1')
     .sort(([a, x], [b, y]) => (x.index < y.index ? -1 : x.index > y.index ? 1 : a < b ? -1 : 1))
     .map(([id]) => id)
+
+/**
+ * Selects layers through the page's editor, in the primary format of the first page unless
+ * `format` names another, then waits as the options say.
+ */
+export async function selectLayers(page: Page, ids: string[], { bar = false, card, format }: SelectLayers = {}) {
+  await page.evaluate(({ ids, format }) => window.dazbee?.select(ids, undefined, format), { ids, format })
+  if (format) await drawn(page)
+  if (bar && ids.length > 0) await expect(page.getByTestId('top-bar')).toHaveAttribute('data-selection', ids.join(' '))
+  else if (bar) await expect(page.getByTestId('top-bar')).toHaveCount(0)
+  if (card) await expect(await openCard(page, card)).toBeVisible()
+}
 
 /**
  * Drags with the mouse between two design pixels of the square, in a few steps like a hand would.
@@ -83,14 +134,14 @@ export async function dragScreen(
   await page.mouse.move(b.x, b.y, { steps: 6 })
   await page.mouse.up()
   for (const key of modifiers) await page.keyboard.up(key)
-  await page.evaluate(() => window.dazbee?.drawn())
+  await drawn(page)
 }
 export async function click(page: Page, x: number, y: number, modifiers: 'Shift'[] = []) {
   const at = await screenPoint(page, x, y)
   for (const key of modifiers) await page.keyboard.down(key)
   await page.mouse.click(at.x, at.y)
   for (const key of modifiers) await page.keyboard.up(key)
-  await page.evaluate(() => window.dazbee?.drawn())
+  await drawn(page)
 }
 /** Where a handle of the selection box is on screen now. */
 export async function handle(page: Page, which: string) {
@@ -99,71 +150,6 @@ export async function handle(page: Page, which: string) {
   return { x: box.x + box.width / 2, y: box.y + box.height / 2 }
 }
 export const zoomOf = (page: Page) => page.evaluate(() => window.dazbee?.camera().zoom ?? 1)
-
-/** Opens the top bar's scope menu, unless it is open: all sizes or only this one, and its own changes. */
-export async function scopeMenu(page: Page) {
-  const menu = page.getByTestId('scope-menu')
-  if (!(await menu.isVisible())) await page.getByTestId('scope-chip').click()
-  return menu
-}
-
-/** Opens the zoom pill's menu: the zooms, the rulers and snapping. */
-export async function zoomMenu(page: Page) {
-  const menu = page.getByTestId('zoom-menu')
-  if (!(await menu.isVisible())) await page.getByTestId('zoom').click()
-  return menu
-}
-
-/**
- * Opens the full menu from the small menu's ⋯, unless it is open, and gives it once it shows: the
- * selected layers' own actions. A row that closes it is waited out by its caller, so a menu still
- * closing is never taken for an open one.
- */
-export async function moreMenu(page: Page) {
-  const menu = page.getByTestId('bar-more-menu')
-  if (!(await menu.isVisible())) await page.getByTestId('bar-more').click()
-  await expect(menu).toBeVisible()
-  return menu
-}
-
-/**
- * Opens what one of the top bar's items opens, `bar-<id>`, unless it is open, and gives it once it
- * shows: its pop-up, or the edit panel. An item in the bar's second row is reached through ⋯.
- */
-export async function barMenu(page: Page, id: string) {
-  const menu = page.getByTestId(`bar-${id}-menu`)
-  if (await menu.isVisible()) return menu
-  const item = page.getByTestId(`bar-${id}`)
-  if (!(await item.isVisible()) && (await page.getByTestId('bar-overflow').isVisible()))
-    await page.getByTestId('bar-overflow').click()
-  await item.click()
-  await expect(menu).toBeVisible()
-  return menu
-}
-
-/**
- * Closes the open pop-up or panel of an item on the top bar with Esc, by the item's test id
- * (`bar-align`, `bar-more`, or `more-order` for the menu beside that row of the full menu), and
- * waits until it is gone.
- */
-export async function closeBarMenu(page: Page, button: string) {
-  await page.keyboard.press('Escape')
-  await expect(page.getByTestId(`${button}-menu`)).toBeHidden()
-}
-
-/** The fill list: in the Colour panel, or a photo's in its Edit image panel, opened. */
-export const fillList = async (page: Page) => {
-  const panel = await barMenu(page, (await page.getByTestId('bar-colour').count()) > 0 ? 'colour' : 'edit')
-  return panel.getByTestId('fill-list')
-}
-
-/** The Sizes panel, opened from the header pill unless it is open. */
-export async function sizesPanel(page: Page) {
-  const panel = page.getByTestId('bar-sizes-menu')
-  if (!(await panel.isVisible())) await page.getByTestId('sizes-button').click()
-  await expect(panel).toBeVisible()
-  return panel
-}
 
 /**
  * Picks the page by a click on its background at a design pixel of the first page's primary size
@@ -178,107 +164,4 @@ export async function pickPage(page: Page, x = 4, y = 4) {
 export async function backgroundPanel(page: Page, x = 4, y = 4) {
   if (!(await page.getByTestId('bar-background').isVisible())) await pickPage(page, x, y)
   return barMenu(page, 'background')
-}
-
-/** The Pages panel, from Pages by the zoom pill: opened. */
-export async function pagesPanel(page: Page) {
-  const panel = page.getByTestId('bar-pages-menu')
-  if (!(await panel.isVisible())) await page.getByTestId('pages-button').click()
-  await expect(panel).toBeVisible()
-  return panel
-}
-
-/** The text colour's hex field, in the Colour panel, under its +: opened. */
-export async function textColourHex(page: Page) {
-  const panel = await barMenu(page, 'colour')
-  const field = panel.getByRole('textbox', { name: 'Text colour hex' })
-  if (!(await field.isVisible())) await panel.getByTestId('colour-pick').click()
-  return field
-}
-
-/** The outline list, in the Outline panel, opened. */
-export const strokeList = async (page: Page) => (await barMenu(page, 'outline')).getByTestId('stroke-list')
-
-/** The menus beside the full menu's rows, by their test ids. */
-const SUBMENUS = ['line-up', 'order']
-
-/**
- * Clicks an action of the full menu, or of the right-click menu when `menu` is it, by the start of
- * its name (the first row that starts so): in the menu, or in the menu beside a row (Line up ▸,
- * Order ▸). The action closes the menu, and this waits until it has.
- */
-export async function moreAction(page: Page, name: string, menu?: Locator) {
-  const root = menu ?? (await moreMenu(page))
-  const named = (within: Locator) => within.getByRole('button', { name: new RegExp(`^${name}`) }).first()
-  const run = async (action: Locator) => {
-    await action.click()
-    await expect(root).toBeHidden()
-  }
-  if ((await named(root).count()) > 0) return run(named(root))
-  for (const id of SUBMENUS) {
-    const row = root.getByTestId(`more-${id}`)
-    if ((await row.count()) === 0) continue
-    const beside = page.getByTestId(`more-${id}-menu`)
-    await row.click()
-    await expect(beside).toBeVisible()
-    if ((await named(beside).count()) > 0) return run(named(beside))
-    await page.keyboard.press('Escape')
-    await expect(beside).toBeHidden()
-  }
-  throw new Error(`no ${name} in the menu`)
-}
-
-/** Opens the menu beside one of the full menu's rows, `more-<id>`, and gives it once it shows. */
-export async function moreSubmenu(page: Page, id: string) {
-  const sub = page.getByTestId(`more-${id}-menu`)
-  if (!(await sub.isVisible())) await (await moreMenu(page)).getByTestId(`more-${id}`).click()
-  await expect(sub).toBeVisible()
-  return sub
-}
-
-/** Where each of the selection's cards is now: the top bar's pop-up or edit panel that holds it. */
-const HOLDER: Record<string, string> = {
-  'layout-card': 'position',
-  'flow-card': 'position',
-  'appearance-card': 'transparency',
-  'spacing-card': 'spacing',
-  'text-box-card': 'spacing',
-  'frame-card': 'box',
-  'auto-layout-card': 'stack',
-  'combine-card': 'combine-op',
-  'mask-card': 'mask',
-  'adjust-card': 'edit',
-  'look-card': 'edit',
-  'photos-card': 'edit',
-  'text-fit-card': 'spacing',
-  'stroke-look': 'outline',
-  'stroke-card': 'outline',
-  'effect-tiles': 'effects',
-  'effects-card': 'effects',
-  'brand-colours': 'colour',
-  'design-colours': 'colour',
-  'auto-layout-advanced': 'stack',
-}
-
-/**
- * One of the selection's cards, by its test id, in the pop-up or edit panel of the top bar that
- * holds it, opened: the shape's card in Shape (or a photo's Corners), the fills in Colour (or a
- * photo's Edit image panel).
- */
-export async function openCard(page: Page, testId: string) {
-  const has = async (id: string) => (await page.getByTestId(`bar-${id}`).count()) > 0
-  const holder =
-    testId === 'fill-card'
-      ? (await has('colour'))
-        ? 'colour'
-        : 'edit'
-      : testId === 'shape-card'
-        ? (await has('shape'))
-          ? 'shape'
-          : 'corners'
-        : testId === 'frame-card' && !(await has('box'))
-          ? 'corners'
-          : HOLDER[testId]
-  if (!holder) throw new Error(`no top bar item holds ${testId}`)
-  return (await barMenu(page, holder)).getByTestId(testId)
 }

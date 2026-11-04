@@ -1,8 +1,6 @@
 // Onboarding (#109, ADR-0013): "Paste your website" names the first brand and opens its home.
-import { writeOutput } from '../support/editor.ts'
-import { expect, type Page, test } from '../support/test.ts'
-
-const shoot = async (page: Page, name: string) => writeOutput(`welcome-${name}.png`, await page.screenshot())
+import { shoot, writeOutput } from '../support/editor.ts'
+import { expect, test } from '../support/test.ts'
 
 test.use({ viewport: { width: 1440, height: 900 } })
 
@@ -11,7 +9,7 @@ test('a pasted website names the first brand and opens its home', async ({ page 
   await page.goto('/welcome')
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Paste your website')
   await page.getByLabel('Website').fill(`https://www.${slug}.co.uk/shop`)
-  await shoot(page, 'website')
+  await shoot(page, 'welcome-website')
   await page.getByRole('button', { name: 'Open it' }).click()
   await expect(page).toHaveURL(/\/brands\/[\w-]+$/)
   const name = slug
