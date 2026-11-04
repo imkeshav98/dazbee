@@ -1,5 +1,8 @@
 // Every text token reads at 4.5:1 or more on every surface it sits on, in both themes; and on glass,
 // text reads at 4.5:1 or more on the glass and on every tint laid on it, whatever ad lies behind.
+// Text is held to 4.5:1, the minimum of WCAG 2.2 SC 1.4.3 (contrast, minimum). Icons are held to
+// 3:1, the minimum of WCAG 2.2 SC 1.4.11 (non-text contrast) for the graphics a control needs: the
+// one such check is the pink icon of an open glass button on the pressed tint.
 import { readFileSync } from 'node:fs'
 
 import { describe, expect, it } from 'vitest'
@@ -158,6 +161,7 @@ describe.each(THEMES)('%s glass', (_, selector) => {
     'a pink icon on the pressed tint, as an open glass button shows it, over a %s ad is at least 3:1',
     (ad) => {
       const pressed = over(tint('glass-pressed'), glassOver(ADS[ad]))
+      // An icon is a graphic, so WCAG 2.2 SC 1.4.11 (non-text contrast) asks 3:1 of it, not text's 4.5:1.
       expect(readsOver('glass-accent-text', pressed)).toBeGreaterThanOrEqual(3)
     },
   )
