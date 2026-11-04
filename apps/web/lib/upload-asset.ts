@@ -2,18 +2,18 @@
 // storage and records it, telling how much has gone. Used by the editor's library and the brief.
 import { AssetSummary } from '@dazbee/schema'
 
+import { brandPath, RouteError } from '@/lib/brand-routes.ts'
+
 /** The image types a fill takes; the web app checks the bytes again. */
 export const IMAGE_ACCEPT = 'image/png,image/jpeg,image/webp'
 /** What the library takes: those images and SVG files, which are placed as layers. */
 export const ASSET_ACCEPT = `${IMAGE_ACCEPT},image/svg+xml,.svg`
 
-const base = (brandId: string) => `/brands/${encodeURIComponent(brandId)}/assets`
-
 /** Sends one file to the web app, which uploads it to storage and records it, telling how much has gone. */
 export function sendAsset(brandId: string, file: File, onProgress: (share: number) => void): Promise<AssetSummary> {
   return new Promise((resolve, reject) => {
     const request = new XMLHttpRequest()
-    request.open('POST', base(brandId))
+    request.open('POST', brandPath(brandId, 'assets'))
     request.upload.onprogress = (e) => {
       if (e.lengthComputable) onProgress(e.loaded / e.total)
     }
@@ -25,11 +25,7 @@ export function sendAsset(brandId: string, file: File, onProgress: (share: numbe
         // Not JSON: the status says what went wrong.
       }
       if (request.status === 201) return resolve(AssetSummary.parse(body))
-      const reason =
-        body && typeof body === 'object' && 'error' in body && typeof body.error === 'string'
-          ? body.error
-          : `${request.status}`
-      reject(new Error(reason))
+      reject(RouteError.fromBody(request.status, body))
     }
     request.onerror = () => reject(new Error('no connection'))
     const form = new FormData()

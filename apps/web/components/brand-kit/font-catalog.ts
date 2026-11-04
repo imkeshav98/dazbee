@@ -8,6 +8,8 @@ import { useCallback, useEffect, useState } from 'react'
 import { FONT_FACES } from '@dazbee/fonts'
 import { FontFamily } from '@dazbee/schema'
 
+import { brandPath } from '@/lib/brand-routes.ts'
+
 /** The fonts we ship, as catalog families; they have no stored preview. */
 const SHIPPED: FontFamily[] = [...new Set(FONT_FACES.map((f) => f.family))].map((family) => ({
   family,
@@ -28,7 +30,7 @@ export function useFontCatalog(brandId: string) {
   const [catalog, setCatalog] = useState<FontFamily[]>(SHIPPED)
   const refresh = useCallback(async () => {
     // Offline, the list keeps what it had; it is fetched again each time it opens.
-    const response = await fetch(`/brands/${encodeURIComponent(brandId)}/fonts`).catch(() => null)
+    const response = await fetch(brandPath(brandId, 'fonts')).catch(() => null)
     if (!response?.ok) return
     const families = FontFamily.array().parse(await response.json())
     // A brand's upload of a shipped family's name is the one it sees.

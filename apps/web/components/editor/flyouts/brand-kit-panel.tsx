@@ -16,6 +16,7 @@ import { KitEditor, useKitSaver } from '@/components/brand-kit/kit-editor.tsx'
 import { loadKit, useBrandKit } from '@/components/brand-kit/use-brand-kit.ts'
 import { useEditorDesign, useSelection } from '@/components/editor/editor-hooks.ts'
 import { overlayScroll } from '@/components/ui/overlay-scroll.ts'
+import { brandPath } from '@/lib/brand-routes.ts'
 import { cn } from '@/lib/cn.ts'
 import { hexOf, hexText } from '@/lib/colour.ts'
 import { placeAsset } from '@/lib/editor/place-asset.ts'
@@ -65,7 +66,7 @@ export function BrandKitPanel({ editor, brandId }: { editor: Editor; brandId: st
   const placeLogo = () => {
     const id = kit.logoAssetId
     if (!id) return
-    fetch(`/brands/${encodeURIComponent(brandId)}/assets`)
+    fetch(brandPath(brandId, 'assets'))
       .then(async (response) =>
         response.ok
           ? AssetSummary.array()
@@ -82,9 +83,7 @@ export function BrandKitPanel({ editor, brandId }: { editor: Editor; brandId: st
   }
 
   if (!editing) {
-    const logo = kit.logoAssetId
-      ? `/brands/${encodeURIComponent(brandId)}/assets/${encodeURIComponent(kit.logoAssetId)}/thumbnail`
-      : null
+    const logo = kit.logoAssetId ? brandPath(brandId, 'assets', kit.logoAssetId, 'thumbnail') : null
     return (
       <div
         ref={overlayScroll}

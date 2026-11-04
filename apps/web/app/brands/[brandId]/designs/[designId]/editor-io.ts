@@ -2,8 +2,10 @@
 // its brand kit's values; and asking the offline worker to keep the page.
 import { BrandKit, brandVariables, FontFamily, type Variables } from '@dazbee/schema'
 
+import { brandPath } from '@/lib/brand-routes.ts'
+
 export async function assetBytes(brandId: string, assetId: string) {
-  const response = await fetch(`/brands/${encodeURIComponent(brandId)}/assets/${encodeURIComponent(assetId)}`)
+  const response = await fetch(brandPath(brandId, 'assets', assetId))
   if (!response.ok) throw new Error(`asset ${assetId}: ${response.status}`)
   return new Uint8Array(await response.arrayBuffer())
 }
@@ -13,10 +15,9 @@ export async function assetBytes(brandId: string, assetId: string) {
  * again when a family isn't in it yet, as after an upload.
  */
 export function fontLoader(brandId: string) {
-  const brand = `/brands/${encodeURIComponent(brandId)}/fonts`
   let catalog: Promise<FontFamily[]> | null = null
   const fetchCatalog = async () => {
-    const response = await fetch(brand)
+    const response = await fetch(brandPath(brandId, 'fonts'))
     if (!response.ok) throw new Error(`fonts: ${response.status}`)
     return FontFamily.array().parse(await response.json())
   }
@@ -29,7 +30,7 @@ export function fontLoader(brandId: string) {
     const faces = known.filter((f) => families.includes(f.family)).flatMap((f) => f.faces)
     return Promise.all(
       faces.map(async (face) => {
-        const response = await fetch(`${brand}/${encodeURIComponent(face.id)}`)
+        const response = await fetch(brandPath(brandId, 'fonts', face.id))
         if (!response.ok) throw new Error(`font ${face.family} ${face.weight}: ${response.status}`)
         return { family: face.family, bytes: new Uint8Array(await response.arrayBuffer()) }
       }),
@@ -42,7 +43,7 @@ export function fontLoader(brandId: string) {
  * editor starts without them, and bound layers keep the values they were bound with.
  */
 export async function brandKitVariables(brandId: string): Promise<Variables | undefined> {
-  const response = await fetch(`/brands/${encodeURIComponent(brandId)}/kit/data`).catch(() => null)
+  const response = await fetch(brandPath(brandId, 'kit', 'data')).catch(() => null)
   if (!response?.ok) return undefined
   return brandVariables(BrandKit.parse(await response.json()))
 }

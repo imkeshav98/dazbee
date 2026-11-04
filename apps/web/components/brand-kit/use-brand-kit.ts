@@ -8,7 +8,7 @@ import { useCallback, useEffect, useSyncExternalStore } from 'react'
 
 import { BrandKit, EMPTY_BRAND_KIT } from '@dazbee/schema'
 
-const kitUrl = (brandId: string) => `/brands/${encodeURIComponent(brandId)}/kit/data`
+import { brandPath } from '@/lib/brand-routes.ts'
 
 const kits = new Map<string, BrandKit>()
 const listeners = new Map<string, Set<() => void>>()
@@ -22,7 +22,7 @@ export function showKit(brandId: string, kit: BrandKit) {
 
 /** Saves the kit; a fetch started meanwhile waits for it. Resolves to the response, or rejects as fetch does. */
 export function saveKit(brandId: string, kit: BrandKit) {
-  const put = fetch(kitUrl(brandId), {
+  const put = fetch(brandPath(brandId, 'kit', 'data'), {
     method: 'PUT',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(kit),
@@ -39,7 +39,7 @@ export function saveKit(brandId: string, kit: BrandKit) {
 export async function loadKit(brandId: string) {
   await saving.get(brandId)
   const before = kits.get(brandId)
-  const response = await fetch(kitUrl(brandId)).catch(() => null)
+  const response = await fetch(brandPath(brandId, 'kit', 'data')).catch(() => null)
   const kit = response?.ok ? BrandKit.safeParse(await response.json().catch(() => null)) : null
   // A change made while the fetch was out is newer than what it brings.
   if (kits.get(brandId) !== before) return

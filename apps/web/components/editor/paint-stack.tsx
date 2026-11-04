@@ -17,6 +17,7 @@ import type { P } from '@/components/editor/edit-panel/target.ts'
 import { useMenuFocus } from '@/components/editor/top-bar/bar-popover.tsx'
 import { FOCUS_RING } from '@/components/ui/looks.ts'
 import { segment, SEGMENTED } from '@/components/ui/segmented.tsx'
+import { brandPath } from '@/lib/brand-routes.ts'
 import { cn } from '@/lib/cn.ts'
 import { hexOf } from '@/lib/colour.ts'
 import { tidy } from '@/lib/editor/size.ts'
@@ -28,8 +29,7 @@ import { ImagePickerButton } from './image-tool.tsx'
 import { CHIP, ICON_BUTTON, KNOBS, POPOVER, SWATCH } from './styles.ts'
 
 /** An image asset's small picture, as the API serves it. */
-export const assetThumbnail = (brandId: string, assetId: string) =>
-  `/brands/${encodeURIComponent(brandId)}/assets/${encodeURIComponent(assetId)}/thumbnail`
+export const assetThumbnail = (brandId: string, assetId: string) => brandPath(brandId, 'assets', assetId, 'thumbnail')
 const PAINT_TYPES = ['solid', 'linear', 'radial', 'angular', 'image'] as const
 type PaintType = (typeof PAINT_TYPES)[number]
 

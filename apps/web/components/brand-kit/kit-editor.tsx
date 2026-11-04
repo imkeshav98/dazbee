@@ -11,6 +11,7 @@ import { AssetSummary, type BrandColor, type BrandFont, type BrandKit } from '@d
 
 import { DASHED_BUTTON } from '@/components/ui/looks.ts'
 import { Select } from '@/components/ui/select.tsx'
+import { brandPath, readJson } from '@/lib/brand-routes.ts'
 import { cn } from '@/lib/cn.ts'
 import { hexOf, hexText, parseHex } from '@/lib/colour.ts'
 import { useMessages } from '@/lib/i18n/client.tsx'
@@ -64,15 +65,8 @@ export function useKitSaver(brandId: string, onShow?: (kit: BrandKit) => void) {
     saving.current = { timer: null, kit: null }
     if (!next) return
     saveKit(brandId, next)
-      .then(async (response) => {
-        if (response.ok) return setError(null)
-        const body: unknown = await response.json().catch(() => null)
-        setError(
-          body && typeof body === 'object' && 'error' in body && typeof body.error === 'string'
-            ? body.error
-            : `${response.status}`,
-        )
-      })
+      .then(readJson)
+      .then(() => setError(null))
       .catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)))
   }, [brandId])
   useEffect(
@@ -119,7 +113,7 @@ export function KitEditor({
   const { catalog } = useFontCatalog(brandId)
 
   useEffect(() => {
-    fetch(`/brands/${encodeURIComponent(brandId)}/assets`)
+    fetch(brandPath(brandId, 'assets'))
       .then(async (response) => {
         if (response.ok) setAssets(AssetSummary.array().parse(await response.json()))
       })
@@ -321,7 +315,7 @@ export function KitEditor({
         <div className="grid size-12 shrink-0 place-items-center overflow-hidden rounded-[12px] border border-line bg-bg/40">
           {kit.logoAssetId && (
             <img
-              src={`/brands/${encodeURIComponent(brandId)}/assets/${encodeURIComponent(kit.logoAssetId)}/thumbnail`}
+              src={brandPath(brandId, 'assets', kit.logoAssetId, 'thumbnail')}
               alt=""
               className="size-full object-contain"
             />

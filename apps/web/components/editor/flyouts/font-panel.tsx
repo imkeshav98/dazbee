@@ -15,6 +15,7 @@ import { useEditorDesign, useSelection } from '@/components/editor/editor-hooks.
 import { PANEL_BUTTON, PANEL_HEADING } from '@/components/editor/styles.ts'
 import { useOverlayScroll } from '@/components/ui/overlay-scroll.ts'
 import { Select } from '@/components/ui/select.tsx'
+import { brandPath, readJson } from '@/lib/brand-routes.ts'
 import { cn } from '@/lib/cn.ts'
 import { useMessages } from '@/lib/i18n/client.tsx'
 import { format } from '@/lib/i18n/index.ts'
@@ -75,7 +76,7 @@ export function FontPreview({
   return (
     // The family's name drawn in its own face by the API, at twice the size it shows.
     <img
-      src={`/brands/${encodeURIComponent(brandId)}/fonts/${encodeURIComponent(face.id)}/preview`}
+      src={brandPath(brandId, 'fonts', face.id, 'preview')}
       alt={family.family}
       loading="lazy"
       draggable={false}
@@ -226,10 +227,8 @@ function FontList({
     try {
       const form = new FormData()
       form.set('file', file)
-      const response = await fetch(`/brands/${encodeURIComponent(brandId)}/fonts`, { method: 'POST', body: form })
-      const json: unknown = await response.json().catch(() => null)
-      if (!response.ok) throw new Error((json as { error?: string } | null)?.error ?? String(response.status))
-      await onUploaded(FontFace.parse(json))
+      const response = await fetch(brandPath(brandId, 'fonts'), { method: 'POST', body: form })
+      await onUploaded(FontFace.parse(await readJson(response)))
     } catch (reason) {
       setError(
         format(t.editor.fonts.uploadFailed, { reason: reason instanceof Error ? reason.message : String(reason) }),
