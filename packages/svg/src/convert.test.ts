@@ -27,7 +27,8 @@ vi.mock('./style.ts', async (importOriginal) => {
   const actual = await importOriginal<typeof import('./style.ts')>()
   return {
     ...actual,
-    // The conversion works out the style of each element it reads, so this counts the reads.
+    // The conversion works out the style of each element it reads, so this counts the reads. Masks,
+    // clips and gradient stops work out more styles than that; a fan of uses has none.
     styleOf: (...args: Parameters<typeof actual.styleOf>) => {
       if (++reads.count > reads.limit) throw new Error(`read more than ${reads.limit} elements`)
       return actual.styleOf(...args)
@@ -254,7 +255,6 @@ describe('svgToLayers with hostile files', () => {
     for (const flood of floods) {
       expect(problem(flood.file(flood.tenth)), flood.name).toBe(flood.problem)
       const grown = growth(problem, flood.file(flood.tenth), flood.file(flood.tenth * 10))
-      console.log(`[growth-log] ${flood.name}: ${grown.times.toFixed(2)}`)
       expect(grown.result, flood.name).toBe(flood.problem)
       expect(grown.times, flood.name).toBeLessThan(MAX_GROWTH)
     }
