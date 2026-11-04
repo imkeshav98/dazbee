@@ -4,13 +4,13 @@
 // lock toggles. The panel hands every row one set of handlers, so a row renders again only when what
 // it shows changes.
 import {
+  BoundingBoxIcon,
   CaretRightIcon,
   CircleIcon,
   EyeClosedIcon,
   EyeIcon,
   EyeSlashIcon,
   FolderSimpleIcon,
-  FrameCornersIcon,
   type Icon,
   ImageIcon,
   LockSimpleIcon,
@@ -68,7 +68,7 @@ const isLocked = (node: Layer) => LOCK_FLAGS.some((flag) => node.lock?.[flag])
 function iconOf(node: Layer): Icon {
   if (node.type === 'text') return TextTIcon
   if (node.type === 'group') return FolderSimpleIcon
-  if (node.type === 'box') return FrameCornersIcon
+  if (node.type === 'box') return BoundingBoxIcon
   if (node.type === 'boolean') return UniteIcon
   const props = node.props as { shape?: { kind?: string }; fills?: { type: string }[] }
   if (props.fills?.some((f) => f.type === 'image')) return ImageIcon
