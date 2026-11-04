@@ -9,6 +9,9 @@ const IDENTITY: ColorMatrix = [1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0
 // Rec. 709 luma, as the sRGB primaries weigh.
 const LUMA = [0.2126, 0.7152, 0.0722] as const
 
+/** Alpha from luma, for a luminance mask drawn over black: bright shows, dark hides. */
+export const LUMA_TO_ALPHA: ColorMatrix = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, ...LUMA, 0, 0]
+
 /** `a` after `b`: the matrix that does `b`, then `a`. */
 export function after(a: ColorMatrix, b: ColorMatrix): ColorMatrix {
   const out: number[] = []
@@ -112,6 +115,3 @@ export function imageColorMatrix(adjust: ImageAdjust | undefined, filter: ImageF
   if (steps.length === 0) return null
   return steps.reduce((done, next) => after(next, done))
 }
-
-/** Alpha from luma, for a luminance mask drawn over black: bright shows, dark hides. */
-export const LUMA_TO_ALPHA: ColorMatrix = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, ...LUMA, 0, 0]

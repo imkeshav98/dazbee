@@ -17,6 +17,7 @@ import {
   other,
   otherBrand,
   personA,
+  run,
   sibling,
   syncSecret,
   workspace,
@@ -153,6 +154,48 @@ describe('refusals', () => {
     expect((await call('a', 'POST', `/brands/${otherBrand.id}/designs`, { name: 'Sneaky' })).status).toBe(404)
     // The owner still sees it.
     expect((await call('b', 'GET', `/brands/${otherBrand.id}/designs/${theirs.id}`)).status).toBe(200)
+
+    // Every brand route answers "No such brand", for another workspace's brand and for one that doesn't
+    // exist, before it reads the body: the empty body would be refused as not valid.
+    for (const brandId of [otherBrand.id, `no-such-brand-${run}`]) {
+      for (const [method, path] of [
+        ['GET', 'designs'],
+        ['POST', 'designs'],
+        ['GET', `designs/${theirs.id}`],
+        ['PATCH', `designs/${theirs.id}`],
+        ['DELETE', `designs/${theirs.id}`],
+        ['POST', `designs/${theirs.id}/duplicate`],
+        ['GET', `designs/${theirs.id}/cover`],
+        ['GET', `designs/${theirs.id}/thumbnail`],
+        ['POST', `designs/${theirs.id}/sync-token`],
+        ['GET', 'assets'],
+        ['POST', 'assets/uploads'],
+        ['POST', 'assets'],
+        ['GET', 'assets/any'],
+        ['PATCH', 'assets/any'],
+        ['GET', 'assets/any/uses'],
+        ['DELETE', 'assets/any'],
+        ['GET', 'assets/any/thumbnail'],
+        ['GET', 'templates'],
+        ['POST', 'templates'],
+        ['PATCH', 'templates/any'],
+        ['DELETE', 'templates/any'],
+        ['GET', 'templates/any/thumbnail'],
+        ['POST', 'templates/any/designs'],
+        ['GET', 'kit'],
+        ['PUT', 'kit'],
+        ['GET', 'fonts'],
+        ['POST', 'fonts/uploads'],
+        ['POST', 'fonts'],
+        ['GET', 'fonts/faces/any'],
+      ] as const) {
+        const response = await call('a', method, `/brands/${brandId}/${path}`, method === 'GET' ? undefined : {})
+        expect(response, `${method} /brands/${brandId}/${path}`).toEqual({
+          status: 404,
+          json: { error: 'No such brand' },
+        })
+      }
+    }
   })
 
   it('refuses a design opened under another brand of the same workspace', async () => {

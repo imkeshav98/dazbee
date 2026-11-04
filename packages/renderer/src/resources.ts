@@ -1,7 +1,22 @@
 import type { CanvasKit, FontCollection, Image, TypefaceFontProvider } from '@dazbee/canvaskit'
 import type { Variables } from '@dazbee/schema'
 
-import type { Resources } from './draw.ts'
+import type { LayerPictures } from './pictures.ts'
+import type { ParagraphCache } from './text/layout.ts'
+
+/** What drawing needs besides the scene: fonts registered from our own files and images decoded by CanvasKit. */
+export interface Resources {
+  fonts: FontCollection
+  /** Families tried, in order, for characters a layer's own font lacks. */
+  fallbackFamilies: string[]
+  images: ReadonlyMap<string, Image>
+  /** Paragraphs kept between draws, for the editor's screen; without it each draw lays out its text and frees it. */
+  paragraphs?: ParagraphCache
+  /** Top-level layers recorded between draws, for the editor's screen; without it each draw draws every layer. */
+  layers?: LayerPictures
+  /** Set when drawing into a PDF or SVG: a text's outline pass is drawn as shapes, so the file holds the text once. */
+  vector?: boolean
+}
 
 export interface ResourceBytes {
   /** Font files by family; the font's own name is ignored. Never system fonts (CLAUDE.md). */
@@ -12,6 +27,8 @@ export interface ResourceBytes {
   /** The values bound properties take: the brand kit's colours and fonts by `brand:<token>` (#53). */
   variables?: Variables
 }
+
+export type ResourceCache = ReturnType<typeof resourceCache>
 
 /** Registers fonts and decodes images with CanvasKit itself, so every runtime reads the same bytes the same way. */
 export function makeResources(ck: CanvasKit, bytes: ResourceBytes): Resources & { delete(): void } {
@@ -31,11 +48,18 @@ export function makeResources(ck: CanvasKit, bytes: ResourceBytes): Resources & 
  * come as a new array. Resources from an earlier call stay usable only until the next one.
  */
 export function resourceCache(ck: CanvasKit) {
+  // Decoded images by asset id, each with the bytes it was decoded from.
   const images = new Map<string, { bytes: Uint8Array; image: Image }>()
+  // The registered fonts, with the list they were registered from.
   let fonts: { list: ResourceBytes['fonts']; provider: TypefaceFontProvider; collection: FontCollection } | undefined
 
-  const sameFonts = (a: ResourceBytes['fonts'], b: ResourceBytes['fonts']) =>
-    a.length === b.length && a.every((f, i) => f.family === b[i]?.family && f.bytes === b[i]?.bytes)
+  function resources(bytes: ResourceBytes): Resources {
+    return {
+      fonts: fontsFor(bytes.fonts),
+      fallbackFamilies: [...bytes.fallbackFamilies],
+      images: imagesFor(bytes.images),
+    }
+  }
 
   function fontsFor(list: ResourceBytes['fonts']) {
     if (fonts && sameFonts(fonts.list, list)) return fonts.collection
@@ -71,19 +95,15 @@ export function resourceCache(ck: CanvasKit) {
     return new Map([...images].map(([id, { image }]) => [id, image]))
   }
 
-  return {
-    resources(bytes: ResourceBytes): Resources {
-      return {
-        fonts: fontsFor(bytes.fonts),
-        fallbackFamilies: [...bytes.fallbackFamilies],
-        images: imagesFor(bytes.images),
-      }
-    },
-    delete() {
-      for (const { image } of images.values()) image.delete()
-      images.clear()
-      freeFonts()
-    },
+  function destroy() {
+    for (const { image } of images.values()) image.delete()
+    images.clear()
+    freeFonts()
   }
+
+  return { resources, delete: destroy }
 }
-export type ResourceCache = ReturnType<typeof resourceCache>
+
+function sameFonts(a: ResourceBytes['fonts'], b: ResourceBytes['fonts']) {
+  return a.length === b.length && a.every((f, i) => f.family === b[i]?.family && f.bytes === b[i]?.bytes)
+}
