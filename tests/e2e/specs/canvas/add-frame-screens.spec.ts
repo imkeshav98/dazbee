@@ -1,11 +1,12 @@
 // Add a frame and Add size at the three screen sizes: the cards sit clear of everything with
 // nothing cut off, three tiles across, a sheet on a phone; a frame added from a tile, W × H, Add
 // size or a drag shows whole with its label clear of the chrome, as does the first frame on an
-// empty page; the Arabic ratio line; and the PR's pictures of the card, a size past the limits, Add
-// size in ⋯ and its card, and a frame drawn by a drag, in both themes.
+// empty page; a long frame name wraps in its title; the Arabic ratio line; and the PR's pictures of
+// the card, a size past the limits, Add size in ⋯ and its card, and a frame drawn by a drag, in both
+// themes.
 import { addSize, card, chromeOver, frameButton, labelsUnderIslands, typeSize } from '../../support/add-frame.ts'
 import { writeOutput } from '../../support/editor.ts'
-import { clickLabel, openSized, picked } from '../../support/frames-on-canvas.ts'
+import { clickLabel, design, openSized, picked } from '../../support/frames-on-canvas.ts'
 import { THEMES } from '../../support/glass.ts'
 import { EDITOR_CHROME, layoutProblems, SCREEN_SIZES } from '../../support/layout.ts'
 import { dragScreen, drawn, nextFrame, press, read } from '../../support/stage.ts'
@@ -166,6 +167,35 @@ test('on a phone, from an empty page at 100%: W × H starts at 1080 × 1080, and
   expect(await chromeOver(page, square)).toEqual([])
   expect(await zoomOf(page)).toBeLessThan(1)
   writeOutput('add-frame-empty-page-390.png', await page.screenshot({ animations: 'disabled' }))
+  expect(errors).toEqual([])
+})
+
+test('a long frame name in “Add a size to {name}” wraps onto a second line, then ends in an ellipsis with the whole title as its tooltip', async ({
+  browser,
+}) => {
+  const long = 'Black Friday weekend mega sale for the Harbour Coffee loyalty members'
+  const input = design()
+  const square = input.frames.sq
+  if (!square) throw new Error('no square')
+  input.frames.sq = { ...square, name: long }
+  const { page, errors } = await openSized(browser, { width: 1280, height: 760 }, { input })
+  await page.evaluate(() => window.dazbee?.pickFrame('sq'))
+  await addSize(page)
+  const title = card(page).locator('#edit-panel-title')
+  await expect(title).toHaveAttribute('title', `Add a size to ${long}`)
+  const shown = await title.evaluate((el) => ({
+    lines: Math.round(el.clientHeight / parseFloat(getComputedStyle(el).lineHeight)),
+    cut: el.scrollHeight > el.clientHeight + 1,
+    clamp: getComputedStyle(el).webkitLineClamp,
+  }))
+  expect(shown).toEqual({ lines: 2, cut: true, clamp: '2' })
+  // A short title keeps one line and needs no tooltip.
+  await page.keyboard.press('Escape')
+  await frameButton(page)
+  await expect(title).not.toHaveAttribute('title')
+  expect(await title.evaluate((el) => Math.round(el.clientHeight / parseFloat(getComputedStyle(el).lineHeight)))).toBe(
+    1,
+  )
   expect(errors).toEqual([])
 })
 
