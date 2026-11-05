@@ -55,7 +55,7 @@ export function useFrameItems(editor: Editor, frameId: string, design: Design): 
           onOpen={setOpen}
           label={f.more}
           face={<DotsThreeIcon size={18} weight="bold" aria-hidden />}
-          caret={false}
+          menu
           align="end"
           buttonRef={more}
           testId="frame-more"

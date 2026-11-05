@@ -78,7 +78,7 @@ test.describe('at 1280×760', () => {
     await undoRedo(page, top, before, back)
 
     const x = async () => (await props(page, 'shape')).x
-    await (await arrangeSubmenu(page, 'line-up')).getByRole('button', { name: 'Align left' }).click()
+    await (await arrangeSubmenu(page, 'line-up')).getByRole('button', { name: 'Left' }).click()
     await expect.poll(x).toBe(0)
     await page.keyboard.press('Escape')
     await page.keyboard.press('Escape')
@@ -102,61 +102,97 @@ test.describe('at 1280×760', () => {
     expect(errors).toEqual([])
   })
 
-  test('by keyboard: End reaches ⋯ in the bar, Enter opens it on Order, the arrow opens Order and Enter runs a move; the arrows never move the layer, and Esc gives the focus back to ⋯', async ({
+  test('by keyboard: End reaches Arrange and Enter opens it on Order; up, down, Home and End move between its rows; the arrow towards a row opens its menu, the row lit, where the arrows move and Enter runs a line-up, a text direction or a move; the layer never moves by an arrow, and Esc gives the focus back', async ({
     browser,
   }) => {
     const { page, errors } = await openStage(browser, arrangeDesign())
     await page.setViewportSize({ width: 1280, height: 760 })
-    await selectLayers(page, ['shape'], { bar: true })
-    const where = async () => {
-      const { x, y } = await props(page, 'shape')
-      return { x, y }
-    }
-    const at = await where()
+    await selectLayers(page, ['words'], { bar: true })
+    const words = () => props(page, 'words')
     const more = page.getByTestId('bar-arrange')
     await page.getByTestId('top-bar-row').locator('[data-bar-item]').first().focus()
     await page.keyboard.press('End')
     await expect(more).toBeFocused()
-    await page.keyboard.press('ArrowRight')
-    await page.keyboard.press('ArrowLeft')
-    await expect(more).toBeFocused()
-    expect(await where()).toEqual(at)
-
     await page.keyboard.press('Enter')
     const menu = page.getByTestId('bar-arrange-menu')
-    await expect(menu).toBeVisible()
-    await expect(menu.getByTestId('more-order')).toBeFocused()
+    const orderRow = menu.getByTestId('more-order')
+    const lineUp = menu.getByTestId('more-line-up')
+    const direction = menu.getByTestId('more-text-direction')
+    await expect(orderRow).toBeFocused()
+    // The rotation field is passed over: its own arrows step the turn, and Tab reaches it.
+    for (const [key, row] of [
+      ['ArrowDown', lineUp],
+      ['ArrowDown', direction],
+      ['ArrowDown', orderRow],
+      ['ArrowUp', direction],
+      ['Home', orderRow],
+      ['End', direction],
+      ['ArrowUp', lineUp],
+    ] as const) {
+      await page.keyboard.press(key)
+      await expect(row, key).toBeFocused()
+    }
+    expect(await words()).toMatchObject({ x: 80, y: 60 })
+
+    // Line up: its buttons are named, the first says so in a tooltip, and its row stays lit while it is open.
+    await page.keyboard.press('ArrowRight')
+    const lining = page.getByTestId('more-line-up-menu')
+    const names = await lining.getByRole('button').evaluateAll((els) => els.map((el) => el.getAttribute('aria-label')))
+    expect(names).toEqual(['Left', 'Centre', 'Right', 'Top', 'Middle', 'Bottom'])
+    await expect(lining.getByRole('button', { name: 'Left' })).toBeFocused()
+    await expect(page.getByRole('tooltip')).toHaveText('Left (Alt+A)')
+    await expect(lineUp).toHaveAttribute('data-state', 'open')
+    expect(await lineUp.evaluate((el) => getComputedStyle(el).backgroundColor)).not.toBe('rgba(0, 0, 0, 0)')
+    await page.keyboard.press('ArrowDown')
+    await expect(lining.getByRole('button', { name: 'Centre' })).toBeFocused()
+    await page.keyboard.press('Enter')
+    await expect.poll(async () => (await words()).x).toBe(240)
+    await page.keyboard.press('ArrowLeft')
+    await expect(lining).toBeHidden()
+    await expect(lineUp).toBeFocused()
+
+    // Text direction: the arrow opens it on Auto, and Enter on the next one sets it, closing Arrange.
+    await page.keyboard.press('End')
+    await page.keyboard.press('ArrowRight')
+    const directions = page.getByTestId('more-text-direction-menu')
+    await expect(directions.getByRole('button', { name: 'Auto' })).toBeFocused()
+    await page.keyboard.press('ArrowDown')
+    await page.keyboard.press('Enter')
+    await expect(menu).toBeHidden()
+    await expect.poll(async () => (await read(page)).nodes.words?.props.direction).toBe('ltr')
+    await expect(more).toBeFocused()
+
+    // Order: the arrow opens the moves, End and Home reach their ends, and Enter runs one.
+    await page.keyboard.press('Enter')
+    await expect(orderRow).toBeFocused()
     await page.keyboard.press('ArrowRight')
     const moves = page.getByTestId('more-order-menu')
-    await expect(moves).toBeVisible()
     await expect(moves.getByRole('button', { name: /^Bring to front/ })).toBeFocused()
-    await page.keyboard.press('ArrowDown')
-    await page.keyboard.press('ArrowUp')
-    expect(await where()).toEqual(at)
+    await page.keyboard.press('End')
+    await expect(moves.getByRole('button', { name: /^Send to back/ })).toBeFocused()
+    await page.keyboard.press('Home')
     const before = await order(page)
     await page.keyboard.press('Enter')
     await expect(menu).toBeHidden()
-    await expect.poll(() => order(page)).toEqual([...before.filter((id) => id !== 'shape'), 'shape'])
+    await expect.poll(() => order(page)).toEqual([...before.filter((id) => id !== 'words'), 'words'])
     await expect(more).toBeFocused()
 
     // Tab goes down the menu to the rotation field, which takes a typed turn.
     await page.keyboard.press('Enter')
-    await expect(menu.getByTestId('more-order')).toBeFocused()
     await page.keyboard.press('Tab')
-    await expect(menu.getByTestId('more-line-up')).toBeFocused()
     await page.keyboard.press('Tab')
     const field = menu.getByRole('spinbutton', { name: 'Rotation in degrees' })
     await expect(field).toBeFocused()
     await page.keyboard.type('90')
     await page.keyboard.press('Enter')
-    await expect.poll(async () => (await props(page, 'shape')).rotation).toBe(90)
-    expect(await where()).toEqual(at)
+    await expect.poll(async () => (await words()).rotation).toBe(90)
+    expect(await words()).toMatchObject({ x: 240, y: 60 })
 
     await page.keyboard.press('Escape')
     await expect(menu).toBeHidden()
     await expect(more).toBeFocused()
-    expect(await page.evaluate(() => window.dazbee?.selection())).toEqual(['shape'])
-    await undoRedo(page, async () => (await props(page, 'shape')).rotation ?? 0, 0, 90)
+    expect(await page.evaluate(() => window.dazbee?.selection())).toEqual(['words'])
+    await undoRedo(page, async () => (await words()).rotation ?? 0, 0, 90)
     expect(errors).toEqual([])
   })
 
@@ -182,7 +218,7 @@ test.describe('at 1280×760', () => {
       // Plus 0, so a left just under 0 that rounds to -0 reads as 0.
       return Math.round(x + width / 2 - (width * Math.abs(Math.cos(turn)) + height * Math.abs(Math.sin(turn))) / 2) + 0
     }
-    await (await arrangeSubmenu(page, 'line-up')).getByRole('button', { name: 'Align left' }).click()
+    await (await arrangeSubmenu(page, 'line-up')).getByRole('button', { name: 'Left' }).click()
     await expect.poll(drawnLeft).toBe(0)
     expect(await rotation()).toBe(30)
     await page.keyboard.press('Escape')

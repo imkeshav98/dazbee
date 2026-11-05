@@ -57,7 +57,7 @@ test('a selection shows the top bar; several layers line up and spread out from 
   // One layer lines up with its frame from the top bar's ⋯.
   await expect(arrange).toHaveCount(0)
   await expect(page.getByTestId('bar-line-up')).toHaveCount(0)
-  await expect((await arrangeSubmenu(page, 'line-up')).getByRole('button', { name: 'Align left' })).toBeEnabled()
+  await expect((await arrangeSubmenu(page, 'line-up')).getByRole('button', { name: 'Left' })).toBeEnabled()
   // Each Esc closes one menu, the one beside the row first: each is gone before the next key.
   await closeBarMenu(page, 'more-line-up')
   await closeBarMenu(page, 'bar-arrange')
@@ -67,7 +67,7 @@ test('a selection shows the top bar; several layers line up and spread out from 
   await expect(page.getByTestId('top-bar')).toHaveAttribute('data-selection', / /)
   await expect(arrange).toHaveCount(0)
   const lineUp = await barMenu(page, 'line-up')
-  await expect(lineUp.getByRole('button', { name: 'Align left' })).toBeEnabled()
+  await expect(lineUp.getByRole('button', { name: 'Left' })).toBeEnabled()
   await expect(lineUp.getByRole('button', { name: /^Distribute horizontally/ })).toBeEnabled()
   await shoot(page, 'cards-arrange')
   await page.keyboard.press('Escape')

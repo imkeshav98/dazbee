@@ -31,6 +31,14 @@ const GAP = 8
 /** The room between a sheet and the screen's edges on a phone, in pixels, as an edit panel's sheet keeps. */
 const SHEET_EDGE = 8
 
+/** Where each key moves the focus in a menu, from the row at `i` of rows up to `last`. */
+const STEPS = {
+  ArrowDown: (i: number, last: number) => (i >= last ? 0 : i + 1),
+  ArrowUp: (i: number, last: number) => (i <= 0 ? last : i - 1),
+  Home: () => 0,
+  End: (_: number, last: number) => last,
+}
+
 const nowhere = () => document.activeElement === null || document.activeElement === document.body
 
 /**
@@ -81,6 +89,25 @@ export function arrowAlong(event: KeyboardEvent<HTMLElement>) {
         ? items.length - 1
         : (at + (forward ? 1 : -1) + items.length) % items.length
   items[next]?.focus()
+}
+
+/**
+ * Moves the focus between a menu's rows with the up and down arrows, wrapping round at the ends,
+ * and Home and End: its buttons that show, greyed ones too. A field keeps its own keys, its arrows
+ * stepping its value; Tab reaches it. Goes on the menu's content; a menu opened beside a row of it,
+ * drawn elsewhere in the page, moves through its own rows.
+ */
+export function arrowThrough(event: KeyboardEvent<HTMLElement>) {
+  if (event.defaultPrevented || !(event.key in STEPS)) return
+  const at = document.activeElement
+  if (!(at instanceof HTMLButtonElement) || !event.currentTarget.contains(at)) return
+  const rows = [...event.currentTarget.querySelectorAll<HTMLElement>('button:not(:disabled)')].filter((row) =>
+    row.checkVisibility({ visibilityProperty: true }),
+  )
+  const i = rows.indexOf(at)
+  if (i < 0) return
+  event.preventDefault()
+  rows[STEPS[event.key as keyof typeof STEPS](i, rows.length - 1)]?.focus()
 }
 
 /**
@@ -177,7 +204,7 @@ export function BarPopover({
   children,
   testId,
   className,
-  caret = true,
+  menu = false,
   align = 'center',
   buttonRef,
 }: {
@@ -192,8 +219,11 @@ export function BarPopover({
   children: ReactNode
   testId: string
   className?: string
-  /** Whether the button shows ▾; a ⋯ that opens a menu of actions has none. */
-  caret?: boolean
+  /**
+   * Whether it is a ⋯ that opens a menu of actions: its button shows no ▾, and the arrows, Home and
+   * End move between the menu's rows.
+   */
+  menu?: boolean
   /** Where the popover lines up under its button: its middle, or its end, as a menu of actions does. */
   align?: 'center' | 'end'
   /** Given the button, for a control that gives the focus back to it later. */
@@ -228,7 +258,7 @@ export function BarPopover({
         >
           {icon}
           {face ?? label}
-          {caret && <CaretDownIcon size={10} weight="bold" aria-hidden className="text-subtle" />}
+          {!menu && <CaretDownIcon size={10} weight="bold" aria-hidden className="text-subtle" />}
         </button>
       </Popover.Trigger>
       {asSheet && <Popover.Anchor virtualRef={SCREEN_BOTTOM} />}
@@ -242,6 +272,7 @@ export function BarPopover({
           // A number field being typed in takes Esc first, throwing away what was typed; the next
           // Esc closes the popover.
           onEscapeKeyDown={(event) => typingIn(document.activeElement) && event.preventDefault()}
+          onKeyDown={menu ? arrowThrough : undefined}
           aria-label={label}
           data-testid={`bar-${testId}-menu`}
           data-sheet={asSheet || undefined}

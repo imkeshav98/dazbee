@@ -48,7 +48,7 @@ test.describe('top bar and full menu', () => {
     await selectLayers(page, ['box', 'dot'], { bar: true })
     await step(
       page,
-      async () => (await barMenu(page, 'line-up')).getByRole('button', { name: 'Align left' }).click(),
+      async () => (await barMenu(page, 'line-up')).getByRole('button', { name: 'Left' }).click(),
       async () => {
         await expect.poll(async () => (await props(page, 'dot')).x).toBe(80)
       },

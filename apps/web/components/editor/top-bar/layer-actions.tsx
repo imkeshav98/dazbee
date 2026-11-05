@@ -23,7 +23,7 @@ import { cn } from '@/lib/cn.ts'
 import { useLocale, useMessages } from '@/lib/i18n/client.tsx'
 import { dirOf } from '@/lib/i18n/index.ts'
 
-import { useMenuFocus, useScrollingMenu } from './bar-popover.tsx'
+import { arrowThrough, useMenuFocus, useScrollingMenu } from './bar-popover.tsx'
 
 /** The layers hidden in one frame, which a right-click on its empty canvas offers to show. */
 export interface HiddenLayers {
@@ -266,7 +266,8 @@ export function StageMenu({
 /**
  * A row of the menu that opens a short menu beside it, or under it on a phone, where the screen has
  * no room beside the menu; in a sheet at the bottom of a phone's screen, above the sheet. Enter or
- * the arrow towards it opens it, the arrow back or Esc closes it.
+ * the arrow towards it opens it, the arrow back or Esc closes it; up, down, Home and End move
+ * between its rows, and the row stays lit while it is open.
  */
 export function SubMenu({ label, testId, children }: { label: string; testId: string; children: ReactNode }) {
   const [open, setOpen] = useState(false)
@@ -296,7 +297,8 @@ export function SubMenu({ label, testId, children }: { label: string; testId: st
             event.preventDefault()
             setOpen(true)
           }}
-          className={MENU_ITEM}
+          // Lit with the hover tint while the menu beside it is open.
+          className={cn(MENU_ITEM, 'data-[state=open]:bg-hover data-[state=open]:lit')}
         >
           {label}
           <CaretRightIcon size={12} weight="bold" aria-hidden className="text-subtle rtl:-scale-x-100" />
@@ -314,7 +316,7 @@ export function SubMenu({ label, testId, children }: { label: string; testId: st
           aria-label={label}
           data-testid={`more-${testId}-menu`}
           onKeyDown={(event) => {
-            if (event.key !== back) return
+            if (event.key !== back) return arrowThrough(event)
             event.preventDefault()
             setOpen(false)
           }}

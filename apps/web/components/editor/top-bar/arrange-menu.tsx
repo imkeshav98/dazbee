@@ -65,7 +65,7 @@ export function ArrangeMenu({ target, design, locked }: { target: Target; design
       onOpen={setOpen}
       label={b.arrange}
       face={<DotsThreeIcon size={18} weight="bold" aria-hidden />}
-      caret={false}
+      menu
       align="end"
       testId="arrange"
       className="w-64"
@@ -154,23 +154,27 @@ export function ArrangeMenu({ target, design, locked }: { target: Target; design
   )
 }
 
-/** The six ways to line up the selection, as icons: left, centre, right, top, middle, bottom. */
+/**
+ * The six ways to line up the selection, as icons: left, centre, right, top, middle, bottom. Each
+ * is named by where it lines up to, and its tooltip says so with its shortcut.
+ */
 export function AlignRow({ editor }: { editor: Editor }) {
   const t = useMessages()
+  const named = t.editor.bar.placing
   return (
     <div dir="ltr" role="group" aria-label={t.editor.arrange.align} className="grid grid-cols-6 gap-0.5">
       {ALIGN.map(({ action, icon: Icon }) => (
-        <button
-          key={action}
-          type="button"
-          aria-label={t.editor.arrange[action]}
-          title={format(t.editor.arrange.withKey, { label: t.editor.arrange[action], key: keyOf(action) })}
-          data-action={action}
-          onClick={() => editor.perform(action)}
-          className={ICON_BUTTON}
-        >
-          <Icon size={16} aria-hidden />
-        </button>
+        <Tooltip key={action} label={format(t.editor.arrange.withKey, { label: named[action], key: keyOf(action) })}>
+          <button
+            type="button"
+            aria-label={named[action]}
+            data-action={action}
+            onClick={() => editor.perform(action)}
+            className={ICON_BUTTON}
+          >
+            <Icon size={16} aria-hidden />
+          </button>
+        </Tooltip>
       ))}
     </div>
   )

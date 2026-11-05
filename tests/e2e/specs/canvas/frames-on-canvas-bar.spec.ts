@@ -1,11 +1,12 @@
 // The picked frame's top bar: it is one Tab stop, and the arrows inside it move the focus between
-// Background and ⋯, never the frame; Rename in its ⋯ with the frame's label off screen, zoomed in or
-// above the view, pans at the same zoom to show the label first, then opens the field focused. The
-// rest of frames on the canvas is in frames-on-canvas.spec.ts.
+// Background and ⋯, never the frame, as they move between the rows of its ⋯ menu; Rename in its ⋯
+// with the frame's label off screen, zoomed in or above the view, pans at the same zoom to show the
+// label first, then opens the field focused. The rest of frames on the canvas is in
+// frames-on-canvas.spec.ts.
 import { writeOutput } from '../../support/editor.ts'
 import { clickLabel, frameOf, labelRow, openFrames, picked, tabToBar } from '../../support/frames-on-canvas.ts'
 import { drawn, press, zoomOf } from '../../support/stage.ts'
-import { expect, test } from '../../support/test.ts'
+import { expect, type Locator, test } from '../../support/test.ts'
 import { barMenu } from '../../support/top-bar.ts'
 
 test.describe.configure({ timeout: 180_000 })
@@ -48,6 +49,39 @@ test('the picked frame’s bar is one Tab stop, and the arrows inside it move th
   await page.keyboard.press('ArrowRight')
   await drawn(page)
   expect(await frameOf(page, 'sq')).toMatchObject({ x: 1, y: 0 })
+  expect(errors).toEqual([])
+})
+
+test('the picked frame’s ⋯ menu opens on Duplicate from the keyboard, and up, down, Home and End move between its rows, never the frame; Esc gives the focus back to ⋯', async ({
+  browser,
+}) => {
+  const { a: page, errors } = await openFrames(browser)
+  await clickLabel(page, 'sq')
+  expect(await tabToBar(page)).toBe('bar-background')
+  await page.keyboard.press('ArrowRight')
+  await page.keyboard.press('Enter')
+  const menu = page.getByTestId('bar-frame-more-menu')
+  const rows = ['duplicate', 'rename', 'delete'].map((action) => menu.locator(`[data-action="${action}"]`))
+  await expect(rows[0] as Locator).toBeFocused()
+  for (const [key, row] of [
+    ['ArrowDown', 1],
+    ['ArrowDown', 2],
+    ['ArrowDown', 0],
+    ['ArrowUp', 2],
+    ['Home', 0],
+    ['End', 2],
+    ['ArrowUp', 1],
+  ] as const) {
+    await page.keyboard.press(key)
+    await expect(rows[row] as Locator, key).toBeFocused()
+  }
+  await drawn(page)
+  expect(await frameOf(page, 'sq')).toMatchObject({ x: 0, y: 0 })
+  expect(await page.evaluate(() => window.dazbee?.canUndo())).toBe(false)
+  expect(await picked(page)).toBe('sq')
+  await page.keyboard.press('Escape')
+  await expect(menu).toBeHidden()
+  await expect(page.getByTestId('bar-frame-more')).toBeFocused()
   expect(errors).toEqual([])
 })
 
