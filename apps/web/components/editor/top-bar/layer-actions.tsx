@@ -6,9 +6,7 @@
 // beside their rows, and the turn; box, mask (or release the mask a layer is under); text
 // direction; and, at the bottom, lock, hide and delete in all frames, acting on the layers and
 // their linked copies. Every row runs the same editor action as its shortcut. An item that never
-// applies is left out; one with nothing to do is greyed, its tooltip saying why. A right-click on
-// empty canvas offers to show the hidden layers of the frame there, or of the one nearest it
-// outside every frame, when it has some.
+// applies is left out; one with nothing to do is greyed, its tooltip saying why.
 import { CaretRightIcon } from '@phosphor-icons/react'
 import * as Popover from '@radix-ui/react-popover'
 import { type ReactNode, useState } from 'react'
@@ -27,7 +25,7 @@ import { useLocale, useMessages } from '@/lib/i18n/client.tsx'
 import { dirOf, format, type Messages } from '@/lib/i18n/index.ts'
 
 import { useMenuFocus } from './bar-popover.tsx'
-import { Row } from './menu-row.tsx'
+import { MenuRow } from './menu-row.tsx'
 
 /** Why an item has nothing to do: the reason the linked-copy items give, by its message. */
 type Why = keyof Messages['editor']['bar']['linked']['why']
@@ -100,7 +98,7 @@ export function LayerActions({ editor, ids, onDone }: { editor: Editor; ids: str
   const whyOf = (state: Why | 'ready' | 'hidden') => (state === 'ready' || state === 'hidden' ? null : l.why[state])
   /** A row that runs a style or linked-copy action, greyed with the reason while it has nothing to do. */
   const linkedRow = (action: ShortcutAction, label: string, why: string | null, danger = false) => (
-    <Row
+    <MenuRow
       key={action}
       action={action}
       label={label}
@@ -113,7 +111,7 @@ export function LayerActions({ editor, ids, onDone }: { editor: Editor; ids: str
   return (
     <>
       <SubMenu label={b.copy} testId="copy">
-        <Row
+        <MenuRow
           action="copy"
           label={b.copy}
           keys={copyKey}
@@ -126,7 +124,7 @@ export function LayerActions({ editor, ids, onDone }: { editor: Editor; ids: str
         {linkedRow('copyStyle', l.copyStyle, whyOf(linked.copyStyle))}
       </SubMenu>
       <SubMenu label={b.paste} testId="paste">
-        <Row
+        <MenuRow
           action="paste"
           label={b.paste}
           keys={pasteKey}
@@ -140,7 +138,7 @@ export function LayerActions({ editor, ids, onDone }: { editor: Editor; ids: str
       </SubMenu>
       {row('duplicate', t.editor.arrange.duplicate)}
       {linked.frames === 0 ? (
-        <Row action="copyToFrames" label={l.copyToFrames} keys="" why={l.why.noFrames} caret />
+        <MenuRow action="copyToFrames" label={l.copyToFrames} keys="" why={l.why.noFrames} caret />
       ) : (
         <SubMenu
           label={l.copyToFrames}

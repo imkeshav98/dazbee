@@ -1,5 +1,5 @@
-// The PR's screenshots of the small menu, its ⋯, Copy to other frames ▸, a greyed row's tooltip and
-// the dashed outlines of linked copies (#456), at the three screen sizes in both themes.
+// Screenshots of the small menu, its ⋯, Copy to other frames ▸, a greyed row's tooltip and the
+// dashed outlines of linked copies, at the three screen sizes in both themes.
 import { photo, upload } from '../../support/assets.ts'
 import { shoot } from '../../support/editor.ts'
 import { openDesignIn, THEMES } from '../../support/glass.ts'

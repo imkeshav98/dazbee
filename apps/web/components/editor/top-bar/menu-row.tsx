@@ -16,7 +16,7 @@ import { dirOf } from '@/lib/i18n/index.ts'
  * A row of the menu that runs an action, its key at the end. While it has nothing to do it is
  * greyed, and says why in a tooltip under the pointer, on keyboard focus and on a tap.
  */
-export function Row({
+export function MenuRow({
   action,
   label,
   keys,

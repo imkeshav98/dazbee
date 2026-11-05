@@ -1,9 +1,7 @@
-// The small menu, its ⋯ (the full menu) and the right-click menu, and paste across frames, in
-// Chromium (#456): the small menu acts on this frame; the full menu's Copy ▸ and Paste ▸ take the
-// layers or their style; Copy to other frames ▸ writes a style, a text or the layer into the
-// linked frames; lock, hide and delete in all frames reach the linked copies, which a dashed
-// outline shows while a layer is selected. Each by mouse and by key, as one undo step, at the
-// three screen sizes and live in a second tab.
+// The full menu's items that reach a layer's linked copies, in Chromium: Copy to other frames ▸
+// writes a style, a text or the layer into the linked frames; lock, hide and delete in all frames
+// reach the copies, which a dashed outline shows while a layer is selected. Each by mouse and by
+// key, as one undo step, and live in a second tab.
 import { photo, upload } from '../../support/assets.ts'
 import { openTabs } from '../../support/editor.ts'
 import { closeMenus, colourOf, expectGreyed, holders, node, open, redo, undo } from '../../support/linked-menu.ts'
