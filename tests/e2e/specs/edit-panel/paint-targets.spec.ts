@@ -16,6 +16,7 @@ import {
   SWATCH_PANELS,
   type SwatchControl,
   swatchTouches,
+  TOUCH_TARGET,
 } from '../../support/swatches.ts'
 import { expect, type Locator, test } from '../../support/test.ts'
 import { PIECES, UNCUT } from '../../support/top-bar.ts'
@@ -74,28 +75,50 @@ const KEPT_ON_DESKTOP = [
   { control: 'Replace', selector: '[data-testid="paint-replace-image"]', height: 24.5 },
 ] as const
 
-/** Switches the paint editor of a panel's + to a kind of fill, an image by picking `assetId`, and gives the editor. */
-async function fillAs(panel: Locator, kind: (typeof FILL_KINDS)[number], assetId: string) {
+/** The image picker's targets: its upload and the brand's images. */
+const IMAGE_PICKER_TARGETS: SwatchControl = {
+  control: 'a target of the image picker',
+  id: 'image-picker',
+  selector: 'label, li[data-asset] button',
+  size: 0,
+}
+
+/** A phone or a tablet as a touch screen, which takes no hover. */
+const TOUCH_SCREEN = { touch: true, mobile: true }
+
+/**
+ * Switches the paint editor of a panel's + to a kind of fill, an image by picking `assetId`, and
+ * gives the editor; `onPicker` is given the image picker before the image is picked.
+ */
+async function fillAs(
+  panel: Locator,
+  kind: (typeof FILL_KINDS)[number],
+  assetId: string,
+  onPicker?: (picker: Locator) => Promise<void>,
+) {
   const picker = panel.getByTestId('colour-picker')
   const tab = picker.getByRole('radio', { name: kind })
   if (kind === 'Image') {
     if ((await tab.count()) === 0) {
       await picker.getByTestId('paint-image').click()
-      await panel.page().getByTestId('paint-image-picker').locator(`li[data-asset="${assetId}"] button`).click()
+      const images = panel.page().getByTestId('paint-image-picker')
+      await expect(images.locator(`li[data-asset="${assetId}"] button`)).toBeVisible()
+      await onPicker?.(images)
+      await images.locator(`li[data-asset="${assetId}"] button`).click()
     }
   } else if ((await tab.getAttribute('aria-checked')) !== 'true') await tab.click()
   await expect(picker.getByRole('radio', { name: kind })).toHaveAttribute('aria-checked', 'true')
   return picker.getByTestId('paint-editor')
 }
 
-test('on a phone or a touch screen every target of the paint editor in the Colour and Background panels, for each kind of fill, and Add image is 44 px tall and 8 px from the next, in a sheet that cuts none off', async ({
+test('on a phone every target of the paint editor in the Colour and Background panels, for each kind of fill, Add image and the image picker is 44 px tall and 8 px from the next, in a sheet that cuts none off', async ({
   browser,
 }) => {
   const brandId = await newBrand('e2e phone paint targets')
   await putKit(brandId, SWATCH_KIT)
   const asset = await upload(photo, { brandId })
   const screen = { width: 390, height: 844 }
-  const { page, errors } = await openSized(browser, screen, { brandId, touch: true })
+  const { page, errors } = await openSized(browser, screen, { brandId, ...TOUCH_SCREEN })
   for (const { name, open, kinds } of PAINT_PANELS) {
     const panel = await open(page)
     const sheet = await panel.boundingBox()
@@ -103,7 +126,13 @@ test('on a phone or a touch screen every target of the paint editor in the Colou
     if (name === "a shape's Colour panel")
       expectTouchTargets(await swatchTouches(panel, ADD_IMAGE), `${name}, ${ADD_IMAGE.control}`, sheet)
     for (const kind of kinds) {
-      const editor = await fillAs(panel, kind, asset.id)
+      const editor = await fillAs(panel, kind, asset.id, async (picker) =>
+        expectTouchTargets(
+          await swatchTouches(picker, IMAGE_PICKER_TARGETS),
+          `${name}, ${IMAGE_PICKER_TARGETS.control}`,
+          { x: 0, width: screen.width },
+        ),
+      )
       // A third stop, tapped onto the bar's middle, so Remove this stop can be pressed.
       const stops = editor.locator('[data-stop]')
       if (kind !== 'Solid' && kind !== 'Image' && (await stops.count()) < 3) {
@@ -119,6 +148,51 @@ test('on a phone or a touch screen every target of the paint editor in the Colou
     await page.keyboard.press('Escape')
     await expect(page.locator('#edit-panel')).toHaveCount(0)
   }
+  expect(errors).toEqual([])
+})
+
+test('at 820×1180 on a touch screen the paint editor in the Colour and Background panels has its tabs, hex field and buttons, and Add image, 44 px tall, the tabs 8 px apart, each whole in the editor', async ({
+  browser,
+}) => {
+  const brandId = await newBrand('e2e tablet paint targets')
+  await putKit(brandId, SWATCH_KIT)
+  const asset = await upload(photo, { brandId })
+  const { page, errors } = await openSized(browser, { width: 820, height: 1180 }, { brandId, ...TOUCH_SCREEN })
+  const measured = new Set<string>()
+  for (const { name, open, kinds } of PAINT_PANELS) {
+    const panel = await open(page)
+    if (name === "a shape's Colour panel")
+      expect((await panel.getByTestId('add-image').boundingBox())?.height, `${name}, ${ADD_IMAGE.control}`).toBeCloseTo(
+        TOUCH_TARGET.size,
+        1,
+      )
+    for (const kind of kinds) {
+      const editor = await fillAs(panel, kind, asset.id)
+      const room = await editor.boundingBox()
+      if (!room) throw new Error(`${name} has no paint editor`)
+      const tabs = editor.getByRole('radiogroup', { name: 'Kind of paint' })
+      // The tabs fit their well, none pushed past its end.
+      expect(
+        await tabs.evaluate((well) => well.scrollWidth - well.clientWidth),
+        `${name}, its paint editor on ${kind}, the fill tabs: past their well`,
+      ).toBeLessThanOrEqual(0)
+      for (const { control, selector, ...kept } of KEPT_ON_DESKTOP) {
+        if ((await editor.locator(selector).count()) === 0) continue
+        measured.add(control)
+        const what = `${name}, its paint editor on ${kind}, ${control}`
+        for (const touch of await swatchTouches(editor, { control, id: control, selector, size: TOUCH_TARGET.size })) {
+          expect(touch.height, `${what}: its height`).toBeCloseTo(TOUCH_TARGET.size, 1)
+          if ('gap' in kept)
+            expect(touch.space, `${what}: the space to the next target`).toBeGreaterThanOrEqual(TOUCH_TARGET.gap)
+          expect(touch.x, `${what}: starts in the editor`).toBeGreaterThanOrEqual(room.x)
+          expect(touch.x + touch.width, `${what}: ends in the editor`).toBeLessThanOrEqual(room.x + room.width)
+        }
+      }
+    }
+    await page.keyboard.press('Escape')
+    await expect(page.locator('#edit-panel')).toHaveCount(0)
+  }
+  expect([...measured].sort()).toEqual(KEPT_ON_DESKTOP.map(({ control }) => control).sort())
   expect(errors).toEqual([])
 })
 
@@ -167,7 +241,11 @@ for (const [width, height] of SCREEN_SIZES) {
         await putKit(brandId, SWATCH_KIT)
         const asset = await upload(photo, { brandId })
         const phone = width < 640
-        const { page, errors } = await openSized(browser, { width, height }, { theme, brandId, touch: phone })
+        const { page, errors } = await openSized(
+          browser,
+          { width, height },
+          { theme, brandId, touch: phone, mobile: phone },
+        )
         for (const [i, { open, kinds }] of PAINT_PANELS.entries()) {
           const panel = await open(page)
           for (const kind of kinds.filter((k) => k === 'Solid' || k === 'Line gradient' || k === 'Image')) {

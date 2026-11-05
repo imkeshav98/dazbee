@@ -208,10 +208,11 @@ export async function openSized(
     input = design(),
     brandId = DEV_BRAND,
     touch = false,
-  }: { theme?: string; locale?: string; input?: DesignInput; touch?: boolean } & InBrand = {},
+    mobile = false,
+  }: { theme?: string; locale?: string; input?: DesignInput; touch?: boolean; mobile?: boolean } & InBrand = {},
 ) {
   const designId = await seed(input, { brandId })
-  const page = await (await browser.newContext({ viewport, hasTouch: touch })).newPage()
+  const page = await (await browser.newContext({ viewport, hasTouch: touch, isMobile: mobile })).newPage()
   const errors: string[] = []
   page.on('pageerror', (error) => errors.push(error.message))
   await setCookies(page, { theme, ...(locale && { locale }) })
