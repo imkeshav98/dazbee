@@ -57,7 +57,6 @@ export const ar: Messages = {
     brief: 'الموجز',
     briefPlaceholder: 'لماذا، ولمن، والطابع والعرض. مثلًا: تخفيضات نهاية الأسبوع، جريئة ومرحة، خصم 20٪',
     sizes: 'المقاسات',
-    chips: { 'feed-square': 'مربع', 'feed-portrait': 'عمودي', story: 'ستوري', 'link-image': 'بانر' },
     brandKit: 'هوية العلامة',
     reference: 'إعلان مرجعي',
     add: 'أضف مرجعًا أو صورًا',

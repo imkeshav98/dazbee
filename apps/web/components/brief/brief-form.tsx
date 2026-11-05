@@ -165,7 +165,7 @@ export function BriefForm({
             <span className="grid w-5 shrink-0 place-items-center text-muted">
               <Shape id={id} size={16} />
             </span>
-            <span className="flex-1">{h.chips[id]}</span>
+            <span className="flex-1">{t.editor.sizes.preset[id]}</span>
           </label>
         )
       })}

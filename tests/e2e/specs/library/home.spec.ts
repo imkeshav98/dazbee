@@ -161,7 +161,7 @@ test('the brief is alone on the home, and the capsule goes to Recent, Templates 
 test('a size under the brief opens a blank design in that size', async ({ page }) => {
   test.setTimeout(60_000)
   await page.goto('/brands/dev-brand-coffee')
-  await page.getByRole('button', { name: 'Start a blank Story' }).click()
+  await page.getByRole('button', { name: 'Start a blank Story and Reel' }).click()
   await expect(page).toHaveURL(/\/brands\/dev-brand-coffee\/designs\/[\w-]+$/)
   await expect(page.getByTestId('status')).toHaveAttribute('data-ready', '', { timeout: 30_000 })
   const design = await page.evaluate(() => window.dazbee?.design())
@@ -186,9 +186,10 @@ test('the Sizes dropdown keeps one size picked, and Make drafts opens a design o
   await expect(page.getByTestId('brief-size-feed-square')).toBeChecked()
   await button.click()
   await expect(page.getByTestId('brief-size-feed-square')).toBeChecked()
-  await dropdown.getByText('Square', { exact: true }).click()
+  // Each size is named as the frame it makes is.
+  await dropdown.getByText('Feed square', { exact: true }).click()
   await expect(page.getByTestId('brief-size-feed-square')).toBeChecked()
-  await dropdown.getByText('Story', { exact: true }).click()
+  await dropdown.getByText('Story and Reel', { exact: true }).click()
   await expect(page.getByTestId('brief-size-story')).toBeChecked()
   await expect(button).toHaveText(/2 sizes/)
   await shoot(page, 'home-sizes')

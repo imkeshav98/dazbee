@@ -62,7 +62,6 @@ export const en = {
     briefPlaceholder:
       'What it is for, who it speaks to, the feel and the offer. Say, a weekend sale: bold, playful, 20% off',
     sizes: 'Sizes',
-    chips: { 'feed-square': 'Square', 'feed-portrait': 'Portrait', story: 'Story', 'link-image': 'Banner' },
     brandKit: 'Brand kit',
     reference: 'Reference ad',
     /** The brief's + menu (#136): a reference ad, or images uploaded to the brand's assets. */

@@ -1,6 +1,7 @@
-// Under the brand home's brief: "Or start blank" and a row of sizes, each drawn in its own shape
-// (Square, Portrait, Story, Banner), that open a design of one empty frame in that size, and a last tile for
-// the brand's templates. Each size is a form, so it works before any script loads.
+// Under the brand home's brief: "Or start blank" and a row of sizes, each drawn in its own shape and
+// named as the frame it makes is (Feed square, Feed portrait, Story and Reel, Link image), that open
+// a design of one empty frame in that size, and a last tile for the brand's templates. Each size is a
+// form, so it works before any script loads.
 import { SquaresFourIcon } from '@phosphor-icons/react/ssr'
 import Link from 'next/link'
 
@@ -41,7 +42,7 @@ export function StartBlank({
           const preset = SIZE_PRESETS.find((p) => p.id === id)
           if (!preset) return null
           const scale = OUTLINE / Math.max(preset.width, preset.height)
-          const name = t.home.chips[id]
+          const name = t.editor.sizes.preset[id]
           return (
             <li key={id}>
               <form action={start.bind(null, id)}>
@@ -56,7 +57,7 @@ export function StartBlank({
                     className={SHAPE}
                     style={{ width: Math.round(preset.width * scale), height: Math.round(preset.height * scale) }}
                   />
-                  {name}
+                  <span className="max-w-20 text-center leading-tight">{name}</span>
                 </button>
               </form>
             </li>
