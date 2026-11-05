@@ -59,7 +59,8 @@ export type Stroke = z.infer<typeof Stroke>
 export const LineEnd = z.enum(['none', 'arrow', 'triangle', 'circle'])
 export type LineEnd = z.infer<typeof LineEnd>
 
-const Radius = z.number().min(0)
+/** A corner's radius, in pixels. */
+export const Radius = z.number().min(0)
 
 export const Shape = z.discriminatedUnion('kind', [
   z.object({
@@ -181,7 +182,8 @@ export const BooleanProps = z.object({
 })
 export type BooleanProps = z.infer<typeof BooleanProps>
 
-const textStyleFields = {
+/** The fields of a text's character style, as the base style and a run's style take them. */
+export const textStyleFields = {
   fontFamily: z.string().min(1),
   fontWeight: z.number().int().min(100).max(900),
   fontStyle: z.enum(['normal', 'italic']),

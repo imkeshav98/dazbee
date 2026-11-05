@@ -4,23 +4,21 @@
 import { z } from 'zod'
 
 import { Effect } from './effects.ts'
-import { type Layer, Stroke, TextStyle } from './layers.ts'
+import { type Layer, Radius, Stroke, TextStyle, textStyleFields } from './layers.ts'
 import { Paint } from './paint.ts'
 import { ContainerBlendMode } from './primitives.ts'
 import { BINDING_TARGETS, Bindings, type BindingTarget, canBind } from './variables.ts'
 
-const Radius = z.number().min(0)
-
 /** A text's look without its size: font, weight, colour, spacing and the outline along its glyphs. Null is none. */
 const TextLook = z.object({
   fontFamily: TextStyle.shape.fontFamily,
-  fontWeight: z.number().int().min(100).max(900),
-  fontStyle: z.enum(['normal', 'italic']),
+  fontWeight: textStyleFields.fontWeight,
+  fontStyle: textStyleFields.fontStyle,
   color: TextStyle.shape.color,
-  letterSpacing: z.number(),
-  lineHeight: z.number().positive().nullable(),
+  letterSpacing: textStyleFields.letterSpacing,
+  lineHeight: textStyleFields.lineHeight.nullable(),
   paragraphSpacing: z.number().min(0).nullable(),
-  outline: z.object({ width: z.number().min(0), color: TextStyle.shape.color }).nullable(),
+  outline: textStyleFields.outline.nullable(),
 })
 
 export const LayerStyle = z.object({
@@ -47,11 +45,9 @@ export interface Restyle {
 
 type Corners = NonNullable<LayerStyle['corners']>
 type Props = Readonly<Record<string, unknown>>
-type ShapeProps = { kind: string; cornerRadius?: number; corners?: [number, number, number, number] }
 
 /** A layer's style. */
 export function styleOf(layer: Layer): LayerStyle {
-  const props = layer.props as Props
   const style: LayerStyle = {
     effects: layer.props.effects,
     opacity: layer.props.opacity,
@@ -71,7 +67,7 @@ export function styleOf(layer: Layer): LayerStyle {
       color: s.color,
       letterSpacing: s.letterSpacing,
       lineHeight: s.lineHeight ?? null,
-      paragraphSpacing: (props.paragraphSpacing as number | undefined) ?? null,
+      paragraphSpacing: layer.props.paragraphSpacing ?? null,
       outline: s.outline ?? null,
     }
   }
@@ -132,9 +128,9 @@ function holdsLayers(layer: Layer) {
 function cornersOf(layer: Layer): Corners | undefined {
   if (layer.type === 'box') return layer.props.cornerRadius
   if (layer.type !== 'graphic') return undefined
-  const shape = layer.props.shape as ShapeProps
-  if (shape.kind === 'rect') return shape.corners ?? shape.cornerRadius ?? 0
-  if (shape.kind === 'polygon' || shape.kind === 'star') return shape.cornerRadius ?? 0
+  const { shape } = layer.props
+  if (shape.kind === 'rect') return shape.corners ?? shape.cornerRadius
+  if (shape.kind === 'polygon' || shape.kind === 'star') return shape.cornerRadius
   return undefined
 }
 
@@ -145,11 +141,9 @@ function cornersOf(layer: Layer): Corners | undefined {
 function withCorners(layer: Layer, corners: Corners): Record<string, unknown> {
   if (layer.type === 'box') return { cornerRadius: corners }
   if (layer.type !== 'graphic') return {}
-  const shape = layer.props.shape as ShapeProps
-  if (shape.kind === 'rect') {
-    const rest = Object.fromEntries(Object.entries(shape).filter(([key]) => key !== 'corners'))
-    return { shape: Array.isArray(corners) ? { ...rest, corners } : { ...rest, cornerRadius: corners } }
-  }
+  const { shape } = layer.props
+  if (shape.kind === 'rect')
+    return { shape: Array.isArray(corners) ? { ...shape, corners } : { kind: shape.kind, cornerRadius: corners } }
   if (shape.kind === 'polygon' || shape.kind === 'star')
     return { shape: { ...shape, cornerRadius: Array.isArray(corners) ? corners[0] : corners } }
   return {}
