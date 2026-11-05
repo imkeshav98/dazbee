@@ -143,6 +143,22 @@ for (const screen of FIELD_SCREENS) {
     })
   }
 
+  if (screen.touch)
+    test(`${size}: a colour's hex and opacity are 44 px tall and 8 px apart, as every field on a touch screen`, async ({
+      browser,
+    }) => {
+      const opacity = NUMBER_INPUTS.find((n) => n.name === "a colour's opacity")
+      if (!opacity) throw new Error("no colour's opacity in the list")
+      const { errors, field } = await openInput(browser, screen, opacity)
+      // The colour's row: its hex, then the opacity's field in a box of its own.
+      const hex = field.locator('xpath=../..').locator('[name="colour-hex"]')
+      const [h, o] = [await hex.boundingBox(), await field.boundingBox()]
+      if (!h || !o) throw new Error('no colour on screen')
+      expect([h.height, o.height]).toEqual([44, 44])
+      expect(o.x - (h.x + h.width)).toBeCloseTo(8, 1)
+      expect(errors).toEqual([])
+    })
+
   for (const theme of THEMES)
     test(
       `screenshots at ${size} in ${theme}: each number input selected and typed into, and a field with a fill selected`,
@@ -180,7 +196,7 @@ for (const screen of FIELD_SCREENS) {
         await nextFrame(page)
         const file = `number-input-filled-${screen.width}-${theme}`
         writeOutput(`${file}.png`, await page.screenshot({ animations: 'disabled', caret: 'initial' }))
-        const card = await page.locator('#edit-panel').getByTestId(FIELDS.opacity.card).boundingBox()
+        const card = await (await openCard(page, FIELDS.opacity.card)).boundingBox()
         if (!card) throw new Error('no Appearance on screen')
         const clip = { x: card.x - 12, y: card.y - 12, width: card.width + 24, height: card.height + 24 }
         writeOutput(`${file}-close.png`, await page.screenshot({ animations: 'disabled', caret: 'initial', clip }))
