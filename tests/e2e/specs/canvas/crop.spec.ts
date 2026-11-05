@@ -207,8 +207,9 @@ test('two layers become a mask and what it masks in one key press, and one undo'
   const { page, errors } = await openStage(browser, design(asset.id))
   const before = await exportHashOf(page)
   const start = new Set(Object.keys((await read(page)).nodes))
-  // A marquee around the disc and the poster over it.
-  await drag(page, { x: 770, y: 770 }, { x: 1075, y: 1075 })
+  // A marquee around the disc and the poster over it, Shift held from the press on the frame's empty
+  // area so it draws a marquee rather than move the frame.
+  await drag(page, { x: 770, y: 770 }, { x: 1075, y: 1075 }, ['Shift'], true)
   expect((await selection(page)).sort()).toEqual(['disc', 'poster'])
   await press(page, 'mask')
   const d = await read(page)

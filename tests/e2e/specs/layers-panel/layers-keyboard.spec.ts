@@ -296,12 +296,12 @@ test('a rename finished by clicking the canvas keeps the name and leaves the foc
   await expect(field).toBeFocused()
   await field.fill('Hero panel')
 
-  // An empty part of the page, right of the backdrop: the click lands on the canvas and picks nothing.
-  const at = await screenPoint(page, 1060, 500)
+  // Empty canvas right of the frame: the click lands on the canvas and picks nothing.
+  const at = await screenPoint(page, 1100, 500)
   expect(await page.evaluate(([x, y]) => document.elementFromPoint(x, y)?.tagName, [at.x, at.y] as const)).toBe(
     'CANVAS',
   )
-  await click(page, 1060, 500)
+  await click(page, 1100, 500)
   await expect.poll(async () => (await node(page, 'box')).name).toBe('Hero panel')
   expect(await page.evaluate(() => window.dazbee?.selection())).toEqual([])
   expect(await focusInTree(page)).toBe(false)
