@@ -23,15 +23,16 @@ import { canHold, frameIdOf, framesOf } from '@dazbee/schema'
 
 import { usePickedFrame, useSelection, useShownPage } from '@/components/editor/editor-hooks.ts'
 import { useFlyoutNote } from '@/components/editor/shell.tsx'
-import { swatchOf } from '@/components/editor/top-bar/frame-items.tsx'
 import { useLiveDesign } from '@/components/editor/use-live-design.ts'
 import { useOverlayScroll } from '@/components/ui/overlay-scroll.ts'
+import { swatchOf } from '@/lib/editor/frame-swatch.ts'
 import { arrowStep, type LayerTreeRow, opensFor, type Row, treeRows } from '@/lib/editor/layer-tree.ts'
 import { useLocale, useMessages } from '@/lib/i18n/client.tsx'
 import { dirOf, format } from '@/lib/i18n/index.ts'
 
 import { FrameRow } from './frame-row.tsx'
-import { LAYER_ROW, LayerRow, type RowApi, type Where } from './layer-row.tsx'
+import { LayerRow } from './layer-row.tsx'
+import { LAYER_ROW, type RowApi, type Where } from './tree-row.tsx'
 import { useLayerPictures } from './use-layer-pictures.ts'
 
 /** Rows rendered beyond each edge of the view, so a fast scroll never shows a gap. */

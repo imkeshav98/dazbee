@@ -13,19 +13,11 @@ import { keyOf } from '@/components/editor/arrange-actions.ts'
 import { setOpen, setRenameOpener, useEditState } from '@/components/editor/edit-store.ts'
 import { MENU_DIVIDER, MENU_ITEM, MENU_KEY } from '@/components/editor/styles.ts'
 import { cn } from '@/lib/cn.ts'
-import { hexOf } from '@/lib/colour.ts'
+import { swatchOf } from '@/lib/editor/frame-swatch.ts'
 import { useMessages } from '@/lib/i18n/client.tsx'
 
 import { BarPopover } from './bar-popover.tsx'
 import { type BarItem, Dot, PanelButton } from './top-bar-items.tsx'
-
-/** The swatch for a frame's fills: the fill on top that shows, a gradient's first stop, a rainbow for an image, or empty for none. */
-export function swatchOf(design: Design, frameId: string): string | 'mixed' | 'none' {
-  const top = (design.frames[frameId]?.fills ?? []).findLast((fill) => fill.visible !== false)
-  if (!top) return 'none'
-  const colour = top.type === 'solid' ? top.color : 'stops' in top ? top.stops[0]?.color : undefined
-  return colour === undefined ? 'mixed' : hexOf(colour)
-}
 
 /** The items of a picked frame's top bar, in order. */
 export function useFrameItems(editor: Editor, frameId: string, design: Design): BarItem[] {

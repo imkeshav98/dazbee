@@ -14,7 +14,7 @@ import { shortSizeOf } from '@/lib/editor/size.ts'
 import { useMessages } from '@/lib/i18n/client.tsx'
 import { format } from '@/lib/i18n/index.ts'
 
-import { ROW_LABEL, ROW_LOOK, ROW_SELECTED, type RowApi, RowCaret, rowPlace } from './layer-row.tsx'
+import { ROW_LABEL, ROW_LOOK, ROW_SELECTED, type RowApi, RowCaret, rowPlace } from './tree-row.tsx'
 
 /** A frame's row. Rendered again only when something it shows changes. */
 export const FrameRow = memo(function FrameRow({
