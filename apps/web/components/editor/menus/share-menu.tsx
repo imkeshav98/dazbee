@@ -6,6 +6,8 @@
 // through; a form, on its first control. They stand over the edit panel: Esc closes them first,
 // giving the focus back to Share when it was in them, and never clears the selection. A picked
 // frame's ⋯ opens Export too, with its frame ticked alone; Esc then gives the focus back to that ⋯.
+// While Export is open, Share shows it open as the rail's button for an open flyout does: glass
+// under the pressed tint, its icon pink.
 import { BookmarkSimpleIcon, CaretRightIcon, DownloadSimpleIcon, ShareFatIcon } from '@phosphor-icons/react'
 import { type KeyboardEvent as ReactKeyboardEvent, useEffect, useId, useRef, useState } from 'react'
 
@@ -15,6 +17,7 @@ import { onExportAsked } from '@/components/editor/edit-store.ts'
 import { useEditorDesign } from '@/components/editor/editor-hooks.ts'
 import { Button } from '@/components/ui/button.tsx'
 import { useMenuClose } from '@/components/ui/menu-close.ts'
+import { cn } from '@/lib/cn.ts'
 import { useMessages } from '@/lib/i18n/client.tsx'
 
 import { ExportForm } from './export-menu.tsx'
@@ -94,7 +97,7 @@ export function ShareMenu({
     <div ref={box} {...overPanelMark} className="relative">
       <Button
         ref={button}
-        variant="primary"
+        variant={open === 'export' ? null : 'primary'}
         aria-haspopup="menu"
         aria-expanded={open !== null}
         aria-controls={id}
@@ -104,9 +107,17 @@ export function ShareMenu({
           setOpen(open ? null : 'menu')
         }}
         data-testid="share-open"
-        className="h-9 rounded-full px-4 text-sm font-semibold max-sm:w-9 max-sm:px-0"
+        className={cn(
+          'h-9 rounded-full px-4 text-sm font-semibold max-sm:w-9 max-sm:px-0',
+          open === 'export' && 'surface-frost text-text tint-pressed',
+        )}
       >
-        <ShareFatIcon size={16} weight="fill" aria-hidden className="rtl:-scale-x-100" />
+        <ShareFatIcon
+          size={16}
+          weight="fill"
+          aria-hidden
+          className={cn('rtl:-scale-x-100', open === 'export' && 'text-accent-text')}
+        />
         <span className="max-sm:sr-only">{t.editor.share.open}</span>
       </Button>
       {open === 'menu' && (

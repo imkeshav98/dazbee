@@ -1,12 +1,32 @@
 // Export lists frames, from a picked frame's ⋯: Export there opens the Export form with that frame
-// ticked alone, by mouse and by keyboard, and Esc gives the focus back to the ⋯.
+// ticked alone, by mouse and by keyboard, and Esc gives the focus back to the ⋯; and while the form
+// is open, from there or from Share, Share shows it open and the form has its heading.
 import { expectNode, openExport, runExport } from '../../support/export.ts'
 import { openSized, rows } from '../../support/export-frames.ts'
 import { clickLabel, picked, tabToBar } from '../../support/frames-on-canvas.ts'
-import { expect, test } from '../../support/test.ts'
+import { expect, type Page, test } from '../../support/test.ts'
 import { barMenu } from '../../support/top-bar.ts'
 
 test.describe.configure({ timeout: 180_000 })
+
+/**
+ * The Share button's fill and the tint laid over it, and the same of glass under the pressed tint,
+ * as the rail's button for an open flyout shows it.
+ */
+const shareLook = (page: Page) =>
+  page.getByTestId('share-open').evaluate((share) => {
+    const probe = document.createElement('span')
+    probe.style.backgroundColor = 'var(--glass)'
+    probe.style.backgroundImage = 'linear-gradient(var(--glass-pressed), var(--glass-pressed))'
+    share.after(probe)
+    const [own, open] = [getComputedStyle(share), getComputedStyle(probe)]
+    const look = {
+      share: [own.backgroundColor, own.backgroundImage],
+      openGlass: [open.backgroundColor, open.backgroundImage],
+    }
+    probe.remove()
+    return look
+  })
 
 test('a picked frame’s ⋯ has Export after Rename, before the line and Delete: it opens Export with that frame ticked alone, by mouse and by keyboard', async ({
   browser,
@@ -63,5 +83,37 @@ test('a picked frame’s ⋯ has Export after Rename, before the line and Delete
   // Share opens Export with every frame ticked again.
   const share = await openExport(page)
   expect((await rows(share)).every((row) => row.on === true)).toBe(true)
+  expect(errors).toEqual([])
+})
+
+test('while Export is open, from Share or a picked frame’s ⋯, Share shows it open, glass under the pressed tint, and the form has its heading', async ({
+  browser,
+}) => {
+  const { page, errors } = await openSized(browser, { width: 1280, height: 760 })
+  const closed = await shareLook(page)
+  expect(closed.share[1]).toBe('none')
+  const dialog = await openExport(page)
+  await expect(dialog.getByRole('heading', { name: 'Export', exact: true })).toBeVisible()
+  await expect(page.getByRole('dialog', { name: 'Export', exact: true })).toBeVisible()
+  await expect
+    .poll(async () => {
+      const look = await shareLook(page)
+      return look.share.join() === look.openGlass.join()
+    })
+    .toBe(true)
+  await page.keyboard.press('Escape')
+  await expect(dialog).toBeHidden()
+  await expect.poll(async () => (await shareLook(page)).share).toEqual(closed.share)
+
+  await clickLabel(page, 'story')
+  const menu = await barMenu(page, 'frame-more')
+  await menu.getByRole('button', { name: 'Export', exact: true }).click()
+  await expect(dialog.getByRole('heading', { name: 'Export', exact: true })).toBeVisible()
+  await expect
+    .poll(async () => {
+      const look = await shareLook(page)
+      return look.share.join() === look.openGlass.join()
+    })
+    .toBe(true)
   expect(errors).toEqual([])
 })

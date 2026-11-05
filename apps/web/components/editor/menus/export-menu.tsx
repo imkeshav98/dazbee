@@ -170,10 +170,13 @@ export function ExportForm({
     <div
       id={id}
       role="dialog"
-      aria-label={t.editor.exports.title}
+      aria-labelledby={`${id}-title`}
       data-testid="export"
       className="modal-in absolute end-0 top-full z-30 mt-2 flex w-80 flex-col gap-3 rounded-card surface-frost p-3"
     >
+      <h2 id={`${id}-title`} className="px-0.5 font-display text-[15px] font-bold tracking-tight">
+        {t.editor.exports.title}
+      </h2>
       {/* Another page's frames can be the ones. */}
       {pages.length > 1 && (
         <div className="flex flex-col gap-1.5">
