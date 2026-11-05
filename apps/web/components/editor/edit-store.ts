@@ -10,8 +10,8 @@ import { OVER_PANEL } from '@/components/ui/menu-close.ts'
 
 /** The top bar's items that open the edit panel for the selected layers. */
 const LAYER_PANELS = ['font', 'colour', 'spacing', 'effects', 'position', 'edit', 'outline', 'stack'] as const
-/** The design's own panel: Pages, from by the zoom. */
-const DESIGN_PANELS = ['pages'] as const
+/** The design's own panels: Pages, from by the zoom, and the picked frame's Background. */
+const DESIGN_PANELS = ['pages', 'background'] as const
 /** Every id that opens the edit panel; every other id is a pop-up or the full menu. */
 const PANELS = [...LAYER_PANELS, ...DESIGN_PANELS] as const
 export type LayerPanelId = (typeof LAYER_PANELS)[number]

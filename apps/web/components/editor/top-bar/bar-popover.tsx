@@ -158,6 +158,7 @@ export function BarPopover({
   children,
   testId,
   className,
+  caret = true,
 }: {
   id: string
   open: string | null
@@ -170,6 +171,8 @@ export function BarPopover({
   children: ReactNode
   testId: string
   className?: string
+  /** Whether the button shows ▾; a ⋯ that opens a menu of actions has none. */
+  caret?: boolean
 }) {
   const focus = useMenuFocus()
   const shown = open === id
@@ -193,7 +196,7 @@ export function BarPopover({
         >
           {icon}
           {face ?? label}
-          <CaretDownIcon size={10} weight="bold" aria-hidden className="text-subtle" />
+          {caret && <CaretDownIcon size={10} weight="bold" aria-hidden className="text-subtle" />}
         </button>
       </Popover.Trigger>
       <Popover.Portal>

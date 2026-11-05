@@ -743,6 +743,16 @@ export const ar: Messages = {
     frames: {
       name: 'إطار',
       emptyPage: 'اختر أداة الإطار لإضافة إطار',
+      bar: 'الإطار',
+      background: 'الخلفية',
+      backgroundColour: 'لون الخلفية',
+      more: 'إجراءات الإطار',
+      rename: 'إعادة تسمية',
+      nameOf: 'اسم {name}',
+      layers: 'طبقات الخلفية',
+      layer: 'طبقة خلفية',
+      layerName: 'الخلفية {n}',
+      addLayer: 'أضف طبقة خلفية',
     },
     statusText: {
       Starting: 'جارٍ البدء',

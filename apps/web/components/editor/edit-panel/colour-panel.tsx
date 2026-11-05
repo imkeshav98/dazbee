@@ -1,7 +1,7 @@
 'use client'
 
 // The Colour panel: the brand kit's and the design's colours, any paint by +, and every fill under
-// Advanced.
+// Advanced; its colour choices are the picked frame's Background panel's too.
 import { ImageSquareIcon, PlusIcon } from '@phosphor-icons/react'
 import { type ReactNode, useState } from 'react'
 
@@ -23,10 +23,10 @@ import { format, type Messages } from '@/lib/i18n/index.ts'
 import { ColorField, PanelPart } from './fields.tsx'
 import { kindOf, type P, type PanelProps, set, shared, type Style, type Target, textStyle } from './target.ts'
 
-const NEW_FILL: Paint = { type: 'solid', color: '#D9D9D9FF' }
+export const NEW_FILL: Paint = { type: 'solid', color: '#D9D9D9FF' }
 
 /** A fill + adds over others: a see-through wash, so what was there still shows through it. */
-const FILL_ON_TOP: Paint = { type: 'solid', color: '#00000033' }
+export const FILL_ON_TOP: Paint = { type: 'solid', color: '#00000033' }
 
 /** The Colour panel: text's colour for text, else the colour of the fill that shows. */
 export function ColourPanel({ target, design, brandId }: PanelProps) {
@@ -58,6 +58,68 @@ export function FillsCard({
       {children}
       <FillBody target={target} brandId={brandId} p={p} title={b.colourPanel.fills} />
     </PanelPart>
+  )
+}
+
+/**
+ * The colours to pick from, simple first: the brand kit's, which `onBrand` binds to (paint without
+ * it), and the colours already in the design, with + first, which opens `picker` under them: any
+ * colour, or for shapes, boxes and a frame's background a gradient or an image too.
+ */
+export function ColourChoices({
+  design,
+  brandId,
+  p,
+  b,
+  current,
+  paint,
+  onBrand,
+  picker,
+}: {
+  design: Design
+  brandId: string
+  p: P
+  b: Messages['editor']['bar']
+  current: string | 'mixed' | undefined
+  paint: (hex: string) => void
+  onBrand?: (token: string, hex: string) => void
+  picker: ReactNode
+}) {
+  const [picking, setPicking] = useState(false)
+  const kit = (useBrandKit(brandId)?.colors.length ?? 0) > 0
+  const now = current && current !== 'mixed' ? hexOf(current).toUpperCase() : null
+  return (
+    <>
+      <PanelPart id="brand-colours" title={kit ? b.colourPanel.brandKit : p.colours}>
+        <Swatches brandId={brandId} p={p} current={current} paint={paint} onBrand={onBrand} />
+      </PanelPart>
+      <PanelPart id="design-colours" title={b.colourPanel.inDesign}>
+        <div role="group" aria-label={b.colourPanel.inDesign} className="flex flex-wrap items-center gap-1.5">
+          <button
+            type="button"
+            aria-label={b.colourPanel.pick}
+            title={b.colourPanel.pick}
+            aria-pressed={picking}
+            data-testid="colour-pick"
+            onClick={() => setPicking(!picking)}
+            className={cn(
+              'grid size-[22px] shrink-0 cursor-pointer place-items-center rounded-full border border-dashed border-line-strong text-muted transition-colors hover:border-accent hover:text-text aria-pressed:border-accent aria-pressed:text-accent-text',
+              FOCUS_RING,
+            )}
+          >
+            <PlusIcon size={12} weight="bold" aria-hidden />
+          </button>
+          {designColours(design).map((hex) => (
+            <Swatch key={hex} color={hex} label={hex} on={now === hex} onPick={() => paint(hex)} />
+          ))}
+        </div>
+        {picking && (
+          <div className="rounded-[12px] border border-line" data-testid="colour-picker">
+            {picker}
+          </div>
+        )}
+      </PanelPart>
+    </>
   )
 }
 
@@ -182,68 +244,6 @@ function FillColourPanel({
         </ImagePickerButton>
       )}
       <FillsCard target={target} brandId={brandId} p={p} b={b} />
-    </>
-  )
-}
-
-/**
- * The colours to pick from, simple first: the brand kit's, which `onBrand` binds to (paint without
- * it), and the colours already in the design, with + first, which opens `picker` under them: any
- * colour, or for shapes, boxes and the page a gradient or an image too.
- */
-function ColourChoices({
-  design,
-  brandId,
-  p,
-  b,
-  current,
-  paint,
-  onBrand,
-  picker,
-}: {
-  design: Design
-  brandId: string
-  p: P
-  b: Messages['editor']['bar']
-  current: string | 'mixed' | undefined
-  paint: (hex: string) => void
-  onBrand?: (token: string, hex: string) => void
-  picker: ReactNode
-}) {
-  const [picking, setPicking] = useState(false)
-  const kit = (useBrandKit(brandId)?.colors.length ?? 0) > 0
-  const now = current && current !== 'mixed' ? hexOf(current).toUpperCase() : null
-  return (
-    <>
-      <PanelPart id="brand-colours" title={kit ? b.colourPanel.brandKit : p.colours}>
-        <Swatches brandId={brandId} p={p} current={current} paint={paint} onBrand={onBrand} />
-      </PanelPart>
-      <PanelPart id="design-colours" title={b.colourPanel.inDesign}>
-        <div role="group" aria-label={b.colourPanel.inDesign} className="flex flex-wrap items-center gap-1.5">
-          <button
-            type="button"
-            aria-label={b.colourPanel.pick}
-            title={b.colourPanel.pick}
-            aria-pressed={picking}
-            data-testid="colour-pick"
-            onClick={() => setPicking(!picking)}
-            className={cn(
-              'grid size-[22px] shrink-0 cursor-pointer place-items-center rounded-full border border-dashed border-line-strong text-muted transition-colors hover:border-accent hover:text-text aria-pressed:border-accent aria-pressed:text-accent-text',
-              FOCUS_RING,
-            )}
-          >
-            <PlusIcon size={12} weight="bold" aria-hidden />
-          </button>
-          {designColours(design).map((hex) => (
-            <Swatch key={hex} color={hex} label={hex} on={now === hex} onPick={() => paint(hex)} />
-          ))}
-        </div>
-        {picking && (
-          <div className="rounded-[12px] border border-line" data-testid="colour-picker">
-            {picker}
-          </div>
-        )}
-      </PanelPart>
     </>
   )
 }

@@ -6,6 +6,7 @@ import { type Editor, SHAPE_MENU_TOOLS, type ShapeMenuTool, startEditor, type To
 import { isVectorAsset } from '@dazbee/schema'
 
 import { ASSET_DRAG_TYPE, draggedAsset, VECTOR_DRAG_TYPE } from '@/components/editor/asset-drag.ts'
+import { BackgroundPanel } from '@/components/editor/edit-panel/background-panel.tsx'
 import { EditPanel } from '@/components/editor/edit-panel/edit-panel.tsx'
 import { useEditState } from '@/components/editor/edit-store.ts'
 import { EmptyPageHint } from '@/components/editor/empty-page-hint.tsx'
@@ -348,6 +349,7 @@ export function EditorStage({
       {editor && <TopBar editor={editor} brandId={brandId} />}
       {editor && <SmallMenu editor={editor} rightClick={menuAt !== null} />}
       {editor && <EditPanel editor={editor} brandId={brandId} />}
+      {editor && <BackgroundPanel editor={editor} brandId={brandId} />}
       {editor && <PagesPanel editor={editor} onRemoved={setRemoved} />}
       {editor && <EmptyPageHint editor={editor} />}
       <div
