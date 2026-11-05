@@ -79,9 +79,10 @@ test('a click on a frame’s empty area or its label picks it: outlined, its lab
   const bar = page.getByTestId('top-bar')
   await expect(bar).toHaveAttribute('data-frame', 'sq')
   await expect(bar.locator('[data-bar-item]')).toHaveCount(2)
-  // Background is a swatch, as a layer's Fill is, named for the person who can't see it.
-  await expect(page.getByTestId('bar-background')).toHaveText('')
-  await expect(page.getByTestId('bar-background')).toHaveAccessibleName('Background colour')
+  // Background is its swatch and its name, as the mock draws it.
+  await expect(page.getByTestId('bar-background')).toHaveText('Background')
+  await expect(page.getByTestId('bar-background')).toHaveAccessibleName('Background')
+  await expect(page.getByTestId('bar-background').locator('span').first()).toHaveCSS('border-radius', /px/)
   await expect(page.getByTestId('bar-frame-more')).toHaveAccessibleName('Frame actions')
   await expect(page.getByTestId('small-menu')).toHaveCount(0)
   writeOutput('frames-1-picked.png', await page.screenshot({ animations: 'disabled' }))

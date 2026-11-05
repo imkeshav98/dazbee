@@ -1,6 +1,6 @@
 'use client'
 
-// The picked frame's top bar items: Background, a swatch as a layer's Fill is, which opens the
+// The picked frame's top bar items: Background, its swatch and its name, which opens the
 // Background panel for the frame's own fills, and ⋯ with the frame's actions: Duplicate, Rename and
 // Delete, the last after a line and in the danger colour, as a page's ⋯ on the Pages card.
 import { DotsThreeIcon } from '@phosphor-icons/react'
@@ -42,9 +42,7 @@ export function useFrameItems(editor: Editor, frameId: string, design: Design): 
   return [
     {
       key: 'background',
-      node: (
-        <PanelButton id="background" label={f.backgroundColour} face={<Dot colour={swatchOf(design, frameId)} />} />
-      ),
+      node: <PanelButton id="background" label={f.background} icon={<Dot colour={swatchOf(design, frameId)} />} />,
     },
     {
       key: 'frame-more',
