@@ -8,7 +8,7 @@ import { type CSSProperties, type ReactNode, useRef, useState } from 'react'
 import { type Editor, shortcutFor } from '@dazbee/editor'
 import { alphaOf } from '@dazbee/schema'
 
-import { useNumberInput } from '@/components/editor/number-input.ts'
+import { useNumberInput } from '@/components/editor/number-input.tsx'
 import {
   FIELD,
   KNOB,
