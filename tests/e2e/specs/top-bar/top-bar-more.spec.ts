@@ -10,7 +10,7 @@ import { layoutProblems, rowHeights, SCREEN_SIZES } from '../../support/layout.t
 import { frameDesign } from '../../support/seed.ts'
 import { fitSettled, nextFrame, openStage, order, perform, props, read, selectLayers } from '../../support/stage.ts'
 import { expect, type Page, test } from '../../support/test.ts'
-import { layerMore, layerMoreSubmenu, moreMenu, PIECES, UNCUT } from '../../support/top-bar.ts'
+import { arrangeMenu, arrangeSubmenu, moreMenu, PIECES, UNCUT } from '../../support/top-bar.ts'
 
 test.describe.configure({ timeout: 180_000 })
 
@@ -81,8 +81,8 @@ const barItems = (page: Page) =>
 
 /** Clicks an Order move in the menu beside Order in the top bar's ⋯, and waits as the ⋯ closes. */
 async function orderMove(page: Page, name: string) {
-  await (await layerMoreSubmenu(page, 'order')).getByRole('button', { name: new RegExp(`^${name}`) }).click()
-  await expect(page.getByTestId('bar-layer-more-menu')).toBeHidden()
+  await (await arrangeSubmenu(page, 'order')).getByRole('button', { name: new RegExp(`^${name}`) }).click()
+  await expect(page.getByTestId('bar-arrange-menu')).toBeHidden()
 }
 
 /** Undoes, then redoes, checking the value read goes back and comes again. */
@@ -100,9 +100,9 @@ test.describe('at 1280×760', () => {
     const { page, errors } = await openStage(browser, design())
     await page.setViewportSize({ width: 1280, height: 760 })
     await selectLayers(page, ['shape'], { bar: true })
-    expect((await barItems(page)).at(-1)).toBe('layer-more')
-    const menu = await layerMore(page)
-    await expect(page.getByTestId('bar-layer-more')).toHaveAccessibleName('Arrange')
+    expect((await barItems(page)).at(-1)).toBe('arrange')
+    const menu = await arrangeMenu(page)
+    await expect(page.getByTestId('bar-arrange')).toHaveAccessibleName('Arrange')
     await expect(menu.getByTestId('more-order')).toBeVisible()
     await expect(menu.getByTestId('more-line-up')).toBeVisible()
     await expect(menu.getByRole('spinbutton', { name: 'Rotation in degrees' })).toBeVisible()
@@ -118,16 +118,16 @@ test.describe('at 1280×760', () => {
     await page.keyboard.press('Escape')
 
     await selectLayers(page, ['words'], { bar: true })
-    expect((await barItems(page)).at(-1)).toBe('layer-more')
-    const text = await layerMore(page)
+    expect((await barItems(page)).at(-1)).toBe('arrange')
+    const text = await arrangeMenu(page)
     await expect(text.locator('[data-testid^="more-"], [data-scrub]')).toHaveCount(4)
     await expect(text.getByTestId('more-text-direction')).toBeVisible()
     await page.keyboard.press('Escape')
 
     // Several layers line up from the bar's own Line up, so their ⋯ has no Line up.
     await selectLayers(page, ['shape', 'turned'], { bar: true })
-    expect((await barItems(page)).at(-1)).toBe('layer-more')
-    const several = await layerMore(page)
+    expect((await barItems(page)).at(-1)).toBe('arrange')
+    const several = await arrangeMenu(page)
     await expect(several.getByTestId('more-order')).toBeVisible()
     await expect(several.getByTestId('more-line-up')).toHaveCount(0)
     expect(errors).toEqual([])
@@ -147,25 +147,25 @@ test.describe('at 1280×760', () => {
     await undoRedo(page, top, before, back)
 
     const x = async () => (await props(page, 'shape')).x
-    await (await layerMoreSubmenu(page, 'line-up')).getByRole('button', { name: 'Align left' }).click()
+    await (await arrangeSubmenu(page, 'line-up')).getByRole('button', { name: 'Align left' }).click()
     await expect.poll(x).toBe(0)
     await page.keyboard.press('Escape')
     await page.keyboard.press('Escape')
-    await expect(page.getByTestId('bar-layer-more-menu')).toBeHidden()
+    await expect(page.getByTestId('bar-arrange-menu')).toBeHidden()
     await undoRedo(page, x, 120, 0)
 
     const rotation = async () => (await props(page, 'shape')).rotation ?? 0
-    await enter((await layerMore(page)).getByRole('spinbutton', { name: 'Rotation in degrees' }), '45')
+    await enter((await arrangeMenu(page)).getByRole('spinbutton', { name: 'Rotation in degrees' }), '45')
     await expect.poll(rotation).toBe(45)
     await page.keyboard.press('Escape')
     await undoRedo(page, rotation, 0, 45)
 
     await selectLayers(page, ['words'], { bar: true })
     const direction = async () => (await read(page)).nodes.words?.props.direction ?? 'auto'
-    const directions = await layerMoreSubmenu(page, 'text-direction')
+    const directions = await arrangeSubmenu(page, 'text-direction')
     await expect(directions.locator('[data-direction="auto"]')).toHaveAttribute('aria-pressed', 'true')
     await directions.getByRole('button', { name: 'Right to left' }).click()
-    await expect(page.getByTestId('bar-layer-more-menu')).toBeHidden()
+    await expect(page.getByTestId('bar-arrange-menu')).toBeHidden()
     await expect.poll(direction).toBe('rtl')
     await undoRedo(page, direction, 'auto', 'rtl')
     expect(errors).toEqual([])
@@ -182,7 +182,7 @@ test.describe('at 1280×760', () => {
       return { x, y }
     }
     const at = await where()
-    const more = page.getByTestId('bar-layer-more')
+    const more = page.getByTestId('bar-arrange')
     await page.getByTestId('top-bar-row').locator('[data-bar-item]').first().focus()
     await page.keyboard.press('End')
     await expect(more).toBeFocused()
@@ -192,7 +192,7 @@ test.describe('at 1280×760', () => {
     expect(await where()).toEqual(at)
 
     await page.keyboard.press('Enter')
-    const menu = page.getByTestId('bar-layer-more-menu')
+    const menu = page.getByTestId('bar-arrange-menu')
     await expect(menu).toBeVisible()
     await expect(menu.getByTestId('more-order')).toBeFocused()
     await page.keyboard.press('ArrowRight')
@@ -235,7 +235,7 @@ test.describe('at 1280×760', () => {
     const { page, errors } = await openStage(browser, design())
     await page.setViewportSize({ width: 1280, height: 760 })
     await selectLayers(page, ['turned'], { bar: true })
-    const field = (await layerMore(page)).getByRole('spinbutton', { name: 'Rotation in degrees' })
+    const field = (await arrangeMenu(page)).getByRole('spinbutton', { name: 'Rotation in degrees' })
     await expect(field).toHaveValue('30')
     await enter(field, '-15')
     const rotation = async () => (await props(page, 'turned')).rotation
@@ -251,7 +251,7 @@ test.describe('at 1280×760', () => {
       // Plus 0, so a left just under 0 that rounds to -0 reads as 0.
       return Math.round(x + width / 2 - (width * Math.abs(Math.cos(turn)) + height * Math.abs(Math.sin(turn))) / 2) + 0
     }
-    await (await layerMoreSubmenu(page, 'line-up')).getByRole('button', { name: 'Align left' }).click()
+    await (await arrangeSubmenu(page, 'line-up')).getByRole('button', { name: 'Align left' }).click()
     await expect.poll(drawnLeft).toBe(0)
     expect(await rotation()).toBe(30)
     await page.keyboard.press('Escape')
@@ -266,7 +266,7 @@ test.describe('at 1280×760', () => {
     const { page, errors } = await openStage(browser, design())
     await page.setViewportSize({ width: 1280, height: 760 })
     await selectLayers(page, ['one'], { bar: true })
-    const menu = await layerMore(page)
+    const menu = await arrangeMenu(page)
     const lineUp = menu.getByTestId('more-line-up')
     await expect(lineUp).toHaveAttribute('aria-disabled', 'true')
     await expect(lineUp).toHaveAttribute('title', 'Auto layout places this layer')
@@ -282,14 +282,14 @@ test.describe('at 1280×760', () => {
     await undoRedo(page, row, ['one', 'two'], ['two', 'one'])
 
     const rotation = async () => (await props(page, 'one')).rotation ?? 0
-    await enter((await layerMore(page)).getByRole('spinbutton', { name: 'Rotation in degrees' }), '20')
+    await enter((await arrangeMenu(page)).getByRole('spinbutton', { name: 'Rotation in degrees' }), '20')
     await expect.poll(rotation).toBe(20)
     await page.keyboard.press('Escape')
     await undoRedo(page, rotation, 0, 20)
 
     // Set to keep where it is, the layer lines up again.
     await page.evaluate(() => window.dazbee?.session.run('node.update', { ids: ['one'], patch: { absolute: true } }))
-    await expect((await layerMore(page)).getByTestId('more-line-up')).not.toHaveAttribute('aria-disabled')
+    await expect((await arrangeMenu(page)).getByTestId('more-line-up')).not.toHaveAttribute('aria-disabled')
     expect(errors).toEqual([])
   })
 
@@ -299,8 +299,8 @@ test.describe('at 1280×760', () => {
     await page.evaluate(() => window.dazbee?.setLocked(['shape'], true))
     await selectLayers(page, ['shape'], { bar: true })
     await expect(page.getByTestId('bar-locked')).toBeVisible()
-    expect(await barItems(page)).toEqual(['locked', 'layer-more'])
-    const menu = await layerMore(page)
+    expect(await barItems(page)).toEqual(['locked', 'arrange'])
+    const menu = await arrangeMenu(page)
     await expect(menu.locator('[data-testid^="more-"], [data-scrub]')).toHaveCount(1)
     const before = await order(page)
     await orderMove(page, 'Bring to front')
@@ -317,7 +317,7 @@ test("on a phone the ⋯ stays at the bar's end and opens as a sheet at the bott
   await fitSettled(page)
   // A text's bar, the longest, scrolls sideways under its ⋯, which shows whole at its end.
   await selectLayers(page, ['words'], { bar: true })
-  const more = page.getByTestId('bar-layer-more')
+  const more = page.getByTestId('bar-arrange')
   const bar = await page.getByTestId('top-bar-row').boundingBox()
   const button = await more.boundingBox()
   expect(bar && button && button.x + button.width <= bar.x + bar.width && button.x >= bar.x).toBe(true)
@@ -332,7 +332,7 @@ test("on a phone the ⋯ stays at the bar's end and opens as a sheet at the bott
   await page.locator('[data-panel="layers"]').click()
   await expect(page.getByTestId('flyout')).toBeVisible()
   await more.click()
-  const sheet = page.getByTestId('bar-layer-more-menu')
+  const sheet = page.getByTestId('bar-arrange-menu')
   await expect(sheet).toBeVisible()
   await expect(sheet).toHaveAttribute('data-sheet', 'true')
   await expect(page.getByTestId('flyout')).toHaveCount(0)
@@ -351,7 +351,7 @@ test("on a phone the ⋯ stays at the bar's end and opens as a sheet at the bott
     expect(height).toBeGreaterThanOrEqual(44)
   expect(await layoutProblems(page, { pieces: PIECES, uncut: UNCUT })).toEqual([])
 
-  const moves = await layerMoreSubmenu(page, 'order')
+  const moves = await arrangeSubmenu(page, 'order')
   for (const row of await moves.getByRole('button').all()) {
     const at = await row.boundingBox()
     expect(at && at.x >= 0 && at.x + at.width <= 390 && at.y >= 0 && at.y + at.height <= 844).toBe(true)
@@ -374,18 +374,18 @@ test('at each screen size the ⋯ and the menus beside its rows meet nothing and
     await fitSettled(page)
     for (const id of ['words', 'shape']) {
       await selectLayers(page, [id], { bar: true })
-      await layerMore(page)
+      await arrangeMenu(page)
       await nextFrame(page)
       expect(await layoutProblems(page, { pieces: PIECES, uncut: UNCUT }), `${width} ${id} ⋯`).toEqual([])
       for (const sub of ['order', 'line-up']) {
-        await layerMoreSubmenu(page, sub)
+        await arrangeSubmenu(page, sub)
         await nextFrame(page)
         expect(await layoutProblems(page, { pieces: PIECES, uncut: UNCUT }), `${width} ${id} ${sub}`).toEqual([])
         await page.keyboard.press('Escape')
         await expect(page.getByTestId(`more-${sub}-menu`)).toBeHidden()
       }
       await page.keyboard.press('Escape')
-      await expect(page.getByTestId('bar-layer-more-menu')).toBeHidden()
+      await expect(page.getByTestId('bar-arrange-menu')).toBeHidden()
     }
   }
   expect(errors).toEqual([])
@@ -412,20 +412,20 @@ for (const theme of ['dark', 'light'] as const)
           await selectLayers(page, [id], { bar: true })
           // Opened by a mouse with no focus left from the keys before, as a person clicking it sees it.
           await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur())
-          await page.getByTestId('bar-layer-more').click()
-          await expect(page.getByTestId('bar-layer-more-menu')).toBeVisible()
+          await page.getByTestId('bar-arrange').click()
+          await expect(page.getByTestId('bar-arrange-menu')).toBeVisible()
           await shot(`${id === 'words' ? 'text' : 'shape'}-${width}`)
           await page.keyboard.press('Escape')
-          await expect(page.getByTestId('bar-layer-more-menu')).toBeHidden()
+          await expect(page.getByTestId('bar-arrange-menu')).toBeHidden()
         }
         await selectLayers(page, ['words'], { bar: true })
         for (const sub of ['order', 'line-up']) {
           await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur())
-          await layerMoreSubmenu(page, sub)
+          await arrangeSubmenu(page, sub)
           await shot(`${sub}-${width}`)
           await page.keyboard.press('Escape')
           await page.keyboard.press('Escape')
-          await expect(page.getByTestId('bar-layer-more-menu')).toBeHidden()
+          await expect(page.getByTestId('bar-arrange-menu')).toBeHidden()
         }
       }
       expect(errors).toEqual([])

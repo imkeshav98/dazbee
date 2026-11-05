@@ -166,15 +166,16 @@ export async function moreSubmenu(page: Page, id: string) {
 }
 
 /**
- * Opens the top bar's ⋯ for the selected layers, unless it is open, and gives it once it shows: how
- * they sit (Order ▸, Line up ▸, the rotation field, Text direction ▸). On a phone it is a sheet.
+ * Opens the top bar's Arrange ⋯ for the selected layers, unless it is open, and gives it once it
+ * shows: how they sit (Order ▸, Line up ▸, the rotation field, Text direction ▸). On a phone it is a
+ * sheet.
  */
-export const layerMore = (page: Page) => barMenu(page, 'layer-more')
+export const arrangeMenu = (page: Page) => barMenu(page, 'arrange')
 
-/** Opens the menu beside one of the top bar ⋯'s rows, `more-<id>` (order, line-up, text-direction), and gives it once it shows. */
-export async function layerMoreSubmenu(page: Page, id: string) {
+/** Opens the menu beside one of Arrange ⋯'s rows, `more-<id>` (order, line-up, text-direction), and gives it once it shows. */
+export async function arrangeSubmenu(page: Page, id: string) {
   const sub = page.getByTestId(`more-${id}-menu`)
-  if (!(await sub.isVisible())) await (await layerMore(page)).getByTestId(`more-${id}`).click()
+  if (!(await sub.isVisible())) await (await arrangeMenu(page)).getByTestId(`more-${id}`).click()
   await expect(sub).toBeVisible()
   return sub
 }

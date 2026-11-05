@@ -1,9 +1,9 @@
 'use client'
 
-// The top bar's ⋯ for the selected layers, its last item: how they sit. Order ▸, Line up ▸ (with
-// the frame, for one layer), the rotation field, and Text direction ▸ for text, each shown only
-// where it applies (`topBarMoreRows`). It opens under the bar, and on a phone as a sheet at the
-// bottom of the screen. Every row runs the same editor action as its shortcut.
+// The top bar's Arrange ⋯ for the selected layers, its last item: how they sit. Order ▸, Line up ▸
+// (with the frame, for one layer), the rotation field, and Text direction ▸ for text, each shown only
+// where it applies (`arrangeRows`). It opens under the bar, and on a phone as a sheet at the bottom
+// of the screen. Every row runs the same editor action as its shortcut.
 import { DotsThreeIcon } from '@phosphor-icons/react'
 
 import type { Editor } from '@dazbee/editor'
@@ -15,7 +15,7 @@ import { factsOf, set, shared, type Target } from '@/components/editor/edit-pane
 import { setOpen, useEditState } from '@/components/editor/edit-store.ts'
 import { ICON_BUTTON, MENU_DIVIDER, MENU_ITEM, MENU_KEY } from '@/components/editor/styles.ts'
 import { cn } from '@/lib/cn.ts'
-import { topBarMoreRows } from '@/lib/editor/arrange-menu.ts'
+import { arrangeRows } from '@/lib/editor/arrange-menu.ts'
 import { useMessages } from '@/lib/i18n/client.tsx'
 import { format } from '@/lib/i18n/index.ts'
 
@@ -25,31 +25,28 @@ import { SubMenu } from './layer-actions.tsx'
 /** The four moves along the stack: to the front, forward, backward, to the back. */
 export const ORDER = ['bringToFront', 'bringForward', 'sendBackward', 'sendToBack'] as const
 
-/** The top bar's ⋯ for the selected layers: its button, and the menu it opens with the rows that apply. */
-export function TopBarMore({ target, design }: { target: Target; design: Design }) {
+/**
+ * The top bar's Arrange ⋯ for the selected layers: its button, and the menu it opens with the rows
+ * that apply. `locked` says some of the layers are locked, as the bar has worked out.
+ */
+export function ArrangeMenu({ target, design, locked }: { target: Target; design: Design; locked: boolean }) {
   const t = useMessages()
   const b = t.editor.bar
   const { open } = useEditState()
   const { editor } = target
-  const rows = topBarMoreRows({
-    types: target.types,
-    locked: target.ids.some((id) => Object.values(design.nodes[id]?.lock ?? {}).some(Boolean)),
-    // Placed by its auto layout box: in the box's flow, and not set to keep where it is.
-    placed: factsOf(target, design).inFlow && target.props.every((pr) => pr.absolute !== true),
-  })
+  const rows = arrangeRows({ ...factsOf(target, design), several: target.ids.length > 1, locked })
   const done = () => setOpen(null)
   const direction = shared(target.props.map((pr) => (pr.direction ?? 'auto') as 'auto' | 'ltr' | 'rtl'))
   return (
     <BarPopover
-      id="layer-more"
+      id="arrange"
       open={open}
       onOpen={setOpen}
       label={b.arrange}
       face={<DotsThreeIcon size={18} weight="bold" aria-hidden />}
       caret={false}
       align="end"
-      sheet
-      testId="layer-more"
+      testId="arrange"
       className="w-64"
     >
       {rows.map((row) => {

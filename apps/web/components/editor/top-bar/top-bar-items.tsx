@@ -1,7 +1,7 @@
 'use client'
 
 // The top bar's items for what is selected: text, a photo, a shape, a box or several layers, each
-// with the buttons and pop-ups it offers, and last the ⋯ with how the layers sit.
+// with the buttons and pop-ups it offers, and last Arrange ⋯ with how the layers sit.
 import {
   AlignLeftIcon,
   ArrowsClockwiseIcon,
@@ -64,7 +64,7 @@ import { cn } from '@/lib/cn.ts'
 import { hexOf } from '@/lib/colour.ts'
 import { useMessages } from '@/lib/i18n/client.tsx'
 
-import { AlignRow, TopBarMore } from './arrange-menu.tsx'
+import { AlignRow, ArrangeMenu } from './arrange-menu.tsx'
 import { BarPopover } from './bar-popover.tsx'
 import { SizeStepper } from './size-stepper.tsx'
 
@@ -121,8 +121,8 @@ export function useSelectionItems(target: Target, design: Design, brandId: strin
     )
   const popup = (id: string) => <PopupContent popup={id} target={target} design={design} />
 
-  // A locked layer's settings would all be refused: its bar says it is locked, and unlocks it; its ⋯
-  // keeps Order, which no lock refuses.
+  // A locked layer's settings would all be refused: its bar says it is locked, and unlocks it; its
+  // Arrange ⋯ keeps Order, which no lock refuses.
   const locked = target.ids.filter((id) => Object.values(design.nodes[id]?.lock ?? {}).some(Boolean))
   if (locked.length > 0) {
     add(
@@ -142,7 +142,7 @@ export function useSelectionItems(target: Target, design: Design, brandId: strin
         </button>
       </span>,
     )
-    add('layer-more', <TopBarMore target={target} design={design} />)
+    add('arrange', <ArrangeMenu target={target} design={design} locked />)
     return items
   }
 
@@ -429,7 +429,7 @@ export function useSelectionItems(target: Target, design: Design, brandId: strin
       </button>,
     )
   }
-  add('layer-more', <TopBarMore target={target} design={design} />)
+  add('arrange', <ArrangeMenu target={target} design={design} locked={false} />)
   return items
 }
 

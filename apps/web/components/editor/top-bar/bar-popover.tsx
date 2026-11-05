@@ -1,7 +1,7 @@
 'use client'
 
-// One button of the bar by the selection and the popover it opens under it, or, for a menu that
-// asks, at the bottom of a phone's screen as a sheet. The bar keeps which one is open, so only one
+// One button of the bar by the selection and the popover it opens under it, or, for a pop-up the
+// edit store names a sheet, at the bottom of a phone's screen. The bar keeps which one is open, so only one
 // is open at a time. Also the hooks the editor's menus share: the focus as a
 // popover opens and closes, Tab once into a toolbar, and a menu that shows it scrolls.
 import { CaretDownIcon } from '@phosphor-icons/react'
@@ -18,7 +18,7 @@ import {
   useState,
 } from 'react'
 
-import { useEditState, usePhone } from '@/components/editor/edit-store.ts'
+import { isSheet, useEditState, usePhone } from '@/components/editor/edit-store.ts'
 import { BAR_BUTTON, POPOVER } from '@/components/editor/styles.ts'
 import { useOverlayScroll } from '@/components/ui/overlay-scroll.ts'
 import { fadedEdges, useScrollEdges } from '@/components/ui/scroll-edges.ts'
@@ -178,7 +178,6 @@ export function BarPopover({
   className,
   caret = true,
   align = 'center',
-  sheet = false,
   buttonRef,
 }: {
   id: string
@@ -196,16 +195,15 @@ export function BarPopover({
   caret?: boolean
   /** Where the popover lines up under its button: its middle, or its end, as a menu of actions does. */
   align?: 'center' | 'end'
-  /** Whether it opens as a sheet at the bottom of the screen on a phone, as an edit panel does. */
-  sheet?: boolean
   /** Given the button, for a control that gives the focus back to it later. */
   buttonRef?: RefObject<HTMLButtonElement | null>
 }) {
   const focus = useMenuFocus()
   const shown = open === id
   const phone = usePhone()
-  // On a phone the anchor is the screen's bottom edge; Radix's trigger width is the anchor's.
-  const asSheet = sheet && phone
+  // A sheet on a phone, as `isSheet` names it: the anchor is the screen's bottom edge, and Radix's
+  // trigger width is the anchor's.
+  const asSheet = phone && isSheet(id)
   // Measured as it opens, and again when the bar's bottom moves, as when its second row opens.
   const { barBottom } = useEditState()
   const [below, setBelow] = useState(GAP)

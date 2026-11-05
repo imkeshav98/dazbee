@@ -11,7 +11,7 @@ import { layoutProblems } from '../../support/layout.ts'
 import { frameDesign } from '../../support/seed.ts'
 import { nextFrame, openStage, read, selection, selectLayers } from '../../support/stage.ts'
 import { expect, type Page, test } from '../../support/test.ts'
-import { barMenu, layerMore, layerMoreSubmenu, PIECES, UNCUT } from '../../support/top-bar.ts'
+import { arrangeMenu, arrangeSubmenu, barMenu, PIECES, UNCUT } from '../../support/top-bar.ts'
 import { topBarDesign } from '../../support/top-bar-design.ts'
 
 test.describe.configure({ timeout: 240_000 })
@@ -505,16 +505,16 @@ test.describe('the focus as a menu of the bar closes', () => {
   }) => {
     const { page, errors } = await openStage(browser, oneLayer())
     await selectLayers(page, ['a'])
-    const order = await layerMoreSubmenu(page, 'order')
+    const order = await arrangeSubmenu(page, 'order')
     expect(await order.evaluate((menu) => menu.contains(document.activeElement))).toBe(true)
 
-    await keyThen(page, { key: 'Escape', closed: 'more-order-menu', next: 'esc', then: '!bar-layer-more-menu' })
+    await keyThen(page, { key: 'Escape', closed: 'more-order-menu', next: 'esc', then: '!bar-arrange-menu' })
     await timers(page)
 
     expect(await selection(page)).toEqual(['a'])
-    await expect(page.getByTestId('bar-layer-more-menu')).toBeHidden()
-    await expect(page.getByTestId('bar-layer-more')).toBeVisible()
-    await expect(page.getByTestId('bar-layer-more')).toBeFocused()
+    await expect(page.getByTestId('bar-arrange-menu')).toBeHidden()
+    await expect(page.getByTestId('bar-arrange')).toBeVisible()
+    await expect(page.getByTestId('bar-arrange')).toBeFocused()
     expect(errors).toEqual([])
   })
 
@@ -523,15 +523,15 @@ test.describe('the focus as a menu of the bar closes', () => {
   }) => {
     const { page, errors } = await openStage(browser, oneLayer())
     await selectLayers(page, ['a'])
-    const order = await layerMoreSubmenu(page, 'order')
+    const order = await arrangeSubmenu(page, 'order')
     expect(await order.evaluate((menu) => menu.contains(document.activeElement))).toBe(true)
 
-    await keyThen(page, { key: 'ArrowLeft', closed: 'more-order-menu', next: 'esc', then: '!bar-layer-more-menu' })
+    await keyThen(page, { key: 'ArrowLeft', closed: 'more-order-menu', next: 'esc', then: '!bar-arrange-menu' })
     await timers(page)
 
     expect(await selection(page)).toEqual(['a'])
-    await expect(page.getByTestId('bar-layer-more')).toBeVisible()
-    await expect(page.getByTestId('bar-layer-more')).toBeFocused()
+    await expect(page.getByTestId('bar-arrange')).toBeVisible()
+    await expect(page.getByTestId('bar-arrange')).toBeFocused()
     expect(errors).toEqual([])
   })
 
@@ -540,7 +540,7 @@ test.describe('the focus as a menu of the bar closes', () => {
   }) => {
     const { page, errors } = await openStage(browser, oneLayer())
     await selectLayers(page, ['a'])
-    const more = await layerMore(page)
+    const more = await arrangeMenu(page)
     const rotation = more.getByRole('spinbutton', { name: 'Rotation in degrees' })
     await rotation.fill('45')
     await expect(rotation).toBeFocused()
@@ -551,7 +551,7 @@ test.describe('the focus as a menu of the bar closes', () => {
 
     expect((await read(page)).nodes.a?.props.rotation).toBe(0)
     expect(await selection(page)).toEqual(['a'])
-    await expect(page.getByTestId('bar-layer-more')).toBeFocused()
+    await expect(page.getByTestId('bar-arrange')).toBeFocused()
     expect(errors).toEqual([])
   })
 })

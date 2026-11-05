@@ -2,9 +2,9 @@
 
 // What the top bar has open: one pop-up, the full menu or one edit panel, never two at once, since
 // they share this one value. Opening any of them closes what was open. The shell reads it too: on a
-// phone an edit panel, and the top bar's ⋯, is a sheet, and a rail flyout and a sheet close each other. And whether
-// something stands over the edit panel and the bar's second row, which Esc closes first; and the
-// menu's button a rename field gives the focus back to.
+// phone an edit panel, and the top bar's Arrange ⋯, is a sheet, and a rail flyout and a sheet close
+// each other. And whether something stands over the edit panel and the bar's second row, which Esc
+// closes first; and the menu's button a rename field gives the focus back to.
 import { useEffect, useState, useSyncExternalStore } from 'react'
 
 import { OVER_PANEL } from '@/components/ui/menu-close.ts'
@@ -15,8 +15,8 @@ const LAYER_PANELS = ['font', 'colour', 'spacing', 'effects', 'position', 'edit'
 const DESIGN_PANELS = ['pages', 'background'] as const
 /** Every id that opens the edit panel; every other id is a pop-up or the full menu. */
 const PANELS = [...LAYER_PANELS, ...DESIGN_PANELS] as const
-/** The top bar's pop-ups that open as a sheet at the bottom on a phone, as an edit panel does: the layers' ⋯. */
-const SHEET_POPUPS = ['layer-more'] as const
+/** The top bar's pop-ups that open as a sheet at the bottom on a phone, as an edit panel does: Arrange ⋯. */
+const SHEET_POPUPS = ['arrange'] as const
 export type LayerPanelId = (typeof LAYER_PANELS)[number]
 export type PanelId = (typeof PANELS)[number]
 
@@ -48,7 +48,7 @@ const subscribe = (listener: () => void) => {
 export const isPanel = (id: string | null): id is PanelId => (PANELS as readonly string[]).includes(id ?? '')
 export const isLayerPanel = (id: string | null): id is LayerPanelId =>
   (LAYER_PANELS as readonly string[]).includes(id ?? '')
-/** Whether what is open is a sheet at the bottom on a phone: every edit panel but Pages, and the layers' ⋯. */
+/** Whether what is open is a sheet at the bottom on a phone: every edit panel but Pages, and Arrange ⋯. */
 export const isSheet = (id: string | null) =>
   (isPanel(id) && id !== 'pages') || (SHEET_POPUPS as readonly string[]).includes(id ?? '')
 

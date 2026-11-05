@@ -5,7 +5,7 @@ import { assets, doc, fills, props, setupInventory, step, style } from '../../su
 import { copyIn } from '../../support/seed.ts'
 import { selectLayers } from '../../support/stage.ts'
 import { expect, test } from '../../support/test.ts'
-import { barMenu, layerMoreSubmenu, moreAction, openCard } from '../../support/top-bar.ts'
+import { arrangeSubmenu, barMenu, moreAction, openCard } from '../../support/top-bar.ts'
 
 const row = setupInventory()
 
@@ -35,8 +35,7 @@ test.describe('top bar and full menu', () => {
     await selectLayers(page, ['headline'], { bar: true })
     await step(
       page,
-      async () =>
-        (await layerMoreSubmenu(page, 'text-direction')).getByRole('button', { name: 'Right to left' }).click(),
+      async () => (await arrangeSubmenu(page, 'text-direction')).getByRole('button', { name: 'Right to left' }).click(),
       async () => {
         await expect.poll(async () => (await props(page, 'headline')).direction).toBe('rtl')
       },

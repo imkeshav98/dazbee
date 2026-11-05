@@ -185,9 +185,9 @@ export function EditorShell({
     ai: t.editor.aiEmpty,
     brand: t.editor.brandEmpty,
   }
-  // What the top bar has open: on a phone an edit panel, or the top bar's ⋯, is a sheet, which hides
-  // the tab bar and the dock, and a sheet and a rail flyout close each other. Pages drops under its
-  // button instead.
+  // What the top bar has open: on a phone an edit panel, or the top bar's Arrange ⋯, is a sheet,
+  // which hides the tab bar and the dock, and a sheet and a rail flyout close each other. Pages
+  // drops under its button instead.
   const edit = useEditState()
   const panelOnPhone = phone && (isPanel(edit.open) || isSheet(edit.open))
   const sheet = phone && isSheet(edit.open)

@@ -7,7 +7,7 @@ import { screenPoint, writeOutput } from '../../support/editor.ts'
 import { frameDesign } from '../../support/seed.ts'
 import { openStage, selectLayers } from '../../support/stage.ts'
 import { expect, type Page, test } from '../../support/test.ts'
-import { closeBarMenu, layerMore, layerMoreSubmenu, moreAction } from '../../support/top-bar.ts'
+import { arrangeMenu, arrangeSubmenu, closeBarMenu, moreAction } from '../../support/top-bar.ts'
 
 test.describe.configure({ timeout: 120_000 })
 
@@ -53,19 +53,19 @@ test("one layer has its actions in the full menu and the right-click menu, and i
 }) => {
   const { page, errors } = await openStage(browser, design())
   const more = (name: string) => moreAction(page, name)
-  const sit = async (name: string) => moreAction(page, name, await layerMore(page))
+  const sit = async (name: string) => moreAction(page, name, await arrangeMenu(page))
 
   // One layer's order is in the menu beside Order in the top bar's ⋯, each move with its shortcut.
   await selectLayers(page, ['a'])
-  const menu = await layerMore(page)
-  await expect((await layerMoreSubmenu(page, 'order')).getByRole('button', { name: 'Bring forward' })).toContainText(
+  const menu = await arrangeMenu(page)
+  await expect((await arrangeSubmenu(page, 'order')).getByRole('button', { name: 'Bring forward' })).toContainText(
     'Ctrl+]',
   )
   await page.evaluate(() => window.dazbee?.drawn())
   writeOutput('arrange-actions-more.png', await page.screenshot())
   // Esc closes the menu beside, then the top bar's ⋯.
   await closeBarMenu(page, 'more-order')
-  await closeBarMenu(page, 'bar-layer-more')
+  await closeBarMenu(page, 'bar-arrange')
   await expect(menu).toBeHidden()
 
   await sit('Bring to front')

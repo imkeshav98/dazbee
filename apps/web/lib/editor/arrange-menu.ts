@@ -1,30 +1,37 @@
-// The rows of the top bar's ⋯ for the selected layers: how they sit. Each row shows only where it
-// applies to the selection, and Line up is greyed out, with the reason, while it has nothing to do.
-/** One row of the top bar's ⋯, and why it is greyed out when it is. */
-export type TopBarMoreRow = { row: 'order' | 'rotation' | 'textDirection' } | { row: 'lineUp'; off?: 'placedByLayout' }
+// The rows of the top bar's Arrange ⋯ for the selected layers: how they sit. Each row shows only
+// where it applies to the selection, and Line up is greyed out, with the reason, while it has
+// nothing to do.
 
-/** What the rows depend on: the selected layers' types, and whether they are locked or placed by an auto layout. */
-export interface TopBarMoreOf {
-  /** Each selected layer's type, as a layer's `type` names it. */
-  types: readonly string[]
+/** Why a row of the Arrange ⋯ is greyed out. */
+export type ArrangeWhy = 'placedByLayout'
+
+/** One row of the Arrange ⋯, and why it is greyed out when it is. */
+export type ArrangeRow = { row: 'order' | 'lineUp' | 'rotation' | 'textDirection'; off?: ArrangeWhy }
+
+/** What the rows depend on: the facts the top bar reads of the selected layers, and their lock. */
+export interface ArrangeOf {
+  /** More than one layer is selected. */
+  several: boolean
+  /** None of the layers is a group or a boolean, which turn with what they hold. */
+  sized: boolean
+  /** Every layer is text. */
+  texts: boolean
+  /** Every layer is placed by its auto layout box: in the box's flow, and not set to keep where it is. */
+  placed: boolean
   /** Some of the layers are locked. */
   locked: boolean
-  /** Every layer is in an auto layout box's flow, so the box places it. */
-  placed: boolean
 }
 
 /**
  * The rows for a selection, in order: Order ▸ always; Line up ▸ for one layer, as several have the
- * bar's own Line up; the rotation field unless a group or boolean is selected, which turn with what
- * they hold; Text direction ▸ when every layer is text. A locked layer keeps only Order, the one
- * row its lock doesn't refuse.
+ * bar's own Line up; the rotation field unless a group or boolean is selected; Text direction ▸ when
+ * every layer is text. A locked layer keeps only Order, the one row its lock doesn't refuse.
  */
-export function topBarMoreRows({ types, locked, placed }: TopBarMoreOf): TopBarMoreRow[] {
-  if (types.length === 0) return []
-  const rows: TopBarMoreRow[] = [{ row: 'order' }]
+export function arrangeRows({ several, sized, texts, placed, locked }: ArrangeOf): ArrangeRow[] {
+  const rows: ArrangeRow[] = [{ row: 'order' }]
   if (locked) return rows
-  if (types.length === 1) rows.push(placed ? { row: 'lineUp', off: 'placedByLayout' } : { row: 'lineUp' })
-  if (types.every((type) => type !== 'group' && type !== 'boolean')) rows.push({ row: 'rotation' })
-  if (types.every((type) => type === 'text')) rows.push({ row: 'textDirection' })
+  if (!several) rows.push(placed ? { row: 'lineUp', off: 'placedByLayout' } : { row: 'lineUp' })
+  if (sized) rows.push({ row: 'rotation' })
+  if (texts) rows.push({ row: 'textDirection' })
   return rows
 }

@@ -8,7 +8,7 @@ import { layoutProblems, rowHeights, scrolling } from '../../support/layout.ts'
 import { seed } from '../../support/seed.ts'
 import { drawn, fitSettled, nextFrame, openStage, selectLayers } from '../../support/stage.ts'
 import { expect, test } from '../../support/test.ts'
-import { barMenu, layerMore, layerMoreSubmenu, moreMenu, PIECES, UNCUT, zoomMenu } from '../../support/top-bar.ts'
+import { arrangeMenu, arrangeSubmenu, barMenu, moreMenu, PIECES, UNCUT, zoomMenu } from '../../support/top-bar.ts'
 import { topBarDesign } from '../../support/top-bar-design.ts'
 
 test.describe.configure({ timeout: 240_000 })
@@ -163,7 +163,7 @@ test.describe('on a phone, 390×844', () => {
     for (const height of await rowHeights(full, ':scope > button')) expect(height).toBeGreaterThanOrEqual(44)
     await page.keyboard.press('Escape')
 
-    const sit = await layerMore(page)
+    const sit = await arrangeMenu(page)
     await expect(sit.locator('[data-scrub]')).toHaveCount(1)
     for (const height of await rowHeights(sit, ':scope > button, [data-scrub]'))
       expect(height).toBeGreaterThanOrEqual(44)
@@ -244,7 +244,7 @@ test.describe('on a phone, 390×844', () => {
     await page.setViewportSize({ width: 390, height: 844 })
     await fitSettled(page)
     await selectLayers(page, ['box'], { bar: true })
-    const order = await layerMoreSubmenu(page, 'order')
+    const order = await arrangeSubmenu(page, 'order')
     for (const row of await order.getByRole('button').all()) {
       const box = await row.boundingBox()
       expect(box && box.x >= 0 && box.x + box.width <= 390 && box.y >= 0 && box.y + box.height <= 844).toBe(true)

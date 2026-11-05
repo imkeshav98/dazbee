@@ -62,10 +62,10 @@ const SPREAD = [
 export function PositionPanel({ target, design }: PanelProps) {
   const t = useMessages()
   const p = t.editor.props
-  const { inFlow } = factsOf(target, design)
+  const { inFlow, placed } = factsOf(target, design)
   return (
     <>
-      <ArrangePart target={target} placed={inFlow && target.props.every((pr) => pr.absolute !== true)} />
+      <ArrangePart target={target} placed={placed} />
       <PlaceCard target={target} p={p} title={t.editor.bar.advanced}>
         {inFlow && <FlowPart target={target} p={p} />}
       </PlaceCard>

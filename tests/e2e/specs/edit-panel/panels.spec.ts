@@ -356,7 +356,7 @@ test.describe('found by QA', () => {
     const items = page.getByTestId('top-bar').locator('[data-item]')
     await expect(items).toHaveCount(2)
     await expect(page.getByTestId('bar-locked')).toContainText('Locked')
-    await expect(page.getByTestId('bar-layer-more')).toBeVisible()
+    await expect(page.getByTestId('bar-arrange')).toBeVisible()
     await expect(page.getByTestId('bar-effects')).toHaveCount(0)
     await expect(page.getByTestId('bar-position')).toHaveCount(0)
     writeOutput('locked-bar.png', await page.screenshot({ animations: 'disabled' }))

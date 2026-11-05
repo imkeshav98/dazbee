@@ -5,7 +5,7 @@ import { choose, enter } from '../../support/fields.ts'
 import { doc, fills, props, setupInventory, solid, step, style } from '../../support/inventory.ts'
 import { perform, selectLayers } from '../../support/stage.ts'
 import { expect, type Page, test } from '../../support/test.ts'
-import { barMenu, fillList, layerMore, moreAction, openCard } from '../../support/top-bar.ts'
+import { arrangeMenu, barMenu, fillList, moreAction, openCard } from '../../support/top-bar.ts'
 
 const row = setupInventory()
 
@@ -42,7 +42,7 @@ test.describe('every selection', () => {
     await selectLayers(page, ['box'], { bar: true })
     await step(
       page,
-      async () => enter((await layerMore(page)).getByRole('spinbutton', { name: 'Rotation in degrees' }), '15'),
+      async () => enter((await arrangeMenu(page)).getByRole('spinbutton', { name: 'Rotation in degrees' }), '15'),
       async () => {
         await expect.poll(async () => (await props(page, 'box')).rotation).toBe(15)
       },
@@ -266,7 +266,7 @@ test.describe('every selection', () => {
     const small = page.getByTestId('small-menu')
     // One layer's actions are in the full menu, and its order in the top bar's ⋯.
     const more = (name: string) => moreAction(page, name)
-    const sit = async (name: string) => moreAction(page, name, await layerMore(page))
+    const sit = async (name: string) => moreAction(page, name, await arrangeMenu(page))
     await step(
       page,
       async () => more('Duplicate'),
