@@ -1,15 +1,35 @@
-// The number fields' checks: a design with one box to type into and scrub, the screens they run
-// at (the phone's a touch screen), and the fields they press, by the name each field's input has.
+// The number inputs' checks: a design with a box and a headline to type into and scrub, the screens
+// they run at (the phone's a touch screen), the shared field's fields they press, by the name each
+// field's input has, every number input in the app and how to reach it, and readers of the caret
+// and of a selection's colours as drawn.
 import { decodePng, type Pixels, rgbaAt } from '@dazbee/pixels/pixels'
 import { loadCanvasKit } from '@dazbee/renderer/node'
 import type { DesignInput } from '@dazbee/schema'
 
+import { frameButton } from './add-frame.ts'
 import { SCREEN_SIZES } from './layout.ts'
 import { frameDesign } from './seed.ts'
-import type { Locator } from './test.ts'
+import { selectLayers } from './stage.ts'
+import type { Locator, Page } from './test.ts'
+import { openCard } from './top-bar.ts'
 
 /** A colour's red, green and blue. */
 export type Rgb = [number, number, number]
+
+/**
+ * A number input as the checks reach it, in the design `numberFieldsDesign` makes: the field around
+ * its input carries `data-knob`, and takes a press beside the digits.
+ */
+export interface NumberInput {
+  /** What the checks call it. */
+  name: string
+  /** The value it shows once opened. */
+  value: string
+  /** Opens what holds it and gives its input. */
+  open: (page: Page) => Promise<Locator>
+  /** What shows its edge while it is typed in, where that isn't the field around the input. */
+  edge?: (page: Page) => Locator
+}
 
 /** A screen the checks run at: its size, and whether it is a touch screen. */
 export interface FieldScreen {
@@ -27,6 +47,8 @@ export const FIELD_SCREENS: FieldScreen[] = SCREEN_SIZES.map(([width, height]) =
 
 /** The box's place and look, as the fields show them. */
 export const BOX = { x: 80, y: 120, width: 400, height: 300, opacity: 0.2 } as const
+/** The headline's font size, as the top bar shows it. */
+export const HEADLINE_SIZE = 64
 
 /** The fields pressed: two of Position's Advanced, and Opacity, whose fill spans its 0 to 100%. */
 export const FIELDS = {
@@ -36,7 +58,53 @@ export const FIELDS = {
   opacity: { card: 'appearance-card', name: 'Opacity' },
 } as const
 
-/** One frame holding one box, `box`, at BOX. */
+/**
+ * Every number input, each once: the shared field (X position), a colour's opacity beside its hex
+ * (the box's fill), the top bar's font size between − and + (the headline's), and the width of
+ * Add a frame's size of your own, which starts at the frame's.
+ */
+export const NUMBER_INPUTS: NumberInput[] = [
+  {
+    name: 'X position',
+    value: String(BOX.x),
+    open: async (page) => {
+      await selectLayers(page, ['box'], { card: FIELDS.x.card })
+      return (await openCard(page, FIELDS.x.card)).getByRole('spinbutton', { name: FIELDS.x.name, exact: true })
+    },
+  },
+  {
+    name: "a colour's opacity",
+    value: '100',
+    open: async (page) => {
+      await selectLayers(page, ['box'], { card: 'fill-card' })
+      return (await openCard(page, 'fill-card')).getByLabel('Colour 1 opacity', { exact: true })
+    },
+  },
+  {
+    name: 'the font size',
+    value: String(HEADLINE_SIZE),
+    open: async (page) => {
+      await selectLayers(page, ['headline'], { bar: true })
+      const input = page.getByTestId('bar-size-field')
+      if (!(await input.isVisible()) && (await page.getByTestId('bar-overflow').isVisible()))
+        await page.getByTestId('bar-overflow').click()
+      return input
+    },
+    edge: (page) => page.getByTestId('bar-size'),
+  },
+  {
+    name: "Add a frame's width",
+    value: '1080',
+    open: async (page) => {
+      await frameButton(page)
+      const input = page.getByTestId('own-width')
+      await input.scrollIntoViewIfNeeded()
+      return input
+    },
+  },
+]
+
+/** One frame holding a box, `box`, at BOX, and a headline, `headline`, under it. */
 export const numberFieldsDesign = (): DesignInput =>
   frameDesign({
     name: 'Number fields',
@@ -54,6 +122,21 @@ export const numberFieldsDesign = (): DesignInput =>
           opacity: BOX.opacity,
           shape: { kind: 'rect', cornerRadius: 24 },
           fills: [{ type: 'solid', color: '#3D6BFFFF' }],
+        },
+      },
+      headline: {
+        type: 'text',
+        parentId: 'sq',
+        index: 'a1',
+        name: 'Headline',
+        props: {
+          x: BOX.x,
+          y: 520,
+          width: 600,
+          height: 90,
+          boxMode: 'autoHeight',
+          text: 'Summer sale',
+          style: { fontFamily: 'Noto Sans', fontSize: HEADLINE_SIZE, fontWeight: 400, color: '#111111FF' },
         },
       },
     },
