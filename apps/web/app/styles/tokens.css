@@ -16,6 +16,8 @@
   --pressed: #342b3f;
   --line: #382f42;
   --line-strong: #4e4359;
+  /* A swatch's hairline ring, 3:1 against dark glass over any ad, so a dark colour shows on it. */
+  --swatch-ring: #ada4b5;
   --canvas: #100d14;
   --canvas-dot: #2e2638;
   --text: #f8f2fb;
@@ -68,6 +70,7 @@
   --pressed: #eae2da;
   --line: #e7dfe6;
   --line-strong: #cfc4cf;
+  --swatch-ring: #cfc4cf;
   --canvas: #f1ece5;
   --canvas-dot: #d9d0c8;
   --text: #1a1420;
@@ -136,6 +139,7 @@
   --color-pressed: var(--pressed);
   --color-line: var(--line);
   --color-line-strong: var(--line-strong);
+  --color-swatch-ring: var(--swatch-ring);
   --color-canvas: var(--canvas);
   --color-text: var(--text);
   --color-muted: var(--text-muted);

@@ -285,7 +285,7 @@ function live(
     autoLayoutDrag,
     frameMove,
     selectPress,
-    renameFrame: frameRenames.emit,
+    renameFrame: (frameId: string) => pickFrame(frameId, true),
     signal,
     drawOverlay,
   })
@@ -422,13 +422,14 @@ function live(
   }
   /**
    * Picks a frame of the shown page, ending typing, and with `rename` asks the page to rename it in
-   * place; any other frame lets the picked one go.
+   * place of its label, which the overlay leaves out meanwhile; any other frame lets the picked one go.
    */
   function pickFrame(frameId: string | null, rename = false) {
     const shown = frameOf(frameId ?? undefined)
     if (shown) typing.stop()
-    selection.pickFrame(shown?.id ?? null)
-    if (shown && rename) frameRenames.emit(shown.id)
+    if (!shown || !rename) return selection.pickFrame(shown?.id ?? null)
+    selection.renameFrame(shown.id)
+    frameRenames.emit(shown.id)
   }
   /** Fits a frame in view, showing its page first when another is shown. */
   function fitFrame(frameId: string) {
@@ -512,6 +513,7 @@ function live(
     onFramePick: (listener: (frameId: string | null) => void) => selection.onFramePick(listener),
     renameFrame: (frameId: string) => pickFrame(frameId, true),
     onFrameRename: frameRenames.on,
+    renamed: () => selection.renameFrame(null),
     onFrameDelete: actions.onFrameDelete,
     labelRect: overlay.labelRect,
     rulers: () => view.rulers(),

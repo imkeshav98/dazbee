@@ -43,6 +43,8 @@ export interface EditorSelection {
    * No layer is selected meanwhile; the frame's own keys act on it.
    */
   pickedFrame(): string | null
+  /** The picked frame the page renames in place of its label, which the overlay then leaves out; null with none. */
+  renamingFrame(): string | null
   /** The layer whose image fill is being cropped on the stage (#48). */
   cropping(): Picked | null
   /** The path layer whose points are being edited (#45), and which of its anchors are selected. */
@@ -69,6 +71,11 @@ export interface EditorSelection {
   dropOffPage(): void
   /** Picks a frame, or none with null, letting the selection go, and shows it. */
   pickFrame(frameId: string | null): void
+  /**
+   * Picks a frame for the page to rename in place of its label, and shows it; null once the rename
+   * ends. It ends too once the frame is let go or another is picked.
+   */
+  renameFrame(frameId: string | null): void
   /** Goes into a group or box, or out of every one with null. */
   enter(id: string | null): void
   /** Starts cropping a layer's image fill, or ends the crop with null. */
@@ -101,6 +108,8 @@ export function editorSelection({ drawn, frames, changed }: SelectionDeps): Edit
   let selection: Selection | null = null
   /** The frame picked as a whole; a layer selected, Esc, or a click on empty canvas lets it go. */
   let pickedFrame: string | null = null
+  /** The frame the page renames in place of its label, while it stays picked. */
+  let renaming: string | null = null
   /** The picked frame the frame listeners last heard of. */
   let lastPicked: string | null = null
   /** The group or box double-clicked into. */
@@ -133,6 +142,9 @@ export function editorSelection({ drawn, frames, changed }: SelectionDeps): Edit
   }
   function picked() {
     return pickedFrame
+  }
+  function renamingFrame() {
+    return renaming !== null && renaming === pickedFrame ? renaming : null
   }
   function croppingLayer() {
     return cropping
@@ -191,6 +203,7 @@ export function editorSelection({ drawn, frames, changed }: SelectionDeps): Edit
   function pickFrame(frameId: string | null) {
     if (frameId === pickedFrame) return
     pickedFrame = frameId
+    renaming = null
     // Picking a frame lets the selection go, with a crop or path edit on it and any group gone into.
     if (frameId !== null && selection) {
       entered = null
@@ -198,6 +211,13 @@ export function editorSelection({ drawn, frames, changed }: SelectionDeps): Edit
       return
     }
     changed()
+  }
+  function renameFrame(frameId: string | null) {
+    const was = pickedFrame
+    if (frameId !== null) pickFrame(frameId)
+    renaming = frameId
+    // Picking another frame showed it already.
+    if (pickedFrame === was) changed()
   }
   function enter(id: string | null) {
     entered = id
@@ -247,6 +267,7 @@ export function editorSelection({ drawn, frames, changed }: SelectionDeps): Edit
     entered: enteredGroup,
     lastFrameOn,
     pickedFrame: picked,
+    renamingFrame,
     cropping: croppingLayer,
     pathEditing: editingPath,
     hovered: hoveredLayer,
@@ -255,6 +276,7 @@ export function editorSelection({ drawn, frames, changed }: SelectionDeps): Edit
     keep,
     dropOffPage,
     pickFrame,
+    renameFrame,
     enter,
     crop,
     editPath,

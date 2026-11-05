@@ -27,7 +27,7 @@ export interface OverlayDeps {
   view: Pick<EditorView, 'camera' | 'viewport' | 'design' | 'inView' | 'frameOf' | 'rulers' | 'outline'>
   selection: Pick<
     EditorSelection,
-    'current' | 'entered' | 'hovered' | 'pickedFrame' | 'cropping' | 'pathEditing' | 'tellListeners'
+    'current' | 'entered' | 'hovered' | 'pickedFrame' | 'renamingFrame' | 'cropping' | 'pathEditing' | 'tellListeners'
   >
   boxes: Pick<EditorBoxes, 'selectionBox' | 'drawnBoxOf' | 'handlesFor'>
   typing: Pick<EditorTyping, 'editing' | 'parts'>
@@ -101,6 +101,8 @@ export function editorOverlay({
   }
 
   function frameLabel(frame: Frame) {
+    // The page's rename field stands in the label's place.
+    if (selection.renamingFrame() === frame.id) return null
     const label = document.createElement('div')
     label.className = 'frame-label'
     label.dataset.frame = frame.id

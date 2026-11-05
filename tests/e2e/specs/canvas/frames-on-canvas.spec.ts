@@ -44,6 +44,13 @@ async function onScreen(page: Page, id: string) {
   if (!stage) throw new Error('no stage')
   return { start, end, stage }
 }
+/** Where a frame's label row is on screen, as the editor places it, drawn or not. */
+async function labelRow(page: Page, id: string) {
+  const stage = await page.getByTestId('stage').boundingBox()
+  const rect = await page.evaluate((id) => window.dazbee?.labelRect(id), id)
+  if (!stage || !rect) throw new Error(`no label for ${id}`)
+  return { x: stage.x + rect.x, y: stage.y + rect.y, width: rect.width, height: rect.height }
+}
 /** Double-clicks a frame's name on its label, and gives the field that renames it once it shows. */
 async function renameByLabel(page: Page, id: string) {
   const name = await label(page, id).locator('.frame-name').boundingBox()
@@ -98,7 +105,9 @@ test('a click on a frame’s empty area or its label picks it: outlined, its lab
   const bar = page.getByTestId('top-bar')
   await expect(bar).toHaveAttribute('data-frame', 'sq')
   await expect(bar.locator('[data-bar-item]')).toHaveCount(2)
-  await expect(page.getByTestId('bar-background')).toHaveText('Background')
+  // Background is a swatch, as a layer's Fill is, named for the person who can't see it.
+  await expect(page.getByTestId('bar-background')).toHaveText('')
+  await expect(page.getByTestId('bar-background')).toHaveAccessibleName('Background colour')
   await expect(page.getByTestId('bar-frame-more')).toHaveAccessibleName('Frame actions')
   await expect(page.getByTestId('small-menu')).toHaveCount(0)
   writeOutput('frames-1-picked.png', await page.screenshot({ animations: 'disabled' }))
@@ -250,7 +259,10 @@ test('presses on a turned, a masked and a locked layer act on the layer; the fra
   expect(by('tilt')?.props.rotation).toBe(30)
   expect(by('locked')?.lock).toEqual(before.nodes.locked?.lock)
   expect(by('disc')?.props.mask).toBe('alpha')
-  // Deleting the square takes its layers; its copies in the story and the copy stay.
+  // Deleting the square takes its layers; its copies in the story and the copy stay. Duplicate
+  // panned to the copy, so the view goes back to the square first.
+  await page.evaluate(() => window.dazbee?.setCamera({ x: 300, y: 180, zoom: 0.5 }))
+  await drawn(page)
   await clickLabel(page, 'sq')
   await press(page, 'delete')
   let after = await read(page)
@@ -271,6 +283,19 @@ test('Duplicate from ⋯ and Ctrl+D copy the picked frame beside the rightmost o
   await click(a, 1000, 1000)
   const menu = await barMenu(a, 'frame-more')
   await expect(menu.getByRole('button')).toHaveText(['DuplicateCtrl+D', 'Rename', 'DeleteDelete'])
+  // As a page's ⋯ on the Pages card: a line before Delete, in the danger colour, and the menu
+  // under the bar, lined up with the end of ⋯.
+  const remove = menu.getByRole('button', { name: /Delete/ })
+  await expect(menu.getByRole('separator')).toHaveCount(1)
+  expect(await remove.evaluate((el) => el.previousElementSibling?.getAttribute('role'))).toBe('separator')
+  const ink = (el: Element) => getComputedStyle(el).color
+  expect(await remove.evaluate(ink)).not.toBe(await menu.getByRole('button', { name: 'Rename' }).evaluate(ink))
+  const more = await a.getByTestId('bar-frame-more').boundingBox()
+  const bar = await a.getByTestId('top-bar').boundingBox()
+  const box = await menu.boundingBox()
+  if (!more || !bar || !box) throw new Error('no menu')
+  expect(Math.abs(box.x + box.width - (more.x + more.width))).toBeLessThanOrEqual(1)
+  expect(box.y).toBeGreaterThanOrEqual(bar.y + bar.height)
   writeOutput('frames-2-menu.png', await a.screenshot({ animations: 'disabled' }))
   await menu.getByRole('button', { name: /Duplicate/ }).click()
   await expect(menu).toBeHidden()
@@ -375,8 +400,25 @@ test('a double click on a frame’s name renames it in place, Enter keeping it a
   const { a, b, errors } = await open(browser, 2)
   let field = await renameByLabel(a, 'sq')
   await expect(field).toHaveValue('Square')
-  // The field takes the label's place: the label hides while it is open.
+  // The field takes the label's place: the label hides while it is open, and the field stands in
+  // its row, its text where the label's was, as see-through as the label, with an accent line
+  // under it, clear of the frame's outline and no wider than the label.
+  const row = await labelRow(a, 'sq')
   await expect(label(a, 'sq')).toBeHidden()
+  await expect(a.locator('[data-testid="frame-rename"] style')).toHaveCount(0)
+  const at = await field.boundingBox()
+  if (!at) throw new Error('no field')
+  expect(at.y).toBeCloseTo(row.y, 0)
+  expect(at.height).toBeCloseTo(row.height, 0)
+  expect(at.x).toBeCloseTo(row.x, 0)
+  expect(at.x + at.width).toBeLessThanOrEqual(row.x + row.width + 0.5)
+  const look = await field.evaluate((el) => {
+    const css = getComputedStyle(el)
+    return { padding: css.paddingLeft, fill: css.backgroundColor, outline: css.outlineStyle, under: css.boxShadow }
+  })
+  expect(look).toMatchObject({ padding: '0px', fill: 'rgba(0, 0, 0, 0)', outline: 'none' })
+  expect(look.under).toMatch(/inset$/)
+  expect(look.under).toContain('0px -1px 0px 0px')
   expect(await field.evaluate((el: HTMLInputElement) => [el.selectionStart, el.selectionEnd])).toEqual([0, 6])
   expect(await picked(a)).toBe('sq')
   writeOutput('frames-3-renaming.png', await a.screenshot({ animations: 'disabled' }))
@@ -456,6 +498,13 @@ test('Background opens the Colour panel for the picked frame’s own fills: a co
   expect((await frameOf(a, 'sq'))?.fills).toEqual(solid('#FFFFFFFF'))
   await press(a, 'redo')
   expect((await frameOf(a, 'sq'))?.fills).toEqual(solid('#2F6BFFFF'))
+  // With no fill left, Background's swatch is empty, not the rainbow of colours that differ.
+  await fills.getByRole('button', { name: 'Remove colour 1' }).click()
+  expect((await frameOf(a, 'sq'))?.fills).toEqual([])
+  const swatch = a.getByTestId('bar-background').locator('span').first()
+  await expect(swatch).toHaveCSS('background-image', 'none')
+  await expect(swatch).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)')
+  await press(a, 'undo')
   // Esc closes the panel, giving the focus back to Background, and leaves the frame picked; Enter
   // opens it again, and a second Esc after closing it lets the frame go.
   await panel.focus()

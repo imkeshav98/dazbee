@@ -48,6 +48,7 @@ function harness(
     editing?: Picked | null
     selected?: boolean
     picked?: boolean
+    renaming?: boolean
     zoom?: number
   } = {},
 ) {
@@ -75,6 +76,7 @@ function harness(
       entered: () => 'g',
       hovered: () => ({ id: 'h', frameId: 'one-sq' }),
       pickedFrame: () => (state.picked ? 'one-sq' : null),
+      renamingFrame: () => (state.renaming ? 'one-sq' : null),
       cropping: () => null,
       pathEditing: () => null,
       tellListeners: () => log.push('tell listeners'),
@@ -127,6 +129,12 @@ describe('editorOverlay', () => {
       expect(drawn().slice(0, 3)).toEqual(['frame-label', 'frame-picked', 'hover'])
       expect(part('frame-picked')?.dataset).toEqual({ frame: 'one-sq' })
       expect(part('frame-label')?.dataset).toEqual({ frame: 'one-sq', active: '' })
+    })
+
+    it('leaves out the label of the frame the page renames in its place, outlining the frame still', () => {
+      const { overlay, drawn } = harness({ selected: false, picked: true, renaming: true })
+      overlay.draw()
+      expect(drawn().slice(0, 2)).toEqual(['frame-picked', 'hover'])
     })
 
     it("outlines no hovered layer while a gesture runs, and shows a drawing's parts before the marquee's", () => {

@@ -3,7 +3,8 @@
 // What the top bar has open: one pop-up, the full menu or one edit panel, never two at once, since
 // they share this one value. Opening any of them closes what was open. The shell reads it too: on a
 // phone an edit panel is a sheet, and a rail flyout and a sheet close each other. And whether
-// something stands over the edit panel and the bar's second row, which Esc closes first.
+// something stands over the edit panel and the bar's second row, which Esc closes first; and the
+// menu's button a rename field gives the focus back to.
 import { useEffect, useState, useSyncExternalStore } from 'react'
 
 import { OVER_PANEL } from '@/components/ui/menu-close.ts'
@@ -32,6 +33,8 @@ interface EditState {
 
 let state: EditState = { open: null, bar: false, barBottom: 0, sheetTop: null, flyoutEnd: null }
 const listeners = new Set<() => void>()
+/** The menu's button a rename was asked from, which the rename field gives the focus back to as it ends from the keyboard. */
+let renameOpener: HTMLElement | null = null
 
 const subscribe = (listener: () => void) => {
   listeners.add(listener)
@@ -50,6 +53,16 @@ export const setBar = (bar: boolean, barBottom = 0) => update({ bar, barBottom: 
 export const setSheetTop = (sheetTop: number | null) => update({ sheetTop })
 export const setFlyoutEnd = (flyoutEnd: number | null) => update({ flyoutEnd })
 export const editState = () => state
+/** Notes the menu's button a rename is asked from, just before asking, for the field to give the focus back to. */
+export const setRenameOpener = (opener: HTMLElement | null) => {
+  renameOpener = opener
+}
+/** The menu's button the rename asked for now came from, or null for one asked from the canvas; read once. */
+export function takeRenameOpener() {
+  const opener = renameOpener
+  renameOpener = null
+  return opener
+}
 /**
  * Whether something stands over the edit panel and the bar's second row, so Esc closes it first: a
  * modal dialog, such as Keyboard shortcuts, or a menu that closes as `useMenuClose` says, as the

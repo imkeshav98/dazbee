@@ -1,33 +1,24 @@
 'use client'
 
 // The field that renames a frame in place of its label on the stage: a double click on the label,
-// or Rename in the picked frame's ⋯ menu, opens it with the name selected, the label hidden under
-// it. Enter or leaving it keeps the new name, as one undo step; Escape keeps the old one. It
-// follows the label as the view moves, and ends once the frame is gone.
+// or Rename in the picked frame's ⋯ menu, opens it with the name selected, in the label's own row
+// with its text where the label's was, see-through as the label is, with an accent line under it.
+// The editor leaves the label out meanwhile. Enter or leaving it keeps the new name, as one undo
+// step; Escape keeps the old one. It follows the label as the view moves, and ends once the frame
+// is gone.
 import { useEffect, useState } from 'react'
 
 import type { Editor } from '@dazbee/editor'
 import type { Rect } from '@dazbee/schema'
 
+import { takeRenameOpener } from '@/components/editor/edit-store.ts'
 import { useLiveDesign } from '@/components/editor/use-live-design.ts'
-import { FOCUS_RING } from '@/components/ui/looks.ts'
 import { RenameField } from '@/components/ui/rename-field.tsx'
-import { cn } from '@/lib/cn.ts'
 import { useMessages } from '@/lib/i18n/client.tsx'
 import { format } from '@/lib/i18n/index.ts'
 
-/** The frame being renamed, and whether its rename came from the frame's ⋯ menu, whose button takes the focus back. */
-type Renaming = { frameId: string; fromMenu: boolean }
-
-/** The field's least width, in pixels (its min-w-[120px]), so a name has room on a frame narrow on screen. */
-const MIN_WIDTH = 120
-/** The frame's ⋯ in its top bar, and the menu it opens. */
-const MENU_BUTTON = '[data-testid="bar-frame-more"]'
-const MENU = '[data-testid="bar-frame-more-menu"]'
-
-/** The rule that hides a frame's label on the stage. */
-const hiddenLabel = (frameId: string) =>
-  `.stage-overlay .frame-label[data-frame="${CSS.escape(frameId)}"] { visibility: hidden; }`
+/** The frame being renamed, and the menu's button it was asked from, which takes the focus back. */
+type Renaming = { frameId: string; opener: HTMLElement | null }
 
 const sameRect = (a: Rect | null, b: Rect | null) =>
   a === b || (a !== null && b !== null && a.x === b.x && a.y === b.y && a.width === b.width && a.height === b.height)
@@ -53,9 +44,7 @@ export function FrameRename({ editor }: { editor: Editor }) {
   const { design } = useLiveDesign(editor)
   const rect = useLabelRect(editor, renaming?.frameId ?? null)
   useEffect(() => {
-    const stop = editor.onFrameRename((frameId) =>
-      setRenaming({ frameId, fromMenu: document.activeElement?.closest(MENU) !== null }),
-    )
+    const stop = editor.onFrameRename((frameId) => setRenaming({ frameId, opener: takeRenameOpener() }))
     return () => {
       stop()
     }
@@ -63,37 +52,35 @@ export function FrameRename({ editor }: { editor: Editor }) {
   const frame = renaming ? design.frames[renaming.frameId] : undefined
   // A frame another tab deleted ends its rename.
   useEffect(() => {
-    if (renaming && !frame) setRenaming(null)
-  }, [renaming, frame])
+    if (!renaming || frame) return
+    setRenaming(null)
+    editor.renamed()
+  }, [editor, renaming, frame])
   if (!renaming || !frame || !rect) return null
   const done = (name: string | null, byKey: boolean) => {
     setRenaming(null)
+    editor.renamed()
     const next = name?.trim()
     if (next && next !== frame.name && editor.design().frames[renaming.frameId])
       editor.session.run('frame.update', { frameId: renaming.frameId, name: next })
     // Ended from the keyboard after Rename in the menu, the focus goes back to the menu's ⋯.
-    if (byKey && renaming.fromMenu) document.querySelector<HTMLElement>(MENU_BUTTON)?.focus()
+    if (byKey) renaming.opener?.focus()
   }
   return (
     <div
       data-testid="frame-rename"
       data-frame={renaming.frameId}
-      className="absolute z-10"
-      style={{ left: rect.x - 4, top: rect.y - 2, width: Math.max(rect.width + 4, MIN_WIDTH) }}
+      className="absolute z-10 flex"
+      style={{ left: rect.x, top: rect.y, width: rect.width, height: rect.height }}
     >
-      {/* The frame's own label, name and size, gives way to the field while it is open. */}
-      <style>{hiddenLabel(renaming.frameId)}</style>
       <RenameField
         key={renaming.frameId}
         name={frame.name}
         label={format(t.editor.frames.nameOf, { name: frame.name })}
         inputName="frame-name"
         maxLength={120}
-        // As wide as the name, from the least width up to the label's.
-        className={cn(
-          'h-6 max-w-full min-w-[120px] rounded-[6px] bg-surface px-1 font-mono text-[12px] font-medium text-text outline outline-1 outline-accent [field-sizing:content]',
-          FOCUS_RING,
-        )}
+        // The label's own type, its text at the label's start, with a thin accent line under it.
+        className="h-full w-full min-w-0 border-0 bg-transparent p-0 font-mono text-[11px] leading-5 font-medium text-accent-text shadow-[inset_0_-1px_0_var(--accent)] outline-none focus-visible:outline-none!"
         onDone={done}
       />
     </div>

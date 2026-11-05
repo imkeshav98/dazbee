@@ -359,6 +359,31 @@ describe('editorSelection', () => {
     })
   })
 
+  describe('renameFrame', () => {
+    it('picks the frame and keeps it as the one renamed until null, or until another frame is picked', () => {
+      const { selection, log } = harness()
+      selection.renameFrame('p1-f1')
+      expect(selection.pickedFrame()).toBe('p1-f1')
+      expect(selection.renamingFrame()).toBe('p1-f1')
+      expect(log).toEqual(['changed'])
+      selection.renameFrame(null)
+      expect(selection.renamingFrame()).toBeNull()
+      expect(selection.pickedFrame()).toBe('p1-f1')
+      selection.renameFrame('p1-f1')
+      selection.pickFrame('p1-f2')
+      expect(selection.renamingFrame()).toBeNull()
+      selection.pickFrame('p1-f1')
+      expect(selection.renamingFrame()).toBeNull()
+    })
+
+    it('ends with the frame let go, as a layer selected does', () => {
+      const { selection } = harness()
+      selection.renameFrame('p1-f1')
+      selection.select(['rect'], 'p1-f1')
+      expect(selection.renamingFrame()).toBeNull()
+    })
+  })
+
   describe('tellListeners', () => {
     it('tells the selection listeners only when the selection differs from the last they heard', () => {
       const { selection, log } = harness()

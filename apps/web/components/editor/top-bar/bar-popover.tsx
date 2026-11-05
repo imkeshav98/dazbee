@@ -159,6 +159,8 @@ export function BarPopover({
   testId,
   className,
   caret = true,
+  align = 'center',
+  buttonRef,
 }: {
   id: string
   open: string | null
@@ -173,6 +175,10 @@ export function BarPopover({
   className?: string
   /** Whether the button shows ▾; a ⋯ that opens a menu of actions has none. */
   caret?: boolean
+  /** Where the popover lines up under its button: its middle, or its end, as a menu of actions does. */
+  align?: 'center' | 'end'
+  /** Given the button, for a control that gives the focus back to it later. */
+  buttonRef?: RefObject<HTMLButtonElement | null>
 }) {
   const focus = useMenuFocus()
   const shown = open === id
@@ -186,7 +192,10 @@ export function BarPopover({
     <Popover.Root open={shown} onOpenChange={(to) => onOpen(to ? id : null)}>
       <Popover.Trigger asChild>
         <button
-          ref={focus.button}
+          ref={(button) => {
+            focus.button.current = button
+            if (buttonRef) buttonRef.current = button
+          }}
           type="button"
           data-bar-item
           aria-label={face ? label : undefined}
@@ -202,7 +211,7 @@ export function BarPopover({
       <Popover.Portal>
         <Popover.Content
           side="bottom"
-          align="center"
+          align={align}
           sideOffset={below}
           collisionPadding={12}
           {...focus.content}

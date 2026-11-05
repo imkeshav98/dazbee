@@ -116,7 +116,9 @@ export const picked = (page: Page) => page.evaluate(() => window.dazbee?.pickedF
  * the header: at its middle, or a point `dx` in from its start, kept on the name.
  */
 export async function labelPoint(page: Page, id: string, dx?: number) {
-  const name = await page.locator(`.stage-overlay .frame-label[data-frame="${id}"] .frame-name`).boundingBox()
+  const name = await page
+    .locator(`.stage-overlay .frame-label[data-frame="${id}"] .frame-name`)
+    .boundingBox({ timeout: 5000 })
   if (!name) throw new Error(`no label for ${id}`)
   return { x: name.x + Math.min(dx ?? name.width / 2, name.width - 1), y: name.y + name.height - 5 }
 }

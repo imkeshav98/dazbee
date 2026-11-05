@@ -462,13 +462,15 @@ export function PanelButton({
   )
 }
 
-/** A swatch on a bar button: the colour, or a rainbow where the layers have different ones. */
-export function Dot({ colour }: { colour: string | null | 'mixed' }) {
+/** A swatch on a bar button: the colour, a rainbow where the layers have different ones, or empty for none. */
+export function Dot({ colour }: { colour: string | null | 'mixed' | 'none' }) {
   return (
     <span
       aria-hidden
-      className="size-4 rounded-full border border-line-strong"
-      style={{ background: colour === 'mixed' || colour === null ? MIXED_COLOUR : colour }}
+      className="size-4 rounded-full border border-swatch-ring"
+      style={{
+        background: colour === 'none' ? 'transparent' : colour === 'mixed' || colour === null ? MIXED_COLOUR : colour,
+      }}
     />
   )
 }
