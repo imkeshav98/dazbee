@@ -11,6 +11,7 @@ import {
   DEFAULT_EXPORT_NAME,
   type Design,
   type ExportType,
+  type Frame,
   framesOf,
   inOrder,
   numberedFrameNames,
@@ -143,14 +144,14 @@ export function ExportForm({
   const isTicked = (frameId: string) => ticked === 'all' || ticked.has(frameId)
   const frameIds = frames.filter(([frameId]) => isTicked(frameId)).map(([frameId]) => frameId)
   const count = frameIds.length
-  const every = count === frames.length ? true : count === 0 ? false : 'mixed'
+  const allTicked = count === frames.length ? true : count === 0 ? false : 'mixed'
 
   const choosePage = (pageId: string) => {
     setChosen(pageId)
     setTicked('all')
   }
   const tick = (frameId: string, on: boolean) => {
-    const next = new Set(frames.filter(([id]) => isTicked(id)).map(([id]) => id))
+    const next = new Set(frameIds)
     if (on) next.add(frameId)
     else next.delete(frameId)
     setTicked(next)
@@ -215,25 +216,15 @@ export function ExportForm({
             className={cn(FRAMES_LIST, '[--line-strong:var(--text-muted)]')}
             data-testid="export-frames"
           >
-            {frames.length > 1 && (
-              <FrameRow
-                name={t.editor.exports.allFrames}
-                on={every}
-                onTick={(on) => setTicked(on ? 'all' : new Set())}
-                testId="export-all-frames"
-                bold
-              />
-            )}
+            {frames.length > 1 && <AllFramesRow on={allTicked} onTick={(on) => setTicked(on ? 'all' : new Set())} />}
             {frames.map(([frameId, frame]) => (
               <FrameRow
                 key={frameId}
-                name={frame.name}
+                frameId={frameId}
+                frame={frame}
                 number={names.get(frameId)?.number ?? null}
-                size={`${frame.width} × ${frame.height}`}
                 on={isTicked(frameId)}
                 onTick={(on) => tick(frameId, on)}
-                testId="export-frame"
-                frameId={frameId}
                 lights={lightsFrame(frameId)}
               />
             ))}
@@ -318,38 +309,83 @@ export function ExportForm({
   )
 }
 
+/** The row that ticks every frame of the page, or unticks them all; a dash while only some are ticked. */
+function AllFramesRow({ on, onTick }: { on: boolean | 'mixed'; onTick: (on: boolean) => void }) {
+  const t = useMessages()
+  return (
+    <label className={ROW} title={t.editor.exports.allFrames}>
+      <TickBox on={on} onTick={onTick} name="all-frames" testId="export-all-frames" />
+      <span className="min-w-0 flex-1 truncate font-semibold" data-part="name">
+        {t.editor.exports.allFrames}
+      </span>
+    </label>
+  )
+}
+
 /**
- * A row of the frames list: a tick, the frame's own name as its label shows it, the number its file
- * takes after it, and its size; or, `bold`, the row that ticks them all.
+ * A frame's row: its tick, its own name as its label shows it, the number its file takes after it,
+ * muted, and its size; under the pointer or with the keyboard focus it lights its frame on the canvas.
  */
 function FrameRow({
-  name,
-  number = null,
-  size,
+  frameId,
+  frame,
+  number,
   on,
   onTick,
+  lights,
+}: {
+  frameId: string
+  frame: Frame
+  /** The number added to the frame's name to keep its file's apart, or null. */
+  number: number | null
+  on: boolean
+  onTick: (on: boolean) => void
+  lights: ReturnType<ReturnType<typeof useLitFrame>>
+}) {
+  const size = `${frame.width} × ${frame.height}`
+  return (
+    <label className={ROW} title={number === null ? frame.name : `${frame.name} ${number}`} {...lights}>
+      <TickBox on={on} onTick={onTick} name="frame" testId="export-frame" frameId={frameId} />
+      <span className="flex min-w-0 flex-1 items-baseline gap-1">
+        <span className="truncate" data-part="name">
+          {frame.name}
+        </span>
+        {number !== null && (
+          <span className="shrink-0 text-muted" data-part="number">
+            {number}
+          </span>
+        )}
+      </span>
+      {/* Width × height in every language, as the frame's label reads, isolated from the row's direction. */}
+      <span dir="ltr" className={cn(MENU_KEY, 'shrink-0')} data-part="size">
+        {size}
+      </span>
+    </label>
+  )
+}
+
+/**
+ * A row's tick: a checkbox the eye doesn't see, drawn as Tick; as it takes the focus, its row
+ * scrolls whole into view.
+ */
+function TickBox({
+  on,
+  onTick,
+  name,
   testId,
   frameId,
-  lights,
-  bold = false,
 }: {
-  name: string
-  /** The number added to the frame's name to keep its file's apart, shown after it, muted. */
-  number?: number | null
-  size?: string
   on: boolean | 'mixed'
   onTick: (on: boolean) => void
+  name: string
   testId: string
   frameId?: string
-  /** What lights the row's frame on the canvas while the row is under the pointer or focused. */
-  lights?: ReturnType<ReturnType<typeof useLitFrame>>
-  bold?: boolean
 }) {
   return (
-    <label className={ROW} title={number === null ? name : `${name} ${number}`} {...lights}>
+    <>
       <input
         type="checkbox"
-        name={frameId ? 'frame' : 'all-frames'}
+        name={name}
         value={frameId}
         checked={on === true}
         ref={(input) => {
@@ -362,22 +398,6 @@ function FrameRow({
         data-frame={frameId}
       />
       <Tick on={on} />
-      <span className="flex min-w-0 flex-1 items-baseline gap-1">
-        <span className={cn('truncate', bold && 'font-semibold')} data-part="name">
-          {name}
-        </span>
-        {number !== null && (
-          <span className="shrink-0 text-muted" data-part="number">
-            {number}
-          </span>
-        )}
-      </span>
-      {/* Width × height in every language, as the frame's label reads, isolated from the row's direction. */}
-      {size && (
-        <span dir="ltr" className={cn(MENU_KEY, 'shrink-0')} data-part="size">
-          {size}
-        </span>
-      )}
-    </label>
+    </>
   )
 }
