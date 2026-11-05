@@ -287,7 +287,7 @@ test('Duplicate from ⋯ and Ctrl+D copy the picked frame beside the rightmost o
   const { a, b, errors } = await openFrames(browser, 2)
   await click(a, 1000, 1000)
   const menu = await barMenu(a, 'frame-more')
-  await expect(menu.getByRole('button')).toHaveText(['DuplicateCtrl+D', 'Rename', 'DeleteDelete'])
+  await expect(menu.getByRole('button')).toHaveText(['DuplicateCtrl+D', 'Rename', 'Export', 'DeleteDelete'])
   // As a page's ⋯ on the Pages card: a line before Delete, in the danger colour, and the menu
   // under the bar, lined up with the end of ⋯.
   const remove = menu.getByRole('button', { name: /Delete/ })
