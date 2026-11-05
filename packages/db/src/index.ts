@@ -8,6 +8,7 @@ import pg from 'pg'
 
 import * as tables from './tables.ts'
 
+export * from './ids.ts'
 export * from './tables.ts'
 
 export type Db = NodePgDatabase<typeof tables>
