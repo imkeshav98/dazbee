@@ -1,13 +1,13 @@
 // The design and helpers of the frames-on-canvas specs: a page holding a square, a story linked to it
 // and a banner linked to nothing, the square holding a headline, a layer turned 30°, a locked one and
-// a photo under a round mask, opened at half size; which frame is picked and what a frame holds,
-// where a frame's label is, and Tab to the top bar.
+// a photo under a round mask, opened at half size or alone at a screen size; which frame is picked
+// and what a frame holds, where a frame's label is, and Tab to the top bar.
 import type { DesignInput } from '@dazbee/schema'
 
 import { solid } from './edit-in-frame.ts'
-import { openTabs, settle } from './editor.ts'
+import { editorPath, openTabs, setCookies, settle } from './editor.ts'
 import { frameDesign, linkedFrames, seed } from './seed.ts'
-import { drawn, read } from './stage.ts'
+import { drawn, fitSettled, read } from './stage.ts'
 import { type Browser, expect, type Page } from './test.ts'
 
 /**
@@ -168,4 +168,17 @@ export async function openFrames(browser: Browser, count = 1) {
   await drawn(a)
   if (count > 1) await settle(tabs)
   return { a, b: tabs[1] as Page, tabs, errors }
+}
+/** Opens the design alone in a tab of a theme at a screen size, fitted, with its fonts loaded. */
+export async function openSized(browser: Browser, viewport: { width: number; height: number }, theme = 'dark') {
+  const designId = await seed(design())
+  const page = await (await browser.newContext({ viewport })).newPage()
+  const errors: string[] = []
+  page.on('pageerror', (error) => errors.push(error.message))
+  await setCookies(page, { theme })
+  await page.goto(editorPath(designId))
+  await expect(page.getByTestId('status')).toHaveAttribute('data-ready', '', { timeout: 60_000 })
+  await page.evaluate(() => window.dazbee?.loaded())
+  await fitSettled(page)
+  return { page, errors }
 }

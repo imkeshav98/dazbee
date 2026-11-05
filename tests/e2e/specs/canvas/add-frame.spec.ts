@@ -4,16 +4,14 @@
 // frame past the page's rightmost one, picked and shown; a drag with the tool still draws one. A
 // picked frame's ⋯ › Add size opens the same card titled for it, which adds a frame of the size
 // holding linked copies of its layers laid out to fit. Each by the mouse and by the keyboard, each
-// one undo step that a second tab sees, and at the three screen sizes. A page holds a square, a
-// story linked to it and a banner linked to nothing; the square holds a turned layer, a locked one
-// and one under a mask.
-import { editorPath, setCookies, settle, writeOutput } from '../../support/editor.ts'
-import { clickLabel, design, frameOf, openFrames, picked, tabToBar } from '../../support/frames-on-canvas.ts'
-import { THEMES } from '../../support/glass.ts'
-import { EDITOR_CHROME, layoutProblems, SCREEN_SIZES } from '../../support/layout.ts'
-import { layersIn, seed } from '../../support/seed.ts'
-import { type Design, drag, dragScreen, drawn, fitSettled, nextFrame, press, read } from '../../support/stage.ts'
-import { type Browser, expect, type Page, test } from '../../support/test.ts'
+// one undo step that a second tab sees. A page holds a square, a story linked to it and a banner
+// linked to nothing; the square holds a turned layer, a locked one and one under a mask.
+import { addSize, card, frameButton, typeSize } from '../../support/add-frame.ts'
+import { settle, writeOutput } from '../../support/editor.ts'
+import { clickLabel, frameOf, openFrames, picked, tabToBar } from '../../support/frames-on-canvas.ts'
+import { layersIn } from '../../support/seed.ts'
+import { type Design, drag, drawn, press, read } from '../../support/stage.ts'
+import { expect, type Page, test } from '../../support/test.ts'
 import { barMenu } from '../../support/top-bar.ts'
 
 test.describe.configure({ timeout: 180_000 })
@@ -21,7 +19,6 @@ test.describe.configure({ timeout: 180_000 })
 /** The frames the design starts with; a new one goes 200 px past the banner, which ends at 3760. */
 const START = ['banner', 'sq', 'story']
 const NEW_X = 3960
-const PIECES = { ...EDITOR_CHROME, 'top bar': '[data-testid="top-bar-row"]', 'edit panel': '#edit-panel' }
 /** The tiles in order, as each reads: its name, then its pixels. */
 const TILES = [
   'Feed square1080 × 1080',
@@ -33,8 +30,6 @@ const TILES = [
   'Link image1200 × 628',
 ]
 
-/** The card in the edit panel, Add a frame or Add size. */
-const card = (page: Page) => page.locator('#edit-panel')
 const tool = (page: Page) => page.evaluate(() => window.dazbee?.tool())
 /** The frames added since the design opened. */
 const added = async (page: Page) => Object.keys((await read(page)).frames).filter((id) => !START.includes(id))
@@ -51,48 +46,11 @@ const linksIn = (d: Design, frameId: string) =>
     .sort()
 /** Whether the focus is inside the card. */
 const focusInCard = (page: Page) => page.evaluate(() => document.activeElement?.closest('#edit-panel') !== null)
-/** Whether the card's body, which scrolls, is scrolled to its end, the size issue's line last in it. */
-const scrolledToEnd = (page: Page) =>
-  page.getByTestId('own-size-issue').evaluate((line) => {
-    let body = line.parentElement
-    while (body && getComputedStyle(body).overflowY !== 'auto') body = body.parentElement
-    return body !== null && body.scrollTop + body.clientHeight >= body.scrollHeight - 1
-  })
 /** Whether a frame's label shows on the stage: it is in view. */
 const inView = async (page: Page, frameId: string) => {
   const stage = await page.getByTestId('stage').boundingBox()
   const rect = await page.evaluate((id) => window.dazbee?.labelRect(id), frameId)
   return Boolean(stage && rect && rect.x >= 0 && rect.y >= 0 && rect.x < stage.width && rect.y < stage.height)
-}
-
-/** Picks the Frame tool by the dock's button and waits for the card. */
-async function frameButton(page: Page) {
-  await page.locator('[data-dock] [data-tool="frame"]').click()
-  await expect(card(page)).toHaveAttribute('data-panel', 'addFrame')
-}
-/** Opens the picked frame's ⋯ and its Add size, and waits for the card. */
-async function addSize(page: Page) {
-  const menu = await barMenu(page, 'frame-more')
-  await menu.getByRole('button', { name: 'Add size' }).click()
-  await expect(card(page)).toHaveAttribute('data-panel', 'addSize')
-}
-/** Types a size of your own into the card's fields. */
-async function typeSize(page: Page, width: string, height: string) {
-  await page.getByTestId('own-width').fill(width)
-  await page.getByTestId('own-height').fill(height)
-}
-/** Opens the design alone in a tab of a theme at a screen size, fitted, with its fonts loaded. */
-async function openSized(browser: Browser, viewport: { width: number; height: number }, theme = 'dark') {
-  const designId = await seed(design())
-  const page = await (await browser.newContext({ viewport })).newPage()
-  const errors: string[] = []
-  page.on('pageerror', (error) => errors.push(error.message))
-  await setCookies(page, { theme })
-  await page.goto(editorPath(designId))
-  await expect(page.getByTestId('status')).toHaveAttribute('data-ready', '', { timeout: 60_000 })
-  await page.evaluate(() => window.dazbee?.loaded())
-  await fitSettled(page)
-  return { page, errors }
 }
 
 test('F and the Frame button open Add a frame; ✕, Esc, another tool and another panel close it and put the tool down', async ({
@@ -396,95 +354,3 @@ test('Add size by the keyboard: Tab to the bar, ⋯, Add size; Esc gives the foc
   expect(await added(a)).toEqual([])
   expect(errors).toEqual([])
 })
-
-for (const [width, height] of SCREEN_SIZES) {
-  test(`at ${width}×${height} the Add a frame and Add size cards sit clear of everything, nothing cut off`, async ({
-    browser,
-  }) => {
-    const { page, errors } = await openSized(browser, { width, height })
-    const phone = width < 640
-    await frameButton(page)
-    await nextFrame(page)
-    expect(await layoutProblems(page, { pieces: PIECES, uncut: 'h2' })).toEqual([])
-    // Three tiles across at every size.
-    const tops = await page
-      .getByTestId('sizes-meta')
-      .locator('[data-preset]')
-      .evaluateAll((tiles) => tiles.map((tile) => Math.round(tile.getBoundingClientRect().top)))
-    expect(new Set(tops).size).toBe(1)
-    // On a phone the card is a sheet at the bottom, the dock and the tab bar hidden under it.
-    const panel = await card(page).boundingBox()
-    if (!panel) throw new Error('no card')
-    if (phone) {
-      // Measured as laid out, not as the pop-in animation scales it; offsets round to whole pixels.
-      const below = await card(page).evaluate((el) => {
-        const sheet = el as HTMLElement
-        return (sheet.offsetParent?.clientHeight ?? 0) - sheet.offsetTop - sheet.offsetHeight
-      })
-      expect(Math.abs(below - 8)).toBeLessThanOrEqual(1)
-      await expect(page.locator('[data-dock]')).toBeHidden()
-    }
-    // Scrolled to the end, a size past the limits says why under the fields, in view and whole.
-    await page.getByTestId('own-width').scrollIntoViewIfNeeded()
-    await typeSize(page, '9000', '1000')
-    await expect(page.getByTestId('own-size-issue')).toBeVisible()
-    // The line comes into view as it shows, clear of the faded edge: the card's body is scrolled to its end.
-    await expect.poll(() => scrolledToEnd(page)).toBe(true)
-    await nextFrame(page)
-    expect(await layoutProblems(page, { pieces: PIECES, uncut: 'h2' })).toEqual([])
-    const fields = await page.getByTestId('own-size').boundingBox()
-    const grown = await card(page).boundingBox()
-    if (!fields || !grown) throw new Error('no fields')
-    expect(fields.y + fields.height).toBeLessThanOrEqual(grown.y + grown.height)
-    await page.getByTestId('edit-panel-close').click()
-
-    await clickLabel(page, 'sq')
-    await addSize(page)
-    await nextFrame(page)
-    expect(await layoutProblems(page, { pieces: PIECES, uncut: 'h2' })).toEqual([])
-    expect(errors).toEqual([])
-  })
-}
-
-for (const [width, height] of SCREEN_SIZES) {
-  for (const theme of THEMES) {
-    test(
-      `screenshots at ${width}×${height}, ${theme}: Add a frame, a size past the limits, Add size in ⋯ and its card, and a frame drawn by a drag`,
-      { tag: '@evidence' },
-      async ({ browser }) => {
-        const { page, errors } = await openSized(browser, { width, height }, theme)
-        const shot = async (name: string) => {
-          // The pointer rests off the card, so no tile shows the hover tint.
-          await page.mouse.move(1, 1)
-          await nextFrame(page)
-          writeOutput(`add-frame-${width}-${theme}-${name}.png`, await page.screenshot({ animations: 'disabled' }))
-        }
-        await frameButton(page)
-        await shot('1-card')
-        await page.getByTestId('own-width').scrollIntoViewIfNeeded()
-        await typeSize(page, '9000', '1000')
-        await expect.poll(() => scrolledToEnd(page)).toBe(true)
-        await shot('2-past-limits')
-        await page.getByTestId('edit-panel-close').click()
-        await clickLabel(page, 'sq')
-        await barMenu(page, 'frame-more')
-        await shot('3-menu')
-        await page.getByTestId('bar-frame-more-menu').getByRole('button', { name: 'Add size' }).click()
-        await expect(card(page)).toHaveAttribute('data-panel', 'addSize')
-        await shot('4-add-size')
-        await page.keyboard.press('Escape')
-        await page.keyboard.press('Escape')
-        // A frame drawn with the tool on empty canvas: clear of the rail, and on a phone above the card's sheet.
-        await page.locator('[data-dock] [data-tool="frame"]').click()
-        const stage = await page.getByTestId('stage').boundingBox()
-        if (!stage) throw new Error('no stage')
-        const phone = width < 640
-        const from = { x: stage.x + (phone ? 40 : 140), y: stage.y + stage.height * (phone ? 0.42 : 0.62) }
-        await dragScreen(page, from, { x: from.x + 120, y: from.y + 80 })
-        await expect(card(page)).toHaveCount(0)
-        await shot('5-drawn')
-        expect(errors).toEqual([])
-      },
-    )
-  }
-}
