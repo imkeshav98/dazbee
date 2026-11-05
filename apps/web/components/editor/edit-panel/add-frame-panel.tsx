@@ -14,6 +14,7 @@ import { SIZE_CHANNELS, SIZE_LIMITS, SIZE_PRESETS } from '@dazbee/schema'
 
 import { editState, setOpen, useEditState } from '@/components/editor/edit-store.ts'
 import { usePickedFrame } from '@/components/editor/editor-hooks.ts'
+import { NumberInput, useNumberInput } from '@/components/editor/number-input.tsx'
 import { PANEL_HEADING } from '@/components/editor/styles.ts'
 import { useLiveDesign } from '@/components/editor/use-live-design.ts'
 import { FOCUS_RING, LIT_ROW } from '@/components/ui/looks.ts'
@@ -36,9 +37,12 @@ interface PickedFrame extends Size {
 const TIMES = '×'
 /** The longest side of a tile's outlined shape, in pixels. */
 const TILE_SHAPE = 40
-/** A size of your own's field: its letter, then the number in mono; its border shows the focus. */
+/**
+ * A size of your own's field: its letter, then the number; its edge is the accent while it is typed
+ * in, and the danger colour on a side past the limits.
+ */
 const SIZE_FIELD =
-  'flex h-[34px] min-w-0 flex-1 items-center gap-1.5 rounded-row border border-line bg-surface px-2.5 focus-within:border-accent has-[[aria-invalid=true]]:border-danger max-sm:h-11'
+  'flex h-[34px] min-w-0 flex-1 cursor-text items-center gap-1.5 overflow-hidden rounded-row border border-line bg-surface px-2.5 transition-colors duration-[var(--chrome-fast)] data-typing:border-accent has-[[aria-invalid=true]]:border-danger max-sm:h-11'
 
 /** A size's outline, as long as a tile's shape on its long side and never thinner than a hairline box. */
 const shapeStyle = ({ width, height }: Size): CSSProperties => {
@@ -176,23 +180,13 @@ function OwnSize({ start, onAdd }: { start: Size; onAdd: (size: Size) => void })
   const field = (axis: 'width' | 'height', value: string, set: (to: string) => void) => {
     const wrong = issues.some(({ side }) => side === axis)
     return (
-      <label className={SIZE_FIELD}>
-        <span aria-hidden className="text-[11px] font-semibold text-subtle">
-          {axis === 'width' ? a.w : a.h}
-        </span>
-        <input
-          value={value}
-          onChange={(e) => set(e.target.value)}
-          inputMode="numeric"
-          autoComplete="off"
-          aria-label={a[axis]}
-          aria-invalid={wrong}
-          aria-describedby={wrong ? `${issueId}-${axis}` : undefined}
-          name={axis}
-          data-testid={`own-${axis}`}
-          className="w-full min-w-0 bg-transparent font-mono text-[12px] text-text tabular-nums outline-none focus-visible:outline-none!"
-        />
-      </label>
+      <OwnSide
+        axis={axis}
+        value={value}
+        wrong={wrong}
+        describedBy={wrong ? `${issueId}-${axis}` : undefined}
+        onChange={set}
+      />
     )
   }
   return (
@@ -238,6 +232,43 @@ function OwnSize({ start, onAdd }: { start: Size; onAdd: (size: Size) => void })
         </div>
       )}
     </form>
+  )
+}
+
+/** One side of a size of your own: its letter, then the side as a number input. */
+function OwnSide({
+  axis,
+  value,
+  wrong,
+  describedBy,
+  onChange,
+}: {
+  axis: 'width' | 'height'
+  value: string
+  wrong: boolean
+  describedBy: string | undefined
+  onChange: (to: string) => void
+}) {
+  const a = useMessages().editor.addFrame
+  const entry = useNumberInput()
+  return (
+    <div {...entry.knob} className={SIZE_FIELD}>
+      <span aria-hidden className="text-[11px] font-semibold text-subtle">
+        {axis === 'width' ? a.w : a.h}
+      </span>
+      <NumberInput
+        entry={entry}
+        text={value}
+        onChange={(e) => onChange(e.target.value)}
+        inputMode="numeric"
+        autoComplete="off"
+        aria-label={a[axis]}
+        aria-invalid={wrong}
+        aria-describedby={describedBy}
+        name={axis}
+        data-testid={`own-${axis}`}
+      />
+    </div>
   )
 }
 

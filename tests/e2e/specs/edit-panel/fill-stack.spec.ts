@@ -98,8 +98,8 @@ test('a gradient over a photo: added on top, a stop edited, the two reordered, o
   await editor.locator('[data-stop="1"]').click()
   await editor.getByRole('textbox', { name: 'Stop 2 hex' }).fill('FF2E7E')
   await editor.getByRole('textbox', { name: 'Stop 2 hex' }).press('Enter')
-  await editor.getByRole('textbox', { name: 'Stop 2 opacity' }).fill('70')
-  await editor.getByRole('textbox', { name: 'Stop 2 opacity' }).press('Enter')
+  await editor.getByRole('spinbutton', { name: 'Stop 2 opacity' }).fill('70')
+  await editor.getByRole('spinbutton', { name: 'Stop 2 opacity' }).press('Enter')
   await expect.poll(async () => (await fillsOf(page))[1]?.stops?.[1]?.color).toBe('#FF2E7EB3')
   // A click on the bar adds a stop there.
   const bar = await editor.getByTestId('gradient-bar').boundingBox()

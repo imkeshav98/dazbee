@@ -169,6 +169,7 @@ function TextColourPanel({
           <ColorField
             name={p.textColour}
             value={color}
+            editor={target.editor}
             onSet={(to) =>
               target.range
                 ? setStyle('color', to(first))

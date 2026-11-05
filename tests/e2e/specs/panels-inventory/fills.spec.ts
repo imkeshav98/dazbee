@@ -212,7 +212,7 @@ test.describe('fills', () => {
     )
     await step(
       page,
-      async () => enter(card.getByRole('textbox', { name: 'Colour 1 opacity' }), '80'),
+      async () => enter(card.getByRole('spinbutton', { name: 'Colour 1 opacity' }), '80'),
       async () => {
         await expect.poll(async () => (await fills(page, 'box'))[0]?.color).toBe('#00A889CC')
       },

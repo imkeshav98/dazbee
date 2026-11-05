@@ -128,14 +128,20 @@ describe.each(THEMES)('%s theme', (_, selector) => {
     expect(contrast(t.text ?? '', drawn)).toBeGreaterThanOrEqual(4.5)
   })
 
-  it.each(['the fill', 'the field beside the fill'])(
-    'a value selected in a number field with a fill is at least 3:1 against %s, its digits at least 4.5:1 on it',
+  it.each(['a fill', 'the field beside a fill', 'glass over the canvas'])(
+    'a value selected in the stronger tint is at least 3:1 against %s, its digits at least 4.5:1 on it',
     (where) => {
       const see = tints(selector)
-      const [selected, soft] = [see['accent-selected-on-fill'], see['accent-soft']]
-      const [digits, field] = [t['text-selected-on-fill'], t.surface]
-      if (!selected || !soft || !digits || !field) throw new Error('missing token for a selection on a fill')
-      const under = where === 'the fill' ? over(soft, channels(field)) : channels(field)
+      const [selected, soft, glass] = [see['accent-selected-strong'], see['accent-soft'], see.glass]
+      const [digits, field, canvas] = [t['text-selected-strong'], t.surface, t.canvas]
+      if (!selected || !soft || !glass || !digits || !field || !canvas)
+        throw new Error('missing token for a strong selection')
+      const under =
+        where === 'a fill'
+          ? over(soft, channels(field))
+          : where === 'glass over the canvas'
+            ? over(glass, channels(canvas))
+            : channels(field)
       const drawn = hexOf(over(selected, under))
       expect(contrast(drawn, hexOf(under))).toBeGreaterThanOrEqual(3)
       expect(contrast(digits, drawn)).toBeGreaterThanOrEqual(4.5)

@@ -288,10 +288,10 @@ test('in Arabic Pages mirrors and sits clear of everything, and a colour hex rea
   // A hex and its opacity read left to right in Arabic too, the # first: the headline's colour.
   await page.evaluate(() => window.dazbee?.select(['headline']))
   await (await barMenu(page, 'colour')).getByTestId('colour-pick').click()
-  for (const name of ['colour-hex', 'colour-opacity'])
+  for (const field of ['[name="colour-hex"]', '[data-testid="colour-opacity"]'])
     expect(
       await page
-        .locator(`[data-testid="bar-colour-menu"] [name="${name}"]`)
+        .locator(`[data-testid="bar-colour-menu"] ${field}`)
         .first()
         .evaluate((el) => getComputedStyle(el).direction),
     ).toBe('ltr')

@@ -120,7 +120,7 @@ test('one layer: position, size, turn, opacity, blend, fill, stroke and effects'
   const fill = await fillList(page)
   await enter(fill.getByRole('textbox', { name: 'Colour 1 hex' }), '00a889')
   await expect.poll(async () => (await props(page, 'box')).fills).toEqual([{ type: 'solid', color: '#00A889FF' }])
-  await enter(fill.getByRole('textbox', { name: 'Colour 1 opacity' }), '80')
+  await enter(fill.getByRole('spinbutton', { name: 'Colour 1 opacity' }), '80')
   await expect.poll(async () => (await props(page, 'box')).fills).toEqual([{ type: 'solid', color: '#00A889CC' }])
   await fill.getByRole('button', { name: 'Add fill' }).click()
   await expect.poll(async () => ((await props(page, 'box')).fills as unknown[]).length).toBe(2)

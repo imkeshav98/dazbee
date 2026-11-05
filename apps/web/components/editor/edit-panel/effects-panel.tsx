@@ -183,6 +183,7 @@ export function EffectsPanel({ target, brandId }: PanelProps) {
               <ColorField
                 name={p.outline}
                 value={outline.color}
+                editor={target.editor}
                 onSet={(to) => setOutline((was) => ({ ...was, color: to(was.color) }))}
               />
             </div>
@@ -334,6 +335,7 @@ function EffectRow({
         <ColorField
           name={format(p.effectNamed, { effect: effectName, n: i + 1 })}
           value={effect.color}
+          editor={target.editor}
           onSet={(to) => change((now) => ({ ...now, color: to('color' in now ? now.color : undefined) }) as Effect)}
         />
       )}

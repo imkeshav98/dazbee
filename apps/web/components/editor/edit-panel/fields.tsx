@@ -8,18 +8,8 @@ import { type CSSProperties, type ReactNode, useRef, useState } from 'react'
 import { type Editor, shortcutFor } from '@dazbee/editor'
 import { alphaOf } from '@dazbee/schema'
 
-import { useNumberInput } from '@/components/editor/number-input.tsx'
-import {
-  FIELD,
-  KNOB,
-  NUMBER_SELECTED,
-  NUMBER_SELECTED_ON_FILL,
-  NUMBER_TEXT,
-  PANEL_PART,
-  SELECT,
-  SWITCH,
-  SWITCH_ROW,
-} from '@/components/editor/styles.ts'
+import { NumberInput, useNumberInput } from '@/components/editor/number-input.tsx'
+import { FIELD, KNOB, NUMBER_TEXT, PANEL_PART, SELECT, SWITCH, SWITCH_ROW } from '@/components/editor/styles.ts'
 import { SEGMENT, SEGMENTS } from '@/components/ui/looks.ts'
 import { Select } from '@/components/ui/select.tsx'
 import { cn } from '@/lib/cn.ts'
@@ -102,7 +92,7 @@ export function NumberField({
   unit?: string | undefined
   placeholder?: string
   /** Makes a drag one undo step; without one, a drag is as many changes as it makes. */
-  editor?: Editor
+  editor?: Editor | undefined
   testId?: string
   /** Looks laid over the knob's, such as its height on a phone. */
   className?: string
@@ -111,7 +101,6 @@ export function NumberField({
   onClear?: () => void
 }) {
   const t = useMessages()
-  const input = useRef<HTMLInputElement>(null)
   // What a value typed, stepped or dragged stops at: the field's own limits, or, without, where a
   // design would only break. `least` and `most` are the field's own, for its fill and Home and End.
   const min = least ?? -LIMITS.any
@@ -130,12 +119,13 @@ export function NumberField({
   const range = fillRange ?? (least !== undefined && most !== undefined ? ([least, most] as const) : undefined)
   const fill = fillOf(value, range)
   const entry = useNumberInput({
-    input,
     editor,
-    value: typeof value === 'number' ? value * scale : null,
-    scrubField: (width) => scrubOf({ step, min, max, scale, range, width }),
-    onScrubStart: () => setDraft(null),
-    onScrub: (by) => onShift(by / scale),
+    scrub: {
+      value: typeof value === 'number' ? value * scale : null,
+      field: (width) => scrubOf({ step, min, max, scale, range, width }),
+      onStart: () => setDraft(null),
+      onScrub: (by) => onShift(by / scale),
+    },
   })
   /** One step, or ten with Shift, or a tenth with Alt where the steps are fractions. */
   const stepOf = (event: { shiftKey: boolean; altKey: boolean }) =>
@@ -164,70 +154,56 @@ export function NumberField({
       className={cn(KNOB, className)}
     >
       <span className="relative min-w-0 flex-1 truncate">{label}</span>
-      {/* As wide as what it shows: the hidden copy sizes the input, so the room beside the digits is the knob's. */}
-      <span className="relative inline-grid shrink-0 [&>*]:[grid-area:1/1]">
-        <span aria-hidden className={cn(NUMBER_TEXT, 'invisible whitespace-pre pe-[2px]')}>
-          {text || hint || ' '}
-        </span>
-        <input
-          ref={input}
-          name={name}
-          role="spinbutton"
-          aria-label={name}
-          aria-valuenow={typeof value === 'number' ? tidy(value * scale) : undefined}
-          aria-valuemin={least === undefined || !Number.isFinite(least) ? undefined : tidy(least * scale)}
-          aria-valuemax={most === undefined || !Number.isFinite(most) ? undefined : tidy(most * scale)}
-          aria-valuetext={value === 'mixed' ? t.editor.props.mixed : shown ? `${shown}${unit}` : placeholder}
-          data-testid={testId}
-          data-draft={draft === null ? undefined : ''}
-          inputMode="decimal"
-          size={1}
-          value={text}
-          placeholder={hint}
-          onFocus={entry.input.onFocus}
-          onChange={(event) => setDraft(event.target.value)}
-          onBlur={(event) => {
-            entry.input.onBlur()
-            if (typedNow.current !== null) commit(event.target.value)
-          }}
-          onKeyDown={(event) => {
-            // Undo and redo are the design's while nothing is being typed; once something is, the
-            // field's own, taking back what was typed.
-            const action = shortcutFor(event.nativeEvent)
-            if (editor && typedNow.current === null && (action === 'undo' || action === 'redo')) {
-              event.preventDefault()
-              editor.perform(action)
-            } else if (event.key === 'Enter') commit(event.currentTarget.value)
-            else if (event.key === 'Escape') {
-              // What was typed is thrown away and the field keeps the focus, its value chosen again;
-              // with nothing typed, the field lets go of the focus.
-              const typed = typedNow.current !== null
-              setDraft(null)
-              if (typed) requestAnimationFrame(() => input.current?.select())
-              else event.currentTarget.blur()
-            } else if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
-              event.preventDefault()
-              setDraft(null)
-              shift(((event.key === 'ArrowUp' ? 1 : -1) * stepOf(event)) / scale)
-            } else if ((event.key === 'Home' || event.key === 'End') && hasEnds && draft === null) {
-              // A range's ends, as a slider's; while a value is being typed they move the caret.
-              event.preventDefault()
-              onSet(event.key === 'Home' ? min : max)
-            } else return
-            // Keys typed into a field are the field's, not the stage's.
-            event.stopPropagation()
-          }}
-          className={cn(
-            NUMBER_TEXT,
-            fill.at === null ? NUMBER_SELECTED : NUMBER_SELECTED_ON_FILL,
-            'w-full min-w-0 cursor-[inherit] bg-transparent pe-[2px] text-end outline-none focus-visible:outline-none! placeholder:text-subtle focus:cursor-text',
-            entry.typing && 'select-text',
-          )}
-        />
-      </span>
+      <NumberInput
+        entry={entry}
+        text={text}
+        hint={hint}
+        strong={fill.at !== null}
+        name={name}
+        role="spinbutton"
+        aria-label={name}
+        aria-valuenow={typeof value === 'number' ? tidy(value * scale) : undefined}
+        aria-valuemin={least === undefined || !Number.isFinite(least) ? undefined : tidy(least * scale)}
+        aria-valuemax={most === undefined || !Number.isFinite(most) ? undefined : tidy(most * scale)}
+        aria-valuetext={value === 'mixed' ? t.editor.props.mixed : shown ? `${shown}${unit}` : placeholder}
+        data-testid={testId}
+        data-draft={draft === null ? undefined : ''}
+        onChange={(event) => setDraft(event.target.value)}
+        onBlur={(event) => {
+          if (typedNow.current !== null) commit(event.target.value)
+        }}
+        onKeyDown={(event) => {
+          // Undo and redo are the design's while nothing is being typed; once something is, the
+          // field's own, taking back what was typed.
+          const action = shortcutFor(event.nativeEvent)
+          if (editor && typedNow.current === null && (action === 'undo' || action === 'redo')) {
+            event.preventDefault()
+            editor.perform(action)
+          } else if (event.key === 'Enter') commit(event.currentTarget.value)
+          else if (event.key === 'Escape') {
+            // What was typed is thrown away and the field keeps the focus, its value chosen again;
+            // with nothing typed, the field lets go of the focus.
+            const typed = typedNow.current !== null
+            setDraft(null)
+            if (typed) entry.reselect()
+            else event.currentTarget.blur()
+          } else if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
+            event.preventDefault()
+            setDraft(null)
+            shift(((event.key === 'ArrowUp' ? 1 : -1) * stepOf(event)) / scale)
+          } else if ((event.key === 'Home' || event.key === 'End') && hasEnds && draft === null) {
+            // A range's ends, as a slider's; while a value is being typed they move the caret.
+            event.preventDefault()
+            onSet(event.key === 'Home' ? min : max)
+          } else return
+          // Keys typed into a field are the field's, not the stage's.
+          event.stopPropagation()
+        }}
+      />
       {unit && (shown !== '' || !!draft) && (
-        // Against the digits: back over the gap and the input's room for the caret.
-        <span aria-hidden className={cn(NUMBER_TEXT, 'relative -ms-[calc(0.5rem+2px)] shrink-0')}>
+        // Against the digits: back over the gap, and over the input's room for the caret where that
+        // is on its side, after digits that read left to right.
+        <span aria-hidden className={cn(NUMBER_TEXT, 'relative -ms-[calc(0.5rem+2px)] shrink-0 rtl:-ms-2')}>
           {unit}
         </span>
       )}
@@ -237,25 +213,30 @@ export function NumberField({
 
 /**
  * A colour: a swatch that opens the system picker (unless `swatch` is off, where a swatch beside it
- * does more), the hex, and its opacity as a percentage. A
- * change gives `onSet` the colour to build from the one the document holds then, so a hex and an
- * opacity committed one after the other each keep the other's change.
+ * does more), the hex, and its opacity as a percentage, a number field. A change gives `onSet` the
+ * colour to build from the one the document holds then, so a hex and an opacity committed one after
+ * the other each keep the other's change, and an opacity stepped or dragged across layers whose
+ * colours differ moves each from its own. With `editor`, a drag of the opacity is one undo step.
  */
 export function ColorField({
   name,
   value,
   swatch = true,
+  editor,
   onSet,
 }: {
   name: string
   value: string | 'mixed' | undefined
   swatch?: boolean
+  editor?: Editor | undefined
   onSet: (to: (now: string | undefined) => string) => void
 }) {
   const t = useMessages()
   const p = t.editor.props
   const hex = value && value !== 'mixed' ? hexOf(value).toUpperCase() : ''
-  const alpha = value && value !== 'mixed' ? alphaOf(value) : undefined
+  /** An opacity in whole percents, as the field shows it. */
+  const percents = (color: string) => Math.round(alphaOf(color) * 100) / 100
+  const opacity = value === 'mixed' ? 'mixed' : value ? percents(value) : undefined
   const [draft, setDraft, typedNow] = useDraft()
   const commitHex = (text: string) => {
     setDraft(null)
@@ -290,24 +271,23 @@ export function ColorField({
         }}
         className={cn(FIELD, 'uppercase')}
       />
-      <input
-        name="colour-opacity"
-        dir="ltr"
-        aria-label={format(p.alpha, { name })}
-        inputMode="numeric"
-        key={alpha ?? 'mixed'}
-        defaultValue={alpha === undefined ? '' : String(Math.round(alpha * 100))}
-        placeholder={value === 'mixed' ? '–' : ''}
-        onBlur={(event) => {
-          const n = Number.parseFloat(event.target.value)
-          if (Number.isFinite(n) && hex && Math.round(n) !== Math.round((alpha ?? 1) * 100)) onSet(alphaChange(n / 100))
-        }}
-        onKeyDown={(event) => {
-          if (event.key === 'Enter') event.currentTarget.blur()
-          event.stopPropagation()
-        }}
-        className={cn(FIELD, 'w-11 shrink-0 text-end')}
-      />
+      <div className="w-[4.5rem] shrink-0">
+        <NumberField
+          label=""
+          name={format(p.alpha, { name })}
+          value={opacity}
+          scale={100}
+          min={0}
+          max={1}
+          unit="%"
+          editor={editor}
+          testId="colour-opacity"
+          onSet={(to) => opacity !== undefined && onSet(alphaChange(to))}
+          onShift={(by) =>
+            opacity !== undefined && onSet((now) => alphaChange(clamp(percents(now || '#000000') + by, 0, 1))(now))
+          }
+        />
+      </div>
     </div>
   )
 }
