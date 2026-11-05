@@ -63,12 +63,15 @@ export interface ActionsDeps {
   frameActions: Pick<EditorFrameActions, 'frameAction'>
   /**
    * Tells the app that auto layout places some of the layers an align or distribute would move, or
-   * what a layer held that an ungroup would leave somewhere else.
+   * some of the selected layers an ungroup leaves whole while it takes the others apart.
    */
   notify: (notice: 'placedByLayout') => void
   /** Draws the overlay. */
   drawOverlay: () => void
 }
+
+/** What Ungroup would do for the selection, or why it has nothing to do (`EditorActions.ungroupState`). */
+export type UngroupState = 'ready' | 'none' | 'locked' | 'placedByLayout'
 
 export interface EditorActions {
   /**
@@ -77,6 +80,13 @@ export interface EditorActions {
    * open on the stage first: they do nothing here.
    */
   perform(action: ShortcutAction): boolean
+  /**
+   * What Ungroup would do for the selection: `ready` while a selected group, box or boolean comes
+   * apart with every layer of its frame staying where it is drawn; otherwise why none can, `locked`
+   * when each is locked against deleting, else `placedByLayout` when an auto layout box would place
+   * what one holds elsewhere; `none` with no group, box or boolean selected.
+   */
+  ungroupState(): UngroupState
   /** Fits the selection in view, else the picked frame, else the shown page's frames. */
   fitSelection(): void
 }
@@ -129,6 +139,36 @@ export function editorActions({
       runQuietly(() => trial.run('node.ungroup', { ids: [id], drawn: placed })) &&
       boxes.drawnAlike(frame.id, now, trial.design())
     )
+  }
+
+  /**
+   * The selected groups, boxes and booleans that come apart with nothing moving, each with where
+   * what it holds is drawn; how many were selected; and how many stay whole because their auto
+   * layout box would place what they hold elsewhere. One locked against deleting stays whole too.
+   */
+  function ungroupable() {
+    const current = selection.current()
+    const frame = current && frameOf(current.frameId)
+    const now = session.design()
+    const containers = frame
+      ? boxes.roots(now).filter((id) => ['group', 'box', 'boolean'].includes(now.nodes[id]?.type ?? ''))
+      : []
+    const unlocked = containers.filter((id) => !now.nodes[id]?.lock?.delete)
+    const placed = (id: string) => boxes.drawnInFlow(childrenOf(now, id).map(([child]) => child)) ?? {}
+    const groups = unlocked
+      .filter(
+        (id) => !layoutIn(now.nodes[id]?.parentId ?? '', now) || (frame && ungroupKeeps(frame, id, placed(id), now)),
+      )
+      .map((id) => ({ id, drawn: placed(id) }))
+    return { groups, selected: containers.length, placedByLayout: unlocked.length - groups.length }
+  }
+
+  /** What Ungroup would do for the selection, or why it has nothing to do. */
+  function ungroupState(): UngroupState {
+    const { groups, selected, placedByLayout } = ungroupable()
+    if (selected === 0) return 'none'
+    if (groups.length > 0) return 'ready'
+    return placedByLayout > 0 ? 'placedByLayout' : 'locked'
   }
 
   /** Combines the selected shapes into a live boolean (#44) and selects it. One undo step. */
@@ -445,26 +485,25 @@ export function editorActions({
         break
       case 'ungroup': {
         // Boxes and booleans come apart the same way: what a box laid out stays where it is drawn,
-        // and a boolean's shapes show their own paints again.
-        const containers = ids.filter((id) => ['group', 'box', 'boolean'].includes(nodes[id]?.type ?? ''))
-        if (containers.length === 0) return false
-        const now = session.design()
-        const placed = (id: string) => boxes.drawnInFlow(childrenOf(now, id).map(([child]) => child)) ?? {}
-        // In an auto layout box, a layer comes apart only when what it held takes its place in the
-        // flow with nothing moving; otherwise it stays whole and the app says why.
-        const groups = containers.filter(
-          (id) => !layoutIn(nodes[id]?.parentId ?? '', now) || ungroupKeeps(frame, id, placed(id), now),
-        )
-        if (groups.length < containers.length) notify('placedByLayout')
+        // and a boolean's shapes show their own paints again. In an auto layout box, a layer comes
+        // apart only when what it held takes its place in the flow with nothing moving, and one
+        // locked against deleting stays whole; while none can, the menus grey Ungroup with the
+        // reason and its key does nothing.
+        const { groups, selected, placedByLayout } = ungroupable()
+        if (selected === 0) return false
         if (groups.length === 0) return true
-        const drawn = Object.assign({}, ...groups.map(placed))
+        if (placedByLayout > 0) notify('placedByLayout')
+        const freeing = groups.map((group) => group.id)
         let freed: string[] = []
         if (
           runQuietly(() => {
-            freed = session.run('node.ungroup', { ids: groups, drawn })
+            freed = session.run('node.ungroup', {
+              ids: freeing,
+              drawn: Object.assign({}, ...groups.map((g) => g.drawn)),
+            })
           })
         ) {
-          selection.select([...ids.filter((id) => !groups.includes(id)), ...freed], frame.id)
+          selection.select([...ids.filter((id) => !freeing.includes(id)), ...freed], frame.id)
         }
         break
       }
@@ -519,6 +558,7 @@ export function editorActions({
 
   return {
     perform,
+    ungroupState,
     fitSelection,
   }
 }

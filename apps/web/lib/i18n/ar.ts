@@ -213,6 +213,7 @@ export const ar: Messages = {
       order: 'الترتيب',
       arrange: 'ترتيب',
       placedByLayout: 'التخطيط التلقائي يحدد مكان هذه الطبقة',
+      ungroupMoves: 'التخطيط التلقائي سينقل ما تحتويه',
       atFront: 'في المقدمة بالفعل',
       atBack: 'في الخلف بالفعل',
       lockedRow: 'الطبقة مقفلة',
