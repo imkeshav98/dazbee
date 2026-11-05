@@ -33,6 +33,7 @@ import { useMessages } from '@/lib/i18n/client.tsx'
 import { format } from '@/lib/i18n/index.ts'
 
 import {
+  LAYER_ROW,
   ROW_LABEL,
   ROW_LOOK,
   ROW_SELECTED,
@@ -113,6 +114,7 @@ export const LayerRow = memo(function LayerRow({
   hidden,
   drop,
   picture,
+  pitch,
   api,
 }: {
   row: LayerTreeRow
@@ -124,6 +126,8 @@ export const LayerRow = memo(function LayerRow({
   hidden: boolean
   drop: Where | null
   picture: string | null
+  /** The rows' height on this screen; roomier on a phone or a touch screen, with targets a finger can hit. */
+  pitch: number
   api: RowApi
 }) {
   const t = useMessages()
@@ -132,6 +136,7 @@ export const LayerRow = memo(function LayerRow({
   const { id, node, depth } = row
   const locked = isLocked(node)
   const LayerIcon = iconOf(node)
+  const roomy = pitch > LAYER_ROW
   // A box says whether it is plain or stacks what it holds.
   const kind =
     node.type === 'box'
@@ -160,7 +165,7 @@ export const LayerRow = memo(function LayerRow({
         event.dataTransfer.setData(DRAG_TYPE, id)
       }}
       onDragEnd={() => api.dragEnd()}
-      style={rowPlace(i, depth)}
+      style={rowPlace(i, depth, pitch)}
       className={cn(
         ROW_LOOK,
         'font-medium',
@@ -210,21 +215,25 @@ export const LayerRow = memo(function LayerRow({
           {node.name}
         </span>
       )}
-      <RowToggle
-        on={hidden}
-        label={format(hidden ? t.editor.layersPanel.show : t.editor.layersPanel.hide, { name: node.name })}
-        state={hidden ? 'hidden' : 'shown'}
-        onToggle={() => api.hide(id, !hidden)}
-        icon={hidden ? EyeSlashIcon : EyeIcon}
-        testId="layer-hide"
-      />
-      <RowToggle
-        on={locked}
-        label={format(locked ? t.editor.layersPanel.unlock : t.editor.layersPanel.lock, { name: node.name })}
-        onToggle={() => api.lock(id, !locked)}
-        icon={locked ? LockSimpleIcon : LockSimpleOpenIcon}
-        testId="layer-lock"
-      />
+      <span className={cn('flex shrink-0', roomy ? 'gap-[8px]' : 'gap-1.5')}>
+        <RowToggle
+          on={hidden}
+          label={format(hidden ? t.editor.layersPanel.show : t.editor.layersPanel.hide, { name: node.name })}
+          state={hidden ? 'hidden' : 'shown'}
+          onToggle={() => api.hide(id, !hidden)}
+          icon={hidden ? EyeSlashIcon : EyeIcon}
+          roomy={roomy}
+          testId="layer-hide"
+        />
+        <RowToggle
+          on={locked}
+          label={format(locked ? t.editor.layersPanel.unlock : t.editor.layersPanel.lock, { name: node.name })}
+          onToggle={() => api.lock(id, !locked)}
+          icon={locked ? LockSimpleIcon : LockSimpleOpenIcon}
+          roomy={roomy}
+          testId="layer-lock"
+        />
+      </span>
       {/* The end labels line up with the frames' sizes, after the toggles. */}
       {kind && !renaming && (
         <span data-testid="layer-kind" className={cn(ROW_LABEL, 'pe-1.5')}>
@@ -240,13 +249,14 @@ export const LayerRow = memo(function LayerRow({
   )
 })
 
-/** Lock or hide on a row: shown while the row is hovered or focused, and always while it is on. */
+/** Lock or hide on a row: shown while the row is hovered or focused, on a touch screen, and always while it is on. */
 function RowToggle({
   on,
   label,
   state,
   onToggle,
   icon: ToggleIcon,
+  roomy,
   testId,
 }: {
   on: boolean
@@ -254,6 +264,7 @@ function RowToggle({
   state?: string
   onToggle: () => void
   icon: Icon
+  roomy: boolean
   testId: string
 }) {
   return (
@@ -270,8 +281,11 @@ function RowToggle({
       }}
       onDoubleClick={(event) => event.stopPropagation()}
       className={cn(
-        'grid size-6 shrink-0 cursor-pointer place-items-center rounded-[6px] text-subtle hover:bg-hover hover:text-text active:bg-pressed',
-        !on && 'opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100',
+        'grid shrink-0 cursor-pointer place-items-center rounded-[6px] text-subtle hover:bg-hover hover:text-text active:bg-pressed',
+        roomy ? 'size-[44px]' : 'size-6',
+        // Off, it shows while the row is hovered or focused, and always on a screen without hover,
+        // so nothing a finger can't see acts on a tap.
+        !on && 'opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100 [@media(hover:none)]:opacity-100',
       )}
     >
       <ToggleIcon size={14} aria-hidden />

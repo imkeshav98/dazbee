@@ -24,6 +24,7 @@ export function useTreeFocus({
   isFrame,
   scroller,
   follow,
+  pitch,
 }: {
   editor: Editor
   design: Design
@@ -34,6 +35,7 @@ export function useTreeFocus({
   isFrame: (id: string) => boolean
   scroller: RefObject<HTMLDivElement | null>
   follow: (el: HTMLElement) => void
+  pitch: number
 }) {
   // The row keyboard focus was last on: the one the arrows move from.
   const [active, setActive] = useState<string | null>(null)
@@ -81,12 +83,12 @@ export function useTreeFocus({
     (id: string, at = indexOf.get(id)) => {
       const el = scroller.current
       if (!el || at === undefined) return
-      scrollToRow(el, at)
+      scrollToRow(el, at, pitch)
       follow(el)
       setActive(id)
       focusing.current = id
     },
-    [indexOf, follow],
+    [indexOf, follow, pitch],
   )
   // Moves the focus off a row that left the list and back when it returns, then focuses the row
   // asked for in the commit that renders it, so it reads the rows that commit put in

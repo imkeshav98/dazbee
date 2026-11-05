@@ -1,13 +1,14 @@
 // The layers panel's frames at the three screen sizes, in Chromium: the frame rows, a deep group and a
-// picked frame clear of the rest of the editor with nothing cut short, and screenshots of each in both
-// themes.
+// picked frame clear of the rest of the editor with nothing cut short; on a phone, rows a finger can
+// hit; on a touch screen, every row's hide and lock showing as targets a finger can hit; and
+// screenshots of each in both themes.
 import { writeOutput } from '../../support/editor.ts'
 import { THEMES } from '../../support/glass.ts'
 import { layerRow, openSized, picked } from '../../support/layers-frames.ts'
-import { frameRow, row, tabIntoTree } from '../../support/layers-panel.ts'
+import { frameRow, row, tabIntoTree, tree } from '../../support/layers-panel.ts'
 import { EDITOR_CHROME, layoutProblems, SCREEN_SIZES } from '../../support/layout.ts'
 import { copyIn } from '../../support/seed.ts'
-import { nextFrame } from '../../support/stage.ts'
+import { nextFrame, read } from '../../support/stage.ts'
 import { expect, test } from '../../support/test.ts'
 
 test.describe.configure({ timeout: 180_000 })
@@ -35,6 +36,13 @@ for (const [width, height] of SCREEN_SIZES) {
       )
       expect(fits, `${name} shows whole`).toBe(true)
     }
+    if (width < 640) {
+      // On a phone every row is at least 44 px tall.
+      const heights = await tree(page)
+        .getByRole('treeitem')
+        .evaluateAll((rows) => rows.map((r) => r.getBoundingClientRect().height))
+      expect(Math.min(...heights)).toBeGreaterThanOrEqual(44)
+    }
     await frameRow(page, 'Fresh square').click()
     expect(await picked(page)).toBe('fresh')
     await nextFrame(page)
@@ -42,6 +50,44 @@ for (const [width, height] of SCREEN_SIZES) {
     expect(errors).toEqual([])
   })
 }
+
+test('on a touch screen every layer row shows its hide and lock, 44 px targets 8 px apart, and a tap on one acts', async ({
+  browser,
+}) => {
+  const { page, errors } = await openSized(browser, { width: 390, height: 844 }, { touch: true })
+  await frameRow(page, 'Sale square').tap()
+  await expect(row(page, 'Photo')).toBeInViewport()
+  expect(await layoutProblems(page, { pieces: PIECES })).toEqual([])
+  for (const id of ['badge', 'button', 'logo', 'head', 'photo']) {
+    const toggles = await Promise.all(
+      ['layer-hide', 'layer-lock'].map((name) =>
+        layerRow(page, id)
+          .getByTestId(name)
+          .evaluate((el) => {
+            const box = el.getBoundingClientRect()
+            return {
+              left: box.left,
+              right: box.right,
+              width: box.width,
+              height: box.height,
+              opacity: getComputedStyle(el).opacity,
+            }
+          }),
+      ),
+    )
+    for (const toggle of toggles) {
+      expect(toggle.opacity, `${id}'s toggles show`).toBe('1')
+      expect(Math.min(toggle.width, toggle.height), `${id}'s toggles are 44 px`).toBeGreaterThanOrEqual(44)
+    }
+    const [a, b] = toggles.sort((x, y) => x.left - y.left)
+    expect((b?.left ?? 0) - (a?.right ?? 0), `${id}'s toggles apart`).toBeGreaterThanOrEqual(8)
+  }
+  writeOutput('layers-frames-390-touch-toggles.png', await page.screenshot({ animations: 'disabled' }))
+  // A tap on Headline's eye hides Headline, as the eye shows.
+  await layerRow(page, 'head').getByTestId('layer-hide').tap()
+  await expect.poll(async () => ((await read(page)).nodes.head?.props as { visible?: boolean }).visible).toBe(false)
+  expect(errors).toEqual([])
+})
 
 for (const [width, height] of SCREEN_SIZES) {
   for (const theme of THEMES) {

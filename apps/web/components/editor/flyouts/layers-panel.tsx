@@ -24,7 +24,7 @@ import { dirOf, format } from '@/lib/i18n/index.ts'
 
 import { FrameRow } from './frame-row.tsx'
 import { LayerRow } from './layer-row.tsx'
-import { LAYER_ROW, type RowApi, type Where } from './tree-row.tsx'
+import { type RowApi, useRowPitch, type Where } from './tree-row.tsx'
 import { useLayerPictures } from './use-layer-pictures.ts'
 import { scrollToRow, useRowWindow } from './use-row-window.ts'
 import { useTreeFocus } from './use-tree-focus.ts'
@@ -84,7 +84,8 @@ export function LayersPanel({ editor }: { editor: Editor }) {
   // Which rows are in view.
   const scroller = useRef<HTMLDivElement>(null)
   const scrollerRef = useOverlayScroll(scroller)
-  const { view, follow } = useRowWindow(scroller)
+  const pitch = useRowPitch()
+  const { view, follow } = useRowWindow(scroller, pitch)
   const scrolledAt = useRef(0)
   const first = view.from
   const last = Math.min(rows.length, view.to)
@@ -102,6 +103,7 @@ export function LayersPanel({ editor }: { editor: Editor }) {
     isFrame,
     scroller,
     follow,
+    pitch,
   })
 
   // A selection made anywhere shows its row: the list scrolls to the topmost selected row once it
@@ -115,7 +117,7 @@ export function LayersPanel({ editor }: { editor: Editor }) {
     if (!Number.isFinite(at) && key) return
     shownFor.current = key
     if (!el || !Number.isFinite(at)) return
-    scrollToRow(el, at)
+    scrollToRow(el, at, pitch)
     follow(el)
   })
 
@@ -335,7 +337,7 @@ export function LayersPanel({ editor }: { editor: Editor }) {
             aria-label={format(t.editor.layersPanel.tree, { page: page?.name ?? '' })}
             aria-multiselectable
             className="relative"
-            style={{ height: rows.length * LAYER_ROW }}
+            style={{ height: rows.length * pitch }}
           >
             {shown.map(({ row, i }) =>
               row.kind === 'frame' ? (
@@ -349,6 +351,7 @@ export function LayersPanel({ editor }: { editor: Editor }) {
                   open={expanded.has(row.id)}
                   swatch={swatchOf(design, row.id)}
                   dropInto={drop?.id === row.id}
+                  pitch={pitch}
                   api={api}
                 />
               ) : (
@@ -363,6 +366,7 @@ export function LayersPanel({ editor }: { editor: Editor }) {
                   hidden={row.node.props.visible === false}
                   drop={drop?.id === row.id ? drop.where : null}
                   picture={pictures[row.id] ?? null}
+                  pitch={pitch}
                   api={api}
                 />
               ),

@@ -1,9 +1,9 @@
 'use client'
 
 // The pieces every row of the layers panel's tree shares, a frame's and a layer's: the calls a row
-// makes on the panel, its height, look and place in the list, and its caret.
+// makes on the panel, its height on this screen, its look and place in the list, and its caret.
 import { CaretRightIcon } from '@phosphor-icons/react'
-import type { DragEvent, KeyboardEvent, MouseEvent } from 'react'
+import { type DragEvent, type KeyboardEvent, type MouseEvent, useEffect, useState } from 'react'
 
 import { cn } from '@/lib/cn.ts'
 import type { Row } from '@/lib/editor/layer-tree.ts'
@@ -30,6 +30,8 @@ export interface RowApi {
 
 /** A row's height in pixels: every row is the same, which is what lets only the rows in view render. */
 export const LAYER_ROW = 36
+/** A row's height on a phone or a touch screen: a pill 44 px tall, a target a finger can hit. */
+export const ROOMY_ROW = 46
 /** A row's look: a pill, its focus ring inset, its start padded by its depth. */
 export const ROW_LOOK =
   'group absolute inset-x-1 flex cursor-default items-center gap-1.5 rounded-[8px] pe-1 text-[13px] outline-none select-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-inset'
@@ -38,11 +40,13 @@ export const ROW_SELECTED = 'bg-accent/20 text-text lit'
 /** A row's end label in mono, at the row's end: a box's kind, "only here", a frame's size. */
 export const ROW_LABEL = 'shrink-0 font-mono text-[11px] text-subtle'
 const INDENT = 16
+/** The screens whose rows are roomy: a phone's, and any a finger works without hover. */
+const ROOMY_SCREENS = '(max-width: 639px), (hover: none)'
 
 /** Where a row sits: its place in the list and its start padded by its depth, 2 px apart so each selected row reads as its own pill. */
-export const rowPlace = (i: number, depth: number) => ({
-  top: i * LAYER_ROW + 1,
-  height: LAYER_ROW - 2,
+export const rowPlace = (i: number, depth: number, pitch = LAYER_ROW) => ({
+  top: i * pitch + 1,
+  height: pitch - 2,
   paddingInlineStart: 4 + depth * INDENT,
 })
 
@@ -67,6 +71,19 @@ export function rowHandlers(api: RowApi, row: Row, i: number) {
       if (api.drop(event, row)) event.preventDefault()
     },
   }
+}
+
+/** The rows' height on this screen: ROOMY_ROW on a phone or a touch screen, else LAYER_ROW. */
+export function useRowPitch() {
+  const [pitch, setPitch] = useState(LAYER_ROW)
+  useEffect(() => {
+    const query = window.matchMedia(ROOMY_SCREENS)
+    const update = () => setPitch(query.matches ? ROOMY_ROW : LAYER_ROW)
+    update()
+    query.addEventListener('change', update)
+    return () => query.removeEventListener('change', update)
+  }, [])
+  return pitch
 }
 
 /** A row's caret, which opens and closes it and never renames it; an empty space of its size on a row with nothing inside. */

@@ -26,6 +26,7 @@ export const FrameRow = memo(function FrameRow({
   open,
   swatch,
   dropInto,
+  pitch,
   api,
 }: {
   row: FrameTreeRow
@@ -37,6 +38,8 @@ export const FrameRow = memo(function FrameRow({
   /** The frame's background as its swatch shows it: a colour, see-through or not, mixed for an image, or none. */
   swatch: string
   dropInto: boolean
+  /** The rows' height on this screen. */
+  pitch: number
   api: RowApi
 }) {
   const t = useMessages()
@@ -54,7 +57,7 @@ export const FrameRow = memo(function FrameRow({
       data-drop={dropInto ? 'into' : undefined}
       tabIndex={focusable ? 0 : -1}
       {...rowHandlers(api, row, i)}
-      style={rowPlace(i, 0)}
+      style={rowPlace(i, 0, pitch)}
       className={cn(ROW_LOOK, picked ? ROW_SELECTED : LIT_ROW, dropInto && 'ring-2 ring-accent ring-inset')}
     >
       <RowCaret shown={row.hasChildren} open={open} name={frame.name} onToggle={() => api.toggle(id)} />
