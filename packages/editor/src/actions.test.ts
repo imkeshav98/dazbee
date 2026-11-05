@@ -177,6 +177,18 @@ describe('editorActions', () => {
       expect(session.design().nodes.a?.parentId).toBe(group)
     })
 
+    it('ungroups a box, what its auto layout placed staying where it is drawn, and selects what it held', () => {
+      const { actions, session, selection, frame, at } = harness()
+      selection.select(['row'], frame.id)
+      expect(actions.perform('ungroup')).toBe(true)
+      expect(session.design().nodes.row).toBeUndefined()
+      expect(session.design().nodes.inRow?.parentId).toBe('sq')
+      expect(at('inRow')).toEqual({ x: 100, y: 500 })
+      expect(selection.current()?.ids).toEqual(['inRow'])
+      session.undo()
+      expect(session.design().nodes.inRow?.parentId).toBe('row')
+    })
+
     it('aligns the selected layers to the left one, as one undo step', () => {
       const { actions, session, selection, frame, at } = harness()
       selection.select(['a', 'b'], frame.id)

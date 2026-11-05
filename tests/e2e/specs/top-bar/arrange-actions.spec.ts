@@ -79,11 +79,16 @@ test('one layer has its actions in the full menu and the right-click menu; sever
   await expect.poll(async () => (await order(page)).length).toBe(4)
   await page.evaluate(() => window.dazbee?.perform('undo'))
 
-  // Group two, then ungroup them, by their keys: neither is in a menu.
+  // Group two by its key, as Put in a box is the menu's way to group; the group's ⋯ has Ungroup,
+  // and its key ungroups too.
   await selectLayers(page, ['b', 'c'])
   await page.keyboard.press('Control+KeyG')
   await expect.poll(async () => Object.values(await nodes(page)).some((n) => n.type === 'group')).toBe(true)
   const group = Object.entries(await nodes(page)).find(([, n]) => n.type === 'group')?.[0] ?? ''
+  await selectLayers(page, [group])
+  await more('Ungroup')
+  await expect.poll(async () => Object.values(await nodes(page)).some((n) => n.type === 'group')).toBe(false)
+  await page.evaluate(() => window.dazbee?.perform('undo'))
   await selectLayers(page, [group])
   await page.keyboard.press('Control+Shift+KeyG')
   await expect.poll(async () => Object.values(await nodes(page)).some((n) => n.type === 'group')).toBe(false)

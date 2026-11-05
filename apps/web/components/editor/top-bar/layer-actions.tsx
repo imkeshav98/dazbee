@@ -3,10 +3,10 @@
 // The selected layers' own actions, one list for the small menu's ⋯ (the full menu) and the
 // right-click menu: Copy ▸ and Paste ▸ (the layers or their style), duplicate, Copy to other frames ▸
 // (style, text or the layer, into the linked frames); order and line up with the frame as menus
-// beside their rows, and the turn; box, mask (or release the mask a layer is under); text
-// direction; and, at the bottom, lock, hide and delete in all frames, acting on the layers and
-// their linked copies. Every row runs the same editor action as its shortcut. An item that never
-// applies is left out; one with nothing to do is greyed, its tooltip saying why.
+// beside their rows, and the turn; box, ungroup for a group or a box, mask (or release the mask a
+// layer is under); text direction; and, at the bottom, lock, hide and delete in all frames, acting on
+// the layers and their linked copies. Every row runs the same editor action as its shortcut. An item
+// that never applies is left out; one with nothing to do is greyed, its tooltip saying why.
 import { CaretRightIcon } from '@phosphor-icons/react'
 import * as Popover from '@radix-ui/react-popover'
 import { type ReactNode, useState } from 'react'
@@ -167,6 +167,7 @@ export function LayerActions({ editor, ids, onDone }: { editor: Editor; ids: str
       )}
       <div className={MENU_DIVIDER} />
       {row('boxSelection', b.putInBox)}
+      {target.types.every((type) => type === 'group' || type === 'box') && row('ungroup', t.editor.arrange.ungroup)}
       {over ? (
         <button
           type="button"

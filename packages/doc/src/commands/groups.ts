@@ -3,7 +3,7 @@
 import { nanoid } from 'nanoid'
 import { z } from 'zod'
 
-import { BooleanOp, canHold, Layer, type Layer as LayerT, NodeId } from '@dazbee/schema'
+import { BooleanOp, canHold, type Design, Layer, type Layer as LayerT, NodeId } from '@dazbee/schema'
 
 import { ancestorsOf, childrenOf, descendants, isInside } from '../children.ts'
 import { DELETED, toYNode } from '../design-doc.ts'
@@ -118,28 +118,31 @@ export const nodeBoolean = defineCommand({
 })
 
 /**
- * Takes the layers out of groups or booleans and removes them, without moving anything on
- * screen: a turned group's turn goes into each layer it held, and a hidden group hides them.
- * Shapes out of a boolean show their own paints again. The layers take the group's place among
- * its siblings. Returns their ids, in order.
+ * Takes the layers out of groups, boxes or booleans and removes them, without moving anything on
+ * screen: what a box's auto layout placed goes where `drawn` says it is drawn, a turned group's
+ * turn goes into each layer it held, and a hidden group hides them. Shapes out of a boolean show
+ * their own paints again. The layers take the group's place among its siblings. Returns their ids,
+ * in order.
  */
 export const nodeUngroup = defineCommand({
   name: 'node.ungroup',
-  input: z.object({ ids: NodeId.array().min(1) }),
+  input: z.object({ ids: NodeId.array().min(1), drawn: DrawnBoxes.optional() }),
   check: ({ design }, { ids }) => {
     for (const id of ids) {
       const node = design.nodes[id]
       if (!node) return missingLayer(design, [id])
-      if (node.type !== 'group' && node.type !== 'boolean') return `"${id}" is a ${node.type}, not a group or boolean`
+      if (node.type !== 'group' && node.type !== 'box' && node.type !== 'boolean')
+        return `"${id}" is a ${node.type}, not a group, box or boolean`
       const locked = lockProblem(id, node, 'delete')
       if (locked) return locked
     }
     return undefined
   },
-  apply: ({ r, design }, { ids }) => {
+  apply: ({ r, design }, { ids, drawn = {} }) => {
     const freed: string[] = []
     const groups = ids.filter((id) => !ids.some((other) => other !== id && isInside(design, id, other)))
     const plan = boxPlan(design)
+    placeDrawn(plan, design, drawn)
     for (const id of groups) {
       const group = plan.get(id)
       for (const [kid] of childrenOf(design, id)) {
@@ -247,16 +250,7 @@ function wrap(
   const inside = childrenOf(design, parentId).filter(([child]) => ids.includes(child))
   const top = inside.at(-1)?.[1] as LayerT
   const plan = boxPlan(design)
-  for (const [child, box] of Object.entries(drawn)) {
-    if (!ids.includes(child)) continue
-    const was = plan.get(child)
-    plan.set(child, box)
-    // What it holds is drawn where the flow put it too: it moves by as much.
-    for (const inner of descendants(design, child)) {
-      const at = plan.get(inner)
-      plan.set(inner, { x: at.x + box.x - was.x, y: at.y + box.y - was.y })
-    }
-  }
+  placeDrawn(plan, design, Object.fromEntries(Object.entries(drawn).filter(([child]) => ids.includes(child))))
   plan.write(r)
   const absolute = inside.every(([, child]) => child.props.absolute)
   const hug = boundsOf(inside.map(([child]) => plan.get(child)))
@@ -277,4 +271,17 @@ function wrap(
   // Their indexes already order them; they only change parent.
   for (const [child] of inside) r.nodes.get(child)?.set('parentId', id)
   return id
+}
+
+/** Plans each layer at the box it is drawn in, as an auto layout box places it, and what it holds moved by as much. */
+function placeDrawn(plan: ReturnType<typeof boxPlan>, design: Design, drawn: DrawnBoxes) {
+  for (const [child, box] of Object.entries(drawn)) {
+    if (!design.nodes[child]) continue
+    const was = plan.get(child)
+    plan.set(child, box)
+    for (const inner of descendants(design, child)) {
+      const at = plan.get(inner)
+      plan.set(inner, { x: at.x + box.x - was.x, y: at.y + box.y - was.y })
+    }
+  }
 }

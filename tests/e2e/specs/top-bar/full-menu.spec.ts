@@ -60,6 +60,49 @@ test.describe('the full menu', () => {
     expect(errors).toEqual([])
   })
 
+  test('shows Ungroup after Put in a box for a group or a box, hidden for any other selection; it takes what they hold out in their frame', async ({
+    browser,
+  }) => {
+    const { page, errors } = await open(browser)
+    for (const [ids, shown] of [
+      [['logo'], true],
+      [['card'], true],
+      [['logo', 'card'], true],
+      [['badge'], false],
+      [['shapes'], false],
+      [['headline'], false],
+      [['logo', 'badge'], false],
+    ] as const) {
+      await selectLayers(page, [...ids])
+      const rows = await rowsOf(await moreMenu(page))
+      const box = rows.indexOf('Put in a box')
+      if (shown) expect(rows.slice(box, box + 2), ids.join(' ')).toEqual(['Put in a box', 'Ungroup'])
+      else expect(rows, ids.join(' ')).not.toContain('Ungroup')
+      await closeMenus(page)
+    }
+    await selectLayers(page, ['logo'])
+    await moreAction(page, 'Ungroup')
+    await expect.poll(async () => (await node(page, 'mark'))?.parentId).toBe('sq')
+    expect(await node(page, 'logo')).toBeNull()
+    expect(await node(page, copyIn('story', 'logo'))).not.toBeNull()
+    await undo(page)
+    await expect.poll(async () => (await node(page, 'mark'))?.parentId).toBe('logo')
+
+    // A box, from the right-click menu, by a press on its own fill.
+    await selectLayers(page, [])
+    const at = await page.evaluate(() => window.dazbee?.screenPoint(90, 885, 'sq'))
+    await page.mouse.click(at?.x ?? 0, at?.y ?? 0, { button: 'right' })
+    const right = page.getByTestId('stage-menu')
+    await expect(right).toBeVisible()
+    expect(await page.evaluate(() => window.dazbee?.selection())).toEqual(['card'])
+    await moreAction(page, 'Ungroup', right)
+    await expect.poll(async () => (await node(page, 'cta'))?.parentId).toBe('sq')
+    expect((await node(page, 'cta'))?.props).toMatchObject({ x: 140, y: 910 })
+    await undo(page)
+    await expect.poll(async () => (await node(page, 'cta'))?.parentId).toBe('card')
+    expect(errors).toEqual([])
+  })
+
   test('shows Text only for text layers, for every layer type and several', async ({ browser }) => {
     const { page, errors } = await open(browser)
     for (const [ids, text] of [

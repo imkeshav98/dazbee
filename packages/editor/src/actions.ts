@@ -445,13 +445,19 @@ export function editorActions({
         combine('exclude')
         break
       case 'ungroup': {
-        // Booleans come apart the same way, their shapes showing their own paints again.
-        const groups = ids.filter((id) => nodes[id]?.type === 'group' || nodes[id]?.type === 'boolean')
+        // Boxes and booleans come apart the same way: what a box laid out stays where it is drawn,
+        // and a boolean's shapes show their own paints again.
+        const groups = ids.filter((id) => ['group', 'box', 'boolean'].includes(nodes[id]?.type ?? ''))
         if (groups.length === 0) return false
+        const now = session.design()
+        const drawn = Object.assign(
+          {},
+          ...groups.map((id) => boxes.drawnInFlow(childrenOf(now, id).map(([child]) => child)) ?? {}),
+        )
         let freed: string[] = []
         if (
           runQuietly(() => {
-            freed = session.run('node.ungroup', { ids: groups })
+            freed = session.run('node.ungroup', { ids: groups, drawn })
           })
         ) {
           selection.select([...ids.filter((id) => !groups.includes(id)), ...freed], frame.id)
