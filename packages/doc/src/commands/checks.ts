@@ -1,5 +1,5 @@
-// The checks commands share: a free id, a parent that can hold a layer, a frame that exists, locks,
-// and layers that exist.
+// The checks commands share: a free id, a parent that can hold a layer, a page or frame that exists,
+// locks, and layers that exist.
 import { canHold, type Design, type Layer as LayerT, LayerLock } from '@dazbee/schema'
 
 import type { CommandContext } from './define.ts'
@@ -18,6 +18,9 @@ export const parentProblem = (design: Design, parentId: string, type: string) =>
   }
   return undefined
 }
+
+export const pageProblem = (design: Design, pageId: string) =>
+  Object.hasOwn(design.pages, pageId) ? undefined : `no page "${pageId}"`
 
 export const frameProblem = (design: Design, frameId: string) =>
   Object.hasOwn(design.frames, frameId) ? undefined : `no frame "${frameId}"`

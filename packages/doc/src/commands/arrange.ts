@@ -3,7 +3,7 @@
 import { nanoid } from 'nanoid'
 import { z } from 'zod'
 
-import { type Design, FrameId, frameIdOf, Layer, type Layer as LayerT, LayerTree, NodeId } from '@dazbee/schema'
+import { type Design, FrameId, frameIdOf, Layer, type Layer as LayerT, LayerTree, NodeId, PageId } from '@dazbee/schema'
 
 import { ancestorsOf, childrenOf, descendants, isInside } from '../children.ts'
 import { toYNode } from '../design-doc.ts'
@@ -11,7 +11,7 @@ import { centreOf, normalAngle, turn } from '../geometry.ts'
 import { boxPlan } from './box-plan.ts'
 import { missingLayer, parentProblem } from './checks.ts'
 import { type CommandContext, defineCommand } from './define.ts'
-import { copyLayers, indexBetween } from './tree.ts'
+import { copyLayers, indexBetween, linkMaker } from './tree.ts'
 
 /**
  * Moves a layer to another parent, or another place among its siblings, in its own frame: a layer
@@ -114,7 +114,7 @@ export const nodeDuplicate = defineCommand({
 
 /**
  * Places a tree of layers, such as the clipboard's, in a frame or container (#49): every layer gets
- * a fresh id and, unless `keepLinks` keeps its own, a new link id; the roots go on top in their
+ * a fresh id and, unless `keepLinksFrom` keeps its own, a new link id; the roots go on top in their
  * order, and everything moves by `dx`, `dy`. Placing the same tree twice gives two copies. Returns
  * the new roots' ids, bottom to top.
  */
@@ -126,24 +126,21 @@ export const designPlace = defineCommand({
     dx: z.number().default(0),
     dy: z.number().default(0),
     /**
-     * Each layer, in the tree's order, keeps its link id where the frame it goes into holds no
-     * layer with it and no layer placed before it kept it, so it is a linked copy; the rest get new ones.
+     * The page the tree was copied from. Into a frame of that page, each layer, in the tree's order,
+     * keeps its link id where the frame holds no layer with it and no layer placed before it kept
+     * it, so it is a linked copy; the rest, and every layer placed on another page, get new ones.
      */
-    keepLinks: z.boolean().default(false),
+    keepLinksFrom: PageId.optional(),
   }),
   check: ({ design }, { parentId, tree }) =>
     tree.roots.map((root) => parentProblem(design, parentId, tree.nodes[root]?.type ?? '')).find(Boolean),
-  apply: ({ r, design }, { parentId, tree, dx, dy, keepLinks }) => {
+  apply: ({ r, design }, { parentId, tree, dx, dy, keepLinksFrom }) => {
     const frameId = frameIdOf(design, parentId)
-    /** The link ids the frame holds, and those this place has kept so far. */
-    const held = new Set(
-      keepLinks && frameId !== undefined ? descendants(design, frameId).map((id) => design.nodes[id]?.link) : [],
+    const keeps =
+      frameId !== undefined && keepLinksFrom !== undefined && design.frames[frameId]?.pageId === keepLinksFrom
+    const linkOf = linkMaker(
+      keeps ? { held: new Set(descendants(design, frameId).map((id) => design.nodes[id]?.link ?? '')) } : 'new',
     )
-    const linkOf = (link: string) => {
-      if (!keepLinks || frameId === undefined || held.has(link)) return nanoid()
-      held.add(link)
-      return link
-    }
     const ids = new Map(Object.keys(tree.nodes).map((id) => [id, nanoid()]))
     let index = childrenOf(design, parentId).at(-1)?.[1].index ?? null
     const placed = new Map<string, { parentId: string; index: string }>()

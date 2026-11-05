@@ -7,7 +7,6 @@ import {
   Frame,
   FrameId,
   framesOf,
-  type Layer as LayerT,
   NEW_FRAME_FILLS,
   newFramePosition,
   PageId,
@@ -15,12 +14,12 @@ import {
   sizeProblem,
 } from '@dazbee/schema'
 
-import { childrenOf, descendants } from '../children.ts'
+import { descendants } from '../children.ts'
 import { DELETED, toYMap } from '../design-doc.ts'
-import { frameProblem, idProblem } from './checks.ts'
+import { frameProblem, idProblem, pageProblem } from './checks.ts'
 import { type CommandContext, defineCommand } from './define.ts'
 import type { Size } from './fit.ts'
-import { copyLayers, indexBetween, lastOrder } from './tree.ts'
+import { copyFrameLayers, indexBetween, lastOrder } from './tree.ts'
 
 /** A frame's name as a command takes it. */
 export const FrameName = z.string().trim().min(1).max(120)
@@ -41,9 +40,7 @@ export const frameAdd = defineCommand({
     y: Frame.shape.y.optional(),
   }),
   check: (ctx, { id, pageId, width, height }) =>
-    (Object.hasOwn(ctx.design.pages, pageId) ? undefined : `no page "${pageId}"`) ??
-    idProblem(ctx, id) ??
-    sizeProblem(width, height),
+    pageProblem(ctx.design, pageId) ?? idProblem(ctx, id) ?? sizeProblem(width, height),
   apply: ({ r, design }, { id = nanoid(), pageId, x, y, ...frame }) => {
     const next = nextOnPage(design, pageId)
     r.frames.set(
@@ -140,12 +137,6 @@ function copyFrame({ r, design }: CommandContext, frameId: string, newId: string
   const to = size ?? frame
   const copy = { ...frame, ...nextOnPage(design, frame.pageId), width: to.width, height: to.height }
   r.frames.set(newId, toYMap(Frame.parse(copy)))
-  copyLayers(
-    r,
-    design,
-    childrenOf(design, frameId).map(([id]) => id),
-    (root) => ({ parentId: newId, index: (design.nodes[root] as LayerT).index }),
-    { links: 'keep', ...(size && { fit: { from: frame, to: size } }) },
-  )
+  copyFrameLayers(r, design, frameId, newId, { links: 'keep', ...(size && { fit: { from: frame, to: size } }) })
   return newId
 }

@@ -1,4 +1,5 @@
-// Where layers, pages and frames go in their order, and copies of layers with fresh ids.
+// Where layers, pages and frames go in their order, and copies of layers with fresh ids and the
+// link ids they take.
 import { generateKeyBetween } from 'fractional-indexing'
 import { nanoid } from 'nanoid'
 
@@ -8,6 +9,14 @@ import { ancestorsOf, childrenOf, descendants } from '../children.ts'
 import { toYNode } from '../design-doc.ts'
 import type { CommandContext } from './define.ts'
 import { fitted, type Size } from './fit.ts'
+
+/**
+ * The link ids copies take: 'new', a new one each; 'keep', each its original's; a Map, one new link
+ * per old link, filled as it goes, so copies made together stay linked to each other; `{ held }`,
+ * the link ids the frame they go into holds: each keeps its original's where the frame doesn't hold
+ * it yet, and then holds it, else a new one.
+ */
+export type LinkRule = 'new' | 'keep' | Map<string, string> | { held: Set<string> }
 
 /**
  * A fractional index between two neighbours that never throws. Neighbours can tie (two tabs
@@ -34,6 +43,23 @@ export function indexBetween(before: string | null, after: string | null): strin
 export const topIndex = (design: Design, parentId: string) =>
   indexBetween(childrenOf(design, parentId).at(-1)?.[1].index ?? null, null)
 
+/** The link id each copy takes, from its original's, by the rule. */
+export function linkMaker(rule: LinkRule): (old: string) => string {
+  if (rule === 'new') return () => nanoid()
+  if (rule === 'keep') return (old) => old
+  if (rule instanceof Map)
+    return (old) => {
+      const fresh = rule.get(old) ?? nanoid()
+      rule.set(old, fresh)
+      return fresh
+    }
+  return (old) => {
+    if (rule.held.has(old)) return nanoid()
+    rule.held.add(old)
+    return old
+  }
+}
+
 /**
  * Copies layers with fresh ids, each with every layer under it; `place` says where each copied
  * root goes. Returns the old id to new id map.
@@ -44,23 +70,14 @@ export function copyLayers(
   roots: string[],
   place: (root: string) => { parentId: string; index: string },
   options: {
-    /**
-     * 'new' (default): a new link id per copy. 'keep': each copy keeps its original's. A Map: one
-     * new link per old link, filled as it goes, so copies made together stay linked to each other.
-     */
-    links?: 'new' | 'keep' | Map<string, string>
+    /** The link ids the copies take ('new' by default). */
+    links?: LinkRule
     /** Lays the copies out to fit (fit.ts) from a frame of `from` to one of `to`. */
     fit?: { from: Size; to: Size }
   } = {},
 ) {
   const { links = 'new', fit } = options
-  const linkOf = (old: string) => {
-    if (links === 'new') return nanoid()
-    if (links === 'keep') return old
-    const fresh = links.get(old) ?? nanoid()
-    links.set(old, fresh)
-    return fresh
-  }
+  const linkOf = linkMaker(links)
   const ids = new Map<string, string>()
   /** The copied root each copied layer is under, itself for a root. */
   const rootOf = new Map<string, string>()
@@ -81,6 +98,27 @@ export function copyLayers(
     r.nodes.set(fresh, toYNode({ ...node, ...placed, link: linkOf(node.link), props } as LayerT))
   }
   return ids
+}
+
+/**
+ * Copies every layer of a frame into another frame, each top layer at the index it had, with
+ * everything under it. Returns the old id to new id map.
+ */
+export function copyFrameLayers(
+  r: CommandContext['r'],
+  design: Design,
+  from: string,
+  to: string,
+  options: Parameters<typeof copyLayers>[4] = {},
+) {
+  const roots = childrenOf(design, from).map(([id]) => id)
+  return copyLayers(
+    r,
+    design,
+    roots,
+    (root) => ({ parentId: to, index: (design.nodes[root] as LayerT).index }),
+    options,
+  )
 }
 
 export const depthOf = (design: Design, id: string) => ancestorsOf(design, design.nodes[id]?.parentId ?? '').length

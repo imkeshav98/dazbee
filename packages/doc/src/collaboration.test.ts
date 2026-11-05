@@ -218,7 +218,7 @@ describe('two tabs', () => {
     const { a, b, tabA, tabB, sync } = twoTabs()
     const tree = { roots: ['box'], nodes: { box: tabB.design().nodes.box as Layer } }
     tabA.run('frame.delete', { frameId: 'banner' })
-    const [pasted = ''] = tabB.run('design.place', { parentId: 'banner', tree, keepLinks: true })
+    const [pasted = ''] = tabB.run('design.place', { parentId: 'banner', tree, keepLinksFrom: 'p1' })
     sync()
     expectFullRead(tabA, a)
     expectFullRead(tabB, b)
@@ -244,8 +244,8 @@ describe('two tabs', () => {
     tabA.run('frame.add', { id: 'f2', pageId: 'p1', name: 'Frame', width: 600, height: 500 })
     sync()
     const tree = { roots: ['box'], nodes: { box: tabA.design().nodes.box as Layer } }
-    const [fromA = ''] = tabA.run('design.place', { parentId: 'f2', tree, keepLinks: true })
-    const [fromB = ''] = tabB.run('design.place', { parentId: 'f2', tree, keepLinks: true })
+    const [fromA = ''] = tabA.run('design.place', { parentId: 'f2', tree, keepLinksFrom: 'p1' })
+    const [fromB = ''] = tabB.run('design.place', { parentId: 'f2', tree, keepLinksFrom: 'p1' })
     expect([tabA.design().nodes[fromA]?.link, tabB.design().nodes[fromB]?.link]).toEqual(['box', 'box'])
     sync()
     const [keeper = '', other = ''] = [fromA, fromB].sort()
@@ -478,14 +478,16 @@ function randomCommand(tab: Session, doc: DesignDoc, random: () => number) {
       else if (which < 0.8) tab.run('frame.addSize', { frameId: pick(frames), width: side(), height: side() })
       else tab.run('frame.delete', { frameId: pick(frames) })
     } else if (roll < 0.94 && ids.length > 0) {
-      // A paste of a layer and what is in it, copied from a frame, onto a frame of the same page.
+      // A paste of a layer and what is in it, copied from a frame, keeping links from its page: most
+      // often onto a frame of that page, else onto any frame.
       const root = pick(ids)
-      const from = frameIdOf(design, root) ?? ''
-      const onPage = framesOf(design, design.frames[from]?.pageId ?? '').map(([id]) => id)
+      const from = design.frames[frameIdOf(design, root) ?? '']?.pageId ?? ''
+      const onPage = framesOf(design, from).map(([id]) => id)
       const nodes = Object.fromEntries(
         [root, ...descendants(design, root)].map((id) => [id, design.nodes[id] as Layer]),
       )
-      tab.run('design.place', { parentId: pick(onPage), tree: { roots: [root], nodes }, keepLinks: true })
+      const parentId = pick(random() < 0.8 ? onPage : Object.keys(design.frames))
+      tab.run('design.place', { parentId, tree: { roots: [root], nodes }, keepLinksFrom: from })
     } else if (roll < 0.96 && texts.length > 0) {
       const id = pick(texts)
       const node = design.nodes[id]

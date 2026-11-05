@@ -7,19 +7,17 @@ import {
   FrameId,
   framesOf,
   inOrder,
-  type Layer as LayerT,
   NEW_FRAME_FILLS,
   Page,
   PageId,
   sizeProblem,
 } from '@dazbee/schema'
 
-import { childrenOf } from '../children.ts'
 import { toYMap } from '../design-doc.ts'
-import { idProblem } from './checks.ts'
+import { idProblem, pageProblem } from './checks.ts'
 import { type CommandContext, defineCommand } from './define.ts'
 import { deleteFrame, FrameName } from './frames.ts'
-import { copyLayers, indexBetween, lastOrder } from './tree.ts'
+import { copyFrameLayers, indexBetween, lastOrder } from './tree.ts'
 
 /**
  * Adds a page after the last one, holding one empty white frame at 0, 0 of the given name and
@@ -59,7 +57,7 @@ export const pageAdd = defineCommand({
 export const pageUpdate = defineCommand({
   name: 'page.update',
   input: z.object({ id: PageId, name: z.string().optional() }),
-  check: ({ design }, { id }) => (design.pages[id] ? undefined : `no page "${id}"`),
+  check: ({ design }, { id }) => pageProblem(design, id),
   apply: ({ r, design }, { id, name }) => {
     writeRepairedPages(r, design)
     if (name !== undefined) r.pages.get(id)?.set('name', name)
@@ -75,7 +73,7 @@ export const pageUpdate = defineCommand({
 export const pageDuplicate = defineCommand({
   name: 'page.duplicate',
   input: z.object({ id: PageId, newId: PageId.optional(), name: z.string().optional() }),
-  check: (ctx, { id, newId }) => (ctx.design.pages[id] ? idProblem(ctx, newId) : `no page "${id}"`),
+  check: (ctx, { id, newId }) => pageProblem(ctx.design, id) ?? idProblem(ctx, newId),
   apply: ({ r, design }, { id, newId = nanoid(), name }) => {
     const page = design.pages[id]
     if (!page) return newId
@@ -87,13 +85,7 @@ export const pageDuplicate = defineCommand({
     for (const [frameId, frame] of framesOf(design, id)) {
       const copy = nanoid()
       r.frames.set(copy, toYMap(Frame.parse({ ...frame, pageId: newId })))
-      copyLayers(
-        r,
-        design,
-        childrenOf(design, frameId).map(([child]) => child),
-        (root) => ({ parentId: copy, index: (design.nodes[root] as LayerT).index }),
-        { links },
-      )
+      copyFrameLayers(r, design, frameId, copy, { links })
     }
     return newId
   },
@@ -104,8 +96,9 @@ export const pageMove = defineCommand({
   name: 'page.move',
   input: z.object({ id: PageId, before: PageId.nullable() }),
   check: ({ design }, { id, before }) => {
-    if (!design.pages[id]) return `no page "${id}"`
-    if (before && (before === id || !design.pages[before])) return `no other page "${before}" to go before`
+    const problem = pageProblem(design, id)
+    if (problem) return problem
+    if (before && (before === id || pageProblem(design, before))) return `no other page "${before}" to go before`
     return undefined
   },
   apply: ({ r, design }, { id, before }) => {
@@ -121,7 +114,8 @@ export const pageDelete = defineCommand({
   name: 'page.delete',
   input: z.object({ id: PageId }),
   check: ({ design }, { id }) => {
-    if (!design.pages[id]) return `no page "${id}"`
+    const problem = pageProblem(design, id)
+    if (problem) return problem
     if (Object.keys(design.pages).length === 1) return 'a design keeps at least one page'
     return undefined
   },

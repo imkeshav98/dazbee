@@ -263,7 +263,7 @@ describe('design.place', () => {
     expect(new Set(Object.values(design.nodes).map((n) => n.link)).size).toBe(2 + 9)
   })
 
-  it('with keepLinks, keeps each link id the frame it goes into holds on no layer', () => {
+  it('keeping links from a page, keeps each link id the frame it goes into holds on no layer', () => {
     const doc = testDoc()
     const tab = openTestSession(doc)
     // The square's box and headline, as a copy in the square puts them on the clipboard.
@@ -274,7 +274,7 @@ describe('design.place', () => {
     }
     tab.run('node.delete', { ids: ['banner-headline'] })
 
-    const [box, headline] = tab.run('design.place', { parentId: 'banner', tree: copied, keepLinks: true })
+    const [box, headline] = tab.run('design.place', { parentId: 'banner', tree: copied, keepLinksFrom: 'p1' })
 
     const design = readDesign(doc)
     // The banner still holds a copy of the box, so that one is a new layer; its headline was deleted.
@@ -283,7 +283,7 @@ describe('design.place', () => {
     expect(design.nodes['banner-box']?.link).toBe('box')
   })
 
-  it('with keepLinks, keeps a link id once in a frame: a second layer with it, or a second place, makes new ones', () => {
+  it('keeping links from a page, keeps a link id once in a frame: a second layer with it, or a second place, makes new ones', () => {
     const doc = testDoc()
     const tab = openTestSession(doc)
     tab.run('frame.add', { id: 'f2', pageId: 'p1', name: 'Frame', width: 600, height: 500 })
@@ -295,8 +295,8 @@ describe('design.place', () => {
     const t = tree()
     const twice = { ...t, nodes: { ...t.nodes, label: { ...t.nodes.label, link: 'tile' } } }
 
-    const [first] = tab.run('design.place', { parentId: 'holder', tree: twice, keepLinks: true })
-    const [second] = tab.run('design.place', { parentId: 'f2', tree: t, keepLinks: true })
+    const [first] = tab.run('design.place', { parentId: 'holder', tree: twice, keepLinksFrom: 'p1' })
+    const [second] = tab.run('design.place', { parentId: 'f2', tree: t, keepLinksFrom: 'p1' })
 
     const links = (root: string) => {
       const design = readDesign(doc)
@@ -308,8 +308,25 @@ describe('design.place', () => {
     const again = links(second ?? '')
     expect(again.filter((link) => ['g', 'tile', 'label'].includes(link ?? ''))).toEqual(['label'])
     // Another frame of the page holds none of them.
-    const [third] = tab.run('design.place', { parentId: 'sq', tree: t, keepLinks: true })
+    const [third] = tab.run('design.place', { parentId: 'sq', tree: t, keepLinksFrom: 'p1' })
     expect(links(third ?? '')).toEqual(['g', 'tile', 'label'])
+  })
+
+  it('keeping links from a page, gives every layer a new link id in a frame of another page', () => {
+    const doc = testDoc()
+    const tab = openTestSession(doc)
+    const square = readDesign(doc).nodes
+    const copied = { roots: ['box'], nodes: { box: square.box as Layer } }
+    tab.run('page.add', { id: 'p2', name: 'Page 2', frame: { id: 'p2-sq', name: 'Square', width: 1080, height: 1080 } })
+
+    const [onOther] = tab.run('design.place', { parentId: 'p2-sq', tree: copied, keepLinksFrom: 'p1' })
+    const [onP1] = tab.run('design.place', { parentId: 'p2-sq', tree: copied, keepLinksFrom: 'p2' })
+
+    const design = readDesign(doc)
+    // Copied on p1, so it links to nothing on p2.
+    expect(design.nodes[onOther ?? '']?.link).not.toBe('box')
+    // Said to come from p2, whose frame holds no "box" link yet, it keeps it.
+    expect(design.nodes[onP1 ?? '']?.link).toBe('box')
   })
 
   it('refuses a tree that is not whole, holds a layer its parent cannot, loops, or does not fit where it goes', () => {
