@@ -10,6 +10,7 @@ import {
   ExportRequest,
   type ExportType,
   type Frame,
+  numberedFrameNames,
   type Page,
   parseDesign,
 } from '@dazbee/schema'
@@ -38,10 +39,11 @@ const UNSAFE_IN_NAMES = /[/\\:*?"<>|\u0000-\u001f]/g
 const TOKENS = new RegExp(`\\{(${EXPORT_NAME_TOKENS.join('|')})\\}`, 'g')
 
 /**
- * The request's frames, in its order, each one file, named from the request's template; a name
- * already taken, in any case, gets " 2", " 3" and so on. One file comes as itself; more come as
- * one flat zip named after the design. `onFile` hears each file as it is made, so a caller can
- * show progress.
+ * The request's frames, in its order, each one file, named from the request's template. A frame's
+ * name is numbered by its place among its page's frames (numberedFrameNames), whichever frames are
+ * asked for, so a file takes the name Export lists its frame by; a file name still taken, in any
+ * case, gets " 2", " 3" and so on. One file comes as itself; more come as one flat zip named after
+ * the design. `onFile` hears each file as it is made, so a caller can show progress.
  */
 export function exportDesign(
   ck: CanvasKit,
@@ -58,16 +60,24 @@ export function exportDesign(
   const missing = request.frameIds.find((frameId) => !Object.hasOwn(design.frames, frameId))
   if (missing !== undefined) throw new Error(`no frame "${missing}"`)
   const taken = new Set<string>()
+  // Each page's frames' numbered names, worked out once per page.
+  const numbered = new Map<string, Map<string, string>>()
   const files = request.frameIds.map((frameId, i) => {
     const frame = design.frames[frameId] as Frame
     const page = design.pages[frame.pageId] as Page
+    let names = numbered.get(frame.pageId)
+    if (!names) numbered.set(frame.pageId, (names = numberedFrameNames(design, frame.pageId)))
     const image = {
       png: () => exportPng(ck, design, frameId, bytes, cache),
       jpg: () => exportJpg(ck, design, frameId, bytes, request.quality, cache),
       pdf: () => exportPdf(ck, design, frameId, bytes, cache),
       svg: () => exportSvg(ck, design, frameId, bytes, cache),
     }[request.type]()
-    const base = fileName(request.name, { design: design.meta.name, page: page.name, frame: frame.name })
+    const base = fileName(request.name, {
+      design: design.meta.name,
+      page: page.name,
+      frame: names.get(frameId) ?? frame.name,
+    })
     let name = `${base}.${request.type}`
     for (let n = 2; taken.has(name.toLowerCase()); n++) name = `${base} ${n}.${request.type}`
     taken.add(name.toLowerCase())
