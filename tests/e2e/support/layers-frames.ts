@@ -1,11 +1,11 @@
 // The layers-frames specs' design of linked frames on two pages, its opener and their readers.
 import type { DesignInput } from '@dazbee/schema'
 
-import { openTabs } from './editor.ts'
+import { editorPath, openTabs, setCookies } from './editor.ts'
 import { openLayers, rect, tree } from './layers-panel.ts'
 import { copyIn, frameDesign, linkedFrames, seed } from './seed.ts'
 import { fitSettled } from './stage.ts'
-import type { Browser, Page } from './test.ts'
+import { type Browser, expect, type Page } from './test.ts'
 
 const LOCKED = { move: true, resize: true, content: true, style: true, delete: true }
 const YELLOW = [{ type: 'solid' as const, color: '#FFD23FFF' }]
@@ -128,4 +128,19 @@ export async function openDesign(browser: Browser, count = 1) {
     await openLayers(tab)
   }
   return { tabs, errors }
+}
+
+/** Opens the design alone in a tab of a theme at a screen size, fitted, its fonts loaded, the panel open. */
+export async function openSized(browser: Browser, viewport: { width: number; height: number }, theme = 'dark') {
+  const designId = await seed(framesDesign())
+  const page = await (await browser.newContext({ viewport })).newPage()
+  const errors: string[] = []
+  page.on('pageerror', (error) => errors.push(error.message))
+  await setCookies(page, { theme })
+  await page.goto(editorPath(designId))
+  await expect(page.getByTestId('status')).toHaveAttribute('data-ready', '', { timeout: 60_000 })
+  await page.evaluate(() => window.dazbee?.loaded())
+  await fitSettled(page)
+  await openLayers(page)
+  return { page, errors }
 }
