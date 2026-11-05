@@ -25,7 +25,7 @@ import { format } from '@/lib/i18n/index.ts'
 
 import { angleOf, type Gradient, GradientBar, linearAt, type Stop, stopsCss } from './gradient-bar.tsx'
 import { ImagePickerButton } from './image-tool.tsx'
-import { CHIP, ICON_BUTTON, KNOBS, POPOVER, SWATCH_ROW } from './styles.ts'
+import { CHIP, FACE_SIZE, ICON_BUTTON, KNOBS, POPOVER, SQUARE_SWATCH_TARGET, SWATCH_ROW, TOUCH_GAP } from './styles.ts'
 import { Swatch } from './swatch.tsx'
 
 /** An image asset's small picture, as the API serves it. */
@@ -117,7 +117,10 @@ export function PaintRow({
   const hidden = paint.visible === false
   const focus = useMenuFocus()
   return (
-    <div className={cn('flex min-w-0 flex-1 items-center gap-1', hidden && 'opacity-50')} data-paint={paint.type}>
+    <div
+      className={cn('flex min-w-0 flex-1 items-center gap-1', TOUCH_GAP, hidden && 'opacity-50')}
+      data-paint={paint.type}
+    >
       <Popover.Root onOpenChange={(open) => open && beside.measure(focus.button.current)}>
         <Popover.Trigger asChild>
           <button
@@ -125,9 +128,9 @@ export function PaintRow({
             type="button"
             aria-label={format(p.editPaint, { name })}
             data-testid="paint-swatch"
-            className={cn('shrink-0 cursor-pointer rounded-[7px]', FOCUS_RING)}
+            className={cn(SQUARE_SWATCH_TARGET, FOCUS_RING)}
           >
-            <PaintSwatch paint={paint} brandId={brandId} className="size-7" />
+            <PaintSwatch paint={paint} brandId={brandId} className={cn(FACE_SIZE, 'size-7')} />
           </button>
         </Popover.Trigger>
         <Popover.Portal>
@@ -271,7 +274,7 @@ export function PaintEditor({
       {isGradient(paint) && (
         <>
           <GradientBar paint={paint} picked={picked} onPick={setPicked} editor={editor} p={p} onSet={setGradient} />
-          <div className="flex items-center gap-1">
+          <div className={cn('flex items-center gap-1', TOUCH_GAP)}>
             <ColorField
               name={format(p.stopColour, { n: Math.min(picked, paint.stops.length - 1) + 1 })}
               value={stop?.color}

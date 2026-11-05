@@ -1,27 +1,45 @@
-// The swatch rows of the Colour panel and the frame Background panel built on it, as the swatch
-// tests measure them: a brand kit that fills the kit's row, each row with the size and spacing its
-// swatches keep on a tablet or desktop, the touch target rule a phone holds them to, the two panels
-// opened with + showing its paint editor, and each swatch button's box in a row.
+// The swatch-like controls of the Colour panel and the frame Background panel built on it, as the
+// swatch tests measure them: a brand kit that fills the kit's row, each control with the size it
+// keeps and its space to the next target on a tablet or desktop, the touch target rule a phone holds
+// them to, the panels opened with every control showing, the paint pop-up a row's swatch opens, and
+// where a press lands on each of a control's targets.
 import type { BrandKit } from '@dazbee/schema'
 
 import { clickLabel } from './frames-on-canvas.ts'
 import type { Rect } from './layout.ts'
-import { expect, type Locator, type Page } from './test.ts'
+import { type ElementHandle, expect, type Locator, type Page } from './test.ts'
 import { barMenu, entered } from './top-bar.ts'
 
-/** A swatch row, by what holds it in the panel, with its swatches' size and the space between them off a phone. */
-export interface SwatchRow {
-  row: string
+/**
+ * A swatch-like control, by what it is and a short id for its pictures, its targets by a selector in
+ * what shows it, and off a phone how big a press on each lands and the space to the next target,
+ * where that is set.
+ */
+export interface SwatchControl {
+  control: string
+  id: string
   selector: string
   size: number
-  gap: number
+  gap?: number
 }
 
-/** A panel that shows swatch rows, and how to open it on the frames-on-canvas design. */
+/**
+ * A panel that shows swatch-like controls: how to open it on the frames-on-canvas design with all of
+ * them showing, which it shows, and which the paint pop-up of its first row shows, when its rows have
+ * one.
+ */
 export interface SwatchPanel {
   name: string
   open: (page: Page) => Promise<Locator>
+  controls: SwatchControl[]
+  popup?: SwatchControl[]
 }
+
+/**
+ * Where a press lands on a target, whether a press just inside each side of that lands on it, and the
+ * space from there to the nearest other target.
+ */
+export type Touch = Rect & { space: number; pressable: boolean }
 
 /** A kit with enough colours that its row wraps on a phone. */
 export const SWATCH_KIT: Partial<BrandKit> = {
@@ -40,64 +58,165 @@ export const SWATCH_KIT: Partial<BrandKit> = {
 /** On a phone a tap target is at least this many px across, and this far from the next one. */
 export const TOUCH_TARGET = { size: 44, gap: 8 } as const
 
-/** The brand colours of the paint editor that + opens, the panel's last swatch row. */
-export const PAINT_EDITOR_ROW: SwatchRow = {
-  row: "the paint editor's brand colours",
-  selector: '[data-testid="colour-picker"] [role="group"][aria-label="Brand colours"]',
+/** The brand kit's colours, the panel's first swatch row. */
+export const KIT_ROW: SwatchControl = {
+  control: "the brand kit's colours",
+  id: 'kit',
+  selector: '[data-testid="brand-colours"] [role="group"] > button',
+  size: 22,
+  gap: 5.25,
+}
+
+/** The colours in the design, after +. */
+export const DESIGN_ROW: SwatchControl = {
+  control: 'the colours in this design, with +',
+  id: 'design',
+  selector: '[data-testid="design-colours"] [role="group"][aria-label="In this design"] > button',
+  size: 22,
+  gap: 5.25,
+}
+
+/** The brand colours of a paint editor, the one + opens and a row's pop-up. */
+export const PAINT_EDITOR_ROW: SwatchControl = {
+  control: "the paint editor's brand colours",
+  id: 'paint-editor',
+  selector: '[data-testid="paint-editor"] [role="group"][aria-label="Brand colours"] > button',
   size: 21,
   gap: 3.5,
 }
 
-/** The swatch rows a Colour or Background panel shows with + open, each by its buttons' group. */
-export const SWATCH_ROWS: SwatchRow[] = [
-  { row: 'brand kit', selector: '[data-testid="brand-colours"] [role="group"]', size: 22, gap: 5.25 },
-  { row: 'in this design, with +', selector: '[data-testid="design-colours"] [role="group"]', size: 22, gap: 5.25 },
-  PAINT_EDITOR_ROW,
-]
+/** The box beside a colour field's hex that opens the system's picker. */
+export const COLOUR_BOX: SwatchControl = {
+  control: "a colour field's box, beside its hex",
+  id: 'colour-box',
+  selector: 'input[type="color"]',
+  size: 24.5,
+  gap: 3.5,
+}
 
-/** A shape's Colour panel and a frame's Background panel, each opened with + showing its paint editor. */
+/** The swatch at the start of a fill's or an outline's row, which opens its paint pop-up. */
+export const PAINT_SWATCH: SwatchControl = {
+  control: "a fill's or an outline's swatch",
+  id: 'paint-swatch',
+  selector: '[data-testid="paint-swatch"]',
+  size: 24.5,
+  gap: 3.5,
+}
+
+/**
+ * What a swatch-like control keeps its space from: everything a person presses or types in. A
+ * knob is its whole box, with the field inside it.
+ */
+const TARGETS = 'button, input, select, textarea, label, [role="radio"], [role="switch"], [data-scrub]'
+
+/**
+ * The panels with swatch-like controls, each opened with + showing its paint editor and two rows in
+ * its list, so the space between rows is measured too: a shape's Colour panel and a frame's
+ * Background panel.
+ */
 export const SWATCH_PANELS: SwatchPanel[] = [
   {
     name: "a shape's Colour panel",
     open: async (page) => {
       await page.evaluate(() => window.dazbee?.select(['tilt']))
-      return withPicker(await barMenu(page, 'colour'))
+      const panel = await withPicker(await barMenu(page, 'colour'))
+      await twoRows(panel.getByTestId('fill-list'), 'Add fill')
+      return panel
     },
+    controls: [KIT_ROW, DESIGN_ROW, PAINT_EDITOR_ROW, COLOUR_BOX, PAINT_SWATCH],
+    popup: [COLOUR_BOX, PAINT_EDITOR_ROW],
   },
   {
     name: "a frame's Background panel",
     open: async (page) => {
       await page.evaluate(() => window.dazbee?.select([]))
       await clickLabel(page, 'sq')
-      return withPicker(await barMenu(page, 'background'))
+      const panel = await withPicker(await barMenu(page, 'background'))
+      await twoRows(panel.getByTestId('frame-fills'), 'Add a colour')
+      return panel
     },
+    controls: [KIT_ROW, DESIGN_ROW, PAINT_EDITOR_ROW, COLOUR_BOX, PAINT_SWATCH],
+    popup: [COLOUR_BOX, PAINT_EDITOR_ROW],
   },
 ]
 
-/** The boxes of a row's buttons on screen, once the panel holding them has stopped moving. */
-export async function swatchBoxes(panel: Locator, row: SwatchRow): Promise<Rect[]> {
-  await entered(panel)
-  const buttons = panel.locator(row.selector).first().getByRole('button')
-  await expect(buttons.first(), `${row.row} shows`).toBeVisible()
-  return buttons.evaluateAll((els) =>
-    els.map((el) => {
-      const box = el.getBoundingClientRect()
-      return { x: box.x, y: box.y, width: box.width, height: box.height }
-    }),
-  )
+/** Opens the paint pop-up of a panel's first row, by its swatch, and gives it once it shows. */
+export async function paintPopup(panel: Locator) {
+  const swatch = panel.locator(PAINT_SWATCH.selector).first()
+  await swatch.click()
+  await expect(swatch).toHaveAttribute('aria-expanded', 'true')
+  const popup = panel.page().locator(`[id="${await swatch.getAttribute('aria-controls')}"]`)
+  await expect(popup.getByTestId('paint-editor')).toBeVisible()
+  await entered(popup)
+  return popup
 }
 
-/** The least space between any two of the boxes, across or down, whichever keeps them further apart. */
-export function closest(boxes: Rect[]) {
-  let least = Infinity
-  for (const [i, a] of boxes.entries()) {
-    for (const b of boxes.slice(i + 1)) {
-      const across = Math.max(b.x - (a.x + a.width), a.x - (b.x + b.width))
-      const down = Math.max(b.y - (a.y + a.height), a.y - (b.y + b.height))
-      least = Math.min(least, Math.max(across, down))
-    }
-  }
-  return least
+/**
+ * Where a press lands on each of a control's targets in `root`, once `root` has stopped moving, as
+ * `touchOf` gives it, with the space from there to the nearest other target in `root`.
+ */
+export async function swatchTouches(root: Locator, control: SwatchControl): Promise<Touch[]> {
+  await entered(root)
+  const targets = root.locator(control.selector)
+  await expect(targets.first(), `${control.control} shows`).toBeVisible()
+  const within = await root.elementHandle()
+  const touches: Touch[] = []
+  for (const target of await targets.all()) touches.push(await touchOf(target, within))
+  return touches
+}
+
+/**
+ * Where a press lands on a target, scrolled into view: the box round it and what it holds, such as a
+ * touch area round a smaller drawing, to a hundredth of a px, and whether a press just inside each
+ * of that box's sides lands on it. A press on the label round a target lands on the target, so the
+ * label counts as the target. With the space from there to the nearest other target in `within`,
+ * if given.
+ */
+export function touchOf(target: Locator, within?: ElementHandle | null): Promise<Touch> {
+  return target.evaluate(
+    (control, { root, all }) => {
+      const t = control.closest('label') ?? control
+      t.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'instant' })
+      const shown = (el: Element) => {
+        const box = el.getBoundingClientRect()
+        return el.checkVisibility() && box.width > 0 && box.height > 0
+      }
+      const boxes = [t, ...t.querySelectorAll('*')].filter(shown).map((el) => el.getBoundingClientRect())
+      const left = Math.min(...boxes.map((b) => b.left))
+      const top = Math.min(...boxes.map((b) => b.top))
+      const right = Math.max(...boxes.map((b) => b.right))
+      const bottom = Math.max(...boxes.map((b) => b.bottom))
+      const lands = (x: number, y: number) => {
+        const hit = document.elementFromPoint(x, y)
+        return !!hit && t.contains(hit)
+      }
+      const middle = { x: (left + right) / 2, y: (top + bottom) / 2 }
+      const pressable =
+        lands(left + 1, middle.y) &&
+        lands(right - 1, middle.y) &&
+        lands(middle.x, top + 1) &&
+        lands(middle.x, bottom - 1)
+      let space = Number.POSITIVE_INFINITY
+      const others = root instanceof Element ? [...root.querySelectorAll(all)] : []
+      for (const other of others) {
+        if (other.contains(t) || t.contains(other) || !shown(other)) continue
+        const b = other.getBoundingClientRect()
+        const across = Math.max(b.left - right, left - b.right)
+        const between = Math.max(b.top - bottom, top - b.bottom)
+        space = Math.min(space, Math.max(across, between))
+      }
+      const hundredth = (n: number) => Math.round(n * 100) / 100
+      return {
+        x: hundredth(left),
+        y: hundredth(top),
+        width: hundredth(right - left),
+        height: hundredth(bottom - top),
+        space: hundredth(space),
+        pressable,
+      }
+    },
+    { root: within ?? null, all: TARGETS },
+  )
 }
 
 /** The panel, with + open so its paint editor shows under the design's colours. */
@@ -106,4 +225,11 @@ async function withPicker(panel: Locator) {
   if ((await pick.getAttribute('aria-pressed')) !== 'true') await pick.click()
   await expect(panel.getByTestId('colour-picker')).toBeVisible()
   return panel
+}
+
+/** A list of paints with a second row added by its + when it has one row. */
+async function twoRows(list: Locator, add: string) {
+  const rows = list.locator('[data-row]')
+  if ((await rows.count()) < 2) await list.getByRole('button', { name: add }).click()
+  await expect(rows).toHaveCount(2)
 }

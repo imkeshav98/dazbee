@@ -1,9 +1,9 @@
 // The visual-first property cards (as in the final mock) in Chromium: text's size and its colour
 // from the brand kit, the effects as tiles with their numbers under them, and the header card that
-// names the layer and holds its box. And the swatch rows of the Colour panel and the frame
-// Background panel built on it: on a phone each swatch is a target a finger can hit, in a sheet that
-// scrolls rather than cutting one off, while a desktop keeps their size; with pictures of both
-// panels at the three screen sizes in both themes.
+// names the layer and holds its box. And the swatch-like controls of the Colour panel and the frame
+// Background panel built on it: on a phone each is a target a finger can hit, in a sheet that
+// scrolls rather than cutting one off, while a desktop keeps their size; with pictures of the panels
+// at the three screen sizes in both themes.
 import type { DesignInput } from '@dazbee/schema'
 
 import { writeOutput } from '../../support/editor.ts'
@@ -13,12 +13,12 @@ import { layoutProblems, SCREEN_SIZES } from '../../support/layout.ts'
 import { frameDesign, newBrand, putKit } from '../../support/seed.ts'
 import { nextFrame, openStage } from '../../support/stage.ts'
 import {
-  closest,
-  PAINT_EDITOR_ROW,
+  paintPopup,
   SWATCH_KIT,
   SWATCH_PANELS,
-  SWATCH_ROWS,
-  swatchBoxes,
+  type SwatchControl,
+  swatchTouches,
+  type Touch,
   TOUCH_TARGET,
 } from '../../support/swatches.ts'
 import { expect, type Page, test } from '../../support/test.ts'
@@ -133,52 +133,79 @@ test('the look comes first: size and brand colour, effect tiles, and the header 
 })
 
 test.describe('found by review', () => {
-  test('on a phone every swatch of the Colour and Background panels is a 44 px target 8 px from the next, in a sheet that cuts none off', async ({
+  /** Each touch at least a touch target across and down, that far from the next target, and inside `room` across. */
+  const expectTouchTargets = (touches: Touch[], what: string, room: { x: number; width: number }) => {
+    for (const touch of touches) {
+      expect(touch.pressable, `${what}: a press lands at each side`).toBe(true)
+      expect(Math.min(touch.width, touch.height), `${what}: where a press lands`).toBeGreaterThanOrEqual(
+        TOUCH_TARGET.size,
+      )
+      expect(touch.space, `${what}: the space to the next target`).toBeGreaterThanOrEqual(TOUCH_TARGET.gap)
+      expect(touch.x, `${what}: starts in its panel`).toBeGreaterThanOrEqual(room.x)
+      expect(touch.x + touch.width, `${what}: ends in its panel`).toBeLessThanOrEqual(room.x + room.width)
+    }
+  }
+  /** Each touch as big as the control draws it off a phone, as far from the next target as it was. */
+  const expectKept = (touches: Touch[], control: SwatchControl, what: string) => {
+    for (const touch of touches) {
+      expect(touch.pressable, `${what}: a press lands at each side`).toBe(true)
+      expect(touch.width, `${what}: where a press lands, across`).toBeCloseTo(control.size, 1)
+      expect(touch.height, `${what}: where a press lands, down`).toBeCloseTo(control.size, 1)
+      if (control.gap !== undefined)
+        expect(touch.space, `${what}: the space to the next target`).toBeCloseTo(control.gap, 1)
+    }
+  }
+
+  test('on a phone every swatch-like control of the Colour and Background panels is a 44 px target 8 px from the next, in a sheet that cuts none off', async ({
     browser,
   }) => {
     const brandId = await newBrand('e2e phone swatches')
     await putKit(brandId, SWATCH_KIT)
-    const { page, errors } = await openSized(browser, { width: 390, height: 844 }, { brandId })
-    for (const { name, open } of SWATCH_PANELS) {
+    const screen = { width: 390, height: 844 }
+    const { page, errors } = await openSized(browser, screen, { brandId })
+    for (const { name, open, controls, popup } of SWATCH_PANELS) {
       const panel = await open(page)
       const sheet = await panel.boundingBox()
       if (!sheet) throw new Error(`${name} has no box`)
-      for (const row of SWATCH_ROWS) {
-        const boxes = await swatchBoxes(panel, row)
-        for (const box of boxes) {
-          expect(Math.min(box.width, box.height), `${name}, ${row.row}: a swatch's target`).toBeGreaterThanOrEqual(
-            TOUCH_TARGET.size,
-          )
-          expect(box.x, `${name}, ${row.row}: a swatch starts in the sheet`).toBeGreaterThanOrEqual(sheet.x)
-          expect(box.x + box.width, `${name}, ${row.row}: a swatch ends in the sheet`).toBeLessThanOrEqual(
-            sheet.x + sheet.width,
-          )
-        }
-        expect(closest(boxes), `${name}, ${row.row}: the space between swatches`).toBeGreaterThanOrEqual(
-          TOUCH_TARGET.gap,
-        )
-      }
+      for (const control of controls)
+        expectTouchTargets(await swatchTouches(panel, control), `${name}, ${control.control}`, sheet)
       // The sheet scrolls to what is under its fold, and cuts nothing short across it.
       expect(await layoutProblems(page, { pieces: PIECES, uncut: UNCUT })).toEqual([])
+      if (popup) {
+        const shown = await paintPopup(panel)
+        for (const control of popup)
+          expectTouchTargets(
+            await swatchTouches(shown, control),
+            `${name}, its first row's paint pop-up, ${control.control}`,
+            { x: 0, width: screen.width },
+          )
+        await page.keyboard.press('Escape')
+        await expect(shown).toBeHidden()
+      }
       await page.keyboard.press('Escape')
       await expect(page.locator('#edit-panel')).toHaveCount(0)
     }
     expect(errors).toEqual([])
   })
 
-  test('at 1280×760 the swatches keep their size and the space between them', async ({ browser }) => {
+  test('at 1280×760 the swatch-like controls keep their size and the space between them', async ({ browser }) => {
     const brandId = await newBrand('e2e desktop swatches')
     await putKit(brandId, SWATCH_KIT)
     const { page, errors } = await openSized(browser, { width: 1280, height: 760 }, { brandId })
-    for (const { name, open } of SWATCH_PANELS) {
+    for (const { name, open, controls, popup } of SWATCH_PANELS) {
       const panel = await open(page)
-      for (const row of SWATCH_ROWS) {
-        const boxes = await swatchBoxes(panel, row)
-        for (const box of boxes) {
-          expect(box.width, `${name}, ${row.row}: a swatch's width`).toBeCloseTo(row.size, 1)
-          expect(box.height, `${name}, ${row.row}: a swatch's height`).toBeCloseTo(row.size, 1)
-        }
-        expect(closest(boxes), `${name}, ${row.row}: the space between swatches`).toBeCloseTo(row.gap, 1)
+      for (const control of controls)
+        expectKept(await swatchTouches(panel, control), control, `${name}, ${control.control}`)
+      if (popup) {
+        const shown = await paintPopup(panel)
+        for (const control of popup)
+          expectKept(
+            await swatchTouches(shown, control),
+            control,
+            `${name}, its first row's paint pop-up, ${control.control}`,
+          )
+        await page.keyboard.press('Escape')
+        await expect(shown).toBeHidden()
       }
       await page.keyboard.press('Escape')
       await expect(page.locator('#edit-panel')).toHaveCount(0)
@@ -190,24 +217,31 @@ test.describe('found by review', () => {
 for (const [width, height] of SCREEN_SIZES) {
   for (const theme of THEMES) {
     test(
-      `screenshots at ${width}×${height}, ${theme}: a shape's Colour panel and a frame's Background panel with + open`,
+      `screenshots at ${width}×${height}, ${theme}: every panel with swatch-like controls, each control in view on a phone, and each row's paint pop-up`,
       { tag: '@evidence' },
       async ({ browser }) => {
         const brandId = await newBrand('e2e swatch shots')
         await putKit(brandId, SWATCH_KIT)
         const { page, errors } = await openSized(browser, { width, height }, { theme, brandId })
-        for (const [i, { open }] of SWATCH_PANELS.entries()) {
-          const panel = await open(page)
+        const shoot = async (name: string) => {
           await nextFrame(page)
-          writeOutput(`swatches-${width}-${theme}-${i + 1}.png`, await page.screenshot({ animations: 'disabled' }))
+          writeOutput(`swatches-${width}-${theme}-${name}.png`, await page.screenshot({ animations: 'disabled' }))
+        }
+        for (const [i, { open, controls, popup }] of SWATCH_PANELS.entries()) {
+          const panel = await open(page)
+          await shoot(`${i + 1}`)
           if (width < 640) {
-            // On a phone the paint editor's row is under the sheet's fold until scrolled to.
-            await panel.locator(PAINT_EDITOR_ROW.selector).first().scrollIntoViewIfNeeded()
-            await nextFrame(page)
-            writeOutput(
-              `swatches-${width}-${theme}-${i + 1}-scrolled.png`,
-              await page.screenshot({ animations: 'disabled' }),
-            )
+            // On a phone most controls are under the sheet's fold until scrolled to.
+            for (const control of controls) {
+              await panel.locator(control.selector).first().scrollIntoViewIfNeeded()
+              await shoot(`${i + 1}-${control.id}`)
+            }
+          }
+          if (popup) {
+            const shown = await paintPopup(panel)
+            await shoot(`${i + 1}-popup`)
+            await page.keyboard.press('Escape')
+            await expect(shown).toBeHidden()
           }
           await page.keyboard.press('Escape')
           await expect(page.locator('#edit-panel')).toHaveCount(0)

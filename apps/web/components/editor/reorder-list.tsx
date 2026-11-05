@@ -12,7 +12,7 @@ import { cn } from '@/lib/cn.ts'
 import { useMessages } from '@/lib/i18n/client.tsx'
 import { format } from '@/lib/i18n/index.ts'
 
-import { FIELD_LABEL, ICON_BUTTON } from './styles.ts'
+import { FIELD_LABEL, ICON_BUTTON, TOUCH_GAP } from './styles.ts'
 
 /** A list of fills or strokes: the rows the selected layers share, and adding one on top. */
 function useList<T>(target: Target, field: string, fresh: T, onTop: T, topFirst: boolean) {
@@ -76,7 +76,7 @@ export function ReorderList<T>({
           // Paints have no ids; their place in the list is what they are.
           <div
             key={i}
-            className="flex items-center gap-1 rounded-row"
+            className={cn('flex items-center gap-1 rounded-row', TOUCH_GAP)}
             style={style}
             data-item={`${field}-${i}`}
             data-row={n}
@@ -171,7 +171,7 @@ export function ListBody<T>({
 }) {
   const { list, write, add } = useList(target, field, fresh, onTop, topFirst)
   return (
-    <div className="flex flex-col gap-2" data-testid={testId}>
+    <div className={cn('flex flex-col gap-2', TOUCH_GAP)} data-testid={testId}>
       {header && (
         <div className={cn('flex items-center justify-between', FIELD_LABEL)}>
           {title}
