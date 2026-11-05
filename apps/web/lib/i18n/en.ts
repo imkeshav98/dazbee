@@ -1,5 +1,11 @@
 // English, the source catalog. Every string the UI shows lives in a catalog; components never hold
 // literal text (eslint react/jsx-no-literals).
+/**
+ * The words a count takes, one per plural form the language has (Intl.PluralRules), with `other`
+ * for every count no other form names; `{n}` is the count.
+ */
+export type Counted = Partial<Record<Intl.LDMLPluralRule, string>> & { other: string }
+
 export const en = {
   app: { name: 'Dazbee' },
   library: {
@@ -224,6 +230,16 @@ export const en = {
       label: 'Selection',
       lineUp: 'Line up',
       order: 'Order',
+      /** The top bar's ⋯ for layers, which holds how they sit: order, line up, rotation, text direction. */
+      arrange: 'Arrange',
+      /** Why Line up is greyed out for a layer its auto layout box places. */
+      placedByLayout: 'Auto layout places this layer',
+      /** Why Bring to front and Bring forward are greyed out for layers at the top of their stack. */
+      atFront: 'Already at the front',
+      /** Why Send to back and Send backward are greyed out for layers at the bottom of their stack. */
+      atBack: 'Already at the back',
+      /** Why Line up, the rotation field and Text direction are greyed out for a locked layer. */
+      lockedRow: 'The layer is locked',
       grouping: 'Group',
       putInBox: 'Put in a box',
       combine: 'Combine',
@@ -623,8 +639,10 @@ export const en = {
     layersPanel: {
       box: 'Box',
       stack: 'Stack',
-      tree: 'Layers of {frame}',
-      empty: 'No layers in this frame yet. Draw a shape or add text to start.',
+      tree: 'Frames and layers of {page}',
+      empty: 'No layers on this page yet. Draw a shape or add text to start.',
+      /** A layer none of its frame's linked frames holds a copy of. */
+      onlyHere: 'only here',
       expand: 'Expand {name}',
       collapse: 'Collapse {name}',
       lock: 'Lock {name}',
@@ -784,15 +802,15 @@ export const en = {
     exports: {
       open: 'Export',
       title: 'Export',
-      pages: 'Pages',
-      allPages: 'All {n}',
-      thisPage: 'This page',
       page: 'Page',
+      frames: 'Frames',
+      allFrames: 'All frames',
+      noFrames: 'This page has no frames',
       fileNames: 'File names',
       type: 'File type',
       quality: 'Quality',
-      run: 'Export {n} files',
-      runOne: 'Export 1 file',
+      run: { one: 'Export 1 file', other: 'Export {n} files' } as Counted,
+      tickOne: 'Tick a frame to export',
       making: 'Making {done} of {total}',
       failed: 'Export failed: {reason}',
     },
@@ -807,6 +825,37 @@ export const en = {
         'half-page': 'Half page',
         'link-image': 'Link image',
       },
+      /** The channels the presets are grouped by, by their ids. */
+      channel: { meta: 'Meta', google: 'Google', 'linkedin-x': 'LinkedIn and X' },
+    },
+    /** The Add a frame card the Frame tool opens, and the Add size card for a picked frame. */
+    addFrame: {
+      title: 'Add a frame',
+      note: 'A new frame starts empty. Or drag on the canvas with the Frame tool for any size.',
+      addSizeTitle: 'Add a size to {name}',
+      addSizeNote: "The new frame holds linked copies of {name}'s layers, laid out to fit.",
+      ownSize: 'Your own size',
+      width: 'Width',
+      height: 'Height',
+      /** The letters on the width and height fields. */
+      w: 'W',
+      h: 'H',
+      add: 'Add',
+      /** Why a side of the size typed in can't be a frame's, by the side and the reason's id. */
+      issue: {
+        width: {
+          whole: 'Width is in whole pixels.',
+          short: 'Width is at least {n} px.',
+          long: 'Width is at most {n} px.',
+          ratio: 'Width is at most {n} times the height.',
+        },
+        height: {
+          whole: 'Height is in whole pixels.',
+          short: 'Height is at least {n} px.',
+          long: 'Height is at most {n} px.',
+          ratio: 'Height is at most {n} times the width.',
+        },
+      },
     },
     frames: {
       /** A frame of a size of your own. */
@@ -815,9 +864,10 @@ export const en = {
       /** The picked frame's top bar, its ⋯ menu, its Background panel and the field that renames it on its label. */
       bar: 'Frame',
       background: 'Background',
-      backgroundColour: 'Background colour',
       more: 'Frame actions',
+      addSize: 'Add size',
       rename: 'Rename',
+      export: 'Export',
       nameOf: 'Name of {name}',
       fills: 'Background colours',
       fill: 'background colour',

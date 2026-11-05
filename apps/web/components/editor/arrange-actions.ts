@@ -36,7 +36,7 @@ export type Action = Extract<
   | 'sendBackward'
   | 'sendToBack'
 >
-export const ALIGN: { action: Action; icon: Icon }[] = [
+export const ALIGN: { action: Extract<Action, `align${string}`>; icon: Icon }[] = [
   { action: 'alignLeft', icon: AlignLeftIcon },
   { action: 'alignCentre', icon: AlignCenterHorizontalIcon },
   { action: 'alignRight', icon: AlignRightIcon },

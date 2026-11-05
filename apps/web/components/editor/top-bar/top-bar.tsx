@@ -4,9 +4,11 @@
 // its items set by what is selected (text, a photo, a shape, a box, a group, or several, or the
 // picked frame's Background and ⋯); a locked layer's bar says it is locked and unlocks it. An item
 // with ▾ opens a pop-up under the bar; a panel item opens the one edit panel at the stage's end;
-// the rest act at once. When the items don't fit, the last ones go into ⋯, which opens a second row
-// under the bar; on a phone the bar scrolls sideways instead.
-import { DotsThreeIcon } from '@phosphor-icons/react'
+// the rest act at once. Its last item, Arrange ⋯ for layers or a picked frame's ⋯, always ends the
+// first row. When the items don't fit, the others that don't go to a second row under the bar: on
+// a tablet or desktop it opens from More controls, which stands before the last item; on a phone it
+// is a second card that always shows, as the mock draws it. Nothing scrolls sideways.
+import { CaretDownIcon } from '@phosphor-icons/react'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 
 import type { Editor } from '@dazbee/editor'
@@ -14,6 +16,7 @@ import type { Design } from '@dazbee/schema'
 
 import { type Target, useTarget } from '@/components/editor/edit-panel/target.ts'
 import {
+  closesWithSelection,
   editState,
   isLayerPanel,
   isPanel,
@@ -33,37 +36,48 @@ import { arrowAlong, useRovingTab } from './bar-popover.tsx'
 import { useFrameItems } from './frame-items.tsx'
 import { type BarItem, useSelectionItems } from './top-bar-items.tsx'
 
-/** Room kept between the bar and the stage's sides. */
-const SIDE = 16
+/** The gap after each of the bar's items, in pixels. */
+const GAP = 2
+/** The width More controls takes on the first row, with its gap, in pixels. */
+const MORE = 30 + GAP
 /** The bar's look: a frosted pill of buttons, centred at the top of the stage under the header pill. */
 const TOP_BAR = 'flex items-center gap-0.5 rounded-[14px] surface-frost p-1'
 
+/** The sum of an element's own widths along its sides, by their CSS names, in pixels. */
+function sidesOf(el: Element, ...names: string[]) {
+  const style = getComputedStyle(el)
+  return names.reduce((sum, name) => sum + Number.parseFloat(style.getPropertyValue(name)), 0)
+}
+
 /**
- * How many of the items fit on the bar's row; the rest go in the second row behind ⋯. Every item
- * is drawn in one of the two rows at all times, so each one's width can be read.
+ * How many of the items before the last fit on the bar's first row, which the last item always
+ * ends; the others go to the second row. All of them fitting is Infinity. On a tablet or desktop
+ * More controls stands before the last item while some don't fit, so its room is kept too. Every
+ * item is drawn in one of the two rows at all times, so each one's width can be read; `keys` are
+ * the items' keys in order, joined by spaces.
  */
-function useFit(row: HTMLElement | null, extra: HTMLElement | null, keys: string, off: boolean) {
+function useFit(row: HTMLElement | null, extra: HTMLElement | null, keys: string, phone: boolean) {
   const [fit, setFit] = useState(Infinity)
   useLayoutEffect(() => {
-    if (!row || !extra || off) {
-      setFit(Infinity)
-      return
-    }
+    if (!row || !extra) return
     const wrapper = row.parentElement
     const measure = () => {
-      // The bar's own padding and border take 8 px; each item has 2 px of gap after it; ⋯ is 34 px.
-      const room = (wrapper?.clientWidth ?? window.innerWidth) - SIDE * 2 - 8
+      // Inside the wrapper's padding, less the bar's own padding and border.
+      const room =
+        (wrapper ? wrapper.clientWidth - sidesOf(wrapper, 'padding-left', 'padding-right') : window.innerWidth) -
+        sidesOf(row, 'padding-left', 'padding-right', 'border-left-width', 'border-right-width')
       // Each item's wrapper draws nothing of its own (display: contents); its button has the width.
-      const widths = [...row.children, ...extra.children]
-        .filter((el) => el instanceof HTMLElement && el.dataset.item !== undefined)
-        .map((el) => ((el.firstElementChild as HTMLElement | null)?.offsetWidth ?? 0) + 2)
-      const total = widths.reduce((sum, w) => sum + w, 0)
-      if (total <= room) return setFit(Infinity)
-      const more = 34
-      let used = 0
+      const widths = new Map<string, number>()
+      for (const el of [...row.children, ...extra.children])
+        if (el instanceof HTMLElement && el.dataset.item !== undefined)
+          widths.set(el.dataset.item, ((el.firstElementChild as HTMLElement | null)?.offsetWidth ?? 0) + GAP)
+      const ordered = keys.split(' ').map((key) => widths.get(key) ?? 0)
+      // The last item has no gap after it.
+      if (ordered.reduce((sum, w) => sum + w, 0) - GAP <= room) return setFit(Infinity)
+      let used = (ordered.at(-1) ?? 0) + (phone ? 0 : MORE)
       let n = 0
-      for (const w of widths) {
-        if (used + w > room - more) break
+      for (const w of ordered.slice(0, -1)) {
+        if (used + w - GAP > room) break
         used += w
         n++
       }
@@ -74,7 +88,7 @@ function useFit(row: HTMLElement | null, extra: HTMLElement | null, keys: string
     if (wrapper) watch.observe(wrapper)
     for (const el of [...row.children, ...extra.children]) watch.observe(el.firstElementChild ?? el)
     return () => watch.disconnect()
-  }, [row, extra, keys, off])
+  }, [row, extra, keys, phone])
   return fit
 }
 
@@ -83,14 +97,15 @@ export function TopBar({ editor, brandId }: { editor: Editor; brandId: string })
   const picked = usePickedFrame(editor)
   const selected = useTarget(editor, ids)
   // A pop-up or panel belongs to the selection or the picked frame it was opened for: another one
-  // closes it. Pages stays open when showing another page lets the selection go.
+  // closes it, and selecting layers closes any. Pages and Add a frame stay open as the selection goes
+  // or another frame is picked (`closesWithSelection`).
   const opened = useRef({ ids, picked })
   useLayoutEffect(() => {
     const was = opened.current
     if (was.ids === ids && was.picked === picked) return
     opened.current = { ids, picked }
     const now = editState().open
-    if (ids.length > 0 || !isPanel(now) || isLayerPanel(now) || now === 'background') setOpen(null)
+    if (ids.length > 0 || closesWithSelection(now)) setOpen(null)
   }, [ids, picked])
   useEffect(
     () => () => {
@@ -146,25 +161,28 @@ function Bar({
   const [extra, setExtra] = useState<HTMLDivElement | null>(null)
   const keys = items.map((item) => item.key).join(' ')
   const fit = useFit(row, extra, keys, phone)
-  // A divider never ends the first row or starts the second.
-  let shown = Math.min(fit, items.length)
-  while (shown > 0 && items[shown - 1]?.key.startsWith('divider')) shown--
-  const first = items.slice(0, shown)
-  const rest = items.slice(shown).filter((item, i) => !(i === 0 && item.key.startsWith('divider')))
+  // The last item ends the first row; before it, the items that fit. A divider never ends the first
+  // row's items or starts the second row.
+  const fits = fit >= items.length
+  let shown = fits ? items.length : fit
+  while (!fits && shown > 0 && items[shown - 1]?.key.startsWith('divider')) shown--
+  const first = fits ? items : [...items.slice(0, shown), ...items.slice(-1)]
+  const rest = fits ? [] : items.slice(shown, -1).filter((item, i) => !(i === 0 && item.key.startsWith('divider')))
   const overflowing = rest.length > 0
-  // The second row is its own: opening it leaves an open panel, which moves down under it.
+  // The second row is its own: opening it leaves an open panel, which moves down under it. On a
+  // phone it always shows.
   const [rowOpen, setRowOpen] = useState(false)
-  const overflowOpen = overflowing && (rowOpen || rest.some((item) => item.key === open))
+  const overflowOpen = overflowing && (phone || rowOpen || rest.some((item) => item.key === open))
   const focused = useRovingTab(bar)
-  // The bar's bottom edge, under the second row when it is open, for what sits under the bar.
+  // The bar's bottom edge, under the second row when it shows, for what sits under the bar: in the
+  // stage's pixels, rounded up, as the rows' gap may leave it between two pixels.
   const reported = useRef(-1)
   useLayoutEffect(() => {
     const measure = () => {
       if (!row) return
-      const bottom =
-        Math.round(
-          (overflowOpen && extra ? extra.offsetTop + extra.offsetHeight : 0) || row.offsetTop + row.offsetHeight,
-        ) + (bar?.offsetTop ?? 0)
+      const lowest = overflowOpen && extra ? extra : row
+      const stageTop = bar?.offsetParent?.getBoundingClientRect().top ?? 0
+      const bottom = Math.ceil(lowest.getBoundingClientRect().bottom - stageTop)
       if (bottom === reported.current) return
       reported.current = bottom
       setBar(true, bottom)
@@ -175,12 +193,9 @@ function Bar({
     return () => watch.disconnect()
   }, [bar, row, extra, overflowOpen])
   useLayoutEffect(() => () => setBar(false), [])
-  // Each selection's bar starts at its first item, on a phone too, where the bar scrolls sideways.
+  // Each selection's bar starts with its second row closed.
   const selectionKey = Object.values(named).join(' ')
-  useLayoutEffect(() => {
-    if (row) row.scrollLeft = 0
-    setRowOpen(false)
-  }, [row, selectionKey])
+  useLayoutEffect(() => setRowOpen(false), [selectionKey])
   // A panel whose item has left the bar closes, as a shape's Colour does once it holds a photo.
   useLayoutEffect(() => {
     if (isLayerPanel(open) && !items.some((item) => item.key === open)) setOpen(null)
@@ -226,13 +241,9 @@ function Bar({
         BAR_ROW,
       )}
     >
-      <div
-        ref={setRow}
-        className={cn(TOP_BAR, 'pointer-events-auto max-w-full', phone && 'no-scrollbar overflow-x-auto')}
-        data-testid="top-bar-row"
-      >
-        {first.map(item)}
-        {overflowing && (
+      <div ref={setRow} className={cn(TOP_BAR, 'pointer-events-auto max-w-full')} data-testid="top-bar-row">
+        {first.slice(0, -1).map(item)}
+        {overflowing && !phone && (
           <button
             type="button"
             data-bar-item
@@ -243,9 +254,16 @@ function Bar({
             onClick={() => setRowOpen(!overflowOpen)}
             className={cn(BAR_BUTTON, 'px-1.5')}
           >
-            <DotsThreeIcon size={18} weight="bold" aria-hidden />
+            {/* A caret, not a ⋯, so it never looks like the ⋯ beside it. */}
+            <CaretDownIcon
+              size={14}
+              weight="bold"
+              aria-hidden
+              className={cn('transition-transform duration-[var(--chrome-fast)]', overflowOpen && 'rotate-180')}
+            />
           </button>
         )}
+        {first.slice(-1).map(item)}
       </div>
       <div
         ref={setExtra}

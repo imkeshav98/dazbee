@@ -10,7 +10,15 @@ import type { CanvasKit } from '@dazbee/canvaskit'
 import { frameIdOf, openSession, readDesign, type Session } from '@dazbee/doc'
 import { FALLBACK_FAMILIES } from '@dazbee/fonts'
 import { renderDesign, type ResourceCache, resourceCache } from '@dazbee/renderer'
-import { type Design, fontFamilies, imageAssetIds, type Point, type VariableRef, type Variables } from '@dazbee/schema'
+import {
+  type Design,
+  fontFamilies,
+  imageAssetIds,
+  type Point,
+  type Rect,
+  type VariableRef,
+  type Variables,
+} from '@dazbee/schema'
 import type { Skipped } from '@dazbee/svg'
 
 import { editorActions } from './actions.ts'
@@ -23,6 +31,7 @@ import { editorView, type Spot } from './canvas/view.ts'
 import { loadCanvasKit } from './canvaskit.ts'
 import type { DrawInfo, Editor, EditorOptions, Notice } from './editor-interface.ts'
 import { editorExports } from './export/exports.ts'
+import { editorFrameActions } from './frame-actions.ts'
 import { editorCropping } from './gestures/crop/cropping.ts'
 import { editorDrawing } from './gestures/drawing/drawing.ts'
 import { editorPen } from './gestures/pen/pen.ts'
@@ -204,6 +213,14 @@ function live(
     outline,
     drawOverlay,
   })
+  const frameActions = editorFrameActions({
+    session,
+    view,
+    tools,
+    frameName: options.frameName,
+    selection,
+    drawOverlay,
+  })
   const drawing = editorDrawing({
     canvas,
     session,
@@ -214,6 +231,7 @@ function live(
     camera,
     page: view.page,
     frameName: options.frameName,
+    frameActions,
     hug,
     placeBox,
     drawOverlay,
@@ -253,6 +271,7 @@ function live(
     pen,
     transformDrag,
     autoLayoutDrag,
+    frameActions,
     notify,
     drawOverlay,
   })
@@ -442,6 +461,10 @@ function live(
     selection.renameFrame(shown.id)
     frameRenames.emit(shown.id)
   }
+  /** Lights a frame from outside the stage, or none, and shows it. */
+  function lightFrame(frameId: string | null) {
+    if (selection.lightFrame(frameId)) drawOverlay()
+  }
   /** Renames a frame of the shown page in place of its label, panning first, at the same zoom, so the label shows. */
   function renameFrame(frameId: string) {
     const frame = frameOf(frameId)
@@ -454,6 +477,11 @@ function live(
     const pageId = Object.hasOwn(now.frames, frameId) ? now.frames[frameId]?.pageId : undefined
     if (pageId !== undefined && pageId !== view.page()) showPage(pageId)
     view.fitArea(view.defaultFrame(frameId))
+  }
+  /** Pans, at the same zoom, so a frame of the shown page shows clear of the chrome, and out from under `panel` when it lies under it. */
+  function showFrame(frameId: string, panel?: Rect) {
+    const frame = frameOf(frameId)
+    if (frame) view.showArea(frame, panel)
   }
   /** A layer's box as drawn in its frame, shown or not. */
   function boxOf(id: string) {
@@ -529,10 +557,13 @@ function live(
     pickedFrame: () => selection.pickedFrame(),
     pickFrame: (frameId: string | null) => pickFrame(frameId),
     onFramePick: (listener: (frameId: string | null) => void) => selection.onFramePick(listener),
+    lightFrame,
     renameFrame,
     onFrameRename: frameRenames.on,
     renamed: () => selection.renameFrame(null),
-    onFrameDelete: actions.onFrameDelete,
+    onFrameDelete: frameActions.onFrameDelete,
+    addFrame: frameActions.addFrame,
+    addSize: frameActions.addSize,
     labelRect: overlay.labelRect,
     rulers: () => view.rulers(),
     snapping: () => tools.snapping(),
@@ -552,6 +583,7 @@ function live(
     fitAll: view.fitAll,
     fitSelection: actions.fitSelection,
     fitFrame,
+    showFrame,
     setTool: (next: Tool) => tools.setTool(next),
     tool: () => tools.tool(),
     armImage: (asset: PlacedAsset | null) => tools.setTool(asset ? 'image' : tools.tool(), asset),

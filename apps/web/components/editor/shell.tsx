@@ -35,7 +35,7 @@ import { useLocale, useMessages } from '@/lib/i18n/client.tsx'
 import { dirOf } from '@/lib/i18n/index.ts'
 
 import { DesignName } from './design-name.tsx'
-import { isPanel, setFlyoutEnd, setOpen, useEditState, usePhone } from './edit-store.ts'
+import { isPanel, isSheet, setFlyoutEnd, setOpen, useEditState, usePhone } from './edit-store.ts'
 import { ImageTool } from './image-tool.tsx'
 import { SaveStatus } from './save-status.tsx'
 import { BAR_ROW, BAR_ROW_HEIGHT, dockTool } from './styles.ts'
@@ -185,11 +185,14 @@ export function EditorShell({
     ai: t.editor.aiEmpty,
     brand: t.editor.brandEmpty,
   }
-  // What the top bar has open: on a phone an edit panel is a sheet, which hides the tab bar and the
-  // dock, and a sheet and a rail flyout close each other. Pages drops under its button instead.
+  // What the top bar has open: on a phone an edit panel, or the top bar's Arrange ⋯, is a sheet,
+  // which hides the tab bar and the dock, and a sheet and a rail flyout close each other. Pages
+  // drops under its button instead. The tab bar and the dock keep their place unseen under the
+  // sheet, so the stage's insets keep them and a frame shown as the sheet closes lands clear of
+  // where they come back.
   const edit = useEditState()
-  const panelOnPhone = phone && isPanel(edit.open)
-  const sheet = panelOnPhone && edit.open !== 'pages'
+  const panelOnPhone = phone && (isPanel(edit.open) || isSheet(edit.open))
+  const sheet = phone && isSheet(edit.open)
   useEffect(() => {
     if (panelOnPhone) setFlyout((now) => (now === null ? now : null))
   }, [panelOnPhone])
@@ -313,7 +316,7 @@ export function EditorShell({
               'absolute z-20 flex gap-2 overflow-hidden rounded-full surface-frost p-2',
               // A vertical capsule at the start edge; on phones a tab bar floating at the bottom.
               'start-5 top-1/2 -translate-y-1/2 flex-col sm:p-2.5 max-sm:start-1/2 max-sm:top-auto max-sm:bottom-3 max-sm:translate-y-0 max-sm:flex-row max-sm:-translate-x-1/2 max-sm:rtl:translate-x-1/2',
-              sheet && 'max-sm:hidden',
+              sheet && 'max-sm:invisible',
             )}
           >
             {FLYOUTS.map(({ id, icon: FlyoutIcon }) => {
@@ -444,7 +447,7 @@ export function EditorShell({
               data-dock
               className={cn(
                 'absolute inset-x-0 bottom-4 z-10 mx-auto flex w-max max-sm:bottom-[5.25rem] items-center gap-1 rounded-[18px] surface-frost p-1.5',
-                sheet && 'max-sm:hidden',
+                sheet && 'max-sm:invisible',
               )}
             >
               {TOOLS.map(({ id, icon: ToolIcon, key }) => {
@@ -489,6 +492,8 @@ export function EditorShell({
                       aria-label={label}
                       aria-pressed={on}
                       data-tool={id}
+                      // The Frame tool opens Add a frame, which gives the focus back here as it closes.
+                      data-opens={id === 'frame' ? 'addFrame' : undefined}
                       onClick={() => {
                         setTool(id)
                         onToolChange?.(id, shape)

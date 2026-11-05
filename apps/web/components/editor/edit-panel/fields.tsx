@@ -23,6 +23,13 @@ export const clamp = (n: number, min = Number.NEGATIVE_INFINITY, max = Number.PO
   Math.min(max, Math.max(min, n))
 
 /**
+ * Whether the focus is in a number field with something typed in it. Such a field is the top-most
+ * thing: Esc throws away what was typed and keeps the field, so the menu or panel it is in closes
+ * only on the next Esc.
+ */
+export const typingIn = (at: Element | null) => at?.matches('input[data-draft]') === true
+
+/**
  * What is being typed into a field, null when nothing is: `typed.current` has it as soon as it is
  * typed, before the field draws again, for a key or a blur that comes right after.
  */
@@ -61,6 +68,7 @@ export function NumberField({
   placeholder,
   editor,
   testId,
+  className,
   onSet,
   onShift,
   onClear,
@@ -81,6 +89,8 @@ export function NumberField({
   /** Makes a drag one undo step; without one, a drag is as many changes as it makes. */
   editor?: Editor
   testId?: string
+  /** Looks laid over the knob's, such as its height on a phone. */
+  className?: string
   onSet: (value: number) => void
   onShift: (by: number) => void
   onClear?: () => void
@@ -159,7 +169,7 @@ export function NumberField({
       onPointerUp={() => release(true)}
       onPointerCancel={() => release(false)}
       onLostPointerCapture={() => release(false)}
-      className={KNOB}
+      className={cn(KNOB, className)}
     >
       <span className="relative min-w-0 truncate">{label}</span>
       <input
@@ -172,6 +182,7 @@ export function NumberField({
         aria-valuemax={most === undefined || !Number.isFinite(most) ? undefined : tidy(most * scale)}
         aria-valuetext={value === 'mixed' ? t.editor.props.mixed : shown ? `${shown}${unit}` : placeholder}
         data-testid={testId}
+        data-draft={draft === null ? undefined : ''}
         inputMode="decimal"
         value={draft ?? shown}
         placeholder={value === 'mixed' ? t.editor.props.mixed : placeholder}
@@ -194,8 +205,12 @@ export function NumberField({
             editor.perform(action)
           } else if (event.key === 'Enter') commit(event.currentTarget.value)
           else if (event.key === 'Escape') {
+            // What was typed is thrown away and the field keeps the focus, its value chosen again;
+            // with nothing typed, the field lets go of the focus.
+            const typed = typedNow.current !== null
             setDraft(null)
-            event.currentTarget.blur()
+            if (typed) requestAnimationFrame(() => input.current?.select())
+            else event.currentTarget.blur()
           } else if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
             event.preventDefault()
             setDraft(null)

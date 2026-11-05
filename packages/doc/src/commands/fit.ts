@@ -13,6 +13,10 @@ interface TextLike {
   runs?: { style: { fontSize?: number } }[]
   shrinkToFit?: { min: number; max: number }
 }
+/** The part of a box's props that lays out its children. */
+interface BoxLike {
+  layout?: { gap: number; lineGap: number; padding: { top: number; right: number; bottom: number; left: number } }
+}
 /** The part of a graphic's props that says how a path is drawn. */
 interface PathLike {
   shape?: { kind: string; drawnIn?: Size }
@@ -46,8 +50,17 @@ export function fitted<P extends Readonly<Record<string, unknown>>>(
     width: round(width),
     height: round(height),
     ...fontSizes(props as TextLike, s),
+    ...layout(props as BoxLike, s),
     ...drawnIn(props as PathLike, box),
   }
+}
+
+/** An auto layout box's gaps and paddings, scaled with its size so its children stay inside; nothing for other layers. */
+function layout({ layout: was }: BoxLike, s: number): Partial<BoxLike> {
+  if (!was) return {}
+  const { top, right, bottom, left } = was.padding
+  const padding = { top: round(top * s), right: round(right * s), bottom: round(bottom * s), left: round(left * s) }
+  return { layout: { ...was, gap: round(was.gap * s), lineGap: round(was.lineGap * s), padding } }
 }
 
 /** A path drawn at its own size, given its box as the box it was drawn in; nothing for any other layer. */

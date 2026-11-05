@@ -1,7 +1,8 @@
 'use client'
 
-// One button of the bar by the selection and the popover it opens under it. The bar keeps which
-// one is open, so only one is open at a time. Also the hooks the editor's menus share: the focus as a
+// One button of the bar by the selection and the popover it opens under it, or, for a pop-up the
+// edit store names a sheet, at the bottom of a phone's screen. The bar keeps which one is open, so only one
+// is open at a time. Also the hooks the editor's menus share: the focus as a
 // popover opens and closes, Tab once into a toolbar, and a menu that shows it scrolls.
 import { CaretDownIcon } from '@phosphor-icons/react'
 import * as Popover from '@radix-ui/react-popover'
@@ -17,16 +18,45 @@ import {
   useState,
 } from 'react'
 
-import { useEditState, usePhone } from '@/components/editor/edit-store.ts'
+import { typingIn } from '@/components/editor/edit-panel/fields.tsx'
+import { isSheet, type PanelId, useEditState, usePhone } from '@/components/editor/edit-store.ts'
 import { BAR_BUTTON, POPOVER } from '@/components/editor/styles.ts'
 import { useOverlayScroll } from '@/components/ui/overlay-scroll.ts'
 import { fadedEdges, linedEdges, useScrollEdges } from '@/components/ui/scroll-edges.ts'
 import { cn } from '@/lib/cn.ts'
 
+/**
+ * The room between a sheet and the screen's edges on a phone, in pixels: an edit panel's sheet
+ * keeps 0.5rem, which is 7 px at the 14 px root.
+ */
+export const SHEET_EDGE = 7
+
 /** The room between the bar's last row that shows and a popover under it, in pixels. */
 const GAP = 8
 
+/** Where each key moves the focus in a menu, from the row at `i` of rows up to `last`. */
+const STEPS = {
+  ArrowDown: (i: number, last: number) => (i >= last ? 0 : i + 1),
+  ArrowUp: (i: number, last: number) => (i <= 0 ? last : i - 1),
+  Home: () => 0,
+  End: (_: number, last: number) => last,
+}
+
 const nowhere = () => document.activeElement === null || document.activeElement === document.body
+
+/**
+ * Where a sheet hangs from on a phone: a line along the screen's bottom edge, SHEET_EDGE in from
+ * each side and from the bottom, so a popover above it spans the screen's width.
+ */
+const SCREEN_BOTTOM = {
+  current: {
+    getBoundingClientRect: () => {
+      const width = document.documentElement.clientWidth
+      const bottom = window.innerHeight - SHEET_EDGE
+      return DOMRect.fromRect({ x: SHEET_EDGE, y: bottom, width: width - SHEET_EDGE * 2, height: 0 })
+    },
+  },
+}
 
 /**
  * How far under its button a popover hangs to clear the whole bar: GAP under the bar's last row
@@ -62,6 +92,25 @@ export function arrowAlong(event: KeyboardEvent<HTMLElement>) {
         ? items.length - 1
         : (at + (forward ? 1 : -1) + items.length) % items.length
   items[next]?.focus()
+}
+
+/**
+ * Moves the focus between a menu's rows with the up and down arrows, wrapping round at the ends,
+ * and Home and End: its buttons that show, greyed ones too. A field keeps its own keys, its arrows
+ * stepping its value; Tab reaches it. Goes on the menu's content; a menu opened beside a row of it,
+ * drawn elsewhere in the page, moves through its own rows.
+ */
+export function arrowThrough(event: KeyboardEvent<HTMLElement>) {
+  if (event.defaultPrevented || !(event.key in STEPS)) return
+  const at = document.activeElement
+  if (!(at instanceof HTMLButtonElement) || !event.currentTarget.contains(at)) return
+  const rows = [...event.currentTarget.querySelectorAll<HTMLElement>('button:not(:disabled)')].filter((row) =>
+    row.checkVisibility({ visibilityProperty: true }),
+  )
+  const i = rows.indexOf(at)
+  if (i < 0) return
+  event.preventDefault()
+  rows[STEPS[event.key as keyof typeof STEPS](i, rows.length - 1)]?.focus()
 }
 
 /**
@@ -158,9 +207,10 @@ export function BarPopover({
   children,
   testId,
   className,
-  caret = true,
+  menu = false,
   align = 'center',
   buttonRef,
+  opens,
 }: {
   id: string
   open: string | null
@@ -173,15 +223,24 @@ export function BarPopover({
   children: ReactNode
   testId: string
   className?: string
-  /** Whether the button shows ▾; a ⋯ that opens a menu of actions has none. */
-  caret?: boolean
+  /**
+   * Whether it is a ⋯ that opens a menu of actions: its button shows no ▾, and the arrows, Home and
+   * End move between the menu's rows.
+   */
+  menu?: boolean
   /** Where the popover lines up under its button: its middle, or its end, as a menu of actions does. */
   align?: 'center' | 'end'
   /** Given the button, for a control that gives the focus back to it later. */
   buttonRef?: RefObject<HTMLButtonElement | null>
+  /** The edit panel a row of the popover opens, which gives the focus back to the button as it closes. */
+  opens?: PanelId
 }) {
   const focus = useMenuFocus()
   const shown = open === id
+  const phone = usePhone()
+  // A sheet on a phone, as `isSheet` names it: the anchor is the screen's bottom edge, and Radix's
+  // trigger width is the anchor's.
+  const asSheet = phone && isSheet(id)
   // Measured as it opens, and again when the bar's bottom moves, as when its second row opens.
   const { barBottom } = useEditState()
   const [below, setBelow] = useState(GAP)
@@ -201,23 +260,36 @@ export function BarPopover({
           aria-label={face ? label : undefined}
           title={face ? label : undefined}
           data-testid={`bar-${testId}`}
+          data-opens={opens}
           className={BAR_BUTTON}
         >
           {icon}
           {face ?? label}
-          {caret && <CaretDownIcon size={10} weight="bold" aria-hidden className="text-subtle" />}
+          {!menu && <CaretDownIcon size={10} weight="bold" aria-hidden className="text-subtle" />}
         </button>
       </Popover.Trigger>
+      {asSheet && <Popover.Anchor virtualRef={SCREEN_BOTTOM} />}
       <Popover.Portal>
         <Popover.Content
-          side="bottom"
-          align={align}
-          sideOffset={below}
-          collisionPadding={12}
+          side={asSheet ? 'top' : 'bottom'}
+          align={asSheet ? 'center' : align}
+          sideOffset={asSheet ? 0 : below}
+          collisionPadding={asSheet ? SHEET_EDGE : 12}
           {...focus.content}
+          // A number field being typed in takes Esc first, throwing away what was typed; the next
+          // Esc closes the popover.
+          onEscapeKeyDown={(event) => typingIn(document.activeElement) && event.preventDefault()}
+          onKeyDown={menu ? arrowThrough : undefined}
           aria-label={label}
           data-testid={`bar-${testId}-menu`}
-          className={cn(POPOVER, 'flex flex-col p-1.5', className ?? 'min-w-56')}
+          data-sheet={asSheet || undefined}
+          className={cn(
+            POPOVER,
+            'flex flex-col p-1.5',
+            asSheet
+              ? 'max-h-[var(--radix-popover-content-available-height)] w-[var(--radix-popover-trigger-width)] overflow-y-auto rounded-[22px]'
+              : (className ?? 'min-w-56'),
+          )}
         >
           {focus.back}
           {children}

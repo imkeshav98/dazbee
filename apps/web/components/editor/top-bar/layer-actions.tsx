@@ -2,11 +2,11 @@
 
 // The selected layers' own actions, one list for the small menu's ⋯ (the full menu) and the
 // right-click menu: Copy ▸ and Paste ▸ (the layers or their style), duplicate, Copy to other frames ▸
-// (style, text or the layer, into the linked frames); order and line up with the frame as menus
-// beside their rows, and the turn; box, ungroup for a group or a box, mask (or release the mask a
-// layer is under); text direction; and, at the bottom, lock, hide and delete in all frames, acting on
-// the layers and their linked copies. Every row runs the same editor action as its shortcut. An item
-// that never applies is left out; one with nothing to do is greyed, its tooltip saying why.
+// (style, text or the layer, into the linked frames); box, ungroup for a group or a box, mask (or
+// release the mask a layer is under); and, at the bottom, lock, hide and delete in all frames, acting
+// on the layers and their linked copies. Every row runs the same editor action as its shortcut. An
+// item that never applies is left out; one with nothing to do is greyed, its tooltip saying why. How
+// the layers sit (order, line up, the turn, text direction) is in the top bar's Arrange ⋯.
 import { CaretRightIcon } from '@phosphor-icons/react'
 import * as Popover from '@radix-ui/react-popover'
 import { type ReactNode, useLayoutEffect, useState } from 'react'
@@ -15,16 +15,15 @@ import { childrenOf } from '@dazbee/doc'
 import type { Editor, ShortcutAction } from '@dazbee/editor'
 import type { Design } from '@dazbee/schema'
 
-import { ALIGN, keyOf } from '@/components/editor/arrange-actions.ts'
-import { RotationField } from '@/components/editor/edit-panel/position-panel.tsx'
-import { set, shared, useTarget } from '@/components/editor/edit-panel/target.ts'
+import { keyOf } from '@/components/editor/arrange-actions.ts'
+import { useTarget } from '@/components/editor/edit-panel/target.ts'
 import { usePhone } from '@/components/editor/edit-store.ts'
-import { ICON_BUTTON, MENU, MENU_DIVIDER, MENU_HEADING, MENU_ITEM, MENU_KEY } from '@/components/editor/styles.ts'
+import { MENU, MENU_DIVIDER, MENU_HEADING, MENU_ITEM, MENU_KEY } from '@/components/editor/styles.ts'
 import { cn } from '@/lib/cn.ts'
 import { useLocale, useMessages } from '@/lib/i18n/client.tsx'
 import { dirOf, format, type Messages } from '@/lib/i18n/index.ts'
 
-import { useMenuFocus } from './bar-popover.tsx'
+import { SHEET_EDGE, useMenuFocus } from './bar-popover.tsx'
 import { arrowThroughRows, MenuRow } from './menu-row.tsx'
 
 /** Why an item has nothing to do: the reason the linked-copy items give, by its message. */
@@ -32,9 +31,6 @@ type Why = keyof Messages['editor']['bar']['linked']['why']
 
 /** The width of a menu beside a row whose rows have long keys, as the mock draws Copy to other frames ▸. */
 export const WIDE_MENU = 258
-
-/** The four moves along the stack: to the front, forward, backward, to the back. */
-export const ORDER = ['bringToFront', 'bringForward', 'sendBackward', 'sendToBack'] as const
 
 /**
  * The masks the layers are under, each the nearest mask before it among its siblings; null unless
@@ -64,7 +60,6 @@ function masksOver(design: Design, ids: readonly string[]): string[] | null {
  */
 export function LayerActions({ editor, ids, onDone }: { editor: Editor; ids: string[]; onDone: () => void }) {
   const t = useMessages()
-  const p = t.editor.props
   const b = t.editor.bar
   const selected = useTarget(editor, ids)
   if (!selected) return null
@@ -91,9 +86,6 @@ export function LayerActions({ editor, ids, onDone }: { editor: Editor; ids: str
   const [copyKey, pasteKey] = [`${mod}+C`, `${mod}+V`]
   const masks = target.props.every((pr) => Boolean(pr.mask))
   const over = masksOver(design, target.ids)
-  const sized = target.types.every((type) => type !== 'group' && type !== 'boolean')
-  const texts = target.types.every((type) => type === 'text')
-  const direction = shared(target.props.map((pr) => (pr.direction ?? 'auto') as 'auto' | 'ltr' | 'rtl'))
   const linked = editor.linkedMenu()
   if (!linked) return null
   const l = b.linked
@@ -156,21 +148,6 @@ export function LayerActions({ editor, ids, onDone }: { editor: Editor; ids: str
         </SubMenu>
       )}
       <div className={MENU_DIVIDER} />
-      <SubMenu label={b.order} testId="order">
-        {ORDER.map((action) => row(action, t.editor.arrange[action]))}
-      </SubMenu>
-      {ids.length === 1 && (
-        <SubMenu label={b.lineUp} testId="line-up">
-          <AlignRow editor={editor} />
-        </SubMenu>
-      )}
-      {sized && (
-        // On a phone the turn field is as tall as a row, a touch target a finger can hit.
-        <div className="px-1.5 py-1 max-sm:[&_[data-scrub]]:min-h-[44px]">
-          <RotationField target={target} p={p} />
-        </div>
-      )}
-      <div className={MENU_DIVIDER} />
       {row('boxSelection', b.putInBox)}
       {target.types.every((type) => type === 'group' || type === 'box') && row('ungroup', t.editor.arrange.ungroup)}
       {over ? (
@@ -188,28 +165,6 @@ export function LayerActions({ editor, ids, onDone }: { editor: Editor; ids: str
       ) : (
         row('mask', t.editor.arrange.mask, masks)
       )}
-      {texts && (
-        <>
-          <div className={MENU_DIVIDER} />
-          <SubMenu label={b.textDirection} testId="text-direction">
-            {(['auto', 'ltr', 'rtl'] as const).map((to) => (
-              <button
-                key={to}
-                type="button"
-                aria-pressed={direction === to}
-                data-direction={to}
-                onClick={() => {
-                  set(target, () => ({ direction: to }))
-                  onDone()
-                }}
-                className={MENU_ITEM}
-              >
-                {b.textDirections[to]}
-              </button>
-            ))}
-          </SubMenu>
-        </>
-      )}
       <div className={MENU_DIVIDER} />
       {linkedRow('lockLinked', linked.lock === 'lock' ? l.lockAll : l.unlockAll, null)}
       {linkedRow('hideLinked', linked.hide === 'hide' ? l.hideAll : l.showAll, null)}
@@ -218,34 +173,13 @@ export function LayerActions({ editor, ids, onDone }: { editor: Editor; ids: str
   )
 }
 
-/** The six ways to line up the selection, as icons: left, centre, right, top, middle, bottom. */
-export function AlignRow({ editor }: { editor: Editor }) {
-  const t = useMessages()
-  return (
-    <div dir="ltr" role="group" aria-label={t.editor.arrange.align} className="grid grid-cols-6 gap-0.5">
-      {ALIGN.map(({ action, icon: Icon }) => (
-        <button
-          key={action}
-          type="button"
-          aria-label={t.editor.arrange[action]}
-          title={format(t.editor.arrange.withKey, { label: t.editor.arrange[action], key: keyOf(action) })}
-          data-action={action}
-          onClick={() => editor.perform(action)}
-          className={ICON_BUTTON}
-        >
-          <Icon size={16} aria-hidden />
-        </button>
-      ))}
-    </div>
-  )
-}
-
 /**
- * A row of the menu that opens a short menu beside it, or under it on a phone, where the screen has
- * no room beside the menu and it lies over the menu across its whole width: Enter or the arrow
- * towards it opens it, the arrow back or Esc closes it, and the up and down arrows move through it.
+ * A row of the menu that opens a short menu beside it; on a phone, where the screen has no room
+ * beside the menu, the short menu lies on its row instead, sharing the menu's start edge. Enter or
+ * the arrow towards it opens it, the arrow back or Esc closes it; up, down, Home and End move
+ * between its rows, and the row stays lit while it is open.
  */
-function SubMenu({
+export function SubMenu({
   label,
   testId,
   heading,
@@ -262,19 +196,20 @@ function SubMenu({
 }) {
   const [open, setOpen] = useState(false)
   const phone = usePhone()
+  // On a phone, how far the short menu moves to lie on its row at the start edge of the menu the
+  // row is in: up by the row's height, and back by the row's inset from that edge.
+  const [over, setOver] = useState({ up: 0, back: 0 })
   const rtl = dirOf(useLocale()) === 'rtl'
   const [toward, back] = rtl ? ['ArrowLeft', 'ArrowRight'] : ['ArrowRight', 'ArrowLeft']
   const focus = useMenuFocus()
-  // On a phone, the menu's width and how far its start edge is from the row's, so it covers the menu.
-  const [span, setSpan] = useState<{ width: number; offset: number } | null>(null)
   useLayoutEffect(() => {
     const row = focus.button.current
-    const menu = phone && open ? row?.closest('[role="dialog"]') : null
-    if (!row || !menu) return setSpan(null)
-    const r = row.getBoundingClientRect()
-    const m = menu.getBoundingClientRect()
-    setSpan({ width: Math.round(m.width), offset: Math.round(rtl ? r.right - m.right : m.left - r.left) })
-  }, [phone, open, rtl, focus.button])
+    const menu = row?.parentElement
+    if (!phone || !open || !row || !menu) return
+    const [at, edge] = [row.getBoundingClientRect(), menu.getBoundingClientRect()]
+    const to = { up: Math.round(at.height), back: Math.round(rtl ? edge.right - at.right : at.left - edge.left) }
+    setOver((now) => (now.up === to.up && now.back === to.back ? now : to))
+  }, [phone, open, focus.button, rtl])
   return (
     <Popover.Root open={open} onOpenChange={setOpen}>
       <Popover.Trigger asChild>
@@ -288,7 +223,8 @@ function SubMenu({
             event.preventDefault()
             setOpen(true)
           }}
-          className={MENU_ITEM}
+          // Lit with the hover tint while the menu beside it is open.
+          className={cn(MENU_ITEM, 'data-[state=open]:bg-hover data-[state=open]:lit')}
         >
           {label}
           <CaretRightIcon size={12} weight="bold" aria-hidden className="text-subtle rtl:-scale-x-100" />
@@ -296,12 +232,12 @@ function SubMenu({
       </Popover.Trigger>
       <Popover.Portal>
         <Popover.Content
+          // Beside the row, or on a phone over it at its menu's start edge, as the mock draws it.
           side={phone ? 'bottom' : rtl ? 'left' : 'right'}
           align="start"
-          alignOffset={span?.offset ?? 0}
-          sideOffset={phone ? 4 : 8}
-          // On a phone, as close to the screen's edges as the menu it covers.
-          collisionPadding={phone ? 8 : 12}
+          sideOffset={phone ? -over.up : 8}
+          alignOffset={phone ? -over.back : 0}
+          collisionPadding={phone ? SHEET_EDGE : 12}
           // A click elsewhere, Esc or the arrow back closes it; focus moving as the menu opens does not.
           onFocusOutside={(event) => event.preventDefault()}
           {...focus.content}
@@ -312,7 +248,7 @@ function SubMenu({
             event.preventDefault()
             setOpen(false)
           }}
-          style={span ? { width: span.width } : wide ? { width: WIDE_MENU } : undefined}
+          style={wide ? { width: WIDE_MENU } : undefined}
           className={cn(MENU, !wide && 'min-w-52')}
         >
           {focus.back}

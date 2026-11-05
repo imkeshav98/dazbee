@@ -2,21 +2,35 @@
 
 // What the top bar has open: one pop-up, the full menu or one edit panel, never two at once, since
 // they share this one value. Opening any of them closes what was open. The shell reads it too: on a
-// phone an edit panel is a sheet, and a rail flyout and a sheet close each other. And whether
-// something stands over the edit panel and the bar's second row, which Esc closes first; and the
-// menu's button a rename field gives the focus back to.
+// phone an edit panel, and the top bar's Arrange ⋯, is a sheet, and a rail flyout and a sheet close
+// each other. And whether something stands over the edit panel and the bar's second row, which Esc
+// closes first; the menu's button a rename field gives the focus back to; and the Share menu's
+// listener for an Export asked from a picked frame's ⋯.
 import { useEffect, useState, useSyncExternalStore } from 'react'
 
 import { OVER_PANEL } from '@/components/ui/menu-close.ts'
 
 /** The top bar's items that open the edit panel for the selected layers. */
 const LAYER_PANELS = ['font', 'colour', 'spacing', 'effects', 'position', 'edit', 'outline', 'stack'] as const
-/** The design's own panels: Pages, from by the zoom, and the picked frame's Background. */
-const DESIGN_PANELS = ['pages', 'background'] as const
-/** Every id that opens the edit panel; every other id is a pop-up or the full menu. */
-const PANELS = [...LAYER_PANELS, ...DESIGN_PANELS] as const
+/**
+ * The design's own panels, each with whether it belongs to the picked frame it was opened for, so
+ * picking another frame or letting it go closes it: Pages, from by the zoom, stays; the picked
+ * frame's Background goes; Add a frame, open while the Frame tool is, stays; and Add size, the same
+ * card adding a size to the picked frame, goes. Selecting layers closes each of them.
+ */
+const DESIGN_PANELS = {
+  pages: { ofPickedFrame: false },
+  background: { ofPickedFrame: true },
+  addFrame: { ofPickedFrame: false },
+  addSize: { ofPickedFrame: true },
+} as const satisfies Record<string, { ofPickedFrame: boolean }>
+type DesignPanelId = keyof typeof DESIGN_PANELS
+/** The top bar's pop-ups that open as a sheet at the bottom on a phone, as an edit panel does: Arrange ⋯. */
+const SHEET_POPUPS = ['arrange'] as const
 export type LayerPanelId = (typeof LAYER_PANELS)[number]
-export type PanelId = (typeof PANELS)[number]
+export type PanelId = LayerPanelId | DesignPanelId
+/** Every id that opens the edit panel; every other id is a pop-up or the full menu. */
+const PANELS: readonly PanelId[] = [...LAYER_PANELS, ...(Object.keys(DESIGN_PANELS) as DesignPanelId[])]
 
 interface EditState {
   /** The open pop-up, full menu or edit panel, by its top bar id. */
@@ -35,6 +49,8 @@ let state: EditState = { open: null, bar: false, barBottom: 0, sheetTop: null, f
 const listeners = new Set<() => void>()
 /** The menu's button a rename was asked from, which the rename field gives the focus back to as it ends from the keyboard. */
 let renameOpener: HTMLElement | null = null
+/** What the Share menu does with an Export asked from elsewhere: open it with these frames ticked. */
+let exportListener: ((frameIds: string[], opener: HTMLElement | null) => void) | null = null
 
 const subscribe = (listener: () => void) => {
   listeners.add(listener)
@@ -46,6 +62,15 @@ const subscribe = (listener: () => void) => {
 export const isPanel = (id: string | null): id is PanelId => (PANELS as readonly string[]).includes(id ?? '')
 export const isLayerPanel = (id: string | null): id is LayerPanelId =>
   (LAYER_PANELS as readonly string[]).includes(id ?? '')
+/** Whether what is open is a sheet at the bottom on a phone: every edit panel but Pages, and Arrange ⋯. */
+export const isSheet = (id: string | null) =>
+  (isPanel(id) && id !== 'pages') || (SHEET_POPUPS as readonly string[]).includes(id ?? '')
+/**
+ * Whether what is open closes when the selection or the picked frame changes: a pop-up, the full
+ * menu, a layer's panel, or a panel of the picked frame.
+ */
+export const closesWithSelection = (id: string | null) =>
+  !isPanel(id) || isLayerPanel(id) || DESIGN_PANELS[id].ofPickedFrame
 
 /** Opens a pop-up, the full menu or an edit panel by its id, closing what was open; null closes it. */
 export const setOpen = (open: string | null) => update({ open })
@@ -62,6 +87,18 @@ export function takeRenameOpener() {
   const opener = renameOpener
   renameOpener = null
   return opener
+}
+/**
+ * Opens Export in the Share menu with only these frames ticked, as a picked frame's ⋯ does; Esc
+ * gives the focus back to `opener`, the menu's button it was asked from.
+ */
+export const askExport = (frameIds: string[], opener: HTMLElement | null) => exportListener?.(frameIds, opener)
+/** Hears each Export asked from elsewhere, until the function it returns is called; the Share menu listens. */
+export function onExportAsked(listener: (frameIds: string[], opener: HTMLElement | null) => void) {
+  exportListener = listener
+  return () => {
+    if (exportListener === listener) exportListener = null
+  }
 }
 /**
  * Whether something stands over the edit panel and the bar's second row, so Esc closes it first: a

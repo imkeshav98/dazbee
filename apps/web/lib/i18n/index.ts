@@ -1,9 +1,9 @@
 // Message catalogs and the person's locale. The locale comes from the `locale` cookie; Arabic
 // turns the whole UI right to left (CSS is written with logical properties only).
 import { ar } from './ar.ts'
-import { en, type Messages } from './en.ts'
+import { type Counted, en, type Messages } from './en.ts'
 
-export type { Messages }
+export type { Counted, Messages }
 
 export const CATALOGS = { en, ar } satisfies Record<string, Messages>
 export type Locale = keyof typeof CATALOGS
@@ -23,3 +23,10 @@ export type BrandWords = ReturnType<typeof brandWords>
 /** Fills `{name}` placeholders in a catalog string. */
 export const format = (template: string, values: Record<string, string | number>) =>
   template.replace(/\{(\w+)\}/g, (whole, name: string) => (name in values ? String(values[name]) : whole))
+
+/**
+ * The words for `n` in a locale, by its plural rules, `{n}` filled in: Arabic says 3 to 10 files in
+ * the plural and 11 to 99 in the singular.
+ */
+export const counted = (locale: Locale, words: Counted, n: number) =>
+  format(words[new Intl.PluralRules(locale).select(n)] ?? words.other, { n })

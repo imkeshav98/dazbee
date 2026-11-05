@@ -11,7 +11,6 @@
 import {
   ArrowLeftIcon,
   CaretDownIcon,
-  CheckIcon,
   CircleNotchIcon,
   LayoutIcon,
   PaletteIcon,
@@ -29,6 +28,7 @@ import { type AssetSummary, type BrandKit, SIZE_PRESETS } from '@dazbee/schema'
 import { useBrandKit } from '@/components/brand-kit/use-brand-kit.ts'
 import { buttonStyles } from '@/components/ui/button.tsx'
 import { overlayScroll } from '@/components/ui/overlay-scroll.ts'
+import { Tick } from '@/components/ui/tick.tsx'
 import { Tooltip } from '@/components/ui/tooltip.tsx'
 import { brandPath } from '@/lib/brand-routes.ts'
 import { BRIEF_SIZES, type BriefSize } from '@/lib/brief.ts'
@@ -619,21 +619,6 @@ export function BriefForm({
         </button>
       </div>
     </form>
-  )
-}
-
-/** A tick that shows whether a part is picked, as a filled or empty box. */
-function Tick({ on }: { on: boolean }) {
-  return (
-    <span
-      aria-hidden
-      className={cn(
-        'grid size-4 shrink-0 place-items-center rounded-[4px] border-[1.5px]',
-        on ? 'border-accent-solid bg-accent-solid text-on-accent' : 'border-line-strong',
-      )}
-    >
-      {on && <CheckIcon size={10} weight="bold" />}
-    </span>
   )
 }
 

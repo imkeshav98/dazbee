@@ -6,6 +6,7 @@ import { type Editor, SHAPE_MENU_TOOLS, type ShapeMenuTool, startEditor, type To
 import { isVectorAsset } from '@dazbee/schema'
 
 import { ASSET_DRAG_TYPE, draggedAsset, VECTOR_DRAG_TYPE } from '@/components/editor/asset-drag.ts'
+import { AddFramePanel, useFrameToolCard } from '@/components/editor/edit-panel/add-frame-panel.tsx'
 import { BackgroundPanel } from '@/components/editor/edit-panel/background-panel.tsx'
 import { EditPanel } from '@/components/editor/edit-panel/edit-panel.tsx'
 import { useEditState } from '@/components/editor/edit-store.ts'
@@ -114,6 +115,8 @@ export function EditorStage({
     }
   }, [editor])
   const dockTool = isShapeMenuTool(tool) ? 'shape' : tool
+  // The Frame tool opens Add a frame, and closing the card puts the tool down.
+  useFrameToolCard(editor, tool)
   const dismissRemoved = useCallback(() => setRemoved(null), [])
   // A frame Delete deleted, by its key or its ⋯ menu, says so with its undo, as a deleted page does.
   const frameRemoved = t.editor.frames.removed
@@ -361,6 +364,7 @@ export function EditorStage({
       {editor && <SmallMenu editor={editor} rightClick={menuAt !== null} />}
       {editor && <EditPanel editor={editor} brandId={brandId} />}
       {editor && <BackgroundPanel editor={editor} brandId={brandId} />}
+      {editor && <AddFramePanel editor={editor} />}
       {editor && <PagesPanel editor={editor} onRemoved={setRemoved} />}
       {editor && <EmptyPageHint editor={editor} />}
       <div

@@ -10,6 +10,7 @@ import { solid } from '../../support/edit-in-frame.ts'
 import { designOf, screenPoint, settle, writeOutput } from '../../support/editor.ts'
 import {
   clickLabel,
+  frameMenuItems,
   frameOf,
   labelPoint,
   labelRow,
@@ -79,9 +80,10 @@ test('a click on a frame’s empty area or its label picks it: outlined, its lab
   const bar = page.getByTestId('top-bar')
   await expect(bar).toHaveAttribute('data-frame', 'sq')
   await expect(bar.locator('[data-bar-item]')).toHaveCount(2)
-  // Background is a swatch, as a layer's Fill is, named for the person who can't see it.
-  await expect(page.getByTestId('bar-background')).toHaveText('')
-  await expect(page.getByTestId('bar-background')).toHaveAccessibleName('Background colour')
+  // Background is its swatch and its name, as the mock draws it.
+  await expect(page.getByTestId('bar-background')).toHaveText('Background')
+  await expect(page.getByTestId('bar-background')).toHaveAccessibleName('Background')
+  await expect(page.getByTestId('bar-background').locator('span').first()).toHaveCSS('border-radius', /px/)
   await expect(page.getByTestId('bar-frame-more')).toHaveAccessibleName('Frame actions')
   await expect(page.getByTestId('small-menu')).toHaveCount(0)
   writeOutput('frames-1-picked.png', await page.screenshot({ animations: 'disabled' }))
@@ -286,8 +288,8 @@ test('Duplicate from ⋯ and Ctrl+D copy the picked frame beside the rightmost o
 }) => {
   const { a, b, errors } = await openFrames(browser, 2)
   await click(a, 1000, 1000)
-  const menu = await barMenu(a, 'frame-more')
-  await expect(menu.getByRole('button')).toHaveText(['DuplicateCtrl+D', 'Rename', 'DeleteDelete'])
+  await barMenu(a, 'frame-more')
+  const menu = await frameMenuItems(a)
   // As a page's ⋯ on the Pages card: a line before Delete, in the danger colour, and the menu
   // under the bar, lined up with the end of ⋯.
   const remove = menu.getByRole('button', { name: /Delete/ })
@@ -456,10 +458,7 @@ test('a double click on a frame’s name renames it in place, Enter keeping it a
   await a.keyboard.press('ArrowRight')
   await expect(a.getByTestId('bar-frame-more')).toBeFocused()
   await a.keyboard.press('Enter')
-  const menu = a.getByTestId('bar-frame-more-menu')
-  await expect(menu.getByRole('button', { name: /Duplicate/ })).toBeFocused()
-  await a.keyboard.press('Tab')
-  await expect(menu.getByRole('button', { name: 'Rename' })).toBeFocused()
+  await frameMenuItems(a, 'Rename')
   await a.keyboard.press('Enter')
   field = a.getByTestId('frame-rename').locator('input')
   await expect(field).toBeFocused()

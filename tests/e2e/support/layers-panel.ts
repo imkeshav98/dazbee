@@ -1,13 +1,15 @@
-// The layers panel specs' design and helpers: the tree and its rows, what the panel lists, the
-// layers in the document, and Tab into the tree.
+// The layers panel specs' design and helpers: the tree and its frame and layer rows, what the panel
+// lists, the layers in the document, and Tab into the tree.
 import type { DesignInput } from '@dazbee/schema'
 
 import { frameDesign } from './seed.ts'
 import { read } from './stage.ts'
 import { expect, type Page } from './test.ts'
 
-/** A row's height in the panel, in pixels (LAYER_ROW in components/editor/flyouts/layer-row.tsx). */
+/** A row's height in the panel, in pixels (LAYER_ROW in components/editor/flyouts/tree-row.tsx). */
 export const ROW = 36
+/** The square's frame row as `listed` gives it, for the designs `frameDesign` makes. */
+export const SQUARE = 'Square 1080×1080'
 
 export const rect = (x: number, y: number, width: number, height: number, color: string) => ({
   x,
@@ -62,11 +64,20 @@ export const layersDesign = (): DesignInput =>
   })
 
 export const tree = (page: Page) => page.getByRole('tree')
+/** A layer's row, by the layer's name. */
 export const row = (page: Page, name: string) =>
   tree(page)
     .getByRole('treeitem')
     .filter({ has: page.locator(`[data-testid="layer-name"]:text-is("${name}")`) })
-/** The rows' names as the panel lists them, top to bottom. */
+/** A frame's row, by the frame's name. */
+export const frameRow = (page: Page, name: string) =>
+  tree(page)
+    .getByRole('treeitem')
+    .filter({ has: page.locator(`[data-testid="frame-name"]:text-is("${name}")`) })
+/**
+ * The rows as the panel lists them, top to bottom: a frame's as its name and size, a layer's as its
+ * words, indented two spaces for each level it sits below the frames.
+ */
 export const listed = (page: Page) =>
   tree(page)
     .getByRole('treeitem')
@@ -75,7 +86,11 @@ export const listed = (page: Page) =>
         .sort(
           (a, b) => Number.parseFloat((a as HTMLElement).style.top) - Number.parseFloat((b as HTMLElement).style.top),
         )
-        .map((r) => `${'  '.repeat(Number(r.getAttribute('aria-level')) - 1)}${r.textContent}`),
+        .map((r) => {
+          const text = (id: string) => r.querySelector(`[data-testid="${id}"]`)?.textContent ?? ''
+          const words = r.hasAttribute('data-frame') ? `${text('frame-name')} ${text('frame-size')}` : r.textContent
+          return `${'  '.repeat(Number(r.getAttribute('aria-level')) - 1)}${words}`
+        }),
     )
 export const node = async (page: Page, id: string) =>
   (await read(page)).nodes[id] as unknown as { parentId: string; name: string; lock?: Record<string, boolean> }

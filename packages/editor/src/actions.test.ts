@@ -5,6 +5,7 @@ import type { DesignInput } from '@dazbee/schema'
 
 import { type ActionsDeps, editorActions } from './actions.ts'
 import { type Frame, pageFrames } from './canvas/frames.ts'
+import { editorFrameActions } from './frame-actions.ts'
 import { editorAutoLayoutDrag } from './gestures/select/auto-layout-drag.ts'
 import { editorTransformDrag } from './gestures/select/transform-drag.ts'
 import { hug } from './layers/hug.ts'
@@ -82,6 +83,18 @@ function harness(penDrawing = false) {
       throw new Error('nothing is drawn in these tests')
     },
   })
+  const frameActions = editorFrameActions({
+    session,
+    view: {
+      page: () => 'p1',
+      showArea: (area) => log.push(`showArea ${JSON.stringify(area)}`),
+      showWhole: (area) => log.push(`showWhole ${JSON.stringify(area)}`),
+    },
+    tools: { setTool: (tool) => log.push(`tool ${tool}`) },
+    frameName: (width, height) => `Size ${width}×${height}`,
+    selection,
+    drawOverlay: () => log.push('overlay'),
+  })
   const deps: ActionsDeps = {
     session,
     view: {
@@ -92,7 +105,6 @@ function harness(penDrawing = false) {
       nearestFrame: () => wide,
       fitAll: () => log.push('fitAll'),
       fitArea: (area) => log.push(`fitArea ${JSON.stringify(area)}`),
-      showArea: (area) => log.push(`showArea ${JSON.stringify(area)}`),
       zoomTo: (zoom) => log.push(`zoomTo ${zoom}`),
       zoomIn: () => log.push('zoomIn'),
       zoomOut: () => log.push('zoomOut'),
@@ -110,6 +122,7 @@ function harness(penDrawing = false) {
     },
     transformDrag,
     autoLayoutDrag,
+    frameActions,
     notify: (notice) => log.push(notice),
     drawOverlay: () => log.push('overlay'),
   }
@@ -119,7 +132,7 @@ function harness(penDrawing = false) {
     const p = session.design().nodes[id]?.props as { x: number; y: number }
     return { x: p.x, y: p.y }
   }
-  return { actions, session, selection, frame, wide, log, at }
+  return { actions, frameActions, session, selection, frame, wide, log, at }
 }
 
 describe('editorActions', () => {
@@ -281,8 +294,8 @@ describe('editorActions', () => {
     })
 
     it('lets the picked frame go with Esc, and deletes it with Delete, its layers too and their linked copies left, as one undo step the page hears of', () => {
-      const { actions, session, selection, frame, log } = harness()
-      actions.onFrameDelete((name) => log.push(`deleted ${name}`))
+      const { actions, frameActions, session, selection, frame, log } = harness()
+      frameActions.onFrameDelete((name) => log.push(`deleted ${name}`))
       selection.pickFrame(frame.id)
       expect(actions.perform('deselect')).toBe(true)
       expect(selection.pickedFrame()).toBeNull()

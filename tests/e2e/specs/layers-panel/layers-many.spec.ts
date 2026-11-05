@@ -32,15 +32,15 @@ const threeHundred = (): DesignInput => {
 }
 
 /**
- * The rows in the page: how many, the first one's place in the list (from 0, by its
- * aria-posinset: the 300 layers are siblings), the first row in view, how many rows the view
- * holds, and how far the panel can scroll. The row Tab lands on stays in the page wherever the
- * list is scrolled, so it counts for the first only when it is next to the other rows.
+ * The rows in the page: how many, the first one's place in the list (from 0, by where it is drawn),
+ * the first row in view, how many rows the view holds, and how far the panel can scroll. The row Tab
+ * lands on stays in the page wherever the list is scrolled, so it counts for the first only when it
+ * is next to the other rows.
  */
 const mounted = (scroller: Locator) =>
   scroller.evaluate((el, row) => {
     const rows = [...el.querySelectorAll<HTMLElement>('[role=treeitem]')]
-    const places = rows.map((r) => Number(r.getAttribute('aria-posinset')) - 1)
+    const places = rows.map((r) => Math.round(Number.parseFloat(r.style.top) / row))
     const tab = rows.findIndex((r) => r.tabIndex === 0)
     const run = places.filter((at, i) => i !== tab || places.includes(at - 1) || places.includes(at + 1))
     return {
@@ -82,7 +82,8 @@ test('300 layers: only the rows in view are in the page, and they follow the scr
   const scroller = page.getByTestId('layers-scroller')
   const top = await mounted(scroller)
   expect(top.count).toBeLessThan(60)
-  expect(await tree(page).evaluate((el) => el.getBoundingClientRect().height)).toBe(300 * ROW)
+  // The frame's row, then its 300 layers.
+  expect(await tree(page).evaluate((el) => el.getBoundingClientRect().height)).toBe(301 * ROW)
   // The rows the panel keeps in the page past the end of the view, read once at the top.
   const overscan = top.count - top.fits
   expect(overscan).toBeGreaterThan(0)

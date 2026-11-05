@@ -1,38 +1,36 @@
 'use client'
 
-// The picked frame's top bar items: Background, a swatch as a layer's Fill is, which opens the
-// Background panel for the frame's own fills, and ⋯ with the frame's actions: Duplicate, Rename and
-// Delete, the last after a line and in the danger colour, as a page's ⋯ on the Pages card.
-import { DotsThreeIcon } from '@phosphor-icons/react'
+// The picked frame's top bar items: Background, its swatch and its name, which opens the
+// Background panel for the frame's own fills, and ⋯ with the frame's actions: Duplicate, Add size ▸,
+// which opens the Add size card, Rename, Export, which opens the Share menu's Export with this frame
+// ticked alone, and Delete, the last after a line and in the danger colour, as a page's ⋯ on the
+// Pages card.
+import { CaretRightIcon, DotsThreeIcon } from '@phosphor-icons/react'
 import { useRef } from 'react'
 
 import type { Editor } from '@dazbee/editor'
 import type { Design } from '@dazbee/schema'
 
 import { keyOf } from '@/components/editor/arrange-actions.ts'
-import { setOpen, setRenameOpener, useEditState } from '@/components/editor/edit-store.ts'
+import { askExport, setOpen, setRenameOpener, useEditState } from '@/components/editor/edit-store.ts'
 import { MENU_DIVIDER, MENU_ITEM, MENU_KEY } from '@/components/editor/styles.ts'
 import { cn } from '@/lib/cn.ts'
 import { hexOf } from '@/lib/colour.ts'
+import { swatchOf } from '@/lib/editor/frame-swatch.ts'
 import { useMessages } from '@/lib/i18n/client.tsx'
 
 import { BarPopover } from './bar-popover.tsx'
 import { type BarItem, Dot, PanelButton } from './top-bar-items.tsx'
 
-/** The swatch for a frame's fills: the fill on top that shows, a gradient's first stop, a rainbow for an image, or empty for none. */
-function swatchOf(design: Design, frameId: string): string | 'mixed' | 'none' {
-  const top = (design.frames[frameId]?.fills ?? []).findLast((fill) => fill.visible !== false)
-  if (!top) return 'none'
-  const colour = top.type === 'solid' ? top.color : 'stops' in top ? top.stops[0]?.color : undefined
-  return colour === undefined ? 'mixed' : hexOf(colour)
-}
+/** A swatch without its transparency, as a layer's Fill shows its colour on its button. */
+const opaque = (swatch: string) => (swatch === 'mixed' || swatch === 'none' ? swatch : hexOf(swatch))
 
 /** The items of a picked frame's top bar, in order. */
 export function useFrameItems(editor: Editor, frameId: string, design: Design): BarItem[] {
   const t = useMessages()
   const f = t.editor.frames
   const { open } = useEditState()
-  // The ⋯ button, which the rename field gives the focus back to after Rename here.
+  // The ⋯ button, which the rename field and Export give the focus back to after Rename or Export here.
   const more = useRef<HTMLButtonElement | null>(null)
   /** Closes the menu, then does what its row says. */
   const act = (run: () => void) => () => {
@@ -43,7 +41,7 @@ export function useFrameItems(editor: Editor, frameId: string, design: Design): 
     {
       key: 'background',
       node: (
-        <PanelButton id="background" label={f.backgroundColour} face={<Dot colour={swatchOf(design, frameId)} />} />
+        <PanelButton id="background" label={f.background} icon={<Dot colour={opaque(swatchOf(design, frameId))} />} />
       ),
     },
     {
@@ -55,10 +53,11 @@ export function useFrameItems(editor: Editor, frameId: string, design: Design): 
           onOpen={setOpen}
           label={f.more}
           face={<DotsThreeIcon size={18} weight="bold" aria-hidden />}
-          caret={false}
+          menu
           align="end"
           buttonRef={more}
           testId="frame-more"
+          opens="addSize"
         >
           <button
             type="button"
@@ -71,6 +70,16 @@ export function useFrameItems(editor: Editor, frameId: string, design: Design): 
           </button>
           <button
             type="button"
+            data-action="add-size"
+            aria-haspopup="dialog"
+            onClick={() => setOpen('addSize')}
+            className={MENU_ITEM}
+          >
+            {f.addSize}
+            <CaretRightIcon size={12} weight="bold" aria-hidden className="text-subtle rtl:-scale-x-100" />
+          </button>
+          <button
+            type="button"
             data-action="rename"
             onClick={act(() => {
               setRenameOpener(more.current)
@@ -79,6 +88,14 @@ export function useFrameItems(editor: Editor, frameId: string, design: Design): 
             className={MENU_ITEM}
           >
             {f.rename}
+          </button>
+          <button
+            type="button"
+            data-action="export"
+            onClick={act(() => askExport([frameId], more.current))}
+            className={MENU_ITEM}
+          >
+            {f.export}
           </button>
           <div role="separator" className={MENU_DIVIDER} />
           <button
