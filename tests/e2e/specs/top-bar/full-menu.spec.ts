@@ -6,7 +6,14 @@
 import { boxOf, layoutProblems, SCREEN_SIZES } from '../../support/layout.ts'
 import { closeMenus, expectGreyed, fillOf, holders, node, open, redo, rowsOf, undo } from '../../support/linked-menu.ts'
 import { GREEN, INK, PINK } from '../../support/linked-menu-design.ts'
-import { besideRows, FULL_MENU_BESIDE, fullMenuRows, rowIn, rowName } from '../../support/menu-rows.ts'
+import {
+  besideRows,
+  FULL_MENU_BESIDE,
+  fullMenuRows,
+  rowIn,
+  rowName,
+  rowsUnderTooltip,
+} from '../../support/menu-rows.ts'
 import { copyIn } from '../../support/seed.ts'
 import { fitSettled, selectLayers } from '../../support/stage.ts'
 import { expect, type Page, test } from '../../support/test.ts'
@@ -16,24 +23,6 @@ test.describe.configure({ mode: 'parallel', timeout: 120_000 })
 
 /** The words of the row that has the focus, without its key. */
 const focusedRow = (page: Page) => page.evaluate(() => document.activeElement?.firstChild?.textContent?.trim() ?? '')
-
-/** A box on screen, as the browser measures it. */
-type Box = { left: number; top: number; right: number; bottom: number }
-/** How much of `a` lies in `b`, in square pixels. */
-const overlap = (a: Box, b: Box) =>
-  Math.max(0, Math.min(a.right, b.right) - Math.max(a.left, b.left)) *
-  Math.max(0, Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top))
-/** How much of a tooltip covers the full menu where the menu beside its row doesn't lie over it, in square pixels. */
-function coversMenu(tip: Box, menu: Box, beside: Box) {
-  const inMenu: Box = {
-    left: Math.max(tip.left, menu.left),
-    top: Math.max(tip.top, menu.top),
-    right: Math.min(tip.right, menu.right),
-    bottom: Math.min(tip.bottom, menu.bottom),
-  }
-  if (inMenu.right <= inMenu.left || inMenu.bottom <= inMenu.top) return 0
-  return overlap(inMenu, inMenu) - overlap(inMenu, beside)
-}
 
 test.describe('the full menu', () => {
   test('opens with the focus on its first item, lists its rows in order, and gives the focus back to ⋯', async ({
@@ -372,31 +361,36 @@ test.describe('at each screen size', () => {
       expect(errors).toEqual([])
     })
 
-    test(`at ${width}×${height} Copy to other frames ▸ is as wide as the mock’s, and a greyed row’s tooltip covers no row of the full menu`, async ({
+    test(`at ${width}×${height} Copy to other frames ▸ is as wide as the mock’s, and a greyed row’s tooltip lies beside the row, covering no row of either menu, for its first, middle and last row`, async ({
       browser,
     }) => {
       const { page, errors } = await open(browser)
       await page.setViewportSize({ width, height })
       await fitSettled(page)
       await selectLayers(page, ['headline'])
-      const menu = await moreMenu(page)
       const sub = await moreSubmenu(page, 'copy-to-frames')
       await entered(sub)
-      const [main, beside] = [await boxOf(menu), await boxOf(sub)]
+      const beside = await boxOf(sub)
       expect(Math.abs(beside.right - beside.left - 258)).toBeLessThanOrEqual(4)
       // Each row's key ends at the same right-hand edge, as the full menu's do.
       const ends = await sub
         .locator('button kbd')
         .evaluateAll((keys) => keys.map((key) => Math.round(key.getBoundingClientRect().right)))
       expect(new Set(ends).size).toBe(1)
-      await rowIn(sub, 'layerToLinked').hover()
-      const tip = page.getByRole('tooltip').filter({ hasText: 'Every linked frame has this layer already' })
-      await expect(tip).toBeVisible()
-      const shown = tip.locator('xpath=..')
-      await entered(shown)
-      const box = await boxOf(shown)
-      expect(coversMenu(box, main, beside)).toBe(0)
-      expect(box.left >= 0 && box.right <= width && box.top >= 0 && box.bottom <= height).toBe(true)
+      for (const id of FULL_MENU_BESIDE['copy-to-frames'].map((row) => row.id)) {
+        const row = rowIn(sub, id)
+        await expect(row, id).toHaveAttribute('aria-disabled', 'true')
+        const why = (await row.getAttribute('aria-description')) ?? ''
+        await expectGreyed(page, sub, rowName(id), why)
+        const shown = page.getByRole('tooltip').filter({ hasText: why }).locator('xpath=..')
+        await entered(shown)
+        expect(await rowsUnderTooltip(page), id).toEqual([])
+        // Beside the row, level with it.
+        const [box, under] = [await boxOf(shown), await boxOf(row)]
+        expect(Math.abs((box.top + box.bottom) / 2 - (under.top + under.bottom) / 2), id).toBeLessThanOrEqual(1)
+        expect(box.left >= under.right || box.right <= under.left, id).toBe(true)
+        expect(box.left >= 0 && box.right <= width && box.top >= 0 && box.bottom <= height, id).toBe(true)
+      }
       expect(errors).toEqual([])
     })
   }

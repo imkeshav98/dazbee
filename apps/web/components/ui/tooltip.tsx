@@ -26,6 +26,7 @@ export function Tooltip({
   label,
   side = 'top',
   align = 'center',
+  sideOffset = 8,
   open,
   onOpenChange,
   children,
@@ -34,6 +35,8 @@ export function Tooltip({
   side?: 'top' | 'right' | 'bottom' | 'left'
   /** How it lines up along its control's side. */
   align?: 'start' | 'center' | 'end'
+  /** Pixels between it and its control. */
+  sideOffset?: number
   /** Whether it shows, for a caller that also opens it another way, such as a tap; left out, hover and focus decide. */
   open?: boolean
   onOpenChange?: (open: boolean) => void
@@ -48,7 +51,7 @@ export function Tooltip({
         <RadixTooltip.Content
           side={side}
           align={align}
-          sideOffset={8}
+          sideOffset={sideOffset}
           // Off the window's edges by as much as it keeps from its control.
           collisionPadding={8}
           className={TOOLTIP}

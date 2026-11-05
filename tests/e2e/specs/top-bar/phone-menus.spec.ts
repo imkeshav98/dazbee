@@ -2,12 +2,20 @@
 // menu opens in its menu's place, under a back row naming its row, with nothing of the menu showing;
 // the back row, the arrow back and Esc go back to the row, and a second Esc closes the menu, in
 // English and in Arabic. No row shows a shortcut key, and every row stays a finger's height. A tap
-// on a greyed row says why in a tooltip above it, clear of the finger, which Esc closes first.
-// Arrange's sheet is checked in top-bar-more-screens.
+// on a greyed row says why in a tooltip just above its menu, covering no row and clear of the finger,
+// which Esc closes first. Arrange's sheet is checked in top-bar-more-screens.
 import { setCookies } from '../../support/editor.ts'
 import { boxOf } from '../../support/layout.ts'
 import { open } from '../../support/linked-menu.ts'
-import { besideRows, fullMenuRows, rowIn, rowName, shownKeys, shownRows } from '../../support/menu-rows.ts'
+import {
+  besideRows,
+  fullMenuRows,
+  rowIn,
+  rowName,
+  rowsUnderTooltip,
+  shownKeys,
+  shownRows,
+} from '../../support/menu-rows.ts'
 import { fitSettled, selectLayers } from '../../support/stage.ts'
 import { expect, type Locator, type Page, test } from '../../support/test.ts'
 import { entered, moreMenu } from '../../support/top-bar.ts'
@@ -148,35 +156,60 @@ for (const [locale, toward, back] of [
   })
 }
 
-test('a tap on a greyed row says why in a tooltip above the row, clear of the finger, the first row of a menu too, and Esc closes the tooltip first', async ({
+test('a tap on a greyed row says why in a tooltip just above its menu, covering no row, back row or finger, for the first, a middle and the last row, and Esc closes the tooltip first', async ({
   browser,
 }) => {
   const { page, errors } = await openOnPhone(browser)
-  await page.evaluate(() => localStorage.removeItem('dazbee.copiedLayers'))
+  await page.evaluate(() => {
+    localStorage.removeItem('dazbee.copiedLayers')
+    localStorage.removeItem('dazbee.copiedStyle')
+  })
+  /** Taps a greyed row, checks its tooltip lies just above its menu and covers no row, and gives the tooltip. */
+  const tapGreyed = async (menu: Locator, greyed: Locator, why: string, label: string) => {
+    // Playwright holds back a click on a row marked disabled until it isn't; the tap is the point here.
+    await greyed.click({ force: true })
+    const tip = page.getByRole('tooltip').filter({ hasText: why })
+    await expect(tip, label).toBeVisible()
+    const shown = tip.locator('xpath=..')
+    await entered(shown)
+    expect(await rowsUnderTooltip(page), label).toEqual([])
+    const [box, around] = [await boxOf(shown), await boxOf(menu)]
+    expect(box.bottom, label).toBeLessThanOrEqual(around.top + 0.5)
+    expect(box.left >= 0 && box.right <= PHONE.width && box.top >= 0, label).toBe(true)
+    return tip
+  }
+  // The first and the last row of a menu in the full menu's place, under its back row, and a middle one.
   for (const [id, sub, row, why] of [
     ['photo', 'paste', 'paste', 'Copy layers first'],
-    ['headline', 'copy-to-frames', 'layerToLinked', 'Every linked frame has this layer already'],
+    ['photo', 'paste', 'pasteStyle', 'Copy a style first'],
+    ['headline', 'copy-to-frames', 'textToLinked', 'Every linked copy has this text already'],
   ] as const) {
-    const name = rowName(row)
     await selectLayers(page, [id])
     const menu = await moreMenu(page)
     await menu.getByTestId(`more-${sub}`).click()
     const greyed = rowIn(page.getByTestId(`more-${sub}-menu`), row)
-    // Playwright holds back a click on a row marked disabled until it isn't; the tap is the point here.
-    await greyed.click({ force: true })
-    const tip = page.getByRole('tooltip').filter({ hasText: why })
-    await expect(tip).toBeVisible()
-    const shown = tip.locator('xpath=..')
-    await entered(shown)
-    const [box, under] = [await boxOf(shown), await boxOf(greyed)]
-    expect(box.bottom, name).toBeLessThanOrEqual(under.top + 0.5)
-    expect(box.left >= 0 && box.right <= PHONE.width && box.top >= 0, name).toBe(true)
+    const tip = await tapGreyed(menu, greyed, why, row)
     // Esc closes the top-most first: the tooltip, then the menu in the full menu's place, then the full menu.
     await page.keyboard.press('Escape')
     await expect(tip).toBeHidden()
     await expect(greyed).toBeVisible()
     await page.keyboard.press('Escape')
     await expect(greyed).toBeHidden()
+    await expect(menu).toBeVisible()
+    await page.keyboard.press('Escape')
+    await expect(menu).toBeHidden()
+  }
+  // The full menu's own rows: a middle one for a frame linked to none, and the last for a layer locked against deleting.
+  await page.evaluate(() => window.dazbee?.setLocked(['badge'], true))
+  for (const [id, row, why] of [
+    ['fresh-title', 'more-copy-to-frames', 'No other frame on this page is linked to this one'],
+    ['badge', 'deleteLinked', 'The selection is locked against deleting'],
+  ] as const) {
+    await selectLayers(page, [id])
+    const menu = await moreMenu(page)
+    const tip = await tapGreyed(menu, rowIn(menu, row), why, row)
+    await page.keyboard.press('Escape')
+    await expect(tip).toBeHidden()
     await expect(menu).toBeVisible()
     await page.keyboard.press('Escape')
     await expect(menu).toBeHidden()

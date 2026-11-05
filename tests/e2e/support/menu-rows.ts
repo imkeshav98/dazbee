@@ -2,7 +2,7 @@
 // small menu's ⋯ and a right-click on a layer) with the menus beside its rows, and the top bar's
 // Arrange ⋯ with the moves beside its Order; and readers of the rows a menu shows. A picked frame's
 // ⋯ keeps its own list in frames-on-canvas.ts.
-import type { Locator } from './test.ts'
+import type { Locator, Page } from './test.ts'
 
 /**
  * A row of a menu: what a spec names it by (its `data-action`, or the test id of a row that opens a
@@ -110,3 +110,22 @@ export const shownRows = (menu: Locator) =>
 /** How many of a menu's shortcut keys show. */
 export const shownKeys = (menu: Locator) =>
   menu.locator('kbd').evaluateAll((keys) => keys.filter((key) => key.checkVisibility()).length)
+/**
+ * The rows of the open menus that the tooltip showing now covers, by their words: every row, back
+ * row and field that shows in them, the tooltip's own menu's included. Empty while it covers none.
+ */
+export const rowsUnderTooltip = (page: Page) =>
+  page.evaluate(() => {
+    const tip = document.querySelector('[role="tooltip"]')?.parentElement
+    if (!tip) return []
+    const t = tip.getBoundingClientRect()
+    return [...document.querySelectorAll('[data-radix-popper-content-wrapper] :is(button, [data-scrub])')]
+      .filter((row) => !tip.contains(row) && row.checkVisibility())
+      .filter((row) => {
+        const r = row.getBoundingClientRect()
+        const across = Math.min(r.right, t.right) - Math.max(r.left, t.left)
+        const down = Math.min(r.bottom, t.bottom) - Math.max(r.top, t.top)
+        return across > 0.5 && down > 0.5
+      })
+      .map((row) => (row as HTMLElement).innerText.trim() || (row.getAttribute('aria-label') ?? ''))
+  })

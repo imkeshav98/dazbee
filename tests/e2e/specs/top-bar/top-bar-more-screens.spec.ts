@@ -6,12 +6,12 @@
 // Nothing meets or is cut at any size; and the screenshots for the pull request.
 import { arrangeDesign } from '../../support/arrange-design.ts'
 import { editorPath, setCookies, writeOutput } from '../../support/editor.ts'
-import { layoutProblems, rowHeights, SCREEN_SIZES } from '../../support/layout.ts'
-import { rowIn, rowName, shownKeys, shownRows } from '../../support/menu-rows.ts'
+import { boxOf, layoutProblems, rowHeights, SCREEN_SIZES } from '../../support/layout.ts'
+import { rowIn, rowName, rowsUnderTooltip, shownKeys, shownRows } from '../../support/menu-rows.ts'
 import { seed } from '../../support/seed.ts'
 import { fitSettled, nextFrame, openStage, order, selectLayers } from '../../support/stage.ts'
 import { type Browser, expect, type Locator, type Page, test } from '../../support/test.ts'
-import { arrangeMenu, arrangeSubmenu, barMenu, PIECES, UNCUT } from '../../support/top-bar.ts'
+import { arrangeMenu, arrangeSubmenu, barMenu, entered, PIECES, UNCUT } from '../../support/top-bar.ts'
 
 test.describe.configure({ timeout: 180_000 })
 
@@ -185,7 +185,9 @@ test("on a phone Arrange opens as a sheet at the bottom, hiding the dock and tab
   expect(errors).toEqual([])
 })
 
-test('on a phone a tap on a greyed row of the sheet says why, and opens nothing', async ({ browser }) => {
+test('on a phone a tap on a greyed row of the sheet says why just above the sheet, covering no row, and opens nothing', async ({
+  browser,
+}) => {
   const { page, errors } = await openOnTouch(browser)
   await selectLayers(page, ['one'], { bar: true })
   await page.getByTestId('bar-arrange').tap()
@@ -196,6 +198,23 @@ test('on a phone a tap on a greyed row of the sheet says why, and opens nothing'
   await expect(page.getByRole('tooltip')).toHaveText('Auto layout places this layer')
   await expect(page.getByTestId('more-line-up-menu')).toHaveCount(0)
   await expect(sheet).toBeVisible()
+  // A locked text's greyed rows: one in the middle and the last.
+  await page.keyboard.press('Escape')
+  await page.keyboard.press('Escape')
+  await expect(sheet).toBeHidden()
+  await page.evaluate(() => window.dazbee?.setLocked(['words'], true))
+  await selectLayers(page, ['words'], { bar: true })
+  await page.getByTestId('bar-arrange').tap()
+  await expect(sheet).toBeVisible()
+  await entered(sheet)
+  for (const id of ['more-line-up', 'more-text-direction']) {
+    await sheet.getByTestId(id).tap({ force: true })
+    const shown = page.getByRole('tooltip').filter({ hasText: 'The layer is locked' }).locator('xpath=..')
+    await expect(shown, id).toBeVisible()
+    await entered(shown)
+    expect(await rowsUnderTooltip(page), id).toEqual([])
+    expect((await boxOf(shown)).bottom, id).toBeLessThanOrEqual((await boxOf(sheet)).top + 0.5)
+  }
   expect(errors).toEqual([])
   await page.context().close()
 })

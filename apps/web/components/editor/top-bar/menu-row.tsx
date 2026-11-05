@@ -14,6 +14,9 @@ import { type Box, type TooltipPlace, tooltipPlace } from '@/lib/editor/tooltip-
 import { useLocale } from '@/lib/i18n/client.tsx'
 import { dirOf } from '@/lib/i18n/index.ts'
 
+/** The open menus: each popover's content. */
+const MENUS = '[data-radix-popper-content-wrapper] > [role="dialog"]'
+
 /** An element's box in the window. */
 const boxOf = (el: Element): Box => {
   const { left, top, right, bottom } = el.getBoundingClientRect()
@@ -87,24 +90,31 @@ export function MenuRow({
 
 /**
  * The tooltip of a greyed control, saying `why` it has nothing to do: under the pointer, on
- * keyboard focus and on a tap or click, placed as it shows so it covers no row of another open menu,
- * and on a phone above the control, clear of the finger. The ref and `tap` go on the control, and
- * `tooltip` on the Tooltip around it.
+ * keyboard focus and on a tap or click, placed as it shows so it covers no row of any open menu,
+ * its own menu's included, and on a phone just above the control's menu, clear of the finger. The
+ * ref and `tap` go on the control, and `tooltip` on the Tooltip around it.
  */
 export function useWhyTip<T extends HTMLElement>(why: string | null) {
   const [told, setTold] = useState(false)
   const rtl = dirOf(useLocale()) === 'rtl'
   const phone = usePhone()
-  const [place, setPlace] = useState<TooltipPlace>({ side: rtl ? 'left' : 'right', align: 'center' })
+  const [place, setPlace] = useState<TooltipPlace>({ side: rtl ? 'left' : 'right', align: 'center', offset: 8 })
   const ref = useRef<T>(null)
-  /** Shows or hides why, placed clear of the other open menus as it shows. */
+  /** Shows or hides why, placed clear of every open menu's rows as it shows. */
   const tell = (open: boolean) => {
     if (open && ref.current && why) setPlace(placeFor(ref.current, why, rtl, phone))
     setTold(open)
   }
   return {
     ref,
-    tooltip: { label: why ?? '', side: place.side, align: place.align, open: told, onOpenChange: tell },
+    tooltip: {
+      label: why ?? '',
+      side: place.side,
+      align: place.align,
+      sideOffset: place.offset,
+      open: told,
+      onOpenChange: tell,
+    },
     /** A tap or a click shows why, as the pointer resting on it does, and runs nothing. */
     tap: (event: MouseEvent) => {
       event.preventDefault()
@@ -114,19 +124,20 @@ export function useWhyTip<T extends HTMLElement>(why: string | null) {
 }
 
 /**
- * Where a row's tooltip goes: beside it when there is room, otherwise above or below it, or on a
- * phone above it, clear of the other open menus, measured as it is about to show.
+ * Where a row's tooltip goes: beside it when there is room, otherwise past the top or bottom of its
+ * menu, or on a phone just above its menu, clear of every row that shows in the open menus, measured
+ * as it is about to show.
  */
 function placeFor(row: HTMLElement, label: string, rtl: boolean, phone: boolean): TooltipPlace {
   const own = row.closest('[role="dialog"]') ?? row
-  const others = [...document.querySelectorAll('[data-radix-popper-content-wrapper] > [role="dialog"]')].filter(
-    (menu) => menu !== own,
+  const rows = [...document.querySelectorAll(`${MENUS} :is(button, [data-scrub])`)].filter((one) =>
+    one.checkVisibility(),
   )
   return tooltipPlace({
     row: boxOf(row),
     size: tooltipSize(label),
     own: boxOf(own),
-    others: others.map(boxOf),
+    rows: rows.map(boxOf),
     room: { width: document.documentElement.clientWidth, height: window.innerHeight },
     rtl,
     phone,
