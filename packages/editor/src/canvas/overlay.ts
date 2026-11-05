@@ -1,6 +1,8 @@
 // The overlay over the stage: the frame labels, the picked frame, the outlines of the group gone
-// into, the hovered layer and the drop target, the selection with its handles and size, what each
-// gesture shows, the rulers and the caret, drawn in that order.
+// into, the hovered layer and the drop target, the dashed outlines of the selected layers' linked
+// copies, the selection with its handles and size, what each gesture shows, the rulers and the
+// caret, drawn in that order.
+import { copiesOf, frameIdOf } from '@dazbee/doc'
 import { scaleText } from '@dazbee/renderer'
 import type { Rect } from '@dazbee/schema'
 
@@ -137,6 +139,28 @@ export function editorOverlay({
     return below + 24 > view.viewport().height - SIZE_CLEARANCE ? Math.min(...ys) - 26 : below
   }
 
+  /** A dashed outline round each linked copy of the selected layers in the frames in view. */
+  function linkedParts() {
+    const current = selection.current()
+    if (!current) return []
+    const design = view.design()
+    const shown = view.inView()
+    const parts: HTMLElement[] = []
+    for (const id of current.ids) {
+      for (const copy of copiesOf(design, id)) {
+        const frameId = frameIdOf(design, copy)
+        const frame = shown.find((f) => f.id === frameId)
+        const box = frame && boxes.drawnBoxOf(frame, copy, design)
+        if (!frame || !box) continue
+        const el = outline('linked-copy', frame, box)
+        el.dataset.layer = copy
+        el.dataset.frame = frame.id
+        parts.push(el)
+      }
+    }
+    return parts
+  }
+
   /** Each selected layer's outline, then the box with its handles and the size under it. */
   function selectionParts() {
     const gesture = pointer.gesture()
@@ -224,6 +248,7 @@ export function editorOverlay({
     const dropBox = dropFrame && dropTarget && boxes.drawnBoxOf(dropFrame, dropTarget.id, view.design())
     if (dropFrame && dropBox) parts.push(outline('drop-target', dropFrame, dropBox))
     parts.push(
+      ...linkedParts(),
       ...(selection.pathEditing() || selection.cropping() ? [] : selectionParts()),
       ...pen.parts(),
       ...cropping.parts(),

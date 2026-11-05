@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { Design } from '@dazbee/schema'
+
 import type { Gesture } from '../gestures/pointer.ts'
 import type { Box } from '../layers/transform.ts'
 import type { Picked } from '../selection.ts'
@@ -27,6 +29,23 @@ const fake = (name = ''): Fake => ({
   },
 })
 const SQUARE: Frame = { id: 'one-sq', pageId: 'one', name: 'Sale', x: 0, y: 0, width: 1080, height: 1080 }
+const STORY: Frame = { id: 'one-story', pageId: 'one', name: 'Story', x: 1280, y: 0, width: 1080, height: 1920 }
+/** A layer whose link id the story, the MPU (off the stage) and a frame of page two hold too. */
+const linkedDesign = (() => {
+  const layer = (parentId: string) => ({
+    type: 'graphic' as const,
+    parentId,
+    link: 'a',
+    index: 'a0',
+    name: 'A',
+    props: { x: 10, y: 10, width: 100, height: 100, shape: { kind: 'rect' as const } },
+  })
+  const parsed = Design.parse({
+    ...design,
+    nodes: { a: layer('one-sq'), 'story-a': layer('one-story'), 'mpu-a': layer('one-mpu'), 'two-a': layer('two-sq') },
+  })
+  return parsed
+})()
 const BOX: Box = { x: 10, y: 10, width: 100, height: 100, rotation: 0 }
 
 beforeEach(() => {
@@ -50,6 +69,8 @@ function harness(
     picked?: boolean
     renaming?: boolean
     zoom?: number
+    /** The design holds linked copies of the selected layer, and the story is in view too. */
+    linked?: boolean
   } = {},
 ) {
   const log: string[] = []
@@ -65,8 +86,8 @@ function harness(
     view: {
       camera: () => ({ x: 0, y: 100, zoom: state.zoom ?? 1 }),
       viewport: () => ({ width: 1000, height: 800 }),
-      design: () => design,
-      inView: () => [SQUARE],
+      design: () => (state.linked ? linkedDesign : design),
+      inView: () => (state.linked ? [SQUARE, STORY] : [SQUARE]),
       frameOf: (key) => (key === SQUARE.id ? SQUARE : undefined),
       rulers: () => false,
       outline: (className) => fake(className) as unknown as HTMLElement,
@@ -173,6 +194,17 @@ describe('editorOverlay', () => {
         overlay.draw()
         expect(part('frame-label')?.children.map((c) => `${c.className} ${c.textContent}`)).toEqual(['frame-name Sale'])
       }
+    })
+
+    it('outlines the selected layer’s linked copies in the frames in view, dashed, before the selection', () => {
+      const { overlay, drawn, part } = harness({ linked: true })
+      overlay.draw()
+      expect(drawn().filter((name) => name === 'linked-copy')).toHaveLength(1)
+      expect(part('linked-copy')?.dataset).toEqual({ layer: 'story-a', frame: 'one-story' })
+      expect(drawn().indexOf('linked-copy')).toBeLessThan(drawn().indexOf('selection'))
+      const none = harness({ linked: true, selected: false })
+      none.overlay.draw()
+      expect(none.drawn()).not.toContain('linked-copy')
     })
 
     it('gives the selection its handles and size, and leaves them off while text is typed into', () => {
