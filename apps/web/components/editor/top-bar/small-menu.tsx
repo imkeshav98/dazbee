@@ -24,7 +24,8 @@ import { keyOf } from '@/components/editor/arrange-actions.ts'
 import { useTarget } from '@/components/editor/edit-panel/target.ts'
 import { editState, isPanel, setOpen, useEditState, usePhone } from '@/components/editor/edit-store.ts'
 import { useSelection } from '@/components/editor/editor-hooks.ts'
-import { BAR_BUTTON, BAR_TOGGLE, MENU } from '@/components/editor/styles.ts'
+import { BAR_BUTTON, BAR_TOGGLE, MENU, MENU_ITEM_GREYED } from '@/components/editor/styles.ts'
+import { Tooltip } from '@/components/ui/tooltip.tsx'
 import { cn } from '@/lib/cn.ts'
 import { type Box, CLEAR, smallMenuPlace } from '@/lib/editor/small-menu-place.ts'
 import { useLocale, useMessages } from '@/lib/i18n/client.tsx'
@@ -200,8 +201,11 @@ export function SmallMenu({ editor, rightClick }: { editor: Editor; rightClick: 
   const focused = useRovingTab(menu)
   const fullMenu = useFullMenuPlace(menu, content, place, phone, rtl)
   const scroll = useScrollingMenu(setContent)
+  const [toldWhy, setToldWhy] = useState(false)
   if (!selected) return null
   const { target, design } = selected
+  // Delete does nothing to a layer locked against deleting, or holding one: it is greyed, saying so.
+  const undeletable = editor.linkedMenu()?.delete !== 'ready' ? b.linked.why.selectionLocked : null
   const locked = target.ids.every((id) => {
     const lock = design.nodes[id]?.lock
     return Boolean(lock && Object.values(lock).some(Boolean))
@@ -253,17 +257,38 @@ export function SmallMenu({ editor, rightClick }: { editor: Editor; rightClick: 
           >
             <CopyIcon size={16} aria-hidden />
           </button>
-          <button
-            type="button"
-            data-bar-item
-            data-testid="small-delete"
-            aria-label={b.delete}
-            title={withKey(b.delete, 'delete')}
-            onClick={() => editor.perform('delete')}
-            className={cn(BAR_BUTTON, 'rounded-full px-1.5')}
-          >
-            <TrashIcon size={16} aria-hidden />
-          </button>
+          {undeletable ? (
+            <Tooltip label={undeletable} open={toldWhy} onOpenChange={setToldWhy}>
+              <button
+                type="button"
+                data-bar-item
+                data-testid="small-delete"
+                aria-label={b.delete}
+                aria-disabled="true"
+                aria-description={undeletable}
+                // A tap shows why, as the pointer resting on it does.
+                onClick={(event) => {
+                  event.preventDefault()
+                  setToldWhy(true)
+                }}
+                className={cn(BAR_BUTTON, 'rounded-full px-1.5', MENU_ITEM_GREYED)}
+              >
+                <TrashIcon size={16} aria-hidden />
+              </button>
+            </Tooltip>
+          ) : (
+            <button
+              type="button"
+              data-bar-item
+              data-testid="small-delete"
+              aria-label={b.delete}
+              title={withKey(b.delete, 'delete')}
+              onClick={() => editor.perform('delete')}
+              className={cn(BAR_BUTTON, 'rounded-full px-1.5')}
+            >
+              <TrashIcon size={16} aria-hidden />
+            </button>
+          )}
           <button
             type="button"
             data-bar-item

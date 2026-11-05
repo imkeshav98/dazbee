@@ -2,7 +2,7 @@
 // its own frame only, by mouse and by key, each one undo step.
 import { holders, node, open, redo, undo } from '../../support/linked-menu.ts'
 import { copyIn } from '../../support/seed.ts'
-import { selectLayers } from '../../support/stage.ts'
+import { drawn, selectLayers } from '../../support/stage.ts'
 import { expect, test } from '../../support/test.ts'
 
 test.describe.configure({ mode: 'parallel', timeout: 120_000 })
@@ -50,6 +50,29 @@ test.describe('the small menu', () => {
     await undo(page)
     await expect.poll(() => node(page, 'badge')).not.toBeNull()
     await redo(page)
+    await expect.poll(() => node(page, 'badge')).toBeNull()
+    expect(errors).toEqual([])
+  })
+
+  test('greys Delete on a locked layer, saying it is locked, and deletes nothing', async ({ browser }) => {
+    const { page, errors } = await open(browser)
+    await selectLayers(page, ['badge'])
+    await page.getByTestId('small-lock').click()
+    const del = page.getByTestId('small-delete')
+    await expect(del).toHaveAttribute('aria-disabled', 'true')
+    await expect(del).toHaveAttribute('aria-description', 'The selection is locked against deleting')
+    await del.hover()
+    await expect(
+      page.getByRole('tooltip').filter({ hasText: 'The selection is locked against deleting' }),
+    ).toBeVisible()
+    // Playwright holds back a click on a control marked disabled; the click is the point here.
+    await del.click({ force: true })
+    await page.keyboard.press('Delete')
+    await drawn(page)
+    expect(await node(page, 'badge')).not.toBeNull()
+    await page.getByTestId('small-lock').click()
+    await expect(del).not.toHaveAttribute('aria-disabled', 'true')
+    await del.click()
     await expect.poll(() => node(page, 'badge')).toBeNull()
     expect(errors).toEqual([])
   })
