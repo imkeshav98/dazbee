@@ -2,7 +2,7 @@
 // up ▸, the rotation field and, for text, Text direction ▸, by mouse and keyboard, each one undo
 // step; a rotated layer and one inside an auto layout box; locked; at the three screen sizes, where
 // on a phone it is a sheet at the bottom and stays at the bar's end.
-import { barItems, design } from '../../support/arrange-design.ts'
+import { arrangeDesign, barItems } from '../../support/arrange-design.ts'
 import { enter } from '../../support/fields.ts'
 import { openStage, order, perform, props, read, selectLayers } from '../../support/stage.ts'
 import { expect, type Page, test } from '../../support/test.ts'
@@ -28,7 +28,7 @@ test.describe('at 1280×760', () => {
   test("the ⋯ is the bar's last item: a shape's holds Order, Line up and the rotation field, a text's Text direction too, and the full menu none of them", async ({
     browser,
   }) => {
-    const { page, errors } = await openStage(browser, design())
+    const { page, errors } = await openStage(browser, arrangeDesign())
     await page.setViewportSize({ width: 1280, height: 760 })
     await selectLayers(page, ['shape'], { bar: true })
     expect((await barItems(page)).at(-1)).toBe('arrange')
@@ -67,7 +67,7 @@ test.describe('at 1280×760', () => {
   test('by mouse, Order, Line up, the rotation field and Text direction each act on the layer as one undo step', async ({
     browser,
   }) => {
-    const { page, errors } = await openStage(browser, design())
+    const { page, errors } = await openStage(browser, arrangeDesign())
     await page.setViewportSize({ width: 1280, height: 760 })
     await selectLayers(page, ['shape'], { bar: true })
     const top = () => order(page)
@@ -105,7 +105,7 @@ test.describe('at 1280×760', () => {
   test('by keyboard: End reaches ⋯ in the bar, Enter opens it on Order, the arrow opens Order and Enter runs a move; the arrows never move the layer, and Esc gives the focus back to ⋯', async ({
     browser,
   }) => {
-    const { page, errors } = await openStage(browser, design())
+    const { page, errors } = await openStage(browser, arrangeDesign())
     await page.setViewportSize({ width: 1280, height: 760 })
     await selectLayers(page, ['shape'], { bar: true })
     const where = async () => {
@@ -163,7 +163,7 @@ test.describe('at 1280×760', () => {
   test('a rotated layer: the field shows its turn and a typed one replaces it, and Line up lines up its turned box with the frame', async ({
     browser,
   }) => {
-    const { page, errors } = await openStage(browser, design())
+    const { page, errors } = await openStage(browser, arrangeDesign())
     await page.setViewportSize({ width: 1280, height: 760 })
     await selectLayers(page, ['turned'], { bar: true })
     const field = (await arrangeMenu(page)).getByRole('spinbutton', { name: 'Rotation in degrees' })
@@ -194,18 +194,40 @@ test.describe('at 1280×760', () => {
   test('inside an auto layout box: Line up is greyed out with its reason and opens nothing; Order moves the layer along its row and the field turns it', async ({
     browser,
   }) => {
-    const { page, errors } = await openStage(browser, design())
+    const { page, errors } = await openStage(browser, arrangeDesign())
     await page.setViewportSize({ width: 1280, height: 760 })
     await selectLayers(page, ['one'], { bar: true })
-    const menu = await arrangeMenu(page)
+    // Reached by the keyboard, the greyed Line up says why in a tooltip, and its pointer is not-allowed.
+    await page.getByTestId('top-bar-row').locator('[data-bar-item]').first().focus()
+    await page.keyboard.press('End')
+    await page.keyboard.press('Enter')
+    const menu = page.getByTestId('bar-arrange-menu')
+    await expect(menu.getByTestId('more-order')).toBeFocused()
+    await page.keyboard.press('Tab')
     const lineUp = menu.getByTestId('more-line-up')
+    await expect(lineUp).toBeFocused()
     await expect(lineUp).toHaveAttribute('aria-disabled', 'true')
-    await expect(lineUp).toHaveAttribute('title', 'Auto layout places this layer')
+    await expect(lineUp).not.toHaveAttribute('title')
+    await expect(lineUp).toHaveCSS('cursor', 'not-allowed')
+    const tip = page.getByRole('tooltip')
+    await expect(tip).toHaveText('Auto layout places this layer')
+    // Esc closes the tooltip first, then the menu.
+    await page.keyboard.press('Escape')
+    await expect(tip).toHaveCount(0)
+    await expect(menu).toBeVisible()
+    await page.keyboard.press('Escape')
+    await expect(menu).toBeHidden()
+    // Under the pointer it says why again, and a click opens nothing.
+    await (await arrangeMenu(page)).getByTestId('more-line-up').hover()
+    await expect(tip).toHaveText('Auto layout places this layer')
     // Clicked as a person would, though the row says it is disabled.
     await lineUp.click({ force: true })
     await expect(page.getByTestId('more-line-up-menu')).toHaveCount(0)
     await expect(menu).toBeVisible()
+    await expect(tip).toHaveText('Auto layout places this layer')
     await page.keyboard.press('Escape')
+    await page.keyboard.press('Escape')
+    await expect(menu).toBeHidden()
 
     const row = () => order(page, 'stack')
     await orderMove(page, 'Bring forward')
@@ -224,8 +246,63 @@ test.describe('at 1280×760', () => {
     expect(errors).toEqual([])
   })
 
+  test('the Order moves with nothing to do are greyed, saying why: to the front for the top layer, to the back for the bottom one, in the frame and in an auto layout box', async ({
+    browser,
+  }) => {
+    const { page, errors } = await openStage(browser, arrangeDesign())
+    await page.setViewportSize({ width: 1280, height: 760 })
+    const tip = page.getByRole('tooltip')
+    const cases = [
+      {
+        id: 'stack',
+        off: ['Bring to front', 'Bring forward'],
+        on: ['Send backward', 'Send to back'],
+        why: 'Already at the front',
+      },
+      {
+        id: 'under',
+        off: ['Send backward', 'Send to back'],
+        on: ['Bring to front', 'Bring forward'],
+        why: 'Already at the back',
+      },
+      {
+        id: 'two',
+        off: ['Bring to front', 'Bring forward'],
+        on: ['Send backward', 'Send to back'],
+        why: 'Already at the front',
+      },
+    ]
+    for (const { id, off, on, why } of cases) {
+      await selectLayers(page, [id], { bar: true })
+      const moves = await arrangeSubmenu(page, 'order')
+      const move = (name: string) => moves.getByRole('button', { name: new RegExp(`^${name}`) })
+      for (const name of on) await expect(move(name), `${id} ${name}`).not.toHaveAttribute('aria-disabled')
+      for (const name of off) {
+        await expect(move(name), `${id} ${name}`).toHaveAttribute('aria-disabled', 'true')
+        await expect(move(name)).toHaveCSS('cursor', 'not-allowed')
+        await move(name).hover()
+        await expect(tip).toHaveText(why)
+      }
+      // A click on one does nothing and leaves the menu open, saying why.
+      const before = await order(page)
+      await move(off[0] as string).click({ force: true })
+      await expect(moves).toBeVisible()
+      await expect(tip).toHaveText(why)
+      expect(await order(page)).toEqual(before)
+      expect(await page.evaluate(() => window.dazbee?.canUndo())).toBe(false)
+      await page.keyboard.press('Escape')
+      await page.keyboard.press('Escape')
+      await page.keyboard.press('Escape')
+      await expect(page.getByTestId('bar-arrange-menu')).toBeHidden()
+    }
+    // A layer in the middle of its stack has every move.
+    await selectLayers(page, ['shape'], { bar: true })
+    await expect((await arrangeSubmenu(page, 'order')).locator('[aria-disabled]')).toHaveCount(0)
+    expect(errors).toEqual([])
+  })
+
   test("a locked layer's bar keeps its ⋯ with Order alone, which still moves it", async ({ browser }) => {
-    const { page, errors } = await openStage(browser, design())
+    const { page, errors } = await openStage(browser, arrangeDesign())
     await page.setViewportSize({ width: 1280, height: 760 })
     await page.evaluate(() => window.dazbee?.setLocked(['shape'], true))
     await selectLayers(page, ['shape'], { bar: true })

@@ -2,7 +2,7 @@
 // up ▸, the rotation field and, for text, Text direction ▸, by mouse and keyboard, each one undo
 // step; a rotated layer and one inside an auto layout box; locked; at the three screen sizes, where
 // on a phone it is a sheet at the bottom and stays at the bar's end.
-import { design } from '../../support/arrange-design.ts'
+import { arrangeDesign } from '../../support/arrange-design.ts'
 import { setCookies, writeOutput } from '../../support/editor.ts'
 import { layoutProblems, rowHeights, SCREEN_SIZES } from '../../support/layout.ts'
 import { fitSettled, nextFrame, openStage, order, selectLayers } from '../../support/stage.ts'
@@ -14,7 +14,7 @@ test.describe.configure({ timeout: 180_000 })
 test("on a phone the ⋯ stays at the bar's end and opens as a sheet at the bottom, hiding the dock and tab bar, with rows a finger can hit; a menu beside a row opens inside the screen", async ({
   browser,
 }) => {
-  const { page, errors } = await openStage(browser, design())
+  const { page, errors } = await openStage(browser, arrangeDesign())
   await page.setViewportSize({ width: 390, height: 844 })
   await fitSettled(page)
   // A text's bar, the longest, scrolls sideways under its ⋯, which shows whole at its end.
@@ -70,7 +70,7 @@ test("on a phone the ⋯ stays at the bar's end and opens as a sheet at the bott
 test('at each screen size the ⋯ and the menus beside its rows meet nothing and cut nothing, for a text and a shape', async ({
   browser,
 }) => {
-  const { page, errors } = await openStage(browser, design())
+  const { page, errors } = await openStage(browser, arrangeDesign())
   for (const [width, height] of SCREEN_SIZES) {
     await page.setViewportSize({ width, height })
     await fitSettled(page)
@@ -98,7 +98,7 @@ for (const theme of ['dark', 'light'] as const)
     `screenshots in the ${theme} theme: the ⋯ open for a shape and a text, Order and Line up open, the phone's sheet`,
     { tag: '@evidence' },
     async ({ browser }) => {
-      const { page, errors } = await openStage(browser, design())
+      const { page, errors } = await openStage(browser, arrangeDesign())
       await setCookies(page, { theme })
       await page.reload()
       await expect(page.getByTestId('status')).toHaveAttribute('data-ready', '', { timeout: 30_000 })

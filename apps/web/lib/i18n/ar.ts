@@ -213,6 +213,8 @@ export const ar: Messages = {
       order: 'الترتيب',
       arrange: 'ترتيب',
       placedByLayout: 'التخطيط التلقائي يحدد مكان هذه الطبقة',
+      atFront: 'في المقدمة بالفعل',
+      atBack: 'في الخلف بالفعل',
       grouping: 'تجميع',
       putInBox: 'ضع في صندوق',
       combine: 'دمج',

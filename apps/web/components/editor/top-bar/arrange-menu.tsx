@@ -4,7 +4,8 @@
 // (with the frame, for one layer), the rotation field, and Text direction ▸ for text, each shown only
 // where it applies (`arrangeRows`). It opens under the bar, and on a phone as a sheet at the bottom
 // of the screen. Every row runs the same editor action as its shortcut.
-import { DotsThreeIcon } from '@phosphor-icons/react'
+import { CaretRightIcon, DotsThreeIcon } from '@phosphor-icons/react'
+import { type ReactNode, useState } from 'react'
 
 import type { Editor } from '@dazbee/editor'
 import type { Design } from '@dazbee/schema'
@@ -12,12 +13,13 @@ import type { Design } from '@dazbee/schema'
 import { ALIGN, keyOf } from '@/components/editor/arrange-actions.ts'
 import { RotationField } from '@/components/editor/edit-panel/position-panel.tsx'
 import { factsOf, set, shared, type Target } from '@/components/editor/edit-panel/target.ts'
-import { setOpen, useEditState } from '@/components/editor/edit-store.ts'
-import { ICON_BUTTON, MENU_DIVIDER, MENU_ITEM, MENU_KEY } from '@/components/editor/styles.ts'
+import { setOpen, useEditState, usePhone } from '@/components/editor/edit-store.ts'
+import { ICON_BUTTON, MENU_DIVIDER, MENU_ITEM, MENU_ITEM_GREYED, MENU_KEY } from '@/components/editor/styles.ts'
+import { Tooltip } from '@/components/ui/tooltip.tsx'
 import { cn } from '@/lib/cn.ts'
-import { arrangeRows } from '@/lib/editor/arrange-menu.ts'
-import { useMessages } from '@/lib/i18n/client.tsx'
-import { format } from '@/lib/i18n/index.ts'
+import { arrangeRows, stackEnds } from '@/lib/editor/arrange-menu.ts'
+import { useLocale, useMessages } from '@/lib/i18n/client.tsx'
+import { dirOf, format } from '@/lib/i18n/index.ts'
 
 import { BarPopover } from './bar-popover.tsx'
 import { SubMenu } from './layer-actions.tsx'
@@ -35,6 +37,12 @@ export function ArrangeMenu({ target, design, locked }: { target: Target; design
   const { open } = useEditState()
   const { editor } = target
   const rows = arrangeRows({ ...factsOf(target, design), several: target.ids.length > 1, locked })
+  // A move to the front has nothing to do for layers at the front of their stacks, one to the back
+  // for layers at the back.
+  const ends = stackEnds(design, target.ids)
+  const toFront = (action: (typeof ORDER)[number]) => action === 'bringToFront' || action === 'bringForward'
+  const nothingToDo = (action: (typeof ORDER)[number]) =>
+    toFront(action) ? (ends.front ? b.atFront : null) : ends.back ? b.atBack : null
   const done = () => setOpen(null)
   const direction = shared(target.props.map((pr) => (pr.direction ?? 'auto') as 'auto' | 'ltr' | 'rtl'))
   return (
@@ -54,26 +62,32 @@ export function ArrangeMenu({ target, design, locked }: { target: Target; design
           case 'order':
             return (
               <SubMenu key="order" label={b.order} testId="order">
-                {ORDER.map((action) => (
-                  <button
-                    key={action}
-                    type="button"
-                    data-action={action}
-                    onClick={() => {
-                      editor.perform(action)
-                      done()
-                    }}
-                    className={MENU_ITEM}
-                  >
-                    {t.editor.arrange[action]}
-                    <kbd className={MENU_KEY}>{keyOf(action)}</kbd>
-                  </button>
-                ))}
+                {ORDER.map((action) => {
+                  const why = nothingToDo(action)
+                  const end = <kbd className={MENU_KEY}>{keyOf(action)}</kbd>
+                  return why ? (
+                    <GreyedRow key={action} label={t.editor.arrange[action]} why={why} action={action} end={end} />
+                  ) : (
+                    <button
+                      key={action}
+                      type="button"
+                      data-action={action}
+                      onClick={() => {
+                        editor.perform(action)
+                        done()
+                      }}
+                      className={MENU_ITEM}
+                    >
+                      {t.editor.arrange[action]}
+                      {end}
+                    </button>
+                  )
+                })}
               </SubMenu>
             )
           case 'lineUp':
             return row.off ? (
-              <OffRow key="line-up" label={b.lineUp} why={b.placedByLayout} testId="line-up" />
+              <GreyedRow key="line-up" label={b.lineUp} why={b.placedByLayout} testId="more-line-up" end={<Caret />} />
             ) : (
               <SubMenu key="line-up" label={b.lineUp} testId="line-up">
                 <AlignRow editor={editor} />
@@ -136,19 +150,51 @@ export function AlignRow({ editor }: { editor: Editor }) {
 }
 
 /**
- * A row that applies but has nothing to do now: greyed out, opening nothing, with a tooltip saying
- * why. It keeps the focus, so the keyboard still reaches it and reads why.
+ * A row that applies but is refused or has nothing to do now: greyed out, opening and running
+ * nothing, with a tooltip saying why under the pointer, on keyboard focus and on a tap. It keeps
+ * the focus, so the keyboard still reaches it and hears why. `end` is what the row ends with: its
+ * shortcut, or the caret of a row that opens a menu beside it.
  */
-function OffRow({ label, why, testId }: { label: string; why: string; testId: string }) {
+function GreyedRow({
+  label,
+  why,
+  end,
+  action,
+  testId,
+}: {
+  label: string
+  why: string
+  end: ReactNode
+  action?: string
+  testId?: string
+}) {
+  const [told, setTold] = useState(false)
+  // Beside the row at its end, or under it on a phone, where a menu fills the width.
+  const phone = usePhone()
+  const rtl = dirOf(useLocale()) === 'rtl'
   return (
-    <button
-      type="button"
-      aria-disabled
-      title={why}
-      data-testid={`more-${testId}`}
-      className={cn(MENU_ITEM, 'cursor-default opacity-40 hover:bg-transparent active:bg-transparent')}
-    >
-      {label}
-    </button>
+    <Tooltip label={why} side={phone ? 'bottom' : rtl ? 'left' : 'right'} open={told} onOpenChange={setTold}>
+      <button
+        type="button"
+        aria-disabled="true"
+        aria-description={why}
+        data-action={action}
+        data-testid={testId}
+        // A tap or a click shows why, as the pointer resting on it does.
+        onClick={(event) => {
+          event.preventDefault()
+          setTold(true)
+        }}
+        className={cn(MENU_ITEM, MENU_ITEM_GREYED)}
+      >
+        {label}
+        {end}
+      </button>
+    </Tooltip>
   )
+}
+
+/** The caret at the end of a row that opens a menu beside it. */
+function Caret() {
+  return <CaretRightIcon size={12} weight="bold" aria-hidden className="text-subtle rtl:-scale-x-100" />
 }

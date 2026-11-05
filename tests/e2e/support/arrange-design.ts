@@ -1,3 +1,5 @@
+// The design the Arrange ⋯ specs open, and a reader of the top bar's items: a text, a shape over
+// another, a turned shape, and two shapes in an auto layout row, in one frame.
 import type { Page } from '@playwright/test'
 
 import type { DesignInput } from '@dazbee/schema'
@@ -21,7 +23,7 @@ const rect = (
 })
 
 /** A text, a shape over another, a turned shape, and two shapes in an auto layout row, in one frame. */
-export const design = (): DesignInput =>
+export const arrangeDesign = (): DesignInput =>
   frameDesign({
     name: 'Top bar more',
     fills: solid('#FFF8F0FF'),
