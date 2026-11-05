@@ -59,7 +59,7 @@ export const ROW_LOOK =
   'group absolute inset-x-1 flex cursor-default items-center gap-1.5 rounded-[8px] pe-1 text-[13px] outline-none select-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-inset'
 /** A selected layer's or picked frame's row is tinted pink, as in the mock. */
 export const ROW_SELECTED = 'bg-accent/20 text-text lit'
-/** A row's end label in mono: a box's kind, a frame's size, "only here". */
+/** A row's end label in mono, at the row's end: a box's kind, "only here", a frame's size. */
 export const ROW_LABEL = 'shrink-0 font-mono text-[11px] text-subtle'
 const INDENT = 16
 const DRAG_TYPE = 'application/x-dazbee-layer'
@@ -249,16 +249,6 @@ export const LayerRow = memo(function LayerRow({
           {node.name}
         </span>
       )}
-      {kind && !renaming && (
-        <span data-testid="layer-kind" className={ROW_LABEL}>
-          {kind}
-        </span>
-      )}
-      {row.onlyHere && !renaming && (
-        <span data-testid="layer-only-here" className={ROW_LABEL}>
-          {t.editor.layersPanel.onlyHere}
-        </span>
-      )}
       <RowToggle
         on={hidden}
         label={format(hidden ? t.editor.layersPanel.show : t.editor.layersPanel.hide, { name: node.name })}
@@ -274,6 +264,17 @@ export const LayerRow = memo(function LayerRow({
         icon={locked ? LockSimpleIcon : LockSimpleOpenIcon}
         testId="layer-lock"
       />
+      {/* The end labels line up with the frames' sizes, after the toggles. */}
+      {kind && !renaming && (
+        <span data-testid="layer-kind" className={cn(ROW_LABEL, 'pe-1.5')}>
+          {kind}
+        </span>
+      )}
+      {row.onlyHere && !renaming && (
+        <span data-testid="layer-only-here" className={cn(ROW_LABEL, 'pe-1.5')}>
+          {t.editor.layersPanel.onlyHere}
+        </span>
+      )}
     </div>
   )
 })
