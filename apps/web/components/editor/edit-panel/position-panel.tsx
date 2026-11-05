@@ -23,7 +23,7 @@ import { type ShortcutAction } from '@dazbee/editor'
 
 import { ALIGN, keyOf } from '@/components/editor/arrange-actions.ts'
 import { KNOB_SWITCH, KNOBS, PANEL_ACTION, PANEL_HEADING, PANEL_PART } from '@/components/editor/styles.ts'
-import type { ORDER } from '@/components/editor/top-bar/layer-actions.tsx'
+import type { ORDER } from '@/components/editor/top-bar/top-bar-more.tsx'
 import { cn } from '@/lib/cn.ts'
 import { LIMITS } from '@/lib/editor/limits.ts'
 import { sizeTo, tidy } from '@/lib/editor/size.ts'

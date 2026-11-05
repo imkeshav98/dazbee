@@ -65,8 +65,8 @@ import { hexOf } from '@/lib/colour.ts'
 import { useMessages } from '@/lib/i18n/client.tsx'
 
 import { BarPopover } from './bar-popover.tsx'
-import { AlignRow } from './layer-actions.tsx'
 import { SizeStepper } from './size-stepper.tsx'
+import { AlignRow } from './top-bar-more.tsx'
 
 /** One item of the bar: a button, a pop-up's button or a divider, by a key that names it. */
 export type BarItem = { key: string; node: ReactNode }

@@ -14,26 +14,24 @@ import { childrenOf, descendants } from '@dazbee/doc'
 import { type Editor, type Frame, type Point, type ShortcutAction, visibleIn } from '@dazbee/editor'
 import type { Design } from '@dazbee/schema'
 
-import { ALIGN, keyOf } from '@/components/editor/arrange-actions.ts'
+import { keyOf } from '@/components/editor/arrange-actions.ts'
 import { RotationField } from '@/components/editor/edit-panel/position-panel.tsx'
 import { set, shared, useTarget } from '@/components/editor/edit-panel/target.ts'
 import { useEditState, usePhone } from '@/components/editor/edit-store.ts'
 import { useSelection } from '@/components/editor/editor-hooks.ts'
-import { ICON_BUTTON, MENU, MENU_DIVIDER, MENU_ITEM, MENU_KEY } from '@/components/editor/styles.ts'
+import { MENU, MENU_DIVIDER, MENU_ITEM, MENU_KEY } from '@/components/editor/styles.ts'
 import { cn } from '@/lib/cn.ts'
 import { useLocale, useMessages } from '@/lib/i18n/client.tsx'
-import { dirOf, format } from '@/lib/i18n/index.ts'
+import { dirOf } from '@/lib/i18n/index.ts'
 
 import { useMenuFocus, useScrollingMenu } from './bar-popover.tsx'
+import { AlignRow, ORDER } from './top-bar-more.tsx'
 
 /** The layers hidden in one frame, which a right-click on its empty canvas offers to show. */
 export interface HiddenLayers {
   ids: string[]
   frameId: string
 }
-
-/** The four moves along the stack: to the front, forward, backward, to the back. */
-export const ORDER = ['bringToFront', 'bringForward', 'sendBackward', 'sendToBack'] as const
 
 /**
  * The layers hidden in the frame at a client point, or outside every frame in the one nearest it;
@@ -305,28 +303,6 @@ export function StageMenu({
         </Popover.Content>
       </Popover.Portal>
     </Popover.Root>
-  )
-}
-
-/** The six ways to line up the selection, as icons: left, centre, right, top, middle, bottom. */
-export function AlignRow({ editor }: { editor: Editor }) {
-  const t = useMessages()
-  return (
-    <div dir="ltr" role="group" aria-label={t.editor.arrange.align} className="grid grid-cols-6 gap-0.5">
-      {ALIGN.map(({ action, icon: Icon }) => (
-        <button
-          key={action}
-          type="button"
-          aria-label={t.editor.arrange[action]}
-          title={format(t.editor.arrange.withKey, { label: t.editor.arrange[action], key: keyOf(action) })}
-          data-action={action}
-          onClick={() => editor.perform(action)}
-          className={ICON_BUTTON}
-        >
-          <Icon size={16} aria-hidden />
-        </button>
-      ))}
-    </div>
   )
 }
 
