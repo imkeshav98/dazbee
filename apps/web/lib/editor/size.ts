@@ -1,7 +1,9 @@
-// Sizes as the app writes them and as they are typed, and a layer's width or height as a patch: with
-// the ratio kept, the other side follows by the same factor, rounded as the fields show it; a box
-// with a side of 0 has no ratio, so only that side changes.
-import { type SizeIssue, sizeIssue } from '@dazbee/schema'
+// Sizes as the app writes them and as they are typed, the size of the frame you are on, and a
+// layer's width or height as a patch: with the ratio kept, the other side follows by the same
+// factor, rounded as the fields show it; a box with a side of 0 has no ratio, so only that side
+// changes.
+import type { Editor } from '@dazbee/editor'
+import { BLANK_SIZE, coverFrame, type DesignInput, framesOf, type SizeIssue, sizeIssue } from '@dazbee/schema'
 
 type Box = { width: number; height: number }
 type Axis = keyof Box
@@ -26,6 +28,26 @@ export function typedSize(width: string, height: string): (Box & { issue?: SizeI
   const size = { width: Number(w), height: Number(h) }
   const issue = sizeIssue(size.width, size.height)
   return issue ? { ...size, issue } : size
+}
+
+/**
+ * The size of the frame you are on, which Add page and Add a frame start a new frame at: the picked
+ * frame's, else that of the frame the selection is in, else the shown page's first frame's, else
+ * the cover frame's, else a blank design's.
+ */
+export function sizeYouAreOn(
+  editor: Pick<Editor, 'pickedFrame' | 'selectedFrame' | 'shownPage'>,
+  design: Pick<DesignInput, 'pages' | 'frames'>,
+): Box {
+  const on = [editor.pickedFrame(), editor.selectedFrame()].find(
+    (id) => id !== null && Object.hasOwn(design.frames, id),
+  )
+  const frame =
+    (on ? design.frames[on] : undefined) ??
+    framesOf(design, editor.shownPage())[0]?.[1] ??
+    coverFrame(design)?.[1] ??
+    BLANK_SIZE
+  return { width: frame.width, height: frame.height }
 }
 
 /** A size as the app writes it, in numerals that read the same in every locale. */

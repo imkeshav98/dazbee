@@ -10,15 +10,7 @@
 import { type CSSProperties, useEffect, useId, useRef, useState } from 'react'
 
 import type { Editor, Tool } from '@dazbee/editor'
-import {
-  BLANK_SIZE,
-  type Design,
-  framesOf,
-  SIZE_CHANNELS,
-  SIZE_LIMITS,
-  SIZE_PRESETS,
-  type SizeIssue,
-} from '@dazbee/schema'
+import { SIZE_CHANNELS, SIZE_LIMITS, SIZE_PRESETS, type SizeIssue } from '@dazbee/schema'
 
 import { editState, setOpen, useEditState } from '@/components/editor/edit-store.ts'
 import { usePickedFrame } from '@/components/editor/editor-hooks.ts'
@@ -26,7 +18,7 @@ import { PANEL_HEADING } from '@/components/editor/styles.ts'
 import { useLiveDesign } from '@/components/editor/use-live-design.ts'
 import { FOCUS_RING, LIT_ROW } from '@/components/ui/looks.ts'
 import { cn } from '@/lib/cn.ts'
-import { sizeOf, typedSize } from '@/lib/editor/size.ts'
+import { sizeOf, sizeYouAreOn, typedSize } from '@/lib/editor/size.ts'
 import { useMessages } from '@/lib/i18n/client.tsx'
 import { format, type Messages } from '@/lib/i18n/index.ts'
 
@@ -59,14 +51,6 @@ const issueText = (t: Messages, issue: SizeIssue) =>
   format(t.editor.addFrame.issue[issue], {
     n: issue === 'short' ? SIZE_LIMITS.minSide : issue === 'long' ? SIZE_LIMITS.maxSide : SIZE_LIMITS.maxRatio,
   })
-
-/** The size of the frame you are on: the selection's, else the picked one, else the shown page's first, else a blank design's. */
-function sizeYouAreOn(editor: Editor, design: Design): Size {
-  const on = [editor.selectedFrame(), editor.pickedFrame()].find(
-    (id) => id !== null && Object.hasOwn(design.frames, id),
-  )
-  return (on ? design.frames[on] : undefined) ?? framesOf(design, editor.shownPage())[0]?.[1] ?? BLANK_SIZE
-}
 
 /**
  * Keeps the Add a frame card open while the Frame tool is: picking the tool opens it, putting the
@@ -109,6 +93,12 @@ function SizesCard({ editor, picked }: { editor: Editor; picked: PickedFrame | n
     const at = document.activeElement
     return picked !== null || (at instanceof HTMLElement && at.dataset.opens === 'addFrame')
   })
+  // Add a frame is the only edit panel while it is open: as it opens, after its size of your own has
+  // read the frame they are in, the layers selected are let go, with their top bar and small menu.
+  const addingFrame = picked === null
+  useEffect(() => {
+    if (addingFrame && editor.selection().length > 0) editor.select([])
+  }, [editor, addingFrame])
   const add = (size: Size) => {
     const added = picked ? editor.addSize(picked.id, size) : editor.addFrame(size)
     if (added !== null) setOpen(null)
