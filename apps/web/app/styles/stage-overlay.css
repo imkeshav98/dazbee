@@ -3,8 +3,10 @@
   position: absolute;
   font-family: var(--font-mono);
   display: flex;
+  /* The size wraps onto a hidden second line when it and the name don't both fit, so it goes before the name is cut. */
+  flex-wrap: wrap;
   align-items: baseline;
-  gap: 8px;
+  column-gap: 8px;
   height: 20px;
   margin-top: -24px;
   overflow: hidden;
