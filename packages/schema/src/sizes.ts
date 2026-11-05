@@ -26,6 +26,9 @@ export const SIZE_PRESETS = [
 ] as const satisfies readonly { id: string; channel: SizeChannel; width: number; height: number }[]
 export type SizePreset = (typeof SIZE_PRESETS)[number]
 
+/** The size a design starts at when nothing gives it one: the first preset, Feed square. */
+export const BLANK_SIZE: SizePreset = SIZE_PRESETS[0]
+
 /** What keeps a frame from being this size, or undefined when it can be. */
 export function sizeIssue(width: number, height: number): SizeIssue | undefined {
   const { minSide, maxSide, maxRatio } = SIZE_LIMITS

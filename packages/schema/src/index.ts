@@ -12,7 +12,7 @@ export {
   parseDesign,
   type ParseResult,
 } from './design.ts'
-export { coverFrame, FRAME_GAP, frameIdOf, framesOf, newFramePosition } from './frames.ts'
+export { blankDesign, coverFrame, FRAME_GAP, frameIdOf, framesOf, NEW_FRAME_FILLS, newFramePosition } from './frames.ts'
 export * from './effects.ts'
 export * from './export.ts'
 export { deepFreeze } from './json.ts'

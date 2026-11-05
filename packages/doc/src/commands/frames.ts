@@ -8,6 +8,7 @@ import {
   FrameId,
   framesOf,
   type Layer as LayerT,
+  NEW_FRAME_FILLS,
   newFramePosition,
   PageId,
   Paint,
@@ -20,9 +21,6 @@ import { frameProblem, idProblem } from './checks.ts'
 import { type CommandContext, defineCommand } from './define.ts'
 import type { Size } from './fit.ts'
 import { copyLayers, indexBetween, lastOrder } from './tree.ts'
-
-/** A new frame's background. */
-export const WHITE: Paint[] = [{ type: 'solid', color: '#FFFFFFFF' }]
 
 /** A frame's name as a command takes it. */
 export const FrameName = z.string().trim().min(1).max(120)
@@ -48,7 +46,10 @@ export const frameAdd = defineCommand({
     sizeProblem(width, height),
   apply: ({ r, design }, { id = nanoid(), pageId, x, y, ...frame }) => {
     const next = nextOnPage(design, pageId)
-    r.frames.set(id, toYMap(Frame.parse({ ...frame, ...next, pageId, x: x ?? next.x, y: y ?? next.y, fills: WHITE })))
+    r.frames.set(
+      id,
+      toYMap(Frame.parse({ ...frame, ...next, pageId, x: x ?? next.x, y: y ?? next.y, fills: NEW_FRAME_FILLS })),
+    )
     return id
   },
 })

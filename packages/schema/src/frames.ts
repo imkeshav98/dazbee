@@ -1,9 +1,14 @@
 // Where a design's frames are: a page's frames in order, the cover frame, where the frame rule puts
-// a new one, and the frame a layer is in.
+// a new one, and the frame a layer is in; and what a new frame and a blank design start as.
+import type { DesignInput, DesignMeta } from './design.ts'
+import type { Paint } from './paint.ts'
 import { inOrder } from './primitives.ts'
 
 /** The gap the frame rule leaves between a page's rightmost frame and a new one. */
 export const FRAME_GAP = 200
+
+/** A new frame's background: white. */
+export const NEW_FRAME_FILLS: Paint[] = [{ type: 'solid', color: '#FFFFFFFF' }]
 
 /** A page's frames as `[id, frame]` pairs, by order, ties broken by id. */
 export function framesOf<F extends { readonly pageId: string; readonly order: string }>(
@@ -63,4 +68,21 @@ export function frameIdOf(
     seen.add(up)
   }
   return undefined
+}
+
+/**
+ * A blank design: one page, "Page 1", holding an empty white frame of each size given, in the order
+ * given, in a row by the frame rule (newFramePosition), with ids `f1`, `f2` …
+ */
+export function blankDesign(
+  meta: DesignMeta,
+  frames: readonly { name: string; width: number; height: number }[],
+): DesignInput {
+  const placed: { x: number; y: number; width: number }[] = []
+  const entries = frames.map(({ name, width, height }, i) => {
+    const at = newFramePosition(placed)
+    placed.push({ ...at, width })
+    return [`f${i + 1}`, { pageId: 'p1', name, width, height, ...at, fills: NEW_FRAME_FILLS, order: `a${i}` }] as const
+  })
+  return { meta, pages: { p1: { name: 'Page 1', order: 'a0' } }, frames: Object.fromEntries(entries), nodes: {} }
 }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { presetOf, shapeOf, SIZE_CHANNELS, SIZE_PRESETS, sizeIssue, sizeProblem } from './sizes.ts'
+import { BLANK_SIZE, presetOf, shapeOf, SIZE_CHANNELS, SIZE_PRESETS, sizeIssue, sizeProblem } from './sizes.ts'
 
 describe('SIZE_PRESETS', () => {
   it('offers presets a frame may take, Leaderboard included', () => {
@@ -12,6 +12,12 @@ describe('SIZE_PRESETS', () => {
     const channels = SIZE_PRESETS.map((p) => p.channel)
     expect([...new Set(channels)]).toEqual([...SIZE_CHANNELS])
     expect(channels).toEqual([...channels].sort((a, b) => SIZE_CHANNELS.indexOf(a) - SIZE_CHANNELS.indexOf(b)))
+  })
+})
+
+describe('BLANK_SIZE', () => {
+  it('is Feed square, 1080 × 1080', () => {
+    expect(BLANK_SIZE).toMatchObject({ id: 'feed-square', width: 1080, height: 1080 })
   })
 })
 

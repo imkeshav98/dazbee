@@ -8,6 +8,7 @@ import {
   framesOf,
   inOrder,
   type Layer as LayerT,
+  NEW_FRAME_FILLS,
   Page,
   PageId,
   sizeProblem,
@@ -17,7 +18,7 @@ import { childrenOf } from '../children.ts'
 import { toYMap } from '../design-doc.ts'
 import { idProblem } from './checks.ts'
 import { type CommandContext, defineCommand } from './define.ts'
-import { deleteFrame, FrameName, WHITE } from './frames.ts'
+import { deleteFrame, FrameName } from './frames.ts'
 import { copyLayers, indexBetween, lastOrder } from './tree.ts'
 
 /**
@@ -46,7 +47,9 @@ export const pageAdd = defineCommand({
     r.pages.set(id, toYMap(Page.parse({ name, order: indexBetween(lastOrder(Object.values(design.pages)), null) })))
     r.frames.set(
       frameId,
-      toYMap(Frame.parse({ ...frame, pageId: id, x: 0, y: 0, fills: WHITE, order: indexBetween(null, null) })),
+      toYMap(
+        Frame.parse({ ...frame, pageId: id, x: 0, y: 0, fills: NEW_FRAME_FILLS, order: indexBetween(null, null) }),
+      ),
     )
     return id
   },

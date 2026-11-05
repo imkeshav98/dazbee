@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
-import { coverFrame, FRAME_GAP, frameIdOf, framesOf, newFramePosition } from './frames.ts'
+import { parseDesign } from './design.ts'
+import { blankDesign, coverFrame, FRAME_GAP, frameIdOf, framesOf, NEW_FRAME_FILLS, newFramePosition } from './frames.ts'
 
 const frame = (pageId: string, order: string) => ({
   pageId,
@@ -93,5 +94,43 @@ describe('frameIdOf', () => {
     expect(frameIdOf(design, 'p1')).toBeUndefined()
     expect(frameIdOf(design, 'constructor')).toBeUndefined()
     expect(frameIdOf(design, 'x')).toBeUndefined()
+  })
+})
+
+describe('blankDesign', () => {
+  it('is one page holding an empty white frame of each size, in a row by the frame rule', () => {
+    const design = blankDesign({ designId: 'd1', name: 'Blank' }, [
+      { name: 'Feed square', width: 1080, height: 1080 },
+      { name: 'Story and Reel', width: 1080, height: 1920 },
+    ])
+    expect(design).toEqual({
+      meta: { designId: 'd1', name: 'Blank' },
+      pages: { p1: { name: 'Page 1', order: 'a0' } },
+      frames: {
+        f1: {
+          pageId: 'p1',
+          name: 'Feed square',
+          width: 1080,
+          height: 1080,
+          x: 0,
+          y: 0,
+          fills: NEW_FRAME_FILLS,
+          order: 'a0',
+        },
+        f2: {
+          pageId: 'p1',
+          name: 'Story and Reel',
+          width: 1080,
+          height: 1920,
+          x: 1280,
+          y: 0,
+          fills: NEW_FRAME_FILLS,
+          order: 'a1',
+        },
+      },
+      nodes: {},
+    })
+    expect(NEW_FRAME_FILLS).toEqual([{ type: 'solid', color: '#FFFFFFFF' }])
+    expect(parseDesign(design).success).toBe(true)
   })
 })

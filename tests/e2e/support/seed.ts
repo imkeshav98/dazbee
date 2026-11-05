@@ -6,6 +6,7 @@ import {
   EMPTY_BRAND_KIT,
   frameIdOf,
   framesOf,
+  NEW_FRAME_FILLS,
   newFramePosition,
 } from '@dazbee/schema'
 
@@ -18,8 +19,6 @@ type FrameInput = DesignInput['frames'][string]
 /** A layer as the builders take it: its link may be left out, and is then its own id. */
 export type Seeded = Node extends unknown ? Omit<Node, 'link'> & { link?: string } : never
 
-const WHITE: FrameInput['fills'] = [{ type: 'solid', color: '#FFFFFFFF' }]
-
 /**
  * A design of one page, `p1`, holding one frame at 0, 0 (`sq`, 1080 × 1080, white and named Square
  * unless given), which holds `nodes`; each layer's link is its own id unless given.
@@ -30,7 +29,7 @@ export function frameDesign({
   frameName = 'Square',
   width = 1080,
   height = 1080,
-  fills = WHITE,
+  fills = NEW_FRAME_FILLS,
   nodes = {},
 }: {
   name: string

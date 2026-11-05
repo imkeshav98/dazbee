@@ -9,7 +9,7 @@ import { FilesIcon, PlusIcon } from '@phosphor-icons/react'
 import { type CSSProperties, type ReactNode, useEffect, useLayoutEffect, useRef, useState } from 'react'
 
 import type { Editor } from '@dazbee/editor'
-import { coverFrame, type Design, framesOf, inOrder } from '@dazbee/schema'
+import { BLANK_SIZE, coverFrame, type Design, framesOf, inOrder } from '@dazbee/schema'
 
 import { PanelFrame } from '@/components/editor/edit-panel/edit-panel.tsx'
 import { FOCUS_RING } from '@/components/ui/looks.ts'
@@ -25,12 +25,10 @@ import { setOpen, useEditState } from './edit-store.ts'
 import { useEditorDesign, useShownPage } from './editor-hooks.ts'
 import { DROP_LINE, PANEL_BUTTON } from './styles.ts'
 
-/** A new page's frame when the design has none to take the size of. */
-const FALLBACK_FRAME = { width: 1080, height: 1080 }
-
 /**
  * The frame a new page starts with: the size of the frame you are on (the selection's, else the
- * shown page's first, else the design's cover frame), named after its size.
+ * shown page's first, else the design's cover frame, else the size a blank design starts at), named
+ * after its size.
  */
 function newPageFrame(editor: Editor, design: Design, t: Messages) {
   const selected = editor.selectedFrame()
@@ -38,7 +36,7 @@ function newPageFrame(editor: Editor, design: Design, t: Messages) {
     (selected !== null && Object.hasOwn(design.frames, selected) ? design.frames[selected] : undefined) ??
     framesOf(design, editor.shownPage())[0]?.[1] ??
     coverFrame(design)?.[1] ??
-    FALLBACK_FRAME
+    BLANK_SIZE
   return { name: frameName(t, on.width, on.height), width: on.width, height: on.height }
 }
 

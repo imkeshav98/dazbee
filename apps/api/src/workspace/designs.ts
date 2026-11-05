@@ -6,7 +6,7 @@ import * as Y from 'yjs'
 
 import { type Db, designs, designStates, readDesignState } from '@dazbee/db'
 import { loadDesign, readDesign } from '@dazbee/doc'
-import { type Design, type DesignInput, type DesignSummary, parseDesign } from '@dazbee/schema'
+import { BLANK_SIZE, blankDesign, type Design, type DesignInput, type DesignSummary, parseDesign } from '@dazbee/schema'
 
 export class InvalidContent extends Error {}
 
@@ -25,24 +25,9 @@ const toSummary = (row: {
   updatedAt: Date
 }): DesignSummary => ({ ...row, createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString() })
 
-/** One page holding one empty, white 1080×1080 frame: what a design starts as when nothing else is given. */
-const blankDesign = (designId: string, name: string): DesignInput => ({
-  meta: { designId, name },
-  pages: { p1: { name: 'Page 1', order: 'a0' } },
-  frames: {
-    f1: {
-      pageId: 'p1',
-      name: 'Feed square',
-      width: 1080,
-      height: 1080,
-      x: 0,
-      y: 0,
-      fills: [{ type: 'solid', color: '#FFFFFFFF' }],
-      order: 'a0',
-    },
-  },
-  nodes: {},
-})
+/** What a design starts as when nothing else is given: one page holding one empty Feed square frame. */
+const startingDesign = (designId: string, name: string): DesignInput =>
+  blankDesign({ designId, name }, [{ name: 'Feed square', width: BLANK_SIZE.width, height: BLANK_SIZE.height }])
 
 export async function listDesigns(db: Db, workspaceId: string, brandId: string): Promise<DesignSummary[]> {
   const rows = await db
@@ -103,7 +88,7 @@ export async function createDesign(
   content?: unknown,
 ): Promise<DesignSummary> {
   const id = randomUUID()
-  const input = content === undefined ? blankDesign(id, name) : withMeta(content, id, name)
+  const input = content === undefined ? startingDesign(id, name) : withMeta(content, id, name)
   const parsed = parseDesign(input)
   if (!parsed.success) throw new InvalidContent(parsed.errors.slice(0, 5).join('; '))
   const state = Y.encodeStateAsUpdate(loadDesign(parsed.design))
