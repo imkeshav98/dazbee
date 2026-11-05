@@ -25,9 +25,12 @@ for (const [width, height] of SCREEN_SIZES) {
         const name = (state: string) => `linked-menu-${state}-${width}-${theme}`
         // The square's headline in pink with new words, so Style and Text have work and Layer none, as in the mock.
         await page.evaluate(() => {
-          window.dazbee?.setProps(['headline'], (_, p) => ({ style: { ...(p.style as object), color: '#E0157FFF' } }))
-          if (window.dazbee?.design().nodes.headline?.props.text === 'Weekend sale')
-            window.dazbee.session.run('text.edit', { id: 'headline', op: { kind: 'insert', at: 12, text: '!' } })
+          const editor = window.dazbee
+          if (!editor) return
+          editor.setProps(['headline'], (_, p) => ({ style: { ...(p.style as object), color: '#E0157FFF' } }))
+          const headline = editor.design().nodes.headline
+          if (headline?.type === 'text' && headline.props.text === 'Weekend sale')
+            editor.session.run('text.edit', { id: 'headline', op: { kind: 'insert', at: 12, text: '!' } })
         })
         await selectLayers(page, ['headline'])
         await expect(page.getByTestId('small-menu')).toBeVisible()
