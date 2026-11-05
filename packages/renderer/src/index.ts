@@ -1,5 +1,7 @@
 export { imageColorMatrix, type ColorMatrix } from './draw/adjust.ts'
 export { drawFrame, drawLayers, drawScene } from './draw/draw.ts'
+export { imagePlacement } from './draw/paint.ts'
+export { outlineOf } from './draw/paths.ts'
 export { drawVectorFrame, type VectorTarget } from './draw/vector.ts'
 export { applyLayout, sizingOf, type MeasureText } from './layout.ts'
 export { layerPictures, type LayerPictures } from './pictures.ts'
