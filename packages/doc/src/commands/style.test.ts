@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
+import type * as Y from 'yjs'
 
-import { styleOf } from '@dazbee/schema'
+import { brandRef, styleOf } from '@dazbee/schema'
 
 import { readDesign } from '../design-doc.ts'
 import { linkedDesign, openTestSession, testDoc } from '../test-design.ts'
@@ -56,6 +57,22 @@ describe('node.style', () => {
     const props = readDesign(doc).nodes['wide-title']?.props as Record<string, unknown>
     expect(props.style).toMatchObject({ fontWeight: 800, fontSize: 40 })
     expect(props).not.toHaveProperty('paragraphSpacing')
+  })
+
+  it('leaves bindings alone when the style has the same ones in another key order', () => {
+    const doc = testDoc(linkedDesign())
+    const ynode = doc.getMap<Y.Map<unknown>>('nodes').get('title')
+    ynode?.set('bindings', { fontFamily: brandRef('heading'), textColor: brandRef('ink') })
+    const tab = openTestSession(doc)
+    const title = readDesign(doc).nodes.title
+    if (!title || !ynode) throw new Error('no title')
+    const changed: string[] = []
+    ynode.observe((event) => changed.push(...event.keysChanged))
+
+    tab.run('node.style', { ids: ['title'], style: { ...styleOf(title), opacity: 0.5 } })
+
+    expect(readDesign(doc).nodes.title?.props.opacity).toBe(0.5)
+    expect(changed).not.toContain('bindings')
   })
 
   it('refuses a layer whose style is locked', () => {

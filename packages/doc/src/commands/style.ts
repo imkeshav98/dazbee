@@ -35,7 +35,7 @@ export const nodeStyle = defineCommand({
         if (value === undefined) props.delete(key)
         else props.set(key, value)
       }
-      if (JSON.stringify(change.bindings) === JSON.stringify(node.bindings ?? {})) continue
+      if (!change.bindings) continue
       if (Object.keys(change.bindings).length > 0) ynode.set('bindings', change.bindings)
       else ynode.delete('bindings')
     }

@@ -37,10 +37,13 @@ export const LayerStyle = z.object({
 })
 export type LayerStyle = z.infer<typeof LayerStyle>
 
-/** What setting a style changes on a layer: its props, a value of undefined clearing one, and its bindings after. */
+/**
+ * What setting a style changes on a layer: its props, a value of undefined clearing one, and its
+ * bindings after, left out when they stay as they are.
+ */
 export interface Restyle {
   patch: Record<string, unknown>
-  bindings: Bindings
+  bindings?: Bindings
 }
 
 type Corners = NonNullable<LayerStyle['corners']>
@@ -111,7 +114,9 @@ export function restyle(layer: Layer, style: LayerStyle): Restyle | null {
       return ref ? [[target, ref]] : []
     }),
   )
-  return Object.keys(patch).length === 0 && same(bindings, layer.bindings ?? {}) ? null : { patch, bindings }
+  const rebind = !same(bindings, layer.bindings ?? {})
+  if (Object.keys(patch).length === 0 && !rebind) return null
+  return rebind ? { patch, bindings } : { patch }
 }
 
 /** Whether a style sets what a binding target binds on this layer. */

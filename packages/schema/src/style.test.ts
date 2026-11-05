@@ -152,12 +152,21 @@ describe('restyle', () => {
     expect(restyle(ellipse, styleOf(graphic()))?.patch).not.toHaveProperty('shape')
   })
 
-  it('carries the bindings of what it sets, and keeps the ones it leaves', () => {
+  it('carries the bindings of what it sets, and leaves them out when they stay', () => {
     const bound = styleOf(graphic({}, { bindings: { fill: 'brand:primary' } }))
     expect(restyle(graphic(), bound)?.bindings).toEqual({ fill: 'brand:primary' })
     const loose = restyle(graphic({}, { bindings: { fill: 'brand:primary' } }), styleOf(graphic()))
     expect(loose?.bindings).toEqual({})
     const kept = restyle(text({}, {}, { bindings: { fontFamily: 'brand:heading' } }), styleOf(graphic()))
-    expect(kept?.bindings).toEqual({ fontFamily: 'brand:heading' })
+    expect(kept).not.toBeNull()
+    expect(kept).not.toHaveProperty('bindings')
+  })
+
+  it('counts bindings the same whatever order their keys are in', () => {
+    const bound = text({}, {}, { bindings: { textColor: 'brand:ink', fontFamily: 'brand:heading' } })
+    const layer = { ...bound, bindings: { fontFamily: 'brand:heading', textColor: 'brand:ink' } } as typeof bound
+    const change = restyle(layer, { ...styleOf(bound), opacity: 0.5 })
+    expect(change?.patch).toEqual({ opacity: 0.5 })
+    expect(change).not.toHaveProperty('bindings')
   })
 })
