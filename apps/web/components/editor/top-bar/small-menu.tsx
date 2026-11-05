@@ -41,6 +41,7 @@ import {
   SHEET_LOOK,
   SHEET_PLACE,
   SheetAnchor,
+  useEscapeBack,
   useMenuFocus,
   useRovingTab,
   useScrollingMenu,
@@ -213,6 +214,7 @@ export function SmallMenu({ editor, rightClick }: { editor: Editor; rightClick: 
   const place = usePlace(editor, menu, rightClick)
   const { open, barBottom } = useEditState()
   const moreFocus = useMenuFocus()
+  const escape = useEscapeBack()
   const rtl = dirOf(useLocale()) === 'rtl'
   const phone = usePhone()
   const focused = useRovingTab(menu)
@@ -349,6 +351,7 @@ export function SmallMenu({ editor, rightClick }: { editor: Editor; rightClick: 
                 },
               })}
           {...moreFocus.content}
+          onEscapeKeyDown={escape.onEscapeKeyDown}
           onKeyDown={arrowThrough}
           aria-label={b.more}
           data-testid="bar-more-menu"
@@ -359,7 +362,7 @@ export function SmallMenu({ editor, rightClick }: { editor: Editor; rightClick: 
           )}
         >
           {moreFocus.back}
-          <LayerActions editor={editor} ids={ids} onDone={() => setOpen(null)} />
+          {escape.rows(<LayerActions editor={editor} ids={ids} onDone={() => setOpen(null)} />)}
         </Popover.Content>
       </Popover.Portal>
     </div>

@@ -16,7 +16,7 @@ import { MENU, MENU_ITEM } from '@/components/editor/styles.ts'
 import { cn } from '@/lib/cn.ts'
 import { useMessages } from '@/lib/i18n/client.tsx'
 
-import { arrowThrough, SHEET_LOOK, SHEET_PLACE, SheetAnchor, useScrollingMenu } from './bar-popover.tsx'
+import { arrowThrough, SHEET_LOOK, SHEET_PLACE, SheetAnchor, useEscapeBack, useScrollingMenu } from './bar-popover.tsx'
 import { LayerActions } from './layer-actions.tsx'
 
 /** The layers hidden in one frame, which a right-click on its empty canvas offers to show. */
@@ -74,6 +74,7 @@ export function StageMenu({
   const { barBottom } = useEditState()
   const phone = usePhone()
   const scroll = useScrollingMenu()
+  const escape = useEscapeBack()
   const [openedFor] = useState(ids)
   useEffect(() => {
     if (ids !== openedFor) onClose()
@@ -107,6 +108,7 @@ export function StageMenu({
               })}
           // A click elsewhere or Esc closes it; focus given back to a button that just closed does not.
           onFocusOutside={(event) => event.preventDefault()}
+          onEscapeKeyDown={escape.onEscapeKeyDown}
           onKeyDown={arrowThrough}
           aria-label={hidden ? b.canvasMenu : b.actions}
           data-testid="stage-menu"
@@ -135,7 +137,7 @@ export function StageMenu({
               {b.showHidden}
             </button>
           ) : (
-            <LayerActions editor={editor} ids={ids} onDone={onClose} />
+            escape.rows(<LayerActions editor={editor} ids={ids} onDone={onClose} />)
           )}
         </Popover.Content>
       </Popover.Portal>

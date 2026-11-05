@@ -9,7 +9,7 @@
 // the layers sit (order, line up, the turn, text direction) is in the top bar's Arrange ⋯.
 import { CaretLeftIcon, CaretRightIcon } from '@phosphor-icons/react'
 import * as Popover from '@radix-ui/react-popover'
-import { type ReactNode, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { type ReactNode, useCallback, useLayoutEffect, useRef, useState } from 'react'
 import { flushSync } from 'react-dom'
 
 import { childrenOf } from '@dazbee/doc'
@@ -25,7 +25,7 @@ import { holdHover } from '@/lib/hover-hold.ts'
 import { useLocale, useMessages } from '@/lib/i18n/client.tsx'
 import { dirOf, format, type Messages } from '@/lib/i18n/index.ts'
 
-import { arrowThrough, useMenuFocus } from './bar-popover.tsx'
+import { arrowThrough, useBackInPlace, useMenuFocus } from './bar-popover.tsx'
 import { MenuRow } from './menu-row.tsx'
 
 /** Why an item has nothing to do: the reason the linked-copy items give, by its message. */
@@ -283,7 +283,8 @@ export function SubMenu({
  * A row's short menu in the place of the menu the row is in, as a phone shows it: a back row naming
  * the row, then the short menu's rows. Every other piece of the menu hides while it shows (globals.css
  * hides the siblings of a `data-drill`). It takes the focus at its back row as it opens, so a greyed
- * first row doesn't say why unasked; the back row, the arrow back and Esc go back.
+ * first row doesn't say why unasked; the back row, the arrow back and Esc go back, Esc through the
+ * menu's own (`useBackInPlace`) once a greyed row's tooltip that shows has closed.
  */
 function DrillScreen({
   label,
@@ -302,19 +303,7 @@ function DrillScreen({
   const b = useMessages().editor.bar
   const backRow = useRef<HTMLButtonElement>(null)
   useLayoutEffect(() => backRow.current?.focus(), [])
-  // Esc goes back before the menu hears it and closes: the window hears a key before the document,
-  // where Radix listens for Esc. A greyed row's tooltip that shows is the top-most thing, so it
-  // hears Esc first and closes.
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape' || document.querySelector('[role="tooltip"]')) return
-      event.preventDefault()
-      event.stopPropagation()
-      onBack()
-    }
-    window.addEventListener('keydown', onKey, { capture: true })
-    return () => window.removeEventListener('keydown', onKey, { capture: true })
-  }, [onBack])
+  useBackInPlace(onBack)
   return (
     <div
       data-drill

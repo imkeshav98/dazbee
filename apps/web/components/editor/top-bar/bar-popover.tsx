@@ -4,15 +4,18 @@
 // edit store names a sheet, at the bottom of a phone's screen. The bar keeps which one is open, so
 // only one is open at a time. Also what the editor's menus share: the sheet a phone shows a menu as,
 // the focus as a popover opens and closes, the arrows along a toolbar and through a menu's rows, Tab
-// once into a toolbar, and a menu that shows it scrolls.
+// once into a toolbar, Esc going back from a row's short menu shown in its menu's place, and a menu
+// that shows it scrolls.
 import { CaretDownIcon } from '@phosphor-icons/react'
 import * as Popover from '@radix-ui/react-popover'
 import {
+  createContext,
   type FocusEvent,
   type KeyboardEvent,
   type ReactNode,
   type RefObject,
   useCallback,
+  useContext,
   useEffect,
   useLayoutEffect,
   useRef,
@@ -59,6 +62,12 @@ const STEPS = {
 }
 
 const nowhere = () => document.activeElement === null || document.activeElement === document.body
+
+/**
+ * The way back from the row's short menu that shows in its menu's place, kept for the menu that
+ * holds it: null while none shows.
+ */
+const BackInPlace = createContext<RefObject<(() => void) | null> | null>(null)
 
 /**
  * Where a sheet hangs from on a phone: a line along the screen's bottom edge, SHEET_EDGE in from
@@ -165,6 +174,35 @@ export function useMenuFocus() {
 }
 
 /**
+ * Lets Esc go back from a row's short menu shown in the menu's place (SubMenu, on a phone) before it
+ * closes the menu, through Radix's own layers: `onEscapeKeyDown` goes on the menu's content and
+ * `rows` round its rows. A greyed row's tooltip that shows is a layer over the menu, so Radix gives
+ * it Esc first and it closes.
+ */
+export function useEscapeBack() {
+  const back = useRef<(() => void) | null>(null)
+  const onEscapeKeyDown = useCallback((event: globalThis.KeyboardEvent) => {
+    if (!back.current) return
+    event.preventDefault()
+    back.current()
+  }, [])
+  const rows = useCallback((children: ReactNode) => <BackInPlace value={back}>{children}</BackInPlace>, [])
+  return { onEscapeKeyDown, rows }
+}
+
+/** Keeps `goBack` as the way back Esc takes in the menu this short menu shows in the place of, while it shows. */
+export function useBackInPlace(goBack: () => void) {
+  const back = useContext(BackInPlace)
+  useEffect(() => {
+    if (!back) return
+    back.current = goBack
+    return () => {
+      if (back.current === goBack) back.current = null
+    }
+  }, [back, goBack])
+}
+
+/**
  * Lets Tab reach a toolbar once, at the button last focused, as a toolbar should; the arrows move
  * along it. Returns the focus handler to put on the toolbar.
  */
@@ -253,6 +291,7 @@ export function BarPopover({
   opens?: PanelId
 }) {
   const focus = useMenuFocus()
+  const escape = useEscapeBack()
   const shown = open === id
   const phone = usePhone()
   // A sheet on a phone, as `isSheet` names it: the anchor is the screen's bottom edge, and Radix's
@@ -291,15 +330,17 @@ export function BarPopover({
           {...(asSheet ? SHEET_PLACE : { side: 'bottom', align, sideOffset: below, collisionPadding: 12 })}
           {...focus.content}
           // A number field being typed in takes Esc first, throwing away what was typed; the next
-          // Esc closes the popover.
-          onEscapeKeyDown={(event) => typingIn(document.activeElement) && event.preventDefault()}
+          // Esc goes back from a row's short menu shown in its place, then closes the popover.
+          onEscapeKeyDown={(event) =>
+            typingIn(document.activeElement) ? event.preventDefault() : escape.onEscapeKeyDown(event)
+          }
           onKeyDown={menu ? arrowThrough : undefined}
           aria-label={label}
           data-testid={`bar-${testId}-menu`}
           className={cn(POPOVER, 'flex flex-col p-1.5', asSheet ? SHEET_LOOK : (className ?? 'min-w-56'))}
         >
           {focus.back}
-          {children}
+          {escape.rows(children)}
         </Popover.Content>
       </Popover.Portal>
     </Popover.Root>
