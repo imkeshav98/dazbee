@@ -169,9 +169,14 @@ test(
       afterText: 'beside-short-text',
     }
     for (const [key, name] of Object.entries(shots) as [keyof typeof shots, string][]) {
-      const { at } = SPOTS[key]
-      // Close enough to see the outline: the spot in the middle of the window at 110%.
-      await page.evaluate(({ x, y }) => window.dazbee?.setCamera({ x: 640 - x * 1.1, y: 400 - y * 1.1, zoom: 1.1 }), at)
+      const { at, picks } = SPOTS[key]
+      // Close enough to see the outline: the layer it lands on in the middle of the window at 110%.
+      const box = await boxOf(page, picks)
+      const middle = { x: box.x + box.width / 2, y: box.y + box.height / 2 }
+      await page.evaluate(
+        ({ x, y }) => window.dazbee?.setCamera({ x: 640 - x * 1.1, y: 380 - y * 1.1, zoom: 1.1 }),
+        middle,
+      )
       await hover(page, at)
       await expect(page.locator('.stage-overlay > .hover')).toBeVisible()
       // A headless screenshot has no cursor: a ring marks where the pointer is.
