@@ -103,6 +103,25 @@ test.describe('the full menu', () => {
     expect(errors).toEqual([])
   })
 
+  test('Release mask frees what a mask is over, and greys like every other row while the mask’s style is locked', async ({
+    browser,
+  }) => {
+    const { page, errors } = await open(browser)
+    await selectLayers(page, ['badge'])
+    await moreAction(page, 'Use as mask')
+    await selectLayers(page, ['logo'])
+    await page.evaluate(() => window.dazbee?.session.run('node.lock', { ids: ['badge'], lock: { style: true } }))
+    const menu = await moreMenu(page)
+    const release = menu.getByRole('button', { name: /^Release mask/ })
+    expect(await release.evaluate((row) => (row as HTMLButtonElement).disabled)).toBe(false)
+    await expectGreyed(page, menu, 'Release mask', 'The mask’s style is locked')
+    await closeMenus(page)
+    await page.evaluate(() => window.dazbee?.session.run('node.lock', { ids: ['badge'], lock: { style: false } }))
+    await moreAction(page, 'Release mask')
+    await expect.poll(async () => (await node(page, 'badge'))?.props.mask).toBeFalsy()
+    expect(errors).toEqual([])
+  })
+
   test('shows Text only for text layers, for every layer type and several', async ({ browser }) => {
     const { page, errors } = await open(browser)
     for (const [ids, text] of [

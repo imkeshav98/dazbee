@@ -239,6 +239,7 @@ export const ar: Messages = {
       paste: 'لصق',
       delete: 'حذف',
       releaseMask: 'إلغاء القناع',
+      maskLocked: 'نمط القناع مقفل',
       linked: {
         copyStyle: 'نسخ النمط',
         pasteStyle: 'لصق النمط',

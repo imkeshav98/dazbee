@@ -169,19 +169,17 @@ export function LayerActions({ editor, ids, onDone }: { editor: Editor; ids: str
       {row('boxSelection', b.putInBox)}
       {target.types.every((type) => type === 'group' || type === 'box') && row('ungroup', t.editor.arrange.ungroup)}
       {over ? (
-        <button
-          type="button"
-          data-action="releaseMask"
-          disabled={over.some((id) => design.nodes[id]?.lock?.style)}
-          onClick={() => {
+        <MenuRow
+          action="releaseMask"
+          label={b.releaseMask}
+          keys=""
+          why={over.some((id) => design.nodes[id]?.lock?.style) ? b.maskLocked : null}
+          onRun={() => {
             // The mask becomes a layer of its own again, in one undo step.
             editor.session.run('node.mask', { ids: over, mask: null })
             onDone()
           }}
-          className={MENU_ITEM}
-        >
-          {b.releaseMask}
-        </button>
+        />
       ) : (
         row('mask', t.editor.arrange.mask, masks)
       )}

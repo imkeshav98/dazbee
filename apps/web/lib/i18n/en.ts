@@ -252,6 +252,7 @@ export const en = {
       paste: 'Paste',
       delete: 'Delete',
       releaseMask: 'Release mask',
+      maskLocked: 'The mask’s style is locked',
       linked: {
         copyStyle: 'Copy style',
         pasteStyle: 'Paste style',
