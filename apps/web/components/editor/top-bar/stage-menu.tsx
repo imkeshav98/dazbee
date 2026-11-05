@@ -13,11 +13,12 @@ import { type Editor, type Frame, type Point, visibleIn } from '@dazbee/editor'
 import { setRightClick, useEditState } from '@/components/editor/edit-store.ts'
 import { useSelection } from '@/components/editor/editor-hooks.ts'
 import { MENU, MENU_ITEM } from '@/components/ui/looks.ts'
+import { useScrollingMenu } from '@/components/ui/menu.tsx'
 import { cn } from '@/lib/cn.ts'
 import { useMessages } from '@/lib/i18n/client.tsx'
 import { usePhone } from '@/lib/phone.ts'
 
-import { arrowThrough, SHEET_LOOK, SHEET_PLACE, SheetAnchor, useEscapeBack, useScrollingMenu } from './bar-popover.tsx'
+import { arrowThrough, SHEET_LOOK, SHEET_PLACE, SheetAnchor, useEscapeBack, } from './bar-popover.tsx'
 import { LayerActions } from './layer-actions.tsx'
 
 /** The layers hidden in one frame, which a right-click on its empty canvas offers to show. */

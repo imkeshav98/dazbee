@@ -30,6 +30,7 @@ import { editState, isPanel, setOpen, useEditState } from '@/components/editor/e
 import { useSelection } from '@/components/editor/editor-hooks.ts'
 import { BAR_BUTTON, BAR_TOGGLE } from '@/components/editor/styles.ts'
 import { MENU, MENU_ITEM_GREYED } from '@/components/ui/looks.ts'
+import { useScrollingMenu } from '@/components/ui/menu.tsx'
 import { Tooltip } from '@/components/ui/tooltip.tsx'
 import { cn } from '@/lib/cn.ts'
 import { type Box, CLEAR, smallMenuPlace } from '@/lib/editor/small-menu-place.ts'
@@ -46,8 +47,7 @@ import {
   useEscapeBack,
   useMenuFocus,
   useRovingTab,
-  useScrollingMenu,
-} from './bar-popover.tsx'
+  } from './bar-popover.tsx'
 import { LayerActions, WIDE_MENU } from './layer-actions.tsx'
 
 type Place = { left: number; top: number }
