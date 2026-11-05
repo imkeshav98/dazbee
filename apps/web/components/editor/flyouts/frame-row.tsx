@@ -84,7 +84,8 @@ export const FrameRow = memo(function FrameRow({
         </span>
       )}
       {!renaming && (
-        <span data-testid="frame-size" className={cn(ROW_LABEL, 'pe-1.5')}>
+        // Isolated left to right, so it reads width × height in a right-to-left language too.
+        <span data-testid="frame-size" dir="ltr" className={cn(ROW_LABEL, 'pe-1.5')}>
           {shortSizeOf(frame)}
         </span>
       )}

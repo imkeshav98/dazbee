@@ -1,7 +1,7 @@
-// The layers panel's rows as they look, in Chromium: a frame's swatch showing its background as it
-// looks, see-through too, a shape's picture bare beside a text's outlined tile, no pink ring on a
-// picked frame's or selected layer's picture, and a frame picked from its row brought out from under
-// the panel at the same zoom.
+// The layers panel's rows as they look, in Chromium: a frame's size read width × height in Arabic
+// too, a frame's swatch showing its background as it looks, see-through too, a shape's picture bare
+// beside a text's outlined tile, no pink ring on a picked frame's or selected layer's picture, and a
+// frame picked from its row brought out from under the panel at the same zoom.
 import { screenPoint } from '../../support/editor.ts'
 import { layerRow, openDesign, openSized } from '../../support/layers-frames.ts'
 import { frameRow, rect, row } from '../../support/layers-panel.ts'
@@ -51,6 +51,27 @@ async function frameOnScreen(page: Page, frameId: string, width: number, height:
   return { left: start.x, top: start.y, right: end.x, bottom: end.y }
 }
 const zoomOf = (page: Page) => page.evaluate(() => window.dazbee?.camera().zoom ?? 1)
+
+test('in Arabic a frame row’s size reads width × height, as its label on the canvas does', async ({ browser }) => {
+  const { page, errors } = await openSized(browser, { width: 1280, height: 760 }, { locale: 'ar' })
+  const size = frameRow(page, 'Sale story').getByTestId('frame-size')
+  await expect(size).toHaveText('1080×1920')
+  // The width is the digits before ×: they come first from the left, as the canvas label reads.
+  const widthFirst = await size.evaluate((el) => {
+    const text = el.firstChild
+    if (!(text instanceof Text)) return null
+    const range = document.createRange()
+    const leftOf = (from: number, to: number) => {
+      range.setStart(text, from)
+      range.setEnd(text, to)
+      return range.getBoundingClientRect().left
+    }
+    const cut = text.data.indexOf('×')
+    return leftOf(0, cut) < leftOf(cut + 1, text.data.length)
+  })
+  expect(widthFirst).toBe(true)
+  expect(errors).toEqual([])
+})
 
 test('a frame’s swatch shows its background as it looks, see-through too, and keeps its neutral edge when picked', async ({
   browser,
