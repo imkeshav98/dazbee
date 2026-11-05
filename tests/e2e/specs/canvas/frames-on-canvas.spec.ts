@@ -53,9 +53,8 @@ async function labelRow(page: Page, id: string) {
 }
 /** Double-clicks a frame's name on its label, and gives the field that renames it once it shows. */
 async function renameByLabel(page: Page, id: string) {
-  const name = await label(page, id).locator('.frame-name').boundingBox()
-  if (!name) throw new Error(`no name on ${id}'s label`)
-  await page.mouse.dblclick(name.x + name.width / 2, name.y + name.height / 2)
+  const name = await labelPoint(page, id)
+  await page.mouse.dblclick(name.x, name.y)
   const field = page.getByTestId('frame-rename').locator('input')
   await expect(field).toBeFocused()
   return field
@@ -143,9 +142,14 @@ test('the label takes a press only on its name and size, after a selected layerâ
   browser,
 }) => {
   const { a: page, errors } = await open(browser)
-  const row = await label(page, 'sq').boundingBox()
-  const name = await label(page, 'sq').locator('.frame-name').boundingBox()
-  const size = await label(page, 'sq').locator('.frame-size').boundingBox()
+  // Measured in one step in the page, as the overlay draws its labels afresh on every draw.
+  const boxes = await page.evaluate(() =>
+    ['', ' .frame-name', ' .frame-size'].map((part) => {
+      const box = document.querySelector(`.stage-overlay .frame-label[data-frame="sq"]${part}`)?.getBoundingClientRect()
+      return box ? { x: box.x, y: box.y, width: box.width, height: box.height } : null
+    }),
+  )
+  const [row, name, size] = boxes
   if (!row || !name || !size) throw new Error('no label on the square')
   // Between the name and the size, the row is canvas: a drag from there is a marquee over the headline.
   const from = { x: (name.x + name.width + size.x) / 2, y: row.y + row.height - 5 }

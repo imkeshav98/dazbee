@@ -6,7 +6,7 @@ import type { DesignInput } from '@dazbee/schema'
 import { solid } from './edit-in-frame.ts'
 import { frameDesign, linkedFrames } from './seed.ts'
 import { drawn } from './stage.ts'
-import type { Page } from './test.ts'
+import { expect, type Page } from './test.ts'
 
 /**
  * A square holding a headline, a layer turned 30°, a locked one and a photo under a round mask; a
@@ -113,12 +113,18 @@ export const design = (): DesignInput => {
 export const picked = (page: Page) => page.evaluate(() => window.dazbee?.pickedFrame() ?? null)
 /**
  * Where a frame's name is on its label on screen, near its bottom edge, which a fit keeps clear of
- * the header: at its middle, or a point `dx` in from its start, kept on the name.
+ * the header: at its middle, or a point `dx` in from its start, kept on the name. The overlay draws
+ * its labels afresh on every draw, so the name is measured in one step in the page.
  */
 export async function labelPoint(page: Page, id: string, dx?: number) {
-  const name = await page
-    .locator(`.stage-overlay .frame-label[data-frame="${id}"] .frame-name`)
-    .boundingBox({ timeout: 5000 })
+  const measure = () =>
+    page.evaluate((id) => {
+      const name = document.querySelector(`.stage-overlay .frame-label[data-frame="${id}"] .frame-name`)
+      const box = name?.getBoundingClientRect()
+      return box ? { x: box.x, y: box.y, width: box.width, height: box.height } : null
+    }, id)
+  await expect.poll(measure, { message: `no label for ${id}` }).not.toBeNull()
+  const name = await measure()
   if (!name) throw new Error(`no label for ${id}`)
   return { x: name.x + Math.min(dx ?? name.width / 2, name.width - 1), y: name.y + name.height - 5 }
 }
