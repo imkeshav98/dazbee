@@ -248,7 +248,7 @@ test('W × H adds a size of your own: at the limits it adds; past them the side 
   expect(errors).toEqual([])
 })
 
-test('a drag with the Frame tool, the card open, draws an empty frame of the dragged size, and the card closes as the select tool comes back', async ({
+test('a drag with the Frame tool, the card open, draws an empty frame of the dragged size, picked at once as the card closes and the select tool comes back; undo and redo', async ({
   browser,
 }) => {
   const { a, errors } = await openFrames(browser)
@@ -257,12 +257,19 @@ test('a drag with the Frame tool, the card open, draws an empty frame of the dra
   // Below the square, on empty canvas.
   await drag(a, { x: -400, y: 1100 }, { x: 100, y: 1300 })
   const drawnFrame = await addedFrame(a)
-  expect(await frameOf(a, drawnFrame)).toMatchObject({ name: 'Frame', x: -400, y: 1100, width: 500, height: 200 })
+  const at = { name: 'Frame', x: -400, y: 1100, width: 500, height: 200 }
+  expect(await frameOf(a, drawnFrame)).toMatchObject(at)
   expect(layersIn(await read(a), drawnFrame)).toEqual([])
   await expect(card(a)).toHaveCount(0)
   expect(await tool(a)).toBe('select')
+  // Picked, as a frame added from a tile is: its label lit and its top bar showing.
+  expect(await picked(a)).toBe(drawnFrame)
+  await expect(a.locator(`.stage-overlay .frame-label[data-frame="${drawnFrame}"]`)).toHaveAttribute('data-active', '')
+  await expect(a.getByTestId('top-bar')).toHaveAttribute('data-frame', drawnFrame)
   await press(a, 'undo')
   expect(await added(a)).toEqual([])
+  await press(a, 'redo')
+  expect(await frameOf(a, drawnFrame)).toMatchObject(at)
   expect(errors).toEqual([])
 })
 
