@@ -15,9 +15,8 @@ import { MENU, MENU_ITEM } from '@/components/editor/styles.ts'
 import { cn } from '@/lib/cn.ts'
 import { useMessages } from '@/lib/i18n/client.tsx'
 
-import { useScrollingMenu } from './bar-popover.tsx'
+import { arrowThrough, useScrollingMenu } from './bar-popover.tsx'
 import { LayerActions } from './layer-actions.tsx'
-import { arrowThroughRows } from './menu-row.tsx'
 
 /** The layers hidden in one frame, which a right-click on its empty canvas offers to show. */
 export interface HiddenLayers {
@@ -92,7 +91,7 @@ export function StageMenu({
           collisionPadding={{ top: barBottom + 8, bottom: 72, left: 12, right: 12 }}
           // A click elsewhere or Esc closes it; focus given back to a button that just closed does not.
           onFocusOutside={(event) => event.preventDefault()}
-          onKeyDown={arrowThroughRows}
+          onKeyDown={arrowThrough}
           aria-label={hidden ? b.canvasMenu : b.actions}
           data-testid="stage-menu"
           ref={scroll.ref}

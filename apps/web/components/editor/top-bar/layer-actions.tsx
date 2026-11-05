@@ -23,8 +23,8 @@ import { cn } from '@/lib/cn.ts'
 import { useLocale, useMessages } from '@/lib/i18n/client.tsx'
 import { dirOf, format, type Messages } from '@/lib/i18n/index.ts'
 
-import { SHEET_EDGE, useMenuFocus } from './bar-popover.tsx'
-import { arrowThroughRows, MenuRow } from './menu-row.tsx'
+import { arrowThrough, SHEET_EDGE, useMenuFocus } from './bar-popover.tsx'
+import { MenuRow } from './menu-row.tsx'
 
 /** Why an item has nothing to do: the reason the linked-copy items give, by its message. */
 type Why = keyof Messages['editor']['bar']['linked']['why']
@@ -244,7 +244,7 @@ export function SubMenu({
           aria-label={label}
           data-testid={`more-${testId}-menu`}
           onKeyDown={(event) => {
-            if (event.key !== back) return arrowThroughRows(event)
+            if (event.key !== back) return arrowThrough(event)
             event.preventDefault()
             setOpen(false)
           }}

@@ -34,9 +34,8 @@ import { type Box, CLEAR, smallMenuPlace } from '@/lib/editor/small-menu-place.t
 import { useLocale, useMessages } from '@/lib/i18n/client.tsx'
 import { dirOf, format } from '@/lib/i18n/index.ts'
 
-import { arrowAlong, useMenuFocus, useRovingTab, useScrollingMenu } from './bar-popover.tsx'
+import { arrowAlong, arrowThrough, useMenuFocus, useRovingTab, useScrollingMenu } from './bar-popover.tsx'
 import { LayerActions, WIDE_MENU } from './layer-actions.tsx'
-import { arrowThroughRows } from './menu-row.tsx'
 
 type Place = { left: number; top: number }
 /**
@@ -342,7 +341,7 @@ export function SmallMenu({ editor, rightClick }: { editor: Editor; rightClick: 
                 right: rtl ? fullMenu.startInset : CLEAR,
               }}
               {...moreFocus.content}
-              onKeyDown={arrowThroughRows}
+              onKeyDown={arrowThrough}
               aria-label={b.more}
               data-testid="bar-more-menu"
               className={cn(

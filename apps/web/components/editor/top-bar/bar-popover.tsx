@@ -1,9 +1,10 @@
 'use client'
 
 // One button of the bar by the selection and the popover it opens under it, or, for a pop-up the
-// edit store names a sheet, at the bottom of a phone's screen. The bar keeps which one is open, so only one
-// is open at a time. Also the hooks the editor's menus share: the focus as a
-// popover opens and closes, Tab once into a toolbar, and a menu that shows it scrolls.
+// edit store names a sheet, at the bottom of a phone's screen. The bar keeps which one is open, so
+// only one is open at a time. Also what the editor's menus share: the focus as a popover opens and
+// closes, the arrows along a toolbar and through a menu's rows, Tab once into a toolbar, and a menu
+// that shows it scrolls.
 import { CaretDownIcon } from '@phosphor-icons/react'
 import * as Popover from '@radix-ui/react-popover'
 import {
@@ -97,8 +98,9 @@ export function arrowAlong(event: KeyboardEvent<HTMLElement>) {
 /**
  * Moves the focus between a menu's rows with the up and down arrows, wrapping round at the ends,
  * and Home and End: its buttons that show, greyed ones too. A field keeps its own keys, its arrows
- * stepping its value; Tab reaches it. Goes on the menu's content; a menu opened beside a row of it,
- * drawn elsewhere in the page, moves through its own rows.
+ * stepping its value; Tab reaches it. Goes on the content of every menu of the editor (the full
+ * menu, the right-click menu, Arrange ⋯, a picked frame's ⋯ and each menu beside one of their
+ * rows); a menu opened beside a row, drawn elsewhere in the page, moves through its own rows.
  */
 export function arrowThrough(event: KeyboardEvent<HTMLElement>) {
   if (event.defaultPrevented || !(event.key in STEPS)) return
