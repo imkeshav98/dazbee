@@ -1,6 +1,6 @@
 // Copied layers on the clipboard, kept on this device too, so a paste that brings only their
-// plain text still pastes them.
-import { LAYER_CLIPBOARD_TYPE, LayerClipboard, type LayerTree } from '@dazbee/schema'
+// plain text still pastes them; and the style Copy style keeps on this device for Paste style.
+import { LAYER_CLIPBOARD_TYPE, LayerClipboard, LayerStyle } from '@dazbee/schema'
 
 /**
  * The last layers copied, kept in this browser too with the plain text the copy wrote: a paste
@@ -8,6 +8,8 @@ import { LAYER_CLIPBOARD_TYPE, LayerClipboard, type LayerTree } from '@dazbee/sc
  * drops custom types) still pastes the layers.
  */
 const REMEMBERED = 'dazbee.copiedLayers'
+/** The style Copy style last took, kept in this browser so Paste style works in any design. */
+const STYLE = 'dazbee.copiedStyle'
 
 /** Keeps copied layers on this device, as JSON and as their names in plain text; `kept` is false without storage. */
 export function keepCopy(copied: LayerClipboard) {
@@ -30,10 +32,10 @@ export function putOnClipboard(data: DataTransfer, copied: LayerClipboard) {
 }
 
 /**
- * The layers a paste brings: in our own type, or the copy kept on this device when the paste brings
- * only the plain text that copy wrote. Null for anything else.
+ * The layers a paste brings, with where they were copied from: in our own type, or the copy kept on
+ * this device when the paste brings only the plain text that copy wrote. Null for anything else.
  */
-export function layersOnClipboard(data: DataTransfer | null): LayerTree | null {
+export function layersOnClipboard(data: DataTransfer | null): LayerClipboard | null {
   let raw = data?.getData(LAYER_CLIPBOARD_TYPE)
   const plain = data?.getData('text/plain')
   try {
@@ -42,18 +44,38 @@ export function layersOnClipboard(data: DataTransfer | null): LayerTree | null {
       if (kept?.plain === plain) raw = kept.json
     }
     const parsed = raw ? LayerClipboard.safeParse(JSON.parse(raw)) : null
-    return parsed?.success ? parsed.data.tree : null
+    return parsed?.success ? parsed.data : null
   } catch {
     return null
   }
 }
 
-/** The layers last copied in Dazbee on this device, as kept in browser storage; null when there are none. */
-export function rememberedLayers(): LayerTree | null {
+/** The layers last copied in Dazbee on this device, as kept in browser storage, with where they came from; null when there are none. */
+export function rememberedLayers(): LayerClipboard | null {
   try {
     const kept = JSON.parse(localStorage.getItem(REMEMBERED) ?? 'null') as { json?: string } | null
     const parsed = kept?.json ? LayerClipboard.safeParse(JSON.parse(kept.json)) : null
-    return parsed?.success ? parsed.data.tree : null
+    return parsed?.success ? parsed.data : null
+  } catch {
+    return null
+  }
+}
+
+/** Keeps a copied style on this device; false without storage. */
+export function keepStyle(style: LayerStyle) {
+  try {
+    localStorage.setItem(STYLE, JSON.stringify(style))
+    return true
+  } catch {
+    return false
+  }
+}
+
+/** The style last copied on this device; null when there is none, or it can't be read. */
+export function rememberedStyle(): LayerStyle | null {
+  try {
+    const parsed = LayerStyle.safeParse(JSON.parse(localStorage.getItem(STYLE) ?? 'null'))
+    return parsed.success ? parsed.data : null
   } catch {
     return null
   }
