@@ -9,7 +9,7 @@ import { GREEN, INK, PINK } from '../../support/linked-menu-design.ts'
 import { copyIn } from '../../support/seed.ts'
 import { fitSettled, selectLayers } from '../../support/stage.ts'
 import { expect, type Locator, type Page, test } from '../../support/test.ts'
-import { moreAction, moreMenu, moreSubmenu, PIECES, UNCUT } from '../../support/top-bar.ts'
+import { moreAction, moreMenu, moreSubmenu, PIECES, UNCUT, underPhoneMenu } from '../../support/top-bar.ts'
 
 test.describe.configure({ mode: 'parallel', timeout: 120_000 })
 
@@ -29,12 +29,6 @@ const ROWS = [
 /** The words of the row that has the focus, without its key. */
 const focusedRow = (page: Page) => page.evaluate(() => document.activeElement?.firstChild?.textContent?.trim() ?? '')
 
-/** Hides the dock and the rail, which a phone's full menu lies over, or shows them again with ''. */
-const underMenu = (page: Page, visibility: 'hidden' | '') =>
-  page.evaluate((to) => {
-    for (const el of document.querySelectorAll<HTMLElement>('[data-dock], [data-testid="rail"]'))
-      el.style.visibility = to
-  }, visibility)
 /** A box on screen, as the browser measures it. */
 type Box = { left: number; top: number; right: number; bottom: number }
 /** Where an element is on screen. */
@@ -366,9 +360,9 @@ for (const [width, height] of SCREEN_SIZES) {
     await moreMenu(page)
     // On a phone the full menu lies over the dock and the rail, as the mock draws it, so they are
     // left out here; the phone's own test checks the menu is on top of them.
-    if (width <= 600) await underMenu(page, 'hidden')
+    if (width <= 600) await underPhoneMenu(page, 'hidden')
     await expect.poll(() => layoutProblems(page, { pieces: PIECES, uncut: UNCUT })).toEqual([])
-    if (width <= 600) await underMenu(page, '')
+    if (width <= 600) await underPhoneMenu(page, '')
     const sub = await moreSubmenu(page, 'copy-to-frames')
     if (width > 600) {
       await expect.poll(() => layoutProblems(page, { pieces: PIECES, uncut: UNCUT })).toEqual([])

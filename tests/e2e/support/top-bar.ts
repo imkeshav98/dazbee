@@ -66,6 +66,16 @@ export async function moreMenu(page: Page) {
 }
 
 /**
+ * Hides the dock and the rail, which the full menu lies over on a phone, so a layout check sees
+ * the rest; '' shows them again.
+ */
+export const underPhoneMenu = (page: Page, visibility: 'hidden' | '') =>
+  page.evaluate((to) => {
+    for (const el of document.querySelectorAll<HTMLElement>('[data-dock], [data-testid="rail"]'))
+      el.style.visibility = to
+  }, visibility)
+
+/**
  * Waits until an element and what it holds have played their entrances (a pop-up pops in scaled
  * and raised), so the boxes measured in it are where they stay. Only animations that end at a time
  * count: endless ones and those driven by scrolling, as the scroll bars' are, are left out.

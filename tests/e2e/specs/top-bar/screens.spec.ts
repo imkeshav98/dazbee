@@ -127,22 +127,25 @@ test.describe('on a phone, 390×844', () => {
     expect(errors).toEqual([])
   })
 
-  test('the full menu shows that it scrolls, with a fade at its cut edge and its bar, and every row can be reached', async ({
+  test('the full menu shows that it scrolls, with a line at its cut edge, never a fade that reads as a greyed row, and its bar, and every row can be reached', async ({
     browser,
   }) => {
     const asset = await upload(photo)
     const { page, errors } = await openStage(browser, topBarDesign(asset.id))
     await page.setViewportSize({ width: 390, height: 844 })
-    await selectLayers(page, ['box'], { bar: true })
+    // A text's menu, the longest, is taller than the room down to the screen's bottom.
+    await selectLayers(page, ['headline'], { bar: true })
     const menu = await moreMenu(page)
     // Away from the menu, past the time an overlay bar takes to hide.
     await page.mouse.move(4, 400)
     await page.waitForTimeout(1_200)
+    const edge = () => menu.evaluate((el) => getComputedStyle(el).boxShadow)
     const top = await scrolling(menu)
-    expect(top).toMatchObject({ scrolls: true, bar: true })
-    expect(top.fade).toContain('gradient')
+    expect(top).toMatchObject({ scrolls: true, bar: true, fade: 'none' })
+    const line = await edge()
+    expect(line).toContain('inset')
     await menu.evaluate((el) => el.scrollTo({ top: el.scrollHeight }))
-    await expect.poll(async () => (await scrolling(menu)).fade).not.toBe(top.fade)
+    await expect.poll(edge).not.toBe(line)
     const box = await menu.boundingBox()
     const last = await menu.locator(':scope > button').last().boundingBox()
     expect(box && last && last.y >= box.y && last.y + last.height <= box.y + box.height).toBe(true)

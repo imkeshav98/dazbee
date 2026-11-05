@@ -7,7 +7,7 @@ import { screenPoint, writeOutput } from '../../support/editor.ts'
 import { layoutProblems } from '../../support/layout.ts'
 import { fitSettled, nextFrame, openStage, selectLayers } from '../../support/stage.ts'
 import { expect, test } from '../../support/test.ts'
-import { barMenu, moreAction, moreMenu, moreSubmenu, PIECES, UNCUT } from '../../support/top-bar.ts'
+import { barMenu, moreAction, moreMenu, moreSubmenu, PIECES, UNCUT, underPhoneMenu } from '../../support/top-bar.ts'
 import { topBarDesign } from '../../support/top-bar-design.ts'
 
 test.describe.configure({ timeout: 240_000 })
@@ -385,6 +385,8 @@ test('the small menu keeps out of a drag, and over a selection filling a phone i
   const at = await small.boundingBox()
   expect(bar && at && at.y >= bar.y + bar.height).toBe(true)
   await moreMenu(page)
+  // It lies over the dock and the rail, as the mock draws it.
+  await underPhoneMenu(page, 'hidden')
   expect(await layoutProblems(page, { pieces: PIECES, uncut: UNCUT })).toEqual([])
   expect(errors).toEqual([])
 })

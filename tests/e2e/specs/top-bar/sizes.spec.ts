@@ -6,7 +6,7 @@ import { writeOutput } from '../../support/editor.ts'
 import { layoutProblems, SCREEN_SIZES, wrapped } from '../../support/layout.ts'
 import { fitSettled, nextFrame, openStage, selectLayers } from '../../support/stage.ts'
 import { expect, type Page, test } from '../../support/test.ts'
-import { barMenu, moreMenu, PIECES, UNCUT } from '../../support/top-bar.ts'
+import { barMenu, moreMenu, PIECES, UNCUT, underPhoneMenu } from '../../support/top-bar.ts'
 import { topBarDesign } from '../../support/top-bar-design.ts'
 
 test.describe.configure({ timeout: 240_000 })
@@ -97,7 +97,10 @@ for (const [width, height] of SCREEN_SIZES) {
       }
       if (await page.getByTestId('small-menu').isVisible()) {
         await moreMenu(page)
+        // On a phone it lies over the dock and the rail, as the mock draws it.
+        if (width <= 600) await underPhoneMenu(page, 'hidden')
         await check(`${name}, full menu`)
+        if (width <= 600) await underPhoneMenu(page, '')
         await page.keyboard.press('Escape')
         await expect(page.getByTestId('bar-more-menu')).toBeHidden()
       }
