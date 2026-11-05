@@ -208,7 +208,10 @@ test('keyboard only: a layer moved past a big open group keeps the focus, and ty
 }) => {
   const { page, errors } = await openStage(browser, crowd())
   await openLayers(page)
+  // Selecting the group's bottom layer on the stage opens the group and scrolls to that layer's row.
   await page.evaluate(() => window.dazbee?.select(['k0']))
+  await expect(row(page, 'Crowd 1')).toBeInViewport()
+  await page.getByTestId('layers-scroller').evaluate((el) => (el.scrollTop = 0))
   await expect(row(page, 'Crowd')).toHaveAttribute('aria-expanded', 'true')
   await row(page, 'Mover').click()
   await expect(row(page, 'Mover')).toBeFocused()

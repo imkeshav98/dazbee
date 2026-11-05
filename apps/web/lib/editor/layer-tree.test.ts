@@ -168,4 +168,3 @@ describe('arrowStep', () => {
     expect(step('head', 'Enter')).toBeNull()
   })
 })
-
