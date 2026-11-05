@@ -5,9 +5,9 @@
 // linked to nothing; the square holds a turned layer, a locked one and one under a mask. The three
 // screen sizes are in frames-on-canvas-screens.spec.ts.
 import { solid } from '../../support/edit-in-frame.ts'
-import { designOf, openTabs, screenPoint, settle, writeOutput } from '../../support/editor.ts'
-import { clickLabel, design, labelPoint, picked } from '../../support/frames-on-canvas.ts'
-import { layersIn, seed } from '../../support/seed.ts'
+import { designOf, screenPoint, settle, writeOutput } from '../../support/editor.ts'
+import { clickLabel, frameOf, labelPoint, labelRow, open, picked, tabToBar } from '../../support/frames-on-canvas.ts'
+import { layersIn } from '../../support/seed.ts'
 import {
   click,
   type Design,
@@ -21,12 +21,11 @@ import {
   selection,
   zoomOf,
 } from '../../support/stage.ts'
-import { type Browser, expect, type Page, test } from '../../support/test.ts'
+import { expect, type Page, test } from '../../support/test.ts'
 import { barMenu } from '../../support/top-bar.ts'
 
 test.describe.configure({ timeout: 180_000 })
 
-const frameOf = async (page: Page, id: string) => (await read(page)).frames[id]
 /** What a frame holds: the frame as stored and its layers by id. */
 const inFrame = (d: Design, frameId: string) => ({
   frame: d.frames[frameId],
@@ -44,13 +43,6 @@ async function onScreen(page: Page, id: string) {
   if (!stage) throw new Error('no stage')
   return { start, end, stage }
 }
-/** Where a frame's label row is on screen, as the editor places it, drawn or not. */
-async function labelRow(page: Page, id: string) {
-  const stage = await page.getByTestId('stage').boundingBox()
-  const rect = await page.evaluate((id) => window.dazbee?.labelRect(id), id)
-  if (!stage || !rect) throw new Error(`no label for ${id}`)
-  return { x: stage.x + rect.x, y: stage.y + rect.y, width: rect.width, height: rect.height }
-}
 /** Double-clicks a frame's name on its label, and gives the field that renames it once it shows. */
 async function renameByLabel(page: Page, id: string) {
   const name = await labelPoint(page, id)
@@ -58,33 +50,6 @@ async function renameByLabel(page: Page, id: string) {
   const field = page.getByTestId('frame-rename').locator('input')
   await expect(field).toBeFocused()
   return field
-}
-/** Presses Tab until the focus is in the top bar, from wherever it is, and gives the item it reached. */
-async function tabToBar(page: Page) {
-  for (let i = 0; i < 40; i++) {
-    await page.keyboard.press('Tab')
-    const inBar = await page.evaluate(() => document.activeElement?.closest('[data-testid="top-bar"]') !== null)
-    if (inBar) return page.evaluate(() => document.activeElement?.getAttribute('data-testid') ?? '')
-  }
-  throw new Error('Tab never reached the top bar')
-}
-
-/**
- * Opens a fresh copy of the design in `count` tabs; the first is 1440 × 1000 with the square at half
- * size 300 px in and 180 px down, so its label clears the chrome, and its fonts loaded. All tabs
- * agree before it returns.
- */
-async function open(browser: Browser, count = 1) {
-  const { tabs, errors } = await openTabs(browser, count, await seed(design()))
-  const [a] = tabs as [Page, ...Page[]]
-  await a.setViewportSize({ width: 1440, height: 1000 })
-  await a.evaluate(async () => {
-    window.dazbee?.setCamera({ x: 300, y: 180, zoom: 0.5 })
-    await window.dazbee?.loaded()
-  })
-  await drawn(a)
-  if (count > 1) await settle(tabs)
-  return { a, b: tabs[1] as Page, tabs, errors }
 }
 
 test('a click on a frame’s empty area or its label picks it: outlined, its label lit, a bar with Background and ⋯; Esc, empty canvas or a layer lets it go', async ({

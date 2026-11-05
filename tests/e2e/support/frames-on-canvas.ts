@@ -4,9 +4,10 @@
 import type { DesignInput } from '@dazbee/schema'
 
 import { solid } from './edit-in-frame.ts'
-import { frameDesign, linkedFrames } from './seed.ts'
-import { drawn } from './stage.ts'
-import { expect, type Page } from './test.ts'
+import { openTabs, settle } from './editor.ts'
+import { frameDesign, linkedFrames, seed } from './seed.ts'
+import { drawn, read } from './stage.ts'
+import { type Browser, expect, type Page } from './test.ts'
 
 /**
  * A square holding a headline, a layer turned 30°, a locked one and a photo under a round mask; a
@@ -111,6 +112,7 @@ export const design = (): DesignInput => {
 
 /** The picked frame, or null. */
 export const picked = (page: Page) => page.evaluate(() => window.dazbee?.pickedFrame() ?? null)
+export const frameOf = async (page: Page, id: string) => (await read(page)).frames[id]
 /**
  * Where a frame's name is on its label on screen, near its bottom edge, which a fit keeps clear of
  * the header: at its middle, or a point `dx` in from its start, kept on the name. The overlay draws
@@ -132,4 +134,37 @@ export async function clickLabel(page: Page, id: string) {
   const at = await labelPoint(page, id, 20)
   await page.mouse.click(at.x, at.y)
   await drawn(page)
+}
+/** Where a frame's label row is on screen, as the editor places it, drawn or not. */
+export async function labelRow(page: Page, id: string) {
+  const stage = await page.getByTestId('stage').boundingBox()
+  const rect = await page.evaluate((id) => window.dazbee?.labelRect(id), id)
+  if (!stage || !rect) throw new Error(`no label for ${id}`)
+  return { x: stage.x + rect.x, y: stage.y + rect.y, width: rect.width, height: rect.height }
+}
+/** Presses Tab until the focus is in the top bar, from wherever it is, and gives the item it reached. */
+export async function tabToBar(page: Page) {
+  for (let i = 0; i < 40; i++) {
+    await page.keyboard.press('Tab')
+    const inBar = await page.evaluate(() => document.activeElement?.closest('[data-testid="top-bar"]') !== null)
+    if (inBar) return page.evaluate(() => document.activeElement?.getAttribute('data-testid') ?? '')
+  }
+  throw new Error('Tab never reached the top bar')
+}
+/**
+ * Opens a fresh copy of the design in `count` tabs; the first is 1440 × 1000 with the square at half
+ * size 300 px in and 180 px down, so its label clears the chrome, and its fonts loaded. All tabs
+ * agree before it returns.
+ */
+export async function open(browser: Browser, count = 1) {
+  const { tabs, errors } = await openTabs(browser, count, await seed(design()))
+  const [a] = tabs as [Page, ...Page[]]
+  await a.setViewportSize({ width: 1440, height: 1000 })
+  await a.evaluate(async () => {
+    window.dazbee?.setCamera({ x: 300, y: 180, zoom: 0.5 })
+    await window.dazbee?.loaded()
+  })
+  await drawn(a)
+  if (count > 1) await settle(tabs)
+  return { a, b: tabs[1] as Page, tabs, errors }
 }
