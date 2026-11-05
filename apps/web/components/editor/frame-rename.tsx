@@ -1,9 +1,9 @@
 'use client'
 
-// The field that renames a frame in place, over its label on the stage: a double click on the
-// label, or Rename in the picked frame's ⋯ menu, opens it with the name selected. Enter or leaving
-// it keeps the new name, as one undo step; Escape keeps the old one. It follows the label as the
-// view moves, and ends once the frame is gone.
+// The field that renames a frame in place of its label on the stage: a double click on the label,
+// or Rename in the picked frame's ⋯ menu, opens it with the name selected, the label hidden under
+// it. Enter or leaving it keeps the new name, as one undo step; Escape keeps the old one. It
+// follows the label as the view moves, and ends once the frame is gone.
 import { useEffect, useState } from 'react'
 
 import type { Editor } from '@dazbee/editor'
@@ -19,11 +19,15 @@ import { format } from '@/lib/i18n/index.ts'
 /** The frame being renamed, and whether its rename came from the frame's ⋯ menu, whose button takes the focus back. */
 type Renaming = { frameId: string; fromMenu: boolean }
 
-/** The field's least width, in pixels, so a name has room on a frame that is narrow on screen. */
-const MIN_WIDTH = 160
+/** The field's least width, in pixels (its min-w-[120px]), so a name has room on a frame narrow on screen. */
+const MIN_WIDTH = 120
 /** The frame's ⋯ in its top bar, and the menu it opens. */
 const MENU_BUTTON = '[data-testid="bar-frame-more"]'
 const MENU = '[data-testid="bar-frame-more-menu"]'
+
+/** The rule that hides a frame's label on the stage. */
+const hiddenLabel = (frameId: string) =>
+  `.stage-overlay .frame-label[data-frame="${CSS.escape(frameId)}"] { visibility: hidden; }`
 
 const sameRect = (a: Rect | null, b: Rect | null) =>
   a === b || (a !== null && b !== null && a.x === b.x && a.y === b.y && a.width === b.width && a.height === b.height)
@@ -77,14 +81,17 @@ export function FrameRename({ editor }: { editor: Editor }) {
       className="absolute z-10"
       style={{ left: rect.x - 4, top: rect.y - 2, width: Math.max(rect.width + 4, MIN_WIDTH) }}
     >
+      {/* The frame's own label, name and size, gives way to the field while it is open. */}
+      <style>{hiddenLabel(renaming.frameId)}</style>
       <RenameField
         key={renaming.frameId}
         name={frame.name}
         label={format(t.editor.frames.nameOf, { name: frame.name })}
         inputName="frame-name"
         maxLength={120}
+        // As wide as the name, from the least width up to the label's.
         className={cn(
-          'h-6 w-full rounded-[6px] bg-surface px-1 font-mono text-[12px] font-medium text-text outline outline-1 outline-accent',
+          'h-6 max-w-full min-w-[120px] rounded-[6px] bg-surface px-1 font-mono text-[12px] font-medium text-text outline outline-1 outline-accent [field-sizing:content]',
           FOCUS_RING,
         )}
         onDone={done}

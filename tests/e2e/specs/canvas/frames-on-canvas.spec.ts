@@ -291,6 +291,8 @@ test('a double click on a frame’s name renames it in place, Enter keeping it a
   const { a, b, errors } = await open(browser, 2)
   let field = await renameByLabel(a, 'sq')
   await expect(field).toHaveValue('Square')
+  // The field takes the label's place: the label hides while it is open.
+  await expect(label(a, 'sq')).toBeHidden()
   expect(await field.evaluate((el: HTMLInputElement) => [el.selectionStart, el.selectionEnd])).toEqual([0, 6])
   expect(await picked(a)).toBe('sq')
   writeOutput('frames-3-renaming.png', await a.screenshot({ animations: 'disabled' }))
@@ -298,6 +300,7 @@ test('a double click on a frame’s name renames it in place, Enter keeping it a
   await a.keyboard.press('Enter')
   await expect(a.getByTestId('frame-rename')).toHaveCount(0)
   expect((await frameOf(a, 'sq'))?.name).toBe('Sale')
+  await expect(label(a, 'sq')).toBeVisible()
   await expect(label(a, 'sq').locator('.frame-name')).toHaveText('Sale')
   await settle([a, b])
   expect((await frameOf(b, 'sq'))?.name).toBe('Sale')
