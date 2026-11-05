@@ -8,10 +8,11 @@ export const TOUCH_ROW = 'max-sm:min-h-[44px]'
 export const FOCUS_RING = 'focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent'
 
 /**
- * A row on glass lit by the hover tint under the pointer and the pressed tint while pressed, its muted
- * and coloured text in the text colour while lit (the lit utility in app/globals.css).
+ * A row on glass lit by the hover tint under a pointer that hovers there (`hovered:`, not for rows
+ * that just showed up under a pointer at rest) and the pressed tint while pressed, its muted and
+ * coloured text in the text colour while lit (the lit utility in app/globals.css).
  */
-export const LIT_ROW = 'hover:bg-hover hover:lit active:bg-pressed active:lit'
+export const LIT_ROW = 'hovered:bg-hover hovered:lit active:bg-pressed active:lit'
 
 /**
  * A row of choices that look as one control, one of them on, in a sunken well: each as wide as its

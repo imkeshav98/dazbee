@@ -129,3 +129,12 @@ export const rowsUnderTooltip = (page: Page) =>
       })
       .map((row) => (row as HTMLElement).innerText.trim() || (row.getAttribute('aria-label') ?? ''))
   })
+/** The words of the rows that show in a menu lit with a tint, as the hover tint lights a row under a pointer. */
+export const litRows = (menu: Locator) =>
+  menu
+    .locator('button')
+    .evaluateAll((rows) =>
+      rows
+        .filter((row) => row.checkVisibility() && getComputedStyle(row).backgroundColor !== 'rgba(0, 0, 0, 0)')
+        .map((row) => (row as HTMLElement).innerText.trim()),
+    )

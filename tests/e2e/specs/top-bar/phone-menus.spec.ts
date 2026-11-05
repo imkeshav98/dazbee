@@ -4,13 +4,15 @@
 // English and in Arabic. No row shows a shortcut key, and every row stays a finger's height. A tap
 // on a greyed row says why in a tooltip just above its menu, covering no row and clear of the finger,
 // which Esc closes first. The full menu and the right-click menu are the sheet Arrange is, and a
-// group's fits whole. The rest of Arrange's sheet is checked in top-bar-more-screens.
+// group's fits whole; no row shows the hover tint until a pointer moves over it. The rest of
+// Arrange's sheet is checked in top-bar-more-screens.
 import { setCookies } from '../../support/editor.ts'
 import { boxOf, layoutProblems } from '../../support/layout.ts'
 import { open, rowsOf } from '../../support/linked-menu.ts'
 import {
   besideRows,
   fullMenuRows,
+  litRows,
   rowIn,
   rowName,
   rowsUnderTooltip,
@@ -254,5 +256,35 @@ test('the full menu and the right-click menu open as the sheet at the bottom of 
       await expect(page.locator('[data-dock]')).toBeVisible()
     }
   }
+  expect(errors).toEqual([])
+})
+
+test('after a click opens a row’s menu in its menu’s place, or goes back from it, no row shows the hover tint until the pointer moves over one', async ({
+  browser,
+}) => {
+  const { page, errors } = await openOnPhone(browser)
+  // Going back: the full menu's rows come back under the pointer resting on the back row.
+  await selectLayers(page, ['headline'])
+  const menu = await moreMenu(page)
+  await entered(menu)
+  await menu.getByTestId('more-copy-to-frames').click()
+  const sub = menu.getByTestId('more-copy-to-frames-menu')
+  await expect(sub).toBeVisible()
+  await menu.getByTestId('more-copy-to-frames-back').click()
+  await expect(sub).toHaveCount(0)
+  expect(await litRows(menu)).toEqual([])
+  await page.keyboard.press('Escape')
+  await expect(menu).toBeHidden()
+
+  // Opening: in Arrange's sheet, Text direction's rows show under the pointer that tapped it.
+  await selectLayers(page, ['headline'], { bar: true })
+  const sheet = await arrangeMenu(page)
+  await sheet.getByTestId('more-text-direction').click()
+  const directions = sheet.getByTestId('more-text-direction-menu')
+  await expect(directions).toBeVisible()
+  expect(await litRows(sheet)).toEqual([])
+  // A pointer that moves over a row lights it.
+  await directions.getByRole('button').first().hover()
+  await expect.poll(() => litRows(sheet)).toHaveLength(1)
   expect(errors).toEqual([])
 })

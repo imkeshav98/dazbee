@@ -21,6 +21,7 @@ import { useTarget } from '@/components/editor/edit-panel/target.ts'
 import { usePhone } from '@/components/editor/edit-store.ts'
 import { MENU, MENU_DIVIDER, MENU_HEADING, MENU_ITEM, MENU_KEY } from '@/components/editor/styles.ts'
 import { cn } from '@/lib/cn.ts'
+import { holdHover } from '@/lib/hover-hold.ts'
 import { useLocale, useMessages } from '@/lib/i18n/client.tsx'
 import { dirOf, format, type Messages } from '@/lib/i18n/index.ts'
 
@@ -201,11 +202,22 @@ export function SubMenu({
   const rtl = dirOf(useLocale()) === 'rtl'
   const [toward, back] = rtl ? ['ArrowLeft', 'ArrowRight'] : ['ArrowRight', 'ArrowLeft']
   const focus = useMenuFocus()
+  /**
+   * Opens or closes its menu. On a phone that swaps the rows of its menu in place, and the rows
+   * that show up under a pointer at rest take no hover tint until it moves.
+   */
+  const show = useCallback(
+    (to: boolean) => {
+      if (phone) holdHover(focus.button.current?.closest<HTMLElement>('[role="dialog"]') ?? null)
+      setOpen(to)
+    },
+    [phone, focus.button],
+  )
   /** Back from the menu in the place of a phone's menu to the row, the focus on the row once it shows. */
   const goBack = useCallback(() => {
-    flushSync(() => setOpen(false))
+    flushSync(() => show(false))
     focus.button.current?.focus()
-  }, [focus.button])
+  }, [show, focus.button])
   const rows = (
     <>
       {heading && <p className={MENU_HEADING}>{heading}</p>}
@@ -215,7 +227,7 @@ export function SubMenu({
   return (
     <>
       {/* On a phone the popover never opens: its row opens the menu in the menu's place. */}
-      <Popover.Root open={open && !phone} onOpenChange={setOpen}>
+      <Popover.Root open={open && !phone} onOpenChange={show}>
         <Popover.Trigger asChild>
           <button
             ref={focus.button}
@@ -225,7 +237,7 @@ export function SubMenu({
             onKeyDown={(event) => {
               if (event.key !== toward) return
               event.preventDefault()
-              setOpen(true)
+              show(true)
             }}
             // Lit with the hover tint while the menu beside it is open.
             className={cn(MENU_ITEM, 'data-[state=open]:bg-hover data-[state=open]:lit')}
