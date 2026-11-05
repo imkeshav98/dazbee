@@ -5,11 +5,14 @@ import { loadCanvasKit } from '@dazbee/renderer/node'
 import { type DesignInput, LAYER_CLIPBOARD_TYPE } from '@dazbee/schema'
 
 import { type Frame, frameAt, pageFrames } from './canvas/frames.ts'
+import { hitTest } from './canvas/hit-test.ts'
+import { testLooks } from './canvas/test-looks.ts'
 import { measure, sessionOf, testBoxes } from './layers/test-boxes.ts'
 import { editorPlace, type PlaceDeps } from './place.ts'
 import { editorSelection } from './selection.ts'
 
 const ck = await loadCanvasKit()
+const looks = testLooks()
 
 const RED = { type: 'solid' as const, color: '#FF0000FF' }
 const rect = (parentId: string, index: string, box: { x: number; y: number; width: number; height: number }) => ({
@@ -155,7 +158,9 @@ function harness(typed = false, { emptyPage = false } = {}) {
     },
     tools: { setTool: (tool) => log.push(`tool ${tool}`) },
     selection,
-    scenes: { scene: (f) => render(session.design(), f.id, undefined, measure) },
+    scenes: {
+      hit: (f, p, options) => hitTest(render(session.design(), f.id, undefined, measure).layers, p, looks, options),
+    },
     boxes,
     typing: {
       editing: () => (typed ? { id: 'words', frameId: square.id } : null),

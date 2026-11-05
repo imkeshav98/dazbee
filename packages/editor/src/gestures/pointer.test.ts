@@ -90,7 +90,7 @@ function harness(tool: Tool = 'select', under: SceneLayer = UNDER, handle = fals
     },
     tools: { tool: () => tool, imageToPlace: () => null, snapping: () => true },
     selection,
-    scenes: { scene: () => ({ layers: [under] }) as unknown as ReturnType<PointerDeps['scenes']['scene']> },
+    scenes: { hit: (_frame, p) => (p.x >= 0 && p.y >= 0 && p.x <= 100 && p.y <= 100 ? under : null) },
     boxes: {
       pickable: () => true,
       selectionBox: () => null,

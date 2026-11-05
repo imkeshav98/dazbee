@@ -5,6 +5,7 @@ import type { DesignInput, Point } from '@dazbee/schema'
 
 import type { Frame } from '../../canvas/frames.ts'
 import { hitTest } from '../../canvas/hit-test.ts'
+import { testLooks } from '../../canvas/test-looks.ts'
 import { measure, sessionOf, testBoxes } from '../../layers/test-boxes.ts'
 import { editorSelection } from '../../selection.ts'
 import { editorFrameMove } from './frame-move.ts'
@@ -38,6 +39,7 @@ const DESIGN: DesignInput = {
   },
 }
 const SQUARE: Frame = { id: 'sq', pageId: 'p1', name: 'Square', x: 0, y: 0, width: 1080, height: 1080 }
+const looks = testLooks()
 
 /**
  * The select tool's press over the design on a real session, selection and box queries, at zoom 1
@@ -76,7 +78,9 @@ function harness(handle: ResizeDrag['handle'] | null = null) {
   const select = editorSelectPress(deps)
   /** A press at a point, with Shift held when asked, on the layer a press there finds. */
   const press = (p: Point, shiftKey = false) => {
-    const deepest = hitTest(render(session.design(), 'sq', undefined, measure).layers, p, boxes.pickable)
+    const deepest = hitTest(render(session.design(), 'sq', undefined, measure).layers, p, looks, {
+      pickable: boxes.pickable,
+    })
     return select.press({ pointerId: 1, shiftKey } as PointerEvent, p, { frame: SQUARE, p }, deepest)
   }
   /** A press off every frame, on empty canvas. */

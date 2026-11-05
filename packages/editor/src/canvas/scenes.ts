@@ -18,10 +18,11 @@ import {
   type TextLayout,
   textMeasure,
 } from '@dazbee/renderer'
-import type { Design } from '@dazbee/schema'
+import type { Design, Point } from '@dazbee/schema'
 
 import type { EditorResources } from '../resources.ts'
 import type { Frame } from './frames.ts'
+import { type HitOptions, hitTest, type Looks } from './hit-test.ts'
 
 export interface ScenesDeps {
   ck: CanvasKit
@@ -37,6 +38,8 @@ export interface FrameScenes {
   measure(): MeasureText
   /** Text laid out as drawn, from the screen's cache, which owns it. */
   layout(props: Parameters<ParagraphCache['layout']>[1]): TextLayout
+  /** The layer that shows under a point of a frame, as a click or a hover picks it (`hitTest`). */
+  hit(frame: Frame, p: Point, options?: HitOptions): SceneLayer | null
   /**
    * The pictures of the frames in view for a redraw, `all` being every frame of the shown page: each
    * one recorded again where it changed, and how many were. A frame off the shown page lets go of its
@@ -81,6 +84,8 @@ export function frameScenes({ ck, resources, drawn }: ScenesDeps): FrameScenes {
   const paragraphs = paragraphCache()
   const scenes = sceneMemo()
   const layers = layerPictures()
+  /** What a hit test reads: the images' alpha maps and the text as the screen lays it out. */
+  const looks: Looks = { ck, alpha: resources.alpha, layout }
 
   function scene(frame: Frame) {
     return cached(frame).scene
@@ -92,6 +97,9 @@ export function frameScenes({ ck, resources, drawn }: ScenesDeps): FrameScenes {
   }
   function layout(props: Parameters<ParagraphCache['layout']>[1]) {
     return paragraphs.layout(ck, props, resources.resources())
+  }
+  function hit(frame: Frame, p: Point, options?: HitOptions) {
+    return hitTest(scene(frame).layers, p, looks, options)
   }
 
   function pictures(all: Frame[], inView: Frame[], screen: Resources) {
@@ -203,6 +211,7 @@ export function frameScenes({ ck, resources, drawn }: ScenesDeps): FrameScenes {
     scene,
     measure,
     layout,
+    hit,
     pictures,
     ghost,
     destroy,
