@@ -70,6 +70,12 @@ export interface Editor {
   select(ids: string[]): void
   /** Does what a shortcut does, as if its key was pressed on the stage. */
   perform: (action: ShortcutAction) => boolean
+  /**
+   * Whether Ungroup has something to do for the selection: false while every selected group or box
+   * is in an auto layout box whose flow would place what it holds elsewhere. It tries the ungroup on
+   * a copy of the design, so a menu asks once as it opens.
+   */
+  canUngroup: () => boolean
   /** Whether this tab has a change of its own to undo, or an undone one to redo. */
   canUndo: () => boolean
   canRedo: () => boolean

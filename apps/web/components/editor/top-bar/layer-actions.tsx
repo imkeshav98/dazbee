@@ -5,7 +5,8 @@
 // (style, text or the layer, into the linked frames); box, ungroup for a group or a box, mask (or
 // release the mask a layer is under); and, at the bottom, lock, hide and delete in all frames, acting
 // on the layers and their linked copies. Every row runs the same editor action as its shortcut. An
-// item that never applies is left out; one with nothing to do is greyed, its tooltip saying why. How
+// item that never applies is left out; one with nothing to do is greyed, its tooltip saying why, as
+// Ungroup is while auto layout would move what the group or box holds. How
 // the layers sit (order, line up, the turn, text direction) is in the top bar's Arrange ⋯.
 import { CaretLeftIcon, CaretRightIcon } from '@phosphor-icons/react'
 import * as Popover from '@radix-ui/react-popover'
@@ -77,6 +78,8 @@ export function LayerActions({ editor, ids, onDone }: { editor: Editor; ids: str
   const t = useMessages()
   const b = t.editor.bar
   const selected = useTarget(editor, ids)
+  // Asked once as the menu opens: it tries the ungroup on a copy of the design.
+  const [ungroupable] = useState(() => editor.canUngroup())
   if (!selected) return null
   const { target, design } = selected
   const run = (action: ShortcutAction) => {
@@ -106,8 +109,8 @@ export function LayerActions({ editor, ids, onDone }: { editor: Editor; ids: str
   const l = b.linked
   /** What an item says while it has nothing to do, or null while it has something to do. */
   const whyOf = (state: Why | 'ready' | 'hidden') => (state === 'ready' || state === 'hidden' ? null : l.why[state])
-  /** A row that runs a style or linked-copy action, greyed with the reason while it has nothing to do. */
-  const linkedRow = (action: ShortcutAction, label: string, why: string | null, danger = false) => (
+  /** A row that runs an action, greyed with the reason while it has nothing to do. */
+  const actionRow = (action: ShortcutAction, label: string, why: string | null, danger = false) => (
     <MenuRow
       key={action}
       action={action}
@@ -131,7 +134,7 @@ export function LayerActions({ editor, ids, onDone }: { editor: Editor; ids: str
             onDone()
           }}
         />
-        {linkedRow('copyStyle', l.copyStyle, whyOf(linked.copyStyle))}
+        {actionRow('copyStyle', l.copyStyle, whyOf(linked.copyStyle))}
       </SubMenu>
       <SubMenu label={b.paste} testId="paste">
         <MenuRow
@@ -144,7 +147,7 @@ export function LayerActions({ editor, ids, onDone }: { editor: Editor; ids: str
             onDone()
           }}
         />
-        {linkedRow('pasteStyle', l.pasteStyle, whyOf(linked.pasteStyle))}
+        {actionRow('pasteStyle', l.pasteStyle, whyOf(linked.pasteStyle))}
       </SubMenu>
       {row('duplicate', t.editor.arrange.duplicate)}
       <div className={MENU_DIVIDER} />
@@ -157,14 +160,15 @@ export function LayerActions({ editor, ids, onDone }: { editor: Editor; ids: str
           wide
           heading={linked.reach === 1 ? l.toFrame : format(l.toFrames, { n: linked.reach })}
         >
-          {linkedRow('styleToLinked', l.style, whyOf(linked.style))}
-          {linked.text !== 'hidden' && linkedRow('textToLinked', l.text, whyOf(linked.text))}
-          {linkedRow('layerToLinked', l.layer, whyOf(linked.layer))}
+          {actionRow('styleToLinked', l.style, whyOf(linked.style))}
+          {linked.text !== 'hidden' && actionRow('textToLinked', l.text, whyOf(linked.text))}
+          {actionRow('layerToLinked', l.layer, whyOf(linked.layer))}
         </SubMenu>
       )}
       <div className={MENU_DIVIDER} />
       {row('boxSelection', b.putInBox)}
-      {target.types.every((type) => type === 'group' || type === 'box') && row('ungroup', t.editor.arrange.ungroup)}
+      {target.types.every((type) => type === 'group' || type === 'box') &&
+        actionRow('ungroup', t.editor.arrange.ungroup, ungroupable ? null : b.ungroupMoves)}
       {over ? (
         <MenuRow
           action="releaseMask"
@@ -181,9 +185,9 @@ export function LayerActions({ editor, ids, onDone }: { editor: Editor; ids: str
         row('mask', t.editor.arrange.mask, masks)
       )}
       <div className={MENU_DIVIDER} />
-      {linkedRow('lockLinked', linked.lock === 'lock' ? l.lockAll : l.unlockAll, null)}
-      {linkedRow('hideLinked', linked.hide === 'hide' ? l.hideAll : l.showAll, null)}
-      {linkedRow('deleteLinked', l.deleteAll, whyOf(linked.delete), true)}
+      {actionRow('lockLinked', linked.lock === 'lock' ? l.lockAll : l.unlockAll, null)}
+      {actionRow('hideLinked', linked.hide === 'hide' ? l.hideAll : l.showAll, null)}
+      {actionRow('deleteLinked', l.deleteAll, whyOf(linked.delete), true)}
     </>
   )
 }

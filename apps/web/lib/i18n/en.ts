@@ -234,6 +234,8 @@ export const en = {
       arrange: 'Arrange',
       /** Why Line up is greyed out for a layer its auto layout box places. */
       placedByLayout: 'Auto layout places this layer',
+      /** Why Ungroup is greyed out for a group or box whose auto layout box would move what it holds. */
+      ungroupMoves: 'Auto layout would move what it holds',
       /** Why Bring to front and Bring forward are greyed out for layers at the top of their stack. */
       atFront: 'Already at the front',
       /** Why Send to back and Send backward are greyed out for layers at the bottom of their stack. */

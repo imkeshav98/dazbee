@@ -261,7 +261,7 @@ describe('editorActions', () => {
       expect(session.design().nodes.inRow?.parentId).toBe('row')
     })
 
-    it('leaves a box in a flow whole when the flow would place what it holds elsewhere, and says why', () => {
+    it('leaves a box in a flow whole when the flow would place what it holds elsewhere, saying nothing', () => {
       const { actions, session, selection, frame, log, drawn } = harness(false, FLOW)
       const before = drawn()
       expect(before.inHug).toMatchObject({ x: 490, y: 850, width: 60, height: 60 })
@@ -270,7 +270,7 @@ describe('editorActions', () => {
       expect(actions.perform('ungroup')).toBe(true)
       expect(drawn()).toEqual(before)
       expect(session.design().nodes.hugging).toBeDefined()
-      expect(log).toContain('placedByLayout')
+      expect(log).not.toContain('placedByLayout')
       expect(session.canUndo()).toBe(false)
       expect(selection.current()?.ids).toEqual(['hugging'])
     })
@@ -455,6 +455,36 @@ describe('editorActions', () => {
       selection.select(['a'], frame.id)
       actions.perform('nudgeLeft')
       expect(log).toEqual(['overlay'])
+    })
+  })
+
+  describe('canUngroup', () => {
+    it('is true for a box or a group whose layers stay where they are drawn once it comes apart', () => {
+      const { actions, selection, frame } = harness(false, FLOW)
+      selection.select(['row'], frame.id)
+      expect(actions.canUngroup()).toBe(true)
+      selection.select(['fixed', 'filling'], frame.id)
+      actions.perform('group')
+      expect(actions.canUngroup()).toBe(true)
+    })
+
+    it('is false for a box in a flow that would place what it holds elsewhere, and nothing changes', () => {
+      const { actions, session, selection, frame, drawn } = harness(false, FLOW)
+      const before = drawn()
+      selection.select(['hugging'], frame.id)
+      expect(actions.canUngroup()).toBe(false)
+      expect(drawn()).toEqual(before)
+      expect(session.canUndo()).toBe(false)
+    })
+
+    it('is true while one of the selected boxes comes apart, and false with no group or box selected', () => {
+      const { actions, selection, frame } = harness(false, FLOW)
+      selection.select(['hugging', 'row'], frame.id)
+      expect(actions.canUngroup()).toBe(true)
+      selection.select(['a'], frame.id)
+      expect(actions.canUngroup()).toBe(false)
+      selection.select([], frame.id)
+      expect(actions.canUngroup()).toBe(false)
     })
   })
 
