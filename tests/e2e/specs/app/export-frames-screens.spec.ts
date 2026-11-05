@@ -160,7 +160,7 @@ test('on a phone with a coarse pointer every control of Export is at least 44 px
 for (const [width, height] of SCREEN_SIZES) {
   for (const theme of THEMES) {
     test(
-      `screenshots at ${width}×${height}, ${theme}: Export listing the page's frames, and a picked frame's ⋯ with Export`,
+      `screenshots at ${width}×${height}, ${theme}: Export listing the page's frames, a row lighting its frame, and a picked frame's ⋯ with Export`,
       { tag: '@evidence' },
       async ({ browser }) => {
         const { page, errors } = await openSized(browser, { width, height }, { theme })
@@ -169,19 +169,40 @@ for (const [width, height] of SCREEN_SIZES) {
         await page.mouse.move(0, height - 1)
         await drawn(page)
         writeOutput(`export-frames-${width}-${theme}-1-list.png`, await page.screenshot({ animations: 'disabled' }))
+        // The second Sale's row under the pointer lights its frame on the canvas.
+        await dialog.locator('label:has([data-frame="story"])').hover()
+        await expect(page.locator('.stage-overlay .frame-lit[data-frame="story"]')).toHaveCount(1)
+        await drawn(page)
+        writeOutput(`export-frames-${width}-${theme}-2-hovered.png`, await page.screenshot({ animations: 'disabled' }))
         await page.keyboard.press('Escape')
         await clickLabel(page, 'story')
         await barMenu(page, 'frame-more')
         await page.getByTestId('bar-frame-more-menu').getByRole('button', { name: 'Export', exact: true }).hover()
         await drawn(page)
-        writeOutput(`export-frames-${width}-${theme}-2-menu.png`, await page.screenshot({ animations: 'disabled' }))
+        writeOutput(`export-frames-${width}-${theme}-3-menu.png`, await page.screenshot({ animations: 'disabled' }))
         await page.getByTestId('bar-frame-more-menu').getByRole('button', { name: 'Export', exact: true }).click()
         await expect(dialog).toBeVisible()
         await page.mouse.move(0, height - 1)
         await drawn(page)
-        writeOutput(`export-frames-${width}-${theme}-3-one.png`, await page.screenshot({ animations: 'disabled' }))
+        writeOutput(`export-frames-${width}-${theme}-4-one.png`, await page.screenshot({ animations: 'disabled' }))
         expect(errors).toEqual([])
       },
     )
   }
 }
+
+test(
+  'screenshot at 390×844: nine frames with JPG’s Quality showing, the list scrolled part way',
+  { tag: '@evidence' },
+  async ({ browser }) => {
+    const { page, errors } = await openSized(browser, { width: 390, height: 844 }, { input: adsDesign(9) })
+    const dialog = await openExport(page)
+    await dialog.locator('[data-type="jpg"]').click()
+    const list = dialog.getByTestId('export-frames')
+    await list.evaluate((el) => el.scrollBy({ top: 66 }))
+    await page.mouse.move(0, 843)
+    await drawn(page)
+    writeOutput('export-frames-390-dark-5-nine-scrolled.png', await page.screenshot({ animations: 'disabled' }))
+    expect(errors).toEqual([])
+  },
+)
