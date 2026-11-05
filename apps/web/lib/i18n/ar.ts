@@ -717,10 +717,10 @@ export const ar: Messages = {
     exports: {
       open: 'تصدير',
       title: 'تصدير',
-      pages: 'الصفحات',
-      allPages: 'الكل {n}',
-      thisPage: 'هذه الصفحة',
       page: 'الصفحة',
+      frames: 'الإطارات',
+      allFrames: 'كل الإطارات',
+      noFrames: 'لا إطارات في هذه الصفحة',
       fileNames: 'أسماء الملفات',
       type: 'نوع الملف',
       quality: 'الجودة',

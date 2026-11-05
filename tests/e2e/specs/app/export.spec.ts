@@ -1,8 +1,8 @@
 // Export (#55) in Chromium, through the Export menu: every frame of a page as PNG downloads as one
 // flat zip, every file in it byte for byte what Node exports of the same frame, drawn in the export
-// worker rather than on the main thread, and named after its frame or by the File names field,
-// repeated names numbered; every page of a carousel downloads as one zip of each page's frame; and
-// one frame as JPG downloads as itself.
+// worker rather than on the main thread, and named after its frame or by the File names field;
+// each page of a carousel, picked in the Page field, downloads its own frame; and one frame as JPG
+// downloads as itself. Ticking frames and numbered names are in export-frames.spec.ts.
 import { readFileSync } from 'node:fs'
 
 import { exportDesign, readZip } from '@dazbee/export'
@@ -324,7 +324,7 @@ test('Export opened from Share, by pointer or keyboard, takes the focus onto its
   const { page, errors } = await openStage(browser, design(asset.id))
   const share = page.getByTestId('share-open')
   const dialog = page.getByTestId('export')
-  const first = dialog.locator('[data-pages="all"]')
+  const first = dialog.getByTestId('export-page')
   await share.click()
   await page.getByTestId('export-open').click()
   await expect(first).toBeFocused()
@@ -352,10 +352,7 @@ test('every frame of a page as PNG is one flat zip whose files are what Node exp
   await page.getByTestId('export-open').click()
   const dialog = page.getByTestId('export')
   await expect(dialog).toBeVisible()
-  // Every frame of every page, until the export is narrowed.
-  await expect(page.getByTestId('export-run')).toHaveText('Export 10 files')
-  await dialog.getByRole('radio', { name: 'This page' }).click()
-  await choose(page.getByTestId('export-page'), 'p1')
+  // Every frame of the shown page.
   await expect(page.getByTestId('export-run')).toHaveText('Export 5 files')
   writeOutput('export-0-menu.png', await page.screenshot())
 
@@ -394,26 +391,21 @@ test('every frame of a page as PNG is one flat zip whose files are what Node exp
     { kind: 'done', bytes: zipped.length },
   ])
 
-  // Every page: the second page's frames have the same names, so each gets a number.
-  await dialog.getByRole('radio', { name: 'All 2' }).click()
-  await expect(page.getByTestId('export-run')).toHaveText('Export 10 files')
-  const [all] = await Promise.all([page.waitForEvent('download'), page.getByTestId('export-run').click()])
-  expect(readZip(new Uint8Array(readFileSync(await all.path()))).map((e) => e.path)).toEqual([
-    ...SIZES.map((size) => fileOf(size.name)),
-    ...SIZES.map((size) => fileOf(size.name, 2)),
-  ])
+  // The other page: its frames have the same names as the first page's, and keep them, since
+  // numbers count within a page.
+  await choose(page.getByTestId('export-page'), 'p2')
+  await expect(page.getByTestId('export-run')).toHaveText('Export 5 files')
+  const [other] = await Promise.all([page.waitForEvent('download'), page.getByTestId('export-run').click()])
+  expect(readZip(new Uint8Array(readFileSync(await other.path()))).map((e) => e.path)).toEqual(
+    SIZES.map((size) => fileOf(size.name)),
+  )
 
   // The File names field names every file in the zip from its page and frame.
   await page.getByTestId('export-name').fill('{page} for {frame}')
-  await expect(page.getByTestId('export-run')).toHaveText('Export 10 files')
+  await expect(page.getByTestId('export-run')).toHaveText('Export 5 files')
   const [named] = await Promise.all([page.waitForEvent('download'), page.getByTestId('export-run').click()])
-  const names = readZip(new Uint8Array(readFileSync(await named.path())))
-    .map((e) => e.path)
-    .sort()
-  expect(names).toEqual(
-    ['Hero', 'Offer']
-      .flatMap((pageName) => SIZES.map((size) => `${pageName} for ${size.name.replace(':', '-')}.png`))
-      .sort(),
+  expect(readZip(new Uint8Array(readFileSync(await named.path()))).map((e) => e.path)).toEqual(
+    SIZES.map((size) => `Offer for ${size.name.replace(':', '-')}.png`),
   )
   expect(errors).toEqual([])
 })
@@ -446,36 +438,38 @@ test(
   },
 )
 
-test("every page of a carousel as PNG is one zip whose files are each what Node exports of that page's frame", async ({
+test('each page of a carousel, picked in the Page field, downloads its own frame as PNG, what Node exports of that frame', async ({
   browser,
 }) => {
   const asset = await upload(photo)
   const { page, errors } = await openStage(browser, carousel(asset.id))
   await page.getByTestId('share-open').click()
   await page.getByTestId('export-open').click()
-  const dialog = page.getByTestId('export')
-  // Every page, as the export opens.
-  await expect(dialog.getByRole('radio', { name: 'All 3' })).toHaveAttribute('aria-checked', 'true')
-  await expect(page.getByTestId('export-run')).toHaveText('Export 3 files')
+  // The shown page's frame, as the export opens.
+  await expect(page.getByTestId('export-run')).toHaveText('Export 1 file')
   writeOutput('export-5-carousel-menu.png', await page.screenshot())
-  const [download] = await Promise.all([page.waitForEvent('download'), page.getByTestId('export-run').click()])
-  expect(download.suggestedFilename()).toBe('Spring carousel.zip')
-  const entries = readZip(new Uint8Array(readFileSync(await download.path())))
-  expect(entries).toHaveLength(3)
 
-  // Each file is its own page's frame, byte for byte what Node exports of that frame alone.
+  // Each file is its own page's frame, byte for byte what Node exports of that frame alone, named
+  // after it: the three share a name, each alone on its page.
   const node = await nodeExport(page, asset.id)
-  for (const [i, frameId] of ['s1-pt', 's2-pt', 's3-pt'].entries()) {
-    const browserFile = Buffer.from(entries[i]?.bytes ?? [])
+  const files: Buffer[] = []
+  for (const [pageId, frameId] of [
+    ['s1', 's1-pt'],
+    ['s2', 's2-pt'],
+    ['s3', 's3-pt'],
+  ] as const) {
+    await choose(page.getByTestId('export-page'), pageId)
+    const [download] = await Promise.all([page.waitForEvent('download'), page.getByTestId('export-run').click()])
+    expect(download.suggestedFilename()).toBe(fileOf('Portrait 4:5'))
+    const browserFile = readFileSync(await download.path())
     expect(
       browserFile.equals(Buffer.from(node({ frameIds: [frameId], type: 'png' }))),
-      `file ${i + 1} is ${frameId} as Node exports it`,
+      `${pageId} is ${frameId} as Node exports it`,
     ).toBe(true)
     writeOutput(`export-6-carousel-${frameId}.png`, browserFile)
+    files.push(browserFile)
   }
-  expect(new Set(entries.map((e) => Buffer.from(e.bytes).toString('base64'))).size).toBe(3)
-  // The three frames share a name: the second and third get a number.
-  expect(entries.map((e) => e.path)).toEqual([1, 2, 3].map((n) => fileOf('Portrait 4:5', n)))
+  expect(new Set(files.map((file) => file.toString('base64'))).size).toBe(3)
   expect(errors).toEqual([])
 })
 
@@ -486,7 +480,6 @@ test("one page's only frame as JPG downloads as itself, at the quality picked, t
   const { page, errors } = await openStage(browser, carousel(asset.id))
   await page.getByTestId('share-open').click()
   await page.getByTestId('export-open').click()
-  await page.getByTestId('export').getByRole('radio', { name: 'This page' }).click()
   await choose(page.getByTestId('export-page'), 's2')
   await page.locator('[data-type="jpg"]').click()
   await page.getByTestId('export-quality').fill('70')

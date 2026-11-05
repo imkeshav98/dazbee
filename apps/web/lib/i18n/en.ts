@@ -739,10 +739,10 @@ export const en = {
     exports: {
       open: 'Export',
       title: 'Export',
-      pages: 'Pages',
-      allPages: 'All {n}',
-      thisPage: 'This page',
       page: 'Page',
+      frames: 'Frames',
+      allFrames: 'All frames',
+      noFrames: 'This page has no frames',
       fileNames: 'File names',
       type: 'File type',
       quality: 'Quality',

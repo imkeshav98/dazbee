@@ -4,12 +4,14 @@
 // holds what leaves the editor, Export (#55) and Save as template (#54), and each opens its form
 // in the same place. The menu opens with the focus on its first item, which the arrows move
 // through; a form, on its first control. They stand over the edit panel: Esc closes them first,
-// giving the focus back to Share when it was in them, and never clears the selection.
+// giving the focus back to Share when it was in them, and never clears the selection. A picked
+// frame's ⋯ opens Export too, with its frame ticked alone; Esc then gives the focus back to that ⋯.
 import { BookmarkSimpleIcon, CaretRightIcon, DownloadSimpleIcon, ShareFatIcon } from '@phosphor-icons/react'
-import { type KeyboardEvent as ReactKeyboardEvent, useEffect, useId, useState } from 'react'
+import { type KeyboardEvent as ReactKeyboardEvent, useEffect, useId, useRef, useState } from 'react'
 
 import type { Editor } from '@dazbee/editor'
 
+import { onExportAsked } from '@/components/editor/edit-store.ts'
 import { useEditorDesign } from '@/components/editor/editor-hooks.ts'
 import { Button } from '@/components/ui/button.tsx'
 import { useMenuClose } from '@/components/ui/menu-close.ts'
@@ -56,9 +58,28 @@ export function ShareMenu({
   const t = useMessages()
   const { design } = useEditorDesign(editor)
   const [open, setOpen] = useState<Open>(null)
-  // Closes on Esc, before what is under it, or a press outside, giving the focus back to Share.
-  const { box, button, overPanelMark } = useMenuClose(open !== null, () => setOpen(null))
+  // The frames Export was asked for from a picked frame's ⋯, each ask its own form; null from Share.
+  const [asked, setAsked] = useState<{ frameIds: string[]; key: number } | null>(null)
+  // The ⋯ Export was asked from, which Esc gives the focus back to.
+  const opener = useRef<HTMLElement | null>(null)
+  // Closes on Esc, before what is under it, or a press outside, giving the focus back to Share, or
+  // to the ⋯ Export was asked from.
+  const { box, button, overPanelMark } = useMenuClose(open !== null, () => {
+    if (document.activeElement === button.current && opener.current?.isConnected) opener.current.focus()
+    opener.current = null
+    setOpen(null)
+  })
   const id = useId()
+
+  useEffect(
+    () =>
+      onExportAsked((frameIds, from) => {
+        opener.current = from
+        setAsked((was) => ({ frameIds, key: (was?.key ?? 0) + 1 }))
+        setOpen('export')
+      }),
+    [],
+  )
 
   // The menu takes the focus as it opens, on its first item; a form, on its first control.
   useEffect(() => {
@@ -67,7 +88,7 @@ export function ShareMenu({
       ?.querySelector<HTMLElement>(`#${CSS.escape(id)}`)
       ?.querySelector<HTMLElement>(open === 'menu' ? '[role="menuitem"]' : FOCUSABLE)
       ?.focus()
-  }, [open, id])
+  }, [open, id, asked])
 
   return (
     <div ref={box} {...overPanelMark} className="relative">
@@ -77,7 +98,11 @@ export function ShareMenu({
         aria-haspopup="menu"
         aria-expanded={open !== null}
         aria-controls={id}
-        onClick={() => setOpen(open ? null : 'menu')}
+        onClick={() => {
+          opener.current = null
+          setAsked(null)
+          setOpen(open ? null : 'menu')
+        }}
         data-testid="share-open"
         className="h-9 rounded-full px-4 text-sm font-semibold max-sm:w-9 max-sm:px-0"
       >
@@ -101,7 +126,10 @@ export function ShareMenu({
             type="button"
             role="menuitem"
             className={ROW}
-            onClick={() => setOpen('export')}
+            onClick={() => {
+              setAsked(null)
+              setOpen('export')
+            }}
             data-testid="export-open"
           >
             <DownloadSimpleIcon size={18} aria-hidden className="shrink-0 text-muted" />
@@ -121,7 +149,9 @@ export function ShareMenu({
           </button>
         </div>
       )}
-      {open === 'export' && <ExportForm id={id} editor={editor} design={design} />}
+      {open === 'export' && (
+        <ExportForm key={asked?.key ?? 0} id={id} editor={editor} design={design} asked={asked?.frameIds} />
+      )}
       {open === 'template' && (
         <TemplateForm
           id={id}

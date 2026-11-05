@@ -1,9 +1,9 @@
-import { CheckIcon } from '@phosphor-icons/react'
+import { CheckIcon, MinusIcon } from '@phosphor-icons/react'
 
 import { cn } from '@/lib/cn.ts'
 
-/** A tick that shows whether a part is picked, as a filled or empty box. */
-export function Tick({ on }: { on: boolean }) {
+/** A tick that shows whether a part is picked, as a filled or empty box; a dash when only some of a set are. */
+export function Tick({ on }: { on: boolean | 'mixed' }) {
   return (
     <span
       aria-hidden
@@ -12,7 +12,7 @@ export function Tick({ on }: { on: boolean }) {
         on ? 'border-accent-solid bg-accent-solid text-on-accent' : 'border-line-strong',
       )}
     >
-      {on && <CheckIcon size={10} weight="bold" />}
+      {on === 'mixed' ? <MinusIcon size={10} weight="bold" /> : on && <CheckIcon size={10} weight="bold" />}
     </span>
   )
 }
