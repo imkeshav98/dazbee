@@ -360,6 +360,12 @@ test("several layers: the bar ends with Line up then Position; Position has the 
   expect(await page.evaluate(() => window.dazbee?.selection())).toEqual(['shape', 'turned'])
 
   const lineUp = await barMenu(page, 'line-up')
+  // Two layers have nothing to spread: each spread row is greyed and says why.
+  for (const id of ['distributeHorizontal', 'distributeVertical'] as const) {
+    await expect(control(lineUp, id)).toHaveAttribute('aria-disabled', 'true')
+    await control(lineUp, id).hover()
+    await expect(page.getByRole('tooltip')).toHaveText('Needs 3 or more layers')
+  }
   await control(lineUp, 'alignLeft').click()
   await expect.poll(async () => (await props(page, 'turned')).x).not.toBe(640)
   await undoRedo(page, async () => (await props(page, 'turned')).x, 640, (await props(page, 'turned')).x)

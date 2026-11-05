@@ -1,16 +1,17 @@
-// A text's bar (#498): one Text style ▾ in place of the Bold, Italic, Underline and Strikethrough
-// toggles, of a fixed width, tinted while any style is on and named by the styles on; the Align ▾
-// pop-up's three labelled rows, Align, Direction and Vertical, with text direction now in it; and
+// A text's bar: one Text style ▾ that holds Bold, Italic, Underline and Strikethrough, of a fixed
+// width, tinted while any style is on and named by the styles on; the Align ▾
+// pop-up's three labelled rows, Align, Direction and Vertical; and
 // the Align icon drawn where the text sits by its own direction, in an English app and in Arabic.
 // Each by mouse and keyboard, one undo step.
 import type { DesignInput } from '@dazbee/schema'
 
 import { ALIGN_ROWS, barItems, control, CONTROLS, TEXT_STYLES } from '../../support/bar-homes.ts'
 import { editorPath, setCookies } from '../../support/editor.ts'
+import { layoutProblems, SCREEN_SIZES, wrapped } from '../../support/layout.ts'
 import { frameDesign, seed } from '../../support/seed.ts'
 import { openStage, perform, props, selectLayers } from '../../support/stage.ts'
 import { type Browser, expect, type Page, test } from '../../support/test.ts'
-import { barMenu } from '../../support/top-bar.ts'
+import { barMenu, entered, PIECES, UNCUT } from '../../support/top-bar.ts'
 
 test.describe.configure({ timeout: 180_000 })
 
@@ -72,12 +73,45 @@ async function undoRedo<T>(page: Page, value: () => Promise<T>, before: T, after
   await expect.poll(value).toEqual(after)
 }
 
-/** Where the Align button's icon draws its lines, and whether anything flips it. */
+/**
+ * Where the Align button's icon draws its lines, as it shows on screen: lines ending level on the
+ * left are left-aligned, on the right right-aligned, on both justified, on neither centred. Read
+ * from the icon's own outline, then mirrored when CSS flips it or anything around it.
+ */
 const alignIcon = (page: Page) =>
   page
     .getByTestId('bar-align')
-    .locator('[data-sits]')
-    .evaluate((el) => ({ sits: el.getAttribute('data-sits'), flipped: getComputedStyle(el).transform !== 'none' }))
+    .locator('svg')
+    .first()
+    .evaluate((svg) => {
+      // The outline's points, split into lines where a gap runs across the icon.
+      const points: { x: number; y: number }[] = []
+      for (const path of svg.querySelectorAll('path')) {
+        const length = path.getTotalLength()
+        for (let at = 0; at <= length; at += length / 800) points.push(path.getPointAtLength(at))
+      }
+      points.sort((a, b) => a.y - b.y)
+      const lines: { min: number; max: number }[] = []
+      let last = -Infinity
+      for (const { x, y } of points) {
+        if (y - last > 6) lines.push({ min: x, max: x })
+        const line = lines.at(-1) as { min: number; max: number }
+        line.min = Math.min(line.min, x)
+        line.max = Math.max(line.max, x)
+        last = y
+      }
+      const spread = (values: number[]) => Math.max(...values) - Math.min(...values)
+      const [left, right] = [spread(lines.map((l) => l.min)) < 2, spread(lines.map((l) => l.max)) < 2]
+      const drawn = left && right ? 'justify' : left ? 'left' : right ? 'right' : 'center'
+      let flips = 0
+      for (let el: Element | null = svg; el && el.tagName !== 'BUTTON'; el = el.parentElement) {
+        const style = getComputedStyle(el)
+        const scale = Number.parseFloat(style.scale.split(' ')[0] ?? '1')
+        const matrix = style.transform === 'none' ? 1 : new DOMMatrix(style.transform).a
+        if (scale < 0 !== matrix < 0) flips++
+      }
+      return flips % 2 === 0 ? drawn : drawn === 'left' ? 'right' : drawn === 'right' ? 'left' : drawn
+    })
 
 test('Text style ▾ is one button of a fixed width in place of the four toggles, plain with no style on and tinted with any, named by the styles on; its pop-up holds Bold, Italic, Underline and Strikethrough, each one undo step', async ({
   browser,
@@ -192,16 +226,16 @@ test('in an English app the Align icon draws where the text sits: Start is on th
   const { page, errors } = await openStage(browser, design())
   await page.setViewportSize({ width: 1280, height: 760 })
   await selectLayers(page, ['latin'], { bar: true })
-  expect(await alignIcon(page)).toEqual({ sits: 'left', flipped: false })
+  expect(await alignIcon(page)).toBe('left')
   await selectLayers(page, ['arabic'], { bar: true })
-  expect(await alignIcon(page)).toEqual({ sits: 'right', flipped: false })
+  expect(await alignIcon(page)).toBe('right')
   const menu = await barMenu(page, 'align')
   await control(menu, 'direction').getByRole('radio', { name: 'Left to right' }).click()
-  await expect.poll(() => alignIcon(page)).toEqual({ sits: 'left', flipped: false })
+  await expect.poll(() => alignIcon(page)).toBe('left')
   await control(menu, 'align').getByRole('radio', { name: 'End' }).click()
-  await expect.poll(() => alignIcon(page)).toEqual({ sits: 'right', flipped: false })
+  await expect.poll(() => alignIcon(page)).toBe('right')
   await control(menu, 'align').getByRole('radio', { name: 'Centre' }).click()
-  await expect.poll(() => alignIcon(page)).toEqual({ sits: 'center', flipped: false })
+  await expect.poll(() => alignIcon(page)).toBe('center')
   expect(errors).toEqual([])
 })
 
@@ -210,11 +244,31 @@ test('in the app in Arabic the Align icon still draws where the text sits, and t
 }) => {
   const { page, errors } = await openInArabic(browser)
   await selectLayers(page, ['latin'], { bar: true })
-  expect(await alignIcon(page)).toEqual({ sits: 'left', flipped: false })
+  expect(await alignIcon(page)).toBe('left')
+  // The reading sees a flip as the app's language once flipped icons: mirrored, it reads the other side.
+  await page
+    .getByTestId('bar-align')
+    .locator('svg')
+    .first()
+    .evaluate((svg) => svg.setAttribute('style', 'scale: -1 1'))
+  expect(await alignIcon(page)).toBe('right')
+  await page
+    .getByTestId('bar-align')
+    .locator('svg')
+    .first()
+    .evaluate((svg) => svg.removeAttribute('style'))
   await selectLayers(page, ['arabic'], { bar: true })
-  expect(await alignIcon(page)).toEqual({ sits: 'right', flipped: false })
+  expect(await alignIcon(page)).toBe('right')
   const menu = await barMenu(page, 'align')
   await expect(menu.locator(ALIGN_ROWS.map((id) => CONTROLS[id].find).join(', '))).toHaveCount(3)
+  // Its rows in Arabic fit whole, at each screen size.
+  for (const [width, height] of SCREEN_SIZES) {
+    await page.setViewportSize({ width, height })
+    await barMenu(page, 'align')
+    await entered(page.getByTestId('bar-align-menu'))
+    expect(await layoutProblems(page, { pieces: PIECES, uncut: UNCUT }), `${width}`).toEqual([])
+    expect(await wrapped(page), `${width}`).toEqual([])
+  }
   await expect(page.getByTestId('bar-text-style')).toHaveAccessibleName('نمط النص')
   expect(errors).toEqual([])
 })

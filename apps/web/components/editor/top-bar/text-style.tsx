@@ -7,6 +7,7 @@ import { TextBIcon, TextItalicIcon, TextStrikethroughIcon, TextUnderlineIcon } f
 
 import { setOpen, useEditState } from '@/components/editor/edit-store.ts'
 import { BAR_TOGGLE } from '@/components/editor/styles.ts'
+import { cn } from '@/lib/cn.ts'
 import { useMessages } from '@/lib/i18n/client.tsx'
 import { format } from '@/lib/i18n/index.ts'
 
@@ -59,7 +60,7 @@ export function TextStyleButton({ toggles }: { toggles: TextStyleToggle[] }) {
               disabled={disabled}
               onClick={onToggle}
               data-testid={`bar-${id}`}
-              className={BAR_TOGGLE}
+              className={cn(BAR_TOGGLE, 'max-sm:size-[44px]')}
             >
               <Icon size={16} weight="bold" aria-hidden />
             </button>

@@ -1,4 +1,4 @@
-// The top bar without duplicates (#498): for each kind of selection, every control the bar offers,
+// The top bar without duplicates: for each kind of selection, every control the bar offers,
 // on the bar or in what one of its items opens, has exactly one home, the one `HOMES` names.
 import { photo, upload } from '../../support/assets.ts'
 import { type BarCase, expectedHomes, homesOf } from '../../support/bar-homes.ts'

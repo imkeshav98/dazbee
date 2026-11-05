@@ -58,6 +58,7 @@ import { format } from '@/lib/i18n/index.ts'
 
 import { BarPopover } from './bar-popover.tsx'
 import { AlignRow } from './line-up.tsx'
+import { MenuRow } from './menu-row.tsx'
 import { SizeStepper } from './size-stepper.tsx'
 import { TextStyleButton } from './text-style.tsx'
 
@@ -194,7 +195,12 @@ export function useSelectionItems(target: Target, design: Design, brandId: strin
       <PanelButton
         id="font"
         label={b.font}
-        face={<span className="max-w-28 truncate">{family === 'mixed' ? t.editor.fonts.mixed : family}</span>}
+        // Narrower on a phone, so the bar keeps to two rows whatever the font is called.
+        face={
+          <span className="max-w-28 truncate max-sm:max-w-[60px]">
+            {family === 'mixed' ? t.editor.fonts.mixed : family}
+          </span>
+        }
       />,
     )
   }
@@ -424,18 +430,16 @@ export function useSelectionItems(target: Target, design: Design, brandId: strin
       <>
         <AlignRow editor={target.editor} />
         <div className={MENU_DIVIDER} />
+        {/* Spreading needs a layer between the two at the ends. */}
         {DISTRIBUTE.map(({ action }) => (
-          <button
+          <MenuRow
             key={action}
-            type="button"
-            data-action={action}
-            disabled={target.ids.length < 3}
-            onClick={() => act(action)}
-            className={MENU_ITEM}
-          >
-            {a[action]}
-            <kbd className={MENU_KEY}>{keyOf(action)}</kbd>
-          </button>
+            action={action}
+            label={a[action]}
+            keys={keyOf(action)}
+            why={target.ids.length < 3 ? b.needsThree : null}
+            onRun={() => act(action)}
+          />
         ))}
       </>,
       { icon: <AlignLeftIcon size={15} aria-hidden />, className: 'min-w-56', tail: true },

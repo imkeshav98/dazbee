@@ -362,7 +362,8 @@ function TextAlignBody({ target, p }: { target: Target; p: P }) {
   const rows = bar.alignRows
   const value = <T extends string>(key: string, unset: T) => shared(target.props.map((pr) => (pr[key] ?? unset) as T))
   return (
-    <div className="flex w-72 flex-col gap-1.5 p-1">
+    // On a phone every choice is a finger's height.
+    <div className="flex w-72 flex-col gap-1.5 p-1 max-sm:[&_[role=radio]]:h-[44px]">
       <span id="text-align-label" className={ALIGN_ROW_LABEL}>
         {rows.align}
       </span>

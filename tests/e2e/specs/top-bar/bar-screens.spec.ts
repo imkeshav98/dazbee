@@ -1,4 +1,4 @@
-// The top bar without duplicates (#498) at the three screen sizes, over the test grid: text in each
+// The top bar without duplicates at the three screen sizes, over the test grid: text in each
 // box mode, a shape, a photo, a box, several, a locked layer, a turned one, one in an auto layout
 // box and a group. Nothing meets, wraps or is cut, the bar's Position and the text's pop-ups
 // included; no row starts or ends with a divider; at tablet size a divider stands before More
@@ -20,10 +20,17 @@ import { topBarDesign } from '../../support/top-bar-design.ts'
 test.describe.configure({ mode: 'parallel', timeout: 300_000 })
 
 /** The test grid's selections in the top bar design, by name; a text's box mode is set first. */
-const GRID: { name: string; ids: string[]; boxMode?: 'autoWidth' | 'autoHeight' | 'fixed' }[] = [
+const GRID: {
+  name: string
+  ids: string[]
+  boxMode?: 'autoWidth' | 'autoHeight' | 'fixed'
+  /** The text in a font with a long name, turned, so its Position button shows the angle. */
+  long?: true
+}[] = [
   { name: 'text auto width', ids: ['headline'], boxMode: 'autoWidth' },
   { name: 'text auto height', ids: ['headline'], boxMode: 'autoHeight' },
   { name: 'text fixed', ids: ['headline'], boxMode: 'fixed' },
+  { name: 'text in a long-named font, turned', ids: ['headline'], boxMode: 'autoHeight', long: true },
   { name: 'shape', ids: ['star'] },
   { name: 'photo', ids: ['photo'] },
   { name: 'box', ids: ['card'] },
@@ -53,11 +60,24 @@ async function openAt(browser: Browser, designId: string, [width, height]: reado
 }
 
 /** Selects a case of the grid, setting the text's box mode first. */
-async function selectCase(page: Page, { ids, boxMode }: (typeof GRID)[number]) {
+async function selectCase(page: Page, { ids, boxMode, long }: (typeof GRID)[number]) {
   if (boxMode)
     await page.evaluate(
-      (boxMode) => window.dazbee?.session.run('node.update', { ids: ['headline'], patch: { boxMode } }),
-      boxMode,
+      ({ boxMode, long }) =>
+        window.dazbee?.session.run('node.update', {
+          ids: ['headline'],
+          patch: {
+            boxMode,
+            rotation: long ? 345 : 0,
+            style: {
+              fontFamily: long ? 'Noto Naskh Arabic' : 'Noto Sans',
+              fontSize: 64,
+              fontWeight: 400,
+              color: '#111111FF',
+            },
+          },
+        }),
+      { boxMode, long: long === true },
     )
   await selectLayers(page, ids, { bar: true })
   await nextFrame(page)
@@ -213,6 +233,18 @@ test('on a phone the bar takes two rows at most, wraps between its groups, ends 
       if (!next || Math.abs(next.top - target.top) > 4) continue
       expect(next.left - target.right, `${one.name} ${target.name} to ${next.name}`).toBeGreaterThanOrEqual(APART - 0.5)
     }
+  }
+  // A text's Text style and Align pop-ups: every toggle and choice a finger's size.
+  await selectCase(page, GRID[1] as (typeof GRID)[number])
+  for (const pop of ['text-style', 'align']) {
+    const menu = await barMenu(page, pop)
+    const small = await menu
+      .locator('button')
+      .evaluateAll((els) =>
+        els.filter((el) => el.getBoundingClientRect().height < 43.5).map((el) => el.textContent || el.ariaLabel),
+      )
+    expect(small, pop).toEqual([])
+    await page.keyboard.press('Escape')
   }
   expect(errors).toEqual([])
   await page.context().close()
