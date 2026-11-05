@@ -355,6 +355,7 @@ export function SmallMenu({ editor, rightClick }: { editor: Editor; rightClick: 
           onKeyDown={arrowThrough}
           aria-label={b.more}
           data-testid="bar-more-menu"
+          data-menu
           className={cn(
             MENU,
             phone ? SHEET_LOOK : 'max-h-[var(--radix-popover-content-available-height)] w-80 overflow-y-auto',

@@ -337,6 +337,7 @@ export function BarPopover({
           onKeyDown={menu ? arrowThrough : undefined}
           aria-label={label}
           data-testid={`bar-${testId}-menu`}
+          data-menu={menu || undefined}
           className={cn(POPOVER, 'flex flex-col p-1.5', asSheet ? SHEET_LOOK : (className ?? 'min-w-56'))}
         >
           {focus.back}

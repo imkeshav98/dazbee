@@ -112,6 +112,7 @@ export function StageMenu({
           onKeyDown={arrowThrough}
           aria-label={hidden ? b.canvasMenu : b.actions}
           data-testid="stage-menu"
+          data-menu
           ref={scroll.ref}
           onScroll={scroll.onScroll}
           className={cn(

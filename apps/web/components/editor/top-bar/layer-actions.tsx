@@ -218,7 +218,7 @@ export function SubMenu({
    */
   const show = useCallback(
     (to: boolean) => {
-      if (phone) holdHover(focus.button.current?.closest<HTMLElement>('[role="dialog"]') ?? null)
+      if (phone) holdHover(focus.button.current?.closest<HTMLElement>('[data-menu]') ?? null)
       setOpen(to)
     },
     [phone, focus.button],
@@ -288,9 +288,10 @@ export function SubMenu({
 /**
  * A row's short menu in the place of the menu the row is in, as a phone shows it: a back row naming
  * the row, then the short menu's rows. Every other piece of the menu hides while it shows (globals.css
- * hides what isn't a `data-menu-in-place`). It takes the focus at its back row as it opens, so a
- * greyed first row doesn't say why unasked; the back row, the arrow back and Esc go back, Esc through
- * the menu's own (`useBackInPlace`) once a greyed row's tooltip that shows has closed.
+ * hides what in a `data-menu` neither is the `data-menu-in-place` nor holds it). It takes the focus
+ * at its back row as it opens, so a greyed first row doesn't say why unasked; the back row, the arrow
+ * back and Esc go back, Esc through the menu's own (`useBackInPlace`) once a greyed row's tooltip
+ * that shows has closed.
  */
 function MenuInPlace({
   label,
