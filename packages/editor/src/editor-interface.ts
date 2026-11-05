@@ -161,6 +161,8 @@ export interface Editor {
   renameFrame(frameId: string): void
   /** Calls back with the frame to rename in place: its label was double-clicked, or `renameFrame` asked. */
   onFrameRename(listener: (frameId: string) => void): () => boolean
+  /** Calls back with a frame's name once Delete, by its key or `perform('delete')`, deleted it as the picked frame. */
+  onFrameDelete(listener: (name: string) => void): () => boolean
   /**
    * Where a frame's label is drawn on the stage, in pixels from the stage's top start corner; null
    * for a frame the shown page lacks, or one off the stage at its start.

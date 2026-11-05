@@ -778,6 +778,7 @@ export const en = {
       layer: 'background layer',
       layerName: 'Background {n}',
       addLayer: 'Add a background layer',
+      removed: '{name} deleted',
     },
     statusText: {
       Starting: 'Starting',

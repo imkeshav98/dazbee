@@ -5,7 +5,7 @@
 // linked to nothing; the square holds a turned layer, a locked one and one under a mask. The three
 // screen sizes are in frames-on-canvas-screens.spec.ts.
 import { solid } from '../../support/edit-in-frame.ts'
-import { designOf, openTabs, settle, writeOutput } from '../../support/editor.ts'
+import { designOf, openTabs, screenPoint, settle, writeOutput } from '../../support/editor.ts'
 import { clickLabel, design, labelPoint, picked } from '../../support/frames-on-canvas.ts'
 import { layersIn, seed } from '../../support/seed.ts'
 import {
@@ -19,6 +19,7 @@ import {
   props,
   read,
   selection,
+  zoomOf,
 } from '../../support/stage.ts'
 import { type Browser, expect, type Page, test } from '../../support/test.ts'
 import { barMenu } from '../../support/top-bar.ts'
@@ -33,6 +34,16 @@ const inFrame = (d: Design, frameId: string) => ({
 })
 const label = (page: Page, id: string) => page.locator(`.stage-overlay .frame-label[data-frame="${id}"]`)
 
+/** Where a frame is on screen now, as a box in client pixels, and where the stage is. */
+async function onScreen(page: Page, id: string) {
+  await drawn(page)
+  const frame = (await frameOf(page, id)) ?? { width: 0, height: 0 }
+  const start = await screenPoint(page, 0, 0, id)
+  const end = await screenPoint(page, frame.width, frame.height, id)
+  const stage = await page.getByTestId('stage').boundingBox()
+  if (!stage) throw new Error('no stage')
+  return { start, end, stage }
+}
 /** Double-clicks a frame's name on its label, and gives the field that renames it once it shows. */
 async function renameByLabel(page: Page, id: string) {
   const name = await label(page, id).locator('.frame-name').boundingBox()
@@ -253,7 +264,7 @@ test('presses on a turned, a masked and a locked layer act on the layer; the fra
   expect(errors).toEqual([])
 })
 
-test('Duplicate from ⋯ and Ctrl+D copy the picked frame beside the rightmost one, holding linked copies, and pick the copy, each one undo step that a second tab sees', async ({
+test('Duplicate from ⋯ and Ctrl+D copy the picked frame beside the rightmost one, holding linked copies, and pick the copy, panning to show it at the same zoom, each one undo step that a second tab sees', async ({
   browser,
 }) => {
   const { a, b, errors } = await open(browser, 2)
@@ -274,6 +285,14 @@ test('Duplicate from ⋯ and Ctrl+D copy the picked frame beside the rightmost o
       .sort()
   expect(links(copy)).toEqual(links('sq'))
   await expect(a.getByTestId('top-bar')).toHaveAttribute('data-frame', copy)
+  // The view panned to show the copy whole with its label, at the zoom it had.
+  expect(await zoomOf(a)).toBe(0.5)
+  const shown = await onScreen(a, copy)
+  expect(shown.start.x).toBeGreaterThanOrEqual(shown.stage.x)
+  expect(shown.start.y - 24).toBeGreaterThanOrEqual(shown.stage.y)
+  expect(shown.end.x).toBeLessThanOrEqual(shown.stage.x + shown.stage.width)
+  expect(shown.end.y).toBeLessThanOrEqual(shown.stage.y + shown.stage.height)
+  await expect(label(a, copy)).toBeVisible()
   await settle([a, b])
   expect((await frameOf(b, copy))?.name).toBe('Square')
   await press(a, 'undo')
@@ -281,13 +300,21 @@ test('Duplicate from ⋯ and Ctrl+D copy the picked frame beside the rightmost o
   await press(a, 'redo')
   expect(await frameOf(a, copy)).toBeDefined()
 
-  // Ctrl+D with the story picked, by the keyboard alone.
+  // Ctrl+D with the story picked, by the keyboard alone, from the view the test opened with.
+  await a.evaluate(() => window.dazbee?.setCamera({ x: 300, y: 180, zoom: 0.5 }))
+  await drawn(a)
   await clickLabel(a, 'story')
   await press(a, 'duplicate')
   const second = (await picked(a)) ?? ''
   d = await read(a)
   expect(d.frames[second]).toMatchObject({ name: 'Story', width: 1080, height: 1920, x: 5240, y: 0 })
   expect(links(second)).toEqual(links('story'))
+  // Taller than the stage at this zoom, the copy is centred on it.
+  expect(await zoomOf(a)).toBe(0.5)
+  const middle = await onScreen(a, second)
+  expect(Math.abs((middle.start.x + middle.end.x) / 2 - (middle.stage.x + middle.stage.width / 2))).toBeLessThan(
+    middle.stage.width / 4,
+  )
   await press(a, 'undo')
   expect(await frameOf(a, second)).toBeUndefined()
   await settle([a, b])
@@ -295,7 +322,7 @@ test('Duplicate from ⋯ and Ctrl+D copy the picked frame beside the rightmost o
   expect(errors).toEqual([])
 })
 
-test('Delete from ⋯ and the Delete key take the picked frame and its layers away, their linked copies and the unlinked frame staying, each one undo step that a second tab sees', async ({
+test('Delete from ⋯ and the Delete key take the picked frame and its layers away, their linked copies and the unlinked frame staying, with the undo toast, each one undo step that a second tab sees', async ({
   browser,
 }) => {
   const { a, b, errors } = await open(browser, 2)
@@ -305,6 +332,9 @@ test('Delete from ⋯ and the Delete key take the picked frame and its layers aw
   await menu.getByRole('button', { name: /Delete/ }).click()
   await expect.poll(() => picked(a)).toBeNull()
   await expect(a.getByTestId('top-bar')).toHaveCount(0)
+  // The toast says so with its undo, as deleting a page does.
+  const toast = a.getByTestId('removed-toast')
+  await expect(toast).toContainText('Square deleted')
   let after = await read(a)
   expect(after.frames.sq).toBeUndefined()
   expect(Object.keys(inFrame(after, 'sq').layers)).toEqual([])
@@ -312,7 +342,8 @@ test('Delete from ⋯ and the Delete key take the picked frame and its layers aw
   expect(inFrame(after, 'banner')).toEqual(inFrame(before, 'banner'))
   await settle([a, b])
   expect(await frameOf(b, 'sq')).toBeUndefined()
-  await press(a, 'undo')
+  await toast.getByRole('button', { name: 'Undo' }).click()
+  await expect(toast).toHaveCount(0)
   expect(inFrame(await read(a), 'sq')).toEqual(inFrame(before, 'sq'))
   await press(a, 'redo')
   expect(await frameOf(a, 'sq')).toBeUndefined()
@@ -324,6 +355,7 @@ test('Delete from ⋯ and the Delete key take the picked frame and its layers aw
   await clickLabel(a, 'banner')
   await a.keyboard.press('Delete')
   await drawn(a)
+  await expect(toast).toContainText('Banner deleted')
   after = await read(a)
   expect(after.frames.banner).toBeUndefined()
   expect(after.nodes.badge).toBeUndefined()

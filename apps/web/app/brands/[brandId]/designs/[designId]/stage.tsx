@@ -115,6 +115,15 @@ export function EditorStage({
   }, [editor])
   const dockTool = isShapeMenuTool(tool) ? 'shape' : tool
   const dismissRemoved = useCallback(() => setRemoved(null), [])
+  // A frame Delete deleted, by its key or its ⋯ menu, says so with its undo, as a deleted page does.
+  const frameRemoved = t.editor.frames.removed
+  useEffect(() => {
+    if (!editor) return
+    const stop = editor.onFrameDelete((frameName) => setRemoved(format(frameRemoved, { name: frameName })))
+    return () => {
+      stop()
+    }
+  }, [editor, frameRemoved])
 
   // Files dropped from the computer: the images upload into the library and go where they were
   // dropped. The notice says what was left out and stays while the rest upload, then says what was

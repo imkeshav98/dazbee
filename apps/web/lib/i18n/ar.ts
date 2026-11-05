@@ -753,6 +753,7 @@ export const ar: Messages = {
       layer: 'طبقة خلفية',
       layerName: 'الخلفية {n}',
       addLayer: 'أضف طبقة خلفية',
+      removed: 'حُذف {name}',
     },
     statusText: {
       Starting: 'جارٍ البدء',

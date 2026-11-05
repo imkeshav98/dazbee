@@ -15,6 +15,7 @@ import { inFlow } from './layers/auto-layout.ts'
 import { type EditorBoxes, visibleIn } from './layers/boxes.ts'
 import { hug as hugIn } from './layers/hug.ts'
 import { boundsOf, type Box, localTo, round } from './layers/transform.ts'
+import { listenerSet } from './listener-set.ts'
 import { runQuietly } from './run-quietly.ts'
 import { type EditorSelection, isPath } from './selection.ts'
 import { NUDGE, NUDGE_FAR, type ShortcutAction } from './shortcuts.ts'
@@ -75,6 +76,8 @@ export interface EditorActions {
   perform(action: ShortcutAction): boolean
   /** Fits the selection in view, else the picked frame, else the shown page's frames. */
   fitSelection(): void
+  /** Calls back with a frame's name once Delete has deleted it as the picked frame, so the page can offer its undo. */
+  onFrameDelete(listener: (name: string) => void): () => boolean
 }
 
 /** How far each arrow key moves the selection or the picked frame, in design pixels along x and y; Shift goes further. */
@@ -115,6 +118,8 @@ export function editorActions({
   notify,
   drawOverlay,
 }: ActionsDeps): EditorActions {
+  /** Told of each frame Delete deleted, by its name. */
+  const frameDeletes = listenerSet<[name: string]>()
   /** Groups fit what they hold again after a change inside them, in the same undo step. */
   const hug = (ids: string[]) => hugIn(session, ids)
   function fitSelection() {
@@ -516,7 +521,7 @@ export function editorActions({
     } else if (action === 'deselect') {
       selection.pickFrame(null)
     } else if (action === 'delete') {
-      runQuietly(() => session.run('frame.delete', { frameId }))
+      if (stored && runQuietly(() => session.run('frame.delete', { frameId }))) frameDeletes.emit(stored.name)
       selection.pickFrame(null)
     } else if (action === 'duplicate') {
       let copy = ''
@@ -533,5 +538,6 @@ export function editorActions({
   return {
     perform,
     fitSelection,
+    onFrameDelete: frameDeletes.on,
   }
 }

@@ -268,8 +268,9 @@ describe('editorActions', () => {
       expect(session.design().nodes.a?.props.visible).toBe(true)
     })
 
-    it('lets the picked frame go with Esc, and deletes it with Delete, its layers too and their linked copies left, as one undo step', () => {
+    it('lets the picked frame go with Esc, and deletes it with Delete, its layers too and their linked copies left, as one undo step the page hears of', () => {
       const { actions, session, selection, frame, log } = harness()
+      actions.onFrameDelete((name) => log.push(`deleted ${name}`))
       selection.pickFrame(frame.id)
       expect(actions.perform('deselect')).toBe(true)
       expect(selection.pickedFrame()).toBeNull()
@@ -279,7 +280,7 @@ describe('editorActions', () => {
       expect(session.design().nodes.a).toBeUndefined()
       expect(session.design().nodes['wide-a']).toBeDefined()
       expect(selection.pickedFrame()).toBeNull()
-      expect(log).toEqual(['overlay', 'overlay'])
+      expect(log).toEqual(['overlay', 'deleted Square', 'overlay'])
       session.undo()
       expect(session.design().frames[frame.id]).toBeDefined()
       expect(session.design().nodes.a).toBeDefined()

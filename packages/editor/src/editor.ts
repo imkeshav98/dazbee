@@ -512,6 +512,7 @@ function live(
     onFramePick: (listener: (frameId: string | null) => void) => selection.onFramePick(listener),
     renameFrame: (frameId: string) => pickFrame(frameId, true),
     onFrameRename: frameRenames.on,
+    onFrameDelete: actions.onFrameDelete,
     labelRect: overlay.labelRect,
     rulers: () => view.rulers(),
     snapping: () => tools.snapping(),
