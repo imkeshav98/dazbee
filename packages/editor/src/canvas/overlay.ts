@@ -147,10 +147,26 @@ export function editorOverlay({
     return label
   }
 
-  /** Where the size label's top goes for a box spanning `ys` on screen: under it, or over it when the tool dock along the stage's bottom would cover it. */
+  /**
+   * Where the size label's top goes for a box spanning `ys` on screen: under it, else over it when
+   * the chrome along the stage's bottom (the dock, at least SIZE_CLEARANCE) would cover it, else
+   * at the bottom of the room between the chrome, over the box, when the box is taller than the
+   * stage. A box wholly above or below the stage takes the label off the stage with it.
+   */
   function sizeLabelTop(ys: number[]) {
-    const below = Math.max(...ys) + 8
-    return below + 24 > view.viewport().height - SIZE_CLEARANCE ? Math.min(...ys) - 26 : below
+    const top = Math.min(...ys)
+    const bottom = Math.max(...ys)
+    const { height } = view.viewport()
+    const chrome = view.insets()
+    const below = bottom + 8
+    const above = top - 26
+    if (bottom <= 0) return Math.min(below, -SIZE_LABEL_HEIGHT)
+    if (top >= height) return Math.max(above, height)
+    const floor = height - Math.max(SIZE_CLEARANCE, chrome.bottom) - 24
+    const ceiling = Math.max(SIZE_LABEL_INSET, chrome.top)
+    if (below <= floor) return below
+    if (above >= ceiling) return above
+    return Math.max(ceiling, floor)
   }
 
   /** A dashed outline round each linked copy of the selected layers in the frames in view. */
@@ -230,8 +246,8 @@ export function editorOverlay({
   /**
    * Puts the size label centred under the selection's span across the stage, kept SIZE_LABEL_INSET
    * inside the stage's sides and clear of the chrome along them, at the left when there is no room
-   * for both. A selection wholly off the stage takes it off the stage with it. Measured once it is
-   * drawn.
+   * for both. A selection wholly off the stage takes it wholly off the stage with it. Measured once
+   * it is drawn.
    */
   function placeSizeLabel(size: HTMLElement, span: Span) {
     const width = size.offsetWidth
@@ -240,8 +256,9 @@ export function editorOverlay({
     const centred = (span.left + span.right) / 2 - width / 2
     const low = Math.max(SIZE_LABEL_INSET, chrome.left)
     const high = room - Math.max(SIZE_LABEL_INSET, chrome.right) - width
-    const off = span.right <= 0 || span.left >= room
-    size.style.left = px(off ? centred : Math.max(low, Math.min(centred, high)))
+    if (span.right <= 0) size.style.left = px(Math.min(centred, -width))
+    else if (span.left >= room) size.style.left = px(Math.max(centred, room))
+    else size.style.left = px(Math.max(low, Math.min(centred, high)))
   }
 
   function drawOverlay() {

@@ -7,7 +7,7 @@ import { shoot } from '../../support/editor.ts'
 import { design, openSized } from '../../support/frames-on-canvas.ts'
 import { THEMES } from '../../support/glass.ts'
 import { SCREEN_SIZES } from '../../support/layout.ts'
-import { drawn, nextFrame, selectLayers } from '../../support/stage.ts'
+import { drawn, fitSettled, nextFrame, selectLayers } from '../../support/stage.ts'
 import { expect, type Page, test } from '../../support/test.ts'
 import { barMenu } from '../../support/top-bar.ts'
 
@@ -121,27 +121,46 @@ for (const [width, height] of SCREEN_SIZES) {
 }
 
 for (const [width, height] of SCREEN_SIZES) {
-  test(`at ${width}×${height} the size goes off the screen with a selection panned wholly past either side`, async ({
+  test(`at ${width}×${height} the size goes wholly off the screen with a selection panned wholly past either side, a wide and a narrow one`, async ({
     browser,
   }) => {
     const { page, errors } = await openSized(browser, { width, height }, { input: withCorner() })
-    await selectLayers(page, ['headline'])
-    const outline = await page.locator('.stage-overlay .selection').boundingBox()
-    if (!outline) throw new Error('no selection')
-    const shown = () =>
+    /** The selection's outline and its size across the screen, and whether the screen shows any of them. */
+    const across = () =>
       page.evaluate(() => {
+        const outline = document.querySelector('.stage-overlay .selection')?.getBoundingClientRect()
         const size = document.querySelector('.stage-overlay .selection-size')?.getBoundingClientRect()
-        return !!size && size.right > 0 && size.left < document.documentElement.clientWidth
+        const room = document.documentElement.clientWidth
+        const shows = (box: DOMRect | undefined) => !!box && box.right > 0 && box.left < room
+        return {
+          left: outline?.left ?? 0,
+          right: outline?.right ?? 0,
+          room,
+          outline: shows(outline),
+          size: shows(size),
+        }
       })
-    // Panned by the wheel, as a person does, until the selection is past the right side, then the left.
-    for (const by of [-1, 2].map((k) => k * (outline.x + outline.width + width))) {
+    // The headline is wider than its size; the banner's badge, narrower.
+    for (const layer of ['headline', 'badge']) {
+      await fitSettled(page)
+      await selectLayers(page, [layer])
       await page.mouse.move(width / 2, height / 2)
-      for (let moved = 0; Math.abs(moved) < Math.abs(by); moved += Math.sign(by) * 200)
-        await page.mouse.wheel(Math.sign(by) * 200, 0)
-      await drawn(page)
-      await nextFrame(page)
-      await expect(page.getByTestId('small-menu')).toBeHidden()
-      expect(await shown()).toBe(false)
+      // Panned by the wheel in small steps, as a person does, past the right side, then past the left.
+      for (const step of [-16, 16]) {
+        // Counted once the selection has shown and gone, for six steps past the side.
+        let shown = false
+        let off = 0
+        for (let i = 0; i < 400 && off < 6; i++) {
+          await page.mouse.wheel(step, 0)
+          await drawn(page)
+          const now = await across()
+          shown ||= now.outline
+          if (now.outline || !shown) continue
+          off++
+          expect(now.size, `${layer} at ${Math.round(now.left)}–${Math.round(now.right)}`).toBe(false)
+        }
+        expect(off).toBe(6)
+      }
     }
     expect(errors).toEqual([])
   })
