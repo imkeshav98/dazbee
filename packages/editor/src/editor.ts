@@ -34,7 +34,7 @@ import { carried, editorTransformDrag } from './gestures/select/transform-drag.t
 import { editorLayerEdits } from './layer-edits.ts'
 import { editorBoxes } from './layers/boxes.ts'
 import { hug as hugIn } from './layers/hug.ts'
-import { editorLinkedCopies, LINKED_ACTIONS,type LinkedAction } from './linked-copies.ts'
+import { editorLinkedCopies, LINKED_ACTIONS, type LinkedAction } from './linked-copies.ts'
 import { listenerSet } from './listener-set.ts'
 import { editorPlace } from './place.ts'
 import { editorResources, loadFonts, loadImages, shippedFonts } from './resources.ts'
