@@ -3,18 +3,29 @@
 // The edit panels' fields and parts: a number that types, nudges and scrubs, a colour with its hex
 // and opacity, a choice from a list, a part of a panel under its heading, a switch, and a row of
 // segments.
-import { type CSSProperties, type ReactNode, useEffect, useRef, useState } from 'react'
+import { type CSSProperties, type ReactNode, useRef, useState } from 'react'
 
 import { type Editor, shortcutFor } from '@dazbee/editor'
 import { alphaOf } from '@dazbee/schema'
 
-import { FIELD, KNOB, PANEL_PART, SELECT, SWITCH, SWITCH_ROW, VALUE_TEXT } from '@/components/editor/styles.ts'
+import { useNumberInput } from '@/components/editor/number-input.ts'
+import {
+  FIELD,
+  KNOB,
+  NUMBER_TEXT,
+  PANEL_PART,
+  SELECT,
+  SWITCH,
+  SWITCH_ROW,
+  VALUE_TEXT,
+} from '@/components/editor/styles.ts'
 import { SEGMENT, SEGMENTS } from '@/components/ui/looks.ts'
 import { Select } from '@/components/ui/select.tsx'
 import { cn } from '@/lib/cn.ts'
 import { alphaChange, hexChange, hexOf } from '@/lib/colour.ts'
 import { fillOf } from '@/lib/editor/fill.ts'
 import { LIMITS } from '@/lib/editor/limits.ts'
+import { scrubOf } from '@/lib/editor/scrub.ts'
 import { tidy } from '@/lib/editor/size.ts'
 import { useMessages } from '@/lib/i18n/client.tsx'
 import { format } from '@/lib/i18n/index.ts'
@@ -44,14 +55,17 @@ function useDraft() {
 }
 
 /**
- * A number, as a knob: drag it sideways to scrub the value (Shift for 10 times, Alt for a tenth on a
- * field with fractional steps), one undo step for the whole drag; click it, or tab to it, and type a
- * value and press Enter; nudge it with the arrow keys (Shift for 10), and undo or redo the design with
- * its keys while nothing is being typed. With `min` and `max`, or
+ * A number, as a knob: drag it sideways to scrub the value, one undo step for the whole drag (on a
+ * field with a fill the fill's edge follows the pointer; Shift goes 10 times as fast, Alt a tenth
+ * as fast on a field with fractional steps, from the moment either is pressed); click it, or tab to
+ * it, and its whole value is selected, so a value typed replaces it, kept with Enter; nudge it with
+ * the arrow keys (Shift for 10), and undo or redo the design with its keys while nothing is being
+ * typed. With `min` and `max`, or
  * `fillRange` for a fill that doesn't hold the value in, a fill behind it shows where the value sits
  * between them; a range either side of 0 fills from 0 out, each way. Home and End go to `min` and
  * `max`. A value typed, stepped or dragged stops at `min` and `max`, or without them at
- * `LIMITS.any` either way. Steps are in the value as shown, after `scale`.
+ * `LIMITS.any` either way. Steps are in the value as shown, after `scale`. A `unit` sits after the
+ * value, outside what is typed.
  * With `onClear`, emptying the field calls it, for a value that can be left unset (its placeholder
  * shows then), mixed values too once something was typed; without, an empty field is ignored.
  */
@@ -109,12 +123,19 @@ export function NumberField({
   }
   const shown = value === undefined || value === 'mixed' ? '' : String(tidy(value * scale))
   const [draft, setDraft, typedNow] = useDraft()
-  const [typing, setTyping] = useState(false)
-  const press = useRef<{ x: number; applied: number; end: (() => void) | null } | null>(null)
   /** Whether Home and End have a lowest and a highest value to go to. */
   const hasEnds =
     least !== undefined && most !== undefined && Number.isFinite(least) && Number.isFinite(most) && most > least
-  const fill = fillOf(value, fillRange ?? (least !== undefined && most !== undefined ? [least, most] : undefined))
+  const range = fillRange ?? (least !== undefined && most !== undefined ? ([least, most] as const) : undefined)
+  const fill = fillOf(value, range)
+  const entry = useNumberInput({
+    input,
+    editor,
+    value: typeof value === 'number' ? value * scale : null,
+    scrubField: (width) => scrubOf({ step, min, max, scale, range, width }),
+    onScrubStart: () => setDraft(null),
+    onScrub: (by) => onShift(by / scale),
+  })
   /** One step, or ten with Shift, or a tenth with Alt where the steps are fractions. */
   const stepOf = (event: { shiftKey: boolean; altKey: boolean }) =>
     step * (event.shiftKey ? 10 : event.altKey && step < 1 ? 0.1 : 1)
@@ -128,15 +149,8 @@ export function NumberField({
     const n = Number.parseFloat(text.replace(',', '.'))
     if (Number.isFinite(n) && text.trim() !== shown) onSet(clamp(n / scale, min, max))
   }
-  const release = (focus: boolean) => {
-    const p = press.current
-    press.current = null
-    if (!p) return
-    if (p.end) p.end()
-    else if (focus) input.current?.focus()
-  }
-  // A drag the card is taken away in the middle of still ends its undo step.
-  useEffect(() => () => press.current?.end?.(), [])
+  const text = draft ?? shown
+  const hint = value === 'mixed' ? t.editor.props.mixed : placeholder
   return (
     <div
       data-scrub={name}
@@ -145,92 +159,73 @@ export function NumberField({
       style={
         { '--fill-from': `${fill.from}%`, '--fill': `${fill.width}%`, '--fill-at': `${fill.at ?? 0}%` } as CSSProperties
       }
-      onPointerDown={(event) => {
-        // A press on the field being typed in places the caret; anywhere else it starts a drag.
-        if (event.button !== 0 || (typing && event.target === input.current)) return
-        event.preventDefault()
-        event.currentTarget.setPointerCapture(event.pointerId)
-        press.current = { x: event.clientX, applied: 0, end: null }
-      }}
-      onMouseDown={(event) => {
-        // Some browsers focus on the mouse press even when the pointer press was taken.
-        if (!(typing && event.target === input.current)) event.preventDefault()
-      }}
-      onPointerMove={(event) => {
-        const p = press.current
-        if (!p || (!p.end && Math.abs(event.clientX - p.x) < 3)) return
-        if (!p.end) setDraft(null)
-        p.end ??= editor?.beginGesture() ?? (() => undefined)
-        const by = Math.round((event.clientX - p.x) / 2) * stepOf(event)
-        if (by === p.applied) return
-        shift((by - p.applied) / scale)
-        p.applied = by
-      }}
-      onPointerUp={() => release(true)}
-      onPointerCancel={() => release(false)}
-      onLostPointerCapture={() => release(false)}
+      {...entry.knob}
       className={cn(KNOB, className)}
     >
-      <span className="relative min-w-0 truncate">{label}</span>
-      <input
-        ref={input}
-        name={name}
-        role="spinbutton"
-        aria-label={name}
-        aria-valuenow={typeof value === 'number' ? tidy(value * scale) : undefined}
-        aria-valuemin={least === undefined || !Number.isFinite(least) ? undefined : tidy(least * scale)}
-        aria-valuemax={most === undefined || !Number.isFinite(most) ? undefined : tidy(most * scale)}
-        aria-valuetext={value === 'mixed' ? t.editor.props.mixed : shown ? `${shown}${unit}` : placeholder}
-        data-testid={testId}
-        data-draft={draft === null ? undefined : ''}
-        inputMode="decimal"
-        value={draft ?? shown}
-        placeholder={value === 'mixed' ? t.editor.props.mixed : placeholder}
-        onFocus={(event) => {
-          setTyping(true)
-          // What is typed replaces the value.
-          event.currentTarget.select()
-        }}
-        onChange={(event) => setDraft(event.target.value)}
-        onBlur={(event) => {
-          setTyping(false)
-          if (typedNow.current !== null) commit(event.target.value)
-        }}
-        onKeyDown={(event) => {
-          // Undo and redo are the design's while nothing is being typed; once something is, the
-          // field's own, taking back what was typed.
-          const action = shortcutFor(event.nativeEvent)
-          if (editor && typedNow.current === null && (action === 'undo' || action === 'redo')) {
-            event.preventDefault()
-            editor.perform(action)
-          } else if (event.key === 'Enter') commit(event.currentTarget.value)
-          else if (event.key === 'Escape') {
-            // What was typed is thrown away and the field keeps the focus, its value chosen again;
-            // with nothing typed, the field lets go of the focus.
-            const typed = typedNow.current !== null
-            setDraft(null)
-            if (typed) requestAnimationFrame(() => input.current?.select())
-            else event.currentTarget.blur()
-          } else if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
-            event.preventDefault()
-            setDraft(null)
-            shift(((event.key === 'ArrowUp' ? 1 : -1) * stepOf(event)) / scale)
-          } else if ((event.key === 'Home' || event.key === 'End') && hasEnds && draft === null) {
-            // A range's ends, as a slider's; while a value is being typed they move the caret.
-            event.preventDefault()
-            onSet(event.key === 'Home' ? min : max)
-          } else return
-          // Keys typed into a field are the field's, not the stage's.
-          event.stopPropagation()
-        }}
-        className={cn(
-          VALUE_TEXT,
-          'relative min-w-[3ch] flex-1 cursor-[inherit] bg-transparent text-end outline-none focus-visible:outline-none! placeholder:text-subtle focus:cursor-text',
-          typing && 'select-text',
-        )}
-      />
-      {unit && shown && (
-        <span aria-hidden className={cn(VALUE_TEXT, 'relative -ms-2')}>
+      <span className="relative min-w-0 flex-1 truncate">{label}</span>
+      {/* As wide as what it shows: the hidden copy sizes the input, so the room beside the digits is the knob's. */}
+      <span className="relative inline-grid shrink-0 [&>*]:[grid-area:1/1]">
+        <span aria-hidden className={cn(NUMBER_TEXT, 'invisible whitespace-pre pe-[2px]')}>
+          {text || hint || ' '}
+        </span>
+        <input
+          ref={input}
+          name={name}
+          role="spinbutton"
+          aria-label={name}
+          aria-valuenow={typeof value === 'number' ? tidy(value * scale) : undefined}
+          aria-valuemin={least === undefined || !Number.isFinite(least) ? undefined : tidy(least * scale)}
+          aria-valuemax={most === undefined || !Number.isFinite(most) ? undefined : tidy(most * scale)}
+          aria-valuetext={value === 'mixed' ? t.editor.props.mixed : shown ? `${shown}${unit}` : placeholder}
+          data-testid={testId}
+          data-draft={draft === null ? undefined : ''}
+          inputMode="decimal"
+          size={1}
+          value={text}
+          placeholder={hint}
+          onFocus={entry.input.onFocus}
+          onChange={(event) => setDraft(event.target.value)}
+          onBlur={(event) => {
+            entry.input.onBlur()
+            if (typedNow.current !== null) commit(event.target.value)
+          }}
+          onKeyDown={(event) => {
+            // Undo and redo are the design's while nothing is being typed; once something is, the
+            // field's own, taking back what was typed.
+            const action = shortcutFor(event.nativeEvent)
+            if (editor && typedNow.current === null && (action === 'undo' || action === 'redo')) {
+              event.preventDefault()
+              editor.perform(action)
+            } else if (event.key === 'Enter') commit(event.currentTarget.value)
+            else if (event.key === 'Escape') {
+              // What was typed is thrown away and the field keeps the focus, its value chosen again;
+              // with nothing typed, the field lets go of the focus.
+              const typed = typedNow.current !== null
+              setDraft(null)
+              if (typed) requestAnimationFrame(() => input.current?.select())
+              else event.currentTarget.blur()
+            } else if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
+              event.preventDefault()
+              setDraft(null)
+              shift(((event.key === 'ArrowUp' ? 1 : -1) * stepOf(event)) / scale)
+            } else if ((event.key === 'Home' || event.key === 'End') && hasEnds && draft === null) {
+              // A range's ends, as a slider's; while a value is being typed they move the caret.
+              event.preventDefault()
+              onSet(event.key === 'Home' ? min : max)
+            } else return
+            // Keys typed into a field are the field's, not the stage's.
+            event.stopPropagation()
+          }}
+          className={cn(
+            NUMBER_TEXT,
+            'w-full min-w-0 cursor-[inherit] bg-transparent pe-[2px] text-end outline-none focus-visible:outline-none! placeholder:text-subtle focus:cursor-text',
+            entry.typing && 'select-text',
+          )}
+        />
+      </span>
+      {unit && (shown !== '' || !!draft) && (
+        // Against the digits: back over the gap and the input's room for the caret.
+        <span aria-hidden className={cn(VALUE_TEXT, 'relative -ms-[calc(0.5rem+2px)] shrink-0')}>
           {unit}
         </span>
       )}

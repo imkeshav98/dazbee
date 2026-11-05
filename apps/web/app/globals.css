@@ -35,8 +35,11 @@ body {
   outline-offset: 2px;
 }
 
-::selection {
-  background: var(--accent-soft);
+/* In the base layer, so a control's own selection look (a number field's) wins over it. */
+@layer base {
+  ::selection {
+    background: var(--accent-soft);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

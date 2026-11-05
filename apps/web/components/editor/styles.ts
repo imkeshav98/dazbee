@@ -62,6 +62,11 @@ export const PICKED_RING = 'shadow-[0_0_0_2px_var(--surface),0_0_0_4px_var(--acc
 
 /** The look of a value typed into a field: a number, a hex, a dash pattern. */
 export const VALUE_TEXT = 'font-mono text-[12px] tabular-nums text-text'
+/**
+ * The digits of a number input: a value's look, selected in the accent at a see-through tint with
+ * the digits in the text colour, so a value a click selects shows plainly as selected.
+ */
+export const NUMBER_TEXT = `${VALUE_TEXT} selection:bg-accent-selected selection:text-text`
 /** A field to type a value into, as tall as a knob: its border shows the focus, with no ring besides. */
 export const FIELD = `h-8 min-w-0 w-full rounded-row border border-line bg-surface px-1.5 ${VALUE_TEXT} outline-none focus-visible:outline-none! placeholder:text-subtle focus:border-accent`
 /** Where a dragged row would land in a list: a line across it, placed by the row above or below. */
@@ -78,11 +83,14 @@ export const SELECT = 'h-8 w-full bg-surface px-1.5 text-[12px]'
 /**
  * A number you drag sideways, as in the mock: its label at the start, its value in mono at the end,
  * and a soft fill behind them showing where the value sits in its range: from `--fill-from`, `--fill` wide,
- * with a line at the value (`--fill-at`) on a field that has a range (`data-ranged`).
+ * with a line at the value (`--fill-at`) on a field that has a range (`data-ranged`). While it is
+ * typed in (`data-typing`) its edge is the accent, under the pointer too; while it is dragged
+ * (`data-scrubbing`) the fill keeps up with the pointer. On a phone or a touch screen it is 44 px tall.
  */
-export const KNOB = `relative flex h-8 min-w-0 cursor-ew-resize touch-pan-y select-none items-center gap-2 overflow-hidden rounded-row border border-line bg-surface px-2.5 text-[12px] font-semibold text-muted transition-colors duration-[var(--chrome-fast)] hover:border-line-strong focus-within:border-accent before:pointer-events-none before:absolute before:inset-y-0 before:start-[var(--fill-from,0%)] before:w-[var(--fill,0%)] before:bg-accent-soft before:transition-[width] before:duration-75 data-ranged:after:pointer-events-none data-ranged:after:absolute data-ranged:after:inset-y-1.5 data-ranged:after:start-[clamp(4px,var(--fill-at),calc(100%-6px))] data-ranged:after:w-0.5 data-ranged:after:-translate-x-1/2 data-ranged:after:rounded-full data-ranged:after:bg-accent data-ranged:after:shadow-[0_0_8px_rgb(255_72_176/0.7)] rtl:data-ranged:after:translate-x-1/2`
-/** Knobs two to a row; a lone last one takes the whole row. */
-export const KNOBS = 'grid grid-cols-2 gap-1.5 [&>:last-child:nth-child(odd)]:col-span-2'
+export const KNOB = `relative flex h-8 min-w-0 cursor-ew-resize touch-pan-y select-none items-center gap-2 overflow-hidden rounded-row border border-line bg-surface px-2.5 text-[12px] font-semibold text-muted transition-colors duration-[var(--chrome-fast)] hover:border-line-strong data-typing:border-accent max-sm:h-[44px] [@media(hover:none)]:h-[44px] data-scrubbing:before:transition-none before:pointer-events-none before:absolute before:inset-y-0 before:start-[var(--fill-from,0%)] before:w-[var(--fill,0%)] before:bg-accent-soft before:transition-[width] before:duration-75 data-ranged:after:pointer-events-none data-ranged:after:absolute data-ranged:after:inset-y-1.5 data-ranged:after:start-[clamp(4px,var(--fill-at),calc(100%-6px))] data-ranged:after:w-0.5 data-ranged:after:-translate-x-1/2 data-ranged:after:rounded-full data-ranged:after:bg-accent data-ranged:after:shadow-[0_0_8px_rgb(255_72_176/0.7)] rtl:data-ranged:after:translate-x-1/2`
+/** Knobs two to a row, 8 px apart on a phone or a touch screen; a lone last one takes the whole row. */
+export const KNOBS =
+  'grid grid-cols-2 gap-1.5 max-sm:gap-[8px] [@media(hover:none)]:gap-[8px] [&>:last-child:nth-child(odd)]:col-span-2'
 
 /** A row of a menu: its words at the start, a shortcut or a switch at the end. */
 export const MENU_ITEM = `group flex h-9 w-full shrink-0 cursor-pointer items-center justify-between gap-3 rounded-row px-2.5 text-start text-[13px] font-medium text-text transition-colors duration-[var(--chrome-fast)] ${LIT_ROW} ${TOUCH_ROW} ${DISABLED} ${FOCUS_RING}`
@@ -120,8 +128,8 @@ export const PANEL_HEADING = 'text-xs font-semibold text-muted'
 export const PANEL_BUTTON = `flex h-[34px] min-w-0 cursor-pointer items-center gap-2 rounded-row border border-line bg-surface px-2.5 text-[12.5px] font-medium whitespace-nowrap text-text transition-colors duration-[var(--chrome-fast)] hover:tint-hover active:tint-pressed disabled:cursor-not-allowed disabled:opacity-45 [&>span]:truncate ${FOCUS_RING}`
 /** An edit panel's button among many that act at once, as Position's moves: unfilled, lit by the tints. */
 export const PANEL_ACTION = `flex h-[34px] min-w-0 cursor-pointer items-center gap-2 rounded-row px-2.5 text-[12.5px] font-medium whitespace-nowrap text-text transition-colors duration-[var(--chrome-fast)] hover:bg-hover active:bg-pressed disabled:cursor-not-allowed disabled:opacity-45 [&>span]:truncate ${FOCUS_RING}`
-/** A switch shaped as a knob, its name at the start: Lock ratio among the size fields. */
-export const KNOB_SWITCH = `group flex h-8 min-w-0 cursor-pointer items-center justify-between gap-2 rounded-row border border-line bg-surface px-2.5 text-[12px] font-semibold whitespace-nowrap text-muted transition-colors duration-[var(--chrome-fast)] hover:border-line-strong aria-checked:text-text ${FOCUS_RING}`
+/** A switch shaped as a knob, its name at the start: Lock ratio among the size fields; as tall as a knob. */
+export const KNOB_SWITCH = `group flex h-8 max-sm:h-[44px] [@media(hover:none)]:h-[44px] min-w-0 cursor-pointer items-center justify-between gap-2 rounded-row border border-line bg-surface px-2.5 text-[12px] font-semibold whitespace-nowrap text-muted transition-colors duration-[var(--chrome-fast)] hover:border-line-strong aria-checked:text-text ${FOCUS_RING}`
 
 /** The top bar's row on the stage, under the header pill: where the bar sits, and the room the fit keeps for it. */
 export const BAR_ROW = 'top-[90px] max-sm:top-[72px]'

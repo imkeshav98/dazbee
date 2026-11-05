@@ -29,6 +29,9 @@
   --accent-solid-hover: #a80d5d;
   --on-accent: #ffffff;
   --accent-soft: rgb(255 72 176 / 0.16);
+  /* A value selected in a number field: the accent, see-through, 3:1 against the field with the
+     text at 4.5:1 on it. */
+  --accent-selected: rgb(255 72 176 / 0.67);
   --accent-2: #3d6bff;
   --danger: #ff5a5f;
   /* The solid red of a button that confirms a delete, under white words. */
@@ -82,6 +85,7 @@
   --accent-solid-hover: #a80d5d;
   --on-accent: #ffffff;
   --accent-soft: rgb(194 16 108 / 0.1);
+  --accent-selected: rgb(224 21 127 / 0.67);
   --accent-2: #2f55e0;
   --danger: #c42020;
   /* The solid red of a button that confirms a delete, under white words. */
@@ -150,6 +154,7 @@
   --color-accent-solid-hover: var(--accent-solid-hover);
   --color-on-accent: var(--on-accent);
   --color-accent-soft: var(--accent-soft);
+  --color-accent-selected: var(--accent-selected);
   --color-accent-2: var(--accent-2);
   --color-danger: var(--danger);
   --color-danger-solid: var(--danger-solid);

@@ -116,6 +116,17 @@ describe.each(THEMES)('%s theme', (_, selector) => {
       expect(contrast(t['on-accent'] ?? '', fill)).toBeGreaterThanOrEqual(4.5)
     },
   )
+
+  // The selection is a graphic, so WCAG 2.2 SC 1.4.11 (non-text contrast) asks 3:1 of it; the
+  // digits on it are text, held to 4.5:1.
+  it('a value selected in a number field is at least 3:1 against the field, its digits at least 4.5:1 on it', () => {
+    const selected = tints(selector)['accent-selected']
+    const field = t.surface
+    if (!selected || !field) throw new Error('missing token accent-selected or surface')
+    const drawn = hexOf(over(selected, channels(field)))
+    expect(contrast(drawn, field)).toBeGreaterThanOrEqual(3)
+    expect(contrast(t.text ?? '', drawn)).toBeGreaterThanOrEqual(4.5)
+  })
 })
 
 describe.each(THEMES)('%s glass', (_, selector) => {
