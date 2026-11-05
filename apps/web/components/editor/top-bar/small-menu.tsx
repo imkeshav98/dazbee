@@ -26,6 +26,7 @@ import { editState, isPanel, setOpen, useEditState, usePhone } from '@/component
 import { useSelection } from '@/components/editor/editor-hooks.ts'
 import { BAR_BUTTON, BAR_TOGGLE, MENU } from '@/components/editor/styles.ts'
 import { cn } from '@/lib/cn.ts'
+import { type Box, CLEAR, smallMenuPlace } from '@/lib/editor/small-menu-place.ts'
 import { useLocale, useMessages } from '@/lib/i18n/client.tsx'
 import { dirOf, format } from '@/lib/i18n/index.ts'
 
@@ -33,26 +34,14 @@ import { arrowAlong, useMenuFocus, useRovingTab, useScrollingMenu } from './bar-
 import { LayerActions } from './layer-actions.tsx'
 
 type Place = { left: number; top: number }
-type Box = { left: number; top: number; right: number; bottom: number }
 /**
  * Where the full menu opens: beside the small menu on its end or start side, or under it; and how
  * far from the window's start edge it keeps, past the rail and its open flyout.
  */
 type FullMenuPlace = { side: 'end' | 'start' | 'under'; startInset: number }
 
-/** Pixels between the selection and the menu, clear of the turn handles round its corners. */
-const GAP = 28
-/** Pixels kept between the menu and anything it keeps off. */
-const CLEAR = 8
 /** Pixels between the small menu and the full menu. */
 const MENU_GAP = 8
-
-/**
- * `value` kept between `low` and `high`. When `low` is above `high`, as on a phone narrower than the
- * menu, `low` wins, so the menu keeps to the start edge.
- */
-const clampInto = (value: number, low: number, high: number) => Math.max(low, Math.min(value, high))
-const meets = (a: Box, b: Box) => a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom
 
 /** The element's box in the window, or null while it doesn't show. */
 function shownBox(el: Element | null): DOMRect | null {
@@ -119,32 +108,10 @@ function usePlace(editor: Editor, menu: HTMLElement | null, rightClick: boolean)
       const height = menu.offsetHeight
       const blocked = obstacles(stage)
       const floor = (sheetTop ?? room.height) - CLEAR
-      const centre = rect.x + rect.width / 2 - width / 2
       // Under the top bar comes the bar's second row, then this.
       const under = editState().barBottom + CLEAR
-      for (const wanted of [rect.y - height - GAP, rect.y + rect.height + GAP, under]) {
-        const top = Math.round(wanted)
-        if (top < 0 || top + height > floor) continue
-        // Off whatever it would cover, moving sideways the shorter way; still covering, try the next place.
-        let left = clampInto(centre, CLEAR, room.width - width - CLEAR)
-        for (let tries = 0; tries < 4; tries++) {
-          const box = { left, top, right: left + width, bottom: top + height }
-          const hit = blocked.find((b) => meets(box, b))
-          if (!hit) break
-          const toStart = hit.left - width
-          const toEnd = hit.right
-          left = clampInto(
-            Math.abs(toStart - left) <= Math.abs(toEnd - left) && toStart >= CLEAR ? toStart : toEnd,
-            CLEAR,
-            room.width - width - CLEAR,
-          )
-        }
-        const box = { left, top, right: left + width, bottom: top + height }
-        if (blocked.some((b) => meets(box, b))) continue
-        const at = { left: Math.round(left), top }
-        return setPlace((now) => (now?.left === at.left && now.top === at.top ? now : at))
-      }
-      setPlace(null)
+      const at = smallMenuPlace({ rect, width, height, room, blocked, floor, under })
+      setPlace((now) => (now === at || (now && at && now.left === at.left && now.top === at.top) ? now : at))
     }
     // On the next frame, once the menu shows the buttons for the new selection.
     const later = () => {
