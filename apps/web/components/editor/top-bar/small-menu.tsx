@@ -303,7 +303,8 @@ export function SmallMenu({ editor, rightClick }: { editor: Editor; rightClick: 
               sticky="always"
               collisionPadding={{
                 top: barBottom + 8,
-                bottom: phone ? 150 : 72,
+                // On a phone it lies over the dock, as the mock draws it.
+                bottom: phone ? CLEAR : 72,
                 left: rtl ? CLEAR : fullMenu.startInset,
                 right: rtl ? fullMenu.startInset : CLEAR,
               }}

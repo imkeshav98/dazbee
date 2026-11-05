@@ -27,6 +27,12 @@ const ROWS = [
 /** The words of the row that has the focus, without its key. */
 const focusedRow = (page: Page) => page.evaluate(() => document.activeElement?.firstChild?.textContent?.trim() ?? '')
 
+/** Hides the dock and the rail, which a phone's full menu lies over, or shows them again with ''. */
+const underMenu = (page: Page, visibility: 'hidden' | '') =>
+  page.evaluate((to) => {
+    for (const el of document.querySelectorAll<HTMLElement>('[data-dock], [data-testid="rail"]'))
+      el.style.visibility = to
+  }, visibility)
 /** A box on screen, as the browser measures it. */
 type Box = { left: number; top: number; right: number; bottom: number }
 /** Where an element is on screen. */
@@ -342,7 +348,11 @@ for (const [width, height] of SCREEN_SIZES) {
     await expect(page.getByTestId('small-menu')).toBeVisible()
     await expect.poll(() => layoutProblems(page, { pieces: PIECES, uncut: UNCUT })).toEqual([])
     await moreMenu(page)
+    // On a phone the full menu lies over the dock and the rail, as the mock draws it, so they are
+    // left out here; the phone's own test checks the menu is on top of them.
+    if (width <= 600) await underMenu(page, 'hidden')
     await expect.poll(() => layoutProblems(page, { pieces: PIECES, uncut: UNCUT })).toEqual([])
+    if (width <= 600) await underMenu(page, '')
     const sub = await moreSubmenu(page, 'copy-to-frames')
     if (width > 600) {
       await expect.poll(() => layoutProblems(page, { pieces: PIECES, uncut: UNCUT })).toEqual([])
@@ -413,3 +423,31 @@ for (const [width, height] of SCREEN_SIZES) {
     expect(errors).toEqual([])
   })
 }
+
+test('at 390×844 the full menu shows over the dock, and a cut edge never fades a row as a greyed one does', async ({
+  browser,
+}) => {
+  const { page, errors } = await open(browser)
+  await page.setViewportSize({ width: 390, height: 844 })
+  await fitSettled(page)
+  await selectLayers(page, ['headline'])
+  const menu = await moreMenu(page)
+  await menu.evaluate((el) => Promise.all(el.getAnimations().map((a) => a.finished.catch(() => undefined))))
+  const state = await menu.evaluate((el) => {
+    const r = el.getBoundingClientRect()
+    const dock = (document.querySelector('[data-dock]') as Element).getBoundingClientRect()
+    const over = document.elementFromPoint(r.left + r.width / 2, Math.max(dock.top + 4, r.top + 4))
+    return {
+      bottom: Math.round(r.bottom),
+      reachesDock: r.bottom > dock.top,
+      onTop: el.contains(over),
+      scrolls: el.scrollHeight > el.clientHeight,
+      fade: getComputedStyle(el).maskImage,
+    }
+  })
+  expect(state.bottom).toBeLessThanOrEqual(844 - 8)
+  expect(state.reachesDock).toBe(true)
+  expect(state.onTop).toBe(true)
+  if (state.scrolls) expect(state.fade).toBe('none')
+  expect(errors).toEqual([])
+})

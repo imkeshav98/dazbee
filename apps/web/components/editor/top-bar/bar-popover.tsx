@@ -20,7 +20,7 @@ import {
 import { useEditState, usePhone } from '@/components/editor/edit-store.ts'
 import { BAR_BUTTON, POPOVER } from '@/components/editor/styles.ts'
 import { useOverlayScroll } from '@/components/ui/overlay-scroll.ts'
-import { fadedEdges, useScrollEdges } from '@/components/ui/scroll-edges.ts'
+import { fadedEdges, linedEdges, useScrollEdges } from '@/components/ui/scroll-edges.ts'
 import { cn } from '@/lib/cn.ts'
 
 /** The room between the bar's last row that shows and a popover under it, in pixels. */
@@ -121,8 +121,8 @@ export function useRovingTab(bar: HTMLElement | null) {
 
 /**
  * A menu that scrolls when it is longer than its room, and shows that it does: its overlay bar,
- * kept shown on a phone, and its cut edges faded. The ref goes on the scrolling element, and
- * `also` gets the element too.
+ * kept shown on a phone, and its cut edges faded, or on a phone lined, so a cut row never reads as
+ * a greyed one. The ref goes on the scrolling element, and `also` gets the element too.
  */
 export function useScrollingMenu(also?: (element: HTMLDivElement | null) => void) {
   const phone = usePhone()
@@ -145,7 +145,7 @@ export function useScrollingMenu(also?: (element: HTMLDivElement | null) => void
     },
     [bars, also],
   )
-  return { ref, onScroll: edges.measure, className: fadedEdges(edges) }
+  return { ref, onScroll: edges.measure, className: phone ? linedEdges(edges) : fadedEdges(edges) }
 }
 
 export function BarPopover({
