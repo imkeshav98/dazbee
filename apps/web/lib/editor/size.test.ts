@@ -2,7 +2,7 @@
 // writes them, rounded as the fields show them.
 import { describe, expect, it } from 'vitest'
 
-import { shortSizeOf, sizeOf, sizeTo, tidy } from './size.ts'
+import { shortSizeOf, sizeOf, sizeTo, tidy, typedSize } from './size.ts'
 
 describe('a size set with the ratio kept', () => {
   it('moves the other side by the same factor', () => {
@@ -33,6 +33,38 @@ describe('a size as the app writes it', () => {
 describe('a size as a chip shows it', () => {
   it('puts the times sign between the width and the height with no spaces', () => {
     expect(shortSizeOf({ width: 300, height: 250 })).toBe('300×250')
+  })
+})
+
+describe('a size typed into a width and a height field', () => {
+  it('waits for both sides', () => {
+    expect(typedSize('', '250')).toBeNull()
+    expect(typedSize('300', '  ')).toBeNull()
+  })
+
+  it('reads a size within the limits, spaces and Arabic numerals too, with no issue', () => {
+    expect(typedSize('300', '250')).toEqual({ width: 300, height: 250 })
+    expect(typedSize(' 1080 ', '١٩٢٠')).toEqual({ width: 1080, height: 1920 })
+    expect(typedSize('۱۲۰۰', '628')).toEqual({ width: 1200, height: 628 })
+  })
+
+  it('takes the sizes at the limits: 50 px on the short side, 8000 on the long one, 12 times as long as wide', () => {
+    expect(typedSize('50', '600')).toEqual({ width: 50, height: 600 })
+    expect(typedSize('8000', '667')).toEqual({ width: 8000, height: 667 })
+    expect(typedSize('8000', '8000')).toEqual({ width: 8000, height: 8000 })
+  })
+
+  it('says what keeps a size past the limits from being a frame', () => {
+    expect(typedSize('49', '600')).toEqual({ width: 49, height: 600, issue: 'short' })
+    expect(typedSize('0', '600')).toEqual({ width: 0, height: 600, issue: 'short' })
+    expect(typedSize('8001', '1000')).toEqual({ width: 8001, height: 1000, issue: 'long' })
+    expect(typedSize('50', '601')).toEqual({ width: 50, height: 601, issue: 'ratio' })
+    expect(typedSize('300.5', '250')).toEqual({ width: 300.5, height: 250, issue: 'whole' })
+  })
+
+  it('reads anything that is not a number as not a whole number of pixels', () => {
+    expect(typedSize('12px', '250')).toMatchObject({ issue: 'whole' })
+    expect(typedSize('-', '250')).toMatchObject({ issue: 'whole' })
   })
 })
 
