@@ -142,9 +142,11 @@ export function ExportForm({
             {t.editor.exports.noFrames}
           </p>
         ) : (
+          // Eight rows show before it scrolls, five on a phone. An empty tick's edge takes the muted
+          // text's shade, which reads over whatever ad lies behind the glass.
           <div
             ref={overlayScroll}
-            className="-mx-1 flex max-h-56 flex-col overflow-y-auto px-1"
+            className="-mx-1 flex max-h-64 flex-col overflow-y-auto px-1 [--line-strong:var(--text-muted)]"
             data-testid="export-frames"
           >
             {frames.length > 1 && (

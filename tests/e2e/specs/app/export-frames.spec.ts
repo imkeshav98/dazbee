@@ -450,6 +450,10 @@ for (const [width, height] of SCREEN_SIZES) {
       const at = await row.boundingBox()
       expect(at && at.height >= (width < 640 ? 44 : 28)).toBe(true)
     }
+    // The page's five rows show whole, with no scrolling.
+    expect(await dialog.getByTestId('export-frames').evaluate((list) => list.scrollHeight <= list.clientHeight)).toBe(
+      true,
+    )
     // A tap on a row unticks it, on every screen.
     await dialog.getByText('Banner', { exact: true }).click()
     await expect(page.getByTestId('export-run')).toHaveText('Export 3 files')
