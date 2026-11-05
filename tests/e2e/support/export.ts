@@ -10,6 +10,9 @@ import type { ExportRequestInput, ExportType } from '@dazbee/schema'
 import { designOf } from './editor.ts'
 import { expect, type Page } from './test.ts'
 
+/** The file a frame's name gives by default, as the export makes a name safe. */
+export const fileOf = (name: string, n = 1, type = 'png') => `${name.replace(':', '-')}${n > 1 ? ` ${n}` : ''}.${type}`
+
 /** Opens Export from the Share menu, and returns the form. */
 export async function openExport(page: Page) {
   await page.getByTestId('share-open').click()
