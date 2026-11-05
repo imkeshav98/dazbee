@@ -15,7 +15,7 @@ import { SIZE_CHANNELS, SIZE_LIMITS, SIZE_PRESETS } from '@dazbee/schema'
 import { editState, setOpen, useEditState } from '@/components/editor/edit-store.ts'
 import { usePickedFrame } from '@/components/editor/editor-hooks.ts'
 import { NumberInput, useNumberInput } from '@/components/editor/number-input.tsx'
-import { PANEL_HEADING } from '@/components/editor/styles.ts'
+import { PANEL_HEADING, TOUCH_FIELD, TOUCH_GAP } from '@/components/editor/styles.ts'
 import { useLiveDesign } from '@/components/editor/use-live-design.ts'
 import { FOCUS_RING, LIT_ROW } from '@/components/ui/looks.ts'
 import { cn } from '@/lib/cn.ts'
@@ -41,8 +41,7 @@ const TILE_SHAPE = 40
  * A size of your own's field: its letter, then the number; its edge is the accent while it is typed
  * in, and the danger colour on a side past the limits.
  */
-const SIZE_FIELD =
-  'flex h-[34px] min-w-0 flex-1 cursor-text items-center gap-1.5 overflow-hidden rounded-row border border-line bg-surface px-2.5 data-typing:border-accent has-[[aria-invalid=true]]:border-danger max-sm:h-11'
+const SIZE_FIELD = `flex h-[34px] ${TOUCH_FIELD} min-w-0 flex-1 cursor-text items-center gap-1.5 overflow-hidden rounded-row border border-line bg-surface px-2.5 data-typing:border-accent has-[[aria-invalid=true]]:border-danger`
 
 /** A size's outline, as long as a tile's shape on its long side and never thinner than a hairline box. */
 const shapeStyle = ({ width, height }: Size): CSSProperties => {
@@ -200,7 +199,7 @@ function OwnSize({ start, onAdd }: { start: Size; onAdd: (size: Size) => void })
       }}
     >
       <h3 className={PANEL_HEADING}>{a.ownSize}</h3>
-      <div className="flex items-center gap-1.5">
+      <div className={cn('flex items-center gap-1.5', TOUCH_GAP)}>
         {field('width', width, setWidth)}
         <span aria-hidden className="text-[12px] text-subtle">
           {TIMES}
@@ -210,7 +209,8 @@ function OwnSize({ start, onAdd }: { start: Size; onAdd: (size: Size) => void })
           type="submit"
           disabled={!typed || issues.length > 0}
           className={cn(
-            'h-[34px] shrink-0 cursor-pointer rounded-row bg-accent-solid px-[15px] text-[12.5px] font-semibold text-on-accent transition-colors duration-[var(--chrome-fast)] hover:bg-accent-solid-hover active:bg-accent-solid-hover disabled:cursor-not-allowed disabled:opacity-45 max-sm:h-11',
+            'h-[34px] shrink-0 cursor-pointer rounded-row bg-accent-solid px-[15px] text-[12.5px] font-semibold text-on-accent transition-colors duration-[var(--chrome-fast)] hover:bg-accent-solid-hover active:bg-accent-solid-hover disabled:cursor-not-allowed disabled:opacity-45',
+            TOUCH_FIELD,
             FOCUS_RING,
           )}
         >

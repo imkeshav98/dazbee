@@ -9,7 +9,16 @@ import { type Editor, shortcutFor } from '@dazbee/editor'
 import { alphaOf } from '@dazbee/schema'
 
 import { NumberInput, useNumberInput } from '@/components/editor/number-input.tsx'
-import { FIELD, KNOB, NUMBER_TEXT, PANEL_PART, SELECT, SWITCH, SWITCH_ROW } from '@/components/editor/styles.ts'
+import {
+  FIELD,
+  KNOB,
+  NUMBER_TEXT,
+  PANEL_PART,
+  SELECT,
+  SWITCH,
+  SWITCH_ROW,
+  TOUCH_GAP,
+} from '@/components/editor/styles.ts'
 import { SEGMENT, SEGMENTS } from '@/components/ui/looks.ts'
 import { Select } from '@/components/ui/select.tsx'
 import { cn } from '@/lib/cn.ts'
@@ -245,7 +254,7 @@ export function ColorField({
   }
   return (
     // Its hex and opacity are fields, 44 px tall and 8 px apart on a phone or a touch screen.
-    <div className="flex min-w-0 flex-1 items-center gap-1 max-sm:gap-[8px] [@media(hover:none)]:gap-[8px]">
+    <div className={cn('flex min-w-0 flex-1 items-center gap-1', TOUCH_GAP)}>
       {swatch && (
         <input
           name="colour"
@@ -270,7 +279,7 @@ export function ColorField({
           if (event.key === 'Enter') commitHex(event.currentTarget.value)
           event.stopPropagation()
         }}
-        className={cn(FIELD, 'uppercase max-sm:h-[44px] [@media(hover:none)]:h-[44px]')}
+        className={cn(FIELD, 'uppercase')}
       />
       <div className="w-[4.5rem] shrink-0">
         <NumberField

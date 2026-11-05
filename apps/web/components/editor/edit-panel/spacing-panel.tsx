@@ -2,7 +2,7 @@
 
 // The Spacing panel of text: the room between its lines, letters and paragraphs, its box, then under
 // Advanced shrinking to fit and the most lines it shows.
-import { KNOBS, TILE, TILE_FACE_WIDE } from '@/components/editor/styles.ts'
+import { KNOBS, TILE, TILE_FACE_WIDE, TOUCH_GAP } from '@/components/editor/styles.ts'
 import { cn } from '@/lib/cn.ts'
 import { LIMITS } from '@/lib/editor/limits.ts'
 import { tidy } from '@/lib/editor/size.ts'
@@ -54,7 +54,7 @@ function SpacingCard({ target, p }: { target: Target; p: P }) {
   const { style, setStyle, shiftStyle } = textStyle(target)
   return (
     <PanelPart id="spacing-card" title={p.spacing}>
-      <div className="grid gap-1.5">
+      <div className={cn('grid gap-1.5', TOUCH_GAP)}>
         <NumberField
           label={p.lineHeight}
           name={p.lineHeight}

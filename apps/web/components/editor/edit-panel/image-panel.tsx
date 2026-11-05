@@ -7,7 +7,7 @@ import { type ImageAdjust, ImageFilter, type Paint } from '@dazbee/schema'
 
 import { ImagePickerButton } from '@/components/editor/image-tool.tsx'
 import { assetThumbnail } from '@/components/editor/paint-stack.tsx'
-import { CHIP, PANEL_HEADING } from '@/components/editor/styles.ts'
+import { CHIP, PANEL_HEADING, TOUCH_GAP } from '@/components/editor/styles.ts'
 import { FOCUS_RING } from '@/components/ui/looks.ts'
 import { cn } from '@/lib/cn.ts'
 import { tidy } from '@/lib/editor/size.ts'
@@ -165,7 +165,7 @@ function AdjustCard({ target, p, index, paint }: { target: Target; p: P; index: 
     })
   return (
     <PanelPart id="adjust-card" title={p.adjustTitle}>
-      <div className="grid gap-1.5">
+      <div className={cn('grid gap-1.5', TOUCH_GAP)}>
         {ADJUSTMENTS.map((key) => (
           <NumberField
             key={key}
