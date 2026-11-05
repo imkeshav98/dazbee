@@ -1,12 +1,12 @@
 // The rows of the top bar's Arrange ⋯ for the selected layers: how they sit. Each row shows only
-// where it applies to the selection, and Line up is greyed out, with the reason, while it has
-// nothing to do. And where the layers sit in their stacks, for the Order moves that have nothing to
+// where it applies to the selection, and a row that applies but is refused is greyed out, with the
+// reason. And where the layers sit in their stacks, for the Order moves that have nothing to
 // do: to the front at the front, to the back at the back.
 import { childrenOf } from '@dazbee/doc'
 import type { Design } from '@dazbee/schema'
 
 /** Why a row of the Arrange ⋯ is greyed out. */
-export type ArrangeWhy = 'placedByLayout'
+export type ArrangeWhy = 'locked' | 'placedByLayout'
 
 /** One row of the Arrange ⋯, and why it is greyed out when it is. */
 export type ArrangeRow = { row: 'order' | 'lineUp' | 'rotation' | 'textDirection'; off?: ArrangeWhy }
@@ -28,14 +28,15 @@ export interface ArrangeOf {
 /**
  * The rows for a selection, in order: Order ▸ always; Line up ▸ for one layer, as several have the
  * bar's own Line up; the rotation field unless a group or boolean is selected; Text direction ▸ when
- * every layer is text. A locked layer keeps only Order, the one row its lock doesn't refuse.
+ * every layer is text. A lock refuses every row but Order, so they are greyed with the lock as the
+ * reason; Line up is greyed too for a layer its auto layout places.
  */
 export function arrangeRows({ several, sized, texts, placed, locked }: ArrangeOf): ArrangeRow[] {
+  const refused = (row: ArrangeRow['row']): ArrangeRow => (locked ? { row, off: 'locked' } : { row })
   const rows: ArrangeRow[] = [{ row: 'order' }]
-  if (locked) return rows
-  if (!several) rows.push(placed ? { row: 'lineUp', off: 'placedByLayout' } : { row: 'lineUp' })
-  if (sized) rows.push({ row: 'rotation' })
-  if (texts) rows.push({ row: 'textDirection' })
+  if (!several) rows.push(placed && !locked ? { row: 'lineUp', off: 'placedByLayout' } : refused('lineUp'))
+  if (sized) rows.push(refused('rotation'))
+  if (texts) rows.push(refused('textDirection'))
   return rows
 }
 

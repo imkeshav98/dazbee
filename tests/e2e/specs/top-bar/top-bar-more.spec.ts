@@ -301,18 +301,46 @@ test.describe('at 1280×760', () => {
     expect(errors).toEqual([])
   })
 
-  test("a locked layer's bar keeps its ⋯ with Order alone, which still moves it", async ({ browser }) => {
+  test("a locked layer's Arrange greys Line up, the rotation field and Text direction, each saying the layer is locked, and Order still moves it", async ({
+    browser,
+  }) => {
     const { page, errors } = await openStage(browser, arrangeDesign())
     await page.setViewportSize({ width: 1280, height: 760 })
-    await page.evaluate(() => window.dazbee?.setLocked(['shape'], true))
-    await selectLayers(page, ['shape'], { bar: true })
+    await page.evaluate(() => window.dazbee?.setLocked(['words'], true))
+    await selectLayers(page, ['words'], { bar: true })
     await expect(page.getByTestId('bar-locked')).toBeVisible()
     expect(await barItems(page)).toEqual(['locked', 'arrange'])
     const menu = await arrangeMenu(page)
-    await expect(menu.locator('[data-testid^="more-"], [data-scrub]')).toHaveCount(1)
-    const before = await order(page)
+    const tip = page.getByRole('tooltip')
+    const field = menu.getByRole('spinbutton', { name: 'Rotation in degrees' })
+    const before = (await props(page, 'words')).rotation ?? 0
+    for (const greyed of [menu.getByTestId('more-line-up'), field, menu.getByTestId('more-text-direction')]) {
+      await expect(greyed).toHaveAttribute('aria-disabled', 'true')
+      await expect(greyed).toHaveCSS('cursor', 'not-allowed')
+      await greyed.hover()
+      await expect(tip).toHaveText('The layer is locked')
+      // Clicked as a person would, though it says it is disabled: it says why and does nothing.
+      await greyed.click({ force: true })
+      await expect(tip).toHaveText('The layer is locked')
+    }
+    await expect(page.getByTestId('more-line-up-menu')).toHaveCount(0)
+    await expect(page.getByTestId('more-text-direction-menu')).toHaveCount(0)
+    await expect(field).toHaveAttribute('aria-valuetext', '0°')
+    // The keyboard reaches the field, which says why and takes no typing.
+    await page.keyboard.press('Escape')
+    await expect(tip).toHaveCount(0)
+    await menu.getByTestId('more-line-up').focus()
+    await page.keyboard.press('Tab')
+    await expect(field).toBeFocused()
+    await expect(tip).toHaveText('The layer is locked')
+    await page.keyboard.type('45')
+    await page.keyboard.press('ArrowUp')
+    expect((await props(page, 'words')).rotation ?? 0).toBe(before)
+
+    const stack = await order(page)
     await orderMove(page, 'Bring to front')
-    await expect.poll(() => order(page)).toEqual([...before.filter((id) => id !== 'shape'), 'shape'])
+    await expect.poll(() => order(page)).toEqual([...stack.filter((id) => id !== 'words'), 'words'])
+    await undoRedo(page, () => order(page), stack, [...stack.filter((id) => id !== 'words'), 'words'])
     expect(errors).toEqual([])
   })
 })

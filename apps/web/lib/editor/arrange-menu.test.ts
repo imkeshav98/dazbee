@@ -1,5 +1,5 @@
 // The rows of the top bar's Arrange ⋯ for the selected layers: how they sit, each row only where it
-// applies; and where the layers sit in their stacks, for the Order moves with nothing to do.
+// applies, greyed with the reason where it is refused; and where the layers sit in their stacks, for the Order moves with nothing to do.
 import { describe, expect, it } from 'vitest'
 
 import type { Design } from '@dazbee/schema'
@@ -59,8 +59,19 @@ describe('arrangeRows', () => {
     ])
   })
 
-  it('keeps only Order for a locked layer, the one row its lock never refuses', () => {
-    expect(arrangeRows({ ...shape, texts: true, locked: true })).toEqual([{ row: 'order' }])
+  it('greys out every row but Order for a locked layer, the lock as the reason, since a lock never stops reordering', () => {
+    expect(arrangeRows({ ...shape, texts: true, locked: true })).toEqual([
+      { row: 'order' },
+      { row: 'lineUp', off: 'locked' },
+      { row: 'rotation', off: 'locked' },
+      { row: 'textDirection', off: 'locked' },
+    ])
+    // The lock is the reason first, even for a layer its auto layout places.
+    expect(arrangeRows({ ...shape, placed: true, locked: true })).toEqual([
+      { row: 'order' },
+      { row: 'lineUp', off: 'locked' },
+      { row: 'rotation', off: 'locked' },
+    ])
   })
 })
 

@@ -12,9 +12,18 @@ import type { Design } from '@dazbee/schema'
 
 import { ALIGN, keyOf } from '@/components/editor/arrange-actions.ts'
 import { RotationField } from '@/components/editor/edit-panel/position-panel.tsx'
-import { factsOf, set, shared, type Target } from '@/components/editor/edit-panel/target.ts'
+import { factsOf, num, set, shared, type Target } from '@/components/editor/edit-panel/target.ts'
 import { setOpen, useEditState, usePhone } from '@/components/editor/edit-store.ts'
-import { ICON_BUTTON, MENU_DIVIDER, MENU_ITEM, MENU_ITEM_GREYED, MENU_KEY } from '@/components/editor/styles.ts'
+import {
+  ICON_BUTTON,
+  KNOB,
+  MENU_DIVIDER,
+  MENU_ITEM,
+  MENU_ITEM_GREYED,
+  MENU_KEY,
+  VALUE_TEXT,
+} from '@/components/editor/styles.ts'
+import { FOCUS_RING } from '@/components/ui/looks.ts'
 import { Tooltip } from '@/components/ui/tooltip.tsx'
 import { cn } from '@/lib/cn.ts'
 import { arrangeRows, stackEnds } from '@/lib/editor/arrange-menu.ts'
@@ -26,6 +35,9 @@ import { SubMenu } from './layer-actions.tsx'
 
 /** The four moves along the stack: to the front, forward, backward, to the back. */
 export const ORDER = ['bringToFront', 'bringForward', 'sendBackward', 'sendToBack'] as const
+
+/** The mark the rotation field starts with, the same in every language. */
+const TURN_MARK = '↻'
 
 /**
  * The top bar's Arrange ⋯ for the selected layers: its button, and the menu it opens with the rows
@@ -45,6 +57,7 @@ export function ArrangeMenu({ target, design, locked }: { target: Target; design
     toFront(action) ? (ends.front ? b.atFront : null) : ends.back ? b.atBack : null
   const done = () => setOpen(null)
   const direction = shared(target.props.map((pr) => (pr.direction ?? 'auto') as 'auto' | 'ltr' | 'rtl'))
+  const why = { locked: b.lockedRow, placedByLayout: b.placedByLayout }
   return (
     <BarPopover
       id="arrange"
@@ -87,7 +100,7 @@ export function ArrangeMenu({ target, design, locked }: { target: Target; design
             )
           case 'lineUp':
             return row.off ? (
-              <GreyedRow key="line-up" label={b.lineUp} why={b.placedByLayout} testId="more-line-up" end={<Caret />} />
+              <GreyedRow key="line-up" label={b.lineUp} why={why[row.off]} testId="more-line-up" end={<Caret />} />
             ) : (
               <SubMenu key="line-up" label={b.lineUp} testId="line-up">
                 <AlignRow editor={editor} />
@@ -97,29 +110,43 @@ export function ArrangeMenu({ target, design, locked }: { target: Target; design
             return (
               // On a phone the turn field is as tall as a row, a touch target a finger can hit.
               <div key="rotation" className="px-1.5 py-1 max-sm:[&_[data-scrub]]:min-h-[44px]">
-                <RotationField target={target} p={t.editor.props} />
+                {row.off ? (
+                  <GreyedTurn target={target} why={why[row.off]} />
+                ) : (
+                  <RotationField target={target} p={t.editor.props} />
+                )}
               </div>
             )
           case 'textDirection':
             return [
               <div key="divider" role="separator" className={MENU_DIVIDER} />,
-              <SubMenu key="text-direction" label={b.textDirection} testId="text-direction">
-                {(['auto', 'ltr', 'rtl'] as const).map((to) => (
-                  <button
-                    key={to}
-                    type="button"
-                    aria-pressed={direction === to}
-                    data-direction={to}
-                    onClick={() => {
-                      set(target, () => ({ direction: to }))
-                      done()
-                    }}
-                    className={MENU_ITEM}
-                  >
-                    {b.textDirections[to]}
-                  </button>
-                ))}
-              </SubMenu>,
+              row.off ? (
+                <GreyedRow
+                  key="text-direction"
+                  label={b.textDirection}
+                  why={why[row.off]}
+                  testId="more-text-direction"
+                  end={<Caret />}
+                />
+              ) : (
+                <SubMenu key="text-direction" label={b.textDirection} testId="text-direction">
+                  {(['auto', 'ltr', 'rtl'] as const).map((to) => (
+                    <button
+                      key={to}
+                      type="button"
+                      aria-pressed={direction === to}
+                      data-direction={to}
+                      onClick={() => {
+                        set(target, () => ({ direction: to }))
+                        done()
+                      }}
+                      className={MENU_ITEM}
+                    >
+                      {b.textDirections[to]}
+                    </button>
+                  ))}
+                </SubMenu>
+              ),
             ]
         }
       })}
@@ -190,6 +217,41 @@ function GreyedRow({
         {label}
         {end}
       </button>
+    </Tooltip>
+  )
+}
+
+/**
+ * The rotation field greyed out: the layers' turn, which nothing types, scrubs or steps, with a
+ * tooltip saying why under the pointer, on keyboard focus and on a tap, as a greyed row has.
+ */
+function GreyedTurn({ target, why }: { target: Target; why: string }) {
+  const p = useMessages().editor.props
+  const [told, setTold] = useState(false)
+  const phone = usePhone()
+  const rtl = dirOf(useLocale()) === 'rtl'
+  const turn = shared(target.props.map((pr) => num(pr, 'rotation') ?? 0))
+  const shown = turn === 'mixed' ? p.mixed : `${turn}°`
+  return (
+    <Tooltip label={why} side={phone ? 'bottom' : rtl ? 'left' : 'right'} open={told} onOpenChange={setTold}>
+      <div
+        role="spinbutton"
+        tabIndex={0}
+        aria-label={p.rotationName}
+        aria-disabled="true"
+        aria-valuenow={turn === 'mixed' ? undefined : turn}
+        aria-valuetext={shown}
+        aria-description={why}
+        data-scrub={p.rotationName}
+        onClick={(event) => {
+          event.preventDefault()
+          setTold(true)
+        }}
+        className={cn(KNOB, 'cursor-not-allowed opacity-40 hover:border-line', FOCUS_RING)}
+      >
+        <span aria-hidden>{TURN_MARK}</span>
+        <span className={cn(VALUE_TEXT, 'ms-auto')}>{shown}</span>
+      </div>
     </Tooltip>
   )
 }

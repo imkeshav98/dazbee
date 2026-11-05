@@ -215,6 +215,7 @@ export const ar: Messages = {
       placedByLayout: 'التخطيط التلقائي يحدد مكان هذه الطبقة',
       atFront: 'في المقدمة بالفعل',
       atBack: 'في الخلف بالفعل',
+      lockedRow: 'الطبقة مقفلة',
       grouping: 'تجميع',
       putInBox: 'ضع في صندوق',
       combine: 'دمج',

@@ -232,6 +232,8 @@ export const en = {
       atFront: 'Already at the front',
       /** Why Send to back and Send backward are greyed out for layers at the bottom of their stack. */
       atBack: 'Already at the back',
+      /** Why Line up, the rotation field and Text direction are greyed out for a locked layer. */
+      lockedRow: 'The layer is locked',
       grouping: 'Group',
       putInBox: 'Put in a box',
       combine: 'Combine',
