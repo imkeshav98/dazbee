@@ -1,0 +1,4 @@
+PASS click locked ellipse corner @(206,206) want=under got=under
+PASS click locked ellipse middle @(350,350) want=lk got=lk
+PASS hover locked ellipse corner @(206,206) want=under got=under
+PASS hover locked ellipse middle @(350,350) want=lk got=lk

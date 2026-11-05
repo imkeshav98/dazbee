@@ -1,0 +1,82 @@
+== 1280x760 zoom={"zoom":0.41712962962962963,"x":462,"y":188}
+PASS click 1280x760 photoCorner @(75,445) want=base got=base
+PASS click 1280x760 photo @(260,260) want=cutout got=cutout
+PASS click 1280x760 ellipseCorner @(595,445) want=backdrop got=backdrop
+PASS click 1280x760 ellipse @(780,260) want=ellipse got=ellipse
+PASS click 1280x760 starGap @(130,640) want=card got=card
+PASS click 1280x760 star @(260,780) want=star got=star
+PASS click 1280x760 text @(620,640) want=words got=words
+PASS click 1280x760 afterText @(980,640) want=panel got=panel
+PASS click 1280x760 belowText @(900,750) want=panel got=panel
+PASS hover 1280x760 photoCorner @(75,445) want=base got=base
+FAIL hover 1280x760 photo @(260,260) want=cutout got=base
+PASS hover 1280x760 ellipseCorner @(595,445) want=backdrop got=backdrop
+FAIL hover 1280x760 ellipse @(780,260) want=ellipse got=backdrop
+PASS hover 1280x760 starGap @(130,640) want=card got=card
+FAIL hover 1280x760 star @(260,780) want=star got=card
+PASS hover 1280x760 text @(620,640) want=words got=words
+PASS hover 1280x760 afterText @(980,640) want=panel got=panel
+PASS hover 1280x760 belowText @(900,750) want=panel got=panel
+PASS click 1280x760 select ellipse @(780,260) want=ellipse got=ellipse
+PASS click 1280x760 then its empty corner @(595,445) want=backdrop got=backdrop
+PASS click 1280x760 reselect ellipse @(780,260) want=ellipse got=ellipse
+1280x760 drag selected ellipse from empty corner: sel=ellipse ellipse=640,100 backdrop=580,60 (want ellipse ~640,100)
+1280x760   undo: ellipse=580,60
+1280x760 drag from photo clear corner (none selected): sel=base base=120,100 cutout=60,60 camera={"zoom":0.41712962962962963,"x":462,"y":188}
+== 820x1180 zoom={"zoom":0.5828703703703704,"x":142.5,"y":291.75}
+PASS click 820x1180 photoCorner @(75,445) want=base got=base
+PASS click 820x1180 photo @(260,260) want=cutout got=cutout
+PASS click 820x1180 ellipseCorner @(595,445) want=backdrop got=backdrop
+PASS click 820x1180 ellipse @(780,260) want=ellipse got=ellipse
+PASS click 820x1180 starGap @(130,640) want=card got=card
+PASS click 820x1180 star @(260,780) want=star got=star
+PASS click 820x1180 text @(620,640) want=words got=words
+PASS click 820x1180 afterText @(980,640) want=panel got=panel
+PASS click 820x1180 belowText @(900,750) want=panel got=panel
+PASS hover 820x1180 photoCorner @(75,445) want=base got=base
+FAIL hover 820x1180 photo @(260,260) want=cutout got=base
+PASS hover 820x1180 ellipseCorner @(595,445) want=backdrop got=backdrop
+FAIL hover 820x1180 ellipse @(780,260) want=ellipse got=backdrop
+PASS hover 820x1180 starGap @(130,640) want=card got=card
+FAIL hover 820x1180 star @(260,780) want=star got=card
+PASS hover 820x1180 text @(620,640) want=words got=words
+PASS hover 820x1180 afterText @(980,640) want=panel got=panel
+PASS hover 820x1180 belowText @(900,750) want=panel got=panel
+PASS click 820x1180 select ellipse @(780,260) want=ellipse got=ellipse
+PASS click 820x1180 then its empty corner @(595,445) want=backdrop got=backdrop
+PASS click 820x1180 reselect ellipse @(780,260) want=ellipse got=ellipse
+820x1180 drag selected ellipse from empty corner: sel=ellipse ellipse=640,100 backdrop=580,60 (want ellipse ~640,100)
+820x1180   undo: ellipse=580,60
+820x1180 drag from photo clear corner (none selected): sel=base base=120,100 cutout=60,60 camera={"zoom":0.5828703703703704,"x":142.5,"y":291.75}
+== 820x1180-touch zoom={"zoom":0.5828703703703704,"x":142.5,"y":291.75}
+PASS click 820x1180-touch photoCorner @(75,445) want=base got=base
+PASS click 820x1180-touch photo @(260,260) want=cutout got=cutout
+PASS click 820x1180-touch ellipseCorner @(595,445) want=backdrop got=backdrop
+PASS click 820x1180-touch ellipse @(780,260) want=ellipse got=ellipse
+PASS click 820x1180-touch starGap @(130,640) want=card got=card
+PASS click 820x1180-touch star @(260,780) want=star got=star
+PASS click 820x1180-touch text @(620,640) want=words got=words
+PASS click 820x1180-touch afterText @(980,640) want=panel got=panel
+PASS click 820x1180-touch belowText @(900,750) want=panel got=panel
+PASS click 820x1180-touch select ellipse @(780,260) want=ellipse got=ellipse
+PASS click 820x1180-touch then its empty corner @(595,445) want=backdrop got=backdrop
+PASS click 820x1180-touch reselect ellipse @(780,260) want=ellipse got=ellipse
+820x1180-touch drag selected ellipse from empty corner: sel=ellipse ellipse=640,100 backdrop=580,60 (want ellipse ~640,100)
+820x1180-touch   undo: ellipse=580,60
+820x1180-touch drag from photo clear corner (none selected): sel=base base=120,100 cutout=60,60 camera={"zoom":0.5828703703703704,"x":142.5,"y":291.75}
+== 390x844-touch zoom={"zoom":0.3314814814814815,"x":16,"y":154}
+PASS click 390x844-touch photoCorner @(75,445) want=base got=base
+PASS click 390x844-touch photo @(260,260) want=cutout got=cutout
+PASS click 390x844-touch ellipseCorner @(595,445) want=backdrop got=backdrop
+PASS click 390x844-touch ellipse @(780,260) want=ellipse got=ellipse
+PASS click 390x844-touch starGap @(130,640) want=card got=card
+PASS click 390x844-touch star @(260,780) want=star got=star
+PASS click 390x844-touch text @(620,640) want=words got=words
+PASS click 390x844-touch afterText @(980,640) want=panel got=panel
+PASS click 390x844-touch belowText @(900,750) want=panel got=panel
+PASS click 390x844-touch select ellipse @(780,260) want=ellipse got=ellipse
+PASS click 390x844-touch then its empty corner @(595,445) want=backdrop got=backdrop
+PASS click 390x844-touch reselect ellipse @(780,260) want=ellipse got=ellipse
+390x844-touch drag selected ellipse from empty corner: sel=ellipse ellipse=640,100 backdrop=580,60 (want ellipse ~640,100)
+390x844-touch   undo: ellipse=580,60
+390x844-touch drag from photo clear corner (none selected): sel=base base=120,100 cutout=60,60 camera={"zoom":0.3314814814814815,"x":16,"y":154}

@@ -1,0 +1,15 @@
+right-click an ellipse's empty corner: sel=backdrop (want backdrop) menus=0
+image drop target at an ellipse's empty corner: backdrop (want backdrop)
+right-click a cut-out photo's clear corner: sel=base (want base) menus=0
+image drop target at a cut-out photo's clear corner: base (want base)
+right-click the box after a short line of text: sel=panel (want panel) menus=0
+image drop target at the box after a short line of text: panel (want panel)
+right-click the gap between a star's points: sel=card (want card) menus=0
+image drop target at the gap between a star's points: card (want card)
+PASS click select ellipse @(780,260) want=ellipse got=ellipse
+ellipse selected, right-click its empty corner: sel=backdrop
+click ellipse corner over bare frame: sel=[] picked frame=sq
+drag from ellipse corner over bare frame: sel=ell ellipse=60,60
+FAIL click black luminance mask (nothing shows) @(700,200) want=floor2 got=lg
+FAIL click layer at opacity 0 @(700,500) want=floor2 got=zero
+FAIL click fill colour alpha 0 @(700,780) want=floor2 got=clearfill

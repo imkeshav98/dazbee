@@ -1,0 +1,5 @@
+beside short line (380,80): element under pointer=BUTTON.flex h-[30px] min-w-[30px] shrink-0 cursor-pointer items-center justify-c; after click active=SECTION.pop-in absolute z-20 flex flex-col overflow-hidden rounded-[16px] surfac caret=true sel=t1; text "Sale" -> "Sale"
+beside short line (300,110): element under pointer=CANVAS.block size-full touch-none; after click active=BODY. caret=true sel=t1; text "Sale" -> "SaleQ"
+below lines (300,170): element under pointer=CANVAS.block size-full touch-none; after click active=BODY. caret=true sel=t1; text "SaleQ" -> "SaleQQ"
+beside short line (420,60): element under pointer=INPUT.h-full w-10 bg-transparent text-center font-mono text-[12px] tabular-nums ; after click active=INPUT.h-full w-10 bg-transparent text-center font-mono text-[12px] tabular-nums  caret=true sel=t1; text "SaleQQ" -> "SaleQQ"
+t2 editing: click beside short last line, type Q: caret=false sel=floor text="Fresh coffee every morning in town\nHi"

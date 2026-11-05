@@ -1,0 +1,52 @@
+PASS click fill 2:1 opaque left @(100,140) want=p1 got=p1
+PASS click fill 2:1 clear right @(340,140) want=floor got=floor
+PASS click fill 2:1 blue square top right @(420,60) want=p1 got=p1
+PASS click fill 2:1 5% band bottom right @(330,228) want=floor got=floor
+PASS click fill square (cover) left @(540,140) want=p2 got=p2
+PASS click fill square (cover) right @(660,140) want=floor got=floor
+PASS click fit letterbox top @(800,60) want=floor got=floor
+PASS click fit letterbox bottom @(800,300) want=floor got=floor
+PASS click fit opaque left @(800,180) want=p3 got=p3
+PASS click fit clear right @(990,200) want=floor got=floor
+PASS click fit blue square @(1030,120) want=p3 got=p3
+PASS click crop rect left (red) @(100,470) want=p4 got=p4
+PASS click crop rect right (clear) @(300,470) want=floor got=floor
+PASS click tile corner of first tile @(410,350) want=floor got=floor
+PASS click tile middle of first tile @(700,620) want=p5 got=p5
+PASS click tile corner of second tile @(1010,350) want=floor got=floor
+PASS click tile body of second tile @(1035,620) want=p5 got=p5
+PASS click turned 90 top half @(650,680) want=p6 got=p6
+PASS click turned 90 bottom half (clear) @(650,860) want=floor got=floor
+PASS click turned 90 blue square (bottom right) @(706,906) want=p6 got=p6
+FAIL click faint 5% opacity photo opaque px @(850,750) want=floor got=p7
+PASS click photo on ellipse: corner @(48,708) want=floor got=floor
+PASS click photo on ellipse: opaque part @(120,850) want=p8 got=p8
+PASS click photo on ellipse: clear right half @(300,850) want=floor got=floor
+PASS click crop without rect: left @(850,960) want=p9 got=p9
+PASS click crop without rect: right @(990,960) want=floor got=floor
+PASS hover fill 2:1 opaque left @(100,140) want=p1 got=p1
+PASS hover fill 2:1 clear right @(340,140) want=floor got=floor
+PASS hover fill 2:1 blue square top right @(420,60) want=p1 got=p1
+PASS hover fill 2:1 5% band bottom right @(330,228) want=floor got=floor
+PASS hover fill square (cover) left @(540,140) want=p2 got=p2
+PASS hover fill square (cover) right @(660,140) want=floor got=floor
+PASS hover fit letterbox top @(800,60) want=floor got=floor
+PASS hover fit letterbox bottom @(800,300) want=floor got=floor
+PASS hover fit opaque left @(800,180) want=p3 got=p3
+PASS hover fit clear right @(990,200) want=floor got=floor
+PASS hover fit blue square @(1030,120) want=p3 got=p3
+PASS hover crop rect left (red) @(100,470) want=p4 got=p4
+PASS hover crop rect right (clear) @(300,470) want=floor got=floor
+PASS hover tile corner of first tile @(410,350) want=floor got=floor
+PASS hover tile middle of first tile @(700,620) want=p5 got=p5
+PASS hover tile corner of second tile @(1010,350) want=floor got=floor
+PASS hover tile body of second tile @(1035,620) want=p5 got=p5
+FAIL hover turned 90 top half @(650,680) want=p6 got=other(560,560,120x240)
+PASS hover turned 90 bottom half (clear) @(650,860) want=floor got=floor
+FAIL hover turned 90 blue square (bottom right) @(706,906) want=p6 got=other(560,560,120x240)
+FAIL hover faint 5% opacity photo opaque px @(850,750) want=floor got=p7
+PASS hover photo on ellipse: corner @(48,708) want=floor got=floor
+PASS hover photo on ellipse: opaque part @(120,850) want=p8 got=p8
+PASS hover photo on ellipse: clear right half @(300,850) want=floor got=floor
+PASS hover crop without rect: left @(850,960) want=p9 got=p9
+PASS hover crop without rect: right @(990,960) want=floor got=floor

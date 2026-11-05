@@ -1,0 +1,8 @@
+t2 stored: {"x":500,"y":40,"width":420,"height":100,"text":"Fresh coffee every morning in town\nHi","boxMode":"autoHeight"} boxOf={"x":500,"y":40,"width":420,"height":100}
+t2 stored: {"x":500,"y":40,"width":420,"height":100,"text":"Fresh coffee every morning in town\nHi","boxMode":"autoHeight"} boxOf={"x":500,"y":40,"width":420,"height":100}
+after dblclick: {"x":500,"y":40,"width":420,"height":100,"text":"Fresh coffee every morning in town\nHi","boxMode":"autoHeight"} sel=t2
+click on Hi while editing (under=CANVAS): {"x":500,"y":40,"width":420,"height":100,"text":"Fresh coffee every morning in town\nHi","boxMode":"autoHeight"} sel=floor caret=false
+after escape: {"x":500,"y":40,"width":420,"height":100,"text":"Fresh coffee every morning in town\nHi","boxMode":"autoHeight"} boxOf={"x":500,"y":40,"width":420,"height":100}
+click @(510,175) -> floor
+click @(800,175) -> floor
+click @(880,120) -> floor

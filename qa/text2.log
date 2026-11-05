@@ -1,0 +1,40 @@
+b y+ 0: ......#########
+b y+10: ......#########
+b y+20: ......#########
+b y+30: ......#########
+b y+40: ......#########
+b y+50: ......#########
+b y+60: ......#########
+b y+70: ......#########
+b y+80: ......#########
+b y+90: ......#########
+n y+ 0: .........######
+n y+10: .........######
+n y+20: .........######
+n y+30: .........######
+n y+40: .........######
+n y+50: .........######
+n y+60: .........######
+n y+70: .........######
+n y+80: .........######
+n y+90: .........######
+r y+ 0: ...............
+r y+10: #########...###
+r y+20: #########...###
+r y+30: #########...###
+r y+40: #########...###
+r y+50: #########...###
+r y+60: #########...###
+r y+70: #########...###
+r y+80: #########...###
+r y+90: #########......
+dblclick Sale: caret visible=true sel=t1
+click below lines then type 1: caret=true text="Sale1" sel=t1
+hover below lines while editing: hover=floor
+click beside short line then type 2: caret=true text="Sale1" sel=t1
+click in word then type 3: text="S3ale1"
+drag from below lines leftwards: textSel={"id":"t1","range":{"start":0,"end":6}} sel=t1
+click outside text box: caret=false sel=floor
+arabic dblclick words: caret=true sel=t8
+arabic: click left empty part, type Z: caret=true text="مرحبا بالعالمZ" sel=t8
+undo after edits: t1="S3ale1"

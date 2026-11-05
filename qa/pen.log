@@ -1,0 +1,7 @@
+pen path xG4QPqEShNetYf_kOhIcF: {"blendMode":"normal","effects":[],"fills":[],"height":350,"opacity":1,"rotation":0,"shape":{"d":"M0 0 L250 350 L500 0","drawnIn":{"height":350,"width":500},"fillRule":"nonzero","kind":"path"},"strokes":[{"align":"center","cap":"round","dashOffset":0,"dashes":[],"join":"round","miterLimit":4,"paint":{"color":"#1F2329FF","type":"solid"},"width":2}],"visible":true,"width":500,"x":250,"y":250}
+FAIL click block inside the V of an open pen path @(500,375) want=head got=xG4QPqEShNetYf_kOhIcF
+FAIL click floor inside the V of an open pen path @(500,270) want=floor got=xG4QPqEShNetYf_kOhIcF
+PASS click on the pen stroke @(375,425) want=xG4QPqEShNetYf_kOhIcF got=xG4QPqEShNetYf_kOhIcF
+FAIL hover block inside the V @(500,375) want=head got=xG4QPqEShNetYf_kOhIcF
+FAIL click block inside the V (shot) @(500,375) want=head got=xG4QPqEShNetYf_kOhIcF
+final sel=xG4QPqEShNetYf_kOhIcF

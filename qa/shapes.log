@@ -1,0 +1,72 @@
+PASS click ellipse corner @(68,292) want=floor got=floor
+PASS click ellipse middle @(180,180) want=ell got=ell
+PASS click ellipse just inside edge @(64,180) want=ell got=ell
+PASS click star gap upper-left @(402,108) want=floor got=floor
+PASS click star gap bottom middle @(480,290) want=floor got=floor
+PASS click star middle @(480,190) want=star got=star
+PASS click star point tip @(480,66) want=star got=star
+PASS click triangle top-left corner @(672,72) want=floor got=floor
+PASS click triangle middle @(780,230) want=tri got=tri
+PASS click rounded rect corner @(934,64) want=floor got=floor
+PASS click rounded rect middle @(995,180) want=rr got=rr
+PASS click tri path empty half @(280,580) want=floor got=floor
+PASS click tri path filled @(100,400) want=tpath got=tpath
+FAIL click open arc bowl (nothing drawn) @(480,372) want=floor got=arc
+FAIL click open arc below curve @(480,470) want=floor got=arc
+PASS click open arc on stroke @(480,480) want=arc got=arc
+PASS click line on it @(780,480) want=line got=line
+PASS click line 5px off @(780,485) want=line got=line
+PASS click line 14px off @(780,494) want=floor got=floor
+PASS click turned line on it @(990,510) want=rline got=rline
+PASS click turned line off it @(990,450) want=floor got=floor
+PASS click donut hole @(180,780) want=floor got=floor
+PASS click donut ring @(75,780) want=donut got=donut
+PASS click donut corner @(66,666) want=floor got=floor
+PASS click stroke-only ellipse middle @(480,780) want=ring got=ring
+PASS click stroke-only ellipse corner @(366,666) want=floor got=floor
+PASS click stroke-only ellipse on stroke outside edge @(357,780) want=ring got=ring
+PASS click outside stroke 20px out @(670,780) want=outer got=outer
+PASS click outside stroke 40px out @(650,780) want=floor got=floor
+PASS click inside stroke 6px out @(904,765) want=floor got=floor
+PASS click inside stroke on stroke @(915,765) want=inner got=inner
+PASS click turned star middle @(470,1000) want=rstar got=rstar
+PASS click turned star unturned tip spot (top centre of box) @(470,934) want=floor got=floor
+PASS click turned rounded rect: box corner @(702,932) want=floor got=floor
+PASS click turned rounded rect: turned body @(800,940) want=rrect got=rrect
+PASS click turned rounded rect: off turned body @(720,980) want=floor got=floor
+PASS hover ellipse corner @(68,292) want=floor got=floor
+PASS hover ellipse middle @(180,180) want=ell got=ell
+PASS hover ellipse just inside edge @(64,180) want=ell got=ell
+PASS hover star gap upper-left @(402,108) want=floor got=floor
+PASS hover star gap bottom middle @(480,290) want=floor got=floor
+PASS hover star middle @(480,190) want=star got=star
+PASS hover star point tip @(480,66) want=star got=star
+PASS hover triangle top-left corner @(672,72) want=floor got=floor
+PASS hover triangle middle @(780,230) want=tri got=tri
+PASS hover rounded rect corner @(934,64) want=floor got=floor
+PASS hover rounded rect middle @(995,180) want=rr got=rr
+PASS hover tri path empty half @(280,580) want=floor got=floor
+PASS hover tri path filled @(100,400) want=tpath got=tpath
+FAIL hover open arc bowl (nothing drawn) @(480,372) want=floor got=arc
+FAIL hover open arc below curve @(480,470) want=floor got=arc
+PASS hover open arc on stroke @(480,480) want=arc got=arc
+PASS hover line on it @(780,480) want=line got=line
+PASS hover line 5px off @(780,485) want=line got=line
+PASS hover line 14px off @(780,494) want=floor got=floor
+FAIL hover turned line on it @(990,510) want=rline got=other(823,399,91x91)
+PASS hover turned line off it @(990,450) want=floor got=floor
+PASS hover donut hole @(180,780) want=floor got=floor
+PASS hover donut ring @(75,780) want=donut got=donut
+PASS hover donut corner @(66,666) want=floor got=floor
+PASS hover stroke-only ellipse middle @(480,780) want=ring got=ring
+PASS hover stroke-only ellipse corner @(366,666) want=floor got=floor
+PASS hover stroke-only ellipse on stroke outside edge @(357,780) want=ring got=ring
+PASS hover outside stroke 20px out @(670,780) want=outer got=outer
+PASS hover outside stroke 40px out @(650,780) want=floor got=floor
+PASS hover inside stroke 6px out @(904,765) want=floor got=floor
+PASS hover inside stroke on stroke @(915,765) want=inner got=inner
+FAIL hover turned star middle @(470,1000) want=rstar got=other(398,782,156x156)
+PASS hover turned star unturned tip spot (top centre of box) @(470,934) want=floor got=floor
+PASS hover turned rounded rect: box corner @(702,932) want=floor got=floor
+FAIL hover turned rounded rect: turned body @(800,940) want=rrect got=other(700,764,80x160)
+PASS hover turned rounded rect: off turned body @(720,980) want=floor got=floor

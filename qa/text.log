@@ -1,0 +1,126 @@
+t2 box {"x":500,"y":40,"width":420,"height":100} t3 box {"x":40,"y":240,"width":100,"height":80}
+PASS click short: on word @(80,80) want=t1 got=t1
+PASS click short: after word @(380,80) want=floor got=floor
+PASS click short: below line @(80,180) want=floor got=floor
+PASS click auto height: first line start @(520,65) want=t2 got=t2
+PASS click auto height: last short line @(515,120) want=t2 got=t2
+PASS click auto height: beside last short line @(890,120) want=floor got=floor
+PASS click auto width: middle @(90,280) want=t3 got=t3
+PASS click auto width: near top edge @(90,243) want=t3 got=t3
+PASS click centred: left of word @(520,340) want=floor got=floor
+PASS click centred: on word @(750,340) want=t4 got=t4
+PASS click end: left side @(60,440) want=floor got=floor
+PASS click end: right side word @(410,440) want=t5 got=t5
+PASS click bottom: top of box @(540,480) want=floor got=floor
+PASS click bottom: on word at bottom @(540,620) want=t6 got=t6
+FAIL click bullets: marker @(52,588) want=t7 got=floor
+PASS click bullets: after One @(380,588) want=floor got=floor
+PASS click bullets: on Two @(110,640) want=t7 got=t7
+PASS click arabic: right (words) @(960,735) want=t8 got=t8
+PASS click arabic: left (empty) @(530,735) want=floor got=floor
+PASS click middle v: top @(80,945) want=floor got=floor
+PASS click middle v: middle on word @(70,1005) want=t11 got=t11
+PASS hover short: on word @(80,80) want=t1 got=t1
+PASS hover short: after word @(380,80) want=floor got=floor
+PASS hover short: below line @(80,180) want=floor got=floor
+PASS hover auto height: first line start @(520,65) want=t2 got=t2
+PASS hover auto height: last short line @(515,120) want=t2 got=t2
+PASS hover auto height: beside last short line @(890,120) want=floor got=floor
+PASS hover auto width: middle @(90,280) want=t3 got=t3
+PASS hover auto width: near top edge @(90,243) want=t3 got=t3
+PASS hover centred: left of word @(520,340) want=floor got=floor
+PASS hover centred: on word @(750,340) want=t4 got=t4
+PASS hover end: left side @(60,440) want=floor got=floor
+PASS hover end: right side word @(410,440) want=t5 got=t5
+PASS hover bottom: top of box @(540,480) want=floor got=floor
+PASS hover bottom: on word at bottom @(540,620) want=t6 got=t6
+FAIL hover bullets: marker @(52,588) want=t7 got=floor
+PASS hover bullets: after One @(380,588) want=floor got=floor
+PASS hover bullets: on Two @(110,640) want=t7 got=t7
+PASS hover arabic: right (words) @(960,735) want=t8 got=t8
+PASS hover arabic: left (empty) @(530,735) want=floor got=floor
+PASS hover middle v: top @(80,945) want=floor got=floor
+PASS hover middle v: middle on word @(70,1005) want=t11 got=t11
+INFO shrink grid @(60,790) -> t9
+INFO shrink grid @(200,790) -> t9
+INFO shrink grid @(420,790) -> floor
+INFO shrink grid @(60,880) -> t9
+INFO shrink grid @(300,880) -> floor
+INFO shrink grid @(420,890) -> floor
+INFO turned grid @(700,920) -> t10
+INFO turned grid @(760,950) -> t10
+INFO turned grid @(900,990) -> floor
+INFO turned grid @(660,1000) -> floor
+dblclick word -> sel=t1 textSel=null
+editing: click below lines -> sel=t1 textSel=null
+editing: hover below lines -> hover=none
+editing: click beside short line -> sel=t1 textSel=null
+typed X after click beside line -> text="Sale"
+editing: dblclick below lines -> sel=t1 textSel={"id":"t1","range":{"start":0,"end":4}}
+editing: click outside box -> sel=floor textSel=null
+not editing: dblclick beside short line -> sel=floor textSel=null
+arabic dblclick on words -> sel=t8 textSel=null
+arabic editing: click left empty part of box -> sel=t8 textSel=null
+t2 box {"x":500,"y":40,"width":420,"height":100} t3 box {"x":40,"y":240,"width":100,"height":80}
+PASS click short: on word @(80,80) want=t1 got=t1
+PASS click short: after word @(380,80) want=floor got=floor
+PASS click short: below line @(80,180) want=floor got=floor
+PASS click auto height: first line start @(520,65) want=t2 got=t2
+PASS click auto height: last short line @(515,120) want=t2 got=t2
+PASS click auto height: beside last short line @(890,120) want=floor got=floor
+PASS click auto width: middle @(90,280) want=t3 got=t3
+PASS click auto width: near top edge @(90,243) want=t3 got=t3
+PASS click centred: left of word @(520,340) want=floor got=floor
+PASS click centred: on word @(750,340) want=t4 got=t4
+PASS click end: left side @(60,440) want=floor got=floor
+PASS click end: right side word @(410,440) want=t5 got=t5
+PASS click bottom: top of box @(540,480) want=floor got=floor
+PASS click bottom: on word at bottom @(540,620) want=t6 got=t6
+FAIL click bullets: marker @(52,588) want=t7 got=floor
+PASS click bullets: after One @(380,588) want=floor got=floor
+PASS click bullets: on Two @(110,640) want=t7 got=t7
+PASS click arabic: right (words) @(960,735) want=t8 got=t8
+PASS click arabic: left (empty) @(530,735) want=floor got=floor
+PASS click middle v: top @(80,945) want=floor got=floor
+PASS click middle v: middle on word @(70,1005) want=t11 got=t11
+PASS hover short: on word @(80,80) want=t1 got=t1
+PASS hover short: after word @(380,80) want=floor got=floor
+PASS hover short: below line @(80,180) want=floor got=floor
+PASS hover auto height: first line start @(520,65) want=t2 got=t2
+PASS hover auto height: last short line @(515,120) want=t2 got=t2
+PASS hover auto height: beside last short line @(890,120) want=floor got=floor
+PASS hover auto width: middle @(90,280) want=t3 got=t3
+PASS hover auto width: near top edge @(90,243) want=t3 got=t3
+PASS hover centred: left of word @(520,340) want=floor got=floor
+PASS hover centred: on word @(750,340) want=t4 got=t4
+PASS hover end: left side @(60,440) want=floor got=floor
+PASS hover end: right side word @(410,440) want=t5 got=t5
+PASS hover bottom: top of box @(540,480) want=floor got=floor
+PASS hover bottom: on word at bottom @(540,620) want=t6 got=t6
+FAIL hover bullets: marker @(52,588) want=t7 got=floor
+PASS hover bullets: after One @(380,588) want=floor got=floor
+PASS hover bullets: on Two @(110,640) want=t7 got=t7
+PASS hover arabic: right (words) @(960,735) want=t8 got=t8
+PASS hover arabic: left (empty) @(530,735) want=floor got=floor
+PASS hover middle v: top @(80,945) want=floor got=floor
+PASS hover middle v: middle on word @(70,1005) want=t11 got=t11
+INFO shrink grid @(60,790) -> t9
+INFO shrink grid @(200,790) -> t9
+INFO shrink grid @(420,790) -> floor
+INFO shrink grid @(60,880) -> t9
+INFO shrink grid @(300,880) -> floor
+INFO shrink grid @(420,890) -> floor
+INFO turned grid @(700,920) -> t10
+INFO turned grid @(760,950) -> t10
+INFO turned grid @(900,990) -> floor
+INFO turned grid @(660,1000) -> floor
+dblclick word -> sel=t1 textSel=null
+editing: click below lines -> sel=t1 textSel=null
+editing: hover below lines -> hover=none
+editing: click beside short line -> sel=t1 textSel=null
+typed X after click beside line -> text="Sale"
+editing: dblclick below lines -> sel=t1 textSel={"id":"t1","range":{"start":0,"end":4}}
+editing: click outside box -> sel=floor textSel=null
+not editing: dblclick beside short line -> sel=floor textSel=null
+arabic dblclick on words -> sel=t8 textSel=null
+arabic editing: click left empty part of box -> sel=t8 textSel=null

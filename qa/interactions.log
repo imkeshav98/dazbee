@@ -1,0 +1,41 @@
+PASS click select cut-out by its middle @(260,260) want=cutout got=cutout
+selected cutout dragged from clear corner: sel=cutout cutout=100,30 base=60,60 (want cutout 100,30 base 60,60)
+  undo: cutout=60,60 base=60,60 (want 60,60 / 60,60)
+  redo: cutout=100,30 base=60,60 (want 100,30 / 60,60)
+drag from star gap (nothing selected): sel=card card=90,580 star=60,560 (want card 90,580 star 60,560)
+  undo: card=60,560 (want 60,560)
+  redo: card=90,580 (want 90,580)
+PASS click select star @(260,780) want=star got=star
+selected star dragged from its gap: sel=star star=90,580 card=60,560 (want star 90,580 card 60,560)
+PASS click select words @(620,640) want=words got=words
+selected text dragged from below its lines: sel=words words=560,620 panel=580,580 (want words 560,620 panel 580,580)
+  undo: words=600,600
+PASS click select ellipse @(780,260) want=ellipse got=ellipse
+shift+click ellipse's empty corner with ellipse selected: sel=ellipse,backdrop (want ellipse,backdrop)
+shift+click photo clear corner: sel=ellipse,backdrop,base (want ellipse,backdrop,base)
+shift+click photo middle: sel=ellipse,backdrop,base,cutout (want ellipse,backdrop,base,cutout)
+marquee over ellipse's empty corner only: sel=backdrop,ellipse
+marquee around ellipse+backdrop: sel=backdrop,ellipse
+layers panel picks Cut-out: sel=cutout
+  drag from its clear corner: sel=cutout cutout=60,60 base=60,60 (want cutout 90,90)
+PASS click with cutout selected (panel), click its clear corner @(75,445) want=base got=base
+PASS click frame 2 photoCorner @(75,445) want=f2-base got=f2-base
+PASS click frame 2 photo @(260,260) want=f2-cutout got=f2-cutout
+PASS click frame 2 ellipseCorner @(595,445) want=f2-backdrop got=f2-backdrop
+PASS click frame 2 ellipse @(780,260) want=f2-ellipse got=f2-ellipse
+PASS click frame 2 starGap @(130,640) want=f2-card got=f2-card
+PASS click frame 2 star @(260,780) want=f2-star got=f2-star
+PASS click frame 2 text @(620,640) want=f2-words got=f2-words
+PASS click frame 2 afterText @(980,640) want=f2-panel got=f2-panel
+PASS click frame 2 belowText @(900,750) want=f2-panel got=f2-panel
+PASS hover frame 2 photoCorner @(75,445) want=f2-base got=f2-base
+FAIL hover frame 2 photo @(260,260) want=f2-cutout got=f2-base
+PASS hover frame 2 ellipseCorner @(595,445) want=f2-backdrop got=f2-backdrop
+FAIL hover frame 2 ellipse @(780,260) want=f2-ellipse got=f2-backdrop
+PASS hover frame 2 starGap @(130,640) want=f2-card got=f2-card
+FAIL hover frame 2 star @(260,780) want=f2-star got=f2-card
+PASS hover frame 2 text @(620,640) want=f2-words got=f2-words
+PASS hover frame 2 afterText @(980,640) want=f2-panel got=f2-panel
+PASS hover frame 2 belowText @(900,750) want=f2-panel got=f2-panel
+PASS click frame 1 ellipse @(780,260) want=ellipse got=ellipse
+PASS click then frame 2 ellipse corner @(595,445) want=f2-backdrop got=f2-backdrop

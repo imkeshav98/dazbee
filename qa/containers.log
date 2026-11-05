@@ -1,0 +1,51 @@
+auto children: [{"x":60,"y":340,"width":180,"height":180},{"x":260,"y":340,"width":180,"height":180},{"x":460,"y":340,"width":180,"height":180}]
+PASS click group gap between children @(240,130) want=floor got=floor
+PASS click group ellipse corner @(46,46) want=floor got=floor
+PASS click group photo clear corner @(266,46) want=floor got=floor
+PASS click group ellipse middle @(130,130) want=grp got=grp
+PASS click group photo middle @(350,130) want=grp got=grp
+PASS click empty box (no fill) corner, outside its ellipse @(505,45) want=bx got=bx
+PASS click empty box ellipse middle @(610,150) want=bx got=bx
+PASS click clip box photo corner (box fill shows) @(786,46) want=clip got=clip
+PASS click clip box: overhang ellipse outside the clip @(1040,300) want=floor got=floor
+PASS click auto box: ellipse corner @(64,344) want=auto got=auto
+PASS click auto box: ellipse middle @(150,430) want=auto got=auto
+PASS click auto box: photo corner @(264,344) want=auto got=auto
+PASS click auto box: star gap @(490,370) want=auto got=auto
+PASS click masked: mask ellipse corner @(46,626) want=floor got=floor
+PASS click masked: middle @(170,750) want=mg got=mg
+PASS click photo mask: clear corner @(366,626) want=floor got=floor
+PASS click photo mask: middle @(490,750) want=mg2 got=mg2
+PASS click locked ellipse corner -> layer under @(706,626) want=under got=under
+PASS click locked ellipse middle (click selects locked) @(830,750) want=lk got=lk
+PASS click hidden layer @(850,990) want=floor got=floor
+PASS click turned group: ellipse middle @(848,375) want=tgrp got=tgrp
+PASS click turned group: unturned ellipse spot @(790,360) want=floor got=floor
+PASS hover group gap between children @(240,130) want=floor got=floor
+PASS hover group ellipse corner @(46,46) want=floor got=floor
+PASS hover group photo clear corner @(266,46) want=floor got=floor
+PASS hover group ellipse middle @(130,130) want=grp got=grp
+PASS hover group photo middle @(350,130) want=grp got=grp
+PASS hover empty box (no fill) corner, outside its ellipse @(505,45) want=bx got=bx
+PASS hover empty box ellipse middle @(610,150) want=bx got=bx
+PASS hover clip box photo corner (box fill shows) @(786,46) want=clip got=clip
+PASS hover clip box: overhang ellipse outside the clip @(1040,300) want=floor got=floor
+PASS hover auto box: ellipse corner @(64,344) want=auto got=auto
+PASS hover auto box: ellipse middle @(150,430) want=auto got=auto
+PASS hover auto box: photo corner @(264,344) want=auto got=auto
+PASS hover auto box: star gap @(490,370) want=auto got=auto
+PASS hover masked: mask ellipse corner @(46,626) want=floor got=floor
+PASS hover masked: middle @(170,750) want=mg got=mg
+PASS hover photo mask: clear corner @(366,626) want=floor got=floor
+PASS hover photo mask: middle @(490,750) want=mg2 got=mg2
+PASS hover locked ellipse corner -> layer under @(706,626) want=under got=under
+FAIL hover locked ellipse middle (click selects locked) @(830,750) want=lk got=under
+PASS hover hidden layer @(850,990) want=floor got=floor
+drag from locked ellipse corner: sel=under under={"blendMode":"normal","effects":[],"fills":[{"color":"#7E57C2FF","type":"solid"}],"height":260,"opacity":1,"rotation":0,"shape":{"cornerRadius":0,"kind":"rect"},"strokes":[],"visible":true,"width":260,"x":726.08,"y":640} lk={"blendMode":"normal","effects":[],"fills":[{"color":"#FFC400FF","type":"solid"}],"height":260,"opacity":1,"rotation":0,"shape":{"kind":"ellipse"},"strokes":[],"visible":true,"width":260,"x":700,"y":620}
+after undo under={"blendMode":"normal","effects":[],"fills":[{"color":"#7E57C2FF","type":"solid"}],"height":260,"opacity":1,"rotation":0,"shape":{"cornerRadius":0,"kind":"rect"},"strokes":[],"visible":true,"width":260,"x":700,"y":620}
+dblclick group ellipse -> sel=gA
+PASS click in entered group: photo clear corner @(266,46) want=floor got=floor
+PASS click in entered group: photo middle @(350,130) want=gB got=gB
+dblclick auto ellipse -> sel=aE
+FAIL click in entered auto: ellipse corner @(64,344) want=auto got=aE
+PASS click in entered auto: star middle @(550,440) want=aS got=aS

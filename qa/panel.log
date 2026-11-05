@@ -1,0 +1,4 @@
+panel picks Cut-out: sel=cutout
+drag from its clear corner: sel=cutout cutout=90,90 base=60,60 (want cutout 90,90 base 60,60)
+undo: cutout=60,60
+panel picks Ellipse: sel=ellipse
