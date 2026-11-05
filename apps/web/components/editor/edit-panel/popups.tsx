@@ -405,7 +405,7 @@ function TextAlignBody({ target, p }: { target: Target; p: P }) {
 /** The text's list, as the top bar's List pop-up shows it: none, bullets or numbers. */
 function TextListBody({ target, p }: { target: Target; p: P }) {
   return (
-    <div className="flex w-64 flex-col p-1">
+    <div className="flex w-64 flex-col p-1 max-sm:[&_[role=radio]]:h-[44px]">
       <Segments
         name={p.list}
         value={shared(target.props.map((pr) => (pr.list ?? 'none') as 'none' | 'bullet' | 'number'))}
@@ -421,7 +421,7 @@ function TextListBody({ target, p }: { target: Target; p: P }) {
 function TextCaseBody({ target, p }: { target: Target; p: P }) {
   const { style, setStyle } = textStyle(target)
   return (
-    <div className="flex w-56 flex-col p-1">
+    <div className="flex w-56 flex-col p-1 max-sm:[&_[role=radio]]:h-[44px]">
       <Segments
         name={p.textCase}
         value={(style('textCase') ?? 'none') as 'none' | 'upper' | 'lower' | 'title' | 'mixed'}

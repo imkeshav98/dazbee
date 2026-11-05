@@ -241,9 +241,9 @@ test('on a phone the bar takes two rows at most, wraps between its groups, ends 
       expect(next.left - target.right, `${one.name} ${target.name} to ${next.name}`).toBeGreaterThanOrEqual(APART - 0.5)
     }
   }
-  // A text's Text style and Align pop-ups: every toggle and choice a finger's size.
+  // A text's Text style, Align, List and Case pop-ups: every toggle and choice a finger's size.
   await selectCase(page, GRID[1] as (typeof GRID)[number])
-  for (const pop of ['text-style', 'align']) {
+  for (const pop of ['text-style', 'align', 'list', 'case']) {
     const menu = await barMenu(page, pop)
     const small = await menu
       .locator('button')

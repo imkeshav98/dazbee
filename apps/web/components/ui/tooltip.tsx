@@ -29,6 +29,7 @@ export function Tooltip({
   sideOffset = 8,
   open,
   onOpenChange,
+  plain = false,
   children,
 }: {
   label: string
@@ -40,10 +41,19 @@ export function Tooltip({
   /** Whether it shows, for a caller that also opens it another way, such as a tap; left out, hover and focus decide. */
   open?: boolean
   onOpenChange?: (open: boolean) => void
+  /**
+   * It holds only words, so the pointer moving off its control towards it doesn't keep it open,
+   * and the next control's tooltip shows at once.
+   */
+  plain?: boolean
   children: ReactNode
 }) {
   return (
-    <RadixTooltip.Root {...(open === undefined ? {} : { open })} {...(onOpenChange ? { onOpenChange } : {})}>
+    <RadixTooltip.Root
+      {...(open === undefined ? {} : { open })}
+      {...(onOpenChange ? { onOpenChange } : {})}
+      disableHoverableContent={plain}
+    >
       <RadixTooltip.Trigger asChild onFocus={keyboardFocusOnly}>
         {children}
       </RadixTooltip.Trigger>

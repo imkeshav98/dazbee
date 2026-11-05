@@ -275,6 +275,11 @@ test('in the app in Arabic the Align icon still draws where the text sits, and t
     expect(outside, `${width}`).toEqual([])
     expect(await wrapped(page), `${width}`).toEqual([])
   }
+  // Position's labels in Arabic show whole too.
+  await page.setViewportSize({ width: 1280, height: 760 })
+  await barMenu(page, 'position')
+  expect(await layoutProblems(page, { pieces: PIECES, uncut: UNCUT })).toEqual([])
+  await page.keyboard.press('Escape')
   await expect(page.getByTestId('bar-text-style')).toHaveAccessibleName('نمط النص')
   expect(errors).toEqual([])
 })

@@ -14,10 +14,12 @@ import {
   ORDER_MOVES,
   POSITION_NUMBERS,
 } from '../../support/bar-homes.ts'
+import { editorPath } from '../../support/editor.ts'
 import { enter } from '../../support/fields.ts'
 import { positionDesign } from '../../support/position-design.ts'
+import { seed } from '../../support/seed.ts'
 import { openStage, order, perform, props, selectLayers, undoRedo } from '../../support/stage.ts'
-import { expect, type Locator, type Page, test } from '../../support/test.ts'
+import { type Browser, expect, type Locator, type Page, test } from '../../support/test.ts'
 import { barMenu } from '../../support/top-bar.ts'
 
 test.describe.configure({ timeout: 180_000 })
@@ -37,13 +39,24 @@ const shownControls = (within: Locator) =>
     CONTROLS,
   )
 
-/** The controls of the edit panel the tooltip showing now covers, by their names; empty while it covers none. */
+/** The most a greyed control's tooltip keeps from it, in pixels: beside it, or just past its row. */
+const NEAR = 64
+
+/**
+ * The controls the tooltip showing now covers, by their names: the edit panel's, the top bar's
+ * and those of an open pop-up. Empty while it covers none.
+ */
 const controlsUnderTooltip = (page: Page) =>
   page.evaluate(() => {
     const tip = document.querySelector('[role="tooltip"]')?.parentElement
     if (!tip) return []
     const t = tip.getBoundingClientRect()
-    return [...document.querySelectorAll('#edit-panel :is(button, [data-scrub])')]
+    return [
+      ...document.querySelectorAll(
+        ':is(#edit-panel, [role="toolbar"], [data-radix-popper-content-wrapper]) :is(button, [data-scrub])',
+      ),
+    ]
+      .filter((one) => !tip.contains(one) && one.checkVisibility())
       .filter((one) => {
         const r = one.getBoundingClientRect()
         return (
@@ -53,6 +66,27 @@ const controlsUnderTooltip = (page: Page) =>
       })
       .map((one) => one.getAttribute('aria-label') ?? (one as HTMLElement).innerText)
   })
+
+/** How far the tooltip showing now lies from a control, along whichever way they are apart, in pixels. */
+const tooltipFrom = (page: Page, control: Locator) =>
+  control.evaluate((el) => {
+    const tip = document.querySelector('[role="tooltip"]')?.parentElement
+    if (!tip) return Infinity
+    const [t, r] = [tip.getBoundingClientRect(), el.getBoundingClientRect()]
+    return Math.max(0, t.top - r.bottom, r.top - t.bottom, t.left - r.right, r.left - t.right)
+  })
+
+/** The editor at 390×844 taking touches, as a person holds a phone, on the Position design. */
+async function openOnPhone(browser: Browser) {
+  const designId = await seed(positionDesign())
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true })
+  const page = await context.newPage()
+  const errors: string[] = []
+  page.on('pageerror', (error) => errors.push(error.message))
+  await page.goto(editorPath(designId))
+  await expect(page.getByTestId('status')).toHaveAttribute('data-ready', '', { timeout: 60_000 })
+  return { page, errors }
+}
 
 /** Where the turned layer's box, as drawn, starts on the left. */
 async function drawnLeft(page: Page, id: string) {
@@ -305,7 +339,10 @@ test("a locked layer's bar is Locked, Unlock and Position; its Position greys th
     await expect(greyed, id).toHaveCSS('cursor', 'not-allowed')
     await greyed.hover()
     await expect(tip, id).toHaveText('The layer is locked')
+    // Only its own tooltip shows: the one before has gone with the pointer.
+    await expect(tip, id).toHaveCount(1)
     expect(await controlsUnderTooltip(page), id).toEqual([])
+    expect(await tooltipFrom(page, greyed), id).toBeLessThanOrEqual(NEAR)
     await greyed.click({ force: true })
     await expect(tip, id).toHaveText('The layer is locked')
   }
@@ -375,4 +412,35 @@ test('a group takes its size and turn from what it holds, so its Position has on
   await enter(control(position, 'x'), '200')
   await expect.poll(async () => (await props(page, 'g1')).x).toBe(200)
   expect(errors).toEqual([])
+})
+
+test("on a phone a greyed control's tooltip shows just above it on a tap, near it and over no control, and Spread's in several layers' Line up keeps off the bar", async ({
+  browser,
+}) => {
+  const { page, errors } = await openOnPhone(browser)
+  await page.evaluate(() => window.dazbee?.setLocked(['words'], true))
+  await selectLayers(page, ['words'], { bar: true })
+  await page.getByTestId('bar-position').tap()
+  const position = page.locator('#edit-panel')
+  await expect(position).toBeVisible()
+  const tip = page.getByRole('tooltip')
+  for (const id of ['x', 'height', 'alignCentre', 'alignMiddle', 'alignBottom'] as const) {
+    const greyed = control(position, id)
+    await greyed.scrollIntoViewIfNeeded()
+    await greyed.tap({ force: true })
+    await expect(tip, id).toHaveText('The layer is locked')
+    const [t, r] = [await tip.boundingBox(), await greyed.boundingBox()]
+    expect(t && r && t.y + t.height <= r.y + 0.5, `${id} above`).toBe(true)
+    expect(await tooltipFrom(page, greyed), id).toBeLessThanOrEqual(NEAR)
+    expect(await controlsUnderTooltip(page), id).toEqual([])
+  }
+  await page.evaluate(() => window.dazbee?.setLocked(['words'], false))
+
+  await selectLayers(page, ['shape', 'turned'], { bar: true })
+  const lineUp = await barMenu(page, 'line-up')
+  await control(lineUp, 'distributeHorizontal').tap({ force: true })
+  await expect(tip).toHaveText('Needs 3 or more layers')
+  expect(await controlsUnderTooltip(page)).toEqual([])
+  expect(errors).toEqual([])
+  await page.context().close()
 })

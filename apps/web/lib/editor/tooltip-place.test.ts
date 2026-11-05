@@ -134,6 +134,21 @@ describe('tooltipPlace', () => {
     expect(covered(place, row, rows, PHONE)).toEqual([])
   })
 
+  it('with `nearer`, past its menu takes the side nearer the row, as for a control in the edit panel’s last row', () => {
+    const own = { left: 900, top: 200, right: 1260, bottom: 300 }
+    const rows = [
+      { left: 900, top: 200, right: 1075, bottom: 230 },
+      { left: 1085, top: 200, right: 1260, bottom: 230 },
+      { left: 900, top: 270, right: 1075, bottom: 300 },
+      { left: 1085, top: 270, right: 1260, bottom: 300 },
+    ]
+    const row = rows[3] as Box
+    const room = { width: 1280, height: 760 }
+    const place = tooltipPlace({ row, size: TIP, own, rows, room, rtl: false, nearer: true })
+    expect(place).toMatchObject({ side: 'bottom', offset: 8 })
+    expect(tooltipPlace({ row, size: TIP, own, rows, room, rtl: false })).toMatchObject({ side: 'top' })
+  })
+
   it('takes the place that covers the fewest rows when every place covers some', () => {
     const tall = { left: 0, top: 0, right: 390, bottom: 844 }
     const rows = rowsOf(tall, 19, 44)

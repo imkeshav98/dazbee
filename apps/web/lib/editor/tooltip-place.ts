@@ -45,6 +45,7 @@ export function tooltipPlace({
   room,
   rtl,
   phone = false,
+  nearer = false,
 }: {
   row: Box
   size: { width: number; height: number }
@@ -56,6 +57,8 @@ export function tooltipPlace({
   rtl: boolean
   /** The screen is a phone's, tapped with a finger: the tooltip goes past its menu, clear of every row. */
   phone?: boolean
+  /** Past its menu, the side nearer the row comes first, as in the edit panel's grids of controls. */
+  nearer?: boolean
 }): TooltipPlace {
   const [end, start] = rtl ? (['left', 'right'] as const) : (['right', 'left'] as const)
   const pastMenu: TooltipPlace[] = [
@@ -67,7 +70,8 @@ export function tooltipPlace({
     { side: start, align: 'center', offset: GAP },
   ]
   let best: { place: TooltipPlace; covered: number } | null = null
-  for (const place of phone ? pastMenu : [...beside, ...pastMenu]) {
+  const past = nearer && !phone ? [...pastMenu].sort((one, other) => one.offset - other.offset) : pastMenu
+  for (const place of phone ? pastMenu : [...beside, ...past]) {
     const box = tooltipBox(place, row, size, room, rtl)
     if (!box) continue
     const covered = rows.reduce((sum, one) => sum + area(box, one), 0)

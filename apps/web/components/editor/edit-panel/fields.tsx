@@ -506,6 +506,7 @@ function GreyedNumber({
         aria-description={why}
         data-scrub={name}
         onClick={tip.tap}
+        onPointerLeave={tip.leave}
         className={cn(KNOB, 'cursor-not-allowed opacity-40 hover:border-line', FOCUS_RING, className)}
       >
         <span className="relative min-w-0 flex-1 truncate">{label}</span>
