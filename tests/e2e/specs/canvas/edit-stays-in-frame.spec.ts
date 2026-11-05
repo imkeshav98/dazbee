@@ -6,7 +6,7 @@
 import { designOf, openTabs, screenPoint } from '../../support/editor.ts'
 import { enter } from '../../support/fields.ts'
 import { openLayers, row, tree } from '../../support/layers-panel.ts'
-import { copyIn, frameDesign, linkedFrames, seed } from '../../support/seed.ts'
+import { copyIn, frameDesign, layersIn, linkedFrames, seed } from '../../support/seed.ts'
 import { type Design, drag, drawn, handle, perform, press, read, selectLayers } from '../../support/stage.ts'
 import { type Browser, expect, type Page, test } from '../../support/test.ts'
 import { fillList, moreAction } from '../../support/top-bar.ts'
@@ -122,15 +122,7 @@ const design = () =>
 
 /** What a frame is: the frame as stored, and every layer it holds, by id. */
 function inFrame(d: Design, frameId: string) {
-  const frameOf = (id: string) => {
-    let at = id
-    for (let i = 0; d.nodes[at] && i < 50; i++) at = d.nodes[at]?.parentId ?? ''
-    return at
-  }
-  return {
-    frame: d.frames[frameId],
-    layers: Object.fromEntries(Object.entries(d.nodes).filter(([id]) => frameOf(id) === frameId)),
-  }
+  return { frame: d.frames[frameId], layers: Object.fromEntries(layersIn(d, frameId)) }
 }
 /** The square's layers made since `before`. */
 const added = (before: Design, after: Design) =>

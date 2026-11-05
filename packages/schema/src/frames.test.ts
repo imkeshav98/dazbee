@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { coverFrame, FRAME_GAP, framesOf, newFramePosition } from './frames.ts'
+import { coverFrame, FRAME_GAP, frameIdOf, framesOf, newFramePosition } from './frames.ts'
 
 const frame = (pageId: string, order: string) => ({
   pageId,
@@ -64,5 +64,34 @@ describe('newFramePosition', () => {
       { x: 400, y: 20, width: 100 },
     ]
     expect(newFramePosition(frames)).toEqual({ x: 700, y: 10 })
+  })
+})
+
+describe('frameIdOf', () => {
+  /** Frame `sq` holds a box `f` with a group `g` inside, which holds `a`; `d` sits in frame `two`; `x` and `y` hold each other. */
+  const design = {
+    frames: { sq: frame('p1', 'a0'), two: frame('p2', 'a0') },
+    nodes: {
+      f: { parentId: 'sq' },
+      g: { parentId: 'f' },
+      a: { parentId: 'g' },
+      d: { parentId: 'two' },
+      x: { parentId: 'y' },
+      y: { parentId: 'x' },
+    },
+  }
+
+  it('is the frame a layer is in, however deep, and a frame for itself', () => {
+    expect(frameIdOf(design, 'a')).toBe('sq')
+    expect(frameIdOf(design, 'f')).toBe('sq')
+    expect(frameIdOf(design, 'd')).toBe('two')
+    expect(frameIdOf(design, 'two')).toBe('two')
+  })
+
+  it('is undefined for an id that is neither a layer nor a frame, a page included, and for a loop', () => {
+    expect(frameIdOf(design, 'missing')).toBeUndefined()
+    expect(frameIdOf(design, 'p1')).toBeUndefined()
+    expect(frameIdOf(design, 'constructor')).toBeUndefined()
+    expect(frameIdOf(design, 'x')).toBeUndefined()
   })
 })

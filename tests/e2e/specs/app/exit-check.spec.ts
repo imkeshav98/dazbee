@@ -17,12 +17,12 @@ import { decodePng, encodePng, fixtureResources, type Pixels } from '@dazbee/pix
 import { overWhite, rasterisePdf, rasteriseSvg, vectorDifference } from '@dazbee/pixels/vector'
 import { renderDesign } from '@dazbee/renderer'
 import { loadCanvasKit } from '@dazbee/renderer/node'
-import type { ExportType } from '@dazbee/schema'
+import { type ExportType, frameIdOf, framesOf } from '@dazbee/schema'
 
 import { photo, righteous } from '../../support/assets.ts'
 import { designOf, OUTPUT, screenPoint, shoot, writeOutput } from '../../support/editor.ts'
 import { newBrand } from '../../support/seed.ts'
-import { drawn, press } from '../../support/stage.ts'
+import { type Design, drawn, press } from '../../support/stage.ts'
 import { expect, type Page, test } from '../../support/test.ts'
 import { barMenu } from '../../support/top-bar.ts'
 
@@ -44,39 +44,25 @@ const SIZES = [
   { name: 'Link image', width: 1200, height: 628 },
 ]
 
-interface Stored {
-  meta: { name: string }
-  frames: Record<string, { pageId: string; name: string; width: number; height: number; order: string }>
+/** A design as stored, with each layer's fills typed loosely. */
+type Stored = Omit<Design, 'nodes'> & {
   nodes: Record<
     string,
-    {
-      type: string
-      parentId: string
-      link: string
-      bindings?: Record<string, string>
+    Omit<Design['nodes'][string], 'props'> & {
       props: Record<string, unknown> & { fills?: { type: string; assetId?: string }[] }
     }
   >
 }
 const stored = async (page: Page) => JSON.parse(await designOf(page)) as Stored
 /** The page's frames by order, as Export lists them. */
-const framesOf = (design: Stored) =>
-  Object.entries(design.frames)
-    .filter(([, frame]) => frame.pageId === 'p1')
-    .sort(([a, x], [b, y]) => (x.order < y.order ? -1 : x.order > y.order ? 1 : a < b ? -1 : 1))
+const pageFrames = (design: Stored) => framesOf(design, 'p1')
 /** The layer each frame holds with this link, by frame. */
-const copiesOf = (design: Stored, link: string) => {
-  const frameOf = (id: string) => {
-    let at = id
-    for (let i = 0; design.nodes[at] && i < 50; i++) at = design.nodes[at]?.parentId ?? ''
-    return at
-  }
-  return Object.fromEntries(
+const copiesOf = (design: Stored, link: string) =>
+  Object.fromEntries(
     Object.entries(design.nodes)
       .filter(([, node]) => node.link === link)
-      .map(([id, node]) => [frameOf(id), { id, ...node }]),
+      .map(([id, node]) => [frameIdOf(design, id), { id, ...node }]),
   )
-}
 
 /** An SVG file as Chromium's own SVG decoder draws it in the page, at the frame's size over white. */
 async function drawnByChromium(
@@ -130,7 +116,7 @@ test('an ad built in one frame, duplicated and added at 4 more sizes, exports ev
   await page.getByLabel('Brief').fill(`Trail days ${run}`)
   await page.getByRole('button', { name: 'Make drafts' }).click()
   await expect(page.getByTestId('status')).toHaveAttribute('data-ready', '', { timeout: 30_000 })
-  const [[square = '', squareFrame] = []] = framesOf(await stored(page))
+  const [[square = '', squareFrame] = []] = pageFrames(await stored(page))
   expect(squareFrame).toMatchObject({ name: 'Feed square', width: 1080, height: 1080 })
   await page.evaluate(() => window.dazbee?.setCamera({ x: 120, y: 80, zoom: 0.7 }))
   await drawn(page)
@@ -253,7 +239,7 @@ test('an ad built in one frame, duplicated and added at 4 more sizes, exports ev
   )
   await expect.poll(async () => Object.keys((await stored(page)).nodes).length).toBe(layers * 6)
   const design = await stored(page)
-  const frames = framesOf(design)
+  const frames = pageFrames(design)
   expect(frames.map(([id]) => id)).toEqual([square, ...copies])
   // Duplicate and Add size keep the frame's name.
   expect(frames.map(([, f]) => [f.name, f.width, f.height])).toEqual([
@@ -326,7 +312,7 @@ test('an ad built in one frame, duplicated and added at 4 more sizes, exports ev
     images: { [assetId]: image },
   }
   const ck = await loadCanvasKit()
-  const frameIds = framesOf(final).map(([id]) => id)
+  const frameIds = pageFrames(final).map(([id]) => id)
   for (const type of ['png', 'jpg', 'pdf', 'svg'] as const) {
     // Named after the frames, the repeats numbered, in the page's order.
     const names = readZip(exportDesign(ck, json, { frameIds, type }, bytes).bytes).map((entry) => entry.path)
@@ -339,7 +325,7 @@ test('an ad built in one frame, duplicated and added at 4 more sizes, exports ev
   }
   const pdfium = await PDFiumLibrary.init()
   const results: Record<string, unknown>[] = []
-  for (const [i, [frameId, frame]] of framesOf(final).entries()) {
+  for (const [i, [frameId, frame]] of pageFrames(final).entries()) {
     const result: Record<string, unknown> = { frame: frameId, name: frame.name, size: `${frame.width}×${frame.height}` }
     const fileOf = (type: ExportType) => files[type]?.[i]?.bytes ?? new Uint8Array()
     for (const type of ['png', 'jpg', 'pdf', 'svg'] as const) {

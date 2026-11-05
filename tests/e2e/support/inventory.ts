@@ -11,7 +11,7 @@ import type { DesignInput } from '@dazbee/schema'
 import { photo, tile, upload } from './assets.ts'
 import { designOf, placed, writeOutput } from './editor.ts'
 import { frameDesign, linkedFrames, newBrand, putKit } from './seed.ts'
-import { nextFrame, openStage, perform } from './stage.ts'
+import { type Design, nextFrame, openStage, perform } from './stage.ts'
 import { type Browser, expect, type Page, test } from './test.ts'
 
 type Props = Record<string, unknown> & {
@@ -20,35 +20,8 @@ type Props = Record<string, unknown> & {
   strokes?: Record<string, unknown>[]
   effects?: Record<string, unknown>[]
 }
-type Doc = {
-  pages: Record<string, { name: string; order: string }>
-  frames: Record<
-    string,
-    {
-      pageId: string
-      name: string
-      order: string
-      width: number
-      height: number
-      x: number
-      y: number
-      fills: Record<string, unknown>[]
-    }
-  >
-  nodes: Record<
-    string,
-    {
-      type: string
-      parentId: string
-      link: string
-      index: string
-      name: string
-      lock?: Record<string, boolean>
-      bindings?: Record<string, string>
-      props: Props
-    }
-  >
-}
+/** A design as stored, with the paints and style of each layer's props typed loosely. */
+type Doc = Omit<Design, 'nodes'> & { nodes: Record<string, Omit<Design['nodes'][string], 'props'> & { props: Props }> }
 
 /** Rows that fail today, with the bug filed for each. */
 const KNOWN: Record<number, number> = {}

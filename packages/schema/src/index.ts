@@ -1,6 +1,7 @@
 export * from './api.ts'
 export * from './clipboard.ts'
 export {
+  checkStructure,
   Design,
   type DesignInput,
   DesignMeta,

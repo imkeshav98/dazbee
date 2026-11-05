@@ -5,35 +5,21 @@
 import { type Browser, expect, type Page } from '@playwright/test'
 
 import { pressFor, type ShortcutAction } from '@dazbee/editor/shortcuts'
-import type { DesignInput } from '@dazbee/schema'
+import type { Design as Stored,DesignInput, Layer } from '@dazbee/schema'
 
 import { designOf, openTabs, placed, screenPoint } from './editor.ts'
 import { DEV_BRAND, type InBrand, seed } from './seed.ts'
 import { openCard } from './top-bar.ts'
 
-export interface Design {
-  pages: Record<string, { name: string; order: string }>
-  frames: Record<
-    string,
-    {
-      pageId: string
-      name: string
-      width: number
-      height: number
-      x: number
-      y: number
-      fills: Record<string, unknown>[]
-      order: string
-    }
-  >
+/**
+ * A design as the editor stores it, each layer with what every layer has and its props loose, so a
+ * test reads any layer's props without narrowing by its type.
+ */
+export interface Design extends Pick<Stored, 'meta' | 'pages' | 'frames'> {
   nodes: Record<
     string,
-    {
-      parentId: string
-      link: string
-      index: string
-      name: string
-      lock?: Record<string, boolean>
+    Pick<Layer, 'type' | 'parentId' | 'link' | 'index' | 'name' | 'lock'> & {
+      bindings?: Record<string, string>
       props: Record<string, unknown>
     }
   >

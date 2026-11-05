@@ -1,6 +1,5 @@
 // Where a design's frames are: a page's frames in order, the cover frame, where the frame rule puts
 // a new one, and the frame a layer is in.
-import type { Design } from './design.ts'
 import { inOrder } from './primitives.ts'
 
 /** The gap the frame rule leaves between a page's rightmost frame and a new one. */
@@ -46,8 +45,17 @@ export function newFramePosition(frames: readonly { x: number; y: number; width:
   return { x: rightmost.x + rightmost.width + FRAME_GAP, y: rightmost.y }
 }
 
-/** The frame a layer is in, walking up its parents; a frame id gives itself. Undefined when the chain ends at no frame. */
-export function frameIdOf(design: Design, id: string): string | undefined {
+/**
+ * The frame a layer is in, walking up its parents; a frame id gives itself. Undefined when the
+ * chain ends at no frame or loops. Takes only what it reads, so a design as stored or as JSON fits.
+ */
+export function frameIdOf(
+  design: {
+    readonly frames: Readonly<Record<string, unknown>>
+    readonly nodes: Readonly<Record<string, { readonly parentId: string } | undefined>>
+  },
+  id: string,
+): string | undefined {
   const seen = new Set<string>()
   for (let up: string | undefined = id; up !== undefined && !seen.has(up); up = design.nodes[up]?.parentId) {
     if (Object.hasOwn(design.frames, up)) return up

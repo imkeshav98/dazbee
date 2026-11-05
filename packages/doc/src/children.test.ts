@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { type DesignInput, frameIdOf, parseDesign } from '@dazbee/schema'
+import { type DesignInput, parseDesign } from '@dazbee/schema'
 
 import { ancestorsOf, childrenOf, descendants, isInside } from './children.ts'
 
@@ -78,21 +78,5 @@ describe('isInside', () => {
     expect(isInside(d, 'g', 'a')).toBe(false)
     expect(isInside(d, 'a', 'c')).toBe(false)
     expect(isInside(d, 'a', 'p2-sq')).toBe(false)
-  })
-})
-
-describe('frameIdOf', () => {
-  it('is the frame a layer is in, however deep, and a frame for itself', () => {
-    const d = design()
-    expect(frameIdOf(d, 'a')).toBe('p1-sq')
-    expect(frameIdOf(d, 'c')).toBe('p1-sq')
-    expect(frameIdOf(d, 'd')).toBe('p2-sq')
-    expect(frameIdOf(d, 'p2-sq')).toBe('p2-sq')
-  })
-
-  it('is undefined for an id that is neither a layer nor a frame, a page included', () => {
-    expect(frameIdOf(design(), 'missing')).toBeUndefined()
-    expect(frameIdOf(design(), 'p1')).toBeUndefined()
-    expect(frameIdOf(design(), 'constructor')).toBeUndefined()
   })
 })

@@ -30,19 +30,21 @@ describe('brokenInvariants', () => {
       Object.assign(nodes['banner-headline'] as object, { parentId: 'headline' })
     })
     expect(brokenInvariants(d)).toEqual([
-      '"box" is in no frame',
-      '"headline" is in no frame',
-      '"banner-headline" is in no frame',
+      'nodes.box.parentId: parent "gone" is neither a frame nor a layer',
+      'nodes.headline.parentId: parent "banner-headline" is a text, which can\'t hold layers',
+      'nodes.headline.parentId: "headline" is inside itself',
+      'nodes.banner-headline.parentId: parent "headline" is a text, which can\'t hold layers',
+      'nodes.banner-headline.parentId: "banner-headline" is inside itself',
     ])
   })
 
   it('names a frame on no page', () => {
     const d = broken(({ frames }) => Object.assign(frames.banner as object, { pageId: 'p9' }))
-    expect(brokenInvariants(d)).toEqual(['frame "banner" is on no page'])
+    expect(brokenInvariants(d)).toEqual(['frames.banner.pageId: no page "p9"'])
   })
 
   it('names a frame holding one link id twice', () => {
     const d = broken(({ nodes }) => Object.assign(nodes.headline as object, { link: 'box' }))
-    expect(brokenInvariants(d)).toEqual(['frame "sq" holds link "box" on "box" and "headline"'])
+    expect(brokenInvariants(d)).toEqual(['nodes.headline.link: frame "sq" holds link "box" twice, also on "box"'])
   })
 })

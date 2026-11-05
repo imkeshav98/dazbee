@@ -4,6 +4,8 @@ import {
   type DesignInput,
   DesignSummary,
   EMPTY_BRAND_KIT,
+  frameIdOf,
+  framesOf,
   newFramePosition,
 } from '@dazbee/schema'
 
@@ -49,6 +51,12 @@ export function frameDesign({
   }
 }
 
+/** The layers a frame holds, however deep, as `[id, layer]` pairs in the design's order. */
+export const layersIn = <L extends { parentId: string }>(
+  design: { frames: Record<string, unknown>; nodes: Record<string, L> },
+  frameId: string,
+): [string, L][] => Object.entries(design.nodes).filter(([id]) => frameIdOf(design, id) === frameId)
+
 /** The id of a layer's linked copy in another frame, as `linkedFrames` names it. */
 export const copyIn = (frameId: string, id: string) => `${frameId}-${id}`
 
@@ -70,22 +78,11 @@ export interface LinkedFrame {
 export function linkedFrames(design: DesignInput, frames: LinkedFrame[], pageId = 'p1'): DesignInput {
   const all = { ...design.frames }
   const nodes = { ...design.nodes }
-  const onPage = () =>
-    Object.entries(all)
-      .filter(([, frame]) => frame.pageId === pageId)
-      .sort(([, a], [, b]) => (a.order < b.order ? -1 : 1))
+  const onPage = () => framesOf({ frames: all }, pageId)
   const [first] = onPage()
   if (!first) throw new Error(`page ${pageId} has no frame`)
   const [firstId, firstFrame] = first
-  const frameOf = (id: string) => {
-    let at: string | undefined = id
-    for (let i = 0; at !== undefined && i < 100; i++) {
-      if (Object.hasOwn(design.frames, at)) return at
-      at = design.nodes[at]?.parentId
-    }
-    return undefined
-  }
-  const layers = Object.entries(design.nodes).filter(([id]) => frameOf(id) === firstId)
+  const layers = layersIn(design, firstId)
   for (const { id: frameId, name, width, height, values = {} } of frames) {
     const placed = onPage().map(([, frame]) => ({ x: frame.x, y: frame.y, width: frame.width }))
     all[frameId] = {

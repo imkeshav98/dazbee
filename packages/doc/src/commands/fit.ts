@@ -1,13 +1,11 @@
 // Laid out to fit: a layer copied from a frame of one size into a frame of another.
+import type { Rect } from '@dazbee/schema'
+
 import { round } from '../geometry.ts'
 
 export interface Size {
   width: number
   height: number
-}
-interface Rect extends Size {
-  x: number
-  y: number
 }
 /** The parts of a text layer's props that hold font sizes. */
 interface TextLike {

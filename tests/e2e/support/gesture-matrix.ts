@@ -11,12 +11,11 @@ import type { Browser, Page } from '@playwright/test'
 import { photo, upload } from './assets.ts'
 import { designOf, screenPoint } from './editor.ts'
 import { BESIDE, FLOW, HOLDS, LEAVES, matrixDesign, PATH_INK, type Subject } from './gesture-matrix-design.ts'
-import { copyIn } from './seed.ts'
-import { drawn, openStage, press, selectLayers } from './stage.ts'
+import { copyIn, layersIn } from './seed.ts'
+import { type Design as Doc, drawn, openStage, press, selectLayers } from './stage.ts'
 
 type Box = { x: number; y: number; width: number; height: number }
 type Boxes = Record<string, Box | null>
-type Doc = { nodes: Record<string, { parentId: string; index: string; props: Record<string, unknown> }> }
 type FrameId = 'sq' | 'wide'
 const WIDTH: Record<FrameId, number> = { sq: 1080, wide: 1920 }
 
@@ -67,18 +66,8 @@ const boxesIn = (page: Page, frameId: FrameId): Promise<Boxes> =>
     ALL.map((id): [string, string] => [id, idIn(frameId, id)]),
   )
 /** The layers a frame holds as the design stores them, as JSON, so a frame left as it was compares equal. */
-const storedIn = (doc: Doc, frameId: FrameId) => {
-  const frameOf = (id: string) => {
-    let at: string | undefined = id
-    for (let i = 0; at !== undefined && doc.nodes[at] && i < 50; i++) at = doc.nodes[at]?.parentId
-    return at
-  }
-  return JSON.stringify(
-    Object.entries(doc.nodes)
-      .filter(([id]) => frameOf(id) === frameId)
-      .sort(([a], [b]) => (a < b ? -1 : 1)),
-  )
-}
+const storedIn = (doc: Doc, frameId: FrameId) =>
+  JSON.stringify(layersIn(doc, frameId).sort(([a], [b]) => (a < b ? -1 : 1)))
 /** Where a colour is drawn in a frame's export: the box around its pixels, in design pixels, or null. */
 const inkOf = (page: Page, frameId: FrameId, rgb: [number, number, number]) =>
   page.evaluate(
