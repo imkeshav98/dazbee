@@ -1,11 +1,11 @@
 'use client'
 
-// One frame's row in the layers panel's tree: its caret, a swatch of its background, its name and
-// its size, as in the mock. A click picks the frame and a double click renames it in place. A layer
+// One frame's row in the layers panel's tree: its caret, a swatch of its background as it looks, its
+// name and its size, as in the mock. A click picks the frame and a double click renames it in place. A layer
 // of this frame dragged onto it goes to the frame's top.
 import { memo } from 'react'
 
-import { LAYER_PICTURE, MIXED_COLOUR } from '@/components/editor/styles.ts'
+import { MIXED_COLOUR } from '@/components/editor/styles.ts'
 import { LIT_ROW } from '@/components/ui/looks.ts'
 import { RenameField } from '@/components/ui/rename-field.tsx'
 import { cn } from '@/lib/cn.ts'
@@ -34,7 +34,7 @@ export const FrameRow = memo(function FrameRow({
   focusable: boolean
   renaming: boolean
   open: boolean
-  /** The frame's background as its swatch shows it: a colour, mixed for an image or gradient, or none. */
+  /** The frame's background as its swatch shows it: a colour, see-through or not, mixed for an image, or none. */
   swatch: string
   dropInto: boolean
   api: RowApi
@@ -58,14 +58,17 @@ export const FrameRow = memo(function FrameRow({
       className={cn(ROW_LOOK, picked ? ROW_SELECTED : LIT_ROW, dropInto && 'ring-2 ring-accent ring-inset')}
     >
       <RowCaret shown={row.hasChildren} open={open} name={frame.name} onToggle={() => api.toggle(id)} />
+      {/* Over a checkerboard, so a see-through background shows as one; its edge stays neutral when picked. */}
       <span
         aria-hidden
         data-testid="frame-swatch"
-        className={cn('size-[22px] shrink-0 rounded-[5px]', LAYER_PICTURE, picked && 'border-accent')}
-        style={{
-          background: swatch === 'none' ? 'transparent' : swatch === 'mixed' ? MIXED_COLOUR : swatch,
-        }}
-      />
+        className="checker relative size-[22px] shrink-0 overflow-hidden rounded-[5px] border border-line"
+      >
+        <span
+          className="absolute inset-0"
+          style={{ background: swatch === 'none' ? 'transparent' : swatch === 'mixed' ? MIXED_COLOUR : swatch }}
+        />
+      </span>
       {renaming ? (
         <RenameField
           name={frame.name}

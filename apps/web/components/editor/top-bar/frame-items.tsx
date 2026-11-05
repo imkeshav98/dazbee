@@ -13,11 +13,15 @@ import { keyOf } from '@/components/editor/arrange-actions.ts'
 import { setOpen, setRenameOpener, useEditState } from '@/components/editor/edit-store.ts'
 import { MENU_DIVIDER, MENU_ITEM, MENU_KEY } from '@/components/editor/styles.ts'
 import { cn } from '@/lib/cn.ts'
+import { hexOf } from '@/lib/colour.ts'
 import { swatchOf } from '@/lib/editor/frame-swatch.ts'
 import { useMessages } from '@/lib/i18n/client.tsx'
 
 import { BarPopover } from './bar-popover.tsx'
 import { type BarItem, Dot, PanelButton } from './top-bar-items.tsx'
+
+/** A swatch without its transparency, as a layer's Fill shows its colour on its button. */
+const opaque = (swatch: string) => (swatch === 'mixed' || swatch === 'none' ? swatch : hexOf(swatch))
 
 /** The items of a picked frame's top bar, in order. */
 export function useFrameItems(editor: Editor, frameId: string, design: Design): BarItem[] {
@@ -35,7 +39,11 @@ export function useFrameItems(editor: Editor, frameId: string, design: Design): 
     {
       key: 'background',
       node: (
-        <PanelButton id="background" label={f.backgroundColour} face={<Dot colour={swatchOf(design, frameId)} />} />
+        <PanelButton
+          id="background"
+          label={f.backgroundColour}
+          face={<Dot colour={opaque(swatchOf(design, frameId))} />}
+        />
       ),
     },
     {

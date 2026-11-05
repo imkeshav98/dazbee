@@ -1,18 +1,47 @@
-// The layers panel's rows as they look, in Chromium: a frame picked from its row brought out from
-// under the panel at the same zoom.
+// The layers panel's rows as they look, in Chromium: a frame's swatch showing its background as it
+// looks, see-through too, and a frame picked from its row brought out from under the panel at the
+// same zoom.
 import { screenPoint } from '../../support/editor.ts'
-import { openDesign } from '../../support/layers-frames.ts'
-import { frameRow } from '../../support/layers-panel.ts'
+import { openDesign, openSized } from '../../support/layers-frames.ts'
+import { frameRow, rect } from '../../support/layers-panel.ts'
+import { frameDesign } from '../../support/seed.ts'
 import { nextFrame } from '../../support/stage.ts'
 import { expect, type Locator, type Page, test } from '../../support/test.ts'
 
 test.describe.configure({ timeout: 180_000 })
+
+/** A frame of half see-through red holding one shape. */
+const halfRed = () =>
+  frameDesign({
+    name: 'Half red',
+    frameName: 'Half red',
+    fills: [{ type: 'solid', color: '#FF000080' }],
+    nodes: {
+      dot: { type: 'graphic', parentId: 'sq', index: 'a0', name: 'Dot', props: rect(40, 40, 200, 200, '#1A1420FF') },
+    },
+  })
 
 /** Where an element is on screen. */
 async function boxOf(locator: Locator) {
   const box = await locator.boundingBox()
   if (!box) throw new Error('not on screen')
   return box
+}
+/** The colour drawn at the middle of an element, read from a screenshot of it. */
+async function middleColour(page: Page, locator: Locator) {
+  const png = (await locator.screenshot({ animations: 'disabled' })).toString('base64')
+  return page.evaluate(async (data) => {
+    const img = new Image()
+    img.src = `data:image/png;base64,${data}`
+    await img.decode()
+    const paint = document.createElement('canvas')
+    paint.width = img.width
+    paint.height = img.height
+    const g = paint.getContext('2d')
+    if (!g) return null
+    g.drawImage(img, 0, 0)
+    return [...g.getImageData(Math.floor(img.width / 2), Math.floor(img.height / 2), 1, 1).data.slice(0, 3)]
+  }, png)
 }
 /** A frame's place on screen, from its top start corner to its bottom end one. */
 async function frameOnScreen(page: Page, frameId: string, width: number, height: number) {
@@ -21,6 +50,27 @@ async function frameOnScreen(page: Page, frameId: string, width: number, height:
   return { left: start.x, top: start.y, right: end.x, bottom: end.y }
 }
 const zoomOf = (page: Page) => page.evaluate(() => window.dazbee?.camera().zoom ?? 1)
+
+test('a frame’s swatch shows its background as it looks, see-through too, and keeps its neutral edge when picked', async ({
+  browser,
+}) => {
+  for (const theme of ['light', 'dark']) {
+    const { page, errors } = await openSized(browser, { width: 1280, height: 760 }, { theme, content: halfRed() })
+    const swatch = frameRow(page, 'Half red').getByTestId('frame-swatch')
+    const [r = 0, g = 0, b = 0] = (await middleColour(page, swatch)) ?? []
+    // Half red over the panel: pink on light, a dark red on dark; never solid red.
+    if (theme === 'light')
+      expect([r > 200, g > 60 && g < 200, b > 60 && b < 200], `${r},${g},${b}`).toEqual([true, true, true])
+    else expect(r, `${r},${g},${b}`).toBeLessThan(200)
+    const edge = () => swatch.evaluate((el) => getComputedStyle(el).borderTopColor)
+    const before = await edge()
+    await frameRow(page, 'Half red').click()
+    await expect(frameRow(page, 'Half red')).toHaveAttribute('aria-selected', 'true')
+    expect(await edge()).toBe(before)
+    expect(errors).toEqual([])
+    await page.context().close()
+  }
+})
 
 test('a frame picked from its row under the panel is brought out from under it at the same zoom; one in the clear stays put', async ({
   browser,
