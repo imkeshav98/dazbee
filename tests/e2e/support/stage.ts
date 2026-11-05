@@ -37,7 +37,10 @@ export interface Box {
 export interface SelectLayers {
   /** Waits until the top bar shows the selection, or until there is no top bar when it is empty. */
   bar?: boolean
-  /** Opens the card with this test id, in the top bar's pop-up or panel that holds it. */
+  /**
+   * Opens the card with this test id, in the top bar's pop-up or panel that holds it, once the top
+   * bar shows the selection, so a panel of the selection before is never taken for it.
+   */
   card?: string
 }
 
@@ -113,7 +116,8 @@ export const order = async (page: Page, frameId = 'sq') =>
 /** Selects layers through the page's editor, in the frame of the first, then waits as the options say. */
 export async function selectLayers(page: Page, ids: string[], { bar = false, card }: SelectLayers = {}) {
   await page.evaluate((ids) => window.dazbee?.select(ids), ids)
-  if (bar && ids.length > 0) await expect(page.getByTestId('top-bar')).toHaveAttribute('data-selection', ids.join(' '))
+  if ((bar || card) && ids.length > 0)
+    await expect(page.getByTestId('top-bar')).toHaveAttribute('data-selection', ids.join(' '))
   else if (bar) await expect(page.getByTestId('top-bar')).toHaveCount(0)
   if (card) await expect(await openCard(page, card)).toBeVisible()
 }
