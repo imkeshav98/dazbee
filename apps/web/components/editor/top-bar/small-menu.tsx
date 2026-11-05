@@ -44,6 +44,11 @@ type FullMenuPlace = { side: 'end' | 'start' | 'under'; startInset: number }
 
 /** Pixels between the small menu and the full menu. */
 const MENU_GAP = 8
+/**
+ * A round button of the pill, its focus ring drawn inside it so the ring stays inside the pill;
+ * important, as the app's own focus ring sits outside every control.
+ */
+const PILL_BUTTON = 'rounded-full px-1.5 focus-visible:outline-offset-[-2px]!'
 
 /** The element's box in the window, or null while it doesn't show. */
 function shownBox(el: Element | null): DOMRect | null {
@@ -238,7 +243,7 @@ export function SmallMenu({ editor, rightClick }: { editor: Editor; rightClick: 
             title={withKey(locked ? b.unlock : b.lock, 'lock')}
             aria-pressed={locked}
             onClick={() => editor.setLocked(target.ids, !locked)}
-            className={cn(BAR_TOGGLE, 'rounded-full px-1.5')}
+            className={cn(BAR_TOGGLE, PILL_BUTTON)}
           >
             {locked ? (
               <LockSimpleIcon size={16} weight="fill" aria-hidden />
@@ -253,7 +258,7 @@ export function SmallMenu({ editor, rightClick }: { editor: Editor; rightClick: 
             aria-label={t.editor.arrange.duplicate}
             title={withKey(t.editor.arrange.duplicate, 'duplicate')}
             onClick={() => editor.perform('duplicate')}
-            className={cn(BAR_BUTTON, 'rounded-full px-1.5')}
+            className={cn(BAR_BUTTON, PILL_BUTTON)}
           >
             <CopyIcon size={16} aria-hidden />
           </button>
@@ -271,7 +276,7 @@ export function SmallMenu({ editor, rightClick }: { editor: Editor; rightClick: 
                   event.preventDefault()
                   setToldWhy(true)
                 }}
-                className={cn(BAR_BUTTON, 'rounded-full px-1.5', MENU_ITEM_GREYED)}
+                className={cn(BAR_BUTTON, PILL_BUTTON, MENU_ITEM_GREYED)}
               >
                 <TrashIcon size={16} aria-hidden />
               </button>
@@ -284,7 +289,7 @@ export function SmallMenu({ editor, rightClick }: { editor: Editor; rightClick: 
               aria-label={b.delete}
               title={withKey(b.delete, 'delete')}
               onClick={() => editor.perform('delete')}
-              className={cn(BAR_BUTTON, 'rounded-full px-1.5')}
+              className={cn(BAR_BUTTON, PILL_BUTTON)}
             >
               <TrashIcon size={16} aria-hidden />
             </button>
@@ -297,7 +302,7 @@ export function SmallMenu({ editor, rightClick }: { editor: Editor; rightClick: 
             title={withKey(hidden ? b.show : b.hide, 'hide')}
             aria-pressed={hidden}
             onClick={() => editor.setHidden(target.ids, !hidden)}
-            className={cn(BAR_TOGGLE, 'rounded-full px-1.5')}
+            className={cn(BAR_TOGGLE, PILL_BUTTON)}
           >
             {hidden ? <EyeSlashIcon size={16} weight="fill" aria-hidden /> : <EyeIcon size={16} aria-hidden />}
           </button>
@@ -309,7 +314,7 @@ export function SmallMenu({ editor, rightClick }: { editor: Editor; rightClick: 
               aria-label={b.more}
               title={b.more}
               data-testid="bar-more"
-              className={cn(BAR_BUTTON, 'rounded-full px-1.5')}
+              className={cn(BAR_BUTTON, PILL_BUTTON)}
             >
               <DotsThreeIcon size={18} weight="bold" aria-hidden />
             </button>

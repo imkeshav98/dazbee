@@ -76,4 +76,30 @@ test.describe('the small menu', () => {
     await expect.poll(() => node(page, 'badge')).toBeNull()
     expect(errors).toEqual([])
   })
+
+  test('shows the ⋯ button’s focus ring inside the pill, clear of its edge', async ({ browser }) => {
+    const { page, errors } = await open(browser)
+    await selectLayers(page, ['badge'])
+    await page.getByTestId('small-lock').focus()
+    for (let i = 0; i < 4; i++) await page.keyboard.press('ArrowRight')
+    await expect(page.getByTestId('bar-more')).toBeFocused()
+    const ring = await page.getByTestId('bar-more').evaluate((button) => {
+      const style = getComputedStyle(button)
+      const out = parseFloat(style.outlineOffset) + parseFloat(style.outlineWidth)
+      const r = button.getBoundingClientRect()
+      const pill = (button.closest('[data-testid="small-menu"]') as Element).getBoundingClientRect()
+      return {
+        visible: button.matches(':focus-visible') && style.outlineStyle !== 'none',
+        inside: Math.min(
+          r.left - out - pill.left,
+          pill.right - (r.right + out),
+          r.top - out - pill.top,
+          pill.bottom - (r.bottom + out),
+        ),
+      }
+    })
+    expect(ring.visible).toBe(true)
+    expect(ring.inside).toBeGreaterThanOrEqual(1)
+    expect(errors).toEqual([])
+  })
 })
