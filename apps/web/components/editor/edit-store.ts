@@ -12,12 +12,23 @@ import { OVER_PANEL } from '@/components/ui/menu-close.ts'
 
 /** The top bar's items that open the edit panel for the selected layers. */
 const LAYER_PANELS = ['font', 'colour', 'spacing', 'effects', 'position', 'edit', 'outline', 'stack'] as const
-/** The design's own panels: Pages, from by the zoom, and the picked frame's Background. */
-const DESIGN_PANELS = ['pages', 'background'] as const
-/** Every id that opens the edit panel; every other id is a pop-up or the full menu. */
-const PANELS = [...LAYER_PANELS, ...DESIGN_PANELS] as const
+/**
+ * The design's own panels, each with whether it belongs to the picked frame it was opened for, so
+ * picking another frame or letting it go closes it: Pages, from by the zoom, stays; the picked
+ * frame's Background goes; Add a frame, open while the Frame tool is, stays; and Add size, the same
+ * card adding a size to the picked frame, goes. Selecting layers closes each of them.
+ */
+const DESIGN_PANELS = {
+  pages: { ofPickedFrame: false },
+  background: { ofPickedFrame: true },
+  addFrame: { ofPickedFrame: false },
+  addSize: { ofPickedFrame: true },
+} as const satisfies Record<string, { ofPickedFrame: boolean }>
+type DesignPanelId = keyof typeof DESIGN_PANELS
 export type LayerPanelId = (typeof LAYER_PANELS)[number]
-export type PanelId = (typeof PANELS)[number]
+export type PanelId = LayerPanelId | DesignPanelId
+/** Every id that opens the edit panel; every other id is a pop-up or the full menu. */
+const PANELS: readonly PanelId[] = [...LAYER_PANELS, ...(Object.keys(DESIGN_PANELS) as DesignPanelId[])]
 
 interface EditState {
   /** The open pop-up, full menu or edit panel, by its top bar id. */
@@ -49,6 +60,12 @@ const subscribe = (listener: () => void) => {
 export const isPanel = (id: string | null): id is PanelId => (PANELS as readonly string[]).includes(id ?? '')
 export const isLayerPanel = (id: string | null): id is LayerPanelId =>
   (LAYER_PANELS as readonly string[]).includes(id ?? '')
+/**
+ * Whether what is open closes when the selection or the picked frame changes: a pop-up, the full
+ * menu, a layer's panel, or a panel of the picked frame.
+ */
+export const closesWithSelection = (id: string | null) =>
+  !isPanel(id) || isLayerPanel(id) || DESIGN_PANELS[id].ofPickedFrame
 
 /** Opens a pop-up, the full menu or an edit panel by its id, closing what was open; null closes it. */
 export const setOpen = (open: string | null) => update({ open })

@@ -14,6 +14,7 @@ import {
   NO_INSETS,
   reveal,
   revealLabel,
+  revealWhole,
   toScreen,
   toWorld,
   type Viewport,
@@ -101,8 +102,16 @@ export interface EditorView {
   fitAll(): void
   /** Fits a part of the canvas in view, in world units; nothing without one. */
   fitArea(area: Rect | undefined): void
-  /** Pans, keeping the zoom, so a part of the canvas shows whole beside the chrome; nothing when it already does. */
+  /**
+   * Pans, keeping the zoom, so a part of the canvas shows beside the chrome with room for a frame's
+   * label over it, centred; nothing when it already does.
+   */
   showArea(area: Rect): void
+  /**
+   * As `showArea`, but zoomed out, only as far as it needs, when the part and the label's room don't
+   * fit beside the chrome at this zoom, so it shows whole.
+   */
+  showWhole(area: Rect): void
   /** Pans, keeping the zoom, so a frame's label shows beside the chrome; nothing when it already does. */
   showLabel(frame: Rect): void
   /** Turns the rulers on or off; the view listeners hear of it from `viewChanged`. */
@@ -333,6 +342,10 @@ export function editorView({ ck, canvas, session, onZoom, draw }: ViewDeps): Edi
     const next = reveal(camera, area, viewport, insets)
     if (next !== camera) setCamera(next)
   }
+  function showWhole(area: Rect) {
+    const next = revealWhole(camera, area, viewport, insets)
+    if (next !== camera) setCamera(next)
+  }
   function showLabel(frame: Rect) {
     const next = revealLabel(camera, frame, viewport, insets)
     if (next !== camera) setCamera(next)
@@ -414,6 +427,7 @@ export function editorView({ ck, canvas, session, onZoom, draw }: ViewDeps): Edi
     fitAll,
     fitArea,
     showArea,
+    showWhole,
     showLabel,
     toggleRulers,
     viewChanged,

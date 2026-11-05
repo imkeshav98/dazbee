@@ -2,7 +2,17 @@ import { describe, expect, it } from 'vitest'
 
 import { FRAME_GAP, type Rect } from '@dazbee/schema'
 
-import { fit, framesInView, reveal, revealLabel, toScreen, toWorld, visibleRect, zoomAt } from './camera.ts'
+import {
+  fit,
+  framesInView,
+  reveal,
+  revealLabel,
+  revealWhole,
+  toScreen,
+  toWorld,
+  visibleRect,
+  zoomAt,
+} from './camera.ts'
 import { intersects, pageFrames } from './frames.ts'
 import { design } from './test-design.ts'
 
@@ -74,13 +84,80 @@ describe('reveal', () => {
     expect(reveal(camera, { x: 0, y: 0, width: 1080, height: 1080 }, viewport, insets)).toBe(camera)
   })
 
-  it('pans, at the same zoom, to centre a rect that runs off the clear part of the stage', () => {
+  it('pans, at the same zoom, to centre a rect that runs off the clear part of the stage, with its label over it', () => {
     const next = reveal(camera, { x: 1280, y: 0, width: 1080, height: 1080 }, viewport, insets)
     expect(next.zoom).toBe(0.5)
     const topLeft = toScreen(next, { x: 1280, y: 0 })
     const bottomRight = toScreen(next, { x: 2360, y: 1080 })
     expect((topLeft.x + bottomRight.x) / 2).toBeCloseTo(350)
-    expect((topLeft.y + bottomRight.y) / 2).toBeCloseTo(430)
+    // The label's 24 px row and the rect are centred together between the top inset and the bottom.
+    expect((topLeft.y - 24 + bottomRight.y) / 2).toBeCloseTo(430)
+  })
+
+  it('keeps the zoom for a rect too big for the clear part, centring it with its label over it', () => {
+    const story = { x: 1280, y: 0, width: 1080, height: 1920 }
+    const next = reveal(camera, story, viewport, insets)
+    expect(next.zoom).toBe(0.5)
+    const topLeft = toScreen(next, story)
+    const bottomRight = toScreen(next, { x: 2360, y: 1920 })
+    expect((topLeft.x + bottomRight.x) / 2).toBeCloseTo(350)
+    expect((topLeft.y - 24 + bottomRight.y) / 2).toBeCloseTo(430)
+  })
+})
+
+describe('revealWhole', () => {
+  const viewport = { width: 1000, height: 800 }
+  const insets = { top: 60, right: 300, bottom: 0, left: 0 }
+  /** Whether a rect shows whole on the stage, 16 px in from the clear part's edges, with its label's row over it. */
+  const clear = (
+    c: { x: number; y: number; zoom: number },
+    rect: Rect,
+    size: typeof viewport,
+    edges: typeof insets,
+  ) => {
+    const topLeft = toScreen(c, rect)
+    const bottomRight = toScreen(c, { x: rect.x + rect.width, y: rect.y + rect.height })
+    return (
+      topLeft.x >= edges.left + 16 - 1e-9 &&
+      topLeft.y - 24 >= edges.top + 16 - 1e-9 &&
+      bottomRight.x <= size.width - edges.right - 16 + 1e-9 &&
+      bottomRight.y <= size.height - edges.bottom - 16 + 1e-9
+    )
+  }
+
+  it('keeps the camera when the clear part of the stage shows the rect whole, with room for its label', () => {
+    const camera = { x: 100, y: 100, zoom: 0.5 }
+    expect(revealWhole(camera, { x: 0, y: 0, width: 1080, height: 1080 }, viewport, insets)).toBe(camera)
+  })
+
+  it('zooms out only as far as a rect too big for the clear part needs to show whole, its label clear of the top', () => {
+    // A phone at 100%, under the islands, Pages and the top bar's row, over the tab bar: a 1080 square.
+    const phone = { width: 390, height: 844 }
+    const phoneInsets = { top: 132, right: 0, bottom: 84, left: 0 }
+    const square = { x: 0, y: 0, width: 1080, height: 1080 }
+    const next = revealWhole({ x: 0, y: 0, zoom: 1 }, square, phone, phoneInsets)
+    // The width is what limits it: 390 less 16 on each side.
+    expect(next.zoom).toBeCloseTo(358 / 1080)
+    expect(clear(next, square, phone, phoneInsets)).toBe(true)
+    // A desktop at 100% under the top bar's row, over the dock: a 300 × 600 half page.
+    const desk = { width: 1280, height: 760 }
+    const deskInsets = { top: 136, right: 0, bottom: 72, left: 96 }
+    const half = { x: 2680, y: 0, width: 300, height: 600 }
+    const fitted = revealWhole({ x: 0, y: 0, zoom: 1 }, half, desk, deskInsets)
+    expect(fitted.zoom).toBeCloseTo((760 - 136 - 72 - 24 - 32) / 600)
+    expect(clear(fitted, half, desk, deskInsets)).toBe(true)
+  })
+
+  it('never zooms in, and keeps the zoom for a rect that fits', () => {
+    const story = { x: 1280, y: 0, width: 1080, height: 1920 }
+    const tablet = { width: 820, height: 1180 }
+    const tabletInsets = { top: 136, right: 0, bottom: 72, left: 96 }
+    const far = revealWhole({ x: 0, y: 0, zoom: 0.25 }, story, tablet, tabletInsets)
+    expect(far.zoom).toBe(0.25)
+    expect(clear(far, story, tablet, tabletInsets)).toBe(true)
+    const half = revealWhole({ x: 0, y: 0, zoom: 0.5 }, story, tablet, tabletInsets)
+    expect(half.zoom).toBeLessThan(0.5)
+    expect(clear(half, story, tablet, tabletInsets)).toBe(true)
   })
 })
 

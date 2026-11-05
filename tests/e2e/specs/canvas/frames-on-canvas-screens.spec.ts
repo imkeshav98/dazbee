@@ -1,13 +1,12 @@
 // Frames on the canvas at the three screen sizes: the picked frame's bar, ⋯ menu, Background panel
 // and rename field sit clear of the chrome and of each other; and the PR's pictures of them, and of a
 // frame mid-drag, in both themes.
-import { editorPath, setCookies, writeOutput } from '../../support/editor.ts'
-import { clickLabel, design, labelPoint, picked } from '../../support/frames-on-canvas.ts'
+import { writeOutput } from '../../support/editor.ts'
+import { clickLabel, labelPoint, openSized, picked } from '../../support/frames-on-canvas.ts'
 import { THEMES } from '../../support/glass.ts'
 import { EDITOR_CHROME, layoutProblems, SCREEN_SIZES } from '../../support/layout.ts'
-import { seed } from '../../support/seed.ts'
-import { drawn, fitSettled, nextFrame } from '../../support/stage.ts'
-import { type Browser, expect, test } from '../../support/test.ts'
+import { drawn, nextFrame } from '../../support/stage.ts'
+import { expect, test } from '../../support/test.ts'
 import { barMenu } from '../../support/top-bar.ts'
 
 test.describe.configure({ timeout: 180_000 })
@@ -18,20 +17,6 @@ const PIECES = {
   'edit panel': '#edit-panel',
   'frame menu': '[data-testid="bar-frame-more-menu"]',
   'rename field': '[data-testid="frame-rename"]',
-}
-
-/** Opens the design alone in a tab of a theme at a screen size, fitted, with its fonts loaded. */
-async function openSized(browser: Browser, viewport: { width: number; height: number }, theme = 'dark') {
-  const designId = await seed(design())
-  const page = await (await browser.newContext({ viewport })).newPage()
-  const errors: string[] = []
-  page.on('pageerror', (error) => errors.push(error.message))
-  await setCookies(page, { theme })
-  await page.goto(editorPath(designId))
-  await expect(page.getByTestId('status')).toHaveAttribute('data-ready', '', { timeout: 60_000 })
-  await page.evaluate(() => window.dazbee?.loaded())
-  await fitSettled(page)
-  return { page, errors }
 }
 
 for (const [width, height] of SCREEN_SIZES) {
@@ -76,7 +61,7 @@ for (const [width, height] of SCREEN_SIZES) {
       `screenshots at ${width}×${height}, ${theme}: a picked frame, its Background, its ⋯ menu, its label renamed and a frame mid-drag`,
       { tag: '@evidence' },
       async ({ browser }) => {
-        const { page, errors } = await openSized(browser, { width, height }, theme)
+        const { page, errors } = await openSized(browser, { width, height }, { theme })
         const shot = async (name: string) => {
           await nextFrame(page)
           writeOutput(`frames-${width}-${theme}-${name}.png`, await page.screenshot({ animations: 'disabled' }))

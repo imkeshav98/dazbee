@@ -23,6 +23,7 @@ import { editorView, type Spot } from './canvas/view.ts'
 import { loadCanvasKit } from './canvaskit.ts'
 import type { DrawInfo, Editor, EditorOptions, Notice } from './editor-interface.ts'
 import { editorExports } from './export/exports.ts'
+import { editorFrameActions } from './frame-actions.ts'
 import { editorCropping } from './gestures/crop/cropping.ts'
 import { editorDrawing } from './gestures/drawing/drawing.ts'
 import { editorPen } from './gestures/pen/pen.ts'
@@ -200,6 +201,14 @@ function live(
     outline,
     drawOverlay,
   })
+  const frameActions = editorFrameActions({
+    session,
+    view,
+    tools,
+    frameName: options.frameName,
+    selection,
+    drawOverlay,
+  })
   const drawing = editorDrawing({
     canvas,
     session,
@@ -210,6 +219,7 @@ function live(
     camera,
     page: view.page,
     frameName: options.frameName,
+    frameActions,
     hug,
     placeBox,
     drawOverlay,
@@ -249,6 +259,7 @@ function live(
     pen,
     transformDrag,
     autoLayoutDrag,
+    frameActions,
     notify,
     drawOverlay,
   })
@@ -530,7 +541,9 @@ function live(
     renameFrame,
     onFrameRename: frameRenames.on,
     renamed: () => selection.renameFrame(null),
-    onFrameDelete: actions.onFrameDelete,
+    onFrameDelete: frameActions.onFrameDelete,
+    addFrame: frameActions.addFrame,
+    addSize: frameActions.addSize,
     labelRect: overlay.labelRect,
     rulers: () => view.rulers(),
     snapping: () => tools.snapping(),

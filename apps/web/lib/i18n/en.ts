@@ -768,6 +768,37 @@ export const en = {
         'half-page': 'Half page',
         'link-image': 'Link image',
       },
+      /** The channels the presets are grouped by, by their ids. */
+      channel: { meta: 'Meta', google: 'Google', 'linkedin-x': 'LinkedIn and X' },
+    },
+    /** The Add a frame card the Frame tool opens, and the Add size card for a picked frame. */
+    addFrame: {
+      title: 'Add a frame',
+      note: 'A new frame starts empty. Or drag on the canvas with the Frame tool for any size.',
+      addSizeTitle: 'Add a size to {name}',
+      addSizeNote: "The new frame holds linked copies of {name}'s layers, laid out to fit.",
+      ownSize: 'Your own size',
+      width: 'Width',
+      height: 'Height',
+      /** The letters on the width and height fields. */
+      w: 'W',
+      h: 'H',
+      add: 'Add',
+      /** Why a side of the size typed in can't be a frame's, by the side and the reason's id. */
+      issue: {
+        width: {
+          whole: 'Width is in whole pixels.',
+          short: 'Width is at least {n} px.',
+          long: 'Width is at most {n} px.',
+          ratio: 'Width is at most {n} times the height.',
+        },
+        height: {
+          whole: 'Height is in whole pixels.',
+          short: 'Height is at least {n} px.',
+          long: 'Height is at most {n} px.',
+          ratio: 'Height is at most {n} times the width.',
+        },
+      },
     },
     frames: {
       /** A frame of a size of your own. */
@@ -778,6 +809,7 @@ export const en = {
       background: 'Background',
       backgroundColour: 'Background colour',
       more: 'Frame actions',
+      addSize: 'Add size',
       rename: 'Rename',
       export: 'Export',
       nameOf: 'Name of {name}',

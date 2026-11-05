@@ -1,10 +1,11 @@
 'use client'
 
 // The picked frame's top bar items: Background, a swatch as a layer's Fill is, which opens the
-// Background panel for the frame's own fills, and ⋯ with the frame's actions: Duplicate, Rename,
-// Export, which opens the Share menu's Export with this frame ticked alone, and Delete, the last
-// after a line and in the danger colour, as a page's ⋯ on the Pages card.
-import { DotsThreeIcon } from '@phosphor-icons/react'
+// Background panel for the frame's own fills, and ⋯ with the frame's actions: Duplicate, Add size ▸,
+// which opens the Add size card, Rename, Export, which opens the Share menu's Export with this frame
+// ticked alone, and Delete, the last after a line and in the danger colour, as a page's ⋯ on the
+// Pages card.
+import { CaretRightIcon, DotsThreeIcon } from '@phosphor-icons/react'
 import { useRef } from 'react'
 
 import type { Editor } from '@dazbee/editor'
@@ -60,6 +61,7 @@ export function useFrameItems(editor: Editor, frameId: string, design: Design): 
           align="end"
           buttonRef={more}
           testId="frame-more"
+          opens="addSize"
         >
           <button
             type="button"
@@ -69,6 +71,16 @@ export function useFrameItems(editor: Editor, frameId: string, design: Design): 
           >
             {t.editor.arrange.duplicate}
             <kbd className={MENU_KEY}>{keyOf('duplicate')}</kbd>
+          </button>
+          <button
+            type="button"
+            data-action="add-size"
+            aria-haspopup="dialog"
+            onClick={() => setOpen('addSize')}
+            className={MENU_ITEM}
+          >
+            {f.addSize}
+            <CaretRightIcon size={12} weight="bold" aria-hidden className="text-subtle rtl:-scale-x-100" />
           </button>
           <button
             type="button"
