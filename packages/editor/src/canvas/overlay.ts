@@ -26,7 +26,7 @@ import type { EditorView } from './view.ts'
 export interface OverlayDeps {
   /** The element laid over the canvas that holds what the overlay draws. */
   overlay: HTMLElement
-  view: Pick<EditorView, 'camera' | 'viewport' | 'design' | 'inView' | 'frameOf' | 'rulers' | 'outline'>
+  view: Pick<EditorView, 'camera' | 'viewport' | 'insets' | 'design' | 'inView' | 'frameOf' | 'rulers' | 'outline'>
   selection: Pick<
     EditorSelection,
     | 'current'
@@ -63,12 +63,17 @@ export interface EditorOverlay {
   labelRect(frameId: string): Rect | null
 }
 
+/** Where something spans across the stage, in pixels from its left. */
+type Span = { left: number; right: number }
+
 /** Screen pixels a frame's label needs to show the frame's size beside its name. */
 const SIZE_LABEL_WIDTH = 120
 /** Room the tool dock takes along the bottom of the stage, which the size label stays out of. */
 const SIZE_CLEARANCE = 72
 /** The room the selection's size label takes, in screen pixels. */
 const SIZE_LABEL_HEIGHT = 20
+/** Screen pixels the selection's size label keeps inside the stage's sides. */
+const SIZE_LABEL_INSET = 8
 
 export function editorOverlay({
   overlay,
@@ -142,10 +147,27 @@ export function editorOverlay({
     return label
   }
 
-  /** Where the size label's top goes for a box spanning `ys` on screen: under it, or over it when the tool dock along the stage's bottom would cover it. */
+  /**
+   * Where the size label's top goes for a box spanning `ys` on screen: under it, else over it when
+   * the chrome along the stage's bottom (the dock, at least SIZE_CLEARANCE) would cover it, else
+   * at the bottom of the room between the chrome, over the box, when the box is taller than the
+   * stage; always clear of the chrome along the top and bottom while some of the box is on the
+   * stage. A box wholly above or below the stage takes the label off the stage with it.
+   */
   function sizeLabelTop(ys: number[]) {
-    const below = Math.max(...ys) + 8
-    return below + 24 > view.viewport().height - SIZE_CLEARANCE ? Math.min(...ys) - 26 : below
+    const top = Math.min(...ys)
+    const bottom = Math.max(...ys)
+    const { height } = view.viewport()
+    const chrome = view.insets()
+    const below = bottom + 8
+    const above = top - 26
+    if (bottom <= 0) return Math.min(below, -SIZE_LABEL_HEIGHT)
+    if (top >= height) return Math.max(above, height)
+    const floor = height - Math.max(SIZE_CLEARANCE, chrome.bottom) - 24
+    const ceiling = Math.max(SIZE_LABEL_INSET, chrome.top)
+    if (below <= floor) return Math.max(below, ceiling)
+    if (above >= ceiling) return Math.max(ceiling, Math.min(above, floor))
+    return Math.max(ceiling, floor)
   }
 
   /** A dashed outline round each linked copy of the selected layers in the frames in view. */
@@ -170,12 +192,15 @@ export function editorOverlay({
     return parts
   }
 
-  /** Each selected layer's outline, then the box with its handles and the size under it. */
-  function selectionParts() {
+  /**
+   * Each selected layer's outline, then the box with its handles and the size under it, with the
+   * selection's span across the stage, which the size is placed by.
+   */
+  function selectionParts(): { parts: HTMLElement[]; size: { el: HTMLElement; span: Span } | null } {
     const gesture = pointer.gesture()
     const outer = boxes.selectionBox()
     const current = selection.current()
-    if (!outer || !current) return []
+    if (!outer || !current) return { parts: [], size: null }
     const { frame, drawn: box } = outer
     const parts: HTMLElement[] = []
     const several = current.ids.length > 1
@@ -204,23 +229,37 @@ export function editorOverlay({
       }
     }
     parts.push(el)
-    if (!typing.editing()) {
-      const corners = cornersOf(box).map((p) => toScreen(view.camera(), { x: frame.x + p.x, y: frame.y + p.y }))
-      const size = document.createElement('div')
-      size.className = 'selection-size'
-      size.textContent = `${round(box.width, 0)} × ${round(box.height, 0)}`
-      // A corner scaling one text says its size too, from where it was.
-      const g = gesture?.kind === 'resize' ? gesture : null
-      const text = g && !several ? g.texts.get(current.ids[0] ?? '') : undefined
-      if (g && text) size.textContent += ` · ${text.style.fontSize} → ${scaleText(text, g.factor).style.fontSize}`
-      const top = sizeLabelTop(corners.map((c) => c.y))
-      Object.assign(size.style, {
-        left: px((Math.min(...corners.map((c) => c.x)) + Math.max(...corners.map((c) => c.x))) / 2),
-        top: px(top),
-      })
-      parts.push(size)
-    }
-    return parts
+    if (typing.editing()) return { parts, size: null }
+    const corners = cornersOf(box).map((p) => toScreen(view.camera(), { x: frame.x + p.x, y: frame.y + p.y }))
+    const size = document.createElement('div')
+    size.className = 'selection-size'
+    size.textContent = `${round(box.width, 0)} × ${round(box.height, 0)}`
+    // A corner scaling one text says its size too, from where it was.
+    const g = gesture?.kind === 'resize' ? gesture : null
+    const text = g && !several ? g.texts.get(current.ids[0] ?? '') : undefined
+    if (g && text) size.textContent += ` · ${text.style.fontSize} → ${scaleText(text, g.factor).style.fontSize}`
+    size.style.top = px(sizeLabelTop(corners.map((c) => c.y)))
+    parts.push(size)
+    const xs = corners.map((c) => c.x)
+    return { parts, size: { el: size, span: { left: Math.min(...xs), right: Math.max(...xs) } } }
+  }
+
+  /**
+   * Puts the size label centred under the selection's span across the stage, kept SIZE_LABEL_INSET
+   * inside the stage's sides and clear of the chrome along them, at the left when there is no room
+   * for both. A selection wholly off the stage takes it wholly off the stage with it. Measured once
+   * it is drawn.
+   */
+  function placeSizeLabel(size: HTMLElement, span: Span) {
+    const width = size.offsetWidth
+    const room = view.viewport().width
+    const chrome = view.insets()
+    const centred = (span.left + span.right) / 2 - width / 2
+    const low = Math.max(SIZE_LABEL_INSET, chrome.left)
+    const high = room - Math.max(SIZE_LABEL_INSET, chrome.right) - width
+    if (span.right <= 0) size.style.left = px(Math.min(centred, -width))
+    else if (span.left >= room) size.style.left = px(Math.max(centred, room))
+    else size.style.left = px(Math.max(low, Math.min(centred, high)))
   }
 
   function drawOverlay() {
@@ -263,9 +302,10 @@ export function editorOverlay({
     const dropFrame = dropTarget && frameOf(dropTarget.frameId)
     const dropBox = dropFrame && dropTarget && boxes.drawnBoxOf(dropFrame, dropTarget.id, view.design())
     if (dropFrame && dropBox) parts.push(outline('drop-target', dropFrame, dropBox))
+    const selected = selection.pathEditing() || selection.cropping() ? null : selectionParts()
     parts.push(
       ...linkedParts(),
-      ...(selection.pathEditing() || selection.cropping() ? [] : selectionParts()),
+      ...(selected?.parts ?? []),
       ...pen.parts(),
       ...cropping.parts(),
       ...autoLayoutDrag.parts(gesture?.kind === 'reorder' ? gesture : null),
@@ -287,6 +327,7 @@ export function editorOverlay({
     }
     parts.push(...typing.parts())
     overlay.replaceChildren(...parts)
+    if (selected?.size) placeSizeLabel(selected.size.el, selected.size.span)
     selection.tellListeners()
   }
 

@@ -16,6 +16,8 @@ interface Fake {
   style: Record<string, string>
   textContent: string
   children: Fake[]
+  /** Its width as laid out: every part is 70 px wide. */
+  offsetWidth: number
   append(...more: Fake[]): void
 }
 const fake = (name = ''): Fake => ({
@@ -24,6 +26,7 @@ const fake = (name = ''): Fake => ({
   style: {},
   textContent: '',
   children: [],
+  offsetWidth: 70,
   append(...more) {
     this.children.push(...more)
   },
@@ -70,6 +73,11 @@ function harness(
     lit?: boolean
     renaming?: boolean
     zoom?: number
+    /** Where the page's origin is on the stage, across and down. */
+    x?: number
+    y?: number
+    /** The stage's edges floating chrome covers. */
+    insets?: { top: number; right: number; bottom: number; left: number }
     /** The design holds linked copies of the selected layer, and the story is in view too. */
     linked?: boolean
   } = {},
@@ -85,8 +93,9 @@ function harness(
       },
     } as unknown as HTMLElement,
     view: {
-      camera: () => ({ x: 0, y: 100, zoom: state.zoom ?? 1 }),
+      camera: () => ({ x: state.x ?? 0, y: state.y ?? 100, zoom: state.zoom ?? 1 }),
       viewport: () => ({ width: 1000, height: 800 }),
+      insets: () => state.insets ?? { top: 0, right: 0, bottom: 0, left: 0 },
       design: () => (state.linked ? linkedDesign : design),
       inView: () => (state.linked ? [SQUARE, STORY] : [SQUARE]),
       frameOf: (key) => (key === SQUARE.id ? SQUARE : undefined),
@@ -231,6 +240,68 @@ describe('editorOverlay', () => {
       typing.overlay.draw()
       expect(typing.part('selection')?.children).toEqual([])
       expect(typing.drawn()).not.toContain('selection-size')
+    })
+
+    describe('the size', () => {
+      type Insets = { top: number; right: number; bottom: number; left: number }
+      /**
+       * Where the size is on the stage, with the page's origin at `x`, `y`: the selection 100 px
+       * square from 10 px in (times the zoom), its size 70 px wide; the stage 1000 × 800.
+       */
+      const sizeAt = ({ insets, ...camera }: { x?: number; y?: number; zoom?: number; insets?: Insets }) => {
+        const { overlay, part } = harness({ ...camera, ...(insets && { insets }) })
+        overlay.draw()
+        return part('selection-size')?.style
+      }
+      const leftOf = (x: number, insets?: Insets) => sizeAt({ x, ...(insets && { insets }) })?.left
+      const topOf = (y: number, rest: { zoom?: number; insets?: Insets } = {}) => sizeAt({ y, ...rest })?.top
+      const NONE = { top: 0, right: 0, bottom: 0, left: 0 }
+
+      it('centres under the selection, kept inside the stage by 8 px at either edge', () => {
+        expect(leftOf(0)).toBe('25px')
+        expect(leftOf(-50)).toBe('8px')
+        expect(leftOf(900)).toBe('922px')
+      })
+
+      it('keeps clear of the chrome along either side', () => {
+        expect(leftOf(0, { ...NONE, left: 72 })).toBe('72px')
+        expect(leftOf(880, { ...NONE, right: 72 })).toBe('858px')
+      })
+
+      it('stays clear of the chrome while any of the selection is on the stage, and goes off the stage with it', () => {
+        expect(leftOf(-80, { ...NONE, left: 72 })).toBe('72px')
+        expect(leftOf(-200)).toBe('-175px')
+        expect(leftOf(1000)).toBe('1025px')
+      })
+
+      it('goes wholly off the stage with a selection narrower than itself', () => {
+        // 10 px wide at a tenth: from 1001 px, and up to -9 px.
+        expect(sizeAt({ x: 1000, zoom: 0.1 })?.left).toBe('1000px')
+        expect(sizeAt({ x: -20, zoom: 0.1 })?.left).toBe('-70px')
+      })
+
+      it('goes under the selection, over it when the chrome along the bottom would cover it', () => {
+        // The selection's bottom at 680 px: room under it for the dock, not for a phone's dock and tab bar.
+        expect(topOf(570)).toBe('688px')
+        expect(topOf(570, { insets: { ...NONE, bottom: 121 } })).toBe('554px')
+      })
+
+      it('keeps over the chrome along the bottom when the selection is beside it, and under the chrome along the top', () => {
+        // From 740 px, in a phone's dock and tab bar 121 px tall.
+        expect(topOf(730, { insets: { ...NONE, bottom: 121 } })).toBe('655px')
+        // Down to 16 px, under the islands 60 px tall.
+        expect(topOf(-94, { insets: { ...NONE, top: 60 } })).toBe('60px')
+      })
+
+      it('stays on the stage, over the selection, when the selection is taller than the stage', () => {
+        // From -40 px to 960 px at ten times.
+        expect(topOf(-140, { zoom: 10 })).toBe('704px')
+      })
+
+      it('goes wholly off the stage with a selection above or below it', () => {
+        expect(topOf(-115)).toBe('-20px')
+        expect(topOf(800)).toBe('800px')
+      })
     })
   })
 
