@@ -149,6 +149,7 @@ export const ar: Messages = {
       flowEnd: 'هذه الطبقة في طرف صفها أو عمودها بالفعل.',
       svgLeftOut: 'وُضع كطبقات. حُذف ما لا تعرضه أي طبقة: {parts}.',
       svgUnreadable: 'تعذّرت قراءة ملف SVG هذا، فلم يوضع شيء.',
+      pasteNeedsFrame: 'أضف إطارًا أولًا، ثم الصق.',
     },
     svgParts: {
       filter: 'المرشّحات',

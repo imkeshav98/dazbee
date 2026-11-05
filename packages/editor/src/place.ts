@@ -32,8 +32,11 @@ export interface PlaceDeps {
   boxes: Pick<EditorBoxes, 'roots' | 'boxIn' | 'containersOf' | 'pickable'>
   typing: Pick<EditorTyping, 'editing' | 'stop' | 'fitText' | 'copy' | 'cut' | 'paste'>
   actions: Pick<EditorActions, 'perform'>
-  /** Tells the app that an SVG can't be read, or had parts no layer shows, which come as `parts`. */
-  notify: (notice: 'svgUnreadable' | 'svgLeftOut', parts?: readonly Skipped[]) => void
+  /**
+   * Tells the app that an SVG can't be read, or had parts no layer shows, which come as `parts`;
+   * or that a paste found no frame on the page to go in.
+   */
+  notify: (notice: 'svgUnreadable' | 'svgLeftOut' | 'pasteNeedsFrame', parts?: readonly Skipped[]) => void
   /** Aborted when the editor is destroyed: a file read after that places nothing. */
   signal: AbortSignal
   /** Draws the overlay. */
@@ -58,7 +61,7 @@ export interface EditorPlace {
   copyLayers(): boolean
   /** Whether Paste in a menu has layers to place: the ones last copied in Dazbee on this device. */
   canPasteLayers(): boolean
-  /** Pastes the layers last copied in Dazbee on this device, with the pointer where it is; false with none kept. */
+  /** Pastes the layers last copied in Dazbee on this device, with the pointer where it is; false with none kept or nothing pasted. */
   pasteLayers(pointer: () => Point | null): boolean
   /** Places an SVG file as layers, centred on a spot or a point in client coordinates, or in the frame in view. */
   placeSvg(text: string, name: string, where?: Point | Spot): string | null
@@ -163,12 +166,16 @@ export function editorPlace({
    * Pastes layers (#49) into the frame the selection is in, or else the one under the pointer: in
    * the group or box double-clicked into when it can hold them, otherwise at the frame's top level,
    * where they were or centred on the pointer, each a new layer with a link id of its own. One undo
-   * step; the pasted layers end up selected.
+   * step; the pasted layers end up selected. On a page with no frame it says to add one; returns
+   * whether it pasted.
    */
   function pasteTree(tree: LayerTree, atPointer: boolean, pointer: Point | null) {
     const under = pointer ? pointAt(pointer) : null
     const frame = frameOf(selection.current()?.frameId) ?? under?.frame ?? inView()[0] ?? frames()[0]
-    if (!frame) return
+    if (!frame) {
+      notify('pasteNeedsFrame')
+      return false
+    }
     const now = session.design()
     const entered = selection.entered()
     const inside = entered ? now.nodes[entered] : undefined
@@ -191,14 +198,16 @@ export function editorPlace({
     }
     let pasted: string[] = []
     if (
-      runQuietly(() =>
+      !runQuietly(() =>
         session.gesture(() => {
           pasted = session.run('design.place', { parentId, tree, dx, dy })
           if (now.nodes[parentId]) hug([parentId])
         }),
       )
     )
-      selection.select(pasted, frame.id)
+      return false
+    selection.select(pasted, frame.id)
+    return true
   }
 
   /**
@@ -294,6 +303,7 @@ export function editorPlace({
         const markup = svgMarkup(e.clipboardData?.getData(SVG_TYPE) || e.clipboardData?.getData('text/plain'))
         if (!file && !markup) return
         e.preventDefault()
+        if (frames().length === 0) return notify('pasteNeedsFrame')
         if (markup) placeSvgAt(markup, 'SVG', { client: atPointer ? pointer() : undefined })
         else if (file) {
           void file.text().then((text) => {
@@ -330,8 +340,7 @@ export function editorPlace({
   function pasteLayers(pointer: () => Point | null) {
     const tree = rememberedLayers()
     if (!tree) return false
-    pasteTree(tree, false, pointer())
-    return true
+    return pasteTree(tree, false, pointer())
   }
   function placeImage(asset: PlacedAsset, where?: Point | Spot): string | null {
     // A point off every frame places nothing; with no point, it goes in the frame in the middle of the view.

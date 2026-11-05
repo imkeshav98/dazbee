@@ -160,6 +160,7 @@ export const en = {
       flowEnd: 'This layer is already at that end of its row or column.',
       svgLeftOut: 'Placed as layers. Left out, since no layer can show them: {parts}.',
       svgUnreadable: 'This SVG file can’t be read, so nothing was placed.',
+      pasteNeedsFrame: 'Add a frame first, then paste.',
     },
     /** What an SVG file had that no layer shows, for the notice after placing it. */
     svgParts: {

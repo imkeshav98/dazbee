@@ -36,8 +36,8 @@ export interface EditorOptions extends ResourceSources {
   signal?: AbortSignal
 }
 
-/** Something the page should say: why a gesture did nothing, or how placing an SVG went. */
-export type Notice = 'placedByLayout' | 'flowEnd' | 'svgLeftOut' | 'svgUnreadable'
+/** Something the page should say: why a gesture or a paste did nothing, or how placing an SVG went. */
+export type Notice = 'placedByLayout' | 'flowEnd' | 'svgLeftOut' | 'svgUnreadable' | 'pasteNeedsFrame'
 
 /** What one redraw did, for the checks that count a redraw's work. */
 export interface DrawInfo {

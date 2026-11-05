@@ -122,11 +122,13 @@ function clipboardEvent(data: DataTransfer) {
 /**
  * Placing on a real session and selection over the two frames, a client point being a world point
  * (the stage at the page's corner, zoom 1), logging what it asks of the tools, typing and the page.
+ * With `emptyPage`, the page shown has no frames.
  */
-function harness(typed = false) {
+function harness(typed = false, { emptyPage = false } = {}) {
   const session = sessionOf(DESIGN)
-  const frames = pageFrames(session.design(), 'p1').frames
-  const [square, wide] = frames as [Frame, Frame]
+  const all = pageFrames(session.design(), 'p1').frames
+  const [square, wide] = all as [Frame, Frame]
+  const frames = emptyPage ? [] : all
   const log: string[] = []
   const selection = editorSelection({ drawn: () => session.design(), frames: () => frames, changed: () => {} })
   const boxes = testBoxes(session, selection, frames)
@@ -143,8 +145,8 @@ function harness(typed = false) {
       design: () => session.design(),
       frames: () => frames,
       frameOf,
-      inView: () => [wide],
-      middleFrame: () => wide,
+      inView: () => (emptyPage ? [] : [wide]),
+      middleFrame: () => (emptyPage ? undefined : wide),
       pointAt,
       spotAt: (client) => {
         const at = pointAt(client)
@@ -292,6 +294,25 @@ describe('editorPlace', () => {
       const [group] = selection.current()?.ids ?? []
       expect(selection.current()?.frameId).toBe(wide.id)
       expect(session.design().nodes[group ?? '']?.type).toBe('group')
+    })
+
+    it('says to add a frame first, and pastes nothing, on a page with no frames', () => {
+      const copied = harness()
+      copied.selection.select(['a'], copied.square.id)
+      const data = transfer()
+      copied.place.copy(clipboardEvent(data))
+      const { place, session, log } = harness(false, { emptyPage: true })
+      const e = clipboardEvent(data)
+      place.paste(e, () => null)
+      expect(e.taken).toBe(true)
+      expect(log).toEqual(['pasteNeedsFrame'])
+      place.paste(clipboardEvent(transfer({ 'text/plain': SVG })), () => null)
+      expect(log).toEqual(['pasteNeedsFrame', 'pasteNeedsFrame'])
+      // Paste in a menu, with the copy kept on this device.
+      expect(copied.place.copyLayers()).toBe(true)
+      expect(place.pasteLayers(() => null)).toBe(false)
+      expect(log).toEqual(['pasteNeedsFrame', 'pasteNeedsFrame', 'pasteNeedsFrame'])
+      expect(session.canUndo()).toBe(false)
     })
 
     it('leaves the paste to the text being typed into, and anything else on the clipboard be', () => {
