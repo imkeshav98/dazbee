@@ -48,7 +48,11 @@ function harness() {
     width === 300 && height === 300 ? 'Frame' : `${width} by ${height}`
   const frameActions = editorFrameActions({
     session,
-    view: { page: () => 'p1', showArea: (area) => log.push(`showArea ${JSON.stringify(area)}`) },
+    view: {
+      page: () => 'p1',
+      showArea: (area) => log.push(`showArea ${JSON.stringify(area)}`),
+      showWhole: (area) => log.push(`showWhole ${JSON.stringify(area)}`),
+    },
     tools: { setTool: (tool) => log.push(`tool ${tool}`) },
     frameName,
     selection,
@@ -278,7 +282,7 @@ describe('editorDrawing', () => {
       expect(selection.pickedFrame()).toBe(made?.[0])
       expect(log.slice(-3)).toEqual([
         'tool select',
-        `showArea ${JSON.stringify({ x: 1200, y: 101, width: 300, height: 300 })}`,
+        `showWhole ${JSON.stringify({ x: 1200, y: 101, width: 300, height: 300 })}`,
         'draw',
       ])
       session.undo()

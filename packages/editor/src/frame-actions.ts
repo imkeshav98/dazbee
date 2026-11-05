@@ -11,7 +11,7 @@ import type { EditorTools } from './tools.ts'
 
 export interface FrameActionsDeps {
   session: Session
-  view: Pick<EditorView, 'page' | 'showArea'>
+  view: Pick<EditorView, 'page' | 'showArea' | 'showWhole'>
   tools: Pick<EditorTools, 'setTool'>
   /** The name a frame added from a size takes, in the app's words. */
   frameName: (width: number, height: number) => string
@@ -43,7 +43,8 @@ export interface EditorFrameActions {
   addSize(frameId: string, size: Size): string | null
   /**
    * Shows a frame just added: picks it, the select tool back, and brings it whole into view with
-   * its label beside the chrome (`showArea`). Nothing for a frame gone.
+   * its label beside the chrome, zoomed out only when it doesn't fit (`showWhole`). Nothing for a
+   * frame gone.
    */
   showAdded(frameId: string): void
   /** Calls back with a frame's name once Delete has deleted it as the picked frame, so the page can offer its undo. */
@@ -52,7 +53,7 @@ export interface EditorFrameActions {
 
 export function editorFrameActions({
   session,
-  view: { page, showArea },
+  view: { page, showArea, showWhole },
   tools,
   frameName,
   selection,
@@ -63,8 +64,9 @@ export function editorFrameActions({
 
   /**
    * What a key does to the picked frame: Esc lets it go, Delete deletes it with its layers, Mod+D
-   * duplicates it and picks the copy, showing it whole beside the chrome (`showArea`), and the
-   * arrows move it; each is one undo step. The layers' other keys do nothing to it.
+   * duplicates it and picks the copy, panning to show it beside the chrome at the same zoom
+   * (`showArea`), and the arrows move it; each is one undo step. The layers' other keys do nothing
+   * to it.
    */
   function frameAction(action: ShortcutAction, frameId: string): boolean {
     const step = NUDGES[action]
@@ -102,7 +104,7 @@ export function editorFrameActions({
     if (!made) return
     tools.setTool('select')
     selection.pickFrame(frameId)
-    showArea({ x: made.x, y: made.y, width: made.width, height: made.height })
+    showWhole({ x: made.x, y: made.y, width: made.width, height: made.height })
     drawOverlay()
   }
 

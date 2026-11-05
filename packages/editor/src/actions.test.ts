@@ -88,6 +88,7 @@ function harness(penDrawing = false) {
     view: {
       page: () => 'p1',
       showArea: (area) => log.push(`showArea ${JSON.stringify(area)}`),
+      showWhole: (area) => log.push(`showWhole ${JSON.stringify(area)}`),
     },
     tools: { setTool: (tool) => log.push(`tool ${tool}`) },
     frameName: (width, height) => `Size ${width}×${height}`,

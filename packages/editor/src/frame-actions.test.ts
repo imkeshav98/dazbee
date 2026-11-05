@@ -49,6 +49,7 @@ function harness() {
     view: {
       page: () => 'p1',
       showArea: (area) => log.push(`showArea ${JSON.stringify(area)}`),
+      showWhole: (area) => log.push(`showWhole ${JSON.stringify(area)}`),
     },
     tools: { setTool: (tool) => log.push(`tool ${tool}`) },
     frameName: (width, height) => `Size ${width}×${height}`,
@@ -82,7 +83,7 @@ describe('editorFrameActions', () => {
       expect(selection.current()).toBeNull()
       expect(log).toEqual([
         'tool select',
-        `showArea ${JSON.stringify({ x: 2680, y: 0, width: 300, height: 250 })}`,
+        `showWhole ${JSON.stringify({ x: 2680, y: 0, width: 300, height: 250 })}`,
         'overlay',
       ])
       session.undo()
@@ -139,7 +140,7 @@ describe('editorFrameActions', () => {
       expect(selection.pickedFrame()).toBe(id)
       expect(log).toEqual([
         'tool select',
-        `showArea ${JSON.stringify({ x: 2680, y: 0, width: 540, height: 1080 })}`,
+        `showWhole ${JSON.stringify({ x: 2680, y: 0, width: 540, height: 1080 })}`,
         'overlay',
       ])
       session.undo()
@@ -175,7 +176,7 @@ describe('editorFrameActions', () => {
       expect(selection.current()).toBeNull()
       expect(log).toEqual([
         'tool select',
-        `showArea ${JSON.stringify({ x: 1280, y: 0, width: 1200, height: 628 })}`,
+        `showWhole ${JSON.stringify({ x: 1280, y: 0, width: 1200, height: 628 })}`,
         'overlay',
       ])
     })
