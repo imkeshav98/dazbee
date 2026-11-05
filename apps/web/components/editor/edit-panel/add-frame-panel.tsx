@@ -163,7 +163,7 @@ function SizeTile({ size, name, onAdd }: { size: Size & { id: string }; name: st
 
 /**
  * A size of your own: W × H and Add, starting at `start`. Past the limits, a line under the fields
- * says why, as it is typed, and Add waits; Enter in a field adds as Add does.
+ * says why as it is typed, scrolled into view, and Add waits; Enter in a field adds as Add does.
  */
 function OwnSize({ start, onAdd }: { start: Size; onAdd: (size: Size) => void }) {
   const t = useMessages()
@@ -173,6 +173,12 @@ function OwnSize({ start, onAdd }: { start: Size; onAdd: (size: Size) => void })
   const typed = typedSize(width, height)
   const issue = typed?.issue
   const issueId = useId()
+  const issueLine = useRef<HTMLParagraphElement>(null)
+  // The line saying why comes into view as it shows, past the body's padding and its faded edge:
+  // on a phone the sheet may end at the fields.
+  useEffect(() => {
+    if (issue) issueLine.current?.scrollIntoView({ block: 'nearest' })
+  }, [issue])
   const field = (axis: 'width' | 'height', value: string, set: (to: string) => void) => (
     <label className={SIZE_FIELD}>
       <span aria-hidden className="text-[11px] font-semibold text-subtle">
@@ -221,7 +227,13 @@ function OwnSize({ start, onAdd }: { start: Size; onAdd: (size: Size) => void })
         </button>
       </div>
       {issue && (
-        <p id={issueId} role="alert" data-testid="own-size-issue" className="text-xs text-danger">
+        <p
+          ref={issueLine}
+          id={issueId}
+          role="alert"
+          data-testid="own-size-issue"
+          className="scroll-mb-4 text-xs text-danger"
+        >
           {issueText(t, issue)}
         </p>
       )}

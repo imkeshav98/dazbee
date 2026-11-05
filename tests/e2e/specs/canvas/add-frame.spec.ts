@@ -51,6 +51,13 @@ const linksIn = (d: Design, frameId: string) =>
     .sort()
 /** Whether the focus is inside the card. */
 const focusInCard = (page: Page) => page.evaluate(() => document.activeElement?.closest('#edit-panel') !== null)
+/** Whether the card's body, which scrolls, is scrolled to its end, the size issue's line last in it. */
+const scrolledToEnd = (page: Page) =>
+  page.getByTestId('own-size-issue').evaluate((line) => {
+    let body = line.parentElement
+    while (body && getComputedStyle(body).overflowY !== 'auto') body = body.parentElement
+    return body !== null && body.scrollTop + body.clientHeight >= body.scrollHeight - 1
+  })
 /** Whether a frame's label shows on the stage: it is in view. */
 const inView = async (page: Page, frameId: string) => {
   const stage = await page.getByTestId('stage').boundingBox()
@@ -421,7 +428,8 @@ for (const [width, height] of SCREEN_SIZES) {
     await page.getByTestId('own-width').scrollIntoViewIfNeeded()
     await typeSize(page, '9000', '1000')
     await expect(page.getByTestId('own-size-issue')).toBeVisible()
-    await page.getByTestId('own-size-issue').scrollIntoViewIfNeeded()
+    // The line comes into view as it shows, clear of the faded edge: the card's body is scrolled to its end.
+    await expect.poll(() => scrolledToEnd(page)).toBe(true)
     await nextFrame(page)
     expect(await layoutProblems(page, { pieces: PIECES, uncut: 'h2' })).toEqual([])
     const fields = await page.getByTestId('own-size').boundingBox()
@@ -446,6 +454,8 @@ for (const [width, height] of SCREEN_SIZES) {
       async ({ browser }) => {
         const { page, errors } = await openSized(browser, { width, height }, theme)
         const shot = async (name: string) => {
+          // The pointer rests off the card, so no tile shows the hover tint.
+          await page.mouse.move(1, 1)
           await nextFrame(page)
           writeOutput(`add-frame-${width}-${theme}-${name}.png`, await page.screenshot({ animations: 'disabled' }))
         }
@@ -453,7 +463,7 @@ for (const [width, height] of SCREEN_SIZES) {
         await shot('1-card')
         await page.getByTestId('own-width').scrollIntoViewIfNeeded()
         await typeSize(page, '9000', '1000')
-        await page.getByTestId('own-size-issue').scrollIntoViewIfNeeded()
+        await expect.poll(() => scrolledToEnd(page)).toBe(true)
         await shot('2-past-limits')
         await page.getByTestId('edit-panel-close').click()
         await clickLabel(page, 'sq')
@@ -464,12 +474,12 @@ for (const [width, height] of SCREEN_SIZES) {
         await shot('4-add-size')
         await page.keyboard.press('Escape')
         await page.keyboard.press('Escape')
-        // A frame drawn with the tool: clear of the rail, and on a phone above the card's sheet.
+        // A frame drawn with the tool on empty canvas: clear of the rail, and on a phone above the card's sheet.
         await page.locator('[data-dock] [data-tool="frame"]').click()
         const stage = await page.getByTestId('stage').boundingBox()
         if (!stage) throw new Error('no stage')
         const phone = width < 640
-        const from = { x: stage.x + (phone ? 40 : 140), y: stage.y + stage.height * (phone ? 0.22 : 0.62) }
+        const from = { x: stage.x + (phone ? 40 : 140), y: stage.y + stage.height * (phone ? 0.42 : 0.62) }
         await dragScreen(page, from, { x: from.x + 120, y: from.y + 80 })
         await expect(card(page)).toHaveCount(0)
         await shot('5-drawn')
