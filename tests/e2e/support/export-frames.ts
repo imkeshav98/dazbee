@@ -117,6 +117,34 @@ export const design = (): DesignInput => {
   }
 }
 
+/** Base-62 digits in the order they sort, for frame orders past nine. */
+const DIGITS = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'
+
+/** One page of `n` medium rectangles, Ad 1 to Ad n, side by side, more than the frames list shows at once. */
+export const adsDesign = (n: number): DesignInput => {
+  const first = frameDesign({
+    name: 'Many ads',
+    frameId: 'ad1',
+    frameName: 'Ad 1',
+    width: 300,
+    height: 250,
+    fills: solid('#FFD23FFF'),
+  })
+  const frames = { ...first.frames }
+  for (let i = 2; i <= n; i++)
+    frames[`ad${i}`] = {
+      pageId: 'p1',
+      name: `Ad ${i}`,
+      width: 300,
+      height: 250,
+      x: (i - 1) * 500,
+      y: 0,
+      fills: solid(i % 2 ? '#FFD23FFF' : '#FF48B0FF'),
+      order: `a${DIGITS[i - 1]}`,
+    }
+  return { ...first, frames }
+}
+
 /** Each row of the frames list: its name, its size and whether it is ticked, the All frames row first when it shows. */
 export const rows = (dialog: Locator) =>
   dialog
@@ -136,13 +164,16 @@ export const rows = (dialog: Locator) =>
     )
 export const names = async (dialog: Locator) => (await rows(dialog)).map((row) => row.name)
 
-/** Opens the design alone in a tab of a theme and language at a screen size, fitted, with its fonts loaded. */
+/**
+ * Opens a design, the Summer one unless another is given, alone in a tab of a theme and language at
+ * a screen size, fitted, with its fonts loaded.
+ */
 export async function openSized(
   browser: Browser,
   viewport: { width: number; height: number },
-  { theme = 'dark', locale = 'en' }: { theme?: string; locale?: string } = {},
+  { theme = 'dark', locale = 'en', input = design() }: { theme?: string; locale?: string; input?: DesignInput } = {},
 ) {
-  const designId = await seed(design())
+  const designId = await seed(input)
   const page = await (await browser.newContext({ viewport, acceptDownloads: true })).newPage()
   const errors: string[] = []
   page.on('pageerror', (error) => errors.push(error.message))

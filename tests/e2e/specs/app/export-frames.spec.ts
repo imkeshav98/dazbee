@@ -9,7 +9,7 @@ import { readZip } from '@dazbee/export'
 
 import { writeOutput } from '../../support/editor.ts'
 import { expectNode, openExport, runExport } from '../../support/export.ts'
-import { LISTED, names, openSized, rows, SUMMER } from '../../support/export-frames.ts'
+import { adsDesign, LISTED, names, openSized, rows, SUMMER } from '../../support/export-frames.ts'
 import { choose } from '../../support/fields.ts'
 import { expect, type Locator, type Page, test } from '../../support/test.ts'
 
@@ -196,6 +196,35 @@ test('in Arabic each row’s size reads width × height, as its frame’s label 
     expect(await asRead(page.locator(`.stage-overlay .frame-label[data-frame="${frameId}"] .frame-size`))).toEqual([
       sizes[SUMMER.indexOf(frameId ?? '')],
     ])
+  expect(errors).toEqual([])
+})
+
+test('a row reached by Tab, down the list and back up, scrolls whole into view, its ring and all', async ({
+  browser,
+}) => {
+  const { page, errors } = await openSized(browser, { width: 1280, height: 760 }, { input: adsDesign(14) })
+  const dialog = await openExport(page)
+  const list = dialog.getByTestId('export-frames')
+  expect(await list.evaluate((el) => el.scrollHeight > el.clientHeight)).toBe(true)
+  /** How much of the focused row the list hides, above and below, in pixels. */
+  const hidden = () =>
+    list.evaluate((el) => {
+      const row = document.activeElement?.closest('label')
+      if (!row || !el.contains(row)) throw new Error('no row has the focus')
+      const [box, at] = [el.getBoundingClientRect(), row.getBoundingClientRect()]
+      return { above: Math.max(0, box.top - at.top), below: Math.max(0, at.bottom - box.bottom) }
+    })
+  await dialog.getByTestId('export-all-frames').focus()
+  for (let i = 1; i <= 14; i++) {
+    await page.keyboard.press('Tab')
+    await expect(dialog.locator(`[data-frame="ad${i}"]`)).toBeFocused()
+    expect(await hidden(), `Ad ${i}`).toEqual({ above: 0, below: 0 })
+  }
+  for (let i = 13; i >= 1; i--) {
+    await page.keyboard.press('Shift+Tab')
+    await expect(dialog.locator(`[data-frame="ad${i}"]`)).toBeFocused()
+    expect(await hidden(), `Ad ${i}`).toEqual({ above: 0, below: 0 })
+  }
   expect(errors).toEqual([])
 })
 

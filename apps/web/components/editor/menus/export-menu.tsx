@@ -36,6 +36,16 @@ const LABEL = FIELD_LABEL
 /** A frame's row, its tick in a hidden checkbox: lit under the pointer and while pressed, ringed when reached by keyboard. */
 const ROW = `flex h-8 w-full shrink-0 cursor-pointer items-center gap-2.5 rounded-row px-2 text-start text-[13px] font-medium text-text transition-colors duration-[var(--chrome-fast)] ${LIT_ROW} ${TOUCH_ROW} has-[:focus-visible]:bg-hover has-[:focus-visible]:lit has-[:focus-visible]:outline-2 has-[:focus-visible]:-outline-offset-2 has-[:focus-visible]:outline-accent`
 
+/** Scrolls the list so the row holding a control that took the focus shows whole, its ring and all. */
+function showWhole(control: HTMLElement) {
+  const row = control.closest('label')
+  const list = row?.parentElement
+  if (!row || !list) return
+  const [box, at] = [list.getBoundingClientRect(), row.getBoundingClientRect()]
+  if (at.top < box.top) list.scrollTop -= box.top - at.top
+  else if (at.bottom > box.bottom) list.scrollTop += at.bottom - box.bottom
+}
+
 function download(name: string, type: string, bytes: Uint8Array<ArrayBuffer>) {
   const url = URL.createObjectURL(new Blob([bytes], { type }))
   const link = document.createElement('a')
@@ -303,6 +313,7 @@ function FrameRow({
           if (input) input.indeterminate = on === 'mixed'
         }}
         onChange={(event) => onTick(event.target.checked)}
+        onFocus={(event) => showWhole(event.currentTarget)}
         className="sr-only"
         data-testid={testId}
         data-frame={frameId}
