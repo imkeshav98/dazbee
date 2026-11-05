@@ -13,6 +13,7 @@ import { EmptyPageHint } from '@/components/editor/empty-page-hint.tsx'
 import { AssetLibrary } from '@/components/editor/flyouts/asset-library.tsx'
 import { BrandKitPanel } from '@/components/editor/flyouts/brand-kit-panel.tsx'
 import { LayersPanel } from '@/components/editor/flyouts/layers-panel.tsx'
+import { FrameRename } from '@/components/editor/frame-rename.tsx'
 import { ShareMenu } from '@/components/editor/menus/share-menu.tsx'
 import { ZoomControl } from '@/components/editor/menus/zoom-control.tsx'
 import { PagesButton, PagesPanel } from '@/components/editor/pages-panel.tsx'
@@ -335,6 +336,7 @@ export function EditorStage({
       >
         <canvas ref={canvas} className="block size-full touch-none" data-testid="stage" />
         <div ref={overlay} className="stage-overlay pointer-events-none absolute inset-0 overflow-hidden" aria-hidden />
+        {editor && <FrameRename editor={editor} />}
         {editor && menuAt && (
           <StageMenu
             key={menuAt.n}
