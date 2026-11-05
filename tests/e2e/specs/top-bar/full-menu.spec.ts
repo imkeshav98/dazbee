@@ -6,25 +6,13 @@
 import { layoutProblems, SCREEN_SIZES } from '../../support/layout.ts'
 import { closeMenus, expectGreyed, fillOf, holders, node, open, redo, rowsOf, undo } from '../../support/linked-menu.ts'
 import { GREEN, INK, PINK } from '../../support/linked-menu-design.ts'
+import { besideRows, FULL_MENU_BESIDE, fullMenuRows } from '../../support/menu-rows.ts'
 import { copyIn } from '../../support/seed.ts'
 import { fitSettled, selectLayers } from '../../support/stage.ts'
 import { expect, type Locator, type Page, test } from '../../support/test.ts'
 import { moreAction, moreMenu, moreSubmenu, PIECES, UNCUT, underPhoneMenu } from '../../support/top-bar.ts'
 
 test.describe.configure({ mode: 'parallel', timeout: 120_000 })
-
-/** The full menu's own rows, in their order; the top bar's ⋯ takes the rest. */
-const ROWS = [
-  'Copy',
-  'Paste',
-  'Duplicate',
-  'Copy to other frames',
-  'Put in a box',
-  'Use as mask',
-  'Lock in all frames',
-  'Hide in all frames',
-  'Delete from all frames',
-]
 
 /** The words of the row that has the focus, without its key. */
 const focusedRow = (page: Page) => page.evaluate(() => document.activeElement?.firstChild?.textContent?.trim() ?? '')
@@ -64,13 +52,13 @@ test.describe('the full menu', () => {
     const menu = page.getByTestId('bar-more-menu')
     await expect(menu).toBeVisible()
     await expect(menu.getByTestId('more-copy')).toBeFocused()
-    expect((await rowsOf(menu)).filter((row) => ROWS.includes(row))).toEqual(ROWS)
+    expect(await rowsOf(menu)).toEqual(fullMenuRows())
     // The submenu opens by the arrow with the focus on its first row, and closes back to its row.
     await page.keyboard.press('ArrowRight')
     const copy = page.getByTestId('more-copy-menu')
     await expect(copy).toBeVisible()
     await expect(copy.getByRole('button').first()).toBeFocused()
-    await expect(copy.getByRole('button')).toHaveText([/^Copy\s*Ctrl\+C/, /^Copy style\s*Ctrl\+Alt\+C/])
+    await expect(copy.getByRole('button')).toHaveText(FULL_MENU_BESIDE.copy.map((row) => row.reads))
     await page.keyboard.press('ArrowLeft')
     await expect(copy).toBeHidden()
     await expect(menu.getByTestId('more-copy')).toBeFocused()
@@ -85,7 +73,7 @@ test.describe('the full menu', () => {
     await page.mouse.click(at?.x ?? 0, at?.y ?? 0, { button: 'right' })
     const right = page.getByTestId('stage-menu')
     await expect(right).toBeVisible()
-    expect((await rowsOf(right)).filter((row) => ROWS.includes(row))).toEqual(ROWS)
+    expect(await rowsOf(right)).toEqual(fullMenuRows())
     expect(errors).toEqual([])
   })
 
@@ -98,14 +86,16 @@ test.describe('the full menu', () => {
     await page.keyboard.press('Enter')
     const menu = page.getByTestId('bar-more-menu')
     await expect(menu.getByTestId('more-copy')).toBeFocused()
+    const rows = fullMenuRows()
+    const [first, second, third, last] = [rows[0], rows[1], rows[2], rows.at(-1)]
     for (const [key, row] of [
-      ['ArrowDown', 'Paste'],
-      ['ArrowDown', 'Duplicate'],
-      ['ArrowUp', 'Paste'],
-      ['End', 'Delete from all frames'],
-      ['ArrowDown', 'Copy'],
-      ['ArrowUp', 'Delete from all frames'],
-      ['Home', 'Copy'],
+      ['ArrowDown', second],
+      ['ArrowDown', third],
+      ['ArrowUp', second],
+      ['End', last],
+      ['ArrowDown', first],
+      ['ArrowUp', last],
+      ['Home', first],
     ] as const) {
       await page.keyboard.press(key)
       await expect.poll(() => focusedRow(page), key).toBe(row)
@@ -114,12 +104,13 @@ test.describe('the full menu', () => {
     await page.keyboard.press('ArrowRight')
     const copy = page.getByTestId('more-copy-menu')
     await expect(copy.getByRole('button').first()).toBeFocused()
+    const [copyRow, styleRow] = besideRows('copy')
     for (const [key, row] of [
-      ['ArrowDown', 'Copy style'],
-      ['ArrowDown', 'Copy'],
-      ['ArrowUp', 'Copy style'],
-      ['Home', 'Copy'],
-      ['End', 'Copy style'],
+      ['ArrowDown', styleRow],
+      ['ArrowDown', copyRow],
+      ['ArrowUp', styleRow],
+      ['Home', copyRow],
+      ['End', styleRow],
     ] as const) {
       await page.keyboard.press(key)
       await expect.poll(() => focusedRow(page), key).toBe(row)
@@ -140,10 +131,10 @@ test.describe('the full menu', () => {
     const right = page.getByTestId('stage-menu')
     await expect(right.getByTestId('more-copy')).toBeFocused()
     await page.keyboard.press('ArrowDown')
-    await expect.poll(() => focusedRow(page)).toBe('Paste')
+    await expect.poll(() => focusedRow(page)).toBe(second)
     await page.keyboard.press('ArrowUp')
     await page.keyboard.press('ArrowUp')
-    await expect.poll(() => focusedRow(page)).toBe('Delete from all frames')
+    await expect.poll(() => focusedRow(page)).toBe(last)
     expect(errors).toEqual([])
   })
 
@@ -177,10 +168,7 @@ test.describe('the full menu', () => {
       [['logo', 'badge'], false],
     ] as const) {
       await selectLayers(page, [...ids])
-      const rows = await rowsOf(await moreMenu(page))
-      const box = rows.indexOf('Put in a box')
-      if (shown) expect(rows.slice(box, box + 2), ids.join(' ')).toEqual(['Put in a box', 'Ungroup'])
-      else expect(rows, ids.join(' ')).not.toContain('Ungroup')
+      expect(await rowsOf(await moreMenu(page)), ids.join(' ')).toEqual(fullMenuRows({ group: shown }))
       await closeMenus(page)
     }
     await selectLayers(page, ['logo'])
@@ -240,7 +228,9 @@ test.describe('the full menu', () => {
     ] as const) {
       await selectLayers(page, [...ids])
       const sub = await moreSubmenu(page, 'copy-to-frames')
-      await expect(sub.getByRole('button')).toHaveText(text ? [/^Style/, /^Text/, /^Layer/] : [/^Style/, /^Layer/])
+      await expect(sub.getByRole('button')).toHaveText(
+        besideRows('copy-to-frames', { text }).map((name) => new RegExp(`^${name}`)),
+      )
       await expect(sub.getByText('To the 2 linked frames')).toBeVisible()
       await closeMenus(page)
     }
@@ -367,8 +357,8 @@ for (const [width, height] of SCREEN_SIZES) {
     if (width > 600) {
       await expect.poll(() => layoutProblems(page, { pieces: PIECES, uncut: UNCUT })).toEqual([])
     } else {
-      // On a phone it opens under its row, laid over the full menu as the mock draws it: wholly on
-      // the screen and on top, each row a finger's height, once it has popped in.
+      // On a phone it opens on its row, laid over the full menu as the mock draws it: wholly on the
+      // screen and on top, each row a finger's height, once it has popped in.
       await sub.evaluate((el) => Promise.all(el.getAnimations().map((a) => a.finished.catch(() => undefined))))
       const rows = await sub.getByRole('button').evaluateAll((buttons) =>
         buttons.map((button) => {
@@ -410,9 +400,10 @@ for (const [width, height] of SCREEN_SIZES) {
     if (width > 600) {
       expect(Math.abs(beside.right - beside.left - 258)).toBeLessThanOrEqual(4)
     } else {
-      // On a phone it lies over the full menu across its whole width.
+      // On a phone it lies on its row, at the full menu's start edge.
+      const row = await boxOf(menu.getByTestId('more-copy-to-frames'))
       expect(Math.abs(beside.left - main.left)).toBeLessThanOrEqual(1)
-      expect(Math.abs(beside.right - main.right)).toBeLessThanOrEqual(1)
+      expect(Math.abs(beside.top - row.top)).toBeLessThanOrEqual(1)
     }
     // Each row's key ends at the same right-hand edge, as the full menu's do.
     const ends = await sub

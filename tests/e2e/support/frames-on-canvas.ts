@@ -143,13 +143,13 @@ export async function labelRow(page: Page, id: string) {
   if (!stage || !rect) throw new Error(`no label for ${id}`)
   return { x: stage.x + rect.x, y: stage.y + rect.y, width: rect.width, height: rect.height }
 }
-/** The picked frame's ⋯ items in order, each by its name and as it reads with its key. */
-const FRAME_MENU = [
-  { name: 'Duplicate', reads: 'DuplicateCtrl+D' },
-  { name: 'Add size', reads: 'Add size' },
-  { name: 'Rename', reads: 'Rename' },
-  { name: 'Export', reads: 'Export' },
-  { name: 'Delete', reads: 'DeleteDelete' },
+/** The picked frame's ⋯ items in order, each by its name, as it reads with its key, and by its `data-action`. */
+export const FRAME_MENU = [
+  { name: 'Duplicate', reads: 'DuplicateCtrl+D', action: 'duplicate' },
+  { name: 'Add size', reads: 'Add size', action: 'add-size' },
+  { name: 'Rename', reads: 'Rename', action: 'rename' },
+  { name: 'Export', reads: 'Export', action: 'export' },
+  { name: 'Delete', reads: 'DeleteDelete', action: 'delete' },
 ] as const
 /**
  * Checks the picked frame's open ⋯ lists its items in order: Duplicate, Add size, Rename, Export, Delete. Given `to`,

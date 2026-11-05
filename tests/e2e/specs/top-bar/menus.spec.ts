@@ -5,6 +5,7 @@
 import { photo, upload } from '../../support/assets.ts'
 import { screenPoint, writeOutput } from '../../support/editor.ts'
 import { layoutProblems } from '../../support/layout.ts'
+import { ORDER_MENU } from '../../support/menu-rows.ts'
 import { fitSettled, nextFrame, openStage, selectLayers } from '../../support/stage.ts'
 import { expect, test } from '../../support/test.ts'
 import {
@@ -325,12 +326,7 @@ test("the small menu locks, duplicates, deletes and hides; the full menu copies 
   const sit = await arrangeMenu(page)
   await sit.getByTestId('more-order').focus()
   await page.keyboard.press('ArrowRight')
-  await expect((await arrangeSubmenu(page, 'order')).getByRole('button')).toHaveText([
-    /^Bring to front/,
-    /^Bring forward/,
-    /^Send backward/,
-    /^Send to back/,
-  ])
+  await expect((await arrangeSubmenu(page, 'order')).getByRole('button')).toHaveText(ORDER_MENU.map((row) => row.reads))
   await page.keyboard.press('ArrowLeft')
   await expect(page.getByTestId('more-order-menu')).toBeHidden()
   await expect(sit).toBeVisible()

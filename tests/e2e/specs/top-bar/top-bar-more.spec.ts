@@ -5,6 +5,8 @@
 // screenshots are in top-bar-more-screens.spec.ts.
 import { arrangeDesign, barItems } from '../../support/arrange-design.ts'
 import { enter } from '../../support/fields.ts'
+import { rowsOf } from '../../support/linked-menu.ts'
+import { ARRANGE, arrangeRows, arrangeRowsOf, fullMenuRows, ORDER_MENU } from '../../support/menu-rows.ts'
 import { openStage, order, perform, props, read, selectLayers } from '../../support/stage.ts'
 import { expect, type Page, test } from '../../support/test.ts'
 import { arrangeMenu, arrangeSubmenu, moreMenu } from '../../support/top-bar.ts'
@@ -35,33 +37,27 @@ test.describe('at 1280×760', () => {
     expect((await barItems(page)).at(-1)).toBe('arrange')
     const menu = await arrangeMenu(page)
     await expect(page.getByTestId('bar-arrange')).toHaveAccessibleName('Arrange')
-    await expect(menu.getByTestId('more-order')).toBeVisible()
-    await expect(menu.getByTestId('more-line-up')).toBeVisible()
+    expect(await arrangeRowsOf(menu)).toEqual(arrangeRows())
     await expect(menu.getByRole('spinbutton', { name: 'Rotation in degrees' })).toBeVisible()
-    await expect(menu.getByTestId('more-text-direction')).toHaveCount(0)
     await page.keyboard.press('Escape')
     await expect(menu).toBeHidden()
 
-    // The small menu's ⋯ holds none of how a layer sits.
+    // The small menu's ⋯ holds its own rows and none of how a layer sits.
     const full = await moreMenu(page)
-    for (const id of ['more-order', 'more-line-up', 'more-text-direction'])
-      await expect(full.getByTestId(id)).toHaveCount(0)
+    expect(await rowsOf(full)).toEqual(fullMenuRows())
+    for (const id of ARRANGE.map((row) => row.id)) await expect(full.getByTestId(id)).toHaveCount(0)
     await expect(full.locator('[data-scrub]')).toHaveCount(0)
     await page.keyboard.press('Escape')
 
     await selectLayers(page, ['words'], { bar: true })
     expect((await barItems(page)).at(-1)).toBe('arrange')
-    const text = await arrangeMenu(page)
-    await expect(text.locator('[data-testid^="more-"], [data-scrub]')).toHaveCount(4)
-    await expect(text.getByTestId('more-text-direction')).toBeVisible()
+    expect(await arrangeRowsOf(await arrangeMenu(page))).toEqual(arrangeRows({ text: true }))
     await page.keyboard.press('Escape')
 
     // Several layers line up from the bar's own Line up, so their ⋯ has no Line up.
     await selectLayers(page, ['shape', 'turned'], { bar: true })
     expect((await barItems(page)).at(-1)).toBe('arrange')
-    const several = await arrangeMenu(page)
-    await expect(several.getByTestId('more-order')).toBeVisible()
-    await expect(several.getByTestId('more-line-up')).toHaveCount(0)
+    expect(await arrangeRowsOf(await arrangeMenu(page))).toEqual(arrangeRows({ several: true }))
     expect(errors).toEqual([])
   })
 
@@ -289,25 +285,13 @@ test.describe('at 1280×760', () => {
     const { page, errors } = await openStage(browser, arrangeDesign())
     await page.setViewportSize({ width: 1280, height: 760 })
     const tip = page.getByRole('tooltip')
+    // The first two moves go to the front, the last two to the back.
+    const names = ORDER_MENU.map((row) => row.name)
+    const [front, back] = [names.slice(0, 2), names.slice(2)]
     const cases = [
-      {
-        id: 'stack',
-        off: ['Bring to front', 'Bring forward'],
-        on: ['Send backward', 'Send to back'],
-        why: 'Already at the front',
-      },
-      {
-        id: 'under',
-        off: ['Send backward', 'Send to back'],
-        on: ['Bring to front', 'Bring forward'],
-        why: 'Already at the back',
-      },
-      {
-        id: 'two',
-        off: ['Bring to front', 'Bring forward'],
-        on: ['Send backward', 'Send to back'],
-        why: 'Already at the front',
-      },
+      { id: 'stack', off: front, on: back, why: 'Already at the front' },
+      { id: 'under', off: back, on: front, why: 'Already at the back' },
+      { id: 'two', off: front, on: back, why: 'Already at the front' },
     ]
     for (const { id, off, on, why } of cases) {
       await selectLayers(page, [id], { bar: true })

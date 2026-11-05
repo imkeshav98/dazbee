@@ -4,6 +4,7 @@
 import { expect, type Locator, type Page } from '@playwright/test'
 
 import { EDITOR_CHROME } from './layout.ts'
+import { FULL_MENU_BESIDE } from './menu-rows.ts'
 
 /** The editor's chrome and the pieces of the top bar, small menu and edit panel that must never meet. */
 export const PIECES = {
@@ -23,7 +24,7 @@ export const UNCUT = 'h1, [data-testid="bar-font"], [data-testid="edit-panel-not
  * The menus beside a menu's rows that `moreAction` looks in, by their test ids: the full menu's
  * Copy, Paste and Copy to other frames, and Arrange's Line up and Order.
  */
-const SUBMENUS = ['copy', 'paste', 'copy-to-frames', 'line-up', 'order']
+const SUBMENUS = [...Object.keys(FULL_MENU_BESIDE), 'line-up', 'order']
 
 /** Where each of the selection's cards is now: the top bar's pop-up or edit panel that holds it. */
 const HOLDER: Record<string, string> = {
