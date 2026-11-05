@@ -19,9 +19,8 @@ import {
   SQUARE_SWATCH_TARGET,
   SWITCH,
   SWITCH_ROW,
-  TOUCH_GAP,
 } from '@/components/editor/styles.ts'
-import { SEGMENT, SEGMENTS } from '@/components/ui/looks.ts'
+import { SEGMENT, SEGMENTS, TOUCH_GAP } from '@/components/ui/looks.ts'
 import { Select } from '@/components/ui/select.tsx'
 import { cn } from '@/lib/cn.ts'
 import { alphaChange, hexChange, hexOf } from '@/lib/colour.ts'
@@ -352,7 +351,8 @@ export function PanelPart({
 }) {
   return (
     <section aria-labelledby={`${id}-title`} className={PANEL_PART} data-testid={id}>
-      <div className="flex h-7 items-center gap-2">
+      {/* As tall as its heading, or as its action where that is taller, as on a phone. */}
+      <div className="flex min-h-7 items-center gap-2">
         <h3
           id={`${id}-title`}
           className={cn('min-w-0 flex-1 truncate text-xs font-semibold', strong ? 'text-text' : 'text-muted')}

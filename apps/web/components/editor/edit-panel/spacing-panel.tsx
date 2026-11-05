@@ -2,7 +2,8 @@
 
 // The Spacing panel of text: the room between its lines, letters and paragraphs, its box, then under
 // Advanced shrinking to fit and the most lines it shows.
-import { KNOBS, TILE, TILE_FACE_WIDE, TOUCH_GAP } from '@/components/editor/styles.ts'
+import { KNOBS, TILE, TILE_FACE_WIDE } from '@/components/editor/styles.ts'
+import { TOUCH_GAP } from '@/components/ui/looks.ts'
 import { cn } from '@/lib/cn.ts'
 import { LIMITS } from '@/lib/editor/limits.ts'
 import { tidy } from '@/lib/editor/size.ts'

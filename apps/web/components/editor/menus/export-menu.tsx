@@ -237,7 +237,7 @@ export function ExportForm({
               aria-checked={type === value}
               onClick={() => setType(value)}
               data-type={value}
-              className={cn(SEGMENT, 'uppercase', TOUCH_CONTROL)}
+              className={cn(SEGMENT, 'uppercase')}
             >
               {value}
             </button>

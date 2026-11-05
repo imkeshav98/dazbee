@@ -155,7 +155,7 @@ export function AlignRow({ editor }: { editor: Editor }) {
             aria-label={named[action]}
             data-action={action}
             onClick={() => editor.perform(action)}
-            className={cn(ICON_BUTTON, 'max-sm:size-[44px]')}
+            className={ICON_BUTTON}
           >
             <Icon size={16} aria-hidden />
           </button>

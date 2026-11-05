@@ -2,17 +2,19 @@
 // editor control that looks like one of these takes it from here instead of spelling its classes again.
 // Looks that controls outside the editor share live in components/ui/looks.ts.
 
-import { FOCUS_RING, LIT_ROW, TOUCH_ROW } from '@/components/ui/looks.ts'
+import { FOCUS_RING, LIT_ROW, TOUCH_FIELD, TOUCH_GAP, TOUCH_ROW, TOUCH_SQUARE } from '@/components/ui/looks.ts'
 
 /** A disabled control: faded and not clickable. */
 const DISABLED = 'disabled:pointer-events-none disabled:opacity-40'
 
-/** A small pill button, as the mock's chips under a list, lit by the tints under the pointer and while pressed. */
-export const CHIP = `inline-flex h-7 cursor-pointer items-center gap-1 rounded-full border border-line px-3 text-xs font-semibold text-muted transition-colors duration-[var(--chrome-fast)] hover:border-line-strong ${LIT_ROW} ${DISABLED}`
+/**
+ * A small pill button, as the mock's chips under a list, lit by the tints under the pointer and while
+ * pressed; 44 px tall on a phone or a touch screen.
+ */
+export const CHIP = `inline-flex h-7 ${TOUCH_FIELD} cursor-pointer items-center gap-1 rounded-full border border-line px-3 text-xs font-semibold text-muted transition-colors duration-[var(--chrome-fast)] hover:border-line-strong ${LIT_ROW} ${DISABLED}`
 
-/** A small square icon button in a card's row. */
-export const ICON_BUTTON =
-  'grid size-7 shrink-0 cursor-pointer place-items-center rounded-row text-subtle transition-colors duration-[var(--chrome-fast)] hover:bg-hover hover:text-text active:bg-pressed disabled:pointer-events-none disabled:opacity-30'
+/** A small square icon button in a card's row; 44 px each way on a phone. */
+export const ICON_BUTTON = `grid size-7 ${TOUCH_SQUARE} shrink-0 cursor-pointer place-items-center rounded-row text-subtle transition-colors duration-[var(--chrome-fast)] hover:bg-hover hover:text-text active:bg-pressed disabled:pointer-events-none disabled:opacity-30`
 
 /** A chip on a pink tint, for a choice that is set: the header card's sizes. Its words are in the text colour. */
 export const CHIP_ACCENT = `${CHIP} border-transparent bg-accent-soft text-text hover:border-transparent`
@@ -55,8 +57,6 @@ export const FACE_SIZE = 'shrink-0 max-sm:size-[32px]'
 export const SWATCH_FACE = `${FACE_SIZE} rounded-full`
 /** A round colour swatch, drawn in a SWATCH_TARGET; its size off a phone is the caller's. */
 export const SWATCH = `${SWATCH_FACE} border border-swatch-ring transition-transform duration-[var(--chrome-fast)] group-hover/swatch:scale-110`
-/** The space between targets and fields on a phone or a touch screen, so a finger presses the one it means. */
-export const TOUCH_GAP = 'max-sm:gap-[8px] [@media(hover:none)]:gap-[8px]'
 /** A row of swatch targets, wrapping onto more lines; on a phone TOUCH_GAP apart. */
 export const SWATCH_ROW = `flex flex-wrap items-center ${TOUCH_GAP}`
 /**
@@ -101,8 +101,6 @@ export const NUMBER_SELECTED = 'selection:bg-accent-selected selection:text-text
  * its digits 4.5:1 on it.
  */
 export const NUMBER_SELECTED_STRONG = 'selection:bg-accent-selected-strong selection:text-text-selected-strong'
-/** A field's height on a phone or a touch screen: 44 px, as every field there. */
-export const TOUCH_FIELD = 'max-sm:h-[44px] [@media(hover:none)]:h-[44px]'
 /** A field to type a value into, as tall as a knob: its border shows the focus, with no ring besides. */
 export const FIELD = `h-8 ${TOUCH_FIELD} min-w-0 w-full rounded-row border border-line bg-surface px-1.5 ${VALUE_TEXT} outline-none focus-visible:outline-none! placeholder:text-subtle focus:border-accent`
 /** Where a dragged row would land in a list: a line across it, placed by the row above or below. */
@@ -161,10 +159,10 @@ export const PANEL_PART = 'flex flex-col gap-2.5 border-t border-line pt-3 first
 /** A small heading over a group of an edit panel's choices, as Line up with the frame. */
 export const PANEL_HEADING = 'text-xs font-semibold text-muted'
 /**
- * A boxed button of an edit panel that acts at once: its icon, then its words, or its icon alone. The
- * hover and pressed tints are laid over its fill.
+ * A boxed button of an edit panel that acts at once: its icon, then its words, or its icon alone,
+ * 44 px tall on a phone or a touch screen. The hover and pressed tints are laid over its fill.
  */
-export const PANEL_BUTTON = `flex h-[34px] min-w-0 cursor-pointer items-center gap-2 rounded-row border border-line bg-surface px-2.5 text-[12.5px] font-medium whitespace-nowrap text-text transition-colors duration-[var(--chrome-fast)] hover:tint-hover active:tint-pressed disabled:cursor-not-allowed disabled:opacity-45 [&>span]:truncate ${FOCUS_RING}`
+export const PANEL_BUTTON = `flex h-[34px] ${TOUCH_FIELD} min-w-0 cursor-pointer items-center gap-2 rounded-row border border-line bg-surface px-2.5 text-[12.5px] font-medium whitespace-nowrap text-text transition-colors duration-[var(--chrome-fast)] hover:tint-hover active:tint-pressed disabled:cursor-not-allowed disabled:opacity-45 [&>span]:truncate ${FOCUS_RING}`
 /** An edit panel's button among many that act at once, as Position's moves: unfilled, lit by the tints. */
 export const PANEL_ACTION = `flex h-[34px] min-w-0 cursor-pointer items-center gap-2 rounded-row px-2.5 text-[12.5px] font-medium whitespace-nowrap text-text transition-colors duration-[var(--chrome-fast)] hover:bg-hover active:bg-pressed disabled:cursor-not-allowed disabled:opacity-45 [&>span]:truncate ${FOCUS_RING}`
 /** A switch shaped as a knob, its name at the start: Lock ratio among the size fields; as tall as a knob. */

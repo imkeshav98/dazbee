@@ -12,7 +12,7 @@ import { AssetSummary, isVectorAsset } from '@dazbee/schema'
 
 import { useBesidePanel } from '@/components/editor/beside-panel.ts'
 import { useMenuFocus } from '@/components/editor/top-bar/bar-popover.tsx'
-import { DASHED_BUTTON, FOCUS_RING } from '@/components/ui/looks.ts'
+import { DASHED_BUTTON, FOCUS_RING, TOUCH_GAP } from '@/components/ui/looks.ts'
 import { overlayScroll } from '@/components/ui/overlay-scroll.ts'
 import { Tooltip } from '@/components/ui/tooltip.tsx'
 import { brandPath } from '@/lib/brand-routes.ts'
@@ -223,7 +223,8 @@ function ImagePickerPanel({
 
   return (
     <>
-      <div className="flex shrink-0 flex-col gap-2 p-3 pb-2">
+      {/* On a phone or a touch screen the upload is TOUCH_GAP from the first image. */}
+      <div className="flex shrink-0 flex-col gap-2 p-3 pb-2 max-sm:pb-[8px] [@media(hover:none)]:pb-[8px]">
         <p className="font-display text-[13px] font-bold">{title}</p>
         <label className={DASHED_BUTTON}>
           <UploadSimpleIcon size={14} aria-hidden />
@@ -268,7 +269,7 @@ function ImagePickerPanel({
       <div ref={overlayScroll} className="min-h-0 flex-1 overflow-y-auto px-3 pb-3">
         {assets && assets.length === 0 && <p className="text-[13px] text-muted">{t.imageTool.empty}</p>}
         {assets && assets.length > 0 && (
-          <ul aria-label={t.imageTool.brand} className="grid grid-cols-3 gap-2">
+          <ul aria-label={t.imageTool.brand} className={cn('grid grid-cols-3 gap-2', TOUCH_GAP)}>
             {assets.map((asset) => {
               const name = asset.name || t.assetLibrary.untitled
               return (

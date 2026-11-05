@@ -13,13 +13,13 @@ import { layoutProblems, SCREEN_SIZES } from '../../support/layout.ts'
 import { frameDesign, newBrand, putKit } from '../../support/seed.ts'
 import { nextFrame, openStage } from '../../support/stage.ts'
 import {
+  expectTouchTargets,
   paintPopup,
   SWATCH_KIT,
   SWATCH_PANELS,
   type SwatchControl,
   swatchTouches,
   type Touch,
-  TOUCH_TARGET,
 } from '../../support/swatches.ts'
 import { expect, type Page, test } from '../../support/test.ts'
 import { barMenu, openCard, PIECES, UNCUT } from '../../support/top-bar.ts'
@@ -133,18 +133,6 @@ test('the look comes first: size and brand colour, effect tiles, and the header 
 })
 
 test.describe('found by review', () => {
-  /** Each touch at least a touch target across and down, that far from the next target, and inside `room` across. */
-  const expectTouchTargets = (touches: Touch[], what: string, room: { x: number; width: number }) => {
-    for (const touch of touches) {
-      expect(touch.pressable, `${what}: a press lands at each side`).toBe(true)
-      expect(Math.min(touch.width, touch.height), `${what}: where a press lands`).toBeGreaterThanOrEqual(
-        TOUCH_TARGET.size,
-      )
-      expect(touch.space, `${what}: the space to the next target`).toBeGreaterThanOrEqual(TOUCH_TARGET.gap)
-      expect(touch.x, `${what}: starts in its panel`).toBeGreaterThanOrEqual(room.x)
-      expect(touch.x + touch.width, `${what}: ends in its panel`).toBeLessThanOrEqual(room.x + room.width)
-    }
-  }
   /** Each touch as big as the control draws it off a phone, as far from the next target as it was. */
   const expectKept = (touches: Touch[], control: SwatchControl, what: string) => {
     for (const touch of touches) {
