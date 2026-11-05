@@ -16,7 +16,7 @@ function fakeCanvasKit(log: string[]) {
     restore: () => log.push('restore'),
     scale: (x: number, y: number) => log.push(`scale ${x} ${y}`),
     translate: (x: number, y: number) => log.push(`translate ${x} ${y}`),
-    drawRect: () => log.push('rect'),
+    drawRect: (rect: number[]) => log.push(`rect ${rect.join(' ')}`),
     drawPicture: (picture: { name: string }) => log.push(`picture ${picture.name}`),
     clipRect: (rect: number[], op: string) => log.push(`clip ${op} ${rect.join(' ')}`),
     saveLayer: () => log.push('save layer'),
@@ -33,6 +33,7 @@ function fakeCanvasKit(log: string[]) {
       setStyle() {}
       setStrokeWidth() {}
       setAlphaf() {}
+      setImageFilter() {}
       delete() {
         log.push('delete paint')
       }
@@ -41,6 +42,8 @@ function fakeCanvasKit(log: string[]) {
     TRANSPARENT: 'clear',
     PaintStyle: { Stroke: 'stroke' },
     ClipOp: { Difference: 'out of' },
+    ImageFilter: { MakeBlur: () => ({ delete: () => log.push('delete blur') }) },
+    TileMode: { Decal: 'decal' },
     ColorSpace: { SRGB: 'srgb' },
     Color: () => 'edge',
     XYWHRect: (x: number, y: number, w: number, h: number) => [x, y, w, h],
@@ -297,7 +300,7 @@ describe('editorView', () => {
       expect(view.paint(() => [])).toBe(false)
     })
 
-    it('draws the pictures of the frames in view at the camera, each on its page, and shows them', () => {
+    it('draws the pictures of the frames in view at the camera, each on its page over white on a soft shadow, and shows them', () => {
       const { view, log } = harness()
       view.resize()
       view.setCamera({ x: 0, y: 0, zoom: 0.5 })
@@ -316,12 +319,13 @@ describe('editorView', () => {
         'scale 2 2',
         'translate 0 0',
         'scale 0.5 0.5',
-        'rect',
+        // The shadow: 20 in from each side, 20 down.
+        'rect 20 40 1040 1040',
+        'rect 0 0 1080 1080',
         'save',
         'translate 0 0',
         'picture one-sq',
         'restore',
-        'rect',
         'restore',
         'flush',
       ])
@@ -449,6 +453,7 @@ describe('editorView', () => {
         'delete surface',
         'delete paint',
         'delete paint',
+        'delete blur',
         'delete paint',
         'delete gl',
       ])

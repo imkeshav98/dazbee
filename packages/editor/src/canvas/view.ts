@@ -78,7 +78,7 @@ export interface EditorView {
    */
   update(): void
   /**
-   * Draws the frames in view at the camera, each picture over white with a hairline edge, and
+   * Draws the frames in view at the camera, each picture over white on a soft shadow, and
    * shows them; `record` gives the pictures of the frames in view. `ghost` gives a picture of what
    * a drag carries in its frame, drawn faintly where it is past the frame's edge. False, drawing
    * nothing, before the stage has a surface.
@@ -113,6 +113,11 @@ export interface EditorView {
 }
 
 const ZOOM_STEP = 2
+/**
+ * The shadow under each frame, in design pixels, so it scales with the zoom: 20 down, blurred over
+ * 50, from a box 20 in from each side, black at 70%.
+ */
+const FRAME_SHADOW = { y: 20, blur: 50, inset: 20, alpha: 0.7 }
 /** How strongly the part of a dragged layer past its frame's edge shows. */
 const GHOST_OPACITY = 0.35
 
@@ -148,11 +153,10 @@ export function editorView({ ck, canvas, session, onZoom, draw }: ViewDeps): Edi
 
   const backing = new ck.Paint()
   backing.setColor(ck.WHITE)
-  const edge = new ck.Paint()
-  edge.setStyle(ck.PaintStyle.Stroke)
-  // Width 0 is a hairline: one device pixel at any zoom.
-  edge.setStrokeWidth(0)
-  edge.setColor(ck.Color(0, 0, 0, 0.12))
+  const shadowBlur = ck.ImageFilter.MakeBlur(FRAME_SHADOW.blur / 2, FRAME_SHADOW.blur / 2, ck.TileMode.Decal, null)
+  const shadow = new ck.Paint()
+  shadow.setColor(ck.Color(0, 0, 0, FRAME_SHADOW.alpha))
+  shadow.setImageFilter(shadowBlur)
   const faint = new ck.Paint()
   faint.setAlphaf(GHOST_OPACITY)
   const resized = new ResizeObserver(() => resize())
@@ -258,12 +262,21 @@ export function editorView({ ck, canvas, session, onZoom, draw }: ViewDeps): Edi
     c.scale(camera.zoom, camera.zoom)
     for (const { frame, picture } of pictures) {
       const box = ck.XYWHRect(frame.x, frame.y, frame.width, frame.height)
+      const { inset, y } = FRAME_SHADOW
+      c.drawRect(
+        ck.XYWHRect(
+          frame.x + inset,
+          frame.y + inset + y,
+          Math.max(frame.width - 2 * inset, 0),
+          Math.max(frame.height - 2 * inset, 0),
+        ),
+        shadow,
+      )
       c.drawRect(box, backing)
       c.save()
       c.translate(frame.x, frame.y)
       c.drawPicture(picture)
       c.restore()
-      c.drawRect(box, edge)
     }
     const carried = ghost?.()
     if (carried) {
@@ -350,7 +363,8 @@ export function editorView({ ck, canvas, session, onZoom, draw }: ViewDeps): Edi
     surface?.delete()
     resized.disconnect()
     faint.delete()
-    edge.delete()
+    shadow.delete()
+    shadowBlur.delete()
     backing.delete()
     viewListeners.clear()
     gl.delete()

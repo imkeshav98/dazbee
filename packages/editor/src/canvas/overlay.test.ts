@@ -41,9 +41,7 @@ afterEach(() => {
  * a group gone into, a layer hovered, a drop target and a picked page; each module's parts are
  * one element named for it. Logs what the overlay tells the selection, and keeps what it drew.
  */
-function harness(
-  state: { gesture?: Gesture | null; editing?: Picked | null; selected?: boolean; zoom?: number } = {},
-) {
+function harness(state: { gesture?: Gesture | null; editing?: Picked | null; selected?: boolean; zoom?: number } = {}) {
   const log: string[] = []
   let drawn: Fake[] = []
   const editing = state.editing ?? null
