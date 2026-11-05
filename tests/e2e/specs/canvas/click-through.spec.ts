@@ -169,8 +169,31 @@ test(
       afterText: 'beside-short-text',
     }
     for (const [key, name] of Object.entries(shots) as [keyof typeof shots, string][]) {
-      await hover(page, SPOTS[key].at)
+      const { at } = SPOTS[key]
+      // Close enough to see the outline: the spot in the middle of the window at 110%.
+      await page.evaluate(({ x, y }) => window.dazbee?.setCamera({ x: 640 - x * 1.1, y: 400 - y * 1.1, zoom: 1.1 }), at)
+      await hover(page, at)
       await expect(page.locator('.stage-overlay > .hover')).toBeVisible()
+      // A headless screenshot has no cursor: a ring marks where the pointer is.
+      const screen = await screenPoint(page, at.x, at.y)
+      await page.evaluate(({ x, y }) => {
+        document.getElementById('pointer-mark')?.remove()
+        const mark = document.createElement('div')
+        mark.id = 'pointer-mark'
+        Object.assign(mark.style, {
+          position: 'fixed',
+          left: `${x - 9}px`,
+          top: `${y - 9}px`,
+          width: '18px',
+          height: '18px',
+          borderRadius: '50%',
+          border: '2px solid #ffffff',
+          boxShadow: '0 0 0 2px #111111',
+          pointerEvents: 'none',
+          zIndex: '2147483647',
+        })
+        document.body.append(mark)
+      }, screen)
       writeOutput(`click-through-hover-${name}.png`, await page.screenshot({ animations: 'disabled' }))
     }
   },
