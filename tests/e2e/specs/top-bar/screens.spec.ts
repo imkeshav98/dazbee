@@ -96,10 +96,11 @@ test('at 1280×760 the right-click menu on a layer already selected shows that i
 }) => {
   const asset = await upload(photo)
   const { page, errors } = await openStage(browser, topBarDesign(asset.id))
+  await page.setViewportSize({ width: 1280, height: 760 })
   await fitSettled(page)
   await selectLayers(page, ['headline'])
-  // The headline in the middle of the stage, where its menu, a text's being the longest, has room for
-  // less than all its rows either way.
+  // The headline in the middle of the stage, where its menu has room for less than all its rows
+  // either way.
   await page.evaluate(() => window.dazbee?.fitSelection())
   await drawn(page)
   const at = await screenPoint(page, 200, 85)
@@ -127,12 +128,13 @@ test.describe('on a phone, 390×844', () => {
     expect(errors).toEqual([])
   })
 
-  test('the full menu shows that it scrolls, with a fade at its cut edge and its bar, and every row can be reached', async ({
+  test('on a phone 600 px tall the full menu shows that it scrolls, with a fade at its cut edge and its bar, and every row can be reached', async ({
     browser,
   }) => {
     const asset = await upload(photo)
     const { page, errors } = await openStage(browser, topBarDesign(asset.id))
-    await page.setViewportSize({ width: 390, height: 844 })
+    // Short enough that the full menu has less room than its rows.
+    await page.setViewportSize({ width: 390, height: 600 })
     await selectLayers(page, ['box'], { bar: true })
     const menu = await moreMenu(page)
     // Away from the menu, past the time an overlay bar takes to hide.

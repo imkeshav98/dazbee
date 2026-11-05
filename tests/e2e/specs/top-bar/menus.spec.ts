@@ -12,7 +12,7 @@ import { topBarDesign } from '../../support/top-bar-design.ts'
 
 test.describe.configure({ timeout: 240_000 })
 
-test('each kind gets its own top bar; several layers add Line up, Combine for shapes, and Stack', async ({
+test('each kind gets its own top bar, ending in its ⋯; several layers add Line up, Combine for shapes, and Stack', async ({
   browser,
 }) => {
   const asset = await upload(photo)
@@ -41,12 +41,38 @@ test('each kind gets its own top bar; several layers add Line up, Combine for sh
     'effects',
     'transparency',
     'position',
+    'layer-more',
   ])
-  expect(await items(['box'])).toEqual(['colour', 'outline', 'shape', 'effects', 'transparency', 'position'])
-  expect(await items(['line'])).toEqual(['outline', 'shape', 'effects', 'transparency', 'position'])
-  expect(await items(['combo'])).toEqual(['colour', 'outline', 'combine', 'effects', 'transparency', 'position'])
-  expect(await items(['card'])).toEqual(['colour', 'outline', 'stack', 'box', 'effects', 'transparency', 'position'])
-  expect(await items(['group'])).toEqual(['effects', 'transparency', 'position'])
+  expect(await items(['box'])).toEqual([
+    'colour',
+    'outline',
+    'shape',
+    'effects',
+    'transparency',
+    'position',
+    'layer-more',
+  ])
+  expect(await items(['line'])).toEqual(['outline', 'shape', 'effects', 'transparency', 'position', 'layer-more'])
+  expect(await items(['combo'])).toEqual([
+    'colour',
+    'outline',
+    'combine',
+    'effects',
+    'transparency',
+    'position',
+    'layer-more',
+  ])
+  expect(await items(['card'])).toEqual([
+    'colour',
+    'outline',
+    'stack',
+    'box',
+    'effects',
+    'transparency',
+    'position',
+    'layer-more',
+  ])
+  expect(await items(['group'])).toEqual(['effects', 'transparency', 'position', 'layer-more'])
   expect(await items(['photo'])).toEqual([
     'edit',
     'replace',
@@ -56,6 +82,7 @@ test('each kind gets its own top bar; several layers add Line up, Combine for sh
     'effects',
     'transparency',
     'position',
+    'layer-more',
   ])
   expect(await items(['photoBox'])).toEqual([
     'edit',
@@ -67,8 +94,18 @@ test('each kind gets its own top bar; several layers add Line up, Combine for sh
     'effects',
     'transparency',
     'position',
+    'layer-more',
   ])
-  expect(await items(['cutter'])).toEqual(['colour', 'outline', 'shape', 'mask', 'effects', 'transparency', 'position'])
+  expect(await items(['cutter'])).toEqual([
+    'colour',
+    'outline',
+    'shape',
+    'mask',
+    'effects',
+    'transparency',
+    'position',
+    'layer-more',
+  ])
   expect(await items(['box', 'star'])).toEqual([
     'colour',
     'outline',
@@ -78,6 +115,7 @@ test('each kind gets its own top bar; several layers add Line up, Combine for sh
     'line-up',
     'combine',
     'autoLayout',
+    'layer-more',
   ])
   expect(await items(['headline', 'box'])).toEqual([
     'font',
@@ -86,6 +124,7 @@ test('each kind gets its own top bar; several layers add Line up, Combine for sh
     'position',
     'line-up',
     'autoLayout',
+    'layer-more',
   ])
   expect(await items(['box', 'card'])).toEqual([
     'colour',
@@ -95,6 +134,7 @@ test('each kind gets its own top bar; several layers add Line up, Combine for sh
     'position',
     'line-up',
     'autoLayout',
+    'layer-more',
   ])
   // Several booleans make one new boolean of them; several photos combine into nothing.
   expect(await items(['combo', 'comboB'])).toEqual([
@@ -106,6 +146,7 @@ test('each kind gets its own top bar; several layers add Line up, Combine for sh
     'line-up',
     'combine',
     'autoLayout',
+    'layer-more',
   ])
   expect(await items(['photo', 'photoB'])).toEqual([
     'edit',
@@ -117,6 +158,7 @@ test('each kind gets its own top bar; several layers add Line up, Combine for sh
     'position',
     'line-up',
     'autoLayout',
+    'layer-more',
   ])
   // Several boxes have their own Stack panel, and the action that puts them in one stack is named apart.
   expect(await items(['card', 'cardB'])).toEqual([
@@ -129,6 +171,7 @@ test('each kind gets its own top bar; several layers add Line up, Combine for sh
     'position',
     'line-up',
     'autoLayout',
+    'layer-more',
   ])
   await expect(page.getByTestId('top-bar').locator('[data-action="autoLayout"]')).toHaveText('Stack together')
   // Several layers put in a stack from the bar: the square gains a second box with a layout, its
