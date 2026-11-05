@@ -39,6 +39,7 @@ test('a design tile renames, duplicates and deletes its design', async ({ page }
   await renamed.getByRole('button', { name: `More for Autumn ${run}` }).click()
   await renamed.getByRole('menuitem', { name: 'Duplicate' }).click()
   await expect(page.getByTestId('design-tile').filter({ hasText: `Autumn ${run} copy` })).toBeVisible()
+  expect((await designs()).find((d) => d.name === `Autumn ${run} copy`)?.id).toMatch(/^[0-9a-z]{12}$/)
 
   // Delete asks first; Cancel keeps it, Delete takes it.
   await renamed.hover()

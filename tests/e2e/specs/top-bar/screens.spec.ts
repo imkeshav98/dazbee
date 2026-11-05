@@ -5,6 +5,7 @@
 import { photo, upload } from '../../support/assets.ts'
 import { editorPath, screenPoint, setCookies, writeOutput } from '../../support/editor.ts'
 import { layoutProblems, rowHeights, scrolling } from '../../support/layout.ts'
+import { shownKeys } from '../../support/menu-rows.ts'
 import { seed } from '../../support/seed.ts'
 import { drawn, fitSettled, nextFrame, openStage, selectLayers } from '../../support/stage.ts'
 import { expect, test } from '../../support/test.ts'
@@ -127,30 +128,32 @@ test.describe('on a phone, 390×844', () => {
     expect(errors).toEqual([])
   })
 
-  test('on a phone 600 px tall the full menu shows that it scrolls, with a fade at its cut edge and its bar, and every row can be reached', async ({
+  test('on a phone too short for the full menu’s sheet, 400 px tall, the sheet shows that it scrolls, with a line at its cut edge, never a fade that reads as a greyed row, and its bar, and every row can be reached', async ({
     browser,
   }) => {
     const asset = await upload(photo)
     const { page, errors } = await openStage(browser, topBarDesign(asset.id))
-    // Short enough that the full menu has less room than its rows.
-    await page.setViewportSize({ width: 390, height: 600 })
+    // Short enough that the full menu has less room than its rows, which fit a 600 px tall phone.
+    await page.setViewportSize({ width: 390, height: 400 })
     await selectLayers(page, ['box'], { bar: true })
     const menu = await moreMenu(page)
     // Away from the menu, past the time an overlay bar takes to hide.
-    await page.mouse.move(4, 400)
+    await page.mouse.move(2, 2)
     await page.waitForTimeout(1_200)
+    const edge = () => menu.evaluate((el) => getComputedStyle(el).boxShadow)
     const top = await scrolling(menu)
-    expect(top).toMatchObject({ scrolls: true, bar: true })
-    expect(top.fade).toContain('gradient')
+    expect(top).toMatchObject({ scrolls: true, bar: true, fade: 'none' })
+    const line = await edge()
+    expect(line).toContain('inset')
     await menu.evaluate((el) => el.scrollTo({ top: el.scrollHeight }))
-    await expect.poll(async () => (await scrolling(menu)).fade).not.toBe(top.fade)
+    await expect.poll(edge).not.toBe(line)
     const box = await menu.boundingBox()
     const last = await menu.locator(':scope > button').last().boundingBox()
     expect(box && last && last.y >= box.y && last.y + last.height <= box.y + box.height).toBe(true)
     expect(errors).toEqual([])
   })
 
-  test('every menu row is at least 44 px tall: the full, right-click, top bar ⋯ with its turn field, shape and zoom menus', async ({
+  test('every menu row is at least 44 px tall: the full, right-click, top bar ⋯ with its turn field, shape and zoom menus, and the shape menu shows no keys', async ({
     browser,
   }) => {
     const asset = await upload(photo)
@@ -182,6 +185,8 @@ test.describe('on a phone, 390×844', () => {
     const shapes = page.getByRole('menu')
     await expect(shapes).toBeVisible()
     for (const height of await rowHeights(shapes, '[data-shape]')) expect(height).toBeGreaterThanOrEqual(44)
+    // A phone has no keyboard, so no menu shows a shortcut key.
+    expect(await shownKeys(shapes)).toBe(0)
     await page.keyboard.press('Escape')
 
     const zoom = await zoomMenu(page)

@@ -3,6 +3,10 @@
 import * as RadixTooltip from '@radix-ui/react-tooltip'
 import type { FocusEvent, ReactNode } from 'react'
 
+/** A tooltip's look, for a caller that measures one before it shows. */
+export const TOOLTIP =
+  'z-50 rounded-md border border-line bg-raised px-2 py-1 text-xs font-medium text-text shadow-panel data-[state=delayed-open]:animate-[tooltip-in_var(--chrome-fast)_var(--ease-out)]'
+
 /** Keeps Radix from opening the tooltip on focus the browser doesn't show as keyboard focus. */
 const keyboardFocusOnly = (e: FocusEvent<HTMLElement>) => {
   if (!e.currentTarget.matches(':focus-visible')) e.preventDefault()
@@ -21,12 +25,18 @@ export const TooltipProvider = ({ children }: { children: ReactNode }) => (
 export function Tooltip({
   label,
   side = 'top',
+  align = 'center',
+  sideOffset = 8,
   open,
   onOpenChange,
   children,
 }: {
   label: string
   side?: 'top' | 'right' | 'bottom' | 'left'
+  /** How it lines up along its control's side. */
+  align?: 'start' | 'center' | 'end'
+  /** Pixels between it and its control. */
+  sideOffset?: number
   /** Whether it shows, for a caller that also opens it another way, such as a tap; left out, hover and focus decide. */
   open?: boolean
   onOpenChange?: (open: boolean) => void
@@ -40,10 +50,11 @@ export function Tooltip({
       <RadixTooltip.Portal>
         <RadixTooltip.Content
           side={side}
-          sideOffset={8}
+          align={align}
+          sideOffset={sideOffset}
           // Off the window's edges by as much as it keeps from its control.
           collisionPadding={8}
-          className="z-50 rounded-md border border-line bg-raised px-2 py-1 text-xs font-medium text-text shadow-panel data-[state=delayed-open]:animate-[tooltip-in_var(--chrome-fast)_var(--ease-out)]"
+          className={TOOLTIP}
         >
           {label}
         </RadixTooltip.Content>

@@ -20,7 +20,7 @@ import {
 import { NumberField } from '@/components/editor/edit-panel/fields.tsx'
 import { usePhone } from '@/components/editor/edit-store.ts'
 import { useShownPage } from '@/components/editor/editor-hooks.ts'
-import { FIELD, FIELD_LABEL, MENU_KEY } from '@/components/editor/styles.ts'
+import { FIELD, FIELD_LABEL, MENU_VALUE } from '@/components/editor/styles.ts'
 import { Button } from '@/components/ui/button.tsx'
 import { LIT_ROW, SEGMENT, SEGMENTS } from '@/components/ui/looks.ts'
 import { useOverlayScroll } from '@/components/ui/overlay-scroll.ts'
@@ -351,7 +351,7 @@ function FrameRow({
         )}
       </span>
       {/* Width × height in every language, as the frame's label reads, isolated from the row's direction. */}
-      <span dir="ltr" className={cn(MENU_KEY, 'shrink-0')} data-part="size">
+      <span dir="ltr" className={cn(MENU_VALUE, 'shrink-0')} data-part="size">
         {size}
       </span>
     </label>

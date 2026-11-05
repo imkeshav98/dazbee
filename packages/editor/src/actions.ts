@@ -1,7 +1,7 @@
 // What the shortcuts and the menus do to the selection, the picked frame and the view: delete,
 // group, mask, box, auto layout, combine, reorder, lock and hide, align and distribute, nudge,
 // duplicate, select all, zoom and the tools.
-import { childrenOf, descendants, type Session } from '@dazbee/doc'
+import { childrenOf, descendants, loadDesign, openSession, type Session } from '@dazbee/doc'
 import { type Design, LOCK_FLAGS, type Rect } from '@dazbee/schema'
 
 import type { Frame } from './canvas/frames.ts'
@@ -12,7 +12,7 @@ import type { EditorPen } from './gestures/pen/pen.ts'
 import type { EditorAutoLayoutDrag } from './gestures/select/auto-layout-drag.ts'
 import type { EditorTransformDrag } from './gestures/select/transform-drag.ts'
 import { align, type Alignment, distribute, type Distribution, type Offset } from './layers/arrange.ts'
-import { inFlow } from './layers/auto-layout.ts'
+import { inFlow, layoutIn } from './layers/auto-layout.ts'
 import { type EditorBoxes, visibleIn } from './layers/boxes.ts'
 import { hug as hugIn } from './layers/hug.ts'
 import { boundsOf, type Box, localTo, round } from './layers/transform.ts'
@@ -55,13 +55,16 @@ export interface ActionsDeps {
   scenes: Pick<FrameScenes, 'scene'>
   boxes: Pick<
     EditorBoxes,
-    'roots' | 'startBoxes' | 'boxIn' | 'selectionBox' | 'pickable' | 'drawnInFlow' | 'cropTarget'
+    'roots' | 'startBoxes' | 'boxIn' | 'selectionBox' | 'pickable' | 'drawnInFlow' | 'drawnAlike' | 'cropTarget'
   >
   pen: Pick<EditorPen, 'drawing' | 'finish' | 'deletePoints'>
   transformDrag: Pick<EditorTransformDrag, 'writeBoxes'>
   autoLayoutDrag: Pick<EditorAutoLayoutDrag, 'nudge'>
   frameActions: Pick<EditorFrameActions, 'frameAction'>
-  /** Tells the app that auto layout places some of the layers an align or distribute would move. */
+  /**
+   * Tells the app that auto layout places some of the layers an align or distribute would move, or
+   * what a layer held that an ungroup would leave somewhere else.
+   */
   notify: (notice: 'placedByLayout') => void
   /** Draws the overlay. */
   drawOverlay: () => void
@@ -114,6 +117,18 @@ export function editorActions({
     const { frame, box } = outer
     const b = boundsOf([box])
     fitArea({ x: frame.x + b.x, y: frame.y + b.y, width: b.width, height: b.height })
+  }
+
+  /**
+   * Whether ungrouping a layer leaves every layer of its frame drawn where it is, tried on a copy of
+   * the design: in an auto layout box, the flow places what the layer held once it is out.
+   */
+  function ungroupKeeps(frame: Frame, id: string, placed: Record<string, Omit<Box, 'rotation'>>, now: Design) {
+    const trial = openSession(loadDesign(now))
+    return (
+      runQuietly(() => trial.run('node.ungroup', { ids: [id], drawn: placed })) &&
+      boxes.drawnAlike(frame.id, now, trial.design())
+    )
   }
 
   /** Combines the selected shapes into a live boolean (#44) and selects it. One undo step. */
@@ -429,13 +444,24 @@ export function editorActions({
         combine('exclude')
         break
       case 'ungroup': {
-        // Booleans come apart the same way, their shapes showing their own paints again.
-        const groups = ids.filter((id) => nodes[id]?.type === 'group' || nodes[id]?.type === 'boolean')
-        if (groups.length === 0) return false
+        // Boxes and booleans come apart the same way: what a box laid out stays where it is drawn,
+        // and a boolean's shapes show their own paints again.
+        const containers = ids.filter((id) => ['group', 'box', 'boolean'].includes(nodes[id]?.type ?? ''))
+        if (containers.length === 0) return false
+        const now = session.design()
+        const placed = (id: string) => boxes.drawnInFlow(childrenOf(now, id).map(([child]) => child)) ?? {}
+        // In an auto layout box, a layer comes apart only when what it held takes its place in the
+        // flow with nothing moving; otherwise it stays whole and the app says why.
+        const groups = containers.filter(
+          (id) => !layoutIn(nodes[id]?.parentId ?? '', now) || ungroupKeeps(frame, id, placed(id), now),
+        )
+        if (groups.length < containers.length) notify('placedByLayout')
+        if (groups.length === 0) return true
+        const drawn = Object.assign({}, ...groups.map(placed))
         let freed: string[] = []
         if (
           runQuietly(() => {
-            freed = session.run('node.ungroup', { ids: groups })
+            freed = session.run('node.ungroup', { ids: groups, drawn })
           })
         ) {
           selection.select([...ids.filter((id) => !groups.includes(id)), ...freed], frame.id)

@@ -24,7 +24,8 @@ test('each brand has a card with its design count, and New brand adds one', asyn
   await clients.getByRole('button', { name: 'Create' }).click()
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('What are we making today?')
   await expect(page.getByTestId('brand-switcher')).toContainText(name)
-  await expect(page).toHaveURL(/\/brands\/[\w-]+$/)
+  // A new brand's link holds its short id.
+  await expect(page).toHaveURL(/\/brands\/[0-9a-z]{12}$/)
 
   await page.goto('/')
   await expect(clients.getByRole('link', { name: new RegExp(`^${name}`) })).toContainText('No designs yet')

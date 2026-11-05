@@ -2,11 +2,11 @@
 
 // What the top bar has open: one pop-up, the full menu or one edit panel, never two at once, since
 // they share this one value. Opening any of them closes what was open. The shell reads it too: on a
-// phone an edit panel, and the top bar's Arrange ⋯, is a sheet, and a rail flyout and a sheet close
-// each other. And whether something stands over the edit panel and the bar's second row, which Esc
-// closes first; the menu's button a rename field gives the focus back to; and the Share menu's
-// listener for an Export asked from a picked frame's ⋯.
-import { useEffect, useState, useSyncExternalStore } from 'react'
+// phone an edit panel, the top bar's Arrange ⋯, the full menu and the right-click menu are sheets,
+// and a rail flyout and a sheet close each other. And whether something stands over the edit panel
+// and the bar's second row, which Esc closes first; the menu's button a rename field gives the focus
+// back to; and the Share menu's listener for an Export asked from a picked frame's ⋯.
+import { useLayoutEffect, useState, useSyncExternalStore } from 'react'
 
 import { OVER_PANEL } from '@/components/ui/menu-close.ts'
 
@@ -25,8 +25,11 @@ const DESIGN_PANELS = {
   addSize: { ofPickedFrame: true },
 } as const satisfies Record<string, { ofPickedFrame: boolean }>
 type DesignPanelId = keyof typeof DESIGN_PANELS
-/** The top bar's pop-ups that open as a sheet at the bottom on a phone, as an edit panel does: Arrange ⋯. */
-const SHEET_POPUPS = ['arrange'] as const
+/**
+ * The pop-ups that open as a sheet at the bottom on a phone, as an edit panel does: the top bar's
+ * Arrange ⋯ and the full menu.
+ */
+const SHEET_POPUPS = ['arrange', 'more'] as const
 export type LayerPanelId = (typeof LAYER_PANELS)[number]
 export type PanelId = LayerPanelId | DesignPanelId
 /** Every id that opens the edit panel; every other id is a pop-up or the full menu. */
@@ -43,9 +46,11 @@ interface EditState {
   sheetTop: number | null
   /** How far the open rail flyout reaches from the stage's start edge on tablet and desktop, in pixels; null with none open. */
   flyoutEnd: number | null
+  /** Whether the right-click menu is open, which is a sheet on a phone as the full menu is. */
+  rightClick: boolean
 }
 
-let state: EditState = { open: null, bar: false, barBottom: 0, sheetTop: null, flyoutEnd: null }
+let state: EditState = { open: null, bar: false, barBottom: 0, sheetTop: null, flyoutEnd: null, rightClick: false }
 const listeners = new Set<() => void>()
 /** The menu's button a rename was asked from, which the rename field gives the focus back to as it ends from the keyboard. */
 let renameOpener: HTMLElement | null = null
@@ -62,7 +67,7 @@ const subscribe = (listener: () => void) => {
 export const isPanel = (id: string | null): id is PanelId => (PANELS as readonly string[]).includes(id ?? '')
 export const isLayerPanel = (id: string | null): id is LayerPanelId =>
   (LAYER_PANELS as readonly string[]).includes(id ?? '')
-/** Whether what is open is a sheet at the bottom on a phone: every edit panel but Pages, and Arrange ⋯. */
+/** Whether what is open is a sheet at the bottom on a phone: every edit panel but Pages, Arrange ⋯ and the full menu. */
 export const isSheet = (id: string | null) =>
   (isPanel(id) && id !== 'pages') || (SHEET_POPUPS as readonly string[]).includes(id ?? '')
 /**
@@ -77,6 +82,7 @@ export const setOpen = (open: string | null) => update({ open })
 export const setBar = (bar: boolean, barBottom = 0) => update({ bar, barBottom: bar ? barBottom : 0 })
 export const setSheetTop = (sheetTop: number | null) => update({ sheetTop })
 export const setFlyoutEnd = (flyoutEnd: number | null) => update({ flyoutEnd })
+export const setRightClick = (rightClick: boolean) => update({ rightClick })
 export const editState = () => state
 /** Notes the menu's button a rename is asked from, just before asking, for the field to give the focus back to. */
 export const setRenameOpener = (opener: HTMLElement | null) => {
@@ -116,10 +122,14 @@ export function useEditState() {
   )
 }
 
-/** Under 640 px wide the editor is laid out for a phone: the edit panel is a sheet and the top bar scrolls. */
+/**
+ * Under 640 px wide the editor is laid out for a phone: the edit panel is a sheet and the top bar
+ * scrolls. Read before the first paint, so a menu that opens on a phone, as the right-click menu
+ * does, never shows a frame laid out for a wider screen first.
+ */
 export function usePhone() {
   const [phone, setPhone] = useState(false)
-  useEffect(() => {
+  useLayoutEffect(() => {
     const query = window.matchMedia('(max-width: 639px)')
     const update = () => setPhone(query.matches)
     update()

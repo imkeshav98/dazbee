@@ -209,7 +209,7 @@ describe('node.group', () => {
     expect(() => tab.run('node.enclose', { id: 'f', ids: ['banner-a'] })).toThrow(/not beside/)
     expect(() => tab.run('node.group', { ids: ['a', 'c'] })).toThrow(/share a parent/)
     expect(() => tab.run('node.group', { ids: ['a', 'banner-a'] })).toThrow(/share a parent/)
-    expect(() => tab.run('node.ungroup', { ids: ['f'] })).toThrow(/box, not a group/)
+    expect(() => tab.run('node.ungroup', { ids: ['a'] })).toThrow(/graphic, not a group, box or boolean/)
     tab.run('node.lock', { ids: ['g2'], lock: { delete: true } })
     expect(() => tab.run('node.ungroup', { ids: ['g2'] })).toThrow(/locked/)
   })
@@ -319,6 +319,39 @@ describe('node.ungroup', () => {
     expectSame(drawnAll(after, ['a', 'b']), before)
     expect(drawn(after, 'b')).toMatchObject({ visible: false, rotation: 45 })
     expect(bannerLayers(doc)).toEqual(banner)
+  })
+
+  it('takes the layers out of a turned box too, leaving them where they were, in one undo step', () => {
+    const doc = fresh()
+    const tab = openTestSession(doc)
+    const before = drawnAll(readDesign(doc), LEAVES)
+    const banner = bannerLayers(doc)
+
+    expect(tab.run('node.ungroup', { ids: ['f'] })).toEqual(['c', 'g2'])
+
+    const now = readDesign(doc)
+    expect(now.nodes.f).toBeUndefined()
+    expect(childrenOf(now, 'sq').map(([child]) => child)).toEqual(['a', 'b', 'c', 'g2'])
+    expectSame(drawnAll(now, LEAVES), before)
+    expect(bannerLayers(doc)).toEqual(banner)
+    tab.undo()
+    expect(readDesign(doc)).toEqual(readDesign(fresh()))
+  })
+
+  it('puts what a box held where it is drawn, as an auto layout box places it', () => {
+    const doc = fresh()
+    const tab = openTestSession(doc)
+    tab.run('node.update', { ids: ['f'], patch: { rotation: 0 } })
+
+    tab.run('node.ungroup', {
+      ids: ['f'],
+      drawn: { c: { x: 320, y: 520, width: 100, height: 60 }, g2: { x: 480, y: 610, width: 200, height: 150 } },
+    })
+
+    const now = readDesign(doc)
+    expect(boxOf(now, 'c')).toMatchObject({ x: 320, y: 520 })
+    expect(boxOf(now, 'g2')).toMatchObject({ x: 480, y: 610 })
+    expect(boxOf(now, 'd')).toMatchObject({ x: 480, y: 610 })
   })
 })
 

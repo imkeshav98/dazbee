@@ -8,6 +8,7 @@ import type { Skipped } from '@dazbee/svg'
 import type { Camera, Insets, Viewport } from './canvas/camera.ts'
 import type { Frame } from './canvas/frames.ts'
 import type { Spot } from './canvas/view.ts'
+import type { LinkedMenu } from './linked-copies.ts'
 import type { ResourceSources } from './resources.ts'
 import type { ShortcutAction } from './shortcuts.ts'
 import type { RunStyle, TextRange } from './text/text-edit.ts'
@@ -84,6 +85,12 @@ export interface Editor {
   canPasteLayers: () => boolean
   /** Pastes the layers last copied in Dazbee on this device, as Mod+V does; false with none kept. */
   pasteLayers(): boolean
+  /**
+   * What the full menu's style and linked-copy items would do for the selection now (Copy style,
+   * Paste style, Copy to other frames, and lock, hide and delete in all frames), or why one has
+   * nothing to do; null with nothing selected. `perform` does each, as one undo step.
+   */
+  linkedMenu(): LinkedMenu | null
   /**
    * Moves a layer to the top level of its frame or into a container there, before a sibling or on
    * top (#59), as one undo step; groups it leaves and enters fit what they hold again. False when the

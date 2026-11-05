@@ -12,7 +12,7 @@ import {
   UploadTicket,
 } from '@dazbee/schema'
 
-import { brand, call, run, sibling, uploadImage } from '../test-api.ts'
+import { brand, call, run, SHORT_ID, sibling, uploadImage } from '../test-api.ts'
 import { png, sha256 } from '../test-files.ts'
 import { readImageHeader } from './images.ts'
 
@@ -22,6 +22,7 @@ describe('image uploads', { timeout: 30_000 }, () => {
     const bytes = png(3, 2, run)
     const { asset, uploaded } = await uploadImage('a', brand.id, bytes)
     expect(uploaded).toBe(true)
+    expect(asset.id).toMatch(SHORT_ID)
     expect(asset).toMatchObject({
       brandId: brand.id,
       sha256: sha256(bytes),

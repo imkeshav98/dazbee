@@ -2,7 +2,7 @@
 // image, and putting an image into a layer as its fill, with the layer a dragged image would go into.
 import type { CanvasKit } from '@dazbee/canvaskit'
 import { ancestorsOf, childrenOf, frameIdOf, type Session } from '@dazbee/doc'
-import { canHold, type Layer, LayerClipboard, type LayerTree, type Paint, type Point } from '@dazbee/schema'
+import { canHold, type Layer, LayerClipboard, type Paint, type Point } from '@dazbee/schema'
 import { type Skipped, SVG_TYPE, SvgError, svgMarkup, svgToLayers } from '@dazbee/svg'
 
 import type { EditorActions } from './actions.ts'
@@ -164,11 +164,17 @@ export function editorPlace({
   /**
    * Pastes layers (#49) into the frame the selection is in, or else the one under the pointer: in
    * the group or box double-clicked into when it can hold them, otherwise at the frame's top level,
-   * where they were or centred on the pointer, each a new layer with a link id of its own. One undo
-   * step; the pasted layers end up selected. On a page with no frame it says to add one; returns
-   * whether it pasted.
+   * where they were or centred on the pointer. Onto another frame of the page they were copied
+   * from, each is a linked copy where that frame holds no layer with its link id; into their own
+   * frame, onto another page or from another design, each is a new layer with a link id of its own.
+   * One undo step; the pasted layers end up selected. On a page with no frame it says to add one;
+   * returns whether it pasted.
    */
-  function pasteTree(tree: LayerTree, atPointer: boolean, pointer: Point | null) {
+  function pasteTree(
+    { tree, designId: from, pageId, frameId }: LayerClipboard,
+    atPointer: boolean,
+    pointer: Point | null,
+  ) {
     const under = pointer ? pointAt(pointer) : null
     const frame = frameOf(selection.current()?.frameId) ?? under?.frame ?? inView()[0] ?? frames()[0]
     if (!frame) {
@@ -199,7 +205,8 @@ export function editorPlace({
     if (
       !runQuietly(() =>
         session.gesture(() => {
-          pasted = session.run('design.place', { parentId, tree, dx, dy })
+          const linked = from === designId && frame.id !== frameId
+          pasted = session.run('design.place', { parentId, tree, dx, dy, ...(linked ? { keepLinksFrom: pageId } : {}) })
           if (now.nodes[parentId]) hug([parentId])
         }),
       )
@@ -294,8 +301,8 @@ export function editorPlace({
     if (!typing.editing()) {
       // Layers copied in this or another design, or an SVG file or its markup; anything else on the
       // clipboard isn't ours to paste.
-      const tree = layersOnClipboard(e.clipboardData)
-      if (!tree) {
+      const copied = layersOnClipboard(e.clipboardData)
+      if (!copied) {
         const atPointer = pasteAtPointer
         pasteAtPointer = false
         const file = Array.from(e.clipboardData?.files ?? []).find((f) => f.type === SVG_TYPE)
@@ -313,7 +320,7 @@ export function editorPlace({
         return
       }
       e.preventDefault()
-      pasteTree(tree, pasteAtPointer, pointer())
+      pasteTree(copied, pasteAtPointer, pointer())
       pasteAtPointer = false
       return
     }
@@ -337,9 +344,9 @@ export function editorPlace({
     return rememberedLayers() !== null
   }
   function pasteLayers(pointer: () => Point | null) {
-    const tree = rememberedLayers()
-    if (!tree) return false
-    return pasteTree(tree, false, pointer())
+    const copied = rememberedLayers()
+    if (!copied) return false
+    return pasteTree(copied, false, pointer())
   }
   function placeImage(asset: PlacedAsset, where?: Point | Spot): string | null {
     // A point off every frame places nothing; with no point, it goes in the frame in the middle of the view.
