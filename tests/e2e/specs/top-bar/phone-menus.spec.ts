@@ -7,10 +7,10 @@
 import { setCookies } from '../../support/editor.ts'
 import { boxOf } from '../../support/layout.ts'
 import { open } from '../../support/linked-menu.ts'
-import { besideRows, fullMenuRows, shownKeys, shownRows } from '../../support/menu-rows.ts'
+import { besideRows, fullMenuRows, rowIn, rowName, shownKeys, shownRows } from '../../support/menu-rows.ts'
 import { fitSettled, selectLayers } from '../../support/stage.ts'
 import { expect, type Locator, type Page, test } from '../../support/test.ts'
-import { moreMenu } from '../../support/top-bar.ts'
+import { entered, moreMenu } from '../../support/top-bar.ts'
 
 test.describe.configure({ mode: 'parallel', timeout: 120_000 })
 
@@ -21,9 +21,6 @@ const shownHeights = (menu: Locator) =>
   menu
     .locator('button')
     .evaluateAll((rows) => rows.filter((row) => row.checkVisibility()).map((row) => row.getBoundingClientRect().height))
-/** Waits for an element's pop-in to end, so its box is where it rests. */
-const popped = (locator: Locator) =>
-  locator.evaluate((el) => Promise.all(el.getAnimations().map((a) => a.finished.catch(() => undefined))))
 /** The test id of the element that has the focus. */
 const focused = (page: Page) => page.evaluate(() => document.activeElement?.getAttribute('data-testid') ?? '')
 
@@ -57,7 +54,7 @@ test('a menu beside a row of the full menu opens in its place under a back row n
   const { page, errors } = await openOnPhone(browser)
   await selectLayers(page, ['headline'])
   const menu = await moreMenu(page)
-  await popped(menu)
+  await entered(menu)
   expect(await shownKeys(menu)).toBe(0)
   for (const height of await shownHeights(menu)) expect(height).toBeGreaterThanOrEqual(44)
 
@@ -65,7 +62,10 @@ test('a menu beside a row of the full menu opens in its place under a back row n
   const sub = menu.getByTestId('more-copy-to-frames-menu')
   await expect(sub).toBeVisible()
   // The back row, then the menu's own rows under its heading; no row of the full menu, and no card of its own.
-  expect(await shownRows(menu)).toEqual(['Copy to other frames', ...besideRows('copy-to-frames', { text: true })])
+  expect(await shownRows(menu)).toEqual([
+    rowName('more-copy-to-frames'),
+    ...besideRows('copy-to-frames', { text: true }),
+  ])
   await expect(sub.getByText('To the 2 linked frames')).toBeVisible()
   await expect(page.locator('[data-radix-popper-content-wrapper]')).toHaveCount(1)
   const [outer, back, rows] = [
@@ -93,7 +93,7 @@ test('a menu beside a row of the right-click menu opens in its place, Esc goes b
   await menu.getByTestId('more-paste').click()
   const sub = menu.getByTestId('more-paste-menu')
   await expect(sub).toBeVisible()
-  expect(await shownRows(menu)).toEqual(['Paste', ...besideRows('paste')])
+  expect(await shownRows(menu)).toEqual([rowName('more-paste'), ...besideRows('paste')])
   await expect(page.locator('[data-radix-popper-content-wrapper]')).toHaveCount(1)
   expect(await shownKeys(menu)).toBe(0)
   for (const height of await shownHeights(menu)) expect(height).toBeGreaterThanOrEqual(44)
@@ -153,32 +153,30 @@ test('a tap on a greyed row says why in a tooltip above the row, clear of the fi
 }) => {
   const { page, errors } = await openOnPhone(browser)
   await page.evaluate(() => localStorage.removeItem('dazbee.copiedLayers'))
-  for (const [id, sub, name, why] of [
-    ['photo', 'paste', 'Paste', 'Copy layers first'],
-    ['headline', 'copy-to-frames', 'Layer', 'Every linked frame has this layer already'],
+  for (const [id, sub, row, why] of [
+    ['photo', 'paste', 'paste', 'Copy layers first'],
+    ['headline', 'copy-to-frames', 'layerToLinked', 'Every linked frame has this layer already'],
   ] as const) {
+    const name = rowName(row)
     await selectLayers(page, [id])
     const menu = await moreMenu(page)
     await menu.getByTestId(`more-${sub}`).click()
-    const row = page
-      .getByTestId(`more-${sub}-menu`)
-      .getByRole('button', { name: new RegExp(`^${name}`) })
-      .first()
+    const greyed = rowIn(page.getByTestId(`more-${sub}-menu`), row)
     // Playwright holds back a click on a row marked disabled until it isn't; the tap is the point here.
-    await row.click({ force: true })
+    await greyed.click({ force: true })
     const tip = page.getByRole('tooltip').filter({ hasText: why })
     await expect(tip).toBeVisible()
     const shown = tip.locator('xpath=..')
-    await popped(shown)
-    const [box, under] = [await boxOf(shown), await boxOf(row)]
+    await entered(shown)
+    const [box, under] = [await boxOf(shown), await boxOf(greyed)]
     expect(box.bottom, name).toBeLessThanOrEqual(under.top + 0.5)
     expect(box.left >= 0 && box.right <= PHONE.width && box.top >= 0, name).toBe(true)
     // Esc closes the top-most first: the tooltip, then the menu in the full menu's place, then the full menu.
     await page.keyboard.press('Escape')
     await expect(tip).toBeHidden()
-    await expect(row).toBeVisible()
+    await expect(greyed).toBeVisible()
     await page.keyboard.press('Escape')
-    await expect(row).toBeHidden()
+    await expect(greyed).toBeHidden()
     await expect(menu).toBeVisible()
     await page.keyboard.press('Escape')
     await expect(menu).toBeHidden()

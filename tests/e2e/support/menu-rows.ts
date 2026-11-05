@@ -1,69 +1,82 @@
 // The rows the editor's layer menus show, in order, as the specs check them: the full menu (the
 // small menu's ⋯ and a right-click on a layer) with the menus beside its rows, and the top bar's
-// Arrange ⋯ with the moves beside its Order. A picked frame's ⋯ keeps its own list in
-// frames-on-canvas.ts.
+// Arrange ⋯ with the moves beside its Order; and readers of the rows a menu shows. A picked frame's
+// ⋯ keeps its own list in frames-on-canvas.ts.
 import type { Locator } from './test.ts'
 
-/** A row of a menu: its words, and how it reads with its key after them. */
+/**
+ * A row of a menu: what a spec names it by (its `data-action`, or the test id of a row that opens a
+ * menu beside it or in its place), its words, and how it reads with its key after them.
+ */
 export interface Row {
+  id: string
   name: string
   reads: string
 }
 
 /**
- * The full menu's rows in order, by their words and as each reads with its key; `group` marks
- * Ungroup, there only for a group or a box.
+ * The full menu's rows in order; `group` marks Ungroup, there only for a group or a box. A layer
+ * under a mask shows Release mask (`RELEASE_MASK`) in Use as mask's place.
  */
 export const FULL_MENU: readonly (Row & { group?: true })[] = [
-  { name: 'Copy', reads: 'Copy' },
-  { name: 'Paste', reads: 'Paste' },
-  { name: 'Duplicate', reads: 'DuplicateCtrl+D' },
-  { name: 'Copy to other frames', reads: 'Copy to other frames' },
-  { name: 'Put in a box', reads: 'Put in a boxCtrl+Alt+G' },
-  { name: 'Ungroup', reads: 'UngroupCtrl+Shift+G', group: true },
-  { name: 'Use as mask', reads: 'Use as maskCtrl+Alt+M' },
-  { name: 'Lock in all frames', reads: 'Lock in all framesCtrl+Alt+Shift+L' },
-  { name: 'Hide in all frames', reads: 'Hide in all framesCtrl+Alt+Shift+H' },
-  { name: 'Delete from all frames', reads: 'Delete from all frames' },
+  { id: 'more-copy', name: 'Copy', reads: 'Copy' },
+  { id: 'more-paste', name: 'Paste', reads: 'Paste' },
+  { id: 'duplicate', name: 'Duplicate', reads: 'DuplicateCtrl+D' },
+  { id: 'more-copy-to-frames', name: 'Copy to other frames', reads: 'Copy to other frames' },
+  { id: 'boxSelection', name: 'Put in a box', reads: 'Put in a boxCtrl+Alt+G' },
+  { id: 'ungroup', name: 'Ungroup', reads: 'UngroupCtrl+Shift+G', group: true },
+  { id: 'mask', name: 'Use as mask', reads: 'Use as maskCtrl+Alt+M' },
+  { id: 'lockLinked', name: 'Lock in all frames', reads: 'Lock in all framesCtrl+Alt+Shift+L' },
+  { id: 'hideLinked', name: 'Hide in all frames', reads: 'Hide in all framesCtrl+Alt+Shift+H' },
+  { id: 'deleteLinked', name: 'Delete from all frames', reads: 'Delete from all frames' },
 ]
+/** The row in Use as mask's place for a layer under a mask. */
+export const RELEASE_MASK: Row = { id: 'releaseMask', name: 'Release mask', reads: 'Release mask' }
 /**
  * The rows of the menus beside the full menu's rows, by the test id of the row that opens each
  * (`more-<id>`); `text` marks Copy to other frames ▸ Text, there only for text layers.
  */
 export const FULL_MENU_BESIDE: Record<'copy' | 'paste' | 'copy-to-frames', readonly (Row & { text?: true })[]> = {
   copy: [
-    { name: 'Copy', reads: 'CopyCtrl+C' },
-    { name: 'Copy style', reads: 'Copy styleCtrl+Alt+C' },
+    { id: 'copy', name: 'Copy', reads: 'CopyCtrl+C' },
+    { id: 'copyStyle', name: 'Copy style', reads: 'Copy styleCtrl+Alt+C' },
   ],
   paste: [
-    { name: 'Paste', reads: 'PasteCtrl+V' },
-    { name: 'Paste style', reads: 'Paste styleCtrl+Alt+V' },
+    { id: 'paste', name: 'Paste', reads: 'PasteCtrl+V' },
+    { id: 'pasteStyle', name: 'Paste style', reads: 'Paste styleCtrl+Alt+V' },
   ],
   'copy-to-frames': [
-    { name: 'Style', reads: 'StyleCtrl+Alt+Shift+C' },
-    { name: 'Text', reads: 'TextCtrl+Alt+Shift+T', text: true },
-    { name: 'Layer', reads: 'Layer' },
+    { id: 'styleToLinked', name: 'Style', reads: 'StyleCtrl+Alt+Shift+C' },
+    { id: 'textToLinked', name: 'Text', reads: 'TextCtrl+Alt+Shift+T', text: true },
+    { id: 'layerToLinked', name: 'Layer', reads: 'Layer' },
   ],
 }
 /**
- * Arrange ⋯'s rows in order, by their test ids (`rotation` for the rotation field, which has none):
- * Order ▸; Line up ▸ for one layer (`one`); the rotation field unless a group or a boolean is
- * selected (`turns`); Text direction ▸ for text (`text`).
+ * Arrange ⋯'s rows in order, by their test ids (`rotation` for the rotation field, which has none)
+ * and the words of each row: Order ▸; Line up ▸ for one layer (`one`); the rotation field unless a
+ * group or a boolean is selected (`turns`); Text direction ▸ for text (`text`).
  */
-export const ARRANGE: readonly { id: string; only?: 'one' | 'turns' | 'text' }[] = [
-  { id: 'more-order' },
-  { id: 'more-line-up', only: 'one' },
-  { id: 'rotation', only: 'turns' },
-  { id: 'more-text-direction', only: 'text' },
+export const ARRANGE: readonly { id: string; name: string; only?: 'one' | 'turns' | 'text' }[] = [
+  { id: 'more-order', name: 'Order' },
+  { id: 'more-line-up', name: 'Line up', only: 'one' },
+  { id: 'rotation', name: 'Rotation', only: 'turns' },
+  { id: 'more-text-direction', name: 'Text direction', only: 'text' },
 ]
-/** The moves in the menu beside Arrange's Order, in order, by their words and as each reads with its key. */
+/** The moves in the menu beside Arrange's Order, in order. */
 export const ORDER_MENU: readonly Row[] = [
-  { name: 'Bring to front', reads: 'Bring to frontCtrl+Shift+]' },
-  { name: 'Bring forward', reads: 'Bring forwardCtrl+]' },
-  { name: 'Send backward', reads: 'Send backwardCtrl+[' },
-  { name: 'Send to back', reads: 'Send to backCtrl+Shift+[' },
+  { id: 'bringToFront', name: 'Bring to front', reads: 'Bring to frontCtrl+Shift+]' },
+  { id: 'bringForward', name: 'Bring forward', reads: 'Bring forwardCtrl+]' },
+  { id: 'sendBackward', name: 'Send backward', reads: 'Send backwardCtrl+[' },
+  { id: 'sendToBack', name: 'Send to back', reads: 'Send to backCtrl+Shift+[' },
 ]
 
+/** The words of a row of any of the lists above, by its id. */
+export function rowName(id: string) {
+  const rows = [...FULL_MENU, RELEASE_MASK, ...Object.values(FULL_MENU_BESIDE).flat(), ...ARRANGE, ...ORDER_MENU]
+  const row = rows.find((one) => one.id === id)
+  if (!row) throw new Error(`no menu row ${id}`)
+  return row.name
+}
 /** The full menu's rows for a selection, by their words: Ungroup only for a group or a box. */
 export const fullMenuRows = ({ group = false } = {}) =>
   FULL_MENU.filter((row) => group || !row.group).map((row) => row.name)
@@ -84,6 +97,9 @@ export const arrangeRowsOf = (menu: Locator) =>
     .locator('[data-testid^="more-"], [data-scrub]')
     .evaluateAll((rows) => rows.map((row) => row.getAttribute('data-testid') ?? 'rotation'))
 
+/** A row of a menu by its id in the lists above: the first button whose name starts with its words. */
+export const rowIn = (menu: Locator, id: string) =>
+  menu.getByRole('button', { name: new RegExp(`^${rowName(id)}`) }).first()
 /** The words of each row that shows in a menu, in order, as they read on screen: a key that shows reads too. */
 export const shownRows = (menu: Locator) =>
   menu

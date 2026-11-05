@@ -84,7 +84,7 @@ export const underPhoneMenu = (page: Page, visibility: 'hidden' | '') =>
  * and raised), so the boxes measured in it are where they stay. Only animations that end at a time
  * count: endless ones and those driven by scrolling, as the scroll bars' are, are left out.
  */
-const entered = (locator: Locator) =>
+export const entered = (locator: Locator) =>
   locator.evaluate(async (el) => {
     const entrances = el.getAnimations({ subtree: true }).filter((animation) => {
       const end = animation.effect?.getComputedTiming().endTime

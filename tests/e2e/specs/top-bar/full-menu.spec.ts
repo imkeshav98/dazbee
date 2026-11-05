@@ -6,11 +6,11 @@
 import { boxOf, layoutProblems, SCREEN_SIZES } from '../../support/layout.ts'
 import { closeMenus, expectGreyed, fillOf, holders, node, open, redo, rowsOf, undo } from '../../support/linked-menu.ts'
 import { GREEN, INK, PINK } from '../../support/linked-menu-design.ts'
-import { besideRows, FULL_MENU_BESIDE, fullMenuRows } from '../../support/menu-rows.ts'
+import { besideRows, FULL_MENU_BESIDE, fullMenuRows, rowIn, rowName } from '../../support/menu-rows.ts'
 import { copyIn } from '../../support/seed.ts'
 import { fitSettled, selectLayers } from '../../support/stage.ts'
 import { expect, type Page, test } from '../../support/test.ts'
-import { moreAction, moreMenu, moreSubmenu, PIECES, UNCUT, underPhoneMenu } from '../../support/top-bar.ts'
+import { entered, moreAction, moreMenu, moreSubmenu, PIECES, UNCUT, underPhoneMenu } from '../../support/top-bar.ts'
 
 test.describe.configure({ mode: 'parallel', timeout: 120_000 })
 
@@ -166,7 +166,7 @@ test.describe('the full menu', () => {
       await closeMenus(page)
     }
     await selectLayers(page, ['logo'])
-    await moreAction(page, 'Ungroup')
+    await moreAction(page, rowName('ungroup'))
     await expect.poll(async () => (await node(page, 'mark'))?.parentId).toBe('sq')
     expect(await node(page, 'logo')).toBeNull()
     expect(await node(page, copyIn('story', 'logo'))).not.toBeNull()
@@ -180,7 +180,7 @@ test.describe('the full menu', () => {
     const right = page.getByTestId('stage-menu')
     await expect(right).toBeVisible()
     expect(await page.evaluate(() => window.dazbee?.selection())).toEqual(['card'])
-    await moreAction(page, 'Ungroup', right)
+    await moreAction(page, rowName('ungroup'), right)
     await expect.poll(async () => (await node(page, 'cta'))?.parentId).toBe('sq')
     expect((await node(page, 'cta'))?.props).toMatchObject({ x: 140, y: 910 })
     await undo(page)
@@ -193,16 +193,16 @@ test.describe('the full menu', () => {
   }) => {
     const { page, errors } = await open(browser)
     await selectLayers(page, ['badge'])
-    await moreAction(page, 'Use as mask')
+    await moreAction(page, rowName('mask'))
     await selectLayers(page, ['logo'])
     await page.evaluate(() => window.dazbee?.session.run('node.lock', { ids: ['badge'], lock: { style: true } }))
     const menu = await moreMenu(page)
-    const release = menu.getByRole('button', { name: /^Release mask/ })
+    const release = rowIn(menu, 'releaseMask')
     expect(await release.evaluate((row) => (row as HTMLButtonElement).disabled)).toBe(false)
-    await expectGreyed(page, menu, 'Release mask', 'The mask’s style is locked')
+    await expectGreyed(page, menu, rowName('releaseMask'), 'The mask’s style is locked')
     await closeMenus(page)
     await page.evaluate(() => window.dazbee?.session.run('node.lock', { ids: ['badge'], lock: { style: false } }))
-    await moreAction(page, 'Release mask')
+    await moreAction(page, rowName('releaseMask'))
     await expect.poll(async () => (await node(page, 'badge'))?.props.mask).toBeFalsy()
     expect(errors).toEqual([])
   })
@@ -231,7 +231,7 @@ test.describe('the full menu', () => {
     // A frame linked to none greys the row and says why.
     await selectLayers(page, ['fresh-title'])
     const menu = await moreMenu(page)
-    await expectGreyed(page, menu, 'Copy to other frames', 'No other frame on this page is linked to this one')
+    await expectGreyed(page, menu, rowName('more-copy-to-frames'), 'No other frame on this page is linked to this one')
     expect(errors).toEqual([])
   })
 })
@@ -245,25 +245,35 @@ test.describe('Copy ▸ and Paste ▸', () => {
     })
     await selectLayers(page, ['photo'])
     const paste = await moreSubmenu(page, 'paste')
-    await expectGreyed(page, paste, 'Paste style', 'Copy a style first')
-    await expectGreyed(page, paste, 'Paste', 'Copy layers first')
+    await expectGreyed(page, paste, rowName('pasteStyle'), 'Copy a style first')
+    await expectGreyed(page, paste, rowName('paste'), 'Copy layers first')
     await closeMenus(page)
 
     await selectLayers(page, ['headline', 'badge'])
-    await expectGreyed(page, await moreSubmenu(page, 'copy'), 'Copy style', 'Select one layer to copy its style')
+    await expectGreyed(
+      page,
+      await moreSubmenu(page, 'copy'),
+      rowName('copyStyle'),
+      'Select one layer to copy its style',
+    )
     await closeMenus(page)
 
     await selectLayers(page, ['badge'])
-    await moreAction(page, 'Copy style')
+    await moreAction(page, rowName('copyStyle'))
     await selectLayers(page, ['mark'])
-    await moreAction(page, 'Paste style')
+    await moreAction(page, rowName('pasteStyle'))
     await expect.poll(() => fillOf(page, 'mark')).toBe(PINK)
     expect(await fillOf(page, copyIn('story', 'mark'))).toBe(INK)
     await undo(page)
     await expect.poll(() => fillOf(page, 'mark')).toBe(INK)
     await redo(page)
     await expect.poll(() => fillOf(page, 'mark')).toBe(PINK)
-    await expectGreyed(page, await moreSubmenu(page, 'paste'), 'Paste style', 'The selection has this style already')
+    await expectGreyed(
+      page,
+      await moreSubmenu(page, 'paste'),
+      rowName('pasteStyle'),
+      'The selection has this style already',
+    )
     await closeMenus(page)
 
     // By key: the shape's green onto the card.
@@ -283,12 +293,22 @@ test.describe('Copy ▸ and Paste ▸', () => {
     await selectLayers(page, ['cta'])
     await page.keyboard.press('Control+Alt+KeyC')
     await selectLayers(page, ['badge'])
-    await expectGreyed(page, await moreSubmenu(page, 'paste'), 'Paste style', 'A text’s style doesn’t apply to a shape')
+    await expectGreyed(
+      page,
+      await moreSubmenu(page, 'paste'),
+      rowName('pasteStyle'),
+      'A text’s style doesn’t apply to a shape',
+    )
     await closeMenus(page)
     await selectLayers(page, ['badge'])
     await page.keyboard.press('Control+Alt+KeyC')
     await selectLayers(page, ['sub'])
-    await expectGreyed(page, await moreSubmenu(page, 'paste'), 'Paste style', 'A shape’s style doesn’t apply to a text')
+    await expectGreyed(
+      page,
+      await moreSubmenu(page, 'paste'),
+      rowName('pasteStyle'),
+      'A shape’s style doesn’t apply to a text',
+    )
     expect(errors).toEqual([])
   })
 
@@ -309,7 +329,7 @@ test.describe('Copy ▸ and Paste ▸', () => {
     await expect.poll(async () => (await holders(page, 'badge')).story?.length).toBe(1)
     // The landscape frame has its own copy, so a paste there is a new layer.
     await selectLayers(page, [copyIn('wide', 'sub')])
-    await moreAction(page, 'Paste')
+    await moreAction(page, rowName('paste'))
     await expect.poll(async () => (await holders(page, 'badge')).wide?.length).toBe(1)
     const pasted = await page.evaluate(() => window.dazbee?.selection()[0] ?? '')
     expect((await node(page, pasted))?.link).not.toBe('badge')
@@ -331,103 +351,135 @@ test.describe('Copy ▸ and Paste ▸', () => {
   })
 })
 
-for (const [width, height] of SCREEN_SIZES) {
-  test(`at ${width}×${height} the small menu, its ⋯ and Copy to other frames ▸ fit with nothing cut or covered`, async ({
-    browser,
-  }) => {
-    const { page, errors } = await open(browser)
-    await page.setViewportSize({ width, height })
-    await fitSettled(page)
-    await selectLayers(page, ['headline'])
-    await expect(page.getByTestId('small-menu')).toBeVisible()
-    await expect.poll(() => layoutProblems(page, { pieces: PIECES, uncut: UNCUT })).toEqual([])
-    await moreMenu(page)
-    // On a phone the full menu lies over the dock and the rail, as the mock draws it, so they are
-    // left out here; the phone's own test checks the menu is on top of them.
-    if (width <= 600) await underPhoneMenu(page, 'hidden')
-    await expect.poll(() => layoutProblems(page, { pieces: PIECES, uncut: UNCUT })).toEqual([])
-    if (width <= 600) await underPhoneMenu(page, '')
-    const sub = await moreSubmenu(page, 'copy-to-frames')
-    // On a phone it opens in the full menu's place, which lies over the dock and the rail.
-    if (width <= 600) await underPhoneMenu(page, 'hidden')
-    await expect.poll(() => layoutProblems(page, { pieces: PIECES, uncut: UNCUT })).toEqual([])
-    if (width <= 600) {
-      await underPhoneMenu(page, '')
-      // Wholly on the screen and on top, each row a finger's height, once it has popped in.
-      await sub.evaluate((el) => Promise.all(el.getAnimations().map((a) => a.finished.catch(() => undefined))))
-      const rows = await sub.getByRole('button').evaluateAll((buttons) =>
-        buttons.map((button) => {
-          const r = button.getBoundingClientRect()
-          const top = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2)
-          return {
-            inside: r.left >= 0 && r.right <= innerWidth && r.bottom <= innerHeight,
-            onTop: button.contains(top),
-            height: r.height,
-          }
-        }),
-      )
-      for (const row of rows) expect(row).toMatchObject({ inside: true, onTop: true })
-      for (const row of rows) expect(row.height).toBeGreaterThanOrEqual(44)
-      // A tap on a greyed row says why, as the pointer resting on it does.
-      // Playwright holds back a click on a row marked disabled until it isn't; the tap is the point here.
-      await sub.getByRole('button', { name: /^Layer/ }).click({ force: true })
-      await expect(
-        page.getByRole('tooltip').filter({ hasText: 'Every linked frame has this layer already' }),
-      ).toBeVisible()
-      await expect(sub).toBeVisible()
-    }
-    expect(errors).toEqual([])
-  })
-}
+test.describe('at each screen size', () => {
+  // The laptop and the tablet, then the phone, which shows the full menu its own way.
+  const [laptop, tablet, [phoneWidth, phoneHeight]] = SCREEN_SIZES
 
-for (const [width, height] of SCREEN_SIZES) {
-  test(`at ${width}×${height} Copy to other frames ▸ is as wide as the mock’s, or on a phone in the full menu’s place, and a greyed row’s tooltip covers no row of the full menu`, async ({
-    browser,
-  }) => {
-    const { page, errors } = await open(browser)
-    await page.setViewportSize({ width, height })
-    await fitSettled(page)
-    await selectLayers(page, ['headline'])
-    const menu = await moreMenu(page)
-    const sub = await moreSubmenu(page, 'copy-to-frames')
-    await sub.evaluate((el) => Promise.all(el.getAnimations().map((a) => a.finished.catch(() => undefined))))
-    const [main, beside] = [await boxOf(menu), await boxOf(sub)]
-    if (width > 600) {
+  for (const [width, height] of [laptop, tablet]) {
+    test(`at ${width}×${height} the small menu, its ⋯ and Copy to other frames ▸ fit with nothing cut or covered`, async ({
+      browser,
+    }) => {
+      const { page, errors } = await open(browser)
+      await page.setViewportSize({ width, height })
+      await fitSettled(page)
+      await selectLayers(page, ['headline'])
+      await expect(page.getByTestId('small-menu')).toBeVisible()
+      await expect.poll(() => layoutProblems(page, { pieces: PIECES, uncut: UNCUT })).toEqual([])
+      await moreMenu(page)
+      await expect.poll(() => layoutProblems(page, { pieces: PIECES, uncut: UNCUT })).toEqual([])
+      await moreSubmenu(page, 'copy-to-frames')
+      await expect.poll(() => layoutProblems(page, { pieces: PIECES, uncut: UNCUT })).toEqual([])
+      expect(errors).toEqual([])
+    })
+
+    test(`at ${width}×${height} Copy to other frames ▸ is as wide as the mock’s, and a greyed row’s tooltip covers no row of the full menu`, async ({
+      browser,
+    }) => {
+      const { page, errors } = await open(browser)
+      await page.setViewportSize({ width, height })
+      await fitSettled(page)
+      await selectLayers(page, ['headline'])
+      const menu = await moreMenu(page)
+      const sub = await moreSubmenu(page, 'copy-to-frames')
+      await entered(sub)
+      const [main, beside] = [await boxOf(menu), await boxOf(sub)]
       expect(Math.abs(beside.right - beside.left - 258)).toBeLessThanOrEqual(4)
       // Each row's key ends at the same right-hand edge, as the full menu's do.
       const ends = await sub
         .locator('button kbd')
         .evaluateAll((keys) => keys.map((key) => Math.round(key.getBoundingClientRect().right)))
       expect(new Set(ends).size).toBe(1)
-    } else {
-      // On a phone it is in the full menu's place, under its back row, as wide as the full menu's rows.
-      const back = await boxOf(menu.getByTestId('more-copy-to-frames-back'))
-      expect(back.top - main.top).toBeLessThanOrEqual(8)
-      expect(Math.abs(beside.left - back.left)).toBeLessThanOrEqual(1)
-      expect(Math.abs(beside.right - back.right)).toBeLessThanOrEqual(1)
-    }
-    const layer = sub.getByRole('button', { name: /^Layer/ })
-    if (width > 600) await layer.hover()
+      await rowIn(sub, 'layerToLinked').hover()
+      const tip = page.getByRole('tooltip').filter({ hasText: 'Every linked frame has this layer already' })
+      await expect(tip).toBeVisible()
+      const shown = tip.locator('xpath=..')
+      await entered(shown)
+      const box = await boxOf(shown)
+      expect(coversMenu(box, main, beside)).toBe(0)
+      expect(box.left >= 0 && box.right <= width && box.top >= 0 && box.bottom <= height).toBe(true)
+      expect(errors).toEqual([])
+    })
+  }
+
+  test(`at ${phoneWidth}×${phoneHeight} the small menu, its ⋯ and Copy to other frames ▸ in its place fit with nothing cut or covered, each row on top and a finger's height`, async ({
+    browser,
+  }) => {
+    const { page, errors } = await open(browser)
+    await page.setViewportSize({ width: phoneWidth, height: phoneHeight })
+    await fitSettled(page)
+    await selectLayers(page, ['headline'])
+    await expect(page.getByTestId('small-menu')).toBeVisible()
+    await expect.poll(() => layoutProblems(page, { pieces: PIECES, uncut: UNCUT })).toEqual([])
+    await moreMenu(page)
+    // The full menu lies over the dock and the rail, as the mock draws it, so they are left out
+    // here; the 600 px tall phone's test checks the menu is on top of them.
+    await underPhoneMenu(page, 'hidden')
+    await expect.poll(() => layoutProblems(page, { pieces: PIECES, uncut: UNCUT })).toEqual([])
+    await underPhoneMenu(page, '')
+    const sub = await moreSubmenu(page, 'copy-to-frames')
+    // It opens in the full menu's place, which lies over the dock and the rail.
+    await underPhoneMenu(page, 'hidden')
+    await expect.poll(() => layoutProblems(page, { pieces: PIECES, uncut: UNCUT })).toEqual([])
+    await underPhoneMenu(page, '')
+    // Wholly on the screen and on top, each row a finger's height, once it has popped in.
+    await entered(sub)
+    const rows = await sub.getByRole('button').evaluateAll((buttons) =>
+      buttons.map((button) => {
+        const r = button.getBoundingClientRect()
+        const top = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2)
+        return {
+          inside: r.left >= 0 && r.right <= innerWidth && r.bottom <= innerHeight,
+          onTop: button.contains(top),
+          height: r.height,
+        }
+      }),
+    )
+    for (const row of rows) expect(row).toMatchObject({ inside: true, onTop: true })
+    for (const row of rows) expect(row.height).toBeGreaterThanOrEqual(44)
+    // A tap on a greyed row says why, as the pointer resting on it does.
     // Playwright holds back a click on a row marked disabled until it isn't; the tap is the point here.
-    else await layer.click({ force: true })
+    await rowIn(sub, 'layerToLinked').click({ force: true })
+    await expect(
+      page.getByRole('tooltip').filter({ hasText: 'Every linked frame has this layer already' }),
+    ).toBeVisible()
+    await expect(sub).toBeVisible()
+    expect(errors).toEqual([])
+  })
+
+  test(`at ${phoneWidth}×${phoneHeight} Copy to other frames ▸ is in the full menu’s place under its back row, and a greyed row’s tooltip is above the row`, async ({
+    browser,
+  }) => {
+    const { page, errors } = await open(browser)
+    await page.setViewportSize({ width: phoneWidth, height: phoneHeight })
+    await fitSettled(page)
+    await selectLayers(page, ['headline'])
+    const menu = await moreMenu(page)
+    const sub = await moreSubmenu(page, 'copy-to-frames')
+    await entered(sub)
+    const [main, beside] = [await boxOf(menu), await boxOf(sub)]
+    // Under its back row, as wide as the full menu's rows.
+    const back = await boxOf(menu.getByTestId('more-copy-to-frames-back'))
+    expect(back.top - main.top).toBeLessThanOrEqual(8)
+    expect(Math.abs(beside.left - back.left)).toBeLessThanOrEqual(1)
+    expect(Math.abs(beside.right - back.right)).toBeLessThanOrEqual(1)
+    const layer = rowIn(sub, 'layerToLinked')
+    // Playwright holds back a click on a row marked disabled until it isn't; the tap is the point here.
+    await layer.click({ force: true })
     const tip = page.getByRole('tooltip').filter({ hasText: 'Every linked frame has this layer already' })
     await expect(tip).toBeVisible()
     const shown = tip.locator('xpath=..')
-    await shown.evaluate((el) => Promise.all(el.getAnimations().map((a) => a.finished.catch(() => undefined))))
+    await entered(shown)
     const box = await boxOf(shown)
-    if (width > 600) expect(coversMenu(box, main, beside)).toBe(0)
-    else {
-      // On a phone none of the full menu's own rows shows to be covered, and the tooltip is above Layer.
-      const own = await menu
-        .locator(':scope > button')
-        .evaluateAll((rows) => rows.filter((row) => row.checkVisibility()).length)
-      expect(own).toBe(0)
-      expect(box.bottom).toBeLessThanOrEqual((await boxOf(layer)).top + 0.5)
-    }
-    expect(box.left >= 0 && box.right <= width && box.top >= 0 && box.bottom <= height).toBe(true)
+    // None of the full menu's own rows shows to be covered, and the tooltip is above Layer.
+    const own = await menu
+      .locator(':scope > button')
+      .evaluateAll((rows) => rows.filter((row) => row.checkVisibility()).length)
+    expect(own).toBe(0)
+    expect(box.bottom).toBeLessThanOrEqual((await boxOf(layer)).top + 0.5)
+    expect(box.left >= 0 && box.right <= phoneWidth && box.top >= 0 && box.bottom <= phoneHeight).toBe(true)
     expect(errors).toEqual([])
   })
-}
+})
 
 test('on a phone 600 px tall the full menu shows over the dock, and a cut edge never fades a row as a greyed one does', async ({
   browser,
@@ -438,7 +490,7 @@ test('on a phone 600 px tall the full menu shows over the dock, and a cut edge n
   await fitSettled(page)
   await selectLayers(page, ['headline'])
   const menu = await moreMenu(page)
-  await menu.evaluate((el) => Promise.all(el.getAnimations().map((a) => a.finished.catch(() => undefined))))
+  await entered(menu)
   const state = await menu.evaluate((el) => {
     const r = el.getBoundingClientRect()
     const dock = (document.querySelector('[data-dock]') as Element).getBoundingClientRect()

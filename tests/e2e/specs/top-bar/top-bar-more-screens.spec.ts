@@ -7,7 +7,7 @@
 import { arrangeDesign } from '../../support/arrange-design.ts'
 import { editorPath, setCookies, writeOutput } from '../../support/editor.ts'
 import { layoutProblems, rowHeights, SCREEN_SIZES } from '../../support/layout.ts'
-import { shownRows } from '../../support/menu-rows.ts'
+import { rowIn, rowName, shownKeys, shownRows } from '../../support/menu-rows.ts'
 import { seed } from '../../support/seed.ts'
 import { fitSettled, nextFrame, openStage, order, selectLayers } from '../../support/stage.ts'
 import { type Browser, expect, type Locator, type Page, test } from '../../support/test.ts'
@@ -45,11 +45,6 @@ async function openOnTouch(browser: Browser) {
   await page.goto(editorPath(designId))
   await expect(page.getByTestId('status')).toHaveAttribute('data-ready', '', { timeout: 60_000 })
   return { page, errors }
-}
-
-/** Checks what shows meets nothing and cuts nothing while a menu beside a row of Arrange is open. */
-async function clearOfAll(page: Page, label: string) {
-  expect(await layoutProblems(page, { pieces: PIECES, uncut: UNCUT }), label).toEqual([])
 }
 
 test('on a phone the bar wraps as the mock draws it: the first row holds the items that fit whole and ends with Arrange, the rest sit in a second card under it, always in view, and nothing scrolls sideways or is cut', async ({
@@ -149,11 +144,8 @@ test("on a phone Arrange opens as a sheet at the bottom, hiding the dock and tab
     expect(height).toBeGreaterThanOrEqual(44)
   expect(await layoutProblems(page, { pieces: PIECES, uncut: UNCUT })).toEqual([])
 
-  for (const [id, name] of [
-    ['text-direction', 'Text direction'],
-    ['line-up', 'Line up'],
-    ['order', 'Order'],
-  ] as const) {
+  for (const id of ['text-direction', 'line-up', 'order']) {
+    const name = rowName(`more-${id}`)
     const beside = await arrangeSubmenu(page, id)
     // In the sheet, its back row first; nothing else of Arrange shows, and there is no card of its own.
     await expect(sheet.getByTestId(`more-${id}-menu`)).toBeVisible()
@@ -161,7 +153,7 @@ test("on a phone Arrange opens as a sheet at the bottom, hiding the dock and tab
     expect((await shownRows(sheet))[0], id).toBe(name)
     expect(await shownRows(sheet), id).toEqual([name, ...(await shownRows(beside))])
     await expect.poll(place, id).toEqual([inset, 390 - inset * 2, true])
-    expect(await sheet.locator('kbd').evaluateAll((keys) => keys.filter((key) => key.checkVisibility()).length)).toBe(0)
+    expect(await shownKeys(sheet)).toBe(0)
     for (const height of await rowHeights(
       sheet,
       `:scope [data-testid="more-${id}-back"], :scope [data-testid="more-${id}-menu"] > button`,
@@ -171,7 +163,7 @@ test("on a phone Arrange opens as a sheet at the bottom, hiding the dock and tab
       const at = await row.boundingBox()
       expect(at && at.x >= 0 && at.x + at.width <= 390 && at.y >= 0 && at.y + at.height <= 844, id).toBe(true)
     }
-    await clearOfAll(page, id)
+    expect(await layoutProblems(page, { pieces: PIECES, uncut: UNCUT }), id).toEqual([])
     if (id === 'line-up') {
       const boxes = await Promise.all((await beside.getByRole('button').all()).map((b: Locator) => b.boundingBox()))
       for (const box of boxes) expect(box && box.width >= 44 && box.height >= 44).toBe(true)
@@ -185,10 +177,7 @@ test("on a phone Arrange opens as a sheet at the bottom, hiding the dock and tab
     await expect(sheet.getByTestId(`more-${id}`)).toBeFocused()
   }
   const before = await order(page)
-  await page
-    .getByTestId('more-order-menu')
-    .getByRole('button', { name: /^Send to back/ })
-    .click()
+  await rowIn(page.getByTestId('more-order-menu'), 'sendToBack').click()
   await expect(sheet).toBeHidden()
   await expect.poll(() => order(page)).toEqual(['words', ...before.filter((id) => id !== 'words')])
   await expect(page.getByTestId('rail')).toBeVisible()
@@ -226,7 +215,7 @@ test('at each screen size Arrange and the menus beside its rows meet nothing and
       for (const sub of ['order', 'line-up']) {
         await arrangeSubmenu(page, sub)
         await nextFrame(page)
-        await clearOfAll(page, `${width} ${id} ${sub}`)
+        expect(await layoutProblems(page, { pieces: PIECES, uncut: UNCUT }), `${width} ${id} ${sub}`).toEqual([])
         await page.keyboard.press('Escape')
         await expect(page.getByTestId(`more-${sub}-menu`)).toBeHidden()
       }

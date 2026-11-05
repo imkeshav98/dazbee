@@ -6,6 +6,7 @@ import { shoot } from '../../support/editor.ts'
 import { openDesignIn, THEMES } from '../../support/glass.ts'
 import { SCREEN_SIZES } from '../../support/layout.ts'
 import { linkedMenuDesign } from '../../support/linked-menu-design.ts'
+import { rowIn } from '../../support/menu-rows.ts'
 import { copyIn, seed } from '../../support/seed.ts'
 import { drawn, fitSettled, nextFrame, selectLayers } from '../../support/stage.ts'
 import { expect, test } from '../../support/test.ts'
@@ -43,7 +44,7 @@ for (const [width, height] of SCREEN_SIZES) {
         await moreSubmenu(page, 'copy-to-frames')
         await shoot(page, name('copy-to-frames'))
         const sub = page.getByTestId('more-copy-to-frames-menu')
-        await sub.getByRole('button', { name: /^Layer/ }).hover()
+        await rowIn(sub, 'layerToLinked').hover()
         await expect(page.getByRole('tooltip')).toHaveText('Every linked frame has this layer already')
         await shoot(page, name('greyed'))
         // Esc closes the top-most first: the tooltip, the menu beside its row, then the full menu.
@@ -98,7 +99,7 @@ test(
       // The logo group: its ⋯ has Ungroup right after Put in a box.
       await selectLayers(page, ['logo'])
       const menu = await moreMenu(page)
-      await menu.getByRole('button', { name: /^Ungroup/ }).hover()
+      await rowIn(menu, 'ungroup').hover()
       await settle()
       await shoot(page, name('ungroup'))
       expect(errors).toEqual([])
