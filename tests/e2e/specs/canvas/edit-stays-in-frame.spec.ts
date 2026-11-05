@@ -156,12 +156,13 @@ test.describe('the top bar and its panels', () => {
     )
   })
 
-  test('hiding a layer from the full menu hides it in its frame only', async ({ browser }) => {
+  test('hiding a layer from the small menu hides it in its frame only', async ({ browser }) => {
     await editInSquare(
       browser,
       async (a) => {
         await selectLayers(a, ['shape'], { bar: true })
-        await moreAction(a, 'Hide')
+        await a.getByTestId('small-hide').click()
+        await expect(a.getByTestId('small-hide')).toHaveAttribute('aria-pressed', 'true')
       },
       (_, after) => expect(propsOf(after, 'shape').visible).toBe(false),
     )
