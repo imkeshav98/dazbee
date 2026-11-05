@@ -3,9 +3,9 @@
 // What the top bar has open: one pop-up, the full menu or one edit panel, never two at once, since
 // they share this one value. Opening any of them closes what was open. The shell reads it too: on a
 // phone an edit panel, the top bar's Arrange ⋯, the full menu and the right-click menu are sheets,
-// and a rail flyout and a sheet close each other. And whether something stands over the edit panel and the bar's second row, which Esc
-// closes first; the menu's button a rename field gives the focus back to; and the Share menu's
-// listener for an Export asked from a picked frame's ⋯.
+// and a rail flyout and a sheet close each other. And whether something stands over the edit panel
+// and the bar's second row, which Esc closes first; the menu's button a rename field gives the focus
+// back to; and the Share menu's listener for an Export asked from a picked frame's ⋯.
 import { useLayoutEffect, useState, useSyncExternalStore } from 'react'
 
 import { OVER_PANEL } from '@/components/ui/menu-close.ts'
