@@ -271,6 +271,42 @@ describe('editorPlace', () => {
       expect(session.design().nodes[pasted ?? '']).toBeUndefined()
     })
 
+    it('pastes onto another frame of the page as linked copies, keeping link ids the frame doesn’t hold', () => {
+      const { place, session, selection, square, wide } = harness()
+      session.run('node.delete', { ids: ['wide-a'] })
+      selection.select(['a', 'line'], square.id)
+      const data = transfer()
+      place.copy(clipboardEvent(data))
+      selection.select(['wide-words'], wide.id)
+      place.paste(clipboardEvent(data), () => null)
+      const pasted = selection.current()?.ids ?? []
+      const links = pasted.map((id) => session.design().nodes[id]?.link)
+      // The wide frame lacks the square's first square, so its copy is linked; it holds the line already.
+      expect(links[0]).toBe('a')
+      expect(links[1]).not.toBe('line')
+      expect(pasted.map((id) => session.design().nodes[id]?.parentId)).toEqual(['wide', 'wide'])
+      session.undo()
+      expect(session.design().nodes[pasted[0] ?? '']).toBeUndefined()
+    })
+
+    it('pastes as new layers into the frame the layers came from, and from another design', () => {
+      const { place, session, selection, square, wide } = harness()
+      session.run('node.delete', { ids: ['wide-a'] })
+      selection.select(['a'], square.id)
+      const data = transfer()
+      place.copy(clipboardEvent(data))
+      session.run('node.delete', { ids: ['a'] })
+      selection.select(['words'], square.id)
+      place.paste(clipboardEvent(data), () => null)
+      const [own] = selection.current()?.ids ?? []
+      expect(session.design().nodes[own ?? '']?.link).not.toBe('a')
+      const other = JSON.stringify({ ...JSON.parse(data.getData(LAYER_CLIPBOARD_TYPE)), designId: 'other' })
+      selection.select(['wide-words'], wide.id)
+      place.paste(clipboardEvent(transfer({ [LAYER_CLIPBOARD_TYPE]: other })), () => null)
+      const [fromOther] = selection.current()?.ids ?? []
+      expect(session.design().nodes[fromOther ?? '']?.link).not.toBe('a')
+    })
+
     it('pastes centred on the pointer after Mod+Shift+V, and where the layers were after Mod+V', () => {
       const { place, selection, square, boxOf, client } = harness()
       selection.select(['a'], square.id)

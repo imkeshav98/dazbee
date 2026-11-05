@@ -5,9 +5,19 @@
 import { photo, upload } from '../../support/assets.ts'
 import { screenPoint, writeOutput } from '../../support/editor.ts'
 import { layoutProblems } from '../../support/layout.ts'
+import { ORDER_MENU } from '../../support/menu-rows.ts'
 import { fitSettled, nextFrame, openStage, selectLayers } from '../../support/stage.ts'
 import { expect, test } from '../../support/test.ts'
-import { arrangeMenu, arrangeSubmenu, barMenu, moreAction, moreMenu, PIECES, UNCUT } from '../../support/top-bar.ts'
+import {
+  arrangeMenu,
+  arrangeSubmenu,
+  barMenu,
+  moreAction,
+  moreMenu,
+  moreSubmenu,
+  PIECES,
+  UNCUT,
+} from '../../support/top-bar.ts'
 import { topBarDesign } from '../../support/top-bar-design.ts'
 
 test.describe.configure({ timeout: 240_000 })
@@ -269,7 +279,7 @@ test('undo and redo in the header pill: off with nothing to do, each a step, and
   expect(errors).toEqual([])
 })
 
-test("the small menu locks, duplicates and deletes; the full menu copies and pastes; the top bar's ⋯ keeps its menus beside", async ({
+test("the small menu locks, duplicates, deletes and hides; the full menu copies and pastes; the top bar's Arrange ⋯ keeps its menus beside", async ({
   browser,
 }) => {
   const asset = await upload(photo)
@@ -289,10 +299,22 @@ test("the small menu locks, duplicates and deletes; the full menu copies and pas
   await expect.poll(nodes).toBe(before + 1)
   await page.getByTestId('small-delete').click()
   await expect.poll(nodes).toBe(before)
+  await selectLayers(page, ['box'])
+  const hide = page.getByTestId('small-hide')
+  await hide.click()
+  await expect(hide).toHaveAttribute('aria-pressed', 'true')
+  await hide.click()
+  await expect(hide).toHaveAttribute('aria-pressed', 'false')
 
   await selectLayers(page, ['box'])
-  const menu = await moreMenu(page)
-  await expect(menu.getByRole('button', { name: /^Paste/ })).toBeDisabled()
+  await moreSubmenu(page, 'paste')
+  await expect(
+    page
+      .getByTestId('more-paste-menu')
+      .getByRole('button', { name: /^Paste/ })
+      .first(),
+  ).toHaveAttribute('aria-disabled', 'true')
+  await page.keyboard.press('Escape')
   await moreAction(page, 'Copy')
   await moreMenu(page)
   await moreAction(page, 'Paste')
@@ -303,12 +325,7 @@ test("the small menu locks, duplicates and deletes; the full menu copies and pas
   const sit = await arrangeMenu(page)
   await sit.getByTestId('more-order').focus()
   await page.keyboard.press('ArrowRight')
-  await expect((await arrangeSubmenu(page, 'order')).getByRole('button')).toHaveText([
-    /^Bring to front/,
-    /^Bring forward/,
-    /^Send backward/,
-    /^Send to back/,
-  ])
+  await expect((await arrangeSubmenu(page, 'order')).getByRole('button')).toHaveText(ORDER_MENU.map((row) => row.reads))
   await page.keyboard.press('ArrowLeft')
   await expect(page.getByTestId('more-order-menu')).toBeHidden()
   await expect(sit).toBeVisible()
@@ -407,12 +424,13 @@ test('the small menu keeps out of a drag, and over a selection filling a phone i
   const bar = await page.getByTestId('top-bar-row').boundingBox()
   const at = await small.boundingBox()
   expect(bar && at && at.y >= bar.y + bar.height).toBe(true)
+  // On a phone it is a sheet, which hides the dock and the rail.
   await moreMenu(page)
   expect(await layoutProblems(page, { pieces: PIECES, uncut: UNCUT })).toEqual([])
   expect(errors).toEqual([])
 })
 
-test('beside an open Layers flyout the top bar centres in the room left, and a right-click on a locked layer offers Unlock', async ({
+test('beside an open Layers flyout the top bar centres in the room left, and a right-click on a layer locked in all frames offers to unlock them', async ({
   browser,
 }) => {
   const asset = await upload(photo)
@@ -427,12 +445,12 @@ test('beside an open Layers flyout the top bar centres in the room left, and a r
   await page.locator('[data-panel="layers"]').click()
 
   await selectLayers(page, ['box'])
-  await moreAction(page, 'Lock')
+  await moreAction(page, 'Lock in all frames')
   await selectLayers(page, [])
   const at = await screenPoint(page, 160, 280)
   await page.mouse.click(at.x, at.y, { button: 'right' })
   const menu = page.getByTestId('stage-menu')
-  await menu.getByRole('button', { name: /^Unlock/ }).click()
+  await menu.getByRole('button', { name: /^Unlock in all frames/ }).click()
   await expect(menu).toBeHidden()
   await expect
     .poll(() => page.evaluate(() => Object.values(window.dazbee?.design().nodes.box?.lock ?? {}).some(Boolean)))
@@ -476,6 +494,12 @@ test('at 820×1180 the full menu keeps clear of the rail when its end side has n
   await page.setViewportSize({ width: 820, height: 1180 })
   await fitSettled(page)
   await selectLayers(page, ['box', 'star'])
+  // Zoomed in so the Square's label sits clear above the small menu, which keeps off frame labels.
+  await page.evaluate(() => {
+    const camera = window.dazbee?.camera()
+    if (camera) window.dazbee?.setCamera({ ...camera, zoom: 0.6 })
+  })
+  await nextFrame(page)
   // The small menu centred at x 451 (stage and window share their origin), with no room for the full
   // menu at its end side, and the room at its start side reaching the rail, with the rail below.
   await page.evaluate(() => {

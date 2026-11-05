@@ -43,6 +43,7 @@ import { carried, editorTransformDrag } from './gestures/select/transform-drag.t
 import { editorLayerEdits } from './layer-edits.ts'
 import { editorBoxes } from './layers/boxes.ts'
 import { hug as hugIn } from './layers/hug.ts'
+import { editorLinkedCopies, LINKED_ACTIONS, type LinkedAction } from './linked-copies.ts'
 import { listenerSet } from './listener-set.ts'
 import { editorPlace } from './place.ts'
 import { editorResources, loadFonts, loadImages, shippedFonts } from './resources.ts'
@@ -56,6 +57,9 @@ import { editorTools, type PlacedAsset, type Tool } from './tools.ts'
 /** The popover, menu or dialog a key was pressed in, if any. */
 const dialogOf = (target: EventTarget | null) =>
   target instanceof Element ? target.closest('[role="dialog"], [role="menu"], dialog') : null
+/** Whether an action is one the linked-copy actions do. */
+const isLinked = (action: ShortcutAction): action is LinkedAction =>
+  (LINKED_ACTIONS as readonly string[]).includes(action)
 /** Whether a key is an arrow pressed in a toolbar, such as the top bar, whose arrows move the focus along it. */
 const arrowInToolbar = (e: KeyboardEvent) =>
   e.key.startsWith('Arrow') && e.target instanceof Element && e.target.closest('[role="toolbar"]') !== null
@@ -288,6 +292,7 @@ function live(
   })
   const brandKit = editorBrandKit({ session, resources, view, selection, typing, signal })
   const layerEdits = editorLayerEdits({ session, selection, resources, typing, signal })
+  const linked = editorLinkedCopies({ session, selection, typing, resources, signal, drawOverlay })
 
   // Layer 5: the routers.
   const pointer = editorPointer({
@@ -374,10 +379,11 @@ function live(
   }
 
   /**
-   * Does what a shortcut names, as the actions do; undo and redo first end what is open on the
-   * stage: the pen's path, a drag and typing.
+   * Does what a shortcut names, as the actions and the linked-copy actions do; undo and redo first
+   * end what is open on the stage: the pen's path, a drag and typing.
    */
   function perform(action: ShortcutAction) {
+    if (isLinked(action)) return linked.perform(action)
     if (action !== 'undo' && action !== 'redo') return actions.perform(action)
     pen.finish()
     pointer.endDrag()
@@ -531,6 +537,7 @@ function live(
     copyLayers: () => place.copyLayers(),
     canPasteLayers: () => place.canPasteLayers(),
     pasteLayers: () => place.pasteLayers(pointer.pointerAt),
+    linkedMenu: linked.menu,
     moveLayer: layerEdits.moveLayer,
     beginGesture: () => session.beginGesture(),
     gesturing: () => pointer.gesture() !== null || session.inGesture(),

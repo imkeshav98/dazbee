@@ -14,7 +14,7 @@ import { offsetPath, parsePath, type PenPath, scalePath } from '../gestures/pen/
 import type { EditorResources } from '../resources.ts'
 import type { EditorSelection } from '../selection.ts'
 import { laidOut, placedInside, propIn } from './auto-layout.ts'
-import { boundsOf, type Box, centreOf, drawnFrom, type Handle, HANDLES, turn } from './transform.ts'
+import { boundsOf, type Box, centreOf, drawnFrom, type Handle, HANDLES, normalAngle, turn } from './transform.ts'
 
 /**
  * The image fill a crop works on (#48): the topmost of a layer's fills in a frame, with where the
@@ -84,6 +84,8 @@ export interface EditorBoxes {
   cropTarget(frame: Frame, id: string, from?: Design): CropTarget | null
   /** Where layers in a flow are drawn in their frame, for a command that wraps them; none in no flow. */
   drawnInFlow(ids: string[]): Record<string, Omit<Box, 'rotation'>> | undefined
+  /** Whether every layer of a frame that two designs both hold is drawn in the same place, at the same size and turn, in each. */
+  drawnAlike(frameId: string, before: Design, after: Design): boolean
   /** Where a new layer of a type that a tool makes in a frame goes: the group or box gone into, or the frame. */
   parentFor(frame: Frame, type: string, now: Design): string
   /** The layer locked in place that a press at a point lands on, the one a click there would select; null when it is not locked. */
@@ -308,6 +310,40 @@ export function editorBoxes({ session, scenes, resources, selection, drawn, fram
     walk(render(now, frameId, undefined, scenes.measure(), resources.bytes().variables).layers)
     return boxes
   }
+  /**
+   * Whether every layer of a frame that two designs both hold is drawn in the same place, at the
+   * same size and turn, in each, within what rounding to hundredths leaves.
+   */
+  function drawnAlike(frameId: string, before: Design, after: Design) {
+    const now = drawnLayers(frameId, after)
+    return [...drawnLayers(frameId, before)].every(([id, was]) => {
+      const is = now.get(id)
+      return (
+        !is ||
+        ((['x', 'y', 'width', 'height'] as const).every((k) => Math.abs(is[k] - was[k]) < 0.05) &&
+          Math.abs(normalAngle(is.rotation - was.rotation)) < 0.05)
+      )
+    })
+  }
+  /** Where each layer of a frame is drawn in a design, turned with the containers around it. */
+  function drawnLayers(frameId: string, from: Design) {
+    const boxes = new Map<string, Box>()
+    const walk = (layers: SceneLayer[], around: Box[]) => {
+      for (const l of layers) {
+        const box = {
+          x: l.props.x,
+          y: l.props.y,
+          width: l.props.width,
+          height: l.props.height,
+          rotation: l.props.rotation,
+        }
+        boxes.set(l.id, drawnFrom(box, around))
+        walk(l.children, [...around, box])
+      }
+    }
+    walk(render(from, frameId, undefined, scenes.measure(), resources.bytes().variables).layers, [])
+    return boxes
+  }
   /** Whether a point in a frame is inside a layer as it is drawn there. */
   function drawnContains(frame: Frame, id: string, p: Point, from: Design) {
     const box = drawnBoxOf(frame, id, from)
@@ -364,6 +400,7 @@ export function editorBoxes({ session, scenes, resources, selection, drawn, fram
     pathIn,
     cropTarget,
     drawnInFlow,
+    drawnAlike,
     parentFor,
     lockedAt,
     target,

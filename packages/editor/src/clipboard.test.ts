@@ -1,8 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { LAYER_CLIPBOARD_TYPE, LayerClipboard } from '@dazbee/schema'
+import { LAYER_CLIPBOARD_TYPE, LayerClipboard, type LayerStyle } from '@dazbee/schema'
 
-import { keepCopy, layersOnClipboard, putOnClipboard, rememberedLayers } from './clipboard.ts'
+import {
+  keepCopy,
+  keepStyle,
+  layersOnClipboard,
+  putOnClipboard,
+  rememberedLayers,
+  rememberedStyle,
+} from './clipboard.ts'
 
 /** The `localStorage` key the copied layers are kept under; stored on people's devices, so it never changes. */
 const KEY = 'dazbee.copiedLayers'
@@ -90,13 +97,13 @@ describe('putOnClipboard', () => {
 })
 
 describe('layersOnClipboard', () => {
-  it('reads layers in our type', () => {
-    expect(layersOnClipboard(transfer({ [LAYER_CLIPBOARD_TYPE]: json }))).toEqual(copied.tree)
+  it('reads layers in our type, with the design, page and frame they came from', () => {
+    expect(layersOnClipboard(transfer({ [LAYER_CLIPBOARD_TYPE]: json }))).toEqual(copied)
   })
 
   it('reads the kept copy when the clipboard brings only the plain text it wrote', () => {
     keepCopy(copied)
-    expect(layersOnClipboard(transfer({ 'text/plain': plain }))).toEqual(copied.tree)
+    expect(layersOnClipboard(transfer({ 'text/plain': plain }))).toEqual(copied)
     expect(layersOnClipboard(transfer({ 'text/plain': 'something else' }))).toBeNull()
   })
 
@@ -114,7 +121,7 @@ describe('rememberedLayers', () => {
   it('reads the layers last kept on this device', () => {
     expect(rememberedLayers()).toBeNull()
     keepCopy(copied)
-    expect(rememberedLayers()).toEqual(copied.tree)
+    expect(rememberedLayers()).toEqual(copied)
   })
 
   it('finds nothing in a kept value it can’t read or with storage off', () => {
@@ -124,5 +131,30 @@ describe('rememberedLayers', () => {
     expect(rememberedLayers()).toBeNull()
     vi.stubGlobal('localStorage', storage(true))
     expect(rememberedLayers()).toBeNull()
+  })
+})
+
+describe('keepStyle and rememberedStyle', () => {
+  const style: LayerStyle = {
+    fills: [{ type: 'solid', color: '#E0262BFF' }],
+    effects: [],
+    opacity: 0.5,
+    blendMode: 'normal',
+    bindings: { fill: 'brand:primary' },
+  }
+
+  it('keeps a copied style on this device and reads it back', () => {
+    expect(rememberedStyle()).toBeNull()
+    expect(keepStyle(style)).toBe(true)
+    expect(kept.items.get('dazbee.copiedStyle')).toBe(JSON.stringify(style))
+    expect(rememberedStyle()).toEqual(style)
+  })
+
+  it('finds nothing in a kept value it can’t read, and keeps nothing with storage off', () => {
+    kept.items.set('dazbee.copiedStyle', '{"opacity": 7}')
+    expect(rememberedStyle()).toBeNull()
+    vi.stubGlobal('localStorage', storage(true))
+    expect(keepStyle(style)).toBe(false)
+    expect(rememberedStyle()).toBeNull()
   })
 })

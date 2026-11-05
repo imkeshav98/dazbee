@@ -1,9 +1,9 @@
 // Google Fonts families copied into our storage, shared by every workspace.
-import { createHash, randomUUID } from 'node:crypto'
+import { createHash } from 'node:crypto'
 
 import { and, eq } from 'drizzle-orm'
 
-import { type Db, fontFaces } from '@dazbee/db'
+import { type Db, fontFaces, newId } from '@dazbee/db'
 import { googleCssUrl, googleFaces, type GoogleFamily } from '@dazbee/fonts'
 import type { Storage } from '@dazbee/storage'
 
@@ -43,7 +43,7 @@ export async function importGoogleFamily(
     await storage.put(key, bytes, 'font/ttf')
     await storage.put(previewKey(key), preview, 'image/png')
     await replaceFace(db, {
-      id: randomUUID(),
+      id: newId(),
       workspaceId: null,
       brandId: null,
       source: 'google',

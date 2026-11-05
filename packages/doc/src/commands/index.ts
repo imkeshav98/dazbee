@@ -1,11 +1,13 @@
 // Every command, by the name a session runs it with.
 import { designPlace, nodeDuplicate, nodeMove, nodeReorder } from './arrange.ts'
 import { nodeAutoLayout } from './auto-layout.ts'
+import { nodeCopyToFrames } from './copy-to-frames.ts'
 import { frameAdd, frameAddSize, frameDelete, frameDuplicate, frameUpdate } from './frames.ts'
 import { nodeBoolean, nodeBox, nodeEnclose, nodeGroup, nodeHug, nodeUngroup } from './groups.ts'
 import { nodeBind, nodeCreate, nodeDelete, nodeLock, nodeMask, nodeRename, nodeUpdate } from './layers.ts'
 import { pageAdd, pageDelete, pageDuplicate, pageMove, pageUpdate } from './pages.ts'
 import { nodeReshape } from './paths.ts'
+import { nodeStyle } from './style.ts'
 import { textEdit, textFit } from './text.ts'
 
 export const COMMANDS = {
@@ -17,9 +19,11 @@ export const COMMANDS = {
   'node.rename': nodeRename,
   'node.mask': nodeMask,
   'node.bind': nodeBind,
+  'node.style': nodeStyle,
   'node.reorder': nodeReorder,
   'node.duplicate': nodeDuplicate,
   'design.place': designPlace,
+  'node.copyToFrames': nodeCopyToFrames,
   'node.group': nodeGroup,
   'node.box': nodeBox,
   'node.enclose': nodeEnclose,

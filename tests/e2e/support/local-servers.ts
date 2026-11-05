@@ -71,6 +71,18 @@ export function storedSize(designId: string) {
   )
 }
 
+/**
+ * Stores a design in a brand's workspace under the id given, with its Yjs state, straight into the
+ * sync server's database (packages/db's designs and design_states), as the API stores one it makes.
+ */
+export function storeDesign(id: string, brandId: string, name: string, state: Uint8Array) {
+  const text = (value: string) => `'${value.replace(/'/g, "''")}'`
+  query(
+    `insert into designs (id, workspace_id, brand_id, name) select ${text(id)}, workspace_id, id, ${text(name)} from brands where id = ${text(brandId)}; ` +
+      `insert into design_states (design_id, state) values (${text(id)}, decode('${Buffer.from(state).toString('hex')}', 'hex'))`,
+  )
+}
+
 /** Runs a query in the sync server's database: on CI docker compose's, off CI the suite's own. */
 function query(sql: string) {
   const database = process.env.CI ? 'dazbee' : DATABASE

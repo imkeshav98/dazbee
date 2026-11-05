@@ -6,6 +6,7 @@
 import { writeOutput } from '../../support/editor.ts'
 import {
   clickLabel,
+  FRAME_MENU,
   frameMenuItems,
   frameOf,
   labelRow,
@@ -69,20 +70,17 @@ test('the picked frame’s ⋯ menu opens on Duplicate from the keyboard, and up
   await page.keyboard.press('ArrowRight')
   await page.keyboard.press('Enter')
   const menu = page.getByTestId('bar-frame-more-menu')
-  const rows = ['duplicate', 'add-size', 'rename', 'export', 'delete'].map((action) =>
-    menu.locator(`[data-action="${action}"]`),
-  )
+  const rows = FRAME_MENU.map(({ action }) => menu.locator(`[data-action="${action}"]`))
+  const last = rows.length - 1
   await expect(rows[0] as Locator).toBeFocused()
+  // Down through every row, round from the last to the first, then up, Home and End.
   for (const [key, row] of [
-    ['ArrowDown', 1],
-    ['ArrowDown', 2],
-    ['ArrowDown', 3],
-    ['ArrowDown', 4],
+    ...rows.slice(1).map((_, i) => ['ArrowDown', i + 1] as const),
     ['ArrowDown', 0],
-    ['ArrowUp', 4],
+    ['ArrowUp', last],
     ['Home', 0],
-    ['End', 4],
-    ['ArrowUp', 3],
+    ['End', last],
+    ['ArrowUp', last - 1],
   ] as const) {
     await page.keyboard.press(key)
     await expect(rows[row] as Locator, key).toBeFocused()

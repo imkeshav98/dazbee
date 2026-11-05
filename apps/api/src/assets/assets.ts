@@ -1,11 +1,9 @@
 // Uploaded images. Originals are stored once per workspace by content hash; every brand that uploads
 // the same bytes gets its own asset, so a brand never sees another brand's assets. Each brand names
 // and tags its own, and finds them by those (#52).
-import { randomUUID } from 'node:crypto'
-
 import { and, desc, eq, isNull, type SQL, sql } from 'drizzle-orm'
 
-import { assets, brandKits, type Db, designs, designStates, templates } from '@dazbee/db'
+import { assets, brandKits, type Db, designs, designStates, newId, templates } from '@dazbee/db'
 import {
   type AssetSummary,
   type AssetUse,
@@ -189,7 +187,7 @@ export async function recordAsset(
   }
   await db
     .insert(assets)
-    .values({ id: randomUUID(), workspaceId, brandId, sha256, byteSize: bytes.length, name, ...header })
+    .values({ id: newId(), workspaceId, brandId, sha256, byteSize: bytes.length, name, ...header })
     .onConflictDoNothing()
   const recorded = await findAsset(db, workspaceId, brandId, { sha256 })
   if (!recorded) throw new Error('asset vanished after insert')
