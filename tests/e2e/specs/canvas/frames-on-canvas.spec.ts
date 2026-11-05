@@ -4,8 +4,8 @@
 // deleted, each by the mouse and by the keyboard, each one undo step that a second tab sees. A page
 // holds a square, a story linked to it and a banner linked to nothing; the square holds a turned
 // layer, a locked one and one under a mask. The three screen sizes are in
-// frames-on-canvas-screens.spec.ts, and Rename with the label off screen in
-// frames-on-canvas-bar.spec.ts.
+// frames-on-canvas-screens.spec.ts, and the arrows inside the picked frame's bar and Rename with the
+// label off screen in frames-on-canvas-bar.spec.ts.
 import { solid } from '../../support/edit-in-frame.ts'
 import { designOf, screenPoint, settle, writeOutput } from '../../support/editor.ts'
 import {

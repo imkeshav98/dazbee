@@ -1,13 +1,55 @@
-// The picked frame's top bar: Rename in its ⋯ with the frame's label off screen, zoomed in or above
-// the view, pans at the same zoom to show the label first, then opens the field focused. The rest of
-// frames on the canvas is in frames-on-canvas.spec.ts.
+// The picked frame's top bar: it is one Tab stop, and the arrows inside it move the focus between
+// Background and ⋯, never the frame; Rename in its ⋯ with the frame's label off screen, zoomed in or
+// above the view, pans at the same zoom to show the label first, then opens the field focused. The
+// rest of frames on the canvas is in frames-on-canvas.spec.ts.
 import { writeOutput } from '../../support/editor.ts'
-import { clickLabel, frameOf, labelRow, openFrames, picked } from '../../support/frames-on-canvas.ts'
+import { clickLabel, frameOf, labelRow, openFrames, picked, tabToBar } from '../../support/frames-on-canvas.ts'
 import { drawn, press, zoomOf } from '../../support/stage.ts'
 import { expect, test } from '../../support/test.ts'
 import { barMenu } from '../../support/top-bar.ts'
 
 test.describe.configure({ timeout: 180_000 })
+
+test('the picked frame’s bar is one Tab stop, and the arrows inside it move the focus between Background and ⋯, never the frame', async ({
+  browser,
+}) => {
+  const { a: page, errors } = await openFrames(browser)
+  await clickLabel(page, 'sq')
+  const bar = page.getByTestId('top-bar')
+  await expect(bar.locator('[data-bar-item][tabindex="0"]')).toHaveCount(1)
+  expect(await tabToBar(page)).toBe('bar-background')
+  const background = page.getByTestId('bar-background')
+  const more = page.getByTestId('bar-frame-more')
+  await page.keyboard.press('ArrowRight')
+  await expect(more).toBeFocused()
+  await page.keyboard.press('ArrowRight')
+  await expect(background).toBeFocused()
+  await page.keyboard.press('ArrowLeft')
+  await expect(more).toBeFocused()
+  await page.keyboard.press('Shift+ArrowLeft')
+  await expect(background).toBeFocused()
+  // Up and down keep the focus where it is in the bar.
+  for (const key of ['ArrowUp', 'ArrowDown', 'Shift+ArrowUp', 'Shift+ArrowDown']) {
+    await page.keyboard.press(key)
+    await expect(background).toBeFocused()
+  }
+  // None of the arrows moved the frame, and it is still picked.
+  await drawn(page)
+  expect(await frameOf(page, 'sq')).toMatchObject({ x: 0, y: 0 })
+  expect(await page.evaluate(() => window.dazbee?.canUndo())).toBe(false)
+  expect(await picked(page)).toBe('sq')
+  // Tab leaves the bar from either item; the arrows on the canvas move the frame again.
+  await page.keyboard.press('Tab')
+  expect(await page.evaluate(() => document.activeElement?.closest('[data-testid="top-bar"]') ?? null)).toBeNull()
+  await page.keyboard.press('Shift+Tab')
+  await expect(background).toBeFocused()
+  await page.locator('body').focus()
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur())
+  await page.keyboard.press('ArrowRight')
+  await drawn(page)
+  expect(await frameOf(page, 'sq')).toMatchObject({ x: 1, y: 0 })
+  expect(errors).toEqual([])
+})
 
 test('Rename in ⋯ with the picked frame’s label off screen, zoomed in to 375% or above the view, pans at the same zoom to show the label, then opens the field focused: typing names the frame and picks no tool', async ({
   browser,

@@ -47,6 +47,9 @@ import { editorTools, type PlacedAsset, type Tool } from './tools.ts'
 /** The popover, menu or dialog a key was pressed in, if any. */
 const dialogOf = (target: EventTarget | null) =>
   target instanceof Element ? target.closest('[role="dialog"], [role="menu"], dialog') : null
+/** Whether a key is an arrow pressed in a toolbar, such as the top bar, whose arrows move the focus along it. */
+const arrowInToolbar = (e: KeyboardEvent) =>
+  e.key.startsWith('Arrow') && e.target instanceof Element && e.target.closest('[role="toolbar"]') !== null
 export async function startEditor(options: EditorOptions) {
   const { designId, syncUrl } = options
   const status = options.onStatus ?? (() => {})
@@ -383,6 +386,8 @@ function live(
       if (dialog.getAttribute('aria-modal') === 'false') pointer.keyDown(e)
       return
     }
+    // The arrows in a toolbar are its own: they never move the selection, the picked frame or the caret.
+    if (arrowInToolbar(e)) return
     if (!typing.editing()) {
       if (!pointer.keyDown(e) && action && perform(action)) e.preventDefault()
       return
