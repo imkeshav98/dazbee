@@ -13,13 +13,23 @@ vi.mock('./workspace/designs.ts', async (importOriginal) => {
   return { ...actual, createDesign: vi.fn(actual.createDesign) }
 })
 
-/** One blank page. */
+/** One page holding one empty, white frame. */
 const blank = {
-  meta: { designId: 'any', name: 'Plain', kind: 'single', primaryFormatId: 'sq' },
-  formats: { sq: { name: 'Square', width: 200, height: 200, order: 'a0' } },
-  pages: { p1: { name: 'Page 1', order: 'a0', fills: [{ type: 'solid', color: '#FFFFFFFF' }] } },
+  meta: { designId: 'any', name: 'Plain' },
+  pages: { p1: { name: 'Page 1', order: 'a0' } },
+  frames: {
+    sq: {
+      pageId: 'p1',
+      name: 'Square',
+      width: 200,
+      height: 200,
+      x: 0,
+      y: 0,
+      fills: [{ type: 'solid', color: '#FFFFFFFF' }],
+      order: 'a0',
+    },
+  },
   nodes: {},
-  overrides: {},
 }
 
 // Saving a template draws its thumbnail with CanvasKit, which takes seconds on a busy CI runner.

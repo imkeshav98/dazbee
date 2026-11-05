@@ -5,7 +5,7 @@ import { isContainer, type Point } from '@dazbee/schema'
 
 import { type Camera, toWorld } from '../canvas/camera.ts'
 import { resizeCursor, ROTATE_CURSOR } from '../canvas/cursors.ts'
-import type { Frame } from '../canvas/grid.ts'
+import type { Frame } from '../canvas/frames.ts'
 import { hitTest } from '../canvas/hit-test.ts'
 import type { FrameScenes } from '../canvas/scenes.ts'
 import type { EditorView } from '../canvas/view.ts'
@@ -19,10 +19,24 @@ import type { EditorTools } from '../tools.ts'
 import type { EditorAutoLayoutDrag, ReorderDrag } from './auto-layout-drag.ts'
 import type { CropDrag, EditorCropping } from './cropping.ts'
 import { isDrawTool } from './draw-tools.ts'
-import { type EditorDrawing, type ImageBoxDrag, isDrawing, type ShapeDrag, type TextBoxDrag } from './drawing.ts'
+import {
+  type EditorDrawing,
+  type FrameDrag,
+  type ImageBoxDrag,
+  isDrawing,
+  type ShapeDrag,
+  type TextBoxDrag,
+} from './drawing.ts'
 import type { EditorPen, PathDrag } from './pen.ts'
 import type { EditorSelectPress } from './select-press.ts'
-import type { EditorTransformDrag, MarqueeDrag, MoveDrag, ResizeDrag, RotateDrag } from './transform-drag.ts'
+import {
+  carried,
+  type EditorTransformDrag,
+  type MarqueeDrag,
+  type MoveDrag,
+  type ResizeDrag,
+  type RotateDrag,
+} from './transform-drag.ts'
 
 /** What a drag on the stage is doing, from pointer down to up. */
 export type Gesture =
@@ -36,12 +50,13 @@ export type Gesture =
   | ImageBoxDrag
   | CropDrag
   | ShapeDrag
+  | FrameDrag
   | PathDrag
 
 export interface PointerDeps {
   canvas: HTMLCanvasElement
   session: Pick<Session, 'design'>
-  view: Pick<EditorView, 'camera' | 'design' | 'onStage' | 'pointAt' | 'setCamera' | 'viewport' | 'zoomTo'>
+  view: Pick<EditorView, 'camera' | 'design' | 'onStage' | 'pointAt' | 'redraw' | 'setCamera' | 'viewport' | 'zoomTo'>
   tools: Pick<EditorTools, 'tool' | 'imageToPlace' | 'snapping'>
   selection: Pick<
     EditorSelection,
@@ -52,7 +67,7 @@ export interface PointerDeps {
   typing: Pick<EditorTyping, 'editing' | 'caretFromPoint' | 'caretTo' | 'selectText' | 'start' | 'stop'>
   pen: Pick<EditorPen, 'drawing' | 'down' | 'move' | 'up' | 'pressPoints' | 'dragPoints' | 'releasePoints'>
   cropping: Pick<EditorCropping, 'press' | 'drag' | 'release'>
-  drawing: Pick<EditorDrawing, 'pressShape' | 'pressImage' | 'pressText' | 'drag' | 'release'>
+  drawing: Pick<EditorDrawing, 'pressShape' | 'pressImage' | 'pressText' | 'pressFrame' | 'drag' | 'release'>
   transformDrag: Pick<EditorTransformDrag, 'handleUnder' | 'marquee' | 'drag' | 'release' | 'clearGuides'>
   autoLayoutDrag: Pick<EditorAutoLayoutDrag, 'drag' | 'release'>
   /** What the select tool's press picks, and what it selects once it ends as a click. */
@@ -157,7 +172,7 @@ export function editorPointer({
   }
   // Screen points are CSS pixels from the canvas's corner.
   const screenOf = (e: MouseEvent): Point => view.onStage({ x: e.clientX, y: e.clientY })
-  /** The frame under the pointer and the point in its page's design pixels. */
+  /** The frame under the pointer and the point in its design pixels. */
   function pointIn(e: MouseEvent) {
     return pointAt({ x: e.clientX, y: e.clientY })
   }
@@ -167,7 +182,7 @@ export function editorPointer({
 
   const showCursor = () => {
     const tool = tools.tool()
-    const drawing = isDrawTool(tool) || tool === 'pen' || (tool === 'image' && tools.imageToPlace())
+    const drawing = isDrawTool(tool) || tool === 'frame' || tool === 'pen' || (tool === 'image' && tools.imageToPlace())
     canvas.style.cursor = pan
       ? 'grabbing'
       : panning()
@@ -194,7 +209,7 @@ export function editorPointer({
   function rehover() {
     const at = pointer && !gesture && !panning() ? pointIn(pointer) : null
     const hit = at && hitTest(scenes.scene(at.frame).layers, at.p)
-    const next = at && hit ? { id: target(hit.id, at.frame.key), frame: at.frame.key } : null
+    const next = at && hit ? { id: target(hit.id, at.frame.id), frameId: at.frame.id } : null
     return selection.hover(next)
   }
 
@@ -220,6 +235,8 @@ export function editorPointer({
     else if (gesture?.kind === 'path') pen.releasePoints(gesture)
     else if (gesture?.kind === 'crop') cropping.release(gesture)
     else if (gesture && gesture.kind !== 'marquee') transformDrag.release(gesture)
+    // What the drag carried was drawn faintly past its frame: the canvas draws again without it.
+    if (carried(gesture)) view.redraw()
     selectPress.release(gesture?.kind === 'marquee' ? gesture : null)
     gesture = null
     pan = null
@@ -239,9 +256,9 @@ export function editorPointer({
     const { frame } = at
     const deepest = hitTest(scenes.scene(frame).layers, at.p)
     if (!deepest) return []
-    const id = target(deepest.id, frame.key)
+    const id = target(deepest.id, frame.id)
     const current = selection.current()
-    if (!(current?.frame === frame.key && current.ids.includes(id))) selection.select([id], frame.key)
+    if (!(current?.frameId === frame.id && current.ids.includes(id))) selection.select([id], frame.id)
     return [...(selection.current()?.ids ?? [])]
   }
 
@@ -286,6 +303,11 @@ export function editorPointer({
       const screen = screenOf(e)
       const at = pointIn(e)
       const tool = tools.tool()
+      // The Frame tool draws a frame anywhere on the stage, not only on a frame.
+      if (tool === 'frame') {
+        gesture = drawing.pressFrame(e, toWorld(view.camera(), screen))
+        return
+      }
       if (isDrawTool(tool)) {
         const drag = at && drawing.pressShape(e, tool, at)
         if (drag) gesture = drag
@@ -321,7 +343,7 @@ export function editorPointer({
       }
       const deepest = at && hitTest(scenes.scene(at.frame).layers, at.p, boxes.pickable)
       const editing = typing.editing()
-      if (at && editing && deepest?.id === editing.id && editing.frame === at.frame.key) {
+      if (at && editing && deepest?.id === editing.id && editing.frameId === at.frame.id) {
         // In the text being edited (#47): a press puts the caret there, Shift extends the range to
         // it, a drag selects, and a third click selects the paragraph.
         const offset = typing.caretFromPoint(at.p)
@@ -375,6 +397,10 @@ export function editorPointer({
         gesture.to = world
         transformDrag.marquee(gesture)
         drawOverlay()
+        return
+      }
+      if (gesture.kind === 'frameDraw') {
+        drawing.drag(gesture, world, e.shiftKey, e.altKey)
         return
       }
       if (!selectPress.moved(screen)) return
@@ -435,43 +461,43 @@ export function editorPointer({
       const hit = at && hitTest(scenes.scene(at.frame).layers, at.p, boxes.pickable)
       if (!at || !hit || lockedAt(at.frame, at.p)) return
       const editing = typing.editing()
-      if (editing && hit.id === editing.id && editing.frame === at.frame.key) {
+      if (editing && hit.id === editing.id && editing.frameId === at.frame.id) {
         // A double click in the text being edited selects the word there (#47).
         const node = session.design().nodes[editing.id]
         if (node?.type === 'text') typing.selectText(wordAt(node.props.text, typing.caretFromPoint(at.p)))
         drawOverlay()
         return
       }
-      const picked = target(hit.id, at.frame.key)
+      const picked = target(hit.id, at.frame.id)
       const container = view.design().nodes[picked]
       if (picked !== hit.id && container && isContainer(container.type)) {
         // Into the group, box or boolean: what is directly inside it under the pointer gets picked.
         typing.stop()
         selection.enter(picked)
         selection.selectKeepingModes(null)
-        selection.select([target(hit.id, at.frame.key)], at.frame.key)
+        selection.select([target(hit.id, at.frame.id)], at.frame.id)
         return
       }
       if (boxes.cropTarget(at.frame, hit.id) && !view.design().nodes[hit.id]?.lock?.style) {
         // Into cropping its image fill (#48).
         typing.stop()
-        selection.select([hit.id], at.frame.key)
-        selection.crop({ id: hit.id, frame: at.frame.key })
+        selection.select([hit.id], at.frame.id)
+        selection.crop({ id: hit.id, frameId: at.frame.id })
         drawOverlay()
         return
       }
       if (isPath(view.design(), hit.id) && !view.design().nodes[hit.id]?.lock?.style) {
         // Into a path's points (#45).
         typing.stop()
-        selection.select([hit.id], at.frame.key)
-        selection.editPath({ id: hit.id, frame: at.frame.key })
+        selection.select([hit.id], at.frame.id)
+        selection.editPath({ id: hit.id, frameId: at.frame.id })
         drawOverlay()
         return
       }
       if (hit.type !== 'text' || view.design().nodes[hit.id]?.lock?.content) return
       typing.stop()
-      selection.selectKeepingModes({ ids: [hit.id], frame: at.frame.key })
-      typing.start(hit.id, at.frame.key, 0)
+      selection.selectKeepingModes({ ids: [hit.id], frameId: at.frame.id })
+      typing.start(hit.id, at.frame.id, 0)
       typing.caretTo(typing.caretFromPoint(at.p))
       drawOverlay()
     },

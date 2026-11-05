@@ -8,7 +8,6 @@ import {
   BoundingBoxIcon,
   CaretRightIcon,
   CircleIcon,
-  EyeClosedIcon,
   EyeIcon,
   EyeSlashIcon,
   FolderSimpleIcon,
@@ -52,7 +51,7 @@ export interface RowApi {
   renamed: (id: string, name: string | null, before: string, byKey: boolean) => void
   toggle: (id: string) => void
   lock: (id: string, locked: boolean) => void
-  hide: (id: string, hidden: boolean, everyFormat: boolean) => void
+  hide: (id: string, hidden: boolean) => void
   dragStart: (id: string) => void
   dragEnd: () => void
   dragOver: (event: DragEvent<HTMLElement>, row: Row) => boolean
@@ -129,7 +128,6 @@ export const LayerRow = memo(function LayerRow({
   renaming,
   open,
   hidden,
-  partlyHidden,
   drop,
   picture,
   api,
@@ -141,7 +139,6 @@ export const LayerRow = memo(function LayerRow({
   renaming: boolean
   open: boolean
   hidden: boolean
-  partlyHidden: boolean
   drop: Where | null
   picture: string | null
   api: RowApi
@@ -273,15 +270,12 @@ export const LayerRow = memo(function LayerRow({
           {kind}
         </span>
       )}
-      {/* In this format; with Alt, in every format: hidden in all of them if it shows in any. A layer hidden only in some shows a closed eye. */}
       <RowToggle
         on={hidden}
-        stay={partlyHidden}
         label={format(hidden ? t.editor.layersPanel.show : t.editor.layersPanel.hide, { name: node.name })}
-        title={`${partlyHidden ? `${t.editor.layersPanel.partlyHidden} · ` : ''}${t.editor.layersPanel.altEvery}`}
-        state={partlyHidden ? 'some' : hidden ? 'hidden' : 'shown'}
-        onToggle={(every) => api.hide(id, every ? !(hidden && !partlyHidden) : !hidden, every)}
-        icon={partlyHidden ? EyeClosedIcon : hidden ? EyeSlashIcon : EyeIcon}
+        state={hidden ? 'hidden' : 'shown'}
+        onToggle={() => api.hide(id, !hidden)}
+        icon={hidden ? EyeSlashIcon : EyeIcon}
         testId="layer-hide"
       />
       <RowToggle
@@ -295,24 +289,19 @@ export const LayerRow = memo(function LayerRow({
   )
 })
 
-/** Lock or hide on a row: shown while the row is hovered or focused, and always while it is on. `onToggle` hears whether Alt was held. */
+/** Lock or hide on a row: shown while the row is hovered or focused, and always while it is on. */
 function RowToggle({
   on,
-  stay = false,
   label,
-  title,
   state,
   onToggle,
   icon: ToggleIcon,
   testId,
 }: {
   on: boolean
-  /** Shown even while off and not hovered. */
-  stay?: boolean
   label: string
-  title?: string
   state?: string
-  onToggle: (alt: boolean) => void
+  onToggle: () => void
   icon: Icon
   testId: string
 }) {
@@ -322,17 +311,15 @@ function RowToggle({
       tabIndex={-1}
       aria-label={label}
       aria-pressed={on}
-      title={title}
-      aria-description={title}
       data-state={state}
       data-testid={testId}
       onClick={(event) => {
         event.stopPropagation()
-        onToggle(event.altKey)
+        onToggle()
       }}
       className={cn(
         'grid size-6 shrink-0 cursor-pointer place-items-center rounded-[6px] text-subtle hover:bg-hover hover:text-text active:bg-pressed',
-        !on && !stay && 'opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100',
+        !on && 'opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100',
       )}
     >
       <ToggleIcon size={14} aria-hidden />

@@ -36,11 +36,11 @@ describe('WebGL drift limits', () => {
     expect(driftProblem({ differing: 0, percent: 0, maxDelta: 0 }, undefined)).toMatch(/no baseline/)
   })
 
-  it('every fixture page and format has a committed baseline', () => {
+  it('every fixture frame has a committed baseline', () => {
     const baselines = readDriftBaselines()
     const cases = loadFixtures().flatMap(({ name, json }) => {
-      const design = json as { pages: Record<string, unknown>; formats: Record<string, unknown> }
-      return Object.keys(design.pages).flatMap((p) => Object.keys(design.formats).map((f) => `${name} ${p}.${f}`))
+      const design = json as { frames: Record<string, unknown> }
+      return Object.keys(design.frames).map((frameId) => `${name} ${frameId}`)
     })
     expect(cases.filter((c) => !baselines[c])).toEqual([])
   })

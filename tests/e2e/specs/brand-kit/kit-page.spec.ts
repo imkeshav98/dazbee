@@ -6,7 +6,7 @@ import type { DesignInput } from '@dazbee/schema'
 import { tile } from '../../support/assets.ts'
 import { editorPath, writeOutput } from '../../support/editor.ts'
 import { choose } from '../../support/fields.ts'
-import { getKit, newBrand, seed } from '../../support/seed.ts'
+import { frameDesign, getKit, newBrand, seed } from '../../support/seed.ts'
 import { expect, type Page, test } from '../../support/test.ts'
 
 test.describe.configure({ timeout: 120_000 })
@@ -15,29 +15,27 @@ test.use({ viewport: { width: 1440, height: 900 } })
 const voice = 'Warm and plain, like a barista who knows your order.'
 
 /** A design whose box follows the brand's first colour, stored in the colour it had then. */
-const bound = (stored: string): DesignInput => ({
-  meta: { designId: 'replaced-by-the-api', name: 'Kit page', kind: 'single', primaryFormatId: 'sq' },
-  formats: { sq: { name: 'Square', width: 1080, height: 1080, order: 'a0' } },
-  pages: { p1: { name: 'Page 1', order: 'a0', fills: [{ type: 'solid', color: '#FFFFFFFF' }] } },
-  nodes: {
-    box: {
-      type: 'graphic',
-      parentId: 'p1',
-      index: 'a0',
-      name: 'Box',
-      bindings: { fill: 'brand:colour-1' },
-      props: {
-        x: 640,
-        y: 140,
-        width: 300,
-        height: 300,
-        shape: { kind: 'rect', cornerRadius: 24 },
-        fills: [{ type: 'solid', color: stored }],
+const bound = (stored: string): DesignInput =>
+  frameDesign({
+    name: 'Kit page',
+    nodes: {
+      box: {
+        type: 'graphic',
+        parentId: 'sq',
+        index: 'a0',
+        name: 'Box',
+        bindings: { fill: 'brand:colour-1' },
+        props: {
+          x: 640,
+          y: 140,
+          width: 300,
+          height: 300,
+          shape: { kind: 'rect', cornerRadius: 24 },
+          fills: [{ type: 'solid', color: stored }],
+        },
       },
     },
-  },
-  overrides: {},
-})
+  })
 
 /** The colour the export render draws in the middle of the box. */
 const boxColor = (page: Page) =>

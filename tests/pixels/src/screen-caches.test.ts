@@ -12,7 +12,7 @@ import {
   textMeasure,
 } from '@dazbee/renderer'
 import { loadCanvasKit } from '@dazbee/renderer/node'
-import { parseDesign } from '@dazbee/schema'
+import { framesOf, inOrder, parseDesign } from '@dazbee/schema'
 
 import { loadFixtures } from './fixtures.ts'
 import { comparePixels, fixtureResources } from './pixels.ts'
@@ -36,8 +36,8 @@ const cases = loadFixtures().flatMap(({ name, json }) => {
   const parsed = parseDesign(json)
   if (!parsed.success) throw new Error(parsed.errors.join('\n'))
   const { design } = parsed
-  return Object.keys(design.pages).flatMap((pageId) =>
-    Object.keys(design.formats).map((formatId) => ({ name, json, design, pageId, formatId })),
+  return inOrder(design.pages).flatMap(([pageId]) =>
+    framesOf(design, pageId).map(([frameId]) => ({ name, json, design, frameId })),
   )
 })
 
@@ -65,13 +65,13 @@ function drawCached(scene: ReturnType<typeof render>) {
 
 describe('paragraph and layer caches', () => {
   it.each(cases)(
-    '$name $pageId in $formatId draws the same pixels from the cache, the second time without laying out or recording',
-    ({ json, design, pageId, formatId }) => {
-      const expected = renderDesign(ck, json, pageId, formatId, bytes, cache)
-      expect(comparePixels(expected, drawCached(render(design, pageId, formatId, scenes, measure))).differing).toBe(0)
+    '$name $frameId draws the same pixels from the cache, the second time without laying out or recording',
+    ({ json, design, frameId }) => {
+      const expected = renderDesign(ck, json, frameId, bytes, cache)
+      expect(comparePixels(expected, drawCached(render(design, frameId, scenes, measure))).differing).toBe(0)
       const builds = vi.spyOn(ck.ParagraphBuilder, 'MakeFromFontCollection')
       const recorders = vi.spyOn(ck, 'PictureRecorder')
-      expect(comparePixels(expected, drawCached(render(design, pageId, formatId, scenes, measure))).differing).toBe(0)
+      expect(comparePixels(expected, drawCached(render(design, frameId, scenes, measure))).differing).toBe(0)
       expect(builds).not.toHaveBeenCalled()
       expect(recorders).not.toHaveBeenCalled()
       builds.mockRestore()

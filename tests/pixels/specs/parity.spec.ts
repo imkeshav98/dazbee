@@ -5,7 +5,7 @@ import { expect } from '@playwright/test'
 
 import { renderDesign } from '@dazbee/renderer'
 import { loadCanvasKit } from '@dazbee/renderer/node'
-import { parseDesign } from '@dazbee/schema'
+import { framesOf, inOrder, parseDesign } from '@dazbee/schema'
 
 import { driftProblem, readDriftBaselines, recordDriftBaseline } from '../src/drift.ts'
 import { loadFixtures } from '../src/fixtures.ts'
@@ -13,7 +13,7 @@ import { comparePixels, encodePng, fixtureResources, type Pixels } from '../src/
 import { test } from './support/harness.ts'
 import { BROWSER_OUT, saveDriftRow } from './support/report.ts'
 
-/** Every page in every format of every fixture. */
+/** Every frame of every fixture. */
 const cases = loadFixtures().flatMap(({ name, json }) => {
   const parsed = parseDesign(json)
   if (!parsed.success) throw new Error(parsed.errors.join('\n'))
@@ -24,8 +24,9 @@ const cases = loadFixtures().flatMap(({ name, json }) => {
         ?.map((m) => m.slice(11, -1)) ?? [],
     ),
   ]
-  return Object.keys(parsed.design.pages).flatMap((pageId) =>
-    Object.keys(parsed.design.formats).map((formatId) => ({ name, json, pageId, formatId, assetIds })),
+  const { design } = parsed
+  return inOrder(design.pages).flatMap(([pageId]) =>
+    framesOf(design, pageId).map(([frameId]) => ({ name, json, frameId, assetIds })),
   )
 })
 
@@ -35,21 +36,21 @@ function maxDelta(a: Pixels, b: Pixels) {
   return max
 }
 
-test('every fixture page and format is checked', () => {
+test('every fixture frame is checked', () => {
   expect(cases).toHaveLength(22)
 })
 
 for (const c of cases) {
-  const label = `${c.name} ${c.pageId}.${c.formatId}`
+  const label = `${c.name} ${c.frameId}`
 
   test(`${label}: browser CPU matches Node CPU`, async ({ harness }) => {
     const ck = await loadCanvasKit()
-    const node = renderDesign(ck, c.json, c.pageId, c.formatId, fixtureResources())
-    const browser = await harness.render(c.json, c.pageId, c.formatId, 'cpu', c.assetIds)
+    const node = renderDesign(ck, c.json, c.frameId, fixtureResources())
+    const browser = await harness.render(c.json, c.frameId, 'cpu', c.assetIds)
     const { differing, diff } = comparePixels(node, browser)
     if (differing > 0) {
       mkdirSync(BROWSER_OUT, { recursive: true })
-      const file = `${c.name}.${c.pageId}.${c.formatId}`
+      const file = `${c.name}.${c.frameId}`
       writeFileSync(join(BROWSER_OUT, `${file}.browser.png`), encodePng(ck, browser))
       writeFileSync(join(BROWSER_OUT, `${file}.diff.png`), encodePng(ck, diff))
     }
@@ -57,8 +58,8 @@ for (const c of cases) {
   })
 
   test(`${label}: WebGL drift from CPU stays within its baseline`, async ({ harness }) => {
-    const cpu = await harness.render(c.json, c.pageId, c.formatId, 'cpu', c.assetIds)
-    const webgl = await harness.render(c.json, c.pageId, c.formatId, 'webgl', c.assetIds)
+    const cpu = await harness.render(c.json, c.frameId, 'cpu', c.assetIds)
+    const webgl = await harness.render(c.json, c.frameId, 'webgl', c.assetIds)
     const { differing } = comparePixels(cpu, webgl)
     const drift = { differing, percent: (100 * differing) / (cpu.width * cpu.height), maxDelta: maxDelta(cpu, webgl) }
     if (process.env.UPDATE_DRIFT_BASELINES) recordDriftBaseline(label, drift)

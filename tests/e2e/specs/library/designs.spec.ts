@@ -23,6 +23,8 @@ test('a design made from the brand list opens in the editor and is there after a
   const design = await page.evaluate(() => window.dazbee?.design())
   expect(design?.meta.name).toBe(name)
   expect(Object.keys(design?.pages ?? {})).toHaveLength(1)
+  // The brief's one size: one frame on the page.
+  expect(Object.values(design?.frames ?? {}).map((f) => [f.width, f.height])).toEqual([[1080, 1080]])
   writeOutput('designs-2-editor.png', await page.screenshot())
 
   const url = page.url()

@@ -4,53 +4,48 @@
 import type { DesignInput } from '@dazbee/schema'
 
 import { writeOutput } from '../../support/editor.ts'
+import { frameDesign } from '../../support/seed.ts'
 import { drawn, openStage, perform, read } from '../../support/stage.ts'
 import { expect, type Page, test } from '../../support/test.ts'
 import { barMenu, closeBarMenu, textColourHex } from '../../support/top-bar.ts'
 
 test.describe.configure({ timeout: 180_000 })
 
-const design = (): DesignInput => ({
-  meta: {
-    designId: 'replaced-by-the-api',
+const design = (): DesignInput =>
+  frameDesign({
     name: 'Range styles',
-    kind: 'single',
-    primaryFormatId: 'sq',
-  },
-  formats: { sq: { name: 'Square', width: 1080, height: 1080, order: 'a0' } },
-  pages: { p1: { name: 'Page 1', order: 'a0', fills: [{ type: 'solid', color: '#FFF8F0FF' }] } },
-  nodes: {
-    body: {
-      type: 'text',
-      parentId: 'p1',
-      index: 'a0',
-      name: 'Body',
-      props: {
-        x: 80,
-        y: 100,
-        width: 920,
-        height: 90,
-        text: 'Fresh roast every morning',
-        style: { fontFamily: 'Noto Sans', fontSize: 64, color: '#1F2329FF' },
+    fills: [{ type: 'solid', color: '#FFF8F0FF' }],
+    nodes: {
+      body: {
+        type: 'text',
+        parentId: 'sq',
+        index: 'a0',
+        name: 'Body',
+        props: {
+          x: 80,
+          y: 100,
+          width: 920,
+          height: 90,
+          text: 'Fresh roast every morning',
+          style: { fontFamily: 'Noto Sans', fontSize: 64, color: '#1F2329FF' },
+        },
+      },
+      mixed: {
+        type: 'text',
+        parentId: 'sq',
+        index: 'a1',
+        name: 'Mixed',
+        props: {
+          x: 80,
+          y: 400,
+          width: 920,
+          height: 130,
+          text: 'خصم Dazbee اليوم',
+          style: { fontFamily: 'Noto Naskh Arabic', fontSize: 80, color: '#1F2329FF' },
+        },
       },
     },
-    mixed: {
-      type: 'text',
-      parentId: 'p1',
-      index: 'a1',
-      name: 'Mixed',
-      props: {
-        x: 80,
-        y: 400,
-        width: 920,
-        height: 130,
-        text: 'خصم Dazbee اليوم',
-        style: { fontFamily: 'Noto Naskh Arabic', fontSize: 80, color: '#1F2329FF' },
-      },
-    },
-  },
-  overrides: {},
-})
+  })
 
 type Run = { start: number; end: number; style: Record<string, unknown> }
 const textProps = async (page: Page, id: string) =>

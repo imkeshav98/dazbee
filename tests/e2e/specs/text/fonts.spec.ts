@@ -13,7 +13,7 @@ import { api, righteous } from '../../support/assets.ts'
 import { designOf, editorPath, writeOutput } from '../../support/editor.ts'
 import { choose } from '../../support/fields.ts'
 import { importGoogleFonts } from '../../support/fonts.ts'
-import { API_URL, DEV_BRAND, seed } from '../../support/seed.ts'
+import { API_URL, DEV_BRAND, frameDesign, seed } from '../../support/seed.ts'
 import { openStage } from '../../support/stage.ts'
 import { expect, type Page, type Request, test } from '../../support/test.ts'
 import { barMenu } from '../../support/top-bar.ts'
@@ -30,44 +30,38 @@ const text = (y: number, fontFamily: string, fontWeight: number, words: string) 
   text: words,
   style: { fontFamily, fontSize: 96, fontWeight, color: '#15121AFF' },
 })
-const design = (): DesignInput => ({
-  meta: {
-    designId: 'replaced-by-the-api',
+const design = (): DesignInput =>
+  frameDesign({
     name: 'Font check',
-    kind: 'single',
-    primaryFormatId: 'sq',
-  },
-  formats: { sq: { name: 'Square', width: 1080, height: 1080, order: 'a0' } },
-  pages: { p1: { name: 'Page 1', order: 'a0', fills: [{ type: 'solid', color: '#FFF6E8FF' }] } },
-  nodes: {
-    headline: {
-      type: 'text',
-      parentId: 'p1',
-      index: 'a0',
-      name: 'Headline',
-      role: 'headline',
-      props: text(100, 'Inter', 800, 'Fresh roast'),
-    },
-    badge: {
-      type: 'text',
-      parentId: 'p1',
-      index: 'a1',
-      name: 'Badge',
-      props: text(400, 'Righteous', 400, 'Only today'),
-    },
-    body: {
-      type: 'text',
-      parentId: 'p1',
-      index: 'a2',
-      name: 'Body',
-      props: {
-        ...text(700, 'Noto Sans', 400, 'Shipped font'),
-        style: { fontFamily: 'Noto Sans', fontSize: 64, color: '#15121AFF' },
+    fills: [{ type: 'solid', color: '#FFF6E8FF' }],
+    nodes: {
+      headline: {
+        type: 'text',
+        parentId: 'sq',
+        index: 'a0',
+        name: 'Headline',
+        role: 'headline',
+        props: text(100, 'Inter', 800, 'Fresh roast'),
+      },
+      badge: {
+        type: 'text',
+        parentId: 'sq',
+        index: 'a1',
+        name: 'Badge',
+        props: text(400, 'Righteous', 400, 'Only today'),
+      },
+      body: {
+        type: 'text',
+        parentId: 'sq',
+        index: 'a2',
+        name: 'Body',
+        props: {
+          ...text(700, 'Noto Sans', 400, 'Shipped font'),
+          style: { fontFamily: 'Noto Sans', fontSize: 64, color: '#15121AFF' },
+        },
       },
     },
-  },
-  overrides: {},
-})
+  })
 
 /** The face ids of font files a page fetched, from the moment this is called; previews are pictures, not fonts. */
 function fontRequests(page: Page) {
@@ -163,7 +157,7 @@ test('a design with a Google font and an uploaded font loads only those files, a
 
   const browserPng = Buffer.from(
     await page.evaluate(async () => {
-      const file = await window.dazbee?.exportFiles({ pageIds: ['p1'], formatIds: ['sq'], type: 'png' })
+      const file = await window.dazbee?.exportFiles({ frameIds: ['sq'], type: 'png' })
       return btoa(Array.from(file?.bytes ?? [], (b) => String.fromCharCode(b)).join(''))
     }),
     'base64',
@@ -173,12 +167,7 @@ test('a design with a Google font and an uploaded font loads only those files, a
   const { fonts: shipped, fallbackFamilies } = fixtureResources()
   const node = (fonts: { family: string; bytes: Uint8Array }[]) =>
     Buffer.from(
-      exportDesign(
-        ck,
-        json,
-        { pageIds: ['p1'], formatIds: ['sq'], type: 'png' },
-        { fonts, fallbackFamilies, images: {} },
-      ).bytes,
+      exportDesign(ck, json, { frameIds: ['sq'], type: 'png' }, { fonts, fallbackFamilies, images: {} }).bytes,
     )
   const nodePng = node([...shipped, ...(await filesOf(families, ['Inter', 'Righteous']))])
   expect(browserPng.equals(nodePng), 'the browser export is byte for byte the Node one').toBe(true)

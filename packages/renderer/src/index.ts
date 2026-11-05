@@ -1,6 +1,6 @@
 export { imageColorMatrix, type ColorMatrix } from './draw/adjust.ts'
-export { drawPage, drawScene } from './draw/draw.ts'
-export { drawVectorPage, type VectorTarget } from './draw/vector.ts'
+export { drawFrame, drawLayers, drawScene } from './draw/draw.ts'
+export { drawVectorFrame, type VectorTarget } from './draw/vector.ts'
 export { applyLayout, sizingOf, type MeasureText } from './layout.ts'
 export { layerPictures, type LayerPictures } from './pictures.ts'
 export { makeResources, resourceCache, type ResourceBytes, type ResourceCache, type Resources } from './resources.ts'

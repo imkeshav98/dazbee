@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { renderDesign, type ResourceBytes, resourceCache } from '@dazbee/renderer'
 import { loadCanvasKit } from '@dazbee/renderer/node'
-import { parseDesign } from '@dazbee/schema'
+import { framesOf, inOrder, parseDesign } from '@dazbee/schema'
 
 import { loadFixtures } from './fixtures.ts'
 import { comparePixels, fixtureResources } from './pixels.ts'
@@ -13,8 +13,9 @@ const bytes = fixtureResources()
 const cases = loadFixtures().flatMap(({ name, json }) => {
   const parsed = parseDesign(json)
   if (!parsed.success) throw new Error(parsed.errors.join('\n'))
-  return Object.keys(parsed.design.pages).flatMap((pageId) =>
-    Object.keys(parsed.design.formats).map((formatId) => ({ name, json, pageId, formatId })),
+  const { design } = parsed
+  return inOrder(design.pages).flatMap(([pageId]) =>
+    framesOf(design, pageId).map(([frameId]) => ({ name, json, frameId })),
   )
 })
 
@@ -33,24 +34,21 @@ describe('resource cache', () => {
   const cache = resourceCache(ck)
   afterEach(() => vi.restoreAllMocks())
 
-  it.each(cases)(
-    '$name $pageId in $formatId renders the same pixels with and without the cache',
-    ({ json, pageId, formatId }) => {
-      const fresh = renderDesign(ck, json, pageId, formatId, bytes)
-      const cached = renderDesign(ck, json, pageId, formatId, bytes, cache)
-      expect(comparePixels(fresh, cached).differing).toBe(0)
-    },
-  )
+  it.each(cases)('$name $frameId renders the same pixels with and without the cache', ({ json, frameId }) => {
+    const fresh = renderDesign(ck, json, frameId, bytes)
+    const cached = renderDesign(ck, json, frameId, bytes, cache)
+    expect(comparePixels(fresh, cached).differing).toBe(0)
+  })
 
   it('decodes nothing for a second render of the same resources', () => {
     const [c] = cases
     if (!c) throw new Error('no cases')
     const own = resourceCache(ck)
-    expect(decodes(() => renderDesign(ck, c.json, c.pageId, c.formatId, bytes, own))).toEqual({
+    expect(decodes(() => renderDesign(ck, c.json, c.frameId, bytes, own))).toEqual({
       images: Object.keys(bytes.images).length,
       fontSets: 1,
     })
-    expect(decodes(() => renderDesign(ck, c.json, c.pageId, c.formatId, bytes, own))).toEqual({
+    expect(decodes(() => renderDesign(ck, c.json, c.frameId, bytes, own))).toEqual({
       images: 0,
       fontSets: 0,
     })

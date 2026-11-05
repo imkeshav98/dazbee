@@ -4,7 +4,7 @@ import { childrenOf, type Session } from '@dazbee/doc'
 import { canHold, type Design, type Point } from '@dazbee/schema'
 
 import type { Camera } from '../canvas/camera.ts'
-import { type Frame, frameGrid, scope } from '../canvas/grid.ts'
+import type { Frame } from '../canvas/frames.ts'
 import { type AutoLayoutOf, flowSiblings, inFlow, propIn, rowIn } from '../layers/auto-layout.ts'
 import type { EditorBoxes } from '../layers/boxes.ts'
 import { type Box, drawnFrom, localTo, pageFrom, undrawn } from '../layers/transform.ts'
@@ -34,7 +34,7 @@ export interface AutoLayoutDragDeps {
   camera: () => Camera
   /** Groups fit what they hold again after a change inside them, in the same undo step. */
   hug: (ids: string[]) => void
-  /** Tells the page why the arrow keys did nothing: auto layout decides, or the layers are at the flow's end. */
+  /** Tells the app why the arrow keys did nothing: auto layout decides, or the layers are at the flow's end. */
   notify: (notice: 'placedByLayout' | 'flowEnd') => void
   /** A box on the overlay with a class, turned as the layer is. */
   outline: (className: string, frame: Frame, box: Box) => HTMLElement
@@ -49,8 +49,8 @@ export interface EditorAutoLayoutDrag {
   drag(g: ReorderDrag, p: Point): void
   /** Drops the layers where the drag shows, the groups around them fitting them again, closing its undo step. */
   release(g: ReorderDrag): void
-  /** The arrow keys on layers in a flow: one place along it, one undo step; the page hears why when it can't. */
-  nudge(frame: Frame, ids: string[], dx: number, dy: number, now: Design): void
+  /** The arrow keys on layers in a flow: one place along it, one undo step; the app hears why when it can't. */
+  nudge(ids: string[], dx: number, dy: number, now: Design): void
 }
 
 export function editorAutoLayoutDrag({
@@ -81,8 +81,8 @@ export function editorAutoLayoutDrag({
       parts.push(outline('reorder-leave', g.frame, drawnFrom(holder, g.around.slice(0, -1))))
       return parts
     }
-    const row = rowIn(g.frame, g.parentId, now)
-    const gap = (propIn(g.frame, g.parentId, 'layout', now) as AutoLayoutOf | undefined)?.gap ?? 0
+    const row = rowIn(g.parentId, now)
+    const gap = (propIn(g.parentId, 'layout', now) as AutoLayoutOf | undefined)?.gap ?? 0
     const near = g.near && boxIn(g.frame, g.near.id, now)
     const thick = 2 / camera().zoom
     // Halfway into the gap beside the nearest sibling; at the box's start when the flow is empty.
@@ -109,7 +109,7 @@ export function editorAutoLayoutDrag({
     const now = session.design()
     const parents = new Set(ids.map((id) => now.nodes[id]?.parentId))
     const [flowParent] = parents
-    if (flowParent && parents.size === 1 && ids.every((id) => inFlow(frame, id, now))) {
+    if (flowParent && parents.size === 1 && ids.every((id) => inFlow(id, now))) {
       // Auto layout places these: a drag moves them along the flow, or out of the box.
       const from = localTo(p, around)
       return {
@@ -147,8 +147,8 @@ export function editorAutoLayoutDrag({
    */
   function slotAt(g: ReorderDrag, p: Point) {
     const now = session.design()
-    const row = rowIn(g.frame, g.parentId, now)
-    const siblings = flowSiblings(g.frame, g.parentId, g.roots, now)
+    const row = rowIn(g.parentId, now)
+    const siblings = flowSiblings(g.parentId, g.roots, now)
     let best: { i: number; d: number; after: boolean } | null = null
     siblings.forEach((id, i) => {
       const b = boxIn(g.frame, id, now)
@@ -171,14 +171,13 @@ export function editorAutoLayoutDrag({
   }
   /**
    * Drops layers dragged in a flow, one undo step: inside their box, into the place the line
-   * showed; outside it, out of the box into what holds it, where they were dropped in this
-   * format and where the flow had them in the others.
+   * showed; outside it, out of the box into what holds it, where they were dropped.
    */
   function finishReorder(g: ReorderDrag) {
     if (!g.moved) return
     const now = session.design()
     if (!g.outside) {
-      const siblings = flowSiblings(g.frame, g.parentId, g.roots, now)
+      const siblings = flowSiblings(g.parentId, g.roots, now)
       const before = siblings[g.slot]
       const flow = childrenOf(now, g.parentId).map(([id]) => id)
       const moving = flow.filter((id) => g.roots.includes(id))
@@ -193,74 +192,49 @@ export function editorAutoLayoutDrag({
     if (!now.nodes[g.parentId]) return
     const dx = g.to.x - g.from.x
     const dy = g.to.y - g.from.y
-    // The container the drop point is in, among those holding the box, nearest first; or the page.
+    // The container the drop point is in, among those holding the box, nearest first; or the frame.
     const point = pageFrom(g.to, g.around)
     let branch = g.parentId
-    let target = now.nodes[g.parentId]?.parentId ?? g.frame.pageId
+    let target = now.nodes[g.parentId]?.parentId ?? g.frame.id
     while (
       now.nodes[target] &&
       !(canHold(now.nodes[target]?.type ?? '', 'graphic') && drawnContains(g.frame, target, point, now))
     ) {
       branch = target
-      target = now.nodes[target]?.parentId ?? g.frame.pageId
+      target = now.nodes[target]?.parentId ?? g.frame.id
     }
     // Above the part of the container that held them.
     const order = childrenOf(now, target).map(([id]) => id)
     const before = order[order.indexOf(branch) + 1]
-    // Each format's box as its flow placed it, before the layers leave it.
-    const others = frameGrid(now, null).frames.filter((f) => f.pageId === g.frame.pageId && f.key !== g.frame.key)
-    const placed = new Map(others.map((f) => [f, new Map(g.roots.map((id) => [id, boxIn(f, id, now)]))]))
     for (const id of g.roots) {
       const box = g.boxes.get(id)
       if (!box) continue
-      // Placed below as it is drawn, in every format.
+      // Placed where it was dropped, as it is drawn there.
       runQuietly(() =>
         session.run('node.move', { id, parentId: target, keepDrawn: false, ...(before ? { before } : {}) }),
       )
       const drawn = drawnFrom({ ...box, x: box.x + dx, y: box.y + dy }, g.around)
       runQuietly(() =>
-        session.run('node.update', {
-          ids: [id],
-          scope: scope(g.frame),
-          patch: { ...undrawn(drawn, containersOf(g.frame, target, now)) },
-        }),
+        session.run('node.update', { ids: [id], patch: { ...undrawn(drawn, containersOf(g.frame, target, now)) } }),
       )
-      for (const [f, boxes] of placed) {
-        const there = boxes.get(id)
-        if (!there) continue
-        const drawnThere = drawnFrom(there, containersOf(f, g.parentId, now))
-        runQuietly(() =>
-          session.run('node.update', {
-            ids: [id],
-            scope: scope(f),
-            patch: { ...undrawn(drawnThere, containersOf(f, target, now)) },
-          }),
-        )
-      }
     }
   }
   /**
    * The arrow keys on layers in a flow: along it they move them one place earlier or later, one
-   * undo step; across it, or for layers in different flows, auto layout decides, and the page says so.
+   * undo step; across it, or for layers in different flows, auto layout decides, and the app says so.
    */
-  function nudgeInFlow(frame: Frame, ids: string[], dx: number, dy: number, now: Design) {
+  function nudgeInFlow(ids: string[], dx: number, dy: number, now: Design) {
     const parents = new Set(ids.map((id) => now.nodes[id]?.parentId))
     const [parentId] = parents
-    const row = parentId && rowIn(frame, parentId, now)
+    const row = parentId && rowIn(parentId, now)
     const along = row ? dx : dy
-    if (
-      !parentId ||
-      parents.size > 1 ||
-      !ids.every((id) => inFlow(frame, id, now)) ||
-      along === 0 ||
-      (row ? dy : dx) !== 0
-    ) {
+    if (!parentId || parents.size > 1 || !ids.every((id) => inFlow(id, now)) || along === 0 || (row ? dy : dx) !== 0) {
       notify('placedByLayout')
       return
     }
     const flow = childrenOf(now, parentId)
       .map(([id]) => id)
-      .filter((id) => inFlow(frame, id, now))
+      .filter((id) => inFlow(id, now))
     const places = ids.map((id) => flow.indexOf(id)).sort((a, b) => a - b)
     const first = places[0] ?? 0
     const last = places.at(-1) ?? 0

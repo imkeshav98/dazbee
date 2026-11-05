@@ -89,7 +89,6 @@ export const designs = pgTable(
       .references(() => workspaces.id),
     brandId: text('brand_id').notNull(),
     name: text().notNull(),
-    kind: text({ enum: ['single', 'carousel', 'story', 'document'] }).notNull(),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -200,8 +199,8 @@ export const templates = pgTable(
     /** The brand whose design it was saved from, which owns the assets its images name. */
     fromBrandId: text('from_brand_id').notNull(),
     name: text().notNull(),
-    kind: text({ enum: ['single', 'carousel', 'story', 'document'] }).notNull(),
     content: jsonb().notNull(),
+    /** The size of its cover frame, so a tile takes its shape before its thumbnail loads. */
     width: integer().notNull(),
     height: integer().notNull(),
     createdAt: createdAt(),

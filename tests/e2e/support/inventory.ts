@@ -10,8 +10,8 @@ import type { DesignInput } from '@dazbee/schema'
 
 import { photo, tile, upload } from './assets.ts'
 import { designOf, placed, writeOutput } from './editor.ts'
-import { newBrand, putKit } from './seed.ts'
-import { nextFrame, openStage, perform } from './stage.ts'
+import { frameDesign, linkedFrames, newBrand, putKit } from './seed.ts'
+import { type Design, nextFrame, openStage, perform } from './stage.ts'
 import { type Browser, expect, type Page, test } from './test.ts'
 
 type Props = Record<string, unknown> & {
@@ -20,24 +20,8 @@ type Props = Record<string, unknown> & {
   strokes?: Record<string, unknown>[]
   effects?: Record<string, unknown>[]
 }
-type Doc = {
-  meta: { primaryFormatId: string }
-  formats: Record<string, { name: string; order: string; width: number; height: number }>
-  pages: Record<string, { name: string; order: string; fills: Record<string, unknown>[] }>
-  nodes: Record<
-    string,
-    {
-      type: string
-      parentId: string
-      index: string
-      name: string
-      lock?: Record<string, boolean>
-      bindings?: Record<string, string>
-      props: Props
-    }
-  >
-  overrides: Record<string, Record<string, Props>>
-}
+/** A design as stored, with the paints and style of each layer's props typed loosely. */
+type Doc = Omit<Design, 'nodes'> & { nodes: Record<string, Omit<Design['nodes'][string], 'props'> & { props: Props }> }
 
 /** Rows that fail today, with the bug filed for each. */
 const KNOWN: Record<number, number> = {}
@@ -68,15 +52,15 @@ export function setupInventory() {
 
 export const solid = (color: string) => [{ type: 'solid' as const, color }]
 export const doc = async (page: Page) => JSON.parse(await designOf(page)) as Doc
-/** A layer's props as the Square format shows them. */
-export const props = async (page: Page, id: string) => placed(await doc(page), id, 'sq') as Props
+/** A layer's props. */
+export const props = async (page: Page, id: string) => placed(await doc(page), id) as Props
 export const style = async (page: Page, id: string) => (await props(page, id)).style ?? {}
 export const fills = async (page: Page, id: string) => (await props(page, id)).fills ?? []
 
-/** SHA-256 of the Square's PNG export, which waits for every image and font it draws. */
+/** SHA-256 of the square frame's PNG export, which waits for every image and font it draws. */
 const picture = (page: Page) =>
   page.evaluate(async () => {
-    const file = await window.dazbee?.exportFiles({ pageIds: ['p1'], formatIds: ['sq'], type: 'png' })
+    const file = await window.dazbee?.exportFiles({ frameIds: ['sq'], type: 'png' })
     if (!file) throw new Error('no editor')
     const digest = await crypto.subtle.digest('SHA-256', new Uint8Array(file.bytes))
     return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('')
@@ -113,141 +97,136 @@ const rect = (x: number, y: number, width: number, height: number, color: string
   fills: solid(color),
 })
 
-/** One of each kind of layer the panels have cards for, in a Square format, and a Story with `withStory`. */
-const design = (withStory = false): DesignInput => ({
-  meta: {
-    designId: 'replaced-by-the-api',
+/**
+ * One of each kind of layer the panels have cards for, in a square frame `sq`, and with `withStory`
+ * their linked copies in a Story frame `story`.
+ */
+const design = (withStory = false): DesignInput => {
+  const square = frameDesign({
     name: 'Panels inventory',
-    kind: 'single',
-    primaryFormatId: 'sq',
-  },
-  formats: {
-    sq: { name: 'Square', width: 1080, height: 1080, order: 'a0' },
-    ...(withStory ? { story: { name: 'Story', width: 1080, height: 1920, order: 'a1' } } : {}),
-  },
-  pages: { p1: { name: 'Page 1', order: 'a0', fills: solid('#FFFFFFFF') } },
-  nodes: {
-    box: { type: 'graphic', parentId: 'p1', index: 'a0', name: 'Box', props: rect(80, 80, 300, 200, '#E0262BFF') },
-    dot: {
-      type: 'graphic',
-      parentId: 'p1',
-      index: 'a1',
-      name: 'Dot',
-      props: { ...rect(700, 120, 240, 240, '#2F6BFFFF'), shape: { kind: 'ellipse' } },
-    },
-    poly: {
-      type: 'graphic',
-      parentId: 'p1',
-      index: 'a2',
-      name: 'Hex',
-      props: { ...rect(420, 80, 160, 160, '#FCA311FF'), shape: { kind: 'polygon', sides: 6, cornerRadius: 0 } },
-    },
-    star: {
-      type: 'graphic',
-      parentId: 'p1',
-      index: 'a3',
-      name: 'Star',
-      props: {
-        ...rect(900, 400, 160, 160, '#8E44ADFF'),
-        shape: { kind: 'star', points: 5, innerRadius: 0.4, cornerRadius: 0 },
+    nodes: {
+      box: { type: 'graphic', parentId: 'sq', index: 'a0', name: 'Box', props: rect(80, 80, 300, 200, '#E0262BFF') },
+      dot: {
+        type: 'graphic',
+        parentId: 'sq',
+        index: 'a1',
+        name: 'Dot',
+        props: { ...rect(700, 120, 240, 240, '#2F6BFFFF'), shape: { kind: 'ellipse' } },
+      },
+      poly: {
+        type: 'graphic',
+        parentId: 'sq',
+        index: 'a2',
+        name: 'Hex',
+        props: { ...rect(420, 80, 160, 160, '#FCA311FF'), shape: { kind: 'polygon', sides: 6, cornerRadius: 0 } },
+      },
+      star: {
+        type: 'graphic',
+        parentId: 'sq',
+        index: 'a3',
+        name: 'Star',
+        props: {
+          ...rect(900, 400, 160, 160, '#8E44ADFF'),
+          shape: { kind: 'star', points: 5, innerRadius: 0.4, cornerRadius: 0 },
+        },
+      },
+      rule: {
+        type: 'graphic',
+        parentId: 'sq',
+        index: 'a4',
+        name: 'Rule',
+        props: {
+          x: 80,
+          y: 300,
+          width: 300,
+          height: 120,
+          shape: { kind: 'line', start: 'none', end: 'none' },
+          fills: [],
+          strokes: [{ paint: { type: 'solid', color: '#1A1420FF' }, width: 8, align: 'center' }],
+        },
+      },
+      photo: {
+        type: 'graphic',
+        parentId: 'sq',
+        index: 'a5',
+        name: 'Photo',
+        props: {
+          x: 420,
+          y: 260,
+          width: 240,
+          height: 180,
+          shape: { kind: 'rect', cornerRadius: 0 },
+          fills: [{ type: 'image', assetId: assets.photo, fit: 'fill' }],
+        },
+      },
+      headline: {
+        type: 'text',
+        parentId: 'sq',
+        index: 'a6',
+        name: 'Headline',
+        props: {
+          x: 80,
+          y: 480,
+          width: 760,
+          height: 260,
+          boxMode: 'fixed',
+          text: 'Summer sale\nAll week long',
+          style: { fontFamily: 'Noto Sans', fontSize: 72, fontWeight: 800, color: '#111111FF' },
+        },
+      },
+      stack: {
+        type: 'box',
+        parentId: 'sq',
+        index: 'a7',
+        name: 'Stack',
+        props: {
+          x: 80,
+          y: 760,
+          width: 600,
+          height: 160,
+          fills: solid('#F4EDE4FF'),
+          layout: { direction: 'row', gap: 16, padding: { top: 20, right: 20, bottom: 20, left: 20 } },
+        },
+      },
+      chip1: {
+        type: 'graphic',
+        parentId: 'stack',
+        index: 'a0',
+        name: 'Chip 1',
+        props: rect(100, 780, 120, 120, '#FCA311FF'),
+      },
+      chip2: {
+        type: 'graphic',
+        parentId: 'stack',
+        index: 'a1',
+        name: 'Chip 2',
+        props: rect(236, 780, 120, 120, '#14213DFF'),
+      },
+      plain: {
+        type: 'box',
+        parentId: 'sq',
+        index: 'a8',
+        name: 'Plain',
+        props: { x: 720, y: 760, width: 300, height: 280, fills: solid('#DDEEFFFF') },
+      },
+      tile1: {
+        type: 'graphic',
+        parentId: 'plain',
+        index: 'a0',
+        name: 'Tile 1',
+        props: rect(740, 780, 100, 100, '#11744AFF'),
+      },
+      tile2: {
+        type: 'graphic',
+        parentId: 'plain',
+        index: 'a1',
+        name: 'Tile 2',
+        props: rect(900, 900, 100, 100, '#C8156AFF'),
       },
     },
-    rule: {
-      type: 'graphic',
-      parentId: 'p1',
-      index: 'a4',
-      name: 'Rule',
-      props: {
-        x: 80,
-        y: 300,
-        width: 300,
-        height: 120,
-        shape: { kind: 'line', start: 'none', end: 'none' },
-        fills: [],
-        strokes: [{ paint: { type: 'solid', color: '#1A1420FF' }, width: 8, align: 'center' }],
-      },
-    },
-    photo: {
-      type: 'graphic',
-      parentId: 'p1',
-      index: 'a5',
-      name: 'Photo',
-      props: {
-        x: 420,
-        y: 260,
-        width: 240,
-        height: 180,
-        shape: { kind: 'rect', cornerRadius: 0 },
-        fills: [{ type: 'image', assetId: assets.photo, fit: 'fill' }],
-      },
-    },
-    headline: {
-      type: 'text',
-      parentId: 'p1',
-      index: 'a6',
-      name: 'Headline',
-      props: {
-        x: 80,
-        y: 480,
-        width: 760,
-        height: 260,
-        boxMode: 'fixed',
-        text: 'Summer sale\nAll week long',
-        style: { fontFamily: 'Noto Sans', fontSize: 72, fontWeight: 800, color: '#111111FF' },
-      },
-    },
-    stack: {
-      type: 'box',
-      parentId: 'p1',
-      index: 'a7',
-      name: 'Stack',
-      props: {
-        x: 80,
-        y: 760,
-        width: 600,
-        height: 160,
-        fills: solid('#F4EDE4FF'),
-        layout: { direction: 'row', gap: 16, padding: { top: 20, right: 20, bottom: 20, left: 20 } },
-      },
-    },
-    chip1: {
-      type: 'graphic',
-      parentId: 'stack',
-      index: 'a0',
-      name: 'Chip 1',
-      props: rect(100, 780, 120, 120, '#FCA311FF'),
-    },
-    chip2: {
-      type: 'graphic',
-      parentId: 'stack',
-      index: 'a1',
-      name: 'Chip 2',
-      props: rect(236, 780, 120, 120, '#14213DFF'),
-    },
-    plain: {
-      type: 'box',
-      parentId: 'p1',
-      index: 'a8',
-      name: 'Plain',
-      props: { x: 720, y: 760, width: 300, height: 280, fills: solid('#DDEEFFFF') },
-    },
-    tile1: {
-      type: 'graphic',
-      parentId: 'plain',
-      index: 'a0',
-      name: 'Tile 1',
-      props: rect(740, 780, 100, 100, '#11744AFF'),
-    },
-    tile2: {
-      type: 'graphic',
-      parentId: 'plain',
-      index: 'a1',
-      name: 'Tile 2',
-      props: rect(900, 900, 100, 100, '#C8156AFF'),
-    },
-  },
-  overrides: {},
-})
+  })
+  return withStory ? linkedFrames(square, [{ id: 'story', name: 'Story', width: 1080, height: 1920 }]) : square
+}
 
 /**
  * One row of the inventory: a test named by its number, expected to fail while its bug is open. A

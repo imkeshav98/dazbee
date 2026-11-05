@@ -19,17 +19,17 @@ type TextLayer = Extract<SceneLayer, { type: 'text' }>
  */
 export function drawScene(ck: CanvasKit, canvas: Canvas, scene: Scene, resources: Resources) {
   canvas.clear(ck.TRANSPARENT)
-  drawPageContent(ck, canvas, scene, resources)
+  drawFrameContent(ck, canvas, scene, resources)
 }
 
 /**
  * Draws a scene onto part of a bigger canvas, such as one frame of the editor's infinite canvas:
- * nothing outside the page shows and nothing else on the canvas is cleared. The caller places it.
+ * nothing outside the frame shows and nothing else on the canvas is cleared. The caller places it.
  */
-export function drawPage(ck: CanvasKit, canvas: Canvas, scene: Scene, resources: Resources) {
+export function drawFrame(ck: CanvasKit, canvas: Canvas, scene: Scene, resources: Resources) {
   canvas.save()
   canvas.clipRect(ck.XYWHRect(0, 0, scene.width, scene.height), ck.ClipOp.Intersect, true)
-  drawPageContent(ck, canvas, scene, resources)
+  drawFrameContent(ck, canvas, scene, resources)
   canvas.restore()
 }
 
@@ -78,11 +78,11 @@ export function drawLayers(
   }
 }
 
-function drawPageContent(ck: CanvasKit, canvas: Canvas, scene: Scene, resources: Resources) {
-  const page = { x: 0, y: 0, width: scene.width, height: scene.height }
-  const pagePath = rectPath(ck, page)
-  for (const fill of scene.fills) fillPath(ck, canvas, pagePath, fill, page, resources)
-  pagePath.delete()
+function drawFrameContent(ck: CanvasKit, canvas: Canvas, scene: Scene, resources: Resources) {
+  const frame = { x: 0, y: 0, width: scene.width, height: scene.height }
+  const framePath = rectPath(ck, frame)
+  for (const fill of scene.fills) fillPath(ck, canvas, framePath, fill, frame, resources)
+  framePath.delete()
   const { layers } = resources
   drawLayers(
     ck,
@@ -114,7 +114,7 @@ function drawLayer(ck: CanvasKit, canvas: Canvas, layer: SceneLayer, resources: 
   if (!needsLayer) {
     content()
   } else {
-    // An offscreen layer only as big as what the layer draws, effects included; a page-sized one
+    // An offscreen layer only as big as what the layer draws, effects included; a frame-sized one
     // for every translucent layer made the 300-layer stress fixture take 15 s (#18).
     // One pixel more for anti-aliased edges.
     const reach = unturnedReach(ck, layer, resources)

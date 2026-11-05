@@ -6,7 +6,7 @@ import { notFound, redirect } from 'next/navigation'
 import { BriefComposer } from '@/components/brief/brief-composer.tsx'
 import { StartBlank } from '@/components/brief/start-blank.tsx'
 import { LibraryShell } from '@/components/library/library-shell.tsx'
-import { briefDesign, type BriefFormat } from '@/lib/brief.ts'
+import { briefDesign, type BriefSize } from '@/lib/brief.ts'
 import { brandPage, showsBrandList } from '@/lib/home.ts'
 import { brandWords } from '@/lib/i18n/index.ts'
 import { getMessages } from '@/lib/i18n/server.ts'
@@ -40,29 +40,29 @@ export default async function BrandPage({
     }),
   )
   const untitled = t.library.untitled
-  const presetName = t.editor.formats.preset
+  const presetName = t.editor.sizes.preset
 
   async function make(form: FormData) {
     'use server'
     const brief = String(form.get('brief') ?? '').trim()
     const firstLine = brief.split('\n')[0]?.trim() ?? ''
     const name = (firstLine.length > 60 ? `${firstLine.slice(0, 59).trimEnd()}…` : firstLine) || untitled
-    const formats = form.getAll('format').map(String)
+    const sizes = form.getAll('size').map(String)
     const design = await createDesign(
       brandId,
       name,
-      briefDesign(name, formats, (id) => presetName[id] ?? id),
+      briefDesign(name, sizes, (id) => presetName[id]),
     )
     redirect(`/brands/${brandId}/designs/${design.id}`)
   }
 
-  /** An empty design in one size, named Untitled design. */
-  async function startBlank(formatId: BriefFormat) {
+  /** A design of one empty frame in one size, named Untitled design. */
+  async function startBlank(sizeId: BriefSize) {
     'use server'
     const design = await createDesign(
       brandId,
       untitled,
-      briefDesign(untitled, [formatId], (id) => presetName[id] ?? id),
+      briefDesign(untitled, [sizeId], (id) => presetName[id]),
     )
     redirect(`/brands/${brandId}/designs/${design.id}`)
   }

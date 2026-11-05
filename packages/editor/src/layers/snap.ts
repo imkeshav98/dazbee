@@ -1,6 +1,6 @@
 // Snapping while moving or resizing (#42): to other layers' edges and centres, to equal spacing
-// between layers, and to the format's edges and centre, with the guides that show why. Kept free
-// of the editor so the maths can be tested on its own. Everything is in one page's design pixels;
+// between layers, and to the frame's edges and centre, with the guides that show why. Kept free
+// of the editor so the maths can be tested on its own. Everything is in one frame's design pixels;
 // turned layers snap by the box around them as drawn.
 import type { Rect } from '@dazbee/schema'
 
@@ -62,9 +62,9 @@ const overlaps = (a: Rect, b: Rect, axis: Axis) =>
   startOf(a, axis) < endOf(b, axis) && startOf(b, axis) < endOf(a, axis)
 const moved = (b: Rect, axis: Axis, d: number): Rect => (axis === 'x' ? { ...b, x: b.x + d } : { ...b, y: b.y + d })
 
-/** The lines and boxes to snap to: other layers' boxes as drawn, and the format itself. */
-export function snapTargets(others: Rect[], format: Rect): Targets {
-  const boxes = [...others, format]
+/** The lines and boxes to snap to: other layers' boxes as drawn, and the frame itself. */
+export function snapTargets(others: Rect[], frame: Rect): Targets {
+  const boxes = [...others, frame]
   return { boxes, xs: lines(boxes, 'x'), ys: lines(boxes, 'y') }
 }
 

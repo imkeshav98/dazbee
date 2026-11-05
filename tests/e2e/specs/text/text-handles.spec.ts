@@ -1,10 +1,12 @@
 // Text resizes as in Canva: a corner scales the text, its box keeping its shape; a side changes
 // the width; only a fixed box has top and bottom handles. A drag changes the size shown only, runs
 // and shrink to fit included, in one undo step, and stops at 1 px. Text in a group scales with it,
-// text in a box doesn't, and text whose style is locked resizes its box only.
-import { type DesignInput, formatScope } from '@dazbee/schema'
+// text in a box doesn't, and text whose style is locked resizes its box only. The texts' linked
+// copies in a Story frame keep their own sizes.
+import type { DesignInput } from '@dazbee/schema'
 
 import { writeOutput } from '../../support/editor.ts'
+import { copyIn, frameDesign, linkedFrames, type Seeded } from '../../support/seed.ts'
 import { dragScreen, handle, openStage, press, read } from '../../support/stage.ts'
 import { expect, type Page, test } from '../../support/test.ts'
 import { barMenu } from '../../support/top-bar.ts'
@@ -14,7 +16,7 @@ test.describe.configure({ timeout: 120_000 })
 const style = (fontSize: number) => ({ fontFamily: 'Noto Sans', fontSize, fontWeight: 700, color: '#1F2329FF' })
 const text = (id: string, props: Record<string, unknown>, extra: Record<string, unknown> = {}) => ({
   type: 'text',
-  parentId: 'p1',
+  parentId: 'sq',
   index: `a${id.length}`,
   name: id,
   ...extra,
@@ -29,21 +31,11 @@ const text = (id: string, props: Record<string, unknown>, extra: Record<string, 
     ...props,
   },
 })
-const design = (nodes: Record<string, unknown>): DesignInput => ({
-  meta: {
-    designId: 'replaced-by-the-api',
-    name: 'Text handles',
-    kind: 'single',
-    primaryFormatId: 'sq',
-  },
-  formats: {
-    sq: { name: 'Square', width: 1080, height: 1080, order: 'a0' },
-    st: { name: 'Story', width: 1080, height: 1920, order: 'a1' },
-  },
-  pages: { p1: { name: 'Page 1', order: 'a0', fills: [{ type: 'solid', color: '#FFFFFFFF' }] } },
-  nodes: nodes as DesignInput['nodes'],
-  overrides: {},
-})
+/** The layers in a square frame `sq`, with their linked copies in a Story frame `st`. */
+const design = (nodes: Record<string, unknown>): DesignInput =>
+  linkedFrames(frameDesign({ name: 'Text handles', nodes: nodes as Record<string, Seeded> }), [
+    { id: 'st', name: 'Story', width: 1080, height: 1920 },
+  ])
 
 type Props = {
   width: number
@@ -53,13 +45,11 @@ type Props = {
   runs?: { start: number; end: number; style: { fontSize?: number } }[]
   shrinkToFit?: { min: number; max: number }
 }
-/** A layer's values in a format: its own, with that format's on top. */
-const placed = async (page: Page, id: string, formatId = 'sq') => {
-  const d = await read(page)
-  return { ...d.nodes[id]?.props, ...d.overrides[formatScope(formatId)]?.[id] } as unknown as Props
-}
+/** A layer's values in a frame: the square's layer, or its linked copy in the Story. */
+const placed = async (page: Page, id: string, frameId = 'sq') =>
+  (await read(page)).nodes[frameId === 'sq' ? id : copyIn(frameId, id)]?.props as unknown as Props
 const select = async (page: Page, ids: string[]) => {
-  await page.evaluate((ids) => window.dazbee?.select(ids, 'p1', 'sq'), ids)
+  await page.evaluate((ids) => window.dazbee?.select(ids), ids)
   await page.evaluate(() => window.dazbee?.drawn())
 }
 const handles = (page: Page) =>
@@ -100,7 +90,7 @@ test('one text that grows with its words has no top or bottom handles; a fixed b
   expect(errors).toEqual([])
 })
 
-test('a corner scales the text and its box keeps its shape, in the size shown only, in one undo step; the label says its size', async ({
+test('a corner scales the text and its box keeps its shape, in its frame only, in one undo step; the label says its size', async ({
   browser,
 }) => {
   const { page, errors } = await openStage(
@@ -114,7 +104,7 @@ test('a corner scales the text and its box keeps its shape, in the size shown on
     }),
   )
   await select(page, ['headline'])
-  const was = await page.evaluate(() => window.dazbee?.boxOf('headline', 'p1', 'sq'))
+  const was = await page.evaluate(() => window.dazbee?.boxOf('headline'))
   if (!was) throw new Error('no box')
   const before = JSON.stringify(await read(page))
   // Mid-drag, the size label says the size it goes from and to.
@@ -138,7 +128,7 @@ test('a corner scales the text and its box keeps its shape, in the size shown on
   expect(now.runs?.[0]?.style.fontSize).toBeCloseTo(tenth(60 * factor), 0)
   expect(now.boxMode).toBe('autoHeight')
   expect(now.width).toBeCloseTo(was.width * factor, -1)
-  // The Story keeps its own.
+  // The copy in the Story keeps its own.
   expect((await placed(page, 'headline', 'st')).style.fontSize).toBe(40)
   await press(page, 'undo')
   expect(JSON.stringify(await read(page))).toBe(before)
@@ -184,7 +174,7 @@ test('a corner on a group scales the text in it; text in a box keeps its size; s
     design({
       group: {
         type: 'group',
-        parentId: 'p1',
+        parentId: 'sq',
         index: 'a0',
         name: 'Group',
         props: { x: 80, y: 80, width: 400, height: 80 },
@@ -192,7 +182,7 @@ test('a corner on a group scales the text in it; text in a box keeps its size; s
       inGroup: { ...text('inGroup', {}), parentId: 'group' },
       box: {
         type: 'box',
-        parentId: 'p1',
+        parentId: 'sq',
         index: 'a1',
         name: 'Box',
         props: { x: 80, y: 400, width: 500, height: 200, fills: [{ type: 'solid', color: '#EEEEEEFF' }] },
@@ -210,7 +200,7 @@ test('a corner on a group scales the text in it; text in a box keeps its size; s
       note: text('note', { x: 600, y: 800, width: 300 }),
       dot: {
         type: 'graphic',
-        parentId: 'p1',
+        parentId: 'sq',
         index: 'a8',
         name: 'Dot',
         props: {
@@ -252,7 +242,7 @@ test('a corner on a group scales the text in it; text in a box keeps its size; s
   expect(errors).toEqual([])
 })
 
-test("typed after a corner drag in one size, the text keeps that size's runs on their characters", async ({
+test('typed after a corner drag in one frame, the text keeps its runs on their characters, and its copy keeps its own', async ({
   browser,
 }) => {
   const { page, errors } = await openStage(
@@ -263,13 +253,13 @@ test("typed after a corner drag in one size, the text keeps that size's runs on 
   )
   await select(page, ['headline'])
   await dragHandle(page, 'se', 120, 60)
-  // The square's runs are its own now, scaled with its text.
-  const own = async () => ((await read(page)).overrides['format:sq']?.headline as { runs?: unknown } | undefined)?.runs
+  // The text keeps its run on the pink word, scaled with it.
+  const own = async (frameId = 'sq') => (await placed(page, 'headline', frameId)).runs
   expect(await own()).toEqual([expect.objectContaining({ start: 7, end: 11 })])
-  // Typed before the pink word: the square's own run moves with it.
-  const box = await page.evaluate(() => window.dazbee?.boxOf('headline', 'p1', 'sq'))
+  // Typed before the pink word: the run moves with it.
+  const box = await page.evaluate(() => window.dazbee?.boxOf('headline'))
   if (!box) throw new Error('no box')
-  const at = await page.evaluate(({ x, y }) => window.dazbee?.screenPoint(x, y, 'p1', 'sq'), {
+  const at = await page.evaluate(({ x, y }) => window.dazbee?.screenPoint(x, y, 'sq'), {
     x: box.x + 20,
     y: box.y + box.height / 2,
   })
@@ -280,6 +270,9 @@ test("typed after a corner drag in one size, the text keeps that size's runs on 
   await page.keyboard.press('Escape')
   await expect.poll(async () => (await read(page)).nodes.headline?.props.text).toBe('Hot Summer sale')
   expect(await own()).toEqual([expect.objectContaining({ start: 11, end: 15 })])
+  // The copy in the Story keeps its words, its run where it was and its size.
+  expect(await placed(page, 'headline', 'st')).toMatchObject({ text: 'Summer sale', style: { fontSize: 40 } })
+  expect(await own('st')).toEqual([expect.objectContaining({ start: 7, end: 11 })])
   expect(errors).toEqual([])
 })
 
@@ -305,7 +298,7 @@ test('a corner that scales text snaps one edge to a guide and keeps the shape', 
       headline: text('headline', { boxMode: 'fixed', width: 400, height: 100 }),
       post: {
         type: 'graphic',
-        parentId: 'p1',
+        parentId: 'sq',
         index: 'a9',
         name: 'Post',
         props: {
@@ -358,9 +351,9 @@ test("a fixed box's top and bottom change its height and the size stays; a turne
   expect(turned.width).toBeCloseTo(was.width * factor, -1)
   // Alt keeps the centre where it was.
   await select(page, ['centred'])
-  const before = await page.evaluate(() => window.dazbee?.boxOf('centred', 'p1', 'sq'))
+  const before = await page.evaluate(() => window.dazbee?.boxOf('centred'))
   await dragHandle(page, 'se', 80, 80, ['Alt'])
-  const after = await page.evaluate(() => window.dazbee?.boxOf('centred', 'p1', 'sq'))
+  const after = await page.evaluate(() => window.dazbee?.boxOf('centred'))
   if (!before || !after) throw new Error('no box')
   expect((await placed(page, 'centred')).style.fontSize).toBeGreaterThan(40)
   expect(after.x + after.width / 2).toBeCloseTo(before.x + before.width / 2, 0)

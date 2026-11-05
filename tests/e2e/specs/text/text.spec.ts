@@ -4,47 +4,47 @@
 import type { DesignInput } from '@dazbee/schema'
 
 import { exportHashOf, writeOutput } from '../../support/editor.ts'
+import { frameDesign } from '../../support/seed.ts'
 import { drawn, openStage, press, read, selection } from '../../support/stage.ts'
 import { expect, type Page, test } from '../../support/test.ts'
 
 test.describe.configure({ timeout: 120_000 })
 
-const design = (): DesignInput => ({
-  meta: { designId: 'replaced-by-the-api', name: 'Rich text', kind: 'single', primaryFormatId: 'sq' },
-  formats: { sq: { name: 'Square', width: 1080, height: 1080, order: 'a0' } },
-  pages: { p1: { name: 'Page 1', order: 'a0', fills: [{ type: 'solid', color: '#FFF8F0FF' }] } },
-  nodes: {
-    body: {
-      type: 'text',
-      parentId: 'p1',
-      index: 'a0',
-      name: 'Body',
-      props: {
-        x: 80,
-        y: 100,
-        width: 920,
-        height: 90,
-        text: 'Fresh roast every morning',
-        style: { fontFamily: 'Noto Sans', fontSize: 64, color: '#1F2329FF' },
+const design = (): DesignInput =>
+  frameDesign({
+    name: 'Rich text',
+    fills: [{ type: 'solid', color: '#FFF8F0FF' }],
+    nodes: {
+      body: {
+        type: 'text',
+        parentId: 'sq',
+        index: 'a0',
+        name: 'Body',
+        props: {
+          x: 80,
+          y: 100,
+          width: 920,
+          height: 90,
+          text: 'Fresh roast every morning',
+          style: { fontFamily: 'Noto Sans', fontSize: 64, color: '#1F2329FF' },
+        },
+      },
+      mixed: {
+        type: 'text',
+        parentId: 'sq',
+        index: 'a1',
+        name: 'Mixed',
+        props: {
+          x: 80,
+          y: 300,
+          width: 920,
+          height: 130,
+          text: 'خصم Dazbee اليوم',
+          style: { fontFamily: 'Noto Naskh Arabic', fontSize: 80, color: '#1F2329FF' },
+        },
       },
     },
-    mixed: {
-      type: 'text',
-      parentId: 'p1',
-      index: 'a1',
-      name: 'Mixed',
-      props: {
-        x: 80,
-        y: 300,
-        width: 920,
-        height: 130,
-        text: 'خصم Dazbee اليوم',
-        style: { fontFamily: 'Noto Naskh Arabic', fontSize: 80, color: '#1F2329FF' },
-      },
-    },
-  },
-  overrides: {},
-})
+  })
 
 type Rect = { x: number; y: number; width: number; height: number }
 const textRuns = async (page: Page, id: string) => ((await read(page)).nodes[id]?.props as { runs: unknown[] }).runs

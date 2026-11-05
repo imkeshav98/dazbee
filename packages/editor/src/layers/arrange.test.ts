@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import { align, distribute } from './arrange.ts'
 
-const format = { x: 0, y: 0, width: 1080, height: 1080 }
+const frame = { x: 0, y: 0, width: 1080, height: 1080 }
 
 const boxes = [
   { x: 100, y: 100, width: 100, height: 50 },
@@ -12,15 +12,15 @@ const boxes = [
 
 describe('align', () => {
   it('lines several layers up with the box around them', () => {
-    expect(align(boxes, 'left', format).map((o) => o.dx)).toEqual([0, -200, -500])
-    expect(align(boxes, 'right', format).map((o) => o.dx)).toEqual([480, 330, 0])
-    expect(align(boxes, 'centre', format).map((o) => o.dx)).toEqual([240, 65, -250])
-    expect(align(boxes, 'bottom', format).map((o) => o.dy)).toEqual([170, 0, 80])
-    expect(align(boxes, 'middle', format).map((o) => o.dy)).toEqual([85, -60, 10])
+    expect(align(boxes, 'left', frame).map((o) => o.dx)).toEqual([0, -200, -500])
+    expect(align(boxes, 'right', frame).map((o) => o.dx)).toEqual([480, 330, 0])
+    expect(align(boxes, 'centre', frame).map((o) => o.dx)).toEqual([240, 65, -250])
+    expect(align(boxes, 'bottom', frame).map((o) => o.dy)).toEqual([170, 0, 80])
+    expect(align(boxes, 'middle', frame).map((o) => o.dy)).toEqual([85, -60, 10])
   })
 
   it('lines one layer up with what holds it', () => {
-    expect(align([boxes[0] as never], 'centre', format)).toEqual([{ dx: 390, dy: 0 }])
+    expect(align([boxes[0] as never], 'centre', frame)).toEqual([{ dx: 390, dy: 0 }])
     expect(align([boxes[0] as never], 'bottom', { x: 0, y: 0, width: 500, height: 400 })).toEqual([{ dx: 0, dy: 250 }])
   })
 })

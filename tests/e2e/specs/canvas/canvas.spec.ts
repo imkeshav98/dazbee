@@ -1,15 +1,24 @@
-// The infinite canvas (#36): every page in every format, per-format drags, shared text, pan and
-// zoom. Needs the API and the sync server: `docker compose up -d --wait`.
-import { formatScope } from '@dazbee/schema'
+// The infinite canvas (#36): a page of five frames, each where it is stored, with pan and zoom; a
+// layer dragged past its frame's edge shows there as a faint ghost and stays in its frame; a frame's
+// label drops its size before it cuts its name short; and pictures, in the dark and the light theme
+// at each screen size, of one frame, linked frames, two pages, a page with no frames, the Pages
+// card, a brief's frames, the layers panel and Export.
+// Needs the API and the sync server: `docker compose up -d --wait`.
+import { blankDesign, type DesignInput } from '@dazbee/schema'
 
-import { fiveFormats, FORMATS, open } from '../../support/canvas.ts'
-import { designOf, placed, screenPoint, settle, stageShot, writeOutput } from '../../support/editor.ts'
-import { drawn } from '../../support/stage.ts'
-import { expect, type Page, test } from '../../support/test.ts'
+import { CREAM, fiveFrames, FRAMES, open } from '../../support/canvas.ts'
+import { designOf, editorPath, screenPoint, setCookies, writeOutput } from '../../support/editor.ts'
+import { THEMES } from '../../support/glass.ts'
+import { openLayers } from '../../support/layers-panel.ts'
+import { SCREEN_SIZES } from '../../support/layout.ts'
+import { frameDesign, liveDesign, seed } from '../../support/seed.ts'
+import { drawn, fitSettled, nextFrame, openStage, selectLayers } from '../../support/stage.ts'
+import { type Browser, expect, type Page, test } from '../../support/test.ts'
+import { pagesPanel } from '../../support/top-bar.ts'
 
 test.describe.configure({ timeout: 180_000 })
 
-const FORMAT_IDS = Object.keys(FORMATS)
+const FRAME_IDS = Object.keys(FRAMES)
 
 /** Drags with the real mouse; `keys` are held from the press to the release (Control turns snapping off). */
 async function drag(page: Page, from: { x: number; y: number }, to: { x: number; y: number }, keys: string[] = []) {
@@ -22,142 +31,11 @@ async function drag(page: Page, from: { x: number; y: number }, to: { x: number;
   for (const key of keys) await page.keyboard.up(key)
 }
 
-test.describe('per-format drags', () => {
-  /** The box, in screenshot pixels, around every pixel that differs between two PNGs; decoded in the page. */
-  const differenceBox = (page: Page, a: Buffer, b: Buffer) =>
-    page.evaluate(
-      async ([a, b]) => {
-        const pixels = async (base64: string) => {
-          const image = await createImageBitmap(await (await fetch(`data:image/png;base64,${base64}`)).blob())
-          const canvas = new OffscreenCanvas(image.width, image.height)
-          const ctx = canvas.getContext('2d') as OffscreenCanvasRenderingContext2D
-          ctx.drawImage(image, 0, 0)
-          return ctx.getImageData(0, 0, image.width, image.height)
-        }
-        const [x, y] = [await pixels(a), await pixels(b)]
-        let box = { left: Infinity, top: Infinity, right: -1, bottom: -1, count: 0 }
-        for (let i = 0; i < x.data.length; i += 4) {
-          if (
-            x.data[i] === y.data[i] &&
-            x.data[i + 1] === y.data[i + 1] &&
-            x.data[i + 2] === y.data[i + 2] &&
-            x.data[i + 3] === y.data[i + 3]
-          )
-            continue
-          const px = (i / 4) % x.width
-          const py = Math.floor(i / 4 / x.width)
-          box = {
-            left: Math.min(box.left, px),
-            top: Math.min(box.top, py),
-            right: Math.max(box.right, px),
-            bottom: Math.max(box.bottom, py),
-            count: box.count + 1,
-          }
-        }
-        return box
-      },
-      [a.toString('base64'), b.toString('base64')] as const,
-    )
-
-  test('a drag in the second format moves the layer there only; undo and override.reset put it back', async ({
-    page,
-  }) => {
-    const { errors } = await open(page, fiveFormats(10))
-    await page.keyboard.press('Escape')
-    const before = await stageShot(page)
-    writeOutput('canvas-0-fit-all.png', await page.screenshot())
-
-    // Drag the box in Story from its centre by 100 × 50 design pixels, with the real mouse and
-    // Control held, so it lands where the pointer puts it rather than snapping.
-    const story = { pageId: 'p1', formatId: 'story' }
-    await drag(page, await screenPoint(page, 200, 180, story), await screenPoint(page, 300, 230, story), ['Control'])
-    await expect(page.locator('.selection[data-layer="p1-box"][data-frame="p1/story"]')).toBeVisible()
-    await settle([page])
-    const zoom = await page.evaluate(() => window.dazbee?.camera().zoom ?? 1)
-    let design = JSON.parse(await designOf(page))
-    const moved = placed(design, 'p1-box', 'story') as { x: number; y: number }
-    // One screen pixel is 1/zoom design pixels; the mouse lands on whole screen pixels.
-    expect(Math.abs(moved.x - 200)).toBeLessThanOrEqual(Math.ceil(1 / zoom))
-    expect(Math.abs(moved.y - 150)).toBeLessThanOrEqual(Math.ceil(1 / zoom))
-    expect(design.nodes['p1-box'].props).toMatchObject({ x: 100, y: 100 })
-    for (const formatId of FORMAT_IDS.filter((f) => f !== 'story'))
-      expect(design.overrides[formatScope(formatId)]?.['p1-box']).toBeUndefined()
-    writeOutput('canvas-1-dragged-in-story.png', await page.screenshot())
-
-    // Undo takes the whole drag back in one step.
-    await page.keyboard.press('Control+z')
-    await settle([page])
-    design = JSON.parse(await designOf(page))
-    expect(design.overrides['format:story']?.['p1-box']).toBeUndefined()
-
-    // Drag again, then reset the override: the layer is back on the base, pixel for pixel.
-    await drag(page, await screenPoint(page, 200, 180, story), await screenPoint(page, 300, 230, story))
-    await settle([page])
-    expect(JSON.parse(await designOf(page)).overrides['format:story']?.['p1-box']).toMatchObject({
-      x: expect.any(Number),
-    })
-    await page.evaluate(() => window.dazbee?.session.run('override.reset', { ids: ['p1-box'], scope: 'format:story' }))
-    await settle([page])
-    expect(JSON.parse(await designOf(page)).overrides['format:story']?.['p1-box']).toBeUndefined()
-    await page.keyboard.press('Escape')
-    // Off the stage, so no hover outline is drawn over the layer.
-    await page.mouse.move(0, 0)
-    await expect
-      .poll(async () => (await stageShot(page)).equals(before), { timeout: 10_000 })
-      .toBe(true)
-      .catch(async (error: unknown) => {
-        // Both pictures go beside the run's other output, and the box where they differ to the log.
-        const after = await stageShot(page)
-        writeOutput('canvas-reset-before.png', before)
-        writeOutput('canvas-reset-after.png', after)
-        console.log('the stage differs within', await differenceBox(page, before, after))
-        throw error
-      })
-    expect(errors).toEqual([])
-  })
-})
-
-test.describe('shared text', () => {
-  const hashOf = (page: Page, formatId: string) =>
-    page.evaluate(async (formatId) => {
-      const pixels = window.dazbee?.exportPixels(undefined, formatId)
-      if (!pixels) throw new Error('no editor')
-      const digest = await crypto.subtle.digest('SHA-256', pixels.slice())
-      return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('')
-    }, formatId)
-
-  test('typing into the headline in one format changes it in every format', async ({ page }) => {
-    const { errors } = await open(page, fiveFormats(10))
-    const hashes = await Promise.all(FORMAT_IDS.map((f) => hashOf(page, f)))
-    await page.evaluate(() => window.dazbee?.fitFrame('p1', 'land'))
-    await drawn(page)
-
-    // Past the end of the headline in Landscape, where it sits at 360, 260 and is 800 wide.
-    const land = { pageId: 'p1', formatId: 'land' }
-    const end = await screenPoint(page, 1150, 300, land)
-    await page.mouse.dblclick(end.x, end.y)
-    await expect(page.locator('.caret')).toBeVisible()
-    await page.keyboard.type(' now')
-    await page.keyboard.press('Escape')
-    await settle([page])
-    const design = JSON.parse(await designOf(page))
-    expect(design.nodes['p1-headline'].props.text).toBe('Summer sale now')
-    for (const [i, formatId] of FORMAT_IDS.entries()) {
-      expect(placed(design, 'p1-headline', formatId).text).toBe('Summer sale now')
-      expect(await hashOf(page, formatId)).not.toBe(hashes[i])
-    }
-    await page.keyboard.press('Shift+1')
-    await drawn(page)
-    writeOutput('canvas-2-typed-in-landscape.png', await page.screenshot())
-    expect(errors).toEqual([])
-  })
-})
-
 test.describe('pan and zoom', () => {
   test('zooming keeps the point under the cursor still, panning follows the wheel and space, fit all shows every frame, and the zoom menu zooms to the selection and to 100%', async ({
     page,
   }) => {
-    const { errors } = await open(page, fiveFormats(10))
+    const { errors } = await open(page, fiveFrames(10))
     const camera = () =>
       page.evaluate(() => {
         const editor = window.dazbee
@@ -206,19 +84,26 @@ test.describe('pan and zoom', () => {
     expect(panned.y).toBeCloseTo(scrolled.y - 100, 0)
     expect(await designOf(page)).toBe(designBefore)
 
-    // Shift+1 fits every frame inside the stage.
+    // Shift+1 fits every frame of the page inside the stage, each where it is stored.
     await page.keyboard.press('Shift+1')
     await drawn(page)
-    for (const formatId of FORMAT_IDS) {
-      const frame = await page.evaluate((f) => window.dazbee?.frames().find((x) => x.formatId === f), formatId)
-      if (!frame) throw new Error(`no frame for ${formatId}`)
-      const topLeft = await screenPoint(page, 0, 0, { pageId: 'p1', formatId })
-      const bottomRight = await screenPoint(page, frame.width, frame.height, { pageId: 'p1', formatId })
+    const frames = await page.evaluate(() => window.dazbee?.frames() ?? [])
+    expect(frames.map((frame) => frame.id)).toEqual(FRAME_IDS)
+    const stored = await page.evaluate(() => window.dazbee?.design().frames ?? {})
+    for (const frame of frames) {
+      expect({ x: frame.x, y: frame.y, width: frame.width, height: frame.height }).toEqual({
+        x: stored[frame.id]?.x,
+        y: stored[frame.id]?.y,
+        width: stored[frame.id]?.width,
+        height: stored[frame.id]?.height,
+      })
+      const topLeft = await screenPoint(page, 0, 0, frame.id)
+      const bottomRight = await screenPoint(page, frame.width, frame.height, frame.id)
       expect(topLeft.x).toBeGreaterThanOrEqual(stage.x)
       expect(topLeft.y).toBeGreaterThanOrEqual(stage.y)
       expect(bottomRight.x).toBeLessThanOrEqual(stage.x + stage.width)
       expect(bottomRight.y).toBeLessThanOrEqual(stage.y + stage.height)
-      await expect(page.locator(`.frame-label[data-frame="p1/${formatId}"]`)).toBeVisible()
+      await expect(page.locator(`.frame-label[data-frame="${frame.id}"]`)).toBeVisible()
     }
     // Shift+0 is 100%; Zoom to fit in the zoom pill's menu fits everything again.
     await page.keyboard.press('Shift+0')
@@ -242,4 +127,256 @@ test.describe('pan and zoom', () => {
     await expect.poll(async () => (await camera()).zoom).toBe(1)
     expect(errors).toEqual([])
   })
+})
+
+test.describe('dragging out of a frame', () => {
+  /** A square frame holding a red shape near its end, and a second frame 200 px past it. */
+  const sideBySide = (): DesignInput => {
+    const base = liveDesign()
+    return {
+      ...base,
+      meta: { ...base.meta, name: 'Side by side' },
+      frames: {
+        ...base.frames,
+        other: { pageId: 'p1', name: 'Other', width: 1080, height: 1080, x: 1280, y: 0, fills: CREAM, order: 'a1' },
+      },
+      nodes: {
+        shape: {
+          type: 'graphic',
+          parentId: 'sq',
+          link: 'shape',
+          index: 'a9',
+          name: 'Shape',
+          props: {
+            x: 700,
+            y: 400,
+            width: 300,
+            height: 200,
+            shape: { kind: 'rect' },
+            fills: [{ type: 'solid', color: '#E0262BFF' }],
+          },
+        },
+      },
+    }
+  }
+  /** The colour on screen at a design pixel of the square frame. */
+  async function colourAt(page: Page, x: number, y: number) {
+    const at = await screenPoint(page, x, y)
+    const png = (
+      await page.screenshot({
+        clip: { x: Math.round(at.x), y: Math.round(at.y), width: 1, height: 1 },
+        animations: 'disabled',
+      })
+    ).toString('base64')
+    return page.evaluate(async (png) => {
+      const bitmap = await createImageBitmap(await (await fetch(`data:image/png;base64,${png}`)).blob())
+      const canvas = new OffscreenCanvas(1, 1)
+      const context = canvas.getContext('2d')
+      context?.drawImage(bitmap, 0, 0)
+      return [...(context?.getImageData(0, 0, 1, 1).data ?? [])].slice(0, 3)
+    }, png)
+  }
+
+  test('a layer dragged past its frame shows there as a faint ghost, its frame label lit, and stays in its frame', async ({
+    browser,
+  }) => {
+    const { page, errors } = await openStage(browser, sideBySide())
+    await page.evaluate(() => window.dazbee?.setSnapping(false))
+    // The gap between the frames, beside where the shape goes, and where it goes.
+    const gap = await colourAt(page, 1190, 900)
+    const from = await screenPoint(page, 850, 500)
+    const to = await screenPoint(page, 1250, 500)
+    await page.mouse.move(from.x, from.y)
+    await page.mouse.down()
+    for (let i = 1; i <= 10; i++) await page.mouse.move(from.x + ((to.x - from.x) * i) / 10, from.y)
+    await drawn(page)
+
+    // Mid-drag: the part outside the square is drawn faintly over the gap and the other frame.
+    const ghost = await colourAt(page, 1190, 500)
+    expect(ghost, 'a ghost over the gap').not.toEqual(gap)
+    expect(ghost[0] ?? 0, 'red, but faint').toBeGreaterThan(ghost[1] ?? 0)
+    await expect(page.locator('.frame-label[data-frame="sq"]')).toHaveAttribute('data-active', '')
+    await expect(page.locator('.frame-label[data-frame="other"]')).not.toHaveAttribute('data-active')
+    writeOutput('drag-ghost.png', await page.screenshot({ animations: 'disabled' }))
+
+    // Dropped: the shape stays in the square, clipped there, selected.
+    await page.mouse.up()
+    await drawn(page)
+    const stored = JSON.parse(await designOf(page)) as {
+      nodes: Record<string, { parentId: string; props: { x: number } }>
+    }
+    expect(stored.nodes.shape).toMatchObject({ parentId: 'sq', props: { x: 1100 } })
+    expect(await page.evaluate(() => window.dazbee?.selection())).toEqual(['shape'])
+    await expect(page.locator('.selection')).toBeVisible()
+    expect(await colourAt(page, 1190, 500), 'no ghost once dropped').toEqual(gap)
+    expect(errors).toEqual([])
+  })
+})
+
+test.describe('frame labels', () => {
+  /** What the story frame's label shows with the frame `width` screen pixels wide. */
+  async function labelAt(page: Page, width: number) {
+    await page.evaluate((zoom) => window.dazbee?.setCamera({ x: 100, y: 100, zoom }), width / 1080)
+    await drawn(page)
+    return page.locator('.frame-label[data-frame="sq"]').evaluate((label) => {
+      const name = label.querySelector<HTMLElement>('.frame-name')
+      const size = label.querySelector<HTMLElement>('.frame-size')?.getBoundingClientRect()
+      const line = label.getBoundingClientRect()
+      return {
+        name: name?.textContent,
+        nameCut: !name || name.scrollWidth > name.clientWidth,
+        sizeShown: !!size && size.top < line.bottom && size.bottom > line.top,
+      }
+    })
+  }
+
+  test("a frame's label drops its size before it cuts its name short", async ({ browser }) => {
+    const story = frameDesign({ name: 'Labels', frameName: 'Story and Reel', width: 1080, height: 1920 })
+    const { page, errors } = await openStage(browser, story)
+    // Wide: the name and the size.
+    expect(await labelAt(page, 430)).toEqual({ name: 'Story and Reel', nameCut: false, sizeShown: true })
+    // Room for the name alone: the whole name, no size.
+    expect(await labelAt(page, 150)).toEqual({ name: 'Story and Reel', nameCut: false, sizeShown: false })
+    // Narrower than the name: the name cut short, no size.
+    expect(await labelAt(page, 54)).toEqual({ name: 'Story and Reel', nameCut: true, sizeShown: false })
+    expect(errors).toEqual([])
+  })
+})
+
+test.describe('pages of frames', () => {
+  /**
+   * Page 1 holds the five linked frames, page 2 one frame of its own and page 3 none, so the
+   * pictures show linked frames, two pages listed and shown, and a page with no frames.
+   */
+  const pages = (): DesignInput => {
+    const linked = fiveFrames(10)
+    return {
+      ...linked,
+      pages: { ...linked.pages, p2: { name: 'Page 2', order: 'a1' }, p3: { name: 'Page 3', order: 'a2' } },
+      frames: {
+        ...linked.frames,
+        'p2-sq': {
+          pageId: 'p2',
+          name: 'Feed square',
+          width: 1080,
+          height: 1080,
+          x: 0,
+          y: 0,
+          fills: CREAM,
+          order: 'a0',
+        },
+      },
+      nodes: {
+        ...linked.nodes,
+        'p2-headline': {
+          type: 'text',
+          parentId: 'p2-sq',
+          link: 'p2-headline',
+          index: 'a0',
+          name: 'Headline',
+          props: {
+            x: 80,
+            y: 480,
+            width: 920,
+            height: 120,
+            text: 'Page two',
+            style: { fontFamily: 'Noto Sans', fontSize: 80, fontWeight: 800, color: '#111111FF' },
+          },
+        },
+      },
+    }
+  }
+
+  /** What a brief picking three sizes makes: one page of three empty frames in a row, each named after its size. */
+  const brief = (): DesignInput =>
+    blankDesign({ designId: 'replaced-by-the-api', name: 'Autumn roast' }, [
+      { name: 'Feed square', width: 1080, height: 1080 },
+      { name: 'Story and Reel', width: 1080, height: 1920 },
+      { name: 'Link image', width: 1200, height: 628 },
+    ])
+  /** Opens a design in a tab of its own, in a theme and at a screen size, fitted once the editor is ready. */
+  async function openThemed(
+    browser: Browser,
+    content: DesignInput,
+    theme: (typeof THEMES)[number],
+    viewport: { width: number; height: number },
+  ) {
+    const designId = await seed(content)
+    const page = await (await browser.newContext({ viewport })).newPage()
+    const errors: string[] = []
+    page.on('pageerror', (error) => errors.push(error.message))
+    await setCookies(page, { theme })
+    await page.goto(editorPath(designId))
+    await expect(page.getByTestId('status')).toHaveAttribute('data-ready', '', { timeout: 60_000 })
+    await page.evaluate(() => window.dazbee?.loaded())
+    await fitSettled(page)
+    return { page, errors }
+  }
+
+  for (const [width, height] of SCREEN_SIZES) {
+    for (const theme of THEMES) {
+      test(
+        `screenshots at ${width}×${height}, ${theme}: one frame, linked frames, two pages, an empty page, the Pages card, a brief's frames, the layers panel and Export`,
+        { tag: '@evidence' },
+        async ({ browser }) => {
+          test.setTimeout(300_000)
+          const viewport = { width, height }
+          const shot = async (page: Page, name: string) => {
+            await nextFrame(page)
+            writeOutput(`frames-${width}-${theme}-${name}.png`, await page.screenshot({ animations: 'disabled' }))
+          }
+          const one = await openThemed(browser, liveDesign(), theme, viewport)
+          await shot(one.page, '1-one-frame')
+          expect(one.errors).toEqual([])
+          await one.page.context().close()
+
+          const { page, errors } = await openThemed(browser, pages(), theme, viewport)
+          const shown = () => page.evaluate(() => window.dazbee?.frames().map((frame) => frame.id))
+          expect(await shown()).toEqual(['sq', 'story', 'land', 'mpu', 'leader'])
+          await shot(page, '2-linked-frames')
+          // A layer selected in one frame; its copies stay as they are.
+          await selectLayers(page, ['p1-headline'], { bar: true })
+          await shot(page, '3-linked-frames-selected')
+          await selectLayers(page, [])
+          const panel = await pagesPanel(page)
+          await expect(panel.getByTestId('pages').locator('li')).toHaveCount(3)
+          // Each page with a frame shows a picture of its first frame once the stage settles, the empty page
+          // none; every page shows its number.
+          await expect(panel.getByTestId('page-thumbnail').locator('img')).toHaveCount(2)
+          await expect(panel.getByTestId('page-thumbnail').nth(2).locator('img')).toHaveCount(0)
+          await expect(panel.getByTestId('page-number')).toHaveText(['1', '2', '3'])
+          await shot(page, '4-pages')
+          await page.keyboard.press('Escape')
+          await expect(panel).toBeHidden()
+          // The layers panel lists the frame's layers.
+          await openLayers(page)
+          await shot(page, '5-layers-panel')
+          await page.getByRole('button', { name: 'Layers', exact: true }).click()
+          await expect(page.getByTestId('layers')).toBeHidden()
+          // Export lists what it exports.
+          await page.getByTestId('share-open').click()
+          await page.getByTestId('export-open').click()
+          await expect(page.getByTestId('export')).toBeVisible()
+          await shot(page, '6-export')
+          await page.keyboard.press('Escape')
+          await expect(page.getByTestId('export')).toBeHidden()
+          await page.evaluate(() => window.dazbee?.showPage('p2'))
+          await fitSettled(page)
+          expect(await shown()).toEqual(['p2-sq'])
+          await shot(page, '7-second-page')
+          await page.evaluate(() => window.dazbee?.showPage('p3'))
+          await fitSettled(page)
+          await expect(page.getByTestId('empty-page')).toBeVisible()
+          await shot(page, '8-empty-page')
+          expect(errors).toEqual([])
+          await page.context().close()
+
+          const drafts = await openThemed(browser, brief(), theme, viewport)
+          await expect(drafts.page.locator('.frame-label[data-frame]')).toHaveCount(3)
+          await shot(drafts.page, '9-brief-frames')
+          expect(drafts.errors).toEqual([])
+        },
+      )
+    }
+  }
 })

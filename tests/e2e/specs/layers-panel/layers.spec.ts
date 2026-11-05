@@ -1,7 +1,8 @@
 // The layers panel (#59) in Chromium, with the real mouse: the tree in step with the stage's
 // selection both ways, a layer dragged into a group (the stage redraws it there, one undo step,
 // which redo brings back), rename, lock and hide, all there after a reload; with nothing selected,
-// the page in view, an empty one too; and the rows' pictures reading in both themes.
+// the first frame of the page in view, an empty one too, or a page with no frames; and the rows'
+// pictures reading in both themes.
 import type { DesignInput } from '@dazbee/schema'
 
 import { reloads, setCookies, writeOutput } from '../../support/editor.ts'
@@ -49,7 +50,7 @@ test('the panel and the stage select together; drag into a group, rename, lock a
   expect(await colourAt(page, 800, 780)).toEqual([31, 157, 85])
   // One undo puts it back; redo puts it in again, and the panel follows both.
   await page.evaluate(() => window.dazbee?.perform('undo'))
-  await expect.poll(async () => (await node(page, 'dot')).parentId).toBe('p1')
+  await expect.poll(async () => (await node(page, 'dot')).parentId).toBe('sq')
   expect(await page.evaluate(() => window.dazbee?.boxOf('card'))).toEqual(before)
   await page.evaluate(() => window.dazbee?.perform('redo'))
   await expect.soft.poll(async () => (await node(page, 'dot')).parentId).toBe('card')
@@ -58,7 +59,7 @@ test('the panel and the stage select together; drag into a group, rename, lock a
     .toEqual(['Box', 'Card', '  Dot', '  Card stripe', '  Card back', 'Backdrop'])
   expect.soft(await page.evaluate(() => window.dazbee?.boxOf('card'))).toEqual(after)
   await page.evaluate(() => window.dazbee?.perform('undo'))
-  await expect.poll(async () => (await node(page, 'dot')).parentId).toBe('p1')
+  await expect.poll(async () => (await node(page, 'dot')).parentId).toBe('sq')
 
   // Drag Backdrop above Box: reordered among its siblings.
   const box = await row(page, 'Box').boundingBox()
@@ -118,18 +119,27 @@ test('the panel and the stage select together; drag into a group, rename, lock a
   expect(errors).toEqual([])
 })
 
-test('with nothing selected the panel shows the page in view, an empty one too', async ({ browser }) => {
+test('with nothing selected the panel shows the first frame of the page in view, an empty one too, or says a page has no frames', async ({
+  browser,
+}) => {
   const { page, errors } = await openStage(browser, layersDesign())
   await openLayers(page)
   const note = page.getByTestId('flyout-note')
   await selectLayers(page, ['box'])
   await selectLayers(page, [])
   await expect(note).toHaveText('Page 1 · Square')
-  // Add page brings the new, empty page into view: the panel shows it, with no layers.
+  // Add page brings the new page into view: the panel shows its one frame, with no layers.
   const pages = await pagesPanel(page)
   await pages.getByTestId('add-page').click()
-  await expect(note).toHaveText('Page 2 · Square')
-  await expect(page.getByTestId('layers')).toHaveText('No layers on this page yet. Draw a shape or add text to start.')
+  await expect(note).toHaveText('Page 2 · Feed square')
+  await expect(page.getByTestId('layers')).toHaveText('No layers in this frame yet. Draw a shape or add text to start.')
+  // With that frame deleted the page has none, and the panel says how to add one.
+  await page.evaluate(() => {
+    const editor = window.dazbee
+    for (const frame of editor?.frames() ?? []) editor?.session.run('frame.delete', { frameId: frame.id })
+  })
+  await expect(note).toHaveCount(0)
+  await expect(page.getByTestId('layers')).toHaveText('Pick the Frame tool to add a frame')
   await pages.getByRole('button', { name: 'Show Page 1' }).click()
   await expect(note).toHaveText('Page 1 · Square')
   await expect(row(page, 'Box')).toBeVisible()
@@ -137,9 +147,10 @@ test('with nothing selected the panel shows the page in view, an empty one too',
 })
 
 test.describe('row pictures in dark and light theme', () => {
-  const text = (index: string, name: string, y: number, color: string) => ({
+  const text = (link: string, index: string, name: string, y: number, color: string) => ({
     type: 'text' as const,
-    parentId: 'p1',
+    parentId: 'sq',
+    link,
     index,
     name,
     props: {
@@ -155,8 +166,8 @@ test.describe('row pictures in dark and light theme', () => {
     ...layersDesign(),
     nodes: {
       ...layersDesign().nodes,
-      ink: text('b0', 'Ink', 60, '#111111FF'),
-      chalk: text('b1', 'Chalk', 160, '#FFFFFFFF'),
+      ink: text('ink', 'b0', 'Ink', 60, '#111111FF'),
+      chalk: text('chalk', 'b1', 'Chalk', 160, '#FFFFFFFF'),
     },
   })
   /** How a row's picture tile looks: what it holds, its fill and its ink. */
@@ -195,14 +206,16 @@ test.describe('row pictures in dark and light theme', () => {
       ...layersDesign().nodes,
       night: {
         type: 'graphic',
-        parentId: 'p1',
+        parentId: 'sq',
+        link: 'night',
         index: 'b0',
         name: 'Night box',
         props: rect(80, 60, 300, 300, '#1A1420FF'),
       },
       snow: {
         type: 'graphic',
-        parentId: 'p1',
+        parentId: 'sq',
+        link: 'snow',
         index: 'b1',
         name: 'Snow dot',
         props: { ...rect(600, 60, 300, 200, '#FFFFFFFF'), shape: { kind: 'ellipse' as const } },

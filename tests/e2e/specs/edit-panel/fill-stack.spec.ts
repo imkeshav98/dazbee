@@ -11,39 +11,34 @@ import { AssetLink, type DesignInput } from '@dazbee/schema'
 
 import { api, photo, upload } from '../../support/assets.ts'
 import { designOf, exportHashOf, screenPoint, writeOutput } from '../../support/editor.ts'
-import { backgroundPanel, click, openStage, press, read } from '../../support/stage.ts'
+import { frameDesign } from '../../support/seed.ts'
+import { click, openStage, press, read } from '../../support/stage.ts'
 import { expect, type Page, test } from '../../support/test.ts'
 import { fillList, openCard, strokeList } from '../../support/top-bar.ts'
 
 test.describe.configure({ timeout: 120_000 })
 
-const design = (assetId: string): DesignInput => ({
-  meta: {
-    designId: 'replaced-by-the-api',
+const design = (assetId: string): DesignInput =>
+  frameDesign({
     name: 'Fill stack',
-    kind: 'single',
-    primaryFormatId: 'sq',
-  },
-  formats: { sq: { name: 'Square', width: 1080, height: 1080, order: 'a0' } },
-  pages: { p1: { name: 'Page 1', order: 'a0', fills: [{ type: 'solid', color: '#FFF8F0FF' }] } },
-  nodes: {
-    card: {
-      type: 'graphic',
-      parentId: 'p1',
-      index: 'a0',
-      name: 'Card',
-      props: {
-        x: 540,
-        y: 140,
-        width: 440,
-        height: 440,
-        shape: { kind: 'rect', cornerRadius: 32 },
-        fills: [{ type: 'image', assetId, fit: 'fill' }],
+    fills: [{ type: 'solid', color: '#FFF8F0FF' }],
+    nodes: {
+      card: {
+        type: 'graphic',
+        parentId: 'sq',
+        index: 'a0',
+        name: 'Card',
+        props: {
+          x: 540,
+          y: 140,
+          width: 440,
+          height: 440,
+          shape: { kind: 'rect', cornerRadius: 32 },
+          fills: [{ type: 'image', assetId, fit: 'fill' }],
+        },
       },
     },
-  },
-  overrides: {},
-})
+  })
 
 type Fill = { type: string; color?: string; visible?: boolean; stops?: { offset: number; color: string }[] }
 const fillsOf = async (page: Page) => ((await read(page)).nodes.card?.props.fills ?? []) as Fill[]
@@ -67,7 +62,7 @@ async function stageAndExport(page: Page, x: number, y: number) {
   }, shot)
   const exported = await page.evaluate(
     async ({ x, y }) => {
-      const file = await window.dazbee?.exportFiles({ pageIds: ['p1'], formatIds: ['sq'], type: 'png' })
+      const file = await window.dazbee?.exportFiles({ frameIds: ['sq'], type: 'png' })
       const bitmap = await createImageBitmap(new Blob([new Uint8Array(file?.bytes ?? [])], { type: 'image/png' }))
       const canvas = new OffscreenCanvas(bitmap.width, bitmap.height)
       const context = canvas.getContext('2d')
@@ -168,7 +163,7 @@ test('a gradient over a photo: added on top, a stop edited, the two reordered, o
   const link = AssetLink.parse(await api(`/assets/${asset.id}`))
   const stored = new Uint8Array(await (await fetch(link.url)).arrayBuffer())
   const ck = await loadCanvasKit()
-  const node = renderDesign(ck, doc, 'p1', 'sq', {
+  const node = renderDesign(ck, doc, 'sq', {
     ...fixtureResources(),
     images: { [asset.id]: stored },
   })
@@ -180,9 +175,7 @@ test('a gradient over a photo: added on top, a stop edited, the two reordered, o
   expect(errors).toEqual([])
 })
 
-test('a stroke and the page background take the same paint editor: an angular stroke, a radial page', async ({
-  browser,
-}) => {
+test('a stroke takes the same paint editor: an angular stroke at an angle', async ({ browser }) => {
   const asset = await upload(photo)
   const { page, errors } = await openStage(browser, design(asset.id))
   await click(page, 760, 360)
@@ -203,37 +196,8 @@ test('a stroke and the page background take the same paint editor: an angular st
   // Esc closes the paint editor, then the Outline popover.
   await page.keyboard.press('Escape')
   await page.keyboard.press('Escape')
-
-  // The page picked, its Background panel holds the page's background as a stack too.
-  await press(page, 'deselect')
-  const layers = (await backgroundPanel(page)).getByTestId('page-fills')
-  await layers.locator('[data-row="1"]').getByTestId('paint-swatch').click()
-  await editor.getByRole('radio', { name: 'Circle gradient' }).click()
-  await expect
-    .poll(
-      async () =>
-        ((await read(page)) as unknown as { pages: Record<string, { fills: Fill[] }> }).pages.p1?.fills[0]?.type,
-    )
-    .toBe('radial')
-  await editor.getByRole('spinbutton', { name: 'Gradient size' }).fill('80')
-  await editor.getByRole('spinbutton', { name: 'Gradient size' }).press('Enter')
-  await page.keyboard.press('Escape')
   await page.evaluate(() => window.dazbee?.drawn())
-  writeOutput('fill-stack-5-stroke-and-page.png', await page.screenshot({ animations: 'disabled' }))
-  // A second background layer, an image, goes on top of the gradient: once the list shows it, it is row 1.
-  await layers.getByRole('button', { name: 'Add a background layer' }).click()
-  await expect(layers.locator('[data-row]')).toHaveCount(2)
-  await layers.locator('[data-row="1"]').getByTestId('paint-swatch').click()
-  await editor.getByTestId('paint-image').click()
-  const picker = page.getByTestId('paint-image-picker')
-  await picker.locator(`li[data-asset="${asset.id}"] button`).click()
-  await expect
-    .poll(async () =>
-      ((await read(page)) as unknown as { pages: Record<string, { fills: Fill[] }> }).pages.p1?.fills.map(
-        (f) => f.type,
-      ),
-    )
-    .toEqual(['radial', 'image'])
+  writeOutput('fill-stack-5-stroke.png', await page.screenshot({ animations: 'disabled' }))
   expect(errors).toEqual([])
 })
 
@@ -242,15 +206,15 @@ test('a gradient stop removed while it is dragged ends the drag and its undo ste
 }) => {
   const asset = await upload(photo)
   const { page, errors } = await openStage(browser, design(asset.id))
-  await press(page, 'deselect')
-  const layers = (await backgroundPanel(page)).getByTestId('page-fills')
-  await layers.locator('[data-row="1"]').getByTestId('paint-swatch').click()
+  // A colour on top of the photo, made a line gradient: its stops are the ones edited.
+  await click(page, 760, 360)
+  const card = await fillList(page)
+  await (await openCard(page, 'fill-card')).getByRole('button', { name: 'Add fill' }).click()
+  await expect.poll(async () => (await fillsOf(page)).map((f) => f.type)).toEqual(['image', 'solid'])
+  await card.locator('[data-row="1"]').getByTestId('paint-swatch').click()
   const editor = page.getByTestId('paint-editor')
   await editor.getByRole('radio', { name: 'Line gradient' }).click()
-  const offsets = async () =>
-    ((await read(page)) as unknown as { pages: Record<string, { fills: Fill[] }> }).pages.p1?.fills[0]?.stops?.map(
-      (s) => s.offset,
-    )
+  const offsets = async () => (await fillsOf(page))[1]?.stops?.map((s) => s.offset)
   const stops = async () => (await offsets())?.length
   const bar = await editor.getByTestId('gradient-bar').boundingBox()
   if (!bar) throw new Error('no bar')
@@ -273,8 +237,11 @@ test('a gradient stop removed while it is dragged ends the drag and its undo ste
   expect(await offsets()).toEqual(left)
   await expect.poll(() => page.evaluate(() => window.dazbee?.gesturing())).toBe(false)
 
-  // The last stop, with a third stop again, the pointer let go away from the bar.
-  await page.mouse.click(bar.x + bar.width * 0.5, bar.y + bar.height / 2)
+  // The last stop, with a third stop again, the pointer let go away from the bar. The bar is
+  // measured again: the panel may have moved since.
+  const now = await editor.getByTestId('gradient-bar').boundingBox()
+  if (!now) throw new Error('no bar')
+  await page.mouse.click(now.x + now.width * 0.5, now.y + now.height / 2)
   await expect.poll(stops).toBe(3)
   const last = await editor.locator('[data-stop="2"]').boundingBox()
   if (!last) throw new Error('no stop')

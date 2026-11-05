@@ -9,7 +9,7 @@ import { hovered, laid, look, openDesignIn, openIn, pressed, THEMES } from '../.
 import { API_URL, DEV_BRAND, liveDesign, seed } from '../../support/seed.ts'
 import { selectLayers } from '../../support/stage.ts'
 import { expect, type Locator, type Page, test } from '../../support/test.ts'
-import { barMenu, closeBarMenu, fillList, moreMenu, pagesPanel, sizesPanel } from '../../support/top-bar.ts'
+import { barMenu, closeBarMenu, fillList, moreMenu, pagesPanel } from '../../support/top-bar.ts'
 
 test.describe.configure({ timeout: 180_000 })
 
@@ -185,12 +185,6 @@ test('glass buttons and rows take the hover tint and, while pressed, the pressed
     await pressed(page, undo, { fill: glass.pressed, colour: glass.text })
     await page.keyboard.press('Escape')
     await expect(card).toBeHidden()
-
-    // The Sizes card's chips.
-    const chip = (await sizesPanel(page)).locator('button[data-preset]:visible').first()
-    await hovered(chip, { fill: glass.hover })
-    await pressed(page, chip, { fill: glass.pressed })
-    await page.keyboard.press('Escape')
 
     // The Brand flyout's Edit.
     await page.getByRole('button', { name: 'Brand', exact: true }).click()

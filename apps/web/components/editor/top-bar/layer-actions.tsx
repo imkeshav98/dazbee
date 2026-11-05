@@ -1,7 +1,7 @@
 'use client'
 
 // The selected layers' own actions, one list for the small menu's ⋯ (the full menu) and the
-// right-click menu: copy, paste, duplicate and delete; order and line up with the size as menus
+// right-click menu: copy, paste, duplicate and delete; order and line up with the frame as menus
 // beside their rows, and the turn; group, box, mask (or release the mask a layer is under) and
 // ungroup; lock and hide; text direction. Every row runs the same editor action as its shortcut.
 // A right-click on empty canvas offers to show the hidden layers of the frame there, or of the one
@@ -12,7 +12,7 @@ import { type ReactNode, useEffect, useState } from 'react'
 
 import { childrenOf, descendants } from '@dazbee/doc'
 import { type Editor, type Frame, type Point, type ShortcutAction, visibleIn } from '@dazbee/editor'
-import { type Design, formatScope } from '@dazbee/schema'
+import type { Design } from '@dazbee/schema'
 
 import { ALIGN, keyOf } from '@/components/editor/arrange-actions.ts'
 import { RotationField } from '@/components/editor/edit-panel/position-panel.tsx'
@@ -29,8 +29,7 @@ import { useMenuFocus, useScrollingMenu } from './bar-popover.tsx'
 /** The layers hidden in one frame, which a right-click on its empty canvas offers to show. */
 export interface HiddenLayers {
   ids: string[]
-  pageId: string
-  formatId: string
+  frameId: string
 }
 
 /** The four moves along the stack: to the front, forward, backward, to the back. */
@@ -42,11 +41,11 @@ export const ORDER = ['bringToFront', 'bringForward', 'sendBackward', 'sendToBac
  */
 export function hiddenAt(editor: Editor, client: Point): HiddenLayers | null {
   const spot = editor.spotAt(client)
-  const frame = editor.frames().find((f) => f.key === spot?.frame) ?? nearestFrame(editor, client)
+  const frame = editor.frames().find((f) => f.id === spot?.frameId) ?? nearestFrame(editor, client)
   if (!frame) return null
   const design = editor.design()
-  const ids = descendants(design, frame.pageId).filter((id) => !visibleIn(design, frame, id))
-  return ids.length > 0 ? { ids, pageId: frame.pageId, formatId: frame.formatId } : null
+  const ids = descendants(design, frame.id).filter((id) => !visibleIn(design, id))
+  return ids.length > 0 ? { ids, frameId: frame.id } : null
 }
 
 /**
@@ -74,8 +73,8 @@ function masksOver(design: Design, ids: readonly string[]): string[] | null {
 function nearestFrame(editor: Editor, client: Point) {
   let nearest: { frame: Frame; far: number } | null = null
   for (const frame of editor.frames()) {
-    const a = editor.screenPoint(0, 0, frame.pageId, frame.formatId)
-    const b = editor.screenPoint(frame.width, frame.height, frame.pageId, frame.formatId)
+    const a = editor.screenPoint(0, 0, frame.id)
+    const b = editor.screenPoint(frame.width, frame.height, frame.id)
     const dx = Math.max(Math.min(a.x, b.x) - client.x, 0, client.x - Math.max(a.x, b.x))
     const dy = Math.max(Math.min(a.y, b.y) - client.y, 0, client.y - Math.max(a.y, b.y))
     const far = Math.hypot(dx, dy)
@@ -119,11 +118,6 @@ export function LayerActions({ editor, ids, onDone }: { editor: Editor; ids: str
   const nodes = target.ids.map((id) => design.nodes[id])
   const locked = nodes.every((node) => node?.lock && Object.values(node.lock).some(Boolean))
   const hidden = target.props.every((pr) => pr.visible === false)
-  const hiddenEverywhere = target.ids.every((id) =>
-    Object.keys(design.formats).every(
-      (f) => (design.overrides[formatScope(f)]?.[id]?.visible ?? design.nodes[id]?.props.visible) === false,
-    ),
-  )
   const masks = target.props.every((pr) => Boolean(pr.mask))
   const over = masksOver(design, target.ids)
   const sized = target.types.every((type) => type !== 'group' && type !== 'boolean')
@@ -209,15 +203,14 @@ export function LayerActions({ editor, ids, onDone }: { editor: Editor; ids: str
       <button
         type="button"
         onClick={() => {
-          editor.setHidden(target.ids, !hidden, target.pageId, target.formatId)
+          editor.setHidden(target.ids, !hidden)
           onDone()
         }}
         className={MENU_ITEM}
       >
-        {hidden ? b.showHere : b.hideHere}
+        {hidden ? b.show : b.hide}
         <kbd className={MENU_KEY}>{keyOf('hide')}</kbd>
       </button>
-      {row('hideEverywhere', hiddenEverywhere ? b.showEverywhere : b.hideEverywhere)}
       {texts && (
         <>
           <div className={MENU_DIVIDER} />
@@ -229,7 +222,7 @@ export function LayerActions({ editor, ids, onDone }: { editor: Editor; ids: str
                 aria-pressed={direction === to}
                 data-direction={to}
                 onClick={() => {
-                  set({ ...target, everyFormat: true }, () => ({ direction: to }))
+                  set(target, () => ({ direction: to }))
                   onDone()
                 }}
                 className={MENU_ITEM}
@@ -299,7 +292,7 @@ export function StageMenu({
               type="button"
               data-action="showHidden"
               onClick={() => {
-                editor.setHidden(hidden.ids, false, hidden.pageId, hidden.formatId)
+                editor.setHidden(hidden.ids, false)
                 onClose()
               }}
               className={MENU_ITEM}

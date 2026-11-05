@@ -1,8 +1,8 @@
 'use client'
 
-// The top bar: fixed at the top centre of the stage while something is selected, its items set by
-// what is selected (text, a photo, a shape, a box, a group, or several, or the page: its Background
-// and Sizes); a locked layer's bar says it is locked and unlocks it. An item with ▾ opens a pop-up
+// The top bar: fixed at the top centre of the stage while layers are selected, its items set by
+// what is selected (text, a photo, a shape, a box, a group, or several); a locked layer's bar says
+// it is locked and unlocks it. An item with ▾ opens a pop-up
 // under the bar; a panel item opens the one edit panel at the stage's end; the rest act at once.
 // When the items don't fit, the last ones go into ⋯, which opens a second row under the bar;
 // on a phone the bar scrolls sideways instead.
@@ -19,19 +19,17 @@ import {
   isPanel,
   overPanel,
   setBar,
-  setEveryFormat,
   setOpen,
   useEditState,
   usePhone,
 } from '@/components/editor/edit-store.ts'
-import { usePickedPage, useSelection } from '@/components/editor/editor-hooks.ts'
+import { useSelection } from '@/components/editor/editor-hooks.ts'
 import { BAR_BUTTON, BAR_ROW } from '@/components/editor/styles.ts'
-import { useLiveDesign } from '@/components/editor/use-live-design.ts'
 import { cn } from '@/lib/cn.ts'
 import { useMessages } from '@/lib/i18n/client.tsx'
 
 import { arrowAlong, useRovingTab } from './bar-popover.tsx'
-import { type BarItem, usePageItems, useSelectionItems } from './top-bar-items.tsx'
+import { type BarItem, useSelectionItems } from './top-bar-items.tsx'
 
 /** Room kept between the bar and the stage's sides. */
 const SIDE = 16
@@ -81,21 +79,15 @@ function useFit(row: HTMLElement | null, extra: HTMLElement | null, keys: string
 export function TopBar({ editor, brandId }: { editor: Editor; brandId: string }) {
   const ids = useSelection(editor)
   const selected = useTarget(editor, ids)
-  const picked = usePickedPage(editor)
-  // A pop-up or panel belongs to the selection it was opened for, and Background to the page
-  // picked: another page brought into view from Pages leaves Pages and Sizes open.
-  const opened = useRef({ ids, picked })
+  // A pop-up or panel belongs to the selection it was opened for: another selection closes it. Pages
+  // stays open when showing another page lets the selection go. A picked page has no bar.
+  const opened = useRef(ids)
   useLayoutEffect(() => {
-    const was = opened.current
-    if (was.ids === ids && was.picked === picked) return
-    opened.current = { ids, picked }
+    if (opened.current === ids) return
+    opened.current = ids
     const now = editState().open
-    if (was.ids !== ids || now === 'background' || !isPanel(now) || isLayerPanel(now)) setOpen(null)
-  }, [ids, picked])
-  // Once nothing is selected, changes go to the format shown again.
-  useEffect(() => {
-    if (ids.length === 0) setEveryFormat(false)
-  }, [ids.length])
+    if (ids.length > 0 || !isPanel(now) || isLayerPanel(now)) setOpen(null)
+  }, [ids])
   useEffect(
     () => () => {
       setBar(false)
@@ -104,7 +96,6 @@ export function TopBar({ editor, brandId }: { editor: Editor; brandId: string })
     [],
   )
   if (selected) return <LayerBar target={selected.target} design={selected.design} brandId={brandId} />
-  if (picked) return <PageBar editor={editor} pageId={picked} />
   return <BarGone />
 }
 
@@ -115,28 +106,14 @@ function LayerBar({ target, design, brandId }: { target: Target; design: Design;
   )
 }
 
-function PageBar({ editor, pageId }: { editor: Editor; pageId: string }) {
-  const { design } = useLiveDesign(editor)
-  const items = usePageItems(pageId, design)
-  return <Bar items={items} label={useMessages().editor.page.title} named={{ 'data-page': pageId }} />
-}
-
 /** With nothing selected there is no bar. */
 function BarGone() {
   useLayoutEffect(() => setBar(false), [])
   return null
 }
 
-/** The bar for what it acts on, which `named` names on it: the selected layers, or the page. */
-function Bar({
-  items,
-  label,
-  named,
-}: {
-  items: BarItem[]
-  label: string
-  named: { 'data-selection': string } | { 'data-page': string }
-}) {
+/** The bar for the selected layers, which `named` names on it. */
+function Bar({ items, label, named }: { items: BarItem[]; label: string; named: { 'data-selection': string } }) {
   const t = useMessages()
   const { open, flyoutEnd } = useEditState()
   const phone = usePhone()

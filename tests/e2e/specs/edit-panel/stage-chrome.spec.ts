@@ -25,7 +25,7 @@ test('the canvas runs full width and the ads fit between the capsule and the sta
   const stage = await box(page, 'stage')
   const rail = await box(page, 'rail')
   expect(stage.width).toBeGreaterThan(1430)
-  // No cards: with nothing selected the design's sizes and pages are behind their buttons.
+  // No cards: with nothing selected the design's pages are behind the Pages button.
   await expect(page.getByTestId('cards')).toHaveCount(0)
   await expect(page.getByTestId('top-bar')).toHaveCount(0)
   // The square, fitted, sits wholly between the capsule and the stage's end, centred in that gap:
@@ -54,7 +54,7 @@ test('a selection shows the top bar; several layers line up and spread out from 
   await page.mouse.click(at.x, at.y)
   const arrange = page.getByTestId('arrange')
   await expect(await openCard(page, 'layout-card')).toBeVisible()
-  // One layer lines up with its format from the full menu.
+  // One layer lines up with its frame from the full menu.
   await expect(arrange).toHaveCount(0)
   await expect(page.getByTestId('bar-line-up')).toHaveCount(0)
   await expect((await moreSubmenu(page, 'line-up')).getByRole('button', { name: 'Align left' })).toBeEnabled()

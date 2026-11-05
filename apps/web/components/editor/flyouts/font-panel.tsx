@@ -8,7 +8,7 @@ import { MagnifyingGlassIcon, UploadSimpleIcon } from '@phosphor-icons/react'
 import { type KeyboardEvent, type ReactNode, useEffect, useId, useMemo, useRef, useState } from 'react'
 
 import type { Editor } from '@dazbee/editor'
-import { type Design, FontFace, FontFamily, formatScope } from '@dazbee/schema'
+import { type Design, FontFace, FontFamily } from '@dazbee/schema'
 
 import { nearest, previewFace, weightsOf } from '@/components/brand-kit/font-catalog.ts'
 import { useEditorDesign, useSelection } from '@/components/editor/editor-hooks.ts'
@@ -26,25 +26,19 @@ const GROUPS = ['upload', 'google', 'builtin'] as const
 const same = <T,>(values: T[]) => (values.every((v) => v === values[0]) ? (values[0] ?? null) : null)
 
 /**
- * The base style of the selected text layers: their family and weight, or null where they differ;
- * and the size they are shown at in the format shown, for the card's note.
+ * The base style of the selected text layers: their family, weight and size, each null where they
+ * differ; the size is for the card's note.
  */
-
-function selectedFont(design: Design, ids: string[], formatId: string) {
-  const texts = ids.flatMap((id) => {
+function selectedFont(design: Design, ids: string[]) {
+  const styles = ids.flatMap((id) => {
     const node = design.nodes[id]
-    return node?.type === 'text' ? [{ id, style: node.props.style }] : []
+    return node?.type === 'text' ? [node.props.style] : []
   })
-  if (texts.length === 0) return null
-  const sizes = texts.map(
-    ({ id, style }) =>
-      (design.overrides[formatScope(formatId)]?.[id]?.style as Partial<typeof style> | undefined)?.fontSize ??
-      style.fontSize,
-  )
+  if (styles.length === 0) return null
   return {
-    family: same(texts.map(({ style }) => style.fontFamily)),
-    weight: same(texts.map(({ style }) => style.fontWeight)),
-    size: same(sizes),
+    family: same(styles.map((style) => style.fontFamily)),
+    weight: same(styles.map((style) => style.fontWeight)),
+    size: same(styles.map((style) => style.fontSize)),
   }
 }
 
@@ -115,16 +109,11 @@ export function FontChooser({
     void refresh()
   }, [refresh])
   const listId = useId()
-  const [, frameFormat] = editor.selectedFrame()?.split('/') ?? []
   // With a range of the text being edited selected, its font is the range's.
   const range = editor.textSelectionStyles()
   const current = range
     ? { family: same(range.map((s) => s.fontFamily)), weight: same(range.map((s) => s.fontWeight)) }
-    : selectedFont(
-        design,
-        selected,
-        frameFormat && design.formats[frameFormat] ? frameFormat : design.meta.primaryFormatId,
-      )
+    : selectedFont(design, selected)
   if (!current) return null
   const weights = weightsOf(catalog.find((f) => f.family === current.family))
   const pick = (picked: FontFamily) => {

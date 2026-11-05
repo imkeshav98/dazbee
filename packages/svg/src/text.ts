@@ -99,6 +99,7 @@ export function textLayer(context: Context, element: XmlElement, style: Style, m
   nodes[id] = {
     type: 'text',
     parentId: 'root',
+    link: id,
     index: 'a0',
     name: content.slice(0, 40).replace(/\n/g, ' '),
     props: {

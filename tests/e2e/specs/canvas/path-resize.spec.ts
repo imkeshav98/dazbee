@@ -3,24 +3,18 @@
 import type { DesignInput } from '@dazbee/schema'
 
 import { placed, screenPoint, writeOutput } from '../../support/editor.ts'
+import { frameDesign } from '../../support/seed.ts'
 import { click, dragScreen, handle, openStage, press, read } from '../../support/stage.ts'
 import { expect, type Page, test } from '../../support/test.ts'
 
 test.describe.configure({ timeout: 120_000 })
 
-const design: DesignInput = {
-  meta: {
-    designId: 'replaced-by-the-api',
-    name: 'Path resize',
-    kind: 'single',
-    primaryFormatId: 'sq',
-  },
-  formats: { sq: { name: 'Square', width: 1080, height: 1080, order: 'a0' } },
-  pages: { p1: { name: 'Page 1', order: 'a0', fills: [{ type: 'solid', color: '#FFFFFFFF' }] } },
+const design: DesignInput = frameDesign({
+  name: 'Path resize',
   nodes: {
     pen: {
       type: 'graphic',
-      parentId: 'p1',
+      parentId: 'sq',
       index: 'a0',
       name: 'Pen',
       props: {
@@ -33,8 +27,7 @@ const design: DesignInput = {
       },
     },
   },
-  overrides: {},
-}
+})
 
 /** Drags the selection's south-east handle by a design offset. */
 async function stretch(page: Page, dx: number, dy: number) {
@@ -57,7 +50,7 @@ test('a resized path edits from where its points are drawn', async ({ browser })
   // Dragging one moves it alone: the others stay where they are drawn.
   const zoom = await page.evaluate(() => window.dazbee?.camera().zoom ?? 1)
   await dragScreen(page, want, { x: want.x + 40 * zoom, y: want.y })
-  const pen = placed(await read(page), 'pen', 'sq') as {
+  const pen = placed(await read(page), 'pen') as {
     x: number
     y: number
     width: number

@@ -41,10 +41,18 @@ const design = (): DesignInput => {
     meta: { ...base.meta, name: 'Groups' },
     nodes: {
       ...base.nodes,
-      tag: { type: 'graphic', parentId: 'p1', index: 'a4', name: 'Tag', props: rect(420, 300, 160, 80, '#00A889FF') },
+      tag: {
+        type: 'graphic',
+        parentId: 'sq',
+        link: 'tag',
+        index: 'a4',
+        name: 'Tag',
+        props: rect(420, 300, 160, 80, '#00A889FF'),
+      },
       turned: {
         type: 'group',
-        parentId: 'p1',
+        parentId: 'sq',
+        link: 'turned',
         index: 'a5',
         name: 'Turned',
         props: { x: 560, y: 800, width: 400, height: 160, rotation: 30 },
@@ -52,6 +60,7 @@ const design = (): DesignInput => {
       t1: {
         type: 'graphic',
         parentId: 'turned',
+        link: 't1',
         index: 'a0',
         name: 'T1',
         props: rect(560, 800, 160, 160, '#8E44FFFF'),
@@ -59,6 +68,7 @@ const design = (): DesignInput => {
       t2: {
         type: 'graphic',
         parentId: 'turned',
+        link: 't2',
         index: 'a1',
         name: 'T2',
         props: rect(800, 800, 160, 160, '#FFB020FF'),
@@ -69,7 +79,7 @@ const design = (): DesignInput => {
 
 type Placed = { x: number; y: number; width: number; height: number; rotation: number }
 const box = (d: Design, id: string): Placed => {
-  const p = { ...d.nodes[id]?.props, ...d.overrides['format:sq']?.[id] } as Partial<Placed>
+  const p = { ...d.nodes[id]?.props } as Partial<Placed>
   return { x: p.x ?? 0, y: p.y ?? 0, width: p.width ?? 0, height: p.height ?? 0, rotation: p.rotation ?? 0 }
 }
 const kids = (d: Design, id: string) =>
@@ -110,7 +120,7 @@ test('group three layers, resize the group, enter it and move one, ungroup, and 
   await press(page, 'group')
   const [group = ''] = await selection(page)
   let now = await read(page)
-  expect(now.nodes[group]).toMatchObject({ parentId: 'p1' })
+  expect(now.nodes[group]).toMatchObject({ parentId: 'sq' })
   expect(kids(now, group)).toEqual(['box', 'dot', 'tag'])
   expect(box(now, group)).toMatchObject({ x: 80, y: 80, width: 860, height: 300 })
   // The group stands where the tag, the topmost of the three, was.
@@ -161,7 +171,7 @@ test('group three layers, resize the group, enter it and move one, ungroup, and 
   expect(now.nodes[group]).toBeUndefined()
   expect(await selection(page)).toEqual(['box', 'dot', 'tag'])
   for (const id of ['box', 'dot', 'tag']) {
-    expect(now.nodes[id]?.parentId).toBe('p1')
+    expect(now.nodes[id]?.parentId).toBe('sq')
     expect(box(now, id)).toEqual(box(moved, id))
   }
   writeOutput('groups-4-ungrouped.png', await page.screenshot())

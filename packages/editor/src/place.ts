@@ -1,20 +1,11 @@
 // Putting things on the canvas: copying, cutting and pasting layers, placing an SVG file or an
 // image, and putting an image into a layer as its fill, with the layer a dragged image would go into.
 import type { CanvasKit } from '@dazbee/canvaskit'
-import { ancestorsOf, childrenOf, mergedProps, type Session } from '@dazbee/doc'
-import {
-  canHold,
-  type Design,
-  type Layer,
-  LayerClipboard,
-  type LayerTree,
-  type Paint,
-  type Point,
-} from '@dazbee/schema'
+import { ancestorsOf, childrenOf, frameIdOf, type Session } from '@dazbee/doc'
+import { canHold, type Layer, LayerClipboard, type LayerTree, type Paint, type Point } from '@dazbee/schema'
 import { type Skipped, SVG_TYPE, SvgError, svgMarkup, svgToLayers } from '@dazbee/svg'
 
 import type { EditorActions } from './actions.ts'
-import { frameKey, scope } from './canvas/grid.ts'
 import { hitTest } from './canvas/hit-test.ts'
 import type { FrameScenes } from './canvas/scenes.ts'
 import type { EditorView, Spot } from './canvas/view.ts'
@@ -41,8 +32,11 @@ export interface PlaceDeps {
   boxes: Pick<EditorBoxes, 'roots' | 'boxIn' | 'containersOf' | 'pickable'>
   typing: Pick<EditorTyping, 'editing' | 'stop' | 'fitText' | 'copy' | 'cut' | 'paste'>
   actions: Pick<EditorActions, 'perform'>
-  /** Tells the page that an SVG can't be read, or had parts no layer shows, which come as `parts`. */
-  notify: (notice: 'svgUnreadable' | 'svgLeftOut', parts?: readonly Skipped[]) => void
+  /**
+   * Tells the app that an SVG can't be read, or had parts no layer shows, which come as `parts`;
+   * or that a paste found no frame on the page to go in.
+   */
+  notify: (notice: 'svgUnreadable' | 'svgLeftOut' | 'pasteNeedsFrame', parts?: readonly Skipped[]) => void
   /** Aborted when the editor is destroyed: a file read after that places nothing. */
   signal: AbortSignal
   /** Draws the overlay. */
@@ -67,7 +61,7 @@ export interface EditorPlace {
   copyLayers(): boolean
   /** Whether Paste in a menu has layers to place: the ones last copied in Dazbee on this device. */
   canPasteLayers(): boolean
-  /** Pastes the layers last copied in Dazbee on this device, with the pointer where it is; false with none kept. */
+  /** Pastes the layers last copied in Dazbee on this device, with the pointer where it is; false with none kept or nothing pasted. */
   pasteLayers(pointer: () => Point | null): boolean
   /** Places an SVG file as layers, centred on a spot or a point in client coordinates, or in the frame in view. */
   placeSvg(text: string, name: string, where?: Point | Spot): string | null
@@ -75,8 +69,8 @@ export interface EditorPlace {
   placeImage(asset: PlacedAsset, where?: Point | Spot): string | null
   /** Outlines the layer an image dragged over the stage at `client` would go into, or none with null; returns its id. */
   imageTarget(client: Point | null): string | null
-  /** Puts an image into a layer as its fill, in every format, as one undo step; selects the layer. */
-  fillWithImage(id: string, asset: PlacedAsset, inFrame?: string): boolean
+  /** Puts an image into a layer as its fill, as one undo step; selects the layer in its frame. */
+  fillWithImage(id: string, asset: PlacedAsset): boolean
 }
 
 /** The share of a frame's shorter side a placed SVG may take before it is scaled down to it. */
@@ -123,21 +117,22 @@ export function editorPlace({
     const node = design.nodes[id]
     const takes =
       node?.type === 'box' || node?.type === 'boolean' || (node?.type === 'graphic' && node.props.shape.kind !== 'line')
-    return takes && !node.lock?.style ? { id, frame: at.frame.key } : null
+    return takes && !node.lock?.style ? { id, frameId: at.frame.id } : null
   }
 
   /** Where something placed with no point goes: the frame in the middle of the view, else the selection's or the first. */
   function frameToPlaceIn() {
-    return middleFrame() ?? frameOf(selection.current()?.frame) ?? frames()[0]
+    return middleFrame() ?? frameOf(selection.current()?.frameId) ?? frames()[0]
   }
 
   /**
    * The selected layers as a tree for the clipboard (#49), bottom to top with everything inside
-   * them, each as the selection's format shows it: placed by auto layout, with the format's overrides.
+   * them, each with its own props and its box as drawn, placed by auto layout, with the page and
+   * frame they came from.
    */
   function copiedLayers(): LayerClipboard | null {
     const current = selection.current()
-    const frame = current && frameOf(current.frame)
+    const frame = current && frameOf(current.frameId)
     if (!frame || typing.editing()) return null
     const now = session.design()
     const stacked: string[] = []
@@ -147,7 +142,7 @@ export function editorPlace({
         walk(id)
       }
     }
-    walk(frame.pageId)
+    walk(frame.id)
     const tops = boxes.roots(now).sort((a, b) => stacked.indexOf(a) - stacked.indexOf(b))
     if (tops.length === 0) return null
     const nodes: Record<string, Layer> = {}
@@ -155,33 +150,40 @@ export function editorPlace({
       const node = now.nodes[id]
       const box = boxes.boxIn(frame, id, now)
       if (!node || !box) return
-      nodes[id] = { ...node, props: { ...mergedProps(now, scope(frame), id), ...box } } as Layer
+      nodes[id] = { ...node, props: { ...node.props, ...box } } as Layer
       for (const [child] of childrenOf(now, id)) add(child)
     }
     for (const id of tops) add(id)
     return {
       kind: 'dazbee.layers',
       designId,
+      pageId: frame.pageId,
+      frameId: frame.id,
       tree: { nodes, roots: tops },
     }
   }
   /**
    * Pastes layers (#49) into the frame the selection is in, or else the one under the pointer: in
-   * the group or box double-clicked into when it can hold them, otherwise on the page, where they
-   * were or centred on the pointer. One undo step; the pasted layers end up selected.
+   * the group or box double-clicked into when it can hold them, otherwise at the frame's top level,
+   * where they were or centred on the pointer, each a new layer with a link id of its own. One undo
+   * step; the pasted layers end up selected. On a page with no frame it says to add one; returns
+   * whether it pasted.
    */
   function pasteTree(tree: LayerTree, atPointer: boolean, pointer: Point | null) {
     const under = pointer ? pointAt(pointer) : null
-    const frame = frameOf(selection.current()?.frame) ?? under?.frame ?? inView()[0] ?? frames()[0]
-    if (!frame) return
+    const frame = frameOf(selection.current()?.frameId) ?? under?.frame ?? inView()[0] ?? frames()[0]
+    if (!frame) {
+      notify('pasteNeedsFrame')
+      return false
+    }
     const now = session.design()
     const entered = selection.entered()
     const inside = entered ? now.nodes[entered] : undefined
     const holds = inside && tree.roots.every((root) => canHold(inside.type, tree.nodes[root]?.type ?? ''))
-    const parentId = entered && holds && selection.current()?.frame === frame.key ? entered : frame.pageId
+    const parentId = entered && holds && selection.current()?.frameId === frame.id ? entered : frame.id
     let dx = 0
     let dy = 0
-    if (atPointer && under?.frame.key === frame.key) {
+    if (atPointer && under?.frame.id === frame.id) {
       const p = localTo(under.p, boxes.containersOf(frame, parentId, now))
       const b = boundsOf(
         tree.roots.flatMap((root) => {
@@ -196,14 +198,16 @@ export function editorPlace({
     }
     let pasted: string[] = []
     if (
-      runQuietly(() =>
+      !runQuietly(() =>
         session.gesture(() => {
           pasted = session.run('design.place', { parentId, tree, dx, dy })
           if (now.nodes[parentId]) hug([parentId])
         }),
       )
     )
-      selection.select(pasted, frame.key)
+      return false
+    selection.select(pasted, frame.id)
+    return true
   }
 
   /**
@@ -223,7 +227,7 @@ export function editorPlace({
     const spot = where.spot ?? (client && spotAt(client))
     // A point off every frame puts the file in the middle of the selection's frame; with no point,
     // it goes in the frame in the middle of the view.
-    const frame = spot ? frameOf(spot.frame) : client ? frameOf(selection.current()?.frame) : frameToPlaceIn()
+    const frame = spot ? frameOf(spot.frameId) : client ? frameOf(selection.current()?.frameId) : frameToPlaceIn()
     if (!frame) return null
     const at = spot ? { x: spot.x, y: spot.y } : { x: frame.width / 2, y: frame.height / 2 }
     let made: ReturnType<typeof svgToLayers>
@@ -243,7 +247,7 @@ export function editorPlace({
     const ok = runQuietly(() =>
       session.gesture(() => {
         ids = session.run('design.place', {
-          parentId: frame.pageId,
+          parentId: frame.id,
           tree: made.tree,
           dx: round(at.x - (box.x + box.width / 2)),
           dy: round(at.y - (box.y + box.height / 2)),
@@ -260,7 +264,7 @@ export function editorPlace({
     const id = ids[0]
     if (!ok || !id) return null
     tools.setTool('select')
-    selection.select([id], frame.key)
+    selection.select([id], frame.id)
     if (made.skipped.length > 0) notify('svgLeftOut', made.skipped)
     return id
   }
@@ -299,6 +303,7 @@ export function editorPlace({
         const markup = svgMarkup(e.clipboardData?.getData(SVG_TYPE) || e.clipboardData?.getData('text/plain'))
         if (!file && !markup) return
         e.preventDefault()
+        if (frames().length === 0) return notify('pasteNeedsFrame')
         if (markup) placeSvgAt(markup, 'SVG', { client: atPointer ? pointer() : undefined })
         else if (file) {
           void file.text().then((text) => {
@@ -335,66 +340,48 @@ export function editorPlace({
   function pasteLayers(pointer: () => Point | null) {
     const tree = rememberedLayers()
     if (!tree) return false
-    pasteTree(tree, false, pointer())
-    return true
+    return pasteTree(tree, false, pointer())
   }
   function placeImage(asset: PlacedAsset, where?: Point | Spot): string | null {
     // A point off every frame places nothing; with no point, it goes in the frame in the middle of the view.
-    const spot = where && ('frame' in where ? where : spotAt(where))
+    const spot = where && ('frameId' in where ? where : spotAt(where))
     if (where && !spot) return null
-    const frame = spot ? frameOf(spot.frame) : frameToPlaceIn()
+    const frame = spot ? frameOf(spot.frameId) : frameToPlaceIn()
     if (!frame) return null
     const at = spot ? { x: spot.x, y: spot.y } : { x: frame.width / 2, y: frame.height / 2 }
     typing.stop()
     let id = ''
     if (
       !runQuietly(() => {
-        id = session.run('node.create', { parentId: frame.pageId, layer: newImage(asset, at, frame) })
+        id = session.run('node.create', { parentId: frame.id, layer: newImage(asset, at, frame) })
       })
     )
       return null
     tools.setTool('select')
-    selection.select([id], frame.key)
+    selection.select([id], frame.id)
     return id
   }
   function placeSvg(text: string, name: string, where?: Point | Spot) {
-    return placeSvgAt(text, name, !where ? {} : 'frame' in where ? { spot: where } : { client: where })
+    return placeSvgAt(text, name, !where ? {} : 'frameId' in where ? { spot: where } : { client: where })
   }
   function imageTarget(client: Point | null): string | null {
     const next = client ? imageTargetAt(client) : null
-    if (next?.id !== dropTarget?.id || next?.frame !== dropTarget?.frame) {
+    if (next?.id !== dropTarget?.id || next?.frameId !== dropTarget?.frameId) {
       dropTarget = next
       drawOverlay()
     }
     return next?.id ?? null
   }
-  function fillWithImage(id: string, asset: PlacedAsset, inFrame?: string): boolean {
+  function fillWithImage(id: string, asset: PlacedAsset): boolean {
     const now = session.design()
     const node = now.nodes[id]
     if (!node || !('fills' in node.props) || node.lock?.style) return false
     const fills = node.props.fills as Paint[]
-    const page = pageOf(now, id)
-    const near = [inFrame, dropTarget?.id === id ? dropTarget.frame : undefined, selection.current()?.frame]
-      .map(frameOf)
-      .find((f) => f?.pageId === page)
-    const frame = near ?? frameOf(frameKey(page, now.meta.primaryFormatId))
+    const frameId = frameIdOf(now, id)
     dropTarget = null
     typing.stop()
-    const ok = runQuietly(() =>
-      session.gesture(() => {
-        session.run('node.update', { ids: [id], patch: { fills: withImage(fills, asset.id) } })
-        for (const [scope, byNode] of Object.entries(now.overrides)) {
-          const own = byNode[id]?.fills as Paint[] | undefined
-          if (own)
-            session.run('node.update', {
-              ids: [id],
-              scope,
-              patch: { fills: withImage(own, asset.id) },
-            })
-        }
-      }),
-    )
-    if (ok && frame) selection.select([id], frame.key)
+    const ok = runQuietly(() => session.run('node.update', { ids: [id], patch: { fills: withImage(fills, asset.id) } }))
+    if (ok && frameId !== undefined) selection.select([id], frameId)
     drawOverlay()
     return ok
   }
@@ -413,11 +400,4 @@ export function editorPlace({
     imageTarget,
     fillWithImage,
   }
-}
-
-/** The page a layer is on. */
-function pageOf(design: Design, id: string) {
-  let up = id
-  while (design.nodes[up]) up = design.nodes[up]?.parentId ?? ''
-  return up
 }

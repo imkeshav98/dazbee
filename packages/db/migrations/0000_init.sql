@@ -44,7 +44,6 @@ CREATE TABLE "designs" (
 	"workspace_id" text NOT NULL,
 	"brand_id" text NOT NULL,
 	"name" text NOT NULL,
-	"kind" text NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );
@@ -79,7 +78,6 @@ CREATE TABLE "templates" (
 	"brand_id" text,
 	"from_brand_id" text NOT NULL,
 	"name" text NOT NULL,
-	"kind" text NOT NULL,
 	"content" jsonb NOT NULL,
 	"width" integer NOT NULL,
 	"height" integer NOT NULL,

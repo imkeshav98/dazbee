@@ -28,7 +28,7 @@ export function openSession(doc: DesignDoc) {
   /** The design as the open batch found it, which its commands check and read; null outside a batch. */
   let batched: Design | null = null
   const r = root(doc)
-  const roots = [r.meta, r.formats, r.pages, r.nodes, r.overrides]
+  const roots = [r.meta, r.pages, r.frames, r.nodes]
   const view = designView(doc)
   const undoManager = new Y.UndoManager(roots, { trackedOrigins: new Set([origin]), captureTimeout: 0 })
 
@@ -180,7 +180,7 @@ export function openSession(doc: DesignDoc) {
     },
     /**
      * The design, validated. It is live: it always shows the document as it is now, and can't be
-     * changed through. Its layers and override values are frozen and replaced when they change.
+     * changed through. Its layers are frozen and replaced when they change.
      */
     design: () => view.read(),
     destroy: () => {

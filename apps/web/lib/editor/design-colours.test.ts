@@ -6,9 +6,9 @@ import { DESIGN_COLOURS_SHOWN, designColours } from './design-colours.ts'
 const solid = (color: string) => ({ type: 'solid', color })
 
 describe('the colours a design uses', () => {
-  it('takes the pages’ and layers’ solid fills, outlines and text, each once, as #RRGGBB', () => {
+  it('takes the frames’ and layers’ solid fills, outlines and text, each once, as #RRGGBB', () => {
     const colours = designColours({
-      pages: { p1: { fills: [solid('#fff8f0ff')] } },
+      frames: { sq: { fills: [solid('#fff8f0ff')] }, wide: { fills: [solid('#FFF8F0FF'), solid('#2A6FDBFF')] } },
       nodes: {
         a: {
           props: {
@@ -20,7 +20,7 @@ describe('the colours a design uses', () => {
         c: { props: { fills: [{ type: 'linear', stops: [] }] } },
       },
     })
-    expect(colours).toEqual(['#FFF8F0', '#C2106C', '#15121A'])
+    expect(colours).toEqual(['#FFF8F0', '#2A6FDB', '#C2106C', '#15121A'])
   })
 
   it('keeps the first few only', () => {
@@ -30,6 +30,6 @@ describe('the colours a design uses', () => {
         { props: { fills: [solid(`#0000${String(i).padStart(2, '0')}FF`)] } },
       ]),
     )
-    expect(designColours({ pages: {}, nodes })).toHaveLength(DESIGN_COLOURS_SHOWN)
+    expect(designColours({ frames: {}, nodes })).toHaveLength(DESIGN_COLOURS_SHOWN)
   })
 })

@@ -6,7 +6,7 @@ import * as Y from 'yjs'
 
 import { type Db, designs, designStates, readDesignState } from '@dazbee/db'
 import { loadDesign, readDesign } from '@dazbee/doc'
-import { type Design, type DesignInput, type DesignSummary, parseDesign } from '@dazbee/schema'
+import { BLANK_SIZE, blankDesign, type Design, type DesignInput, type DesignSummary, parseDesign } from '@dazbee/schema'
 
 export class InvalidContent extends Error {}
 
@@ -14,7 +14,6 @@ const summary = {
   id: designs.id,
   brandId: designs.brandId,
   name: designs.name,
-  kind: designs.kind,
   createdAt: designs.createdAt,
   updatedAt: designs.updatedAt,
 }
@@ -22,19 +21,13 @@ const toSummary = (row: {
   id: string
   brandId: string
   name: string
-  kind: DesignSummary['kind']
   createdAt: Date
   updatedAt: Date
 }): DesignSummary => ({ ...row, createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString() })
 
-/** One blank 1080×1080 page: what a design starts as when nothing else is given. */
-const blankDesign = (designId: string, name: string): DesignInput => ({
-  meta: { designId, name, kind: 'single', primaryFormatId: 'sq' },
-  formats: { sq: { name: 'Square', width: 1080, height: 1080, order: 'a0' } },
-  pages: { p1: { name: 'Page 1', order: 'a0', fills: [{ type: 'solid', color: '#FFFFFFFF' }] } },
-  nodes: {},
-  overrides: {},
-})
+/** What a design starts as when nothing else is given: one page holding one empty Feed square frame. */
+const startingDesign = (designId: string, name: string): DesignInput =>
+  blankDesign({ designId, name }, [{ name: 'Feed square', width: BLANK_SIZE.width, height: BLANK_SIZE.height }])
 
 export async function listDesigns(db: Db, workspaceId: string, brandId: string): Promise<DesignSummary[]> {
   const rows = await db
@@ -95,15 +88,12 @@ export async function createDesign(
   content?: unknown,
 ): Promise<DesignSummary> {
   const id = randomUUID()
-  const input = content === undefined ? blankDesign(id, name) : withMeta(content, id, name)
+  const input = content === undefined ? startingDesign(id, name) : withMeta(content, id, name)
   const parsed = parseDesign(input)
   if (!parsed.success) throw new InvalidContent(parsed.errors.slice(0, 5).join('; '))
   const state = Y.encodeStateAsUpdate(loadDesign(parsed.design))
   return db.transaction(async (tx) => {
-    const [row] = await tx
-      .insert(designs)
-      .values({ id, workspaceId, brandId, name, kind: parsed.design.meta.kind })
-      .returning(summary)
+    const [row] = await tx.insert(designs).values({ id, workspaceId, brandId, name }).returning(summary)
     if (!row) throw new Error('insert returned no design')
     await tx.insert(designStates).values({ designId: id, state })
     return toSummary(row)

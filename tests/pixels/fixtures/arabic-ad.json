@@ -1,34 +1,23 @@
 {
-  "meta": {
-    "designId": "arabic-ad",
-    "name": "Arabic ad",
-    "kind": "single",
-    "primaryFormatId": "sq"
-  },
-  "formats": {
+  "meta": { "designId": "arabic-ad", "name": "Arabic ad" },
+  "pages": { "p1": { "name": "Page 1", "order": "a0" } },
+  "frames": {
     "sq": {
+      "pageId": "p1",
       "name": "Square 1:1",
       "width": 1080,
       "height": 1080,
+      "x": 0,
+      "y": 0,
+      "fills": [{ "type": "solid", "color": "#F1F8E9FF" }],
       "order": "a0"
-    }
-  },
-  "pages": {
-    "p1": {
-      "name": "Page 1",
-      "order": "a0",
-      "fills": [
-        {
-          "type": "solid",
-          "color": "#F1F8E9FF"
-        }
-      ]
     }
   },
   "nodes": {
     "band": {
       "type": "graphic",
-      "parentId": "p1",
+      "parentId": "sq",
+      "link": "band",
       "index": "a0",
       "name": "Green band",
       "props": {
@@ -36,21 +25,15 @@
         "y": 0,
         "width": 1080,
         "height": 300,
-        "shape": {
-          "kind": "rect"
-        },
-        "fills": [
-          {
-            "type": "solid",
-            "color": "#1B5E20FF"
-          }
-        ]
+        "shape": { "kind": "rect" },
+        "fills": [{ "type": "solid", "color": "#1B5E20FF" }]
       },
       "role": "decoration"
     },
     "headline": {
       "type": "text",
-      "parentId": "p1",
+      "parentId": "sq",
+      "link": "headline",
       "index": "a1",
       "name": "Headline",
       "props": {
@@ -61,18 +44,14 @@
         "text": "تخفيضات الصيف",
         "align": "end",
         "direction": "rtl",
-        "style": {
-          "fontFamily": "Noto Naskh Arabic",
-          "fontSize": 96,
-          "color": "#FFFFFFFF",
-          "fontWeight": 700
-        }
+        "style": { "fontFamily": "Noto Naskh Arabic", "fontSize": 96, "color": "#FFFFFFFF", "fontWeight": 700 }
       },
       "role": "headline"
     },
     "body": {
       "type": "text",
-      "parentId": "p1",
+      "parentId": "sq",
+      "link": "body",
       "index": "a2",
       "name": "Body",
       "props": {
@@ -95,7 +74,8 @@
     },
     "price": {
       "type": "text",
-      "parentId": "p1",
+      "parentId": "sq",
+      "link": "price",
       "index": "a3",
       "name": "Price",
       "props": {
@@ -106,15 +86,9 @@
         "text": "السعر 299 ر.س",
         "align": "end",
         "direction": "rtl",
-        "style": {
-          "fontFamily": "Noto Naskh Arabic",
-          "fontSize": 80,
-          "color": "#1B5E20FF",
-          "fontWeight": 700
-        }
+        "style": { "fontFamily": "Noto Naskh Arabic", "fontSize": 80, "color": "#1B5E20FF", "fontWeight": 700 }
       },
       "role": "price"
     }
-  },
-  "overrides": {}
+  }
 }

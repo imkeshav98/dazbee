@@ -1,38 +1,46 @@
 'use client'
 
-// The design's pages. Pages, by the zoom pill, says which page is in view and how many there are
-// ("Pages 2/3", the numbers alone on a phone) and opens the Pages panel: each page's picture, name
-// and sizes, shown with a click and reordered by dragging; ⋯ renames, duplicates, moves and deletes
-// one, and Add page adds one. A click on a page's background picks it, and its Background panel
-// paints it in every size. Every change is a command, so it is one undo step and reaches the other tabs.
+// The design's pages. Pages, by the zoom pill, says which page the canvas shows and how many there
+// are ("Pages 2/3") and opens the Pages panel, dropping under it on a phone: each page's picture,
+// name and number of frames, shown with a click and reordered by dragging; ⋯ renames, duplicates,
+// moves and deletes one, and Add page adds one holding a frame the size of the frame you are on.
+// Every change is a command, so it is one undo step and reaches the other tabs.
 import { FilesIcon, PlusIcon } from '@phosphor-icons/react'
 import { type CSSProperties, type ReactNode, useEffect, useLayoutEffect, useRef, useState } from 'react'
 
 import type { Editor } from '@dazbee/editor'
-import { type Design, inOrder } from '@dazbee/schema'
+import { BLANK_SIZE, coverFrame, type Design, framesOf, inOrder } from '@dazbee/schema'
 
-import { BackgroundBody } from '@/components/editor/edit-panel/colour-panel.tsx'
 import { PanelFrame } from '@/components/editor/edit-panel/edit-panel.tsx'
 import { FOCUS_RING } from '@/components/ui/looks.ts'
 import { RenameField, useFocusBack } from '@/components/ui/rename-field.tsx'
 import { cn } from '@/lib/cn.ts'
-import { useValue } from '@/lib/editor/value-store.ts'
+import { frameName } from '@/lib/frame-name.ts'
 import { useMessages } from '@/lib/i18n/client.tsx'
-import { format } from '@/lib/i18n/index.ts'
+import { format, type Messages } from '@/lib/i18n/index.ts'
 
 import { afterDraws, sameUrls } from './after-draws.ts'
 import { CARD_ROW, CardMenu } from './card.tsx'
 import { setOpen, useEditState } from './edit-store.ts'
-import { shownPage, useEditorDesign, usePickedPage } from './editor-hooks.ts'
+import { useEditorDesign, useShownPage } from './editor-hooks.ts'
 import { DROP_LINE, PANEL_BUTTON } from './styles.ts'
 
-/** The page in view: the one last shown or picked while it is still there, else the first. */
-function useCurrentPage(design: Design) {
-  const shown = useValue(shownPage)
-  return shown && design.pages[shown] ? shown : (inOrder(design.pages)[0]?.[0] ?? null)
+/**
+ * The frame a new page starts with: the size of the frame you are on (the selection's, else the
+ * shown page's first, else the design's cover frame, else the size a blank design starts at), named
+ * after its size.
+ */
+function newPageFrame(editor: Editor, design: Design, t: Messages) {
+  const selected = editor.selectedFrame()
+  const on =
+    (selected !== null && Object.hasOwn(design.frames, selected) ? design.frames[selected] : undefined) ??
+    framesOf(design, editor.shownPage())[0]?.[1] ??
+    coverFrame(design)?.[1] ??
+    BLANK_SIZE
+  return { name: frameName(t, on.width, on.height), width: on.width, height: on.height }
 }
 
-/** Each page's picture in the primary format, drawn once the stage settles and again once its fonts and images arrive. */
+/** Each page's picture of its first frame, drawn once the stage settles and again once its fonts and images arrive. */
 function usePagePictures(editor: Editor): Record<string, string | null> {
   const [pictures, setPictures] = useState<Record<string, string | null>>({})
   useEffect(
@@ -70,21 +78,6 @@ export function PagesPanel({ editor, onRemoved }: { editor: Editor; onRemoved: (
   return (
     <PanelFrame id="pages" title={t.editor.pages.title}>
       <PageList editor={editor} onRemoved={onRemoved} />
-    </PanelFrame>
-  )
-}
-
-/** The picked page's Background panel: the Colour panel's choices, for the page in every size. */
-export function BackgroundPanel({ editor, brandId }: { editor: Editor; brandId: string }) {
-  const t = useMessages()
-  const { open } = useEditState()
-  const { design } = useEditorDesign(editor)
-  const picked = usePickedPage(editor)
-  const page = picked ? design.pages[picked] : undefined
-  if (open !== 'background' || !picked || !page) return null
-  return (
-    <PanelFrame id="background" title={t.editor.page.backgroundColour} note={page.name}>
-      <BackgroundBody editor={editor} design={design} pageId={picked} brandId={brandId} />
     </PanelFrame>
   )
 }
@@ -136,35 +129,29 @@ function PagesFrame({ label, disabled = false, children }: { label: string; disa
   )
 }
 
-/** Pages once the design is open: which page is in view, of how many. */
+/** Pages once the design is open: which page the canvas shows, of how many. */
 function LivePages({ editor }: { editor: Editor }) {
   const t = useMessages()
-  // Each design opens on its first page.
-  useEffect(() => () => shownPage.set(null), [editor])
   const { design } = useEditorDesign(editor)
-  usePickedPage(editor)
-  const current = useCurrentPage(design)
+  const current = useShownPage(editor)
   const pages = inOrder(design.pages)
   const counts = { n: Math.max(1, pages.findIndex(([id]) => id === current) + 1), total: pages.length }
   return (
     <PagesFrame label={format(t.editor.pages.buttonLabel, counts)}>
-      <span aria-hidden className="tabular-nums max-sm:hidden">
+      <span aria-hidden className="tabular-nums">
         {format(t.editor.pages.button, counts)}
-      </span>
-      <span aria-hidden className="font-mono tabular-nums sm:hidden">
-        {format(t.editor.pages.buttonShort, counts)}
       </span>
     </PagesFrame>
   )
 }
 
-/** Each page: its picture, name and sizes, shown with a click, renamed with a double click, dragged to reorder; then Add page. */
+/** Each page: its picture, name and number of frames, shown with a click, renamed with a double click, dragged to reorder; then Add page. */
 function PageList({ editor, onRemoved }: { editor: Editor; onRemoved: (message: string) => void }) {
   const t = useMessages()
   const g = t.editor.pages
   const { design } = useEditorDesign(editor)
   const pages = inOrder(design.pages)
-  const current = useCurrentPage(design)
+  const current = useShownPage(editor)
   const [renaming, setRenaming] = useState<string | null>(null)
   const focusBack = useFocusBack()
   // The page being dragged, and the page it would land before (null for the end).
@@ -173,13 +160,8 @@ function PageList({ editor, onRemoved }: { editor: Editor; onRemoved: (message: 
   const run = editor.session.run.bind(editor.session)
   const pictures = usePagePictures(editor)
 
-  const show = (id: string) => {
-    shownPage.set(id)
-    // Another page in view lets the picked one go.
-    if (editor.pickedPage() !== id) editor.pickPage(null)
-    // After the command's redraw, so a new page's row is in the grid already.
-    requestAnimationFrame(() => editor.fitPage(id))
-  }
+  // The canvas shows the page with its frames fitted, letting go of what was selected or picked.
+  const show = (id: string) => editor.showPage(id)
   const rename = (id: string, name: string | null, byKey: boolean) => {
     if (byKey) focusBack.mark(id)
     setRenaming(null)
@@ -200,24 +182,23 @@ function PageList({ editor, onRemoved }: { editor: Editor; onRemoved: (message: 
     const names = new Set(pages.map(([, p]) => p.name))
     let n = pages.length + 1
     while (names.has(format(g.newName, { n }))) n++
-    show(run('page.add', { name: format(g.newName, { n }) }))
+    show(run('page.add', { name: format(g.newName, { n }), frame: newPageFrame(editor, design, t) }))
   }
-
-  const formatCount = Object.keys(design.formats).length
-  const primary = design.formats[design.meta.primaryFormatId]
-  // Each page's picture in the primary format, its long side 34, on its background until one is drawn.
-  const tile = primary
-    ? {
-        width: Math.max(8, Math.round(34 * Math.min(1, primary.width / primary.height))),
-        height: Math.max(8, Math.round(34 * Math.min(1, primary.height / primary.width))),
-      }
-    : { width: 34, height: 34 }
 
   return (
     <>
       <ol aria-label={g.title} className="flex flex-col gap-1.5" data-testid="pages">
         {pages.map(([id, page], i) => {
-          const fill = page.fills[0]
+          const frames = framesOf(design, id)
+          const first = frames[0]?.[1]
+          // The picture of its first frame, its long side 34, on that frame's background until one is drawn.
+          const tile = first
+            ? {
+                width: Math.max(8, Math.round(34 * Math.min(1, first.width / first.height))),
+                height: Math.max(8, Math.round(34 * Math.min(1, first.height / first.width))),
+              }
+            : { width: 34, height: 34 }
+          const fill = first?.fills[0]
           const picture = pictures[id]
           return (
             <li
@@ -257,11 +238,14 @@ function PageList({ editor, onRemoved }: { editor: Editor; onRemoved: (message: 
                 <span aria-hidden className={cn(DROP_LINE, '-bottom-[4px]')} />
               )}
               <span aria-hidden className="relative grid size-[34px] shrink-0 place-items-center">
-                {/* The page's picture on a white page, as the canvas draws it, under its colour while the
-                    picture is drawn. */}
+                {/* The first frame's picture on white, as the canvas draws it, under the frame's colour while
+                    the picture is drawn; a page with no frames shows an empty well. */}
                 <span
                   data-testid="page-thumbnail"
-                  className="relative grid place-items-center overflow-hidden rounded-[3px] border border-line-strong bg-white"
+                  className={cn(
+                    'relative grid place-items-center overflow-hidden rounded-[3px] border border-line-strong',
+                    first ? 'bg-white' : 'bg-well',
+                  )}
                   style={{ ...tile, backgroundColor: fill?.type === 'solid' ? fill.color : undefined }}
                 >
                   {picture && <img src={picture} alt="" draggable={false} className="absolute inset-0 size-full" />}
@@ -300,7 +284,9 @@ function PageList({ editor, onRemoved }: { editor: Editor; onRemoved: (message: 
                     {format(g.numbered, { n: i + 1, name: page.name })}
                   </span>
                   <span className="w-full truncate text-[11px] text-subtle">
-                    {format(formatCount === 1 ? g.formatsOne : g.formatsMany, { n: formatCount })}
+                    {format(frames.length === 0 ? g.framesNone : frames.length === 1 ? g.framesOne : g.framesMany, {
+                      n: frames.length,
+                    })}
                   </span>
                 </button>
               )}
@@ -328,7 +314,6 @@ function PageList({ editor, onRemoved }: { editor: Editor; onRemoved: (message: 
                     danger: true,
                     run: () => {
                       run('page.delete', { id })
-                      if (shownPage.get() === id) shownPage.set(null)
                       onRemoved(format(g.removed, { name: page.name }))
                     },
                   },

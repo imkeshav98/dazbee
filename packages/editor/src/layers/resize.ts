@@ -1,10 +1,9 @@
 // What a resize of layers changes: their boxes and those of the layers under them, the text a
 // corner scales, and the sizing of the axes it drags, which stop following their content.
-import { childrenOf, descendants, mergedProps, type Session } from '@dazbee/doc'
+import { childrenOf, descendants, type Session } from '@dazbee/doc'
 import type { ScaledText } from '@dazbee/renderer'
 import type { Design, Layer } from '@dazbee/schema'
 
-import { type Frame, scope } from '../canvas/grid.ts'
 import { runQuietly } from '../run-quietly.ts'
 import { inFlow, layoutIn, propIn } from './auto-layout.ts'
 import { type Box, carry, type Handle, isCorner, keptOnScreen, scaleWithin } from './transform.ts'
@@ -18,7 +17,6 @@ type SizingOf = NonNullable<Layer['props']['sizing']>
  */
 export function resizedBoxes(
   now: Design,
-  frame: Frame,
   roots: string[],
   boxes: Map<string, Box>,
   from: Box,
@@ -30,7 +28,7 @@ export function resizedBoxes(
     if (!was) continue
     const box = roots.length === 1 ? to : scaleWithin(was, from, to)
     // Auto layout places a layer in its flow: a resize gives it a size, never a place.
-    next.set(root, inFlow(frame, root, now) ? { ...box, x: was.x, y: was.y, rotation: was.rotation } : box)
+    next.set(root, inFlow(root, now) ? { ...box, x: was.x, y: was.y, rotation: was.rotation } : box)
     const type = now.nodes[root]?.type
     if (type === 'group' || type === 'boolean') {
       // Layers inside a group or boolean keep their place in it, scaled with it.
@@ -52,17 +50,17 @@ export function resizedBoxes(
 }
 
 /**
- * The text a corner drag on `roots` scales, with its sizes in the frame now: each text whose box
- * scales with the drag, selected itself or in a group, not one in a box, whose text keeps its
- * size. A text whose style is locked isn't scaled.
+ * The text a corner drag on `roots` scales, with its sizes now: each text whose box scales with the
+ * drag, selected itself or in a group, not one in a box, whose text keeps its size. A text whose
+ * style is locked isn't scaled.
  */
-export function scalingTexts(now: Design, frame: Frame, roots: string[], handle: Handle): Map<string, ScaledText> {
+export function scalingTexts(now: Design, roots: string[], handle: Handle): Map<string, ScaledText> {
   const texts = new Map<string, ScaledText>()
   if (!isCorner(handle)) return texts
   const add = (id: string) => {
     const node = now.nodes[id]
     if (node?.type !== 'text' || node.lock?.style) return
-    const props = mergedProps(now, scope(frame), id) as typeof node.props
+    const { props } = node
     texts.set(id, {
       style: props.style,
       runs: props.runs,
@@ -87,7 +85,6 @@ export function scalingTexts(now: Design, frame: Frame, roots: string[], handle:
  */
 export function switchSizing(
   session: Session,
-  frame: Frame,
   ids: string[],
   handle: Handle,
   from: Design,
@@ -99,16 +96,16 @@ export function switchSizing(
     const node = from.nodes[id]
     if (!node) continue
     const patch: Record<string, unknown> = {}
-    const boxMode = propIn(frame, id, 'boxMode', from)
+    const boxMode = propIn(id, 'boxMode', from)
     // Text a corner scales keeps its box mode: it grows with its words still.
     if (node.type === 'text' && boxMode !== 'fixed' && !scaled.has(id)) {
       const next = down ? 'fixed' : boxMode === 'autoWidth' && across ? 'autoHeight' : boxMode
       if (next !== boxMode) patch.boxMode = next
     }
-    const sizing = propIn(frame, id, 'sizing', from) as SizingOf | undefined
+    const sizing = propIn(id, 'sizing', from) as SizingOf | undefined
     // Text without sizing of its own follows its box mode, changed above; with its own, the
     // axes its new box mode fixes are fixed too.
-    if ((inFlow(frame, id, from) || layoutIn(frame, id, from)) && (sizing || node.type !== 'text')) {
+    if ((inFlow(id, from) || layoutIn(id, from)) && (sizing || node.type !== 'text')) {
       const was: SizingOf = sizing ?? { width: 'fixed', height: 'fixed' }
       const mode = patch.boxMode ?? boxMode
       const fixedW = across || (node.type === 'text' && mode !== 'autoWidth')
@@ -116,7 +113,6 @@ export function switchSizing(
       const next: SizingOf = { width: fixedW ? 'fixed' : was.width, height: fixedH ? 'fixed' : was.height }
       if (next.width !== was.width || next.height !== was.height) patch.sizing = next
     }
-    if (Object.keys(patch).length > 0)
-      runQuietly(() => session.run('node.update', { ids: [id], scope: scope(frame), patch }))
+    if (Object.keys(patch).length > 0) runQuietly(() => session.run('node.update', { ids: [id], patch }))
   }
 }

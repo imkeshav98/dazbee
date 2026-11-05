@@ -5,7 +5,7 @@ import { loadDesign, openSession, type Session } from '@dazbee/doc'
 import { type MeasureText, render, type Resources } from '@dazbee/renderer'
 import { type DesignInput, parseDesign } from '@dazbee/schema'
 
-import type { Frame } from '../canvas/grid.ts'
+import type { Frame } from '../canvas/frames.ts'
 import type { Size } from '../gestures/crop.ts'
 import type { EditorSelection } from '../selection.ts'
 import { editorBoxes } from './boxes.ts'
@@ -36,7 +36,7 @@ export function testBoxes(
   return editorBoxes({
     session,
     scenes: {
-      scene: (frame) => render(session.design(), frame.pageId, frame.formatId, undefined, measure),
+      scene: (frame) => render(session.design(), frame.id, undefined, measure),
       measure: () => measure,
     },
     resources: {
@@ -45,6 +45,6 @@ export function testBoxes(
     },
     selection,
     drawn: () => session.design(),
-    frameOf: (key) => frames.find((f) => f.key === key),
+    frameOf: (key) => frames.find((f) => f.id === key),
   })
 }

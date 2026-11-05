@@ -1,12 +1,12 @@
 // Text bound to a brand font when the kit's font changes, in Chromium: the bound text takes the new
-// family and its box fits it again in every format, as a change no one undoes (the kit can't be
-// undone with it); a box that shrinks its words to fit keeps them inside, and the export draws every
-// word within its box.
+// family and its box fits it again in every frame, its linked copies too, as a change no one undoes
+// (the kit can't be undone with it); a box that shrinks its words to fit keeps them inside, and the
+// export draws every word within its box.
 import type { DesignInput } from '@dazbee/schema'
 
 import { writeOutput } from '../../support/editor.ts'
 import { importGoogleFonts } from '../../support/fonts.ts'
-import { newBrand, putKit } from '../../support/seed.ts'
+import { copyIn, frameDesign, linkedFrames, newBrand, putKit } from '../../support/seed.ts'
 import { openStage, read } from '../../support/stage.ts'
 import { expect, type Page, test } from '../../support/test.ts'
 
@@ -14,80 +14,81 @@ test.describe.configure({ timeout: 180_000 })
 
 const heading = { fontFamily: 'brand:heading' as const }
 const style = { fontFamily: 'Noto Sans', fontSize: 72, fontWeight: 400, color: '#111111FF' }
-const design = (): DesignInput => ({
-  meta: {
-    designId: 'replaced-by-the-api',
-    name: 'Brand font',
-    kind: 'single',
-    primaryFormatId: 'sq',
-  },
-  formats: {
-    sq: { name: 'Square', width: 1080, height: 1080, order: 'a0' },
-    story: { name: 'Story', width: 1080, height: 1920, order: 'a1' },
-  },
-  pages: { p1: { name: 'Page 1', order: 'a0', fills: [{ type: 'solid', color: '#FFFFFFFF' }] } },
-  nodes: {
-    // A box that grows wide with its words, smaller in the story.
-    wide: {
-      type: 'text',
-      parentId: 'p1',
-      index: 'a0',
-      name: 'Wide',
-      bindings: heading,
-      props: { x: 60, y: 100, width: 420, height: 98, boxMode: 'autoWidth', text: 'Summer sale', style },
-    },
-    // A box that grows down with its words.
-    tall: {
-      type: 'text',
-      parentId: 'p1',
-      index: 'a2',
-      name: 'Tall',
-      bindings: heading,
-      props: {
-        x: 720,
-        y: 100,
-        width: 320,
-        height: 98,
-        boxMode: 'autoHeight',
-        text: 'Fresh beans roasted daily',
-        style,
+const design = (): DesignInput =>
+  linkedFrames(
+    frameDesign({
+      name: 'Brand font',
+      nodes: {
+        // A box that grows wide with its words, smaller in its copy in the story.
+        wide: {
+          type: 'text',
+          parentId: 'sq',
+          index: 'a0',
+          name: 'Wide',
+          bindings: heading,
+          props: { x: 60, y: 100, width: 420, height: 98, boxMode: 'autoWidth', text: 'Summer sale', style },
+        },
+        // A box that grows down with its words.
+        tall: {
+          type: 'text',
+          parentId: 'sq',
+          index: 'a2',
+          name: 'Tall',
+          bindings: heading,
+          props: {
+            x: 720,
+            y: 100,
+            width: 320,
+            height: 98,
+            boxMode: 'autoHeight',
+            text: 'Fresh beans roasted daily',
+            style,
+          },
+        },
+        // A long headline in a fixed box, kept as it is.
+        fixed: {
+          type: 'text',
+          parentId: 'sq',
+          index: 'a3',
+          name: 'Fixed',
+          bindings: heading,
+          props: { x: 600, y: 700, width: 400, height: 240, boxMode: 'fixed', text: 'Open late on Fridays', style },
+        },
+        // A long headline in a fixed box that shrinks its words to fit.
+        shrink: {
+          type: 'text',
+          parentId: 'sq',
+          index: 'a1',
+          name: 'Shrink',
+          bindings: heading,
+          props: {
+            x: 60,
+            y: 400,
+            width: 460,
+            height: 200,
+            boxMode: 'fixed',
+            shrinkToFit: { min: 12, max: 72 },
+            text: 'Cold brew, three ways, every single morning of the week',
+            style,
+          },
+        },
       },
-    },
-    // A long headline in a fixed box, kept as it is.
-    fixed: {
-      type: 'text',
-      parentId: 'p1',
-      index: 'a3',
-      name: 'Fixed',
-      bindings: heading,
-      props: { x: 600, y: 700, width: 400, height: 240, boxMode: 'fixed', text: 'Open late on Fridays', style },
-    },
-    // A long headline in a fixed box that shrinks its words to fit.
-    shrink: {
-      type: 'text',
-      parentId: 'p1',
-      index: 'a1',
-      name: 'Shrink',
-      bindings: heading,
-      props: {
-        x: 60,
-        y: 400,
-        width: 460,
-        height: 200,
-        boxMode: 'fixed',
-        shrinkToFit: { min: 12, max: 72 },
-        text: 'Cold brew, three ways, every single morning of the week',
-        style,
+    }),
+    [
+      {
+        id: 'story',
+        name: 'Story',
+        width: 1080,
+        height: 1920,
+        values: { wide: { style: { ...style, fontSize: 48 } } },
       },
-    },
-  },
-  overrides: { 'format:story': { wide: { style: { ...style, fontSize: 48 } } } },
-})
+    ],
+  )
 
 type Text = { props: { width: number; height: number; style: { fontFamily: string } } }
 const text = async (page: Page, id: string) => (await read(page)).nodes[id] as unknown as Text
-const storyWidth = async (page: Page) =>
-  ((await read(page)).overrides['format:story']?.wide as { width?: number } | undefined)?.width
+/** The width of the wide text's copy in the story. */
+const storyWidth = async (page: Page) => (await text(page, copyIn('story', 'wide'))).props.width
 
 /** Whether the export draws anything but the white page under a box, over its columns, before the next layer. */
 const inkBelow = (page: Page, box: { x: number; y: number; width: number; height: number }) =>
@@ -121,7 +122,7 @@ test.beforeAll(() => {
   importGoogleFonts(['Playfair Display'])
 })
 
-test('a brand kit font change refits the text bound to it in every format, and undo leaves the refit', async ({
+test('a brand kit font change refits the text bound to it in every frame, and undo leaves the refit', async ({
   browser,
 }) => {
   const brandId = await newBrand('e2e brand-font-refit')
@@ -140,11 +141,14 @@ test('a brand kit font change refits the text bound to it in every format, and u
   await kit.getByRole('combobox', { name: 'Family of Heading' }).click()
   await page.locator('[role="listbox"] [role="option"][data-value="Playfair Display"]').click()
 
-  // Both bound texts take the family; the wide box fits its words again, in the square and the story.
+  // The bound texts take the family; the wide box fits its words again, in the square and the story.
   await expect
     .poll(async () => (await text(page, 'wide')).props.style.fontFamily, { timeout: 20_000 })
     .toBe('Playfair Display')
   expect((await text(page, 'shrink')).props.style.fontFamily).toBe('Playfair Display')
+  await expect
+    .poll(async () => (await text(page, copyIn('story', 'wide'))).props.style.fontFamily)
+    .toBe('Playfair Display')
   await expect.poll(async () => (await text(page, 'tall')).props.style.fontFamily).toBe('Playfair Display')
   const after = {
     wide: (await text(page, 'wide')).props.width,
@@ -159,14 +163,13 @@ test('a brand kit font change refits the text bound to it in every format, and u
     style: { fontFamily: 'Playfair Display' },
   })
   expect(after.wide).not.toBe(before.wide)
-  expect(after.story).toBeDefined()
   expect(after.story).not.toBe(before.story)
   // The shrinking box keeps its size.
   expect((await text(page, 'shrink')).props).toMatchObject({ width: 460, height: 200 })
 
   // The export draws every word inside its box: nothing to the right of either.
   await page.evaluate(() => window.dazbee?.drawn())
-  await page.evaluate(() => window.dazbee?.exportFiles({ pageIds: ['p1'], formatIds: ['sq'], type: 'png' }))
+  await page.evaluate(() => window.dazbee?.exportFiles({ frameIds: ['sq'], type: 'png' }))
   const wide = (await text(page, 'wide')).props
   expect(await inkRightOf(page, { x: 60, y: 100, width: wide.width, height: wide.height })).toBe(false)
   expect(await inkRightOf(page, { x: 60, y: 400, width: 460, height: 200 })).toBe(false)

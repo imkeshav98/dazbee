@@ -4,24 +4,18 @@
 import type { DesignInput } from '@dazbee/schema'
 
 import { placed, screenPoint, writeOutput } from '../../support/editor.ts'
+import { frameDesign } from '../../support/seed.ts'
 import { openStage, press, read, selection } from '../../support/stage.ts'
 import { expect, type Page, test } from '../../support/test.ts'
 
 test.describe.configure({ timeout: 120_000 })
 
-const design: DesignInput = {
-  meta: {
-    designId: 'replaced-by-the-api',
-    name: 'Drag a mask',
-    kind: 'single',
-    primaryFormatId: 'sq',
-  },
-  formats: { sq: { name: 'Square', width: 1080, height: 1080, order: 'a0' } },
-  pages: { p1: { name: 'Page 1', order: 'a0', fills: [{ type: 'solid', color: '#FFFFFFFF' }] } },
+const design: DesignInput = frameDesign({
+  name: 'Drag a mask',
   nodes: {
     group: {
       type: 'group',
-      parentId: 'p1',
+      parentId: 'sq',
       index: 'a0',
       name: 'Masked',
       props: { x: 200, y: 200, width: 400, height: 300 },
@@ -56,10 +50,9 @@ const design: DesignInput = {
       },
     },
   },
-  overrides: {},
-}
+})
 const box = async (page: Page, id: string) => {
-  const p = placed(await read(page), id, 'sq') as { x: number; y: number; width: number; height: number }
+  const p = placed(await read(page), id) as { x: number; y: number; width: number; height: number }
   return { x: p.x, y: p.y, width: p.width, height: p.height }
 }
 const row = (page: Page, name: string) =>
@@ -97,7 +90,7 @@ test('a mask picked in the layers panel is dragged on the stage, and what it mas
   expect(await box(page, 'mask')).toEqual({ x: 200, y: 200, width: 400, height: 300 })
 
   // A click there without a drag picks what is under the pointer.
-  await page.evaluate(() => window.dazbee?.select(['mask'], 'p1', 'sq'))
+  await page.evaluate(() => window.dazbee?.select(['mask']))
   await page.evaluate(() => window.dazbee?.drawn())
   const at = await screenPoint(page, 400, 350)
   await page.mouse.click(at.x, at.y)

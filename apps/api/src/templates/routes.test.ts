@@ -4,70 +4,87 @@ import * as Y from 'yjs'
 
 import { readDesignState } from '@dazbee/db'
 import { readDesign } from '@dazbee/doc'
-import { AssetSummary, DesignSummary, parseDesign, SignedLink, TemplateSummary } from '@dazbee/schema'
+import { AssetSummary, type Design, DesignSummary, parseDesign, SignedLink, TemplateSummary } from '@dazbee/schema'
 
 import { readImageHeader } from '../assets/images.ts'
 import { coverOf } from '../drawing/design-thumbnails.ts'
-import { renderFirstPage } from '../drawing/render.ts'
+import { renderCover } from '../drawing/render.ts'
 import { brand, call, db, otherBrand, run, sibling, storage, uploadImage, workspace } from '../test-api.ts'
 import { png } from '../test-files.ts'
 
 // Saving a template draws its thumbnail with CanvasKit, which takes seconds on a busy CI runner.
 describe('templates (#54)', { timeout: 60_000 }, () => {
-  /** A design with a shape, text and one of the brand's images, in two formats. */
-  const content = (assetId: string) => ({
-    meta: { designId: 'any', name: 'Sale', kind: 'single', primaryFormatId: 'sq' },
-    formats: {
-      sq: { name: 'Square', width: 400, height: 400, order: 'a0' },
-      wide: { name: 'Wide', width: 800, height: 400, order: 'a1' },
-    },
-    pages: { p1: { name: 'Page 1', order: 'a0', fills: [{ type: 'solid', color: '#FFF6E8FF' }] } },
-    nodes: {
-      photo: {
-        type: 'graphic',
-        parentId: 'p1',
-        index: 'a0',
-        name: 'Photo',
-        props: {
-          x: 20,
-          y: 20,
-          width: 200,
-          height: 150,
-          shape: { kind: 'rect' },
-          fills: [{ type: 'image', assetId, fit: 'fill' }],
-        },
-      },
-      dot: {
-        type: 'graphic',
-        parentId: 'p1',
-        index: 'a1',
-        name: 'Dot',
-        props: {
-          x: 250,
-          y: 40,
-          width: 120,
-          height: 120,
-          shape: { kind: 'ellipse' },
-          fills: [{ type: 'solid', color: '#E0262BFF' }],
-        },
-      },
-      words: {
-        type: 'text',
-        parentId: 'p1',
-        index: 'a2',
-        name: 'Words',
-        props: {
-          x: 20,
-          y: 250,
-          width: 360,
-          height: 80,
-          text: 'Fresh roast',
-          style: { fontFamily: 'Noto Sans', fontSize: 48, color: '#14213DFF' },
-        },
+  /** A shape, text and one of the brand's images in a square frame, each layer's link its own id. */
+  const square = (assetId: string) => ({
+    photo: {
+      type: 'graphic',
+      parentId: 'sq',
+      link: 'photo',
+      index: 'a0',
+      name: 'Photo',
+      props: {
+        x: 20,
+        y: 20,
+        width: 200,
+        height: 150,
+        shape: { kind: 'rect' },
+        fills: [{ type: 'image', assetId, fit: 'fill' }],
       },
     },
-    overrides: { 'format:wide': { dot: { x: 600 } } },
+    dot: {
+      type: 'graphic',
+      parentId: 'sq',
+      link: 'dot',
+      index: 'a1',
+      name: 'Dot',
+      props: {
+        x: 250,
+        y: 40,
+        width: 120,
+        height: 120,
+        shape: { kind: 'ellipse' },
+        fills: [{ type: 'solid', color: '#E0262BFF' }],
+      },
+    },
+    words: {
+      type: 'text',
+      parentId: 'sq',
+      link: 'words',
+      index: 'a2',
+      name: 'Words',
+      props: {
+        x: 20,
+        y: 250,
+        width: 360,
+        height: 80,
+        text: 'Fresh roast',
+        style: { fontFamily: 'Noto Sans', fontSize: 48, color: '#14213DFF' },
+      },
+    },
   })
+  /** The square frame, and a wide frame beside it holding linked copies of its layers, the dot further right. */
+  const content = (assetId: string) => {
+    const layers = square(assetId)
+    const wide: Record<string, Record<string, unknown>> = { dot: { x: 600 } }
+    const background = [{ type: 'solid', color: '#FFF6E8FF' }]
+    return {
+      meta: { designId: 'any', name: 'Sale' },
+      pages: { p1: { name: 'Page 1', order: 'a0' } },
+      frames: {
+        sq: { pageId: 'p1', name: 'Square', width: 400, height: 400, x: 0, y: 0, fills: background, order: 'a0' },
+        wide: { pageId: 'p1', name: 'Wide', width: 800, height: 400, x: 600, y: 0, fills: background, order: 'a1' },
+      },
+      nodes: {
+        ...layers,
+        ...Object.fromEntries(
+          Object.entries(layers).map(([id, layer]) => [
+            `wide-${id}`,
+            { ...layer, parentId: 'wide', link: id, props: { ...layer.props, ...wide[id] } },
+          ]),
+        ),
+      },
+    }
+  }
   const designOf = async (designId: string) => {
     const state = await readDesignState(db, designId)
     if (!state) throw new Error('no state')
@@ -75,10 +92,12 @@ describe('templates (#54)', { timeout: 60_000 }, () => {
     Y.applyUpdate(doc, state)
     return readDesign(doc)
   }
-  const ids = (d: { formats: object; pages: object; nodes: object }) => [
-    ...Object.keys(d.formats),
+  /** Every id a design holds: its pages, frames, layers and link ids. */
+  const ids = (d: Design) => [
     ...Object.keys(d.pages),
+    ...Object.keys(d.frames),
     ...Object.keys(d.nodes),
+    ...Object.values(d.nodes).map((node) => node.link),
   ]
 
   it('saves a brand template with a thumbnail, and starting from it gives a design with the same pixels and no shared ids', async () => {
@@ -94,7 +113,6 @@ describe('templates (#54)', { timeout: 60_000 }, () => {
       name: 'Sale square',
       scope: 'brand',
       brandId: brand.id,
-      kind: 'single',
       width: 400,
       height: 400,
     })
@@ -115,30 +133,48 @@ describe('templates (#54)', { timeout: 60_000 }, () => {
     const original = parseDesign(content(photo.id))
     if (!original.success) throw new Error(original.errors.join('\n'))
     expect(ids(copy).filter((id) => ids(original.design).includes(id))).toEqual([])
+    // The copies stay linked to each other: one new link id per old one.
+    expect(Object.keys(copy.frames)).toHaveLength(2)
+    expect(new Set(Object.values(copy.nodes).map((node) => node.link)).size).toBe(3)
     // The same brand: the same asset.
     expect(JSON.stringify(copy)).toContain(photo.id)
     const [a, b] = await Promise.all([
-      renderFirstPage(db, storage, workspace.id, brand.id, original.design),
-      renderFirstPage(db, storage, workspace.id, brand.id, copy),
+      renderCover(db, storage, workspace.id, brand.id, original.design),
+      renderCover(db, storage, workspace.id, brand.id, copy),
     ])
     expect(Buffer.from(b.pixels).equals(Buffer.from(a.pixels))).toBe(true)
   })
 
-  it("draws a template's thumbnail from the page a design's picture shows, when two pages share an order", async () => {
-    // Two pages at the same order: the one listed first is not the one first by id.
-    const parsed = parseDesign({
-      meta: { designId: 'any', name: 'Tie', kind: 'single', primaryFormatId: 'sq' },
-      formats: { sq: { name: 'Square', width: 40, height: 40, order: 'a0' } },
-      pages: {
-        pb: { name: 'Red', order: 'a0', fills: [{ type: 'solid', color: '#E0262BFF' }] },
-        pa: { name: 'Navy', order: 'a0', fills: [{ type: 'solid', color: '#14213DFF' }] },
-      },
-      nodes: {},
+  it("draws a template's thumbnail from its cover frame and takes its size: the first frame of the first page that has one", async () => {
+    // An empty page first; then two pages at the same order, the one listed first not the one first by id.
+    const square = (pageId: string, side: number, color: string) => ({
+      pageId,
+      name: 'Square',
+      width: side,
+      height: side,
+      x: 0,
+      y: 0,
+      fills: [{ type: 'solid', color }],
+      order: 'a0',
     })
+    const content = {
+      meta: { designId: 'any', name: 'Tie' },
+      pages: {
+        p0: { name: 'Empty', order: 'a0' },
+        pb: { name: 'Red', order: 'a1' },
+        pa: { name: 'Navy', order: 'a1' },
+      },
+      frames: { 'pb-sq': square('pb', 60, '#E0262BFF'), 'pa-sq': square('pa', 40, '#14213DFF') },
+      nodes: {},
+    }
+    const parsed = parseDesign(content)
     if (!parsed.success) throw new Error(parsed.errors.join('\n'))
-    expect(coverOf(parsed.design)?.pageId).toBe('pa')
-    const drawn = await renderFirstPage(db, storage, workspace.id, brand.id, parsed.design)
+    expect(coverOf(parsed.design)?.frameId).toBe('pa-sq')
+    const drawn = await renderCover(db, storage, workspace.id, brand.id, parsed.design)
+    expect([drawn.width, drawn.height]).toEqual([40, 40])
     expect([...drawn.pixels.slice(0, 4)]).toEqual([0x14, 0x21, 0x3d, 0xff])
+    const saved = await call('a', 'POST', `/brands/${brand.id}/templates`, { name: 'Tie', scope: 'brand', content })
+    expect(TemplateSummary.parse(saved.json)).toMatchObject({ width: 40, height: 40 })
   })
 
   it('renames and deletes a template the brand can see (#159)', async () => {
@@ -230,8 +266,8 @@ describe('templates (#54)', { timeout: 60_000 }, () => {
     const original = parseDesign(content(photo.id))
     if (!original.success) throw new Error(original.errors.join('\n'))
     const [a, b] = await Promise.all([
-      renderFirstPage(db, storage, workspace.id, brand.id, original.design),
-      renderFirstPage(db, storage, workspace.id, sibling.id, copy),
+      renderCover(db, storage, workspace.id, brand.id, original.design),
+      renderCover(db, storage, workspace.id, sibling.id, copy),
     ])
     expect(Buffer.from(b.pixels).equals(Buffer.from(a.pixels))).toBe(true)
   })
@@ -251,6 +287,14 @@ describe('templates (#54)', { timeout: 60_000 }, () => {
       (await call('a', 'POST', `/brands/${brand.id}/templates`, { name: 'Bad', scope: 'brand', content: { meta: {} } }))
         .status,
     ).toBe(400)
+    const frameless = { meta: { designId: 'any', name: 'Empty' }, pages: { p1: { name: 'Page 1', order: 'a0' } } }
+    expect(
+      await call('a', 'POST', `/brands/${brand.id}/templates`, {
+        name: 'Empty',
+        scope: 'brand',
+        content: { ...frameless, frames: {}, nodes: {} },
+      }),
+    ).toEqual({ status: 400, json: { error: 'The design is not valid: the design has no frame' } })
     expect(
       (
         await call('a', 'POST', `/brands/${brand.id}/templates`, {

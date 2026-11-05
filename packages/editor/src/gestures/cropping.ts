@@ -4,7 +4,7 @@ import type { Session } from '@dazbee/doc'
 import type { Point } from '@dazbee/schema'
 
 import { type Camera, toScreen, toWorld } from '../canvas/camera.ts'
-import { type Frame, scope } from '../canvas/grid.ts'
+import type { Frame } from '../canvas/frames.ts'
 import type { ThumbnailCache } from '../canvas/thumbnails.ts'
 import type { CropTarget, EditorBoxes } from '../layers/boxes.ts'
 import { type Box, drawnFrom, localTo, pageFrom, round } from '../layers/transform.ts'
@@ -31,8 +31,8 @@ export interface CroppingDeps {
   selection: Pick<EditorSelection, 'cropping' | 'crop'>
   thumbnails: Pick<ThumbnailCache, 'ghost'>
   camera: () => Camera
-  /** The frame of the grid as last drawn with a key, if there is one. */
-  frameOf: (key: string | undefined) => Frame | undefined
+  /** The shown page's frame with an id, as last drawn, if there is one. */
+  frameOf: (id: string | undefined) => Frame | undefined
   boxes: Pick<EditorBoxes, 'cropTarget'>
   /** A box on the overlay with a class, turned as the layer is. */
   outline: (className: string, frame: Frame, box: Box) => HTMLElement
@@ -47,7 +47,7 @@ export interface EditorCropping {
    * so the press does what a press does.
    */
   press(e: PointerEvent, screen: Point): CropDrag | null
-  /** Writes the crop a drag gives, in this format, as the fill's own crop. */
+  /** Writes the crop a drag gives as the fill's own crop. */
   drag(g: CropDrag, p: Point): void
   /** Ends a crop drag, closing its undo step. */
   release(g: CropDrag): void
@@ -69,7 +69,7 @@ export function editorCropping({
   /** The crop being made (#48): the whole image, faint outside the layer, a handle on each corner. */
   function cropParts(): HTMLElement[] {
     const cropping = selection.cropping()
-    const frame = cropping && frameOf(cropping.frame)
+    const frame = cropping && frameOf(cropping.frameId)
     const target = frame && cropping && cropTarget(frame, cropping.id)
     if (!frame || !target) return []
     const { box, rect, around } = target
@@ -101,7 +101,7 @@ export function editorCropping({
    */
   function startCrop(e: PointerEvent, screen: Point): CropDrag | null {
     const cropping = selection.cropping()
-    const frame = cropping && frameOf(cropping.frame)
+    const frame = cropping && frameOf(cropping.frameId)
     const target = frame && cropping && cropTarget(frame, cropping.id)
     if (!frame || !target || !cropping) {
       selection.crop(null)
@@ -137,7 +137,7 @@ export function editorCropping({
       end: session.beginGesture(),
     }
   }
-  /** Writes the crop a drag gives, in this format, as the fill's own crop. */
+  /** Writes the crop a drag gives as the fill's own crop. */
   function cropTo(g: CropDrag, p: Point) {
     const { start } = g
     const rect =
@@ -152,7 +152,7 @@ export function editorCropping({
       height: round(c.height),
     }
     const fills = start.fills.map((f, i) => (i === start.index ? { ...start.fill, fit: 'crop' as const, crop } : f))
-    runQuietly(() => session.run('node.update', { ids: [g.id], scope: scope(g.frame), patch: { fills } }))
+    runQuietly(() => session.run('node.update', { ids: [g.id], patch: { fills } }))
     drawOverlay()
   }
   /** Ends a crop drag, closing its undo step. */

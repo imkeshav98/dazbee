@@ -2,40 +2,38 @@
 // and see the layer change, with the design itself untouched; another design bound to the same
 // colour opens in the new one, and one undo lets the layer go of the brand again. The flyout opens
 // as a picker: its colour tiles and font rows apply the kit, each one undo step that redo brings
-// back and there after a reload, and the page's Background panel shows the colours.
+// back and there after a reload.
 import type { DesignInput } from '@dazbee/schema'
 
 import { editorPath, reloads, writeOutput } from '../../support/editor.ts'
-import { getKit, newBrand, putKit, seed } from '../../support/seed.ts'
-import { backgroundPanel, openStage, read } from '../../support/stage.ts'
+import { frameDesign, getKit, newBrand, putKit, seed } from '../../support/seed.ts'
+import { openStage, read } from '../../support/stage.ts'
 import { expect, type Page, test } from '../../support/test.ts'
 
 test.describe.configure({ timeout: 120_000 })
 
 const navy = '#14213DFF'
-const design = (bindings?: Record<string, string>): DesignInput => ({
-  meta: { designId: 'replaced-by-the-api', name: 'Brand kit', kind: 'single', primaryFormatId: 'sq' },
-  formats: { sq: { name: 'Square', width: 1080, height: 1080, order: 'a0' } },
-  pages: { p1: { name: 'Page 1', order: 'a0', fills: [{ type: 'solid', color: '#FFFFFFFF' }] } },
-  nodes: {
-    box: {
-      type: 'graphic',
-      parentId: 'p1',
-      index: 'a0',
-      name: 'Box',
-      ...(bindings ? { bindings } : {}),
-      props: {
-        x: 640,
-        y: 140,
-        width: 300,
-        height: 300,
-        shape: { kind: 'rect', cornerRadius: 24 },
-        fills: [{ type: 'solid', color: navy }],
+const design = (bindings?: Record<string, string>): DesignInput =>
+  frameDesign({
+    name: 'Brand kit',
+    nodes: {
+      box: {
+        type: 'graphic',
+        parentId: 'sq',
+        index: 'a0',
+        name: 'Box',
+        ...(bindings ? { bindings } : {}),
+        props: {
+          x: 640,
+          y: 140,
+          width: 300,
+          height: 300,
+          shape: { kind: 'rect', cornerRadius: 24 },
+          fills: [{ type: 'solid', color: navy }],
+        },
       },
     },
-  },
-  overrides: {},
-})
+  })
 
 /** The colour the export render draws in the middle of the box. */
 const boxColor = (page: Page) =>
@@ -100,7 +98,7 @@ test('a layer bound to a brand colour changes when the brand colour does', async
 
   // The export the user downloads is drawn in the new colour too.
   const exported = await page.evaluate(async () => {
-    const file = await window.dazbee?.exportFiles({ pageIds: ['p1'], formatIds: ['sq'], type: 'png' })
+    const file = await window.dazbee?.exportFiles({ frameIds: ['sq'], type: 'png' })
     const bitmap = await createImageBitmap(new Blob([new Uint8Array(file?.bytes ?? [])], { type: 'image/png' }))
     const canvas = new OffscreenCanvas(bitmap.width, bitmap.height)
     const context = canvas.getContext('2d')
@@ -116,9 +114,7 @@ test('a layer bound to a brand colour changes when the brand colour does', async
   expect(errors).toEqual([])
 })
 
-test('the picker applies a colour tile and a font row, and the page Background panel shows the colours', async ({
-  browser,
-}) => {
+test('the picker applies a colour tile and a font row', async ({ browser }) => {
   const brandId = await newBrand('e2e brand-kit')
   await putKit(brandId, {
     colors: [
@@ -130,7 +126,8 @@ test('the picker applies a colour tile and a font row, and the page Background p
   const content = design()
   content.nodes.title = {
     type: 'text',
-    parentId: 'p1',
+    parentId: 'sq',
+    link: 'title',
     index: 'a1',
     name: 'Title',
     props: {
@@ -144,20 +141,6 @@ test('the picker applies a colour tile and a font row, and the page Background p
   } as DesignInput['nodes'][string]
   const { page, errors } = await openStage(browser, content, { brandId })
 
-  // The page picked, its Background panel offers the brand's colours in place of the fixed set.
-  const brandRow = (await backgroundPanel(page)).getByTestId('brand-colours')
-  // The kit's two, after the page's own white, which the kit doesn't hold.
-  await expect(brandRow.getByRole('button')).toHaveCount(3)
-  await expect(brandRow.getByRole('button', { name: 'Roast' })).toBeVisible()
-  await brandRow.getByRole('button', { name: 'Sun' }).click()
-  await expect
-    .poll(
-      async () => ((await read(page)) as unknown as { pages: Record<string, { fills: unknown[] }> }).pages.p1?.fills,
-    )
-    .toEqual([{ type: 'solid', color: '#FF8A3DFF' }])
-
-  await page.keyboard.press('Escape')
-  await page.keyboard.press('Escape')
   await page.locator('[data-panel="brand"]').click()
   const picker = page.getByTestId('brand-kit')
   await expect(picker).toHaveAttribute('data-mode', 'pick')

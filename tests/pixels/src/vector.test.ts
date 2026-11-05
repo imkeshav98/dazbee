@@ -14,7 +14,7 @@ import {
   textMeasure,
 } from '@dazbee/renderer'
 import { loadCanvasKit } from '@dazbee/renderer/node'
-import { parseDesign } from '@dazbee/schema'
+import { framesOf, inOrder, parseDesign } from '@dazbee/schema'
 
 import { loadFixtures } from './fixtures.ts'
 import { pdfGlyphs } from './pdf-glyphs.ts'
@@ -46,15 +46,8 @@ const cases = loadFixtures().flatMap(({ name, json }) => {
   const parsed = parseDesign(json)
   if (!parsed.success) throw new Error(parsed.errors.join('\n'))
   const design = parsed.design
-  return Object.keys(design.pages).flatMap((pageId) =>
-    Object.keys(design.formats).map((formatId) => ({
-      name,
-      json,
-      design,
-      pageId,
-      formatId,
-      label: `${name} ${pageId}.${formatId}`,
-    })),
+  return inOrder(design.pages).flatMap(([pageId]) =>
+    framesOf(design, pageId).map(([frameId]) => ({ name, json, design, frameId, label: `${name} ${frameId}` })),
   )
 })
 const baselines = readVectorBaselines()
@@ -82,7 +75,7 @@ const turn = (m: Affine, degrees: number, cx: number, cy: number): Affine => {
   ]
 }
 
-/** Every glyph the renderer lays out, by glyph id, where it draws it on the page, each layer turned as it is drawn. */
+/** Every glyph the renderer lays out, by glyph id, where it draws it in the frame, each layer turned as it is drawn. */
 function rendererGlyphs(
   layers: readonly SceneLayer[],
   resources: ReturnType<typeof cache.resources>,
@@ -124,13 +117,13 @@ function rendererGlyphs(
 describe('PDF and SVG exports (#56)', () => {
   it.each(cases)(
     '$label: pdfium and resvg draw them as the CPU does, within the baseline',
-    async ({ name, json, pageId, formatId, label }) => {
-      const cpu = overWhite(renderDesign(ck, json, pageId, formatId, bytes, cache))
+    async ({ name, json, frameId, label }) => {
+      const cpu = overWhite(renderDesign(ck, json, frameId, bytes, cache))
       await breathe()
-      const pdf = renderVector(ck, json, pageId, formatId, bytes, 'pdf', cache)
+      const pdf = renderVector(ck, json, frameId, bytes, 'pdf', cache)
       pdfs.set(label, pdf)
       await breathe()
-      const svg = renderVector(ck, json, pageId, formatId, bytes, 'svg', cache)
+      const svg = renderVector(ck, json, frameId, bytes, 'svg', cache)
       await breathe()
       const pdfPixels = await rasterisePdf(pdfium, pdf)
       const svgPixels = rasteriseSvg(svg)
@@ -147,7 +140,7 @@ describe('PDF and SVG exports (#56)', () => {
       if (over.length > 0) {
         const out = join(OUTPUT_DIR, 'vector', name)
         mkdirSync(out, { recursive: true })
-        const base = `${pageId}.${formatId}`
+        const base = frameId
         writeFileSync(join(out, `${base}.pdf`), pdf)
         writeFileSync(join(out, `${base}.svg`), svg)
         writeFileSync(join(out, `${base}.cpu.png`), encodePng(ck, cpu))
@@ -167,25 +160,22 @@ describe('PDF and SVG exports (#56)', () => {
     const styles = cases.find((c) => c.name === 'text-styles')
     const sale = cases.find((c) => c.name === 'english-sale-ad')
     if (!styles || !sale) throw new Error('fixtures missing')
-    const stylesText = await pdfText(
-      pdfium,
-      renderVector(ck, styles.json, styles.pageId, styles.formatId, bytes, 'pdf', cache),
-    )
+    const stylesText = await pdfText(pdfium, renderVector(ck, styles.json, styles.frameId, bytes, 'pdf', cache))
     expect(stylesText).toContain('Bold outline')
     expect(stylesText.match(/Bold/g)).toHaveLength(1)
-    expect(
-      await pdfText(pdfium, renderVector(ck, sale.json, sale.pageId, sale.formatId, bytes, 'pdf', cache)),
-    ).toContain('Summer sale')
+    expect(await pdfText(pdfium, renderVector(ck, sale.json, sale.frameId, bytes, 'pdf', cache))).toContain(
+      'Summer sale',
+    )
   })
 
   it.each(cases)(
     '$label: every glyph in the PDF sits where the renderer draws it, within 0.05 px',
-    async ({ design, pageId, formatId, json, label }) => {
+    async ({ design, frameId, json, label }) => {
       await breathe()
       const resources = cache.resources(bytes)
-      const scene = render(design, pageId, formatId, undefined, textMeasure(ck, resources), bytes.variables)
+      const scene = render(design, frameId, undefined, textMeasure(ck, resources), bytes.variables)
       const drawn = rendererGlyphs(scene.layers, resources)
-      const inFile = pdfGlyphs(pdfs.get(label) ?? renderVector(ck, json, pageId, formatId, bytes, 'pdf', cache))
+      const inFile = pdfGlyphs(pdfs.get(label) ?? renderVector(ck, json, frameId, bytes, 'pdf', cache))
       // Text drawn only as a mask lives in the PDF's soft masks, which this doesn't read.
       let worst = 0
       for (const g of inFile) {
@@ -203,7 +193,7 @@ describe('PDF and SVG exports (#56)', () => {
       ['pdf', 'application/pdf'],
       ['svg', 'image/svg+xml'],
     ] as const) {
-      const file = exportDesign(ck, c.json, { pageIds: [c.pageId], formatIds: [c.formatId], type }, bytes, cache)
+      const file = exportDesign(ck, c.json, { frameIds: [c.frameId], type }, bytes, cache)
       expect(file.type).toBe(mime)
       expect(file.name.endsWith(`.${type}`)).toBe(true)
     }

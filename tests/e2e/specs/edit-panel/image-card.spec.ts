@@ -5,53 +5,47 @@ import type { DesignInput } from '@dazbee/schema'
 import { photo, upload } from '../../support/assets.ts'
 import { writeOutput } from '../../support/editor.ts'
 import { enter } from '../../support/fields.ts'
+import { frameDesign } from '../../support/seed.ts'
 import { openStage } from '../../support/stage.ts'
 import { expect, type Page, test } from '../../support/test.ts'
 import { barMenu, openCard } from '../../support/top-bar.ts'
 
 test.describe.configure({ timeout: 120_000 })
 
-const design = (assetId: string): DesignInput => ({
-  meta: {
-    designId: 'replaced-by-the-api',
+const design = (assetId: string): DesignInput =>
+  frameDesign({
     name: 'Image card',
-    kind: 'single',
-    primaryFormatId: 'sq',
-  },
-  formats: { sq: { name: 'Square', width: 1080, height: 1080, order: 'a0' } },
-  pages: { p1: { name: 'Page 1', order: 'a0', fills: [{ type: 'solid', color: '#FFFFFFFF' }] } },
-  nodes: {
-    photo: {
-      type: 'graphic',
-      parentId: 'p1',
-      index: 'a0',
-      name: 'Photo',
-      props: {
-        x: 140,
-        y: 140,
-        width: 800,
-        height: 800,
-        shape: { kind: 'rect', cornerRadius: 24 },
-        fills: [{ type: 'image', assetId, fit: 'fill' }],
+    nodes: {
+      photo: {
+        type: 'graphic',
+        parentId: 'sq',
+        index: 'a0',
+        name: 'Photo',
+        props: {
+          x: 140,
+          y: 140,
+          width: 800,
+          height: 800,
+          shape: { kind: 'rect', cornerRadius: 24 },
+          fills: [{ type: 'image', assetId, fit: 'fill' }],
+        },
+      },
+      box: {
+        type: 'graphic',
+        parentId: 'sq',
+        index: 'a1',
+        name: 'Box',
+        props: {
+          x: 40,
+          y: 40,
+          width: 80,
+          height: 80,
+          shape: { kind: 'rect' },
+          fills: [{ type: 'solid', color: '#14213DFF' }],
+        },
       },
     },
-    box: {
-      type: 'graphic',
-      parentId: 'p1',
-      index: 'a1',
-      name: 'Box',
-      props: {
-        x: 40,
-        y: 40,
-        width: 80,
-        height: 80,
-        shape: { kind: 'rect' },
-        fills: [{ type: 'solid', color: '#14213DFF' }],
-      },
-    },
-  },
-  overrides: {},
-})
+  })
 
 const imageOf = async (page: Page) =>
   ((await page.evaluate(() => window.dazbee?.design().nodes.photo?.props)) as { fills: Record<string, unknown>[] })

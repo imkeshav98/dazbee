@@ -1,34 +1,23 @@
 {
-  "meta": {
-    "designId": "hindi-ad",
-    "name": "Hindi ad",
-    "kind": "single",
-    "primaryFormatId": "sq"
-  },
-  "formats": {
+  "meta": { "designId": "hindi-ad", "name": "Hindi ad" },
+  "pages": { "p1": { "name": "Page 1", "order": "a0" } },
+  "frames": {
     "sq": {
+      "pageId": "p1",
       "name": "Square 1:1",
       "width": 1080,
       "height": 1080,
+      "x": 0,
+      "y": 0,
+      "fills": [{ "type": "solid", "color": "#FFF8E1FF" }],
       "order": "a0"
-    }
-  },
-  "pages": {
-    "p1": {
-      "name": "Page 1",
-      "order": "a0",
-      "fills": [
-        {
-          "type": "solid",
-          "color": "#FFF8E1FF"
-        }
-      ]
     }
   },
   "nodes": {
     "bg": {
       "type": "graphic",
-      "parentId": "p1",
+      "parentId": "sq",
+      "link": "bg",
       "index": "a0",
       "name": "Saffron circle",
       "props": {
@@ -36,21 +25,15 @@
         "y": -200,
         "width": 800,
         "height": 800,
-        "shape": {
-          "kind": "ellipse"
-        },
-        "fills": [
-          {
-            "type": "solid",
-            "color": "#FF9933FF"
-          }
-        ]
+        "shape": { "kind": "ellipse" },
+        "fills": [{ "type": "solid", "color": "#FF9933FF" }]
       },
       "role": "decoration"
     },
     "headline": {
       "type": "text",
-      "parentId": "p1",
+      "parentId": "sq",
+      "link": "headline",
       "index": "a1",
       "name": "Headline",
       "props": {
@@ -59,18 +42,14 @@
         "width": 960,
         "height": 140,
         "text": "श्री दिवाली सेल",
-        "style": {
-          "fontFamily": "Noto Sans Devanagari",
-          "fontSize": 96,
-          "color": "#7A1F00FF",
-          "fontWeight": 700
-        }
+        "style": { "fontFamily": "Noto Sans Devanagari", "fontSize": 96, "color": "#7A1F00FF", "fontWeight": 700 }
       },
       "role": "headline"
     },
     "body": {
       "type": "text",
-      "parentId": "p1",
+      "parentId": "sq",
+      "link": "body",
       "index": "a2",
       "name": "Body",
       "props": {
@@ -91,7 +70,8 @@
     },
     "price": {
       "type": "text",
-      "parentId": "p1",
+      "parentId": "sq",
+      "link": "price",
       "index": "a3",
       "name": "Price",
       "props": {
@@ -100,15 +80,9 @@
         "width": 960,
         "height": 110,
         "text": "सिर्फ़ ₹1,299",
-        "style": {
-          "fontFamily": "Noto Sans Devanagari",
-          "fontSize": 80,
-          "color": "#C62828FF",
-          "fontWeight": 700
-        }
+        "style": { "fontFamily": "Noto Sans Devanagari", "fontSize": 80, "color": "#C62828FF", "fontWeight": 700 }
       },
       "role": "price"
     }
-  },
-  "overrides": {}
+  }
 }

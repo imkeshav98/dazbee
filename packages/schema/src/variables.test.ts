@@ -19,13 +19,16 @@ describe('BrandToken', () => {
 describe('Bindings', () => {
   it('stores bindings on a layer, and fontFamilies adds the bound brand family', () => {
     const json = {
-      meta: { designId: 'd', name: 'Kit', kind: 'single', primaryFormatId: 'sq' },
-      formats: { sq: { name: 'Square', width: 100, height: 100, order: 'a0' } },
+      meta: { designId: 'd', name: 'Kit' },
       pages: { p1: { name: 'Page 1', order: 'a0' } },
+      frames: {
+        sq: { pageId: 'p1', name: 'Square', width: 100, height: 100, x: 0, y: 0, fills: [], order: 'a0' },
+      },
       nodes: {
         t: {
           type: 'text',
-          parentId: 'p1',
+          parentId: 'sq',
+          link: 't',
           index: 'a0',
           name: 'T',
           bindings: { fontFamily: 'brand:heading' },
@@ -39,7 +42,6 @@ describe('Bindings', () => {
           },
         },
       },
-      overrides: {},
     }
     const parsed = parseDesign(json)
     if (!parsed.success) throw new Error(parsed.errors.join('\n'))

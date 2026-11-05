@@ -1,19 +1,18 @@
-// The picture of a design the home's bento shows (#84): its first page in its primary format,
-// drawn on a small CPU surface like an export (ADR-0005), on a thread of its own, with the fonts
-// and images we store. Like an asset's thumbnail (ADR-0010) it is an image we make and store, once
+// The picture of a design the home's bento shows (#84): its cover frame, drawn on a small CPU
+// surface like an export (ADR-0005), on a thread of its own, with the fonts and images we store. Like an asset's thumbnail (ADR-0010) it is an image we make and store, once
 // per version of the design: the key carries the design's updatedAt, so an edit makes a new one.
 import { Worker } from 'node:worker_threads'
 
 import type { Db } from '@dazbee/db'
-import type { Design, DesignCover, DesignSummary } from '@dazbee/schema'
+import { coverFrame, type Design, type DesignCover, type DesignSummary } from '@dazbee/schema'
 import type { Storage } from '@dazbee/storage'
 
 import { designThumbnailKey } from '../storage-keys.ts'
 import { storedDesign } from '../workspace/designs.ts'
 import type { DrawJob, DrawResult } from './draw-worker.ts'
-import { brandResourcesFor, firstPageId } from './render.ts'
+import { brandResourcesFor } from './render.ts'
 
-/** Where a design's stored picture is, and the size of the format it shows. */
+/** Where a design's stored picture is, and the size of the frame it shows. */
 export type ThumbnailCover = DesignCover & { key: string }
 
 /** The longest side of a design's picture: the bento's big tile on a 2× screen. */
@@ -27,18 +26,15 @@ const waiting = new Map<number, { resolve: (png: Uint8Array) => void; reject: (e
 // A picture being made, by its key, so two requests for the same one draw it once.
 const making = new Map<string, Promise<void>>()
 
-/** The page and format a design's picture shows: its first page, in its primary format. */
-export function coverOf(design: Design) {
-  const pageId = firstPageId(design)
-  const formatId = design.formats[design.meta.primaryFormatId]
-    ? design.meta.primaryFormatId
-    : Object.keys(design.formats)[0]
-  const format = formatId ? design.formats[formatId] : undefined
-  if (!pageId || !formatId || !format) return null
-  return { pageId, formatId, width: format.width, height: format.height }
+/** The frame a design's picture shows, its cover frame (see `coverFrame`), with its size; null with no frame. */
+export function coverOf(design: Design): { frameId: string; width: number; height: number } | null {
+  const cover = coverFrame(design)
+  if (!cover) return null
+  const [frameId, frame] = cover
+  return { frameId, width: frame.width, height: frame.height }
 }
 
-/** The primary format's size, read from the stored design without drawing: what a tile needs to take its shape. */
+/** The cover frame's size, read from the stored design without drawing: what a tile needs to take its shape. */
 export async function designCover(db: Db, summary: DesignSummary): Promise<DesignCover | null> {
   const design = await storedDesign(db, summary.id)
   const cover = design && coverOf(design)
@@ -47,7 +43,7 @@ export async function designCover(db: Db, summary: DesignSummary): Promise<Desig
 
 /**
  * The stored picture of the design as it is now, made first if this version has none, and the
- * primary format's size. It is drawn on its own thread (see draw-worker.ts), straight at its small
+ * cover frame's size. It is drawn on its own thread (see draw-worker.ts), straight at its small
  * size. Null when the design has nothing to show.
  */
 export async function ensureDesignThumbnail(
@@ -73,9 +69,8 @@ export async function ensureDesignThumbnail(
       }
       const png = await drawOnThread({
         design,
-        pageId: cover.pageId,
-        formatId: cover.formatId,
-        format: { width: cover.width, height: cover.height },
+        frameId: cover.frameId,
+        frame: { width: cover.width, height: cover.height },
         size,
         resources,
       })

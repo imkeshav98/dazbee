@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import type { Design } from '@dazbee/schema'
 
-import type { Frame } from './canvas/grid.ts'
+import type { Frame } from './canvas/frames.ts'
 import { editorSelection, isPath } from './selection.ts'
 
 const graphic = (kind: string, parentId?: string) => ({
@@ -10,25 +10,30 @@ const graphic = (kind: string, parentId?: string) => ({
   ...(parentId ? { parentId } : {}),
   props: { shape: { kind } },
 })
-/** Two pages; a rect, a path, and a group holding a rect, on the first. */
+/**
+ * Two pages; a rect, a path, and a group holding a rect, in the first page's first frame, and an
+ * ellipse in its second.
+ */
 const fakeDesign = () =>
   ({
     pages: { p1: { name: 'One' }, p2: { name: 'Two' } },
+    frames: { 'p1-f1': { pageId: 'p1' }, 'p1-f2': { pageId: 'p1' }, 'p2-f1': { pageId: 'p2' } },
     nodes: {
-      rect: graphic('rect', 'p1'),
-      path: graphic('path', 'p1'),
-      group: { type: 'group', parentId: 'p1', props: {} },
+      rect: graphic('rect', 'p1-f1'),
+      path: graphic('path', 'p1-f1'),
+      group: { type: 'group', parentId: 'p1-f1', props: {} },
       child: graphic('rect', 'group'),
+      dot: graphic('ellipse', 'p1-f2'),
     },
   }) as unknown as Design
-const frame = (pageId: string, formatId: string) => ({ key: `${pageId}/${formatId}`, pageId, formatId }) as Frame
-/** The first page in two formats, and the second in one. */
-const GRID = [frame('p1', 'f1'), frame('p1', 'f2'), frame('p2', 'f1')]
+const frame = (pageId: string, name: string) => ({ id: `${pageId}-${name}`, pageId, name }) as Frame
+/** Two frames of the first page and one of the second, as the frames shown. */
+const FRAMES = [frame('p1', 'f1'), frame('p1', 'f2'), frame('p2', 'f1')]
 
-/** A selection over a fake design and grid whose dependencies and listeners log what they hear. */
+/** A selection over a fake design and frames whose dependencies and listeners log what they hear. */
 function harness() {
   const log: string[] = []
-  const world = { design: fakeDesign(), frames: GRID }
+  const world = { design: fakeDesign(), frames: FRAMES }
   const selection = editorSelection({
     drawn: () => world.design,
     frames: () => world.frames,
@@ -67,41 +72,63 @@ describe('editorSelection', () => {
   })
 
   describe('select', () => {
+    it('keeps the group gone into only while the layers selected are in its frame', () => {
+      const { selection } = harness()
+      selection.enter('group')
+      selection.select(['child'], 'p1-f1')
+      expect(selection.entered()).toBe('group')
+      selection.select([], 'p1-f1')
+      expect(selection.entered()).toBe('group')
+      // Pasted or picked in another frame: the group is no way out of there.
+      selection.select(['dot'], 'p1-f2')
+      expect(selection.entered()).toBeNull()
+    })
+
+    it('remembers the frame last selected in on each page, after the selection is let go', () => {
+      const { selection } = harness()
+      expect(selection.lastFrameOn('p1')).toBeNull()
+      selection.select(['rect'], 'p1-f1')
+      selection.select(['dot'], 'p1-f2')
+      selection.select([], 'p1-f2')
+      expect(selection.lastFrameOn('p1')).toBe('p1-f2')
+      expect(selection.lastFrameOn('p2')).toBeNull()
+    })
+
     it('selects layers in one frame and shows it; none lets the selection go', () => {
       const { selection, log } = harness()
-      selection.select(['rect', 'path'], 'p1/f1')
-      expect(selection.current()).toEqual({ ids: ['rect', 'path'], frame: 'p1/f1' })
-      selection.select([], 'p1/f1')
+      selection.select(['rect', 'path'], 'p1-f1')
+      expect(selection.current()).toEqual({ ids: ['rect', 'path'], frameId: 'p1-f1' })
+      selection.select([], 'p1-f1')
       expect(selection.current()).toBeNull()
       expect(log).toEqual(['changed', 'changed'])
     })
 
     it('keeps a path edit only while its one layer stays selected in its frame', () => {
       const { selection } = harness()
-      selection.select(['path'], 'p1/f1')
-      selection.editPath({ id: 'path', frame: 'p1/f1' })
-      selection.select(['path'], 'p1/f1')
-      expect(selection.pathEditing()).toEqual({ id: 'path', frame: 'p1/f1', selected: [] })
-      selection.select(['path', 'rect'], 'p1/f1')
+      selection.select(['path'], 'p1-f1')
+      selection.editPath({ id: 'path', frameId: 'p1-f1' })
+      selection.select(['path'], 'p1-f1')
+      expect(selection.pathEditing()).toEqual({ id: 'path', frameId: 'p1-f1', selected: [] })
+      selection.select(['path', 'rect'], 'p1-f1')
       expect(selection.pathEditing()).toBeNull()
 
-      selection.editPath({ id: 'path', frame: 'p1/f1' })
-      selection.select(['path'], 'p1/f2')
+      selection.editPath({ id: 'path', frameId: 'p1-f1' })
+      selection.select(['path'], 'p1-f2')
       expect(selection.pathEditing()).toBeNull()
-      selection.editPath({ id: 'path', frame: 'p1/f1' })
-      selection.select(['rect'], 'p1/f1')
+      selection.editPath({ id: 'path', frameId: 'p1-f1' })
+      selection.select(['rect'], 'p1-f1')
       expect(selection.pathEditing()).toBeNull()
     })
 
     it('keeps a crop only while its one layer stays selected in its frame', () => {
       const { selection } = harness()
-      selection.crop({ id: 'rect', frame: 'p1/f1' })
-      selection.select(['rect'], 'p1/f1')
-      expect(selection.cropping()).toEqual({ id: 'rect', frame: 'p1/f1' })
-      selection.select(['rect'], 'p1/f2')
+      selection.crop({ id: 'rect', frameId: 'p1-f1' })
+      selection.select(['rect'], 'p1-f1')
+      expect(selection.cropping()).toEqual({ id: 'rect', frameId: 'p1-f1' })
+      selection.select(['rect'], 'p1-f2')
       expect(selection.cropping()).toBeNull()
-      selection.crop({ id: 'rect', frame: 'p1/f1' })
-      selection.select([], 'p1/f1')
+      selection.crop({ id: 'rect', frameId: 'p1-f1' })
+      selection.select([], 'p1-f1')
       expect(selection.cropping()).toBeNull()
     })
 
@@ -109,7 +136,7 @@ describe('editorSelection', () => {
       const { selection } = harness()
       selection.pickPage('p1')
       selection.enter('group')
-      selection.select(['child'], 'p1/f1')
+      selection.select(['child'], 'p1-f1')
       expect(selection.entered()).toBe('group')
       expect(selection.pickedPage()).toBe('p1')
     })
@@ -118,21 +145,21 @@ describe('editorSelection', () => {
   describe('selectKeepingModes', () => {
     it('sets the selection alone: a crop and a path edit stay, and nothing is shown', () => {
       const { selection, log } = harness()
-      selection.crop({ id: 'rect', frame: 'p1/f1' })
-      selection.editPath({ id: 'path', frame: 'p1/f1' })
-      selection.selectKeepingModes({ ids: ['child'], frame: 'p1/f2' })
-      expect(selection.current()).toEqual({ ids: ['child'], frame: 'p1/f2' })
-      expect(selection.cropping()).toEqual({ id: 'rect', frame: 'p1/f1' })
-      expect(selection.pathEditing()).toEqual({ id: 'path', frame: 'p1/f1', selected: [] })
+      selection.crop({ id: 'rect', frameId: 'p1-f1' })
+      selection.editPath({ id: 'path', frameId: 'p1-f1' })
+      selection.selectKeepingModes({ ids: ['child'], frameId: 'p1-f2' })
+      expect(selection.current()).toEqual({ ids: ['child'], frameId: 'p1-f2' })
+      expect(selection.cropping()).toEqual({ id: 'rect', frameId: 'p1-f1' })
+      expect(selection.pathEditing()).toEqual({ id: 'path', frameId: 'p1-f1', selected: [] })
       expect(log).toEqual([])
     })
 
     it('with none, lets a crop and a path edit go with the selection, keeping the group gone into', () => {
       const { selection, log } = harness()
       selection.enter('group')
-      selection.select(['path'], 'p1/f1')
-      selection.crop({ id: 'path', frame: 'p1/f1' })
-      selection.editPath({ id: 'path', frame: 'p1/f1' })
+      selection.select(['path'], 'p1-f1')
+      selection.crop({ id: 'path', frameId: 'p1-f1' })
+      selection.editPath({ id: 'path', frameId: 'p1-f1' })
       log.length = 0
       selection.selectKeepingModes(null)
       expect(selection.current()).toBeNull()
@@ -146,18 +173,18 @@ describe('editorSelection', () => {
   describe('keep', () => {
     it('drops selected layers that are gone, and the selection once none are left', () => {
       const { selection, remove } = harness()
-      selection.select(['rect', 'path'], 'p1/f1')
+      selection.select(['rect', 'path'], 'p1-f1')
       remove('rect')
       selection.keep()
-      expect(selection.current()).toEqual({ ids: ['path'], frame: 'p1/f1' })
+      expect(selection.current()).toEqual({ ids: ['path'], frameId: 'p1-f1' })
       remove('path')
       selection.keep()
       expect(selection.current()).toBeNull()
     })
 
-    it('lets the selection go when its frame is gone from the grid', () => {
+    it('lets the selection go when its frame is not on the shown page', () => {
       const { selection, world } = harness()
-      selection.select(['rect'], 'p1/f2')
+      selection.select(['rect'], 'p1-f2')
       world.frames = [frame('p1', 'f1')]
       selection.keep()
       expect(selection.current()).toBeNull()
@@ -166,7 +193,7 @@ describe('editorSelection', () => {
     it('leaves a group gone into once that group is gone', () => {
       const { selection, remove } = harness()
       selection.enter('group')
-      selection.select(['rect'], 'p1/f1')
+      selection.select(['rect'], 'p1-f1')
       selection.keep()
       expect(selection.entered()).toBe('group')
       remove('group', 'child')
@@ -176,35 +203,35 @@ describe('editorSelection', () => {
 
     it('ends a path edit when its layer is no longer selected or no longer a path', () => {
       const { selection, world } = harness()
-      selection.select(['path'], 'p1/f1')
-      selection.editPath({ id: 'path', frame: 'p1/f1' })
+      selection.select(['path'], 'p1-f1')
+      selection.editPath({ id: 'path', frameId: 'p1-f1' })
       selection.keep()
       expect(selection.pathEditing()).not.toBeNull()
       world.design = {
         ...world.design,
-        nodes: { ...world.design.nodes, path: graphic('rect', 'p1') },
+        nodes: { ...world.design.nodes, path: graphic('rect', 'p1-f1') },
       } as unknown as Design
       selection.keep()
       expect(selection.pathEditing()).toBeNull()
 
-      selection.editPath({ id: 'path', frame: 'p1/f1' })
-      selection.selectKeepingModes({ ids: ['rect'], frame: 'p1/f1' })
+      selection.editPath({ id: 'path', frameId: 'p1-f1' })
+      selection.selectKeepingModes({ ids: ['rect'], frameId: 'p1-f1' })
       selection.keep()
       expect(selection.pathEditing()).toBeNull()
     })
 
     it('ends a crop when its layer is no longer selected, or the selection moved frame', () => {
       const { selection } = harness()
-      selection.select(['rect'], 'p1/f1')
-      selection.crop({ id: 'rect', frame: 'p1/f1' })
+      selection.select(['rect'], 'p1-f1')
+      selection.crop({ id: 'rect', frameId: 'p1-f1' })
       selection.keep()
       expect(selection.cropping()).not.toBeNull()
-      selection.selectKeepingModes({ ids: ['rect'], frame: 'p1/f2' })
+      selection.selectKeepingModes({ ids: ['rect'], frameId: 'p1-f2' })
       selection.keep()
       expect(selection.cropping()).toBeNull()
 
-      selection.crop({ id: 'rect', frame: 'p1/f2' })
-      selection.selectKeepingModes({ ids: ['path'], frame: 'p1/f2' })
+      selection.crop({ id: 'rect', frameId: 'p1-f2' })
+      selection.selectKeepingModes({ ids: ['path'], frameId: 'p1-f2' })
       selection.keep()
       expect(selection.cropping()).toBeNull()
     })
@@ -212,8 +239,8 @@ describe('editorSelection', () => {
     it('with nothing selected, ends a crop and a path edit, and leaves the group gone into be', () => {
       const { selection, remove } = harness()
       selection.enter('group')
-      selection.crop({ id: 'rect', frame: 'p1/f1' })
-      selection.editPath({ id: 'path', frame: 'p1/f1' })
+      selection.crop({ id: 'rect', frameId: 'p1-f1' })
+      selection.editPath({ id: 'path', frameId: 'p1-f1' })
       remove('group', 'child')
       selection.keep()
       expect(selection.entered()).toBe('group')
@@ -223,7 +250,7 @@ describe('editorSelection', () => {
 
     it('shows nothing and tells no one', () => {
       const { selection, log, remove } = harness()
-      selection.select(['rect'], 'p1/f1')
+      selection.select(['rect'], 'p1-f1')
       log.length = 0
       remove('rect')
       selection.keep()
@@ -231,27 +258,29 @@ describe('editorSelection', () => {
     })
   })
 
-  describe('dropOffGrid', () => {
-    it('lets the selection go when its frame is gone, with its crop and path edit, keeping the group gone into', () => {
+  describe('dropOffPage', () => {
+    it('lets the selection go when its frame is not shown, with its crop, path edit and the group gone into', () => {
       const { selection, log, world } = harness()
       selection.enter('group')
-      selection.select(['rect'], 'p1/f2')
-      selection.crop({ id: 'rect', frame: 'p1/f2' })
+      selection.select(['child'], 'p1-f1')
+      selection.crop({ id: 'child', frameId: 'p1-f1' })
       log.length = 0
-      selection.dropOffGrid()
-      expect(selection.current()).toEqual({ ids: ['rect'], frame: 'p1/f2' })
-      expect(selection.cropping()).toEqual({ id: 'rect', frame: 'p1/f2' })
-      world.frames = [frame('p1', 'f1')]
-      selection.dropOffGrid()
+      selection.dropOffPage()
+      expect(selection.current()).toEqual({ ids: ['child'], frameId: 'p1-f1' })
+      expect(selection.cropping()).toEqual({ id: 'child', frameId: 'p1-f1' })
+      expect(selection.entered()).toBe('group')
+      world.frames = [frame('p1', 'f2')]
+      selection.dropOffPage()
       expect(selection.current()).toBeNull()
       expect(selection.cropping()).toBeNull()
-      expect(selection.entered()).toBe('group')
+      expect(selection.entered()).toBeNull()
       expect(log).toEqual([])
+      world.frames = FRAMES
 
-      selection.select(['path'], 'p1/f1')
-      selection.editPath({ id: 'path', frame: 'p1/f1' })
+      selection.select(['path'], 'p1-f1')
+      selection.editPath({ id: 'path', frameId: 'p1-f1' })
       world.frames = [frame('p1', 'f2')]
-      selection.dropOffGrid()
+      selection.dropOffPage()
       expect(selection.pathEditing()).toBeNull()
     })
   })
@@ -264,7 +293,7 @@ describe('editorSelection', () => {
       expect(log).toEqual(['changed', 'page p2'])
     })
 
-    it('picks no page for one the design lacks, or one with no frame in the grid', () => {
+    it('picks no page for one the design lacks, or one with no frame shown', () => {
       const { selection, world, log } = harness()
       selection.pickPage('nope')
       expect(selection.pickedPage()).toBeNull()
@@ -285,8 +314,8 @@ describe('editorSelection', () => {
     it('lets the selection go, with its crop, path edit and the group gone into', () => {
       const { selection, log } = harness()
       selection.enter('group')
-      selection.select(['path'], 'p1/f1')
-      selection.editPath({ id: 'path', frame: 'p1/f1' })
+      selection.select(['path'], 'p1-f1')
+      selection.editPath({ id: 'path', frameId: 'p1-f1' })
       log.length = 0
       selection.pickPage('p1')
       expect(selection.current()).toBeNull()
@@ -305,11 +334,11 @@ describe('editorSelection', () => {
     it('lets the page go with null, keeping the selection', () => {
       const { selection, log } = harness()
       selection.pickPage('p1')
-      selection.selectKeepingModes({ ids: ['rect'], frame: 'p1/f1' })
+      selection.selectKeepingModes({ ids: ['rect'], frameId: 'p1-f1' })
       log.length = 0
       selection.pickPage(null)
       expect(selection.pickedPage()).toBeNull()
-      expect(selection.current()).toEqual({ ids: ['rect'], frame: 'p1/f1' })
+      expect(selection.current()).toEqual({ ids: ['rect'], frameId: 'p1-f1' })
       expect(log).toEqual(['changed', 'page null'])
     })
   })
@@ -326,14 +355,14 @@ describe('editorSelection', () => {
     it('lets the page go once a layer is selected', () => {
       const { selection, log } = harness()
       selection.pickPage('p1')
-      selection.select(['rect'], 'p1/f1')
+      selection.select(['rect'], 'p1-f1')
       log.length = 0
       expect(selection.dropGonePage()).toBe(true)
       expect(selection.pickedPage()).toBeNull()
       expect(log).toEqual([])
     })
 
-    it('lets the page go once it is deleted, or its frames are gone from the grid', () => {
+    it('lets the page go once it is deleted, or its frames are no longer shown', () => {
       const { selection, world } = harness()
       selection.pickPage('p2')
       world.design = { ...world.design, pages: { p1: world.design.pages.p1 } } as Design
@@ -352,14 +381,14 @@ describe('editorSelection', () => {
       const { selection, log } = harness()
       selection.tellListeners(false)
       expect(log).toEqual([])
-      selection.selectKeepingModes({ ids: ['rect'], frame: 'p1/f1' })
+      selection.selectKeepingModes({ ids: ['rect'], frameId: 'p1-f1' })
       selection.tellListeners(false)
       selection.tellListeners(false)
-      selection.selectKeepingModes({ ids: ['rect'], frame: 'p1/f1' })
+      selection.selectKeepingModes({ ids: ['rect'], frameId: 'p1-f1' })
       selection.tellListeners(false)
-      selection.selectKeepingModes({ ids: ['rect'], frame: 'p1/f2' })
+      selection.selectKeepingModes({ ids: ['rect'], frameId: 'p1-f2' })
       selection.tellListeners(false)
-      selection.selectKeepingModes({ ids: ['rect', 'path'], frame: 'p1/f2' })
+      selection.selectKeepingModes({ ids: ['rect', 'path'], frameId: 'p1-f2' })
       selection.tellListeners(false)
       selection.selectKeepingModes(null)
       selection.tellListeners(false)
@@ -368,8 +397,8 @@ describe('editorSelection', () => {
 
     it('tells nothing for a change undone before the listeners hear', () => {
       const { selection, log } = harness()
-      selection.select(['rect'], 'p1/f1')
-      selection.select([], 'p1/f1')
+      selection.select(['rect'], 'p1-f1')
+      selection.select([], 'p1-f1')
       selection.tellListeners(false)
       expect(log).toEqual(['changed', 'changed'])
     })
@@ -377,7 +406,7 @@ describe('editorSelection', () => {
     it('tells the page listeners the page went, after the selection listeners', () => {
       const { selection, log } = harness()
       selection.pickPage('p1')
-      selection.select(['rect'], 'p1/f1')
+      selection.select(['rect'], 'p1-f1')
       log.length = 0
       selection.tellListeners(selection.dropGonePage())
       expect(log).toEqual(['selection rect', 'page null'])
@@ -398,8 +427,8 @@ describe('editorSelection', () => {
   describe('crop', () => {
     it('starts and ends a crop, showing nothing', () => {
       const { selection, log } = harness()
-      selection.crop({ id: 'rect', frame: 'p1/f1' })
-      expect(selection.cropping()).toEqual({ id: 'rect', frame: 'p1/f1' })
+      selection.crop({ id: 'rect', frameId: 'p1-f1' })
+      expect(selection.cropping()).toEqual({ id: 'rect', frameId: 'p1-f1' })
       selection.crop(null)
       expect(selection.cropping()).toBeNull()
       expect(log).toEqual([])
@@ -409,10 +438,10 @@ describe('editorSelection', () => {
   describe('editPath and pickAnchors', () => {
     it('goes into a path with no anchor picked, picks anchors, and leaves it', () => {
       const { selection, log } = harness()
-      selection.editPath({ id: 'path', frame: 'p1/f1' })
+      selection.editPath({ id: 'path', frameId: 'p1-f1' })
       const editing = selection.pathEditing()
       selection.pickAnchors([{ contour: 0, index: 2 }])
-      expect(selection.pathEditing()).toEqual({ id: 'path', frame: 'p1/f1', selected: [{ contour: 0, index: 2 }] })
+      expect(selection.pathEditing()).toEqual({ id: 'path', frameId: 'p1-f1', selected: [{ contour: 0, index: 2 }] })
       // The same path edit, so what a press read from it before follows.
       expect(editing?.selected).toEqual([{ contour: 0, index: 2 }])
       selection.editPath(null)
@@ -427,11 +456,11 @@ describe('editorSelection', () => {
     it('says whether the layer under the pointer changed', () => {
       const { selection, log } = harness()
       expect(selection.hover(null)).toBe(false)
-      expect(selection.hover({ id: 'rect', frame: 'p1/f1' })).toBe(true)
-      expect(selection.hover({ id: 'rect', frame: 'p1/f1' })).toBe(false)
-      expect(selection.hover({ id: 'rect', frame: 'p1/f2' })).toBe(true)
-      expect(selection.hover({ id: 'path', frame: 'p1/f2' })).toBe(true)
-      expect(selection.hovered()).toEqual({ id: 'path', frame: 'p1/f2' })
+      expect(selection.hover({ id: 'rect', frameId: 'p1-f1' })).toBe(true)
+      expect(selection.hover({ id: 'rect', frameId: 'p1-f1' })).toBe(false)
+      expect(selection.hover({ id: 'rect', frameId: 'p1-f2' })).toBe(true)
+      expect(selection.hover({ id: 'path', frameId: 'p1-f2' })).toBe(true)
+      expect(selection.hovered()).toEqual({ id: 'path', frameId: 'p1-f2' })
       expect(selection.hover(null)).toBe(true)
       expect(selection.hovered()).toBeNull()
       expect(log).toEqual([])
@@ -444,7 +473,7 @@ describe('editorSelection', () => {
       const heard: string[] = []
       const stop = selection.onSelection((ids) => heard.push(ids.join(',')))
       const stopPage = selection.onPagePick((pageId) => heard.push(`page ${pageId}`))
-      selection.selectKeepingModes({ ids: ['rect'], frame: 'p1/f1' })
+      selection.selectKeepingModes({ ids: ['rect'], frameId: 'p1-f1' })
       selection.tellListeners(false)
       expect(stop()).toBe(true)
       expect(stopPage()).toBe(true)
@@ -453,7 +482,7 @@ describe('editorSelection', () => {
       expect(heard).toEqual(['rect'])
       selection.destroy()
       log.length = 0
-      selection.selectKeepingModes({ ids: ['rect'], frame: 'p1/f1' })
+      selection.selectKeepingModes({ ids: ['rect'], frameId: 'p1-f1' })
       selection.tellListeners(true)
       selection.pickPage('p2')
       expect(log).toEqual(['changed', 'changed'])

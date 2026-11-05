@@ -1,79 +1,65 @@
 import type * as Y from 'yjs'
 
-import {
-  canHold,
-  deepFreeze,
-  type Design,
-  formatIdOf,
-  type Layer,
-  parseDesignIncrementally,
-  parseLayer,
-  parseOverrideValues,
-} from '@dazbee/schema'
+import { canHold, deepFreeze, type Design, type Layer, parseDesignIncrementally, parseLayer } from '@dazbee/schema'
 
 import { buildChildIndex, registerChildIndex, siblingOrder } from './children.ts'
-import { DELETED, type DesignDoc, nodeToJson, readDesign, root, splitOverrideKey } from './design-doc.ts'
+import { DELETED, type DesignDoc, nodeToJson, readDesign, root } from './design-doc.ts'
 import { repair } from './repair.ts'
 
 type Json = Record<string, unknown>
-type Head = Pick<Design, 'meta' | 'formats' | 'pages'>
+type Head = Pick<Design, 'meta' | 'pages' | 'frames'>
 
 /**
  * A tab's validated design, kept up to date as the document changes (#23, #29). An edit that
- * changes layers' properties or override values, which is nearly every edit, re-reads and
- * validates only what it touched: nothing it does grows with the number of layers. An edit that
- * adds, removes or re-parents a layer, or changes the formats, pages or meta, reads and repairs
- * the whole design, as `readDesign` does. Either way the design equals what `readDesign` returns.
+ * changes layers' properties, which is nearly every edit, re-reads and validates only what it
+ * touched: nothing it does grows with the number of layers. An edit that changes the meta, pages
+ * or frames reads and repairs the whole design, as `readDesign` does, and so does one that adds,
+ * removes, re-parents or re-links a layer in a way only repair can settle. Either way the design
+ * equals what `readDesign` returns.
  *
  * The design it hands out is live: it always shows the document as it is now, so it never needs
- * copying. It can't be changed through, and each layer and set of override values in it is frozen
- * and replaced, never changed, when the document changes, so holding one of those is safe.
+ * copying. It can't be changed through, and each layer in it is frozen and replaced, never
+ * changed, when the document changes, so holding one is safe.
  */
 export function designView(doc: DesignDoc) {
   const r = root(doc)
   /** Each live layer as plain JSON, as the document holds it, before repair and validation. */
   const rawNodes = new Map<string, Json>()
-  /** Override values by scope and layer as the document holds them; each set is replaced when one value changes. */
-  const rawOverrides = new Map<string, Map<string, Json>>()
   /** The validated design's layers. */
   const layers = new Map<string, Layer>()
-  /** The validated override values by scope and layer, with defaults filled. */
-  const filled = new Map<string, Map<string, Json>>()
-  /** One live record per scope in `filled`, handed out as `design.overrides[scope]`. */
-  const scopeRecords = new Map<string, Record<string, Json>>()
   /** Each parent's children, back to front. */
   let children = new Map<string, string[]>()
-  /** The validated meta, formats and pages; null until the first whole read. */
+  /** The frame each layer is in. */
+  const frameOfLayer = new Map<string, string>()
+  /** The layer holding each link id, by frame. */
+  const linkHolder = new Map<string, Map<string, string>>()
+  /** The validated meta, pages and frames; null until the first whole read. */
   let head: Head | null = null
-  /** Whether the last whole read moved a layer from where the document puts it, or gave it an index. */
-  let placesRepaired = false
+  /**
+   * Whether the last whole read moved, dropped or re-linked a layer, or gave it an index: a later
+   * change can undo what made repair do it, so only a whole read can tell.
+   */
+  let layersRepaired = false
   /** Whether the whole design must be read again. */
   let whole = true
   /** The layers changed since the last read. */
   const dirtyNodes = new Set<string>()
-  /** The override values changed since the last read, by scope and the layers they belong to. */
-  const dirtyPairs = new Map<string, Set<string>>()
 
   const nodes = readOnlyRecord(() => {
     refresh()
     return layers
   })
-  const overrides = readOnlyRecord(() => {
-    refresh()
-    return scopeRecords
-  })
   const design = Object.freeze({
     get meta() {
       return current().meta
     },
-    get formats() {
-      return current().formats
-    },
     get pages() {
       return current().pages
     },
+    get frames() {
+      return current().frames
+    },
     nodes,
-    overrides,
   }) as unknown as Design
 
   function current() {
@@ -89,79 +75,64 @@ export function designView(doc: DesignDoc) {
     return design
   }
 
-  /** A scope the document still has values in stays, even empty: its values may all belong to deleted layers, as in `readDesign`. */
-  const setScope = (scope: string, byNode: Map<string, Json> | undefined) => {
-    if (!byNode || (byNode.size === 0 && !rawOverrides.has(scope))) {
-      filled.delete(scope)
-      scopeRecords.delete(scope)
-      return
-    }
-    filled.set(scope, byNode)
-    if (!scopeRecords.has(scope))
-      scopeRecords.set(
-        scope,
-        readOnlyRecord(() => {
-          refresh()
-          return filled.get(scope) ?? new Map<string, Json>()
-        }),
-      )
-  }
   const loadNode = (id: string) => {
     const ynode = r.nodes.get(id)
     if (!ynode || ynode.get(DELETED) === true) rawNodes.delete(id)
     else rawNodes.set(id, nodeToJson(ynode))
   }
-  const loadOverride = (key: string) => {
-    const { scope, nodeId, path } = splitOverrideKey(key)
-    const byNode = rawOverrides.get(scope) ?? new Map<string, Json>()
-    const props = Object.fromEntries(Object.entries(byNode.get(nodeId) ?? {}).filter(([p]) => p !== path))
-    // Defined, not assigned: a path such as `__proto__` from another tab stays a plain key.
-    if (r.overrides.has(key))
-      Object.defineProperty(props, path, {
-        value: r.overrides.get(key),
-        enumerable: true,
-        writable: true,
-        configurable: true,
-      })
-    if (Object.keys(props).length > 0) byNode.set(nodeId, props)
-    else byNode.delete(nodeId)
-    if (byNode.size > 0) rawOverrides.set(scope, byNode)
-    else rawOverrides.delete(scope)
-    const pairs = dirtyPairs.get(scope) ?? new Set<string>()
-    pairs.add(nodeId)
-    dirtyPairs.set(scope, pairs)
+  const holdLink = (id: string, layer: Layer, frameId: string) => {
+    frameOfLayer.set(id, frameId)
+    const links = linkHolder.get(frameId) ?? new Map<string, string>()
+    linkHolder.set(frameId, links)
+    links.set(layer.link, id)
+  }
+  const releaseLink = (id: string, layer: Layer) => {
+    const frameId = frameOfLayer.get(id)
+    const links = frameId === undefined ? undefined : linkHolder.get(frameId)
+    if (links?.get(layer.link) === id) links.delete(layer.link)
+    frameOfLayer.delete(id)
   }
 
   /** Reads, repairs and validates the whole design, as `readDesign` does. */
   function readWhole(onRepair?: (repairs: string[]) => void) {
     for (const id of dirtyNodes) loadNode(id)
-    const rawHead = { meta: r.meta.toJSON(), formats: r.formats.toJSON(), pages: r.pages.toJSON() }
-    const nested = Object.fromEntries([...rawOverrides].map(([scope, byNode]) => [scope, Object.fromEntries(byNode)]))
-    const repaired = repair({ ...rawHead, nodes: Object.fromEntries(rawNodes), overrides: nested })
+    const rawHead = { meta: r.meta.toJSON(), pages: r.pages.toJSON(), frames: r.frames.toJSON() }
+    const repaired = repair({ ...rawHead, nodes: Object.fromEntries(rawNodes) })
     if (repaired.repairs.length > 0) onRepair?.(repaired.repairs)
     const result = parseDesignIncrementally(repaired.snapshot)
     if (!result.success) throw new Error(`design document is invalid:\n${result.errors.join('\n')}`)
     const d = result.design
-    head = { meta: deepFreeze(d.meta), formats: deepFreeze(d.formats), pages: deepFreeze(d.pages) }
+    head = { meta: deepFreeze(d.meta), pages: deepFreeze(d.pages), frames: deepFreeze(d.frames) }
     layers.clear()
     for (const [id, layer] of Object.entries(d.nodes)) layers.set(id, layer)
-    for (const scope of [...filled.keys()]) if (!Object.hasOwn(d.overrides, scope)) setScope(scope, undefined)
-    for (const [scope, byNode] of Object.entries(d.overrides)) setScope(scope, new Map(Object.entries(byNode)))
     children = buildChildIndex(layers)
-    placesRepaired = [...layers].some(
-      ([id, layer]) => rawNodes.get(id)?.parentId !== layer.parentId || rawNodes.get(id)?.index !== layer.index,
-    )
+    frameOfLayer.clear()
+    linkHolder.clear()
+    const frameOf = (id: string): string => {
+      const known = frameOfLayer.get(id)
+      if (known !== undefined) return known
+      const parentId = (layers.get(id) as Layer).parentId
+      return Object.hasOwn(d.frames, parentId) ? parentId : frameOf(parentId)
+    }
+    for (const [id, layer] of layers) holdLink(id, layer, frameOf(id))
+    layersRepaired =
+      rawNodes.size !== layers.size ||
+      [...layers].some(([id, layer]) => {
+        const raw = rawNodes.get(id)
+        return raw?.parentId !== layer.parentId || raw.index !== layer.index || raw.link !== layer.link
+      })
   }
 
   /**
-   * Takes in an edit by checking only the layers and override values it touched. Returns false,
-   * having changed nothing, when repair has to decide instead: something is invalid, a layer
-   * changed type, a move would put a layer inside itself, a removed layer leaves children behind,
-   * or the last whole read repaired a layer's place, which a later change can undo.
+   * Takes in an edit by checking only the layers it touched. Returns false, having changed
+   * nothing, when repair has to decide instead: something is invalid, a layer changed type, a
+   * move would put a layer inside itself or into another frame, a removed layer leaves children
+   * behind, a layer takes a link id its frame holds, or the last whole read repaired a layer,
+   * which a later change can undo.
    */
   function readChanges(): boolean {
     if (!head) return false
-    const pages = head.pages
+    const frames = head.frames
     const staged = new Map<string, Layer>()
     const removed = new Set<string>()
     let structural = false
@@ -177,52 +148,45 @@ export function designView(doc: DesignDoc) {
       const parsed = parseLayer(raw)
       if (!parsed.success) return false
       staged.set(id, parsed.layer)
-      if (!was || was.parentId !== parsed.layer.parentId) structural = true
+      if (!was || was.parentId !== parsed.layer.parentId || was.link !== parsed.layer.link) structural = true
     }
     if (removed.size > 0) structural = true
-    if (structural && placesRepaired) return false
+    if (structural && layersRepaired) return false
 
-    // The layers as they will be: what a parent check or a cycle walk sees.
+    // The layers as they will be: what a parent check or a walk up to the frame sees.
     const next = (id: string) => staged.get(id) ?? (removed.has(id) ? undefined : layers.get(id))
+    /** The frame and link of each staged layer that came, moved or changed its link id. */
+    const relinks = new Map<string, string>()
+    const claimed = new Map<string, Map<string, string>>()
     for (const [id, layer] of staged) {
-      if (layers.get(id)?.parentId === layer.parentId) continue
-      if (Object.hasOwn(pages, id)) return false
-      if (!Object.hasOwn(pages, layer.parentId)) {
-        const parent = next(layer.parentId)
-        if (!parent || !canHold(parent.type, layer.type)) return false
+      const was = layers.get(id)
+      const moved = !was || was.parentId !== layer.parentId
+      if (!moved && was.link === layer.link) continue
+      if (moved) {
+        if (Object.hasOwn(frames, id)) return false
+        if (!Object.hasOwn(frames, layer.parentId)) {
+          const parent = next(layer.parentId)
+          if (!parent || !canHold(parent.type, layer.type)) return false
+        }
       }
-      for (let up = layer.parentId, steps = 0; !Object.hasOwn(pages, up); steps++) {
+      let up = layer.parentId
+      for (let steps = 0; !Object.hasOwn(frames, up); steps++) {
         const above = next(up)
         if (up === id || !above || steps > layers.size + staged.size) return false
         up = above.parentId
       }
+      // Moving to another frame takes everything under the layer along: repair decides.
+      if (was && up !== frameOfLayer.get(id)) return false
+      const holder = linkHolder.get(up)?.get(layer.link)
+      if (holder !== undefined && holder !== id) return false
+      const claims = claimed.get(up) ?? new Map<string, string>()
+      claimed.set(up, claims)
+      if (claims.has(layer.link)) return false
+      claims.set(layer.link, id)
+      relinks.set(id, up)
     }
     for (const id of removed) {
       for (const child of children.get(id) ?? []) if (next(child)?.parentId === id) return false
-    }
-
-    // A changed layer's overrides are checked against it again, in every scope; a removed layer's go.
-    const pairs = new Map([...dirtyPairs].map(([scope, ids]) => [scope, new Set(ids)]))
-    for (const id of [...staged.keys(), ...removed]) {
-      for (const [scope, byNode] of rawOverrides)
-        if (byNode.has(id)) pairs.set(scope, (pairs.get(scope) ?? new Set()).add(id))
-    }
-    const stagedValues: [string, string, Json | undefined][] = []
-    for (const [scope, ids] of pairs) {
-      if (ids.size > 0 && !head.formats[formatIdOf(scope) ?? '']) return false
-      for (const id of ids) {
-        const values = rawOverrides.get(scope)?.get(id)
-        if (!values || removed.has(id)) {
-          stagedValues.push([scope, id, undefined])
-          continue
-        }
-        // Values for a layer that doesn't exist: repair drops them and reports it.
-        const layer = next(id)
-        if (!layer) return false
-        const parsed = parseOverrideValues(scope, layer, values)
-        if (!parsed.success) return false
-        stagedValues.push([scope, id, parsed.values])
-      }
     }
 
     // Every list that changes is a new array, so a list handed out before stays as it was.
@@ -241,7 +205,9 @@ export function designView(doc: DesignDoc) {
       if (at !== -1) list.splice(at, 1)
     }
     for (const id of removed) {
-      drop((layers.get(id) as Layer).parentId, id)
+      const layer = layers.get(id) as Layer
+      drop(layer.parentId, id)
+      releaseLink(id, layer)
       layers.delete(id)
     }
     for (const [id, layer] of staged) {
@@ -252,6 +218,11 @@ export function designView(doc: DesignDoc) {
       } else if (was.index !== layer.index) {
         listOf(layer.parentId)
       }
+      const frameId = relinks.get(id)
+      if (frameId !== undefined) {
+        if (was) releaseLink(id, was)
+        holdLink(id, layer, frameId)
+      }
       layers.set(id, layer)
     }
     const order = siblingOrder(layers)
@@ -260,42 +231,29 @@ export function designView(doc: DesignDoc) {
       else children.delete(parentId)
     }
     for (const id of removed) if (!layers.has(id)) children.delete(id)
-    for (const [scope, id, values] of stagedValues) {
-      const byNode = filled.get(scope) ?? new Map<string, Json>()
-      if (values) byNode.set(id, values)
-      else byNode.delete(id)
-      setScope(scope, byNode)
-    }
     return true
   }
 
   /** Brings the validated design up to date with the document. Not inside a transaction: the changes so far aren't reported yet. */
   function refresh(onRepair?: (repairs: string[]) => void) {
     if (doc._transaction) return
-    if (!whole && dirtyNodes.size === 0 && dirtyPairs.size === 0) return
+    if (!whole && dirtyNodes.size === 0) return
     if (whole || !readChanges()) readWhole(onRepair)
     whole = false
     dirtyNodes.clear()
-    dirtyPairs.clear()
   }
 
   // The document as it is when the view opens.
   for (const id of r.nodes.keys()) loadNode(id)
-  for (const key of r.overrides.keys()) loadOverride(key)
-  dirtyPairs.clear()
 
   // Every change is seen before any observer of the document runs, so an observer that reads the
-  // view gets the new design. The changed types name the touched layers and override keys.
-  const heads = new Set<unknown>([r.meta, r.formats, r.pages])
+  // view gets the new design. The changed types name the touched layers.
+  const heads = new Set<unknown>([r.meta, r.pages, r.frames])
   const onChange = (tr: Y.Transaction) => {
     for (const [changed, keys] of tr.changed) {
       const type: unknown = changed
       if (heads.has(type)) {
         whole = true
-        continue
-      }
-      if (type === r.overrides) {
-        for (const key of keys) if (key !== null) loadOverride(key)
         continue
       }
       if (type === r.nodes) {

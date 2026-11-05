@@ -7,17 +7,21 @@ import { keepCopy, layersOnClipboard, putOnClipboard, rememberedLayers } from '.
 /** The `localStorage` key the copied layers are kept under; stored on people's devices, so it never changes. */
 const KEY = 'dazbee.copiedLayers'
 
-const rect = (name: string, index: string) => ({
+const rect = (name: string, index: string, link: string) => ({
   type: 'graphic',
-  parentId: 'p1',
+  parentId: 'sq',
+  link,
   index,
   name,
   props: { x: 0, y: 0, width: 10, height: 10, shape: { kind: 'rect' } },
 })
+/** Two layers copied from frame `sq` on page `p1`, each with its own link id. */
 const copied = LayerClipboard.parse({
   kind: 'dazbee.layers',
   designId: 'd1',
-  tree: { nodes: { a: rect('Logo', 'a0'), b: rect('', 'a1') }, roots: ['a', 'b'] },
+  pageId: 'p1',
+  frameId: 'sq',
+  tree: { nodes: { a: rect('Logo', 'a0', 'a'), b: rect('', 'a1', 'b') }, roots: ['a', 'b'] },
 })
 const json = JSON.stringify(copied)
 const plain = 'Logo\nLayer'

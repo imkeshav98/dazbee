@@ -1,19 +1,9 @@
 // Every command, by the name a session runs it with.
 import { designPlace, nodeDuplicate, nodeMove, nodeReorder } from './arrange.ts'
 import { nodeAutoLayout } from './auto-layout.ts'
-import { formatAdd, formatRemove, formatSetPrimary, formatUpdate } from './formats.ts'
+import { frameAdd, frameAddSize, frameDelete, frameDuplicate, frameUpdate } from './frames.ts'
 import { nodeBoolean, nodeBox, nodeEnclose, nodeGroup, nodeHug, nodeUngroup } from './groups.ts'
-import {
-  nodeBind,
-  nodeCreate,
-  nodeDelete,
-  nodeLock,
-  nodeMask,
-  nodeRename,
-  nodeUpdate,
-  nodeVisibleEverywhere,
-  overrideReset,
-} from './layers.ts'
+import { nodeBind, nodeCreate, nodeDelete, nodeLock, nodeMask, nodeRename, nodeUpdate } from './layers.ts'
 import { pageAdd, pageDelete, pageDuplicate, pageMove, pageUpdate } from './pages.ts'
 import { nodeReshape } from './paths.ts'
 import { textEdit, textFit } from './text.ts'
@@ -21,8 +11,6 @@ import { textEdit, textFit } from './text.ts'
 export const COMMANDS = {
   'node.create': nodeCreate,
   'node.update': nodeUpdate,
-  'override.reset': overrideReset,
-  'node.visibleEverywhere': nodeVisibleEverywhere,
   'node.move': nodeMove,
   'node.delete': nodeDelete,
   'node.lock': nodeLock,
@@ -47,9 +35,10 @@ export const COMMANDS = {
   'page.duplicate': pageDuplicate,
   'page.move': pageMove,
   'page.delete': pageDelete,
-  'format.add': formatAdd,
-  'format.update': formatUpdate,
-  'format.remove': formatRemove,
-  'format.setPrimary': formatSetPrimary,
+  'frame.add': frameAdd,
+  'frame.update': frameUpdate,
+  'frame.duplicate': frameDuplicate,
+  'frame.addSize': frameAddSize,
+  'frame.delete': frameDelete,
 } as const
 export type CommandName = keyof typeof COMMANDS

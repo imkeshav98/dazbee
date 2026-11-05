@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Gesture } from '../gestures/pointer.ts'
 import type { Box } from '../layers/transform.ts'
 import type { Picked } from '../selection.ts'
-import type { Frame } from './grid.ts'
+import type { Frame } from './frames.ts'
 import { editorOverlay, type OverlayDeps } from './overlay.ts'
 import { design } from './test-design.ts'
 
@@ -26,7 +26,7 @@ const fake = (name = ''): Fake => ({
     this.children.push(...more)
   },
 })
-const SQUARE = { key: 'one/sq', pageId: 'one', formatId: 'sq', x: 0, y: 0, width: 1080, height: 1080 } as Frame
+const SQUARE: Frame = { id: 'one-sq', pageId: 'one', name: 'Sale', x: 0, y: 0, width: 1080, height: 1080 }
 const BOX: Box = { x: 10, y: 10, width: 100, height: 100, rotation: 0 }
 
 beforeEach(() => {
@@ -41,7 +41,7 @@ afterEach(() => {
  * a group gone into, a layer hovered, a drop target and a picked page; each module's parts are
  * one element named for it. Logs what the overlay tells the selection, and keeps what it drew.
  */
-function harness(state: { gesture?: Gesture | null; editing?: Picked | null; selected?: boolean } = {}) {
+function harness(state: { gesture?: Gesture | null; editing?: Picked | null; selected?: boolean; zoom?: number } = {}) {
   const log: string[] = []
   let drawn: Fake[] = []
   const editing = state.editing ?? null
@@ -53,18 +53,18 @@ function harness(state: { gesture?: Gesture | null; editing?: Picked | null; sel
       },
     } as unknown as HTMLElement,
     view: {
-      camera: () => ({ x: 0, y: 0, zoom: 1 }),
+      camera: () => ({ x: 0, y: 0, zoom: state.zoom ?? 1 }),
       viewport: () => ({ width: 1000, height: 800 }),
       design: () => design,
       inView: () => [SQUARE],
-      frameOf: (key) => (key === SQUARE.key ? SQUARE : undefined),
+      frameOf: (key) => (key === SQUARE.id ? SQUARE : undefined),
       rulers: () => false,
       outline: (className) => fake(className) as unknown as HTMLElement,
     },
     selection: {
-      current: () => (state.selected === false ? null : { ids: ['a'], frame: 'one/sq' }),
+      current: () => (state.selected === false ? null : { ids: ['a'], frameId: 'one-sq' }),
       entered: () => 'g',
-      hovered: () => ({ id: 'h', frame: 'one/sq' }),
+      hovered: () => ({ id: 'h', frameId: 'one-sq' }),
       pickedPage: () => 'one',
       cropping: () => null,
       pathEditing: () => null,
@@ -86,7 +86,7 @@ function harness(state: { gesture?: Gesture | null; editing?: Picked | null; sel
     drawing: { parts: () => [fake('drawing') as unknown as HTMLElement] },
     transformDrag: { parts: (g) => [fake(g ? 'marquee' : 'guides') as unknown as HTMLElement] },
     autoLayoutDrag: { parts: (g) => [fake(g ? 'reorder' : 'flow') as unknown as HTMLElement] },
-    place: { dropTarget: () => ({ id: 't', frame: 'one/sq' }) },
+    place: { dropTarget: () => ({ id: 't', frameId: 'one-sq' }) },
     pointer: { gesture: () => state.gesture ?? null },
   }
   const overlay = editorOverlay(deps)
@@ -136,13 +136,32 @@ describe('editorOverlay', () => {
       ])
     })
 
+    it('labels each frame in view with its own name and size, by its id, lit while its layer is selected', () => {
+      const { overlay, part } = harness()
+      overlay.draw()
+      const label = part('frame-label')
+      expect(label?.dataset).toEqual({ frame: 'one-sq', active: '' })
+      expect(label?.children.map((c) => `${c.className} ${c.textContent}`)).toEqual([
+        'frame-name Sale',
+        'frame-size 1080 × 1080',
+      ])
+    })
+
+    it('keeps a narrow frame its name, without the size, however narrow it is on screen', () => {
+      for (const zoom of [0.1, 0.02]) {
+        const { overlay, part } = harness({ zoom })
+        overlay.draw()
+        expect(part('frame-label')?.children.map((c) => `${c.className} ${c.textContent}`)).toEqual(['frame-name Sale'])
+      }
+    })
+
     it('gives the selection its handles and size, and leaves them off while text is typed into', () => {
       const shown = harness()
       shown.overlay.draw()
-      expect(shown.part('selection')?.dataset).toEqual({ frame: 'one/sq', count: '1', layer: 'a' })
+      expect(shown.part('selection')?.dataset).toEqual({ frame: 'one-sq', count: '1', layer: 'a' })
       expect(shown.part('selection')?.children.map((h) => `${h.className} ${h.dataset.handle}`)).toEqual(['handle nw'])
       expect(shown.part('selection-size')?.textContent).toBe('100 × 100')
-      const typing = harness({ editing: { id: 'a', frame: 'one/sq' } })
+      const typing = harness({ editing: { id: 'a', frameId: 'one-sq' } })
       typing.overlay.draw()
       expect(typing.part('selection')?.children).toEqual([])
       expect(typing.drawn()).not.toContain('selection-size')
@@ -152,7 +171,7 @@ describe('editorOverlay', () => {
   describe('selectionRect', () => {
     it('is the box round the selection and the size label under it, the box alone while typing, none with nothing selected', () => {
       expect(harness().overlay.selectionRect()).toEqual({ x: 10, y: 10, width: 100, height: 128 })
-      expect(harness({ editing: { id: 'a', frame: 'one/sq' } }).overlay.selectionRect()).toEqual({
+      expect(harness({ editing: { id: 'a', frameId: 'one-sq' } }).overlay.selectionRect()).toEqual({
         x: 10,
         y: 10,
         width: 100,

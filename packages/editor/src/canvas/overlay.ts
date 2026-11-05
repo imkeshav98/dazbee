@@ -17,7 +17,7 @@ import type { EditorPlace } from '../place.ts'
 import type { EditorSelection } from '../selection.ts'
 import type { EditorTyping } from '../text/typing.ts'
 import { toScreen } from './camera.ts'
-import type { Frame } from './grid.ts'
+import type { Frame } from './frames.ts'
 import { px, rulerParts } from './rulers.ts'
 import type { EditorView } from './view.ts'
 
@@ -51,8 +51,8 @@ export interface EditorOverlay {
   selectionRect(): Rect | null
 }
 
-/** Screen pixels a frame needs before it gets a label. */
-const MIN_LABEL_WIDTH = 56
+/** Screen pixels a frame's label needs to show the frame's size beside its name. */
+const SIZE_LABEL_WIDTH = 120
 /** How far a label stays from the stage's start edge when its frame runs past it. */
 const LABEL_INSET = 8
 /** Room the tool dock takes along the bottom of the stage, which the size label stays out of. */
@@ -95,16 +95,13 @@ export function editorOverlay({
     }
   }
 
-  function frameLabel(frame: Frame, drawnFrames: Frame[]) {
-    const format = view.design().formats[frame.formatId]
-    const page = view.design().pages[frame.pageId]
-    if (!format || !page) return null
+  function frameLabel(frame: Frame) {
     const label = document.createElement('div')
     label.className = 'frame-label'
-    label.dataset.frame = frame.key
+    label.dataset.frame = frame.id
     if (
-      selection.current()?.frame === frame.key ||
-      typing.editing()?.frame === frame.key ||
+      selection.current()?.frameId === frame.id ||
+      typing.editing()?.frameId === frame.id ||
       selection.pickedPage() === frame.pageId
     )
       label.dataset.active = ''
@@ -112,18 +109,17 @@ export function editorOverlay({
     // A frame running off the stage's start keeps its label in view, along the part still showing.
     const left = Math.max(at.x, LABEL_INSET)
     const width = at.x + frame.width * view.camera().zoom - left
-    // Too narrow to read even a cut name: zoomed far out, the frames speak for themselves.
-    if (width < MIN_LABEL_WIDTH) return null
+    // A narrow frame keeps its name, cut short, and drops its size; only a frame off the stage has none.
+    if (width <= 0) return null
     Object.assign(label.style, { left: px(left), top: px(at.y), width: px(width) })
     const name = document.createElement('span')
     name.className = 'frame-name'
-    const pages = new Set(drawnFrames.map((f) => f.pageId)).size > 1 || Object.keys(view.design().pages).length > 1
-    name.textContent = pages ? `${page.name} · ${format.name}` : format.name
+    name.textContent = frame.name
     label.append(name)
-    if (width >= 120) {
+    if (width >= SIZE_LABEL_WIDTH) {
       const size = document.createElement('span')
       size.className = 'frame-size'
-      size.textContent = `${format.width} × ${format.height}`
+      size.textContent = `${frame.width} × ${frame.height}`
       label.append(size)
     }
     return label
@@ -154,7 +150,7 @@ export function editorOverlay({
       }
     }
     const el = outline('selection', frame, box)
-    el.dataset.frame = frame.key
+    el.dataset.frame = frame.id
     el.dataset.count = String(current.ids.length)
     if (!several) el.dataset.layer = current.ids[0]
     // Handles only once the box is big enough on screen to grab them apart, and not on a locked one.
@@ -190,11 +186,11 @@ export function editorOverlay({
 
   function drawOverlay() {
     const gesture = pointer.gesture()
-    // A layer selected, or the page's frames gone (a page deleted, a size shown alone), lets the page go.
+    // A layer selected, or the page's frames no longer shown (the page deleted, another page shown), lets the page go.
     const pageGone = selection.dropGonePage()
     const parts: Element[] = []
     for (const frame of view.inView()) {
-      const label = frameLabel(frame, view.inView())
+      const label = frameLabel(frame)
       if (label) parts.push(label)
     }
     for (const frame of view.inView()) {
@@ -202,17 +198,17 @@ export function editorOverlay({
         parts.push(outline('page-picked', frame, { x: 0, y: 0, width: frame.width, height: frame.height, rotation: 0 }))
     }
     const entered = selection.entered()
-    const enteredFrame = entered && frameOf(selection.current()?.frame)
+    const enteredFrame = entered && frameOf(selection.current()?.frameId)
     const enteredBox = enteredFrame && entered && boxes.drawnBoxOf(enteredFrame, entered, view.design())
     if (enteredFrame && enteredBox) parts.push(outline('entered', enteredFrame, enteredBox))
     const hovered = selection.hovered()
     const hover = !gesture && hovered && !selection.current()?.ids.includes(hovered.id) ? hovered : null
-    const hoverFrame = hover && frameOf(hover.frame)
+    const hoverFrame = hover && frameOf(hover.frameId)
     const hoverBox = hoverFrame && hover && boxes.drawnBoxOf(hoverFrame, hover.id, view.design())
     if (hoverFrame && hoverBox) parts.push(outline('hover', hoverFrame, hoverBox))
     // The layer an image dragged over the stage would go into.
     const dropTarget = place.dropTarget()
-    const dropFrame = dropTarget && frameOf(dropTarget.frame)
+    const dropFrame = dropTarget && frameOf(dropTarget.frameId)
     const dropBox = dropFrame && dropTarget && boxes.drawnBoxOf(dropFrame, dropTarget.id, view.design())
     if (dropFrame && dropBox) parts.push(outline('drop-target', dropFrame, dropBox))
     parts.push(
@@ -224,7 +220,7 @@ export function editorOverlay({
     if (isDrawing(gesture)) parts.push(...drawing.parts(gesture))
     parts.push(...transformDrag.parts(gesture?.kind === 'marquee' ? gesture : null))
     if (view.rulers()) {
-      const origin = frameOf(selection.current()?.frame) ?? frameOf(selection.hovered()?.frame) ?? view.inView()[0]
+      const origin = frameOf(selection.current()?.frameId) ?? frameOf(selection.hovered()?.frameId) ?? view.inView()[0]
       const outer = boxes.selectionBox()
       if (origin)
         parts.push(
@@ -232,7 +228,7 @@ export function editorOverlay({
             view.camera(),
             view.viewport(),
             origin,
-            outer && outer.frame.key === origin.key ? boundsOf([outer.drawn]) : null,
+            outer && outer.frame.id === origin.id ? boundsOf([outer.drawn]) : null,
           ),
         )
     }

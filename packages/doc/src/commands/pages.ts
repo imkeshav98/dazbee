@@ -1,46 +1,79 @@
 import { nanoid } from 'nanoid'
 import { z } from 'zod'
 
-import { type Design, inOrder, type Layer as LayerT, Page, PageId, Paint } from '@dazbee/schema'
+import {
+  type Design,
+  Frame,
+  FrameId,
+  framesOf,
+  inOrder,
+  NEW_FRAME_FILLS,
+  Page,
+  PageId,
+  sizeProblem,
+} from '@dazbee/schema'
 
-import { childrenOf, descendants } from '../children.ts'
-import { DELETED, toYMap } from '../design-doc.ts'
-import { idProblem } from './checks.ts'
+import { toYMap } from '../design-doc.ts'
+import { idProblem, pageProblem } from './checks.ts'
 import { type CommandContext, defineCommand } from './define.ts'
-import { copyLayers, indexBetween, lastOrder } from './tree.ts'
+import { deleteFrame, FrameName } from './frames.ts'
+import { copyFrameLayers, indexBetween, lastOrder } from './tree.ts'
 
+/**
+ * Adds a page after the last one, holding one empty white frame at 0, 0 of the given name and
+ * size: the caller passes those of the frame the user is on. Returns the page's id.
+ */
 export const pageAdd = defineCommand({
   name: 'page.add',
-  input: z.object({ id: PageId.optional(), name: z.string() }),
-  check: (ctx, { id }) => idProblem(ctx, id),
-  apply: ({ r, design }, { id = nanoid(), name }) => {
+  input: z.object({
+    id: PageId.optional(),
+    name: z.string(),
+    frame: z.object({
+      id: FrameId.optional(),
+      name: FrameName,
+      width: Frame.shape.width,
+      height: Frame.shape.height,
+    }),
+  }),
+  check: (ctx, { id, frame }) =>
+    idProblem(ctx, id) ??
+    idProblem(ctx, frame.id) ??
+    (id !== undefined && id === frame.id ? `id "${id}" is taken` : undefined) ??
+    sizeProblem(frame.width, frame.height),
+  apply: ({ r, design }, { id = nanoid(), name, frame: { id: frameId = nanoid(), ...frame } }) => {
     writeRepairedPages(r, design)
     r.pages.set(id, toYMap(Page.parse({ name, order: indexBetween(lastOrder(Object.values(design.pages)), null) })))
+    r.frames.set(
+      frameId,
+      toYMap(
+        Frame.parse({ ...frame, pageId: id, x: 0, y: 0, fills: NEW_FRAME_FILLS, order: indexBetween(null, null) }),
+      ),
+    )
     return id
   },
 })
 
-/** Renames a page, or sets its background fills (the Page card, #83). */
+/** Renames a page. */
 export const pageUpdate = defineCommand({
   name: 'page.update',
-  input: z.object({ id: PageId, name: z.string().optional(), fills: Paint.array().optional() }),
-  check: ({ design }, { id }) => (design.pages[id] ? undefined : `no page "${id}"`),
-  apply: ({ r, design }, { id, name, fills }) => {
+  input: z.object({ id: PageId, name: z.string().optional() }),
+  check: ({ design }, { id }) => pageProblem(design, id),
+  apply: ({ r, design }, { id, name }) => {
     writeRepairedPages(r, design)
-    const page = r.pages.get(id)
-    if (name !== undefined) page?.set('name', name)
-    if (fills !== undefined) page?.set('fills', fills)
+    if (name !== undefined) r.pages.get(id)?.set('name', name)
   },
 })
 
 /**
- * Copies a page right after itself: every layer with a fresh id, and every override those layers
- * have in any format. Returns the new page's id.
+ * Copies a page right after itself, with each of its frames (new ids, the same name, size, place,
+ * fills and order) and every layer in them with a fresh id. The copies get one new link id per
+ * old one, so the copied frames stay linked to each other and to nothing on the page they came
+ * from. Returns the new page's id.
  */
 export const pageDuplicate = defineCommand({
   name: 'page.duplicate',
   input: z.object({ id: PageId, newId: PageId.optional(), name: z.string().optional() }),
-  check: (ctx, { id, newId }) => (ctx.design.pages[id] ? idProblem(ctx, newId) : `no page "${id}"`),
+  check: (ctx, { id, newId }) => pageProblem(ctx.design, id) ?? idProblem(ctx, newId),
   apply: ({ r, design }, { id, newId = nanoid(), name }) => {
     const page = design.pages[id]
     if (!page) return newId
@@ -48,12 +81,12 @@ export const pageDuplicate = defineCommand({
     const pages = inOrder(design.pages)
     const next = pages[pages.findIndex(([other]) => other === id) + 1]?.[1].order ?? null
     r.pages.set(newId, toYMap(Page.parse({ ...page, name: name ?? page.name, order: indexBetween(page.order, next) })))
-    copyLayers(
-      r,
-      design,
-      childrenOf(design, id).map(([child]) => child),
-      (root) => ({ parentId: newId, index: (design.nodes[root] as LayerT).index }),
-    )
+    const links = new Map<string, string>()
+    for (const [frameId, frame] of framesOf(design, id)) {
+      const copy = nanoid()
+      r.frames.set(copy, toYMap(Frame.parse({ ...frame, pageId: newId })))
+      copyFrameLayers(r, design, frameId, copy, { links })
+    }
     return newId
   },
 })
@@ -63,8 +96,9 @@ export const pageMove = defineCommand({
   name: 'page.move',
   input: z.object({ id: PageId, before: PageId.nullable() }),
   check: ({ design }, { id, before }) => {
-    if (!design.pages[id]) return `no page "${id}"`
-    if (before && (before === id || !design.pages[before])) return `no other page "${before}" to go before`
+    const problem = pageProblem(design, id)
+    if (problem) return problem
+    if (before && (before === id || pageProblem(design, before))) return `no other page "${before}" to go before`
     return undefined
   },
   apply: ({ r, design }, { id, before }) => {
@@ -75,18 +109,18 @@ export const pageMove = defineCommand({
   },
 })
 
-/** Deletes a page and its layers; undo brings both back. A design keeps at least one page. */
+/** Deletes a page, its frames and their layers; undo brings them back. A design keeps at least one page. */
 export const pageDelete = defineCommand({
   name: 'page.delete',
   input: z.object({ id: PageId }),
   check: ({ design }, { id }) => {
-    if (!design.pages[id]) return `no page "${id}"`
+    const problem = pageProblem(design, id)
+    if (problem) return problem
     if (Object.keys(design.pages).length === 1) return 'a design keeps at least one page'
     return undefined
   },
   apply: ({ r, design }, { id }) => {
-    // Layers get the same tombstone node.delete gives them, so undo and other tabs' edits behave alike.
-    for (const node of descendants(design, id)) r.nodes.get(node)?.set(DELETED, true)
+    for (const [frameId] of framesOf(design, id)) deleteFrame(r, design, frameId)
     r.pages.delete(id)
   },
 })

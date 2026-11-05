@@ -93,6 +93,7 @@ export function shape(context: Context, element: XmlElement, style: Style, m: Ma
   nodes[id] = {
     type: 'graphic',
     parentId: 'root',
+    link: id,
     index: 'a0',
     name: nameOf(element, DEFAULT_NAMES[element.name] ?? 'Path'),
     props: {

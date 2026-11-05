@@ -2,7 +2,6 @@
 // every response with them, so the two can't drift apart.
 import { z } from 'zod'
 
-import { DesignMeta } from './design.ts'
 import { Color } from './primitives.ts'
 import { brandRef, BrandToken, type Variables } from './variables.ts'
 
@@ -42,7 +41,6 @@ export const DesignSummary = z.object({
   id: RecordId,
   brandId: RecordId,
   name: z.string(),
-  kind: DesignMeta.shape.kind,
   createdAt: z.iso.datetime(),
   updatedAt: z.iso.datetime(),
 })
@@ -52,7 +50,7 @@ export const CreateDesign = z.object({
   name: z.string().trim().min(1).max(120),
   /**
    * The design to start from, checked with parseDesign; its meta.designId and name are replaced
-   * by the new design's. Left out, the design starts as one blank 1080×1080 page.
+   * by the new design's. Left out, the design starts as one page holding one empty 1080×1080 frame.
    */
   content: z.unknown().optional(),
 })
@@ -166,11 +164,11 @@ export type UpdateAsset = z.infer<typeof UpdateAsset>
 export const SignedLink = z.object({ url: z.url(), expiresAt: z.iso.datetime() })
 export type SignedLink = z.infer<typeof SignedLink>
 
-/** The size of a design's primary format (#84), so a tile takes its shape before its picture loads. */
+/** The size of a design's cover frame (see `coverFrame`), so a tile takes its shape before its picture loads. */
 export const DesignCover = z.object({ width: z.number().int().positive(), height: z.number().int().positive() })
 export type DesignCover = z.infer<typeof DesignCover>
 
-/** A design's picture (#84): a short-lived URL, and the primary format's size. */
+/** A design's picture: a short-lived URL, and its cover frame's size. */
 export const DesignThumbnail = SignedLink.extend(DesignCover.shape)
 export type DesignThumbnail = z.infer<typeof DesignThumbnail>
 
@@ -289,8 +287,7 @@ export const TemplateSummary = z.object({
   scope: TemplateScope,
   /** The brand a brand template belongs to; null for a workspace template. */
   brandId: RecordId.nullable(),
-  kind: DesignMeta.shape.kind,
-  /** The primary format's size, for the gallery to keep the thumbnail's shape. */
+  /** The cover frame's size, for the gallery to keep the thumbnail's shape. */
   width: z.number().int().positive(),
   height: z.number().int().positive(),
   createdAt: z.iso.datetime(),

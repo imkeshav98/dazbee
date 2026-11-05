@@ -25,7 +25,7 @@ export const QUIET_BUTTON = `flex h-8 cursor-pointer items-center gap-1.5 rounde
 export const ASSET_TILE =
   'grid aspect-square place-items-center overflow-hidden rounded-[10px] border border-line bg-bg/40 transition-colors duration-[var(--chrome-fast)]'
 
-/** A popover's frosted panel, as the cards are: the shape menu, the image picker, Add format. */
+/** A popover's frosted panel, as the cards are: the shape menu, the image picker. */
 export const POPOVER = 'pop-in z-50 rounded-card surface-frost'
 /** A menu of rows: ⋯ More, the right-click menu, and the menus beside their rows. */
 export const MENU = `${POPOVER} flex flex-col p-1.5`
@@ -106,7 +106,7 @@ export const SWITCH_ROW = `group flex h-8 w-full cursor-pointer items-center jus
 
 /** One part of an edit panel or pop-up: a card's controls under a small heading, a hairline above all but the first. */
 export const PANEL_PART = 'flex flex-col gap-2.5 border-t border-line pt-3 first:border-t-0 first:pt-0'
-/** A small heading over a group of an edit panel's choices, as Line up with the size. */
+/** A small heading over a group of an edit panel's choices, as Line up with the frame. */
 export const PANEL_HEADING = 'text-xs font-semibold text-muted'
 /**
  * A boxed button of an edit panel that acts at once: its icon, then its words, or its icon alone. The

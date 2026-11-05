@@ -1,10 +1,10 @@
 'use client'
 
-// The layers panel (#59): the page's layer tree, topmost first, in step with the stage's selection;
-// with nothing selected, the page in view's.
-// Drag a row to reorder it or drop it into a group; rename, lock and hide; expand groups. Every
-// change is an editor call, so each is one undo step. Only the rows in view are in the page, so a
-// page of hundreds of layers scrolls as smoothly as one of ten.
+// The layers panel (#59): one frame's layer tree, topmost first, in step with the stage's selection:
+// the selection's frame, else the shown page's first. Drag a row to reorder it or drop it into a
+// group; rename, lock and hide; expand groups. Every change is an editor call, so each is one undo
+// step. Only the rows in view are in the page, so a frame of hundreds of layers scrolls as smoothly
+// as one of ten.
 import {
   type DragEvent,
   type KeyboardEvent,
@@ -18,13 +18,12 @@ import {
 
 import { ancestorsOf, childrenOf } from '@dazbee/doc'
 import type { Editor } from '@dazbee/editor'
-import { canHold, type Design, formatScope, inOrder } from '@dazbee/schema'
+import { canHold, type Design } from '@dazbee/schema'
 
-import { shownPage, useSelectionWithFrame } from '@/components/editor/editor-hooks.ts'
+import { useSelectionWithFrame, useShownFrames } from '@/components/editor/editor-hooks.ts'
 import { useFlyoutNote } from '@/components/editor/shell.tsx'
 import { useLiveDesign } from '@/components/editor/use-live-design.ts'
 import { useOverlayScroll } from '@/components/ui/overlay-scroll.ts'
-import { useValue } from '@/lib/editor/value-store.ts'
 import { useLocale, useMessages } from '@/lib/i18n/client.tsx'
 import { dirOf, format } from '@/lib/i18n/index.ts'
 
@@ -34,9 +33,10 @@ import { useLayerPictures } from './use-layer-pictures.ts'
 /** Rows rendered beyond each edge of the view, so a fast scroll never shows a gap. */
 const OVERSCAN = 8
 
-/** The page's layers as rows, topmost first, with the children of expanded layers under them. */
-function rowsOf(design: Design, pageId: string, expanded: ReadonlySet<string>) {
+/** The frame's layers as rows, topmost first, with the children of expanded layers under them; none without a frame. */
+function rowsOf(design: Design, frameId: string | undefined, expanded: ReadonlySet<string>) {
   const rows: Row[] = []
+  if (frameId === undefined) return rows
   const walk = (parentId: string, depth: number) => {
     const children = childrenOf(design, parentId).reverse()
     for (const [position, [id, node]] of children.entries()) {
@@ -45,7 +45,7 @@ function rowsOf(design: Design, pageId: string, expanded: ReadonlySet<string>) {
       if (hasChildren && expanded.has(id)) walk(id, depth + 1)
     }
   }
-  walk(pageId, 0)
+  walk(frameId, 0)
   return rows
 }
 
@@ -56,17 +56,14 @@ export function LayersPanel({ editor }: { editor: Editor }) {
   const selection = useSelectionWithFrame(editor)
   const selected = useMemo(() => new Set(selection.ids), [selection.ids])
 
-  // The frame the panel shows: the selection's; with nothing selected, the page in view (shown from
-  // the Pages panel or picked on the stage), an empty one too, else the last selection's; else the
-  // first page. In the selection's format, else the primary one.
-  const inView = useValue(shownPage)
-  const [selectedPage, frameFormat] = selection.frame?.split('/') ?? []
-  const framePage = selection.ids.length === 0 && inView ? inView : selectedPage
-  const pageId = framePage && design.pages[framePage] ? framePage : (inOrder(design.pages)[0]?.[0] ?? '')
-  const formatId = frameFormat && design.formats[frameFormat] ? frameFormat : design.meta.primaryFormatId
-  const page = design.pages[pageId]
-  // The title row's note says which frame the tree is of, as in the mock: "Page 1 · Square".
-  useFlyoutNote(page ? [page.name, design.formats[formatId]?.name].filter(Boolean).join(' · ') : null)
+  // The frame the panel shows: the selection's, else the shown page's first; none on a page with no frames.
+  const shownFrames = useShownFrames(editor)
+  const wanted = selection.frameId ?? shownFrames[0]?.id
+  const frameId = wanted !== undefined && Object.hasOwn(design.frames, wanted) ? wanted : undefined
+  const frame = frameId === undefined ? undefined : design.frames[frameId]
+  const page = frame ? design.pages[frame.pageId] : undefined
+  // The title row's note says which frame the tree is of, as in the mock: "Page 1 · Feed square".
+  useFlyoutNote(frame ? [page?.name, frame.name].filter(Boolean).join(' · ') : null)
 
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(() => new Set())
   // A layer selected on the stage shows in the panel: the groups it is in open.
@@ -82,7 +79,7 @@ export function LayersPanel({ editor }: { editor: Editor }) {
   // a frame later at the redraw.
   const [moved, setMoved] = useState(0)
   // The version is how the live design says it changed.
-  const rows = useMemo(() => rowsOf(design, pageId, expanded), [design, version, moved, pageId, expanded])
+  const rows = useMemo(() => rowsOf(design, frameId, expanded), [design, version, moved, frameId, expanded])
   const indexOf = useMemo(() => new Map(rows.map((row, i) => [row.id, i])), [rows])
 
   // Which rows are in view.
@@ -170,7 +167,7 @@ export function LayersPanel({ editor }: { editor: Editor }) {
   useLayoutEffect(() => {
     // Focuses a row and selects it unless it is selected, so the focus and the selection agree.
     const take = (id: string) => {
-      if (!selected.has(id)) editor.select([id], pageId, formatId)
+      if (!selected.has(id)) editor.select([id])
       reveal(id)
     }
     const before = document.activeElement
@@ -207,7 +204,7 @@ export function LayersPanel({ editor }: { editor: Editor }) {
 
   const select = (id: string, add = false) => {
     const ids = add ? (selected.has(id) ? selection.ids.filter((s) => s !== id) : [...selection.ids, id]) : [id]
-    editor.select(ids, pageId, formatId)
+    editor.select(ids)
   }
   const toggle = (id: string, open = !expanded.has(id)) => {
     const next = new Set(expanded)
@@ -264,7 +261,7 @@ export function LayersPanel({ editor }: { editor: Editor }) {
   const placeOf = (id: string) => {
     const open = new Set(expanded)
     for (const up of ancestorsOf(design, design.nodes[id]?.parentId ?? '')) open.add(up)
-    const at = rowsOf(design, pageId, open).findIndex((r) => r.id === id)
+    const at = rowsOf(design, frameId, open).findIndex((r) => r.id === id)
     return at < 0 ? undefined : at
   }
 
@@ -335,7 +332,7 @@ export function LayersPanel({ editor }: { editor: Editor }) {
     },
     toggle: (id) => toggle(id),
     lock: (id, locked) => editor.setLocked([id], locked),
-    hide: (id, hidden, everyFormat) => editor.setHidden([id], hidden, pageId, formatId, everyFormat),
+    hide: (id, hidden) => editor.setHidden([id], hidden),
     dragStart: (id) => {
       dragged.current = id
     },
@@ -381,13 +378,6 @@ export function LayersPanel({ editor }: { editor: Editor }) {
     }
   }, [])
 
-  /** Hidden in some formats and shown in others. */
-  const partlyHidden = (id: string) => {
-    const visible = Object.keys(design.formats).map(
-      (f) => (design.overrides[formatScope(f)]?.[id]?.visible ?? design.nodes[id]?.props.visible) !== false,
-    )
-    return visible.some(Boolean) && !visible.every(Boolean)
-  }
   // The rows in view, with the row Tab lands on and the row the focus was last on wherever they are,
   // so the focus stays in the tree when its row scrolls away and Tab always reaches the tree.
   const places = new Set<number>()
@@ -401,14 +391,14 @@ export function LayersPanel({ editor }: { editor: Editor }) {
   // colour can vanish against the panel.
   const pictures = useLayerPictures(
     editor,
-    `${pageId}/${formatId}`,
+    frameId,
     shown.flatMap(({ row }) => (row.node.type === 'text' ? [] : [row.id])),
     scrolledAt,
   )
   return (
     <div className="flex min-h-0 flex-1 flex-col" data-testid="layers">
       {rows.length === 0 ? (
-        <p className="p-4 text-[13px] text-muted">{t.editor.layersPanel.empty}</p>
+        <p className="p-4 text-[13px] text-muted">{frame ? t.editor.layersPanel.empty : t.editor.frames.emptyPage}</p>
       ) : (
         <div
           ref={scrollerRef}
@@ -421,7 +411,7 @@ export function LayersPanel({ editor }: { editor: Editor }) {
         >
           <div
             role="tree"
-            aria-label={format(t.editor.layersPanel.tree, { page: page?.name ?? '' })}
+            aria-label={format(t.editor.layersPanel.tree, { frame: frame?.name ?? '' })}
             aria-multiselectable
             className="relative"
             style={{ height: rows.length * LAYER_ROW }}
@@ -435,10 +425,7 @@ export function LayersPanel({ editor }: { editor: Editor }) {
                 focusable={row.id === current}
                 renaming={renaming === row.id}
                 open={expanded.has(row.id)}
-                hidden={
-                  (design.overrides[formatScope(formatId)]?.[row.id]?.visible ?? row.node.props.visible) === false
-                }
-                partlyHidden={partlyHidden(row.id)}
+                hidden={row.node.props.visible === false}
                 drop={drop?.id === row.id ? drop.where : null}
                 picture={pictures[row.id] ?? null}
                 api={api}

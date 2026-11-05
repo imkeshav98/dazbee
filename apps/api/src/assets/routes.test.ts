@@ -275,13 +275,14 @@ describe('image uploads', { timeout: 30_000 }, () => {
 
 describe('deleting images', { timeout: 60_000 }, () => {
   const withPhoto = (assetId: string) => ({
-    meta: { designId: 'any', name: 'Any', kind: 'single', primaryFormatId: 'sq' },
-    formats: { sq: { name: 'Square', width: 400, height: 400, order: 'a0' } },
+    meta: { designId: 'any', name: 'Any' },
     pages: { p1: { name: 'Page 1', order: 'a0' } },
+    frames: { sq: { pageId: 'p1', name: 'Square', width: 400, height: 400, x: 0, y: 0, fills: [], order: 'a0' } },
     nodes: {
       photo: {
         type: 'graphic',
-        parentId: 'p1',
+        parentId: 'sq',
+        link: 'photo',
         index: 'a0',
         name: 'Photo',
         props: {
@@ -294,7 +295,6 @@ describe('deleting images', { timeout: 60_000 }, () => {
         },
       },
     },
-    overrides: {},
   })
 
   const listedIds = async () =>

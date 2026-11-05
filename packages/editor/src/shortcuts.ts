@@ -27,7 +27,6 @@ export const SHORTCUTS = [
   { action: 'distributeVertical', keys: ['Alt+Shift+V'] },
   { action: 'lock', keys: ['Mod+Shift+L'] },
   { action: 'hide', keys: ['Mod+Shift+H'] },
-  { action: 'hideEverywhere', keys: ['Mod+Alt+Shift+H'] },
   { action: 'nudgeLeft', keys: ['ArrowLeft'] },
   { action: 'nudgeRight', keys: ['ArrowRight'] },
   { action: 'nudgeUp', keys: ['ArrowUp'] },

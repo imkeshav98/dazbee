@@ -1,32 +1,28 @@
-// Commands that change layers where they are: create, edit, reset to the base, show, delete, rename, lock, bind
-// and mask.
+// Commands that change layers where they are, in their own frame: create, edit, delete, rename, lock,
+// bind and mask.
 import { nanoid } from 'nanoid'
 import type * as Y from 'yjs'
 import { z } from 'zod'
 
 import {
-  AnyScope,
   BINDING_TARGETS,
   boundFillIndex,
   canBind,
   fitsTarget,
-  formatIdOf,
+  FrameId,
   Layer,
   type Layer as LayerT,
   LAYER_PROPS,
   LayerLock,
   LOCK_FLAGS,
   NodeId,
-  PageId,
   Paint,
   parseLayer,
-  parseOverrideValues,
-  Scope,
   VariableRef,
 } from '@dazbee/schema'
 
 import { childrenOf, descendants } from '../children.ts'
-import { DELETED, overrideKey, toYNode } from '../design-doc.ts'
+import { DELETED, toYNode } from '../design-doc.ts'
 import { idProblem, lockFor, lockProblem, missingLayer, parentProblem } from './checks.ts'
 import { defineCommand } from './define.ts'
 import { keepDrawnIn } from './paths.ts'
@@ -39,31 +35,32 @@ const LayerInput = z.object({
   props: z.record(z.string(), z.unknown()),
 })
 
+/** Adds a layer on top of what its frame or parent layer holds, with a link id of its own. Returns its id. */
 export const nodeCreate = defineCommand({
   name: 'node.create',
-  input: z.object({ id: NodeId.optional(), parentId: z.union([PageId, NodeId]), layer: LayerInput }),
+  input: z.object({ id: NodeId.optional(), parentId: z.union([FrameId, NodeId]), layer: LayerInput }),
   check: (ctx, { id, parentId, layer }) => {
     const { design } = ctx
     const taken = idProblem(ctx, id)
     if (taken) return taken
     const problem = parentProblem(design, parentId, layer.type)
     if (problem) return problem
-    const parsed = Layer.safeParse({ ...layer, parentId, index: 'a0' })
+    const parsed = Layer.safeParse({ ...layer, parentId, link: 'new', index: 'a0' })
     if (!parsed.success) return parsed.error.issues.map((i) => `layer.${i.path.join('.')}: ${i.message}`).join('; ')
     return undefined
   },
   apply: ({ r, design }, { id = nanoid(), parentId, layer }) => {
-    r.nodes.set(id, toYNode(Layer.parse({ ...layer, parentId, index: topIndex(design, parentId) })))
+    r.nodes.set(id, toYNode(Layer.parse({ ...layer, parentId, link: nanoid(), index: topIndex(design, parentId) })))
     return id
   },
 })
 
+/** Sets properties of layers. Their linked copies in other frames stay as they are. */
 export const nodeUpdate = defineCommand({
   name: 'node.update',
-  input: z.object({ ids: NodeId.array().min(1), scope: AnyScope, patch: z.record(z.string(), z.unknown()) }),
-  check: ({ design }, { ids, scope, patch }) => {
-    // Only the patched layers and their overrides are checked: nothing else changes (#29).
-    if (scope !== 'base' && !design.formats[formatIdOf(scope) ?? '']) return `no format "${formatIdOf(scope) ?? scope}"`
+  input: z.object({ ids: NodeId.array().min(1), patch: z.record(z.string(), z.unknown()) }),
+  check: ({ design }, { ids, patch }) => {
+    // Only the patched layers are checked: nothing else changes (#29).
     for (const id of ids) {
       const node = design.nodes[id]
       if (!node) return missingLayer(design, [id])
@@ -71,69 +68,23 @@ export const nodeUpdate = defineCommand({
         if (!Object.hasOwn(LAYER_PROPS[node.type].shape, path)) return `a ${node.type} has no property "${path}"`
         const locked = lockProblem(id, node, lockFor(path))
         if (locked) return locked
-        if (scope === 'base' && node.type === 'text' && (path === 'text' || path === 'runs'))
-          return 'change text with text.edit'
-      }
-      if (scope !== 'base') {
-        const values = parseOverrideValues(scope, node, { ...design.overrides[scope]?.[id], ...patch })
-        if (!values.success) return values.errors.map((e) => `${id}.${e}`).join('; ')
-        continue
+        if (node.type === 'text' && (path === 'text' || path === 'runs')) return 'change text with text.edit'
       }
       const layer = parseLayer({ ...node, props: { ...node.props, ...patch } })
       if (!layer.success) return layer.errors.map((e) => `${id}.${e.replace(/^props\./, '')}`).join('; ')
-      // A new base value can make an override that merges with it invalid.
-      for (const [overrideScope, byNode] of Object.entries(design.overrides)) {
-        const values = byNode[id] && parseOverrideValues(overrideScope, layer.layer, byNode[id])
-        if (values && !values.success) return values.errors.map((e) => `${id}.${e}`).join('; ')
-      }
     }
     return undefined
   },
-  apply: ({ r, design }, { ids, scope, patch }) => {
+  apply: ({ r, design }, { ids, patch }) => {
     for (const id of ids) {
       if ('width' in patch || 'height' in patch) keepDrawnIn(r, design, id)
-      if (scope === 'base') {
-        const props = r.nodes.get(id)?.get('props') as Y.Map<unknown>
-        for (const [path, value] of Object.entries(patch)) props.set(path, value)
-        continue
-      }
-      for (const [path, value] of Object.entries(patch)) r.overrides.set(overrideKey(scope, id, path), value)
+      const props = r.nodes.get(id)?.get('props') as Y.Map<unknown>
+      for (const [path, value] of Object.entries(patch)) props.set(path, value)
     }
   },
 })
 
-/**
- * Puts layers back to the base in one format: removes their overrides there, every one or only
- * the named property paths. Values the layers don't override are left as they are.
- */
-export const overrideReset = defineCommand({
-  name: 'override.reset',
-  input: z.object({ ids: NodeId.array().min(1), scope: Scope, paths: z.string().array().min(1).optional() }),
-  check: ({ design }, { ids, scope }) => {
-    if (!design.formats[formatIdOf(scope) ?? '']) return `no format "${formatIdOf(scope) ?? scope}"`
-    return missingLayer(design, ids)
-  },
-  apply: ({ r, design }, { ids, scope, paths }) => {
-    for (const id of ids) {
-      for (const path of paths ?? Object.keys(design.overrides[scope]?.[id] ?? {}))
-        r.overrides.delete(overrideKey(scope, id, path))
-    }
-  },
-})
-
-/** Shows or hides layers in every format: the base, with every format's own visibility gone. */
-export const nodeVisibleEverywhere = defineCommand({
-  name: 'node.visibleEverywhere',
-  input: z.object({ ids: NodeId.array().min(1), visible: z.boolean() }),
-  check: ({ design }, { ids }) => missingLayer(design, ids),
-  apply: ({ r, design }, { ids, visible }) => {
-    for (const id of ids) {
-      ;(r.nodes.get(id)?.get('props') as Y.Map<unknown> | undefined)?.set('visible', visible)
-      for (const scope of Object.keys(design.overrides)) r.overrides.delete(overrideKey(scope, id, 'visible'))
-    }
-  },
-})
-
+/** Deletes layers and everything under them. Their linked copies in other frames stay. */
 export const nodeDelete = defineCommand({
   name: 'node.delete',
   input: z.object({ ids: NodeId.array().min(1) }),
@@ -243,10 +194,7 @@ export const nodeBind = defineCommand({
   },
 })
 
-/**
- * Makes layers masks, or plain layers again (#48). A mask is the same in every format, so the flag
- * is set on the base and any format's override of it goes.
- */
+/** Makes layers masks, or plain layers again (#48). Their linked copies in other frames stay as they are. */
 export const nodeMask = defineCommand({
   name: 'node.mask',
   input: z.object({ ids: NodeId.array().min(1), mask: z.enum(['alpha', 'luminance']).nullable() }),
@@ -259,12 +207,11 @@ export const nodeMask = defineCommand({
     }
     return undefined
   },
-  apply: ({ r, design }, { ids, mask }) => {
+  apply: ({ r }, { ids, mask }) => {
     for (const id of ids) {
       const props = r.nodes.get(id)?.get('props') as Y.Map<unknown>
       if (mask) props.set('mask', mask)
       else props.delete('mask')
-      for (const scope of Object.keys(design.overrides)) r.overrides.delete(overrideKey(scope, id, 'mask'))
     }
   },
 })

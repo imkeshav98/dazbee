@@ -1,5 +1,5 @@
 // SVG files turned into layers (#225) draw as resvg draws the files themselves: each logo, written
-// the way a design tool or icon set writes it, is converted, placed on a page its own size and
+// the way a design tool or icon set writes it, is converted, placed in a frame its own size and
 // drawn by the CPU renderer, then compared with resvg's drawing of the original file.
 import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -20,7 +20,7 @@ const LOGOS = join(ASSETS_DIR, 'svg')
 /** The share of pixels, in percent, that may differ from resvg's drawing: curves are flattened and anti-aliased differently. */
 const LIMIT = 1
 
-/** The file drawn by resvg over white, as the page is. */
+/** The file drawn by resvg over white, as the frame is. */
 function rasterise(text: string) {
   const image = new Resvg(text, {
     background: '#FFFFFF',
@@ -33,15 +33,26 @@ function rasterise(text: string) {
 function draw(text: string) {
   const { tree, root, width, height, skipped } = svgToLayers(ck, text)
   const nodes = Object.fromEntries(
-    Object.entries(tree.nodes).map(([id, node]) => [id, id === root ? { ...node, parentId: 'p1', index: 'a0' } : node]),
+    Object.entries(tree.nodes).map(([id, node]) => [id, id === root ? { ...node, parentId: 'f', index: 'a0' } : node]),
   )
   const design = {
-    meta: { designId: 'd', name: 'Logo', kind: 'single', primaryFormatId: 'f' },
-    formats: { f: { name: 'Logo', width: Math.round(width), height: Math.round(height), order: 'a0' } },
-    pages: { p1: { name: 'Page', order: 'a0', fills: [{ type: 'solid', color: '#FFFFFFFF' }] } },
+    meta: { designId: 'd', name: 'Logo' },
+    pages: { p1: { name: 'Page', order: 'a0' } },
+    frames: {
+      f: {
+        pageId: 'p1',
+        name: 'Logo',
+        width: Math.round(width),
+        height: Math.round(height),
+        x: 0,
+        y: 0,
+        fills: [{ type: 'solid', color: '#FFFFFFFF' }],
+        order: 'a0',
+      },
+    },
     nodes,
   }
-  return { drawn: renderDesign(ck, design, 'p1', 'f', bytes), skipped, layers: Object.keys(nodes).length }
+  return { drawn: renderDesign(ck, design, 'f', bytes), skipped, layers: Object.keys(nodes).length }
 }
 
 describe('SVG files as layers', () => {

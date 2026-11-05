@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
 
-import { childrenOf, mergedProps } from '@dazbee/doc'
+import { childrenOf } from '@dazbee/doc'
 import type { DesignInput } from '@dazbee/schema'
 
-import { type Frame, frameGrid } from '../canvas/grid.ts'
+import { type Frame, pageFrames } from '../canvas/frames.ts'
 import { hug } from '../layers/hug.ts'
 import { sessionOf, testBoxes } from '../layers/test-boxes.ts'
 import { editorSelection } from '../selection.ts'
@@ -16,33 +16,43 @@ const square = (parentId: string, index: string) => ({
   name: 'Square',
   props: { x: 0, y: 0, width: 50, height: 50, shape: { kind: 'rect' as const } },
 })
-/** One page in a square and a wide format: a row laid out by auto layout holding three squares, and one on the page. */
+const row = (parentId: string) => ({
+  type: 'box' as const,
+  parentId,
+  index: 'a0',
+  name: 'Row',
+  props: { x: 100, y: 100, width: 300, height: 100, layout: { direction: 'row' as const } },
+})
+const FREE = { x: 600, y: 600, width: 50, height: 50, shape: { kind: 'rect' as const } }
+/**
+ * One page with a square and a wide frame, each holding its copy of a row laid out by auto layout
+ * with three squares in it, and of one square beside it.
+ */
 const DESIGN: DesignInput = {
-  meta: { designId: 'd', name: 'D', kind: 'single', primaryFormatId: 'sq' },
-  formats: {
-    sq: { name: 'Square', width: 1080, height: 1080, order: 'a0' },
-    wide: { name: 'Wide', width: 1200, height: 628, order: 'a1' },
-  },
+  meta: { designId: 'd', name: 'D' },
   pages: { p1: { name: 'One', order: 'a0' } },
+  frames: {
+    sq: { pageId: 'p1', name: 'Square', width: 1080, height: 1080, x: 0, y: 0, order: 'a0' },
+    wide: { pageId: 'p1', name: 'Wide', width: 1200, height: 628, x: 1280, y: 0, order: 'a1' },
+  },
   nodes: {
-    row: {
-      type: 'box',
-      parentId: 'p1',
-      index: 'a0',
-      name: 'Row',
-      props: { x: 100, y: 100, width: 300, height: 100, layout: { direction: 'row' } },
-    },
-    one: square('row', 'a0'),
-    two: square('row', 'a1'),
-    three: square('row', 'a2'),
-    free: { ...square('p1', 'a1'), props: { x: 600, y: 600, width: 50, height: 50, shape: { kind: 'rect' as const } } },
+    row: { ...row('sq'), link: 'row' },
+    one: { ...square('row', 'a0'), link: 'one' },
+    two: { ...square('row', 'a1'), link: 'two' },
+    three: { ...square('row', 'a2'), link: 'three' },
+    free: { ...square('sq', 'a1'), link: 'free', props: FREE },
+    'wide-row': { ...row('wide'), link: 'row' },
+    'wide-one': { ...square('wide-row', 'a0'), link: 'one' },
+    'wide-two': { ...square('wide-row', 'a1'), link: 'two' },
+    'wide-three': { ...square('wide-row', 'a2'), link: 'three' },
+    'wide-free': { ...square('wide', 'a1'), link: 'free', props: FREE },
   },
 }
 
 /** Drags in the row on a real session and selection, at zoom 1 over the square frame, logging what they tell. */
 function harness() {
   const session = sessionOf(DESIGN)
-  const frames = frameGrid(session.design()).frames
+  const frames = pageFrames(session.design(), 'p1').frames
   const frame = frames[0] as Frame
   const log: string[] = []
   const selection = editorSelection({ drawn: () => session.design(), frames: () => frames, changed: () => {} })
@@ -62,7 +72,9 @@ function harness() {
   }
   const reorder = editorAutoLayoutDrag(deps)
   const order = () => childrenOf(session.design(), 'row').map(([id]) => id)
-  return { reorder, session, log, frame, frames, order }
+  /** The wide frame's layers as they are now. */
+  const wideCopies = () => Object.entries(session.design().nodes).filter(([id]) => id.startsWith('wide-'))
+  return { reorder, session, log, frame, frames, order, wideCopies }
 }
 
 describe('editorAutoLayoutDrag', () => {
@@ -100,29 +112,32 @@ describe('editorAutoLayoutDrag', () => {
   })
 
   describe('release', () => {
-    it('drops the layers into their new place in the flow, one undo step', () => {
-      const { reorder, session, log, frame, order } = harness()
+    it('drops the layers into their new place in the flow, one undo step, leaving the copies in the other frame be', () => {
+      const { reorder, session, log, frame, order, wideCopies } = harness()
+      const copies = wideCopies()
       const drag = reorder.press(frame, [], { x: 125, y: 125 }, ['one'])
       if (!drag) throw new Error('no drag')
       reorder.drag(drag, { x: 240, y: 125 })
       reorder.release(drag)
       expect(order()).toEqual(['two', 'three', 'one'])
+      expect(wideCopies()).toEqual(copies)
       expect(log).toEqual(['hug one'])
       expect(session.inGesture()).toBe(false)
       session.undo()
       expect(order()).toEqual(['one', 'two', 'three'])
     })
 
-    it('takes the layers out of the box onto the page, where they were dropped and where the flow had them in the other formats', () => {
-      const { reorder, session, frame, order } = harness()
+    it("takes the layers out of the box to the frame's top level, where they were dropped; the copies in the other frame stay", () => {
+      const { reorder, session, frame, order, wideCopies } = harness()
+      const copies = wideCopies()
       const drag = reorder.press(frame, [], { x: 125, y: 125 }, ['one'])
       if (!drag) throw new Error('no drag')
       reorder.drag(drag, { x: 525, y: 325 })
       reorder.release(drag)
       expect(order()).toEqual(['two', 'three'])
-      expect(session.design().nodes.one?.parentId).toBe('p1')
-      expect(mergedProps(session.design(), 'format:sq', 'one')).toMatchObject({ x: 500, y: 300 })
-      expect(mergedProps(session.design(), 'format:wide', 'one')).toMatchObject({ x: 100, y: 100 })
+      expect(session.design().nodes.one?.parentId).toBe('sq')
+      expect(session.design().nodes.one?.props).toMatchObject({ x: 500, y: 300 })
+      expect(wideCopies()).toEqual(copies)
     })
 
     it('writes nothing for a drag that stayed a click, or a drop where they were', () => {
@@ -140,18 +155,18 @@ describe('editorAutoLayoutDrag', () => {
 
   describe('nudge', () => {
     it('moves layers one place along the flow, as one undo step', () => {
-      const { reorder, session, frame, order } = harness()
-      reorder.nudge(frame, ['one'], 1, 0, session.design())
+      const { reorder, session, order } = harness()
+      reorder.nudge(['one'], 1, 0, session.design())
       expect(order()).toEqual(['two', 'one', 'three'])
-      reorder.nudge(frame, ['one'], -1, 0, session.design())
+      reorder.nudge(['one'], -1, 0, session.design())
       expect(order()).toEqual(['one', 'two', 'three'])
     })
 
     it('says why it does nothing: across the flow auto layout decides, and past its end there is no place', () => {
-      const { reorder, session, log, frame, order } = harness()
-      reorder.nudge(frame, ['one'], 0, 1, session.design())
-      reorder.nudge(frame, ['one'], -1, 0, session.design())
-      reorder.nudge(frame, ['three'], 1, 0, session.design())
+      const { reorder, session, log, order } = harness()
+      reorder.nudge(['one'], 0, 1, session.design())
+      reorder.nudge(['one'], -1, 0, session.design())
+      reorder.nudge(['three'], 1, 0, session.design())
       expect(log).toEqual(['placedByLayout', 'flowEnd', 'flowEnd'])
       expect(order()).toEqual(['one', 'two', 'three'])
     })

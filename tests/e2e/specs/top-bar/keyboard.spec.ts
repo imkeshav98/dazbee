@@ -8,12 +8,26 @@ import type { DesignInput } from '@dazbee/schema'
 
 import { photo, upload } from '../../support/assets.ts'
 import { layoutProblems } from '../../support/layout.ts'
-import { openStage, read, selection, selectLayers } from '../../support/stage.ts'
+import { frameDesign } from '../../support/seed.ts'
+import { nextFrame, openStage, read, selection, selectLayers } from '../../support/stage.ts'
 import { expect, type Page, test } from '../../support/test.ts'
 import { barMenu, moreMenu, moreSubmenu, PIECES, UNCUT } from '../../support/top-bar.ts'
 import { topBarDesign } from '../../support/top-bar-design.ts'
 
 test.describe.configure({ timeout: 240_000 })
+
+/**
+ * Narrows the window from a tablet's 820 px, 20 px at a time down to 640, until the bar of the
+ * selection has more items than fit and so a second row behind its ⋯. Returns the width.
+ */
+async function narrowUntilSecondRow(page: Page) {
+  for (let width = 820; width >= 640; width -= 20) {
+    await page.setViewportSize({ width, height: 1180 })
+    await nextFrame(page)
+    if (await page.getByTestId('bar-overflow').isVisible()) return width
+  }
+  throw new Error('the bar fits in one row at every tablet width')
+}
 
 test('Tab reaches the top bar once and the arrows move along it; a panel takes the focus, Esc gives it back, and a second Esc clears the selection', async ({
   browser,
@@ -55,6 +69,7 @@ test("Esc closes the bar's second row and keeps the selection; the arrows and En
   const { page, errors } = await openStage(browser, topBarDesign(asset.id))
   await page.setViewportSize({ width: 820, height: 1180 })
   await selectLayers(page, ['headline'])
+  await narrowUntilSecondRow(page)
   const more = page.getByTestId('bar-overflow')
   await expect(more).toBeVisible()
   const row = page.getByTestId('top-bar-row')
@@ -79,6 +94,7 @@ test("Esc closes the keyboard shortcuts dialog over the bar's second row first, 
   const { page, errors } = await openStage(browser, topBarDesign(asset.id))
   await page.setViewportSize({ width: 820, height: 1180 })
   await selectLayers(page, ['headline'])
+  await narrowUntilSecondRow(page)
   await page.getByTestId('bar-overflow').click()
   const row = page.getByTestId('top-bar-overflow')
   await expect(row).toBeVisible()
@@ -103,12 +119,9 @@ test('the size field steps with the arrows; a pop-up closes when the window chan
   const asset = await upload(photo)
   const { page, errors } = await openStage(browser, topBarDesign(asset.id))
   const size = () =>
-    page.evaluate(() => {
-      const d = window.dazbee?.design()
-      return (
-        { ...d?.nodes.headline?.props, ...d?.overrides['format:sq']?.headline } as { style: { fontSize: number } }
-      ).style.fontSize
-    })
+    page.evaluate(
+      () => (window.dazbee?.design().nodes.headline?.props as { style: { fontSize: number } }).style.fontSize,
+    )
   await selectLayers(page, ['headline'])
   await page.getByTestId('bar-size-field').click()
   await page.keyboard.press('ArrowUp')
@@ -138,6 +151,7 @@ test('⋯ on the top bar leaves an open panel open, and Esc closes the panel fir
   const { page, errors } = await openStage(browser, topBarDesign(asset.id))
   await page.setViewportSize({ width: 820, height: 1180 })
   await selectLayers(page, ['headline'])
+  await narrowUntilSecondRow(page)
   await barMenu(page, 'font')
   await page.getByTestId('bar-overflow').click()
   await expect(page.getByTestId('top-bar-overflow')).toBeVisible()
@@ -335,12 +349,9 @@ test("Esc in a field outside the panel, the design's name or the bar's size, thr
   const asset = await upload(photo)
   const { page, errors } = await openStage(browser, topBarDesign(asset.id))
   const fontSize = () =>
-    page.evaluate(() => {
-      const d = window.dazbee?.design()
-      return (
-        { ...d?.nodes.headline?.props, ...d?.overrides['format:sq']?.headline } as { style: { fontSize: number } }
-      ).style.fontSize
-    })
+    page.evaluate(
+      () => (window.dazbee?.design().nodes.headline?.props as { style: { fontSize: number } }).style.fontSize,
+    )
   await selectLayers(page, ['headline'])
   const name = page.getByTestId('island-start').locator('h1 button')
   const nameField = page.locator('input[name="design-name"]')
@@ -408,34 +419,27 @@ test('the zoom menu and the shape menu keep closing on their own Esc over the Co
 test.describe('the focus as a menu of the bar closes', () => {
   test.describe.configure({ timeout: 120_000 })
 
-  /** One page in one format, holding the layer A. */
-  const oneLayer = (): DesignInput => ({
-    meta: {
-      designId: 'replaced-by-the-api',
+  /** One frame holding the layer A. */
+  const oneLayer = (): DesignInput =>
+    frameDesign({
       name: 'Bar menu focus',
-      kind: 'single',
-      primaryFormatId: 'sq',
-    },
-    formats: { sq: { name: 'Square', width: 1080, height: 1080, order: 'a0' } },
-    pages: { p1: { name: 'Page 1', order: 'a0', fills: [{ type: 'solid', color: '#FFFFFFFF' }] } },
-    nodes: {
-      a: {
-        type: 'graphic',
-        parentId: 'p1',
-        index: 'a0',
-        name: 'A',
-        props: {
-          x: 300,
-          y: 400,
-          width: 300,
-          height: 300,
-          shape: { kind: 'rect' },
-          fills: [{ type: 'solid', color: '#14213DFF' }],
+      nodes: {
+        a: {
+          type: 'graphic',
+          parentId: 'sq',
+          index: 'a0',
+          name: 'A',
+          props: {
+            x: 300,
+            y: 400,
+            width: 300,
+            height: 300,
+            shape: { kind: 'rect' },
+            fills: [{ type: 'solid', color: '#14213DFF' }],
+          },
         },
       },
-    },
-    overrides: {},
-  })
+    })
 
   /** Lets the page's timers run: one set now runs after every timer set before it. */
   const timers = (page: Page) => page.evaluate(() => new Promise((r) => setTimeout(r, 50)))

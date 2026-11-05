@@ -13,9 +13,11 @@ import { useMessages } from '@/lib/i18n/client.tsx'
 import type { Messages } from '@/lib/i18n/index.ts'
 
 type Group = keyof Messages['editor']['shortcuts']['groups']
+/** The table's actions the list names: every one that does something. */
+type Listed = ShortcutAction & keyof Messages['editor']['shortcuts']['actions']
 
 /** The table's actions, in the groups the list shows them in. */
-const GROUPS: [Group, ShortcutAction[]][] = [
+const GROUPS: [Group, Listed[]][] = [
   ['edit', ['undo', 'redo', 'selectAll', 'deselect', 'delete', 'duplicate', 'editPoints']],
   [
     'tools',
@@ -44,7 +46,6 @@ const GROUPS: [Group, ShortcutAction[]][] = [
       'sendToBack',
       'lock',
       'hide',
-      'hideEverywhere',
       'mask',
       'autoLayout',
     ],

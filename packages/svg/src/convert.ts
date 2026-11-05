@@ -156,6 +156,7 @@ export function svgToLayers(ck: CanvasKit, text: string, options: ConvertOptions
     nodes[id] = {
       type: 'group',
       parentId: 'root',
+      link: id,
       index: 'a0',
       name,
       props: {
@@ -243,6 +244,7 @@ export function svgToLayers(ck: CanvasKit, text: string, options: ConvertOptions
     nodes[maskId] = {
       type: 'graphic',
       parentId: 'root',
+      link: maskId,
       index: 'a0',
       name: nameOf(clip, 'Clip'),
       props: {

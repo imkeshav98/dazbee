@@ -2,26 +2,13 @@
 // the drop itself, the uploads held or failed, and the images placed and stored.
 import { AssetSummary, type DesignInput } from '@dazbee/schema'
 
-import { callApi } from './seed.ts'
+import { callApi, frameDesign, type Seeded } from './seed.ts'
 import { read } from './stage.ts'
 import type { Page } from './test.ts'
 
-/** A square design with one white page, and any more formats and pages given. */
-export const dropDesign = (
-  nodes: DesignInput['nodes'] = {},
-  more: Partial<Pick<DesignInput, 'formats' | 'pages'>> = {},
-): DesignInput => ({
-  meta: {
-    designId: 'replaced-by-the-api',
-    name: 'Dropped files',
-    kind: 'single',
-    primaryFormatId: 'sq',
-  },
-  formats: { sq: { name: 'Square', width: 1080, height: 1080, order: 'a0' }, ...more.formats },
-  pages: { p1: { name: 'Page 1', order: 'a0', fills: [{ type: 'solid', color: '#FFFFFFFF' }] }, ...more.pages },
-  nodes,
-  overrides: {},
-})
+/** A design of one white square frame, `sq`, holding `nodes`. */
+export const dropDesign = (nodes: Record<string, Seeded> = {}): DesignInput =>
+  frameDesign({ name: 'Dropped files', nodes })
 
 /**
  * Drops files from the computer at a point on screen, as the browser does: the drag enters and
@@ -89,7 +76,7 @@ export async function routeUploads(page: Page, brandId: string, { hold = false }
 export const assetsOf = async (brandId: string) =>
   AssetSummary.array().parse(await callApi('GET', `/brands/${brandId}/assets`))
 
-/** The graphics on the page filled with an image, and the asset each shows. */
+/** The graphics filled with an image, and the asset each shows. */
 export async function images(page: Page) {
   const nodes = (await read(page)).nodes as unknown as Record<
     string,

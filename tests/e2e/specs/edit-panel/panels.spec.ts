@@ -6,6 +6,7 @@ import { photo, upload } from '../../support/assets.ts'
 import { writeOutput } from '../../support/editor.ts'
 import { choose, enter } from '../../support/fields.ts'
 import { SCREEN_SIZES } from '../../support/layout.ts'
+import { frameDesign } from '../../support/seed.ts'
 import { fitSettled, nextFrame, openStage, selectLayers } from '../../support/stage.ts'
 import { expect, type Page, test } from '../../support/test.ts'
 import { barMenu } from '../../support/top-bar.ts'
@@ -22,88 +23,87 @@ const PANELS: [string, string[], string[]][] = [
 ]
 
 const solid = (color: string) => [{ type: 'solid' as const, color }]
-const design = (assetId: string): DesignInput => ({
-  meta: { designId: 'replaced-by-the-api', name: 'Panels', kind: 'single', primaryFormatId: 'sq' },
-  formats: { sq: { name: 'Square', width: 1080, height: 1080, order: 'a0' } },
-  pages: { p1: { name: 'Page 1', order: 'a0', fills: solid('#FFF8F0FF') } },
-  nodes: {
-    headline: {
-      type: 'text',
-      parentId: 'p1',
-      index: 'a0',
-      name: 'Headline',
-      props: {
-        x: 80,
-        y: 60,
-        width: 600,
-        height: 90,
-        boxMode: 'autoHeight',
-        text: 'Summer sale',
-        style: { fontFamily: 'Noto Sans', fontSize: 64, fontWeight: 800, color: '#C2106CFF' },
+const design = (assetId: string): DesignInput =>
+  frameDesign({
+    name: 'Panels',
+    fills: solid('#FFF8F0FF'),
+    nodes: {
+      headline: {
+        type: 'text',
+        parentId: 'sq',
+        index: 'a0',
+        name: 'Headline',
+        props: {
+          x: 80,
+          y: 60,
+          width: 600,
+          height: 90,
+          boxMode: 'autoHeight',
+          text: 'Summer sale',
+          style: { fontFamily: 'Noto Sans', fontSize: 64, fontWeight: 800, color: '#C2106CFF' },
+        },
+      },
+      badge: {
+        type: 'graphic',
+        parentId: 'sq',
+        index: 'a1',
+        name: 'Badge',
+        props: {
+          x: 80,
+          y: 220,
+          width: 220,
+          height: 220,
+          shape: { kind: 'star', points: 5, innerRadius: 0.5 },
+          fills: solid('#FFD23FFF'),
+          strokes: [{ paint: { type: 'solid', color: '#15121AFF' }, width: 4, align: 'center' }],
+        },
+      },
+      photo: {
+        type: 'graphic',
+        parentId: 'sq',
+        index: 'a2',
+        name: 'Photo',
+        props: {
+          x: 380,
+          y: 220,
+          width: 300,
+          height: 300,
+          shape: { kind: 'rect', cornerRadius: 20 },
+          fills: [{ type: 'image', assetId, fit: 'fill' }],
+        },
+      },
+      button: {
+        type: 'box',
+        parentId: 'sq',
+        index: 'a3',
+        name: 'Button',
+        props: {
+          x: 80,
+          y: 600,
+          width: 360,
+          height: 120,
+          fills: solid('#C2106CFF'),
+          cornerRadius: 60,
+          layout: { direction: 'row', gap: 16, padding: { top: 24, right: 40, bottom: 24, left: 40 } },
+        },
+      },
+      label: {
+        type: 'text',
+        parentId: 'button',
+        index: 'a0',
+        name: 'Label',
+        props: {
+          x: 0,
+          y: 0,
+          width: 200,
+          height: 60,
+          boxMode: 'autoWidth',
+          text: 'Shop now',
+          style: { fontFamily: 'Noto Sans', fontSize: 40, fontWeight: 700, color: '#FFFFFFFF' },
+        },
       },
     },
-    badge: {
-      type: 'graphic',
-      parentId: 'p1',
-      index: 'a1',
-      name: 'Badge',
-      props: {
-        x: 80,
-        y: 220,
-        width: 220,
-        height: 220,
-        shape: { kind: 'star', points: 5, innerRadius: 0.5 },
-        fills: solid('#FFD23FFF'),
-        strokes: [{ paint: { type: 'solid', color: '#15121AFF' }, width: 4, align: 'center' }],
-      },
-    },
-    photo: {
-      type: 'graphic',
-      parentId: 'p1',
-      index: 'a2',
-      name: 'Photo',
-      props: {
-        x: 380,
-        y: 220,
-        width: 300,
-        height: 300,
-        shape: { kind: 'rect', cornerRadius: 20 },
-        fills: [{ type: 'image', assetId, fit: 'fill' }],
-      },
-    },
-    button: {
-      type: 'box',
-      parentId: 'p1',
-      index: 'a3',
-      name: 'Button',
-      props: {
-        x: 80,
-        y: 600,
-        width: 360,
-        height: 120,
-        fills: solid('#C2106CFF'),
-        cornerRadius: 60,
-        layout: { direction: 'row', gap: 16, padding: { top: 24, right: 40, bottom: 24, left: 40 } },
-      },
-    },
-    label: {
-      type: 'text',
-      parentId: 'button',
-      index: 'a0',
-      name: 'Label',
-      props: {
-        x: 0,
-        y: 0,
-        width: 200,
-        height: 60,
-        boxMode: 'autoWidth',
-        text: 'Shop now',
-        style: { fontFamily: 'Noto Sans', fontSize: 40, fontWeight: 700, color: '#FFFFFFFF' },
-      },
-    },
-  },
-  overrides: {},
-})
+  })
 
 /** The layer's props as the document holds them. */
 const propsOf = (page: Page, id: string) =>
@@ -274,7 +274,7 @@ test.describe('found by QA', () => {
     expect(errors).toEqual([])
   })
 
-  test('a layer in a stack has no Line up with the size: the stack places it', async ({ browser }) => {
+  test('a layer in a stack has no Line up with the frame: the stack places it', async ({ browser }) => {
     const asset = await upload(photo)
     const { page, errors } = await openStage(browser, design(asset.id))
     await selectLayers(page, ['label'], { bar: true })

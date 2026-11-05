@@ -3,7 +3,7 @@ import { join } from 'node:path'
 
 import { REFERENCE_DIR } from './pixels.ts'
 
-/** How far the WebGL stage drew from the CPU export for one page in one format. */
+/** How far the WebGL stage drew from the CPU export for one frame. */
 export interface Drift {
   differing: number
   /** Share of pixels that differ, in percent. */

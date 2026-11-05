@@ -20,7 +20,7 @@ export interface Drop {
 export interface DropResult {
   /** The files that didn't upload, and why. */
   failed: { name: string; reason: string }[]
-  /** How many uploaded but weren't placed, having been dropped on no page or one gone since. */
+  /** How many uploaded but weren't placed, having been dropped on no frame or one gone since. */
   unplaced: number
 }
 
@@ -92,18 +92,18 @@ export async function placeDroppedFiles(
   if (!spot || done.length === 0) return { failed, unplaced: done.length }
 
   if (!(await settled(editor))) return { failed, unplaced: 0 }
-  // The page or format dropped on may have gone while the files uploaded.
-  const frame = editor.frames().find((f) => f.key === spot.frame)
+  // The frame dropped on may have gone, or its page be no longer shown, while the files uploaded.
+  const frame = editor.frames().find((f) => f.id === spot.frameId)
   if (!frame) return { failed, unplaced: done.length }
   const ids: string[] = []
   let unplaced = 0
   const [only] = done
   const end = editor.beginGesture()
   try {
-    if (into && only && done.length === 1 && !only.svg && editor.fillWithImage(into, only.asset, spot.frame))
+    if (into && only && done.length === 1 && !only.svg && editor.fillWithImage(into, only.asset))
       return { failed, unplaced }
     done.forEach(({ asset, svg }, i) => {
-      const next = { frame: spot.frame, x: spot.x + i * step, y: spot.y + i * step }
+      const next: Spot = { frameId: spot.frameId, x: spot.x + i * step, y: spot.y + i * step }
       const at = next.x <= frame.width && next.y <= frame.height ? next : spot
       const id = svg !== null ? editor.placeSvg(svg, asset.name || 'SVG', at) : editor.placeImage(asset, at)
       // An SVG file that can't be read is noticed by the editor.
@@ -113,8 +113,7 @@ export async function placeDroppedFiles(
   } finally {
     end()
   }
-  const [pageId, formatId] = spot.frame.split('/')
-  if (ids.length > 1) editor.select(ids, pageId, formatId)
+  if (ids.length > 1) editor.select(ids)
   return { failed, unplaced }
 }
 

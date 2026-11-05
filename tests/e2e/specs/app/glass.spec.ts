@@ -10,7 +10,7 @@ import type { DesignInput } from '@dazbee/schema'
 import { shoot, writeOutput } from '../../support/editor.ts'
 import { hovered, laid, look, openDesignIn, openIn, pressed, THEMES } from '../../support/glass.ts'
 import { SCREEN_SIZES } from '../../support/layout.ts'
-import { DEV_BRAND, liveDesign, seed } from '../../support/seed.ts'
+import { DEV_BRAND, frameDesign, liveDesign, seed } from '../../support/seed.ts'
 import { drawn, fitSettled, nextFrame, selectLayers } from '../../support/stage.ts'
 import { expect, type Page, test } from '../../support/test.ts'
 import { barMenu, moreMenu, pagesPanel } from '../../support/top-bar.ts'
@@ -27,7 +27,7 @@ const shape = (
   box: { x: number; y: number; width: number; height: number },
   color: string,
   kind: 'rect' | 'ellipse' = 'rect',
-  parentId = 'p1',
+  parentId = 'sq',
 ) => ({
   type: 'graphic' as const,
   parentId,
@@ -37,7 +37,7 @@ const shape = (
 })
 const headline = {
   type: 'text' as const,
-  parentId: 'p1',
+  parentId: 'sq',
   index: 'a3',
   name: 'Headline',
   props: {
@@ -51,40 +51,38 @@ const headline = {
 }
 
 /** A yellow ad with a white and a black block, a pink circle, a headline and a box with auto layout. */
-const brightAd = (): DesignInput => ({
-  meta: { designId: 'replaced-by-the-api', name: 'Bright ad', kind: 'single', primaryFormatId: 'sq' },
-  formats: { sq: { name: 'Square', width: SIDE, height: SIDE, order: 'a0' } },
-  pages: { p1: { name: 'Page 1', order: 'a0', fills: solid('#FFD23FFF') } },
-  nodes: {
-    white: shape('White', 'a0', { x: 0, y: 0, width: 540, height: 380 }, '#FFFFFFFF'),
-    black: shape('Black', 'a1', { x: 0, y: 700, width: 540, height: 380 }, '#000000FF'),
-    circle: shape('Circle', 'a2', { x: 560, y: 260, width: 520, height: 520 }, '#FF48B0FF', 'ellipse'),
-    headline,
-    stack: {
-      type: 'box',
-      parentId: 'p1',
-      index: 'a4',
-      name: 'Stack',
-      props: {
-        x: 600,
-        y: 840,
-        width: 360,
-        height: 160,
-        fills: solid('#3D6BFFFF'),
-        layout: { direction: 'row', gap: 8, padding: { top: 12, right: 12, bottom: 12, left: 12 } },
+const brightAd = (): DesignInput =>
+  frameDesign({
+    name: 'Bright ad',
+    width: SIDE,
+    height: SIDE,
+    fills: solid('#FFD23FFF'),
+    nodes: {
+      white: shape('White', 'a0', { x: 0, y: 0, width: 540, height: 380 }, '#FFFFFFFF'),
+      black: shape('Black', 'a1', { x: 0, y: 700, width: 540, height: 380 }, '#000000FF'),
+      circle: shape('Circle', 'a2', { x: 560, y: 260, width: 520, height: 520 }, '#FF48B0FF', 'ellipse'),
+      headline,
+      stack: {
+        type: 'box',
+        parentId: 'sq',
+        index: 'a4',
+        name: 'Stack',
+        props: {
+          x: 600,
+          y: 840,
+          width: 360,
+          height: 160,
+          fills: solid('#3D6BFFFF'),
+          layout: { direction: 'row', gap: 8, padding: { top: 12, right: 12, bottom: 12, left: 12 } },
+        },
       },
+      inStack: shape('In stack', 'a0', { x: 0, y: 0, width: 80, height: 80 }, '#FFFFFFFF', 'rect', 'stack'),
     },
-    inStack: shape('In stack', 'a0', { x: 0, y: 0, width: 80, height: 80 }, '#FFFFFFFF', 'rect', 'stack'),
-  },
-  overrides: {},
-})
+  })
 
 /** A white ad with only its headline, so a menu opened from it floats over white. */
-const whiteAd = (): DesignInput => ({
-  ...brightAd(),
-  pages: { p1: { name: 'Page 1', order: 'a0', fills: solid('#FFFFFFFF') } },
-  nodes: { headline },
-})
+const whiteAd = (): DesignInput =>
+  frameDesign({ name: 'Bright ad', width: SIDE, height: SIDE, fills: solid('#FFFFFFFF'), nodes: { headline } })
 
 /** Zooms so the ad covers the whole window, centred, so every piece of glass floats over it. */
 async function fillWithAd(page: Page, width: number, height: number) {
@@ -143,7 +141,7 @@ test('the Pages button keeps its glass while open, lit by the pressed tint, its 
     expect(await look(button)).toMatchObject({ fill: glass.fill, image: laid(glass.pressed) })
     expect((await look(button.locator('svg'))).colour).toBe(glass.accentText)
     const current = card.locator('[data-page][aria-current="page"]')
-    expect((await look(current.getByText('1 size'))).colour).toBe(glass.text)
+    expect((await look(current.getByText('1 frame'))).colour).toBe(glass.text)
     expect(errors).toEqual([])
     await page.context().close()
   }

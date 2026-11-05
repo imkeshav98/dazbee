@@ -4,6 +4,7 @@
 import type { DesignInput } from '@dazbee/schema'
 
 import { exportHashOf, writeOutput } from '../../support/editor.ts'
+import { frameDesign } from '../../support/seed.ts'
 import { boxOf, click, openStage, press, read, selection } from '../../support/stage.ts'
 import { expect, test } from '../../support/test.ts'
 
@@ -27,76 +28,70 @@ const rect = (
     props: { x, y, width, height, shape: { kind: 'rect', cornerRadius: 12 }, fills: [{ type: 'solid', color }] },
   }) as Node
 
-const design = (): DesignInput => ({
-  meta: {
-    designId: 'replaced-by-the-api',
+const design = (): DesignInput =>
+  frameDesign({
     name: 'Auto layout',
-    kind: 'single',
-    primaryFormatId: 'sq',
-  },
-  formats: { sq: { name: 'Square', width: 1080, height: 1080, order: 'a0' } },
-  pages: { p1: { name: 'Page 1', order: 'a0', fills: [{ type: 'solid', color: '#FFF8F0FF' }] } },
-  nodes: {
-    // A row: a button that hugs its label, then a tile, 24 apart, centred across.
-    bar: {
-      type: 'box',
-      parentId: 'p1',
-      index: 'a0',
-      name: 'Bar',
-      props: {
-        x: 100,
-        y: 100,
-        width: 880,
-        height: 200,
-        fills: [{ type: 'solid', color: '#EEF1F6FF' }],
-        layout: { direction: 'row', gap: 24, padding: { top: 24, right: 24, bottom: 24, left: 24 }, align: 'center' },
+    fills: [{ type: 'solid', color: '#FFF8F0FF' }],
+    nodes: {
+      // A row: a button that hugs its label, then a tile, 24 apart, centred across.
+      bar: {
+        type: 'box',
+        parentId: 'sq',
+        index: 'a0',
+        name: 'Bar',
+        props: {
+          x: 100,
+          y: 100,
+          width: 880,
+          height: 200,
+          fills: [{ type: 'solid', color: '#EEF1F6FF' }],
+          layout: { direction: 'row', gap: 24, padding: { top: 24, right: 24, bottom: 24, left: 24 }, align: 'center' },
+        },
       },
-    },
-    btn: {
-      type: 'box',
-      parentId: 'bar',
-      index: 'a0',
-      name: 'Button',
-      props: {
-        x: 0,
-        y: 0,
-        width: 10,
-        height: 10,
-        sizing: { width: 'hug', height: 'hug' },
-        fills: [{ type: 'solid', color: '#FF2E7EFF' }],
-        layout: { direction: 'row', padding: { top: 16, right: 32, bottom: 16, left: 32 } },
+      btn: {
+        type: 'box',
+        parentId: 'bar',
+        index: 'a0',
+        name: 'Button',
+        props: {
+          x: 0,
+          y: 0,
+          width: 10,
+          height: 10,
+          sizing: { width: 'hug', height: 'hug' },
+          fills: [{ type: 'solid', color: '#FF2E7EFF' }],
+          layout: { direction: 'row', padding: { top: 16, right: 32, bottom: 16, left: 32 } },
+        },
       },
-    },
-    label: {
-      type: 'text',
-      parentId: 'btn',
-      index: 'a0',
-      name: 'Label',
-      props: {
-        x: 0,
-        y: 0,
-        width: 10,
-        height: 10,
-        text: 'Buy',
-        boxMode: 'autoWidth',
-        style: { fontFamily: 'Noto Sans', fontSize: 40, fontWeight: 700, color: '#FFFFFFFF' },
+      label: {
+        type: 'text',
+        parentId: 'btn',
+        index: 'a0',
+        name: 'Label',
+        props: {
+          x: 0,
+          y: 0,
+          width: 10,
+          height: 10,
+          text: 'Buy',
+          boxMode: 'autoWidth',
+          style: { fontFamily: 'Noto Sans', fontSize: 40, fontWeight: 700, color: '#FFFFFFFF' },
+        },
       },
+      tile: rect('bar', 'a1', 0, 0, 120, 120, '#2F6BFFFF'),
+      // Laid out by hand: three tiles in a row, 20 apart, 30 in from the box's top and left.
+      shelf: {
+        type: 'box',
+        parentId: 'sq',
+        index: 'a1',
+        name: 'Shelf',
+        props: { x: 100, y: 500, width: 700, height: 220, fills: [{ type: 'solid', color: '#1F2329FF' }] },
+      },
+      one: rect('shelf', 'a0', 130, 530, 160, 160, '#FFB020FF'),
+      two: rect('shelf', 'a1', 310, 530, 200, 160, '#00A88AFF'),
+      three: rect('shelf', 'a2', 530, 530, 120, 160, '#9747FFFF'),
     },
-    tile: rect('bar', 'a1', 0, 0, 120, 120, '#2F6BFFFF'),
-    // Laid out by hand: three tiles in a row, 20 apart, 30 in from the box's top and left.
-    shelf: {
-      type: 'box',
-      parentId: 'p1',
-      index: 'a1',
-      name: 'Shelf',
-      props: { x: 100, y: 500, width: 700, height: 220, fills: [{ type: 'solid', color: '#1F2329FF' }] },
-    },
-    one: rect('shelf', 'a0', 130, 530, 160, 160, '#FFB020FF'),
-    two: rect('shelf', 'a1', 310, 530, 200, 160, '#00A88AFF'),
-    three: rect('shelf', 'a2', 530, 530, 120, 160, '#9747FFFF'),
-  },
-  overrides: {},
-})
+  })
 
 test("typing into a button's label grows the button and moves the tile after it along", async ({ browser }) => {
   const { page, errors } = await openStage(browser, design())

@@ -4,7 +4,7 @@
 import type { Rect } from '@dazbee/schema'
 
 import { type Camera, toScreen, toWorld, type Viewport } from './camera.ts'
-import type { Frame } from './grid.ts'
+import type { Frame } from './frames.ts'
 
 /** The rulers' thickness, in CSS pixels. */
 const RULER_SIZE = 20

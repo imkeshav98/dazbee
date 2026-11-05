@@ -1,7 +1,7 @@
 // Auto layout (#46), solved while a scene is built so the editor, exports and the server lay out
-// alike, per format. A box with `layout` places the children in its flow, in a row or a column,
+// alike. A box with `layout` places the children in its flow, in a row or a column,
 // sizing each one fixed, hugging what it holds or filling the room left; children marked
-// `absolute` stay where they are put. Boxes stay in page space and unturned: a turned box turns
+// `absolute` stay where they are put. Boxes stay in frame space and unturned: a turned box turns
 // its laid-out children about its centre when drawn, as it does any child.
 import type { AutoLayout, TextProps } from '@dazbee/schema'
 

@@ -125,7 +125,7 @@ export const duplicateDesign = (brandId: string, designId: string) =>
 export const deleteDesign = (brandId: string, designId: string) =>
   call(z.null(), `/brands/${encodeURIComponent(brandId)}/designs/${encodeURIComponent(designId)}`, { method: 'DELETE' })
 
-/** The size of a design's primary format (#84), read without drawing, or null when it has nothing to show. */
+/** The size of a design's cover frame (#84), read without drawing, or null when it has nothing to show. */
 export async function designCover(brandId: string, designId: string) {
   try {
     return await call(

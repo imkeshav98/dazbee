@@ -2,9 +2,9 @@
 // auto layout, combine, reorder, lock and hide, align and distribute, nudge, select all, zoom and
 // the tools.
 import { childrenOf, descendants, type Session } from '@dazbee/doc'
-import { type Design, formatScope, LOCK_FLAGS, type Rect } from '@dazbee/schema'
+import { type Design, LOCK_FLAGS, type Rect } from '@dazbee/schema'
 
-import { type Frame, frameKey, scope } from './canvas/grid.ts'
+import type { Frame } from './canvas/frames.ts'
 import type { FrameScenes } from './canvas/scenes.ts'
 import type { EditorView } from './canvas/view.ts'
 import type { EditorAutoLayoutDrag } from './gestures/auto-layout-drag.ts'
@@ -25,9 +25,9 @@ export interface ActionsDeps {
   view: Pick<
     EditorView,
     | 'design'
-    | 'frames'
     | 'frameOf'
-    | 'firstPage'
+    | 'page'
+    | 'nearestFrame'
     | 'fitAll'
     | 'fitArea'
     | 'zoomTo'
@@ -41,6 +41,7 @@ export interface ActionsDeps {
     EditorSelection,
     | 'current'
     | 'entered'
+    | 'lastFrameOn'
     | 'pickedPage'
     | 'cropping'
     | 'pathEditing'
@@ -58,7 +59,7 @@ export interface ActionsDeps {
   pen: Pick<EditorPen, 'drawing' | 'finish' | 'deletePoints'>
   transformDrag: Pick<EditorTransformDrag, 'writeBoxes'>
   autoLayoutDrag: Pick<EditorAutoLayoutDrag, 'nudge'>
-  /** Tells the page that auto layout places some of the layers an align or distribute would move. */
+  /** Tells the app that auto layout places some of the layers an align or distribute would move. */
   notify: (notice: 'placedByLayout') => void
   /** Draws the overlay. */
   drawOverlay: () => void
@@ -71,19 +72,17 @@ export interface EditorActions {
    * open on the stage first: they do nothing here.
    */
   perform(action: ShortcutAction): boolean
-  /** Fits the selection in view, or every frame with nothing selected. */
+  /** Fits the selection in view, or the shown page's frames with nothing selected. */
   fitSelection(): void
-  /** Hides layers in every format, or shows them in every one. One undo step. */
-  hideInEveryFormat(ids: string[], hidden: boolean): boolean
 }
 
 export function editorActions({
   session,
   view: {
     design: drawn,
-    frames,
     frameOf,
-    firstPage,
+    page,
+    nearestFrame,
     fitAll,
     fitArea,
     zoomTo,
@@ -112,15 +111,10 @@ export function editorActions({
     fitArea({ x: frame.x + b.x, y: frame.y + b.y, width: b.width, height: b.height })
   }
 
-  /** Hides layers in every format, or shows them in every one: the base, with each format's own visibility gone. One undo step. */
-  function hideInEveryFormat(ids: string[], hidden: boolean) {
-    return runQuietly(() => session.run('node.visibleEverywhere', { ids, visible: !hidden }))
-  }
-
   /** Combines the selected shapes into a live boolean (#44) and selects it. One undo step. */
   function combine(op: 'union' | 'subtract' | 'intersect' | 'exclude') {
     const current = selection.current()
-    const frame = current && frameOf(current.frame)
+    const frame = current && frameOf(current.frameId)
     if (!frame) return
     let id = ''
     if (
@@ -128,11 +122,11 @@ export function editorActions({
         id = session.run('node.boolean', {
           ids: boxes.roots(),
           op,
-          drawn: boxes.drawnInFlow(boxes.roots(), frame.pageId),
+          drawn: boxes.drawnInFlow(boxes.roots()),
         })
       })
     )
-      selection.select([id], frame.key)
+      selection.select([id], frame.id)
   }
 
   /**
@@ -141,29 +135,22 @@ export function editorActions({
    */
   function arrange(offsets: (boxes: Rect[], within: Rect) => Offset[]) {
     const current = selection.current()
-    const frame = current && frameOf(current.frame)
-    const format = frame && drawn().formats[frame.formatId]
-    if (!frame || !format) return false
+    const frame = current && frameOf(current.frameId)
+    if (!frame) return false
     const now = session.design()
     const ids = boxes.roots(now)
-    if (ids.some((id) => inFlow(frame, id, now))) notify('placedByLayout')
-    const free = ids.filter((id) => !inFlow(frame, id, now))
+    if (ids.some((id) => inFlow(id, now))) notify('placedByLayout')
+    const free = ids.filter((id) => !inFlow(id, now))
     if (free.length === 0) return true
-    return arrangeFree(frame, format, free, offsets, now)
+    return arrangeFree(frame, free, offsets, now)
   }
   /** Align or distribute layers that aren't in a flow. */
-  function arrangeFree(
-    frame: Frame,
-    format: { width: number; height: number },
-    ids: string[],
-    offsets: (boxes: Rect[], within: Rect) => Offset[],
-    now: Design,
-  ) {
+  function arrangeFree(frame: Frame, ids: string[], offsets: (boxes: Rect[], within: Rect) => Offset[], now: Design) {
     const start = boxes.startBoxes(frame, ids)
-    // One layer lines up with what holds it: its group or box, or the format.
+    // One layer lines up with what holds it: its group or box, or the frame.
     const parent = now.nodes[ids[0] ?? '']?.parentId
     const holder = parent && now.nodes[parent] ? boxes.boxIn(frame, parent, now) : null
-    const within = holder ?? { x: 0, y: 0, width: format.width, height: format.height }
+    const within = holder ?? { x: 0, y: 0, width: frame.width, height: frame.height }
     const moves = offsets(
       ids.map((id) => boundsOf([start.get(id) as Box])),
       within,
@@ -185,19 +172,19 @@ export function editorActions({
   const alignTo = (to: Alignment) => arrange((boxes, within) => align(boxes, to, within))
   const distributeAlong = (axis: Distribution) => arrange((boxes) => distribute(boxes, axis))
 
-  /** Moves the selection by whole pixels in its format, one undo step per press. */
+  /** Moves the selection by whole pixels in its frame, one undo step per press. */
   function nudge(dx: number, dy: number) {
     const current = selection.current()
-    const frame = current && frameOf(current.frame)
+    const frame = current && frameOf(current.frameId)
     if (!frame) return
     const ids = boxes.roots()
     const now = session.design()
-    if (ids.some((id) => inFlow(frame, id, now))) {
-      autoLayoutDrag.nudge(frame, ids, dx, dy, now)
+    if (ids.some((id) => inFlow(id, now))) {
+      autoLayoutDrag.nudge(ids, dx, dy, now)
       return
     }
     const start = boxes.startBoxes(frame, ids)
-    // Arrows move along the page as drawn, also inside a turned group.
+    // Arrows move along the frame as drawn, also inside a turned group.
     const around = boxes.selectionBox()?.around ?? []
     const step = localTo(
       { x: dx, y: dy },
@@ -213,17 +200,22 @@ export function editorActions({
     })
   }
 
-  /** The top-level layers of the selection's page, or the first page's, that can be picked. */
+  /** The top-level layers of the selection's frame, or else of the shown page's first frame, that can be picked. */
+  /**
+   * Selects every top-level layer that can be picked in the selection's frame; with nothing
+   * selected, in the frame last selected in on the shown page, else the frame nearest the middle
+   * of the view.
+   */
   function selectAll() {
     const frame =
-      frameOf(selection.current()?.frame) ?? frameOf(frameKey(firstPage(), drawn().meta.primaryFormatId)) ?? frames()[0]
+      frameOf(selection.current()?.frameId) ?? frameOf(selection.lastFrameOn(page()) ?? undefined) ?? nearestFrame()
     if (!frame) return
     selection.select(
       scenes
         .scene(frame)
         .layers.filter(boxes.pickable)
         .map((layer) => layer.id),
-      frame.key,
+      frame.id,
     )
   }
 
@@ -289,18 +281,18 @@ export function editorActions({
       return true
     }
     const current = selection.current()
-    const frame = current && frameOf(current.frame)
+    const frame = current && frameOf(current.frameId)
     if (!current || !frame) return false
     const ids = boxes.roots()
     const nodes = session.design().nodes
     const far = action.endsWith('Far') ? NUDGE_FAR : NUDGE
     switch (action) {
       case 'deselect': {
-        // Out of a group or box one level at a time: it gets selected, then the page.
+        // Out of a group or box one level at a time: it gets selected, then nothing.
         const up = selection.entered()
         const parent = up ? drawn().nodes[up]?.parentId : undefined
         selection.enter(parent && drawn().nodes[parent] ? parent : null)
-        selection.select(up ? [up] : [], frame.key)
+        selection.select(up ? [up] : [], frame.id)
         break
       }
       case 'delete': {
@@ -313,17 +305,17 @@ export function editorActions({
             }),
           )
         )
-          selection.select([], frame.key)
+          selection.select([], frame.id)
         break
       }
       case 'group': {
         let group = ''
         if (
           runQuietly(() => {
-            group = session.run('node.group', { ids, drawn: boxes.drawnInFlow(ids, frame.pageId) })
+            group = session.run('node.group', { ids, drawn: boxes.drawnInFlow(ids) })
           })
         )
-          selection.select([group], frame.key)
+          selection.select([group], frame.id)
         break
       }
       case 'alignLeft':
@@ -354,8 +346,8 @@ export function editorActions({
         // Enter on one layer with an image fill crops it (#48); on one path, it goes into its points (#45).
         const [only] = current.ids
         if (current.ids.length !== 1 || !only || nodes[only]?.lock?.style) return false
-        if (boxes.cropTarget(frame, only)) selection.crop({ id: only, frame: frame.key })
-        else if (isPath(session.design(), only)) selection.editPath({ id: only, frame: frame.key })
+        if (boxes.cropTarget(frame, only)) selection.crop({ id: only, frameId: frame.id })
+        else if (isPath(session.design(), only)) selection.editPath({ id: only, frameId: frame.id })
         else return false
         break
       }
@@ -371,23 +363,23 @@ export function editorActions({
         if (
           runQuietly(() =>
             session.gesture(() => {
-              group = session.run('node.group', { ids, drawn: boxes.drawnInFlow(ids, frame.pageId) })
+              group = session.run('node.group', { ids, drawn: boxes.drawnInFlow(ids) })
               const [[bottom] = []] = childrenOf(session.design(), group)
               if (bottom) session.run('node.mask', { ids: [bottom], mask: 'alpha' })
             }),
           )
         )
-          selection.select([group], frame.key)
+          selection.select([group], frame.id)
         break
       }
       case 'boxSelection': {
         let boxed = ''
         if (
           runQuietly(() => {
-            boxed = session.run('node.box', { ids, drawn: boxes.drawnInFlow(ids, frame.pageId) })
+            boxed = session.run('node.box', { ids, drawn: boxes.drawnInFlow(ids) })
           })
         )
-          selection.select([boxed], frame.key)
+          selection.select([boxed], frame.id)
         break
       }
       case 'autoLayout': {
@@ -412,13 +404,13 @@ export function editorActions({
         if (
           runQuietly(() =>
             session.gesture(() => {
-              boxed = session.run('node.box', { ids, drawn: boxes.drawnInFlow(ids, frame.pageId) })
+              boxed = session.run('node.box', { ids, drawn: boxes.drawnInFlow(ids) })
               session.run('node.autoLayout', { id: boxed, on: true })
               session.run('node.update', { ids: [boxed], patch: { sizing: { width: 'hug', height: 'hug' } } })
             }),
           )
         )
-          selection.select([boxed], frame.key)
+          selection.select([boxed], frame.id)
         break
       }
       case 'booleanUnion':
@@ -443,7 +435,7 @@ export function editorActions({
             freed = session.run('node.ungroup', { ids: groups })
           })
         ) {
-          selection.select([...ids.filter((id) => !groups.includes(id)), ...freed], frame.key)
+          selection.select([...ids.filter((id) => !groups.includes(id)), ...freed], frame.id)
         }
         break
       }
@@ -454,7 +446,7 @@ export function editorActions({
             copies = session.run('node.duplicate', { ids })
           })
         )
-          selection.select(copies, frame.key)
+          selection.select(copies, frame.id)
         break
       }
       case 'bringForward':
@@ -481,22 +473,9 @@ export function editorActions({
         break
       }
       case 'hide': {
-        // Hidden in this format only, like a move; the layer stays selected so it can be shown again.
-        const shown = current.ids.some((id) => visibleIn(session.design(), frame, id))
-        runQuietly(() =>
-          session.run('node.update', { ids: current?.ids ?? [], scope: scope(frame), patch: { visible: !shown } }),
-        )
-        break
-      }
-      case 'hideEverywhere': {
-        // Shown in any format: hidden in every one; hidden in all of them: shown in every one.
-        const now = session.design()
-        const shown = current.ids.some((id) =>
-          Object.keys(now.formats).some(
-            (f) => (now.overrides[formatScope(f)]?.[id]?.visible ?? now.nodes[id]?.props.visible) !== false,
-          ),
-        )
-        hideInEveryFormat(current.ids, shown)
+        // Hidden in its frame, its linked copies left as they are; the layer stays selected so it can be shown again.
+        const shown = current.ids.some((id) => visibleIn(session.design(), id))
+        runQuietly(() => session.run('node.update', { ids: current?.ids ?? [], patch: { visible: !shown } }))
         break
       }
       case 'nudgeLeft':
@@ -525,6 +504,5 @@ export function editorActions({
   return {
     perform,
     fitSelection,
-    hideInEveryFormat,
   }
 }

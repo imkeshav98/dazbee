@@ -1,50 +1,63 @@
 import { z } from 'zod'
 
-import { Format } from './formats.ts'
 import { canHold, Layer } from './layers.ts'
-import { checkOverride, type Fail, formatIdOf, Overrides, withOverrideDefaults } from './overrides.ts'
 import { Paint } from './paint.ts'
-import { FormatId, FractionalIndex, NodeId, PageId } from './primitives.ts'
+import { FractionalIndex, FrameId, NodeId, PageId } from './primitives.ts'
 import type { Variables } from './variables.ts'
 
 export const Page = z.object({
   name: z.string(),
+  /** Orders the design's pages. */
   order: FractionalIndex,
-  /** Paints behind every layer on the page. */
-  fills: Paint.array().default([]),
 })
 export type Page = z.infer<typeof Page>
+
+/** One ad, post or other piece of creative at one size, placed on a page. It owns its layers. */
+export const Frame = z.object({
+  pageId: PageId,
+  name: z.string(),
+  width: z.number().int().positive(),
+  height: z.number().int().positive(),
+  /** Where the frame's top start corner sits on its page, in design pixels. */
+  x: z.number(),
+  y: z.number(),
+  /** Paints behind every layer in the frame: its background. */
+  fills: Paint.array().default([]),
+  /** Orders the frames of one page: the layers panel and Export list them in it. */
+  order: FractionalIndex,
+})
+export type Frame = z.infer<typeof Frame>
 
 export const DesignMeta = z.object({
   designId: z.string().min(1),
   name: z.string(),
-  kind: z.enum(['single', 'carousel', 'story', 'document']),
-  primaryFormatId: FormatId,
 })
 export type DesignMeta = z.infer<typeof DesignMeta>
 
-/** Everything in a design but its layers and overrides: small, so always validated whole. */
+/** Everything in a design but its layers: small, so always validated whole. */
 export const DesignHead = z.object({
   meta: DesignMeta,
-  formats: z.record(FormatId, Format),
   pages: z.record(PageId, Page),
+  frames: z.record(FrameId, Frame),
 })
 export type DesignHead = z.infer<typeof DesignHead>
 
 export const DesignShape = z.object({
   ...DesignHead.shape,
   nodes: z.record(NodeId, Layer),
-  overrides: Overrides.default({}),
 })
 export type DesignShape = z.infer<typeof DesignShape>
 
 export const Design = DesignShape.superRefine((d, ctx) =>
-  checkDesign(d, (path, message) => ctx.addIssue({ code: 'custom', path, message })),
-).transform(withOverrideDefaults)
+  checkStructure(d, (path, message) => ctx.addIssue({ code: 'custom', path, message })),
+)
 export type Design = z.infer<typeof Design>
 export type DesignInput = z.input<typeof Design>
 
 export type ParseResult = { success: true; design: Design } | { success: false; errors: string[] }
+
+/** Reports one broken rule: where in the design, and what is wrong. */
+export type Fail = (path: PropertyKey[], message: string) => void
 
 /** Validates untrusted JSON as a design. Errors read `path: message`. */
 export function parseDesign(input: unknown): ParseResult {
@@ -56,7 +69,7 @@ export function parseDesign(input: unknown): ParseResult {
   }
 }
 
-/** Every asset an image fill of the design names, on pages, layers or format overrides, sorted. */
+/** Every asset an image fill of the design names, on frames and layers, sorted. */
 export function imageAssetIds(design: Design): string[] {
   const ids = new Set<string>()
   const add = (fills: unknown) => {
@@ -68,22 +81,19 @@ export function imageAssetIds(design: Design): string[] {
       }
     }
   }
-  for (const page of Object.values(design.pages)) add(page.fills)
+  for (const frame of Object.values(design.frames)) add(frame.fills)
   for (const node of Object.values(design.nodes)) add((node.props as { fills?: unknown }).fills)
-  for (const byNode of Object.values(design.overrides)) {
-    for (const values of Object.values(byNode)) add(values.fills)
-  }
   return [...ids].sort()
 }
 
 /**
- * Every font family the design's text names, in base styles, runs and format overrides, sorted
- * (#50): the families the editor and exports load. Fallback families are not among them. With the
- * brand's variables, the families of brand fonts text is bound to are among them too (#53).
+ * Every font family the design's text names, in base styles and runs, sorted: the families the
+ * editor and exports load. Fallback families are not among them. With the brand's variables, the
+ * families of brand fonts text is bound to are among them too.
  */
 export function fontFamilies(design: Design, variables?: Variables): string[] {
   const families = new Set<string>()
-  // A font family bound to a brand font draws in the brand's family (#53).
+  // A font family bound to a brand font draws in the brand's family.
   for (const node of Object.values(design.nodes)) {
     const ref = node.type === 'text' ? node.bindings?.fontFamily : undefined
     const bound = ref ? variables?.[ref]?.trim() : undefined
@@ -93,27 +103,34 @@ export function fontFamilies(design: Design, variables?: Variables): string[] {
     const family = style && typeof style === 'object' ? (style as { fontFamily?: unknown }).fontFamily : undefined
     if (typeof family === 'string' && family) families.add(family)
   }
-  const addText = (values: { style?: unknown; runs?: unknown }) => {
-    addStyle(values.style)
-    if (Array.isArray(values.runs)) for (const run of values.runs) addStyle((run as { style?: unknown } | null)?.style)
-  }
-  for (const node of Object.values(design.nodes)) if (node.type === 'text') addText(node.props)
-  for (const byNode of Object.values(design.overrides)) {
-    for (const [id, values] of Object.entries(byNode)) if (design.nodes[id]?.type === 'text') addText(values)
+  for (const node of Object.values(design.nodes)) {
+    if (node.type !== 'text') continue
+    addStyle(node.props.style)
+    for (const run of node.props.runs) addStyle(run.style)
   }
   return [...families].sort()
 }
 
-/** The rules about the design's shape: the primary format, pages, parents and cycles. */
-export function checkStructure(d: Pick<DesignShape, 'meta' | 'formats' | 'pages' | 'nodes'>, fail: Fail) {
-  if (!d.formats[d.meta.primaryFormatId]) fail(['meta', 'primaryFormatId'], `no format "${d.meta.primaryFormatId}"`)
+/**
+ * The rules about the design's shape: it has a page; every frame's page exists; every layer's
+ * chain of parents ends at a frame, through layers that can hold what they hold; and no frame
+ * holds two layers with one link id.
+ */
+export function checkStructure(d: Pick<DesignShape, 'pages' | 'frames' | 'nodes'>, fail: Fail) {
   if (Object.keys(d.pages).length === 0) fail(['pages'], 'a design needs a page')
+  for (const [id, frame] of Object.entries(d.frames)) {
+    if (!Object.hasOwn(d.pages, frame.pageId)) fail(['frames', id, 'pageId'], `no page "${frame.pageId}"`)
+  }
 
+  const layer = (id: string) => (Object.hasOwn(d.nodes, id) ? d.nodes[id] : undefined)
+  const isFrame = (id: string) => Object.hasOwn(d.frames, id)
+  /** The first holder of each link id, by frame. */
+  const holders = new Map<string, Map<string, string>>()
   for (const [id, node] of Object.entries(d.nodes)) {
-    if (d.pages[id]) fail(['nodes', id], `"${id}" is both a page and a layer`)
-    const parent = d.nodes[node.parentId]
-    if (!d.pages[node.parentId] && !parent) {
-      fail(['nodes', id, 'parentId'], `parent "${node.parentId}" is neither a page nor a layer`)
+    if (isFrame(id)) fail(['nodes', id], `"${id}" is both a frame and a layer`)
+    const parent = layer(node.parentId)
+    if (!isFrame(node.parentId) && !parent) {
+      fail(['nodes', id, 'parentId'], `parent "${node.parentId}" is neither a frame nor a layer`)
     } else if (parent && !canHold(parent.type, node.type)) {
       fail(
         ['nodes', id, 'parentId'],
@@ -122,25 +139,23 @@ export function checkStructure(d: Pick<DesignShape, 'meta' | 'formats' | 'pages'
           : `parent "${node.parentId}" is a ${parent.type}, which can't hold layers`,
       )
     }
-    // Walk up towards the page. Reaching this layer again means it is inside itself; reaching
+    // Walk up towards the frame. Reaching this layer again means it is inside itself; reaching
     // another repeat means a cycle above it, which is reported for the layers in that cycle.
     const seen = new Set<string>()
-    for (let up = node.parentId; d.nodes[up] && !seen.has(up); up = d.nodes[up]?.parentId ?? '') {
-      if (up === id) {
-        fail(['nodes', id, 'parentId'], `"${id}" is inside itself`)
-        break
-      }
+    let up = node.parentId
+    let loops = false
+    for (let above = layer(up); above; above = layer(up)) {
+      if (up === id) fail(['nodes', id, 'parentId'], `"${id}" is inside itself`)
+      loops = up === id || seen.has(up)
+      if (loops) break
       seen.add(up)
+      up = above.parentId
     }
-  }
-}
-
-/** The rules no single part can check alone: parents, cycles, and overrides against their layers. */
-function checkDesign(d: DesignShape, fail: Fail) {
-  checkStructure(d, fail)
-  for (const [scope, byNode] of Object.entries(d.overrides)) {
-    const formatId = formatIdOf(scope) ?? ''
-    if (!d.formats[formatId]) fail(['overrides', scope], `no format "${formatId}"`)
-    for (const [nodeId, props] of Object.entries(byNode)) checkOverride(scope, nodeId, d.nodes[nodeId], props, fail)
+    if (loops || !isFrame(up)) continue
+    const links = holders.get(up) ?? new Map<string, string>()
+    holders.set(up, links)
+    const first = links.get(node.link)
+    if (first === undefined) links.set(node.link, id)
+    else fail(['nodes', id, 'link'], `frame "${up}" holds link "${node.link}" twice, also on "${first}"`)
   }
 }

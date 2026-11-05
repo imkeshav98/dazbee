@@ -25,25 +25,19 @@ const fonts = await Promise.all(
 const webglSurfaces = new Map<string, Surface>()
 
 /**
- * Renders one page and format and returns raw RGBA pixels as base64. CPU goes through the export
- * seam; WebGL draws as the editor screen will, and is read back here only to measure its drift.
+ * Renders one frame and returns raw RGBA pixels as base64. CPU goes through the export seam;
+ * WebGL draws as the editor screen will, and is read back here only to measure its drift.
  */
-async function renderFixture(
-  json: unknown,
-  pageId: string,
-  formatId: string,
-  surface: 'cpu' | 'webgl',
-  assetIds: string[],
-) {
+async function renderFixture(json: unknown, frameId: string, surface: 'cpu' | 'webgl', assetIds: string[]) {
   const resources = await resourcesFor(assetIds)
   if (surface === 'cpu') {
-    const { width, height, pixels } = renderDesign(ck, json, pageId, formatId, resources)
+    const { width, height, pixels } = renderDesign(ck, json, frameId, resources)
     return { width, height, pixels: toBase64(pixels) }
   }
-  const format = (json as { formats: Record<string, { width: number; height: number } | undefined> }).formats[formatId]
-  if (!format) throw new Error(`no format "${formatId}"`)
-  const gl = webglSurface(format.width, format.height)
-  const { width, height } = drawDesign(ck, gl, json, pageId, formatId, resources)
+  const frame = (json as { frames: Record<string, { width: number; height: number } | undefined> }).frames[frameId]
+  if (!frame) throw new Error(`no frame "${frameId}"`)
+  const gl = webglSurface(frame.width, frame.height)
+  const { width, height } = drawDesign(ck, gl, json, frameId, resources)
   const image = gl.makeImageSnapshot()
   const pixels = image.readPixels(0, 0, {
     width,
@@ -57,14 +51,9 @@ async function renderFixture(
   return { width, height, pixels: toBase64(pixels) }
 }
 
-/** One page in one format exported as PNG, JPG, PDF or SVG, the file's bytes as base64 (#55, #56). */
-async function exportFixture(json: unknown, pageId: string, formatId: string, type: ExportType, assetIds: string[]) {
-  const file = exportDesign(
-    ck,
-    json,
-    { pageIds: [pageId], formatIds: [formatId], type, quality: 85 },
-    await resourcesFor(assetIds),
-  )
+/** One frame exported as PNG, JPG, PDF or SVG, the file's bytes as base64 (#55, #56). */
+async function exportFixture(json: unknown, frameId: string, type: ExportType, assetIds: string[]) {
+  const file = exportDesign(ck, json, { frameIds: [frameId], type, quality: 85 }, await resourcesFor(assetIds))
   return toBase64(file.bytes)
 }
 

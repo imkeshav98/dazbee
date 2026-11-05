@@ -16,17 +16,20 @@ const solid = (color: string) => [{ type: 'solid', color }]
 const stroke = (align: 'inside' | 'center' | 'outside') => [
   { paint: { type: 'solid', color: '#000000FF' }, width: 10, align },
 ]
-/** A 300 square page holding a 200 rounded rect, or a boolean of two overlapping squares, stroked 10 wide. */
+/** A 300 square frame holding a 200 rounded rect, or a boolean of two overlapping squares, stroked 10 wide. */
 const design = (align: 'inside' | 'center' | 'outside', kind: 'shape' | 'boolean') => ({
-  meta: { designId: 'd', name: 'Outside strokes', kind: 'single', primaryFormatId: 'f' },
-  formats: { f: { name: 'F', width: 300, height: 300, order: 'a0' } },
-  pages: { p1: { name: 'Page', order: 'a0', fills: solid('#FFFFFFFF') } },
+  meta: { designId: 'd', name: 'Outside strokes' },
+  pages: { p1: { name: 'Page', order: 'a0' } },
+  frames: {
+    f: { pageId: 'p1', name: 'F', width: 300, height: 300, x: 0, y: 0, fills: solid('#FFFFFFFF'), order: 'a0' },
+  },
   nodes:
     kind === 'shape'
       ? {
           box: {
             type: 'graphic',
-            parentId: 'p1',
+            parentId: 'f',
+            link: 'box',
             index: 'a0',
             name: 'Box',
             props: {
@@ -43,7 +46,8 @@ const design = (align: 'inside' | 'center' | 'outside', kind: 'shape' | 'boolean
       : {
           both: {
             type: 'boolean',
-            parentId: 'p1',
+            parentId: 'f',
+            link: 'both',
             index: 'a0',
             name: 'Both',
             props: {
@@ -59,6 +63,7 @@ const design = (align: 'inside' | 'center' | 'outside', kind: 'shape' | 'boolean
           a: {
             type: 'graphic',
             parentId: 'both',
+            link: 'a',
             index: 'a0',
             name: 'A',
             props: { x: 50, y: 50, width: 140, height: 140, shape: { kind: 'rect' }, fills: solid('#000000FF') },
@@ -66,19 +71,19 @@ const design = (align: 'inside' | 'center' | 'outside', kind: 'shape' | 'boolean
           b: {
             type: 'graphic',
             parentId: 'both',
+            link: 'b',
             index: 'a1',
             name: 'B',
             props: { x: 110, y: 110, width: 140, height: 140, shape: { kind: 'ellipse' }, fills: solid('#000000FF') },
           },
         },
-  overrides: {},
 })
 
 describe('outside strokes', () => {
   for (const kind of ['shape', 'boolean'] as const) {
     for (const align of ['inside', 'center', 'outside'] as const) {
       it(`a ${kind} with a stroke ${align} exports to SVG and PDF as drawn`, async () => {
-        const { cpu, pdf, svg } = await renderThreeWays(ck, pdfium, design(align, kind), 'p1', 'f', bytes)
+        const { cpu, pdf, svg } = await renderThreeWays(ck, pdfium, design(align, kind), 'f', bytes)
         const svgPercent = vectorDifference(cpu, svg)
         const pdfPercent = vectorDifference(cpu, pdf)
         console.log(`${kind} ${align}: SVG ${svgPercent.toFixed(3)}%, PDF ${pdfPercent.toFixed(3)}%`)
@@ -96,7 +101,8 @@ describe('outside strokes', () => {
       nodes: {
         star: {
           type: 'graphic',
-          parentId: 'p1',
+          parentId: 'f',
+          link: 'star',
           index: 'a0',
           name: 'Star',
           props: {
@@ -111,7 +117,7 @@ describe('outside strokes', () => {
         },
       },
     }
-    const { cpu, pdf, svg } = await renderThreeWays(ck, pdfium, json, 'p1', 'f', bytes)
+    const { cpu, pdf, svg } = await renderThreeWays(ck, pdfium, json, 'f', bytes)
     // Just inside the star's middle, which winds twice, 5 px below a line crossing it: the fill shows.
     expect(at(cpu, 150, 124)).toEqual([32, 80, 224])
     expect(at(svg, 150, 124)).toEqual([32, 80, 224])
@@ -120,11 +126,11 @@ describe('outside strokes', () => {
   })
 
   it('lies outside the edge only: inside it the fill shows, past it the stroke', () => {
-    const r = renderDesign(ck, design('outside', 'shape'), 'p1', 'f', bytes)
+    const r = renderDesign(ck, design('outside', 'shape'), 'f', bytes)
     // The left edge is at x 50; the stroke runs from 40 to 50.
     expect(at(r, 45, 150)).toEqual([0, 0, 0])
     expect(at(r, 55, 150)).toEqual([32, 80, 224])
-    const svg = rasteriseSvg(renderVector(ck, design('outside', 'shape'), 'p1', 'f', bytes, 'svg'))
+    const svg = rasteriseSvg(renderVector(ck, design('outside', 'shape'), 'f', bytes, 'svg'))
     expect(at(svg, 55, 150)).toEqual([32, 80, 224])
   })
 })

@@ -1,14 +1,13 @@
 import { describe, expect, it } from 'vitest'
 
-import { parseDesign } from '@dazbee/schema'
-
-import { loadDesign, openSession, readDesign } from '../index.ts'
-import { testDesign, testDoc } from '../test-design.ts'
+import { readDesign } from '../index.ts'
+import { openTestSession, testDoc } from '../test-design.ts'
 
 describe('text.edit', () => {
-  it('inserts, deletes and styles ranges of a text layer', () => {
+  it('inserts, deletes and styles ranges of a text layer; its linked copy keeps its own text', () => {
     const doc = testDoc()
-    const tab = openSession(doc)
+    const tab = openTestSession(doc)
+    const copy = readDesign(doc).nodes['banner-headline']
 
     tab.run('text.edit', { id: 'headline', op: { kind: 'insert', at: 11, text: '!' } })
     tab.run('text.edit', { id: 'headline', op: { kind: 'delete', at: 0, length: 7 } })
@@ -22,6 +21,7 @@ describe('text.edit', () => {
       { start: 0, end: 4, style: { fontWeight: 800, color: '#FF0000FF' } },
       { start: 4, end: 5, style: { fontWeight: 800 } },
     ])
+    expect(readDesign(doc).nodes['banner-headline']).toEqual(copy)
 
     expect(() => tab.run('text.edit', { id: 'box', op: { kind: 'delete', at: 0, length: 1 } })).toThrow(
       /"box" is a graphic, not a text layer/,
@@ -31,78 +31,37 @@ describe('text.edit', () => {
     )
   })
 
-  it("keeps a format's own runs on their characters as text is typed and deleted, and leaves a format with its own text be", () => {
-    const result = parseDesign({
-      ...testDesign(),
-      overrides: {
-        // The square's own runs: "Summer" bigger, "sale" in pink.
-        'format:sq': {
-          headline: {
-            runs: [
-              { start: 0, end: 6, style: { fontSize: 120 } },
-              { start: 7, end: 11, style: { color: '#FF3D6EFF' } },
-            ],
-          },
-        },
-        'format:banner': { headline: { text: 'Sale', runs: [{ start: 0, end: 4, style: { fontWeight: 800 } }] } },
-      },
-    })
-    if (!result.success) throw new Error(result.errors.join('\n'))
-    const doc = loadDesign(result.design)
-    const tab = openSession(doc)
-    const own = () => readDesign(doc).overrides['format:sq']?.headline?.runs
-    // Before every run: both move along.
-    tab.run('text.edit', { id: 'headline', op: { kind: 'insert', at: 0, text: 'Hot ' } })
-    expect(own()).toEqual([
-      { start: 4, end: 10, style: { fontSize: 120 } },
-      { start: 11, end: 15, style: { color: '#FF3D6EFF' } },
-    ])
-    // Inside a run, and at its end, as the text takes the character before's style: it grows.
-    tab.run('text.edit', { id: 'headline', op: { kind: 'insert', at: 7, text: 'mmm' } })
-    tab.run('text.edit', { id: 'headline', op: { kind: 'insert', at: 18, text: '!' } })
-    expect(readDesign(doc).nodes.headline?.props).toMatchObject({ text: 'Hot Summmmmer sale!' })
-    expect(own()).toEqual([
-      { start: 4, end: 13, style: { fontSize: 120 } },
-      { start: 14, end: 19, style: { color: '#FF3D6EFF' } },
-    ])
-    // A delete across a run's edge trims it; one across a whole run removes it.
-    tab.run('text.edit', { id: 'headline', op: { kind: 'delete', at: 10, length: 5 } })
-    expect(own()).toEqual([
-      { start: 4, end: 10, style: { fontSize: 120 } },
-      { start: 10, end: 14, style: { color: '#FF3D6EFF' } },
-    ])
-    tab.run('text.edit', { id: 'headline', op: { kind: 'delete', at: 9, length: 5 } })
-    expect(own()).toEqual([{ start: 4, end: 9, style: { fontSize: 120 } }])
-    // The banner's own text has its own runs, which the base's typing never moves.
-    expect(readDesign(doc).overrides['format:banner']?.headline?.runs).toEqual([
-      { start: 0, end: 4, style: { fontWeight: 800 } },
-    ])
-    // Each edit is one undo step, its runs with it.
+  it('edits a linked copy on its own, and each edit is one undo step', () => {
+    const doc = testDoc()
+    const tab = openTestSession(doc)
+    tab.run('text.edit', { id: 'banner-headline', op: { kind: 'insert', at: 4, text: '!' } })
+    expect(readDesign(doc).nodes['banner-headline']?.props).toMatchObject({ text: 'Sale!' })
+    expect(readDesign(doc).nodes.headline?.props).toMatchObject({ text: 'Summer sale' })
     tab.undo()
-    expect(own()).toEqual([
-      { start: 4, end: 10, style: { fontSize: 120 } },
-      { start: 10, end: 14, style: { color: '#FF3D6EFF' } },
-    ])
+    expect(readDesign(doc).nodes['banner-headline']?.props).toMatchObject({ text: 'Sale' })
   })
 })
 
 describe('text.fit', () => {
-  it('sizes a text box in each format, base from the primary, one undo step', () => {
+  it('sizes a text box, rounded, in one undo step; its linked copy stays as it was', () => {
     const doc = testDoc()
-    const tab = openSession(doc)
-    tab.run('text.fit', {
-      id: 'headline',
-      sizes: { sq: { width: 300, height: 90 }, banner: { width: 120, height: 40 } },
-    })
-    const d = readDesign(doc)
-    expect(d.nodes.headline?.props).toMatchObject({ width: 300, height: 90 })
-    expect(d.overrides['format:banner']?.headline).toMatchObject({ width: 120, height: 40 })
-    expect(d.overrides['format:sq']?.headline).toBeUndefined()
+    const tab = openTestSession(doc)
+    const copy = readDesign(doc).nodes['banner-headline']
+    tab.run('text.fit', { id: 'headline', width: 300.004, height: 90.456 })
+    expect(readDesign(doc).nodes.headline?.props).toMatchObject({ width: 300, height: 90.46 })
+    expect(readDesign(doc).nodes['banner-headline']).toEqual(copy)
     tab.undo()
-    expect(readDesign(doc).nodes.headline?.props).not.toMatchObject({ width: 300, height: 90 })
-    expect(() => tab.run('text.fit', { id: 'box', sizes: {} })).toThrow(/"box" is a graphic, not a text layer/)
-    expect(() => tab.run('text.fit', { id: 'headline', sizes: { story: { width: 1, height: 1 } } })).toThrow(
-      /no format "story"/,
+    expect(readDesign(doc).nodes.headline?.props).toMatchObject({ width: 960, height: 100 })
+    expect(() => tab.run('text.fit', { id: 'box', width: 1, height: 1 })).toThrow(
+      /"box" is a graphic, not a text layer/,
     )
+    expect(() => tab.run('text.fit', { id: 'headline', width: -1, height: 1 })).toThrow(/width/)
+  })
+
+  it('writes nothing when the box already fits', () => {
+    const doc = testDoc()
+    const tab = openTestSession(doc)
+    tab.run('text.fit', { id: 'headline', width: 960, height: 100.001 })
+    expect(tab.canUndo()).toBe(false)
   })
 })

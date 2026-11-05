@@ -7,7 +7,7 @@ import type { DesignInput } from '@dazbee/schema'
 
 import { api, photo, upload } from '../../support/assets.ts'
 import { writeOutput } from '../../support/editor.ts'
-import { API_URL, DEV_BRAND } from '../../support/seed.ts'
+import { API_URL, DEV_BRAND, frameDesign } from '../../support/seed.ts'
 import { openStage } from '../../support/stage.ts'
 import { expect, type Locator, type Page, test } from '../../support/test.ts'
 
@@ -16,35 +16,29 @@ test.describe.configure({ timeout: 120_000 })
 const run = randomUUID().slice(0, 8)
 /** The sneaker photo with bytes of its own after its end, so each is a new image. */
 const unique = (tag: string) => new Uint8Array(Buffer.concat([Buffer.from(photo), Buffer.from(`${run}-${tag}`)]))
-const design = (assetId?: string): DesignInput => ({
-  meta: {
-    designId: 'replaced-by-the-api',
+const design = (assetId?: string): DesignInput =>
+  frameDesign({
     name: 'Delete images',
-    kind: 'single',
-    primaryFormatId: 'sq',
-  },
-  formats: { sq: { name: 'Square', width: 1080, height: 1080, order: 'a0' } },
-  pages: { p1: { name: 'Page 1', order: 'a0', fills: [{ type: 'solid', color: '#FFF8F0FF' }] } },
-  nodes: assetId
-    ? {
-        photo: {
-          type: 'graphic',
-          parentId: 'p1',
-          index: 'a0',
-          name: 'Photo',
-          props: {
-            x: 100,
-            y: 100,
-            width: 600,
-            height: 400,
-            shape: { kind: 'rect' },
-            fills: [{ type: 'image', assetId, fit: 'fill' }],
+    fills: [{ type: 'solid', color: '#FFF8F0FF' }],
+    nodes: assetId
+      ? {
+          photo: {
+            type: 'graphic',
+            parentId: 'sq',
+            index: 'a0',
+            name: 'Photo',
+            props: {
+              x: 100,
+              y: 100,
+              width: 600,
+              height: 400,
+              shape: { kind: 'rect' },
+              fills: [{ type: 'image', assetId, fit: 'fill' }],
+            },
           },
-        },
-      }
-    : {},
-  overrides: {},
-})
+        }
+      : {},
+  })
 /** Whether the library lists the asset. */
 const listed = async (id: string) =>
   ((await (await fetch(`${API_URL}/brands/${DEV_BRAND}/assets`)).json()) as { id: string }[]).some((a) => a.id === id)

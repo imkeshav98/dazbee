@@ -1,13 +1,13 @@
 // Small pictures of layers and pages for the panels, and of images for the crop: drawn on the CPU
 // surface, never the stage's WebGL one (ADR-0005), and kept until what they show changes.
 import type { CanvasKit, Image } from '@dazbee/canvaskit'
-import { drawPage, type Resources, type Scene, type SceneLayer } from '@dazbee/renderer'
-import type { Design } from '@dazbee/schema'
+import { frameIdOf } from '@dazbee/doc'
+import { drawFrame, type Resources, type Scene, type SceneLayer } from '@dazbee/renderer'
+import { type Design, framesOf } from '@dazbee/schema'
 
 import { boundsOf } from '../layers/transform.ts'
 import type { EditorResources } from '../resources.ts'
-import type { EditorSelection } from '../selection.ts'
-import { type Frame, frameKey } from './grid.ts'
+import { type Frame, frameIn } from './frames.ts'
 import { findLayer, type FrameScenes } from './scenes.ts'
 
 export interface ThumbnailsDeps {
@@ -18,39 +18,26 @@ export interface ThumbnailsDeps {
   current: () => Design
   /** The design as last drawn. */
   drawn: () => Design
-  selection: Pick<EditorSelection, 'current'>
-  /** The frame of the grid as last drawn with a key, if there is one. */
-  frameOf: (key: string | undefined) => Frame | undefined
-  /** The first page of the grid as last drawn. */
-  firstPage: () => string
 }
 
 export interface ThumbnailCache {
   /**
-   * A small picture of one layer as a frame shows it, without its own effects (the tiles show
+   * A small picture of one layer as its frame shows it, without its own effects (the tiles show
    * those): a PNG object URL, `size` pixels square. Text is "Aa" in its look, outlined with no
-   * fill when asked. Null when the layer isn't in the frame or draws nothing there. The frame is
-   * `inFrame`, as `<pageId>/<formatId>`, else the one the selection is in, else the first page in
-   * the primary format.
+   * fill when asked. Null when the layer is in no frame or draws nothing there.
    */
-  layer(id: string, size?: number, outlined?: boolean, inFrame?: string): string | null
-  /** A small picture of a page in its primary format, as the stage draws it, `size` pixels on its longer side. */
+  layer(id: string, size?: number, outlined?: boolean): string | null
+  /**
+   * A small picture of a page's first frame, as the stage draws it, `size` pixels on its longer
+   * side, whether the page is shown or not. Null for a page with no frames.
+   */
   page(pageId: string, size?: number): string | null
   /** An image as a URL, for the crop's faint whole image. */
   ghost(image: Image): string
   destroy(): void
 }
 
-export function thumbnailCache({
-  ck,
-  scenes,
-  resources,
-  current,
-  drawn,
-  selection,
-  frameOf,
-  firstPage,
-}: ThumbnailsDeps): ThumbnailCache {
+export function thumbnailCache({ ck, scenes, resources, current, drawn }: ThumbnailsDeps): ThumbnailCache {
   /**
    * Each layer's preview for the effect tiles, with what it was drawn from: its scene layer and the
    * fonts and images there were then, so one that arrives later draws it again.
@@ -100,7 +87,7 @@ export function thumbnailCache({
   function layerThumbnail(frame: Frame, id: string, size: number, outlined: boolean): string | null {
     const found = findLayer(scenes.scene(frame).layers, id)
     if (!found || found.props.mask) return null
-    const key = `${frame.key}/${id}${outlined ? '/outlined' : ''}@${size}`
+    const key = `${frame.id}/${id}${outlined ? '/outlined' : ''}@${size}`
     const kept = thumbnails.get(key)
     // Drawn with what the stage draws with: an image whose bytes are still coming is a placeholder.
     const drawWith = resources.screen(current())
@@ -121,17 +108,10 @@ export function thumbnailCache({
       )
       canvas.scale(scale, scale)
       const alone = { ...layer, props: { ...layer.props, effects: [] } } as SceneLayer
-      drawPage(
+      drawFrame(
         ck,
         canvas,
-        {
-          pageId: frame.pageId,
-          formatId: frame.formatId,
-          width: frame.width,
-          height: frame.height,
-          fills: [],
-          layers: [alone],
-        },
+        { frameId: frame.id, width: frame.width, height: frame.height, fills: [], layers: [alone] },
         drawWith,
       )
       const image = surface.makeImageSnapshot()
@@ -155,14 +135,14 @@ export function thumbnailCache({
   }
 
   /**
-   * A small picture of a page in one format, as the stage draws it, `size` pixels on its longer side:
-   * a PNG as an object URL, drawn on the CPU surface and kept until the page or what it is drawn
-   * with changes.
+   * A small picture of a page by its first frame, as the stage draws it, `size` pixels on its longer
+   * side: a PNG as an object URL, drawn on the CPU surface and kept until the frame or what it is
+   * drawn with changes.
    */
   function pageThumbnail(frame: Frame, size: number): string | null {
     const scene = scenes.scene(frame)
     const drawWith = resources.screen(current())
-    const key = `${frame.key}@${size}`
+    const key = `${frame.pageId}@${size}`
     const kept = pageThumbnails.get(key)
     if (kept?.scene === scene && kept.resources === drawWith) return kept.url
     const scale = size / Math.max(frame.width, frame.height, 1)
@@ -175,7 +155,7 @@ export function thumbnailCache({
       const canvas = surface.getCanvas()
       canvas.clear(ck.TRANSPARENT)
       canvas.scale(scale, scale)
-      drawPage(ck, canvas, scene, drawWith)
+      drawFrame(ck, canvas, scene, drawWith)
       const image = surface.makeImageSnapshot()
       const url = pngUrl(image)
       image.delete()
@@ -204,12 +184,15 @@ export function thumbnailCache({
   }
 
   function pageOf(pageId: string, size = 72): string | null {
-    const frame = frameOf(frameKey(pageId, drawn().meta.primaryFormatId))
+    const design = drawn()
+    const first = framesOf(design, pageId)[0]
+    const frame = first && frameIn(design, first[0])
     return frame ? pageThumbnail(frame, size) : null
   }
-  function layerIn(id: string, size = 96, outlined = false, inFrame?: string): string | null {
-    const frame =
-      frameOf(inFrame ?? selection.current()?.frame) ?? frameOf(frameKey(firstPage(), drawn().meta.primaryFormatId))
+  function layerIn(id: string, size = 96, outlined = false): string | null {
+    const design = drawn()
+    const frameId = frameIdOf(design, id)
+    const frame = frameId === undefined ? undefined : frameIn(design, frameId)
     return frame ? layerThumbnail(frame, id, size, outlined) : null
   }
 

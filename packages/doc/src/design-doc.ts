@@ -5,19 +5,19 @@ import { type Design, parseDesign } from '@dazbee/schema'
 import { repair } from './repair.ts'
 
 /**
- * How a design lives in a Y.Doc (ADR-0003). Every map is a Y.Map so each key merges on its own:
+ * How a design lives in a Y.Doc (ADR-0003, ADR-0014). Every map is a Y.Map so each key merges on its own:
  *
- *   meta       Y.Map<key, value>
- *   formats    Y.Map<FormatId, Y.Map<key, value>>
- *   pages      Y.Map<PageId, Y.Map<key, value>>
- *   nodes      Y.Map<NodeId, Y.Map>   type, parentId, index, name, role?, props: Y.Map<path, value>
- *                                     a text layer's `text` prop is a Y.Text whose formatting holds its runs
- *   overrides  Y.Map<"scope|nodeId|path", value>   flat, so two tabs overriding in a new scope never
- *                                                race to create the same nested map
+ *   meta    Y.Map<key, value>        designId, name
+ *   pages   Y.Map<PageId, Y.Map>     name, order
+ *   frames  Y.Map<FrameId, Y.Map>    pageId, name, width, height, x, y, fills, order
+ *   nodes   Y.Map<NodeId, Y.Map>     type, parentId, link, index, name, role?, lock?, bindings?,
+ *                                    props: Y.Map<path, value>; a text layer's `text` prop is a
+ *                                    Y.Text whose formatting holds its runs
  *
- * Deleted layers keep their Y.Map with `deleted: true`. Removing the map would make undo restore
- * it without the edits another tab made to it in the meantime, leaving required keys unset. Once
- * nobody is connected, compaction (compact.ts) drops them.
+ * A deleted page or frame is removed from its map. A deleted layer keeps its Y.Map with
+ * `deleted: true`: removing the map would make undo restore it without the edits another tab made
+ * to it in the meantime, leaving required keys unset. Once nobody is connected, compaction
+ * (compact.ts) drops them.
  */
 export type DesignDoc = Y.Doc
 
@@ -31,21 +31,12 @@ type Json = Record<string, unknown>
 
 export const DELETED = 'deleted'
 
-const SEP = '|'
-
 export const root = (doc: DesignDoc) => ({
   meta: doc.getMap<unknown>('meta'),
-  formats: doc.getMap<Y.Map<unknown>>('formats'),
   pages: doc.getMap<Y.Map<unknown>>('pages'),
+  frames: doc.getMap<Y.Map<unknown>>('frames'),
   nodes: doc.getMap<Y.Map<unknown>>('nodes'),
-  overrides: doc.getMap<unknown>('overrides'),
 })
-
-export const overrideKey = (scope: string, nodeId: string, path: string) => [scope, nodeId, path].join(SEP)
-export const splitOverrideKey = (key: string) => {
-  const [scope = '', nodeId = '', ...path] = key.split(SEP)
-  return { scope, nodeId, path: path.join(SEP) }
-}
 
 export const toYMap = (json: Json) => {
   const map = new Y.Map<unknown>()
@@ -71,14 +62,9 @@ export function loadDesign(design: Design, doc: DesignDoc = new Y.Doc()): Design
   const r = root(doc)
   doc.transact(() => {
     for (const [k, v] of Object.entries(design.meta)) r.meta.set(k, v)
-    for (const [id, f] of Object.entries(design.formats)) r.formats.set(id, toYMap(f))
     for (const [id, p] of Object.entries(design.pages)) r.pages.set(id, toYMap(p))
+    for (const [id, f] of Object.entries(design.frames)) r.frames.set(id, toYMap(f))
     for (const [id, n] of Object.entries(design.nodes)) r.nodes.set(id, toYNode(n))
-    for (const [scope, byNode] of Object.entries(design.overrides)) {
-      for (const [nodeId, props] of Object.entries(byNode)) {
-        for (const [path, value] of Object.entries(props)) r.overrides.set(overrideKey(scope, nodeId, path), value)
-      }
-    }
   })
   return doc
 }
@@ -106,12 +92,11 @@ export function snapshot(doc: DesignDoc) {
     Object.fromEntries([...m.entries()].map(([k, v]) => [k, f(v)]))
   return {
     meta: r.meta.toJSON(),
-    formats: mapOf(r.formats, (f) => f.toJSON()),
     pages: mapOf(r.pages, (p) => p.toJSON()),
+    frames: mapOf(r.frames, (f) => f.toJSON()),
     nodes: Object.fromEntries(
       [...r.nodes.entries()].filter(([, n]) => n.get(DELETED) !== true).map(([id, n]) => [id, nodeToJson(n)]),
     ),
-    overrides: nestOverrides(r.overrides),
   }
 }
 
@@ -159,25 +144,6 @@ function fromYText(ytext: Y.Text) {
     at = end
   }
   return { text: ytext.toString(), runs }
-}
-
-/** Built through Maps: an id such as `__proto__` from another tab stays a plain key. */
-function nestOverrides(flat: Y.Map<unknown>) {
-  const nested = new Map<string, Map<string, Map<string, unknown>>>()
-  for (const [key, value] of flat.entries()) {
-    const { scope, nodeId, path } = splitOverrideKey(key)
-    const byNode = nested.get(scope) ?? new Map<string, Map<string, unknown>>()
-    nested.set(scope, byNode)
-    const props = byNode.get(nodeId) ?? new Map<string, unknown>()
-    byNode.set(nodeId, props)
-    props.set(path, value)
-  }
-  return Object.fromEntries(
-    [...nested].map(([scope, byNode]) => [
-      scope,
-      Object.fromEntries([...byNode].map(([id, props]) => [id, Object.fromEntries(props)])),
-    ]),
-  )
 }
 
 function liveText(doc: DesignDoc, id: string) {

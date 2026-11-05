@@ -7,12 +7,13 @@ import type { DesignInput } from '@dazbee/schema'
 
 import { writeOutput } from '../../support/editor.ts'
 import { screenPoint } from '../../support/editor.ts'
+import { copyIn, frameDesign, linkedFrames, type Seeded } from '../../support/seed.ts'
 import { type Box, boxOf, click, dragScreen, handle, openStage, press, read, selection } from '../../support/stage.ts'
 import { expect, type Page, test } from '../../support/test.ts'
 
 test.describe.configure({ timeout: 120_000 })
 
-type Node = DesignInput['nodes'][string]
+type Node = Seeded
 const circle = (name: string, index: string): Node =>
   ({
     type: 'graphic',
@@ -51,96 +52,91 @@ const rect = (
     props: { x, y, width, height, shape: { kind: 'rect' }, fills: [{ type: 'solid', color }] },
   }) as Node
 
-const design = (): DesignInput => ({
-  meta: {
-    designId: 'replaced-by-the-api',
-    name: 'Gestures and layout',
-    kind: 'single',
-    primaryFormatId: 'sq',
-  },
-  formats: {
-    sq: { name: 'Square', width: 1080, height: 1080, order: 'a0' },
-    wide: { name: 'Wide', width: 1920, height: 1080, order: 'a1' },
-  },
-  pages: { p1: { name: 'Page 1', order: 'a0', fills: [{ type: 'solid', color: '#FFF8F0FF' }] } },
-  nodes: {
-    // Four circles in a row that wraps, the box as tall as they need.
-    row: {
-      type: 'box',
-      parentId: 'p1',
-      index: 'a0',
-      name: 'Row',
-      props: {
-        x: 60,
-        y: 60,
-        width: 520,
-        height: 140,
-        sizing: { width: 'fixed', height: 'hug' },
-        fills: [{ type: 'solid', color: '#EEF1F6FF' }],
-        layout: {
-          direction: 'row',
-          gap: 20,
-          padding: { top: 20, right: 20, bottom: 20, left: 20 },
-          wrap: true,
-          lineGap: 20,
+/** The layers in a square frame, and their linked copies in a wide frame. */
+const design = (): DesignInput =>
+  linkedFrames(
+    frameDesign({
+      name: 'Gestures and layout',
+      fills: [{ type: 'solid', color: '#FFF8F0FF' }],
+      nodes: {
+        // Four circles in a row that wraps, the box as tall as they need.
+        row: {
+          type: 'box',
+          parentId: 'sq',
+          index: 'a0',
+          name: 'Row',
+          props: {
+            x: 60,
+            y: 60,
+            width: 520,
+            height: 140,
+            sizing: { width: 'fixed', height: 'hug' },
+            fills: [{ type: 'solid', color: '#EEF1F6FF' }],
+            layout: {
+              direction: 'row',
+              gap: 20,
+              padding: { top: 20, right: 20, bottom: 20, left: 20 },
+              wrap: true,
+              lineGap: 20,
+            },
+          },
+        },
+        c0: circle('C0', 'a0'),
+        c1: circle('C1', 'a1'),
+        c2: circle('C2', 'a2'),
+        c3: circle('C3', 'a3'),
+        plain: {
+          type: 'box',
+          parentId: 'sq',
+          index: 'a1',
+          name: 'Plain',
+          props: { x: 660, y: 60, width: 340, height: 220, fills: [{ type: 'solid', color: '#1F2329FF' }] },
+        },
+        inner: rect('Inner', 'plain', 'a0', 700, 100, 120, 80, '#9747FFFF'),
+        grp: {
+          type: 'group',
+          parentId: 'sq',
+          index: 'a2',
+          name: 'Group',
+          props: { x: 660, y: 360, width: 300, height: 120 },
+        },
+        g0: rect('G0', 'grp', 'a0', 660, 360, 120, 120, '#FF2E7EFF'),
+        g1: rect('G1', 'grp', 'a1', 840, 360, 120, 120, '#2F6BFFFF'),
+        turned: {
+          type: 'box',
+          parentId: 'sq',
+          index: 'a3',
+          name: 'Turned',
+          props: {
+            x: 640,
+            y: 640,
+            width: 320,
+            height: 200,
+            rotation: 30,
+            clip: false,
+            fills: [{ type: 'solid', color: '#E8E0FFFF' }],
+          },
+        },
+        tchild: rect('Turned child', 'turned', 'a0', 680, 680, 100, 60, '#00A88AFF'),
+        label: {
+          type: 'text',
+          parentId: 'sq',
+          index: 'a4',
+          name: 'Label',
+          props: {
+            x: 60,
+            y: 560,
+            width: 300,
+            height: 66,
+            text: 'Fresh coffee',
+            boxMode: 'autoWidth',
+            style: { fontFamily: 'Noto Sans', fontSize: 48, fontWeight: 700, color: '#1F2329FF' },
+          },
         },
       },
-    },
-    c0: circle('C0', 'a0'),
-    c1: circle('C1', 'a1'),
-    c2: circle('C2', 'a2'),
-    c3: circle('C3', 'a3'),
-    plain: {
-      type: 'box',
-      parentId: 'p1',
-      index: 'a1',
-      name: 'Plain',
-      props: { x: 660, y: 60, width: 340, height: 220, fills: [{ type: 'solid', color: '#1F2329FF' }] },
-    },
-    inner: rect('Inner', 'plain', 'a0', 700, 100, 120, 80, '#9747FFFF'),
-    grp: {
-      type: 'group',
-      parentId: 'p1',
-      index: 'a2',
-      name: 'Group',
-      props: { x: 660, y: 360, width: 300, height: 120 },
-    },
-    g0: rect('G0', 'grp', 'a0', 660, 360, 120, 120, '#FF2E7EFF'),
-    g1: rect('G1', 'grp', 'a1', 840, 360, 120, 120, '#2F6BFFFF'),
-    turned: {
-      type: 'box',
-      parentId: 'p1',
-      index: 'a3',
-      name: 'Turned',
-      props: {
-        x: 640,
-        y: 640,
-        width: 320,
-        height: 200,
-        rotation: 30,
-        clip: false,
-        fills: [{ type: 'solid', color: '#E8E0FFFF' }],
-      },
-    },
-    tchild: rect('Turned child', 'turned', 'a0', 680, 680, 100, 60, '#00A88AFF'),
-    label: {
-      type: 'text',
-      parentId: 'p1',
-      index: 'a4',
-      name: 'Label',
-      props: {
-        x: 60,
-        y: 560,
-        width: 300,
-        height: 66,
-        text: 'Fresh coffee',
-        boxMode: 'autoWidth',
-        style: { fontFamily: 'Noto Sans', fontSize: 48, fontWeight: 700, color: '#1F2329FF' },
-      },
-    },
-  },
-  overrides: {},
-})
+    }),
+    [{ id: 'wide', name: 'Wide', width: 1920, height: 1080 }],
+  )
 
 const near = (a: Box, b: Box, what: string) => {
   for (const k of ['x', 'y', 'width', 'height'] as const)
@@ -190,15 +186,12 @@ test("an auto layout box resized from its handle keeps its circles' size and ref
     [200, 200],
   ])
   near(await boxOf(page, 'row'), { x: 60, y: 60, width: 320, height: 260 }, 'row')
-  const row = (await read(page)).overrides['format:sq']?.row as { width?: number; sizing?: unknown } | undefined
+  const row = (await read(page)).nodes.row?.props as { width?: number; sizing?: unknown } | undefined
   expect(row?.width).toBe(320)
   writeOutput('layout-resize-1-reflowed.png', await page.screenshot({ animations: 'disabled' }))
-  // The other format is as it was.
-  near(
-    await boxOf(page, 'row', { pageId: 'p1', formatId: 'wide' }),
-    { x: 60, y: 60, width: 520, height: 140 },
-    'row in wide',
-  )
+  // Its copy in the wide frame is as it was.
+  near(await boxOf(page, copyIn('wide', 'row')), { x: 60, y: 60, width: 520, height: 140 }, 'row in wide')
+  expect((await read(page)).nodes[copyIn('wide', 'row')]?.props.width).toBe(520)
   await press(page, 'undo')
   near(await boxOf(page, 'row'), { x: 60, y: 60, width: 520, height: 140 }, 'row after undo')
   expect(errors).toEqual([])
@@ -240,10 +233,10 @@ test('a child of auto layout: a resize fixes its size and the flow moves up; a d
   expect(await selection(page)).toEqual(['c0'])
   await dragHandle(page, 'e', 60, 0)
   expect((await boxOf(page, 'c0')).width).toBe(160)
-  expect((await read(page)).overrides['format:sq']?.c0?.sizing).toBeUndefined()
+  expect((await read(page)).nodes.c0?.props.sizing).toBeUndefined()
   expect((await boxOf(page, 'c1')).x).toBe(260)
   // Its place is the flow's: the resize wrote no position.
-  expect((await read(page)).overrides['format:sq']?.c0?.x).toBeUndefined()
+  expect((await read(page)).nodes.c0?.props.x).toBe(0)
   await press(page, 'undo')
 
   // Dragged past C2: it goes after it, a line showing where.
@@ -255,14 +248,11 @@ test('a child of auto layout: a resize fixes its size and the flow moves up; a d
 
   // Dragged out of the box: it leaves it, and lands where it was dropped.
   await dragDesign(page, { x: 130, y: 130 }, { x: 330, y: 830 }, 'layout-move-2-out.png')
-  expect((await read(page)).nodes.c0?.parentId).toBe('p1')
+  expect((await read(page)).nodes.c0?.parentId).toBe('sq')
   near(await boxOf(page, 'c0'), { x: 280, y: 780, width: 100, height: 100 }, 'c0 out')
-  // In the other format it stays where its flow had it.
-  near(
-    await boxOf(page, 'c0', { pageId: 'p1', formatId: 'wide' }),
-    { x: 80, y: 80, width: 100, height: 100 },
-    'c0 out in wide',
-  )
+  // Its copy in the wide frame stays in its flow, where it was.
+  expect((await read(page)).nodes[copyIn('wide', 'c0')]?.parentId).toBe(copyIn('wide', 'row'))
+  near(await boxOf(page, copyIn('wide', 'c0')), { x: 80, y: 80, width: 100, height: 100 }, 'c0 in wide')
   expect((await boxOf(page, 'c1')).x).toBe(80)
   writeOutput('layout-move-3-left.png', await page.screenshot({ animations: 'disabled' }))
   await press(page, 'undo')
@@ -276,8 +266,9 @@ test('auto width text resized takes the size given instead of snapping back', as
   expect(await selection(page)).toEqual(['label'])
   const was = await boxOf(page, 'label')
   await dragHandle(page, 'e', -120, 0)
-  const overrides = (await read(page)).overrides['format:sq']?.label as { boxMode?: string; width?: number }
-  expect(overrides.boxMode).toBe('autoHeight')
+  const label = (await read(page)).nodes.label?.props as { boxMode?: string; width?: number }
+  expect(label.boxMode).toBe('autoHeight')
+  expect((await read(page)).nodes[copyIn('wide', 'label')]?.props.boxMode).toBe('autoWidth')
   expect((await boxOf(page, 'label')).width).toBeCloseTo(was.width - 120, 0)
   // Taller than one line now, as it wraps in the width given.
   expect((await boxOf(page, 'label')).height).toBeGreaterThan(was.height)

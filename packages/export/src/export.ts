@@ -9,6 +9,8 @@ import {
   type ExportNameToken,
   ExportRequest,
   type ExportType,
+  type Frame,
+  type Page,
   parseDesign,
 } from '@dazbee/schema'
 
@@ -36,9 +38,10 @@ const UNSAFE_IN_NAMES = /[/\\:*?"<>|\u0000-\u001f]/g
 const TOKENS = new RegExp(`\\{(${EXPORT_NAME_TOKENS.join('|')})\\}`, 'g')
 
 /**
- * The request's pages in its formats, each one file, named from the request's template. One
- * file comes as itself; more come as one zip with a folder per format. `onFile` hears each file
- * as it is made, so a caller can show progress.
+ * The request's frames, in its order, each one file, named from the request's template; a name
+ * already taken, in any case, gets " 2", " 3" and so on. One file comes as itself; more come as
+ * one flat zip named after the design. `onFile` hears each file as it is made, so a caller can
+ * show progress.
  */
 export function exportDesign(
   ck: CanvasKit,
@@ -52,26 +55,23 @@ export function exportDesign(
   if (!parsed.success) throw new Error(`invalid design:\n${parsed.errors.join('\n')}`)
   const design = parsed.design
   const request = ExportRequest.parse(input)
-  const jobs = request.formatIds.flatMap((formatId) => request.pageIds.map((pageId) => ({ pageId, formatId })))
+  const missing = request.frameIds.find((frameId) => !Object.hasOwn(design.frames, frameId))
+  if (missing !== undefined) throw new Error(`no frame "${missing}"`)
   const taken = new Set<string>()
-  const files = jobs.map(({ pageId, formatId }, i) => {
-    const page = design.pages[pageId]
-    const format = design.formats[formatId]
-    if (!page) throw new Error(`no page "${pageId}"`)
-    if (!format) throw new Error(`no format "${formatId}"`)
+  const files = request.frameIds.map((frameId, i) => {
+    const frame = design.frames[frameId] as Frame
+    const page = design.pages[frame.pageId] as Page
     const image = {
-      png: () => exportPng(ck, design, pageId, formatId, bytes, cache),
-      jpg: () => exportJpg(ck, design, pageId, formatId, bytes, request.quality, cache),
-      pdf: () => exportPdf(ck, design, pageId, formatId, bytes, cache),
-      svg: () => exportSvg(ck, design, pageId, formatId, bytes, cache),
+      png: () => exportPng(ck, design, frameId, bytes, cache),
+      jpg: () => exportJpg(ck, design, frameId, bytes, request.quality, cache),
+      pdf: () => exportPdf(ck, design, frameId, bytes, cache),
+      svg: () => exportSvg(ck, design, frameId, bytes, cache),
     }[request.type]()
-    const base = fileName(request.name, { design: design.meta.name, page: page.name, format: format.name })
-    const folder = jobs.length > 1 ? `${safe(format.name)}/` : ''
-    // Two pages may share a name: the later ones get a number.
-    let name = `${folder}${base}.${request.type}`
-    for (let n = 2; taken.has(name.toLowerCase()); n++) name = `${folder}${base} ${n}.${request.type}`
+    const base = fileName(request.name, { design: design.meta.name, page: page.name, frame: frame.name })
+    let name = `${base}.${request.type}`
+    for (let n = 2; taken.has(name.toLowerCase()); n++) name = `${base} ${n}.${request.type}`
     taken.add(name.toLowerCase())
-    onFile?.(i + 1, jobs.length)
+    onFile?.(i + 1, request.frameIds.length)
     return { name, type: MIME[request.type], bytes: image }
   })
   const [only] = files
@@ -83,29 +83,27 @@ export function exportDesign(
   }
 }
 
-/** One page in one format as a PNG, transparency kept. */
+/** One frame as a PNG, transparency kept. */
 export function exportPng(
   ck: CanvasKit,
   design: Design,
-  pageId: string,
-  formatId: string,
+  frameId: string,
   bytes: ResourceBytes,
   cache?: ResourceCache,
 ): Uint8Array {
-  return renderDesign(ck, design, pageId, formatId, bytes, cache).png
+  return renderDesign(ck, design, frameId, bytes, cache).png
 }
 
-/** One page in one format as a JPG at a quality from 1 to 100, over white where the page is see-through. */
+/** One frame as a JPG at a quality from 1 to 100, over white where the frame is see-through. */
 export function exportJpg(
   ck: CanvasKit,
   design: Design,
-  pageId: string,
-  formatId: string,
+  frameId: string,
   bytes: ResourceBytes,
   quality: number,
   cache?: ResourceCache,
 ): Uint8Array {
-  const { width, height, pixels } = renderDesign(ck, design, pageId, formatId, bytes, cache)
+  const { width, height, pixels } = renderDesign(ck, design, frameId, bytes, cache)
   const opaque = new Uint8Array(pixels.length)
   for (let i = 0; i < pixels.length; i += 4) {
     const a = pixels[i + 3] ?? 255
@@ -135,36 +133,33 @@ export function exportJpg(
 }
 
 /**
- * One page in one format as a one-page PDF for print: shapes and text stay vectors, text keeps its
- * fonts embedded and can be selected, and a page unit is one pixel of the format.
+ * One frame as a one-page PDF for print: shapes and text stay vectors, text keeps its fonts
+ * embedded and can be selected, and a page unit is one pixel of the frame.
  */
 export function exportPdf(
   ck: CanvasKit,
   design: Design,
-  pageId: string,
-  formatId: string,
+  frameId: string,
   bytes: ResourceBytes,
   cache?: ResourceCache,
 ): Uint8Array {
-  return renderVector(ck, design, pageId, formatId, bytes, 'pdf', cache, { title: design.meta.name })
+  return renderVector(ck, design, frameId, bytes, 'pdf', cache, { title: design.meta.name })
 }
 
-/** One page in one format as an SVG, its text drawn as shapes so it looks the same in every app. */
+/** One frame as an SVG, its text drawn as shapes so it looks the same in every app. */
 export function exportSvg(
   ck: CanvasKit,
   design: Design,
-  pageId: string,
-  formatId: string,
+  frameId: string,
   bytes: ResourceBytes,
   cache?: ResourceCache,
 ): Uint8Array {
-  return renderVector(ck, design, pageId, formatId, bytes, 'svg', cache)
+  return renderVector(ck, design, frameId, bytes, 'svg', cache)
 }
 
-/** A file name from the request's template, its tokens filled in: `{size}` and `{format}` both name the format. */
-export function fileName(template: string, values: { design: string; page: string; format: string }): string {
-  const value: Record<ExportNameToken, string> = { ...values, size: values.format }
-  return safe(template.replace(TOKENS, (_, token: ExportNameToken) => value[token]))
+/** A file name from the request's template, its tokens filled in; anything else is kept as written. */
+export function fileName(template: string, values: Record<ExportNameToken, string>): string {
+  return safe(template.replace(TOKENS, (_, token: ExportNameToken) => values[token]))
 }
 
 /** A name safe on every file system: no path separators or reserved characters, never empty. */

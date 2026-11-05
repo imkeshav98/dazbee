@@ -9,11 +9,11 @@ import { boxPath, rectPath } from './paths.ts'
 import { layerReach, outset } from './reach.ts'
 import { strokePath, strokeReach } from './strokes.ts'
 
-/** The vector file a page is drawn into. */
+/** The vector file a frame is drawn into. */
 export type VectorTarget = 'pdf' | 'svg'
 
 /**
- * Draws a page into a PDF page or an SVG with the same drawing code as the pixels. What the file
+ * Draws a frame into a PDF page or an SVG with the same drawing code as the pixels. What the file
  * can't hold as vectors is drawn as an image, by the CPU renderer, at `scale` pixels to a unit:
  *
  * - PDF keeps opacity, blend modes and masks, and Skia rasterises blurs and shadows itself at the
@@ -21,9 +21,9 @@ export type VectorTarget = 'pdf' | 'svg'
  * - SVG from Skia keeps shapes, solid colours, linear and radial gradients and clips, and text as
  *   paths. A layer with opacity, effects, an angular gradient, an image fill or a mask comes as an
  *   image of itself; a blend mode or background blur, which mix with what is behind, as an image of
- *   the page as drawn up to it.
+ *   the frame as drawn up to it.
  */
-export function drawVectorPage(
+export function drawVectorFrame(
   ck: CanvasKit,
   canvas: Canvas,
   scene: Scene,
@@ -37,15 +37,15 @@ export function drawVectorPage(
     images: resources.images,
   }
   const vector: Resources = { ...raster, vector: true }
-  const page = { x: 0, y: 0, width: scene.width, height: scene.height }
+  const frame = { x: 0, y: 0, width: scene.width, height: scene.height }
   canvas.save()
   canvas.clipRect(ck.XYWHRect(0, 0, scene.width, scene.height), ck.ClipOp.Intersect, true)
 
   if (target === 'svg' && scene.fills.some((fill) => !svgPaint(fill))) {
-    drawImage(ck, canvas, page, scale, (into) => drawScene(ck, into, { ...scene, layers: [] }, raster))
+    drawImage(ck, canvas, frame, scale, (into) => drawScene(ck, into, { ...scene, layers: [] }, raster))
   } else {
-    const path = rectPath(ck, page)
-    for (const fill of scene.fills) fillPath(ck, canvas, path, fill, page, vector)
+    const path = rectPath(ck, frame)
+    for (const fill of scene.fills) fillPath(ck, canvas, path, fill, frame, vector)
     path.delete()
   }
 
@@ -53,10 +53,10 @@ export function drawVectorPage(
   units.forEach((unit, i) => {
     const backdrop = unit.some((layer) => readsBackdrop(layer, target))
     if (backdrop) {
-      // The page as drawn up to and including this unit, cut to where the unit reaches.
+      // The frame as drawn up to and including this unit, cut to where the unit reaches.
       const upTo = { ...scene, layers: units.slice(0, i + 1).flat() }
       const reach = unitReach(ck, unit, raster)
-      drawImage(ck, canvas, reach, scale, (into) => drawScene(ck, into, upTo, raster), page)
+      drawImage(ck, canvas, reach, scale, (into) => drawScene(ck, into, upTo, raster), frame)
       return
     }
     drawUnit(ck, canvas, unit, target, vector, raster, scale)

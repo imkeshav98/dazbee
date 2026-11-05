@@ -1,7 +1,7 @@
 'use client'
 
 // The top bar's items for what is selected: text, a photo, a shape, a box or several layers, each
-// with the buttons and pop-ups it offers; or the picked page's Background and Sizes.
+// with the buttons and pop-ups it offers.
 import {
   AlignLeftIcon,
   ArrowsClockwiseIcon,
@@ -10,7 +10,6 @@ import {
   CornersOutIcon,
   CropIcon,
   FadersIcon,
-  FrameCornersIcon,
   ListBulletsIcon,
   ListNumbersIcon,
   LockSimpleIcon,
@@ -38,7 +37,6 @@ import { boundFillIndex, type Design, type Paint } from '@dazbee/schema'
 import { nearest, useFontCatalog, weightsOf } from '@/components/brand-kit/font-catalog.ts'
 import { COMBINE, DISTRIBUTE, keyOf } from '@/components/editor/arrange-actions.ts'
 import { PopupContent } from '@/components/editor/edit-panel/popups.tsx'
-import { ScopeChip } from '@/components/editor/edit-panel/scope-chip.tsx'
 import {
   factsOf,
   imageFillOf,
@@ -65,7 +63,6 @@ import {
 import { cn } from '@/lib/cn.ts'
 import { hexOf } from '@/lib/colour.ts'
 import { useMessages } from '@/lib/i18n/client.tsx'
-import { format } from '@/lib/i18n/index.ts'
 
 import { BarPopover } from './bar-popover.tsx'
 import { AlignRow } from './layer-actions.tsx'
@@ -145,19 +142,6 @@ export function useSelectionItems(target: Target, design: Design, brandId: strin
       </span>,
     )
     return items
-  }
-
-  if (Object.keys(design.formats).length > 1) {
-    add(
-      'scope',
-      <ScopeChip
-        target={target}
-        design={design}
-        open={open === 'scope'}
-        onOpen={(to) => setOpen(to ? 'scope' : null)}
-      />,
-    )
-    divider()
   }
 
   // Text: its font, size and colour, its styles, and its paragraph's alignment, list, case and spacing.
@@ -444,33 +428,6 @@ export function useSelectionItems(target: Target, design: Design, brandId: strin
     )
   }
   return items
-}
-
-/** The picked page's items: its Background, and the design's Sizes. */
-export function usePageItems(pageId: string, design: Design): BarItem[] {
-  const t = useMessages()
-  const fills = design.pages[pageId]?.fills ?? []
-  const top = fills.findLast((f) => f.visible !== false)
-  const colour = top?.type === 'solid' ? top.color : top && 'stops' in top ? top.stops[0]?.color : undefined
-  const sizes = format(t.editor.formats.button, { n: Object.keys(design.formats).length })
-  return [
-    {
-      key: 'background',
-      node: (
-        <PanelButton
-          id="background"
-          label={t.editor.page.backgroundColour}
-          face={
-            <>
-              <Dot colour={colour === undefined ? 'mixed' : hexOf(colour)} />
-              {t.editor.page.background}
-            </>
-          }
-        />
-      ),
-    },
-    { key: 'sizes', node: <PanelButton id="sizes" label={sizes} icon={<FrameCornersIcon size={15} aria-hidden />} /> },
-  ]
 }
 
 /** A bar item that opens one of the edit panels, or closes it when it is open. */

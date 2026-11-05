@@ -5,6 +5,7 @@ import type { DesignInput } from '@dazbee/schema'
 
 import { writeOutput } from '../../support/editor.ts'
 import { choose } from '../../support/fields.ts'
+import { frameDesign } from '../../support/seed.ts'
 import { boxOf, openStage, selectLayers } from '../../support/stage.ts'
 import { expect, type Page, test } from '../../support/test.ts'
 import { barMenu, openCard } from '../../support/top-bar.ts'
@@ -26,49 +27,42 @@ const chip = (name: string, index: string, x: number, color: string) => ({
   },
 })
 
-const design = (): DesignInput => ({
-  meta: {
-    designId: 'replaced-by-the-api',
+const design = (): DesignInput =>
+  frameDesign({
     name: 'Auto layout sizing',
-    kind: 'single',
-    primaryFormatId: 'sq',
-  },
-  formats: { sq: { name: 'Square', width: 1080, height: 1080, order: 'a0' } },
-  pages: { p1: { name: 'Page 1', order: 'a0', fills: [{ type: 'solid', color: '#FFFFFFFF' }] } },
-  nodes: {
-    stack: {
-      type: 'box',
-      parentId: 'p1',
-      index: 'a0',
-      name: 'Stack',
-      props: {
-        x: 80,
-        y: 200,
-        width: 920,
-        height: 200,
-        fills: [{ type: 'solid', color: '#F4EDE4FF' }],
-        layout: { direction: 'row', gap: 20, padding: { top: 20, right: 20, bottom: 20, left: 20 } },
+    nodes: {
+      stack: {
+        type: 'box',
+        parentId: 'sq',
+        index: 'a0',
+        name: 'Stack',
+        props: {
+          x: 80,
+          y: 200,
+          width: 920,
+          height: 200,
+          fills: [{ type: 'solid', color: '#F4EDE4FF' }],
+          layout: { direction: 'row', gap: 20, padding: { top: 20, right: 20, bottom: 20, left: 20 } },
+        },
+      },
+      one: chip('One', 'a0', 100, '#FCA311FF'),
+      two: chip('Two', 'a1', 280, '#14213DFF'),
+      loose: {
+        type: 'graphic',
+        parentId: 'sq',
+        index: 'a1',
+        name: 'Loose',
+        props: {
+          x: 80,
+          y: 600,
+          width: 200,
+          height: 200,
+          shape: { kind: 'ellipse' },
+          fills: [{ type: 'solid', color: '#E0262BFF' }],
+        },
       },
     },
-    one: chip('One', 'a0', 100, '#FCA311FF'),
-    two: chip('Two', 'a1', 280, '#14213DFF'),
-    loose: {
-      type: 'graphic',
-      parentId: 'p1',
-      index: 'a1',
-      name: 'Loose',
-      props: {
-        x: 80,
-        y: 600,
-        width: 200,
-        height: 200,
-        shape: { kind: 'ellipse' },
-        fills: [{ type: 'solid', color: '#E0262BFF' }],
-      },
-    },
-  },
-  overrides: {},
-})
+  })
 
 const propsOf = (page: Page, id: string) =>
   page.evaluate((id) => window.dazbee?.design().nodes[id]?.props, id) as Promise<Record<string, unknown>>

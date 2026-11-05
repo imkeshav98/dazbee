@@ -20,7 +20,7 @@ export interface ExportsDeps {
 
 /** What the `Editor`'s `exportPixels` and `exportFiles` do. */
 export interface EditorExports {
-  pixels(pageId?: string, formatId?: string): Uint8Array
+  pixels(frameId?: string): Uint8Array
   files(request: ExportRequestInput, progress?: (done: number, total: number) => void): Promise<ExportedFile>
   /** Stops the export worker, if one started. */
   destroy(): void
@@ -31,9 +31,10 @@ export function editorExports({ ck, cache, session, resources, view }: ExportsDe
   // Exports are drawn in a worker of their own (#55), started at the first one.
   const exporter = exportClient()
 
-  function exportPixels(pageId?: string, formatId?: string) {
-    const frame = defaultFrame(pageId, formatId)
-    return renderDesign(ck, session.design(), frame.pageId, frame.formatId, resources.bytes(), cache).pixels
+  /** A frame drawn as pixels, shown or not; the shown page's first frame by default. */
+  function exportPixels(frameId?: string) {
+    const id = frameId ?? defaultFrame().id
+    return renderDesign(ck, session.design(), id, resources.bytes(), cache).pixels
   }
   async function exportFiles(request: ExportRequestInput, progress?: (done: number, total: number) => void) {
     // A family picked or an image placed a moment ago is drawn as itself, never the fallback or a gap.

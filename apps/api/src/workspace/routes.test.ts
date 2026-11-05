@@ -44,7 +44,7 @@ describe('designs per brand', () => {
     const created = await call('a', 'POST', `/brands/${brand.id}/designs`, { name: 'Spring sale' })
     expect(created.status).toBe(201)
     const design = DesignSummary.parse(created.json)
-    expect(design).toMatchObject({ brandId: brand.id, name: 'Spring sale', kind: 'single' })
+    expect(design).toMatchObject({ brandId: brand.id, name: 'Spring sale' })
 
     const listed = await call('a', 'GET', `/brands/${brand.id}/designs`)
     expect(
@@ -57,35 +57,55 @@ describe('designs per brand', () => {
     expect(opened).toEqual({ status: 200, json: design })
   })
 
-  it('starts a design with one blank page, already in the store for the sync server', async () => {
+  it('starts a design as one page holding one empty, white 1080×1080 frame, already in the store for the sync server', async () => {
     const { json } = await call('a', 'POST', `/brands/${brand.id}/designs`, { name: 'Blank' })
     const { id } = DesignSummary.parse(json)
     const state = await readDesignState(db, id)
     if (!state) throw new Error('no state')
     const doc = new Y.Doc()
     Y.applyUpdate(doc, state)
-    const design = readDesign(doc)
-    expect(design.meta).toMatchObject({ designId: id, name: 'Blank', kind: 'single' })
-    expect(Object.keys(design.pages)).toHaveLength(1)
-    expect(design.formats).toEqual({ sq: expect.objectContaining({ width: 1080, height: 1080 }) })
+    expect(readDesign(doc)).toEqual({
+      meta: { designId: id, name: 'Blank' },
+      pages: { p1: { name: 'Page 1', order: 'a0' } },
+      frames: {
+        f1: {
+          pageId: 'p1',
+          name: 'Feed square',
+          width: 1080,
+          height: 1080,
+          x: 0,
+          y: 0,
+          fills: [{ type: 'solid', color: '#FFFFFFFF' }],
+          order: 'a0',
+        },
+      },
+      nodes: {},
+    })
   })
 
   it('starts a design from given content, under its own id and name', async () => {
+    const portrait = (pageId: string) => ({
+      pageId,
+      name: 'Portrait',
+      width: 1080,
+      height: 1350,
+      x: 0,
+      y: 0,
+      fills: [],
+      order: 'a0',
+    })
     const content = {
-      meta: { designId: 'ignored', name: 'Ignored', kind: 'carousel', primaryFormatId: 'pt' },
-      formats: { pt: { name: 'Portrait', width: 1080, height: 1350, order: 'a0' } },
+      meta: { designId: 'ignored', name: 'Ignored' },
       pages: { p1: { name: 'Card 1', order: 'a0' }, p2: { name: 'Card 2', order: 'a1' } },
+      frames: { 'p1-pt': portrait('p1'), 'p2-pt': portrait('p2') },
       nodes: {},
-      overrides: {},
     }
     const { status, json } = await call('a', 'POST', `/brands/${brand.id}/designs`, { name: 'Carousel', content })
     expect(status).toBe(201)
-    const { id, kind } = DesignSummary.parse(json)
-    expect(kind).toBe('carousel')
+    const { id } = DesignSummary.parse(json)
     const doc = new Y.Doc()
     Y.applyUpdate(doc, (await readDesignState(db, id)) ?? new Uint8Array())
-    expect(readDesign(doc).meta).toMatchObject({ designId: id, name: 'Carousel' })
-    expect(Object.keys(readDesign(doc).pages)).toEqual(['p1', 'p2'])
+    expect(readDesign(doc)).toEqual({ ...content, meta: { designId: id, name: 'Carousel' } })
   })
 
   it('lists only the asked brand’s designs, newest change first', async () => {

@@ -9,50 +9,52 @@ import { loadCanvasKit } from '@dazbee/renderer/node'
 import { at, fixtureResources } from './pixels.ts'
 
 const ck = await loadCanvasKit()
-const design = {
-  meta: { designId: 'd', name: 'Brand kit', kind: 'single', primaryFormatId: 'f' },
-  formats: {
-    f: { name: 'F', width: 200, height: 100, order: 'a0' },
-    wide: { name: 'Wide', width: 400, height: 100, order: 'a1' },
+const box = {
+  type: 'graphic',
+  index: 'a0',
+  name: 'Box',
+  bindings: { fill: 'brand:primary' },
+  props: {
+    x: 0,
+    y: 0,
+    width: 100,
+    height: 100,
+    shape: { kind: 'rect' },
+    fills: [{ type: 'solid', color: '#14213DFF' }],
   },
-  pages: { p1: { name: 'Page', order: 'a0', fills: [{ type: 'solid', color: '#FFFFFFFF' }] } },
-  nodes: {
-    box: {
-      type: 'graphic',
-      parentId: 'p1',
-      index: 'a0',
-      name: 'Box',
-      bindings: { fill: 'brand:primary' },
-      props: {
-        x: 0,
-        y: 0,
-        width: 100,
-        height: 100,
-        shape: { kind: 'rect' },
-        fills: [{ type: 'solid', color: '#14213DFF' }],
-      },
-    },
-    word: {
-      type: 'text',
-      parentId: 'p1',
-      index: 'a1',
-      name: 'Word',
-      bindings: { textColor: 'brand:primary', fontFamily: 'brand:heading' },
-      props: {
-        x: 100,
-        y: 0,
-        width: 100,
-        height: 100,
-        text: '■■',
-        style: { fontFamily: 'Noto Sans', fontSize: 60, color: '#14213DFF' },
-      },
-    },
-  },
-  // A format that moves the box keeps it bound.
-  overrides: { 'format:wide': { box: { x: 300 } } },
 }
-const draw = (variables?: Record<string, string>, formatId = 'f') =>
-  renderDesign(ck, design, 'p1', formatId, { ...fixtureResources(), ...(variables ? { variables } : {}) })
+const word = {
+  type: 'text',
+  index: 'a1',
+  name: 'Word',
+  bindings: { textColor: 'brand:primary', fontFamily: 'brand:heading' },
+  props: {
+    x: 100,
+    y: 0,
+    width: 100,
+    height: 100,
+    text: '■■',
+    style: { fontFamily: 'Noto Sans', fontSize: 60, color: '#14213DFF' },
+  },
+}
+const white = [{ type: 'solid', color: '#FFFFFFFF' }]
+/** A frame and a wide frame holding linked copies; the wide frame's box sits further right, still bound. */
+const design = {
+  meta: { designId: 'd', name: 'Brand kit' },
+  pages: { p1: { name: 'Page', order: 'a0' } },
+  frames: {
+    f: { pageId: 'p1', name: 'F', width: 200, height: 100, x: 0, y: 0, fills: white, order: 'a0' },
+    wide: { pageId: 'p1', name: 'Wide', width: 400, height: 100, x: 400, y: 0, fills: white, order: 'a1' },
+  },
+  nodes: {
+    box: { ...box, parentId: 'f', link: 'box' },
+    word: { ...word, parentId: 'f', link: 'word' },
+    'wide-box': { ...box, parentId: 'wide', link: 'box', props: { ...box.props, x: 300 } },
+    'wide-word': { ...word, parentId: 'wide', link: 'word' },
+  },
+}
+const draw = (variables?: Record<string, string>, frameId = 'f') =>
+  renderDesign(ck, design, frameId, { ...fixtureResources(), ...(variables ? { variables } : {}) })
 /** Every distinct opaque colour in a region, so text's anti-aliased edges don't count. */
 const inked = (r: { pixels: Uint8Array; width: number }, x0: number, x1: number) => {
   const seen = new Set<string>()
@@ -72,7 +74,7 @@ describe('brand kit bindings at the render seam (#53)', () => {
     expect(at(green, 50, 50)).toEqual([31, 157, 85])
     expect(inked(green, 100, 200).has('31,157,85')).toBe(true)
     expect(inked(green, 100, 200).has('224,38,43')).toBe(false)
-    // In every format, overrides and all.
+    // In the other frame too, where the copy sits elsewhere.
     expect(at(draw({ 'brand:primary': '#1F9D55FF' }, 'wide'), 350, 50)).toEqual([31, 157, 85])
   })
 

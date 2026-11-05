@@ -1,9 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
-import { mergedProps } from '@dazbee/doc'
 import type { DesignInput } from '@dazbee/schema'
 
-import { type Frame, frameGrid } from '../canvas/grid.ts'
 import { resizedBoxes, scalingTexts, switchSizing } from './resize.ts'
 import { sessionOf } from './test-boxes.ts'
 import type { Box } from './transform.ts'
@@ -27,36 +25,53 @@ const text = (parentId: string, index: string, boxMode: 'fixed' | 'autoWidth') =
   name: 'Text',
   props: { x: 0, y: 0, width: 100, height: 24, text: 'Hi', boxMode, style: STYLE },
 })
+const row = (parentId: string) => ({
+  type: 'box' as const,
+  parentId,
+  index: 'a2',
+  name: 'Row',
+  props: { x: 0, y: 200, width: 300, height: 100, layout: { direction: 'row' as const } },
+})
 /**
- * One page in one format: a group holding a text and a rect, a box holding a text, a row laid out
- * by auto layout holding a rect, a text that grows with its words, and one whose style is locked.
+ * One page with a square frame and a wide one. The square holds a group with a text and a rect, a
+ * box holding a text, a row laid out by auto layout holding a rect, a text that grows with its
+ * words, and one whose style is locked; the wide frame holds copies of the row, its rect and the
+ * text that grows.
  */
 const DESIGN: DesignInput = {
-  meta: { designId: 'd', name: 'D', kind: 'single', primaryFormatId: 'sq' },
-  formats: { sq: { name: 'Square', width: 1080, height: 1080, order: 'a0' } },
+  meta: { designId: 'd', name: 'D' },
   pages: { p1: { name: 'One', order: 'a0' } },
+  frames: {
+    sq: { pageId: 'p1', name: 'Square', width: 1080, height: 1080, x: 0, y: 0, order: 'a0' },
+    wide: { pageId: 'p1', name: 'Wide', width: 1200, height: 628, x: 1280, y: 0, order: 'a1' },
+  },
   nodes: {
     group: {
       type: 'group',
-      parentId: 'p1',
+      parentId: 'sq',
+      link: 'group',
       index: 'a0',
       name: 'Group',
       props: { x: 0, y: 0, width: 100, height: 100 },
     },
-    grouped: text('group', 'a0', 'fixed'),
-    inGroup: rect('group', 'a1', { x: 50, y: 50, width: 50, height: 50 }),
-    card: { type: 'box', parentId: 'p1', index: 'a1', name: 'Card', props: { x: 0, y: 0, width: 100, height: 100 } },
-    framed: text('card', 'a0', 'fixed'),
-    row: {
+    grouped: { ...text('group', 'a0', 'fixed'), link: 'grouped' },
+    inGroup: { ...rect('group', 'a1', { x: 50, y: 50, width: 50, height: 50 }), link: 'inGroup' },
+    card: {
       type: 'box',
-      parentId: 'p1',
-      index: 'a2',
-      name: 'Row',
-      props: { x: 0, y: 200, width: 300, height: 100, layout: { direction: 'row' } },
+      parentId: 'sq',
+      link: 'card',
+      index: 'a1',
+      name: 'Card',
+      props: { x: 0, y: 0, width: 100, height: 100 },
     },
-    flowing: rect('row', 'a0', { x: 0, y: 200, width: 50, height: 50 }),
-    grows: text('p1', 'a3', 'autoWidth'),
-    styled: { ...text('p1', 'a4', 'fixed'), lock: { style: true } },
+    framed: { ...text('card', 'a0', 'fixed'), link: 'framed' },
+    row: { ...row('sq'), link: 'row' },
+    flowing: { ...rect('row', 'a0', { x: 0, y: 200, width: 50, height: 50 }), link: 'flowing' },
+    grows: { ...text('sq', 'a3', 'autoWidth'), link: 'grows' },
+    styled: { ...text('sq', 'a4', 'fixed'), link: 'styled', lock: { style: true } },
+    'wide-row': { ...row('wide'), link: 'row' },
+    'wide-flowing': { ...rect('wide-row', 'a0', { x: 0, y: 200, width: 50, height: 50 }), link: 'flowing' },
+    'wide-grows': { ...text('wide', 'a3', 'autoWidth'), link: 'grows' },
   },
 }
 const box = (x: number, y: number, width: number, height: number, rotation = 0): Box => ({
@@ -67,20 +82,20 @@ const box = (x: number, y: number, width: number, height: number, rotation = 0):
   rotation,
 })
 
-/** A session over the design and its one frame. */
+/** A session over the design. */
 function harness() {
   const session = sessionOf(DESIGN)
-  const frame = frameGrid(session.design()).frames[0] as Frame
-  const prop = (id: string, key: string) => mergedProps(session.design(), 'format:sq', id)[key]
-  return { session, frame, prop }
+  const prop = (id: string, key: string) => (session.design().nodes[id]?.props as Record<string, unknown>)[key]
+  /** The wide frame's copies as they are now. */
+  const copies = () => Object.entries(session.design().nodes).filter(([id]) => id.startsWith('wide-'))
+  return { session, prop, copies }
 }
 
 describe('resizedBoxes', () => {
   it('gives one root the new box itself, and scales several within it', () => {
-    const { session, frame } = harness()
+    const { session } = harness()
     const one = resizedBoxes(
       session.design(),
-      frame,
       ['grows'],
       new Map([['grows', box(0, 0, 100, 24)]]),
       box(0, 0, 100, 24),
@@ -91,30 +106,22 @@ describe('resizedBoxes', () => {
       ['grows', box(0, 0, 50, 50)],
       ['styled', box(50, 50, 50, 50)],
     ])
-    const several = resizedBoxes(
-      session.design(),
-      frame,
-      ['grows', 'styled'],
-      start,
-      box(0, 0, 100, 100),
-      box(0, 0, 200, 200),
-    )
+    const several = resizedBoxes(session.design(), ['grows', 'styled'], start, box(0, 0, 100, 100), box(0, 0, 200, 200))
     expect(several.get('grows')).toEqual(box(0, 0, 100, 100))
     expect(several.get('styled')).toEqual(box(100, 100, 100, 100))
   })
 
   it('gives a layer in a flow a size and never a place', () => {
-    const { session, frame } = harness()
+    const { session } = harness()
     const start = new Map([['flowing', box(0, 200, 50, 50)]])
-    const next = resizedBoxes(session.design(), frame, ['flowing'], start, box(0, 200, 50, 50), box(-10, 190, 60, 60))
+    const next = resizedBoxes(session.design(), ['flowing'], start, box(0, 200, 50, 50), box(-10, 190, 60, 60))
     expect(next.get('flowing')).toEqual(box(0, 200, 60, 60))
   })
 
   it("scales a group's layers with it, and keeps a box's where they are", () => {
-    const { session, frame } = harness()
+    const { session } = harness()
     const group = resizedBoxes(
       session.design(),
-      frame,
       ['group'],
       new Map([
         ['group', box(0, 0, 100, 100)],
@@ -126,7 +133,6 @@ describe('resizedBoxes', () => {
     expect(group.get('inGroup')).toEqual(box(100, 100, 100, 100))
     const card = resizedBoxes(
       session.design(),
-      frame,
       ['card'],
       new Map([
         ['card', box(0, 0, 100, 100)],
@@ -140,62 +146,60 @@ describe('resizedBoxes', () => {
   })
 
   it("moves a box's layers along with it when several layers are resized", () => {
-    const { session, frame } = harness()
+    const { session } = harness()
     const start = new Map([
       ['card', box(0, 0, 100, 100)],
       ['framed', box(10, 10, 50, 24)],
       ['grows', box(100, 0, 100, 100)],
     ])
-    const next = resizedBoxes(
-      session.design(),
-      frame,
-      ['card', 'grows'],
-      start,
-      box(0, 0, 200, 100),
-      box(100, 0, 200, 100),
-    )
+    const next = resizedBoxes(session.design(), ['card', 'grows'], start, box(0, 0, 200, 100), box(100, 0, 200, 100))
     expect(next.get('card')).toEqual(box(100, 0, 100, 100))
     expect(next.get('framed')).toEqual(box(110, 10, 50, 24))
   })
 })
 
 describe('scalingTexts', () => {
-  it('gives the text a corner scales, selected or in a group, with its sizes in the frame', () => {
-    const { session, frame } = harness()
-    const texts = scalingTexts(session.design(), frame, ['group', 'grows', 'card'], 'se')
+  it('gives the text a corner scales, selected or in a group, with its sizes', () => {
+    const { session } = harness()
+    const texts = scalingTexts(session.design(), ['group', 'grows', 'card'], 'se')
     expect([...texts.keys()]).toEqual(['grouped', 'grows'])
     expect(texts.get('grows')).toMatchObject({ style: STYLE, runs: [] })
   })
 
   it('gives none for an edge, or for text whose style is locked', () => {
-    const { session, frame } = harness()
-    expect(scalingTexts(session.design(), frame, ['grows'], 'e').size).toBe(0)
-    expect(scalingTexts(session.design(), frame, ['styled'], 'se').size).toBe(0)
+    const { session } = harness()
+    expect(scalingTexts(session.design(), ['grows'], 'e').size).toBe(0)
+    expect(scalingTexts(session.design(), ['styled'], 'se').size).toBe(0)
   })
 })
 
 describe('switchSizing', () => {
-  it("fixes the axes a resize drags, in the frame's format: text that grows with its words gets a box", () => {
-    const { session, frame, prop } = harness()
-    switchSizing(session, frame, ['grows'], 'e', session.design(), new Map())
+  it('fixes the axes a resize drags: text that grows with its words gets a box, its copy in the other frame not', () => {
+    const { session, prop, copies } = harness()
+    const before = copies()
+    switchSizing(session, ['grows'], 'e', session.design(), new Map())
     expect(prop('grows', 'boxMode')).toBe('autoHeight')
-    expect(session.design().nodes.grows?.props).toMatchObject({ boxMode: 'autoWidth' })
-    switchSizing(session, frame, ['grows'], 's', session.design(), new Map())
+    switchSizing(session, ['grows'], 's', session.design(), new Map())
     expect(prop('grows', 'boxMode')).toBe('fixed')
+    expect(copies()).toEqual(before)
   })
 
   it('leaves the box mode of text a corner scales', () => {
-    const { session, frame, prop } = harness()
-    switchSizing(session, frame, ['grows'], 'se', session.design(), new Map([['grows', {}]]))
+    const { session, prop } = harness()
+    switchSizing(session, ['grows'], 'se', session.design(), new Map([['grows', {}]]))
     expect(prop('grows', 'boxMode')).toBe('autoWidth')
   })
 
   it('fixes the sizing of a layer in a flow, and of an auto layout box, on the axes dragged', () => {
-    const { session, frame, prop } = harness()
-    session.run('node.update', { ids: ['flowing', 'row'], patch: { sizing: { width: 'fill', height: 'hug' } } })
-    switchSizing(session, frame, ['flowing', 'row'], 'e', session.design(), new Map())
+    const { session, prop, copies } = harness()
+    session.run('node.update', {
+      ids: ['flowing', 'row', 'wide-flowing', 'wide-row'],
+      patch: { sizing: { width: 'fill', height: 'hug' } },
+    })
+    const before = copies()
+    switchSizing(session, ['flowing', 'row'], 'e', session.design(), new Map())
     expect(prop('flowing', 'sizing')).toEqual({ width: 'fixed', height: 'hug' })
     expect(prop('row', 'sizing')).toEqual({ width: 'fixed', height: 'hug' })
-    expect(session.design().nodes.row?.props).toMatchObject({ sizing: { width: 'fill', height: 'hug' } })
+    expect(copies()).toEqual(before)
   })
 })

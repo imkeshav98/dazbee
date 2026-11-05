@@ -3,14 +3,13 @@
 import type * as Y from 'yjs'
 import { z } from 'zod'
 
-import { AnyScope, formatScope, NodeId, type Rect } from '@dazbee/schema'
+import { NodeId, type Rect } from '@dazbee/schema'
 
 import { childrenOf } from '../children.ts'
-import { overrideKey } from '../design-doc.ts'
 import { round } from '../geometry.ts'
+import { boxPlan } from './box-plan.ts'
 import { lockProblem, missingLayer } from './checks.ts'
 import { defineCommand } from './define.ts'
-import { Placement } from './placement.ts'
 
 interface Inferred {
   direction: 'row' | 'column'
@@ -23,10 +22,10 @@ interface Inferred {
 }
 
 /**
- * Switches a box's auto layout on or off (#46). On, its settings are read off where its
- * children are, in every format, and the children are put in the order the flow takes them, so a
- * box whose children already sit in an even row or column looks the same. Off, the layout goes
- * from the base and every format.
+ * Switches a box's auto layout on or off (#46). On, its settings are read off where its children
+ * are, and the children are put in the order the flow takes them, so a box whose children already
+ * sit in an even row or column looks the same. Off, the layout goes. Its linked copies in other
+ * frames stay as they are.
  */
 export const nodeAutoLayout = defineCommand({
   name: 'node.autoLayout',
@@ -39,26 +38,17 @@ export const nodeAutoLayout = defineCommand({
   },
   apply: ({ r, design }, { id, on }) => {
     const props = r.nodes.get(id)?.get('props') as Y.Map<unknown>
-    const scopes = Object.keys(design.formats).map((f) => formatScope(f))
     if (!on) {
       props.delete('layout')
-      for (const scope of scopes) r.overrides.delete(overrideKey(scope, id, 'layout'))
       return
     }
-    const place = new Placement(design)
+    const plan = boxPlan(design)
     const flow = childrenOf(design, id).filter(([, node]) => !node.props.absolute)
-    const inferIn = (scope: AnyScope) =>
-      inferLayout(
-        place.get(scope, id),
-        flow.map(([kid]) => [kid, place.get(scope, kid)]),
-      )
-    const { order, layout } = inferIn('base')
+    const { order, layout } = inferLayout(
+      plan.get(id),
+      flow.map(([kid]) => [kid, plan.get(kid)]),
+    )
     props.set('layout', layout)
-    for (const scope of scopes) {
-      const here = inferIn(scope).layout
-      if (JSON.stringify(here) !== JSON.stringify(layout)) r.overrides.set(overrideKey(scope, id, 'layout'), here)
-      else r.overrides.delete(overrideKey(scope, id, 'layout'))
-    }
     // The flow follows the children's order: they swap places in it, leaving absolute ones where they are.
     const slots = flow.map(([, node]) => node.index).sort()
     order.forEach((kid, i) => {

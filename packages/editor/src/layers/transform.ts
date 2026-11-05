@@ -1,5 +1,5 @@
 // The geometry of moving, resizing and rotating layers (#40), kept free of the editor so it can be
-// tested on its own. Boxes are in one page's design pixels; a box's rotation turns it about its
+// tested on its own. Boxes are in one frame's design pixels; a box's rotation turns it about its
 // centre, as the renderer draws it.
 import { type Box, centreOf, normalAngle, type Point, round, turn } from '@dazbee/doc'
 
@@ -26,8 +26,8 @@ export function handleAt(h: Handle): Point {
 }
 
 /**
- * The box after dragging one of its handles to a point on the page. The opposite edge or corner
- * stays where it is on the page (the centre does with `fromCentre`), the rotation is kept, and a
+ * The box after dragging one of its handles to a point in the frame. The opposite edge or corner
+ * stays where it is in the frame (the centre does with `fromCentre`), the rotation is kept, and a
  * drag past the opposite edge just meets it there: the box never turns inside out.
  */
 export function resize(box: Box, handle: Handle, to: Point, options: ResizeOptions = {}): Box {
@@ -127,20 +127,20 @@ export function drawnFrom(box: Box, around: Box[]): Box {
   }
   return { ...box, x: c.x - box.width / 2, y: c.y - box.height / 2, rotation: normalAngle(rotation) }
 }
-/** A point on the page as layers inside containers see it, before the containers turn them. */
+/** A point in the frame as layers inside containers see it, before the containers turn them. */
 export function localTo(p: Point, around: Box[]): Point {
   let q = p
   for (const outer of around) q = turn(q, centreOf(outer), -outer.rotation)
   return q
 }
-/** A point inside containers as it is on the page: back through each one's turn, innermost first. */
+/** A point inside containers as it is in the frame: back through each one's turn, innermost first. */
 export function pageFrom(q: Point, around: Box[]): Point {
   let p = q
   for (const outer of [...around].reverse()) p = turn(p, centreOf(outer), outer.rotation)
   return p
 }
 
-/** A box as drawn on the page, as layers inside containers keep it: the inverse of drawnFrom. */
+/** A box as drawn in the frame, as layers inside containers keep it: the inverse of drawnFrom. */
 export function undrawn(drawn: Box, around: Box[]): Box {
   const c = localTo(centreOf(drawn), around)
   const rotation = normalAngle(around.reduce((r, b) => r - b.rotation, drawn.rotation))

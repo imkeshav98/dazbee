@@ -10,69 +10,67 @@ import type { DesignInput } from '@dazbee/schema'
 
 import { photo, upload } from '../../support/assets.ts'
 import { designOf, exportHashOf, screenPoint, writeOutput } from '../../support/editor.ts'
+import { frameDesign } from '../../support/seed.ts'
 import { click, drag, dragScreen, drawn, openStage, press, read, selection } from '../../support/stage.ts'
 import { expect, type Page, test } from '../../support/test.ts'
-import { sizesPanel } from '../../support/top-bar.ts'
+import { pagesPanel } from '../../support/top-bar.ts'
 
 test.describe.configure({ timeout: 120_000 })
 
-const design = (assetId: string): DesignInput => ({
-  meta: { designId: 'replaced-by-the-api', name: 'Crop', kind: 'single', primaryFormatId: 'sq' },
-  formats: { sq: { name: 'Square', width: 1080, height: 1080, order: 'a0' } },
-  pages: { p1: { name: 'Page 1', order: 'a0', fills: [{ type: 'solid', color: '#FFF6E8FF' }] } },
-  nodes: {
-    // A 1920 × 1200 photo filling a 600 square: shown at half size, 360 cut off each side.
-    photo: {
-      type: 'graphic',
-      parentId: 'p1',
-      index: 'a0',
-      name: 'Photo',
-      props: {
-        x: 140,
-        y: 140,
-        width: 600,
-        height: 600,
-        shape: { kind: 'rect', cornerRadius: 40 },
-        fills: [{ type: 'image', assetId, fit: 'fill' }],
+const design = (assetId: string): DesignInput =>
+  frameDesign({
+    name: 'Crop',
+    fills: [{ type: 'solid', color: '#FFF6E8FF' }],
+    nodes: {
+      // A 1920 × 1200 photo filling a 600 square: shown at half size, 360 cut off each side.
+      photo: {
+        type: 'graphic',
+        parentId: 'sq',
+        index: 'a0',
+        name: 'Photo',
+        props: {
+          x: 140,
+          y: 140,
+          width: 600,
+          height: 600,
+          shape: { kind: 'rect', cornerRadius: 40 },
+          fills: [{ type: 'image', assetId, fit: 'fill' }],
+        },
+      },
+      // A disc under a poster, for the mask.
+      disc: {
+        type: 'graphic',
+        parentId: 'sq',
+        index: 'a1',
+        name: 'Disc',
+        props: {
+          x: 800,
+          y: 800,
+          width: 200,
+          height: 200,
+          shape: { kind: 'ellipse' },
+          fills: [{ type: 'solid', color: '#15121AFF' }],
+        },
+      },
+      poster: {
+        type: 'graphic',
+        parentId: 'sq',
+        index: 'a2',
+        name: 'Poster',
+        props: {
+          x: 780,
+          y: 780,
+          width: 280,
+          height: 280,
+          shape: { kind: 'rect' },
+          fills: [{ type: 'image', assetId, fit: 'fill', filter: 'vivid' }],
+        },
       },
     },
-    // A disc under a poster, for the mask.
-    disc: {
-      type: 'graphic',
-      parentId: 'p1',
-      index: 'a1',
-      name: 'Disc',
-      props: {
-        x: 800,
-        y: 800,
-        width: 200,
-        height: 200,
-        shape: { kind: 'ellipse' },
-        fills: [{ type: 'solid', color: '#15121AFF' }],
-      },
-    },
-    poster: {
-      type: 'graphic',
-      parentId: 'p1',
-      index: 'a2',
-      name: 'Poster',
-      props: {
-        x: 780,
-        y: 780,
-        width: 280,
-        height: 280,
-        shape: { kind: 'rect' },
-        fills: [{ type: 'image', assetId, fit: 'fill', filter: 'vivid' }],
-      },
-    },
-  },
-  overrides: {},
-})
+  })
 
-const fillOf = async (page: Page, id: string) => {
-  const d = await read(page)
-  return ((d.overrides['format:sq']?.[id]?.fills ?? d.nodes[id]?.props.fills) as Record<string, unknown>[])[0]
-}
+const fillOf = async (page: Page, id: string) =>
+  ((await read(page)).nodes[id]?.props.fills as Record<string, unknown>[])[0]
 const cornerHandle = async (page: Page, i: number) => {
   const box = await page.locator(`.crop-image .handle[data-crop-corner="${i}"]`).boundingBox()
   if (!box) throw new Error(`no crop corner ${i}`)
@@ -119,7 +117,7 @@ test('Enter crops a photo: a drag moves it, a corner scales it, each one undo st
   // The export of the cropped design is Node's, pixel for pixel.
   const ck = await loadCanvasKit()
   const stored = new Uint8Array(await (await page.request.get(`/brands/dev-brand-coffee/assets/${asset.id}`)).body())
-  const node = renderDesign(ck, JSON.parse(await designOf(page)), 'p1', 'sq', {
+  const node = renderDesign(ck, JSON.parse(await designOf(page)), 'sq', {
     ...fixtureResources(),
     images: { [asset.id]: stored },
   })
@@ -137,7 +135,8 @@ test('Enter crops a photo: a drag moves it, a corner scales it, each one undo st
   expect(await fillOf(page, 'photo')).toMatchObject({ crop: { x: 160, width: 1200 } })
   expect(await exportHashOf(page)).toBe(moved)
   await press(page, 'undo')
-  expect((await read(page)).overrides['format:sq']?.photo).toBeUndefined()
+  expect(await fillOf(page, 'photo')).toMatchObject({ type: 'image', assetId: asset.id, fit: 'fill' })
+  expect(await fillOf(page, 'photo')).not.toHaveProperty('crop')
   expect(await exportHashOf(page)).toBe(before)
 
   // From nothing selected, a double click crops too, and a click outside the image ends it.
@@ -152,29 +151,48 @@ test('Enter crops a photo: a drag moves it, a corner scales it, each one undo st
   expect(errors).toEqual([])
 })
 
-test('showing another format alone lets the crop go with the selection: showing every format again brings back no crop, and the drag is the one undo step', async ({
+test('showing another page lets the crop go with the selection: showing its page again brings back no crop, and the drag is the one undo step', async ({
   browser,
 }) => {
   const asset = await upload(photo)
   const content = design(asset.id)
-  const wide = { name: 'Wide', width: 1920, height: 1080, order: 'a1' }
-  const { page, errors } = await openStage(browser, { ...content, formats: { ...content.formats, wide } })
+  // A second page holding one empty wide frame.
+  const { page, errors } = await openStage(browser, {
+    ...content,
+    pages: { ...content.pages, p2: { name: 'Page 2', order: 'a1' } },
+    frames: {
+      ...content.frames,
+      wide: {
+        pageId: 'p2',
+        name: 'Wide',
+        width: 1920,
+        height: 1080,
+        x: 0,
+        y: 0,
+        fills: [{ type: 'solid', color: '#FFFFFFFF' }],
+        order: 'a0',
+      },
+    },
+  })
   await click(page, 400, 400)
   await press(page, 'editPoints')
   await expect(page.locator('.crop-image')).toBeVisible()
   await drag(page, { x: 400, y: 400 }, { x: 500, y: 400 })
   expect(await fillOf(page, 'photo')).toMatchObject({ fit: 'crop', crop: { x: 160 } })
 
-  await (await sizesPanel(page)).locator('[data-format="wide"]').getByRole('button', { name: 'Show alone' }).click()
-  await expect(page.getByTestId('focus-chip')).toBeVisible()
+  // The Pages card shows Page 2: the crop and the selection go with Page 1.
+  await (await pagesPanel(page)).getByRole('button', { name: 'Show Page 2' }).click()
+  await expect.poll(() => page.evaluate(() => window.dazbee?.shownPage())).toBe('p2')
   await drawn(page)
-  expect(await selection(page)).toEqual([])
-  await page.getByTestId('focus-chip').getByRole('button', { name: 'Show all formats' }).click()
-  await expect(page.getByTestId('focus-chip')).toBeHidden()
-  await drawn(page)
-  expect(await page.evaluate(() => window.dazbee?.frames().length)).toBe(2)
   await expect(page.locator('.crop-image')).toHaveCount(0)
   expect(await selection(page)).toEqual([])
+  await (await pagesPanel(page)).getByRole('button', { name: 'Show Page 1' }).click()
+  await expect.poll(() => page.evaluate(() => window.dazbee?.shownPage())).toBe('p1')
+  await drawn(page)
+  expect(await page.evaluate(() => window.dazbee?.frames().map((frame) => frame.id))).toEqual(['sq'])
+  await expect(page.locator('.crop-image')).toHaveCount(0)
+  expect(await selection(page)).toEqual([])
+  await page.keyboard.press('Escape')
 
   // The crop's drag is the only undo step: one undo takes it back and leaves nothing to undo.
   await press(page, 'undo')

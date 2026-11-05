@@ -1,5 +1,5 @@
 // The export worker (#55): draws exports on the CPU surface off the main thread, so the editor
-// stays responsive while it makes every format. It has its own CanvasKit and keeps the fonts and
+// stays responsive while it makes every frame. It has its own CanvasKit and keeps the fonts and
 // images it was sent between exports, so each is decoded once.
 import { exportDesign, type ExportedFile } from '@dazbee/export'
 import { type ResourceBytes, resourceCache } from '@dazbee/renderer'

@@ -111,7 +111,7 @@ export function workspaceRoutes({
     return deleted ? c.body(null, 204) : c.json(error('No such design'), 404)
   })
 
-  // The primary format's size alone, read without drawing, for the home to lay out its bento (#84).
+  // The cover frame's size alone, read without drawing, for the home to lay out its bento (#84).
   app.get('/brands/:brandId/designs/:designId/cover', async (c) => {
     const design = await findDesign(db, c.var.session.workspaceId, c.var.brand.id, c.req.param('designId'))
     if (!design) return c.json(error('No such design'), 404)

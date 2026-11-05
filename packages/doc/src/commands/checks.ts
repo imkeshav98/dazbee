@@ -1,15 +1,16 @@
-// The checks commands share: a free id, a parent that can hold a layer, locks, and layers that exist.
+// The checks commands share: a free id, a parent that can hold a layer, a page or frame that exists,
+// locks, and layers that exist.
 import { canHold, type Design, type Layer as LayerT, LayerLock } from '@dazbee/schema'
 
 import type { CommandContext } from './define.ts'
 
 /** Ids of deleted layers stay taken: their tombstones still hold the data an undo brings back. */
 export const idProblem = ({ r }: CommandContext, id: string | undefined) =>
-  id && (r.nodes.has(id) || r.pages.has(id) || r.formats.has(id)) ? `id "${id}" is taken` : undefined
+  id && (r.nodes.has(id) || r.pages.has(id) || r.frames.has(id)) ? `id "${id}" is taken` : undefined
 
 export const parentProblem = (design: Design, parentId: string, type: string) => {
   const parent = design.nodes[parentId]
-  if (!design.pages[parentId] && !parent) return `parent "${parentId}" is neither a page nor a layer`
+  if (!Object.hasOwn(design.frames, parentId) && !parent) return `parent "${parentId}" is neither a frame nor a layer`
   if (parent && !canHold(parent.type, type)) {
     return parent.type === 'boolean'
       ? `parent "${parentId}" is a boolean, which holds only shapes and booleans`
@@ -17,6 +18,12 @@ export const parentProblem = (design: Design, parentId: string, type: string) =>
   }
   return undefined
 }
+
+export const pageProblem = (design: Design, pageId: string) =>
+  Object.hasOwn(design.pages, pageId) ? undefined : `no page "${pageId}"`
+
+export const frameProblem = (design: Design, frameId: string) =>
+  Object.hasOwn(design.frames, frameId) ? undefined : `no frame "${frameId}"`
 
 /** The lock flag a change to a property needs clear: position, size and rotation, content or style. */
 export function lockFor(path: string): keyof LayerLock | null {

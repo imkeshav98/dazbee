@@ -3,22 +3,26 @@
 import { nanoid } from 'nanoid'
 import { z } from 'zod'
 
-import { type Design, Layer, type Layer as LayerT, LayerTree, NodeId, PageId } from '@dazbee/schema'
+import { type Design, FrameId, frameIdOf, Layer, type Layer as LayerT, LayerTree, NodeId, PageId } from '@dazbee/schema'
 
 import { ancestorsOf, childrenOf, descendants, isInside } from '../children.ts'
 import { toYNode } from '../design-doc.ts'
 import { centreOf, normalAngle, turn } from '../geometry.ts'
+import { boxPlan } from './box-plan.ts'
 import { missingLayer, parentProblem } from './checks.ts'
 import { type CommandContext, defineCommand } from './define.ts'
-import { Placement } from './placement.ts'
-import { copyLayers, indexBetween } from './tree.ts'
+import { copyLayers, indexBetween, linkMaker } from './tree.ts'
 
+/**
+ * Moves a layer to another parent, or another place among its siblings, in its own frame: a layer
+ * goes into another frame only as a copy, by paste.
+ */
 export const nodeMove = defineCommand({
   name: 'node.move',
   /** `keepDrawn` false leaves the layer's box as stored, for a caller that places it itself. */
   input: z.object({
     id: NodeId,
-    parentId: z.union([PageId, NodeId]),
+    parentId: z.union([FrameId, NodeId]),
     before: NodeId.optional(),
     keepDrawn: z.boolean().default(true),
   }),
@@ -27,6 +31,7 @@ export const nodeMove = defineCommand({
     if (!node) return missingLayer(design, [id])
     const problem = parentProblem(design, parentId, node.type)
     if (problem) return problem
+    if (frameIdOf(design, parentId) !== frameIdOf(design, id)) return `can't move "${id}" to another frame`
     if (isInside(design, parentId, id)) return `can't move "${id}" inside itself`
     if (before === id) return `can't place "${id}" before itself`
     if (before && design.nodes[before]?.parentId !== parentId) return `"${before}" is not under "${parentId}"`
@@ -108,21 +113,34 @@ export const nodeDuplicate = defineCommand({
 })
 
 /**
- * Places a tree of layers, such as the clipboard's, in a page or container (#49): every layer gets
- * a fresh id, the roots go on top in their order, and everything moves by `dx`, `dy`. Placing the
- * same tree twice gives two copies. Returns the new roots' ids, bottom to top.
+ * Places a tree of layers, such as the clipboard's, in a frame or container (#49): every layer gets
+ * a fresh id and, unless `keepLinksFrom` keeps its own, a new link id; the roots go on top in their
+ * order, and everything moves by `dx`, `dy`. Placing the same tree twice gives two copies. Returns
+ * the new roots' ids, bottom to top.
  */
 export const designPlace = defineCommand({
   name: 'design.place',
   input: z.object({
-    parentId: z.union([PageId, NodeId]),
+    parentId: z.union([FrameId, NodeId]),
     tree: LayerTree,
     dx: z.number().default(0),
     dy: z.number().default(0),
+    /**
+     * The page the tree was copied from. Into a frame of that page, each layer, in the tree's order,
+     * keeps its link id where the frame holds no layer with it and no layer placed before it kept
+     * it, so it is a linked copy; the rest, and every layer placed on another page, get new ones.
+     */
+    keepLinksFrom: PageId.optional(),
   }),
   check: ({ design }, { parentId, tree }) =>
     tree.roots.map((root) => parentProblem(design, parentId, tree.nodes[root]?.type ?? '')).find(Boolean),
-  apply: ({ r, design }, { parentId, tree, dx, dy }) => {
+  apply: ({ r, design }, { parentId, tree, dx, dy, keepLinksFrom }) => {
+    const frameId = frameIdOf(design, parentId)
+    const keeps =
+      frameId !== undefined && keepLinksFrom !== undefined && design.frames[frameId]?.pageId === keepLinksFrom
+    const linkOf = linkMaker(
+      keeps ? { held: new Set(descendants(design, frameId).map((id) => design.nodes[id]?.link ?? '')) } : 'new',
+    )
     const ids = new Map(Object.keys(tree.nodes).map((id) => [id, nanoid()]))
     let index = childrenOf(design, parentId).at(-1)?.[1].index ?? null
     const placed = new Map<string, { parentId: string; index: string }>()
@@ -133,14 +151,14 @@ export const designPlace = defineCommand({
     for (const [old, node] of Object.entries(tree.nodes)) {
       const where = placed.get(old) ?? { parentId: ids.get(node.parentId) as string, index: node.index }
       const props = { ...node.props, x: node.props.x + dx, y: node.props.y + dy }
-      r.nodes.set(ids.get(old) as string, toYNode(Layer.parse({ ...node, ...where, props })))
+      r.nodes.set(ids.get(old) as string, toYNode(Layer.parse({ ...node, ...where, link: linkOf(node.link), props })))
     }
     return tree.roots.map((root) => ids.get(root) as string)
   },
 })
 
 /**
- * Keeps a layer where it is drawn as it moves under `parentId`, in every format: each layer it sits
+ * Keeps a layer where it is drawn as it moves under `parentId`, in its frame: each layer it sits
  * in turns what it holds around its own centre, so the layer takes the turns it leaves and gives
  * back the ones it enters, and what it holds moves with it.
  */
@@ -152,34 +170,30 @@ function keepDrawnPlace(r: CommandContext['r'], design: Design, id: string, pare
   const flows = (container: string) =>
     (design.nodes[container]?.props as { layout?: unknown } | undefined)?.layout !== undefined && !node.props.absolute
   if (flows(node.parentId) || flows(parentId)) return
-  const leaving = ancestorsOf(design, node.parentId)
-  const entering = ancestorsOf(design, parentId)
-  const place = new Placement(design)
-  for (const scope of place.scopes) {
-    const was = place.get(scope, id)
-    const from = centreOf(was)
-    let drawn = from
-    let turned = 0
-    for (const up of leaving) {
-      const outer = place.get(scope, up)
-      drawn = turn(drawn, centreOf(outer), outer.rotation)
-      turned += outer.rotation
-    }
-    for (const up of [...entering].reverse()) {
-      const outer = place.get(scope, up)
-      drawn = turn(drawn, centreOf(outer), -outer.rotation)
-      turned -= outer.rotation
-    }
-    const dx = drawn.x - from.x
-    const dy = drawn.y - from.y
-    if (Math.abs(dx) < 1e-9 && Math.abs(dy) < 1e-9 && normalAngle(turned) === 0) continue
-    place.set(scope, id, { x: was.x + dx, y: was.y + dy, rotation: normalAngle(was.rotation + turned) })
-    for (const inner of descendants(design, id)) {
-      const at = place.get(scope, inner)
-      place.set(scope, inner, { x: at.x + dx, y: at.y + dy })
-    }
+  const plan = boxPlan(design)
+  const was = plan.get(id)
+  const from = centreOf(was)
+  let drawn = from
+  let turned = 0
+  for (const up of ancestorsOf(design, node.parentId)) {
+    const outer = plan.get(up)
+    drawn = turn(drawn, centreOf(outer), outer.rotation)
+    turned += outer.rotation
   }
-  place.write(r)
+  for (const up of [...ancestorsOf(design, parentId)].reverse()) {
+    const outer = plan.get(up)
+    drawn = turn(drawn, centreOf(outer), -outer.rotation)
+    turned -= outer.rotation
+  }
+  const dx = drawn.x - from.x
+  const dy = drawn.y - from.y
+  if (Math.abs(dx) < 1e-9 && Math.abs(dy) < 1e-9 && normalAngle(turned) === 0) return
+  plan.set(id, { x: was.x + dx, y: was.y + dy, rotation: normalAngle(was.rotation + turned) })
+  for (const inner of descendants(design, id)) {
+    const at = plan.get(inner)
+    plan.set(inner, { x: at.x + dx, y: at.y + dy })
+  }
+  plan.write(r)
 }
 
 /** Each sibling list after a z-order change, as ids bottom to top. */

@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 
 import { renderDesign } from '@dazbee/renderer'
 import { loadCanvasKit } from '@dazbee/renderer/node'
-import { parseDesign } from '@dazbee/schema'
+import { framesOf, inOrder, parseDesign } from '@dazbee/schema'
 
 import { loadFixtures } from './fixtures.ts'
 import { comparePixels, decodePng, encodePng, fixtureResources, OUTPUT_DIR, REFERENCE_DIR } from './pixels.ts'
@@ -40,41 +40,41 @@ const cases = loadFixtures()
   .flatMap(({ name, json }) => {
     const parsed = parseDesign(json)
     if (!parsed.success) throw new Error(parsed.errors.join('\n'))
-    const { pages, formats } = parsed.design
-    return Object.keys(pages).flatMap((pageId) =>
-      Object.keys(formats).map((formatId) => ({ name, json, pageId, formatId })),
+    const { design } = parsed
+    return inOrder(design.pages).flatMap(([pageId]) =>
+      framesOf(design, pageId).map(([frameId]) => ({ name, json, frameId })),
     )
   })
 
 describe('Node CPU render', () => {
-  it('covers every page and format of the checked fixtures', () => {
-    expect(cases.map((c) => `${c.name}/${c.pageId}.${c.formatId}`)).toEqual([
-      'arabic-ad/p1.sq',
-      'auto-layout/p1.sq',
-      'box-corners/p1.square',
-      'box-strokes/p1.square',
-      'english-sale-ad/p1.sq',
-      'fill-stacks/p1.sq',
-      'groups-and-boxes/p1.sq',
-      'hindi-ad/p1.sq',
-      'image-fills/p1.sq',
-      'layer-bounds/p1.sq',
-      'shapes-and-booleans/p1.sq',
-      'shapes-and-effects/p1.sq',
-      'strokes-and-effects/p1.sq',
-      'text-and-group-bounds/p1.sq',
-      'text-styles/p1.pt',
+  it('covers every frame of the checked fixtures', () => {
+    expect(cases.map((c) => `${c.name}/${c.frameId}`)).toEqual([
+      'arabic-ad/sq',
+      'auto-layout/sq',
+      'box-corners/square',
+      'box-strokes/square',
+      'english-sale-ad/sq',
+      'fill-stacks/sq',
+      'groups-and-boxes/sq',
+      'hindi-ad/sq',
+      'image-fills/sq',
+      'layer-bounds/sq',
+      'shapes-and-booleans/sq',
+      'shapes-and-effects/sq',
+      'strokes-and-effects/sq',
+      'text-and-group-bounds/sq',
+      'text-styles/pt',
     ])
   })
 
-  it.each(cases)('$name $pageId in $formatId matches its reference image', ({ name, json, pageId, formatId }) => {
-    const file = `${pageId}.${formatId}.png`
+  it.each(cases)('$name $frameId matches its reference image', ({ name, json, frameId }) => {
+    const file = `${frameId}.png`
     const reference = join(REFERENCE_DIR, name, file)
     const out = join(OUTPUT_DIR, name)
     rmSync(join(out, file.replace('.png', '.actual.png')), { force: true })
     rmSync(join(out, file.replace('.png', '.diff.png')), { force: true })
 
-    const rendered = renderDesign(ck, json, pageId, formatId, resources)
+    const rendered = renderDesign(ck, json, frameId, resources)
     if (UPDATE) {
       mkdirSync(join(REFERENCE_DIR, name), { recursive: true })
       writeFileSync(reference, rendered.png)
@@ -95,8 +95,8 @@ describe('Node CPU render', () => {
   it('renders the same pixels twice in a row', () => {
     const [first] = cases
     if (!first) throw new Error('no cases')
-    const a = renderDesign(ck, first.json, first.pageId, first.formatId, resources)
-    const b = renderDesign(ck, first.json, first.pageId, first.formatId, resources)
+    const a = renderDesign(ck, first.json, first.frameId, resources)
+    const b = renderDesign(ck, first.json, first.frameId, resources)
     expect(comparePixels(a, b).differing).toBe(0)
   })
 })

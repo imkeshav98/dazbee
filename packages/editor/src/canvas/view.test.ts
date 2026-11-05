@@ -1,10 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { CanvasKit, SkPicture } from '@dazbee/canvaskit'
-import type { Design } from '@dazbee/schema'
+import type { Design, Rect } from '@dazbee/schema'
 
 import { fit } from './camera.ts'
-import { frameGrid } from './grid.ts'
+import { pageFrames } from './frames.ts'
 import { design } from './test-design.ts'
 import { editorView, type ViewDeps } from './view.ts'
 
@@ -16,8 +16,10 @@ function fakeCanvasKit(log: string[]) {
     restore: () => log.push('restore'),
     scale: (x: number, y: number) => log.push(`scale ${x} ${y}`),
     translate: (x: number, y: number) => log.push(`translate ${x} ${y}`),
-    drawRect: () => log.push('rect'),
+    drawRect: (rect: number[]) => log.push(`rect ${rect.join(' ')}`),
     drawPicture: (picture: { name: string }) => log.push(`picture ${picture.name}`),
+    clipRect: (rect: number[], op: string) => log.push(`clip ${op} ${rect.join(' ')}`),
+    saveLayer: () => log.push('save layer'),
   }
   const ck = {
     GetWebGLContext: () => 1,
@@ -30,6 +32,8 @@ function fakeCanvasKit(log: string[]) {
       setColor() {}
       setStyle() {}
       setStrokeWidth() {}
+      setAlphaf() {}
+      setImageFilter() {}
       delete() {
         log.push('delete paint')
       }
@@ -37,6 +41,9 @@ function fakeCanvasKit(log: string[]) {
     WHITE: 'white',
     TRANSPARENT: 'clear',
     PaintStyle: { Stroke: 'stroke' },
+    ClipOp: { Difference: 'out of' },
+    ImageFilter: { MakeBlur: () => ({ delete: () => log.push('delete blur') }) },
+    TileMode: { Decal: 'decal' },
     ColorSpace: { SRGB: 'srgb' },
     Color: () => 'edge',
     XYWHRect: (x: number, y: number, w: number, h: number) => [x, y, w, h],
@@ -109,16 +116,49 @@ function harness(start: Design = design) {
   return { view, log, change, canvas: deps.canvas }
 }
 const picture = (name: string) => ({ name }) as unknown as SkPicture
+const white = [{ type: 'solid' as const, color: '#FFFFFFFF' }]
+/** The test design with a third page, `three`, holding one frame away from the origin, or none. */
+const withPageThree = (frames: boolean): Design => ({
+  ...design,
+  pages: { ...design.pages, three: { name: 'Three', order: 'a2' } },
+  frames: frames
+    ? {
+        ...design.frames,
+        'three-sq': {
+          pageId: 'three',
+          name: 'Square',
+          width: 500,
+          height: 400,
+          x: 100,
+          y: 200,
+          fills: white,
+          order: 'a0',
+        },
+      }
+    : design.frames,
+})
+/** The test design without page `one` and its frames. */
+const withoutPageOne: Design = {
+  ...design,
+  pages: { two: design.pages.two as Design['pages'][string] },
+  frames: Object.fromEntries(Object.entries(design.frames).filter(([, f]) => f.pageId !== 'one')),
+}
 
 describe('editorView', () => {
-  describe('design, frames, frameOf and firstPage', () => {
-    it('reads the design and lays out its frames as it opens', () => {
+  describe('design, frames, frameOf and page', () => {
+    it('reads the design and shows the first page, its frames where they are stored', () => {
       const { view } = harness()
       expect(view.design()).toBe(design)
-      expect(view.frames()).toEqual(frameGrid(design).frames)
-      expect(view.frameOf('two/mpu')).toMatchObject({ pageId: 'two', formatId: 'mpu' })
-      expect(view.frameOf('two/gone')).toBeUndefined()
-      expect(view.firstPage()).toBe('one')
+      expect(view.page()).toBe('one')
+      expect(view.frames()).toEqual(pageFrames(design, 'one').frames)
+      expect(view.frameOf('one-mpu')).toMatchObject({ pageId: 'one', name: 'MPU', x: 2560, y: 0 })
+    })
+
+    it('finds no frame of a page not shown, or one the design lacks', () => {
+      const { view } = harness()
+      expect(view.frameOf('two-mpu')).toBeUndefined()
+      expect(view.frameOf('gone')).toBeUndefined()
+      expect(view.frameOf(undefined)).toBeUndefined()
     })
   })
 
@@ -127,9 +167,30 @@ describe('editorView', () => {
       const { view } = harness()
       view.resize()
       view.setCamera({ x: 500 - 540, y: 400 - 540, zoom: 1 })
-      expect(view.middleFrame()?.key).toBe('one/sq')
+      expect(view.middleFrame()?.id).toBe('one-sq')
       view.setCamera({ x: 500 - 1200, y: 0, zoom: 1 })
       expect(view.middleFrame()).toBeUndefined()
+    })
+  })
+
+  describe('nearestFrame', () => {
+    it('finds the frame in the middle of the view, else the one nearest the middle', () => {
+      const { view } = harness()
+      view.resize()
+      view.setCamera({ x: 500 - 540, y: 400 - 540, zoom: 1 })
+      expect(view.nearestFrame()?.id).toBe('one-sq')
+      // The middle in the gap at 1200, 400: the story is 80 away, the square 120.
+      view.setCamera({ x: 500 - 1200, y: 0, zoom: 1 })
+      expect(view.nearestFrame()?.id).toBe('one-story')
+      // Past the MPU's end, at 3500, 100.
+      view.setCamera({ x: 500 - 3500, y: 400 - 100, zoom: 1 })
+      expect(view.nearestFrame()?.id).toBe('one-mpu')
+    })
+
+    it('finds none on a page with no frames', () => {
+      const { view } = harness(withPageThree(false))
+      view.showPage('three')
+      expect(view.nearestFrame()).toBeUndefined()
     })
   })
 
@@ -138,23 +199,29 @@ describe('editorView', () => {
       const { view } = harness()
       view.setCamera({ x: 100, y: 50, zoom: 2 })
       expect(view.onStage({ x: 110, y: 60 })).toEqual({ x: 100, y: 50 })
-      expect(view.pointAt({ x: 130, y: 80 })).toMatchObject({ frame: { key: 'one/sq' }, p: { x: 10, y: 10 } })
-      expect(view.spotAt({ x: 130, y: 80 })).toEqual({ frame: 'one/sq', x: 10, y: 10 })
+      expect(view.pointAt({ x: 130, y: 80 })).toMatchObject({ frame: { id: 'one-sq' }, p: { x: 10, y: 10 } })
+      expect(view.spotAt({ x: 130, y: 80 })).toEqual({ frameId: 'one-sq', x: 10, y: 10 })
       expect(view.spotAt({ x: 0, y: 0 })).toBeNull()
     })
   })
 
   describe('defaultFrame and screenPoint', () => {
-    it('finds a page in a format, the first page in the primary format by default, and where its pixels are on screen', () => {
+    it("finds a frame of the shown page, its first by default, and where the frame's pixels are on screen", () => {
       const { view } = harness()
-      expect(view.defaultFrame()).toMatchObject({ pageId: 'one', formatId: 'sq' })
-      expect(view.defaultFrame('two', 'mpu').key).toBe('two/mpu')
-      expect(() => view.defaultFrame('two', 'gone')).toThrow('no frame for page "two" in format "gone"')
+      expect(view.defaultFrame().id).toBe('one-sq')
+      expect(view.defaultFrame('one-mpu').id).toBe('one-mpu')
       view.setCamera({ x: 100, y: 50, zoom: 2 })
-      const { x, y } = view.defaultFrame('two', 'mpu')
-      expect(view.screenPoint(5, 6, 'two', 'mpu')).toEqual({ x: 10 + 100 + (x + 5) * 2, y: 10 + 50 + (y + 6) * 2 })
-      const first = view.defaultFrame()
-      expect(view.screenPoint(0, 0)).toEqual({ x: 10 + 100 + first.x * 2, y: 10 + 50 + first.y * 2 })
+      expect(view.screenPoint(5, 6, 'one-mpu')).toEqual({ x: 10 + 100 + (2560 + 5) * 2, y: 10 + 50 + 6 * 2 })
+      expect(view.screenPoint(0, 0)).toEqual({ x: 10 + 100, y: 10 + 50 })
+    })
+
+    it('throws for a frame not on the shown page, and on a page with no frames', () => {
+      const { view, change } = harness()
+      expect(() => view.defaultFrame('two-mpu')).toThrow('no frame "two-mpu" on the shown page')
+      expect(() => view.screenPoint(0, 0, 'gone')).toThrow('no frame "gone" on the shown page')
+      change(withPageThree(false))
+      view.showPage('three')
+      expect(() => view.defaultFrame()).toThrow('the shown page has no frames')
     })
   })
 
@@ -176,24 +243,54 @@ describe('editorView', () => {
       const { view } = harness()
       view.setCamera({ x: 10, y: 20, zoom: 2 })
       const el = { style: {} } as HTMLElement
-      view.placeBox(el, view.frameOf('one/sq') as never, { x: 5, y: 5, width: 50, height: 25 })
+      view.placeBox(el, view.frameOf('one-sq') as never, { x: 5, y: 5, width: 50, height: 25 })
       expect(el.style).toMatchObject({ left: '20px', top: '30px', width: '100px', height: '50px' })
     })
   })
 
   describe('update', () => {
-    it('reads the design again, and shows every format when the one shown alone is gone', () => {
+    it("reads the design again and lays out the shown page's frames", () => {
       const { view, change } = harness()
-      view.focus('story')
-      expect(view.frames().map((f) => f.key)).toEqual(['one/story', 'two/story'])
-      const formats = Object.fromEntries(Object.entries(design.formats).filter(([id]) => id !== 'story'))
-      const without = { ...design, formats }
+      const without: Design = {
+        ...design,
+        frames: Object.fromEntries(Object.entries(design.frames).filter(([id]) => id !== 'one-story')),
+      }
       change(without)
       expect(view.design()).toBe(design)
       view.update()
       expect(view.design()).toBe(without)
-      expect(view.focused()).toBeNull()
-      expect(view.frames()).toHaveLength(4)
+      expect(view.frames().map((f) => f.id)).toEqual(['one-sq', 'one-mpu'])
+    })
+
+    it('shows the first page again when the shown page is gone', () => {
+      const { view, change } = harness()
+      view.showPage('two')
+      change({ ...design, pages: { one: design.pages.one as Design['pages'][string] } })
+      view.update()
+      expect(view.page()).toBe('one')
+      expect(view.frames().map((f) => f.id)).toEqual(['one-sq', 'one-story', 'one-mpu'])
+      change(withoutPageOne)
+      view.update()
+      expect(view.page()).toBe('two')
+    })
+  })
+
+  describe('showPage', () => {
+    it('shows a page, laying out its frames at once, even one just added, and fits them', () => {
+      const { view, change } = harness()
+      view.resize()
+      change(withPageThree(true))
+      view.showPage('three')
+      expect(view.page()).toBe('three')
+      expect(view.frames().map((f) => f.id)).toEqual(['three-sq'])
+      expect(view.camera()).toEqual(fit({ x: 100, y: 200, width: 500, height: 400 }, { width: 1000, height: 800 }))
+    })
+
+    it('shows the first page for a page the design lacks', () => {
+      const { view } = harness()
+      view.showPage('two')
+      view.showPage('gone')
+      expect(view.page()).toBe('one')
     })
   })
 
@@ -203,31 +300,57 @@ describe('editorView', () => {
       expect(view.paint(() => [])).toBe(false)
     })
 
-    it('draws the pictures of the frames in view at the camera, each on its page, and shows them', () => {
+    it('draws the pictures of the frames in view at the camera, each on its page over white on a soft shadow, and shows them', () => {
       const { view, log } = harness()
       view.resize()
       view.setCamera({ x: 0, y: 0, zoom: 0.5 })
       log.length = 0
       let asked: string[] = []
       const painted = view.paint((inView) => {
-        asked = inView.map((f) => f.key)
-        return inView.slice(0, 1).map((frame) => ({ frame, picture: picture(frame.key) }))
+        asked = inView.map((f) => f.id)
+        return inView.slice(0, 1).map((frame) => ({ frame, picture: picture(frame.id) }))
       })
       expect(painted).toBe(true)
-      expect(asked).toEqual(['one/sq', 'one/story'])
-      expect(view.inView().map((f) => f.key)).toEqual(asked)
+      expect(asked).toEqual(['one-sq', 'one-story'])
+      expect(view.inView().map((f) => f.id)).toEqual(asked)
       expect(log).toEqual([
         'clear',
         'save',
         'scale 2 2',
         'translate 0 0',
         'scale 0.5 0.5',
-        'rect',
+        // The shadow: 20 in from each side, 20 down.
+        'rect 20 40 1040 1040',
+        'rect 0 0 1080 1080',
         'save',
         'translate 0 0',
-        'picture one/sq',
+        'picture one-sq',
         'restore',
-        'rect',
+        'restore',
+        'flush',
+      ])
+    })
+  })
+
+  describe('paint with a ghost', () => {
+    it('draws the ghost after the frames, faintly and only past the edge of its frame', () => {
+      const { view, log } = harness()
+      view.resize()
+      view.setCamera({ x: 0, y: 0, zoom: 0.5 })
+      const story = view.frameOf('one-story')
+      log.length = 0
+      view.paint(
+        (inView) => inView.map((frame) => ({ frame, picture: picture(frame.id) })),
+        () => (story ? { frame: story, picture: picture('ghost') } : null),
+      )
+      expect(log.slice(-9)).toEqual([
+        'save',
+        'clip out of 1280 0 1080 1920',
+        'save layer',
+        'translate 1280 0',
+        'picture ghost',
+        'restore',
+        'restore',
         'restore',
         'flush',
       ])
@@ -257,18 +380,25 @@ describe('editorView', () => {
     })
   })
 
-  describe('fitAll, fitArea and fitPage', () => {
-    it('fits every frame, clear of the insets, with room for the chip when a format shows alone', () => {
+  describe('fitAll and fitArea', () => {
+    it("fits the shown page's frames, clear of the insets", () => {
       const { view } = harness()
       view.resize()
       const insets = { top: 40, right: 0, bottom: 72, left: 0 }
       view.setInsets(insets)
       view.fitAll()
       const viewport = { width: 1000, height: 800 }
-      expect(view.camera()).toEqual(fit(frameGrid(design).bounds, viewport, undefined, insets))
-      view.focus('mpu')
-      view.fitAll()
-      expect(view.camera()).toEqual(fit(frameGrid(design, 'mpu').bounds, viewport, 104, insets))
+      expect(view.camera()).toEqual(fit(pageFrames(design, 'one').bounds as Rect, viewport, undefined, insets))
+      view.showPage('two')
+      expect(view.camera()).toEqual(fit(pageFrames(design, 'two').bounds as Rect, viewport, undefined, insets))
+    })
+
+    it("puts the page's origin in the middle of the stage at 100% on a page with no frames", () => {
+      const { view, change } = harness()
+      view.resize()
+      change(withPageThree(false))
+      view.showPage('three')
+      expect(view.camera()).toEqual({ x: 500, y: 400, zoom: 1 })
     })
 
     it('fits a part of the canvas, or leaves the camera without one', () => {
@@ -279,37 +409,6 @@ describe('editorView', () => {
       expect(view.camera()).toEqual(fit(area, { width: 1000, height: 800 }))
       view.fitArea(undefined)
       expect(view.camera()).toEqual(fit(area, { width: 1000, height: 800 }))
-    })
-
-    it('fits every format of one page', () => {
-      const { view } = harness()
-      view.resize()
-      view.fitPage('two')
-      const row = frameGrid(design).frames.filter((f) => f.pageId === 'two')
-      const last = row.at(-1)
-      const first = row[0]
-      if (!first || !last) throw new Error('no row')
-      expect(view.camera()).toEqual(
-        fit(
-          { x: 0, y: first.y, width: last.x + last.width, height: Math.max(...row.map((f) => f.height)) },
-          { width: 1000, height: 800 },
-        ),
-      )
-      const before = view.camera()
-      view.fitPage('gone')
-      expect(view.camera()).toEqual(before)
-    })
-  })
-
-  describe('focus and focused', () => {
-    it('shows one format alone, or every one again', () => {
-      const { view } = harness()
-      view.focus('mpu')
-      expect(view.focused()).toBe('mpu')
-      expect(view.frames().map((f) => f.key)).toEqual(['one/mpu', 'two/mpu'])
-      view.focus('gone')
-      expect(view.focused()).toBeNull()
-      expect(view.frames()).toHaveLength(6)
     })
   })
 
@@ -349,7 +448,15 @@ describe('editorView', () => {
       view.destroy()
       runFrames()
       expect(observed).toEqual(['observe', 'disconnect'])
-      expect(log).toEqual(['surface 2000×1600', 'delete surface', 'delete paint', 'delete paint', 'delete gl'])
+      expect(log).toEqual([
+        'surface 2000×1600',
+        'delete surface',
+        'delete paint',
+        'delete paint',
+        'delete blur',
+        'delete paint',
+        'delete gl',
+      ])
     })
   })
 })

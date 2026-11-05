@@ -1,5 +1,5 @@
 {
-  "arabic-ad p1.sq": {
+  "arabic-ad sq": {
     "pdf": {
       "percent": 0.35,
       "limit": 0.487
@@ -9,7 +9,7 @@
       "limit": 0.435
     }
   },
-  "auto-layout p1.sq": {
+  "auto-layout sq": {
     "pdf": {
       "percent": 0.743,
       "limit": 0.979
@@ -19,7 +19,7 @@
       "limit": 0.425
     }
   },
-  "box-corners p1.square": {
+  "box-corners square": {
     "pdf": {
       "percent": 0.115,
       "limit": 0.194
@@ -29,7 +29,7 @@
       "limit": 0.092
     }
   },
-  "box-strokes p1.square": {
+  "box-strokes square": {
     "pdf": {
       "percent": 0.097,
       "limit": 0.171
@@ -39,7 +39,7 @@
       "limit": 0.155
     }
   },
-  "carousel p1.pt": {
+  "carousel p1-pt": {
     "pdf": {
       "percent": 0.086,
       "limit": 0.157
@@ -49,7 +49,7 @@
       "limit": 0.148
     }
   },
-  "carousel p1.sq": {
+  "carousel p1-sq": {
     "pdf": {
       "percent": 0.141,
       "limit": 0.226
@@ -59,7 +59,7 @@
       "limit": 0.172
     }
   },
-  "carousel p2.pt": {
+  "carousel p2-pt": {
     "pdf": {
       "percent": 0.093,
       "limit": 0.167
@@ -69,7 +69,7 @@
       "limit": 0.156
     }
   },
-  "carousel p2.sq": {
+  "carousel p2-sq": {
     "pdf": {
       "percent": 0.141,
       "limit": 0.226
@@ -79,7 +79,7 @@
       "limit": 0.182
     }
   },
-  "carousel p3.pt": {
+  "carousel p3-pt": {
     "pdf": {
       "percent": 0.068,
       "limit": 0.135
@@ -89,7 +89,7 @@
       "limit": 0.123
     }
   },
-  "carousel p3.sq": {
+  "carousel p3-sq": {
     "pdf": {
       "percent": 0.119,
       "limit": 0.199
@@ -99,7 +99,7 @@
       "limit": 0.157
     }
   },
-  "english-sale-ad p1.sq": {
+  "english-sale-ad sq": {
     "pdf": {
       "percent": 0.559,
       "limit": 0.748
@@ -109,7 +109,7 @@
       "limit": 0.388
     }
   },
-  "fill-stacks p1.sq": {
+  "fill-stacks sq": {
     "pdf": {
       "percent": 0.046,
       "limit": 0.107
@@ -119,7 +119,7 @@
       "limit": 0.05
     }
   },
-  "groups-and-boxes p1.sq": {
+  "groups-and-boxes sq": {
     "pdf": {
       "percent": 0.025,
       "limit": 0.081
@@ -129,7 +129,7 @@
       "limit": 0.091
     }
   },
-  "hindi-ad p1.sq": {
+  "hindi-ad sq": {
     "pdf": {
       "percent": 0.441,
       "limit": 0.601
@@ -139,7 +139,7 @@
       "limit": 0.545
     }
   },
-  "image-fills p1.sq": {
+  "image-fills sq": {
     "pdf": {
       "percent": 0.424,
       "limit": 0.58
@@ -149,7 +149,7 @@
       "limit": 0.05
     }
   },
-  "layer-bounds p1.sq": {
+  "layer-bounds sq": {
     "pdf": {
       "percent": 0.001,
       "limit": 0.052
@@ -159,7 +159,7 @@
       "limit": 0.05
     }
   },
-  "shapes-and-booleans p1.sq": {
+  "shapes-and-booleans sq": {
     "pdf": {
       "percent": 0.113,
       "limit": 0.191
@@ -169,7 +169,7 @@
       "limit": 0.173
     }
   },
-  "shapes-and-effects p1.sq": {
+  "shapes-and-effects sq": {
     "pdf": {
       "percent": 0.047,
       "limit": 0.109
@@ -179,7 +179,7 @@
       "limit": 0.051
     }
   },
-  "stress p1.sq": {
+  "stress sq": {
     "pdf": {
       "percent": 5.127,
       "limit": 6.459
@@ -189,7 +189,7 @@
       "limit": 4.508
     }
   },
-  "strokes-and-effects p1.sq": {
+  "strokes-and-effects sq": {
     "pdf": {
       "percent": 0.088,
       "limit": 0.16
@@ -199,7 +199,7 @@
       "limit": 0.106
     }
   },
-  "text-and-group-bounds p1.sq": {
+  "text-and-group-bounds sq": {
     "pdf": {
       "percent": 0.268,
       "limit": 0.385
@@ -209,7 +209,7 @@
       "limit": 0.05
     }
   },
-  "text-styles p1.pt": {
+  "text-styles pt": {
     "pdf": {
       "percent": 2.683,
       "limit": 3.404

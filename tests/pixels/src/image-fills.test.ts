@@ -36,7 +36,7 @@ function flat([r, g, b]: readonly number[]): Uint8Array {
 
 const bytes = { ...fixtureResources(), images: { flat: flat(BASE) } }
 type Node = Record<string, unknown>
-const rect = (index: string, props: Record<string, unknown>, parentId = 'p1'): Node => ({
+const rect = (index: string, props: Record<string, unknown>, parentId = 'f'): Node => ({
   type: 'graphic',
   parentId,
   index,
@@ -44,13 +44,24 @@ const rect = (index: string, props: Record<string, unknown>, parentId = 'p1'): N
   props: { x: 0, y: 0, width: 100, height: 100, shape: { kind: 'rect' }, ...props },
 })
 const design = (nodes: Record<string, Node>) => ({
-  meta: { designId: 'd', name: 'Image fills', kind: 'single', primaryFormatId: 'f' },
-  formats: { f: { name: 'F', width: 100, height: 100, order: 'a0' } },
-  pages: { p1: { name: 'Page', order: 'a0', fills: [{ type: 'solid', color: '#FFFFFFFF' }] } },
-  nodes,
-  overrides: {},
+  meta: { designId: 'd', name: 'Image fills' },
+  pages: { p1: { name: 'Page', order: 'a0' } },
+  frames: {
+    f: {
+      pageId: 'p1',
+      name: 'F',
+      width: 100,
+      height: 100,
+      x: 0,
+      y: 0,
+      fills: [{ type: 'solid', color: '#FFFFFFFF' }],
+      order: 'a0',
+    },
+  },
+  // In one frame, each layer's link is its own id.
+  nodes: Object.fromEntries(Object.entries(nodes).map(([id, node]) => [id, { ...node, link: id }])),
 })
-const draw = (nodes: Record<string, Node>) => renderDesign(ck, design(nodes), 'p1', 'f', bytes)
+const draw = (nodes: Record<string, Node>) => renderDesign(ck, design(nodes), 'f', bytes)
 const solid = (color: string) => [{ type: 'solid', color }]
 
 describe('image adjustments and filters', () => {
@@ -161,7 +172,7 @@ describe('masks', () => {
 
   it('masks only up to the next mask, inside its own parent; a hidden mask masks nothing', () => {
     const r = draw({
-      g: { type: 'group', parentId: 'p1', index: 'a0', name: 'g', props: { x: 0, y: 0, width: 100, height: 100 } },
+      g: { type: 'group', parentId: 'f', index: 'a0', name: 'g', props: { x: 0, y: 0, width: 100, height: 100 } },
       m1: rect('a0', { width: 50, height: 100, fills: solid('#000000FF'), mask: 'alpha' }, 'g'),
       a: rect('a1', { fills: solid('#FF0000FF') }, 'g'),
       m2: rect('a2', { x: 50, width: 50, height: 50, fills: solid('#000000FF'), mask: 'alpha' }, 'g'),

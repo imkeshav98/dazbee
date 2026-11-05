@@ -40,7 +40,7 @@ export function writeDriftReport() {
       return `| ${r.case} | ${r.differing} | ${r.percent.toFixed(3)}% | ${r.maxDelta} | ${limit} | ${r.problem ? `**Fail**: ${r.problem}` : 'Pass'} |`
     })
   const table = [
-    '| Page in format | Differing pixels | Share | Largest channel difference | Limit (share, channel) | Result |',
+    '| Frame | Differing pixels | Share | Largest channel difference | Limit (share, channel) | Result |',
     '|---|---|---|---|---|---|',
     ...rows,
   ].join('\n')

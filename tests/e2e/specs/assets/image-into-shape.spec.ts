@@ -2,68 +2,72 @@
 // lights the star and goes into it as its fill, while one dropped on empty space still makes a new
 // layer; the Image card's Replace swaps the picture, keeping its filter; a shape's Add image puts a
 // picture into a plain rectangle. Each is one undo step; redo brings a placed image back, and it is
-// there after a reload.
+// there after a reload. The star's linked copy in the wide frame keeps its own fills throughout.
 import type { DesignInput } from '@dazbee/schema'
 
 import { card1, photo, upload } from '../../support/assets.ts'
 import { placed, reloads, screenPoint, writeOutput } from '../../support/editor.ts'
+import { copyIn, frameDesign, linkedFrames } from '../../support/seed.ts'
 import { click, openStage, press, read, selection } from '../../support/stage.ts'
 import { expect, type Page, test } from '../../support/test.ts'
 import { barMenu, openCard } from '../../support/top-bar.ts'
 
 test.describe.configure({ timeout: 120_000 })
 
-const design = (): DesignInput => ({
-  meta: {
-    designId: 'replaced-by-the-api',
-    name: 'Image into a shape',
-    kind: 'single',
-    primaryFormatId: 'sq',
-  },
-  formats: {
-    sq: { name: 'Square', width: 1080, height: 1080, order: 'a0' },
-    wide: { name: 'Wide', width: 1920, height: 1080, order: 'a1' },
-  },
-  pages: { p1: { name: 'Page 1', order: 'a0', fills: [{ type: 'solid', color: '#FFF8F0FF' }] } },
-  nodes: {
-    star: {
-      type: 'graphic',
-      parentId: 'p1',
-      index: 'a0',
-      name: 'Star',
-      props: {
-        x: 600,
-        y: 120,
-        width: 420,
-        height: 420,
-        shape: { kind: 'star', points: 5 },
-        fills: [{ type: 'solid', color: '#FF2E7EFF' }],
+const design = (): DesignInput =>
+  linkedFrames(
+    frameDesign({
+      name: 'Image into a shape',
+      fills: [{ type: 'solid', color: '#FFF8F0FF' }],
+      nodes: {
+        star: {
+          type: 'graphic',
+          parentId: 'sq',
+          index: 'a0',
+          name: 'Star',
+          props: {
+            x: 600,
+            y: 120,
+            width: 420,
+            height: 420,
+            shape: { kind: 'star', points: 5 },
+            fills: [{ type: 'solid', color: '#FF2E7EFF' }],
+          },
+        },
+        box: {
+          type: 'graphic',
+          parentId: 'sq',
+          index: 'a1',
+          name: 'Box',
+          props: {
+            x: 640,
+            y: 640,
+            width: 320,
+            height: 240,
+            shape: { kind: 'rect', cornerRadius: 24 },
+            fills: [{ type: 'solid', color: '#2F6BFFFF' }],
+          },
+        },
       },
-    },
-    box: {
-      type: 'graphic',
-      parentId: 'p1',
-      index: 'a1',
-      name: 'Box',
-      props: {
-        x: 640,
-        y: 640,
-        width: 320,
-        height: 240,
-        shape: { kind: 'rect', cornerRadius: 24 },
-        fills: [{ type: 'solid', color: '#2F6BFFFF' }],
+    }),
+    // The star's copy in the wide frame is green: it keeps its own fills when an image goes into the square's star.
+    [
+      {
+        id: 'wide',
+        name: 'Wide',
+        width: 1920,
+        height: 1080,
+        values: { star: { fills: [{ type: 'solid', color: '#00A88AFF' }] } },
       },
-    },
-  },
-  // The wide format paints the star green: it keeps its own colour when an image goes in.
-  overrides: { 'format:wide': { star: { fills: [{ type: 'solid', color: '#00A88AFF' }] } } },
-})
+    ],
+  )
 
 type Fill = { type: string; assetId?: string; fit?: string; filter?: string; crop?: unknown }
-/** A layer's fills as the square shows them: the base with the square's own, which the cards write. */
-const fillsOf = async (page: Page, id: string) => (placed(await read(page), id, 'sq').fills ?? []) as Fill[]
-const wideFillsOf = async (page: Page, id: string) =>
-  ((await read(page)).overrides['format:wide']?.[id]?.fills ?? []) as Fill[]
+/** A layer's fills, which the cards write. */
+const fillsOf = async (page: Page, id: string) => (placed(await read(page), id)?.fills ?? []) as Fill[]
+/** The fills of the star's copy in the wide frame. */
+const wideStarFills = async (page: Page) => fillsOf(page, copyIn('wide', 'star'))
+const GREEN = [{ type: 'solid', color: '#00A88AFF' }]
 
 /** Drags an asset library tile to a design pixel of the square with the mouse, the shot taken mid-drag. */
 async function dragTile(page: Page, assetId: string, to: { x: number; y: number }, shot?: string) {
@@ -101,11 +105,8 @@ test('an image dragged onto a star goes into it, the Image card replaces it, and
     { type: 'solid', color: '#FF2E7EFF' },
     { type: 'image', assetId: sneaker.id, fit: 'fill', opacity: 1 },
   ])
-  // In the wide format the photo goes over its own green.
-  expect(await wideFillsOf(page, 'star')).toEqual([
-    { type: 'solid', color: '#00A88AFF' },
-    { type: 'image', assetId: sneaker.id, fit: 'fill', opacity: 1 },
-  ])
+  // The copy in the wide frame keeps its own green and no photo.
+  expect(await wideStarFills(page)).toEqual(GREEN)
   expect(Object.keys((await read(page)).nodes)).toHaveLength(layers)
   expect(await selection(page)).toEqual(['star'])
   await expect(page.locator('.stage-overlay .drop-target')).toHaveCount(0)
@@ -123,17 +124,14 @@ test('an image dragged onto a star goes into it, the Image card replaces it, and
   expect((await fillsOf(page, 'star')).at(-1)).toMatchObject({ type: 'image', assetId: sneaker.id })
   await press(page, 'undo')
   expect(await fillsOf(page, 'star')).toEqual([{ type: 'solid', color: '#FF2E7EFF' }])
-  expect(await wideFillsOf(page, 'star')).toEqual([{ type: 'solid', color: '#00A88AFF' }])
-  // Redo puts the photo into the star again, in both formats.
+  expect(await wideStarFills(page)).toEqual(GREEN)
+  // Redo puts the photo into the star again, and only there.
   await press(page, 'redo')
   expect.soft(await fillsOf(page, 'star')).toEqual([
     { type: 'solid', color: '#FF2E7EFF' },
     { type: 'image', assetId: sneaker.id, fit: 'fill', opacity: 1 },
   ])
-  expect.soft(await wideFillsOf(page, 'star')).toEqual([
-    { type: 'solid', color: '#00A88AFF' },
-    { type: 'image', assetId: sneaker.id, fit: 'fill', opacity: 1 },
-  ])
+  expect.soft(await wideStarFills(page)).toEqual(GREEN)
   await press(page, 'undo')
   expect(await fillsOf(page, 'star')).toEqual([{ type: 'solid', color: '#FF2E7EFF' }])
 
