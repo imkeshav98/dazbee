@@ -6,12 +6,13 @@
 // through; a form, on its first control. They stand over the edit panel: Esc closes them first,
 // giving the focus back to Share when it was in them, and never clears the selection.
 import { BookmarkSimpleIcon, CaretRightIcon, DownloadSimpleIcon, ShareFatIcon } from '@phosphor-icons/react'
-import { type KeyboardEvent as ReactKeyboardEvent, useEffect, useId, useRef, useState } from 'react'
+import { type KeyboardEvent as ReactKeyboardEvent, useEffect, useId, useState } from 'react'
 
 import type { Editor } from '@dazbee/editor'
 
 import { useEditorDesign } from '@/components/editor/editor-hooks.ts'
 import { Button } from '@/components/ui/button.tsx'
+import { useMenuClose } from '@/components/ui/menu-close.ts'
 import { useMessages } from '@/lib/i18n/client.tsx'
 
 import { ExportForm } from './export-menu.tsx'
@@ -55,32 +56,10 @@ export function ShareMenu({
   const t = useMessages()
   const { design } = useEditorDesign(editor)
   const [open, setOpen] = useState<Open>(null)
-  const box = useRef<HTMLDivElement>(null)
-  const button = useRef<HTMLButtonElement>(null)
+  // Closes on Esc, before what is under it, or a press outside, giving the focus back to Share.
+  const { box, button, overPanelMark } = useMenuClose(open !== null, () => setOpen(null))
   const id = useId()
 
-  // Closes on Escape or a press outside. Esc is the menu's or form's before anything under them,
-  // the edit panel and the stage's selection included, unless a list open in the form, as a
-  // select's, takes it to close first. It gives the focus back to Share when it was in them, or nowhere.
-  useEffect(() => {
-    if (!open) return
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape' || event.defaultPrevented) return
-      const at = document.activeElement
-      if (at !== button.current && at?.getAttribute('aria-expanded') === 'true') return
-      event.stopImmediatePropagation()
-      event.preventDefault()
-      if (!at || at === document.body || box.current?.contains(at)) button.current?.focus()
-      setOpen(null)
-    }
-    const onPress = (event: PointerEvent) => !box.current?.contains(event.target as Node) && setOpen(null)
-    window.addEventListener('keydown', onKey, true)
-    window.addEventListener('pointerdown', onPress)
-    return () => {
-      window.removeEventListener('keydown', onKey, true)
-      window.removeEventListener('pointerdown', onPress)
-    }
-  }, [open])
   // The menu takes the focus as it opens, on its first item; a form, on its first control.
   useEffect(() => {
     if (!open) return
@@ -91,7 +70,7 @@ export function ShareMenu({
   }, [open, id])
 
   return (
-    <div ref={box} data-over-panel={open ? '' : undefined} className="relative">
+    <div ref={box} {...overPanelMark} className="relative">
       <Button
         ref={button}
         variant="primary"

@@ -22,6 +22,7 @@ import {
 } from '@/components/editor/edit-store.ts'
 import { useSelection } from '@/components/editor/editor-hooks.ts'
 import { FontChooser } from '@/components/editor/flyouts/font-panel.tsx'
+import { inPopUp } from '@/components/ui/menu-close.ts'
 import { useOverlayScroll } from '@/components/ui/overlay-scroll.ts'
 import { useScrollEdges } from '@/components/ui/scroll-edges.ts'
 import { cn } from '@/lib/cn.ts'
@@ -114,7 +115,9 @@ export function PanelFrame({
   }, [])
   // Esc closes the panel before it clears the selection, wherever the focus is. In a field of the
   // panel the field still takes the key, throwing away what was typed, and the panel closes with
-  // it; the focus goes back to the item that opened it once the field has let it go.
+  // it; the focus goes back to the item that opened it once the field has let it go. A field
+  // outside the panel, as the design's name or the bar's size, stands over it: it takes the key
+  // alone, throwing away what was typed, and the focus leaves it, so the next Esc closes the panel.
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.key !== 'Escape' || event.defaultPrevented) return
@@ -122,16 +125,16 @@ export function PanelFrame({
       if (overPanel()) return
       const at = document.activeElement
       // A list of the panel's own, a select's or a pop-up's, closes first.
-      if (
-        at instanceof Element &&
-        (at.closest('[data-radix-popper-content-wrapper]') || at.getAttribute('aria-expanded') === 'true')
-      )
-        return
+      if (inPopUp(at) || at?.getAttribute('aria-expanded') === 'true') return
       if (
         at instanceof HTMLElement &&
-        panel.current?.contains(at) &&
         (at.tagName === 'INPUT' || at.tagName === 'TEXTAREA' || at.tagName === 'SELECT')
       ) {
+        if (!panel.current?.contains(at)) {
+          // Once the field has thrown away what was typed, so leaving it keeps nothing.
+          requestAnimationFrame(() => document.activeElement === at && at.blur())
+          return
+        }
         setOpen(null)
         requestAnimationFrame(() => {
           if (document.activeElement === document.body || document.activeElement === null) openerOf(id, opener)?.focus()

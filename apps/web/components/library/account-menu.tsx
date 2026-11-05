@@ -1,12 +1,14 @@
 'use client'
 
 // The round avatar at the top end, as in the final mock. Language, theme, settings and signing out
-// live behind it, so the top bar keeps to the work and one action.
+// live behind it, so the top bar keeps to the work and one action. In the editor its menu stands
+// over the edit panel: Esc closes it first, and never clears the selection.
 import { GearSixIcon, SignOutIcon } from '@phosphor-icons/react'
 import Link from 'next/link'
-import { useEffect, useId, useRef, useState } from 'react'
+import { useId, useState } from 'react'
 
 import { TOUCH_ROW } from '@/components/ui/looks.ts'
+import { useMenuClose } from '@/components/ui/menu-close.ts'
 import { useMessages } from '@/lib/i18n/client.tsx'
 import { initialsOf } from '@/lib/initials.ts'
 
@@ -26,24 +28,14 @@ export function AccountMenu({
 }) {
   const t = useMessages()
   const [open, setOpen] = useState(false)
-  const box = useRef<HTMLDivElement>(null)
+  // Closes on Esc, before what is under it, or a press outside, giving the focus back to the avatar.
+  const { box, button, overPanelMark } = useMenuClose(open, () => setOpen(false))
   const id = useId()
 
-  useEffect(() => {
-    if (!open) return
-    const onKey = (event: KeyboardEvent) => event.key === 'Escape' && setOpen(false)
-    const onPress = (event: PointerEvent) => !box.current?.contains(event.target as Node) && setOpen(false)
-    window.addEventListener('keydown', onKey)
-    window.addEventListener('pointerdown', onPress)
-    return () => {
-      window.removeEventListener('keydown', onKey)
-      window.removeEventListener('pointerdown', onPress)
-    }
-  }, [open])
-
   return (
-    <div ref={box} className="relative">
+    <div ref={box} {...overPanelMark} className="relative">
       <button
+        ref={button}
         type="button"
         aria-label={t.account.open}
         aria-expanded={open}
