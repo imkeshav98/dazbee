@@ -4,4 +4,4 @@
 dazbee_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 dazbee_node="$(ls -d /opt/nvm/versions/node/v"$(cat "$dazbee_root/.nvmrc")".*/bin 2>/dev/null | sort -V | tail -1)"
 if [ -n "$dazbee_node" ]; then export PATH="$dazbee_node:$PATH"; fi
-unset WORKOS_API_KEY WORKOS_CLIENT_ID WORKOS_REDIRECT_URI dazbee_root dazbee_node
+unset WORKOS_API_KEY WORKOS_CLIENT_ID WORKOS_REDIRECT_URI WORKOS_TEST_EMAIL WORKOS_TEST_PASSWORD dazbee_root dazbee_node

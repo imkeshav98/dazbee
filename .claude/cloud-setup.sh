@@ -16,10 +16,13 @@ if ! docker info >/dev/null 2>&1; then
 fi
 
 # Node 22 is the machine's default; the repo wants .nvmrc's. pnpm goes in under it, because Turbo
-# cannot start the machine's own pnpm.
+# cannot start the machine's own pnpm. nvm's script stops under set -eu, so it runs without them.
+set +eu
 # shellcheck disable=SC1091
 source /opt/nvm/nvm.sh
 nvm install "$(cat .nvmrc)" >/dev/null
+nvm alias default "$(cat .nvmrc)" >/dev/null
+set -eu
 npm install -g "$(node -p "require('./package.json').packageManager")" >/dev/null 2>&1
 
 # shellcheck disable=SC1091
@@ -27,4 +30,6 @@ source .claude/cloud-env.sh
 pnpm install --frozen-lockfile
 docker compose up -d --wait
 pnpm --filter @dazbee/e2e exec playwright install --with-deps chromium >/dev/null
+# The browser tests serve the built web app: build it again after changing the app.
+pnpm turbo run build --filter=@dazbee/web >/dev/null
 echo "cloud setup done: node $(node -v), pnpm $(pnpm -v), running: $(docker compose ps --format '{{.Service}}' | tr '\n' ' ')"
