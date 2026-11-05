@@ -57,8 +57,10 @@ for (const [width, height] of SCREEN_SIZES) {
           .toBe(false)
         await page.mouse.move(0, height / 2)
         await shoot(page, name('outlines'))
-        // A group's ⋯, the longest, with Ungroup after Put in a box; on a phone the whole sheet.
+        // A group's ⋯, the longest, with Ungroup after Put in a box; on a phone the whole sheet. Opened
+        // by a mouse with no focus left from the keys before, as a person clicking it sees it.
         await selectLayers(page, ['logo'])
+        await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur())
         await moreMenu(page)
         await page.mouse.move(0, height / 2)
         await shoot(page, name('group-more'))
