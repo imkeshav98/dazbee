@@ -318,11 +318,22 @@ describe('editorSelection', () => {
       expect(log).toEqual(['changed'])
     })
 
-    it('does nothing for the frame already picked', () => {
+    it('for the frame already picked, changes nothing and shows it, and the frame listeners hear it again once told', () => {
       const { selection, log } = harness()
       selection.pickFrame('p1-f1')
+      selection.tellListeners()
       log.length = 0
       selection.pickFrame('p1-f1')
+      expect(selection.pickedFrame()).toBe('p1-f1')
+      selection.tellListeners()
+      selection.tellListeners()
+      expect(log).toEqual(['changed', 'frame p1-f1'])
+    })
+
+    it('with none picked, does nothing for null', () => {
+      const { selection, log } = harness()
+      selection.pickFrame(null)
+      selection.tellListeners()
       expect(log).toEqual([])
     })
 

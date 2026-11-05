@@ -151,7 +151,10 @@ export interface Editor {
    * or a frame not on the shown page, lets the picked one go.
    */
   pickFrame: (frameId: string | null) => void
-  /** Calls back with the picked frame, or null, whenever it changes. */
+  /**
+   * Calls back with the picked frame, or null, whenever it changes, and each time the picked frame
+   * is picked again, as by another click on its label.
+   */
   onFramePick(listener: (frameId: string | null) => void): () => boolean
   /**
    * Picks a frame of the shown page and asks the page to rename it in place, as a double click on

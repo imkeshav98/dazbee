@@ -48,9 +48,17 @@ export function LayersPanel({ editor }: { editor: Editor }) {
   useFlyoutNote(page?.name ?? null)
 
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(() => new Set())
-  // A selection on the stage, or a picked frame, shows in the panel: each time either changes, its
-  // frame and the groups it is in open, even those closed by hand since; until then they stay as
-  // they were left.
+  // Each pick of a frame, of the one picked already too, counted so its row opens again.
+  const [picks, setPicks] = useState(0)
+  useEffect(() => {
+    const stop = editor.onFramePick(() => setPicks((n) => n + 1))
+    return () => {
+      stop()
+    }
+  }, [editor])
+  // A selection on the stage, or a picked frame, shows in the panel: each time the selection
+  // changes or a frame is picked, its frame and the groups it is in open, even those closed by hand
+  // since; until then they stay as they were left.
   const selectionKey = selection.join(' ')
   useEffect(() => {
     const opening = opensFor(design, selection, picked)
@@ -59,7 +67,7 @@ export function LayersPanel({ editor }: { editor: Editor }) {
       const add = opening.filter((id) => !now.has(id))
       return add.length > 0 ? new Set([...now, ...add]) : now
     })
-  }, [selectionKey, picked])
+  }, [selectionKey, picked, picks])
   // A page of one frame opens it: there is no other to choose.
   const onlyFrame = frames.length === 1 ? frames[0]?.[0] : undefined
   useEffect(() => {

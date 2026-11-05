@@ -69,7 +69,10 @@ export interface EditorSelection {
    * group gone into, and the picked frame when it is not shown.
    */
   dropOffPage(): void
-  /** Picks a frame, or none with null, letting the selection go, and shows it. */
+  /**
+   * Picks a frame, or none with null, letting the selection go, and shows it. The frame already
+   * picked is picked again: nothing changes, but the frame listeners hear of it.
+   */
   pickFrame(frameId: string | null): void
   /**
    * Picks a frame for the page to rename in place of its label, and shows it; null once the rename
@@ -88,12 +91,13 @@ export interface EditorSelection {
   hover(next: Picked | null): boolean
   /**
    * Tells the selection listeners when the selection differs from the one they last heard of,
-   * then the frame listeners when the picked frame does. The overlay calls it once drawn.
+   * then the frame listeners when the picked frame does or was picked again. The overlay calls it
+   * once drawn.
    */
   tellListeners(): void
   /** Told when the selection changes, so panels can follow it. */
   onSelection(listener: (ids: string[]) => void): () => boolean
-  /** Told when the picked frame changes, with null once it goes. */
+  /** Told when the picked frame changes, with null once it goes, and when it is picked again. */
   onFramePick(listener: (frameId: string | null) => void): () => boolean
   destroy(): void
 }
@@ -112,6 +116,8 @@ export function editorSelection({ drawn, frames, changed }: SelectionDeps): Edit
   let renaming: string | null = null
   /** The picked frame the frame listeners last heard of. */
   let lastPicked: string | null = null
+  /** Whether the picked frame was picked again since the frame listeners last heard. */
+  let pickedAgain = false
   /** The group or box double-clicked into. */
   let entered: string | null = null
   /** The frame layers were last selected in, by page. */
@@ -201,7 +207,12 @@ export function editorSelection({ drawn, frames, changed }: SelectionDeps): Edit
     endModesWhenNone()
   }
   function pickFrame(frameId: string | null) {
-    if (frameId === pickedFrame) return
+    if (frameId === pickedFrame) {
+      if (frameId === null) return
+      pickedAgain = true
+      changed()
+      return
+    }
     pickedFrame = frameId
     renaming = null
     // Picking a frame lets the selection go, with a crop or path edit on it and any group gone into.
@@ -243,8 +254,9 @@ export function editorSelection({ drawn, frames, changed }: SelectionDeps): Edit
       lastSelection = now
       for (const listener of selectionListeners) listener(selection?.ids ?? [])
     }
-    if (pickedFrame !== lastPicked) {
+    if (pickedFrame !== lastPicked || pickedAgain) {
       lastPicked = pickedFrame
+      pickedAgain = false
       for (const listener of frameListeners) listener(pickedFrame)
     }
   }

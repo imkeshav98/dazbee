@@ -5,6 +5,7 @@
 // second tab sees; hide and lock on a row acting on that layer alone, never its linked copy; a layer
 // dragged onto its own frame's row going to the top and onto another frame's going nowhere.
 import { screenPoint, writeOutput } from '../../support/editor.ts'
+import { clickLabel } from '../../support/frames-on-canvas.ts'
 import { layerRow, openDesign, picked } from '../../support/layers-frames.ts'
 import { frameRow, listed, node, row, tree } from '../../support/layers-panel.ts'
 import { copyIn } from '../../support/seed.ts'
@@ -129,6 +130,31 @@ test('a selection on the canvas opens its frame each time it changes, even a fra
   expect(await selection(page)).toEqual([copyIn('story', 'button')])
   await expect(layerRow(page, copyIn('story', 'button'))).toHaveAttribute('aria-selected', 'true')
   await expect(layerRow(page, copyIn('story', 'button'))).toBeInViewport()
+  expect(errors).toEqual([])
+})
+
+test('picking a frame opens its row, even the frame picked already, from its row or its label', async ({ browser }) => {
+  const {
+    tabs: [page],
+    errors,
+  } = await openDesign(browser)
+  if (!page) throw new Error('no tab')
+  const story = frameRow(page, 'Sale story')
+  const collapse = () => story.getByRole('button', { name: 'Collapse Sale story' }).click()
+  await story.click()
+  await expect(story).toHaveAttribute('aria-expanded', 'true')
+  // Closed by its caret, the picked frame opens again at a click on its row.
+  await collapse()
+  await expect(story).toHaveAttribute('aria-expanded', 'false')
+  await story.getByTestId('frame-name').click()
+  expect(await picked(page)).toBe('story')
+  await expect(story).toHaveAttribute('aria-expanded', 'true')
+  // And at a click on its label on the canvas.
+  await collapse()
+  await expect(story).toHaveAttribute('aria-expanded', 'false')
+  await clickLabel(page, 'story')
+  expect(await picked(page)).toBe('story')
+  await expect(story).toHaveAttribute('aria-expanded', 'true')
   expect(errors).toEqual([])
 })
 
