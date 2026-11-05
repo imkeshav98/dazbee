@@ -1,7 +1,8 @@
 // The layers panel's rows as they look, in Chromium: a frame's size read width × height in Arabic
-// too, a frame's swatch showing its background as it looks, see-through too, a shape's picture bare
-// beside a text's outlined tile, no pink ring on a picked frame's or selected layer's picture, and a
-// frame picked from its row brought out from under the panel at the same zoom.
+// too, every layer row's hide and lock in one column with its label in the frames' size column, a
+// frame's swatch showing its background as it looks, see-through too, a shape's picture bare beside
+// a text's outlined tile, no pink ring on a picked frame's or selected layer's picture, and a frame
+// picked from its row brought out from under the panel at the same zoom.
 import { screenPoint } from '../../support/editor.ts'
 import { layerRow, openDesign, openSized } from '../../support/layers-frames.ts'
 import { frameRow, rect, row } from '../../support/layers-panel.ts'
@@ -70,6 +71,37 @@ test('in Arabic a frame row’s size reads width × height, as its label on the 
     return leftOf(0, cut) < leftOf(cut + 1, text.data.length)
   })
   expect(widthFirst).toBe(true)
+  expect(errors).toEqual([])
+})
+
+test('every layer row’s hide and lock sit in one column, labelled or not, and the labels in the frames’ size column', async ({
+  browser,
+}) => {
+  const {
+    tabs: [page],
+    errors,
+  } = await openDesign(browser)
+  if (!page) throw new Error('no tab')
+  await frameRow(page, 'Sale square').click()
+  await expect(row(page, 'Photo')).toBeVisible()
+  // Badge says "only here", Button is locked, Logo hidden; Headline and Photo have neither.
+  const ids = ['badge', 'button', 'logo', 'head', 'photo']
+  for (const toggle of ['layer-hide', 'layer-lock']) {
+    const xs = await Promise.all(
+      ids.map(async (id) => Math.round((await boxOf(layerRow(page, id).getByTestId(toggle))).x)),
+    )
+    expect(new Set(xs).size, `${toggle} at ${xs.join(', ')}`).toBe(1)
+  }
+  // Where the label's words end: where a frame's size ends.
+  const wordsEnd = (locator: Locator) =>
+    locator.evaluate((el) => {
+      const range = document.createRange()
+      range.selectNodeContents(el)
+      return Math.round(range.getBoundingClientRect().right)
+    })
+  expect(await wordsEnd(layerRow(page, 'badge').getByTestId('layer-only-here'))).toBe(
+    await wordsEnd(frameRow(page, 'Sale square').getByTestId('frame-size')),
+  )
   expect(errors).toEqual([])
 })
 

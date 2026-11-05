@@ -39,6 +39,11 @@ export const ROW_LOOK =
 export const ROW_SELECTED = 'bg-accent/20 text-text lit'
 /** A row's end label in mono, at the row's end: a box's kind, "only here", a frame's size. */
 export const ROW_LABEL = 'shrink-0 font-mono text-[11px] text-subtle'
+/**
+ * A layer row's end label slot: one width on every layer row, room for "only here", its label at its
+ * end as a frame's size is.
+ */
+export const ROW_LABEL_SLOT = 'w-[70px] truncate pe-1.5 text-end'
 const INDENT = 16
 /** The screens whose rows are roomy: a phone's, and any a finger works without hover. */
 const ROOMY_SCREENS = '(max-width: 639px), (hover: none)'

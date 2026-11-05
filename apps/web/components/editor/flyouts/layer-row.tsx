@@ -1,10 +1,10 @@
 'use client'
 
-// One layer's row in the layers panel's tree: its picture or icon, name and kind, "only here" when
-// none of its frame's linked frames holds a copy of it, and its hide and lock toggles, which act on
-// this layer alone. A picture about the colour of its tile in a theme shows on a backdrop that sets
-// it off there. The panel hands every row one set of handlers, so a row renders again only when what
-// it shows changes.
+// One layer's row in the layers panel's tree: its picture or icon and name, its hide and lock
+// toggles, which act on this layer alone, and an end label: "only here" when none of its frame's
+// linked frames holds a copy of it, else a box's kind. A picture about the colour of the panel in a
+// theme shows on a backdrop that sets it off there. The panel hands every row one set of handlers,
+// so a row renders again only when what it shows changes.
 import {
   BoundingBoxIcon,
   CircleIcon,
@@ -35,6 +35,7 @@ import { format } from '@/lib/i18n/index.ts'
 import {
   LAYER_ROW,
   ROW_LABEL,
+  ROW_LABEL_SLOT,
   ROW_LOOK,
   ROW_SELECTED,
   type RowApi,
@@ -58,6 +59,20 @@ const LIGHT_CLOSE = 0.475
 const BACKDROP = {
   dark: 'dark:bg-text dark:p-[3px]',
   light: '[[data-theme=light]_&]:bg-text [[data-theme=light]_&]:p-[3px]',
+}
+
+/**
+ * The room a name leaves at its end for the toggles laid over it, 6 px from them: always while one
+ * is on, else while the row is hovered or focused, and always on a screen without hover.
+ */
+const CLEAR = {
+  on: 'pe-[3.75rem]',
+  shown: 'group-hover:pe-[3.75rem] group-focus-visible:pe-[3.75rem] [@media(hover:none)]:pe-[3.75rem]',
+}
+const CLEAR_ROOMY = {
+  on: 'pe-[calc(96px+0.375rem)]',
+  shown:
+    'group-hover:pe-[calc(96px+0.375rem)] group-focus-visible:pe-[calc(96px+0.375rem)] [@media(hover:none)]:pe-[calc(96px+0.375rem)]',
 }
 
 const isLocked = (node: Layer) => LOCK_FLAGS.some((flag) => node.lock?.[flag])
@@ -137,6 +152,7 @@ export const LayerRow = memo(function LayerRow({
   const locked = isLocked(node)
   const LayerIcon = iconOf(node)
   const roomy = pitch > LAYER_ROW
+  const clear = roomy ? CLEAR_ROOMY : CLEAR
   // A box says whether it is plain or stacks what it holds.
   const kind =
     node.type === 'box'
@@ -144,6 +160,8 @@ export const LayerRow = memo(function LayerRow({
         ? t.editor.layersPanel.stack
         : t.editor.layersPanel.box
       : null
+  // The end label: "only here" when the layer is, else a box's kind; none while renaming.
+  const label = renaming ? null : row.onlyHere ? t.editor.layersPanel.onlyHere : kind
   return (
     <div
       key={id}
@@ -211,11 +229,22 @@ export const LayerRow = memo(function LayerRow({
           onDone={(name, byKey) => api.renamed(id, name, node.name, byKey)}
         />
       ) : (
-        <span data-testid="layer-name" className="min-w-0 flex-1 truncate">
+        <span
+          data-testid="layer-name"
+          // Its end kept clear of the toggles while they show.
+          className={cn('min-w-0 flex-1 truncate', hidden || locked ? clear.on : clear.shown)}
+        >
           {node.name}
         </span>
       )}
-      <span className={cn('flex shrink-0', roomy ? 'gap-[8px]' : 'gap-1.5')}>
+      {/* The toggles sit in one column on every row, laid over its end just before the label slot. */}
+      <span
+        className={cn(
+          'absolute inset-y-0 end-[calc(70px+0.625rem)] flex items-center',
+          roomy ? 'gap-[8px]' : 'gap-1.5',
+          renaming && 'hidden',
+        )}
+      >
         <RowToggle
           on={hidden}
           label={format(hidden ? t.editor.layersPanel.show : t.editor.layersPanel.hide, { name: node.name })}
@@ -234,17 +263,13 @@ export const LayerRow = memo(function LayerRow({
           testId="layer-lock"
         />
       </span>
-      {/* The end labels line up with the frames' sizes, after the toggles. */}
-      {kind && !renaming && (
-        <span data-testid="layer-kind" className={cn(ROW_LABEL, 'pe-1.5')}>
-          {kind}
-        </span>
-      )}
-      {row.onlyHere && !renaming && (
-        <span data-testid="layer-only-here" className={cn(ROW_LABEL, 'pe-1.5')}>
-          {t.editor.layersPanel.onlyHere}
-        </span>
-      )}
+      {/* One slot on every layer row, before which the toggles sit; its label ends where the frames' sizes do. */}
+      <span
+        data-testid={label === null ? undefined : row.onlyHere ? 'layer-only-here' : 'layer-kind'}
+        className={cn(ROW_LABEL, ROW_LABEL_SLOT)}
+      >
+        {label}
+      </span>
     </div>
   )
 })
