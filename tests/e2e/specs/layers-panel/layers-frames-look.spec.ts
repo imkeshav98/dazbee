@@ -3,7 +3,7 @@
 // frame's swatch showing its background as it looks, see-through too, a shape's picture bare beside
 // a text's outlined tile, no pink ring on a picked frame's or selected layer's picture, and a frame
 // picked from its row brought out from under the panel at the same zoom.
-import { screenPoint } from '../../support/editor.ts'
+import { screenPoint, writeOutput } from '../../support/editor.ts'
 import { layerRow, openDesign, openSized } from '../../support/layers-frames.ts'
 import { frameRow, rect, row } from '../../support/layers-panel.ts'
 import { frameDesign } from '../../support/seed.ts'
@@ -71,6 +71,9 @@ test('in Arabic a frame row’s size reads width × height, as its label on the 
     return leftOf(0, cut) < leftOf(cut + 1, text.data.length)
   })
   expect(widthFirst).toBe(true)
+  await frameRow(page, 'Sale square').click()
+  await expect(layerRow(page, 'badge').getByTestId('layer-picture').locator('img')).toHaveCount(1)
+  writeOutput('layers-frames-ar.png', await page.screenshot({ animations: 'disabled' }))
   expect(errors).toEqual([])
 })
 
