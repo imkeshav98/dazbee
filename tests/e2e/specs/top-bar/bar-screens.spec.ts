@@ -285,6 +285,46 @@ test("on a phone the bar never covers the selected layer, its handles or its fra
   await page.context().close()
 })
 
+test('on a phone a tap on a layer where the bar shows selects it, presses nothing on the bar, and the stage moves the layer clear of the bar', async ({
+  browser,
+}) => {
+  const { page, errors } = await openAt(browser, designId, [390, 844])
+  for (const id of ['headline', 'star', 'photo']) {
+    await selectLayers(page, [])
+    // The layer's middle brought to 120 px down the screen, where the bar's rows will be.
+    await page.evaluate((id) => {
+      const editor = window.dazbee
+      const box = editor?.boxOf(id)
+      const camera = editor?.camera()
+      if (!editor || !box || !camera) return
+      const at = editor.screenPoint(box.x + box.width / 2, box.y + box.height / 2)
+      editor.setCamera({ ...camera, y: camera.y + 120 - at.y })
+    }, id)
+    await nextFrame(page)
+    const at = await page.evaluate((id) => {
+      const box = window.dazbee?.boxOf(id)
+      return box ? window.dazbee?.screenPoint(box.x + box.width / 2, box.y + box.height / 2) : undefined
+    }, id)
+    await page.touchscreen.tap(at?.x ?? 0, at?.y ?? 0)
+    await expect.poll(() => page.evaluate(() => window.dazbee?.selection()), id).toEqual([id])
+    await page.waitForTimeout(500)
+    await expect(page.locator('[data-radix-popper-content-wrapper]'), id).toHaveCount(0)
+    await expect(page.locator('#edit-panel'), id).toBeHidden()
+    const bar = await page.evaluate(() =>
+      ['top-bar-row', 'top-bar-overflow'].flatMap((row) => {
+        const el = document.querySelector(`[data-testid="${row}"]`)
+        if (!el?.checkVisibility({ visibilityProperty: true })) return []
+        const { left, top, right, bottom } = el.getBoundingClientRect()
+        return [{ left, top, right, bottom }]
+      }),
+    )
+    const { boxes } = await selectionOnScreen(page, [id])
+    for (const box of boxes) for (const row of bar) expect(meet(box, row), `${id} under the bar`).toBe(false)
+  }
+  expect(errors).toEqual([])
+  await page.context().close()
+})
+
 test('at tablet size with a flyout open, a bar too long for its room shows a divider just before More controls', async ({
   browser,
 }) => {

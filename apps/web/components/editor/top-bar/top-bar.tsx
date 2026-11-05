@@ -11,7 +11,7 @@
 // items; on a phone it is a second card that always shows, as the mock draws it, and every item is
 // a 44 px target 8 px from the next. Nothing scrolls sideways.
 import { CaretDownIcon } from '@phosphor-icons/react'
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { type MouseEvent, useEffect, useLayoutEffect, useRef, useState } from 'react'
 
 import type { Editor } from '@dazbee/editor'
 import type { Design } from '@dazbee/schema'
@@ -49,6 +49,15 @@ const MORE = 30 + DIVIDER
 const TOP_BAR =
   'flex items-center gap-0.5 rounded-[14px] surface-frost p-1 max-sm:gap-[8px] max-sm:rounded-[18px] max-sm:p-[2px] max-sm:[&_[data-bar-item]]:h-[44px] max-sm:[&_[data-bar-item]]:min-w-[44px] max-sm:[&_[data-bar-item]]:px-[6px]'
 
+/** Room kept between the bar and a selection the stage moves clear of it, in pixels. */
+const CLEAR = 8
+
+/** How long after the bar shows the press that showed it can still end in a click on it, in ms. */
+const TAP_THROUGH = 700
+
+/** When the last press on the page went down, and whether a press is held, as a window listener keeps them. */
+const press = { at: 0, held: false }
+
 /** An element's width with its margins, in pixels. */
 function outerWidth(el: Element | null) {
   if (!(el instanceof HTMLElement)) return 0
@@ -77,6 +86,57 @@ function groupCut(keys: string[], widths: number[], cut: number, room: number, g
 function sidesOf(el: Element, ...names: string[]) {
   const style = getComputedStyle(el)
   return names.reduce((sum, name) => sum + Number.parseFloat(style.getPropertyValue(name)), 0)
+}
+
+/** Keeps `press` as presses go down and up anywhere on the page, before anything else hears them. */
+function usePressWatch() {
+  useEffect(() => {
+    const down = () => {
+      press.at = performance.now()
+      press.held = true
+    }
+    const up = () => {
+      press.held = false
+    }
+    window.addEventListener('pointerdown', down, true)
+    window.addEventListener('pointerup', up, true)
+    window.addEventListener('pointercancel', up, true)
+    return () => {
+      window.removeEventListener('pointerdown', down, true)
+      window.removeEventListener('pointerup', up, true)
+      window.removeEventListener('pointercancel', up, true)
+    }
+  }, [])
+}
+
+/**
+ * On a phone, once no press is held, moves the stage so the selection lies clear under the bar,
+ * when it sits under it: the bar takes two rows there and must never cover what it acts on.
+ */
+function useSelectionClear(editor: Editor, ids: string[], phone: boolean) {
+  const key = ids.join(' ')
+  useEffect(() => {
+    if (!phone || key === '') return
+    const clear = () => {
+      const rect = editor.selectionRect()
+      const under = editState().barBottom + CLEAR - (rect?.y ?? Infinity)
+      if (!rect || under <= 0) return
+      const camera = editor.camera()
+      // The camera's offset is in screen pixels: adding to it moves the design down.
+      editor.setCamera({ ...camera, y: camera.y + under })
+    }
+    if (!press.held) return clear()
+    // After the editor has heard the press end, so the stage moves under no press it reads.
+    let frame = 0
+    const later = () => {
+      frame = requestAnimationFrame(clear)
+    }
+    window.addEventListener('pointerup', later, { once: true })
+    return () => {
+      window.removeEventListener('pointerup', later)
+      cancelAnimationFrame(frame)
+    }
+  }, [editor, key, phone])
 }
 
 /**
@@ -129,6 +189,8 @@ function useFit(row: HTMLElement | null, extra: HTMLElement | null, keys: string
 
 export function TopBar({ editor, brandId }: { editor: Editor; brandId: string }) {
   const ids = useSelection(editor)
+  usePressWatch()
+  useSelectionClear(editor, ids, usePhone())
   const picked = usePickedFrame(editor)
   const selected = useTarget(editor, ids)
   // A pop-up or panel belongs to the selection or the picked frame it was opened for: another one
@@ -241,6 +303,20 @@ function Bar({
   // Each selection's bar starts with its second row closed.
   const selectionKey = Object.values(named).join(' ')
   useLayoutEffect(() => setRowOpen(false), [selectionKey])
+  // The press that showed this bar, as the tap that selected its layer, presses nothing on it,
+  // though it lifts over one of its buttons.
+  const showing = useRef({ at: 0, press: 0 })
+  useLayoutEffect(() => {
+    showing.current = { at: performance.now(), press: press.at }
+  }, [selectionKey])
+  const onClickCapture = (event: MouseEvent) => {
+    // A pointer's click with no press since the bar showed, coming as that press ends.
+    const fromThatPress =
+      event.detail > 0 && press.at === showing.current.press && performance.now() - showing.current.at < TAP_THROUGH
+    if (!fromThatPress) return
+    event.preventDefault()
+    event.stopPropagation()
+  }
   // A panel whose item has left the bar closes, as a shape's Colour does once it holds a photo.
   useLayoutEffect(() => {
     if (isLayerPanel(open) && !items.some((item) => item.key === open)) setOpen(null)
@@ -283,6 +359,7 @@ function Bar({
       data-testid="top-bar"
       {...named}
       onKeyDown={arrowAlong}
+      onClickCapture={onClickCapture}
       onFocus={focused}
       style={{ insetInlineStart: startAt }}
       className={cn(
