@@ -23,7 +23,7 @@ import { cn } from '@/lib/cn.ts'
 import { useLocale, useMessages } from '@/lib/i18n/client.tsx'
 import { dirOf } from '@/lib/i18n/index.ts'
 
-import { arrowThrough, useMenuFocus, useScrollingMenu } from './bar-popover.tsx'
+import { arrowThrough, SHEET_EDGE, useMenuFocus, useScrollingMenu } from './bar-popover.tsx'
 
 /** The layers hidden in one frame, which a right-click on its empty canvas offers to show. */
 export interface HiddenLayers {
@@ -264,26 +264,28 @@ export function StageMenu({
 }
 
 /**
- * A row of the menu that opens a short menu beside it, or under it on a phone, where the screen has
- * no room beside the menu; in a sheet at the bottom of a phone's screen, above the sheet. Enter or
+ * A row of the menu that opens a short menu beside it; on a phone, where the screen has no room
+ * beside the menu, the short menu lies on its row instead, sharing the menu's start edge. Enter or
  * the arrow towards it opens it, the arrow back or Esc closes it; up, down, Home and End move
  * between its rows, and the row stays lit while it is open.
  */
 export function SubMenu({ label, testId, children }: { label: string; testId: string; children: ReactNode }) {
   const [open, setOpen] = useState(false)
   const phone = usePhone()
-  // In a sheet, how far above the row the short menu sits to clear the sheet's top; null outside one.
-  const [overSheet, setOverSheet] = useState<number | null>(null)
+  // On a phone, how far the short menu moves to lie on its row at the start edge of the menu the
+  // row is in: up by the row's height, and back by the row's inset from that edge.
+  const [over, setOver] = useState({ up: 0, back: 0 })
   const rtl = dirOf(useLocale()) === 'rtl'
   const [toward, back] = rtl ? ['ArrowLeft', 'ArrowRight'] : ['ArrowRight', 'ArrowLeft']
   const focus = useMenuFocus()
   useLayoutEffect(() => {
     const row = focus.button.current
-    const sheet = phone && open ? row?.closest('[data-sheet]') : null
-    setOverSheet(
-      row && sheet ? Math.round(row.getBoundingClientRect().top - sheet.getBoundingClientRect().top) + 8 : null,
-    )
-  }, [phone, open, focus.button])
+    const menu = row?.parentElement
+    if (!phone || !open || !row || !menu) return
+    const [at, edge] = [row.getBoundingClientRect(), menu.getBoundingClientRect()]
+    const to = { up: Math.round(at.height), back: Math.round(rtl ? edge.right - at.right : at.left - edge.left) }
+    setOver((now) => (now.up === to.up && now.back === to.back ? now : to))
+  }, [phone, open, focus.button, rtl])
   return (
     <Popover.Root open={open} onOpenChange={setOpen}>
       <Popover.Trigger asChild>
@@ -306,10 +308,12 @@ export function SubMenu({ label, testId, children }: { label: string; testId: st
       </Popover.Trigger>
       <Popover.Portal>
         <Popover.Content
-          side={overSheet !== null ? 'top' : phone ? 'bottom' : rtl ? 'left' : 'right'}
+          // Beside the row, or on a phone over it at its menu's start edge, as the mock draws it.
+          side={phone ? 'bottom' : rtl ? 'left' : 'right'}
           align="start"
-          sideOffset={overSheet ?? (phone ? 4 : 8)}
-          collisionPadding={12}
+          sideOffset={phone ? -over.up : 8}
+          alignOffset={phone ? -over.back : 0}
+          collisionPadding={phone ? SHEET_EDGE : 12}
           // A click elsewhere, Esc or the arrow back closes it; focus moving as the menu opens does not.
           onFocusOutside={(event) => event.preventDefault()}
           {...focus.content}

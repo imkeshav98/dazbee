@@ -162,7 +162,8 @@ export function AlignRow({ editor }: { editor: Editor }) {
   const t = useMessages()
   const named = t.editor.bar.placing
   return (
-    <div dir="ltr" role="group" aria-label={t.editor.arrange.align} className="grid grid-cols-6 gap-0.5">
+    // On a phone each button is a finger's size, with room between them.
+    <div dir="ltr" role="group" aria-label={t.editor.arrange.align} className="grid grid-cols-6 gap-0.5 max-sm:gap-2">
       {ALIGN.map(({ action, icon: Icon }) => (
         <Tooltip key={action} label={format(t.editor.arrange.withKey, { label: named[action], key: keyOf(action) })}>
           <button
@@ -170,7 +171,7 @@ export function AlignRow({ editor }: { editor: Editor }) {
             aria-label={named[action]}
             data-action={action}
             onClick={() => editor.perform(action)}
-            className={ICON_BUTTON}
+            className={cn(ICON_BUTTON, 'max-sm:size-[44px]')}
           >
             <Icon size={16} aria-hidden />
           </button>

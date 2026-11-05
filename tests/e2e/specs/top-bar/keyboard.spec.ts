@@ -89,8 +89,12 @@ test("Esc closes the bar's second row and keeps the selection; the arrows and En
   await expect(more).toBeVisible()
   const row = page.getByTestId('top-bar-row')
   await row.locator('[data-bar-item]').first().focus()
+  // Arrange ends the first row, after More controls.
   await page.keyboard.press('End')
+  await expect(page.getByTestId('bar-arrange')).toBeFocused()
+  await page.keyboard.press('ArrowLeft')
   await expect(more).toBeFocused()
+  await page.keyboard.press('ArrowRight')
   await page.keyboard.press('ArrowRight')
   await expect(row.locator('[data-bar-item]').first()).toBeFocused()
 
@@ -128,9 +132,7 @@ test("Esc closes the keyboard shortcuts dialog over the bar's second row first, 
   expect(errors).toEqual([])
 })
 
-test('the size field steps with the arrows; a pop-up closes when the window changes size; a new selection shows the phone bar from its start', async ({
-  browser,
-}) => {
+test('the size field steps with the arrows; a pop-up closes when the window changes size', async ({ browser }) => {
   const asset = await upload(photo)
   const { page, errors } = await openStage(browser, topBarDesign(asset.id))
   const size = () =>
@@ -148,15 +150,6 @@ test('the size field steps with the arrows; a pop-up closes when the window chan
   await barMenu(page, 'align')
   await page.setViewportSize({ width: 390, height: 844 })
   await expect(page.getByTestId('bar-align-menu')).toBeHidden()
-
-  // Every item but the last, the ⋯ kept at the bar's end, scrolls sideways.
-  const row = page.getByTestId('top-bar-scroll')
-  await row.evaluate((el) => {
-    el.scrollLeft = el.scrollWidth
-  })
-  await expect.poll(() => row.evaluate((el) => el.scrollLeft)).toBeGreaterThan(0)
-  await selectLayers(page, ['box'])
-  await expect.poll(() => row.evaluate((el) => el.scrollLeft)).toBe(0)
   expect(errors).toEqual([])
 })
 

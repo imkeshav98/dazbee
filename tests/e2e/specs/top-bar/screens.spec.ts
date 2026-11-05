@@ -114,17 +114,16 @@ test('at 1280×760 the right-click menu on a layer already selected shows that i
 })
 
 test.describe('on a phone, 390×844', () => {
-  test('the top bar scrolls sideways with no classic scrollbar', async ({ browser }) => {
+  test('the top bar never scrolls sideways: a text’s bar, wider than the phone, wraps into a second card', async ({
+    browser,
+  }) => {
     const asset = await upload(photo)
     const { page, errors } = await openStage(browser, topBarDesign(asset.id))
     await page.setViewportSize({ width: 390, height: 844 })
-    // A text's bar, the longest, is wider than the phone.
     await selectLayers(page, ['headline'], { bar: true })
-    const row = page.getByTestId('top-bar-scroll')
-    expect(await row.evaluate((el) => [el.scrollWidth > el.clientWidth, getComputedStyle(el).scrollbarWidth])).toEqual([
-      true,
-      'none',
-    ])
+    for (const row of ['top-bar-row', 'top-bar-overflow'])
+      expect(await page.getByTestId(row).evaluate((el) => el.scrollWidth <= el.clientWidth), row).toBe(true)
+    await expect(page.getByTestId('top-bar-overflow')).toBeVisible()
     expect(errors).toEqual([])
   })
 
