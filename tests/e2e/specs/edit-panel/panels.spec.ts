@@ -5,10 +5,11 @@ import type { DesignInput } from '@dazbee/schema'
 import { photo, upload } from '../../support/assets.ts'
 import { writeOutput } from '../../support/editor.ts'
 import { choose, enter } from '../../support/fields.ts'
+import { openDesignIn } from '../../support/glass.ts'
 import { SCREEN_SIZES } from '../../support/layout.ts'
-import { frameDesign } from '../../support/seed.ts'
+import { frameDesign, seed } from '../../support/seed.ts'
 import { fitSettled, nextFrame, openStage, selectLayers } from '../../support/stage.ts'
-import { expect, type Page, test } from '../../support/test.ts'
+import { expect, type Locator, type Page, test } from '../../support/test.ts'
 import { barMenu } from '../../support/top-bar.ts'
 
 test.describe.configure({ timeout: 240_000 })
@@ -109,6 +110,38 @@ const design = (assetId: string): DesignInput =>
 const propsOf = (page: Page, id: string) =>
   page.evaluate((id) => window.dazbee?.design().nodes[id]?.props, id) as Promise<Record<string, unknown>>
 
+/**
+ * What keeps a panel's fields from being touch fields: each number field, choice and hex shown that
+ * is not 44 px tall, and each two of them less than 8 px apart, by their names.
+ */
+const fieldSpacing = (panel: Locator) =>
+  panel.evaluate((root) => {
+    const fields = [
+      ...root.querySelectorAll<HTMLElement>('[data-knob], button[name="choice"], input[name="colour-hex"]'),
+    ].filter((el) => el.checkVisibility())
+    const name = (el: HTMLElement) =>
+      el.getAttribute('aria-label') ?? el.querySelector('input')?.getAttribute('aria-label') ?? el.textContent ?? ''
+    const boxes = fields.map((el) => el.getBoundingClientRect())
+    const problems: string[] = []
+    boxes.forEach((box, i) => {
+      if (Math.abs(box.height - 44) > 0.5) problems.push(`${name(fields[i] as HTMLElement)} is ${box.height} px tall`)
+      for (let j = i + 1; j < boxes.length; j++) {
+        const other = boxes[j] as DOMRect
+        const apart = Math.max(
+          other.left - box.right,
+          box.left - other.right,
+          other.top - box.bottom,
+          box.top - other.bottom,
+        )
+        if (apart < 7.5)
+          problems.push(
+            `${name(fields[i] as HTMLElement)} and ${name(fields[j] as HTMLElement)} are ${apart.toFixed(1)} px apart`,
+          )
+      }
+    })
+    return problems
+  })
+
 for (const [width, height] of SCREEN_SIZES) {
   // The panel is as wide at every size but the phone's, so CI checks it at desktop size; the other
   // sizes take the pictures for review.
@@ -154,6 +187,27 @@ for (const [width, height] of SCREEN_SIZES) {
     },
   )
 }
+
+test("on a touch phone every panel's fields are 44 px tall and at least 8 px from one another", async ({ browser }) => {
+  const asset = await upload(photo)
+  const { page, errors } = await openDesignIn(browser, await seed(design(asset.id)), 'dark', {
+    viewport: { width: 390, height: 844 },
+    hasTouch: true,
+    isMobile: true,
+  })
+  await fitSettled(page)
+  const problems: string[] = []
+  for (const [kind, ids, panels] of PANELS) {
+    await selectLayers(page, ids, { bar: true })
+    for (const id of panels) {
+      for (const problem of await fieldSpacing(await barMenu(page, id))) problems.push(`${kind} ${id}: ${problem}`)
+      await page.keyboard.press('Escape')
+      await expect(page.getByTestId(`bar-${id}-menu`)).toBeHidden()
+    }
+  }
+  expect(problems).toEqual([])
+  expect(errors).toEqual([])
+})
 
 test.describe('found by QA', () => {
   test('number fields stop at limits a design never needs to pass', async ({ browser }) => {

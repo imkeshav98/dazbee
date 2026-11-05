@@ -107,6 +107,38 @@ export const NUMBER_INPUTS: NumberInput[] = [
   },
 ]
 
+/**
+ * Rows of fields on a touch screen, each control 44 px tall and 8 px from the next, as every field is
+ * there: what the checks call the row, and how to open it and give its controls from start to end.
+ */
+export const TOUCH_ROWS: { name: string; open: (page: Page) => Promise<Locator[]> }[] = [
+  {
+    name: "a colour's hex and opacity",
+    open: async (page) => {
+      await selectLayers(page, ['box'], { card: 'fill-card' })
+      const card = await openCard(page, 'fill-card')
+      const opacity = card.getByLabel('Colour 1 opacity', { exact: true })
+      return [card.getByLabel('Colour 1 hex', { exact: true }), opacity.locator('xpath=ancestor::*[@data-knob][1]')]
+    },
+  },
+  {
+    name: "See-through's opacity and blend",
+    open: async (page) => {
+      await selectLayers(page, ['box'], { card: FIELDS.opacity.card })
+      const knob = (await openCard(page, FIELDS.opacity.card)).locator(`[data-scrub="${FIELDS.opacity.name}"]`)
+      return [knob, knob.locator('xpath=following-sibling::*[1]')]
+    },
+  },
+  {
+    name: "Add a frame's height and Add",
+    open: async (page) => {
+      await frameButton(page)
+      const height = page.getByTestId('own-height').locator('xpath=ancestor::*[@data-knob][1]')
+      return [height, page.getByTestId('own-size').getByRole('button', { name: 'Add', exact: true })]
+    },
+  },
+]
+
 /** One frame holding a box, `box`, at BOX, and a headline, `headline`, under it. */
 export const numberFieldsDesign = (): DesignInput =>
   frameDesign({

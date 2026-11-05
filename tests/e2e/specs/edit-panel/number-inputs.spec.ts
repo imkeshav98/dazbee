@@ -14,6 +14,7 @@ import {
   numberFieldsDesign,
   type NumberInput,
   selectionColours,
+  TOUCH_ROWS,
 } from '../../support/number-fields.ts'
 import { seed } from '../../support/seed.ts'
 import { fitSettled, nextFrame, selectLayers } from '../../support/stage.ts'
@@ -33,6 +34,23 @@ const edgeIsAccent = (edge: Locator) =>
     return getComputedStyle(el).borderTopColor === accent
   })
 
+/** Opens the design at a screen size in a theme. */
+async function openScreen(
+  browser: Browser,
+  screen: FieldScreen,
+  { theme = 'dark', scale }: { theme?: (typeof THEMES)[number]; scale?: number } = {},
+) {
+  const designId = await seed(numberFieldsDesign())
+  const opened = await openDesignIn(browser, designId, theme, {
+    viewport: { width: screen.width, height: screen.height },
+    hasTouch: screen.touch,
+    isMobile: screen.touch,
+    ...(scale ? { deviceScaleFactor: scale } : {}),
+  })
+  await fitSettled(opened.page)
+  return opened
+}
+
 /**
  * Opens the design at a screen size in a theme and the number input, and gives its input, the field
  * around it and what shows its edge.
@@ -41,16 +59,9 @@ async function openInput(
   browser: Browser,
   screen: FieldScreen,
   number: NumberInput,
-  { theme = 'dark', scale }: { theme?: (typeof THEMES)[number]; scale?: number } = {},
+  look: { theme?: (typeof THEMES)[number]; scale?: number } = {},
 ) {
-  const designId = await seed(numberFieldsDesign())
-  const { page, errors } = await openDesignIn(browser, designId, theme, {
-    viewport: { width: screen.width, height: screen.height },
-    hasTouch: screen.touch,
-    isMobile: screen.touch,
-    ...(scale ? { deviceScaleFactor: scale } : {}),
-  })
-  await fitSettled(page)
+  const { page, errors } = await openScreen(browser, screen, look)
   const input = await number.open(page)
   const field = input.locator('xpath=ancestor::*[@data-knob][1]')
   // Clear of a panel's faded edge, which a panel shows while there is more to scroll to.
@@ -144,20 +155,22 @@ for (const screen of FIELD_SCREENS) {
   }
 
   if (screen.touch)
-    test(`${size}: a colour's hex and opacity are 44 px tall and 8 px apart, as every field on a touch screen`, async ({
-      browser,
-    }) => {
-      const opacity = NUMBER_INPUTS.find((n) => n.name === "a colour's opacity")
-      if (!opacity) throw new Error("no colour's opacity in the list")
-      const { errors, field } = await openInput(browser, screen, opacity)
-      // The colour's row: its hex, then the opacity's field in a box of its own.
-      const hex = field.locator('xpath=../..').locator('[name="colour-hex"]')
-      const [h, o] = [await hex.boundingBox(), await field.boundingBox()]
-      if (!h || !o) throw new Error('no colour on screen')
-      expect([h.height, o.height]).toEqual([44, 44])
-      expect(o.x - (h.x + h.width)).toBeCloseTo(8, 1)
-      expect(errors).toEqual([])
-    })
+    for (const row of TOUCH_ROWS)
+      test(`${size}: ${row.name} are 44 px tall and 8 px apart, as every field on a touch screen`, async ({
+        browser,
+      }) => {
+        const { page, errors } = await openScreen(browser, screen)
+        const controls = await row.open(page)
+        await controls[0]?.evaluate((el) => el.scrollIntoView({ block: 'center' }))
+        const boxes = await Promise.all(controls.map((control) => control.boundingBox()))
+        expect(boxes.map((box) => box?.height)).toEqual(controls.map(() => 44))
+        for (let i = 1; i < boxes.length; i++) {
+          const [before, at] = [boxes[i - 1], boxes[i]]
+          if (!before || !at) throw new Error('no field on screen')
+          expect(at.x - (before.x + before.width)).toBeCloseTo(8, 0)
+        }
+        expect(errors).toEqual([])
+      })
 
   for (const theme of THEMES)
     test(
