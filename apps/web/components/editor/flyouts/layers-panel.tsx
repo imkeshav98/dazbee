@@ -319,7 +319,8 @@ export function LayersPanel({ editor }: { editor: Editor }) {
   // A page whose frames hold no layer yet says how to add one under its frames.
   const noLayers = rows.every((row) => row.kind === 'frame' && !row.hasChildren)
   return (
-    <div className="flex min-h-0 flex-1 flex-col" data-testid="layers">
+    // On a phone the panel is no taller than the mock's, so the frames stay in view above it.
+    <div className="flex min-h-0 flex-1 flex-col max-sm:max-h-[calc(56dvh-3.5rem-2px)]" data-testid="layers">
       {rows.length === 0 ? (
         <p className="p-4 text-[13px] text-muted">{t.editor.frames.emptyPage}</p>
       ) : (

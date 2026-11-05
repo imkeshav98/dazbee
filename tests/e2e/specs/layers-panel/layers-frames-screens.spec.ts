@@ -1,7 +1,7 @@
 // The layers panel's frames at the three screen sizes, in Chromium: the frame rows, a deep group and a
 // picked frame clear of the rest of the editor with nothing cut short; on a phone, rows a finger can
-// hit; on a touch screen, every row's hide and lock showing as targets a finger can hit; and
-// screenshots of each in both themes.
+// hit in a panel that leaves the frames in view; on a touch screen, every row's hide and lock showing
+// as targets a finger can hit; and screenshots of each in both themes.
 import { writeOutput } from '../../support/editor.ts'
 import { THEMES } from '../../support/glass.ts'
 import { layerRow, openSized, picked } from '../../support/layers-frames.ts'
@@ -37,11 +37,15 @@ for (const [width, height] of SCREEN_SIZES) {
       expect(fits, `${name} shows whole`).toBe(true)
     }
     if (width < 640) {
-      // On a phone every row is at least 44 px tall.
+      // On a phone every row is at least 44 px tall, and the open panel no taller than the mock's,
+      // about 56% of the screen from y≈245, so the frames show above it while its rows scroll.
       const heights = await tree(page)
         .getByRole('treeitem')
         .evaluateAll((rows) => rows.map((r) => r.getBoundingClientRect().height))
       expect(Math.min(...heights)).toBeGreaterThanOrEqual(44)
+      const panel = await page.getByTestId('flyout').boundingBox()
+      expect(panel?.height ?? Infinity).toBeLessThanOrEqual(Math.ceil(height * 0.56))
+      expect(panel?.y ?? 0).toBeGreaterThanOrEqual(240)
     }
     await frameRow(page, 'Fresh square').click()
     expect(await picked(page)).toBe('fresh')
