@@ -6,23 +6,15 @@
 // dragged onto its own frame's row going to the top and onto another frame's going nowhere; the
 // keyboard through frames and layers; and the panel at the three screen sizes, with screenshots in
 // both themes.
-import type { DesignInput } from '@dazbee/schema'
-
-import { editorPath, openTabs, screenPoint, setCookies, writeOutput } from '../../support/editor.ts'
-import { THEMES } from '../../support/glass.ts'
-import { frameRow, listed, node, openLayers, rect, row, tabIntoTree, tree } from '../../support/layers-panel.ts'
-import { EDITOR_CHROME, layoutProblems, SCREEN_SIZES } from '../../support/layout.ts'
-import { copyIn, frameDesign, linkedFrames, seed } from '../../support/seed.ts'
+import { openTabs, screenPoint, writeOutput } from '../../support/editor.ts'
+import { design, layerRow, picked } from '../../support/layers-frames.ts'
+import { frameRow, listed, node, openLayers, row, tabIntoTree, tree } from '../../support/layers-panel.ts'
+import { copyIn, seed } from '../../support/seed.ts'
 import { drawn, fitSettled, nextFrame, perform, read, selection } from '../../support/stage.ts'
 import { type Browser, expect, type Page, test } from '../../support/test.ts'
 
 test.describe.configure({ timeout: 180_000 })
 
-const LOCKED = { move: true, resize: true, content: true, style: true, delete: true }
-const YELLOW = [{ type: 'solid' as const, color: '#FFD23FFF' }]
-const GREEN = [{ type: 'solid' as const, color: '#218A5CFF' }]
-/** The pieces that must not cover each other with the panel open. */
-const PIECES = { ...EDITOR_CHROME, flyout: '[data-testid="flyout"]' }
 /** The rows of Sale square, open with its deep group open, as `listed` gives them. */
 const SQUARE_OPEN = [
   'Sale square 1080×1080',
@@ -36,113 +28,6 @@ const SQUARE_OPEN = [
   '        Picture',
 ]
 
-const text = (parentId: string, index: string, name: string, words: string, y: number) => ({
-  type: 'text' as const,
-  parentId,
-  index,
-  name,
-  props: {
-    x: 80,
-    y,
-    width: 900,
-    height: 110,
-    text: words,
-    style: { fontFamily: 'Noto Sans', fontSize: 80, color: '#1A1420FF' },
-  },
-})
-const group = (parentId: string, index: string, name: string) => ({
-  type: 'group' as const,
-  parentId,
-  index,
-  name,
-  props: { x: 560, y: 420, width: 400, height: 400 },
-})
-
-/**
- * Page "Summer sale" holds Sale square and Sale story, linked: the story holds a copy of every
- * square layer but Badge, its Logo shown and its Button unlocked where the square's are hidden and
- * locked. Fresh square sits beside them, linked to neither. The square's Photo holds Mount, which
- * holds Inner, which holds Picture. Page 2 holds one banner.
- */
-function design(): DesignInput {
-  const square = frameDesign({
-    name: 'Layers of frames',
-    frameName: 'Sale square',
-    fills: YELLOW,
-    nodes: {
-      photo: group('sq', 'a0', 'Photo'),
-      mount: group('photo', 'a0', 'Mount'),
-      inner: group('mount', 'a0', 'Inner'),
-      picture: {
-        type: 'graphic',
-        parentId: 'inner',
-        index: 'a0',
-        name: 'Picture',
-        props: { ...rect(560, 420, 400, 400, '#FF48B0FF'), shape: { kind: 'ellipse' as const } },
-      },
-      head: text('sq', 'a1', 'Headline', 'Weekend sale', 80),
-      logo: {
-        type: 'graphic',
-        parentId: 'sq',
-        index: 'a2',
-        name: 'Logo',
-        props: { ...rect(900, 60, 120, 120, '#1A1420FF'), visible: false },
-      },
-      button: {
-        type: 'graphic',
-        parentId: 'sq',
-        index: 'a3',
-        name: 'Button',
-        lock: LOCKED,
-        props: rect(80, 900, 300, 100, '#1A1420FF'),
-      },
-      badge: {
-        type: 'graphic',
-        parentId: 'sq',
-        index: 'a4',
-        name: 'Badge',
-        props: { ...rect(820, 700, 160, 160, '#FF48B0FF'), shape: { kind: 'ellipse' as const } },
-      },
-    },
-  })
-  const linked = linkedFrames(square, [
-    { id: 'story', name: 'Sale story', width: 1080, height: 1920, values: { logo: { visible: true } } },
-  ])
-  const nodes = Object.fromEntries(Object.entries(linked.nodes).filter(([id]) => id !== copyIn('story', 'badge')))
-  const button = nodes[copyIn('story', 'button')]
-  if (button) {
-    const unlocked = { ...button }
-    delete unlocked.lock
-    nodes[copyIn('story', 'button')] = unlocked
-  }
-  return {
-    ...linked,
-    pages: { p1: { name: 'Summer sale', order: 'a0' }, p2: { name: 'Diwali', order: 'a1' } },
-    frames: {
-      ...linked.frames,
-      fresh: {
-        pageId: 'p1',
-        name: 'Fresh square',
-        width: 1080,
-        height: 1080,
-        x: 2560,
-        y: 0,
-        fills: GREEN,
-        order: 'a2',
-      },
-      banner: { pageId: 'p2', name: 'Banner', width: 300, height: 250, x: 0, y: 0, fills: YELLOW, order: 'a0' },
-    },
-    nodes: {
-      ...nodes,
-      roast: { ...text('fresh', 'a0', 'Fresh roast', 'Fresh roast', 80), link: 'roast' },
-      bannerHead: { ...text('banner', 'a0', 'Headline', 'Diwali', 40), link: 'head' },
-    },
-  }
-}
-
-/** A layer's row by its id: the square's layers and the story's copies share names. */
-const layerRow = (page: Page, id: string) => tree(page).locator(`[data-layer="${id}"]`)
-const picked = (page: Page) => page.evaluate(() => window.dazbee?.pickedFrame() ?? null)
 /** The names of the rows marked "only here". */
 const onlyHere = (page: Page) =>
   tree(page)
@@ -152,21 +37,6 @@ const onlyHere = (page: Page) =>
     .allTextContents()
 /** The id of the row the focus is on, a frame's or a layer's, or null off the rows. */
 const focusedRow = (page: Page) => page.evaluate(() => document.activeElement?.getAttribute('data-row') ?? null)
-
-/** Opens the design alone in a tab of a theme at a screen size, fitted, its fonts loaded, the panel open. */
-async function openSized(browser: Browser, viewport: { width: number; height: number }, theme = 'dark') {
-  const designId = await seed(design())
-  const page = await (await browser.newContext({ viewport })).newPage()
-  const errors: string[] = []
-  page.on('pageerror', (error) => errors.push(error.message))
-  await setCookies(page, { theme })
-  await page.goto(editorPath(designId))
-  await expect(page.getByTestId('status')).toHaveAttribute('data-ready', '', { timeout: 60_000 })
-  await page.evaluate(() => window.dazbee?.loaded())
-  await fitSettled(page)
-  await openLayers(page)
-  return { page, errors }
-}
 
 /** Opens the design in one tab or two, 1440×1000, the panel open in each. */
 async function openDesign(browser: Browser, count = 1) {
@@ -438,68 +308,3 @@ test('keyboard only: through frames and layers, opening and closing them, pickin
   await expect.poll(async () => (await read(page)).frames.sq?.name).toBe('Sale square')
   expect(errors).toEqual([])
 })
-
-for (const [width, height] of SCREEN_SIZES) {
-  test(`at ${width}×${height} the frame rows, a deep group and a picked frame sit clear of everything, nothing cut short`, async ({
-    browser,
-  }) => {
-    const { page, errors } = await openSized(browser, { width, height })
-    await nextFrame(page)
-    expect(await layoutProblems(page, { pieces: PIECES })).toEqual([])
-    await page.evaluate(() => window.dazbee?.select(['picture']))
-    await expect(row(page, 'Picture')).toBeInViewport()
-    await nextFrame(page)
-    expect(await layoutProblems(page, { pieces: PIECES })).toEqual([])
-    // Every frame row shows its whole name and size.
-    for (const name of ['Sale square', 'Sale story', 'Fresh square']) {
-      const fits = await frameRow(page, name).evaluate((el) =>
-        [...el.querySelectorAll('[data-testid="frame-name"], [data-testid="frame-size"]')].every(
-          (part) => part.scrollWidth <= part.clientWidth,
-        ),
-      )
-      expect(fits, `${name} shows whole`).toBe(true)
-    }
-    await frameRow(page, 'Fresh square').click()
-    expect(await picked(page)).toBe('fresh')
-    await nextFrame(page)
-    expect(await layoutProblems(page, { pieces: PIECES })).toEqual([])
-    expect(errors).toEqual([])
-  })
-}
-
-for (const [width, height] of SCREEN_SIZES) {
-  for (const theme of THEMES) {
-    test(
-      `screenshots at ${width}×${height}, ${theme}: the frames listed, a frame open to a deep group, a picked frame, hidden and locked rows, the focus on a frame row`,
-      { tag: '@evidence' },
-      async ({ browser }) => {
-        const { page, errors } = await openSized(browser, { width, height }, theme)
-        const shot = async (name: string) => {
-          await nextFrame(page)
-          writeOutput(`layers-frames-${width}-${theme}-${name}.png`, await page.screenshot({ animations: 'disabled' }))
-        }
-        await shot('1-frames')
-        await page.evaluate(() => window.dazbee?.select(['picture']))
-        await expect(row(page, 'Picture')).toBeInViewport()
-        // The rows' pictures are drawn once the panel is still.
-        await expect(row(page, 'Badge').getByTestId('layer-picture').locator('img')).toHaveCount(1)
-        await shot('2-deep-group')
-        await frameRow(page, 'Sale square').click()
-        await expect(frameRow(page, 'Sale square')).toHaveAttribute('aria-selected', 'true')
-        await page.mouse.move(0, height / 2)
-        await shot('3-picked-frame')
-        await frameRow(page, 'Sale story').getByRole('button', { name: 'Expand Sale story' }).click()
-        await expect(layerRow(page, copyIn('story', 'logo')).getByTestId('layer-picture').locator('img')).toHaveCount(1)
-        await row(page, 'Logo').first().hover()
-        await shot('4-hidden-locked')
-        await page.mouse.move(0, height / 2)
-        await tabIntoTree(page)
-        await page.keyboard.press('ArrowDown')
-        await page.keyboard.press('Home')
-        await expect(frameRow(page, 'Sale square')).toBeFocused()
-        await shot('5-focus')
-        expect(errors).toEqual([])
-      },
-    )
-  }
-}
