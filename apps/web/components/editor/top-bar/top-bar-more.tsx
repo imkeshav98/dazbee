@@ -11,7 +11,7 @@ import type { Design } from '@dazbee/schema'
 
 import { ALIGN, keyOf } from '@/components/editor/arrange-actions.ts'
 import { RotationField } from '@/components/editor/edit-panel/position-panel.tsx'
-import { set, shared, type Target } from '@/components/editor/edit-panel/target.ts'
+import { factsOf, set, shared, type Target } from '@/components/editor/edit-panel/target.ts'
 import { setOpen, useEditState } from '@/components/editor/edit-store.ts'
 import { ICON_BUTTON, MENU_DIVIDER, MENU_ITEM, MENU_KEY } from '@/components/editor/styles.ts'
 import { cn } from '@/lib/cn.ts'
@@ -25,12 +25,6 @@ import { SubMenu } from './layer-actions.tsx'
 /** The four moves along the stack: to the front, forward, backward, to the back. */
 export const ORDER = ['bringToFront', 'bringForward', 'sendBackward', 'sendToBack'] as const
 
-/** Whether a layer's parent is a box with auto layout, which places the layers in its flow. */
-function isLaidOut(design: Design, parentId: string | undefined) {
-  const parent = design.nodes[parentId ?? '']
-  return parent?.type === 'box' && parent.props.layout !== undefined
-}
-
 /** The top bar's ⋯ for the selected layers: its button, and the menu it opens with the rows that apply. */
 export function TopBarMore({ target, design }: { target: Target; design: Design }) {
   const t = useMessages()
@@ -41,9 +35,7 @@ export function TopBarMore({ target, design }: { target: Target; design: Design 
     types: target.types,
     locked: target.ids.some((id) => Object.values(design.nodes[id]?.lock ?? {}).some(Boolean)),
     // Placed by its auto layout box: in the box's flow, and not set to keep where it is.
-    placed: target.ids.every(
-      (id, i) => isLaidOut(design, design.nodes[id]?.parentId) && target.props[i]?.absolute !== true,
-    ),
+    placed: factsOf(target, design).inFlow && target.props.every((pr) => pr.absolute !== true),
   })
   const done = () => setOpen(null)
   const direction = shared(target.props.map((pr) => (pr.direction ?? 'auto') as 'auto' | 'ltr' | 'rtl'))
@@ -58,7 +50,7 @@ export function TopBarMore({ target, design }: { target: Target; design: Design 
       align="end"
       sheet
       testId="layer-more"
-      className="w-56"
+      className="w-64"
     >
       {rows.map((row) => {
         switch (row.row) {

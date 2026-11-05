@@ -403,13 +403,15 @@ for (const theme of ['dark', 'light'] as const)
       const shot = async (name: string) => {
         await page.mouse.move(2, 400)
         await nextFrame(page)
-        writeOutput(`top-bar-more/${name}-${theme}.png`, await page.screenshot({ animations: 'disabled' }))
+        writeOutput(`top-bar-more-${name}-${theme}.png`, await page.screenshot({ animations: 'disabled' }))
       }
       for (const [width, height] of SCREEN_SIZES) {
         await page.setViewportSize({ width, height })
         await fitSettled(page)
         for (const id of ['shape', 'words']) {
           await selectLayers(page, [id], { bar: true })
+          // Opened by a mouse with no focus left from the keys before, as a person clicking it sees it.
+          await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur())
           await page.getByTestId('bar-layer-more').click()
           await expect(page.getByTestId('bar-layer-more-menu')).toBeVisible()
           await shot(`${id === 'words' ? 'text' : 'shape'}-${width}`)
@@ -418,6 +420,7 @@ for (const theme of ['dark', 'light'] as const)
         }
         await selectLayers(page, ['words'], { bar: true })
         for (const sub of ['order', 'line-up']) {
+          await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur())
           await layerMoreSubmenu(page, sub)
           await shot(`${sub}-${width}`)
           await page.keyboard.press('Escape')
