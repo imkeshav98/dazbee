@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { numberedFrameNames } from './export.ts'
+import { numberedFrameNames, safeFileName } from './export.ts'
 
 const frame = (pageId: string, name: string, order: string) => ({
   pageId,
@@ -58,5 +58,35 @@ describe('numberedFrameNames', () => {
       'Sale 5',
       'Sale 4',
     ])
+  })
+
+  it('numbers the names files take: one a file cannot hold is cleaned first, so the list and the files agree', () => {
+    const frames = {
+      a: frame('p1', 'Sale/Promo', 'a0'),
+      b: frame('p1', 'Sale-Promo', 'a1'),
+      c: frame('p1', '..', 'a2'),
+      d: frame('p1', 'untitled', 'a3'),
+      e: frame('p1', '. Story', 'a4'),
+      f: frame('p1', 'story', 'a5'),
+    }
+    expect([...numberedFrameNames({ frames }, 'p1').values()]).toEqual([
+      'Sale-Promo',
+      'Sale-Promo 2',
+      'untitled',
+      'untitled 2',
+      'Story',
+      'story 2',
+    ])
+  })
+})
+
+describe('safeFileName', () => {
+  it('makes a name every file system holds, and leaves a name it made as it is', () => {
+    expect(safeFileName('Sale/Promo: 50%')).toBe('Sale-Promo- 50%')
+    expect(safeFileName('  Big    sale  ')).toBe('Big sale')
+    expect(safeFileName('. . Story')).toBe('Story')
+    expect(safeFileName('...')).toBe('untitled')
+    for (const name of ['Sale/Promo', ' . Story ', '.. x', 'a  \u0001 b'])
+      expect(safeFileName(safeFileName(name))).toBe(safeFileName(name))
   })
 })

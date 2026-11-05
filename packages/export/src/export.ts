@@ -13,7 +13,7 @@ import {
   numberedFrameNames,
   type Page,
   parseDesign,
-  safe,
+  safeFileName,
 } from '@dazbee/schema'
 
 import { zip } from './zip.ts'
@@ -37,9 +37,9 @@ const TOKENS = new RegExp(`\\{(${EXPORT_NAME_TOKENS.join('|')})\\}`, 'g')
 
 /**
  * The request's frames, in its order, each one file, named from the request's template. A frame's
- * name is numbered by its place among its page's frames (numberedFrameNames), whichever frames are
- * asked for, so a file takes the name Export lists its frame by; a file name still taken, in any
- * case, gets " 2", " 3" and so on. One file comes as itself; more come as one flat zip named after
+ * name is the one its page's frames give it (numberedFrameNames), numbered by its place among them
+ * once made safe for files, whichever frames are asked for, so a file takes the name Export lists
+ * its frame by; a file name still taken, in any case, gets " 2", " 3" and so on. One file comes as itself; more come as one flat zip named after
  * the design. `onFile` hears each file as it is made, so a caller can show progress.
  */
 export function exportDesign(
@@ -84,7 +84,7 @@ export function exportDesign(
   const [only] = files
   if (files.length === 1 && only) return only
   return {
-    name: `${safe(design.meta.name)}.zip`,
+    name: `${safeFileName(design.meta.name)}.zip`,
     type: MIME.zip,
     bytes: zip(files.map((f) => ({ path: f.name, bytes: f.bytes }))),
   }
@@ -166,5 +166,5 @@ export function exportSvg(
 
 /** A file name from the request's template, its tokens filled in; anything else is kept as written. */
 export function fileName(template: string, values: Record<ExportNameToken, string>): string {
-  return safe(template.replace(TOKENS, (_, token: ExportNameToken) => values[token]))
+  return safeFileName(template.replace(TOKENS, (_, token: ExportNameToken) => values[token]))
 }

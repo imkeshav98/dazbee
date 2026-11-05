@@ -163,6 +163,21 @@ describe('exportDesign', () => {
     expect(names(['s2', 's3'], '{page} {frame}')).toEqual(['Hero Sale 2.png', 'Hero Sale 3.png'])
   })
 
+  it('numbers frames by the names their files take, so frames filed alike are numbered, whichever are asked for', () => {
+    const promo = (name: string, order: string) => ({ ...design.frames['p1-sq'], name, order })
+    const promos = {
+      ...design,
+      pages: { p1: design.pages.p1 },
+      frames: { a: promo('Sale/Promo', 'a0'), b: promo('Sale-Promo', 'a1') },
+      nodes: {},
+    }
+    expect(
+      readZip(exportDesign(ck, promos, { frameIds: ['a', 'b'], type: 'png' }, bytes).bytes).map((e) => e.path),
+    ).toEqual(['Sale-Promo.png', 'Sale-Promo 2.png'])
+    expect(exportDesign(ck, promos, { frameIds: ['b'], type: 'png' }, bytes).name).toBe('Sale-Promo 2.png')
+    expect(exportDesign(ck, promos, { frameIds: ['a'], type: 'png' }, bytes).name).toBe('Sale-Promo.png')
+  })
+
   it('the same request gives the same bytes every time', () => {
     const request = { frameIds: ['p1-sq', 'p2-sq', 'p1-story', 'p2-story'], type: 'jpg' }
     expect(exportDesign(ck, design, request, bytes).bytes).toEqual(exportDesign(ck, design, request, bytes).bytes)
