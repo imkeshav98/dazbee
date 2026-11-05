@@ -21,6 +21,8 @@ test.describe.configure({ timeout: 180_000 })
 const LOCKED = { move: true, resize: true, content: true, style: true, delete: true }
 const YELLOW = [{ type: 'solid' as const, color: '#FFD23FFF' }]
 const GREEN = [{ type: 'solid' as const, color: '#218A5CFF' }]
+/** The pieces that must not cover each other with the panel open. */
+const PIECES = { ...EDITOR_CHROME, flyout: '[data-testid="flyout"]' }
 /** The rows of Sale square, open with its deep group open, as `listed` gives them. */
 const SQUARE_OPEN = [
   'Sale square 1080×1080',
@@ -436,9 +438,6 @@ test('keyboard only: through frames and layers, opening and closing them, pickin
   await expect.poll(async () => (await read(page)).frames.sq?.name).toBe('Sale square')
   expect(errors).toEqual([])
 })
-
-/** The pieces that must not cover each other with the panel open. */
-const PIECES = { ...EDITOR_CHROME, flyout: '[data-testid="flyout"]' }
 
 for (const [width, height] of SCREEN_SIZES) {
   test(`at ${width}×${height} the frame rows, a deep group and a picked frame sit clear of everything, nothing cut short`, async ({
