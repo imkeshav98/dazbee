@@ -1,7 +1,6 @@
 // The design and helpers of the frames-on-canvas specs: a page holding a square, a story linked to it
 // and a banner linked to nothing, the square holding a headline, a layer turned 30°, a locked one and
-// a photo under a round mask; which frame is picked, where a frame's label is, and the design opened
-// alone at a screen size and in a theme.
+// a photo under a round mask; which frame is picked, and where a frame's label is.
 import type { DesignInput } from '@dazbee/schema'
 
 import { solid } from './edit-in-frame.ts'
