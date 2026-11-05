@@ -13,6 +13,7 @@ import {
   numberedFrameNames,
   type Page,
   parseDesign,
+  safe,
 } from '@dazbee/schema'
 
 import { zip } from './zip.ts'
@@ -31,10 +32,6 @@ const MIME: Record<ExportType | 'zip', string> = {
   svg: 'image/svg+xml',
   zip: 'application/zip',
 }
-
-/** Path separators, the characters some file systems reserve, and control characters. */
-// eslint-disable-next-line no-control-regex
-const UNSAFE_IN_NAMES = /[/\\:*?"<>|\u0000-\u001f]/g
 
 const TOKENS = new RegExp(`\\{(${EXPORT_NAME_TOKENS.join('|')})\\}`, 'g')
 
@@ -170,10 +167,4 @@ export function exportSvg(
 /** A file name from the request's template, its tokens filled in; anything else is kept as written. */
 export function fileName(template: string, values: Record<ExportNameToken, string>): string {
   return safe(template.replace(TOKENS, (_, token: ExportNameToken) => values[token]))
-}
-
-/** A name safe on every file system: no path separators or reserved characters, never empty. */
-function safe(part: string) {
-  const cleaned = part.replace(UNSAFE_IN_NAMES, '-').replace(/\s+/g, ' ').trim().replace(/^\.+/, '')
-  return cleaned || 'untitled'
 }

@@ -13,6 +13,10 @@ export type ExportNameToken = (typeof EXPORT_NAME_TOKENS)[number]
 /** The name a file takes when the request names none: its frame's. */
 export const DEFAULT_EXPORT_NAME = '{frame}'
 
+/** Path separators, the characters some file systems reserve, and control characters. */
+// eslint-disable-next-line no-control-regex
+const UNSAFE_IN_NAMES = /[/\\:*?"<>|\u0000-\u001f]/g
+
 /**
  * What to export from a design: some frames, as one file type. The same request runs in the
  * browser's export worker and in Node. More than one file comes as one zip.
@@ -55,4 +59,10 @@ export function numberedFrameNames<
     names.set(frameId, name)
   }
   return names
+}
+
+/** A name safe on every file system: no path separators or reserved characters, never empty. */
+export function safe(part: string) {
+  const cleaned = part.replace(UNSAFE_IN_NAMES, '-').replace(/\s+/g, ' ').trim().replace(/^\.+/, '')
+  return cleaned || 'untitled'
 }
