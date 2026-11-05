@@ -216,3 +216,34 @@ test('on a phone a frame picked from its row above the panel stays put, its labe
   expect(await page.evaluate(() => window.dazbee?.camera())).toEqual(camera)
   expect(errors).toEqual([])
 })
+
+test('on a phone a layer picked from its row just above the panel stays clear of it, its frame label under the bar', async ({
+  browser,
+}) => {
+  const { page, errors } = await openSized(browser, { width: 390, height: 844 })
+  // The deep group open, the panel stands as tall as it gets.
+  await page.evaluate(() => window.dazbee?.select(['picture']))
+  await expect(row(page, 'Picture')).toBeInViewport()
+  const panel = await boxOf(page.getByTestId('flyout'))
+  // Badge's bottom 10 px above the panel, Sale square's top and label up under the bar.
+  await page.evaluate((top) => {
+    const editor = window.dazbee
+    const camera = editor?.camera()
+    if (!editor || !camera) return
+    editor.setCamera({ zoom: 0.25, x: camera.x, y: top - 10 - 860 * 0.25 })
+  }, panel.y)
+  await nextFrame(page)
+  const camera = await page.evaluate(() => window.dazbee?.camera())
+  await row(page, 'Badge').getByTestId('layer-name').click()
+  await expect(row(page, 'Badge')).toHaveAttribute('aria-selected', 'true')
+  await nextFrame(page)
+  await nextFrame(page)
+  const badge = await page.evaluate(() => {
+    const editor = window.dazbee
+    const box = editor?.boxOf('badge')
+    return box && editor?.screenPoint(box.x, box.y + box.height).y
+  })
+  expect(badge).toBeLessThan(panel.y)
+  expect(await page.evaluate(() => window.dazbee?.camera())).toEqual(camera)
+  expect(errors).toEqual([])
+})
