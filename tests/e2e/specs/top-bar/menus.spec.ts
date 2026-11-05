@@ -7,7 +7,7 @@ import { screenPoint, writeOutput } from '../../support/editor.ts'
 import { layoutProblems } from '../../support/layout.ts'
 import { fitSettled, nextFrame, openStage, selectLayers } from '../../support/stage.ts'
 import { expect, test } from '../../support/test.ts'
-import { barMenu, moreAction, moreMenu, moreSubmenu, PIECES, UNCUT } from '../../support/top-bar.ts'
+import { barMenu, layerMore, layerMoreSubmenu, moreAction, moreMenu, PIECES, UNCUT } from '../../support/top-bar.ts'
 import { topBarDesign } from '../../support/top-bar-design.ts'
 
 test.describe.configure({ timeout: 240_000 })
@@ -234,7 +234,7 @@ test('undo and redo in the header pill: off with nothing to do, each a step, and
   expect(errors).toEqual([])
 })
 
-test('the small menu locks, duplicates and deletes; the full menu copies, pastes and keeps its menus beside', async ({
+test("the small menu locks, duplicates and deletes; the full menu copies and pastes; the top bar's ⋯ keeps its menus beside", async ({
   browser,
 }) => {
   const asset = await upload(photo)
@@ -263,12 +263,12 @@ test('the small menu locks, duplicates and deletes; the full menu copies, pastes
   await moreAction(page, 'Paste')
   await expect.poll(nodes).toBe(before + 1)
 
-  // Order opens beside its row with the arrow and closes with the arrow back.
+  // Order opens beside its row in the top bar's ⋯ with the arrow and closes with the arrow back.
   await selectLayers(page, ['box'])
-  const full = await moreMenu(page)
-  await full.getByTestId('more-order').focus()
+  const sit = await layerMore(page)
+  await sit.getByTestId('more-order').focus()
   await page.keyboard.press('ArrowRight')
-  await expect((await moreSubmenu(page, 'order')).getByRole('button')).toHaveText([
+  await expect((await layerMoreSubmenu(page, 'order')).getByRole('button')).toHaveText([
     /^Bring to front/,
     /^Bring forward/,
     /^Send backward/,
@@ -276,7 +276,7 @@ test('the small menu locks, duplicates and deletes; the full menu copies, pastes
   ])
   await page.keyboard.press('ArrowLeft')
   await expect(page.getByTestId('more-order-menu')).toBeHidden()
-  await expect(full).toBeVisible()
+  await expect(sit).toBeVisible()
   expect(errors).toEqual([])
 })
 

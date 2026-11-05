@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 
 import { topBarMoreRows } from './top-bar-more.ts'
 
-const one = (type: Parameters<typeof topBarMoreRows>[0]['types'][number]) => ({
+const one = (type: string) => ({
   types: [type],
   locked: false,
   placed: false,

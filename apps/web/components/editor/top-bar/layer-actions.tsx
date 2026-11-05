@@ -1,22 +1,21 @@
 'use client'
 
 // The selected layers' own actions, one list for the small menu's ⋯ (the full menu) and the
-// right-click menu: copy, paste, duplicate and delete; order and line up with the frame as menus
-// beside their rows, and the turn; group, box, mask (or release the mask a layer is under) and
-// ungroup; lock and hide; text direction. Every row runs the same editor action as its shortcut.
+// right-click menu: copy, paste, duplicate and delete; group, box, mask (or release the mask a layer
+// is under) and ungroup; lock and hide. Every row runs the same editor action as its shortcut. How
+// the layers sit (order, line up, the turn, text direction) is in the top bar's ⋯.
 // A right-click on empty canvas offers to show the hidden layers of the frame there, or of the one
 // nearest it outside every frame, when it has some.
 import { CaretRightIcon } from '@phosphor-icons/react'
 import * as Popover from '@radix-ui/react-popover'
-import { type ReactNode, useEffect, useState } from 'react'
+import { type ReactNode, useEffect, useLayoutEffect, useState } from 'react'
 
 import { childrenOf, descendants } from '@dazbee/doc'
 import { type Editor, type Frame, type Point, type ShortcutAction, visibleIn } from '@dazbee/editor'
 import type { Design } from '@dazbee/schema'
 
 import { keyOf } from '@/components/editor/arrange-actions.ts'
-import { RotationField } from '@/components/editor/edit-panel/position-panel.tsx'
-import { set, shared, useTarget } from '@/components/editor/edit-panel/target.ts'
+import { useTarget } from '@/components/editor/edit-panel/target.ts'
 import { useEditState, usePhone } from '@/components/editor/edit-store.ts'
 import { useSelection } from '@/components/editor/editor-hooks.ts'
 import { MENU, MENU_DIVIDER, MENU_ITEM, MENU_KEY } from '@/components/editor/styles.ts'
@@ -25,7 +24,6 @@ import { useLocale, useMessages } from '@/lib/i18n/client.tsx'
 import { dirOf } from '@/lib/i18n/index.ts'
 
 import { useMenuFocus, useScrollingMenu } from './bar-popover.tsx'
-import { AlignRow, ORDER } from './top-bar-more.tsx'
 
 /** The layers hidden in one frame, which a right-click on its empty canvas offers to show. */
 export interface HiddenLayers {
@@ -88,7 +86,6 @@ function nearestFrame(editor: Editor, client: Point) {
  */
 export function LayerActions({ editor, ids, onDone }: { editor: Editor; ids: string[]; onDone: () => void }) {
   const t = useMessages()
-  const p = t.editor.props
   const b = t.editor.bar
   const selected = useTarget(editor, ids)
   if (!selected) return null
@@ -118,9 +115,6 @@ export function LayerActions({ editor, ids, onDone }: { editor: Editor; ids: str
   const hidden = target.props.every((pr) => pr.visible === false)
   const masks = target.props.every((pr) => Boolean(pr.mask))
   const over = masksOver(design, target.ids)
-  const sized = target.types.every((type) => type !== 'group' && type !== 'boolean')
-  const texts = target.types.every((type) => type === 'text')
-  const direction = shared(target.props.map((pr) => (pr.direction ?? 'auto') as 'auto' | 'ltr' | 'rtl'))
   return (
     <>
       <button
@@ -150,21 +144,6 @@ export function LayerActions({ editor, ids, onDone }: { editor: Editor; ids: str
       </button>
       {row('duplicate', t.editor.arrange.duplicate)}
       {row('delete', b.delete)}
-      <div className={MENU_DIVIDER} />
-      <SubMenu label={b.order} testId="order">
-        {ORDER.map((action) => row(action, t.editor.arrange[action]))}
-      </SubMenu>
-      {ids.length === 1 && (
-        <SubMenu label={b.lineUp} testId="line-up">
-          <AlignRow editor={editor} />
-        </SubMenu>
-      )}
-      {sized && (
-        // On a phone the turn field is as tall as a row, a touch target a finger can hit.
-        <div className="px-1.5 py-1 max-sm:[&_[data-scrub]]:min-h-[44px]">
-          <RotationField target={target} p={p} />
-        </div>
-      )}
       <div className={MENU_DIVIDER} />
       {ids.length > 1 && row('group', t.editor.arrange.group)}
       {row('boxSelection', b.putInBox)}
@@ -209,28 +188,6 @@ export function LayerActions({ editor, ids, onDone }: { editor: Editor; ids: str
         {hidden ? b.show : b.hide}
         <kbd className={MENU_KEY}>{keyOf('hide')}</kbd>
       </button>
-      {texts && (
-        <>
-          <div className={MENU_DIVIDER} />
-          <SubMenu label={b.textDirection} testId="text-direction">
-            {(['auto', 'ltr', 'rtl'] as const).map((to) => (
-              <button
-                key={to}
-                type="button"
-                aria-pressed={direction === to}
-                data-direction={to}
-                onClick={() => {
-                  set(target, () => ({ direction: to }))
-                  onDone()
-                }}
-                className={MENU_ITEM}
-              >
-                {b.textDirections[to]}
-              </button>
-            ))}
-          </SubMenu>
-        </>
-      )}
     </>
   )
 }
@@ -308,14 +265,24 @@ export function StageMenu({
 
 /**
  * A row of the menu that opens a short menu beside it, or under it on a phone, where the screen has
- * no room beside the menu: Enter or the arrow towards it opens it, the arrow back or Esc closes it.
+ * no room beside the menu; in a sheet at the bottom of a phone's screen, above the sheet. Enter or
+ * the arrow towards it opens it, the arrow back or Esc closes it.
  */
-function SubMenu({ label, testId, children }: { label: string; testId: string; children: ReactNode }) {
+export function SubMenu({ label, testId, children }: { label: string; testId: string; children: ReactNode }) {
   const [open, setOpen] = useState(false)
   const phone = usePhone()
+  // In a sheet, how far above the row the short menu sits to clear the sheet's top; null outside one.
+  const [overSheet, setOverSheet] = useState<number | null>(null)
   const rtl = dirOf(useLocale()) === 'rtl'
   const [toward, back] = rtl ? ['ArrowLeft', 'ArrowRight'] : ['ArrowRight', 'ArrowLeft']
   const focus = useMenuFocus()
+  useLayoutEffect(() => {
+    const row = focus.button.current
+    const sheet = phone && open ? row?.closest('[data-sheet]') : null
+    setOverSheet(
+      row && sheet ? Math.round(row.getBoundingClientRect().top - sheet.getBoundingClientRect().top) + 8 : null,
+    )
+  }, [phone, open, focus.button])
   return (
     <Popover.Root open={open} onOpenChange={setOpen}>
       <Popover.Trigger asChild>
@@ -337,9 +304,9 @@ function SubMenu({ label, testId, children }: { label: string; testId: string; c
       </Popover.Trigger>
       <Popover.Portal>
         <Popover.Content
-          side={phone ? 'bottom' : rtl ? 'left' : 'right'}
+          side={overSheet !== null ? 'top' : phone ? 'bottom' : rtl ? 'left' : 'right'}
           align="start"
-          sideOffset={phone ? 4 : 8}
+          sideOffset={overSheet ?? (phone ? 4 : 8)}
           collisionPadding={12}
           // A click elsewhere, Esc or the arrow back closes it; focus moving as the menu opens does not.
           onFocusOutside={(event) => event.preventDefault()}

@@ -1,13 +1,12 @@
 // The rows of the top bar's ⋯ for the selected layers: how they sit. Each row shows only where it
 // applies to the selection, and Line up is greyed out, with the reason, while it has nothing to do.
-import type { LayerType } from '@dazbee/schema'
-
 /** One row of the top bar's ⋯, and why it is greyed out when it is. */
 export type TopBarMoreRow = { row: 'order' | 'rotation' | 'textDirection' } | { row: 'lineUp'; off?: 'placedByLayout' }
 
 /** What the rows depend on: the selected layers' types, and whether they are locked or placed by an auto layout. */
 export interface TopBarMoreOf {
-  types: readonly LayerType[]
+  /** Each selected layer's type, as a layer's `type` names it. */
+  types: readonly string[]
   /** Some of the layers are locked. */
   locked: boolean
   /** Every layer is in an auto layout box's flow, so the box places it. */

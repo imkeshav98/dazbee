@@ -132,9 +132,9 @@ export async function textColourHex(page: Page) {
 export const strokeList = async (page: Page) => (await barMenu(page, 'outline')).getByTestId('stroke-list')
 
 /**
- * Clicks an action of the full menu, or of the right-click menu when `menu` is it, by the start of
- * its name (the first row that starts so): in the menu, or in the menu beside a row (Line up ▸,
- * Order ▸). The action closes the menu, and this waits until it has.
+ * Clicks an action of the full menu, or of the right-click menu or the top bar's ⋯ when `menu` is
+ * it, by the start of its name (the first row that starts so): in the menu, or in the menu beside a
+ * row (Line up ▸, Order ▸). The action closes the menu, and this waits until it has.
  */
 export async function moreAction(page: Page, name: string, menu?: Locator) {
   const root = menu ?? (await moreMenu(page))
@@ -161,6 +161,20 @@ export async function moreAction(page: Page, name: string, menu?: Locator) {
 export async function moreSubmenu(page: Page, id: string) {
   const sub = page.getByTestId(`more-${id}-menu`)
   if (!(await sub.isVisible())) await (await moreMenu(page)).getByTestId(`more-${id}`).click()
+  await expect(sub).toBeVisible()
+  return sub
+}
+
+/**
+ * Opens the top bar's ⋯ for the selected layers, unless it is open, and gives it once it shows: how
+ * they sit (Order ▸, Line up ▸, the rotation field, Text direction ▸). On a phone it is a sheet.
+ */
+export const layerMore = (page: Page) => barMenu(page, 'layer-more')
+
+/** Opens the menu beside one of the top bar ⋯'s rows, `more-<id>` (order, line-up, text-direction), and gives it once it shows. */
+export async function layerMoreSubmenu(page: Page, id: string) {
+  const sub = page.getByTestId(`more-${id}-menu`)
+  if (!(await sub.isVisible())) await (await layerMore(page)).getByTestId(`more-${id}`).click()
   await expect(sub).toBeVisible()
   return sub
 }

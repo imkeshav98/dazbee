@@ -5,7 +5,8 @@
 // picked frame's Background and ⋯); a locked layer's bar says it is locked and unlocks it. An item
 // with ▾ opens a pop-up under the bar; a panel item opens the one edit panel at the stage's end;
 // the rest act at once. When the items don't fit, the last ones go into ⋯, which opens a second row
-// under the bar; on a phone the bar scrolls sideways instead.
+// under the bar; on a phone the bar scrolls sideways instead, its last item, the ⋯ of the layers or
+// the frame, kept in view at its end.
 import { DotsThreeIcon } from '@phosphor-icons/react'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 
@@ -143,6 +144,8 @@ function Bar({
   const startAt = !phone && flyoutEnd !== null ? flyoutEnd + 12 : 0
   const [bar, setBarEl] = useState<HTMLDivElement | null>(null)
   const [row, setRow] = useState<HTMLDivElement | null>(null)
+  // On a phone, what scrolls sideways: every item but the last.
+  const [scroller, setScroller] = useState<HTMLDivElement | null>(null)
   const [extra, setExtra] = useState<HTMLDivElement | null>(null)
   const keys = items.map((item) => item.key).join(' ')
   const fit = useFit(row, extra, keys, phone)
@@ -179,8 +182,9 @@ function Bar({
   const selectionKey = Object.values(named).join(' ')
   useLayoutEffect(() => {
     if (row) row.scrollLeft = 0
+    if (scroller) scroller.scrollLeft = 0
     setRowOpen(false)
-  }, [row, selectionKey])
+  }, [row, scroller, selectionKey])
   // A panel whose item has left the bar closes, as a shape's Colour does once it holds a photo.
   useLayoutEffect(() => {
     if (isLayerPanel(open) && !items.some((item) => item.key === open)) setOpen(null)
@@ -211,6 +215,8 @@ function Bar({
       {node}
     </span>
   )
+  // On a phone the last item stays at the bar's end while the others scroll.
+  const pinned = phone ? first.at(-1) : undefined
   return (
     <div
       ref={setBarEl}
@@ -226,12 +232,21 @@ function Bar({
         BAR_ROW,
       )}
     >
-      <div
-        ref={setRow}
-        className={cn(TOP_BAR, 'pointer-events-auto max-w-full', phone && 'no-scrollbar overflow-x-auto')}
-        data-testid="top-bar-row"
-      >
-        {first.map(item)}
+      <div ref={setRow} className={cn(TOP_BAR, 'pointer-events-auto max-w-full')} data-testid="top-bar-row">
+        {pinned ? (
+          <>
+            <div
+              ref={setScroller}
+              data-testid="top-bar-scroll"
+              className="no-scrollbar flex min-w-0 items-center gap-0.5 overflow-x-auto"
+            >
+              {first.slice(0, -1).map(item)}
+            </div>
+            {item(pinned)}
+          </>
+        ) : (
+          first.map(item)
+        )}
         {overflowing && (
           <button
             type="button"

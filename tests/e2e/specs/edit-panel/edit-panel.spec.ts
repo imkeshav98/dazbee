@@ -12,7 +12,7 @@ import {
   barMenu,
   closeBarMenu,
   fillList,
-  moreMenu,
+  layerMore,
   openCard,
   strokeList,
   textColourHex,
@@ -107,7 +107,7 @@ test('one layer: position, size, turn, opacity, blend, fill, stroke and effects'
   await expect.poll(async () => (await props(page, 'box')).width).toBe(301)
   await (await layout()).getByRole('spinbutton', { name: 'Width' }).press('Shift+ArrowUp')
   await expect.poll(async () => (await props(page, 'box')).width).toBe(311)
-  await enter((await moreMenu(page)).getByRole('spinbutton', { name: 'Rotation in degrees' }), '15')
+  await enter((await layerMore(page)).getByRole('spinbutton', { name: 'Rotation in degrees' }), '15')
   await page.keyboard.press('Escape')
   await expect.poll(async () => (await props(page, 'box')).rotation).toBe(15)
 

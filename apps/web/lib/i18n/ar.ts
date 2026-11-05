@@ -211,6 +211,8 @@ export const ar: Messages = {
       label: 'التحديد',
       lineUp: 'محاذاة',
       order: 'الترتيب',
+      arrange: 'ترتيب',
+      placedByLayout: 'التخطيط التلقائي يحدد مكان هذه الطبقة',
       grouping: 'تجميع',
       putInBox: 'ضع في صندوق',
       combine: 'دمج',

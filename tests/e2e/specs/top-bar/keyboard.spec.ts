@@ -11,7 +11,7 @@ import { layoutProblems } from '../../support/layout.ts'
 import { frameDesign } from '../../support/seed.ts'
 import { nextFrame, openStage, read, selection, selectLayers } from '../../support/stage.ts'
 import { expect, type Page, test } from '../../support/test.ts'
-import { barMenu, moreMenu, moreSubmenu, PIECES, UNCUT } from '../../support/top-bar.ts'
+import { barMenu, layerMore, layerMoreSubmenu, PIECES, UNCUT } from '../../support/top-bar.ts'
 import { topBarDesign } from '../../support/top-bar-design.ts'
 
 test.describe.configure({ timeout: 240_000 })
@@ -148,7 +148,8 @@ test('the size field steps with the arrows; a pop-up closes when the window chan
   await page.setViewportSize({ width: 390, height: 844 })
   await expect(page.getByTestId('bar-align-menu')).toBeHidden()
 
-  const row = page.getByTestId('top-bar-row')
+  // Every item but the last, the ⋯ kept at the bar's end, scrolls sideways.
+  const row = page.getByTestId('top-bar-scroll')
   await row.evaluate((el) => {
     el.scrollLeft = el.scrollWidth
   })
@@ -499,47 +500,47 @@ test.describe('the focus as a menu of the bar closes', () => {
     expect(errors).toEqual([])
   })
 
-  test('Esc twice at once in the menu beside Order: the first closes it, the second ⋯ More, and the layer stays selected', async ({
+  test("Esc twice at once in the menu beside Order: the first closes it, the second the top bar's ⋯, and the layer stays selected", async ({
     browser,
   }) => {
     const { page, errors } = await openStage(browser, oneLayer())
     await selectLayers(page, ['a'])
-    const order = await moreSubmenu(page, 'order')
+    const order = await layerMoreSubmenu(page, 'order')
     expect(await order.evaluate((menu) => menu.contains(document.activeElement))).toBe(true)
 
-    await keyThen(page, { key: 'Escape', closed: 'more-order-menu', next: 'esc', then: '!bar-more-menu' })
+    await keyThen(page, { key: 'Escape', closed: 'more-order-menu', next: 'esc', then: '!bar-layer-more-menu' })
     await timers(page)
 
     expect(await selection(page)).toEqual(['a'])
-    await expect(page.getByTestId('bar-more-menu')).toBeHidden()
-    await expect(page.getByTestId('bar-more')).toBeVisible()
-    await expect(page.getByTestId('bar-more')).toBeFocused()
+    await expect(page.getByTestId('bar-layer-more-menu')).toBeHidden()
+    await expect(page.getByTestId('bar-layer-more')).toBeVisible()
+    await expect(page.getByTestId('bar-layer-more')).toBeFocused()
     expect(errors).toEqual([])
   })
 
-  test('the arrow back out of the menu beside Order, then Esc at once: ⋯ More closes and the layer stays selected', async ({
+  test("the arrow back out of the menu beside Order, then Esc at once: the top bar's ⋯ closes and the layer stays selected", async ({
     browser,
   }) => {
     const { page, errors } = await openStage(browser, oneLayer())
     await selectLayers(page, ['a'])
-    const order = await moreSubmenu(page, 'order')
+    const order = await layerMoreSubmenu(page, 'order')
     expect(await order.evaluate((menu) => menu.contains(document.activeElement))).toBe(true)
 
-    await keyThen(page, { key: 'ArrowLeft', closed: 'more-order-menu', next: 'esc', then: '!bar-more-menu' })
+    await keyThen(page, { key: 'ArrowLeft', closed: 'more-order-menu', next: 'esc', then: '!bar-layer-more-menu' })
     await timers(page)
 
     expect(await selection(page)).toEqual(['a'])
-    await expect(page.getByTestId('bar-more')).toBeVisible()
-    await expect(page.getByTestId('bar-more')).toBeFocused()
+    await expect(page.getByTestId('bar-layer-more')).toBeVisible()
+    await expect(page.getByTestId('bar-layer-more')).toBeFocused()
     expect(errors).toEqual([])
   })
 
-  test('Esc in a number field of ⋯ More throws away what was typed: the menu closes and the layer keeps its rotation', async ({
+  test("Esc in the top bar ⋯'s rotation field throws away what was typed: the menu closes and the layer keeps its rotation", async ({
     browser,
   }) => {
     const { page, errors } = await openStage(browser, oneLayer())
     await selectLayers(page, ['a'])
-    const more = await moreMenu(page)
+    const more = await layerMore(page)
     const rotation = more.getByRole('spinbutton', { name: 'Rotation in degrees' })
     await rotation.fill('45')
     await expect(rotation).toBeFocused()
@@ -550,7 +551,7 @@ test.describe('the focus as a menu of the bar closes', () => {
 
     expect((await read(page)).nodes.a?.props.rotation).toBe(0)
     expect(await selection(page)).toEqual(['a'])
-    await expect(page.getByTestId('bar-more')).toBeFocused()
+    await expect(page.getByTestId('bar-layer-more')).toBeFocused()
     expect(errors).toEqual([])
   })
 })

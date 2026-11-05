@@ -8,7 +8,7 @@ import { layoutProblems, rowHeights, scrolling } from '../../support/layout.ts'
 import { seed } from '../../support/seed.ts'
 import { drawn, fitSettled, nextFrame, openStage, selectLayers } from '../../support/stage.ts'
 import { expect, test } from '../../support/test.ts'
-import { barMenu, moreMenu, PIECES, UNCUT, zoomMenu } from '../../support/top-bar.ts'
+import { barMenu, layerMore, layerMoreSubmenu, moreMenu, PIECES, UNCUT, zoomMenu } from '../../support/top-bar.ts'
 import { topBarDesign } from '../../support/top-bar-design.ts'
 
 test.describe.configure({ timeout: 240_000 })
@@ -119,7 +119,7 @@ test.describe('on a phone, 390×844', () => {
     await page.setViewportSize({ width: 390, height: 844 })
     // A text's bar, the longest, is wider than the phone.
     await selectLayers(page, ['headline'], { bar: true })
-    const row = page.getByTestId('top-bar-row')
+    const row = page.getByTestId('top-bar-scroll')
     expect(await row.evaluate((el) => [el.scrollWidth > el.clientWidth, getComputedStyle(el).scrollbarWidth])).toEqual([
       true,
       'none',
@@ -149,7 +149,7 @@ test.describe('on a phone, 390×844', () => {
     expect(errors).toEqual([])
   })
 
-  test('every menu row is at least 44 px tall, the turn field too: the full, right-click, shape and zoom menus', async ({
+  test('every menu row is at least 44 px tall: the full, right-click, top bar ⋯ with its turn field, shape and zoom menus', async ({
     browser,
   }) => {
     const asset = await upload(photo)
@@ -158,8 +158,12 @@ test.describe('on a phone, 390×844', () => {
     await fitSettled(page)
     await selectLayers(page, ['box'], { bar: true })
     const full = await moreMenu(page)
-    await expect(full.locator('[data-scrub]')).toHaveCount(1)
-    for (const height of await rowHeights(full, ':scope > button, [data-scrub]'))
+    for (const height of await rowHeights(full, ':scope > button')) expect(height).toBeGreaterThanOrEqual(44)
+    await page.keyboard.press('Escape')
+
+    const sit = await layerMore(page)
+    await expect(sit.locator('[data-scrub]')).toHaveCount(1)
+    for (const height of await rowHeights(sit, ':scope > button, [data-scrub]'))
       expect(height).toBeGreaterThanOrEqual(44)
     await page.keyboard.press('Escape')
 
@@ -168,9 +172,7 @@ test.describe('on a phone, 390×844', () => {
     await page.mouse.click(at.x, at.y, { button: 'right' })
     const right = page.getByTestId('stage-menu')
     await expect(right).toBeVisible()
-    await expect(right.locator('[data-scrub]')).toHaveCount(1)
-    for (const height of await rowHeights(right, ':scope > button, [data-scrub]'))
-      expect(height).toBeGreaterThanOrEqual(44)
+    for (const height of await rowHeights(right, ':scope > button')) expect(height).toBeGreaterThanOrEqual(44)
     await page.keyboard.press('Escape')
     await expect(right).toBeHidden()
 
@@ -232,7 +234,7 @@ test.describe('on a phone, 390×844', () => {
     expect(errors).toEqual([])
   })
 
-  test("a menu beside a row of the full menu opens inside the screen: Order's every row shows whole", async ({
+  test("a menu beside a row of the top bar's ⋯ opens inside the screen: Order's every row shows whole", async ({
     browser,
   }) => {
     const asset = await upload(photo)
@@ -240,10 +242,7 @@ test.describe('on a phone, 390×844', () => {
     await page.setViewportSize({ width: 390, height: 844 })
     await fitSettled(page)
     await selectLayers(page, ['box'], { bar: true })
-    const full = await moreMenu(page)
-    await full.getByTestId('more-order').click()
-    const order = page.getByTestId('more-order-menu')
-    await expect(order).toBeVisible()
+    const order = await layerMoreSubmenu(page, 'order')
     for (const row of await order.getByRole('button').all()) {
       const box = await row.boundingBox()
       expect(box && box.x >= 0 && box.x + box.width <= 390 && box.y >= 0 && box.y + box.height <= 844).toBe(true)

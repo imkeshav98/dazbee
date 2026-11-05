@@ -1,7 +1,8 @@
 'use client'
 
-// One button of the bar by the selection and the popover it opens under it. The bar keeps which
-// one is open, so only one is open at a time. Also the hooks the editor's menus share: the focus as a
+// One button of the bar by the selection and the popover it opens under it, or, for a menu that
+// asks, at the bottom of a phone's screen as a sheet. The bar keeps which one is open, so only one
+// is open at a time. Also the hooks the editor's menus share: the focus as a
 // popover opens and closes, Tab once into a toolbar, and a menu that shows it scrolls.
 import { CaretDownIcon } from '@phosphor-icons/react'
 import * as Popover from '@radix-ui/react-popover'
@@ -26,7 +27,24 @@ import { cn } from '@/lib/cn.ts'
 /** The room between the bar's last row that shows and a popover under it, in pixels. */
 const GAP = 8
 
+/** The room between a sheet and the screen's edges on a phone, in pixels, as an edit panel's sheet keeps. */
+const SHEET_EDGE = 8
+
 const nowhere = () => document.activeElement === null || document.activeElement === document.body
+
+/**
+ * Where a sheet hangs from on a phone: a line along the screen's bottom edge, SHEET_EDGE in from
+ * each side and from the bottom, so a popover above it spans the screen's width.
+ */
+const SCREEN_BOTTOM = {
+  current: {
+    getBoundingClientRect: () => {
+      const width = document.documentElement.clientWidth
+      const bottom = window.innerHeight - SHEET_EDGE
+      return DOMRect.fromRect({ x: SHEET_EDGE, y: bottom, width: width - SHEET_EDGE * 2, height: 0 })
+    },
+  },
+}
 
 /**
  * How far under its button a popover hangs to clear the whole bar: GAP under the bar's last row
@@ -160,6 +178,7 @@ export function BarPopover({
   className,
   caret = true,
   align = 'center',
+  sheet = false,
   buttonRef,
 }: {
   id: string
@@ -177,11 +196,16 @@ export function BarPopover({
   caret?: boolean
   /** Where the popover lines up under its button: its middle, or its end, as a menu of actions does. */
   align?: 'center' | 'end'
+  /** Whether it opens as a sheet at the bottom of the screen on a phone, as an edit panel does. */
+  sheet?: boolean
   /** Given the button, for a control that gives the focus back to it later. */
   buttonRef?: RefObject<HTMLButtonElement | null>
 }) {
   const focus = useMenuFocus()
   const shown = open === id
+  const phone = usePhone()
+  // On a phone the anchor is the screen's bottom edge; Radix's trigger width is the anchor's.
+  const asSheet = sheet && phone
   // Measured as it opens, and again when the bar's bottom moves, as when its second row opens.
   const { barBottom } = useEditState()
   const [below, setBelow] = useState(GAP)
@@ -208,16 +232,24 @@ export function BarPopover({
           {caret && <CaretDownIcon size={10} weight="bold" aria-hidden className="text-subtle" />}
         </button>
       </Popover.Trigger>
+      {asSheet && <Popover.Anchor virtualRef={SCREEN_BOTTOM} />}
       <Popover.Portal>
         <Popover.Content
-          side="bottom"
-          align={align}
-          sideOffset={below}
-          collisionPadding={12}
+          side={asSheet ? 'top' : 'bottom'}
+          align={asSheet ? 'center' : align}
+          sideOffset={asSheet ? 0 : below}
+          collisionPadding={asSheet ? SHEET_EDGE : 12}
           {...focus.content}
           aria-label={label}
           data-testid={`bar-${testId}-menu`}
-          className={cn(POPOVER, 'flex flex-col p-1.5', className ?? 'min-w-56')}
+          data-sheet={asSheet || undefined}
+          className={cn(
+            POPOVER,
+            'flex flex-col p-1.5',
+            asSheet
+              ? 'max-h-[var(--radix-popover-content-available-height)] w-[var(--radix-popover-trigger-width)] overflow-y-auto rounded-[22px]'
+              : (className ?? 'min-w-56'),
+          )}
         >
           {focus.back}
           {children}

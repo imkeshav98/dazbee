@@ -224,6 +224,10 @@ export const en = {
       label: 'Selection',
       lineUp: 'Line up',
       order: 'Order',
+      /** The top bar's ⋯ for layers, which holds how they sit: order, line up, rotation, text direction. */
+      arrange: 'Arrange',
+      /** Why Line up is greyed out for a layer its auto layout box places. */
+      placedByLayout: 'Auto layout places this layer',
       grouping: 'Group',
       putInBox: 'Put in a box',
       combine: 'Combine',
