@@ -42,4 +42,21 @@ describe('numberedFrameNames', () => {
     }
     expect([...numberedFrameNames({ frames }, 'p1').values()]).toEqual(['Sale 2', 'Sale', 'Sale 3', 'Sale 4'])
   })
+
+  it('keeps a name no other frame shares, numbering a repeat with the lowest number no frame has and none was given', () => {
+    const frames = {
+      a: frame('p1', 'Sale', 'a0'),
+      b: frame('p1', 'Sale', 'a1'),
+      c: frame('p1', 'Sale 2', 'a2'),
+    }
+    expect([...numberedFrameNames({ frames }, 'p1').values()]).toEqual(['Sale', 'Sale 3', 'Sale 2'])
+    const more = { ...frames, d: frame('p1', 'Sale', 'a3'), e: frame('p1', 'Sale 4', 'a4') }
+    expect([...numberedFrameNames({ frames: more }, 'p1').values()]).toEqual([
+      'Sale',
+      'Sale 3',
+      'Sale 2',
+      'Sale 5',
+      'Sale 4',
+    ])
+  })
 })

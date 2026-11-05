@@ -30,19 +30,28 @@ export type ExportRequest = z.infer<typeof ExportRequest>
 export type ExportRequestInput = z.input<typeof ExportRequest>
 
 /**
- * A page's frames' names as Export lists them and names their files, by the page's order: a frame
- * whose name an earlier frame has, in any case, gets " 2", " 3" and so on, so no two are alike.
+ * A page's frames' names as Export lists them and names their files, by the page's order. A frame
+ * whose name no other frame has, in any case, keeps it; so does the first of a repeated name. Each
+ * later repeat gets the lowest number from 2 whose name no frame has and no earlier frame was
+ * given, so no two are alike.
  */
 export function numberedFrameNames<
   F extends { readonly pageId: string; readonly order: string; readonly name: string },
 >(design: { readonly frames: Readonly<Record<string, F>> }, pageId: string): Map<string, string> {
-  const taken = new Set<string>()
+  const frames = framesOf(design, pageId)
+  const had = new Set(frames.map(([, frame]) => frame.name.trim().toLowerCase()))
+  const given = new Set<string>()
+  const free = (name: string) => !had.has(name.toLowerCase()) && !given.has(name.toLowerCase())
   const names = new Map<string, string>()
-  for (const [frameId, frame] of framesOf(design, pageId)) {
+  for (const [frameId, frame] of frames) {
     const base = frame.name.trim()
     let name = base
-    for (let n = 2; taken.has(name.toLowerCase()); n++) name = `${base} ${n}`
-    taken.add(name.toLowerCase())
+    if (given.has(base.toLowerCase())) {
+      let n = 2
+      while (!free(`${base} ${n}`)) n++
+      name = `${base} ${n}`
+    }
+    given.add(name.toLowerCase())
     names.set(frameId, name)
   }
   return names
