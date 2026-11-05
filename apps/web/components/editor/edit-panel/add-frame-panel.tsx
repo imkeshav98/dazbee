@@ -34,8 +34,8 @@ import { PanelFrame } from './edit-panel.tsx'
 
 type Size = { width: number; height: number }
 
-/** The frame Add size copies: its id, name and size. */
-interface Source extends Size {
+/** The picked frame Add size adds a size to: its id, name and size. */
+interface PickedFrame extends Size {
   id: string
   name: string
 }
@@ -92,7 +92,7 @@ export function useFrameToolCard(editor: Editor | null, tool: Tool) {
 export function AddFramePanel({ editor }: { editor: Editor }) {
   const { open } = useEditState()
   const picked = usePickedFrame(editor)
-  if (open === 'addFrame') return <SizesCard editor={editor} from={null} />
+  if (open === 'addFrame') return <SizesCard editor={editor} picked={null} />
   if (open !== 'addSize' || !picked) return null
   return <AddSize key={picked} editor={editor} frameId={picked} />
 }
@@ -102,24 +102,25 @@ export function AddFramePanel({ editor }: { editor: Editor }) {
  * leaves the focus there, so the tool keys still work; from the dock's Frame button or a menu, it
  * takes the focus as every edit panel does.
  */
-function SizesCard({ editor, from }: { editor: Editor; from: Source | null }) {
+function SizesCard({ editor, picked }: { editor: Editor; picked: PickedFrame | null }) {
   const t = useMessages()
   const a = t.editor.addFrame
   const [focus] = useState(() => {
     const at = document.activeElement
-    return from !== null || (at instanceof HTMLElement && at.dataset.opens === 'addFrame')
+    return picked !== null || (at instanceof HTMLElement && at.dataset.opens === 'addFrame')
   })
   const add = (size: Size) => {
-    if (editor.addFrame(size, from?.id) !== null) setOpen(null)
+    const added = picked ? editor.addSize(picked.id, size) : editor.addFrame(size)
+    if (added !== null) setOpen(null)
   }
   return (
     <PanelFrame
-      id={from ? 'addSize' : 'addFrame'}
-      title={from ? format(a.addSizeTitle, { name: from.name }) : a.title}
+      id={picked ? 'addSize' : 'addFrame'}
+      title={picked ? format(a.addSizeTitle, { name: picked.name }) : a.title}
       focus={focus}
     >
       <p data-testid="add-frame-note" className="text-[12px] leading-[1.4] text-subtle">
-        {from ? format(a.addSizeNote, { name: from.name }) : a.note}
+        {picked ? format(a.addSizeNote, { name: picked.name }) : a.note}
       </p>
       {SIZE_CHANNELS.map((channel) => (
         <section key={channel} aria-label={t.editor.sizes.channel[channel]} className="flex flex-col gap-1">
@@ -131,7 +132,7 @@ function SizesCard({ editor, from }: { editor: Editor; from: Source | null }) {
           </div>
         </section>
       ))}
-      <OwnSize start={from ?? sizeYouAreOn(editor, editor.design())} onAdd={add} />
+      <OwnSize start={picked ?? sizeYouAreOn(editor, editor.design())} onAdd={add} />
     </PanelFrame>
   )
 }
@@ -247,6 +248,6 @@ function AddSize({ editor, frameId }: { editor: Editor; frameId: string }) {
   const frame = design.frames[frameId]
   if (!frame) return null
   return (
-    <SizesCard editor={editor} from={{ id: frameId, name: frame.name, width: frame.width, height: frame.height }} />
+    <SizesCard editor={editor} picked={{ id: frameId, name: frame.name, width: frame.width, height: frame.height }} />
   )
 }

@@ -167,13 +167,18 @@ export interface Editor {
   /** Calls back with a frame's name once Delete, by its key or `perform('delete')`, deleted it as the picked frame. */
   onFrameDelete(listener: (name: string) => void): () => boolean
   /**
-   * Adds an empty white frame of a size to the shown page, named after the size; or, given `from`,
-   * Add size: a frame of that size holding linked copies of `from`'s layers laid out to fit, under
-   * its name. The frame goes where the frame rule puts it, as one undo step, and is picked and shown
-   * at the same zoom; the select tool comes back. Returns its id, or null with nothing changed for a
-   * size past the limits or a frame gone.
+   * Adds an empty white frame of a size to the shown page, named after the size, where the frame
+   * rule puts it, as one undo step. It is picked and shown whole with its label beside the chrome,
+   * panned at the same zoom when it fits and zoomed out only as far as it needs when it doesn't; the
+   * select tool comes back. Returns its id, or null with nothing changed for a size past the limits.
    */
-  addFrame(size: { width: number; height: number }, from?: string): string | null
+  addFrame(size: { width: number; height: number }): string | null
+  /**
+   * Add size: a frame of a size holding linked copies of a frame's layers laid out to fit, under its
+   * name, where the frame rule puts it, as one undo step, then picked and shown as `addFrame` does.
+   * Returns its id, or null with nothing changed for a frame gone or a size past the limits.
+   */
+  addSize(frameId: string, size: { width: number; height: number }): string | null
   /**
    * Where a frame's label is drawn on the stage, in pixels from the stage's top start corner; null
    * for a frame the shown page lacks, or one off the stage at its start.

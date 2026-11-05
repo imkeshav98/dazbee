@@ -6,6 +6,7 @@ import { canHold, type Point, type Rect, SIZE_LIMITS } from '@dazbee/schema'
 import { type Camera, toScreen } from '../../canvas/camera.ts'
 import type { Frame } from '../../canvas/frames.ts'
 import { px } from '../../canvas/rulers.ts'
+import type { EditorFrameActions } from '../../frame-actions.ts'
 import { laidOut } from '../../layers/auto-layout.ts'
 import type { EditorBoxes } from '../../layers/boxes.ts'
 import { boundsOf, type Box, localTo, round } from '../../layers/transform.ts'
@@ -80,6 +81,8 @@ export interface DrawingDeps {
   page: () => string
   /** The name a frame drawn with the Frame tool takes, from its size. */
   frameName: (width: number, height: number) => string
+  /** Picks and shows a frame drawn with the Frame tool, as a frame added from a size is. */
+  frameActions: Pick<EditorFrameActions, 'showAdded'>
   /** Groups fit what they hold again after a change inside them, in the same undo step. */
   hug: (ids: string[]) => void
   /** Puts an overlay element over a box in a frame, in design pixels. */
@@ -110,8 +113,8 @@ export interface EditorDrawing {
   /**
    * Ends a drawing gesture, its layer selected and the select tool back. A shape's undo step
    * closes; a text box's layer is made and typed into, one undo step until typing stops; an
-   * image box's layer is made, one undo step. A frame dragged out is added, one undo step, with
-   * nothing selected; a click adds none.
+   * image box's layer is made, one undo step. A frame dragged out is added, one undo step, and
+   * picked and shown; a click adds none and keeps the Frame tool.
    */
   release(g: DrawingDrag): void
 }
@@ -130,6 +133,7 @@ export function editorDrawing({
   camera,
   page,
   frameName,
+  frameActions,
   hug,
   placeBox,
   drawOverlay,
@@ -351,11 +355,10 @@ export function editorDrawing({
   }
   /**
    * Adds the frame the Frame tool dragged out to the shown page, empty and named Frame, on whole
-   * pixels and held within the size limits, one undo step; a click adds none. Nothing is selected
-   * after, and the select tool comes back.
+   * pixels and held within the size limits, one undo step, then picks and shows it, the select
+   * tool back. A click adds none and keeps the Frame tool, so what the Add a frame card holds stays.
    */
   function finishFrame(g: FrameDrag) {
-    tools.setTool('select')
     if (!draggedBox(g)) return
     const x = Math.round(Math.min(g.from.x, g.to.x))
     const y = Math.round(Math.min(g.from.y, g.to.y))
@@ -363,12 +366,11 @@ export function editorDrawing({
       Math.round(Math.max(g.from.x, g.to.x)) - x,
       Math.round(Math.max(g.from.y, g.to.y)) - y,
     )
-    if (
-      runQuietly(() =>
-        session.run('frame.add', { pageId: page(), name: frameName(size.width, size.height), x, y, ...size }),
-      )
-    )
-      selection.select([], null)
+    let id = ''
+    const add = () =>
+      (id = session.run('frame.add', { pageId: page(), name: frameName(size.width, size.height), x, y, ...size }))
+    if (runQuietly(add)) frameActions.showAdded(id)
+    else tools.setTool('select')
   }
 
   return {

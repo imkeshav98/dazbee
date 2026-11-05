@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { DesignInput } from '@dazbee/schema'
 
 import { type Frame, pageFrames } from '../../canvas/frames.ts'
+import { editorFrameActions } from '../../frame-actions.ts'
 import { hug } from '../../layers/hug.ts'
 import { sessionOf, testBoxes } from '../../layers/test-boxes.ts'
 import { editorSelection } from '../../selection.ts'
@@ -43,6 +44,16 @@ function harness() {
   const frame = frames[0] as Frame
   const log: string[] = []
   const selection = editorSelection({ drawn: () => session.design(), frames: () => frames, changed: () => {} })
+  const frameName = (width: number, height: number) =>
+    width === 300 && height === 300 ? 'Frame' : `${width} by ${height}`
+  const frameActions = editorFrameActions({
+    session,
+    view: { page: () => 'p1', showArea: (area) => log.push(`showArea ${JSON.stringify(area)}`) },
+    tools: { setTool: (tool) => log.push(`tool ${tool}`) },
+    frameName,
+    selection,
+    drawOverlay: () => log.push('draw'),
+  })
   const deps: DrawingDeps = {
     canvas: { setPointerCapture: () => {} } as unknown as HTMLCanvasElement,
     session,
@@ -58,7 +69,8 @@ function harness() {
     boxes: testBoxes(session, selection, frames),
     camera: () => ({ x: 0, y: 0, zoom: 1 }),
     page: () => 'p1',
-    frameName: (width, height) => (width === 300 && height === 300 ? 'Frame' : `${width} by ${height}`),
+    frameName,
+    frameActions,
     hug: (ids) => {
       log.push(`hug ${ids.join(',')}`)
       hug(session, ids)
@@ -246,7 +258,7 @@ describe('editorDrawing', () => {
       })
     })
 
-    it('adds an empty white frame named Frame where it was dragged, on whole pixels, as one undo step', () => {
+    it('adds an empty white frame named Frame where it was dragged, on whole pixels, as one undo step, picked and shown, the select tool back', () => {
       const { session, selection, log, madeFrames, drawFrame } = harness()
       selection.select(['rect'], 'sq')
       drawFrame({ x: 1500.4, y: 400.6 }, { x: 1200.4, y: 100.6 })
@@ -263,9 +275,16 @@ describe('editorDrawing', () => {
       expect(made?.[1].order).toBe('a1')
       expect(Object.values(session.design().nodes).filter((n) => n.parentId === made?.[0])).toEqual([])
       expect(selection.current()).toBeNull()
-      expect(log.at(-1)).toBe('tool select')
+      expect(selection.pickedFrame()).toBe(made?.[0])
+      expect(log.slice(-3)).toEqual([
+        'tool select',
+        `showArea ${JSON.stringify({ x: 1200, y: 101, width: 300, height: 300 })}`,
+        'draw',
+      ])
       session.undo()
       expect(madeFrames()).toEqual([])
+      session.redo()
+      expect(madeFrames().map(([, f]) => [f.x, f.y, f.width, f.height])).toEqual([[1200, 101, 300, 300]])
     })
 
     it('keeps the shape dragged, scaled to fit the size limits; past 12 times as long as wide, the short side grows', () => {
@@ -290,11 +309,13 @@ describe('editorDrawing', () => {
       expect(madeFrames().map(([, f]) => f.name)).toEqual(['400 by 200'])
     })
 
-    it('adds nothing for a click, and the select tool comes back', () => {
-      const { log, madeFrames, drawFrame } = harness()
+    it('adds nothing for a click and keeps the Frame tool, so the Add a frame card stays open', () => {
+      const { session, selection, log, madeFrames, drawFrame } = harness()
       drawFrame({ x: 300, y: 300 }, { x: 301, y: 302 })
       expect(madeFrames()).toEqual([])
-      expect(log.at(-1)).toBe('tool select')
+      expect(log).not.toContain('tool select')
+      expect(selection.pickedFrame()).toBeNull()
+      expect(session.canUndo()).toBe(false)
     })
   })
 })

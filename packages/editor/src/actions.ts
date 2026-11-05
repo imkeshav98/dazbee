@@ -1,6 +1,6 @@
 // What the shortcuts and the menus do to the selection, the picked frame and the view: delete,
 // group, mask, box, auto layout, combine, reorder, lock and hide, align and distribute, nudge,
-// duplicate, select all, zoom and the tools; and adding a frame of a size, or a size of a frame.
+// duplicate, select all, zoom and the tools.
 import { childrenOf, descendants, type Session } from '@dazbee/doc'
 import { type Design, LOCK_FLAGS, type Rect } from '@dazbee/schema'
 
