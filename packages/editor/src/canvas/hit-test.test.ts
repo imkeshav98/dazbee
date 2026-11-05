@@ -77,6 +77,14 @@ const text = (id: string, value: string, box: Record<string, unknown>, more: Rec
   })
 const boxLayer = (id: string, clip: boolean, children: SceneLayer[], more: Record<string, unknown> = {}) =>
   layer(id, 'box', { x: 0, y: 0, width: 200, height: 200, clip, ...more }, children)
+const CLEAR = { type: 'solid', color: '#FF000000' } as const
+/** A 100 × 100 box at the page's corner. */
+const SQUARE = { x: 0, y: 0, width: 100, height: 100 } as const
+/** A red square at the page's corner with more props set. */
+const faded = (id: string, more: Record<string, unknown> = {}) =>
+  layer(id, 'graphic', { ...SQUARE, shape: { kind: 'rect' }, fills: [RED], ...more })
+/** Layers over a larger square, `under`. */
+const over = (...layers: SceneLayer[]) => [rect('under', 0, 0, 200, 200), ...layers]
 /** The layer under a point, by id. */
 const idAt = (layers: SceneLayer[], x: number, y: number, with_: Looks = looks) => hitTest(layers, { x, y }, with_)?.id
 
@@ -421,6 +429,118 @@ describe('hitTest', () => {
     const layers = [rect('under', 0, 0, 300, 300), mask, rect('masked', 0, 0, 200, 200)]
     expect(idAt(layers, 100, 100)).toBe('masked')
     expect(idAt(layers, 8, 8)).toBe('under')
+  })
+
+  it('passes over a layer drawn under 10% opaque, and picks one at 11%', () => {
+    for (const opacity of [0, 0.05, 0.09]) expect(idAt(over(faded('over', { opacity })), 50, 50)).toBe('under')
+    expect(idAt(over(faded('over', { opacity: 0.11 })), 50, 50)).toBe('over')
+  })
+
+  it("passes through a group or a box at opacity 0, and multiplies a group's opacity into its children's", () => {
+    const group = (opacity: number, child = faded('child')) => layer('group', 'group', { ...SQUARE, opacity }, [child])
+    expect(idAt(over(group(0)), 50, 50)).toBe('under')
+    expect(idAt(over(boxLayer('box', false, [faded('child')], { opacity: 0 })), 50, 50)).toBe('under')
+    // 30% of 30% is 9%: under the threshold, though each alone is over it.
+    expect(idAt(over(group(0.3, faded('child', { opacity: 0.3 }))), 50, 50)).toBe('under')
+    expect(idAt(over(group(1)), 50, 50)).toBe('child')
+  })
+
+  it('passes through a shape whose fill is clear, and picks it on a stroke that shows', () => {
+    expect(idAt(over(faded('clear', { fills: [CLEAR] })), 50, 50)).toBe('under')
+    const stroked = (paint: unknown) =>
+      over(faded('stroked', { fills: [CLEAR], strokes: [{ paint, width: 10, align: 'center' }] }))
+    expect(idAt(stroked(RED), 50, 50)).toBe('under')
+    expect(idAt(stroked(RED), 2, 50)).toBe('stroked')
+    expect(idAt(stroked(RED), 103, 50)).toBe('stroked')
+    // A clear stroke shows no more than a clear fill.
+    expect(idAt(stroked(CLEAR), 2, 50)).toBe('under')
+  })
+
+  it('reads a gradient by its stops where the point is: all clear passes, a fade passes at its clear end', () => {
+    const stops = (from: string, to: string) => [
+      { offset: 0, color: from },
+      { offset: 1, color: to },
+    ]
+    const linear = (from: string, to: string) =>
+      over(
+        faded('linear', {
+          fills: [{ type: 'linear', from: { x: 0, y: 0.5 }, to: { x: 1, y: 0.5 }, stops: stops(from, to) }],
+        }),
+      )
+    expect(idAt(linear('#FF000000', '#0000FF00'), 50, 50)).toBe('under')
+    expect(idAt(linear('#FF0000FF', '#FF000000'), 10, 50)).toBe('linear')
+    expect(idAt(linear('#FF0000FF', '#FF000000'), 95, 50)).toBe('under')
+    const radial = over(
+      faded('radial', {
+        fills: [{ type: 'radial', center: { x: 0.5, y: 0.5 }, radius: 0.5, stops: stops('#FF0000FF', '#FF000000') }],
+      }),
+    )
+    expect(idAt(radial, 50, 50)).toBe('radial')
+    expect(idAt(radial, 98, 50)).toBe('under')
+  })
+
+  it('passes through text in a clear colour', () => {
+    const style = { fontFamily: 'Noto Sans', fontSize: 40, color: '#00000000' }
+    expect(idAt(over(text('clear', 'Sale', { x: 0, y: 0, width: 400, height: 100 }, { style })), 20, 25)).toBe('under')
+    expect(idAt(over(text('inked', 'Sale', { x: 0, y: 0, width: 400, height: 100 })), 20, 25)).toBe('inked')
+  })
+
+  it('passes through a photo at 5% opacity, on its opaque part too', () => {
+    const layers = over(photo('photo', 'half', { x: 0, y: 0, width: 200, height: 100 }, { opacity: 0.05 }))
+    expect(idAt(layers, 50, 50)).toBe('under')
+    expect(idAt(layers, 50, 50, loading)).toBe('under')
+  })
+
+  it('passes through a layer under a black luminance mask, or an alpha mask at opacity 0', () => {
+    const masked = (mask: 'alpha' | 'luminance', color: string, opacity = 1) =>
+      over(faded('mask', { mask, opacity, fills: [{ type: 'solid', color }] }), faded('masked'))
+    expect(idAt(masked('luminance', '#000000FF'), 50, 50)).toBe('under')
+    expect(idAt(masked('luminance', '#FFFFFFFF'), 50, 50)).toBe('masked')
+    expect(idAt(masked('alpha', '#000000FF', 0), 50, 50)).toBe('under')
+    expect(idAt(masked('alpha', '#00000000'), 50, 50)).toBe('under')
+    expect(idAt(masked('alpha', '#000000FF'), 50, 50)).toBe('masked')
+  })
+
+  it("weighs a group or box used as a luminance mask by its layers' brightness", () => {
+    const black = { fills: [{ type: 'solid', color: '#000000FF' }] }
+    const white = { fills: [{ type: 'solid', color: '#FFFFFFFF' }] }
+    const group = (paint: Record<string, unknown>) =>
+      layer('mask', 'group', { ...SQUARE, mask: 'luminance' }, [faded('a', paint), faded('b', paint)])
+    expect(idAt(over(group(black), faded('masked')), 50, 50)).toBe('under')
+    expect(idAt(over(group(white), faded('masked')), 50, 50)).toBe('masked')
+    const box = (paint: Record<string, unknown>) =>
+      boxLayer('mask', false, [faded('child', paint)], { ...SQUARE, ...black, mask: 'luminance' })
+    expect(idAt(over(box(black), faded('masked')), 50, 50)).toBe('under')
+    expect(idAt(over(box(white), faded('masked')), 50, 50)).toBe('masked')
+  })
+
+  it('picks frosted glass inside its outline, however clear its fill or low its opacity', () => {
+    const glass = { effects: [{ type: 'backgroundBlur', radius: 20 }] }
+    expect(idAt(over(faded('pane', { ...glass, fills: [CLEAR] })), 50, 50)).toBe('pane')
+    expect(idAt(over(faded('pane', { ...glass, opacity: 0 })), 50, 50)).toBe('pane')
+    // Its group's opacity fades the glass with the rest.
+    expect(idAt(over(layer('group', 'group', { ...SQUARE, opacity: 0 }, [faded('pane', glass)])), 50, 50)).toBe('under')
+  })
+
+  it('picks a selected layer that shows nothing anywhere in its box, and a visible one only where it shows', () => {
+    const pick = (layers: SceneLayer[], x: number, y: number, selected: string[]) =>
+      hitTest(layers, { x, y }, looks, { selected })?.id
+    const ghost = over(faded('ghost', { shape: { kind: 'ellipse' }, opacity: 0 }))
+    expect(pick(ghost, 50, 50, [])).toBe('under')
+    expect(pick(ghost, 50, 50, ['ghost'])).toBe('ghost')
+    // In its box's empty corner too: nothing on screen tells its outline from its box.
+    expect(pick(ghost, 4, 4, ['ghost'])).toBe('ghost')
+    expect(pick(ghost, 150, 150, ['ghost'])).toBe('under')
+    // A selected layer that shows keeps its see-through parts.
+    expect(pick(over(faded('ellipse', { shape: { kind: 'ellipse' } })), 4, 4, ['ellipse'])).toBe('under')
+    // A child of a group at opacity 0, selected from the layers panel, and the group itself.
+    const group = over(layer('group', 'group', { ...SQUARE, opacity: 0 }, [faded('child')]))
+    expect(pick(group, 50, 50, ['child'])).toBe('child')
+    expect(pick(group, 50, 50, ['group'])).toBe('group')
+    // A group at full opacity whose layers are all at 0 shows nothing either.
+    const emptied = over(layer('group', 'group', SQUARE, [faded('a', { opacity: 0 }), faded('b', { opacity: 0 })]))
+    expect(pick(emptied, 50, 50, ['group'])).toBe('group')
+    expect(pick(emptied, 50, 50, [])).toBe('under')
   })
 })
 

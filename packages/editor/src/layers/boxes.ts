@@ -7,6 +7,7 @@ import { render, type SceneLayer } from '@dazbee/renderer'
 import { canHold, type Design, type ImagePaint, type Paint, pathScale, type Point, type Rect } from '@dazbee/schema'
 
 import type { Frame } from '../canvas/frames.ts'
+import type { HitOptions } from '../canvas/hit-test.ts'
 import { findLayer, type FrameScenes } from '../canvas/scenes.ts'
 import { coverCrop, imageRect, type Size } from '../gestures/crop/crop.ts'
 import { offsetPath, parsePath, type PenPath, scalePath } from '../gestures/pen/path.ts'
@@ -87,6 +88,11 @@ export interface EditorBoxes {
   drawnAlike(frameId: string, before: Design, after: Design): boolean
   /** Where a new layer of a type that a tool makes in a frame goes: the group or box gone into, or the frame. */
   parentFor(frame: Frame, type: string, now: Design): string
+  /**
+   * The deepest layer a press, a click, a hover or a tap picks at a point of a frame: the one that
+   * shows there, as `hitTest` tells it, with the selected layers counted as it counts them.
+   */
+  pickAt(frame: Frame, p: Point, options?: HitOptions): SceneLayer | null
   /** The layer locked in place that a press at a point lands on, the one a click there would select; null when it is not locked. */
   lockedAt(frame: Frame, p: Point): string | null
   /** What a press on a layer picks: a selected layer it is in, what is directly in the group gone into, or else the top-level layer that holds it. */
@@ -356,8 +362,11 @@ export function editorBoxes({ session, scenes, resources, selection, drawn, fram
    * layer there, as a click picks it, when that one is locked. A click selects it, so its lock can
    * be undone; a drag from it draws a marquee and moves nothing, it or what lies beneath.
    */
+  function pickAt(frame: Frame, p: Point, options: HitOptions = {}) {
+    return scenes.hit(frame, p, { ...options, selected: selection.current()?.ids })
+  }
   function lockedAt(frame: Frame, p: Point): string | null {
-    const top = scenes.hit(frame, p)
+    const top = pickAt(frame, p)
     const id = top ? target(top.id, frame.id) : null
     return id && drawn().nodes[id]?.lock?.move ? id : null
   }
@@ -401,6 +410,7 @@ export function editorBoxes({ session, scenes, resources, selection, drawn, fram
     drawnInFlow,
     drawnAlike,
     parentFor,
+    pickAt,
     lockedAt,
     target,
     insideEntered,

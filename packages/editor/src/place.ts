@@ -6,7 +6,6 @@ import { canHold, type Layer, LayerClipboard, type Paint, type Point } from '@da
 import { type Skipped, SVG_TYPE, SvgError, svgMarkup, svgToLayers } from '@dazbee/svg'
 
 import type { EditorActions } from './actions.ts'
-import type { FrameScenes } from './canvas/scenes.ts'
 import type { EditorView, Spot } from './canvas/view.ts'
 import { keepCopy, layersOnClipboard, putOnClipboard, rememberedLayers } from './clipboard.ts'
 import { newImage, withImage } from './gestures/drawing/draw-tools.ts'
@@ -27,8 +26,7 @@ export interface PlaceDeps {
   view: Pick<EditorView, 'design' | 'frames' | 'frameOf' | 'inView' | 'middleFrame' | 'pointAt' | 'spotAt'>
   tools: Pick<EditorTools, 'setTool'>
   selection: Pick<EditorSelection, 'current' | 'entered' | 'select'>
-  scenes: Pick<FrameScenes, 'hit'>
-  boxes: Pick<EditorBoxes, 'roots' | 'boxIn' | 'containersOf' | 'pickable'>
+  boxes: Pick<EditorBoxes, 'roots' | 'boxIn' | 'containersOf' | 'pickable' | 'pickAt'>
   typing: Pick<EditorTyping, 'editing' | 'stop' | 'fitText' | 'copy' | 'cut' | 'paste'>
   actions: Pick<EditorActions, 'perform'>
   /**
@@ -82,7 +80,6 @@ export function editorPlace({
   view: { design: drawn, frames, frameOf, inView, middleFrame, pointAt, spotAt },
   tools,
   selection,
-  scenes,
   boxes,
   typing,
   actions,
@@ -108,7 +105,7 @@ export function editorPlace({
   function imageTargetAt(client: Point): Picked | null {
     const design = drawn()
     const at = pointAt(client)
-    const hit = at && scenes.hit(at.frame, at.p, { pickable: boxes.pickable })
+    const hit = at && boxes.pickAt(at.frame, at.p, { pickable: boxes.pickable })
     if (!at || !hit) return null
     let id = hit.id
     for (const up of ancestorsOf(design, design.nodes[id]?.parentId ?? ''))
