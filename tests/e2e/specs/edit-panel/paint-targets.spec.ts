@@ -231,31 +231,32 @@ test('at 1280×760 the paint editor in the Colour and Background panels keeps it
   expect(errors).toEqual([])
 })
 
-for (const [width, height] of SCREEN_SIZES) {
+// Each screen size as a mouse takes it, and a tablet and a phone as a touch screen too.
+const SHOT_SCREENS = [
+  ...SCREEN_SIZES.filter(([width]) => width >= 640).map(([width, height]) => ({ width, height, touch: false })),
+  ...SCREEN_SIZES.filter(([width]) => width < 1000).map(([width, height]) => ({ width, height, touch: true })),
+]
+
+for (const { width, height, touch } of SHOT_SCREENS) {
   for (const theme of THEMES) {
     test(
-      `screenshots at ${width}×${height}, ${theme}: the paint editor in the Colour and Background panels on a solid, a gradient and an image`,
+      `screenshots at ${width}×${height}${touch ? ' on a touch screen' : ''}, ${theme}: the paint editor in the Colour and Background panels on a solid, a gradient and an image`,
       { tag: '@evidence' },
       async ({ browser }) => {
         const brandId = await newBrand('e2e paint editor shots')
         await putKit(brandId, SWATCH_KIT)
         const asset = await upload(photo, { brandId })
-        const phone = width < 640
-        const { page, errors } = await openSized(
-          browser,
-          { width, height },
-          { theme, brandId, touch: phone, mobile: phone },
-        )
+        const { page, errors } = await openSized(browser, { width, height }, { theme, brandId, touch, mobile: touch })
         for (const [i, { open, kinds }] of PAINT_PANELS.entries()) {
           const panel = await open(page)
           for (const kind of kinds.filter((k) => k === 'Solid' || k === 'Line gradient' || k === 'Image')) {
             const editor = await fillAs(panel, kind, asset.id)
             // On a phone the editor is under the sheet's fold until scrolled to.
-            await editor.evaluate((el) => el.scrollIntoView({ block: 'center', behavior: 'instant' }))
+            await editor.evaluate((el) => el.scrollIntoView({ block: 'start', behavior: 'instant' }))
             await nextFrame(page)
             const slug = kind.split(' ')[0]?.toLowerCase()
             writeOutput(
-              `paint-${width}-${theme}-${i + 1}-${slug}.png`,
+              `paint-${width}${touch ? '-touch' : ''}-${theme}-${i + 1}-${slug}.png`,
               await page.screenshot({ animations: 'disabled' }),
             )
           }
