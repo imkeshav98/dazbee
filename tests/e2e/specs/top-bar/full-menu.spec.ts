@@ -425,11 +425,12 @@ for (const [width, height] of SCREEN_SIZES) {
   })
 }
 
-test('at 390×844 the full menu shows over the dock, and a cut edge never fades a row as a greyed one does', async ({
+test('on a phone 600 px tall the full menu shows over the dock, and a cut edge never fades a row as a greyed one does', async ({
   browser,
 }) => {
   const { page, errors } = await open(browser)
-  await page.setViewportSize({ width: 390, height: 844 })
+  // Short enough that the full menu reaches down to the dock.
+  await page.setViewportSize({ width: 390, height: 600 })
   await fitSettled(page)
   await selectLayers(page, ['headline'])
   const menu = await moreMenu(page)
@@ -446,7 +447,7 @@ test('at 390×844 the full menu shows over the dock, and a cut edge never fades 
       fade: getComputedStyle(el).maskImage,
     }
   })
-  expect(state.bottom).toBeLessThanOrEqual(844 - 8)
+  expect(state.bottom).toBeLessThanOrEqual(600 - 8)
   expect(state.reachesDock).toBe(true)
   expect(state.onTop).toBe(true)
   if (state.scrolls) expect(state.fade).toBe('none')
