@@ -244,9 +244,8 @@ test('the full menu and the right-click menu open as a sheet at the bottom of th
       const label = `${height} ${await menu.getAttribute('data-testid')}`
       await expect(menu, label).toHaveAttribute('data-sheet', 'true')
       const box = await boxOf(menu)
-      expect([box.left, box.right, box.bottom].map(Math.round), label).toEqual(
-        [sheet.left, sheet.right, sheet.bottom].map(Math.round),
-      )
+      for (const side of ['left', 'right', 'bottom'] as const)
+        expect(Math.abs(box[side] - sheet[side]), `${label} ${side}`).toBeLessThanOrEqual(1)
       expect(await rowsOf(menu), label).toEqual(fullMenuRows({ group: true }))
       // Whole: every row on the screen, with nothing to scroll to.
       expect(box.top, label).toBeGreaterThanOrEqual(0)
@@ -288,7 +287,7 @@ test('after a click opens a row’s menu in its menu’s place, or goes back fro
   await expect(rows).toBeVisible()
   expect(await litRows(again)).toEqual([])
   // A pointer that moves over a row lights it.
-  await rows.getByRole('button').first().hover()
+  await again.getByTestId('more-copy-to-frames-back').hover()
   await expect.poll(() => litRows(again)).toHaveLength(1)
   expect(errors).toEqual([])
 })

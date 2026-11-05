@@ -116,7 +116,13 @@ export const HOMES: Record<BarCase, Partial<Record<ControlId, Home>>> = {
     ...ON_BAR('edit', 'replace', 'crop', 'corners', 'outline', 'effects', 'transparency', 'position'),
     ...POSITION_ONE,
   },
-  photos: { ...ON_BAR('edit', 'replace', 'corners', 'outline', 'effects', 'transparency'), ...POSITION_SEVERAL },
+  photos: {
+    ...ON_BAR('edit', 'replace', 'corners', 'outline', 'effects', 'transparency', 'stack', 'lineUp', 'position'),
+    ...Object.fromEntries(
+      [...FRAME_LINE_UP, 'distributeHorizontal', 'distributeVertical'].map((id) => [id, 'line-up']),
+    ),
+    ...POSITION_SEVERAL,
+  },
   box: {
     ...ON_BAR('colour', 'outline', 'stackPanel', 'boxCard', 'effects', 'transparency', 'position'),
     ...POSITION_ONE,

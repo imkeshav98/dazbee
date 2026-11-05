@@ -74,7 +74,15 @@ const shownItems = (page: Page) =>
         .map((el) => {
           const shown = el.dataset.item === undefined ? el : (el.firstElementChild as HTMLElement)
           const { left, right, top, bottom } = shown.getBoundingClientRect()
-          return { key: el.dataset.item ?? shown.dataset.testid ?? '', row: at, left, right, top, bottom }
+          return {
+            key: el.dataset.item ?? shown.dataset.testid ?? '',
+            group: el.dataset.group,
+            row: at,
+            left,
+            right,
+            top,
+            bottom,
+          }
         }),
     ),
   )
@@ -84,7 +92,7 @@ const targets = (page: Page) =>
   page.evaluate(() =>
     [
       ...document.querySelectorAll<HTMLElement>(
-        '[data-testid="top-bar"] :is([data-bar-item], [data-testid="bar-size-field"])',
+        '[data-testid="top-bar"] :is([data-bar-item], [data-testid="bar-size"] [data-knob])',
       ),
     ]
       .filter((el) => el.checkVisibility({ visibilityProperty: true }))
@@ -171,24 +179,24 @@ test('on a phone the bar takes two rows at most, wraps between its groups, ends 
   for (const one of GRID) {
     await selectCase(page, one)
     const items = await shownItems(page)
+    // The bar settles: a moment later every item is where it was.
+    await page.waitForTimeout(400)
+    await nextFrame(page)
+    expect(await shownItems(page), `${one.name} settles`).toEqual(items)
     const rows = new Set(items.map((item) => Math.round((item.top + item.bottom) / 2)))
     expect(rows.size, `${one.name}: ${[...rows].join(' ')}`).toBeLessThanOrEqual(2)
     const first = items.filter((item) => item.row === 0).map((item) => item.key)
     expect(first.slice(one.ids.length > 1 ? -2 : -1), one.name).toEqual(
       one.ids.length > 1 ? ['line-up', 'position'] : ['position'],
     )
-    // A group is split between the rows only when it is too wide for one.
+    // A group is split between the rows only when it is too wide for one. The bar's last items end
+    // the first row whatever is cut, so they belong to no group here.
     const room = 390 - 16
-    let group: typeof items = []
-    const groups: (typeof items)[] = []
-    for (const item of items.filter((one) => one.key !== 'bar-overflow')) {
-      if (item.key.startsWith('divider')) {
-        groups.push(group)
-        group = []
-      } else group.push(item)
-    }
-    groups.push(group)
-    for (const each of groups) {
+    const groups = new Map<string, typeof items>()
+    for (const item of items)
+      if (item.group !== undefined && !['line-up', 'position'].includes(item.key) && !item.key.startsWith('divider'))
+        groups.set(item.group, [...(groups.get(item.group) ?? []), item])
+    for (const each of groups.values()) {
       const split = new Set(each.map((item) => item.row)).size > 1
       const wide = each.reduce((sum, item) => sum + item.right - item.left + APART, 0)
       if (split) expect(wide, `${one.name} splits ${each.map((item) => item.key).join(' ')}`).toBeGreaterThan(room)

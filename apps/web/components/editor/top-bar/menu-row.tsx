@@ -151,7 +151,7 @@ export function useWhyTip<T extends HTMLElement>(why: string | null) {
  * as it is about to show.
  */
 function placeFor(row: HTMLElement, label: string, rtl: boolean, phone: boolean): TooltipPlace {
-  const own = row.closest(HOLDERS) ?? row
+  const own = row.closest('[role="dialog"], #edit-panel') ?? row
   const rows = [...document.querySelectorAll(`${HOLDERS} :is(button, [data-scrub])`)].filter((one) =>
     one.checkVisibility(),
   )

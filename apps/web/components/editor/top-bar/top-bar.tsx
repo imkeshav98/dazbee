@@ -38,8 +38,10 @@ import { arrowAlong, useRovingTab } from './bar-popover.tsx'
 import { useFrameItems } from './frame-items.tsx'
 import { type BarItem, useSelectionItems } from './top-bar-items.tsx'
 
+/** The width a divider takes with its margins, as a tablet or desktop draws it, in pixels. */
+const DIVIDER = 5
 /** The width More controls and the divider before it take on the first row, without their gaps, in pixels. */
-const MORE = 30 + 5
+const MORE = 30 + DIVIDER
 /**
  * The bar's look: a frosted pill of buttons, centred at the top of the stage under the header pill.
  * On a phone every item is a 44 px target, 8 px from the next.
@@ -100,8 +102,11 @@ function useFit(row: HTMLElement | null, extra: HTMLElement | null, keys: string
       for (const el of [...row.children, ...extra.children])
         if (el instanceof HTMLElement && el.dataset.item !== undefined)
           widths.set(el.dataset.item, outerWidth(el.firstElementChild) + gap)
+      // A divider the cut leaves out is not drawn, yet counts as wide as a drawn one, so the fit never
+      // changes for its having been left out.
+      const drawn = [...widths].find(([key]) => key.startsWith('divider'))?.[1] ?? DIVIDER + gap
       const named = keys.split(' ')
-      const ordered = named.map((key) => widths.get(key) ?? 0)
+      const ordered = named.map((key) => widths.get(key) ?? (key.startsWith('divider') ? drawn : 0))
       // The last item has no gap after it.
       if (ordered.reduce((sum, w) => sum + w, 0) - gap <= room) return setFit(Infinity)
       let used = ordered.slice(-tail).reduce((sum, w) => sum + w, 0) + (phone ? 0 : MORE + gap * 2)
@@ -182,8 +187,11 @@ function Bar({
   named: { 'data-selection': string } | { 'data-frame': string }
 }) {
   const t = useMessages()
-  const { open, flyoutEnd } = useEditState()
+  const { open, flyoutEnd, rightClick } = useEditState()
   const phone = usePhone()
+  // On a phone the full menu and the right-click menu are a sheet over the stage, which the bar,
+  // having nothing for it, gives way to, as the dock and the tab bar do.
+  const givesWay = phone && (open === 'more' || rightClick)
   // Beside an open rail flyout, the bar is centred in the room left at the end side.
   const startAt = !phone && flyoutEnd !== null ? flyoutEnd + 12 : 0
   const [bar, setBarEl] = useState<HTMLDivElement | null>(null)
@@ -258,8 +266,12 @@ function Bar({
     window.addEventListener('keydown', onKey, true)
     return () => window.removeEventListener('keydown', onKey, true)
   }, [rowOpen])
+  // Each item names its group, counted by the dividers before it, which a row's cut may leave out.
+  const groupOf = new Map(
+    items.map((one, i) => [one.key, items.slice(0, i).filter((it) => it.key.startsWith('divider')).length]),
+  )
   const item = ({ key, node }: BarItem) => (
-    <span key={key} data-item={key} className="contents [&>*]:shrink-0">
+    <span key={key} data-item={key} data-group={groupOf.get(key)} className="contents [&>*]:shrink-0">
       {node}
     </span>
   )
@@ -276,6 +288,7 @@ function Bar({
       className={cn(
         'pointer-events-none absolute end-0 z-20 flex flex-col items-center gap-1.5 px-4 max-sm:px-2',
         BAR_ROW,
+        givesWay && 'invisible',
       )}
     >
       <div ref={setRow} className={cn(TOP_BAR, 'pointer-events-auto max-w-full')} data-testid="top-bar-row">

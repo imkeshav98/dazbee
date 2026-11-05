@@ -17,8 +17,11 @@ export const PIECES = {
   flyout: '#editor-flyout',
   toasts: '[data-toasts] > *',
 }
-/** The design's name and the font's name end in "…" by design when there is no room. */
-export const UNCUT = 'h1, [data-testid="bar-font"], [data-testid="edit-panel-note"]'
+/**
+ * The design's name, the font's name and a narrow frame's name end in "…" by design when there is
+ * no room.
+ */
+export const UNCUT = 'h1, [data-testid="bar-font"], [data-testid="edit-panel-note"], .frame-name'
 
 /**
  * The menus beside a menu's rows that `moreAction` looks in, by their test ids: the full menu's
