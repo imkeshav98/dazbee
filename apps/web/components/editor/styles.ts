@@ -13,7 +13,7 @@ const DISABLED = 'disabled:pointer-events-none disabled:opacity-40'
  */
 export const CHIP = `inline-flex h-7 ${TOUCH_FIELD} cursor-pointer items-center gap-1 rounded-full border border-line px-3 text-xs font-semibold text-muted transition-colors duration-[var(--chrome-fast)] hover:border-line-strong ${LIT_ROW} ${DISABLED}`
 
-/** A small square icon button in a card's row; 44 px each way on a phone or a touch screen. */
+/** A small square icon button in a card's row; 44 px each way on a phone. */
 export const ICON_BUTTON = `grid size-7 ${TOUCH_SQUARE} shrink-0 cursor-pointer place-items-center rounded-row text-subtle transition-colors duration-[var(--chrome-fast)] hover:bg-hover hover:text-text active:bg-pressed disabled:pointer-events-none disabled:opacity-30`
 
 /** A chip on a pink tint, for a choice that is set: the header card's sizes. Its words are in the text colour. */

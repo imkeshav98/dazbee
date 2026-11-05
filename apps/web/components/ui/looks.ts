@@ -6,8 +6,8 @@ export const TOUCH_ROW = 'max-sm:min-h-[44px]'
 
 /** A field's, a tab's or a button's height on a phone or a touch screen: 44 px, a target a finger can hit. */
 export const TOUCH_FIELD = 'max-sm:h-[44px] [@media(hover:none)]:h-[44px]'
-/** An icon button's size on a phone or a touch screen: 44 px each way. */
-export const TOUCH_SQUARE = 'max-sm:size-[44px] [@media(hover:none)]:size-[44px]'
+/** An icon button's size on a phone: 44 px each way, as a swatch's target there. */
+export const TOUCH_SQUARE = 'max-sm:size-[44px]'
 /** The space between targets and fields on a phone or a touch screen, so a finger presses the one it means. */
 export const TOUCH_GAP = 'max-sm:gap-[8px] [@media(hover:none)]:gap-[8px]'
 
