@@ -9,6 +9,7 @@ import type { DesignInput } from '@dazbee/schema'
 import { screenPoint, writeOutput } from '../../support/editor.ts'
 import {
   colourAt,
+  frameRow,
   layerIds,
   layersDesign,
   listed,
@@ -16,6 +17,7 @@ import {
   openLayers,
   rect,
   row,
+  SQUARE,
   tabIntoTree,
   tree,
 } from '../../support/layers-panel.ts'
@@ -82,13 +84,15 @@ test('keyboard only: move through the tree, select, rename, lock, hide and move 
   await page.getByRole('button', { name: 'Layers', exact: true }).focus()
   await page.keyboard.press('Enter')
   await expect(tree(page)).toBeVisible()
-  // Tab into the tree: it is one stop, on the first row.
+  // Tab into the tree: it is one stop, on the first row, the frame's; Down goes to its top layer.
   for (
     let i = 0;
     i < 8 && !(await page.evaluate(() => document.activeElement?.getAttribute('role') === 'treeitem'));
     i++
   )
     await page.keyboard.press('Tab')
+  await expect(frameRow(page, 'Square')).toBeFocused()
+  await page.keyboard.press('ArrowDown')
   await expect(row(page, 'Dot')).toBeFocused()
 
   // Down selects the next row as it moves there.
@@ -136,19 +140,19 @@ test('keyboard only: move through the tree, select, rename, lock, hide and move 
 
   // Alt+Down moves it below Card; Alt+Right (Card is now above it) moves it into Card, on top.
   await page.keyboard.press('Alt+ArrowDown')
-  await expect.poll(() => listed(page)).toEqual(['Dot', 'Card', 'Headline plate', 'Backdrop'])
+  await expect.poll(() => listed(page)).toEqual([SQUARE, '  Dot', '  Card', '  Headline plate', '  Backdrop'])
   await expect(row(page, 'Headline plate')).toBeFocused()
   await page.keyboard.press('Alt+ArrowUp')
   await page.keyboard.press('Alt+ArrowUp')
-  await expect.poll(() => listed(page)).toEqual(['Headline plate', 'Dot', 'Card', 'Backdrop'])
+  await expect.poll(() => listed(page)).toEqual([SQUARE, '  Headline plate', '  Dot', '  Card', '  Backdrop'])
   await page.keyboard.press('Alt+ArrowDown')
   await page.keyboard.press('Alt+ArrowDown')
-  await expect.poll(() => listed(page)).toEqual(['Dot', 'Card', 'Headline plate', 'Backdrop'])
+  await expect.poll(() => listed(page)).toEqual([SQUARE, '  Dot', '  Card', '  Headline plate', '  Backdrop'])
   await page.keyboard.press('Alt+ArrowRight')
   await expect.poll(async () => (await node(page, 'box')).parentId).toBe('card')
   await expect
     .poll(() => listed(page))
-    .toEqual(['Dot', 'Card', '  Headline plate', '  Card stripe', '  Card back', 'Backdrop'])
+    .toEqual([SQUARE, '  Dot', '  Card', '    Headline plate', '    Card stripe', '    Card back', '  Backdrop'])
   await expect(row(page, 'Headline plate')).toBeFocused()
   writeOutput('layers-4-keyboard.png', await page.screenshot())
   // Alt+Left takes it out again, just above the group.
@@ -156,7 +160,7 @@ test('keyboard only: move through the tree, select, rename, lock, hide and move 
   await expect.poll(async () => (await node(page, 'box')).parentId).toBe('sq')
   await expect
     .poll(() => listed(page))
-    .toEqual(['Dot', 'Headline plate', 'Card', '  Card stripe', '  Card back', 'Backdrop'])
+    .toEqual([SQUARE, '  Dot', '  Headline plate', '  Card', '    Card stripe', '    Card back', '  Backdrop'])
   // Delete, from the panel, deletes the selected layer like on the stage.
   await page.keyboard.press('Delete')
   await expect.poll(async () => Object.keys((await read(page)).nodes)).not.toContain('box')
@@ -391,7 +395,9 @@ test('keyboard only: grouping from the tree puts the focus on the new group, and
   expect(errors).toEqual([])
 })
 
-test('keyboard only: deleting the only layer and undoing puts the focus back on its row', async ({ browser }) => {
+test('keyboard only: deleting the only layer puts the focus on its frame, and undoing puts it back on its row', async ({
+  browser,
+}) => {
   const only: Record<string, Seeded> = {
     box: { type: 'graphic', parentId: 'sq', index: 'a0', name: 'Box', props: rect(120, 120, 400, 300, '#E0262BFF') },
   }
@@ -400,7 +406,8 @@ test('keyboard only: deleting the only layer and undoing puts the focus back on 
   await row(page, 'Box').click()
   await page.keyboard.press('Delete')
   await expect.poll(() => layerIds(page)).not.toContain('box')
-  await expect(tree(page)).toHaveCount(0)
+  await expect.poll(() => listed(page)).toEqual([SQUARE])
+  await expect(frameRow(page, 'Square')).toBeFocused()
 
   await page.keyboard.press('ControlOrMeta+Z')
   await expect.poll(() => layerIds(page)).toContain('box')

@@ -1,12 +1,23 @@
 // The layers panel (#59) in Chromium, with the real mouse: the tree in step with the stage's
 // selection both ways, a layer dragged into a group (the stage redraws it there, one undo step,
-// which redo brings back), rename, lock and hide, all there after a reload; with nothing selected,
-// the first frame of the page in view, an empty one too, or a page with no frames; and the rows'
-// pictures reading in both themes.
+// which redo brings back), rename, lock and hide, all there after a reload; the page the panel
+// lists, with a frame that has no layers or no frames at all; and the rows' pictures reading in
+// both themes.
 import type { DesignInput } from '@dazbee/schema'
 
 import { reloads, setCookies, writeOutput } from '../../support/editor.ts'
-import { colourAt, layersDesign, listed, node, openLayers, rect, ROW, row, tree } from '../../support/layers-panel.ts'
+import {
+  colourAt,
+  layersDesign,
+  listed,
+  node,
+  openLayers,
+  rect,
+  ROW,
+  row,
+  SQUARE,
+  tree,
+} from '../../support/layers-panel.ts'
 import { click, openStage, selectLayers } from '../../support/stage.ts'
 import { expect, type Page, test } from '../../support/test.ts'
 import { pagesPanel } from '../../support/top-bar.ts'
@@ -16,7 +27,7 @@ test.describe.configure({ timeout: 120_000 })
 test('the panel and the stage select together; drag into a group, rename, lock and hide', async ({ browser }) => {
   const { page, errors } = await openStage(browser, layersDesign())
   await openLayers(page)
-  expect(await listed(page)).toEqual(['Dot', 'Box', 'Card', 'Backdrop'])
+  expect(await listed(page)).toEqual([SQUARE, '  Dot', '  Box', '  Card', '  Backdrop'])
   await expect(row(page, 'Card')).toHaveAttribute('aria-expanded', 'false')
 
   // Select in the panel: the stage selects. Select on the stage: the panel follows.
@@ -30,7 +41,9 @@ test('the panel and the stage select together; drag into a group, rename, lock a
   await page.evaluate(() => window.dazbee?.select(['c2']))
   await expect(row(page, 'Card')).toHaveAttribute('aria-expanded', 'true')
   await expect(row(page, 'Card stripe')).toHaveAttribute('aria-selected', 'true')
-  await expect.poll(() => listed(page)).toEqual(['Dot', 'Box', 'Card', '  Card stripe', '  Card back', 'Backdrop'])
+  await expect
+    .poll(() => listed(page))
+    .toEqual([SQUARE, '  Dot', '  Box', '  Card', '    Card stripe', '    Card back', '  Backdrop'])
   writeOutput('layers-0-tree.png', await page.screenshot())
 
   // Drag Dot onto the middle of Card: it goes inside, on top, and the group grows to hold it.
@@ -38,7 +51,9 @@ test('the panel and the stage select together; drag into a group, rename, lock a
   const target = await row(page, 'Card').boundingBox()
   await row(page, 'Dot').dragTo(row(page, 'Card'), { targetPosition: { x: 60, y: (target?.height ?? ROW) / 2 } })
   await expect.poll(async () => (await node(page, 'dot')).parentId).toBe('card')
-  await expect.poll(() => listed(page)).toEqual(['Box', 'Card', '  Dot', '  Card stripe', '  Card back', 'Backdrop'])
+  await expect
+    .poll(() => listed(page))
+    .toEqual([SQUARE, '  Box', '  Card', '    Dot', '    Card stripe', '    Card back', '  Backdrop'])
   const after = await page.evaluate(() => window.dazbee?.boxOf('card'))
   expect(after).toEqual({ x: 120, y: 620, width: 780, height: 300 })
   expect(before).toEqual({ x: 120, y: 620, width: 520, height: 300 })
@@ -56,7 +71,7 @@ test('the panel and the stage select together; drag into a group, rename, lock a
   await expect.soft.poll(async () => (await node(page, 'dot')).parentId).toBe('card')
   await expect.soft
     .poll(() => listed(page))
-    .toEqual(['Box', 'Card', '  Dot', '  Card stripe', '  Card back', 'Backdrop'])
+    .toEqual([SQUARE, '  Box', '  Card', '    Dot', '    Card stripe', '    Card back', '  Backdrop'])
   expect.soft(await page.evaluate(() => window.dazbee?.boxOf('card'))).toEqual(after)
   await page.evaluate(() => window.dazbee?.perform('undo'))
   await expect.poll(async () => (await node(page, 'dot')).parentId).toBe('sq')
@@ -64,18 +79,26 @@ test('the panel and the stage select together; drag into a group, rename, lock a
   // Drag Backdrop above Box: reordered among its siblings.
   const box = await row(page, 'Box').boundingBox()
   await row(page, 'Backdrop').dragTo(row(page, 'Box'), { targetPosition: { x: 60, y: 3 } })
-  await expect.poll(() => listed(page)).toEqual(['Dot', 'Backdrop', 'Box', 'Card', '  Card stripe', '  Card back'])
+  await expect
+    .poll(() => listed(page))
+    .toEqual([SQUARE, '  Dot', '  Backdrop', '  Box', '  Card', '    Card stripe', '    Card back'])
   expect(box).not.toBeNull()
   // The backdrop now covers the box: the stage draws it on top.
   expect(await colourAt(page, 300, 200)).toEqual([244, 237, 228])
   await page.evaluate(() => window.dazbee?.perform('undo'))
-  await expect.poll(() => listed(page)).toEqual(['Dot', 'Box', 'Card', '  Card stripe', '  Card back', 'Backdrop'])
+  await expect
+    .poll(() => listed(page))
+    .toEqual([SQUARE, '  Dot', '  Box', '  Card', '    Card stripe', '    Card back', '  Backdrop'])
   // Redo puts the backdrop above the box again.
   await page.evaluate(() => window.dazbee?.perform('redo'))
-  await expect.soft.poll(() => listed(page)).toEqual(['Dot', 'Backdrop', 'Box', 'Card', '  Card stripe', '  Card back'])
+  await expect.soft
+    .poll(() => listed(page))
+    .toEqual([SQUARE, '  Dot', '  Backdrop', '  Box', '  Card', '    Card stripe', '    Card back'])
   expect.soft(await colourAt(page, 300, 200)).toEqual([244, 237, 228])
   await page.evaluate(() => window.dazbee?.perform('undo'))
-  await expect.poll(() => listed(page)).toEqual(['Dot', 'Box', 'Card', '  Card stripe', '  Card back', 'Backdrop'])
+  await expect
+    .poll(() => listed(page))
+    .toEqual([SQUARE, '  Dot', '  Box', '  Card', '    Card stripe', '    Card back', '  Backdrop'])
 
   // Rename with a double-click.
   await row(page, 'Box').dblclick()
@@ -119,7 +142,7 @@ test('the panel and the stage select together; drag into a group, rename, lock a
   expect(errors).toEqual([])
 })
 
-test('with nothing selected the panel shows the first frame of the page in view, an empty one too, or says a page has no frames', async ({
+test('the panel lists the page in view: its one frame open, an empty frame with how to add layers, or how to add a frame', async ({
   browser,
 }) => {
   const { page, errors } = await openStage(browser, layersDesign())
@@ -127,21 +150,25 @@ test('with nothing selected the panel shows the first frame of the page in view,
   const note = page.getByTestId('flyout-note')
   await selectLayers(page, ['box'])
   await selectLayers(page, [])
-  await expect(note).toHaveText('Page 1 · Square')
-  // Add page brings the new page into view: the panel shows its one frame, with no layers.
+  await expect(note).toHaveText('Page 1')
+  await expect.poll(() => listed(page)).toEqual([SQUARE, '  Dot', '  Box', '  Card', '  Backdrop'])
+  // Add page brings the new page into view: the panel lists its one frame, which has no layers.
   const pages = await pagesPanel(page)
   await pages.getByTestId('add-page').click()
-  await expect(note).toHaveText('Page 2 · Feed square')
-  await expect(page.getByTestId('layers')).toHaveText('No layers in this frame yet. Draw a shape or add text to start.')
+  await expect(note).toHaveText('Page 2')
+  await expect.poll(() => listed(page)).toEqual(['Feed square 1080×1080'])
+  await expect(page.getByTestId('layers')).toContainText(
+    'No layers on this page yet. Draw a shape or add text to start.',
+  )
   // With that frame deleted the page has none, and the panel says how to add one.
   await page.evaluate(() => {
     const editor = window.dazbee
     for (const frame of editor?.frames() ?? []) editor?.session.run('frame.delete', { frameId: frame.id })
   })
-  await expect(note).toHaveCount(0)
   await expect(page.getByTestId('layers')).toHaveText('Pick the Frame tool to add a frame')
+  await expect(note).toHaveText('Page 2')
   await pages.getByRole('button', { name: 'Show Page 1' }).click()
-  await expect(note).toHaveText('Page 1 · Square')
+  await expect(note).toHaveText('Page 1')
   await expect(row(page, 'Box')).toBeVisible()
   expect(errors).toEqual([])
 })

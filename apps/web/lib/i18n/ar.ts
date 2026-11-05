@@ -563,8 +563,9 @@ export const ar: Messages = {
     layersPanel: {
       box: 'صندوق',
       stack: 'رصّ',
-      tree: 'طبقات {frame}',
-      empty: 'لا توجد طبقات في هذا الإطار بعد. ارسم شكلًا أو أضف نصًا لتبدأ.',
+      tree: 'إطارات وطبقات {page}',
+      empty: 'لا توجد طبقات في هذه الصفحة بعد. ارسم شكلًا أو أضف نصًا لتبدأ.',
+      onlyHere: 'هنا فقط',
       expand: 'توسيع {name}',
       collapse: 'طي {name}',
       lock: 'قفل {name}',

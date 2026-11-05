@@ -1,9 +1,10 @@
 'use client'
 
-// One row of the layers panel's tree: its layer's picture or icon, name and kind, and its hide and
-// lock toggles. A picture about the colour of its tile in a theme shows on a backdrop that sets it off
-// there. The panel hands every row one set of handlers, so a row renders again only when what it
-// shows changes.
+// One layer's row in the layers panel's tree: its picture or icon, name and kind, "only here" when
+// none of its frame's linked frames holds a copy of it, and its hide and lock toggles, which act on
+// this layer alone. A picture about the colour of its tile in a theme shows on a backdrop that sets
+// it off there. The panel hands every row one set of handlers, so a row renders again only when what
+// it shows changes. The caret and the row's look are shared with the frame rows.
 import {
   BoundingBoxIcon,
   CaretRightIcon,
@@ -28,7 +29,7 @@ import { DROP_LINE, LAYER_PICTURE, LAYER_PICTURE_PICKED } from '@/components/edi
 import { LIT_ROW } from '@/components/ui/looks.ts'
 import { RenameField } from '@/components/ui/rename-field.tsx'
 import { cn } from '@/lib/cn.ts'
-import type { Row } from '@/lib/editor/layer-tree.ts'
+import type { LayerTreeRow, Row } from '@/lib/editor/layer-tree.ts'
 import { useMessages } from '@/lib/i18n/client.tsx'
 import { format } from '@/lib/i18n/index.ts'
 
@@ -53,6 +54,13 @@ export interface RowApi {
 
 /** A row's height in pixels: every row is the same, which is what lets only the rows in view render. */
 export const LAYER_ROW = 36
+/** A row's look: a pill, its focus ring inset, its start padded by its depth. */
+export const ROW_LOOK =
+  'group absolute inset-x-1 flex cursor-default items-center gap-1.5 rounded-[8px] pe-1 text-[13px] outline-none select-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-inset'
+/** A selected layer's or picked frame's row is tinted pink, as in the mock. */
+export const ROW_SELECTED = 'bg-accent/20 text-text lit'
+/** A row's end label in mono: a box's kind, a frame's size, "only here". */
+export const ROW_LABEL = 'shrink-0 font-mono text-[11px] text-subtle'
 const INDENT = 16
 const DRAG_TYPE = 'application/x-dazbee-layer'
 /**
@@ -111,7 +119,14 @@ function closeTheme(img: HTMLImageElement): keyof typeof BACKDROP | null {
   return luminance < DARK_CLOSE ? 'dark' : luminance > LIGHT_CLOSE ? 'light' : null
 }
 
-/** One row of the tree. Rendered again only when something it shows changes. */
+/** Where a row sits: its place in the list and its start padded by its depth, 2 px apart so each selected row reads as its own pill. */
+export const rowPlace = (i: number, depth: number) => ({
+  top: i * LAYER_ROW + 1,
+  height: LAYER_ROW - 2,
+  paddingInlineStart: 4 + depth * INDENT,
+})
+
+/** A layer's row. Rendered again only when something it shows changes. */
 export const LayerRow = memo(function LayerRow({
   row,
   i,
@@ -124,7 +139,7 @@ export const LayerRow = memo(function LayerRow({
   picture,
   api,
 }: {
-  row: Row
+  row: LayerTreeRow
   i: number
   selected: boolean
   focusable: boolean
@@ -153,6 +168,7 @@ export const LayerRow = memo(function LayerRow({
       key={id}
       role="treeitem"
       data-layer={id}
+      data-row={id}
       aria-level={depth + 1}
       aria-setsize={row.siblings}
       aria-posinset={row.position}
@@ -180,43 +196,19 @@ export const LayerRow = memo(function LayerRow({
       onDrop={(event) => {
         if (api.drop(event, row)) event.preventDefault()
       }}
-      // A 2 px gap between rows, so each selected row reads as its own pill.
-      style={{ top: i * LAYER_ROW + 1, height: LAYER_ROW - 2, paddingInlineStart: 4 + depth * INDENT }}
+      style={rowPlace(i, depth)}
       className={cn(
-        'group absolute inset-x-1 flex cursor-default items-center gap-1.5 rounded-[8px] pe-1 text-[13px] font-medium outline-none select-none',
-        'focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-inset',
-        // The selected row is tinted pink, its type tile solid pink, as in the mock.
-        selected ? 'bg-accent/20 text-text lit' : LIT_ROW,
+        ROW_LOOK,
+        'font-medium',
+        // The selected row's type tile is solid pink, as in the mock.
+        selected ? ROW_SELECTED : LIT_ROW,
         drop === 'into' && 'ring-2 ring-accent ring-inset',
         hidden && 'text-subtle',
       )}
     >
       {drop === 'above' && <span aria-hidden className={cn(DROP_LINE, '-top-px')} />}
       {drop === 'below' && <span aria-hidden className={cn(DROP_LINE, '-bottom-px')} />}
-      {row.hasChildren ? (
-        <button
-          type="button"
-          tabIndex={-1}
-          aria-label={format(open ? t.editor.layersPanel.collapse : t.editor.layersPanel.expand, { name: node.name })}
-          onClick={(event) => {
-            event.stopPropagation()
-            api.toggle(id)
-          }}
-          className="grid size-4 shrink-0 cursor-pointer place-items-center rounded-row text-subtle hover:text-text"
-        >
-          <CaretRightIcon
-            size={11}
-            weight="bold"
-            aria-hidden
-            className={cn(
-              'transition-transform duration-[var(--chrome-fast)] rtl:-scale-x-100',
-              open && 'rotate-90 rtl:-rotate-90',
-            )}
-          />
-        </button>
-      ) : (
-        <span aria-hidden className="size-4 shrink-0" />
-      )}
+      <RowCaret shown={row.hasChildren} open={open} name={node.name} onToggle={() => api.toggle(id)} />
       <span
         aria-hidden
         data-testid="layer-picture"
@@ -258,8 +250,13 @@ export const LayerRow = memo(function LayerRow({
         </span>
       )}
       {kind && !renaming && (
-        <span data-testid="layer-kind" className="shrink-0 font-mono text-[11px] text-subtle">
+        <span data-testid="layer-kind" className={ROW_LABEL}>
           {kind}
+        </span>
+      )}
+      {row.onlyHere && !renaming && (
+        <span data-testid="layer-only-here" className={ROW_LABEL}>
+          {t.editor.layersPanel.onlyHere}
         </span>
       )}
       <RowToggle
@@ -280,6 +277,44 @@ export const LayerRow = memo(function LayerRow({
     </div>
   )
 })
+
+/** A row's caret, which opens and closes it; an empty space of its size on a row with nothing inside. */
+export function RowCaret({
+  shown,
+  open,
+  name,
+  onToggle,
+}: {
+  shown: boolean
+  open: boolean
+  name: string
+  onToggle: () => void
+}) {
+  const t = useMessages()
+  if (!shown) return <span aria-hidden className="size-4 shrink-0" />
+  return (
+    <button
+      type="button"
+      tabIndex={-1}
+      aria-label={format(open ? t.editor.layersPanel.collapse : t.editor.layersPanel.expand, { name })}
+      onClick={(event) => {
+        event.stopPropagation()
+        onToggle()
+      }}
+      className="grid size-4 shrink-0 cursor-pointer place-items-center rounded-row text-subtle hover:text-text"
+    >
+      <CaretRightIcon
+        size={11}
+        weight="bold"
+        aria-hidden
+        className={cn(
+          'transition-transform duration-[var(--chrome-fast)] rtl:-scale-x-100',
+          open && 'rotate-90 rtl:-rotate-90',
+        )}
+      />
+    </button>
+  )
+}
 
 /** Lock or hide on a row: shown while the row is hovered or focused, and always while it is on. */
 function RowToggle({

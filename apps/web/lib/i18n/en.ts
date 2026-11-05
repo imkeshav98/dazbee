@@ -585,8 +585,10 @@ export const en = {
     layersPanel: {
       box: 'Box',
       stack: 'Stack',
-      tree: 'Layers of {frame}',
-      empty: 'No layers in this frame yet. Draw a shape or add text to start.',
+      tree: 'Frames and layers of {page}',
+      empty: 'No layers on this page yet. Draw a shape or add text to start.',
+      /** A layer none of its frame's linked frames holds a copy of. */
+      onlyHere: 'only here',
       expand: 'Expand {name}',
       collapse: 'Collapse {name}',
       lock: 'Lock {name}',

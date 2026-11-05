@@ -1,10 +1,11 @@
 'use client'
 
-// The layers panel (#59): one frame's layer tree, topmost first, in step with the stage's selection:
-// the selection's frame, else the shown page's first. Drag a row to reorder it or drop it into a
-// group; rename, lock and hide; expand groups. Every change is an editor call, so each is one undo
-// step. Only the rows in view are in the page, so a frame of hundreds of layers scrolls as smoothly
-// as one of ten.
+// The layers panel (#59): the shown page's frames as top-level rows, each opening to its layers,
+// topmost first, in step with the stage: a selection opens its frame and groups and scrolls to its
+// row, a picked frame opens, and a click on a frame's row picks it. Drag a layer's row to reorder it
+// or drop it into a group of its frame; rename frames and layers, lock and hide layers; expand frames
+// and groups. Every change is an editor call or a command, so each is one undo step. Only the rows in
+// view are in the page, so a page of hundreds of layers scrolls as smoothly as one of ten.
 import {
   type DragEvent,
   type KeyboardEvent,
@@ -18,53 +19,70 @@ import {
 
 import { ancestorsOf, childrenOf } from '@dazbee/doc'
 import type { Editor } from '@dazbee/editor'
-import { canHold } from '@dazbee/schema'
+import { canHold, frameIdOf, framesOf } from '@dazbee/schema'
 
-import { useSelectionWithFrame, useShownFrames } from '@/components/editor/editor-hooks.ts'
+import { usePickedFrame, useSelection, useShownPage } from '@/components/editor/editor-hooks.ts'
 import { useFlyoutNote } from '@/components/editor/shell.tsx'
+import { swatchOf } from '@/components/editor/top-bar/frame-items.tsx'
 import { useLiveDesign } from '@/components/editor/use-live-design.ts'
 import { useOverlayScroll } from '@/components/ui/overlay-scroll.ts'
-import { type Row, rowsOf } from '@/lib/editor/layer-tree.ts'
+import { arrowStep, type LayerTreeRow, opensFor, type Row, treeRows } from '@/lib/editor/layer-tree.ts'
 import { useLocale, useMessages } from '@/lib/i18n/client.tsx'
 import { dirOf, format } from '@/lib/i18n/index.ts'
 
+import { FrameRow } from './frame-row.tsx'
 import { LAYER_ROW, LayerRow, type RowApi, type Where } from './layer-row.tsx'
 import { useLayerPictures } from './use-layer-pictures.ts'
 
 /** Rows rendered beyond each edge of the view, so a fast scroll never shows a gap. */
 const OVERSCAN = 8
+const ARROWS = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight']
+
+/** Scrolls a list of rows the least that shows the row at `at` whole. */
+function scrollToRow(el: HTMLElement, at: number) {
+  const top = at * LAYER_ROW
+  if (top < el.scrollTop) el.scrollTop = top
+  else if (top + LAYER_ROW > el.scrollTop + el.clientHeight) el.scrollTop = top + LAYER_ROW - el.clientHeight
+}
 
 export function LayersPanel({ editor }: { editor: Editor }) {
   const t = useMessages()
   const rtl = dirOf(useLocale()) === 'rtl'
   const { design, version } = useLiveDesign(editor)
-  const selection = useSelectionWithFrame(editor)
-  const selected = useMemo(() => new Set(selection.ids), [selection.ids])
+  const selection = useSelection(editor)
+  const picked = usePickedFrame(editor)
+  // The rows lit as chosen: the selected layers', and the picked frame's.
+  const selected = useMemo(() => new Set(picked === null ? selection : [...selection, picked]), [selection, picked])
+  const isFrame = (id: string) => Object.hasOwn(design.frames, id)
 
-  // The frame the panel shows: the selection's, else the shown page's first; none on a page with no frames.
-  const shownFrames = useShownFrames(editor)
-  const wanted = selection.frameId ?? shownFrames[0]?.id
-  const frameId = wanted !== undefined && Object.hasOwn(design.frames, wanted) ? wanted : undefined
-  const frame = frameId === undefined ? undefined : design.frames[frameId]
-  const page = frame ? design.pages[frame.pageId] : undefined
-  // The title row's note says which frame the tree is of, as in the mock: "Page 1 · Feed square".
-  useFlyoutNote(frame ? [page?.name, frame.name].filter(Boolean).join(' · ') : null)
+  const pageId = useShownPage(editor)
+  const page = design.pages[pageId]
+  const frames = framesOf(design, pageId)
+  // The title row's note names the page the tree is of, as in the mock.
+  useFlyoutNote(page?.name ?? null)
 
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(() => new Set())
-  // A layer selected on the stage shows in the panel: the groups it is in open.
+  // A selection on the stage, or a picked frame, shows in the panel: its frame and the groups it is
+  // in open, each time what they are changes, so a row closed by hand stays closed until then.
+  const opening = opensFor(design, selection, picked).join(' ')
   useEffect(() => {
-    const open = new Set<string>()
-    for (const id of selection.ids) {
-      for (const up of ancestorsOf(design, design.nodes[id]?.parentId ?? '')) open.add(up)
-    }
-    if ([...open].some((id) => !expanded.has(id))) setExpanded(new Set([...expanded, ...open]))
-  }, [selection.ids, design, version, expanded])
+    if (!opening) return
+    setExpanded((now) => {
+      const add = opening.split(' ').filter((id) => !now.has(id))
+      return add.length > 0 ? new Set([...now, ...add]) : now
+    })
+  }, [opening])
+  // A page of one frame opens it: there is no other to choose.
+  const onlyFrame = frames.length === 1 ? frames[0]?.[0] : undefined
+  useEffect(() => {
+    if (onlyFrame !== undefined) setExpanded((now) => (now.has(onlyFrame) ? now : new Set([...now, onlyFrame])))
+  }, [onlyFrame])
 
   // The panel's own moves, counted so the rows show a move in the render that follows its key, not
   // a frame later at the redraw.
   const [moved, setMoved] = useState(0)
   // The version is how the live design says it changed.
-  const rows = useMemo(() => rowsOf(design, frameId, expanded), [design, version, moved, frameId, expanded])
+  const rows = useMemo(() => treeRows(design, pageId, expanded), [design, version, moved, pageId, expanded])
   const indexOf = useMemo(() => new Map(rows.map((row, i) => [row.id, i])), [rows])
 
   // Which rows are in view.
@@ -96,7 +114,7 @@ export function LayersPanel({ editor }: { editor: Editor }) {
   // The row Tab lands on, the tree's one tab stop: while the focus is in the tree, the row it is on;
   // from outside, the selected row the focus was last on, else the first selected row, else the row
   // the focus was last on, else the first row.
-  const listedSelection = selection.ids.filter((id) => indexOf.has(id))
+  const listedSelection = [...selected].filter((id) => indexOf.has(id))
   const current =
     active && indexOf.has(active) && (inTree || listedSelection.includes(active))
       ? active
@@ -135,9 +153,7 @@ export function LayersPanel({ editor }: { editor: Editor }) {
     (id: string, at = indexOf.get(id)) => {
       const el = scroller.current
       if (!el || at === undefined) return
-      const top = at * LAYER_ROW
-      if (top < el.scrollTop) el.scrollTop = top
-      else if (top + LAYER_ROW > el.scrollTop + el.clientHeight) el.scrollTop = top + LAYER_ROW - el.clientHeight
+      scrollToRow(el, at)
       follow(el)
       setActive(id)
       focusing.current = id
@@ -150,20 +166,24 @@ export function LayersPanel({ editor }: { editor: Editor }) {
   // the panel or from the page itself, never out of a field or control elsewhere; a row no longer in
   // the list is no longer asked for.
   useLayoutEffect(() => {
-    // Focuses a row and selects it unless it is selected, so the focus and the selection agree.
+    // Focuses a row and selects its layer or picks its frame unless it is so, so the focus and the
+    // selection agree.
     const take = (id: string) => {
-      if (!selected.has(id)) editor.select([id])
+      if (!selected.has(id)) {
+        if (isFrame(id)) editor.pickFrame(id)
+        else editor.select([id])
+      }
       reveal(id)
     }
     const before = document.activeElement
     const dropped = !before || before === document.body || !before.isConnected
     const lost = held.current
     if (lost && !indexOf.has(lost)) {
-      // The row the focus was on left the list, as when its layer is deleted or grouped: the focus
-      // goes to the selected row, else to the row now in its place or the last row.
+      // The row the focus was on left the list, as when its layer or frame is deleted or its layer
+      // grouped: the focus goes to the selected row, else to the row now in its place or the last row.
       held.current = null
       if (dropped) {
-        gone.current = design.nodes[lost] ? null : lost
+        gone.current = design.nodes[lost] || isFrame(lost) ? null : lost
         const next = listedSelection[0] ?? rows[Math.min(heldAt.current, rows.length - 1)]?.id
         if (next) take(next)
       }
@@ -179,7 +199,7 @@ export function LayersPanel({ editor }: { editor: Editor }) {
       focusing.current = null
       return
     }
-    const row = scroller.current?.querySelector<HTMLElement>(`[data-layer="${CSS.escape(id)}"]`)
+    const row = scroller.current?.querySelector<HTMLElement>(`[data-row="${CSS.escape(id)}"]`)
     if (!row) return
     const from = document.activeElement
     if (from !== row && (!from || from === document.body || !from.isConnected || scroller.current?.contains(from)))
@@ -187,8 +207,28 @@ export function LayersPanel({ editor }: { editor: Editor }) {
     focusing.current = null
   })
 
+  // A selection made anywhere shows its row: the list scrolls to the topmost selected row once it
+  // is listed, each time the selection changes.
+  const shownFor = useRef('')
+  useLayoutEffect(() => {
+    const key = [...selected].join(' ')
+    if (key === shownFor.current) return
+    const at = Math.min(...[...selected].flatMap((id) => indexOf.get(id) ?? []))
+    const el = scroller.current
+    if (!Number.isFinite(at) && key) return
+    shownFor.current = key
+    if (!el || !Number.isFinite(at)) return
+    scrollToRow(el, at)
+    follow(el)
+  })
+
+  /** Picks a frame by its row, or selects a layer by its row, alone or added to the selection or taken from it. */
   const select = (id: string, add = false) => {
-    const ids = add ? (selected.has(id) ? selection.ids.filter((s) => s !== id) : [...selection.ids, id]) : [id]
+    if (isFrame(id)) {
+      editor.pickFrame(id)
+      return
+    }
+    const ids = add ? (selected.has(id) ? selection.filter((s) => s !== id) : [...selection, id]) : [id]
     editor.select(ids)
   }
   const toggle = (id: string, open = !expanded.has(id)) => {
@@ -198,9 +238,10 @@ export function LayersPanel({ editor }: { editor: Editor }) {
     setExpanded(next)
   }
 
-  /** Moves a layer next to or into another, as the panel shows them. */
+  /** Moves a layer next to or into another, or to the top of its frame, as the panel shows them. */
   const place = (id: string, target: Row, where: Where) => {
     if (id === target.id) return false
+    if (target.kind === 'frame') return editor.moveLayer(id, target.id)
     if (where === 'into') {
       const moved = editor.moveLayer(id, target.id)
       if (moved) toggle(target.id, true)
@@ -216,7 +257,7 @@ export function LayersPanel({ editor }: { editor: Editor }) {
   }
 
   /** Alt with the arrows: up and down among its siblings, into the group above it, or out of its group. */
-  const shift = (row: Row, key: string) => {
+  const shift = (row: LayerTreeRow, key: string) => {
     const siblings = childrenOf(design, row.parentId).map(([sibling]) => sibling)
     const at = siblings.indexOf(row.id)
     const inward = rtl ? 'ArrowLeft' : 'ArrowRight'
@@ -246,35 +287,26 @@ export function LayersPanel({ editor }: { editor: Editor }) {
   const placeOf = (id: string) => {
     const open = new Set(expanded)
     for (const up of ancestorsOf(design, design.nodes[id]?.parentId ?? '')) open.add(up)
-    const at = rowsOf(design, frameId, open).findIndex((r) => r.id === id)
+    const at = treeRows(design, pageId, open).findIndex((r) => r.id === id)
     return at < 0 ? undefined : at
   }
 
   const onKey = (event: KeyboardEvent<HTMLElement>, row: Row, i: number) => {
     if (renaming) return
-    const inward = rtl ? 'ArrowLeft' : 'ArrowRight'
-    const outward = rtl ? 'ArrowRight' : 'ArrowLeft'
-    const go = (to: Row | undefined) => {
-      if (!to) return
-      select(to.id)
-      reveal(to.id)
-    }
     let handled = true
-    if (event.altKey && ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key)) {
-      if (shift(row, event.key)) {
+    if (event.altKey && ARROWS.includes(event.key)) {
+      // Frames keep their place: Alt with the arrows moves layers only.
+      if (row.kind === 'layer' && shift(row, event.key)) {
         setMoved((n) => n + 1)
         reveal(row.id, placeOf(row.id))
       }
-    } else if (event.key === 'ArrowDown') go(rows[i + 1])
-    else if (event.key === 'ArrowUp') go(rows[i - 1])
-    else if (event.key === 'Home') go(rows[0])
-    else if (event.key === 'End') go(rows.at(-1))
-    else if (event.key === inward) {
-      if (row.hasChildren && !expanded.has(row.id)) toggle(row.id, true)
-      else if (row.hasChildren) go(rows[i + 1])
-    } else if (event.key === outward) {
-      if (row.hasChildren && expanded.has(row.id)) toggle(row.id, false)
-      else go(rows.find((r) => r.id === row.parentId))
+    } else if (ARROWS.includes(event.key) || event.key === 'Home' || event.key === 'End') {
+      // Onto a frame's row picks the frame; onto a layer's selects the layer.
+      const step = arrowStep(rows, i, event.key, expanded, rtl)
+      if (step && 'go' in step) {
+        select(step.go.id)
+        reveal(step.go.id)
+      } else if (step) toggle(step.toggle, step.open)
     } else if (event.key === 'Enter' || event.key === 'F2') setRenaming(row.id)
     else if (event.key === ' ') select(row.id, event.shiftKey || event.metaKey || event.ctrlKey)
     else handled = false
@@ -289,6 +321,9 @@ export function LayersPanel({ editor }: { editor: Editor }) {
     const id = dragged.current
     const node = id && design.nodes[id]
     if (!node || id === row.id) return null
+    // A layer moves only within its own frame; on its frame's row it goes to the frame's top.
+    if (frameIdOf(design, id) !== row.frameId) return null
+    if (row.kind === 'frame') return 'into'
     const box = event.currentTarget.getBoundingClientRect()
     const y = (event.clientY - box.top) / box.height
     if (canHold(row.node.type, node.type) && y > 0.25 && y < 0.75) return 'into'
@@ -310,7 +345,11 @@ export function LayersPanel({ editor }: { editor: Editor }) {
     rename: (id) => setRenaming(id),
     renamed: (id, name, before, byKey) => {
       setRenaming(null)
-      if (name !== null && name.trim() && name.trim() !== before) editor.renameLayer(id, name)
+      const next = name?.trim()
+      if (next && next !== before) {
+        if (!isFrame(id)) editor.renameLayer(id, next)
+        else if (editor.design().frames[id]) editor.session.run('frame.update', { frameId: id, name: next })
+      }
       // Ended from the keyboard, the focus goes back to the row; ended by a click elsewhere, it
       // stays where the click put it.
       if (byKey) reveal(id)
@@ -373,17 +412,19 @@ export function LayersPanel({ editor }: { editor: Editor }) {
   }
   const shown = [...places].sort((a, b) => a - b).flatMap((i) => (rows[i] ? [{ row: rows[i], i }] : []))
   // A text's row shows the text icon, as every text row does: a picture of its words in their own
-  // colour can vanish against the panel.
+  // colour can vanish against the panel. A frame's row shows its background.
   const pictures = useLayerPictures(
     editor,
-    frameId,
-    shown.flatMap(({ row }) => (row.node.type === 'text' ? [] : [row.id])),
+    pageId,
+    shown.flatMap(({ row }) => (row.kind === 'frame' || row.node.type === 'text' ? [] : [row.id])),
     scrolledAt,
   )
+  // A page whose frames hold no layer yet says how to add one under its frames.
+  const noLayers = rows.every((row) => row.kind === 'frame' && !row.hasChildren)
   return (
     <div className="flex min-h-0 flex-1 flex-col" data-testid="layers">
       {rows.length === 0 ? (
-        <p className="p-4 text-[13px] text-muted">{frame ? t.editor.layersPanel.empty : t.editor.frames.emptyPage}</p>
+        <p className="p-4 text-[13px] text-muted">{t.editor.frames.emptyPage}</p>
       ) : (
         <div
           ref={scrollerRef}
@@ -396,27 +437,43 @@ export function LayersPanel({ editor }: { editor: Editor }) {
         >
           <div
             role="tree"
-            aria-label={format(t.editor.layersPanel.tree, { frame: frame?.name ?? '' })}
+            aria-label={format(t.editor.layersPanel.tree, { page: page?.name ?? '' })}
             aria-multiselectable
             className="relative"
             style={{ height: rows.length * LAYER_ROW }}
           >
-            {shown.map(({ row, i }) => (
-              <LayerRow
-                key={row.id}
-                row={row}
-                i={i}
-                selected={selected.has(row.id)}
-                focusable={row.id === current}
-                renaming={renaming === row.id}
-                open={expanded.has(row.id)}
-                hidden={row.node.props.visible === false}
-                drop={drop?.id === row.id ? drop.where : null}
-                picture={pictures[row.id] ?? null}
-                api={api}
-              />
-            ))}
+            {shown.map(({ row, i }) =>
+              row.kind === 'frame' ? (
+                <FrameRow
+                  key={row.id}
+                  row={row}
+                  i={i}
+                  picked={selected.has(row.id)}
+                  focusable={row.id === current}
+                  renaming={renaming === row.id}
+                  open={expanded.has(row.id)}
+                  swatch={swatchOf(design, row.id)}
+                  dropInto={drop?.id === row.id}
+                  api={api}
+                />
+              ) : (
+                <LayerRow
+                  key={row.id}
+                  row={row}
+                  i={i}
+                  selected={selected.has(row.id)}
+                  focusable={row.id === current}
+                  renaming={renaming === row.id}
+                  open={expanded.has(row.id)}
+                  hidden={row.node.props.visible === false}
+                  drop={drop?.id === row.id ? drop.where : null}
+                  picture={pictures[row.id] ?? null}
+                  api={api}
+                />
+              ),
+            )}
           </div>
+          {noLayers && <p className="px-2.5 pt-2 text-[13px] text-muted">{t.editor.layersPanel.empty}</p>}
         </div>
       )}
     </div>

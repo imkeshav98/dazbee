@@ -11,19 +11,19 @@ const PICTURES_AFTER_SCROLL = 300
 const PICTURES_SLICE = 6
 
 /**
- * Each listed layer's picture in the frame the panel shows, drawn once the stage has settled and
+ * Each listed layer's picture on the page the panel shows, drawn once the stage has settled and
  * the list has been still a moment (so a drag or a scroll draws none) and again once fonts and
  * images arrive, a few at a time in the browser's idle time so no frame waits on them.
  * `scrolledAt` is when the list last scrolled.
  */
 export function useLayerPictures(
   editor: Editor,
-  frameId: string | undefined,
+  pageId: string,
   ids: readonly string[],
   scrolledAt: { current: number },
 ): Record<string, string | null> {
-  const [pictures, setPictures] = useState<{ frameId: string | undefined; urls: Record<string, string | null> }>({
-    frameId,
+  const [pictures, setPictures] = useState<{ pageId: string; urls: Record<string, string | null> }>({
+    pageId,
     urls: {},
   })
   const wanted = ids.join(' ')
@@ -46,7 +46,7 @@ export function useLayerPictures(
           next[id] = editor.layerThumbnail(id, 44, false)
         }
         if (i < list.length) cancel = whenIdle(slice)
-        else setPictures((now) => (now.frameId === frameId && sameUrls(now.urls, next) ? now : { frameId, urls: next }))
+        else setPictures((now) => (now.pageId === pageId && sameUrls(now.urls, next) ? now : { pageId, urls: next }))
       }
       cancel = whenIdle(slice)
     })
@@ -54,9 +54,9 @@ export function useLayerPictures(
       cancel()
       stop()
     }
-  }, [editor, frameId, wanted, scrolledAt])
-  // Another frame's pictures are not this one's.
-  return pictures.frameId === frameId ? pictures.urls : {}
+  }, [editor, pageId, wanted, scrolledAt])
+  // Another page's pictures are not this one's.
+  return pictures.pageId === pageId ? pictures.urls : {}
 }
 
 /** Runs `work` when the browser is idle, with how many ms it may take; returns the cancel. */
