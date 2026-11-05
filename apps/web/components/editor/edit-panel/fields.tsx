@@ -26,7 +26,7 @@ import { alphaChange, hexChange, hexOf } from '@/lib/colour.ts'
 import { fillOf } from '@/lib/editor/fill.ts'
 import { LIMITS } from '@/lib/editor/limits.ts'
 import { scrubOf } from '@/lib/editor/scrub.ts'
-import { tidy } from '@/lib/editor/size.ts'
+import { latinDigits, tidy } from '@/lib/editor/size.ts'
 import { useMessages } from '@/lib/i18n/client.tsx'
 import { format } from '@/lib/i18n/index.ts'
 
@@ -146,7 +146,7 @@ export function NumberField({
       if (onClear && (shown !== '' || (value === 'mixed' && typed))) onClear()
       return
     }
-    const n = Number.parseFloat(text.replace(',', '.'))
+    const n = Number.parseFloat(latinDigits(text).replace(',', '.'))
     if (Number.isFinite(n) && text.trim() !== shown) onSet(clamp(n / scale, min, max))
   }
   const text = draft ?? shown

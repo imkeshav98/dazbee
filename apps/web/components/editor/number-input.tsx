@@ -1,9 +1,11 @@
 'use client'
 
 // What every number input does with the pointer and the caret, and how its digits look. A press that
-// doesn't move focuses the input with its whole value selected, so what is typed replaces it. In an
-// input being typed in, a press beside the digits (on the label, the unit or the room between) puts
-// the caret at the end of the value, and a press on the digits places it where it lands. On an input
+// doesn't move focuses the input with its whole value selected, so what is typed replaces it, and
+// brings the field clear of a panel's faded edge. In an input being typed in, a press beside the
+// digits (on the label, the unit or the room between) puts the caret at the end of the value, and a
+// press on the digits places it where it lands; a tap does too, as a finger can't aim between
+// digits and a phone's browser moves a tap beside them onto them. On an input
 // that scrubs, a press that moves sideways scrubs the value (lib/editor/scrub.ts), one undo step for
 // the whole drag when given the editor. The digits are an input as wide as what it shows, so a press
 // beside them lands on the knob around it.
@@ -69,8 +71,10 @@ export function useNumberInput({
   const [typing, setTyping] = useState(false)
   const [scrubbing, setScrubbing] = useState(false)
   const press = useRef<Press | null>(null)
-  /** Whether a press on `target` belongs to the input: one on its digits while it is typed in. */
-  const typedAt = (target: EventTarget) => typing && target === ref.current
+  /** Whether the last press was a finger's. */
+  const touched = useRef(false)
+  /** Whether a press on `target` belongs to the input: a mouse's or a pen's on its digits while it is typed in. */
+  const typedAt = (target: EventTarget) => typing && !touched.current && target === ref.current
   const release = (focus: boolean) => {
     const p = press.current
     press.current = null
@@ -89,6 +93,7 @@ export function useNumberInput({
     'data-typing': typing ? '' : undefined,
     'data-scrubbing': scrubbing ? '' : undefined,
     onPointerDown: (event: PointerEvent<HTMLElement>) => {
+      touched.current = event.pointerType === 'touch'
       if (event.button !== 0 || typedAt(event.target)) return
       event.preventDefault()
       const el = event.currentTarget
@@ -107,7 +112,8 @@ export function useNumberInput({
         end: null,
       }
     },
-    // Some browsers focus on the mouse press even when the pointer press was taken.
+    // Some browsers focus on the mouse press even when the pointer press was taken, and the mouse press
+    // that follows a tap would place the caret.
     onMouseDown: (event: MouseEvent<HTMLElement>) => {
       if (!typedAt(event.target)) event.preventDefault()
     },
@@ -135,8 +141,9 @@ export function useNumberInput({
   const input = {
     onFocus: () => {
       setTyping(true)
-      // What is typed replaces the value.
+      // What is typed replaces the value, in a field clear of a panel's faded edge.
       ref.current?.select()
+      ref.current?.closest('[data-knob]')?.scrollIntoView({ block: 'nearest' })
     },
     onBlur: () => setTyping(false),
   }
@@ -161,9 +168,10 @@ export function NumberInput({
   hint,
   strong = false,
   className,
+  onFocus,
   onBlur,
   ...input
-}: Omit<ComponentProps<'input'>, 'value' | 'placeholder' | 'size' | 'onFocus' | 'ref' | 'dir'> & {
+}: Omit<ComponentProps<'input'>, 'value' | 'placeholder' | 'size' | 'ref' | 'dir'> & {
   entry: NumberEntry
   text: string
   hint?: string | undefined
@@ -182,7 +190,10 @@ export function NumberInput({
         size={1}
         value={text}
         placeholder={hint}
-        onFocus={entry.input.onFocus}
+        onFocus={(event) => {
+          entry.input.onFocus()
+          onFocus?.(event)
+        }}
         onBlur={(event) => {
           entry.input.onBlur()
           onBlur?.(event)

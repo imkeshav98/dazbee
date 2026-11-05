@@ -8,6 +8,7 @@ import { shortcutFor } from '@dazbee/editor'
 import { type Target, textStyle } from '@/components/editor/edit-panel/target.ts'
 import { NumberInput, useNumberInput } from '@/components/editor/number-input.tsx'
 import { LIMITS } from '@/lib/editor/limits.ts'
+import { latinDigits } from '@/lib/editor/size.ts'
 import { useMessages } from '@/lib/i18n/client.tsx'
 
 /**
@@ -24,7 +25,7 @@ export function SizeStepper({ target }: { target: Target }) {
   const [draft, setDraft] = useState<string | null>(null)
   const entry = useNumberInput()
   const commit = (text: string) => {
-    const n = Number(text)
+    const n = Number(latinDigits(text))
     if (text.trim() !== '' && Number.isFinite(n) && n >= 1)
       setStyle('fontSize', Math.round(Math.min(n, LIMITS.fontSize) * 10) / 10)
     setDraft(null)
@@ -68,8 +69,10 @@ export function SizeStepper({ target }: { target: Target }) {
             }
             if (event.key === 'Enter') commit(event.currentTarget.value)
             if (event.key === 'Escape') {
-              // What was typed is thrown away, its size chosen again, so a size typed next replaces it.
+              // What was typed is thrown away, its size chosen again, so a size typed next replaces it;
+              // with nothing typed, the field lets go of the focus.
               if (draft !== null) entry.reselect()
+              else event.currentTarget.blur()
               setDraft(null)
             }
             if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {

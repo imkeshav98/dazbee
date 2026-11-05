@@ -235,7 +235,11 @@ function OwnSize({ start, onAdd }: { start: Size; onAdd: (size: Size) => void })
   )
 }
 
-/** One side of a size of your own: its letter, then the side as a number input. */
+/**
+ * One side of a size of your own: its letter, then the side as a number input. What is typed is
+ * marked as a draft while it differs from the side as the field took the focus, so Esc throws it
+ * away, back to that side, and keeps the field; with nothing typed, Esc goes on to the card.
+ */
 function OwnSide({
   axis,
   value,
@@ -251,6 +255,9 @@ function OwnSide({
 }) {
   const a = useMessages().editor.addFrame
   const entry = useNumberInput()
+  /** The side as the field took the focus; null while it doesn't have it. */
+  const [atFocus, setAtFocus] = useState<string | null>(null)
+  const typed = atFocus !== null && value !== atFocus
   return (
     <div {...entry.knob} className={SIZE_FIELD}>
       <span aria-hidden className="text-[11px] font-semibold text-subtle">
@@ -260,6 +267,14 @@ function OwnSide({
         entry={entry}
         text={value}
         onChange={(e) => onChange(e.target.value)}
+        onFocus={() => setAtFocus(value)}
+        onBlur={() => setAtFocus(null)}
+        onKeyDown={(e) => {
+          if (e.key !== 'Escape' || !typed) return
+          e.stopPropagation()
+          onChange(atFocus)
+          entry.reselect()
+        }}
         inputMode="numeric"
         autoComplete="off"
         aria-label={a[axis]}
@@ -267,6 +282,7 @@ function OwnSide({
         aria-describedby={describedBy}
         name={axis}
         data-testid={`own-${axis}`}
+        data-draft={typed ? '' : undefined}
       />
     </div>
   )
