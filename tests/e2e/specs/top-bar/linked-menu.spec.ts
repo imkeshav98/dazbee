@@ -9,11 +9,24 @@ import { INK, linkedMenuDesign, PINK } from '../../support/linked-menu-design.ts
 import { copyIn, seed } from '../../support/seed.ts'
 import { selectLayers } from '../../support/stage.ts'
 import { expect, type Page, test } from '../../support/test.ts'
-import { moreAction, moreSubmenu } from '../../support/top-bar.ts'
+import { moreAction, moreMenu, moreSubmenu } from '../../support/top-bar.ts'
 
 test.describe.configure({ mode: 'parallel', timeout: 120_000 })
 
 test.describe('Copy to other frames ▸', () => {
+  test('its heading counts the linked frames that hold a copy, which Style and Text reach', async ({ browser }) => {
+    const { page, errors } = await open(browser)
+    await selectLayers(page, [copyIn('story', 'badge')])
+    await page.getByTestId('small-delete').click()
+    await expect.poll(async () => (await holders(page, 'badge')).story).toBeUndefined()
+    await selectLayers(page, ['badge'])
+    await expect((await moreSubmenu(page, 'copy-to-frames')).getByText('To the linked frame')).toBeVisible()
+    await closeMenus(page)
+    await selectLayers(page, ['headline'])
+    await expect((await moreSubmenu(page, 'copy-to-frames')).getByText('To the 2 linked frames')).toBeVisible()
+    expect(errors).toEqual([])
+  })
+
   test('Style writes the layer’s style into every linked copy, keeping each one’s font size, one undo step', async ({
     browser,
   }) => {
@@ -169,6 +182,15 @@ test.describe('in all frames', () => {
     expect(Object.keys(await holders(page, 'badge'))).toEqual(['wide'])
     await undo(page)
     await expect.poll(async () => Object.keys(await holders(page, 'badge')).sort()).toEqual(['sq', 'story', 'wide'])
+
+    // The layer itself locked against deleting: the row greys and deletes no copy.
+    await page.evaluate(() => window.dazbee?.setLocked(['wide-badge'], false))
+    await selectLayers(page, ['badge'])
+    await page.getByTestId('small-lock').click()
+    const menu = await moreMenu(page)
+    await expectGreyed(page, menu, 'Delete from all frames', 'The selection is locked against deleting')
+    await closeMenus(page)
+    expect(Object.keys(await holders(page, 'badge')).sort()).toEqual(['sq', 'story', 'wide'])
     expect(errors).toEqual([])
   })
 })

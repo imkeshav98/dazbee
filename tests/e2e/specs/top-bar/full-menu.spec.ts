@@ -1,6 +1,8 @@
-// The full menu (the small menu's ⋯) and the right-click menu in Chromium: their rows in order,
-// the focus as they open and close, Text only for text layers; Copy ▸ and Paste ▸ with the layers or
-// their style, and paste across frames and pages; and the menus at the three screen sizes.
+// The full menu (the small menu's ⋯) and the right-click menu in Chromium: their rows in order with
+// their dividers, the focus as they open and close and as the arrows move it, Text only for text
+// layers, Ungroup for a group or a box, Release mask; Copy ▸ and Paste ▸ with the layers or their
+// style, and paste across frames and pages; and the menus, their widths and a greyed row's tooltip
+// at the three screen sizes.
 import { layoutProblems, SCREEN_SIZES } from '../../support/layout.ts'
 import { closeMenus, expectGreyed, fillOf, holders, node, open, redo, rowsOf, undo } from '../../support/linked-menu.ts'
 import { GREEN, INK, PINK } from '../../support/linked-menu-design.ts'
@@ -295,6 +297,20 @@ test.describe('Copy ▸ and Paste ▸', () => {
     expect((await node(page, 'card'))?.props).toMatchObject({ x: 80, width: 320 })
     await undo(page)
     await expect.poll(() => fillOf(page, 'card')).toBe(INK)
+    expect(errors).toEqual([])
+  })
+
+  test('Paste style says when a copied style doesn’t apply to this kind of layer', async ({ browser }) => {
+    const { page, errors } = await open(browser)
+    await selectLayers(page, ['cta'])
+    await page.keyboard.press('Control+Alt+KeyC')
+    await selectLayers(page, ['badge'])
+    await expectGreyed(page, await moreSubmenu(page, 'paste'), 'Paste style', 'A text’s style doesn’t apply to a shape')
+    await closeMenus(page)
+    await selectLayers(page, ['badge'])
+    await page.keyboard.press('Control+Alt+KeyC')
+    await selectLayers(page, ['sub'])
+    await expectGreyed(page, await moreSubmenu(page, 'paste'), 'Paste style', 'A shape’s style doesn’t apply to a text')
     expect(errors).toEqual([])
   })
 
