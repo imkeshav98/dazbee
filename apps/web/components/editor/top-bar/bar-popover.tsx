@@ -1,17 +1,21 @@
 'use client'
 
 // One button of the bar by the selection and the popover it opens under it, or, for a pop-up the
-// edit store names a sheet, at the bottom of a phone's screen. The bar keeps which one is open, so only one
-// is open at a time. Also the hooks the editor's menus share: the focus as a
-// popover opens and closes, Tab once into a toolbar, and a menu that shows it scrolls.
+// edit store names a sheet, at the bottom of a phone's screen. The bar keeps which one is open, so
+// only one is open at a time. Also what the editor's menus share: the sheet a phone shows a menu as,
+// the focus as a popover opens and closes, the arrows along a toolbar and through a menu's rows, Tab
+// once into a toolbar, Esc going back from a row's short menu shown in its menu's place, and a menu
+// that shows it scrolls.
 import { CaretDownIcon } from '@phosphor-icons/react'
 import * as Popover from '@radix-ui/react-popover'
 import {
+  createContext,
   type FocusEvent,
   type KeyboardEvent,
   type ReactNode,
   type RefObject,
   useCallback,
+  useContext,
   useEffect,
   useLayoutEffect,
   useRef,
@@ -22,7 +26,7 @@ import { typingIn } from '@/components/editor/edit-panel/fields.tsx'
 import { isSheet, type PanelId, useEditState, usePhone } from '@/components/editor/edit-store.ts'
 import { BAR_BUTTON, POPOVER } from '@/components/editor/styles.ts'
 import { useOverlayScroll } from '@/components/ui/overlay-scroll.ts'
-import { fadedEdges, useScrollEdges } from '@/components/ui/scroll-edges.ts'
+import { fadedEdges, linedEdges, useScrollEdges } from '@/components/ui/scroll-edges.ts'
 import { cn } from '@/lib/cn.ts'
 
 /**
@@ -30,6 +34,21 @@ import { cn } from '@/lib/cn.ts'
  * keeps 0.5rem, which is 7 px at the 14 px root.
  */
 export const SHEET_EDGE = 7
+
+/**
+ * Where a popover shown as a phone's sheet lies, for its content: above the screen's bottom edge
+ * (`SheetAnchor`), as wide as the screen less SHEET_EDGE each side, SHEET_EDGE from every edge.
+ */
+export const SHEET_PLACE = {
+  side: 'top',
+  align: 'center',
+  sideOffset: 0,
+  collisionPadding: SHEET_EDGE,
+  'data-sheet': true,
+} as const
+/** A sheet's look: as wide as its anchor, as tall as what it holds up to its room, scrolling past that. */
+export const SHEET_LOOK =
+  'max-h-[var(--radix-popover-content-available-height)] w-[var(--radix-popover-trigger-width)] overflow-y-auto rounded-[22px]'
 
 /** The room between the bar's last row that shows and a popover under it, in pixels. */
 const GAP = 8
@@ -43,6 +62,12 @@ const STEPS = {
 }
 
 const nowhere = () => document.activeElement === null || document.activeElement === document.body
+
+/**
+ * The way back from the row's short menu that shows in its menu's place, kept for the menu that
+ * holds it: null while none shows.
+ */
+const BackInPlace = createContext<RefObject<(() => void) | null> | null>(null)
 
 /**
  * Where a sheet hangs from on a phone: a line along the screen's bottom edge, SHEET_EDGE in from
@@ -97,8 +122,9 @@ export function arrowAlong(event: KeyboardEvent<HTMLElement>) {
 /**
  * Moves the focus between a menu's rows with the up and down arrows, wrapping round at the ends,
  * and Home and End: its buttons that show, greyed ones too. A field keeps its own keys, its arrows
- * stepping its value; Tab reaches it. Goes on the menu's content; a menu opened beside a row of it,
- * drawn elsewhere in the page, moves through its own rows.
+ * stepping its value; Tab reaches it. Goes on the content of every menu of the editor (the full
+ * menu, the right-click menu, Arrange ⋯, a picked frame's ⋯ and each menu beside one of their
+ * rows); a menu opened beside a row, drawn elsewhere in the page, moves through its own rows.
  */
 export function arrowThrough(event: KeyboardEvent<HTMLElement>) {
   if (event.defaultPrevented || !(event.key in STEPS)) return
@@ -148,6 +174,38 @@ export function useMenuFocus() {
 }
 
 /**
+ * Lets Esc go back from a row's short menu shown in the menu's place (SubMenu, on a phone) before it
+ * closes the menu, through Radix's own layers: `onEscapeKeyDown` goes on the menu's content and
+ * `rows` round its rows. A greyed row's tooltip that shows is a layer over the menu, so Radix gives
+ * it Esc first and it closes. The Esc that goes back goes no further: going back takes the focused
+ * row out of the page, and the stage would take an Esc from outside a menu as its own and let the
+ * selection go, closing the menu with it.
+ */
+export function useEscapeBack() {
+  const back = useRef<(() => void) | null>(null)
+  const onEscapeKeyDown = useCallback((event: globalThis.KeyboardEvent) => {
+    if (!back.current) return
+    event.preventDefault()
+    event.stopPropagation()
+    back.current()
+  }, [])
+  const rows = useCallback((children: ReactNode) => <BackInPlace value={back}>{children}</BackInPlace>, [])
+  return { onEscapeKeyDown, rows }
+}
+
+/** Keeps `goBack` as the way back Esc takes in the menu this short menu shows in the place of, while it shows. */
+export function useBackInPlace(goBack: () => void) {
+  const back = useContext(BackInPlace)
+  useEffect(() => {
+    if (!back) return
+    back.current = goBack
+    return () => {
+      if (back.current === goBack) back.current = null
+    }
+  }, [back, goBack])
+}
+
+/**
  * Lets Tab reach a toolbar once, at the button last focused, as a toolbar should; the arrows move
  * along it. Returns the focus handler to put on the toolbar.
  */
@@ -170,8 +228,8 @@ export function useRovingTab(bar: HTMLElement | null) {
 
 /**
  * A menu that scrolls when it is longer than its room, and shows that it does: its overlay bar,
- * kept shown on a phone, and its cut edges faded. The ref goes on the scrolling element, and
- * `also` gets the element too.
+ * kept shown on a phone, and its cut edges faded, or on a phone lined, so a cut row never reads as
+ * a greyed one. The ref goes on the scrolling element, and `also` gets the element too.
  */
 export function useScrollingMenu(also?: (element: HTMLDivElement | null) => void) {
   const phone = usePhone()
@@ -194,7 +252,7 @@ export function useScrollingMenu(also?: (element: HTMLDivElement | null) => void
     },
     [bars, also],
   )
-  return { ref, onScroll: edges.measure, className: fadedEdges(edges) }
+  return { ref, onScroll: edges.measure, className: phone ? linedEdges(edges) : fadedEdges(edges) }
 }
 
 export function BarPopover({
@@ -236,6 +294,7 @@ export function BarPopover({
   opens?: PanelId
 }) {
   const focus = useMenuFocus()
+  const escape = useEscapeBack()
   const shown = open === id
   const phone = usePhone()
   // A sheet on a phone, as `isSheet` names it: the anchor is the screen's bottom edge, and Radix's
@@ -268,35 +327,36 @@ export function BarPopover({
           {!menu && <CaretDownIcon size={10} weight="bold" aria-hidden className="text-subtle" />}
         </button>
       </Popover.Trigger>
-      {asSheet && <Popover.Anchor virtualRef={SCREEN_BOTTOM} />}
+      {asSheet && <SheetAnchor />}
       <Popover.Portal>
         <Popover.Content
-          side={asSheet ? 'top' : 'bottom'}
-          align={asSheet ? 'center' : align}
-          sideOffset={asSheet ? 0 : below}
-          collisionPadding={asSheet ? SHEET_EDGE : 12}
+          {...(asSheet ? SHEET_PLACE : { side: 'bottom', align, sideOffset: below, collisionPadding: 12 })}
           {...focus.content}
           // A number field being typed in takes Esc first, throwing away what was typed; the next
-          // Esc closes the popover.
-          onEscapeKeyDown={(event) => typingIn(document.activeElement) && event.preventDefault()}
+          // Esc goes back from a row's short menu shown in its place, then closes the popover.
+          onEscapeKeyDown={(event) =>
+            typingIn(document.activeElement) ? event.preventDefault() : escape.onEscapeKeyDown(event)
+          }
           onKeyDown={menu ? arrowThrough : undefined}
           aria-label={label}
           data-testid={`bar-${testId}-menu`}
-          data-sheet={asSheet || undefined}
-          className={cn(
-            POPOVER,
-            'flex flex-col p-1.5',
-            asSheet
-              ? 'max-h-[var(--radix-popover-content-available-height)] w-[var(--radix-popover-trigger-width)] overflow-y-auto rounded-[22px]'
-              : (className ?? 'min-w-56'),
-          )}
+          data-menu={menu || undefined}
+          className={cn(POPOVER, 'flex flex-col p-1.5', asSheet ? SHEET_LOOK : (className ?? 'min-w-56'))}
         >
           {focus.back}
-          {children}
+          {escape.rows(children)}
         </Popover.Content>
       </Popover.Portal>
     </Popover.Root>
   )
+}
+
+/**
+ * A popover's anchor while it shows as a phone's sheet (`SHEET_PLACE`, `SHEET_LOOK`): the screen's
+ * bottom edge. It goes in the popover's root in place of any other anchor.
+ */
+export function SheetAnchor() {
+  return <Popover.Anchor virtualRef={SCREEN_BOTTOM} />
 }
 
 /**

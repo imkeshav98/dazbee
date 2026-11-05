@@ -36,6 +36,7 @@
 .stage-overlay .selection,
 .stage-overlay .selection-member,
 .stage-overlay .entered,
+.stage-overlay .linked-copy,
 .stage-overlay .hover {
   position: absolute;
   transform-origin: center;
@@ -81,6 +82,10 @@
   .stage-overlay .drop-target {
     animation: none;
   }
+}
+/* The selected layers' linked copies in the page's other frames, so you see where else they are. */
+.stage-overlay .linked-copy {
+  outline: 1.5px dashed var(--accent);
 }
 /* The group or box double-clicked into, while working inside it. */
 .stage-overlay .entered {

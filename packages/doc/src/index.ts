@@ -1,5 +1,6 @@
 export { CommandError, defineCommand, type Command } from './commands/define.ts'
 export { ancestorsOf, childrenOf, descendants, isInside } from './children.ts'
+export { copiesOf, framesWithout, linkedFrames } from './links.ts'
 export { frameIdOf } from '@dazbee/schema'
 export { COMMANDS, type CommandName } from './commands/index.ts'
 export {

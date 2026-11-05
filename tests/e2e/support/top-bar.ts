@@ -4,6 +4,7 @@
 import { expect, type Locator, type Page } from '@playwright/test'
 
 import { EDITOR_CHROME } from './layout.ts'
+import { FULL_MENU_BESIDE } from './menu-rows.ts'
 
 /** The editor's chrome and the pieces of the top bar, small menu and edit panel that must never meet. */
 export const PIECES = {
@@ -19,8 +20,11 @@ export const PIECES = {
 /** The design's name and the font's name end in "…" by design when there is no room. */
 export const UNCUT = 'h1, [data-testid="bar-font"], [data-testid="edit-panel-note"]'
 
-/** The menus beside a menu's rows that `moreAction` looks in, by their test ids: Arrange's Line up and Order. */
-const SUBMENUS = ['line-up', 'order']
+/**
+ * The menus beside a menu's rows that `moreAction` looks in, by their test ids: the full menu's
+ * Copy, Paste and Copy to other frames, and Arrange's Line up and Order.
+ */
+const SUBMENUS = [...Object.keys(FULL_MENU_BESIDE), 'line-up', 'order']
 
 /** Where each of the selection's cards is now: the top bar's pop-up or edit panel that holds it. */
 const HOLDER: Record<string, string> = {
@@ -70,7 +74,7 @@ export async function moreMenu(page: Page) {
  * and raised), so the boxes measured in it are where they stay. Only animations that end at a time
  * count: endless ones and those driven by scrolling, as the scroll bars' are, are left out.
  */
-const entered = (locator: Locator) =>
+export const entered = (locator: Locator) =>
   locator.evaluate(async (el) => {
     const entrances = el.getAnimations({ subtree: true }).filter((animation) => {
       const end = animation.effect?.getComputedTiming().endTime
@@ -98,8 +102,8 @@ export async function barMenu(page: Page, id: string) {
 
 /**
  * Closes the open pop-up or panel of an item on the top bar with Esc, by the item's test id
- * (`bar-align`, `bar-more`, or `more-order` for the menu beside that row of the full menu), and
- * waits until it is gone.
+ * (`bar-align`, `bar-more`, or `more-order` for the menu beside that row of Arrange ⋯), and waits
+ * until it is gone.
  */
 export async function closeBarMenu(page: Page, button: string) {
   await page.keyboard.press('Escape')
@@ -133,12 +137,18 @@ export const strokeList = async (page: Page) => (await barMenu(page, 'outline'))
 
 /**
  * Clicks an action of the full menu, or of the right-click menu or Arrange ⋯ when `menu` is it, by
- * the start of its name (the first row that starts so): in the menu, or in the menu beside one of
- * Arrange's rows (Line up ▸, Order ▸). The action closes the menu, and this waits until it has.
+ * the start of its name (the first row that starts so, leaving out rows that open a menu beside
+ * them and greyed rows): in the menu, or in the menu beside a row (the full menu's Copy ▸, Paste ▸
+ * and Copy to other frames ▸, Arrange's Line up ▸ and Order ▸). The action closes the menu, and
+ * this waits until it has.
  */
 export async function moreAction(page: Page, name: string, menu?: Locator) {
   const root = menu ?? (await moreMenu(page))
-  const named = (within: Locator) => within.getByRole('button', { name: new RegExp(`^${name}`) }).first()
+  const named = (within: Locator) =>
+    within
+      .getByRole('button', { name: new RegExp(`^${name}`) })
+      .and(within.locator('button:not([aria-haspopup]):not([aria-disabled="true"])'))
+      .first()
   const run = async (action: Locator) => {
     await action.click()
     await expect(root).toBeHidden()

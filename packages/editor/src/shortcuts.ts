@@ -1,5 +1,5 @@
 // Every keyboard shortcut of the stage in one table (#40): the editor reads it to act on keys, the
-// tests to press them, and the help overlay will list it. A key is `Mod` (Ctrl, or ⌘ on a Mac),
+// tests to press them, and the shortcuts dialog lists it. An action only a menu runs has no keys. A key is `Mod` (Ctrl, or ⌘ on a Mac),
 // `Shift` and `Alt`, then one key: a letter, matched by the character it types, or a
 // KeyboardEvent.code for anything else, so brackets and digits work whatever Shift does to them.
 
@@ -58,6 +58,14 @@ export const SHORTCUTS = [
   { action: 'booleanSubtract', keys: ['Mod+Alt+S'] },
   { action: 'booleanIntersect', keys: ['Mod+Alt+I'] },
   { action: 'booleanExclude', keys: ['Mod+Alt+X'] },
+  { action: 'copyStyle', keys: ['Mod+Alt+C'] },
+  { action: 'pasteStyle', keys: ['Mod+Alt+V'] },
+  { action: 'styleToLinked', keys: ['Mod+Alt+Shift+C'] },
+  { action: 'textToLinked', keys: ['Mod+Alt+Shift+T'] },
+  { action: 'layerToLinked', keys: [] },
+  { action: 'lockLinked', keys: ['Mod+Alt+Shift+L'] },
+  { action: 'hideLinked', keys: ['Mod+Alt+Shift+H'] },
+  { action: 'deleteLinked', keys: [] },
 ] as const satisfies readonly { action: string; keys: readonly string[] }[]
 
 export type ShortcutAction = (typeof SHORTCUTS)[number]['action']

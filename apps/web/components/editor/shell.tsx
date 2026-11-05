@@ -185,14 +185,14 @@ export function EditorShell({
     ai: t.editor.aiEmpty,
     brand: t.editor.brandEmpty,
   }
-  // What the top bar has open: on a phone an edit panel, or the top bar's Arrange ⋯, is a sheet,
-  // which hides the tab bar and the dock, and a sheet and a rail flyout close each other. Pages
-  // drops under its button instead. The tab bar and the dock keep their place unseen under the
-  // sheet, so the stage's insets keep them and a frame shown as the sheet closes lands clear of
-  // where they come back.
+  // What the top bar has open: on a phone an edit panel, the top bar's Arrange ⋯, the full menu or
+  // the right-click menu is a sheet, which hides the tab bar and the dock, and a sheet and a rail
+  // flyout close each other. Pages drops under its button instead. The tab bar and the dock keep
+  // their place unseen under the sheet, so the stage's insets keep them and a frame shown as the
+  // sheet closes lands clear of where they come back.
   const edit = useEditState()
-  const panelOnPhone = phone && (isPanel(edit.open) || isSheet(edit.open))
-  const sheet = phone && isSheet(edit.open)
+  const sheet = phone && (isSheet(edit.open) || edit.rightClick)
+  const panelOnPhone = sheet || (phone && isPanel(edit.open))
   useEffect(() => {
     if (panelOnPhone) setFlyout((now) => (now === null ? now : null))
   }, [panelOnPhone])
