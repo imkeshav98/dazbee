@@ -10,6 +10,7 @@ import { readZip } from '@dazbee/export'
 import { writeOutput } from '../../support/editor.ts'
 import { expectNode, openExport, runExport } from '../../support/export.ts'
 import { LISTED, names, openSized, rows, SUMMER } from '../../support/export-frames.ts'
+import { choose } from '../../support/fields.ts'
 import { expect, test } from '../../support/test.ts'
 
 test.describe.configure({ timeout: 180_000 })
@@ -74,8 +75,7 @@ test('a page of one frame lists it alone and exports it as itself, the same byte
 }) => {
   const { page, errors } = await openSized(browser, { width: 1280, height: 760 })
   const dialog = await openExport(page)
-  await dialog.getByTestId('export-page').click()
-  await page.locator('[role="listbox"] [role="option"][data-value="p2"]').click()
+  await choose(dialog.getByTestId('export-page'), 'p2')
   // Sale is Sale here: numbers count within a page. No All frames row for one frame.
   expect(await rows(dialog)).toEqual([{ name: 'Sale', size: '1080 × 1080', on: true, frame: 'one' }])
   await expect(page.getByTestId('export-run')).toHaveText('Export 1 file')
@@ -86,8 +86,7 @@ test('a page of one frame lists it alone and exports it as itself, the same byte
     await expectNode(page, { frameIds: ['one'], type }, got)
   }
   // Back on Summer, every frame is ticked again.
-  await dialog.getByTestId('export-page').click()
-  await page.locator('[role="listbox"] [role="option"][data-value="p1"]').click()
+  await choose(dialog.getByTestId('export-page'), 'p1')
   expect(await names(dialog)).toEqual(['All frames', ...LISTED])
   expect((await rows(dialog)).every((row) => row.on === true)).toBe(true)
 
@@ -98,8 +97,7 @@ test('a page of one frame lists it alone and exports it as itself, the same byte
   await page.evaluate(() => window.dazbee?.perform('delete'))
   await expect.poll(() => page.evaluate(() => window.dazbee?.pickedFrame() ?? null)).toBeNull()
   await openExport(page)
-  await dialog.getByTestId('export-page').click()
-  await page.locator('[role="listbox"] [role="option"][data-value="p2"]').click()
+  await choose(dialog.getByTestId('export-page'), 'p2')
   await expect(dialog.getByTestId('export-no-frames')).toHaveText('This page has no frames')
   await expect(page.getByTestId('export-run')).toBeDisabled()
   expect(errors).toEqual([])

@@ -5,16 +5,33 @@ import { readFileSync } from 'node:fs'
 import { exportDesign, readZip } from '@dazbee/export'
 import { fixtureResources } from '@dazbee/pixels/pixels'
 import { loadCanvasKit } from '@dazbee/renderer/node'
-import type { ExportType } from '@dazbee/schema'
+import type { ExportRequestInput, ExportType } from '@dazbee/schema'
 
 import { designOf } from './editor.ts'
 import { expect, type Page } from './test.ts'
 
-/** Node's export of a request over the design as the page holds it now, with the shipped fonts. */
-export async function nodeExport(page: Page) {
+/** Opens Export from the Share menu, and returns the form. */
+export async function openExport(page: Page) {
+  await page.getByTestId('share-open').click()
+  await page.getByTestId('export-open').click()
+  const dialog = page.getByTestId('export')
+  await expect(dialog).toBeVisible()
+  return dialog
+}
+
+/**
+ * Node's export of a request over the design as the page holds it now, with the shipped fonts and
+ * the stored bytes of each uploaded image asked for.
+ */
+export async function nodeExport(page: Page, assetIds: readonly string[] = []) {
   const ck = await loadCanvasKit()
   const json = JSON.parse(await designOf(page)) as unknown
-  return (request: { frameIds: string[]; type: ExportType }) => exportDesign(ck, json, request, fixtureResources())
+  const resources = fixtureResources()
+  for (const assetId of assetIds)
+    resources.images[assetId] = new Uint8Array(
+      await (await page.request.get(`/brands/dev-brand-coffee/assets/${assetId}`)).body(),
+    )
+  return (request: ExportRequestInput) => exportDesign(ck, json, request, resources)
 }
 
 /** Clicks Export and reads what downloads: its name, and each file in it with its bytes. */
@@ -37,12 +54,4 @@ export async function expectNode(
   expect(got.files.map((f) => f.path)).toEqual(want.map((f) => f.path))
   for (const [i, file] of got.files.entries())
     expect(Buffer.from(file.bytes).equals(Buffer.from(want[i]?.bytes ?? [])), `${file.path} is Node's`).toBe(true)
-}
-
-export async function openExport(page: Page) {
-  await page.getByTestId('share-open').click()
-  await page.getByTestId('export-open').click()
-  const dialog = page.getByTestId('export')
-  await expect(dialog).toBeVisible()
-  return dialog
 }

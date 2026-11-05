@@ -5,13 +5,12 @@
 // downloads as itself. Ticking frames and numbered names are in export-frames.spec.ts.
 import { readFileSync } from 'node:fs'
 
-import { exportDesign, readZip } from '@dazbee/export'
-import { fixtureResources } from '@dazbee/pixels/pixels'
-import { loadCanvasKit } from '@dazbee/renderer/node'
+import { readZip } from '@dazbee/export'
 import type { DesignInput } from '@dazbee/schema'
 
 import { photo, upload } from '../../support/assets.ts'
-import { designOf, writeOutput } from '../../support/editor.ts'
+import { writeOutput } from '../../support/editor.ts'
+import { nodeExport } from '../../support/export.ts'
 import { choose } from '../../support/fields.ts'
 import { PERF, report } from '../../support/perf.ts'
 import { frameDesign, linkedFrames } from '../../support/seed.ts'
@@ -308,15 +307,6 @@ const watchWorkers = (page: Page) =>
   })
 const workers = (page: Page) => page.evaluate(() => (window as unknown as { workers: Posted }).workers)
 
-async function nodeExport(page: Page, assetId: string) {
-  const ck = await loadCanvasKit()
-  const json = JSON.parse(await designOf(page)) as unknown
-  const stored = new Uint8Array(await (await page.request.get(`/brands/dev-brand-coffee/assets/${assetId}`)).body())
-  const bytes = { ...fixtureResources(), images: { [assetId]: stored } }
-  return (request: { frameIds: string[]; type: 'png' | 'jpg'; quality?: number }) =>
-    exportDesign(ck, json, request, bytes).bytes
-}
-
 test('Export opened from Share, by pointer or keyboard, takes the focus onto its first control, and Esc gives it back to Share', async ({
   browser,
 }) => {
@@ -364,12 +354,12 @@ test('every frame of a page as PNG is one flat zip whose files are what Node exp
   // One file per frame, in the page's frame order, each named after its frame, with no folders.
   const entries = readZip(zipped)
   expect(entries.map((e) => e.path)).toEqual(SIZES.map((size) => fileOf(size.name)))
-  const node = await nodeExport(page, asset.id)
+  const node = await nodeExport(page, [asset.id])
   for (const [i, frameId] of framesOn('p1').entries()) {
     const browserFile = entries[i]?.bytes
     expect(browserFile, frameId).toBeDefined()
     expect(
-      Buffer.from(browserFile ?? []).equals(Buffer.from(node({ frameIds: [frameId], type: 'png' }))),
+      Buffer.from(browserFile ?? []).equals(Buffer.from(node({ frameIds: [frameId], type: 'png' }).bytes)),
       `${frameId} matches Node`,
     ).toBe(true)
   }
@@ -451,7 +441,7 @@ test('each page of a carousel, picked in the Page field, downloads its own frame
 
   // Each file is its own page's frame, byte for byte what Node exports of that frame alone, named
   // after it: the three share a name, each alone on its page.
-  const node = await nodeExport(page, asset.id)
+  const node = await nodeExport(page, [asset.id])
   const files: Buffer[] = []
   for (const [pageId, frameId] of [
     ['s1', 's1-pt'],
@@ -463,7 +453,7 @@ test('each page of a carousel, picked in the Page field, downloads its own frame
     expect(download.suggestedFilename()).toBe(fileOf('Portrait 4:5'))
     const browserFile = readFileSync(await download.path())
     expect(
-      browserFile.equals(Buffer.from(node({ frameIds: [frameId], type: 'png' }))),
+      browserFile.equals(Buffer.from(node({ frameIds: [frameId], type: 'png' }).bytes)),
       `${pageId} is ${frameId} as Node exports it`,
     ).toBe(true)
     writeOutput(`export-6-carousel-${frameId}.png`, browserFile)
@@ -489,10 +479,10 @@ test("one page's only frame as JPG downloads as itself, at the quality picked, t
   const [download] = await Promise.all([page.waitForEvent('download'), page.getByTestId('export-run').click()])
   expect(download.suggestedFilename()).toBe(fileOf('Portrait 4:5', 1, 'jpg'))
   const jpg = readFileSync(await download.path())
-  const node = await nodeExport(page, asset.id)
-  expect(jpg.equals(Buffer.from(node({ frameIds: ['s2-pt'], type: 'jpg', quality: 70 })))).toBe(true)
+  const node = await nodeExport(page, [asset.id])
+  expect(jpg.equals(Buffer.from(node({ frameIds: ['s2-pt'], type: 'jpg', quality: 70 }).bytes))).toBe(true)
   // Lower quality is a smaller file.
-  expect(jpg.length).toBeLessThan(node({ frameIds: ['s2-pt'], type: 'jpg', quality: 100 }).length)
+  expect(jpg.length).toBeLessThan(node({ frameIds: ['s2-pt'], type: 'jpg', quality: 100 }).bytes.length)
   writeOutput('export-4-offer.jpg', jpg)
   expect(errors).toEqual([])
 })

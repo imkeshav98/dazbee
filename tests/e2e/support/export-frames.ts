@@ -8,6 +8,10 @@ import { frameDesign, linkedFrames, seed } from './seed.ts'
 import { fitSettled } from './stage.ts'
 import { type Browser, expect, type Locator } from './test.ts'
 
+/** The first page's frames in its order, and the names Export lists them by. */
+export const SUMMER = ['sq', 'story', 'banner', 'mpu']
+export const LISTED = ['Sale', 'Sale 2', 'Banner', 'sale 3']
+
 /**
  * Page "Summer": Sale (a square), Sale (a story linked to it), Banner and sale (a medium rectangle),
  * each a headline and a badge; page "Diwali": one frame, Sale, its own headline.
@@ -113,24 +117,6 @@ export const design = (): DesignInput => {
   }
 }
 
-/** The first page's frames in its order, and the names Export lists them by. */
-export const SUMMER = ['sq', 'story', 'banner', 'mpu']
-export const LISTED = ['Sale', 'Sale 2', 'Banner', 'sale 3']
-
-/** Opens the design alone in a tab of a theme at a screen size, fitted, with its fonts loaded. */
-export async function openSized(browser: Browser, viewport: { width: number; height: number }, theme = 'dark') {
-  const designId = await seed(design())
-  const page = await (await browser.newContext({ viewport, acceptDownloads: true })).newPage()
-  const errors: string[] = []
-  page.on('pageerror', (error) => errors.push(error.message))
-  await setCookies(page, { theme })
-  await page.goto(editorPath(designId))
-  await expect(page.getByTestId('status')).toHaveAttribute('data-ready', '', { timeout: 60_000 })
-  await page.evaluate(() => window.dazbee?.loaded())
-  await fitSettled(page)
-  return { page, errors }
-}
-
 /** Each row of the frames list: its name, its size and whether it is ticked, the All frames row first when it shows. */
 export const rows = (dialog: Locator) =>
   dialog
@@ -149,3 +135,17 @@ export const rows = (dialog: Locator) =>
       }),
     )
 export const names = async (dialog: Locator) => (await rows(dialog)).map((row) => row.name)
+
+/** Opens the design alone in a tab of a theme at a screen size, fitted, with its fonts loaded. */
+export async function openSized(browser: Browser, viewport: { width: number; height: number }, theme = 'dark') {
+  const designId = await seed(design())
+  const page = await (await browser.newContext({ viewport, acceptDownloads: true })).newPage()
+  const errors: string[] = []
+  page.on('pageerror', (error) => errors.push(error.message))
+  await setCookies(page, { theme })
+  await page.goto(editorPath(designId))
+  await expect(page.getByTestId('status')).toHaveAttribute('data-ready', '', { timeout: 60_000 })
+  await page.evaluate(() => window.dazbee?.loaded())
+  await fitSettled(page)
+  return { page, errors }
+}
