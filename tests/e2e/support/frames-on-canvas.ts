@@ -1,6 +1,7 @@
 // The design and helpers of the frames-on-canvas specs: a page holding a square, a story linked to it
 // and a banner linked to nothing, the square holding a headline, a layer turned 30°, a locked one and
-// a photo under a round mask; which frame is picked, and where a frame's label is.
+// a photo under a round mask, opened at half size; which frame is picked and what a frame holds,
+// where a frame's label is, and Tab to the top bar.
 import type { DesignInput } from '@dazbee/schema'
 
 import { solid } from './edit-in-frame.ts'
@@ -156,7 +157,7 @@ export async function tabToBar(page: Page) {
  * size 300 px in and 180 px down, so its label clears the chrome, and its fonts loaded. All tabs
  * agree before it returns.
  */
-export async function open(browser: Browser, count = 1) {
+export async function openFrames(browser: Browser, count = 1) {
   const { tabs, errors } = await openTabs(browser, count, await seed(design()))
   const [a] = tabs as [Page, ...Page[]]
   await a.setViewportSize({ width: 1440, height: 1000 })

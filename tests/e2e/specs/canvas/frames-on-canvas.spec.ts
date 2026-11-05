@@ -1,12 +1,22 @@
 // Frames on the canvas: a frame is picked by a click on its empty area or its label (outlined, its
 // label lit, a top bar with Background and ⋯), moved by a drag on its label or by the arrows, while a
 // drag on its empty area draws a marquee; given a background, duplicated, renamed in place and
-// deleted, each by the mouse and by the keyboard, each one undo step that a second tab sees. A page holds a square, a story linked to it and a banner
-// linked to nothing; the square holds a turned layer, a locked one and one under a mask. The three
-// screen sizes are in frames-on-canvas-screens.spec.ts.
+// deleted, each by the mouse and by the keyboard, each one undo step that a second tab sees. A page
+// holds a square, a story linked to it and a banner linked to nothing; the square holds a turned
+// layer, a locked one and one under a mask. The three screen sizes are in
+// frames-on-canvas-screens.spec.ts, and Rename with the label off screen in
+// frames-on-canvas-bar.spec.ts.
 import { solid } from '../../support/edit-in-frame.ts'
 import { designOf, screenPoint, settle, writeOutput } from '../../support/editor.ts'
-import { clickLabel, frameOf, labelPoint, labelRow, open, picked, tabToBar } from '../../support/frames-on-canvas.ts'
+import {
+  clickLabel,
+  frameOf,
+  labelPoint,
+  labelRow,
+  openFrames,
+  picked,
+  tabToBar,
+} from '../../support/frames-on-canvas.ts'
 import { layersIn } from '../../support/seed.ts'
 import {
   click,
@@ -55,7 +65,7 @@ async function renameByLabel(page: Page, id: string) {
 test('a click on a frame’s empty area or its label picks it: outlined, its label lit, a bar with Background and ⋯; Esc, empty canvas or a layer lets it go', async ({
   browser,
 }) => {
-  const { a: page, errors } = await open(browser)
+  const { a: page, errors } = await openFrames(browser)
   const still = await page.evaluate(() => window.dazbee?.camera())
   await click(page, 1000, 1000)
   expect(await picked(page)).toBe('sq')
@@ -106,7 +116,7 @@ test('a click on a frame’s empty area or its label picks it: outlined, its lab
 test('the label takes a press only on its name and size, after a selected layer’s handles and turning zones under it: beside its text a press starts a marquee', async ({
   browser,
 }) => {
-  const { a: page, errors } = await open(browser)
+  const { a: page, errors } = await openFrames(browser)
   // Measured in one step in the page, as the overlay draws its labels afresh on every draw.
   const boxes = await page.evaluate(() =>
     ['', ' .frame-name', ' .frame-size'].map((part) => {
@@ -152,7 +162,7 @@ test('the label takes a press only on its name and size, after a selected layer�
 test('a drag on a frame’s empty area, picked or not, draws a marquee, adding with Shift; a drag on its label moves it with its layers, along one axis with Shift, and the arrows move it too, each one undo step that a second tab sees', async ({
   browser,
 }) => {
-  const { a, b, errors } = await open(browser, 2)
+  const { a, b, errors } = await openFrames(browser, 2)
   const before = await read(a)
   // From the empty area, the frame not picked: a marquee over the headline, the frame left where it is.
   await drag(a, { x: 1000, y: 120 }, { x: 600, y: 160 })
@@ -226,7 +236,7 @@ test('a drag on a frame’s empty area, picked or not, draws a marquee, adding w
 test('presses on a turned, a masked and a locked layer act on the layer; the frame holding them moves, copies and goes with them as they are', async ({
   browser,
 }) => {
-  const { a: page, errors } = await open(browser)
+  const { a: page, errors } = await openFrames(browser)
   const before = await read(page)
   // The turned layer and the photo inside its mask are selected, the frame left as it is.
   await click(page, 200, 460)
@@ -274,7 +284,7 @@ test('presses on a turned, a masked and a locked layer act on the layer; the fra
 test('Duplicate from ⋯ and Ctrl+D copy the picked frame beside the rightmost one, holding linked copies, and pick the copy, panning to show it at the same zoom, each one undo step that a second tab sees', async ({
   browser,
 }) => {
-  const { a, b, errors } = await open(browser, 2)
+  const { a, b, errors } = await openFrames(browser, 2)
   await click(a, 1000, 1000)
   const menu = await barMenu(a, 'frame-more')
   await expect(menu.getByRole('button')).toHaveText(['DuplicateCtrl+D', 'Rename', 'DeleteDelete'])
@@ -345,7 +355,7 @@ test('Duplicate from ⋯ and Ctrl+D copy the picked frame beside the rightmost o
 test('Delete from ⋯ and the Delete key take the picked frame and its layers away, their linked copies and the unlinked frame staying, with the undo toast, each one undo step that a second tab sees', async ({
   browser,
 }) => {
-  const { a, b, errors } = await open(browser, 2)
+  const { a, b, errors } = await openFrames(browser, 2)
   const before = await read(a)
   await clickLabel(a, 'sq')
   const menu = await barMenu(a, 'frame-more')
@@ -392,10 +402,10 @@ test('Delete from ⋯ and the Delete key take the picked frame and its layers aw
 test('a double click on a frame’s name renames it in place, Enter keeping it and Esc not; Rename in ⋯ does the same by the keyboard; each one undo step that a second tab sees', async ({
   browser,
 }) => {
-  const { a, b, errors } = await open(browser, 2)
+  const { a, b, errors } = await openFrames(browser, 2)
   let field = await renameByLabel(a, 'sq')
   await expect(field).toHaveValue('Square')
-  // The field takes the label's place: the label hides while it is open, and the field stands in
+  // The field takes the label's place: the label hides while it is openFrames, and the field stands in
   // its row, its text where the label's was, as see-through as the label, with an accent line
   // under it, clear of the frame's outline and no wider than the label.
   const row = await labelRow(a, 'sq')
@@ -467,7 +477,7 @@ test('a double click on a frame’s name renames it in place, Enter keeping it a
 test('Background opens the Colour panel for the picked frame’s own fills: a colour is one undo step, the linked story keeps its own, a second tab sees it; Tab, Enter and Esc work it', async ({
   browser,
 }) => {
-  const { a, b, errors } = await open(browser, 2)
+  const { a, b, errors } = await openFrames(browser, 2)
   await click(a, 1000, 1000)
   const panel = await barMenu(a, 'background')
   await expect(panel.locator('#edit-panel-title')).toHaveText('Background')

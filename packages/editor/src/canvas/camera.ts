@@ -30,6 +30,9 @@ const MAX_FIT_ZOOM = 4
 
 /** The room a frame's label takes over its top, which showing a frame keeps in view too. */
 const LABEL_ROOM = 24
+/** How far in from the clear part's edges a label brought into view sits, and the room past its frame's corner its name takes. */
+const LABEL_PAD = 16
+const LABEL_NAME_ROOM = 120
 
 /** Narrower than this, the stage is a phone's (#125). */
 const PHONE_WIDTH = 640
@@ -90,6 +93,21 @@ export function reveal(c: Camera, rect: Rect, viewport: Viewport, insets: Insets
   }
 }
 
+/**
+ * The camera at the same zoom that shows a frame's label: its row over the frame's top start corner,
+ * with room for its name past the corner, in the part of the viewport the insets leave clear. Along
+ * each axis the camera stays as it is where that part shows the label already, else it pans the
+ * least to bring the label LABEL_PAD in from the clear part's edge.
+ */
+export function revealLabel(c: Camera, rect: Rect, viewport: Viewport, insets: Insets = NO_INSETS): Camera {
+  const corner = toScreen(c, { x: rect.x, y: rect.y })
+  const right = viewport.width - insets.right - LABEL_NAME_ROOM
+  const bottom = viewport.height - insets.bottom
+  const dx = panInto(corner.x, insets.left, right)
+  const dy = panInto(corner.y, insets.top + LABEL_ROOM, bottom)
+  return dx === 0 && dy === 0 ? c : { zoom: c.zoom, x: c.x + dx, y: c.y + dy }
+}
+
 /** The part of the world the viewport shows. */
 export function visibleRect(c: Camera, viewport: Viewport): Rect {
   const corner = toWorld(c, { x: 0, y: 0 })
@@ -100,4 +118,15 @@ export function visibleRect(c: Camera, viewport: Viewport): Rect {
 export function framesInView<F extends Rect>(frames: readonly F[], c: Camera, viewport: Viewport): F[] {
   const view = visibleRect(c, viewport)
   return frames.filter((frame) => intersects(frame, view))
+}
+
+/**
+ * How far a screen coordinate moves to lie between `start` and `end`: nothing when it does already,
+ * else to LABEL_PAD inside the edge it is past, kept between the two, and at `start` where `end` is
+ * before it.
+ */
+function panInto(at: number, start: number, end: number): number {
+  if (at >= start && at <= end) return 0
+  const to = at < start ? start + LABEL_PAD : end - LABEL_PAD
+  return Math.max(start, Math.min(to, end)) - at
 }

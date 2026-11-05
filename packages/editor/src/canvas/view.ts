@@ -13,6 +13,7 @@ import {
   type Insets,
   NO_INSETS,
   reveal,
+  revealLabel,
   toScreen,
   toWorld,
   type Viewport,
@@ -102,6 +103,8 @@ export interface EditorView {
   fitArea(area: Rect | undefined): void
   /** Pans, keeping the zoom, so a part of the canvas shows whole beside the chrome; nothing when it already does. */
   showArea(area: Rect): void
+  /** Pans, keeping the zoom, so a frame's label shows beside the chrome; nothing when it already does. */
+  showLabel(frame: Rect): void
   /** Turns the rulers on or off; the view listeners hear of it from `viewChanged`. */
   toggleRulers(): void
   /** Tells the view listeners that the rulers or snapping turned on or off. */
@@ -330,6 +333,10 @@ export function editorView({ ck, canvas, session, onZoom, draw }: ViewDeps): Edi
     const next = reveal(camera, area, viewport, insets)
     if (next !== camera) setCamera(next)
   }
+  function showLabel(frame: Rect) {
+    const next = revealLabel(camera, frame, viewport, insets)
+    if (next !== camera) setCamera(next)
+  }
   function toggleRulers() {
     rulers = !rulers
   }
@@ -407,6 +414,7 @@ export function editorView({ ck, canvas, session, onZoom, draw }: ViewDeps): Edi
     fitAll,
     fitArea,
     showArea,
+    showLabel,
     toggleRulers,
     viewChanged,
     onView,

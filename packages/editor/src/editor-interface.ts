@@ -155,8 +155,9 @@ export interface Editor {
   onFramePick(listener: (frameId: string | null) => void): () => boolean
   /**
    * Picks a frame of the shown page and asks the page to rename it in place, as a double click on
-   * its label does; the page renames it with the `frame.update` command and calls `renamed` once
-   * its field closes, the label left out until then. Does nothing for a frame not on the shown page.
+   * its label does, panning first, at the same zoom, so the label shows beside the chrome; the page
+   * renames it with the `frame.update` command and calls `renamed` once its field closes, the label
+   * left out until then. Does nothing for a frame not on the shown page.
    */
   renameFrame(frameId: string): void
   /** Calls back with the frame to rename in place: its label was double-clicked, or `renameFrame` asked. */

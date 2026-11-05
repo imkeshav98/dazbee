@@ -431,6 +431,12 @@ function live(
     selection.renameFrame(shown.id)
     frameRenames.emit(shown.id)
   }
+  /** Renames a frame of the shown page in place of its label, panning first, at the same zoom, so the label shows. */
+  function renameFrame(frameId: string) {
+    const frame = frameOf(frameId)
+    if (frame) view.showLabel(frame)
+    pickFrame(frameId, true)
+  }
   /** Fits a frame in view, showing its page first when another is shown. */
   function fitFrame(frameId: string) {
     const now = session.design()
@@ -511,7 +517,7 @@ function live(
     pickedFrame: () => selection.pickedFrame(),
     pickFrame: (frameId: string | null) => pickFrame(frameId),
     onFramePick: (listener: (frameId: string | null) => void) => selection.onFramePick(listener),
-    renameFrame: (frameId: string) => pickFrame(frameId, true),
+    renameFrame,
     onFrameRename: frameRenames.on,
     renamed: () => selection.renameFrame(null),
     onFrameDelete: actions.onFrameDelete,
