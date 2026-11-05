@@ -474,6 +474,9 @@ function Row({
   onRun?: () => void
 }) {
   const [told, setTold] = useState(false)
+  // Beside the row at its end, or under it on a phone, where a menu fills the width.
+  const phone = usePhone()
+  const rtl = dirOf(useLocale()) === 'rtl'
   const end = caret ? (
     <CaretRightIcon size={12} weight="bold" aria-hidden className="text-subtle rtl:-scale-x-100" />
   ) : (
@@ -487,7 +490,7 @@ function Row({
       </button>
     )
   return (
-    <Tooltip label={why} side="right" open={told} onOpenChange={setTold}>
+    <Tooltip label={why} side={phone ? 'bottom' : rtl ? 'left' : 'right'} open={told} onOpenChange={setTold}>
       <button
         type="button"
         data-action={action}

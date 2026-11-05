@@ -41,6 +41,8 @@ export function Tooltip({
         <RadixTooltip.Content
           side={side}
           sideOffset={8}
+          // Off the window's edges by as much as it keeps from its control.
+          collisionPadding={8}
           className="z-50 rounded-md border border-line bg-raised px-2 py-1 text-xs font-medium text-text shadow-panel data-[state=delayed-open]:animate-[tooltip-in_var(--chrome-fast)_var(--ease-out)]"
         >
           {label}

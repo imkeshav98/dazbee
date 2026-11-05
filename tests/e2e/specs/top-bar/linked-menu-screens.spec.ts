@@ -26,7 +26,8 @@ for (const [width, height] of SCREEN_SIZES) {
         // The square's headline in pink with new words, so Style and Text have work and Layer none, as in the mock.
         await page.evaluate(() => {
           window.dazbee?.setProps(['headline'], (_, p) => ({ style: { ...(p.style as object), color: '#E0157FFF' } }))
-          window.dazbee?.session.run('text.edit', { id: 'headline', op: { kind: 'insert', at: 12, text: '!' } })
+          if (window.dazbee?.design().nodes.headline?.props.text === 'Weekend sale')
+            window.dazbee.session.run('text.edit', { id: 'headline', op: { kind: 'insert', at: 12, text: '!' } })
         })
         await selectLayers(page, ['headline'])
         await expect(page.getByTestId('small-menu')).toBeVisible()
