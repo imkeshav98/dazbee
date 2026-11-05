@@ -52,6 +52,14 @@ const LINKED: DesignInput = {
     own: { ...rect('tall', 'a1', { x: 100, y: 800, width: 100, height: 100 }), link: 'own' },
   },
 }
+/** The linked design with the tall frame's copy of the box locked in place. */
+const LOCKED_COPY: DesignInput = {
+  ...LINKED,
+  nodes: {
+    ...LINKED.nodes,
+    'tall-box': { ...LINKED.nodes['tall-box'], lock: { move: true } } as DesignInput['nodes'][string],
+  },
+}
 const TALL: Frame = { id: 'tall', pageId: 'p1', name: 'Tall', x: 1280, y: 0, width: 1080, height: 1920 }
 const looks = testLooks()
 
@@ -138,6 +146,15 @@ describe('editorSelectPress', () => {
       pressIn(TALL, { x: 650, y: 150 })
       expect(log.at(-1)).toBe('press move tall: tall-box + sq: box')
       expect(selection.current()).toEqual([...pairsIn('sq', ['box']), ...pairsIn('tall', ['tall-box'])])
+    })
+
+    it('adds a copy locked in place with Shift and a click, and takes it out again, as a click selects it alone', () => {
+      const { select, selection, pressIn } = harness(null, LOCKED_COPY)
+      selection.select(['box'], SQUARE.id)
+      select.release(pressIn(TALL, { x: 650, y: 150 }, true) as MarqueeDrag)
+      expect(selection.current()).toEqual([...pairsIn('sq', ['box']), ...pairsIn('tall', ['tall-box'])])
+      select.release(pressIn(TALL, { x: 650, y: 150 }, true) as MarqueeDrag)
+      expect(selection.current()).toEqual(pairsIn('sq', ['box']))
     })
 
     it('selects alone the copy a click picked, in its own frame', () => {

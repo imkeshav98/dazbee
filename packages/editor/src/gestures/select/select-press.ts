@@ -94,7 +94,7 @@ export function editorSelectPress({
   /** The frame the press that may still be a click went down in. */
   let pressedFrame: string | null = null
   /** The locked layer under a press that started a marquee: a click, with no drag, selects it. */
-  let lockedClick: { id: string; frameId: string } | null = null
+  let lockedClick: (Picked & { shift: boolean }) | null = null
   /** Where a press that may still be a click went down, on screen: it drags only once it has gone CLICK_SLOP from there. */
   let pressedAt: Point | null = null
   /** The text selected alone when the last press went down, and when the last run of clicks began. */
@@ -167,7 +167,9 @@ export function editorSelectPress({
       // Empty canvas, a frame's empty area, picked or not, or a locked layer: a marquee, adding to
       // the selection with Shift.
       canvas.setPointerCapture(e.pointerId)
-      lockedClick = at && locked ? { id: locked, frameId: at.frame.id } : null
+      // With Shift, the locked layer a click lands on is added or taken out once the press ends a click.
+      const under = at && (locked ?? (e.shiftKey ? lockedAt(at.frame, at.p) : null))
+      lockedClick = at && under ? { id: under, frameId: at.frame.id, shift: e.shiftKey } : null
       const from = toWorld(view.camera(), screen)
       const base = e.shiftKey ? (selection.current() ?? []) : []
       // A press on a locked layer keeps the selection until it is a drag, so a click on the one
@@ -225,7 +227,11 @@ export function editorSelectPress({
     const clicked =
       gesture?.kind === 'marquee' &&
       Math.hypot(gesture.to.x - gesture.from.x, gesture.to.y - gesture.from.y) * view.camera().zoom < CLICK_SLOP
-    if (clicked && lockedClick) selection.select([lockedClick.id], lockedClick.frameId)
+    if (clicked && lockedClick?.shift)
+      selection.selectAcross(
+        toggled(selection.current(), { id: lockedClick.id, frameId: lockedClick.frameId }, view.design()),
+      )
+    else if (clicked && lockedClick) selection.select([lockedClick.id], lockedClick.frameId)
     else if (gesture?.kind === 'marquee')
       selection.pickFrame(clicked && !selection.current() ? (frameAt(view.frames(), gesture.from)?.id ?? null) : null)
     lockedClick = null

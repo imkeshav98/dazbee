@@ -179,9 +179,12 @@ export function editorOverlay({
     const shown = view.inView()
     const parts: HTMLElement[] = []
     const ids = idsOf(current)
+    const outlined = new Set(ids)
     for (const id of ids) {
       for (const copy of copiesOf(design, id)) {
-        if (ids.includes(copy)) continue
+        // Each copy once, though several selected layers share its link id.
+        if (outlined.has(copy)) continue
+        outlined.add(copy)
         const frameId = frameIdOf(design, copy)
         const frame = shown.find((f) => f.id === frameId)
         const box = frame && boxes.drawnBoxOf(frame, copy, design)
