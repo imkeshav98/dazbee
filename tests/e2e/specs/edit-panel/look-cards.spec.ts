@@ -1,9 +1,9 @@
 // The visual-first property cards (as in the final mock) in Chromium: text's size and its colour
 // from the brand kit, the effects as tiles with their numbers under them, and the header card that
-// names the layer and holds its box. And the swatch-like controls of the Colour panel and the frame
-// Background panel built on it: on a phone each is a target a finger can hit, in a sheet that
-// scrolls rather than cutting one off, while a desktop keeps their size; with pictures of the panels
-// at the three screen sizes in both themes.
+// names the layer and holds its box. And the swatch-like controls of the Colour panel, the frame
+// Background panel built on it, the Outline panel and the Effects panel: on a phone each is a target a
+// finger can hit, in a sheet that scrolls rather than cutting one off, while a desktop keeps their
+// size; with pictures of the panels at the three screen sizes in both themes.
 import type { DesignInput } from '@dazbee/schema'
 
 import { writeOutput } from '../../support/editor.ts'
@@ -156,7 +156,7 @@ test.describe('found by review', () => {
     }
   }
 
-  test('on a phone every swatch-like control of the Colour and Background panels is a 44 px target 8 px from the next, in a sheet that cuts none off', async ({
+  test('on a phone every swatch-like control of the Colour, Background, Outline and Effects panels is a 44 px target 8 px from the next, in a sheet that cuts none off', async ({
     browser,
   }) => {
     const brandId = await newBrand('e2e phone swatches')

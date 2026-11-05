@@ -1,8 +1,8 @@
-// The swatch-like controls of the Colour panel and the frame Background panel built on it, as the
-// swatch tests measure them: a brand kit that fills the kit's row, each control with the size it
-// keeps and its space to the next target on a tablet or desktop, the touch target rule a phone holds
-// them to, the panels opened with every control showing, the paint pop-up a row's swatch opens, and
-// where a press lands on each of a control's targets.
+// The swatch-like controls of the Colour panel, the frame Background panel built on it, the Outline
+// panel and the Effects panel, as the swatch tests measure them: a brand kit that fills the kit's
+// row, each control with the size it keeps and its space to the next target on a tablet or desktop,
+// the touch target rule a phone holds them to, the panels opened with every control showing, the
+// paint pop-up a row's swatch opens, and where a press lands on each of a control's targets.
 import type { BrandKit } from '@dazbee/schema'
 
 import { clickLabel } from './frames-on-canvas.ts'
@@ -119,8 +119,9 @@ const TARGETS = 'button, input, select, textarea, label, [role="radio"], [role="
 
 /**
  * The panels with swatch-like controls, each opened with + showing its paint editor and two rows in
- * its list, so the space between rows is measured too: a shape's Colour panel and a frame's
- * Background panel.
+ * its list, so the space between rows is measured too: a shape's Colour panel, a frame's Background
+ * panel, a shape's Outline panel, a shape's Colour panel with a line gradient in its paint editor, a
+ * text's Colour panel, and a shape's Effects panel with a shadow.
  */
 export const SWATCH_PANELS: SwatchPanel[] = [
   {
@@ -145,6 +146,53 @@ export const SWATCH_PANELS: SwatchPanel[] = [
     },
     controls: [KIT_ROW, DESIGN_ROW, PAINT_EDITOR_ROW, COLOUR_BOX, PAINT_SWATCH],
     popup: [COLOUR_BOX, PAINT_EDITOR_ROW],
+  },
+  {
+    name: "a shape's Outline panel",
+    open: async (page) => {
+      await page.evaluate(() => window.dazbee?.select(['tilt']))
+      const panel = await barMenu(page, 'outline')
+      const solid = panel.getByRole('radio', { name: 'Solid' })
+      if ((await solid.getAttribute('aria-checked')) !== 'true') await solid.click()
+      await twoRows(panel.getByTestId('stroke-list'), 'Add outline')
+      return panel
+    },
+    controls: [PAINT_SWATCH],
+    popup: [COLOUR_BOX, PAINT_EDITOR_ROW],
+  },
+  {
+    name: "a shape's Colour panel with a line gradient",
+    open: async (page) => {
+      await page.evaluate(() => window.dazbee?.select(['tilt']))
+      const panel = await withPicker(await barMenu(page, 'colour'))
+      await twoRows(panel.getByTestId('fill-list'), 'Add fill')
+      const line = panel.getByTestId('colour-picker').getByRole('radio', { name: 'Line gradient' })
+      if ((await line.getAttribute('aria-checked')) !== 'true') await line.click()
+      await expect(panel.locator(GRADIENT_STOPS.selector)).toHaveCount(2)
+      return panel
+    },
+    controls: [GRADIENT_STOPS, COLOUR_BOX, PAINT_EDITOR_ROW, PAINT_SWATCH],
+    popup: [GRADIENT_STOPS, COLOUR_BOX, PAINT_EDITOR_ROW],
+  },
+  {
+    name: "a text's Colour panel",
+    open: async (page) => {
+      await page.evaluate(() => window.dazbee?.select(['headline']))
+      return withPicker(await barMenu(page, 'colour'))
+    },
+    controls: [KIT_ROW, DESIGN_ROW, COLOUR_BOX],
+  },
+  {
+    name: "a shape's Effects panel with a shadow",
+    open: async (page) => {
+      await page.evaluate(() => window.dazbee?.select(['tilt']))
+      const panel = await barMenu(page, 'effects')
+      const shadow = panel.locator('[data-tile="dropShadow"]')
+      if ((await shadow.getAttribute('aria-pressed')) !== 'true') await shadow.click()
+      await expect(panel.locator(COLOUR_BOX.selector)).toHaveCount(1)
+      return panel
+    },
+    controls: [COLOUR_BOX],
   },
 ]
 
