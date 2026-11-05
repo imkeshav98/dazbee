@@ -239,6 +239,7 @@ export const ar: Messages = {
       upDown: 'أعلى وأسفل في الصندوق',
       topBar: 'الطبقات المحددة',
       smallMenu: 'إجراءات الطبقة',
+      backFrom: 'رجوع من {menu}',
       overflow: 'مزيد من الأدوات',
       copy: 'نسخ',
       paste: 'لصق',

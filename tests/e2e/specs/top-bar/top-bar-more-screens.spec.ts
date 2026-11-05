@@ -1,8 +1,8 @@
 // The top bar's Arrange ⋯ at the three screen sizes. On a phone the bar wraps as the mock draws it:
 // its first row holds the items that fit whole and ends with Arrange, the rest in a second card under
-// it, always in view; Arrange opens as a sheet at the bottom, the menus beside its rows open on the
-// sheet at its start edge, Line up's buttons are a finger's size, and a tap on a greyed row says
-// why. On a tablet or desktop too narrow for the bar, Arrange stays the last item of the first row.
+// it, always in view; Arrange opens as a sheet at the bottom with no keys, the menus beside its rows
+// open in its place under a back row, Line up's buttons are a finger's size, and a tap on a greyed
+// row says why. On a tablet or desktop too narrow for the bar, Arrange stays the last item of the first row.
 // Nothing meets or is cut at any size; and the screenshots for the pull request.
 import { arrangeDesign } from '../../support/arrange-design.ts'
 import { editorPath, setCookies, writeOutput } from '../../support/editor.ts'
@@ -46,17 +46,18 @@ async function openOnTouch(browser: Browser) {
   return { page, errors }
 }
 
-/**
- * Checks what shows meets nothing and cuts nothing while a menu beside a row of Arrange is open.
- * On a phone that menu lies on Arrange's sheet on purpose, so the sheet is left out meanwhile.
- */
-async function clearOfAll(page: Page, phone: boolean, label: string) {
-  // Radix draws the sheet in a wrapper of its own, which is the piece the check measures.
-  const sheet = page.getByTestId('bar-arrange-menu').locator('xpath=..')
-  if (phone) await sheet.evaluate((el: HTMLElement) => (el.style.visibility = 'hidden'))
+/** Checks what shows meets nothing and cuts nothing while a menu beside a row of Arrange is open. */
+async function clearOfAll(page: Page, label: string) {
   expect(await layoutProblems(page, { pieces: PIECES, uncut: UNCUT }), label).toEqual([])
-  if (phone) await sheet.evaluate((el: HTMLElement) => (el.style.visibility = ''))
 }
+
+/** The words of each row that shows in a menu, in order, as they read on screen: a key that shows reads too. */
+const shownRows = (menu: Locator) =>
+  menu
+    .locator('button')
+    .evaluateAll((rows) =>
+      rows.filter((row) => row.checkVisibility()).map((row) => (row as HTMLElement).innerText.trim()),
+    )
 
 test('on a phone the bar wraps as the mock draws it: the first row holds the items that fit whole and ends with Arrange, the rest sit in a second card under it, always in view, and nothing scrolls sideways or is cut', async ({
   browser,
@@ -117,7 +118,7 @@ test('at 760×900, too narrow for a text’s bar, Arrange stays the last item of
   expect(errors).toEqual([])
 })
 
-test("on a phone Arrange opens as a sheet at the bottom, hiding the dock and tab bar, with rows a finger can hit; the menus beside its rows open on the sheet at its start edge, inside the screen, and Line up's buttons are a finger's size with room between them", async ({
+test("on a phone Arrange opens as a sheet at the bottom, hiding the dock and tab bar, with rows a finger can hit and no keys; the menus beside its rows open in the sheet's place under a back row naming the row, the sheet keeping its sides and bottom, and Line up's buttons are a finger's size with room between them", async ({
   browser,
 }) => {
   const { page, errors } = await openStage(browser, arrangeDesign())
@@ -142,12 +143,11 @@ test("on a phone Arrange opens as a sheet at the bottom, hiding the dock and tab
   const inset = Math.round(panel?.x ?? -1)
   expect(Math.round(844 - ((panel?.y ?? 0) + (panel?.height ?? 0)))).toBe(inset)
   await more.click()
-  await expect
-    .poll(async () => {
-      const box = await sheet.boundingBox()
-      return box && [Math.round(box.x), Math.round(box.width), Math.abs(box.y + box.height - (844 - inset)) <= 1]
-    })
-    .toEqual([inset, 390 - inset * 2, true])
+  const place = async () => {
+    const box = await sheet.boundingBox()
+    return box && [Math.round(box.x), Math.round(box.width), Math.abs(box.y + box.height - (844 - inset)) <= 1]
+  }
+  await expect.poll(place).toEqual([inset, 390 - inset * 2, true])
   await expect(sheet).toHaveAttribute('data-sheet', 'true')
   await expect(page.getByTestId('rail')).toBeHidden()
   await expect(page.locator('[data-dock]')).toBeHidden()
@@ -156,15 +156,29 @@ test("on a phone Arrange opens as a sheet at the bottom, hiding the dock and tab
     expect(height).toBeGreaterThanOrEqual(44)
   expect(await layoutProblems(page, { pieces: PIECES, uncut: UNCUT })).toEqual([])
 
-  const edge = Math.round((await sheet.boundingBox())?.x ?? -1)
-  for (const id of ['text-direction', 'line-up', 'order']) {
+  for (const [id, name] of [
+    ['text-direction', 'Text direction'],
+    ['line-up', 'Line up'],
+    ['order', 'Order'],
+  ] as const) {
     const beside = await arrangeSubmenu(page, id)
-    await expect.poll(async () => Math.round((await beside.boundingBox())?.x ?? -1), id).toBe(edge)
+    // In the sheet, its back row first; nothing else of Arrange shows, and there is no card of its own.
+    await expect(sheet.getByTestId(`more-${id}-menu`)).toBeVisible()
+    await expect(page.locator('[data-radix-popper-content-wrapper]')).toHaveCount(1)
+    expect((await shownRows(sheet))[0], id).toBe(name)
+    expect(await shownRows(sheet), id).toEqual([name, ...(await shownRows(beside))])
+    await expect.poll(place, id).toEqual([inset, 390 - inset * 2, true])
+    expect(await sheet.locator('kbd').evaluateAll((keys) => keys.filter((key) => key.checkVisibility()).length)).toBe(0)
+    for (const height of await rowHeights(
+      sheet,
+      `:scope [data-testid="more-${id}-back"], :scope [data-testid="more-${id}-menu"] > button`,
+    ))
+      expect(height, id).toBeGreaterThanOrEqual(44)
     for (const row of await beside.getByRole('button').all()) {
       const at = await row.boundingBox()
       expect(at && at.x >= 0 && at.x + at.width <= 390 && at.y >= 0 && at.y + at.height <= 844, id).toBe(true)
     }
-    await clearOfAll(page, true, id)
+    await clearOfAll(page, id)
     if (id === 'line-up') {
       const boxes = await Promise.all((await beside.getByRole('button').all()).map((b: Locator) => b.boundingBox()))
       for (const box of boxes) expect(box && box.width >= 44 && box.height >= 44).toBe(true)
@@ -172,8 +186,10 @@ test("on a phone Arrange opens as a sheet at the bottom, hiding the dock and tab
         expect((boxes[i]?.x ?? 0) - ((boxes[i - 1]?.x ?? 0) + (boxes[i - 1]?.width ?? 0))).toBeGreaterThanOrEqual(6)
     }
     if (id === 'order') break
+    // Esc goes back to Arrange, with the focus on the row the menu opened from.
     await page.keyboard.press('Escape')
     await expect(beside).toBeHidden()
+    await expect(sheet.getByTestId(`more-${id}`)).toBeFocused()
   }
   const before = await order(page)
   await page
@@ -217,7 +233,7 @@ test('at each screen size Arrange and the menus beside its rows meet nothing and
       for (const sub of ['order', 'line-up']) {
         await arrangeSubmenu(page, sub)
         await nextFrame(page)
-        await clearOfAll(page, width < 640, `${width} ${id} ${sub}`)
+        await clearOfAll(page, `${width} ${id} ${sub}`)
         await page.keyboard.press('Escape')
         await expect(page.getByTestId(`more-${sub}-menu`)).toBeHidden()
       }

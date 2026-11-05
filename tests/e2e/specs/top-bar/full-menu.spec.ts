@@ -354,11 +354,12 @@ for (const [width, height] of SCREEN_SIZES) {
     await expect.poll(() => layoutProblems(page, { pieces: PIECES, uncut: UNCUT })).toEqual([])
     if (width <= 600) await underPhoneMenu(page, '')
     const sub = await moreSubmenu(page, 'copy-to-frames')
-    if (width > 600) {
-      await expect.poll(() => layoutProblems(page, { pieces: PIECES, uncut: UNCUT })).toEqual([])
-    } else {
-      // On a phone it opens on its row, laid over the full menu as the mock draws it: wholly on the
-      // screen and on top, each row a finger's height, once it has popped in.
+    // On a phone it opens in the full menu's place, which lies over the dock and the rail.
+    if (width <= 600) await underPhoneMenu(page, 'hidden')
+    await expect.poll(() => layoutProblems(page, { pieces: PIECES, uncut: UNCUT })).toEqual([])
+    if (width <= 600) {
+      await underPhoneMenu(page, '')
+      // Wholly on the screen and on top, each row a finger's height, once it has popped in.
       await sub.evaluate((el) => Promise.all(el.getAnimations().map((a) => a.finished.catch(() => undefined))))
       const rows = await sub.getByRole('button').evaluateAll((buttons) =>
         buttons.map((button) => {
@@ -386,7 +387,7 @@ for (const [width, height] of SCREEN_SIZES) {
 }
 
 for (const [width, height] of SCREEN_SIZES) {
-  test(`at ${width}×${height} Copy to other frames ▸ is as wide as the mock’s, and a greyed row’s tooltip covers no row of the full menu`, async ({
+  test(`at ${width}×${height} Copy to other frames ▸ is as wide as the mock’s, or on a phone in the full menu’s place, and a greyed row’s tooltip covers no row of the full menu`, async ({
     browser,
   }) => {
     const { page, errors } = await open(browser)
@@ -399,17 +400,18 @@ for (const [width, height] of SCREEN_SIZES) {
     const [main, beside] = [await boxOf(menu), await boxOf(sub)]
     if (width > 600) {
       expect(Math.abs(beside.right - beside.left - 258)).toBeLessThanOrEqual(4)
+      // Each row's key ends at the same right-hand edge, as the full menu's do.
+      const ends = await sub
+        .locator('button kbd')
+        .evaluateAll((keys) => keys.map((key) => Math.round(key.getBoundingClientRect().right)))
+      expect(new Set(ends).size).toBe(1)
     } else {
-      // On a phone it lies on its row, at the full menu's start edge.
-      const row = await boxOf(menu.getByTestId('more-copy-to-frames'))
-      expect(Math.abs(beside.left - main.left)).toBeLessThanOrEqual(1)
-      expect(Math.abs(beside.top - row.top)).toBeLessThanOrEqual(1)
+      // On a phone it is in the full menu's place, under its back row, as wide as the full menu's rows.
+      const back = await boxOf(menu.getByTestId('more-copy-to-frames-back'))
+      expect(back.top - main.top).toBeLessThanOrEqual(8)
+      expect(Math.abs(beside.left - back.left)).toBeLessThanOrEqual(1)
+      expect(Math.abs(beside.right - back.right)).toBeLessThanOrEqual(1)
     }
-    // Each row's key ends at the same right-hand edge, as the full menu's do.
-    const ends = await sub
-      .locator('button kbd')
-      .evaluateAll((keys) => keys.map((key) => Math.round(key.getBoundingClientRect().right)))
-    expect(new Set(ends).size).toBe(1)
     const layer = sub.getByRole('button', { name: /^Layer/ })
     if (width > 600) await layer.hover()
     // Playwright holds back a click on a row marked disabled until it isn't; the tap is the point here.
@@ -419,7 +421,15 @@ for (const [width, height] of SCREEN_SIZES) {
     const shown = tip.locator('xpath=..')
     await shown.evaluate((el) => Promise.all(el.getAnimations().map((a) => a.finished.catch(() => undefined))))
     const box = await boxOf(shown)
-    expect(coversMenu(box, main, beside)).toBe(0)
+    if (width > 600) expect(coversMenu(box, main, beside)).toBe(0)
+    else {
+      // On a phone none of the full menu's own rows shows to be covered, and the tooltip is above Layer.
+      const own = await menu
+        .locator(':scope > button')
+        .evaluateAll((rows) => rows.filter((row) => row.checkVisibility()).length)
+      expect(own).toBe(0)
+      expect(box.bottom).toBeLessThanOrEqual((await boxOf(layer)).top + 0.5)
+    }
     expect(box.left >= 0 && box.right <= width && box.top >= 0 && box.bottom <= height).toBe(true)
     expect(errors).toEqual([])
   })

@@ -237,6 +237,14 @@ body {
   --danger: var(--text);
 }
 
+/*
+ * A menu showing a row's short menu in its own place, as a phone does (SubMenu): only that short
+ * menu shows, under its back row.
+ */
+:has(> [data-drill]) > :not([data-drill]) {
+  display: none;
+}
+
 /* The hover or pressed tint laid over a control's own fill, which stays: a card's row or boxed button
    under the pointer or pressed, and a glass button that is open. */
 @utility tint-hover {

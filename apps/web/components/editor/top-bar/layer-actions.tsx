@@ -7,9 +7,10 @@
 // on the layers and their linked copies. Every row runs the same editor action as its shortcut. An
 // item that never applies is left out; one with nothing to do is greyed, its tooltip saying why. How
 // the layers sit (order, line up, the turn, text direction) is in the top bar's Arrange ⋯.
-import { CaretRightIcon } from '@phosphor-icons/react'
+import { CaretLeftIcon, CaretRightIcon } from '@phosphor-icons/react'
 import * as Popover from '@radix-ui/react-popover'
-import { type ReactNode, useLayoutEffect, useState } from 'react'
+import { type ReactNode, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { flushSync } from 'react-dom'
 
 import { childrenOf } from '@dazbee/doc'
 import type { Editor, ShortcutAction } from '@dazbee/editor'
@@ -23,7 +24,7 @@ import { cn } from '@/lib/cn.ts'
 import { useLocale, useMessages } from '@/lib/i18n/client.tsx'
 import { dirOf, format, type Messages } from '@/lib/i18n/index.ts'
 
-import { arrowThrough, SHEET_EDGE, useMenuFocus } from './bar-popover.tsx'
+import { arrowThrough, useMenuFocus } from './bar-popover.tsx'
 import { MenuRow } from './menu-row.tsx'
 
 /** Why an item has nothing to do: the reason the linked-copy items give, by its message. */
@@ -175,9 +176,10 @@ export function LayerActions({ editor, ids, onDone }: { editor: Editor; ids: str
 
 /**
  * A row of the menu that opens a short menu beside it; on a phone, where the screen has no room
- * beside the menu, the short menu lies on its row instead, sharing the menu's start edge. Enter or
- * the arrow towards it opens it, the arrow back or Esc closes it; up, down, Home and End move
- * between its rows, and the row stays lit while it is open.
+ * beside the menu, the short menu opens in the menu's place instead, under a back row naming the row
+ * (`DrillScreen`). Enter or the arrow towards it opens it; the arrow back or Esc closes it, or on a
+ * phone goes back to the row with the back row too. Up, down, Home and End move between its rows,
+ * and the row stays lit while the menu beside it is open.
  */
 export function SubMenu({
   label,
@@ -196,66 +198,138 @@ export function SubMenu({
 }) {
   const [open, setOpen] = useState(false)
   const phone = usePhone()
-  // On a phone, how far the short menu moves to lie on its row at the start edge of the menu the
-  // row is in: up by the row's height, and back by the row's inset from that edge.
-  const [over, setOver] = useState({ up: 0, back: 0 })
   const rtl = dirOf(useLocale()) === 'rtl'
   const [toward, back] = rtl ? ['ArrowLeft', 'ArrowRight'] : ['ArrowRight', 'ArrowLeft']
   const focus = useMenuFocus()
-  useLayoutEffect(() => {
-    const row = focus.button.current
-    const menu = row?.parentElement
-    if (!phone || !open || !row || !menu) return
-    const [at, edge] = [row.getBoundingClientRect(), menu.getBoundingClientRect()]
-    const to = { up: Math.round(at.height), back: Math.round(rtl ? edge.right - at.right : at.left - edge.left) }
-    setOver((now) => (now.up === to.up && now.back === to.back ? now : to))
-  }, [phone, open, focus.button, rtl])
+  /** Back from the menu in the place of a phone's menu to the row, the focus on the row once it shows. */
+  const goBack = useCallback(() => {
+    flushSync(() => setOpen(false))
+    focus.button.current?.focus()
+  }, [focus.button])
+  const rows = (
+    <>
+      {heading && <p className={MENU_HEADING}>{heading}</p>}
+      {children}
+    </>
+  )
   return (
-    <Popover.Root open={open} onOpenChange={setOpen}>
-      <Popover.Trigger asChild>
-        <button
-          ref={focus.button}
-          type="button"
-          aria-haspopup="dialog"
-          data-testid={`more-${testId}`}
-          onKeyDown={(event) => {
-            if (event.key !== toward) return
-            event.preventDefault()
-            setOpen(true)
-          }}
-          // Lit with the hover tint while the menu beside it is open.
-          className={cn(MENU_ITEM, 'data-[state=open]:bg-hover data-[state=open]:lit')}
-        >
-          {label}
-          <CaretRightIcon size={12} weight="bold" aria-hidden className="text-subtle rtl:-scale-x-100" />
-        </button>
-      </Popover.Trigger>
-      <Popover.Portal>
-        <Popover.Content
-          // Beside the row, or on a phone over it at its menu's start edge, as the mock draws it.
-          side={phone ? 'bottom' : rtl ? 'left' : 'right'}
-          align="start"
-          sideOffset={phone ? -over.up : 8}
-          alignOffset={phone ? -over.back : 0}
-          collisionPadding={phone ? SHEET_EDGE : 12}
-          // A click elsewhere, Esc or the arrow back closes it; focus moving as the menu opens does not.
-          onFocusOutside={(event) => event.preventDefault()}
-          {...focus.content}
-          aria-label={label}
-          data-testid={`more-${testId}-menu`}
-          onKeyDown={(event) => {
-            if (event.key !== back) return arrowThrough(event)
-            event.preventDefault()
-            setOpen(false)
-          }}
-          style={wide ? { width: WIDE_MENU } : undefined}
-          className={cn(MENU, !wide && 'min-w-52')}
-        >
-          {focus.back}
-          {heading && <p className={MENU_HEADING}>{heading}</p>}
-          {children}
-        </Popover.Content>
-      </Popover.Portal>
-    </Popover.Root>
+    <>
+      {/* On a phone the popover never opens: its row opens the menu in the menu's place. */}
+      <Popover.Root open={open && !phone} onOpenChange={setOpen}>
+        <Popover.Trigger asChild>
+          <button
+            ref={focus.button}
+            type="button"
+            aria-haspopup="dialog"
+            data-testid={`more-${testId}`}
+            onKeyDown={(event) => {
+              if (event.key !== toward) return
+              event.preventDefault()
+              setOpen(true)
+            }}
+            // Lit with the hover tint while the menu beside it is open.
+            className={cn(MENU_ITEM, 'data-[state=open]:bg-hover data-[state=open]:lit')}
+          >
+            {label}
+            <CaretRightIcon size={12} weight="bold" aria-hidden className="text-subtle rtl:-scale-x-100" />
+          </button>
+        </Popover.Trigger>
+        <Popover.Portal>
+          <Popover.Content
+            side={rtl ? 'left' : 'right'}
+            align="start"
+            sideOffset={8}
+            collisionPadding={12}
+            // A click elsewhere, Esc or the arrow back closes it; focus moving as the menu opens does not.
+            onFocusOutside={(event) => event.preventDefault()}
+            {...focus.content}
+            aria-label={label}
+            data-testid={`more-${testId}-menu`}
+            onKeyDown={(event) => {
+              if (event.key !== back) return arrowThrough(event)
+              event.preventDefault()
+              setOpen(false)
+            }}
+            style={wide ? { width: WIDE_MENU } : undefined}
+            className={cn(MENU, !wide && 'min-w-52')}
+          >
+            {focus.back}
+            {rows}
+          </Popover.Content>
+        </Popover.Portal>
+      </Popover.Root>
+      {phone && open && (
+        <DrillScreen label={label} testId={testId} back={back} onBack={goBack}>
+          {rows}
+        </DrillScreen>
+      )}
+    </>
+  )
+}
+
+/**
+ * A row's short menu in the place of the menu the row is in, as a phone shows it: a back row naming
+ * the row, then the short menu's rows. Every other piece of the menu hides while it shows (globals.css
+ * hides the siblings of a `data-drill`). It takes the focus at its back row as it opens, so a greyed
+ * first row doesn't say why unasked; the back row, the arrow back and Esc go back.
+ */
+function DrillScreen({
+  label,
+  testId,
+  back,
+  onBack,
+  children,
+}: {
+  label: string
+  testId: string
+  /** The arrow key that goes back: the one towards the page's start. */
+  back: string
+  onBack: () => void
+  children: ReactNode
+}) {
+  const b = useMessages().editor.bar
+  const backRow = useRef<HTMLButtonElement>(null)
+  useLayoutEffect(() => backRow.current?.focus(), [])
+  // Esc goes back before the menu hears it and closes: the window hears a key before the document,
+  // where Radix listens for Esc. A greyed row's tooltip that shows is the top-most thing, so it
+  // hears Esc first and closes.
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape' || document.querySelector('[role="tooltip"]')) return
+      event.preventDefault()
+      event.stopPropagation()
+      onBack()
+    }
+    window.addEventListener('keydown', onKey, { capture: true })
+    return () => window.removeEventListener('keydown', onKey, { capture: true })
+  }, [onBack])
+  return (
+    <div
+      data-drill
+      role="group"
+      aria-label={label}
+      onKeyDown={(event) => {
+        if (event.key !== back) return arrowThrough(event)
+        event.preventDefault()
+        onBack()
+      }}
+      className="flex flex-col"
+    >
+      <button
+        ref={backRow}
+        type="button"
+        data-testid={`more-${testId}-back`}
+        aria-label={format(b.backFrom, { menu: label })}
+        onClick={onBack}
+        className={cn(MENU_ITEM, 'justify-start gap-1.5')}
+      >
+        <CaretLeftIcon size={12} weight="bold" aria-hidden className="text-subtle rtl:-scale-x-100" />
+        {label}
+      </button>
+      <div className={MENU_DIVIDER} />
+      <div data-testid={`more-${testId}-menu`} className="flex flex-col">
+        {children}
+      </div>
+    </div>
   )
 }

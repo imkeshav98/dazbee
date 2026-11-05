@@ -263,6 +263,8 @@ export const en = {
       upDown: 'Up and down in the box',
       topBar: 'Selected layers',
       smallMenu: 'Layer actions',
+      /** The back row of a menu shown in its menu's place on a phone, which names the row it opened from. */
+      backFrom: 'Back from {menu}',
       overflow: 'More controls',
       copy: 'Copy',
       paste: 'Paste',
