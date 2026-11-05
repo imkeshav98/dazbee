@@ -3,10 +3,7 @@
 // names the layer and holds its box. And the swatch-like controls of the Colour panel, the frame
 // Background panel built on it, the Outline panel and the Effects panel: on a phone each is a target a
 // finger can hit, in a sheet that scrolls rather than cutting one off, while a desktop keeps their
-// size; with pictures of the panels at the three screen sizes in both themes. And the paint editor
-// that + opens in the Colour and Background panels, with Add image: on a phone or a touch screen
-// every one of its targets is 44 px tall and 8 px from the next for each kind of fill, while a desktop
-// keeps their size.
+// size; with pictures of the panels at the three screen sizes in both themes.
 import type { DesignInput } from '@dazbee/schema'
 
 import { writeOutput } from '../../support/editor.ts'

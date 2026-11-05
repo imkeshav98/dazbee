@@ -1,7 +1,8 @@
-// size; with pictures of the panels at the three screen sizes in both themes. And the paint editor
-// that + opens in the Colour and Background panels, with Add image: on a phone or a touch screen
-// every one of its targets is 44 px tall and 8 px from the next for each kind of fill, while a desktop
-// keeps their size.
+// The paint editor that + opens in the Colour and Background panels, and Add image under the
+// Colour panel's: on a phone or a touch screen every one of the editor's targets is 44 px tall and
+// 8 px from the next, for each kind of fill, in a sheet that cuts none off, while a desktop keeps
+// their size; with pictures of the editor on a solid, a gradient and an image at the three screen
+// sizes in both themes.
 import { photo, upload } from '../../support/assets.ts'
 import { writeOutput } from '../../support/editor.ts'
 import { openSized } from '../../support/frames-on-canvas.ts'
