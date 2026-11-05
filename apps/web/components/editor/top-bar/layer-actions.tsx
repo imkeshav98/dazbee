@@ -9,7 +9,7 @@
 // the layers sit (order, line up, the turn, text direction) is in the top bar's Arrange ⋯.
 import { CaretLeftIcon, CaretRightIcon } from '@phosphor-icons/react'
 import * as Popover from '@radix-ui/react-popover'
-import { type ReactNode, useCallback, useLayoutEffect, useRef, useState } from 'react'
+import { type KeyboardEvent, type ReactNode, useCallback, useLayoutEffect, useRef, useState } from 'react'
 import { flushSync } from 'react-dom'
 
 import { childrenOf } from '@dazbee/doc'
@@ -53,6 +53,16 @@ function masksOver(design: Design, ids: readonly string[]): string[] | null {
     masks.add(mask[0])
   }
   return [...masks]
+}
+
+/**
+ * The keys of a row's short menu, beside the row or in its menu's place: the arrow `back`, towards
+ * the page's start, goes back, and up, down, Home and End move between its rows (`arrowThrough`).
+ */
+const backKeys = (back: string, goBack: () => void) => (event: KeyboardEvent<HTMLElement>) => {
+  if (event.key !== back) return arrowThrough(event)
+  event.preventDefault()
+  goBack()
 }
 
 /**
@@ -178,7 +188,7 @@ export function LayerActions({ editor, ids, onDone }: { editor: Editor; ids: str
 /**
  * A row of the menu that opens a short menu beside it; on a phone, where the screen has no room
  * beside the menu, the short menu opens in the menu's place instead, under a back row naming the row
- * (`DrillScreen`). Enter or the arrow towards it opens it; the arrow back or Esc closes it, or on a
+ * (`MenuInPlace`). Enter or the arrow towards it opens it; the arrow back or Esc closes it, or on a
  * phone goes back to the row with the back row too. Up, down, Home and End move between its rows,
  * and the row stays lit while the menu beside it is open.
  */
@@ -257,11 +267,7 @@ export function SubMenu({
             {...focus.content}
             aria-label={label}
             data-testid={`more-${testId}-menu`}
-            onKeyDown={(event) => {
-              if (event.key !== back) return arrowThrough(event)
-              event.preventDefault()
-              setOpen(false)
-            }}
+            onKeyDown={backKeys(back, () => show(false))}
             style={wide ? { width: WIDE_MENU } : undefined}
             className={cn(MENU, !wide && 'min-w-52')}
           >
@@ -271,9 +277,9 @@ export function SubMenu({
         </Popover.Portal>
       </Popover.Root>
       {phone && open && (
-        <DrillScreen label={label} testId={testId} back={back} onBack={goBack}>
+        <MenuInPlace label={label} testId={testId} back={back} onBack={goBack}>
           {rows}
-        </DrillScreen>
+        </MenuInPlace>
       )}
     </>
   )
@@ -282,11 +288,11 @@ export function SubMenu({
 /**
  * A row's short menu in the place of the menu the row is in, as a phone shows it: a back row naming
  * the row, then the short menu's rows. Every other piece of the menu hides while it shows (globals.css
- * hides the siblings of a `data-drill`). It takes the focus at its back row as it opens, so a greyed
- * first row doesn't say why unasked; the back row, the arrow back and Esc go back, Esc through the
- * menu's own (`useBackInPlace`) once a greyed row's tooltip that shows has closed.
+ * hides what isn't a `data-menu-in-place`). It takes the focus at its back row as it opens, so a
+ * greyed first row doesn't say why unasked; the back row, the arrow back and Esc go back, Esc through
+ * the menu's own (`useBackInPlace`) once a greyed row's tooltip that shows has closed.
  */
-function DrillScreen({
+function MenuInPlace({
   label,
   testId,
   back,
@@ -306,14 +312,10 @@ function DrillScreen({
   useBackInPlace(onBack)
   return (
     <div
-      data-drill
+      data-menu-in-place
       role="group"
       aria-label={label}
-      onKeyDown={(event) => {
-        if (event.key !== back) return arrowThrough(event)
-        event.preventDefault()
-        onBack()
-      }}
+      onKeyDown={backKeys(back, onBack)}
       className="flex flex-col"
     >
       <button
