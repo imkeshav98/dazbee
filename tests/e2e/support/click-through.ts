@@ -13,6 +13,13 @@ export interface Spot {
   what: string
 }
 
+/** A stroke as a seeded layer gives it. */
+interface Stroked {
+  paint: { type: 'solid'; color: string }
+  width: number
+  align: 'center' | 'outside'
+}
+
 interface Box {
   x: number
   y: number
@@ -103,44 +110,56 @@ export function clickThroughDesign(assetId: string): DesignInput {
 
 /**
  * The perf frame: a floor, and over it STACKED layers whose boxes all hold THROUGH_ALL while none
- * shows there (ellipses by a corner, stars between their points, cut-out photos by a clear corner,
- * short texts after their line), so a click or a hover there tests every one of them.
+ * shows there (ellipses by a corner, stars with an outline stroke between their points, cut-out
+ * photos by a clear corner, short texts after their line, open stroked arcs in the area they go
+ * round), so a click or a hover there tests every one of them.
  */
 export function stackedDesign(assetId: string): DesignInput {
   const nodes: Record<string, Seeded> = {
     floor: rect('a0', 'Floor', { x: 0, y: 0, width: 1080, height: 1080 }, '#E7E2DAFF'),
   }
   const corner = { x: THROUGH_ALL.x - 10, y: THROUGH_ALL.y - 10, width: 400, height: 400 }
+  const kinds: ((index: string, name: string) => Seeded)[] = [
+    (index, name) => shape(index, `Ellipse ${name}`, { kind: 'ellipse' }, corner, '#2F6BFF66'),
+    (index, name) =>
+      shape(
+        index,
+        `Star ${name}`,
+        { kind: 'star', points: 5 },
+        // The gap between a 400 px star's top and upper-left points is 70, 80 into its box, clear of its stroke.
+        { x: THROUGH_ALL.x - 70, y: THROUGH_ALL.y - 80, width: 400, height: 400 },
+        '#FF5A3666',
+        [stroke(8, 'outside')],
+      ),
+    (index, name) => ({
+      type: 'graphic',
+      parentId: 'sq',
+      index,
+      name: `Photo ${name}`,
+      props: { ...corner, shape: { kind: 'rect' }, fills: [{ type: 'image', assetId, fit: 'fill' }] },
+    }),
+    (index, name) =>
+      text(index, `Text ${name}`, 'Hi', { x: THROUGH_ALL.x - 100, y: THROUGH_ALL.y - 40, width: 400, height: 120 }, 40),
+    // An arc dipping 300 px below its ends, THROUGH_ALL 100 below its middle, far from its line.
+    (index, name) => ({
+      type: 'graphic',
+      parentId: 'sq',
+      index,
+      name: `Arc ${name}`,
+      props: {
+        x: THROUGH_ALL.x - 200,
+        y: THROUGH_ALL.y - 100,
+        width: 400,
+        height: 400,
+        shape: { kind: 'path', d: 'M0 0 C100 400 300 400 400 0' },
+        fills: [],
+        strokes: [stroke(4, 'center')],
+      },
+    }),
+  ]
   for (let i = 0; i < STACKED; i++) {
-    const index = `a1${String(i).padStart(3, '0')}`
-    const kind = i % 4
-    nodes[`l${i}`] =
-      kind === 0
-        ? shape(index, `Ellipse ${i}`, { kind: 'ellipse' }, corner, '#2F6BFF66')
-        : kind === 1
-          ? shape(
-              index,
-              `Star ${i}`,
-              { kind: 'star', points: 5 },
-              // The gap between a 400 px star's top and upper-left points is 70, 80 into its box.
-              { x: THROUGH_ALL.x - 70, y: THROUGH_ALL.y - 80, width: 400, height: 400 },
-              '#FF5A3666',
-            )
-          : kind === 2
-            ? {
-                type: 'graphic',
-                parentId: 'sq',
-                index,
-                name: `Photo ${i}`,
-                props: { ...corner, shape: { kind: 'rect' }, fills: [{ type: 'image', assetId, fit: 'fill' }] },
-              }
-            : text(
-                index,
-                `Text ${i}`,
-                'Hi',
-                { x: THROUGH_ALL.x - 100, y: THROUGH_ALL.y - 40, width: 400, height: 120 },
-                40,
-              )
+    const make = kinds[i % kinds.length] as (typeof kinds)[number]
+    nodes[`l${i}`] = make(`a1${String(i).padStart(3, '0')}`, String(i))
   }
   return frameDesign({ name: 'Stacked see-through layers', nodes })
 }
@@ -155,13 +174,14 @@ function shape(
   kind: { kind: 'rect' } | { kind: 'ellipse' } | { kind: 'star'; points: number },
   box: Box,
   color: string,
+  strokes: Stroked[] = [],
 ): Seeded {
   return {
     type: 'graphic',
     parentId: 'sq',
     index,
     name,
-    props: { ...box, shape: kind, fills: [{ type: 'solid', color }] },
+    props: { ...box, shape: kind, fills: [{ type: 'solid', color }], strokes },
   }
 }
 
@@ -178,4 +198,9 @@ function text(index: string, name: string, value: string, box: Box, fontSize: nu
       style: { fontFamily: 'Noto Sans', fontSize, fontWeight: 700, color: '#111111FF' },
     },
   }
+}
+
+/** A dark stroke of a width, centred on the outline or outside it. */
+function stroke(width: number, align: 'center' | 'outside'): Stroked {
+  return { paint: { type: 'solid', color: '#111111FF' }, width, align }
 }
