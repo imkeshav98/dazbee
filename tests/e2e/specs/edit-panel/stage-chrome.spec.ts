@@ -3,7 +3,7 @@
 import { designOf, editorPath, screenPoint, setCookies, shoot } from '../../support/editor.ts'
 import { liveDesign, seed } from '../../support/seed.ts'
 import { expect, type Page, test } from '../../support/test.ts'
-import { barMenu, moreSubmenu, openCard } from '../../support/top-bar.ts'
+import { barMenu, closeBarMenu, moreSubmenu, openCard } from '../../support/top-bar.ts'
 
 test.use({ viewport: { width: 1440, height: 900 } })
 
@@ -58,11 +58,13 @@ test('a selection shows the top bar; several layers line up and spread out from 
   await expect(arrange).toHaveCount(0)
   await expect(page.getByTestId('bar-line-up')).toHaveCount(0)
   await expect((await moreSubmenu(page, 'line-up')).getByRole('button', { name: 'Align left' })).toBeEnabled()
-  await page.keyboard.press('Escape')
-  await page.keyboard.press('Escape')
+  // Each Esc closes one menu, the one beside the row first: each is gone before the next key.
+  await closeBarMenu(page, 'more-line-up')
+  await closeBarMenu(page, 'bar-more')
 
   // Several layers: Line up with the spread outs on the top bar, Group in the small menu.
   await page.keyboard.press('Control+a')
+  await expect(page.getByTestId('top-bar')).toHaveAttribute('data-selection', / /)
   await expect(arrange).toHaveCount(0)
   const lineUp = await barMenu(page, 'line-up')
   await expect(lineUp.getByRole('button', { name: 'Align left' })).toBeEnabled()
