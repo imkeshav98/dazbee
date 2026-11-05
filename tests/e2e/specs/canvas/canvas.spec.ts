@@ -1,15 +1,18 @@
 // The infinite canvas (#36): a page of five frames, each where it is stored, with pan and zoom; a
 // layer dragged past its frame's edge shows there as a faint ghost and stays in its frame; and
-// pictures of one frame, linked frames, two pages and a page with no frames at each screen size.
+// pictures, in the dark and the light theme at each screen size, of one frame, linked frames, two
+// pages, a page with no frames, the Pages card, a brief's frames, the layers panel and Export.
 // Needs the API and the sync server: `docker compose up -d --wait`.
-import type { DesignInput } from '@dazbee/schema'
+import { blankDesign, type DesignInput } from '@dazbee/schema'
 
 import { CREAM, fiveFrames, FRAMES, open } from '../../support/canvas.ts'
-import { designOf, screenPoint, writeOutput } from '../../support/editor.ts'
+import { designOf, editorPath, screenPoint, setCookies, writeOutput } from '../../support/editor.ts'
+import { THEMES } from '../../support/glass.ts'
+import { openLayers } from '../../support/layers-panel.ts'
 import { SCREEN_SIZES } from '../../support/layout.ts'
-import { liveDesign } from '../../support/seed.ts'
+import { liveDesign, seed } from '../../support/seed.ts'
 import { drawn, fitSettled, nextFrame, openStage, selectLayers } from '../../support/stage.ts'
-import { expect, type Page, test } from '../../support/test.ts'
+import { type Browser, expect, type Page, test } from '../../support/test.ts'
 import { pagesPanel } from '../../support/top-bar.ts'
 
 test.describe.configure({ timeout: 180_000 })
@@ -253,52 +256,96 @@ test.describe('pages of frames', () => {
     }
   }
 
-  for (const [width, height] of SCREEN_SIZES) {
-    test(
-      `screenshots at ${width}×${height}: one frame, linked frames, two pages and an empty page`,
-      { tag: '@evidence' },
-      async ({ browser }) => {
-        const shot = async (page: Page, name: string) => {
-          await nextFrame(page)
-          writeOutput(`frames-${width}-${name}.png`, await page.screenshot({ animations: 'disabled' }))
-        }
-        const one = await openStage(browser, liveDesign())
-        await one.page.setViewportSize({ width, height })
-        await fitSettled(one.page)
-        await shot(one.page, '1-one-frame')
-        expect(one.errors).toEqual([])
-        await one.page.context().close()
+  /** What a brief picking three sizes makes: one page of three empty frames in a row, each named after its size. */
+  const brief = (): DesignInput =>
+    blankDesign({ designId: 'replaced-by-the-api', name: 'Autumn roast' }, [
+      { name: 'Feed square', width: 1080, height: 1080 },
+      { name: 'Story and Reel', width: 1080, height: 1920 },
+      { name: 'Link image', width: 1200, height: 628 },
+    ])
+  /** Opens a design in a tab of its own, in a theme and at a screen size, fitted once the editor is ready. */
+  async function openThemed(
+    browser: Browser,
+    content: DesignInput,
+    theme: (typeof THEMES)[number],
+    viewport: { width: number; height: number },
+  ) {
+    const designId = await seed(content)
+    const page = await (await browser.newContext({ viewport })).newPage()
+    const errors: string[] = []
+    page.on('pageerror', (error) => errors.push(error.message))
+    await setCookies(page, { theme })
+    await page.goto(editorPath(designId))
+    await expect(page.getByTestId('status')).toHaveAttribute('data-ready', '', { timeout: 60_000 })
+    await page.evaluate(() => window.dazbee?.loaded())
+    await fitSettled(page)
+    return { page, errors }
+  }
 
-        const { page, errors } = await openStage(browser, pages())
-        await page.setViewportSize({ width, height })
-        await fitSettled(page)
-        const shown = () => page.evaluate(() => window.dazbee?.frames().map((frame) => frame.id))
-        expect(await shown()).toEqual(['sq', 'story', 'land', 'mpu', 'leader'])
-        await shot(page, '2-linked-frames')
-        // A layer selected in one frame; its copies stay as they are.
-        await selectLayers(page, ['p1-headline'], { bar: true })
-        await shot(page, '3-linked-frames-selected')
-        await selectLayers(page, [])
-        const panel = await pagesPanel(page)
-        await expect(panel.getByTestId('pages').locator('li')).toHaveCount(3)
-        // Each page with a frame shows a picture of its first frame once the stage settles, the empty page
-        // none; every page shows its number.
-        await expect(panel.getByTestId('page-thumbnail').locator('img')).toHaveCount(2)
-        await expect(panel.getByTestId('page-thumbnail').nth(2).locator('img')).toHaveCount(0)
-        await expect(panel.getByTestId('page-number')).toHaveText(['1', '2', '3'])
-        await shot(page, '4-pages')
-        await page.keyboard.press('Escape')
-        await expect(panel).toBeHidden()
-        await page.evaluate(() => window.dazbee?.showPage('p2'))
-        await fitSettled(page)
-        expect(await shown()).toEqual(['p2-sq'])
-        await shot(page, '5-second-page')
-        await page.evaluate(() => window.dazbee?.showPage('p3'))
-        await fitSettled(page)
-        await expect(page.getByTestId('empty-page')).toBeVisible()
-        await shot(page, '6-empty-page')
-        expect(errors).toEqual([])
-      },
-    )
+  for (const [width, height] of SCREEN_SIZES) {
+    for (const theme of THEMES) {
+      test(
+        `screenshots at ${width}×${height}, ${theme}: one frame, linked frames, two pages, an empty page, the Pages card, a brief's frames, the layers panel and Export`,
+        { tag: '@evidence' },
+        async ({ browser }) => {
+          test.setTimeout(300_000)
+          const viewport = { width, height }
+          const shot = async (page: Page, name: string) => {
+            await nextFrame(page)
+            writeOutput(`frames-${width}-${theme}-${name}.png`, await page.screenshot({ animations: 'disabled' }))
+          }
+          const one = await openThemed(browser, liveDesign(), theme, viewport)
+          await shot(one.page, '1-one-frame')
+          expect(one.errors).toEqual([])
+          await one.page.context().close()
+
+          const { page, errors } = await openThemed(browser, pages(), theme, viewport)
+          const shown = () => page.evaluate(() => window.dazbee?.frames().map((frame) => frame.id))
+          expect(await shown()).toEqual(['sq', 'story', 'land', 'mpu', 'leader'])
+          await shot(page, '2-linked-frames')
+          // A layer selected in one frame; its copies stay as they are.
+          await selectLayers(page, ['p1-headline'], { bar: true })
+          await shot(page, '3-linked-frames-selected')
+          await selectLayers(page, [])
+          const panel = await pagesPanel(page)
+          await expect(panel.getByTestId('pages').locator('li')).toHaveCount(3)
+          // Each page with a frame shows a picture of its first frame once the stage settles, the empty page
+          // none; every page shows its number.
+          await expect(panel.getByTestId('page-thumbnail').locator('img')).toHaveCount(2)
+          await expect(panel.getByTestId('page-thumbnail').nth(2).locator('img')).toHaveCount(0)
+          await expect(panel.getByTestId('page-number')).toHaveText(['1', '2', '3'])
+          await shot(page, '4-pages')
+          await page.keyboard.press('Escape')
+          await expect(panel).toBeHidden()
+          // The layers panel lists the frame's layers.
+          await openLayers(page)
+          await shot(page, '5-layers-panel')
+          await page.getByRole('button', { name: 'Layers', exact: true }).click()
+          await expect(page.getByTestId('layers')).toBeHidden()
+          // Export lists what it exports.
+          await page.getByTestId('share-open').click()
+          await page.getByTestId('export-open').click()
+          await expect(page.getByTestId('export')).toBeVisible()
+          await shot(page, '6-export')
+          await page.keyboard.press('Escape')
+          await expect(page.getByTestId('export')).toBeHidden()
+          await page.evaluate(() => window.dazbee?.showPage('p2'))
+          await fitSettled(page)
+          expect(await shown()).toEqual(['p2-sq'])
+          await shot(page, '7-second-page')
+          await page.evaluate(() => window.dazbee?.showPage('p3'))
+          await fitSettled(page)
+          await expect(page.getByTestId('empty-page')).toBeVisible()
+          await shot(page, '8-empty-page')
+          expect(errors).toEqual([])
+          await page.context().close()
+
+          const drafts = await openThemed(browser, brief(), theme, viewport)
+          await expect(drafts.page.locator('.frame-label[data-frame]')).toHaveCount(3)
+          await shot(drafts.page, '9-brief-frames')
+          expect(drafts.errors).toEqual([])
+        },
+      )
+    }
   }
 })
