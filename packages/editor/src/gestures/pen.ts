@@ -63,7 +63,7 @@ export interface PenDeps {
   /** The design as last drawn. */
   drawn: () => Design
   /** The shown page's frame with an id, as last drawn, if there is one. */
-  frameOf: (key: string | undefined) => Frame | undefined
+  frameOf: (id: string | undefined) => Frame | undefined
   boxes: Pick<EditorBoxes, 'containersOf' | 'pathIn' | 'parentFor'>
   /** Groups fit what they hold again after a change inside them, in the same undo step. */
   hug: (ids: string[]) => void
@@ -168,7 +168,7 @@ export function editorPen({
       const from = pen.anchors[last]
       if (from && pen.hover && pen.dragging === null) preview = [from, pen.hover]
     } else if (pathEditing) {
-      frame = frameOf(pathEditing.frame)
+      frame = frameOf(pathEditing.frameId)
       const found = frame && pathIn(frame, pathEditing.id, drawn())
       if (!found) return []
       ;({ path, around } = found)
@@ -274,9 +274,9 @@ export function editorPen({
    */
   function startPathEdit(e: PointerEvent, at: { frame: Frame; p: Point } | null): PathDrag | null {
     const editingPath = selection.pathEditing()
-    const frame = editingPath && frameOf(editingPath.frame)
+    const frame = editingPath && frameOf(editingPath.frameId)
     const found = frame && editingPath && pathIn(frame, editingPath.id)
-    const q = found && at?.frame.key === frame.key ? localTo(at.p, found.around) : null
+    const q = found && at?.frame.id === frame.id ? localTo(at.p, found.around) : null
     const hit = found && q && hitPath(found.path, q, POINT_REACH / camera().zoom, editingPath.selected)
     if (!editingPath || !frame || !found || !q || !hit) {
       selection.editPath(null)
@@ -354,7 +354,7 @@ export function editorPen({
   /** Takes the selected anchors out of the path being edited, or the layer once none would be left. One undo step. */
   function deletePoints() {
     const editingPath = selection.pathEditing()
-    const frame = editingPath && frameOf(editingPath.frame)
+    const frame = editingPath && frameOf(editingPath.frameId)
     const found = frame && editingPath && pathIn(frame, editingPath.id)
     if (!editingPath || !found || editingPath.selected.length === 0) return false
     const next = deleteAnchors(found.path, editingPath.selected)
@@ -376,7 +376,7 @@ export function editorPen({
    */
   function penDown(e: PointerEvent, at: { frame: Frame; p: Point }) {
     typing.stop()
-    if (pen && pen.frame.key !== at.frame.key) finishPen()
+    if (pen && pen.frame.id !== at.frame.id) finishPen()
     if (!pen) {
       const now = session.design()
       const parentId = parentFor(at.frame, 'graphic', now)
@@ -467,7 +467,7 @@ export function editorPen({
     pen = null
     if (done.layer) hug([done.layer.id])
     done.end()
-    if (done.layer && session.design().nodes[done.layer.id]) selection.select([done.layer.id], done.frame.key)
+    if (done.layer && session.design().nodes[done.layer.id]) selection.select([done.layer.id], done.frame.id)
     tools.setTool('select')
     drawOverlay()
   }

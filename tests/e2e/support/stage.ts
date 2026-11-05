@@ -5,7 +5,7 @@
 import { type Browser, expect, type Page } from '@playwright/test'
 
 import { pressFor, type ShortcutAction } from '@dazbee/editor/shortcuts'
-import type { Design as Stored,DesignInput, Layer } from '@dazbee/schema'
+import type { Design as Stored, DesignInput, Layer } from '@dazbee/schema'
 
 import { designOf, openTabs, placed, screenPoint } from './editor.ts'
 import { DEV_BRAND, type InBrand, seed } from './seed.ts'

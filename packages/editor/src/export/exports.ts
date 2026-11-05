@@ -33,7 +33,7 @@ export function editorExports({ ck, cache, session, resources, view }: ExportsDe
 
   /** A frame drawn as pixels, shown or not; the shown page's first frame by default. */
   function exportPixels(frameId?: string) {
-    const id = frameId ?? defaultFrame().key
+    const id = frameId ?? defaultFrame().id
     return renderDesign(ck, session.design(), id, resources.bytes(), cache).pixels
   }
   async function exportFiles(request: ExportRequestInput, progress?: (done: number, total: number) => void) {

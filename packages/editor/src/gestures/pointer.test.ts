@@ -10,7 +10,7 @@ import type { Tool } from '../tools.ts'
 import { editorPointer, type PointerDeps } from './pointer.ts'
 import type { MoveDrag } from './transform-drag.ts'
 
-const SQUARE: Frame = { key: 'one-sq', pageId: 'one', name: 'Square', x: 0, y: 0, width: 1080, height: 1080 }
+const SQUARE: Frame = { id: 'one-sq', pageId: 'one', name: 'Square', x: 0, y: 0, width: 1080, height: 1080 }
 /** A scene layer of a type over the first 100 pixels of the frame each way. */
 const sceneLayer = (id: string, type: string) =>
   ({
@@ -207,7 +207,7 @@ describe('editorPointer', () => {
       expect(pointer.pointerAt()).toBeNull()
       send('pointermove', event(5, 6))
       expect(pointer.pointerAt()).toEqual({ x: 5, y: 6 })
-      expect(selection.hovered()).toEqual({ id: 'under picked', frame: 'one-sq' })
+      expect(selection.hovered()).toEqual({ id: 'under picked', frameId: 'one-sq' })
       expect(log).toEqual(['draw overlay'])
       expect(pointer.rehover()).toBe(false)
       send('pointerleave')
@@ -334,7 +334,7 @@ describe('editorPointer', () => {
     it('starts typing into the text under the pointer, selecting it', () => {
       const { selection, send, log } = harness('select', sceneLayer('words', 'text'))
       send('dblclick', event(10, 10))
-      expect(selection.current()).toEqual({ ids: ['words'], frame: 'one-sq' })
+      expect(selection.current()).toEqual({ ids: ['words'], frameId: 'one-sq' })
       expect(log).toEqual(['type into words in one-sq', 'draw overlay'])
     })
 

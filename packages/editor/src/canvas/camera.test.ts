@@ -69,13 +69,13 @@ describe('framesInView', () => {
   it('draws the frames the viewport shows any part of, and only those', () => {
     const viewport = { width: 1000, height: 600 }
     // At 100%, from one-story's top start corner: a 1000 × 600 part of it only.
-    const story = frames.find((f) => f.key === 'one-story') ?? { x: 0, y: 0 }
-    expect(framesInView(frames, { x: -story.x, y: -story.y, zoom: 1 }, viewport).map((f) => f.key)).toEqual([
+    const story = frames.find((f) => f.id === 'one-story') ?? { x: 0, y: 0 }
+    expect(framesInView(frames, { x: -story.x, y: -story.y, zoom: 1 }, viewport).map((f) => f.id)).toEqual([
       'one-story',
     ])
     // Moved the gap and one pixel toward the start, one-sq's last column of pixels shows too.
     expect(
-      framesInView(frames, { x: -story.x + FRAME_GAP + 1, y: -story.y, zoom: 1 }, viewport).map((f) => f.key),
+      framesInView(frames, { x: -story.x + FRAME_GAP + 1, y: -story.y, zoom: 1 }, viewport).map((f) => f.id),
     ).toEqual(['one-sq', 'one-story'])
     expect(framesInView(frames, fit(bounds, viewport), viewport)).toHaveLength(3)
   })

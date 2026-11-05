@@ -22,7 +22,7 @@ import { px } from './rulers.ts'
 
 /** A point on the design: a frame, by its id, and a point in it in design pixels. */
 export interface Spot {
-  frame: string
+  frameId: string
   x: number
   y: number
 }
@@ -45,7 +45,7 @@ export interface EditorView {
   /** The shown page's frames as last drawn, by order. */
   frames(): Frame[]
   /** The shown page's frame with an id, as last drawn, if there is one. */
-  frameOf(key: string | undefined): Frame | undefined
+  frameOf(id: string | undefined): Frame | undefined
   /** The page the canvas shows. */
   page(): string
   /** The frames the last redraw drew: the ones in view then. */
@@ -160,8 +160,8 @@ export function editorView({ ck, canvas, session, onZoom, draw }: ViewDeps): Edi
   function frames() {
     return laid.frames
   }
-  function frameOf(key: string | undefined) {
-    return laid.frames.find((f) => f.key === key)
+  function frameOf(id: string | undefined) {
+    return laid.frames.find((f) => f.id === id)
   }
   function shownPage() {
     return shown
@@ -190,7 +190,7 @@ export function editorView({ ck, canvas, session, onZoom, draw }: ViewDeps): Edi
   }
   function spotAt(client: Point): Spot | null {
     const at = pointAt(client)
-    return at ? { frame: at.frame.key, x: at.p.x, y: at.p.y } : null
+    return at ? { frameId: at.frame.id, x: at.p.x, y: at.p.y } : null
   }
   const defaultFrame = (frameId?: string) => {
     const found = frameId === undefined ? laid.frames[0] : frameOf(frameId)

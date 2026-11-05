@@ -275,7 +275,7 @@ export function editorDrawing({
     if (drawsBox(g.tool) && g.moved) enclose(g.frame, g.id)
     hug([g.id])
     g.end()
-    selection.select([g.id], g.frame.key)
+    selection.select([g.id], g.frame.id)
     tools.setTool('select')
   }
   /**
@@ -322,8 +322,8 @@ export function editorDrawing({
       return
     }
     tools.setTool('select')
-    selection.select([id], g.frame.key)
-    typing.start(id, g.frame.key, 0, end, true)
+    selection.select([id], g.frame.id)
+    typing.start(id, g.frame.id, 0, end, true)
   }
   /** Places the image the image tool drew, one undo step; it is selected and the select tool comes back. */
   function finishImageBox(g: ImageBoxDrag) {
@@ -347,7 +347,7 @@ export function editorDrawing({
     )
       return
     tools.setTool('select')
-    selection.select([id], g.frame.key)
+    selection.select([id], g.frame.id)
   }
   /**
    * Adds the frame the Frame tool dragged out to the shown page, empty and named Frame, on whole

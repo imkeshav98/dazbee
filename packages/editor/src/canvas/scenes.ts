@@ -94,7 +94,7 @@ export function frameScenes({ ck, resources, drawn }: ScenesDeps): FrameScenes {
       }
       picturesFor = screen
     }
-    const kept = new Set(all.map((f) => f.key))
+    const kept = new Set(all.map((f) => f.id))
     const design = drawn()
     for (const [key, entry] of frames) {
       if (kept.has(key)) continue
@@ -125,28 +125,28 @@ export function frameScenes({ ck, resources, drawn }: ScenesDeps): FrameScenes {
 
   function cached(frame: Frame): FrameCache {
     const deps = depsOf(frame)
-    const entry = frames.get(frame.key)
+    const entry = frames.get(frame.id)
     if (entry && sameDeps(entry.deps, deps)) return entry
     entry?.picture?.delete()
     const fresh = {
       deps,
-      scene: render(drawn(), frame.key, scenes, measure(), resources.bytes().variables),
+      scene: render(drawn(), frame.id, scenes, measure(), resources.bytes().variables),
       picture: null,
     }
-    frames.set(frame.key, fresh)
+    frames.set(frame.id, fresh)
     return fresh
   }
   function depsOf(frame: Frame) {
     const design = drawn()
     // The brand kit's values too (#53): a change rebuilds the scene, reusing every unbound layer.
-    const deps: unknown[] = [design.frames[frame.key], resources.bytes().variables]
+    const deps: unknown[] = [design.frames[frame.id], resources.bytes().variables]
     const walk = (parentId: string) => {
       for (const [id, node] of childrenOf(design, parentId)) {
         deps.push(id, node)
         walk(id)
       }
     }
-    walk(frame.key)
+    walk(frame.id)
     return deps
   }
   function record(scene: Scene, with_: Resources) {

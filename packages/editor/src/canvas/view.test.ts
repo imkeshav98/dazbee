@@ -160,7 +160,7 @@ describe('editorView', () => {
       const { view } = harness()
       view.resize()
       view.setCamera({ x: 500 - 540, y: 400 - 540, zoom: 1 })
-      expect(view.middleFrame()?.key).toBe('one-sq')
+      expect(view.middleFrame()?.id).toBe('one-sq')
       view.setCamera({ x: 500 - 1200, y: 0, zoom: 1 })
       expect(view.middleFrame()).toBeUndefined()
     })
@@ -171,8 +171,8 @@ describe('editorView', () => {
       const { view } = harness()
       view.setCamera({ x: 100, y: 50, zoom: 2 })
       expect(view.onStage({ x: 110, y: 60 })).toEqual({ x: 100, y: 50 })
-      expect(view.pointAt({ x: 130, y: 80 })).toMatchObject({ frame: { key: 'one-sq' }, p: { x: 10, y: 10 } })
-      expect(view.spotAt({ x: 130, y: 80 })).toEqual({ frame: 'one-sq', x: 10, y: 10 })
+      expect(view.pointAt({ x: 130, y: 80 })).toMatchObject({ frame: { id: 'one-sq' }, p: { x: 10, y: 10 } })
+      expect(view.spotAt({ x: 130, y: 80 })).toEqual({ frameId: 'one-sq', x: 10, y: 10 })
       expect(view.spotAt({ x: 0, y: 0 })).toBeNull()
     })
   })
@@ -180,8 +180,8 @@ describe('editorView', () => {
   describe('defaultFrame and screenPoint', () => {
     it("finds a frame of the shown page, its first by default, and where the frame's pixels are on screen", () => {
       const { view } = harness()
-      expect(view.defaultFrame().key).toBe('one-sq')
-      expect(view.defaultFrame('one-mpu').key).toBe('one-mpu')
+      expect(view.defaultFrame().id).toBe('one-sq')
+      expect(view.defaultFrame('one-mpu').id).toBe('one-mpu')
       view.setCamera({ x: 100, y: 50, zoom: 2 })
       expect(view.screenPoint(5, 6, 'one-mpu')).toEqual({ x: 10 + 100 + (2560 + 5) * 2, y: 10 + 50 + 6 * 2 })
       expect(view.screenPoint(0, 0)).toEqual({ x: 10 + 100, y: 10 + 50 })
@@ -231,7 +231,7 @@ describe('editorView', () => {
       expect(view.design()).toBe(design)
       view.update()
       expect(view.design()).toBe(without)
-      expect(view.frames().map((f) => f.key)).toEqual(['one-sq', 'one-mpu'])
+      expect(view.frames().map((f) => f.id)).toEqual(['one-sq', 'one-mpu'])
     })
 
     it('shows the first page again when the shown page is gone', () => {
@@ -240,7 +240,7 @@ describe('editorView', () => {
       change({ ...design, pages: { one: design.pages.one as Design['pages'][string] } })
       view.update()
       expect(view.page()).toBe('one')
-      expect(view.frames().map((f) => f.key)).toEqual(['one-sq', 'one-story', 'one-mpu'])
+      expect(view.frames().map((f) => f.id)).toEqual(['one-sq', 'one-story', 'one-mpu'])
       change(withoutPageOne)
       view.update()
       expect(view.page()).toBe('two')
@@ -254,7 +254,7 @@ describe('editorView', () => {
       change(withPageThree(true))
       view.showPage('three')
       expect(view.page()).toBe('three')
-      expect(view.frames().map((f) => f.key)).toEqual(['three-sq'])
+      expect(view.frames().map((f) => f.id)).toEqual(['three-sq'])
       expect(view.camera()).toEqual(fit({ x: 100, y: 200, width: 500, height: 400 }, { width: 1000, height: 800 }))
     })
 
@@ -279,12 +279,12 @@ describe('editorView', () => {
       log.length = 0
       let asked: string[] = []
       const painted = view.paint((inView) => {
-        asked = inView.map((f) => f.key)
-        return inView.slice(0, 1).map((frame) => ({ frame, picture: picture(frame.key) }))
+        asked = inView.map((f) => f.id)
+        return inView.slice(0, 1).map((frame) => ({ frame, picture: picture(frame.id) }))
       })
       expect(painted).toBe(true)
       expect(asked).toEqual(['one-sq', 'one-story'])
-      expect(view.inView().map((f) => f.key)).toEqual(asked)
+      expect(view.inView().map((f) => f.id)).toEqual(asked)
       expect(log).toEqual([
         'clear',
         'save',

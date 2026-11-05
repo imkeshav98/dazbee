@@ -195,13 +195,13 @@ export function editorAutoLayoutDrag({
     // The container the drop point is in, among those holding the box, nearest first; or the frame.
     const point = pageFrom(g.to, g.around)
     let branch = g.parentId
-    let target = now.nodes[g.parentId]?.parentId ?? g.frame.key
+    let target = now.nodes[g.parentId]?.parentId ?? g.frame.id
     while (
       now.nodes[target] &&
       !(canHold(now.nodes[target]?.type ?? '', 'graphic') && drawnContains(g.frame, target, point, now))
     ) {
       branch = target
-      target = now.nodes[target]?.parentId ?? g.frame.key
+      target = now.nodes[target]?.parentId ?? g.frame.id
     }
     // Above the part of the container that held them.
     const order = childrenOf(now, target).map(([id]) => id)

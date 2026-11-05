@@ -34,7 +34,7 @@ const DESIGN: DesignInput = {
     },
   },
 }
-const SQUARE: Frame = { key: 'sq', pageId: 'p1', name: 'Square', x: 0, y: 0, width: 1080, height: 1080 }
+const SQUARE: Frame = { id: 'sq', pageId: 'p1', name: 'Square', x: 0, y: 0, width: 1080, height: 1080 }
 const IMAGE = { width: 400, height: 400 }
 const pointer = { pointerId: 1 } as PointerEvent
 
@@ -53,7 +53,7 @@ function harness() {
     selection,
     thumbnails: { ghost: () => '' },
     camera: () => ({ x: 0, y: 0, zoom: 1 }),
-    frameOf: (key) => (key === SQUARE.key ? SQUARE : undefined),
+    frameOf: (key) => (key === SQUARE.id ? SQUARE : undefined),
     boxes: testBoxes(session, selection, [SQUARE], { a1: IMAGE }),
     outline: () => {
       throw new Error('nothing is drawn in these tests')
@@ -61,7 +61,7 @@ function harness() {
     drawOverlay: () => log.push('draw'),
   }
   const cropping = editorCropping(deps)
-  selection.crop({ id: 'photo', frame: 'sq' })
+  selection.crop({ id: 'photo', frameId: 'sq' })
   return { cropping, session, selection, log, fills }
 }
 
@@ -84,7 +84,7 @@ describe('editorCropping', () => {
 
     it('ends a crop whose layer has nothing left to crop', () => {
       const { cropping, selection, log } = harness()
-      selection.crop({ id: 'gone', frame: 'sq' })
+      selection.crop({ id: 'gone', frameId: 'sq' })
       expect(cropping.press(pointer, { x: 200, y: 150 })).toBeNull()
       expect(selection.cropping()).toBeNull()
       expect(log).toEqual([])

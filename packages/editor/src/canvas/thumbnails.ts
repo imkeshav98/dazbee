@@ -87,7 +87,7 @@ export function thumbnailCache({ ck, scenes, resources, current, drawn }: Thumbn
   function layerThumbnail(frame: Frame, id: string, size: number, outlined: boolean): string | null {
     const found = findLayer(scenes.scene(frame).layers, id)
     if (!found || found.props.mask) return null
-    const key = `${frame.key}/${id}${outlined ? '/outlined' : ''}@${size}`
+    const key = `${frame.id}/${id}${outlined ? '/outlined' : ''}@${size}`
     const kept = thumbnails.get(key)
     // Drawn with what the stage draws with: an image whose bytes are still coming is a placeholder.
     const drawWith = resources.screen(current())
@@ -111,7 +111,7 @@ export function thumbnailCache({ ck, scenes, resources, current, drawn }: Thumbn
       drawFrame(
         ck,
         canvas,
-        { frameId: frame.key, width: frame.width, height: frame.height, fills: [], layers: [alone] },
+        { frameId: frame.id, width: frame.width, height: frame.height, fills: [], layers: [alone] },
         drawWith,
       )
       const image = surface.makeImageSnapshot()

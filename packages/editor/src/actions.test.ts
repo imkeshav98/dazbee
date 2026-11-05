@@ -56,7 +56,7 @@ function harness(penDrawing = false) {
   const log: string[] = []
   const selection = editorSelection({ drawn: () => session.design(), frames: () => frames, changed: () => {} })
   const boxes = testBoxes(session, selection, frames)
-  const scenes = { scene: (f: Frame) => render(session.design(), f.key, undefined, measure) }
+  const scenes = { scene: (f: Frame) => render(session.design(), f.id, undefined, measure) }
   const hugAll = (ids: string[]) => hug(session, ids)
   const camera = () => ({ x: 0, y: 0, zoom: 1 })
   const transformDrag = editorTransformDrag({
@@ -87,7 +87,7 @@ function harness(penDrawing = false) {
     view: {
       design: () => session.design(),
       frames: () => frames,
-      frameOf: (key) => frames.find((f) => f.key === key),
+      frameOf: (key) => frames.find((f) => f.id === key),
       fitAll: () => log.push('fitAll'),
       fitArea: (area) => log.push(`fitArea ${JSON.stringify(area)}`),
       zoomTo: (zoom) => log.push(`zoomTo ${zoom}`),
@@ -133,7 +133,7 @@ describe('editorActions', () => {
 
     it('leaves undo and redo to the editor, which ends what is open first', () => {
       const { actions, session, selection, frame, at } = harness()
-      selection.select(['a'], frame.key)
+      selection.select(['a'], frame.id)
       actions.perform('nudgeRight')
       expect(actions.perform('undo')).toBe(false)
       expect(at('a')).toEqual({ x: 101, y: 100 })
@@ -155,7 +155,7 @@ describe('editorActions', () => {
 
     it('deletes the selected layers as one undo step, letting the selection go', () => {
       const { actions, session, selection, frame } = harness()
-      selection.select(['a', 'b'], frame.key)
+      selection.select(['a', 'b'], frame.id)
       expect(actions.perform('delete')).toBe(true)
       expect(session.design().nodes.a).toBeUndefined()
       expect(session.design().nodes.b).toBeUndefined()
@@ -167,7 +167,7 @@ describe('editorActions', () => {
 
     it('groups the selected layers and selects the group', () => {
       const { actions, session, selection, frame } = harness()
-      selection.select(['a', 'b'], frame.key)
+      selection.select(['a', 'b'], frame.id)
       actions.perform('group')
       const [group] = selection.current()?.ids ?? []
       expect(session.design().nodes[group ?? '']?.type).toBe('group')
@@ -176,7 +176,7 @@ describe('editorActions', () => {
 
     it('aligns the selected layers to the left one, as one undo step', () => {
       const { actions, session, selection, frame, at } = harness()
-      selection.select(['a', 'b'], frame.key)
+      selection.select(['a', 'b'], frame.id)
       actions.perform('alignLeft')
       expect(at('a')).toEqual({ x: 100, y: 100 })
       expect(at('b')).toEqual({ x: 100, y: 300 })
@@ -190,14 +190,14 @@ describe('editorActions', () => {
 
     it('aligns one layer to its frame', () => {
       const { actions, selection, frame, at } = harness()
-      selection.select(['a'], frame.key)
+      selection.select(['a'], frame.id)
       actions.perform('alignRight')
       expect(at('a')).toEqual({ x: 980, y: 100 })
     })
 
     it('spaces the selected layers evenly between the outer ones', () => {
       const { actions, selection, frame, at } = harness()
-      selection.select(['a', 'b', 'c'], frame.key)
+      selection.select(['a', 'b', 'c'], frame.id)
       actions.perform('distributeHorizontal')
       expect(at('a')).toEqual({ x: 100, y: 100 })
       expect(at('b')).toEqual({ x: 400, y: 300 })
@@ -206,7 +206,7 @@ describe('editorActions', () => {
 
     it('says auto layout places the layers in a flow, and aligns the rest', () => {
       const { actions, selection, frame, at, log } = harness()
-      selection.select(['b', 'c', 'inRow'], frame.key)
+      selection.select(['b', 'c', 'inRow'], frame.id)
       actions.perform('alignTop')
       expect(log).toContain('placedByLayout')
       expect(at('b')).toEqual({ x: 250, y: 120 })
@@ -216,7 +216,7 @@ describe('editorActions', () => {
 
     it('nudges by a pixel, or ten with Shift, each press one undo step', () => {
       const { actions, session, selection, frame, at } = harness()
-      selection.select(['a'], frame.key)
+      selection.select(['a'], frame.id)
       actions.perform('nudgeRight')
       actions.perform('nudgeDownFar')
       expect(at('a')).toEqual({ x: 101, y: 110 })
@@ -226,7 +226,7 @@ describe('editorActions', () => {
 
     it('nudges a layer in a flow along it, which says why it can go no further', () => {
       const { actions, selection, frame, log } = harness()
-      selection.select(['inRow'], frame.key)
+      selection.select(['inRow'], frame.id)
       actions.perform('nudgeRight')
       expect(log).toContain('flowEnd')
     })
@@ -234,15 +234,15 @@ describe('editorActions', () => {
     it("selects every top-level layer that can be picked of the selection's frame, else of the first frame", () => {
       const { actions, selection, frame, wide } = harness()
       actions.perform('selectAll')
-      expect(selection.current()).toEqual({ frame: frame.key, ids: ['a', 'b', 'c', 'row'] })
-      selection.select(['wide-a'], wide.key)
+      expect(selection.current()).toEqual({ frameId: frame.id, ids: ['a', 'b', 'c', 'row'] })
+      selection.select(['wide-a'], wide.id)
       actions.perform('selectAll')
-      expect(selection.current()).toEqual({ frame: wide.key, ids: ['wide-a'] })
+      expect(selection.current()).toEqual({ frameId: wide.id, ids: ['wide-a'] })
     })
 
     it('locks the selected layers, then unlocks them when every one is locked', () => {
       const { actions, session, selection, frame } = harness()
-      selection.select(['a'], frame.key)
+      selection.select(['a'], frame.id)
       actions.perform('lock')
       expect(session.design().nodes.a?.lock).toMatchObject({ move: true, style: true, content: true })
       actions.perform('lock')
@@ -252,7 +252,7 @@ describe('editorActions', () => {
     it('hides the selected layers, keeping them selected, their copies in the other frame left as they are; again shows them', () => {
       const { actions, session, selection, frame } = harness()
       const copy = session.design().nodes['wide-a']
-      selection.select(['a'], frame.key)
+      selection.select(['a'], frame.id)
       actions.perform('hide')
       expect(session.design().nodes.a?.props.visible).toBe(false)
       expect(session.design().nodes['wide-a']).toEqual(copy)
@@ -263,7 +263,7 @@ describe('editorActions', () => {
 
     it('draws the overlay after a change to the layers', () => {
       const { actions, selection, frame, log } = harness()
-      selection.select(['a'], frame.key)
+      selection.select(['a'], frame.id)
       actions.perform('nudgeLeft')
       expect(log).toEqual(['overlay'])
     })
@@ -273,7 +273,7 @@ describe('editorActions', () => {
     it("fits the box around the selection, or the shown page's frames with none", () => {
       const { actions, selection, frame, log } = harness()
       actions.fitSelection()
-      selection.select(['a', 'b'], frame.key)
+      selection.select(['a', 'b'], frame.id)
       actions.fitSelection()
       expect(log).toEqual([
         'fitAll',

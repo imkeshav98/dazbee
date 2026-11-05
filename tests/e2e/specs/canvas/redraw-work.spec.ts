@@ -144,7 +144,7 @@ type Work = Awaited<ReturnType<typeof redraws>>
 
 /** The keys of the frames a redraw had in view, culled as the editor culls them. */
 const inView = (work: Work, draw: Redraw) =>
-  framesInView(work.frames, draw.camera, draw.viewport).map((frame) => frame.key)
+  framesInView(work.frames, draw.camera, draw.viewport).map((frame) => frame.id)
 
 /**
  * The work the redraws did. Every frame was drawn, all in view, once the fonts and images had
@@ -229,7 +229,7 @@ test('a 20-card carousel shows one card at a time and culls its frames out of vi
   const { errors } = await openCarousel(page)
   expect(await page.evaluate(() => Object.keys(window.dazbee?.design().frames ?? {}).length)).toBe(100)
   expect(await page.evaluate(() => window.dazbee?.shownPage())).toBe('c3')
-  expect(await page.evaluate(() => window.dazbee?.frames().map((frame) => frame.key))).toEqual([
+  expect(await page.evaluate(() => window.dazbee?.frames().map((frame) => frame.id))).toEqual([
     'c3-sq',
     'c3-story',
     'c3-land',

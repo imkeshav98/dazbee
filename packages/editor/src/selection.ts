@@ -8,12 +8,12 @@ import type { AnchorRef } from './gestures/path.ts'
 /** A layer as one frame shows it: selection, dragging and typing all happen in one frame. */
 export interface Picked {
   id: string
-  frame: string
+  frameId: string
 }
 /** The selected layers, all in one frame, in the order they were picked. */
 export interface Selection {
   ids: string[]
-  frame: string
+  frameId: string
 }
 /** The path layer whose points are being edited (#45), and which of its anchors are selected. */
 export interface PathEditing extends Picked {
@@ -45,7 +45,7 @@ export interface EditorSelection {
   /** The layer under the pointer, outlined while nothing is being dragged. */
   hovered(): Picked | null
   /** Selects layers in one frame, or none; a crop or path edit stays only on that one layer there. Shows it. */
-  select(ids: string[], frame: string): void
+  select(ids: string[], frameId: string): void
   /** Sets the selection and shows nothing: a crop or path edit stays while a layer is selected, and ends with none. */
   selectKeepingModes(next: Selection | null): void
   /**
@@ -109,7 +109,7 @@ export function editorSelection({ drawn, frames, changed }: SelectionDeps): Edit
   /** Told when the picked page changes. */
   const pageListeners = new Set<(pageId: string | null) => void>()
 
-  const frameOf = (key: string | undefined) => frames().find((f) => f.key === key)
+  const frameOf = (id: string | undefined) => frames().find((f) => f.id === id)
 
   function current() {
     return selection
@@ -130,11 +130,11 @@ export function editorSelection({ drawn, frames, changed }: SelectionDeps): Edit
     return hovered
   }
 
-  function select(ids: string[], frame: string) {
-    selection = ids.length > 0 ? { ids, frame } : null
-    if (pathEditing && (ids.length !== 1 || ids[0] !== pathEditing.id || frame !== pathEditing.frame))
+  function select(ids: string[], frameId: string) {
+    selection = ids.length > 0 ? { ids, frameId } : null
+    if (pathEditing && (ids.length !== 1 || ids[0] !== pathEditing.id || frameId !== pathEditing.frameId))
       pathEditing = null
-    if (cropping && (ids.length !== 1 || ids[0] !== cropping.id || frame !== cropping.frame)) cropping = null
+    if (cropping && (ids.length !== 1 || ids[0] !== cropping.id || frameId !== cropping.frameId)) cropping = null
     changed()
   }
   /** With nothing selected there is no crop and no path edit. */
@@ -151,13 +151,13 @@ export function editorSelection({ drawn, frames, changed }: SelectionDeps): Edit
     if (!selection) return endModesWhenNone()
     const design = drawn()
     const ids = selection.ids.filter((id) => design.nodes[id])
-    selection = ids.length > 0 && frameOf(selection.frame) ? { ...selection, ids } : null
+    selection = ids.length > 0 && frameOf(selection.frameId) ? { ...selection, ids } : null
     if (entered && !design.nodes[entered]) entered = null
     if (pathEditing && (!selection?.ids.includes(pathEditing.id) || !isPath(design, pathEditing.id))) pathEditing = null
-    if (cropping && (!selection?.ids.includes(cropping.id) || selection.frame !== cropping.frame)) cropping = null
+    if (cropping && (!selection?.ids.includes(cropping.id) || selection.frameId !== cropping.frameId)) cropping = null
   }
   function dropOffPage() {
-    if (selection && !frameOf(selection.frame)) selection = null
+    if (selection && !frameOf(selection.frameId)) selection = null
     endModesWhenNone()
   }
   function pickPage(pageId: string | null) {
@@ -168,7 +168,7 @@ export function editorSelection({ drawn, frames, changed }: SelectionDeps): Edit
     // Picking the page lets the selection go, with a crop or path edit on it and any group gone into.
     if (next && selection) {
       entered = null
-      select([], selection.frame)
+      select([], selection.frameId)
     }
     changed()
     for (const listener of pageListeners) listener(pickedPage)
@@ -186,7 +186,7 @@ export function editorSelection({ drawn, frames, changed }: SelectionDeps): Edit
     if (pathEditing) pathEditing.selected = refs
   }
   function hover(next: Picked | null) {
-    const moved = next?.id !== hovered?.id || next?.frame !== hovered?.frame
+    const moved = next?.id !== hovered?.id || next?.frameId !== hovered?.frameId
     hovered = next
     return moved
   }
@@ -200,7 +200,7 @@ export function editorSelection({ drawn, frames, changed }: SelectionDeps): Edit
     return pageGone
   }
   function tellListeners(pageGone: boolean) {
-    const now = selection ? `${selection.frame}|${selection.ids.join(',')}` : ''
+    const now = selection ? `${selection.frameId}|${selection.ids.join(',')}` : ''
     if (now !== lastSelection) {
       lastSelection = now
       for (const listener of selectionListeners) listener(selection?.ids ?? [])

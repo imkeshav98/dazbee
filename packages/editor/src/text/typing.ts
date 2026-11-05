@@ -20,7 +20,7 @@ export interface TypingDeps {
   resources: Pick<EditorResources, 'bytes'>
   scenes: Pick<FrameScenes, 'scene' | 'measure' | 'layout'>
   /** The shown page's frame with an id, as last drawn, if there is one. */
-  frameOf: (key: string | undefined) => Frame | undefined
+  frameOf: (id: string | undefined) => Frame | undefined
   /** Groups fit what they hold again after a change inside them, in the same undo step. */
   hug: (ids: string[]) => void
   /** Puts an overlay element over a box in a frame, in design pixels. */
@@ -107,7 +107,7 @@ export function editorTyping({
   }
   /** The layer as a frame shows it now, with the frame. */
   function pickedLayer(picked: Picked | null) {
-    const frame = picked && frameOf(picked.frame)
+    const frame = picked && frameOf(picked.frameId)
     const layer = frame && findLayer(scenes.scene(frame).layers, picked.id)
     return frame && layer ? { frame, layer } : null
   }
@@ -194,7 +194,7 @@ export function editorTyping({
     created = false,
   ) {
     const at = textAnchor(doc, id, offset)
-    editing = { id, frame, caret: at, anchor: at, endGesture, created }
+    editing = { id, frameId: frame, caret: at, anchor: at, endGesture, created }
     textSelectionChanged()
   }
   /** Ends typing, closing its undo step. */

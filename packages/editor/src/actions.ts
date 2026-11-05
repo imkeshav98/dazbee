@@ -100,7 +100,7 @@ export function editorActions({
   /** Combines the selected shapes into a live boolean (#44) and selects it. One undo step. */
   function combine(op: 'union' | 'subtract' | 'intersect' | 'exclude') {
     const current = selection.current()
-    const frame = current && frameOf(current.frame)
+    const frame = current && frameOf(current.frameId)
     if (!frame) return
     let id = ''
     if (
@@ -112,7 +112,7 @@ export function editorActions({
         })
       })
     )
-      selection.select([id], frame.key)
+      selection.select([id], frame.id)
   }
 
   /**
@@ -121,7 +121,7 @@ export function editorActions({
    */
   function arrange(offsets: (boxes: Rect[], within: Rect) => Offset[]) {
     const current = selection.current()
-    const frame = current && frameOf(current.frame)
+    const frame = current && frameOf(current.frameId)
     if (!frame) return false
     const now = session.design()
     const ids = boxes.roots(now)
@@ -161,7 +161,7 @@ export function editorActions({
   /** Moves the selection by whole pixels in its frame, one undo step per press. */
   function nudge(dx: number, dy: number) {
     const current = selection.current()
-    const frame = current && frameOf(current.frame)
+    const frame = current && frameOf(current.frameId)
     if (!frame) return
     const ids = boxes.roots()
     const now = session.design()
@@ -188,14 +188,14 @@ export function editorActions({
 
   /** The top-level layers of the selection's frame, or else of the shown page's first frame, that can be picked. */
   function selectAll() {
-    const frame = frameOf(selection.current()?.frame) ?? frames()[0]
+    const frame = frameOf(selection.current()?.frameId) ?? frames()[0]
     if (!frame) return
     selection.select(
       scenes
         .scene(frame)
         .layers.filter(boxes.pickable)
         .map((layer) => layer.id),
-      frame.key,
+      frame.id,
     )
   }
 
@@ -261,7 +261,7 @@ export function editorActions({
       return true
     }
     const current = selection.current()
-    const frame = current && frameOf(current.frame)
+    const frame = current && frameOf(current.frameId)
     if (!current || !frame) return false
     const ids = boxes.roots()
     const nodes = session.design().nodes
@@ -272,7 +272,7 @@ export function editorActions({
         const up = selection.entered()
         const parent = up ? drawn().nodes[up]?.parentId : undefined
         selection.enter(parent && drawn().nodes[parent] ? parent : null)
-        selection.select(up ? [up] : [], frame.key)
+        selection.select(up ? [up] : [], frame.id)
         break
       }
       case 'delete': {
@@ -285,7 +285,7 @@ export function editorActions({
             }),
           )
         )
-          selection.select([], frame.key)
+          selection.select([], frame.id)
         break
       }
       case 'group': {
@@ -295,7 +295,7 @@ export function editorActions({
             group = session.run('node.group', { ids, drawn: boxes.drawnInFlow(ids) })
           })
         )
-          selection.select([group], frame.key)
+          selection.select([group], frame.id)
         break
       }
       case 'alignLeft':
@@ -326,8 +326,8 @@ export function editorActions({
         // Enter on one layer with an image fill crops it (#48); on one path, it goes into its points (#45).
         const [only] = current.ids
         if (current.ids.length !== 1 || !only || nodes[only]?.lock?.style) return false
-        if (boxes.cropTarget(frame, only)) selection.crop({ id: only, frame: frame.key })
-        else if (isPath(session.design(), only)) selection.editPath({ id: only, frame: frame.key })
+        if (boxes.cropTarget(frame, only)) selection.crop({ id: only, frameId: frame.id })
+        else if (isPath(session.design(), only)) selection.editPath({ id: only, frameId: frame.id })
         else return false
         break
       }
@@ -349,7 +349,7 @@ export function editorActions({
             }),
           )
         )
-          selection.select([group], frame.key)
+          selection.select([group], frame.id)
         break
       }
       case 'boxSelection': {
@@ -359,7 +359,7 @@ export function editorActions({
             boxed = session.run('node.box', { ids, drawn: boxes.drawnInFlow(ids) })
           })
         )
-          selection.select([boxed], frame.key)
+          selection.select([boxed], frame.id)
         break
       }
       case 'autoLayout': {
@@ -390,7 +390,7 @@ export function editorActions({
             }),
           )
         )
-          selection.select([boxed], frame.key)
+          selection.select([boxed], frame.id)
         break
       }
       case 'booleanUnion':
@@ -415,7 +415,7 @@ export function editorActions({
             freed = session.run('node.ungroup', { ids: groups })
           })
         ) {
-          selection.select([...ids.filter((id) => !groups.includes(id)), ...freed], frame.key)
+          selection.select([...ids.filter((id) => !groups.includes(id)), ...freed], frame.id)
         }
         break
       }
@@ -426,7 +426,7 @@ export function editorActions({
             copies = session.run('node.duplicate', { ids })
           })
         )
-          selection.select(copies, frame.key)
+          selection.select(copies, frame.id)
         break
       }
       case 'bringForward':

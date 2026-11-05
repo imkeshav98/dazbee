@@ -41,11 +41,11 @@ export const ORDER = ['bringToFront', 'bringForward', 'sendBackward', 'sendToBac
  */
 export function hiddenAt(editor: Editor, client: Point): HiddenLayers | null {
   const spot = editor.spotAt(client)
-  const frame = editor.frames().find((f) => f.key === spot?.frame) ?? nearestFrame(editor, client)
+  const frame = editor.frames().find((f) => f.id === spot?.frameId) ?? nearestFrame(editor, client)
   if (!frame) return null
   const design = editor.design()
-  const ids = descendants(design, frame.key).filter((id) => !visibleIn(design, id))
-  return ids.length > 0 ? { ids, frameId: frame.key } : null
+  const ids = descendants(design, frame.id).filter((id) => !visibleIn(design, id))
+  return ids.length > 0 ? { ids, frameId: frame.id } : null
 }
 
 /**
@@ -73,8 +73,8 @@ function masksOver(design: Design, ids: readonly string[]): string[] | null {
 function nearestFrame(editor: Editor, client: Point) {
   let nearest: { frame: Frame; far: number } | null = null
   for (const frame of editor.frames()) {
-    const a = editor.screenPoint(0, 0, frame.key)
-    const b = editor.screenPoint(frame.width, frame.height, frame.key)
+    const a = editor.screenPoint(0, 0, frame.id)
+    const b = editor.screenPoint(frame.width, frame.height, frame.id)
     const dx = Math.max(Math.min(a.x, b.x) - client.x, 0, client.x - Math.max(a.x, b.x))
     const dy = Math.max(Math.min(a.y, b.y) - client.y, 0, client.y - Math.max(a.y, b.y))
     const far = Math.hypot(dx, dy)

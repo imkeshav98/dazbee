@@ -190,14 +190,14 @@ describe('editorBoxes', () => {
     it("is one layer's own box, or the box around several, with where it is drawn and its containers", () => {
       const { selection, boxes, square } = harness()
       expect(boxes.selectionBox()).toBeNull()
-      selection.select(['inside'], square.key)
+      selection.select(['inside'], square.id)
       expect(boxes.selectionBox()).toMatchObject({
         frame: square,
         box: { x: 600, y: 100, width: 20, height: 20, rotation: 0 },
         drawn: { rotation: 90 },
         around: [{ x: 600, y: 100, rotation: 90 }],
       })
-      selection.select(['dot', 'zig'], square.key)
+      selection.select(['dot', 'zig'], square.id)
       expect(boxes.selectionBox()?.box).toEqual({ x: 100, y: 120, width: 100, height: 680, rotation: 0 })
     })
   })
@@ -205,7 +205,7 @@ describe('editorBoxes', () => {
   describe('roots', () => {
     it('leaves out selected layers inside another selected layer, and layers that are gone', () => {
       const { session, selection, boxes, square } = harness()
-      selection.select(['dot', 'card', 'zig'], square.key)
+      selection.select(['dot', 'card', 'zig'], square.id)
       expect(boxes.roots()).toEqual(['card', 'zig'])
       session.run('node.delete', { ids: ['zig'] })
       expect(boxes.roots()).toEqual(['card'])
@@ -224,7 +224,7 @@ describe('editorBoxes', () => {
     it('says whether a selected layer is locked in place', () => {
       const { selection, boxes, square } = harness()
       expect(boxes.lockedSelection()).toBe(false)
-      selection.select(['dot', 'pin'], square.key)
+      selection.select(['dot', 'pin'], square.id)
       expect(boxes.lockedSelection()).toBe(true)
     })
   })
@@ -233,11 +233,11 @@ describe('editorBoxes', () => {
     it('gives every handle, none while locked, and no top or bottom one to text that grows with its words', () => {
       const { selection, boxes, square } = harness()
       expect(boxes.handlesFor()).toEqual([])
-      selection.select(['dot'], square.key)
+      selection.select(['dot'], square.id)
       expect(boxes.handlesFor()).toHaveLength(8)
-      selection.select(['label'], square.key)
+      selection.select(['label'], square.id)
       expect(boxes.handlesFor()).toEqual(['nw', 'ne', 'e', 'se', 'sw', 'w'])
-      selection.select(['pin'], square.key)
+      selection.select(['pin'], square.id)
       expect(boxes.handlesFor()).toEqual([])
     })
   })
@@ -340,14 +340,14 @@ describe('editorBoxes', () => {
   describe('target', () => {
     it('picks the top-level layer, a selected layer the press is in, or what is directly in the group gone into', () => {
       const { selection, boxes, square, wide } = harness()
-      expect(boxes.target('dot', square.key)).toBe('card')
-      selection.select(['dot'], square.key)
-      expect(boxes.target('dot', square.key)).toBe('dot')
-      expect(boxes.target('wide-dot', wide.key)).toBe('wide-card')
-      selection.select([], square.key)
+      expect(boxes.target('dot', square.id)).toBe('card')
+      selection.select(['dot'], square.id)
+      expect(boxes.target('dot', square.id)).toBe('dot')
+      expect(boxes.target('wide-dot', wide.id)).toBe('wide-card')
+      selection.select([], square.id)
       selection.enter('card')
-      expect(boxes.target('dot', square.key)).toBe('dot')
-      expect(boxes.target('inside', square.key)).toBe('turned')
+      expect(boxes.target('dot', square.id)).toBe('dot')
+      expect(boxes.target('inside', square.id)).toBe('turned')
     })
   })
 

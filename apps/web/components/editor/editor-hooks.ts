@@ -89,7 +89,7 @@ function sameFrames(a: readonly Frame[], b: readonly Frame[]) {
       const other = b[i]
       return (
         other !== undefined &&
-        frame.key === other.key &&
+        frame.id === other.id &&
         frame.pageId === other.pageId &&
         frame.name === other.name &&
         frame.x === other.x &&

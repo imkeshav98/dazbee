@@ -13,7 +13,7 @@ test.describe('nothing selected', () => {
   row(59, "the shown page's frames, counted in Pages; an empty page says how to add a frame", async (open) => {
     const page = await open(true)
     // The page's two linked frames are on the stage, each labelled with its name.
-    expect(await page.evaluate(() => window.dazbee?.frames().map((f) => f.key))).toEqual(['sq', 'story'])
+    expect(await page.evaluate(() => window.dazbee?.frames().map((f) => f.id))).toEqual(['sq', 'story'])
     await expect.soft(page.locator('.frame-label[data-frame="sq"]')).toContainText('Square')
     await expect.soft(page.locator('.frame-label[data-frame="story"]')).toContainText('Story')
     await expect(page.getByTestId('empty-page')).toHaveCount(0)

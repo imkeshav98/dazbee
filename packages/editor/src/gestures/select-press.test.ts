@@ -36,7 +36,7 @@ const DESIGN: DesignInput = {
     pin: { ...rect('sq', 'a2', { x: 600, y: 700, width: 10, height: 10 }), link: 'pin', lock: { move: true } },
   },
 }
-const SQUARE: Frame = { key: 'sq', pageId: 'p1', name: 'Square', x: 0, y: 0, width: 1080, height: 1080 }
+const SQUARE: Frame = { id: 'sq', pageId: 'p1', name: 'Square', x: 0, y: 0, width: 1080, height: 1080 }
 
 /**
  * The select tool's press over the design on a real session, selection and box queries, at zoom 1
@@ -53,7 +53,7 @@ function harness(handle: ResizeDrag['handle'] | null = null) {
     view: {
       camera: () => ({ x: 0, y: 0, zoom: 1 }),
       frames: () => [SQUARE],
-      frameOf: (key) => (key === SQUARE.key ? SQUARE : undefined),
+      frameOf: (key) => (key === SQUARE.id ? SQUARE : undefined),
     },
     selection,
     boxes,
@@ -85,13 +85,13 @@ describe('editorSelectPress', () => {
     it('selects the top-level layer under the press, ending typing, and starts moving it', () => {
       const { selection, press, log } = harness()
       expect(press({ x: 115, y: 125 })).toEqual({ kind: 'move' })
-      expect(selection.current()).toEqual({ ids: ['card'], frame: 'sq' })
+      expect(selection.current()).toEqual({ ids: ['card'], frameId: 'sq' })
       expect(log).toEqual(['stop typing', 'capture', 'press move card'])
     })
 
     it('adds a layer to the selection with Shift, or takes it out again', () => {
       const { selection, press } = harness()
-      selection.select(['box'], SQUARE.key)
+      selection.select(['box'], SQUARE.id)
       expect(press({ x: 115, y: 125 }, true)).toEqual({ kind: 'move' })
       expect(selection.current()?.ids).toEqual(['box', 'card'])
       expect(press({ x: 115, y: 125 }, true)).toBeNull()
@@ -100,7 +100,7 @@ describe('editorSelectPress', () => {
 
     it('starts a marquee on nothing, letting the selection go', () => {
       const { selection, press, log } = harness()
-      selection.select(['box'], SQUARE.key)
+      selection.select(['box'], SQUARE.id)
       expect(press({ x: 900, y: 900 })).toEqual({
         kind: 'marquee',
         from: { x: 900, y: 900 },
@@ -114,7 +114,7 @@ describe('editorSelectPress', () => {
 
     it('grabs a handle of the selection under the press', () => {
       const { selection, press, log } = harness('se')
-      selection.select(['box'], SQUARE.key)
+      selection.select(['box'], SQUARE.id)
       expect(press({ x: 700, y: 200 })).toEqual({ kind: 'resize' })
       expect(log).toEqual(['stop typing', 'press handle resize'])
     })
@@ -123,7 +123,7 @@ describe('editorSelectPress', () => {
   describe('moved', () => {
     it('keeps a press a click until the pointer has gone more than the slop from it', () => {
       const { select, selection, press } = harness()
-      selection.select(['card', 'box'], SQUARE.key)
+      selection.select(['card', 'box'], SQUARE.id)
       press({ x: 115, y: 125 })
       expect(select.moved({ x: 117, y: 126 })).toBe(false)
       expect(select.moved({ x: 125, y: 125 })).toBe(true)
@@ -134,11 +134,11 @@ describe('editorSelectPress', () => {
   describe('release', () => {
     it('selects alone the one of several selected layers a click picked, unless it became a drag', () => {
       const { select, selection, press } = harness()
-      selection.select(['card', 'box'], SQUARE.key)
+      selection.select(['card', 'box'], SQUARE.id)
       press({ x: 115, y: 125 })
       select.release(null)
       expect(selection.current()?.ids).toEqual(['card'])
-      selection.select(['card', 'box'], SQUARE.key)
+      selection.select(['card', 'box'], SQUARE.id)
       press({ x: 115, y: 125 })
       select.moved({ x: 140, y: 140 })
       select.release(null)
@@ -150,7 +150,7 @@ describe('editorSelectPress', () => {
       select.release(press({ x: 900, y: 900 }) as MarqueeDrag)
       expect(selection.pickedPage()).toBe('p1')
       select.release(press({ x: 605, y: 705 }) as MarqueeDrag)
-      expect(selection.current()).toEqual({ ids: ['pin'], frame: 'sq' })
+      expect(selection.current()).toEqual({ ids: ['pin'], frameId: 'sq' })
     })
 
     it('lets the page go after a marquee that was dragged', () => {

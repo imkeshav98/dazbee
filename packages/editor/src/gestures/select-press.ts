@@ -84,7 +84,7 @@ export function editorSelectPress({
       return transformDrag.pressHandle(e, screen, grabbed, outer)
     }
     const inSelection = (id: string) =>
-      selection.current()?.frame === at?.frame.key && selection.current()?.ids.includes(id)
+      selection.current()?.frameId === at?.frame.id && selection.current()?.ids.includes(id)
     const locked = at && !e.shiftKey ? lockedAt(at.frame, at.p) : null
     // Inside the selection's box, a press moves the selection, gaps and layers over it included:
     // a mask, which isn't drawn, or a layer under others, is dragged where it is.
@@ -98,7 +98,7 @@ export function editorSelectPress({
       current &&
       movable &&
       current.ids.length > 0 &&
-      outer.frame.key === at.frame.key &&
+      outer.frame.id === at.frame.id &&
       inner.x >= outer.box.x &&
       inner.x <= outer.box.x + outer.box.width &&
       inner.y >= outer.box.y &&
@@ -111,24 +111,24 @@ export function editorSelectPress({
       !(locked && insideEntered(locked))
     )
       selection.enter(null)
-    const hit = at && deepest && !(locked && !inOuter) ? { id: target(deepest.id, at.frame.key) } : null
+    const hit = at && deepest && !(locked && !inOuter) ? { id: target(deepest.id, at.frame.id) } : null
     if (at && hit) {
       if (e.shiftKey) {
         // Shift adds a layer to the selection, or takes it out again.
         if (inSelection(hit.id) && current) {
           selection.select(
             current.ids.filter((id) => id !== hit.id),
-            current.frame,
+            current.frameId,
           )
           return null
         }
-        selection.select(current?.frame === at.frame.key ? [...current.ids, hit.id] : [hit.id], at.frame.key)
+        selection.select(current?.frameId === at.frame.id ? [...current.ids, hit.id] : [hit.id], at.frame.id)
       } else if (inSelection(hit.id)) {
         if ((selection.current()?.ids.length ?? 0) > 1) clickedAlone = hit.id
       } else if (inOuter) {
         clickedAlone = hit.id
       } else {
-        selection.select([hit.id], at.frame.key)
+        selection.select([hit.id], at.frame.id)
       }
       // Inside the selection's box a drag still moves the selection; a click picks the locked layer
       // on top there.
@@ -136,10 +136,10 @@ export function editorSelectPress({
     } else if (!inOuter) {
       // Empty canvas, or a locked layer: a marquee, adding to the selection with shift.
       canvas.setPointerCapture(e.pointerId)
-      lockedClick = at && locked ? { id: locked, frame: at.frame.key } : null
+      lockedClick = at && locked ? { id: locked, frame: at.frame.id } : null
       const from = toWorld(view.camera(), screen)
       const base = e.shiftKey ? (selection.current()?.ids ?? []) : []
-      const baseFrame = e.shiftKey ? (selection.current()?.frame ?? null) : null
+      const baseFrame = e.shiftKey ? (selection.current()?.frameId ?? null) : null
       // A press on a locked layer keeps the selection until it is a drag, so a click on the one
       // selected leaves it be.
       if (!e.shiftKey && !locked) selection.selectKeepingModes(null)
@@ -148,7 +148,7 @@ export function editorSelectPress({
     } else if (!e.shiftKey) {
       clickedAlone = ''
     }
-    const frame = at && frameOf(selection.current()?.frame)
+    const frame = at && frameOf(selection.current()?.frameId)
     const around = boxes.selectionBox()?.around ?? []
     if (!at || !frame) return null
     canvas.setPointerCapture(e.pointerId)
@@ -182,7 +182,7 @@ export function editorSelectPress({
     if (clickedAlone !== null && current) {
       // A click that picks a layer outside the group gone into, or nothing, leaves it.
       if (selection.entered() && (!clickedAlone || !insideEntered(clickedAlone))) selection.enter(null)
-      selection.select(clickedAlone ? [clickedAlone] : [], current.frame)
+      selection.select(clickedAlone ? [clickedAlone] : [], current.frameId)
       // A click inside the selection's box on no layer picks the page there.
       if (!clickedAlone && pressedAt)
         selection.pickPage(frameAt(view.frames(), toWorld(view.camera(), pressedAt))?.pageId ?? null)

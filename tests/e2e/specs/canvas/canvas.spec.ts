@@ -83,22 +83,22 @@ test.describe('pan and zoom', () => {
     await page.keyboard.press('Shift+1')
     await drawn(page)
     const frames = await page.evaluate(() => window.dazbee?.frames() ?? [])
-    expect(frames.map((frame) => frame.key)).toEqual(FRAME_IDS)
+    expect(frames.map((frame) => frame.id)).toEqual(FRAME_IDS)
     const stored = await page.evaluate(() => window.dazbee?.design().frames ?? {})
     for (const frame of frames) {
       expect({ x: frame.x, y: frame.y, width: frame.width, height: frame.height }).toEqual({
-        x: stored[frame.key]?.x,
-        y: stored[frame.key]?.y,
-        width: stored[frame.key]?.width,
-        height: stored[frame.key]?.height,
+        x: stored[frame.id]?.x,
+        y: stored[frame.id]?.y,
+        width: stored[frame.id]?.width,
+        height: stored[frame.id]?.height,
       })
-      const topLeft = await screenPoint(page, 0, 0, frame.key)
-      const bottomRight = await screenPoint(page, frame.width, frame.height, frame.key)
+      const topLeft = await screenPoint(page, 0, 0, frame.id)
+      const bottomRight = await screenPoint(page, frame.width, frame.height, frame.id)
       expect(topLeft.x).toBeGreaterThanOrEqual(stage.x)
       expect(topLeft.y).toBeGreaterThanOrEqual(stage.y)
       expect(bottomRight.x).toBeLessThanOrEqual(stage.x + stage.width)
       expect(bottomRight.y).toBeLessThanOrEqual(stage.y + stage.height)
-      await expect(page.locator(`.frame-label[data-frame="${frame.key}"]`)).toBeVisible()
+      await expect(page.locator(`.frame-label[data-frame="${frame.id}"]`)).toBeVisible()
     }
     // Shift+0 is 100%; Zoom to fit in the zoom pill's menu fits everything again.
     await page.keyboard.press('Shift+0')
@@ -187,7 +187,7 @@ test.describe('pages of frames', () => {
         const { page, errors } = await openStage(browser, pages())
         await page.setViewportSize({ width, height })
         await fitSettled(page)
-        const shown = () => page.evaluate(() => window.dazbee?.frames().map((frame) => frame.key))
+        const shown = () => page.evaluate(() => window.dazbee?.frames().map((frame) => frame.id))
         expect(await shown()).toEqual(['sq', 'story', 'land', 'mpu', 'leader'])
         await shot(page, '2-linked-frames')
         // A layer selected in one frame; its copies stay as they are.

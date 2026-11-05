@@ -36,7 +36,7 @@ export function testBoxes(
   return editorBoxes({
     session,
     scenes: {
-      scene: (frame) => render(session.design(), frame.key, undefined, measure),
+      scene: (frame) => render(session.design(), frame.id, undefined, measure),
       measure: () => measure,
     },
     resources: {
@@ -45,6 +45,6 @@ export function testBoxes(
     },
     selection,
     drawn: () => session.design(),
-    frameOf: (key) => frames.find((f) => f.key === key),
+    frameOf: (key) => frames.find((f) => f.id === key),
   })
 }

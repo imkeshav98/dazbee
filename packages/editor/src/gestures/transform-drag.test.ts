@@ -80,7 +80,7 @@ function harness() {
   const deps: TransformDragDeps = {
     canvas: { setPointerCapture: () => {} } as unknown as HTMLCanvasElement,
     session,
-    scenes: { scene: (f) => render(session.design(), f.key, undefined, measure) },
+    scenes: { scene: (f) => render(session.design(), f.id, undefined, measure) },
     selection,
     typing: { editing: () => null, fitText: (id) => log.push(`fit ${id}`) },
     boxes: testBoxes(session, selection, frames),
@@ -123,7 +123,7 @@ describe('editorTransformDrag', () => {
     it('finds the handle under a point, the zone outside a corner that turns, or nothing', () => {
       const { drag, selection, frame } = harness()
       expect(drag.handleUnder({ x: 200, y: 200 })).toBeNull()
-      selection.select(['a'], frame.key)
+      selection.select(['a'], frame.id)
       expect(drag.handleUnder({ x: 202, y: 198 })).toEqual({ kind: 'resize', handle: 'se' })
       expect(drag.handleUnder({ x: 150, y: 100 })).toEqual({ kind: 'resize', handle: 'n' })
       expect(drag.handleUnder({ x: 215, y: 215 })).toEqual({ kind: 'rotate', corner: 2 })
@@ -133,7 +133,7 @@ describe('editorTransformDrag', () => {
 
     it('finds none on a selection locked in place', () => {
       const { drag, selection, frame } = harness()
-      selection.select(['pin'], frame.key)
+      selection.select(['pin'], frame.id)
       expect(drag.handleUnder({ x: 750, y: 750 })).toBeNull()
     })
   })
@@ -141,7 +141,7 @@ describe('editorTransformDrag', () => {
   describe('pressHandle and resize', () => {
     it('resizes from the handle grabbed, as one undo step', () => {
       const { drag, session, selection, frame, boxOf, pressSelection } = harness()
-      selection.select(['a'], frame.key)
+      selection.select(['a'], frame.id)
       const resize = pressSelection({ x: 200, y: 150 })
       expect(resize).toMatchObject({ kind: 'resize', handle: 'e', roots: ['a'] })
       expect(drag.snapWork().gathered).toBe(1)
@@ -157,7 +157,7 @@ describe('editorTransformDrag', () => {
 
     it('keeps the shape with Shift on a corner', () => {
       const { drag, selection, frame, boxOf, pressSelection } = harness()
-      selection.select(['a'], frame.key)
+      selection.select(['a'], frame.id)
       const resize = pressSelection({ x: 200, y: 200 })
       drag.drag(resize, { x: 300, y: 220 }, true, false, false)
       expect(boxOf('a')).toMatchObject({ width: 200, height: 200 })
@@ -166,7 +166,7 @@ describe('editorTransformDrag', () => {
     it("scales a text's sizes from a corner, its own runs' too, leaving its copy in the other frame be", () => {
       const { drag, session, selection, frame, copies, pressSelection } = harness()
       const before = copies()
-      selection.select(['words'], frame.key)
+      selection.select(['words'], frame.id)
       const resize = pressSelection({ x: 900, y: 148 })
       expect(resize).toMatchObject({ kind: 'resize', handle: 'se' })
       drag.drag(resize, { x: 1100, y: 196 }, false, false, false)
@@ -189,7 +189,7 @@ describe('editorTransformDrag', () => {
   describe('pressHandle and rotate', () => {
     it('turns the layer about its centre from outside a corner, in 15° steps with Shift', () => {
       const { drag, selection, frame, boxOf, pressSelection } = harness()
-      selection.select(['a'], frame.key)
+      selection.select(['a'], frame.id)
       const rotate = pressSelection({ x: 210, y: 210 })
       expect(rotate).toMatchObject({ kind: 'rotate', roots: ['a'] })
       // From the bottom right corner to straight below the centre: an eighth of a turn.
@@ -271,15 +271,15 @@ describe('editorTransformDrag', () => {
     it('selects the layers it touches that can be picked, with those selected before', () => {
       const { drag, selection, frame } = harness()
       drag.marquee({ kind: 'marquee', from: { x: 50, y: 50 }, to: { x: 450, y: 150 }, base: [], baseFrame: null })
-      expect(selection.current()).toEqual({ frame: frame.key, ids: ['a', 'b'] })
+      expect(selection.current()).toEqual({ frameId: frame.id, ids: ['a', 'b'] })
       drag.marquee({
         kind: 'marquee',
         from: { x: 650, y: 650 },
         to: { x: 800, y: 800 },
         base: ['b'],
-        baseFrame: frame.key,
+        baseFrame: frame.id,
       })
-      expect(selection.current()).toEqual({ frame: frame.key, ids: ['b'] })
+      expect(selection.current()).toEqual({ frameId: frame.id, ids: ['b'] })
       drag.marquee({ kind: 'marquee', from: { x: 650, y: 650 }, to: { x: 800, y: 800 }, base: [], baseFrame: null })
       expect(selection.current()).toBeNull()
     })

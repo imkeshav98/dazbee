@@ -32,7 +32,7 @@ export interface CroppingDeps {
   thumbnails: Pick<ThumbnailCache, 'ghost'>
   camera: () => Camera
   /** The shown page's frame with an id, as last drawn, if there is one. */
-  frameOf: (key: string | undefined) => Frame | undefined
+  frameOf: (id: string | undefined) => Frame | undefined
   boxes: Pick<EditorBoxes, 'cropTarget'>
   /** A box on the overlay with a class, turned as the layer is. */
   outline: (className: string, frame: Frame, box: Box) => HTMLElement
@@ -69,7 +69,7 @@ export function editorCropping({
   /** The crop being made (#48): the whole image, faint outside the layer, a handle on each corner. */
   function cropParts(): HTMLElement[] {
     const cropping = selection.cropping()
-    const frame = cropping && frameOf(cropping.frame)
+    const frame = cropping && frameOf(cropping.frameId)
     const target = frame && cropping && cropTarget(frame, cropping.id)
     if (!frame || !target) return []
     const { box, rect, around } = target
@@ -101,7 +101,7 @@ export function editorCropping({
    */
   function startCrop(e: PointerEvent, screen: Point): CropDrag | null {
     const cropping = selection.cropping()
-    const frame = cropping && frameOf(cropping.frame)
+    const frame = cropping && frameOf(cropping.frameId)
     const target = frame && cropping && cropTarget(frame, cropping.id)
     if (!frame || !target || !cropping) {
       selection.crop(null)

@@ -504,10 +504,10 @@ export function editorTransformDrag({
       .scene(frame)
       .layers.filter((layer) => pickable(layer) && intersects(boundsOf([{ ...layer.props }]), local))
       .map((layer) => layer.id)
-    const base = g.baseFrame === frame.key ? g.base : []
+    const base = g.baseFrame === frame.id ? g.base : []
     selection.selectKeepingModes(
       hits.length + base.length > 0
-        ? { frame: frame.key, ids: [...base, ...hits.filter((id) => !base.includes(id))] }
+        ? { frameId: frame.id, ids: [...base, ...hits.filter((id) => !base.includes(id))] }
         : null,
     )
   }

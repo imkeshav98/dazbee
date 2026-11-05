@@ -391,7 +391,7 @@ function live(
     view.showPage(pageId)
     selection.dropOffPage()
     const editing = typing.editing()
-    if (editing && !frameOf(editing.frame)) typing.stop()
+    if (editing && !frameOf(editing.frameId)) typing.stop()
     selection.pickPage(null)
     drawOverlay()
   }
@@ -447,7 +447,7 @@ function live(
     design: () => session.design(),
     selected: () => selection.current()?.ids[0] ?? null,
     selection: () => [...(selection.current()?.ids ?? [])],
-    selectedFrame: () => selection.current()?.frame ?? null,
+    selectedFrame: () => selection.current()?.frameId ?? null,
     select,
     perform,
     canUndo: () => session.canUndo(),

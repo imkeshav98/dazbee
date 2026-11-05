@@ -38,8 +38,8 @@ const DESIGN: DesignInput = {
   },
 }
 const FRAMES: Frame[] = [
-  { key: 'sq', pageId: 'p1', name: 'Square', x: 0, y: 0, width: 1080, height: 1080 },
-  { key: 'wide', pageId: 'p1', name: 'Wide', x: 1280, y: 0, width: 1200, height: 628 },
+  { id: 'sq', pageId: 'p1', name: 'Square', x: 0, y: 0, width: 1080, height: 1080 },
+  { id: 'wide', pageId: 'p1', name: 'Wide', x: 1280, y: 0, width: 1200, height: 628 },
 ]
 
 /** A key as the keyboard sends it, which records whether the editor took it. */
@@ -102,7 +102,7 @@ function harness() {
         throw new Error('nothing is laid out in these tests')
       },
     },
-    frameOf: (key) => FRAMES.find((f) => f.key === key),
+    frameOf: (key) => FRAMES.find((f) => f.id === key),
     hug: (ids) => log.push(`hug ${ids.join(',')}`),
     placeBox: () => {},
     textSelectionChanged: () => log.push('text selection'),
@@ -132,7 +132,7 @@ describe('editorTyping', () => {
     it('starts typing into a text layer in a frame, and tells the text selection listeners', () => {
       const { typing, log } = harness()
       typing.start('title', 'sq', 2)
-      expect(typing.editing()).toMatchObject({ id: 'title', frame: 'sq' })
+      expect(typing.editing()).toMatchObject({ id: 'title', frameId: 'sq' })
       // The caret alone selects nothing.
       expect(typing.selectedText()).toBeNull()
       expect(log).toEqual(['text selection'])

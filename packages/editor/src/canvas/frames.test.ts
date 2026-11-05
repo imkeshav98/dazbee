@@ -14,7 +14,7 @@ const withEmptyPage: Design = {
 describe('frameIn', () => {
   it('reads a stored frame as the canvas shows it, keyed by its id', () => {
     expect(frameIn(design, 'two-mpu')).toEqual({
-      key: 'two-mpu',
+      id: 'two-mpu',
       pageId: 'two',
       name: 'MPU',
       x: 2560,
@@ -33,7 +33,7 @@ describe('frameIn', () => {
 describe('pageFrames', () => {
   it("lists a page's frames by order, at their stored places, and the box round them", () => {
     const { frames, bounds } = pageFrames(design, 'one')
-    expect(frames.map((f) => f.key)).toEqual(['one-sq', 'one-story', 'one-mpu'])
+    expect(frames.map((f) => f.id)).toEqual(['one-sq', 'one-story', 'one-mpu'])
     expect(frames[1]).toMatchObject({ x: 1280, y: 0, width: 1080, height: 1920 })
     expect(bounds).toEqual({ x: 0, y: 0, width: 2860, height: 1920 })
   })
@@ -57,7 +57,7 @@ describe('pageFrames', () => {
 
 describe('frameAt', () => {
   const frame = (key: string, x: number, y: number, width: number, height: number): Frame => ({
-    key,
+    id: key,
     pageId: 'p1',
     name: key,
     x,
@@ -68,13 +68,13 @@ describe('frameAt', () => {
 
   it('finds the frame under a world point, or none in the space between frames', () => {
     const { frames } = pageFrames(design, 'one')
-    expect(frameAt(frames, { x: 1280 + 5, y: 1500 })?.key).toBe('one-story')
+    expect(frameAt(frames, { x: 1280 + 5, y: 1500 })?.id).toBe('one-story')
     expect(frameAt(frames, { x: 1080 + 5, y: 5 })).toBeUndefined()
   })
 
   it('takes the topmost of overlapping frames: the last by order', () => {
     const frames = [frame('under', 0, 0, 500, 500), frame('over', 400, 400, 500, 500)]
-    expect(frameAt(frames, { x: 450, y: 450 })?.key).toBe('over')
-    expect(frameAt(frames, { x: 100, y: 100 })?.key).toBe('under')
+    expect(frameAt(frames, { x: 450, y: 450 })?.id).toBe('over')
+    expect(frameAt(frames, { x: 100, y: 100 })?.id).toBe('under')
   })
 })

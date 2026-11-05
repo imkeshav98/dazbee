@@ -52,7 +52,7 @@ export interface BoxesDeps {
   /** The design as last drawn. */
   drawn: () => Design
   /** The shown page's frame with an id, as last drawn, if there is one. */
-  frameOf: (key: string | undefined) => Frame | undefined
+  frameOf: (id: string | undefined) => Frame | undefined
 }
 
 export interface EditorBoxes {
@@ -136,7 +136,7 @@ export function editorBoxes({ session, scenes, resources, selection, drawn, fram
   function parentFor(frame: Frame, type: string, now: Design) {
     const entered = selection.entered()
     const inside = entered ? now.nodes[entered] : undefined
-    return entered && inside && canHold(inside.type, type) ? entered : frame.key
+    return entered && inside && canHold(inside.type, type) ? entered : frame.id
   }
   /** The groups and boxes a layer is inside, outermost first, each as its position, size and turn in a frame. */
   function containersOf(frame: Frame, parentId: string | undefined, from: Design = session.design()): Box[] {
@@ -162,7 +162,7 @@ export function editorBoxes({ session, scenes, resources, selection, drawn, fram
    */
   function handlesFor(): readonly Handle[] {
     const current = selection.current()
-    const frame = frameOf(current?.frame)
+    const frame = frameOf(current?.frameId)
     if (!current || !frame || lockedSelection()) return []
     const [only] = current.ids
     if (
@@ -200,7 +200,7 @@ export function editorBoxes({ session, scenes, resources, selection, drawn, fram
   /** The box the handles go on, with where it is drawn and its containers. */
   function selectionBox(): SelectionBox | null {
     const current = selection.current()
-    const frame = current && frameOf(current.frame)
+    const frame = current && frameOf(current.frameId)
     if (!frame || !current) return null
     const now = session.design()
     const boxes = current.ids.map((id) => boxIn(frame, id, now)).filter((b): b is Box => b !== null)
@@ -323,7 +323,7 @@ export function editorBoxes({ session, scenes, resources, selection, drawn, fram
    */
   function lockedAt(frame: Frame, p: Point): string | null {
     const top = hitTest(scenes.scene(frame).layers, p)
-    const id = top ? target(top.id, frame.key) : null
+    const id = top ? target(top.id, frame.id) : null
     return id && drawn().nodes[id]?.lock?.move ? id : null
   }
   /**
@@ -334,7 +334,7 @@ export function editorBoxes({ session, scenes, resources, selection, drawn, fram
   function target(hitId: string, frame: string) {
     const chain = ancestorsOf(drawn(), hitId)
     const current = selection.current()
-    const selected = current?.frame === frame ? chain.find((id) => current?.ids.includes(id)) : undefined
+    const selected = current?.frameId === frame ? chain.find((id) => current?.ids.includes(id)) : undefined
     const entered = selection.entered()
     const at = entered ? chain.indexOf(entered) : -1
     return selected ?? (at > 0 ? chain[at - 1] : chain.at(-1)) ?? hitId

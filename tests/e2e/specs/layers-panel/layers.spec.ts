@@ -136,7 +136,7 @@ test('with nothing selected the panel shows the first frame of the page in view,
   // With that frame deleted the page has none, and the panel says how to add one.
   await page.evaluate(() => {
     const editor = window.dazbee
-    for (const frame of editor?.frames() ?? []) editor?.session.run('frame.delete', { frameId: frame.key })
+    for (const frame of editor?.frames() ?? []) editor?.session.run('frame.delete', { frameId: frame.id })
   })
   await expect(note).toHaveCount(0)
   await expect(page.getByTestId('layers')).toHaveText('Pick the Frame tool to add a frame')

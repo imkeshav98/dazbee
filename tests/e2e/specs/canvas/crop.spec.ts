@@ -189,7 +189,7 @@ test('showing another page lets the crop go with the selection: showing its page
   await (await pagesPanel(page)).getByRole('button', { name: 'Show Page 1' }).click()
   await expect.poll(() => page.evaluate(() => window.dazbee?.shownPage())).toBe('p1')
   await drawn(page)
-  expect(await page.evaluate(() => window.dazbee?.frames().map((frame) => frame.key))).toEqual(['sq'])
+  expect(await page.evaluate(() => window.dazbee?.frames().map((frame) => frame.id))).toEqual(['sq'])
   await expect(page.locator('.crop-image')).toHaveCount(0)
   expect(await selection(page)).toEqual([])
   await page.keyboard.press('Escape')

@@ -130,7 +130,7 @@ function harness(typed = false) {
   const log: string[] = []
   const selection = editorSelection({ drawn: () => session.design(), frames: () => frames, changed: () => {} })
   const boxes = testBoxes(session, selection, frames)
-  const frameOf = (key: string | undefined) => frames.find((f) => f.key === key)
+  const frameOf = (id: string | undefined) => frames.find((f) => f.id === id)
   const pointAt = (client: { x: number; y: number }) => {
     const frame = frameAt(frames, client)
     return frame ? { frame, p: { x: client.x - frame.x, y: client.y - frame.y } } : null
@@ -148,15 +148,15 @@ function harness(typed = false) {
       pointAt,
       spotAt: (client) => {
         const at = pointAt(client)
-        return at ? { frame: at.frame.key, x: at.p.x, y: at.p.y } : null
+        return at ? { frameId: at.frame.id, x: at.p.x, y: at.p.y } : null
       },
     },
     tools: { setTool: (tool) => log.push(`tool ${tool}`) },
     selection,
-    scenes: { scene: (f) => render(session.design(), f.key, undefined, measure) },
+    scenes: { scene: (f) => render(session.design(), f.id, undefined, measure) },
     boxes,
     typing: {
-      editing: () => (typed ? { id: 'words', frame: square.key } : null),
+      editing: () => (typed ? { id: 'words', frameId: square.id } : null),
       stop: () => log.push('typing stop'),
       fitText: (id) => log.push(`fit ${id}`),
       copy: () => typed,
@@ -195,7 +195,7 @@ describe('editorPlace', () => {
     it('outlines the shape or box an image dragged over the stage would go into', () => {
       const { place, square, log, client } = harness()
       expect(place.imageTarget(client(square, 150, 150))).toBe('a')
-      expect(place.dropTarget()).toEqual({ id: 'a', frame: square.key })
+      expect(place.dropTarget()).toEqual({ id: 'a', frameId: square.id })
       expect(place.imageTarget(client(square, 160, 160))).toBe('a')
       expect(log).toEqual(['overlay'])
       expect(place.imageTarget(client(square, 380, 780))).toBe('box')
@@ -216,7 +216,7 @@ describe('editorPlace', () => {
   describe('copy, cut and paste', () => {
     it('copies the selected layers onto the clipboard as they are, with their link ids and the page and frame they came from', () => {
       const { place, selection, wide } = harness()
-      selection.select(['wide-a'], wide.key)
+      selection.select(['wide-a'], wide.id)
       const data = transfer()
       const e = clipboardEvent(data)
       place.copy(e)
@@ -235,7 +235,7 @@ describe('editorPlace', () => {
 
     it('leaves the copy to the text being typed into', () => {
       const { place, selection, square } = harness(true)
-      selection.select(['words'], square.key)
+      selection.select(['words'], square.id)
       const data = transfer()
       place.copy(clipboardEvent(data))
       expect(data.items.size).toBe(0)
@@ -243,7 +243,7 @@ describe('editorPlace', () => {
 
     it('cuts the selected layers: copied, then deleted', () => {
       const { place, selection, square, log } = harness()
-      selection.select(['a'], square.key)
+      selection.select(['a'], square.id)
       const data = transfer()
       place.cut(clipboardEvent(data))
       expect(data.getData('text/plain')).toBe('Rect')
@@ -252,7 +252,7 @@ describe('editorPlace', () => {
 
     it('pastes copied layers where they were, in the selection’s frame, selected, as one undo step', () => {
       const { place, session, selection, square, boxOf } = harness()
-      selection.select(['a'], square.key)
+      selection.select(['a'], square.id)
       const data = transfer()
       place.copy(clipboardEvent(data))
       const e = clipboardEvent(data)
@@ -271,7 +271,7 @@ describe('editorPlace', () => {
 
     it('pastes centred on the pointer after Mod+Shift+V, and where the layers were after Mod+V', () => {
       const { place, selection, square, boxOf, client } = harness()
-      selection.select(['a'], square.key)
+      selection.select(['a'], square.id)
       const data = transfer()
       place.copy(clipboardEvent(data))
       place.aimPaste(true)
@@ -290,7 +290,7 @@ describe('editorPlace', () => {
       place.paste(e, () => null)
       expect(e.taken).toBe(true)
       const [group] = selection.current()?.ids ?? []
-      expect(selection.current()?.frame).toBe(wide.key)
+      expect(selection.current()?.frameId).toBe(wide.id)
       expect(session.design().nodes[group ?? '']?.type).toBe('group')
     })
 
@@ -312,7 +312,7 @@ describe('editorPlace', () => {
       expect(place.canPasteLayers()).toBe(false)
       expect(place.pasteLayers(() => null)).toBe(false)
       expect(place.copyLayers()).toBe(false)
-      selection.select(['a'], square.key)
+      selection.select(['a'], square.id)
       expect(place.copyLayers()).toBe(true)
       expect(place.canPasteLayers()).toBe(true)
       expect(place.pasteLayers(() => null)).toBe(true)
@@ -325,18 +325,18 @@ describe('editorPlace', () => {
   describe('placeSvg', () => {
     it('places a file as a group centred on a spot, selected, with the select tool back', () => {
       const { place, session, selection, square, boxOf, log } = harness()
-      const id = place.placeSvg(SVG, 'Logo', { frame: square.key, x: 500, y: 500 })
+      const id = place.placeSvg(SVG, 'Logo', { frameId: square.id, x: 500, y: 500 })
       expect(id).not.toBeNull()
       expect(session.design().nodes[id ?? '']).toMatchObject({ type: 'group', name: 'Logo', parentId: 'sq' })
       expect(boxOf(id ?? '')).toEqual({ x: 450, y: 475, width: 100, height: 50 })
-      expect(selection.current()).toEqual({ ids: [id], frame: square.key })
+      expect(selection.current()).toEqual({ ids: [id], frameId: square.id })
       expect(log).toEqual(['typing stop', 'tool select'])
     })
 
     it('goes in the middle of the frame in view with no point', () => {
       const { place, selection, wide } = harness()
       place.placeSvg(SVG, 'Logo')
-      expect(selection.current()?.frame).toBe(wide.key)
+      expect(selection.current()?.frameId).toBe(wide.id)
     })
 
     it('says so and places nothing when the file can’t be read', () => {
@@ -355,14 +355,14 @@ describe('editorPlace', () => {
         fills: [{ type: 'image', assetId: 'photo', fit: 'fill' }],
       })
       expect(boxOf(id ?? '')).toEqual({ x: 300, y: 400, width: 400, height: 200 })
-      expect(selection.current()).toEqual({ ids: [id], frame: square.key })
+      expect(selection.current()).toEqual({ ids: [id], frameId: square.id })
     })
 
     it('places nothing off every frame, and in the middle of the frame in view with no point', () => {
       const { place, selection, wide } = harness()
       expect(place.placeImage(PHOTO, { x: -500, y: -500 })).toBeNull()
       const id = place.placeImage(PHOTO)
-      expect(selection.current()).toEqual({ ids: [id], frame: wide.key })
+      expect(selection.current()).toEqual({ ids: [id], frameId: wide.id })
     })
   })
 
@@ -374,7 +374,7 @@ describe('editorPlace', () => {
       const image = { type: 'image', assetId: 'photo', fit: 'fill', opacity: 1 }
       expect(fillsOf('wide-a')).toEqual([BLUE, image])
       expect(fillsOf('a')).toEqual([RED])
-      expect(selection.current()).toEqual({ ids: ['wide-a'], frame: wide.key })
+      expect(selection.current()).toEqual({ ids: ['wide-a'], frameId: wide.id })
       expect(place.dropTarget()).toBeNull()
       session.undo()
       expect(fillsOf('wide-a')).toEqual([BLUE])
@@ -389,7 +389,7 @@ describe('editorPlace', () => {
     it('selects the layer in its own frame when it was dropped nowhere', () => {
       const { place, selection, square } = harness()
       place.fillWithImage('inside', PHOTO)
-      expect(selection.current()).toEqual({ ids: ['inside'], frame: square.key })
+      expect(selection.current()).toEqual({ ids: ['inside'], frameId: square.id })
     })
   })
 })

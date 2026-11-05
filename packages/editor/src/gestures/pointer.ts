@@ -202,7 +202,7 @@ export function editorPointer({
   function rehover() {
     const at = pointer && !gesture && !panning() ? pointIn(pointer) : null
     const hit = at && hitTest(scenes.scene(at.frame).layers, at.p)
-    const next = at && hit ? { id: target(hit.id, at.frame.key), frame: at.frame.key } : null
+    const next = at && hit ? { id: target(hit.id, at.frame.id), frameId: at.frame.id } : null
     return selection.hover(next)
   }
 
@@ -247,9 +247,9 @@ export function editorPointer({
     const { frame } = at
     const deepest = hitTest(scenes.scene(frame).layers, at.p)
     if (!deepest) return []
-    const id = target(deepest.id, frame.key)
+    const id = target(deepest.id, frame.id)
     const current = selection.current()
-    if (!(current?.frame === frame.key && current.ids.includes(id))) selection.select([id], frame.key)
+    if (!(current?.frameId === frame.id && current.ids.includes(id))) selection.select([id], frame.id)
     return [...(selection.current()?.ids ?? [])]
   }
 
@@ -334,7 +334,7 @@ export function editorPointer({
       }
       const deepest = at && hitTest(scenes.scene(at.frame).layers, at.p, boxes.pickable)
       const editing = typing.editing()
-      if (at && editing && deepest?.id === editing.id && editing.frame === at.frame.key) {
+      if (at && editing && deepest?.id === editing.id && editing.frameId === at.frame.id) {
         // In the text being edited (#47): a press puts the caret there, Shift extends the range to
         // it, a drag selects, and a third click selects the paragraph.
         const offset = typing.caretFromPoint(at.p)
@@ -452,43 +452,43 @@ export function editorPointer({
       const hit = at && hitTest(scenes.scene(at.frame).layers, at.p, boxes.pickable)
       if (!at || !hit || lockedAt(at.frame, at.p)) return
       const editing = typing.editing()
-      if (editing && hit.id === editing.id && editing.frame === at.frame.key) {
+      if (editing && hit.id === editing.id && editing.frameId === at.frame.id) {
         // A double click in the text being edited selects the word there (#47).
         const node = session.design().nodes[editing.id]
         if (node?.type === 'text') typing.selectText(wordAt(node.props.text, typing.caretFromPoint(at.p)))
         drawOverlay()
         return
       }
-      const picked = target(hit.id, at.frame.key)
+      const picked = target(hit.id, at.frame.id)
       const container = view.design().nodes[picked]
       if (picked !== hit.id && container && isContainer(container.type)) {
         // Into the group, box or boolean: what is directly inside it under the pointer gets picked.
         typing.stop()
         selection.enter(picked)
         selection.selectKeepingModes(null)
-        selection.select([target(hit.id, at.frame.key)], at.frame.key)
+        selection.select([target(hit.id, at.frame.id)], at.frame.id)
         return
       }
       if (boxes.cropTarget(at.frame, hit.id) && !view.design().nodes[hit.id]?.lock?.style) {
         // Into cropping its image fill (#48).
         typing.stop()
-        selection.select([hit.id], at.frame.key)
-        selection.crop({ id: hit.id, frame: at.frame.key })
+        selection.select([hit.id], at.frame.id)
+        selection.crop({ id: hit.id, frameId: at.frame.id })
         drawOverlay()
         return
       }
       if (isPath(view.design(), hit.id) && !view.design().nodes[hit.id]?.lock?.style) {
         // Into a path's points (#45).
         typing.stop()
-        selection.select([hit.id], at.frame.key)
-        selection.editPath({ id: hit.id, frame: at.frame.key })
+        selection.select([hit.id], at.frame.id)
+        selection.editPath({ id: hit.id, frameId: at.frame.id })
         drawOverlay()
         return
       }
       if (hit.type !== 'text' || view.design().nodes[hit.id]?.lock?.content) return
       typing.stop()
-      selection.selectKeepingModes({ ids: [hit.id], frame: at.frame.key })
-      typing.start(hit.id, at.frame.key, 0)
+      selection.selectKeepingModes({ ids: [hit.id], frameId: at.frame.id })
+      typing.start(hit.id, at.frame.id, 0)
       typing.caretTo(typing.caretFromPoint(at.p))
       drawOverlay()
     },

@@ -57,7 +57,7 @@ export function LayersPanel({ editor }: { editor: Editor }) {
 
   // The frame the panel shows: the selection's, else the shown page's first; none on a page with no frames.
   const shownFrames = useShownFrames(editor)
-  const wanted = selection.frame ?? shownFrames[0]?.key
+  const wanted = selection.frame ?? shownFrames[0]?.id
   const frameId = wanted !== undefined && Object.hasOwn(design.frames, wanted) ? wanted : ''
   const frame = frameId ? design.frames[frameId] : undefined
   const page = frame ? design.pages[frame.pageId] : undefined

@@ -1,11 +1,11 @@
-// The frames of a page as the canvas shows them: each stored frame where it was placed, keyed by
+// The frames of a page as the canvas shows them: each stored frame where it was placed, by
 // its frame id, in world units.
 import { type Design, framesOf, type Point, type Rect } from '@dazbee/schema'
 
 /** A frame as the canvas shows it: the stored frame, by its id, in world units (design pixels at 100%) on its page. */
 export interface Frame {
   /** The frame's id. */
-  key: string
+  id: string
   pageId: string
   name: string
   x: number
@@ -41,5 +41,5 @@ export const frameAt = (frames: readonly Frame[], p: Point) =>
 
 function canvasFrame(id: string, stored: Design['frames'][string]): Frame {
   const { pageId, name, x, y, width, height } = stored
-  return { key: id, pageId, name, x, y, width, height }
+  return { id, pageId, name, x, y, width, height }
 }

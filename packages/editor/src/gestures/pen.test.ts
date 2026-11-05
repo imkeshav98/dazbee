@@ -22,8 +22,8 @@ const DESIGN: DesignInput = {
     'wide-zig': { type: 'graphic', parentId: 'wide', link: 'zig', index: 'a0', name: 'Zig', props: ZIG },
   },
 }
-const SQUARE: Frame = { key: 'sq', pageId: 'p1', name: 'Square', x: 0, y: 0, width: 1080, height: 1080 }
-const WIDE: Frame = { key: 'wide', pageId: 'p1', name: 'Wide', x: 1280, y: 0, width: 1200, height: 628 }
+const SQUARE: Frame = { id: 'sq', pageId: 'p1', name: 'Square', x: 0, y: 0, width: 1080, height: 1080 }
+const WIDE: Frame = { id: 'wide', pageId: 'p1', name: 'Wide', x: 1280, y: 0, width: 1200, height: 628 }
 const FRAMES = [SQUARE, WIDE]
 
 /** A press or move of the pointer, Shift held or not. */
@@ -35,7 +35,7 @@ function harness() {
   if (!parsed.success) throw new Error(parsed.errors.join('\n'))
   const session = openSession(loadDesign(parsed.design))
   const log: string[] = []
-  const frameOf = (key: string | undefined) => FRAMES.find((f) => f.key === key)
+  const frameOf = (id: string | undefined) => FRAMES.find((f) => f.id === id)
   const selection = editorSelection({ drawn: () => session.design(), frames: () => FRAMES, changed: () => {} })
   const boxes = testBoxes(session, selection, FRAMES)
   const deps: PenDeps = {
@@ -63,7 +63,7 @@ function harness() {
   /** Edits the zig's points, none selected. */
   const editZig = () => {
     selection.select(['zig'], 'sq')
-    selection.editPath({ id: 'zig', frame: 'sq' })
+    selection.editPath({ id: 'zig', frameId: 'sq' })
   }
   return { pen, session, selection, log, click, made, anchors, editZig }
 }
@@ -94,7 +94,7 @@ describe('editorPen', () => {
       pen.finish()
       const [id] = made()
       expect(pen.drawing()).toBe(false)
-      expect(selection.current()).toEqual({ ids: [id], frame: 'sq' })
+      expect(selection.current()).toEqual({ ids: [id], frameId: 'sq' })
       expect(log).toContain(`hug ${id}`)
       expect(log.at(-2)).toBe('tool select')
       session.undo()
@@ -222,7 +222,7 @@ describe('editorPen', () => {
       editZig()
       expect(pen.pressPoints(pointer(), { frame: SQUARE, p: { x: 600, y: 600 } })).toBeNull()
       expect(selection.pathEditing()).toBeNull()
-      expect(selection.current()).toEqual({ ids: ['zig'], frame: 'sq' })
+      expect(selection.current()).toEqual({ ids: ['zig'], frameId: 'sq' })
       expect(log).toEqual(['draw'])
       expect(pen.pressPoints(pointer(), null)).toBeNull()
     })

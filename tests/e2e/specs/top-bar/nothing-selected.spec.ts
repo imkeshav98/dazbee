@@ -64,8 +64,8 @@ const ads = async (page: Page) => {
   const frames = await page.evaluate(() => window.dazbee?.frames() ?? [])
   return Promise.all(
     frames.map(async (f) => {
-      const a = await screenPoint(page, 0, 0, f.key)
-      const b = await screenPoint(page, f.width, f.height, f.key)
+      const a = await screenPoint(page, 0, 0, f.id)
+      const b = await screenPoint(page, f.width, f.height, f.id)
       return { x: a.x, y: a.y, width: b.x - a.x, height: b.y - a.y }
     }),
   )
@@ -75,7 +75,7 @@ const camera = (page: Page) => page.evaluate(() => window.dazbee?.camera())
 const emptyThePage = (page: Page) =>
   page.evaluate(() => {
     const editor = window.dazbee
-    for (const frame of editor?.frames() ?? []) editor?.session.run('frame.delete', { frameId: frame.key })
+    for (const frame of editor?.frames() ?? []) editor?.session.run('frame.delete', { frameId: frame.id })
   })
 /** Page White, holding a square frame filled white, and a second page holding one square frame of its own. */
 const twoPages = (name: string, fills: DesignInput['frames'][string]['fills']): DesignInput => {

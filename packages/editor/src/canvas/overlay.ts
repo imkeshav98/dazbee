@@ -98,10 +98,10 @@ export function editorOverlay({
   function frameLabel(frame: Frame) {
     const label = document.createElement('div')
     label.className = 'frame-label'
-    label.dataset.frame = frame.key
+    label.dataset.frame = frame.id
     if (
-      selection.current()?.frame === frame.key ||
-      typing.editing()?.frame === frame.key ||
+      selection.current()?.frameId === frame.id ||
+      typing.editing()?.frameId === frame.id ||
       selection.pickedPage() === frame.pageId
     )
       label.dataset.active = ''
@@ -150,7 +150,7 @@ export function editorOverlay({
       }
     }
     const el = outline('selection', frame, box)
-    el.dataset.frame = frame.key
+    el.dataset.frame = frame.id
     el.dataset.count = String(current.ids.length)
     if (!several) el.dataset.layer = current.ids[0]
     // Handles only once the box is big enough on screen to grab them apart, and not on a locked one.
@@ -198,17 +198,17 @@ export function editorOverlay({
         parts.push(outline('page-picked', frame, { x: 0, y: 0, width: frame.width, height: frame.height, rotation: 0 }))
     }
     const entered = selection.entered()
-    const enteredFrame = entered && frameOf(selection.current()?.frame)
+    const enteredFrame = entered && frameOf(selection.current()?.frameId)
     const enteredBox = enteredFrame && entered && boxes.drawnBoxOf(enteredFrame, entered, view.design())
     if (enteredFrame && enteredBox) parts.push(outline('entered', enteredFrame, enteredBox))
     const hovered = selection.hovered()
     const hover = !gesture && hovered && !selection.current()?.ids.includes(hovered.id) ? hovered : null
-    const hoverFrame = hover && frameOf(hover.frame)
+    const hoverFrame = hover && frameOf(hover.frameId)
     const hoverBox = hoverFrame && hover && boxes.drawnBoxOf(hoverFrame, hover.id, view.design())
     if (hoverFrame && hoverBox) parts.push(outline('hover', hoverFrame, hoverBox))
     // The layer an image dragged over the stage would go into.
     const dropTarget = place.dropTarget()
-    const dropFrame = dropTarget && frameOf(dropTarget.frame)
+    const dropFrame = dropTarget && frameOf(dropTarget.frameId)
     const dropBox = dropFrame && dropTarget && boxes.drawnBoxOf(dropFrame, dropTarget.id, view.design())
     if (dropFrame && dropBox) parts.push(outline('drop-target', dropFrame, dropBox))
     parts.push(
@@ -220,7 +220,7 @@ export function editorOverlay({
     if (isDrawing(gesture)) parts.push(...drawing.parts(gesture))
     parts.push(...transformDrag.parts(gesture?.kind === 'marquee' ? gesture : null))
     if (view.rulers()) {
-      const origin = frameOf(selection.current()?.frame) ?? frameOf(selection.hovered()?.frame) ?? view.inView()[0]
+      const origin = frameOf(selection.current()?.frameId) ?? frameOf(selection.hovered()?.frameId) ?? view.inView()[0]
       const outer = boxes.selectionBox()
       if (origin)
         parts.push(
@@ -228,7 +228,7 @@ export function editorOverlay({
             view.camera(),
             view.viewport(),
             origin,
-            outer && outer.frame.key === origin.key ? boundsOf([outer.drawn]) : null,
+            outer && outer.frame.id === origin.id ? boundsOf([outer.drawn]) : null,
           ),
         )
     }
