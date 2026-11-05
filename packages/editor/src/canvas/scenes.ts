@@ -24,7 +24,7 @@ import type { Design, Point, Rect } from '@dazbee/schema'
 
 import type { EditorResources } from '../resources.ts'
 import type { Frame } from './frames.ts'
-import { type HitOptions, hitTest, lineBoxes, type Looks } from './hit-test.ts'
+import { type HitOptions, hitTest, lineBoxes, type Looks, outlineBand } from './hit-test.ts'
 
 export interface ScenesDeps {
   ck: CanvasKit
@@ -86,14 +86,24 @@ export function frameScenes({ ck, resources, drawn }: ScenesDeps): FrameScenes {
   const paragraphs = paragraphCache()
   const scenes = sceneMemo()
   const layers = layerPictures()
-  // Outlines a hit test reads, kept by layer: an unchanged layer is the same object between scenes.
+  // Outlines and their bands by reach that a hit test reads, kept by layer: an unchanged layer is
+  // the same object between scenes.
   const outlines = lru<SceneLayer, Path>(4000, (path) => path.delete())
+  const bands = lru<SceneLayer, Map<number, Path | null>>(4000, (made) => {
+    for (const band of made.values()) band?.delete()
+  })
   /** The line boxes of each text layout a hit test has read. */
   const lines = new WeakMap<TextLayout, Rect[]>()
+  const outline = (layer: SceneLayer) => outlines.get(layer, () => outlineOf(ck, layer))
   /** What a hit test reads: outlines, the images' alpha maps and the text as the screen lays it out. */
   const looks: Looks = {
-    ck,
-    outline: (layer) => outlines.get(layer, () => outlineOf(ck, layer)),
+    outline,
+    band: (layer, reach) => {
+      const made = bands.get(layer, () => new Map())
+      let band = made.get(reach)
+      if (band === undefined) made.set(reach, (band = outlineBand(ck, outline(layer), reach)))
+      return band
+    },
     alpha: resources.alpha,
     lines: (props) => {
       const laid = layout(props)
@@ -219,6 +229,7 @@ export function frameScenes({ ck, resources, drawn }: ScenesDeps): FrameScenes {
     stopArriving()
     ghosted?.picture.delete()
     forget()
+    bands.clear()
     outlines.clear()
     layers.delete()
     paragraphs.delete()

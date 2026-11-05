@@ -10,9 +10,10 @@ import { type AlphaMap, opacityAt } from './alpha-map.ts'
 
 /** What a hit test reads to tell where a layer shows, each kept by the caller between tests. */
 export interface Looks {
-  ck: CanvasKit
   /** A layer's outline, as the renderer's `outlineOf` makes it; the caller keeps it and frees it. */
   outline(layer: SceneLayer): Path
+  /** The `outlineBand` of a layer's outline, `reach` wide; the caller keeps it and frees it. */
+  band(layer: SceneLayer, reach: number): Path | null
   /** A decoded image's alpha map, by asset id; none while the image loads, when a photo shows all over its outline. */
   alpha(assetId: string): AlphaMap | undefined
   /** A text's `lineBoxes`, from its layout as drawn. */
@@ -92,6 +93,14 @@ export function lineBoxes(laid: TextLayout): Rect[] {
   return boxes
 }
 
+/**
+ * What lies within `reach` of an outline, either side of it along its whole length, round at its
+ * corners and ends; null when CanvasKit can't stroke it.
+ */
+export function outlineBand(ck: CanvasKit, outline: Path, reach: number): Path | null {
+  return outline.makeStroked({ width: reach * 2, cap: ck.StrokeCap.Round, join: ck.StrokeJoin.Round })
+}
+
 /** The layer, or the child of it, that shows at a point in its parent's coordinates. */
 function layerAt(layer: SceneLayer, p: Point, looks: Looks, options: HitOptions): SceneLayer | null {
   const q = unrotate(p, layer)
@@ -151,15 +160,14 @@ function shows(looks: Looks, layer: Painted, q: Point): boolean {
       ? Math.max(0, ...props.strokes.map((s) => s.width / 2)) + LINE_REACH
       : strokeReach(props.strokes, 'outside')
   if (!inBox(q, props, reach)) return false
-  const outline = looks.outline(layer)
-  if (!outline.contains(q.x, q.y)) return reach > 0 && nearOutline(looks.ck, outline, q, reach)
+  if (!looks.outline(layer).contains(q.x, q.y)) return reach > 0 && nearOutline(looks, layer, q, reach)
   // With no fill, a closed outline shows all over inside it, so an empty box is easy to grab; an
   // open path shows only along its line.
   const open = layer.type === 'graphic' && layer.props.shape.kind === 'path' && !closesEvery(layer.props.shape.d)
   if (paintsShow(looks, props.fills, props, q, !open)) return true
   // Where a photo is clear or an open path has no fill, the strokes still show along the outline.
   const within = kind === 'path' ? reach : strokeReach(props.strokes, 'inside')
-  return within > 0 && nearOutline(looks.ck, outline, q, within)
+  return within > 0 && nearOutline(looks, layer, q, within)
 }
 
 /** A line is picked along it, up to half its stroke and LINE_REACH more either side of it. */
@@ -179,13 +187,9 @@ function strokeReach(strokes: readonly Stroke[], side: 'inside' | 'outside') {
   )
 }
 
-/** Whether a point is within `reach` of an outline, along it. */
-function nearOutline(ck: CanvasKit, outline: Path, q: Point, reach: number) {
-  const band = outline.makeStroked({ width: reach * 2, cap: ck.StrokeCap.Round, join: ck.StrokeJoin.Round })
-  if (!band) return false
-  const near = band.contains(q.x, q.y)
-  band.delete()
-  return near
+/** Whether a point is within `reach` of a layer's outline, along it. */
+function nearOutline(looks: Looks, layer: SceneLayer, q: Point, reach: number) {
+  return looks.band(layer, reach)?.contains(q.x, q.y) ?? false
 }
 
 /** Whether path data closes every contour it starts, so its outline holds an area with no fill. */

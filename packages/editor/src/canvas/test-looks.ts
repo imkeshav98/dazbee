@@ -6,7 +6,7 @@ import { makeResources, outlineOf, paragraphCache, type SceneLayer } from '@dazb
 import { loadCanvasKit } from '@dazbee/renderer/node'
 
 import { alphaMap } from './alpha-map.ts'
-import { lineBoxes, type Looks } from './hit-test.ts'
+import { lineBoxes, type Looks, outlineBand } from './hit-test.ts'
 
 const ck = await loadCanvasKit()
 const fonts = makeResources(ck, {
@@ -15,8 +15,9 @@ const fonts = makeResources(ck, {
   images: {},
 })
 const paragraphs = paragraphCache()
-/** Outlines made for tests, kept for as long as the test file runs. */
+/** Outlines and their bands by reach made for tests, kept for as long as the test file runs. */
 const outlines = new WeakMap<SceneLayer, Path>()
+const bands = new WeakMap<SceneLayer, Map<number, Path | null>>()
 
 /** A test's looks: the alpha maps of `images` by asset id, and text laid out with the shipped fonts. */
 export function testLooks(images: Record<string, Image> = {}): Looks {
@@ -26,9 +27,16 @@ export function testLooks(images: Record<string, Image> = {}): Looks {
     if (!path) outlines.set(layer, (path = outlineOf(ck, layer)))
     return path
   }
+  const band = (layer: SceneLayer, reach: number) => {
+    let made = bands.get(layer)
+    if (!made) bands.set(layer, (made = new Map()))
+    let path = made.get(reach)
+    if (path === undefined) made.set(reach, (path = outlineBand(ck, outline(layer), reach)))
+    return path
+  }
   return {
-    ck,
     outline,
+    band,
     alpha: (assetId) => maps.get(assetId),
     lines: (props) => lineBoxes(paragraphs.layout(ck, props, fonts)),
   }
