@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import type { SceneLayer } from '@dazbee/renderer'
 import { loadCanvasKit } from '@dazbee/renderer/node'
-import { LAYER_PROPS, type LayerType } from '@dazbee/schema'
+import { LAYER_PROPS, type LayerType, type TextProps } from '@dazbee/schema'
 
 import { hitTest, type Looks } from './hit-test.ts'
 import { testLooks } from './test-looks.ts'
@@ -391,5 +391,26 @@ describe('hitTest', () => {
     const layers = [rect('under', 0, 0, 300, 300), mask, rect('masked', 0, 0, 200, 200)]
     expect(idAt(layers, 100, 100)).toBe('masked')
     expect(idAt(layers, 8, 8)).toBe('under')
+  })
+})
+
+describe('lineBoxes', () => {
+  /** The line boxes of a text, from the shipped fonts' layout. */
+  const linesOf = (value: string, more: Record<string, unknown> = {}) =>
+    looks.lines(text('t', value, { x: 0, y: 0, width: 600, height: 300 }, more).props as TextProps)
+
+  it('gives each laid-out line a box as wide as its words, each below the one before', () => {
+    const [short, long] = linesOf('Hi\nHello there')
+    expect(short && long).toBeTruthy()
+    expect(short?.x).toBeCloseTo(0, 0)
+    expect(short?.width).toBeLessThan(long?.width ?? 0)
+    expect(long?.y).toBeGreaterThanOrEqual((short?.y ?? 0) + (short?.height ?? 0) - 1)
+  })
+
+  it('moves the lines by the alignment, and gives a text with no words none', () => {
+    const [centred] = linesOf('Hi', { align: 'center', verticalAlign: 'middle' })
+    expect((centred?.x ?? 0) + (centred?.width ?? 0) / 2).toBeCloseTo(300, 0)
+    expect((centred?.y ?? 0) + (centred?.height ?? 0) / 2).toBeCloseTo(150, 0)
+    expect(linesOf('')).toEqual([])
   })
 })
