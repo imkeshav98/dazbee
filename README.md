@@ -1,12 +1,12 @@
 # Evidence: the top bar without duplicates (#498)
 
-Screenshots from branch `feat/498-top-bar`, taken by the `@evidence` tests in `tests/e2e/specs/top-bar/bar-screens.spec.ts` on the top bar test design, at 1280×760, 820×1180 and 390×844 (touch) in dark and light: `shots/<state>-<width>x<height>-<theme>.png`. The first 14 states carry the names of the approved mock's pictures on `mock/498`.
+Screenshots from branch `feat/498-top-bar` (taken at commit 539a7e4), taken by the `@evidence` tests in `tests/e2e/specs/top-bar/bar-screens.spec.ts` on the top bar test design, at 1280×760, 820×1180 and 390×844 (touch) in dark and light: `shots/<state>-<width>x<height>-<theme>.png`. The first 14 states carry the names of the approved mock's pictures on `mock/498`.
 
 | State | What it shows |
 |---|---|
-| `1-text` | A text's bar: font, size, colour, Text style ▾, Align ▾, list, case, Spacing, Effects, Transparency, Position. On a phone, two rows of 44 px targets, Position's icon ending the first; Spacing and Effects show their icons alone there |
+| `1-text` | A text's bar: font, size, colour, Text style ▾, Align ▾, list, case, Spacing, Effects, Transparency, Position. On a phone, two rows of 44 px targets 8 px apart, Position's icon ending the first; every button with an icon shows it alone there, named by its label |
 | `2-shape` | A star's bar, ending with Position |
-| `3-photo` | A photo's bar: Edit, Replace, Crop, Corners, Outline, Effects, Transparency, Position |
+| `3-photo` | A photo's bar: Edit, Replace, Crop, Corners, Outline, Effects, Transparency, Position (icons alone on a phone) |
 | `4-box` | A box's bar, ending with Position |
 | `5-several` | Two layers: the bar ends with Line up ▾ then Position, together on the first row |
 | `6-locked` | A locked layer: Locked, Unlock, Position |
