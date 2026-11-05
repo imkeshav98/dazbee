@@ -7,7 +7,7 @@ import { useState } from 'react'
 import { type Editor } from '@dazbee/editor'
 import { type Paint } from '@dazbee/schema'
 
-import { PaintRow } from '@/components/editor/paint-stack.tsx'
+import { PaintRow } from '@/components/editor/paint/paint-stack.tsx'
 import { ListBody } from '@/components/editor/reorder-list.tsx'
 import { FIELD, KNOBS, TILE, TILE_FACE_WIDE, TOUCH_GAP } from '@/components/editor/styles.ts'
 import { cn } from '@/lib/cn.ts'

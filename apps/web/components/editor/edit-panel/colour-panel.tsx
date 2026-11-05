@@ -18,10 +18,10 @@ import {
 
 import { useBrandKit } from '@/components/brand-kit/use-brand-kit.ts'
 import { ImagePickerButton } from '@/components/editor/image-tool.tsx'
-import { PaintEditor, PaintRow } from '@/components/editor/paint-stack.tsx'
+import { PaintEditor, PaintRow } from '@/components/editor/paint/paint-stack.tsx'
+import { Swatch } from '@/components/editor/paint/swatch.tsx'
 import { ListBody } from '@/components/editor/reorder-list.tsx'
 import { PANEL_BUTTON, SWATCH_FACE, SWATCH_ROW, SWATCH_TARGET, SWATCHES } from '@/components/editor/styles.ts'
-import { Swatch } from '@/components/editor/swatch.tsx'
 import { FOCUS_RING } from '@/components/ui/looks.ts'
 import { cn } from '@/lib/cn.ts'
 import { hexChange, hexOf } from '@/lib/colour.ts'

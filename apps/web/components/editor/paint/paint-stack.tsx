@@ -15,6 +15,17 @@ import { useBrandKit } from '@/components/brand-kit/use-brand-kit.ts'
 import { useBesidePanel } from '@/components/editor/beside-panel.ts'
 import { Choice, clamp, ColorField, NumberField } from '@/components/editor/edit-panel/fields.tsx'
 import type { P } from '@/components/editor/edit-panel/target.ts'
+import { ImagePickerButton } from '@/components/editor/image-tool.tsx'
+import {
+  CHIP,
+  FACE_SIZE,
+  ICON_BUTTON,
+  KNOBS,
+  POPOVER,
+  SQUARE_SWATCH_TARGET,
+  SWATCH_ROW,
+  TOUCH_GAP,
+} from '@/components/editor/styles.ts'
 import { useMenuFocus } from '@/components/editor/top-bar/bar-popover.tsx'
 import { FOCUS_RING, SEGMENT, SEGMENTS } from '@/components/ui/looks.ts'
 import { brandPath } from '@/lib/brand-routes.ts'
@@ -24,8 +35,6 @@ import { tidy } from '@/lib/editor/size.ts'
 import { format } from '@/lib/i18n/index.ts'
 
 import { angleOf, type Gradient, GradientBar, linearAt, type Stop, stopsCss } from './gradient-bar.tsx'
-import { ImagePickerButton } from './image-tool.tsx'
-import { CHIP, FACE_SIZE, ICON_BUTTON, KNOBS, POPOVER, SQUARE_SWATCH_TARGET, SWATCH_ROW, TOUCH_GAP } from './styles.ts'
 import { Swatch } from './swatch.tsx'
 
 /** An image asset's small picture, as the API serves it. */

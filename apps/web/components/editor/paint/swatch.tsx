@@ -2,10 +2,9 @@
 
 // A round colour swatch that picks its colour, as every swatch row draws one: the swatch as small as
 // its row draws it, inside a target as big as the swatch, or 44 px on a phone so a finger hits it.
+import { PICKED_RING, SWATCH, SWATCH_TARGET } from '@/components/editor/styles.ts'
 import { FOCUS_RING } from '@/components/ui/looks.ts'
 import { cn } from '@/lib/cn.ts'
-
-import { PICKED_RING, SWATCH, SWATCH_TARGET } from './styles.ts'
 
 /**
  * A swatch button of `color`, drawn `size` (a size class) off a phone, ringed while `on`. `on`

@@ -9,12 +9,11 @@ import type { Paint } from '@dazbee/schema'
 
 import { clamp } from '@/components/editor/edit-panel/fields.tsx'
 import type { P } from '@/components/editor/edit-panel/target.ts'
+import { PICKED_RING, TOUCH_AREA } from '@/components/editor/styles.ts'
 import { FOCUS_RING } from '@/components/ui/looks.ts'
 import { cn } from '@/lib/cn.ts'
 import { tidy } from '@/lib/editor/size.ts'
 import { format } from '@/lib/i18n/index.ts'
-
-import { PICKED_RING, TOUCH_AREA } from './styles.ts'
 
 export type Gradient = Extract<Paint, { type: 'linear' | 'radial' | 'angular' }>
 export type Stop = Gradient['stops'][number]
