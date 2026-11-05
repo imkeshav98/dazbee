@@ -65,7 +65,7 @@ export function editorSelectPress({
    */
   let clickedAlone: string | null = null
   /** The locked layer under a press that started a marquee: a click, with no drag, selects it. */
-  let lockedClick: { id: string; frame: string } | null = null
+  let lockedClick: { id: string; frameId: string } | null = null
   /** Where a press that may still be a click went down, on screen: it drags only once it has gone CLICK_SLOP from there. */
   let pressedAt: Point | null = null
 
@@ -136,7 +136,7 @@ export function editorSelectPress({
     } else if (!inOuter) {
       // Empty canvas, or a locked layer: a marquee, adding to the selection with shift.
       canvas.setPointerCapture(e.pointerId)
-      lockedClick = at && locked ? { id: locked, frame: at.frame.id } : null
+      lockedClick = at && locked ? { id: locked, frameId: at.frame.id } : null
       const from = toWorld(view.camera(), screen)
       const base = e.shiftKey ? (selection.current()?.ids ?? []) : []
       const baseFrame = e.shiftKey ? (selection.current()?.frameId ?? null) : null
@@ -172,7 +172,7 @@ export function editorSelectPress({
     const clicked =
       gesture?.kind === 'marquee' &&
       Math.hypot(gesture.to.x - gesture.from.x, gesture.to.y - gesture.from.y) * view.camera().zoom < CLICK_SLOP
-    if (clicked && lockedClick) selection.select([lockedClick.id], lockedClick.frame)
+    if (clicked && lockedClick) selection.select([lockedClick.id], lockedClick.frameId)
     else if (gesture?.kind === 'marquee')
       selection.pickPage(
         clicked && !selection.current() ? (frameAt(view.frames(), gesture.from)?.pageId ?? null) : null,

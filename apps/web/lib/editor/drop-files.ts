@@ -103,7 +103,7 @@ export async function placeDroppedFiles(
     if (into && only && done.length === 1 && !only.svg && editor.fillWithImage(into, only.asset))
       return { failed, unplaced }
     done.forEach(({ asset, svg }, i) => {
-      const next = { frame: spot.frameId, x: spot.x + i * step, y: spot.y + i * step }
+      const next: Spot = { frameId: spot.frameId, x: spot.x + i * step, y: spot.y + i * step }
       const at = next.x <= frame.width && next.y <= frame.height ? next : spot
       const id = svg !== null ? editor.placeSvg(svg, asset.name || 'SVG', at) : editor.placeImage(asset, at)
       // An SVG file that can't be read is noticed by the editor.
