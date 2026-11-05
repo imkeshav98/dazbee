@@ -158,7 +158,9 @@ test('picking a frame opens its row, even the frame picked already, from its row
   expect(errors).toEqual([])
 })
 
-test('a frame renamed from its row is one undo step, and a second tab sees it', async ({ browser }) => {
+test('a frame renamed from its row is one undo step, and a second tab sees it; a double click on a caret only opens and closes its row', async ({
+  browser,
+}) => {
   const {
     tabs: [a, b],
     errors,
@@ -190,6 +192,17 @@ test('a frame renamed from its row is one undo step, and a second tab sees it', 
   await tree(a).getByRole('textbox', { name: 'Name of Weekend story' }).fill('  ')
   await a.keyboard.press('Enter')
   expect((await read(a)).frames.story?.name).toBe('Weekend story')
+
+  // A double click on a frame's caret, or a layer's, opens and closes the row and renames nothing.
+  const story = frameRow(a, 'Weekend story')
+  const open = (await story.getAttribute('aria-expanded')) ?? ''
+  await story.getByRole('button', { name: /^(Expand|Collapse) Weekend story$/ }).dblclick()
+  await expect(story).toHaveAttribute('aria-expanded', open)
+  await expect(tree(a).getByRole('textbox')).toHaveCount(0)
+  await frameRow(a, 'Sale square').getByRole('button', { name: 'Expand Sale square' }).click()
+  await layerRow(a, 'photo').getByRole('button', { name: 'Expand Photo' }).dblclick()
+  await expect(layerRow(a, 'photo')).toHaveAttribute('aria-expanded', 'false')
+  await expect(tree(a).getByRole('textbox')).toHaveCount(0)
   expect(errors).toEqual([])
 })
 

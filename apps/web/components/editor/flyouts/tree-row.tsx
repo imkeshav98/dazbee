@@ -69,7 +69,7 @@ export function rowHandlers(api: RowApi, row: Row, i: number) {
   }
 }
 
-/** A row's caret, which opens and closes it; an empty space of its size on a row with nothing inside. */
+/** A row's caret, which opens and closes it and never renames it; an empty space of its size on a row with nothing inside. */
 export function RowCaret({
   shown,
   open,
@@ -92,6 +92,8 @@ export function RowCaret({
         event.stopPropagation()
         onToggle()
       }}
+      // Two clicks open and close the row; their double click never reaches it to rename.
+      onDoubleClick={(event) => event.stopPropagation()}
       className="grid size-4 shrink-0 cursor-pointer place-items-center rounded-row text-subtle hover:text-text"
     >
       <CaretRightIcon

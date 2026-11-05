@@ -271,6 +271,7 @@ function RowToggle({
         event.stopPropagation()
         onToggle()
       }}
+      onDoubleClick={(event) => event.stopPropagation()}
       className={cn(
         'grid size-6 shrink-0 cursor-pointer place-items-center rounded-[6px] text-subtle hover:bg-hover hover:text-text active:bg-pressed',
         !on && 'opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100',
