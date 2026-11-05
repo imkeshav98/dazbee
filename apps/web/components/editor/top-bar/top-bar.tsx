@@ -3,10 +3,9 @@
 // The top bar: fixed at the top centre of the stage while layers are selected or a frame is picked,
 // its items set by what is selected (text, a photo, a shape, a box, a group, or several, or the
 // picked frame's Background and ⋯); a locked layer's bar says it is locked and unlocks it. An item
-// with ▾ opens a pop-up
-// under the bar; a panel item opens the one edit panel at the stage's end; the rest act at once.
-// When the items don't fit, the last ones go into ⋯, which opens a second row under the bar;
-// on a phone the bar scrolls sideways instead.
+// with ▾ opens a pop-up under the bar; a panel item opens the one edit panel at the stage's end;
+// the rest act at once. When the items don't fit, the last ones go into ⋯, which opens a second row
+// under the bar; on a phone the bar scrolls sideways instead.
 import { DotsThreeIcon } from '@phosphor-icons/react'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 

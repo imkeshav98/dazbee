@@ -88,3 +88,25 @@ export const boundFillIndex = (fills: readonly unknown[]) =>
   fills.findLastIndex(
     (f) => (f as { type?: unknown } | null)?.type === 'solid' && (f as { visible?: unknown }).visible !== false,
   )
+
+/** The fill a paint picker edits: the topmost one that shows, whatever its type. -1 when none shows. */
+export const showingFillIndex = (fills: readonly Paint[]) => fills.findLastIndex((fill) => fill.visible !== false)
+
+/** Fills with the one at `index` changed by `to`; at -1 there is none to change, so `to(added)` goes on top. */
+export const changeFill = (
+  fills: readonly Paint[],
+  index: number,
+  to: (fill: Paint) => Paint,
+  added: Paint,
+): Paint[] => (index < 0 ? [...fills, to(added)] : fills.map((fill, i) => (i === index ? to(fill) : fill)))
+
+/**
+ * A colour, `#rrggbb` in either case, painted on a fill, opaque and in upper case as the design
+ * stores it: a solid keeps its other settings, and any other paint becomes a solid of it.
+ */
+export const paintColour =
+  (hex: string) =>
+  (fill: Paint): Paint => {
+    const color = `${hex.toUpperCase()}FF`
+    return fill.type === 'solid' ? { ...fill, color } : { type: 'solid', color }
+  }

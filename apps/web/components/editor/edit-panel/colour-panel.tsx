@@ -6,7 +6,15 @@ import { ImageSquareIcon, PlusIcon } from '@phosphor-icons/react'
 import { type ReactNode, useState } from 'react'
 
 import { withImage } from '@dazbee/editor'
-import { boundFillIndex, brandRef, type Design, type Paint } from '@dazbee/schema'
+import {
+  boundFillIndex,
+  brandRef,
+  changeFill,
+  type Design,
+  type Paint,
+  paintColour,
+  showingFillIndex,
+} from '@dazbee/schema'
 
 import { useBrandKit } from '@/components/brand-kit/use-brand-kit.ts'
 import { ImagePickerButton } from '@/components/editor/image-tool.tsx'
@@ -191,34 +199,29 @@ function FillColourPanel({
   p: P
   b: Messages['editor']['bar']
 }) {
-  // The fill a colour paints: the topmost one that shows.
-  const bound = (fills: Paint[]) => fills[boundFillIndex(fills)]
+  // The fill a colour paints: the topmost solid one that shows.
   const shown = shared(
     target.props.map((pr) => {
-      const fill = bound((pr.fills ?? []) as Paint[])
+      const fills = (pr.fills ?? []) as Paint[]
+      const fill = fills[boundFillIndex(fills)]
       return fill?.type === 'solid' ? fill.color : undefined
     }),
   )
-  const paintFill = (to: (now: Paint) => Paint) =>
+  const paint = (hex: string) =>
     set(target, (now) => {
       const fills = (now.fills ?? []) as Paint[]
-      const i = boundFillIndex(fills)
-      return { fills: i < 0 ? [...fills, to(NEW_FILL)] : fills.map((f, j) => (j === i ? to(f) : f)) }
+      return { fills: changeFill(fills, boundFillIndex(fills), paintColour(hex), NEW_FILL) }
     })
-  const paint = (hex: string) =>
-    paintFill((now) => (now.type === 'solid' ? { ...now, color: `${hex}FF` } : { type: 'solid', color: `${hex}FF` }))
   // The picker edits the topmost fill that shows, whatever its type, so a gradient picked stays the one it shows.
-  const showing = (fills: Paint[]) => fills.findLastIndex((f) => f.visible !== false)
   const pickFill = (to: (now: Paint) => Paint) =>
     set(target, (now) => {
       const fills = (now.fills ?? []) as Paint[]
-      const i = showing(fills)
-      return { fills: i < 0 ? [...fills, to(NEW_FILL)] : fills.map((f, j) => (j === i ? to(f) : f)) }
+      return { fills: changeFill(fills, showingFillIndex(fills), to, NEW_FILL) }
     })
   // A picture goes into layers that have none; one that has a picture changes it with Replace on the bar.
   const pictureless = target.props.every((pr) => !((pr.fills ?? []) as Paint[]).some((f) => f.type === 'image'))
   const firstFills = (target.props[0]?.fills ?? []) as Paint[]
-  const first = firstFills[showing(firstFills)] ?? NEW_FILL
+  const first = firstFills[showingFillIndex(firstFills)] ?? NEW_FILL
   return (
     <>
       <ColourChoices

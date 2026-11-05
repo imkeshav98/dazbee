@@ -448,7 +448,7 @@ test('Background opens the Colour panel for the picked frame’s own fills: a co
   // Advanced lists the frame's fills, and + adds one over it.
   const fills = panel.getByTestId('frame-fills')
   await expect(fills.locator('[data-item^="fills-"]')).toHaveCount(1)
-  await fills.getByRole('button', { name: 'Add a background layer' }).click()
+  await fills.getByRole('button', { name: 'Add a colour' }).click()
   await expect(fills.locator('[data-item^="fills-"]')).toHaveCount(2)
   await press(a, 'undo')
   await expect(fills.locator('[data-item^="fills-"]')).toHaveCount(1)

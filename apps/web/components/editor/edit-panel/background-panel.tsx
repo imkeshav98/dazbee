@@ -1,10 +1,10 @@
 'use client'
 
 // The picked frame's Background panel: the kit's and the design's colours, which paint the frame's
-// top fill that shows, + with any paint for it, then its background layers under Advanced. Each
-// change is the frame's alone and one undo step; a kit colour paints as it is, with no binding.
+// top fill that shows, + with any paint for it, then all its fills under Advanced. Each change is
+// the frame's alone and one undo step; a kit colour paints as it is, with no binding.
 import type { Editor } from '@dazbee/editor'
-import { boundFillIndex, type Design, type Paint } from '@dazbee/schema'
+import { boundFillIndex, changeFill, type Design, type Paint, paintColour, showingFillIndex } from '@dazbee/schema'
 
 import { useEditState } from '@/components/editor/edit-store.ts'
 import { usePickedFrame } from '@/components/editor/editor-hooks.ts'
@@ -19,9 +19,6 @@ import { format } from '@/lib/i18n/index.ts'
 import { ColourChoices, FILL_ON_TOP, NEW_FILL } from './colour-panel.tsx'
 import { PanelFrame } from './edit-panel.tsx'
 import { PanelPart } from './fields.tsx'
-
-/** The topmost fill that shows, the one the picker edits, whatever its type. */
-const showing = (fills: Paint[]) => fills.findLastIndex((f) => f.visible !== false)
 
 /** The picked frame's Background panel, while its bar has it open. */
 export function BackgroundPanel({ editor, brandId }: { editor: Editor; brandId: string }) {
@@ -67,19 +64,9 @@ function BackgroundBody({
     if (now) editor.session.run('frame.update', { frameId, fills: to(now.fills) })
   }
   const bound = fills[boundFillIndex(fills)]
-  const paint = (hex: string) =>
-    writeFills((now) => {
-      const i = boundFillIndex(now)
-      const solid: Paint = { type: 'solid', color: `${hex.toUpperCase()}FF` }
-      return i < 0
-        ? [...now, solid]
-        : now.map((fill, j) => (j === i ? (fill.type === 'solid' ? { ...fill, color: solid.color } : solid) : fill))
-    })
+  const paint = (hex: string) => writeFills((now) => changeFill(now, boundFillIndex(now), paintColour(hex), NEW_FILL))
   const pickFill = (to: (now: Paint) => Paint) =>
-    writeFills((now) => {
-      const i = showing(now)
-      return i < 0 ? [...now, to(NEW_FILL)] : now.map((fill, j) => (j === i ? to(fill) : fill))
-    })
+    writeFills((now) => changeFill(now, showingFillIndex(now), to, NEW_FILL))
   return (
     <>
       <ColourChoices
@@ -91,7 +78,7 @@ function BackgroundBody({
         paint={paint}
         picker={
           <PaintEditor
-            paint={fills[showing(fills)] ?? NEW_FILL}
+            paint={fills[showingFillIndex(fills)] ?? NEW_FILL}
             brandId={brandId}
             editor={editor}
             p={p}
@@ -102,9 +89,9 @@ function BackgroundBody({
       <PanelPart id="background-card" title={b.advanced} strong>
         <div className="flex flex-col gap-2" data-testid="frame-fills">
           <div className={cn('flex items-center justify-between', FIELD_LABEL)}>
-            {f.layers}
+            {f.fills}
             <AddButton
-              label={f.addLayer}
+              label={f.addFill}
               onClick={() =>
                 writeFills((now) => [...now, now.length === 0 ? { type: 'solid', color: '#FFFFFFFF' } : FILL_ON_TOP])
               }
@@ -114,12 +101,12 @@ function BackgroundBody({
             items={fills}
             field="fills"
             topFirst
-            removeLabel={(n) => format(p.remove, { name: f.layer, n })}
+            removeLabel={(n) => format(p.remove, { name: f.fill, n })}
             onWrite={writeFills}
             render={(item, n, change) => (
               <PaintRow
                 paint={item}
-                name={format(f.layerName, { n })}
+                name={format(f.fillName, { n })}
                 brandId={brandId}
                 editor={editor}
                 p={p}
