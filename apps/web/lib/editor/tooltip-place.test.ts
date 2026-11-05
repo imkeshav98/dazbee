@@ -46,17 +46,29 @@ describe('tooltipPlace', () => {
     })
   })
 
-  it('on a phone keeps it over the menu that lies over the full menu, not over the full menu’s rows', () => {
+  it('on a phone puts it above the row, clear of the finger, even with room beside it', () => {
     const phone = { width: 390, height: 844 }
-    const main = { left: 8, top: 300, right: 288, bottom: 836 }
-    const own = { left: 8, top: 460, right: 288, bottom: 610 }
-    const last = { left: 14, top: 560, right: 282, bottom: 604 }
-    expect(tooltipPlace({ row: last, size: TIP, own, others: [main], room: phone, rtl: false })).toMatchObject({
+    // A short reason by a menu at the screen's start edge, with room at the row's end to hold it.
+    const own = { left: 8, top: 300, right: 208, bottom: 600 }
+    const row = { left: 14, top: 400, right: 202, bottom: 444 }
+    const size = { width: 120, height: 26 }
+    expect(tooltipPlace({ row, size, own, others: [], room: phone, rtl: false, phone: true })).toMatchObject({
       side: 'top',
     })
-    // The first row: above it is the full menu's row it opened from, so the tooltip goes below.
-    const first = { left: 14, top: 492, right: 282, bottom: 536 }
-    expect(tooltipPlace({ row: first, size: TIP, own, others: [main], room: phone, rtl: false })).toMatchObject({
+  })
+
+  it('on a phone puts it above the first row too, and below only when the room above can’t hold it', () => {
+    const phone = { width: 390, height: 844 }
+    const own = { left: 7, top: 460, right: 383, bottom: 836 }
+    const first = { left: 13, top: 466, right: 377, bottom: 510 }
+    expect(tooltipPlace({ row: first, size: TIP, own, others: [], room: phone, rtl: false, phone: true })).toEqual({
+      side: 'top',
+      align: 'start',
+    })
+    const atTop = { left: 13, top: 20, right: 377, bottom: 64 }
+    expect(
+      tooltipPlace({ row: atTop, size: TIP, own, others: [], room: phone, rtl: false, phone: true }),
+    ).toMatchObject({
       side: 'bottom',
     })
   })

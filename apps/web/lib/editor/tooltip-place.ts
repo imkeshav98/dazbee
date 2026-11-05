@@ -1,7 +1,8 @@
 // Where a greyed menu row's tooltip goes so it covers no row of another menu: beside the row at its
 // end when the window has room there, otherwise above or below it, lined up with the row's start,
-// middle or end, whichever first keeps clear of the other open menus. Where the row's own menu lies
-// over another, as a phone's menu beside a row lies over the full menu, the tooltip may cover it.
+// middle or end, whichever first keeps clear of the other open menus. On a phone it goes above the
+// row, clear of the finger that tapped it, and below only when the room above can't hold it. Where
+// the row's own menu lies over another, the tooltip may cover what the own menu covers.
 
 /** A box in the window, in CSS pixels. */
 export interface Box {
@@ -24,9 +25,9 @@ const EDGE = 8
 
 /**
  * The first place that fits in the window and covers no other open menu outside the row's own,
- * trying beside the row at its end, then above, then below; when each covers some, the one that
- * covers least. `rtl` puts the end on the left, and lines a tooltip's start up with the row's right
- * edge, as Radix does in a right-to-left page.
+ * trying beside the row at its end, then above, then below, or on a `phone` above, then below; when
+ * each covers some, the one that covers least. `rtl` puts the end on the left, and lines a tooltip's
+ * start up with the row's right edge, as Radix does in a right-to-left page.
  */
 export function tooltipPlace({
   row,
@@ -35,6 +36,7 @@ export function tooltipPlace({
   others,
   room,
   rtl,
+  phone = false,
 }: {
   row: Box
   size: { width: number; height: number }
@@ -44,14 +46,14 @@ export function tooltipPlace({
   others: readonly Box[]
   room: { width: number; height: number }
   rtl: boolean
+  /** The screen is a phone's, tapped with a finger: the tooltip goes above the row, clear of it. */
+  phone?: boolean
 }): TooltipPlace {
   const end = rtl ? 'left' : 'right'
-  const places: TooltipPlace[] = [
-    { side: end, align: 'center' },
-    ...(['top', 'bottom'] as const).flatMap((side) =>
-      (['start', 'center', 'end'] as const).map((align) => ({ side, align })),
-    ),
-  ]
+  const aboveOrBelow = (['top', 'bottom'] as const).flatMap((side) =>
+    (['start', 'center', 'end'] as const).map((align) => ({ side, align })),
+  )
+  const places: TooltipPlace[] = phone ? aboveOrBelow : [{ side: end, align: 'center' }, ...aboveOrBelow]
   let best: { place: TooltipPlace; covered: number } | null = null
   for (const place of places) {
     const box = boxAt(place, row, size, room, rtl)

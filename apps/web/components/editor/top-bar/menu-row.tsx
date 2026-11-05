@@ -6,6 +6,7 @@
 import { CaretRightIcon } from '@phosphor-icons/react'
 import { type MouseEvent, useRef, useState } from 'react'
 
+import { usePhone } from '@/components/editor/edit-store.ts'
 import { MENU_ITEM, MENU_ITEM_GREYED, MENU_KEY } from '@/components/editor/styles.ts'
 import { TOOLTIP, Tooltip } from '@/components/ui/tooltip.tsx'
 import { cn } from '@/lib/cn.ts'
@@ -86,17 +87,19 @@ export function MenuRow({
 
 /**
  * The tooltip of a greyed control, saying `why` it has nothing to do: under the pointer, on
- * keyboard focus and on a tap or click, placed as it shows so it covers no row of another open menu.
- * The ref and `tap` go on the control, and `tooltip` on the Tooltip around it.
+ * keyboard focus and on a tap or click, placed as it shows so it covers no row of another open menu,
+ * and on a phone above the control, clear of the finger. The ref and `tap` go on the control, and
+ * `tooltip` on the Tooltip around it.
  */
 export function useWhyTip<T extends HTMLElement>(why: string | null) {
   const [told, setTold] = useState(false)
   const rtl = dirOf(useLocale()) === 'rtl'
+  const phone = usePhone()
   const [place, setPlace] = useState<TooltipPlace>({ side: rtl ? 'left' : 'right', align: 'center' })
   const ref = useRef<T>(null)
   /** Shows or hides why, placed clear of the other open menus as it shows. */
   const tell = (open: boolean) => {
-    if (open && ref.current && why) setPlace(placeFor(ref.current, why, rtl))
+    if (open && ref.current && why) setPlace(placeFor(ref.current, why, rtl, phone))
     setTold(open)
   }
   return {
@@ -111,10 +114,10 @@ export function useWhyTip<T extends HTMLElement>(why: string | null) {
 }
 
 /**
- * Where a row's tooltip goes: beside it when there is room, otherwise above or below it, clear of
- * the other open menus, measured as it is about to show.
+ * Where a row's tooltip goes: beside it when there is room, otherwise above or below it, or on a
+ * phone above it, clear of the other open menus, measured as it is about to show.
  */
-function placeFor(row: HTMLElement, label: string, rtl: boolean): TooltipPlace {
+function placeFor(row: HTMLElement, label: string, rtl: boolean, phone: boolean): TooltipPlace {
   const own = row.closest('[role="dialog"]') ?? row
   const others = [...document.querySelectorAll('[data-radix-popper-content-wrapper] > [role="dialog"]')].filter(
     (menu) => menu !== own,
@@ -126,6 +129,7 @@ function placeFor(row: HTMLElement, label: string, rtl: boolean): TooltipPlace {
     others: others.map(boxOf),
     room: { width: document.documentElement.clientWidth, height: window.innerHeight },
     rtl,
+    phone,
   })
 }
 
