@@ -1,7 +1,8 @@
 // The infinite canvas (#36): a page of five frames, each where it is stored, with pan and zoom; a
-// layer dragged past its frame's edge shows there as a faint ghost and stays in its frame; and
-// pictures, in the dark and the light theme at each screen size, of one frame, linked frames, two
-// pages, a page with no frames, the Pages card, a brief's frames, the layers panel and Export.
+// layer dragged past its frame's edge shows there as a faint ghost and stays in its frame; a frame's
+// label drops its size before it cuts its name short; and pictures, in the dark and the light theme
+// at each screen size, of one frame, linked frames, two pages, a page with no frames, the Pages
+// card, a brief's frames, the layers panel and Export.
 // Needs the API and the sync server: `docker compose up -d --wait`.
 import { blankDesign, type DesignInput } from '@dazbee/schema'
 
@@ -10,7 +11,7 @@ import { designOf, editorPath, screenPoint, setCookies, writeOutput } from '../.
 import { THEMES } from '../../support/glass.ts'
 import { openLayers } from '../../support/layers-panel.ts'
 import { SCREEN_SIZES } from '../../support/layout.ts'
-import { liveDesign, seed } from '../../support/seed.ts'
+import { frameDesign, liveDesign, seed } from '../../support/seed.ts'
 import { drawn, fitSettled, nextFrame, openStage, selectLayers } from '../../support/stage.ts'
 import { type Browser, expect, type Page, test } from '../../support/test.ts'
 import { pagesPanel } from '../../support/top-bar.ts'
@@ -208,6 +209,36 @@ test.describe('dragging out of a frame', () => {
     expect(await page.evaluate(() => window.dazbee?.selection())).toEqual(['shape'])
     await expect(page.locator('.selection')).toBeVisible()
     expect(await colourAt(page, 1190, 500), 'no ghost once dropped').toEqual(gap)
+    expect(errors).toEqual([])
+  })
+})
+
+test.describe('frame labels', () => {
+  /** What the story frame's label shows with the frame `width` screen pixels wide. */
+  async function labelAt(page: Page, width: number) {
+    await page.evaluate((zoom) => window.dazbee?.setCamera({ x: 100, y: 100, zoom }), width / 1080)
+    await drawn(page)
+    return page.locator('.frame-label[data-frame="sq"]').evaluate((label) => {
+      const name = label.querySelector<HTMLElement>('.frame-name')
+      const size = label.querySelector<HTMLElement>('.frame-size')?.getBoundingClientRect()
+      const line = label.getBoundingClientRect()
+      return {
+        name: name?.textContent,
+        nameCut: !name || name.scrollWidth > name.clientWidth,
+        sizeShown: !!size && size.top < line.bottom && size.bottom > line.top,
+      }
+    })
+  }
+
+  test("a frame's label drops its size before it cuts its name short", async ({ browser }) => {
+    const story = frameDesign({ name: 'Labels', frameName: 'Story and Reel', width: 1080, height: 1920 })
+    const { page, errors } = await openStage(browser, story)
+    // Wide: the name and the size.
+    expect(await labelAt(page, 430)).toEqual({ name: 'Story and Reel', nameCut: false, sizeShown: true })
+    // Room for the name alone: the whole name, no size.
+    expect(await labelAt(page, 150)).toEqual({ name: 'Story and Reel', nameCut: false, sizeShown: false })
+    // Narrower than the name: the name cut short, no size.
+    expect(await labelAt(page, 54)).toEqual({ name: 'Story and Reel', nameCut: true, sizeShown: false })
     expect(errors).toEqual([])
   })
 })
