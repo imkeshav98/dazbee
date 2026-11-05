@@ -19,7 +19,7 @@ import { type KeyboardEvent, useRef, useState } from 'react'
 
 import type { ShapeMenuTool } from '@dazbee/editor'
 
-import { DOCK_BUTTON, DOCK_OFF, DOCK_ON, POPOVER } from '@/components/editor/styles.ts'
+import { DOCK_BUTTON, DOCK_OFF, DOCK_ON, MENU_KEY, POPOVER } from '@/components/editor/styles.ts'
 import { LIT_ROW, TOUCH_ROW } from '@/components/ui/looks.ts'
 import { Tooltip } from '@/components/ui/tooltip.tsx'
 import { cn } from '@/lib/cn.ts'
@@ -146,7 +146,7 @@ export function ShapeTools({
                     className={cn(id === shape && 'text-accent-text')}
                   />
                   <span className="flex-1 text-start">{t.editor.shapes[id]}</span>
-                  {key && <kbd className="font-mono text-[11px] text-subtle">{key}</kbd>}
+                  {key && <kbd className={MENU_KEY}>{key}</kbd>}
                 </button>
               ))}
             </div>

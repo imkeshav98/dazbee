@@ -5,6 +5,7 @@
 import { photo, upload } from '../../support/assets.ts'
 import { editorPath, screenPoint, setCookies, writeOutput } from '../../support/editor.ts'
 import { layoutProblems, rowHeights, scrolling } from '../../support/layout.ts'
+import { shownKeys } from '../../support/menu-rows.ts'
 import { seed } from '../../support/seed.ts'
 import { drawn, fitSettled, nextFrame, openStage, selectLayers } from '../../support/stage.ts'
 import { expect, test } from '../../support/test.ts'
@@ -152,7 +153,7 @@ test.describe('on a phone, 390×844', () => {
     expect(errors).toEqual([])
   })
 
-  test('every menu row is at least 44 px tall: the full, right-click, top bar ⋯ with its turn field, shape and zoom menus', async ({
+  test('every menu row is at least 44 px tall: the full, right-click, top bar ⋯ with its turn field, shape and zoom menus, and the shape menu shows no keys', async ({
     browser,
   }) => {
     const asset = await upload(photo)
@@ -184,6 +185,8 @@ test.describe('on a phone, 390×844', () => {
     const shapes = page.getByRole('menu')
     await expect(shapes).toBeVisible()
     for (const height of await rowHeights(shapes, '[data-shape]')) expect(height).toBeGreaterThanOrEqual(44)
+    // A phone has no keyboard, so no menu shows a shortcut key.
+    expect(await shownKeys(shapes)).toBe(0)
     await page.keyboard.press('Escape')
 
     const zoom = await zoomMenu(page)
