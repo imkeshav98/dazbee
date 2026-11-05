@@ -5,7 +5,7 @@ import { type DesignInput, parseDesign } from '@dazbee/schema'
 
 import type { Frame } from '../../canvas/frames.ts'
 import { testBoxes } from '../../layers/test-boxes.ts'
-import { editorSelection } from '../../selection.ts'
+import { editorSelection, pairsIn } from '../../selection.ts'
 import { editorPen, type PenDeps } from './pen.ts'
 
 const ZIG = { x: 100, y: 100, width: 100, height: 100, shape: { kind: 'path' as const, d: 'M0 0 L100 0 L100 100' } }
@@ -94,7 +94,7 @@ describe('editorPen', () => {
       pen.finish()
       const [id] = made()
       expect(pen.drawing()).toBe(false)
-      expect(selection.current()).toEqual({ ids: [id], frameId: 'sq' })
+      expect(selection.current()).toEqual(pairsIn('sq', [id ?? '']))
       expect(log).toContain(`hug ${id}`)
       expect(log.at(-2)).toBe('tool select')
       session.undo()
@@ -222,7 +222,7 @@ describe('editorPen', () => {
       editZig()
       expect(pen.pressPoints(pointer(), { frame: SQUARE, p: { x: 600, y: 600 } })).toBeNull()
       expect(selection.pathEditing()).toBeNull()
-      expect(selection.current()).toEqual({ ids: ['zig'], frameId: 'sq' })
+      expect(selection.current()).toEqual(pairsIn('sq', ['zig']))
       expect(log).toEqual(['draw'])
       expect(pen.pressPoints(pointer(), null)).toBeNull()
     })

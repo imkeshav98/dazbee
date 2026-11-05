@@ -680,6 +680,7 @@ export const ar: Messages = {
         booleanExclude: 'استبعاد',
         copyStyle: 'نسخ النمط',
         pasteStyle: 'لصق النمط',
+        selectLinkedCopies: 'تحديد النسخ المرتبطة في كل الإطارات',
         styleToLinked: 'نسخ النمط إلى الإطارات المرتبطة',
         textToLinked: 'نسخ النص إلى الإطارات المرتبطة',
         lockLinked: 'القفل أو فكه في كل الإطارات',

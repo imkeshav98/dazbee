@@ -8,7 +8,7 @@ import { hug as hugIn } from './layers/hug.ts'
 import { round } from './layers/transform.ts'
 import type { EditorResources } from './resources.ts'
 import { runQuietly } from './run-quietly.ts'
-import type { EditorSelection } from './selection.ts'
+import { type EditorSelection, idsOf } from './selection.ts'
 import type { EditorTyping } from './text/typing.ts'
 
 export interface LayerEditsDeps {
@@ -123,7 +123,7 @@ export function editorLayerEdits({ session, selection, resources, typing, signal
   const setHidden = (ids: string[], hidden: boolean) =>
     runQuietly(() => session.run('node.update', { ids, patch: { visible: !hidden } }))
   async function setFont(fontFamily: string, fontWeight?: number) {
-    const ids = (selection.current()?.ids ?? []).filter((id) => session.design().nodes[id]?.type === 'text')
+    const ids = idsOf(selection.current()).filter((id) => session.design().nodes[id]?.type === 'text')
     const range = typing.selectedText()
     if (ids.length === 0 && !range) return
     await resources.loadFamilies([fontFamily])[0]

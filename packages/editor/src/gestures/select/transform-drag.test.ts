@@ -7,7 +7,7 @@ import { type Frame, pageFrames } from '../../canvas/frames.ts'
 import { hug } from '../../layers/hug.ts'
 import { measure, sessionOf, testBoxes } from '../../layers/test-boxes.ts'
 import type { Box } from '../../layers/transform.ts'
-import { editorSelection } from '../../selection.ts'
+import { editorSelection, pairsIn } from '../../selection.ts'
 import { carried, editorTransformDrag, type TransformDrag, type TransformDragDeps } from './transform-drag.ts'
 
 const rect = (
@@ -226,6 +226,40 @@ describe('editorTransformDrag', () => {
       expect(copies()).toEqual(before)
     })
 
+    it('moves the selected copies of other frames by the same amount, in the same undo step', () => {
+      const { drag, session, log, frame, boxOf } = harness()
+      const wide = pageFrames(session.design(), 'p1').frames[1] as Frame
+      const move = drag.pressMove(frame, [], { x: 150, y: 150 }, ['a'], [{ frame: wide, around: [], ids: ['wide-a'] }])
+      drag.drag(move, { x: 160.4, y: 170.6 }, false, false, false)
+      expect(boxOf('wide-a')).toMatchObject({ x: 110, y: 121 })
+      drag.drag(move, { x: 130, y: 190 }, true, false, false)
+      expect(boxOf('a')).toMatchObject({ x: 100, y: 140 })
+      expect(boxOf('wide-a')).toMatchObject({ x: 100, y: 140 })
+      drag.release(move)
+      expect(log).toEqual(['hug a,wide-a'])
+      session.undo()
+      expect([boxOf('a'), boxOf('wide-a')]).toMatchObject([
+        { x: 100, y: 100 },
+        { x: 100, y: 100 },
+      ])
+    })
+
+    it('moves a copy inside a turned container across its frame as the dragged layer goes across its own', () => {
+      const { drag, session, frame, boxOf } = harness()
+      const wide = pageFrames(session.design(), 'p1').frames[1] as Frame
+      const turned = { x: 0, y: 0, width: 400, height: 400, rotation: 90 }
+      const move = drag.pressMove(
+        frame,
+        [],
+        { x: 150, y: 150 },
+        ['a'],
+        [{ frame: wide, around: [turned], ids: ['wide-a'] }],
+      )
+      drag.drag(move, { x: 160, y: 150 }, false, false, false)
+      // Ten pixels right across the frame is ten up inside a container turned a quarter clockwise.
+      expect(boxOf('wide-a')).toMatchObject({ x: 100, y: 90 })
+    })
+
     it('keeps a move to one axis with Shift', () => {
       const { drag, frame, boxOf } = harness()
       const move = drag.pressMove(frame, [], { x: 150, y: 150 }, ['a'])
@@ -270,17 +304,16 @@ describe('editorTransformDrag', () => {
   describe('marquee', () => {
     it('selects the layers it touches that can be picked, with those selected before', () => {
       const { drag, selection, frame } = harness()
-      drag.marquee({ kind: 'marquee', from: { x: 50, y: 50 }, to: { x: 450, y: 150 }, base: [], baseFrame: null })
-      expect(selection.current()).toEqual({ frameId: frame.id, ids: ['a', 'b'] })
+      drag.marquee({ kind: 'marquee', from: { x: 50, y: 50 }, to: { x: 450, y: 150 }, base: [] })
+      expect(selection.current()).toEqual(pairsIn(frame.id, ['a', 'b']))
       drag.marquee({
         kind: 'marquee',
         from: { x: 650, y: 650 },
         to: { x: 800, y: 800 },
-        base: ['b'],
-        baseFrame: frame.id,
+        base: pairsIn(frame.id, ['b']),
       })
-      expect(selection.current()).toEqual({ frameId: frame.id, ids: ['b'] })
-      drag.marquee({ kind: 'marquee', from: { x: 650, y: 650 }, to: { x: 800, y: 800 }, base: [], baseFrame: null })
+      expect(selection.current()).toEqual(pairsIn(frame.id, ['b']))
+      drag.marquee({ kind: 'marquee', from: { x: 650, y: 650 }, to: { x: 800, y: 800 }, base: [] })
       expect(selection.current()).toBeNull()
     })
   })

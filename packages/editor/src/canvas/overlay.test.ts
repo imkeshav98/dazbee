@@ -5,6 +5,7 @@ import { Design } from '@dazbee/schema'
 import type { Gesture } from '../gestures/pointer.ts'
 import type { Box } from '../layers/transform.ts'
 import type { Picked } from '../selection.ts'
+import { pairsIn } from '../selection.ts'
 import type { Frame } from './frames.ts'
 import { editorOverlay, type OverlayDeps } from './overlay.ts'
 import { design } from './test-design.ts'
@@ -103,7 +104,7 @@ function harness(
       outline: (className) => fake(className) as unknown as HTMLElement,
     },
     selection: {
-      current: () => (state.selected === false ? null : { ids: ['a'], frameId: 'one-sq' }),
+      current: () => (state.selected === false ? null : pairsIn('one-sq', ['a'])),
       entered: () => 'g',
       hovered: () => ({ id: 'h', frameId: 'one-sq' }),
       pickedFrame: () => (state.picked ? 'one-sq' : null),
@@ -116,6 +117,8 @@ function harness(
     boxes: {
       selectionBox: () =>
         state.selected === false ? null : { frame: SQUARE, box: BOX, drawn: BOX, around: [] as Box[] },
+      selectionBoxes: () =>
+        state.selected === false ? [] : [{ frame: SQUARE, box: BOX, drawn: BOX, around: [] as Box[] }],
       drawnBoxOf: () => BOX,
       handlesFor: () => ['nw'],
     },

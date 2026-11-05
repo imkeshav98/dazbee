@@ -11,11 +11,12 @@ export interface Picked {
   id: string
   frameId: string
 }
-/** The selected layers, all in one frame, in the order they were picked. */
-export interface Selection {
-  ids: string[]
-  frameId: string
-}
+/**
+ * The selected layers, each with its frame, in the order they were picked; never empty. They sit in
+ * one frame, or in several frames of one page once linked copies join them (Ctrl+Alt+A, or Shift
+ * and a click on a copy). The first one's frame is the one the selection's box and handles go in.
+ */
+export type Selection = readonly Picked[]
 /** The path layer whose points are being edited (#45), and which of its anchors are selected. */
 export interface PathEditing extends Picked {
   selected: AnchorRef[]
@@ -59,6 +60,12 @@ export interface EditorSelection {
    * that one layer there. Shows it.
    */
   select(ids: string[], frameId: string | null): void
+  /**
+   * Selects layers in frames of one page, in order, or none: any on another page than the first
+   * one's are left out. A crop or path edit stays only on that one layer, and the group gone into
+   * only while the first layer is in its frame. Shows it.
+   */
+  selectAcross(layers: Selection): void
   /** Sets the selection and shows nothing: a crop or path edit stays while a layer is selected, and ends with none. */
   selectKeepingModes(next: Selection | null): void
   /**
@@ -107,6 +114,15 @@ export interface EditorSelection {
   destroy(): void
 }
 
+/** The selected layers' ids, in the order they were picked; none with nothing selected. */
+export const idsOf = (selection: Selection | null) => selection?.map((layer) => layer.id) ?? []
+
+/** Layers of one frame as selection pairs, in order. */
+export const pairsIn = (frameId: string, ids: readonly string[]): Picked[] => ids.map((id) => ({ id, frameId }))
+
+/** The first selected layer's frame, where the selection's box and handles go; undefined with nothing selected. */
+export const firstFrameOf = (selection: Selection | null) => selection?.[0]?.frameId
+
 export const isPath = (from: Design, id: string) => {
   const node = from.nodes[id]
   return node?.type === 'graphic' && node.props.shape.kind === 'path'
@@ -127,7 +143,7 @@ export function editorSelection({ drawn, frames, changed }: SelectionDeps): Edit
   let entered: string | null = null
   /** The frame layers were last selected in, by page. */
   const lastFrames = new Map<string, string>()
-  /** The selection the selection listeners last heard of, as `<frame>|<ids>`. */
+  /** The selection the selection listeners last heard of, as `<frame>|<id>` pairs. */
   let lastSelection = ''
   /** The layer under the pointer. */
   let hovered: Picked | null = null
@@ -170,15 +186,25 @@ export function editorSelection({ drawn, frames, changed }: SelectionDeps): Edit
   }
 
   function select(ids: string[], frameId: string | null) {
-    selection = ids.length > 0 && frameId !== null ? { ids, frameId } : null
+    selectAcross(frameId === null ? [] : pairsIn(frameId, ids))
+  }
+  function selectAcross(layers: Selection) {
+    const pageId = drawn().frames[layers[0]?.frameId ?? '']?.pageId
+    const kept = layers.filter((layer) => drawn().frames[layer.frameId]?.pageId === pageId)
+    selection = kept.length > 0 ? kept : null
     if (selection) pickedFrame = null
     rememberFrame()
+    const [first] = kept
     // Layers selected in another frame leave the group gone into: Esc never goes back to it.
-    if (entered && frameId !== null && frameIdOf(drawn(), entered) !== frameId) entered = null
-    if (pathEditing && (ids.length !== 1 || ids[0] !== pathEditing.id || frameId !== pathEditing.frameId))
-      pathEditing = null
-    if (cropping && (ids.length !== 1 || ids[0] !== cropping.id || frameId !== cropping.frameId)) cropping = null
+    if (entered && first && frameIdOf(drawn(), entered) !== first.frameId) entered = null
+    if (pathEditing && !onlyLayer(pathEditing)) pathEditing = null
+    if (cropping && !onlyLayer(cropping)) cropping = null
     changed()
+  }
+  /** Whether a layer is all the selection holds. */
+  function onlyLayer(layer: Picked) {
+    const [only] = selection ?? []
+    return selection?.length === 1 && only?.id === layer.id && only.frameId === layer.frameId
   }
   /** With nothing selected there is no crop and no path edit. */
   function endModesWhenNone() {
@@ -192,23 +218,26 @@ export function editorSelection({ drawn, frames, changed }: SelectionDeps): Edit
     rememberFrame()
     endModesWhenNone()
   }
-  /** Keeps the selection's frame as the one last selected in on its page. */
+  /** Keeps the first selected layer's frame as the one last selected in on its page. */
   function rememberFrame() {
-    const frame = frameOf(selection?.frameId)
+    const frame = frameOf(selection?.[0]?.frameId)
     if (frame) lastFrames.set(frame.pageId, frame.id)
   }
   function keep() {
     if (pickedFrame !== null && !frameOf(pickedFrame)) pickedFrame = null
     if (!selection) return endModesWhenNone()
     const design = drawn()
-    const ids = selection.ids.filter((id) => design.nodes[id])
-    selection = ids.length > 0 && frameOf(selection.frameId) ? { ...selection, ids } : null
+    const kept = selection.filter((layer) => design.nodes[layer.id] && frameOf(layer.frameId))
+    selection = kept.length > 0 ? kept : null
     if (entered && !design.nodes[entered]) entered = null
-    if (pathEditing && (!selection?.ids.includes(pathEditing.id) || !isPath(design, pathEditing.id))) pathEditing = null
-    if (cropping && (!selection?.ids.includes(cropping.id) || selection.frameId !== cropping.frameId)) cropping = null
+    const holds = (layer: Picked) => kept.some((p) => p.id === layer.id && p.frameId === layer.frameId)
+    if (pathEditing && (!kept.some((p) => p.id === pathEditing?.id) || !isPath(design, pathEditing.id)))
+      pathEditing = null
+    if (cropping && !holds(cropping)) cropping = null
   }
   function dropOffPage() {
-    if (selection && !frameOf(selection.frameId)) selection = null
+    const kept = selection?.filter((layer) => frameOf(layer.frameId)) ?? []
+    selection = kept.length > 0 ? kept : null
     if (pickedFrame !== null && !frameOf(pickedFrame)) pickedFrame = null
     if (entered && !frameOf(frameIdOf(drawn(), entered))) entered = null
     endModesWhenNone()
@@ -225,7 +254,7 @@ export function editorSelection({ drawn, frames, changed }: SelectionDeps): Edit
     // Picking a frame lets the selection go, with a crop or path edit on it and any group gone into.
     if (frameId !== null && selection) {
       entered = null
-      select([], selection.frameId)
+      selectAcross([])
       return
     }
     changed()
@@ -261,10 +290,10 @@ export function editorSelection({ drawn, frames, changed }: SelectionDeps): Edit
   }
 
   function tellListeners() {
-    const now = selection ? `${selection.frameId}|${selection.ids.join(',')}` : ''
+    const now = (selection ?? []).map((layer) => `${layer.frameId}|${layer.id}`).join(',')
     if (now !== lastSelection) {
       lastSelection = now
-      for (const listener of selectionListeners) listener(selection?.ids ?? [])
+      for (const listener of selectionListeners) listener(idsOf(selection))
     }
     if (pickedFrame !== lastPicked || pickedAgain) {
       lastPicked = pickedFrame
@@ -297,6 +326,7 @@ export function editorSelection({ drawn, frames, changed }: SelectionDeps): Edit
     hovered: hoveredLayer,
     litFrame: () => lit,
     select,
+    selectAcross,
     selectKeepingModes,
     keep,
     dropOffPage,

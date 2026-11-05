@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest'
 
-import { isPath } from './selection.ts'
+import { idsOf, isPath, pairsIn } from './selection.ts'
 import { fakeDesign, frame, FRAMES, graphic, harness } from './test-selection.ts'
+
+/** Layers of one frame as selection pairs. */
+const pairs = (frameId: string, ...ids: string[]) => pairsIn(frameId, ids)
 
 describe('isPath', () => {
   it('says whether a layer is a graphic drawn as a path', () => {
@@ -10,6 +13,13 @@ describe('isPath', () => {
     expect(isPath(design, 'rect')).toBe(false)
     expect(isPath(design, 'group')).toBe(false)
     expect(isPath(design, 'gone')).toBe(false)
+  })
+})
+
+describe('idsOf', () => {
+  it('lists the selected layers in the order they were picked, none with nothing selected', () => {
+    expect(idsOf([...pairs('p1-f1', 'rect'), ...pairs('p1-f2', 'dot')])).toEqual(['rect', 'dot'])
+    expect(idsOf(null)).toEqual([])
   })
 })
 
@@ -51,7 +61,7 @@ describe('editorSelection', () => {
     it('selects layers in one frame and shows it; none lets the selection go', () => {
       const { selection, log } = harness()
       selection.select(['rect', 'path'], 'p1-f1')
-      expect(selection.current()).toEqual({ ids: ['rect', 'path'], frameId: 'p1-f1' })
+      expect(selection.current()).toEqual(pairs('p1-f1', 'rect', 'path'))
       selection.select([], 'p1-f1')
       expect(selection.current()).toBeNull()
       expect(log).toEqual(['changed', 'changed'])
@@ -103,13 +113,46 @@ describe('editorSelection', () => {
     })
   })
 
+  describe('selectAcross', () => {
+    it('selects layers in several frames of one page, in order, and shows it; none lets the selection go', () => {
+      const { selection, log } = harness()
+      const across = [...pairs('p1-f1', 'rect'), ...pairs('p1-f2', 'dot')]
+      selection.selectAcross([...across, ...pairs('p2-f1', 'path')])
+      // The layer on another page than the first one's is left out.
+      expect(selection.current()).toEqual(across)
+      selection.selectAcross([])
+      expect(selection.current()).toBeNull()
+      expect(log).toEqual(['changed', 'changed'])
+    })
+
+    it("remembers the first layer's frame as the one last selected in, and lets the picked frame go", () => {
+      const { selection } = harness()
+      selection.pickFrame('p1-f1')
+      selection.selectAcross([...pairs('p1-f2', 'dot'), ...pairs('p1-f1', 'rect')])
+      expect(selection.pickedFrame()).toBeNull()
+      expect(selection.lastFrameOn('p1')).toBe('p1-f2')
+    })
+
+    it('keeps the group gone into while the first layer is in its frame, and a crop only on one layer', () => {
+      const { selection } = harness()
+      selection.enter('group')
+      selection.selectAcross([...pairs('p1-f1', 'child'), ...pairs('p1-f2', 'dot')])
+      expect(selection.entered()).toBe('group')
+      selection.selectAcross([...pairs('p1-f2', 'dot'), ...pairs('p1-f1', 'child')])
+      expect(selection.entered()).toBeNull()
+      selection.crop({ id: 'rect', frameId: 'p1-f1' })
+      selection.selectAcross([...pairs('p1-f1', 'rect'), ...pairs('p1-f2', 'dot')])
+      expect(selection.cropping()).toBeNull()
+    })
+  })
+
   describe('selectKeepingModes', () => {
     it('sets the selection alone: a crop and a path edit stay, and nothing is shown', () => {
       const { selection, log } = harness()
       selection.crop({ id: 'rect', frameId: 'p1-f1' })
       selection.editPath({ id: 'path', frameId: 'p1-f1' })
-      selection.selectKeepingModes({ ids: ['child'], frameId: 'p1-f2' })
-      expect(selection.current()).toEqual({ ids: ['child'], frameId: 'p1-f2' })
+      selection.selectKeepingModes(pairs('p1-f2', 'child'))
+      expect(selection.current()).toEqual(pairs('p1-f2', 'child'))
       expect(selection.cropping()).toEqual({ id: 'rect', frameId: 'p1-f1' })
       expect(selection.pathEditing()).toEqual({ id: 'path', frameId: 'p1-f1', selected: [] })
       expect(log).toEqual([])
@@ -147,10 +190,18 @@ describe('editorSelection', () => {
       selection.select(['rect', 'path'], 'p1-f1')
       remove('rect')
       selection.keep()
-      expect(selection.current()).toEqual({ ids: ['path'], frameId: 'p1-f1' })
+      expect(selection.current()).toEqual(pairs('p1-f1', 'path'))
       remove('path')
       selection.keep()
       expect(selection.current()).toBeNull()
+    })
+
+    it('drops the layers of a frame no longer shown, keeping the rest', () => {
+      const { selection, world } = harness()
+      selection.selectAcross([...pairs('p1-f1', 'rect'), ...pairs('p1-f2', 'dot')])
+      world.frames = [frame('p1', 'f1')]
+      selection.keep()
+      expect(selection.current()).toEqual(pairs('p1-f1', 'rect'))
     })
 
     it('lets the selection go when its frame is not on the shown page', () => {
@@ -186,7 +237,7 @@ describe('editorSelection', () => {
       expect(selection.pathEditing()).toBeNull()
 
       selection.editPath({ id: 'path', frameId: 'p1-f1' })
-      selection.selectKeepingModes({ ids: ['rect'], frameId: 'p1-f1' })
+      selection.selectKeepingModes(pairs('p1-f1', 'rect'))
       selection.keep()
       expect(selection.pathEditing()).toBeNull()
     })
@@ -197,12 +248,12 @@ describe('editorSelection', () => {
       selection.crop({ id: 'rect', frameId: 'p1-f1' })
       selection.keep()
       expect(selection.cropping()).not.toBeNull()
-      selection.selectKeepingModes({ ids: ['rect'], frameId: 'p1-f2' })
+      selection.selectKeepingModes(pairs('p1-f2', 'rect'))
       selection.keep()
       expect(selection.cropping()).toBeNull()
 
       selection.crop({ id: 'rect', frameId: 'p1-f2' })
-      selection.selectKeepingModes({ ids: ['path'], frameId: 'p1-f2' })
+      selection.selectKeepingModes(pairs('p1-f2', 'path'))
       selection.keep()
       expect(selection.cropping()).toBeNull()
     })
@@ -237,7 +288,7 @@ describe('editorSelection', () => {
       selection.crop({ id: 'child', frameId: 'p1-f1' })
       log.length = 0
       selection.dropOffPage()
-      expect(selection.current()).toEqual({ ids: ['child'], frameId: 'p1-f1' })
+      expect(selection.current()).toEqual(pairs('p1-f1', 'child'))
       expect(selection.cropping()).toEqual({ id: 'child', frameId: 'p1-f1' })
       expect(selection.entered()).toBe('group')
       world.frames = [frame('p1', 'f2')]
@@ -314,7 +365,7 @@ describe('editorSelection', () => {
     it('lets the frame go with null, keeping the selection', () => {
       const { selection, log } = harness()
       selection.pickFrame('p1-f1')
-      selection.selectKeepingModes({ ids: ['rect'], frameId: 'p1-f1' })
+      selection.selectKeepingModes(pairs('p1-f1', 'rect'))
       selection.pickFrame('p1-f1')
       log.length = 0
       selection.pickFrame(null)
@@ -354,14 +405,14 @@ describe('editorSelection', () => {
       const { selection, log } = harness()
       selection.tellListeners()
       expect(log).toEqual([])
-      selection.selectKeepingModes({ ids: ['rect'], frameId: 'p1-f1' })
+      selection.selectKeepingModes(pairs('p1-f1', 'rect'))
       selection.tellListeners()
       selection.tellListeners()
-      selection.selectKeepingModes({ ids: ['rect'], frameId: 'p1-f1' })
+      selection.selectKeepingModes(pairs('p1-f1', 'rect'))
       selection.tellListeners()
-      selection.selectKeepingModes({ ids: ['rect'], frameId: 'p1-f2' })
+      selection.selectKeepingModes(pairs('p1-f2', 'rect'))
       selection.tellListeners()
-      selection.selectKeepingModes({ ids: ['rect', 'path'], frameId: 'p1-f2' })
+      selection.selectKeepingModes(pairs('p1-f2', 'rect', 'path'))
       selection.tellListeners()
       selection.selectKeepingModes(null)
       selection.tellListeners()
@@ -466,7 +517,7 @@ describe('editorSelection', () => {
       const heard: string[] = []
       const stop = selection.onSelection((ids) => heard.push(ids.join(',')))
       const stopFrame = selection.onFramePick((frameId) => heard.push(`frame ${frameId}`))
-      selection.selectKeepingModes({ ids: ['rect'], frameId: 'p1-f1' })
+      selection.selectKeepingModes(pairs('p1-f1', 'rect'))
       selection.tellListeners()
       expect(stop()).toBe(true)
       expect(stopFrame()).toBe(true)
@@ -476,7 +527,7 @@ describe('editorSelection', () => {
       expect(heard).toEqual(['rect'])
       selection.destroy()
       log.length = 0
-      selection.selectKeepingModes({ ids: ['rect'], frameId: 'p1-f1' })
+      selection.selectKeepingModes(pairs('p1-f1', 'rect'))
       selection.tellListeners()
       selection.pickFrame('p1-f2')
       selection.tellListeners()

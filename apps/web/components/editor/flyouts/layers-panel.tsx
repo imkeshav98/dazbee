@@ -132,8 +132,8 @@ export function LayersPanel({ editor }: { editor: Editor }) {
       if (panel) editor.showFrame(id, panel.getBoundingClientRect())
       return
     }
-    const ids = add ? (selected.has(id) ? selection.filter((s) => s !== id) : [...selection, id]) : [id]
-    editor.select(ids)
+    if (add) editor.toggleSelected(id)
+    else editor.select([id])
   }
   const toggle = (id: string, open = !expanded.has(id)) => {
     const next = new Set(expanded)
