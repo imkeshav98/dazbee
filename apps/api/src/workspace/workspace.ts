@@ -1,9 +1,8 @@
 // The workspace and its brands, always read and written within one workspace.
-import { randomUUID } from 'node:crypto'
 
 import { and, asc, eq } from 'drizzle-orm'
 
-import { brands, type Db, workspaces } from '@dazbee/db'
+import { brands, type Db, newId, workspaces } from '@dazbee/db'
 import type { BrandSummary, UpdateWorkspace, WorkspaceSummary } from '@dazbee/schema'
 
 const workspaceSummary = { id: workspaces.id, name: workspaces.name }
@@ -37,7 +36,7 @@ export async function listBrands(db: Db, workspaceId: string): Promise<BrandSumm
 export async function createBrand(db: Db, workspaceId: string, name: string, website?: string): Promise<BrandSummary> {
   const [row] = await db
     .insert(brands)
-    .values({ id: randomUUID(), workspaceId, name, website: website ?? null })
+    .values({ id: newId(), workspaceId, name, website: website ?? null })
     .returning({ id: brands.id, name: brands.name })
   if (!row) throw new Error('insert returned no brand')
   return row

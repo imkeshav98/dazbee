@@ -1,11 +1,10 @@
 // The font catalog (#50): Google Fonts copied into our storage, shared by every workspace, and the
 // fonts each brand uploads, its own. A brand's upload of a family Google also has is the one that
 // brand sees. Every file is read back from our storage, by the editor and by Node renders alike.
-import { randomUUID } from 'node:crypto'
 
 import { and, eq, inArray, isNull, or } from 'drizzle-orm'
 
-import { type Db, fontFaces } from '@dazbee/db'
+import { type Db, fontFaces, newId } from '@dazbee/db'
 import {
   byCodeUnits,
   type FontFace,
@@ -146,7 +145,7 @@ export async function recordFont(
   }
   await storage.put(previewKey(key), preview, 'image/png')
   const row = {
-    id: randomUUID(),
+    id: newId(),
     workspaceId,
     brandId,
     source: 'upload',

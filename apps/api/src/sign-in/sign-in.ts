@@ -1,12 +1,11 @@
 // Sign-in with WorkOS AuthKit (#58). The API alone holds the WorkOS key: it gives the web app the
 // sign-in link, swaps the code WorkOS sends back for the person, and makes their session. A first
 // sign-in makes a workspace (one WorkOS organization) with the person as its Owner (ADR-0011).
-import { randomUUID } from 'node:crypto'
 
 import { WorkOS } from '@workos-inc/node'
 import { asc, eq } from 'drizzle-orm'
 
-import { type Db, memberships, users, workspaces } from '@dazbee/db'
+import { type Db, memberships, newId, users, workspaces } from '@dazbee/db'
 import type { SignedIn } from '@dazbee/schema'
 
 import { signSessionToken } from './session.ts'
@@ -109,7 +108,7 @@ export async function completeSignIn(
 ): Promise<SignedIn> {
   const [user] = await db
     .insert(users)
-    .values({ id: randomUUID(), workosUserId: person.user.id, email: person.user.email, name: person.user.name })
+    .values({ id: newId(), workosUserId: person.user.id, email: person.user.email, name: person.user.name })
     .onConflictDoUpdate({ target: users.workosUserId, set: { email: person.user.email, name: person.user.name } })
     .returning({ id: users.id })
   if (!user) throw new Error('The user was not recorded')
@@ -126,7 +125,7 @@ export async function completeSignIn(
 
   if (!workspaceId) {
     // WorkOS first, so a failure there leaves nothing half made here.
-    const id = randomUUID()
+    const id = newId()
     const name = firstWorkspaceName(person.user)
     const organizationId = await provider.createOrganization(name, id)
     await provider.addMember(organizationId, person.user.id)

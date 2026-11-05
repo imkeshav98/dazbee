@@ -5,7 +5,7 @@ import { afterAll, describe, expect, it } from 'vitest'
 import { fontFaces } from '@dazbee/db'
 import { FontFace, FontFamily, FontLink, FontUploadTicket } from '@dazbee/schema'
 
-import { brand, call, db, otherBrand, run, sibling, storage, workspace } from '../test-api.ts'
+import { brand, call, db, otherBrand, run, SHORT_ID, sibling, storage, workspace } from '../test-api.ts'
 import { fontFile, sha256 } from '../test-files.ts'
 import { fontFiles } from './fonts.ts'
 import { importGoogleFamily } from './google.ts'
@@ -61,6 +61,11 @@ describe('fonts', { timeout: 30_000 }, () => {
   it('copies a Google family into our storage once, and every brand lists it', async () => {
     expect(await importGoogleFamily(db, storage, googleFamily, fakeGoogle)).toBe(2)
     expect(await importGoogleFamily(db, storage, googleFamily, fakeGoogle)).toBe(0)
+    const stored = await db
+      .select({ id: fontFaces.id })
+      .from(fontFaces)
+      .where(eq(fontFaces.family, googleFamily.family))
+    expect(stored.map((f) => f.id)).toEqual([expect.stringMatching(SHORT_ID), expect.stringMatching(SHORT_ID)])
     for (const [as, brandId] of [
       ['a', brand.id],
       ['b', otherBrand.id],
@@ -80,6 +85,7 @@ describe('fonts', { timeout: 30_000 }, () => {
   it('uploads a font for a brand, named by its own tables, with a preview, and keeps it to that brand', async () => {
     const { face, uploaded } = await upload('a', brand.id, bold)
     expect(uploaded).toBe(true)
+    expect(face.id).toMatch(SHORT_ID)
     expect(face).toMatchObject({
       family: 'Noto Sans',
       weight: 700,

@@ -1,11 +1,13 @@
 // The workspace, brand and design routes, against Postgres from Docker Compose
 // (`docker compose up -d --wait postgres`).
+import { randomUUID } from 'node:crypto'
+
 import { describe, expect, it } from 'vitest'
 import * as Y from 'yjs'
 
-import { readDesignState, writeDesignState } from '@dazbee/db'
-import { readDesign } from '@dazbee/doc'
-import { ApiError, BrandSummary, DesignSummary, SyncToken, WorkspaceSummary } from '@dazbee/schema'
+import { designs, readDesignState, writeDesignState } from '@dazbee/db'
+import { loadDesign, readDesign } from '@dazbee/doc'
+import { ApiError, BrandSummary, DesignSummary, parseDesign, SyncToken, WorkspaceSummary } from '@dazbee/schema'
 import { verifySyncToken } from '@dazbee/sync-token'
 
 import {
@@ -18,6 +20,7 @@ import {
   otherBrand,
   personA,
   run,
+  SHORT_ID,
   sibling,
   syncSecret,
   workspace,
@@ -45,6 +48,7 @@ describe('designs per brand', () => {
     expect(created.status).toBe(201)
     const design = DesignSummary.parse(created.json)
     expect(design).toMatchObject({ brandId: brand.id, name: 'Spring sale' })
+    expect(design.id).toMatch(SHORT_ID)
 
     const listed = await call('a', 'GET', `/brands/${brand.id}/designs`)
     expect(
@@ -108,6 +112,27 @@ describe('designs per brand', () => {
     expect(readDesign(doc)).toEqual({ ...content, meta: { designId: id, name: 'Carousel' } })
   })
 
+  it('opens, syncs and copies a design whose id is a UUID, the copy under a short id', async () => {
+    const id = randomUUID()
+    const parsed = parseDesign({
+      meta: { designId: id, name: 'Older' },
+      pages: { p1: { name: 'Page 1', order: 'a0' } },
+      frames: {},
+      nodes: {},
+    })
+    if (!parsed.success) throw new Error(parsed.errors.join('\n'))
+    await db.insert(designs).values({ id, workspaceId: workspace.id, brandId: brand.id, name: 'Older' })
+    await writeDesignState(db, id, Y.encodeStateAsUpdate(loadDesign(parsed.design)))
+
+    const opened = await call('a', 'GET', `/brands/${brand.id}/designs/${id}`)
+    expect(opened.status).toBe(200)
+    expect(DesignSummary.parse(opened.json)).toMatchObject({ id, name: 'Older' })
+    const { token } = SyncToken.parse((await call('a', 'POST', `/brands/${brand.id}/designs/${id}/sync-token`)).json)
+    expect(verifySyncToken(syncSecret, token, id)).toMatchObject({ ok: true, payload: { designId: id } })
+    const copied = await call('a', 'POST', `/brands/${brand.id}/designs/${id}/duplicate`, {})
+    expect(DesignSummary.parse(copied.json).id).toMatch(SHORT_ID)
+  })
+
   it('lists only the asked brand’s designs, newest change first', async () => {
     const first = DesignSummary.parse(
       (await call('a', 'POST', `/brands/${sibling.id}/designs`, { name: 'First' })).json,
@@ -126,6 +151,7 @@ describe('designs per brand', () => {
   it('lists and creates brands within the workspace only', async () => {
     const created = await call('a', 'POST', '/brands', { name: 'New brand' })
     expect(created.status).toBe(201)
+    expect(BrandSummary.parse(created.json).id).toMatch(SHORT_ID)
     const { json } = await call('a', 'GET', '/brands')
     expect(
       BrandSummary.array()
@@ -273,6 +299,7 @@ describe('renaming, copying and deleting designs (#159)', () => {
     const copy = DesignSummary.parse(copied.json)
     expect(copy).toMatchObject({ name: 'Spring launch copy', brandId: brand.id })
     expect(copy.id).not.toBe(design.id)
+    expect(copy.id).toMatch(SHORT_ID)
     const state = await readDesignState(db, copy.id)
     if (!state) throw new Error('no state')
     const doc = new Y.Doc()

@@ -1,10 +1,9 @@
 // A brand's designs, always read and written within one workspace.
-import { randomUUID } from 'node:crypto'
 
 import { and, asc, desc, eq } from 'drizzle-orm'
 import * as Y from 'yjs'
 
-import { type Db, designs, designStates, readDesignState } from '@dazbee/db'
+import { type Db, designs, designStates, newId, readDesignState } from '@dazbee/db'
 import { loadDesign, readDesign } from '@dazbee/doc'
 import { BLANK_SIZE, blankDesign, type Design, type DesignInput, type DesignSummary, parseDesign } from '@dazbee/schema'
 
@@ -87,7 +86,7 @@ export async function createDesign(
   name: string,
   content?: unknown,
 ): Promise<DesignSummary> {
-  const id = randomUUID()
+  const id = newId()
   const input = content === undefined ? startingDesign(id, name) : withMeta(content, id, name)
   const parsed = parseDesign(input)
   if (!parsed.success) throw new InvalidContent(parsed.errors.slice(0, 5).join('; '))
