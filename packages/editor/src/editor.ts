@@ -457,7 +457,7 @@ function live(
     if (pageId !== undefined && pageId !== view.page()) showPage(pageId)
     view.fitArea(view.defaultFrame(frameId))
   }
-  /** Pans, at the same zoom, so a frame of the shown page shows whole, clear of the chrome and of `panel`. */
+  /** Pans, at the same zoom, so a frame of the shown page shows clear of the chrome, and out from under `panel` when it lies under it. */
   function showFrame(frameId: string, panel?: Rect) {
     const frame = frameOf(frameId)
     if (frame) view.showArea(frame, panel)

@@ -194,3 +194,25 @@ test('at 820×1180 a frame picked from its row below the panel stays put', async
   expect(await page.evaluate(() => window.dazbee?.camera())).toEqual(camera)
   expect(errors).toEqual([])
 })
+
+test('on a phone a frame picked from its row above the panel stays put, its label under the chrome or not', async ({
+  browser,
+}) => {
+  const { page, errors } = await openSized(browser, { width: 390, height: 844 })
+  // The deep group open, the panel stands as tall as it gets.
+  await page.evaluate(() => window.dazbee?.select(['picture']))
+  await expect(row(page, 'Picture')).toBeInViewport()
+  const panel = await boxOf(page.getByTestId('flyout'))
+  // Picked once, Sale square comes up out from under the panel.
+  await frameRow(page, 'Sale square').click()
+  await expect.poll(async () => (await frameOnScreen(page, 'sq', 1080, 1080)).bottom).toBeLessThan(panel.y)
+  // A layer selected, then the frame picked again from its row: nothing moves.
+  await row(page, 'Badge').getByTestId('layer-name').click()
+  await expect(row(page, 'Badge')).toHaveAttribute('aria-selected', 'true')
+  const camera = await page.evaluate(() => window.dazbee?.camera())
+  await frameRow(page, 'Sale square').click()
+  await expect(frameRow(page, 'Sale square')).toHaveAttribute('aria-selected', 'true')
+  await nextFrame(page)
+  expect(await page.evaluate(() => window.dazbee?.camera())).toEqual(camera)
+  expect(errors).toEqual([])
+})
