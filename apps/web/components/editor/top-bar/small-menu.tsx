@@ -31,7 +31,7 @@ import { useLocale, useMessages } from '@/lib/i18n/client.tsx'
 import { dirOf, format } from '@/lib/i18n/index.ts'
 
 import { arrowAlong, useMenuFocus, useRovingTab, useScrollingMenu } from './bar-popover.tsx'
-import { LayerActions } from './layer-actions.tsx'
+import { LayerActions, WIDE_MENU } from './layer-actions.tsx'
 import { arrowThroughRows } from './menu-row.tsx'
 
 type Place = { left: number; top: number }
@@ -144,11 +144,11 @@ function usePlace(editor: Editor, menu: HTMLElement | null, rightClick: boolean)
 }
 
 /**
- * Where the full menu opens: beside the small menu on its end side, else on its start side, kept off
- * the rail and its open flyout; under it when neither side has room, and always on a phone. Under
- * it, the menu keeps off the flyout only when the room past the flyout holds it, and off the rail
- * always. Measured once the full menu shows, and again as the small menu, the flyout or the window
- * changes.
+ * Where the full menu opens: beside the small menu on its end side when there is room for it and
+ * the widest menu beside its rows, else on its start side, kept off the rail and its open flyout;
+ * under it when neither side has room, and always on a phone. Under it, the menu keeps off the
+ * flyout only when the room past the flyout holds it, and off the rail always. Measured once the
+ * full menu shows, and again as the small menu, the flyout or the window changes.
  */
 function useFullMenuPlace(
   menu: HTMLElement | null,
@@ -171,7 +171,8 @@ function useFullMenuPlace(
       const past = Math.max(rail, reach('#editor-flyout'))
       const anchor = menu.getBoundingClientRect()
       const need = content.offsetWidth + MENU_GAP
-      const endRoom = rtl ? anchor.left - CLEAR : width - CLEAR - anchor.right
+      // Beside it on its end side only with room for the widest menu beside its rows too, which opens that way.
+      const endRoom = (rtl ? anchor.left - CLEAR : width - CLEAR - anchor.right) - WIDE_MENU - MENU_GAP
       const startRoom = rtl ? width - past - anchor.right : anchor.left - past
       const side = endRoom >= need ? 'end' : startRoom >= need ? 'start' : 'under'
       const startInset = side !== 'under' || width - CLEAR - past >= content.offsetWidth ? past : rail

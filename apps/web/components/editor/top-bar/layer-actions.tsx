@@ -9,7 +9,7 @@
 // that never applies is left out; one with nothing to do is greyed, its tooltip saying why.
 import { CaretRightIcon } from '@phosphor-icons/react'
 import * as Popover from '@radix-ui/react-popover'
-import { type ReactNode, useState } from 'react'
+import { type ReactNode, useLayoutEffect, useState } from 'react'
 
 import { childrenOf } from '@dazbee/doc'
 import type { Editor, ShortcutAction } from '@dazbee/editor'
@@ -29,6 +29,9 @@ import { arrowThroughRows, MenuRow } from './menu-row.tsx'
 
 /** Why an item has nothing to do: the reason the linked-copy items give, by its message. */
 type Why = keyof Messages['editor']['bar']['linked']['why']
+
+/** The width of a menu beside a row whose rows have long keys, as the mock draws Copy to other frames ▸. */
+export const WIDE_MENU = 258
 
 /** The four moves along the stack: to the front, forward, backward, to the back. */
 export const ORDER = ['bringToFront', 'bringForward', 'sendBackward', 'sendToBack'] as const
@@ -144,6 +147,7 @@ export function LayerActions({ editor, ids, onDone }: { editor: Editor; ids: str
         <SubMenu
           label={l.copyToFrames}
           testId="copy-to-frames"
+          wide
           heading={linked.reach === 1 ? l.toFrame : format(l.toFrames, { n: linked.reach })}
         >
           {linkedRow('styleToLinked', l.style, whyOf(linked.style))}
@@ -238,19 +242,22 @@ export function AlignRow({ editor }: { editor: Editor }) {
 
 /**
  * A row of the menu that opens a short menu beside it, or under it on a phone, where the screen has
- * no room beside the menu: Enter or the arrow towards it opens it, the arrow back or Esc closes it,
- * and the up and down arrows move through it.
+ * no room beside the menu and it lies over the menu across its whole width: Enter or the arrow
+ * towards it opens it, the arrow back or Esc closes it, and the up and down arrows move through it.
  */
 function SubMenu({
   label,
   testId,
   heading,
+  wide = false,
   children,
 }: {
   label: string
   testId: string
   /** A short line over its rows saying what they act on. */
   heading?: string
+  /** As wide as the mock draws a menu whose rows have long keys. */
+  wide?: boolean
   children: ReactNode
 }) {
   const [open, setOpen] = useState(false)
@@ -258,6 +265,16 @@ function SubMenu({
   const rtl = dirOf(useLocale()) === 'rtl'
   const [toward, back] = rtl ? ['ArrowLeft', 'ArrowRight'] : ['ArrowRight', 'ArrowLeft']
   const focus = useMenuFocus()
+  // On a phone, the menu's width and how far its start edge is from the row's, so it covers the menu.
+  const [span, setSpan] = useState<{ width: number; offset: number } | null>(null)
+  useLayoutEffect(() => {
+    const row = focus.button.current
+    const menu = phone && open ? row?.closest('[role="dialog"]') : null
+    if (!row || !menu) return setSpan(null)
+    const r = row.getBoundingClientRect()
+    const m = menu.getBoundingClientRect()
+    setSpan({ width: Math.round(m.width), offset: Math.round(rtl ? r.right - m.right : m.left - r.left) })
+  }, [phone, open, rtl, focus.button])
   return (
     <Popover.Root open={open} onOpenChange={setOpen}>
       <Popover.Trigger asChild>
@@ -281,8 +298,10 @@ function SubMenu({
         <Popover.Content
           side={phone ? 'bottom' : rtl ? 'left' : 'right'}
           align="start"
+          alignOffset={span?.offset ?? 0}
           sideOffset={phone ? 4 : 8}
-          collisionPadding={12}
+          // On a phone, as close to the screen's edges as the menu it covers.
+          collisionPadding={phone ? 8 : 12}
           // A click elsewhere, Esc or the arrow back closes it; focus moving as the menu opens does not.
           onFocusOutside={(event) => event.preventDefault()}
           {...focus.content}
@@ -293,7 +312,8 @@ function SubMenu({
             event.preventDefault()
             setOpen(false)
           }}
-          className={cn(MENU, 'min-w-52')}
+          style={span ? { width: span.width } : wide ? { width: WIDE_MENU } : undefined}
+          className={cn(MENU, !wide && 'min-w-52')}
         >
           {focus.back}
           {heading && <p className={MENU_HEADING}>{heading}</p>}
