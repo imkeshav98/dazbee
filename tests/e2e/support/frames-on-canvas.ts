@@ -1,7 +1,7 @@
 // The design and helpers of the frames-on-canvas specs: a page holding a square, a story linked to it
 // and a banner linked to nothing, the square holding a headline, a layer turned 30°, a locked one and
 // a photo under a round mask, opened at half size or alone at a screen size; which frame is picked
-// and what a frame holds, where a frame's label is, and Tab to the top bar.
+// and what a frame holds, where a frame's label is, Tab to the top bar, and the picked frame's ⋯.
 import type { DesignInput } from '@dazbee/schema'
 
 import { solid } from './edit-in-frame.ts'
@@ -142,6 +142,29 @@ export async function labelRow(page: Page, id: string) {
   const rect = await page.evaluate((id) => window.dazbee?.labelRect(id), id)
   if (!stage || !rect) throw new Error(`no label for ${id}`)
   return { x: stage.x + rect.x, y: stage.y + rect.y, width: rect.width, height: rect.height }
+}
+/** The picked frame's ⋯ items in order, each by its name and as it reads with its key. */
+const FRAME_MENU = [
+  { name: 'Duplicate', reads: 'DuplicateCtrl+D' },
+  { name: 'Add size', reads: 'Add size' },
+  { name: 'Rename', reads: 'Rename' },
+  { name: 'Delete', reads: 'DeleteDelete' },
+] as const
+/**
+ * Checks the picked frame's open ⋯ lists its items in order, Add size after Duplicate. Given `to`,
+ * the focus is on the first and Tab moves it down the list item by item, up to `to`. Gives the menu.
+ */
+export async function frameMenuItems(page: Page, to?: (typeof FRAME_MENU)[number]['name']) {
+  const menu = page.getByTestId('bar-frame-more-menu')
+  const items = menu.getByRole('button')
+  await expect(items).toHaveText(FRAME_MENU.map((item) => item.reads))
+  for (const [i, item] of FRAME_MENU.entries()) {
+    if (to === undefined) break
+    await expect(items.nth(i)).toBeFocused()
+    if (item.name === to) break
+    await page.keyboard.press('Tab')
+  }
+  return menu
 }
 /** Presses Tab until the focus is in the top bar, from wherever it is, and gives the item it reached. */
 export async function tabToBar(page: Page) {

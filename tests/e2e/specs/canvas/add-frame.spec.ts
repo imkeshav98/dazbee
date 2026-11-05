@@ -8,7 +8,7 @@
 // linked to nothing; the square holds a turned layer, a locked one and one under a mask.
 import { addSize, card, frameButton, typeSize } from '../../support/add-frame.ts'
 import { settle, writeOutput } from '../../support/editor.ts'
-import { clickLabel, frameOf, openFrames, picked, tabToBar } from '../../support/frames-on-canvas.ts'
+import { clickLabel, frameMenuItems, frameOf, openFrames, picked, tabToBar } from '../../support/frames-on-canvas.ts'
 import { layersIn } from '../../support/seed.ts'
 import { type Design, drag, drawn, press, read } from '../../support/stage.ts'
 import { expect, type Page, test } from '../../support/test.ts'
@@ -278,9 +278,8 @@ test("Add size in a picked frame's ⋯ opens “Add a size to Square”: a tile 
 }) => {
   const { a, b, tabs, errors } = await openFrames(browser, 2)
   await clickLabel(a, 'sq')
-  // Add size ▸ sits after Duplicate.
-  const menu = await barMenu(a, 'frame-more')
-  await expect(menu.getByRole('button')).toHaveText(['DuplicateCtrl+D', 'Add size', 'Rename', 'DeleteDelete'])
+  await barMenu(a, 'frame-more')
+  await frameMenuItems(a)
   await addSize(a)
   await expect(card(a).locator('#edit-panel-title')).toHaveText('Add a size to Square')
   await expect(a.getByTestId('add-frame-note')).toHaveText(
@@ -345,10 +344,7 @@ test('Add size by the keyboard: Tab to the bar, ⋯, Add size; Esc gives the foc
   await a.keyboard.press('ArrowRight')
   await expect(a.getByTestId('bar-frame-more')).toBeFocused()
   await a.keyboard.press('Enter')
-  const menu = a.getByTestId('bar-frame-more-menu')
-  await expect(menu.getByRole('button', { name: /Duplicate/ })).toBeFocused()
-  await a.keyboard.press('Tab')
-  await expect(menu.getByRole('button', { name: 'Add size' })).toBeFocused()
+  await frameMenuItems(a, 'Add size')
   await a.keyboard.press('Enter')
   await expect(card(a)).toHaveAttribute('data-panel', 'addSize')
   expect(await focusInCard(a)).toBe(true)
