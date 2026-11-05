@@ -1,4 +1,5 @@
-// The infinite canvas (#36): a page of five frames, each where it is stored, with pan and zoom, and
+// The infinite canvas (#36): a page of five frames, each where it is stored, with pan and zoom; a
+// layer dragged past its frame's edge shows there as a faint ghost and stays in its frame; and
 // pictures of one frame, linked frames, two pages and a page with no frames at each screen size.
 // Needs the API and the sync server: `docker compose up -d --wait`.
 import type { DesignInput } from '@dazbee/schema'
@@ -120,6 +121,90 @@ test.describe('pan and zoom', () => {
     await page.getByTestId('zoom').click()
     await page.getByTestId('zoom-menu').getByRole('button', { name: /100%/ }).click()
     await expect.poll(async () => (await camera()).zoom).toBe(1)
+    expect(errors).toEqual([])
+  })
+})
+
+test.describe('dragging out of a frame', () => {
+  /** A square frame holding a red shape near its end, and a second frame 200 px past it. */
+  const sideBySide = (): DesignInput => {
+    const base = liveDesign()
+    return {
+      ...base,
+      meta: { ...base.meta, name: 'Side by side' },
+      frames: {
+        ...base.frames,
+        other: { pageId: 'p1', name: 'Other', width: 1080, height: 1080, x: 1280, y: 0, fills: CREAM, order: 'a1' },
+      },
+      nodes: {
+        shape: {
+          type: 'graphic',
+          parentId: 'sq',
+          link: 'shape',
+          index: 'a9',
+          name: 'Shape',
+          props: {
+            x: 700,
+            y: 400,
+            width: 300,
+            height: 200,
+            shape: { kind: 'rect' },
+            fills: [{ type: 'solid', color: '#E0262BFF' }],
+          },
+        },
+      },
+    }
+  }
+  /** The colour on screen at a design pixel of the square frame. */
+  async function colourAt(page: Page, x: number, y: number) {
+    const at = await screenPoint(page, x, y)
+    const png = (
+      await page.screenshot({
+        clip: { x: Math.round(at.x), y: Math.round(at.y), width: 1, height: 1 },
+        animations: 'disabled',
+      })
+    ).toString('base64')
+    return page.evaluate(async (png) => {
+      const bitmap = await createImageBitmap(await (await fetch(`data:image/png;base64,${png}`)).blob())
+      const canvas = new OffscreenCanvas(1, 1)
+      const context = canvas.getContext('2d')
+      context?.drawImage(bitmap, 0, 0)
+      return [...(context?.getImageData(0, 0, 1, 1).data ?? [])].slice(0, 3)
+    }, png)
+  }
+
+  test('a layer dragged past its frame shows there as a faint ghost, its frame label lit, and stays in its frame', async ({
+    browser,
+  }) => {
+    const { page, errors } = await openStage(browser, sideBySide())
+    await page.evaluate(() => window.dazbee?.setSnapping(false))
+    // The gap between the frames, beside where the shape goes, and where it goes.
+    const gap = await colourAt(page, 1190, 900)
+    const from = await screenPoint(page, 850, 500)
+    const to = await screenPoint(page, 1250, 500)
+    await page.mouse.move(from.x, from.y)
+    await page.mouse.down()
+    for (let i = 1; i <= 10; i++) await page.mouse.move(from.x + ((to.x - from.x) * i) / 10, from.y)
+    await drawn(page)
+
+    // Mid-drag: the part outside the square is drawn faintly over the gap and the other frame.
+    const ghost = await colourAt(page, 1190, 500)
+    expect(ghost, 'a ghost over the gap').not.toEqual(gap)
+    expect(ghost[0] ?? 0, 'red, but faint').toBeGreaterThan(ghost[1] ?? 0)
+    await expect(page.locator('.frame-label[data-frame="sq"]')).toHaveAttribute('data-active', '')
+    await expect(page.locator('.frame-label[data-frame="other"]')).not.toHaveAttribute('data-active')
+    writeOutput('drag-ghost.png', await page.screenshot({ animations: 'disabled' }))
+
+    // Dropped: the shape stays in the square, clipped there, selected.
+    await page.mouse.up()
+    await drawn(page)
+    const stored = JSON.parse(await designOf(page)) as {
+      nodes: Record<string, { parentId: string; props: { x: number } }>
+    }
+    expect(stored.nodes.shape).toMatchObject({ parentId: 'sq', props: { x: 1100 } })
+    expect(await page.evaluate(() => window.dazbee?.selection())).toEqual(['shape'])
+    await expect(page.locator('.selection')).toBeVisible()
+    expect(await colourAt(page, 1190, 500), 'no ghost once dropped').toEqual(gap)
     expect(errors).toEqual([])
   })
 })

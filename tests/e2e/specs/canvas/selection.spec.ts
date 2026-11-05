@@ -1,7 +1,8 @@
 // Selection and transforms (#40), with real pointer and keyboard input: click, shift-click and
 // marquee; move, resize and rotate with handles (shift and alt too), on a turned layer as well;
 // arrow nudges, duplicate, z-order, delete, lock and hide from the shortcut table. Every drag,
-// resize and rotate undoes in one step.
+// resize and rotate undoes in one step. With nothing selected, select all picks the frame last
+// selected in on the page, else the frame nearest the middle of the view.
 import type { DesignInput } from '@dazbee/schema'
 
 import { screenPoint, writeOutput } from '../../support/editor.ts'
@@ -103,6 +104,38 @@ const design = (): DesignInput => {
 }
 
 const open = (browser: Browser) => openStage(browser, design())
+
+/** Three frames in a row on one page, each holding its own layers. */
+const threeFrames = (): DesignInput => {
+  const frame = (name: string, x: number, order: string) => ({
+    pageId: 'p1',
+    name,
+    width: 1080,
+    height: 1080,
+    x,
+    y: 0,
+    fills: [{ type: 'solid' as const, color: '#FFFFFFFF' }],
+    order,
+  })
+  const layer = (parentId: string, index: string, color: string) => ({
+    type: 'graphic' as const,
+    parentId,
+    index,
+    name: 'Square',
+    props: rect(200 + Number(index.slice(1)) * 300, 400, 200, 200, color),
+  })
+  return {
+    meta: { designId: 'replaced-by-the-api', name: 'Three frames' },
+    pages: { p1: { name: 'Page 1', order: 'a0' } },
+    frames: { sq: frame('Square', 0, 'a0'), f2: frame('Second', 1280, 'a1'), f3: frame('Third', 2560, 'a2') },
+    nodes: {
+      a: { ...layer('sq', 'a0', '#E0262BFF'), link: 'a' },
+      b: { ...layer('f2', 'a0', '#2F6BFFFF'), link: 'b' },
+      c: { ...layer('f3', 'a0', '#00A889FF'), link: 'c' },
+      c2: { ...layer('f3', 'a1', '#FFB020FF'), link: 'c2' },
+    },
+  }
+}
 
 test("click, shift-click and marquee select; select all and a marquee leave locked layers out, and hidden ones can't be hit", async ({
   browser,
@@ -381,5 +414,26 @@ test('nudge, duplicate, z-order, lock, hide and delete from the keyboard', async
   expect(await selection(page)).toEqual([])
   await press(page, 'undo')
   expect((await read(page)).nodes.dot).toBeDefined()
+  expect(errors).toEqual([])
+})
+
+test('select all with nothing selected picks the frame last selected in on the page, else the frame nearest the middle of the view', async ({
+  browser,
+}) => {
+  const { page, errors } = await openStage(browser, threeFrames())
+  // Nothing selected yet: the frame in the middle of the view, not the page's first.
+  await page.evaluate(() => window.dazbee?.fitFrame('f3'))
+  await page.evaluate(() => window.dazbee?.drawn())
+  await press(page, 'selectAll')
+  expect((await selection(page)).sort()).toEqual(['c', 'c2'])
+  await press(page, 'deselect')
+
+  // A layer of the second frame selected, then let go: select all picks that frame again, though
+  // the third is in the middle of the view.
+  await page.evaluate(() => window.dazbee?.select(['b']))
+  await press(page, 'deselect')
+  expect(await selection(page)).toEqual([])
+  await press(page, 'selectAll')
+  expect(await selection(page)).toEqual(['b'])
   expect(errors).toEqual([])
 })

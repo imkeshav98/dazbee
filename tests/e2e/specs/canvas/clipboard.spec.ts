@@ -1,6 +1,8 @@
 // Copy and paste across designs (#49), with real keys: a group with a photo, text and a shape
 // copied in one design and pasted into another draws the same pixels there; pasting twice gives
-// two copies; each paste is one undo step; Mod+Shift+V puts it where the pointer is.
+// two copies; each paste is one undo step; Mod+Shift+V puts it where the pointer is. Across pages:
+// after a paste on another page, Esc and the keys reach no layer of the page the copy came from;
+// a paste on a page with no frame says to add one first.
 import type { DesignInput } from '@dazbee/schema'
 
 import { photo, upload } from '../../support/assets.ts'
@@ -109,6 +111,42 @@ const target = () =>
     },
   })
 
+/**
+ * A box holding a square on the first page, and a second page: with a square frame, or with no
+ * frame at all.
+ */
+const twoPages = (secondFrame: boolean): DesignInput => {
+  const first = shell('Two pages', {
+    holder: {
+      type: 'box',
+      parentId: 'sq',
+      index: 'a0',
+      name: 'Holder',
+      props: { x: 200, y: 200, width: 400, height: 400, fills: [{ type: 'solid', color: '#15121AFF' }] },
+    },
+    inner: {
+      type: 'graphic',
+      parentId: 'holder',
+      index: 'a0',
+      name: 'Inner',
+      props: {
+        x: 300,
+        y: 300,
+        width: 200,
+        height: 200,
+        shape: { kind: 'rect' },
+        fills: [{ type: 'solid', color: '#FF48B0FF' }],
+      },
+    },
+  })
+  const square = { pageId: 'p2', name: 'Square', width: 1080, height: 1080, x: 0, y: 0, order: 'a0' }
+  return {
+    ...first,
+    pages: { ...first.pages, p2: { name: 'Page 2', order: 'a1' } },
+    frames: { ...first.frames, ...(secondFrame ? { 'p2-sq': { ...square, fills: [...BACKGROUND] } } : {}) },
+  }
+}
+
 /** SHA-256 of the export's pixels inside a rect of the 1080 wide square. */
 const regionHash = (page: Page, r: { x: number; y: number; width: number; height: number }) =>
   page.evaluate(async (r) => {
@@ -216,4 +254,50 @@ test('Mod+Shift+V pastes centred on the pointer, and cut takes the layers away i
   await press(page, 'undo')
   expect((await read(page)).nodes.other?.props).toMatchObject({ x: 700, y: 700 })
   expect(errors).toEqual([])
+})
+
+test.describe('across pages', () => {
+  /** Selects the square inside the holder with a double-click, as a person goes into the box, and copies it. */
+  async function copyInner(page: Page) {
+    const at = await screenPoint(page, 400, 400)
+    await page.mouse.dblclick(at.x, at.y)
+    await page.evaluate(() => window.dazbee?.drawn())
+    expect(await selection(page)).toEqual(['inner'])
+    await keys(page, 'ControlOrMeta+C')
+  }
+  const showPage = async (page: Page, pageId: string) => {
+    await page.evaluate((id) => window.dazbee?.showPage(id), pageId)
+    await page.evaluate(() => window.dazbee?.drawn())
+  }
+
+  test('after a paste on another page, Esc and the arrow keys reach no layer of the page the copy came from', async ({
+    browser,
+  }) => {
+    const { page, errors } = await openStage(browser, twoPages(true))
+    await copyInner(page)
+    await showPage(page, 'p2')
+    await keys(page, 'ControlOrMeta+V')
+    const [pasted = ''] = await selection(page)
+    expect((await read(page)).nodes[pasted]?.parentId).toBe('p2-sq')
+    const before = await read(page)
+
+    // Esc goes out of the paste, to nothing: the box gone into on the first page is not this page's.
+    await keys(page, 'Escape')
+    expect(await selection(page)).toEqual([])
+    expect(await page.evaluate(() => window.dazbee?.shownPage())).toBe('p2')
+    await keys(page, 'ArrowRight')
+    expect((await read(page)).nodes).toEqual(before.nodes)
+    expect(errors).toEqual([])
+  })
+
+  test('a paste on a page with no frame says to add a frame first, and adds nothing', async ({ browser }) => {
+    const { page, errors } = await openStage(browser, twoPages(false))
+    await copyInner(page)
+    await showPage(page, 'p2')
+    const before = await read(page)
+    await keys(page, 'ControlOrMeta+V')
+    await expect(page.getByTestId('notice-toast')).toHaveText('Add a frame first, then paste.')
+    expect((await read(page)).nodes).toEqual(before.nodes)
+    expect(errors).toEqual([])
+  })
 })

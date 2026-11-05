@@ -1,5 +1,5 @@
 // The frame, box and image tools, with real pointer and keyboard input: F draws an empty frame
-// where it is dragged; the shape menu's Box draws a box, and one drawn around layers takes them in
+// where it is dragged, and one dragged past the size limits keeps its shape; the shape menu's Box draws a box, and one drawn around layers takes them in
 // without moving them, their copies in the wide frame staying as they were; Mod+Alt+G and the
 // Arrange card box the selection; Shift+A on shapes wraps them in an auto layout box where they
 // stand; I opens the image picker, and the image picked lands where the stage is clicked, one undo
@@ -143,6 +143,21 @@ test('F draws an empty frame where dragged and a click adds none; the Box tool d
   await press(page, 'undo')
   expect((await read(page)).nodes.a?.parentId).toBe('sq')
   expect((await read(page)).nodes[box ?? '']).toBeUndefined()
+  expect(errors).toEqual([])
+})
+
+test('a frame dragged out far past the size limits keeps the shape dragged, scaled to fit them', async ({
+  browser,
+}) => {
+  const { page, errors } = await openStage(browser, design())
+  // Zoomed far out, a wide drag on screen spans 35000 × 10000 design pixels.
+  await page.evaluate(() => window.dazbee?.setCamera({ x: 50, y: 150, zoom: 0.02 }))
+  await page.evaluate(() => window.dazbee?.drawn())
+  await press(page, 'toolFrame')
+  await drag(page, { x: 10000, y: 10000 }, { x: 45000, y: 20000 })
+  const [drawnFrame = ''] = (await frameIds(page)).filter((id) => id !== 'sq' && id !== 'wide')
+  // 3.5 times as wide as tall, as dragged, with its long side at the most a frame may have.
+  expect((await read(page)).frames[drawnFrame]).toMatchObject({ x: 10000, y: 10000, width: 8000, height: 2286 })
   expect(errors).toEqual([])
 })
 
