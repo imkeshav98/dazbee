@@ -221,7 +221,14 @@ test('hide and lock on a row act on that layer alone, never its linked copy, eac
   // The square's Logo is hidden and its Button locked; their copies in the story are not.
   const toggle = (id: string, name: string) => layerRow(page, id).getByRole('button', { name, exact: true })
   await expect(toggle('logo', 'Show Logo')).toHaveAttribute('aria-pressed', 'true')
-  await expect(layerRow(page, 'logo').getByTestId('layer-name')).toHaveCSS('text-decoration-line', 'line-through')
+  // A hidden layer's name is dimmed, with no line through it.
+  const nameLook = (id: string) =>
+    layerRow(page, id)
+      .getByTestId('layer-name')
+      .evaluate((el) => ({ line: getComputedStyle(el).textDecorationLine, colour: getComputedStyle(el).color }))
+  const hiddenName = await nameLook('logo')
+  expect(hiddenName.line).toBe('none')
+  expect(hiddenName.colour).not.toBe((await nameLook('head')).colour)
   await expect(toggle('button', 'Unlock Button')).toHaveAttribute('aria-pressed', 'true')
   await expect(toggle(storyLogo, 'Show Logo')).toHaveCount(0)
   await expect(toggle(storyButton, 'Unlock Button')).toHaveCount(0)

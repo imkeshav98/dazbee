@@ -206,10 +206,7 @@ export const LayerRow = memo(function LayerRow({
           onDone={(name, byKey) => api.renamed(id, name, node.name, byKey)}
         />
       ) : (
-        <span
-          data-testid="layer-name"
-          className={cn('min-w-0 flex-1 truncate', hidden && 'line-through decoration-subtle/60')}
-        >
+        <span data-testid="layer-name" className="min-w-0 flex-1 truncate">
           {node.name}
         </span>
       )}
