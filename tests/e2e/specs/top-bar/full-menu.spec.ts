@@ -60,6 +60,22 @@ test.describe('the full menu', () => {
     expect(errors).toEqual([])
   })
 
+  test('sets Duplicate apart from Copy to other frames with a divider, as the mock does', async ({ browser }) => {
+    const { page, errors } = await open(browser)
+    await selectLayers(page, ['badge'])
+    const menu = await moreMenu(page)
+    // A divider is a line, not a row: no button, with a top border.
+    const around = await menu.locator('[data-action="duplicate"]').evaluate((row) => {
+      const next = row.nextElementSibling
+      return [
+        next?.tagName === 'DIV' && getComputedStyle(next).borderTopWidth !== '0px',
+        next?.nextElementSibling?.getAttribute('data-testid'),
+      ]
+    })
+    expect(around).toEqual([true, 'more-copy-to-frames'])
+    expect(errors).toEqual([])
+  })
+
   test('shows Ungroup after Put in a box for a group or a box, hidden for any other selection; it takes what they hold out in their frame', async ({
     browser,
   }) => {

@@ -137,6 +137,7 @@ export function LayerActions({ editor, ids, onDone }: { editor: Editor; ids: str
         {linkedRow('pasteStyle', l.pasteStyle, whyOf(linked.pasteStyle))}
       </SubMenu>
       {row('duplicate', t.editor.arrange.duplicate)}
+      <div className={MENU_DIVIDER} />
       {linked.frames === 0 ? (
         <MenuRow action="copyToFrames" label={l.copyToFrames} keys="" why={l.why.noFrames} caret />
       ) : (
