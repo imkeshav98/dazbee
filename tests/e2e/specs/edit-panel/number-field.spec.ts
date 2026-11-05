@@ -4,12 +4,22 @@
 // in puts the caret at the end; Rotate's ° stays outside what is typed; a field with a fill keeps
 // the fill's edge under the pointer through a drag; Shift pressed mid-drag changes the speed without
 // jumping the value; on a touch screen the fields are 44 px tall and 8 px apart.
-import { decodePng, type Pixels, rgbaAt } from '@dazbee/pixels/pixels'
+import { decodePng, rgbaAt } from '@dazbee/pixels/pixels'
 import { loadCanvasKit } from '@dazbee/renderer/node'
 
 import { writeOutput } from '../../support/editor.ts'
 import { openDesignIn, THEMES } from '../../support/glass.ts'
-import { BOX, FIELD_SCREENS, FIELDS, type FieldScreen, numberFieldsDesign } from '../../support/number-fields.ts'
+import {
+  BOX,
+  caretOf,
+  contrast,
+  FIELD_SCREENS,
+  FIELDS,
+  type FieldScreen,
+  numberFieldsDesign,
+  type Rgb,
+  selectionColours,
+} from '../../support/number-fields.ts'
 import { seed } from '../../support/seed.ts'
 import { fitSettled, nextFrame, props, selectLayers } from '../../support/stage.ts'
 import { type Browser, expect, type Locator, type Page, test } from '../../support/test.ts'
@@ -18,16 +28,6 @@ import { openCard } from '../../support/top-bar.ts'
 test.describe.configure({ timeout: 120_000 })
 
 type Field = (typeof FIELDS)[keyof typeof FIELDS]
-type Rgb = [number, number, number]
-
-/** Where an input's caret or selection is, what it holds, and whether it has the focus. */
-const caretOf = (input: Locator) =>
-  input.evaluate((el: HTMLInputElement) => ({
-    value: el.value,
-    start: el.selectionStart,
-    end: el.selectionEnd,
-    focused: document.activeElement === el,
-  }))
 
 /** Where the fill's edge is on screen: the knob's start plus the fill's end, in its padding box. */
 const fillEdge = (knob: Locator) =>
@@ -39,49 +39,6 @@ const fillEdge = (knob: Locator) =>
       ? box.right - el.clientLeft - end * el.clientWidth
       : box.left + el.clientLeft + end * el.clientWidth
   })
-
-/** The commonest colour in a region of a picture, which over a field's flat fill is that fill. */
-function commonest(shot: Pixels, x0: number, y0: number, x1: number, y1: number): Rgb {
-  const counts = new Map<string, number>()
-  for (let y = Math.round(y0); y < Math.round(y1); y++)
-    for (let x = Math.round(x0); x < Math.round(x1); x++) {
-      const key = rgbaAt(shot, x, y).slice(0, 3).join(',')
-      counts.set(key, (counts.get(key) ?? 0) + 1)
-    }
-  const [top] = [...counts.entries()].sort((a, b) => b[1] - a[1])
-  return (top?.[0] ?? '0,0,0').split(',').map(Number) as Rgb
-}
-
-/** WCAG 2.2's contrast ratio between two colours. */
-function contrast(a: Rgb, b: Rgb) {
-  const luminance = (rgb: Rgb) => {
-    const [r, g, bl] = rgb.map((c) => c / 255).map((c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4))
-    return 0.2126 * (r ?? 0) + 0.7152 * (g ?? 0) + 0.0722 * (bl ?? 0)
-  }
-  const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x)
-  return ((hi ?? 0) + 0.05) / ((lo ?? 0) + 0.05)
-}
-
-/**
- * The colours a field with its whole value selected shows, as drawn: the selection behind the last
- * digit, the field's fill beside its label, and the digits' colour.
- */
-async function selectionColours(knob: Locator, input: Locator) {
-  const ck = await loadCanvasKit()
-  const shot = decodePng(ck, new Uint8Array(await knob.screenshot({ animations: 'disabled' })))
-  const [k, i] = [await knob.boundingBox(), await input.boundingBox()]
-  if (!k || !i) throw new Error('no field on screen')
-  const scale = shot.width / k.width
-  const right = (i.x + i.width - k.x) * scale
-  const top = (i.y - k.y) * scale
-  const digit = (await input.evaluate((el) => parseFloat(getComputedStyle(el).fontSize))) * 0.6 * scale
-  const selection = commonest(shot, right - digit, top + 2 * scale, right - scale, top + i.height * scale - 2 * scale)
-  const field = commonest(shot, 2 * scale, (k.height / 2 - 2) * scale, 6 * scale, (k.height / 2 + 2) * scale)
-  const digits = await input.evaluate((el) =>
-    getComputedStyle(el, '::selection').color.match(/\d+/g)?.slice(0, 3).map(Number),
-  )
-  return { selection, field, digits: digits as Rgb }
-}
 
 /**
  * The first and last rows, in device pixels down the knob, of the ink drawn in each of `parts`: the
