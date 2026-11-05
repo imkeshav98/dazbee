@@ -234,7 +234,7 @@ test('undo and redo in the header pill: off with nothing to do, each a step, and
   expect(errors).toEqual([])
 })
 
-test('the small menu locks, duplicates and deletes; the full menu copies, pastes and keeps its menus beside', async ({
+test('the small menu locks, duplicates, deletes and hides; the full menu copies, pastes and keeps its menus beside', async ({
   browser,
 }) => {
   const asset = await upload(photo)
@@ -254,10 +254,22 @@ test('the small menu locks, duplicates and deletes; the full menu copies, pastes
   await expect.poll(nodes).toBe(before + 1)
   await page.getByTestId('small-delete').click()
   await expect.poll(nodes).toBe(before)
+  await selectLayers(page, ['box'])
+  const hide = page.getByTestId('small-hide')
+  await hide.click()
+  await expect(hide).toHaveAttribute('aria-pressed', 'true')
+  await hide.click()
+  await expect(hide).toHaveAttribute('aria-pressed', 'false')
 
   await selectLayers(page, ['box'])
-  const menu = await moreMenu(page)
-  await expect(menu.getByRole('button', { name: /^Paste/ })).toBeDisabled()
+  await moreSubmenu(page, 'paste')
+  await expect(
+    page
+      .getByTestId('more-paste-menu')
+      .getByRole('button', { name: /^Paste/ })
+      .first(),
+  ).toHaveAttribute('aria-disabled', 'true')
+  await page.keyboard.press('Escape')
   await moreAction(page, 'Copy')
   await moreMenu(page)
   await moreAction(page, 'Paste')
@@ -377,7 +389,7 @@ test('the small menu keeps out of a drag, and over a selection filling a phone i
   expect(errors).toEqual([])
 })
 
-test('beside an open Layers flyout the top bar centres in the room left, and a right-click on a locked layer offers Unlock', async ({
+test('beside an open Layers flyout the top bar centres in the room left, and a right-click on a layer locked in all frames offers to unlock them', async ({
   browser,
 }) => {
   const asset = await upload(photo)
@@ -392,12 +404,12 @@ test('beside an open Layers flyout the top bar centres in the room left, and a r
   await page.locator('[data-panel="layers"]').click()
 
   await selectLayers(page, ['box'])
-  await moreAction(page, 'Lock')
+  await moreAction(page, 'Lock in all frames')
   await selectLayers(page, [])
   const at = await screenPoint(page, 160, 280)
   await page.mouse.click(at.x, at.y, { button: 'right' })
   const menu = page.getByTestId('stage-menu')
-  await menu.getByRole('button', { name: /^Unlock/ }).click()
+  await menu.getByRole('button', { name: /^Unlock in all frames/ }).click()
   await expect(menu).toBeHidden()
   await expect
     .poll(() => page.evaluate(() => Object.values(window.dazbee?.design().nodes.box?.lock ?? {}).some(Boolean)))

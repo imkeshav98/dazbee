@@ -62,7 +62,7 @@ test('a selection shows the top bar; several layers line up and spread out from 
   await closeBarMenu(page, 'more-line-up')
   await closeBarMenu(page, 'bar-more')
 
-  // Several layers: Line up with the spread outs on the top bar, Group in the small menu.
+  // Several layers: Line up with the spread outs on the top bar, grouped by its key.
   await page.keyboard.press('Control+a')
   await expect(page.getByTestId('top-bar')).toHaveAttribute('data-selection', / /)
   await expect(arrange).toHaveCount(0)
@@ -72,7 +72,7 @@ test('a selection shows the top bar; several layers line up and spread out from 
   await shoot(page, 'cards-arrange')
   await page.keyboard.press('Escape')
   const before = Object.keys(JSON.parse(await designOf(page)).nodes).length
-  await page.getByTestId('small-group').click()
+  await page.keyboard.press('Control+KeyG')
   await expect
     .poll(
       async () =>

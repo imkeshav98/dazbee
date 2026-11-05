@@ -66,12 +66,12 @@ test.describe('top bar and full menu', () => {
     await reloads(page)
   })
 
-  row(72, 'lock and hide in this frame from the full menu', async (open) => {
+  row(72, 'lock and hide in this frame from the small menu', async (open) => {
     const page = await open(true)
     await selectLayers(page, ['box'], { bar: true })
     await step(
       page,
-      async () => moreAction(page, 'Lock'),
+      async () => page.getByTestId('small-lock').click(),
       async () => {
         await expect.poll(async () => Object.values((await doc(page)).nodes.box?.lock ?? {}).some(Boolean)).toBe(true)
       },
@@ -79,7 +79,7 @@ test.describe('top bar and full menu', () => {
     )
     await step(
       page,
-      async () => moreAction(page, 'Hide'),
+      async () => page.getByTestId('small-hide').click(),
       async () => {
         await expect.poll(async () => (await props(page, 'box')).visible).toBe(false)
         // Its linked copy in the Story frame still shows.

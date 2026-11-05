@@ -262,8 +262,7 @@ test.describe('every selection', () => {
   row(11, 'arrange: duplicate, order, group, ungroup, put in a box, use as mask', async (open) => {
     const page = await open()
     await selectLayers(page, ['box'], { bar: true })
-    // Several layers group from the small menu and go in a box from the full menu.
-    const small = page.getByTestId('small-menu')
+    // Several layers group by their key and go in a box from the full menu.
     // One layer's actions are in the full menu.
     const more = (name: string) => moreAction(page, name)
     await step(
@@ -320,7 +319,7 @@ test.describe('every selection', () => {
     await selectLayers(page, ['box', 'poly'], { bar: true })
     await step(
       page,
-      async () => small.getByTestId('small-group').click(),
+      async () => page.keyboard.press('Control+KeyG'),
       async () => {
         await expect.poll(async () => (await doc(page)).nodes.box?.parentId).not.toBe('sq')
       },
@@ -330,7 +329,7 @@ test.describe('every selection', () => {
     await selectLayers(page, [group], { bar: true })
     await step(
       page,
-      async () => more('Ungroup'),
+      async () => page.keyboard.press('Control+Shift+KeyG'),
       async () => {
         await expect.poll(async () => (await doc(page)).nodes.box?.parentId).toBe('sq')
       },

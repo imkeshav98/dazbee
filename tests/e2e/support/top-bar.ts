@@ -20,7 +20,7 @@ export const PIECES = {
 export const UNCUT = 'h1, [data-testid="bar-font"], [data-testid="edit-panel-note"]'
 
 /** The menus beside the full menu's rows, by their test ids. */
-const SUBMENUS = ['line-up', 'order']
+const SUBMENUS = ['copy', 'paste', 'copy-to-frames', 'line-up', 'order']
 
 /** Where each of the selection's cards is now: the top bar's pop-up or edit panel that holds it. */
 const HOLDER: Record<string, string> = {
@@ -133,12 +133,17 @@ export const strokeList = async (page: Page) => (await barMenu(page, 'outline'))
 
 /**
  * Clicks an action of the full menu, or of the right-click menu when `menu` is it, by the start of
- * its name (the first row that starts so): in the menu, or in the menu beside a row (Line up ▸,
- * Order ▸). The action closes the menu, and this waits until it has.
+ * its name (the first row that starts so, leaving out rows that open a menu beside them): in the
+ * menu, or in the menu beside a row (Copy ▸, Paste ▸, Copy to other frames ▸, Line up ▸, Order ▸).
+ * The action closes the menu, and this waits until it has.
  */
 export async function moreAction(page: Page, name: string, menu?: Locator) {
   const root = menu ?? (await moreMenu(page))
-  const named = (within: Locator) => within.getByRole('button', { name: new RegExp(`^${name}`) }).first()
+  const named = (within: Locator) =>
+    within
+      .getByRole('button', { name: new RegExp(`^${name}`) })
+      .and(within.locator('button:not([aria-haspopup]):not([aria-disabled="true"])'))
+      .first()
   const run = async (action: Locator) => {
     await action.click()
     await expect(root).toBeHidden()

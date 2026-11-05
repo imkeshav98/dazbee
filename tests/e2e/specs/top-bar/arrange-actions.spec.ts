@@ -79,13 +79,13 @@ test('one layer has its actions in the full menu and the right-click menu; sever
   await expect.poll(async () => (await order(page)).length).toBe(4)
   await page.evaluate(() => window.dazbee?.perform('undo'))
 
-  // Group two from the small menu, then ungroup them from the full menu.
+  // Group two, then ungroup them, by their keys: neither is in a menu.
   await selectLayers(page, ['b', 'c'])
-  await page.getByTestId('small-group').click()
+  await page.keyboard.press('Control+KeyG')
   await expect.poll(async () => Object.values(await nodes(page)).some((n) => n.type === 'group')).toBe(true)
   const group = Object.entries(await nodes(page)).find(([, n]) => n.type === 'group')?.[0] ?? ''
   await selectLayers(page, [group])
-  await more('Ungroup')
+  await page.keyboard.press('Control+Shift+KeyG')
   await expect.poll(async () => Object.values(await nodes(page)).some((n) => n.type === 'group')).toBe(false)
 
   // A right-click on A picks it and opens the same actions: it becomes a mask.
