@@ -4,7 +4,7 @@
 // layers in their own frame and never on their linked copies, and ⋯ for the full menu. It
 // sits above the selection, below it when there is no room above, and under the top bar when there
 // is room neither side, as when the selection fills the stage. It keeps off the top bar, the edit
-// panel, the rail and its flyout and the bottom controls, and hides while a gesture runs, a top bar pop-up or the right-click menu is open, or the selection is off the stage.
+// panel, the rail and its flyout, the bottom controls and the frames' labels, and hides while a gesture runs, a top bar pop-up or the right-click menu is open, or the selection is off the stage.
 // ⋯ opens the full menu beside it, clear of the rail and its flyout.
 import {
   CopyIcon,
@@ -75,6 +75,7 @@ function obstacles(stage: HTMLElement): Box[] {
     '[data-testid="island-start"]',
     '[data-testid="island-end"]',
     '[data-toasts] > *',
+    '.stage-overlay .frame-label',
   ]
   return selectors
     .flatMap((selector) => [...document.querySelectorAll(selector)])
