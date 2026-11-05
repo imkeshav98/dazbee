@@ -267,6 +267,20 @@ test('in the app in Arabic the Align icon still draws where the text sits, and t
     await barMenu(page, 'align')
     await entered(page.getByTestId('bar-align-menu'))
     expect(await layoutProblems(page, { pieces: PIECES, uncut: UNCUT }), `${width}`).toEqual([])
+    // Every choice lies whole inside its row's well and the pop-up.
+    const outside = await page.getByTestId('bar-align-menu').evaluate((menu) => {
+      const inside = (el: Element, box: DOMRect) => {
+        const r = el.getBoundingClientRect()
+        return r.left >= box.left - 0.5 && r.right <= box.right + 0.5
+      }
+      return [...menu.querySelectorAll('[role="radio"]')]
+        .filter((radio) => {
+          const well = radio.closest('[role="radiogroup"]')
+          return !inside(radio, menu.getBoundingClientRect()) || !well || !inside(radio, well.getBoundingClientRect())
+        })
+        .map((radio) => radio.textContent)
+    })
+    expect(outside, `${width}`).toEqual([])
     expect(await wrapped(page), `${width}`).toEqual([])
   }
   await expect(page.getByTestId('bar-text-style')).toHaveAccessibleName('نمط النص')

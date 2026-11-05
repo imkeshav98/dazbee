@@ -46,13 +46,19 @@ const TARGET = 44
 const APART = 8
 
 /** Opens the top bar design at a screen size, in a theme, taking touches on a phone. */
-async function openAt(browser: Browser, designId: string, [width, height]: readonly [number, number], theme = 'dark') {
+async function openAt(
+  browser: Browser,
+  designId: string,
+  [width, height]: readonly [number, number],
+  theme = 'dark',
+  locale = 'en',
+) {
   const touch = width < 640
   const context = await browser.newContext({ viewport: { width, height }, hasTouch: touch, isMobile: touch })
   const page = await context.newPage()
   const errors: string[] = []
   page.on('pageerror', (error) => errors.push(error.message))
-  await setCookies(page, { theme })
+  await setCookies(page, { theme, locale })
   await page.goto(editorPath(designId))
   await expect(page.getByTestId('status')).toHaveAttribute('data-ready', '', { timeout: 60_000 })
   await fitSettled(page)
@@ -155,10 +161,11 @@ async function checked(page: Page, what: string) {
 }
 
 let designId: string
+let assetId: string
 
 test.beforeAll(async () => {
-  const asset = await upload(photo)
-  designId = await seed(topBarDesign(asset.id))
+  assetId = (await upload(photo)).id
+  designId = await seed(topBarDesign(assetId))
 })
 
 for (const size of SCREEN_SIZES) {
@@ -375,5 +382,50 @@ for (const size of SCREEN_SIZES)
         }
         expect(errors).toEqual([])
         await page.context().close()
+      },
+    )
+
+/** Changes the headline as one step, for a state that shows a text set some way. */
+const setHeadline = (page: Page, patch: Record<string, unknown>) =>
+  page.evaluate((patch) => window.dazbee?.session.run('node.update', { ids: ['headline'], patch }), patch)
+
+for (const size of SCREEN_SIZES)
+  for (const theme of THEMES)
+    test(
+      `the PR's screenshots at ${size[0]}×${size[1]} in the ${theme} theme: Text style with Bold and Italic on, right-to-left text's Align, and the app in Arabic`,
+      { tag: '@evidence' },
+      async ({ browser }) => {
+        // A design of its own, as these states change the headline.
+        const own = await seed(topBarDesign(assetId))
+        const name = (state: string) => `${state}-${size[0]}x${size[1]}-${theme}`
+        const { page, errors } = await openAt(browser, own, size, theme)
+        const style = { fontFamily: 'Noto Sans', fontSize: 64, color: '#111111FF' }
+        await setHeadline(page, { style: { ...style, fontWeight: 700, fontStyle: 'italic' } })
+        await selectLayers(page, ['headline'], { bar: true })
+        await page.mouse.move(2, size[1] / 2)
+        await shoot(page, name('styles-on'))
+        await barMenu(page, 'text-style')
+        await page.mouse.move(2, size[1] / 2)
+        await shoot(page, name('styles-on-open'))
+        await page.keyboard.press('Escape')
+        await setHeadline(page, { direction: 'rtl', style: { ...style, fontWeight: 400 } })
+        await barMenu(page, 'align')
+        await page.mouse.move(2, size[1] / 2)
+        await drawn(page)
+        await shoot(page, name('rtl-text-align-open'))
+        expect(errors).toEqual([])
+        await page.context().close()
+
+        const arabic = await openAt(browser, own, size, theme, 'ar')
+        await selectLayers(arabic.page, ['headline'], { bar: true })
+        await drawn(arabic.page)
+        await shoot(arabic.page, name('arabic-text'))
+        await barMenu(arabic.page, 'align')
+        await shoot(arabic.page, name('arabic-align-open'))
+        await arabic.page.keyboard.press('Escape')
+        await barMenu(arabic.page, 'position')
+        await shoot(arabic.page, name('arabic-position'))
+        expect(arabic.errors).toEqual([])
+        await arabic.page.context().close()
       },
     )
