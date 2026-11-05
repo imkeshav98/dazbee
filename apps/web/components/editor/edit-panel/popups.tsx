@@ -364,7 +364,7 @@ function TextAlignBody({ target, p }: { target: Target; p: P }) {
   return (
     // As wide as its longest row, which a language with long names for the directions makes wider;
     // on a phone every choice is a finger's height.
-    <div className="flex w-max min-w-72 flex-col gap-1.5 p-1 max-sm:[&_[role=radio]]:h-[44px]">
+    <div className="flex w-max min-w-72 flex-col gap-1.5 p-1 max-sm:[&_[role=radio]]:h-[44px] max-sm:[&_[role=radio]]:min-w-[44px]">
       <span id="text-align-label" className={ALIGN_ROW_LABEL}>
         {rows.align}
       </span>
@@ -405,7 +405,7 @@ function TextAlignBody({ target, p }: { target: Target; p: P }) {
 /** The text's list, as the top bar's List pop-up shows it: none, bullets or numbers. */
 function TextListBody({ target, p }: { target: Target; p: P }) {
   return (
-    <div className="flex w-64 flex-col p-1 max-sm:[&_[role=radio]]:h-[44px]">
+    <div className="flex w-64 flex-col p-1 max-sm:[&_[role=radio]]:h-[44px] max-sm:[&_[role=radio]]:min-w-[44px]">
       <Segments
         name={p.list}
         value={shared(target.props.map((pr) => (pr.list ?? 'none') as 'none' | 'bullet' | 'number'))}
@@ -421,7 +421,7 @@ function TextListBody({ target, p }: { target: Target; p: P }) {
 function TextCaseBody({ target, p }: { target: Target; p: P }) {
   const { style, setStyle } = textStyle(target)
   return (
-    <div className="flex w-56 flex-col p-1 max-sm:[&_[role=radio]]:h-[44px]">
+    <div className="flex w-56 flex-col p-1 max-sm:[&_[role=radio]]:h-[44px] max-sm:[&_[role=radio]]:min-w-[44px]">
       <Segments
         name={p.textCase}
         value={(style('textCase') ?? 'none') as 'none' | 'upper' | 'lower' | 'title' | 'mixed'}

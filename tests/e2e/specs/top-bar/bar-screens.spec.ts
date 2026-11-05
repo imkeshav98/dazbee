@@ -35,6 +35,8 @@ const GRID: {
   { name: 'photo', ids: ['photo'] },
   { name: 'box', ids: ['card'] },
   { name: 'several', ids: ['box', 'card'] },
+  { name: 'several shapes of one kind', ids: ['box', 'turned'] },
+  { name: 'several photos', ids: ['photo', 'photoB'] },
   { name: 'locked', ids: ['locked'] },
   { name: 'turned', ids: ['turned'] },
   { name: 'in auto layout', ids: ['inStack'] },
@@ -245,11 +247,14 @@ test('on a phone the bar takes two rows at most, wraps between its groups, ends 
   await selectCase(page, GRID[1] as (typeof GRID)[number])
   for (const pop of ['text-style', 'align', 'list', 'case']) {
     const menu = await barMenu(page, pop)
-    const small = await menu
-      .locator('button')
-      .evaluateAll((els) =>
-        els.filter((el) => el.getBoundingClientRect().height < 43.5).map((el) => el.textContent || el.ariaLabel),
-      )
+    const small = await menu.locator('button').evaluateAll((els) =>
+      els
+        .filter((el) => {
+          const { width, height } = el.getBoundingClientRect()
+          return width < 43.5 || height < 43.5
+        })
+        .map((el) => el.textContent || el.ariaLabel),
+    )
     expect(small, pop).toEqual([])
     await page.keyboard.press('Escape')
   }

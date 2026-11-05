@@ -290,10 +290,7 @@ export function useSelectionItems(target: Target, design: Design, brandId: strin
         </span>
       ),
     })
-    add(
-      'spacing',
-      <PanelButton id="spacing" label={b.spacing} icon={<TextAaIcon size={16} aria-hidden />} iconOnPhone />,
-    )
+    add('spacing', <PanelButton id="spacing" label={b.spacing} icon={<TextAaIcon size={16} aria-hidden />} />)
   }
 
   // A photo: its look and fit, replacing and cropping it, its corners and outline.
@@ -313,7 +310,7 @@ export function useSelectionItems(target: Target, design: Design, brandId: strin
         onPick={(asset) => set(target, (now) => ({ fills: withImage((now.fills ?? []) as Paint[], asset.id) }))}
       >
         <ArrowsClockwiseIcon size={15} aria-hidden />
-        <span aria-hidden>{b.replace}</span>
+        {!phone && <span aria-hidden>{b.replace}</span>}
       </ImagePickerButton>,
     )
     if (!several)
@@ -323,11 +320,13 @@ export function useSelectionItems(target: Target, design: Design, brandId: strin
           type="button"
           data-bar-item
           data-testid="bar-crop"
+          aria-label={phone ? b.crop : undefined}
+          title={phone ? b.crop : undefined}
           onClick={() => target.editor.perform('editPoints')}
           className={BAR_BUTTON}
         >
           <CropIcon size={15} aria-hidden />
-          {b.crop}
+          {!phone && b.crop}
         </button>,
       )
     // A photo in a box keeps the box's own settings, whose Box pop-up holds its corners.
@@ -379,10 +378,7 @@ export function useSelectionItems(target: Target, design: Design, brandId: strin
 
   // Every selection: its effects and how much it shows through.
   divider()
-  add(
-    'effects',
-    <PanelButton id="effects" label={p.effects} icon={<SparkleIcon size={15} aria-hidden />} iconOnPhone />,
-  )
+  add('effects', <PanelButton id="effects" label={p.effects} icon={<SparkleIcon size={15} aria-hidden />} />)
   pop('transparency', b.transparency, popup('transparency'), {
     face: <CircleHalfIcon size={17} aria-hidden />,
     className: 'w-72 p-2.5',
@@ -392,6 +388,7 @@ export function useSelectionItems(target: Target, design: Design, brandId: strin
   // which stays beside Position at the end of the bar.
   if (several) {
     const act = (action: ShortcutAction) => target.editor.perform(action)
+    const stackLabel = kind === 'box' ? b.stackTogether : b.autoLayout
     divider()
     if (kind === 'shape') {
       pop(
@@ -417,11 +414,13 @@ export function useSelectionItems(target: Target, design: Design, brandId: strin
         type="button"
         data-bar-item
         data-action="autoLayout"
+        aria-label={phone ? stackLabel : undefined}
+        title={phone ? stackLabel : undefined}
         onClick={() => act('autoLayout')}
         className={BAR_BUTTON}
       >
         <RowsIcon size={15} aria-hidden />
-        {kind === 'box' ? b.stackTogether : b.autoLayout}
+        {!phone && stackLabel}
       </button>,
     )
     pop(
@@ -455,18 +454,16 @@ export function PanelButton({
   label,
   icon,
   face,
-  iconOnPhone = false,
 }: {
   id: PanelId
   label: string
   icon?: ReactNode
   face?: ReactNode
-  /** On a phone it shows its icon alone, so the bar keeps to two rows; its label names it. */
-  iconOnPhone?: boolean
 }) {
   const { open } = useEditState()
   const phone = usePhone()
-  const bare = iconOnPhone && phone && !face
+  // On a phone a button with an icon shows it alone, named by its label, so the bar keeps to two rows.
+  const bare = phone && icon !== undefined && face === undefined
   const named = face !== undefined || bare
   return (
     <button
