@@ -9,16 +9,7 @@ import { type Editor, shortcutFor } from '@dazbee/editor'
 import { alphaOf } from '@dazbee/schema'
 
 import { useNumberInput } from '@/components/editor/number-input.ts'
-import {
-  FIELD,
-  KNOB,
-  NUMBER_TEXT,
-  PANEL_PART,
-  SELECT,
-  SWITCH,
-  SWITCH_ROW,
-  VALUE_TEXT,
-} from '@/components/editor/styles.ts'
+import { FIELD, KNOB, NUMBER_TEXT, PANEL_PART, SELECT, SWITCH, SWITCH_ROW } from '@/components/editor/styles.ts'
 import { SEGMENT, SEGMENTS } from '@/components/ui/looks.ts'
 import { Select } from '@/components/ui/select.tsx'
 import { cn } from '@/lib/cn.ts'
@@ -225,7 +216,7 @@ export function NumberField({
       </span>
       {unit && (shown !== '' || !!draft) && (
         // Against the digits: back over the gap and the input's room for the caret.
-        <span aria-hidden className={cn(VALUE_TEXT, 'relative -ms-[calc(0.5rem+2px)] shrink-0')}>
+        <span aria-hidden className={cn(NUMBER_TEXT, 'relative -ms-[calc(0.5rem+2px)] shrink-0')}>
           {unit}
         </span>
       )}
