@@ -25,7 +25,8 @@ import { format } from '@/lib/i18n/index.ts'
 
 import { angleOf, type Gradient, GradientBar, linearAt, type Stop, stopsCss } from './gradient-bar.tsx'
 import { ImagePickerButton } from './image-tool.tsx'
-import { CHIP, ICON_BUTTON, KNOBS, POPOVER, SWATCH } from './styles.ts'
+import { CHIP, ICON_BUTTON, KNOBS, POPOVER, SWATCH_ROW } from './styles.ts'
+import { Swatch } from './swatch.tsx'
 
 /** An image asset's small picture, as the API serves it. */
 export const assetThumbnail = (brandId: string, assetId: string) => brandPath(brandId, 'assets', assetId, 'thumbnail')
@@ -436,16 +437,15 @@ function BrandColours({ brandId, label, onPick }: { brandId: string; label: stri
   const colors = useBrandKit(brandId)?.colors ?? []
   if (colors.length === 0) return null
   return (
-    <div role="group" aria-label={label} className="flex flex-wrap gap-1">
+    <div role="group" aria-label={label} className={cn(SWATCH_ROW, 'gap-1')}>
       {colors.map((c) => (
-        <button
+        <Swatch
           key={c.token}
-          type="button"
-          aria-label={`${c.name} ${hexOf(c.value)}`}
+          color={c.value}
+          label={`${c.name} ${hexOf(c.value)}`}
           title={c.name}
-          onClick={() => onPick(c.value)}
-          style={{ backgroundColor: c.value }}
-          className={cn(SWATCH, 'size-6', FOCUS_RING)}
+          size="size-6"
+          onPick={() => onPick(c.value)}
         />
       ))}
     </div>

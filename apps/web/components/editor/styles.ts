@@ -38,9 +38,19 @@ export const DOCK_OFF = 'text-muted hover:bg-hover hover:text-text active:bg-pre
 /** One tool's square dock button, lit while the tool is in use. */
 export const dockTool = (on: boolean) => `${DOCK_BUTTON} w-10 ${on ? DOCK_ON : DOCK_OFF}`
 
-/** A round colour swatch that picks its colour; its size is the caller's. */
-export const SWATCH =
-  'shrink-0 cursor-pointer rounded-full border border-swatch-ring transition-transform duration-[var(--chrome-fast)] hover:scale-110'
+/**
+ * A swatch's button, the target a pointer or finger hits: as big as the swatch it holds, and on a
+ * phone 44 px across, a touch target a finger can hit, with the pressed tint showing round its swatch
+ * while pressed. A row of them is a SWATCH_ROW.
+ */
+export const SWATCH_TARGET =
+  'group/swatch grid shrink-0 cursor-pointer place-items-center rounded-full transition-colors duration-[var(--chrome-fast)] active:bg-pressed max-sm:size-[44px] max-sm:rounded-row'
+/** What a SWATCH_TARGET draws: round, as big as its caller says, and 32 px on a phone. */
+export const SWATCH_FACE = 'shrink-0 rounded-full max-sm:size-[32px]'
+/** A round colour swatch, drawn in a SWATCH_TARGET; its size off a phone is the caller's. */
+export const SWATCH = `${SWATCH_FACE} border border-swatch-ring transition-transform duration-[var(--chrome-fast)] group-hover/swatch:scale-110`
+/** A row of swatch targets, wrapping onto more lines; on a phone 8 px apart, the space between touch targets. */
+export const SWATCH_ROW = 'flex flex-wrap items-center max-sm:gap-[8px]'
 
 /** Colours a click away when the brand's kit has none; the hex fields take any colour. */
 export const SWATCHES = [
