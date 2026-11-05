@@ -7,12 +7,12 @@ import { DotsSixVerticalIcon, MinusIcon, PlusIcon } from '@phosphor-icons/react'
 import { type CSSProperties, type ReactNode, useRef, useState } from 'react'
 
 import { type P, set, shared, type Target } from '@/components/editor/edit-panel/target.ts'
-import { FOCUS_RING } from '@/components/ui/looks.ts'
+import { FOCUS_RING, TOUCH_GAP } from '@/components/ui/looks.ts'
 import { cn } from '@/lib/cn.ts'
 import { useMessages } from '@/lib/i18n/client.tsx'
 import { format } from '@/lib/i18n/index.ts'
 
-import { FIELD_LABEL, ICON_BUTTON, TOUCH_GAP } from './styles.ts'
+import { FIELD_LABEL, ICON_BUTTON } from './styles.ts'
 
 /** A list of fills or strokes: the rows the selected layers share, and adding one on top. */
 function useList<T>(target: Target, field: string, fresh: T, onTop: T, topFirst: boolean) {

@@ -4,6 +4,11 @@
 /** On a phone, a menu's row is at least 44 px tall, a touch target a finger can hit. */
 export const TOUCH_ROW = 'max-sm:min-h-[44px]'
 
+/** A field's height on a phone or a touch screen: 44 px, as every field there. */
+export const TOUCH_FIELD = 'max-sm:h-[44px] [@media(hover:none)]:h-[44px]'
+/** The space between targets and fields on a phone or a touch screen, so a finger presses the one it means. */
+export const TOUCH_GAP = 'max-sm:gap-[8px] [@media(hover:none)]:gap-[8px]'
+
 /** The ring a focused control shows when reached by keyboard. */
 export const FOCUS_RING = 'focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent'
 

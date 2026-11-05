@@ -2,7 +2,7 @@
 // editor control that looks like one of these takes it from here instead of spelling its classes again.
 // Looks that controls outside the editor share live in components/ui/looks.ts.
 
-import { FOCUS_RING, LIT_ROW, TOUCH_ROW } from '@/components/ui/looks.ts'
+import { FOCUS_RING, LIT_ROW, TOUCH_FIELD, TOUCH_GAP, TOUCH_ROW } from '@/components/ui/looks.ts'
 
 /** A disabled control: faded and not clickable. */
 const DISABLED = 'disabled:pointer-events-none disabled:opacity-40'
@@ -55,8 +55,6 @@ export const FACE_SIZE = 'shrink-0 max-sm:size-[32px]'
 export const SWATCH_FACE = `${FACE_SIZE} rounded-full`
 /** A round colour swatch, drawn in a SWATCH_TARGET; its size off a phone is the caller's. */
 export const SWATCH = `${SWATCH_FACE} border border-swatch-ring transition-transform duration-[var(--chrome-fast)] group-hover/swatch:scale-110`
-/** The space between targets and fields on a phone or a touch screen, so a finger presses the one it means. */
-export const TOUCH_GAP = 'max-sm:gap-[8px] [@media(hover:none)]:gap-[8px]'
 /** A row of swatch targets, wrapping onto more lines; on a phone TOUCH_GAP apart. */
 export const SWATCH_ROW = `flex flex-wrap items-center ${TOUCH_GAP}`
 /**
@@ -101,8 +99,6 @@ export const NUMBER_SELECTED = 'selection:bg-accent-selected selection:text-text
  * its digits 4.5:1 on it.
  */
 export const NUMBER_SELECTED_STRONG = 'selection:bg-accent-selected-strong selection:text-text-selected-strong'
-/** A field's height on a phone or a touch screen: 44 px, as every field there. */
-export const TOUCH_FIELD = 'max-sm:h-[44px] [@media(hover:none)]:h-[44px]'
 /** A field to type a value into, as tall as a knob: its border shows the focus, with no ring besides. */
 export const FIELD = `h-8 ${TOUCH_FIELD} min-w-0 w-full rounded-row border border-line bg-surface px-1.5 ${VALUE_TEXT} outline-none focus-visible:outline-none! placeholder:text-subtle focus:border-accent`
 /** Where a dragged row would land in a list: a line across it, placed by the row above or below. */
