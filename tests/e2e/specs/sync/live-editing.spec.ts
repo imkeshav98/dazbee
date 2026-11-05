@@ -255,10 +255,11 @@ test('a real mouse drag and real typing in one tab show up in the other, and und
   expect(Math.abs(dragged.y - 180)).toBeLessThanOrEqual(1)
   writeOutput('real-input-2-dragged-tab-b.png', await b.screenshot())
 
-  // Double-click past the end of the headline, type, and see it arrive in tab B.
-  const end = await screenPoint(a, 700, 540)
-  await a.mouse.dblclick(end.x, end.y)
+  // Double-click on the headline's words, go to the end of its line, type, and see it arrive in tab B.
+  const word = await screenPoint(a, 300, 540)
+  await a.mouse.dblclick(word.x, word.y)
   await expect(a.locator('.caret')).toBeVisible()
+  await a.keyboard.press('End')
   await a.keyboard.type(' now on')
   await a.keyboard.press('Backspace')
   await a.keyboard.press('Backspace')
@@ -277,10 +278,13 @@ test('a real mouse drag and real typing in one tab show up in the other, and und
   writeOutput('real-input-3-typed-tab-a.png', await a.screenshot())
   writeOutput('real-input-4-typed-tab-b.png', await b.screenshot())
 
-  // Backspace in the Arabic line takes one grapheme, from the end of the text in logical order.
-  const arabicEnd = await screenPoint(a, 120, 720)
+  // Backspace in the Arabic line takes one grapheme, from the end of the text in logical order. The
+  // line sits at the box's right, from x 604, where right-to-left text starts; a double click on its
+  // last letter's left half puts the caret at the end.
+  const arabicEnd = await screenPoint(a, 610, 720)
   await a.keyboard.press('Escape')
   await a.mouse.dblclick(arabicEnd.x, arabicEnd.y)
+  await expect(a.locator('.caret')).toBeVisible()
   await a.keyboard.press('Backspace')
   await settle(tabs)
   expect(JSON.parse(await designOf(b)).nodes.arabic.props.text).toBe('تخفيضات الصي')

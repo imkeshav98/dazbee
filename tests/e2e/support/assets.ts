@@ -36,11 +36,12 @@ export async function api(path: string, body?: unknown, { brandId = DEV_BRAND }:
   return callApi(body === undefined ? 'GET' : 'POST', `/brands/${brandId}${path}`, body)
 }
 
-/** Uploads into a brand's assets the way the browser will: ask, PUT to the signed URL, record. */
+/** Uploads a JPEG or PNG into a brand's assets the way the browser will: ask, PUT to the signed URL, record. */
 export async function upload(bytes: Uint8Array<ArrayBuffer>, { brandId = DEV_BRAND }: InBrand = {}) {
   const sha256 = createHash('sha256').update(bytes).digest('hex')
+  const contentType = bytes[0] === 0x89 && bytes[1] === 0x50 ? 'image/png' : 'image/jpeg'
   const ticket = UploadTicket.parse(
-    await api('/assets/uploads', { sha256, byteSize: bytes.length, contentType: 'image/jpeg' }, { brandId }),
+    await api('/assets/uploads', { sha256, byteSize: bytes.length, contentType }, { brandId }),
   )
   if (ticket.asset) return ticket.asset
   const put = await fetch(ticket.upload.url, { method: 'PUT', body: bytes, headers: ticket.upload.headers })

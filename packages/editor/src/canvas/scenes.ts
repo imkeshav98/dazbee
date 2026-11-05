@@ -1,13 +1,15 @@
 // Scenes and pictures by frame. A frame is recorded again only when a layer it shows or the frame
 // itself changed: dragging in one frame leaves the other frames' pictures as they are, and panning
 // records nothing.
-import type { CanvasKit, SkPicture } from '@dazbee/canvaskit'
+import type { CanvasKit, Path, SkPicture } from '@dazbee/canvaskit'
 import { childrenOf } from '@dazbee/doc'
 import {
   drawFrame,
   drawLayers,
   layerPictures,
+  lru,
   type MeasureText,
+  outlineOf,
   type ParagraphCache,
   paragraphCache,
   render,
@@ -18,10 +20,11 @@ import {
   type TextLayout,
   textMeasure,
 } from '@dazbee/renderer'
-import type { Design } from '@dazbee/schema'
+import type { Design, Point, Rect } from '@dazbee/schema'
 
 import type { EditorResources } from '../resources.ts'
 import type { Frame } from './frames.ts'
+import { type HitOptions, hitTest, lineBoxes, type Looks, outlineBand } from './hit-test.ts'
 
 export interface ScenesDeps {
   ck: CanvasKit
@@ -37,6 +40,8 @@ export interface FrameScenes {
   measure(): MeasureText
   /** Text laid out as drawn, from the screen's cache, which owns it. */
   layout(props: Parameters<ParagraphCache['layout']>[1]): TextLayout
+  /** The layer that shows under a point of a frame, as a click or a hover picks it (`hitTest`). */
+  hit(frame: Frame, p: Point, options?: HitOptions): SceneLayer | null
   /**
    * The pictures of the frames in view for a redraw, `all` being every frame of the shown page: each
    * one recorded again where it changed, and how many were. A frame off the shown page lets go of its
@@ -81,6 +86,32 @@ export function frameScenes({ ck, resources, drawn }: ScenesDeps): FrameScenes {
   const paragraphs = paragraphCache()
   const scenes = sceneMemo()
   const layers = layerPictures()
+  // Outlines and their bands by reach that a hit test reads, kept by layer: an unchanged layer is
+  // the same object between scenes.
+  const outlines = lru<SceneLayer, Path>(4000, (path) => path.delete())
+  const bands = lru<SceneLayer, Map<number, Path | null>>(4000, (made) => {
+    for (const band of made.values()) band?.delete()
+  })
+  /** The line boxes of each text layout a hit test has read. */
+  const lines = new WeakMap<TextLayout, Rect[]>()
+  const outline = (layer: SceneLayer) => outlines.get(layer, () => outlineOf(ck, layer))
+  /** What a hit test reads: outlines, the images' alpha maps and the text as the screen lays it out. */
+  const looks: Looks = {
+    outline,
+    band: (layer, reach) => {
+      const made = bands.get(layer, () => new Map())
+      let band = made.get(reach)
+      if (band === undefined) made.set(reach, (band = outlineBand(ck, outline(layer), reach)))
+      return band
+    },
+    alpha: resources.alpha,
+    lines: (props) => {
+      const laid = layout(props)
+      let boxes = lines.get(laid)
+      if (!boxes) lines.set(laid, (boxes = lineBoxes(laid)))
+      return boxes
+    },
+  }
 
   function scene(frame: Frame) {
     return cached(frame).scene
@@ -92,6 +123,9 @@ export function frameScenes({ ck, resources, drawn }: ScenesDeps): FrameScenes {
   }
   function layout(props: Parameters<ParagraphCache['layout']>[1]) {
     return paragraphs.layout(ck, props, resources.resources())
+  }
+  function hit(frame: Frame, p: Point, options?: HitOptions) {
+    return hitTest(scene(frame).layers, p, looks, options)
   }
 
   function pictures(all: Frame[], inView: Frame[], screen: Resources) {
@@ -195,6 +229,8 @@ export function frameScenes({ ck, resources, drawn }: ScenesDeps): FrameScenes {
     stopArriving()
     ghosted?.picture.delete()
     forget()
+    bands.clear()
+    outlines.clear()
     layers.delete()
     paragraphs.delete()
   }
@@ -203,6 +239,7 @@ export function frameScenes({ ck, resources, drawn }: ScenesDeps): FrameScenes {
     scene,
     measure,
     layout,
+    hit,
     pictures,
     ghost,
     destroy,

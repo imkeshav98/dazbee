@@ -92,10 +92,42 @@ export function paintFor(ck: CanvasKit, fill: Paint, box: Rect, resources: Resou
   return paint
 }
 
-/** Places an image in a box: fill covers it, fit fits inside it, crop shows the crop rect stretched to it, tile repeats it. */
+/**
+ * Where an image fill puts its image in a box: the part of the image it shows (`src`, in image
+ * pixels) and where that part is drawn (`dst`). Fill covers the box, fit fits inside it, crop shows
+ * the crop rect stretched to it, and tile starts the image at the box's corner at its own size.
+ */
+export function imagePlacement(
+  image: Pick<Rect, 'width' | 'height'>,
+  fill: ImagePaint,
+  box: Rect,
+): { src: Rect; dst: Rect } {
+  const { width: iw, height: ih } = image
+  const whole = { x: 0, y: 0, width: iw, height: ih }
+  if (fill.fit === 'tile') return { src: whole, dst: { x: box.x, y: box.y, width: iw, height: ih } }
+  if (fill.fit === 'crop' && fill.crop) return { src: fill.crop, dst: box }
+  if (fill.fit === 'fill' || fill.fit === 'crop') {
+    const scale = Math.max(box.width / iw, box.height / ih)
+    const src = {
+      width: box.width / scale,
+      height: box.height / scale,
+      x: (iw - box.width / scale) / 2,
+      y: (ih - box.height / scale) / 2,
+    }
+    return { src, dst: box }
+  }
+  const scale = Math.min(box.width / iw, box.height / ih)
+  const dst = {
+    width: iw * scale,
+    height: ih * scale,
+    x: box.x + (box.width - iw * scale) / 2,
+    y: box.y + (box.height - ih * scale) / 2,
+  }
+  return { src: whole, dst }
+}
+
+/** Places an image in a box as `imagePlacement` says: tile repeats it, fit leaves clear what it doesn't cover. */
 function imageShader(ck: CanvasKit, image: Image, fill: ImagePaint, box: Rect): Shader {
-  const iw = image.width()
-  const ih = image.height()
   const sampling = [ck.FilterMode.Linear, ck.MipmapMode.None] as const
   if (fill.fit === 'tile') {
     return image.makeShaderOptions(
@@ -105,27 +137,7 @@ function imageShader(ck: CanvasKit, image: Image, fill: ImagePaint, box: Rect): 
       ck.Matrix.translated(box.x, box.y),
     )
   }
-  let src = { x: 0, y: 0, width: iw, height: ih }
-  let dst: Rect = box
-  if (fill.fit === 'crop' && fill.crop) {
-    src = fill.crop
-  } else if (fill.fit === 'fill' || fill.fit === 'crop') {
-    const scale = Math.max(box.width / iw, box.height / ih)
-    src = {
-      width: box.width / scale,
-      height: box.height / scale,
-      x: (iw - box.width / scale) / 2,
-      y: (ih - box.height / scale) / 2,
-    }
-  } else {
-    const scale = Math.min(box.width / iw, box.height / ih)
-    dst = {
-      width: iw * scale,
-      height: ih * scale,
-      x: box.x + (box.width - iw * scale) / 2,
-      y: box.y + (box.height - ih * scale) / 2,
-    }
-  }
+  const { src, dst } = imagePlacement({ width: image.width(), height: image.height() }, fill, box)
   const matrix = ck.Matrix.multiply(
     ck.Matrix.translated(dst.x, dst.y),
     ck.Matrix.scaled(dst.width / src.width, dst.height / src.height),

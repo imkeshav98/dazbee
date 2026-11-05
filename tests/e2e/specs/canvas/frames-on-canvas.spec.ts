@@ -102,7 +102,7 @@ test('a click on a frame’s empty area or its label picks it: outlined, its lab
   // A click on a layer selects it and lets the frame go; one on the empty area picks it again and
   // lets the layer go.
   await clickLabel(page, 'sq')
-  await click(page, 300, 130)
+  await click(page, 180, 130)
   expect(await selection(page)).toEqual(['headline'])
   expect(await picked(page)).toBeNull()
   await expect(bar).toHaveAttribute('data-selection', 'headline')

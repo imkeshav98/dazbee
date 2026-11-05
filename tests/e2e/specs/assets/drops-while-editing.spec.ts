@@ -41,10 +41,11 @@ test('images that finish uploading while a text is typed into end the typing and
   ]
   expect(await dropFiles(page, await screenPoint(page, 540, 700), files)).toBe(true)
   await expect(page.getByTestId('notice-toast')).toContainText('Uploading 2 images')
-  // Typing into the title, past its end, when the uploads finish.
-  const end = await screenPoint(page, 600, 130)
-  await page.mouse.dblclick(end.x, end.y)
+  // Typing into the title, at the end of its words, when the uploads finish.
+  const word = await screenPoint(page, 150, 130)
+  await page.mouse.dblclick(word.x, word.y)
   await expect(page.locator('.caret')).toBeVisible()
+  await page.keyboard.press('End')
   await page.keyboard.type('abc')
   release()
 

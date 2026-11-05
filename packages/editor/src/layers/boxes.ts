@@ -7,7 +7,6 @@ import { render, type SceneLayer } from '@dazbee/renderer'
 import { canHold, type Design, type ImagePaint, type Paint, pathScale, type Point, type Rect } from '@dazbee/schema'
 
 import type { Frame } from '../canvas/frames.ts'
-import { hitTest } from '../canvas/hit-test.ts'
 import { findLayer, type FrameScenes } from '../canvas/scenes.ts'
 import { coverCrop, imageRect, type Size } from '../gestures/crop/crop.ts'
 import { offsetPath, parsePath, type PenPath, scalePath } from '../gestures/pen/path.ts'
@@ -46,7 +45,7 @@ export interface SelectionBox {
 
 export interface BoxesDeps {
   session: Session
-  scenes: Pick<FrameScenes, 'scene' | 'measure'>
+  scenes: Pick<FrameScenes, 'scene' | 'measure' | 'hit'>
   resources: Pick<EditorResources, 'resources' | 'bytes'>
   selection: Pick<EditorSelection, 'current' | 'entered'>
   /** The design as last drawn. */
@@ -358,7 +357,7 @@ export function editorBoxes({ session, scenes, resources, selection, drawn, fram
    * be undone; a drag from it draws a marquee and moves nothing, it or what lies beneath.
    */
   function lockedAt(frame: Frame, p: Point): string | null {
-    const top = hitTest(scenes.scene(frame).layers, p)
+    const top = scenes.hit(frame, p)
     const id = top ? target(top.id, frame.id) : null
     return id && drawn().nodes[id]?.lock?.move ? id : null
   }

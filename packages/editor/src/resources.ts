@@ -5,6 +5,8 @@ import { FONT_FACES } from '@dazbee/fonts'
 import type { ResourceBytes, ResourceCache, Resources } from '@dazbee/renderer'
 import { type Design, fontFamilies, imageAssetIds, type Variables } from '@dazbee/schema'
 
+import { type AlphaMap, alphaMap } from './canvas/alpha-map.ts'
+
 /** Where fonts and images come from, beside the fonts we ship. */
 export interface ResourceSources {
   /** The stored bytes of an image asset (#35); designs with image fills need it. */
@@ -51,6 +53,8 @@ export interface EditorResources {
   loaded(): Promise<undefined>
   /** The families whose files the editor has, shipped ones included (#50). */
   families(): string[]
+  /** A decoded image's alpha map, by asset id, drawn when the image arrived; none for one still coming. */
+  alpha(assetId: string): AlphaMap | undefined
   /** Gives bound properties new values: the brand kit's, from the next scene on. */
   setVariables(variables: Variables): void
   /** Calls back when fonts or images arrive: `fonts` when they were fonts. */
@@ -89,6 +93,8 @@ export function editorResources({
   let imagesLoading: Promise<void> = Promise.resolve()
   /** Told when fonts or images arrive. */
   const arriveListeners = new Set<(fonts: boolean) => void>()
+  /** Each decoded image's alpha map, by asset id, with the image it was drawn from. */
+  const alphaMaps = new Map<string, { image: Image; map: AlphaMap }>()
 
   // Images that arrive after the design (another tab added them) load in the background; until
   // then the screen draws them clear. Exports never do: they throw until every image is loaded.
@@ -105,6 +111,7 @@ export function editorResources({
   )
   if (!maybeClear) throw new Error('could not make the image placeholder')
   const clear: Image = maybeClear
+  mapImages()
 
   function screen(current: Design): Resources {
     askFamilies(fontFamilies(current, resourceBytes.variables))
@@ -119,6 +126,7 @@ export function editorResources({
             if (signal.aborted) return
             resourceBytes = { ...resourceBytes, images: { ...resourceBytes.images, ...images } }
             resources = cache.resources(resourceBytes)
+            mapImages()
             for (const listener of arriveListeners) listener(false)
           },
           (error: unknown) => {
@@ -150,6 +158,17 @@ export function editorResources({
   }
   function families() {
     return [...new Set(resourceBytes.fonts.map((f) => f.family))]
+  }
+  function alpha(assetId: string) {
+    return alphaMaps.get(assetId)?.map
+  }
+
+  /** Draws the alpha map of each image decoded since the last call, and lets go of those no longer decoded. */
+  function mapImages() {
+    for (const [id, entry] of alphaMaps) if (resources.images.get(id) !== entry.image) alphaMaps.delete(id)
+    for (const [id, image] of resources.images) {
+      if (!alphaMaps.has(id)) alphaMaps.set(id, { image, map: alphaMap(ck, image) })
+    }
   }
 
   function loadFamilies(families: string[]) {
@@ -192,6 +211,7 @@ export function editorResources({
 
   function destroy() {
     arriveListeners.clear()
+    alphaMaps.clear()
     clear.delete()
   }
 
@@ -202,6 +222,7 @@ export function editorResources({
     loadFamilies,
     loaded,
     families,
+    alpha,
     setVariables,
     onArrive,
     destroy,
