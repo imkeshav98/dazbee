@@ -1,6 +1,7 @@
 // What the click-through checks share: a cut-out PNG drawn with CanvasKit, a frame where each
-// layer has see-through parts over another, the points a click or a hover goes to with the layer
-// each picks, and a frame of 200 layers that each show nothing over one point.
+// layer has see-through parts over another, a frame of layers drawn too faint to see over a floor,
+// the points a click or a hover goes to with the layer each picks, and a frame of 200 layers that
+// each show nothing over one point.
 import { loadCanvasKit } from '@dazbee/renderer/node'
 import type { DesignInput } from '@dazbee/schema'
 
@@ -43,6 +44,20 @@ export const SPOTS = {
   afterText: { at: { x: 980, y: 640 }, picks: 'panel', what: 'the box after a short line of text' },
   belowText: { at: { x: 900, y: 750 }, picks: 'panel', what: "the box below a text's lines" },
 } satisfies Record<string, Spot>
+
+/**
+ * The faint frame's spots: each over a layer drawn under 10% opaque there, so the floor beneath is
+ * picked, and the clear-filled square's stroke, which shows and is picked.
+ */
+export const FAINT_SPOTS = {
+  zero: { at: { x: 280, y: 230 }, picks: 'floor', what: 'a layer at opacity 0' },
+  clearFill: { at: { x: 800, y: 230 }, picks: 'floor', what: 'a shape whose fill has alpha 0' },
+  blackMask: { at: { x: 280, y: 750 }, picks: 'floor', what: 'a layer under a black luminance mask' },
+  faintPhoto: { at: { x: 800, y: 750 }, picks: 'floor', what: 'a photo at 5% opacity, on its opaque middle' },
+} satisfies Record<string, Spot>
+
+/** The clear-filled square's left edge, on its stroke, which shows. */
+export const CLEAR_FILL_STROKE: Spot = { at: { x: 600, y: 230 }, picks: 'clearFill', what: "a clear shape's stroke" }
 
 /** Where the perf frame's 200 layers each show nothing, so a click there passes through all of them to the floor. */
 export const THROUGH_ALL = { x: 300, y: 300 }
@@ -106,6 +121,36 @@ export function clickThroughDesign(assetId: string): DesignInput {
     words: text('a7', 'Words', 'Sale', { x: 600, y: 600, width: 420, height: 170 }, 64),
   }
   return frameDesign({ name: 'Click through', nodes })
+}
+
+/**
+ * The faint frame: a floor, and over it a square at opacity 0, a square whose fill has alpha 0 with
+ * a dark stroke, a square under a black luminance mask, and the cut-out photo at 5% opacity.
+ */
+export function faintDesign(assetId: string): DesignInput {
+  const square = (x: number, y: number) => ({ x, y, width: 400, height: 300 })
+  const nodes: Record<string, Seeded> = {
+    floor: rect('a0', 'Floor', { x: 0, y: 0, width: 1080, height: 1080 }, '#1B9E77FF'),
+    zero: faded(rect('a1', 'Gone', square(80, 80), '#2F6BFFFF'), { opacity: 0 }),
+    clearFill: shape('a2', 'Clear fill', { kind: 'rect' }, square(600, 80), '#FF5A3600', [
+      { paint: { type: 'solid', color: '#111111FF' }, width: 12, align: 'center' },
+    ]),
+    faint: {
+      type: 'graphic',
+      parentId: 'sq',
+      index: 'a3',
+      name: 'Faint photo',
+      props: {
+        ...square(600, 600),
+        shape: { kind: 'rect' },
+        opacity: 0.05,
+        fills: [{ type: 'image', assetId, fit: 'fill' }],
+      },
+    },
+    blackMask: faded(rect('a4', 'Black mask', square(80, 600), '#000000FF'), { mask: 'luminance' }),
+    veiled: rect('a5', 'Veiled', square(80, 600), '#7E57C2FF'),
+  }
+  return frameDesign({ name: 'Faint layers', nodes })
 }
 
 /**
@@ -183,6 +228,11 @@ function shape(
     name,
     props: { ...box, shape: kind, fills: [{ type: 'solid', color }], strokes },
   }
+}
+
+/** A seeded layer with more props set. */
+function faded(layer: Seeded, more: { opacity?: number; mask?: 'luminance' }): Seeded {
+  return { ...layer, props: { ...layer.props, ...more } } as Seeded
 }
 
 function text(index: string, name: string, value: string, box: Box, fontSize: number): Seeded {

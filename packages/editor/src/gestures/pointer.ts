@@ -220,10 +220,11 @@ export function editorPointer({
   /**
    * The deepest layer that shows at a point of a frame, as a press, a double click and a hover pick
    * it: the text being typed in shows anywhere in its box, below its lines too, and so does `text`,
-   * when not typing. With `pickable`, what can't be picked (locked) is passed over.
+   * when not typing; a selected layer that shows nothing counts all over its box. With `pickable`,
+   * what can't be picked (locked) is passed over.
    */
   const deepestAt = (at: { frame: Frame; p: Point }, pickable?: PointerDeps['boxes']['pickable'], text?: string) =>
-    scenes.hit(at.frame, at.p, { pickable, wholeBox: typing.editing()?.id ?? text })
+    scenes.hit(at.frame, at.p, { pickable, wholeBox: typing.editing()?.id ?? text, selected: selection.current()?.ids })
   function rehover() {
     const at = pointer && !gesture && !panning() ? pointIn(pointer) : null
     const hit = at && deepestAt(at)
@@ -273,7 +274,7 @@ export function editorPointer({
     const at = pointAt(client)
     if (!at) return []
     const { frame } = at
-    const deepest = scenes.hit(frame, at.p)
+    const deepest = deepestAt(at)
     if (!deepest) return []
     const id = target(deepest.id, frame.id)
     const current = selection.current()

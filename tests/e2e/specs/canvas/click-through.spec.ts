@@ -3,18 +3,24 @@
 // layer beneath is picked, and a hover outlines the same layer a click picks. A selected layer still
 // drags from an empty part of its box, a double click anywhere in a selected text's box types into
 // it, and a drag from a see-through part moves what shows there, as one undo step. Taps pick the same at the three screen sizes, and a click and a hover over 200
-// see-through layers are timed.
+// see-through layers are timed. Layers drawn under 10% opaque (opacity 0, a clear fill, a black
+// luminance mask, a photo at 5%) pass a click, a hover and a tap to the floor beneath at the three
+// screen sizes, and one selected from the layers panel still counts all over its box.
 
 import { upload } from '../../support/assets.ts'
 import {
+  CLEAR_FILL_STROKE,
   clickThroughDesign,
   cutOutPng,
+  FAINT_SPOTS,
+  faintDesign,
   SPOTS,
   STACKED,
   stackedDesign,
   THROUGH_ALL,
 } from '../../support/click-through.ts'
 import { editorPath, screenPoint, setCookies, writeOutput } from '../../support/editor.ts'
+import { openLayers, row, tree } from '../../support/layers-panel.ts'
 import { SCREEN_SIZES } from '../../support/layout.ts'
 import { PERF, report, spread } from '../../support/perf.ts'
 import { seed } from '../../support/seed.ts'
@@ -53,16 +59,27 @@ async function hover(page: Page, at: { x: number; y: number }) {
   await drawn(page)
 }
 
-/** Opens a design alone in a tab at a screen size, dark, on a touch screen when `touch`, fitted and its images loaded. */
+/** Whether the hover outline is where a layer's box is on screen, within a pixel or two. */
+async function outlines(page: Page, id: string) {
+  const want = await onScreen(page, id)
+  const got = await hoverOutline(page)
+  return !!got && Math.max(...(['x', 'y', 'width', 'height'] as const).map((k) => Math.abs(got[k] - want[k]))) < 2
+}
+
+/**
+ * Opens a design alone in a tab at a screen size, dark unless `theme` says, on a touch screen when
+ * `touch`, fitted and its images loaded.
+ */
 async function openSized(
   browser: Browser,
   viewport: { width: number; height: number },
   content: Parameters<typeof seed>[0],
   touch = false,
+  theme: 'dark' | 'light' = 'dark',
 ) {
   const designId = await seed(content)
   const page = await (await browser.newContext({ viewport, hasTouch: touch, isMobile: touch })).newPage()
-  await setCookies(page, { theme: 'dark' })
+  await setCookies(page, { theme })
   await page.goto(editorPath(designId))
   await expect(page.getByTestId('status')).toHaveAttribute('data-ready', '', { timeout: 60_000 })
   await page.evaluate(() => window.dazbee?.loaded())
@@ -187,6 +204,112 @@ for (const [width, height] of SCREEN_SIZES) {
       expect(await selection(page), spot.what).toEqual([spot.picks])
     }
   })
+}
+
+for (const [width, height] of SCREEN_SIZES) {
+  test(`a click and a hover pass through layers drawn under 10% opaque at ${width}×${height}`, async ({ browser }) => {
+    const asset = await upload(await cutOutPng())
+    const page = await openSized(browser, { width, height }, faintDesign(asset.id))
+    for (const spot of Object.values(FAINT_SPOTS)) {
+      await hover(page, spot.at)
+      await expect.poll(() => outlines(page, spot.picks), spot.what).toBe(true)
+    }
+    for (const spot of [...Object.values(FAINT_SPOTS), CLEAR_FILL_STROKE]) {
+      await page.keyboard.press('Escape')
+      await click(page, spot.at.x, spot.at.y)
+      expect(await selection(page), spot.what).toEqual([spot.picks])
+    }
+  })
+
+  test(`a tap passes through layers drawn under 10% opaque at ${width}×${height} on a touch screen`, async ({
+    browser,
+  }) => {
+    const asset = await upload(await cutOutPng())
+    const page = await openSized(browser, { width, height }, faintDesign(asset.id), true)
+    for (const spot of [...Object.values(FAINT_SPOTS), CLEAR_FILL_STROKE]) {
+      const at = await screenPoint(page, spot.at.x, spot.at.y)
+      await page.touchscreen.tap(at.x, at.y)
+      await drawn(page)
+      expect(await selection(page), spot.what).toEqual([spot.picks])
+    }
+  })
+}
+
+test('a layer at opacity 0 picked in the layers panel counts all over its box: a click keeps it, a drag moves it', async ({
+  browser,
+}) => {
+  const asset = await upload(await cutOutPng())
+  const { page, errors } = await openStage(browser, faintDesign(asset.id))
+  await page.evaluate(() => window.dazbee?.loaded())
+  await openLayers(page)
+  await row(page, 'Gone').click()
+  expect(await selection(page)).toEqual(['zero'])
+  // Closed again, the panel leaves the stage's points clear.
+  await page.getByRole('button', { name: 'Layers', exact: true }).click()
+  await expect(tree(page)).toBeHidden()
+  const { zero } = FAINT_SPOTS
+  // Hovered, it is what the pointer is on: being selected, it has no hover outline, and the floor isn't outlined.
+  await hover(page, zero.at)
+  await expect(page.locator('.stage-overlay > .hover')).toHaveCount(0)
+  await click(page, zero.at.x, zero.at.y)
+  expect(await selection(page)).toEqual(['zero'])
+  await drag(page, zero.at, { x: zero.at.x + 40, y: zero.at.y + 20 })
+  expect(await selection(page)).toEqual(['zero'])
+  expect(await props(page, 'zero')).toMatchObject({ x: 120, y: 100 })
+  expect(await props(page, 'floor')).toMatchObject({ x: 0, y: 0 })
+  await press(page, 'undo')
+  expect(await props(page, 'zero')).toMatchObject({ x: 80, y: 80 })
+  await press(page, 'redo')
+  expect(await props(page, 'zero')).toMatchObject({ x: 120, y: 100 })
+  // Once it is let go, a click there passes through it again.
+  await page.keyboard.press('Escape')
+  await click(page, zero.at.x + 40, zero.at.y + 20)
+  expect(await selection(page)).toEqual(['floor'])
+  expect(errors).toEqual([])
+})
+
+/** Marks where a pointer is: a headless screenshot has no cursor. */
+async function markPointer(page: Page, screen: { x: number; y: number }) {
+  await page.evaluate(({ x, y }) => {
+    document.getElementById('pointer-mark')?.remove()
+    const mark = document.createElement('div')
+    mark.id = 'pointer-mark'
+    Object.assign(mark.style, {
+      position: 'fixed',
+      left: `${x - 9}px`,
+      top: `${y - 9}px`,
+      width: '18px',
+      height: '18px',
+      borderRadius: '50%',
+      border: '2px solid #ffffff',
+      boxShadow: '0 0 0 2px #111111',
+      pointerEvents: 'none',
+      zIndex: '2147483647',
+    })
+    document.body.append(mark)
+  }, screen)
+}
+
+for (const [width, height] of SCREEN_SIZES) {
+  for (const theme of ['dark', 'light'] as const) {
+    test(
+      `evidence: a hover passing through each faint layer to the floor, ${width}×${height} ${theme}`,
+      { tag: '@evidence' },
+      async ({ browser }) => {
+        const asset = await upload(await cutOutPng())
+        const page = await openSized(browser, { width, height }, faintDesign(asset.id), false, theme)
+        for (const [name, spot] of Object.entries(FAINT_SPOTS)) {
+          await hover(page, spot.at)
+          await expect.poll(() => outlines(page, spot.picks), spot.what).toBe(true)
+          await markPointer(page, await screenPoint(page, spot.at.x, spot.at.y))
+          writeOutput(
+            `faint-hover-${name}-${width}x${height}-${theme}.png`,
+            await page.screenshot({ animations: 'disabled' }),
+          )
+        }
+      },
+    )
+  }
 }
 
 test(
