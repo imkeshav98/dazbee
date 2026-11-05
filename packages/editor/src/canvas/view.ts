@@ -101,7 +101,11 @@ export interface EditorView {
   fitAll(): void
   /** Fits a part of the canvas in view, in world units; nothing without one. */
   fitArea(area: Rect | undefined): void
-  /** Pans, keeping the zoom, so a part of the canvas shows whole beside the chrome; nothing when it already does. */
+  /**
+   * Shows a part of the canvas whole beside the chrome, with room for a frame's label over it:
+   * nothing when it shows already, else it is centred, at the same zoom when it fits and zoomed out
+   * only as far as it needs when it doesn't.
+   */
   showArea(area: Rect): void
   /** Pans, keeping the zoom, so a frame's label shows beside the chrome; nothing when it already does. */
   showLabel(frame: Rect): void
