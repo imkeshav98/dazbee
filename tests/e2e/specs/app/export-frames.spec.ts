@@ -226,6 +226,37 @@ test('frames whose names file alike are numbered by the names their files take, 
   expect(errors).toEqual([])
 })
 
+test('with nothing ticked the greyed Export says why in a tooltip, under the pointer and by keyboard, and does nothing', async ({
+  browser,
+}) => {
+  const { page, errors } = await openSized(browser, { width: 1280, height: 760 })
+  const dialog = await openExport(page)
+  const run = page.getByTestId('export-run')
+  const why = page.getByRole('tooltip').filter({ hasText: 'Tick a frame to export' })
+  await dialog.getByText('All frames').click()
+  await expect(run).toBeDisabled()
+  await run.hover()
+  await expect(why).toHaveCount(1)
+  // A click downloads nothing.
+  let downloads = 0
+  page.on('download', () => downloads++)
+  await run.click({ force: true })
+  await page.mouse.move(0, 759)
+  await expect(why).toHaveCount(0)
+  // Reached by Tab, it says so too; ticking a frame takes the tooltip away.
+  await dialog.getByTestId('export-name').focus()
+  await page.keyboard.press('Tab')
+  await expect(run).toBeFocused()
+  await expect(why).toHaveCount(1)
+  await dialog.getByText('Banner', { exact: true }).click()
+  await expect(run).toBeEnabled()
+  await expect(run).toHaveText('Export 1 file')
+  await run.hover()
+  await expect(page.getByRole('tooltip')).toHaveCount(0)
+  expect(downloads).toBe(0)
+  expect(errors).toEqual([])
+})
+
 test('in Arabic each row’s size reads width × height, as its frame’s label on the canvas does', async ({ browser }) => {
   const { page, errors } = await openSized(browser, { width: 1280, height: 760 }, { locale: 'ar' })
   await expect(page.locator('html')).toHaveAttribute('dir', 'rtl')

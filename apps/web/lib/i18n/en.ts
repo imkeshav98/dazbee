@@ -753,6 +753,7 @@ export const en = {
       type: 'File type',
       quality: 'Quality',
       run: { one: 'Export 1 file', other: 'Export {n} files' } as Counted,
+      tickOne: 'Tick a frame to export',
       making: 'Making {done} of {total}',
       failed: 'Export failed: {reason}',
     },

@@ -25,6 +25,7 @@ import { LIT_ROW, SEGMENT, SEGMENTS } from '@/components/ui/looks.ts'
 import { useOverlayScroll } from '@/components/ui/overlay-scroll.ts'
 import { Select } from '@/components/ui/select.tsx'
 import { Tick } from '@/components/ui/tick.tsx'
+import { Tooltip } from '@/components/ui/tooltip.tsx'
 import { cn } from '@/lib/cn.ts'
 import { useLocale, useMessages } from '@/lib/i18n/client.tsx'
 import { counted, format } from '@/lib/i18n/index.ts'
@@ -36,6 +37,8 @@ const LABEL = FIELD_LABEL
 
 /** On a phone a control is 44 px tall, a touch target a finger can hit, as the frame rows are. */
 const TOUCH_CONTROL = 'max-sm:h-[44px]'
+/** A button that applies but has nothing to do: faded and unlit, as a disabled one looks, yet it takes the pointer. */
+const GREYED = 'cursor-not-allowed opacity-50 hover:bg-accent-solid active:scale-100'
 
 /**
  * The frames list: its rows as tall as a menu's (MENU_ITEM), 44 px on a phone for a finger, and as
@@ -286,17 +289,26 @@ export function ExportForm({
         />
       </label>
 
-      <Button
-        variant="primary"
-        disabled={count === 0 || progress !== null}
-        onClick={() => void run()}
-        data-testid="export-run"
-        className={TOUCH_CONTROL}
-      >
-        {progress
-          ? format(t.editor.exports.making, { done: progress.done, total: progress.total })
-          : counted(locale, t.editor.exports.run, count)}
-      </Button>
+      {count === 0 && progress === null ? (
+        // Greyed with nothing ticked, still under the pointer and the keyboard, so its tooltip says why.
+        <Tooltip label={t.editor.exports.tickOne}>
+          <Button variant="primary" aria-disabled="true" data-testid="export-run" className={cn(TOUCH_CONTROL, GREYED)}>
+            {counted(locale, t.editor.exports.run, count)}
+          </Button>
+        </Tooltip>
+      ) : (
+        <Button
+          variant="primary"
+          disabled={progress !== null}
+          onClick={() => void run()}
+          data-testid="export-run"
+          className={TOUCH_CONTROL}
+        >
+          {progress
+            ? format(t.editor.exports.making, { done: progress.done, total: progress.total })
+            : counted(locale, t.editor.exports.run, count)}
+        </Button>
+      )}
       {error && (
         <p role="alert" className="text-xs text-danger">
           {error}

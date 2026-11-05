@@ -732,6 +732,7 @@ export const ar: Messages = {
         many: 'تصدير {n} ملفًا',
         other: 'تصدير {n} ملف',
       },
+      tickOne: 'حدّد إطارًا للتصدير',
       making: 'جارٍ إنشاء {done} من {total}',
       failed: 'تعذّر التصدير: {reason}',
     },
