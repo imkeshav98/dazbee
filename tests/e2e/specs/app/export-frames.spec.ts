@@ -11,11 +11,18 @@ import { writeOutput } from '../../support/editor.ts'
 import { expectNode, openExport, runExport } from '../../support/export.ts'
 import { LISTED, names, openSized, rows, SUMMER } from '../../support/export-frames.ts'
 import { choose } from '../../support/fields.ts'
-import { expect, test } from '../../support/test.ts'
+import { expect, type Page, test } from '../../support/test.ts'
 
 test.describe.configure({ timeout: 180_000 })
 
 const TYPES = ['png', 'jpg', 'pdf', 'svg'] as const
+
+/** The frames lit on the canvas from outside the stage, by id, and those whose label is lit so. */
+const lit = (page: Page) =>
+  page.locator('.stage-overlay').evaluate((overlay) => ({
+    frames: [...overlay.querySelectorAll<HTMLElement>('.frame-lit')].map((el) => el.dataset.frame),
+    labels: [...overlay.querySelectorAll<HTMLElement>('.frame-label[data-lit]')].map((el) => el.dataset.frame),
+  }))
 
 test('Export lists the shown page’s frames, all ticked, numbered where names repeat; each file type exports the ticked frames as Node does', async ({
   browser,
@@ -146,5 +153,44 @@ test('by keyboard: Export opens on its first control, Tab and Space tick frames 
   await page.keyboard.press('Escape')
   await expect(dialog).toBeHidden()
   await expect(share).toBeFocused()
+  expect(errors).toEqual([])
+})
+
+test('a row under the pointer or reached by keyboard lights its frame on the canvas, as a layer under the pointer is lit, until it is left', async ({
+  browser,
+}) => {
+  const { page, errors } = await openSized(browser, { width: 1280, height: 760 })
+  const dialog = await openExport(page)
+  const none = { frames: [], labels: [] }
+  expect(await lit(page)).toEqual(none)
+  const row = (frameId: string) => dialog.locator(`label:has([data-frame="${frameId}"])`)
+  // The two Sales tell apart: each lights its own frame, and the All frames row none.
+  await row('story').hover()
+  await expect.poll(() => lit(page)).toEqual({ frames: ['story'], labels: ['story'] })
+  const outline = await page.locator('.stage-overlay .frame-lit').evaluate((el) => getComputedStyle(el).outlineStyle)
+  expect(outline).toBe('solid')
+  await row('sq').hover()
+  await expect.poll(() => lit(page)).toEqual({ frames: ['sq'], labels: ['sq'] })
+  await dialog.getByTestId('export-all-frames').locator('xpath=..').hover()
+  await expect.poll(() => lit(page)).toEqual(none)
+  await row('mpu').hover()
+  await expect.poll(() => lit(page)).toEqual({ frames: ['mpu'], labels: ['mpu'] })
+  await page.mouse.move(640, 740)
+  await expect.poll(() => lit(page)).toEqual(none)
+
+  // By keyboard: the row with the focus lights its frame, and the next takes over.
+  await dialog.getByTestId('export-page').focus()
+  await page.keyboard.press('Tab')
+  await expect.poll(() => lit(page)).toEqual(none)
+  await page.keyboard.press('Tab')
+  await expect.poll(() => lit(page)).toEqual({ frames: ['sq'], labels: ['sq'] })
+  await page.keyboard.press('Tab')
+  await expect.poll(() => lit(page)).toEqual({ frames: ['story'], labels: ['story'] })
+  // Leaving the list, or closing Export, lets it go.
+  await page.keyboard.press('Shift+Tab')
+  await expect.poll(() => lit(page)).toEqual({ frames: ['sq'], labels: ['sq'] })
+  await page.keyboard.press('Escape')
+  await expect(dialog).toBeHidden()
+  await expect.poll(() => lit(page)).toEqual(none)
   expect(errors).toEqual([])
 })

@@ -2,9 +2,9 @@
 
 // Export: the frames of one page, each with a tick, all ticked at first, as PNG, JPG, PDF or SVG;
 // the editor's export worker draws them while the stage stays responsive. Each frame is listed by
-// the name its file takes, numbered where frames share a name. One file downloads as itself, more
-// as one zip.
-import { useState } from 'react'
+// the name its file takes, numbered where frames share a name, and a row under the pointer or with
+// the keyboard focus lights its frame on the canvas. One file downloads as itself, more as one zip.
+import { type FocusEvent, useEffect, useRef, useState } from 'react'
 
 import type { Editor } from '@dazbee/editor'
 import {
@@ -47,6 +47,35 @@ function download(name: string, type: string, bytes: Uint8Array<ArrayBuffer>) {
 }
 
 /**
+ * Lights a frame on the canvas while its row is under the pointer or has the keyboard focus, the
+ * pointer's first, and none once the list goes; returns the handlers a frame's row takes.
+ */
+function useLitFrame(editor: Editor) {
+  const under = useRef<string | null>(null)
+  const focused = useRef<string | null>(null)
+  useEffect(() => () => editor.lightFrame(null), [editor])
+  const show = () => editor.lightFrame(under.current ?? focused.current)
+  return (frameId: string) => ({
+    onPointerEnter: () => {
+      under.current = frameId
+      show()
+    },
+    onPointerLeave: () => {
+      if (under.current === frameId) under.current = null
+      show()
+    },
+    onFocus: (event: FocusEvent<HTMLElement>) => {
+      focused.current = (event.target as HTMLElement).matches(':focus-visible') ? frameId : null
+      show()
+    },
+    onBlur: () => {
+      if (focused.current === frameId) focused.current = null
+      show()
+    },
+  })
+}
+
+/**
  * The export form, opened from the Share menu with every frame of the shown page ticked, or from a
  * picked frame's ⋯ with `asked`, its frame, ticked alone.
  */
@@ -74,6 +103,7 @@ export function ExportForm({
   const [quality, setQuality] = useState(90)
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const lightsFrame = useLitFrame(editor)
 
   // The page's frames in its order, each by its numbered name; the ticked ones are exported, in that order.
   const frames = framesOf(design, thisPage)
@@ -168,6 +198,7 @@ export function ExportForm({
                 onTick={(on) => tick(frameId, on)}
                 testId="export-frame"
                 frameId={frameId}
+                lights={lightsFrame(frameId)}
               />
             ))}
           </div>
@@ -248,6 +279,7 @@ function FrameRow({
   onTick,
   testId,
   frameId,
+  lights,
   bold = false,
 }: {
   name: string
@@ -256,10 +288,12 @@ function FrameRow({
   onTick: (on: boolean) => void
   testId: string
   frameId?: string
+  /** What lights the row's frame on the canvas while the row is under the pointer or focused. */
+  lights?: ReturnType<ReturnType<typeof useLitFrame>>
   bold?: boolean
 }) {
   return (
-    <label className={ROW} title={name}>
+    <label className={ROW} title={name} {...lights}>
       <input
         type="checkbox"
         name={frameId ? 'frame' : 'all-frames'}
