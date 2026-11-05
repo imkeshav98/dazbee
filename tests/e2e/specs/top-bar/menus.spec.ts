@@ -453,6 +453,12 @@ test('at 820×1180 the full menu keeps clear of the rail when its end side has n
   await page.setViewportSize({ width: 820, height: 1180 })
   await fitSettled(page)
   await selectLayers(page, ['box', 'star'])
+  // Zoomed in so the Square's label sits clear above the small menu, which keeps off frame labels.
+  await page.evaluate(() => {
+    const camera = window.dazbee?.camera()
+    if (camera) window.dazbee?.setCamera({ ...camera, zoom: 0.6 })
+  })
+  await nextFrame(page)
   // The small menu centred at x 451 (stage and window share their origin), with no room for the full
   // menu at its end side, and the room at its start side reaching the rail, with the rail below.
   await page.evaluate(() => {
