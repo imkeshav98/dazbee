@@ -244,7 +244,8 @@ export function ColorField({
     if (/^#[0-9A-F]{6}$/.test(h) && h !== hex) onSet(hexChange(h))
   }
   return (
-    <div className="flex min-w-0 flex-1 items-center gap-1">
+    // Its hex and opacity are fields, 44 px tall and 8 px apart on a phone or a touch screen.
+    <div className="flex min-w-0 flex-1 items-center gap-1 max-sm:gap-[8px] [@media(hover:none)]:gap-[8px]">
       {swatch && (
         <input
           name="colour"
@@ -269,7 +270,7 @@ export function ColorField({
           if (event.key === 'Enter') commitHex(event.currentTarget.value)
           event.stopPropagation()
         }}
-        className={cn(FIELD, 'uppercase')}
+        className={cn(FIELD, 'uppercase max-sm:h-[44px] [@media(hover:none)]:h-[44px]')}
       />
       <div className="w-[4.5rem] shrink-0">
         <NumberField
