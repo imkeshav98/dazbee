@@ -278,7 +278,6 @@
 }
 .stage-overlay .selection-size {
   position: absolute;
-  translate: -50% 0;
   padding: 1px 6px;
   border-radius: 4px;
   background: var(--accent-solid);

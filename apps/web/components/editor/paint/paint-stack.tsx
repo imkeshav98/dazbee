@@ -24,10 +24,9 @@ import {
   POPOVER,
   SQUARE_SWATCH_TARGET,
   SWATCH_ROW,
-  TOUCH_GAP,
 } from '@/components/editor/styles.ts'
 import { useMenuFocus } from '@/components/editor/top-bar/bar-popover.tsx'
-import { FOCUS_RING, SEGMENT, SEGMENTS } from '@/components/ui/looks.ts'
+import { FOCUS_RING, SEGMENT, SEGMENTS, TOUCH_GAP } from '@/components/ui/looks.ts'
 import { brandPath } from '@/lib/brand-routes.ts'
 import { cn } from '@/lib/cn.ts'
 import { hexOf } from '@/lib/colour.ts'
@@ -407,7 +406,7 @@ export function PaintEditor({
       {paint.type === 'image' && (
         <div className="flex items-center gap-2">
           <PaintSwatch paint={paint} brandId={brandId} className="size-12 shrink-0" />
-          <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+          <div className={cn('flex min-w-0 flex-1 flex-col gap-1.5', TOUCH_GAP)}>
             <ImagePickerButton
               brandId={brandId}
               title={p.replaceImageTitle}

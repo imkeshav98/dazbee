@@ -18,8 +18,6 @@ export interface CardMenuItem {
   danger?: boolean
 }
 
-/** A size's or a page's own button on its card: a 44 px target on a phone. */
-export const CARD_BUTTON = cn(ICON_BUTTON, 'max-sm:size-10')
 /** A size's or a page's card in its panel's list. */
 export const CARD_ROW = 'flex items-center gap-2.5 rounded-[10px] border border-line bg-surface p-2'
 
@@ -30,7 +28,7 @@ export function CardMenu({ label, items }: { label: string; items: CardMenuItem[
   return (
     <Popover.Root open={open} onOpenChange={setMenuOpen}>
       <Popover.Trigger asChild>
-        <button ref={focus.button} type="button" aria-label={label} title={label} className={CARD_BUTTON}>
+        <button ref={focus.button} type="button" aria-label={label} title={label} className={ICON_BUTTON}>
           <DotsThreeIcon size={16} weight="bold" aria-hidden />
         </button>
       </Popover.Trigger>

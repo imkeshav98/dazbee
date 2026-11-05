@@ -94,6 +94,8 @@ export interface EditorView {
     ghost?: () => { frame: Frame; picture: SkPicture } | null,
   ): boolean
   setCamera(next: Camera): void
+  /** The stage's edges floating chrome covers, in screen pixels, as last set. */
+  insets(): Insets
   /** The stage's edges floating chrome covers, in screen pixels; later fits keep clear of them. */
   setInsets(next: Insets): void
   zoomTo(zoom: number, at?: Point): void
@@ -428,6 +430,7 @@ export function editorView({ ck, canvas, session, onZoom, draw }: ViewDeps): Edi
     update,
     paint,
     setCamera,
+    insets: () => insets,
     setInsets,
     zoomTo,
     zoomIn,

@@ -5,7 +5,8 @@
 import { type ImageAdjust, ImageFilter, type Paint } from '@dazbee/schema'
 
 import { assetThumbnail } from '@/components/editor/paint/paint-stack.tsx'
-import { PANEL_HEADING, TOUCH_GAP } from '@/components/editor/styles.ts'
+import { PANEL_HEADING } from '@/components/editor/styles.ts'
+import { TOUCH_GAP } from '@/components/ui/looks.ts'
 import { cn } from '@/lib/cn.ts'
 import { tidy } from '@/lib/editor/size.ts'
 import { useMessages } from '@/lib/i18n/client.tsx'
