@@ -309,6 +309,8 @@ for (const [width, height] of SCREEN_SIZES) {
         await page.getByTestId('own-width').scrollIntoViewIfNeeded()
         await typeSize(page, '9000', '1000')
         await expect.poll(() => scrolledToEnd(page)).toBe(true)
+        // The focus leaves the fields, so the picture shows the danger outline on the width alone.
+        await page.getByTestId('own-size').locator('h3').click()
         await shot('2-past-limits')
         await page.getByTestId('edit-panel-close').click()
         await clickLabel(page, 'sq')
