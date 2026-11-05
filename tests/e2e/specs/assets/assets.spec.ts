@@ -127,6 +127,7 @@ test('uploads two images with progress, tags one, finds it by its tag and drags 
   await expect(item(beach)).toBeVisible({ timeout: 30_000 })
   await expect(item(mountain)).toBeVisible({ timeout: 30_000 })
   await expect(library.getByTestId('asset-uploads')).toHaveCount(0)
+  for (const name of [beach, mountain]) await expect(item(name)).toHaveAttribute('data-asset', /^[0-9a-z]{12}$/)
   await cdp.send('Network.emulateNetworkConditions', {
     offline: false,
     latency: 0,

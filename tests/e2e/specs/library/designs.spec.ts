@@ -17,7 +17,7 @@ test('a design made from the brand list opens in the editor and is there after a
 
   await page.getByLabel('Brief').fill(name)
   await page.getByRole('button', { name: 'Make drafts' }).click()
-  await expect(page).toHaveURL(/\/brands\/dev-brand-coffee\/designs\/[\w-]+$/)
+  await expect(page).toHaveURL(/\/brands\/dev-brand-coffee\/designs\/[0-9a-z]{12}$/)
   await expect(page.getByRole('heading', { level: 1 })).toHaveText(name)
   await expect(page.getByTestId('status')).toHaveAttribute('data-ready', '', { timeout: 30_000 })
   const design = await page.evaluate(() => window.dazbee?.design())
