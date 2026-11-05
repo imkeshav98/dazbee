@@ -103,6 +103,14 @@ export const PAINT_SWATCH: SwatchControl = {
   gap: 3.5,
 }
 
+/** A gradient's stops on its bar, drawn 14 px. */
+export const GRADIENT_STOPS: SwatchControl = {
+  control: "a gradient's stops",
+  id: 'stops',
+  selector: '[data-stop]',
+  size: 14,
+}
+
 /**
  * What a swatch-like control keeps its space from: everything a person presses or types in. A
  * knob is its whole box, with the field inside it.

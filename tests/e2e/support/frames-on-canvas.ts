@@ -196,7 +196,8 @@ export async function openFrames(browser: Browser, count = 1) {
 /**
  * Opens a design, this spec's unless given, alone in a tab at a screen size, in a theme (dark unless
  * given) and a language (the app's own unless given), fitted, with its fonts loaded. The design
- * belongs to the brand given, or the development brand.
+ * belongs to the brand given, or the development brand. With `touch`, the tab takes touches as a
+ * phone's screen does.
  */
 export async function openSized(
   browser: Browser,
@@ -206,10 +207,11 @@ export async function openSized(
     locale,
     input = design(),
     brandId = DEV_BRAND,
-  }: { theme?: string; locale?: string; input?: DesignInput } & InBrand = {},
+    touch = false,
+  }: { theme?: string; locale?: string; input?: DesignInput; touch?: boolean } & InBrand = {},
 ) {
   const designId = await seed(input, { brandId })
-  const page = await (await browser.newContext({ viewport })).newPage()
+  const page = await (await browser.newContext({ viewport, hasTouch: touch })).newPage()
   const errors: string[] = []
   page.on('pageerror', (error) => errors.push(error.message))
   await setCookies(page, { theme, ...(locale && { locale }) })

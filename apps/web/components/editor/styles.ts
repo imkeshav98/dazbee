@@ -59,6 +59,12 @@ export const SWATCH = `${SWATCH_FACE} border border-swatch-ring transition-trans
 export const TOUCH_GAP = 'max-sm:gap-[8px]'
 /** A row of swatch targets, wrapping onto more lines; on a phone TOUCH_GAP apart. */
 export const SWATCH_ROW = `flex flex-wrap items-center ${TOUCH_GAP}`
+/**
+ * A touch area for a control drawn smaller than a finger, such as a gradient's stop: an empty element
+ * inside the control, shown only on a phone, 44 px across and centred on it, so a press anywhere in
+ * it lands on the control.
+ */
+export const TOUCH_AREA = 'absolute top-1/2 left-1/2 hidden size-[44px] -translate-1/2 max-sm:block'
 
 /** Colours a click away when the brand's kit has none; the hex fields take any colour. */
 export const SWATCHES = [
