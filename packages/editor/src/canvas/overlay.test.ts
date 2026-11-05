@@ -48,6 +48,7 @@ function harness(
     editing?: Picked | null
     selected?: boolean
     picked?: boolean
+    lit?: boolean
     renaming?: boolean
     zoom?: number
   } = {},
@@ -76,6 +77,7 @@ function harness(
       entered: () => 'g',
       hovered: () => ({ id: 'h', frameId: 'one-sq' }),
       pickedFrame: () => (state.picked ? 'one-sq' : null),
+      litFrame: () => (state.lit ? 'one-sq' : null),
       renamingFrame: () => (state.renaming ? 'one-sq' : null),
       cropping: () => null,
       pathEditing: () => null,
@@ -129,6 +131,18 @@ describe('editorOverlay', () => {
       expect(drawn().slice(0, 3)).toEqual(['frame-label', 'frame-picked', 'hover'])
       expect(part('frame-picked')?.dataset).toEqual({ frame: 'one-sq' })
       expect(part('frame-label')?.dataset).toEqual({ frame: 'one-sq', active: '' })
+    })
+
+    it('outlines the frame lit from outside the stage round the whole of it, after the labels, its own label lit', () => {
+      const { overlay, drawn, part } = harness({ selected: false, lit: true })
+      overlay.draw()
+      expect(drawn().slice(0, 3)).toEqual(['frame-label', 'frame-lit', 'hover'])
+      expect(part('frame-lit')?.dataset).toEqual({ frame: 'one-sq' })
+      expect(part('frame-label')?.dataset).toEqual({ frame: 'one-sq', lit: '' })
+      const unlit = harness({ selected: false })
+      unlit.overlay.draw()
+      expect(unlit.drawn()).not.toContain('frame-lit')
+      expect(unlit.part('frame-label')?.dataset).toEqual({ frame: 'one-sq' })
     })
 
     it('leaves out the label of the frame the page renames in its place, outlining the frame still', () => {

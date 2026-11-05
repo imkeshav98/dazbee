@@ -447,6 +447,10 @@ function live(
     selection.renameFrame(shown.id)
     frameRenames.emit(shown.id)
   }
+  /** Lights a frame from outside the stage, or none, and shows it. */
+  function lightFrame(frameId: string | null) {
+    if (selection.lightFrame(frameId)) drawOverlay()
+  }
   /** Renames a frame of the shown page in place of its label, panning first, at the same zoom, so the label shows. */
   function renameFrame(frameId: string) {
     const frame = frameOf(frameId)
@@ -533,6 +537,7 @@ function live(
     pickedFrame: () => selection.pickedFrame(),
     pickFrame: (frameId: string | null) => pickFrame(frameId),
     onFramePick: (listener: (frameId: string | null) => void) => selection.onFramePick(listener),
+    lightFrame,
     renameFrame,
     onFrameRename: frameRenames.on,
     renamed: () => selection.renameFrame(null),

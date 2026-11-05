@@ -3,8 +3,9 @@
 // What the top bar has open: one pop-up, the full menu or one edit panel, never two at once, since
 // they share this one value. Opening any of them closes what was open. The shell reads it too: on a
 // phone an edit panel is a sheet, and a rail flyout and a sheet close each other. And whether
-// something stands over the edit panel and the bar's second row, which Esc closes first; and the
-// menu's button a rename field gives the focus back to.
+// something stands over the edit panel and the bar's second row, which Esc closes first; the
+// menu's button a rename field gives the focus back to; and the Share menu's listener for an Export
+// asked from a picked frame's ⋯.
 import { useEffect, useState, useSyncExternalStore } from 'react'
 
 import { OVER_PANEL } from '@/components/ui/menu-close.ts'
@@ -46,6 +47,8 @@ let state: EditState = { open: null, bar: false, barBottom: 0, sheetTop: null, f
 const listeners = new Set<() => void>()
 /** The menu's button a rename was asked from, which the rename field gives the focus back to as it ends from the keyboard. */
 let renameOpener: HTMLElement | null = null
+/** What the Share menu does with an Export asked from elsewhere: open it with these frames ticked. */
+let exportListener: ((frameIds: string[], opener: HTMLElement | null) => void) | null = null
 
 const subscribe = (listener: () => void) => {
   listeners.add(listener)
@@ -79,6 +82,18 @@ export function takeRenameOpener() {
   const opener = renameOpener
   renameOpener = null
   return opener
+}
+/**
+ * Opens Export in the Share menu with only these frames ticked, as a picked frame's ⋯ does; Esc
+ * gives the focus back to `opener`, the menu's button it was asked from.
+ */
+export const askExport = (frameIds: string[], opener: HTMLElement | null) => exportListener?.(frameIds, opener)
+/** Hears each Export asked from elsewhere, until the function it returns is called; the Share menu listens. */
+export function onExportAsked(listener: (frameIds: string[], opener: HTMLElement | null) => void) {
+  exportListener = listener
+  return () => {
+    if (exportListener === listener) exportListener = null
+  }
 }
 /**
  * Whether something stands over the edit panel and the bar's second row, so Esc closes it first: a

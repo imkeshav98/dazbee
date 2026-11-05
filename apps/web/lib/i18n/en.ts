@@ -1,5 +1,11 @@
 // English, the source catalog. Every string the UI shows lives in a catalog; components never hold
 // literal text (eslint react/jsx-no-literals).
+/**
+ * The words a count takes, one per plural form the language has (Intl.PluralRules), with `other`
+ * for every count no other form names; `{n}` is the count.
+ */
+export type Counted = Partial<Record<Intl.LDMLPluralRule, string>> & { other: string }
+
 export const en = {
   app: { name: 'Dazbee' },
   library: {
@@ -739,15 +745,15 @@ export const en = {
     exports: {
       open: 'Export',
       title: 'Export',
-      pages: 'Pages',
-      allPages: 'All {n}',
-      thisPage: 'This page',
       page: 'Page',
+      frames: 'Frames',
+      allFrames: 'All frames',
+      noFrames: 'This page has no frames',
       fileNames: 'File names',
       type: 'File type',
       quality: 'Quality',
-      run: 'Export {n} files',
-      runOne: 'Export 1 file',
+      run: { one: 'Export 1 file', other: 'Export {n} files' } as Counted,
+      tickOne: 'Tick a frame to export',
       making: 'Making {done} of {total}',
       failed: 'Export failed: {reason}',
     },
@@ -805,6 +811,7 @@ export const en = {
       more: 'Frame actions',
       addSize: 'Add size',
       rename: 'Rename',
+      export: 'Export',
       nameOf: 'Name of {name}',
       fills: 'Background colours',
       fill: 'background colour',

@@ -211,7 +211,6 @@ test.describe('on a phone, 390×844', () => {
     // The Export card's page list, a select.
     await page.getByTestId('export-open').click()
     const card = page.getByTestId('export')
-    await card.locator('[data-pages="one"]').click()
     await card.getByTestId('export-page').click()
     const options = page.getByRole('listbox', { name: 'Page' })
     await expect(options).toBeVisible()

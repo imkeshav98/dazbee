@@ -148,10 +148,11 @@ const FRAME_MENU = [
   { name: 'Duplicate', reads: 'DuplicateCtrl+D' },
   { name: 'Add size', reads: 'Add size' },
   { name: 'Rename', reads: 'Rename' },
+  { name: 'Export', reads: 'Export' },
   { name: 'Delete', reads: 'DeleteDelete' },
 ] as const
 /**
- * Checks the picked frame's open ⋯ lists its items in order, Add size after Duplicate. Given `to`,
+ * Checks the picked frame's open ⋯ lists its items in order: Duplicate, Add size, Rename, Export, Delete. Given `to`,
  * the focus is on the first and Tab moves it down the list item by item, up to `to`. Gives the menu.
  */
 export async function frameMenuItems(page: Page, to?: (typeof FRAME_MENU)[number]['name']) {

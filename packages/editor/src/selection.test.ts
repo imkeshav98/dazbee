@@ -480,6 +480,21 @@ describe('editorSelection', () => {
     })
   })
 
+  describe('lightFrame', () => {
+    it('says whether the frame lit from outside the stage changed, and lights none at first', () => {
+      const { selection, log } = harness()
+      expect(selection.litFrame()).toBeNull()
+      expect(selection.lightFrame(null)).toBe(false)
+      expect(selection.lightFrame('p1-f1')).toBe(true)
+      expect(selection.lightFrame('p1-f1')).toBe(false)
+      expect(selection.lightFrame('p1-f2')).toBe(true)
+      expect(selection.litFrame()).toBe('p1-f2')
+      expect(selection.lightFrame(null)).toBe(true)
+      expect(selection.litFrame()).toBeNull()
+      expect(log).toEqual([])
+    })
+  })
+
   describe('listeners', () => {
     it('stop hearing once they let go, and after destroy', () => {
       const { selection, log } = harness()

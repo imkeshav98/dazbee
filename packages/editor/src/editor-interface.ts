@@ -154,6 +154,11 @@ export interface Editor {
   /** Calls back with the picked frame, or null, whenever it changes. */
   onFramePick(listener: (frameId: string | null) => void): () => boolean
   /**
+   * Lights a frame of the shown page from outside the stage, outlined as a layer under the pointer
+   * is and its label lit, as a list's row does while it is hovered or focused; null lets it go.
+   */
+  lightFrame(frameId: string | null): void
+  /**
    * Picks a frame of the shown page and asks the page to rename it in place, as a double click on
    * its label does, panning first, at the same zoom, so the label shows beside the chrome; the page
    * renames it with the `frame.update` command and calls `renamed` once its field closes, the label
