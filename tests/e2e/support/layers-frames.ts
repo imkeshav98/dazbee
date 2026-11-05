@@ -130,17 +130,32 @@ export async function openDesign(browser: Browser, count = 1) {
   return { tabs, errors }
 }
 
-/** Opens the design alone in a tab of a theme at a screen size, fitted, its fonts loaded, the panel open. */
-export async function openSized(browser: Browser, viewport: { width: number; height: number }, theme = 'dark') {
-  const designId = await seed(framesDesign())
-  const page = await (await browser.newContext({ viewport })).newPage()
+/**
+ * Opens a design, the linked frames unless `content` says, alone in a tab at a screen size: in a
+ * theme and a language, on a touch screen when `touch`, fitted, its fonts loaded, the panel open.
+ */
+export async function openSized(
+  browser: Browser,
+  viewport: { width: number; height: number },
+  {
+    theme = 'dark',
+    locale,
+    touch = false,
+    content = framesDesign(),
+  }: { theme?: string; locale?: string; touch?: boolean; content?: DesignInput } = {},
+) {
+  const designId = await seed(content)
+  const page = await (await browser.newContext({ viewport, hasTouch: touch, isMobile: touch })).newPage()
   const errors: string[] = []
   page.on('pageerror', (error) => errors.push(error.message))
-  await setCookies(page, { theme })
+  await setCookies(page, locale ? { theme, locale } : { theme })
   await page.goto(editorPath(designId))
   await expect(page.getByTestId('status')).toHaveAttribute('data-ready', '', { timeout: 60_000 })
   await page.evaluate(() => window.dazbee?.loaded())
   await fitSettled(page)
-  await openLayers(page)
+  if (locale === 'ar') {
+    await page.getByRole('button', { name: 'الطبقات', exact: true }).click()
+    await expect(tree(page)).toBeVisible()
+  } else await openLayers(page)
   return { page, errors }
 }

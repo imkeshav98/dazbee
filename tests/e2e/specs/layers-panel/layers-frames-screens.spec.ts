@@ -49,7 +49,7 @@ for (const [width, height] of SCREEN_SIZES) {
       `screenshots at ${width}×${height}, ${theme}: the frames listed, a frame open to a deep group, a picked frame, hidden and locked rows, the focus on a frame row`,
       { tag: '@evidence' },
       async ({ browser }) => {
-        const { page, errors } = await openSized(browser, { width, height }, theme)
+        const { page, errors } = await openSized(browser, { width, height }, { theme })
         const shot = async (name: string) => {
           await nextFrame(page)
           writeOutput(`layers-frames-${width}-${theme}-${name}.png`, await page.screenshot({ animations: 'disabled' }))
