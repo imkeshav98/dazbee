@@ -14,7 +14,7 @@ import { shortSizeOf } from '@/lib/editor/size.ts'
 import { useMessages } from '@/lib/i18n/client.tsx'
 import { format } from '@/lib/i18n/index.ts'
 
-import { ROW_LABEL, ROW_LOOK, ROW_SELECTED, type RowApi, RowCaret, rowPlace } from './tree-row.tsx'
+import { ROW_LABEL, ROW_LOOK, ROW_SELECTED, type RowApi, RowCaret, rowHandlers, rowPlace } from './tree-row.tsx'
 
 /** A frame's row. Rendered again only when something it shows changes. */
 export const FrameRow = memo(function FrameRow({
@@ -53,19 +53,7 @@ export const FrameRow = memo(function FrameRow({
       aria-expanded={row.hasChildren ? open : undefined}
       data-drop={dropInto ? 'into' : undefined}
       tabIndex={focusable ? 0 : -1}
-      onFocus={() => api.focus(id)}
-      onKeyDown={(event) => api.key(event, row, i)}
-      onClick={(event) => api.click(id, event.shiftKey || event.metaKey || event.ctrlKey)}
-      onDoubleClick={() => api.rename(id)}
-      onDragOver={(event) => {
-        if (!api.dragOver(event, row)) return
-        event.preventDefault()
-        event.dataTransfer.dropEffect = 'move'
-      }}
-      onDragLeave={() => api.dragLeave(id)}
-      onDrop={(event) => {
-        if (api.drop(event, row)) event.preventDefault()
-      }}
+      {...rowHandlers(api, row, i)}
       style={rowPlace(i, 0)}
       className={cn(ROW_LOOK, picked ? ROW_SELECTED : LIT_ROW, dropInto && 'ring-2 ring-accent ring-inset')}
     >

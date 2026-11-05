@@ -18,6 +18,7 @@ import { useLiveDesign } from '@/components/editor/use-live-design.ts'
 import { useOverlayScroll } from '@/components/ui/overlay-scroll.ts'
 import { swatchOf } from '@/lib/editor/frame-swatch.ts'
 import { arrowStep, type LayerTreeRow, opensFor, type Row, treeRows } from '@/lib/editor/layer-tree.ts'
+import { renameFrame } from '@/lib/editor/rename-frame.ts'
 import { useLocale, useMessages } from '@/lib/i18n/client.tsx'
 import { dirOf, format } from '@/lib/i18n/index.ts'
 
@@ -226,10 +227,8 @@ export function LayersPanel({ editor }: { editor: Editor }) {
     renamed: (id, name, before, byKey) => {
       setRenaming(null)
       const next = name?.trim()
-      if (next && next !== before) {
-        if (!isFrame(id)) editor.renameLayer(id, next)
-        else if (editor.design().frames[id]) editor.session.run('frame.update', { frameId: id, name: next })
-      }
+      if (isFrame(id)) renameFrame(editor, id, name)
+      else if (next && next !== before) editor.renameLayer(id, next)
       // Ended from the keyboard, the focus goes back to the row; ended by a click elsewhere, it
       // stays where the click put it.
       if (byKey) reveal(id)

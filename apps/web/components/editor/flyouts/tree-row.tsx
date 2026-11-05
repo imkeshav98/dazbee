@@ -3,7 +3,7 @@
 // The pieces every row of the layers panel's tree shares, a frame's and a layer's: the calls a row
 // makes on the panel, its height, look and place in the list, and its caret.
 import { CaretRightIcon } from '@phosphor-icons/react'
-import type { DragEvent, KeyboardEvent } from 'react'
+import type { DragEvent, KeyboardEvent, MouseEvent } from 'react'
 
 import { cn } from '@/lib/cn.ts'
 import type { Row } from '@/lib/editor/layer-tree.ts'
@@ -45,6 +45,29 @@ export const rowPlace = (i: number, depth: number) => ({
   height: LAYER_ROW - 2,
   paddingInlineStart: 4 + depth * INDENT,
 })
+
+/**
+ * The handlers every row of the tree has, a frame's and a layer's: taking the focus, its keys, a
+ * click that picks or selects it (with Shift, Ctrl or Cmd adding to the selection or taking from
+ * it), a double click that renames it, and a layer dragged over, off or dropped on it.
+ */
+export function rowHandlers(api: RowApi, row: Row, i: number) {
+  return {
+    onFocus: () => api.focus(row.id),
+    onKeyDown: (event: KeyboardEvent<HTMLElement>) => api.key(event, row, i),
+    onClick: (event: MouseEvent<HTMLElement>) => api.click(row.id, event.shiftKey || event.metaKey || event.ctrlKey),
+    onDoubleClick: () => api.rename(row.id),
+    onDragOver: (event: DragEvent<HTMLElement>) => {
+      if (!api.dragOver(event, row)) return
+      event.preventDefault()
+      event.dataTransfer.dropEffect = 'move'
+    },
+    onDragLeave: () => api.dragLeave(row.id),
+    onDrop: (event: DragEvent<HTMLElement>) => {
+      if (api.drop(event, row)) event.preventDefault()
+    },
+  }
+}
 
 /** A row's caret, which opens and closes it; an empty space of its size on a row with nothing inside. */
 export function RowCaret({

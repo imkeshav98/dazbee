@@ -32,7 +32,16 @@ import type { LayerTreeRow } from '@/lib/editor/layer-tree.ts'
 import { useMessages } from '@/lib/i18n/client.tsx'
 import { format } from '@/lib/i18n/index.ts'
 
-import { ROW_LABEL, ROW_LOOK, ROW_SELECTED, type RowApi, RowCaret, rowPlace, type Where } from './tree-row.tsx'
+import {
+  ROW_LABEL,
+  ROW_LOOK,
+  ROW_SELECTED,
+  type RowApi,
+  RowCaret,
+  rowHandlers,
+  rowPlace,
+  type Where,
+} from './tree-row.tsx'
 
 type Layer = Design['nodes'][string]
 
@@ -144,25 +153,13 @@ export const LayerRow = memo(function LayerRow({
       data-drop={drop ?? undefined}
       tabIndex={focusable ? 0 : -1}
       draggable={!renaming}
-      onFocus={() => api.focus(id)}
-      onKeyDown={(event) => api.key(event, row, i)}
-      onClick={(event) => api.click(id, event.shiftKey || event.metaKey || event.ctrlKey)}
-      onDoubleClick={() => api.rename(id)}
+      {...rowHandlers(api, row, i)}
       onDragStart={(event) => {
         api.dragStart(id)
         event.dataTransfer.effectAllowed = 'move'
         event.dataTransfer.setData(DRAG_TYPE, id)
       }}
       onDragEnd={() => api.dragEnd()}
-      onDragOver={(event) => {
-        if (!api.dragOver(event, row)) return
-        event.preventDefault()
-        event.dataTransfer.dropEffect = 'move'
-      }}
-      onDragLeave={() => api.dragLeave(id)}
-      onDrop={(event) => {
-        if (api.drop(event, row)) event.preventDefault()
-      }}
       style={rowPlace(i, depth)}
       className={cn(
         ROW_LOOK,
