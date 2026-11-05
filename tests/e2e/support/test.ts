@@ -8,13 +8,29 @@ export type { Browser, Locator, Page, Request } from '@playwright/test'
 type Guard = {
   /** Lets this test cause the problems these patterns match, such as a 404 it asks for on purpose. */
   allowProblems: (...patterns: RegExp[]) => void
+  /** Closes the browser contexts the test opened itself when it ends. */
+  closeContexts: undefined
 }
 
 /**
  * Playwright's `test`, failing any test whose pages throw, log a console error or get a 4xx or 5xx
- * from the web app or the API. Every spec imports `test` from here (lint enforces it).
+ * from the web app or the API, and closing every browser context a test opened, so a worker's
+ * memory stays flat through a run. Every spec imports `test` from here (lint enforces it).
  */
 export const test = base.extend<Guard>({
+  closeContexts: [
+    async ({ browser, context }, use) => {
+      const open = new Set([...browser.contexts(), context])
+      await use(undefined)
+      await Promise.all(
+        browser
+          .contexts()
+          .filter((opened) => !open.has(opened))
+          .map((opened) => opened.close()),
+      )
+    },
+    { auto: true },
+  ],
   allowProblems: [
     async ({ context, baseURL }, use) => {
       const origins = new Set([new URL(baseURL ?? 'http://localhost:3100').origin, new URL(API_URL).origin])
