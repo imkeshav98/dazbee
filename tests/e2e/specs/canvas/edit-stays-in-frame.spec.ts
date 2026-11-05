@@ -59,9 +59,9 @@ test.describe('on the canvas', () => {
     await editInSquare(
       browser,
       async (a) => {
-        // Past the end of the headline's one line, inside its box.
-        const end = await screenPoint(a, 990, 860)
-        await a.mouse.dblclick(end.x, end.y)
+        // On the headline's one line: a click past its end, in the box's empty part, picks what is under it.
+        const word = await screenPoint(a, 300, 870)
+        await a.mouse.dblclick(word.x, word.y)
         await expect(a.locator('.caret')).toBeVisible()
         await a.keyboard.press('End')
         await a.keyboard.type(' now')

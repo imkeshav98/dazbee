@@ -255,10 +255,11 @@ test('a real mouse drag and real typing in one tab show up in the other, and und
   expect(Math.abs(dragged.y - 180)).toBeLessThanOrEqual(1)
   writeOutput('real-input-2-dragged-tab-b.png', await b.screenshot())
 
-  // Double-click past the end of the headline, type, and see it arrive in tab B.
-  const end = await screenPoint(a, 700, 540)
-  await a.mouse.dblclick(end.x, end.y)
+  // Double-click on the headline's words, go to the end of its line, type, and see it arrive in tab B.
+  const word = await screenPoint(a, 300, 540)
+  await a.mouse.dblclick(word.x, word.y)
   await expect(a.locator('.caret')).toBeVisible()
+  await a.keyboard.press('End')
   await a.keyboard.type(' now on')
   await a.keyboard.press('Backspace')
   await a.keyboard.press('Backspace')
