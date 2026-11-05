@@ -113,7 +113,9 @@ export function useTreeFocus({
       if (dropped) {
         gone.current = design.nodes[lost] || isFrame(lost) ? null : lost
         const next = listedSelection[0] ?? rows[Math.min(heldAt.current, rows.length - 1)]?.id
-        if (next) take(next)
+        // A frame's row in its place takes the focus unpicked, so a second Delete deletes nothing.
+        if (next && isFrame(next)) reveal(next)
+        else if (next) take(next)
       }
     } else if (gone.current && indexOf.has(gone.current) && (dropped || scroller.current?.contains(before))) {
       take(gone.current)

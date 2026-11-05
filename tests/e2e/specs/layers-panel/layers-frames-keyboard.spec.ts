@@ -1,6 +1,6 @@
 // The layers panel's frames by the keyboard alone, in Chromium: Tab into the tree, the arrows, Home
 // and End through frames and layers, opening and closing them and picking a frame, and renaming it;
-// the focus following a duplicated frame to its copy.
+// the focus following a duplicated frame to its copy, and a delete never leaving a frame picked.
 import { writeOutput } from '../../support/editor.ts'
 import { openDesign, picked } from '../../support/layers-frames.ts'
 import { frameRow, row, tabIntoTree, tree } from '../../support/layers-panel.ts'
@@ -99,5 +99,41 @@ test('keyboard: Ctrl+D on a frame’s row takes the focus to the copy’s row, p
   await expect(tree(page).locator(`[data-frame="${copy}"]`)).toHaveAttribute('aria-selected', 'true')
   await page.keyboard.press('ControlOrMeta+Z')
   await expect.poll(frames).toEqual(['banner', 'fresh', 'sq', 'story'])
+  expect(errors).toEqual([])
+})
+
+test('keyboard: a delete leaves a frame’s row in its place focused and unpicked, so a second Delete deletes nothing', async ({
+  browser,
+}) => {
+  const {
+    tabs: [page],
+    errors,
+  } = await openDesign(browser)
+  if (!page) throw new Error('no tab')
+  const frames = async () => Object.keys((await read(page)).frames).sort()
+  // Delete on Photo, the square's last row above the story's: the focus goes to the story's row,
+  // which stays unpicked, so a second Delete deletes nothing.
+  await frameRow(page, 'Sale square').click()
+  await row(page, 'Photo').click()
+  await expect(row(page, 'Photo')).toBeFocused()
+  await page.keyboard.press('Delete')
+  await expect.poll(async () => Object.keys((await read(page)).nodes)).not.toContain('photo')
+  await expect(frameRow(page, 'Sale story')).toBeFocused()
+  expect(await picked(page)).toBeNull()
+  expect(await selection(page)).toEqual([])
+  await page.keyboard.press('Delete')
+  await nextFrame(page)
+  expect(await frames()).toEqual(['banner', 'fresh', 'sq', 'story'])
+
+  // On a page of one frame, deleting its only layer leaves the focus on the frame's row, unpicked.
+  await page.evaluate(() => window.dazbee?.showPage('p2'))
+  await row(page, 'Headline').click()
+  await expect(row(page, 'Headline')).toBeFocused()
+  await page.keyboard.press('Delete')
+  await expect(frameRow(page, 'Banner')).toBeFocused()
+  expect(await picked(page)).toBeNull()
+  await page.keyboard.press('Delete')
+  await nextFrame(page)
+  expect(await frames()).toEqual(['banner', 'fresh', 'sq', 'story'])
   expect(errors).toEqual([])
 })
