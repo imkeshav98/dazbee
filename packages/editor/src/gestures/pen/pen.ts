@@ -3,16 +3,17 @@
 import type { Session } from '@dazbee/doc'
 import type { Design, Point } from '@dazbee/schema'
 
-import { type Camera, toScreen, toWorld } from '../canvas/camera.ts'
-import type { Frame } from '../canvas/frames.ts'
-import { px } from '../canvas/rulers.ts'
-import type { EditorBoxes } from '../layers/boxes.ts'
-import { type Box, localTo, pageFrom, round } from '../layers/transform.ts'
-import { runQuietly } from '../run-quietly.ts'
-import type { EditorSelection } from '../selection.ts'
-import type { EditorTyping } from '../text/typing.ts'
-import type { EditorTools } from '../tools.ts'
-import { newPath } from './draw-tools.ts'
+import { type Camera, toScreen, toWorld } from '../../canvas/camera.ts'
+import type { Frame } from '../../canvas/frames.ts'
+import { px } from '../../canvas/rulers.ts'
+import type { EditorBoxes } from '../../layers/boxes.ts'
+import { type Box, localTo, pageFrom, round } from '../../layers/transform.ts'
+import { runQuietly } from '../../run-quietly.ts'
+import type { EditorSelection } from '../../selection.ts'
+import type { EditorTyping } from '../../text/typing.ts'
+import type { EditorTools } from '../../tools.ts'
+import { newPath } from '../drawing/draw-tools.ts'
+import { CLICK_SLOP } from '../press.ts'
 import {
   type Anchor,
   anchorOf,
@@ -31,7 +32,6 @@ import {
   type Side,
   splitSegment,
 } from './path.ts'
-import { CLICK_SLOP } from './press.ts'
 
 /** A path layer being drawn or edited: the box it had when that began, which its points are relative to, and how far the box has moved since. */
 export interface Reshaping {

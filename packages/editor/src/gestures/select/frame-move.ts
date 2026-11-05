@@ -3,9 +3,9 @@
 import type { Session } from '@dazbee/doc'
 import type { Point } from '@dazbee/schema'
 
-import type { Frame } from '../canvas/frames.ts'
-import { runQuietly } from '../run-quietly.ts'
-import { CLICK_SLOP } from './press.ts'
+import type { Frame } from '../../canvas/frames.ts'
+import { runQuietly } from '../../run-quietly.ts'
+import { CLICK_SLOP } from '../press.ts'
 
 /** A frame being moved, from the press on its label or empty area until it is let go. */
 export interface FrameMoveDrag {

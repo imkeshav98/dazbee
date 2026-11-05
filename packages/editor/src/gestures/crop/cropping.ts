@@ -3,15 +3,15 @@
 import type { Session } from '@dazbee/doc'
 import type { Point } from '@dazbee/schema'
 
-import { type Camera, toScreen, toWorld } from '../canvas/camera.ts'
-import type { Frame } from '../canvas/frames.ts'
-import type { ThumbnailCache } from '../canvas/thumbnails.ts'
-import type { CropTarget, EditorBoxes } from '../layers/boxes.ts'
-import { type Box, drawnFrom, localTo, pageFrom, round } from '../layers/transform.ts'
-import { runQuietly } from '../run-quietly.ts'
-import type { EditorSelection } from '../selection.ts'
+import { type Camera, toScreen, toWorld } from '../../canvas/camera.ts'
+import type { Frame } from '../../canvas/frames.ts'
+import type { ThumbnailCache } from '../../canvas/thumbnails.ts'
+import type { CropTarget, EditorBoxes } from '../../layers/boxes.ts'
+import { type Box, drawnFrom, localTo, pageFrom, round } from '../../layers/transform.ts'
+import { runQuietly } from '../../run-quietly.ts'
+import type { EditorSelection } from '../../selection.ts'
+import { HANDLE_REACH } from '../press.ts'
 import { cornersOfRect, cropOf, panned, scaled } from './crop.ts'
-import { HANDLE_REACH } from './press.ts'
 
 /** A drag of the image being cropped, or of one of its corners, from the press until it ends: one undo step. */
 export interface CropDrag {

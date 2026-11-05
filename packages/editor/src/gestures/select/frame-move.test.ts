@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest'
 
 import type { DesignInput, Point } from '@dazbee/schema'
 
-import type { Frame } from '../canvas/frames.ts'
-import { sessionOf } from '../layers/test-boxes.ts'
+import type { Frame } from '../../canvas/frames.ts'
+import { sessionOf } from '../../layers/test-boxes.ts'
 import { dragFrame, type FrameMoveDrag, pressFrame, releaseFrame } from './frame-move.ts'
 
 /** Two frames on one page, the square holding a dot. */

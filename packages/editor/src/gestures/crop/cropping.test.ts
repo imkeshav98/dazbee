@@ -3,9 +3,9 @@ import { describe, expect, it } from 'vitest'
 import { loadDesign, openSession } from '@dazbee/doc'
 import { type DesignInput, type Paint, parseDesign } from '@dazbee/schema'
 
-import type { Frame } from '../canvas/frames.ts'
-import { testBoxes } from '../layers/test-boxes.ts'
-import { editorSelection } from '../selection.ts'
+import type { Frame } from '../../canvas/frames.ts'
+import { testBoxes } from '../../layers/test-boxes.ts'
+import { editorSelection } from '../../selection.ts'
 import { type CroppingDeps, editorCropping } from './cropping.ts'
 
 /** A box 200 × 100 filled with a square image, which covers it: the image's whole sits 200 × 200 around it. */

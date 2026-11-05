@@ -3,7 +3,7 @@
 import { type Design, frameIdOf } from '@dazbee/schema'
 
 import type { Frame } from './canvas/frames.ts'
-import type { AnchorRef } from './gestures/path.ts'
+import type { AnchorRef } from './gestures/pen/path.ts'
 
 /** A layer as one frame shows it: selection, dragging and typing all happen in one frame. */
 export interface Picked {

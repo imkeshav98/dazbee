@@ -8,7 +8,7 @@ import { design } from '../canvas/test-design.ts'
 import { editorSelection } from '../selection.ts'
 import type { Tool } from '../tools.ts'
 import { editorPointer, type PointerDeps } from './pointer.ts'
-import type { MoveDrag } from './transform-drag.ts'
+import type { MoveDrag } from './select/transform-drag.ts'
 
 const SQUARE: Frame = { id: 'one-sq', pageId: 'one', name: 'Square', x: 0, y: 0, width: 1080, height: 1080 }
 /** A scene layer of a type over the first 100 pixels of the frame each way. */

@@ -2,10 +2,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { DesignInput } from '@dazbee/schema'
 
-import { type Frame, pageFrames } from '../canvas/frames.ts'
-import { hug } from '../layers/hug.ts'
-import { sessionOf, testBoxes } from '../layers/test-boxes.ts'
-import { editorSelection } from '../selection.ts'
+import { type Frame, pageFrames } from '../../canvas/frames.ts'
+import { hug } from '../../layers/hug.ts'
+import { sessionOf, testBoxes } from '../../layers/test-boxes.ts'
+import { editorSelection } from '../../selection.ts'
 import { type DrawingDeps, editorDrawing, isDrawing } from './drawing.ts'
 
 const WHITE = [{ type: 'solid' as const, color: '#FFFFFFFF' }]

@@ -17,9 +17,8 @@ import { inField } from '../shortcuts.ts'
 import { paragraphAt, wordAt } from '../text/text-edit.ts'
 import type { EditorTyping } from '../text/typing.ts'
 import type { EditorTools } from '../tools.ts'
-import type { EditorAutoLayoutDrag, ReorderDrag } from './auto-layout-drag.ts'
-import type { CropDrag, EditorCropping } from './cropping.ts'
-import { isDrawTool } from './draw-tools.ts'
+import type { CropDrag, EditorCropping } from './crop/cropping.ts'
+import { isDrawTool } from './drawing/draw-tools.ts'
 import {
   type EditorDrawing,
   type FrameDrag,
@@ -27,10 +26,11 @@ import {
   isDrawing,
   type ShapeDrag,
   type TextBoxDrag,
-} from './drawing.ts'
-import { dragFrame, type FrameMoveDrag, releaseFrame } from './frame-move.ts'
-import type { EditorPen, PathDrag } from './pen.ts'
-import type { EditorSelectPress } from './select-press.ts'
+} from './drawing/drawing.ts'
+import type { EditorPen, PathDrag } from './pen/pen.ts'
+import type { EditorAutoLayoutDrag, ReorderDrag } from './select/auto-layout-drag.ts'
+import { dragFrame, type FrameMoveDrag, releaseFrame } from './select/frame-move.ts'
+import type { EditorSelectPress } from './select/select-press.ts'
 import {
   carried,
   type EditorTransformDrag,
@@ -38,7 +38,7 @@ import {
   type MoveDrag,
   type ResizeDrag,
   type RotateDrag,
-} from './transform-drag.ts'
+} from './select/transform-drag.ts'
 
 /** What a drag on the stage is doing, from pointer down to up. */
 export type Gesture =

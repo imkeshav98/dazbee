@@ -3,16 +3,17 @@
 import { childrenOf, type Session } from '@dazbee/doc'
 import { canHold, type Point, type Rect, SIZE_LIMITS } from '@dazbee/schema'
 
-import { type Camera, toScreen } from '../canvas/camera.ts'
-import type { Frame } from '../canvas/frames.ts'
-import { px } from '../canvas/rulers.ts'
-import { laidOut } from '../layers/auto-layout.ts'
-import type { EditorBoxes } from '../layers/boxes.ts'
-import { boundsOf, type Box, localTo, round } from '../layers/transform.ts'
-import { runQuietly } from '../run-quietly.ts'
-import type { EditorSelection } from '../selection.ts'
-import type { EditorTyping } from '../text/typing.ts'
-import type { EditorTools, PlacedAsset } from '../tools.ts'
+import { type Camera, toScreen } from '../../canvas/camera.ts'
+import type { Frame } from '../../canvas/frames.ts'
+import { px } from '../../canvas/rulers.ts'
+import { laidOut } from '../../layers/auto-layout.ts'
+import type { EditorBoxes } from '../../layers/boxes.ts'
+import { boundsOf, type Box, localTo, round } from '../../layers/transform.ts'
+import { runQuietly } from '../../run-quietly.ts'
+import type { EditorSelection } from '../../selection.ts'
+import type { EditorTyping } from '../../text/typing.ts'
+import type { EditorTools, PlacedAsset } from '../../tools.ts'
+import { CLICK_SLOP } from '../press.ts'
 import {
   clickedRect,
   draggedRect,
@@ -24,7 +25,6 @@ import {
   newImage,
   newText,
 } from './draw-tools.ts'
-import { CLICK_SLOP } from './press.ts'
 
 /** A shape or box being drawn, from the press until it ends: the new layer and every change the drag makes to it are one undo step. */
 export interface ShapeDrag {

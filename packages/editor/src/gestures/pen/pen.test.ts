@@ -3,9 +3,9 @@ import { describe, expect, it } from 'vitest'
 import { loadDesign, openSession } from '@dazbee/doc'
 import { type DesignInput, parseDesign } from '@dazbee/schema'
 
-import type { Frame } from '../canvas/frames.ts'
-import { testBoxes } from '../layers/test-boxes.ts'
-import { editorSelection } from '../selection.ts'
+import type { Frame } from '../../canvas/frames.ts'
+import { testBoxes } from '../../layers/test-boxes.ts'
+import { editorSelection } from '../../selection.ts'
 import { editorPen, type PenDeps } from './pen.ts'
 
 const ZIG = { x: 100, y: 100, width: 100, height: 100, shape: { kind: 'path' as const, d: 'M0 0 L100 0 L100 100' } }

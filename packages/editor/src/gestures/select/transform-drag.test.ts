@@ -3,11 +3,11 @@ import { describe, expect, it } from 'vitest'
 import { render } from '@dazbee/renderer'
 import type { DesignInput } from '@dazbee/schema'
 
-import { type Frame, pageFrames } from '../canvas/frames.ts'
-import { hug } from '../layers/hug.ts'
-import { measure, sessionOf, testBoxes } from '../layers/test-boxes.ts'
-import type { Box } from '../layers/transform.ts'
-import { editorSelection } from '../selection.ts'
+import { type Frame, pageFrames } from '../../canvas/frames.ts'
+import { hug } from '../../layers/hug.ts'
+import { measure, sessionOf, testBoxes } from '../../layers/test-boxes.ts'
+import type { Box } from '../../layers/transform.ts'
+import { editorSelection } from '../../selection.ts'
 import { carried, editorTransformDrag, type TransformDrag, type TransformDragDeps } from './transform-drag.ts'
 
 const rect = (

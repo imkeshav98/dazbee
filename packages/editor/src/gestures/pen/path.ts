@@ -4,7 +4,7 @@
 // only. Points are in one coordinate space throughout; the editor picks which.
 import type { Point } from '@dazbee/schema'
 
-import { round } from '../layers/transform.ts'
+import { round } from '../../layers/transform.ts'
 
 export interface Anchor {
   x: number

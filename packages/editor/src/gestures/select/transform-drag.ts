@@ -4,14 +4,22 @@ import { descendants, type Session } from '@dazbee/doc'
 import { type ScaledText, scaleText, smallestSize } from '@dazbee/renderer'
 import type { Point, Rect, RunStyle } from '@dazbee/schema'
 
-import { type Camera, toScreen, toWorld } from '../canvas/camera.ts'
-import { type Frame, frameAt, intersects } from '../canvas/frames.ts'
-import { px } from '../canvas/rulers.ts'
-import type { FrameScenes } from '../canvas/scenes.ts'
-import { inFlow } from '../layers/auto-layout.ts'
-import type { EditorBoxes, SelectionBox } from '../layers/boxes.ts'
-import { resizedBoxes, scalingTexts, switchSizing } from '../layers/resize.ts'
-import { type Gap, type Guide, SNAP_DISTANCE, snapMove, snapResize, snapTargets, type Targets } from '../layers/snap.ts'
+import { type Camera, toScreen, toWorld } from '../../canvas/camera.ts'
+import { type Frame, frameAt, intersects } from '../../canvas/frames.ts'
+import { px } from '../../canvas/rulers.ts'
+import type { FrameScenes } from '../../canvas/scenes.ts'
+import { inFlow } from '../../layers/auto-layout.ts'
+import type { EditorBoxes, SelectionBox } from '../../layers/boxes.ts'
+import { resizedBoxes, scalingTexts, switchSizing } from '../../layers/resize.ts'
+import {
+  type Gap,
+  type Guide,
+  SNAP_DISTANCE,
+  snapMove,
+  snapResize,
+  snapTargets,
+  type Targets,
+} from '../../layers/snap.ts'
 import {
   angleOf,
   boundsOf,
@@ -28,11 +36,11 @@ import {
   round,
   snapAngle,
   turn,
-} from '../layers/transform.ts'
-import { runQuietly } from '../run-quietly.ts'
-import type { EditorSelection } from '../selection.ts'
-import type { EditorTyping } from '../text/typing.ts'
-import { HANDLE_REACH, HANDLE_SIZE } from './press.ts'
+} from '../../layers/transform.ts'
+import { runQuietly } from '../../run-quietly.ts'
+import type { EditorSelection } from '../../selection.ts'
+import type { EditorTyping } from '../../text/typing.ts'
+import { HANDLE_REACH, HANDLE_SIZE } from '../press.ts'
 
 /** A drag moving the selection, from the press until it ends: one undo step. */
 export interface MoveDrag {
