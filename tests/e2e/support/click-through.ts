@@ -1,4 +1,4 @@
-// What the click-through checks share (#500): a cut-out PNG drawn with CanvasKit, a frame where each
+// What the click-through checks share: a cut-out PNG drawn with CanvasKit, a frame where each
 // layer has see-through parts over another, the points a click or a hover goes to with the layer
 // each picks, and a frame of 200 layers that each show nothing over one point.
 import { loadCanvasKit } from '@dazbee/renderer/node'

@@ -1,4 +1,4 @@
-// A click picks what shows (#500), with real pointer input: through a cut-out photo's clear corners,
+// A click picks what shows, with real pointer input: through a cut-out photo's clear corners,
 // an ellipse's empty corners, the gaps between a star's points and the box after short text, the
 // layer beneath is picked, and a hover outlines the same layer a click picks. A selected layer still
 // drags from an empty part of its box, and a drag from a see-through part moves what shows there, as
