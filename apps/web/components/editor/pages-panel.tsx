@@ -1,7 +1,7 @@
 'use client'
 
 // The design's pages. Pages, by the zoom pill, says which page the canvas shows and how many there
-// are ("Pages 2/3", the numbers alone on a phone) and opens the Pages panel: each page's picture,
+// are ("Pages 2/3") and opens the Pages panel, dropping under it on a phone: each page's picture,
 // name and number of frames, shown with a click and reordered by dragging; ⋯ renames, duplicates,
 // moves and deletes one, and Add page adds one holding a frame the size of the frame you are on.
 // Every change is a command, so it is one undo step and reaches the other tabs.
@@ -138,11 +138,8 @@ function LivePages({ editor }: { editor: Editor }) {
   const counts = { n: Math.max(1, pages.findIndex(([id]) => id === current) + 1), total: pages.length }
   return (
     <PagesFrame label={format(t.editor.pages.buttonLabel, counts)}>
-      <span aria-hidden className="tabular-nums max-sm:hidden">
+      <span aria-hidden className="tabular-nums">
         {format(t.editor.pages.button, counts)}
-      </span>
-      <span aria-hidden className="font-mono tabular-nums sm:hidden">
-        {format(t.editor.pages.buttonShort, counts)}
       </span>
     </PagesFrame>
   )

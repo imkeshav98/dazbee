@@ -338,7 +338,6 @@ export const en = {
     pages: {
       title: 'Pages',
       button: 'Pages {n}/{total}',
-      buttonShort: '{n}/{total}',
       buttonLabel: 'Pages: page {n} of {total}',
       more: 'More for {name}',
       add: 'Add page',

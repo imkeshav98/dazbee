@@ -186,12 +186,13 @@ export function EditorShell({
     brand: t.editor.brandEmpty,
   }
   // What the top bar has open: on a phone an edit panel is a sheet, which hides the tab bar and the
-  // dock, and a sheet and a rail flyout close each other.
+  // dock, and a sheet and a rail flyout close each other. Pages drops under its button instead.
   const edit = useEditState()
-  const sheet = phone && isPanel(edit.open)
+  const panelOnPhone = phone && isPanel(edit.open)
+  const sheet = panelOnPhone && edit.open !== 'pages'
   useEffect(() => {
-    if (sheet) setFlyout((now) => (now === null ? now : null))
-  }, [sheet])
+    if (panelOnPhone) setFlyout((now) => (now === null ? now : null))
+  }, [panelOnPhone])
   const stage = useRef<HTMLElement>(null)
   const flyoutEl = useRef<HTMLElement>(null)
   useLayoutEffect(() => {

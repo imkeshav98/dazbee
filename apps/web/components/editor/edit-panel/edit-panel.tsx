@@ -95,6 +95,8 @@ export function PanelFrame({
   const t = useMessages()
   const { barBottom } = useEditState()
   const phone = usePhone()
+  // On a phone the edit panel is a sheet at the bottom; Pages drops under its button instead, the dock still showing.
+  const sheet = phone && id !== 'pages'
   const panel = useRef<HTMLElement>(null)
   const body = useRef<HTMLDivElement>(null)
   // On a phone the sheet's bar stays shown while there is more to scroll to: no pointer hovers to show it.
@@ -155,7 +157,7 @@ export function PanelFrame({
   }, [])
   // On a phone the sheet's top edge is known, so what sits at the bottom start can stand above it.
   useLayoutEffect(() => {
-    if (!phone || !panel.current) {
+    if (!sheet || !panel.current) {
       setSheetTop(null)
       return
     }
@@ -168,7 +170,7 @@ export function PanelFrame({
       watch.disconnect()
       setSheetTop(null)
     }
-  }, [phone])
+  }, [sheet])
   const top = (barBottom || rowBottom) + 10
   return (
     <section
@@ -186,7 +188,11 @@ export function PanelFrame({
         'pop-in absolute z-20 flex flex-col overflow-hidden rounded-[16px] surface-frost outline-none',
         // Clear of the zoom pill below it, and on a tablet of Pages stacked over the zoom pill too.
         'end-3 w-[300px] max-h-[calc(100%-var(--panel-top)-4.5rem)] sm:max-lg:max-h-[calc(100%-var(--panel-top)-7.5rem)]',
-        'max-sm:inset-x-2 max-sm:end-2 max-sm:top-auto max-sm:bottom-2 max-sm:max-h-[46%] max-sm:w-auto max-sm:rounded-[22px]',
+        'max-sm:inset-x-2 max-sm:end-2 max-sm:w-auto max-sm:rounded-[22px]',
+        // Under the Pages button at the top start (5rem down, 2.25rem tall), clear of the dock and the tab bar.
+        sheet
+          ? 'max-sm:top-auto max-sm:bottom-2 max-sm:max-h-[46%]'
+          : 'max-sm:top-[7.75rem] max-sm:bottom-auto max-sm:max-h-[calc(100%-17.5rem)]',
       )}
     >
       <div

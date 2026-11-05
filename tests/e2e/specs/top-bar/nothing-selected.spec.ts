@@ -298,7 +298,7 @@ for (const [width, height] of SCREEN_SIZES) {
     const still = await camera(page)
     // No properties button on the phones' tab bar.
     await expect(page.locator('[data-panel="properties"]')).toHaveCount(0)
-    if (width === 390) await expect(page.getByTestId('pages-button').locator('span:visible')).toHaveText('1/1')
+    await expect(page.getByTestId('pages-button').locator('span:visible')).toHaveText('Pages 1/1')
     const check = async (name: string) => {
       await nextFrame(page)
       expect(
@@ -314,6 +314,13 @@ for (const [width, height] of SCREEN_SIZES) {
     expect(await layoutProblems(page, { pieces: { ...PIECES, square, story } })).toEqual([])
     await check('nothing-selected')
     await pagesPanel(page)
+    // On a phone the Pages card drops under its button, the dock still showing under it.
+    if (width === 390) {
+      await expect(page.locator('[data-dock]')).toBeVisible()
+      const button = await page.getByTestId('pages-button').boundingBox()
+      const card = await page.locator('#edit-panel').boundingBox()
+      expect(card?.y ?? 0).toBeGreaterThan((button?.y ?? 0) + (button?.height ?? 0))
+    }
     await check('pages')
     await page.keyboard.press('Escape')
     // With the page's frames deleted, the hint over the stage keeps clear of the chrome too.

@@ -325,7 +325,6 @@ export const ar: Messages = {
     pages: {
       title: 'الصفحات',
       button: 'الصفحات {n}/{total}',
-      buttonShort: '{n}/{total}',
       buttonLabel: 'الصفحات: الصفحة {n} من {total}',
       more: 'المزيد لـ {name}',
       add: 'إضافة صفحة',
