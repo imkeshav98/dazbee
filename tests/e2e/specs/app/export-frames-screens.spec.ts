@@ -130,6 +130,33 @@ for (const [width, height] of SCREEN_SIZES) {
   })
 }
 
+test('on a phone with a coarse pointer every control of Export is at least 44 px tall, as its frame rows are', async ({
+  browser,
+}) => {
+  const { page, errors } = await openSized(browser, { width: 390, height: 844 }, { touch: true })
+  expect(await page.evaluate(() => matchMedia('(pointer: coarse)').matches)).toBe(true)
+  const dialog = await openExport(page)
+  await dialog.locator('[data-type="jpg"]').click()
+  await expect(dialog.getByTestId('export-quality')).toBeVisible()
+  const heights = await dialog.evaluate((form) =>
+    Object.fromEntries(
+      Object.entries({
+        page: '[data-testid="export-page"]',
+        png: '[data-type="png"]',
+        jpg: '[data-type="jpg"]',
+        pdf: '[data-type="pdf"]',
+        svg: '[data-type="svg"]',
+        quality: '[data-scrub]',
+        'file names': '[data-testid="export-name"]',
+        export: '[data-testid="export-run"]',
+        row: '[data-testid="export-frames"] label',
+      }).map(([control, selector]) => [control, form.querySelector<HTMLElement>(selector)?.offsetHeight ?? 0]),
+    ),
+  )
+  for (const [control, tall] of Object.entries(heights)) expect(tall, control).toBeGreaterThanOrEqual(44)
+  expect(errors).toEqual([])
+})
+
 for (const [width, height] of SCREEN_SIZES) {
   for (const theme of THEMES) {
     test(

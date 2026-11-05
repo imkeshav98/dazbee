@@ -169,15 +169,20 @@ export const names = async (dialog: Locator) => (await rows(dialog)).map((row) =
 
 /**
  * Opens a design, the Summer one unless another is given, alone in a tab of a theme and language at
- * a screen size, fitted, with its fonts loaded.
+ * a screen size, with a touch screen if asked, fitted, with its fonts loaded.
  */
 export async function openSized(
   browser: Browser,
   viewport: { width: number; height: number },
-  { theme = 'dark', locale = 'en', input = design() }: { theme?: string; locale?: string; input?: DesignInput } = {},
+  {
+    theme = 'dark',
+    locale = 'en',
+    input = design(),
+    touch = false,
+  }: { theme?: string; locale?: string; input?: DesignInput; touch?: boolean } = {},
 ) {
   const designId = await seed(input)
-  const page = await (await browser.newContext({ viewport, acceptDownloads: true })).newPage()
+  const page = await (await browser.newContext({ viewport, acceptDownloads: true, hasTouch: touch })).newPage()
   const errors: string[] = []
   page.on('pageerror', (error) => errors.push(error.message))
   await setCookies(page, { theme, locale })

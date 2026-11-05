@@ -34,6 +34,9 @@ type Ticked = 'all' | ReadonlySet<string>
 
 const LABEL = FIELD_LABEL
 
+/** On a phone a control is 44 px tall, a touch target a finger can hit, as the frame rows are. */
+const TOUCH_CONTROL = 'max-sm:h-[44px]'
+
 /**
  * The frames list: its rows as tall as a menu's (MENU_ITEM), 44 px on a phone for a finger, and as
  * tall as eight and a half of them, five and a half on a phone, so the part of the next row at the
@@ -188,7 +191,7 @@ export function ExportForm({
             options={pages.map(([pageId, p]) => ({ value: pageId, label: p.name }))}
             onChange={choosePage}
             testId="export-page"
-            className="h-8 bg-raised px-2 text-[13px]"
+            className={cn('h-8 bg-raised px-2 text-[13px]', TOUCH_CONTROL)}
           />
         </div>
       )}
@@ -246,7 +249,7 @@ export function ExportForm({
               aria-checked={type === value}
               onClick={() => setType(value)}
               data-type={value}
-              className={cn(SEGMENT, 'uppercase')}
+              className={cn(SEGMENT, 'uppercase', TOUCH_CONTROL)}
             >
               {value}
             </button>
@@ -262,6 +265,7 @@ export function ExportForm({
           min={1}
           max={100}
           testId="export-quality"
+          className={TOUCH_CONTROL}
           onSet={(to) => setQuality(Math.round(to))}
           onShift={(by) => setQuality((now) => Math.round(Math.min(100, Math.max(1, now + by))))}
         />
@@ -278,7 +282,7 @@ export function ExportForm({
           onChange={(event) => setName(event.target.value)}
           onKeyDown={(event) => event.stopPropagation()}
           data-testid="export-name"
-          className={FIELD}
+          className={cn(FIELD, TOUCH_CONTROL)}
         />
       </label>
 
@@ -287,6 +291,7 @@ export function ExportForm({
         disabled={count === 0 || progress !== null}
         onClick={() => void run()}
         data-testid="export-run"
+        className={TOUCH_CONTROL}
       >
         {progress
           ? format(t.editor.exports.making, { done: progress.done, total: progress.total })
