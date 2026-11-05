@@ -506,7 +506,8 @@ function randomCommand(tab: Session, doc: DesignDoc, random: () => number) {
         const first = pick(ids)
         const siblings = ids.filter((id) => design.nodes[id]?.parentId === design.nodes[first]?.parentId)
         tab.run('node.group', { ids: [first, pick(siblings)] })
-      } else if (which < 0.9) tab.run('node.ungroup', { ids: [pick(ids)] })
+      } else if (which < 0.85) tab.run('node.ungroup', { ids: [pick(ids)] })
+      else if (which < 0.92) tab.run('node.copyToFrames', { ids: [pick(ids)] })
       else tab.run('node.hug', { ids: [pick(ids)] })
     } else if (random() < 0.5) {
       tab.undo()
