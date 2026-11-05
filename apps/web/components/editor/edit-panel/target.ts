@@ -129,11 +129,14 @@ export function factsOf(target: Target, design: Design) {
   return {
     ownShape,
     inFlow,
+    // Placed by its auto layout box: in the box's flow, and not set to keep where it is.
+    placed: inFlow && target.props.every((pr) => pr.absolute !== true),
     lines: ownShape === 'line',
     booleans: target.types.every((type) => type === 'boolean'),
     boxes: target.types.every((type) => type === 'box'),
     masks: target.props.every((pr) => Boolean(pr.mask)),
     sized: target.types.every((type) => type !== 'group' && type !== 'boolean'),
+    texts: target.types.every((type) => type === 'text'),
   }
 }
 

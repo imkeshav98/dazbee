@@ -5,7 +5,7 @@ import { assets, doc, fills, props, setupInventory, step, style } from '../../su
 import { copyIn } from '../../support/seed.ts'
 import { selectLayers } from '../../support/stage.ts'
 import { expect, test } from '../../support/test.ts'
-import { barMenu, moreAction, moreSubmenu, openCard } from '../../support/top-bar.ts'
+import { arrangeSubmenu, barMenu, moreAction, openCard } from '../../support/top-bar.ts'
 
 const row = setupInventory()
 
@@ -30,12 +30,12 @@ test.describe('top bar and full menu', () => {
     await reloads(page)
   })
 
-  row(70, 'text direction in the full menu', async (open) => {
+  row(70, "text direction in the top bar's ⋯", async (open) => {
     const page = await open()
     await selectLayers(page, ['headline'], { bar: true })
     await step(
       page,
-      async () => (await moreSubmenu(page, 'text-direction')).getByRole('button', { name: 'Right to left' }).click(),
+      async () => (await arrangeSubmenu(page, 'text-direction')).getByRole('button', { name: 'Right to left' }).click(),
       async () => {
         await expect.poll(async () => (await props(page, 'headline')).direction).toBe('rtl')
       },
@@ -48,7 +48,7 @@ test.describe('top bar and full menu', () => {
     await selectLayers(page, ['box', 'dot'], { bar: true })
     await step(
       page,
-      async () => (await barMenu(page, 'line-up')).getByRole('button', { name: 'Align left' }).click(),
+      async () => (await barMenu(page, 'line-up')).getByRole('button', { name: 'Left' }).click(),
       async () => {
         await expect.poll(async () => (await props(page, 'dot')).x).toBe(80)
       },

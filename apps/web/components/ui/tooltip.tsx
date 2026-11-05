@@ -21,14 +21,19 @@ export const TooltipProvider = ({ children }: { children: ReactNode }) => (
 export function Tooltip({
   label,
   side = 'top',
+  open,
+  onOpenChange,
   children,
 }: {
   label: string
   side?: 'top' | 'right' | 'bottom' | 'left'
+  /** Whether it shows, for a caller that also opens it another way, such as a tap; left out, hover and focus decide. */
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
   children: ReactNode
 }) {
   return (
-    <RadixTooltip.Root>
+    <RadixTooltip.Root {...(open === undefined ? {} : { open })} {...(onOpenChange ? { onOpenChange } : {})}>
       <RadixTooltip.Trigger asChild onFocus={keyboardFocusOnly}>
         {children}
       </RadixTooltip.Trigger>
@@ -36,6 +41,8 @@ export function Tooltip({
         <RadixTooltip.Content
           side={side}
           sideOffset={8}
+          // Off the window's edges by as much as it keeps from its control.
+          collisionPadding={8}
           className="z-50 rounded-md border border-line bg-raised px-2 py-1 text-xs font-medium text-text shadow-panel data-[state=delayed-open]:animate-[tooltip-in_var(--chrome-fast)_var(--ease-out)]"
         >
           {label}

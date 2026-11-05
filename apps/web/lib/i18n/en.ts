@@ -230,6 +230,16 @@ export const en = {
       label: 'Selection',
       lineUp: 'Line up',
       order: 'Order',
+      /** The top bar's ⋯ for layers, which holds how they sit: order, line up, rotation, text direction. */
+      arrange: 'Arrange',
+      /** Why Line up is greyed out for a layer its auto layout box places. */
+      placedByLayout: 'Auto layout places this layer',
+      /** Why Bring to front and Bring forward are greyed out for layers at the top of their stack. */
+      atFront: 'Already at the front',
+      /** Why Send to back and Send backward are greyed out for layers at the bottom of their stack. */
+      atBack: 'Already at the back',
+      /** Why Line up, the rotation field and Text direction are greyed out for a locked layer. */
+      lockedRow: 'The layer is locked',
       grouping: 'Group',
       putInBox: 'Put in a box',
       combine: 'Combine',
@@ -809,7 +819,6 @@ export const en = {
       /** The picked frame's top bar, its ⋯ menu, its Background panel and the field that renames it on its label. */
       bar: 'Frame',
       background: 'Background',
-      backgroundColour: 'Background colour',
       more: 'Frame actions',
       addSize: 'Add size',
       rename: 'Rename',

@@ -8,7 +8,7 @@ import { layoutProblems, rowHeights, scrolling } from '../../support/layout.ts'
 import { seed } from '../../support/seed.ts'
 import { drawn, fitSettled, nextFrame, openStage, selectLayers } from '../../support/stage.ts'
 import { expect, test } from '../../support/test.ts'
-import { barMenu, moreMenu, PIECES, UNCUT, zoomMenu } from '../../support/top-bar.ts'
+import { arrangeMenu, arrangeSubmenu, barMenu, moreMenu, PIECES, UNCUT, zoomMenu } from '../../support/top-bar.ts'
 import { topBarDesign } from '../../support/top-bar-design.ts'
 
 test.describe.configure({ timeout: 240_000 })
@@ -96,10 +96,11 @@ test('at 1280×760 the right-click menu on a layer already selected shows that i
 }) => {
   const asset = await upload(photo)
   const { page, errors } = await openStage(browser, topBarDesign(asset.id))
+  await page.setViewportSize({ width: 1280, height: 760 })
   await fitSettled(page)
   await selectLayers(page, ['headline'])
-  // The headline in the middle of the stage, where its menu, a text's being the longest, has room for
-  // less than all its rows either way.
+  // The headline in the middle of the stage, where its menu has room for less than all its rows
+  // either way.
   await page.evaluate(() => window.dazbee?.fitSelection())
   await drawn(page)
   const at = await screenPoint(page, 200, 85)
@@ -113,26 +114,26 @@ test('at 1280×760 the right-click menu on a layer already selected shows that i
 })
 
 test.describe('on a phone, 390×844', () => {
-  test('the top bar scrolls sideways with no classic scrollbar', async ({ browser }) => {
-    const asset = await upload(photo)
-    const { page, errors } = await openStage(browser, topBarDesign(asset.id))
-    await page.setViewportSize({ width: 390, height: 844 })
-    // A text's bar, the longest, is wider than the phone.
-    await selectLayers(page, ['headline'], { bar: true })
-    const row = page.getByTestId('top-bar-row')
-    expect(await row.evaluate((el) => [el.scrollWidth > el.clientWidth, getComputedStyle(el).scrollbarWidth])).toEqual([
-      true,
-      'none',
-    ])
-    expect(errors).toEqual([])
-  })
-
-  test('the full menu shows that it scrolls, with a fade at its cut edge and its bar, and every row can be reached', async ({
+  test('the top bar never scrolls sideways: a text’s bar, wider than the phone, wraps into a second card', async ({
     browser,
   }) => {
     const asset = await upload(photo)
     const { page, errors } = await openStage(browser, topBarDesign(asset.id))
     await page.setViewportSize({ width: 390, height: 844 })
+    await selectLayers(page, ['headline'], { bar: true })
+    for (const row of ['top-bar-row', 'top-bar-overflow'])
+      expect(await page.getByTestId(row).evaluate((el) => el.scrollWidth <= el.clientWidth), row).toBe(true)
+    await expect(page.getByTestId('top-bar-overflow')).toBeVisible()
+    expect(errors).toEqual([])
+  })
+
+  test('on a phone 600 px tall the full menu shows that it scrolls, with a fade at its cut edge and its bar, and every row can be reached', async ({
+    browser,
+  }) => {
+    const asset = await upload(photo)
+    const { page, errors } = await openStage(browser, topBarDesign(asset.id))
+    // Short enough that the full menu has less room than its rows.
+    await page.setViewportSize({ width: 390, height: 600 })
     await selectLayers(page, ['box'], { bar: true })
     const menu = await moreMenu(page)
     // Away from the menu, past the time an overlay bar takes to hide.
@@ -149,7 +150,7 @@ test.describe('on a phone, 390×844', () => {
     expect(errors).toEqual([])
   })
 
-  test('every menu row is at least 44 px tall, the turn field too: the full, right-click, shape and zoom menus', async ({
+  test('every menu row is at least 44 px tall: the full, right-click, top bar ⋯ with its turn field, shape and zoom menus', async ({
     browser,
   }) => {
     const asset = await upload(photo)
@@ -158,8 +159,12 @@ test.describe('on a phone, 390×844', () => {
     await fitSettled(page)
     await selectLayers(page, ['box'], { bar: true })
     const full = await moreMenu(page)
-    await expect(full.locator('[data-scrub]')).toHaveCount(1)
-    for (const height of await rowHeights(full, ':scope > button, [data-scrub]'))
+    for (const height of await rowHeights(full, ':scope > button')) expect(height).toBeGreaterThanOrEqual(44)
+    await page.keyboard.press('Escape')
+
+    const sit = await arrangeMenu(page)
+    await expect(sit.locator('[data-scrub]')).toHaveCount(1)
+    for (const height of await rowHeights(sit, ':scope > button, [data-scrub]'))
       expect(height).toBeGreaterThanOrEqual(44)
     await page.keyboard.press('Escape')
 
@@ -168,9 +173,7 @@ test.describe('on a phone, 390×844', () => {
     await page.mouse.click(at.x, at.y, { button: 'right' })
     const right = page.getByTestId('stage-menu')
     await expect(right).toBeVisible()
-    await expect(right.locator('[data-scrub]')).toHaveCount(1)
-    for (const height of await rowHeights(right, ':scope > button, [data-scrub]'))
-      expect(height).toBeGreaterThanOrEqual(44)
+    for (const height of await rowHeights(right, ':scope > button')) expect(height).toBeGreaterThanOrEqual(44)
     await page.keyboard.press('Escape')
     await expect(right).toBeHidden()
 
@@ -231,7 +234,7 @@ test.describe('on a phone, 390×844', () => {
     expect(errors).toEqual([])
   })
 
-  test("a menu beside a row of the full menu opens inside the screen: Order's every row shows whole", async ({
+  test("a menu beside a row of the top bar's ⋯ opens inside the screen: Order's every row shows whole", async ({
     browser,
   }) => {
     const asset = await upload(photo)
@@ -239,10 +242,7 @@ test.describe('on a phone, 390×844', () => {
     await page.setViewportSize({ width: 390, height: 844 })
     await fitSettled(page)
     await selectLayers(page, ['box'], { bar: true })
-    const full = await moreMenu(page)
-    await full.getByTestId('more-order').click()
-    const order = page.getByTestId('more-order-menu')
-    await expect(order).toBeVisible()
+    const order = await arrangeSubmenu(page, 'order')
     for (const row of await order.getByRole('button').all()) {
       const box = await row.boundingBox()
       expect(box && box.x >= 0 && box.x + box.width <= 390 && box.y >= 0 && box.y + box.height <= 844).toBe(true)

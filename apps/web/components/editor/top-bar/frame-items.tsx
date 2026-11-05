@@ -1,6 +1,6 @@
 'use client'
 
-// The picked frame's top bar items: Background, a swatch as a layer's Fill is, which opens the
+// The picked frame's top bar items: Background, its swatch and its name, which opens the
 // Background panel for the frame's own fills, and ⋯ with the frame's actions: Duplicate, Add size ▸,
 // which opens the Add size card, Rename, Export, which opens the Share menu's Export with this frame
 // ticked alone, and Delete, the last after a line and in the danger colour, as a page's ⋯ on the
@@ -41,11 +41,7 @@ export function useFrameItems(editor: Editor, frameId: string, design: Design): 
     {
       key: 'background',
       node: (
-        <PanelButton
-          id="background"
-          label={f.backgroundColour}
-          face={<Dot colour={opaque(swatchOf(design, frameId))} />}
-        />
+        <PanelButton id="background" label={f.background} icon={<Dot colour={opaque(swatchOf(design, frameId))} />} />
       ),
     },
     {
@@ -57,7 +53,7 @@ export function useFrameItems(editor: Editor, frameId: string, design: Design): 
           onOpen={setOpen}
           label={f.more}
           face={<DotsThreeIcon size={18} weight="bold" aria-hidden />}
-          caret={false}
+          menu
           align="end"
           buttonRef={more}
           testId="frame-more"

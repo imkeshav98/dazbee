@@ -6,7 +6,7 @@ import { writeOutput } from '../../support/editor.ts'
 import { copyIn, frameDesign, linkedFrames } from '../../support/seed.ts'
 import { openStage, press, read, selectLayers } from '../../support/stage.ts'
 import { expect, type Page, test } from '../../support/test.ts'
-import { moreSubmenu, openCard } from '../../support/top-bar.ts'
+import { arrangeSubmenu, openCard } from '../../support/top-bar.ts'
 
 test.describe.configure({ timeout: 180_000 })
 
@@ -155,17 +155,17 @@ test("a boolean's operation and a mask's type change in place, one undo step eac
   expect(errors).toEqual([])
 })
 
-test("a text's direction from ⋯ More, one undo step", async ({ browser }) => {
+test("a text's direction from the top bar's ⋯, one undo step", async ({ browser }) => {
   const { page, errors } = await openStage(browser, design())
   await selectLayers(page, ['words'])
-  const menu = await moreSubmenu(page, 'text-direction')
+  const menu = await arrangeSubmenu(page, 'text-direction')
   await expect(menu.locator('[data-direction="auto"]')).toHaveAttribute('aria-pressed', 'true')
   await menu.locator('[data-direction="rtl"]').click()
   await expect.poll(async () => (await props(page, 'words')).direction).toBe('rtl')
   await page.evaluate(() => window.dazbee?.drawn())
   writeOutput('controls-direction.png', await page.screenshot())
   await selectLayers(page, ['words'])
-  await expect((await moreSubmenu(page, 'text-direction')).locator('[data-direction="rtl"]')).toHaveAttribute(
+  await expect((await arrangeSubmenu(page, 'text-direction')).locator('[data-direction="rtl"]')).toHaveAttribute(
     'aria-pressed',
     'true',
   )

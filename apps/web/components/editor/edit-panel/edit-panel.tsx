@@ -32,6 +32,7 @@ import { format } from '@/lib/i18n/index.ts'
 import { AutoLayoutPanel } from './auto-layout-panel.tsx'
 import { ColourPanel } from './colour-panel.tsx'
 import { EffectsPanel } from './effects-panel.tsx'
+import { typingIn } from './fields.tsx'
 import { ImagePanel } from './image-panel.tsx'
 import { StrokePanel } from './outline-panel.tsx'
 import { PositionPanel } from './position-panel.tsx'
@@ -119,11 +120,13 @@ export function PanelFrame({
     watch.observe(row)
     return () => watch.disconnect()
   }, [])
-  // Esc closes the panel before it clears the selection, wherever the focus is. In a field of the
-  // panel the field still takes the key, throwing away what was typed, and the panel closes with
-  // it; the focus goes back to the item that opened it once the field has let it go. A field
-  // outside the panel, as the design's name or the bar's size, stands over it: it takes the key
-  // alone, throwing away what was typed, and the focus leaves it, so the next Esc closes the panel.
+  // Esc closes the panel before it clears the selection, wherever the focus is. A number field with
+  // something typed in it stands over the panel: it takes the key alone, throwing away what was
+  // typed and keeping the focus, so the next Esc closes the panel. In another field of the panel
+  // the field still takes the key and the panel closes with it; the focus goes back to the item
+  // that opened it once the field has let it go. A field outside the panel, as the design's name or
+  // the bar's size, stands over it: it takes the key alone, throwing away what was typed, and the
+  // focus leaves it, so the next Esc closes the panel.
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.key !== 'Escape' || event.defaultPrevented) return
@@ -132,6 +135,7 @@ export function PanelFrame({
       const at = document.activeElement
       // A list of the panel's own, a select's or a pop-up's, closes first.
       if (inPopUp(at) || at?.getAttribute('aria-expanded') === 'true') return
+      if (typingIn(at)) return
       if (
         at instanceof HTMLElement &&
         (at.tagName === 'INPUT' || at.tagName === 'TEXTAREA' || at.tagName === 'SELECT')

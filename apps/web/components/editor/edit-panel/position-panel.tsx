@@ -23,7 +23,7 @@ import { type ShortcutAction } from '@dazbee/editor'
 
 import { ALIGN, keyOf } from '@/components/editor/arrange-actions.ts'
 import { KNOB_SWITCH, KNOBS, PANEL_ACTION, PANEL_HEADING, PANEL_PART } from '@/components/editor/styles.ts'
-import type { ORDER } from '@/components/editor/top-bar/layer-actions.tsx'
+import type { ORDER } from '@/components/editor/top-bar/arrange-menu.tsx'
 import { cn } from '@/lib/cn.ts'
 import { LIMITS } from '@/lib/editor/limits.ts'
 import { sizeTo, tidy } from '@/lib/editor/size.ts'
@@ -62,10 +62,10 @@ const SPREAD = [
 export function PositionPanel({ target, design }: PanelProps) {
   const t = useMessages()
   const p = t.editor.props
-  const { inFlow } = factsOf(target, design)
+  const { inFlow, placed } = factsOf(target, design)
   return (
     <>
-      <ArrangePart target={target} placed={inFlow && target.props.every((pr) => pr.absolute !== true)} />
+      <ArrangePart target={target} placed={placed} />
       <PlaceCard target={target} p={p} title={t.editor.bar.advanced}>
         {inFlow && <FlowPart target={target} p={p} />}
       </PlaceCard>

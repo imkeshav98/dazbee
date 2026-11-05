@@ -5,7 +5,7 @@ import { choose, enter } from '../../support/fields.ts'
 import { doc, fills, props, setupInventory, solid, step, style } from '../../support/inventory.ts'
 import { perform, selectLayers } from '../../support/stage.ts'
 import { expect, type Page, test } from '../../support/test.ts'
-import { barMenu, fillList, moreAction, moreMenu, openCard } from '../../support/top-bar.ts'
+import { arrangeMenu, barMenu, fillList, moreAction, openCard } from '../../support/top-bar.ts'
 
 const row = setupInventory()
 
@@ -42,7 +42,7 @@ test.describe('every selection', () => {
     await selectLayers(page, ['box'], { bar: true })
     await step(
       page,
-      async () => enter((await moreMenu(page)).getByRole('spinbutton', { name: 'Rotation in degrees' }), '15'),
+      async () => enter((await arrangeMenu(page)).getByRole('spinbutton', { name: 'Rotation in degrees' }), '15'),
       async () => {
         await expect.poll(async () => (await props(page, 'box')).rotation).toBe(15)
       },
@@ -264,8 +264,9 @@ test.describe('every selection', () => {
     await selectLayers(page, ['box'], { bar: true })
     // Several layers group from the small menu and go in a box from the full menu.
     const small = page.getByTestId('small-menu')
-    // One layer's actions are in the full menu.
+    // One layer's actions are in the full menu, and its order in the top bar's ⋯.
     const more = (name: string) => moreAction(page, name)
+    const sit = async (name: string) => moreAction(page, name, await arrangeMenu(page))
     await step(
       page,
       async () => more('Duplicate'),
@@ -279,7 +280,7 @@ test.describe('every selection', () => {
     const at = async () => (await children(page, 'sq')).indexOf('box')
     await step(
       page,
-      async () => more('Bring to front'),
+      async () => sit('Bring to front'),
       async () => {
         await expect.poll(at).toBe(8)
       },
@@ -287,7 +288,7 @@ test.describe('every selection', () => {
     )
     await step(
       page,
-      async () => more('Send backward'),
+      async () => sit('Send backward'),
       async () => {
         await expect.poll(at).toBe(7)
       },
@@ -295,7 +296,7 @@ test.describe('every selection', () => {
     )
     await step(
       page,
-      async () => more('Send to back'),
+      async () => sit('Send to back'),
       async () => {
         await expect.poll(at).toBe(0)
       },
@@ -303,7 +304,7 @@ test.describe('every selection', () => {
     )
     await step(
       page,
-      async () => more('Bring forward'),
+      async () => sit('Bring forward'),
       async () => {
         await expect.poll(at).toBe(1)
       },
