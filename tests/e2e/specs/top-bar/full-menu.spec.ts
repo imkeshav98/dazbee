@@ -16,7 +16,7 @@ import {
 } from '../../support/menu-rows.ts'
 import { copyIn } from '../../support/seed.ts'
 import { fitSettled, selectLayers } from '../../support/stage.ts'
-import { expect, type Page, test } from '../../support/test.ts'
+import { expect, type Locator, type Page, test } from '../../support/test.ts'
 import { entered, moreAction, moreMenu, moreSubmenu, PIECES, UNCUT, underPhoneMenu } from '../../support/top-bar.ts'
 
 test.describe.configure({ mode: 'parallel', timeout: 120_000 })
@@ -361,12 +361,25 @@ test.describe('at each screen size', () => {
       expect(errors).toEqual([])
     })
 
-    test(`at ${width}×${height} Copy to other frames ▸ is as wide as the mock’s, and a greyed row’s tooltip lies beside the row, covering no row of either menu, for its first, middle and last row`, async ({
+    test(`at ${width}×${height} Copy to other frames ▸ is as wide as the mock’s, and a greyed row’s tooltip covers no row of any open menu: beside the row where the window has room at its end, else past its menu’s top or bottom, for a first, a middle and a last row`, async ({
       browser,
     }) => {
       const { page, errors } = await open(browser)
       await page.setViewportSize({ width, height })
       await fitSettled(page)
+      /** Shows a greyed row's tooltip with the pointer, checks it covers no row and is in the window, and gives its box and the row's. */
+      const tipOf = async (menu: Locator, id: string) => {
+        const row = rowIn(menu, id)
+        await expect(row, id).toHaveAttribute('aria-disabled', 'true')
+        const why = (await row.getAttribute('aria-description')) ?? ''
+        await expectGreyed(page, menu, rowName(id), why)
+        const shown = page.getByRole('tooltip').filter({ hasText: why }).locator('xpath=..')
+        await entered(shown)
+        expect(await rowsUnderTooltip(page), id).toEqual([])
+        const [box, under] = [await boxOf(shown), await boxOf(row)]
+        expect(box.left >= 0 && box.right <= width && box.top >= 0 && box.bottom <= height, id).toBe(true)
+        return { box, under }
+      }
       await selectLayers(page, ['headline'])
       const sub = await moreSubmenu(page, 'copy-to-frames')
       await entered(sub)
@@ -377,19 +390,27 @@ test.describe('at each screen size', () => {
         .locator('button kbd')
         .evaluateAll((keys) => keys.map((key) => Math.round(key.getBoundingClientRect().right)))
       expect(new Set(ends).size).toBe(1)
+      // Its rows, at the window's end with the full menu at their start: past the menu, or beside a row with room.
       for (const id of FULL_MENU_BESIDE['copy-to-frames'].map((row) => row.id)) {
-        const row = rowIn(sub, id)
-        await expect(row, id).toHaveAttribute('aria-disabled', 'true')
-        const why = (await row.getAttribute('aria-description')) ?? ''
-        await expectGreyed(page, sub, rowName(id), why)
-        const shown = page.getByRole('tooltip').filter({ hasText: why }).locator('xpath=..')
-        await entered(shown)
-        expect(await rowsUnderTooltip(page), id).toEqual([])
-        // Beside the row, level with it.
-        const [box, under] = [await boxOf(shown), await boxOf(row)]
+        const { box, under } = await tipOf(sub, id)
+        const level =
+          Math.abs((box.top + box.bottom) / 2 - (under.top + under.bottom) / 2) <= 1 &&
+          (box.left >= under.right || box.right <= under.left)
+        const past = box.bottom <= beside.top + 0.5 || box.top >= beside.bottom - 0.5
+        expect(level || past, id).toBe(true)
+      }
+      await closeMenus(page)
+      // The full menu's own rows, a middle and the last, with room at their end: beside the row, level with it.
+      await page.evaluate(() => window.dazbee?.setLocked(['badge'], true))
+      for (const [layer, id] of [
+        ['fresh-title', 'more-copy-to-frames'],
+        ['badge', 'deleteLinked'],
+      ] as const) {
+        await selectLayers(page, [layer])
+        const { box, under } = await tipOf(await moreMenu(page), id)
         expect(Math.abs((box.top + box.bottom) / 2 - (under.top + under.bottom) / 2), id).toBeLessThanOrEqual(1)
-        expect(box.left >= under.right || box.right <= under.left, id).toBe(true)
-        expect(box.left >= 0 && box.right <= width && box.top >= 0 && box.bottom <= height, id).toBe(true)
+        expect(box.left, id).toBeGreaterThanOrEqual(under.right)
+        await closeMenus(page)
       }
       expect(errors).toEqual([])
     })
