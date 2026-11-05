@@ -12,7 +12,7 @@ import { layoutProblems } from '../../support/layout.ts'
 import { frameDesign } from '../../support/seed.ts'
 import { nextFrame, openStage, read, selection, selectLayers } from '../../support/stage.ts'
 import { expect, type Page, test } from '../../support/test.ts'
-import { arrangeMenu, arrangeSubmenu, barMenu, PIECES, UNCUT } from '../../support/top-bar.ts'
+import { arrangeSubmenu, barMenu, PIECES, UNCUT } from '../../support/top-bar.ts'
 import { topBarDesign } from '../../support/top-bar-design.ts'
 
 test.describe.configure({ timeout: 240_000 })
