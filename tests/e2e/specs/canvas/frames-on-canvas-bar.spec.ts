@@ -111,6 +111,8 @@ test('Rename in ⋯ with the picked frame’s label off screen, zoomed in to 375
   await page.keyboard.press('Enter')
   await expect(menu.getByRole('button', { name: /Duplicate/ })).toBeFocused()
   await page.keyboard.press('Tab')
+  await expect(menu.getByRole('button', { name: 'Add size' })).toBeFocused()
+  await page.keyboard.press('Tab')
   await expect(menu.getByRole('button', { name: 'Rename' })).toBeFocused()
   await page.keyboard.press('Enter')
   await expect(field).toBeFocused()

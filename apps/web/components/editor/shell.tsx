@@ -489,6 +489,8 @@ export function EditorShell({
                       aria-label={label}
                       aria-pressed={on}
                       data-tool={id}
+                      // The Frame tool opens Add a frame, which gives the focus back here as it closes.
+                      data-opens={id === 'frame' ? 'addFrame' : undefined}
                       onClick={() => {
                         setTool(id)
                         onToolChange?.(id, shape)

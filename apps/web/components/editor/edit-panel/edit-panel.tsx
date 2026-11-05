@@ -77,19 +77,23 @@ export function EditPanel({ editor, brandId }: { editor: Editor; brandId: string
  * The edit panel's frame, for a layer's panels and the design's own (Pages): its title, a note and
  * an action beside it, ✕, and a body that scrolls. It floats at the stage's end side under the top
  * bar's row, only as tall as what it holds; on a phone it is a sheet at the bottom. Esc or ✕ closes
- * it, and the focus goes back to the item that opened it when closed from inside it.
+ * it, and the focus goes back to the item that opened it when closed from inside it. It takes the
+ * focus as it opens unless `focus` is false.
  */
 export function PanelFrame({
   id,
   title,
   note,
   action,
+  focus = true,
   children,
 }: {
   id: PanelId
   title: string
   note?: string
   action?: ReactNode
+  /** Whether the panel takes the focus as it opens; false leaves it where it is, as on the stage. */
+  focus?: boolean
   children: ReactNode
 }) {
   const t = useMessages()
@@ -151,10 +155,11 @@ export function PanelFrame({
     return () => window.removeEventListener('keydown', onKey, true)
   })
   // The focus moves into the panel as it opens, onto the panel itself: Tab goes on to its
-  // controls, and no field takes the focus, so a phone's keyboard stays down.
+  // controls, and no field takes the focus, so a phone's keyboard stays down. `focus` is set once,
+  // as the panel opens.
   useEffect(() => {
-    panel.current?.focus({ preventScroll: true })
-  }, [])
+    if (focus) panel.current?.focus({ preventScroll: true })
+  }, [focus])
   // On a phone the sheet's top edge is known, so what sits at the bottom start can stand above it.
   useLayoutEffect(() => {
     if (!sheet || !panel.current) {
