@@ -1,8 +1,6 @@
-// Every edit stays in the frame it is made in (#450, Editing), in Chromium with real input. A page
-// holds two linked frames, a square `sq` and a story `story` holding a copy of every layer of the
-// square: a shape, a dot, a group, a box with auto layout, a masked group and a text. Each kind of
-// edit is made in the square: the story's copies are stored exactly as they were, the square's
-// layer changed as asked, one undo puts the design back, and a second tab has the change.
+// Every edit stays in the frame it is made in, in Chromium with real input, on the canvas and by the
+// top bar and its panels; the design and the check are support/edit-in-frame.ts's. The same check
+// by shortcut, in the layers panel and for deleting a frame is edit-stays-in-frame-keys.spec.ts.
 import { added, editInSquare, propsOf, solid } from '../../support/edit-in-frame.ts'
 import { screenPoint } from '../../support/editor.ts'
 import { enter } from '../../support/fields.ts'

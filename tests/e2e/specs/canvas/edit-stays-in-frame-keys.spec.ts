@@ -1,3 +1,6 @@
+// Every edit stays in the frame it is made in, in Chromium with real input, by shortcut and in the
+// layers panel, and deleting a frame leaves the layers of every other frame; the design and the
+// check are support/edit-in-frame.ts's.
 import { added, editInSquare, inFrame, propsOf } from '../../support/edit-in-frame.ts'
 import { openLayers, row, tree } from '../../support/layers-panel.ts'
 import { copyIn } from '../../support/seed.ts'
@@ -136,14 +139,17 @@ test.describe('the layers panel', () => {
   })
 })
 
-test('deleting the square frame deletes its layers; their copies in the story stay', async ({ browser }) => {
+test('deleting the square frame deletes its layers; their copies in the story and the poster stay', async ({
+  browser,
+}) => {
   await editInSquare(
     browser,
     (a) => a.evaluate(() => void window.dazbee?.session.run('frame.delete', { frameId: 'sq' })),
     (before, after) => {
       expect(after.frames.sq).toBeUndefined()
       expect(Object.keys(inFrame(after, 'sq').layers)).toEqual([])
-      expect(Object.keys(after.nodes).sort()).toEqual(Object.keys(inFrame(before, 'story').layers).sort())
+      const others = [...Object.keys(inFrame(before, 'story').layers), ...Object.keys(inFrame(before, 'poster').layers)]
+      expect(Object.keys(after.nodes).sort()).toEqual(others.sort())
     },
   )
 })

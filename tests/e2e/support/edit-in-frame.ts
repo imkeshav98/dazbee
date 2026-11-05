@@ -1,3 +1,11 @@
+// The design and the check of the edit-stays-in-frame specs. A page holds two linked frames, a
+// square `sq` and a story `story` holding a copy of every layer of the square (a shape, a dot, a
+// group, a box with auto layout, a masked group and a text), and an unlinked poster `poster` with a
+// layer of its own. Each edit is made in the square: the story's copies and the poster are stored
+// exactly as they were, the square's layer changed as asked, one undo puts the design back, and a
+// second tab has the change.
+import type { DesignInput } from '@dazbee/schema'
+
 import { designOf, openTabs } from './editor.ts'
 import { frameDesign, layersIn, linkedFrames, seed } from './seed.ts'
 import { type Design, drawn, perform, read } from './stage.ts'
@@ -13,9 +21,12 @@ const rect = (x: number, y: number, width: number, height: number, color: string
   fills: solid(color),
 })
 
-/** The square's layers, and their linked copies in a story where the headline sits lower. */
-const design = () =>
-  linkedFrames(
+/**
+ * The square's layers, their linked copies in a story where the headline sits lower, and a poster
+ * beside them, where the frame rule puts it, holding a badge linked to nothing.
+ */
+const design = (): DesignInput => {
+  const linked = linkedFrames(
     frameDesign({
       name: 'Edit stays in its frame',
       nodes: {
@@ -109,6 +120,23 @@ const design = () =>
     }),
     [{ id: 'story', name: 'Story', width: 1080, height: 1920, values: { headline: { y: 1500 } } }],
   )
+  const poster = { pageId: 'p1', name: 'Poster', width: 600, height: 600, x: 2560, y: 0, order: 'a2' }
+  return {
+    ...linked,
+    frames: { ...linked.frames, poster: { ...poster, fills: solid('#FFF4E0FF') } },
+    nodes: {
+      ...linked.nodes,
+      badge: {
+        type: 'graphic',
+        parentId: 'poster',
+        link: 'badge',
+        index: 'a0',
+        name: 'Badge',
+        props: rect(100, 100, 400, 400, '#2A9D8FFF'),
+      },
+    },
+  }
+}
 
 /** What a frame is: the frame as stored, and every layer it holds, by id. */
 export function inFrame(d: Design, frameId: string) {
@@ -152,8 +180,8 @@ async function open(browser: Browser) {
 
 /**
  * Makes one edit in the square of the first tab and checks it stayed there: the story's frame and
- * copies are stored as they were, `check` sees the change asked for, the second tab has it, and one
- * undo puts the design back.
+ * copies, and the unlinked poster, are stored as they were, `check` sees the change asked for, the
+ * second tab has it, and one undo puts the design back.
  */
 export async function editInSquare(
   browser: Browser,
@@ -168,6 +196,7 @@ export async function editInSquare(
   const after = await read(a)
   expect(after, 'the edit changed the design').not.toEqual(before)
   expect(inFrame(after, 'story'), 'the copies in the story as they were').toEqual(inFrame(before, 'story'))
+  expect(inFrame(after, 'poster'), 'the unlinked poster as it was').toEqual(inFrame(before, 'poster'))
   check(before, after)
   expect(await read(b), 'the second tab has the change').toEqual(after)
   await perform(a, 'undo')
