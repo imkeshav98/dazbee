@@ -1,11 +1,14 @@
 'use client'
 
 // The small menu by the selection: lock, duplicate, delete and hide, which act on the selected
-// layers in their own frame and never on their linked copies, and ⋯ for the full menu. It
-// sits above the selection, below it when there is no room above, and under the top bar when there
-// is room neither side, as when the selection fills the stage. It keeps off the top bar, the edit
-// panel, the rail and its flyout, the bottom controls and the frames' labels, and hides while a gesture runs, a top bar pop-up or the right-click menu is open, or the selection is off the stage.
-// ⋯ opens the full menu beside it, clear of the rail and its flyout.
+// layers in their own frame and never on their linked copies, and ⋯ for the full menu. Delete is
+// greyed, saying why, on a layer locked against deleting. The menu sits above the selection, below
+// it when the place above is covered, as by a frame's label, and under the top bar when there is
+// room neither side, as when the selection fills the stage; only then does it move sideways, never
+// off the selection (small-menu-place). It keeps off the top bar, the edit panel, the rail and its
+// flyout, the bottom controls and the frames' labels, and hides while a gesture runs, a top bar
+// pop-up or the right-click menu is open, or the selection is off the stage. ⋯ opens the full menu
+// beside it, clear of the rail and its flyout, or under it on a phone, where it may lie over the dock.
 import {
   CopyIcon,
   DotsThreeIcon,
