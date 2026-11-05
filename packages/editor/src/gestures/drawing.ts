@@ -364,7 +364,7 @@ export function editorDrawing({
       Math.round(Math.max(g.from.y, g.to.y)) - y,
     )
     if (runQuietly(() => session.run('frame.add', { pageId: page(), name: FRAME_NAME, x, y, ...size })))
-      selection.select([], '')
+      selection.select([], null)
   }
 
   return {

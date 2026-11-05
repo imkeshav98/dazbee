@@ -44,8 +44,11 @@ export interface EditorSelection {
   pathEditing(): Readonly<PathEditing> | null
   /** The layer under the pointer, outlined while nothing is being dragged. */
   hovered(): Picked | null
-  /** Selects layers in one frame, or none; a crop or path edit stays only on that one layer there. Shows it. */
-  select(ids: string[], frameId: string): void
+  /**
+   * Selects layers in one frame, or none, with no ids or no frame; a crop or path edit stays only on
+   * that one layer there. Shows it.
+   */
+  select(ids: string[], frameId: string | null): void
   /** Sets the selection and shows nothing: a crop or path edit stays while a layer is selected, and ends with none. */
   selectKeepingModes(next: Selection | null): void
   /**
@@ -130,8 +133,8 @@ export function editorSelection({ drawn, frames, changed }: SelectionDeps): Edit
     return hovered
   }
 
-  function select(ids: string[], frameId: string) {
-    selection = ids.length > 0 ? { ids, frameId } : null
+  function select(ids: string[], frameId: string | null) {
+    selection = ids.length > 0 && frameId !== null ? { ids, frameId } : null
     if (pathEditing && (ids.length !== 1 || ids[0] !== pathEditing.id || frameId !== pathEditing.frameId))
       pathEditing = null
     if (cropping && (ids.length !== 1 || ids[0] !== cropping.id || frameId !== cropping.frameId)) cropping = null

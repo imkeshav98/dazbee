@@ -33,9 +33,10 @@ import { useLayerPictures } from './use-layer-pictures.ts'
 /** Rows rendered beyond each edge of the view, so a fast scroll never shows a gap. */
 const OVERSCAN = 8
 
-/** The frame's layers as rows, topmost first, with the children of expanded layers under them. */
-function rowsOf(design: Design, frameId: string, expanded: ReadonlySet<string>) {
+/** The frame's layers as rows, topmost first, with the children of expanded layers under them; none without a frame. */
+function rowsOf(design: Design, frameId: string | undefined, expanded: ReadonlySet<string>) {
   const rows: Row[] = []
+  if (frameId === undefined) return rows
   const walk = (parentId: string, depth: number) => {
     const children = childrenOf(design, parentId).reverse()
     for (const [position, [id, node]] of children.entries()) {
@@ -57,9 +58,9 @@ export function LayersPanel({ editor }: { editor: Editor }) {
 
   // The frame the panel shows: the selection's, else the shown page's first; none on a page with no frames.
   const shownFrames = useShownFrames(editor)
-  const wanted = selection.frame ?? shownFrames[0]?.id
-  const frameId = wanted !== undefined && Object.hasOwn(design.frames, wanted) ? wanted : ''
-  const frame = frameId ? design.frames[frameId] : undefined
+  const wanted = selection.frameId ?? shownFrames[0]?.id
+  const frameId = wanted !== undefined && Object.hasOwn(design.frames, wanted) ? wanted : undefined
+  const frame = frameId === undefined ? undefined : design.frames[frameId]
   const page = frame ? design.pages[frame.pageId] : undefined
   // The title row's note says which frame the tree is of, as in the mock: "Page 1 · Feed square".
   useFlyoutNote(frame ? [page?.name, frame.name].filter(Boolean).join(' · ') : null)

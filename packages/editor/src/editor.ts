@@ -375,7 +375,7 @@ function live(
     const frameId = live[0] === undefined ? undefined : frameIdOf(now, live[0])
     const pageId = frameId === undefined ? undefined : now.frames[frameId]?.pageId
     if (frameId === undefined || pageId === undefined) {
-      selection.select([], '')
+      selection.select([], null)
       return
     }
     if (pageId !== view.page()) showPage(pageId)

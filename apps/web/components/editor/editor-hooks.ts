@@ -22,9 +22,9 @@ export function useSelection(editor: Editor) {
 
 /** The selection and the frame it is in, kept current. */
 export function useSelectionWithFrame(editor: Editor) {
-  const [state, setState] = useState(() => ({ ids: editor.selection(), frame: editor.selectedFrame() }))
+  const [state, setState] = useState(() => ({ ids: editor.selection(), frameId: editor.selectedFrame() }))
   useEffect(() => {
-    const stop = editor.onSelection((ids) => setState({ ids, frame: editor.selectedFrame() }))
+    const stop = editor.onSelection((ids) => setState({ ids, frameId: editor.selectedFrame() }))
     return () => {
       stop()
     }

@@ -18,11 +18,11 @@ const PICTURES_SLICE = 6
  */
 export function useLayerPictures(
   editor: Editor,
-  frameId: string,
+  frameId: string | undefined,
   ids: readonly string[],
   scrolledAt: { current: number },
 ): Record<string, string | null> {
-  const [pictures, setPictures] = useState<{ frameId: string; urls: Record<string, string | null> }>({
+  const [pictures, setPictures] = useState<{ frameId: string | undefined; urls: Record<string, string | null> }>({
     frameId,
     urls: {},
   })
