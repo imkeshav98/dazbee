@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one deep module: startEditor builds every editor module in the code layout's order and returns the Editor */
 // The editor: a design's pages, each an infinite canvas with its frames where they were placed,
 // shown one page at a time (#36); click to select, drag to move, typing into text, pan and zoom.
 // It has no framework in it; the page only hands it a canvas and an overlay the size of the stage.
@@ -22,13 +23,14 @@ import { editorView, type Spot } from './canvas/view.ts'
 import { loadCanvasKit } from './canvaskit.ts'
 import type { DrawInfo, Editor, EditorOptions, Notice } from './editor-interface.ts'
 import { editorExports } from './export/exports.ts'
-import { editorAutoLayoutDrag } from './gestures/auto-layout-drag.ts'
-import { editorCropping } from './gestures/cropping.ts'
-import { editorDrawing } from './gestures/drawing.ts'
-import { editorPen } from './gestures/pen.ts'
+import { editorCropping } from './gestures/crop/cropping.ts'
+import { editorDrawing } from './gestures/drawing/drawing.ts'
+import { editorPen } from './gestures/pen/pen.ts'
 import { editorPointer } from './gestures/pointer.ts'
-import { editorSelectPress } from './gestures/select-press.ts'
-import { carried, editorTransformDrag } from './gestures/transform-drag.ts'
+import { editorAutoLayoutDrag } from './gestures/select/auto-layout-drag.ts'
+import { editorFrameMove } from './gestures/select/frame-move.ts'
+import { editorSelectPress } from './gestures/select/select-press.ts'
+import { carried, editorTransformDrag } from './gestures/select/transform-drag.ts'
 import { editorLayerEdits } from './layer-edits.ts'
 import { editorBoxes } from './layers/boxes.ts'
 import { hug as hugIn } from './layers/hug.ts'
@@ -45,6 +47,9 @@ import { editorTools, type PlacedAsset, type Tool } from './tools.ts'
 /** The popover, menu or dialog a key was pressed in, if any. */
 const dialogOf = (target: EventTarget | null) =>
   target instanceof Element ? target.closest('[role="dialog"], [role="menu"], dialog') : null
+/** Whether a key is an arrow pressed in a toolbar, such as the top bar, whose arrows move the focus along it. */
+const arrowInToolbar = (e: KeyboardEvent) =>
+  e.key.startsWith('Arrow') && e.target instanceof Element && e.target.closest('[role="toolbar"]') !== null
 export async function startEditor(options: EditorOptions) {
   const { designId, syncUrl } = options
   const status = options.onStatus ?? (() => {})
@@ -140,6 +145,8 @@ function live(
   const notify = (notice: Notice, parts: readonly Skipped[] = []) => notices.emit(notice, parts)
   /** Called after every redraw with the design it drew; the two-tab test times edits with it. */
   const draws = listenerSet<[design: Design, at: number, info: DrawInfo]>()
+  /** Told of a frame to rename in place: its label was double-clicked, or the page asked. */
+  const frameRenames = listenerSet<[frameId: string]>()
 
   // Layer 2: the state owners.
   const saving = watchSaveState({ provider, onSaveState: (state) => status(state) })
@@ -221,7 +228,17 @@ function live(
     placeBox,
   })
   const autoLayoutDrag = editorAutoLayoutDrag({ session, boxes, camera, hug, notify, outline })
-  const selectPress = editorSelectPress({ canvas, view, selection, boxes, typing, transformDrag, autoLayoutDrag })
+  const frameMove = editorFrameMove({ session })
+  const selectPress = editorSelectPress({
+    canvas,
+    view,
+    selection,
+    boxes,
+    typing,
+    transformDrag,
+    autoLayoutDrag,
+    frameMove,
+  })
   const actions = editorActions({
     session,
     view,
@@ -256,6 +273,7 @@ function live(
   // Layer 5: the routers.
   const pointer = editorPointer({
     canvas,
+    overlay: options.overlay,
     session,
     view,
     tools,
@@ -268,7 +286,9 @@ function live(
     drawing,
     transformDrag,
     autoLayoutDrag,
+    frameMove,
     selectPress,
+    renameFrame: (frameId: string) => pickFrame(frameId, true),
     signal,
     drawOverlay,
   })
@@ -366,6 +386,8 @@ function live(
       if (dialog.getAttribute('aria-modal') === 'false') pointer.keyDown(e)
       return
     }
+    // The arrows in a toolbar are its own: they never move the selection, the picked frame or the caret.
+    if (arrowInToolbar(e)) return
     if (!typing.editing()) {
       if (!pointer.keyDown(e) && action && perform(action)) e.preventDefault()
       return
@@ -392,7 +414,7 @@ function live(
   }
   /**
    * Shows a page, its frames fitted: a selection, crop, path edit, pen path or typing on another
-   * page lets go, and so does the picked page.
+   * page lets go, and so does the picked frame.
    */
   function showPage(pageId: string) {
     pen.finish()
@@ -400,8 +422,25 @@ function live(
     selection.dropOffPage()
     const editing = typing.editing()
     if (editing && !frameOf(editing.frameId)) typing.stop()
-    selection.pickPage(null)
+    selection.pickFrame(null)
     drawOverlay()
+  }
+  /**
+   * Picks a frame of the shown page, ending typing, and with `rename` asks the page to rename it in
+   * place of its label, which the overlay leaves out meanwhile; any other frame lets the picked one go.
+   */
+  function pickFrame(frameId: string | null, rename = false) {
+    const shown = frameOf(frameId ?? undefined)
+    if (shown) typing.stop()
+    if (!shown || !rename) return selection.pickFrame(shown?.id ?? null)
+    selection.renameFrame(shown.id)
+    frameRenames.emit(shown.id)
+  }
+  /** Renames a frame of the shown page in place of its label, panning first, at the same zoom, so the label shows. */
+  function renameFrame(frameId: string) {
+    const frame = frameOf(frameId)
+    if (frame) view.showLabel(frame)
+    pickFrame(frameId, true)
   }
   /** Fits a frame in view, showing its page first when another is shown. */
   function fitFrame(frameId: string) {
@@ -480,9 +519,14 @@ function live(
     styleTextSelection: (style: RunStyle) => typing.styleSelectedText(style),
     onTextSelection: textSelection.on,
     onSelection: (listener: (ids: string[]) => void) => selection.onSelection(listener),
-    pickedPage: () => selection.pickedPage(),
-    pickPage: (pageId: string | null) => selection.pickPage(pageId),
-    onPagePick: (listener: (pageId: string | null) => void) => selection.onPagePick(listener),
+    pickedFrame: () => selection.pickedFrame(),
+    pickFrame: (frameId: string | null) => pickFrame(frameId),
+    onFramePick: (listener: (frameId: string | null) => void) => selection.onFramePick(listener),
+    renameFrame,
+    onFrameRename: frameRenames.on,
+    renamed: () => selection.renameFrame(null),
+    onFrameDelete: actions.onFrameDelete,
+    labelRect: overlay.labelRect,
     rulers: () => view.rulers(),
     snapping: () => tools.snapping(),
     snapWork: () => transformDrag.snapWork(),

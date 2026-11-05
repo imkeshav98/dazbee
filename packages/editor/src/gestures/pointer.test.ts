@@ -8,7 +8,7 @@ import { design } from '../canvas/test-design.ts'
 import { editorSelection } from '../selection.ts'
 import type { Tool } from '../tools.ts'
 import { editorPointer, type PointerDeps } from './pointer.ts'
-import type { MoveDrag } from './transform-drag.ts'
+import type { MoveDrag } from './select/transform-drag.ts'
 
 const SQUARE: Frame = { id: 'one-sq', pageId: 'one', name: 'Square', x: 0, y: 0, width: 1080, height: 1080 }
 /** A scene layer of a type over the first 100 pixels of the frame each way. */
@@ -38,12 +38,29 @@ const event = (x: number, y: number, extra: Record<string, unknown> = {}) =>
 const key = (code: string, log: string[], extra: Record<string, unknown> = {}) =>
   ({ code, preventDefault: () => log.push(`prevent ${code}`), ...extra }) as unknown as KeyboardEvent
 
+/** A box in client pixels, as getBoundingClientRect gives it, 24 to 4 pixels over the square's top. */
+const labelBox = (left: number, width: number) => ({
+  left,
+  right: left + width,
+  top: -24,
+  bottom: -4,
+  width,
+  height: 20,
+})
+/** The square's label as the overlay draws it: its row across the frame, its name at 0–40 and its size at 1000–1080. */
+const LABEL = {
+  dataset: { frame: SQUARE.id },
+  getBoundingClientRect: () => labelBox(0, 1080),
+  children: [labelBox(0, 40), labelBox(1000, 80)].map((text) => ({ getBoundingClientRect: () => text })),
+}
+
 /**
  * The pointer on a canvas that keeps its listeners, over a stage where client points are design
- * pixels of the square frame at zoom 1, off every frame past 1100 across, with a real selection;
- * every behaviour logs what it is asked.
+ * pixels of the square frame at zoom 1, its label's name and size 24 to 4 pixels over its top, off
+ * every frame past 1100 across or above it, with a real selection; every behaviour logs what it is
+ * asked. With `handle`, a press anywhere is on a handle of the selection.
  */
-function harness(tool: Tool = 'select', under: SceneLayer = UNDER) {
+function harness(tool: Tool = 'select', under: SceneLayer = UNDER, handle = false) {
   const log: string[] = []
   const listeners = new Map<string, (e: Event) => void>()
   const canvas = {
@@ -56,12 +73,13 @@ function harness(tool: Tool = 'select', under: SceneLayer = UNDER) {
   const selection = editorSelection({ drawn: () => design, frames: () => [SQUARE], changed: () => {} })
   const deps: PointerDeps = {
     canvas: canvas as unknown as HTMLCanvasElement,
+    overlay: { querySelectorAll: () => [LABEL] } as unknown as ParentNode,
     session: { design: () => design },
     view: {
       camera: () => camera,
       design: () => design,
       onStage: (client) => client,
-      pointAt: (client) => (client.x > 1100 ? null : { frame: SQUARE, p: client }),
+      pointAt: (client) => (client.x > 1100 || client.y < 0 ? null : { frame: SQUARE, p: client }),
       setCamera: (next) => {
         camera = next
         log.push(`camera ${next.x} ${next.y}`)
@@ -114,13 +132,18 @@ function harness(tool: Tool = 'select', under: SceneLayer = UNDER) {
       },
     },
     transformDrag: {
-      handleUnder: () => null,
+      handleUnder: () => (handle ? { kind: 'resize', handle: 'n' } : null),
       marquee: () => {},
       drag: (_g, p, _shift, _alt, snap) => log.push(`drag ${p.x} ${p.y}${snap ? ' snapped' : ''}`),
       release: () => log.push('release move'),
       clearGuides: () => {},
     },
     autoLayoutDrag: { drag: () => {}, release: () => {} },
+    frameMove: {
+      drag: (_g, _screen, world, shift) =>
+        log.push(`move frame to ${world.x} ${world.y}${shift ? ' along one axis' : ''}`),
+      release: () => log.push('release frame move'),
+    },
     selectPress: {
       press: (_e, screen) => {
         log.push(`press ${screen.x} ${screen.y}`)
@@ -129,10 +152,15 @@ function harness(tool: Tool = 'select', under: SceneLayer = UNDER) {
         pressed = { kind: 'move', frame: SQUARE, around: [] } as unknown as MoveDrag
         return pressed
       },
+      pressLabel: (_e, screen, frameId) => {
+        log.push(`press label of ${frameId} at ${screen.x} ${screen.y}`)
+        return { kind: 'frameMove', frame: SQUARE, pressedAt: screen, from: screen, end: null }
+      },
       moved: (screen) => screen.x > 20,
       release: (marquee) => log.push(`release press${marquee ? ' marquee' : ''}`),
       cancel: () => log.push('cancel press'),
     },
+    renameFrame: (frameId) => log.push(`rename ${frameId}`),
     signal: new AbortController().signal,
     drawOverlay: () => log.push('draw overlay'),
   }
@@ -201,6 +229,59 @@ describe('editorPointer', () => {
       send('pointerup')
       expect(pointer.gesture()).toBeNull()
       expect(log).toEqual(['camera 100 50', 'frame from 1200 20', 'frame to 1400 200', 'frame drawn', 'draw overlay'])
+    })
+  })
+
+  describe("a frame's label", () => {
+    it('picks and moves the frame from a press on it, the drag in world units, until the pointer goes up', () => {
+      const { pointer, send, log } = harness()
+      send('pointerdown', event(20, -10))
+      expect(pointer.gesture()).toMatchObject({ kind: 'frameMove', frame: SQUARE })
+      send('pointermove', event(70, -20, { shiftKey: true }))
+      send('pointerup')
+      expect(pointer.gesture()).toBeNull()
+      expect(log).toEqual([
+        'press label of one-sq at 20 -10',
+        'draw overlay',
+        'move frame to 70 -20 along one axis',
+        'release frame move',
+        'release press',
+        'draw overlay',
+      ])
+    })
+
+    it('asks to rename the frame on a double click, unless panning', () => {
+      const { send, log } = harness()
+      send('dblclick', event(20, -10))
+      expect(log).toEqual(['rename one-sq'])
+      const panning = harness('hand')
+      panning.send('dblclick', event(20, -10))
+      expect(panning.log).toEqual([])
+    })
+
+    it('takes a press on its size too, and leaves one on its row beside its text to what is under it, so a marquee can start there', () => {
+      const { pointer, send, log } = harness()
+      send('pointerdown', event(1040, -10))
+      expect(pointer.gesture()).toMatchObject({ kind: 'frameMove', frame: SQUARE })
+      send('pointerup')
+      log.length = 0
+      send('pointerdown', event(600, -10))
+      send('dblclick', event(600, -10))
+      expect(log).toEqual(['press 600 -10'])
+    })
+
+    it("leaves a press on the selection's handles to the selection where the label is over them", () => {
+      const { selection, send, log } = harness('select', UNDER, true)
+      selection.select(['under'], SQUARE.id)
+      send('pointerdown', event(20, -10))
+      expect(log).toEqual(['press 20 -10', 'draw overlay'])
+    })
+
+    it('is left to the drawing tools, which draw nothing off a frame', () => {
+      const { pointer, send, log } = harness('text')
+      send('pointerdown', event(20, -10))
+      expect(pointer.gesture()).toBeNull()
+      expect(log).toEqual([])
     })
   })
 

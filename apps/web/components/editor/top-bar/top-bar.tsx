@@ -1,11 +1,11 @@
 'use client'
 
-// The top bar: fixed at the top centre of the stage while layers are selected, its items set by
-// what is selected (text, a photo, a shape, a box, a group, or several); a locked layer's bar says
-// it is locked and unlocks it. An item with ▾ opens a pop-up
-// under the bar; a panel item opens the one edit panel at the stage's end; the rest act at once.
-// When the items don't fit, the last ones go into ⋯, which opens a second row under the bar;
-// on a phone the bar scrolls sideways instead.
+// The top bar: fixed at the top centre of the stage while layers are selected or a frame is picked,
+// its items set by what is selected (text, a photo, a shape, a box, a group, or several, or the
+// picked frame's Background and ⋯); a locked layer's bar says it is locked and unlocks it. An item
+// with ▾ opens a pop-up under the bar; a panel item opens the one edit panel at the stage's end;
+// the rest act at once. When the items don't fit, the last ones go into ⋯, which opens a second row
+// under the bar; on a phone the bar scrolls sideways instead.
 import { DotsThreeIcon } from '@phosphor-icons/react'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 
@@ -23,12 +23,14 @@ import {
   useEditState,
   usePhone,
 } from '@/components/editor/edit-store.ts'
-import { useSelection } from '@/components/editor/editor-hooks.ts'
+import { usePickedFrame, useSelection } from '@/components/editor/editor-hooks.ts'
 import { BAR_BUTTON, BAR_ROW } from '@/components/editor/styles.ts'
+import { useLiveDesign } from '@/components/editor/use-live-design.ts'
 import { cn } from '@/lib/cn.ts'
 import { useMessages } from '@/lib/i18n/client.tsx'
 
 import { arrowAlong, useRovingTab } from './bar-popover.tsx'
+import { useFrameItems } from './frame-items.tsx'
 import { type BarItem, useSelectionItems } from './top-bar-items.tsx'
 
 /** Room kept between the bar and the stage's sides. */
@@ -78,16 +80,18 @@ function useFit(row: HTMLElement | null, extra: HTMLElement | null, keys: string
 
 export function TopBar({ editor, brandId }: { editor: Editor; brandId: string }) {
   const ids = useSelection(editor)
+  const picked = usePickedFrame(editor)
   const selected = useTarget(editor, ids)
-  // A pop-up or panel belongs to the selection it was opened for: another selection closes it. Pages
-  // stays open when showing another page lets the selection go. A picked page has no bar.
-  const opened = useRef(ids)
+  // A pop-up or panel belongs to the selection or the picked frame it was opened for: another one
+  // closes it. Pages stays open when showing another page lets the selection go.
+  const opened = useRef({ ids, picked })
   useLayoutEffect(() => {
-    if (opened.current === ids) return
-    opened.current = ids
+    const was = opened.current
+    if (was.ids === ids && was.picked === picked) return
+    opened.current = { ids, picked }
     const now = editState().open
-    if (ids.length > 0 || !isPanel(now) || isLayerPanel(now)) setOpen(null)
-  }, [ids])
+    if (ids.length > 0 || !isPanel(now) || isLayerPanel(now) || now === 'background') setOpen(null)
+  }, [ids, picked])
   useEffect(
     () => () => {
       setBar(false)
@@ -96,6 +100,7 @@ export function TopBar({ editor, brandId }: { editor: Editor; brandId: string })
     [],
   )
   if (selected) return <LayerBar target={selected.target} design={selected.design} brandId={brandId} />
+  if (picked) return <FrameBar editor={editor} frameId={picked} />
   return <BarGone />
 }
 
@@ -106,14 +111,31 @@ function LayerBar({ target, design, brandId }: { target: Target; design: Design;
   )
 }
 
+function FrameBar({ editor, frameId }: { editor: Editor; frameId: string }) {
+  const { design } = useLiveDesign(editor)
+  const items = useFrameItems(editor, frameId, design)
+  const label = useMessages().editor.frames.bar
+  // A frame duplicated a moment ago is picked before the design that holds it is drawn.
+  if (!design.frames[frameId]) return <BarGone />
+  return <Bar items={items} label={label} named={{ 'data-frame': frameId }} />
+}
+
 /** With nothing selected there is no bar. */
 function BarGone() {
   useLayoutEffect(() => setBar(false), [])
   return null
 }
 
-/** The bar for the selected layers, which `named` names on it. */
-function Bar({ items, label, named }: { items: BarItem[]; label: string; named: { 'data-selection': string } }) {
+/** The bar for what it acts on, which `named` names on it: the selected layers, or the picked frame. */
+function Bar({
+  items,
+  label,
+  named,
+}: {
+  items: BarItem[]
+  label: string
+  named: { 'data-selection': string } | { 'data-frame': string }
+}) {
   const t = useMessages()
   const { open, flyoutEnd } = useEditState()
   const phone = usePhone()

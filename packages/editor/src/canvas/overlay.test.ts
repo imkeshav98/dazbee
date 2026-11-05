@@ -37,11 +37,21 @@ afterEach(() => {
 })
 
 /**
- * The overlay at zoom 1 on a stage 1000 × 800 showing the square frame, with a layer selected,
- * a group gone into, a layer hovered, a drop target and a picked page; each module's parts are
- * one element named for it. Logs what the overlay tells the selection, and keeps what it drew.
+ * The overlay at zoom 1 on a stage 1000 × 800 showing the square frame 100 px down, with a layer
+ * selected (or the frame picked instead), a group gone into, a layer hovered and a drop target; each
+ * module's parts are one element named for it. Logs what the overlay tells the selection, and keeps
+ * what it drew.
  */
-function harness(state: { gesture?: Gesture | null; editing?: Picked | null; selected?: boolean; zoom?: number } = {}) {
+function harness(
+  state: {
+    gesture?: Gesture | null
+    editing?: Picked | null
+    selected?: boolean
+    picked?: boolean
+    renaming?: boolean
+    zoom?: number
+  } = {},
+) {
   const log: string[] = []
   let drawn: Fake[] = []
   const editing = state.editing ?? null
@@ -53,7 +63,7 @@ function harness(state: { gesture?: Gesture | null; editing?: Picked | null; sel
       },
     } as unknown as HTMLElement,
     view: {
-      camera: () => ({ x: 0, y: 0, zoom: state.zoom ?? 1 }),
+      camera: () => ({ x: 0, y: 100, zoom: state.zoom ?? 1 }),
       viewport: () => ({ width: 1000, height: 800 }),
       design: () => design,
       inView: () => [SQUARE],
@@ -65,14 +75,11 @@ function harness(state: { gesture?: Gesture | null; editing?: Picked | null; sel
       current: () => (state.selected === false ? null : { ids: ['a'], frameId: 'one-sq' }),
       entered: () => 'g',
       hovered: () => ({ id: 'h', frameId: 'one-sq' }),
-      pickedPage: () => 'one',
+      pickedFrame: () => (state.picked ? 'one-sq' : null),
+      renamingFrame: () => (state.renaming ? 'one-sq' : null),
       cropping: () => null,
       pathEditing: () => null,
-      dropGonePage: () => {
-        log.push('drop gone page')
-        return true
-      },
-      tellListeners: (pageGone) => log.push(`tell listeners ${pageGone}`),
+      tellListeners: () => log.push('tell listeners'),
     },
     boxes: {
       selectionBox: () =>
@@ -97,12 +104,11 @@ function harness(state: { gesture?: Gesture | null; editing?: Picked | null; sel
 
 describe('editorOverlay', () => {
   describe('draw', () => {
-    it("draws each module's parts in order, between letting the gone page go and telling the selection's listeners", () => {
+    it("draws each module's parts in order, then tells the selection's listeners", () => {
       const { overlay, log, drawn } = harness()
       overlay.draw()
       expect(drawn()).toEqual([
         'frame-label',
-        'page-picked',
         'entered',
         'hover',
         'drop-target',
@@ -114,7 +120,21 @@ describe('editorOverlay', () => {
         'guides',
         'caret',
       ])
-      expect(log).toEqual(['drop gone page', 'replace', 'tell listeners true'])
+      expect(log).toEqual(['replace', 'tell listeners'])
+    })
+
+    it('outlines the picked frame after the labels, its own label lit', () => {
+      const { overlay, drawn, part } = harness({ selected: false, picked: true })
+      overlay.draw()
+      expect(drawn().slice(0, 3)).toEqual(['frame-label', 'frame-picked', 'hover'])
+      expect(part('frame-picked')?.dataset).toEqual({ frame: 'one-sq' })
+      expect(part('frame-label')?.dataset).toEqual({ frame: 'one-sq', active: '' })
+    })
+
+    it('leaves out the label of the frame the page renames in its place, outlining the frame still', () => {
+      const { overlay, drawn } = harness({ selected: false, picked: true, renaming: true })
+      overlay.draw()
+      expect(drawn().slice(0, 2)).toEqual(['frame-picked', 'hover'])
     })
 
     it("outlines no hovered layer while a gesture runs, and shows a drawing's parts before the marquee's", () => {
@@ -122,7 +142,6 @@ describe('editorOverlay', () => {
       overlay.draw()
       expect(drawn()).toEqual([
         'frame-label',
-        'page-picked',
         'entered',
         'drop-target',
         'selection',
@@ -136,11 +155,12 @@ describe('editorOverlay', () => {
       ])
     })
 
-    it('labels each frame in view with its own name and size, by its id, lit while its layer is selected', () => {
+    it('labels each frame in view over its top with its own name and size, by its id, lit while its layer is selected', () => {
       const { overlay, part } = harness()
       overlay.draw()
       const label = part('frame-label')
       expect(label?.dataset).toEqual({ frame: 'one-sq', active: '' })
+      expect(label?.style).toEqual({ left: '8px', top: '76px', width: '1072px' })
       expect(label?.children.map((c) => `${c.className} ${c.textContent}`)).toEqual([
         'frame-name Sale',
         'frame-size 1080 × 1080',
@@ -170,14 +190,22 @@ describe('editorOverlay', () => {
 
   describe('selectionRect', () => {
     it('is the box round the selection and the size label under it, the box alone while typing, none with nothing selected', () => {
-      expect(harness().overlay.selectionRect()).toEqual({ x: 10, y: 10, width: 100, height: 128 })
+      expect(harness().overlay.selectionRect()).toEqual({ x: 10, y: 110, width: 100, height: 128 })
       expect(harness({ editing: { id: 'a', frameId: 'one-sq' } }).overlay.selectionRect()).toEqual({
         x: 10,
-        y: 10,
+        y: 110,
         width: 100,
         height: 100,
       })
       expect(harness({ selected: false }).overlay.selectionRect()).toBeNull()
+    })
+  })
+
+  describe('labelRect', () => {
+    it("is where a shown frame's label is drawn on the stage, none for a frame not shown", () => {
+      const { overlay } = harness()
+      expect(overlay.labelRect('one-sq')).toEqual({ x: 8, y: 76, width: 1072, height: 20 })
+      expect(overlay.labelRect('gone')).toBeNull()
     })
   })
 })

@@ -1,20 +1,21 @@
-// What the shortcuts and the menus do to the selection and the view: delete, group, mask, box,
-// auto layout, combine, reorder, lock and hide, align and distribute, nudge, select all, zoom and
-// the tools.
+// What the shortcuts and the menus do to the selection, the picked frame and the view: delete,
+// group, mask, box, auto layout, combine, reorder, lock and hide, align and distribute, nudge,
+// duplicate, select all, zoom and the tools.
 import { childrenOf, descendants, type Session } from '@dazbee/doc'
 import { type Design, LOCK_FLAGS, type Rect } from '@dazbee/schema'
 
 import type { Frame } from './canvas/frames.ts'
 import type { FrameScenes } from './canvas/scenes.ts'
 import type { EditorView } from './canvas/view.ts'
-import type { EditorAutoLayoutDrag } from './gestures/auto-layout-drag.ts'
-import type { EditorPen } from './gestures/pen.ts'
-import type { EditorTransformDrag } from './gestures/transform-drag.ts'
+import type { EditorPen } from './gestures/pen/pen.ts'
+import type { EditorAutoLayoutDrag } from './gestures/select/auto-layout-drag.ts'
+import type { EditorTransformDrag } from './gestures/select/transform-drag.ts'
 import { align, type Alignment, distribute, type Distribution, type Offset } from './layers/arrange.ts'
 import { inFlow } from './layers/auto-layout.ts'
 import { type EditorBoxes, visibleIn } from './layers/boxes.ts'
 import { hug as hugIn } from './layers/hug.ts'
 import { boundsOf, type Box, localTo, round } from './layers/transform.ts'
+import { listenerSet } from './listener-set.ts'
 import { runQuietly } from './run-quietly.ts'
 import { type EditorSelection, isPath } from './selection.ts'
 import { NUDGE, NUDGE_FAR, type ShortcutAction } from './shortcuts.ts'
@@ -30,6 +31,7 @@ export interface ActionsDeps {
     | 'nearestFrame'
     | 'fitAll'
     | 'fitArea'
+    | 'showArea'
     | 'zoomTo'
     | 'zoomIn'
     | 'zoomOut'
@@ -42,12 +44,12 @@ export interface ActionsDeps {
     | 'current'
     | 'entered'
     | 'lastFrameOn'
-    | 'pickedPage'
+    | 'pickedFrame'
     | 'cropping'
     | 'pathEditing'
     | 'select'
     | 'enter'
-    | 'pickPage'
+    | 'pickFrame'
     | 'crop'
     | 'editPath'
   >
@@ -72,8 +74,22 @@ export interface EditorActions {
    * open on the stage first: they do nothing here.
    */
   perform(action: ShortcutAction): boolean
-  /** Fits the selection in view, or the shown page's frames with nothing selected. */
+  /** Fits the selection in view, else the picked frame, else the shown page's frames. */
   fitSelection(): void
+  /** Calls back with a frame's name once Delete has deleted it as the picked frame, so the page can offer its undo. */
+  onFrameDelete(listener: (name: string) => void): () => boolean
+}
+
+/** How far each arrow key moves the selection or the picked frame, in design pixels along x and y; Shift goes further. */
+const NUDGES: Readonly<Partial<Record<ShortcutAction, readonly [number, number]>>> = {
+  nudgeLeft: [-NUDGE, 0],
+  nudgeRight: [NUDGE, 0],
+  nudgeUp: [0, -NUDGE],
+  nudgeDown: [0, NUDGE],
+  nudgeLeftFar: [-NUDGE_FAR, 0],
+  nudgeRightFar: [NUDGE_FAR, 0],
+  nudgeUpFar: [0, -NUDGE_FAR],
+  nudgeDownFar: [0, NUDGE_FAR],
 }
 
 export function editorActions({
@@ -85,6 +101,7 @@ export function editorActions({
     nearestFrame,
     fitAll,
     fitArea,
+    showArea,
     zoomTo,
     zoomIn,
     zoomOut,
@@ -101,10 +118,14 @@ export function editorActions({
   notify,
   drawOverlay,
 }: ActionsDeps): EditorActions {
+  /** Told of each frame Delete deleted, by its name. */
+  const frameDeletes = listenerSet<[name: string]>()
   /** Groups fit what they hold again after a change inside them, in the same undo step. */
   const hug = (ids: string[]) => hugIn(session, ids)
   function fitSelection() {
     const outer = boxes.selectionBox()
+    const picked = frameOf(selection.pickedFrame() ?? undefined)
+    if (!outer && picked) return fitArea({ x: picked.x, y: picked.y, width: picked.width, height: picked.height })
     if (!outer) return fitAll()
     const { frame, box } = outer
     const b = boundsOf([box])
@@ -200,15 +221,17 @@ export function editorActions({
     })
   }
 
-  /** The top-level layers of the selection's frame, or else of the shown page's first frame, that can be picked. */
   /**
    * Selects every top-level layer that can be picked in the selection's frame; with nothing
-   * selected, in the frame last selected in on the shown page, else the frame nearest the middle
-   * of the view.
+   * selected, in the picked frame, else the frame last selected in on the shown page, else the
+   * frame nearest the middle of the view.
    */
   function selectAll() {
     const frame =
-      frameOf(selection.current()?.frameId) ?? frameOf(selection.lastFrameOn(page()) ?? undefined) ?? nearestFrame()
+      frameOf(selection.current()?.frameId) ??
+      frameOf(selection.pickedFrame() ?? undefined) ??
+      frameOf(selection.lastFrameOn(page()) ?? undefined) ??
+      nearestFrame()
     if (!frame) return
     selection.select(
       scenes
@@ -275,17 +298,13 @@ export function editorActions({
       anytime()
       return true
     }
-    // Esc lets the picked page go; the layers' other keys do nothing to it.
-    if (action === 'deselect' && !selection.current() && selection.pickedPage()) {
-      selection.pickPage(null)
-      return true
-    }
+    const picked = selection.pickedFrame()
+    if (picked !== null && !selection.current()) return frameAction(action, picked)
     const current = selection.current()
     const frame = current && frameOf(current.frameId)
     if (!current || !frame) return false
     const ids = boxes.roots()
     const nodes = session.design().nodes
-    const far = action.endsWith('Far') ? NUDGE_FAR : NUDGE
     switch (action) {
       case 'deselect': {
         // Out of a group or box one level at a time: it gets selected, then nothing.
@@ -478,24 +497,39 @@ export function editorActions({
         runQuietly(() => session.run('node.update', { ids: current?.ids ?? [], patch: { visible: !shown } }))
         break
       }
-      case 'nudgeLeft':
-      case 'nudgeLeftFar':
-        nudge(-far, 0)
-        break
-      case 'nudgeRight':
-      case 'nudgeRightFar':
-        nudge(far, 0)
-        break
-      case 'nudgeUp':
-      case 'nudgeUpFar':
-        nudge(0, -far)
-        break
-      case 'nudgeDown':
-      case 'nudgeDownFar':
-        nudge(0, far)
-        break
-      default:
-        return false
+      default: {
+        const step = NUDGES[action]
+        if (!step) return false
+        nudge(...step)
+      }
+    }
+    drawOverlay()
+    return true
+  }
+
+  /**
+   * What a key does to the picked frame: Esc lets it go, Delete deletes it with its layers, Mod+D
+   * duplicates it and picks the copy, panning to show it at the same zoom, and the arrows move it;
+   * each is one undo step. The layers' other keys do nothing to it.
+   */
+  function frameAction(action: ShortcutAction, frameId: string): boolean {
+    const step = NUDGES[action]
+    const stored = session.design().frames[frameId]
+    if (step && stored) {
+      // Another tab may have deleted the frame a moment ago; the key then does nothing.
+      runQuietly(() => session.run('frame.update', { frameId, x: stored.x + step[0], y: stored.y + step[1] }))
+    } else if (action === 'deselect') {
+      selection.pickFrame(null)
+    } else if (action === 'delete') {
+      if (stored && runQuietly(() => session.run('frame.delete', { frameId }))) frameDeletes.emit(stored.name)
+      selection.pickFrame(null)
+    } else if (action === 'duplicate') {
+      let copy = ''
+      if (runQuietly(() => (copy = session.run('frame.duplicate', { frameId })))) selection.pickFrame(copy)
+      const made = session.design().frames[copy]
+      if (made) showArea({ x: made.x, y: made.y, width: made.width, height: made.height })
+    } else {
+      return false
     }
     drawOverlay()
     return true
@@ -504,5 +538,6 @@ export function editorActions({
   return {
     perform,
     fitSelection,
+    onFrameDelete: frameDeletes.on,
   }
 }

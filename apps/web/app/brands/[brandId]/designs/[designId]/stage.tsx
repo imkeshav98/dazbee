@@ -6,12 +6,14 @@ import { type Editor, SHAPE_MENU_TOOLS, type ShapeMenuTool, startEditor, type To
 import { isVectorAsset } from '@dazbee/schema'
 
 import { ASSET_DRAG_TYPE, draggedAsset, VECTOR_DRAG_TYPE } from '@/components/editor/asset-drag.ts'
+import { BackgroundPanel } from '@/components/editor/edit-panel/background-panel.tsx'
 import { EditPanel } from '@/components/editor/edit-panel/edit-panel.tsx'
 import { useEditState } from '@/components/editor/edit-store.ts'
 import { EmptyPageHint } from '@/components/editor/empty-page-hint.tsx'
 import { AssetLibrary } from '@/components/editor/flyouts/asset-library.tsx'
 import { BrandKitPanel } from '@/components/editor/flyouts/brand-kit-panel.tsx'
 import { LayersPanel } from '@/components/editor/flyouts/layers-panel.tsx'
+import { FrameRename } from '@/components/editor/frame-rename.tsx'
 import { ShareMenu } from '@/components/editor/menus/share-menu.tsx'
 import { ZoomControl } from '@/components/editor/menus/zoom-control.tsx'
 import { PagesButton, PagesPanel } from '@/components/editor/pages-panel.tsx'
@@ -113,6 +115,15 @@ export function EditorStage({
   }, [editor])
   const dockTool = isShapeMenuTool(tool) ? 'shape' : tool
   const dismissRemoved = useCallback(() => setRemoved(null), [])
+  // A frame Delete deleted, by its key or its ⋯ menu, says so with its undo, as a deleted page does.
+  const frameRemoved = t.editor.frames.removed
+  useEffect(() => {
+    if (!editor) return
+    const stop = editor.onFrameDelete((frameName) => setRemoved(format(frameRemoved, { name: frameName })))
+    return () => {
+      stop()
+    }
+  }, [editor, frameRemoved])
 
   // Files dropped from the computer: the images upload into the library and go where they were
   // dropped. The notice says what was left out and stays while the rest upload, then says what was
@@ -334,6 +345,7 @@ export function EditorStage({
       >
         <canvas ref={canvas} className="block size-full touch-none" data-testid="stage" />
         <div ref={overlay} className="stage-overlay pointer-events-none absolute inset-0 overflow-hidden" aria-hidden />
+        {editor && <FrameRename editor={editor} />}
         {editor && menuAt && (
           <StageMenu
             key={menuAt.n}
@@ -348,6 +360,7 @@ export function EditorStage({
       {editor && <TopBar editor={editor} brandId={brandId} />}
       {editor && <SmallMenu editor={editor} rightClick={menuAt !== null} />}
       {editor && <EditPanel editor={editor} brandId={brandId} />}
+      {editor && <BackgroundPanel editor={editor} brandId={brandId} />}
       {editor && <PagesPanel editor={editor} onRemoved={setRemoved} />}
       {editor && <EmptyPageHint editor={editor} />}
       <div

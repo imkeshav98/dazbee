@@ -166,6 +166,16 @@ describe.each(THEMES)('%s glass', (_, selector) => {
     },
   )
 
+  // A dark swatch on dark glass shows by its ring, as a white one on light glass does; a ring is a
+  // graphic, so WCAG 2.2 SC 1.4.11 (non-text contrast) asks 3:1 of it.
+  if (_ === 'dark')
+    it.each([...Object.entries(ADS), ['canvas', t.canvas ?? '']])(
+      "a swatch's ring on glass over the %s is at least 3:1",
+      (_under, hex) => {
+        expect(readsOver('swatch-ring', glassOver(hex))).toBeGreaterThanOrEqual(3)
+      },
+    )
+
   it('a glass dialog over its dimmed canvas is as light or as dark as glass over the canvas itself', () => {
     const canvas = channels(t.canvas ?? '')
     const dialog = over(tint('glass'), over(tint('glass-backdrop'), canvas))

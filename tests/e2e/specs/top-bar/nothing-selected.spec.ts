@@ -1,24 +1,13 @@
 // With nothing selected, the design's own panel and the page itself. Pages opens from by the zoom
-// pill ("Pages 1/1") and counts each page's frames. A click on the page's background picks it: a
-// dashed outline round each of its frames, their labels pink, and no top bar. A page with no frames
-// says how to add one. No cards are left, nor the phones' properties button. Nothing overlaps at the
-// three screen sizes, and the canvas never moves.
+// pill ("Pages 1/1") and counts each page's frames. A page with no frames says how to add one. No
+// cards are left, nor the phones' properties button. Nothing overlaps at the three screen sizes, and
+// the canvas never moves.
 import type { DesignInput } from '@dazbee/schema'
 
-import { designOf, editorPath, screenPoint, setCookies, writeOutput } from '../../support/editor.ts'
+import { editorPath, screenPoint, setCookies, writeOutput } from '../../support/editor.ts'
 import { EDITOR_CHROME, layoutProblems, SCREEN_SIZES } from '../../support/layout.ts'
 import { frameDesign, linkedFrames, seed } from '../../support/seed.ts'
-import {
-  click,
-  drag,
-  fitSettled,
-  nextFrame,
-  openStage,
-  perform,
-  pickPage,
-  press,
-  selection,
-} from '../../support/stage.ts'
+import { fitSettled, nextFrame, openStage, perform } from '../../support/stage.ts'
 import { expect, type Locator, type Page, test } from '../../support/test.ts'
 import { barMenu, pagesPanel } from '../../support/top-bar.ts'
 
@@ -230,60 +219,6 @@ test("in dark theme a page's tile shows its first frame's picture on white, as t
     expect(await numberContrast(tile, i + 1)).toBeGreaterThanOrEqual(4.5)
   }
   writeOutput('pages-tiles-dark.png', await page.screenshot({ animations: 'disabled' }))
-  expect(errors).toEqual([])
-})
-
-test('a click on the page picks it: a dashed outline round each frame, pink labels and no top bar; the layers keys leave it be', async ({
-  browser,
-}) => {
-  const { page, errors } = await openStage(browser, design())
-  const still = await camera(page)
-  await pickPage(page, 900, 900)
-  // Each of its frames outlined, dashed, and their labels lit.
-  await expect(page.locator('.stage-overlay .page-picked')).toHaveCount(2)
-  expect(
-    await page
-      .locator('.stage-overlay .page-picked')
-      .first()
-      .evaluate((el) => getComputedStyle(el).outlineStyle),
-  ).toBe('dashed')
-  await expect(page.locator('.stage-overlay .frame-label[data-active]')).toHaveCount(2)
-  // No layer is selected, and there is no small menu nor top bar.
-  expect(await selection(page)).toEqual([])
-  await expect(page.getByTestId('small-menu')).toHaveCount(0)
-  await expect(page.getByTestId('top-bar')).toHaveCount(0)
-  writeOutput('page-picked.png', await page.screenshot({ animations: 'disabled' }))
-
-  // The layers' keys do nothing to the page.
-  const before = await designOf(page)
-  for (const key of ['Delete', 'Control+d', 'Control+c', 'ArrowRight']) await page.keyboard.press(key)
-  expect(await designOf(page)).toBe(before)
-  await expect(page.locator('.stage-overlay .page-picked')).toHaveCount(2)
-  // Esc lets the page go.
-  await page.keyboard.press('Escape')
-  await expect(page.locator('.stage-overlay .page-picked')).toHaveCount(0)
-  await expect(page.locator('.stage-overlay .frame-label[data-active]')).toHaveCount(0)
-
-  // A click off every page lets it go too.
-  await pickPage(page, 900, 900)
-  // Under the square, where no frame is.
-  await click(page, 500, 1100)
-  await expect(page.locator('.stage-overlay .page-picked')).toHaveCount(0)
-  // A click on a layer selects it and the page goes.
-  await pickPage(page, 900, 900)
-  await click(page, 300, 100)
-  expect(await selection(page)).toEqual(['headline'])
-  await expect(page.locator('.stage-overlay .page-picked')).toHaveCount(0)
-  // A drag that starts on the page draws a marquee and selects the layers it touches; no page is picked.
-  await press(page, 'deselect')
-  await drag(page, { x: 40, y: 20 }, { x: 400, y: 200 })
-  expect(await selection(page)).toEqual(['headline'])
-  await expect(page.locator('.stage-overlay .page-picked')).toHaveCount(0)
-  // With a layer selected, a click on the page away from it picks the page and lets the layer go.
-  await pickPage(page, 900, 900)
-  expect(await selection(page)).toEqual([])
-  // Picking never moved the canvas.
-  expect(await camera(page)).toEqual(still)
   expect(errors).toEqual([])
 })
 

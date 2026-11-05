@@ -1,7 +1,8 @@
 'use client'
 
-// The hooks that follow the editor: the selection, the design, the page the canvas shows and its
-// frames, and the text being edited. Each re-renders its caller when what it follows changes.
+// The hooks that follow the editor: the selection, the picked frame, the design, the page the
+// canvas shows and its frames, and the text being edited. Each re-renders its caller when what it
+// follows changes.
 import { useEffect, useState } from 'react'
 
 import type { Editor, Frame } from '@dazbee/editor'
@@ -18,6 +19,19 @@ export function useSelection(editor: Editor) {
     }
   }, [editor])
   return ids
+}
+
+/** The frame picked as a whole, or null, kept current. */
+export function usePickedFrame(editor: Editor) {
+  const [picked, setPicked] = useState(() => editor.pickedFrame())
+  useEffect(() => {
+    setPicked(editor.pickedFrame())
+    const stop = editor.onFramePick(setPicked)
+    return () => {
+      stop()
+    }
+  }, [editor])
+  return picked
 }
 
 /** The selection and the frame it is in, kept current. */

@@ -1,9 +1,9 @@
-// What is selected, the group gone into, the picked page, a crop or path edit, and the layer under
+// What is selected, the group gone into, the picked frame, a crop or path edit, and the layer under
 // the pointer, with the rules that keep them in step and the listeners that follow them.
 import { type Design, frameIdOf } from '@dazbee/schema'
 
 import type { Frame } from './canvas/frames.ts'
-import type { AnchorRef } from './gestures/path.ts'
+import type { AnchorRef } from './gestures/pen/path.ts'
 
 /** A layer as one frame shows it: selection, dragging and typing all happen in one frame. */
 export interface Picked {
@@ -39,10 +39,12 @@ export interface EditorSelection {
   /** The frame layers were last selected in on a page, kept after the selection is let go; null with none. */
   lastFrameOn(pageId: string): string | null
   /**
-   * The page a click on a frame's background picked: its frames outlined dashed, their labels lit.
-   * No layer is selected meanwhile, so the layers' keys do nothing to it.
+   * The frame chosen as a whole, by a click on its label or its empty area: outlined, its label lit.
+   * No layer is selected meanwhile; the frame's own keys act on it.
    */
-  pickedPage(): string | null
+  pickedFrame(): string | null
+  /** The picked frame the page renames in place of its label, which the overlay then leaves out; null with none. */
+  renamingFrame(): string | null
   /** The layer whose image fill is being cropped on the stage (#48). */
   cropping(): Picked | null
   /** The path layer whose points are being edited (#45), and which of its anchors are selected. */
@@ -58,13 +60,22 @@ export interface EditorSelection {
   selectKeepingModes(next: Selection | null): void
   /**
    * Drops selected layers that are gone, and the selection once none are left or its frame is not
-   * on the shown page; with nothing selected, a crop or path edit ends.
+   * on the shown page; with nothing selected, a crop or path edit ends. The picked frame goes once
+   * it is not shown.
    */
   keep(): void
-  /** Lets the selection go when its frame is not on the shown page, with a crop, path edit and the group gone into. */
+  /**
+   * Lets the selection go when its frame is not on the shown page, with a crop, path edit and the
+   * group gone into, and the picked frame when it is not shown.
+   */
   dropOffPage(): void
-  /** Picks a page that has a frame shown, or none, letting the selection go; shows it and tells the page listeners. */
-  pickPage(pageId: string | null): void
+  /** Picks a frame, or none with null, letting the selection go, and shows it. */
+  pickFrame(frameId: string | null): void
+  /**
+   * Picks a frame for the page to rename in place of its label, and shows it; null once the rename
+   * ends. It ends too once the frame is let go or another is picked.
+   */
+  renameFrame(frameId: string | null): void
   /** Goes into a group or box, or out of every one with null. */
   enter(id: string | null): void
   /** Starts cropping a layer's image fill, or ends the crop with null. */
@@ -76,19 +87,14 @@ export interface EditorSelection {
   /** Sets the layer under the pointer; returns whether it changed. */
   hover(next: Picked | null): boolean
   /**
-   * Lets the picked page go once a layer is selected or the page's frames are no longer shown (the
-   * page deleted, another page shown); returns whether it did. The overlay calls it as it starts to draw.
-   */
-  dropGonePage(): boolean
-  /**
    * Tells the selection listeners when the selection differs from the one they last heard of,
-   * then the page listeners when the page went. The overlay calls it once drawn.
+   * then the frame listeners when the picked frame does. The overlay calls it once drawn.
    */
-  tellListeners(pageGone: boolean): void
+  tellListeners(): void
   /** Told when the selection changes, so panels can follow it. */
   onSelection(listener: (ids: string[]) => void): () => boolean
-  /** Told when the picked page changes. */
-  onPagePick(listener: (pageId: string | null) => void): () => boolean
+  /** Told when the picked frame changes, with null once it goes. */
+  onFramePick(listener: (frameId: string | null) => void): () => boolean
   destroy(): void
 }
 
@@ -100,8 +106,12 @@ export const isPath = (from: Design, id: string) => {
 export function editorSelection({ drawn, frames, changed }: SelectionDeps): EditorSelection {
   /** The selected layers, or null. */
   let selection: Selection | null = null
-  /** The page a click on its background picked; a layer selected, Esc, or a click or drag elsewhere lets it go. */
-  let pickedPage: string | null = null
+  /** The frame picked as a whole; a layer selected, Esc, or a click on empty canvas lets it go. */
+  let pickedFrame: string | null = null
+  /** The frame the page renames in place of its label, while it stays picked. */
+  let renaming: string | null = null
+  /** The picked frame the frame listeners last heard of. */
+  let lastPicked: string | null = null
   /** The group or box double-clicked into. */
   let entered: string | null = null
   /** The frame layers were last selected in, by page. */
@@ -116,8 +126,8 @@ export function editorSelection({ drawn, frames, changed }: SelectionDeps): Edit
   let cropping: Picked | null = null
   /** Told when the selection changes. */
   const selectionListeners = new Set<(ids: string[]) => void>()
-  /** Told when the picked page changes. */
-  const pageListeners = new Set<(pageId: string | null) => void>()
+  /** Told when the picked frame changes. */
+  const frameListeners = new Set<(frameId: string | null) => void>()
 
   const frameOf = (id: string | undefined) => frames().find((f) => f.id === id)
 
@@ -131,7 +141,10 @@ export function editorSelection({ drawn, frames, changed }: SelectionDeps): Edit
     return lastFrames.get(pageId) ?? null
   }
   function picked() {
-    return pickedPage
+    return pickedFrame
+  }
+  function renamingFrame() {
+    return renaming !== null && renaming === pickedFrame ? renaming : null
   }
   function croppingLayer() {
     return cropping
@@ -145,6 +158,7 @@ export function editorSelection({ drawn, frames, changed }: SelectionDeps): Edit
 
   function select(ids: string[], frameId: string | null) {
     selection = ids.length > 0 && frameId !== null ? { ids, frameId } : null
+    if (selection) pickedFrame = null
     rememberFrame()
     // Layers selected in another frame leave the group gone into: Esc never goes back to it.
     if (entered && frameId !== null && frameIdOf(drawn(), entered) !== frameId) entered = null
@@ -161,6 +175,7 @@ export function editorSelection({ drawn, frames, changed }: SelectionDeps): Edit
   }
   function selectKeepingModes(next: Selection | null) {
     selection = next
+    if (selection) pickedFrame = null
     rememberFrame()
     endModesWhenNone()
   }
@@ -170,6 +185,7 @@ export function editorSelection({ drawn, frames, changed }: SelectionDeps): Edit
     if (frame) lastFrames.set(frame.pageId, frame.id)
   }
   function keep() {
+    if (pickedFrame !== null && !frameOf(pickedFrame)) pickedFrame = null
     if (!selection) return endModesWhenNone()
     const design = drawn()
     const ids = selection.ids.filter((id) => design.nodes[id])
@@ -180,21 +196,28 @@ export function editorSelection({ drawn, frames, changed }: SelectionDeps): Edit
   }
   function dropOffPage() {
     if (selection && !frameOf(selection.frameId)) selection = null
+    if (pickedFrame !== null && !frameOf(pickedFrame)) pickedFrame = null
     if (entered && !frameOf(frameIdOf(drawn(), entered))) entered = null
     endModesWhenNone()
   }
-  function pickPage(pageId: string | null) {
-    const design = drawn()
-    const next = pageId && design.pages[pageId] && frames().some((f) => f.pageId === pageId) ? pageId : null
-    if (next === pickedPage) return
-    pickedPage = next
-    // Picking the page lets the selection go, with a crop or path edit on it and any group gone into.
-    if (next && selection) {
+  function pickFrame(frameId: string | null) {
+    if (frameId === pickedFrame) return
+    pickedFrame = frameId
+    renaming = null
+    // Picking a frame lets the selection go, with a crop or path edit on it and any group gone into.
+    if (frameId !== null && selection) {
       entered = null
       select([], selection.frameId)
+      return
     }
     changed()
-    for (const listener of pageListeners) listener(pickedPage)
+  }
+  function renameFrame(frameId: string | null) {
+    const was = pickedFrame
+    if (frameId !== null) pickFrame(frameId)
+    renaming = frameId
+    // Picking another frame showed it already.
+    if (pickedFrame === was) changed()
   }
   function enter(id: string | null) {
     entered = id
@@ -214,33 +237,28 @@ export function editorSelection({ drawn, frames, changed }: SelectionDeps): Edit
     return moved
   }
 
-  function dropGonePage() {
-    const design = drawn()
-    const pageGone =
-      pickedPage !== null &&
-      (selection !== null || !design.pages[pickedPage] || !frames().some((f) => f.pageId === pickedPage))
-    if (pageGone) pickedPage = null
-    return pageGone
-  }
-  function tellListeners(pageGone: boolean) {
+  function tellListeners() {
     const now = selection ? `${selection.frameId}|${selection.ids.join(',')}` : ''
     if (now !== lastSelection) {
       lastSelection = now
       for (const listener of selectionListeners) listener(selection?.ids ?? [])
     }
-    if (pageGone) for (const listener of pageListeners) listener(null)
+    if (pickedFrame !== lastPicked) {
+      lastPicked = pickedFrame
+      for (const listener of frameListeners) listener(pickedFrame)
+    }
   }
   function onSelection(listener: (ids: string[]) => void) {
     selectionListeners.add(listener)
     return () => selectionListeners.delete(listener)
   }
-  function onPagePick(listener: (pageId: string | null) => void) {
-    pageListeners.add(listener)
-    return () => pageListeners.delete(listener)
+  function onFramePick(listener: (frameId: string | null) => void) {
+    frameListeners.add(listener)
+    return () => frameListeners.delete(listener)
   }
 
   function destroy() {
-    pageListeners.clear()
+    frameListeners.clear()
     selectionListeners.clear()
   }
 
@@ -248,7 +266,8 @@ export function editorSelection({ drawn, frames, changed }: SelectionDeps): Edit
     current,
     entered: enteredGroup,
     lastFrameOn,
-    pickedPage: picked,
+    pickedFrame: picked,
+    renamingFrame,
     cropping: croppingLayer,
     pathEditing: editingPath,
     hovered: hoveredLayer,
@@ -256,16 +275,16 @@ export function editorSelection({ drawn, frames, changed }: SelectionDeps): Edit
     selectKeepingModes,
     keep,
     dropOffPage,
-    pickPage,
+    pickFrame,
+    renameFrame,
     enter,
     crop,
     editPath,
     pickAnchors,
     hover,
-    dropGonePage,
     tellListeners,
     onSelection,
-    onPagePick,
+    onFramePick,
     destroy,
   }
 }

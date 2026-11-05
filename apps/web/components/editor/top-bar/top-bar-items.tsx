@@ -431,7 +431,17 @@ export function useSelectionItems(target: Target, design: Design, brandId: strin
 }
 
 /** A bar item that opens one of the edit panels, or closes it when it is open. */
-function PanelButton({ id, label, icon, face }: { id: PanelId; label: string; icon?: ReactNode; face?: ReactNode }) {
+export function PanelButton({
+  id,
+  label,
+  icon,
+  face,
+}: {
+  id: PanelId
+  label: string
+  icon?: ReactNode
+  face?: ReactNode
+}) {
   const { open } = useEditState()
   return (
     <button
@@ -452,13 +462,15 @@ function PanelButton({ id, label, icon, face }: { id: PanelId; label: string; ic
   )
 }
 
-/** A swatch on a bar button: the colour, or a rainbow where the layers have different ones. */
-function Dot({ colour }: { colour: string | null | 'mixed' }) {
+/** A swatch on a bar button: the colour, a rainbow where the layers have different ones, or empty for none. */
+export function Dot({ colour }: { colour: string | null | 'mixed' | 'none' }) {
   return (
     <span
       aria-hidden
-      className="size-4 rounded-full border border-line-strong"
-      style={{ background: colour === 'mixed' || colour === null ? MIXED_COLOUR : colour }}
+      className="size-4 rounded-full border border-swatch-ring"
+      style={{
+        background: colour === 'none' ? 'transparent' : colour === 'mixed' || colour === null ? MIXED_COLOUR : colour,
+      }}
     />
   )
 }

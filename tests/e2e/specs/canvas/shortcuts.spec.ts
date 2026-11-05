@@ -33,7 +33,9 @@ const design = (): DesignInput =>
     },
   })
 
-test('? and the keyboard button list every shortcut, F, I and Mod+Alt+G among them', async ({ browser }) => {
+test('? and the keyboard button list every shortcut, F, I and Mod+Alt+G among them, and no key held for a drag', async ({
+  browser,
+}) => {
   const { page, errors } = await openStage(browser, design())
   const list = page.getByTestId('shortcuts')
   await expect(list).toBeHidden()
@@ -47,6 +49,9 @@ test('? and the keyboard button list every shortcut, F, I and Mod+Alt+G among th
   await expect(list.locator('[data-shortcut="toolImage"]')).toContainText('I')
   await expect(list.locator('[data-shortcut="boxSelection"]')).toContainText('G')
   await expect(list.locator('[data-shortcut="boxSelection"]')).toContainText('Put in a box')
+  // A drag on a frame's empty area draws a marquee with no key held, so the list names no drag.
+  await expect(list.locator('dt')).toHaveCount(SHORTCUTS.length)
+  await expect(list).not.toContainText('Select by dragging over a frame')
   writeOutput('shortcuts.png', await page.screenshot())
   await page.keyboard.press('Escape')
   await expect(list).toBeHidden()

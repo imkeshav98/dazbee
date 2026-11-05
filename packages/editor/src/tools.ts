@@ -1,5 +1,5 @@
 // The tool a drag on the stage uses, the image the image tool places, and snapping.
-import type { ShapeMenuTool } from './gestures/draw-tools.ts'
+import type { ShapeMenuTool } from './gestures/drawing/draw-tools.ts'
 
 /**
  * What a drag on the stage does: select and move, pan with the hand, draw a shape (#44), a path

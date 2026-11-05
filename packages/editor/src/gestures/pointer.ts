@@ -1,11 +1,13 @@
 // The pointer on the stage: presses, drags, double-clicks and the wheel, each routed to the
-// behaviour that owns its gesture, with panning, the hover outline and the cursor.
+// behaviour that owns its gesture, with panning, the hover outline and the cursor. A press on a
+// frame label's text grabs the frame, after the selection's handles, and a double click there asks
+// to rename it.
 import type { Session } from '@dazbee/doc'
 import { isContainer, type Point } from '@dazbee/schema'
 
 import { type Camera, toWorld } from '../canvas/camera.ts'
 import { resizeCursor, ROTATE_CURSOR } from '../canvas/cursors.ts'
-import type { Frame } from '../canvas/frames.ts'
+import { type Frame, labelTextAt } from '../canvas/frames.ts'
 import { hitTest } from '../canvas/hit-test.ts'
 import type { FrameScenes } from '../canvas/scenes.ts'
 import type { EditorView } from '../canvas/view.ts'
@@ -16,9 +18,8 @@ import { inField } from '../shortcuts.ts'
 import { paragraphAt, wordAt } from '../text/text-edit.ts'
 import type { EditorTyping } from '../text/typing.ts'
 import type { EditorTools } from '../tools.ts'
-import type { EditorAutoLayoutDrag, ReorderDrag } from './auto-layout-drag.ts'
-import type { CropDrag, EditorCropping } from './cropping.ts'
-import { isDrawTool } from './draw-tools.ts'
+import type { CropDrag, EditorCropping } from './crop/cropping.ts'
+import { isDrawTool } from './drawing/draw-tools.ts'
 import {
   type EditorDrawing,
   type FrameDrag,
@@ -26,9 +27,11 @@ import {
   isDrawing,
   type ShapeDrag,
   type TextBoxDrag,
-} from './drawing.ts'
-import type { EditorPen, PathDrag } from './pen.ts'
-import type { EditorSelectPress } from './select-press.ts'
+} from './drawing/drawing.ts'
+import type { EditorPen, PathDrag } from './pen/pen.ts'
+import type { EditorAutoLayoutDrag, ReorderDrag } from './select/auto-layout-drag.ts'
+import type { EditorFrameMove, FrameMoveDrag } from './select/frame-move.ts'
+import type { EditorSelectPress } from './select/select-press.ts'
 import {
   carried,
   type EditorTransformDrag,
@@ -36,7 +39,7 @@ import {
   type MoveDrag,
   type ResizeDrag,
   type RotateDrag,
-} from './transform-drag.ts'
+} from './select/transform-drag.ts'
 
 /** What a drag on the stage is doing, from pointer down to up. */
 export type Gesture =
@@ -51,10 +54,13 @@ export type Gesture =
   | CropDrag
   | ShapeDrag
   | FrameDrag
+  | FrameMoveDrag
   | PathDrag
 
 export interface PointerDeps {
   canvas: HTMLCanvasElement
+  /** The overlay over the stage, whose frame labels a press may be on. */
+  overlay: ParentNode
   session: Pick<Session, 'design'>
   view: Pick<EditorView, 'camera' | 'design' | 'onStage' | 'pointAt' | 'redraw' | 'setCamera' | 'viewport' | 'zoomTo'>
   tools: Pick<EditorTools, 'tool' | 'imageToPlace' | 'snapping'>
@@ -70,8 +76,11 @@ export interface PointerDeps {
   drawing: Pick<EditorDrawing, 'pressShape' | 'pressImage' | 'pressText' | 'pressFrame' | 'drag' | 'release'>
   transformDrag: Pick<EditorTransformDrag, 'handleUnder' | 'marquee' | 'drag' | 'release' | 'clearGuides'>
   autoLayoutDrag: Pick<EditorAutoLayoutDrag, 'drag' | 'release'>
+  frameMove: Pick<EditorFrameMove, 'drag' | 'release'>
   /** What the select tool's press picks, and what it selects once it ends as a click. */
   selectPress: EditorSelectPress
+  /** Asks the page to rename a frame in place, after a double click on its label. */
+  renameFrame: (frameId: string) => void
   /** Removes the pointer's listeners once it aborts. */
   signal: AbortSignal
   /** Draws the overlay. */
@@ -132,6 +141,7 @@ const CONTROL_ROLES = new Set([
 
 export function editorPointer({
   canvas,
+  overlay,
   session,
   view,
   tools,
@@ -144,7 +154,9 @@ export function editorPointer({
   drawing,
   transformDrag,
   autoLayoutDrag,
+  frameMove,
   selectPress,
+  renameFrame,
   signal,
   drawOverlay,
 }: PointerDeps): EditorPointer {
@@ -177,6 +189,8 @@ export function editorPointer({
     return pointAt({ x: e.clientX, y: e.clientY })
   }
   const panning = () => tools.tool() === 'hand' || spaceHeld
+  /** The frame whose label's name or size is under the pointer, as last drawn. */
+  const labelUnder = (e: MouseEvent) => labelTextAt(overlay, { x: e.clientX, y: e.clientY })
   /** Where the pointer last was over the stage, in client coordinates, or null. */
   const pointerAt = () => (pointer ? { x: pointer.clientX, y: pointer.clientY } : null)
 
@@ -232,6 +246,7 @@ export function editorPointer({
       return
     }
     if (gesture?.kind === 'reorder') autoLayoutDrag.release(gesture)
+    else if (gesture?.kind === 'frameMove') frameMove.release(gesture)
     else if (gesture?.kind === 'path') pen.releasePoints(gesture)
     else if (gesture?.kind === 'crop') cropping.release(gesture)
     else if (gesture && gesture.kind !== 'marquee') transformDrag.release(gesture)
@@ -341,6 +356,15 @@ export function editorPointer({
           return
         }
       }
+      // A frame label's text, drawn over the canvas, takes the press before what is under it, once
+      // the selection's handles and turning zones have let it go.
+      const label = selection.current() && transformDrag.handleUnder(screen) ? undefined : labelUnder(e)
+      const grabbed = label && selectPress.pressLabel(e, screen, label)
+      if (grabbed) {
+        gesture = grabbed
+        drawOverlay()
+        return
+      }
       const deepest = at && hitTest(scenes.scene(at.frame).layers, at.p, boxes.pickable)
       const editing = typing.editing()
       if (at && editing && deepest?.id === editing.id && editing.frameId === at.frame.id) {
@@ -403,6 +427,10 @@ export function editorPointer({
         drawing.drag(gesture, world, e.shiftKey, e.altKey)
         return
       }
+      if (gesture.kind === 'frameMove') {
+        frameMove.drag(gesture, screen, world, e.shiftKey)
+        return
+      }
       if (!selectPress.moved(screen)) return
       const p = localTo({ x: world.x - gesture.frame.x, y: world.y - gesture.frame.y }, gesture.around)
       if (gesture.kind === 'textSelect') {
@@ -457,6 +485,11 @@ export function editorPointer({
     'dblclick',
     (e) => {
       if (panning()) return
+      const label = labelUnder(e)
+      if (label && tools.tool() === 'select') {
+        renameFrame(label)
+        return
+      }
       const at = pointIn(e)
       const hit = at && hitTest(scenes.scene(at.frame).layers, at.p, boxes.pickable)
       if (!at || !hit || lockedAt(at.frame, at.p)) return

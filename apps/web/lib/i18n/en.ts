@@ -767,6 +767,18 @@ export const en = {
       /** A frame of a size of your own. */
       name: 'Frame',
       emptyPage: 'Pick the Frame tool to add a frame',
+      /** The picked frame's top bar, its ⋯ menu, its Background panel and the field that renames it on its label. */
+      bar: 'Frame',
+      background: 'Background',
+      backgroundColour: 'Background colour',
+      more: 'Frame actions',
+      rename: 'Rename',
+      nameOf: 'Name of {name}',
+      fills: 'Background colours',
+      fill: 'background colour',
+      fillName: 'Colour {n}',
+      addFill: 'Add a colour',
+      removed: '{name} deleted',
     },
     statusText: {
       Starting: 'Starting',

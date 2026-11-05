@@ -158,7 +158,8 @@ test("click, shift-click and marquee select; select all and a marquee leave lock
   await press(page, 'deselect')
   expect(await selection(page)).toEqual([])
 
-  // A marquee from empty canvas picks every top-level layer it touches: the box, the dot and the group.
+  // A marquee from the frame's empty area picks every top-level layer it touches: the box, the dot
+  // and the group.
   await drag(page, { x: 20, y: 30 }, { x: 760, y: 700 })
   expect((await selection(page)).sort()).toEqual(['arabic', 'box', 'dot', 'headline'])
   writeOutput('selection-1-marquee.png', await page.screenshot())

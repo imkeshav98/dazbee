@@ -3,10 +3,10 @@ import { describe, expect, it } from 'vitest'
 import { childrenOf } from '@dazbee/doc'
 import type { DesignInput } from '@dazbee/schema'
 
-import { type Frame, pageFrames } from '../canvas/frames.ts'
-import { hug } from '../layers/hug.ts'
-import { sessionOf, testBoxes } from '../layers/test-boxes.ts'
-import { editorSelection } from '../selection.ts'
+import { type Frame, pageFrames } from '../../canvas/frames.ts'
+import { hug } from '../../layers/hug.ts'
+import { sessionOf, testBoxes } from '../../layers/test-boxes.ts'
+import { editorSelection } from '../../selection.ts'
 import { type AutoLayoutDragDeps, editorAutoLayoutDrag } from './auto-layout-drag.ts'
 
 const square = (parentId: string, index: string) => ({

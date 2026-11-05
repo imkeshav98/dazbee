@@ -29,22 +29,36 @@ async function narrowUntilSecondRow(page: Page) {
   throw new Error('the bar fits in one row at every tablet width')
 }
 
-test('Tab reaches the top bar once and the arrows move along it; a panel takes the focus, Esc gives it back, and a second Esc clears the selection', async ({
+test('Tab reaches the top bar once and the arrows move along it, never the layer; a panel takes the focus, Esc gives it back, and a second Esc clears the selection', async ({
   browser,
 }) => {
   const asset = await upload(photo)
   const { page, errors } = await openStage(browser, topBarDesign(asset.id))
   await selectLayers(page, ['box'])
+  const before = (await read(page)).nodes.box?.props
   const bar = page.getByTestId('top-bar')
   await expect(bar.locator('[data-bar-item][tabindex="0"]')).toHaveCount(1)
   const items = bar.locator('[data-bar-item]')
   await items.first().focus()
   await page.keyboard.press('ArrowRight')
   await expect(items.nth(1)).toBeFocused()
+  await page.keyboard.press('Shift+ArrowRight')
+  await expect(items.nth(2)).toBeFocused()
+  await page.keyboard.press('ArrowLeft')
+  await expect(items.nth(1)).toBeFocused()
+  // Up and down keep the focus where it is in the bar.
+  for (const key of ['ArrowUp', 'ArrowDown', 'Shift+ArrowUp', 'Shift+ArrowDown']) {
+    await page.keyboard.press(key)
+    await expect(items.nth(1)).toBeFocused()
+  }
   await page.keyboard.press('End')
   await expect(items.last()).toBeFocused()
   await page.keyboard.press('Home')
   await expect(items.first()).toBeFocused()
+  // None of the arrows moved the layer.
+  await nextFrame(page)
+  expect((await read(page)).nodes.box?.props).toEqual(before)
+  expect(await page.evaluate(() => window.dazbee?.canUndo())).toBe(false)
 
   await page.getByTestId('bar-effects').click()
   const panel = page.locator('#edit-panel')

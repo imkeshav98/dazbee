@@ -3,13 +3,13 @@
 import { childrenOf, type Session } from '@dazbee/doc'
 import { canHold, type Design, type Point } from '@dazbee/schema'
 
-import type { Camera } from '../canvas/camera.ts'
-import type { Frame } from '../canvas/frames.ts'
-import { type AutoLayoutOf, flowSiblings, inFlow, propIn, rowIn } from '../layers/auto-layout.ts'
-import type { EditorBoxes } from '../layers/boxes.ts'
-import { type Box, drawnFrom, localTo, pageFrom, undrawn } from '../layers/transform.ts'
-import { runQuietly } from '../run-quietly.ts'
-import { CLICK_SLOP } from './press.ts'
+import type { Camera } from '../../canvas/camera.ts'
+import type { Frame } from '../../canvas/frames.ts'
+import { type AutoLayoutOf, flowSiblings, inFlow, propIn, rowIn } from '../../layers/auto-layout.ts'
+import type { EditorBoxes } from '../../layers/boxes.ts'
+import { type Box, drawnFrom, localTo, pageFrom, undrawn } from '../../layers/transform.ts'
+import { runQuietly } from '../../run-quietly.ts'
+import { CLICK_SLOP } from '../press.ts'
 
 /** A drag of layers in a flow, from the press until it ends: where they would go in it, or out of it. One undo step. */
 export interface ReorderDrag {

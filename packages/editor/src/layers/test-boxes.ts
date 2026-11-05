@@ -6,7 +6,7 @@ import { type MeasureText, render, type Resources } from '@dazbee/renderer'
 import { type DesignInput, parseDesign } from '@dazbee/schema'
 
 import type { Frame } from '../canvas/frames.ts'
-import type { Size } from '../gestures/crop.ts'
+import type { Size } from '../gestures/crop/crop.ts'
 import type { EditorSelection } from '../selection.ts'
 import { editorBoxes } from './boxes.ts'
 

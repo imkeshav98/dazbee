@@ -13,7 +13,7 @@ import { TOAST } from './styles.ts'
 
 const TOAST_MS = 8000
 
-/** After a page is removed: says so, with undo, for a few seconds. */
+/** After a page or a frame is deleted: says so, with undo, for a few seconds. */
 export function UndoToast({ editor, message, onDone }: { editor: Editor; message: string; onDone: () => void }) {
   const t = useMessages()
   // It stays while the pointer or focus is on it, so the undo can't vanish from under a click.

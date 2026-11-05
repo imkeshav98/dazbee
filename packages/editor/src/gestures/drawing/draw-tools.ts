@@ -2,7 +2,7 @@
 // free of the editor so the geometry can be tested on its own. Points are a frame's design pixels.
 import type { Paint, Point, Rect } from '@dazbee/schema'
 
-import { normalAngle, round } from '../layers/transform.ts'
+import { normalAngle, round } from '../../layers/transform.ts'
 
 /** A layer as node.create takes it. */
 export interface NewLayer {

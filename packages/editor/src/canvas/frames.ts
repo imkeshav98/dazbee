@@ -1,6 +1,9 @@
 // The frames of a page as the canvas shows them: each stored frame where it was placed, by
-// its frame id, in world units.
+// its frame id, in world units; where each frame's label sits over it on the stage, and which
+// label's text a point is on.
 import { type Design, framesOf, type Point, type Rect } from '@dazbee/schema'
+
+import { type Camera, toScreen } from './camera.ts'
 
 /** A frame as the canvas shows it: the stored frame, by its id, in world units (design pixels at 100%) on its page. */
 export interface Frame {
@@ -13,6 +16,12 @@ export interface Frame {
   width: number
   height: number
 }
+
+/** A frame label's height on screen, and the room between it and its frame's top. */
+const LABEL_HEIGHT = 20
+const LABEL_GAP = 4
+/** How far a label stays from the stage's start edge when its frame runs past it. */
+const LABEL_INSET = 8
 
 /** The canvas frame of a stored frame, or undefined for an id the design lacks. */
 export function frameIn(design: Design, frameId: string): Frame | undefined {
@@ -50,6 +59,38 @@ export function frameNearest(frames: readonly Frame[], p: Point): Frame | undefi
     if (away < best) [nearest, best] = [f, away]
   }
   return nearest
+}
+
+/**
+ * Where a frame's label sits on the stage, in screen pixels: a row over the frame's top, as wide as
+ * the frame shows, starting along the part still on the stage when the frame runs past its start
+ * edge. Null for a frame off the stage at its start.
+ */
+export function labelBox(frame: Frame, camera: Camera): Rect | null {
+  const at = toScreen(camera, frame)
+  const x = Math.max(at.x, LABEL_INSET)
+  const width = at.x + frame.width * camera.zoom - x
+  if (width <= 0) return null
+  return { x, y: at.y - LABEL_GAP - LABEL_HEIGHT, width, height: LABEL_HEIGHT }
+}
+
+/**
+ * The frame whose label's text, its name or its size where that shows, is under a client point, as
+ * the overlay last drew the labels: the last drawn of those there. The rest of a label's row leaves
+ * a press to what is under it.
+ */
+export function labelTextAt(overlay: ParentNode, client: Point): string | undefined {
+  let found: string | undefined
+  for (const label of overlay.querySelectorAll<HTMLElement>('.frame-label')) {
+    const row = label.getBoundingClientRect()
+    if (client.y < row.top || client.y > row.bottom) continue
+    for (const text of label.children) {
+      const box = text.getBoundingClientRect()
+      // A size with no room beside the name wraps onto the label's hidden second line.
+      if (box.top < row.bottom && client.x >= box.left && client.x <= box.right) found = label.dataset.frame
+    }
+  }
+  return found
 }
 
 function canvasFrame(id: string, stored: Design['frames'][string]): Frame {

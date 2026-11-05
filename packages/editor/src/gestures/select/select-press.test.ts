@@ -3,10 +3,11 @@ import { describe, expect, it } from 'vitest'
 import { render } from '@dazbee/renderer'
 import type { DesignInput, Point } from '@dazbee/schema'
 
-import type { Frame } from '../canvas/frames.ts'
-import { hitTest } from '../canvas/hit-test.ts'
-import { measure, sessionOf, testBoxes } from '../layers/test-boxes.ts'
-import { editorSelection } from '../selection.ts'
+import type { Frame } from '../../canvas/frames.ts'
+import { hitTest } from '../../canvas/hit-test.ts'
+import { measure, sessionOf, testBoxes } from '../../layers/test-boxes.ts'
+import { editorSelection } from '../../selection.ts'
+import { editorFrameMove } from './frame-move.ts'
 import { editorSelectPress, type SelectPressDeps } from './select-press.ts'
 import type { MarqueeDrag, MoveDrag, ResizeDrag } from './transform-drag.ts'
 
@@ -70,6 +71,7 @@ function harness(handle: ResizeDrag['handle'] | null = null) {
       },
     },
     autoLayoutDrag: { press: () => null },
+    frameMove: editorFrameMove({ session }),
   }
   const select = editorSelectPress(deps)
   /** A press at a point, with Shift held when asked, on the layer a press there finds. */
@@ -77,7 +79,10 @@ function harness(handle: ResizeDrag['handle'] | null = null) {
     const deepest = hitTest(render(session.design(), 'sq', undefined, measure).layers, p, boxes.pickable)
     return select.press({ pointerId: 1, shiftKey } as PointerEvent, p, { frame: SQUARE, p }, deepest)
   }
-  return { select, selection, press, log }
+  /** A press off every frame, on empty canvas. */
+  const pressOff = (p: Point, shiftKey = false) =>
+    select.press({ pointerId: 1, shiftKey } as PointerEvent, p, null, null)
+  return { select, selection, press, pressOff, log }
 }
 
 describe('editorSelectPress', () => {
@@ -98,9 +103,10 @@ describe('editorSelectPress', () => {
       expect(selection.current()?.ids).toEqual(['box'])
     })
 
-    it('starts a marquee on nothing, letting the selection go', () => {
+    it("starts a marquee on a frame's empty area, letting the selection and the group gone into go", () => {
       const { selection, press, log } = harness()
-      selection.select(['box'], SQUARE.id)
+      selection.enter('card')
+      selection.select(['dot'], SQUARE.id)
       expect(press({ x: 900, y: 900 })).toEqual({
         kind: 'marquee',
         from: { x: 900, y: 900 },
@@ -109,7 +115,41 @@ describe('editorSelectPress', () => {
         baseFrame: null,
       })
       expect(selection.current()).toBeNull()
+      expect(selection.entered()).toBeNull()
       expect(log).toEqual(['stop typing', 'capture'])
+    })
+
+    it("starts a marquee on a picked frame's empty area, leaving the frame where it is", () => {
+      const { selection, press } = harness()
+      selection.pickFrame('sq')
+      expect(press({ x: 900, y: 900 })).toMatchObject({ kind: 'marquee', base: [] })
+    })
+
+    it('starts a marquee off every frame, letting the selection and the picked frame go', () => {
+      const { selection, pressOff, log } = harness()
+      selection.select(['box'], SQUARE.id)
+      expect(pressOff({ x: 1200, y: 900 })).toEqual({
+        kind: 'marquee',
+        from: { x: 1200, y: 900 },
+        to: { x: 1200, y: 900 },
+        base: [],
+        baseFrame: null,
+      })
+      expect(selection.current()).toBeNull()
+      expect(log).toEqual(['stop typing', 'capture'])
+    })
+
+    it("starts a marquee on a frame's empty area with Shift, adding to the selection", () => {
+      const { selection, press } = harness()
+      selection.select(['box'], SQUARE.id)
+      expect(press({ x: 900, y: 900 }, true)).toMatchObject({ kind: 'marquee', base: ['box'], baseFrame: 'sq' })
+      expect(selection.pickedFrame()).toBeNull()
+    })
+
+    it('starts a marquee on a locked layer, which a click then selects', () => {
+      const { selection, press } = harness()
+      expect(press({ x: 605, y: 705 })).toMatchObject({ kind: 'marquee' })
+      expect(selection.pickedFrame()).toBeNull()
     })
 
     it('grabs a handle of the selection under the press', () => {
@@ -117,6 +157,32 @@ describe('editorSelectPress', () => {
       selection.select(['box'], SQUARE.id)
       expect(press({ x: 700, y: 200 })).toEqual({ kind: 'resize' })
       expect(log).toEqual(['stop typing', 'press handle resize'])
+    })
+  })
+
+  describe('pressLabel', () => {
+    it('picks the frame, ending typing and letting the selection and the group gone into go, and starts moving it', () => {
+      const { select, selection, log } = harness()
+      selection.enter('card')
+      selection.select(['dot'], SQUARE.id)
+      expect(select.pressLabel({ pointerId: 1 } as PointerEvent, { x: 40, y: -10 }, 'sq')).toMatchObject({
+        kind: 'frameMove',
+        frame: SQUARE,
+        pressedAt: { x: 40, y: -10 },
+        from: { x: 40, y: -10 },
+      })
+      expect(selection.current()).toBeNull()
+      expect(selection.entered()).toBeNull()
+      expect(selection.pickedFrame()).toBe('sq')
+      expect(log).toEqual(['stop typing', 'capture'])
+    })
+
+    it('does nothing for a frame the shown page lacks', () => {
+      const { select, selection, log } = harness()
+      selection.select(['box'], SQUARE.id)
+      expect(select.pressLabel({ pointerId: 1 } as PointerEvent, { x: 40, y: -10 }, 'gone')).toBeNull()
+      expect(selection.current()?.ids).toEqual(['box'])
+      expect(log).toEqual([])
     })
   })
 
@@ -145,21 +211,43 @@ describe('editorSelectPress', () => {
       expect(selection.current()?.ids).toEqual(['card', 'box'])
     })
 
-    it('picks the page under a marquee that stayed a click, and the locked layer it was pressed on', () => {
+    it('picks the frame a click on its empty area was pressed on, picked or not, and lets it go after a marquee dragged from there', () => {
       const { select, selection, press } = harness()
       select.release(press({ x: 900, y: 900 }) as MarqueeDrag)
-      expect(selection.pickedPage()).toBe('p1')
+      expect(selection.pickedFrame()).toBe('sq')
+      select.release(press({ x: 900, y: 900 }) as MarqueeDrag)
+      expect(selection.pickedFrame()).toBe('sq')
+      const marquee = press({ x: 900, y: 900 }) as MarqueeDrag
+      marquee.to = { x: 1000, y: 1000 }
+      select.release(marquee)
+      expect(selection.pickedFrame()).toBeNull()
+    })
+
+    it('selects the locked layer a marquee that stayed a click was pressed on', () => {
+      const { select, selection, press } = harness()
       select.release(press({ x: 605, y: 705 }) as MarqueeDrag)
       expect(selection.current()).toEqual({ ids: ['pin'], frameId: 'sq' })
     })
 
-    it('lets the page go after a marquee that was dragged', () => {
-      const { select, selection, press } = harness()
-      selection.pickPage('p1')
-      const marquee = press({ x: 900, y: 900 }) as MarqueeDrag
-      marquee.to = { x: 1000, y: 1000 }
+    it('lets the picked frame go after a marquee off every frame, a click or a drag', () => {
+      const { select, selection, pressOff } = harness()
+      selection.pickFrame('sq')
+      select.release(pressOff({ x: 1200, y: 900 }) as MarqueeDrag)
+      expect(selection.pickedFrame()).toBeNull()
+      selection.pickFrame('sq')
+      const marquee = pressOff({ x: 1200, y: 900 }) as MarqueeDrag
+      marquee.to = { x: 900, y: 900 }
       select.release(marquee)
-      expect(selection.pickedPage()).toBeNull()
+      expect(selection.pickedFrame()).toBeNull()
+    })
+
+    it('picks the frame under a click in the selection box on no layer', () => {
+      const { select, selection, press } = harness()
+      selection.select(['card', 'box'], SQUARE.id)
+      press({ x: 550, y: 150 })
+      select.release(null)
+      expect(selection.current()).toBeNull()
+      expect(selection.pickedFrame()).toBe('sq')
     })
   })
 
