@@ -1,8 +1,8 @@
 // Export (#55) in Chromium, through the Export menu: every frame of a page as PNG downloads as one
 // flat zip, every file in it byte for byte what Node exports of the same frame, drawn in the export
-// worker rather than on the main thread, and named after its frame or by the File names field;
-// each page of a carousel, picked in the Page field, downloads its own frame; and one frame as JPG
-// downloads as itself. Ticking frames and numbered names are in export-frames.spec.ts.
+// worker rather than on the main thread, and named after its frame or by the File names field. A
+// carousel's pages are in export-pages.spec.ts; ticking frames and numbered names in
+// export-frames.spec.ts.
 import { readFileSync } from 'node:fs'
 
 import { readZip } from '@dazbee/export'
