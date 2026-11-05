@@ -5,6 +5,7 @@ import type { DesignInput } from '@dazbee/schema'
 
 import { type ActionsDeps, editorActions } from './actions.ts'
 import { type Frame, pageFrames } from './canvas/frames.ts'
+import { editorFrameActions } from './frame-actions.ts'
 import { editorAutoLayoutDrag } from './gestures/select/auto-layout-drag.ts'
 import { editorTransformDrag } from './gestures/select/transform-drag.ts'
 import { hug } from './layers/hug.ts'
@@ -82,6 +83,17 @@ function harness(penDrawing = false) {
       throw new Error('nothing is drawn in these tests')
     },
   })
+  const frameActions = editorFrameActions({
+    session,
+    view: {
+      page: () => 'p1',
+      showArea: (area) => log.push(`showArea ${JSON.stringify(area)}`),
+    },
+    tools: { setTool: (tool) => log.push(`tool ${tool}`) },
+    frameName: (width, height) => `Size ${width}×${height}`,
+    selection,
+    drawOverlay: () => log.push('overlay'),
+  })
   const deps: ActionsDeps = {
     session,
     view: {
@@ -92,7 +104,6 @@ function harness(penDrawing = false) {
       nearestFrame: () => wide,
       fitAll: () => log.push('fitAll'),
       fitArea: (area) => log.push(`fitArea ${JSON.stringify(area)}`),
-      showArea: (area) => log.push(`showArea ${JSON.stringify(area)}`),
       zoomTo: (zoom) => log.push(`zoomTo ${zoom}`),
       zoomIn: () => log.push('zoomIn'),
       zoomOut: () => log.push('zoomOut'),
@@ -100,7 +111,6 @@ function harness(penDrawing = false) {
       viewChanged: () => log.push('viewChanged'),
     },
     tools: { setTool: (tool) => log.push(`tool ${tool}`) },
-    frameName: (width, height) => `Size ${width}×${height}`,
     selection,
     scenes,
     boxes,
@@ -111,6 +121,7 @@ function harness(penDrawing = false) {
     },
     transformDrag,
     autoLayoutDrag,
+    frameActions,
     notify: (notice) => log.push(notice),
     drawOverlay: () => log.push('overlay'),
   }
@@ -120,7 +131,7 @@ function harness(penDrawing = false) {
     const p = session.design().nodes[id]?.props as { x: number; y: number }
     return { x: p.x, y: p.y }
   }
-  return { actions, session, selection, frame, wide, log, at }
+  return { actions, frameActions, session, selection, frame, wide, log, at }
 }
 
 describe('editorActions', () => {
@@ -270,8 +281,8 @@ describe('editorActions', () => {
     })
 
     it('lets the picked frame go with Esc, and deletes it with Delete, its layers too and their linked copies left, as one undo step the page hears of', () => {
-      const { actions, session, selection, frame, log } = harness()
-      actions.onFrameDelete((name) => log.push(`deleted ${name}`))
+      const { actions, frameActions, session, selection, frame, log } = harness()
+      frameActions.onFrameDelete((name) => log.push(`deleted ${name}`))
       selection.pickFrame(frame.id)
       expect(actions.perform('deselect')).toBe(true)
       expect(selection.pickedFrame()).toBeNull()
@@ -365,9 +376,9 @@ describe('editorActions', () => {
 
   describe('addFrame', () => {
     it('adds an empty white frame of a size to the shown page, named from its size, past its rightmost frame, picks it and shows it at the same zoom, the select tool back, as one undo step', () => {
-      const { actions, session, selection, log } = harness()
+      const { frameActions, session, selection, log } = harness()
       const layers = Object.keys(session.design().nodes).length
-      const id = actions.addFrame({ width: 300, height: 250 }) ?? ''
+      const id = frameActions.addFrame({ width: 300, height: 250 }) ?? ''
       // 200 px past the wide frame, which ends at 2480, its top lined up with the wide frame's.
       expect(session.design().frames[id]).toMatchObject({
         pageId: 'p1',
@@ -393,9 +404,9 @@ describe('editorActions', () => {
     })
 
     it('adds a size of a frame, under its name, holding linked copies of its layers laid out to fit, and picks it, as one undo step', () => {
-      const { actions, session, selection, frame, log } = harness()
+      const { frameActions, session, selection, frame, log } = harness()
       selection.pickFrame(frame.id)
-      const id = actions.addFrame({ width: 540, height: 1080 }, frame.id) ?? ''
+      const id = frameActions.addFrame({ width: 540, height: 1080 }, frame.id) ?? ''
       expect(session.design().frames[id]).toMatchObject({
         pageId: 'p1',
         name: 'Square',
@@ -420,7 +431,7 @@ describe('editorActions', () => {
     })
 
     it('adds nothing for a size past the limits or from a frame gone, leaving the tool and the picked frame be', () => {
-      const { actions, session, selection, wide, log } = harness()
+      const { frameActions, session, selection, wide, log } = harness()
       selection.pickFrame(wide.id)
       for (const size of [
         { width: 49, height: 600 },
@@ -428,8 +439,8 @@ describe('editorActions', () => {
         { width: 50, height: 601 },
         { width: 300.5, height: 250 },
       ])
-        expect(actions.addFrame(size)).toBeNull()
-      expect(actions.addFrame({ width: 300, height: 250 }, 'gone')).toBeNull()
+        expect(frameActions.addFrame(size)).toBeNull()
+      expect(frameActions.addFrame({ width: 300, height: 250 }, 'gone')).toBeNull()
       expect(Object.keys(session.design().frames).sort()).toEqual(['sq', 'wide'])
       expect(selection.pickedFrame()).toBe(wide.id)
       expect(log).toEqual([])
@@ -437,12 +448,12 @@ describe('editorActions', () => {
     })
 
     it('adds a frame at the limits: 50 px on its short side, 8000 on its long one, and 12 times as long as wide', () => {
-      const { actions, session } = harness()
+      const { frameActions, session } = harness()
       for (const size of [
         { width: 50, height: 600 },
         { width: 8000, height: 667 },
       ]) {
-        const id = actions.addFrame(size) ?? ''
+        const id = frameActions.addFrame(size) ?? ''
         expect(session.design().frames[id]).toMatchObject(size)
       }
     })
