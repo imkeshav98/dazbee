@@ -6,6 +6,10 @@
 set -euo pipefail
 cd "$(git rev-parse --show-toplevel)"
 
+# Commits made in the session carry the owner's name and GitHub address, not the machine's own.
+git config user.name "Keshav"
+git config user.email "97694772+imkeshav98@users.noreply.github.com"
+
 # The cloud machine has Docker installed with its daemon stopped.
 if ! docker info >/dev/null 2>&1; then
   (dockerd >/tmp/dockerd.log 2>&1 &)
