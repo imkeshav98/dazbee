@@ -1,6 +1,6 @@
 'use client'
 
-// The layers panel (#59): the shown page's frames as top-level rows, each opening to its layers,
+// The layers panel: the shown page's frames as top-level rows, each opening to its layers,
 // topmost first, in step with the stage: a selection opens its frame and groups and scrolls to its
 // row, a picked frame opens, and a click on a frame's row picks it. Drag a layer's row to reorder it
 // or drop it into a group of its frame; rename frames and layers, lock and hide layers; expand frames

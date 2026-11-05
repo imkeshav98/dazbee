@@ -1,11 +1,11 @@
-// The layers panel lists the page's frames (#458), in Chromium with the real mouse and keyboard: the
+// The layers panel lists the page's frames, in Chromium with the real mouse and keyboard: the
 // frames as top-level rows with their sizes, a click on one picking and opening it, a selection on
 // the canvas opening its frame and the groups it is in and showing its row, "only here" on a layer
 // none of its frame's linked frames holds; a frame renamed from its row in one undo step, which a
 // second tab sees; hide and lock on a row acting on that layer alone, never its linked copy; a layer
 // dragged onto its own frame's row going to the top and onto another frame's going nowhere; the
-// keyboard through frames and layers; and the panel at the three screen sizes, with the PR's
-// pictures in both themes.
+// keyboard through frames and layers; and the panel at the three screen sizes, with screenshots in
+// both themes.
 import type { DesignInput } from '@dazbee/schema'
 
 import { editorPath, openTabs, screenPoint, setCookies, writeOutput } from '../../support/editor.ts'
