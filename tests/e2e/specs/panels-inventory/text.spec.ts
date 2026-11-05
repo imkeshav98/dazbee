@@ -9,7 +9,7 @@ import { importGoogleFonts } from '../../support/fonts.ts'
 import { doc, props, setupInventory, step, style } from '../../support/inventory.ts'
 import { perform, selectLayers } from '../../support/stage.ts'
 import { expect, type Page, test } from '../../support/test.ts'
-import { barMenu, moreAction, openCard, textColourHex } from '../../support/top-bar.ts'
+import { barMenu, moreAction, openCard, textColourHex, textStyleToggle } from '../../support/top-bar.ts'
 
 const row = setupInventory()
 
@@ -365,18 +365,17 @@ test.describe('text', () => {
   row(22, 'underline, strikethrough', async (open) => {
     const page = await open()
     await selectLayers(page, ['headline'], { bar: true })
-    const toggle = async (name: string) =>
-      page.getByTestId('top-bar').getByRole('button', { name, exact: true }).click()
+    const toggle = async (id: 'underline' | 'strikethrough') => (await textStyleToggle(page, id)).click()
     await step(
       page,
-      async () => toggle('Underline'),
+      async () => toggle('underline'),
       async () => {
         await expect.poll(async () => (await style(page, 'headline')).underline).toBe(true)
       },
     )
     await step(
       page,
-      async () => toggle('Strikethrough'),
+      async () => toggle('strikethrough'),
       async () => {
         await expect.poll(async () => (await style(page, 'headline')).strikethrough).toBe(true)
       },
