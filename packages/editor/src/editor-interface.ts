@@ -30,7 +30,7 @@ export interface EditorOptions extends ResourceSources {
   onStatus?: (status: string) => void
   /** Called with the zoom (1 is 100%) whenever it changes. */
   onZoom?: (zoom: number) => void
-  /** The name a frame drawn with the Frame tool takes, from its size, in the app's words. */
+  /** The name a frame added from a size, or drawn with the Frame tool, takes from its size, in the app's words. */
   frameName: (width: number, height: number) => string
   /** Aborting it while the editor is still connecting stops it, freeing what it made. */
   signal?: AbortSignal
@@ -166,6 +166,14 @@ export interface Editor {
   renamed(): void
   /** Calls back with a frame's name once Delete, by its key or `perform('delete')`, deleted it as the picked frame. */
   onFrameDelete(listener: (name: string) => void): () => boolean
+  /**
+   * Adds an empty white frame of a size to the shown page, named after the size; or, given `from`,
+   * Add size: a frame of that size holding linked copies of `from`'s layers laid out to fit, under
+   * its name. The frame goes where the frame rule puts it, as one undo step, and is picked and shown
+   * at the same zoom; the select tool comes back. Returns its id, or null with nothing changed for a
+   * size past the limits or a frame gone.
+   */
+  addFrame(size: { width: number; height: number }, from?: string): string | null
   /**
    * Where a frame's label is drawn on the stage, in pixels from the stage's top start corner; null
    * for a frame the shown page lacks, or one off the stage at its start.

@@ -1,6 +1,6 @@
 // What the shortcuts and the menus do to the selection, the picked frame and the view: delete,
 // group, mask, box, auto layout, combine, reorder, lock and hide, align and distribute, nudge,
-// duplicate, select all, zoom and the tools.
+// duplicate, select all, zoom and the tools; and adding a frame of a size, or a size of a frame.
 import { childrenOf, descendants, type Session } from '@dazbee/doc'
 import { type Design, LOCK_FLAGS, type Rect } from '@dazbee/schema'
 
@@ -39,6 +39,8 @@ export interface ActionsDeps {
     | 'viewChanged'
   >
   tools: Pick<EditorTools, 'setTool'>
+  /** The name a frame added from a size takes, in the app's words. */
+  frameName: (width: number, height: number) => string
   selection: Pick<
     EditorSelection,
     | 'current'
@@ -76,6 +78,14 @@ export interface EditorActions {
   perform(action: ShortcutAction): boolean
   /** Fits the selection in view, else the picked frame, else the shown page's frames. */
   fitSelection(): void
+  /**
+   * Adds an empty frame of a size to the shown page, named after the size; or, from a frame, a
+   * frame of that size on its page holding linked copies of its layers laid out to fit, under its
+   * name (Add size). Either goes where the frame rule puts it, as one undo step; it is picked and
+   * shown at the same zoom, and the select tool comes back. Null, with nothing changed, for a size
+   * past the limits or a frame gone.
+   */
+  addFrame(size: { width: number; height: number }, from?: string): string | null
   /** Calls back with a frame's name once Delete has deleted it as the picked frame, so the page can offer its undo. */
   onFrameDelete(listener: (name: string) => void): () => boolean
 }
@@ -109,6 +119,7 @@ export function editorActions({
     viewChanged,
   },
   tools,
+  frameName,
   selection,
   scenes,
   boxes,
@@ -535,9 +546,26 @@ export function editorActions({
     return true
   }
 
+  function addFrame({ width, height }: { width: number; height: number }, from?: string) {
+    let id = ''
+    const added = runQuietly(() => {
+      id = from
+        ? session.run('frame.addSize', { frameId: from, width, height })
+        : session.run('frame.add', { pageId: page(), name: frameName(width, height), width, height })
+    })
+    const made = session.design().frames[id]
+    if (!added || !made) return null
+    tools.setTool('select')
+    selection.pickFrame(id)
+    showArea({ x: made.x, y: made.y, width, height })
+    drawOverlay()
+    return id
+  }
+
   return {
     perform,
     fitSelection,
+    addFrame,
     onFrameDelete: frameDeletes.on,
   }
 }
