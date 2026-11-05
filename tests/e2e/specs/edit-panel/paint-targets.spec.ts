@@ -87,6 +87,12 @@ const IMAGE_PICKER_TARGETS: SwatchControl = {
 const TOUCH_SCREEN = { touch: true, mobile: true }
 
 /**
+ * What a touch screen off a phone holds to a finger's size: the fill tabs, the hex field and
+ * Replace. The icon buttons are 44 px on a phone alone.
+ */
+const TOUCH_SCREEN_TARGETS = KEPT_ON_DESKTOP.filter(({ control }) => control !== 'Remove this stop')
+
+/**
  * Switches the paint editor of a panel's + to a kind of fill, an image by picking `assetId`, and
  * gives the editor; `onPicker` is given the image picker before the image is picked.
  */
@@ -151,7 +157,7 @@ test('on a phone every target of the paint editor in the Colour and Background p
   expect(errors).toEqual([])
 })
 
-test('at 820×1180 on a touch screen the paint editor in the Colour and Background panels has its tabs, hex field and buttons, and Add image, 44 px tall, the tabs 8 px apart, each whole in the editor', async ({
+test('at 820×1180 on a touch screen the paint editor in the Colour and Background panels has its tabs, hex field, Replace and Add image 44 px tall, the tabs 8 px apart, each whole in the editor, and each fill row’s hex whole', async ({
   browser,
 }) => {
   const brandId = await newBrand('e2e tablet paint targets')
@@ -176,7 +182,7 @@ test('at 820×1180 on a touch screen the paint editor in the Colour and Backgrou
         await tabs.evaluate((well) => well.scrollWidth - well.clientWidth),
         `${name}, its paint editor on ${kind}, the fill tabs: past their well`,
       ).toBeLessThanOrEqual(0)
-      for (const { control, selector, ...kept } of KEPT_ON_DESKTOP) {
+      for (const { control, selector, ...kept } of TOUCH_SCREEN_TARGETS) {
         if ((await editor.locator(selector).count()) === 0) continue
         measured.add(control)
         const what = `${name}, its paint editor on ${kind}, ${control}`
@@ -189,10 +195,16 @@ test('at 820×1180 on a touch screen the paint editor in the Colour and Backgrou
         }
       }
     }
+    // Each fill row shows its whole hex beside its buttons.
+    for (const hex of await panel.locator('[data-row] input[name="colour-hex"]').all())
+      expect(
+        await hex.evaluate((input) => input.scrollWidth - input.clientWidth),
+        `${name}, a fill row's hex: cut short`,
+      ).toBeLessThanOrEqual(0)
     await page.keyboard.press('Escape')
     await expect(page.locator('#edit-panel')).toHaveCount(0)
   }
-  expect([...measured].sort()).toEqual(KEPT_ON_DESKTOP.map(({ control }) => control).sort())
+  expect([...measured].sort()).toEqual(TOUCH_SCREEN_TARGETS.map(({ control }) => control).sort())
   expect(errors).toEqual([])
 })
 
