@@ -69,16 +69,20 @@ test('the picked frame’s ⋯ menu opens on Duplicate from the keyboard, and up
   await page.keyboard.press('ArrowRight')
   await page.keyboard.press('Enter')
   const menu = page.getByTestId('bar-frame-more-menu')
-  const rows = ['duplicate', 'rename', 'delete'].map((action) => menu.locator(`[data-action="${action}"]`))
+  const rows = ['duplicate', 'add-size', 'rename', 'export', 'delete'].map((action) =>
+    menu.locator(`[data-action="${action}"]`),
+  )
   await expect(rows[0] as Locator).toBeFocused()
   for (const [key, row] of [
     ['ArrowDown', 1],
     ['ArrowDown', 2],
+    ['ArrowDown', 3],
+    ['ArrowDown', 4],
     ['ArrowDown', 0],
-    ['ArrowUp', 2],
+    ['ArrowUp', 4],
     ['Home', 0],
-    ['End', 2],
-    ['ArrowUp', 1],
+    ['End', 4],
+    ['ArrowUp', 3],
   ] as const) {
     await page.keyboard.press(key)
     await expect(rows[row] as Locator, key).toBeFocused()
