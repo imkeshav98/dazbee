@@ -1,7 +1,7 @@
 // The rows of the top bar's ⋯ for the selected layers: how they sit, each row only where it applies.
 import { describe, expect, it } from 'vitest'
 
-import { topBarMoreRows } from './top-bar-more.ts'
+import { topBarMoreRows } from './arrange-menu.ts'
 
 const one = (type: string) => ({
   types: [type],

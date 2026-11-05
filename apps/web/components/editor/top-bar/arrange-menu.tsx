@@ -15,7 +15,7 @@ import { factsOf, set, shared, type Target } from '@/components/editor/edit-pane
 import { setOpen, useEditState } from '@/components/editor/edit-store.ts'
 import { ICON_BUTTON, MENU_DIVIDER, MENU_ITEM, MENU_KEY } from '@/components/editor/styles.ts'
 import { cn } from '@/lib/cn.ts'
-import { topBarMoreRows } from '@/lib/editor/top-bar-more.ts'
+import { topBarMoreRows } from '@/lib/editor/arrange-menu.ts'
 import { useMessages } from '@/lib/i18n/client.tsx'
 import { format } from '@/lib/i18n/index.ts'
 
