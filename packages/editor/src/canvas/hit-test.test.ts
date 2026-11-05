@@ -146,6 +146,23 @@ describe('hitTest', () => {
     expect(idAt(layers, 25, 100)).toBe('under')
   })
 
+  it("picks a stroke where it shows over a photo's clear part, inside the outline too", () => {
+    const framed = (align: string) => [
+      rect('under', 0, 0, 200, 100),
+      shape(
+        'framed',
+        { kind: 'rect' },
+        { x: 0, y: 0, width: 200, height: 100, strokes: [{ paint: RED, width: 10, align }] },
+        [{ type: 'image', assetId: 'half' }],
+      ),
+    ]
+    // The photo's right half is clear: its inside stroke covers 190–200 there, a centred one 195–200.
+    expect(idAt(framed('inside'), 195, 50)).toBe('framed')
+    expect(idAt(framed('inside'), 180, 50)).toBe('under')
+    expect(idAt(framed('center'), 198, 50)).toBe('framed')
+    expect(idAt(framed('center'), 190, 50)).toBe('under')
+  })
+
   it('picks a path inside its outline and near its stroke, and a thin path near it', () => {
     // A triangle drawn as an open stroke: picked inside it and along its edges, not in its box's empty corner.
     const vee = layer('vee', 'graphic', {
@@ -300,6 +317,13 @@ describe('hitTest', () => {
     expect(idAt(clipping, 6, 6)).toBe('under')
   })
 
+  it("picks a clipping box's outside stroke, which its clip doesn't cut", () => {
+    const stroked = boxLayer('f', true, [], { strokes: [{ paint: RED, width: 10, align: 'outside' }] })
+    const layers = [rect('under', 0, 0, 300, 300), stroked]
+    expect(idAt(layers, 205, 100)).toBe('f')
+    expect(idAt(layers, 220, 100)).toBe('under')
+  })
+
   it('picks an ellipse inside a box only inside its outline, and the box around it', () => {
     const box = boxLayer('f', false, [shape('dot', { kind: 'ellipse' }, { x: 0, y: 0, width: 200, height: 200 })])
     expect(idAt([box], 100, 100)).toBe('dot')
@@ -405,6 +429,15 @@ describe('lineBoxes', () => {
     expect(short?.x).toBeCloseTo(0, 0)
     expect(short?.width).toBeLessThan(long?.width ?? 0)
     expect(long?.y).toBeGreaterThanOrEqual((short?.y ?? 0) + (short?.height ?? 0) - 1)
+  })
+
+  it("puts a list's bullet where it is drawn: before a left-to-right line, after a right-to-left one", () => {
+    const [bullet, line] = linesOf('One', { list: 'bullet' })
+    expect(bullet?.x).toBeCloseTo(0, 0)
+    expect((bullet?.x ?? 0) + (bullet?.width ?? 0)).toBeLessThan(line?.x ?? 0)
+    const [after, rtl] = linesOf('One', { list: 'bullet', direction: 'rtl' })
+    expect((after?.x ?? 0) + (after?.width ?? 0)).toBeCloseTo(600, 0)
+    expect(after?.x).toBeGreaterThan((rtl?.x ?? 0) + (rtl?.width ?? 0))
   })
 
   it('moves the lines by the alignment, and gives a text with no words none', () => {

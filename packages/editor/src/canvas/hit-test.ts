@@ -79,7 +79,7 @@ export function lineBoxes(laid: TextLayout): Rect[] {
     const { marker } = b
     if (marker)
       boxes.push({
-        x: b.x + b.markerX,
+        x: b.markerX,
         y: y + b.markerY,
         width: marker.getMaxIntrinsicWidth(),
         height: marker.getHeight(),
@@ -100,7 +100,8 @@ function layerAt(layer: SceneLayer, p: Point, looks: Looks, options: HitOptions)
     case 'group':
       return hitTest(layer.children, q, looks, options)
     case 'box':
-      if (layer.props.clip && !inOutline(looks, layer, q)) return null
+      // Past a clipping box's outline only its strokes show: the clip never cuts them.
+      if (layer.props.clip && !inOutline(looks, layer, q)) return shows(looks, layer, q) ? layer : null
       return hitTest(layer.children, q, looks, options) ?? (shows(looks, layer, q) ? layer : null)
     case 'boolean':
       // Its shapes' own paints don't show, only the boolean's: the shape under the point is picked
@@ -138,7 +139,7 @@ function inOutline(looks: Looks, layer: SceneLayer, q: Point) {
 
 /**
  * Whether a shape, boolean or box shows at a point in its own coordinates: inside its outline where
- * its paints show, or on its strokes past the outline. A line is picked near it, however thin its
+ * its paints show, or on its strokes, past the outline or within it. A line is picked near it, however thin its
  * box; a path also near its stroke, so a thin one is as easy to pick.
  */
 function shows(looks: Looks, layer: Painted, q: Point): boolean {
@@ -146,11 +147,16 @@ function shows(looks: Looks, layer: Painted, q: Point): boolean {
   const kind = layer.type === 'graphic' ? layer.props.shape.kind : null
   if (kind === 'line') return nearLine(q, layer)
   const reach =
-    kind === 'path' ? Math.max(0, ...props.strokes.map((s) => s.width / 2)) + LINE_REACH : strokeReach(props.strokes)
+    kind === 'path'
+      ? Math.max(0, ...props.strokes.map((s) => s.width / 2)) + LINE_REACH
+      : strokeReach(props.strokes, 'outside')
   if (!inBox(q, props, reach)) return false
   const outline = looks.outline(layer)
-  if (outline.contains(q.x, q.y)) return paintsShow(looks, props.fills, props, q)
-  return reach > 0 && nearOutline(looks.ck, outline, q, reach)
+  if (!outline.contains(q.x, q.y)) return reach > 0 && nearOutline(looks.ck, outline, q, reach)
+  if (paintsShow(looks, props.fills, props, q)) return true
+  // Where a photo is clear, the strokes still show along the inside of the outline.
+  const within = strokeReach(props.strokes, 'inside')
+  return within > 0 && nearOutline(looks.ck, outline, q, within)
 }
 
 /** A line is picked along it, up to half its stroke and LINE_REACH more either side of it. */
@@ -160,12 +166,12 @@ function nearLine(q: Point, layer: Painted) {
   return q.x >= x && q.x <= x + width && Math.abs(q.y - (y + height / 2)) <= reach
 }
 
-/** How far past the outline the visible strokes show: half a centred one, all of one outside. */
-function strokeReach(strokes: readonly Stroke[]) {
+/** How far the visible strokes show past the outline, or within it: all of one on that side, half a centred one. */
+function strokeReach(strokes: readonly Stroke[], side: 'inside' | 'outside') {
   return Math.max(
     0,
     ...strokes.map((s) =>
-      s.paint.visible === false ? 0 : s.align === 'outside' ? s.width : s.align === 'center' ? s.width / 2 : 0,
+      s.paint.visible === false ? 0 : s.align === side ? s.width : s.align === 'center' ? s.width / 2 : 0,
     ),
   )
 }
