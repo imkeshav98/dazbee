@@ -1,5 +1,6 @@
 // The layers panel's frames by the keyboard alone, in Chromium: Tab into the tree, the arrows, Home
-// and End through frames and layers, opening and closing them and picking a frame, and renaming it.
+// and End through frames and layers, opening and closing them and picking a frame, and renaming it;
+// the focus following a duplicated frame to its copy.
 import { writeOutput } from '../../support/editor.ts'
 import { openDesign, picked } from '../../support/layers-frames.ts'
 import { frameRow, row, tabIntoTree, tree } from '../../support/layers-panel.ts'
@@ -76,5 +77,27 @@ test('keyboard only: through frames and layers, opening and closing them, pickin
   // Undo from the row puts the old name back.
   await page.keyboard.press('ControlOrMeta+Z')
   await expect.poll(async () => (await read(page)).frames.sq?.name).toBe('Sale square')
+  expect(errors).toEqual([])
+})
+
+test('keyboard: Ctrl+D on a frame’s row takes the focus to the copy’s row, picked', async ({ browser }) => {
+  const {
+    tabs: [page],
+    errors,
+  } = await openDesign(browser)
+  if (!page) throw new Error('no tab')
+  const frames = async () => Object.keys((await read(page)).frames).sort()
+  // End picks Fresh square; Ctrl+D there picks its copy, and the copy's row takes the focus.
+  await tabIntoTree(page)
+  await page.keyboard.press('End')
+  await expect(frameRow(page, 'Fresh square')).toBeFocused()
+  await page.keyboard.press('ControlOrMeta+D')
+  await expect.poll(() => picked(page)).not.toBe('fresh')
+  const copy = await picked(page)
+  expect(copy).not.toBeNull()
+  await expect.poll(() => focusedRow(page)).toBe(copy)
+  await expect(tree(page).locator(`[data-frame="${copy}"]`)).toHaveAttribute('aria-selected', 'true')
+  await page.keyboard.press('ControlOrMeta+Z')
+  await expect.poll(frames).toEqual(['banner', 'fresh', 'sq', 'story'])
   expect(errors).toEqual([])
 })

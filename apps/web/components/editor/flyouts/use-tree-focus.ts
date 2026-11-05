@@ -20,6 +20,7 @@ export function useTreeFocus({
   rows,
   indexOf,
   selected,
+  picked,
   isFrame,
   scroller,
   follow,
@@ -29,6 +30,7 @@ export function useTreeFocus({
   rows: Row[]
   indexOf: Map<string, number>
   selected: ReadonlySet<string>
+  picked: string | null
   isFrame: (id: string) => boolean
   scroller: RefObject<HTMLDivElement | null>
   follow: (el: HTMLElement) => void
@@ -53,6 +55,10 @@ export function useTreeFocus({
   // The layer of a row deleted while it had the focus: its row takes the focus again if it comes
   // back, as on undo, until a press or focus outside the tree.
   const gone = useRef<string | null>(null)
+  // The picked frame at the last commit, and a frame picked from elsewhere while the focus was on
+  // another frame's row, as Ctrl+D there picks its copy: its row takes the focus once listed.
+  const pickedAt = useRef(picked)
+  const following = useRef<string | null>(null)
   useEffect(() => {
     const away = (event: Event) => {
       if (event.target instanceof Node && scroller.current?.contains(event.target)) return
@@ -114,6 +120,15 @@ export function useTreeFocus({
       gone.current = null
     }
     if (held.current) heldAt.current = indexOf.get(held.current) ?? heldAt.current
+    if (picked !== pickedAt.current) {
+      pickedAt.current = picked
+      const from = held.current
+      following.current = picked !== null && from !== null && from !== picked && isFrame(from) ? picked : null
+    }
+    if (following.current && indexOf.has(following.current)) {
+      reveal(following.current)
+      following.current = null
+    }
 
     const id = focusing.current
     if (!id) return

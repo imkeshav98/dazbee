@@ -98,6 +98,7 @@ export function LayersPanel({ editor }: { editor: Editor }) {
     rows,
     indexOf,
     selected,
+    picked,
     isFrame,
     scroller,
     follow,
