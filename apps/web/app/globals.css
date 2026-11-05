@@ -21,11 +21,12 @@
 /*
  * Hovered: under a pointer that hovers, as `hover:` is, except inside what holds rows that showed up
  * under a pointer at rest (`data-hover-held`, set by lib/hover-hold.ts) until the pointer moves there.
- * It adds nothing to a rule's specificity, so it orders as `hover:` does.
+ * Its rules weigh only their class, so the pressed, current, open and greyed looks, each a variant
+ * that weighs more, show over it wherever they come in the stylesheet.
  */
 @custom-variant hovered {
   @media (hover: hover) {
-    &:hover:not(:where([data-hover-held] *)) {
+    &:where(:hover:not([data-hover-held] *)) {
       @slot;
     }
   }
