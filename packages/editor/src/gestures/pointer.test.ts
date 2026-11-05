@@ -68,6 +68,7 @@ function harness(tool: Tool = 'select', under: SceneLayer = UNDER) {
       },
       viewport: () => ({ width: 1000, height: 800 }),
       zoomTo: (zoom, at) => log.push(`zoom ${zoom.toFixed(3)} at ${at?.x} ${at?.y}`),
+      redraw: () => log.push('redraw'),
     },
     tools: { tool: () => tool, imageToPlace: () => null, snapping: () => true },
     selection,
@@ -154,12 +155,13 @@ describe('editorPointer', () => {
         'draw overlay',
         'press 600 10',
         'release move',
+        'redraw',
         'release press',
         'draw overlay',
       ])
     })
 
-    it("holds the select tool's drag from its press until the pointer goes up", () => {
+    it("holds the select tool's drag from its press until the pointer goes up, then draws the canvas again", () => {
       const { pointer, send, log, pressed } = harness()
       send('pointerdown', event(10, 10))
       expect(pointer.gesture()).toBe(pressed())
@@ -172,6 +174,7 @@ describe('editorPointer', () => {
         'draw overlay',
         'drag 30 12 snapped',
         'release move',
+        'redraw',
         'release press',
         'draw overlay',
       ])
@@ -222,14 +225,14 @@ describe('editorPointer', () => {
       send('pointerdown', event(10, 10))
       pointer.endDrag()
       expect(pointer.gesture()).toBeNull()
-      expect(log.slice(2)).toEqual(['release move', 'release press', 'draw overlay'])
+      expect(log.slice(2)).toEqual(['release move', 'redraw', 'release press', 'draw overlay'])
     })
 
     it('cancels a press whose pointer capture goes, and nothing once the press has ended', () => {
       const { send, log } = harness()
       send('pointerdown', event(10, 10))
       send('lostpointercapture')
-      expect(log.slice(2)).toEqual(['cancel press', 'release move', 'release press', 'draw overlay'])
+      expect(log.slice(2)).toEqual(['cancel press', 'release move', 'redraw', 'release press', 'draw overlay'])
       log.length = 0
       send('lostpointercapture')
       expect(log).toEqual([])

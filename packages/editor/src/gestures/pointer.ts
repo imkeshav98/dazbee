@@ -29,7 +29,14 @@ import {
 } from './drawing.ts'
 import type { EditorPen, PathDrag } from './pen.ts'
 import type { EditorSelectPress } from './select-press.ts'
-import type { EditorTransformDrag, MarqueeDrag, MoveDrag, ResizeDrag, RotateDrag } from './transform-drag.ts'
+import {
+  carried,
+  type EditorTransformDrag,
+  type MarqueeDrag,
+  type MoveDrag,
+  type ResizeDrag,
+  type RotateDrag,
+} from './transform-drag.ts'
 
 /** What a drag on the stage is doing, from pointer down to up. */
 export type Gesture =
@@ -49,7 +56,7 @@ export type Gesture =
 export interface PointerDeps {
   canvas: HTMLCanvasElement
   session: Pick<Session, 'design'>
-  view: Pick<EditorView, 'camera' | 'design' | 'onStage' | 'pointAt' | 'setCamera' | 'viewport' | 'zoomTo'>
+  view: Pick<EditorView, 'camera' | 'design' | 'onStage' | 'pointAt' | 'redraw' | 'setCamera' | 'viewport' | 'zoomTo'>
   tools: Pick<EditorTools, 'tool' | 'imageToPlace' | 'snapping'>
   selection: Pick<
     EditorSelection,
@@ -228,6 +235,8 @@ export function editorPointer({
     else if (gesture?.kind === 'path') pen.releasePoints(gesture)
     else if (gesture?.kind === 'crop') cropping.release(gesture)
     else if (gesture && gesture.kind !== 'marquee') transformDrag.release(gesture)
+    // What the drag carried was drawn faintly past its frame: the canvas draws again without it.
+    if (carried(gesture)) view.redraw()
     selectPress.release(gesture?.kind === 'marquee' ? gesture : null)
     gesture = null
     pan = null
