@@ -209,6 +209,12 @@ export interface Editor {
   fitSelection: () => void
   /** Fits a frame in view, showing its page first when another is shown. Throws for a frame the design lacks. */
   fitFrame(frameId: string): void
+  /**
+   * Pans, at the same zoom, so a frame of the shown page shows whole with its label in the part of
+   * the stage the chrome leaves clear, clear too of `panel`, a panel floating over the stage at its
+   * place on the page. The view stays as it is when the frame shows there already.
+   */
+  showFrame(frameId: string, panel?: Rect): void
   setTool: (next: Tool) => void
   tool: () => Tool
   /**

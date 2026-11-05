@@ -119,10 +119,15 @@ export function LayersPanel({ editor }: { editor: Editor }) {
     follow(el)
   })
 
-  /** Picks a frame by its row, or selects a layer by its row, alone or added to the selection or taken from it. */
+  /**
+   * Picks a frame by its row, panning at the same zoom to bring it out from under the panel, or
+   * selects a layer by its row, alone or added to the selection or taken from it.
+   */
   const select = (id: string, add = false) => {
     if (isFrame(id)) {
       editor.pickFrame(id)
+      const panel = scroller.current?.closest('#editor-flyout')
+      if (panel) editor.showFrame(id, panel.getBoundingClientRect())
       return
     }
     const ids = add ? (selected.has(id) ? selection.filter((s) => s !== id) : [...selection, id]) : [id]

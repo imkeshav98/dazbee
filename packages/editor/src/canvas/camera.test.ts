@@ -2,7 +2,18 @@ import { describe, expect, it } from 'vitest'
 
 import { FRAME_GAP, type Rect } from '@dazbee/schema'
 
-import { fit, framesInView, reveal, revealLabel, toScreen, toWorld, visibleRect, zoomAt } from './camera.ts'
+import {
+  coverOf,
+  fit,
+  framesInView,
+  reveal,
+  revealLabel,
+  toScreen,
+  toWorld,
+  visibleRect,
+  widen,
+  zoomAt,
+} from './camera.ts'
 import { intersects, pageFrames } from './frames.ts'
 import { design } from './test-design.ts'
 
@@ -109,6 +120,34 @@ describe('revealLabel', () => {
   it('pans up and back to a label past the stage’s end and bottom, leaving room for its name', () => {
     const next = revealLabel({ x: 1200, y: 900, zoom: 1 }, square, viewport, insets)
     expect(toScreen(next, { x: 0, y: 0 })).toEqual({ x: 864, y: 704 })
+  })
+})
+
+describe('coverOf', () => {
+  const stage = { x: 0, y: 0, width: 1440, height: 1000 }
+
+  it('covers the side a panel floats on, past its edge by the gap', () => {
+    expect(coverOf({ x: 116, y: 80, width: 344, height: 600 }, stage)).toEqual({ left: 472 })
+    expect(coverOf({ x: 980, y: 80, width: 344, height: 600 }, stage)).toEqual({ right: 472 })
+  })
+
+  it('covers the bottom for a panel across most of the stage, as on a phone', () => {
+    expect(coverOf({ x: 12, y: 245, width: 366, height: 472 }, { x: 0, y: 0, width: 390, height: 844 })).toEqual({
+      bottom: 611,
+    })
+  })
+
+  it('measures from the stage, wherever it is on the page', () => {
+    expect(coverOf({ x: 216, y: 180, width: 344, height: 600 }, { ...stage, x: 100, y: 100 })).toEqual({ left: 472 })
+  })
+})
+
+describe('widen', () => {
+  it('keeps each edge clear of the chrome and of what covers it, the larger of the two', () => {
+    const chrome = { top: 70, right: 12, bottom: 90, left: 96 }
+    expect(widen(chrome, { left: 472 })).toEqual({ top: 70, right: 12, bottom: 90, left: 472 })
+    expect(widen(chrome, { bottom: 40, top: 20 })).toEqual(chrome)
+    expect(widen(chrome, {})).toEqual(chrome)
   })
 })
 

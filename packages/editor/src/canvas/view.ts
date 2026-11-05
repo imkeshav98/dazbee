@@ -8,6 +8,7 @@ import { type Design, inOrder, type Point, type Rect } from '@dazbee/schema'
 import type { Box } from '../layers/transform.ts'
 import {
   type Camera,
+  coverOf,
   fit,
   framesInView,
   type Insets,
@@ -17,6 +18,7 @@ import {
   toScreen,
   toWorld,
   type Viewport,
+  widen,
   zoomAt,
 } from './camera.ts'
 import { type Frame, frameAt, frameNearest, pageFrames } from './frames.ts'
@@ -101,8 +103,11 @@ export interface EditorView {
   fitAll(): void
   /** Fits a part of the canvas in view, in world units; nothing without one. */
   fitArea(area: Rect | undefined): void
-  /** Pans, keeping the zoom, so a part of the canvas shows whole beside the chrome; nothing when it already does. */
-  showArea(area: Rect): void
+  /**
+   * Pans, keeping the zoom, so a part of the canvas shows whole beside the chrome, and clear of
+   * `panel`, floating over the stage at its place on the page; nothing when it already does.
+   */
+  showArea(area: Rect, panel?: Rect): void
   /** Pans, keeping the zoom, so a frame's label shows beside the chrome; nothing when it already does. */
   showLabel(frame: Rect): void
   /** Turns the rulers on or off; the view listeners hear of it from `viewChanged`. */
@@ -329,8 +334,9 @@ export function editorView({ ck, canvas, session, onZoom, draw }: ViewDeps): Edi
   function fitArea(area: Rect | undefined) {
     if (area) setCamera(fit(area, viewport, undefined, insets))
   }
-  function showArea(area: Rect) {
-    const next = reveal(camera, area, viewport, insets)
+  function showArea(area: Rect, panel?: Rect) {
+    const cover = panel ? coverOf(panel, canvas.getBoundingClientRect()) : {}
+    const next = reveal(camera, area, viewport, widen(insets, cover))
     if (next !== camera) setCamera(next)
   }
   function showLabel(frame: Rect) {
