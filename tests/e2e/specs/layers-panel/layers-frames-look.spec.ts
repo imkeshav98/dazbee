@@ -1,9 +1,10 @@
 // The layers panel's rows as they look, in Chromium: a frame's swatch showing its background as it
-// looks, see-through too, and a frame picked from its row brought out from under the panel at the
-// same zoom.
+// looks, see-through too, a shape's picture bare beside a text's outlined tile, no pink ring on a
+// picked frame's or selected layer's picture, and a frame picked from its row brought out from under
+// the panel at the same zoom.
 import { screenPoint } from '../../support/editor.ts'
-import { openDesign, openSized } from '../../support/layers-frames.ts'
-import { frameRow, rect } from '../../support/layers-panel.ts'
+import { layerRow, openDesign, openSized } from '../../support/layers-frames.ts'
+import { frameRow, rect, row } from '../../support/layers-panel.ts'
 import { frameDesign } from '../../support/seed.ts'
 import { nextFrame } from '../../support/stage.ts'
 import { expect, type Locator, type Page, test } from '../../support/test.ts'
@@ -70,6 +71,33 @@ test('a frame’s swatch shows its background as it looks, see-through too, and 
     expect(errors).toEqual([])
     await page.context().close()
   }
+})
+
+test('a shape’s picture is bare, a text’s icon on an outlined tile, and a selected layer’s picture has no ring', async ({
+  browser,
+}) => {
+  const {
+    tabs: [page],
+    errors,
+  } = await openDesign(browser)
+  if (!page) throw new Error('no tab')
+  await frameRow(page, 'Sale square').click()
+  const badge = layerRow(page, 'badge').getByTestId('layer-picture')
+  await expect(badge.locator('img')).toHaveCount(1)
+  const look = (locator: Locator) =>
+    locator.evaluate((el) => {
+      const style = getComputedStyle(el)
+      return { border: style.borderTopWidth, fill: style.backgroundColor, ring: style.boxShadow }
+    })
+  expect(await look(badge)).toEqual({ border: '0px', fill: 'rgba(0, 0, 0, 0)', ring: 'none' })
+  expect((await boxOf(badge.locator('img'))).width).toBe(20)
+  expect((await look(layerRow(page, 'head').getByTestId('layer-picture'))).border).toBe('1px')
+  // Selected, Badge's row is tinted and its picture stays bare.
+  await row(page, 'Badge').click()
+  await expect(row(page, 'Badge')).toHaveAttribute('aria-selected', 'true')
+  await nextFrame(page)
+  expect(await look(badge)).toEqual({ border: '0px', fill: 'rgba(0, 0, 0, 0)', ring: 'none' })
+  expect(errors).toEqual([])
 })
 
 test('a frame picked from its row under the panel is brought out from under it at the same zoom; one in the clear stays put', async ({

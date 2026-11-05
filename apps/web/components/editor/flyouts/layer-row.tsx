@@ -24,7 +24,7 @@ import { memo, useState } from 'react'
 
 import { type Design, LOCK_FLAGS } from '@dazbee/schema'
 
-import { DROP_LINE, LAYER_PICTURE, LAYER_PICTURE_PICKED } from '@/components/editor/styles.ts'
+import { DROP_LINE, LAYER_PICTURE } from '@/components/editor/styles.ts'
 import { LIT_ROW } from '@/components/ui/looks.ts'
 import { RenameField } from '@/components/ui/rename-field.tsx'
 import { cn } from '@/lib/cn.ts'
@@ -164,7 +164,6 @@ export const LayerRow = memo(function LayerRow({
       className={cn(
         ROW_LOOK,
         'font-medium',
-        // The selected row's type tile is solid pink, as in the mock.
         selected ? ROW_SELECTED : LIT_ROW,
         drop === 'into' && 'ring-2 ring-accent ring-inset',
         hidden && 'text-subtle',
@@ -178,9 +177,10 @@ export const LayerRow = memo(function LayerRow({
         data-testid="layer-picture"
         className={cn(
           'grid size-[22px] shrink-0 place-items-center overflow-hidden rounded-[5px] transition-colors duration-[var(--chrome-fast)]',
-          picture || !selected ? LAYER_PICTURE : 'bg-accent-solid text-on-accent',
+          // A picture is bare, as in the mock; a text's icon sits on an outlined tile, solid pink
+          // while selected, and any other icon is bare until its picture is drawn.
           !picture && !selected && 'text-muted',
-          picture && selected && LAYER_PICTURE_PICKED,
+          !picture && node.type === 'text' && (selected ? 'bg-accent-solid text-on-accent' : LAYER_PICTURE),
           picture && close && BACKDROP[close],
         )}
       >
@@ -190,7 +190,7 @@ export const LayerRow = memo(function LayerRow({
             alt=""
             draggable={false}
             onLoad={(event) => setClose(closeTheme(event.currentTarget))}
-            className="size-full object-contain"
+            className="size-full max-h-[20px] max-w-[20px] object-contain"
           />
         ) : (
           <LayerIcon size={13} weight={selected ? 'bold' : 'regular'} />
