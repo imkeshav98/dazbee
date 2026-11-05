@@ -1,5 +1,6 @@
-// What is selected, the group gone into, the picked frame, a crop or path edit, and the layer under
-// the pointer, with the rules that keep them in step and the listeners that follow them.
+// What is selected, the group gone into, the picked frame, a crop or path edit, the layer under the
+// pointer and the frame lit from outside the stage, with the rules that keep them in step and the
+// listeners that follow them.
 import { type Design, frameIdOf } from '@dazbee/schema'
 
 import type { Frame } from './canvas/frames.ts'
@@ -51,6 +52,8 @@ export interface EditorSelection {
   pathEditing(): Readonly<PathEditing> | null
   /** The layer under the pointer, outlined while nothing is being dragged. */
   hovered(): Picked | null
+  /** The frame lit from outside the stage, as a list's row does while it is hovered or focused; null with none. */
+  litFrame(): string | null
   /**
    * Selects layers in one frame, or none, with no ids or no frame; a crop or path edit stays only on
    * that one layer there. Shows it.
@@ -89,6 +92,8 @@ export interface EditorSelection {
   pickAnchors(refs: AnchorRef[]): void
   /** Sets the layer under the pointer; returns whether it changed. */
   hover(next: Picked | null): boolean
+  /** Lights a frame from outside the stage, or none with null; returns whether it changed. */
+  lightFrame(frameId: string | null): boolean
   /**
    * Tells the selection listeners when the selection differs from the one they last heard of,
    * then the frame listeners when the picked frame does or was picked again. The overlay calls it
@@ -126,6 +131,8 @@ export function editorSelection({ drawn, frames, changed }: SelectionDeps): Edit
   let lastSelection = ''
   /** The layer under the pointer. */
   let hovered: Picked | null = null
+  /** The frame lit from outside the stage. */
+  let lit: string | null = null
   /** The path layer whose points are being edited, and its selected anchors. */
   let pathEditing: PathEditing | null = null
   /** The layer whose image fill is being cropped. */
@@ -247,6 +254,11 @@ export function editorSelection({ drawn, frames, changed }: SelectionDeps): Edit
     hovered = next
     return moved
   }
+  function lightFrame(frameId: string | null) {
+    const changed = frameId !== lit
+    lit = frameId
+    return changed
+  }
 
   function tellListeners() {
     const now = selection ? `${selection.frameId}|${selection.ids.join(',')}` : ''
@@ -283,6 +295,7 @@ export function editorSelection({ drawn, frames, changed }: SelectionDeps): Edit
     cropping: croppingLayer,
     pathEditing: editingPath,
     hovered: hoveredLayer,
+    litFrame: () => lit,
     select,
     selectKeepingModes,
     keep,
@@ -294,6 +307,7 @@ export function editorSelection({ drawn, frames, changed }: SelectionDeps): Edit
     editPath,
     pickAnchors,
     hover,
+    lightFrame,
     tellListeners,
     onSelection,
     onFramePick,

@@ -81,8 +81,8 @@ test('F draws an empty frame where dragged and a click adds none; the Box tool d
   const before = { a: await boxOf(page, 'a'), b: await boxOf(page, 'b') }
   const layers = Object.keys((await read(page)).nodes).length
 
-  // F and a drag: an empty white frame named Frame on the page, where dragged; nothing is
-  // selected, and the select tool comes back.
+  // F and a drag: an empty white frame named Frame on the page, where dragged, picked with no
+  // layer selected, and the select tool comes back.
   await press(page, 'toolFrame')
   await expect(page.locator('[data-tool="frame"]')).toHaveAttribute('aria-pressed', 'true')
   await drag(page, { x: 600, y: 400 }, { x: 900, y: 520 })
@@ -98,6 +98,7 @@ test('F draws an empty frame where dragged and a click adds none; the Box tool d
   })
   expect(Object.keys((await read(page)).nodes)).toHaveLength(layers)
   expect(await selection(page)).toEqual([])
+  expect(await page.evaluate(() => window.dazbee?.pickedFrame())).toBe(drawnFrame)
   expect(await page.evaluate(() => window.dazbee?.tool())).toBe('select')
   await expect(page.locator('[data-tool="select"]')).toHaveAttribute('aria-pressed', 'true')
   await expect(page.locator(`.frame-label[data-frame="${drawnFrame}"]`)).toContainText('Frame')
@@ -106,12 +107,12 @@ test('F draws an empty frame where dragged and a click adds none; the Box tool d
   await press(page, 'undo')
   expect(await frameIds(page)).toEqual(['sq', 'wide'])
 
-  // A click with the Frame tool adds nothing, and the select tool comes back.
+  // A click with the Frame tool adds nothing and keeps the tool, so the Add a frame card stays open.
   await press(page, 'toolFrame')
   await click(page, 700, 800)
   expect(await frameIds(page)).toEqual(['sq', 'wide'])
   expect(Object.keys((await read(page)).nodes)).toHaveLength(layers)
-  expect(await page.evaluate(() => window.dazbee?.tool())).toBe('select')
+  expect(await page.evaluate(() => window.dazbee?.tool())).toBe('frame')
 
   // A click with the Box tool draws a box of the default size, centred on it.
   await pick(page, 'box')

@@ -14,7 +14,8 @@
   white-space: nowrap;
   color: var(--text-subtle);
 }
-.stage-overlay .frame-label[data-active] {
+.stage-overlay .frame-label[data-active],
+.stage-overlay .frame-label[data-lit] {
   color: var(--accent-text);
 }
 .stage-overlay .frame-name {
@@ -23,7 +24,8 @@
   font-weight: 500;
   color: var(--text-muted);
 }
-.stage-overlay .frame-label[data-active] .frame-name {
+.stage-overlay .frame-label[data-active] .frame-name,
+.stage-overlay .frame-label[data-lit] .frame-name {
   color: inherit;
 }
 .stage-overlay .frame-size {
@@ -50,7 +52,12 @@
   position: absolute;
   outline: 2px solid var(--accent);
 }
-.stage-overlay .hover {
+/* A frame lit from outside the stage, as a list's row under the pointer lights it: outlined whole, as a layer under the pointer is. */
+.stage-overlay .frame-lit {
+  position: absolute;
+}
+.stage-overlay .hover,
+.stage-overlay .frame-lit {
   outline: 1.5px solid var(--accent);
   opacity: 0.6;
 }

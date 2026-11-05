@@ -49,7 +49,7 @@ describe('fitted', () => {
     }
   })
 
-  it('copies rotation, visibility, strokes, corners, effects, gaps and paddings as they are', () => {
+  it('copies rotation, visibility, strokes, corners and effects as they are', () => {
     const kept = {
       rotation: 30,
       visible: false,
@@ -57,12 +57,43 @@ describe('fitted', () => {
       cornerRadius: [4, 8, 12, 16],
       strokes: [{ paint: { type: 'solid', color: '#000000FF' }, width: 6, align: 'inside' }],
       effects: [{ type: 'drop-shadow', color: '#00000080', x: 0, y: 4, blur: 12, spread: 0 }],
-      layout: { direction: 'row', gap: 24, padding: { top: 10, right: 20, bottom: 10, left: 20 } },
     }
     const box = { x: 100, y: 100, width: 400, height: 300, ...kept }
     const { x, y, width, height, ...rest } = fitted(box, box, { from: square, to: mpu })
     expect({ x, y, width, height }).toEqual({ x: 37.04, y: 23.15, width: 92.59, height: 69.44 })
     expect(rest).toEqual(kept)
+  })
+
+  it('scales an auto layout box’s gap, line gap and paddings with its size, so its children stay inside it', () => {
+    const layout = {
+      direction: 'row',
+      gap: 40,
+      padding: { top: 50, right: 50, bottom: 50, left: 50 },
+      justify: 'start',
+      wrap: true,
+      lineGap: 12,
+    }
+    // Three 140 × 100 children fill the row exactly: 50 + 140 + 40 + 140 + 40 + 140 + 50 = 600.
+    const row = { x: 240, y: 440, width: 600, height: 200, layout }
+    const child = (i: number) => ({ x: 290 + i * 180, y: 490, width: 140, height: 100 })
+    const fit = { from: square, to: mpu }
+    const s = 250 / 1080
+
+    const box = fitted(row, row, fit)
+
+    expect(box.layout).toEqual({
+      ...layout,
+      gap: 9.26,
+      padding: { top: 11.57, right: 11.57, bottom: 11.57, left: 11.57 },
+      lineGap: 2.78,
+    })
+    const children = [0, 1, 2].map((i) => fitted(child(i), row, fit))
+    const across = children.reduce((sum, c) => sum + c.width, 0) + 2 * box.layout.gap
+    expect(box.layout.padding.left + across + box.layout.padding.right).toBeLessThanOrEqual(box.width + 0.01)
+    expect(box.layout.padding.top + (children[0]?.height ?? 0) + box.layout.padding.bottom).toBeLessThanOrEqual(
+      box.height + 0.01,
+    )
+    expect(box.width).toBeCloseTo(600 * s, 1)
   })
 
   it('scales a text’s font size, its runs’ font sizes where they set one, and its shrink-to-fit sizes', () => {

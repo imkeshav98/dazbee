@@ -137,6 +137,47 @@ describe('exportDesign', () => {
     expect(readZip(byPage.bytes).map((e) => e.path)).toEqual(['Hero.png', 'Hero 2.png'])
   })
 
+  it('frames of a page that share a name are numbered by their place on the page, whichever are asked for', () => {
+    const sale = (order: string, x: number) => ({
+      pageId: 'p1',
+      name: 'Sale',
+      width: 40,
+      height: 40,
+      x,
+      y: 0,
+      fills: red,
+      order,
+    })
+    const sales = {
+      ...design,
+      pages: { p1: design.pages.p1 },
+      frames: { s1: sale('a0', 0), s2: sale('a1', 240), s3: sale('a2', 480) },
+      nodes: {},
+    }
+    const names = (frameIds: string[], name?: string) =>
+      readZip(exportDesign(ck, sales, { frameIds, type: 'png', name }, bytes).bytes).map((e) => e.path)
+    expect(names(['s1', 's2', 's3'])).toEqual(['Sale.png', 'Sale 2.png', 'Sale 3.png'])
+    expect(names(['s3', 's2'])).toEqual(['Sale 3.png', 'Sale 2.png'])
+    expect(exportDesign(ck, sales, { frameIds: ['s3'], type: 'svg' }, bytes).name).toBe('Sale 3.svg')
+    // The File names field's {frame} is the numbered name too.
+    expect(names(['s2', 's3'], '{page} {frame}')).toEqual(['Hero Sale 2.png', 'Hero Sale 3.png'])
+  })
+
+  it('numbers frames by the names their files take, so frames filed alike are numbered, whichever are asked for', () => {
+    const promo = (name: string, order: string) => ({ ...design.frames['p1-sq'], name, order })
+    const promos = {
+      ...design,
+      pages: { p1: design.pages.p1 },
+      frames: { a: promo('Sale/Promo', 'a0'), b: promo('Sale-Promo', 'a1') },
+      nodes: {},
+    }
+    expect(
+      readZip(exportDesign(ck, promos, { frameIds: ['a', 'b'], type: 'png' }, bytes).bytes).map((e) => e.path),
+    ).toEqual(['Sale-Promo.png', 'Sale-Promo 2.png'])
+    expect(exportDesign(ck, promos, { frameIds: ['b'], type: 'png' }, bytes).name).toBe('Sale-Promo 2.png')
+    expect(exportDesign(ck, promos, { frameIds: ['a'], type: 'png' }, bytes).name).toBe('Sale-Promo.png')
+  })
+
   it('the same request gives the same bytes every time', () => {
     const request = { frameIds: ['p1-sq', 'p2-sq', 'p1-story', 'p2-story'], type: 'jpg' }
     expect(exportDesign(ck, design, request, bytes).bytes).toEqual(exportDesign(ck, design, request, bytes).bytes)

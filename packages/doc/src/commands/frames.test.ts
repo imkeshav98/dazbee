@@ -245,6 +245,28 @@ describe('frame.addSize', () => {
     expect(readDesign(doc)).toEqual(before)
   })
 
+  it('lays out an auto layout box to fit as other layers: its gap and paddings scale with it', () => {
+    const doc = testDoc()
+    const tab = openTestSession(doc)
+    const layout = { direction: 'row', gap: 40, padding: { top: 50, right: 50, bottom: 50, left: 50 } } as const
+    tab.run('node.create', {
+      id: 'row',
+      parentId: 'sq',
+      layer: { type: 'box', name: 'Row', props: { x: 240, y: 440, width: 600, height: 200, layout } },
+    })
+
+    const mpu = tab.run('frame.addSize', { frameId: 'sq', newId: 'mpu', width: 300, height: 250 })
+
+    const design = readDesign(doc)
+    const row = childrenOf(design, mpu).find(([, n]) => n.link === design.nodes.row?.link)?.[1]
+    // 250 / 1080 is the smaller ratio: the box and its gap and paddings all scale by it.
+    expect(row?.props).toMatchObject({
+      width: 138.89,
+      height: 46.3,
+      layout: { gap: 9.26, padding: { top: 11.57, right: 11.57, bottom: 11.57, left: 11.57 } },
+    })
+  })
+
   it('refuses a frame that is missing, an id that is taken and a size a frame may not have', () => {
     const tab = openTestSession(testDoc())
     expect(() => tab.run('frame.addSize', { frameId: 'nope', width: 300, height: 250 })).toThrow(/no frame "nope"/)

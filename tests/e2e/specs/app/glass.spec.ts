@@ -288,11 +288,9 @@ test('segmented choices on glass sit in a well, the chosen one on a chip in the 
     await page.getByTestId('share-open').click()
     await page.getByTestId('export-open').click()
     const exports = page.getByTestId('export')
-    for (const name of ['Pages', 'File type']) {
-      const choices = exports.getByRole('radiogroup', { name })
-      expect((await look(choices)).fill).toBe(glass.well)
-      expect(await look(choices.getByRole('radio', { checked: true }))).toMatchObject(chosen)
-    }
+    const types = exports.getByRole('radiogroup', { name: 'File type' })
+    expect((await look(types)).fill).toBe(glass.well)
+    expect(await look(types.getByRole('radio', { checked: true }))).toMatchObject(chosen)
     // Another choice is lit by the tints under the pointer and while pressed; once chosen, its chip
     // stays under the pointer.
     const choice = exports.locator('[data-type="pdf"]')

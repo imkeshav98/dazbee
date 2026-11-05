@@ -30,7 +30,7 @@ export interface EditorOptions extends ResourceSources {
   onStatus?: (status: string) => void
   /** Called with the zoom (1 is 100%) whenever it changes. */
   onZoom?: (zoom: number) => void
-  /** The name a frame drawn with the Frame tool takes, from its size, in the app's words. */
+  /** The name a frame added from a size, or drawn with the Frame tool, takes from its size, in the app's words. */
   frameName: (width: number, height: number) => string
   /** Aborting it while the editor is still connecting stops it, freeing what it made. */
   signal?: AbortSignal
@@ -157,6 +157,11 @@ export interface Editor {
    */
   onFramePick(listener: (frameId: string | null) => void): () => boolean
   /**
+   * Lights a frame of the shown page from outside the stage, outlined as a layer under the pointer
+   * is and its label lit, as a list's row does while it is hovered or focused; null lets it go.
+   */
+  lightFrame(frameId: string | null): void
+  /**
    * Picks a frame of the shown page and asks the page to rename it in place, as a double click on
    * its label does, panning first, at the same zoom, so the label shows beside the chrome; the page
    * renames it with the `frame.update` command and calls `renamed` once its field closes, the label
@@ -169,6 +174,19 @@ export interface Editor {
   renamed(): void
   /** Calls back with a frame's name once Delete, by its key or `perform('delete')`, deleted it as the picked frame. */
   onFrameDelete(listener: (name: string) => void): () => boolean
+  /**
+   * Adds an empty white frame of a size to the shown page, named after the size, where the frame
+   * rule puts it, as one undo step. It is picked and shown whole with its label beside the chrome,
+   * panned at the same zoom when it fits and zoomed out only as far as it needs when it doesn't; the
+   * select tool comes back. Returns its id, or null with nothing changed for a size past the limits.
+   */
+  addFrame(size: { width: number; height: number }): string | null
+  /**
+   * Add size: a frame of a size holding linked copies of a frame's layers laid out to fit, under its
+   * name, where the frame rule puts it, as one undo step, then picked and shown as `addFrame` does.
+   * Returns its id, or null with nothing changed for a frame gone or a size past the limits.
+   */
+  addSize(frameId: string, size: { width: number; height: number }): string | null
   /**
    * Where a frame's label is drawn on the stage, in pixels from the stage's top start corner; null
    * for a frame the shown page lacks, or one off the stage at its start.
