@@ -130,7 +130,8 @@ export function clickThroughDesign(assetId: string): DesignInput {
 export function faintDesign(assetId: string): DesignInput {
   const square = (x: number, y: number) => ({ x, y, width: 400, height: 300 })
   const nodes: Record<string, Seeded> = {
-    floor: rect('a0', 'Floor', { x: 0, y: 0, width: 1080, height: 1080 }, '#1B9E77FF'),
+    // Short of the frame's edges, so its hover outline shows apart from the frame's.
+    floor: rect('a0', 'Floor', { x: 60, y: 60, width: 960, height: 960 }, '#1B9E77FF'),
     zero: faded(rect('a1', 'Gone', square(80, 80), '#2F6BFFFF'), { opacity: 0 }),
     clearFill: shape('a2', 'Clear fill', { kind: 'rect' }, square(600, 80), '#FF5A3600', [
       { paint: { type: 'solid', color: '#111111FF' }, width: 12, align: 'center' },

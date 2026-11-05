@@ -256,7 +256,7 @@ test('a layer at opacity 0 picked in the layers panel counts all over its box: a
   await drag(page, zero.at, { x: zero.at.x + 40, y: zero.at.y + 20 })
   expect(await selection(page)).toEqual(['zero'])
   expect(await props(page, 'zero')).toMatchObject({ x: 120, y: 100 })
-  expect(await props(page, 'floor')).toMatchObject({ x: 0, y: 0 })
+  expect(await props(page, 'floor')).toMatchObject({ x: 60, y: 60 })
   await press(page, 'undo')
   expect(await props(page, 'zero')).toMatchObject({ x: 80, y: 80 })
   await press(page, 'redo')
