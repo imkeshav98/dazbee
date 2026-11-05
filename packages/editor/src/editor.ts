@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one deep module: startEditor builds every editor module in the code layout's order and returns the Editor */
 // The editor: a design's pages, each an infinite canvas with its frames where they were placed,
 // shown one page at a time (#36); click to select, drag to move, typing into text, pan and zoom.
 // It has no framework in it; the page only hands it a canvas and an overlay the size of the stage.
@@ -27,6 +28,7 @@ import { editorDrawing } from './gestures/drawing/drawing.ts'
 import { editorPen } from './gestures/pen/pen.ts'
 import { editorPointer } from './gestures/pointer.ts'
 import { editorAutoLayoutDrag } from './gestures/select/auto-layout-drag.ts'
+import { editorFrameMove } from './gestures/select/frame-move.ts'
 import { editorSelectPress } from './gestures/select/select-press.ts'
 import { carried, editorTransformDrag } from './gestures/select/transform-drag.ts'
 import { editorLayerEdits } from './layer-edits.ts'
@@ -223,7 +225,17 @@ function live(
     placeBox,
   })
   const autoLayoutDrag = editorAutoLayoutDrag({ session, boxes, camera, hug, notify, outline })
-  const selectPress = editorSelectPress({ canvas, view, selection, boxes, typing, transformDrag, autoLayoutDrag })
+  const frameMove = editorFrameMove({ session })
+  const selectPress = editorSelectPress({
+    canvas,
+    view,
+    selection,
+    boxes,
+    typing,
+    transformDrag,
+    autoLayoutDrag,
+    frameMove,
+  })
   const actions = editorActions({
     session,
     view,
@@ -270,6 +282,7 @@ function live(
     drawing,
     transformDrag,
     autoLayoutDrag,
+    frameMove,
     selectPress,
     renameFrame: frameRenames.emit,
     signal,

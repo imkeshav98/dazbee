@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest'
 
-import type { DesignInput, Point } from '@dazbee/schema'
+import type { DesignInput } from '@dazbee/schema'
 
 import type { Frame } from '../../canvas/frames.ts'
 import { sessionOf } from '../../layers/test-boxes.ts'
-import { dragFrame, type FrameMoveDrag, pressFrame, releaseFrame } from './frame-move.ts'
+import { editorFrameMove } from './frame-move.ts'
 
 /** Two frames on one page, the square holding a dot. */
 const DESIGN: DesignInput = {
@@ -27,21 +27,36 @@ const DESIGN: DesignInput = {
 }
 const SQUARE: Frame = { id: 'sq', pageId: 'p1', name: 'Square', x: 0, y: 0, width: 1080, height: 1080 }
 
+/** The frame moves on a real session, with where a frame is now. */
 function harness() {
   const session = sessionOf(DESIGN)
-  const drag = (...args: [FrameMoveDrag, Point, Point, boolean]) => dragFrame(session, ...args)
+  const { start, drag, release } = editorFrameMove({ session })
   const where = (id: string) => {
     const frame = session.design().frames[id]
     return frame && { x: frame.x, y: frame.y }
   }
-  return { session, drag, where }
+  return { session, start, drag, release, where }
 }
 
-describe('frame moves', () => {
-  describe('dragFrame', () => {
+describe('editorFrameMove', () => {
+  describe('start', () => {
+    it('holds the frame as pressed and where the press went down, writing nothing yet', () => {
+      const { session, start } = harness()
+      expect(start(SQUARE, { x: 100, y: 100 }, { x: 40, y: 40 })).toEqual({
+        kind: 'frameMove',
+        frame: SQUARE,
+        pressedAt: { x: 100, y: 100 },
+        from: { x: 40, y: 40 },
+        end: null,
+      })
+      expect(session.canUndo()).toBe(false)
+    })
+  })
+
+  describe('drag', () => {
     it('moves the frame by how far the pointer went, in whole design pixels, its layers with it', () => {
-      const { session, drag, where } = harness()
-      const g = pressFrame(SQUARE, { x: 100, y: 100 }, { x: 40, y: 40 })
+      const { session, start, drag, where } = harness()
+      const g = start(SQUARE, { x: 100, y: 100 }, { x: 40, y: 40 })
       drag(g, { x: 150, y: 130 }, { x: 140.4, y: 99.6 }, false)
       expect(where('sq')).toEqual({ x: 100, y: 60 })
       drag(g, { x: 160, y: 140 }, { x: 240, y: 340 }, false)
@@ -51,8 +66,8 @@ describe('frame moves', () => {
     })
 
     it('waits until the pointer has gone further than a click may wander', () => {
-      const { drag, where } = harness()
-      const g = pressFrame(SQUARE, { x: 100, y: 100 }, { x: 40, y: 40 })
+      const { start, drag, where } = harness()
+      const g = start(SQUARE, { x: 100, y: 100 }, { x: 40, y: 40 })
       drag(g, { x: 102, y: 101 }, { x: 60, y: 50 }, false)
       expect(where('sq')).toEqual({ x: 0, y: 0 })
       drag(g, { x: 110, y: 100 }, { x: 60, y: 50 }, false)
@@ -60,8 +75,8 @@ describe('frame moves', () => {
     })
 
     it('keeps to the axis it went furthest along with Shift', () => {
-      const { drag, where } = harness()
-      const g = pressFrame(SQUARE, { x: 100, y: 100 }, { x: 0, y: 0 })
+      const { start, drag, where } = harness()
+      const g = start(SQUARE, { x: 100, y: 100 }, { x: 0, y: 0 })
       drag(g, { x: 200, y: 120 }, { x: 300, y: 40 }, true)
       expect(where('sq')).toEqual({ x: 300, y: 0 })
       drag(g, { x: 120, y: 200 }, { x: 40, y: 500 }, true)
@@ -69,21 +84,21 @@ describe('frame moves', () => {
     })
 
     it('leaves a frame another tab deleted mid-drag be', () => {
-      const { session, drag } = harness()
-      const g = pressFrame(SQUARE, { x: 100, y: 100 }, { x: 0, y: 0 })
+      const { session, start, drag, release } = harness()
+      const g = start(SQUARE, { x: 100, y: 100 }, { x: 0, y: 0 })
       drag(g, { x: 200, y: 200 }, { x: 100, y: 100 }, false)
       session.run('frame.delete', { frameId: 'sq' })
       expect(() => drag(g, { x: 300, y: 300 }, { x: 200, y: 200 }, false)).not.toThrow()
-      releaseFrame(g)
+      release(g)
     })
   })
 
-  describe('releaseFrame', () => {
+  describe('release', () => {
     it('makes the whole drag one undo step', () => {
-      const { session, drag, where } = harness()
-      const g = pressFrame(SQUARE, { x: 100, y: 100 }, { x: 0, y: 0 })
+      const { session, start, drag, release, where } = harness()
+      const g = start(SQUARE, { x: 100, y: 100 }, { x: 0, y: 0 })
       for (const d of [20, 40, 80]) drag(g, { x: 100 + d, y: 100 }, { x: d, y: 0 }, false)
-      releaseFrame(g)
+      release(g)
       expect(where('sq')).toEqual({ x: 80, y: 0 })
       session.run('frame.update', { frameId: 'sq', name: 'Sale' })
       session.undo()
@@ -96,8 +111,8 @@ describe('frame moves', () => {
     })
 
     it('writes nothing for a press that never moved', () => {
-      const { session } = harness()
-      releaseFrame(pressFrame(SQUARE, { x: 100, y: 100 }, { x: 0, y: 0 }))
+      const { session, start, release } = harness()
+      release(start(SQUARE, { x: 100, y: 100 }, { x: 0, y: 0 }))
       expect(session.canUndo()).toBe(false)
     })
   })

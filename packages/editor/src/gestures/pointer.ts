@@ -29,7 +29,7 @@ import {
 } from './drawing/drawing.ts'
 import type { EditorPen, PathDrag } from './pen/pen.ts'
 import type { EditorAutoLayoutDrag, ReorderDrag } from './select/auto-layout-drag.ts'
-import { dragFrame, type FrameMoveDrag, releaseFrame } from './select/frame-move.ts'
+import type { EditorFrameMove, FrameMoveDrag } from './select/frame-move.ts'
 import type { EditorSelectPress } from './select/select-press.ts'
 import {
   carried,
@@ -58,7 +58,7 @@ export type Gesture =
 
 export interface PointerDeps {
   canvas: HTMLCanvasElement
-  session: Pick<Session, 'design' | 'run' | 'beginGesture'>
+  session: Pick<Session, 'design'>
   view: Pick<
     EditorView,
     'camera' | 'design' | 'frames' | 'onStage' | 'pointAt' | 'redraw' | 'setCamera' | 'viewport' | 'zoomTo'
@@ -76,6 +76,7 @@ export interface PointerDeps {
   drawing: Pick<EditorDrawing, 'pressShape' | 'pressImage' | 'pressText' | 'pressFrame' | 'drag' | 'release'>
   transformDrag: Pick<EditorTransformDrag, 'handleUnder' | 'marquee' | 'drag' | 'release' | 'clearGuides'>
   autoLayoutDrag: Pick<EditorAutoLayoutDrag, 'drag' | 'release'>
+  frameMove: Pick<EditorFrameMove, 'drag' | 'release'>
   /** What the select tool's press picks, and what it selects once it ends as a click. */
   selectPress: EditorSelectPress
   /** Asks the page to rename a frame in place, after a double click on its label. */
@@ -152,6 +153,7 @@ export function editorPointer({
   drawing,
   transformDrag,
   autoLayoutDrag,
+  frameMove,
   selectPress,
   renameFrame,
   signal,
@@ -241,7 +243,7 @@ export function editorPointer({
       return
     }
     if (gesture?.kind === 'reorder') autoLayoutDrag.release(gesture)
-    else if (gesture?.kind === 'frameMove') releaseFrame(gesture)
+    else if (gesture?.kind === 'frameMove') frameMove.release(gesture)
     else if (gesture?.kind === 'path') pen.releasePoints(gesture)
     else if (gesture?.kind === 'crop') cropping.release(gesture)
     else if (gesture && gesture.kind !== 'marquee') transformDrag.release(gesture)
@@ -354,7 +356,7 @@ export function editorPointer({
       // A frame's label, drawn over the canvas, takes the press before what is under it.
       const labelled = labelAt(view.frames(), view.camera(), screen)
       if (labelled) {
-        gesture = selectPress.pressFrame(e, screen, labelled)
+        gesture = selectPress.pressLabel(e, screen, labelled)
         drawOverlay()
         return
       }
@@ -421,7 +423,7 @@ export function editorPointer({
         return
       }
       if (gesture.kind === 'frameMove') {
-        dragFrame(session, gesture, screen, world, e.shiftKey)
+        frameMove.drag(gesture, screen, world, e.shiftKey)
         return
       }
       if (!selectPress.moved(screen)) return

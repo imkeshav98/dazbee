@@ -56,12 +56,7 @@ function harness(tool: Tool = 'select', under: SceneLayer = UNDER) {
   const selection = editorSelection({ drawn: () => design, frames: () => [SQUARE], changed: () => {} })
   const deps: PointerDeps = {
     canvas: canvas as unknown as HTMLCanvasElement,
-    session: {
-      design: () => design,
-      beginGesture: () => () => log.push('end frame move'),
-      run: ((name: string, input: { x: number; y: number }) =>
-        log.push(`${name} ${input.x} ${input.y}`)) as unknown as PointerDeps['session']['run'],
-    },
+    session: { design: () => design },
     view: {
       camera: () => camera,
       design: () => design,
@@ -127,6 +122,11 @@ function harness(tool: Tool = 'select', under: SceneLayer = UNDER) {
       clearGuides: () => {},
     },
     autoLayoutDrag: { drag: () => {}, release: () => {} },
+    frameMove: {
+      drag: (_g, _screen, world, shift) =>
+        log.push(`move frame to ${world.x} ${world.y}${shift ? ' along one axis' : ''}`),
+      release: () => log.push('release frame move'),
+    },
     selectPress: {
       press: (_e, screen) => {
         log.push(`press ${screen.x} ${screen.y}`)
@@ -135,8 +135,8 @@ function harness(tool: Tool = 'select', under: SceneLayer = UNDER) {
         pressed = { kind: 'move', frame: SQUARE, around: [] } as unknown as MoveDrag
         return pressed
       },
-      pressFrame: (_e, screen, frame) => {
-        log.push(`press frame ${frame.id} at ${screen.x} ${screen.y}`)
+      pressLabel: (_e, screen, frame) => {
+        log.push(`press label of ${frame.id} at ${screen.x} ${screen.y}`)
         return { kind: 'frameMove', frame, pressedAt: screen, from: screen, end: null }
       },
       moved: (screen) => screen.x > 20,
@@ -224,10 +224,10 @@ describe('editorPointer', () => {
       send('pointerup')
       expect(pointer.gesture()).toBeNull()
       expect(log).toEqual([
-        'press frame one-sq at 100 -10',
+        'press label of one-sq at 100 -10',
         'draw overlay',
-        'frame.update 50 0',
-        'end frame move',
+        'move frame to 150 -20 along one axis',
+        'release frame move',
         'release press',
         'draw overlay',
       ])

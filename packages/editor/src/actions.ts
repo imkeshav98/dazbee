@@ -76,12 +76,16 @@ export interface EditorActions {
   fitSelection(): void
 }
 
-/** Which way each arrow moves what it nudges, in steps along x and y. */
-const ARROWS: Readonly<Record<string, readonly [number, number]>> = {
-  nudgeLeft: [-1, 0],
-  nudgeRight: [1, 0],
-  nudgeUp: [0, -1],
-  nudgeDown: [0, 1],
+/** How far each arrow key moves the selection or the picked frame, in design pixels along x and y; Shift goes further. */
+const NUDGES: Readonly<Partial<Record<ShortcutAction, readonly [number, number]>>> = {
+  nudgeLeft: [-NUDGE, 0],
+  nudgeRight: [NUDGE, 0],
+  nudgeUp: [0, -NUDGE],
+  nudgeDown: [0, NUDGE],
+  nudgeLeftFar: [-NUDGE_FAR, 0],
+  nudgeRightFar: [NUDGE_FAR, 0],
+  nudgeUpFar: [0, -NUDGE_FAR],
+  nudgeDownFar: [0, NUDGE_FAR],
 }
 
 export function editorActions({
@@ -294,7 +298,6 @@ export function editorActions({
     if (!current || !frame) return false
     const ids = boxes.roots()
     const nodes = session.design().nodes
-    const far = action.endsWith('Far') ? NUDGE_FAR : NUDGE
     switch (action) {
       case 'deselect': {
         // Out of a group or box one level at a time: it gets selected, then nothing.
@@ -487,24 +490,11 @@ export function editorActions({
         runQuietly(() => session.run('node.update', { ids: current?.ids ?? [], patch: { visible: !shown } }))
         break
       }
-      case 'nudgeLeft':
-      case 'nudgeLeftFar':
-        nudge(-far, 0)
-        break
-      case 'nudgeRight':
-      case 'nudgeRightFar':
-        nudge(far, 0)
-        break
-      case 'nudgeUp':
-      case 'nudgeUpFar':
-        nudge(0, -far)
-        break
-      case 'nudgeDown':
-      case 'nudgeDownFar':
-        nudge(0, far)
-        break
-      default:
-        return false
+      default: {
+        const step = NUDGES[action]
+        if (!step) return false
+        nudge(...step)
+      }
     }
     drawOverlay()
     return true
@@ -516,14 +506,11 @@ export function editorActions({
    * other keys do nothing to it.
    */
   function frameAction(action: ShortcutAction, frameId: string): boolean {
-    const arrow = ARROWS[action.replace(/Far$/, '')]
-    const far = action.endsWith('Far') ? NUDGE_FAR : NUDGE
+    const step = NUDGES[action]
     const stored = session.design().frames[frameId]
-    if (arrow && stored) {
+    if (step && stored) {
       // Another tab may have deleted the frame a moment ago; the key then does nothing.
-      runQuietly(() =>
-        session.run('frame.update', { frameId, x: stored.x + arrow[0] * far, y: stored.y + arrow[1] * far }),
-      )
+      runQuietly(() => session.run('frame.update', { frameId, x: stored.x + step[0], y: stored.y + step[1] }))
     } else if (action === 'deselect') {
       selection.pickFrame(null)
     } else if (action === 'delete') {

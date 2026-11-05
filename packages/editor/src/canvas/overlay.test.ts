@@ -180,14 +180,6 @@ describe('editorOverlay', () => {
     })
   })
 
-  describe('labelRect', () => {
-    it("is where a shown frame's label is drawn on the stage, none for a frame not shown", () => {
-      const { overlay } = harness()
-      expect(overlay.labelRect('one-sq')).toEqual({ x: 8, y: 76, width: 1072, height: 20 })
-      expect(overlay.labelRect('gone')).toBeNull()
-    })
-  })
-
   describe('selectionRect', () => {
     it('is the box round the selection and the size label under it, the box alone while typing, none with nothing selected', () => {
       expect(harness().overlay.selectionRect()).toEqual({ x: 10, y: 110, width: 100, height: 128 })
@@ -198,6 +190,14 @@ describe('editorOverlay', () => {
         height: 100,
       })
       expect(harness({ selected: false }).overlay.selectionRect()).toBeNull()
+    })
+  })
+
+  describe('labelRect', () => {
+    it("is where a shown frame's label is drawn on the stage, none for a frame not shown", () => {
+      const { overlay } = harness()
+      expect(overlay.labelRect('one-sq')).toEqual({ x: 8, y: 76, width: 1072, height: 20 })
+      expect(overlay.labelRect('gone')).toBeNull()
     })
   })
 })

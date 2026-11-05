@@ -14,7 +14,7 @@ import type { EditorSelection } from '../../selection.ts'
 import type { EditorTyping } from '../../text/typing.ts'
 import { CLICK_SLOP } from '../press.ts'
 import type { EditorAutoLayoutDrag, ReorderDrag } from './auto-layout-drag.ts'
-import { type FrameMoveDrag, pressFrame as frameMovePress } from './frame-move.ts'
+import type { EditorFrameMove, FrameMoveDrag } from './frame-move.ts'
 import type { EditorTransformDrag, MarqueeDrag, MoveDrag, ResizeDrag, RotateDrag } from './transform-drag.ts'
 
 /** A drag the select tool's press starts. */
@@ -28,6 +28,7 @@ export interface SelectPressDeps {
   typing: Pick<EditorTyping, 'stop'>
   transformDrag: Pick<EditorTransformDrag, 'handleUnder' | 'pressHandle' | 'pressMove'>
   autoLayoutDrag: Pick<EditorAutoLayoutDrag, 'press'>
+  frameMove: Pick<EditorFrameMove, 'start'>
 }
 
 export interface EditorSelectPress {
@@ -42,10 +43,10 @@ export interface EditorSelectPress {
     deepest: SceneLayer | null,
   ): SelectDrag | null
   /**
-   * A press on a frame's label, or its empty area: it picks the frame, letting the selection and
-   * the group gone into go, and returns the drag that moves the frame.
+   * A press on a frame's label: it picks the frame, letting the selection and the group gone into
+   * go, and returns the drag that moves the frame.
    */
-  pressFrame(e: PointerEvent, screen: Point, frame: Frame): FrameMoveDrag
+  pressLabel(e: PointerEvent, screen: Point, frame: Frame): FrameMoveDrag
   /** Whether the pointer at `screen` has gone far enough to drag; once it has, the press no longer clicks. */
   moved(screen: Point): boolean
   /**
@@ -65,6 +66,7 @@ export function editorSelectPress({
   typing,
   transformDrag,
   autoLayoutDrag,
+  frameMove,
 }: SelectPressDeps): EditorSelectPress {
   const { frameOf } = view
   const { target, lockedAt, insideEntered } = boxes
@@ -173,7 +175,7 @@ export function editorSelectPress({
     }
     return transformDrag.pressMove(frame, around, at.p, ids)
   }
-  function pressFrame(e: PointerEvent, screen: Point, frame: Frame) {
+  function pressLabel(e: PointerEvent, screen: Point, frame: Frame) {
     typing.stop()
     clickedAlone = null
     pressedAt = screen
@@ -184,7 +186,7 @@ export function editorSelectPress({
     selection.enter(null)
     selection.pickFrame(frame.id)
     canvas.setPointerCapture(e.pointerId)
-    return frameMovePress(frame, screen, toWorld(view.camera(), screen))
+    return frameMove.start(frame, screen, toWorld(view.camera(), screen))
   }
   function moved(screen: Point) {
     // A press that may be a click waits until the pointer has really moved, so a shaking tap still clicks.
@@ -221,7 +223,7 @@ export function editorSelectPress({
 
   return {
     press,
-    pressFrame,
+    pressLabel,
     moved,
     release,
     cancel,

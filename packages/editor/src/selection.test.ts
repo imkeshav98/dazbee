@@ -300,6 +300,14 @@ describe('editorSelection', () => {
       selection.dropOffPage()
       expect(selection.pathEditing()).toBeNull()
     })
+
+    it('lets the picked frame go when it is not on the shown page', () => {
+      const { selection, world } = harness()
+      selection.pickFrame('p2-f1')
+      world.frames = [frame('p1', 'f1')]
+      selection.dropOffPage()
+      expect(selection.pickedFrame()).toBeNull()
+    })
   })
 
   describe('pickFrame', () => {
@@ -348,16 +356,6 @@ describe('editorSelection', () => {
       expect(selection.pickedFrame()).toBeNull()
       expect(selection.current()).toBeNull()
       expect(log).toEqual(['changed'])
-    })
-  })
-
-  describe('dropOffPage', () => {
-    it('lets the picked frame go when it is not on the shown page', () => {
-      const { selection, world } = harness()
-      selection.pickFrame('p2-f1')
-      world.frames = [frame('p1', 'f1')]
-      selection.dropOffPage()
-      expect(selection.pickedFrame()).toBeNull()
     })
   })
 

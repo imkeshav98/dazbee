@@ -7,6 +7,7 @@ import type { Frame } from '../../canvas/frames.ts'
 import { hitTest } from '../../canvas/hit-test.ts'
 import { measure, sessionOf, testBoxes } from '../../layers/test-boxes.ts'
 import { editorSelection } from '../../selection.ts'
+import { editorFrameMove } from './frame-move.ts'
 import { editorSelectPress, type SelectPressDeps } from './select-press.ts'
 import type { MarqueeDrag, MoveDrag, ResizeDrag } from './transform-drag.ts'
 
@@ -70,6 +71,7 @@ function harness(handle: ResizeDrag['handle'] | null = null) {
       },
     },
     autoLayoutDrag: { press: () => null },
+    frameMove: editorFrameMove({ session }),
   }
   const select = editorSelectPress(deps)
   /** A press at a point, with Shift held when asked, on the layer a press there finds. */
@@ -144,6 +146,24 @@ describe('editorSelectPress', () => {
       selection.select(['box'], SQUARE.id)
       expect(press({ x: 700, y: 200 })).toEqual({ kind: 'resize' })
       expect(log).toEqual(['stop typing', 'press handle resize'])
+    })
+  })
+
+  describe('pressLabel', () => {
+    it('picks the frame, ending typing and letting the selection and the group gone into go, and starts moving it', () => {
+      const { select, selection, log } = harness()
+      selection.enter('card')
+      selection.select(['dot'], SQUARE.id)
+      expect(select.pressLabel({ pointerId: 1 } as PointerEvent, { x: 40, y: -10 }, SQUARE)).toMatchObject({
+        kind: 'frameMove',
+        frame: SQUARE,
+        pressedAt: { x: 40, y: -10 },
+        from: { x: 40, y: -10 },
+      })
+      expect(selection.current()).toBeNull()
+      expect(selection.entered()).toBeNull()
+      expect(selection.pickedFrame()).toBe('sq')
+      expect(log).toEqual(['stop typing', 'capture'])
     })
   })
 
