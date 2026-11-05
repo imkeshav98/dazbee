@@ -1,9 +1,11 @@
 // The layers-frames specs' design of linked frames on two pages, and their readers.
 import type { DesignInput } from '@dazbee/schema'
 
-import { rect, tree } from './layers-panel.ts'
-import { copyIn, frameDesign, linkedFrames } from './seed.ts'
-import type { Page } from './test.ts'
+import { openTabs } from './editor.ts'
+import { openLayers, rect, tree } from './layers-panel.ts'
+import { copyIn, frameDesign, linkedFrames, seed } from './seed.ts'
+import { fitSettled } from './stage.ts'
+import type { Browser, Page } from './test.ts'
 
 const LOCKED = { move: true, resize: true, content: true, style: true, delete: true }
 const YELLOW = [{ type: 'solid' as const, color: '#FFD23FFF' }]
@@ -115,3 +117,15 @@ export function framesDesign(): DesignInput {
 /** A layer's row by its id: the square's layers and the story's copies share names. */
 export const layerRow = (page: Page, id: string) => tree(page).locator(`[data-layer="${id}"]`)
 export const picked = (page: Page) => page.evaluate(() => window.dazbee?.pickedFrame() ?? null)
+
+/** Opens the design in one tab or two, 1440×1000, the panel open in each. */
+export async function openDesign(browser: Browser, count = 1) {
+  const { tabs, errors } = await openTabs(browser, count, await seed(framesDesign()))
+  for (const tab of tabs) {
+    await tab.setViewportSize({ width: 1440, height: 1000 })
+    await tab.evaluate(() => window.dazbee?.loaded())
+    await fitSettled(tab)
+    await openLayers(tab)
+  }
+  return { tabs, errors }
+}
