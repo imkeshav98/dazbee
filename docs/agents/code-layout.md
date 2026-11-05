@@ -197,7 +197,7 @@ For `apps/web`, run `pnpm dlx madge --circular --extensions ts,tsx --ts-config t
 
 | Layer | Modules, in build order | State owned |
 |---|---|---|
-| 1. No in-memory state | `canvaskit` (the one CanvasKit loader), `run-quietly`, `shortcuts`, `canvas/{camera frames hit-test rulers cursors}`, `layers/{transform snap arrange auto-layout resize}`, `gestures/{press draw-tools path crop}`, `text/text-edit`, `clipboard` (uses `localStorage` and the system clipboard) | none |
+| 1. No in-memory state | `canvaskit` (the one CanvasKit loader), `run-quietly`, `listener-set`, `shortcuts`, `canvas/{camera frames hit-test rulers cursors}`, `layers/{transform snap arrange auto-layout resize}`, `gestures/{press draw-tools path crop}`, `text/text-edit`, `clipboard` (uses `localStorage` and the system clipboard) | none |
 | 2. State owners | `save-state`, `canvas/view`, `resources`, `canvas/scenes`, `tools`, `selection` | see the table below |
 | 3. Queries | `layers/{boxes hug}`, `canvas/thumbnails`, `export/exports` (with `export/export-client`, its side of the export worker `export/export-worker`) | thumbnail caches; the export worker |
 | 4. Behaviours | `text/typing`, `gestures/{pen cropping drawing transform-drag auto-layout-drag select-press}`, `actions`, `place`, `brand-kit`, `layer-edits` | the text being edited and its caret; pen state; snapped guides, snap work and what each drag has written; what a press may still select as a click; drop target; paste point |
