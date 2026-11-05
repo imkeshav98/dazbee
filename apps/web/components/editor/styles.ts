@@ -87,6 +87,14 @@ export const KNOBS = 'grid grid-cols-2 gap-1.5 [&>:last-child:nth-child(odd)]:co
 
 /** A row of a menu: its words at the start, a shortcut or a switch at the end. */
 export const MENU_ITEM = `group flex h-9 w-full shrink-0 cursor-pointer items-center justify-between gap-3 rounded-row px-2.5 text-start text-[13px] font-medium text-text transition-colors duration-[var(--chrome-fast)] ${LIT_ROW} ${TOUCH_ROW} ${DISABLED} ${FOCUS_RING}`
+/**
+ * A menu row that applies but has nothing to do: faded and unlit, still reachable by the pointer and
+ * the keyboard so its tooltip can say why. It goes on a MENU_ITEM marked aria-disabled.
+ */
+export const MENU_ITEM_GREYED =
+  'aria-disabled:cursor-default aria-disabled:opacity-40 aria-disabled:hover:bg-transparent aria-disabled:active:bg-transparent'
+/** A short line over a menu's rows saying what they act on. */
+export const MENU_HEADING = 'px-2.5 pt-1.5 pb-1 text-[11px] font-semibold text-subtle'
 /** The hairline between a menu's groups of rows. */
 export const MENU_DIVIDER = 'mx-1.5 my-1 border-t border-line'
 /** A shortcut shown in a menu row. */

@@ -1,6 +1,7 @@
 'use client'
 
-// The small menu by the selection: lock, duplicate, delete and ⋯, with Group first for several. It
+// The small menu by the selection: lock, duplicate, delete and hide, which act on the selected
+// layers in their own frame and never on their linked copies, and ⋯ for the full menu. It
 // sits above the selection, below it when there is no room above, and under the top bar when there
 // is room neither side, as when the selection fills the stage. It keeps off the top bar, the edit
 // panel, the rail and its flyout and the bottom controls, and hides while a gesture runs, a top bar pop-up or the right-click menu is open, or the selection is off the stage.
@@ -8,9 +9,10 @@
 import {
   CopyIcon,
   DotsThreeIcon,
+  EyeIcon,
+  EyeSlashIcon,
   LockSimpleIcon,
   LockSimpleOpenIcon,
-  SelectionPlusIcon,
   TrashIcon,
 } from '@phosphor-icons/react'
 import * as Popover from '@radix-ui/react-popover'
@@ -234,7 +236,7 @@ export function SmallMenu({ editor, rightClick }: { editor: Editor; rightClick: 
     const lock = design.nodes[id]?.lock
     return Boolean(lock && Object.values(lock).some(Boolean))
   })
-  const several = target.ids.length > 1
+  const hidden = target.props.every((props) => props.visible === false)
   const withKey = (label: string, action: Parameters<typeof keyOf>[0]) =>
     format(t.editor.arrange.withKey, { label, key: keyOf(action) })
   const under = fullMenu.side === 'under'
@@ -254,19 +256,6 @@ export function SmallMenu({ editor, rightClick }: { editor: Editor; rightClick: 
             place ? 'visible' : 'invisible',
           )}
         >
-          {several && (
-            <button
-              type="button"
-              data-bar-item
-              data-testid="small-group"
-              aria-label={t.editor.arrange.group}
-              title={withKey(t.editor.arrange.group, 'group')}
-              onClick={() => editor.perform('group')}
-              className={cn(BAR_BUTTON, 'rounded-full px-1.5')}
-            >
-              <SelectionPlusIcon size={16} aria-hidden />
-            </button>
-          )}
           <button
             type="button"
             data-bar-item
@@ -304,6 +293,18 @@ export function SmallMenu({ editor, rightClick }: { editor: Editor; rightClick: 
             className={cn(BAR_BUTTON, 'rounded-full px-1.5')}
           >
             <TrashIcon size={16} aria-hidden />
+          </button>
+          <button
+            type="button"
+            data-bar-item
+            data-testid="small-hide"
+            aria-label={hidden ? b.show : b.hide}
+            title={withKey(hidden ? b.show : b.hide, 'hide')}
+            aria-pressed={hidden}
+            onClick={() => editor.setHidden(target.ids, !hidden)}
+            className={cn(BAR_TOGGLE, 'rounded-full px-1.5')}
+          >
+            {hidden ? <EyeSlashIcon size={16} weight="fill" aria-hidden /> : <EyeIcon size={16} aria-hidden />}
           </button>
           <Popover.Trigger asChild>
             <button

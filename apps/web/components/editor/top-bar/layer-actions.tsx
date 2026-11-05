@@ -1,17 +1,20 @@
 'use client'
 
 // The selected layers' own actions, one list for the small menu's ⋯ (the full menu) and the
-// right-click menu: copy, paste, duplicate and delete; order and line up with the frame as menus
-// beside their rows, and the turn; group, box, mask (or release the mask a layer is under) and
-// ungroup; lock and hide; text direction. Every row runs the same editor action as its shortcut.
-// A right-click on empty canvas offers to show the hidden layers of the frame there, or of the one
-// nearest it outside every frame, when it has some.
+// right-click menu: Copy ▸ and Paste ▸ (the layers or their style), duplicate, Copy to other frames ▸
+// (style, text or the layer, into the linked frames); order and line up with the frame as menus
+// beside their rows, and the turn; box, mask (or release the mask a layer is under); text
+// direction; and, at the bottom, lock, hide and delete in all frames, acting on the layers and
+// their linked copies. Every row runs the same editor action as its shortcut. An item that never
+// applies is left out; one with nothing to do is greyed, its tooltip saying why. A right-click on
+// empty canvas offers to show the hidden layers of the frame there, or of the one nearest it
+// outside every frame, when it has some.
 import { CaretRightIcon } from '@phosphor-icons/react'
 import * as Popover from '@radix-ui/react-popover'
 import { type ReactNode, useEffect, useState } from 'react'
 
 import { childrenOf, descendants } from '@dazbee/doc'
-import { type Editor, type Frame, type Point, type ShortcutAction, visibleIn } from '@dazbee/editor'
+import { type Editor, type Frame, type LinkedMenu, type Point, type ShortcutAction, visibleIn } from '@dazbee/editor'
 import type { Design } from '@dazbee/schema'
 
 import { ALIGN, keyOf } from '@/components/editor/arrange-actions.ts'
@@ -19,10 +22,19 @@ import { RotationField } from '@/components/editor/edit-panel/position-panel.tsx
 import { set, shared, useTarget } from '@/components/editor/edit-panel/target.ts'
 import { useEditState, usePhone } from '@/components/editor/edit-store.ts'
 import { useSelection } from '@/components/editor/editor-hooks.ts'
-import { ICON_BUTTON, MENU, MENU_DIVIDER, MENU_ITEM, MENU_KEY } from '@/components/editor/styles.ts'
+import {
+  ICON_BUTTON,
+  MENU,
+  MENU_DIVIDER,
+  MENU_HEADING,
+  MENU_ITEM,
+  MENU_ITEM_GREYED,
+  MENU_KEY,
+} from '@/components/editor/styles.ts'
+import { Tooltip } from '@/components/ui/tooltip.tsx'
 import { cn } from '@/lib/cn.ts'
 import { useLocale, useMessages } from '@/lib/i18n/client.tsx'
-import { dirOf, format } from '@/lib/i18n/index.ts'
+import { dirOf, format, type Messages } from '@/lib/i18n/index.ts'
 
 import { useMenuFocus, useScrollingMenu } from './bar-popover.tsx'
 
@@ -32,8 +44,20 @@ export interface HiddenLayers {
   frameId: string
 }
 
+/** Why an item has nothing to do, by the reasons the linked-copy items give. */
+type Why = keyof Messages['editor']['bar']['linked']['why']
+
 /** The four moves along the stack: to the front, forward, backward, to the back. */
 export const ORDER = ['bringToFront', 'bringForward', 'sendBackward', 'sendToBack'] as const
+
+/** Why each linked-copy state has nothing to do; `ready` has none. */
+const WHY: Record<string, Why> = {
+  several: 'several',
+  nothingCopied: 'nothingCopied',
+  noFrames: 'noFrames',
+  noCopies: 'noCopies',
+  everyFrame: 'everyFrame',
+}
 
 /**
  * The layers hidden in the frame at a client point, or outside every frame in the one nearest it;
@@ -67,6 +91,31 @@ function masksOver(design: Design, ids: readonly string[]): string[] | null {
     masks.add(mask[0])
   }
   return [...masks]
+}
+
+/**
+ * Why each of the full menu's style and linked-copy items has nothing to do, or null for one that
+ * has something to do; Paste needs layers copied.
+ */
+function reasons(menu: LinkedMenu, canPaste: boolean) {
+  const own = (state: string, same: Why): Why | null =>
+    state === 'ready' || state === 'hidden'
+      ? null
+      : state === 'same'
+        ? same
+        : state === 'locked'
+          ? 'copiesLocked'
+          : (WHY[state] ?? null)
+  return {
+    paste: canPaste ? null : ('nothingToPaste' as const),
+    copyStyle: own(menu.copyStyle, 'hasStyle'),
+    pasteStyle: menu.pasteStyle === 'locked' ? ('styleLocked' as const) : own(menu.pasteStyle, 'hasStyle'),
+    frames: menu.frames === 0 ? ('noFrames' as const) : null,
+    style: own(menu.style, 'copiesHaveStyle'),
+    text: own(menu.text, 'copiesHaveText'),
+    layer: own(menu.layer, 'everyFrame'),
+    delete: menu.delete === 'locked' ? ('deleteLocked' as const) : null,
+  }
 }
 
 /** The frame nearest a client point, by the distance from the point to its edges on screen. */
@@ -115,43 +164,69 @@ export function LayerActions({ editor, ids, onDone }: { editor: Editor; ids: str
   const mac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform)
   const mod = mac ? '⌘' : 'Ctrl'
   const [copyKey, pasteKey] = [`${mod}+C`, `${mod}+V`]
-  const nodes = target.ids.map((id) => design.nodes[id])
-  const locked = nodes.every((node) => node?.lock && Object.values(node.lock).some(Boolean))
-  const hidden = target.props.every((pr) => pr.visible === false)
   const masks = target.props.every((pr) => Boolean(pr.mask))
   const over = masksOver(design, target.ids)
   const sized = target.types.every((type) => type !== 'group' && type !== 'boolean')
   const texts = target.types.every((type) => type === 'text')
   const direction = shared(target.props.map((pr) => (pr.direction ?? 'auto') as 'auto' | 'ltr' | 'rtl'))
+  const linked = editor.linkedMenu()
+  if (!linked) return null
+  const l = b.linked
+  const why = reasons(linked, editor.canPasteLayers())
+  /** A row that runs a style or linked-copy action, greyed with the reason while it has nothing to do. */
+  const linkedRow = (action: ShortcutAction, label: string, reason: Why | null, danger = false) => (
+    <Row
+      key={action}
+      action={action}
+      label={label}
+      keys={keyOf(action)}
+      why={reason && l.why[reason]}
+      danger={danger}
+      onRun={() => run(action)}
+    />
+  )
   return (
     <>
-      <button
-        type="button"
-        data-action="copy"
-        onClick={() => {
-          if (!document.execCommand('copy')) editor.copyLayers()
-          onDone()
-        }}
-        className={MENU_ITEM}
-      >
-        {b.copy}
-        <kbd className={MENU_KEY}>{copyKey}</kbd>
-      </button>
-      <button
-        type="button"
-        data-action="paste"
-        disabled={!editor.canPasteLayers()}
-        onClick={() => {
-          editor.pasteLayers()
-          onDone()
-        }}
-        className={MENU_ITEM}
-      >
-        {b.paste}
-        <kbd className={MENU_KEY}>{pasteKey}</kbd>
-      </button>
+      <SubMenu label={b.copy} testId="copy">
+        <Row
+          action="copy"
+          label={b.copy}
+          keys={copyKey}
+          why={null}
+          onRun={() => {
+            if (!document.execCommand('copy')) editor.copyLayers()
+            onDone()
+          }}
+        />
+        {linkedRow('copyStyle', l.copyStyle, why.copyStyle)}
+      </SubMenu>
+      <SubMenu label={b.paste} testId="paste">
+        <Row
+          action="paste"
+          label={b.paste}
+          keys={pasteKey}
+          why={why.paste && l.why[why.paste]}
+          onRun={() => {
+            editor.pasteLayers()
+            onDone()
+          }}
+        />
+        {linkedRow('pasteStyle', l.pasteStyle, why.pasteStyle)}
+      </SubMenu>
       {row('duplicate', t.editor.arrange.duplicate)}
-      {row('delete', b.delete)}
+      {why.frames ? (
+        <Row action="copyToFrames" label={l.copyToFrames} keys="" why={l.why[why.frames]} caret />
+      ) : (
+        <SubMenu
+          label={l.copyToFrames}
+          testId="copy-to-frames"
+          heading={linked.frames === 1 ? l.toFrame : format(l.toFrames, { n: linked.frames })}
+        >
+          {linkedRow('styleToLinked', l.style, why.style)}
+          {linked.text !== 'hidden' && linkedRow('textToLinked', l.text, why.text)}
+          {linkedRow('layerToLinked', l.layer, why.layer)}
+        </SubMenu>
+      )}
       <div className={MENU_DIVIDER} />
       <SubMenu label={b.order} testId="order">
         {ORDER.map((action) => row(action, t.editor.arrange[action]))}
@@ -168,7 +243,6 @@ export function LayerActions({ editor, ids, onDone }: { editor: Editor; ids: str
         </div>
       )}
       <div className={MENU_DIVIDER} />
-      {ids.length > 1 && row('group', t.editor.arrange.group)}
       {row('boxSelection', b.putInBox)}
       {over ? (
         <button
@@ -187,30 +261,6 @@ export function LayerActions({ editor, ids, onDone }: { editor: Editor; ids: str
       ) : (
         row('mask', t.editor.arrange.mask, masks)
       )}
-      {target.types.some((type) => type === 'group') && row('ungroup', t.editor.arrange.ungroup)}
-      <div className={MENU_DIVIDER} />
-      <button
-        type="button"
-        onClick={() => {
-          editor.setLocked(target.ids, !locked)
-          onDone()
-        }}
-        className={MENU_ITEM}
-      >
-        {locked ? b.unlock : b.lock}
-        <kbd className={MENU_KEY}>{keyOf('lock')}</kbd>
-      </button>
-      <button
-        type="button"
-        onClick={() => {
-          editor.setHidden(target.ids, !hidden)
-          onDone()
-        }}
-        className={MENU_ITEM}
-      >
-        {hidden ? b.show : b.hide}
-        <kbd className={MENU_KEY}>{keyOf('hide')}</kbd>
-      </button>
       {texts && (
         <>
           <div className={MENU_DIVIDER} />
@@ -233,6 +283,10 @@ export function LayerActions({ editor, ids, onDone }: { editor: Editor; ids: str
           </SubMenu>
         </>
       )}
+      <div className={MENU_DIVIDER} />
+      {linkedRow('lockLinked', linked.lock === 'lock' ? l.lockAll : l.unlockAll, null)}
+      {linkedRow('hideLinked', linked.hide === 'hide' ? l.hideAll : l.showAll, null)}
+      {linkedRow('deleteLinked', l.deleteAll, why.delete, true)}
     </>
   )
 }
@@ -334,7 +388,18 @@ export function AlignRow({ editor }: { editor: Editor }) {
  * A row of the menu that opens a short menu beside it, or under it on a phone, where the screen has
  * no room beside the menu: Enter or the arrow towards it opens it, the arrow back or Esc closes it.
  */
-function SubMenu({ label, testId, children }: { label: string; testId: string; children: ReactNode }) {
+function SubMenu({
+  label,
+  testId,
+  heading,
+  children,
+}: {
+  label: string
+  testId: string
+  /** A short line over its rows saying what they act on. */
+  heading?: string
+  children: ReactNode
+}) {
   const [open, setOpen] = useState(false)
   const phone = usePhone()
   const rtl = dirOf(useLocale()) === 'rtl'
@@ -378,9 +443,66 @@ function SubMenu({ label, testId, children }: { label: string; testId: string; c
           className={cn(MENU, 'min-w-52')}
         >
           {focus.back}
+          {heading && <p className={MENU_HEADING}>{heading}</p>}
           {children}
         </Popover.Content>
       </Popover.Portal>
     </Popover.Root>
+  )
+}
+
+/**
+ * A row of the menu that runs an action, its key at the end. While it has nothing to do it is
+ * greyed, and says why in a tooltip under the pointer, on keyboard focus and on a tap.
+ */
+function Row({
+  action,
+  label,
+  keys,
+  why,
+  danger = false,
+  caret = false,
+  onRun,
+}: {
+  action: string
+  label: string
+  keys: string
+  why: string | null
+  danger?: boolean
+  /** It stands for a row that opens a menu beside it. */
+  caret?: boolean
+  onRun?: () => void
+}) {
+  const [told, setTold] = useState(false)
+  const end = caret ? (
+    <CaretRightIcon size={12} weight="bold" aria-hidden className="text-subtle rtl:-scale-x-100" />
+  ) : (
+    keys && <kbd className={MENU_KEY}>{keys}</kbd>
+  )
+  if (!why)
+    return (
+      <button type="button" data-action={action} onClick={onRun} className={cn(MENU_ITEM, danger && 'text-danger')}>
+        {label}
+        {end}
+      </button>
+    )
+  return (
+    <Tooltip label={why} side="right" open={told} onOpenChange={setTold}>
+      <button
+        type="button"
+        data-action={action}
+        aria-disabled="true"
+        aria-description={why}
+        // A tap shows why, as the pointer resting on it does.
+        onClick={(event) => {
+          event.preventDefault()
+          setTold(true)
+        }}
+        className={cn(MENU_ITEM, MENU_ITEM_GREYED, danger && 'text-danger')}
+      >
+        {label}
+        {end}
+      </button>
+    </Tooltip>
   )
 }
