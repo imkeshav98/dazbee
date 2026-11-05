@@ -92,6 +92,7 @@ function harness(penDrawing = false) {
       nearestFrame: () => wide,
       fitAll: () => log.push('fitAll'),
       fitArea: (area) => log.push(`fitArea ${JSON.stringify(area)}`),
+      showArea: (area) => log.push(`showArea ${JSON.stringify(area)}`),
       zoomTo: (zoom) => log.push(`zoomTo ${zoom}`),
       zoomIn: () => log.push('zoomIn'),
       zoomOut: () => log.push('zoomOut'),
@@ -285,13 +286,18 @@ describe('editorActions', () => {
       expect(session.canUndo()).toBe(false)
     })
 
-    it('duplicates the picked frame with its layers as linked copies, picking the copy, as one undo step', () => {
-      const { actions, session, selection, frame } = harness()
+    it('duplicates the picked frame with its layers as linked copies, picking the copy and showing it, as one undo step', () => {
+      const { actions, session, selection, frame, log } = harness()
       selection.pickFrame(frame.id)
       expect(actions.perform('duplicate')).toBe(true)
       const copy = selection.pickedFrame() ?? ''
       expect(copy).not.toBe(frame.id)
-      expect(session.design().frames[copy]).toMatchObject({ name: 'Square', width: 1080, height: 1080 })
+      const made = session.design().frames[copy]
+      expect(made).toMatchObject({ name: 'Square', width: 1080, height: 1080 })
+      expect(log).toEqual([
+        `showArea ${JSON.stringify({ x: made?.x, y: made?.y, width: 1080, height: 1080 })}`,
+        'overlay',
+      ])
       const links = Object.values(session.design().nodes)
         .filter((node) => node.parentId === copy)
         .map((node) => node.link)

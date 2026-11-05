@@ -28,6 +28,9 @@ export const NO_INSETS: Insets = { top: 0, right: 0, bottom: 0, left: 0 }
 /** Fitting never zooms in past this, so a 320×50 banner doesn't fill the screen. */
 const MAX_FIT_ZOOM = 4
 
+/** The room a frame's label takes over its top, which showing a frame keeps in view too. */
+const LABEL_ROOM = 24
+
 /** Narrower than this, the stage is a phone's (#125). */
 const PHONE_WIDTH = 640
 /** On a phone, the room kept above the ads for their frame labels. */
@@ -66,6 +69,24 @@ export function fit(rect: Rect, viewport: Viewport, padding?: number, insets: In
     zoom,
     x: insets.left + clear.width / 2 - (rect.x + rect.width / 2) * zoom,
     y: phone ? insets.top + above - rect.y * zoom : insets.top + clear.height / 2 - (rect.y + rect.height / 2) * zoom,
+  }
+}
+
+/**
+ * The camera at the same zoom that shows a rect whole, with room for its label over it, in the part
+ * of the viewport the insets leave clear: the camera as it is when that part shows it already, else
+ * one that centres the rect there.
+ */
+export function reveal(c: Camera, rect: Rect, viewport: Viewport, insets: Insets = NO_INSETS): Camera {
+  const start = toScreen(c, { x: rect.x, y: rect.y })
+  const end = toScreen(c, { x: rect.x + rect.width, y: rect.y + rect.height })
+  const right = viewport.width - insets.right
+  const bottom = viewport.height - insets.bottom
+  if (start.x >= insets.left && start.y - LABEL_ROOM >= insets.top && end.x <= right && end.y <= bottom) return c
+  return {
+    zoom: c.zoom,
+    x: (insets.left + right) / 2 - (rect.x + rect.width / 2) * c.zoom,
+    y: (insets.top + bottom) / 2 - (rect.y + rect.height / 2) * c.zoom,
   }
 }
 

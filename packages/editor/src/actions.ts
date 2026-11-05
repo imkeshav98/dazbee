@@ -30,6 +30,7 @@ export interface ActionsDeps {
     | 'nearestFrame'
     | 'fitAll'
     | 'fitArea'
+    | 'showArea'
     | 'zoomTo'
     | 'zoomIn'
     | 'zoomOut'
@@ -97,6 +98,7 @@ export function editorActions({
     nearestFrame,
     fitAll,
     fitArea,
+    showArea,
     zoomTo,
     zoomIn,
     zoomOut,
@@ -502,8 +504,8 @@ export function editorActions({
 
   /**
    * What a key does to the picked frame: Esc lets it go, Delete deletes it with its layers, Mod+D
-   * duplicates it and picks the copy, and the arrows move it; each is one undo step. The layers'
-   * other keys do nothing to it.
+   * duplicates it and picks the copy, panning to show it at the same zoom, and the arrows move it;
+   * each is one undo step. The layers' other keys do nothing to it.
    */
   function frameAction(action: ShortcutAction, frameId: string): boolean {
     const step = NUDGES[action]
@@ -519,6 +521,8 @@ export function editorActions({
     } else if (action === 'duplicate') {
       let copy = ''
       if (runQuietly(() => (copy = session.run('frame.duplicate', { frameId })))) selection.pickFrame(copy)
+      const made = session.design().frames[copy]
+      if (made) showArea({ x: made.x, y: made.y, width: made.width, height: made.height })
     } else {
       return false
     }

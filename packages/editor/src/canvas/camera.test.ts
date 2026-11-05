@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import { FRAME_GAP, type Rect } from '@dazbee/schema'
 
-import { fit, framesInView, toScreen, toWorld, visibleRect, zoomAt } from './camera.ts'
+import { fit, framesInView, reveal, toScreen, toWorld, visibleRect, zoomAt } from './camera.ts'
 import { intersects, pageFrames } from './frames.ts'
 import { design } from './test-design.ts'
 
@@ -62,6 +62,25 @@ describe('fit', () => {
     expect(bottomRight.x).toBeLessThanOrEqual(390 - 16 + 1e-9)
     expect(bottomRight.y).toBeLessThanOrEqual(760 - 150 - 16 + 1e-9)
     expect((topLeft.x + bottomRight.x) / 2).toBeCloseTo(195)
+  })
+})
+
+describe('reveal', () => {
+  const viewport = { width: 1000, height: 800 }
+  const insets = { top: 60, right: 300, bottom: 0, left: 0 }
+  const camera = { x: 100, y: 100, zoom: 0.5 }
+
+  it('keeps the camera when the clear part of the stage shows the rect whole, with room for its label', () => {
+    expect(reveal(camera, { x: 0, y: 0, width: 1080, height: 1080 }, viewport, insets)).toBe(camera)
+  })
+
+  it('pans, at the same zoom, to centre a rect that runs off the clear part of the stage', () => {
+    const next = reveal(camera, { x: 1280, y: 0, width: 1080, height: 1080 }, viewport, insets)
+    expect(next.zoom).toBe(0.5)
+    const topLeft = toScreen(next, { x: 1280, y: 0 })
+    const bottomRight = toScreen(next, { x: 2360, y: 1080 })
+    expect((topLeft.x + bottomRight.x) / 2).toBeCloseTo(350)
+    expect((topLeft.y + bottomRight.y) / 2).toBeCloseTo(430)
   })
 })
 
