@@ -202,6 +202,7 @@ function live(
     boxes,
     camera,
     page: view.page,
+    frameName: options.frameName,
     hug,
     placeBox,
     drawOverlay,

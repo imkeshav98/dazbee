@@ -58,6 +58,7 @@ function harness() {
     boxes: testBoxes(session, selection, frames),
     camera: () => ({ x: 0, y: 0, zoom: 1 }),
     page: () => 'p1',
+    frameName: (width, height) => (width === 300 && height === 300 ? 'Frame' : `${width} by ${height}`),
     hug: (ids) => {
       log.push(`hug ${ids.join(',')}`)
       hug(session, ids)
@@ -273,6 +274,12 @@ describe('editorDrawing', () => {
       drawFrame({ x: 0, y: 0 }, { x: 1300, y: 60 })
       drawFrame({ x: 0, y: 0 }, { x: 70, y: 9000 })
       expect(madeFrames().map(([, f]) => `${f.width}×${f.height}`)).toEqual(['50×50', '1300×109', '667×8000'])
+    })
+
+    it('names the frame it adds as the app names a frame of its size', () => {
+      const { madeFrames, drawFrame } = harness()
+      drawFrame({ x: 0, y: 0 }, { x: 400, y: 200 })
+      expect(madeFrames().map(([, f]) => f.name)).toEqual(['400 by 200'])
     })
 
     it('adds nothing for a click, and the select tool comes back', () => {

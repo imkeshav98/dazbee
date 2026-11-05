@@ -78,6 +78,8 @@ export interface DrawingDeps {
   camera: () => Camera
   /** The page the canvas shows, which a frame drawn with the Frame tool goes on. */
   page: () => string
+  /** The name a frame drawn with the Frame tool takes, from its size. */
+  frameName: (width: number, height: number) => string
   /** Groups fit what they hold again after a change inside them, in the same undo step. */
   hug: (ids: string[]) => void
   /** Puts an overlay element over a box in a frame, in design pixels. */
@@ -114,9 +116,6 @@ export interface EditorDrawing {
   release(g: DrawingDrag): void
 }
 
-/** The name a frame drawn with the Frame tool gets. */
-const FRAME_NAME = 'Frame'
-
 /** Whether a gesture is one that draws a new layer or frame. */
 export const isDrawing = (g: { kind: string } | null): g is DrawingDrag =>
   g?.kind === 'draw' || g?.kind === 'textBox' || g?.kind === 'imageBox' || g?.kind === 'frameDraw'
@@ -130,6 +129,7 @@ export function editorDrawing({
   boxes: { boxIn, containersOf, parentFor },
   camera,
   page,
+  frameName,
   hug,
   placeBox,
   drawOverlay,
@@ -363,7 +363,11 @@ export function editorDrawing({
       Math.round(Math.max(g.from.x, g.to.x)) - x,
       Math.round(Math.max(g.from.y, g.to.y)) - y,
     )
-    if (runQuietly(() => session.run('frame.add', { pageId: page(), name: FRAME_NAME, x, y, ...size })))
+    if (
+      runQuietly(() =>
+        session.run('frame.add', { pageId: page(), name: frameName(size.width, size.height), x, y, ...size }),
+      )
+    )
       selection.select([], null)
   }
 

@@ -30,6 +30,8 @@ export interface EditorOptions extends ResourceSources {
   onStatus?: (status: string) => void
   /** Called with the zoom (1 is 100%) whenever it changes. */
   onZoom?: (zoom: number) => void
+  /** The name a frame drawn with the Frame tool takes, from its size, in the app's words. */
+  frameName: (width: number, height: number) => string
   /** Aborting it while the editor is still connecting stops it, freeing what it made. */
   signal?: AbortSignal
 }

@@ -24,6 +24,7 @@ import { TopBar } from '@/components/editor/top-bar/top-bar.tsx'
 import { carriesFiles, dragFills, dropAt, isAssetFile, placeDroppedFiles } from '@/lib/editor/drop-files.ts'
 import { placeAsset } from '@/lib/editor/place-asset.ts'
 import { useValue, type ValueStore, valueStore } from '@/lib/editor/value-store.ts'
+import { frameName } from '@/lib/frame-name.ts'
 import { useLocale, useMessages } from '@/lib/i18n/client.tsx'
 import { format } from '@/lib/i18n/index.ts'
 
@@ -71,6 +72,12 @@ export function EditorStage({
   // Why a gesture did nothing: auto layout decides where a layer in its flow goes.
   const notices = useMessages().editor.notices
   const svgParts = useMessages().editor.svgParts
+  // The messages a frame drawn with the Frame tool is named from, as they are when it is drawn.
+  const t = useMessages()
+  const messages = useRef(t)
+  useEffect(() => {
+    messages.current = t
+  }, [t])
   const locale = useLocale()
   const [notice, setNotice] = useState<{ text: string; at: number; lasting?: boolean } | null>(null)
   // A right-click on a layer: where, for the menu of its actions, and a count so each right-click opens its own.
@@ -191,6 +198,7 @@ export function EditorStage({
           ...(variables ? { variables } : {}),
           onStatus: status.set,
           onZoom: zoom.set,
+          frameName: (width, height) => frameName(messages.current, width, height),
           signal: unmounted.signal,
         }),
       )
