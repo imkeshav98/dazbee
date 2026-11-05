@@ -39,7 +39,7 @@ export interface EditorSelection {
   /** The frame layers were last selected in on a page, kept after the selection is let go; null with none. */
   lastFrameOn(pageId: string): string | null
   /**
-   * The frame chosen as a whole, by a press on its label or its empty area: outlined, its label lit.
+   * The frame chosen as a whole, by a click on its label or its empty area: outlined, its label lit.
    * No layer is selected meanwhile; the frame's own keys act on it.
    */
   pickedFrame(): string | null

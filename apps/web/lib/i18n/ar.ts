@@ -581,7 +581,6 @@ export const ar: Messages = {
       openKey: 'اختصارات لوحة المفاتيح (?)',
       close: 'إغلاق',
       or: 'أو',
-      drag: 'اسحب',
       groups: {
         edit: 'تحرير',
         tools: 'الأدوات',
@@ -595,7 +594,6 @@ export const ar: Messages = {
         undo: 'تراجع',
         redo: 'إعادة',
         selectAll: 'تحديد الكل',
-        marquee: 'التحديد بالسحب فوق إطار',
         deselect: 'إلغاء التحديد أو الخروج',
         delete: 'حذف',
         duplicate: 'تكرار',

@@ -1,5 +1,5 @@
-// Moving a frame on its page by a drag on its label or its empty area: the frame goes where the
-// pointer takes it, in whole design pixels, and the whole drag is one undo step.
+// Moving a frame on its page by a drag on its label: the frame goes where the pointer takes it, in
+// whole design pixels, and the whole drag is one undo step.
 import type { Session } from '@dazbee/doc'
 import type { Point } from '@dazbee/schema'
 
@@ -7,7 +7,7 @@ import type { Frame } from '../../canvas/frames.ts'
 import { runQuietly } from '../../run-quietly.ts'
 import { CLICK_SLOP } from '../press.ts'
 
-/** A frame being moved, from the press on its label or empty area until it is let go. */
+/** A frame being moved, from the press on its label until it is let go. */
 export interface FrameMoveDrag {
   kind: 'frameMove'
   /** The frame as it was when pressed. */
@@ -24,7 +24,7 @@ export interface FrameMoveDeps {
 }
 
 export interface EditorFrameMove {
-  /** The drag a press on a frame's label or empty area starts, at `screen` on the stage and `world` on the page. */
+  /** The drag a press on a frame's label starts, at `screen` on the stage and `world` on the page. */
   start(frame: Frame, screen: Point, world: Point): FrameMoveDrag
   /**
    * Follows the pointer once it has gone further than a click may wander: the frame moves by as

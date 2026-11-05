@@ -1,7 +1,7 @@
 // Frames on the canvas: a frame is picked by a click on its empty area or its label (outlined, its
-// label lit, a top bar with Background and ⋯), moved by a drag from there or by the arrows, given a
-// background, duplicated, renamed in place and deleted, each by the mouse and by the keyboard, each
-// one undo step that a second tab sees. A page holds a square, a story linked to it and a banner
+// label lit, a top bar with Background and ⋯), moved by a drag on its label or by the arrows, while a
+// drag on its empty area draws a marquee; given a background, duplicated, renamed in place and
+// deleted, each by the mouse and by the keyboard, each one undo step that a second tab sees. A page holds a square, a story linked to it and a banner
 // linked to nothing; the square holds a turned layer, a locked one and one under a mask. The three
 // screen sizes are in frames-on-canvas-screens.spec.ts.
 import { solid } from '../../support/edit-in-frame.ts'
@@ -184,14 +184,32 @@ test('the label takes a press only on its name and size, after a selected layer�
   expect(errors).toEqual([])
 })
 
-test('a drag on a frame’s empty area or its label moves it with its layers, the arrows move it too, each one undo step that a second tab sees', async ({
+test('a drag on a frame’s empty area, picked or not, draws a marquee, adding with Shift; a drag on its label moves it with its layers, along one axis with Shift, and the arrows move it too, each one undo step that a second tab sees', async ({
   browser,
 }) => {
   const { a, b, errors } = await open(browser, 2)
   const before = await read(a)
-  // From the empty area: 100 and 50 design pixels; the layers keep their places in the frame, and
-  // the linked story and the unlinked banner stay as they were.
-  await drag(a, { x: 1000, y: 1000 }, { x: 1100, y: 1050 })
+  // From the empty area, the frame not picked: a marquee over the headline, the frame left where it is.
+  await drag(a, { x: 1000, y: 120 }, { x: 600, y: 160 })
+  expect(await selection(a)).toEqual(['headline'])
+  expect(await picked(a)).toBeNull()
+  // Picked, the same: a marquee from its empty area, which lets the frame go.
+  await click(a, 1000, 1000)
+  expect(await picked(a)).toBe('sq')
+  await drag(a, { x: 1000, y: 120 }, { x: 600, y: 160 })
+  expect(await selection(a)).toEqual(['headline'])
+  expect(await picked(a)).toBeNull()
+  // With Shift, a marquee from the empty area adds what it touches to the selection.
+  await drag(a, { x: 60, y: 1000 }, { x: 250, y: 480 }, ['Shift'], true)
+  expect((await selection(a)).sort()).toEqual(['headline', 'tilt'])
+  expect(await read(a)).toEqual(before)
+  expect(await a.evaluate(() => window.dazbee?.canUndo())).toBe(false)
+
+  // From the label: 100 and 50 design pixels, 50 by 25 screen pixels at half size; the layers keep
+  // their places in the frame, and the linked story and the unlinked banner stay as they were.
+  await a.keyboard.press('Escape')
+  const sq = await labelPoint(a, 'sq', 30)
+  await dragScreen(a, sq, { x: sq.x + 50, y: sq.y + 25 })
   expect(await picked(a)).toBe('sq')
   let after = await read(a)
   expect(after.frames.sq).toMatchObject({ x: 100, y: 50 })
@@ -206,6 +224,13 @@ test('a drag on a frame’s empty area or its label moves it with its layers, th
   expect(await frameOf(a, 'sq')).toMatchObject({ x: 100, y: 50 })
   await press(a, 'undo')
   expect(await a.evaluate(() => window.dazbee?.canUndo())).toBe(false)
+
+  // Shift holds a drag on the label to the axis it went furthest along.
+  const along = await labelPoint(a, 'sq', 30)
+  await dragScreen(a, along, { x: along.x + 60, y: along.y + 20 }, ['Shift'])
+  expect(await frameOf(a, 'sq')).toMatchObject({ x: 120, y: 0 })
+  await press(a, 'undo')
+  expect(await frameOf(a, 'sq')).toMatchObject({ x: 0, y: 0 })
 
   // From the label, which follows the frame: 100 by 40 screen pixels at half size.
   await a.keyboard.press('Escape')
@@ -249,8 +274,9 @@ test('presses on a turned, a masked and a locked layer act on the layer; the fra
   await drag(page, { x: 800, y: 500 }, { x: 1000, y: 700 })
   expect(await frameOf(page, 'sq')).toMatchObject({ x: 0, y: 0 })
   expect(await picked(page)).toBeNull()
-  // The frame moves with its layers as they were: turned, locked and masked.
-  await drag(page, { x: 1000, y: 1000 }, { x: 1040, y: 1000 })
+  // The frame moves by its label with its layers as they were: turned, locked and masked.
+  const from = await labelPoint(page, 'sq', 30)
+  await dragScreen(page, from, { x: from.x + 20, y: from.y })
   expect(await frameOf(page, 'sq')).toMatchObject({ x: 40, y: 0 })
   expect(inFrame(await read(page), 'sq').layers).toEqual(inFrame(before, 'sq').layers)
   // Its copy holds a linked copy of each, turned, locked and masked as they are.

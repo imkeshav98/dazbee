@@ -142,7 +142,7 @@ export interface Editor {
   /** Calls back with the selected layers whenever the selection changes. */
   onSelection(listener: (ids: string[]) => void): () => boolean
   /**
-   * The frame picked as a whole, by a press on its label or its empty area, or null; no layer is
+   * The frame picked as a whole, by a click on its label or its empty area, or null; no layer is
    * selected while one is. Esc, a layer selected or a click on empty canvas lets it go.
    */
   pickedFrame: () => string | null

@@ -158,12 +158,12 @@ test("click, shift-click and marquee select; select all and a marquee leave lock
   await press(page, 'deselect')
   expect(await selection(page)).toEqual([])
 
-  // A marquee from empty canvas, left of the frame, picks every top-level layer it touches: the box,
-  // the dot and the group.
-  await drag(page, { x: -20, y: 30 }, { x: 760, y: 700 })
+  // A marquee from the frame's empty area picks every top-level layer it touches: the box, the dot
+  // and the group.
+  await drag(page, { x: 20, y: 30 }, { x: 760, y: 700 })
   expect((await selection(page)).sort()).toEqual(['arabic', 'box', 'dot', 'headline'])
   writeOutput('selection-1-marquee.png', await page.screenshot())
-  await drag(page, { x: -20, y: 30 }, { x: 400, y: 300 })
+  await drag(page, { x: 20, y: 30 }, { x: 400, y: 300 })
   expect(await selection(page)).toEqual(['box'])
   // Shift adds what a second marquee touches.
   await drag(page, { x: 1060, y: 100 }, { x: 900, y: 200 }, ['Shift'], true)
@@ -324,10 +324,9 @@ test('move, resize and rotate with handles, each one undo step, on a turned laye
   await press(page, 'undo')
   expect((await props(page, 'tilt')).rotation).toBe(30)
 
-  // Several layers: a marquee around the group takes it whole, and its layers move with it. It starts
-  // on the frame's empty area, so Shift is held from the press to draw it rather than move the frame.
+  // Several layers: a marquee around the group takes it whole, and its layers move with it.
   await press(page, 'deselect')
-  await drag(page, { x: 100, y: 1060 }, { x: 140, y: 1000 }, ['Shift'], true)
+  await drag(page, { x: 100, y: 1060 }, { x: 140, y: 1000 })
   expect(await selection(page)).toEqual(['g'])
   await drag(page, { x: 160, y: 940 }, { x: 200, y: 900 })
   expect(await props(page, 'g')).toMatchObject({ x: 160, y: 820 })

@@ -103,15 +103,26 @@ describe('editorSelectPress', () => {
       expect(selection.current()?.ids).toEqual(['box'])
     })
 
-    it('picks the frame on its empty area and starts moving it, letting the selection go', () => {
+    it("starts a marquee on a frame's empty area, letting the selection and the group gone into go", () => {
       const { selection, press, log } = harness()
       selection.enter('card')
       selection.select(['dot'], SQUARE.id)
-      expect(press({ x: 900, y: 900 })).toMatchObject({ kind: 'frameMove', frame: SQUARE, from: { x: 900, y: 900 } })
+      expect(press({ x: 900, y: 900 })).toEqual({
+        kind: 'marquee',
+        from: { x: 900, y: 900 },
+        to: { x: 900, y: 900 },
+        base: [],
+        baseFrame: null,
+      })
       expect(selection.current()).toBeNull()
       expect(selection.entered()).toBeNull()
-      expect(selection.pickedFrame()).toBe('sq')
       expect(log).toEqual(['stop typing', 'capture'])
+    })
+
+    it("starts a marquee on a picked frame's empty area, leaving the frame where it is", () => {
+      const { selection, press } = harness()
+      selection.pickFrame('sq')
+      expect(press({ x: 900, y: 900 })).toMatchObject({ kind: 'marquee', base: [] })
     })
 
     it('starts a marquee off every frame, letting the selection and the picked frame go', () => {
@@ -200,11 +211,16 @@ describe('editorSelectPress', () => {
       expect(selection.current()?.ids).toEqual(['card', 'box'])
     })
 
-    it('keeps the frame a press on its empty area picked, whether it moved the frame or not', () => {
+    it('picks the frame a click on its empty area was pressed on, picked or not, and lets it go after a marquee dragged from there', () => {
       const { select, selection, press } = harness()
-      press({ x: 900, y: 900 })
-      select.release(null)
+      select.release(press({ x: 900, y: 900 }) as MarqueeDrag)
       expect(selection.pickedFrame()).toBe('sq')
+      select.release(press({ x: 900, y: 900 }) as MarqueeDrag)
+      expect(selection.pickedFrame()).toBe('sq')
+      const marquee = press({ x: 900, y: 900 }) as MarqueeDrag
+      marquee.to = { x: 1000, y: 1000 }
+      select.release(marquee)
+      expect(selection.pickedFrame()).toBeNull()
     })
 
     it('selects the locked layer a marquee that stayed a click was pressed on', () => {

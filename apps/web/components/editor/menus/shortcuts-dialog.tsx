@@ -1,8 +1,8 @@
 'use client'
 
 // Every keyboard shortcut of the editor in one place (#158): the table the stage acts on, grouped,
-// with each key as this computer names it, and the keys held while dragging. It opens from the View
-// card's keyboard button, or with ? anywhere but a text field.
+// with each key as this computer names it. It opens from the View card's keyboard button, or with
+// ? anywhere but a text field.
 import { KeyboardIcon, XIcon } from '@phosphor-icons/react'
 import { useEffect, useRef, useState } from 'react'
 
@@ -16,13 +16,9 @@ type Group = keyof Messages['editor']['shortcuts']['groups']
 /** The table's actions the list names: every one that does something. */
 type Listed = ShortcutAction & keyof Messages['editor']['shortcuts']['actions']
 
-/** What a drag does with keys held from its press, and the keys: a marquee on a frame with Shift. */
-const WITH_DRAG = { marquee: ['Shift'] } as const
-type DragAction = keyof typeof WITH_DRAG
-
 /** The table's actions, in the groups the list shows them in. */
-const GROUPS: [Group, (Listed | DragAction)[]][] = [
-  ['edit', ['undo', 'redo', 'selectAll', 'marquee', 'deselect', 'delete', 'duplicate', 'editPoints']],
+const GROUPS: [Group, Listed[]][] = [
+  ['edit', ['undo', 'redo', 'selectAll', 'deselect', 'delete', 'duplicate', 'editPoints']],
   [
     'tools',
     [
@@ -160,23 +156,19 @@ export function ShortcutsButton({ className }: { className: string }) {
                 </h3>
                 <dl className="flex flex-col">
                   {actions.map((action) => {
-                    const drag = action in WITH_DRAG ? (action as DragAction) : null
-                    // A drag's keys end with the drag itself, named in the person's language.
-                    const keys = drag
-                      ? [[...WITH_DRAG[drag].map((key) => keysOf(key, mac)[0] ?? key), t.drag]]
-                      : (SHORTCUTS.find((s) => s.action === action)?.keys ?? []).map((spec) => keysOf(spec, mac))
+                    const keys = SHORTCUTS.find((s) => s.action === action)?.keys ?? []
                     return (
                       <div
                         key={action}
-                        {...(drag ? { 'data-gesture': drag } : { 'data-shortcut': action })}
+                        data-shortcut={action}
                         className="flex items-center justify-between gap-3 border-t border-line py-1.5 first:border-t-0"
                       >
                         <dt className="min-w-0 text-[13px]">{t.actions[action]}</dt>
                         <dd className="flex shrink-0 flex-wrap justify-end gap-1.5" dir="ltr">
-                          {keys.slice(0, 2).map((caps, n) => (
-                            <span key={caps.join('+')} className="flex items-center gap-0.5">
+                          {keys.slice(0, 2).map((spec, n) => (
+                            <span key={spec} className="flex items-center gap-0.5">
                               {n > 0 && <span className="pe-1 text-[11px] text-subtle">{t.or}</span>}
-                              {caps.map((key, i) => (
+                              {keysOf(spec, mac).map((key, i) => (
                                 // A keycap: the well's tint with no outline, its key in the well's muted shade.
                                 <kbd
                                   key={i}
