@@ -309,7 +309,12 @@ function FrameRow({
       />
       <Tick on={on} />
       <span className={cn('min-w-0 flex-1 truncate', bold && 'font-semibold')}>{name}</span>
-      {size && <span className={cn(MENU_KEY, 'shrink-0')}>{size}</span>}
+      {/* Width × height in every language, as the frame's label reads, isolated from the row's direction. */}
+      {size && (
+        <span dir="ltr" className={cn(MENU_KEY, 'shrink-0')}>
+          {size}
+        </span>
+      )}
     </label>
   )
 }

@@ -136,13 +136,17 @@ export const rows = (dialog: Locator) =>
     )
 export const names = async (dialog: Locator) => (await rows(dialog)).map((row) => row.name)
 
-/** Opens the design alone in a tab of a theme at a screen size, fitted, with its fonts loaded. */
-export async function openSized(browser: Browser, viewport: { width: number; height: number }, theme = 'dark') {
+/** Opens the design alone in a tab of a theme and language at a screen size, fitted, with its fonts loaded. */
+export async function openSized(
+  browser: Browser,
+  viewport: { width: number; height: number },
+  { theme = 'dark', locale = 'en' }: { theme?: string; locale?: string } = {},
+) {
   const designId = await seed(design())
   const page = await (await browser.newContext({ viewport, acceptDownloads: true })).newPage()
   const errors: string[] = []
   page.on('pageerror', (error) => errors.push(error.message))
-  await setCookies(page, { theme })
+  await setCookies(page, { theme, locale })
   await page.goto(editorPath(designId))
   await expect(page.getByTestId('status')).toHaveAttribute('data-ready', '', { timeout: 60_000 })
   await page.evaluate(() => window.dazbee?.loaded())

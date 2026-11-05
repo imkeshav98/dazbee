@@ -95,7 +95,7 @@ for (const [width, height] of SCREEN_SIZES) {
       `screenshots at ${width}×${height}, ${theme}: Export listing the page's frames, and a picked frame's ⋯ with Export`,
       { tag: '@evidence' },
       async ({ browser }) => {
-        const { page, errors } = await openSized(browser, { width, height }, theme)
+        const { page, errors } = await openSized(browser, { width, height }, { theme })
         const dialog = await openExport(page)
         await dialog.getByText('Banner', { exact: true }).click()
         await page.mouse.move(0, height - 1)

@@ -11,11 +11,36 @@ import { writeOutput } from '../../support/editor.ts'
 import { expectNode, openExport, runExport } from '../../support/export.ts'
 import { LISTED, names, openSized, rows, SUMMER } from '../../support/export-frames.ts'
 import { choose } from '../../support/fields.ts'
-import { expect, type Page, test } from '../../support/test.ts'
+import { expect, type Locator, type Page, test } from '../../support/test.ts'
 
 test.describe.configure({ timeout: 180_000 })
 
 const TYPES = ['png', 'jpg', 'pdf', 'svg'] as const
+
+/**
+ * The words of each element a locator finds in the order they are drawn, from left to right: a
+ * size reads "1080 × 1920" here when its width is drawn first.
+ */
+const asRead = (found: Locator) =>
+  found.evaluateAll((els) =>
+    els.map((el) => {
+      const words: [number, string][] = []
+      const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT)
+      for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+        const text = node.textContent ?? ''
+        for (const match of text.matchAll(/\S+/g)) {
+          const range = document.createRange()
+          range.setStart(node, match.index)
+          range.setEnd(node, match.index + match[0].length)
+          words.push([range.getBoundingClientRect().left, match[0]])
+        }
+      }
+      return words
+        .sort((a, b) => a[0] - b[0])
+        .map(([, word]) => word)
+        .join(' ')
+    }),
+  )
 
 /** The frames lit on the canvas from outside the stage, by id, and those whose label is lit so. */
 const lit = (page: Page) =>
@@ -153,6 +178,24 @@ test('by keyboard: Export opens on its first control, Tab and Space tick frames 
   await page.keyboard.press('Escape')
   await expect(dialog).toBeHidden()
   await expect(share).toBeFocused()
+  expect(errors).toEqual([])
+})
+
+test('in Arabic each row’s size reads width × height, as its frame’s label on the canvas does', async ({ browser }) => {
+  const { page, errors } = await openSized(browser, { width: 1280, height: 760 }, { locale: 'ar' })
+  await expect(page.locator('html')).toHaveAttribute('dir', 'rtl')
+  const dialog = await openExport(page)
+  const sizes = await asRead(dialog.locator('label:has([data-frame]) > :last-child'))
+  expect(sizes).toEqual(['1080 × 1080', '1080 × 1920', '1200 × 628', '300 × 250'])
+  // Each label that shows its size, as a small frame's drops it, reads as its row does.
+  const labels = await page
+    .locator('.stage-overlay .frame-label:has(.frame-size)')
+    .evaluateAll((els) => els.map((el) => (el as HTMLElement).dataset.frame))
+  expect(labels.length).toBeGreaterThanOrEqual(3)
+  for (const frameId of labels)
+    expect(await asRead(page.locator(`.stage-overlay .frame-label[data-frame="${frameId}"] .frame-size`))).toEqual([
+      sizes[SUMMER.indexOf(frameId ?? '')],
+    ])
   expect(errors).toEqual([])
 })
 
