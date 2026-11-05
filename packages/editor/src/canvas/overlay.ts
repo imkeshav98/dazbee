@@ -51,8 +51,8 @@ export interface EditorOverlay {
   selectionRect(): Rect | null
 }
 
-/** Screen pixels a frame needs before it gets a label. */
-const MIN_LABEL_WIDTH = 56
+/** Screen pixels a frame's label needs to show the frame's size beside its name. */
+const SIZE_LABEL_WIDTH = 120
 /** How far a label stays from the stage's start edge when its frame runs past it. */
 const LABEL_INSET = 8
 /** Room the tool dock takes along the bottom of the stage, which the size label stays out of. */
@@ -109,14 +109,14 @@ export function editorOverlay({
     // A frame running off the stage's start keeps its label in view, along the part still showing.
     const left = Math.max(at.x, LABEL_INSET)
     const width = at.x + frame.width * view.camera().zoom - left
-    // Too narrow to read even a cut name: zoomed far out, the frames speak for themselves.
-    if (width < MIN_LABEL_WIDTH) return null
+    // A narrow frame keeps its name, cut short, and drops its size; only a frame off the stage has none.
+    if (width <= 0) return null
     Object.assign(label.style, { left: px(left), top: px(at.y), width: px(width) })
     const name = document.createElement('span')
     name.className = 'frame-name'
     name.textContent = frame.name
     label.append(name)
-    if (width >= 120) {
+    if (width >= SIZE_LABEL_WIDTH) {
       const size = document.createElement('span')
       size.className = 'frame-size'
       size.textContent = `${frame.width} × ${frame.height}`

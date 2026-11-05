@@ -41,7 +41,9 @@ afterEach(() => {
  * a group gone into, a layer hovered, a drop target and a picked page; each module's parts are
  * one element named for it. Logs what the overlay tells the selection, and keeps what it drew.
  */
-function harness(state: { gesture?: Gesture | null; editing?: Picked | null; selected?: boolean } = {}) {
+function harness(
+  state: { gesture?: Gesture | null; editing?: Picked | null; selected?: boolean; zoom?: number } = {},
+) {
   const log: string[] = []
   let drawn: Fake[] = []
   const editing = state.editing ?? null
@@ -53,7 +55,7 @@ function harness(state: { gesture?: Gesture | null; editing?: Picked | null; sel
       },
     } as unknown as HTMLElement,
     view: {
-      camera: () => ({ x: 0, y: 0, zoom: 1 }),
+      camera: () => ({ x: 0, y: 0, zoom: state.zoom ?? 1 }),
       viewport: () => ({ width: 1000, height: 800 }),
       design: () => design,
       inView: () => [SQUARE],
@@ -145,6 +147,14 @@ describe('editorOverlay', () => {
         'frame-name Sale',
         'frame-size 1080 × 1080',
       ])
+    })
+
+    it('keeps a narrow frame its name, without the size, however narrow it is on screen', () => {
+      for (const zoom of [0.1, 0.02]) {
+        const { overlay, part } = harness({ zoom })
+        overlay.draw()
+        expect(part('frame-label')?.children.map((c) => `${c.className} ${c.textContent}`)).toEqual(['frame-name Sale'])
+      }
     })
 
     it('gives the selection its handles and size, and leaves them off while text is typed into', () => {
