@@ -216,10 +216,13 @@ test('a gradient stop removed while it is dragged ends the drag and its undo ste
   await editor.getByRole('radio', { name: 'Line gradient' }).click()
   const offsets = async () => (await fillsOf(page))[1]?.stops?.map((s) => s.offset)
   const stops = async () => (await offsets())?.length
+  // The bar draws the stops the design has a render later: they are measured once it shows them all.
+  const shown = editor.locator('[data-stop]')
   const bar = await editor.getByTestId('gradient-bar').boundingBox()
   if (!bar) throw new Error('no bar')
   await page.mouse.click(bar.x + bar.width * 0.5, bar.y + bar.height / 2)
   await expect.poll(stops).toBe(3)
+  await expect(shown).toHaveCount(3)
 
   // The middle stop is pressed and, while held, removed with Delete: the drag ends there, and the
   // pointer moving on along the bar moves the stop that took its place in the list no more.
@@ -243,6 +246,7 @@ test('a gradient stop removed while it is dragged ends the drag and its undo ste
   if (!now) throw new Error('no bar')
   await page.mouse.click(now.x + now.width * 0.5, now.y + now.height / 2)
   await expect.poll(stops).toBe(3)
+  await expect(shown).toHaveCount(3)
   const last = await editor.locator('[data-stop="2"]').boundingBox()
   if (!last) throw new Error('no stop')
   await page.mouse.move(last.x + last.width / 2, last.y + last.height / 2)
