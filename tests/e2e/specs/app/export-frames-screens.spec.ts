@@ -1,11 +1,12 @@
 // Export lists frames at the three screen sizes: Export and a picked frame's ⋯ sit clear of
-// everything, the frames list whole and its rows tall enough; and the PR's pictures in both themes.
+// everything, the frames list whole and its rows tall enough; a page of more frames than the list
+// shows scrolls in it, the form still on screen; and the PR's pictures in both themes.
 import { writeOutput } from '../../support/editor.ts'
 import { openExport } from '../../support/export.ts'
-import { LISTED, names, openSized, rows } from '../../support/export-frames.ts'
+import { adsDesign, LISTED, names, openSized, rows } from '../../support/export-frames.ts'
 import { clickLabel } from '../../support/frames-on-canvas.ts'
 import { THEMES } from '../../support/glass.ts'
-import { EDITOR_CHROME, layoutProblems, SCREEN_SIZES } from '../../support/layout.ts'
+import { EDITOR_CHROME, layoutProblems, rowHeights, SCREEN_SIZES, scrolling } from '../../support/layout.ts'
 import { drawn, nextFrame } from '../../support/stage.ts'
 import { expect, type Page, test } from '../../support/test.ts'
 import { barMenu } from '../../support/top-bar.ts'
@@ -62,10 +63,8 @@ for (const [width, height] of SCREEN_SIZES) {
     expect(box.x).toBeGreaterThanOrEqual(0)
     expect(box.x + box.width).toBeLessThanOrEqual(width)
     expect(box.y + box.height).toBeLessThanOrEqual(height)
-    for (const row of await dialog.getByTestId('export-frames').locator('label').all()) {
-      const at = await row.boundingBox()
-      expect(at && at.height >= (width < 640 ? 44 : 28)).toBe(true)
-    }
+    for (const tall of await rowHeights(dialog.getByTestId('export-frames'), 'label'))
+      expect(tall).toBeGreaterThanOrEqual(width < 640 ? 44 : 28)
     // The page's five rows show whole, with no scrolling.
     expect(await dialog.getByTestId('export-frames').evaluate((list) => list.scrollHeight <= list.clientHeight)).toBe(
       true,
@@ -85,6 +84,48 @@ for (const [width, height] of SCREEN_SIZES) {
     await nextFrame(page)
     expect(await problemsWithExport(page)).toEqual([])
     expect((await rows(dialog)).filter((row) => row.on === true).map((row) => row.frame)).toEqual(['sq'])
+    expect(errors).toEqual([])
+  })
+}
+
+for (const [width, height] of SCREEN_SIZES) {
+  test(`at ${width}×${height} a page of nine frames scrolls in the list, part of the next row showing, with JPG’s Quality the whole form on screen`, async ({
+    browser,
+  }) => {
+    const phone = width < 640
+    const { page, errors } = await openSized(browser, { width, height }, { input: adsDesign(9) })
+    // A frame's ⋯ menu's rows, which the list's rows are as tall as.
+    await clickLabel(page, 'ad1')
+    const menu = await barMenu(page, 'frame-more')
+    const [menuRow = 0] = await rowHeights(menu, 'button')
+    await page.keyboard.press('Escape')
+    await expect(menu).toBeHidden()
+
+    const dialog = await openExport(page)
+    await dialog.locator('[data-type="jpg"]').click()
+    await expect(dialog.getByTestId('export-quality')).toBeVisible()
+    await page.mouse.move(0, height - 1)
+    await nextFrame(page)
+    const list = dialog.getByTestId('export-frames')
+    const heights = await rowHeights(list, 'label')
+    expect(heights).toHaveLength(10)
+    expect(new Set(heights)).toEqual(new Set([phone ? Math.max(44, menuRow) : menuRow]))
+    // About eight rows show, five on a phone, and part of the next at the bottom edge, so the list
+    // never looks whole; its bar stays shown on a phone, where no pointer brings it up.
+    const shown = (await list.evaluate((el) => el.clientHeight)) / (heights[0] ?? 1)
+    expect(Math.floor(shown)).toBe(phone ? 5 : 8)
+    expect(shown % 1).toBeGreaterThan(0.3)
+    expect(shown % 1).toBeLessThan(0.7)
+    const state = await scrolling(list)
+    expect(state.scrolls).toBe(true)
+    if (phone) expect(state.bar).toBe(true)
+    // The whole form, Quality and Export too, stays on screen.
+    const box = await dialog.boundingBox()
+    if (!box) throw new Error('no export')
+    expect(box.x).toBeGreaterThanOrEqual(0)
+    expect(box.x + box.width).toBeLessThanOrEqual(width)
+    expect(box.y + box.height).toBeLessThanOrEqual(height)
+    expect(await problemsWithExport(page)).toEqual([])
     expect(errors).toEqual([])
   })
 }

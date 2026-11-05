@@ -17,11 +17,12 @@ import {
 } from '@dazbee/schema'
 
 import { NumberField } from '@/components/editor/edit-panel/fields.tsx'
+import { usePhone } from '@/components/editor/edit-store.ts'
 import { useShownPage } from '@/components/editor/editor-hooks.ts'
 import { FIELD, FIELD_LABEL, MENU_KEY } from '@/components/editor/styles.ts'
 import { Button } from '@/components/ui/button.tsx'
-import { LIT_ROW, SEGMENT, SEGMENTS, TOUCH_ROW } from '@/components/ui/looks.ts'
-import { overlayScroll } from '@/components/ui/overlay-scroll.ts'
+import { LIT_ROW, SEGMENT, SEGMENTS } from '@/components/ui/looks.ts'
+import { useOverlayScroll } from '@/components/ui/overlay-scroll.ts'
 import { Select } from '@/components/ui/select.tsx'
 import { Tick } from '@/components/ui/tick.tsx'
 import { cn } from '@/lib/cn.ts'
@@ -33,8 +34,19 @@ type Ticked = 'all' | ReadonlySet<string>
 
 const LABEL = FIELD_LABEL
 
-/** A frame's row, its tick in a hidden checkbox: lit under the pointer and while pressed, ringed when reached by keyboard. */
-const ROW = `flex h-8 w-full shrink-0 cursor-pointer items-center gap-2.5 rounded-row px-2 text-start text-[13px] font-medium text-text transition-colors duration-[var(--chrome-fast)] ${LIT_ROW} ${TOUCH_ROW} has-[:focus-visible]:bg-hover has-[:focus-visible]:lit has-[:focus-visible]:outline-2 has-[:focus-visible]:-outline-offset-2 has-[:focus-visible]:outline-accent`
+/**
+ * The frames list: its rows as tall as a menu's (MENU_ITEM), 44 px on a phone for a finger, and as
+ * tall as eight and a half of them, five and a half on a phone, so the part of the next row at the
+ * bottom edge shows that it scrolls.
+ */
+const FRAMES_LIST =
+  '-mx-1 flex max-h-[calc(var(--frame-row)*8.5)] flex-col overflow-y-auto px-1 [--frame-row:calc(var(--spacing)*9)] max-sm:max-h-[calc(var(--frame-row)*5.5)] max-sm:[--frame-row:44px]'
+
+/**
+ * A frame's row, its tick in a hidden checkbox: as tall as the list says (FRAMES_LIST), lit under the
+ * pointer and while pressed, ringed when reached by keyboard.
+ */
+const ROW = `flex h-(--frame-row) w-full shrink-0 cursor-pointer items-center gap-2.5 rounded-row px-2 text-start text-[13px] font-medium text-text transition-colors duration-[var(--chrome-fast)] ${LIT_ROW} has-[:focus-visible]:bg-hover has-[:focus-visible]:lit has-[:focus-visible]:outline-2 has-[:focus-visible]:-outline-offset-2 has-[:focus-visible]:outline-accent`
 
 /** Scrolls the list so the row holding a control that took the focus shows whole, its ring and all. */
 function showWhole(control: HTMLElement) {
@@ -42,8 +54,9 @@ function showWhole(control: HTMLElement) {
   const list = row?.parentElement
   if (!row || !list) return
   const [box, at] = [list.getBoundingClientRect(), row.getBoundingClientRect()]
-  if (at.top < box.top) list.scrollTop -= box.top - at.top
-  else if (at.bottom > box.bottom) list.scrollTop += at.bottom - box.bottom
+  // Whole pixels, rounded out, as rows sit on fractions of one.
+  if (at.top < box.top) list.scrollTop -= Math.ceil(box.top - at.top)
+  else if (at.bottom > box.bottom) list.scrollTop += Math.ceil(at.bottom - box.bottom)
 }
 
 function download(name: string, type: string, bytes: Uint8Array<ArrayBuffer>) {
@@ -114,6 +127,9 @@ export function ExportForm({
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null)
   const [error, setError] = useState<string | null>(null)
   const lightsFrame = useLitFrame(editor)
+  // On a phone the list's bar stays shown, as no pointer hovers to bring it up.
+  const list = useRef<HTMLDivElement>(null)
+  const listRef = useOverlayScroll(list, { shown: usePhone() })
 
   // The page's frames in its order, each by its numbered name; the ticked ones are exported, in that order.
   const frames = framesOf(design, thisPage)
@@ -183,11 +199,11 @@ export function ExportForm({
             {t.editor.exports.noFrames}
           </p>
         ) : (
-          // Eight rows show before it scrolls, five on a phone. An empty tick's edge takes the muted
-          // text's shade, which reads over whatever ad lies behind the glass.
+          // An empty tick's edge takes the muted text's shade, which reads over whatever ad lies
+          // behind the glass.
           <div
-            ref={overlayScroll}
-            className="-mx-1 flex max-h-64 flex-col overflow-y-auto px-1 [--line-strong:var(--text-muted)]"
+            ref={listRef}
+            className={cn(FRAMES_LIST, '[--line-strong:var(--text-muted)]')}
             data-testid="export-frames"
           >
             {frames.length > 1 && (
