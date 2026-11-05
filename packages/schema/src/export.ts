@@ -33,6 +33,14 @@ export type ExportRequest = z.infer<typeof ExportRequest>
 /** A request as a caller writes it, before the defaults are filled in. */
 export type ExportRequestInput = z.input<typeof ExportRequest>
 
+/** The name a frame's file takes, and the number added to it to keep it apart from the others. */
+export interface NumberedName {
+  /** The frame's own name made safe for files, then the number, if one was added. */
+  name: string
+  /** The number added after the name, which Export lists after the frame's own; null with none. */
+  number: number | null
+}
+
 /**
  * The names a page's frames' files take, as Export lists them, by the page's order. Each name is
  * first made safe for files (safeFileName), so names that file alike count as one. A frame whose
@@ -42,22 +50,22 @@ export type ExportRequestInput = z.input<typeof ExportRequest>
  */
 export function numberedFrameNames<
   F extends { readonly pageId: string; readonly order: string; readonly name: string },
->(design: { readonly frames: Readonly<Record<string, F>> }, pageId: string): Map<string, string> {
+>(design: { readonly frames: Readonly<Record<string, F>> }, pageId: string): Map<string, NumberedName> {
   const frames = framesOf(design, pageId)
   const had = new Set(frames.map(([, frame]) => safeFileName(frame.name).toLowerCase()))
   const given = new Set<string>()
   const free = (name: string) => !had.has(name.toLowerCase()) && !given.has(name.toLowerCase())
-  const names = new Map<string, string>()
+  const names = new Map<string, NumberedName>()
   for (const [frameId, frame] of frames) {
     const base = safeFileName(frame.name)
-    let name = base
+    let numbered: NumberedName = { name: base, number: null }
     if (given.has(base.toLowerCase())) {
       let n = 2
       while (!free(`${base} ${n}`)) n++
-      name = `${base} ${n}`
+      numbered = { name: `${base} ${n}`, number: n }
     }
-    given.add(name.toLowerCase())
-    names.set(frameId, name)
+    given.add(numbered.name.toLowerCase())
+    names.set(frameId, numbered)
   }
   return names
 }

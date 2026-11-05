@@ -11,6 +11,7 @@ import {
   type ExportType,
   type Frame,
   numberedFrameNames,
+  type NumberedName,
   type Page,
   parseDesign,
   safeFileName,
@@ -58,7 +59,7 @@ export function exportDesign(
   if (missing !== undefined) throw new Error(`no frame "${missing}"`)
   const taken = new Set<string>()
   // Each page's frames' numbered names, worked out once per page.
-  const numbered = new Map<string, Map<string, string>>()
+  const numbered = new Map<string, Map<string, NumberedName>>()
   const files = request.frameIds.map((frameId, i) => {
     const frame = design.frames[frameId] as Frame
     const page = design.pages[frame.pageId] as Page
@@ -73,7 +74,7 @@ export function exportDesign(
     const base = fileName(request.name, {
       design: design.meta.name,
       page: page.name,
-      frame: names.get(frameId) ?? frame.name,
+      frame: names.get(frameId)?.name ?? frame.name,
     })
     let name = `${base}.${request.type}`
     for (let n = 2; taken.has(name.toLowerCase()); n++) name = `${base} ${n}.${request.type}`

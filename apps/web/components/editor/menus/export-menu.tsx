@@ -2,7 +2,7 @@
 
 // Export: the frames of one page, each with a tick, all ticked at first, as PNG, JPG, PDF or SVG;
 // the editor's export worker draws them while the stage stays responsive. Each frame is listed by
-// the name its file takes, numbered where frames share a name, and a row under the pointer or with
+// its own name, then, muted, the number its file takes where frames share a name; a row under the pointer or with
 // the keyboard focus lights its frame on the canvas. One file downloads as itself, more as one zip.
 import { type FocusEvent, useEffect, useRef, useState } from 'react'
 
@@ -218,7 +218,8 @@ export function ExportForm({
             {frames.map(([frameId, frame]) => (
               <FrameRow
                 key={frameId}
-                name={names.get(frameId) ?? frame.name}
+                name={frame.name}
+                number={names.get(frameId)?.number ?? null}
                 size={`${frame.width} × ${frame.height}`}
                 on={isTicked(frameId)}
                 onTick={(on) => tick(frameId, on)}
@@ -297,9 +298,13 @@ export function ExportForm({
   )
 }
 
-/** A row of the frames list: a tick, the name, and the frame's size; or, `bold`, the row that ticks them all. */
+/**
+ * A row of the frames list: a tick, the frame's own name as its label shows it, the number its file
+ * takes after it, and its size; or, `bold`, the row that ticks them all.
+ */
 function FrameRow({
   name,
+  number = null,
   size,
   on,
   onTick,
@@ -309,6 +314,8 @@ function FrameRow({
   bold = false,
 }: {
   name: string
+  /** The number added to the frame's name to keep its file's apart, shown after it, muted. */
+  number?: number | null
   size?: string
   on: boolean | 'mixed'
   onTick: (on: boolean) => void
@@ -319,7 +326,7 @@ function FrameRow({
   bold?: boolean
 }) {
   return (
-    <label className={ROW} title={name} {...lights}>
+    <label className={ROW} title={number === null ? name : `${name} ${number}`} {...lights}>
       <input
         type="checkbox"
         name={frameId ? 'frame' : 'all-frames'}
@@ -335,10 +342,19 @@ function FrameRow({
         data-frame={frameId}
       />
       <Tick on={on} />
-      <span className={cn('min-w-0 flex-1 truncate', bold && 'font-semibold')}>{name}</span>
+      <span className="flex min-w-0 flex-1 items-baseline gap-1">
+        <span className={cn('truncate', bold && 'font-semibold')} data-part="name">
+          {name}
+        </span>
+        {number !== null && (
+          <span className="shrink-0 text-muted" data-part="number">
+            {number}
+          </span>
+        )}
+      </span>
       {/* Width × height in every language, as the frame's label reads, isolated from the row's direction. */}
       {size && (
-        <span dir="ltr" className={cn(MENU_KEY, 'shrink-0')}>
+        <span dir="ltr" className={cn(MENU_KEY, 'shrink-0')} data-part="size">
           {size}
         </span>
       )}

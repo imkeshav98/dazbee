@@ -22,14 +22,14 @@ describe('numberedFrameNames', () => {
       fourth: frame('p1', 'Sale', 'a3'),
       other: frame('p2', 'Sale', 'a0'),
     }
-    expect([...numberedFrameNames({ frames }, 'p1')]).toEqual([
+    expect([...numberedFrameNames({ frames }, 'p1')].map(([id, { name }]) => [id, name])).toEqual([
       ['first', 'Sale'],
       ['story', 'Story'],
       ['third', 'sale 2'],
       ['fourth', 'Sale 3'],
     ])
     // Another page numbers its own frames.
-    expect([...numberedFrameNames({ frames }, 'p2')]).toEqual([['other', 'Sale']])
+    expect([...numberedFrameNames({ frames }, 'p2')].map(([id, { name }]) => [id, name])).toEqual([['other', 'Sale']])
     expect(numberedFrameNames({ frames }, 'p3').size).toBe(0)
   })
 
@@ -40,7 +40,12 @@ describe('numberedFrameNames', () => {
       c: frame('p1', 'Sale', 'a2'),
       d: frame('p1', ' Sale ', 'a3'),
     }
-    expect([...numberedFrameNames({ frames }, 'p1').values()]).toEqual(['Sale 2', 'Sale', 'Sale 3', 'Sale 4'])
+    expect([...numberedFrameNames({ frames }, 'p1').values()].map(({ name }) => name)).toEqual([
+      'Sale 2',
+      'Sale',
+      'Sale 3',
+      'Sale 4',
+    ])
   })
 
   it('keeps a name no other frame shares, numbering a repeat with the lowest number no frame has and none was given', () => {
@@ -49,15 +54,34 @@ describe('numberedFrameNames', () => {
       b: frame('p1', 'Sale', 'a1'),
       c: frame('p1', 'Sale 2', 'a2'),
     }
-    expect([...numberedFrameNames({ frames }, 'p1').values()]).toEqual(['Sale', 'Sale 3', 'Sale 2'])
+    expect([...numberedFrameNames({ frames }, 'p1').values()].map(({ name }) => name)).toEqual([
+      'Sale',
+      'Sale 3',
+      'Sale 2',
+    ])
     const more = { ...frames, d: frame('p1', 'Sale', 'a3'), e: frame('p1', 'Sale 4', 'a4') }
-    expect([...numberedFrameNames({ frames: more }, 'p1').values()]).toEqual([
+    expect([...numberedFrameNames({ frames: more }, 'p1').values()].map(({ name }) => name)).toEqual([
       'Sale',
       'Sale 3',
       'Sale 2',
       'Sale 5',
       'Sale 4',
     ])
+  })
+
+  it('says the number it added to a name, so a list can show it apart from the frame’s own name', () => {
+    const frames = {
+      a: frame('p1', 'Sale', 'a0'),
+      b: frame('p1', 'Sale', 'a1'),
+      c: frame('p1', 'Sale 2', 'a2'),
+      d: frame('p1', 'Sale/Promo', 'a3'),
+    }
+    expect(Object.fromEntries(numberedFrameNames({ frames }, 'p1'))).toEqual({
+      a: { name: 'Sale', number: null },
+      b: { name: 'Sale 3', number: 3 },
+      c: { name: 'Sale 2', number: null },
+      d: { name: 'Sale-Promo', number: null },
+    })
   })
 
   it('numbers the names files take: one a file cannot hold is cleaned first, so the list and the files agree', () => {
@@ -69,7 +93,7 @@ describe('numberedFrameNames', () => {
       e: frame('p1', '. Story', 'a4'),
       f: frame('p1', 'story', 'a5'),
     }
-    expect([...numberedFrameNames({ frames }, 'p1').values()]).toEqual([
+    expect([...numberedFrameNames({ frames }, 'p1').values()].map(({ name }) => name)).toEqual([
       'Sale-Promo',
       'Sale-Promo 2',
       'untitled',

@@ -75,7 +75,7 @@ test('Export lists the shown page’s frames, all ticked, numbered where names r
   }
 
   // Untick the first Sale and Banner by a click: All frames shows some, and the two left keep their numbers.
-  await dialog.getByText('Sale', { exact: true }).click()
+  await dialog.locator('label:has([data-frame="sq"])').click()
   await dialog.getByText('Banner', { exact: true }).click()
   expect((await rows(dialog)).map((row) => row.on)).toEqual(['mixed', false, true, false, true])
   await expect(page.getByTestId('export-run')).toHaveText('Export 2 files')
@@ -178,6 +178,51 @@ test('by keyboard: Export opens on its first control, Tab and Space tick frames 
   await page.keyboard.press('Escape')
   await expect(dialog).toBeHidden()
   await expect(share).toBeFocused()
+  expect(errors).toEqual([])
+})
+
+test('each row shows its frame’s own name, as its label does, and the number its file takes after it, muted', async ({
+  browser,
+}) => {
+  const { page, errors } = await openSized(browser, { width: 1280, height: 760 })
+  const dialog = await openExport(page)
+  await page.mouse.move(0, 759)
+  const muted = await dialog.getByText('Frames', { exact: true }).evaluate((el) => getComputedStyle(el).color)
+  const shown = (frameId: string) =>
+    dialog.locator(`label:has([data-frame="${frameId}"])`).evaluate((label) => {
+      const [name, number] = ['name', 'number'].map((part) => label.querySelector(`[data-part="${part}"]`))
+      return {
+        name: name?.textContent,
+        number: number?.textContent ?? null,
+        colours: [name, number].map((el) => el && getComputedStyle(el).color),
+      }
+    })
+  const text = await dialog.evaluate((el) => getComputedStyle(el).color)
+  expect(await shown('sq')).toEqual({ name: 'Sale', number: null, colours: [text, null] })
+  expect(await shown('story')).toEqual({ name: 'Sale', number: '2', colours: [text, muted] })
+  expect(await shown('mpu')).toEqual({ name: 'sale', number: '3', colours: [text, muted] })
+  expect(muted).not.toBe(text)
+  // The name is the one on the frame's label.
+  for (const frameId of SUMMER)
+    expect((await shown(frameId)).name).toBe(
+      await page.locator(`.stage-overlay .frame-label[data-frame="${frameId}"] .frame-name`).textContent(),
+    )
+  expect(errors).toEqual([])
+})
+
+test('frames whose names file alike are numbered by the names their files take, the list and the files agreeing, one exported alone too', async ({
+  browser,
+}) => {
+  const ads = adsDesign(2)
+  const named = (frameId: string, name: string) => ({ ...ads.frames[frameId], name }) as (typeof ads.frames)[string]
+  const input = { ...ads, frames: { ad1: named('ad1', 'Sale/Promo'), ad2: named('ad2', 'Sale-Promo') } }
+  const { page, errors } = await openSized(browser, { width: 1280, height: 760 }, { input })
+  const dialog = await openExport(page)
+  expect((await rows(dialog)).map((row) => row.name)).toEqual(['All frames', 'Sale/Promo', 'Sale-Promo 2'])
+  const both = await runExport(page)
+  expect(both.files.map((f) => f.path)).toEqual(['Sale-Promo.png', 'Sale-Promo 2.png'])
+  await dialog.getByText('Sale/Promo', { exact: true }).click()
+  expect((await runExport(page)).name).toBe('Sale-Promo 2.png')
   expect(errors).toEqual([])
 })
 

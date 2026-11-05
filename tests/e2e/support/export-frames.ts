@@ -145,7 +145,10 @@ export const adsDesign = (n: number): DesignInput => {
   return { ...first, frames }
 }
 
-/** Each row of the frames list: its name, its size and whether it is ticked, the All frames row first when it shows. */
+/**
+ * Each row of the frames list: its name with the number its file takes, its size and whether it is
+ * ticked, the All frames row first when it shows.
+ */
 export const rows = (dialog: Locator) =>
   dialog
     .getByTestId('export-frames')
@@ -153,10 +156,10 @@ export const rows = (dialog: Locator) =>
     .evaluateAll((labels) =>
       labels.map((label) => {
         const input = label.querySelector('input')
-        const [name, size] = [...label.querySelectorAll('span:not([aria-hidden])')].map((span) => span.textContent)
+        const part = (name: string) => label.querySelector(`[data-part="${name}"]`)?.textContent ?? undefined
         return {
-          name,
-          size,
+          name: [part('name'), part('number')].filter(Boolean).join(' '),
+          size: part('size'),
           on: input?.indeterminate ? 'mixed' : (input?.checked ?? false),
           frame: input?.dataset.frame,
         }
