@@ -1,6 +1,6 @@
 // Short ids in links: a brand and a design made in the app open at a link of two 12-character ids,
 // edits there reach a second tab, and a copy of the design gets a short id too. A design whose id
-// is a UUID, as ids were made before, still opens, syncs to a second tab and exports.
+// is a UUID still opens, syncs to a second tab and exports.
 import * as Y from 'yjs'
 
 import { loadDesign } from '@dazbee/doc'

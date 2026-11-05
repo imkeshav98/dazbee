@@ -1,5 +1,4 @@
 // The workspace and its brands, always read and written within one workspace.
-
 import { and, asc, eq } from 'drizzle-orm'
 
 import { brands, type Db, newId, workspaces } from '@dazbee/db'

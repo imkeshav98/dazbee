@@ -2,7 +2,6 @@
 // for every brand of the workspace, a brand template for its brand only. Starting from one makes a
 // new design of the brand with fresh ids; where the brand isn't the one the template was saved
 // from, the images it names become assets of the brand too, so nothing crosses the brand wall.
-
 import { and, desc, eq, isNull, or } from 'drizzle-orm'
 
 import { assets, type Db, newId, templates } from '@dazbee/db'

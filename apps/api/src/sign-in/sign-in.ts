@@ -1,7 +1,6 @@
 // Sign-in with WorkOS AuthKit (#58). The API alone holds the WorkOS key: it gives the web app the
 // sign-in link, swaps the code WorkOS sends back for the person, and makes their session. A first
 // sign-in makes a workspace (one WorkOS organization) with the person as its Owner (ADR-0011).
-
 import { WorkOS } from '@workos-inc/node'
 import { asc, eq } from 'drizzle-orm'
 
