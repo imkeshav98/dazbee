@@ -96,8 +96,10 @@ export const MENU_ITEM_GREYED =
 export const MENU_HEADING = 'px-2.5 pt-1.5 pb-1 text-[11px] font-semibold text-subtle'
 /** The hairline between a menu's groups of rows. */
 export const MENU_DIVIDER = 'mx-1.5 my-1 border-t border-line'
-/** A shortcut shown in a menu row. */
-export const MENU_KEY = 'font-mono text-[11px] font-normal text-subtle'
+/** A short value at the end of a menu row, in a shortcut's look, as a frame's size in Export. */
+export const MENU_VALUE = 'font-mono text-[11px] font-normal text-subtle'
+/** A shortcut shown in a menu row; none shows on a phone, which has no keyboard. */
+export const MENU_KEY = `${MENU_VALUE} max-sm:hidden`
 /** A switch drawn in a menu row or a card's row that is role="switch": checked, its knob slides to the end. */
 export const SWITCH =
   'relative h-5 w-[34px] shrink-0 rounded-full bg-subtle/70 transition-colors duration-[var(--chrome-fast)] group-aria-checked:bg-accent-solid after:absolute after:start-0.5 after:top-0.5 after:size-4 after:rounded-full after:bg-white after:transition-transform after:duration-[var(--chrome-fast)] group-aria-checked:after:translate-x-3.5 rtl:group-aria-checked:after:-translate-x-3.5'
