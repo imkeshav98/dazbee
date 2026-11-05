@@ -162,9 +162,9 @@ test.describe('the full menu', () => {
     await undo(page)
     await expect.poll(async () => (await node(page, 'mark'))?.parentId).toBe('logo')
 
-    // A box, from the right-click menu, by a press on its own fill.
+    // A box, from the right-click menu, by a press on its fill, clear of its round corners.
     await selectLayers(page, [])
-    const at = await page.evaluate(() => window.dazbee?.screenPoint(90, 885, 'sq'))
+    const at = await page.evaluate(() => window.dazbee?.screenPoint(100, 935, 'sq'))
     await page.mouse.click(at?.x ?? 0, at?.y ?? 0, { button: 'right' })
     const right = page.getByTestId('stage-menu')
     await expect(right).toBeVisible()
