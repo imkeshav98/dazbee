@@ -6,23 +6,22 @@
 // of the screen. Every row runs the same editor action as its shortcut.
 import { DotsThreeIcon } from '@phosphor-icons/react'
 
-import type { Editor } from '@dazbee/editor'
 import type { Design } from '@dazbee/schema'
 
-import { ALIGN, keyOf } from '@/components/editor/arrange-actions.ts'
+import { keyOf } from '@/components/editor/arrange-actions.ts'
 import { RotationField } from '@/components/editor/edit-panel/position-panel.tsx'
 import { factsOf, num, set, shared, type Target } from '@/components/editor/edit-panel/target.ts'
 import { setOpen, useEditState } from '@/components/editor/edit-store.ts'
-import { ICON_BUTTON, KNOB, MENU_DIVIDER, MENU_ITEM, VALUE_TEXT } from '@/components/editor/styles.ts'
+import { KNOB, MENU_DIVIDER, MENU_ITEM, VALUE_TEXT } from '@/components/editor/styles.ts'
 import { FOCUS_RING } from '@/components/ui/looks.ts'
 import { Tooltip } from '@/components/ui/tooltip.tsx'
 import { cn } from '@/lib/cn.ts'
 import { arrangeRows, stackEnds } from '@/lib/editor/stack-ends.ts'
 import { useMessages } from '@/lib/i18n/client.tsx'
-import { format } from '@/lib/i18n/index.ts'
 
 import { BarPopover } from './bar-popover.tsx'
 import { SubMenu } from './layer-actions.tsx'
+import { AlignRow } from './line-up.tsx'
 import { MenuRow, useWhyTip } from './menu-row.tsx'
 
 /** The four moves along the stack: to the front, forward, backward, to the back. */
@@ -135,33 +134,6 @@ export function ArrangeMenu({ target, design, locked }: { target: Target; design
         }
       })}
     </BarPopover>
-  )
-}
-
-/**
- * The six ways to line up the selection, as icons: left, centre, right, top, middle, bottom. Each
- * is named by where it lines up to, and its tooltip says so with its shortcut.
- */
-export function AlignRow({ editor }: { editor: Editor }) {
-  const t = useMessages()
-  const named = t.editor.bar.placing
-  return (
-    // On a phone each button is a finger's size, with room between them.
-    <div dir="ltr" role="group" aria-label={t.editor.arrange.align} className="grid grid-cols-6 gap-0.5 max-sm:gap-2">
-      {ALIGN.map(({ action, icon: Icon }) => (
-        <Tooltip key={action} label={format(t.editor.arrange.withKey, { label: named[action], key: keyOf(action) })}>
-          <button
-            type="button"
-            aria-label={named[action]}
-            data-action={action}
-            onClick={() => editor.perform(action)}
-            className={cn(ICON_BUTTON, 'max-sm:size-[44px]')}
-          >
-            <Icon size={16} aria-hidden />
-          </button>
-        </Tooltip>
-      ))}
-    </div>
   )
 }
 
