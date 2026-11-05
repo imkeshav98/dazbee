@@ -81,6 +81,41 @@ async function selectionColours(knob: Locator, input: Locator) {
   return { selection, field, digits: digits as Rgb }
 }
 
+/**
+ * The first and last rows, in device pixels down the knob, of the ink drawn in each of `parts`: the
+ * pixels near the text colour, inside the part's box.
+ */
+async function inkRows(knob: Locator, parts: Locator[]) {
+  const ck = await loadCanvasKit()
+  const k = await knob.boundingBox()
+  if (!k) throw new Error('no field on screen')
+  // As the page draws it, the caret too, as a person sees it.
+  const drawn = await knob.page().screenshot({ clip: k, animations: 'disabled', caret: 'initial' })
+  const shot = decodePng(ck, new Uint8Array(drawn))
+  const ink = (await knob.evaluate((el) => getComputedStyle(el.querySelector('input') ?? el).color))
+    .match(/\d+/g)
+    ?.slice(0, 3)
+    .map(Number) as Rgb
+  const scale = shot.width / k.width
+  const rows = async (part: Locator) => {
+    const box = await part.boundingBox()
+    if (!box) throw new Error('no part on screen')
+    const found: number[] = []
+    for (let y = 0; y < shot.height; y++)
+      for (let x = Math.round((box.x - k.x) * scale); x < Math.round((box.x + box.width - k.x) * scale); x++) {
+        const [r = 0, g = 0, b = 0] = rgbaAt(shot, x, y)
+        if (Math.abs(r - ink[0]) + Math.abs(g - ink[1]) + Math.abs(b - ink[2]) < 90) {
+          found.push(y)
+          break
+        }
+      }
+    return [Math.min(...found), Math.max(...found)]
+  }
+  const all: number[][] = []
+  for (const part of parts) all.push(await rows(part))
+  return all
+}
+
 /** Presses the mouse at a point and moves it sideways by `by` px, 2 px at a time, as a hand would. */
 async function pressAndMove(page: Page, at: { x: number; y: number }, by: number) {
   await page.mouse.move(at.x, at.y)
@@ -162,17 +197,24 @@ for (const screen of FIELD_SCREENS) {
     expect(errors).toEqual([])
   })
 
-  test(`${size}: Rotate's ° stays outside what is typed, where it is`, async ({ browser }) => {
-    const { page, errors, knob, input } = await openField(browser, screen, FIELDS.rotation)
+  test(`${size}: Rotate's ° stays outside what is typed, where it is, on one line with the digits`, async ({
+    browser,
+  }) => {
+    // At twice the pixels, so a shift of half a pixel shows.
+    const { page, errors, knob, input } = await openField(browser, screen, FIELDS.rotation, { scale: 2 })
     const degree = knob.locator(':scope > [aria-hidden]')
     await expect(degree).toHaveText('°')
     const before = await degree.boundingBox()
+    const atRest = await inkRows(knob, [input, degree])
     const at = await middleOf(knob)
     await page.mouse.click(at.x, at.y)
     await expect.poll(() => caretOf(input)).toEqual({ value: '0', start: 0, end: 1, focused: true })
+    // Neither the 0 nor the ° moves once the field is typed in.
+    expect(await inkRows(knob, [input, degree])).toEqual(atRest)
     await page.keyboard.type('45')
     await expect(input).toHaveValue('45')
     expect(await degree.boundingBox()).toEqual(before)
+    expect((await inkRows(knob, [degree]))[0]).toEqual(atRest[1])
     expect(errors).toEqual([])
   })
 
@@ -235,7 +277,7 @@ for (const screen of FIELD_SCREENS) {
 
   for (const theme of THEMES)
     test(
-      `screenshots at ${size} in ${theme}: selected, typing, hovering, and Rotate's °`,
+      `screenshots at ${size} in ${theme}: selected, typing, hovering, and Rotate's ° selected and typed into`,
       { tag: '@evidence' },
       async ({ browser }) => {
         const { page, errors, knob } = await openField(browser, screen, FIELDS.x, { theme, scale: 2 })
@@ -265,6 +307,8 @@ for (const screen of FIELD_SCREENS) {
         await page.mouse.click(r.x, r.y)
         await expect(rotation.input).toBeFocused()
         await shot('4-rotate')
+        await page.keyboard.type('45')
+        await shot('5-rotate-typing')
         expect(errors).toEqual([])
       },
     )
