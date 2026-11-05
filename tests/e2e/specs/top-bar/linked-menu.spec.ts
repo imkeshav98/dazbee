@@ -69,17 +69,31 @@ const colourOf = async (page: Page, id: string) => ((await node(page, id))?.prop
 const undo = (page: Page) => perform(page, 'undo')
 const redo = (page: Page) => perform(page, 'redo')
 
-/** The rows of a menu that are its own, in order: buttons straight inside it. */
+/** The rows of a menu that are its own, in order, by their words without their keys: buttons straight inside it. */
 const rowsOf = (menu: Locator) =>
-  menu.locator(':scope > button').evaluateAll((rows) => rows.map((row) => row.textContent?.trim() ?? ''))
-/** The greyed row named so in a menu, its tooltip shown by the pointer resting on it; gives the tooltip's words. */
-async function greyedWhy(page: Page, menu: Locator, name: string) {
+  menu.locator(':scope > button').evaluateAll((rows) => rows.map((row) => row.firstChild?.textContent?.trim() ?? ''))
+/**
+ * Checks that the row of a menu named so is greyed and says why: to a screen reader, and in a
+ * tooltip as the pointer rests on it.
+ */
+async function expectGreyed(page: Page, menu: Locator, name: string, why: string) {
   const row = menu.getByRole('button', { name: new RegExp(`^${name}`) }).first()
   await expect(row).toHaveAttribute('aria-disabled', 'true')
+  await expect(row).toHaveAttribute('aria-description', why)
+  // Over the row in a few moves, as a hand does: the first after leaving another tooltip's row only ends that one.
   await row.hover()
-  const tip = page.getByRole('tooltip')
-  await expect(tip).toBeVisible()
-  return (await tip.textContent())?.trim()
+  const box = await row.boundingBox()
+  if (box) await page.mouse.move(box.x + box.width / 2 + 4, box.y + box.height / 2, { steps: 2 })
+  await expect(page.getByRole('tooltip').filter({ hasText: why })).toBeVisible()
+}
+/** Closes the open menus with Esc, which closes the top-most first: a tooltip, a menu beside a row, the menu. */
+async function closeMenus(page: Page) {
+  await expect
+    .poll(async () => {
+      await page.keyboard.press('Escape')
+      return (await page.getByTestId('bar-more-menu').isVisible()) || (await page.getByTestId('stage-menu').isVisible())
+    })
+    .toBe(false)
 }
 
 test.describe('the small menu', () => {
@@ -183,16 +197,12 @@ test.describe('the full menu', () => {
       const sub = await moreSubmenu(page, 'copy-to-frames')
       await expect(sub.getByRole('button')).toHaveText(text ? [/^Style/, /^Text/, /^Layer/] : [/^Style/, /^Layer/])
       await expect(sub.getByText('To the 2 linked frames')).toBeVisible()
-      await page.keyboard.press('Escape')
-      await page.keyboard.press('Escape')
-      await expect(page.getByTestId('bar-more-menu')).toBeHidden()
+      await closeMenus(page)
     }
     // A frame linked to none greys the row and says why.
     await selectLayers(page, ['fresh-title'])
     const menu = await moreMenu(page)
-    expect(await greyedWhy(page, menu, 'Copy to other frames')).toBe(
-      'No other frame on this page is linked to this one',
-    )
+    await expectGreyed(page, menu, 'Copy to other frames', 'No other frame on this page is linked to this one')
     expect(errors).toEqual([])
   })
 })
@@ -206,17 +216,13 @@ test.describe('Copy ▸ and Paste ▸', () => {
     })
     await selectLayers(page, ['photo'])
     const paste = await moreSubmenu(page, 'paste')
-    expect(await greyedWhy(page, paste, 'Paste style')).toBe('Copy a style first')
-    expect(await greyedWhy(page, paste, 'Paste')).toBe('Copy layers first')
-    await page.keyboard.press('Escape')
-    await page.keyboard.press('Escape')
+    await expectGreyed(page, paste, 'Paste style', 'Copy a style first')
+    await expectGreyed(page, paste, 'Paste', 'Copy layers first')
+    await closeMenus(page)
 
     await selectLayers(page, ['headline', 'badge'])
-    expect(await greyedWhy(page, await moreSubmenu(page, 'copy'), 'Copy style')).toBe(
-      'Select one layer to copy its style',
-    )
-    await page.keyboard.press('Escape')
-    await page.keyboard.press('Escape')
+    await expectGreyed(page, await moreSubmenu(page, 'copy'), 'Copy style', 'Select one layer to copy its style')
+    await closeMenus(page)
 
     await selectLayers(page, ['badge'])
     await moreAction(page, 'Copy style')
@@ -228,11 +234,8 @@ test.describe('Copy ▸ and Paste ▸', () => {
     await expect.poll(() => fillOf(page, 'mark')).toBe(INK)
     await redo(page)
     await expect.poll(() => fillOf(page, 'mark')).toBe(PINK)
-    expect(await greyedWhy(page, await moreSubmenu(page, 'paste'), 'Paste style')).toBe(
-      'The selection has this style already',
-    )
-    await page.keyboard.press('Escape')
-    await page.keyboard.press('Escape')
+    await expectGreyed(page, await moreSubmenu(page, 'paste'), 'Paste style', 'The selection has this style already')
+    await closeMenus(page)
 
     // By key: the shape's green onto the card.
     await selectLayers(page, ['shapes'])
@@ -292,9 +295,8 @@ test.describe('Copy to other frames ▸', () => {
     const { page, errors } = await open(browser)
     await selectLayers(page, ['headline'])
     const sub = await moreSubmenu(page, 'copy-to-frames')
-    expect(await greyedWhy(page, sub, 'Style')).toBe('Every linked copy has this style already')
-    await page.keyboard.press('Escape')
-    await page.keyboard.press('Escape')
+    await expectGreyed(page, sub, 'Style', 'Every linked copy has this style already')
+    await closeMenus(page)
     await page.evaluate(() =>
       window.dazbee?.setProps(['headline'], (_, p) => ({ style: { ...(p.style as object), color: '#FF4FB0FF' } })),
     )
@@ -315,7 +317,10 @@ test.describe('Copy to other frames ▸', () => {
     await page.keyboard.press('Control+Alt+Shift+KeyC')
     await expect.poll(() => colourOf(page, copyIn('wide', 'headline'))).toBe(PINK)
     expect(await colourOf(page, copyIn('story', 'headline'))).toBe(INK)
-    expect(await greyedWhy(page, await moreSubmenu(page, 'copy-to-frames'), 'Style')).toBe(
+    await expectGreyed(
+      page,
+      await moreSubmenu(page, 'copy-to-frames'),
+      'Style',
       'The linked copies that differ are locked',
     )
     expect(errors).toEqual([])
@@ -330,11 +335,13 @@ test.describe('Copy to other frames ▸', () => {
     await moreAction(page, 'Text')
     await expect.poll(async () => (await node(page, copyIn('story', 'headline')))?.props.text).toBe('Weekend sale!')
     expect((await node(page, copyIn('wide', 'headline')))?.props.text).toBe('Weekend sale!')
-    expect(await greyedWhy(page, await moreSubmenu(page, 'copy-to-frames'), 'Text')).toBe(
+    await expectGreyed(
+      page,
+      await moreSubmenu(page, 'copy-to-frames'),
+      'Text',
       'Every linked copy has this text already',
     )
-    await page.keyboard.press('Escape')
-    await page.keyboard.press('Escape')
+    await closeMenus(page)
     await undo(page)
     await expect.poll(async () => (await node(page, copyIn('story', 'headline')))?.props.text).toBe('Weekend sale')
     await page.keyboard.press('Control+Alt+Shift+KeyT')
@@ -367,20 +374,23 @@ test.describe('Copy to other frames ▸', () => {
     )
     await selectLayers(page, [copyIn('wide', 'logo')])
     await page.getByTestId('small-delete').click()
+    const dot = (await node(page, 'dot'))?.link ?? ''
     await selectLayers(page, ['dot'])
     await moreAction(page, 'Layer')
-    await expect.poll(async () => Object.keys(await holders(page, 'dot')).sort()).toEqual(['sq', 'story', 'wide'])
-    const placed = await holders(page, 'dot')
+    await expect.poll(async () => Object.keys(await holders(page, dot)).sort()).toEqual(['sq', 'story', 'wide'])
+    const placed = await holders(page, dot)
     expect((await node(page, placed.story?.[0] ?? ''))?.parentId).toBe(copyIn('story', 'logo'))
     expect((await node(page, placed.wide?.[0] ?? ''))?.parentId).toBe('wide')
     expect(await page.evaluate(() => window.dazbee?.selection())).toEqual(['dot'])
-    expect(await greyedWhy(page, await moreSubmenu(page, 'copy-to-frames'), 'Layer')).toBe(
+    await expectGreyed(
+      page,
+      await moreSubmenu(page, 'copy-to-frames'),
+      'Layer',
       'Every linked frame has this layer already',
     )
-    await page.keyboard.press('Escape')
-    await page.keyboard.press('Escape')
+    await closeMenus(page)
     await undo(page)
-    await expect.poll(async () => Object.keys(await holders(page, 'dot'))).toEqual(['sq'])
+    await expect.poll(async () => Object.keys(await holders(page, dot))).toEqual(['sq'])
 
     // The headline and subline grouped in the square: the group goes into each linked frame with
     // that frame's own copies of the two inside it.
@@ -481,8 +491,34 @@ for (const [width, height] of SCREEN_SIZES) {
     await expect.poll(() => layoutProblems(page, { pieces: PIECES, uncut: UNCUT })).toEqual([])
     await moreMenu(page)
     await expect.poll(() => layoutProblems(page, { pieces: PIECES, uncut: UNCUT })).toEqual([])
-    await moreSubmenu(page, 'copy-to-frames')
-    await expect.poll(() => layoutProblems(page, { pieces: PIECES, uncut: UNCUT })).toEqual([])
+    const sub = await moreSubmenu(page, 'copy-to-frames')
+    if (width > 600) {
+      await expect.poll(() => layoutProblems(page, { pieces: PIECES, uncut: UNCUT })).toEqual([])
+    } else {
+      // On a phone it opens under its row, laid over the full menu as the mock draws it: wholly on
+      // the screen and on top, each row a finger's height, once it has popped in.
+      await sub.evaluate((el) => Promise.all(el.getAnimations().map((a) => a.finished.catch(() => undefined))))
+      const rows = await sub.getByRole('button').evaluateAll((buttons) =>
+        buttons.map((button) => {
+          const r = button.getBoundingClientRect()
+          const top = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2)
+          return {
+            inside: r.left >= 0 && r.right <= innerWidth && r.bottom <= innerHeight,
+            onTop: button.contains(top),
+            height: r.height,
+          }
+        }),
+      )
+      for (const row of rows) expect(row).toMatchObject({ inside: true, onTop: true })
+      for (const row of rows) expect(row.height).toBeGreaterThanOrEqual(44)
+      // A tap on a greyed row says why, as the pointer resting on it does.
+      // Playwright holds back a click on a row marked disabled until it isn't; the tap is the point here.
+      await sub.getByRole('button', { name: /^Layer/ }).click({ force: true })
+      await expect(
+        page.getByRole('tooltip').filter({ hasText: 'Every linked frame has this layer already' }),
+      ).toBeVisible()
+      await expect(sub).toBeVisible()
+    }
     expect(errors).toEqual([])
   })
 }

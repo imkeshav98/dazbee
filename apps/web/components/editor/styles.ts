@@ -92,7 +92,7 @@ export const MENU_ITEM = `group flex h-9 w-full shrink-0 cursor-pointer items-ce
  * the keyboard so its tooltip can say why. It goes on a MENU_ITEM marked aria-disabled.
  */
 export const MENU_ITEM_GREYED =
-  'aria-disabled:cursor-default aria-disabled:opacity-40 aria-disabled:hover:bg-transparent aria-disabled:active:bg-transparent'
+  'aria-disabled:cursor-not-allowed aria-disabled:opacity-40 aria-disabled:hover:bg-transparent aria-disabled:active:bg-transparent'
 /** A short line over a menu's rows saying what they act on. */
 export const MENU_HEADING = 'px-2.5 pt-1.5 pb-1 text-[11px] font-semibold text-subtle'
 /** The hairline between a menu's groups of rows. */
