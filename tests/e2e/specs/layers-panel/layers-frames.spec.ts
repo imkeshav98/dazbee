@@ -3,8 +3,7 @@
 // the canvas opening its frame and the groups it is in and showing its row, "only here" on a layer
 // none of its frame's linked frames holds; a frame renamed from its row in one undo step, which a
 // second tab sees; hide and lock on a row acting on that layer alone, never its linked copy; a layer
-// dragged onto its own frame's row going to the top and onto another frame's going nowhere; the
-// keyboard through frames and layers.
+// dragged onto its own frame's row going to the top and onto another frame's going nowhere.
 import { screenPoint, writeOutput } from '../../support/editor.ts'
 import { layerRow, openDesign, picked } from '../../support/layers-frames.ts'
 import { frameRow, listed, node, row, tree } from '../../support/layers-panel.ts'

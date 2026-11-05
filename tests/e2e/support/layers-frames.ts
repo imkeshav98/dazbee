@@ -1,4 +1,4 @@
-// The layers-frames specs' design of linked frames on two pages, and their readers.
+// The layers-frames specs' design of linked frames on two pages, its opener and their readers.
 import type { DesignInput } from '@dazbee/schema'
 
 import { openTabs } from './editor.ts'

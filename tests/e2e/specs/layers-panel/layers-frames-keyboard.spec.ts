@@ -1,3 +1,5 @@
+// The layers panel's frames by the keyboard alone, in Chromium: Tab into the tree, the arrows, Home
+// and End through frames and layers, opening and closing them and picking a frame, and renaming it.
 import { writeOutput } from '../../support/editor.ts'
 import { openDesign, picked } from '../../support/layers-frames.ts'
 import { frameRow, row, tabIntoTree, tree } from '../../support/layers-panel.ts'
