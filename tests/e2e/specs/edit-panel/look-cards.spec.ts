@@ -274,6 +274,12 @@ test.describe('found by review', () => {
         expectTouchTargets(await swatchTouches(panel, ADD_IMAGE), `${name}, ${ADD_IMAGE.control}`, sheet)
       for (const kind of kinds) {
         const editor = await fillAs(panel, kind, asset.id)
+        // A third stop, tapped onto the bar's middle, so Remove this stop can be pressed.
+        const stops = editor.locator('[data-stop]')
+        if (kind !== 'Solid' && kind !== 'Image' && (await stops.count()) < 3) {
+          await editor.getByRole('group', { name: /^Gradient stops/ }).tap()
+          await expect(stops).toHaveCount(3)
+        }
         const what = `${name}, its paint editor on ${kind}, ${PAINT_TARGETS.control}`
         const touches = await swatchTouches(editor, PAINT_TARGETS)
         expect(touches.length, `${what}: the targets measured`).toBeGreaterThan(5)
