@@ -70,6 +70,9 @@ export interface ActionsDeps {
   drawOverlay: () => void
 }
 
+/** What Ungroup would do for the selection, or why it has nothing to do (`EditorActions.ungroupState`). */
+export type UngroupState = 'ready' | 'none' | 'locked' | 'placedByLayout'
+
 export interface EditorActions {
   /**
    * Does what a shortcut names. Returns whether there was anything to do it to; the keys that act
@@ -78,11 +81,12 @@ export interface EditorActions {
    */
   perform(action: ShortcutAction): boolean
   /**
-   * Whether Ungroup has something to do: a selected group, box or boolean comes apart with every
-   * layer of its frame staying where it is drawn. False while each one is in an auto layout box
-   * whose flow would place what it holds elsewhere, or with none selected.
+   * What Ungroup would do for the selection: `ready` while a selected group, box or boolean comes
+   * apart with every layer of its frame staying where it is drawn; otherwise why none can, `locked`
+   * when each is locked against deleting, else `placedByLayout` when an auto layout box would place
+   * what one holds elsewhere; `none` with no group, box or boolean selected.
    */
-  canUngroup(): boolean
+  ungroupState(): UngroupState
   /** Fits the selection in view, else the picked frame, else the shown page's frames. */
   fitSelection(): void
 }
@@ -139,19 +143,32 @@ export function editorActions({
 
   /**
    * The selected groups, boxes and booleans that come apart with nothing moving, each with where
-   * what it holds is drawn, and how many were selected; null without a selection.
+   * what it holds is drawn; how many were selected; and how many stay whole because their auto
+   * layout box would place what they hold elsewhere. One locked against deleting stays whole too.
    */
   function ungroupable() {
     const current = selection.current()
     const frame = current && frameOf(current.frameId)
-    if (!frame) return null
     const now = session.design()
-    const containers = boxes.roots(now).filter((id) => ['group', 'box', 'boolean'].includes(now.nodes[id]?.type ?? ''))
+    const containers = frame
+      ? boxes.roots(now).filter((id) => ['group', 'box', 'boolean'].includes(now.nodes[id]?.type ?? ''))
+      : []
+    const unlocked = containers.filter((id) => !now.nodes[id]?.lock?.delete)
     const placed = (id: string) => boxes.drawnInFlow(childrenOf(now, id).map(([child]) => child)) ?? {}
-    const groups = containers
-      .filter((id) => !layoutIn(now.nodes[id]?.parentId ?? '', now) || ungroupKeeps(frame, id, placed(id), now))
+    const groups = unlocked
+      .filter(
+        (id) => !layoutIn(now.nodes[id]?.parentId ?? '', now) || (frame && ungroupKeeps(frame, id, placed(id), now)),
+      )
       .map((id) => ({ id, drawn: placed(id) }))
-    return { frame, groups, selected: containers.length }
+    return { groups, selected: containers.length, placedByLayout: unlocked.length - groups.length }
+  }
+
+  /** What Ungroup would do for the selection, or why it has nothing to do. */
+  function ungroupState(): UngroupState {
+    const { groups, selected, placedByLayout } = ungroupable()
+    if (selected === 0) return 'none'
+    if (groups.length > 0) return 'ready'
+    return placedByLayout > 0 ? 'placedByLayout' : 'locked'
   }
 
   /** Combines the selected shapes into a live boolean (#44) and selects it. One undo step. */
@@ -469,12 +486,13 @@ export function editorActions({
       case 'ungroup': {
         // Boxes and booleans come apart the same way: what a box laid out stays where it is drawn,
         // and a boolean's shapes show their own paints again. In an auto layout box, a layer comes
-        // apart only when what it held takes its place in the flow with nothing moving; while none
-        // can, the menus grey Ungroup and its key does nothing.
-        const { groups, selected } = ungroupable() ?? { groups: [], selected: 0 }
+        // apart only when what it held takes its place in the flow with nothing moving, and one
+        // locked against deleting stays whole; while none can, the menus grey Ungroup with the
+        // reason and its key does nothing.
+        const { groups, selected, placedByLayout } = ungroupable()
         if (selected === 0) return false
         if (groups.length === 0) return true
-        if (groups.length < selected) notify('placedByLayout')
+        if (placedByLayout > 0) notify('placedByLayout')
         const freeing = groups.map((group) => group.id)
         let freed: string[] = []
         if (
@@ -540,7 +558,7 @@ export function editorActions({
 
   return {
     perform,
-    canUngroup: () => (ungroupable()?.groups.length ?? 0) > 0,
+    ungroupState,
     fitSelection,
   }
 }

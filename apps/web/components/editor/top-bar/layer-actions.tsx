@@ -6,15 +6,15 @@
 // release the mask a layer is under); and, at the bottom, lock, hide and delete in all frames, acting
 // on the layers and their linked copies. Every row runs the same editor action as its shortcut. An
 // item that never applies is left out; one with nothing to do is greyed, its tooltip saying why, as
-// Ungroup is while auto layout would move what the group or box holds. How
-// the layers sit (order, line up, the turn, text direction) is in the top bar's Arrange ⋯.
+// Ungroup is while the group or box is locked or auto layout would move what it holds. How the
+// layers sit (order, line up, the turn, text direction) is in the top bar's Arrange ⋯.
 import { CaretLeftIcon, CaretRightIcon } from '@phosphor-icons/react'
 import * as Popover from '@radix-ui/react-popover'
 import { type KeyboardEvent, type ReactNode, useCallback, useLayoutEffect, useRef, useState } from 'react'
 import { flushSync } from 'react-dom'
 
 import { childrenOf } from '@dazbee/doc'
-import type { Editor, ShortcutAction } from '@dazbee/editor'
+import type { Editor, ShortcutAction, UngroupState } from '@dazbee/editor'
 import type { Design } from '@dazbee/schema'
 
 import { keyOf } from '@/components/editor/arrange-actions.ts'
@@ -31,6 +31,10 @@ import { MenuRow } from './menu-row.tsx'
 
 /** Why an item has nothing to do: the reason the linked-copy items give, by its message. */
 type Why = keyof Messages['editor']['bar']['linked']['why']
+
+/** Why Ungroup has nothing to do, or null while it has something to do. */
+const ungroupWhy = (state: UngroupState, b: Messages['editor']['bar']) =>
+  state === 'locked' ? b.lockedRow : state === 'placedByLayout' ? b.ungroupMoves : null
 
 /** The width of a menu beside a row whose rows have long keys, as the mock draws Copy to other frames ▸. */
 export const WIDE_MENU = 258
@@ -79,7 +83,7 @@ export function LayerActions({ editor, ids, onDone }: { editor: Editor; ids: str
   const b = t.editor.bar
   const selected = useTarget(editor, ids)
   // Asked once as the menu opens: it tries the ungroup on a copy of the design.
-  const [ungroupable] = useState(() => editor.canUngroup())
+  const [ungroup] = useState(() => editor.ungroupState())
   if (!selected) return null
   const { target, design } = selected
   const run = (action: ShortcutAction) => {
@@ -168,7 +172,7 @@ export function LayerActions({ editor, ids, onDone }: { editor: Editor; ids: str
       <div className={MENU_DIVIDER} />
       {row('boxSelection', b.putInBox)}
       {target.types.every((type) => type === 'group' || type === 'box') &&
-        actionRow('ungroup', t.editor.arrange.ungroup, ungroupable ? null : b.ungroupMoves)}
+        actionRow('ungroup', t.editor.arrange.ungroup, ungroupWhy(ungroup, b))}
       {over ? (
         <MenuRow
           action="releaseMask"

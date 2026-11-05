@@ -5,6 +5,7 @@ import type { ExportedFile } from '@dazbee/export'
 import type { Design, ExportRequestInput, Point, Rect, TextStyle, VariableRef, Variables } from '@dazbee/schema'
 import type { Skipped } from '@dazbee/svg'
 
+import type { UngroupState } from './actions.ts'
 import type { Camera, Insets, Viewport } from './canvas/camera.ts'
 import type { Frame } from './canvas/frames.ts'
 import type { Spot } from './canvas/view.ts'
@@ -71,11 +72,12 @@ export interface Editor {
   /** Does what a shortcut does, as if its key was pressed on the stage. */
   perform: (action: ShortcutAction) => boolean
   /**
-   * Whether Ungroup has something to do for the selection: false while every selected group or box
-   * is in an auto layout box whose flow would place what it holds elsewhere. It tries the ungroup on
-   * a copy of the design, so a menu asks once as it opens.
+   * What Ungroup would do for the selection: `ready`, `none` with no group or box selected, or why
+   * none can come apart, `locked` (each is locked against deleting) or `placedByLayout` (an auto
+   * layout box would place what it holds elsewhere). It tries the ungroup on a copy of the design,
+   * so a menu asks once as it opens.
    */
-  canUngroup: () => boolean
+  ungroupState: () => UngroupState
   /** Whether this tab has a change of its own to undo, or an undone one to redo. */
   canUndo: () => boolean
   canRedo: () => boolean

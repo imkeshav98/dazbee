@@ -1,6 +1,7 @@
 // Ungroup in the full menu (the small menu's ⋯) and the right-click menu for a group or a box in an
-// auto layout box, in Chromium: greyed with the reason while ungrouping would move what it holds,
-// its key doing nothing and showing no notice, and live for one outside an auto layout box.
+// auto layout box, in Chromium: greyed with the reason while ungrouping would move what it holds
+// or the layer is locked, its key doing nothing and showing no notice; live for one outside an auto
+// layout box, and for a group whose layer takes its place with nothing moving.
 import { closeMenus, expectGreyed, node, open } from '../../support/linked-menu.ts'
 import { rowIn, rowName } from '../../support/menu-rows.ts'
 import { drawn, press, selectLayers } from '../../support/stage.ts'
@@ -68,5 +69,28 @@ test('greys Ungroup with its reason in both menus for a box an auto layout row w
   expect(await page.evaluate(() => JSON.stringify(window.dazbee?.design()))).toBe(before)
   expect(await notices()).toBe(0)
   expect(await page.evaluate(() => window.dazbee?.selection())).toEqual(['card'])
+  expect(errors).toEqual([])
+})
+
+test('keeps Ungroup live for a group in an auto layout row whose layer takes its place, and greys it with the lock as the reason once it is locked', async ({
+  browser,
+}) => {
+  const { page, errors } = await open(browser)
+  await page.evaluate(() => {
+    const session = window.dazbee?.session
+    const row = session?.run('node.box', { ids: ['badge', 'card', 'logo'] }) ?? ''
+    session?.run('node.autoLayout', { id: row, on: true })
+  })
+  await drawn(page)
+  await selectLayers(page, ['logo'])
+  await expect(rowIn(await moreMenu(page), 'ungroup')).not.toHaveAttribute('aria-disabled', 'true')
+  await closeMenus(page)
+  // Locked from its small menu, as a person locks it.
+  await selectLayers(page, ['logo'])
+  await page.getByTestId('small-lock').click()
+  await expectGreyed(page, await moreMenu(page), rowName('ungroup'), 'The layer is locked')
+  await closeMenus(page)
+  await press(page, 'ungroup')
+  expect((await node(page, 'mark'))?.parentId).toBe('logo')
   expect(errors).toEqual([])
 })

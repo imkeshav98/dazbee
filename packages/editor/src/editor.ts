@@ -531,7 +531,7 @@ function live(
     selectedFrame: () => selection.current()?.frameId ?? null,
     select,
     perform,
-    canUngroup: () => actions.canUngroup(),
+    ungroupState: actions.ungroupState,
     canUndo: () => session.canUndo(),
     canRedo: () => session.canRedo(),
     onHistory: (listener: () => void) => session.onHistory(listener),

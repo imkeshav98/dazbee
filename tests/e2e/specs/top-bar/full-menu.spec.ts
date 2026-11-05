@@ -1,8 +1,8 @@
 // The full menu (the small menu's ⋯) and the right-click menu in Chromium: their rows in order with
 // their dividers, the focus as they open and close and as the arrows move it, Text only for text
-// layers, Ungroup for a group or a box (greyed where auto layout would move what it holds), Release
-// mask; Copy ▸ and Paste ▸ with the layers or their style, and paste across frames and pages; and
-// the menus, their widths and a greyed row's tooltip at the three screen sizes.
+// layers, Ungroup for a group or a box, Release mask; Copy ▸ and Paste ▸ with the layers or their
+// style, and paste across frames and pages; and the menus, their widths and a greyed row's tooltip
+// at the three screen sizes. Ungroup in an auto layout box is in ungroup-in-auto-layout.spec.ts.
 import { boxOf, layoutProblems, SCREEN_SIZES } from '../../support/layout.ts'
 import { closeMenus, expectGreyed, fillOf, holders, node, open, redo, rowsOf, undo } from '../../support/linked-menu.ts'
 import { GREEN, INK, PINK } from '../../support/linked-menu-design.ts'
