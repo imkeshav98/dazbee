@@ -17,7 +17,7 @@ import { ICON_BUTTON, KNOB, MENU_DIVIDER, MENU_ITEM, VALUE_TEXT } from '@/compon
 import { FOCUS_RING } from '@/components/ui/looks.ts'
 import { Tooltip } from '@/components/ui/tooltip.tsx'
 import { cn } from '@/lib/cn.ts'
-import { arrangeRows, stackEnds } from '@/lib/editor/arrange-menu.ts'
+import { arrangeRows, stackEnds } from '@/lib/editor/stack-ends.ts'
 import { useMessages } from '@/lib/i18n/client.tsx'
 import { format } from '@/lib/i18n/index.ts'
 

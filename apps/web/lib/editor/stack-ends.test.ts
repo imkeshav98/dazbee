@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest'
 
 import type { Design } from '@dazbee/schema'
 
-import { type ArrangeOf, arrangeRows, stackEnds } from './arrange-menu.ts'
+import { type ArrangeOf, arrangeRows, stackEnds } from './stack-ends.ts'
 
 /** One shape: it turns, lines up, and is neither text, locked nor placed by an auto layout. */
 const shape: ArrangeOf = { several: false, sized: true, texts: false, placed: false, locked: false }
