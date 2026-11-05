@@ -1,14 +1,14 @@
 // Add a frame and Add size at the three screen sizes: the cards sit clear of everything with
 // nothing cut off, three tiles across, a sheet on a phone; a frame added from a tile, W × H, Add
 // size or a drag shows whole with its label clear of the chrome, as does the first frame on an
-// empty page; a long frame name wraps in its title; the Arabic ratio line; and the PR's pictures of
-// the card, a size past the limits, Add size in ⋯ and its card, and a frame drawn by a drag, in both
-// themes.
+// empty page; the card keeps the mock's spacing and scrolls inside on a short screen; a long frame
+// name wraps in its title; the Arabic ratio line; and the PR's pictures of the card, a size past the
+// limits, Add size in ⋯ and its card, and a frame drawn by a drag, in both themes.
 import { addSize, card, chromeOver, frameButton, labelsUnderIslands, typeSize } from '../../support/add-frame.ts'
 import { writeOutput } from '../../support/editor.ts'
 import { clickLabel, design, openSized, picked } from '../../support/frames-on-canvas.ts'
 import { THEMES } from '../../support/glass.ts'
-import { EDITOR_CHROME, layoutProblems, SCREEN_SIZES } from '../../support/layout.ts'
+import { EDITOR_CHROME, layoutProblems, SCREEN_SIZES, scrolling } from '../../support/layout.ts'
 import { dragScreen, drawn, nextFrame, press, read } from '../../support/stage.ts'
 import { expect, type Page, test } from '../../support/test.ts'
 import { barMenu } from '../../support/top-bar.ts'
@@ -71,6 +71,18 @@ for (const [width, height] of SCREEN_SIZES) {
       })
       expect(Math.abs(below - 8)).toBeLessThanOrEqual(1)
       await expect(page.locator('[data-dock]')).toBeHidden()
+      // It scrolls as the other edit panel sheets do: no classic scrollbar, and the app's slim bar
+      // kept shown while there is more to scroll to, away from the pointer.
+      const body = card(page).locator(':scope > div').last()
+      await page.mouse.move(4, 300)
+      await page.waitForTimeout(1_200)
+      expect(await scrolling(body)).toMatchObject({ scrolls: true, bar: true })
+      expect(
+        await body.evaluate((el) => [
+          getComputedStyle(el).scrollbarWidth,
+          (el as HTMLElement).offsetWidth - el.clientWidth,
+        ]),
+      ).toEqual(['none', 0])
     }
     // Scrolled to the end, a size past the limits says why under the fields, in view and whole.
     await page.getByTestId('own-width').scrollIntoViewIfNeeded()
@@ -169,6 +181,73 @@ test('on a phone, from an empty page at 100%: W × H starts at 1080 × 1080, and
   writeOutput('add-frame-empty-page-390.png', await page.screenshot({ animations: 'disabled' }))
   expect(errors).toEqual([])
 })
+
+for (const [width, height] of SCREEN_SIZES.filter(([w]) => w >= 640)) {
+  test(`at ${width}×${height} the card keeps the mock's spacing, lines up with the other edit panels and scrolls inside when the screen is short`, async ({
+    browser,
+  }) => {
+    const { page, errors } = await openSized(browser, { width, height })
+    await page.evaluate(() => window.dazbee?.pickFrame('sq'))
+    await addSize(page)
+    // Measured once the card has popped in: the pop-in scales it, and every distance with it.
+    const spacing = () =>
+      card(page).evaluate(async (panel) => {
+        await Promise.all(panel.getAnimations().map((animation) => animation.finished))
+        const box = (el: Element | null | undefined) => el?.getBoundingClientRect() ?? new DOMRect()
+        const middle = (el: Element | null | undefined) => box(el).top + box(el).height / 2
+        /** Where an element's words start, inside its padding. */
+        const words = (el: Element | null | undefined) => {
+          const range = document.createRange()
+          if (el) range.selectNodeContents(el)
+          return range.getBoundingClientRect().left
+        }
+        const title = words(panel.querySelector('#edit-panel-title'))
+        const [meta, google] = [...panel.querySelectorAll('section h3')]
+        const tile = panel.querySelector('[data-preset="feed-square"]')
+        const [shape, name, pixels] = tile ? [...tile.children] : []
+        return {
+          top: (panel as HTMLElement).offsetTop,
+          labelToShape: Math.round(box(shape).top - middle(meta)),
+          shapeToName: Math.round(middle(name) - box(shape).bottom),
+          rowToLabel: Math.round(middle(google) - middle(pixels)),
+          noteIn: Math.round(words(panel.querySelector('[data-testid="add-frame-note"]')) - title),
+          labelIn: Math.round(words(meta) - title),
+          fieldsIn: Math.round(box(panel.querySelector('[data-testid="own-width"]')?.closest('label')).left - title),
+          add: Math.round(box(panel.querySelector('[data-testid="own-size"] button[type="submit"]')).width),
+        }
+      })
+    const measured = await spacing()
+    expect(measured).toMatchObject({
+      labelToShape: 26,
+      shapeToName: 18,
+      rowToLabel: 34,
+      noteIn: 8,
+      labelIn: 8,
+      fieldsIn: 8,
+    })
+    expect(Math.abs(measured.add - 52)).toBeLessThanOrEqual(2)
+    // Its top lines up with the picked frame's Background panel, as laid out, not as the pop-in scales it.
+    await page.keyboard.press('Escape')
+    await barMenu(page, 'background')
+    expect(await card(page).evaluate((panel) => (panel as HTMLElement).offsetTop)).toBe(measured.top)
+    await page.keyboard.press('Escape')
+
+    // On a screen too short for it, it keeps its spacing and scrolls inside.
+    await page.setViewportSize({ width, height: 600 })
+    await frameButton(page)
+    expect(await spacing()).toMatchObject({ labelToShape: 26, shapeToName: 18, rowToLabel: 34 })
+    const body = await card(page).evaluate((panel) => {
+      const scroller = [...panel.querySelectorAll('div')].find((el) => getComputedStyle(el).overflowY === 'auto')
+      return {
+        scrolls: (scroller?.scrollHeight ?? 0) > (scroller?.clientHeight ?? 0),
+        bottom: panel.getBoundingClientRect().bottom,
+      }
+    })
+    expect(body.scrolls).toBe(true)
+    expect(body.bottom).toBeLessThanOrEqual(600)
+    expect(errors).toEqual([])
+  })
+}
 
 test('a long frame name in “Add a size to {name}” wraps onto a second line, then ends in an ellipsis with the whole title as its tooltip', async ({
   browser,

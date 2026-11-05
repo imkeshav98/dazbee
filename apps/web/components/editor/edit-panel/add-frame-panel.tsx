@@ -82,9 +82,10 @@ export function AddFramePanel({ editor }: { editor: Editor }) {
 }
 
 /**
- * The card: a note, the tiles by channel, then a size of your own. Opened by F on the stage, it
- * leaves the focus there, so the tool keys still work; from the dock's Frame button or a menu, it
- * takes the focus as every edit panel does.
+ * The card: a note, the tiles by channel, then a size of your own, the words and fields 8 px in from
+ * the title as the mock sets them. Opened by F on the stage, it leaves the focus there, so the tool
+ * keys still work; from the dock's Frame button or a menu, it takes the focus as every edit panel
+ * does.
  */
 function SizesCard({ editor, picked }: { editor: Editor; picked: PickedFrame | null }) {
   const t = useMessages()
@@ -109,12 +110,12 @@ function SizesCard({ editor, picked }: { editor: Editor; picked: PickedFrame | n
       title={picked ? format(a.addSizeTitle, { name: picked.name }) : a.title}
       focus={focus}
     >
-      <p data-testid="add-frame-note" className="text-[12px] leading-[1.4] text-subtle">
+      <p data-testid="add-frame-note" className="px-[8px] text-[12px] leading-[1.4] text-subtle">
         {picked ? format(a.addSizeNote, { name: picked.name }) : a.note}
       </p>
       {SIZE_CHANNELS.map((channel) => (
-        <section key={channel} aria-label={t.editor.sizes.channel[channel]} className="flex flex-col gap-1">
-          <h3 className={PANEL_HEADING}>{t.editor.sizes.channel[channel]}</h3>
+        <section key={channel} aria-label={t.editor.sizes.channel[channel]} className="flex flex-col gap-[8px]">
+          <h3 className={cn(PANEL_HEADING, 'px-[8px]')}>{t.editor.sizes.channel[channel]}</h3>
           <div className="grid grid-cols-3 gap-0.5" data-testid={`sizes-${channel}`}>
             {SIZE_PRESETS.filter((preset) => preset.channel === channel).map((preset) => (
               <SizeTile key={preset.id} size={preset} name={t.editor.sizes.preset[preset.id]} onAdd={add} />
@@ -135,12 +136,12 @@ function SizeTile({ size, name, onAdd }: { size: Size & { id: string }; name: st
       data-preset={size.id}
       onClick={() => onAdd({ width: size.width, height: size.height })}
       className={cn(
-        'group flex min-w-0 cursor-pointer flex-col items-center gap-1 rounded-[10px] px-1 pt-2.5 pb-2 text-center text-text transition-colors duration-[var(--chrome-fast)]',
+        'group flex min-w-0 cursor-pointer flex-col items-center gap-[4px] rounded-[10px] px-1 pt-[11px] pb-[11px] text-center text-text transition-colors duration-[var(--chrome-fast)]',
         LIT_ROW,
         FOCUS_RING,
       )}
     >
-      <span aria-hidden className="grid h-11 place-items-center">
+      <span aria-hidden className="grid h-[40px] place-items-center">
         <span
           style={shapeStyle(size)}
           className="block rounded-[2px] border-[1.5px] border-subtle transition-colors duration-[var(--chrome-fast)] group-hover:border-accent group-focus-visible:border-accent"
@@ -198,7 +199,7 @@ function OwnSize({ start, onAdd }: { start: Size; onAdd: (size: Size) => void })
     <form
       aria-label={a.ownSize}
       data-testid="own-size"
-      className="flex flex-col gap-1.5"
+      className="flex flex-col gap-1.5 px-[8px]"
       onSubmit={(e) => {
         e.preventDefault()
         if (typed && typed.issues.length === 0) onAdd({ width: typed.width, height: typed.height })
@@ -215,7 +216,7 @@ function OwnSize({ start, onAdd }: { start: Size; onAdd: (size: Size) => void })
           type="submit"
           disabled={!typed || issues.length > 0}
           className={cn(
-            'h-[34px] shrink-0 cursor-pointer rounded-row bg-accent-solid px-3.5 text-[12.5px] font-semibold text-on-accent transition-colors duration-[var(--chrome-fast)] hover:bg-accent-solid-hover active:bg-accent-solid-hover disabled:cursor-not-allowed disabled:opacity-45 max-sm:h-11',
+            'h-[34px] shrink-0 cursor-pointer rounded-row bg-accent-solid px-[15px] text-[12.5px] font-semibold text-on-accent transition-colors duration-[var(--chrome-fast)] hover:bg-accent-solid-hover active:bg-accent-solid-hover disabled:cursor-not-allowed disabled:opacity-45 max-sm:h-11',
             FOCUS_RING,
           )}
         >
