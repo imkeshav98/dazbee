@@ -44,9 +44,9 @@ export interface EditorSelectPress {
   ): SelectDrag | null
   /**
    * A press on a frame's label: it picks the frame, letting the selection and the group gone into
-   * go, and returns the drag that moves the frame.
+   * go, and returns the drag that moves the frame; null for a frame the shown page lacks.
    */
-  pressLabel(e: PointerEvent, screen: Point, frame: Frame): FrameMoveDrag
+  pressLabel(e: PointerEvent, screen: Point, frameId: string): FrameMoveDrag | null
   /** Whether the pointer at `screen` has gone far enough to drag; once it has, the press no longer clicks. */
   moved(screen: Point): boolean
   /**
@@ -175,7 +175,9 @@ export function editorSelectPress({
     }
     return transformDrag.pressMove(frame, around, at.p, ids)
   }
-  function pressLabel(e: PointerEvent, screen: Point, frame: Frame) {
+  function pressLabel(e: PointerEvent, screen: Point, frameId: string) {
+    const frame = frameOf(frameId)
+    if (!frame) return null
     typing.stop()
     clickedAlone = null
     pressedAt = screen

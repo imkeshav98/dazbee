@@ -154,7 +154,7 @@ describe('editorSelectPress', () => {
       const { select, selection, log } = harness()
       selection.enter('card')
       selection.select(['dot'], SQUARE.id)
-      expect(select.pressLabel({ pointerId: 1 } as PointerEvent, { x: 40, y: -10 }, SQUARE)).toMatchObject({
+      expect(select.pressLabel({ pointerId: 1 } as PointerEvent, { x: 40, y: -10 }, 'sq')).toMatchObject({
         kind: 'frameMove',
         frame: SQUARE,
         pressedAt: { x: 40, y: -10 },
@@ -164,6 +164,14 @@ describe('editorSelectPress', () => {
       expect(selection.entered()).toBeNull()
       expect(selection.pickedFrame()).toBe('sq')
       expect(log).toEqual(['stop typing', 'capture'])
+    })
+
+    it('does nothing for a frame the shown page lacks', () => {
+      const { select, selection, log } = harness()
+      selection.select(['box'], SQUARE.id)
+      expect(select.pressLabel({ pointerId: 1 } as PointerEvent, { x: 40, y: -10 }, 'gone')).toBeNull()
+      expect(selection.current()?.ids).toEqual(['box'])
+      expect(log).toEqual([])
     })
   })
 

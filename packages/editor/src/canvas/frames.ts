@@ -1,5 +1,6 @@
 // The frames of a page as the canvas shows them: each stored frame where it was placed, by
-// its frame id, in world units; and where each frame's label sits over it on the stage.
+// its frame id, in world units; where each frame's label sits over it on the stage, and which
+// label's text a point is on.
 import { type Design, framesOf, type Point, type Rect } from '@dazbee/schema'
 
 import { type Camera, toScreen } from './camera.ts'
@@ -73,18 +74,23 @@ export function labelBox(frame: Frame, camera: Camera): Rect | null {
   return { x, y: at.y - LABEL_GAP - LABEL_HEIGHT, width, height: LABEL_HEIGHT }
 }
 
-/** The frame whose label is under a point on the stage: the topmost (last by order) of those there. */
-export function labelAt(frames: readonly Frame[], camera: Camera, screen: Point): Frame | undefined {
-  return frames.findLast((frame) => {
-    const box = labelBox(frame, camera)
-    return (
-      box !== null &&
-      screen.x >= box.x &&
-      screen.x <= box.x + box.width &&
-      screen.y >= box.y &&
-      screen.y <= box.y + box.height
-    )
-  })
+/**
+ * The frame whose label's text, its name or its size where that shows, is under a client point, as
+ * the overlay last drew the labels: the last drawn of those there. The rest of a label's row leaves
+ * a press to what is under it.
+ */
+export function labelTextAt(overlay: ParentNode, client: Point): string | undefined {
+  let found: string | undefined
+  for (const label of overlay.querySelectorAll<HTMLElement>('.frame-label')) {
+    const row = label.getBoundingClientRect()
+    if (client.y < row.top || client.y > row.bottom) continue
+    for (const text of label.children) {
+      const box = text.getBoundingClientRect()
+      // A size with no room beside the name wraps onto the label's hidden second line.
+      if (box.top < row.bottom && client.x >= box.left && client.x <= box.right) found = label.dataset.frame
+    }
+  }
+  return found
 }
 
 function canvasFrame(id: string, stored: Design['frames'][string]): Frame {

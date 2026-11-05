@@ -1,12 +1,13 @@
 // The pointer on the stage: presses, drags, double-clicks and the wheel, each routed to the
 // behaviour that owns its gesture, with panning, the hover outline and the cursor. A press on a
-// frame's label grabs the frame, and a double click there asks to rename it.
+// frame label's text grabs the frame, after the selection's handles, and a double click there asks
+// to rename it.
 import type { Session } from '@dazbee/doc'
 import { isContainer, type Point } from '@dazbee/schema'
 
 import { type Camera, toWorld } from '../canvas/camera.ts'
 import { resizeCursor, ROTATE_CURSOR } from '../canvas/cursors.ts'
-import { type Frame, labelAt } from '../canvas/frames.ts'
+import { type Frame, labelTextAt } from '../canvas/frames.ts'
 import { hitTest } from '../canvas/hit-test.ts'
 import type { FrameScenes } from '../canvas/scenes.ts'
 import type { EditorView } from '../canvas/view.ts'
@@ -58,11 +59,10 @@ export type Gesture =
 
 export interface PointerDeps {
   canvas: HTMLCanvasElement
+  /** The overlay over the stage, whose frame labels a press may be on. */
+  overlay: ParentNode
   session: Pick<Session, 'design'>
-  view: Pick<
-    EditorView,
-    'camera' | 'design' | 'frames' | 'onStage' | 'pointAt' | 'redraw' | 'setCamera' | 'viewport' | 'zoomTo'
-  >
+  view: Pick<EditorView, 'camera' | 'design' | 'onStage' | 'pointAt' | 'redraw' | 'setCamera' | 'viewport' | 'zoomTo'>
   tools: Pick<EditorTools, 'tool' | 'imageToPlace' | 'snapping'>
   selection: Pick<
     EditorSelection,
@@ -141,6 +141,7 @@ const CONTROL_ROLES = new Set([
 
 export function editorPointer({
   canvas,
+  overlay,
   session,
   view,
   tools,
@@ -188,6 +189,8 @@ export function editorPointer({
     return pointAt({ x: e.clientX, y: e.clientY })
   }
   const panning = () => tools.tool() === 'hand' || spaceHeld
+  /** The frame whose label's name or size is under the pointer, as last drawn. */
+  const labelUnder = (e: MouseEvent) => labelTextAt(overlay, { x: e.clientX, y: e.clientY })
   /** Where the pointer last was over the stage, in client coordinates, or null. */
   const pointerAt = () => (pointer ? { x: pointer.clientX, y: pointer.clientY } : null)
 
@@ -353,10 +356,12 @@ export function editorPointer({
           return
         }
       }
-      // A frame's label, drawn over the canvas, takes the press before what is under it.
-      const labelled = labelAt(view.frames(), view.camera(), screen)
-      if (labelled) {
-        gesture = selectPress.pressLabel(e, screen, labelled)
+      // A frame label's text, drawn over the canvas, takes the press before what is under it, once
+      // the selection's handles and turning zones have let it go.
+      const label = selection.current() && transformDrag.handleUnder(screen) ? undefined : labelUnder(e)
+      const grabbed = label && selectPress.pressLabel(e, screen, label)
+      if (grabbed) {
+        gesture = grabbed
         drawOverlay()
         return
       }
@@ -480,9 +485,9 @@ export function editorPointer({
     'dblclick',
     (e) => {
       if (panning()) return
-      const labelled = labelAt(view.frames(), view.camera(), screenOf(e))
-      if (labelled && tools.tool() === 'select') {
-        renameFrame(labelled.id)
+      const label = labelUnder(e)
+      if (label && tools.tool() === 'select') {
+        renameFrame(label)
         return
       }
       const at = pointIn(e)

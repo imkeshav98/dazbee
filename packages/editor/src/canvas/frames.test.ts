@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import type { Design } from '@dazbee/schema'
 
-import { type Frame, frameAt, frameIn, labelAt, labelBox, pageFrames } from './frames.ts'
+import { type Frame, frameAt, frameIn, labelBox, labelTextAt, pageFrames } from './frames.ts'
 import { design } from './test-design.ts'
 
 /** The test design with page `two`'s frames gone. */
@@ -95,18 +95,40 @@ describe('labelBox', () => {
   })
 })
 
-describe('labelAt', () => {
-  const a = { id: 'a', pageId: 'p', name: 'A', x: 0, y: 100, width: 300, height: 300 }
-  const b = { id: 'b', pageId: 'p', name: 'B', x: 200, y: 100, width: 300, height: 300 }
-  const camera = { x: 0, y: 0, zoom: 1 }
+describe('labelTextAt', () => {
+  /** A box in client pixels, as getBoundingClientRect gives it. */
+  const box = (left: number, top: number, width: number, height = 20) => ({
+    left,
+    top,
+    right: left + width,
+    bottom: top + height,
+    width,
+    height,
+  })
+  /** A label as the overlay draws one: its row, then its name and its size, each where it shows. */
+  const label = (frame: string, row: ReturnType<typeof box>, ...texts: ReturnType<typeof box>[]) => ({
+    dataset: { frame },
+    getBoundingClientRect: () => row,
+    children: texts.map((text) => ({ getBoundingClientRect: () => text })),
+  })
+  /** An overlay holding labels, in the order it drew them. */
+  const overlay = (...labels: ReturnType<typeof label>[]) =>
+    ({ querySelectorAll: () => labels }) as unknown as ParentNode
+  // A over B's start: A's name at 0–40 and its size at 220–300; B's name at 200–230, its size wrapped
+  // onto the hidden second line.
+  const a = label('a', box(0, 76, 300), box(0, 76, 40), box(220, 76, 80))
+  const b = label('b', box(200, 76, 300), box(200, 76, 30), box(200, 96, 80))
 
-  it('finds the frame whose label is under a point on the stage, the last by order where labels overlap', () => {
-    expect(labelAt([a, b], camera, { x: 50, y: 86 })?.id).toBe('a')
-    expect(labelAt([a, b], camera, { x: 250, y: 86 })?.id).toBe('b')
+  it('finds the frame whose name or size is under a client point, the last drawn where labels overlap', () => {
+    expect(labelTextAt(overlay(a, b), { x: 20, y: 86 })).toBe('a')
+    expect(labelTextAt(overlay(a, b), { x: 260, y: 86 })).toBe('a')
+    expect(labelTextAt(overlay(a, b), { x: 210, y: 86 })).toBe('b')
   })
 
-  it('finds none off every label: in the gap over the frame, or inside it', () => {
-    expect(labelAt([a, b], camera, { x: 50, y: 98 })).toBeUndefined()
-    expect(labelAt([a, b], camera, { x: 50, y: 150 })).toBeUndefined()
+  it("finds none beside the text on the label's row, under a size that wrapped out of sight, or off the row", () => {
+    expect(labelTextAt(overlay(a, b), { x: 120, y: 86 })).toBeUndefined()
+    expect(labelTextAt(overlay(a, b), { x: 450, y: 86 })).toBeUndefined()
+    expect(labelTextAt(overlay(a, b), { x: 20, y: 100 })).toBeUndefined()
+    expect(labelTextAt(overlay(), { x: 20, y: 86 })).toBeUndefined()
   })
 })

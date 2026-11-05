@@ -8,7 +8,18 @@ import { solid } from '../../support/edit-in-frame.ts'
 import { designOf, openTabs, settle, writeOutput } from '../../support/editor.ts'
 import { clickLabel, design, labelPoint, picked } from '../../support/frames-on-canvas.ts'
 import { layersIn, seed } from '../../support/seed.ts'
-import { click, type Design, drag, dragScreen, drawn, press, read, selection } from '../../support/stage.ts'
+import {
+  click,
+  type Design,
+  drag,
+  dragScreen,
+  drawn,
+  handle,
+  press,
+  props,
+  read,
+  selection,
+} from '../../support/stage.ts'
 import { type Browser, expect, type Page, test } from '../../support/test.ts'
 import { barMenu } from '../../support/top-bar.ts'
 
@@ -105,6 +116,47 @@ test('a click on a frame’s empty area or its label picks it: outlined, its lab
   // Picking never moved the canvas, nor changed the design.
   expect(await page.evaluate(() => window.dazbee?.camera())).toEqual(still)
   expect(await page.evaluate(() => window.dazbee?.canUndo())).toBe(false)
+  expect(errors).toEqual([])
+})
+
+test('the label takes a press only on its name and size, after a selected layer’s handles and turning zones under it: beside its text a press starts a marquee', async ({
+  browser,
+}) => {
+  const { a: page, errors } = await open(browser)
+  const row = await label(page, 'sq').boundingBox()
+  const name = await label(page, 'sq').locator('.frame-name').boundingBox()
+  const size = await label(page, 'sq').locator('.frame-size').boundingBox()
+  if (!row || !name || !size) throw new Error('no label on the square')
+  // Between the name and the size, the row is canvas: a drag from there is a marquee over the headline.
+  const from = { x: (name.x + name.width + size.x) / 2, y: row.y + row.height - 5 }
+  await dragScreen(page, from, { x: from.x + 300, y: from.y + 140 })
+  expect(await selection(page)).toEqual(['headline'])
+  expect(await picked(page)).toBeNull()
+  expect(await frameOf(page, 'sq')).toMatchObject({ x: 0, y: 0 })
+
+  // The headline moved into the frame's corner and selected: its corner handle and the zone that
+  // turns it lie under the label's name, and act on the headline.
+  await page.evaluate(() => window.dazbee?.setProps(['headline'], () => ({ x: 0, y: 0 })))
+  await page.evaluate(() => window.dazbee?.select(['headline']))
+  await drawn(page)
+  const corner = await handle(page, 'nw')
+  const onName = (p: { x: number; y: number }) =>
+    p.x >= name.x && p.x <= name.x + name.width && p.y >= row.y && p.y <= row.y + row.height
+  const grab = { x: corner.x + 2, y: corner.y - 5 }
+  expect(onName(grab)).toBe(true)
+  await dragScreen(page, grab, { x: grab.x - 40, y: grab.y - 30 })
+  expect(await picked(page)).toBeNull()
+  expect(await selection(page)).toEqual(['headline'])
+  const resized = await props(page, 'headline')
+  expect(resized.x).toBeLessThan(0)
+  expect(resized.y).toBeLessThan(0)
+  await press(page, 'undo')
+  const turn = { x: corner.x + 10, y: corner.y - 12 }
+  expect(onName(turn)).toBe(true)
+  await dragScreen(page, turn, { x: turn.x + 60, y: turn.y - 60 })
+  expect(await picked(page)).toBeNull()
+  expect((await props(page, 'headline')).rotation ?? 0).not.toBe(0)
+  expect(await frameOf(page, 'sq')).toMatchObject({ x: 0, y: 0 })
   expect(errors).toEqual([])
 })
 

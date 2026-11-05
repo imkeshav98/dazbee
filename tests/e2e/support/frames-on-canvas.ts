@@ -114,14 +114,13 @@ export const design = (): DesignInput => {
 /** The picked frame, or null. */
 export const picked = (page: Page) => page.evaluate(() => window.dazbee?.pickedFrame() ?? null)
 /**
- * Where a frame's label is on screen, near its bottom edge, which a fit keeps clear of the header:
- * at its middle, or a point `dx` in from its start.
+ * Where a frame's name is on its label on screen, near its bottom edge, which a fit keeps clear of
+ * the header: at its middle, or a point `dx` in from its start, kept on the name.
  */
 export async function labelPoint(page: Page, id: string, dx?: number) {
-  const stage = await page.getByTestId('stage').boundingBox()
-  const rect = await page.evaluate((id) => window.dazbee?.labelRect(id), id)
-  if (!stage || !rect) throw new Error(`no label for ${id}`)
-  return { x: stage.x + rect.x + (dx ?? rect.width / 2), y: stage.y + rect.y + rect.height - 5 }
+  const name = await page.locator(`.stage-overlay .frame-label[data-frame="${id}"] .frame-name`).boundingBox()
+  if (!name) throw new Error(`no label for ${id}`)
+  return { x: name.x + Math.min(dx ?? name.width / 2, name.width - 1), y: name.y + name.height - 5 }
 }
 export async function clickLabel(page: Page, id: string) {
   const at = await labelPoint(page, id, 20)

@@ -270,6 +270,7 @@ function live(
   // Layer 5: the routers.
   const pointer = editorPointer({
     canvas,
+    overlay: options.overlay,
     session,
     view,
     tools,
