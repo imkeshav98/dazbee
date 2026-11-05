@@ -531,6 +531,13 @@ export function editorTransformDrag({
   }
 }
 
+/** The frame and the layers a move, resize or turn carries, which may reach past the frame's edge; null for any other gesture. */
+export function carried(g: { kind: string } | null): { frame: Frame; roots: string[] } | null {
+  if (g?.kind !== 'move' && g?.kind !== 'resize' && g?.kind !== 'rotate') return null
+  const { frame, roots } = g as TransformDrag
+  return { frame, roots }
+}
+
 /** The sizes a run's style sets, which a corner scales: its font size, letter spacing and outline. */
 function sizesOf(style: RunStyle): RunStyle {
   const sizes: RunStyle = {}

@@ -39,6 +39,19 @@ export const intersects = (a: Rect, b: Rect) =>
 export const frameAt = (frames: readonly Frame[], p: Point) =>
   frames.findLast((f) => p.x >= f.x && p.x <= f.x + f.width && p.y >= f.y && p.y <= f.y + f.height)
 
+/** The frame under a world point, else the one whose edge is nearest it (the first of those that tie); none with no frames. */
+export function frameNearest(frames: readonly Frame[], p: Point): Frame | undefined {
+  const under = frameAt(frames, p)
+  if (under) return under
+  let nearest: Frame | undefined
+  let best = Infinity
+  for (const f of frames) {
+    const away = Math.hypot(Math.max(f.x - p.x, 0, p.x - f.x - f.width), Math.max(f.y - p.y, 0, p.y - f.y - f.height))
+    if (away < best) [nearest, best] = [f, away]
+  }
+  return nearest
+}
+
 function canvasFrame(id: string, stored: Design['frames'][string]): Frame {
   const { pageId, name, x, y, width, height } = stored
   return { id, pageId, name, x, y, width, height }

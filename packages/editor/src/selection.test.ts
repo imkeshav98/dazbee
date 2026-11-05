@@ -10,15 +10,20 @@ const graphic = (kind: string, parentId?: string) => ({
   ...(parentId ? { parentId } : {}),
   props: { shape: { kind } },
 })
-/** Two pages; a rect, a path, and a group holding a rect, in the first page's first frame. */
+/**
+ * Two pages; a rect, a path, and a group holding a rect, in the first page's first frame, and an
+ * ellipse in its second.
+ */
 const fakeDesign = () =>
   ({
     pages: { p1: { name: 'One' }, p2: { name: 'Two' } },
+    frames: { 'p1-f1': { pageId: 'p1' }, 'p1-f2': { pageId: 'p1' }, 'p2-f1': { pageId: 'p2' } },
     nodes: {
       rect: graphic('rect', 'p1-f1'),
       path: graphic('path', 'p1-f1'),
       group: { type: 'group', parentId: 'p1-f1', props: {} },
       child: graphic('rect', 'group'),
+      dot: graphic('ellipse', 'p1-f2'),
     },
   }) as unknown as Design
 const frame = (pageId: string, name: string) => ({ id: `${pageId}-${name}`, pageId, name }) as Frame
@@ -67,6 +72,28 @@ describe('editorSelection', () => {
   })
 
   describe('select', () => {
+    it('keeps the group gone into only while the layers selected are in its frame', () => {
+      const { selection } = harness()
+      selection.enter('group')
+      selection.select(['child'], 'p1-f1')
+      expect(selection.entered()).toBe('group')
+      selection.select([], 'p1-f1')
+      expect(selection.entered()).toBe('group')
+      // Pasted or picked in another frame: the group is no way out of there.
+      selection.select(['dot'], 'p1-f2')
+      expect(selection.entered()).toBeNull()
+    })
+
+    it('remembers the frame last selected in on each page, after the selection is let go', () => {
+      const { selection } = harness()
+      expect(selection.lastFrameOn('p1')).toBeNull()
+      selection.select(['rect'], 'p1-f1')
+      selection.select(['dot'], 'p1-f2')
+      selection.select([], 'p1-f2')
+      expect(selection.lastFrameOn('p1')).toBe('p1-f2')
+      expect(selection.lastFrameOn('p2')).toBeNull()
+    })
+
     it('selects layers in one frame and shows it; none lets the selection go', () => {
       const { selection, log } = harness()
       selection.select(['rect', 'path'], 'p1-f1')
@@ -232,21 +259,23 @@ describe('editorSelection', () => {
   })
 
   describe('dropOffPage', () => {
-    it('lets the selection go when its frame is not shown, with its crop and path edit, keeping the group gone into', () => {
+    it('lets the selection go when its frame is not shown, with its crop, path edit and the group gone into', () => {
       const { selection, log, world } = harness()
       selection.enter('group')
-      selection.select(['rect'], 'p1-f2')
-      selection.crop({ id: 'rect', frameId: 'p1-f2' })
+      selection.select(['child'], 'p1-f1')
+      selection.crop({ id: 'child', frameId: 'p1-f1' })
       log.length = 0
       selection.dropOffPage()
-      expect(selection.current()).toEqual({ ids: ['rect'], frameId: 'p1-f2' })
-      expect(selection.cropping()).toEqual({ id: 'rect', frameId: 'p1-f2' })
-      world.frames = [frame('p1', 'f1')]
+      expect(selection.current()).toEqual({ ids: ['child'], frameId: 'p1-f1' })
+      expect(selection.cropping()).toEqual({ id: 'child', frameId: 'p1-f1' })
+      expect(selection.entered()).toBe('group')
+      world.frames = [frame('p1', 'f2')]
       selection.dropOffPage()
       expect(selection.current()).toBeNull()
       expect(selection.cropping()).toBeNull()
-      expect(selection.entered()).toBe('group')
+      expect(selection.entered()).toBeNull()
       expect(log).toEqual([])
+      world.frames = FRAMES
 
       selection.select(['path'], 'p1-f1')
       selection.editPath({ id: 'path', frameId: 'p1-f1' })

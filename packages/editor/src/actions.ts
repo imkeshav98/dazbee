@@ -25,8 +25,9 @@ export interface ActionsDeps {
   view: Pick<
     EditorView,
     | 'design'
-    | 'frames'
     | 'frameOf'
+    | 'page'
+    | 'nearestFrame'
     | 'fitAll'
     | 'fitArea'
     | 'zoomTo'
@@ -40,6 +41,7 @@ export interface ActionsDeps {
     EditorSelection,
     | 'current'
     | 'entered'
+    | 'lastFrameOn'
     | 'pickedPage'
     | 'cropping'
     | 'pathEditing'
@@ -76,7 +78,19 @@ export interface EditorActions {
 
 export function editorActions({
   session,
-  view: { design: drawn, frames, frameOf, fitAll, fitArea, zoomTo, zoomIn, zoomOut, toggleRulers, viewChanged },
+  view: {
+    design: drawn,
+    frameOf,
+    page,
+    nearestFrame,
+    fitAll,
+    fitArea,
+    zoomTo,
+    zoomIn,
+    zoomOut,
+    toggleRulers,
+    viewChanged,
+  },
   tools,
   selection,
   scenes,
@@ -187,8 +201,14 @@ export function editorActions({
   }
 
   /** The top-level layers of the selection's frame, or else of the shown page's first frame, that can be picked. */
+  /**
+   * Selects every top-level layer that can be picked in the selection's frame; with nothing
+   * selected, in the frame last selected in on the shown page, else the frame nearest the middle
+   * of the view.
+   */
   function selectAll() {
-    const frame = frameOf(selection.current()?.frameId) ?? frames()[0]
+    const frame =
+      frameOf(selection.current()?.frameId) ?? frameOf(selection.lastFrameOn(page()) ?? undefined) ?? nearestFrame()
     if (!frame) return
     selection.select(
       scenes

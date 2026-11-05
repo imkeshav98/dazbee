@@ -18,6 +18,8 @@ function fakeCanvasKit(log: string[]) {
     translate: (x: number, y: number) => log.push(`translate ${x} ${y}`),
     drawRect: () => log.push('rect'),
     drawPicture: (picture: { name: string }) => log.push(`picture ${picture.name}`),
+    clipRect: (rect: number[], op: string) => log.push(`clip ${op} ${rect.join(' ')}`),
+    saveLayer: () => log.push('save layer'),
   }
   const ck = {
     GetWebGLContext: () => 1,
@@ -30,6 +32,7 @@ function fakeCanvasKit(log: string[]) {
       setColor() {}
       setStyle() {}
       setStrokeWidth() {}
+      setAlphaf() {}
       delete() {
         log.push('delete paint')
       }
@@ -37,6 +40,7 @@ function fakeCanvasKit(log: string[]) {
     WHITE: 'white',
     TRANSPARENT: 'clear',
     PaintStyle: { Stroke: 'stroke' },
+    ClipOp: { Difference: 'out of' },
     ColorSpace: { SRGB: 'srgb' },
     Color: () => 'edge',
     XYWHRect: (x: number, y: number, w: number, h: number) => [x, y, w, h],
@@ -163,6 +167,27 @@ describe('editorView', () => {
       expect(view.middleFrame()?.id).toBe('one-sq')
       view.setCamera({ x: 500 - 1200, y: 0, zoom: 1 })
       expect(view.middleFrame()).toBeUndefined()
+    })
+  })
+
+  describe('nearestFrame', () => {
+    it('finds the frame in the middle of the view, else the one nearest the middle', () => {
+      const { view } = harness()
+      view.resize()
+      view.setCamera({ x: 500 - 540, y: 400 - 540, zoom: 1 })
+      expect(view.nearestFrame()?.id).toBe('one-sq')
+      // The middle in the gap at 1200, 400: the story is 80 away, the square 120.
+      view.setCamera({ x: 500 - 1200, y: 0, zoom: 1 })
+      expect(view.nearestFrame()?.id).toBe('one-story')
+      // Past the MPU's end, at 3500, 100.
+      view.setCamera({ x: 500 - 3500, y: 400 - 100, zoom: 1 })
+      expect(view.nearestFrame()?.id).toBe('one-mpu')
+    })
+
+    it('finds none on a page with no frames', () => {
+      const { view } = harness(withPageThree(false))
+      view.showPage('three')
+      expect(view.nearestFrame()).toBeUndefined()
     })
   })
 
@@ -303,6 +328,31 @@ describe('editorView', () => {
     })
   })
 
+  describe('paint with a ghost', () => {
+    it('draws the ghost after the frames, faintly and only past the edge of its frame', () => {
+      const { view, log } = harness()
+      view.resize()
+      view.setCamera({ x: 0, y: 0, zoom: 0.5 })
+      const story = view.frameOf('one-story')
+      log.length = 0
+      view.paint(
+        (inView) => inView.map((frame) => ({ frame, picture: picture(frame.id) })),
+        () => (story ? { frame: story, picture: picture('ghost') } : null),
+      )
+      expect(log.slice(-9)).toEqual([
+        'save',
+        'clip out of 1280 0 1080 1920',
+        'save layer',
+        'translate 1280 0',
+        'picture ghost',
+        'restore',
+        'restore',
+        'restore',
+        'flush',
+      ])
+    })
+  })
+
   describe('setCamera, zoomTo, zoomIn and zoomOut', () => {
     it('moves the camera and redraws, telling the zoom when it changes', () => {
       const { view, log } = harness()
@@ -394,7 +444,14 @@ describe('editorView', () => {
       view.destroy()
       runFrames()
       expect(observed).toEqual(['observe', 'disconnect'])
-      expect(log).toEqual(['surface 2000×1600', 'delete surface', 'delete paint', 'delete paint', 'delete gl'])
+      expect(log).toEqual([
+        'surface 2000×1600',
+        'delete surface',
+        'delete paint',
+        'delete paint',
+        'delete paint',
+        'delete gl',
+      ])
     })
   })
 })

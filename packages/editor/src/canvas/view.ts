@@ -17,7 +17,7 @@ import {
   type Viewport,
   zoomAt,
 } from './camera.ts'
-import { type Frame, frameAt, pageFrames } from './frames.ts'
+import { type Frame, frameAt, frameNearest, pageFrames } from './frames.ts'
 import { px } from './rulers.ts'
 
 /** A point on the design: a frame, by its id, and a point in it in design pixels. */
@@ -52,6 +52,8 @@ export interface EditorView {
   inView(): Frame[]
   /** The frame in the middle of the view, if one is there. */
   middleFrame(): Frame | undefined
+  /** The frame in the middle of the view, else the one nearest the middle; none on a page with no frames. */
+  nearestFrame(): Frame | undefined
   /** Whether the rulers along the stage's edges show. */
   rulers(): boolean
   /** A point in client coordinates as a point on the stage. */
@@ -77,10 +79,14 @@ export interface EditorView {
   update(): void
   /**
    * Draws the frames in view at the camera, each picture over white with a hairline edge, and
-   * shows them; `record` gives the pictures of the frames in view. False, drawing nothing, before
-   * the stage has a surface.
+   * shows them; `record` gives the pictures of the frames in view. `ghost` gives a picture of what
+   * a drag carries in its frame, drawn faintly where it is past the frame's edge. False, drawing
+   * nothing, before the stage has a surface.
    */
-  paint(record: (inView: Frame[]) => readonly { frame: Frame; picture: SkPicture }[]): boolean
+  paint(
+    record: (inView: Frame[]) => readonly { frame: Frame; picture: SkPicture }[],
+    ghost?: () => { frame: Frame; picture: SkPicture } | null,
+  ): boolean
   setCamera(next: Camera): void
   /** The stage's edges floating chrome covers, in screen pixels; later fits keep clear of them. */
   setInsets(next: Insets): void
@@ -107,6 +113,8 @@ export interface EditorView {
 }
 
 const ZOOM_STEP = 2
+/** How strongly the part of a dragged layer past its frame's edge shows. */
+const GHOST_OPACITY = 0.35
 
 export function editorView({ ck, canvas, session, onZoom, draw }: ViewDeps): EditorView {
   const maybeGl = ck.MakeWebGLContext(ck.GetWebGLContext(canvas))
@@ -145,6 +153,8 @@ export function editorView({ ck, canvas, session, onZoom, draw }: ViewDeps): Edi
   // Width 0 is a hairline: one device pixel at any zoom.
   edge.setStrokeWidth(0)
   edge.setColor(ck.Color(0, 0, 0, 0.12))
+  const faint = new ck.Paint()
+  faint.setAlphaf(GHOST_OPACITY)
   const resized = new ResizeObserver(() => resize())
   resized.observe(canvas)
 
@@ -174,6 +184,9 @@ export function editorView({ ck, canvas, session, onZoom, draw }: ViewDeps): Edi
   }
   function middleFrame() {
     return frameAt(laid.frames, toWorld(camera, centre()))
+  }
+  function nearestFrame() {
+    return frameNearest(laid.frames, toWorld(camera, centre()))
   }
   function rulersShown() {
     return rulers
@@ -230,7 +243,10 @@ export function editorView({ ck, canvas, session, onZoom, draw }: ViewDeps): Edi
     if (!Object.hasOwn(design.pages, shown)) shown = firstPageOf(design)
     laid = pageFrames(design, shown)
   }
-  function paint(record: (inView: Frame[]) => readonly { frame: Frame; picture: SkPicture }[]) {
+  function paint(
+    record: (inView: Frame[]) => readonly { frame: Frame; picture: SkPicture }[],
+    ghost?: () => { frame: Frame; picture: SkPicture } | null,
+  ) {
     if (!surface) return false
     drawnFrames = framesInView(laid.frames, camera, viewport)
     const pictures = record(drawnFrames)
@@ -248,6 +264,17 @@ export function editorView({ ck, canvas, session, onZoom, draw }: ViewDeps): Edi
       c.drawPicture(picture)
       c.restore()
       c.drawRect(box, edge)
+    }
+    const carried = ghost?.()
+    if (carried) {
+      const { frame, picture } = carried
+      c.save()
+      c.clipRect(ck.XYWHRect(frame.x, frame.y, frame.width, frame.height), ck.ClipOp.Difference, true)
+      c.saveLayer(faint)
+      c.translate(frame.x, frame.y)
+      c.drawPicture(picture)
+      c.restore()
+      c.restore()
     }
     c.restore()
     surface.flush()
@@ -322,6 +349,7 @@ export function editorView({ ck, canvas, session, onZoom, draw }: ViewDeps): Edi
     cancelAnimationFrame(pending)
     surface?.delete()
     resized.disconnect()
+    faint.delete()
     edge.delete()
     backing.delete()
     viewListeners.clear()
@@ -337,6 +365,7 @@ export function editorView({ ck, canvas, session, onZoom, draw }: ViewDeps): Edi
     page: shownPage,
     inView,
     middleFrame,
+    nearestFrame,
     rulers: rulersShown,
     onStage,
     pointAt,

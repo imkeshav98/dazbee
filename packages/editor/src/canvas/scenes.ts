@@ -5,6 +5,7 @@ import type { CanvasKit, SkPicture } from '@dazbee/canvaskit'
 import { childrenOf } from '@dazbee/doc'
 import {
   drawFrame,
+  drawLayers,
   layerPictures,
   type MeasureText,
   type ParagraphCache,
@@ -46,6 +47,11 @@ export interface FrameScenes {
     inView: Frame[],
     screen: Resources,
   ): { pictures: { frame: Frame; picture: SkPicture }[]; recorded: number }
+  /**
+   * A picture of some of a frame's layers, each with what it holds, in the frame's design pixels and
+   * not cut to the frame: what a drag carries past the frame's edge. Kept until asked for another.
+   */
+  ghost(frame: Frame, ids: readonly string[], screen: Resources): SkPicture
   destroy(): void
 }
 
@@ -67,6 +73,8 @@ export function frameScenes({ ck, resources, drawn }: ScenesDeps): FrameScenes {
   let recordingWith: { for: Resources; resources: Resources } | null = null
   // Auto layout measures text with the fonts the screen draws with (#46); a new font set measures anew.
   let measuring: { for: Resources; measure: MeasureText } | null = null
+  /** The last ghost asked for, by the scene and layers it shows. */
+  let ghosted: { scene: Scene; ids: string; picture: SkPicture } | null = null
 
   // Text laid out and layers recorded once and kept: recording a frame again records only the
   // layers that changed, and lays out only the text that did.
@@ -116,6 +124,21 @@ export function frameScenes({ ck, resources, drawn }: ScenesDeps): FrameScenes {
       shown.push({ frame, picture: entry.picture })
     }
     return { pictures: shown, recorded }
+  }
+  function ghost(frame: Frame, ids: readonly string[], screen: Resources) {
+    const { scene } = cached(frame)
+    const key = ids.join(' ')
+    if (ghosted?.scene === scene && ghosted.ids === key) return ghosted.picture
+    const layers = ids.flatMap((id) => findLayer(scene.layers, id) ?? [])
+    const recorder = new ck.PictureRecorder()
+    try {
+      drawLayers(ck, recorder.beginRecording(ck.LTRBRect(-1e6, -1e6, 1e6, 1e6)), layers, withParagraphs(screen))
+      ghosted?.picture.delete()
+      ghosted = { scene, ids: key, picture: recorder.finishRecordingAsPicture() }
+      return ghosted.picture
+    } finally {
+      recorder.delete()
+    }
   }
   /** Lets go of every frame's scene and picture. */
   function forget() {
@@ -170,6 +193,7 @@ export function frameScenes({ ck, resources, drawn }: ScenesDeps): FrameScenes {
 
   function destroy() {
     stopArriving()
+    ghosted?.picture.delete()
     forget()
     layers.delete()
     paragraphs.delete()
@@ -180,6 +204,7 @@ export function frameScenes({ ck, resources, drawn }: ScenesDeps): FrameScenes {
     measure,
     layout,
     pictures,
+    ghost,
     destroy,
   }
 }

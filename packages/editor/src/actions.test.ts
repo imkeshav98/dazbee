@@ -86,8 +86,10 @@ function harness(penDrawing = false) {
     session,
     view: {
       design: () => session.design(),
-      frames: () => frames,
       frameOf: (key) => frames.find((f) => f.id === key),
+      page: () => 'p1',
+      // The wide frame is in the middle of the view.
+      nearestFrame: () => wide,
       fitAll: () => log.push('fitAll'),
       fitArea: (area) => log.push(`fitArea ${JSON.stringify(area)}`),
       zoomTo: (zoom) => log.push(`zoomTo ${zoom}`),
@@ -231,8 +233,12 @@ describe('editorActions', () => {
       expect(log).toContain('flowEnd')
     })
 
-    it("selects every top-level layer that can be picked of the selection's frame, else of the first frame", () => {
+    it("selects every top-level layer that can be picked of the selection's frame, else of the frame last selected in on the page, else of the frame nearest the middle of the view", () => {
       const { actions, selection, frame, wide } = harness()
+      actions.perform('selectAll')
+      expect(selection.current()).toEqual({ frameId: wide.id, ids: ['wide-a'] })
+      selection.select(['a'], frame.id)
+      selection.select([], frame.id)
       actions.perform('selectAll')
       expect(selection.current()).toEqual({ frameId: frame.id, ids: ['a', 'b', 'c', 'row'] })
       selection.select(['wide-a'], wide.id)

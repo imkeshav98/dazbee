@@ -28,7 +28,7 @@ import { editorDrawing } from './gestures/drawing.ts'
 import { editorPen } from './gestures/pen.ts'
 import { editorPointer } from './gestures/pointer.ts'
 import { editorSelectPress } from './gestures/select-press.ts'
-import { editorTransformDrag } from './gestures/transform-drag.ts'
+import { carried, editorTransformDrag } from './gestures/transform-drag.ts'
 import { editorLayerEdits } from './layer-edits.ts'
 import { editorBoxes } from './layers/boxes.ts'
 import { hug as hugIn } from './layers/hug.ts'
@@ -309,12 +309,18 @@ function live(
     typing.stopWhenGone()
     const design = view.design()
     let recorded = 0
-    const painted = view.paint((inView) => {
-      const screen = resources.screen(design)
-      const made = scenes.pictures(view.frames(), inView, screen)
-      recorded = made.recorded
-      return made.pictures
-    })
+    const painted = view.paint(
+      (inView) => {
+        const made = scenes.pictures(view.frames(), inView, resources.screen(design))
+        recorded = made.recorded
+        return made.pictures
+      },
+      () => {
+        // What a drag carries, drawn faintly past its frame's edge.
+        const drag = carried(pointer.gesture())
+        return drag && { frame: drag.frame, picture: scenes.ghost(drag.frame, drag.roots, resources.screen(design)) }
+      },
+    )
     if (!painted) return
     pointer.rehover()
     drawOverlay()

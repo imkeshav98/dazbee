@@ -8,7 +8,7 @@ import { hug } from '../layers/hug.ts'
 import { measure, sessionOf, testBoxes } from '../layers/test-boxes.ts'
 import type { Box } from '../layers/transform.ts'
 import { editorSelection } from '../selection.ts'
-import { editorTransformDrag, type TransformDragDeps } from './transform-drag.ts'
+import { carried, editorTransformDrag, type TransformDrag, type TransformDragDeps } from './transform-drag.ts'
 
 const rect = (
   parentId: string,
@@ -283,5 +283,18 @@ describe('editorTransformDrag', () => {
       drag.marquee({ kind: 'marquee', from: { x: 650, y: 650 }, to: { x: 800, y: 800 }, base: [], baseFrame: null })
       expect(selection.current()).toBeNull()
     })
+  })
+})
+
+describe('carried', () => {
+  it('is the frame and the layers a move, resize or turn carries, and nothing for any other gesture', () => {
+    const frame = { id: 'sq' } as Frame
+    for (const kind of ['move', 'resize', 'rotate'])
+      expect(carried({ kind, frame, roots: ['a', 'b'] } as unknown as TransformDrag)).toEqual({
+        frame,
+        roots: ['a', 'b'],
+      })
+    expect(carried({ kind: 'marquee' })).toBeNull()
+    expect(carried(null)).toBeNull()
   })
 })

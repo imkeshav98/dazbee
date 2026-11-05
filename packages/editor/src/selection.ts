@@ -1,6 +1,6 @@
 // What is selected, the group gone into, the picked page, a crop or path edit, and the layer under
 // the pointer, with the rules that keep them in step and the listeners that follow them.
-import type { Design } from '@dazbee/schema'
+import { type Design, frameIdOf } from '@dazbee/schema'
 
 import type { Frame } from './canvas/frames.ts'
 import type { AnchorRef } from './gestures/path.ts'
@@ -31,8 +31,13 @@ export interface SelectionDeps {
 
 export interface EditorSelection {
   current(): Selection | null
-  /** The group or box double-clicked into: a click then picks what is directly inside it (#41). */
+  /**
+   * The group or box double-clicked into: a click then picks what is directly inside it (#41).
+   * It is always in the selection's frame, on the shown page.
+   */
   entered(): string | null
+  /** The frame layers were last selected in on a page, kept after the selection is let go; null with none. */
+  lastFrameOn(pageId: string): string | null
   /**
    * The page a click on a frame's background picked: its frames outlined dashed, their labels lit.
    * No layer is selected meanwhile, so the layers' keys do nothing to it.
@@ -56,7 +61,7 @@ export interface EditorSelection {
    * on the shown page; with nothing selected, a crop or path edit ends.
    */
   keep(): void
-  /** Lets the selection go when its frame is not on the shown page, with a crop or path edit. */
+  /** Lets the selection go when its frame is not on the shown page, with a crop, path edit and the group gone into. */
   dropOffPage(): void
   /** Picks a page that has a frame shown, or none, letting the selection go; shows it and tells the page listeners. */
   pickPage(pageId: string | null): void
@@ -99,6 +104,8 @@ export function editorSelection({ drawn, frames, changed }: SelectionDeps): Edit
   let pickedPage: string | null = null
   /** The group or box double-clicked into. */
   let entered: string | null = null
+  /** The frame layers were last selected in, by page. */
+  const lastFrames = new Map<string, string>()
   /** The selection the selection listeners last heard of, as `<frame>|<ids>`. */
   let lastSelection = ''
   /** The layer under the pointer. */
@@ -120,6 +127,9 @@ export function editorSelection({ drawn, frames, changed }: SelectionDeps): Edit
   function enteredGroup() {
     return entered
   }
+  function lastFrameOn(pageId: string) {
+    return lastFrames.get(pageId) ?? null
+  }
   function picked() {
     return pickedPage
   }
@@ -135,6 +145,9 @@ export function editorSelection({ drawn, frames, changed }: SelectionDeps): Edit
 
   function select(ids: string[], frameId: string | null) {
     selection = ids.length > 0 && frameId !== null ? { ids, frameId } : null
+    rememberFrame()
+    // Layers selected in another frame leave the group gone into: Esc never goes back to it.
+    if (entered && frameId !== null && frameIdOf(drawn(), entered) !== frameId) entered = null
     if (pathEditing && (ids.length !== 1 || ids[0] !== pathEditing.id || frameId !== pathEditing.frameId))
       pathEditing = null
     if (cropping && (ids.length !== 1 || ids[0] !== cropping.id || frameId !== cropping.frameId)) cropping = null
@@ -148,7 +161,13 @@ export function editorSelection({ drawn, frames, changed }: SelectionDeps): Edit
   }
   function selectKeepingModes(next: Selection | null) {
     selection = next
+    rememberFrame()
     endModesWhenNone()
+  }
+  /** Keeps the selection's frame as the one last selected in on its page. */
+  function rememberFrame() {
+    const frame = frameOf(selection?.frameId)
+    if (frame) lastFrames.set(frame.pageId, frame.id)
   }
   function keep() {
     if (!selection) return endModesWhenNone()
@@ -161,6 +180,7 @@ export function editorSelection({ drawn, frames, changed }: SelectionDeps): Edit
   }
   function dropOffPage() {
     if (selection && !frameOf(selection.frameId)) selection = null
+    if (entered && !frameOf(frameIdOf(drawn(), entered))) entered = null
     endModesWhenNone()
   }
   function pickPage(pageId: string | null) {
@@ -227,6 +247,7 @@ export function editorSelection({ drawn, frames, changed }: SelectionDeps): Edit
   return {
     current,
     entered: enteredGroup,
+    lastFrameOn,
     pickedPage: picked,
     cropping: croppingLayer,
     pathEditing: editingPath,
