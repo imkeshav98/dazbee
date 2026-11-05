@@ -305,7 +305,12 @@ test('on a phone a tap on a layer where the bar shows selects it, presses nothin
       const box = window.dazbee?.boxOf(id)
       return box ? window.dazbee?.screenPoint(box.x + box.width / 2, box.y + box.height / 2) : undefined
     }, id)
-    await page.touchscreen.tap(at?.x ?? 0, at?.y ?? 0)
+    // A press held a second, as a slow finger's, before it lifts.
+    const touch = await page.context().newCDPSession(page)
+    const point = [{ x: at?.x ?? 0, y: at?.y ?? 0 }]
+    await touch.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: point })
+    await page.waitForTimeout(1_000)
+    await touch.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
     await expect.poll(() => page.evaluate(() => window.dazbee?.selection()), id).toEqual([id])
     await page.waitForTimeout(500)
     await expect(page.locator('[data-radix-popper-content-wrapper]'), id).toHaveCount(0)
@@ -319,7 +324,15 @@ test('on a phone a tap on a layer where the bar shows selects it, presses nothin
       }),
     )
     const { boxes } = await selectionOnScreen(page, [id])
-    for (const box of boxes) for (const row of bar) expect(meet(box, row), `${id} under the bar`).toBe(false)
+    // The label of the selection's frame, lit while a layer in it is selected, stays clear too.
+    const label = await page.evaluate(() => {
+      const el = document.querySelector('.stage-overlay .frame-label[data-active]')
+      if (!el) return []
+      const { left, top, right, bottom } = el.getBoundingClientRect()
+      return [{ left, top, right, bottom }]
+    })
+    for (const box of [...boxes, ...label])
+      for (const row of bar) expect(meet(box, row), `${id} under the bar`).toBe(false)
   }
   expect(errors).toEqual([])
   await page.context().close()

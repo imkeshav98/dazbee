@@ -49,11 +49,8 @@ const MORE = 30 + DIVIDER
 const TOP_BAR =
   'flex items-center gap-0.5 rounded-[14px] surface-frost p-1 max-sm:gap-[8px] max-sm:rounded-[18px] max-sm:p-[2px] max-sm:[&_[data-bar-item]]:h-[44px] max-sm:[&_[data-bar-item]]:min-w-[44px] max-sm:[&_[data-bar-item]]:px-[6px]'
 
-/** Room kept between the bar and a selection the stage moves clear of it, in pixels. */
-const CLEAR = 8
-
-/** How long after the bar shows the press that showed it can still end in a click on it, in ms. */
-const TAP_THROUGH = 700
+/** Room kept between the bar and a selection the stage moves clear of it, its handles' reach included, in pixels. */
+const CLEAR = 12
 
 /** When the last press on the page went down, and whether a press is held, as a window listener keeps them. */
 const press = { at: 0, held: false }
@@ -119,8 +116,13 @@ function useSelectionClear(editor: Editor, ids: string[], phone: boolean) {
     if (!phone || key === '') return
     const clear = () => {
       const rect = editor.selectionRect()
-      const under = editState().barBottom + CLEAR - (rect?.y ?? Infinity)
-      if (!rect || under <= 0) return
+      if (!rect) return
+      // The selection's frame label, lit while a layer in it is selected, is kept clear too; the
+      // overlay places it in the stage's pixels.
+      const label = document.querySelector<HTMLElement>('.stage-overlay .frame-label[data-active]')
+      const top = Math.min(rect.y, label ? Number.parseFloat(label.style.top) : Infinity)
+      const under = editState().barBottom + CLEAR - top
+      if (under <= 0) return
       const camera = editor.camera()
       // The camera's offset is in screen pixels: adding to it moves the design down.
       editor.setCamera({ ...camera, y: camera.y + under })
@@ -311,8 +313,7 @@ function Bar({
   }, [selectionKey])
   const onClickCapture = (event: MouseEvent) => {
     // A pointer's click with no press since the bar showed, coming as that press ends.
-    const fromThatPress =
-      event.detail > 0 && press.at === showing.current.press && performance.now() - showing.current.at < TAP_THROUGH
+    const fromThatPress = event.detail > 0 && press.at === showing.current.press && press.at < showing.current.at
     if (!fromThatPress) return
     event.preventDefault()
     event.stopPropagation()
