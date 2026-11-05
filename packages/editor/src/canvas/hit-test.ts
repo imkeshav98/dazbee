@@ -3,18 +3,20 @@
 // 10% opaque; a text on its laid-out lines. What shows nothing there passes the click to the layer
 // beneath.
 import type { CanvasKit, Path } from '@dazbee/canvaskit'
-import { imagePlacement, outlineOf, type SceneLayer, type TextLayout } from '@dazbee/renderer'
+import { imagePlacement, type SceneLayer, type TextLayout } from '@dazbee/renderer'
 import type { ImagePaint, Paint, Point, Rect, Stroke, TextProps } from '@dazbee/schema'
 
 import { type AlphaMap, opacityAt } from './alpha-map.ts'
 
-/** What a hit test reads to tell where a layer shows. */
+/** What a hit test reads to tell where a layer shows, each kept by the caller between tests. */
 export interface Looks {
   ck: CanvasKit
+  /** A layer's outline, as the renderer's `outlineOf` makes it; the caller keeps it and frees it. */
+  outline(layer: SceneLayer): Path
   /** A decoded image's alpha map, by asset id; none while the image loads, when a photo shows all over its outline. */
   alpha(assetId: string): AlphaMap | undefined
-  /** A text layer laid out as it is drawn. */
-  layout(props: TextProps): TextLayout
+  /** A text's `lineBoxes`, from its layout as drawn. */
+  lines(props: TextProps): readonly Rect[]
 }
 
 export interface HitOptions {
@@ -66,6 +68,30 @@ export function hitTest(layers: SceneLayer[], p: Point, looks: Looks, options: H
   return null
 }
 
+/**
+ * Where a text shows: the boxes of its laid-out lines and list markers, in its own coordinates from
+ * its box's corner, its vertical alignment applied. A line with no words has no box.
+ */
+export function lineBoxes(laid: TextLayout): Rect[] {
+  const boxes: Rect[] = []
+  for (const b of laid.blocks) {
+    const y = laid.dy + b.y
+    const { marker } = b
+    if (marker)
+      boxes.push({
+        x: b.x + b.markerX,
+        y: y + b.markerY,
+        width: marker.getMaxIntrinsicWidth(),
+        height: marker.getHeight(),
+      })
+    for (const line of b.paragraph.getLineMetrics()) {
+      if (line.width > 0)
+        boxes.push({ x: b.x + line.left, y: y + line.baseline - line.ascent, width: line.width, height: line.height })
+    }
+  }
+  return boxes
+}
+
 /** The layer, or the child of it, that shows at a point in its parent's coordinates. */
 function layerAt(layer: SceneLayer, p: Point, looks: Looks, options: HitOptions): SceneLayer | null {
   const q = unrotate(p, layer)
@@ -74,13 +100,13 @@ function layerAt(layer: SceneLayer, p: Point, looks: Looks, options: HitOptions)
     case 'group':
       return hitTest(layer.children, q, looks, options)
     case 'box':
-      if (layer.props.clip && !inOutline(looks.ck, layer, q)) return null
+      if (layer.props.clip && !inOutline(looks, layer, q)) return null
       return hitTest(layer.children, q, looks, options) ?? (shows(looks, layer, q) ? layer : null)
     case 'boolean':
       // Its shapes' own paints don't show, only the boolean's: the shape under the point is picked
       // where the boolean shows, so a click inside it can still reach one shape.
       if (!shows(looks, layer, q)) return null
-      return shapeUnder(looks.ck, layer.children, q, options.pickable ?? everything) ?? layer
+      return shapeUnder(looks, layer.children, q, options.pickable ?? everything) ?? layer
     case 'text':
       return onLines(looks, layer, q) ? layer : null
     case 'graphic':
@@ -106,12 +132,8 @@ function inBox(q: Point, box: Rect, grow = 0) {
   )
 }
 
-function inOutline(ck: CanvasKit, layer: SceneLayer, q: Point) {
-  if (!inBox(q, layer.props)) return false
-  const outline = outlineOf(ck, layer)
-  const inside = outline.contains(q.x, q.y)
-  outline.delete()
-  return inside
+function inOutline(looks: Looks, layer: SceneLayer, q: Point) {
+  return inBox(q, layer.props) && looks.outline(layer).contains(q.x, q.y)
 }
 
 /**
@@ -126,13 +148,9 @@ function shows(looks: Looks, layer: Painted, q: Point): boolean {
   const reach =
     kind === 'path' ? Math.max(0, ...props.strokes.map((s) => s.width / 2)) + LINE_REACH : strokeReach(props.strokes)
   if (!inBox(q, props, reach)) return false
-  const outline = outlineOf(looks.ck, layer)
-  try {
-    if (outline.contains(q.x, q.y)) return paintsShow(looks, props.fills, props, q)
-    return reach > 0 && nearOutline(looks.ck, outline, q, reach)
-  } finally {
-    outline.delete()
-  }
+  const outline = looks.outline(layer)
+  if (outline.contains(q.x, q.y)) return paintsShow(looks, props.fills, props, q)
+  return reach > 0 && nearOutline(looks.ck, outline, q, reach)
 }
 
 /** A line is picked along it, up to half its stroke and LINE_REACH more either side of it. */
@@ -191,7 +209,7 @@ function photoShows(looks: Looks, fill: ImagePaint, box: Rect, q: Point) {
 
 /** The topmost pickable shape of a boolean whose own outline holds a point, inside a boolean within it too. */
 function shapeUnder(
-  ck: CanvasKit,
+  looks: Looks,
   shapes: SceneLayer[],
   p: Point,
   pickable: (layer: SceneLayer) => boolean,
@@ -201,8 +219,8 @@ function shapeUnder(
     if (!pickable(shape) || (shape.type !== 'graphic' && shape.type !== 'boolean')) continue
     if (shape.type === 'graphic' && shape.props.shape.kind === 'line') continue
     const q = unrotate(p, shape)
-    if (!inOutline(ck, shape, q)) continue
-    return shape.type === 'boolean' ? (shapeUnder(ck, shape.children, q, pickable) ?? shape) : shape
+    if (!inOutline(looks, shape, q)) continue
+    return shape.type === 'boolean' ? (shapeUnder(looks, shape.children, q, pickable) ?? shape) : shape
   }
   return null
 }
@@ -215,26 +233,7 @@ function shapeUnder(
 function onLines(looks: Looks, layer: TextLayer, q: Point) {
   const { props } = layer
   if (!inBox(q, props)) return false
-  const laid = looks.layout(props)
-  const x = q.x - props.x
-  const y = q.y - props.y - laid.dy
-  let words = false
-  for (const b of laid.blocks) {
-    const { marker } = b
-    if (
-      marker &&
-      inBox(
-        { x, y },
-        { x: b.x + b.markerX, y: b.y + b.markerY, width: marker.getMaxIntrinsicWidth(), height: marker.getHeight() },
-      )
-    )
-      return true
-    for (const line of b.paragraph.getLineMetrics()) {
-      if (line.width <= 0) continue
-      words = true
-      const top = b.y + line.baseline - line.ascent
-      if (inBox({ x, y }, { x: b.x + line.left, y: top, width: line.width, height: line.height })) return true
-    }
-  }
-  return !words
+  const lines = looks.lines(props)
+  const at = { x: q.x - props.x, y: q.y - props.y }
+  return lines.length === 0 || lines.some((line) => inBox(at, line))
 }

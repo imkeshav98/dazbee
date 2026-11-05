@@ -1,13 +1,15 @@
 // Scenes and pictures by frame. A frame is recorded again only when a layer it shows or the frame
 // itself changed: dragging in one frame leaves the other frames' pictures as they are, and panning
 // records nothing.
-import type { CanvasKit, SkPicture } from '@dazbee/canvaskit'
+import type { CanvasKit, Path, SkPicture } from '@dazbee/canvaskit'
 import { childrenOf } from '@dazbee/doc'
 import {
   drawFrame,
   drawLayers,
   layerPictures,
+  lru,
   type MeasureText,
+  outlineOf,
   type ParagraphCache,
   paragraphCache,
   render,
@@ -18,11 +20,11 @@ import {
   type TextLayout,
   textMeasure,
 } from '@dazbee/renderer'
-import type { Design, Point } from '@dazbee/schema'
+import type { Design, Point, Rect } from '@dazbee/schema'
 
 import type { EditorResources } from '../resources.ts'
 import type { Frame } from './frames.ts'
-import { type HitOptions, hitTest, type Looks } from './hit-test.ts'
+import { type HitOptions, hitTest, lineBoxes, type Looks } from './hit-test.ts'
 
 export interface ScenesDeps {
   ck: CanvasKit
@@ -84,8 +86,22 @@ export function frameScenes({ ck, resources, drawn }: ScenesDeps): FrameScenes {
   const paragraphs = paragraphCache()
   const scenes = sceneMemo()
   const layers = layerPictures()
-  /** What a hit test reads: the images' alpha maps and the text as the screen lays it out. */
-  const looks: Looks = { ck, alpha: resources.alpha, layout }
+  // Outlines a hit test reads, kept by layer: an unchanged layer is the same object between scenes.
+  const outlines = lru<SceneLayer, Path>(4000, (path) => path.delete())
+  /** The line boxes of each text layout a hit test has read. */
+  const lines = new WeakMap<TextLayout, Rect[]>()
+  /** What a hit test reads: outlines, the images' alpha maps and the text as the screen lays it out. */
+  const looks: Looks = {
+    ck,
+    outline: (layer) => outlines.get(layer, () => outlineOf(ck, layer)),
+    alpha: resources.alpha,
+    lines: (props) => {
+      const laid = layout(props)
+      let boxes = lines.get(laid)
+      if (!boxes) lines.set(laid, (boxes = lineBoxes(laid)))
+      return boxes
+    },
+  }
 
   function scene(frame: Frame) {
     return cached(frame).scene
@@ -203,6 +219,7 @@ export function frameScenes({ ck, resources, drawn }: ScenesDeps): FrameScenes {
     stopArriving()
     ghosted?.picture.delete()
     forget()
+    outlines.clear()
     layers.delete()
     paragraphs.delete()
   }
