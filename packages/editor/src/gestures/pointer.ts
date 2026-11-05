@@ -219,11 +219,11 @@ export function editorPointer({
   }
   /**
    * The deepest layer that shows at a point of a frame, as a press, a double click and a hover pick
-   * it: the text being typed in shows anywhere in its box, below its lines too. With `pickable`, what
-   * can't be picked (locked) is passed over.
+   * it: the text being typed in shows anywhere in its box, below its lines too, and so does `text`,
+   * when not typing. With `pickable`, what can't be picked (locked) is passed over.
    */
-  const deepestAt = (at: { frame: Frame; p: Point }, pickable?: PointerDeps['boxes']['pickable']) =>
-    scenes.hit(at.frame, at.p, { pickable, wholeBox: typing.editing()?.id })
+  const deepestAt = (at: { frame: Frame; p: Point }, pickable?: PointerDeps['boxes']['pickable'], text?: string) =>
+    scenes.hit(at.frame, at.p, { pickable, wholeBox: typing.editing()?.id ?? text })
   function rehover() {
     const at = pointer && !gesture && !panning() ? pointIn(pointer) : null
     const hit = at && deepestAt(at)
@@ -485,6 +485,7 @@ export function editorPointer({
     },
     on,
   )
+  canvas.addEventListener('click', selectPress.clicked, on)
   canvas.addEventListener(
     'dblclick',
     (e) => {
@@ -496,7 +497,8 @@ export function editorPointer({
       }
       const at = pointIn(e)
       const editing = typing.editing()
-      const hit = at && deepestAt(at, boxes.pickable)
+      // A double click picks the text selected before it anywhere in its box, as a press there drags it.
+      const hit = at && deepestAt(at, boxes.pickable, selectPress.textBeforeClicks(at.frame.id))
       if (!at || !hit || lockedAt(at.frame, at.p)) return
       if (editing && hit.id === editing.id && editing.frameId === at.frame.id) {
         // A double click in the text being edited selects the word there (#47).

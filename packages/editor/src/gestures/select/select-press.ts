@@ -2,7 +2,7 @@
 // inside the group gone into or on a locked layer, or the frame whose label it is on; the drag it
 // starts (a handle, a marquee, a move, an auto layout reorder or, from a label, a frame's move); and
 // what a press that never became a drag selects once it ends, such as the frame whose empty area a
-// click was on.
+// click was on; and the text selected before a run of clicks, which its double click types into.
 import type { SceneLayer } from '@dazbee/renderer'
 import type { Point } from '@dazbee/schema'
 
@@ -11,7 +11,7 @@ import { type Frame, frameAt } from '../../canvas/frames.ts'
 import type { EditorView } from '../../canvas/view.ts'
 import type { EditorBoxes } from '../../layers/boxes.ts'
 import { localTo } from '../../layers/transform.ts'
-import type { EditorSelection } from '../../selection.ts'
+import type { EditorSelection, Picked } from '../../selection.ts'
 import type { EditorTyping } from '../../text/typing.ts'
 import { CLICK_SLOP } from '../press.ts'
 import type { EditorAutoLayoutDrag, ReorderDrag } from './auto-layout-drag.ts'
@@ -23,7 +23,7 @@ export type SelectDrag = MoveDrag | ResizeDrag | RotateDrag | MarqueeDrag | Reor
 
 export interface SelectPressDeps {
   canvas: Pick<HTMLCanvasElement, 'setPointerCapture'>
-  view: Pick<EditorView, 'camera' | 'frames' | 'frameOf'>
+  view: Pick<EditorView, 'camera' | 'design' | 'frames' | 'frameOf'>
   selection: Pick<EditorSelection, 'current' | 'entered' | 'enter' | 'select' | 'selectKeepingModes' | 'pickFrame'>
   boxes: Pick<EditorBoxes, 'selectionBox' | 'lockedSelection' | 'roots' | 'target' | 'lockedAt' | 'insideEntered'>
   typing: Pick<EditorTyping, 'stop'>
@@ -57,6 +57,13 @@ export interface EditorSelectPress {
   release(gesture: MarqueeDrag | null): void
   /** Forgets the locked layer a press would select, for a press the browser took away. */
   cancel(): void
+  /** A click on the stage, by a mouse or a finger: the first of a run notes the text selected when its press went down. */
+  clicked(e: MouseEvent): void
+  /**
+   * The text selected alone in a frame when the last run of clicks began, though its first click
+   * picked what shows beneath: the run's double click picks it anywhere in its box.
+   */
+  textBeforeClicks(frameId: string): string | undefined
 }
 
 export function editorSelectPress({
@@ -81,6 +88,9 @@ export function editorSelectPress({
   let lockedClick: { id: string; frameId: string } | null = null
   /** Where a press that may still be a click went down, on screen: it drags only once it has gone CLICK_SLOP from there. */
   let pressedAt: Point | null = null
+  /** The text selected alone when the last press went down, and when the last run of clicks began. */
+  let pressedText: Picked | null = null
+  let runText: Picked | null = null
 
   function press(
     e: PointerEvent,
@@ -88,6 +98,7 @@ export function editorSelectPress({
     at: { frame: Frame; p: Point } | null,
     deepest: SceneLayer | null,
   ): SelectDrag | null {
+    pressedText = textSelected()
     typing.stop()
     clickedAlone = null
     pressedAt = screen
@@ -174,6 +185,7 @@ export function editorSelectPress({
     return transformDrag.pressMove(frame, around, at.p, ids)
   }
   function pressLabel(e: PointerEvent, screen: Point, frameId: string) {
+    pressedText = textSelected()
     const frame = frameOf(frameId)
     if (!frame) return null
     typing.stop()
@@ -216,6 +228,19 @@ export function editorSelectPress({
   function cancel() {
     lockedClick = null
   }
+  function clicked(e: MouseEvent) {
+    // Each click uses up what its press noted, so a run whose press went elsewhere notes no older text.
+    if (e.detail <= 1) runText = pressedText
+    pressedText = null
+  }
+  function textBeforeClicks(frameId: string) {
+    return runText?.frameId === frameId ? runText.id : undefined
+  }
+  function textSelected(): Picked | null {
+    const current = selection.current()
+    const id = current?.ids.length === 1 ? current.ids[0] : undefined
+    return current && id && view.design().nodes[id]?.type === 'text' ? { id, frameId: current.frameId } : null
+  }
 
   return {
     press,
@@ -223,5 +248,7 @@ export function editorSelectPress({
     moved,
     release,
     cancel,
+    clicked,
+    textBeforeClicks,
   }
 }

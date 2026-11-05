@@ -55,6 +55,7 @@ function harness(handle: ResizeDrag['handle'] | null = null) {
     canvas: { setPointerCapture: () => log.push('capture') },
     view: {
       camera: () => ({ x: 0, y: 0, zoom: 1 }),
+      design: () => session.design(),
       frames: () => [SQUARE],
       frameOf: (key) => (key === SQUARE.id ? SQUARE : undefined),
     },

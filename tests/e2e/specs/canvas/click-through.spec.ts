@@ -1,8 +1,8 @@
 // A click picks what shows, with real pointer input: through a cut-out photo's clear corners,
 // an ellipse's empty corners, the gaps between a star's points and the box after short text, the
 // layer beneath is picked, and a hover outlines the same layer a click picks. A selected layer still
-// drags from an empty part of its box, and a drag from a see-through part moves what shows there, as
-// one undo step. Taps pick the same at the three screen sizes, and a click and a hover over 200
+// drags from an empty part of its box, a double click anywhere in a selected text's box types into
+// it, and a drag from a see-through part moves what shows there, as one undo step. Taps pick the same at the three screen sizes, and a click and a hover over 200
 // see-through layers are timed.
 
 import { upload } from '../../support/assets.ts'
@@ -125,6 +125,38 @@ test('a selected layer drags from an empty part of its box, and a click there pi
   expect(await props(page, 'ellipse')).toMatchObject({ x: 580, y: 60 })
   await press(page, 'redo')
   expect(await props(page, 'ellipse')).toMatchObject({ x: 620, y: 100 })
+  expect(errors).toEqual([])
+})
+
+test("a double click in a selected text's empty box types into it, and in an unselected one's picks what shows there", async ({
+  browser,
+}) => {
+  const { page, errors } = await openClickThrough(browser)
+  const { text, afterText, belowText } = SPOTS
+  for (const spot of [afterText, belowText]) {
+    await click(page, text.at.x, text.at.y)
+    expect(await selection(page)).toEqual(['words'])
+    const at = await screenPoint(page, spot.at.x, spot.at.y)
+    await page.mouse.dblclick(at.x, at.y)
+    await drawn(page)
+    await expect(page.locator('.caret'), spot.what).toBeVisible()
+    expect(await selection(page)).toEqual(['words'])
+    // The caret goes to the nearest place in the text: after its one short line.
+    await page.keyboard.type('!')
+    await page.keyboard.press('Escape')
+    await drawn(page)
+    expect(await props(page, 'words'), spot.what).toMatchObject({ text: 'Sale!' })
+    await press(page, 'undo')
+    expect(await props(page, 'words')).toMatchObject({ text: 'Sale' })
+  }
+  // With the text not selected, the same double click picks the layer that shows there.
+  await page.keyboard.press('Escape')
+  await click(page, SPOTS.star.at.x, SPOTS.star.at.y)
+  const at = await screenPoint(page, afterText.at.x, afterText.at.y)
+  await page.mouse.dblclick(at.x, at.y)
+  await drawn(page)
+  expect(await selection(page)).toEqual([afterText.picks])
+  await expect(page.locator('.caret')).toHaveCount(0)
   expect(errors).toEqual([])
 })
 

@@ -163,6 +163,8 @@ function harness(tool: Tool = 'select', under: SceneLayer = UNDER, handle = fals
         return { kind: 'frameMove', frame: SQUARE, pressedAt: screen, from: screen, end: null }
       },
       moved: (screen) => screen.x > 20,
+      clicked: () => {},
+      textBeforeClicks: () => undefined,
       release: (marquee) => log.push(`release press${marquee ? ' marquee' : ''}`),
       cancel: () => log.push('cancel press'),
     },
