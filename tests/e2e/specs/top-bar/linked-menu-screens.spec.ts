@@ -1,6 +1,7 @@
-// Screenshots of the small menu, its ⋯, Copy to other frames ▸, a greyed row's tooltip and the
-// dashed outlines of linked copies, at the three screen sizes in both themes; and at 1280×760, the
-// small menu by a headline, a locked layer's greyed Delete and Ungroup in a group's ⋯.
+// Screenshots of the small menu, its ⋯, Copy to other frames ▸, a greyed row's tooltip, the dashed
+// outlines of linked copies and a group's ⋯, the longest, at the three screen sizes in both themes;
+// and at 1280×760, the small menu by a headline, a locked layer's greyed Delete and Ungroup in a
+// group's ⋯.
 import { photo, upload } from '../../support/assets.ts'
 import { shoot } from '../../support/editor.ts'
 import { openDesignIn, THEMES } from '../../support/glass.ts'
@@ -16,7 +17,7 @@ test.describe.configure({ mode: 'parallel', timeout: 180_000 })
 
 for (const [width, height] of SCREEN_SIZES) {
   test(
-    `the PR's screenshots at ${width}×${height}: the small menu, its ⋯, Copy to other frames ▸, a greyed row's tooltip and the dashed outlines`,
+    `the PR's screenshots at ${width}×${height}: the small menu, its ⋯, Copy to other frames ▸, a greyed row's tooltip, the dashed outlines and a group's ⋯`,
     { tag: '@evidence' },
     async ({ browser }) => {
       const asset = await upload(photo)
@@ -56,6 +57,11 @@ for (const [width, height] of SCREEN_SIZES) {
           .toBe(false)
         await page.mouse.move(0, height / 2)
         await shoot(page, name('outlines'))
+        // A group's ⋯, the longest, with Ungroup after Put in a box; on a phone the whole sheet.
+        await selectLayers(page, ['logo'])
+        await moreMenu(page)
+        await page.mouse.move(0, height / 2)
+        await shoot(page, name('group-more'))
         expect(errors).toEqual([])
         await page.context().close()
       }
