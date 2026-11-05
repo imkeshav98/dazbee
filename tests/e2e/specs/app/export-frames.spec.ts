@@ -257,6 +257,20 @@ test('with nothing ticked the greyed Export says why in a tooltip, under the poi
   expect(errors).toEqual([])
 })
 
+test('an empty tick on Export’s glass has its edge in the muted text colour, which reads over any ad', async ({
+  browser,
+}) => {
+  const { page, errors } = await openSized(browser, { width: 1280, height: 760 })
+  const dialog = await openExport(page)
+  const banner = dialog.locator('label:has([data-frame="banner"])')
+  await banner.click()
+  await page.mouse.move(0, 759)
+  const muted = await dialog.getByText('Frames', { exact: true }).evaluate((el) => getComputedStyle(el).color)
+  const edge = await banner.locator('> span[aria-hidden]').evaluate((el) => getComputedStyle(el).borderTopColor)
+  expect(edge).toBe(muted)
+  expect(errors).toEqual([])
+})
+
 test('in Arabic each row’s size reads width × height, as its frame’s label on the canvas does', async ({ browser }) => {
   const { page, errors } = await openSized(browser, { width: 1280, height: 760 }, { locale: 'ar' })
   await expect(page.locator('html')).toHaveAttribute('dir', 'rtl')

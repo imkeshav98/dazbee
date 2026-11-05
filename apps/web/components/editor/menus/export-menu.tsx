@@ -209,13 +209,7 @@ export function ExportForm({
             {t.editor.exports.noFrames}
           </p>
         ) : (
-          // An empty tick's edge takes the muted text's shade, which reads over whatever ad lies
-          // behind the glass.
-          <div
-            ref={listRef}
-            className={cn(FRAMES_LIST, '[--line-strong:var(--text-muted)]')}
-            data-testid="export-frames"
-          >
+          <div ref={listRef} className={FRAMES_LIST} data-testid="export-frames">
             {frames.length > 1 && <AllFramesRow on={allTicked} onTick={(on) => setTicked(on ? 'all' : new Set())} />}
             {frames.map(([frameId, frame]) => (
               <FrameRow
