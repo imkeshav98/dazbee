@@ -1,7 +1,7 @@
 // Sizes as the app writes them and as they are typed, and a layer's width or height as a patch: with
 // the ratio kept, the other side follows by the same factor, rounded as the fields show it; a box
 // with a side of 0 has no ratio, so only that side changes.
-import { type SizeIssue,sizeIssue } from '@dazbee/schema'
+import { type SizeIssue, sizeIssue } from '@dazbee/schema'
 
 type Box = { width: number; height: number }
 type Axis = keyof Box
