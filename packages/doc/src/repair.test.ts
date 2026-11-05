@@ -131,6 +131,31 @@ describe('repair', () => {
     expect(out.repairs).toEqual(['"g1" was inside itself; moved to frame "p1-b"'])
   })
 
+  it('gives the layers a broken cycle brings into a frame a link no other layer holds, so no link id is on two pages', () => {
+    const out = repaired(
+      snap({
+        g1: layer('group', 'g2', 'L'),
+        g2: layer('group', 'g1', 'g2'),
+        kid: layer('graphic', 'g2', 'kid'),
+        // Their linked copies on page p2, where the cycle's layers were before the moves.
+        'p2-g1': layer('group', 'p2-sq', 'L'),
+        'p2-kid': layer('graphic', 'p2-g1', 'kid'),
+        // A layer on p1 that holds the cycle layer's id as its link.
+        other: layer('graphic', 'p1-story', 'g2'),
+      }),
+    )
+    expect(out.nodes.g1).toMatchObject({ parentId: 'p1-sq', link: 'g1' })
+    expect(out.nodes.g2).toMatchObject({ parentId: 'g1', link: 'g2-2' })
+    expect(out.nodes.kid).toMatchObject({ parentId: 'g2', link: 'kid-2' })
+    expect([out.nodes['p2-g1']?.link, out.nodes['p2-kid']?.link, out.nodes.other?.link]).toEqual(['L', 'kid', 'g2'])
+    expect(out.repairs).toEqual([
+      '"g1" was inside itself; moved to frame "p1-sq"',
+      '"g1" came out of a cycle with link "L", which another layer holds; its link is now "g1"',
+      '"g2" came out of a cycle with link "g2", which another layer holds; its link is now "g2-2"',
+      '"kid" came out of a cycle with link "kid", which another layer holds; its link is now "kid-2"',
+    ])
+  })
+
   it('drops the layers of a cycle, and what they hold, when no frame is left to move them to', () => {
     const s = snap({
       g1: layer('group', 'g2', 'g1'),

@@ -1,11 +1,11 @@
-import { byCodeUnits, canHold } from '@dazbee/schema'
+import { byCodeUnits, canHold, LinkId } from '@dazbee/schema'
 
 type Json = Record<string, unknown>
 type NodeJson = { parentId: string; link?: unknown } & Json
 type Snapshot = { pages: Record<string, unknown>; frames: Record<string, unknown>; nodes: Record<string, Json> }
 
-/** The longest part of a layer id a new link id keeps, so `-<n>` still fits in an id. */
-const LINK_STEM = 60
+/** The longest part of a layer id a new link id keeps: a link id's longest, less room for `-<n>` up to 999. */
+const LINK_STEM = (LinkId.maxLength ?? 64) - 4
 
 /** The page a design with no page left gets; the page commands write it with their next edit. */
 const EMPTY_PAGE = { name: 'Page 1', order: 'a0' }
@@ -17,8 +17,8 @@ const byOrder = ([a, x]: [string, unknown], [b, y]: [string, unknown]) =>
 /**
  * Concurrent edits can merge into a state no single command allows: two tabs each deleting one
  * of the last two pages, a frame added to a page another tab deleted, a layer added to a frame or
- * group another tab deleted, two moves that put layers inside each other, two layers of one frame
- * with one link id, a key an undo left unset. These rules turn any merged state into a valid one.
+ * group another tab deleted, two moves that put layers inside each other (whose links may then
+ * reach another page), two layers of one frame with one link id, a key an undo left unset. These rules turn any merged state into a valid one.
  * They read only the merged state, so every device repairs it the same way, and they never write:
  * the next edit carries on from the repaired view. The snapshot is not changed either: a repaired
  * layer is a copy, and every other object comes back as it was, so a reader can keep what it
@@ -67,6 +67,8 @@ export function repair<S extends Snapshot>(snapshot: S): { snapshot: S; repairs:
 
   // 4. A cycle breaks at its smallest id, so all devices pick the same layer. It has no frame to
   // go back to, so it goes to the top of the first frame there is.
+  /** The layers a broken cycle moved into a frame. */
+  const outOfCycles = new Set<string>()
   const fallback = Object.entries(s.pages)
     .sort(byOrder)
     .map(([pageId]) => frames.filter(([, frame]) => field(frame, 'pageId') === pageId).sort(byOrder)[0]?.[0])
@@ -88,6 +90,7 @@ export function repair<S extends Snapshot>(snapshot: S): { snapshot: S; repairs:
       } else {
         repairs.push(`"${cycle[0]}" was inside itself; moved to frame "${fallback}"`)
         change(cycle[0] as string, { parentId: fallback })
+        outOfCycles.add(cycle[0] as string)
       }
       break
     }
@@ -122,7 +125,37 @@ export function repair<S extends Snapshot>(snapshot: S): { snapshot: S; repairs:
     nodes.delete(id)
   }
 
-  // 7. No frame holds a link id twice: the holder whose id sorts first keeps it, and each other
+  // 7. A broken cycle may bring layers from another page into the fallback frame, while their
+  // linked copies stay there. So each layer it brought keeps its link only when no other layer
+  // holds it, else takes its own id, or that id numbered from 2, whichever no layer holds.
+  const holders = new Map<string, number>()
+  for (const node of nodes.values()) holders.set(String(node.link), (holders.get(String(node.link)) ?? 0) + 1)
+  const cameOut = (id: string) => {
+    const seen = new Set<string>()
+    for (
+      let up: string | undefined = id;
+      up !== undefined && nodes.has(up) && !seen.has(up);
+      up = nodes.get(up)?.parentId
+    ) {
+      if (outOfCycles.has(up)) return true
+      seen.add(up)
+    }
+    return false
+  }
+  for (const id of [...nodes.keys()].filter(cameOut).sort(byCodeUnits)) {
+    const link = String(nodes.get(id)?.link)
+    if ((holders.get(link) ?? 0) < 2) continue
+    let fresh = id
+    for (let n = 2; holders.has(fresh); n++) fresh = `${id.slice(0, LINK_STEM)}-${n}`
+    holders.set(link, (holders.get(link) ?? 1) - 1)
+    holders.set(fresh, 1)
+    repairs.push(
+      `"${id}" came out of a cycle with link "${link}", which another layer holds; its link is now "${fresh}"`,
+    )
+    change(id, { link: fresh })
+  }
+
+  // 8. No frame holds a link id twice: the holder whose id sorts first keeps it, and each other
   // one takes its own id, or that id numbered from 2, whichever its frame doesn't hold yet.
   const held = new Map<string, Map<string, string[]>>()
   for (const [id, node] of nodes) {
