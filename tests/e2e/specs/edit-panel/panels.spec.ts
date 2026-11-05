@@ -137,7 +137,7 @@ for (const [width, height] of SCREEN_SIZES) {
             .locator('input[role="spinbutton"]')
             .evaluateAll((els) =>
               els
-                .filter((el) => el.checkVisibility() && el.clientWidth < 18)
+                .filter((el) => el.checkVisibility() && el.scrollWidth > el.clientWidth)
                 .map((el) => el.getAttribute('aria-label')),
             )
           expect(squeezed, `${kind} ${id}: values with no room`).toEqual([])

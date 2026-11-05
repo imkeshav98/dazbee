@@ -42,7 +42,7 @@ const TILE_SHAPE = 40
  * in, and the danger colour on a side past the limits.
  */
 const SIZE_FIELD =
-  'flex h-[34px] min-w-0 flex-1 cursor-text items-center gap-1.5 overflow-hidden rounded-row border border-line bg-surface px-2.5 transition-colors duration-[var(--chrome-fast)] data-typing:border-accent has-[[aria-invalid=true]]:border-danger max-sm:h-11'
+  'flex h-[34px] min-w-0 flex-1 cursor-text items-center gap-1.5 overflow-hidden rounded-row border border-line bg-surface px-2.5 data-typing:border-accent has-[[aria-invalid=true]]:border-danger max-sm:h-11'
 
 /** A size's outline, as long as a tile's shape on its long side and never thinner than a hairline box. */
 const shapeStyle = ({ width, height }: Size): CSSProperties => {
