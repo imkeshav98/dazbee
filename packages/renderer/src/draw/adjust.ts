@@ -6,8 +6,8 @@ import type { ImageAdjust, ImageFilter } from '@dazbee/schema'
 export type ColorMatrix = number[]
 
 const IDENTITY: ColorMatrix = [1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0]
-// Rec. 709 luma, as the sRGB primaries weigh.
-const LUMA = [0.2126, 0.7152, 0.0722] as const
+/** Rec. 709 luma: how much red, green and blue each weigh in a colour's brightness, as the sRGB primaries weigh. */
+export const LUMA = [0.2126, 0.7152, 0.0722] as const
 
 /** Alpha from luma, for a luminance mask drawn over black: bright shows, dark hides. */
 export const LUMA_TO_ALPHA: ColorMatrix = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, ...LUMA, 0, 0]

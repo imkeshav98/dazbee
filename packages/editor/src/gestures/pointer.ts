@@ -8,7 +8,6 @@ import { isContainer, type Point } from '@dazbee/schema'
 import { type Camera, toWorld } from '../canvas/camera.ts'
 import { resizeCursor, ROTATE_CURSOR } from '../canvas/cursors.ts'
 import { type Frame, labelTextAt } from '../canvas/frames.ts'
-import type { FrameScenes } from '../canvas/scenes.ts'
 import type { EditorView } from '../canvas/view.ts'
 import type { EditorBoxes } from '../layers/boxes.ts'
 import { type Box, localTo } from '../layers/transform.ts'
@@ -67,8 +66,7 @@ export interface PointerDeps {
     EditorSelection,
     'current' | 'hover' | 'cropping' | 'pathEditing' | 'enter' | 'select' | 'selectKeepingModes' | 'crop' | 'editPath'
   >
-  scenes: Pick<FrameScenes, 'hit'>
-  boxes: Pick<EditorBoxes, 'pickable' | 'selectionBox' | 'cropTarget' | 'target' | 'lockedAt'>
+  boxes: Pick<EditorBoxes, 'pickable' | 'selectionBox' | 'cropTarget' | 'target' | 'lockedAt' | 'pickAt'>
   typing: Pick<EditorTyping, 'editing' | 'caretFromPoint' | 'caretTo' | 'selectText' | 'start' | 'stop'>
   pen: Pick<EditorPen, 'drawing' | 'down' | 'move' | 'up' | 'pressPoints' | 'dragPoints' | 'releasePoints'>
   cropping: Pick<EditorCropping, 'press' | 'drag' | 'release'>
@@ -145,7 +143,6 @@ export function editorPointer({
   view,
   tools,
   selection,
-  scenes,
   boxes,
   typing,
   pen,
@@ -224,7 +221,7 @@ export function editorPointer({
    * what can't be picked (locked) is passed over.
    */
   const deepestAt = (at: { frame: Frame; p: Point }, pickable?: PointerDeps['boxes']['pickable'], text?: string) =>
-    scenes.hit(at.frame, at.p, { pickable, wholeBox: typing.editing()?.id ?? text, selected: selection.current()?.ids })
+    boxes.pickAt(at.frame, at.p, { pickable, wholeBox: typing.editing()?.id ?? text })
   function rehover() {
     const at = pointer && !gesture && !panning() ? pointIn(pointer) : null
     const hit = at && deepestAt(at)

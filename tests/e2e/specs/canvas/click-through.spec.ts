@@ -51,19 +51,19 @@ async function onScreen(page: Page, id: string): Promise<Box> {
   return { x: from.x, y: from.y, width: to.x - from.x, height: to.y - from.y }
 }
 
+/** Whether the hover outline is where a layer's box is on screen, within a pixel or two. */
+async function outlines(page: Page, id: string) {
+  const want = await onScreen(page, id)
+  const got = await hoverOutline(page)
+  return !!got && Math.max(...(['x', 'y', 'width', 'height'] as const).map((k) => Math.abs(got[k] - want[k]))) < 2
+}
+
 /** Moves the mouse over a point of the frame, as a hand would, and waits for the overlay to show it. */
 async function hover(page: Page, at: { x: number; y: number }) {
   const screen = await screenPoint(page, at.x, at.y)
   await page.mouse.move(screen.x - 6, screen.y - 6)
   await page.mouse.move(screen.x, screen.y, { steps: 3 })
   await drawn(page)
-}
-
-/** Whether the hover outline is where a layer's box is on screen, within a pixel or two. */
-async function outlines(page: Page, id: string) {
-  const want = await onScreen(page, id)
-  const got = await hoverOutline(page)
-  return !!got && Math.max(...(['x', 'y', 'width', 'height'] as const).map((k) => Math.abs(got[k] - want[k]))) < 2
 }
 
 /**
@@ -85,6 +85,28 @@ async function openSized(
   await page.evaluate(() => window.dazbee?.loaded())
   await fitSettled(page)
   return page
+}
+
+/** Marks where a pointer is: a headless screenshot has no cursor. */
+async function markPointer(page: Page, screen: { x: number; y: number }) {
+  await page.evaluate(({ x, y }) => {
+    document.getElementById('pointer-mark')?.remove()
+    const mark = document.createElement('div')
+    mark.id = 'pointer-mark'
+    Object.assign(mark.style, {
+      position: 'fixed',
+      left: `${x - 9}px`,
+      top: `${y - 9}px`,
+      width: '18px',
+      height: '18px',
+      borderRadius: '50%',
+      border: '2px solid #ffffff',
+      boxShadow: '0 0 0 2px #111111',
+      pointerEvents: 'none',
+      zIndex: '2147483647',
+    })
+    document.body.append(mark)
+  }, screen)
 }
 
 /** Opens the click-through frame at 1440 × 1000 with its cut-out photo loaded. */
@@ -268,27 +290,32 @@ test('a layer at opacity 0 picked in the layers panel counts all over its box: a
   expect(errors).toEqual([])
 })
 
-/** Marks where a pointer is: a headless screenshot has no cursor. */
-async function markPointer(page: Page, screen: { x: number; y: number }) {
-  await page.evaluate(({ x, y }) => {
-    document.getElementById('pointer-mark')?.remove()
-    const mark = document.createElement('div')
-    mark.id = 'pointer-mark'
-    Object.assign(mark.style, {
-      position: 'fixed',
-      left: `${x - 9}px`,
-      top: `${y - 9}px`,
-      width: '18px',
-      height: '18px',
-      borderRadius: '50%',
-      border: '2px solid #ffffff',
-      boxShadow: '0 0 0 2px #111111',
-      pointerEvents: 'none',
-      zIndex: '2147483647',
-    })
-    document.body.append(mark)
-  }, screen)
-}
+test('a layer at opacity 0 picked in the layers panel over a locked layer keeps the selection on a click and a right-click', async ({
+  browser,
+}) => {
+  const asset = await upload(await cutOutPng())
+  const { page, errors } = await openStage(browser, faintDesign(asset.id))
+  await page.evaluate(() => window.dazbee?.loaded())
+  await openLayers(page)
+  await row(page, 'Floor').getByRole('button', { name: 'Lock Floor' }).click()
+  await row(page, 'Gone').click()
+  expect(await selection(page)).toEqual(['zero'])
+  await page.getByRole('button', { name: 'Layers', exact: true }).click()
+  await expect(tree(page)).toBeHidden()
+  const { zero } = FAINT_SPOTS
+  await click(page, zero.at.x, zero.at.y)
+  expect(await selection(page)).toEqual(['zero'])
+  const at = await screenPoint(page, zero.at.x, zero.at.y)
+  await page.mouse.click(at.x, at.y, { button: 'right' })
+  await drawn(page)
+  expect(await selection(page)).toEqual(['zero'])
+  await page.keyboard.press('Escape')
+  // Let go, a click there passes through it to the locked floor, which it selects so its lock can be undone.
+  await page.keyboard.press('Escape')
+  await click(page, zero.at.x, zero.at.y)
+  expect(await selection(page)).toEqual(['floor'])
+  expect(errors).toEqual([])
+})
 
 for (const [width, height] of SCREEN_SIZES) {
   for (const theme of ['dark', 'light'] as const) {
@@ -335,25 +362,7 @@ test(
       await hover(page, at)
       await expect(page.locator('.stage-overlay > .hover')).toBeVisible()
       // A headless screenshot has no cursor: a ring marks where the pointer is.
-      const screen = await screenPoint(page, at.x, at.y)
-      await page.evaluate(({ x, y }) => {
-        document.getElementById('pointer-mark')?.remove()
-        const mark = document.createElement('div')
-        mark.id = 'pointer-mark'
-        Object.assign(mark.style, {
-          position: 'fixed',
-          left: `${x - 9}px`,
-          top: `${y - 9}px`,
-          width: '18px',
-          height: '18px',
-          borderRadius: '50%',
-          border: '2px solid #ffffff',
-          boxShadow: '0 0 0 2px #111111',
-          pointerEvents: 'none',
-          zIndex: '2147483647',
-        })
-        document.body.append(mark)
-      }, screen)
+      await markPointer(page, await screenPoint(page, at.x, at.y))
       writeOutput(`click-through-hover-${name}.png`, await page.screenshot({ animations: 'disabled' }))
     }
   },

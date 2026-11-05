@@ -91,13 +91,11 @@ function harness(tool: Tool = 'select', under: SceneLayer = UNDER, handle = fals
     },
     tools: { tool: () => tool, imageToPlace: () => null, snapping: () => true },
     selection,
-    scenes: {
-      hit: (_frame, p, options) => {
+    boxes: {
+      pickAt: (_frame, p, options) => {
         if (p.x < 0 || p.y < 0 || p.x > 100 || p.y > 100) return null
         return options?.wholeBox ? sceneLayer(options.wholeBox, 'text') : under
       },
-    },
-    boxes: {
       pickable: () => true,
       selectionBox: () => null,
       cropTarget: () => null,

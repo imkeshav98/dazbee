@@ -3,7 +3,7 @@
 // Where a layer is drawn under 10% opaque, its own opacity, its groups', its mask's and its paint's
 // there multiplied, it shows nothing, and the click passes to the layer beneath.
 import type { CanvasKit, Path } from '@dazbee/canvaskit'
-import { imagePlacement, type SceneLayer, type TextLayout } from '@dazbee/renderer'
+import { imagePlacement, LUMA, type SceneLayer, type TextLayout } from '@dazbee/renderer'
 import type { Color, ImagePaint, Paint, Point, Rect, Stroke, TextProps } from '@dazbee/schema'
 
 import { type AlphaMap, opacityAt } from './alpha-map.ts'
@@ -42,8 +42,6 @@ type Rgba = readonly [number, number, number, number]
 const LINE_REACH = 4
 /** How opaque a layer must be drawn under the point to be picked there; below it the click passes on. */
 const SEE_THROUGH = 0.1
-/** Rec. 709 luma, as the renderer's luminance mask weighs red, green and blue. */
-const LUMA = [0.2126, 0.7152, 0.0722] as const
 
 const everything = () => true
 
@@ -92,7 +90,7 @@ export function outlineBand(ck: CanvasKit, outline: Path, reach: number): Path |
 /** The topmost layer of one parent that shows at a point, each drawn at `fade` of its own opacity. */
 function pickIn(layers: SceneLayer[], p: Point, looks: Looks, options: HitOptions, fade: number): SceneLayer | null {
   const pickable = options.pickable ?? everything
-  // A mask isn't drawn, and what it masks shows only inside it (#48), as opaque or bright as it is there.
+  // A mask isn't drawn, and what it masks shows only inside it, as opaque or bright as it is there.
   const maskOf: (SceneLayer | null)[] = []
   let mask: SceneLayer | null = null
   for (const layer of layers) {
@@ -118,53 +116,59 @@ function pickIn(layers: SceneLayer[], p: Point, looks: Looks, options: HitOption
 }
 
 /**
+ * How much a mask lets show at a point in its parent's coordinates, from 0 to 1: an alpha mask by
+ * its opacity and its paint's alpha there, a luminance mask by its paint's brightness; a group or a
+ * box by the layers in it too. Null where the mask draws nothing, so what it masks isn't there at all.
+ */
+function maskAt(mask: SceneLayer, p: Point, looks: Looks, luminance = mask.props.mask === 'luminance'): number | null {
+  const q = unrotate(p, mask)
+  let shown: number | null
+  if (mask.type === 'text') shown = onLines(looks, mask, q) ? textShade(mask.props, luminance) : null
+  else if (mask.type === 'group') shown = brightest(mask.children, q, looks, luminance)
+  else {
+    shown = paintAt(looks, mask, q, 1, luminance)
+    const inside = mask.type === 'box' ? brightest(mask.children, q, looks, luminance) : null
+    if (inside !== null) shown = Math.max(shown ?? 0, inside)
+  }
+  return shown === null ? null : mask.props.opacity * shown
+}
+
+/** The most that the layers of a group or box used as a mask let show at a point; null where none of them draws. */
+function brightest(layers: SceneLayer[], q: Point, looks: Looks, luminance: boolean): number | null {
+  let most: number | null = null
+  for (const layer of layers) {
+    const shown = layer.props.mask ? null : maskAt(layer, q, looks, luminance)
+    if (shown !== null) most = Math.max(most ?? 0, shown)
+  }
+  return most
+}
+
+/**
  * The layer, or the child of it, that shows at a point in its parent's coordinates, drawn at
  * `fade` of its own opacity.
  */
 function layerAt(layer: SceneLayer, p: Point, looks: Looks, options: HitOptions, fade: number): SceneLayer | null {
   const q = unrotate(p, layer)
   if (layer.id === options.wholeBox) return inBox(q, layer.props) ? layer : null
-  const shown = fade * layer.props.opacity
-  if (options.selected?.includes(layer.id) && inBox(q, layer.props) && shown * strongest(layer) < SEE_THROUGH)
+  if (options.selected?.includes(layer.id) && inBox(q, layer.props) && fade * strongest(layer) < SEE_THROUGH)
     return layer
+  const shown = fade * layer.props.opacity
   switch (layer.type) {
     case 'group':
       return pickIn(layer.children, q, looks, options, shown)
     case 'box':
       // Past a clipping box's outline only its strokes show: the clip never cuts them.
-      if (layer.props.clip && !inOutline(looks, layer, q)) return shows(looks, layer, q, shown) ? layer : null
-      return pickIn(layer.children, q, looks, options, shown) ?? (shows(looks, layer, q, shown) ? layer : null)
+      if (layer.props.clip && !inOutline(looks, layer, q)) return shows(looks, layer, q, fade) ? layer : null
+      return pickIn(layer.children, q, looks, options, shown) ?? (shows(looks, layer, q, fade) ? layer : null)
     case 'boolean':
       // Its shapes' own paints don't show, only the boolean's: the shape under the point is picked
       // where the boolean shows, so a click inside it can still reach one shape.
-      if (!shows(looks, layer, q, shown)) return null
+      if (!shows(looks, layer, q, fade)) return null
       return shapeUnder(looks, layer.children, q, options.pickable ?? everything) ?? layer
     case 'text':
       return shown * textShade(layer.props, false) >= SEE_THROUGH && onLines(looks, layer, q) ? layer : null
     case 'graphic':
-      return shows(looks, layer, q, shown) ? layer : null
-  }
-}
-
-/**
- * How much a mask lets show at a point in its parent's coordinates, from 0 to 1: an alpha mask by
- * its opacity and its paint's alpha there, a luminance mask by its paint's brightness. Null where
- * the mask draws nothing, so what it masks isn't there at all.
- */
-function maskAt(mask: SceneLayer, p: Point, looks: Looks): number | null {
-  const q = unrotate(p, mask)
-  const luminance = mask.props.mask === 'luminance'
-  const own = mask.props.opacity
-  switch (mask.type) {
-    case 'group':
-      return pickIn(mask.children, q, looks, {}, 1) ? own : null
-    case 'text':
-      return onLines(looks, mask, q) ? own * textShade(mask.props, luminance) : null
-    default: {
-      const painted = paintAt(looks, mask, q, 1, luminance)
-      if (mask.type === 'box' && (painted ?? 0) < 1 && pickIn(mask.children, q, looks, {}, 1)) return own
-      return painted === null ? null : own * painted
-    }
+      return shows(looks, layer, q, fade) ? layer : null
   }
 }
 
@@ -186,15 +190,58 @@ function inBox(q: Point, box: Rect, grow = 0) {
   )
 }
 
+/**
+ * How opaque a layer is drawn where it is strongest, its own opacity included, from 0 to 1: a group
+ * or a box by its strongest layer too, frosted glass as opaque, and a shape with no paint as
+ * showing inside its outline.
+ */
+function strongest(layer: SceneLayer): number {
+  if (frosted(layer)) return 1
+  const { opacity } = layer.props
+  if (layer.type === 'text') return opacity * textShade(layer.props, false)
+  const inside = layer.type === 'group' || layer.type === 'box' ? layer.children.filter((c) => !c.props.mask) : []
+  const most = Math.max(0, ...inside.map(strongest))
+  if (layer.type === 'group') return opacity * most
+  const paints = [...layer.props.fills, ...strokePaints(layer.props.strokes)].filter((f) => f.visible !== false)
+  const own = paints.length === 0 ? 1 : Math.max(...paints.map(paintStrongest))
+  return opacity * Math.max(own, most)
+}
+
+/** Whether a layer frosts what lies behind it inside its outline, which its own opacity doesn't fade. */
+function frosted(layer: SceneLayer) {
+  return layer.props.effects.some((e) => e.type === 'backgroundBlur' && e.radius > 0)
+}
+
+/** How opaque, or for `luminance` how bright, a text's strongest colour is: its style's, a run's or its outline's. */
+function textShade(props: TextProps, luminance: boolean) {
+  const colours = [props.style.color, ...props.runs.flatMap((r) => (r.style.color ? [r.style.color] : []))]
+  const { outline } = props.style
+  if (outline && outline.width > 0) colours.push(outline.color)
+  return Math.max(...colours.map((c) => shade(rgbaOf(c), luminance)))
+}
+
+/** How opaque a paint is where it is strongest: a gradient by its most opaque stop, a photo by its opacity. */
+function paintStrongest(paint: Paint) {
+  const opacity = paint.opacity ?? 1
+  if (paint.type === 'solid') return rgbaOf(paint.color)[3] * opacity
+  if (paint.type === 'image') return opacity
+  return Math.max(...paint.stops.map((s) => rgbaOf(s.color)[3])) * opacity
+}
+
 function inOutline(looks: Looks, layer: SceneLayer, q: Point) {
   return inBox(q, layer.props) && looks.outline(layer).contains(q.x, q.y)
 }
 
-/** Whether a shape, boolean or box drawn at `shown` of full opacity shows at a point in its own coordinates. */
-function shows(looks: Looks, layer: Painted, q: Point, shown: number): boolean {
-  if (shown < SEE_THROUGH) return false
+/**
+ * Whether a shape, boolean or box drawn at `fade` of its own opacity shows at a point in its own
+ * coordinates: where its paints show, or inside its outline where it frosts what lies behind it.
+ */
+function shows(looks: Looks, layer: Painted, q: Point, fade: number): boolean {
+  if (fade < SEE_THROUGH) return false
+  const shown = fade * layer.props.opacity
   const need = SEE_THROUGH / shown
-  return (paintAt(looks, layer, q, need, false) ?? 0) >= need
+  if (shown >= SEE_THROUGH && (paintAt(looks, layer, q, need, false) ?? 0) >= need) return true
+  return frosted(layer) && inOutline(looks, layer, q)
 }
 
 /**
@@ -225,7 +272,9 @@ function paintAt(looks: Looks, layer: Painted, q: Point, need: number, luminance
   // Where the fill is clear or an open path has none, the strokes still show along the outline.
   const within = kind === 'path' ? reach : strokeReach(props.strokes, 'inside')
   if (!(within > 0 && nearOutline(looks, layer, q, within))) return fill
-  return Math.max(fill ?? 0, strokes() ?? 0)
+  const stroke = strokes() ?? 0
+  // Laid over the fill, a stroke adds to how opaque it is there; brightness is taken at the brighter.
+  return luminance ? Math.max(fill ?? 0, stroke) : 1 - (1 - (fill ?? 0)) * (1 - stroke)
 }
 
 /** A line is picked along it, up to half its stroke and LINE_REACH more either side of it. */
@@ -333,7 +382,8 @@ function stopsAt(stops: readonly { offset: number; color: Color }[], t: number):
   const k = b.offset > a.offset ? (t - a.offset) / (b.offset - a.offset) : 0
   const from = rgbaOf(a.color)
   const to = rgbaOf(b.color)
-  return [0, 1, 2, 3].map((i) => (from[i] ?? 0) + ((to[i] ?? 0) - (from[i] ?? 0)) * k) as unknown as Rgba
+  const mix = (i: 0 | 1 | 2 | 3) => from[i] + (to[i] - from[i]) * k
+  return [mix(0), mix(1), mix(2), mix(3)]
 }
 
 /**
@@ -356,33 +406,6 @@ function photoOpacity(looks: Looks, fill: ImagePaint, box: Rect, q: Point) {
     y = Math.min(Math.max(y, 0), ih - 0.5)
   }
   return opacityAt(map, x, y)
-}
-
-/**
- * How opaque a layer's strongest paint is anywhere, from 0 to 1, before its opacity: a group's
- * children decide for themselves, and a shape with no paint shows inside its outline.
- */
-function strongest(layer: SceneLayer): number {
-  if (layer.type === 'group') return 1
-  if (layer.type === 'text') return textShade(layer.props, false)
-  const paints = [...layer.props.fills, ...strokePaints(layer.props.strokes)].filter((f) => f.visible !== false)
-  if (paints.length === 0) return 1
-  return Math.max(
-    ...paints.map((f) => {
-      const opacity = f.opacity ?? 1
-      if (f.type === 'solid') return rgbaOf(f.color)[3] * opacity
-      if (f.type === 'image') return opacity
-      return Math.max(...f.stops.map((s) => rgbaOf(s.color)[3])) * opacity
-    }),
-  )
-}
-
-/** How opaque, or for `luminance` how bright, a text's strongest colour is: its style's, a run's or its outline's. */
-function textShade(props: TextProps, luminance: boolean) {
-  const colours = [props.style.color, ...props.runs.flatMap((r) => (r.style.color ? [r.style.color] : []))]
-  const { outline } = props.style
-  if (outline && outline.width > 0) colours.push(outline.color)
-  return Math.max(...colours.map((c) => shade(rgbaOf(c), luminance)))
 }
 
 /** The topmost pickable shape of a boolean whose own outline holds a point, inside a boolean within it too. */

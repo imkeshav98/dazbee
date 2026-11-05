@@ -501,6 +501,27 @@ describe('hitTest', () => {
     expect(idAt(masked('alpha', '#000000FF'), 50, 50)).toBe('masked')
   })
 
+  it("weighs a group or box used as a luminance mask by its layers' brightness", () => {
+    const black = { fills: [{ type: 'solid', color: '#000000FF' }] }
+    const white = { fills: [{ type: 'solid', color: '#FFFFFFFF' }] }
+    const group = (paint: Record<string, unknown>) =>
+      layer('mask', 'group', { ...SQUARE, mask: 'luminance' }, [faded('a', paint), faded('b', paint)])
+    expect(idAt(over(group(black), faded('masked')), 50, 50)).toBe('under')
+    expect(idAt(over(group(white), faded('masked')), 50, 50)).toBe('masked')
+    const box = (paint: Record<string, unknown>) =>
+      boxLayer('mask', false, [faded('child', paint)], { ...SQUARE, ...black, mask: 'luminance' })
+    expect(idAt(over(box(black), faded('masked')), 50, 50)).toBe('under')
+    expect(idAt(over(box(white), faded('masked')), 50, 50)).toBe('masked')
+  })
+
+  it('picks frosted glass inside its outline, however clear its fill or low its opacity', () => {
+    const glass = { effects: [{ type: 'backgroundBlur', radius: 20 }] }
+    expect(idAt(over(faded('pane', { ...glass, fills: [CLEAR] })), 50, 50)).toBe('pane')
+    expect(idAt(over(faded('pane', { ...glass, opacity: 0 })), 50, 50)).toBe('pane')
+    // Its group's opacity fades the glass with the rest.
+    expect(idAt(over(layer('group', 'group', { ...SQUARE, opacity: 0 }, [faded('pane', glass)])), 50, 50)).toBe('under')
+  })
+
   it('picks a selected layer that shows nothing anywhere in its box, and a visible one only where it shows', () => {
     const pick = (layers: SceneLayer[], x: number, y: number, selected: string[]) =>
       hitTest(layers, { x, y }, looks, { selected })?.id
@@ -516,6 +537,10 @@ describe('hitTest', () => {
     const group = over(layer('group', 'group', { ...SQUARE, opacity: 0 }, [faded('child')]))
     expect(pick(group, 50, 50, ['child'])).toBe('child')
     expect(pick(group, 50, 50, ['group'])).toBe('group')
+    // A group at full opacity whose layers are all at 0 shows nothing either.
+    const emptied = over(layer('group', 'group', SQUARE, [faded('a', { opacity: 0 }), faded('b', { opacity: 0 })]))
+    expect(pick(emptied, 50, 50, ['group'])).toBe('group')
+    expect(pick(emptied, 50, 50, [])).toBe('under')
   })
 })
 
