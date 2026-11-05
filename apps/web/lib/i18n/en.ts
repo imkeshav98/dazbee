@@ -778,12 +778,20 @@ export const en = {
       w: 'W',
       h: 'H',
       add: 'Add',
-      /** Why the size typed in can't be a frame's, by the reason's id. */
+      /** Why a side of the size typed in can't be a frame's, by the side and the reason's id. */
       issue: {
-        whole: 'A size is in whole pixels.',
-        short: 'Each side is at least {n} px.',
-        long: 'Each side is at most {n} px.',
-        ratio: 'A frame is at most {n} times as long as it is wide.',
+        width: {
+          whole: 'Width is in whole pixels.',
+          short: 'Width is at least {n} px.',
+          long: 'Width is at most {n} px.',
+          ratio: 'Width is at most {n} times the height.',
+        },
+        height: {
+          whole: 'Height is in whole pixels.',
+          short: 'Height is at least {n} px.',
+          long: 'Height is at most {n} px.',
+          ratio: 'Height is at most {n} times the width.',
+        },
       },
     },
     frames: {

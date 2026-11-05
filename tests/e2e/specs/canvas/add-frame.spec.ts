@@ -174,24 +174,39 @@ test('a tile adds an empty white frame named after its size past the rightmost f
   expect(errors).toEqual([])
 })
 
-test('W × H adds a size of your own: at the limits it adds, past them a line says why and Add waits; Enter adds as Add does', async ({
+test('W × H adds a size of your own: at the limits it adds; past them the side at fault alone is outlined and named, and Add waits; Enter adds as Add does', async ({
   browser,
 }) => {
   const { a, errors } = await openFrames(browser)
   await frameButton(a)
   const add = card(a).getByRole('button', { name: 'Add', exact: true })
   const issue = a.getByTestId('own-size-issue')
-  for (const [width, height, says] of [
-    ['49', '600', 'Each side is at least 50 px.'],
-    ['8001', '1000', 'Each side is at most 8000 px.'],
-    ['50', '601', 'A frame is at most 12 times as long as it is wide.'],
-    ['300.5', '250', 'A size is in whole pixels.'],
-    ['300', 'tall', 'A size is in whole pixels.'],
+  /** Each field's border colour, width then height. */
+  const borders = () =>
+    a.evaluate(() =>
+      ['width', 'height'].map((axis) => {
+        const field = document.querySelector(`[data-testid="own-${axis}"]`)?.closest('label')
+        return field ? getComputedStyle(field).borderColor : ''
+      }),
+    )
+  const plain = await borders()
+  for (const [width, height, says, wrong] of [
+    ['49', '600', 'Width is at least 50 px.', [true, false]],
+    ['600', '8001', 'Height is at most 8000 px.', [false, true]],
+    ['50', '601', 'Height is at most 12 times the width.', [false, true]],
+    ['300.5', '250', 'Width is in whole pixels.', [true, false]],
+    ['300', 'tall', 'Height is in whole pixels.', [false, true]],
+    // Digits only: an exponent or a hex number is refused as letters are.
+    ['1e3', '0x64', 'Width is in whole pixels.Height is in whole pixels.', [true, true]],
   ] as const) {
     await typeSize(a, width, height)
     await expect(issue).toHaveText(says)
     await expect(add).toBeDisabled()
-    await expect(a.getByTestId('own-width')).toHaveAttribute('aria-invalid', 'true')
+    await expect(a.getByTestId('own-width')).toHaveAttribute('aria-invalid', String(wrong[0]))
+    await expect(a.getByTestId('own-height')).toHaveAttribute('aria-invalid', String(wrong[1]))
+    // Each side at fault, and only it, has the danger outline, seen with the focus out of the fields.
+    await a.getByTestId('own-size').click({ position: { x: 1, y: 1 } })
+    expect((await borders()).map((now, i) => now !== plain[i])).toEqual(wrong)
     // Enter adds nothing either.
     await a.getByTestId('own-height').press('Enter')
   }
@@ -211,8 +226,12 @@ test('W × H adds a size of your own: at the limits it adds, past them a line sa
   expect(await frameOf(a, thin)).toMatchObject({ name: 'Frame', width: 50, height: 600, x: NEW_X, y: 0 })
   expect(await picked(a)).toBe(thin)
   await expect(card(a)).toHaveCount(0)
+  // One undo step takes it away; redo brings it back.
   await press(a, 'undo')
   expect(await added(a)).toEqual([])
+  await press(a, 'redo')
+  expect(await frameOf(a, thin)).toMatchObject({ name: 'Frame', width: 50, height: 600, x: NEW_X, y: 0 })
+  await press(a, 'undo')
 
   // 8000 px long, by Enter in a field.
   await press(a, 'toolFrame')

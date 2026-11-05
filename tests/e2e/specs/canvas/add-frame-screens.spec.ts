@@ -1,8 +1,8 @@
 // Add a frame and Add size at the three screen sizes: the cards sit clear of everything with
 // nothing cut off, three tiles across, a sheet on a phone; a frame added from a tile, W × H, Add
 // size or a drag shows whole with its label clear of the chrome, as does the first frame on an
-// empty page; and the PR's pictures of the card, a size past the limits, Add size in ⋯ and its card,
-// and a frame drawn by a drag, in both themes.
+// empty page; the Arabic ratio line; and the PR's pictures of the card, a size past the limits, Add
+// size in ⋯ and its card, and a frame drawn by a drag, in both themes.
 import { addSize, card, chromeOver, frameButton, labelsUnderIslands, typeSize } from '../../support/add-frame.ts'
 import { writeOutput } from '../../support/editor.ts'
 import { clickLabel, openSized, picked } from '../../support/frames-on-canvas.ts'
@@ -166,6 +166,19 @@ test('on a phone, from an empty page at 100%: W × H starts at 1080 × 1080, and
   expect(await chromeOver(page, square)).toEqual([])
   expect(await zoomOf(page)).toBeLessThan(1)
   writeOutput('add-frame-empty-page-390.png', await page.screenshot({ animations: 'disabled' }))
+  expect(errors).toEqual([])
+})
+
+test('in Arabic a size past the ratio names its long side, counted with the singular noun twelve takes', async ({
+  browser,
+}) => {
+  const { page, errors } = await openSized(browser, { width: 1280, height: 760 }, { locale: 'ar' })
+  await frameButton(page)
+  await typeSize(page, '50', '601')
+  await expect(page.getByTestId('own-size-issue')).toHaveText('لا يزيد الارتفاع على 12 ضعفًا من العرض.')
+  await typeSize(page, '601', '50')
+  await expect(page.getByTestId('own-size-issue')).toHaveText('لا يزيد العرض على 12 ضعفًا من الارتفاع.')
+  writeOutput('add-frame-ar-ratio.png', await page.screenshot({ animations: 'disabled' }))
   expect(errors).toEqual([])
 })
 

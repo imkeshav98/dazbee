@@ -8,8 +8,18 @@ import { BLANK_SIZE, coverFrame, type DesignInput, framesOf, type SizeIssue, siz
 type Box = { width: number; height: number }
 type Axis = keyof Box
 
+/** A side of a typed size that keeps it from being a frame's size, and why. */
+export interface SideIssue {
+  side: Axis
+  issue: SizeIssue
+}
+
 /** Arabic-Indic and Persian digits: each run starts at a multiple of 16, so a digit's code modulo 16 is its value. */
 const EASTERN_DIGITS = /[\u0660-\u0669\u06F0-\u06F9]/g
+/** The Arabic decimal separator, which Persian uses too. */
+const ARABIC_DECIMAL = '\u066B'
+/** A side as typed, once in Latin digits: digits with at most one decimal point. */
+const DIGITS = /^(?=\.?\d)\d*\.?\d*$/
 
 export function sizeTo(now: Box, axis: Axis, to: number, keepRatio: boolean): Partial<Box> {
   const other: Axis = axis === 'width' ? 'height' : 'width'
@@ -18,16 +28,27 @@ export function sizeTo(now: Box, axis: Axis, to: number, keepRatio: boolean): Pa
 }
 
 /**
- * A size typed into a width and a height field: null while either is empty, else its numbers and
- * what keeps it from being a frame's size, if anything (`sizeIssue`). Anything that is not a number
- * reads as not whole.
+ * A size typed into a width and a height field: null while either is empty, else its numbers and,
+ * for each side that keeps it from being a frame's size, that side and why (`sizeIssue`). A side
+ * is digits (Latin, Arabic or Persian) with at most one decimal point; anything else, a sign, an
+ * exponent or a letter, reads as not whole. With both sides within the limits, a size longer than
+ * the ratio allows names its long side.
  */
-export function typedSize(width: string, height: string): (Box & { issue?: SizeIssue }) | null {
-  const [w, h] = [width, height].map((text) => text.trim().replace(EASTERN_DIGITS, (d) => String(d.charCodeAt(0) % 16)))
-  if (!w || !h) return null
-  const size = { width: Number(w), height: Number(h) }
-  const issue = sizeIssue(size.width, size.height)
-  return issue ? { ...size, issue } : size
+export function typedSize(width: string, height: string): (Box & { issues: SideIssue[] }) | null {
+  const w = sideOf(width)
+  const h = sideOf(height)
+  if (w === null || h === null) return null
+  const issues: SideIssue[] = []
+  for (const [side, n] of [
+    ['width', w],
+    ['height', h],
+  ] as const) {
+    const issue = sizeIssue(n, n)
+    if (issue) issues.push({ side, issue })
+  }
+  const ratio = issues.length === 0 && sizeIssue(w, h)
+  if (ratio) issues.push({ side: w > h ? 'width' : 'height', issue: ratio })
+  return { width: w, height: h, issues }
 }
 
 /**
@@ -63,4 +84,14 @@ export function shortSizeOf({ width, height }: Box) {
 /** A number rounded to hundredths, as the fields show it. */
 export function tidy(n: number) {
   return Math.round(n * 100) / 100
+}
+
+/** A side as typed: null when empty, its number when it is digits with at most one decimal point, else NaN. */
+function sideOf(text: string): number | null {
+  const latin = text
+    .trim()
+    .replace(EASTERN_DIGITS, (d) => String(d.charCodeAt(0) % 16))
+    .replace(ARABIC_DECIMAL, '.')
+  if (!latin) return null
+  return DIGITS.test(latin) ? Number(latin) : Number.NaN
 }

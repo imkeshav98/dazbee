@@ -10,7 +10,7 @@
 import { type CSSProperties, useEffect, useId, useRef, useState } from 'react'
 
 import type { Editor, Tool } from '@dazbee/editor'
-import { SIZE_CHANNELS, SIZE_LIMITS, SIZE_PRESETS, type SizeIssue } from '@dazbee/schema'
+import { SIZE_CHANNELS, SIZE_LIMITS, SIZE_PRESETS } from '@dazbee/schema'
 
 import { editState, setOpen, useEditState } from '@/components/editor/edit-store.ts'
 import { usePickedFrame } from '@/components/editor/editor-hooks.ts'
@@ -18,7 +18,7 @@ import { PANEL_HEADING } from '@/components/editor/styles.ts'
 import { useLiveDesign } from '@/components/editor/use-live-design.ts'
 import { FOCUS_RING, LIT_ROW } from '@/components/ui/looks.ts'
 import { cn } from '@/lib/cn.ts'
-import { sizeOf, sizeYouAreOn, typedSize } from '@/lib/editor/size.ts'
+import { type SideIssue, sizeOf, sizeYouAreOn, typedSize } from '@/lib/editor/size.ts'
 import { useMessages } from '@/lib/i18n/client.tsx'
 import { format, type Messages } from '@/lib/i18n/index.ts'
 
@@ -46,9 +46,9 @@ const shapeStyle = ({ width, height }: Size): CSSProperties => {
   return { width: Math.max(4, Math.round(width * k)), height: Math.max(3, Math.round(height * k)) }
 }
 
-/** Why a size can't be a frame's, in the app's words. */
-const issueText = (t: Messages, issue: SizeIssue) =>
-  format(t.editor.addFrame.issue[issue], {
+/** Why a side of a size can't be a frame's, in the app's words. */
+const issueText = (t: Messages, { side, issue }: SideIssue) =>
+  format(t.editor.addFrame.issue[side][issue], {
     n: issue === 'short' ? SIZE_LIMITS.minSide : issue === 'long' ? SIZE_LIMITS.maxSide : SIZE_LIMITS.maxRatio,
   })
 
@@ -153,8 +153,9 @@ function SizeTile({ size, name, onAdd }: { size: Size & { id: string }; name: st
 }
 
 /**
- * A size of your own: W × H and Add, starting at `start`. Past the limits, a line under the fields
- * says why as it is typed, scrolled into view, and Add waits; Enter in a field adds as Add does.
+ * A size of your own: W × H and Add, starting at `start`. Past the limits, the side at fault has
+ * the danger outline and a line under the fields names it and says why as it is typed, scrolled
+ * into view, while a side within them stays plain; Add waits. Enter in a field adds as Add does.
  */
 function OwnSize({ start, onAdd }: { start: Size; onAdd: (size: Size) => void }) {
   const t = useMessages()
@@ -162,33 +163,37 @@ function OwnSize({ start, onAdd }: { start: Size; onAdd: (size: Size) => void })
   const [width, setWidth] = useState(() => String(start.width))
   const [height, setHeight] = useState(() => String(start.height))
   const typed = typedSize(width, height)
-  const issue = typed?.issue
+  const issues = typed?.issues ?? []
   const issueId = useId()
-  const issueLine = useRef<HTMLParagraphElement>(null)
-  // The line saying why comes into view as it shows, past the body's padding and its faded edge:
+  const issueLines = useRef<HTMLDivElement>(null)
+  const said = issues.map(({ side, issue }) => `${side} ${issue}`).join()
+  // The lines saying why come into view as they show, past the body's padding and its faded edge:
   // on a phone the sheet may end at the fields.
   useEffect(() => {
-    if (issue) issueLine.current?.scrollIntoView({ block: 'nearest' })
-  }, [issue])
-  const field = (axis: 'width' | 'height', value: string, set: (to: string) => void) => (
-    <label className={SIZE_FIELD}>
-      <span aria-hidden className="text-[11px] font-semibold text-subtle">
-        {axis === 'width' ? a.w : a.h}
-      </span>
-      <input
-        value={value}
-        onChange={(e) => set(e.target.value)}
-        inputMode="numeric"
-        autoComplete="off"
-        aria-label={a[axis]}
-        aria-invalid={issue !== undefined}
-        aria-describedby={issue ? issueId : undefined}
-        name={axis}
-        data-testid={`own-${axis}`}
-        className="w-full min-w-0 bg-transparent font-mono text-[12px] text-text tabular-nums outline-none focus-visible:outline-none!"
-      />
-    </label>
-  )
+    if (said) issueLines.current?.scrollIntoView({ block: 'nearest' })
+  }, [said])
+  const field = (axis: 'width' | 'height', value: string, set: (to: string) => void) => {
+    const wrong = issues.some(({ side }) => side === axis)
+    return (
+      <label className={SIZE_FIELD}>
+        <span aria-hidden className="text-[11px] font-semibold text-subtle">
+          {axis === 'width' ? a.w : a.h}
+        </span>
+        <input
+          value={value}
+          onChange={(e) => set(e.target.value)}
+          inputMode="numeric"
+          autoComplete="off"
+          aria-label={a[axis]}
+          aria-invalid={wrong}
+          aria-describedby={wrong ? `${issueId}-${axis}` : undefined}
+          name={axis}
+          data-testid={`own-${axis}`}
+          className="w-full min-w-0 bg-transparent font-mono text-[12px] text-text tabular-nums outline-none focus-visible:outline-none!"
+        />
+      </label>
+    )
+  }
   return (
     <form
       aria-label={a.ownSize}
@@ -196,7 +201,7 @@ function OwnSize({ start, onAdd }: { start: Size; onAdd: (size: Size) => void })
       className="flex flex-col gap-1.5"
       onSubmit={(e) => {
         e.preventDefault()
-        if (typed && !typed.issue) onAdd(typed)
+        if (typed && typed.issues.length === 0) onAdd({ width: typed.width, height: typed.height })
       }}
     >
       <h3 className={PANEL_HEADING}>{a.ownSize}</h3>
@@ -208,7 +213,7 @@ function OwnSize({ start, onAdd }: { start: Size; onAdd: (size: Size) => void })
         {field('height', height, setHeight)}
         <button
           type="submit"
-          disabled={!typed || issue !== undefined}
+          disabled={!typed || issues.length > 0}
           className={cn(
             'h-[34px] shrink-0 cursor-pointer rounded-row bg-accent-solid px-3.5 text-[12.5px] font-semibold text-on-accent transition-colors duration-[var(--chrome-fast)] hover:bg-accent-solid-hover active:bg-accent-solid-hover disabled:cursor-not-allowed disabled:opacity-45 max-sm:h-11',
             FOCUS_RING,
@@ -217,16 +222,19 @@ function OwnSize({ start, onAdd }: { start: Size; onAdd: (size: Size) => void })
           {a.add}
         </button>
       </div>
-      {issue && (
-        <p
-          ref={issueLine}
-          id={issueId}
+      {issues.length > 0 && (
+        <div
+          ref={issueLines}
           role="alert"
           data-testid="own-size-issue"
-          className="scroll-mb-4 text-xs text-danger"
+          className="flex scroll-mb-4 flex-col gap-0.5 text-xs text-danger"
         >
-          {issueText(t, issue)}
-        </p>
+          {issues.map((at) => (
+            <p key={at.side} id={`${issueId}-${at.side}`}>
+              {issueText(t, at)}
+            </p>
+          ))}
+        </div>
       )}
     </form>
   )

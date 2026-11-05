@@ -57,29 +57,39 @@ describe('typedSize', () => {
     expect(typedSize('300', '  ')).toBeNull()
   })
 
-  it('reads a size within the limits, spaces and Arabic numerals too, with no issue', () => {
-    expect(typedSize('300', '250')).toEqual({ width: 300, height: 250 })
-    expect(typedSize(' 1080 ', '١٩٢٠')).toEqual({ width: 1080, height: 1920 })
-    expect(typedSize('۱۲۰۰', '628')).toEqual({ width: 1200, height: 628 })
+  it('reads a size within the limits, spaces and Arabic and Persian digits too, with no issue', () => {
+    expect(typedSize('300', '250')).toEqual({ width: 300, height: 250, issues: [] })
+    expect(typedSize(' 1080 ', '١٩٢٠')).toEqual({ width: 1080, height: 1920, issues: [] })
+    expect(typedSize('۱۲۰۰', '628')).toEqual({ width: 1200, height: 628, issues: [] })
   })
 
   it('takes the sizes at the limits: 50 px on the short side, 8000 on the long one, 12 times as long as wide', () => {
-    expect(typedSize('50', '600')).toEqual({ width: 50, height: 600 })
-    expect(typedSize('8000', '667')).toEqual({ width: 8000, height: 667 })
-    expect(typedSize('8000', '8000')).toEqual({ width: 8000, height: 8000 })
+    expect(typedSize('50', '600')).toEqual({ width: 50, height: 600, issues: [] })
+    expect(typedSize('8000', '667')).toEqual({ width: 8000, height: 667, issues: [] })
+    expect(typedSize('8000', '8000')).toEqual({ width: 8000, height: 8000, issues: [] })
   })
 
-  it('says what keeps a size past the limits from being a frame', () => {
-    expect(typedSize('49', '600')).toEqual({ width: 49, height: 600, issue: 'short' })
-    expect(typedSize('0', '600')).toEqual({ width: 0, height: 600, issue: 'short' })
-    expect(typedSize('8001', '1000')).toEqual({ width: 8001, height: 1000, issue: 'long' })
-    expect(typedSize('50', '601')).toEqual({ width: 50, height: 601, issue: 'ratio' })
-    expect(typedSize('300.5', '250')).toEqual({ width: 300.5, height: 250, issue: 'whole' })
+  it('names each side past the limits and why, and only that side', () => {
+    expect(typedSize('49', '600')?.issues).toEqual([{ side: 'width', issue: 'short' }])
+    expect(typedSize('600', '0')?.issues).toEqual([{ side: 'height', issue: 'short' }])
+    expect(typedSize('8001', '1000')?.issues).toEqual([{ side: 'width', issue: 'long' }])
+    expect(typedSize('300.5', '250')?.issues).toEqual([{ side: 'width', issue: 'whole' }])
+    expect(typedSize('49', '9000')?.issues).toEqual([
+      { side: 'width', issue: 'short' },
+      { side: 'height', issue: 'long' },
+    ])
   })
 
-  it('reads anything that is not a number as not a whole number of pixels', () => {
-    expect(typedSize('12px', '250')).toMatchObject({ issue: 'whole' })
-    expect(typedSize('-', '250')).toMatchObject({ issue: 'whole' })
+  it('names the long side of a size longer than 12 times its short one, when both sides are within the limits', () => {
+    expect(typedSize('50', '601')?.issues).toEqual([{ side: 'height', issue: 'ratio' }])
+    expect(typedSize('7300', '600')?.issues).toEqual([{ side: 'width', issue: 'ratio' }])
+  })
+
+  it('takes digits only, with at most one decimal point: letters, signs, exponents and hex read as not whole', () => {
+    for (const text of ['12px', '-', '-300', '+300', '1e3', '0x64', '0b111', '1,080', '1.2.3', 'Infinity', '.'])
+      expect(typedSize(text, '250')?.issues, text).toEqual([{ side: 'width', issue: 'whole' }])
+    expect(typedSize('300.0', '250')).toEqual({ width: 300, height: 250, issues: [] })
+    expect(typedSize('٣٠٠٫٥', '250')?.issues).toEqual([{ side: 'width', issue: 'whole' }])
   })
 })
 
