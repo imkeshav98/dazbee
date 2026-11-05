@@ -75,6 +75,8 @@ function harness(
     zoom?: number
     /** Where the page's origin is on the stage, across. */
     x?: number
+    /** The stage's edges floating chrome covers. */
+    insets?: { top: number; right: number; bottom: number; left: number }
     /** The design holds linked copies of the selected layer, and the story is in view too. */
     linked?: boolean
   } = {},
@@ -92,6 +94,7 @@ function harness(
     view: {
       camera: () => ({ x: state.x ?? 0, y: 100, zoom: state.zoom ?? 1 }),
       viewport: () => ({ width: 1000, height: 800 }),
+      insets: () => state.insets ?? { top: 0, right: 0, bottom: 0, left: 0 },
       design: () => (state.linked ? linkedDesign : design),
       inView: () => (state.linked ? [SQUARE, STORY] : [SQUARE]),
       frameOf: (key) => (key === SQUARE.id ? SQUARE : undefined),
@@ -238,16 +241,30 @@ describe('editorOverlay', () => {
       expect(typing.drawn()).not.toContain('selection-size')
     })
 
-    it('centres the size under the selection, kept inside the stage by 8 px at either edge', () => {
-      const leftOf = (x: number) => {
-        const { overlay, part } = harness({ x })
+    describe('the size', () => {
+      /** Where the size starts across the stage, with the page's origin `x` px in: the selection 100 px wide from 10 px in, its size 70 px wide. */
+      const leftOf = (x: number, insets?: { top: number; right: number; bottom: number; left: number }) => {
+        const { overlay, part } = harness({ x, ...(insets && { insets }) })
         overlay.draw()
         return part('selection-size')?.style.left
       }
-      // The selection 100 px wide from 10 px in, its size 70 px wide.
-      expect(leftOf(0)).toBe('25px')
-      expect(leftOf(-50)).toBe('8px')
-      expect(leftOf(900)).toBe('922px')
+
+      it('centres under the selection, kept inside the stage by 8 px at either edge', () => {
+        expect(leftOf(0)).toBe('25px')
+        expect(leftOf(-50)).toBe('8px')
+        expect(leftOf(900)).toBe('922px')
+      })
+
+      it('keeps clear of the chrome along either side', () => {
+        expect(leftOf(0, { top: 0, right: 0, bottom: 0, left: 72 })).toBe('72px')
+        expect(leftOf(880, { top: 0, right: 72, bottom: 0, left: 0 })).toBe('858px')
+      })
+
+      it('stays clear of the chrome while any of the selection is on the stage, and goes off the stage with it', () => {
+        expect(leftOf(-80, { top: 0, right: 0, bottom: 0, left: 72 })).toBe('72px')
+        expect(leftOf(-200)).toBe('-175px')
+        expect(leftOf(1000)).toBe('1025px')
+      })
     })
   })
 

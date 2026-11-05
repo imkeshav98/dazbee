@@ -26,7 +26,7 @@ import type { EditorView } from './view.ts'
 export interface OverlayDeps {
   /** The element laid over the canvas that holds what the overlay draws. */
   overlay: HTMLElement
-  view: Pick<EditorView, 'camera' | 'viewport' | 'design' | 'inView' | 'frameOf' | 'rulers' | 'outline'>
+  view: Pick<EditorView, 'camera' | 'viewport' | 'insets' | 'design' | 'inView' | 'frameOf' | 'rulers' | 'outline'>
   selection: Pick<
     EditorSelection,
     | 'current'
@@ -62,6 +62,9 @@ export interface EditorOverlay {
   /** Where a frame of the shown page has its label on the stage, as last drawn; null for one off the stage at its start. */
   labelRect(frameId: string): Rect | null
 }
+
+/** Where something spans across the stage, in pixels from its left. */
+type Span = { left: number; right: number }
 
 /** Screen pixels a frame's label needs to show the frame's size beside its name. */
 const SIZE_LABEL_WIDTH = 120
@@ -174,9 +177,9 @@ export function editorOverlay({
 
   /**
    * Each selected layer's outline, then the box with its handles and the size under it, with the
-   * point across the stage the size centres on.
+   * selection's span across the stage, which the size is placed by.
    */
-  function selectionParts(): { parts: HTMLElement[]; size: { el: HTMLElement; centre: number } | null } {
+  function selectionParts(): { parts: HTMLElement[]; size: { el: HTMLElement; span: Span } | null } {
     const gesture = pointer.gesture()
     const outer = boxes.selectionBox()
     const current = selection.current()
@@ -220,19 +223,25 @@ export function editorOverlay({
     if (g && text) size.textContent += ` · ${text.style.fontSize} → ${scaleText(text, g.factor).style.fontSize}`
     size.style.top = px(sizeLabelTop(corners.map((c) => c.y)))
     parts.push(size)
-    const centre = (Math.min(...corners.map((c) => c.x)) + Math.max(...corners.map((c) => c.x))) / 2
-    return { parts, size: { el: size, centre } }
+    const xs = corners.map((c) => c.x)
+    return { parts, size: { el: size, span: { left: Math.min(...xs), right: Math.max(...xs) } } }
   }
 
   /**
-   * Puts the size label centred on `centre` across the stage, kept SIZE_LABEL_INSET inside its
-   * sides, at its left side when the stage is too narrow for both; measured once it is drawn.
+   * Puts the size label centred under the selection's span across the stage, kept SIZE_LABEL_INSET
+   * inside the stage's sides and clear of the chrome along them, at the left when there is no room
+   * for both. A selection wholly off the stage takes it off the stage with it. Measured once it is
+   * drawn.
    */
-  function placeSizeLabel(size: HTMLElement, centre: number) {
+  function placeSizeLabel(size: HTMLElement, span: Span) {
     const width = size.offsetWidth
     const room = view.viewport().width
-    const start = Math.max(SIZE_LABEL_INSET, Math.min(centre - width / 2, room - width - SIZE_LABEL_INSET))
-    size.style.left = px(start)
+    const chrome = view.insets()
+    const centred = (span.left + span.right) / 2 - width / 2
+    const low = Math.max(SIZE_LABEL_INSET, chrome.left)
+    const high = room - Math.max(SIZE_LABEL_INSET, chrome.right) - width
+    const off = span.right <= 0 || span.left >= room
+    size.style.left = px(off ? centred : Math.max(low, Math.min(centred, high)))
   }
 
   function drawOverlay() {
@@ -300,7 +309,7 @@ export function editorOverlay({
     }
     parts.push(...typing.parts())
     overlay.replaceChildren(...parts)
-    if (selected?.size) placeSizeLabel(selected.size.el, selected.size.centre)
+    if (selected?.size) placeSizeLabel(selected.size.el, selected.size.span)
     selection.tellListeners()
   }
 
