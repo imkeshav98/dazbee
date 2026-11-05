@@ -85,6 +85,40 @@ export function reveal(c: Camera, rect: Rect, viewport: Viewport, insets: Insets
 }
 
 /**
+ * As `reveal`, with the stage's edges a panel covers (`coverOf`) kept clear too. Where the clear
+ * part is too small for the rect, the panel wins: the rect ends at the panel's edge and runs past
+ * the chrome's inset on the other side, its label with it.
+ */
+export function revealBeside(
+  c: Camera,
+  rect: Rect,
+  viewport: Viewport,
+  insets: Insets,
+  cover: Partial<Insets>,
+): Camera {
+  const clear = widen(insets, cover)
+  const next = reveal(c, rect, viewport, clear)
+  if (next === c) return c
+  const start = toScreen(next, { x: rect.x, y: rect.y })
+  const end = toScreen(next, { x: rect.x + rect.width, y: rect.y + rect.height })
+  const right = viewport.width - clear.right
+  const bottom = viewport.height - clear.bottom
+  const dx =
+    cover.left !== undefined && start.x < clear.left
+      ? clear.left - start.x
+      : cover.right !== undefined && end.x > right
+        ? right - end.x
+        : 0
+  const dy =
+    cover.top !== undefined && start.y < clear.top
+      ? clear.top - start.y
+      : cover.bottom !== undefined && end.y > bottom
+        ? bottom - end.y
+        : 0
+  return dx === 0 && dy === 0 ? next : { zoom: next.zoom, x: next.x + dx, y: next.y + dy }
+}
+
+/**
  * As `reveal`, but zoomed out, only as far as it needs, for a rect and its label that don't fit
  * LABEL_PAD in from the clear part's edges at the camera's zoom; it never zooms in.
  */

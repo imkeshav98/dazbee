@@ -7,6 +7,7 @@ import {
   fit,
   framesInView,
   reveal,
+  revealBeside,
   revealLabel,
   revealWhole,
   toScreen,
@@ -105,6 +106,43 @@ describe('reveal', () => {
     const bottomRight = toScreen(next, { x: 2360, y: 1920 })
     expect((topLeft.x + bottomRight.x) / 2).toBeCloseTo(350)
     expect((topLeft.y - 24 + bottomRight.y) / 2).toBeCloseTo(430)
+  })
+})
+
+describe('revealBeside', () => {
+  // A phone, its chrome at the top keeping 190 px clear, and the layers panel covering all below 233.
+  const viewport = { width: 390, height: 844 }
+  const insets = { top: 190, right: 0, bottom: 0, left: 0 }
+  const cover = { bottom: 611 }
+  const camera = { x: 16, y: 222, zoom: 0.1 }
+  const square = { x: 0, y: 0, width: 1080, height: 1080 }
+
+  it('centres a rect that fits between the chrome and the panel, with its label over it', () => {
+    const next = revealBeside(camera, square, viewport, { ...insets, top: 60 }, cover)
+    expect(next.zoom).toBe(0.1)
+    expect((toScreen(next, square).y - 24 + toScreen(next, { x: 0, y: 1080 }).y) / 2).toBeCloseTo((60 + 233) / 2)
+  })
+
+  it('keeps a rect too tall for the room above the panel clear of the panel, its top under the chrome', () => {
+    const next = revealBeside(camera, square, viewport, insets, cover)
+    expect(next.zoom).toBe(0.1)
+    expect(toScreen(next, { x: 0, y: 1080 }).y).toBeCloseTo(233)
+    expect(toScreen(next, square).y).toBeLessThan(190)
+  })
+
+  it('keeps a rect too wide for the room beside a side panel clear of the panel', () => {
+    const wide = { x: 0, y: 0, width: 4000, height: 400 }
+    const next = revealBeside({ x: 0, y: 0, zoom: 0.5 }, wide, { width: 1440, height: 1000 }, insets, { left: 472 })
+    expect(toScreen(next, wide).x).toBeCloseTo(472)
+    const sideways = revealBeside({ x: 0, y: 0, zoom: 0.5 }, wide, { width: 1440, height: 1000 }, insets, {
+      right: 472,
+    })
+    expect(toScreen(sideways, { x: 4000, y: 0 }).x).toBeCloseTo(968)
+  })
+
+  it('keeps the camera when the clear part shows the rect whole, with room for its label', () => {
+    const low = { x: 0, y: 0, zoom: 0.1 }
+    expect(revealBeside({ ...low, y: 100 }, square, viewport, { ...insets, top: 0 }, cover)).toEqual({ ...low, y: 100 })
   })
 })
 
