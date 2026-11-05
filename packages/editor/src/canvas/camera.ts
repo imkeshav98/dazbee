@@ -119,6 +119,15 @@ export function coverOf(panel: Rect, stage: Rect, gap = 12): Partial<Insets> {
   return { right: stage.x + stage.width - panel.x + gap }
 }
 
+/** Whether a rect of the world shows, at the camera, under a panel over the stage, both at their places on the page. */
+export function under(c: Camera, rect: Rect, panel: Rect, stage: Rect): boolean {
+  const start = toScreen(c, { x: rect.x, y: rect.y })
+  const end = toScreen(c, { x: rect.x + rect.width, y: rect.y + rect.height })
+  const left = panel.x - stage.x
+  const top = panel.y - stage.y
+  return start.x < left + panel.width && end.x > left && start.y < top + panel.height && end.y > top
+}
+
 /** Insets kept clear of `cover` too, the stage's edges a panel covers: each edge the larger of the two. */
 export function widen(insets: Insets, cover: Partial<Insets>): Insets {
   return {

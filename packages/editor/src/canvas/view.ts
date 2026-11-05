@@ -17,6 +17,7 @@ import {
   revealLabel,
   toScreen,
   toWorld,
+  under,
   type Viewport,
   widen,
   zoomAt,
@@ -105,7 +106,8 @@ export interface EditorView {
   fitArea(area: Rect | undefined): void
   /**
    * Pans, keeping the zoom, so a part of the canvas shows whole beside the chrome, and clear of
-   * `panel`, floating over the stage at its place on the page; nothing when it already does.
+   * `panel`, floating over the stage at its place on the page, when it lies under it; nothing when
+   * it shows so already.
    */
   showArea(area: Rect, panel?: Rect): void
   /** Pans, keeping the zoom, so a frame's label shows beside the chrome; nothing when it already does. */
@@ -335,7 +337,9 @@ export function editorView({ ck, canvas, session, onZoom, draw }: ViewDeps): Edi
     if (area) setCamera(fit(area, viewport, undefined, insets))
   }
   function showArea(area: Rect, panel?: Rect) {
-    const cover = panel ? coverOf(panel, canvas.getBoundingClientRect()) : {}
+    const stage = canvas.getBoundingClientRect()
+    // A panel counts only for an area it lies over.
+    const cover = panel && under(camera, area, panel, stage) ? coverOf(panel, stage) : {}
     const next = reveal(camera, area, viewport, widen(insets, cover))
     if (next !== camera) setCamera(next)
   }

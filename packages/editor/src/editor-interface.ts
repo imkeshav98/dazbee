@@ -211,8 +211,9 @@ export interface Editor {
   fitFrame(frameId: string): void
   /**
    * Pans, at the same zoom, so a frame of the shown page shows whole with its label in the part of
-   * the stage the chrome leaves clear, clear too of `panel`, a panel floating over the stage at its
-   * place on the page. The view stays as it is when the frame shows there already.
+   * the stage the chrome leaves clear, and clear too of `panel`, a panel floating over the stage at
+   * its place on the page, when the frame lies under it. The view stays as it is when the frame
+   * shows so already.
    */
   showFrame(frameId: string, panel?: Rect): void
   setTool: (next: Tool) => void

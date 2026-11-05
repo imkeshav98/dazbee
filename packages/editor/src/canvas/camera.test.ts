@@ -10,6 +10,7 @@ import {
   revealLabel,
   toScreen,
   toWorld,
+  under,
   visibleRect,
   widen,
   zoomAt,
@@ -139,6 +140,21 @@ describe('coverOf', () => {
 
   it('measures from the stage, wherever it is on the page', () => {
     expect(coverOf({ x: 216, y: 180, width: 344, height: 600 }, { ...stage, x: 100, y: 100 })).toEqual({ left: 472 })
+  })
+})
+
+describe('under', () => {
+  const camera = { x: 100, y: 200, zoom: 0.5 }
+  const stage = { x: 0, y: 50, width: 820, height: 1130 }
+  const panel = { x: 116, y: 120, width: 301, height: 200 }
+
+  it('says whether a rect shows under a panel over the stage, both at their places on the page', () => {
+    // On screen at 100,200 to 640,740 on the stage, 250 down the page: under the panel's start.
+    expect(under(camera, { x: 0, y: 0, width: 1080, height: 1080 }, panel, stage)).toBe(true)
+    // Below the panel, from 350 down the page, past its bottom at 320.
+    expect(under(camera, { x: 0, y: 200, width: 1080, height: 1080 }, panel, stage)).toBe(false)
+    // Past its end.
+    expect(under(camera, { x: 700, y: 0, width: 400, height: 400 }, panel, stage)).toBe(false)
   })
 })
 

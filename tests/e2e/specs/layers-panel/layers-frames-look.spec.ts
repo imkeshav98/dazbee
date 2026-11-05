@@ -181,3 +181,16 @@ test('a frame picked from its row under the panel is brought out from under it a
   expect(await zoomOf(page)).toBe(zoom)
   expect(errors).toEqual([])
 })
+
+test('at 820×1180 a frame picked from its row below the panel stays put', async ({ browser }) => {
+  const { page, errors } = await openSized(browser, { width: 820, height: 1180 })
+  const panel = await boxOf(page.getByTestId('flyout'))
+  // The three closed frame rows make a short panel; the frames sit below it.
+  expect((await frameOnScreen(page, 'sq', 1080, 1080)).top).toBeGreaterThan(panel.y + panel.height)
+  const camera = await page.evaluate(() => window.dazbee?.camera())
+  await frameRow(page, 'Sale square').click()
+  await expect(frameRow(page, 'Sale square')).toHaveAttribute('aria-selected', 'true')
+  await nextFrame(page)
+  expect(await page.evaluate(() => window.dazbee?.camera())).toEqual(camera)
+  expect(errors).toEqual([])
+})
