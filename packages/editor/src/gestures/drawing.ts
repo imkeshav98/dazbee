@@ -382,13 +382,22 @@ export function editorDrawing({
   }
 }
 
-/** A frame's size pushed into the size limits: each side 50 to 8000 px, the short side grown until it is at most 12 times shorter. */
+/**
+ * A dragged frame's size brought within SIZE_LIMITS keeping its shape: the short side grown until
+ * the ratio is within the limit, then the whole size scaled down to the longest side, or up to the
+ * shortest, and rounded to whole pixels.
+ */
 function withinSizeLimits(width: number, height: number) {
   const { minSide, maxSide, maxRatio } = SIZE_LIMITS
-  const side = (n: number) => Math.min(maxSide, Math.max(minSide, n))
-  const w = side(width)
-  const h = side(height)
-  if (w > h * maxRatio) return { width: w, height: Math.ceil(w / maxRatio) }
-  if (h > w * maxRatio) return { width: Math.ceil(h / maxRatio), height: h }
-  return { width: w, height: h }
+  let w = Math.max(width, 1)
+  let h = Math.max(height, 1)
+  if (w > h * maxRatio) h = w / maxRatio
+  else if (h > w * maxRatio) w = h / maxRatio
+  const scale = Math.min(1, maxSide / Math.max(w, h)) * Math.max(1, minSide / Math.min(w, h))
+  const side = (n: number) => Math.min(maxSide, Math.max(minSide, Math.round(n * scale)))
+  const [sw, sh] = [side(w), side(h)]
+  // Rounding may leave the short side a pixel past the ratio.
+  if (sw > sh * maxRatio) return { width: sw, height: Math.ceil(sw / maxRatio) }
+  if (sh > sw * maxRatio) return { width: Math.ceil(sh / maxRatio), height: sh }
+  return { width: sw, height: sh }
 }

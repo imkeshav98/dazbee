@@ -268,12 +268,20 @@ describe('editorDrawing', () => {
       expect(madeFrames()).toEqual([])
     })
 
-    it('holds the size it adds within the size limits: sides of 50 to 8000 px, up to 12 times as long as wide', () => {
+    it('keeps the shape dragged, scaled to fit the size limits; past 12 times as long as wide, the short side grows', () => {
       const { madeFrames, drawFrame } = harness()
       drawFrame({ x: 0, y: 0 }, { x: 20, y: 10 })
+      drawFrame({ x: 0, y: 0 }, { x: 35000, y: 10000 })
       drawFrame({ x: 0, y: 0 }, { x: 1300, y: 60 })
       drawFrame({ x: 0, y: 0 }, { x: 70, y: 9000 })
-      expect(madeFrames().map(([, f]) => `${f.width}×${f.height}`)).toEqual(['50×50', '1300×109', '667×8000'])
+      drawFrame({ x: 0, y: 0 }, { x: 900, y: 40 })
+      expect(madeFrames().map(([, f]) => `${f.width}×${f.height}`)).toEqual([
+        '100×50',
+        '8000×2286',
+        '1300×109',
+        '667×8000',
+        '900×75',
+      ])
     })
 
     it('names the frame it adds as the app names a frame of its size', () => {
