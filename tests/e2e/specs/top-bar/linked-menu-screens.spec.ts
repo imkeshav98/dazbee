@@ -1,11 +1,12 @@
 // Screenshots of the small menu, its ⋯, Copy to other frames ▸, a greyed row's tooltip and the
-// dashed outlines of linked copies, at the three screen sizes in both themes.
+// dashed outlines of linked copies, at the three screen sizes in both themes; and at 1280×760, the
+// small menu by a headline, a locked layer's greyed Delete and Ungroup in a group's ⋯.
 import { photo, upload } from '../../support/assets.ts'
 import { shoot } from '../../support/editor.ts'
 import { openDesignIn, THEMES } from '../../support/glass.ts'
 import { SCREEN_SIZES } from '../../support/layout.ts'
 import { linkedMenuDesign } from '../../support/linked-menu-design.ts'
-import { seed } from '../../support/seed.ts'
+import { copyIn, seed } from '../../support/seed.ts'
 import { drawn, fitSettled, nextFrame, selectLayers } from '../../support/stage.ts'
 import { expect, test } from '../../support/test.ts'
 import { moreMenu, moreSubmenu } from '../../support/top-bar.ts'
@@ -60,3 +61,48 @@ for (const [width, height] of SCREEN_SIZES) {
     },
   )
 }
+
+test(
+  "the PR's screenshots at 1280×760: the small menu by a headline, a locked layer's greyed Delete and Ungroup in a group's ⋯",
+  { tag: '@evidence' },
+  async ({ browser }) => {
+    const asset = await upload(photo)
+    const designId = await seed(linkedMenuDesign(asset.id))
+    for (const theme of THEMES) {
+      const { page, errors } = await openDesignIn(browser, designId, theme, { viewport: { width: 1280, height: 760 } })
+      await fitSettled(page)
+      const name = (state: string) => `small-menu-${state}-1280-${theme}`
+      const settle = async () => {
+        await drawn(page)
+        await nextFrame(page)
+      }
+      for (const [id, state] of [
+        ['headline', 'by-headline'],
+        [copyIn('wide', 'headline'), 'by-landscape-headline'],
+      ] as const) {
+        await selectLayers(page, [id])
+        await expect(page.getByTestId('small-menu')).toBeVisible()
+        await settle()
+        await shoot(page, name(state))
+      }
+      // The badge locked: Delete is greyed and says why. Unlocked again after, as the next theme opens the same design.
+      await selectLayers(page, ['badge'])
+      await page.getByTestId('small-lock').click()
+      await page.getByTestId('small-delete').hover()
+      await expect(page.getByRole('tooltip')).toHaveText('The selection is locked against deleting')
+      await settle()
+      await shoot(page, name('locked-delete'))
+      await page.mouse.move(0, 380)
+      await page.getByTestId('small-lock').click()
+      await expect(page.getByTestId('small-delete')).not.toHaveAttribute('aria-disabled', 'true')
+      // The logo group: its ⋯ has Ungroup right after Put in a box.
+      await selectLayers(page, ['logo'])
+      const menu = await moreMenu(page)
+      await menu.getByRole('button', { name: /^Ungroup/ }).hover()
+      await settle()
+      await shoot(page, name('ungroup'))
+      expect(errors).toEqual([])
+      await page.context().close()
+    }
+  },
+)
