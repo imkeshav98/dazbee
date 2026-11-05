@@ -1,7 +1,7 @@
 // Every number input in the app, from the one list of them, in Chromium with a real mouse (a finger
 // on the phone) and keyboard at the three screen sizes, in both themes: the first press selects the
-// whole value, plainly, in the field's accent edge, so a digit typed replaces it; a press beside the
-// digits of a field being typed in puts the caret at the end.
+// whole value, plainly, in the field's accent edge, so a digit typed replaces it; a press just
+// before the digits of a field being typed in puts the caret at the end.
 import { writeOutput } from '../../support/editor.ts'
 import { openDesignIn, THEMES } from '../../support/glass.ts'
 import {
@@ -53,6 +53,8 @@ async function openInput(
   await fitSettled(page)
   const input = await number.open(page)
   const field = input.locator('xpath=ancestor::*[@data-knob][1]')
+  // Clear of a panel's faded edge, which a panel shows while there is more to scroll to.
+  await field.evaluate((el) => el.scrollIntoView({ block: 'center' }))
   await expect(field).toBeVisible()
   return { page, errors, input, field, edge: number.edge?.(page) ?? field }
 }
@@ -75,16 +77,30 @@ async function press(page: Page, screen: FieldScreen, at: { x: number; y: number
   else await page.mouse.click(at.x, at.y)
 }
 
-/** The middle of the field, and the middle of its widest room beside the digits. */
-async function pointsOf(field: Locator, input: Locator) {
-  const [f, i] = [await field.boundingBox(), await input.boundingBox()]
-  if (!f || !i) throw new Error('no number input on screen')
+/**
+ * The middle of the field, and a press beside the digits: with a mouse 4 px before the first digit
+ * drawn, where a press just left of the number lands; on a touch screen, whose browser moves a tap
+ * near a field onto it, 4 px into the field, as far before the digits as it goes. The digits end
+ * at the input's content edge, as wide as the text they draw.
+ */
+async function pointsOf(screen: FieldScreen, field: Locator, input: Locator) {
+  const f = await field.boundingBox()
+  if (!f) throw new Error('no number input on screen')
+  const first = await input.evaluate((el: HTMLInputElement) => {
+    const probe = document.createElement('canvas').getContext('2d')
+    if (!probe) throw new Error('no canvas')
+    const style = getComputedStyle(el)
+    probe.font = `${style.fontSize} ${style.fontFamily}`
+    const box = el.getBoundingClientRect()
+    return (
+      box.right -
+      parseFloat(style.paddingRight) -
+      parseFloat(style.borderRightWidth) -
+      probe.measureText(el.value).width
+    )
+  })
   const y = f.y + f.height / 2
-  const [before, after] = [i.x - f.x, f.x + f.width - (i.x + i.width)]
-  return {
-    middle: { x: f.x + f.width / 2, y },
-    beside: { x: before > after ? f.x + before / 2 : i.x + i.width + after / 2, y },
-  }
+  return { middle: { x: f.x + f.width / 2, y }, beside: { x: screen.touch ? f.x + 4 : first - 4, y } }
 }
 
 for (const screen of FIELD_SCREENS) {
@@ -96,7 +112,7 @@ for (const screen of FIELD_SCREENS) {
         browser,
       }) => {
         const { page, errors, input, field, edge } = await openInput(browser, screen, number, { theme })
-        await press(page, screen, (await pointsOf(field, input)).middle)
+        await press(page, screen, (await pointsOf(screen, field, input)).middle)
         await expect
           .poll(() => caretOf(input))
           .toEqual({ value: number.value, start: 0, end: number.value.length, focused: true })
@@ -110,13 +126,15 @@ for (const screen of FIELD_SCREENS) {
         expect(errors).toEqual([])
       })
 
-    test(`${size}, ${number.name}: a press beside the digits while it is typed in puts the caret at the end`, async ({
+    test(`${size}, ${number.name}: a press just before the digits while it is typed in puts the caret at the end`, async ({
       browser,
     }) => {
       const { page, errors, input, field } = await openInput(browser, screen, number)
-      await press(page, screen, (await pointsOf(field, input)).middle)
+      await press(page, screen, (await pointsOf(screen, field, input)).middle)
       await expect.poll(() => caretOf(input)).toMatchObject({ start: 0, end: number.value.length, focused: true })
-      await press(page, screen, (await pointsOf(field, input)).beside)
+      // Where no fingertip fits beside the digits, a mouse presses there, on a touch screen too.
+      const pointer = number.fingerRoom === false ? { ...screen, touch: false } : screen
+      await press(page, pointer, (await pointsOf(pointer, field, input)).beside)
       const end = number.value.length
       await expect.poll(() => caretOf(input)).toEqual({ value: number.value, start: end, end, focused: true })
       await page.keyboard.type('1')
@@ -142,7 +160,7 @@ for (const screen of FIELD_SCREENS) {
             const clip = { x: at.x - 40, y: at.y - 24, width: at.width + 80, height: at.height + 48 }
             writeOutput(`${file}-close.png`, await page.screenshot({ animations: 'disabled', caret: 'initial', clip }))
           }
-          await press(page, screen, (await pointsOf(field, input)).middle)
+          await press(page, screen, (await pointsOf(screen, field, input)).middle)
           await shot('1-selected')
           await page.keyboard.type('7')
           await shot('2-typing')
@@ -154,7 +172,7 @@ for (const screen of FIELD_SCREENS) {
           theme,
           scale: 2,
         })
-        await press(page, screen, (await pointsOf(field, input)).middle)
+        await press(page, screen, (await pointsOf(screen, field, input)).middle)
         await page.keyboard.press('End')
         await page.keyboard.press('Tab')
         await page.keyboard.press('Shift+Tab')

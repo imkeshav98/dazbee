@@ -29,6 +29,8 @@ export interface NumberInput {
   open: (page: Page) => Promise<Locator>
   /** What shows its edge while it is typed in, where that isn't the field around the input. */
   edge?: (page: Page) => Locator
+  /** False where the room beside the digits is narrower than a fingertip, so only a mouse presses there. */
+  fingerRoom?: false
 }
 
 /** A screen the checks run at: its size, and whether it is a touch screen. */
@@ -91,6 +93,7 @@ export const NUMBER_INPUTS: NumberInput[] = [
       return input
     },
     edge: (page) => page.getByTestId('bar-size'),
+    fingerRoom: false,
   },
   {
     name: "Add a frame's width",
