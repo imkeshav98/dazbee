@@ -780,7 +780,6 @@ export const en = {
       /** The picked frame's top bar, its ⋯ menu, its Background panel and the field that renames it on its label. */
       bar: 'Frame',
       background: 'Background',
-      backgroundColour: 'Background colour',
       more: 'Frame actions',
       rename: 'Rename',
       nameOf: 'Name of {name}',

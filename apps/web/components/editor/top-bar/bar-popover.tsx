@@ -25,8 +25,11 @@ import { useOverlayScroll } from '@/components/ui/overlay-scroll.ts'
 import { fadedEdges, useScrollEdges } from '@/components/ui/scroll-edges.ts'
 import { cn } from '@/lib/cn.ts'
 
-/** The room between a sheet and the screen's edges on a phone, in pixels, as an edit panel's sheet keeps. */
-export const SHEET_EDGE = 8
+/**
+ * The room between a sheet and the screen's edges on a phone, in pixels: an edit panel's sheet
+ * keeps 0.5rem, which is 7 px at the 14 px root.
+ */
+export const SHEET_EDGE = 7
 
 /** The room between the bar's last row that shows and a popover under it, in pixels. */
 const GAP = 8

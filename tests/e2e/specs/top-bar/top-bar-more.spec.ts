@@ -1,7 +1,8 @@
-// The top bar's ⋯ for the selected layers (#457): its last item, holding how they sit. Order ▸, Line
-// up ▸, the rotation field and, for text, Text direction ▸, by mouse and keyboard, each one undo
-// step; a rotated layer and one inside an auto layout box; locked; at the three screen sizes, where
-// on a phone it is a sheet at the bottom and stays at the bar's end.
+// The top bar's Arrange ⋯ for the selected layers at 1280×760: its last item, holding how they sit.
+// Order ▸, Line up ▸, the rotation field and, for text, Text direction ▸, by mouse and by keyboard,
+// each one undo step; a rotated layer and one inside an auto layout box; the Order moves with
+// nothing to do and a locked layer's rows greyed, each saying why. The screen sizes and the
+// screenshots are in top-bar-more-screens.spec.ts.
 import { arrangeDesign, barItems } from '../../support/arrange-design.ts'
 import { enter } from '../../support/fields.ts'
 import { openStage, order, perform, props, read, selectLayers } from '../../support/stage.ts'
@@ -41,7 +42,7 @@ test.describe('at 1280×760', () => {
     await page.keyboard.press('Escape')
     await expect(menu).toBeHidden()
 
-    // The small menu's ⋯ no longer holds how a layer sits.
+    // The small menu's ⋯ holds none of how a layer sits.
     const full = await moreMenu(page)
     for (const id of ['more-order', 'more-line-up', 'more-text-direction'])
       await expect(full.getByTestId(id)).toHaveCount(0)

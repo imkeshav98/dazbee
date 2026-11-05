@@ -10,7 +10,7 @@ import { layoutProblems, rowHeights, SCREEN_SIZES } from '../../support/layout.t
 import { seed } from '../../support/seed.ts'
 import { fitSettled, nextFrame, openStage, order, selectLayers } from '../../support/stage.ts'
 import { type Browser, expect, type Locator, type Page, test } from '../../support/test.ts'
-import { arrangeMenu, arrangeSubmenu, PIECES, UNCUT } from '../../support/top-bar.ts'
+import { arrangeMenu, arrangeSubmenu, barMenu, PIECES, UNCUT } from '../../support/top-bar.ts'
 
 test.describe.configure({ timeout: 180_000 })
 
@@ -132,19 +132,26 @@ test("on a phone Arrange opens as a sheet at the bottom, hiding the dock and tab
   await more.click()
   const sheet = page.getByTestId('bar-arrange-menu')
   await expect(sheet).toBeVisible()
-  await expect(sheet).toHaveAttribute('data-sheet', 'true')
   await expect(page.getByTestId('flyout')).toHaveCount(0)
-  await expect(page.getByTestId('rail')).toBeHidden()
-  await expect(page.locator('[data-dock]')).toBeHidden()
-  await expect(page.getByTestId('small-menu')).toBeHidden()
-  // 8 px from the screen's sides and bottom, once it has popped in; its top is on a whole pixel, so
-  // its bottom may be half a pixel off.
+  await page.keyboard.press('Escape')
+  await expect(sheet).toBeHidden()
+  // As far from the screen's sides and bottom as an edit panel's sheet, once it has popped in; its
+  // top is on a whole pixel, so its bottom may be half a pixel off.
+  await barMenu(page, 'position')
+  const panel = await page.locator('#edit-panel').boundingBox()
+  const inset = Math.round(panel?.x ?? -1)
+  expect(Math.round(844 - ((panel?.y ?? 0) + (panel?.height ?? 0)))).toBe(inset)
+  await more.click()
   await expect
     .poll(async () => {
       const box = await sheet.boundingBox()
-      return box && [Math.round(box.x), Math.round(box.width), Math.abs(box.y + box.height - 836) <= 1]
+      return box && [Math.round(box.x), Math.round(box.width), Math.abs(box.y + box.height - (844 - inset)) <= 1]
     })
-    .toEqual([8, 374, true])
+    .toEqual([inset, 390 - inset * 2, true])
+  await expect(sheet).toHaveAttribute('data-sheet', 'true')
+  await expect(page.getByTestId('rail')).toBeHidden()
+  await expect(page.locator('[data-dock]')).toBeHidden()
+  await expect(page.getByTestId('small-menu')).toBeHidden()
   for (const height of await rowHeights(sheet, ':scope > button, [data-scrub]'))
     expect(height).toBeGreaterThanOrEqual(44)
   expect(await layoutProblems(page, { pieces: PIECES, uncut: UNCUT })).toEqual([])

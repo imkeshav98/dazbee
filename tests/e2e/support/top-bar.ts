@@ -19,7 +19,7 @@ export const PIECES = {
 /** The design's name and the font's name end in "…" by design when there is no room. */
 export const UNCUT = 'h1, [data-testid="bar-font"], [data-testid="edit-panel-note"]'
 
-/** The menus beside the full menu's rows, by their test ids. */
+/** The menus beside a menu's rows that `moreAction` looks in, by their test ids: Arrange's Line up and Order. */
 const SUBMENUS = ['line-up', 'order']
 
 /** Where each of the selection's cards is now: the top bar's pop-up or edit panel that holds it. */
@@ -132,9 +132,9 @@ export async function textColourHex(page: Page) {
 export const strokeList = async (page: Page) => (await barMenu(page, 'outline')).getByTestId('stroke-list')
 
 /**
- * Clicks an action of the full menu, or of the right-click menu or the top bar's ⋯ when `menu` is
- * it, by the start of its name (the first row that starts so): in the menu, or in the menu beside a
- * row (Line up ▸, Order ▸). The action closes the menu, and this waits until it has.
+ * Clicks an action of the full menu, or of the right-click menu or Arrange ⋯ when `menu` is it, by
+ * the start of its name (the first row that starts so): in the menu, or in the menu beside one of
+ * Arrange's rows (Line up ▸, Order ▸). The action closes the menu, and this waits until it has.
  */
 export async function moreAction(page: Page, name: string, menu?: Locator) {
   const root = menu ?? (await moreMenu(page))
