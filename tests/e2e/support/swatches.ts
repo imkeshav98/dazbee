@@ -1,8 +1,9 @@
 // The swatch-like controls of the Colour panel, the frame Background panel built on it, the Outline
 // panel and the Effects panel, as the swatch tests measure them: a brand kit that fills the kit's
 // row, each control with the size it keeps and its space to the next target on a tablet or desktop,
-// the touch target rule a phone holds them to and its check, the panels opened with every control showing, the
-// paint pop-up a row's swatch opens, and where a press lands on each of a control's targets.
+// the touch target rule a phone holds them to and its check, the panels opened with every control
+// showing, the paint pop-up a row's swatch opens, and where a press lands on each of a control's
+// targets.
 import type { BrandKit } from '@dazbee/schema'
 
 import { clickLabel } from './frames-on-canvas.ts'
