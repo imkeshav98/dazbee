@@ -6,7 +6,7 @@ import type { DesignInput } from '@dazbee/schema'
 
 import { solid } from './edit-in-frame.ts'
 import { editorPath, openTabs, setCookies, settle } from './editor.ts'
-import { frameDesign, linkedFrames, seed } from './seed.ts'
+import { DEV_BRAND, frameDesign, type InBrand, linkedFrames, seed } from './seed.ts'
 import { drawn, fitSettled, read } from './stage.ts'
 import { type Browser, expect, type Page } from './test.ts'
 
@@ -195,19 +195,25 @@ export async function openFrames(browser: Browser, count = 1) {
 }
 /**
  * Opens a design, this spec's unless given, alone in a tab at a screen size, in a theme (dark unless
- * given) and a language (the app's own unless given), fitted, with its fonts loaded.
+ * given) and a language (the app's own unless given), fitted, with its fonts loaded. The design
+ * belongs to the brand given, or the development brand.
  */
 export async function openSized(
   browser: Browser,
   viewport: { width: number; height: number },
-  { theme = 'dark', locale, input = design() }: { theme?: string; locale?: string; input?: DesignInput } = {},
+  {
+    theme = 'dark',
+    locale,
+    input = design(),
+    brandId = DEV_BRAND,
+  }: { theme?: string; locale?: string; input?: DesignInput } & InBrand = {},
 ) {
-  const designId = await seed(input)
+  const designId = await seed(input, { brandId })
   const page = await (await browser.newContext({ viewport })).newPage()
   const errors: string[] = []
   page.on('pageerror', (error) => errors.push(error.message))
   await setCookies(page, { theme, ...(locale && { locale }) })
-  await page.goto(editorPath(designId))
+  await page.goto(editorPath(designId, { brandId }))
   await expect(page.getByTestId('status')).toHaveAttribute('data-ready', '', { timeout: 60_000 })
   await page.evaluate(() => window.dazbee?.loaded())
   await fitSettled(page)

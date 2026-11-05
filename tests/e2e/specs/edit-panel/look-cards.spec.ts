@@ -1,13 +1,28 @@
 // The visual-first property cards (as in the final mock) in Chromium: text's size and its colour
 // from the brand kit, the effects as tiles with their numbers under them, and the header card that
-// names the layer and holds its box.
+// names the layer and holds its box. And the swatch rows of the Colour panel and the frame
+// Background panel built on it: on a phone each swatch is a target a finger can hit, in a sheet that
+// scrolls rather than cutting one off, while a desktop keeps their size; with pictures of both
+// panels at the three screen sizes in both themes.
 import type { DesignInput } from '@dazbee/schema'
 
 import { writeOutput } from '../../support/editor.ts'
+import { openSized } from '../../support/frames-on-canvas.ts'
+import { THEMES } from '../../support/glass.ts'
+import { layoutProblems, SCREEN_SIZES } from '../../support/layout.ts'
 import { frameDesign, newBrand, putKit } from '../../support/seed.ts'
-import { openStage } from '../../support/stage.ts'
+import { nextFrame, openStage } from '../../support/stage.ts'
+import {
+  closest,
+  PAINT_EDITOR_ROW,
+  SWATCH_KIT,
+  SWATCH_PANELS,
+  SWATCH_ROWS,
+  swatchBoxes,
+  TOUCH_TARGET,
+} from '../../support/swatches.ts'
 import { expect, type Page, test } from '../../support/test.ts'
-import { barMenu, openCard } from '../../support/top-bar.ts'
+import { barMenu, openCard, PIECES, UNCUT } from '../../support/top-bar.ts'
 
 test.describe.configure({ timeout: 120_000 })
 
@@ -116,3 +131,89 @@ test('the look comes first: size and brand colour, effect tiles, and the header 
   writeOutput('look-cards-shape.png', await page.screenshot())
   expect(errors).toEqual([])
 })
+
+test.describe('found by review', () => {
+  test('on a phone every swatch of the Colour and Background panels is a 44 px target 8 px from the next, in a sheet that cuts none off', async ({
+    browser,
+  }) => {
+    const brandId = await newBrand('e2e phone swatches')
+    await putKit(brandId, SWATCH_KIT)
+    const { page, errors } = await openSized(browser, { width: 390, height: 844 }, { brandId })
+    for (const { name, open } of SWATCH_PANELS) {
+      const panel = await open(page)
+      const sheet = await panel.boundingBox()
+      if (!sheet) throw new Error(`${name} has no box`)
+      for (const row of SWATCH_ROWS) {
+        const boxes = await swatchBoxes(panel, row)
+        for (const box of boxes) {
+          expect(Math.min(box.width, box.height), `${name}, ${row.row}: a swatch's target`).toBeGreaterThanOrEqual(
+            TOUCH_TARGET.size,
+          )
+          expect(box.x, `${name}, ${row.row}: a swatch starts in the sheet`).toBeGreaterThanOrEqual(sheet.x)
+          expect(box.x + box.width, `${name}, ${row.row}: a swatch ends in the sheet`).toBeLessThanOrEqual(
+            sheet.x + sheet.width,
+          )
+        }
+        expect(closest(boxes), `${name}, ${row.row}: the space between swatches`).toBeGreaterThanOrEqual(
+          TOUCH_TARGET.gap,
+        )
+      }
+      // The sheet scrolls to what is under its fold, and cuts nothing short across it.
+      expect(await layoutProblems(page, { pieces: PIECES, uncut: UNCUT })).toEqual([])
+      await page.keyboard.press('Escape')
+      await expect(page.locator('#edit-panel')).toHaveCount(0)
+    }
+    expect(errors).toEqual([])
+  })
+
+  test('at 1280×760 the swatches keep their size and the space between them', async ({ browser }) => {
+    const brandId = await newBrand('e2e desktop swatches')
+    await putKit(brandId, SWATCH_KIT)
+    const { page, errors } = await openSized(browser, { width: 1280, height: 760 }, { brandId })
+    for (const { name, open } of SWATCH_PANELS) {
+      const panel = await open(page)
+      for (const row of SWATCH_ROWS) {
+        const boxes = await swatchBoxes(panel, row)
+        for (const box of boxes) {
+          expect(box.width, `${name}, ${row.row}: a swatch's width`).toBeCloseTo(row.size, 1)
+          expect(box.height, `${name}, ${row.row}: a swatch's height`).toBeCloseTo(row.size, 1)
+        }
+        expect(closest(boxes), `${name}, ${row.row}: the space between swatches`).toBeCloseTo(row.gap, 1)
+      }
+      await page.keyboard.press('Escape')
+      await expect(page.locator('#edit-panel')).toHaveCount(0)
+    }
+    expect(errors).toEqual([])
+  })
+})
+
+for (const [width, height] of SCREEN_SIZES) {
+  for (const theme of THEMES) {
+    test(
+      `screenshots at ${width}×${height}, ${theme}: a shape's Colour panel and a frame's Background panel with + open`,
+      { tag: '@evidence' },
+      async ({ browser }) => {
+        const brandId = await newBrand('e2e swatch shots')
+        await putKit(brandId, SWATCH_KIT)
+        const { page, errors } = await openSized(browser, { width, height }, { theme, brandId })
+        for (const [i, { open }] of SWATCH_PANELS.entries()) {
+          const panel = await open(page)
+          await nextFrame(page)
+          writeOutput(`swatches-${width}-${theme}-${i + 1}.png`, await page.screenshot({ animations: 'disabled' }))
+          if (width < 640) {
+            // On a phone the paint editor's row is under the sheet's fold until scrolled to.
+            await panel.locator(PAINT_EDITOR_ROW.selector).first().scrollIntoViewIfNeeded()
+            await nextFrame(page)
+            writeOutput(
+              `swatches-${width}-${theme}-${i + 1}-scrolled.png`,
+              await page.screenshot({ animations: 'disabled' }),
+            )
+          }
+          await page.keyboard.press('Escape')
+          await expect(page.locator('#edit-panel')).toHaveCount(0)
+        }
+        expect(errors).toEqual([])
+      },
+    )
+  }
+}

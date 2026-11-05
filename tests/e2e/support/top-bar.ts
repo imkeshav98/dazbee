@@ -19,6 +19,20 @@ export const PIECES = {
 /** The design's name and the font's name end in "…" by design when there is no room. */
 export const UNCUT = 'h1, [data-testid="bar-font"], [data-testid="edit-panel-note"]'
 
+/**
+ * Waits until an element and what it holds have played their entrances (a pop-up pops in scaled
+ * and raised), so the boxes measured in it are where they stay. Only animations that end at a time
+ * count: endless ones and those driven by scrolling, as the scroll bars' are, are left out.
+ */
+export const entered = (locator: Locator) =>
+  locator.evaluate(async (el) => {
+    const entrances = el.getAnimations({ subtree: true }).filter((animation) => {
+      const end = animation.effect?.getComputedTiming().endTime
+      return typeof end === 'number' && Number.isFinite(end)
+    })
+    await Promise.all(entrances.map((animation) => animation.finished.catch(() => undefined)))
+  })
+
 /** The menus beside a menu's rows that `moreAction` looks in, by their test ids: Arrange's Line up and Order. */
 const SUBMENUS = ['line-up', 'order']
 
@@ -64,20 +78,6 @@ export async function moreMenu(page: Page) {
   await expect(menu).toBeVisible()
   return menu
 }
-
-/**
- * Waits until an element and what it holds have played their entrances (a pop-up pops in scaled
- * and raised), so the boxes measured in it are where they stay. Only animations that end at a time
- * count: endless ones and those driven by scrolling, as the scroll bars' are, are left out.
- */
-const entered = (locator: Locator) =>
-  locator.evaluate(async (el) => {
-    const entrances = el.getAnimations({ subtree: true }).filter((animation) => {
-      const end = animation.effect?.getComputedTiming().endTime
-      return typeof end === 'number' && Number.isFinite(end)
-    })
-    await Promise.all(entrances.map((animation) => animation.finished.catch(() => undefined)))
-  })
 
 /**
  * Opens what one of the top bar's items opens, `bar-<id>`, unless it is open, and gives it once it
