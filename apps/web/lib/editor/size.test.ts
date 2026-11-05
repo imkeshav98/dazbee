@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 
 import type { DesignInput } from '@dazbee/schema'
 
-import { shortSizeOf, sizeOf, sizeTo, sizeYouAreOn, tidy, typedSize } from './size.ts'
+import { latinDigits, shortSizeOf, sizeOf, sizeTo, sizeYouAreOn, tidy, typedSize } from './size.ts'
 
 /** Two pages: the first holds a square and a story, the second a banner; with the pages' order reversed in their keys. */
 const DESIGN = {
@@ -137,5 +137,16 @@ describe('tidy', () => {
 
   it('leaves a whole number whole', () => {
     expect(tidy(40)).toBe(40)
+  })
+})
+
+describe('latinDigits', () => {
+  it('writes Arabic-Indic and Persian digits and the Arabic decimal separator as Latin digits and a point', () => {
+    expect(latinDigits('١٢٣٫٥')).toBe('123.5')
+    expect(latinDigits('۴۵۶')).toBe('456')
+  })
+
+  it('leaves Latin digits, signs and letters as they are', () => {
+    expect(latinDigits('-12.5px')).toBe('-12.5px')
   })
 })

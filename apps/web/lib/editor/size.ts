@@ -86,12 +86,14 @@ export function tidy(n: number) {
   return Math.round(n * 100) / 100
 }
 
+/** Text with its Arabic-Indic and Persian digits as Latin ones and the Arabic decimal separator as a point. */
+export function latinDigits(text: string) {
+  return text.replace(EASTERN_DIGITS, (d) => String(d.charCodeAt(0) % 16)).replaceAll(ARABIC_DECIMAL, '.')
+}
+
 /** A side as typed: null when empty, its number when it is digits with at most one decimal point, else NaN. */
 function sideOf(text: string): number | null {
-  const latin = text
-    .trim()
-    .replace(EASTERN_DIGITS, (d) => String(d.charCodeAt(0) % 16))
-    .replace(ARABIC_DECIMAL, '.')
+  const latin = latinDigits(text.trim())
   if (!latin) return null
   return DIGITS.test(latin) ? Number(latin) : Number.NaN
 }

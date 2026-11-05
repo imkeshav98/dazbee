@@ -212,7 +212,9 @@ for (const [width, height] of SCREEN_SIZES.filter(([w]) => w >= 640)) {
           rowToLabel: Math.round(middle(google) - middle(pixels)),
           noteIn: Math.round(words(panel.querySelector('[data-testid="add-frame-note"]')) - title),
           labelIn: Math.round(words(meta) - title),
-          fieldsIn: Math.round(box(panel.querySelector('[data-testid="own-width"]')?.closest('label')).left - title),
+          fieldsIn: Math.round(
+            box(panel.querySelector('[data-testid="own-width"]')?.closest('[data-knob]')).left - title,
+          ),
           add: Math.round(box(panel.querySelector('[data-testid="own-size"] button[type="submit"]')).width),
         }
       })

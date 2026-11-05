@@ -162,6 +162,7 @@ export function PaintRow({
           name={name}
           value={paint.color}
           swatch={false}
+          editor={editor}
           onSet={(to) => onSet((now) => (now.type === 'solid' ? { ...now, color: to(now.color) } : now))}
         />
       ) : (
@@ -271,6 +272,7 @@ export function PaintEditor({
           <ColorField
             name={p.paintColour}
             value={paint.color}
+            editor={editor}
             onSet={(to) => onSet((now) => (now.type === 'solid' ? { ...now, color: to(now.color) } : now))}
           />
           <BrandColours
@@ -287,6 +289,7 @@ export function PaintEditor({
             <ColorField
               name={format(p.stopColour, { n: Math.min(picked, paint.stops.length - 1) + 1 })}
               value={stop?.color}
+              editor={editor}
               onSet={setStopColour}
             />
             <button

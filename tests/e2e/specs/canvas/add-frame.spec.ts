@@ -185,7 +185,7 @@ test('W × H adds a size of your own: at the limits it adds; past them the side 
   const borders = () =>
     a.evaluate(() =>
       ['width', 'height'].map((axis) => {
-        const field = document.querySelector(`[data-testid="own-${axis}"]`)?.closest('label')
+        const field = document.querySelector(`[data-testid="own-${axis}"]`)?.closest('[data-knob]')
         return field ? getComputedStyle(field).borderColor : ''
       }),
     )

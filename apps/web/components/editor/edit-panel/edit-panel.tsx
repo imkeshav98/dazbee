@@ -250,11 +250,12 @@ export function PanelFrame({
           <XIcon size={14} aria-hidden />
         </button>
       </div>
+      {/* A field scrolled into view stops above the faded edge, past its 28 px. */}
       <div
         ref={bodyRef}
         onScroll={scroll.measure}
         className={cn(
-          'flex min-h-0 flex-col gap-3 overflow-y-auto overscroll-contain px-4 pb-4 [&>*]:shrink-0',
+          'flex min-h-0 scroll-pb-[28px] flex-col gap-3 overflow-y-auto overscroll-contain px-4 pb-4 [&>*]:shrink-0',
           scroll.more && '[mask-image:linear-gradient(to_bottom,black_calc(100%-28px),transparent)]',
         )}
       >
