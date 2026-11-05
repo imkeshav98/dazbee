@@ -1,9 +1,9 @@
 'use client'
 
 // A row of the editor's menus that runs an action, its key at its end, greyed with the reason in a
-// tooltip while it has nothing to do.
+// tooltip while it has nothing to do; and the arrow keys that move the focus through a menu's rows.
 import { CaretRightIcon } from '@phosphor-icons/react'
-import { useState } from 'react'
+import { type KeyboardEvent, useState } from 'react'
 
 import { usePhone } from '@/components/editor/edit-store.ts'
 import { MENU_ITEM, MENU_ITEM_GREYED, MENU_KEY } from '@/components/editor/styles.ts'
@@ -11,6 +11,29 @@ import { Tooltip } from '@/components/ui/tooltip.tsx'
 import { cn } from '@/lib/cn.ts'
 import { useLocale } from '@/lib/i18n/client.tsx'
 import { dirOf } from '@/lib/i18n/index.ts'
+
+/** The keys that move the focus through a menu's rows. */
+const ROW_KEYS = ['ArrowDown', 'ArrowUp', 'Home', 'End']
+
+/**
+ * Moves the focus through a menu's rows with the up and down arrows, round from the ends, and to
+ * its first and last row with Home and End, as the app's other menus do. A key pressed in a field
+ * of the menu, or in a menu beside one of its rows, is left to them.
+ */
+export function arrowThroughRows(event: KeyboardEvent<HTMLElement>) {
+  if (!ROW_KEYS.includes(event.key) || event.defaultPrevented) return
+  const rows = [
+    ...event.currentTarget.querySelectorAll<HTMLButtonElement>(':scope > button, :scope > [role="group"] > button'),
+  ].filter((row) => !row.disabled && row.checkVisibility())
+  const at = rows.indexOf(document.activeElement as HTMLButtonElement)
+  if (at < 0) return
+  const last = rows.length - 1
+  const next = { ArrowDown: at >= last ? 0 : at + 1, ArrowUp: at <= 0 ? last : at - 1, Home: 0, End: last }[
+    event.key as 'ArrowDown'
+  ]
+  event.preventDefault()
+  rows[next]?.focus()
+}
 
 /**
  * A row of the menu that runs an action, its key at the end. While it has nothing to do it is

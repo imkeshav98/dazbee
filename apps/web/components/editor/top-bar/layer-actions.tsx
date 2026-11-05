@@ -25,7 +25,7 @@ import { useLocale, useMessages } from '@/lib/i18n/client.tsx'
 import { dirOf, format, type Messages } from '@/lib/i18n/index.ts'
 
 import { useMenuFocus } from './bar-popover.tsx'
-import { MenuRow } from './menu-row.tsx'
+import { arrowThroughRows, MenuRow } from './menu-row.tsx'
 
 /** Why an item has nothing to do: the reason the linked-copy items give, by its message. */
 type Why = keyof Messages['editor']['bar']['linked']['why']
@@ -238,7 +238,8 @@ export function AlignRow({ editor }: { editor: Editor }) {
 
 /**
  * A row of the menu that opens a short menu beside it, or under it on a phone, where the screen has
- * no room beside the menu: Enter or the arrow towards it opens it, the arrow back or Esc closes it.
+ * no room beside the menu: Enter or the arrow towards it opens it, the arrow back or Esc closes it,
+ * and the up and down arrows move through it.
  */
 function SubMenu({
   label,
@@ -288,7 +289,7 @@ function SubMenu({
           aria-label={label}
           data-testid={`more-${testId}-menu`}
           onKeyDown={(event) => {
-            if (event.key !== back) return
+            if (event.key !== back) return arrowThroughRows(event)
             event.preventDefault()
             setOpen(false)
           }}

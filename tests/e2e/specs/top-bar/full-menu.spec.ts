@@ -6,7 +6,7 @@ import { closeMenus, expectGreyed, fillOf, holders, node, open, redo, rowsOf, un
 import { GREEN, INK, PINK } from '../../support/linked-menu-design.ts'
 import { copyIn } from '../../support/seed.ts'
 import { fitSettled, selectLayers } from '../../support/stage.ts'
-import { expect, test } from '../../support/test.ts'
+import { expect, type Page, test } from '../../support/test.ts'
 import { moreAction, moreMenu, moreSubmenu, PIECES, UNCUT } from '../../support/top-bar.ts'
 
 test.describe.configure({ mode: 'parallel', timeout: 120_000 })
@@ -23,6 +23,9 @@ const ROWS = [
   'Hide in all frames',
   'Delete from all frames',
 ]
+
+/** The words of the row that has the focus, without its key. */
+const focusedRow = (page: Page) => page.evaluate(() => document.activeElement?.firstChild?.textContent?.trim() ?? '')
 
 test.describe('the full menu', () => {
   test('opens with the focus on its first item, lists its rows in order, and gives the focus back to ⋯', async ({
@@ -57,6 +60,64 @@ test.describe('the full menu', () => {
     const right = page.getByTestId('stage-menu')
     await expect(right).toBeVisible()
     expect((await rowsOf(right)).filter((row) => ROWS.includes(row))).toEqual(ROWS)
+    expect(errors).toEqual([])
+  })
+
+  test('moves the focus through its rows by the arrows, round from the ends, with Home and End, in the menus beside them too', async ({
+    browser,
+  }) => {
+    const { page, errors } = await open(browser)
+    await selectLayers(page, ['badge'])
+    await page.getByTestId('bar-more').focus()
+    await page.keyboard.press('Enter')
+    const menu = page.getByTestId('bar-more-menu')
+    await expect(menu.getByTestId('more-copy')).toBeFocused()
+    for (const [key, row] of [
+      ['ArrowDown', 'Paste'],
+      ['ArrowDown', 'Duplicate'],
+      ['ArrowUp', 'Paste'],
+      ['End', 'Delete from all frames'],
+      ['ArrowDown', 'Copy'],
+      ['ArrowUp', 'Delete from all frames'],
+      ['Home', 'Copy'],
+    ] as const) {
+      await page.keyboard.press(key)
+      await expect.poll(() => focusedRow(page), key).toBe(row)
+    }
+    // Beside a row: the arrow towards it opens the menu, the arrows move through it, the arrow back closes it.
+    await page.keyboard.press('ArrowRight')
+    const copy = page.getByTestId('more-copy-menu')
+    await expect(copy.getByRole('button').first()).toBeFocused()
+    for (const [key, row] of [
+      ['ArrowDown', 'Copy style'],
+      ['ArrowDown', 'Copy'],
+      ['ArrowUp', 'Copy style'],
+      ['Home', 'Copy'],
+      ['End', 'Copy style'],
+    ] as const) {
+      await page.keyboard.press(key)
+      await expect.poll(() => focusedRow(page), key).toBe(row)
+    }
+    await page.keyboard.press('ArrowLeft')
+    await expect(copy).toBeHidden()
+    await expect(menu.getByTestId('more-copy')).toBeFocused()
+    await page.keyboard.press('Escape')
+    await expect(menu).toBeHidden()
+
+    // The right-click menu, the same way.
+    await selectLayers(page, [])
+    const at = await page.evaluate(() => {
+      const box = window.dazbee?.boxOf('badge')
+      return window.dazbee?.screenPoint((box?.x ?? 0) + 100, (box?.y ?? 0) + 100, 'sq')
+    })
+    await page.mouse.click(at?.x ?? 0, at?.y ?? 0, { button: 'right' })
+    const right = page.getByTestId('stage-menu')
+    await expect(right.getByTestId('more-copy')).toBeFocused()
+    await page.keyboard.press('ArrowDown')
+    await expect.poll(() => focusedRow(page)).toBe('Paste')
+    await page.keyboard.press('ArrowUp')
+    await page.keyboard.press('ArrowUp')
+    await expect.poll(() => focusedRow(page)).toBe('Delete from all frames')
     expect(errors).toEqual([])
   })
 
