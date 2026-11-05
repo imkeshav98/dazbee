@@ -17,7 +17,6 @@ import {
   moreSubmenu,
   PIECES,
   UNCUT,
-  underPhoneMenu,
 } from '../../support/top-bar.ts'
 import { topBarDesign } from '../../support/top-bar-design.ts'
 
@@ -425,9 +424,8 @@ test('the small menu keeps out of a drag, and over a selection filling a phone i
   const bar = await page.getByTestId('top-bar-row').boundingBox()
   const at = await small.boundingBox()
   expect(bar && at && at.y >= bar.y + bar.height).toBe(true)
+  // On a phone it is a sheet, which hides the dock and the rail.
   await moreMenu(page)
-  // It lies over the dock and the rail, as the mock draws it.
-  await underPhoneMenu(page, 'hidden')
   expect(await layoutProblems(page, { pieces: PIECES, uncut: UNCUT })).toEqual([])
   expect(errors).toEqual([])
 })

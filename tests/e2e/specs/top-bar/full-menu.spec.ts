@@ -17,7 +17,7 @@ import {
 import { copyIn } from '../../support/seed.ts'
 import { fitSettled, selectLayers } from '../../support/stage.ts'
 import { expect, type Locator, type Page, test } from '../../support/test.ts'
-import { entered, moreAction, moreMenu, moreSubmenu, PIECES, UNCUT, underPhoneMenu } from '../../support/top-bar.ts'
+import { entered, moreAction, moreMenu, moreSubmenu, PIECES, UNCUT } from '../../support/top-bar.ts'
 
 test.describe.configure({ mode: 'parallel', timeout: 120_000 })
 
@@ -425,17 +425,11 @@ test.describe('at each screen size', () => {
     await selectLayers(page, ['headline'])
     await expect(page.getByTestId('small-menu')).toBeVisible()
     await expect.poll(() => layoutProblems(page, { pieces: PIECES, uncut: UNCUT })).toEqual([])
+    // The full menu is a sheet, which hides the dock and the rail; then the menu in its place.
     await moreMenu(page)
-    // The full menu lies over the dock and the rail, as the mock draws it, so they are left out
-    // here; the 600 px tall phone's test checks the menu is on top of them.
-    await underPhoneMenu(page, 'hidden')
     await expect.poll(() => layoutProblems(page, { pieces: PIECES, uncut: UNCUT })).toEqual([])
-    await underPhoneMenu(page, '')
     const sub = await moreSubmenu(page, 'copy-to-frames')
-    // It opens in the full menu's place, which lies over the dock and the rail.
-    await underPhoneMenu(page, 'hidden')
     await expect.poll(() => layoutProblems(page, { pieces: PIECES, uncut: UNCUT })).toEqual([])
-    await underPhoneMenu(page, '')
     // Wholly on the screen and on top, each row a finger's height, once it has popped in.
     await entered(sub)
     const rows = await sub.getByRole('button').evaluateAll((buttons) =>
@@ -494,33 +488,4 @@ test.describe('at each screen size', () => {
     expect(box.left >= 0 && box.right <= phoneWidth && box.top >= 0 && box.bottom <= phoneHeight).toBe(true)
     expect(errors).toEqual([])
   })
-})
-
-test('on a phone 600 px tall the full menu shows over the dock, and a cut edge never fades a row as a greyed one does', async ({
-  browser,
-}) => {
-  const { page, errors } = await open(browser)
-  // Short enough that the full menu reaches down to the dock.
-  await page.setViewportSize({ width: 390, height: 600 })
-  await fitSettled(page)
-  await selectLayers(page, ['headline'])
-  const menu = await moreMenu(page)
-  await entered(menu)
-  const state = await menu.evaluate((el) => {
-    const r = el.getBoundingClientRect()
-    const dock = (document.querySelector('[data-dock]') as Element).getBoundingClientRect()
-    const over = document.elementFromPoint(r.left + r.width / 2, Math.max(dock.top + 4, r.top + 4))
-    return {
-      bottom: Math.round(r.bottom),
-      reachesDock: r.bottom > dock.top,
-      onTop: el.contains(over),
-      scrolls: el.scrollHeight > el.clientHeight,
-      fade: getComputedStyle(el).maskImage,
-    }
-  })
-  expect(state.bottom).toBeLessThanOrEqual(600 - 8)
-  expect(state.reachesDock).toBe(true)
-  expect(state.onTop).toBe(true)
-  if (state.scrolls) expect(state.fade).toBe('none')
-  expect(errors).toEqual([])
 })

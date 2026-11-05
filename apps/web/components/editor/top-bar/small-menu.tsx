@@ -8,7 +8,8 @@
 // off the selection (small-menu-place). It keeps off the top bar, the edit panel, the rail and its
 // flyout, the bottom controls and the frames' labels, and hides while a gesture runs, a top bar
 // pop-up or the right-click menu is open, or the selection is off the stage. ⋯ opens the full menu
-// beside it, clear of the rail and its flyout, or under it on a phone, where it may lie over the dock.
+// beside it, clear of the rail and its flyout, or on a phone as the sheet at the bottom of the
+// screen, while the small menu hides.
 import {
   CopyIcon,
   DotsThreeIcon,
@@ -34,7 +35,16 @@ import { type Box, CLEAR, smallMenuPlace } from '@/lib/editor/small-menu-place.t
 import { useLocale, useMessages } from '@/lib/i18n/client.tsx'
 import { dirOf, format } from '@/lib/i18n/index.ts'
 
-import { arrowAlong, arrowThrough, useMenuFocus, useRovingTab, useScrollingMenu } from './bar-popover.tsx'
+import {
+  arrowAlong,
+  arrowThrough,
+  SHEET_LOOK,
+  SHEET_PLACE,
+  SheetAnchor,
+  useMenuFocus,
+  useRovingTab,
+  useScrollingMenu,
+} from './bar-popover.tsx'
 import { LayerActions, WIDE_MENU } from './layer-actions.tsx'
 
 type Place = { left: number; top: number }
@@ -152,11 +162,11 @@ function usePlace(editor: Editor, menu: HTMLElement | null, rightClick: boolean)
 }
 
 /**
- * Where the full menu opens: beside the small menu on its end side when there is room for it and
- * the widest menu beside its rows, else on its start side, kept off the rail and its open flyout;
- * under it when neither side has room, and always on a phone. Under it, the menu keeps off the
- * flyout only when the room past the flyout holds it, and off the rail always. Measured once the
- * full menu shows, and again as the small menu, the flyout or the window changes.
+ * Where the full menu opens on tablet and desktop: beside the small menu on its end side when there
+ * is room for it and the widest menu beside its rows, else on its start side, kept off the rail and
+ * its open flyout; under it when neither side has room. Under it, the menu keeps off the flyout only
+ * when the room past the flyout holds it, and off the rail always. Measured once the full menu shows,
+ * and again as the small menu, the flyout or the window changes; a phone shows it as a sheet.
  */
 function useFullMenuPlace(
   menu: HTMLElement | null,
@@ -190,7 +200,7 @@ function useFullMenuPlace(
     window.addEventListener('resize', update)
     return () => window.removeEventListener('resize', update)
   }, [menu, content, place, phone, rtl, flyoutEnd])
-  return phone ? { side: 'under', startInset: CLEAR } : at
+  return at
 }
 
 export function SmallMenu({ editor, rightClick }: { editor: Editor; rightClick: boolean }) {
@@ -221,141 +231,143 @@ export function SmallMenu({ editor, rightClick }: { editor: Editor; rightClick: 
   const withKey = (label: string, action: Parameters<typeof keyOf>[0]) =>
     format(t.editor.arrange.withKey, { label, key: keyOf(action) })
   const under = fullMenu.side === 'under'
-  return (
-    <Popover.Root open={open === 'more'} onOpenChange={(to) => setOpen(to ? 'more' : null)}>
-      <Popover.Anchor asChild>
-        <div
-          ref={setMenu}
-          role="toolbar"
-          aria-label={b.smallMenu}
-          data-testid="small-menu"
-          onKeyDown={arrowAlong}
-          onFocus={focused}
-          style={place ? { left: place.left, top: place.top } : undefined}
+  // On a phone the full menu is a sheet, and the small menu hides while it shows, as the mock draws it.
+  const sheet = phone && open === 'more'
+  const toolbar = (
+    <div
+      ref={setMenu}
+      role="toolbar"
+      aria-label={b.smallMenu}
+      data-testid="small-menu"
+      onKeyDown={arrowAlong}
+      onFocus={focused}
+      style={place ? { left: place.left, top: place.top } : undefined}
+      className={cn(
+        'absolute z-20 flex items-center gap-0.5 rounded-full surface-frost p-1',
+        place && !sheet ? 'visible' : 'invisible',
+      )}
+    >
+      <button
+        type="button"
+        data-bar-item
+        data-testid="small-lock"
+        aria-label={locked ? b.unlock : b.lock}
+        title={withKey(locked ? b.unlock : b.lock, 'lock')}
+        aria-pressed={locked}
+        onClick={() => editor.setLocked(target.ids, !locked)}
+        className={cn(BAR_TOGGLE, PILL_BUTTON)}
+      >
+        {locked ? <LockSimpleIcon size={16} weight="fill" aria-hidden /> : <LockSimpleOpenIcon size={16} aria-hidden />}
+      </button>
+      <button
+        type="button"
+        data-bar-item
+        data-testid="small-duplicate"
+        aria-label={t.editor.arrange.duplicate}
+        title={withKey(t.editor.arrange.duplicate, 'duplicate')}
+        onClick={() => editor.perform('duplicate')}
+        className={cn(BAR_BUTTON, PILL_BUTTON)}
+      >
+        <CopyIcon size={16} aria-hidden />
+      </button>
+      {undeletable ? (
+        <Tooltip label={undeletable} open={toldWhy} onOpenChange={setToldWhy}>
+          <button
+            type="button"
+            data-bar-item
+            data-testid="small-delete"
+            aria-label={b.delete}
+            aria-disabled="true"
+            aria-description={undeletable}
+            // A tap shows why, as the pointer resting on it does.
+            onClick={(event) => {
+              event.preventDefault()
+              setToldWhy(true)
+            }}
+            className={cn(BAR_BUTTON, PILL_BUTTON, MENU_ITEM_GREYED)}
+          >
+            <TrashIcon size={16} aria-hidden />
+          </button>
+        </Tooltip>
+      ) : (
+        <button
+          type="button"
+          data-bar-item
+          data-testid="small-delete"
+          aria-label={b.delete}
+          title={withKey(b.delete, 'delete')}
+          onClick={() => editor.perform('delete')}
+          className={cn(BAR_BUTTON, PILL_BUTTON)}
+        >
+          <TrashIcon size={16} aria-hidden />
+        </button>
+      )}
+      <button
+        type="button"
+        data-bar-item
+        data-testid="small-hide"
+        aria-label={hidden ? b.show : b.hide}
+        title={withKey(hidden ? b.show : b.hide, 'hide')}
+        aria-pressed={hidden}
+        onClick={() => editor.setHidden(target.ids, !hidden)}
+        className={cn(BAR_TOGGLE, PILL_BUTTON)}
+      >
+        {hidden ? <EyeSlashIcon size={16} weight="fill" aria-hidden /> : <EyeIcon size={16} aria-hidden />}
+      </button>
+      <Popover.Trigger asChild>
+        <button
+          ref={moreFocus.button}
+          type="button"
+          data-bar-item
+          aria-label={b.more}
+          title={b.more}
+          data-testid="bar-more"
+          className={cn(BAR_BUTTON, PILL_BUTTON)}
+        >
+          <DotsThreeIcon size={18} weight="bold" aria-hidden />
+        </button>
+      </Popover.Trigger>
+      <Popover.Portal>
+        <Popover.Content
+          ref={scroll.ref}
+          onScroll={scroll.onScroll}
+          // On a phone the sheet; elsewhere beside the small menu, or under it with no room beside it,
+          // wholly inside the room between the top bar, the bottom controls and the rail with its
+          // flyout, even moving off its button.
+          {...(phone
+            ? SHEET_PLACE
+            : {
+                side: under ? 'bottom' : rtl !== (fullMenu.side === 'start') ? 'left' : 'right',
+                align: under ? 'center' : 'start',
+                sideOffset: MENU_GAP,
+                sticky: 'always',
+                collisionPadding: {
+                  top: barBottom + 8,
+                  bottom: 72,
+                  left: rtl ? CLEAR : fullMenu.startInset,
+                  right: rtl ? fullMenu.startInset : CLEAR,
+                },
+              })}
+          {...moreFocus.content}
+          onKeyDown={arrowThrough}
+          aria-label={b.more}
+          data-testid="bar-more-menu"
           className={cn(
-            'absolute z-20 flex items-center gap-0.5 rounded-full surface-frost p-1',
-            place ? 'visible' : 'invisible',
+            MENU,
+            phone ? SHEET_LOOK : 'max-h-[var(--radix-popover-content-available-height)] w-80 overflow-y-auto',
+            scroll.className,
           )}
         >
-          <button
-            type="button"
-            data-bar-item
-            data-testid="small-lock"
-            aria-label={locked ? b.unlock : b.lock}
-            title={withKey(locked ? b.unlock : b.lock, 'lock')}
-            aria-pressed={locked}
-            onClick={() => editor.setLocked(target.ids, !locked)}
-            className={cn(BAR_TOGGLE, PILL_BUTTON)}
-          >
-            {locked ? (
-              <LockSimpleIcon size={16} weight="fill" aria-hidden />
-            ) : (
-              <LockSimpleOpenIcon size={16} aria-hidden />
-            )}
-          </button>
-          <button
-            type="button"
-            data-bar-item
-            data-testid="small-duplicate"
-            aria-label={t.editor.arrange.duplicate}
-            title={withKey(t.editor.arrange.duplicate, 'duplicate')}
-            onClick={() => editor.perform('duplicate')}
-            className={cn(BAR_BUTTON, PILL_BUTTON)}
-          >
-            <CopyIcon size={16} aria-hidden />
-          </button>
-          {undeletable ? (
-            <Tooltip label={undeletable} open={toldWhy} onOpenChange={setToldWhy}>
-              <button
-                type="button"
-                data-bar-item
-                data-testid="small-delete"
-                aria-label={b.delete}
-                aria-disabled="true"
-                aria-description={undeletable}
-                // A tap shows why, as the pointer resting on it does.
-                onClick={(event) => {
-                  event.preventDefault()
-                  setToldWhy(true)
-                }}
-                className={cn(BAR_BUTTON, PILL_BUTTON, MENU_ITEM_GREYED)}
-              >
-                <TrashIcon size={16} aria-hidden />
-              </button>
-            </Tooltip>
-          ) : (
-            <button
-              type="button"
-              data-bar-item
-              data-testid="small-delete"
-              aria-label={b.delete}
-              title={withKey(b.delete, 'delete')}
-              onClick={() => editor.perform('delete')}
-              className={cn(BAR_BUTTON, PILL_BUTTON)}
-            >
-              <TrashIcon size={16} aria-hidden />
-            </button>
-          )}
-          <button
-            type="button"
-            data-bar-item
-            data-testid="small-hide"
-            aria-label={hidden ? b.show : b.hide}
-            title={withKey(hidden ? b.show : b.hide, 'hide')}
-            aria-pressed={hidden}
-            onClick={() => editor.setHidden(target.ids, !hidden)}
-            className={cn(BAR_TOGGLE, PILL_BUTTON)}
-          >
-            {hidden ? <EyeSlashIcon size={16} weight="fill" aria-hidden /> : <EyeIcon size={16} aria-hidden />}
-          </button>
-          <Popover.Trigger asChild>
-            <button
-              ref={moreFocus.button}
-              type="button"
-              data-bar-item
-              aria-label={b.more}
-              title={b.more}
-              data-testid="bar-more"
-              className={cn(BAR_BUTTON, PILL_BUTTON)}
-            >
-              <DotsThreeIcon size={18} weight="bold" aria-hidden />
-            </button>
-          </Popover.Trigger>
-          <Popover.Portal>
-            <Popover.Content
-              ref={scroll.ref}
-              onScroll={scroll.onScroll}
-              // Beside the small menu, or under it on a phone or with no room beside it, kept between the
-              // top bar and the bottom controls.
-              side={under ? 'bottom' : rtl !== (fullMenu.side === 'start') ? 'left' : 'right'}
-              align={under ? 'center' : 'start'}
-              sideOffset={MENU_GAP}
-              // Wholly inside the room between the top bar, the bottom controls and the rail with its
-              // flyout, even moving off its button.
-              sticky="always"
-              collisionPadding={{
-                top: barBottom + 8,
-                // On a phone it lies over the dock, as the mock draws it.
-                bottom: phone ? CLEAR : 72,
-                left: rtl ? CLEAR : fullMenu.startInset,
-                right: rtl ? fullMenu.startInset : CLEAR,
-              }}
-              {...moreFocus.content}
-              onKeyDown={arrowThrough}
-              aria-label={b.more}
-              data-testid="bar-more-menu"
-              className={cn(
-                MENU,
-                'max-h-[var(--radix-popover-content-available-height)] w-80 overflow-y-auto',
-                scroll.className,
-              )}
-            >
-              {moreFocus.back}
-              <LayerActions editor={editor} ids={ids} onDone={() => setOpen(null)} />
-            </Popover.Content>
-          </Popover.Portal>
-        </div>
-      </Popover.Anchor>
+          {moreFocus.back}
+          <LayerActions editor={editor} ids={ids} onDone={() => setOpen(null)} />
+        </Popover.Content>
+      </Popover.Portal>
+    </div>
+  )
+  return (
+    <Popover.Root open={open === 'more'} onOpenChange={(to) => setOpen(to ? 'more' : null)}>
+      {phone && <SheetAnchor />}
+      {phone ? toolbar : <Popover.Anchor asChild>{toolbar}</Popover.Anchor>}
     </Popover.Root>
   )
 }

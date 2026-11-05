@@ -2,9 +2,9 @@
 
 // One button of the bar by the selection and the popover it opens under it, or, for a pop-up the
 // edit store names a sheet, at the bottom of a phone's screen. The bar keeps which one is open, so
-// only one is open at a time. Also what the editor's menus share: the focus as a popover opens and
-// closes, the arrows along a toolbar and through a menu's rows, Tab once into a toolbar, and a menu
-// that shows it scrolls.
+// only one is open at a time. Also what the editor's menus share: the sheet a phone shows a menu as,
+// the focus as a popover opens and closes, the arrows along a toolbar and through a menu's rows, Tab
+// once into a toolbar, and a menu that shows it scrolls.
 import { CaretDownIcon } from '@phosphor-icons/react'
 import * as Popover from '@radix-ui/react-popover'
 import {
@@ -31,6 +31,21 @@ import { cn } from '@/lib/cn.ts'
  * keeps 0.5rem, which is 7 px at the 14 px root.
  */
 export const SHEET_EDGE = 7
+
+/**
+ * Where a popover shown as a phone's sheet lies, for its content: above the screen's bottom edge
+ * (`SheetAnchor`), as wide as the screen less SHEET_EDGE each side, SHEET_EDGE from every edge.
+ */
+export const SHEET_PLACE = {
+  side: 'top',
+  align: 'center',
+  sideOffset: 0,
+  collisionPadding: SHEET_EDGE,
+  'data-sheet': true,
+} as const
+/** A sheet's look: as wide as its anchor, as tall as what it holds up to its room, scrolling past that. */
+export const SHEET_LOOK =
+  'max-h-[var(--radix-popover-content-available-height)] w-[var(--radix-popover-trigger-width)] overflow-y-auto rounded-[22px]'
 
 /** The room between the bar's last row that shows and a popover under it, in pixels. */
 const GAP = 8
@@ -270,13 +285,10 @@ export function BarPopover({
           {!menu && <CaretDownIcon size={10} weight="bold" aria-hidden className="text-subtle" />}
         </button>
       </Popover.Trigger>
-      {asSheet && <Popover.Anchor virtualRef={SCREEN_BOTTOM} />}
+      {asSheet && <SheetAnchor />}
       <Popover.Portal>
         <Popover.Content
-          side={asSheet ? 'top' : 'bottom'}
-          align={asSheet ? 'center' : align}
-          sideOffset={asSheet ? 0 : below}
-          collisionPadding={asSheet ? SHEET_EDGE : 12}
+          {...(asSheet ? SHEET_PLACE : { side: 'bottom', align, sideOffset: below, collisionPadding: 12 })}
           {...focus.content}
           // A number field being typed in takes Esc first, throwing away what was typed; the next
           // Esc closes the popover.
@@ -284,14 +296,7 @@ export function BarPopover({
           onKeyDown={menu ? arrowThrough : undefined}
           aria-label={label}
           data-testid={`bar-${testId}-menu`}
-          data-sheet={asSheet || undefined}
-          className={cn(
-            POPOVER,
-            'flex flex-col p-1.5',
-            asSheet
-              ? 'max-h-[var(--radix-popover-content-available-height)] w-[var(--radix-popover-trigger-width)] overflow-y-auto rounded-[22px]'
-              : (className ?? 'min-w-56'),
-          )}
+          className={cn(POPOVER, 'flex flex-col p-1.5', asSheet ? SHEET_LOOK : (className ?? 'min-w-56'))}
         >
           {focus.back}
           {children}
@@ -299,6 +304,14 @@ export function BarPopover({
       </Popover.Portal>
     </Popover.Root>
   )
+}
+
+/**
+ * A popover's anchor while it shows as a phone's sheet (`SHEET_PLACE`, `SHEET_LOOK`): the screen's
+ * bottom edge. It goes in the popover's root in place of any other anchor.
+ */
+export function SheetAnchor() {
+  return <Popover.Anchor virtualRef={SCREEN_BOTTOM} />
 }
 
 /**

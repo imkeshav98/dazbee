@@ -3,10 +3,11 @@
 // the back row, the arrow back and Esc go back to the row, and a second Esc closes the menu, in
 // English and in Arabic. No row shows a shortcut key, and every row stays a finger's height. A tap
 // on a greyed row says why in a tooltip just above its menu, covering no row and clear of the finger,
-// which Esc closes first. Arrange's sheet is checked in top-bar-more-screens.
+// which Esc closes first. The full menu and the right-click menu are the sheet Arrange is, and a
+// group's fits whole. The rest of Arrange's sheet is checked in top-bar-more-screens.
 import { setCookies } from '../../support/editor.ts'
-import { boxOf } from '../../support/layout.ts'
-import { open } from '../../support/linked-menu.ts'
+import { boxOf, layoutProblems } from '../../support/layout.ts'
+import { open, rowsOf } from '../../support/linked-menu.ts'
 import {
   besideRows,
   fullMenuRows,
@@ -18,7 +19,7 @@ import {
 } from '../../support/menu-rows.ts'
 import { fitSettled, selectLayers } from '../../support/stage.ts'
 import { expect, type Locator, type Page, test } from '../../support/test.ts'
-import { entered, moreMenu } from '../../support/top-bar.ts'
+import { arrangeMenu, entered, moreMenu, PIECES, UNCUT } from '../../support/top-bar.ts'
 
 test.describe.configure({ mode: 'parallel', timeout: 120_000 })
 
@@ -213,6 +214,44 @@ test('a tap on a greyed row says why in a tooltip just above its menu, covering 
     await expect(menu).toBeVisible()
     await page.keyboard.press('Escape')
     await expect(menu).toBeHidden()
+  }
+  expect(errors).toEqual([])
+})
+
+test('the full menu and the right-click menu open as the sheet at the bottom of the screen Arrange opens as, hiding the dock, the tab bar and the small menu, and a group’s, the longest, fits whole on a 390×844 and a 390×600 screen', async ({
+  browser,
+}) => {
+  const { page, errors } = await openOnPhone(browser)
+  for (const height of [PHONE.height, 600]) {
+    await page.setViewportSize({ width: PHONE.width, height })
+    await fitSettled(page)
+    await selectLayers(page, ['logo'], { bar: true })
+    // Arrange's sheet, which the full menu's lies as.
+    const arrange = await arrangeMenu(page)
+    const sheet = await boxOf(arrange)
+    await page.keyboard.press('Escape')
+    await expect(arrange).toBeHidden()
+    for (const show of [() => moreMenu(page), () => rightClick(page, 'logo')]) {
+      const menu = await show()
+      await entered(menu)
+      const label = `${height} ${await menu.getAttribute('data-testid')}`
+      await expect(menu, label).toHaveAttribute('data-sheet', 'true')
+      const box = await boxOf(menu)
+      expect([box.left, box.right, box.bottom].map(Math.round), label).toEqual(
+        [sheet.left, sheet.right, sheet.bottom].map(Math.round),
+      )
+      expect(await rowsOf(menu), label).toEqual(fullMenuRows({ group: true }))
+      // Whole: every row on the screen, with nothing to scroll to.
+      expect(box.top, label).toBeGreaterThanOrEqual(0)
+      expect(await menu.evaluate((el) => el.scrollHeight <= el.clientHeight + 1), label).toBe(true)
+      await expect(page.getByTestId('rail')).toBeHidden()
+      await expect(page.locator('[data-dock]')).toBeHidden()
+      await expect(page.getByTestId('small-menu')).toBeHidden()
+      expect(await layoutProblems(page, { pieces: PIECES, uncut: UNCUT }), label).toEqual([])
+      await page.keyboard.press('Escape')
+      await expect(menu).toBeHidden()
+      await expect(page.locator('[data-dock]')).toBeVisible()
+    }
   }
   expect(errors).toEqual([])
 })

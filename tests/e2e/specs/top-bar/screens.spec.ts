@@ -127,17 +127,17 @@ test.describe('on a phone, 390×844', () => {
     expect(errors).toEqual([])
   })
 
-  test('on a phone 600 px tall the full menu shows that it scrolls, with a line at its cut edge, never a fade that reads as a greyed row, and its bar, and every row can be reached', async ({
+  test('on a phone too short for the full menu’s sheet, 400 px tall, the sheet shows that it scrolls, with a line at its cut edge, never a fade that reads as a greyed row, and its bar, and every row can be reached', async ({
     browser,
   }) => {
     const asset = await upload(photo)
     const { page, errors } = await openStage(browser, topBarDesign(asset.id))
-    // Short enough that the full menu has less room than its rows.
-    await page.setViewportSize({ width: 390, height: 600 })
+    // Short enough that the full menu has less room than its rows, which fit a 600 px tall phone.
+    await page.setViewportSize({ width: 390, height: 400 })
     await selectLayers(page, ['box'], { bar: true })
     const menu = await moreMenu(page)
     // Away from the menu, past the time an overlay bar takes to hide.
-    await page.mouse.move(4, 400)
+    await page.mouse.move(2, 2)
     await page.waitForTimeout(1_200)
     const edge = () => menu.evaluate((el) => getComputedStyle(el).boxShadow)
     const top = await scrolling(menu)

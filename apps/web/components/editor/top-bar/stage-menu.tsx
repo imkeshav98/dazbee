@@ -2,20 +2,21 @@
 
 // The right-click menu on the stage: the layer actions for what the right-click picked, or Show
 // hidden layers at one on empty canvas, for the frame there or the one nearest it outside every
-// frame, when it has some.
+// frame, when it has some. It opens at the right-click, or on a phone as the sheet at the bottom of
+// the screen, as the full menu does.
 import * as Popover from '@radix-ui/react-popover'
 import { useEffect, useState } from 'react'
 
 import { descendants } from '@dazbee/doc'
 import { type Editor, type Frame, type Point, visibleIn } from '@dazbee/editor'
 
-import { useEditState } from '@/components/editor/edit-store.ts'
+import { setRightClick, useEditState, usePhone } from '@/components/editor/edit-store.ts'
 import { useSelection } from '@/components/editor/editor-hooks.ts'
 import { MENU, MENU_ITEM } from '@/components/editor/styles.ts'
 import { cn } from '@/lib/cn.ts'
 import { useMessages } from '@/lib/i18n/client.tsx'
 
-import { arrowThrough, useScrollingMenu } from './bar-popover.tsx'
+import { arrowThrough, SHEET_LOOK, SHEET_PLACE, SheetAnchor, useScrollingMenu } from './bar-popover.tsx'
 import { LayerActions } from './layer-actions.tsx'
 
 /** The layers hidden in one frame, which a right-click on its empty canvas offers to show. */
@@ -71,24 +72,39 @@ export function StageMenu({
   const b = t.editor.bar
   const ids = useSelection(editor)
   const { barBottom } = useEditState()
+  const phone = usePhone()
   const scroll = useScrollingMenu()
   const [openedFor] = useState(ids)
   useEffect(() => {
     if (ids !== openedFor) onClose()
   }, [ids, openedFor, onClose])
+  // The shell hides the tab bar and the dock under it on a phone, as under every sheet.
+  useEffect(() => {
+    setRightClick(true)
+    return () => setRightClick(false)
+  }, [])
   return (
     <Popover.Root open onOpenChange={(to) => !to && onClose()}>
-      <Popover.Anchor asChild>
-        <span aria-hidden className="pointer-events-none absolute size-0" style={{ left: at.x, top: at.y }} />
-      </Popover.Anchor>
+      {phone ? (
+        <SheetAnchor />
+      ) : (
+        <Popover.Anchor asChild>
+          <span aria-hidden className="pointer-events-none absolute size-0" style={{ left: at.x, top: at.y }} />
+        </Popover.Anchor>
+      )}
       <Popover.Portal>
         <Popover.Content
-          side="bottom"
-          align="start"
-          sideOffset={2}
-          sticky="always"
-          // Kept between the top bar and the bottom controls, scrolling inside when it has less room.
-          collisionPadding={{ top: barBottom + 8, bottom: 72, left: 12, right: 12 }}
+          // On a phone the sheet; elsewhere at the right-click, kept between the top bar and the
+          // bottom controls, scrolling inside when it has less room.
+          {...(phone
+            ? SHEET_PLACE
+            : {
+                side: 'bottom',
+                align: 'start',
+                sideOffset: 2,
+                sticky: 'always',
+                collisionPadding: { top: barBottom + 8, bottom: 72, left: 12, right: 12 },
+              })}
           // A click elsewhere or Esc closes it; focus given back to a button that just closed does not.
           onFocusOutside={(event) => event.preventDefault()}
           onKeyDown={arrowThrough}
@@ -98,7 +114,11 @@ export function StageMenu({
           onScroll={scroll.onScroll}
           className={cn(
             MENU,
-            hidden ? 'min-w-52' : 'max-h-[var(--radix-popover-content-available-height)] w-80 overflow-y-auto',
+            phone
+              ? SHEET_LOOK
+              : hidden
+                ? 'min-w-52'
+                : 'max-h-[var(--radix-popover-content-available-height)] w-80 overflow-y-auto',
             scroll.className,
           )}
         >
