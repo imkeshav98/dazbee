@@ -41,7 +41,7 @@ async function openOnPhone(browser: Parameters<typeof open>[0]) {
   return opened
 }
 
-/** Right-clicks a layer in the square frame, at its middle, and gives the right-click menu once it shows. */
+/** Right-clicks a layer in the square frame, at its middle, and gives the right-click menu once it has popped in. */
 async function rightClick(page: Page, id: string) {
   const at = await page.evaluate((one) => {
     const box = window.dazbee?.boxOf(one)
@@ -54,6 +54,7 @@ async function rightClick(page: Page, id: string) {
   await page.mouse.click(at?.x ?? 0, at?.y ?? 0, { button: 'right' })
   const menu = page.getByTestId('stage-menu')
   await expect(menu).toBeVisible()
+  await entered(menu)
   return menu
 }
 
