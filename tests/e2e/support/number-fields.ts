@@ -52,7 +52,7 @@ export const BOX = { x: 80, y: 120, width: 400, height: 300, opacity: 0.2 } as c
 /** The headline's font size, as the top bar shows it. */
 export const HEADLINE_SIZE = 64
 
-/** The fields pressed: two of Position's Advanced, and Opacity, whose fill spans its 0 to 100%. */
+/** The fields pressed: three of Position's numbers, and Opacity, whose fill spans its 0 to 100%. */
 export const FIELDS = {
   x: { card: 'layout-card', name: 'X position' },
   y: { card: 'layout-card', name: 'Y position' },

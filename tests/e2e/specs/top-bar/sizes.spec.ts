@@ -46,19 +46,9 @@ const openers = (page: Page) =>
       .map((el) => el.dataset.testid ?? '')
       .filter(
         (id) =>
-          [
-            'bar-overflow',
-            'bar-size',
-            'bar-bold',
-            'bar-italic',
-            'bar-underline',
-            'bar-strikethrough',
-            'bar-crop',
-            'bar-replace',
-            'bar-size-field',
-            'bar-locked',
-            'bar-unlock',
-          ].indexOf(id) < 0,
+          ['bar-overflow', 'bar-size', 'bar-crop', 'bar-replace', 'bar-size-field', 'bar-locked', 'bar-unlock'].indexOf(
+            id,
+          ) < 0,
       )
   })
 

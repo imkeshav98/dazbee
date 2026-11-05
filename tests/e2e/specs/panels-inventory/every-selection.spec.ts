@@ -1,11 +1,12 @@
 // The panels inventory's rows 3 to 11 (support/inventory.ts): what every selection has. X, Y, W
 // and H, rotation, opacity, blend mode, mixed values, the effects, and the arrange actions.
+import { control, type ControlId } from '../../support/bar-homes.ts'
 import { reloads } from '../../support/editor.ts'
 import { choose, enter } from '../../support/fields.ts'
 import { doc, fills, props, setupInventory, solid, step, style } from '../../support/inventory.ts'
 import { perform, selectLayers } from '../../support/stage.ts'
 import { expect, type Page, test } from '../../support/test.ts'
-import { arrangeMenu, barMenu, fillList, moreAction, openCard } from '../../support/top-bar.ts'
+import { barMenu, fillList, moreAction, openCard } from '../../support/top-bar.ts'
 
 const row = setupInventory()
 
@@ -42,7 +43,7 @@ test.describe('every selection', () => {
     await selectLayers(page, ['box'], { bar: true })
     await step(
       page,
-      async () => enter((await arrangeMenu(page)).getByRole('spinbutton', { name: 'Rotation in degrees' }), '15'),
+      async () => enter(control(await barMenu(page, 'position'), 'rotation'), '15'),
       async () => {
         await expect.poll(async () => (await props(page, 'box')).rotation).toBe(15)
       },
@@ -263,9 +264,9 @@ test.describe('every selection', () => {
     const page = await open()
     await selectLayers(page, ['box'], { bar: true })
     // Several layers group by their key and go in a box from the full menu.
-    // One layer's actions are in the full menu, and its order in the top bar's Arrange ⋯.
+    // One layer's actions are in the full menu, and its order in the top bar's Position.
     const more = (name: string) => moreAction(page, name)
-    const sit = async (name: string) => moreAction(page, name, await arrangeMenu(page))
+    const sit = async (move: ControlId) => control(await barMenu(page, 'position'), move).click()
     await step(
       page,
       async () => more('Duplicate'),
@@ -279,7 +280,7 @@ test.describe('every selection', () => {
     const at = async () => (await children(page, 'sq')).indexOf('box')
     await step(
       page,
-      async () => sit('Bring to front'),
+      async () => sit('bringToFront'),
       async () => {
         await expect.poll(at).toBe(8)
       },
@@ -287,7 +288,7 @@ test.describe('every selection', () => {
     )
     await step(
       page,
-      async () => sit('Send backward'),
+      async () => sit('sendBackward'),
       async () => {
         await expect.poll(at).toBe(7)
       },
@@ -295,7 +296,7 @@ test.describe('every selection', () => {
     )
     await step(
       page,
-      async () => sit('Send to back'),
+      async () => sit('sendToBack'),
       async () => {
         await expect.poll(at).toBe(0)
       },
@@ -303,7 +304,7 @@ test.describe('every selection', () => {
     )
     await step(
       page,
-      async () => sit('Bring forward'),
+      async () => sit('bringForward'),
       async () => {
         await expect.poll(at).toBe(1)
       },

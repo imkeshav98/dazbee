@@ -2,6 +2,7 @@
 // line height, letter and paragraph spacing, alignment, case, underline and strikethrough, lists,
 // outline, box mode, shrink to fit and lines at most.
 import { righteous } from '../../support/assets.ts'
+import { control } from '../../support/bar-homes.ts'
 import { designOf, reloads } from '../../support/editor.ts'
 import { choose, enter } from '../../support/fields.ts'
 import { importGoogleFonts } from '../../support/fonts.ts'
@@ -304,8 +305,7 @@ test.describe('text', () => {
     const page = await open()
     await selectLayers(page, ['headline'], { bar: true })
     const pick = async (align: string) =>
-      (await barMenu(page, 'align'))
-        .getByRole('radiogroup', { name: 'Alignment', exact: true })
+      control(await barMenu(page, 'align'), 'align')
         .locator(`[data-value="${align}"]`)
         .click()
     // Each line is a paragraph's last, which justify leaves at the start: those two draw alike.
@@ -325,10 +325,9 @@ test.describe('text', () => {
   row(20, 'vertical alignment: top, middle, bottom', async (open) => {
     const page = await open()
     await selectLayers(page, ['headline'], { bar: true })
-    // Up and down in the box is in the bar's Align, under the alignment.
+    // Vertical is in the bar's Align, its last row.
     const pick = async (to: string) =>
-      (await barMenu(page, 'align'))
-        .getByRole('radiogroup', { name: 'Up and down in the box' })
+      control(await barMenu(page, 'align'), 'vertical')
         .locator(`[data-value="${to}"]`)
         .click()
     for (const align of ['bottom', 'middle', 'top']) {

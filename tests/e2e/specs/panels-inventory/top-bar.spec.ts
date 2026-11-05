@@ -1,28 +1,29 @@
 // The panels inventory's rows 69 to 76 (support/inventory.ts): the controls reached from the top
 // bar, its pop-ups and the full menu.
+import { control } from '../../support/bar-homes.ts'
 import { reloads } from '../../support/editor.ts'
 import { assets, doc, fills, props, setupInventory, step, style } from '../../support/inventory.ts'
 import { copyIn } from '../../support/seed.ts'
 import { selectLayers } from '../../support/stage.ts'
 import { expect, test } from '../../support/test.ts'
-import { arrangeSubmenu, barMenu, moreAction, openCard } from '../../support/top-bar.ts'
+import { barMenu, moreAction, openCard, textStyleToggle } from '../../support/top-bar.ts'
 
 const row = setupInventory()
 
 test.describe('top bar and full menu', () => {
-  row(69, 'bold and italic on the top bar', async (open) => {
+  row(69, "bold and italic in the top bar's Text style", async (open) => {
     const page = await open()
     await selectLayers(page, ['headline'], { bar: true })
     await step(
       page,
-      async () => page.getByTestId('bar-bold').click(),
+      async () => (await textStyleToggle(page, 'bold')).click(),
       async () => {
         await expect.poll(async () => (await style(page, 'headline')).fontWeight).toBeLessThan(600)
       },
     )
     await step(
       page,
-      async () => page.getByTestId('bar-italic').click(),
+      async () => (await textStyleToggle(page, 'italic')).click(),
       async () => {
         await expect.poll(async () => (await style(page, 'headline')).fontStyle).toBe('italic')
       },
@@ -30,12 +31,15 @@ test.describe('top bar and full menu', () => {
     await reloads(page)
   })
 
-  row(70, "text direction in the top bar's ⋯", async (open) => {
+  row(70, "text direction in the top bar's Align", async (open) => {
     const page = await open()
     await selectLayers(page, ['headline'], { bar: true })
     await step(
       page,
-      async () => (await arrangeSubmenu(page, 'text-direction')).getByRole('button', { name: 'Right to left' }).click(),
+      async () =>
+        control(await barMenu(page, 'align'), 'direction')
+          .getByRole('radio', { name: 'Right to left' })
+          .click(),
       async () => {
         await expect.poll(async () => (await props(page, 'headline')).direction).toBe('rtl')
       },
@@ -133,7 +137,7 @@ test.describe('top bar and full menu', () => {
       assets.photo,
     )
     await selectLayers(page, ['photo', 'box'], { bar: true })
-    const card = async () => await openCard(page, 'photos-card')
+    const card = async () => await openCard(page, 'look-card')
     const filters = async () => [(await fills(page, 'photo')).at(-1)?.filter, (await fills(page, 'box')).at(-1)?.filter]
     await step(
       page,
@@ -146,8 +150,8 @@ test.describe('top bar and full menu', () => {
     await step(
       page,
       async () => {
-        await (await card()).getByTestId('replace-image').click()
-        await page.locator(`li[data-asset="${assets.tile}"] button`).first().click()
+        await page.getByTestId('bar-replace').click()
+        await page.getByTestId('bar-replace-picker').locator(`li[data-asset="${assets.tile}"] button`).click()
       },
       async () => {
         await expect

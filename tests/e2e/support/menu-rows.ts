@@ -1,7 +1,7 @@
 // The rows the editor's layer menus show, in order, as the specs check them: the full menu (the
-// small menu's ⋯ and a right-click on a layer) with the menus beside its rows, and the top bar's
-// Arrange ⋯ with the moves beside its Order; and readers of the rows a menu shows. A picked frame's
-// ⋯ keeps its own list in frames-on-canvas.ts.
+// small menu's ⋯ and a right-click on a layer) with the menus beside its rows; and readers of the
+// rows a menu shows. A picked frame's ⋯ keeps its own list in frames-on-canvas.ts, and the top
+// bar's controls are in bar-homes.ts.
 import type { Locator, Page } from './test.ts'
 
 /**
@@ -51,28 +51,9 @@ export const FULL_MENU_BESIDE: Record<'copy' | 'paste' | 'copy-to-frames', reado
     { id: 'layerToLinked', name: 'Layer', reads: 'Layer' },
   ],
 }
-/**
- * Arrange ⋯'s rows in order, by their test ids (`rotation` for the rotation field, which has none)
- * and the words of each row: Order ▸; Line up ▸ for one layer (`one`); the rotation field unless a
- * group or a boolean is selected (`turns`); Text direction ▸ for text (`text`).
- */
-export const ARRANGE: readonly { id: string; name: string; only?: 'one' | 'turns' | 'text' }[] = [
-  { id: 'more-order', name: 'Order' },
-  { id: 'more-line-up', name: 'Line up', only: 'one' },
-  { id: 'rotation', name: 'Rotation', only: 'turns' },
-  { id: 'more-text-direction', name: 'Text direction', only: 'text' },
-]
-/** The moves in the menu beside Arrange's Order, in order. */
-export const ORDER_MENU: readonly Row[] = [
-  { id: 'bringToFront', name: 'Bring to front', reads: 'Bring to frontCtrl+Shift+]' },
-  { id: 'bringForward', name: 'Bring forward', reads: 'Bring forwardCtrl+]' },
-  { id: 'sendBackward', name: 'Send backward', reads: 'Send backwardCtrl+[' },
-  { id: 'sendToBack', name: 'Send to back', reads: 'Send to backCtrl+Shift+[' },
-]
-
 /** The words of a row of any of the lists above, by its id. */
 export function rowName(id: string) {
-  const rows = [...FULL_MENU, RELEASE_MASK, ...Object.values(FULL_MENU_BESIDE).flat(), ...ARRANGE, ...ORDER_MENU]
+  const rows = [...FULL_MENU, RELEASE_MASK, ...Object.values(FULL_MENU_BESIDE).flat()]
   const row = rows.find((one) => one.id === id)
   if (!row) throw new Error(`no menu row ${id}`)
   return row.name
@@ -83,20 +64,6 @@ export const fullMenuRows = ({ group = false } = {}) =>
 /** The rows of the menu beside the full menu's row `more-<id>`, by their words: Text only for text layers. */
 export const besideRows = (id: keyof typeof FULL_MENU_BESIDE, { text = false } = {}) =>
   FULL_MENU_BESIDE[id].filter((row) => text || !row.text).map((row) => row.name)
-/**
- * Arrange ⋯'s rows for a selection, by their test ids: Line up only for one layer, the rotation
- * field unless a group or a boolean is selected, Text direction only for text.
- */
-export const arrangeRows = ({ several = false, group = false, text = false } = {}) =>
-  ARRANGE.filter(
-    ({ only }) => (only !== 'one' || !several) && (only !== 'turns' || !group) && (only !== 'text' || text),
-  ).map((row) => row.id)
-/** The rows open Arrange ⋯ shows, in order, by the test ids `ARRANGE` names them by. */
-export const arrangeRowsOf = (menu: Locator) =>
-  menu
-    .locator('[data-testid^="more-"], [data-scrub]')
-    .evaluateAll((rows) => rows.map((row) => row.getAttribute('data-testid') ?? 'rotation'))
-
 /** A row of a menu by its id in the lists above: the first button whose name starts with its words. */
 export const rowIn = (menu: Locator, id: string) =>
   menu.getByRole('button', { name: new RegExp(`^${rowName(id)}`) }).first()

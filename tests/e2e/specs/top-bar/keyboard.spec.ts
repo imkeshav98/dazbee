@@ -12,7 +12,7 @@ import { layoutProblems } from '../../support/layout.ts'
 import { frameDesign } from '../../support/seed.ts'
 import { nextFrame, openStage, read, selection, selectLayers } from '../../support/stage.ts'
 import { expect, type Page, test } from '../../support/test.ts'
-import { arrangeSubmenu, barMenu, PIECES, UNCUT } from '../../support/top-bar.ts'
+import { barMenu, moreSubmenu, PIECES, UNCUT } from '../../support/top-bar.ts'
 import { topBarDesign } from '../../support/top-bar-design.ts'
 
 test.describe.configure({ timeout: 240_000 })
@@ -89,9 +89,9 @@ test("Esc closes the bar's second row and keeps the selection; the arrows and En
   await expect(more).toBeVisible()
   const row = page.getByTestId('top-bar-row')
   await row.locator('[data-bar-item]').first().focus()
-  // Arrange ends the first row, after More controls.
+  // Position ends the first row, after More controls.
   await page.keyboard.press('End')
-  await expect(page.getByTestId('bar-arrange')).toBeFocused()
+  await expect(page.getByTestId('bar-position')).toBeFocused()
   await page.keyboard.press('ArrowLeft')
   await expect(more).toBeFocused()
   await page.keyboard.press('ArrowRight')
@@ -494,43 +494,25 @@ test.describe('the focus as a menu of the bar closes', () => {
     expect(errors).toEqual([])
   })
 
-  test("Esc twice at once in the menu beside Order: the first closes it, the second the top bar's ⋯, and the layer stays selected", async ({
+  test("Esc twice at once in the menu beside the full menu's Copy: the first closes it, the second the full menu, and the layer stays selected", async ({
     browser,
   }) => {
     const { page, errors } = await openStage(browser, oneLayer())
     await selectLayers(page, ['a'])
-    const order = await arrangeSubmenu(page, 'order')
-    expect(await order.evaluate((menu) => menu.contains(document.activeElement))).toBe(true)
+    const copy = await moreSubmenu(page, 'copy')
+    await copy.getByRole('button').first().focus()
 
-    await keyThen(page, { key: 'Escape', closed: 'more-order-menu', next: 'esc', then: '!bar-arrange-menu' })
+    await keyThen(page, { key: 'Escape', closed: 'more-copy-menu', next: 'esc', then: '!bar-more-menu' })
     await timers(page)
 
     expect(await selection(page)).toEqual(['a'])
-    await expect(page.getByTestId('bar-arrange-menu')).toBeHidden()
-    await expect(page.getByTestId('bar-arrange')).toBeVisible()
-    await expect(page.getByTestId('bar-arrange')).toBeFocused()
+    await expect(page.getByTestId('bar-more-menu')).toBeHidden()
+    await expect(page.getByTestId('bar-more')).toBeVisible()
     expect(errors).toEqual([])
   })
 
-  test("the arrow back out of the menu beside Order, then Esc at once: the top bar's ⋯ closes and the layer stays selected", async ({
-    browser,
-  }) => {
-    const { page, errors } = await openStage(browser, oneLayer())
-    await selectLayers(page, ['a'])
-    const order = await arrangeSubmenu(page, 'order')
-    expect(await order.evaluate((menu) => menu.contains(document.activeElement))).toBe(true)
-
-    await keyThen(page, { key: 'ArrowLeft', closed: 'more-order-menu', next: 'esc', then: '!bar-arrange-menu' })
-    await timers(page)
-
-    expect(await selection(page)).toEqual(['a'])
-    await expect(page.getByTestId('bar-arrange')).toBeVisible()
-    await expect(page.getByTestId('bar-arrange')).toBeFocused()
-    expect(errors).toEqual([])
-  })
-
-  for (const where of ['arrange', 'position'] as const)
-    test(`Esc in ${where === 'arrange' ? "Arrange's" : "the Position panel's"} rotation field while typing throws away what was typed and keeps the focus there, the ${where === 'arrange' ? 'menu' : 'panel'} open; the next Esc closes it, and the layer keeps its rotation`, async ({
+  for (const where of ['position'] as const)
+    test(`Esc in the Position panel's rotation field while typing throws away what was typed and keeps the focus there, the panel open; the next Esc closes it, and the layer keeps its rotation`, async ({
       browser,
     }) => {
       const { page, errors } = await openStage(browser, oneLayer())

@@ -253,7 +253,7 @@ test('the Position panel’s actions are unfilled with no outline, lit by the ho
   for (const theme of THEMES) {
     const { page, errors, glass } = await openDesignIn(browser, designId, theme)
     await selectLayers(page, ['headline'], { bar: true })
-    const action = (await barMenu(page, 'position')).getByTestId('arrange-part').getByRole('button').first()
+    const action = (await barMenu(page, 'position')).getByTestId('order-part').getByRole('button').first()
     expect(await look(action)).toMatchObject({ fill: 'rgba(0, 0, 0, 0)', border: '0px' })
     await action.hover()
     await expect.poll(async () => (await look(action)).fill).toBe(glass.hover)

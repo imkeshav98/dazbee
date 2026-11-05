@@ -3,20 +3,13 @@
 // it was, and scrub a number as one undo step.
 import type { DesignInput } from '@dazbee/schema'
 
+import { control } from '../../support/bar-homes.ts'
 import { writeOutput } from '../../support/editor.ts'
 import { choose, enter } from '../../support/fields.ts'
 import { copyIn, frameDesign, linkedFrames } from '../../support/seed.ts'
 import { openStage, selectLayers } from '../../support/stage.ts'
 import { expect, type Page, test } from '../../support/test.ts'
-import {
-  arrangeMenu,
-  barMenu,
-  closeBarMenu,
-  fillList,
-  openCard,
-  strokeList,
-  textColourHex,
-} from '../../support/top-bar.ts'
+import { barMenu, closeBarMenu, fillList, openCard, strokeList, textColourHex } from '../../support/top-bar.ts'
 
 test.describe.configure({ timeout: 120_000 })
 
@@ -107,8 +100,7 @@ test('one layer: position, size, turn, opacity, blend, fill, stroke and effects'
   await expect.poll(async () => (await props(page, 'box')).width).toBe(301)
   await (await layout()).getByRole('spinbutton', { name: 'Width' }).press('Shift+ArrowUp')
   await expect.poll(async () => (await props(page, 'box')).width).toBe(311)
-  await enter((await arrangeMenu(page)).getByRole('spinbutton', { name: 'Rotation in degrees' }), '15')
-  await page.keyboard.press('Escape')
+  await enter(control(await layout(), 'rotation'), '15')
   await expect.poll(async () => (await props(page, 'box')).rotation).toBe(15)
 
   const look = async () => await openCard(page, 'appearance-card')
@@ -213,10 +205,7 @@ test('several layers: mixed values, set together or each from its own; text and 
   await enter((await text()).getByRole('spinbutton', { name: 'Line height' }), '1.1')
   await enter(await textColourHex(page), '1f9d55')
   await closeBarMenu(page, 'bar-colour')
-  await (
-    await barMenu(page, 'align')
-  )
-    .getByRole('radiogroup', { name: 'Alignment', exact: true })
+  await control(await barMenu(page, 'align'), 'align')
     .locator('[data-value="center"]')
     .click()
   await (await barMenu(page, 'case')).getByRole('radiogroup', { name: 'Case' }).locator('[data-value="upper"]').click()

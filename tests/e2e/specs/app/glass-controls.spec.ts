@@ -9,7 +9,7 @@ import { hovered, laid, look, openDesignIn, openIn, pressed, THEMES } from '../.
 import { API_URL, DEV_BRAND, liveDesign, seed } from '../../support/seed.ts'
 import { selectLayers } from '../../support/stage.ts'
 import { expect, type Locator, type Page, test } from '../../support/test.ts'
-import { barMenu, closeBarMenu, fillList, moreMenu, pagesPanel } from '../../support/top-bar.ts'
+import { barMenu, closeBarMenu, fillList, moreMenu, pagesPanel, textStyleToggle } from '../../support/top-bar.ts'
 
 test.describe.configure({ timeout: 180_000 })
 
@@ -91,10 +91,16 @@ test('a toggle that is on reads in the text colour on its pink tint; an open top
   for (const theme of THEMES) {
     const { page, errors, glass } = await openDesignIn(browser, designId, theme)
     await selectLayers(page, ['headline'], { bar: true })
-    const bold = page.getByTestId('bar-bold')
+    const bold = await textStyleToggle(page, 'bold')
     await expect(bold).toHaveAttribute('aria-pressed', 'true')
     await page.mouse.move(2, 2)
     await expect.poll(async () => look(bold)).toMatchObject({ fill: glass.accentSoft, colour: glass.text })
+    // The Text style button behind it, with a style on, takes the same pink tint.
+    await page.keyboard.press('Escape')
+    await page.mouse.move(2, 2)
+    await expect
+      .poll(async () => look(page.getByTestId('bar-text-style')))
+      .toMatchObject({ fill: glass.accentSoft, colour: glass.text })
     // Open, then pressed again: the press ends in a click that closes it.
     for (const [id, open] of [
       ['bar-align', () => barMenu(page, 'align')],
