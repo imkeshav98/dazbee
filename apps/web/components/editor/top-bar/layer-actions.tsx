@@ -14,7 +14,7 @@ import * as Popover from '@radix-ui/react-popover'
 import { type ReactNode, useEffect, useState } from 'react'
 
 import { childrenOf, descendants } from '@dazbee/doc'
-import { type Editor, type Frame, type LinkedMenu, type Point, type ShortcutAction, visibleIn } from '@dazbee/editor'
+import { type Editor, type Frame, type Point, type ShortcutAction, visibleIn } from '@dazbee/editor'
 import type { Design } from '@dazbee/schema'
 
 import { ALIGN, keyOf } from '@/components/editor/arrange-actions.ts'
@@ -44,20 +44,11 @@ export interface HiddenLayers {
   frameId: string
 }
 
-/** Why an item has nothing to do, by the reasons the linked-copy items give. */
+/** Why an item has nothing to do: the reason the linked-copy items give, by its message. */
 type Why = keyof Messages['editor']['bar']['linked']['why']
 
 /** The four moves along the stack: to the front, forward, backward, to the back. */
 export const ORDER = ['bringToFront', 'bringForward', 'sendBackward', 'sendToBack'] as const
-
-/** Why each linked-copy state has nothing to do; `ready` has none. */
-const WHY: Record<string, Why> = {
-  several: 'several',
-  nothingCopied: 'nothingCopied',
-  noFrames: 'noFrames',
-  noCopies: 'noCopies',
-  everyFrame: 'everyFrame',
-}
 
 /**
  * The layers hidden in the frame at a client point, or outside every frame in the one nearest it;
@@ -91,31 +82,6 @@ function masksOver(design: Design, ids: readonly string[]): string[] | null {
     masks.add(mask[0])
   }
   return [...masks]
-}
-
-/**
- * Why each of the full menu's style and linked-copy items has nothing to do, or null for one that
- * has something to do; Paste needs layers copied.
- */
-function reasons(menu: LinkedMenu, canPaste: boolean) {
-  const own = (state: string, same: Why): Why | null =>
-    state === 'ready' || state === 'hidden'
-      ? null
-      : state === 'same'
-        ? same
-        : state === 'locked'
-          ? 'copiesLocked'
-          : (WHY[state] ?? null)
-  return {
-    paste: canPaste ? null : ('nothingToPaste' as const),
-    copyStyle: own(menu.copyStyle, 'hasStyle'),
-    pasteStyle: menu.pasteStyle === 'locked' ? ('styleLocked' as const) : own(menu.pasteStyle, 'hasStyle'),
-    frames: menu.frames === 0 ? ('noFrames' as const) : null,
-    style: own(menu.style, 'copiesHaveStyle'),
-    text: own(menu.text, 'copiesHaveText'),
-    layer: own(menu.layer, 'everyFrame'),
-    delete: menu.delete === 'locked' ? ('deleteLocked' as const) : null,
-  }
 }
 
 /** The frame nearest a client point, by the distance from the point to its edges on screen. */
@@ -172,15 +138,16 @@ export function LayerActions({ editor, ids, onDone }: { editor: Editor; ids: str
   const linked = editor.linkedMenu()
   if (!linked) return null
   const l = b.linked
-  const why = reasons(linked, editor.canPasteLayers())
+  /** What an item says while it has nothing to do, or null while it has something to do. */
+  const whyOf = (state: Why | 'ready' | 'hidden') => (state === 'ready' || state === 'hidden' ? null : l.why[state])
   /** A row that runs a style or linked-copy action, greyed with the reason while it has nothing to do. */
-  const linkedRow = (action: ShortcutAction, label: string, reason: Why | null, danger = false) => (
+  const linkedRow = (action: ShortcutAction, label: string, why: string | null, danger = false) => (
     <Row
       key={action}
       action={action}
       label={label}
       keys={keyOf(action)}
-      why={reason && l.why[reason]}
+      why={why}
       danger={danger}
       onRun={() => run(action)}
     />
@@ -198,33 +165,33 @@ export function LayerActions({ editor, ids, onDone }: { editor: Editor; ids: str
             onDone()
           }}
         />
-        {linkedRow('copyStyle', l.copyStyle, why.copyStyle)}
+        {linkedRow('copyStyle', l.copyStyle, whyOf(linked.copyStyle))}
       </SubMenu>
       <SubMenu label={b.paste} testId="paste">
         <Row
           action="paste"
           label={b.paste}
           keys={pasteKey}
-          why={why.paste && l.why[why.paste]}
+          why={editor.canPasteLayers() ? null : l.why.nothingToPaste}
           onRun={() => {
             editor.pasteLayers()
             onDone()
           }}
         />
-        {linkedRow('pasteStyle', l.pasteStyle, why.pasteStyle)}
+        {linkedRow('pasteStyle', l.pasteStyle, whyOf(linked.pasteStyle))}
       </SubMenu>
       {row('duplicate', t.editor.arrange.duplicate)}
-      {why.frames ? (
-        <Row action="copyToFrames" label={l.copyToFrames} keys="" why={l.why[why.frames]} caret />
+      {linked.frames === 0 ? (
+        <Row action="copyToFrames" label={l.copyToFrames} keys="" why={l.why.noFrames} caret />
       ) : (
         <SubMenu
           label={l.copyToFrames}
           testId="copy-to-frames"
-          heading={linked.frames === 1 ? l.toFrame : format(l.toFrames, { n: linked.frames })}
+          heading={linked.reach === 1 ? l.toFrame : format(l.toFrames, { n: linked.reach })}
         >
-          {linkedRow('styleToLinked', l.style, why.style)}
-          {linked.text !== 'hidden' && linkedRow('textToLinked', l.text, why.text)}
-          {linkedRow('layerToLinked', l.layer, why.layer)}
+          {linkedRow('styleToLinked', l.style, whyOf(linked.style))}
+          {linked.text !== 'hidden' && linkedRow('textToLinked', l.text, whyOf(linked.text))}
+          {linkedRow('layerToLinked', l.layer, whyOf(linked.layer))}
         </SubMenu>
       )}
       <div className={MENU_DIVIDER} />
@@ -286,7 +253,7 @@ export function LayerActions({ editor, ids, onDone }: { editor: Editor; ids: str
       <div className={MENU_DIVIDER} />
       {linkedRow('lockLinked', linked.lock === 'lock' ? l.lockAll : l.unlockAll, null)}
       {linkedRow('hideLinked', linked.hide === 'hide' ? l.hideAll : l.showAll, null)}
-      {linkedRow('deleteLinked', l.deleteAll, why.delete, true)}
+      {linkedRow('deleteLinked', l.deleteAll, whyOf(linked.delete), true)}
     </>
   )
 }

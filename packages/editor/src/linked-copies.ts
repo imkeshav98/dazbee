@@ -8,6 +8,7 @@ import {
   frameIdOf,
   type Layer,
   type LayerStyle,
+  type LayerType,
   LOCK_FLAGS,
   restyle,
   styleOf,
@@ -24,41 +25,64 @@ import type { ShortcutAction } from './shortcuts.ts'
 import type { EditorTyping } from './text/typing.ts'
 
 /** The actions this module does. */
-export type LinkedAction = Extract<
-  ShortcutAction,
-  | 'copyStyle'
-  | 'pasteStyle'
-  | 'styleToLinked'
-  | 'textToLinked'
-  | 'layerToLinked'
-  | 'lockLinked'
-  | 'hideLinked'
-  | 'deleteLinked'
->
+export const LINKED_ACTIONS = [
+  'copyStyle',
+  'pasteStyle',
+  'styleToLinked',
+  'textToLinked',
+  'layerToLinked',
+  'lockLinked',
+  'hideLinked',
+  'deleteLinked',
+] as const satisfies readonly ShortcutAction[]
+export type LinkedAction = (typeof LINKED_ACTIONS)[number]
 
 /**
  * What each item of the full menu would do for a selection: `ready` when it has something to do,
- * else why not, or `hidden` for an item that never applies to it.
+ * else the reason it has nothing to do, or `hidden` for an item that never applies to it.
  */
 export interface LinkedMenu {
   /** How many frames of the page are linked to the selection's frame. */
   frames: number
+  /**
+   * How many frames Copy to other frames reaches: the linked frames holding a copy of a selected
+   * layer, which Style and Text write into, or every linked frame when none holds one, as Layer
+   * copies into.
+   */
+  reach: number
   /** Copy style takes one layer's style. */
   copyStyle: 'ready' | 'several'
-  /** Paste style: nothing copied yet, every layer has the style, or the ones that lack it are style-locked. */
-  pasteStyle: 'ready' | 'nothingCopied' | 'same' | 'locked'
+  /**
+   * Paste style: nothing copied yet, every layer has the style, the ones that lack it are
+   * style-locked, or the style is a text's or a shape's and no selected layer is that kind.
+   */
+  pasteStyle:
+    | 'ready'
+    | 'nothingCopied'
+    | 'hasStyle'
+    | 'styleLocked'
+    | 'textStyleOnShape'
+    | 'textStyleOnBox'
+    | 'textStyleOnGroup'
+    | 'textStyleOnLayers'
+    | 'shapeStyleOnText'
+    | 'shapeStyleOnGroup'
+    | 'shapeStyleOnLayers'
   /** Copy to other frames ▸ Style: no linked copies, every copy has it, or the ones that lack it are locked. */
-  style: 'ready' | 'noCopies' | 'same' | 'locked'
+  style: 'ready' | 'noCopies' | 'copiesHaveStyle' | 'copiesLocked'
   /** Copy to other frames ▸ Text, for text layers only. */
-  text: 'ready' | 'hidden' | 'noCopies' | 'same' | 'locked'
+  text: 'ready' | 'hidden' | 'noCopies' | 'copiesHaveText' | 'copiesLocked'
   /** Copy to other frames ▸ Layer: no frame is linked, or every linked frame has a copy. */
   layer: 'ready' | 'noFrames' | 'everyFrame'
   /** Lock in all frames, or Unlock once the layers and every copy are locked. */
   lock: 'lock' | 'unlock'
   /** Hide in all frames, or Show once the layers and every copy are hidden. */
   hide: 'hide' | 'show'
-  /** Delete from all frames: every one of them is locked against deleting. */
-  delete: 'ready' | 'locked'
+  /**
+   * Delete from all frames, which the small menu's Delete greys by too: a selected layer, or one
+   * inside it, is locked against deleting, here only or in every frame.
+   */
+  delete: 'ready' | 'selectionLocked' | 'deleteLocked'
 }
 
 export interface LinkedCopiesDeps {
@@ -79,35 +103,10 @@ export interface EditorLinkedCopies {
   menu(): LinkedMenu | null
 }
 
-export const LINKED_ACTIONS: readonly LinkedAction[] = [
-  'copyStyle',
-  'pasteStyle',
-  'styleToLinked',
-  'textToLinked',
-  'layerToLinked',
-  'lockLinked',
-  'hideLinked',
-  'deleteLinked',
-]
-
-/** What each linked-copy item would do for these layers, with `copied` the style Copy style last took. */
-export function linkedMenu(design: Design, ids: readonly string[], copied: LayerStyle | null): LinkedMenu {
-  const live = ids.filter((id) => design.nodes[id])
-  const frameId = live[0] === undefined ? undefined : frameIdOf(design, live[0])
-  const frames = frameId === undefined ? 0 : linkedFrames(design, frameId).length
-  const targets = everyCopy(design, live)
-  const paste = copied ? readiness(styleWork(design, live, () => copied)) : 'nothingCopied'
-  return {
-    frames,
-    copyStyle: live.length === 1 ? 'ready' : 'several',
-    pasteStyle: paste === 'noCopies' ? 'same' : paste,
-    style: readiness(styleWork(design, copiesFor(design, live), styleFrom(design))),
-    text: live.every((id) => design.nodes[id]?.type === 'text') ? textReadiness(design, live) : 'hidden',
-    layer: frames === 0 ? 'noFrames' : live.some((id) => framesWithout(design, id).length > 0) ? 'ready' : 'everyFrame',
-    lock: targets.every((id) => LOCK_FLAGS.every((flag) => design.nodes[id]?.lock?.[flag])) ? 'unlock' : 'lock',
-    hide: targets.every((id) => design.nodes[id]?.props.visible === false) ? 'show' : 'hide',
-    delete: deletable(design, targets).length > 0 ? 'ready' : 'locked',
-  }
+/** Why a copied text's or shape's style has nothing to do on a layer of a type that doesn't take it. */
+const OFF_FOR: Record<'text' | 'shape', Partial<Record<LayerType, LinkedMenu['pasteStyle']>>> = {
+  text: { graphic: 'textStyleOnShape', boolean: 'textStyleOnShape', box: 'textStyleOnBox', group: 'textStyleOnGroup' },
+  shape: { text: 'shapeStyleOnText', group: 'shapeStyleOnGroup' },
 }
 
 export function editorLinkedCopies({
@@ -276,19 +275,30 @@ export function editorLinkedCopies({
   return { perform, menu }
 }
 
+/** What each linked-copy item would do for these layers, with `copied` the style Copy style last took. */
+export function linkedMenu(design: Design, ids: readonly string[], copied: LayerStyle | null): LinkedMenu {
+  const live = ids.filter((id) => design.nodes[id])
+  const frameId = live[0] === undefined ? undefined : frameIdOf(design, live[0])
+  const frames = frameId === undefined ? 0 : linkedFrames(design, frameId).length
+  const holding = new Set(live.flatMap((id) => copiesOf(design, id).map((copy) => frameIdOf(design, copy))))
+  const targets = everyCopy(design, live)
+  return {
+    frames,
+    reach: holding.size > 0 ? holding.size : frames,
+    copyStyle: live.length === 1 ? 'ready' : 'several',
+    pasteStyle: copied ? pasteReadiness(design, live, copied) : 'nothingCopied',
+    style: copiesReadiness(styleWork(design, copiesFor(design, live), styleFrom(design))),
+    text: live.every((id) => design.nodes[id]?.type === 'text') ? textReadiness(design, live) : 'hidden',
+    layer: frames === 0 ? 'noFrames' : live.some((id) => framesWithout(design, id).length > 0) ? 'ready' : 'everyFrame',
+    lock: targets.every((id) => LOCK_FLAGS.every((flag) => design.nodes[id]?.lock?.[flag])) ? 'unlock' : 'lock',
+    hide: targets.every((id) => design.nodes[id]?.props.visible === false) ? 'show' : 'hide',
+    delete: deleteReadiness(design, live, targets),
+  }
+}
+
 /** The layers and each one's linked copies on its page. */
 function everyCopy(design: Design, ids: readonly string[]) {
   return [...new Set(ids.flatMap((id) => [id, ...copiesOf(design, id)]))]
-}
-
-/** The linked copies of each layer, as the layer and its copies. */
-function copiesFor(design: Design, ids: readonly string[]): [string, string[]][] {
-  return ids.map((id) => [id, copiesOf(design, id)])
-}
-
-/** The style each source gives its copies: its own. */
-function styleFrom(design: Design) {
-  return (id: string) => styleOf(design.nodes[id] as Layer)
 }
 
 /**
@@ -316,34 +326,6 @@ function styleWork(
   return [free, locked]
 }
 
-/** Ready when some layer has work that isn't locked; `noCopies` when there was nothing to look at. */
-function readiness(work: [string[], string[]] | null) {
-  if (!work) return 'noCopies' as const
-  const [free, locked] = work
-  if (free.length > 0) return 'ready' as const
-  return locked.length > 0 ? ('locked' as const) : ('same' as const)
-}
-
-/** Copy to other frames ▸ Text for text layers: ready, or why not. */
-function textReadiness(design: Design, ids: readonly string[]): LinkedMenu['text'] {
-  let copies = 0
-  let locked = 0
-  for (const id of ids) {
-    const source = design.nodes[id]
-    if (source?.type !== 'text') continue
-    for (const copy of copiesOf(design, id)) {
-      const node = design.nodes[copy]
-      if (!node) continue
-      copies++
-      if (!textFor(source, node)) continue
-      if (!textLocked(node)) return 'ready'
-      locked++
-    }
-  }
-  if (copies === 0) return 'noCopies'
-  return locked > 0 ? 'locked' : 'same'
-}
-
 /** A text copy's characters and runs are its own to change only while its content and style are unlocked. */
 function textLocked(node: Layer) {
   return Boolean(node.lock?.content || node.lock?.style)
@@ -365,12 +347,86 @@ function textFor(source: Layer, copy: Layer): { text: string; runs: TextRun[] } 
   return same ? null : { text: source.props.text, runs }
 }
 
+/** The layers Delete may take: none of them, nor anything inside them, is locked against deleting. */
+function deletable(design: Design, ids: readonly string[]) {
+  return ids.filter((id) => [id, ...descendants(design, id)].every((inner) => !design.nodes[inner]?.lock?.delete))
+}
+
+/**
+ * Paste style for these layers: ready when some layer has work that isn't locked, else why not;
+ * a style none of them takes, such as a text's on a shape, says so.
+ */
+function pasteReadiness(design: Design, ids: readonly string[], style: LayerStyle): LinkedMenu['pasteStyle'] {
+  const [free, locked] = styleWork(design, ids, () => style) ?? [[], []]
+  if (free.length > 0) return 'ready'
+  if (locked.length > 0) return 'styleLocked'
+  return ids.some((id) => takes(design.nodes[id], style)) ? 'hasStyle' : styleOff(design, ids, style)
+}
+
+/** The linked copies of each layer, as the layer and its copies. */
+function copiesFor(design: Design, ids: readonly string[]): [string, string[]][] {
+  return ids.map((id) => [id, copiesOf(design, id)])
+}
+
+/** The style each source gives its copies: its own. */
+function styleFrom(design: Design) {
+  return (id: string) => styleOf(design.nodes[id] as Layer)
+}
+
+/** Copy to other frames ▸ Style: ready when some copy has work that isn't locked, else why not. */
+function copiesReadiness(work: [string[], string[]] | null): LinkedMenu['style'] {
+  if (!work) return 'noCopies'
+  const [free, locked] = work
+  if (free.length > 0) return 'ready'
+  return locked.length > 0 ? 'copiesLocked' : 'copiesHaveStyle'
+}
+
+/** Copy to other frames ▸ Text for text layers: ready, or why not. */
+function textReadiness(design: Design, ids: readonly string[]): LinkedMenu['text'] {
+  let copies = 0
+  let locked = 0
+  for (const id of ids) {
+    const source = design.nodes[id]
+    if (source?.type !== 'text') continue
+    for (const copy of copiesOf(design, id)) {
+      const node = design.nodes[copy]
+      if (!node) continue
+      copies++
+      if (!textFor(source, node)) continue
+      if (!textLocked(node)) return 'ready'
+      locked++
+    }
+  }
+  if (copies === 0) return 'noCopies'
+  return locked > 0 ? 'copiesLocked' : 'copiesHaveText'
+}
+
+/**
+ * Delete from all frames for these layers and `targets`, them with their copies: ready while no
+ * selected layer is locked against deleting; else locked in every frame when they have copies and
+ * every copy is locked too, or locked here.
+ */
+function deleteReadiness(design: Design, ids: readonly string[], targets: readonly string[]): LinkedMenu['delete'] {
+  if (deletable(design, ids).length === ids.length) return 'ready'
+  return targets.length > ids.length && deletable(design, targets).length === 0 ? 'deleteLocked' : 'selectionLocked'
+}
+
 /** Runs as text that two equal lists of runs share, whatever order their style keys are in. */
 function runsKey(runs: readonly TextRun[]) {
   return JSON.stringify(runs.map((run) => [run.start, run.end, Object.entries(run.style).sort()]))
 }
 
-/** The layers Delete may take: none of them, nor anything inside them, is locked against deleting. */
-function deletable(design: Design, ids: readonly string[]) {
-  return ids.filter((id) => [id, ...descendants(design, id)].every((inner) => !design.nodes[inner]?.lock?.delete))
+/** Whether a layer takes what a style is for: a text's look on a text, fills where it has fills. */
+function takes(layer: Layer | undefined, style: LayerStyle) {
+  if (!layer) return false
+  if (style.text) return layer.type === 'text'
+  return style.fills === undefined || 'fills' in layer.props
+}
+
+/** Why a text's or a shape's style has nothing to do on layers none of which takes it, by their kind. */
+function styleOff(design: Design, ids: readonly string[], style: LayerStyle): LinkedMenu['pasteStyle'] {
+  const kind = style.text ? 'text' : 'shape'
+  const why = new Set(ids.map((id) => OFF_FOR[kind][design.nodes[id]?.type ?? 'group']))
+  const [only] = why
+  return why.size === 1 && only ? only : kind === 'text' ? 'textStyleOnLayers' : 'shapeStyleOnLayers'
 }

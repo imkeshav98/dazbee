@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import type { DesignInput } from '@dazbee/schema'
+import { copiesOf } from '@dazbee/doc'
+import { type DesignInput, type Layer, styleOf } from '@dazbee/schema'
 
 import { pageFrames } from './canvas/frames.ts'
 import { sessionOf } from './layers/test-boxes.ts'
@@ -107,38 +108,6 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
-describe('linkedMenu', () => {
-  it('says what each item would do for the selection, and why one has nothing to do', () => {
-    const { session } = harness()
-    const design = session.design()
-    expect(linkedMenu(design, ['bg'], null)).toEqual({
-      frames: 1,
-      copyStyle: 'ready',
-      pasteStyle: 'nothingCopied',
-      style: 'same',
-      text: 'hidden',
-      layer: 'everyFrame',
-      lock: 'lock',
-      hide: 'hide',
-      delete: 'ready',
-    })
-    expect(linkedMenu(design, ['title'], null)).toMatchObject({ style: 'same', text: 'ready', layer: 'everyFrame' })
-    expect(linkedMenu(design, ['badge'], null)).toMatchObject({ style: 'noCopies', layer: 'ready' })
-    expect(linkedMenu(design, ['other-bg'], null)).toMatchObject({ frames: 0, style: 'noCopies', layer: 'noFrames' })
-    expect(linkedMenu(design, ['bg', 'badge'], null)).toMatchObject({ copyStyle: 'several', layer: 'ready' })
-  })
-
-  it('greys Style when the copies that lack it are locked, and Paste style when the layers have it', () => {
-    const { session } = harness()
-    session.run('node.update', { ids: ['bg'], patch: { fills: [{ type: 'solid', color: BLUE }] } })
-    expect(linkedMenu(session.design(), ['bg'], null).style).toBe('ready')
-    session.run('node.lock', { ids: ['wide-bg'], lock: { style: true } })
-    expect(linkedMenu(session.design(), ['bg'], null).style).toBe('locked')
-    const bg = session.design().nodes.bg
-    expect(bg && linkedMenu(session.design(), ['badge'], null).pasteStyle).toBe('nothingCopied')
-  })
-})
-
 describe('editorLinkedCopies', () => {
   it('copies one layer’s style and pastes it on others, as one undo step', () => {
     const { linked, session, select, fill, node } = harness()
@@ -146,7 +115,7 @@ describe('editorLinkedCopies', () => {
     expect(linked.perform('copyStyle')).toBe(false)
     select('badge')
     expect(linked.perform('copyStyle')).toBe(true)
-    expect(linked.menu()?.pasteStyle).toBe('same')
+    expect(linked.menu()?.pasteStyle).toBe('hasStyle')
     select('bg', 'title')
     expect(linked.menu()?.pasteStyle).toBe('ready')
     expect(linked.perform('pasteStyle')).toBe(true)
@@ -164,7 +133,7 @@ describe('editorLinkedCopies', () => {
     select('bg')
     expect(linked.perform('styleToLinked')).toBe(true)
     expect(fill('wide-bg')).toBe(BLUE)
-    expect(linked.menu()?.style).toBe('same')
+    expect(linked.menu()?.style).toBe('copiesHaveStyle')
     expect(linked.perform('styleToLinked')).toBe(false)
     session.undo()
     expect(fill('wide-bg')).toBe(RED)
@@ -180,7 +149,7 @@ describe('editorLinkedCopies', () => {
       style: { fontSize: 40 },
     })
     expect(log).toContain('fit wide-title')
-    expect(linked.menu()?.text).toBe('same')
+    expect(linked.menu()?.text).toBe('copiesHaveText')
     session.undo()
     expect(node('wide-title')?.props).toMatchObject({ text: 'Sale', runs: [] })
   })
@@ -241,7 +210,97 @@ describe('editorLinkedCopies', () => {
     expect([node('bg'), node('wide-bg')?.link]).toEqual([undefined, 'bg'])
     session.run('node.lock', { ids: ['badge'], lock: { delete: true } })
     select('badge')
-    expect(linked.menu()?.delete).toBe('locked')
+    expect(linked.menu()?.delete).toBe('selectionLocked')
     expect(linked.perform('deleteLinked')).toBe(false)
+  })
+
+  it('deletes no copy while the selected layer itself is locked against deleting', () => {
+    const { linked, session, select, node } = harness()
+    session.run('node.lock', { ids: ['bg'], lock: { delete: true } })
+    select('bg')
+    expect(linked.perform('deleteLinked')).toBe(false)
+    expect([node('bg')?.link, node('wide-bg')?.link]).toEqual(['bg', 'bg'])
+  })
+})
+
+describe('linkedMenu', () => {
+  it('says what each item would do for the selection, and why one has nothing to do', () => {
+    const { session } = harness()
+    const design = session.design()
+    expect(linkedMenu(design, ['bg'], null)).toEqual({
+      frames: 1,
+      reach: 1,
+      copyStyle: 'ready',
+      pasteStyle: 'nothingCopied',
+      style: 'copiesHaveStyle',
+      text: 'hidden',
+      layer: 'everyFrame',
+      lock: 'lock',
+      hide: 'hide',
+      delete: 'ready',
+    })
+    expect(linkedMenu(design, ['title'], null)).toMatchObject({
+      style: 'copiesHaveStyle',
+      text: 'ready',
+      layer: 'everyFrame',
+    })
+    expect(linkedMenu(design, ['badge'], null)).toMatchObject({ style: 'noCopies', layer: 'ready' })
+    expect(linkedMenu(design, ['other-bg'], null)).toMatchObject({
+      frames: 0,
+      reach: 0,
+      style: 'noCopies',
+      layer: 'noFrames',
+    })
+    expect(linkedMenu(design, ['bg', 'badge'], null)).toMatchObject({ copyStyle: 'several', layer: 'ready' })
+  })
+
+  it('reaches the linked frames that hold a copy, or every linked frame when none does', () => {
+    const { session } = harness()
+    session.run('frame.duplicate', { frameId: 'sq' })
+    const design = session.design()
+    expect(linkedMenu(design, ['badge'], null)).toMatchObject({ frames: 2, reach: 1 })
+    expect(linkedMenu(design, ['bg'], null)).toMatchObject({ frames: 2, reach: 2 })
+    session.run('node.delete', { ids: copiesOf(session.design(), 'badge') })
+    expect(linkedMenu(session.design(), ['badge'], null)).toMatchObject({ frames: 2, reach: 2 })
+  })
+
+  it('greys Style when the copies that lack it are locked, and Paste style when the layers have it', () => {
+    const { session } = harness()
+    session.run('node.update', { ids: ['bg'], patch: { fills: [{ type: 'solid', color: BLUE }] } })
+    expect(linkedMenu(session.design(), ['bg'], null).style).toBe('ready')
+    session.run('node.lock', { ids: ['wide-bg'], lock: { style: true } })
+    expect(linkedMenu(session.design(), ['bg'], null).style).toBe('copiesLocked')
+    const design = session.design()
+    expect(linkedMenu(design, ['badge'], null).pasteStyle).toBe('nothingCopied')
+    expect(linkedMenu(design, ['badge'], styleOf(design.nodes.badge as Layer)).pasteStyle).toBe('hasStyle')
+    session.run('node.lock', { ids: ['bg'], lock: { style: true } })
+    expect(linkedMenu(session.design(), ['bg'], styleOf(design.nodes['wide-bg'] as Layer)).pasteStyle).toBe(
+      'styleLocked',
+    )
+  })
+
+  it('says a copied style doesn’t apply to a layer of another kind, unless one of them has it already', () => {
+    const { session } = harness()
+    const design = session.design()
+    const textStyle = styleOf(design.nodes.title as Layer)
+    const shapeStyle = styleOf(design.nodes.badge as Layer)
+    expect(linkedMenu(design, ['badge'], textStyle).pasteStyle).toBe('textStyleOnShape')
+    expect(linkedMenu(design, ['title'], shapeStyle).pasteStyle).toBe('shapeStyleOnText')
+    expect(linkedMenu(design, ['badge', 'title'], textStyle).pasteStyle).toBe('hasStyle')
+    session.run('node.group', { ids: ['badge'] })
+    const group = session.design().nodes.badge?.parentId ?? ''
+    session.run('node.update', { ids: [group], patch: { blendMode: 'normal' } })
+    expect(linkedMenu(session.design(), [group], textStyle).pasteStyle).toBe('textStyleOnGroup')
+    expect(linkedMenu(session.design(), [group, 'bg'], textStyle).pasteStyle).toBe('textStyleOnLayers')
+  })
+
+  it('greys Delete from all frames when the selection is locked against deleting, and says where', () => {
+    const { session } = harness()
+    session.run('node.lock', { ids: ['bg'], lock: { delete: true } })
+    expect(linkedMenu(session.design(), ['bg'], null).delete).toBe('selectionLocked')
+    session.run('node.lock', { ids: ['wide-bg'], lock: { delete: true } })
+    expect(linkedMenu(session.design(), ['bg'], null).delete).toBe('deleteLocked')
+    session.run('node.lock', { ids: ['bg'], lock: { delete: false } })
+    expect(linkedMenu(session.design(), ['bg'], null).delete).toBe('ready')
   })
 })
