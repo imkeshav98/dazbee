@@ -9,7 +9,7 @@ import { memberships, users, workspaces } from '@dazbee/db'
 import { ApiError, SignedIn, SignedOut, SignInLink, WorkspaceSummary } from '@dazbee/schema'
 
 import { createApp } from '../app.ts'
-import { db, storage, syncSecret } from '../test-api.ts'
+import { db, SHORT_ID, storage, syncSecret } from '../test-api.ts'
 import { bearerToken, readSessionToken, SESSION_TTL_MS, signSessionToken, tokenSession } from './session.ts'
 import {
   accessTokenSessionId,
@@ -93,6 +93,8 @@ describe('signing in (#58)', () => {
     const first = await signIn(`code-ada-${run}`)
     const [user] = await db.select().from(users).where(eq(users.workosUserId, ada.user.id))
     expect(user).toMatchObject({ email: ada.user.email, name: 'Ada Lovelace' })
+    expect(user?.id).toMatch(SHORT_ID)
+    expect(first.workspaceId).toMatch(SHORT_ID)
     const [workspace] = await db.select().from(workspaces).where(eq(workspaces.id, first.workspaceId))
     const organization = workos.made.organizations.find((o) => o.workspaceId === first.workspaceId)
     expect(organization).toMatchObject({ name: 'Ada Lovelace' })

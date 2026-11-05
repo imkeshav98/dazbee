@@ -2,11 +2,9 @@
 // for every brand of the workspace, a brand template for its brand only. Starting from one makes a
 // new design of the brand with fresh ids; where the brand isn't the one the template was saved
 // from, the images it names become assets of the brand too, so nothing crosses the brand wall.
-import { randomUUID } from 'node:crypto'
-
 import { and, desc, eq, isNull, or } from 'drizzle-orm'
 
-import { assets, type Db, templates } from '@dazbee/db'
+import { assets, type Db, newId, templates } from '@dazbee/db'
 import { withFreshIds } from '@dazbee/doc'
 import {
   coverFrame,
@@ -115,7 +113,7 @@ export async function saveTemplate(
   }
   const cover = coverFrame(design)?.[1]
   if (!cover) throw new InvalidContent('the design has no frame')
-  const id = randomUUID()
+  const id = newId()
   const rendered = await renderCover(db, storage, workspaceId, brandId, design)
   const thumbnail = await makeThumbnail(rendered.png, 'image/png')
   await storage.put(templateThumbnailKey(workspaceId, id), thumbnail.bytes, thumbnail.contentType)
@@ -184,7 +182,7 @@ async function assetsFor(
       mapped.set(id, own.id)
       continue
     }
-    const copy = randomUUID()
+    const copy = newId()
     await db
       .insert(assets)
       .values({
