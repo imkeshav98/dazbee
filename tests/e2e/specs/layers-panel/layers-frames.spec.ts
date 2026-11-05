@@ -46,7 +46,8 @@ test('the page’s frames are the top rows; a click on one picks and opens it; a
   await expect(page.getByTestId('flyout-note')).toHaveText('Summer sale')
   await expect(tree(page)).toHaveAttribute('aria-label', 'Frames and layers of Summer sale')
   expect(await listed(page)).toEqual(['Sale square 1080×1080', 'Sale story 1080×1920', 'Fresh square 1080×1080'])
-  await expect(frameRow(page, 'Fresh square').getByTestId('frame-swatch')).toHaveCSS(
+  // A frame's swatch is its background's colour, laid over a checkerboard.
+  await expect(frameRow(page, 'Fresh square').getByTestId('frame-swatch').locator('span')).toHaveCSS(
     'background-color',
     'rgb(33, 138, 92)',
   )
