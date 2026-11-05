@@ -14,6 +14,7 @@ import type { Design } from '@dazbee/schema'
 
 import { type Target, useTarget } from '@/components/editor/edit-panel/target.ts'
 import {
+  closesWithSelection,
   editState,
   isLayerPanel,
   isPanel,
@@ -83,15 +84,15 @@ export function TopBar({ editor, brandId }: { editor: Editor; brandId: string })
   const picked = usePickedFrame(editor)
   const selected = useTarget(editor, ids)
   // A pop-up or panel belongs to the selection or the picked frame it was opened for: another one
-  // closes it. Pages stays open when showing another page lets the selection go, and Add a frame
-  // stays open with the Frame tool until a layer is selected.
+  // closes it, and selecting layers closes any. Pages and Add a frame stay open as the selection goes
+  // or another frame is picked (`closesWithSelection`).
   const opened = useRef({ ids, picked })
   useLayoutEffect(() => {
     const was = opened.current
     if (was.ids === ids && was.picked === picked) return
     opened.current = { ids, picked }
     const now = editState().open
-    if (ids.length > 0 || !isPanel(now) || isLayerPanel(now) || now === 'background' || now === 'addSize') setOpen(null)
+    if (ids.length > 0 || closesWithSelection(now)) setOpen(null)
   }, [ids, picked])
   useEffect(
     () => () => {
