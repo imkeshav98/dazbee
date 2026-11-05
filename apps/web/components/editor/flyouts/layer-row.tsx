@@ -28,19 +28,11 @@ import { DROP_LINE, LAYER_PICTURE, LAYER_PICTURE_PICKED } from '@/components/edi
 import { LIT_ROW } from '@/components/ui/looks.ts'
 import { RenameField } from '@/components/ui/rename-field.tsx'
 import { cn } from '@/lib/cn.ts'
+import type { Row } from '@/lib/editor/layer-tree.ts'
 import { useMessages } from '@/lib/i18n/client.tsx'
 import { format } from '@/lib/i18n/index.ts'
 
 type Layer = Design['nodes'][string]
-export interface Row {
-  id: string
-  node: Layer
-  depth: number
-  parentId: string
-  hasChildren: boolean
-  position: number
-  siblings: number
-}
 export type Where = 'above' | 'below' | 'into'
 
 export interface RowApi {

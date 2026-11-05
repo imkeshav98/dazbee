@@ -18,36 +18,21 @@ import {
 
 import { ancestorsOf, childrenOf } from '@dazbee/doc'
 import type { Editor } from '@dazbee/editor'
-import { canHold, type Design } from '@dazbee/schema'
+import { canHold } from '@dazbee/schema'
 
 import { useSelectionWithFrame, useShownFrames } from '@/components/editor/editor-hooks.ts'
 import { useFlyoutNote } from '@/components/editor/shell.tsx'
 import { useLiveDesign } from '@/components/editor/use-live-design.ts'
 import { useOverlayScroll } from '@/components/ui/overlay-scroll.ts'
+import { type Row, rowsOf } from '@/lib/editor/layer-tree.ts'
 import { useLocale, useMessages } from '@/lib/i18n/client.tsx'
 import { dirOf, format } from '@/lib/i18n/index.ts'
 
-import { LAYER_ROW, LayerRow, type Row, type RowApi, type Where } from './layer-row.tsx'
+import { LAYER_ROW, LayerRow, type RowApi, type Where } from './layer-row.tsx'
 import { useLayerPictures } from './use-layer-pictures.ts'
 
 /** Rows rendered beyond each edge of the view, so a fast scroll never shows a gap. */
 const OVERSCAN = 8
-
-/** The frame's layers as rows, topmost first, with the children of expanded layers under them; none without a frame. */
-function rowsOf(design: Design, frameId: string | undefined, expanded: ReadonlySet<string>) {
-  const rows: Row[] = []
-  if (frameId === undefined) return rows
-  const walk = (parentId: string, depth: number) => {
-    const children = childrenOf(design, parentId).reverse()
-    for (const [position, [id, node]] of children.entries()) {
-      const hasChildren = childrenOf(design, id).length > 0
-      rows.push({ id, node, depth, parentId, hasChildren, position: position + 1, siblings: children.length })
-      if (hasChildren && expanded.has(id)) walk(id, depth + 1)
-    }
-  }
-  walk(frameId, 0)
-  return rows
-}
 
 export function LayersPanel({ editor }: { editor: Editor }) {
   const t = useMessages()
