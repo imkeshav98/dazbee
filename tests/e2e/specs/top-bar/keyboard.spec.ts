@@ -2,8 +2,9 @@
 // clearing the selection, Esc closing the second row, the size field's arrows, and Esc closing a
 // panel first wherever the focus is, after what stands over it: a dialog, the Share menu or its
 // card, the account menu, the zoom menu or the shape menu, a pop-up opened over one of those menus
-// first; a field outside the panel throwing away what was typed and leaving the panel open; and the
-// focus as a menu of the bar closes with the next input coming at once.
+// first; a field outside the panel, or a number field being typed in, throwing away what was typed
+// and leaving the panel open; and the focus as a menu of the bar closes with the next input coming
+// at once.
 import type { DesignInput } from '@dazbee/schema'
 
 import { photo, upload } from '../../support/assets.ts'
@@ -535,23 +536,32 @@ test.describe('the focus as a menu of the bar closes', () => {
     expect(errors).toEqual([])
   })
 
-  test("Esc in the top bar ⋯'s rotation field throws away what was typed: the menu closes and the layer keeps its rotation", async ({
-    browser,
-  }) => {
-    const { page, errors } = await openStage(browser, oneLayer())
-    await selectLayers(page, ['a'])
-    const more = await arrangeMenu(page)
-    const rotation = more.getByRole('spinbutton', { name: 'Rotation in degrees' })
-    await rotation.fill('45')
-    await expect(rotation).toBeFocused()
+  for (const where of ['arrange', 'position'] as const)
+    test(`Esc in ${where === 'arrange' ? "Arrange's" : "the Position panel's"} rotation field while typing throws away what was typed and keeps the focus there, the ${where === 'arrange' ? 'menu' : 'panel'} open; the next Esc closes it, and the layer keeps its rotation`, async ({
+      browser,
+    }) => {
+      const { page, errors } = await openStage(browser, oneLayer())
+      await selectLayers(page, ['a'])
+      const holder = await barMenu(page, where)
+      const rotation = holder.getByRole('spinbutton', { name: 'Rotation in degrees' })
+      await rotation.fill('45')
+      await expect(rotation).toBeFocused()
 
-    await page.keyboard.press('Escape')
-    await expect(more).toBeHidden()
-    await timers(page)
+      // The field being typed in is the top-most thing: the first Esc is its own.
+      await page.keyboard.press('Escape')
+      await expect(rotation).toHaveValue('0')
+      await expect(rotation).toBeFocused()
+      await timers(page)
+      await expect(holder).toBeVisible()
+      expect((await read(page)).nodes.a?.props.rotation).toBe(0)
 
-    expect((await read(page)).nodes.a?.props.rotation).toBe(0)
-    expect(await selection(page)).toEqual(['a'])
-    await expect(page.getByTestId('bar-arrange')).toBeFocused()
-    expect(errors).toEqual([])
-  })
+      // With nothing typed, Esc closes what the field is in, and the focus goes back to its item.
+      await page.keyboard.press('Escape')
+      await expect(holder).toBeHidden()
+      await timers(page)
+      expect((await read(page)).nodes.a?.props.rotation).toBe(0)
+      expect(await selection(page)).toEqual(['a'])
+      await expect(page.getByTestId(`bar-${where}`)).toBeFocused()
+      expect(errors).toEqual([])
+    })
 })

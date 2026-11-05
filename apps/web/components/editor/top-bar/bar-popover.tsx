@@ -18,6 +18,7 @@ import {
   useState,
 } from 'react'
 
+import { typingIn } from '@/components/editor/edit-panel/fields.tsx'
 import { isSheet, useEditState, usePhone } from '@/components/editor/edit-store.ts'
 import { BAR_BUTTON, POPOVER } from '@/components/editor/styles.ts'
 import { useOverlayScroll } from '@/components/ui/overlay-scroll.ts'
@@ -238,6 +239,9 @@ export function BarPopover({
           sideOffset={asSheet ? 0 : below}
           collisionPadding={asSheet ? SHEET_EDGE : 12}
           {...focus.content}
+          // A number field being typed in takes Esc first, throwing away what was typed; the next
+          // Esc closes the popover.
+          onEscapeKeyDown={(event) => typingIn(document.activeElement) && event.preventDefault()}
           aria-label={label}
           data-testid={`bar-${testId}-menu`}
           data-sheet={asSheet || undefined}
