@@ -48,16 +48,18 @@ export function LayersPanel({ editor }: { editor: Editor }) {
   useFlyoutNote(page?.name ?? null)
 
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(() => new Set())
-  // A selection on the stage, or a picked frame, shows in the panel: its frame and the groups it is
-  // in open, each time what they are changes, so a row closed by hand stays closed until then.
-  const opening = opensFor(design, selection, picked).join(' ')
+  // A selection on the stage, or a picked frame, shows in the panel: each time either changes, its
+  // frame and the groups it is in open, even those closed by hand since; until then they stay as
+  // they were left.
+  const selectionKey = selection.join(' ')
   useEffect(() => {
-    if (!opening) return
+    const opening = opensFor(design, selection, picked)
+    if (opening.length === 0) return
     setExpanded((now) => {
-      const add = opening.split(' ').filter((id) => !now.has(id))
+      const add = opening.filter((id) => !now.has(id))
       return add.length > 0 ? new Set([...now, ...add]) : now
     })
-  }, [opening])
+  }, [selectionKey, picked])
   // A page of one frame opens it: there is no other to choose.
   const onlyFrame = frames.length === 1 ? frames[0]?.[0] : undefined
   useEffect(() => {

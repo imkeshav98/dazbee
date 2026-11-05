@@ -98,6 +98,40 @@ test('the page’s frames are the top rows; a click on one picks and opens it; a
   expect(errors).toEqual([])
 })
 
+test('a selection on the canvas opens its frame each time it changes, even a frame closed by hand while its layer stays selected', async ({
+  browser,
+}) => {
+  const {
+    tabs: [page],
+    errors,
+  } = await openDesign(browser)
+  if (!page) throw new Error('no tab')
+  const story = frameRow(page, 'Sale story')
+  const collapse = () => story.getByRole('button', { name: 'Collapse Sale story' }).click()
+  const clickIn = async (x: number, y: number) => {
+    const at = await screenPoint(page, x, y, 'story')
+    await page.mouse.click(at.x, at.y)
+    await drawn(page)
+  }
+  // Picked from its row, then closed by its caret: a click on its Headline on the canvas opens it.
+  await story.click()
+  await expect(story).toHaveAttribute('aria-expanded', 'true')
+  await collapse()
+  await expect(layerRow(page, copyIn('story', 'head'))).toHaveCount(0)
+  await clickIn(300, 130)
+  expect(await selection(page)).toEqual([copyIn('story', 'head')])
+  await expect(layerRow(page, copyIn('story', 'head'))).toHaveAttribute('aria-selected', 'true')
+  await expect(layerRow(page, copyIn('story', 'head'))).toBeInViewport()
+  // Closed again while Headline stays selected: a click on its Button opens it again, and shows the row.
+  await collapse()
+  await expect(layerRow(page, copyIn('story', 'button'))).toHaveCount(0)
+  await clickIn(230, 950)
+  expect(await selection(page)).toEqual([copyIn('story', 'button')])
+  await expect(layerRow(page, copyIn('story', 'button'))).toHaveAttribute('aria-selected', 'true')
+  await expect(layerRow(page, copyIn('story', 'button'))).toBeInViewport()
+  expect(errors).toEqual([])
+})
+
 test('a frame renamed from its row is one undo step, and a second tab sees it', async ({ browser }) => {
   const {
     tabs: [a, b],
