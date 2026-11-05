@@ -1,4 +1,4 @@
-// The overlay over the stage: the frame labels, the picked page, the outlines of the group gone
+// The overlay over the stage: the frame labels, the picked frame, the outlines of the group gone
 // into, the hovered layer and the drop target, the selection with its handles and size, what each
 // gesture shows, the rulers and the caret, drawn in that order.
 import { scaleText } from '@dazbee/renderer'
@@ -17,7 +17,7 @@ import type { EditorPlace } from '../place.ts'
 import type { EditorSelection } from '../selection.ts'
 import type { EditorTyping } from '../text/typing.ts'
 import { toScreen } from './camera.ts'
-import type { Frame } from './frames.ts'
+import { type Frame, labelBox } from './frames.ts'
 import { px, rulerParts } from './rulers.ts'
 import type { EditorView } from './view.ts'
 
@@ -27,7 +27,7 @@ export interface OverlayDeps {
   view: Pick<EditorView, 'camera' | 'viewport' | 'design' | 'inView' | 'frameOf' | 'rulers' | 'outline'>
   selection: Pick<
     EditorSelection,
-    'current' | 'entered' | 'hovered' | 'pickedPage' | 'cropping' | 'pathEditing' | 'dropGonePage' | 'tellListeners'
+    'current' | 'entered' | 'hovered' | 'pickedFrame' | 'cropping' | 'pathEditing' | 'tellListeners'
   >
   boxes: Pick<EditorBoxes, 'selectionBox' | 'drawnBoxOf' | 'handlesFor'>
   typing: Pick<EditorTyping, 'editing' | 'parts'>
@@ -49,12 +49,12 @@ export interface EditorOverlay {
    * selected.
    */
   selectionRect(): Rect | null
+  /** Where a frame of the shown page has its label on the stage, as last drawn; null for one off the stage at its start. */
+  labelRect(frameId: string): Rect | null
 }
 
 /** Screen pixels a frame's label needs to show the frame's size beside its name. */
 const SIZE_LABEL_WIDTH = 120
-/** How far a label stays from the stage's start edge when its frame runs past it. */
-const LABEL_INSET = 8
 /** Room the tool dock takes along the bottom of the stage, which the size label stays out of. */
 const SIZE_CLEARANCE = 72
 /** The room the selection's size label takes, in screen pixels. */
@@ -95,6 +95,11 @@ export function editorOverlay({
     }
   }
 
+  function labelRect(frameId: string) {
+    const frame = frameOf(frameId)
+    return frame ? labelBox(frame, view.camera()) : null
+  }
+
   function frameLabel(frame: Frame) {
     const label = document.createElement('div')
     label.className = 'frame-label'
@@ -102,16 +107,15 @@ export function editorOverlay({
     if (
       selection.current()?.frameId === frame.id ||
       typing.editing()?.frameId === frame.id ||
-      selection.pickedPage() === frame.pageId
+      selection.pickedFrame() === frame.id
     )
       label.dataset.active = ''
-    const at = toScreen(view.camera(), frame)
-    // A frame running off the stage's start keeps its label in view, along the part still showing.
-    const left = Math.max(at.x, LABEL_INSET)
-    const width = at.x + frame.width * view.camera().zoom - left
-    // A narrow frame keeps its name, cut short, and drops its size; only a frame off the stage has none.
-    if (width <= 0) return null
-    Object.assign(label.style, { left: px(left), top: px(at.y), width: px(width) })
+    // A frame running off the stage's start keeps its label in view, along the part still showing;
+    // a narrow frame keeps its name, cut short, and drops its size; only a frame off the stage has none.
+    const box = labelBox(frame, view.camera())
+    if (!box) return null
+    const { width } = box
+    Object.assign(label.style, { left: px(box.x), top: px(box.y), width: px(width) })
     const name = document.createElement('span')
     name.className = 'frame-name'
     name.textContent = frame.name
@@ -186,16 +190,22 @@ export function editorOverlay({
 
   function drawOverlay() {
     const gesture = pointer.gesture()
-    // A layer selected, or the page's frames no longer shown (the page deleted, another page shown), lets the page go.
-    const pageGone = selection.dropGonePage()
     const parts: Element[] = []
     for (const frame of view.inView()) {
       const label = frameLabel(frame)
       if (label) parts.push(label)
     }
-    for (const frame of view.inView()) {
-      if (frame.pageId === selection.pickedPage())
-        parts.push(outline('page-picked', frame, { x: 0, y: 0, width: frame.width, height: frame.height, rotation: 0 }))
+    const picked = view.inView().find((frame) => frame.id === selection.pickedFrame())
+    if (picked) {
+      const el = outline('frame-picked', picked, {
+        x: 0,
+        y: 0,
+        width: picked.width,
+        height: picked.height,
+        rotation: 0,
+      })
+      el.dataset.frame = picked.id
+      parts.push(el)
     }
     const entered = selection.entered()
     const enteredFrame = entered && frameOf(selection.current()?.frameId)
@@ -234,11 +244,12 @@ export function editorOverlay({
     }
     parts.push(...typing.parts())
     overlay.replaceChildren(...parts)
-    selection.tellListeners(pageGone)
+    selection.tellListeners()
   }
 
   return {
     draw: drawOverlay,
     selectionRect,
+    labelRect,
   }
 }

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import type { Design } from '@dazbee/schema'
 
-import { type Frame, frameAt, frameIn, pageFrames } from './frames.ts'
+import { type Frame, frameAt, frameIn, labelAt, labelBox, pageFrames } from './frames.ts'
 import { design } from './test-design.ts'
 
 /** The test design with page `two`'s frames gone. */
@@ -76,5 +76,37 @@ describe('frameAt', () => {
     const frames = [frame('under', 0, 0, 500, 500), frame('over', 400, 400, 500, 500)]
     expect(frameAt(frames, { x: 450, y: 450 })?.id).toBe('over')
     expect(frameAt(frames, { x: 100, y: 100 })?.id).toBe('under')
+  })
+})
+
+describe('labelBox', () => {
+  const frame = { id: 'f', pageId: 'p', name: 'F', x: 100, y: 200, width: 400, height: 300 }
+
+  it("is a row 20 px tall ending 4 px above the frame's top, as wide as the frame on screen", () => {
+    expect(labelBox(frame, { x: 10, y: 20, zoom: 0.5 })).toEqual({ x: 60, y: 96, width: 200, height: 20 })
+  })
+
+  it("keeps its start 8 px in from the stage's start edge, along the part of the frame still showing", () => {
+    expect(labelBox(frame, { x: -150, y: 0, zoom: 1 })).toEqual({ x: 8, y: 176, width: 342, height: 20 })
+  })
+
+  it('is null for a frame off the stage at its start', () => {
+    expect(labelBox(frame, { x: -500, y: 0, zoom: 1 })).toBeNull()
+  })
+})
+
+describe('labelAt', () => {
+  const a = { id: 'a', pageId: 'p', name: 'A', x: 0, y: 100, width: 300, height: 300 }
+  const b = { id: 'b', pageId: 'p', name: 'B', x: 200, y: 100, width: 300, height: 300 }
+  const camera = { x: 0, y: 0, zoom: 1 }
+
+  it('finds the frame whose label is under a point on the stage, the last by order where labels overlap', () => {
+    expect(labelAt([a, b], camera, { x: 50, y: 86 })?.id).toBe('a')
+    expect(labelAt([a, b], camera, { x: 250, y: 86 })?.id).toBe('b')
+  })
+
+  it('finds none off every label: in the gap over the frame, or inside it', () => {
+    expect(labelAt([a, b], camera, { x: 50, y: 98 })).toBeUndefined()
+    expect(labelAt([a, b], camera, { x: 50, y: 150 })).toBeUndefined()
   })
 })

@@ -8,7 +8,6 @@
   align-items: baseline;
   column-gap: 8px;
   height: 20px;
-  margin-top: -24px;
   overflow: hidden;
   font-size: 11px;
   line-height: 20px;
@@ -46,10 +45,10 @@
   outline: 1px solid var(--accent);
   opacity: 0.7;
 }
-/* The page picked by a click on its background: each of its frames outlined, dashed. */
-.stage-overlay .page-picked {
+/* The frame picked by a press on its label or its empty area: outlined whole. */
+.stage-overlay .frame-picked {
   position: absolute;
-  outline: 2px dashed var(--accent);
+  outline: 2px solid var(--accent);
 }
 .stage-overlay .hover {
   outline: 1.5px solid var(--accent);

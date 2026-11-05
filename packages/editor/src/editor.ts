@@ -140,6 +140,8 @@ function live(
   const notify = (notice: Notice, parts: readonly Skipped[] = []) => notices.emit(notice, parts)
   /** Called after every redraw with the design it drew; the two-tab test times edits with it. */
   const draws = listenerSet<[design: Design, at: number, info: DrawInfo]>()
+  /** Told of a frame to rename in place: its label was double-clicked, or the page asked. */
+  const frameRenames = listenerSet<[frameId: string]>()
 
   // Layer 2: the state owners.
   const saving = watchSaveState({ provider, onSaveState: (state) => status(state) })
@@ -269,6 +271,7 @@ function live(
     transformDrag,
     autoLayoutDrag,
     selectPress,
+    renameFrame: frameRenames.emit,
     signal,
     drawOverlay,
   })
@@ -392,7 +395,7 @@ function live(
   }
   /**
    * Shows a page, its frames fitted: a selection, crop, path edit, pen path or typing on another
-   * page lets go, and so does the picked page.
+   * page lets go, and so does the picked frame.
    */
   function showPage(pageId: string) {
     pen.finish()
@@ -400,8 +403,18 @@ function live(
     selection.dropOffPage()
     const editing = typing.editing()
     if (editing && !frameOf(editing.frameId)) typing.stop()
-    selection.pickPage(null)
+    selection.pickFrame(null)
     drawOverlay()
+  }
+  /**
+   * Picks a frame of the shown page, ending typing, and with `rename` asks the page to rename it in
+   * place; any other frame lets the picked one go.
+   */
+  function pickFrame(frameId: string | null, rename = false) {
+    const shown = frameOf(frameId ?? undefined)
+    if (shown) typing.stop()
+    selection.pickFrame(shown?.id ?? null)
+    if (shown && rename) frameRenames.emit(shown.id)
   }
   /** Fits a frame in view, showing its page first when another is shown. */
   function fitFrame(frameId: string) {
@@ -480,9 +493,12 @@ function live(
     styleTextSelection: (style: RunStyle) => typing.styleSelectedText(style),
     onTextSelection: textSelection.on,
     onSelection: (listener: (ids: string[]) => void) => selection.onSelection(listener),
-    pickedPage: () => selection.pickedPage(),
-    pickPage: (pageId: string | null) => selection.pickPage(pageId),
-    onPagePick: (listener: (pageId: string | null) => void) => selection.onPagePick(listener),
+    pickedFrame: () => selection.pickedFrame(),
+    pickFrame: (frameId: string | null) => pickFrame(frameId),
+    onFramePick: (listener: (frameId: string | null) => void) => selection.onFramePick(listener),
+    renameFrame: (frameId: string) => pickFrame(frameId, true),
+    onFrameRename: frameRenames.on,
+    labelRect: overlay.labelRect,
     rulers: () => view.rulers(),
     snapping: () => tools.snapping(),
     snapWork: () => transformDrag.snapWork(),

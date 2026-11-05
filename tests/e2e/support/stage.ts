@@ -168,10 +168,10 @@ export async function handle(page: Page, which: string) {
 export const zoomOf = (page: Page) => page.evaluate(() => window.dazbee?.camera().zoom ?? 1)
 
 /**
- * Picks the page by a click on its background at a design pixel of its first frame (`x`, `y`, on
- * no layer), and waits until the editor has it picked.
+ * Picks the shown page's first frame by a click on its empty area at a design pixel of it (`x`,
+ * `y`, on no layer), and waits until the editor has it picked.
  */
-export async function pickPage(page: Page, x = 4, y = 4) {
+export async function pickFrame(page: Page, x = 4, y = 4) {
   await click(page, x, y)
-  await expect.poll(() => page.evaluate(() => window.dazbee?.pickedPage() ?? null)).not.toBeNull()
+  await expect.poll(() => page.evaluate(() => window.dazbee?.pickedFrame() ?? null)).not.toBeNull()
 }

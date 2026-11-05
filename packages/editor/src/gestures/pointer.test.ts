@@ -40,8 +40,8 @@ const key = (code: string, log: string[], extra: Record<string, unknown> = {}) =
 
 /**
  * The pointer on a canvas that keeps its listeners, over a stage where client points are design
- * pixels of the square frame at zoom 1, off every frame past 1100 across, with a real selection;
- * every behaviour logs what it is asked.
+ * pixels of the square frame at zoom 1, its label 24 to 4 pixels over its top, off every frame
+ * past 1100 across or above it, with a real selection; every behaviour logs what it is asked.
  */
 function harness(tool: Tool = 'select', under: SceneLayer = UNDER) {
   const log: string[] = []
@@ -56,12 +56,18 @@ function harness(tool: Tool = 'select', under: SceneLayer = UNDER) {
   const selection = editorSelection({ drawn: () => design, frames: () => [SQUARE], changed: () => {} })
   const deps: PointerDeps = {
     canvas: canvas as unknown as HTMLCanvasElement,
-    session: { design: () => design },
+    session: {
+      design: () => design,
+      beginGesture: () => () => log.push('end frame move'),
+      run: ((name: string, input: { x: number; y: number }) =>
+        log.push(`${name} ${input.x} ${input.y}`)) as unknown as PointerDeps['session']['run'],
+    },
     view: {
       camera: () => camera,
       design: () => design,
       onStage: (client) => client,
-      pointAt: (client) => (client.x > 1100 ? null : { frame: SQUARE, p: client }),
+      frames: () => [SQUARE],
+      pointAt: (client) => (client.x > 1100 || client.y < 0 ? null : { frame: SQUARE, p: client }),
       setCamera: (next) => {
         camera = next
         log.push(`camera ${next.x} ${next.y}`)
@@ -129,10 +135,15 @@ function harness(tool: Tool = 'select', under: SceneLayer = UNDER) {
         pressed = { kind: 'move', frame: SQUARE, around: [] } as unknown as MoveDrag
         return pressed
       },
+      pressFrame: (_e, screen, frame) => {
+        log.push(`press frame ${frame.id} at ${screen.x} ${screen.y}`)
+        return { kind: 'frameMove', frame, pressedAt: screen, from: screen, end: null }
+      },
       moved: (screen) => screen.x > 20,
       release: (marquee) => log.push(`release press${marquee ? ' marquee' : ''}`),
       cancel: () => log.push('cancel press'),
     },
+    renameFrame: (frameId) => log.push(`rename ${frameId}`),
     signal: new AbortController().signal,
     drawOverlay: () => log.push('draw overlay'),
   }
@@ -201,6 +212,41 @@ describe('editorPointer', () => {
       send('pointerup')
       expect(pointer.gesture()).toBeNull()
       expect(log).toEqual(['camera 100 50', 'frame from 1200 20', 'frame to 1400 200', 'frame drawn', 'draw overlay'])
+    })
+  })
+
+  describe("a frame's label", () => {
+    it('picks and moves the frame from a press on it, the drag in world units, until the pointer goes up', () => {
+      const { pointer, send, log } = harness()
+      send('pointerdown', event(100, -10))
+      expect(pointer.gesture()).toMatchObject({ kind: 'frameMove', frame: SQUARE })
+      send('pointermove', event(150, -20, { shiftKey: true }))
+      send('pointerup')
+      expect(pointer.gesture()).toBeNull()
+      expect(log).toEqual([
+        'press frame one-sq at 100 -10',
+        'draw overlay',
+        'frame.update 50 0',
+        'end frame move',
+        'release press',
+        'draw overlay',
+      ])
+    })
+
+    it('asks to rename the frame on a double click, unless panning', () => {
+      const { send, log } = harness()
+      send('dblclick', event(100, -10))
+      expect(log).toEqual(['rename one-sq'])
+      const panning = harness('hand')
+      panning.send('dblclick', event(100, -10))
+      expect(panning.log).toEqual([])
+    })
+
+    it('is left to the drawing tools, which draw nothing off a frame', () => {
+      const { pointer, send, log } = harness('text')
+      send('pointerdown', event(100, -10))
+      expect(pointer.gesture()).toBeNull()
+      expect(log).toEqual([])
     })
   })
 

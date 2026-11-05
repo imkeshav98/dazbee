@@ -40,7 +40,7 @@ function harness() {
     changed: () => log.push('changed'),
   })
   selection.onSelection((ids) => log.push(`selection ${ids.join(',')}`))
-  selection.onPagePick((pageId) => log.push(`page ${pageId}`))
+  selection.onFramePick((frameId) => log.push(`frame ${frameId}`))
   /** Takes layers out of the design. */
   const remove = (...ids: string[]) => {
     const nodes = Object.fromEntries(Object.entries(world.design.nodes).filter(([id]) => !ids.includes(id)))
@@ -64,7 +64,7 @@ describe('editorSelection', () => {
     const { selection, log } = harness()
     expect(selection.current()).toBeNull()
     expect(selection.entered()).toBeNull()
-    expect(selection.pickedPage()).toBeNull()
+    expect(selection.pickedFrame()).toBeNull()
     expect(selection.cropping()).toBeNull()
     expect(selection.pathEditing()).toBeNull()
     expect(selection.hovered()).toBeNull()
@@ -132,13 +132,20 @@ describe('editorSelection', () => {
       expect(selection.cropping()).toBeNull()
     })
 
-    it('leaves the group gone into and the picked page as they are', () => {
+    it('leaves the group gone into as it is', () => {
       const { selection } = harness()
-      selection.pickPage('p1')
       selection.enter('group')
       selection.select(['child'], 'p1-f1')
       expect(selection.entered()).toBe('group')
-      expect(selection.pickedPage()).toBe('p1')
+    })
+
+    it('lets the picked frame go once a layer is selected, and keeps it with none', () => {
+      const { selection } = harness()
+      selection.pickFrame('p1-f1')
+      selection.select([], 'p1-f1')
+      expect(selection.pickedFrame()).toBe('p1-f1')
+      selection.select(['rect'], 'p1-f1')
+      expect(selection.pickedFrame()).toBeNull()
     })
   })
 
@@ -171,6 +178,16 @@ describe('editorSelection', () => {
   })
 
   describe('keep', () => {
+    it('lets the picked frame go once it is no longer shown: deleted, or on a page not shown', () => {
+      const { selection, world } = harness()
+      selection.pickFrame('p1-f2')
+      selection.keep()
+      expect(selection.pickedFrame()).toBe('p1-f2')
+      world.frames = [frame('p1', 'f1')]
+      selection.keep()
+      expect(selection.pickedFrame()).toBeNull()
+    })
+
     it('drops selected layers that are gone, and the selection once none are left', () => {
       const { selection, remove } = harness()
       selection.select(['rect', 'path'], 'p1-f1')
@@ -285,29 +302,19 @@ describe('editorSelection', () => {
     })
   })
 
-  describe('pickPage', () => {
-    it('picks a page that has a frame, shows it and tells the page listeners', () => {
+  describe('pickFrame', () => {
+    it('picks a frame and shows it, telling no listener until they are told', () => {
       const { selection, log } = harness()
-      selection.pickPage('p2')
-      expect(selection.pickedPage()).toBe('p2')
-      expect(log).toEqual(['changed', 'page p2'])
+      selection.pickFrame('p1-f2')
+      expect(selection.pickedFrame()).toBe('p1-f2')
+      expect(log).toEqual(['changed'])
     })
 
-    it('picks no page for one the design lacks, or one with no frame shown', () => {
-      const { selection, world, log } = harness()
-      selection.pickPage('nope')
-      expect(selection.pickedPage()).toBeNull()
-      world.frames = [frame('p1', 'f1')]
-      selection.pickPage('p2')
-      expect(selection.pickedPage()).toBeNull()
-      expect(log).toEqual([])
-    })
-
-    it('does nothing for the page already picked', () => {
+    it('does nothing for the frame already picked', () => {
       const { selection, log } = harness()
-      selection.pickPage('p1')
+      selection.pickFrame('p1-f1')
       log.length = 0
-      selection.pickPage('p1')
+      selection.pickFrame('p1-f1')
       expect(log).toEqual([])
     })
 
@@ -317,81 +324,59 @@ describe('editorSelection', () => {
       selection.select(['path'], 'p1-f1')
       selection.editPath({ id: 'path', frameId: 'p1-f1' })
       log.length = 0
-      selection.pickPage('p1')
+      selection.pickFrame('p1-f1')
       expect(selection.current()).toBeNull()
       expect(selection.entered()).toBeNull()
       expect(selection.pathEditing()).toBeNull()
-      expect(log).toEqual(['changed', 'changed', 'page p1'])
+      expect(selection.pickedFrame()).toBe('p1-f1')
     })
 
     it('with no selection, leaves the group gone into be', () => {
       const { selection } = harness()
       selection.enter('group')
-      selection.pickPage('p1')
+      selection.pickFrame('p1-f1')
       expect(selection.entered()).toBe('group')
     })
 
-    it('lets the page go with null, keeping the selection', () => {
+    it('lets the frame go with null, keeping the selection', () => {
       const { selection, log } = harness()
-      selection.pickPage('p1')
+      selection.pickFrame('p1-f1')
       selection.selectKeepingModes({ ids: ['rect'], frameId: 'p1-f1' })
+      selection.pickFrame('p1-f1')
       log.length = 0
-      selection.pickPage(null)
-      expect(selection.pickedPage()).toBeNull()
-      expect(selection.current()).toEqual({ ids: ['rect'], frameId: 'p1-f1' })
-      expect(log).toEqual(['changed', 'page null'])
+      selection.pickFrame(null)
+      expect(selection.pickedFrame()).toBeNull()
+      expect(selection.current()).toBeNull()
+      expect(log).toEqual(['changed'])
     })
   })
 
-  describe('dropGonePage', () => {
-    it('keeps the picked page while nothing is selected and its frames are there', () => {
-      const { selection } = harness()
-      expect(selection.dropGonePage()).toBe(false)
-      selection.pickPage('p1')
-      expect(selection.dropGonePage()).toBe(false)
-      expect(selection.pickedPage()).toBe('p1')
-    })
-
-    it('lets the page go once a layer is selected', () => {
-      const { selection, log } = harness()
-      selection.pickPage('p1')
-      selection.select(['rect'], 'p1-f1')
-      log.length = 0
-      expect(selection.dropGonePage()).toBe(true)
-      expect(selection.pickedPage()).toBeNull()
-      expect(log).toEqual([])
-    })
-
-    it('lets the page go once it is deleted, or its frames are no longer shown', () => {
+  describe('dropOffPage', () => {
+    it('lets the picked frame go when it is not on the shown page', () => {
       const { selection, world } = harness()
-      selection.pickPage('p2')
-      world.design = { ...world.design, pages: { p1: world.design.pages.p1 } } as Design
-      expect(selection.dropGonePage()).toBe(true)
-
-      world.design = fakeDesign()
-      selection.pickPage('p2')
+      selection.pickFrame('p2-f1')
       world.frames = [frame('p1', 'f1')]
-      expect(selection.dropGonePage()).toBe(true)
-      expect(selection.pickedPage()).toBeNull()
+      selection.dropOffPage()
+      expect(selection.pickedFrame()).toBeNull()
     })
   })
 
   describe('tellListeners', () => {
     it('tells the selection listeners only when the selection differs from the last they heard', () => {
       const { selection, log } = harness()
-      selection.tellListeners(false)
+      selection.tellListeners()
       expect(log).toEqual([])
       selection.selectKeepingModes({ ids: ['rect'], frameId: 'p1-f1' })
-      selection.tellListeners(false)
-      selection.tellListeners(false)
+      selection.tellListeners()
+      selection.tellListeners()
       selection.selectKeepingModes({ ids: ['rect'], frameId: 'p1-f1' })
-      selection.tellListeners(false)
+      selection.tellListeners()
       selection.selectKeepingModes({ ids: ['rect'], frameId: 'p1-f2' })
-      selection.tellListeners(false)
+      selection.tellListeners()
       selection.selectKeepingModes({ ids: ['rect', 'path'], frameId: 'p1-f2' })
-      selection.tellListeners(false)
+      selection.tellListeners()
       selection.selectKeepingModes(null)
-      selection.tellListeners(false)
+      selection.tellListeners()
       expect(log).toEqual(['selection rect', 'selection rect', 'selection rect,path', 'selection '])
     })
 
@@ -399,17 +384,22 @@ describe('editorSelection', () => {
       const { selection, log } = harness()
       selection.select(['rect'], 'p1-f1')
       selection.select([], 'p1-f1')
-      selection.tellListeners(false)
+      selection.tellListeners()
       expect(log).toEqual(['changed', 'changed'])
     })
 
-    it('tells the page listeners the page went, after the selection listeners', () => {
+    it('tells the frame listeners when the picked frame differs from the last they heard, after the selection listeners', () => {
       const { selection, log } = harness()
-      selection.pickPage('p1')
+      selection.pickFrame('p1-f1')
+      selection.tellListeners()
+      selection.tellListeners()
+      selection.pickFrame('p1-f2')
+      selection.pickFrame('p1-f1')
+      selection.tellListeners()
       selection.select(['rect'], 'p1-f1')
       log.length = 0
-      selection.tellListeners(selection.dropGonePage())
-      expect(log).toEqual(['selection rect', 'page null'])
+      selection.tellListeners()
+      expect(log).toEqual(['selection rect', 'frame null'])
     })
   })
 
@@ -472,20 +462,22 @@ describe('editorSelection', () => {
       const { selection, log } = harness()
       const heard: string[] = []
       const stop = selection.onSelection((ids) => heard.push(ids.join(',')))
-      const stopPage = selection.onPagePick((pageId) => heard.push(`page ${pageId}`))
+      const stopFrame = selection.onFramePick((frameId) => heard.push(`frame ${frameId}`))
       selection.selectKeepingModes({ ids: ['rect'], frameId: 'p1-f1' })
-      selection.tellListeners(false)
+      selection.tellListeners()
       expect(stop()).toBe(true)
-      expect(stopPage()).toBe(true)
+      expect(stopFrame()).toBe(true)
       selection.selectKeepingModes(null)
-      selection.pickPage('p1')
+      selection.pickFrame('p1-f1')
+      selection.tellListeners()
       expect(heard).toEqual(['rect'])
       selection.destroy()
       log.length = 0
       selection.selectKeepingModes({ ids: ['rect'], frameId: 'p1-f1' })
-      selection.tellListeners(true)
-      selection.pickPage('p2')
-      expect(log).toEqual(['changed', 'changed'])
+      selection.tellListeners()
+      selection.pickFrame('p1-f2')
+      selection.tellListeners()
+      expect(log).toEqual(['changed'])
     })
   })
 })

@@ -267,6 +267,70 @@ describe('editorActions', () => {
       expect(session.design().nodes.a?.props.visible).toBe(true)
     })
 
+    it('lets the picked frame go with Esc, and deletes it with Delete, its layers too and their linked copies left, as one undo step', () => {
+      const { actions, session, selection, frame, log } = harness()
+      selection.pickFrame(frame.id)
+      expect(actions.perform('deselect')).toBe(true)
+      expect(selection.pickedFrame()).toBeNull()
+      selection.pickFrame(frame.id)
+      expect(actions.perform('delete')).toBe(true)
+      expect(session.design().frames[frame.id]).toBeUndefined()
+      expect(session.design().nodes.a).toBeUndefined()
+      expect(session.design().nodes['wide-a']).toBeDefined()
+      expect(selection.pickedFrame()).toBeNull()
+      expect(log).toEqual(['overlay', 'overlay'])
+      session.undo()
+      expect(session.design().frames[frame.id]).toBeDefined()
+      expect(session.design().nodes.a).toBeDefined()
+      expect(session.canUndo()).toBe(false)
+    })
+
+    it('duplicates the picked frame with its layers as linked copies, picking the copy, as one undo step', () => {
+      const { actions, session, selection, frame } = harness()
+      selection.pickFrame(frame.id)
+      expect(actions.perform('duplicate')).toBe(true)
+      const copy = selection.pickedFrame() ?? ''
+      expect(copy).not.toBe(frame.id)
+      expect(session.design().frames[copy]).toMatchObject({ name: 'Square', width: 1080, height: 1080 })
+      const links = Object.values(session.design().nodes)
+        .filter((node) => node.parentId === copy)
+        .map((node) => node.link)
+      expect(links.sort()).toEqual(['a', 'b', 'c', 'pin', 'row'])
+      session.undo()
+      expect(session.design().frames[copy]).toBeUndefined()
+      expect(session.canUndo()).toBe(false)
+    })
+
+    it('moves the picked frame by a pixel, or ten with Shift, each press one undo step', () => {
+      const { actions, session, selection, wide } = harness()
+      selection.pickFrame(wide.id)
+      actions.perform('nudgeRight')
+      actions.perform('nudgeDownFar')
+      actions.perform('nudgeLeftFar')
+      actions.perform('nudgeUp')
+      expect(session.design().frames[wide.id]).toMatchObject({ x: 1271, y: 9 })
+      expect(session.design().nodes['wide-a']?.props).toMatchObject({ x: 100, y: 100 })
+      session.undo()
+      expect(session.design().frames[wide.id]).toMatchObject({ x: 1271, y: 10 })
+    })
+
+    it("leaves the picked frame and its layers be under the layers' other keys", () => {
+      const { actions, session, selection, frame } = harness()
+      selection.pickFrame(frame.id)
+      for (const action of ['group', 'alignLeft', 'lock', 'hide', 'mask', 'bringToFront'] as const)
+        expect(actions.perform(action)).toBe(false)
+      expect(session.canUndo()).toBe(false)
+      expect(selection.pickedFrame()).toBe(frame.id)
+    })
+
+    it('selects every layer that can be picked of the picked frame', () => {
+      const { actions, selection, frame } = harness()
+      selection.pickFrame(frame.id)
+      actions.perform('selectAll')
+      expect(selection.current()).toEqual({ frameId: frame.id, ids: ['a', 'b', 'c', 'row'] })
+      expect(selection.pickedFrame()).toBeNull()
+    })
+
     it('draws the overlay after a change to the layers', () => {
       const { actions, selection, frame, log } = harness()
       selection.select(['a'], frame.id)
@@ -276,14 +340,17 @@ describe('editorActions', () => {
   })
 
   describe('fitSelection', () => {
-    it("fits the box around the selection, or the shown page's frames with none", () => {
-      const { actions, selection, frame, log } = harness()
+    it("fits the box around the selection, else the picked frame, else the shown page's frames", () => {
+      const { actions, selection, frame, wide, log } = harness()
       actions.fitSelection()
       selection.select(['a', 'b'], frame.id)
+      actions.fitSelection()
+      selection.pickFrame(wide.id)
       actions.fitSelection()
       expect(log).toEqual([
         'fitAll',
         `fitArea ${JSON.stringify({ x: frame.x + 100, y: frame.y + 100, width: 250, height: 300 })}`,
+        `fitArea ${JSON.stringify({ x: 1280, y: 0, width: 1200, height: 628 })}`,
       ])
     })
   })

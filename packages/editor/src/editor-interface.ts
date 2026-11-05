@@ -141,12 +141,31 @@ export interface Editor {
   onTextSelection(listener: () => void): () => boolean
   /** Calls back with the selected layers whenever the selection changes. */
   onSelection(listener: (ids: string[]) => void): () => boolean
-  /** The page a click on its background picked, or null; no layer is selected while one is. */
-  pickedPage: () => string | null
-  /** Picks a page as a click on its background does, clearing the selection; null lets it go. */
-  pickPage: (pageId: string | null) => void
-  /** Calls back with the picked page, or null, whenever it changes. */
-  onPagePick(listener: (pageId: string | null) => void): () => boolean
+  /**
+   * The frame picked as a whole, by a press on its label or its empty area, or null; no layer is
+   * selected while one is. Esc, a layer selected or a click on empty canvas lets it go.
+   */
+  pickedFrame: () => string | null
+  /**
+   * Picks a frame of the shown page as a press on its label does, letting the selection go; null,
+   * or a frame not on the shown page, lets the picked one go.
+   */
+  pickFrame: (frameId: string | null) => void
+  /** Calls back with the picked frame, or null, whenever it changes. */
+  onFramePick(listener: (frameId: string | null) => void): () => boolean
+  /**
+   * Picks a frame of the shown page and asks the page to rename it in place, as a double click on
+   * its label does; the page renames it with the `frame.update` command. Does nothing for a frame
+   * not on the shown page.
+   */
+  renameFrame(frameId: string): void
+  /** Calls back with the frame to rename in place: its label was double-clicked, or `renameFrame` asked. */
+  onFrameRename(listener: (frameId: string) => void): () => boolean
+  /**
+   * Where a frame's label is drawn on the stage, in pixels from the stage's top start corner; null
+   * for a frame the shown page lacks, or one off the stage at its start.
+   */
+  labelRect(frameId: string): Rect | null
   /** Whether the rulers along the stage's edges show. */
   rulers: () => boolean
   /** Whether a drag snaps to layers and the frame. */
@@ -167,7 +186,7 @@ export interface Editor {
   shownPage: () => string
   /**
    * Shows a page, its frames fitted; the first page for one the design lacks. A selection, crop,
-   * path edit, pen path or typing on another page and the picked page let go.
+   * path edit, pen path or typing on another page and the picked frame let go.
    */
   showPage(pageId: string): void
   camera: () => Camera

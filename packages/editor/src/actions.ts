@@ -1,6 +1,6 @@
-// What the shortcuts and the menus do to the selection and the view: delete, group, mask, box,
-// auto layout, combine, reorder, lock and hide, align and distribute, nudge, select all, zoom and
-// the tools.
+// What the shortcuts and the menus do to the selection, the picked frame and the view: delete,
+// group, mask, box, auto layout, combine, reorder, lock and hide, align and distribute, nudge,
+// duplicate, select all, zoom and the tools.
 import { childrenOf, descendants, type Session } from '@dazbee/doc'
 import { type Design, LOCK_FLAGS, type Rect } from '@dazbee/schema'
 
@@ -42,12 +42,12 @@ export interface ActionsDeps {
     | 'current'
     | 'entered'
     | 'lastFrameOn'
-    | 'pickedPage'
+    | 'pickedFrame'
     | 'cropping'
     | 'pathEditing'
     | 'select'
     | 'enter'
-    | 'pickPage'
+    | 'pickFrame'
     | 'crop'
     | 'editPath'
   >
@@ -72,8 +72,16 @@ export interface EditorActions {
    * open on the stage first: they do nothing here.
    */
   perform(action: ShortcutAction): boolean
-  /** Fits the selection in view, or the shown page's frames with nothing selected. */
+  /** Fits the selection in view, else the picked frame, else the shown page's frames. */
   fitSelection(): void
+}
+
+/** Which way each arrow moves what it nudges, in steps along x and y. */
+const ARROWS: Readonly<Record<string, readonly [number, number]>> = {
+  nudgeLeft: [-1, 0],
+  nudgeRight: [1, 0],
+  nudgeUp: [0, -1],
+  nudgeDown: [0, 1],
 }
 
 export function editorActions({
@@ -105,6 +113,8 @@ export function editorActions({
   const hug = (ids: string[]) => hugIn(session, ids)
   function fitSelection() {
     const outer = boxes.selectionBox()
+    const picked = frameOf(selection.pickedFrame() ?? undefined)
+    if (!outer && picked) return fitArea({ x: picked.x, y: picked.y, width: picked.width, height: picked.height })
     if (!outer) return fitAll()
     const { frame, box } = outer
     const b = boundsOf([box])
@@ -200,15 +210,17 @@ export function editorActions({
     })
   }
 
-  /** The top-level layers of the selection's frame, or else of the shown page's first frame, that can be picked. */
   /**
    * Selects every top-level layer that can be picked in the selection's frame; with nothing
-   * selected, in the frame last selected in on the shown page, else the frame nearest the middle
-   * of the view.
+   * selected, in the picked frame, else the frame last selected in on the shown page, else the
+   * frame nearest the middle of the view.
    */
   function selectAll() {
     const frame =
-      frameOf(selection.current()?.frameId) ?? frameOf(selection.lastFrameOn(page()) ?? undefined) ?? nearestFrame()
+      frameOf(selection.current()?.frameId) ??
+      frameOf(selection.pickedFrame() ?? undefined) ??
+      frameOf(selection.lastFrameOn(page()) ?? undefined) ??
+      nearestFrame()
     if (!frame) return
     selection.select(
       scenes
@@ -275,11 +287,8 @@ export function editorActions({
       anytime()
       return true
     }
-    // Esc lets the picked page go; the layers' other keys do nothing to it.
-    if (action === 'deselect' && !selection.current() && selection.pickedPage()) {
-      selection.pickPage(null)
-      return true
-    }
+    const picked = selection.pickedFrame()
+    if (picked !== null && !selection.current()) return frameAction(action, picked)
     const current = selection.current()
     const frame = current && frameOf(current.frameId)
     if (!current || !frame) return false
@@ -496,6 +505,35 @@ export function editorActions({
         break
       default:
         return false
+    }
+    drawOverlay()
+    return true
+  }
+
+  /**
+   * What a key does to the picked frame: Esc lets it go, Delete deletes it with its layers, Mod+D
+   * duplicates it and picks the copy, and the arrows move it; each is one undo step. The layers'
+   * other keys do nothing to it.
+   */
+  function frameAction(action: ShortcutAction, frameId: string): boolean {
+    const arrow = ARROWS[action.replace(/Far$/, '')]
+    const far = action.endsWith('Far') ? NUDGE_FAR : NUDGE
+    const stored = session.design().frames[frameId]
+    if (arrow && stored) {
+      // Another tab may have deleted the frame a moment ago; the key then does nothing.
+      runQuietly(() =>
+        session.run('frame.update', { frameId, x: stored.x + arrow[0] * far, y: stored.y + arrow[1] * far }),
+      )
+    } else if (action === 'deselect') {
+      selection.pickFrame(null)
+    } else if (action === 'delete') {
+      runQuietly(() => session.run('frame.delete', { frameId }))
+      selection.pickFrame(null)
+    } else if (action === 'duplicate') {
+      let copy = ''
+      if (runQuietly(() => (copy = session.run('frame.duplicate', { frameId })))) selection.pickFrame(copy)
+    } else {
+      return false
     }
     drawOverlay()
     return true

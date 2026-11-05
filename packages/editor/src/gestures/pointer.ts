@@ -1,11 +1,12 @@
 // The pointer on the stage: presses, drags, double-clicks and the wheel, each routed to the
-// behaviour that owns its gesture, with panning, the hover outline and the cursor.
+// behaviour that owns its gesture, with panning, the hover outline and the cursor. A press on a
+// frame's label grabs the frame, and a double click there asks to rename it.
 import type { Session } from '@dazbee/doc'
 import { isContainer, type Point } from '@dazbee/schema'
 
 import { type Camera, toWorld } from '../canvas/camera.ts'
 import { resizeCursor, ROTATE_CURSOR } from '../canvas/cursors.ts'
-import type { Frame } from '../canvas/frames.ts'
+import { type Frame, labelAt } from '../canvas/frames.ts'
 import { hitTest } from '../canvas/hit-test.ts'
 import type { FrameScenes } from '../canvas/scenes.ts'
 import type { EditorView } from '../canvas/view.ts'
@@ -27,6 +28,7 @@ import {
   type ShapeDrag,
   type TextBoxDrag,
 } from './drawing.ts'
+import { dragFrame, type FrameMoveDrag, releaseFrame } from './frame-move.ts'
 import type { EditorPen, PathDrag } from './pen.ts'
 import type { EditorSelectPress } from './select-press.ts'
 import {
@@ -51,12 +53,16 @@ export type Gesture =
   | CropDrag
   | ShapeDrag
   | FrameDrag
+  | FrameMoveDrag
   | PathDrag
 
 export interface PointerDeps {
   canvas: HTMLCanvasElement
-  session: Pick<Session, 'design'>
-  view: Pick<EditorView, 'camera' | 'design' | 'onStage' | 'pointAt' | 'redraw' | 'setCamera' | 'viewport' | 'zoomTo'>
+  session: Pick<Session, 'design' | 'run' | 'beginGesture'>
+  view: Pick<
+    EditorView,
+    'camera' | 'design' | 'frames' | 'onStage' | 'pointAt' | 'redraw' | 'setCamera' | 'viewport' | 'zoomTo'
+  >
   tools: Pick<EditorTools, 'tool' | 'imageToPlace' | 'snapping'>
   selection: Pick<
     EditorSelection,
@@ -72,6 +78,8 @@ export interface PointerDeps {
   autoLayoutDrag: Pick<EditorAutoLayoutDrag, 'drag' | 'release'>
   /** What the select tool's press picks, and what it selects once it ends as a click. */
   selectPress: EditorSelectPress
+  /** Asks the page to rename a frame in place, after a double click on its label. */
+  renameFrame: (frameId: string) => void
   /** Removes the pointer's listeners once it aborts. */
   signal: AbortSignal
   /** Draws the overlay. */
@@ -145,6 +153,7 @@ export function editorPointer({
   transformDrag,
   autoLayoutDrag,
   selectPress,
+  renameFrame,
   signal,
   drawOverlay,
 }: PointerDeps): EditorPointer {
@@ -232,6 +241,7 @@ export function editorPointer({
       return
     }
     if (gesture?.kind === 'reorder') autoLayoutDrag.release(gesture)
+    else if (gesture?.kind === 'frameMove') releaseFrame(gesture)
     else if (gesture?.kind === 'path') pen.releasePoints(gesture)
     else if (gesture?.kind === 'crop') cropping.release(gesture)
     else if (gesture && gesture.kind !== 'marquee') transformDrag.release(gesture)
@@ -341,6 +351,13 @@ export function editorPointer({
           return
         }
       }
+      // A frame's label, drawn over the canvas, takes the press before what is under it.
+      const labelled = labelAt(view.frames(), view.camera(), screen)
+      if (labelled) {
+        gesture = selectPress.pressFrame(e, screen, labelled)
+        drawOverlay()
+        return
+      }
       const deepest = at && hitTest(scenes.scene(at.frame).layers, at.p, boxes.pickable)
       const editing = typing.editing()
       if (at && editing && deepest?.id === editing.id && editing.frameId === at.frame.id) {
@@ -403,6 +420,10 @@ export function editorPointer({
         drawing.drag(gesture, world, e.shiftKey, e.altKey)
         return
       }
+      if (gesture.kind === 'frameMove') {
+        dragFrame(session, gesture, screen, world, e.shiftKey)
+        return
+      }
       if (!selectPress.moved(screen)) return
       const p = localTo({ x: world.x - gesture.frame.x, y: world.y - gesture.frame.y }, gesture.around)
       if (gesture.kind === 'textSelect') {
@@ -457,6 +478,11 @@ export function editorPointer({
     'dblclick',
     (e) => {
       if (panning()) return
+      const labelled = labelAt(view.frames(), view.camera(), screenOf(e))
+      if (labelled && tools.tool() === 'select') {
+        renameFrame(labelled.id)
+        return
+      }
       const at = pointIn(e)
       const hit = at && hitTest(scenes.scene(at.frame).layers, at.p, boxes.pickable)
       if (!at || !hit || lockedAt(at.frame, at.p)) return
