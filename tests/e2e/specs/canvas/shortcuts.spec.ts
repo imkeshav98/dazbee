@@ -32,8 +32,6 @@ const design = (): DesignInput =>
       },
     },
   })
-/** The shortcuts the dialog lists: every one but hideEverywhere, which does nothing yet. */
-const LISTED = SHORTCUTS.filter((s) => s.action !== 'hideEverywhere')
 
 test('? and the keyboard button list every shortcut, F, I and Mod+Alt+G among them', async ({ browser }) => {
   const { page, errors } = await openStage(browser, design())
@@ -43,8 +41,7 @@ test('? and the keyboard button list every shortcut, F, I and Mod+Alt+G among th
   await page.keyboard.press('Shift+Slash')
   await expect(list).toBeVisible()
   await expect(list.getByRole('heading', { level: 2 })).toHaveText('Keyboard shortcuts')
-  await expect(list.locator('[data-shortcut]')).toHaveCount(LISTED.length)
-  await expect(list.locator('[data-shortcut="hideEverywhere"]')).toHaveCount(0)
+  await expect(list.locator('[data-shortcut]')).toHaveCount(SHORTCUTS.length)
   await expect(list.locator('[data-shortcut="bringForward"] kbd')).toHaveText(['Ctrl', ']'])
   await expect(list.locator('[data-shortcut="toolFrame"]')).toContainText('F')
   await expect(list.locator('[data-shortcut="toolImage"]')).toContainText('I')
