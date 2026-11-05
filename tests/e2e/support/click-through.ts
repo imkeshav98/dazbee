@@ -69,10 +69,14 @@ export async function cutOutPng(): Promise<Uint8Array<ArrayBuffer>> {
   return new Uint8Array(png)
 }
 
-/** The click-through frame: a cut-out photo over a rectangle, an ellipse and a star over others, and short text over a box. */
+/**
+ * The click-through frame: a cut-out photo over a rectangle, an ellipse and a star over others, and
+ * short text over a box. Each layer beneath reaches 20 px past the one over it, so their outlines
+ * differ.
+ */
 export function clickThroughDesign(assetId: string): DesignInput {
   const nodes: Record<string, Seeded> = {
-    base: rect('a0', 'Base', { x: 60, y: 60, width: 400, height: 400 }, '#1B9E77FF'),
+    base: rect('a0', 'Base', { x: 40, y: 40, width: 440, height: 440 }, '#1B9E77FF'),
     cutout: {
       type: 'graphic',
       parentId: 'sq',
@@ -87,9 +91,9 @@ export function clickThroughDesign(assetId: string): DesignInput {
         fills: [{ type: 'image', assetId, fit: 'fill' }],
       },
     },
-    backdrop: rect('a2', 'Backdrop', { x: 580, y: 60, width: 400, height: 400 }, '#FFC400FF'),
+    backdrop: rect('a2', 'Backdrop', { x: 560, y: 40, width: 440, height: 440 }, '#FFC400FF'),
     ellipse: shape('a3', 'Ellipse', { kind: 'ellipse' }, { x: 580, y: 60, width: 400, height: 400 }, '#2F6BFFFF'),
-    card: rect('a4', 'Card', { x: 60, y: 560, width: 400, height: 400 }, '#7E57C2FF'),
+    card: rect('a4', 'Card', { x: 40, y: 540, width: 440, height: 440 }, '#7E57C2FF'),
     star: shape('a5', 'Star', { kind: 'star', points: 5 }, { x: 60, y: 560, width: 400, height: 400 }, '#FF5A36FF'),
     panel: rect('a6', 'Panel', { x: 580, y: 580, width: 460, height: 220 }, '#E7E2DAFF'),
     words: text('a7', 'Words', 'Sale', { x: 600, y: 600, width: 420, height: 170 }, 64),
