@@ -16,6 +16,8 @@ interface Fake {
   style: Record<string, string>
   textContent: string
   children: Fake[]
+  /** Its width as laid out: every part is 70 px wide. */
+  offsetWidth: number
   append(...more: Fake[]): void
 }
 const fake = (name = ''): Fake => ({
@@ -24,6 +26,7 @@ const fake = (name = ''): Fake => ({
   style: {},
   textContent: '',
   children: [],
+  offsetWidth: 70,
   append(...more) {
     this.children.push(...more)
   },
@@ -70,6 +73,8 @@ function harness(
     lit?: boolean
     renaming?: boolean
     zoom?: number
+    /** Where the page's origin is on the stage, across. */
+    x?: number
     /** The design holds linked copies of the selected layer, and the story is in view too. */
     linked?: boolean
   } = {},
@@ -85,7 +90,7 @@ function harness(
       },
     } as unknown as HTMLElement,
     view: {
-      camera: () => ({ x: 0, y: 100, zoom: state.zoom ?? 1 }),
+      camera: () => ({ x: state.x ?? 0, y: 100, zoom: state.zoom ?? 1 }),
       viewport: () => ({ width: 1000, height: 800 }),
       design: () => (state.linked ? linkedDesign : design),
       inView: () => (state.linked ? [SQUARE, STORY] : [SQUARE]),
@@ -231,6 +236,18 @@ describe('editorOverlay', () => {
       typing.overlay.draw()
       expect(typing.part('selection')?.children).toEqual([])
       expect(typing.drawn()).not.toContain('selection-size')
+    })
+
+    it('centres the size under the selection, kept inside the stage by 8 px at either edge', () => {
+      const leftOf = (x: number) => {
+        const { overlay, part } = harness({ x })
+        overlay.draw()
+        return part('selection-size')?.style.left
+      }
+      // The selection 100 px wide from 10 px in, its size 70 px wide.
+      expect(leftOf(0)).toBe('25px')
+      expect(leftOf(-50)).toBe('8px')
+      expect(leftOf(900)).toBe('922px')
     })
   })
 

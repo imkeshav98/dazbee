@@ -69,6 +69,8 @@ const SIZE_LABEL_WIDTH = 120
 const SIZE_CLEARANCE = 72
 /** The room the selection's size label takes, in screen pixels. */
 const SIZE_LABEL_HEIGHT = 20
+/** Screen pixels the selection's size label keeps inside the stage's sides. */
+const SIZE_LABEL_INSET = 8
 
 export function editorOverlay({
   overlay,
@@ -170,12 +172,15 @@ export function editorOverlay({
     return parts
   }
 
-  /** Each selected layer's outline, then the box with its handles and the size under it. */
-  function selectionParts() {
+  /**
+   * Each selected layer's outline, then the box with its handles and the size under it, with the
+   * point across the stage the size centres on.
+   */
+  function selectionParts(): { parts: HTMLElement[]; size: { el: HTMLElement; centre: number } | null } {
     const gesture = pointer.gesture()
     const outer = boxes.selectionBox()
     const current = selection.current()
-    if (!outer || !current) return []
+    if (!outer || !current) return { parts: [], size: null }
     const { frame, drawn: box } = outer
     const parts: HTMLElement[] = []
     const several = current.ids.length > 1
@@ -204,23 +209,30 @@ export function editorOverlay({
       }
     }
     parts.push(el)
-    if (!typing.editing()) {
-      const corners = cornersOf(box).map((p) => toScreen(view.camera(), { x: frame.x + p.x, y: frame.y + p.y }))
-      const size = document.createElement('div')
-      size.className = 'selection-size'
-      size.textContent = `${round(box.width, 0)} × ${round(box.height, 0)}`
-      // A corner scaling one text says its size too, from where it was.
-      const g = gesture?.kind === 'resize' ? gesture : null
-      const text = g && !several ? g.texts.get(current.ids[0] ?? '') : undefined
-      if (g && text) size.textContent += ` · ${text.style.fontSize} → ${scaleText(text, g.factor).style.fontSize}`
-      const top = sizeLabelTop(corners.map((c) => c.y))
-      Object.assign(size.style, {
-        left: px((Math.min(...corners.map((c) => c.x)) + Math.max(...corners.map((c) => c.x))) / 2),
-        top: px(top),
-      })
-      parts.push(size)
-    }
-    return parts
+    if (typing.editing()) return { parts, size: null }
+    const corners = cornersOf(box).map((p) => toScreen(view.camera(), { x: frame.x + p.x, y: frame.y + p.y }))
+    const size = document.createElement('div')
+    size.className = 'selection-size'
+    size.textContent = `${round(box.width, 0)} × ${round(box.height, 0)}`
+    // A corner scaling one text says its size too, from where it was.
+    const g = gesture?.kind === 'resize' ? gesture : null
+    const text = g && !several ? g.texts.get(current.ids[0] ?? '') : undefined
+    if (g && text) size.textContent += ` · ${text.style.fontSize} → ${scaleText(text, g.factor).style.fontSize}`
+    size.style.top = px(sizeLabelTop(corners.map((c) => c.y)))
+    parts.push(size)
+    const centre = (Math.min(...corners.map((c) => c.x)) + Math.max(...corners.map((c) => c.x))) / 2
+    return { parts, size: { el: size, centre } }
+  }
+
+  /**
+   * Puts the size label centred on `centre` across the stage, kept SIZE_LABEL_INSET inside its
+   * sides, at its left side when the stage is too narrow for both; measured once it is drawn.
+   */
+  function placeSizeLabel(size: HTMLElement, centre: number) {
+    const width = size.offsetWidth
+    const room = view.viewport().width
+    const start = Math.max(SIZE_LABEL_INSET, Math.min(centre - width / 2, room - width - SIZE_LABEL_INSET))
+    size.style.left = px(start)
   }
 
   function drawOverlay() {
@@ -263,9 +275,10 @@ export function editorOverlay({
     const dropFrame = dropTarget && frameOf(dropTarget.frameId)
     const dropBox = dropFrame && dropTarget && boxes.drawnBoxOf(dropFrame, dropTarget.id, view.design())
     if (dropFrame && dropBox) parts.push(outline('drop-target', dropFrame, dropBox))
+    const selected = selection.pathEditing() || selection.cropping() ? null : selectionParts()
     parts.push(
       ...linkedParts(),
-      ...(selection.pathEditing() || selection.cropping() ? [] : selectionParts()),
+      ...(selected?.parts ?? []),
       ...pen.parts(),
       ...cropping.parts(),
       ...autoLayoutDrag.parts(gesture?.kind === 'reorder' ? gesture : null),
@@ -287,6 +300,7 @@ export function editorOverlay({
     }
     parts.push(...typing.parts())
     overlay.replaceChildren(...parts)
+    if (selected?.size) placeSizeLabel(selected.size.el, selected.size.centre)
     selection.tellListeners()
   }
 
