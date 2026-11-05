@@ -351,7 +351,8 @@ export function PanelPart({
 }) {
   return (
     <section aria-labelledby={`${id}-title`} className={PANEL_PART} data-testid={id}>
-      <div className="flex h-7 items-center gap-2">
+      {/* As tall as its heading, or as its action where that is taller, as on a phone. */}
+      <div className="flex min-h-7 items-center gap-2">
         <h3
           id={`${id}-title`}
           className={cn('min-w-0 flex-1 truncate text-xs font-semibold', strong ? 'text-text' : 'text-muted')}
