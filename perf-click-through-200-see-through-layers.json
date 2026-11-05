@@ -1,0 +1,20 @@
+{
+  "hover (pointer move)": {
+    "samples": 61,
+    "medianMs": 0.7,
+    "p95Ms": 1.2,
+    "maxMs": 8
+  },
+  "click (pointer down)": {
+    "samples": 30,
+    "medianMs": 2.6,
+    "p95Ms": 7,
+    "maxMs": 35.2
+  },
+  "what a click picks (selectAt)": {
+    "samples": 200,
+    "medianMs": 0.2,
+    "p95Ms": 0.4,
+    "maxMs": 6.4
+  }
+}
