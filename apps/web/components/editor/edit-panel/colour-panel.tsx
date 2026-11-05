@@ -18,9 +18,10 @@ import {
 
 import { useBrandKit } from '@/components/brand-kit/use-brand-kit.ts'
 import { ImagePickerButton } from '@/components/editor/image-tool.tsx'
-import { PaintEditor, PaintRow } from '@/components/editor/paint-stack.tsx'
+import { PaintEditor, PaintRow } from '@/components/editor/paint/paint-stack.tsx'
+import { Swatch } from '@/components/editor/paint/swatch.tsx'
 import { ListBody } from '@/components/editor/reorder-list.tsx'
-import { PANEL_BUTTON, PICKED_RING, SWATCH, SWATCHES } from '@/components/editor/styles.ts'
+import { PANEL_BUTTON, SWATCH_FACE, SWATCH_ROW, SWATCH_TARGET, SWATCHES } from '@/components/editor/styles.ts'
 import { FOCUS_RING } from '@/components/ui/looks.ts'
 import { cn } from '@/lib/cn.ts'
 import { hexChange, hexOf } from '@/lib/colour.ts'
@@ -35,6 +36,9 @@ export const NEW_FILL: Paint = { type: 'solid', color: '#D9D9D9FF' }
 
 /** A fill + adds over others: a see-through wash, so what was there still shows through it. */
 export const FILL_ON_TOP: Paint = { type: 'solid', color: '#00000033' }
+
+/** How big the panel draws its swatches and its +, off a phone. */
+const PANEL_SWATCH = 'size-[22px]'
 
 /** The Colour panel: text's colour for text, else the colour of the fill that shows. */
 export function ColourPanel({ target, design, brandId }: PanelProps) {
@@ -102,7 +106,7 @@ export function ColourChoices({
         <Swatches brandId={brandId} p={p} current={current} paint={paint} onBrand={onBrand} />
       </PanelPart>
       <PanelPart id="design-colours" title={b.colourPanel.inDesign}>
-        <div role="group" aria-label={b.colourPanel.inDesign} className="flex flex-wrap items-center gap-1.5">
+        <div role="group" aria-label={b.colourPanel.inDesign} className={cn(SWATCH_ROW, 'gap-1.5')}>
           <button
             type="button"
             aria-label={b.colourPanel.pick}
@@ -110,15 +114,21 @@ export function ColourChoices({
             aria-pressed={picking}
             data-testid="colour-pick"
             onClick={() => setPicking(!picking)}
-            className={cn(
-              'grid size-[22px] shrink-0 cursor-pointer place-items-center rounded-full border border-dashed border-line-strong text-muted transition-colors hover:border-accent hover:text-text aria-pressed:border-accent aria-pressed:text-accent-text',
-              FOCUS_RING,
-            )}
+            className={cn(SWATCH_TARGET, FOCUS_RING)}
           >
-            <PlusIcon size={12} weight="bold" aria-hidden />
+            <span
+              aria-hidden
+              className={cn(
+                SWATCH_FACE,
+                PANEL_SWATCH,
+                'grid place-items-center border border-dashed border-line-strong text-muted transition-colors group-hover/swatch:border-accent group-hover/swatch:text-text group-aria-pressed/swatch:border-accent group-aria-pressed/swatch:text-accent-text',
+              )}
+            >
+              <PlusIcon size={12} weight="bold" />
+            </span>
           </button>
           {designColours(design).map((hex) => (
-            <Swatch key={hex} color={hex} label={hex} on={now === hex} onPick={() => paint(hex)} />
+            <Swatch key={hex} color={hex} label={hex} size={PANEL_SWATCH} on={now === hex} onPick={() => paint(hex)} />
           ))}
         </div>
         {picking && (
@@ -274,13 +284,15 @@ function Swatches({
   // The colour it has now leads the row when the row does not hold it, as in the mock.
   const offered = colors.length > 0 ? colors.map((c) => hexOf(c.value).toUpperCase()) : [...SWATCHES]
   return (
-    <div
-      role="group"
-      aria-label={colors.length > 0 ? p.brandColours : p.colours}
-      className="flex flex-wrap items-center gap-1.5"
-    >
+    <div role="group" aria-label={colors.length > 0 ? p.brandColours : p.colours} className={cn(SWATCH_ROW, 'gap-1.5')}>
       {now && !offered.includes(now) && (
-        <Swatch color={now} label={format(p.currentColour, { hex: now })} on onPick={() => undefined} />
+        <Swatch
+          color={now}
+          label={format(p.currentColour, { hex: now })}
+          size={PANEL_SWATCH}
+          on
+          onPick={() => undefined}
+        />
       )}
       {colors.length > 0
         ? colors.map((c) => (
@@ -288,29 +300,15 @@ function Swatches({
               key={c.token}
               color={hexOf(c.value)}
               label={c.name}
+              size={PANEL_SWATCH}
               on={now === hexOf(c.value).toUpperCase()}
               onPick={() => (onBrand ? onBrand(c.token, hexOf(c.value)) : paint(hexOf(c.value)))}
             />
           ))
         : SWATCHES.map((hex) => (
-            <Swatch key={hex} color={hex} label={hex} on={now === hex} onPick={() => paint(hex)} />
+            <Swatch key={hex} color={hex} label={hex} size={PANEL_SWATCH} on={now === hex} onPick={() => paint(hex)} />
           ))}
     </div>
-  )
-}
-
-/** A swatch of the look cards: round, ringed while it is the colour. */
-function Swatch({ color, label, on, onPick }: { color: string; label: string; on: boolean; onPick: () => void }) {
-  return (
-    <button
-      type="button"
-      aria-label={label}
-      title={label}
-      aria-pressed={on}
-      onClick={onPick}
-      style={{ backgroundColor: color }}
-      className={cn(SWATCH, 'size-[22px]', on && PICKED_RING)}
-    />
   )
 }
 

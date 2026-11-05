@@ -8,7 +8,18 @@ import { type CSSProperties, type ReactNode, useEffect, useRef, useState } from 
 import { type Editor, shortcutFor } from '@dazbee/editor'
 import { alphaOf } from '@dazbee/schema'
 
-import { FIELD, KNOB, PANEL_PART, SELECT, SWITCH, SWITCH_ROW, VALUE_TEXT } from '@/components/editor/styles.ts'
+import {
+  FACE_SIZE,
+  FIELD,
+  KNOB,
+  PANEL_PART,
+  SELECT,
+  SQUARE_SWATCH_TARGET,
+  SWITCH,
+  SWITCH_ROW,
+  TOUCH_GAP,
+  VALUE_TEXT,
+} from '@/components/editor/styles.ts'
 import { SEGMENT, SEGMENTS } from '@/components/ui/looks.ts'
 import { Select } from '@/components/ui/select.tsx'
 import { cn } from '@/lib/cn.ts'
@@ -266,16 +277,19 @@ export function ColorField({
     if (/^#[0-9A-F]{6}$/.test(h) && h !== hex) onSet(hexChange(h))
   }
   return (
-    <div className="flex min-w-0 flex-1 items-center gap-1">
+    <div className={cn('flex min-w-0 flex-1 items-center gap-1', TOUCH_GAP)}>
       {swatch && (
-        <input
-          name="colour"
-          type="color"
-          aria-label={format(p.colourOf, { name })}
-          value={hex || '#000000'}
-          onChange={(event) => onSet(hexChange(event.target.value.toUpperCase()))}
-          className="size-7 shrink-0 cursor-pointer rounded-row border border-line bg-surface p-0.5"
-        />
+        // The label is the box's target: on a phone a press round the box opens the picker too.
+        <label className={SQUARE_SWATCH_TARGET}>
+          <input
+            name="colour"
+            type="color"
+            aria-label={format(p.colourOf, { name })}
+            value={hex || '#000000'}
+            onChange={(event) => onSet(hexChange(event.target.value.toUpperCase()))}
+            className={cn(FACE_SIZE, 'size-7 cursor-pointer rounded-row border border-line bg-surface p-0.5')}
+          />
+        </label>
       )}
       {/* A hex reads left to right in every language, with its # first. */}
       <input

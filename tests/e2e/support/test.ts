@@ -3,7 +3,7 @@ import { expect, type Page, test as base } from '@playwright/test'
 import { API_URL } from './seed.ts'
 
 export { expect }
-export type { Browser, Locator, Page, Request } from '@playwright/test'
+export type { Browser, ElementHandle, Locator, Page, Request } from '@playwright/test'
 
 type Guard = {
   /** Lets this test cause the problems these patterns match, such as a 404 it asks for on purpose. */

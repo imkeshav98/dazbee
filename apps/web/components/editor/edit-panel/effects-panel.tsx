@@ -4,9 +4,9 @@
 // colour, and text's outline.
 import { type Effect } from '@dazbee/schema'
 
-import { assetThumbnail } from '@/components/editor/paint-stack.tsx'
+import { assetThumbnail } from '@/components/editor/paint/paint-stack.tsx'
 import { RemoveButton } from '@/components/editor/reorder-list.tsx'
-import { KNOBS, PANEL_PART, TILE, TILE_FACE_WIDE } from '@/components/editor/styles.ts'
+import { KNOBS, PANEL_PART, TILE, TILE_FACE_WIDE, TOUCH_GAP } from '@/components/editor/styles.ts'
 import { Select } from '@/components/ui/select.tsx'
 import { cn } from '@/lib/cn.ts'
 import { LIMITS } from '@/lib/editor/limits.ts'
@@ -167,7 +167,7 @@ export function EffectsPanel({ target, brandId }: PanelProps) {
                 onClick={() => press('outline')}
               />
             </div>
-            <div className="flex items-center gap-1">
+            <div className={cn('flex items-center gap-1', TOUCH_GAP)}>
               <div className="w-24 shrink-0">
                 <NumberField
                   label="W"
@@ -289,7 +289,7 @@ function EffectRow({
   const change = (to: (now: Effect) => Effect) => write((now) => now.map((x, j) => (j === i ? to(x) : x)))
   const effectName = p.effect[effect.type]
   return (
-    <div className="flex flex-col gap-1.5" data-item={`effects-${i}`}>
+    <div className={cn('flex flex-col gap-1.5', TOUCH_GAP)} data-item={`effects-${i}`}>
       <div className="flex items-center justify-between">
         <span className="text-xs font-bold text-text">{effectName}</span>
         <RemoveButton

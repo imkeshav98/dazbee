@@ -7,9 +7,9 @@ import { useState } from 'react'
 import { type Editor } from '@dazbee/editor'
 import { type Paint } from '@dazbee/schema'
 
-import { PaintRow } from '@/components/editor/paint-stack.tsx'
+import { PaintRow } from '@/components/editor/paint/paint-stack.tsx'
 import { ListBody } from '@/components/editor/reorder-list.tsx'
-import { FIELD, KNOBS, TILE, TILE_FACE_WIDE } from '@/components/editor/styles.ts'
+import { FIELD, KNOBS, TILE, TILE_FACE_WIDE, TOUCH_GAP } from '@/components/editor/styles.ts'
 import { cn } from '@/lib/cn.ts'
 import { LIMITS } from '@/lib/editor/limits.ts'
 import { tidy } from '@/lib/editor/size.ts'
@@ -181,7 +181,7 @@ function StrokeRow({
 }) {
   const n = { n: place }
   return (
-    <div className="flex min-w-0 flex-1 flex-col gap-1">
+    <div className={cn('flex min-w-0 flex-1 flex-col gap-1', TOUCH_GAP)}>
       <PaintRow
         paint={stroke.paint}
         name={format(p.strokeColour, n)}
