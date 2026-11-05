@@ -72,6 +72,17 @@ interface Parsed {
 /** How far the arrow keys move the selection, in design pixels: 1, or 10 with Shift. */
 export const NUDGE = 1
 export const NUDGE_FAR = 10
+/** How far each arrow key moves the selection or the picked frame, in design pixels along x and y; Shift goes further. */
+export const NUDGES: Readonly<Partial<Record<ShortcutAction, readonly [number, number]>>> = {
+  nudgeLeft: [-NUDGE, 0],
+  nudgeRight: [NUDGE, 0],
+  nudgeUp: [0, -NUDGE],
+  nudgeDown: [0, NUDGE],
+  nudgeLeftFar: [-NUDGE_FAR, 0],
+  nudgeRightFar: [NUDGE_FAR, 0],
+  nudgeUpFar: [0, -NUDGE_FAR],
+  nudgeDownFar: [0, NUDGE_FAR],
+}
 
 /** Keys typed into the page's own fields belong to them. */
 export const inField = (target: EventTarget | null) =>

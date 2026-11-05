@@ -4,7 +4,15 @@
 // label first, then opens the field focused. The rest of frames on the canvas is in
 // frames-on-canvas.spec.ts.
 import { writeOutput } from '../../support/editor.ts'
-import { clickLabel, frameOf, labelRow, openFrames, picked, tabToBar } from '../../support/frames-on-canvas.ts'
+import {
+  clickLabel,
+  frameMenuItems,
+  frameOf,
+  labelRow,
+  openFrames,
+  picked,
+  tabToBar,
+} from '../../support/frames-on-canvas.ts'
 import { drawn, press, zoomOf } from '../../support/stage.ts'
 import { expect, type Locator, test } from '../../support/test.ts'
 import { barMenu } from '../../support/top-bar.ts'
@@ -143,9 +151,7 @@ test('Rename in ⋯ with the picked frame’s label off screen, zoomed in to 375
   expect(await picked(page)).toBe('sq')
   await page.getByTestId('bar-frame-more').focus()
   await page.keyboard.press('Enter')
-  await expect(menu.getByRole('button', { name: /Duplicate/ })).toBeFocused()
-  await page.keyboard.press('Tab')
-  await expect(menu.getByRole('button', { name: 'Rename' })).toBeFocused()
+  await frameMenuItems(page, 'Rename')
   await page.keyboard.press('Enter')
   await expect(field).toBeFocused()
   expect(await zoomOf(page)).toBe(0.5)

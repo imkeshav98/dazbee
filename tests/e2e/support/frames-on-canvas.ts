@@ -1,13 +1,13 @@
 // The design and helpers of the frames-on-canvas specs: a page holding a square, a story linked to it
 // and a banner linked to nothing, the square holding a headline, a layer turned 30°, a locked one and
-// a photo under a round mask, opened at half size; which frame is picked and what a frame holds,
-// where a frame's label is, and Tab to the top bar.
+// a photo under a round mask, opened at half size or alone at a screen size; which frame is picked
+// and what a frame holds, where a frame's label is, Tab to the top bar, and the picked frame's ⋯.
 import type { DesignInput } from '@dazbee/schema'
 
 import { solid } from './edit-in-frame.ts'
-import { openTabs, settle } from './editor.ts'
+import { editorPath, openTabs, setCookies, settle } from './editor.ts'
 import { frameDesign, linkedFrames, seed } from './seed.ts'
-import { drawn, read } from './stage.ts'
+import { drawn, fitSettled, read } from './stage.ts'
 import { type Browser, expect, type Page } from './test.ts'
 
 /**
@@ -143,6 +143,30 @@ export async function labelRow(page: Page, id: string) {
   if (!stage || !rect) throw new Error(`no label for ${id}`)
   return { x: stage.x + rect.x, y: stage.y + rect.y, width: rect.width, height: rect.height }
 }
+/** The picked frame's ⋯ items in order, each by its name and as it reads with its key. */
+const FRAME_MENU = [
+  { name: 'Duplicate', reads: 'DuplicateCtrl+D' },
+  { name: 'Add size', reads: 'Add size' },
+  { name: 'Rename', reads: 'Rename' },
+  { name: 'Export', reads: 'Export' },
+  { name: 'Delete', reads: 'DeleteDelete' },
+] as const
+/**
+ * Checks the picked frame's open ⋯ lists its items in order: Duplicate, Add size, Rename, Export, Delete. Given `to`,
+ * the focus is on the first and Tab moves it down the list item by item, up to `to`. Gives the menu.
+ */
+export async function frameMenuItems(page: Page, to?: (typeof FRAME_MENU)[number]['name']) {
+  const menu = page.getByTestId('bar-frame-more-menu')
+  const items = menu.getByRole('button')
+  await expect(items).toHaveText(FRAME_MENU.map((item) => item.reads))
+  for (const [i, item] of FRAME_MENU.entries()) {
+    if (to === undefined) break
+    await expect(items.nth(i)).toBeFocused()
+    if (item.name === to) break
+    await page.keyboard.press('Tab')
+  }
+  return menu
+}
 /** Presses Tab until the focus is in the top bar, from wherever it is, and gives the item it reached. */
 export async function tabToBar(page: Page) {
   for (let i = 0; i < 40; i++) {
@@ -168,4 +192,24 @@ export async function openFrames(browser: Browser, count = 1) {
   await drawn(a)
   if (count > 1) await settle(tabs)
   return { a, b: tabs[1] as Page, tabs, errors }
+}
+/**
+ * Opens a design, this spec's unless given, alone in a tab at a screen size, in a theme (dark unless
+ * given) and a language (the app's own unless given), fitted, with its fonts loaded.
+ */
+export async function openSized(
+  browser: Browser,
+  viewport: { width: number; height: number },
+  { theme = 'dark', locale, input = design() }: { theme?: string; locale?: string; input?: DesignInput } = {},
+) {
+  const designId = await seed(input)
+  const page = await (await browser.newContext({ viewport })).newPage()
+  const errors: string[] = []
+  page.on('pageerror', (error) => errors.push(error.message))
+  await setCookies(page, { theme, ...(locale && { locale }) })
+  await page.goto(editorPath(designId))
+  await expect(page.getByTestId('status')).toHaveAttribute('data-ready', '', { timeout: 60_000 })
+  await page.evaluate(() => window.dazbee?.loaded())
+  await fitSettled(page)
+  return { page, errors }
 }

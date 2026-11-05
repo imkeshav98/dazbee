@@ -1,12 +1,12 @@
 'use client'
 
-// One row of the layers panel's tree: its layer's picture or icon, name and kind, and its hide and
-// lock toggles. A picture about the colour of its tile in a theme shows on a backdrop that sets it off
-// there. The panel hands every row one set of handlers, so a row renders again only when what it
-// shows changes.
+// One layer's row in the layers panel's tree: its picture or icon and name, its hide and lock
+// toggles, which act on this layer alone, and an end label: "only here" when none of its frame's
+// linked frames holds a copy of it, else a box's kind. A picture about the colour of the panel in a
+// theme shows on a backdrop that sets it off there. The panel hands every row one set of handlers,
+// so a row renders again only when what it shows changes.
 import {
   BoundingBoxIcon,
-  CaretRightIcon,
   CircleIcon,
   EyeIcon,
   EyeSlashIcon,
@@ -20,48 +20,33 @@ import {
   TextTIcon,
   UniteIcon,
 } from '@phosphor-icons/react'
-import { type DragEvent, type KeyboardEvent, memo, useState } from 'react'
+import { memo, useState } from 'react'
 
 import { type Design, LOCK_FLAGS } from '@dazbee/schema'
 
-import { DROP_LINE, LAYER_PICTURE, LAYER_PICTURE_PICKED } from '@/components/editor/styles.ts'
+import { DROP_LINE, LAYER_PICTURE } from '@/components/editor/styles.ts'
 import { LIT_ROW } from '@/components/ui/looks.ts'
 import { RenameField } from '@/components/ui/rename-field.tsx'
 import { cn } from '@/lib/cn.ts'
+import type { LayerTreeRow } from '@/lib/editor/layer-tree.ts'
 import { useMessages } from '@/lib/i18n/client.tsx'
 import { format } from '@/lib/i18n/index.ts'
 
+import {
+  LAYER_ROW,
+  ROW_LABEL,
+  ROW_LABEL_SLOT,
+  ROW_LOOK,
+  ROW_SELECTED,
+  type RowApi,
+  RowCaret,
+  rowHandlers,
+  rowPlace,
+  type Where,
+} from './tree-row.tsx'
+
 type Layer = Design['nodes'][string]
-export interface Row {
-  id: string
-  node: Layer
-  depth: number
-  parentId: string
-  hasChildren: boolean
-  position: number
-  siblings: number
-}
-export type Where = 'above' | 'below' | 'into'
 
-export interface RowApi {
-  focus: (id: string) => void
-  key: (event: KeyboardEvent<HTMLElement>, row: Row, i: number) => void
-  click: (id: string, add: boolean) => void
-  rename: (id: string) => void
-  renamed: (id: string, name: string | null, before: string, byKey: boolean) => void
-  toggle: (id: string) => void
-  lock: (id: string, locked: boolean) => void
-  hide: (id: string, hidden: boolean) => void
-  dragStart: (id: string) => void
-  dragEnd: () => void
-  dragOver: (event: DragEvent<HTMLElement>, row: Row) => boolean
-  dragLeave: (id: string) => void
-  drop: (event: DragEvent<HTMLElement>, row: Row) => boolean
-}
-
-/** A row's height in pixels: every row is the same, which is what lets only the rows in view render. */
-export const LAYER_ROW = 36
-const INDENT = 16
 const DRAG_TYPE = 'application/x-dazbee-layer'
 /**
  * The mean luminance of a picture under which it nearly vanishes on the dark theme's tile, and over
@@ -74,6 +59,20 @@ const LIGHT_CLOSE = 0.475
 const BACKDROP = {
   dark: 'dark:bg-text dark:p-[3px]',
   light: '[[data-theme=light]_&]:bg-text [[data-theme=light]_&]:p-[3px]',
+}
+
+/**
+ * The room a name leaves at its end for the toggles laid over it, 6 px from them: always while one
+ * is on, else while the row is hovered or focused, and always on a screen without hover.
+ */
+const CLEAR = {
+  on: 'pe-[3.75rem]',
+  shown: 'group-hover:pe-[3.75rem] group-focus-visible:pe-[3.75rem] [@media(hover:none)]:pe-[3.75rem]',
+}
+const CLEAR_ROOMY = {
+  on: 'pe-[calc(96px+0.375rem)]',
+  shown:
+    'group-hover:pe-[calc(96px+0.375rem)] group-focus-visible:pe-[calc(96px+0.375rem)] [@media(hover:none)]:pe-[calc(96px+0.375rem)]',
 }
 
 const isLocked = (node: Layer) => LOCK_FLAGS.some((flag) => node.lock?.[flag])
@@ -119,7 +118,7 @@ function closeTheme(img: HTMLImageElement): keyof typeof BACKDROP | null {
   return luminance < DARK_CLOSE ? 'dark' : luminance > LIGHT_CLOSE ? 'light' : null
 }
 
-/** One row of the tree. Rendered again only when something it shows changes. */
+/** A layer's row. Rendered again only when something it shows changes. */
 export const LayerRow = memo(function LayerRow({
   row,
   i,
@@ -130,9 +129,10 @@ export const LayerRow = memo(function LayerRow({
   hidden,
   drop,
   picture,
+  pitch,
   api,
 }: {
-  row: Row
+  row: LayerTreeRow
   i: number
   selected: boolean
   focusable: boolean
@@ -141,6 +141,8 @@ export const LayerRow = memo(function LayerRow({
   hidden: boolean
   drop: Where | null
   picture: string | null
+  /** The rows' height on this screen; roomier on a phone or a touch screen, with targets a finger can hit. */
+  pitch: number
   api: RowApi
 }) {
   const t = useMessages()
@@ -149,6 +151,8 @@ export const LayerRow = memo(function LayerRow({
   const { id, node, depth } = row
   const locked = isLocked(node)
   const LayerIcon = iconOf(node)
+  const roomy = pitch > LAYER_ROW
+  const clear = roomy ? CLEAR_ROOMY : CLEAR
   // A box says whether it is plain or stacks what it holds.
   const kind =
     node.type === 'box'
@@ -156,11 +160,14 @@ export const LayerRow = memo(function LayerRow({
         ? t.editor.layersPanel.stack
         : t.editor.layersPanel.box
       : null
+  // The end label: "only here" when the layer is, else a box's kind; none while renaming.
+  const label = renaming ? null : row.onlyHere ? t.editor.layersPanel.onlyHere : kind
   return (
     <div
       key={id}
       role="treeitem"
       data-layer={id}
+      data-row={id}
       aria-level={depth + 1}
       aria-setsize={row.siblings}
       aria-posinset={row.position}
@@ -169,70 +176,34 @@ export const LayerRow = memo(function LayerRow({
       data-drop={drop ?? undefined}
       tabIndex={focusable ? 0 : -1}
       draggable={!renaming}
-      onFocus={() => api.focus(id)}
-      onKeyDown={(event) => api.key(event, row, i)}
-      onClick={(event) => api.click(id, event.shiftKey || event.metaKey || event.ctrlKey)}
-      onDoubleClick={() => api.rename(id)}
+      {...rowHandlers(api, row, i)}
       onDragStart={(event) => {
         api.dragStart(id)
         event.dataTransfer.effectAllowed = 'move'
         event.dataTransfer.setData(DRAG_TYPE, id)
       }}
       onDragEnd={() => api.dragEnd()}
-      onDragOver={(event) => {
-        if (!api.dragOver(event, row)) return
-        event.preventDefault()
-        event.dataTransfer.dropEffect = 'move'
-      }}
-      onDragLeave={() => api.dragLeave(id)}
-      onDrop={(event) => {
-        if (api.drop(event, row)) event.preventDefault()
-      }}
-      // A 2 px gap between rows, so each selected row reads as its own pill.
-      style={{ top: i * LAYER_ROW + 1, height: LAYER_ROW - 2, paddingInlineStart: 4 + depth * INDENT }}
+      style={rowPlace(i, depth, pitch)}
       className={cn(
-        'group absolute inset-x-1 flex cursor-default items-center gap-1.5 rounded-[8px] pe-1 text-[13px] font-medium outline-none select-none',
-        'focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-inset',
-        // The selected row is tinted pink, its type tile solid pink, as in the mock.
-        selected ? 'bg-accent/20 text-text lit' : LIT_ROW,
+        ROW_LOOK,
+        'font-medium',
+        selected ? ROW_SELECTED : LIT_ROW,
         drop === 'into' && 'ring-2 ring-accent ring-inset',
         hidden && 'text-subtle',
       )}
     >
       {drop === 'above' && <span aria-hidden className={cn(DROP_LINE, '-top-px')} />}
       {drop === 'below' && <span aria-hidden className={cn(DROP_LINE, '-bottom-px')} />}
-      {row.hasChildren ? (
-        <button
-          type="button"
-          tabIndex={-1}
-          aria-label={format(open ? t.editor.layersPanel.collapse : t.editor.layersPanel.expand, { name: node.name })}
-          onClick={(event) => {
-            event.stopPropagation()
-            api.toggle(id)
-          }}
-          className="grid size-4 shrink-0 cursor-pointer place-items-center rounded-row text-subtle hover:text-text"
-        >
-          <CaretRightIcon
-            size={11}
-            weight="bold"
-            aria-hidden
-            className={cn(
-              'transition-transform duration-[var(--chrome-fast)] rtl:-scale-x-100',
-              open && 'rotate-90 rtl:-rotate-90',
-            )}
-          />
-        </button>
-      ) : (
-        <span aria-hidden className="size-4 shrink-0" />
-      )}
+      <RowCaret shown={row.hasChildren} open={open} name={node.name} onToggle={() => api.toggle(id)} />
       <span
         aria-hidden
         data-testid="layer-picture"
         className={cn(
           'grid size-[22px] shrink-0 place-items-center overflow-hidden rounded-[5px] transition-colors duration-[var(--chrome-fast)]',
-          picture || !selected ? LAYER_PICTURE : 'bg-accent-solid text-on-accent',
+          // A picture is bare, as in the mock; a text's icon sits on an outlined tile, solid pink
+          // while selected, and any other icon is bare until its picture is drawn.
           !picture && !selected && 'text-muted',
-          picture && selected && LAYER_PICTURE_PICKED,
+          !picture && node.type === 'text' && (selected ? 'bg-accent-solid text-on-accent' : LAYER_PICTURE),
           picture && close && BACKDROP[close],
         )}
       >
@@ -242,7 +213,7 @@ export const LayerRow = memo(function LayerRow({
             alt=""
             draggable={false}
             onLoad={(event) => setClose(closeTheme(event.currentTarget))}
-            className="size-full object-contain"
+            className="size-full max-h-[20px] max-w-[20px] object-contain"
           />
         ) : (
           <LayerIcon size={13} weight={selected ? 'bold' : 'regular'} />
@@ -260,42 +231,57 @@ export const LayerRow = memo(function LayerRow({
       ) : (
         <span
           data-testid="layer-name"
-          className={cn('min-w-0 flex-1 truncate', hidden && 'line-through decoration-subtle/60')}
+          // Its end kept clear of the toggles while they show.
+          className={cn('min-w-0 flex-1 truncate', hidden || locked ? clear.on : clear.shown)}
         >
           {node.name}
         </span>
       )}
-      {kind && !renaming && (
-        <span data-testid="layer-kind" className="shrink-0 font-mono text-[11px] text-subtle">
-          {kind}
-        </span>
-      )}
-      <RowToggle
-        on={hidden}
-        label={format(hidden ? t.editor.layersPanel.show : t.editor.layersPanel.hide, { name: node.name })}
-        state={hidden ? 'hidden' : 'shown'}
-        onToggle={() => api.hide(id, !hidden)}
-        icon={hidden ? EyeSlashIcon : EyeIcon}
-        testId="layer-hide"
-      />
-      <RowToggle
-        on={locked}
-        label={format(locked ? t.editor.layersPanel.unlock : t.editor.layersPanel.lock, { name: node.name })}
-        onToggle={() => api.lock(id, !locked)}
-        icon={locked ? LockSimpleIcon : LockSimpleOpenIcon}
-        testId="layer-lock"
-      />
+      {/* The toggles sit in one column on every row, laid over its end just before the label slot. */}
+      <span
+        className={cn(
+          'absolute inset-y-0 end-[calc(70px+0.625rem)] flex items-center',
+          roomy ? 'gap-[8px]' : 'gap-1.5',
+          renaming && 'hidden',
+        )}
+      >
+        <RowToggle
+          on={hidden}
+          label={format(hidden ? t.editor.layersPanel.show : t.editor.layersPanel.hide, { name: node.name })}
+          state={hidden ? 'hidden' : 'shown'}
+          onToggle={() => api.hide(id, !hidden)}
+          icon={hidden ? EyeSlashIcon : EyeIcon}
+          roomy={roomy}
+          testId="layer-hide"
+        />
+        <RowToggle
+          on={locked}
+          label={format(locked ? t.editor.layersPanel.unlock : t.editor.layersPanel.lock, { name: node.name })}
+          onToggle={() => api.lock(id, !locked)}
+          icon={locked ? LockSimpleIcon : LockSimpleOpenIcon}
+          roomy={roomy}
+          testId="layer-lock"
+        />
+      </span>
+      {/* One slot on every layer row, before which the toggles sit; its label ends where the frames' sizes do. */}
+      <span
+        data-testid={label === null ? undefined : row.onlyHere ? 'layer-only-here' : 'layer-kind'}
+        className={cn(ROW_LABEL, ROW_LABEL_SLOT)}
+      >
+        {label}
+      </span>
     </div>
   )
 })
 
-/** Lock or hide on a row: shown while the row is hovered or focused, and always while it is on. */
+/** Lock or hide on a row: shown while the row is hovered or focused, on a touch screen, and always while it is on. */
 function RowToggle({
   on,
   label,
   state,
   onToggle,
   icon: ToggleIcon,
+  roomy,
   testId,
 }: {
   on: boolean
@@ -303,6 +289,7 @@ function RowToggle({
   state?: string
   onToggle: () => void
   icon: Icon
+  roomy: boolean
   testId: string
 }) {
   return (
@@ -317,9 +304,13 @@ function RowToggle({
         event.stopPropagation()
         onToggle()
       }}
+      onDoubleClick={(event) => event.stopPropagation()}
       className={cn(
-        'grid size-6 shrink-0 cursor-pointer place-items-center rounded-[6px] text-subtle hover:bg-hover hover:text-text active:bg-pressed',
-        !on && 'opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100',
+        'grid shrink-0 cursor-pointer place-items-center rounded-[6px] text-subtle hover:bg-hover hover:text-text active:bg-pressed',
+        roomy ? 'size-[44px]' : 'size-6',
+        // Off, it shows while the row is hovered or focused, and always on a screen without hover,
+        // so nothing a finger can't see acts on a tap.
+        !on && 'opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100 [@media(hover:none)]:opacity-100',
       )}
     >
       <ToggleIcon size={14} aria-hidden />

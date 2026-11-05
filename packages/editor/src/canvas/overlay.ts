@@ -1,5 +1,5 @@
-// The overlay over the stage: the frame labels, the picked frame, the outlines of the group gone
-// into, the hovered layer and the drop target, the selection with its handles and size, what each
+// The overlay over the stage: the frame labels, the picked frame, the frame lit from outside the
+// stage, the outlines of the group gone into, the hovered layer and the drop target, the selection with its handles and size, what each
 // gesture shows, the rulers and the caret, drawn in that order.
 import { scaleText } from '@dazbee/renderer'
 import type { Rect } from '@dazbee/schema'
@@ -27,7 +27,15 @@ export interface OverlayDeps {
   view: Pick<EditorView, 'camera' | 'viewport' | 'design' | 'inView' | 'frameOf' | 'rulers' | 'outline'>
   selection: Pick<
     EditorSelection,
-    'current' | 'entered' | 'hovered' | 'pickedFrame' | 'renamingFrame' | 'cropping' | 'pathEditing' | 'tellListeners'
+    | 'current'
+    | 'entered'
+    | 'hovered'
+    | 'pickedFrame'
+    | 'litFrame'
+    | 'renamingFrame'
+    | 'cropping'
+    | 'pathEditing'
+    | 'tellListeners'
   >
   boxes: Pick<EditorBoxes, 'selectionBox' | 'drawnBoxOf' | 'handlesFor'>
   typing: Pick<EditorTyping, 'editing' | 'parts'>
@@ -112,6 +120,7 @@ export function editorOverlay({
       selection.pickedFrame() === frame.id
     )
       label.dataset.active = ''
+    else if (selection.litFrame() === frame.id) label.dataset.lit = ''
     // A frame running off the stage's start keeps its label in view, along the part still showing;
     // a narrow frame keeps its name, cut short, and drops its size; only a frame off the stage has none.
     const box = labelBox(frame, view.camera())
@@ -207,6 +216,13 @@ export function editorOverlay({
         rotation: 0,
       })
       el.dataset.frame = picked.id
+      parts.push(el)
+    }
+    // Lit as a layer under the pointer is, round the whole frame.
+    const lit = view.inView().find((frame) => frame.id === selection.litFrame())
+    if (lit) {
+      const el = outline('frame-lit', lit, { x: 0, y: 0, width: lit.width, height: lit.height, rotation: 0 })
+      el.dataset.frame = lit.id
       parts.push(el)
     }
     const entered = selection.entered()

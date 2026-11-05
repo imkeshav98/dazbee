@@ -19,7 +19,7 @@ import {
 } from 'react'
 
 import { typingIn } from '@/components/editor/edit-panel/fields.tsx'
-import { isSheet, useEditState, usePhone } from '@/components/editor/edit-store.ts'
+import { isSheet, type PanelId, useEditState, usePhone } from '@/components/editor/edit-store.ts'
 import { BAR_BUTTON, POPOVER } from '@/components/editor/styles.ts'
 import { useOverlayScroll } from '@/components/ui/overlay-scroll.ts'
 import { fadedEdges, useScrollEdges } from '@/components/ui/scroll-edges.ts'
@@ -210,6 +210,7 @@ export function BarPopover({
   menu = false,
   align = 'center',
   buttonRef,
+  opens,
 }: {
   id: string
   open: string | null
@@ -231,6 +232,8 @@ export function BarPopover({
   align?: 'center' | 'end'
   /** Given the button, for a control that gives the focus back to it later. */
   buttonRef?: RefObject<HTMLButtonElement | null>
+  /** The edit panel a row of the popover opens, which gives the focus back to the button as it closes. */
+  opens?: PanelId
 }) {
   const focus = useMenuFocus()
   const shown = open === id
@@ -257,6 +260,7 @@ export function BarPopover({
           aria-label={face ? label : undefined}
           title={face ? label : undefined}
           data-testid={`bar-${testId}`}
+          data-opens={opens}
           className={BAR_BUTTON}
         >
           {icon}

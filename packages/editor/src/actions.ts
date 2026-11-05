@@ -7,6 +7,7 @@ import { type Design, LOCK_FLAGS, type Rect } from '@dazbee/schema'
 import type { Frame } from './canvas/frames.ts'
 import type { FrameScenes } from './canvas/scenes.ts'
 import type { EditorView } from './canvas/view.ts'
+import type { EditorFrameActions } from './frame-actions.ts'
 import type { EditorPen } from './gestures/pen/pen.ts'
 import type { EditorAutoLayoutDrag } from './gestures/select/auto-layout-drag.ts'
 import type { EditorTransformDrag } from './gestures/select/transform-drag.ts'
@@ -15,10 +16,9 @@ import { inFlow } from './layers/auto-layout.ts'
 import { type EditorBoxes, visibleIn } from './layers/boxes.ts'
 import { hug as hugIn } from './layers/hug.ts'
 import { boundsOf, type Box, localTo, round } from './layers/transform.ts'
-import { listenerSet } from './listener-set.ts'
 import { runQuietly } from './run-quietly.ts'
 import { type EditorSelection, isPath } from './selection.ts'
-import { NUDGE, NUDGE_FAR, type ShortcutAction } from './shortcuts.ts'
+import { NUDGES, type ShortcutAction } from './shortcuts.ts'
 import type { EditorTools } from './tools.ts'
 
 export interface ActionsDeps {
@@ -31,7 +31,6 @@ export interface ActionsDeps {
     | 'nearestFrame'
     | 'fitAll'
     | 'fitArea'
-    | 'showArea'
     | 'zoomTo'
     | 'zoomIn'
     | 'zoomOut'
@@ -61,6 +60,7 @@ export interface ActionsDeps {
   pen: Pick<EditorPen, 'drawing' | 'finish' | 'deletePoints'>
   transformDrag: Pick<EditorTransformDrag, 'writeBoxes'>
   autoLayoutDrag: Pick<EditorAutoLayoutDrag, 'nudge'>
+  frameActions: Pick<EditorFrameActions, 'frameAction'>
   /** Tells the app that auto layout places some of the layers an align or distribute would move. */
   notify: (notice: 'placedByLayout') => void
   /** Draws the overlay. */
@@ -76,20 +76,6 @@ export interface EditorActions {
   perform(action: ShortcutAction): boolean
   /** Fits the selection in view, else the picked frame, else the shown page's frames. */
   fitSelection(): void
-  /** Calls back with a frame's name once Delete has deleted it as the picked frame, so the page can offer its undo. */
-  onFrameDelete(listener: (name: string) => void): () => boolean
-}
-
-/** How far each arrow key moves the selection or the picked frame, in design pixels along x and y; Shift goes further. */
-const NUDGES: Readonly<Partial<Record<ShortcutAction, readonly [number, number]>>> = {
-  nudgeLeft: [-NUDGE, 0],
-  nudgeRight: [NUDGE, 0],
-  nudgeUp: [0, -NUDGE],
-  nudgeDown: [0, NUDGE],
-  nudgeLeftFar: [-NUDGE_FAR, 0],
-  nudgeRightFar: [NUDGE_FAR, 0],
-  nudgeUpFar: [0, -NUDGE_FAR],
-  nudgeDownFar: [0, NUDGE_FAR],
 }
 
 export function editorActions({
@@ -101,7 +87,6 @@ export function editorActions({
     nearestFrame,
     fitAll,
     fitArea,
-    showArea,
     zoomTo,
     zoomIn,
     zoomOut,
@@ -115,11 +100,10 @@ export function editorActions({
   pen,
   transformDrag,
   autoLayoutDrag,
+  frameActions,
   notify,
   drawOverlay,
 }: ActionsDeps): EditorActions {
-  /** Told of each frame Delete deleted, by its name. */
-  const frameDeletes = listenerSet<[name: string]>()
   /** Groups fit what they hold again after a change inside them, in the same undo step. */
   const hug = (ids: string[]) => hugIn(session, ids)
   function fitSelection() {
@@ -299,7 +283,7 @@ export function editorActions({
       return true
     }
     const picked = selection.pickedFrame()
-    if (picked !== null && !selection.current()) return frameAction(action, picked)
+    if (picked !== null && !selection.current()) return frameActions.frameAction(action, picked)
     const current = selection.current()
     const frame = current && frameOf(current.frameId)
     if (!current || !frame) return false
@@ -507,37 +491,8 @@ export function editorActions({
     return true
   }
 
-  /**
-   * What a key does to the picked frame: Esc lets it go, Delete deletes it with its layers, Mod+D
-   * duplicates it and picks the copy, panning to show it at the same zoom, and the arrows move it;
-   * each is one undo step. The layers' other keys do nothing to it.
-   */
-  function frameAction(action: ShortcutAction, frameId: string): boolean {
-    const step = NUDGES[action]
-    const stored = session.design().frames[frameId]
-    if (step && stored) {
-      // Another tab may have deleted the frame a moment ago; the key then does nothing.
-      runQuietly(() => session.run('frame.update', { frameId, x: stored.x + step[0], y: stored.y + step[1] }))
-    } else if (action === 'deselect') {
-      selection.pickFrame(null)
-    } else if (action === 'delete') {
-      if (stored && runQuietly(() => session.run('frame.delete', { frameId }))) frameDeletes.emit(stored.name)
-      selection.pickFrame(null)
-    } else if (action === 'duplicate') {
-      let copy = ''
-      if (runQuietly(() => (copy = session.run('frame.duplicate', { frameId })))) selection.pickFrame(copy)
-      const made = session.design().frames[copy]
-      if (made) showArea({ x: made.x, y: made.y, width: made.width, height: made.height })
-    } else {
-      return false
-    }
-    drawOverlay()
-    return true
-  }
-
   return {
     perform,
     fitSelection,
-    onFrameDelete: frameDeletes.on,
   }
 }

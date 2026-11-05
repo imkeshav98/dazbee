@@ -68,6 +68,7 @@ export function NumberField({
   placeholder,
   editor,
   testId,
+  className,
   onSet,
   onShift,
   onClear,
@@ -88,6 +89,8 @@ export function NumberField({
   /** Makes a drag one undo step; without one, a drag is as many changes as it makes. */
   editor?: Editor
   testId?: string
+  /** Looks laid over the knob's, such as its height on a phone. */
+  className?: string
   onSet: (value: number) => void
   onShift: (by: number) => void
   onClear?: () => void
@@ -166,7 +169,7 @@ export function NumberField({
       onPointerUp={() => release(true)}
       onPointerCancel={() => release(false)}
       onLostPointerCapture={() => release(false)}
-      className={KNOB}
+      className={cn(KNOB, className)}
     >
       <span className="relative min-w-0 truncate">{label}</span>
       <input

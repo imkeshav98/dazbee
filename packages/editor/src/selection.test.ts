@@ -318,11 +318,22 @@ describe('editorSelection', () => {
       expect(log).toEqual(['changed'])
     })
 
-    it('does nothing for the frame already picked', () => {
+    it('for the frame already picked, changes nothing and shows it, and the frame listeners hear it again once told', () => {
       const { selection, log } = harness()
       selection.pickFrame('p1-f1')
+      selection.tellListeners()
       log.length = 0
       selection.pickFrame('p1-f1')
+      expect(selection.pickedFrame()).toBe('p1-f1')
+      selection.tellListeners()
+      selection.tellListeners()
+      expect(log).toEqual(['changed', 'frame p1-f1'])
+    })
+
+    it('with none picked, does nothing for null', () => {
+      const { selection, log } = harness()
+      selection.pickFrame(null)
+      selection.tellListeners()
       expect(log).toEqual([])
     })
 
@@ -476,6 +487,21 @@ describe('editorSelection', () => {
       expect(selection.hovered()).toEqual({ id: 'path', frameId: 'p1-f2' })
       expect(selection.hover(null)).toBe(true)
       expect(selection.hovered()).toBeNull()
+      expect(log).toEqual([])
+    })
+  })
+
+  describe('lightFrame', () => {
+    it('says whether the frame lit from outside the stage changed, and lights none at first', () => {
+      const { selection, log } = harness()
+      expect(selection.litFrame()).toBeNull()
+      expect(selection.lightFrame(null)).toBe(false)
+      expect(selection.lightFrame('p1-f1')).toBe(true)
+      expect(selection.lightFrame('p1-f1')).toBe(false)
+      expect(selection.lightFrame('p1-f2')).toBe(true)
+      expect(selection.litFrame()).toBe('p1-f2')
+      expect(selection.lightFrame(null)).toBe(true)
+      expect(selection.litFrame()).toBeNull()
       expect(log).toEqual([])
     })
   })

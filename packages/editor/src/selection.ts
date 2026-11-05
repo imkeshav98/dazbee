@@ -1,5 +1,6 @@
-// What is selected, the group gone into, the picked frame, a crop or path edit, and the layer under
-// the pointer, with the rules that keep them in step and the listeners that follow them.
+// What is selected, the group gone into, the picked frame, a crop or path edit, the layer under the
+// pointer and the frame lit from outside the stage, with the rules that keep them in step and the
+// listeners that follow them.
 import { type Design, frameIdOf } from '@dazbee/schema'
 
 import type { Frame } from './canvas/frames.ts'
@@ -51,6 +52,8 @@ export interface EditorSelection {
   pathEditing(): Readonly<PathEditing> | null
   /** The layer under the pointer, outlined while nothing is being dragged. */
   hovered(): Picked | null
+  /** The frame lit from outside the stage, as a list's row does while it is hovered or focused; null with none. */
+  litFrame(): string | null
   /**
    * Selects layers in one frame, or none, with no ids or no frame; a crop or path edit stays only on
    * that one layer there. Shows it.
@@ -69,7 +72,10 @@ export interface EditorSelection {
    * group gone into, and the picked frame when it is not shown.
    */
   dropOffPage(): void
-  /** Picks a frame, or none with null, letting the selection go, and shows it. */
+  /**
+   * Picks a frame, or none with null, letting the selection go, and shows it. The frame already
+   * picked is picked again: nothing changes, but the frame listeners hear of it.
+   */
   pickFrame(frameId: string | null): void
   /**
    * Picks a frame for the page to rename in place of its label, and shows it; null once the rename
@@ -86,14 +92,17 @@ export interface EditorSelection {
   pickAnchors(refs: AnchorRef[]): void
   /** Sets the layer under the pointer; returns whether it changed. */
   hover(next: Picked | null): boolean
+  /** Lights a frame from outside the stage, or none with null; returns whether it changed. */
+  lightFrame(frameId: string | null): boolean
   /**
    * Tells the selection listeners when the selection differs from the one they last heard of,
-   * then the frame listeners when the picked frame does. The overlay calls it once drawn.
+   * then the frame listeners when the picked frame does or was picked again. The overlay calls it
+   * once drawn.
    */
   tellListeners(): void
   /** Told when the selection changes, so panels can follow it. */
   onSelection(listener: (ids: string[]) => void): () => boolean
-  /** Told when the picked frame changes, with null once it goes. */
+  /** Told when the picked frame changes, with null once it goes, and when it is picked again. */
   onFramePick(listener: (frameId: string | null) => void): () => boolean
   destroy(): void
 }
@@ -112,6 +121,8 @@ export function editorSelection({ drawn, frames, changed }: SelectionDeps): Edit
   let renaming: string | null = null
   /** The picked frame the frame listeners last heard of. */
   let lastPicked: string | null = null
+  /** Whether the picked frame was picked again since the frame listeners last heard. */
+  let pickedAgain = false
   /** The group or box double-clicked into. */
   let entered: string | null = null
   /** The frame layers were last selected in, by page. */
@@ -120,6 +131,8 @@ export function editorSelection({ drawn, frames, changed }: SelectionDeps): Edit
   let lastSelection = ''
   /** The layer under the pointer. */
   let hovered: Picked | null = null
+  /** The frame lit from outside the stage. */
+  let lit: string | null = null
   /** The path layer whose points are being edited, and its selected anchors. */
   let pathEditing: PathEditing | null = null
   /** The layer whose image fill is being cropped. */
@@ -201,7 +214,12 @@ export function editorSelection({ drawn, frames, changed }: SelectionDeps): Edit
     endModesWhenNone()
   }
   function pickFrame(frameId: string | null) {
-    if (frameId === pickedFrame) return
+    if (frameId === pickedFrame) {
+      if (frameId === null) return
+      pickedAgain = true
+      changed()
+      return
+    }
     pickedFrame = frameId
     renaming = null
     // Picking a frame lets the selection go, with a crop or path edit on it and any group gone into.
@@ -236,6 +254,11 @@ export function editorSelection({ drawn, frames, changed }: SelectionDeps): Edit
     hovered = next
     return moved
   }
+  function lightFrame(frameId: string | null) {
+    const changed = frameId !== lit
+    lit = frameId
+    return changed
+  }
 
   function tellListeners() {
     const now = selection ? `${selection.frameId}|${selection.ids.join(',')}` : ''
@@ -243,8 +266,9 @@ export function editorSelection({ drawn, frames, changed }: SelectionDeps): Edit
       lastSelection = now
       for (const listener of selectionListeners) listener(selection?.ids ?? [])
     }
-    if (pickedFrame !== lastPicked) {
+    if (pickedFrame !== lastPicked || pickedAgain) {
       lastPicked = pickedFrame
+      pickedAgain = false
       for (const listener of frameListeners) listener(pickedFrame)
     }
   }
@@ -271,6 +295,7 @@ export function editorSelection({ drawn, frames, changed }: SelectionDeps): Edit
     cropping: croppingLayer,
     pathEditing: editingPath,
     hovered: hoveredLayer,
+    litFrame: () => lit,
     select,
     selectKeepingModes,
     keep,
@@ -282,6 +307,7 @@ export function editorSelection({ drawn, frames, changed }: SelectionDeps): Edit
     editPath,
     pickAnchors,
     hover,
+    lightFrame,
     tellListeners,
     onSelection,
     onFramePick,

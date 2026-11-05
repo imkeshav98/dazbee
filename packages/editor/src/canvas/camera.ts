@@ -76,21 +76,25 @@ export function fit(rect: Rect, viewport: Viewport, padding?: number, insets: In
 }
 
 /**
- * The camera at the same zoom that shows a rect whole, with room for its label over it, in the part
- * of the viewport the insets leave clear: the camera as it is when that part shows it already, else
- * one that centres the rect there.
+ * The camera at the same zoom that shows a rect whole with room for its label over it, in the part
+ * of the viewport the insets leave clear: the camera as it is when that part shows them already,
+ * else one that centres them there.
  */
 export function reveal(c: Camera, rect: Rect, viewport: Viewport, insets: Insets = NO_INSETS): Camera {
-  const start = toScreen(c, { x: rect.x, y: rect.y })
-  const end = toScreen(c, { x: rect.x + rect.width, y: rect.y + rect.height })
-  const right = viewport.width - insets.right
-  const bottom = viewport.height - insets.bottom
-  if (start.x >= insets.left && start.y - LABEL_ROOM >= insets.top && end.x <= right && end.y <= bottom) return c
-  return {
-    zoom: c.zoom,
-    x: (insets.left + right) / 2 - (rect.x + rect.width / 2) * c.zoom,
-    y: (insets.top + bottom) / 2 - (rect.y + rect.height / 2) * c.zoom,
+  return revealAt(c, c.zoom, rect, viewport, insets)
+}
+
+/**
+ * As `reveal`, but zoomed out, only as far as it needs, for a rect and its label that don't fit
+ * LABEL_PAD in from the clear part's edges at the camera's zoom; it never zooms in.
+ */
+export function revealWhole(c: Camera, rect: Rect, viewport: Viewport, insets: Insets = NO_INSETS): Camera {
+  const room = {
+    width: Math.max(1, viewport.width - insets.left - insets.right - 2 * LABEL_PAD),
+    height: Math.max(1, viewport.height - insets.top - insets.bottom - LABEL_ROOM - 2 * LABEL_PAD),
   }
+  const zoom = clampZoom(Math.min(c.zoom, room.width / Math.max(1, rect.width), room.height / Math.max(1, rect.height)))
+  return revealAt(c, zoom, rect, viewport, insets)
 }
 
 /**
@@ -108,6 +112,36 @@ export function revealLabel(c: Camera, rect: Rect, viewport: Viewport, insets: I
   return dx === 0 && dy === 0 ? c : { zoom: c.zoom, x: c.x + dx, y: c.y + dy }
 }
 
+/**
+ * The edge of the stage a panel floating over it covers, both at their places on the page, `gap`
+ * past the panel's edge: the bottom for a panel across most of the stage's width, as on a phone,
+ * else the side it floats on.
+ */
+export function coverOf(panel: Rect, stage: Rect, gap = 12): Partial<Insets> {
+  if (panel.width > stage.width * 0.6) return { bottom: stage.y + stage.height - panel.y + gap }
+  if (panel.x + panel.width / 2 < stage.x + stage.width / 2) return { left: panel.x + panel.width - stage.x + gap }
+  return { right: stage.x + stage.width - panel.x + gap }
+}
+
+/** Whether a rect of the world shows, at the camera, under a panel over the stage, both at their places on the page. */
+export function under(c: Camera, rect: Rect, panel: Rect, stage: Rect): boolean {
+  const start = toScreen(c, { x: rect.x, y: rect.y })
+  const end = toScreen(c, { x: rect.x + rect.width, y: rect.y + rect.height })
+  const left = panel.x - stage.x
+  const top = panel.y - stage.y
+  return start.x < left + panel.width && end.x > left && start.y < top + panel.height && end.y > top
+}
+
+/** Insets kept clear of `cover` too, the stage's edges a panel covers: each edge the larger of the two. */
+export function widen(insets: Insets, cover: Partial<Insets>): Insets {
+  return {
+    top: Math.max(insets.top, cover.top ?? 0),
+    right: Math.max(insets.right, cover.right ?? 0),
+    bottom: Math.max(insets.bottom, cover.bottom ?? 0),
+    left: Math.max(insets.left, cover.left ?? 0),
+  }
+}
+
 /** The part of the world the viewport shows. */
 export function visibleRect(c: Camera, viewport: Viewport): Rect {
   const corner = toWorld(c, { x: 0, y: 0 })
@@ -118,6 +152,23 @@ export function visibleRect(c: Camera, viewport: Viewport): Rect {
 export function framesInView<F extends Rect>(frames: readonly F[], c: Camera, viewport: Viewport): F[] {
   const view = visibleRect(c, viewport)
   return frames.filter((frame) => intersects(frame, view))
+}
+
+/**
+ * The camera as it is when the clear part of the viewport shows the rect whole with room for its
+ * label over it, else one at `zoom` that centres the two there.
+ */
+function revealAt(c: Camera, zoom: number, rect: Rect, viewport: Viewport, insets: Insets): Camera {
+  const start = toScreen(c, { x: rect.x, y: rect.y })
+  const end = toScreen(c, { x: rect.x + rect.width, y: rect.y + rect.height })
+  const right = viewport.width - insets.right
+  const bottom = viewport.height - insets.bottom
+  if (start.x >= insets.left && start.y - LABEL_ROOM >= insets.top && end.x <= right && end.y <= bottom) return c
+  return {
+    zoom,
+    x: (insets.left + right) / 2 - (rect.x + rect.width / 2) * zoom,
+    y: (insets.top + LABEL_ROOM + bottom) / 2 - (rect.y + rect.height / 2) * zoom,
+  }
 }
 
 /**

@@ -2,7 +2,7 @@
 // layers panel, and deleting a frame leaves the layers of every other frame; the design and the
 // check are support/edit-in-frame.ts's.
 import { added, editInSquare, inFrame, propsOf } from '../../support/edit-in-frame.ts'
-import { openLayers, row, tree } from '../../support/layers-panel.ts'
+import { frameRow, openLayers, row, tree } from '../../support/layers-panel.ts'
 import { copyIn } from '../../support/seed.ts'
 import { press, selectLayers } from '../../support/stage.ts'
 import { expect, test } from '../../support/test.ts'
@@ -116,6 +116,8 @@ test.describe('the layers panel', () => {
       browser,
       async (a) => {
         await openLayers(a)
+        // The square's row picks it and opens it to its layers.
+        await frameRow(a, 'Square').click()
         await row(a, 'Shape').dblclick()
         const field = tree(a).getByRole('textbox', { name: 'Name of Shape' })
         await expect(field).toBeFocused()
@@ -131,6 +133,7 @@ test.describe('the layers panel', () => {
       browser,
       async (a) => {
         await openLayers(a)
+        await frameRow(a, 'Square').click()
         await row(a, 'Shape').hover()
         await row(a, 'Shape').getByRole('button', { name: 'Hide Shape' }).click()
       },

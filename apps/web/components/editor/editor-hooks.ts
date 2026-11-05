@@ -34,18 +34,6 @@ export function usePickedFrame(editor: Editor) {
   return picked
 }
 
-/** The selection and the frame it is in, kept current. */
-export function useSelectionWithFrame(editor: Editor) {
-  const [state, setState] = useState(() => ({ ids: editor.selection(), frameId: editor.selectedFrame() }))
-  useEffect(() => {
-    const stop = editor.onSelection((ids) => setState({ ids, frameId: editor.selectedFrame() }))
-    return () => {
-      stop()
-    }
-  }, [editor])
-  return state
-}
-
 /** The design as the editor holds it, kept current: every redraw hands over the latest one. */
 export function useEditorDesign(editor: Editor) {
   const { design } = useLiveDesign(editor)

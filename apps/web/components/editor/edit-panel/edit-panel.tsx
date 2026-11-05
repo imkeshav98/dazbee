@@ -75,22 +75,26 @@ export function EditPanel({ editor, brandId }: { editor: Editor; brandId: string
 }
 
 /**
- * The edit panel's frame, for a layer's panels and the design's own (Pages): its title, a note and
- * an action beside it, ✕, and a body that scrolls. It floats at the stage's end side under the top
- * bar's row, only as tall as what it holds; on a phone it is a sheet at the bottom. Esc or ✕ closes
- * it, and the focus goes back to the item that opened it when closed from inside it.
+ * The edit panel's frame, for a layer's panels and the design's own (Pages): its title, up to two
+ * lines, a note and an action beside it, ✕, and a body that scrolls. It floats at the stage's end
+ * side under the top bar's row, only as tall as what it holds; on a phone it is a sheet at the
+ * bottom. Esc or ✕ closes it, and the focus goes back to the item that opened it when closed from
+ * inside it. It takes the focus as it opens unless `focus` is false.
  */
 export function PanelFrame({
   id,
   title,
   note,
   action,
+  focus = true,
   children,
 }: {
   id: PanelId
   title: string
   note?: string
   action?: ReactNode
+  /** Whether the panel takes the focus as it opens; false leaves it where it is, as on the stage. */
+  focus?: boolean
   children: ReactNode
 }) {
   const t = useMessages()
@@ -155,10 +159,11 @@ export function PanelFrame({
     return () => window.removeEventListener('keydown', onKey, true)
   })
   // The focus moves into the panel as it opens, onto the panel itself: Tab goes on to its
-  // controls, and no field takes the focus, so a phone's keyboard stays down.
+  // controls, and no field takes the focus, so a phone's keyboard stays down. `focus` is set once,
+  // as the panel opens.
   useEffect(() => {
-    panel.current?.focus({ preventScroll: true })
-  }, [])
+    if (focus) panel.current?.focus({ preventScroll: true })
+  }, [focus])
   // On a phone the sheet's top edge is known, so what sits at the bottom start can stand above it.
   useLayoutEffect(() => {
     if (!sheet || !panel.current) {
@@ -175,6 +180,19 @@ export function PanelFrame({
       setSheetTop(null)
     }
   }, [sheet])
+  // A long title, as a frame's long name in Add a size to, wraps onto a second line and then ends
+  // in an ellipsis, with the whole title as its tooltip.
+  const heading = useRef<HTMLHeadingElement>(null)
+  const [titleCut, setTitleCut] = useState(false)
+  useLayoutEffect(() => {
+    const el = heading.current
+    if (!el) return
+    const measure = () => setTitleCut(el.scrollHeight > el.clientHeight + 1)
+    measure()
+    const watch = new ResizeObserver(measure)
+    watch.observe(el)
+    return () => watch.disconnect()
+  }, [title])
   const top = (barBottom || rowBottom) + 10
   return (
     <section
@@ -201,11 +219,16 @@ export function PanelFrame({
     >
       <div
         className={cn(
-          'flex h-12 shrink-0 items-center gap-2 border-b ps-4 pe-2 transition-colors',
+          'flex min-h-12 shrink-0 items-center gap-2 border-b py-1.5 ps-4 pe-2 transition-colors',
           scroll.down ? 'border-line' : 'border-transparent',
         )}
       >
-        <h2 id="edit-panel-title" className="min-w-0 flex-1 truncate font-display text-[15px] font-bold tracking-tight">
+        <h2
+          ref={heading}
+          id="edit-panel-title"
+          title={titleCut ? title : undefined}
+          className="line-clamp-2 min-w-0 flex-1 font-display text-[15px] leading-[1.3] font-bold tracking-tight break-words"
+        >
           {title}
         </h2>
         {note && (

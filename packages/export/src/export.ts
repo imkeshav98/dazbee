@@ -10,8 +10,11 @@ import {
   ExportRequest,
   type ExportType,
   type Frame,
+  numberedFrameNames,
+  type NumberedName,
   type Page,
   parseDesign,
+  safeFileName,
 } from '@dazbee/schema'
 
 import { zip } from './zip.ts'
@@ -31,17 +34,14 @@ const MIME: Record<ExportType | 'zip', string> = {
   zip: 'application/zip',
 }
 
-/** Path separators, the characters some file systems reserve, and control characters. */
-// eslint-disable-next-line no-control-regex
-const UNSAFE_IN_NAMES = /[/\\:*?"<>|\u0000-\u001f]/g
-
 const TOKENS = new RegExp(`\\{(${EXPORT_NAME_TOKENS.join('|')})\\}`, 'g')
 
 /**
- * The request's frames, in its order, each one file, named from the request's template; a name
- * already taken, in any case, gets " 2", " 3" and so on. One file comes as itself; more come as
- * one flat zip named after the design. `onFile` hears each file as it is made, so a caller can
- * show progress.
+ * The request's frames, in its order, each one file, named from the request's template. A frame's
+ * name is the one its page's frames give it (numberedFrameNames), numbered by its place among them
+ * once made safe for files, whichever frames are asked for, so a file takes the name Export lists
+ * its frame by; a file name still taken, in any case, gets " 2", " 3" and so on. One file comes as itself; more come as one flat zip named after
+ * the design. `onFile` hears each file as it is made, so a caller can show progress.
  */
 export function exportDesign(
   ck: CanvasKit,
@@ -58,16 +58,24 @@ export function exportDesign(
   const missing = request.frameIds.find((frameId) => !Object.hasOwn(design.frames, frameId))
   if (missing !== undefined) throw new Error(`no frame "${missing}"`)
   const taken = new Set<string>()
+  // Each page's frames' numbered names, worked out once per page.
+  const numbered = new Map<string, Map<string, NumberedName>>()
   const files = request.frameIds.map((frameId, i) => {
     const frame = design.frames[frameId] as Frame
     const page = design.pages[frame.pageId] as Page
+    let names = numbered.get(frame.pageId)
+    if (!names) numbered.set(frame.pageId, (names = numberedFrameNames(design, frame.pageId)))
     const image = {
       png: () => exportPng(ck, design, frameId, bytes, cache),
       jpg: () => exportJpg(ck, design, frameId, bytes, request.quality, cache),
       pdf: () => exportPdf(ck, design, frameId, bytes, cache),
       svg: () => exportSvg(ck, design, frameId, bytes, cache),
     }[request.type]()
-    const base = fileName(request.name, { design: design.meta.name, page: page.name, frame: frame.name })
+    const base = fileName(request.name, {
+      design: design.meta.name,
+      page: page.name,
+      frame: names.get(frameId)?.name ?? frame.name,
+    })
     let name = `${base}.${request.type}`
     for (let n = 2; taken.has(name.toLowerCase()); n++) name = `${base} ${n}.${request.type}`
     taken.add(name.toLowerCase())
@@ -77,7 +85,7 @@ export function exportDesign(
   const [only] = files
   if (files.length === 1 && only) return only
   return {
-    name: `${safe(design.meta.name)}.zip`,
+    name: `${safeFileName(design.meta.name)}.zip`,
     type: MIME.zip,
     bytes: zip(files.map((f) => ({ path: f.name, bytes: f.bytes }))),
   }
@@ -159,11 +167,5 @@ export function exportSvg(
 
 /** A file name from the request's template, its tokens filled in; anything else is kept as written. */
 export function fileName(template: string, values: Record<ExportNameToken, string>): string {
-  return safe(template.replace(TOKENS, (_, token: ExportNameToken) => values[token]))
-}
-
-/** A name safe on every file system: no path separators or reserved characters, never empty. */
-function safe(part: string) {
-  const cleaned = part.replace(UNSAFE_IN_NAMES, '-').replace(/\s+/g, ' ').trim().replace(/^\.+/, '')
-  return cleaned || 'untitled'
+  return safeFileName(template.replace(TOKENS, (_, token: ExportNameToken) => values[token]))
 }
