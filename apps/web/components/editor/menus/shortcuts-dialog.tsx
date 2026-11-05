@@ -18,7 +18,7 @@ type Listed = ShortcutAction & keyof Messages['editor']['shortcuts']['actions']
 
 /** The table's actions, in the groups the list shows them in. */
 const GROUPS: [Group, Listed[]][] = [
-  ['edit', ['undo', 'redo', 'selectAll', 'deselect', 'delete', 'duplicate', 'editPoints']],
+  ['edit', ['undo', 'redo', 'selectAll', 'deselect', 'delete', 'duplicate', 'editPoints', 'copyStyle', 'pasteStyle']],
   [
     'tools',
     [
@@ -64,6 +64,7 @@ const GROUPS: [Group, Listed[]][] = [
     ],
   ],
   ['combine', ['booleanUnion', 'booleanSubtract', 'booleanIntersect', 'booleanExclude']],
+  ['linked', ['styleToLinked', 'textToLinked', 'lockLinked', 'hideLinked']],
   [
     'move',
     ['nudgeLeft', 'nudgeRight', 'nudgeUp', 'nudgeDown', 'nudgeLeftFar', 'nudgeRightFar', 'nudgeUpFar', 'nudgeDownFar'],

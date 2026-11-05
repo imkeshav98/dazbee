@@ -31,6 +31,23 @@ describe('shortcuts', () => {
     expect(shortcutFor(key('R', 'KeyR', { shift: true }))).toBe('toggleRulers')
   })
 
+  it('give the style and linked-copy actions Ctrl+Alt, with Shift for the ones that reach the linked copies', () => {
+    expect(shortcutFor(key('c', 'KeyC', { ctrl: true, alt: true }))).toBe('copyStyle')
+    expect(shortcutFor(key('v', 'KeyV', { ctrl: true, alt: true }))).toBe('pasteStyle')
+    expect(shortcutFor(key('C', 'KeyC', { ctrl: true, alt: true, shift: true }))).toBe('styleToLinked')
+    expect(shortcutFor(key('T', 'KeyT', { ctrl: true, alt: true, shift: true }))).toBe('textToLinked')
+    expect(shortcutFor(key('L', 'KeyL', { ctrl: true, alt: true, shift: true }))).toBe('lockLinked')
+    expect(shortcutFor(key('H', 'KeyH', { ctrl: true, alt: true, shift: true }))).toBe('hideLinked')
+    // ⌘⌥C on a Mac types ç; the key's place still names it.
+    expect(shortcutFor(key('ç', 'KeyC', { meta: true, alt: true }))).toBe('copyStyle')
+    expect(shortcutFor(key('l', 'KeyL', { ctrl: true, shift: true }))).toBe('lock')
+    expect(pressFor('hideLinked')).toBe('Control+Alt+Shift+KeyH')
+    // Copy to other frames ▸ Layer and Delete from all frames are menu items with no key.
+    const keysOf = (action: string) => SHORTCUTS.find((s) => s.action === action)?.keys
+    expect(keysOf('layerToLinked')).toEqual([])
+    expect(keysOf('deleteLinked')).toEqual([])
+  })
+
   it('give each key one action', () => {
     const specs = SHORTCUTS.flatMap((s) => s.keys)
     expect(new Set(specs).size).toBe(specs.length)

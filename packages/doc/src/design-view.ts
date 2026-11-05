@@ -4,6 +4,7 @@ import { canHold, deepFreeze, type Design, type Layer, parseDesignIncrementally,
 
 import { buildChildIndex, registerChildIndex, siblingOrder } from './children.ts'
 import { DELETED, type DesignDoc, nodeToJson, readDesign, root } from './design-doc.ts'
+import { registerLinkIndex } from './links.ts'
 import { repair } from './repair.ts'
 
 type Json = Record<string, unknown>
@@ -273,6 +274,10 @@ export function designView(doc: DesignDoc) {
   registerChildIndex(nodes, (parentId) => {
     refresh()
     return children.get(parentId) ?? []
+  })
+  registerLinkIndex(nodes, (frameId) => {
+    refresh()
+    return linkHolder.get(frameId)
   })
 
   function destroy() {

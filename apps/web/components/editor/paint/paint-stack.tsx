@@ -15,6 +15,17 @@ import { useBrandKit } from '@/components/brand-kit/use-brand-kit.ts'
 import { useBesidePanel } from '@/components/editor/beside-panel.ts'
 import { Choice, clamp, ColorField, NumberField } from '@/components/editor/edit-panel/fields.tsx'
 import type { P } from '@/components/editor/edit-panel/target.ts'
+import { ImagePickerButton } from '@/components/editor/image-tool.tsx'
+import {
+  CHIP,
+  FACE_SIZE,
+  ICON_BUTTON,
+  KNOBS,
+  POPOVER,
+  SQUARE_SWATCH_TARGET,
+  SWATCH_ROW,
+  TOUCH_GAP,
+} from '@/components/editor/styles.ts'
 import { useMenuFocus } from '@/components/editor/top-bar/bar-popover.tsx'
 import { FOCUS_RING, SEGMENT, SEGMENTS } from '@/components/ui/looks.ts'
 import { brandPath } from '@/lib/brand-routes.ts'
@@ -24,8 +35,7 @@ import { tidy } from '@/lib/editor/size.ts'
 import { format } from '@/lib/i18n/index.ts'
 
 import { angleOf, type Gradient, GradientBar, linearAt, type Stop, stopsCss } from './gradient-bar.tsx'
-import { ImagePickerButton } from './image-tool.tsx'
-import { CHIP, ICON_BUTTON, KNOBS, POPOVER, SWATCH } from './styles.ts'
+import { Swatch } from './swatch.tsx'
 
 /** An image asset's small picture, as the API serves it. */
 export const assetThumbnail = (brandId: string, assetId: string) => brandPath(brandId, 'assets', assetId, 'thumbnail')
@@ -116,7 +126,10 @@ export function PaintRow({
   const hidden = paint.visible === false
   const focus = useMenuFocus()
   return (
-    <div className={cn('flex min-w-0 flex-1 items-center gap-1', hidden && 'opacity-50')} data-paint={paint.type}>
+    <div
+      className={cn('flex min-w-0 flex-1 items-center gap-1', TOUCH_GAP, hidden && 'opacity-50')}
+      data-paint={paint.type}
+    >
       <Popover.Root onOpenChange={(open) => open && beside.measure(focus.button.current)}>
         <Popover.Trigger asChild>
           <button
@@ -124,9 +137,9 @@ export function PaintRow({
             type="button"
             aria-label={format(p.editPaint, { name })}
             data-testid="paint-swatch"
-            className={cn('shrink-0 cursor-pointer rounded-[7px]', FOCUS_RING)}
+            className={cn(SQUARE_SWATCH_TARGET, FOCUS_RING)}
           >
-            <PaintSwatch paint={paint} brandId={brandId} className="size-7" />
+            <PaintSwatch paint={paint} brandId={brandId} className={cn(FACE_SIZE, 'size-7')} />
           </button>
         </Popover.Trigger>
         <Popover.Portal>
@@ -272,7 +285,7 @@ export function PaintEditor({
       {isGradient(paint) && (
         <>
           <GradientBar paint={paint} picked={picked} onPick={setPicked} editor={editor} p={p} onSet={setGradient} />
-          <div className="flex items-center gap-1">
+          <div className={cn('flex items-center gap-1', TOUCH_GAP)}>
             <ColorField
               name={format(p.stopColour, { n: Math.min(picked, paint.stops.length - 1) + 1 })}
               value={stop?.color}
@@ -439,16 +452,15 @@ function BrandColours({ brandId, label, onPick }: { brandId: string; label: stri
   const colors = useBrandKit(brandId)?.colors ?? []
   if (colors.length === 0) return null
   return (
-    <div role="group" aria-label={label} className="flex flex-wrap gap-1">
+    <div role="group" aria-label={label} className={cn(SWATCH_ROW, 'gap-1')}>
       {colors.map((c) => (
-        <button
+        <Swatch
           key={c.token}
-          type="button"
-          aria-label={`${c.name} ${hexOf(c.value)}`}
+          color={c.value}
+          label={`${c.name} ${hexOf(c.value)}`}
           title={c.name}
-          onClick={() => onPick(c.value)}
-          style={{ backgroundColor: c.value }}
-          className={cn(SWATCH, 'size-6', FOCUS_RING)}
+          size="size-6"
+          onPick={() => onPick(c.value)}
         />
       ))}
     </div>

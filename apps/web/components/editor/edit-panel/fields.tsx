@@ -10,11 +10,13 @@ import { alphaOf } from '@dazbee/schema'
 
 import { NumberInput, useNumberInput } from '@/components/editor/number-input.tsx'
 import {
+  FACE_SIZE,
   FIELD,
   KNOB,
   NUMBER_TEXT,
   PANEL_PART,
   SELECT,
+  SQUARE_SWATCH_TARGET,
   SWITCH,
   SWITCH_ROW,
   TOUCH_GAP,
@@ -256,14 +258,17 @@ export function ColorField({
     // Its hex and opacity are fields, 44 px tall and 8 px apart on a phone or a touch screen.
     <div className={cn('flex min-w-0 flex-1 items-center gap-1', TOUCH_GAP)}>
       {swatch && (
-        <input
-          name="colour"
-          type="color"
-          aria-label={format(p.colourOf, { name })}
-          value={hex || '#000000'}
-          onChange={(event) => onSet(hexChange(event.target.value.toUpperCase()))}
-          className="size-7 shrink-0 cursor-pointer rounded-row border border-line bg-surface p-0.5"
-        />
+        // The label is the box's target: on a phone a press round the box opens the picker too.
+        <label className={SQUARE_SWATCH_TARGET}>
+          <input
+            name="colour"
+            type="color"
+            aria-label={format(p.colourOf, { name })}
+            value={hex || '#000000'}
+            onChange={(event) => onSet(hexChange(event.target.value.toUpperCase()))}
+            className={cn(FACE_SIZE, 'size-7 cursor-pointer rounded-row border border-line bg-surface p-0.5')}
+          />
+        </label>
       )}
       {/* A hex reads left to right in every language, with its # first. */}
       <input

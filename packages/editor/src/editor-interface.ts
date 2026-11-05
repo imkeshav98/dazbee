@@ -5,9 +5,11 @@ import type { ExportedFile } from '@dazbee/export'
 import type { Design, ExportRequestInput, Point, Rect, TextStyle, VariableRef, Variables } from '@dazbee/schema'
 import type { Skipped } from '@dazbee/svg'
 
+import type { UngroupState } from './actions.ts'
 import type { Camera, Insets, Viewport } from './canvas/camera.ts'
 import type { Frame } from './canvas/frames.ts'
 import type { Spot } from './canvas/view.ts'
+import type { LinkedMenu } from './linked-copies.ts'
 import type { ResourceSources } from './resources.ts'
 import type { ShortcutAction } from './shortcuts.ts'
 import type { RunStyle, TextRange } from './text/text-edit.ts'
@@ -69,6 +71,13 @@ export interface Editor {
   select(ids: string[]): void
   /** Does what a shortcut does, as if its key was pressed on the stage. */
   perform: (action: ShortcutAction) => boolean
+  /**
+   * What Ungroup would do for the selection: `ready`, `none` with no group or box selected, or why
+   * none can come apart, `locked` (each is locked against deleting) or `placedByLayout` (an auto
+   * layout box would place what it holds elsewhere). It tries the ungroup on a copy of the design,
+   * so a menu asks once as it opens.
+   */
+  ungroupState: () => UngroupState
   /** Whether this tab has a change of its own to undo, or an undone one to redo. */
   canUndo: () => boolean
   canRedo: () => boolean
@@ -84,6 +93,12 @@ export interface Editor {
   canPasteLayers: () => boolean
   /** Pastes the layers last copied in Dazbee on this device, as Mod+V does; false with none kept. */
   pasteLayers(): boolean
+  /**
+   * What the full menu's style and linked-copy items would do for the selection now (Copy style,
+   * Paste style, Copy to other frames, and lock, hide and delete in all frames), or why one has
+   * nothing to do; null with nothing selected. `perform` does each, as one undo step.
+   */
+  linkedMenu(): LinkedMenu | null
   /**
    * Moves a layer to the top level of its frame or into a container there, before a sibling or on
    * top (#59), as one undo step; groups it leaves and enters fit what they hold again. False when the

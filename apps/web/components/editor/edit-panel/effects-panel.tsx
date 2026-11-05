@@ -4,7 +4,7 @@
 // colour, and text's outline.
 import { type Effect } from '@dazbee/schema'
 
-import { assetThumbnail } from '@/components/editor/paint-stack.tsx'
+import { assetThumbnail } from '@/components/editor/paint/paint-stack.tsx'
 import { RemoveButton } from '@/components/editor/reorder-list.tsx'
 import { KNOBS, PANEL_PART, TILE, TILE_FACE_WIDE, TOUCH_GAP } from '@/components/editor/styles.ts'
 import { Select } from '@/components/ui/select.tsx'

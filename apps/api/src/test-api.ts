@@ -19,6 +19,8 @@ export const db = database.db
 
 // Two workspaces with a brand each, fresh for every run so runs never see each other's rows.
 export const run = randomUUID().slice(0, 8)
+/** The shape of every id the API gives a new record. */
+export const SHORT_ID = /^[0-9a-z]{12}$/
 export const workspace = { id: `workspace-a-${run}`, name: 'Agency A' }
 export const other = { id: `workspace-b-${run}`, name: 'Studio B' }
 export const brand = { id: `brand-a-${run}`, workspaceId: workspace.id, name: 'Brand A' }

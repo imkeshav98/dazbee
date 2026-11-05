@@ -38,9 +38,33 @@ export const DOCK_OFF = 'text-muted hover:bg-hover hover:text-text active:bg-pre
 /** One tool's square dock button, lit while the tool is in use. */
 export const dockTool = (on: boolean) => `${DOCK_BUTTON} w-10 ${on ? DOCK_ON : DOCK_OFF}`
 
-/** A round colour swatch that picks its colour; its size is the caller's. */
-export const SWATCH =
-  'shrink-0 cursor-pointer rounded-full border border-swatch-ring transition-transform duration-[var(--chrome-fast)] hover:scale-110'
+/**
+ * What a swatch-like control's target is, the box a pointer or finger hits: as big as what it draws,
+ * and on a phone 44 px across, a touch target a finger can hit, with the pressed tint showing round
+ * its drawing while pressed. What holds it keeps it TOUCH_GAP from the next target.
+ */
+const SWATCH_HIT =
+  'group/swatch grid shrink-0 cursor-pointer place-items-center transition-colors duration-[var(--chrome-fast)] max-sm:size-[44px] max-sm:rounded-row max-sm:active:bg-pressed'
+/** A round swatch's target. A row of them is a SWATCH_ROW. */
+export const SWATCH_TARGET = `${SWATCH_HIT} rounded-full`
+/** A square swatch's target: a paint's swatch in its row, a colour field's box beside its hex. */
+export const SQUARE_SWATCH_TARGET = `${SWATCH_HIT} rounded-[7px]`
+/** How big a swatch target draws what it holds on a phone; off a phone that size is the caller's. */
+export const FACE_SIZE = 'shrink-0 max-sm:size-[32px]'
+/** What a round swatch target draws: round, as big as its caller says, and 32 px on a phone. */
+export const SWATCH_FACE = `${FACE_SIZE} rounded-full`
+/** A round colour swatch, drawn in a SWATCH_TARGET; its size off a phone is the caller's. */
+export const SWATCH = `${SWATCH_FACE} border border-swatch-ring transition-transform duration-[var(--chrome-fast)] group-hover/swatch:scale-110`
+/** The space between targets and fields on a phone or a touch screen, so a finger presses the one it means. */
+export const TOUCH_GAP = 'max-sm:gap-[8px] [@media(hover:none)]:gap-[8px]'
+/** A row of swatch targets, wrapping onto more lines; on a phone TOUCH_GAP apart. */
+export const SWATCH_ROW = `flex flex-wrap items-center ${TOUCH_GAP}`
+/**
+ * A touch area for a control drawn smaller than a finger, such as a gradient's stop: an empty element
+ * inside the control, shown only on a phone, 44 px across and centred on it, so a press anywhere in
+ * it lands on the control.
+ */
+export const TOUCH_AREA = 'absolute top-1/2 left-1/2 hidden size-[44px] -translate-1/2 max-sm:block'
 
 /** Colours a click away when the brand's kit has none; the hex fields take any colour. */
 export const SWATCHES = [
@@ -79,8 +103,6 @@ export const NUMBER_SELECTED = 'selection:bg-accent-selected selection:text-text
 export const NUMBER_SELECTED_STRONG = 'selection:bg-accent-selected-strong selection:text-text-selected-strong'
 /** A field's height on a phone or a touch screen: 44 px, as every field there. */
 export const TOUCH_FIELD = 'max-sm:h-[44px] [@media(hover:none)]:h-[44px]'
-/** The room between fields on a phone or a touch screen: 8 px. */
-export const TOUCH_GAP = 'max-sm:gap-[8px] [@media(hover:none)]:gap-[8px]'
 /** A field to type a value into, as tall as a knob: its border shows the focus, with no ring besides. */
 export const FIELD = `h-8 ${TOUCH_FIELD} min-w-0 w-full rounded-row border border-line bg-surface px-1.5 ${VALUE_TEXT} outline-none focus-visible:outline-none! placeholder:text-subtle focus:border-accent`
 /** Where a dragged row would land in a list: a line across it, placed by the row above or below. */
@@ -113,10 +135,14 @@ export const MENU_ITEM = `group flex h-9 w-full shrink-0 cursor-pointer items-ce
  */
 export const MENU_ITEM_GREYED =
   'aria-disabled:cursor-not-allowed aria-disabled:opacity-40 aria-disabled:hover:bg-transparent aria-disabled:active:bg-transparent'
+/** A short line over a menu's rows saying what they act on. */
+export const MENU_HEADING = 'px-2.5 pt-1.5 pb-1 text-[11px] font-semibold text-subtle'
 /** The hairline between a menu's groups of rows. */
 export const MENU_DIVIDER = 'mx-1.5 my-1 border-t border-line'
-/** A shortcut shown in a menu row. */
-export const MENU_KEY = 'font-mono text-[11px] font-normal text-subtle'
+/** A short value at the end of a menu row, in a shortcut's look, as a frame's size in Export. */
+export const MENU_VALUE = 'font-mono text-[11px] font-normal text-subtle'
+/** A shortcut shown in a menu row; none shows on a phone, which has no keyboard. */
+export const MENU_KEY = `${MENU_VALUE} max-sm:hidden`
 /** A switch drawn in a menu row or a card's row that is role="switch": checked, its knob slides to the end. */
 export const SWITCH =
   'relative h-5 w-[34px] shrink-0 rounded-full bg-subtle/70 transition-colors duration-[var(--chrome-fast)] group-aria-checked:bg-accent-solid after:absolute after:start-0.5 after:top-0.5 after:size-4 after:rounded-full after:bg-white after:transition-transform after:duration-[var(--chrome-fast)] group-aria-checked:after:translate-x-3.5 rtl:group-aria-checked:after:-translate-x-3.5'

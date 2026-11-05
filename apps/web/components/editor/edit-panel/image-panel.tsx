@@ -6,7 +6,7 @@ import { withImage } from '@dazbee/editor'
 import { type ImageAdjust, ImageFilter, type Paint } from '@dazbee/schema'
 
 import { ImagePickerButton } from '@/components/editor/image-tool.tsx'
-import { assetThumbnail } from '@/components/editor/paint-stack.tsx'
+import { assetThumbnail } from '@/components/editor/paint/paint-stack.tsx'
 import { CHIP, PANEL_HEADING, TOUCH_GAP } from '@/components/editor/styles.ts'
 import { FOCUS_RING } from '@/components/ui/looks.ts'
 import { cn } from '@/lib/cn.ts'

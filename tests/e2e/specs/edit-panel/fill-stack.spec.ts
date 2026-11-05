@@ -1,7 +1,8 @@
 // A layer's fills as a stack, with real pointer and keyboard input: the list shows the top coat
 // first; + puts a see-through colour on top of a photo; its swatch turns it into a linear gradient
 // whose stop is edited; a drag swaps the two; the eye hides one. The stage and a PNG export show the
-// same, and the browser's export matches Node's to the pixel.
+// same, and the browser's export matches Node's to the pixel. And a gradient's stops under a finger
+// on a phone: each a touch target, the nearer one picked where two touch areas overlap.
 import { createHash } from 'node:crypto'
 
 import { fixtureResources } from '@dazbee/pixels/pixels'
@@ -11,10 +12,12 @@ import { AssetLink, type DesignInput } from '@dazbee/schema'
 
 import { api, photo, upload } from '../../support/assets.ts'
 import { designOf, exportHashOf, screenPoint, writeOutput } from '../../support/editor.ts'
+import { openSized } from '../../support/frames-on-canvas.ts'
 import { frameDesign } from '../../support/seed.ts'
 import { click, openStage, press, read } from '../../support/stage.ts'
-import { expect, type Page, test } from '../../support/test.ts'
-import { fillList, openCard, strokeList } from '../../support/top-bar.ts'
+import { GRADIENT_STOPS, TOUCH_TARGET, touchOf } from '../../support/swatches.ts'
+import { type Browser, expect, type Locator, type Page, test } from '../../support/test.ts'
+import { barMenu, fillList, openCard, strokeList } from '../../support/top-bar.ts'
 
 test.describe.configure({ timeout: 120_000 })
 
@@ -258,4 +261,133 @@ test('a gradient stop removed while it is dragged ends the drag and its undo ste
   await page.mouse.up()
   await expect.poll(() => page.evaluate(() => window.dazbee?.gesturing())).toBe(false)
   expect(errors).toEqual([])
+})
+
+test.describe('found by QA', () => {
+  /** A shape with a line gradient of four stops: one at each end, and two close together in the middle. */
+  const gradient = (): DesignInput =>
+    frameDesign({
+      name: 'Gradient stops',
+      nodes: {
+        band: {
+          type: 'graphic',
+          parentId: 'sq',
+          index: 'a0',
+          name: 'Band',
+          props: {
+            x: 140,
+            y: 140,
+            width: 800,
+            height: 800,
+            shape: { kind: 'rect' },
+            fills: [
+              {
+                type: 'linear',
+                from: { x: 0, y: 0.5 },
+                to: { x: 1, y: 0.5 },
+                stops: [
+                  { offset: 0, color: '#FF3D6EFF' },
+                  { offset: 0.45, color: '#2E9E5BFF' },
+                  { offset: 0.55, color: '#3D9BFFFF' },
+                  { offset: 1, color: '#FFC83DFF' },
+                ],
+              },
+            ],
+          },
+        },
+      },
+    })
+  const offsets = async (page: Page) =>
+    ((await read(page)).nodes.band?.props.fills as Fill[] | undefined)?.[0]?.stops?.map((s) => s.offset)
+  /** The middle of an element on screen. */
+  async function middle(locator: Locator) {
+    const box = await locator.boundingBox()
+    if (!box) throw new Error('no box')
+    return { x: box.x + box.width / 2, y: box.y + box.height / 2 }
+  }
+  /** The band's Colour panel, with + showing its gradient's stops on their bar. */
+  async function openStops(browser: Browser, viewport: { width: number; height: number }) {
+    const { page, errors } = await openSized(browser, viewport, { input: gradient(), touch: viewport.width < 640 })
+    await page.evaluate(() => window.dazbee?.select(['band']))
+    const panel = await barMenu(page, 'colour')
+    await panel.getByTestId('colour-pick').click()
+    const bar = panel.getByTestId('gradient-bar')
+    await bar.scrollIntoViewIfNeeded()
+    await expect(panel.locator(GRADIENT_STOPS.selector)).toHaveCount(4)
+    const stop = (i: number) => panel.locator(`[data-stop="${i}"]`)
+    return { page, errors, bar, stop }
+  }
+  /** A finger pressed at one point, moved to another in steps, and lifted. */
+  async function fingerDrag(page: Page, from: { x: number; y: number }, to: { x: number; y: number }) {
+    const touch = await page.context().newCDPSession(page)
+    await touch.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [from] })
+    for (let step = 1; step <= 8; step++) {
+      const at = { x: from.x + ((to.x - from.x) * step) / 8, y: from.y + ((to.y - from.y) * step) / 8 }
+      await touch.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [at] })
+    }
+    await touch.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
+    await touch.detach()
+  }
+
+  test('on a phone each gradient stop takes a 44 px touch area, a press where two overlap picks the nearer stop, and a finger drags a stop from its touch area', async ({
+    browser,
+  }) => {
+    const { page, errors, bar, stop } = await openStops(browser, { width: 390, height: 844 })
+    // Each stop is drawn at its size, and a press lands on it across a touch target round it.
+    for (const i of [0, 3]) {
+      const drawn = await stop(i).boundingBox()
+      expect(drawn?.width, `stop ${i + 1} drawn`).toBeCloseTo(GRADIENT_STOPS.size, 1)
+      const touch = await touchOf(stop(i))
+      expect(touch.pressable, `stop ${i + 1}: a press lands at each side`).toBe(true)
+      expect(Math.min(touch.width, touch.height), `stop ${i + 1}: where a press lands`).toBeGreaterThanOrEqual(
+        TOUCH_TARGET.size,
+      )
+    }
+
+    // The middle two stops' touch areas overlap: a tap off both drawings picks the nearer one, and
+    // adds no stop.
+    const second = await middle(stop(1))
+    const third = await middle(stop(2))
+    const apart = third.x - second.x
+    expect(apart, 'the middle stops are closer than a touch area').toBeLessThan(TOUCH_TARGET.size)
+    await page.touchscreen.tap(second.x + apart * 0.4, second.y)
+    await expect(stop(1)).toHaveAttribute('aria-pressed', 'true')
+    await page.touchscreen.tap(second.x + apart * 0.6, second.y)
+    await expect(stop(2)).toHaveAttribute('aria-pressed', 'true')
+    expect(await offsets(page)).toEqual([0, 0.45, 0.55, 1])
+
+    // A finger pressed in the last stop's touch area, off its drawing, drags it as far as it moves,
+    // in one undo step.
+    const box = await bar.boundingBox()
+    if (!box) throw new Error('no bar')
+    const last = await middle(stop(3))
+    await fingerDrag(page, { x: last.x - 15, y: last.y }, { x: last.x - 55, y: last.y })
+    await expect(stop(3)).toHaveAttribute('aria-pressed', 'true')
+    await expect.poll(async () => (await offsets(page))?.length).toBe(4)
+    const moved = (await offsets(page))?.[3] ?? 0
+    expect(Math.abs(moved - (last.x - 40 - box.x) / box.width), 'the last stop moved with the finger').toBeLessThan(
+      0.01,
+    )
+    await press(page, 'undo')
+    await expect.poll(() => offsets(page)).toEqual([0, 0.45, 0.55, 1])
+
+    // A tap on the bar away from every stop's touch area still adds a stop there.
+    await page.touchscreen.tap(box.x + box.width * 0.25, last.y)
+    await expect.poll(async () => (await offsets(page))?.length).toBe(5)
+    expect(errors).toEqual([])
+  })
+
+  test('at 1280×760 a gradient stop takes no more than its drawing, and a click beside it adds a stop', async ({
+    browser,
+  }) => {
+    const { page, errors, stop } = await openStops(browser, { width: 1280, height: 760 })
+    const touch = await touchOf(stop(0))
+    expect(touch.pressable).toBe(true)
+    expect(touch.width).toBeCloseTo(GRADIENT_STOPS.size, 1)
+    expect(touch.height).toBeCloseTo(GRADIENT_STOPS.size, 1)
+    const second = await middle(stop(1))
+    await page.mouse.click(second.x + 10, second.y)
+    await expect.poll(async () => (await offsets(page))?.length).toBe(5)
+    expect(errors).toEqual([])
+  })
 })

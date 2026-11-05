@@ -9,12 +9,11 @@ import type { Paint } from '@dazbee/schema'
 
 import { clamp } from '@/components/editor/edit-panel/fields.tsx'
 import type { P } from '@/components/editor/edit-panel/target.ts'
+import { PICKED_RING, TOUCH_AREA } from '@/components/editor/styles.ts'
 import { FOCUS_RING } from '@/components/ui/looks.ts'
 import { cn } from '@/lib/cn.ts'
 import { tidy } from '@/lib/editor/size.ts'
 import { format } from '@/lib/i18n/index.ts'
-
-import { PICKED_RING } from './styles.ts'
 
 export type Gradient = Extract<Paint, { type: 'linear' | 'radial' | 'angular' }>
 export type Stop = Gradient['stops'][number]
@@ -56,7 +55,9 @@ function colourAt(stops: Stop[], at: number): string {
 
 /**
  * A gradient's stops on a bar: a click on the bar adds one there in the colour the gradient has,
- * a drag moves one (one undo step), the arrow keys move the focused one, Delete removes it.
+ * a drag moves one (one undo step), the arrow keys move the focused one, Delete removes it. On a
+ * phone each stop takes a touch area round it, and a press where two stops' areas overlap picks the
+ * nearer stop.
  */
 export function GradientBar({
   paint,
@@ -74,10 +75,28 @@ export function GradientBar({
   onSet: (to: (now: Gradient) => Gradient) => void
 }) {
   const bar = useRef<HTMLDivElement>(null)
-  const drag = useRef<{ i: number; count: number; end: () => void } | null>(null)
+  // The stop held, how far across from its middle it was pressed, and the stops there were then.
+  const drag = useRef<{ i: number; grab: number; count: number; end: () => void } | null>(null)
   const at = (clientX: number) => {
     const box = bar.current?.getBoundingClientRect()
     return box ? tidy(clamp((clientX - box.left) / box.width, 0, 1)) : 0
+  }
+  const stopAt = (i: number) => bar.current?.querySelector<HTMLElement>(`[data-stop="${i}"]`) ?? undefined
+  const middleOf = (i: number) => {
+    const box = stopAt(i)?.getBoundingClientRect()
+    return box ? box.left + box.width / 2 : Number.POSITIVE_INFINITY
+  }
+  /**
+   * The stop a press on stop `i` picks: `i` when the press is on its drawing, else, in the touch area
+   * round it, the stop whose middle is nearest across, as where two stops' areas overlap.
+   */
+  const pickedBy = (i: number, x: number, y: number) => {
+    const face = stopAt(i)?.getBoundingClientRect()
+    if (!face || (x >= face.left && x <= face.right && y >= face.top && y <= face.bottom)) return i
+    let nearest = i
+    for (const [j] of paint.stops.entries())
+      if (Math.abs(middleOf(j) - x) < Math.abs(middleOf(nearest) - x)) nearest = j
+    return nearest
   }
   const move = (i: number, offset: number) =>
     onSet((now) => ({
@@ -119,8 +138,9 @@ export function GradientBar({
     onPick(Math.max(0, i - 1))
   }
   return (
-    // The gradient runs left to right in the design whatever the language, as the stage does.
-    <div dir="ltr" className="px-2">
+    // The gradient runs left to right in the design whatever the language, as the stage does. On a
+    // phone the bar's row is a touch area tall, with room at its sides for half of one past each end.
+    <div dir="ltr" className="px-2 max-sm:flex max-sm:h-[44px] max-sm:flex-col max-sm:justify-center max-sm:px-[21px]">
       <div
         ref={bar}
         role="group"
@@ -147,12 +167,24 @@ export function GradientBar({
             data-stop={i}
             onPointerDown={(e) => {
               e.stopPropagation()
-              onPick(i)
+              const held = pickedBy(i, e.clientX, e.clientY)
+              if (held !== i) {
+                // The nearer stop takes the focus the press would give this one, so Delete removes it.
+                e.preventDefault()
+                stopAt(held)?.focus()
+              }
+              onPick(held)
               e.currentTarget.setPointerCapture(e.pointerId)
-              drag.current = { i, count: paint.stops.length, end: editor.beginGesture() }
+              drag.current = {
+                i: held,
+                grab: e.clientX - middleOf(held),
+                count: paint.stops.length,
+                end: editor.beginGesture(),
+              }
             }}
             onPointerMove={(e) => {
-              if (drag.current?.i === i) move(i, at(e.clientX))
+              const held = drag.current
+              if (held && e.currentTarget.hasPointerCapture(e.pointerId)) move(held.i, at(e.clientX - held.grab))
             }}
             onPointerUp={endDrag}
             onPointerCancel={endDrag}
@@ -172,11 +204,13 @@ export function GradientBar({
             }}
             style={{ left: `${stop.offset * 100}%`, backgroundColor: stop.color }}
             className={cn(
-              'absolute top-1/2 size-4 -translate-1/2 cursor-grab rounded-full border-2 border-white shadow-[0_0_0_1px_rgb(0_0_0/0.35)] active:cursor-grabbing',
+              'absolute top-1/2 size-4 -translate-1/2 cursor-grab touch-pan-y rounded-full border-2 border-white shadow-[0_0_0_1px_rgb(0_0_0/0.35)] active:cursor-grabbing',
               FOCUS_RING,
               picked === i && PICKED_RING,
             )}
-          />
+          >
+            <span aria-hidden className={TOUCH_AREA} />
+          </button>
         ))}
       </div>
     </div>

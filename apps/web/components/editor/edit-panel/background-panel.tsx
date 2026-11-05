@@ -8,9 +8,9 @@ import { boundFillIndex, changeFill, type Design, type Paint, paintColour, showi
 
 import { useEditState } from '@/components/editor/edit-store.ts'
 import { usePickedFrame } from '@/components/editor/editor-hooks.ts'
-import { PaintEditor, PaintRow } from '@/components/editor/paint-stack.tsx'
+import { PaintEditor, PaintRow } from '@/components/editor/paint/paint-stack.tsx'
 import { AddButton, ReorderList } from '@/components/editor/reorder-list.tsx'
-import { FIELD_LABEL } from '@/components/editor/styles.ts'
+import { FIELD_LABEL, TOUCH_GAP } from '@/components/editor/styles.ts'
 import { useLiveDesign } from '@/components/editor/use-live-design.ts'
 import { cn } from '@/lib/cn.ts'
 import { useMessages } from '@/lib/i18n/client.tsx'
@@ -87,7 +87,7 @@ function BackgroundBody({
         }
       />
       <PanelPart id="background-card" title={b.advanced} strong>
-        <div className="flex flex-col gap-2" data-testid="frame-fills">
+        <div className={cn('flex flex-col gap-2', TOUCH_GAP)} data-testid="frame-fills">
           <div className={cn('flex items-center justify-between', FIELD_LABEL)}>
             {f.fills}
             <AddButton

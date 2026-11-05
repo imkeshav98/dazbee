@@ -137,6 +137,7 @@ test('save a template, start a design from it, edit that design, and the templat
   const template = listed.find((t) => t.name === name)
   // Its size is its cover frame's.
   expect(template).toMatchObject({ scope: 'brand', brandId: DEV_BRAND, width: 1080, height: 1080 })
+  expect(template?.id).toMatch(/^[0-9a-z]{12}$/)
 
   // The brand's Templates page lists it with its thumbnail, the small copy the API drew.
   await dialog.getByRole('link', { name: 'See it with the templates' }).click()
@@ -158,7 +159,7 @@ test('save a template, start a design from it, edit that design, and the templat
 
   // Start a design from it: a new design, the same pixels, none of the template's ids.
   await card.getByRole('button', { name: `Use ${name}` }).click()
-  await expect(page).toHaveURL(/\/designs\/[\w-]+$/, { timeout: 20_000 })
+  await expect(page).toHaveURL(/\/designs\/[0-9a-z]{12}$/, { timeout: 20_000 })
   await ready(page)
   const started = await read(page)
   const startedId = page.url().split('/designs/')[1]

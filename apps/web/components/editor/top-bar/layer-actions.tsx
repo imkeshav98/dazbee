@@ -1,48 +1,43 @@
 'use client'
 
 // The selected layers' own actions, one list for the small menu's ⋯ (the full menu) and the
-// right-click menu: copy, paste, duplicate and delete; group, box, mask (or release the mask a layer
-// is under) and ungroup; lock and hide. Every row runs the same editor action as its shortcut. How
-// the layers sit (order, line up, the turn, text direction) is in the top bar's ⋯.
-// A right-click on empty canvas offers to show the hidden layers of the frame there, or of the one
-// nearest it outside every frame, when it has some.
-import { CaretRightIcon } from '@phosphor-icons/react'
+// right-click menu: Copy ▸ and Paste ▸ (the layers or their style), duplicate, Copy to other frames ▸
+// (style, text or the layer, into the linked frames); box, ungroup for a group or a box, mask (or
+// release the mask a layer is under); and, at the bottom, lock, hide and delete in all frames, acting
+// on the layers and their linked copies. Every row runs the same editor action as its shortcut. An
+// item that never applies is left out; one with nothing to do is greyed, its tooltip saying why, as
+// Ungroup is while the group or box is locked or auto layout would move what it holds. How the
+// layers sit (order, line up, the turn, text direction) is in the top bar's Arrange ⋯.
+import { CaretLeftIcon, CaretRightIcon } from '@phosphor-icons/react'
 import * as Popover from '@radix-ui/react-popover'
-import { type ReactNode, useEffect, useLayoutEffect, useState } from 'react'
+import { type KeyboardEvent, type ReactNode, useCallback, useLayoutEffect, useRef, useState } from 'react'
+import { flushSync } from 'react-dom'
 
-import { childrenOf, descendants } from '@dazbee/doc'
-import { type Editor, type Frame, type Point, type ShortcutAction, visibleIn } from '@dazbee/editor'
+import { childrenOf } from '@dazbee/doc'
+import type { Editor, ShortcutAction, UngroupState } from '@dazbee/editor'
 import type { Design } from '@dazbee/schema'
 
 import { keyOf } from '@/components/editor/arrange-actions.ts'
 import { useTarget } from '@/components/editor/edit-panel/target.ts'
-import { useEditState, usePhone } from '@/components/editor/edit-store.ts'
-import { useSelection } from '@/components/editor/editor-hooks.ts'
-import { MENU, MENU_DIVIDER, MENU_ITEM, MENU_KEY } from '@/components/editor/styles.ts'
+import { usePhone } from '@/components/editor/edit-store.ts'
+import { MENU, MENU_DIVIDER, MENU_HEADING, MENU_ITEM, MENU_KEY } from '@/components/editor/styles.ts'
 import { cn } from '@/lib/cn.ts'
+import { holdHover } from '@/lib/hover-hold.ts'
 import { useLocale, useMessages } from '@/lib/i18n/client.tsx'
-import { dirOf } from '@/lib/i18n/index.ts'
+import { dirOf, format, type Messages } from '@/lib/i18n/index.ts'
 
-import { arrowThrough, SHEET_EDGE, useMenuFocus, useScrollingMenu } from './bar-popover.tsx'
+import { arrowThrough, useBackInPlace, useMenuFocus } from './bar-popover.tsx'
+import { MenuRow } from './menu-row.tsx'
 
-/** The layers hidden in one frame, which a right-click on its empty canvas offers to show. */
-export interface HiddenLayers {
-  ids: string[]
-  frameId: string
-}
+/** Why an item has nothing to do: the reason the linked-copy items give, by its message. */
+type Why = keyof Messages['editor']['bar']['linked']['why']
 
-/**
- * The layers hidden in the frame at a client point, or outside every frame in the one nearest it;
- * null when that frame has none.
- */
-export function hiddenAt(editor: Editor, client: Point): HiddenLayers | null {
-  const spot = editor.spotAt(client)
-  const frame = editor.frames().find((f) => f.id === spot?.frameId) ?? nearestFrame(editor, client)
-  if (!frame) return null
-  const design = editor.design()
-  const ids = descendants(design, frame.id).filter((id) => !visibleIn(design, id))
-  return ids.length > 0 ? { ids, frameId: frame.id } : null
-}
+/** Why Ungroup has nothing to do, or null while it has something to do. */
+const ungroupWhy = (state: UngroupState, b: Messages['editor']['bar']) =>
+  state === 'locked' ? b.lockedRow : state === 'placedByLayout' ? b.ungroupMoves : null
+
+/** The width of a menu beside a row whose rows have long keys, as the mock draws Copy to other frames ▸. */
+export const WIDE_MENU = 258
 
 /**
  * The masks the layers are under, each the nearest mask before it among its siblings; null unless
@@ -65,18 +60,17 @@ function masksOver(design: Design, ids: readonly string[]): string[] | null {
   return [...masks]
 }
 
-/** The frame nearest a client point, by the distance from the point to its edges on screen. */
-function nearestFrame(editor: Editor, client: Point) {
-  let nearest: { frame: Frame; far: number } | null = null
-  for (const frame of editor.frames()) {
-    const a = editor.screenPoint(0, 0, frame.id)
-    const b = editor.screenPoint(frame.width, frame.height, frame.id)
-    const dx = Math.max(Math.min(a.x, b.x) - client.x, 0, client.x - Math.max(a.x, b.x))
-    const dy = Math.max(Math.min(a.y, b.y) - client.y, 0, client.y - Math.max(a.y, b.y))
-    const far = Math.hypot(dx, dy)
-    if (!nearest || far < nearest.far) nearest = { frame, far }
-  }
-  return nearest?.frame ?? null
+/**
+ * The keys of a row's short menu, beside the row or in its menu's place: the arrow `back`, towards
+ * the page's start, goes back, and up, down, Home and End move between its rows (`arrowThrough`).
+ * The arrow that goes back goes no further: going back takes the focused row out of the page, and
+ * the stage would take an arrow from outside a menu as its own and nudge the selection.
+ */
+const backKeys = (back: string, goBack: () => void) => (event: KeyboardEvent<HTMLElement>) => {
+  if (event.key !== back) return arrowThrough(event)
+  event.preventDefault()
+  event.stopPropagation()
+  goBack()
 }
 
 /**
@@ -88,6 +82,8 @@ export function LayerActions({ editor, ids, onDone }: { editor: Editor; ids: str
   const t = useMessages()
   const b = t.editor.bar
   const selected = useTarget(editor, ids)
+  // Asked once as the menu opens: it tries the ungroup on a copy of the design.
+  const [ungroup] = useState(() => editor.ungroupState())
   if (!selected) return null
   const { target, design } = selected
   const run = (action: ShortcutAction) => {
@@ -110,226 +106,245 @@ export function LayerActions({ editor, ids, onDone }: { editor: Editor; ids: str
   const mac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform)
   const mod = mac ? '⌘' : 'Ctrl'
   const [copyKey, pasteKey] = [`${mod}+C`, `${mod}+V`]
-  const nodes = target.ids.map((id) => design.nodes[id])
-  const locked = nodes.every((node) => node?.lock && Object.values(node.lock).some(Boolean))
-  const hidden = target.props.every((pr) => pr.visible === false)
   const masks = target.props.every((pr) => Boolean(pr.mask))
   const over = masksOver(design, target.ids)
+  const linked = editor.linkedMenu()
+  if (!linked) return null
+  const l = b.linked
+  /** What an item says while it has nothing to do, or null while it has something to do. */
+  const whyOf = (state: Why | 'ready' | 'hidden') => (state === 'ready' || state === 'hidden' ? null : l.why[state])
+  /** A row that runs an action, greyed with the reason while it has nothing to do. */
+  const actionRow = (action: ShortcutAction, label: string, why: string | null, danger = false) => (
+    <MenuRow
+      key={action}
+      action={action}
+      label={label}
+      keys={keyOf(action)}
+      why={why}
+      danger={danger}
+      onRun={() => run(action)}
+    />
+  )
   return (
     <>
-      <button
-        type="button"
-        data-action="copy"
-        onClick={() => {
-          if (!document.execCommand('copy')) editor.copyLayers()
-          onDone()
-        }}
-        className={MENU_ITEM}
-      >
-        {b.copy}
-        <kbd className={MENU_KEY}>{copyKey}</kbd>
-      </button>
-      <button
-        type="button"
-        data-action="paste"
-        disabled={!editor.canPasteLayers()}
-        onClick={() => {
-          editor.pasteLayers()
-          onDone()
-        }}
-        className={MENU_ITEM}
-      >
-        {b.paste}
-        <kbd className={MENU_KEY}>{pasteKey}</kbd>
-      </button>
+      <SubMenu label={b.copy} testId="copy">
+        <MenuRow
+          action="copy"
+          label={b.copy}
+          keys={copyKey}
+          why={null}
+          onRun={() => {
+            if (!document.execCommand('copy')) editor.copyLayers()
+            onDone()
+          }}
+        />
+        {actionRow('copyStyle', l.copyStyle, whyOf(linked.copyStyle))}
+      </SubMenu>
+      <SubMenu label={b.paste} testId="paste">
+        <MenuRow
+          action="paste"
+          label={b.paste}
+          keys={pasteKey}
+          why={editor.canPasteLayers() ? null : l.why.nothingToPaste}
+          onRun={() => {
+            editor.pasteLayers()
+            onDone()
+          }}
+        />
+        {actionRow('pasteStyle', l.pasteStyle, whyOf(linked.pasteStyle))}
+      </SubMenu>
       {row('duplicate', t.editor.arrange.duplicate)}
-      {row('delete', b.delete)}
       <div className={MENU_DIVIDER} />
-      {ids.length > 1 && row('group', t.editor.arrange.group)}
+      {linked.frames === 0 ? (
+        <MenuRow action="copyToFrames" label={l.copyToFrames} keys="" why={l.why.noFrames} caret />
+      ) : (
+        <SubMenu
+          label={l.copyToFrames}
+          testId="copy-to-frames"
+          wide
+          heading={linked.reach === 1 ? l.toFrame : format(l.toFrames, { n: linked.reach })}
+        >
+          {actionRow('styleToLinked', l.style, whyOf(linked.style))}
+          {linked.text !== 'hidden' && actionRow('textToLinked', l.text, whyOf(linked.text))}
+          {actionRow('layerToLinked', l.layer, whyOf(linked.layer))}
+        </SubMenu>
+      )}
+      <div className={MENU_DIVIDER} />
       {row('boxSelection', b.putInBox)}
+      {target.types.every((type) => type === 'group' || type === 'box') &&
+        actionRow('ungroup', t.editor.arrange.ungroup, ungroupWhy(ungroup, b))}
       {over ? (
-        <button
-          type="button"
-          data-action="releaseMask"
-          disabled={over.some((id) => design.nodes[id]?.lock?.style)}
-          onClick={() => {
+        <MenuRow
+          action="releaseMask"
+          label={b.releaseMask}
+          keys=""
+          why={over.some((id) => design.nodes[id]?.lock?.style) ? b.maskLocked : null}
+          onRun={() => {
             // The mask becomes a layer of its own again, in one undo step.
             editor.session.run('node.mask', { ids: over, mask: null })
             onDone()
           }}
-          className={MENU_ITEM}
-        >
-          {b.releaseMask}
-        </button>
+        />
       ) : (
         row('mask', t.editor.arrange.mask, masks)
       )}
-      {target.types.some((type) => type === 'group') && row('ungroup', t.editor.arrange.ungroup)}
       <div className={MENU_DIVIDER} />
-      <button
-        type="button"
-        onClick={() => {
-          editor.setLocked(target.ids, !locked)
-          onDone()
-        }}
-        className={MENU_ITEM}
-      >
-        {locked ? b.unlock : b.lock}
-        <kbd className={MENU_KEY}>{keyOf('lock')}</kbd>
-      </button>
-      <button
-        type="button"
-        onClick={() => {
-          editor.setHidden(target.ids, !hidden)
-          onDone()
-        }}
-        className={MENU_ITEM}
-      >
-        {hidden ? b.show : b.hide}
-        <kbd className={MENU_KEY}>{keyOf('hide')}</kbd>
-      </button>
+      {actionRow('lockLinked', linked.lock === 'lock' ? l.lockAll : l.unlockAll, null)}
+      {actionRow('hideLinked', linked.hide === 'hide' ? l.hideAll : l.showAll, null)}
+      {actionRow('deleteLinked', l.deleteAll, whyOf(linked.delete), true)}
     </>
   )
 }
 
 /**
- * The layer actions at a right-click on the stage, for what it picked, or Show hidden layers at one
- * on empty canvas; it closes once the selection changes.
+ * A row of the menu that opens a short menu beside it; on a phone, where the screen has no room
+ * beside the menu, the short menu opens in the menu's place instead, under a back row naming the row
+ * (`MenuInPlace`). Enter or the arrow towards it opens it; the arrow back or Esc closes it, or on a
+ * phone goes back to the row with the back row too. Up, down, Home and End move between its rows,
+ * and the row stays lit while the menu beside it is open.
  */
-export function StageMenu({
-  editor,
-  at,
-  hidden,
-  onClose,
+export function SubMenu({
+  label,
+  testId,
+  heading,
+  wide = false,
+  children,
 }: {
-  editor: Editor
-  at: { x: number; y: number }
-  /** The hidden layers of the frame right-clicked, or nearest the right-click, where nothing was picked. */
-  hidden: HiddenLayers | null
-  onClose: () => void
+  label: string
+  testId: string
+  /** A short line over its rows saying what they act on. */
+  heading?: string
+  /** As wide as the mock draws a menu whose rows have long keys. */
+  wide?: boolean
+  children: ReactNode
 }) {
-  const t = useMessages()
-  const b = t.editor.bar
-  const ids = useSelection(editor)
-  const { barBottom } = useEditState()
-  const scroll = useScrollingMenu()
-  const [openedFor] = useState(ids)
-  useEffect(() => {
-    if (ids !== openedFor) onClose()
-  }, [ids, openedFor, onClose])
+  const [open, setOpen] = useState(false)
+  const phone = usePhone()
+  const rtl = dirOf(useLocale()) === 'rtl'
+  const [toward, back] = rtl ? ['ArrowLeft', 'ArrowRight'] : ['ArrowRight', 'ArrowLeft']
+  const focus = useMenuFocus()
+  /**
+   * Opens or closes its menu. On a phone that swaps the rows of its menu in place, and the rows
+   * that show up under a pointer at rest take no hover tint until it moves.
+   */
+  const show = useCallback(
+    (to: boolean) => {
+      if (phone) holdHover(focus.button.current?.closest<HTMLElement>('[data-menu]') ?? null)
+      setOpen(to)
+    },
+    [phone, focus.button],
+  )
+  /** Back from the menu in the place of a phone's menu to the row, the focus on the row once it shows. */
+  const goBack = useCallback(() => {
+    flushSync(() => show(false))
+    focus.button.current?.focus()
+  }, [show, focus.button])
+  const rows = (
+    <>
+      {heading && <p className={MENU_HEADING}>{heading}</p>}
+      {children}
+    </>
+  )
   return (
-    <Popover.Root open onOpenChange={(to) => !to && onClose()}>
-      <Popover.Anchor asChild>
-        <span aria-hidden className="pointer-events-none absolute size-0" style={{ left: at.x, top: at.y }} />
-      </Popover.Anchor>
-      <Popover.Portal>
-        <Popover.Content
-          side="bottom"
-          align="start"
-          sideOffset={2}
-          sticky="always"
-          // Kept between the top bar and the bottom controls, scrolling inside when it has less room.
-          collisionPadding={{ top: barBottom + 8, bottom: 72, left: 12, right: 12 }}
-          // A click elsewhere or Esc closes it; focus given back to a button that just closed does not.
-          onFocusOutside={(event) => event.preventDefault()}
-          aria-label={hidden ? b.canvasMenu : b.actions}
-          data-testid="stage-menu"
-          ref={scroll.ref}
-          onScroll={scroll.onScroll}
-          className={cn(
-            MENU,
-            hidden ? 'min-w-52' : 'max-h-[var(--radix-popover-content-available-height)] w-80 overflow-y-auto',
-            scroll.className,
-          )}
-        >
-          {hidden ? (
-            <button
-              type="button"
-              data-action="showHidden"
-              onClick={() => {
-                editor.setHidden(hidden.ids, false)
-                onClose()
-              }}
-              className={MENU_ITEM}
-            >
-              {b.showHidden}
-            </button>
-          ) : (
-            <LayerActions editor={editor} ids={ids} onDone={onClose} />
-          )}
-        </Popover.Content>
-      </Popover.Portal>
-    </Popover.Root>
+    <>
+      {/* On a phone the popover never opens: its row opens the menu in the menu's place. */}
+      <Popover.Root open={open && !phone} onOpenChange={show}>
+        <Popover.Trigger asChild>
+          <button
+            ref={focus.button}
+            type="button"
+            aria-haspopup="dialog"
+            data-testid={`more-${testId}`}
+            onKeyDown={(event) => {
+              if (event.key !== toward) return
+              event.preventDefault()
+              show(true)
+            }}
+            // Lit with the hover tint while the menu beside it is open.
+            className={cn(MENU_ITEM, 'data-[state=open]:bg-hover data-[state=open]:lit')}
+          >
+            {label}
+            <CaretRightIcon size={12} weight="bold" aria-hidden className="text-subtle rtl:-scale-x-100" />
+          </button>
+        </Popover.Trigger>
+        <Popover.Portal>
+          <Popover.Content
+            side={rtl ? 'left' : 'right'}
+            align="start"
+            sideOffset={8}
+            collisionPadding={12}
+            // A click elsewhere, Esc or the arrow back closes it; focus moving as the menu opens does not.
+            onFocusOutside={(event) => event.preventDefault()}
+            {...focus.content}
+            aria-label={label}
+            data-testid={`more-${testId}-menu`}
+            onKeyDown={backKeys(back, () => show(false))}
+            style={wide ? { width: WIDE_MENU } : undefined}
+            className={cn(MENU, !wide && 'min-w-52')}
+          >
+            {focus.back}
+            {rows}
+          </Popover.Content>
+        </Popover.Portal>
+      </Popover.Root>
+      {phone && open && (
+        <MenuInPlace label={label} testId={testId} back={back} onBack={goBack}>
+          {rows}
+        </MenuInPlace>
+      )}
+    </>
   )
 }
 
 /**
- * A row of the menu that opens a short menu beside it; on a phone, where the screen has no room
- * beside the menu, the short menu lies on its row instead, sharing the menu's start edge. Enter or
- * the arrow towards it opens it, the arrow back or Esc closes it; up, down, Home and End move
- * between its rows, and the row stays lit while it is open.
+ * A row's short menu in the place of the menu the row is in, as a phone shows it: a back row naming
+ * the row, then the short menu's rows. Every other piece of the menu hides while it shows (globals.css
+ * hides what in a `data-menu` neither is the `data-menu-in-place` nor holds it). It takes the focus
+ * at its back row as it opens, so a greyed first row doesn't say why unasked; the back row, the arrow
+ * back and Esc go back, Esc through the menu's own (`useBackInPlace`) once a greyed row's tooltip
+ * that shows has closed.
  */
-export function SubMenu({ label, testId, children }: { label: string; testId: string; children: ReactNode }) {
-  const [open, setOpen] = useState(false)
-  const phone = usePhone()
-  // On a phone, how far the short menu moves to lie on its row at the start edge of the menu the
-  // row is in: up by the row's height, and back by the row's inset from that edge.
-  const [over, setOver] = useState({ up: 0, back: 0 })
-  const rtl = dirOf(useLocale()) === 'rtl'
-  const [toward, back] = rtl ? ['ArrowLeft', 'ArrowRight'] : ['ArrowRight', 'ArrowLeft']
-  const focus = useMenuFocus()
-  useLayoutEffect(() => {
-    const row = focus.button.current
-    const menu = row?.parentElement
-    if (!phone || !open || !row || !menu) return
-    const [at, edge] = [row.getBoundingClientRect(), menu.getBoundingClientRect()]
-    const to = { up: Math.round(at.height), back: Math.round(rtl ? edge.right - at.right : at.left - edge.left) }
-    setOver((now) => (now.up === to.up && now.back === to.back ? now : to))
-  }, [phone, open, focus.button, rtl])
+function MenuInPlace({
+  label,
+  testId,
+  back,
+  onBack,
+  children,
+}: {
+  label: string
+  testId: string
+  /** The arrow key that goes back: the one towards the page's start. */
+  back: string
+  onBack: () => void
+  children: ReactNode
+}) {
+  const b = useMessages().editor.bar
+  const backRow = useRef<HTMLButtonElement>(null)
+  useLayoutEffect(() => backRow.current?.focus(), [])
+  useBackInPlace(onBack)
   return (
-    <Popover.Root open={open} onOpenChange={setOpen}>
-      <Popover.Trigger asChild>
-        <button
-          ref={focus.button}
-          type="button"
-          aria-haspopup="dialog"
-          data-testid={`more-${testId}`}
-          onKeyDown={(event) => {
-            if (event.key !== toward) return
-            event.preventDefault()
-            setOpen(true)
-          }}
-          // Lit with the hover tint while the menu beside it is open.
-          className={cn(MENU_ITEM, 'data-[state=open]:bg-hover data-[state=open]:lit')}
-        >
-          {label}
-          <CaretRightIcon size={12} weight="bold" aria-hidden className="text-subtle rtl:-scale-x-100" />
-        </button>
-      </Popover.Trigger>
-      <Popover.Portal>
-        <Popover.Content
-          // Beside the row, or on a phone over it at its menu's start edge, as the mock draws it.
-          side={phone ? 'bottom' : rtl ? 'left' : 'right'}
-          align="start"
-          sideOffset={phone ? -over.up : 8}
-          alignOffset={phone ? -over.back : 0}
-          collisionPadding={phone ? SHEET_EDGE : 12}
-          // A click elsewhere, Esc or the arrow back closes it; focus moving as the menu opens does not.
-          onFocusOutside={(event) => event.preventDefault()}
-          {...focus.content}
-          aria-label={label}
-          data-testid={`more-${testId}-menu`}
-          onKeyDown={(event) => {
-            if (event.key !== back) return arrowThrough(event)
-            event.preventDefault()
-            setOpen(false)
-          }}
-          className={cn(MENU, 'min-w-52')}
-        >
-          {focus.back}
-          {children}
-        </Popover.Content>
-      </Popover.Portal>
-    </Popover.Root>
+    <div
+      data-menu-in-place
+      role="group"
+      aria-label={label}
+      onKeyDown={backKeys(back, onBack)}
+      className="flex flex-col"
+    >
+      <button
+        ref={backRow}
+        type="button"
+        data-testid={`more-${testId}-back`}
+        aria-label={format(b.backFrom, { menu: label })}
+        onClick={onBack}
+        className={cn(MENU_ITEM, 'justify-start gap-1.5')}
+      >
+        <CaretLeftIcon size={12} weight="bold" aria-hidden className="text-subtle rtl:-scale-x-100" />
+        {label}
+      </button>
+      <div className={MENU_DIVIDER} />
+      <div data-testid={`more-${testId}-menu`} className="flex flex-col">
+        {children}
+      </div>
+    </div>
   )
 }

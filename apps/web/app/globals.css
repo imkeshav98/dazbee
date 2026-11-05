@@ -18,6 +18,19 @@
  * :active, an element is pressed while anything inside it is.
  */
 @custom-variant active (&:is(:active, [data-pressed], :has([data-pressed])));
+/*
+ * Hovered: under a pointer that hovers, as `hover:` is, except inside what holds rows that showed up
+ * under a pointer at rest (`data-hover-held`, set by lib/hover-hold.ts) until the pointer moves there.
+ * Its rules weigh only their class, so the pressed, current, open and greyed looks, each a variant
+ * that weighs more, show over it wherever they come in the stylesheet.
+ */
+@custom-variant hovered {
+  @media (hover: hover) {
+    &:where(:hover:not([data-hover-held] *)) {
+      @slot;
+    }
+  }
+}
 
 html,
 body {
@@ -231,13 +244,22 @@ body {
 /*
  * A row on glass lit by a tint: under the pointer, pressed, or the current or chosen one. Its muted
  * and coloured text reads in the text colour, as they fall below 4.5:1 on a tint over a bright ad.
- * Rows take it with the tint's variant: `hover:bg-hover hover:lit`.
+ * Rows take it with the tint's variant: `hovered:bg-hover hovered:lit`.
  */
 @utility lit {
   --text-muted: var(--text);
   --text-subtle: var(--text);
   --accent-text: var(--text);
   --danger: var(--text);
+}
+
+/*
+ * A menu (`data-menu`, a menu's content) showing a row's short menu in its own place, as a phone
+ * does (SubMenu): only that short menu shows, under its back row, and the rest of the menu hides,
+ * however deep in the menu the short menu sits.
+ */
+[data-menu]:has([data-menu-in-place]) :not([data-menu-in-place], [data-menu-in-place] *, :has([data-menu-in-place])) {
+  display: none;
 }
 
 /* The hover or pressed tint laid over a control's own fill, which stays: a card's row or boxed button

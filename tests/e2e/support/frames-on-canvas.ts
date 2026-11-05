@@ -6,7 +6,7 @@ import type { DesignInput } from '@dazbee/schema'
 
 import { solid } from './edit-in-frame.ts'
 import { editorPath, openTabs, setCookies, settle } from './editor.ts'
-import { frameDesign, linkedFrames, seed } from './seed.ts'
+import { DEV_BRAND, frameDesign, type InBrand, linkedFrames, seed } from './seed.ts'
 import { drawn, fitSettled, read } from './stage.ts'
 import { type Browser, expect, type Page } from './test.ts'
 
@@ -143,13 +143,13 @@ export async function labelRow(page: Page, id: string) {
   if (!stage || !rect) throw new Error(`no label for ${id}`)
   return { x: stage.x + rect.x, y: stage.y + rect.y, width: rect.width, height: rect.height }
 }
-/** The picked frame's ⋯ items in order, each by its name and as it reads with its key. */
-const FRAME_MENU = [
-  { name: 'Duplicate', reads: 'DuplicateCtrl+D' },
-  { name: 'Add size', reads: 'Add size' },
-  { name: 'Rename', reads: 'Rename' },
-  { name: 'Export', reads: 'Export' },
-  { name: 'Delete', reads: 'DeleteDelete' },
+/** The picked frame's ⋯ items in order, each by its name, as it reads with its key, and by its `data-action`. */
+export const FRAME_MENU = [
+  { name: 'Duplicate', reads: 'DuplicateCtrl+D', action: 'duplicate' },
+  { name: 'Add size', reads: 'Add size', action: 'add-size' },
+  { name: 'Rename', reads: 'Rename', action: 'rename' },
+  { name: 'Export', reads: 'Export', action: 'export' },
+  { name: 'Delete', reads: 'DeleteDelete', action: 'delete' },
 ] as const
 /**
  * Checks the picked frame's open ⋯ lists its items in order: Duplicate, Add size, Rename, Export, Delete. Given `to`,
@@ -195,19 +195,27 @@ export async function openFrames(browser: Browser, count = 1) {
 }
 /**
  * Opens a design, this spec's unless given, alone in a tab at a screen size, in a theme (dark unless
- * given) and a language (the app's own unless given), fitted, with its fonts loaded.
+ * given) and a language (the app's own unless given), fitted, with its fonts loaded. The design
+ * belongs to the brand given, or the development brand. With `touch`, the tab takes touches as a
+ * phone's screen does.
  */
 export async function openSized(
   browser: Browser,
   viewport: { width: number; height: number },
-  { theme = 'dark', locale, input = design() }: { theme?: string; locale?: string; input?: DesignInput } = {},
+  {
+    theme = 'dark',
+    locale,
+    input = design(),
+    brandId = DEV_BRAND,
+    touch = false,
+  }: { theme?: string; locale?: string; input?: DesignInput; touch?: boolean } & InBrand = {},
 ) {
-  const designId = await seed(input)
-  const page = await (await browser.newContext({ viewport })).newPage()
+  const designId = await seed(input, { brandId })
+  const page = await (await browser.newContext({ viewport, hasTouch: touch })).newPage()
   const errors: string[] = []
   page.on('pageerror', (error) => errors.push(error.message))
   await setCookies(page, { theme, ...(locale && { locale }) })
-  await page.goto(editorPath(designId))
+  await page.goto(editorPath(designId, { brandId }))
   await expect(page.getByTestId('status')).toHaveAttribute('data-ready', '', { timeout: 60_000 })
   await page.evaluate(() => window.dazbee?.loaded())
   await fitSettled(page)

@@ -9,7 +9,7 @@ import { AssetSummary, type Design, DesignSummary, parseDesign, SignedLink, Temp
 import { readImageHeader } from '../assets/images.ts'
 import { coverOf } from '../drawing/design-thumbnails.ts'
 import { renderCover } from '../drawing/render.ts'
-import { brand, call, db, otherBrand, run, sibling, storage, uploadImage, workspace } from '../test-api.ts'
+import { brand, call, db, otherBrand, run, SHORT_ID, sibling, storage, uploadImage, workspace } from '../test-api.ts'
 import { png } from '../test-files.ts'
 
 // Saving a template draws its thumbnail with CanvasKit, which takes seconds on a busy CI runner.
@@ -109,6 +109,7 @@ describe('templates (#54)', { timeout: 60_000 }, () => {
     })
     expect(saved.status).toBe(201)
     const template = TemplateSummary.parse(saved.json)
+    expect(template.id).toMatch(SHORT_ID)
     expect(template).toMatchObject({
       name: 'Sale square',
       scope: 'brand',
@@ -129,6 +130,7 @@ describe('templates (#54)', { timeout: 60_000 }, () => {
     expect(started.status).toBe(201)
     const design = DesignSummary.parse(started.json)
     expect(design).toMatchObject({ name: 'Sale square', brandId: brand.id })
+    expect(design.id).toMatch(SHORT_ID)
     const copy = await designOf(design.id)
     const original = parseDesign(content(photo.id))
     if (!original.success) throw new Error(original.errors.join('\n'))
@@ -261,7 +263,7 @@ describe('templates (#54)', { timeout: 60_000 }, () => {
     const theirs = AssetSummary.array()
       .parse((await call('a', 'GET', `/brands/${sibling.id}/assets`)).json)
       .find((x) => x.sha256 === photo.sha256)
-    expect(theirs).toBeDefined()
+    expect(theirs?.id).toMatch(SHORT_ID)
     expect(JSON.stringify(copy)).toContain(theirs?.id)
     const original = parseDesign(content(photo.id))
     if (!original.success) throw new Error(original.errors.join('\n'))

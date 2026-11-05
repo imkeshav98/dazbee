@@ -12,12 +12,17 @@ import { hug } from './layers/hug.ts'
 import { measure, sessionOf, testBoxes } from './layers/test-boxes.ts'
 import { editorSelection } from './selection.ts'
 
-const rect = (parentId: string, index: string, box: { x: number; y: number; width: number; height: number }) => ({
+const rect = (
+  parentId: string,
+  index: string,
+  box: { x: number; y: number; width: number; height: number },
+  extra: Record<string, unknown> = {},
+) => ({
   type: 'graphic' as const,
   parentId,
   index,
   name: 'Rect',
-  props: { ...box, shape: { kind: 'rect' as const } },
+  props: { ...box, shape: { kind: 'rect' as const }, ...extra },
 })
 /**
  * One page with a square frame and a wide one. The square holds three squares in a row with uneven
@@ -48,10 +53,57 @@ const DESIGN: DesignInput = {
     'wide-a': { ...rect('wide', 'a0', { x: 100, y: 100, width: 100, height: 100 }), link: 'a' },
   },
 }
+const PADDED = (pad: number) => ({ top: pad, right: pad, bottom: pad, left: pad })
+/**
+ * The design with a row laid out by auto layout lower in the square: a fixed square, a square that
+ * fills the row's width, and a box hugging one square inside its padding, laid out by auto layout too.
+ */
+const FLOW: DesignInput = {
+  ...DESIGN,
+  nodes: {
+    ...DESIGN.nodes,
+    flow: {
+      type: 'box',
+      parentId: 'sq',
+      link: 'flow',
+      index: 'a5',
+      name: 'Flow',
+      props: {
+        x: 40,
+        y: 800,
+        width: 560,
+        height: 160,
+        sizing: { width: 'fixed', height: 'hug' },
+        layout: { direction: 'row', gap: 20, padding: PADDED(20) },
+      },
+    },
+    fixed: { ...rect('flow', 'a0', { x: 0, y: 0, width: 120, height: 120 }), link: 'fixed' },
+    filling: {
+      ...rect('flow', 'a1', { x: 0, y: 0, width: 100, height: 120 }, { sizing: { width: 'fill', height: 'fixed' } }),
+      link: 'filling',
+    },
+    hugging: {
+      type: 'box',
+      parentId: 'flow',
+      link: 'hugging',
+      index: 'a2',
+      name: 'Hugging',
+      props: {
+        x: 0,
+        y: 0,
+        width: 10,
+        height: 10,
+        sizing: { width: 'hug', height: 'hug' },
+        layout: { direction: 'row', gap: 0, padding: PADDED(30) },
+      },
+    },
+    inHug: { ...rect('hugging', 'a0', { x: 0, y: 0, width: 60, height: 60 }), link: 'inHug' },
+  },
+}
 
 /** The actions on a real session, selection and drags over the page's frames, logging what they ask of the view, the tools and the pen. */
-function harness(penDrawing = false) {
-  const session = sessionOf(DESIGN)
+function harness(penDrawing = false, design = DESIGN) {
+  const session = sessionOf(design)
   const frames = pageFrames(session.design(), 'p1').frames
   const [frame, wide] = frames as [Frame, Frame]
   const log: string[] = []
@@ -132,7 +184,14 @@ function harness(penDrawing = false) {
     const p = session.design().nodes[id]?.props as { x: number; y: number }
     return { x: p.x, y: p.y }
   }
-  return { actions, frameActions, session, selection, frame, wide, log, at }
+  /** Where each layer of the square is drawn, by id. */
+  const drawn = () =>
+    Object.fromEntries(
+      Object.keys(session.design().nodes)
+        .filter((id) => session.design().nodes[id]?.parentId !== 'wide')
+        .map((id) => [id, boxes.drawnBoxOf(frame, id)]),
+    )
+  return { actions, frameActions, session, selection, frame, wide, log, at, drawn }
 }
 
 describe('editorActions', () => {
@@ -188,6 +247,46 @@ describe('editorActions', () => {
       const [group] = selection.current()?.ids ?? []
       expect(session.design().nodes[group ?? '']?.type).toBe('group')
       expect(session.design().nodes.a?.parentId).toBe(group)
+    })
+
+    it('ungroups a box, what its auto layout placed staying where it is drawn, and selects what it held', () => {
+      const { actions, session, selection, frame, at } = harness()
+      selection.select(['row'], frame.id)
+      expect(actions.perform('ungroup')).toBe(true)
+      expect(session.design().nodes.row).toBeUndefined()
+      expect(session.design().nodes.inRow?.parentId).toBe('sq')
+      expect(at('inRow')).toEqual({ x: 100, y: 500 })
+      expect(selection.current()?.ids).toEqual(['inRow'])
+      session.undo()
+      expect(session.design().nodes.inRow?.parentId).toBe('row')
+    })
+
+    it('leaves a box in a flow whole when the flow would place what it holds elsewhere, saying nothing', () => {
+      const { actions, session, selection, frame, log, drawn } = harness(false, FLOW)
+      const before = drawn()
+      expect(before.inHug).toMatchObject({ x: 490, y: 850, width: 60, height: 60 })
+      expect(before.filling).toMatchObject({ x: 200, y: 820, width: 240, height: 120 })
+      selection.select(['hugging'], frame.id)
+      expect(actions.perform('ungroup')).toBe(true)
+      expect(drawn()).toEqual(before)
+      expect(session.design().nodes.hugging).toBeDefined()
+      expect(log).not.toContain('placedByLayout')
+      expect(session.canUndo()).toBe(false)
+      expect(selection.current()?.ids).toEqual(['hugging'])
+    })
+
+    it('ungroups a group in a flow when what it held takes its place there, nothing moving', () => {
+      const { actions, session, selection, frame, log, drawn } = harness(false, FLOW)
+      const before = drawn()
+      selection.select(['fixed', 'filling'], frame.id)
+      actions.perform('group')
+      const [group = ''] = selection.current()?.ids ?? []
+      expect(drawn()).toMatchObject(before)
+      expect(actions.perform('ungroup')).toBe(true)
+      expect(session.design().nodes[group]).toBeUndefined()
+      expect(session.design().nodes.filling?.parentId).toBe('flow')
+      expect(drawn()).toEqual(before)
+      expect(log).not.toContain('placedByLayout')
     })
 
     it('aligns the selected layers to the left one, as one undo step', () => {
@@ -356,6 +455,65 @@ describe('editorActions', () => {
       selection.select(['a'], frame.id)
       actions.perform('nudgeLeft')
       expect(log).toEqual(['overlay'])
+    })
+  })
+
+  describe('ungroupState', () => {
+    it('is ready for a box or a group whose layers stay where they are drawn once it comes apart', () => {
+      const { actions, selection, frame } = harness(false, FLOW)
+      selection.select(['row'], frame.id)
+      expect(actions.ungroupState()).toBe('ready')
+      selection.select(['fixed', 'filling'], frame.id)
+      actions.perform('group')
+      expect(actions.ungroupState()).toBe('ready')
+    })
+
+    it('says auto layout places what a box in a flow holds elsewhere, and nothing changes', () => {
+      const { actions, session, selection, frame, drawn } = harness(false, FLOW)
+      const before = drawn()
+      selection.select(['hugging'], frame.id)
+      expect(actions.ungroupState()).toBe('placedByLayout')
+      expect(drawn()).toEqual(before)
+      expect(session.canUndo()).toBe(false)
+    })
+
+    it('is ready while one of the selected boxes comes apart, and none with no group or box selected', () => {
+      const { actions, selection, frame } = harness(false, FLOW)
+      selection.select(['hugging', 'row'], frame.id)
+      expect(actions.ungroupState()).toBe('ready')
+      selection.select(['a'], frame.id)
+      expect(actions.ungroupState()).toBe('none')
+      selection.select([], frame.id)
+      expect(actions.ungroupState()).toBe('none')
+    })
+
+    it('says a group or box locked against deleting is locked, in a flow or not, and its key does nothing', () => {
+      const { actions, session, selection, frame, log } = harness(false, FLOW)
+      selection.select(['fixed', 'filling'], frame.id)
+      actions.perform('group')
+      const [group = ''] = selection.current()?.ids ?? []
+      session.run('node.lock', { ids: [group, 'row'], lock: { delete: true } })
+      for (const id of [group, 'row']) {
+        selection.select([id], frame.id)
+        expect(actions.ungroupState()).toBe('locked')
+        expect(actions.perform('ungroup')).toBe(true)
+        expect(session.design().nodes[id]).toBeDefined()
+      }
+      expect(log).not.toContain('placedByLayout')
+    })
+
+    it('takes the unlocked one apart from a selection with a locked one, saying nothing', () => {
+      const { actions, session, selection, frame, log } = harness(false, FLOW)
+      selection.select(['fixed', 'filling'], frame.id)
+      actions.perform('group')
+      const [group = ''] = selection.current()?.ids ?? []
+      session.run('node.lock', { ids: ['row'], lock: { delete: true } })
+      selection.select([group, 'row'], frame.id)
+      expect(actions.ungroupState()).toBe('ready')
+      actions.perform('ungroup')
+      expect(session.design().nodes[group]).toBeUndefined()
+      expect(session.design().nodes.row).toBeDefined()
+      expect(log).not.toContain('placedByLayout')
     })
   })
 
