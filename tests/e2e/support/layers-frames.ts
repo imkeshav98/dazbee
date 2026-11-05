@@ -1,3 +1,4 @@
+// The layers-frames specs' design of linked frames on two pages, and their readers.
 import type { DesignInput } from '@dazbee/schema'
 
 import { rect, tree } from './layers-panel.ts'
@@ -35,7 +36,7 @@ const group = (parentId: string, index: string, name: string) => ({
  * locked. Fresh square sits beside them, linked to neither. The square's Photo holds Mount, which
  * holds Inner, which holds Picture. Page 2 holds one banner.
  */
-export function design(): DesignInput {
+export function framesDesign(): DesignInput {
   const square = frameDesign({
     name: 'Layers of frames',
     frameName: 'Sale square',

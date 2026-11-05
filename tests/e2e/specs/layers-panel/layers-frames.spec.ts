@@ -4,10 +4,9 @@
 // none of its frame's linked frames holds; a frame renamed from its row in one undo step, which a
 // second tab sees; hide and lock on a row acting on that layer alone, never its linked copy; a layer
 // dragged onto its own frame's row going to the top and onto another frame's going nowhere; the
-// keyboard through frames and layers; and the panel at the three screen sizes, with screenshots in
-// both themes.
+// keyboard through frames and layers.
 import { openTabs, screenPoint, writeOutput } from '../../support/editor.ts'
-import { design, layerRow, picked } from '../../support/layers-frames.ts'
+import { framesDesign, layerRow, picked } from '../../support/layers-frames.ts'
 import { frameRow, listed, node, openLayers, row, tabIntoTree, tree } from '../../support/layers-panel.ts'
 import { copyIn, seed } from '../../support/seed.ts'
 import { drawn, fitSettled, nextFrame, perform, read, selection } from '../../support/stage.ts'
@@ -40,7 +39,7 @@ const focusedRow = (page: Page) => page.evaluate(() => document.activeElement?.g
 
 /** Opens the design in one tab or two, 1440×1000, the panel open in each. */
 async function openDesign(browser: Browser, count = 1) {
-  const { tabs, errors } = await openTabs(browser, count, await seed(design()))
+  const { tabs, errors } = await openTabs(browser, count, await seed(framesDesign()))
   for (const tab of tabs) {
     await tab.setViewportSize({ width: 1440, height: 1000 })
     await tab.evaluate(() => window.dazbee?.loaded())

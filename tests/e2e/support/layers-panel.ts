@@ -6,8 +6,10 @@ import { frameDesign } from './seed.ts'
 import { read } from './stage.ts'
 import { expect, type Page } from './test.ts'
 
-/** A row's height in the panel, in pixels (LAYER_ROW in components/editor/flyouts/layer-row.tsx). */
+/** A row's height in the panel, in pixels (LAYER_ROW in components/editor/flyouts/tree-row.tsx). */
 export const ROW = 36
+/** The square's frame row as `listed` gives it, for the designs `frameDesign` makes. */
+export const SQUARE = 'Square 1080×1080'
 
 export const rect = (x: number, y: number, width: number, height: number, color: string) => ({
   x,
@@ -107,9 +109,6 @@ export async function openLayers(page: Page) {
   await page.getByRole('button', { name: 'Layers', exact: true }).click()
   await expect(tree(page)).toBeVisible()
 }
-
-/** The square's frame row as `listed` gives it, for the designs `frameDesign` makes. */
-export const SQUARE = 'Square 1080×1080'
 
 /** Tabs from the Layers button until the focus is on a row, at most eight times. */
 export async function tabIntoTree(page: Page) {

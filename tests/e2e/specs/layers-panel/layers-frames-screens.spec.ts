@@ -1,6 +1,9 @@
+// The layers panel's frames at the three screen sizes, in Chromium: the frame rows, a deep group and a
+// picked frame clear of the rest of the editor with nothing cut short, and screenshots of each in both
+// themes.
 import { editorPath, setCookies, writeOutput } from '../../support/editor.ts'
 import { THEMES } from '../../support/glass.ts'
-import { design, layerRow, picked } from '../../support/layers-frames.ts'
+import { framesDesign, layerRow, picked } from '../../support/layers-frames.ts'
 import { frameRow, openLayers, row, tabIntoTree } from '../../support/layers-panel.ts'
 import { EDITOR_CHROME, layoutProblems, SCREEN_SIZES } from '../../support/layout.ts'
 import { copyIn, seed } from '../../support/seed.ts'
@@ -13,7 +16,7 @@ test.describe.configure({ timeout: 180_000 })
 const PIECES = { ...EDITOR_CHROME, flyout: '[data-testid="flyout"]' }
 /** Opens the design alone in a tab of a theme at a screen size, fitted, its fonts loaded, the panel open. */
 async function openSized(browser: Browser, viewport: { width: number; height: number }, theme = 'dark') {
-  const designId = await seed(design())
+  const designId = await seed(framesDesign())
   const page = await (await browser.newContext({ viewport })).newPage()
   const errors: string[] = []
   page.on('pageerror', (error) => errors.push(error.message))

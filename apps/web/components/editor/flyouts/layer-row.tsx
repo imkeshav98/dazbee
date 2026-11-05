@@ -4,7 +4,7 @@
 // none of its frame's linked frames holds a copy of it, and its hide and lock toggles, which act on
 // this layer alone. A picture about the colour of its tile in a theme shows on a backdrop that sets
 // it off there. The panel hands every row one set of handlers, so a row renders again only when what
-// it shows changes. The caret and the row's look are shared with the frame rows.
+// it shows changes.
 import {
   BoundingBoxIcon,
   CircleIcon,

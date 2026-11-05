@@ -1,3 +1,5 @@
+// The layers panel tree's keyboard focus: one Tab stop, the row it lands on, the row the arrows move
+// from, and the focus kept on a row through a delete, an undo and a scroll that takes its row away.
 import { type RefObject, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 
 import type { Editor } from '@dazbee/editor'
@@ -7,6 +9,11 @@ import type { Row } from '@/lib/editor/layer-tree.ts'
 
 import { scrollToRow } from './use-row-window.ts'
 
+/**
+ * The tree's focus: `current`, the row Tab lands on; `active`, the row the focus was last on;
+ * `reveal`, which scrolls to a row and focuses it; and `focused`, which a row calls as it takes the
+ * focus.
+ */
 export function useTreeFocus({
   editor,
   design,

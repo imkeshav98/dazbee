@@ -1,5 +1,7 @@
 'use client'
 
+// The pieces every row of the layers panel's tree shares, a frame's and a layer's: the calls a row
+// makes on the panel, its height, look and place in the list, and its caret.
 import { CaretRightIcon } from '@phosphor-icons/react'
 import type { DragEvent, KeyboardEvent } from 'react'
 
