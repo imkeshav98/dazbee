@@ -9,7 +9,17 @@ import { type Editor, shortcutFor } from '@dazbee/editor'
 import { alphaOf } from '@dazbee/schema'
 
 import { useNumberInput } from '@/components/editor/number-input.ts'
-import { FIELD, KNOB, NUMBER_TEXT, PANEL_PART, SELECT, SWITCH, SWITCH_ROW } from '@/components/editor/styles.ts'
+import {
+  FIELD,
+  KNOB,
+  NUMBER_SELECTED,
+  NUMBER_SELECTED_ON_FILL,
+  NUMBER_TEXT,
+  PANEL_PART,
+  SELECT,
+  SWITCH,
+  SWITCH_ROW,
+} from '@/components/editor/styles.ts'
 import { SEGMENT, SEGMENTS } from '@/components/ui/looks.ts'
 import { Select } from '@/components/ui/select.tsx'
 import { cn } from '@/lib/cn.ts'
@@ -209,6 +219,7 @@ export function NumberField({
           }}
           className={cn(
             NUMBER_TEXT,
+            fill.at === null ? NUMBER_SELECTED : NUMBER_SELECTED_ON_FILL,
             'w-full min-w-0 cursor-[inherit] bg-transparent pe-[2px] text-end outline-none focus-visible:outline-none! placeholder:text-subtle focus:cursor-text',
             entry.typing && 'select-text',
           )}

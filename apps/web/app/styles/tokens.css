@@ -32,6 +32,10 @@
   /* A value selected in a number field: the accent, see-through, 3:1 against the field with the
      text at 4.5:1 on it. */
   --accent-selected: rgb(255 72 176 / 0.67);
+  /* The same on a number field with a fill, stronger, so it stays 3:1 against the fill; its digits in
+     white, as the text colour can't be 4.5:1 on a tint that far from the fill. */
+  --accent-selected-on-fill: rgb(255 72 176 / 0.72);
+  --text-selected-on-fill: #ffffff;
   --accent-2: #3d6bff;
   --danger: #ff5a5f;
   /* The solid red of a button that confirms a delete, under white words. */
@@ -86,6 +90,8 @@
   --on-accent: #ffffff;
   --accent-soft: rgb(194 16 108 / 0.1);
   --accent-selected: rgb(224 21 127 / 0.67);
+  --accent-selected-on-fill: rgb(224 21 127 / 0.79);
+  --text-selected-on-fill: #1a1420;
   --accent-2: #2f55e0;
   --danger: #c42020;
   /* The solid red of a button that confirms a delete, under white words. */
@@ -155,6 +161,8 @@
   --color-on-accent: var(--on-accent);
   --color-accent-soft: var(--accent-soft);
   --color-accent-selected: var(--accent-selected);
+  --color-accent-selected-on-fill: var(--accent-selected-on-fill);
+  --color-text-selected-on-fill: var(--text-selected-on-fill);
   --color-accent-2: var(--accent-2);
   --color-danger: var(--danger);
   --color-danger-solid: var(--danger-solid);

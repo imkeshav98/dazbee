@@ -64,10 +64,16 @@ export const PICKED_RING = 'shadow-[0_0_0_2px_var(--surface),0_0_0_4px_var(--acc
 export const VALUE_TEXT = 'font-mono text-[12px] tabular-nums text-text'
 /**
  * The digits of a number input and its unit: a value's look on a line of whole pixels, so the
- * digits stay put when the input takes the focus, selected in the accent at a see-through tint with
- * the digits in the text colour, so a value a click selects shows plainly as selected.
+ * digits stay put when the input takes the focus.
  */
-export const NUMBER_TEXT = `${VALUE_TEXT} leading-[16px] selection:bg-accent-selected selection:text-text`
+export const NUMBER_TEXT = `${VALUE_TEXT} leading-[16px]`
+/**
+ * A number input's value as a click selects it: the accent at a see-through tint with the digits in
+ * the text colour, so it shows plainly as selected, 3:1 against the field.
+ */
+export const NUMBER_SELECTED = 'selection:bg-accent-selected selection:text-text'
+/** The same on a field with a fill, a stronger tint, so it stays 3:1 against the fill with its digits 4.5:1 on it. */
+export const NUMBER_SELECTED_ON_FILL = 'selection:bg-accent-selected-on-fill selection:text-text-selected-on-fill'
 /** A field to type a value into, as tall as a knob: its border shows the focus, with no ring besides. */
 export const FIELD = `h-8 min-w-0 w-full rounded-row border border-line bg-surface px-1.5 ${VALUE_TEXT} outline-none focus-visible:outline-none! placeholder:text-subtle focus:border-accent`
 /** Where a dragged row would land in a list: a line across it, placed by the row above or below. */

@@ -77,7 +77,9 @@ async function selectionColours(knob: Locator, input: Locator) {
   const digit = (await input.evaluate((el) => parseFloat(getComputedStyle(el).fontSize))) * 0.6 * scale
   const selection = commonest(shot, right - digit, top + 2 * scale, right - scale, top + i.height * scale - 2 * scale)
   const field = commonest(shot, 2 * scale, (k.height / 2 - 2) * scale, 6 * scale, (k.height / 2 + 2) * scale)
-  const digits = await input.evaluate((el) => getComputedStyle(el).color.match(/\d+/g)?.slice(0, 3).map(Number))
+  const digits = await input.evaluate((el) =>
+    getComputedStyle(el, '::selection').color.match(/\d+/g)?.slice(0, 3).map(Number),
+  )
   return { selection, field, digits: digits as Rgb }
 }
 
@@ -180,6 +182,25 @@ for (const screen of FIELD_SCREENS) {
       await expect(input).toHaveValue('5')
       await page.keyboard.press('Enter')
       await expect.poll(async () => (await props(page, 'box')).x).toBe(5)
+      expect(errors).toEqual([])
+    })
+
+    test(`${size}, ${theme}: on a field with a fill, the selection is at least 3:1 against the fill and its digits at least 4.5:1 on it`, async ({
+      browser,
+    }) => {
+      const { page, errors, knob, input } = await openField(browser, screen, FIELDS.opacity, { theme })
+      const at = await middleOf(knob)
+      // Filled to its end, so the fill lies under the digits and beside the label.
+      await page.mouse.click(at.x, at.y)
+      await page.keyboard.press('End')
+      await expect(input).toHaveValue('100')
+      // Away and back, so the whole value is selected again.
+      await page.keyboard.press('Tab')
+      await page.keyboard.press('Shift+Tab')
+      await expect.poll(() => caretOf(input)).toEqual({ value: '100', start: 0, end: 3, focused: true })
+      const drawn = await selectionColours(knob, input)
+      expect(contrast(drawn.selection, drawn.field)).toBeGreaterThanOrEqual(3)
+      expect(contrast(drawn.digits, drawn.selection)).toBeGreaterThanOrEqual(4.5)
       expect(errors).toEqual([])
     })
   }
