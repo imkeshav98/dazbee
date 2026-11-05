@@ -1,10 +1,10 @@
 'use client'
 
 // A row of the editor's menus that runs an action, its key at its end, greyed with the reason in a
-// tooltip while it has nothing to do, as every menu's greyed rows are; and the tooltip that says why
-// a greyed control has nothing to do.
+// tooltip while it has nothing to do, as every menu's greyed rows are; a greyed button of any look;
+// and the tooltip that says why a greyed control has nothing to do.
 import { CaretRightIcon } from '@phosphor-icons/react'
-import { type MouseEvent, useRef, useState } from 'react'
+import { type ComponentProps, type MouseEvent, useRef, useState } from 'react'
 
 import { usePhone } from '@/components/editor/edit-store.ts'
 import { MENU_ITEM, MENU_ITEM_GREYED, MENU_KEY } from '@/components/editor/styles.ts'
@@ -14,8 +14,8 @@ import { type Box, type TooltipPlace, tooltipPlace } from '@/lib/editor/tooltip-
 import { useLocale } from '@/lib/i18n/client.tsx'
 import { dirOf } from '@/lib/i18n/index.ts'
 
-/** The open menus: each popover's content. */
-const MENUS = '[data-radix-popper-content-wrapper] > [role="dialog"]'
+/** What a greyed control's tooltip keeps clear of: each open popover's content, and the edit panel. */
+const HOLDERS = ':is([data-radix-popper-content-wrapper] > [role="dialog"], #edit-panel)'
 
 /** An element's box in the window. */
 const boxOf = (el: Element): Box => {
@@ -50,7 +50,6 @@ export function MenuRow({
   caret?: boolean
   onRun?: () => void
 }) {
-  const tip = useWhyTip<HTMLButtonElement>(why)
   const end = caret ? (
     <CaretRightIcon size={12} weight="bold" aria-hidden className="text-subtle rtl:-scale-x-100" />
   ) : (
@@ -70,19 +69,42 @@ export function MenuRow({
       </button>
     )
   return (
+    <GreyedButton
+      why={why}
+      data-action={action}
+      data-testid={testId}
+      className={cn(MENU_ITEM, danger && 'text-danger')}
+    >
+      {label}
+      {end}
+    </GreyedButton>
+  )
+}
+
+/**
+ * A button greyed because it has nothing to do, in its own look (`className`): the not-allowed
+ * pointer, it runs nothing, and it says `why` in a tooltip under the pointer, on keyboard focus and
+ * on a tap (`useWhyTip`). It keeps the focus, so the keyboard still reaches it and hears why.
+ */
+export function GreyedButton({
+  why,
+  className,
+  children,
+  ...button
+}: Omit<ComponentProps<'button'>, 'onClick' | 'ref' | 'type'> & { why: string }) {
+  const tip = useWhyTip<HTMLButtonElement>(why)
+  return (
     <Tooltip {...tip.tooltip}>
       <button
+        {...button}
         ref={tip.ref}
         type="button"
-        data-action={action}
-        data-testid={testId}
         aria-disabled="true"
         aria-description={why}
         onClick={tip.tap}
-        className={cn(MENU_ITEM, MENU_ITEM_GREYED, danger && 'text-danger')}
+        className={cn(className, MENU_ITEM_GREYED)}
       >
-        {label}
-        {end}
+        {children}
       </button>
     </Tooltip>
   )
@@ -90,8 +112,8 @@ export function MenuRow({
 
 /**
  * The tooltip of a greyed control, saying `why` it has nothing to do: under the pointer, on
- * keyboard focus and on a tap or click, placed as it shows so it covers no row of any open menu,
- * its own menu's included, and on a phone just above the control's menu, clear of the finger. The
+ * keyboard focus and on a tap or click, placed as it shows so it covers no row of any open menu
+ * or control of the edit panel, its own menu's or panel's included, and on a phone just above the control's menu, clear of the finger. The
  * ref and `tap` go on the control, and `tooltip` on the Tooltip around it.
  */
 export function useWhyTip<T extends HTMLElement>(why: string | null) {
@@ -129,8 +151,8 @@ export function useWhyTip<T extends HTMLElement>(why: string | null) {
  * as it is about to show.
  */
 function placeFor(row: HTMLElement, label: string, rtl: boolean, phone: boolean): TooltipPlace {
-  const own = row.closest('[role="dialog"]') ?? row
-  const rows = [...document.querySelectorAll(`${MENUS} :is(button, [data-scrub])`)].filter((one) =>
+  const own = row.closest(HOLDERS) ?? row
+  const rows = [...document.querySelectorAll(`${HOLDERS} :is(button, [data-scrub])`)].filter((one) =>
     one.checkVisibility(),
   )
   return tooltipPlace({

@@ -36,7 +36,8 @@ export function SizeStepper({ target }: { target: Target }) {
       aria-label={t.editor.props.fontSize}
       data-testid="bar-size"
       data-typing={entry.typing ? '' : undefined}
-      className="flex h-[30px] shrink-0 items-center rounded-row border border-line transition-colors duration-[var(--chrome-fast)] data-typing:border-accent"
+      // On a phone smaller, the size and bigger are three 44 px targets 8 px apart, the size boxed.
+      className="flex h-[30px] shrink-0 items-center rounded-row border border-line transition-colors duration-[var(--chrome-fast)] data-typing:border-accent max-sm:h-[44px] max-sm:gap-[8px] max-sm:border-0"
     >
       <button
         type="button"
@@ -48,7 +49,10 @@ export function SizeStepper({ target }: { target: Target }) {
       >
         <MinusIcon size={12} aria-hidden />
       </button>
-      <div {...entry.knob} className="flex h-full w-10 cursor-text items-center justify-center overflow-hidden">
+      <div
+        {...entry.knob}
+        className="flex h-full w-10 cursor-text items-center justify-center overflow-hidden max-sm:w-[44px] max-sm:rounded-row max-sm:border max-sm:border-line max-sm:in-data-typing:border-accent"
+      >
         <NumberInput
           entry={entry}
           text={draft ?? shown}

@@ -2,7 +2,7 @@
 
 // What the top bar has open: one pop-up, the full menu or one edit panel, never two at once, since
 // they share this one value. Opening any of them closes what was open. The shell reads it too: on a
-// phone an edit panel, the top bar's Arrange ⋯, the full menu and the right-click menu are sheets,
+// phone an edit panel, the full menu and the right-click menu are sheets,
 // and a rail flyout and a sheet close each other. And whether something stands over the edit panel
 // and the bar's second row, which Esc closes first; the menu's button a rename field gives the focus
 // back to; and the Share menu's listener for an Export asked from a picked frame's ⋯.
@@ -25,11 +25,8 @@ const DESIGN_PANELS = {
   addSize: { ofPickedFrame: true },
 } as const satisfies Record<string, { ofPickedFrame: boolean }>
 type DesignPanelId = keyof typeof DESIGN_PANELS
-/**
- * The pop-ups that open as a sheet at the bottom on a phone, as an edit panel does: the top bar's
- * Arrange ⋯ and the full menu.
- */
-const SHEET_POPUPS = ['arrange', 'more'] as const
+/** The pop-ups that open as a sheet at the bottom on a phone, as an edit panel does: the full menu. */
+const SHEET_POPUPS = ['more'] as const
 export type LayerPanelId = (typeof LAYER_PANELS)[number]
 export type PanelId = LayerPanelId | DesignPanelId
 /** Every id that opens the edit panel; every other id is a pop-up or the full menu. */
@@ -67,7 +64,7 @@ const subscribe = (listener: () => void) => {
 export const isPanel = (id: string | null): id is PanelId => (PANELS as readonly string[]).includes(id ?? '')
 export const isLayerPanel = (id: string | null): id is LayerPanelId =>
   (LAYER_PANELS as readonly string[]).includes(id ?? '')
-/** Whether what is open is a sheet at the bottom on a phone: every edit panel but Pages, Arrange ⋯ and the full menu. */
+/** Whether what is open is a sheet at the bottom on a phone: every edit panel but Pages, and the full menu. */
 export const isSheet = (id: string | null) =>
   (isPanel(id) && id !== 'pages') || (SHEET_POPUPS as readonly string[]).includes(id ?? '')
 /**
@@ -124,7 +121,7 @@ export function useEditState() {
 
 /**
  * Under 640 px wide the editor is laid out for a phone: the edit panel is a sheet and the top bar
- * scrolls. Read before the first paint, so a menu that opens on a phone, as the right-click menu
+ * wraps into two rows. Read before the first paint, so a menu that opens on a phone, as the right-click menu
  * does, never shows a frame laid out for a wider screen first.
  */
 export function usePhone() {

@@ -269,6 +269,7 @@ export function BarPopover({
   align = 'center',
   buttonRef,
   opens,
+  on = false,
 }: {
   id: string
   open: string | null
@@ -292,6 +293,8 @@ export function BarPopover({
   buttonRef?: RefObject<HTMLButtonElement | null>
   /** The edit panel a row of the popover opens, which gives the focus back to the button as it closes. */
   opens?: PanelId
+  /** Something it sets is on, so its button takes the pink tint a pressed toggle has. */
+  on?: boolean
 }) {
   const focus = useMenuFocus()
   const escape = useEscapeBack()
@@ -320,7 +323,8 @@ export function BarPopover({
           title={face ? label : undefined}
           data-testid={`bar-${testId}`}
           data-opens={opens}
-          className={BAR_BUTTON}
+          data-on={on || undefined}
+          className={cn(BAR_BUTTON, 'data-on:bg-accent-soft')}
         >
           {icon}
           {face ?? label}

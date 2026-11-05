@@ -172,8 +172,11 @@ export const KNOB_SWITCH = `group flex h-8 ${TOUCH_FIELD} min-w-0 cursor-pointer
 
 /** The top bar's row on the stage, under the header pill: where the bar sits, and the room the fit keeps for it. */
 export const BAR_ROW = 'top-[90px] max-sm:top-[72px]'
-/** The top bar's height, for the room the fit keeps. */
-export const BAR_ROW_HEIGHT = 'h-[38px]'
+/**
+ * The top bar's height, for the room the fit keeps: one row, or on a phone the two rows it may wrap
+ * into, each of 44 px targets, so the bar never covers the design as fitted.
+ */
+export const BAR_ROW_HEIGHT = 'h-[38px] max-sm:h-[106px]'
 /** One button of the bar: words or an icon, lit by the hover tint while its popover is open and by the pressed tint while pressed. */
 export const BAR_BUTTON = `flex h-[30px] min-w-[30px] shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-row px-2 text-[12px] font-semibold whitespace-nowrap text-text transition-colors duration-[var(--chrome-fast)] hover:bg-hover active:bg-pressed aria-expanded:bg-hover aria-expanded:active:bg-pressed ${FOCUS_RING}`
 /** A button of the bar that turns something on or off, such as bold: on a pink tint while it is on, its icon in the text colour. */
@@ -181,7 +184,7 @@ export const BAR_TOGGLE = `${BAR_BUTTON} aria-pressed:bg-accent-soft aria-presse
 /** The swatch a bar button shows for a colour the selected layers don't share. */
 export const MIXED_COLOUR = 'conic-gradient(red, yellow, lime, aqua, blue, magenta, red)'
 /** The upright hairline between the bar's groups of buttons. */
-export const BAR_DIVIDER = 'mx-0.5 h-5 w-px bg-line'
+export const BAR_DIVIDER = 'mx-0.5 h-5 w-px shrink-0 bg-line max-sm:mx-0'
 
 /** A small message floating at the stage's start corner: a layer removed, something auto layout decides. */
 export const TOAST =

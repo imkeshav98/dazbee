@@ -137,6 +137,8 @@ export function factsOf(target: Target, design: Design) {
     masks: target.props.every((pr) => Boolean(pr.mask)),
     sized: target.types.every((type) => type !== 'group' && type !== 'boolean'),
     texts: target.types.every((type) => type === 'text'),
+    // The layers locked against any change, which every setting but their order would be refused for.
+    locked: target.ids.filter((id) => Object.values(design.nodes[id]?.lock ?? {}).some(Boolean)),
   }
 }
 

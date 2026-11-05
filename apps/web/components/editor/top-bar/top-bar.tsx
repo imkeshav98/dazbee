@@ -4,10 +4,12 @@
 // its items set by what is selected (text, a photo, a shape, a box, a group, or several, or the
 // picked frame's Background and ⋯); a locked layer's bar says it is locked and unlocks it. An item
 // with ▾ opens a pop-up under the bar; a panel item opens the one edit panel at the stage's end;
-// the rest act at once. Its last item, Arrange ⋯ for layers or a picked frame's ⋯, always ends the
-// first row. When the items don't fit, the others that don't go to a second row under the bar: on
-// a tablet or desktop it opens from More controls, which stands before the last item; on a phone it
-// is a second card that always shows, as the mock draws it. Nothing scrolls sideways.
+// the rest act at once. Its last items, Position for layers (Line up ▾ and Position for several) or
+// a picked frame's ⋯, always end the first row together. When the items don't fit, the others that
+// don't go to a second row under the bar, cut between two groups where the group fits in a row: on a
+// tablet or desktop it opens from More controls, which stands after a divider before the last
+// items; on a phone it is a second card that always shows, as the mock draws it, and every item is
+// a 44 px target 8 px from the next. Nothing scrolls sideways.
 import { CaretDownIcon } from '@phosphor-icons/react'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 
@@ -27,7 +29,7 @@ import {
   usePhone,
 } from '@/components/editor/edit-store.ts'
 import { usePickedFrame, useSelection } from '@/components/editor/editor-hooks.ts'
-import { BAR_BUTTON, BAR_ROW } from '@/components/editor/styles.ts'
+import { BAR_BUTTON, BAR_DIVIDER, BAR_ROW } from '@/components/editor/styles.ts'
 import { useLiveDesign } from '@/components/editor/use-live-design.ts'
 import { cn } from '@/lib/cn.ts'
 import { useMessages } from '@/lib/i18n/client.tsx'
@@ -36,12 +38,38 @@ import { arrowAlong, useRovingTab } from './bar-popover.tsx'
 import { useFrameItems } from './frame-items.tsx'
 import { type BarItem, useSelectionItems } from './top-bar-items.tsx'
 
-/** The gap after each of the bar's items, in pixels. */
-const GAP = 2
-/** The width More controls takes on the first row, with its gap, in pixels. */
-const MORE = 30 + GAP
-/** The bar's look: a frosted pill of buttons, centred at the top of the stage under the header pill. */
-const TOP_BAR = 'flex items-center gap-0.5 rounded-[14px] surface-frost p-1'
+/** The width More controls and the divider before it take on the first row, without their gaps, in pixels. */
+const MORE = 30 + 5
+/**
+ * The bar's look: a frosted pill of buttons, centred at the top of the stage under the header pill.
+ * On a phone every item is a 44 px target, 8 px from the next.
+ */
+const TOP_BAR =
+  'flex items-center gap-0.5 rounded-[14px] surface-frost p-1 max-sm:gap-[8px] max-sm:rounded-[18px] max-sm:p-[2px] max-sm:[&_[data-bar-item]]:h-[44px] max-sm:[&_[data-bar-item]]:min-w-[44px] max-sm:[&_[data-bar-item]]:px-[6px]'
+
+/** An element's width with its margins, in pixels. */
+function outerWidth(el: Element | null) {
+  if (!(el instanceof HTMLElement)) return 0
+  return el.offsetWidth + sidesOf(el, 'margin-left', 'margin-right')
+}
+
+/**
+ * Where the first row ends when it would cut a group of items in two, `cut` being the first item
+ * that doesn't fit: before the group, when the group starts after a divider and fits in a row of
+ * its own, so it goes whole to the second row; else at `cut`. `widths` are the items' widths, each
+ * with the gap after it.
+ */
+function groupCut(keys: string[], widths: number[], cut: number, room: number, gap: number) {
+  const divider = (i: number) => keys[i]?.startsWith('divider') === true
+  if (cut <= 0 || cut >= keys.length || divider(cut) || divider(cut - 1)) return cut
+  let start = cut
+  while (start > 0 && !divider(start - 1)) start--
+  if (start === 0) return cut
+  let end = cut
+  while (end < keys.length && !divider(end)) end++
+  const wide = widths.slice(start, end).reduce((sum, w) => sum + w, 0) - gap
+  return wide <= room ? start : cut
+}
 
 /** The sum of an element's own widths along its sides, by their CSS names, in pixels. */
 function sidesOf(el: Element, ...names: string[]) {
@@ -50,13 +78,13 @@ function sidesOf(el: Element, ...names: string[]) {
 }
 
 /**
- * How many of the items before the last fit on the bar's first row, which the last item always
- * ends; the others go to the second row. All of them fitting is Infinity. On a tablet or desktop
- * More controls stands before the last item while some don't fit, so its room is kept too. Every
- * item is drawn in one of the two rows at all times, so each one's width can be read; `keys` are
- * the items' keys in order, joined by spaces.
+ * How many of the items before the last `tail` fit on the bar's first row, which those always end;
+ * the others go to the second row, cut between two groups where `groupCut` says so. All of them
+ * fitting is Infinity. On a tablet or desktop More controls stands before the last items while some
+ * don't fit, so its room is kept too. Every item is drawn in one of the two rows at all times, so
+ * each one's width can be read; `keys` are the items' keys in order, joined by spaces.
  */
-function useFit(row: HTMLElement | null, extra: HTMLElement | null, keys: string, phone: boolean) {
+function useFit(row: HTMLElement | null, extra: HTMLElement | null, keys: string, tail: number, phone: boolean) {
   const [fit, setFit] = useState(Infinity)
   useLayoutEffect(() => {
     if (!row || !extra) return
@@ -66,29 +94,31 @@ function useFit(row: HTMLElement | null, extra: HTMLElement | null, keys: string
       const room =
         (wrapper ? wrapper.clientWidth - sidesOf(wrapper, 'padding-left', 'padding-right') : window.innerWidth) -
         sidesOf(row, 'padding-left', 'padding-right', 'border-left-width', 'border-right-width')
+      const gap = Number.parseFloat(getComputedStyle(row).columnGap) || 0
       // Each item's wrapper draws nothing of its own (display: contents); its button has the width.
       const widths = new Map<string, number>()
       for (const el of [...row.children, ...extra.children])
         if (el instanceof HTMLElement && el.dataset.item !== undefined)
-          widths.set(el.dataset.item, ((el.firstElementChild as HTMLElement | null)?.offsetWidth ?? 0) + GAP)
-      const ordered = keys.split(' ').map((key) => widths.get(key) ?? 0)
+          widths.set(el.dataset.item, outerWidth(el.firstElementChild) + gap)
+      const named = keys.split(' ')
+      const ordered = named.map((key) => widths.get(key) ?? 0)
       // The last item has no gap after it.
-      if (ordered.reduce((sum, w) => sum + w, 0) - GAP <= room) return setFit(Infinity)
-      let used = (ordered.at(-1) ?? 0) + (phone ? 0 : MORE)
+      if (ordered.reduce((sum, w) => sum + w, 0) - gap <= room) return setFit(Infinity)
+      let used = ordered.slice(-tail).reduce((sum, w) => sum + w, 0) + (phone ? 0 : MORE + gap * 2)
       let n = 0
-      for (const w of ordered.slice(0, -1)) {
-        if (used + w - GAP > room) break
+      for (const w of ordered.slice(0, -tail)) {
+        if (used + w - gap > room) break
         used += w
         n++
       }
-      setFit(n)
+      setFit(groupCut(named.slice(0, -tail), ordered.slice(0, -tail), n, room, gap))
     }
     measure()
     const watch = new ResizeObserver(measure)
     if (wrapper) watch.observe(wrapper)
     for (const el of [...row.children, ...extra.children]) watch.observe(el.firstElementChild ?? el)
     return () => watch.disconnect()
-  }, [row, extra, keys, phone])
+  }, [row, extra, keys, tail, phone])
   return fit
 }
 
@@ -160,14 +190,21 @@ function Bar({
   const [row, setRow] = useState<HTMLDivElement | null>(null)
   const [extra, setExtra] = useState<HTMLDivElement | null>(null)
   const keys = items.map((item) => item.key).join(' ')
-  const fit = useFit(row, extra, keys, phone)
-  // The last item ends the first row; before it, the items that fit. A divider never ends the first
-  // row's items or starts the second row.
-  const fits = fit >= items.length
-  let shown = fits ? items.length : fit
+  // The items that end the bar together: those marked as its tail, or at least the last one.
+  let tail = 1
+  while (tail < items.length && items[items.length - tail - 1]?.tail) tail++
+  const fit = useFit(row, extra, keys, tail, phone)
+  // The last items end the first row; before them, the items that fit. A divider never ends the
+  // first row's items or starts the second row.
+  const fits = fit >= items.length - tail
+  let shown = fits ? items.length - tail : fit
   while (!fits && shown > 0 && items[shown - 1]?.key.startsWith('divider')) shown--
-  const first = fits ? items : [...items.slice(0, shown), ...items.slice(-1)]
-  const rest = fits ? [] : items.slice(shown, -1).filter((item, i) => !(i === 0 && item.key.startsWith('divider')))
+  const first = fits ? items : [...items.slice(0, shown), ...items.slice(-tail)]
+  const rest = fits
+    ? []
+    : items
+        .slice(shown, -tail)
+        .filter((item, i, all) => !(item.key.startsWith('divider') && (i === 0 || i === all.length - 1)))
   const overflowing = rest.length > 0
   // The second row is its own: opening it leaves an open panel, which moves down under it. On a
   // phone it always shows.
@@ -242,7 +279,11 @@ function Bar({
       )}
     >
       <div ref={setRow} className={cn(TOP_BAR, 'pointer-events-auto max-w-full')} data-testid="top-bar-row">
-        {first.slice(0, -1).map(item)}
+        {first.slice(0, -tail).map(item)}
+        {overflowing && !phone && (
+          // A divider sets More controls apart, so it never reads as the caret of the item before it.
+          <span aria-hidden data-testid="divider-more" className={BAR_DIVIDER} />
+        )}
         {overflowing && !phone && (
           <button
             type="button"
@@ -263,7 +304,7 @@ function Bar({
             />
           </button>
         )}
-        {first.slice(-1).map(item)}
+        {first.slice(-tail).map(item)}
       </div>
       <div
         ref={setExtra}

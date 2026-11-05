@@ -1,80 +1,94 @@
 'use client'
 
-// The Position panel: the moves along the stack and lining up, then under Advanced the box's size,
-// place and turn, and how a layer in an auto layout sizes.
-import {
-  AlignBottomIcon,
-  AlignCenterHorizontalIcon,
-  AlignCenterVerticalIcon,
-  AlignLeftIcon,
-  AlignRightIcon,
-  AlignTopIcon,
-  ArrowDownIcon,
-  ArrowLineDownIcon,
-  ArrowLineUpIcon,
-  ArrowsOutLineHorizontalIcon,
-  ArrowsOutLineVerticalIcon,
-  ArrowUpIcon,
-  type Icon,
-} from '@phosphor-icons/react'
-import { type ReactNode, useState } from 'react'
+// The Position panel, the one home of how the selected layers sit: their size, place and turn, then
+// their order in the stack, then for one layer lining it up with its frame, and how a layer in an
+// auto layout sizes. A lock greys all but the order, each greyed control saying why.
+import { ArrowDownIcon, ArrowLineDownIcon, ArrowLineUpIcon, ArrowUpIcon, type Icon } from '@phosphor-icons/react'
+import { useState } from 'react'
 
 import { type ShortcutAction } from '@dazbee/editor'
 
 import { ALIGN, keyOf } from '@/components/editor/arrange-actions.ts'
-import { KNOB_SWITCH, KNOBS, PANEL_ACTION, PANEL_HEADING, PANEL_PART } from '@/components/editor/styles.ts'
-import type { ORDER } from '@/components/editor/top-bar/arrange-menu.tsx'
+import { KNOB_SWITCH, KNOBS, PANEL_ACTION, PANEL_HEADING, PANEL_PART, SWITCH } from '@/components/editor/styles.ts'
+import { GreyedButton } from '@/components/editor/top-bar/menu-row.tsx'
+import { Tooltip } from '@/components/ui/tooltip.tsx'
 import { cn } from '@/lib/cn.ts'
 import { LIMITS } from '@/lib/editor/limits.ts'
 import { sizeTo, tidy } from '@/lib/editor/size.ts'
+import { stackEnds } from '@/lib/editor/stack-ends.ts'
 import { useMessages } from '@/lib/i18n/client.tsx'
-import { format } from '@/lib/i18n/index.ts'
+import { format, type Messages } from '@/lib/i18n/index.ts'
 
 import { SizingFields } from './auto-layout-panel.tsx'
-import { clamp, NumberField, PanelPart, Switch, SwitchRow } from './fields.tsx'
+import { clamp, NumberField, Switch, SwitchRow } from './fields.tsx'
 import { factsOf, num, type P, type PanelProps, type Patch, type Props, set, shared, type Target } from './target.ts'
 
 /** The four moves along the stack, two to a row: a step forward and back, then all the way. */
-const MOVES: { action: (typeof ORDER)[number]; icon: Icon }[] = [
-  { action: 'bringForward', icon: ArrowUpIcon },
-  { action: 'sendBackward', icon: ArrowDownIcon },
-  { action: 'bringToFront', icon: ArrowLineUpIcon },
-  { action: 'sendToBack', icon: ArrowLineDownIcon },
-]
+const MOVES = [
+  { action: 'bringForward', icon: ArrowUpIcon, front: true },
+  { action: 'sendBackward', icon: ArrowDownIcon, front: false },
+  { action: 'bringToFront', icon: ArrowLineUpIcon, front: true },
+  { action: 'sendToBack', icon: ArrowLineDownIcon, front: false },
+] as const satisfies readonly { action: ShortcutAction; icon: Icon; front: boolean }[]
 
-/** One layer lines up with its frame by these, two to a row: each up-down one beside its across one. */
-const FRAME_ALIGN = [
-  { action: 'alignTop', icon: AlignTopIcon },
-  { action: 'alignLeft', icon: AlignLeftIcon },
-  { action: 'alignMiddle', icon: AlignCenterVerticalIcon },
-  { action: 'alignCentre', icon: AlignCenterHorizontalIcon },
-  { action: 'alignBottom', icon: AlignBottomIcon },
-  { action: 'alignRight', icon: AlignRightIcon },
-] as const satisfies readonly { action: ShortcutAction; icon: Icon }[]
+/** The mark the Position button and the Rotate field show a turn with, the same in every language. */
+export const TURN_MARK = '↻'
 
-/** Three or more layers spread out evenly, across or down. */
-const SPREAD = [
-  { action: 'distributeHorizontal', icon: ArrowsOutLineHorizontalIcon },
-  { action: 'distributeVertical', icon: ArrowsOutLineVerticalIcon },
-] as const satisfies readonly { action: ShortcutAction; icon: Icon }[]
-
-/** The Position panel: lining up and the stack's order, then the box's numbers under Advanced. */
+/**
+ * The Position panel: the numbers, then Order, then for one layer Line up with the frame (several
+ * have theirs on the bar), then a layer's sizing in its auto layout.
+ */
 export function PositionPanel({ target, design }: PanelProps) {
   const t = useMessages()
+  const b = t.editor.bar
   const p = t.editor.props
-  const { inFlow, placed } = factsOf(target, design)
+  const { inFlow, placed, locked } = factsOf(target, design)
+  const lock = locked.length > 0 ? b.lockedRow : null
+  const ends = stackEnds(design, target.ids)
   return (
     <>
-      <ArrangePart target={target} placed={placed} />
-      <PlaceCard target={target} p={p} title={t.editor.bar.advanced}>
-        {inFlow && <FlowPart target={target} p={p} />}
-      </PlaceCard>
+      <PlaceCard target={target} p={p} why={lock} />
+      <section aria-labelledby="order-part-title" className={PANEL_PART} data-testid="order-part">
+        <h3 id="order-part-title" className={PANEL_HEADING}>
+          {b.order}
+        </h3>
+        <div className="grid grid-cols-2 gap-1.5 max-sm:gap-[8px]">
+          {MOVES.map(({ action, icon, front }) => (
+            <PanelAction
+              key={action}
+              target={target}
+              action={action}
+              icon={icon}
+              why={front ? (ends.front ? b.atFront : null) : ends.back ? b.atBack : null}
+            />
+          ))}
+        </div>
+      </section>
+      {target.ids.length === 1 && (
+        <section aria-labelledby="line-up-part-title" className={PANEL_PART} data-testid="line-up-part">
+          <h3 id="line-up-part-title" className={PANEL_HEADING}>
+            {b.placing.lineUpFrame}
+          </h3>
+          <div dir="ltr" className="grid grid-cols-3 gap-1.5 max-sm:gap-[8px]">
+            {ALIGN.map(({ action, icon }) => (
+              <PanelAction
+                key={action}
+                target={target}
+                action={action}
+                icon={icon}
+                why={lock ?? (placed ? b.placedByLayout : null)}
+              />
+            ))}
+          </div>
+        </section>
+      )}
+      {inFlow && !lock && <FlowPart target={target} p={p} />}
     </>
   )
 }
 
 /** The layers' turn in degrees, wrapping round at 360; groups and booleans turn with what they hold. */
-export function RotationField({ target, p, label = '↻' }: { target: Target; p: P; label?: string }) {
+export function RotationField({ target, p, label, why }: { target: Target; p: P; label: string; why: string | null }) {
   return (
     <NumberField
       label={label}
@@ -85,6 +99,7 @@ export function RotationField({ target, p, label = '↻' }: { target: Target; p:
       min={Number.NEGATIVE_INFINITY}
       max={Number.POSITIVE_INFINITY}
       editor={target.editor}
+      why={why}
       onSet={(v) => set(target, () => ({ rotation: tidy(((v % 360) + 360) % 360) }))}
       onShift={(by) =>
         set(target, (now) => ({ rotation: tidy(((((num(now, 'rotation') ?? 0) + by) % 360) + 360) % 360) }))
@@ -94,107 +109,12 @@ export function RotationField({ target, p, label = '↻' }: { target: Target; p:
 }
 
 /**
- * The Position panel's simple choices: the four moves along the stack, then lining up. One layer
- * lines up with its frame, by name, unless an auto layout places it (`placed`); several line up
- * with each other, by icon, and three or more spread out evenly. Each button runs its shortcut's action, and its tooltip names the shortcut.
+ * The Position panel's numbers, with no heading: the box's width and height, then where it sits,
+ * then its turn and Lock ratio, two to a row. With Lock ratio on, a width or height set moves the
+ * other side with it. Groups and booleans take their box from what they hold, so they have only X
+ * and Y. While `why` says the layers are locked, each is greyed, saying so.
  */
-function ArrangePart({ target, placed }: { target: Target; placed: boolean }) {
-  const t = useMessages()
-  const a = t.editor.arrange
-  const placing = t.editor.bar.placing
-  const run = (action: ShortcutAction) => target.editor.perform(action)
-  const tip = (label: string, action: ShortcutAction) => format(a.withKey, { label, key: keyOf(action) })
-  const several = target.ids.length > 1
-  // Spreading needs a layer between the two at the ends.
-  const spreads = target.ids.length >= 3
-  return (
-    <section aria-labelledby="arrange-part-title" className={PANEL_PART} data-testid="arrange-part">
-      <h3 id="arrange-part-title" className={PANEL_HEADING}>
-        {placing.arrange}
-      </h3>
-      <div className="grid grid-cols-2 gap-1.5">
-        {MOVES.map(({ action, icon: Icon }) => (
-          <button
-            key={action}
-            type="button"
-            data-action={action}
-            title={tip(a[action], action)}
-            onClick={() => run(action)}
-            className={PANEL_ACTION}
-          >
-            <Icon size={14} aria-hidden className="shrink-0" />
-            <span>{placing[action]}</span>
-          </button>
-        ))}
-      </div>
-      {several ? (
-        <>
-          <h3 className={PANEL_HEADING}>{placing.lineUpSelection}</h3>
-          <div dir="ltr" className="grid grid-cols-3 gap-1.5">
-            {ALIGN.map(({ action, icon: Icon }) => (
-              <button
-                key={action}
-                type="button"
-                data-action={action}
-                aria-label={a[action]}
-                title={tip(a[action], action)}
-                onClick={() => run(action)}
-                className={cn(PANEL_ACTION, 'justify-center')}
-              >
-                <Icon size={16} aria-hidden />
-              </button>
-            ))}
-          </div>
-          <div className="grid gap-1.5">
-            {SPREAD.map(({ action, icon: Icon }) => (
-              <button
-                key={action}
-                type="button"
-                data-action={action}
-                disabled={!spreads}
-                title={spreads ? tip(a[action], action) : placing.needsThree}
-                onClick={() => run(action)}
-                className={PANEL_ACTION}
-              >
-                <Icon size={14} aria-hidden className="shrink-0" />
-                <span>{placing[action]}</span>
-              </button>
-            ))}
-          </div>
-        </>
-      ) : (
-        !placed && (
-          <>
-            <h3 className={PANEL_HEADING}>{placing.lineUpFrame}</h3>
-            <div className="grid grid-cols-2 gap-1.5">
-              {FRAME_ALIGN.map(({ action, icon: Icon }) => (
-                <button
-                  key={action}
-                  type="button"
-                  data-action={action}
-                  title={tip(a[action], action)}
-                  onClick={() => run(action)}
-                  className={PANEL_ACTION}
-                >
-                  <Icon size={15} aria-hidden className="shrink-0" />
-                  <span>{placing[action]}</span>
-                </button>
-              ))}
-            </div>
-          </>
-        )
-      )}
-    </section>
-  )
-}
-
-/**
- * The Position panel's numbers, under Advanced: the box's width and height, then where it sits, then
- * its turn, two to a row. With Lock ratio on, a width or height set moves the other side with it.
- * Groups and booleans take their box from what they hold, so they have only X and Y. A layer in an
- * auto layout has its sizing in `children`, under them.
- */
-function PlaceCard({ target, p, title, children }: { target: Target; p: P; title: string; children?: ReactNode }) {
+function PlaceCard({ target, p, why }: { target: Target; p: P; why: string | null }) {
   const placing = useMessages().editor.bar.placing
   const [keepRatio, setKeepRatio] = useState(false)
   const sized = target.types.every((type) => type !== 'group' && type !== 'boolean')
@@ -219,7 +139,7 @@ function PlaceCard({ target, p, title, children }: { target: Target; p: P; title
     { key: 'y', label: p.y, name: p.yName },
   ] as const
   return (
-    <PanelPart id="layout-card" title={title} strong>
+    <div className={PANEL_PART} data-testid="layout-card">
       <div className={KNOBS}>
         {sized &&
           sides.map((f) => (
@@ -230,6 +150,7 @@ function PlaceCard({ target, p, title, children }: { target: Target; p: P; title
               value={shared(target.props.map((pr) => num(pr, f.key)))}
               min={0}
               editor={target.editor}
+              why={why}
               onSet={(v) => set(target, (now) => resize(now, f.key, v))}
               onShift={(by) => set(target, (now) => resize(now, f.key, tidy(clamp(num(now, f.key) + by, 0))))}
             />
@@ -241,38 +162,83 @@ function PlaceCard({ target, p, title, children }: { target: Target; p: P; title
             name={f.name}
             value={shared(target.props.map((pr) => num(pr, f.key)))}
             editor={target.editor}
+            why={why}
             onSet={(v) => set(target, () => ({ [f.key]: v }))}
             onShift={(by) => set(target, (now) => ({ [f.key]: tidy(num(now, f.key) + by) }))}
           />
         ))}
-        {sized && <RotationField target={target} p={p} label={placing.rotate} />}
-        {sized && (
-          <Switch on={keepRatio} onSet={setKeepRatio} className={KNOB_SWITCH}>
-            {placing.lockRatio}
-          </Switch>
-        )}
+        {sized && <RotationField target={target} p={p} label={placing.rotate} why={why} />}
+        {sized &&
+          (why ? (
+            <GreyedButton why={why} role="switch" aria-checked={false} data-testid="lock-ratio" className={KNOB_SWITCH}>
+              {placing.lockRatio}
+              <span aria-hidden className={SWITCH} />
+            </GreyedButton>
+          ) : (
+            <Switch on={keepRatio} onSet={setKeepRatio} testId="lock-ratio" className={KNOB_SWITCH}>
+              {placing.lockRatio}
+            </Switch>
+          ))}
       </div>
-      {children}
-    </PanelPart>
+    </div>
   )
 }
 
 /**
- * A layer in an auto layout, in the Position panel's Advanced: on each axis its own size, fitting
- * its content or filling the room, and kept where it is put, out of the flow.
+ * One of Position's buttons that runs an editor action: its icon and name, its shortcut in a
+ * tooltip; greyed while `why` says it has nothing to do, saying so instead. 44 px tall on a phone.
+ */
+function PanelAction({
+  target,
+  action,
+  icon: Shown,
+  why,
+}: {
+  target: Target
+  action: ShortcutAction & keyof Messages['editor']['bar']['placing']
+  icon: Icon
+  why: string | null
+}) {
+  const t = useMessages()
+  const name = t.editor.bar.placing[action]
+  const look = cn(PANEL_ACTION, 'max-sm:h-[44px]')
+  const face = (
+    <>
+      <Shown size={15} aria-hidden className="shrink-0" />
+      <span>{name}</span>
+    </>
+  )
+  if (why)
+    return (
+      <GreyedButton why={why} data-action={action} className={look}>
+        {face}
+      </GreyedButton>
+    )
+  return (
+    <Tooltip label={format(t.editor.arrange.withKey, { label: name, key: keyOf(action) })}>
+      <button type="button" data-action={action} onClick={() => target.editor.perform(action)} className={look}>
+        {face}
+      </button>
+    </Tooltip>
+  )
+}
+
+/**
+ * A layer in an auto layout, last in Position: on each axis its own size, fitting its content or
+ * filling the room, and kept where it is put, out of the flow.
  */
 function FlowPart({ target, p }: { target: Target; p: P }) {
   return (
-    <div role="group" aria-labelledby="flow-card-title" data-testid="flow-card" className="flex flex-col gap-2.5">
-      <h4 id="flow-card-title" className={cn(PANEL_HEADING, 'pt-1.5')}>
+    <section aria-labelledby="flow-card-title" data-testid="flow-card" className={PANEL_PART}>
+      <h3 id="flow-card-title" className={PANEL_HEADING}>
         {p.inAutoLayout}
-      </h4>
+      </h3>
       <SizingFields target={target} p={p} options={['fixed', 'hug', 'fill']} labels={p.childSizings} />
       <SwitchRow
         name={p.absolute}
         on={shared(target.props.map((pr) => pr.absolute === true))}
         onSet={(absolute) => set(target, () => ({ absolute: absolute ? true : undefined }))}
       />
-    </div>
+    </section>
   )
 }
