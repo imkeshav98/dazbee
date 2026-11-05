@@ -169,13 +169,20 @@ export async function openFrames(browser: Browser, count = 1) {
   if (count > 1) await settle(tabs)
   return { a, b: tabs[1] as Page, tabs, errors }
 }
-/** Opens the design alone in a tab of a theme at a screen size, fitted, with its fonts loaded. */
-export async function openSized(browser: Browser, viewport: { width: number; height: number }, theme = 'dark') {
-  const designId = await seed(design())
+/**
+ * Opens a design, this spec's unless given, alone in a tab at a screen size, in a theme (dark unless
+ * given) and a language (the app's own unless given), fitted, with its fonts loaded.
+ */
+export async function openSized(
+  browser: Browser,
+  viewport: { width: number; height: number },
+  { theme = 'dark', locale, input = design() }: { theme?: string; locale?: string; input?: DesignInput } = {},
+) {
+  const designId = await seed(input)
   const page = await (await browser.newContext({ viewport })).newPage()
   const errors: string[] = []
   page.on('pageerror', (error) => errors.push(error.message))
-  await setCookies(page, { theme })
+  await setCookies(page, { theme, ...(locale && { locale }) })
   await page.goto(editorPath(designId))
   await expect(page.getByTestId('status')).toHaveAttribute('data-ready', '', { timeout: 60_000 })
   await page.evaluate(() => window.dazbee?.loaded())

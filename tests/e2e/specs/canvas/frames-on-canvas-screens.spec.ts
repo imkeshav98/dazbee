@@ -61,7 +61,7 @@ for (const [width, height] of SCREEN_SIZES) {
       `screenshots at ${width}×${height}, ${theme}: a picked frame, its Background, its ⋯ menu, its label renamed and a frame mid-drag`,
       { tag: '@evidence' },
       async ({ browser }) => {
-        const { page, errors } = await openSized(browser, { width, height }, theme)
+        const { page, errors } = await openSized(browser, { width, height }, { theme })
         const shot = async (name: string) => {
           await nextFrame(page)
           writeOutput(`frames-${width}-${theme}-${name}.png`, await page.screenshot({ animations: 'disabled' }))
