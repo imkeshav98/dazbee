@@ -1,20 +1,17 @@
 export * from './api.ts'
 export * from './clipboard.ts'
 export {
-  coverFrame,
   Design,
   type DesignInput,
   DesignMeta,
   fontFamilies,
   Frame,
-  FRAME_GAP,
-  framesOf,
   imageAssetIds,
-  newFramePosition,
   Page,
   parseDesign,
   type ParseResult,
 } from './design.ts'
+export { coverFrame, FRAME_GAP, frameIdOf, framesOf, newFramePosition } from './frames.ts'
 export * from './effects.ts'
 export * from './export.ts'
 export { deepFreeze } from './json.ts'

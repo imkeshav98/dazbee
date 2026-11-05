@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 
-import { type DesignInput, parseDesign } from '@dazbee/schema'
+import { type DesignInput, frameIdOf, parseDesign } from '@dazbee/schema'
 
-import { ancestorsOf, childrenOf, descendants, frameIdOf, isInside } from './children.ts'
+import { ancestorsOf, childrenOf, descendants, isInside } from './children.ts'
 
 const rect = { x: 0, y: 0, width: 10, height: 10, shape: { kind: 'rect' as const } }
 

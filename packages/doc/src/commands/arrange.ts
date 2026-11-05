@@ -3,9 +3,9 @@
 import { nanoid } from 'nanoid'
 import { z } from 'zod'
 
-import { type Design, FrameId, Layer, type Layer as LayerT, LayerTree, NodeId } from '@dazbee/schema'
+import { type Design, FrameId, frameIdOf, Layer, type Layer as LayerT, LayerTree, NodeId } from '@dazbee/schema'
 
-import { ancestorsOf, childrenOf, descendants, frameIdOf, isInside } from '../children.ts'
+import { ancestorsOf, childrenOf, descendants, isInside } from '../children.ts'
 import { toYNode } from '../design-doc.ts'
 import { centreOf, normalAngle, turn } from '../geometry.ts'
 import { boxPlan } from './box-plan.ts'

@@ -57,14 +57,3 @@ export const isInside = (design: Design, id: string, maybeAncestor: string) => {
   for (let up: string | undefined = id; up; up = design.nodes[up]?.parentId) if (up === maybeAncestor) return true
   return false
 }
-
-/** The frame a layer is in, walking up its parents; a frame id gives itself. Undefined when the chain ends at no frame. */
-export function frameIdOf(design: Design, id: string): string | undefined {
-  const seen = new Set<string>()
-  for (let up: string | undefined = id; up !== undefined && !seen.has(up); up = design.nodes[up]?.parentId) {
-    if (Object.hasOwn(design.frames, up)) return up
-    if (!Object.hasOwn(design.nodes, up)) return undefined
-    seen.add(up)
-  }
-  return undefined
-}

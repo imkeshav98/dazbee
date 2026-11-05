@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 
-import { type Design, framesOf, inOrder, type Layer, parseDesign } from '@dazbee/schema'
+import { type Design, frameIdOf, framesOf, inOrder, type Layer, parseDesign } from '@dazbee/schema'
 
-import { childrenOf, descendants, type DesignDoc, frameIdOf, loadDesign, readDesign, type Session } from './index.ts'
+import { childrenOf, descendants, type DesignDoc, loadDesign, readDesign, type Session } from './index.ts'
 import { badge, openTestSession, testDesign, twoTabs } from './test-design.ts'
 
 /** A fuzz run makes hundreds of commands and full reads; a cold CI runner needs more than vitest's 5 s. */
