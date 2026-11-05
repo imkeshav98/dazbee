@@ -16,7 +16,7 @@ import {
 } from '../../support/bar-homes.ts'
 import { enter } from '../../support/fields.ts'
 import { positionDesign } from '../../support/position-design.ts'
-import { openStage, order, perform, props, selectLayers } from '../../support/stage.ts'
+import { openStage, order, perform, props, selectLayers, undoRedo } from '../../support/stage.ts'
 import { expect, type Locator, type Page, test } from '../../support/test.ts'
 import { barMenu } from '../../support/top-bar.ts'
 
@@ -53,14 +53,6 @@ const controlsUnderTooltip = (page: Page) =>
       })
       .map((one) => one.getAttribute('aria-label') ?? (one as HTMLElement).innerText)
   })
-
-/** Undoes, then redoes, checking the value read goes back and comes again. */
-async function undoRedo<T>(page: Page, value: () => Promise<T>, before: T, after: T) {
-  await perform(page, 'undo')
-  await expect.poll(value).toEqual(before)
-  await perform(page, 'redo')
-  await expect.poll(value).toEqual(after)
-}
 
 /** Where the turned layer's box, as drawn, starts on the left. */
 async function drawnLeft(page: Page, id: string) {

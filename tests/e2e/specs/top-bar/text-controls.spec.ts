@@ -9,7 +9,7 @@ import { ALIGN_ROWS, barItems, control, CONTROLS, TEXT_STYLES } from '../../supp
 import { editorPath, setCookies } from '../../support/editor.ts'
 import { layoutProblems, SCREEN_SIZES, wrapped } from '../../support/layout.ts'
 import { frameDesign, seed } from '../../support/seed.ts'
-import { openStage, perform, props, selectLayers } from '../../support/stage.ts'
+import { openStage, props, selectLayers, undoRedo } from '../../support/stage.ts'
 import { type Browser, expect, type Page, test } from '../../support/test.ts'
 import { barMenu, entered, PIECES, UNCUT } from '../../support/top-bar.ts'
 
@@ -64,14 +64,6 @@ const textProps = async (page: Page, id: string) =>
     align?: string
     verticalAlign?: string
   }
-
-/** Undoes, then redoes, checking the value read goes back and comes again. */
-async function undoRedo<T>(page: Page, value: () => Promise<T>, before: T, after: T) {
-  await perform(page, 'undo')
-  await expect.poll(value).toEqual(before)
-  await perform(page, 'redo')
-  await expect.poll(value).toEqual(after)
-}
 
 /**
  * Where the Align button's icon draws its lines, as it shows on screen: lines ending level on the

@@ -107,6 +107,14 @@ export const perform = async (page: Page, action: ShortcutAction) => {
   await drawn(page)
 }
 /** The layers at the top of a frame, the square `sq` by default, back to front. */
+/** Undoes, then redoes, checking the value read goes back and comes again. */
+export async function undoRedo<T>(page: Page, value: () => Promise<T>, before: T, after: T) {
+  await perform(page, 'undo')
+  await expect.poll(value).toEqual(before)
+  await perform(page, 'redo')
+  await expect.poll(value).toEqual(after)
+}
+
 export const order = async (page: Page, frameId = 'sq') =>
   Object.entries((await read(page)).nodes)
     .filter(([, n]) => n.parentId === frameId)

@@ -231,9 +231,7 @@ test('undo and redo in the header pill: off with nothing to do, each a step, and
   expect(errors).toEqual([])
 })
 
-test("the small menu locks, duplicates, deletes and hides; the full menu copies and pastes", async ({
-  browser,
-}) => {
+test('the small menu locks, duplicates, deletes and hides; the full menu copies and pastes', async ({ browser }) => {
   const asset = await upload(photo)
   const { page, errors } = await openStage(browser, topBarDesign(asset.id))
   const nodes = () => page.evaluate(() => Object.keys(window.dazbee?.design().nodes ?? {}).length)
