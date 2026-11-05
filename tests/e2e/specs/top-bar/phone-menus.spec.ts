@@ -5,8 +5,9 @@
 // on a greyed row says why in a tooltip above it, clear of the finger, which Esc closes first.
 // Arrange's sheet is checked in top-bar-more-screens.
 import { setCookies } from '../../support/editor.ts'
+import { boxOf } from '../../support/layout.ts'
 import { open } from '../../support/linked-menu.ts'
-import { besideRows, fullMenuRows } from '../../support/menu-rows.ts'
+import { besideRows, fullMenuRows, shownKeys, shownRows } from '../../support/menu-rows.ts'
 import { fitSettled, selectLayers } from '../../support/stage.ts'
 import { expect, type Locator, type Page, test } from '../../support/test.ts'
 import { moreMenu } from '../../support/top-bar.ts'
@@ -15,27 +16,11 @@ test.describe.configure({ mode: 'parallel', timeout: 120_000 })
 
 const PHONE = { width: 390, height: 844 }
 
-/** The words of each row that shows in a menu, in order, as they read on screen: a key that shows reads too. */
-const shownRows = (menu: Locator) =>
-  menu
-    .locator('button')
-    .evaluateAll((rows) =>
-      rows.filter((row) => row.checkVisibility()).map((row) => (row as HTMLElement).innerText.trim()),
-    )
 /** The heights of the rows that show in a menu. */
 const shownHeights = (menu: Locator) =>
   menu
     .locator('button')
     .evaluateAll((rows) => rows.filter((row) => row.checkVisibility()).map((row) => row.getBoundingClientRect().height))
-/** How many of a menu's shortcut keys show. */
-const shownKeys = (menu: Locator) =>
-  menu.locator('kbd').evaluateAll((keys) => keys.filter((key) => key.checkVisibility()).length)
-/** Where an element is on screen. */
-const boxOf = (locator: Locator) =>
-  locator.evaluate((el) => {
-    const r = el.getBoundingClientRect()
-    return { left: r.left, top: r.top, right: r.right, bottom: r.bottom }
-  })
 /** Waits for an element's pop-in to end, so its box is where it rests. */
 const popped = (locator: Locator) =>
   locator.evaluate((el) => Promise.all(el.getAnimations().map((a) => a.finished.catch(() => undefined))))

@@ -212,3 +212,10 @@ export const scrolling = (area: Locator) =>
 /** The heights of the rows a menu holds, by a selector inside it, as laid out: its opening animation scales none. */
 export const rowHeights = (menu: Locator, rows: string) =>
   menu.locator(rows).evaluateAll((els) => els.map((el) => (el as HTMLElement).offsetHeight))
+
+/** Where an element is on screen. */
+export const boxOf = (locator: Locator) =>
+  locator.evaluate((el) => {
+    const r = el.getBoundingClientRect()
+    return { left: r.left, top: r.top, right: r.right, bottom: r.bottom }
+  })

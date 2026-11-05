@@ -7,6 +7,7 @@
 import { arrangeDesign } from '../../support/arrange-design.ts'
 import { editorPath, setCookies, writeOutput } from '../../support/editor.ts'
 import { layoutProblems, rowHeights, SCREEN_SIZES } from '../../support/layout.ts'
+import { shownRows } from '../../support/menu-rows.ts'
 import { seed } from '../../support/seed.ts'
 import { fitSettled, nextFrame, openStage, order, selectLayers } from '../../support/stage.ts'
 import { type Browser, expect, type Locator, type Page, test } from '../../support/test.ts'
@@ -50,14 +51,6 @@ async function openOnTouch(browser: Browser) {
 async function clearOfAll(page: Page, label: string) {
   expect(await layoutProblems(page, { pieces: PIECES, uncut: UNCUT }), label).toEqual([])
 }
-
-/** The words of each row that shows in a menu, in order, as they read on screen: a key that shows reads too. */
-const shownRows = (menu: Locator) =>
-  menu
-    .locator('button')
-    .evaluateAll((rows) =>
-      rows.filter((row) => row.checkVisibility()).map((row) => (row as HTMLElement).innerText.trim()),
-    )
 
 test('on a phone the bar wraps as the mock draws it: the first row holds the items that fit whole and ends with Arrange, the rest sit in a second card under it, always in view, and nothing scrolls sideways or is cut', async ({
   browser,

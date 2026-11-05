@@ -83,3 +83,14 @@ export const arrangeRowsOf = (menu: Locator) =>
   menu
     .locator('[data-testid^="more-"], [data-scrub]')
     .evaluateAll((rows) => rows.map((row) => row.getAttribute('data-testid') ?? 'rotation'))
+
+/** The words of each row that shows in a menu, in order, as they read on screen: a key that shows reads too. */
+export const shownRows = (menu: Locator) =>
+  menu
+    .locator('button')
+    .evaluateAll((rows) =>
+      rows.filter((row) => row.checkVisibility()).map((row) => (row as HTMLElement).innerText.trim()),
+    )
+/** How many of a menu's shortcut keys show. */
+export const shownKeys = (menu: Locator) =>
+  menu.locator('kbd').evaluateAll((keys) => keys.filter((key) => key.checkVisibility()).length)

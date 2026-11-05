@@ -3,13 +3,13 @@
 // layers, Ungroup for a group or a box, Release mask; Copy ▸ and Paste ▸ with the layers or their
 // style, and paste across frames and pages; and the menus, their widths and a greyed row's tooltip
 // at the three screen sizes.
-import { layoutProblems, SCREEN_SIZES } from '../../support/layout.ts'
+import { boxOf, layoutProblems, SCREEN_SIZES } from '../../support/layout.ts'
 import { closeMenus, expectGreyed, fillOf, holders, node, open, redo, rowsOf, undo } from '../../support/linked-menu.ts'
 import { GREEN, INK, PINK } from '../../support/linked-menu-design.ts'
 import { besideRows, FULL_MENU_BESIDE, fullMenuRows } from '../../support/menu-rows.ts'
 import { copyIn } from '../../support/seed.ts'
 import { fitSettled, selectLayers } from '../../support/stage.ts'
-import { expect, type Locator, type Page, test } from '../../support/test.ts'
+import { expect, type Page, test } from '../../support/test.ts'
 import { moreAction, moreMenu, moreSubmenu, PIECES, UNCUT, underPhoneMenu } from '../../support/top-bar.ts'
 
 test.describe.configure({ mode: 'parallel', timeout: 120_000 })
@@ -19,12 +19,6 @@ const focusedRow = (page: Page) => page.evaluate(() => document.activeElement?.f
 
 /** A box on screen, as the browser measures it. */
 type Box = { left: number; top: number; right: number; bottom: number }
-/** Where an element is on screen. */
-const boxOf = (locator: Locator) =>
-  locator.evaluate((el) => {
-    const r = el.getBoundingClientRect()
-    return { left: r.left, top: r.top, right: r.right, bottom: r.bottom }
-  })
 /** How much of `a` lies in `b`, in square pixels. */
 const overlap = (a: Box, b: Box) =>
   Math.max(0, Math.min(a.right, b.right) - Math.max(a.left, b.left)) *
