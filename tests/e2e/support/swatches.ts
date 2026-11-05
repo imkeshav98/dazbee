@@ -196,6 +196,19 @@ export const SWATCH_PANELS: SwatchPanel[] = [
   },
 ]
 
+/** Each touch at least a touch target across and down, that far from the next target, and inside `room` across. */
+export const expectTouchTargets = (touches: Touch[], what: string, room: { x: number; width: number }) => {
+  for (const touch of touches) {
+    expect(touch.pressable, `${what}: a press lands at each side`).toBe(true)
+    expect(Math.min(touch.width, touch.height), `${what}: where a press lands`).toBeGreaterThanOrEqual(
+      TOUCH_TARGET.size,
+    )
+    expect(touch.space, `${what}: the space to the next target`).toBeGreaterThanOrEqual(TOUCH_TARGET.gap)
+    expect(touch.x, `${what}: starts in its panel`).toBeGreaterThanOrEqual(room.x)
+    expect(touch.x + touch.width, `${what}: ends in its panel`).toBeLessThanOrEqual(room.x + room.width)
+  }
+}
+
 /** Opens the paint pop-up of a panel's first row, by its swatch, and gives it once it shows. */
 export async function paintPopup(panel: Locator) {
   const swatch = panel.locator(PAINT_SWATCH.selector).first()
