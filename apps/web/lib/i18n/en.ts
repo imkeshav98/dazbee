@@ -763,16 +763,6 @@ export const en = {
         'half-page': 'Half page',
         'link-image': 'Link image',
       },
-      custom: 'Custom size',
-      width: 'Width',
-      height: 'Height',
-      add: 'Add',
-      issue: {
-        whole: 'Use whole pixels.',
-        short: 'Sides must be at least {min} px.',
-        long: 'Sides can be at most {max} px.',
-        ratio: 'A size can be up to {max} times as long as it is wide.',
-      },
     },
     frames: {
       /** A frame of a size of your own. */
