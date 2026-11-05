@@ -33,7 +33,9 @@ const design = (): DesignInput =>
     },
   })
 
-test('? and the keyboard button list every shortcut, F, I and Mod+Alt+G among them', async ({ browser }) => {
+test('? and the keyboard button list every shortcut, F, I, Mod+Alt+G and Shift+drag among them', async ({
+  browser,
+}) => {
   const { page, errors } = await openStage(browser, design())
   const list = page.getByTestId('shortcuts')
   await expect(list).toBeHidden()
@@ -47,6 +49,9 @@ test('? and the keyboard button list every shortcut, F, I and Mod+Alt+G among th
   await expect(list.locator('[data-shortcut="toolImage"]')).toContainText('I')
   await expect(list.locator('[data-shortcut="boxSelection"]')).toContainText('G')
   await expect(list.locator('[data-shortcut="boxSelection"]')).toContainText('Put in a box')
+  // A marquee on a frame starts with Shift held from the press, which the list names beside the keys.
+  await expect(list.locator('[data-gesture="marquee"] kbd')).toHaveText(['Shift', 'drag'])
+  await expect(list.locator('[data-gesture="marquee"]')).toContainText('Select by dragging over a frame')
   writeOutput('shortcuts.png', await page.screenshot())
   await page.keyboard.press('Escape')
   await expect(list).toBeHidden()

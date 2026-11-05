@@ -603,6 +603,7 @@ export const en = {
       openKey: 'Keyboard shortcuts (?)',
       close: 'Close',
       or: 'or',
+      drag: 'drag',
       groups: {
         edit: 'Edit',
         tools: 'Tools',
@@ -616,6 +617,7 @@ export const en = {
         undo: 'Undo',
         redo: 'Redo',
         selectAll: 'Select all',
+        marquee: 'Select by dragging over a frame',
         deselect: 'Select nothing, or step out',
         delete: 'Delete',
         duplicate: 'Duplicate',
