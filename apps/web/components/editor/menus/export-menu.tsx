@@ -25,8 +25,8 @@ import { overlayScroll } from '@/components/ui/overlay-scroll.ts'
 import { Select } from '@/components/ui/select.tsx'
 import { Tick } from '@/components/ui/tick.tsx'
 import { cn } from '@/lib/cn.ts'
-import { useMessages } from '@/lib/i18n/client.tsx'
-import { format } from '@/lib/i18n/index.ts'
+import { useLocale, useMessages } from '@/lib/i18n/client.tsx'
+import { counted, format } from '@/lib/i18n/index.ts'
 
 /** Which of the page's frames are ticked: every one, or these. */
 type Ticked = 'all' | ReadonlySet<string>
@@ -62,6 +62,7 @@ export function ExportForm({
   asked?: readonly string[] | undefined
 }) {
   const t = useMessages()
+  const locale = useLocale()
   const pages = inOrder(design.pages)
   // The page: the one picked here, or the asked frames', while it exists; else the one the canvas shows.
   const shown = useShownPage(editor)
@@ -228,9 +229,7 @@ export function ExportForm({
       >
         {progress
           ? format(t.editor.exports.making, { done: progress.done, total: progress.total })
-          : count === 1
-            ? t.editor.exports.runOne
-            : format(t.editor.exports.run, { n: count })}
+          : counted(locale, t.editor.exports.run, count)}
       </Button>
       {error && (
         <p role="alert" className="text-xs text-danger">
