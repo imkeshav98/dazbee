@@ -9,7 +9,7 @@ import type { DesignInput } from '@dazbee/schema'
 import { frameButton } from './add-frame.ts'
 import { SCREEN_SIZES } from './layout.ts'
 import { frameDesign } from './seed.ts'
-import { selectLayers } from './stage.ts'
+import { props, selectLayers } from './stage.ts'
 import type { Locator, Page } from './test.ts'
 import { openCard } from './top-bar.ts'
 
@@ -29,8 +29,8 @@ export interface NumberInput {
   open: (page: Page) => Promise<Locator>
   /** What shows its edge while it is typed in, where that isn't the field around the input. */
   edge?: (page: Page) => Locator
-  /** False where the room beside the digits is narrower than a fingertip, so only a mouse presses there. */
-  fingerRoom?: false
+  /** Reads the value the design holds once one is kept, where Enter keeps what was typed. */
+  stored?: (page: Page) => Promise<unknown>
 }
 
 /** A screen the checks run at: its size, and whether it is a touch screen. */
@@ -73,6 +73,7 @@ export const NUMBER_INPUTS: NumberInput[] = [
       await selectLayers(page, ['box'], { card: FIELDS.x.card })
       return (await openCard(page, FIELDS.x.card)).getByRole('spinbutton', { name: FIELDS.x.name, exact: true })
     },
+    stored: async (page) => (await props(page, 'box')).x,
   },
   {
     name: "a colour's opacity",
@@ -93,7 +94,8 @@ export const NUMBER_INPUTS: NumberInput[] = [
       return input
     },
     edge: (page) => page.getByTestId('bar-size'),
-    fingerRoom: false,
+    stored: async (page) =>
+      ((await props(page, 'headline')) as unknown as { style: { fontSize: number } }).style.fontSize,
   },
   {
     name: "Add a frame's width",
