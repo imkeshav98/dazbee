@@ -2,8 +2,7 @@
 
 import { useRouter } from 'next/navigation'
 
-import { SEGMENT, SEGMENTS, TOUCH_ROW } from '@/components/ui/looks.ts'
-import { cn } from '@/lib/cn.ts'
+import { SEGMENT, SEGMENTS } from '@/components/ui/looks.ts'
 import { useLocale, useMessages } from '@/lib/i18n/client.tsx'
 import { type Locale, LOCALE_NAMES, LOCALES } from '@/lib/i18n/index.ts'
 
@@ -26,7 +25,7 @@ export function LocaleSwitch() {
           aria-checked={l === locale}
           lang={l}
           onClick={() => l !== locale && choose(l)}
-          className={cn(SEGMENT, TOUCH_ROW)}
+          className={SEGMENT}
         >
           {LOCALE_NAMES[l]}
         </button>

@@ -406,7 +406,7 @@ export function PaintEditor({
       {paint.type === 'image' && (
         <div className="flex items-center gap-2">
           <PaintSwatch paint={paint} brandId={brandId} className="size-12 shrink-0" />
-          <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+          <div className={cn('flex min-w-0 flex-1 flex-col gap-1.5', TOUCH_GAP)}>
             <ImagePickerButton
               brandId={brandId}
               title={p.replaceImageTitle}
