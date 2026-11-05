@@ -34,7 +34,13 @@ source .claude/cloud-env.sh
 pnpm install --frozen-lockfile
 # Postgres and storage only: off CI the browser tests start their own API and sync server
 # (tests/e2e/support/local-servers.ts), and compose's need the node image, whose pulls Docker Hub
-# rate-limits for these machines.
+# rate-limits for these machines. An image Docker Hub refuses comes from Google's mirror of it.
+for image in $(docker compose config --images postgres storage); do
+  docker image inspect "$image" >/dev/null 2>&1 && continue
+  docker pull -q "$image" >/dev/null 2>&1 && continue
+  mirror="mirror.gcr.io/$([[ $image == */* ]] || echo library/)$image"
+  docker pull -q "$mirror" >/dev/null && docker tag "$mirror" "$image"
+done
 docker compose up -d --wait postgres storage
 pnpm --filter @dazbee/e2e exec playwright install --with-deps chromium >/dev/null
 # The browser tests serve the built web app: build it again after changing the app.
