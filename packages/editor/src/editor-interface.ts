@@ -151,7 +151,10 @@ export interface Editor {
    * or a frame not on the shown page, lets the picked one go.
    */
   pickFrame: (frameId: string | null) => void
-  /** Calls back with the picked frame, or null, whenever it changes. */
+  /**
+   * Calls back with the picked frame, or null, whenever it changes, and each time the picked frame
+   * is picked again, as by another click on its label.
+   */
   onFramePick(listener: (frameId: string | null) => void): () => boolean
   /**
    * Lights a frame of the shown page from outside the stage, outlined as a layer under the pointer
@@ -224,6 +227,12 @@ export interface Editor {
   fitSelection: () => void
   /** Fits a frame in view, showing its page first when another is shown. Throws for a frame the design lacks. */
   fitFrame(frameId: string): void
+  /**
+   * Pans, at the same zoom, so a frame of the shown page shows whole with its label clear of the
+   * chrome, unless it does already. Given `panel`, a panel floating over the stage at its place on
+   * the page, only a frame that lies under it moves, and out from under it.
+   */
+  showFrame(frameId: string, panel?: Rect): void
   setTool: (next: Tool) => void
   tool: () => Tool
   /**

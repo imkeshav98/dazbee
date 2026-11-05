@@ -10,7 +10,15 @@ import type { CanvasKit } from '@dazbee/canvaskit'
 import { frameIdOf, openSession, readDesign, type Session } from '@dazbee/doc'
 import { FALLBACK_FAMILIES } from '@dazbee/fonts'
 import { renderDesign, type ResourceCache, resourceCache } from '@dazbee/renderer'
-import { type Design, fontFamilies, imageAssetIds, type Point, type VariableRef, type Variables } from '@dazbee/schema'
+import {
+  type Design,
+  fontFamilies,
+  imageAssetIds,
+  type Point,
+  type Rect,
+  type VariableRef,
+  type Variables,
+} from '@dazbee/schema'
 import type { Skipped } from '@dazbee/svg'
 
 import { editorActions } from './actions.ts'
@@ -464,6 +472,11 @@ function live(
     if (pageId !== undefined && pageId !== view.page()) showPage(pageId)
     view.fitArea(view.defaultFrame(frameId))
   }
+  /** Pans, at the same zoom, so a frame of the shown page shows clear of the chrome, and out from under `panel` when it lies under it. */
+  function showFrame(frameId: string, panel?: Rect) {
+    const frame = frameOf(frameId)
+    if (frame) view.showArea(frame, panel)
+  }
   /** A layer's box as drawn in its frame, shown or not. */
   function boxOf(id: string) {
     const now = session.design()
@@ -563,6 +576,7 @@ function live(
     fitAll: view.fitAll,
     fitSelection: actions.fitSelection,
     fitFrame,
+    showFrame,
     setTool: (next: Tool) => tools.setTool(next),
     tool: () => tools.tool(),
     armImage: (asset: PlacedAsset | null) => tools.setTool(asset ? 'image' : tools.tool(), asset),

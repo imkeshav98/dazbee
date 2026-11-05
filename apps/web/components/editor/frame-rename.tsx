@@ -14,6 +14,7 @@ import type { Rect } from '@dazbee/schema'
 import { takeRenameOpener } from '@/components/editor/edit-store.ts'
 import { useLiveDesign } from '@/components/editor/use-live-design.ts'
 import { RenameField } from '@/components/ui/rename-field.tsx'
+import { renameFrame } from '@/lib/editor/rename-frame.ts'
 import { useMessages } from '@/lib/i18n/client.tsx'
 import { format } from '@/lib/i18n/index.ts'
 
@@ -60,9 +61,7 @@ export function FrameRename({ editor }: { editor: Editor }) {
   const done = (name: string | null, byKey: boolean) => {
     setRenaming(null)
     editor.renamed()
-    const next = name?.trim()
-    if (next && next !== frame.name && editor.design().frames[renaming.frameId])
-      editor.session.run('frame.update', { frameId: renaming.frameId, name: next })
+    renameFrame(editor, renaming.frameId, name)
     // Ended from the keyboard after Rename in the menu, the focus goes back to the menu's ⋯.
     if (byKey) renaming.opener?.focus()
   }

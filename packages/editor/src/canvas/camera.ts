@@ -112,6 +112,36 @@ export function revealLabel(c: Camera, rect: Rect, viewport: Viewport, insets: I
   return dx === 0 && dy === 0 ? c : { zoom: c.zoom, x: c.x + dx, y: c.y + dy }
 }
 
+/**
+ * The edge of the stage a panel floating over it covers, both at their places on the page, `gap`
+ * past the panel's edge: the bottom for a panel across most of the stage's width, as on a phone,
+ * else the side it floats on.
+ */
+export function coverOf(panel: Rect, stage: Rect, gap = 12): Partial<Insets> {
+  if (panel.width > stage.width * 0.6) return { bottom: stage.y + stage.height - panel.y + gap }
+  if (panel.x + panel.width / 2 < stage.x + stage.width / 2) return { left: panel.x + panel.width - stage.x + gap }
+  return { right: stage.x + stage.width - panel.x + gap }
+}
+
+/** Whether a rect of the world shows, at the camera, under a panel over the stage, both at their places on the page. */
+export function under(c: Camera, rect: Rect, panel: Rect, stage: Rect): boolean {
+  const start = toScreen(c, { x: rect.x, y: rect.y })
+  const end = toScreen(c, { x: rect.x + rect.width, y: rect.y + rect.height })
+  const left = panel.x - stage.x
+  const top = panel.y - stage.y
+  return start.x < left + panel.width && end.x > left && start.y < top + panel.height && end.y > top
+}
+
+/** Insets kept clear of `cover` too, the stage's edges a panel covers: each edge the larger of the two. */
+export function widen(insets: Insets, cover: Partial<Insets>): Insets {
+  return {
+    top: Math.max(insets.top, cover.top ?? 0),
+    right: Math.max(insets.right, cover.right ?? 0),
+    bottom: Math.max(insets.bottom, cover.bottom ?? 0),
+    left: Math.max(insets.left, cover.left ?? 0),
+  }
+}
+
 /** The part of the world the viewport shows. */
 export function visibleRect(c: Camera, viewport: Viewport): Rect {
   const corner = toWorld(c, { x: 0, y: 0 })
