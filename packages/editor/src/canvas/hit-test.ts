@@ -153,9 +153,12 @@ function shows(looks: Looks, layer: Painted, q: Point): boolean {
   if (!inBox(q, props, reach)) return false
   const outline = looks.outline(layer)
   if (!outline.contains(q.x, q.y)) return reach > 0 && nearOutline(looks.ck, outline, q, reach)
-  if (paintsShow(looks, props.fills, props, q)) return true
-  // Where a photo is clear, the strokes still show along the inside of the outline.
-  const within = strokeReach(props.strokes, 'inside')
+  // With no fill, a closed outline shows all over inside it, so an empty box is easy to grab; an
+  // open path shows only along its line.
+  const open = layer.type === 'graphic' && layer.props.shape.kind === 'path' && !closesEvery(layer.props.shape.d)
+  if (paintsShow(looks, props.fills, props, q, !open)) return true
+  // Where a photo is clear or an open path has no fill, the strokes still show along the outline.
+  const within = kind === 'path' ? reach : strokeReach(props.strokes, 'inside')
   return within > 0 && nearOutline(looks.ck, outline, q, within)
 }
 
@@ -185,13 +188,19 @@ function nearOutline(ck: CanvasKit, outline: Path, q: Point, reach: number) {
   return near
 }
 
+/** Whether path data closes every contour it starts, so its outline holds an area with no fill. */
+function closesEvery(d: string) {
+  return d.split(/(?=[Mm])/).every((contour) => contour.trim() === '' || /[Zz]\s*$/.test(contour))
+}
+
 /**
- * Whether a layer's paints show at a point inside its outline: anywhere with no paint (an outline
- * only, an empty box) or with a paint that isn't a photo; else where a photo is opaque enough.
+ * Whether a layer's paints show at a point inside its outline: anywhere with a paint that isn't a
+ * photo, and where a photo is opaque enough; with no paint, as `bare` says.
  */
-function paintsShow(looks: Looks, fills: readonly Paint[], box: Rect, q: Point) {
+function paintsShow(looks: Looks, fills: readonly Paint[], box: Rect, q: Point, bare: boolean) {
   const visible = fills.filter((f) => f.visible !== false)
-  return visible.length === 0 || visible.some((f) => f.type !== 'image' || photoShows(looks, f, box, q))
+  if (visible.length === 0) return bare
+  return visible.some((f) => f.type !== 'image' || photoShows(looks, f, box, q))
 }
 
 /** Whether a photo fill is at least SEE_THROUGH opaque at a point, its crop and fit placing the pixel. */

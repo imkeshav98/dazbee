@@ -163,19 +163,25 @@ describe('hitTest', () => {
     expect(idAt(framed('center'), 190, 50)).toBe('under')
   })
 
-  it('picks a path inside its outline and near its stroke, and a thin path near it', () => {
-    // A triangle drawn as an open stroke: picked inside it and along its edges, not in its box's empty corner.
-    const vee = layer('vee', 'graphic', {
-      x: 0,
-      y: 0,
-      width: 200,
-      height: 200,
-      shape: { kind: 'path', d: 'M0 0 L100 200 L200 0' },
-      strokes: [{ paint: RED, width: 4 }],
-    })
-    const layers = [rect('under', 0, 0, 200, 200), vee]
-    expect(idAt(layers, 100, 50)).toBe('vee')
+  it('picks a closed path inside its outline, an open one only near its line, and a thin path near it', () => {
+    // A triangle, closed and as an open stroke: the closed one is picked inside it, the open one
+    // along its edges only, and neither in its box's empty corner.
+    const vee = (d: string) =>
+      layer('vee', 'graphic', {
+        x: 0,
+        y: 0,
+        width: 200,
+        height: 200,
+        shape: { kind: 'path', d },
+        strokes: [{ paint: RED, width: 4 }],
+      })
+    const closed = [rect('under', 0, 0, 200, 200), vee('M0 0 L100 200 L200 0 Z')]
+    expect(idAt(closed, 100, 50)).toBe('vee')
+    expect(idAt(closed, 10, 190)).toBe('under')
+    const layers = [rect('under', 0, 0, 200, 200), vee('M0 0 L100 200 L200 0')]
+    expect(idAt(layers, 100, 50)).toBe('under')
     expect(idAt(layers, 10, 190)).toBe('under')
+    expect(idAt(layers, 50 + 2, 100 - 1)).toBe('vee')
     // 5 px off its left edge, outside the triangle: half the stroke, 2, and 4 more reach it.
     expect(idAt(layers, 50 - 5, 100 + 2)).toBe('vee')
     // A flat path, as thin as a line, is picked a few pixels off it.
