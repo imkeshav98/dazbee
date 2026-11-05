@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import * as Y from 'yjs'
 
-import { readDesign } from '../index.ts'
+import { descendants, readDesign } from '../index.ts'
 import { badge, openShapes, openTestSession, testDoc } from '../test-design.ts'
 
 /** The box's and headline's linked copies in the banner, as they are now. */
@@ -82,6 +82,31 @@ describe('node.update', () => {
     expect(design.nodes['banner-headline']?.props).toMatchObject({ x: 8, width: 40 })
     expect(design.nodes.headline?.props).toMatchObject({ x: 60, width: 960 })
     expect(copies(doc).box).toEqual(before.box)
+  })
+
+  it('in two unlinked frames of one page, changes the layers given and leaves the other frame as it was', () => {
+    const doc = testDoc()
+    const tab = openTestSession(doc)
+    tab.run('frame.add', { id: 'f2', pageId: 'p1', name: 'Frame', width: 1080, height: 1080 })
+    tab.run('node.create', { id: 'own', parentId: 'f2', layer: badge })
+    // Unlinked: the new frame's layer shares no link id with the square's.
+    const links = (frame: string) => descendants(readDesign(doc), frame).map((id) => readDesign(doc).nodes[id]?.link)
+    expect(links('f2').filter((link) => links('sq').includes(link))).toEqual([])
+    const inFrame = (frame: string) => {
+      const design = readDesign(doc)
+      return Object.fromEntries(descendants(design, frame).map((id) => [id, design.nodes[id]]))
+    }
+    const square = inFrame('sq')
+    const f2 = inFrame('f2')
+
+    tab.run('node.update', { ids: ['own'], patch: { x: 40 } })
+    tab.run('node.delete', { ids: ['own'] })
+    tab.undo()
+    expect(inFrame('sq')).toEqual(square)
+
+    tab.run('node.update', { ids: ['box'], patch: { y: 20 } })
+    tab.run('node.create', { parentId: 'sq', layer: badge })
+    expect(inFrame('f2')).toEqual({ own: { ...f2.own, props: { ...f2.own?.props, x: 40 } } })
   })
 
   it('refuses a patch that would make the layer invalid, and text, which text.edit changes', () => {
