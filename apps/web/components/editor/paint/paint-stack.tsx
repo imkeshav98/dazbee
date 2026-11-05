@@ -16,17 +16,9 @@ import { useBesidePanel } from '@/components/editor/beside-panel.ts'
 import { Choice, clamp, ColorField, NumberField } from '@/components/editor/edit-panel/fields.tsx'
 import type { P } from '@/components/editor/edit-panel/target.ts'
 import { ImagePickerButton } from '@/components/editor/image-tool.tsx'
-import {
-  CHIP,
-  FACE_SIZE,
-  ICON_BUTTON,
-  KNOBS,
-  POPOVER,
-  SQUARE_SWATCH_TARGET,
-  SWATCH_ROW,
-} from '@/components/editor/styles.ts'
+import { CHIP, FACE_SIZE, ICON_BUTTON, KNOBS, SQUARE_SWATCH_TARGET, SWATCH_ROW } from '@/components/editor/styles.ts'
 import { useMenuFocus } from '@/components/editor/top-bar/bar-popover.tsx'
-import { FOCUS_RING, SEGMENT, SEGMENTS, TOUCH_GAP } from '@/components/ui/looks.ts'
+import { FOCUS_RING, POPOVER, SEGMENT, SEGMENTS, TOUCH_GAP } from '@/components/ui/looks.ts'
 import { brandPath } from '@/lib/brand-routes.ts'
 import { cn } from '@/lib/cn.ts'
 import { hexOf } from '@/lib/colour.ts'

@@ -19,8 +19,8 @@ import { type KeyboardEvent, useRef, useState } from 'react'
 
 import type { ShapeMenuTool } from '@dazbee/editor'
 
-import { DOCK_BUTTON, DOCK_OFF, DOCK_ON, MENU_KEY, POPOVER } from '@/components/editor/styles.ts'
-import { LIT_ROW, TOUCH_ROW } from '@/components/ui/looks.ts'
+import { DOCK_BUTTON, DOCK_OFF, DOCK_ON } from '@/components/editor/styles.ts'
+import { LIT_ROW, MENU_KEY, POPOVER, TOUCH_ROW } from '@/components/ui/looks.ts'
 import { Tooltip } from '@/components/ui/tooltip.tsx'
 import { cn } from '@/lib/cn.ts'
 import { useMessages } from '@/lib/i18n/client.tsx'

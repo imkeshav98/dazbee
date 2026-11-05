@@ -10,7 +10,7 @@ import { type ShortcutAction } from '@dazbee/editor'
 
 import { ALIGN, keyOf } from '@/components/editor/arrange-actions.ts'
 import { KNOB_SWITCH, KNOBS, PANEL_ACTION, PANEL_HEADING, PANEL_PART, SWITCH } from '@/components/editor/styles.ts'
-import { GreyedButton } from '@/components/editor/top-bar/menu-row.tsx'
+import { GreyedButton } from '@/components/ui/greyed.tsx'
 import { Tooltip } from '@/components/ui/tooltip.tsx'
 import { cn } from '@/lib/cn.ts'
 import { LIMITS } from '@/lib/editor/limits.ts'

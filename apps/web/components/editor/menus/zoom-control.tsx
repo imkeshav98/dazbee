@@ -10,7 +10,8 @@ import { useEffect, useMemo, useState } from 'react'
 
 import type { Editor } from '@dazbee/editor'
 
-import { MENU_DIVIDER, MENU_ITEM, MENU_KEY, POPOVER, SWITCH } from '@/components/editor/styles.ts'
+import { SWITCH } from '@/components/editor/styles.ts'
+import { MENU_DIVIDER, MENU_ITEM, MENU_KEY, POPOVER } from '@/components/ui/looks.ts'
 import { Tooltip } from '@/components/ui/tooltip.tsx'
 import { cn } from '@/lib/cn.ts'
 import { useLocale, useMessages } from '@/lib/i18n/client.tsx'

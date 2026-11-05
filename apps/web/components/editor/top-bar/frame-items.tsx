@@ -13,7 +13,7 @@ import type { Design } from '@dazbee/schema'
 
 import { keyOf } from '@/components/editor/arrange-actions.ts'
 import { askExport, setOpen, setRenameOpener, useEditState } from '@/components/editor/edit-store.ts'
-import { MENU_DIVIDER, MENU_ITEM, MENU_KEY } from '@/components/editor/styles.ts'
+import { MENU_DIVIDER, MENU_ITEM, MENU_KEY } from '@/components/ui/looks.ts'
 import { cn } from '@/lib/cn.ts'
 import { hexOf } from '@/lib/colour.ts'
 import { swatchOf } from '@/lib/editor/frame-swatch.ts'

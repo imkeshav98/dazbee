@@ -26,14 +26,16 @@ import type { Editor } from '@dazbee/editor'
 
 import { keyOf } from '@/components/editor/arrange-actions.ts'
 import { useTarget } from '@/components/editor/edit-panel/target.ts'
-import { editState, isPanel, setOpen, useEditState, usePhone } from '@/components/editor/edit-store.ts'
+import { editState, isPanel, setOpen, useEditState } from '@/components/editor/edit-store.ts'
 import { useSelection } from '@/components/editor/editor-hooks.ts'
-import { BAR_BUTTON, BAR_TOGGLE, MENU, MENU_ITEM_GREYED } from '@/components/editor/styles.ts'
+import { BAR_BUTTON, BAR_TOGGLE } from '@/components/editor/styles.ts'
+import { MENU, MENU_ITEM_GREYED } from '@/components/ui/looks.ts'
 import { Tooltip } from '@/components/ui/tooltip.tsx'
 import { cn } from '@/lib/cn.ts'
 import { type Box, CLEAR, smallMenuPlace } from '@/lib/editor/small-menu-place.ts'
 import { useLocale, useMessages } from '@/lib/i18n/client.tsx'
 import { dirOf, format } from '@/lib/i18n/index.ts'
+import { usePhone } from '@/lib/phone.ts'
 
 import {
   arrowAlong,

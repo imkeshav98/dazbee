@@ -23,11 +23,13 @@ import {
 } from 'react'
 
 import { typingIn } from '@/components/editor/edit-panel/fields.tsx'
-import { isSheet, type PanelId, useEditState, usePhone } from '@/components/editor/edit-store.ts'
-import { BAR_BUTTON, POPOVER } from '@/components/editor/styles.ts'
+import { isSheet, type PanelId, useEditState } from '@/components/editor/edit-store.ts'
+import { BAR_BUTTON } from '@/components/editor/styles.ts'
+import { POPOVER } from '@/components/ui/looks.ts'
 import { useOverlayScroll } from '@/components/ui/overlay-scroll.ts'
 import { fadedEdges, linedEdges, useScrollEdges } from '@/components/ui/scroll-edges.ts'
 import { cn } from '@/lib/cn.ts'
+import { usePhone } from '@/lib/phone.ts'
 
 /**
  * The room between a sheet and the screen's edges on a phone, in pixels: an edit panel's sheet

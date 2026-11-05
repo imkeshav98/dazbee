@@ -20,7 +20,7 @@ import {
   SWITCH,
   SWITCH_ROW,
 } from '@/components/editor/styles.ts'
-import { useWhyTip } from '@/components/editor/top-bar/menu-row.tsx'
+import { useWhyTip } from '@/components/ui/greyed.tsx'
 import { FOCUS_RING, SEGMENT, SEGMENTS, TOUCH_GAP } from '@/components/ui/looks.ts'
 import { Select } from '@/components/ui/select.tsx'
 import { Tooltip } from '@/components/ui/tooltip.tsx'

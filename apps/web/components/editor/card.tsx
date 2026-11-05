@@ -6,9 +6,10 @@ import * as Popover from '@radix-ui/react-popover'
 import { Fragment, useState } from 'react'
 
 import { useMenuFocus } from '@/components/editor/top-bar/bar-popover.tsx'
+import { MENU, MENU_DIVIDER, MENU_ITEM } from '@/components/ui/looks.ts'
 import { cn } from '@/lib/cn.ts'
 
-import { ICON_BUTTON, MENU, MENU_DIVIDER, MENU_ITEM } from './styles.ts'
+import { ICON_BUTTON } from './styles.ts'
 
 /** One item of a card's menu; a `danger` one, last, removes, which a toast undoes. */
 export interface CardMenuItem {

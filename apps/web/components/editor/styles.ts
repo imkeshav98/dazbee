@@ -2,10 +2,7 @@
 // editor control that looks like one of these takes it from here instead of spelling its classes again.
 // Looks that controls outside the editor share live in components/ui/looks.ts.
 
-import { FOCUS_RING, LIT_ROW, TOUCH_FIELD, TOUCH_GAP, TOUCH_ROW, TOUCH_SQUARE } from '@/components/ui/looks.ts'
-
-/** A disabled control: faded and not clickable. */
-const DISABLED = 'disabled:pointer-events-none disabled:opacity-40'
+import { DISABLED, FOCUS_RING, LIT_ROW, TOUCH_FIELD, TOUCH_GAP, TOUCH_SQUARE } from '@/components/ui/looks.ts'
 
 /**
  * A small pill button, as the mock's chips under a list, lit by the tints under the pointer and while
@@ -26,11 +23,6 @@ export const QUIET_BUTTON = `flex h-8 cursor-pointer items-center gap-1.5 rounde
 /** A square tile showing one image asset's thumbnail, in the asset library and the image picker. */
 export const ASSET_TILE =
   'grid aspect-square place-items-center overflow-hidden rounded-[10px] border border-line bg-bg/40 transition-colors duration-[var(--chrome-fast)]'
-
-/** A popover's frosted panel, as the cards are: the shape menu, the image picker. */
-export const POPOVER = 'pop-in z-50 rounded-card surface-frost'
-/** A menu of rows: ⋯ More, the right-click menu, and the menus beside their rows. */
-export const MENU = `${POPOVER} flex flex-col p-1.5`
 
 /** A tool dock button's shape; its width is the caller's. */
 export const DOCK_BUTTON = `grid h-10 cursor-pointer place-items-center rounded-[12px] transition-colors duration-[var(--chrome-fast)] ${FOCUS_RING}`
@@ -125,22 +117,6 @@ export const KNOB = `relative flex h-8 min-w-0 cursor-ew-resize touch-pan-y sele
 /** Knobs two to a row, 8 px apart on a phone or a touch screen; a lone last one takes the whole row. */
 export const KNOBS = `grid grid-cols-2 gap-1.5 ${TOUCH_GAP} [&>:last-child:nth-child(odd)]:col-span-2`
 
-/** A row of a menu: its words at the start, a shortcut or a switch at the end. */
-export const MENU_ITEM = `group flex h-9 w-full shrink-0 cursor-pointer items-center justify-between gap-3 rounded-row px-2.5 text-start text-[13px] font-medium text-text transition-colors duration-[var(--chrome-fast)] ${LIT_ROW} ${TOUCH_ROW} ${DISABLED} ${FOCUS_RING}`
-/**
- * A menu row that applies but has nothing to do: faded and unlit, still reachable by the pointer and
- * the keyboard so its tooltip can say why. It goes on a MENU_ITEM marked aria-disabled.
- */
-export const MENU_ITEM_GREYED =
-  'aria-disabled:cursor-not-allowed aria-disabled:opacity-40 aria-disabled:hover:bg-transparent aria-disabled:active:bg-transparent'
-/** A short line over a menu's rows saying what they act on. */
-export const MENU_HEADING = 'px-2.5 pt-1.5 pb-1 text-[11px] font-semibold text-subtle'
-/** The hairline between a menu's groups of rows. */
-export const MENU_DIVIDER = 'mx-1.5 my-1 border-t border-line'
-/** A short value at the end of a menu row, in a shortcut's look, as a frame's size in Export. */
-export const MENU_VALUE = 'font-mono text-[11px] font-normal text-subtle'
-/** A shortcut shown in a menu row; none shows on a phone, which has no keyboard. */
-export const MENU_KEY = `${MENU_VALUE} max-sm:hidden`
 /** A switch drawn in a menu row or a card's row that is role="switch": checked, its knob slides to the end. */
 export const SWITCH =
   'relative h-5 w-[34px] shrink-0 rounded-full bg-subtle/70 transition-colors duration-[var(--chrome-fast)] group-aria-checked:bg-accent-solid after:absolute after:start-0.5 after:top-0.5 after:size-4 after:rounded-full after:bg-white after:transition-transform after:duration-[var(--chrome-fast)] group-aria-checked:after:translate-x-3.5 rtl:group-aria-checked:after:-translate-x-3.5'

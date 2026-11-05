@@ -6,7 +6,7 @@
 // and a rail flyout and a sheet close each other. And whether something stands over the edit panel
 // and the bar's second row, which Esc closes first; the menu's button a rename field gives the focus
 // back to; and the Share menu's listener for an Export asked from a picked frame's ⋯.
-import { useLayoutEffect, useState, useSyncExternalStore } from 'react'
+import { useSyncExternalStore } from 'react'
 
 import { OVER_PANEL } from '@/components/ui/menu-close.ts'
 
@@ -117,23 +117,6 @@ export function useEditState() {
     () => state,
     () => state,
   )
-}
-
-/**
- * Under 640 px wide the editor is laid out for a phone: the edit panel is a sheet and the top bar
- * wraps into two rows. Read before the first paint, so a menu that opens on a phone, as the right-click menu
- * does, never shows a frame laid out for a wider screen first.
- */
-export function usePhone() {
-  const [phone, setPhone] = useState(false)
-  useLayoutEffect(() => {
-    const query = window.matchMedia('(max-width: 639px)')
-    const update = () => setPhone(query.matches)
-    update()
-    query.addEventListener('change', update)
-    return () => query.removeEventListener('change', update)
-  }, [])
-  return phone
 }
 
 function update(change: Partial<EditState>) {
