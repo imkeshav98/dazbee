@@ -5,10 +5,9 @@
 import type { DesignInput } from '@dazbee/schema'
 
 import { solid } from './edit-in-frame.ts'
-import { editorPath, setCookies } from './editor.ts'
-import { frameDesign, linkedFrames, seed } from './seed.ts'
-import { drawn, fitSettled } from './stage.ts'
-import { type Browser, expect, type Page } from './test.ts'
+import { frameDesign, linkedFrames } from './seed.ts'
+import { drawn } from './stage.ts'
+import type { Page } from './test.ts'
 
 /**
  * A square holding a headline, a layer turned 30°, a locked one and a photo under a round mask; a
@@ -126,17 +125,4 @@ export async function clickLabel(page: Page, id: string) {
   const at = await labelPoint(page, id, 20)
   await page.mouse.click(at.x, at.y)
   await drawn(page)
-}
-/** Opens the design alone in a tab of a theme at a screen size, fitted, with its fonts loaded. */
-export async function openSized(browser: Browser, viewport: { width: number; height: number }, theme = 'dark') {
-  const designId = await seed(design())
-  const page = await (await browser.newContext({ viewport })).newPage()
-  const errors: string[] = []
-  page.on('pageerror', (error) => errors.push(error.message))
-  await setCookies(page, { theme })
-  await page.goto(editorPath(designId))
-  await expect(page.getByTestId('status')).toHaveAttribute('data-ready', '', { timeout: 60_000 })
-  await page.evaluate(() => window.dazbee?.loaded())
-  await fitSettled(page)
-  return { page, errors }
 }
