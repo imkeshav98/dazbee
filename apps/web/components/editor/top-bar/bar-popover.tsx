@@ -177,13 +177,16 @@ export function useMenuFocus() {
  * Lets Esc go back from a row's short menu shown in the menu's place (SubMenu, on a phone) before it
  * closes the menu, through Radix's own layers: `onEscapeKeyDown` goes on the menu's content and
  * `rows` round its rows. A greyed row's tooltip that shows is a layer over the menu, so Radix gives
- * it Esc first and it closes.
+ * it Esc first and it closes. The Esc that goes back goes no further: going back takes the focused
+ * row out of the page, and the stage would take an Esc from outside a menu as its own and let the
+ * selection go, closing the menu with it.
  */
 export function useEscapeBack() {
   const back = useRef<(() => void) | null>(null)
   const onEscapeKeyDown = useCallback((event: globalThis.KeyboardEvent) => {
     if (!back.current) return
     event.preventDefault()
+    event.stopPropagation()
     back.current()
   }, [])
   const rows = useCallback((children: ReactNode) => <BackInPlace value={back}>{children}</BackInPlace>, [])
