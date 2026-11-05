@@ -499,7 +499,7 @@ test('Background opens the Colour panel for the picked frame’s own fills: a co
   await press(a, 'redo')
   expect((await frameOf(a, 'sq'))?.fills).toEqual(solid('#2F6BFFFF'))
   // With no fill left, Background's swatch is empty, not the rainbow of colours that differ.
-  await fills.getByRole('button', { name: 'Remove colour 1' }).click()
+  await fills.getByRole('button', { name: 'Remove background colour 1' }).click()
   expect((await frameOf(a, 'sq'))?.fills).toEqual([])
   const swatch = a.getByTestId('bar-background').locator('span').first()
   await expect(swatch).toHaveCSS('background-image', 'none')
