@@ -286,6 +286,13 @@ describe('editorOverlay', () => {
         expect(topOf(570, { insets: { ...NONE, bottom: 121 } })).toBe('554px')
       })
 
+      it('keeps over the chrome along the bottom when the selection is beside it, and under the chrome along the top', () => {
+        // From 740 px, in a phone's dock and tab bar 121 px tall.
+        expect(topOf(730, { insets: { ...NONE, bottom: 121 } })).toBe('655px')
+        // Down to 16 px, under the islands 60 px tall.
+        expect(topOf(-94, { insets: { ...NONE, top: 60 } })).toBe('60px')
+      })
+
       it('stays on the stage, over the selection, when the selection is taller than the stage', () => {
         // From -40 px to 960 px at ten times.
         expect(topOf(-140, { zoom: 10 })).toBe('704px')

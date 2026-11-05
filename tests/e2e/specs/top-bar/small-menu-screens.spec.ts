@@ -1,8 +1,8 @@
 // The small menu and the selection's size at the three screen sizes: with a layer near a frame's
-// top left corner, near its top right corner, in a frame along the stage's left edge, and with the
-// Colour panel open, the small menu shows clear of every frame's label and the size lies wholly on
-// the screen, clear of the chrome; a selection panned off the screen takes its size with it; and
-// the PR's pictures of each in both themes.
+// top left corner, near its top right corner, in a frame along the stage's left edge, with the
+// Colour panel open, and by the dock, the small menu shows clear of every frame's label and the
+// size lies wholly on the screen, clear of the chrome; a selection panned off the screen takes its
+// size with it; and the PR's pictures of each in both themes.
 import { shoot } from '../../support/editor.ts'
 import { design, openSized } from '../../support/frames-on-canvas.ts'
 import { THEMES } from '../../support/glass.ts'
@@ -13,13 +13,17 @@ import { barMenu } from '../../support/top-bar.ts'
 
 test.describe.configure({ mode: 'parallel', timeout: 180_000 })
 
-/** Each case: the layer selected, whether the square is moved to the stage's left edge first, and the panel opened. */
+/**
+ * Each case: the layer selected, whether the square is moved to the stage's left edge first, the
+ * panel opened, and whether the selection is moved down by the dock.
+ */
 const CASES = [
   { name: 'top-left', layer: 'headline', atEdge: false },
   { name: 'top-right', layer: 'corner', atEdge: false },
   { name: 'at-edge', layer: 'tilt', atEdge: true },
   { name: 'colour-open', layer: 'tilt', atEdge: false, panel: 'colour' },
-] as const satisfies { name: string; layer: string; atEdge: boolean; panel?: string }[]
+  { name: 'by-the-dock', layer: 'tilt', atEdge: false, low: true },
+] as const satisfies { name: string; layer: string; atEdge: boolean; panel?: string; low?: boolean }[]
 /** The floating chrome the size keeps clear of. */
 const CHROME = [
   '[data-testid="rail"]',
@@ -92,7 +96,7 @@ const problems = (page: Page) =>
     return found
   }, CHROME)
 
-/** Places the case's frame, selects its layer and opens its panel. */
+/** Places the case's frame, selects its layer, opens its panel and moves it down by the dock. */
 async function openCase(page: Page, one: (typeof CASES)[number]) {
   const { layer, atEdge } = one
   if (atEdge)
@@ -102,6 +106,19 @@ async function openCase(page: Page, one: (typeof CASES)[number]) {
     })
   await selectLayers(page, [layer])
   if ('panel' in one) await barMenu(page, one.panel)
+  if ('low' in one) {
+    // Moved down until the selection's top is 100 px above the screen's bottom, by the dock.
+    await drawn(page)
+    const outline = await page.locator('.stage-overlay .selection').boundingBox()
+    const down = page.viewportSize()?.height ?? 0
+    await page.evaluate(
+      (by) => {
+        const camera = window.dazbee?.camera()
+        if (camera) window.dazbee?.setCamera({ ...camera, y: camera.y + by })
+      },
+      down - 100 - (outline?.y ?? 0),
+    )
+  }
   await drawn(page)
   await nextFrame(page)
 }

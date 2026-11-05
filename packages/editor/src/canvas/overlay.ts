@@ -151,6 +151,7 @@ export function editorOverlay({
    * Where the size label's top goes for a box spanning `ys` on screen: under it, else over it when
    * the chrome along the stage's bottom (the dock, at least SIZE_CLEARANCE) would cover it, else
    * at the bottom of the room between the chrome, over the box, when the box is taller than the
+   * stage; always clear of the chrome along the top and bottom while some of the box is on the
    * stage. A box wholly above or below the stage takes the label off the stage with it.
    */
   function sizeLabelTop(ys: number[]) {
@@ -164,8 +165,8 @@ export function editorOverlay({
     if (top >= height) return Math.max(above, height)
     const floor = height - Math.max(SIZE_CLEARANCE, chrome.bottom) - 24
     const ceiling = Math.max(SIZE_LABEL_INSET, chrome.top)
-    if (below <= floor) return below
-    if (above >= ceiling) return above
+    if (below <= floor) return Math.max(below, ceiling)
+    if (above >= ceiling) return Math.max(ceiling, Math.min(above, floor))
     return Math.max(ceiling, floor)
   }
 
