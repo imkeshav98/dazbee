@@ -58,9 +58,10 @@ const LABEL = {
  * The pointer on a canvas that keeps its listeners, over a stage where client points are design
  * pixels of the square frame at zoom 1, its label's name and size 24 to 4 pixels over its top, off
  * every frame past 1100 across or above it, with a real selection; every behaviour logs what it is
- * asked. With `handle`, a press anywhere is on a handle of the selection.
+ * asked. With `handle`, a press anywhere is on a handle of the selection; with `editing`, that text
+ * is being typed in, and a test that gives it its whole box picks it there.
  */
-function harness(tool: Tool = 'select', under: SceneLayer = UNDER, handle = false) {
+function harness(tool: Tool = 'select', under: SceneLayer = UNDER, handle = false, editing: string | null = null) {
   const log: string[] = []
   const listeners = new Map<string, (e: Event) => void>()
   const canvas = {
@@ -90,7 +91,12 @@ function harness(tool: Tool = 'select', under: SceneLayer = UNDER, handle = fals
     },
     tools: { tool: () => tool, imageToPlace: () => null, snapping: () => true },
     selection,
-    scenes: { hit: (_frame, p) => (p.x >= 0 && p.y >= 0 && p.x <= 100 && p.y <= 100 ? under : null) },
+    scenes: {
+      hit: (_frame, p, options) => {
+        if (p.x < 0 || p.y < 0 || p.x > 100 || p.y > 100) return null
+        return options?.wholeBox ? sceneLayer(options.wholeBox, 'text') : under
+      },
+    },
     boxes: {
       pickable: () => true,
       selectionBox: () => null,
@@ -99,7 +105,7 @@ function harness(tool: Tool = 'select', under: SceneLayer = UNDER, handle = fals
       lockedAt: () => null,
     },
     typing: {
-      editing: () => null,
+      editing: () => (editing ? { id: editing, frameId: SQUARE.id } : null),
       caretFromPoint: () => 0,
       caretTo: () => {},
       selectText: () => {},
@@ -297,6 +303,12 @@ describe('editorPointer', () => {
       send('pointerleave')
       expect(pointer.pointerAt()).toBeNull()
       expect(selection.hovered()).toBeNull()
+    })
+
+    it('outlines the text being typed in where a press puts the caret in it, below its lines too', () => {
+      const { selection, send } = harness('select', UNDER, false, 'words')
+      send('pointermove', event(5, 90))
+      expect(selection.hovered()).toEqual({ id: 'words picked', frameId: 'one-sq' })
     })
   })
 

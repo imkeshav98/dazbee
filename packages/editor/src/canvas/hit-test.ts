@@ -21,7 +21,7 @@ export interface Looks {
 
 export interface HitOptions {
   /** Whether a layer can be picked; one that can't (locked) is passed over with everything in it. */
-  pickable?: (layer: SceneLayer) => boolean
+  pickable?: ((layer: SceneLayer) => boolean) | undefined
   /** The id of a layer that counts everywhere in its box, as the text being typed in does. */
   wholeBox?: string | undefined
 }

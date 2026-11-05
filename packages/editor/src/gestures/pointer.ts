@@ -178,9 +178,7 @@ export function editorPointer({
   let focusByKey = false
   const on = { signal }
 
-  function currentGesture() {
-    return gesture
-  }
+  const currentGesture = () => gesture
   // Screen points are CSS pixels from the canvas's corner.
   const screenOf = (e: MouseEvent): Point => view.onStage({ x: e.clientX, y: e.clientY })
   /** The frame under the pointer and the point in its design pixels. */
@@ -219,9 +217,16 @@ export function editorPointer({
     hoverCursor = !under ? '' : under.kind === 'rotate' ? ROTATE_CURSOR : resizeCursor(under.handle, rotation)
     showCursor()
   }
+  /**
+   * The deepest layer that shows at a point of a frame, as a press, a double click and a hover pick
+   * it: the text being typed in shows anywhere in its box, below its lines too. With `pickable`, what
+   * can't be picked (locked) is passed over.
+   */
+  const deepestAt = (at: { frame: Frame; p: Point }, pickable?: PointerDeps['boxes']['pickable']) =>
+    scenes.hit(at.frame, at.p, { pickable, wholeBox: typing.editing()?.id })
   function rehover() {
     const at = pointer && !gesture && !panning() ? pointIn(pointer) : null
-    const hit = at && scenes.hit(at.frame, at.p)
+    const hit = at && deepestAt(at)
     const next = at && hit ? { id: target(hit.id, at.frame.id), frameId: at.frame.id } : null
     return selection.hover(next)
   }
@@ -365,8 +370,7 @@ export function editorPointer({
         return
       }
       const editing = typing.editing()
-      // The text being typed in takes a press anywhere in its box, below its lines too.
-      const deepest = at && scenes.hit(at.frame, at.p, { pickable: boxes.pickable, wholeBox: editing?.id })
+      const deepest = at && deepestAt(at, boxes.pickable)
       if (at && editing && deepest?.id === editing.id && editing.frameId === at.frame.id) {
         // In the text being edited (#47): a press puts the caret there, Shift extends the range to
         // it, a drag selects, and a third click selects the paragraph.
@@ -492,7 +496,7 @@ export function editorPointer({
       }
       const at = pointIn(e)
       const editing = typing.editing()
-      const hit = at && scenes.hit(at.frame, at.p, { pickable: boxes.pickable, wholeBox: editing?.id })
+      const hit = at && deepestAt(at, boxes.pickable)
       if (!at || !hit || lockedAt(at.frame, at.p)) return
       if (editing && hit.id === editing.id && editing.frameId === at.frame.id) {
         // A double click in the text being edited selects the word there (#47).
