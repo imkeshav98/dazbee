@@ -58,10 +58,13 @@ function masksOver(design: Design, ids: readonly string[]): string[] | null {
 /**
  * The keys of a row's short menu, beside the row or in its menu's place: the arrow `back`, towards
  * the page's start, goes back, and up, down, Home and End move between its rows (`arrowThrough`).
+ * The arrow that goes back goes no further: going back takes the focused row out of the page, and
+ * the stage would take an arrow from outside a menu as its own and nudge the selection.
  */
 const backKeys = (back: string, goBack: () => void) => (event: KeyboardEvent<HTMLElement>) => {
   if (event.key !== back) return arrowThrough(event)
   event.preventDefault()
+  event.stopPropagation()
   goBack()
 }
 

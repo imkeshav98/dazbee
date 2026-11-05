@@ -8,7 +8,7 @@
 // Arrange's sheet is checked in top-bar-more-screens.
 import { setCookies } from '../../support/editor.ts'
 import { boxOf, layoutProblems } from '../../support/layout.ts'
-import { open, rowsOf } from '../../support/linked-menu.ts'
+import { node, open, rowsOf } from '../../support/linked-menu.ts'
 import {
   besideRows,
   fullMenuRows,
@@ -123,7 +123,7 @@ for (const [locale, toward, back] of [
   ['en', 'ArrowRight', 'ArrowLeft'],
   ['ar', 'ArrowLeft', 'ArrowRight'],
 ] as const) {
-  test(`in ${locale}, ${toward} opens a row's menu in place at its back row, ${back} and Esc go back to the row, and a second Esc closes the menu`, async ({
+  test(`in ${locale}, ${toward} opens a row's menu in place at its back row, ${back} and Esc go back to the row, moving no layer, and a second Esc closes the menu`, async ({
     browser,
   }) => {
     const { page, errors } = await openOnPhone(browser)
@@ -134,6 +134,11 @@ for (const [locale, toward, back] of [
       await fitSettled(page)
     }
     await selectLayers(page, ['headline'])
+    const place = async () => {
+      const props = (await node(page, 'headline'))?.props
+      return [props?.x, props?.y]
+    }
+    const at = await place()
     await page.getByTestId('bar-more').focus()
     await page.keyboard.press('Enter')
     const menu = page.getByTestId('bar-more-menu')
@@ -147,12 +152,15 @@ for (const [locale, toward, back] of [
     await page.keyboard.press(back)
     await expect(sub).toHaveCount(0)
     await expect(menu.getByTestId('more-copy')).toBeFocused()
+    // The arrow that went back is the menu's, not the stage's, which would have nudged the layer.
+    expect(await place()).toEqual(at)
     await page.keyboard.press('Enter')
     await expect(sub).toBeVisible()
     await page.keyboard.press('Escape')
     await expect(sub).toHaveCount(0)
     await expect(menu).toBeVisible()
     await expect(menu.getByTestId('more-copy')).toBeFocused()
+    expect(await place()).toEqual(at)
     await page.keyboard.press('Escape')
     await expect(menu).toBeHidden()
     await expect(page.getByTestId('bar-more')).toBeFocused()
