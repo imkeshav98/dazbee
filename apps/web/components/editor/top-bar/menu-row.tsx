@@ -1,9 +1,10 @@
 'use client'
 
 // A row of the editor's menus that runs an action, its key at its end, greyed with the reason in a
-// tooltip while it has nothing to do; and the arrow keys that move the focus through a menu's rows.
+// tooltip while it has nothing to do, as every menu's greyed rows are; the tooltip that says why a
+// greyed control has nothing to do; and the arrow keys that move the focus through a menu's rows.
 import { CaretRightIcon } from '@phosphor-icons/react'
-import { type KeyboardEvent, useRef, useState } from 'react'
+import { type KeyboardEvent, type MouseEvent, useRef, useState } from 'react'
 
 import { MENU_ITEM, MENU_ITEM_GREYED, MENU_KEY } from '@/components/editor/styles.ts'
 import { TOOLTIP, Tooltip } from '@/components/ui/tooltip.tsx'
@@ -19,6 +20,117 @@ const ROW_KEYS = ['ArrowDown', 'ArrowUp', 'Home', 'End']
 const boxOf = (el: Element): Box => {
   const { left, top, right, bottom } = el.getBoundingClientRect()
   return { left, top, right, bottom }
+}
+
+/**
+ * A row of a menu that runs an action, ending in its key, or in a caret when it stands for a row
+ * that opens a menu beside it. While it has nothing to do (`why`) it is greyed with the not-allowed
+ * pointer, runs and opens nothing, and says why in a tooltip (`useWhyTip`); it keeps the focus, so
+ * the keyboard still reaches it and hears why.
+ */
+export function MenuRow({
+  action,
+  testId,
+  label,
+  keys = '',
+  why,
+  danger = false,
+  caret = false,
+  onRun,
+}: {
+  /** The editor action it runs, as its `data-action`. */
+  action?: string
+  testId?: string
+  label: string
+  keys?: string
+  why: string | null
+  danger?: boolean
+  /** It stands for a row that opens a menu beside it. */
+  caret?: boolean
+  onRun?: () => void
+}) {
+  const tip = useWhyTip<HTMLButtonElement>(why)
+  const end = caret ? (
+    <CaretRightIcon size={12} weight="bold" aria-hidden className="text-subtle rtl:-scale-x-100" />
+  ) : (
+    keys && <kbd className={MENU_KEY}>{keys}</kbd>
+  )
+  if (!why)
+    return (
+      <button
+        type="button"
+        data-action={action}
+        data-testid={testId}
+        onClick={onRun}
+        className={cn(MENU_ITEM, danger && 'text-danger')}
+      >
+        {label}
+        {end}
+      </button>
+    )
+  return (
+    <Tooltip {...tip.tooltip}>
+      <button
+        ref={tip.ref}
+        type="button"
+        data-action={action}
+        data-testid={testId}
+        aria-disabled="true"
+        aria-description={why}
+        onClick={tip.tap}
+        className={cn(MENU_ITEM, MENU_ITEM_GREYED, danger && 'text-danger')}
+      >
+        {label}
+        {end}
+      </button>
+    </Tooltip>
+  )
+}
+
+/**
+ * The tooltip of a greyed control, saying `why` it has nothing to do: under the pointer, on
+ * keyboard focus and on a tap or click, placed as it shows so it covers no row of another open menu.
+ * The ref and `tap` go on the control, and `tooltip` on the Tooltip around it.
+ */
+export function useWhyTip<T extends HTMLElement>(why: string | null) {
+  const [told, setTold] = useState(false)
+  const rtl = dirOf(useLocale()) === 'rtl'
+  const [place, setPlace] = useState<TooltipPlace>({ side: rtl ? 'left' : 'right', align: 'center' })
+  const ref = useRef<T>(null)
+  /** Shows or hides why, placed clear of the other open menus as it shows. */
+  const tell = (open: boolean) => {
+    if (open && ref.current && why) setPlace(placeFor(ref.current, why, rtl))
+    setTold(open)
+  }
+  return {
+    ref,
+    tooltip: { label: why ?? '', side: place.side, align: place.align, open: told, onOpenChange: tell },
+    /** A tap or a click shows why, as the pointer resting on it does, and runs nothing. */
+    tap: (event: MouseEvent) => {
+      event.preventDefault()
+      tell(true)
+    },
+  }
+}
+
+/**
+ * Moves the focus through a menu's rows with the up and down arrows, round from the ends, and to
+ * its first and last row with Home and End, as the app's other menus do. A key pressed in a field
+ * of the menu, or in a menu beside one of its rows, is left to them.
+ */
+export function arrowThroughRows(event: KeyboardEvent<HTMLElement>) {
+  if (!ROW_KEYS.includes(event.key) || event.defaultPrevented) return
+  const rows = [
+    ...event.currentTarget.querySelectorAll<HTMLButtonElement>(':scope > button, :scope > [role="group"] > button'),
+  ].filter((row) => !row.disabled && row.checkVisibility())
+  const at = rows.indexOf(document.activeElement as HTMLButtonElement)
+  if (at < 0) return
+  const last = rows.length - 1
+  const next = { ArrowDown: at >= last ? 0 : at + 1, ArrowUp: at <= 0 ? last : at - 1, Home: 0, End: last }[
+    event.key as 'ArrowDown'
+  ]
+  event.preventDefault()
+  rows[next]?.focus()
 }
 
 /**
@@ -50,90 +162,4 @@ function tooltipSize(label: string) {
   const { width, height } = probe.getBoundingClientRect()
   probe.remove()
   return { width, height }
-}
-
-/**
- * Moves the focus through a menu's rows with the up and down arrows, round from the ends, and to
- * its first and last row with Home and End, as the app's other menus do. A key pressed in a field
- * of the menu, or in a menu beside one of its rows, is left to them.
- */
-export function arrowThroughRows(event: KeyboardEvent<HTMLElement>) {
-  if (!ROW_KEYS.includes(event.key) || event.defaultPrevented) return
-  const rows = [
-    ...event.currentTarget.querySelectorAll<HTMLButtonElement>(':scope > button, :scope > [role="group"] > button'),
-  ].filter((row) => !row.disabled && row.checkVisibility())
-  const at = rows.indexOf(document.activeElement as HTMLButtonElement)
-  if (at < 0) return
-  const last = rows.length - 1
-  const next = { ArrowDown: at >= last ? 0 : at + 1, ArrowUp: at <= 0 ? last : at - 1, Home: 0, End: last }[
-    event.key as 'ArrowDown'
-  ]
-  event.preventDefault()
-  rows[next]?.focus()
-}
-
-/**
- * A row of the menu that runs an action, its key at the end. While it has nothing to do it is
- * greyed, and says why in a tooltip under the pointer, on keyboard focus and on a tap, placed so it
- * covers no row of another open menu.
- */
-export function MenuRow({
-  action,
-  label,
-  keys,
-  why,
-  danger = false,
-  caret = false,
-  onRun,
-}: {
-  action: string
-  label: string
-  keys: string
-  why: string | null
-  danger?: boolean
-  /** It stands for a row that opens a menu beside it. */
-  caret?: boolean
-  onRun?: () => void
-}) {
-  const [told, setTold] = useState(false)
-  const rtl = dirOf(useLocale()) === 'rtl'
-  const [place, setPlace] = useState<TooltipPlace>({ side: rtl ? 'left' : 'right', align: 'center' })
-  const button = useRef<HTMLButtonElement>(null)
-  /** Shows or hides why, placed clear of the other open menus as it shows. */
-  const tell = (open: boolean) => {
-    if (open && button.current && why) setPlace(placeFor(button.current, why, rtl))
-    setTold(open)
-  }
-  const end = caret ? (
-    <CaretRightIcon size={12} weight="bold" aria-hidden className="text-subtle rtl:-scale-x-100" />
-  ) : (
-    keys && <kbd className={MENU_KEY}>{keys}</kbd>
-  )
-  if (!why)
-    return (
-      <button type="button" data-action={action} onClick={onRun} className={cn(MENU_ITEM, danger && 'text-danger')}>
-        {label}
-        {end}
-      </button>
-    )
-  return (
-    <Tooltip label={why} side={place.side} align={place.align} open={told} onOpenChange={tell}>
-      <button
-        ref={button}
-        type="button"
-        data-action={action}
-        aria-disabled="true"
-        aria-description={why}
-        // A tap shows why, as the pointer resting on it does.
-        onClick={(event) => {
-          event.preventDefault()
-          tell(true)
-        }}
-        className={cn(MENU_ITEM, MENU_ITEM_GREYED, danger && 'text-danger')}
-      >
-        {label}
-        {end}
-      </button>
-    </Tooltip>
-  )
 }
