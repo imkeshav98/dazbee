@@ -754,6 +754,7 @@ export const ar: Messages = {
       backgroundColour: 'لون الخلفية',
       more: 'إجراءات الإطار',
       rename: 'إعادة تسمية',
+      export: 'تصدير',
       nameOf: 'اسم {name}',
       fills: 'ألوان الخلفية',
       fill: 'لون خلفية',

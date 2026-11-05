@@ -778,6 +778,7 @@ export const en = {
       backgroundColour: 'Background colour',
       more: 'Frame actions',
       rename: 'Rename',
+      export: 'Export',
       nameOf: 'Name of {name}',
       fills: 'Background colours',
       fill: 'background colour',

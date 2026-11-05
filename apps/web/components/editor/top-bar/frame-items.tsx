@@ -87,7 +87,7 @@ export function useFrameItems(editor: Editor, frameId: string, design: Design): 
             onClick={act(() => askExport([frameId], more.current))}
             className={MENU_ITEM}
           >
-            {t.editor.exports.open}
+            {f.export}
           </button>
           <div role="separator" className={MENU_DIVIDER} />
           <button
