@@ -211,7 +211,8 @@ export function editorTransformDrag({
   /** The handle under a screen point: one to resize by, or the zone outside a corner to turn by. */
   function handleUnder(screen: Point): Grab | null {
     const outer = selectionBox()
-    // A selection with no handles, locked in place or across frames, has no turning zones either.
+    // A selection with no handles, locked in place, has no turning zones either; across frames it
+    // has only its resize handles, so a turn never leaves the other copies as they were.
     if (!outer || typing.editing() || selection.pathEditing() || handlesFor().length === 0) return null
     const { frame, drawn: box } = outer
     const onScreen = (p: Point) => toScreen(camera(), { x: frame.x + p.x, y: frame.y + p.y })
@@ -230,7 +231,7 @@ export function editorTransformDrag({
     const world = toWorld(camera(), screen)
     const local = turn({ x: world.x - frame.x, y: world.y - frame.y }, c, -box.rotation)
     const inside = local.x >= box.x && local.x <= box.x + box.width && local.y >= box.y && local.y <= box.y + box.height
-    if (inside) return null
+    if (inside || selectionBoxes().length > 1) return null
     const corner = cornersOf(box).findIndex((p) => dist(onScreen(p)) <= ROTATE_REACH)
     return corner === -1 ? null : { kind: 'rotate', corner }
   }

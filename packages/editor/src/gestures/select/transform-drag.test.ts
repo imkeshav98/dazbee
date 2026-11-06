@@ -131,6 +131,17 @@ describe('editorTransformDrag', () => {
       expect(drag.handleUnder({ x: 300, y: 300 })).toBeNull()
     })
 
+    it('finds the resize handles across frames, but no zone that turns, as a turn would leave the other copies', () => {
+      const { drag, session, selection, frame } = harness()
+      const wide = pageFrames(session.design(), 'p1').frames[1] as Frame
+      selection.selectAcross([
+        { id: 'a', frameId: frame.id },
+        { id: 'wide-a', frameId: wide.id },
+      ])
+      expect(drag.handleUnder({ x: 202, y: 198 })).toEqual({ kind: 'resize', handle: 'se' })
+      expect(drag.handleUnder({ x: 215, y: 215 })).toBeNull()
+    })
+
     it('finds none on a selection locked in place', () => {
       const { drag, selection, frame } = harness()
       selection.select(['pin'], frame.id)
