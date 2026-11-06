@@ -6,7 +6,7 @@ import { type Frame, pageFrames } from '../../canvas/frames.ts'
 import { editorFrameActions } from '../../frame-actions.ts'
 import { hug } from '../../layers/hug.ts'
 import { sessionOf, testBoxes } from '../../layers/test-boxes.ts'
-import { editorSelection } from '../../selection.ts'
+import { editorSelection, pairsIn } from '../../selection.ts'
 import { type DrawingDeps, editorDrawing, isDrawing } from './drawing.ts'
 
 const WHITE = [{ type: 'solid' as const, color: '#FFFFFFFF' }]
@@ -140,7 +140,7 @@ describe('editorDrawing', () => {
       drawing.release(drag)
       const [id] = made()
       expect(session.inGesture()).toBe(false)
-      expect(selection.current()).toEqual({ ids: [id], frameId: 'sq' })
+      expect(selection.current()).toEqual(pairsIn('sq', [id ?? '']))
       expect(log.slice(1)).toEqual([`hug ${id}`, 'tool select'])
       session.undo()
       expect(made()).toEqual([])
@@ -203,7 +203,7 @@ describe('editorDrawing', () => {
       drawing.release(drag)
       const [id] = made()
       expect(props(id as string)).toMatchObject({ x: 200, y: 200, width: 200, height: 60, boxMode: 'fixed' })
-      expect(selection.current()).toEqual({ ids: [id], frameId: 'sq' })
+      expect(selection.current()).toEqual(pairsIn('sq', [id ?? '']))
       expect(log).toEqual(['stop typing', 'draw', 'tool select', 'type into sq at 0, made for it'])
       expect(session.inGesture()).toBe(false)
       session.undo()
@@ -223,7 +223,7 @@ describe('editorDrawing', () => {
       drawing.release(drawing.pressImage(pointer, at(500, 500), PHOTO))
       const [id] = made()
       expect(props(id as string)).toMatchObject({ x: 300, y: 400, width: 400, height: 200 })
-      expect(selection.current()).toEqual({ ids: [id], frameId: 'sq' })
+      expect(selection.current()).toEqual(pairsIn('sq', [id ?? '']))
       expect(log).toEqual(['stop typing', `hug ${id}`, 'tool select'])
       session.undo()
       expect(made()).toEqual([])

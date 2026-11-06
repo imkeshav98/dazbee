@@ -6,7 +6,7 @@ import { type DesignInput, type Layer, styleOf } from '@dazbee/schema'
 import { pageFrames } from './canvas/frames.ts'
 import { sessionOf } from './layers/test-boxes.ts'
 import { editorLinkedCopies, linkedMenu } from './linked-copies.ts'
-import { editorSelection } from './selection.ts'
+import { editorSelection, idsOf } from './selection.ts'
 
 const RED = '#E0262BFF'
 const BLUE = '#1F4FE0FF'
@@ -160,7 +160,7 @@ describe('editorLinkedCopies', () => {
     expect(linked.perform('layerToLinked')).toBe(true)
     const copy = Object.entries(session.design().nodes).find(([, n]) => n.link === 'badge' && n.parentId === 'wide')
     expect(copy).toBeDefined()
-    expect(selection.current()?.ids).toEqual(['badge'])
+    expect(idsOf(selection.current())).toEqual(['badge'])
     expect(linked.menu()?.layer).toBe('everyFrame')
     expect(linked.perform('layerToLinked')).toBe(false)
     session.undo()
@@ -200,7 +200,7 @@ describe('editorLinkedCopies', () => {
     select('bg')
     expect(linked.perform('deleteLinked')).toBe(true)
     expect([node('bg'), node('wide-bg')]).toEqual([undefined, undefined])
-    expect(selection.current()?.ids ?? []).toEqual([])
+    expect(idsOf(selection.current())).toEqual([])
     session.undo()
     expect(node('bg')).toBeDefined()
     expect(node('wide-bg')).toBeDefined()

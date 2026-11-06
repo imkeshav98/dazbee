@@ -62,13 +62,19 @@ export interface Editor {
   selected: () => string | null
   /** Every selected layer, in the order they were picked. */
   selection: () => string[]
-  /** The frame the selection is in, by its id, or null. */
+  /** The frame of the first selected layer, by its id, where the selection's box and handles go; null with none. */
   selectedFrame: () => string | null
   /**
-   * Selects layers in the frame of the first of them, leaving out any in other frames, and shows
-   * that frame's page first when another is shown; none clears the selection.
+   * Selects layers in the frames of the first one's page, leaving out any on other pages, and shows
+   * that page first when another is shown; none clears the selection.
    */
   select(ids: string[]): void
+  /**
+   * Shift and a click on a layer of the shown page from outside the stage, as the layers panel's
+   * rows take it: a selected layer is taken out; a layer of a frame that holds a selected one, or a
+   * linked copy of a selected one, is added; any other is selected alone.
+   */
+  toggleSelected(id: string): void
   /** Does what a shortcut does, as if its key was pressed on the stage. */
   perform: (action: ShortcutAction) => boolean
   /**

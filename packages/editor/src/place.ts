@@ -13,7 +13,7 @@ import type { EditorBoxes } from './layers/boxes.ts'
 import { hug as hugIn } from './layers/hug.ts'
 import { boundsOf, localTo, round } from './layers/transform.ts'
 import { runQuietly } from './run-quietly.ts'
-import type { EditorSelection, Picked } from './selection.ts'
+import { type EditorSelection, firstFrameOf, type Picked } from './selection.ts'
 import { inField } from './shortcuts.ts'
 import type { EditorTyping } from './text/typing.ts'
 import type { EditorTools, PlacedAsset } from './tools.ts'
@@ -26,7 +26,7 @@ export interface PlaceDeps {
   view: Pick<EditorView, 'design' | 'frames' | 'frameOf' | 'inView' | 'middleFrame' | 'pointAt' | 'spotAt'>
   tools: Pick<EditorTools, 'setTool'>
   selection: Pick<EditorSelection, 'current' | 'entered' | 'select'>
-  boxes: Pick<EditorBoxes, 'roots' | 'boxIn' | 'containersOf' | 'pickable' | 'pickAt'>
+  boxes: Pick<EditorBoxes, 'roots' | 'rootsByFrame' | 'boxIn' | 'containersOf' | 'pickable' | 'pickAt'>
   typing: Pick<EditorTyping, 'editing' | 'stop' | 'fitText' | 'copy' | 'cut' | 'paste'>
   actions: Pick<EditorActions, 'perform'>
   /**
@@ -118,7 +118,7 @@ export function editorPlace({
 
   /** Where something placed with no point goes: the frame in the middle of the view, else the selection's or the first. */
   function frameToPlaceIn() {
-    return middleFrame() ?? frameOf(selection.current()?.frameId) ?? frames()[0]
+    return middleFrame() ?? frameOf(firstFrameOf(selection.current())) ?? frames()[0]
   }
 
   /**
@@ -127,8 +127,8 @@ export function editorPlace({
    * frame they came from.
    */
   function copiedLayers(): LayerClipboard | null {
-    const current = selection.current()
-    const frame = current && frameOf(current.frameId)
+    // With layers selected in several frames, the first one's frame is copied: a paste goes into one frame.
+    const frame = frameOf(firstFrameOf(selection.current()))
     if (!frame || typing.editing()) return null
     const now = session.design()
     const stacked: string[] = []
@@ -139,7 +139,8 @@ export function editorPlace({
       }
     }
     walk(frame.id)
-    const tops = boxes.roots(now).sort((a, b) => stacked.indexOf(a) - stacked.indexOf(b))
+    const inFrame = boxes.rootsByFrame(now).find((part) => part.frame.id === frame.id)?.ids ?? []
+    const tops = inFrame.sort((a, b) => stacked.indexOf(a) - stacked.indexOf(b))
     if (tops.length === 0) return null
     const nodes: Record<string, Layer> = {}
     const add = (id: string) => {
@@ -173,7 +174,7 @@ export function editorPlace({
     pointer: Point | null,
   ) {
     const under = pointer ? pointAt(pointer) : null
-    const frame = frameOf(selection.current()?.frameId) ?? under?.frame ?? inView()[0] ?? frames()[0]
+    const frame = frameOf(firstFrameOf(selection.current())) ?? under?.frame ?? inView()[0] ?? frames()[0]
     if (!frame) {
       notify('pasteNeedsFrame')
       return false
@@ -182,7 +183,7 @@ export function editorPlace({
     const entered = selection.entered()
     const inside = entered ? now.nodes[entered] : undefined
     const holds = inside && tree.roots.every((root) => canHold(inside.type, tree.nodes[root]?.type ?? ''))
-    const parentId = entered && holds && selection.current()?.frameId === frame.id ? entered : frame.id
+    const parentId = entered && holds && firstFrameOf(selection.current()) === frame.id ? entered : frame.id
     let dx = 0
     let dy = 0
     if (atPointer && under?.frame.id === frame.id) {
@@ -230,7 +231,7 @@ export function editorPlace({
     const spot = where.spot ?? (client && spotAt(client))
     // A point off every frame puts the file in the middle of the selection's frame; with no point,
     // it goes in the frame in the middle of the view.
-    const frame = spot ? frameOf(spot.frameId) : client ? frameOf(selection.current()?.frameId) : frameToPlaceIn()
+    const frame = spot ? frameOf(spot.frameId) : client ? frameOf(firstFrameOf(selection.current())) : frameToPlaceIn()
     if (!frame) return null
     const at = spot ? { x: spot.x, y: spot.y } : { x: frame.width / 2, y: frame.height / 2 }
     let made: ReturnType<typeof svgToLayers>

@@ -34,6 +34,7 @@
 }
 /* Selection (#40): the box with its handles, each selected layer's outline, hover and marquee. */
 .stage-overlay .selection,
+.stage-overlay .selection-copy,
 .stage-overlay .selection-member,
 .stage-overlay .entered,
 .stage-overlay .linked-copy,
@@ -42,6 +43,10 @@
   transform-origin: center;
 }
 .stage-overlay .selection {
+  outline: 1.5px solid var(--accent);
+}
+/* The selected layers of another frame, beside the first one's: outlined as it is, with no handles. */
+.stage-overlay .selection-copy {
   outline: 1.5px solid var(--accent);
 }
 .stage-overlay .selection-member {

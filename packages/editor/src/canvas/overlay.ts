@@ -6,6 +6,7 @@ import { copiesOf, frameIdOf } from '@dazbee/doc'
 import { scaleText } from '@dazbee/renderer'
 import type { Rect } from '@dazbee/schema'
 
+import { byFrame } from '../across-frames.ts'
 import type { EditorCropping } from '../gestures/crop/cropping.ts'
 import { type EditorDrawing, isDrawing } from '../gestures/drawing/drawing.ts'
 import type { EditorPen } from '../gestures/pen/pen.ts'
@@ -16,7 +17,7 @@ import type { EditorTransformDrag } from '../gestures/select/transform-drag.ts'
 import type { EditorBoxes } from '../layers/boxes.ts'
 import { boundsOf, cornersOf, handleAt, round } from '../layers/transform.ts'
 import type { EditorPlace } from '../place.ts'
-import type { EditorSelection } from '../selection.ts'
+import { type EditorSelection, firstFrameOf, idsOf } from '../selection.ts'
 import type { EditorTyping } from '../text/typing.ts'
 import { toScreen } from './camera.ts'
 import { type Frame, labelBox } from './frames.ts'
@@ -39,7 +40,7 @@ export interface OverlayDeps {
     | 'pathEditing'
     | 'tellListeners'
   >
-  boxes: Pick<EditorBoxes, 'selectionBox' | 'drawnBoxOf' | 'handlesFor'>
+  boxes: Pick<EditorBoxes, 'selectionBox' | 'selectionBoxes' | 'drawnBoxOf' | 'handlesFor'>
   typing: Pick<EditorTyping, 'editing' | 'parts'>
   pen: Pick<EditorPen, 'parts'>
   cropping: Pick<EditorCropping, 'parts'>
@@ -122,7 +123,7 @@ export function editorOverlay({
     label.className = 'frame-label'
     label.dataset.frame = frame.id
     if (
-      selection.current()?.frameId === frame.id ||
+      selection.current()?.some((layer) => layer.frameId === frame.id) ||
       typing.editing()?.frameId === frame.id ||
       selection.pickedFrame() === frame.id
     )
@@ -170,15 +171,20 @@ export function editorOverlay({
     return Math.max(ceiling, floor)
   }
 
-  /** A dashed outline round each linked copy of the selected layers in the frames in view. */
+  /** A dashed outline round each linked copy of the selected layers in the frames in view, unless it is selected too. */
   function linkedParts() {
     const current = selection.current()
     if (!current) return []
     const design = view.design()
     const shown = view.inView()
     const parts: HTMLElement[] = []
-    for (const id of current.ids) {
+    const ids = idsOf(current)
+    const outlined = new Set(ids)
+    for (const id of ids) {
       for (const copy of copiesOf(design, id)) {
+        // Each copy once, though several selected layers share its link id.
+        if (outlined.has(copy)) continue
+        outlined.add(copy)
         const frameId = frameIdOf(design, copy)
         const frame = shown.find((f) => f.id === frameId)
         const box = frame && boxes.drawnBoxOf(frame, copy, design)
@@ -193,30 +199,41 @@ export function editorOverlay({
   }
 
   /**
-   * Each selected layer's outline, then the box with its handles and the size under it, with the
-   * selection's span across the stage, which the size is placed by.
+   * Each selected layer's outline, then the box with its handles and the size under it in the first
+   * selected layer's frame, with the selection's span across the stage, which the size is placed by.
+   * The selected layers of other frames get a box of their own, with no handles or size.
    */
   function selectionParts(): { parts: HTMLElement[]; size: { el: HTMLElement; span: Span } | null } {
     const gesture = pointer.gesture()
-    const outer = boxes.selectionBox()
+    const [outer, ...across] = boxes.selectionBoxes()
     const current = selection.current()
     if (!outer || !current) return { parts: [], size: null }
     const { frame, drawn: box } = outer
+    const inFrame = (frameId: string) => byFrame(current).find((part) => part.frameId === frameId)?.ids ?? []
+    const ids = inFrame(frame.id)
     const parts: HTMLElement[] = []
-    const several = current.ids.length > 1
+    const several = current.length > 1
     if (several) {
-      for (const id of current.ids) {
-        const b = boxes.drawnBoxOf(frame, id, view.design())
-        if (!b) continue
-        const member = outline('selection-member', frame, b)
-        member.dataset.layer = id
+      for (const layer of current) {
+        const shown = layer.frameId === frame.id ? frame : across.find((b) => b.frame.id === layer.frameId)?.frame
+        const b = shown && boxes.drawnBoxOf(shown, layer.id, view.design())
+        if (!shown || !b) continue
+        const member = outline('selection-member', shown, b)
+        member.dataset.layer = layer.id
+        member.dataset.frame = shown.id
         parts.push(member)
       }
     }
+    for (const other of across) {
+      const copy = outline('selection-copy', other.frame, other.drawn)
+      copy.dataset.frame = other.frame.id
+      copy.dataset.count = String(inFrame(other.frame.id).length)
+      parts.push(copy)
+    }
     const el = outline('selection', frame, box)
     el.dataset.frame = frame.id
-    el.dataset.count = String(current.ids.length)
-    if (!several) el.dataset.layer = current.ids[0]
+    el.dataset.count = String(ids.length)
+    if (ids.length === 1) el.dataset.layer = ids[0]
     // Handles only once the box is big enough on screen to grab them apart, and not on a locked one.
     if (!typing.editing() && Math.min(box.width, box.height) * view.camera().zoom >= 2 * HANDLE_SIZE) {
       for (const h of boxes.handlesFor()) {
@@ -236,7 +253,7 @@ export function editorOverlay({
     size.textContent = `${round(box.width, 0)} × ${round(box.height, 0)}`
     // A corner scaling one text says its size too, from where it was.
     const g = gesture?.kind === 'resize' ? gesture : null
-    const text = g && !several ? g.texts.get(current.ids[0] ?? '') : undefined
+    const text = g && !several ? g.texts.get(ids[0] ?? '') : undefined
     if (g && text) size.textContent += ` · ${text.style.fontSize} → ${scaleText(text, g.factor).style.fontSize}`
     size.style.top = px(sizeLabelTop(corners.map((c) => c.y)))
     parts.push(size)
@@ -289,11 +306,11 @@ export function editorOverlay({
       parts.push(el)
     }
     const entered = selection.entered()
-    const enteredFrame = entered && frameOf(selection.current()?.frameId)
+    const enteredFrame = entered && frameOf(firstFrameOf(selection.current()))
     const enteredBox = enteredFrame && entered && boxes.drawnBoxOf(enteredFrame, entered, view.design())
     if (enteredFrame && enteredBox) parts.push(outline('entered', enteredFrame, enteredBox))
     const hovered = selection.hovered()
-    const hover = !gesture && hovered && !selection.current()?.ids.includes(hovered.id) ? hovered : null
+    const hover = !gesture && hovered && !idsOf(selection.current()).includes(hovered.id) ? hovered : null
     const hoverFrame = hover && frameOf(hover.frameId)
     const hoverBox = hoverFrame && hover && boxes.drawnBoxOf(hoverFrame, hover.id, view.design())
     if (hoverFrame && hoverBox) parts.push(outline('hover', hoverFrame, hoverBox))
@@ -313,7 +330,8 @@ export function editorOverlay({
     if (isDrawing(gesture)) parts.push(...drawing.parts(gesture))
     parts.push(...transformDrag.parts(gesture?.kind === 'marquee' ? gesture : null))
     if (view.rulers()) {
-      const origin = frameOf(selection.current()?.frameId) ?? frameOf(selection.hovered()?.frameId) ?? view.inView()[0]
+      const origin =
+        frameOf(firstFrameOf(selection.current())) ?? frameOf(selection.hovered()?.frameId) ?? view.inView()[0]
       const outer = boxes.selectionBox()
       if (origin)
         parts.push(

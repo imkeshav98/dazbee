@@ -5,7 +5,7 @@ import type { SceneLayer } from '@dazbee/renderer'
 import type { Camera } from '../canvas/camera.ts'
 import type { Frame } from '../canvas/frames.ts'
 import { design } from '../canvas/test-design.ts'
-import { editorSelection } from '../selection.ts'
+import { editorSelection, pairsIn } from '../selection.ts'
 import type { Tool } from '../tools.ts'
 import { editorPointer, type PointerDeps } from './pointer.ts'
 import type { MoveDrag } from './select/transform-drag.ts'
@@ -430,7 +430,7 @@ describe('editorPointer', () => {
     it('starts typing into the text under the pointer, selecting it', () => {
       const { selection, send, log } = harness('select', sceneLayer('words', 'text'))
       send('dblclick', event(10, 10))
-      expect(selection.current()).toEqual({ ids: ['words'], frameId: 'one-sq' })
+      expect(selection.current()).toEqual(pairsIn('one-sq', ['words']))
       expect(log).toEqual(['type into words in one-sq', 'draw overlay'])
     })
 

@@ -11,7 +11,7 @@
 // items; on a phone it is a second card that always shows, as the mock draws it, and every item is
 // a 44 px target 8 px from the next. Nothing scrolls sideways.
 import { CaretDownIcon } from '@phosphor-icons/react'
-import { type MouseEvent, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { type MouseEvent, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 
 import type { Editor } from '@dazbee/editor'
 import type { Design } from '@dazbee/schema'
@@ -118,24 +118,27 @@ function floorOf(overlay: HTMLElement) {
 
 /**
  * On a phone, once no press is held, moves the stage so the selection lies clear under the bar,
- * when it sits under it: the bar takes two rows there and must never cover what it acts on. The
- * move never takes the selection under an open flyout or sheet: where it can't clear both, it
- * stops short of them, and the frame's label, or the selection's top, stays under the bar.
+ * when it sits under it: the bar takes two rows there and must never cover what it acts on. When
+ * the bar's bottom moves for the same selection, as when a selection that grows gives the bar a row,
+ * it looks again once the bar has settled into its rows, unless the view moved meanwhile. The move
+ * never takes the selection under an open flyout or sheet: where it can't clear both, it stops
+ * short of them, and the frame's label, or the selection's top, stays under the bar.
  */
 function useSelectionClear(editor: Editor, ids: string[], phone: boolean) {
   const key = ids.join(' ')
-  useEffect(() => {
-    if (!phone || key === '') return
-    const clear = () => {
-      const rect = editor.selectionRect()
-      const overlay = document.querySelector<HTMLElement>('.stage-overlay')
-      if (!rect || !overlay) return
-      // The selection's frame label, lit while a layer in it is selected, is kept clear too; the
-      // overlay places it in the stage's pixels.
-      const label = overlay.querySelector<HTMLElement>('.frame-label[data-active]')
-      const top = Math.min(rect.y, label ? Number.parseFloat(label.style.top) : Infinity)
-      const under = editState().barBottom + CLEAR - top
-      if (under <= 0) return
+  const { barBottom } = useEditState()
+  // The camera as the last look left it, so a later look leaves a view moved since then be.
+  const looked = useRef('')
+  const clear = useCallback(() => {
+    const rect = editor.selectionRect()
+    const overlay = document.querySelector<HTMLElement>('.stage-overlay')
+    if (!rect || !overlay) return
+    // The labels of the selection's frames, lit while a layer in each is selected, are kept clear
+    // too; the overlay places them in the stage's pixels.
+    const labels = [...overlay.querySelectorAll<HTMLElement>('.frame-label[data-active]')]
+    const top = Math.min(rect.y, ...labels.map((label) => Number.parseFloat(label.style.top)))
+    const under = editState().barBottom + CLEAR - top
+    if (under > 0) {
       const camera = editor.camera()
       // The camera's offset is in screen pixels: adding to it moves the design down.
       editor.setCamera({ ...camera, y: camera.y + under })
@@ -145,6 +148,10 @@ function useSelectionClear(editor: Editor, ids: string[], phone: boolean) {
       const past = moved ? moved.y + moved.height - (floorOf(overlay) - CLEAR) : 0
       if (past > 0) editor.setCamera({ ...camera, y: camera.y + Math.max(0, under - past) })
     }
+    looked.current = JSON.stringify(editor.camera())
+  }, [editor])
+  useEffect(() => {
+    if (!phone || key === '') return
     if (!press.held) return clear()
     // After the editor has heard the press end, so the stage moves under no press it reads.
     let frame = 0
@@ -156,7 +163,17 @@ function useSelectionClear(editor: Editor, ids: string[], phone: boolean) {
       window.removeEventListener('pointerup', later)
       cancelAnimationFrame(frame)
     }
-  }, [editor, key, phone])
+  }, [clear, key, phone])
+  useEffect(() => {
+    if (!phone || key === '' || press.held) return
+    // Two frames on, as the bar fitting its items into rows measures one row too many for a frame.
+    let frame = requestAnimationFrame(() => {
+      frame = requestAnimationFrame(() => {
+        if (JSON.stringify(editor.camera()) === looked.current) clear()
+      })
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [barBottom, clear, editor, key, phone])
 }
 
 /**

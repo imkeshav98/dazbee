@@ -20,7 +20,7 @@ import { hug as hugIn } from './layers/hug.ts'
 import { round } from './layers/transform.ts'
 import type { EditorResources } from './resources.ts'
 import { runQuietly } from './run-quietly.ts'
-import type { EditorSelection } from './selection.ts'
+import { type EditorSelection, idsOf } from './selection.ts'
 import type { ShortcutAction } from './shortcuts.ts'
 import type { EditorTyping } from './text/typing.ts'
 
@@ -120,7 +120,7 @@ export function editorLinkedCopies({
   const hug = (ids: string[]) => hugIn(session, ids)
 
   function menu() {
-    const ids = selection.current()?.ids ?? []
+    const ids = idsOf(selection.current())
     return ids.length === 0 ? null : linkedMenu(session.design(), ids, rememberedStyle())
   }
 
@@ -129,7 +129,7 @@ export function editorLinkedCopies({
     const state = menu()
     if (!current || !state) return false
     const design = session.design()
-    const ids = current.ids.filter((id) => design.nodes[id])
+    const ids = idsOf(current).filter((id) => design.nodes[id])
     let done = false
     switch (action) {
       case 'copyStyle': {
@@ -163,7 +163,7 @@ export function editorLinkedCopies({
         break
       }
       case 'deleteLinked':
-        done = state.delete === 'ready' && deleteLinked(ids, current.frameId)
+        done = state.delete === 'ready' && deleteLinked(ids)
         break
     }
     drawOverlay()
@@ -252,7 +252,7 @@ export function editorLinkedCopies({
     )
   }
 
-  function deleteLinked(ids: string[], frameId: string) {
+  function deleteLinked(ids: string[]) {
     const design = session.design()
     const doomed = deletable(design, everyCopy(design, ids))
     const parents = doomed.map((id) => design.nodes[id]?.parentId ?? '').filter((id) => design.nodes[id])
@@ -262,7 +262,7 @@ export function editorLinkedCopies({
         hug(parents)
       }),
     )
-    if (done) selection.select([], frameId)
+    if (done) selection.select([], null)
     return done
   }
 

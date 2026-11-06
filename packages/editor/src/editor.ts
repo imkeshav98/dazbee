@@ -21,6 +21,7 @@ import {
 } from '@dazbee/schema'
 import type { Skipped } from '@dazbee/svg'
 
+import { toggled } from './across-frames.ts'
 import { editorActions } from './actions.ts'
 import { editorBrandKit } from './brand-kit.ts'
 import { frameIn } from './canvas/frames.ts'
@@ -48,7 +49,7 @@ import { listenerSet } from './listener-set.ts'
 import { editorPlace } from './place.ts'
 import { editorResources, loadFonts, loadImages, shippedFonts } from './resources.ts'
 import { watchSaveState } from './save-state.ts'
-import { editorSelection } from './selection.ts'
+import { editorSelection, firstFrameOf, idsOf } from './selection.ts'
 import { inField, type ShortcutAction, shortcutFor } from './shortcuts.ts'
 import type { RunStyle } from './text/text-edit.ts'
 import { editorTyping } from './text/typing.ts'
@@ -418,22 +419,31 @@ function live(
     typing.key(e)
   }
   /**
-   * Selects layers in the frame of the first of them, as the app asks, ending typing first: any in
-   * other frames are left out, and that frame's page is shown first when another is. None clears it.
+   * Selects layers in the frames of the first one's page, as the app asks, ending typing first: any
+   * on other pages are left out, and that page is shown first when another is. None clears it.
    */
   function select(ids: string[]) {
     typing.stop()
     const now = session.design()
-    const live = ids.filter((id) => now.nodes[id])
-    const frameId = live[0] === undefined ? undefined : frameIdOf(now, live[0])
-    const pageId = frameId === undefined ? undefined : now.frames[frameId]?.pageId
-    if (frameId === undefined || pageId === undefined) {
+    const layers = ids.flatMap((id) => {
+      const frameId = now.nodes[id] ? frameIdOf(now, id) : undefined
+      return frameId === undefined ? [] : [{ id, frameId }]
+    })
+    const pageId = now.frames[layers[0]?.frameId ?? '']?.pageId
+    if (pageId === undefined) {
       selection.select([], null)
       return
     }
     if (pageId !== view.page()) showPage(pageId)
-    const inFrame = live.filter((id) => frameIdOf(now, id) === frameId)
-    selection.select(inFrame, frameId)
+    selection.selectAcross(layers)
+  }
+  /** Shift and a click on a layer of the shown page, from a list: as on the stage, it is added, taken out or selected alone. */
+  function toggleSelected(id: string) {
+    const now = session.design()
+    const frameId = now.nodes[id] ? frameIdOf(now, id) : undefined
+    if (frameId === undefined || !frameOf(frameId)) return
+    typing.stop()
+    selection.selectAcross(toggled(selection.current(), { id, frameId }, now))
   }
   /**
    * Shows a page, its frames fitted: a selection, crop, path edit, pen path or typing on another
@@ -524,9 +534,10 @@ function live(
     session,
     doc,
     design: () => session.design(),
-    selected: () => selection.current()?.ids[0] ?? null,
-    selection: () => [...(selection.current()?.ids ?? [])],
-    selectedFrame: () => selection.current()?.frameId ?? null,
+    selected: () => selection.current()?.[0]?.id ?? null,
+    selection: () => idsOf(selection.current()),
+    selectedFrame: () => firstFrameOf(selection.current()) ?? null,
+    toggleSelected,
     select,
     perform,
     ungroupState: actions.ungroupState,
