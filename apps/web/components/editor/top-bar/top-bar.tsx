@@ -238,7 +238,9 @@ function useSelectionClear(editor: Editor, ids: string[], phone: boolean) {
     // first did.
     let timer = 0
     const later = () => {
-      timer = window.setTimeout(clear, doubleTapLeft())
+      const left = doubleTapLeft()
+      if (left > 0) timer = window.setTimeout(later, left)
+      else clear()
     }
     if (press.held) window.addEventListener('pointerup', later, { once: true })
     else later()
@@ -431,7 +433,9 @@ function Bar({
     setThrough(true)
     let timer = 0
     const end = () => {
-      timer = window.setTimeout(() => setThrough(false), doubleTapLeft())
+      const left = doubleTapLeft()
+      if (left > 0) timer = window.setTimeout(end, left)
+      else setThrough(false)
     }
     if (press.held) window.addEventListener('pointerup', end, { once: true })
     else end()
