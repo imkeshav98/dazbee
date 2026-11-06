@@ -21,7 +21,7 @@ import { NumberField } from '@/components/editor/edit-panel/fields.tsx'
 import { useShownPage } from '@/components/editor/editor-hooks.ts'
 import { FIELD, FIELD_LABEL } from '@/components/editor/styles.ts'
 import { Button } from '@/components/ui/button.tsx'
-import { LIT_ROW, MENU_VALUE, SEGMENT, SEGMENTS } from '@/components/ui/looks.ts'
+import { LIT_ROW, MENU_VALUE, SEGMENT, SEGMENTS, TOUCH_FIELD } from '@/components/ui/looks.ts'
 import { useOverlayScroll } from '@/components/ui/overlay-scroll.ts'
 import { Select } from '@/components/ui/select.tsx'
 import { Tick } from '@/components/ui/tick.tsx'
@@ -36,8 +36,6 @@ type Ticked = 'all' | ReadonlySet<string>
 
 const LABEL = FIELD_LABEL
 
-/** On a phone a control is 44 px tall, a touch target a finger can hit, as the frame rows are. */
-const TOUCH_CONTROL = 'max-sm:h-[44px]'
 /** A button that applies but has nothing to do: faded and unlit, as a disabled one looks, yet it takes the pointer. */
 const GREYED = 'cursor-not-allowed opacity-50 hover:bg-accent-solid active:scale-100'
 
@@ -195,7 +193,7 @@ export function ExportForm({
             options={pages.map(([pageId, p]) => ({ value: pageId, label: p.name }))}
             onChange={choosePage}
             testId="export-page"
-            className={cn('h-8 bg-raised px-2 text-[13px]', TOUCH_CONTROL)}
+            className={cn('h-8 bg-raised px-2 text-[13px]', TOUCH_FIELD)}
           />
         </div>
       )}
@@ -253,7 +251,6 @@ export function ExportForm({
           min={1}
           max={100}
           testId="export-quality"
-          className={TOUCH_CONTROL}
           onSet={(to) => setQuality(Math.round(to))}
           onShift={(by) => setQuality((now) => Math.round(Math.min(100, Math.max(1, now + by))))}
         />
@@ -270,14 +267,14 @@ export function ExportForm({
           onChange={(event) => setName(event.target.value)}
           onKeyDown={(event) => event.stopPropagation()}
           data-testid="export-name"
-          className={cn(FIELD, TOUCH_CONTROL)}
+          className={FIELD}
         />
       </label>
 
       {count === 0 && progress === null ? (
         // Greyed with nothing ticked, still under the pointer and the keyboard, so its tooltip says why.
         <Tooltip label={t.editor.exports.tickOne}>
-          <Button variant="primary" aria-disabled="true" data-testid="export-run" className={cn(TOUCH_CONTROL, GREYED)}>
+          <Button variant="primary" aria-disabled="true" data-testid="export-run" className={cn(TOUCH_FIELD, GREYED)}>
             {counted(locale, t.editor.exports.run, count)}
           </Button>
         </Tooltip>
@@ -287,7 +284,7 @@ export function ExportForm({
           disabled={progress !== null}
           onClick={() => void run()}
           data-testid="export-run"
-          className={TOUCH_CONTROL}
+          className={TOUCH_FIELD}
         >
           {progress
             ? format(t.editor.exports.making, { done: progress.done, total: progress.total })
