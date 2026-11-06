@@ -52,7 +52,10 @@ const MENUS: EditorMenu[] = [
   },
   {
     name: "a picked frame's ⋯",
-    ready: (page) => clickLabel(page, 'sq'),
+    ready: async (page) => {
+      await selectLayers(page, [])
+      await clickLabel(page, 'sq')
+    },
     button: (page) => page.getByTestId('bar-frame-more'),
     rows: () => FRAME_MENU.map((row) => row.name),
     jump: ['r', 'Rename'],
@@ -84,14 +87,10 @@ const MENUS: EditorMenu[] = [
     ready: async (page) => {
       await pagesPanel(page)
     },
-    button: (page) =>
-      page
-        .getByTestId('pages')
-        .locator('[data-page]')
-        .first()
-        .getByRole('button', { name: /^More for / }),
+    // Named "More for" its page in the page's language: the button that opens a menu.
+    button: (page) => page.getByTestId('pages').locator('[data-page]').first().locator('button[aria-haspopup="menu"]'),
     rows: () => PAGE_MENU.map((row) => row.name),
-    jump: ['d', 'Duplicate page'],
+    jump: ['r', 'Rename'],
   },
 ]
 
@@ -164,47 +163,46 @@ for (const menu of MENUS)
     expect(errors).toEqual([])
   })
 
-test('every menu takes the page’s direction in Arabic, the down arrow still moving down', async ({ browser }) => {
-  const { page, errors } = await openAt(browser, undefined, true)
-  for (const menu of MENUS) {
+for (const menu of MENUS)
+  test(`${menu.name} takes the page’s direction in Arabic, the down arrow still moving down`, async ({ browser }) => {
+    const { page, errors } = await openAt(browser, undefined, true)
     const opened = await openByKeys(page, menu)
-    await expect(opened, menu.name).toHaveAttribute('dir', 'rtl')
+    await expect(opened).toHaveAttribute('dir', 'rtl')
     const first = await focusedRow(page)
     await page.keyboard.press('ArrowDown')
-    await expect.poll(() => focusedRow(page), menu.name).not.toBe(first)
+    await expect.poll(() => focusedRow(page)).not.toBe(first)
     await page.keyboard.press('Escape')
     await expect(opened).toBeHidden()
     await expect(menu.button(page)).toBeFocused()
-  }
-  expect(errors).toEqual([])
-})
-
-test('on a phone every menu opens by a tap with its rows a finger’s height and no keys', async ({ browser }) => {
-  const asset = await upload(photo)
-  const { page: tab, errors } = await openSized(browser, PHONE, {
-    input: linkedMenuDesign(asset.id),
-    touch: true,
-    mobile: true,
+    expect(errors).toEqual([])
   })
-  for (const menu of MENUS) {
-    await menu.ready(tab)
-    await menu.button(tab).tap()
-    const opened = openMenu(tab)
-    await expect(opened, menu.name).toBeVisible()
+
+for (const menu of MENUS)
+  test(`on a phone ${menu.name} opens by a tap with its rows a finger’s height and no keys`, async ({ browser }) => {
+    const asset = await upload(photo)
+    const { page, errors } = await openSized(browser, PHONE, {
+      input: linkedMenuDesign(asset.id),
+      touch: true,
+      mobile: true,
+    })
+    await menu.ready(page)
+    await menu.button(page).tap()
+    const opened = openMenu(page)
+    await expect(opened).toBeVisible()
     await entered(opened)
     const heights = await opened
       .locator('[role^="menuitem"]')
       .evaluateAll((rows) =>
         rows.filter((row) => row.checkVisibility()).map((row) => row.getBoundingClientRect().height),
       )
-    for (const height of heights) expect(height, menu.name).toBeGreaterThanOrEqual(44)
+    expect(heights.length).toBeGreaterThan(0)
+    for (const height of heights) expect(height).toBeGreaterThanOrEqual(44)
     const keys = await opened.locator('kbd').evaluateAll((all) => all.filter((key) => key.checkVisibility()).length)
-    expect(keys, menu.name).toBe(0)
-    await tab.keyboard.press('Escape')
+    expect(keys).toBe(0)
+    await page.keyboard.press('Escape')
     await expect(opened).toBeHidden()
-  }
-  expect(errors).toEqual([])
-})
+    expect(errors).toEqual([])
+  })
 
 test.describe('the actions a menu runs undo and redo in one step', () => {
   /** How many layers, frames and pages the tab's design holds, and the pages' order and hidden layers. */
