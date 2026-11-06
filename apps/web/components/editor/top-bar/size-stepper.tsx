@@ -10,7 +10,8 @@ import { latinDigits } from '@/lib/editor/size.ts'
 import { useMessages } from '@/lib/i18n/client.tsx'
 
 /**
- * The text's size on the bar: smaller, the size as a number input, bigger. The size takes the
+ * The text's size on the bar: smaller, the size as a number input, bigger; Mixed where the selected
+ * texts differ, the field growing to fit the word. The size takes the
  * number input's press and caret, selected in the stronger tint as it lies on the bar's glass, and
  * the stepper's edge is the accent while it is typed in.
  */
@@ -49,12 +50,12 @@ export function SizeStepper({ target }: { target: Target }) {
       </button>
       <div
         {...entry.knob}
-        className="flex h-full w-10 cursor-text items-center justify-center overflow-hidden max-sm:w-[44px] max-sm:rounded-row max-sm:border max-sm:border-line max-sm:in-data-typing:border-accent"
+        className="flex h-full min-w-10 cursor-text items-center justify-center overflow-hidden px-1 max-sm:min-w-[44px] max-sm:rounded-row max-sm:border max-sm:border-line max-sm:in-data-typing:border-accent"
       >
         <NumberInput
           entry={entry}
           text={draft ?? shown}
-          hint="--"
+          hint={t.editor.props.mixed}
           strong
           name="font-size"
           aria-label={t.editor.props.fontSize}

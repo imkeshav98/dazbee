@@ -35,6 +35,12 @@ async function placeOf(page: Page, id: string) {
 const placesOf = async (page: Page, ids: string[]) => Promise.all(ids.map((id) => placeOf(page, id)))
 /** A text layer's font size as the design holds it. */
 const sizeOf = async (page: Page, id: string) => ((await node(page, id))?.props.style as { fontSize: number }).fontSize
+/** Whether the top bar's font size shows Mixed, the word whole in its field. */
+const sizeShowsMixed = (page: Page) =>
+  page.getByTestId('bar-size-field').evaluate((input: HTMLInputElement) => {
+    const knob = input.closest('[data-knob]')
+    return input.value === '' && input.placeholder === 'Mixed' && !!knob && knob.scrollWidth <= knob.clientWidth
+  })
 /** The middle of a layer on screen, as it is drawn in its frame. */
 async function middleOf(page: Page, id: string, frameId: string) {
   const box = await page.evaluate((one) => window.dazbee?.boxOf(one), id)
@@ -166,7 +172,7 @@ test('a top bar and a panel change sets each copy, Mixed where they differ, as o
   await selectCopies(page, 'headline')
   // The square and the story have 110, the landscape 72: the size shows none of them.
   const size = page.getByTestId('bar-size-field')
-  await expect(size).toHaveValue('')
+  await expect.poll(() => sizeShowsMixed(page)).toBe(true)
   await enter(size, '90')
   await expect.poll(async () => Promise.all(everyCopy('headline').map((id) => sizeOf(page, id)))).toEqual([90, 90, 90])
   await expect(size).toHaveValue('90')
@@ -371,7 +377,7 @@ for (const [width, height] of SCREEN_SIZES) {
   }) => {
     const { page, errors } = await openAt(browser, width, height)
     await selectTwoFrames(page)
-    await expect(page.getByTestId('bar-size-field')).toHaveValue('')
+    await expect.poll(() => sizeShowsMixed(page)).toBe(true)
     await nextFrame(page)
     expect(await layoutProblems(page, { pieces: PIECES, uncut: UNCUT })).toEqual([])
     const x = (await openCard(page, 'layout-card')).getByRole('spinbutton', { name: 'X position' })
