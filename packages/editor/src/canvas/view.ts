@@ -14,13 +14,13 @@ import {
   type Insets,
   NO_INSETS,
   reveal,
+  revealBeside,
   revealLabel,
   revealWhole,
   toScreen,
   toWorld,
   under,
   type Viewport,
-  widen,
   zoomAt,
 } from './camera.ts'
 import { type Frame, frameAt, frameNearest, pageFrames } from './frames.ts'
@@ -349,8 +349,9 @@ export function editorView({ ck, canvas, session, onZoom, draw }: ViewDeps): Edi
     const stage = canvas.getBoundingClientRect()
     // Beside a panel, only an area it lies over moves, and then clear of it too.
     if (panel && !under(camera, area, panel, stage)) return
-    const cover = panel ? coverOf(panel, stage) : {}
-    const next = reveal(camera, area, viewport, widen(insets, cover))
+    const next = panel
+      ? revealBeside(camera, area, viewport, insets, coverOf(panel, stage))
+      : reveal(camera, area, viewport, insets)
     if (next !== camera) setCamera(next)
   }
   function showWhole(area: Rect) {

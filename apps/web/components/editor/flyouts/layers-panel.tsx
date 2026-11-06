@@ -121,15 +121,25 @@ export function LayersPanel({ editor }: { editor: Editor }) {
     follow(el)
   })
 
+  // A frame picked by its row, brought out from under the panel once its row has opened, as tall
+  // as the panel then stands.
+  const showing = useRef<string | null>(null)
+  useLayoutEffect(() => {
+    const id = showing.current
+    if (id === null || !expanded.has(id)) return
+    showing.current = null
+    const panel = scroller.current?.closest('#editor-flyout')
+    if (panel) editor.showFrame(id, panel.getBoundingClientRect())
+  })
+
   /**
    * Picks a frame by its row, panning at the same zoom to bring it out from under the panel, or
    * selects a layer by its row, alone or added to the selection or taken from it.
    */
   const select = (id: string, add = false) => {
     if (isFrame(id)) {
+      showing.current = id
       editor.pickFrame(id)
-      const panel = scroller.current?.closest('#editor-flyout')
-      if (panel) editor.showFrame(id, panel.getBoundingClientRect())
       return
     }
     if (add) editor.toggleSelected(id)

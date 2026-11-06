@@ -107,8 +107,20 @@ function usePressWatch() {
 }
 
 /**
+ * The top edge, in the stage's pixels, of the open flyout or sheet that covers the stage's lower
+ * part on a phone; Infinity with neither open.
+ */
+function floorOf(overlay: HTMLElement) {
+  const flyout = document.querySelector('#editor-flyout')?.getBoundingClientRect()
+  const flyoutTop = flyout && flyout.height > 0 ? flyout.top - overlay.getBoundingClientRect().top : Infinity
+  return Math.min(flyoutTop, editState().sheetTop ?? Infinity)
+}
+
+/**
  * On a phone, once no press is held, moves the stage so the selection lies clear under the bar,
- * when it sits under it: the bar takes two rows there and must never cover what it acts on.
+ * when it sits under it: the bar takes two rows there and must never cover what it acts on. The
+ * move never takes the selection under an open flyout or sheet: where it can't clear both, it
+ * stops short of them, and the frame's label, or the selection's top, stays under the bar.
  */
 function useSelectionClear(editor: Editor, ids: string[], phone: boolean) {
   const key = ids.join(' ')
@@ -116,16 +128,22 @@ function useSelectionClear(editor: Editor, ids: string[], phone: boolean) {
     if (!phone || key === '') return
     const clear = () => {
       const rect = editor.selectionRect()
-      if (!rect) return
+      const overlay = document.querySelector<HTMLElement>('.stage-overlay')
+      if (!rect || !overlay) return
       // The selection's frame label, lit while a layer in it is selected, is kept clear too; the
       // overlay places it in the stage's pixels.
-      const label = document.querySelector<HTMLElement>('.stage-overlay .frame-label[data-active]')
+      const label = overlay.querySelector<HTMLElement>('.frame-label[data-active]')
       const top = Math.min(rect.y, label ? Number.parseFloat(label.style.top) : Infinity)
       const under = editState().barBottom + CLEAR - top
       if (under <= 0) return
       const camera = editor.camera()
       // The camera's offset is in screen pixels: adding to it moves the design down.
       editor.setCamera({ ...camera, y: camera.y + under })
+      // The selection's size label, held below the chrome while the selection is under it, follows
+      // the selection once it is clear, so where the selection ends is read after the move.
+      const moved = editor.selectionRect()
+      const past = moved ? moved.y + moved.height - (floorOf(overlay) - CLEAR) : 0
+      if (past > 0) editor.setCamera({ ...camera, y: camera.y + Math.max(0, under - past) })
     }
     if (!press.held) return clear()
     // After the editor has heard the press end, so the stage moves under no press it reads.
