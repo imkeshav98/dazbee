@@ -13,7 +13,7 @@
 import { CaretDownIcon } from '@phosphor-icons/react'
 import { type MouseEvent, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 
-import type { Editor } from '@dazbee/editor'
+import type { Camera, Editor } from '@dazbee/editor'
 import type { Design } from '@dazbee/schema'
 
 import { type Target, useTarget } from '@/components/editor/edit-panel/target.ts'
@@ -38,6 +38,20 @@ import { arrowAlong, useRovingTab } from './bar-popover.tsx'
 import { useFrameItems } from './frame-items.tsx'
 import { type BarItem, useSelectionItems } from './top-bar-items.tsx'
 
+/** A selection as it was made, for the move that brings it clear under the bar on a phone. */
+type Made = {
+  /** How many presses, wheel turns and keys the page had heard as it was made. */
+  acts: number
+  /** Whether a press made it. */
+  byPress: boolean
+  /** The view it was made in. */
+  base: Camera
+  /** How far above its top the labels of its frames reach, in pixels. */
+  labels: number
+  /** The view as the last move left it, as JSON. */
+  left: string
+}
+
 /** The width a divider takes with its margins, as a tablet or desktop draws it, in pixels. */
 const DIVIDER = 5
 /** The width More controls and the divider before it take on the first row, without their gaps, in pixels. */
@@ -51,9 +65,16 @@ const TOP_BAR =
 
 /** Room kept between the bar and a selection the stage moves clear of it, its handles' reach included, in pixels. */
 const CLEAR = 12
+/** How long after a tap a second tap still makes a double tap, in milliseconds. */
+const DOUBLE_TAP = 400
 
-/** When the last press on the page went down, and whether a press is held, as a window listener keeps them. */
-const press = { at: 0, held: false }
+/**
+ * When the last press on the page went down and where, whether it is held, has moved (the stage
+ * drags a layer at its first move) or is a double tap's second, when it went up, and how many
+ * presses, drags, wheel turns and keys the page has heard, as window listeners keep them; a double
+ * tap's second press is not counted as a press, being the same tap's.
+ */
+const press = { at: 0, x: 0, y: 0, held: false, dragged: false, second: false, upAt: 0, acts: 0 }
 
 /** An element's width with its margins, in pixels. */
 function outerWidth(el: Element | null) {
@@ -85,23 +106,50 @@ function sidesOf(el: Element, ...names: string[]) {
   return names.reduce((sum, name) => sum + Number.parseFloat(style.getPropertyValue(name)), 0)
 }
 
-/** Keeps `press` as presses go down and up anywhere on the page, before anything else hears them. */
+/**
+ * Keeps `press` as presses go down, move and go up, wheels turn and keys go down anywhere on the
+ * page, before anything else hears them.
+ */
 function usePressWatch() {
   useEffect(() => {
-    const down = () => {
-      press.at = performance.now()
-      press.held = true
+    const down = (event: PointerEvent) => {
+      // A press soon after a tap that didn't drag is that tap's second, as a double tap's is.
+      const second = !press.held && !press.dragged && !press.second && doubleTapLeft() > 0
+      Object.assign(press, {
+        at: performance.now(),
+        x: event.clientX,
+        y: event.clientY,
+        held: true,
+        dragged: false,
+        second,
+      })
+      if (!second) press.acts++
+    }
+    const move = (event: PointerEvent) => {
+      if (!press.held || press.dragged || (event.clientX === press.x && event.clientY === press.y)) return
+      press.dragged = true
+      press.acts++
     }
     const up = () => {
       press.held = false
+      press.upAt = performance.now()
+    }
+    const act = () => {
+      press.acts++
     }
     window.addEventListener('pointerdown', down, true)
+    window.addEventListener('pointermove', move, true)
     window.addEventListener('pointerup', up, true)
     window.addEventListener('pointercancel', up, true)
+    window.addEventListener('wheel', act, true)
+    window.addEventListener('keydown', act, true)
     return () => {
       window.removeEventListener('pointerdown', down, true)
+      window.removeEventListener('pointermove', move, true)
       window.removeEventListener('pointerup', up, true)
       window.removeEventListener('pointercancel', up, true)
+      window.removeEventListener('wheel', act, true)
+      window.removeEventListener('keydown', act, true)
     }
   }, [])
 }
@@ -117,63 +165,106 @@ function floorOf(overlay: HTMLElement) {
 }
 
 /**
- * On a phone, once no press is held, moves the stage so the selection lies clear under the bar,
- * when it sits under it: the bar takes two rows there and must never cover what it acts on. When
- * the bar's bottom moves for the same selection, as when a selection that grows gives the bar a row,
- * it looks again once the bar has settled into its rows, unless the view moved meanwhile. The move
- * never takes the selection under an open flyout or sheet: where it can't clear both, it stops
- * short of them, and the frame's label, or the selection's top, stays under the bar.
+ * The selection as it is now: the acts the page has heard, the view, and how far above the
+ * selection's top the labels of its frames reach. The overlay lights the label of each frame with a
+ * selected layer and places it in the stage's pixels, as the selection's box is.
+ */
+function madeNow(editor: Editor): Made {
+  const camera = editor.camera()
+  const rect = editor.selectionRect()
+  const labels = [...document.querySelectorAll<HTMLElement>('.stage-overlay .frame-label[data-active]')]
+  const top = rect ? Math.min(rect.y, ...labels.map((label) => Number.parseFloat(label.style.top))) : 0
+  return {
+    acts: press.acts,
+    byPress: press.held,
+    base: camera,
+    labels: rect ? rect.y - top : 0,
+    left: JSON.stringify(camera),
+  }
+}
+
+/**
+ * How long until a second tap can no longer make the last press a double tap, in milliseconds:
+ * the whole time while the press is held, and none once a double tap's second press is up.
+ */
+function doubleTapLeft() {
+  if (press.held) return DOUBLE_TAP
+  return press.second ? 0 : Math.max(0, press.upAt + DOUBLE_TAP - performance.now())
+}
+
+/**
+ * On a phone, before the stage is next drawn, moves the stage so the selection lies clear under the
+ * bar, when it sits under it: the bar takes two rows there and must never cover what it acts on.
+ * For a selection made by a press, it waits until the press has ended and a second tap can no
+ * longer make it a double tap, or until the stage has heard a double tap, so a text double-tapped
+ * to type in comes clear before anything is typed. When the bar's bottom moves for the same
+ * selection, as when a selection that grows gives the bar a row, it works the move out again from
+ * the view the selection was made in, so a row the bar measures for a moment leaves the stage where
+ * the settled bar needs it. Nothing moves once the person has acted since the selection was made,
+ * with another press, a drag (the press that made it, or a double tap's second, dragging too), a
+ * wheel or a key, or once the view has moved since the last move left it, so a zoom, a pan, a drag
+ * or typing is never followed by a move it didn't ask for. The move never takes the selection under
+ * an open flyout or sheet: where it can't clear both, it stops short of them, and the frame's label,
+ * or the selection's top, stays under the bar.
  */
 function useSelectionClear(editor: Editor, ids: string[], phone: boolean) {
   const key = ids.join(' ')
   const { barBottom } = useEditState()
-  // The camera as the last look left it, so a later look leaves a view moved since then be.
-  const looked = useRef('')
+  // The selection as it was made: the acts the page had heard by then, the view it was made in, how
+  // far the labels of its frames reach above it, and the view as the last move left it.
+  const made = useRef<Made | null>(null)
+  useEffect(() => {
+    const mark = () => {
+      made.current = madeNow(editor)
+    }
+    mark()
+    const stop = editor.onSelection(mark)
+    return () => {
+      stop()
+    }
+  }, [editor])
   const clear = useCallback(() => {
-    const rect = editor.selectionRect()
+    const was = made.current
     const overlay = document.querySelector<HTMLElement>('.stage-overlay')
-    if (!rect || !overlay) return
-    // The labels of the selection's frames, lit while a layer in each is selected, are kept clear
-    // too; the overlay places them in the stage's pixels.
-    const labels = [...overlay.querySelectorAll<HTMLElement>('.frame-label[data-active]')]
-    const top = Math.min(rect.y, ...labels.map((label) => Number.parseFloat(label.style.top)))
-    const under = editState().barBottom + CLEAR - top
+    if (!was || !overlay || press.held || press.acts !== was.acts || (was.byPress && doubleTapLeft() > 0)) return
+    if (JSON.stringify(editor.camera()) !== was.left) return
+    const { base } = was
+    editor.setCamera(base)
+    const rect = editor.selectionRect()
+    const under = rect ? editState().barBottom + CLEAR - (rect.y - was.labels) : 0
     if (under > 0) {
-      const camera = editor.camera()
       // The camera's offset is in screen pixels: adding to it moves the design down.
-      editor.setCamera({ ...camera, y: camera.y + under })
+      editor.setCamera({ ...base, y: base.y + under })
       // The selection's size label, held below the chrome while the selection is under it, follows
       // the selection once it is clear, so where the selection ends is read after the move.
       const moved = editor.selectionRect()
       const past = moved ? moved.y + moved.height - (floorOf(overlay) - CLEAR) : 0
-      if (past > 0) editor.setCamera({ ...camera, y: camera.y + Math.max(0, under - past) })
+      if (past > 0) editor.setCamera({ ...base, y: base.y + Math.max(0, under - past) })
     }
-    looked.current = JSON.stringify(editor.camera())
+    was.left = JSON.stringify(editor.camera())
   }, [editor])
-  useEffect(() => {
-    if (!phone || key === '') return
-    if (!press.held) return clear()
-    // After the editor has heard the press end, so the stage moves under no press it reads.
-    let frame = 0
+  useLayoutEffect(() => {
+    if (!phone || key === '' || !made.current?.byPress) return
+    // Once a second tap can no longer make the press a double tap, so that tap lands where the
+    // first did, or as soon as the stage has heard a double tap, before anything is typed.
+    let timer = 0
     const later = () => {
-      frame = requestAnimationFrame(clear)
+      const left = doubleTapLeft()
+      if (left > 0) timer = window.setTimeout(later, left)
+      else clear()
     }
-    window.addEventListener('pointerup', later, { once: true })
+    if (press.held) window.addEventListener('pointerup', later, { once: true })
+    else later()
+    window.addEventListener('dblclick', clear)
     return () => {
       window.removeEventListener('pointerup', later)
-      cancelAnimationFrame(frame)
+      window.removeEventListener('dblclick', clear)
+      clearTimeout(timer)
     }
   }, [clear, key, phone])
-  useEffect(() => {
-    if (!phone || key === '' || press.held) return
-    // Two frames on, as the bar fitting its items into rows measures one row too many for a frame.
-    let frame = requestAnimationFrame(() => {
-      frame = requestAnimationFrame(() => {
-        if (JSON.stringify(editor.camera()) === looked.current) clear()
-      })
-    })
-    return () => cancelAnimationFrame(frame)
-  }, [barBottom, clear, editor, key, phone])
+  useLayoutEffect(() => {
+    if (phone && key !== '') clear()
+  }, [barBottom, clear, key, phone])
 }
 
 /**
