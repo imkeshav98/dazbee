@@ -363,7 +363,7 @@ export function SmallMenu({ editor, rightClick }: { editor: Editor; rightClick: 
         }
         open={open === 'more'}
         onOpenChange={(to) => {
-          // A row that opened something else, as Add size opens its card, keeps it open.
+          // A row that opened something else keeps it open.
           if (to) setOpen('more')
           else if (editState().open === 'more') setOpen(null)
         }}

@@ -81,6 +81,10 @@ const SharedContext = createContext<Shared | null>(null)
 
 /** The row a pointer is pressed on now, if one is. */
 let pressedRow: EventTarget | null = null
+/** Whether the last press was a key's rather than a pointer's, so a control focused now is reached by keyboard. */
+let keyed = false
+/** Whether the page tells `keyed` each press yet. */
+let watching = false
 
 /**
  * A row's pointer handlers so that only a press that starts on the row runs it. Radix also runs the
@@ -140,6 +144,21 @@ function useShared() {
   return shared
 }
 
+/**
+ * Has the page tell `keyed` whether each press is a key's or a pointer's, and end `pressedRow` with
+ * each press, from the first menu on.
+ */
+function useWatchKeys() {
+  useEffect(() => {
+    if (watching) return
+    watching = true
+    window.addEventListener('keydown', () => (keyed = true), true)
+    window.addEventListener('pointerdown', () => (keyed = false), true)
+    // A press let go anywhere ends, once the row it was let go over has had it.
+    window.addEventListener('pointerup', () => (pressedRow = null))
+  }, [])
+}
+
 /** The arrow key towards the page's end, which opens a row's menu, and the one back. */
 function useArrows() {
   return dirOf(useLocale()) === 'rtl'
@@ -178,11 +197,37 @@ export function Menu({
   children: ReactNode
 }) {
   const dir = dirOf(useLocale())
-  const button = <DropdownMenu.Trigger asChild>{trigger}</DropdownMenu.Trigger>
+  const button = useRef<HTMLButtonElement>(null)
+  // Whether its button was reached by keyboard, as Space presses only such a button; reached by a
+  // pointer, Space is the stage's, to pan.
+  const byKey = useRef(false)
+  useWatchKeys()
+  const opener = (
+    <DropdownMenu.Trigger
+      asChild
+      ref={button}
+      onFocus={() => {
+        byKey.current = keyed
+      }}
+      onKeyDown={(event) => {
+        if (event.key === ' ' && !byKey.current) event.preventDefault()
+      }}
+    >
+      {trigger}
+    </DropdownMenu.Trigger>
+  )
   return (
     <DropdownMenu.Root open={open} onOpenChange={onOpenChange} dir={dir} modal={false}>
-      {tooltip ? <Tooltip label={tooltip}>{button}</Tooltip> : button}
-      <MenuContent parts={DropdownMenu} label={label} testId={testId} sheet={sheet} place={place} className={className}>
+      {tooltip ? <Tooltip label={tooltip}>{opener}</Tooltip> : opener}
+      <MenuContent
+        parts={DropdownMenu}
+        button={button}
+        label={label}
+        testId={testId}
+        sheet={sheet}
+        place={place}
+        className={className}
+      >
         {children}
       </MenuContent>
     </DropdownMenu.Root>
@@ -478,6 +523,7 @@ export function MenuSub({
  */
 function MenuContent({
   parts,
+  button,
   label,
   testId,
   sheet: asSheet,
@@ -486,6 +532,8 @@ function MenuContent({
   children,
 }: {
   parts: Parts
+  /** The button it opens from, which the focus goes back to as it closes; a right-click menu has none. */
+  button?: RefObject<HTMLElement | null>
   label: string
   testId?: string | undefined
   sheet: boolean
@@ -511,7 +559,7 @@ function MenuContent({
         aria-labelledby={undefined}
         data-testid={testId}
         data-menu
-        data-sheet={sheet || undefined}
+        data-menu-sheet={sheet || undefined}
         onFocus={(event: FocusEvent<HTMLDivElement>) => {
           // As it opens, by a click or a key: the focus on the picked row, or the first.
           if (event.target !== event.currentTarget || entered.current) return
@@ -522,11 +570,16 @@ function MenuContent({
             [...into.querySelectorAll<HTMLElement>('[role^="menuitem"]')].find((row) => row.checkVisibility())
           if (!first) return
           event.preventDefault()
-          first.focus({ preventScroll: true })
+          // Ringed only when opened from the keyboard; the rows the pointer moves to after stay unringed.
+          first.focus({ preventScroll: true, focusVisible: keyed } as FocusOptions)
         }}
         onCloseAutoFocus={(event) => {
           entered.current = false
-          if (!nowhere()) event.preventDefault()
+          if (!nowhere()) return event.preventDefault()
+          // Closed by a pointer, the focus goes back without its keyboard ring or a tooltip.
+          if (keyed || !button?.current) return
+          event.preventDefault()
+          button.current.focus({ focusVisible: false } as FocusOptions)
         }}
         // Back from a row's menu shown in its place first, else closing the menu. Either way that Esc
         // goes no further: it takes the focused row out of the page, and the stage would take an Esc

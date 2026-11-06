@@ -105,10 +105,10 @@ export function onExportAsked(listener: (frameIds: string[], opener: HTMLElement
 }
 /**
  * Whether something stands over the edit panel and the bar's second row, so Esc closes it first: a
- * modal dialog, such as Keyboard shortcuts, or a menu that closes as `useMenuClose` says, as the
- * Share menu with its cards and the account menu do.
+ * modal dialog, such as Keyboard shortcuts, an open menu, or a pop-up that closes as `useMenuClose`
+ * says, as Share's forms and the account menu do.
  */
-export const overPanel = () => document.querySelector(`dialog:modal, ${OVER_PANEL}`) !== null
+export const overPanel = () => document.querySelector(`dialog:modal, [data-radix-menu-content], ${OVER_PANEL}`) !== null
 
 /** What the top bar has open and where it sits, re-rendering the caller when that changes. */
 export function useEditState() {
