@@ -137,3 +137,76 @@ test('on a phone the stage has brought a selection clear under the bar by the ti
   expect(errors).toEqual([])
   await page.context().close()
 })
+
+test('on a phone a press that selects a layer and drags it is not followed by a move', async ({ browser }) => {
+  const { page, errors } = await openPhone(browser, designId)
+  const touch = await page.context().newCDPSession(page)
+  const touchAt = (type: 'touchStart' | 'touchMove' | 'touchEnd', at?: { x: number; y: number }) =>
+    touch.send('Input.dispatchTouchEvent', { type, touchPoints: at ? [at] : [] })
+  for (const id of ['card', 'star', 'photo']) {
+    await selectLayers(page, [])
+    // The layer's top 100 px down the screen at 50%, under where the bar's rows will be, pressed a
+    // little below its top.
+    const { at, before, camera } = await page.evaluate((id) => {
+      const editor = window.dazbee
+      const box = editor?.boxOf(id)
+      if (!editor || !box) throw new Error(`no ${id}`)
+      editor.setCamera({ ...editor.camera(), zoom: 0.5 })
+      const now = editor.camera()
+      const was = editor.screenPoint(box.x + box.width / 2, box.y)
+      editor.setCamera({ ...now, x: now.x + 195 - was.x, y: now.y + 100 - was.y })
+      return { at: { x: 195, y: 100 + Math.min(20, (box.height * 0.5) / 2) }, before: box, camera: editor.camera() }
+    }, id)
+    await nextFrame(page)
+    await touchAt('touchStart', at)
+    for (let step = 1; step <= 10; step++) await touchAt('touchMove', { x: at.x, y: at.y + step * 4 })
+    await touchAt('touchEnd')
+    await page.waitForTimeout(800)
+    expect(await page.evaluate(() => window.dazbee?.selection()), id).toEqual([id])
+    expect(await page.evaluate(() => window.dazbee?.camera()), `${id}: no move after the drag`).toEqual(camera)
+    const after = await page.evaluate((id) => window.dazbee?.boxOf(id), id)
+    expect((after?.y ?? 0) - before.y, `${id}: moved with the finger`).toBeGreaterThan(60)
+  }
+  expect(errors).toEqual([])
+  await page.context().close()
+})
+
+test('on a phone a double tap on a text where the bar will show types in it', async ({ browser }) => {
+  const { page, errors } = await openPhone(browser, designId)
+  const touch = await page.context().newCDPSession(page)
+  for (const [zoom, top, gap] of [
+    [1, 150, 120],
+    [1, 150, 250],
+    [0.35, 90, 150],
+  ] as const) {
+    const what = `top ${top} at ${zoom * 100}%, ${gap} ms apart`
+    await page.evaluate(() => window.dazbee?.stopEditing())
+    await selectLayers(page, [])
+    // Past the browser's window for counting taps at one spot as one multi-click.
+    await page.waitForTimeout(800)
+    // The headline's top that far down the screen, and its middle where the finger taps twice.
+    const at = await page.evaluate(
+      ({ zoom, top }) => {
+        const editor = window.dazbee
+        const box = editor?.boxOf('headline')
+        if (!editor || !box) throw new Error('no headline')
+        editor.setCamera({ ...editor.camera(), zoom })
+        const now = editor.camera()
+        const was = editor.screenPoint(box.x + box.width / 2, box.y)
+        editor.setCamera({ ...now, x: now.x + 195 - was.x, y: now.y + top - was.y })
+        return { x: 195, y: top + (box.height * zoom) / 2 }
+      },
+      { zoom, top },
+    )
+    await nextFrame(page)
+    for (let tap = 0; tap < 2; tap++) {
+      await touch.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [at] })
+      await touch.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
+      await page.waitForTimeout(gap)
+    }
+    await expect(page.locator('.caret'), what).toBeVisible()
+    expect(await page.evaluate(() => window.dazbee?.selection()), what).toEqual(['headline'])
+  }
+  expect(errors).toEqual([])
+  await page.context().close()
+})
