@@ -65,12 +65,17 @@ export async function expectGreyed(page: Page, menu: Locator, name: string, why:
   if (box) await page.mouse.move(box.x + box.width / 2 + 4, box.y + box.height / 2, { steps: 2 })
   await expect(page.getByRole('tooltip').filter({ hasText: why })).toBeVisible()
 }
-/** Closes the open menus with Esc, which closes the top-most first: a tooltip, a menu beside a row, the menu. */
+/**
+ * Closes the open menus with Esc, which closes the top-most first: a tooltip, a menu beside a row,
+ * the menu. Each Esc waits for the one before to land, so none reaches the stage and lets the
+ * selection go.
+ */
 export async function closeMenus(page: Page) {
-  await expect
-    .poll(async () => {
-      await page.keyboard.press('Escape')
-      return (await page.getByTestId('bar-more-menu').isVisible()) || (await page.getByTestId('stage-menu').isVisible())
-    })
-    .toBe(false)
+  const shown = async () =>
+    (await page.getByTestId('bar-more-menu').isVisible()) || (await page.getByTestId('stage-menu').isVisible())
+  for (let i = 0; i < 6 && (await shown()); i++) {
+    await page.keyboard.press('Escape')
+    await page.waitForTimeout(200)
+  }
+  expect(await shown()).toBe(false)
 }

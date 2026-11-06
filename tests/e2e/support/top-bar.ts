@@ -27,7 +27,7 @@ export const UNCUT = 'h1, [data-testid="bar-font"], [data-testid="edit-panel-not
  * The menus beside a menu's rows that `moreAction` looks in, by their test ids: the full menu's
  * Copy, Paste and Copy to other frames.
  */
-const SUBMENUS = Object.keys(FULL_MENU_BESIDE)
+const SUBMENUS = Object.keys(FULL_MENU_BESIDE) as (keyof typeof FULL_MENU_BESIDE)[]
 
 /** Where each of the selection's cards is now: the top bar's pop-up or edit panel that holds it. */
 const HOLDER: Record<string, string> = {
@@ -155,15 +155,14 @@ export async function moreAction(page: Page, name: string, menu?: Locator) {
     await expect(root).toBeHidden()
   }
   if ((await named(root).count()) > 0) return run(named(root))
-  for (const id of SUBMENUS) {
-    const row = root.getByTestId(`more-${id}`)
-    if ((await row.count()) === 0) continue
+  // The menu beside a row whose list holds the action.
+  const id = SUBMENUS.find((sub) => FULL_MENU_BESIDE[sub].some((row) => row.name.startsWith(name)))
+  const row = id ? root.getByTestId(`more-${id}`) : null
+  if (id && row && (await row.count()) > 0) {
     const beside = page.getByTestId(`more-${id}-menu`)
     await row.click()
     await expect(beside).toBeVisible()
     if ((await named(beside).count()) > 0) return run(named(beside))
-    await page.keyboard.press('Escape')
-    await expect(beside).toBeHidden()
   }
   throw new Error(`no ${name} in the menu`)
 }

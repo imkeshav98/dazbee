@@ -117,7 +117,10 @@ export const besideRows = (id: keyof typeof FULL_MENU_BESIDE, { text = false } =
   FULL_MENU_BESIDE[id].filter((row) => text || !row.text).map((row) => row.name)
 /** The first menu item of a menu whose words start with `name`, of any kind: a row, a check or a pick. */
 export const namedRow = (menu: Locator, name: string) =>
-  menu.locator('[role^="menuitem"]').filter({ hasText: new RegExp(`^${name}`) }).first()
+  menu
+    .locator('[role^="menuitem"]')
+    .filter({ hasText: new RegExp(`^${name}`) })
+    .first()
 /** A row of a menu by its id in the lists above: the first menu item whose words start with its words. */
 export const rowIn = (menu: Locator, id: string) => namedRow(menu, rowName(id))
 /** The words of each row that shows in a menu, in order, as they read on screen: a key that shows reads too. */

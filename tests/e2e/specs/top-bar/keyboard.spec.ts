@@ -290,28 +290,23 @@ test('Esc closes the account menu over the Colour panel first, wherever the focu
   await expect(panel).toBeHidden()
   expect(await selection(page)).toEqual(['box'])
 
-  // Opened from the keyboard over the Share menu, with the focus in it, it closes first, then the Share menu.
+  // The Share menu keeps Tab inside it, as every menu does (its arrows move between its rows), and
+  // Esc closes it onto Share, keeping the selection.
   const share = page.getByTestId('share-open')
   const exportItem = page.getByTestId('export-open')
   await share.click()
+  await expect(exportItem).toBeFocused()
   await page.keyboard.press('End')
   await page.keyboard.press('Tab')
-  await expect(avatar).toBeFocused()
-  await page.keyboard.press('Enter')
-  await expect(account).toBeVisible()
-  await page.keyboard.press('Tab')
-  await expect(account.getByRole('radio', { name: 'English', exact: true })).toBeFocused()
-  await page.keyboard.press('Escape')
-  await expect(account).toBeHidden()
-  await expect(exportItem).toBeVisible()
-  await expect(avatar).toBeFocused()
+  await expect(page.getByTestId('template-open')).toBeFocused()
   await page.keyboard.press('Escape')
   await expect(exportItem).toBeHidden()
+  await expect(share).toBeFocused()
   expect(await selection(page)).toEqual(['box'])
   expect(errors).toEqual([])
 })
 
-test('a zoom or shape pop-up opened from the keyboard over the Share or account menu closes first on Esc, then the menu, then the Colour panel', async ({
+test('a zoom menu opened from the keyboard closes the Share menu, and the shape menu over the account menu closes first on Esc, then the account menu, then the Colour panel', async ({
   browser,
 }) => {
   const asset = await upload(photo)
@@ -323,16 +318,17 @@ test('a zoom or shape pop-up opened from the keyboard over the Share or account 
   const zoom = page.getByTestId('zoom-menu')
   const shapes = page.getByRole('menu', { name: 'Shapes' })
 
+  // One menu shows at a time: the zoom menu opened from the keyboard closes the Share menu. Esc
+  // closes the zoom menu onto its button, leaving the Colour panel open.
   await page.getByTestId('share-open').click()
   await expect(exportItem).toBeFocused()
   await page.getByTestId('zoom').focus()
+  await expect(exportItem).toBeHidden()
   await page.keyboard.press('Enter')
   await expect(zoom).toBeVisible()
   await page.keyboard.press('Escape')
   await expect(zoom).toBeHidden()
-  await expect(exportItem).toBeVisible()
-  await page.keyboard.press('Escape')
-  await expect(exportItem).toBeHidden()
+  await expect(page.getByTestId('zoom')).toBeFocused()
   await expect(panel).toBeVisible()
 
   await page.getByTestId('account-open').click()

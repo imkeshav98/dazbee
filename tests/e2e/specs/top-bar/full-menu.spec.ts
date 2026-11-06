@@ -116,6 +116,7 @@ test.describe('the full menu', () => {
     await page.keyboard.press('ArrowDown')
     await expect.poll(() => focusedRow(page)).toBe(second)
     await page.keyboard.press('ArrowUp')
+    await expect.poll(() => focusedRow(page)).toBe(rows[0])
     await page.keyboard.press('ArrowUp')
     await expect.poll(() => focusedRow(page)).toBe(last)
     expect(errors).toEqual([])
