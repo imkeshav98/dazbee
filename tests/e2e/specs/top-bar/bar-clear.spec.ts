@@ -108,3 +108,32 @@ test('on a phone a zoom, a pan or a drag straight after a selection whose frame 
   expect(errors).toEqual([])
   await page.context().close()
 })
+
+test('on a phone the stage has brought a selection clear under the bar by the time it is next drawn, and moves no more', async ({
+  browser,
+}) => {
+  const { page, errors } = await openPhone(browser, designId)
+  for (const id of ['box', 'headline', 'photo']) {
+    await selectLayers(page, [])
+    // The layer's top 100 px down the screen at 40%, where the bar's rows will be.
+    const before = await page.evaluate((id) => {
+      const editor = window.dazbee
+      const box = editor?.boxOf(id)
+      if (!editor || !box) throw new Error(`no ${id}`)
+      editor.setCamera({ ...editor.camera(), zoom: 0.4 })
+      const now = editor.camera()
+      const was = editor.screenPoint(box.x + box.width / 2, box.y)
+      editor.setCamera({ ...now, x: now.x + 195 - was.x, y: now.y + 100 - was.y })
+      return editor.camera()
+    }, id)
+    await nextFrame(page)
+    await page.evaluate((id) => window.dazbee?.select([id]), id)
+    await page.evaluate(() => window.dazbee?.drawn())
+    const drawn = await page.evaluate(() => window.dazbee?.camera())
+    expect(drawn?.y, `${id} moved clear`).toBeGreaterThan(before.y)
+    await page.waitForTimeout(300)
+    expect(await page.evaluate(() => window.dazbee?.camera()), `${id} moved no more`).toEqual(drawn)
+  }
+  expect(errors).toEqual([])
+  await page.context().close()
+})
