@@ -10,7 +10,7 @@ import { designOf, editorPath, openTabs, reloads, settle, writeOutput } from '..
 import { expectNode, openExport, runExport } from '../../support/export.ts'
 import { query } from '../../support/local-servers.ts'
 import { nameOf, TILE_MENU } from '../../support/menu-rows.ts'
-import { DEV_BRAND, liveDesign, SHORT_ID } from '../../support/seed.ts'
+import { DEV_BRAND, frameDesign, liveDesign, seed, SHORT_ID } from '../../support/seed.ts'
 import { expect, type Page, test } from '../../support/test.ts'
 
 test.describe.configure({ timeout: 120_000 })
@@ -127,4 +127,12 @@ test('a design whose id is a UUID still opens, syncs to a second tab and exports
   const got = await runExport(a)
   await expectNode(a, { frameIds, type: 'png' }, got)
   expect(errors).toEqual([])
+})
+
+test('a design link typed in upper case opens the design at its lower-case link', async ({ page }) => {
+  const id = await seed(frameDesign({ name: 'Typed in capitals' }))
+  await page.goto(editorPath(id.toUpperCase(), { brandId: DEV_BRAND.toUpperCase() }))
+  await expect(page).toHaveURL(new RegExp(`${editorPath(id)}$`))
+  await expect(page.getByTestId('status')).toHaveAttribute('data-ready', '', { timeout: 30_000 })
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Typed in capitals')
 })
