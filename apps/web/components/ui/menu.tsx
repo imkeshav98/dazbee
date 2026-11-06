@@ -503,6 +503,11 @@ export function MenuSub({
           loop
           aria-label={label}
           data-testid={`${testId}-menu`}
+          // The pointer leaving both menus gives the focus to the menu it is beside, which keeps this
+          // one open; the focus moving to another row closes it.
+          onFocusOutside={(event) => {
+            if (event.target === row.current?.closest('[role="menu"]')) event.preventDefault()
+          }}
           // Esc closes this menu alone, back onto its row, and goes no further; the next closes the
           // menu it is beside.
           onEscapeKeyDown={(event) => {
