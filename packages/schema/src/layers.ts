@@ -345,3 +345,13 @@ export const canHold = (parent: string, child: string) =>
   (CONTAINERS[parent as keyof typeof CONTAINERS] as readonly string[]).includes(child)
 /** Whether a layer of this type holds other layers. */
 export const isContainer = (type: string) => Object.hasOwn(CONTAINERS, type)
+
+/** Hebrew, Arabic, Syriac, Thaana, NKo, their presentation forms, and the right-to-left blocks beyond the BMP. */
+const RTL_CHAR = /[\u0590-\u08FF\uFB1D-\uFDFF\uFE70-\uFEFF\u{10800}-\u{10FFF}\u{1E800}-\u{1EFFF}]/u
+const STRONG_CHAR = /[\p{L}]/u
+
+/** The direction of the first strong character, as the Unicode bidi algorithm picks a paragraph's direction. */
+export function autoDirection(text: string): 'ltr' | 'rtl' {
+  for (const ch of text) if (STRONG_CHAR.test(ch)) return RTL_CHAR.test(ch) ? 'rtl' : 'ltr'
+  return 'ltr'
+}

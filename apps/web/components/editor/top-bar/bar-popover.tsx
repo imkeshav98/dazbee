@@ -269,6 +269,7 @@ export function BarPopover({
   align = 'center',
   buttonRef,
   opens,
+  on = false,
 }: {
   id: string
   open: string | null
@@ -292,11 +293,15 @@ export function BarPopover({
   buttonRef?: RefObject<HTMLButtonElement | null>
   /** The edit panel a row of the popover opens, which gives the focus back to the button as it closes. */
   opens?: PanelId
+  /** Something it sets is on, so its button takes the pink tint a pressed toggle has. */
+  on?: boolean
 }) {
   const focus = useMenuFocus()
   const escape = useEscapeBack()
   const shown = open === id
   const phone = usePhone()
+  // On a phone a button with an icon shows it alone, named by its label, so the bar keeps to two rows.
+  const bare = phone && icon !== undefined && face === undefined
   // A sheet on a phone, as `isSheet` names it: the anchor is the screen's bottom edge, and Radix's
   // trigger width is the anchor's.
   const asSheet = phone && isSheet(id)
@@ -316,14 +321,15 @@ export function BarPopover({
           }}
           type="button"
           data-bar-item
-          aria-label={face ? label : undefined}
-          title={face ? label : undefined}
+          aria-label={face || bare ? label : undefined}
+          title={face || bare ? label : undefined}
           data-testid={`bar-${testId}`}
           data-opens={opens}
-          className={BAR_BUTTON}
+          data-on={on || undefined}
+          className={cn(BAR_BUTTON, 'data-on:bg-accent-soft')}
         >
           {icon}
-          {face ?? label}
+          {face ?? (bare ? null : label)}
           {!menu && <CaretDownIcon size={10} weight="bold" aria-hidden className="text-subtle" />}
         </button>
       </Popover.Trigger>

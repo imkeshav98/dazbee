@@ -2,13 +2,14 @@
 // line height, letter and paragraph spacing, alignment, case, underline and strikethrough, lists,
 // outline, box mode, shrink to fit and lines at most.
 import { righteous } from '../../support/assets.ts'
+import { control } from '../../support/bar-homes.ts'
 import { designOf, reloads } from '../../support/editor.ts'
 import { choose, enter } from '../../support/fields.ts'
 import { importGoogleFonts } from '../../support/fonts.ts'
 import { doc, props, setupInventory, step, style } from '../../support/inventory.ts'
 import { perform, selectLayers } from '../../support/stage.ts'
 import { expect, type Page, test } from '../../support/test.ts'
-import { barMenu, moreAction, openCard, textColourHex } from '../../support/top-bar.ts'
+import { barMenu, moreAction, openCard, textColourHex, textStyleToggle } from '../../support/top-bar.ts'
 
 const row = setupInventory()
 
@@ -304,8 +305,7 @@ test.describe('text', () => {
     const page = await open()
     await selectLayers(page, ['headline'], { bar: true })
     const pick = async (align: string) =>
-      (await barMenu(page, 'align'))
-        .getByRole('radiogroup', { name: 'Alignment', exact: true })
+      control(await barMenu(page, 'align'), 'align')
         .locator(`[data-value="${align}"]`)
         .click()
     // Each line is a paragraph's last, which justify leaves at the start: those two draw alike.
@@ -325,10 +325,9 @@ test.describe('text', () => {
   row(20, 'vertical alignment: top, middle, bottom', async (open) => {
     const page = await open()
     await selectLayers(page, ['headline'], { bar: true })
-    // Up and down in the box is in the bar's Align, under the alignment.
+    // Vertical is in the bar's Align, its last row.
     const pick = async (to: string) =>
-      (await barMenu(page, 'align'))
-        .getByRole('radiogroup', { name: 'Up and down in the box' })
+      control(await barMenu(page, 'align'), 'vertical')
         .locator(`[data-value="${to}"]`)
         .click()
     for (const align of ['bottom', 'middle', 'top']) {
@@ -366,18 +365,17 @@ test.describe('text', () => {
   row(22, 'underline, strikethrough', async (open) => {
     const page = await open()
     await selectLayers(page, ['headline'], { bar: true })
-    const toggle = async (name: string) =>
-      page.getByTestId('top-bar').getByRole('button', { name, exact: true }).click()
+    const toggle = async (id: 'underline' | 'strikethrough') => (await textStyleToggle(page, id)).click()
     await step(
       page,
-      async () => toggle('Underline'),
+      async () => toggle('underline'),
       async () => {
         await expect.poll(async () => (await style(page, 'headline')).underline).toBe(true)
       },
     )
     await step(
       page,
-      async () => toggle('Strikethrough'),
+      async () => toggle('strikethrough'),
       async () => {
         await expect.poll(async () => (await style(page, 'headline')).strikethrough).toBe(true)
       },

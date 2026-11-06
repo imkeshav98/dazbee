@@ -3,9 +3,8 @@
 // the back row, the arrow back and Esc go back to the row, and a second Esc closes the menu, in
 // English and in Arabic. No row shows a shortcut key, and every row stays a finger's height. A tap
 // on a greyed row says why in a tooltip just above its menu, covering no row and clear of the finger,
-// which Esc closes first. The full menu and the right-click menu are the sheet Arrange is, and a
-// group's fits whole; no row shows the hover tint until a pointer moves over it. The rest of
-// Arrange's sheet is checked in top-bar-more-screens.
+// which Esc closes first. The full menu and the right-click menu are a sheet at the bottom of the
+// screen, and a group's fits whole; no row shows the hover tint until a pointer moves over it.
 import { setCookies } from '../../support/editor.ts'
 import { boxOf, layoutProblems } from '../../support/layout.ts'
 import { node, open, rowsOf } from '../../support/linked-menu.ts'
@@ -21,7 +20,7 @@ import {
 } from '../../support/menu-rows.ts'
 import { fitSettled, selectLayers } from '../../support/stage.ts'
 import { expect, type Locator, type Page, test } from '../../support/test.ts'
-import { arrangeMenu, entered, moreMenu, PIECES, UNCUT } from '../../support/top-bar.ts'
+import { entered, moreMenu, PIECES, UNCUT } from '../../support/top-bar.ts'
 
 test.describe.configure({ mode: 'parallel', timeout: 120_000 })
 
@@ -229,7 +228,7 @@ test('a tap on a greyed row says why in a tooltip just above its menu, covering 
   expect(errors).toEqual([])
 })
 
-test('the full menu and the right-click menu open as the sheet at the bottom of the screen Arrange opens as, hiding the dock, the tab bar and the small menu, and a group’s, the longest, fits whole on a 390×844 and a 390×600 screen', async ({
+test('the full menu and the right-click menu open as a sheet at the bottom of the screen, 7 px from its edges, hiding the dock, the tab bar and the small menu, and a group’s, the longest, fits whole on a 390×844 and a 390×600 screen', async ({
   browser,
 }) => {
   const { page, errors } = await openOnPhone(browser)
@@ -237,20 +236,16 @@ test('the full menu and the right-click menu open as the sheet at the bottom of 
     await page.setViewportSize({ width: PHONE.width, height })
     await fitSettled(page)
     await selectLayers(page, ['logo'], { bar: true })
-    // Arrange's sheet, which the full menu's lies as.
-    const arrange = await arrangeMenu(page)
-    const sheet = await boxOf(arrange)
-    await page.keyboard.press('Escape')
-    await expect(arrange).toBeHidden()
+    // A sheet lies 7 px from the screen's sides and bottom.
+    const sheet = { left: 7, right: PHONE.width - 7, bottom: height - 7 }
     for (const show of [() => moreMenu(page), () => rightClick(page, 'logo')]) {
       const menu = await show()
       await entered(menu)
       const label = `${height} ${await menu.getAttribute('data-testid')}`
       await expect(menu, label).toHaveAttribute('data-sheet', 'true')
       const box = await boxOf(menu)
-      expect([box.left, box.right, box.bottom].map(Math.round), label).toEqual(
-        [sheet.left, sheet.right, sheet.bottom].map(Math.round),
-      )
+      for (const side of ['left', 'right', 'bottom'] as const)
+        expect(Math.abs(box[side] - sheet[side]), `${label} ${side}`).toBeLessThanOrEqual(1)
       expect(await rowsOf(menu), label).toEqual(fullMenuRows({ group: true }))
       // Whole: every row on the screen, with nothing to scroll to.
       expect(box.top, label).toBeGreaterThanOrEqual(0)
@@ -284,15 +279,15 @@ test('after a click opens a row’s menu in its menu’s place, or goes back fro
   await page.keyboard.press('Escape')
   await expect(menu).toBeHidden()
 
-  // Opening: in Arrange's sheet, Text direction's rows show under the pointer that tapped it.
-  await selectLayers(page, ['headline'], { bar: true })
-  const sheet = await arrangeMenu(page)
-  await sheet.getByTestId('more-text-direction').click()
-  const directions = sheet.getByTestId('more-text-direction-menu')
-  await expect(directions).toBeVisible()
-  expect(await litRows(sheet)).toEqual([])
+  // Opening: Copy to other frames' rows show under the pointer that tapped it.
+  const again = await moreMenu(page)
+  await entered(again)
+  await again.getByTestId('more-copy-to-frames').click()
+  const rows = again.getByTestId('more-copy-to-frames-menu')
+  await expect(rows).toBeVisible()
+  expect(await litRows(again)).toEqual([])
   // A pointer that moves over a row lights it.
-  await directions.getByRole('button').first().hover()
-  await expect.poll(() => litRows(sheet)).toHaveLength(1)
+  await again.getByTestId('more-copy-to-frames-back').hover()
+  await expect.poll(() => litRows(again)).toHaveLength(1)
   expect(errors).toEqual([])
 })

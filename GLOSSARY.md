@@ -77,7 +77,7 @@ The page's frames and their layers as a tree, topmost first: select, reorder, mo
 _Avoid_: Outline, layer list
 
 **Top bar**:
-The bar fixed at the top centre of the stage while layers are selected or a frame is picked. Its items depend on what is selected, and it ends with a ⋯ of its own: for layers, how they sit (order, line up, rotation, text direction); for a picked frame, the frame's actions. A change sets the value of each selected layer, in whatever frame it is, and a value they don't share shows as mixed.
+The bar fixed at the top centre of the stage while layers are selected or a frame is picked. Its items depend on what is selected, and each control it offers has one home. For layers it ends with Position, which holds how they sit (size, place, rotation, order and, for one layer, line up with the frame); several layers have Line up ▾ just before it. For a picked frame it ends with a ⋯ of the frame's actions. A change sets the value of each selected layer, in whatever frame it is, and a value they don't share shows as mixed.
 _Avoid_: toolbar, selection bar
 
 **Pop-up**:

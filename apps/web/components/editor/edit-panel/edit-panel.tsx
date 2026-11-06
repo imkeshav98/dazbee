@@ -130,8 +130,9 @@ export function PanelFrame({
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.key !== 'Escape' || event.defaultPrevented) return
-      // What stands over the panel, as Keyboard shortcuts or the Share menu, closes first, on its own Esc.
-      if (overPanel()) return
+      // What stands over the panel, as Keyboard shortcuts or the Share menu, closes first, on its own
+      // Esc; so does a greyed control's tooltip saying why.
+      if (overPanel() || document.querySelector('[aria-disabled="true"][data-state$="open"]')) return
       const at = document.activeElement
       // A list of the panel's own, a select's or a pop-up's, closes first.
       if (inPopUp(at) || at?.getAttribute('aria-expanded') === 'true') return

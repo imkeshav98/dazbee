@@ -17,14 +17,17 @@ export const PIECES = {
   flyout: '#editor-flyout',
   toasts: '[data-toasts] > *',
 }
-/** The design's name and the font's name end in "…" by design when there is no room. */
-export const UNCUT = 'h1, [data-testid="bar-font"], [data-testid="edit-panel-note"]'
+/**
+ * The design's name, the font's name and a narrow frame's name end in "…" by design when there is
+ * no room.
+ */
+export const UNCUT = 'h1, [data-testid="bar-font"], [data-testid="edit-panel-note"], .frame-name'
 
 /**
  * The menus beside a menu's rows that `moreAction` looks in, by their test ids: the full menu's
- * Copy, Paste and Copy to other frames, and Arrange's Line up and Order.
+ * Copy, Paste and Copy to other frames.
  */
-const SUBMENUS = [...Object.keys(FULL_MENU_BESIDE), 'line-up', 'order']
+const SUBMENUS = Object.keys(FULL_MENU_BESIDE)
 
 /** Where each of the selection's cards is now: the top bar's pop-up or edit panel that holds it. */
 const HOLDER: Record<string, string> = {
@@ -39,7 +42,6 @@ const HOLDER: Record<string, string> = {
   'mask-card': 'mask',
   'adjust-card': 'edit',
   'look-card': 'edit',
-  'photos-card': 'edit',
   'text-fit-card': 'spacing',
   'stroke-look': 'outline',
   'stroke-card': 'outline',
@@ -102,8 +104,8 @@ export async function barMenu(page: Page, id: string) {
 
 /**
  * Closes the open pop-up or panel of an item on the top bar with Esc, by the item's test id
- * (`bar-align`, `bar-more`, or `more-order` for the menu beside that row of Arrange ⋯), and waits
- * until it is gone.
+ * (`bar-align`, `bar-more`, or `more-copy` for the menu beside that row of the full menu), and
+ * waits until it is gone.
  */
 export async function closeBarMenu(page: Page, button: string) {
   await page.keyboard.press('Escape')
@@ -136,11 +138,10 @@ export async function textColourHex(page: Page) {
 export const strokeList = async (page: Page) => (await barMenu(page, 'outline')).getByTestId('stroke-list')
 
 /**
- * Clicks an action of the full menu, or of the right-click menu or Arrange ⋯ when `menu` is it, by
- * the start of its name (the first row that starts so, leaving out rows that open a menu beside
- * them and greyed rows): in the menu, or in the menu beside a row (the full menu's Copy ▸, Paste ▸
- * and Copy to other frames ▸, Arrange's Line up ▸ and Order ▸). The action closes the menu, and
- * this waits until it has.
+ * Clicks an action of the full menu, or of the right-click menu when `menu` is it, by the start of
+ * its name (the first row that starts so, leaving out rows that open a menu beside them and greyed
+ * rows): in the menu, or in the menu beside a row (the full menu's Copy ▸, Paste ▸ and Copy to
+ * other frames ▸). The action closes the menu, and this waits until it has.
  */
 export async function moreAction(page: Page, name: string, menu?: Locator) {
   const root = menu ?? (await moreMenu(page))
@@ -176,18 +177,11 @@ export async function moreSubmenu(page: Page, id: string) {
 }
 
 /**
- * Opens the top bar's Arrange ⋯ for the selected layers, unless it is open, and gives it once it
- * shows: how they sit (Order ▸, Line up ▸, the rotation field, Text direction ▸). On a phone it is a
- * sheet.
+ * Opens the text's Text style ▾ unless it is open, and gives one of its four toggles: bold, italic,
+ * underline or strikethrough.
  */
-export const arrangeMenu = (page: Page) => barMenu(page, 'arrange')
-
-/** Opens the menu beside one of Arrange ⋯'s rows, `more-<id>` (order, line-up, text-direction), and gives it once it shows. */
-export async function arrangeSubmenu(page: Page, id: string) {
-  const sub = page.getByTestId(`more-${id}-menu`)
-  if (!(await sub.isVisible())) await (await arrangeMenu(page)).getByTestId(`more-${id}`).click()
-  await expect(sub).toBeVisible()
-  return sub
+export async function textStyleToggle(page: Page, id: 'bold' | 'italic' | 'underline' | 'strikethrough') {
+  return (await barMenu(page, 'text-style')).getByTestId(`bar-${id}`)
 }
 
 /**

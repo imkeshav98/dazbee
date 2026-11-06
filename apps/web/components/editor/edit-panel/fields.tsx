@@ -20,8 +20,10 @@ import {
   SWITCH,
   SWITCH_ROW,
 } from '@/components/editor/styles.ts'
-import { SEGMENT, SEGMENTS, TOUCH_GAP } from '@/components/ui/looks.ts'
+import { useWhyTip } from '@/components/editor/top-bar/menu-row.tsx'
+import { FOCUS_RING, SEGMENT, SEGMENTS, TOUCH_GAP } from '@/components/ui/looks.ts'
 import { Select } from '@/components/ui/select.tsx'
+import { Tooltip } from '@/components/ui/tooltip.tsx'
 import { cn } from '@/lib/cn.ts'
 import { alphaChange, hexChange, hexOf } from '@/lib/colour.ts'
 import { fillOf } from '@/lib/editor/fill.ts'
@@ -69,6 +71,8 @@ function useDraft() {
  * value, outside what is typed.
  * With `onClear`, emptying the field calls it, for a value that can be left unset (its placeholder
  * shows then), mixed values too once something was typed; without, an empty field is ignored.
+ * With `why`, it is greyed: it shows its value and takes no typing, stepping or dragging, and says
+ * why in a tooltip, as every greyed control does.
  */
 export function NumberField({
   label,
@@ -87,6 +91,7 @@ export function NumberField({
   onSet,
   onShift,
   onClear,
+  why = null,
 }: {
   label: string
   name: string
@@ -109,6 +114,8 @@ export function NumberField({
   onSet: (value: number) => void
   onShift: (by: number) => void
   onClear?: () => void
+  /** Why the field is greyed, while it is. */
+  why?: string | null
 }) {
   const t = useMessages()
   // What a value typed, stepped or dragged stops at: the field's own limits, or, without, where a
@@ -152,6 +159,16 @@ export function NumberField({
   }
   const text = draft ?? shown
   const hint = value === 'mixed' ? t.editor.props.mixed : placeholder
+  if (why)
+    return (
+      <GreyedNumber
+        label={label}
+        name={name}
+        shown={value === 'mixed' ? t.editor.props.mixed : `${shown}${unit}`}
+        why={why}
+        className={className}
+      />
+    )
   return (
     <div
       data-scrub={name}
@@ -372,12 +389,14 @@ export function Switch({
   on,
   onSet,
   label,
+  testId,
   className,
   children,
 }: {
   on: boolean | 'mixed'
   onSet: (on: boolean) => void
   label?: string
+  testId?: string
   className: string
   children?: ReactNode
 }) {
@@ -388,6 +407,7 @@ export function Switch({
       role={on === 'mixed' ? 'checkbox' : 'switch'}
       aria-checked={on}
       aria-label={label}
+      data-testid={testId}
       onClick={() => onSet(on !== true)}
       className={className}
     >
@@ -406,16 +426,23 @@ export function SwitchRow({ name, on, onSet }: { name: string; on: boolean | 'mi
   )
 }
 
-/** A row of choices of which one is on; `marks` shows a short mark in place of a choice's name. */
+/**
+ * A row of choices of which one is on; `marks` shows a short mark in place of a choice's name. It is
+ * named by `name`, or by the visible label whose id is `labelledBy`.
+ */
 export function Segments<T extends string>({
   name,
+  labelledBy,
+  testId,
   value,
   options,
   labels,
   marks,
   onSet,
 }: {
-  name: string
+  name?: string
+  labelledBy?: string
+  testId?: string
   value: T | 'mixed'
   options: readonly T[]
   labels: Record<T, string>
@@ -423,7 +450,13 @@ export function Segments<T extends string>({
   onSet: (to: T) => void
 }) {
   return (
-    <div role="radiogroup" aria-label={name} className={SEGMENTS}>
+    <div
+      role="radiogroup"
+      aria-label={labelledBy ? undefined : name}
+      aria-labelledby={labelledBy}
+      data-testid={testId}
+      className={SEGMENTS}
+    >
       {options.map((option) => (
         <button
           key={option}
@@ -440,5 +473,45 @@ export function Segments<T extends string>({
         </button>
       ))}
     </div>
+  )
+}
+
+/**
+ * A number field greyed out: its label and value, which nothing types, steps or drags, with the
+ * not-allowed pointer and a tooltip saying why under the pointer, on keyboard focus and on a tap.
+ */
+function GreyedNumber({
+  label,
+  name,
+  shown,
+  why,
+  className,
+}: {
+  label: string
+  name: string
+  shown: string
+  why: string
+  className?: string | undefined
+}) {
+  const tip = useWhyTip<HTMLDivElement>(why)
+  return (
+    <Tooltip {...tip.tooltip}>
+      <div
+        ref={tip.ref}
+        role="spinbutton"
+        tabIndex={0}
+        aria-label={name}
+        aria-disabled="true"
+        aria-valuetext={shown}
+        aria-description={why}
+        data-scrub={name}
+        onClick={tip.tap}
+        onPointerLeave={tip.leave}
+        className={cn(KNOB, 'cursor-not-allowed opacity-40 hover:border-line', FOCUS_RING, className)}
+      >
+        <span className="relative min-w-0 flex-1 truncate">{label}</span>
+        <span className={NUMBER_TEXT}>{shown}</span>
+      </div>
+    </Tooltip>
   )
 }

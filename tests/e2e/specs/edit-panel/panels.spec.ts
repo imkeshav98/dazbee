@@ -3,6 +3,7 @@
 import type { DesignInput } from '@dazbee/schema'
 
 import { photo, upload } from '../../support/assets.ts'
+import { control, FRAME_LINE_UP } from '../../support/bar-homes.ts'
 import { writeOutput } from '../../support/editor.ts'
 import { choose, enter } from '../../support/fields.ts'
 import { openDesignIn } from '../../support/glass.ts'
@@ -328,12 +329,13 @@ test.describe('found by QA', () => {
     expect(errors).toEqual([])
   })
 
-  test('a layer in a stack has no Line up with the frame: the stack places it', async ({ browser }) => {
+  test('a layer in a stack has Line up with the frame greyed, saying the stack places it', async ({ browser }) => {
     const asset = await upload(photo)
     const { page, errors } = await openStage(browser, design(asset.id))
     await selectLayers(page, ['label'], { bar: true })
     const panel = await barMenu(page, 'position')
-    await expect(panel.getByTestId('arrange-part').getByRole('heading')).toHaveText(['Arrange'])
+    for (const id of FRAME_LINE_UP) await expect(control(panel, id)).toHaveAttribute('aria-disabled', 'true')
+    await expect(control(panel, 'alignLeft')).toHaveAttribute('aria-description', 'Auto layout places this layer')
     expect(errors).toEqual([])
   })
 
@@ -399,20 +401,19 @@ test.describe('found by QA', () => {
     await expect(panel.getByRole('textbox', { name: 'Drop shadow 2 hex' })).toHaveCount(1)
     expect(errors).toEqual([])
   })
-  test("a locked layer's top bar is only Locked, Unlock and its ⋯, and Unlock brings its settings back in one undo step", async ({
+  test("a locked layer's top bar is only Locked, Unlock and Position, and Unlock brings its settings back in one undo step", async ({
     browser,
   }) => {
     const asset = await upload(photo)
     const { page, errors } = await openStage(browser, design(asset.id))
     await page.evaluate(() => window.dazbee?.setLocked(['badge'], true))
     await selectLayers(page, ['badge'], { bar: true })
-    // Locked and Unlock, then the ⋯ with Order, which no lock refuses.
+    // Locked and Unlock, then Position with Order, which no lock refuses.
     const items = page.getByTestId('top-bar').locator('[data-item]')
-    await expect(items).toHaveCount(2)
+    await expect(items).toHaveCount(3)
     await expect(page.getByTestId('bar-locked')).toContainText('Locked')
-    await expect(page.getByTestId('bar-arrange')).toBeVisible()
+    await expect(page.getByTestId('bar-position')).toBeVisible()
     await expect(page.getByTestId('bar-effects')).toHaveCount(0)
-    await expect(page.getByTestId('bar-position')).toHaveCount(0)
     writeOutput('locked-bar.png', await page.screenshot({ animations: 'disabled' }))
     await page.getByTestId('bar-unlock').click()
     await expect

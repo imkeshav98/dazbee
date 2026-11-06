@@ -225,22 +225,30 @@ export const en = {
       withKey: '{label} ({key})',
     },
     bar: {
-      textDirection: 'Text direction',
+      /** The rows of a text's Align pop-up: how its lines line up, which way they read, and where they sit up and down. */
+      alignRows: { align: 'Align', direction: 'Direction', vertical: 'Vertical' },
       textDirections: { auto: 'Auto', ltr: 'Left to right', rtl: 'Right to left' },
+      /** The one button that holds Bold, Italic, Underline and Strikethrough, named by the styles on. */
+      textStyle: 'Text style',
+      textStyleOn: 'Text style: {styles}',
+      /** What joins the names of the styles that are on. */
+      listJoin: ', ',
+      /** The Position button's name while the layer is turned. */
+      turned: '{label}, turned {angle}',
       label: 'Selection',
       lineUp: 'Line up',
       order: 'Order',
-      /** The top bar's ⋯ for layers, which holds how they sit: order, line up, rotation, text direction. */
-      arrange: 'Arrange',
       /** Why Line up is greyed out for a layer its auto layout box places. */
       placedByLayout: 'Auto layout places this layer',
       /** Why Ungroup is greyed out for a group or box whose auto layout box would move what it holds. */
       ungroupMoves: 'Auto layout would move what it holds',
+      /** Why Spread across and Spread down are greyed out for fewer than three layers. */
+      needsThree: 'Needs 3 or more layers',
       /** Why Bring to front and Bring forward are greyed out for layers at the top of their stack. */
       atFront: 'Already at the front',
       /** Why Send to back and Send backward are greyed out for layers at the bottom of their stack. */
       atBack: 'Already at the back',
-      /** Why Line up, the rotation field and Text direction are greyed out for a locked layer. */
+      /** Why Position's numbers, Lock ratio and Line up are greyed out for a locked layer. */
       lockedRow: 'The layer is locked',
       grouping: 'Group',
       putInBox: 'Put in a box',
@@ -262,7 +270,6 @@ export const en = {
       locked: 'Locked',
       hide: 'Hide',
       show: 'Show',
-      upDown: 'Up and down in the box',
       topBar: 'Selected layers',
       smallMenu: 'Layer actions',
       /** The back row of a menu shown in its menu's place on a phone, which names the row it opened from. */
@@ -341,12 +348,10 @@ export const en = {
         outlines: 'Outlines',
       },
       placing: {
-        arrange: 'Arrange',
         bringForward: 'Forward',
         sendBackward: 'Backward',
         bringToFront: 'To front',
         sendToBack: 'To back',
-        lineUpSelection: 'Line up the selection',
         lineUpFrame: 'Line up with the frame',
         alignTop: 'Top',
         alignLeft: 'Left',
@@ -356,7 +361,6 @@ export const en = {
         alignRight: 'Right',
         distributeHorizontal: 'Spread across',
         distributeVertical: 'Spread down',
-        needsThree: 'Needs 3 or more layers',
         rotate: 'Rotate',
         lockRatio: 'Lock ratio',
       },

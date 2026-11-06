@@ -1,5 +1,5 @@
 import type { CanvasKit, FontCollection, Paragraph, TextStyle as CkTextStyle } from '@dazbee/canvaskit'
-import type { TextProps } from '@dazbee/schema'
+import { autoDirection, type TextProps } from '@dazbee/schema'
 
 import { color } from '../color.ts'
 import { lru } from '../lru.ts'
@@ -46,10 +46,6 @@ export interface TextLayout {
 export type ParagraphCache = ReturnType<typeof paragraphCache>
 
 type Style = TextProps['style']
-
-/** Hebrew, Arabic, Syriac, Thaana, NKo, their presentation forms, and the right-to-left blocks beyond the BMP. */
-const RTL_CHAR = /[\u0590-\u08FF\uFB1D-\uFDFF\uFE70-\uFEFF\u{10800}-\u{10FFF}\u{1E800}-\u{1EFFF}]/u
-const STRONG_CHAR = /[\p{L}]/u
 
 const ELLIPSIS = '\u2026'
 
@@ -370,12 +366,6 @@ function layoutKey(props: TextProps, fallbackFamilies: string[]) {
     props.shrinkToFit,
     fallbackFamilies,
   ])
-}
-
-/** The direction of the first strong character, as the Unicode bidi algorithm picks a paragraph's direction. */
-function autoDirection(text: string): 'ltr' | 'rtl' {
-  for (const ch of text) if (STRONG_CHAR.test(ch)) return RTL_CHAR.test(ch) ? 'rtl' : 'ltr'
-  return 'ltr'
 }
 
 /** The text with each piece's case applied, a code point at a time and only where that keeps its length, so offsets still match. */

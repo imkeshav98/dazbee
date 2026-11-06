@@ -2,11 +2,12 @@
 // boolean's operation changed in place, a mask's type, and a text's direction from ⋯ More.
 import type { DesignInput } from '@dazbee/schema'
 
+import { control } from '../../support/bar-homes.ts'
 import { writeOutput } from '../../support/editor.ts'
 import { copyIn, frameDesign, linkedFrames } from '../../support/seed.ts'
 import { openStage, press, read, selectLayers } from '../../support/stage.ts'
 import { expect, type Page, test } from '../../support/test.ts'
-import { arrangeSubmenu, openCard } from '../../support/top-bar.ts'
+import { barMenu, openCard } from '../../support/top-bar.ts'
 
 test.describe.configure({ timeout: 180_000 })
 
@@ -155,22 +156,19 @@ test("a boolean's operation and a mask's type change in place, one undo step eac
   expect(errors).toEqual([])
 })
 
-test("a text's direction from the top bar's ⋯, one undo step", async ({ browser }) => {
+test("a text's direction from the top bar's Align, one undo step", async ({ browser }) => {
   const { page, errors } = await openStage(browser, design())
   await selectLayers(page, ['words'])
-  const menu = await arrangeSubmenu(page, 'text-direction')
-  await expect(menu.locator('[data-direction="auto"]')).toHaveAttribute('aria-pressed', 'true')
-  await menu.locator('[data-direction="rtl"]').click()
+  const directions = async () => control(await barMenu(page, 'align'), 'direction')
+  const menu = await directions()
+  await expect(menu.locator('[data-value="auto"]')).toHaveAttribute('aria-checked', 'true')
+  await menu.locator('[data-value="rtl"]').click()
   await expect.poll(async () => (await props(page, 'words')).direction).toBe('rtl')
   await page.evaluate(() => window.dazbee?.drawn())
   writeOutput('controls-direction.png', await page.screenshot())
   await selectLayers(page, ['words'])
-  await expect((await arrangeSubmenu(page, 'text-direction')).locator('[data-direction="rtl"]')).toHaveAttribute(
-    'aria-pressed',
-    'true',
-  )
+  await expect((await directions()).locator('[data-value="rtl"]')).toHaveAttribute('aria-checked', 'true')
   expect((await read(page)).nodes.words?.props.direction).toBe('rtl')
-  await page.keyboard.press('Escape')
   await page.keyboard.press('Escape')
   await press(page, 'undo')
   await expect.poll(async () => (await props(page, 'words')).direction).toBe('auto')

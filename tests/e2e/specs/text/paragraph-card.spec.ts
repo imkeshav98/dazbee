@@ -8,7 +8,7 @@ import { enter } from '../../support/fields.ts'
 import { frameDesign } from '../../support/seed.ts'
 import { openStage } from '../../support/stage.ts'
 import { expect, type Page, test } from '../../support/test.ts'
-import { barMenu, openCard } from '../../support/top-bar.ts'
+import { barMenu, openCard, textStyleToggle } from '../../support/top-bar.ts'
 
 test.describe.configure({ timeout: 120_000 })
 
@@ -59,10 +59,10 @@ test('the Text box card sets the box, lines and fit; the bar sets lists, decorat
     .poll(() => copy(page))
     .toMatchObject({ boxMode: 'fixed', list: 'bullet', paragraphSpacing: 24, maxLines: 2 })
 
-  await page.getByTestId('bar-underline').click()
-  await page.getByTestId('bar-strikethrough').click()
-  await page.getByTestId('bar-strikethrough').click()
-  await expect(page.getByTestId('bar-underline')).toHaveAttribute('aria-pressed', 'true')
+  await (await textStyleToggle(page, 'underline')).click()
+  await (await textStyleToggle(page, 'strikethrough')).click()
+  await (await textStyleToggle(page, 'strikethrough')).click()
+  await expect(await textStyleToggle(page, 'underline')).toHaveAttribute('aria-pressed', 'true')
   await page.keyboard.press('Escape')
   await expect.poll(async () => (await copy(page)).style).toMatchObject({ underline: true, strikethrough: false })
 

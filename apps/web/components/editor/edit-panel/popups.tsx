@@ -38,6 +38,9 @@ const CORNERS = ['tl', 'tr', 'br', 'bl'] as const
  */
 const CORNER_FIELDS = [0, 1, 3, 2] as const
 
+/** A label over a row of the text's Align pop-up. */
+const ALIGN_ROW_LABEL = 'px-1 pt-1 text-[11px] font-semibold text-muted first:pt-0'
+
 /** How each case shows on its button: the same letters in every language, as a font sample is. */
 const CASE_MARKS = { none: 'Ab', upper: 'AB', lower: 'ab', title: 'Aa' }
 
@@ -350,21 +353,47 @@ function MaskCard({ target, p }: { target: Target; p: P }) {
   )
 }
 
-/** The text's alignment, as the top bar's Align pop-up shows it: along the line, and up and down in the box. */
+/**
+ * The text's Align pop-up: three labelled rows, how its lines line up, which way they read, and
+ * where they sit up and down in the box.
+ */
 function TextAlignBody({ target, p }: { target: Target; p: P }) {
-  const t = useMessages()
+  const bar = useMessages().editor.bar
+  const rows = bar.alignRows
+  const value = <T extends string>(key: string, unset: T) => shared(target.props.map((pr) => (pr[key] ?? unset) as T))
   return (
-    <div className="flex w-72 flex-col gap-2.5 p-1">
+    // As wide as its longest row, which a language with long names for the directions makes wider;
+    // on a phone every choice is a finger's height.
+    <div className="flex w-max min-w-72 flex-col gap-1.5 p-1 max-sm:[&_[role=radio]]:h-[44px] max-sm:[&_[role=radio]]:min-w-[44px]">
+      <span id="text-align-label" className={ALIGN_ROW_LABEL}>
+        {rows.align}
+      </span>
       <Segments
-        name={p.textAlign}
-        value={shared(target.props.map((pr) => (pr.align ?? 'start') as 'start' | 'center' | 'end' | 'justify'))}
+        labelledBy="text-align-label"
+        testId="text-align"
+        value={value<'start' | 'center' | 'end' | 'justify'>('align', 'start')}
         options={['start', 'center', 'end', 'justify'] as const}
         labels={p.textAligns}
         onSet={(align) => set(target, () => ({ align }))}
       />
+      <span id="text-direction-label" className={ALIGN_ROW_LABEL}>
+        {rows.direction}
+      </span>
       <Segments
-        name={t.editor.bar.upDown}
-        value={shared(target.props.map((pr) => (pr.verticalAlign ?? 'top') as 'top' | 'middle' | 'bottom'))}
+        labelledBy="text-direction-label"
+        testId="text-direction"
+        value={value<'auto' | 'ltr' | 'rtl'>('direction', 'auto')}
+        options={['auto', 'ltr', 'rtl'] as const}
+        labels={bar.textDirections}
+        onSet={(direction) => set(target, () => ({ direction }))}
+      />
+      <span id="text-vertical-label" className={ALIGN_ROW_LABEL}>
+        {rows.vertical}
+      </span>
+      <Segments
+        labelledBy="text-vertical-label"
+        testId="text-vertical"
+        value={value<'top' | 'middle' | 'bottom'>('verticalAlign', 'top')}
         options={['top', 'middle', 'bottom'] as const}
         labels={p.verticalAligns}
         onSet={(verticalAlign) => set(target, () => ({ verticalAlign }))}
@@ -376,7 +405,7 @@ function TextAlignBody({ target, p }: { target: Target; p: P }) {
 /** The text's list, as the top bar's List pop-up shows it: none, bullets or numbers. */
 function TextListBody({ target, p }: { target: Target; p: P }) {
   return (
-    <div className="flex w-64 flex-col p-1">
+    <div className="flex w-64 flex-col p-1 max-sm:[&_[role=radio]]:h-[44px] max-sm:[&_[role=radio]]:min-w-[44px]">
       <Segments
         name={p.list}
         value={shared(target.props.map((pr) => (pr.list ?? 'none') as 'none' | 'bullet' | 'number'))}
@@ -392,7 +421,7 @@ function TextListBody({ target, p }: { target: Target; p: P }) {
 function TextCaseBody({ target, p }: { target: Target; p: P }) {
   const { style, setStyle } = textStyle(target)
   return (
-    <div className="flex w-56 flex-col p-1">
+    <div className="flex w-56 flex-col p-1 max-sm:[&_[role=radio]]:h-[44px] max-sm:[&_[role=radio]]:min-w-[44px]">
       <Segments
         name={p.textCase}
         value={(style('textCase') ?? 'none') as 'none' | 'upper' | 'lower' | 'title' | 'mixed'}

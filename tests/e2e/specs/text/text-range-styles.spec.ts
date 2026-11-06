@@ -7,7 +7,7 @@ import { writeOutput } from '../../support/editor.ts'
 import { frameDesign } from '../../support/seed.ts'
 import { drawn, openStage, perform, read } from '../../support/stage.ts'
 import { expect, type Page, test } from '../../support/test.ts'
-import { barMenu, closeBarMenu, textColourHex } from '../../support/top-bar.ts'
+import { barMenu, closeBarMenu, textColourHex, textStyleToggle } from '../../support/top-bar.ts'
 
 test.describe.configure({ timeout: 180_000 })
 
@@ -133,13 +133,14 @@ test('bold and italic across an Arabic and Latin boundary, from the bar', async 
   await expect
     .poll(() => page.evaluate(() => window.dazbee?.textSelection()))
     .toMatchObject({ id: 'mixed', range: { start: 2, end: 7 } })
-  const bar = page.getByTestId('top-bar')
-  await bar.getByTestId('bar-bold').click()
+  const bold = await textStyleToggle(page, 'bold')
+  await bold.click()
   await expect.poll(() => runOver(page, 'mixed', 2, 7)).toMatchObject({ fontWeight: 700 })
-  await expect(bar.getByTestId('bar-bold')).toHaveAttribute('aria-pressed', 'true')
-  await bar.getByTestId('bar-italic').click()
+  await expect(bold).toHaveAttribute('aria-pressed', 'true')
+  const italic = await textStyleToggle(page, 'italic')
+  await italic.click()
   await expect.poll(() => runOver(page, 'mixed', 2, 7)).toMatchObject({ fontWeight: 700, fontStyle: 'italic' })
-  await expect(bar.getByTestId('bar-italic')).toHaveAttribute('aria-pressed', 'true')
+  await expect(italic).toHaveAttribute('aria-pressed', 'true')
   const props = await textProps(page, 'mixed')
   expect(props.style).toMatchObject({ fontStyle: 'normal' })
   for (const run of props.runs) expect([run.start, run.end]).toEqual([2, 7])
@@ -176,7 +177,7 @@ test('bold and italic across an Arabic and Latin boundary, from the bar', async 
 test('italic on the bar sets a whole text layer, and turns off again', async ({ browser }) => {
   const { page, errors } = await openStage(browser, design())
   await page.evaluate(() => window.dazbee?.select(['body']))
-  const italic = page.getByTestId('top-bar').getByTestId('bar-italic')
+  const italic = await textStyleToggle(page, 'italic')
   await italic.click()
   await expect.poll(async () => (await textProps(page, 'body')).style.fontStyle).toBe('italic')
   await expect(italic).toHaveAttribute('aria-pressed', 'true')

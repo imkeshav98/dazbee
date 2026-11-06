@@ -5,24 +5,14 @@
 import { photo, upload } from '../../support/assets.ts'
 import { screenPoint, writeOutput } from '../../support/editor.ts'
 import { layoutProblems } from '../../support/layout.ts'
-import { ORDER_MENU } from '../../support/menu-rows.ts'
 import { fitSettled, nextFrame, openStage, selectLayers } from '../../support/stage.ts'
 import { expect, test } from '../../support/test.ts'
-import {
-  arrangeMenu,
-  arrangeSubmenu,
-  barMenu,
-  moreAction,
-  moreMenu,
-  moreSubmenu,
-  PIECES,
-  UNCUT,
-} from '../../support/top-bar.ts'
+import { barMenu, moreAction, moreMenu, moreSubmenu, PIECES, textStyleToggle, UNCUT } from '../../support/top-bar.ts'
 import { topBarDesign } from '../../support/top-bar-design.ts'
 
 test.describe.configure({ timeout: 240_000 })
 
-test('each kind gets its own top bar, ending in its ⋯; several layers add Line up, Combine for shapes, and Stack', async ({
+test('each kind gets its own top bar, ending in Position; several layers add Combine for shapes and Stack, then Line up before Position', async ({
   browser,
 }) => {
   const asset = await upload(photo)
@@ -40,10 +30,7 @@ test('each kind gets its own top bar, ending in its ⋯; several layers add Line
     'font',
     'size',
     'colour',
-    'bold',
-    'italic',
-    'underline',
-    'strikethrough',
+    'text-style',
     'align',
     'list',
     'case',
@@ -51,30 +38,12 @@ test('each kind gets its own top bar, ending in its ⋯; several layers add Line
     'effects',
     'transparency',
     'position',
-    'arrange',
   ])
-  expect(await items(['box'])).toEqual(['colour', 'outline', 'shape', 'effects', 'transparency', 'position', 'arrange'])
-  expect(await items(['line'])).toEqual(['outline', 'shape', 'effects', 'transparency', 'position', 'arrange'])
-  expect(await items(['combo'])).toEqual([
-    'colour',
-    'outline',
-    'combine',
-    'effects',
-    'transparency',
-    'position',
-    'arrange',
-  ])
-  expect(await items(['card'])).toEqual([
-    'colour',
-    'outline',
-    'stack',
-    'box',
-    'effects',
-    'transparency',
-    'position',
-    'arrange',
-  ])
-  expect(await items(['group'])).toEqual(['effects', 'transparency', 'position', 'arrange'])
+  expect(await items(['box'])).toEqual(['colour', 'outline', 'shape', 'effects', 'transparency', 'position'])
+  expect(await items(['line'])).toEqual(['outline', 'shape', 'effects', 'transparency', 'position'])
+  expect(await items(['combo'])).toEqual(['colour', 'outline', 'combine', 'effects', 'transparency', 'position'])
+  expect(await items(['card'])).toEqual(['colour', 'outline', 'stack', 'box', 'effects', 'transparency', 'position'])
+  expect(await items(['group'])).toEqual(['effects', 'transparency', 'position'])
   expect(await items(['photo'])).toEqual([
     'edit',
     'replace',
@@ -84,7 +53,6 @@ test('each kind gets its own top bar, ending in its ⋯; several layers add Line
     'effects',
     'transparency',
     'position',
-    'arrange',
   ])
   expect(await items(['photoBox'])).toEqual([
     'edit',
@@ -96,47 +64,34 @@ test('each kind gets its own top bar, ending in its ⋯; several layers add Line
     'effects',
     'transparency',
     'position',
-    'arrange',
   ])
-  expect(await items(['cutter'])).toEqual([
-    'colour',
-    'outline',
-    'shape',
-    'mask',
-    'effects',
-    'transparency',
-    'position',
-    'arrange',
-  ])
+  expect(await items(['cutter'])).toEqual(['colour', 'outline', 'shape', 'mask', 'effects', 'transparency', 'position'])
   expect(await items(['box', 'star'])).toEqual([
     'colour',
     'outline',
     'effects',
     'transparency',
-    'position',
-    'line-up',
     'combine',
     'autoLayout',
-    'arrange',
+    'line-up',
+    'position',
   ])
   expect(await items(['headline', 'box'])).toEqual([
     'font',
     'effects',
     'transparency',
-    'position',
-    'line-up',
     'autoLayout',
-    'arrange',
+    'line-up',
+    'position',
   ])
   expect(await items(['box', 'card'])).toEqual([
     'colour',
     'outline',
     'effects',
     'transparency',
-    'position',
-    'line-up',
     'autoLayout',
-    'arrange',
+    'line-up',
+    'position',
   ])
   // Several booleans make one new boolean of them; several photos combine into nothing.
   expect(await items(['combo', 'comboB'])).toEqual([
@@ -144,11 +99,10 @@ test('each kind gets its own top bar, ending in its ⋯; several layers add Line
     'outline',
     'effects',
     'transparency',
-    'position',
-    'line-up',
     'combine',
     'autoLayout',
-    'arrange',
+    'line-up',
+    'position',
   ])
   expect(await items(['photo', 'photoB'])).toEqual([
     'edit',
@@ -157,10 +111,9 @@ test('each kind gets its own top bar, ending in its ⋯; several layers add Line
     'outline',
     'effects',
     'transparency',
-    'position',
-    'line-up',
     'autoLayout',
-    'arrange',
+    'line-up',
+    'position',
   ])
   // Several boxes have their own Stack panel, and the action that puts them in one stack is named apart.
   expect(await items(['card', 'cardB'])).toEqual([
@@ -170,10 +123,9 @@ test('each kind gets its own top bar, ending in its ⋯; several layers add Line
     'box',
     'effects',
     'transparency',
-    'position',
-    'line-up',
     'autoLayout',
-    'arrange',
+    'line-up',
+    'position',
   ])
   await expect(page.getByTestId('top-bar').locator('[data-action="autoLayout"]')).toHaveText('Stack together')
   // Several layers put in a stack from the bar: the square gains a second box with a layout, its
@@ -203,7 +155,7 @@ test('text: bold turns on and off as one undo step each, the size steps and take
   await selectLayers(page, ['headline'])
   await expect(page.getByTestId('bar-font')).toHaveText('Noto Sans')
   await expect(page.getByTestId('bar-size-field')).toHaveValue('64')
-  const bold = page.getByTestId('bar-bold')
+  const bold = await textStyleToggle(page, 'bold')
   await expect(bold).toHaveAttribute('aria-pressed', 'false')
   await bold.click()
   await expect.poll(async () => (await style()).fontWeight).toBe(700)
@@ -219,10 +171,10 @@ test('text: bold turns on and off as one undo step each, the size steps and take
   await page.getByTestId('bar-size-field').fill('40')
   await page.getByTestId('bar-size-field').press('Enter')
   await expect.poll(async () => (await style()).fontSize).toBe(40)
-  await page.getByTestId('bar-underline').click()
+  await (await textStyleToggle(page, 'underline')).click()
   await expect.poll(async () => (await style()).underline).toBe(true)
-  await expect(page.getByTestId('bar-underline')).toHaveAttribute('aria-pressed', 'true')
-  await page.getByTestId('bar-strikethrough').click()
+  await expect(await textStyleToggle(page, 'underline')).toHaveAttribute('aria-pressed', 'true')
+  await (await textStyleToggle(page, 'strikethrough')).click()
   await expect.poll(async () => (await style()).strikethrough).toBe(true)
   // One pop-up at a time, and opening one closes an open panel.
   await barMenu(page, 'spacing')
@@ -279,9 +231,7 @@ test('undo and redo in the header pill: off with nothing to do, each a step, and
   expect(errors).toEqual([])
 })
 
-test("the small menu locks, duplicates, deletes and hides; the full menu copies and pastes; the top bar's Arrange ⋯ keeps its menus beside", async ({
-  browser,
-}) => {
+test('the small menu locks, duplicates, deletes and hides; the full menu copies and pastes', async ({ browser }) => {
   const asset = await upload(photo)
   const { page, errors } = await openStage(browser, topBarDesign(asset.id))
   const nodes = () => page.evaluate(() => Object.keys(window.dazbee?.design().nodes ?? {}).length)
@@ -320,15 +270,6 @@ test("the small menu locks, duplicates, deletes and hides; the full menu copies 
   await moreAction(page, 'Paste')
   await expect.poll(nodes).toBe(before + 1)
 
-  // Order opens beside its row in the top bar's ⋯ with the arrow and closes with the arrow back.
-  await selectLayers(page, ['box'])
-  const sit = await arrangeMenu(page)
-  await sit.getByTestId('more-order').focus()
-  await page.keyboard.press('ArrowRight')
-  await expect((await arrangeSubmenu(page, 'order')).getByRole('button')).toHaveText(ORDER_MENU.map((row) => row.reads))
-  await page.keyboard.press('ArrowLeft')
-  await expect(page.getByTestId('more-order-menu')).toBeHidden()
-  await expect(sit).toBeVisible()
   expect(errors).toEqual([])
 })
 

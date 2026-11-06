@@ -1,7 +1,5 @@
-// The design the Arrange ⋯ specs open, and a reader of the top bar's items: a text, a shape over
-// another, a turned shape, and two shapes in an auto layout row, in one frame.
-import type { Page } from '@playwright/test'
-
+// The design the Position specs open: a text, a shape over another, a turned shape, two shapes in
+// an auto layout row, and a group, in one frame.
 import type { DesignInput } from '@dazbee/schema'
 
 import { frameDesign } from './seed.ts'
@@ -22,10 +20,10 @@ const rect = (
   props: { x, y, width: 200, height: 160, shape: { kind: 'rect' as const }, fills: solid('#14213DFF'), ...extra },
 })
 
-/** A text, a shape over another, a turned shape, and two shapes in an auto layout row, in one frame. */
-export const arrangeDesign = (): DesignInput =>
+/** A text, a shape over another, a turned shape, two shapes in an auto layout row and a group, in one frame. */
+export const positionDesign = (): DesignInput =>
   frameDesign({
-    name: 'Top bar more',
+    name: 'Position',
     fills: solid('#FFF8F0FF'),
     nodes: {
       under: rect('Under', 'a0', 160, 340, { fills: solid('#FCA311FF') }),
@@ -62,11 +60,14 @@ export const arrangeDesign = (): DesignInput =>
       },
       one: rect('One', 'a0', 0, 0, { width: 100, height: 100 }, 'stack'),
       two: rect('Two', 'a1', 0, 0, { width: 100, height: 100, fills: solid('#FFFFFFFF') }, 'stack'),
+      group: {
+        type: 'group',
+        parentId: 'sq',
+        index: 'a5',
+        name: 'Group',
+        props: { x: 620, y: 700, width: 300, height: 120 },
+      },
+      g1: rect('G1', 'a0', 620, 700, { width: 140, height: 120 }, 'group'),
+      g2: rect('G2', 'a1', 780, 700, { width: 140, height: 120, fills: solid('#2A9D8FFF') }, 'group'),
     },
   })
-
-/** The top bar's items, by their keys, in order. */
-export const barItems = (page: Page) =>
-  page.evaluate(() =>
-    [...document.querySelectorAll<HTMLElement>('[data-testid="top-bar"] [data-item]')].map((el) => el.dataset.item),
-  )

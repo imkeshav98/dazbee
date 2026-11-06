@@ -1,9 +1,10 @@
 // The stage without cards: the canvas runs full width and the stage fits the ads between the
 // capsule and its end edge. A selection shows the top bar, and nothing selected leaves no bar.
+import { control } from '../../support/bar-homes.ts'
 import { designOf, editorPath, screenPoint, setCookies, shoot } from '../../support/editor.ts'
 import { liveDesign, seed } from '../../support/seed.ts'
 import { expect, type Page, test } from '../../support/test.ts'
-import { arrangeSubmenu, barMenu, closeBarMenu, openCard } from '../../support/top-bar.ts'
+import { barMenu, closeBarMenu, openCard } from '../../support/top-bar.ts'
 
 test.use({ viewport: { width: 1440, height: 900 } })
 
@@ -54,13 +55,11 @@ test('a selection shows the top bar; several layers line up and spread out from 
   await page.mouse.click(at.x, at.y)
   const arrange = page.getByTestId('arrange')
   await expect(await openCard(page, 'layout-card')).toBeVisible()
-  // One layer lines up with its frame from the top bar's ⋯.
+  // One layer lines up with its frame from the top bar's Position.
   await expect(arrange).toHaveCount(0)
   await expect(page.getByTestId('bar-line-up')).toHaveCount(0)
-  await expect((await arrangeSubmenu(page, 'line-up')).getByRole('button', { name: 'Left' })).toBeEnabled()
-  // Each Esc closes one menu, the one beside the row first: each is gone before the next key.
-  await closeBarMenu(page, 'more-line-up')
-  await closeBarMenu(page, 'bar-arrange')
+  await expect(control(await barMenu(page, 'position'), 'alignLeft')).toBeEnabled()
+  await closeBarMenu(page, 'bar-position')
 
   // Several layers: Line up with the spread outs on the top bar, grouped by its key.
   await page.keyboard.press('Control+a')

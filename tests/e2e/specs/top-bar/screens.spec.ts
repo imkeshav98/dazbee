@@ -9,7 +9,7 @@ import { shownKeys } from '../../support/menu-rows.ts'
 import { seed } from '../../support/seed.ts'
 import { drawn, fitSettled, nextFrame, openStage, selectLayers } from '../../support/stage.ts'
 import { expect, test } from '../../support/test.ts'
-import { arrangeMenu, arrangeSubmenu, barMenu, moreMenu, PIECES, UNCUT, zoomMenu } from '../../support/top-bar.ts'
+import { barMenu, moreMenu, PIECES, UNCUT, zoomMenu } from '../../support/top-bar.ts'
 import { topBarDesign } from '../../support/top-bar-design.ts'
 
 test.describe.configure({ timeout: 240_000 })
@@ -153,7 +153,7 @@ test.describe('on a phone, 390×844', () => {
     expect(errors).toEqual([])
   })
 
-  test('every menu row is at least 44 px tall: the full, right-click, top bar ⋯ with its turn field, shape and zoom menus, and the shape menu shows no keys', async ({
+  test("every menu row is at least 44 px tall: the full and right-click menus, Position's fields and buttons, the shape and zoom menus, and the shape menu shows no keys", async ({
     browser,
   }) => {
     const asset = await upload(photo)
@@ -165,9 +165,9 @@ test.describe('on a phone, 390×844', () => {
     for (const height of await rowHeights(full, ':scope > button')) expect(height).toBeGreaterThanOrEqual(44)
     await page.keyboard.press('Escape')
 
-    const sit = await arrangeMenu(page)
-    await expect(sit.locator('[data-scrub]')).toHaveCount(1)
-    for (const height of await rowHeights(sit, ':scope > button, [data-scrub]'))
+    const position = await barMenu(page, 'position')
+    await expect(position.locator('[data-scrub]')).toHaveCount(5)
+    for (const height of await rowHeights(position, '[data-action], [data-scrub]'))
       expect(height).toBeGreaterThanOrEqual(44)
     await page.keyboard.press('Escape')
 
@@ -239,16 +239,16 @@ test.describe('on a phone, 390×844', () => {
     expect(errors).toEqual([])
   })
 
-  test("a menu beside a row of the top bar's ⋯ opens inside the screen: Order's every row shows whole", async ({
+  test("several layers' Line up ▾ opens inside the screen on a phone: its every button shows whole", async ({
     browser,
   }) => {
     const asset = await upload(photo)
     const { page, errors } = await openStage(browser, topBarDesign(asset.id))
     await page.setViewportSize({ width: 390, height: 844 })
     await fitSettled(page)
-    await selectLayers(page, ['box'], { bar: true })
-    const order = await arrangeSubmenu(page, 'order')
-    for (const row of await order.getByRole('button').all()) {
+    await selectLayers(page, ['box', 'card'], { bar: true })
+    const lineUp = await barMenu(page, 'line-up')
+    for (const row of await lineUp.getByRole('button').all()) {
       const box = await row.boundingBox()
       expect(box && box.x >= 0 && box.x + box.width <= 390 && box.y >= 0 && box.y + box.height <= 844).toBe(true)
     }

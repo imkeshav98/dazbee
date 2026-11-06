@@ -1,223 +1,446 @@
-// The Position panel in Chromium: the moves along the stack and lining up first, by name for
-// one layer and by icon for several, and the numbers under Advanced, where Lock ratio keeps the
-// box's shape. Every button is one undo step. Screenshots at desktop, tablet and phone sizes.
-import type { DesignInput } from '@dazbee/schema'
-
-import { writeOutput } from '../../support/editor.ts'
+// The Position panel, the bar's last item and the one home of how a layer sits: W, H, X, Y and
+// Rotate with no heading, Lock ratio, then Order, then for one layer Line up with the frame in two
+// rows of three. Each control by mouse and keyboard, one undo step; a turned layer's Position
+// button shows its angle; inside an auto layout box Line up is greyed saying why; the Order moves
+// with nothing to do greyed; a locked layer's bar is Locked, Unlock and Position, its Position
+// greyed but for Order; several layers have no Line up in Position, theirs being on the bar; a
+// group has only X and Y. The screen sizes are in specs/top-bar/bar-screens.spec.ts.
+import {
+  barItems,
+  control,
+  type ControlId,
+  CONTROLS,
+  FRAME_LINE_UP,
+  ORDER_MOVES,
+  POSITION_NUMBERS,
+} from '../../support/bar-homes.ts'
+import { editorPath } from '../../support/editor.ts'
 import { enter } from '../../support/fields.ts'
-import { SCREEN_SIZES, scrolling } from '../../support/layout.ts'
-import { frameDesign } from '../../support/seed.ts'
-import { fitSettled, nextFrame, openStage, order, perform, props, selectLayers } from '../../support/stage.ts'
-import { expect, type Page, test } from '../../support/test.ts'
+import { positionDesign } from '../../support/position-design.ts'
+import { seed } from '../../support/seed.ts'
+import { openStage, order, perform, props, selectLayers, undoRedo } from '../../support/stage.ts'
+import { type Browser, expect, type Locator, type Page, test } from '../../support/test.ts'
 import { barMenu } from '../../support/top-bar.ts'
 
-test.describe.configure({ timeout: 120_000 })
+test.describe.configure({ timeout: 180_000 })
 
-const solid = (color: string) => [{ type: 'solid' as const, color }]
-const rect = (
-  name: string,
-  index: string,
-  x: number,
-  y: number,
-  width: number,
-  height: number,
-  color: string,
-  parentId = 'sq',
-) => ({
-  type: 'graphic' as const,
-  parentId,
-  index,
-  name,
-  props: { x, y, width, height, shape: { kind: 'rect' as const, cornerRadius: 12 }, fills: solid(color) },
-})
-
-const design = (): DesignInput =>
-  frameDesign({
-    name: 'Position',
-    fills: solid('#FFF8F0FF'),
-    nodes: {
-      headline: {
-        type: 'text',
-        parentId: 'sq',
-        index: 'a0',
-        name: 'Headline',
-        props: {
-          x: 120,
-          y: 80,
-          width: 640,
-          height: 90,
-          boxMode: 'autoHeight',
-          text: 'Summer sale',
-          style: { fontFamily: 'Noto Sans', fontSize: 64, fontWeight: 400, color: '#111111FF' },
-        },
-      },
-      one: rect('One', 'a1', 120, 300, 200, 100, '#FCA311FF'),
-      two: rect('Two', 'a2', 400, 340, 160, 160, '#14213DFF'),
-      three: rect('Three', 'a3', 700, 380, 120, 120, '#E0262BFF'),
-      group: {
-        type: 'group',
-        parentId: 'sq',
-        index: 'a4',
-        name: 'Group',
-        props: { x: 120, y: 700, width: 400, height: 200 },
-      },
-      g1: rect('G1', 'a0', 120, 700, 180, 200, '#2A9D8FFF', 'group'),
-      g2: rect('G2', 'a1', 340, 700, 180, 200, '#E0157FFF', 'group'),
-    },
-  })
+/** Position's controls that a lock greys: its numbers, Lock ratio and Line up. */
+const LOCKED_OFF: ControlId[] = [...POSITION_NUMBERS, 'lockRatio', ...FRAME_LINE_UP]
 
 const panel = (page: Page) => barMenu(page, 'position')
-const button = async (page: Page, name: string | RegExp) =>
-  (await panel(page)).getByRole('button', { name, exact: typeof name === 'string' })
 
-test('one layer: the moves along the stack, lining up with the frame by name, and the numbers under Advanced', async ({
+/** The bar's controls Position shows, by their ids, in the order they show. */
+const shownControls = (within: Locator) =>
+  within.evaluate(
+    (el, all) =>
+      [...el.querySelectorAll('*')]
+        .map((one) => Object.entries(all).find(([, c]) => one.matches(c.find))?.[0])
+        .filter((id): id is string => id !== undefined && id !== 'position'),
+    CONTROLS,
+  )
+
+/** The most a greyed control's tooltip keeps from it, in pixels: beside it, or just past its row. */
+const NEAR = 64
+
+/**
+ * The controls the tooltip showing now covers, by their names: the edit panel's, the top bar's
+ * and those of an open pop-up. Empty while it covers none.
+ */
+const controlsUnderTooltip = (page: Page) =>
+  page.evaluate(() => {
+    const tip = document.querySelector('[role="tooltip"]')?.parentElement
+    if (!tip) return []
+    const t = tip.getBoundingClientRect()
+    return [
+      ...document.querySelectorAll(
+        ':is(#edit-panel, [role="toolbar"], [data-radix-popper-content-wrapper]) :is(button, [data-scrub])',
+      ),
+    ]
+      .filter((one) => !tip.contains(one) && one.checkVisibility())
+      .filter((one) => {
+        const r = one.getBoundingClientRect()
+        return (
+          Math.min(r.right, t.right) - Math.max(r.left, t.left) > 0.5 &&
+          Math.min(r.bottom, t.bottom) - Math.max(r.top, t.top) > 0.5
+        )
+      })
+      .map((one) => one.getAttribute('aria-label') ?? (one as HTMLElement).innerText)
+  })
+
+/** How far the tooltip showing now lies from a control, along whichever way they are apart, in pixels. */
+const tooltipFrom = (page: Page, control: Locator) =>
+  control.evaluate((el) => {
+    const tip = document.querySelector('[role="tooltip"]')?.parentElement
+    if (!tip) return Infinity
+    const [t, r] = [tip.getBoundingClientRect(), el.getBoundingClientRect()]
+    return Math.max(0, t.top - r.bottom, r.top - t.bottom, t.left - r.right, r.left - t.right)
+  })
+
+/** The editor at 390×844 taking touches, as a person holds a phone, on the Position design. */
+async function openOnPhone(browser: Browser) {
+  const designId = await seed(positionDesign())
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true })
+  const page = await context.newPage()
+  const errors: string[] = []
+  page.on('pageerror', (error) => errors.push(error.message))
+  await page.goto(editorPath(designId))
+  await expect(page.getByTestId('status')).toHaveAttribute('data-ready', '', { timeout: 60_000 })
+  return { page, errors }
+}
+
+/** Where the turned layer's box, as drawn, starts on the left. */
+async function drawnLeft(page: Page, id: string) {
+  const { x, width, height, rotation = 0 } = await props(page, id)
+  const turn = (rotation * Math.PI) / 180
+  // Plus 0, so a left just under 0 that rounds to -0 reads as 0.
+  return Math.round(x + width / 2 - (width * Math.abs(Math.cos(turn)) + height * Math.abs(Math.sin(turn))) / 2) + 0
+}
+
+test('one layer: Position ends the bar and holds W, H, X, Y and Rotate with no heading, Lock ratio, then Order, then Line up with the frame in two rows of three', async ({
   browser,
 }) => {
-  const { page, errors } = await openStage(browser, design())
-  await selectLayers(page, ['one'], { bar: true })
-  const part = (await panel(page)).getByTestId('arrange-part')
-  await expect(part.getByRole('heading')).toHaveText(['Arrange', 'Line up with the frame'])
-  await expect(part.getByRole('button')).toHaveText([
-    'Forward',
-    'Backward',
-    'To front',
-    'To back',
-    'Top',
-    'Left',
-    'Middle',
-    'Centre',
-    'Bottom',
-    'Right',
-  ])
-  await expect(part.getByRole('button', { name: 'To front' })).toHaveAttribute('title', 'Bring to front (Ctrl+Shift+])')
-
-  // Each move is one undo step.
-  await (await button(page, 'To front')).click()
-  await expect.poll(() => order(page)).toEqual(['headline', 'two', 'three', 'group', 'one'])
-  await (await button(page, 'Backward')).click()
-  await expect.poll(() => order(page)).toEqual(['headline', 'two', 'three', 'one', 'group'])
-  await (await button(page, 'To back')).click()
-  await expect.poll(() => order(page)).toEqual(['one', 'headline', 'two', 'three', 'group'])
-  await (await button(page, 'Forward')).click()
-  await expect.poll(() => order(page)).toEqual(['headline', 'one', 'two', 'three', 'group'])
-  await perform(page, 'undo')
-  await expect.poll(() => order(page)).toEqual(['one', 'headline', 'two', 'three', 'group'])
-
-  // One layer lines up with the frame it is in.
-  await (await button(page, 'Right')).click()
-  await expect.poll(async () => (await props(page, 'one')).x).toBe(880)
-  await (await button(page, 'Bottom')).click()
-  await expect.poll(async () => (await props(page, 'one')).y).toBe(980)
-  await (await button(page, 'Centre')).click()
-  await expect.poll(async () => (await props(page, 'one')).x).toBe(440)
-  await perform(page, 'undo')
-  await expect.poll(async () => (await props(page, 'one')).x).toBe(880)
-
-  // Advanced: width and height, then where it sits, then its turn and Lock ratio.
-  const advanced = (await panel(page)).getByTestId('layout-card')
-  await expect(advanced.getByRole('heading')).toHaveText('Advanced')
-  await expect(advanced.getByRole('spinbutton')).toHaveCount(5)
-  const names = await advanced
-    .getByRole('spinbutton')
-    .evaluateAll((els) => els.map((el) => el.getAttribute('aria-label')))
-  expect(names).toEqual(['Width', 'Height', 'X position', 'Y position', 'Rotation in degrees'])
-  await enter(advanced.getByRole('spinbutton', { name: 'Width' }), '300')
-  await expect.poll(() => props(page, 'one')).toMatchObject({ width: 300, height: 100 })
-
-  // With Lock ratio on, the other side follows, in one undo step; off again, it doesn't.
-  const lock = advanced.getByRole('switch', { name: 'Lock ratio' })
-  await lock.click()
-  await expect(lock).toHaveAttribute('aria-checked', 'true')
-  await enter(advanced.getByRole('spinbutton', { name: 'Width' }), '150')
-  await expect.poll(() => props(page, 'one')).toMatchObject({ width: 150, height: 50 })
-  await enter(advanced.getByRole('spinbutton', { name: 'Height' }), '80')
-  await expect.poll(() => props(page, 'one')).toMatchObject({ width: 240, height: 80 })
-  await perform(page, 'undo')
-  await expect.poll(() => props(page, 'one')).toMatchObject({ width: 150, height: 50 })
-  await lock.click()
-  await enter(advanced.getByRole('spinbutton', { name: 'Height' }), '120')
-  await expect.poll(() => props(page, 'one')).toMatchObject({ width: 150, height: 120 })
-  expect(errors).toEqual([])
-})
-
-test('several layers line up with each other by icon, and spread out once there are three', async ({ browser }) => {
-  const { page, errors } = await openStage(browser, design())
-  await selectLayers(page, ['one', 'two'], { bar: true })
-  const part = (await panel(page)).getByTestId('arrange-part')
-  await expect(part.getByRole('heading')).toHaveText(['Arrange', 'Line up the selection'])
-  await expect(part.getByRole('button', { name: 'Top', exact: true })).toHaveCount(0)
-  await expect(part.getByRole('button', { name: 'Spread across' })).toBeDisabled()
-  await expect(part.getByRole('button', { name: 'Spread across' })).toHaveAttribute('title', 'Needs 3 or more layers')
-  await (await button(page, 'Align top')).click()
-  await expect.poll(async () => [(await props(page, 'one')).y, (await props(page, 'two')).y]).toEqual([300, 300])
-  await perform(page, 'undo')
-  await expect.poll(async () => (await props(page, 'two')).y).toBe(340)
-
-  // Three spread across: the gaps between them even out, the ends stay.
-  await selectLayers(page, ['one', 'two', 'three'], { bar: true })
-  await expect(await button(page, 'Spread across')).toBeEnabled()
-  await (await button(page, 'Spread across')).click()
-  // From 120 to 820, 200 + 160 + 120 wide, leaves two gaps of 110.
-  await expect
-    .poll(async () => [(await props(page, 'one')).x, (await props(page, 'two')).x, (await props(page, 'three')).x])
-    .toEqual([120, 430, 700])
-  expect(errors).toEqual([])
-})
-
-test('a group takes its size from what it holds, so its Advanced has only where it sits', async ({ browser }) => {
-  const { page, errors } = await openStage(browser, design())
-  await selectLayers(page, ['group'], { bar: true })
-  const advanced = (await panel(page)).getByTestId('layout-card')
-  await expect(advanced.getByRole('spinbutton')).toHaveCount(2)
-  await expect(advanced.getByRole('switch', { name: 'Lock ratio' })).toHaveCount(0)
-  await enter(advanced.getByRole('spinbutton', { name: 'X position' }), '200')
-  await expect.poll(async () => (await props(page, 'g1')).x).toBe(200)
-  expect(errors).toEqual([])
-})
-
-test('on a phone the sheet shows that it scrolls, with its bar, and scrolls to the whole X and Y row', async ({
-  browser,
-}) => {
-  const { page, errors } = await openStage(browser, design())
-  await page.setViewportSize({ width: 390, height: 844 })
-  await fitSettled(page)
-  await selectLayers(page, ['headline'], { bar: true })
-  const sheet = await panel(page)
-  // The body under the title is what scrolls.
-  const body = sheet.locator(':scope > div').last()
-  // Away from the sheet, past the time an overlay bar takes to hide.
-  await page.mouse.move(4, 300)
-  await page.waitForTimeout(1_200)
-  expect(await scrolling(body)).toMatchObject({ scrolls: true, bar: true })
-  await body.evaluate((el) => el.scrollTo({ top: el.scrollHeight }))
-  const shown = await body.boundingBox()
-  for (const name of ['X position', 'Y position']) {
-    const field = await sheet.getByRole('spinbutton', { name }).boundingBox()
-    expect(shown && field && field.y >= shown.y && field.y + field.height <= shown.y + shown.height).toBe(true)
+  const { page, errors } = await openStage(browser, positionDesign())
+  await page.setViewportSize({ width: 1280, height: 760 })
+  for (const id of ['words', 'shape', 'one']) {
+    await selectLayers(page, [id], { bar: true })
+    expect((await barItems(page)).at(-1), id).toBe('position')
+    await expect(page.getByTestId('bar-arrange')).toHaveCount(0)
+    const position = await panel(page)
+    expect(await shownControls(position), id).toEqual([
+      ...POSITION_NUMBERS,
+      'lockRatio',
+      ...ORDER_MOVES,
+      ...FRAME_LINE_UP,
+    ])
+    const headings = position.locator('h3, h4')
+    await expect(headings.first(), id).toHaveText('Order')
+    await expect(position.getByText('Advanced', { exact: true })).toHaveCount(0)
+    await expect(position.getByText('Arrange', { exact: true })).toHaveCount(0)
+    await expect(headings.nth(1)).toHaveText('Line up with the frame')
+    // Two rows of three: Left, Centre, Right over Top, Middle, Bottom.
+    const boxes = await Promise.all(FRAME_LINE_UP.map(async (one) => control(position, one).boundingBox()))
+    const [left, centre, right, top, middle, bottom] = boxes.map((box) => box ?? { x: 0, y: 0, width: 0, height: 0 })
+    for (const box of [centre, right]) expect(box?.y).toBe(left?.y)
+    for (const box of [middle, bottom]) expect(box?.y).toBe(top?.y)
+    expect(top?.y ?? 0).toBeGreaterThan(left?.y ?? 0)
+    expect([left?.x, centre?.x, right?.x]).toEqual([top?.x, middle?.x, bottom?.x])
+    await expect(control(position, 'alignLeft')).toHaveText('Left')
+    await page.keyboard.press('Escape')
+    await expect(page.locator('#edit-panel')).toBeHidden()
   }
   expect(errors).toEqual([])
 })
 
-for (const [width, height] of SCREEN_SIZES) {
-  test(`screenshots at ${width}×${height}: one layer and several`, { tag: '@evidence' }, async ({ browser }) => {
-    const { page, errors } = await openStage(browser, design())
-    await page.setViewportSize({ width, height })
-    await fitSettled(page)
-    for (const [name, ids] of [
-      ['one', ['headline']],
-      ['several', ['one', 'two', 'three']],
-    ] as const) {
-      await selectLayers(page, [...ids], { bar: true })
-      await panel(page)
-      await nextFrame(page)
-      writeOutput(`position-${width}-${name}.png`, await page.screenshot({ animations: 'disabled' }))
-      // On a phone the sheet scrolls: the second picture shows Advanced.
-      if (width === 390) {
-        await page.locator('#edit-panel').getByTestId('layout-card').scrollIntoViewIfNeeded()
-        writeOutput(`position-${width}-${name}-advanced.png`, await page.screenshot({ animations: 'disabled' }))
-      }
-      await page.keyboard.press('Escape')
+test('by mouse, the numbers, Order and Line up each act on the layer as one undo step, and Lock ratio keeps its shape', async ({
+  browser,
+}) => {
+  const { page, errors } = await openStage(browser, positionDesign())
+  await page.setViewportSize({ width: 1280, height: 760 })
+  await selectLayers(page, ['shape'], { bar: true })
+  const position = await panel(page)
+  const shape = () => props(page, 'shape')
+  await enter(control(position, 'width'), '300')
+  await expect.poll(async () => (await shape()).width).toBe(300)
+  await undoRedo(page, async () => (await shape()).width, 200, 300)
+  await enter(control(position, 'x'), '40')
+  await expect.poll(async () => (await shape()).x).toBe(40)
+  await undoRedo(page, async () => (await shape()).x, 120, 40)
+  await enter(control(position, 'rotation'), '45')
+  await expect.poll(async () => (await shape()).rotation).toBe(45)
+  await undoRedo(page, async () => (await shape()).rotation ?? 0, 0, 45)
+  await enter(control(position, 'rotation'), '0')
+
+  const lock = control(position, 'lockRatio')
+  await lock.click()
+  await expect(lock).toHaveAttribute('aria-checked', 'true')
+  await enter(control(position, 'width'), '150')
+  await expect.poll(shape).toMatchObject({ width: 150, height: 80 })
+  await undoRedo(page, async () => [(await shape()).width, (await shape()).height], [300, 160], [150, 80])
+
+  const before = await order(page)
+  await control(position, 'sendToBack').click()
+  const back = ['shape', ...before.filter((id) => id !== 'shape')]
+  await expect.poll(() => order(page)).toEqual(back)
+  await undoRedo(page, () => order(page), before, back)
+  // Position stays open after a move, so several can be tried in a row.
+  await expect(position).toBeVisible()
+
+  await control(position, 'alignRight').click()
+  await expect.poll(async () => (await shape()).x).toBe(1080 - 150)
+  await undoRedo(page, async () => (await shape()).x, 40, 930)
+  await control(position, 'alignMiddle').click()
+  await expect.poll(async () => (await shape()).y).toBe(500)
+  expect(errors).toEqual([])
+})
+
+test('by keyboard: End reaches Position and Enter opens it, Tab goes through its controls, a typed width lands as one undo step, Space runs a move, and the arrows inside never move the layer', async ({
+  browser,
+}) => {
+  const { page, errors } = await openStage(browser, positionDesign())
+  await page.setViewportSize({ width: 1280, height: 760 })
+  await selectLayers(page, ['words'], { bar: true })
+  const words = () => props(page, 'words')
+  const button = page.getByTestId('bar-position')
+  await page.getByTestId('top-bar-row').locator('[data-bar-item]').first().focus()
+  await page.keyboard.press('End')
+  await expect(button).toBeFocused()
+  await page.keyboard.press('Enter')
+  const position = page.locator('#edit-panel')
+  await expect(position).toBeVisible()
+  const width = control(position, 'width')
+  for (let i = 0; i < 8 && !(await width.evaluate((el) => el === document.activeElement)); i++)
+    await page.keyboard.press('Tab')
+  await expect(width).toBeFocused()
+  await page.keyboard.type('500')
+  await page.keyboard.press('Enter')
+  await expect.poll(async () => (await words()).width).toBe(500)
+  await page.keyboard.press('ArrowLeft')
+  await page.keyboard.press('ArrowRight')
+  expect(await words()).toMatchObject({ x: 80, y: 60 })
+  await undoRedo(page, async () => (await words()).width, 600, 500)
+
+  const toFront = control(position, 'bringToFront')
+  await toFront.focus()
+  const before = await order(page)
+  await page.keyboard.press('Space')
+  await expect.poll(() => order(page)).toEqual([...before.filter((id) => id !== 'words'), 'words'])
+  const left = control(position, 'alignLeft')
+  await left.focus()
+  await expect(page.getByRole('tooltip')).toHaveText('Left (Alt+A)')
+  await page.keyboard.press('Enter')
+  await expect.poll(async () => (await words()).x).toBe(0)
+  expect(errors).toEqual([])
+})
+
+test('a turned layer: the Position button reads ↻ and its angle, the bar has no rotation field, Rotate shows the turn and a typed one replaces it, and Line up lines up its turned box with the frame', async ({
+  browser,
+}) => {
+  const { page, errors } = await openStage(browser, positionDesign())
+  await page.setViewportSize({ width: 1280, height: 760 })
+  await selectLayers(page, ['turned'], { bar: true })
+  const button = page.getByTestId('bar-position')
+  await expect(button).toHaveText('Position↻ 30°')
+  await expect(button).toHaveAccessibleName('Position, turned 30°')
+  await expect(page.getByTestId('top-bar').locator(CONTROLS.rotation.find)).toHaveCount(0)
+  const position = await panel(page)
+  const field = control(position, 'rotation')
+  await expect(field).toHaveValue('30')
+  await enter(field, '-15')
+  const rotation = async () => (await props(page, 'turned')).rotation
+  await expect.poll(rotation).toBe(345)
+  await expect(button).toHaveText('Position↻ 345°')
+  await undoRedo(page, rotation, 30, 345)
+  await perform(page, 'undo')
+
+  await control(position, 'alignLeft').click()
+  await expect.poll(() => drawnLeft(page, 'turned')).toBe(0)
+  expect(await rotation()).toBe(30)
+  await undoRedo(page, async () => (await props(page, 'turned')).x, 640, (await props(page, 'turned')).x)
+
+  // Turned back to 0°, the button reads Position alone.
+  await enter(field, '0')
+  await expect(button).toHaveText('Position')
+  expect(errors).toEqual([])
+})
+
+test('inside an auto layout box: Line up is greyed, saying why under the pointer, on focus and on a click, and does nothing; Order moves the layer along its row and Rotate turns it', async ({
+  browser,
+}) => {
+  const { page, errors } = await openStage(browser, positionDesign())
+  await page.setViewportSize({ width: 1280, height: 760 })
+  await selectLayers(page, ['one'], { bar: true })
+  const position = await panel(page)
+  const tip = page.getByRole('tooltip')
+  const before = await props(page, 'one')
+  for (const id of FRAME_LINE_UP) {
+    const button = control(position, id)
+    await expect(button, id).toHaveAttribute('aria-disabled', 'true')
+    await expect(button).toHaveCSS('cursor', 'not-allowed')
+  }
+  const left = control(position, 'alignLeft')
+  await left.hover()
+  await expect(tip).toHaveText('Auto layout places this layer')
+  await left.click({ force: true })
+  await expect(tip).toHaveText('Auto layout places this layer')
+  // Reached by the keyboard, it says why too.
+  await page.mouse.move(2, 400)
+  await control(position, 'alignMiddle').focus()
+  await page.keyboard.press('Tab')
+  await expect(control(position, 'alignBottom')).toBeFocused()
+  await expect(tip).toHaveText('Auto layout places this layer')
+  // Esc closes the tooltip first, then the panel.
+  await page.keyboard.press('Escape')
+  await expect(tip).toHaveCount(0)
+  await expect(position).toBeVisible()
+  expect(await props(page, 'one')).toEqual(before)
+  expect(await page.evaluate(() => window.dazbee?.canUndo())).toBe(false)
+
+  const row = () => order(page, 'stack')
+  await control(position, 'bringForward').click()
+  await expect.poll(row).toEqual(['two', 'one'])
+  await undoRedo(page, row, ['one', 'two'], ['two', 'one'])
+  const rotation = async () => (await props(page, 'one')).rotation ?? 0
+  await enter(control(position, 'rotation'), '20')
+  await expect.poll(rotation).toBe(20)
+  await undoRedo(page, rotation, 0, 20)
+
+  // Set to keep where it is, the layer lines up again.
+  await page.evaluate(() => window.dazbee?.session.run('node.update', { ids: ['one'], patch: { absolute: true } }))
+  await expect(control(position, 'alignLeft')).not.toHaveAttribute('aria-disabled')
+  expect(errors).toEqual([])
+})
+
+test('the Order moves with nothing to do are greyed, saying why: to the front for the top layer, to the back for the bottom one, in the frame and in an auto layout box', async ({
+  browser,
+}) => {
+  const { page, errors } = await openStage(browser, positionDesign())
+  await page.setViewportSize({ width: 1280, height: 760 })
+  const tip = page.getByRole('tooltip')
+  const toFront: ControlId[] = ['bringForward', 'bringToFront']
+  const toBack: ControlId[] = ['sendBackward', 'sendToBack']
+  const cases = [
+    { id: 'group', off: toFront, on: toBack, why: 'Already at the front' },
+    { id: 'under', off: toBack, on: toFront, why: 'Already at the back' },
+    { id: 'two', off: toFront, on: toBack, why: 'Already at the front' },
+  ]
+  for (const { id, off, on, why } of cases) {
+    await selectLayers(page, [id], { bar: true })
+    const position = await panel(page)
+    for (const move of on) await expect(control(position, move), `${id} ${move}`).not.toHaveAttribute('aria-disabled')
+    for (const move of off) {
+      await expect(control(position, move), `${id} ${move}`).toHaveAttribute('aria-disabled', 'true')
+      await control(position, move).hover()
+      await expect(tip).toHaveText(why)
     }
-    expect(errors).toEqual([])
-  })
-}
+    const before = await order(page)
+    await control(position, off[0] as ControlId).click({ force: true })
+    await expect(tip).toHaveText(why)
+    expect(await order(page)).toEqual(before)
+    expect(await page.evaluate(() => window.dazbee?.canUndo())).toBe(false)
+    await page.mouse.move(2, 400)
+  }
+  expect(errors).toEqual([])
+})
+
+test("a locked layer's bar is Locked, Unlock and Position; its Position greys the numbers, Lock ratio and Line up, each saying the layer is locked, and Order still moves it", async ({
+  browser,
+}) => {
+  const { page, errors } = await openStage(browser, positionDesign())
+  await page.setViewportSize({ width: 1280, height: 760 })
+  await page.evaluate(() => window.dazbee?.setLocked(['words'], true))
+  await selectLayers(page, ['words'], { bar: true })
+  expect(await barItems(page)).toEqual(['locked', 'unlock', 'position'])
+  const position = await panel(page)
+  const tip = page.getByRole('tooltip')
+  const before = await props(page, 'words')
+  for (const id of LOCKED_OFF) {
+    const greyed = control(position, id)
+    await expect(greyed, id).toHaveAttribute('aria-disabled', 'true')
+    await expect(greyed, id).toHaveCSS('cursor', 'not-allowed')
+    await greyed.hover()
+    await expect(tip, id).toHaveText('The layer is locked')
+    // Only its own tooltip shows: the one before has gone with the pointer.
+    await expect(tip, id).toHaveCount(1)
+    expect(await controlsUnderTooltip(page), id).toEqual([])
+    expect(await tooltipFrom(page, greyed), id).toBeLessThanOrEqual(NEAR)
+    await greyed.click({ force: true })
+    await expect(tip, id).toHaveText('The layer is locked')
+  }
+  await expect(control(position, 'rotation')).toHaveAttribute('aria-valuetext', '0°')
+  // The keyboard reaches a greyed field, which says why and takes no typing.
+  await page.mouse.move(2, 400)
+  await control(position, 'width').focus()
+  await page.keyboard.press('Tab')
+  await page.keyboard.press('Tab')
+  await expect(control(position, 'x')).toBeFocused()
+  await expect(tip).toHaveText('The layer is locked')
+  await page.keyboard.type('45')
+  await page.keyboard.press('Enter')
+  await page.keyboard.press('ArrowUp')
+  expect(await props(page, 'words')).toEqual(before)
+
+  const stack = await order(page)
+  const front = [...stack.filter((id) => id !== 'words'), 'words']
+  await control(position, 'bringToFront').click()
+  await expect.poll(() => order(page)).toEqual(front)
+  await undoRedo(page, () => order(page), stack, front)
+
+  // Unlock from the bar: the bar and Position come back whole.
+  await page.getByTestId('bar-unlock').click()
+  await expect.poll(() => barItems(page)).toContain('font')
+  expect(errors).toEqual([])
+})
+
+test("several layers: the bar ends with Line up then Position; Position has the numbers and Order, and no Line up; the bar's Line up lines them up as one undo step", async ({
+  browser,
+}) => {
+  const { page, errors } = await openStage(browser, positionDesign())
+  await page.setViewportSize({ width: 1280, height: 760 })
+  await selectLayers(page, ['shape', 'turned'], { bar: true })
+  expect((await barItems(page)).slice(-2)).toEqual(['line-up', 'position'])
+  const position = await panel(page)
+  expect(await shownControls(position)).toEqual([...POSITION_NUMBERS, 'lockRatio', ...ORDER_MOVES])
+  await expect(position.getByText('Line up', { exact: false })).toHaveCount(0)
+  await enter(control(position, 'y'), '100')
+  await expect.poll(async () => [(await props(page, 'shape')).y, (await props(page, 'turned')).y]).toEqual([100, 100])
+  // With nothing typed, one Esc closes the panel; the layers stay selected.
+  await page.keyboard.press('Escape')
+  await expect(position).toBeHidden()
+  expect(await page.evaluate(() => window.dazbee?.selection())).toEqual(['shape', 'turned'])
+
+  const lineUp = await barMenu(page, 'line-up')
+  // Two layers have nothing to spread: each spread row is greyed and says why.
+  for (const id of ['distributeHorizontal', 'distributeVertical'] as const) {
+    await expect(control(lineUp, id)).toHaveAttribute('aria-disabled', 'true')
+    await control(lineUp, id).hover()
+    await expect(page.getByRole('tooltip')).toHaveText('Needs 3 or more layers')
+  }
+  await control(lineUp, 'alignLeft').click()
+  await expect.poll(async () => (await props(page, 'turned')).x).not.toBe(640)
+  await undoRedo(page, async () => (await props(page, 'turned')).x, 640, (await props(page, 'turned')).x)
+  expect(errors).toEqual([])
+})
+
+test('a group takes its size and turn from what it holds, so its Position has only X and Y, then Order and Line up', async ({
+  browser,
+}) => {
+  const { page, errors } = await openStage(browser, positionDesign())
+  await page.setViewportSize({ width: 1280, height: 760 })
+  await selectLayers(page, ['group'], { bar: true })
+  const position = await panel(page)
+  expect(await shownControls(position)).toEqual(['x', 'y', ...ORDER_MOVES, ...FRAME_LINE_UP])
+  await enter(control(position, 'x'), '200')
+  await expect.poll(async () => (await props(page, 'g1')).x).toBe(200)
+  expect(errors).toEqual([])
+})
+
+test("on a phone a greyed control's tooltip shows just above it on a tap, near it and over no control, and Spread's in several layers' Line up keeps off the bar", async ({
+  browser,
+}) => {
+  const { page, errors } = await openOnPhone(browser)
+  await page.evaluate(() => window.dazbee?.setLocked(['words'], true))
+  await selectLayers(page, ['words'], { bar: true })
+  await page.getByTestId('bar-position').tap()
+  const position = page.locator('#edit-panel')
+  await expect(position).toBeVisible()
+  const tip = page.getByRole('tooltip')
+  for (const id of ['x', 'height', 'alignCentre', 'alignMiddle', 'alignBottom'] as const) {
+    const greyed = control(position, id)
+    await greyed.scrollIntoViewIfNeeded()
+    await greyed.tap({ force: true })
+    await expect(tip, id).toHaveText('The layer is locked')
+    const [t, r] = [await tip.boundingBox(), await greyed.boundingBox()]
+    expect(t && r && t.y + t.height <= r.y + 0.5, `${id} above`).toBe(true)
+    expect(await tooltipFrom(page, greyed), id).toBeLessThanOrEqual(NEAR)
+    expect(await controlsUnderTooltip(page), id).toEqual([])
+  }
+  await page.evaluate(() => window.dazbee?.setLocked(['words'], false))
+
+  await selectLayers(page, ['shape', 'turned'], { bar: true })
+  const lineUp = await barMenu(page, 'line-up')
+  await control(lineUp, 'distributeHorizontal').tap({ force: true })
+  await expect(tip).toHaveText('Needs 3 or more layers')
+  expect(await controlsUnderTooltip(page)).toEqual([])
+  expect(errors).toEqual([])
+  await page.context().close()
+})

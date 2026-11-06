@@ -1,13 +1,14 @@
 // The layer actions in Chromium: duplicate, ungroup and use as mask from ⋯ More on the bar by the
-// selection and from a right-click on a layer, and the four order moves from the top bar's ⋯, each
-// with its shortcut.
+// selection and from a right-click on a layer, and the four order moves from the top bar's
+// Position, each with its shortcut in its tooltip.
 import type { DesignInput } from '@dazbee/schema'
 
+import { control, type ControlId } from '../../support/bar-homes.ts'
 import { screenPoint, writeOutput } from '../../support/editor.ts'
 import { frameDesign } from '../../support/seed.ts'
 import { openStage, selectLayers } from '../../support/stage.ts'
 import { expect, type Page, test } from '../../support/test.ts'
-import { arrangeMenu, arrangeSubmenu, closeBarMenu, moreAction } from '../../support/top-bar.ts'
+import { barMenu, closeBarMenu, moreAction } from '../../support/top-bar.ts'
 
 test.describe.configure({ timeout: 120_000 })
 
@@ -48,33 +49,30 @@ const order = async (page: Page) =>
     .sort((x, y) => (x.index < y.index ? -1 : 1))
     .map((n) => n.name)
 
-test("one layer has its actions in the full menu and the right-click menu, and its order in the top bar's ⋯; several layers group from the small menu", async ({
+test("one layer has its actions in the full menu and the right-click menu, and its order in the top bar's Position; several layers group from the small menu", async ({
   browser,
 }) => {
   const { page, errors } = await openStage(browser, design())
   const more = (name: string) => moreAction(page, name)
-  const sit = async (name: string) => moreAction(page, name, await arrangeMenu(page))
+  const sit = async (move: ControlId) => control(await barMenu(page, 'position'), move).click()
 
-  // One layer's order is in the menu beside Order in the top bar's ⋯, each move with its shortcut.
+  // One layer's order is in the top bar's Position, each move with its shortcut in its tooltip.
   await selectLayers(page, ['a'])
-  const menu = await arrangeMenu(page)
-  await expect((await arrangeSubmenu(page, 'order')).getByRole('button', { name: 'Bring forward' })).toContainText(
-    'Ctrl+]',
-  )
+  const position = await barMenu(page, 'position')
+  await control(position, 'bringForward').hover()
+  await expect(page.getByRole('tooltip')).toHaveText('Forward (Ctrl+])')
   await page.evaluate(() => window.dazbee?.drawn())
   writeOutput('arrange-actions-more.png', await page.screenshot())
-  // Esc closes the menu beside, then the top bar's ⋯.
-  await closeBarMenu(page, 'more-order')
-  await closeBarMenu(page, 'bar-arrange')
-  await expect(menu).toBeHidden()
+  await closeBarMenu(page, 'bar-position')
+  await expect(position).toBeHidden()
 
-  await sit('Bring to front')
+  await sit('bringToFront')
   await expect.poll(() => order(page)).toEqual(['B', 'C', 'A'])
-  await sit('Send backward')
+  await sit('sendBackward')
   await expect.poll(() => order(page)).toEqual(['B', 'A', 'C'])
-  await sit('Send to back')
+  await sit('sendToBack')
   await expect.poll(() => order(page)).toEqual(['A', 'B', 'C'])
-  await sit('Bring forward')
+  await sit('bringForward')
   await expect.poll(() => order(page)).toEqual(['B', 'A', 'C'])
 
   await more('Duplicate')
