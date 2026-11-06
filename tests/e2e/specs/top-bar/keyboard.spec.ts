@@ -100,6 +100,15 @@ test("Esc closes the bar's second row and keeps the selection; the arrows and En
 
   await more.click()
   await expect(page.getByTestId('top-bar-overflow')).toBeVisible()
+  // A menu opened over the row closes first, Share's and the zoom menu's alike, the row staying.
+  for (const button of ['share-open', 'zoom']) {
+    await page.getByTestId(button).click()
+    const menu = page.getByRole('menu')
+    await expect(menu).toBeVisible()
+    await page.keyboard.press('Escape')
+    await expect(menu).toBeHidden()
+    await expect(page.getByTestId('top-bar-overflow'), button).toBeVisible()
+  }
   await page.keyboard.press('Escape')
   await expect(page.getByTestId('top-bar-overflow')).toBeHidden()
   expect(await page.evaluate(() => window.dazbee?.selection())).toEqual(['headline'])
