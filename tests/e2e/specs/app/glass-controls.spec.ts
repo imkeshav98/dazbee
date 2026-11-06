@@ -242,7 +242,7 @@ test('a design’s delete is confirmed on a solid red button in white; its red m
     const tile = page.locator(`[data-design="${designId}"]`)
     await tile.hover()
     await tile.getByRole('button', { name: `More for ${name}` }).click()
-    const remove = tile.getByRole('menuitem', { name: 'Delete' })
+    const remove = page.getByRole('menuitem', { name: 'Delete' })
     await hovered(remove, { fill: glass.hover, colour: glass.text })
     await remove.click()
     const confirm = tile.getByRole('button', { name: 'Delete', exact: true })

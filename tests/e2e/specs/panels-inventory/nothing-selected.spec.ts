@@ -62,16 +62,16 @@ test.describe('nothing selected', () => {
       const act = async (item: Locator, action: string) => {
         await item.getByRole('button', { name: /^More for / }).click()
         await page
-          .getByRole('dialog', { name: /^More for / })
-          .getByRole('button', { name: action })
+          .getByRole('menu', { name: /^More for / })
+          .getByRole('menuitem', { name: action })
           .click()
       }
       /** Whether an action of a page's ⋯ menu is on. */
       const canAct = async (item: Locator, action: string) => {
         await item.getByRole('button', { name: /^More for / }).click()
         const on = await page
-          .getByRole('dialog', { name: /^More for / })
-          .getByRole('button', { name: action })
+          .getByRole('menu', { name: /^More for / })
+          .getByRole('menuitem', { name: action })
           .isEnabled()
         await page.keyboard.press('Escape')
         return on

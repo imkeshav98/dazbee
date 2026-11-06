@@ -5,15 +5,13 @@
 // zooms are on Ctrl/Cmd+=, Ctrl/Cmd+-, Shift+1, Shift+2 and Ctrl/Cmd+0, the rulers on Shift+R. On
 // phones it moves to the top corner, since the capsule takes the bottom (#82).
 import { MinusIcon, PlusIcon } from '@phosphor-icons/react'
-import * as Popover from '@radix-ui/react-popover'
 import { useEffect, useMemo, useState } from 'react'
 
 import type { Editor } from '@dazbee/editor'
 
 import { SWITCH } from '@/components/editor/styles.ts'
-import { MENU_DIVIDER, MENU_ITEM, MENU_KEY, POPOVER } from '@/components/ui/looks.ts'
+import { Menu, MenuCheck, MenuDivider, MenuItem } from '@/components/ui/menu.tsx'
 import { Tooltip } from '@/components/ui/tooltip.tsx'
-import { cn } from '@/lib/cn.ts'
 import { useLocale, useMessages } from '@/lib/i18n/client.tsx'
 
 import { ShortcutsButton } from './shortcuts-dialog.tsx'
@@ -78,62 +76,41 @@ export function ZoomControl({ zoom, editor }: { zoom: number | null; editor: Edi
           <MinusIcon size={16} aria-hidden />
         </button>
       </Tooltip>
-      <Popover.Root open={open} onOpenChange={setOpen}>
-        <Tooltip label={t.editor.zoomMenu}>
-          <Popover.Trigger asChild>
-            <button
-              type="button"
-              aria-label={t.editor.zoomMenu}
-              disabled={off}
-              data-testid="zoom"
-              className={`${BUTTON} w-14 font-mono text-xs tabular-nums text-text`}
-            >
-              {zoom === null ? '' : percent.format(zoom)}
-            </button>
-          </Popover.Trigger>
-        </Tooltip>
-        <Popover.Portal>
-          <Popover.Content
-            side="top"
-            align="end"
-            sideOffset={10}
-            collisionPadding={12}
+      <Menu
+        trigger={
+          <button
+            type="button"
             aria-label={t.editor.zoomMenu}
-            data-testid="zoom-menu"
-            className={cn(POPOVER, 'flex w-60 flex-col p-1.5')}
+            disabled={off}
+            data-testid="zoom"
+            className={`${BUTTON} w-14 font-mono text-xs tabular-nums text-text`}
           >
-            {zooms.map((z) => (
-              <button
-                key={z.label}
-                type="button"
-                onClick={() => {
-                  z.run()
-                  setOpen(false)
-                }}
-                className={MENU_ITEM}
-              >
-                {z.label}
-                <kbd className={MENU_KEY}>{z.key}</kbd>
-              </button>
-            ))}
-            <div className={MENU_DIVIDER} />
-            {toggles.map((toggle) => (
-              <button
-                key={toggle.label}
-                type="button"
-                role="switch"
-                aria-checked={toggle.on}
-                onClick={toggle.flip}
-                className={MENU_ITEM}
-              >
-                {toggle.label}
-                {'key' in toggle && <kbd className={cn(MENU_KEY, 'ms-auto me-2')}>{toggle.key}</kbd>}
-                <span aria-hidden className={SWITCH} />
-              </button>
-            ))}
-          </Popover.Content>
-        </Popover.Portal>
-      </Popover.Root>
+            {zoom === null ? '' : percent.format(zoom)}
+          </button>
+        }
+        tooltip={t.editor.zoomMenu}
+        open={open}
+        onOpenChange={setOpen}
+        label={t.editor.zoomMenu}
+        testId="zoom-menu"
+        place={{ side: 'top', align: 'end', sideOffset: 10, collisionPadding: 12 }}
+        className="w-60"
+      >
+        {zooms.map((z) => (
+          <MenuItem key={z.label} label={z.label} keys={z.key} onSelect={z.run} />
+        ))}
+        <MenuDivider />
+        {toggles.map((toggle) => (
+          <MenuCheck
+            key={toggle.label}
+            label={toggle.label}
+            {...('key' in toggle && { keys: toggle.key })}
+            checked={toggle.on}
+            onCheckedChange={toggle.flip}
+            mark={<span aria-hidden className={SWITCH} />}
+          />
+        ))}
+      </Menu>
       <Tooltip label={`${t.editor.zoomIn} · ${t.editor.zoomInKey}`}>
         <button
           type="button"

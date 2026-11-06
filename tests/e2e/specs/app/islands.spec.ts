@@ -82,7 +82,7 @@ test('the editor has no top bar: two islands float over the canvas and the ads f
   await below()
   await page.evaluate(() => window.dazbee?.setCamera({ x: 0, y: 0, zoom: 1 }))
   await page.getByTestId('zoom').click()
-  await page.getByTestId('zoom-menu').getByRole('button', { name: 'Zoom to fit' }).click()
+  await page.getByTestId('zoom-menu').getByRole('menuitem', { name: 'Zoom to fit' }).click()
   await below()
   await writeOutput('islands-editor-dark.png', await page.screenshot())
 

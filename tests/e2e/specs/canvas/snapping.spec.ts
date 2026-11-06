@@ -110,7 +110,7 @@ test('a drag snaps to another layer with a guide, and not with Ctrl held or Snap
   expect(await props(page, 'dot')).toMatchObject({ y: 83 })
 
   // Snap off in the zoom menu: no drag snaps until it is back on.
-  const snap = async () => (await zoomMenu(page)).getByRole('switch', { name: 'Snap' })
+  const snap = async () => (await zoomMenu(page)).getByRole('menuitemcheckbox', { name: 'Snap' })
   await (await snap()).click()
   await expect(await snap()).toHaveAttribute('aria-checked', 'false')
   await page.keyboard.press('Escape')
@@ -178,7 +178,7 @@ test('rulers are off until asked for, count design pixels from the frame, mark t
   const top = page.locator('.stage-overlay .ruler[data-axis="x"]')
   // Off as the editor opens, as in the final mock; Rulers in the zoom menu turns them on.
   await expect(top).toHaveCount(0)
-  const chip = (await zoomMenu(page)).getByRole('switch', { name: 'Rulers' })
+  const chip = (await zoomMenu(page)).getByRole('menuitemcheckbox', { name: 'Rulers' })
   await expect(chip).toHaveAttribute('aria-checked', 'false')
   await chip.click()
   await expect(chip).toHaveAttribute('aria-checked', 'true')
@@ -197,7 +197,10 @@ test('rulers are off until asked for, count design pixels from the frame, mark t
   await press(page, 'toggleRulers')
   await expect(top).toHaveCount(0)
   // The menu follows the shortcut.
-  await expect((await zoomMenu(page)).getByRole('switch', { name: 'Rulers' })).toHaveAttribute('aria-checked', 'false')
+  await expect((await zoomMenu(page)).getByRole('menuitemcheckbox', { name: 'Rulers' })).toHaveAttribute(
+    'aria-checked',
+    'false',
+  )
   expect(errors).toEqual([])
 })
 

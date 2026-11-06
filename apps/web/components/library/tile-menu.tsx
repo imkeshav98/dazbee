@@ -1,13 +1,14 @@
 'use client'
 
 // A bento tile's menu (#159): a round button at the tile's top end that opens Rename, Duplicate and
-// Delete. Rename turns the menu into a name field; Delete asks once more before it deletes.
+// Delete. Rename opens a name field in the menu's place; Delete asks once more before it deletes.
 import { DotsThreeIcon } from '@phosphor-icons/react'
 import { useEffect, useRef, useState } from 'react'
 import { useFormStatus } from 'react-dom'
 
 import { buttonStyles } from '@/components/ui/button.tsx'
 import { LIT_ROW, TOUCH_ROW } from '@/components/ui/looks.ts'
+import { Menu, MenuItem } from '@/components/ui/menu.tsx'
 import { cn } from '@/lib/cn.ts'
 import { useMessages } from '@/lib/i18n/client.tsx'
 import { format } from '@/lib/i18n/index.ts'
@@ -30,8 +31,9 @@ export function TileMenu({
   const t = useMessages().library
   const [step, setStep] = useState<Step | null>(null)
   const box = useRef<HTMLDivElement>(null)
+  // A form closes on Esc or a press outside it; the menu closes on its own.
   useEffect(() => {
-    if (!step) return
+    if (step !== 'rename' && step !== 'delete') return
     const onKey = (event: KeyboardEvent) => event.key === 'Escape' && setStep(null)
     const onPress = (event: PointerEvent) => !box.current?.contains(event.target as Node) && setStep(null)
     window.addEventListener('keydown', onKey)
@@ -44,46 +46,43 @@ export function TileMenu({
   const row = `flex h-9 w-full cursor-pointer items-center rounded-row px-3 text-start text-[13px] font-medium ${LIT_ROW} ${TOUCH_ROW}`
   return (
     <div ref={box} className="absolute end-2 top-2 z-10" data-testid="tile-menu">
-      <button
-        type="button"
-        aria-label={format(t.moreFor, { name })}
-        aria-expanded={step !== null}
-        onClick={() => setStep(step ? null : 'menu')}
-        className={cn(
-          'grid size-8 cursor-pointer place-items-center rounded-full surface-frost text-muted transition-opacity duration-[var(--chrome-fast)] hover:text-text',
-          // Shown on hover and focus, and while it is open, so the tiles stay clean.
-          step ? 'opacity-100' : 'opacity-0 group-hover/tile:opacity-100 focus-visible:opacity-100 max-md:opacity-100',
-        )}
+      <Menu
+        trigger={
+          <button
+            type="button"
+            aria-label={format(t.moreFor, { name })}
+            className={cn(
+              'grid size-8 cursor-pointer place-items-center rounded-full surface-frost text-muted transition-opacity duration-[var(--chrome-fast)] hover:text-text',
+              // Shown on hover and focus, and while it is open, so the tiles stay clean.
+              step
+                ? 'opacity-100'
+                : 'opacity-0 group-hover/tile:opacity-100 focus-visible:opacity-100 max-md:opacity-100',
+            )}
+          >
+            <DotsThreeIcon size={18} weight="bold" aria-hidden />
+          </button>
+        }
+        open={step === 'menu'}
+        onOpenChange={(to) => {
+          if (to) setStep('menu')
+          else if (step === 'menu') setStep(null)
+        }}
+        label={format(t.moreFor, { name })}
+        place={{ side: 'bottom', align: 'end', sideOffset: 6, collisionPadding: 12 }}
+        className="w-44 p-1"
       >
-        <DotsThreeIcon size={18} weight="bold" aria-hidden />
-      </button>
-      {step === 'menu' && (
-        <div
-          role="menu"
-          aria-label={format(t.moreFor, { name })}
-          className="pop-in-end absolute end-0 top-full mt-1.5 flex w-44 flex-col rounded-card surface-frost p-1"
-        >
-          <button type="button" role="menuitem" className={row} onClick={() => setStep('rename')}>
-            {t.rename}
-          </button>
-          {duplicate && (
-            // The menu closes once the copy is made: closing it on the click would take the form away before it sends.
-            <form
-              action={async () => {
-                await duplicate()
-                setStep(null)
-              }}
-            >
-              <button type="submit" role="menuitem" className={row}>
-                {t.duplicate}
-              </button>
-            </form>
-          )}
-          <button type="button" role="menuitem" className={cn(row, 'text-danger')} onClick={() => setStep('delete')}>
-            {t.delete}
-          </button>
-        </div>
-      )}
+        <MenuItem label={t.rename} look={row} onSelect={() => setStep('rename')} />
+        {duplicate && (
+          <MenuItem
+            label={t.duplicate}
+            look={row}
+            keepOpen
+            // The menu closes once the copy is made.
+            onSelect={() => void duplicate().then(() => setStep(null))}
+          />
+        )}
+        <MenuItem label={t.delete} look={cn(row, 'text-danger')} onSelect={() => setStep('delete')} />
+      </Menu>
       {step === 'rename' && (
         <form
           action={async (form) => {

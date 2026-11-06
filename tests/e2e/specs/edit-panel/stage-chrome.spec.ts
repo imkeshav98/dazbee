@@ -42,7 +42,7 @@ test('the canvas runs full width and the ads fit between the capsule and the sta
   await between()
   await page.evaluate(() => window.dazbee?.setCamera({ x: 0, y: 0, zoom: 1 }))
   await page.getByTestId('zoom').click()
-  await page.getByTestId('zoom-menu').getByRole('button', { name: 'Zoom to fit' }).click()
+  await page.getByTestId('zoom-menu').getByRole('menuitem', { name: 'Zoom to fit' }).click()
   await between()
   await shoot(page, 'cards-design')
 })
