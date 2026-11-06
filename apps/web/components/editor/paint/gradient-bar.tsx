@@ -140,7 +140,10 @@ export function GradientBar({
   return (
     // The gradient runs left to right in the design whatever the language, as the stage does. On a
     // phone the bar's row is a touch area tall, with room at its sides for half of one past each end.
-    <div dir="ltr" className="px-2 max-sm:flex [@media(hover:none)]:flex max-sm:h-[44px] [@media(hover:none)]:h-[44px] max-sm:flex-col [@media(hover:none)]:flex-col max-sm:justify-center [@media(hover:none)]:justify-center max-sm:px-[21px] [@media(hover:none)]:px-[21px]">
+    <div
+      dir="ltr"
+      className="px-2 max-sm:flex [@media(hover:none)]:flex max-sm:h-[44px] [@media(hover:none)]:h-[44px] max-sm:flex-col [@media(hover:none)]:flex-col max-sm:justify-center [@media(hover:none)]:justify-center max-sm:px-[21px] [@media(hover:none)]:px-[21px]"
+    >
       <div
         ref={bar}
         role="group"
