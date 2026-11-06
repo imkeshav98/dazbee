@@ -182,16 +182,56 @@ test('a frame picked from its row under the panel is brought out from under it a
   expect(errors).toEqual([])
 })
 
-test('at 820×1180 a frame picked from its row below the panel stays put', async ({ browser }) => {
-  const { page, errors } = await openSized(browser, { width: 820, height: 1180 })
-  const panel = await boxOf(page.getByTestId('flyout'))
+test('at 820×1180 a frame picked from its row ends clear of the panel its opened row makes taller', async ({
+  browser,
+}) => {
+  // On a touch screen, where the rows are 44 px.
+  const { page, errors } = await openSized(browser, { width: 820, height: 1180 }, { touch: true })
   // The three closed frame rows make a short panel; the frames sit below it.
-  expect((await frameOnScreen(page, 'sq', 1080, 1080)).top).toBeGreaterThan(panel.y + panel.height)
-  const camera = await page.evaluate(() => window.dazbee?.camera())
+  const short = await boxOf(page.getByTestId('flyout'))
+  expect((await frameOnScreen(page, 'sq', 1080, 1080)).top).toBeGreaterThan(short.y + short.height)
+  const zoom = await zoomOf(page)
   await frameRow(page, 'Sale square').click()
   await expect(frameRow(page, 'Sale square')).toHaveAttribute('aria-selected', 'true')
+  // Its row opened, the panel reaches down over where the frame was: the frame ends clear of it.
+  await expect.poll(async () => (await boxOf(page.getByTestId('flyout'))).height).toBeGreaterThan(short.height)
+  const panel = await boxOf(page.getByTestId('flyout'))
+  await expect
+    .poll(async () => {
+      const frame = await frameOnScreen(page, 'sq', 1080, 1080)
+      return frame.left >= panel.x + panel.width || frame.top >= panel.y + panel.height
+    })
+    .toBe(true)
+  expect(await zoomOf(page)).toBe(zoom)
+  // Picked again, now clear of the panel, it stays put.
+  const camera = await page.evaluate(() => window.dazbee?.camera())
+  await frameRow(page, 'Sale square').click()
   await nextFrame(page)
   expect(await page.evaluate(() => window.dazbee?.camera())).toEqual(camera)
+  expect(errors).toEqual([])
+})
+
+test('on a phone a frame under the panel picked from its closed row ends clear of the panel its opened row makes taller', async ({
+  browser,
+}) => {
+  const { page, errors } = await openSized(browser, { width: 390, height: 844 })
+  const short = await boxOf(page.getByTestId('flyout'))
+  // Sale square brought under the short panel.
+  const now = await frameOnScreen(page, 'sq', 1080, 1080)
+  await page.evaluate(
+    (dy) => {
+      const camera = window.dazbee?.camera()
+      if (camera) window.dazbee?.setCamera({ ...camera, y: camera.y + dy })
+    },
+    short.y + 40 - now.top,
+  )
+  await nextFrame(page)
+  const zoom = await zoomOf(page)
+  await frameRow(page, 'Sale square').click()
+  await expect.poll(async () => (await boxOf(page.getByTestId('flyout'))).height).toBeGreaterThan(short.height)
+  const panel = await boxOf(page.getByTestId('flyout'))
+  await expect.poll(async () => (await frameOnScreen(page, 'sq', 1080, 1080)).bottom).toBeLessThan(panel.y)
+  expect(await zoomOf(page)).toBe(zoom)
   expect(errors).toEqual([])
 })
 
