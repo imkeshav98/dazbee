@@ -244,3 +244,35 @@ test('a row the pointer moves onto is lit and never ringed, in a menu beside a r
   expect(await outline('paste')).toBe('solid')
   expect(errors).toEqual([])
 })
+
+for (const how of ['full menu', 'right-click menu'])
+  test(`a menu beside a row of the ${how} opened by a click stays open when the pointer leaves the menus, and closes for another row`, async ({
+    browser,
+  }) => {
+    const { page, errors } = await openAt(browser)
+    let menu = page.getByTestId('bar-more-menu')
+    if (how === 'full menu') {
+      await selectLayers(page, ['headline'])
+      await page.getByTestId('bar-more').click()
+    } else {
+      const at = await page.evaluate(() => {
+        const box = window.dazbee?.boxOf('badge')
+        return window.dazbee?.screenPoint((box?.x ?? 0) + 100, (box?.y ?? 0) + 100, 'sq')
+      })
+      await page.mouse.click(at?.x ?? 0, at?.y ?? 0, { button: 'right' })
+      menu = page.getByTestId('stage-menu')
+    }
+    await expect(menu).toBeVisible()
+    await menu.getByTestId('more-copy-to-frames').click()
+    const sub = page.getByTestId('more-copy-to-frames-menu')
+    await expect(sub).toBeVisible()
+    // Off both menus in one move, onto the window's corner: it stays, its row lit.
+    await page.mouse.move(2, 2)
+    await page.waitForTimeout(400)
+    await expect(sub).toBeVisible()
+    await expect(menu.getByTestId('more-copy-to-frames')).toHaveAttribute('data-state', 'open')
+    // Onto another row of the menu: this one closes.
+    await menu.locator('[data-action="duplicate"]').hover()
+    await expect(sub).toBeHidden()
+    expect(errors).toEqual([])
+  })
