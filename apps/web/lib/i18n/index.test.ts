@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 
 import { ar } from './ar.ts'
 import { en } from './en.ts'
-import { counted } from './index.ts'
+import { counted, designCount } from './index.ts'
 
 describe('counted', () => {
   it('takes the words each count takes in Arabic: 3 to 10 files plural, 11 and over singular', () => {
@@ -22,5 +22,22 @@ describe('counted', () => {
     expect(run(1)).toBe('Export 1 file')
     expect(run(2)).toBe('Export 2 files')
     expect(run(11)).toBe('Export 11 files')
+  })
+})
+
+describe('designCount', () => {
+  it('says none for none, the singular for one and the plural for the rest', () => {
+    expect([0, 1, 2, 12].map((n) => designCount('en', en, n))).toEqual([
+      'No designs yet',
+      '1 design',
+      '2 designs',
+      '12 designs',
+    ])
+    expect([1, 2, 3, 11].map((n) => designCount('ar', ar, n))).toEqual([
+      'تصميم واحد',
+      'تصميمان',
+      '3 تصاميم',
+      '11 تصميمًا',
+    ])
   })
 })

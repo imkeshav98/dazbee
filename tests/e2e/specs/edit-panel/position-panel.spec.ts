@@ -39,7 +39,7 @@ const shownControls = (within: Locator) =>
     CONTROLS,
   )
 
-/** The most a greyed control's tooltip keeps from it, in pixels: beside it, or just past its row. */
+/** The most a greyed control's tooltip keeps from it on a phone, in pixels: just past its row. */
 const NEAR = 64
 
 /**
@@ -65,6 +65,16 @@ const controlsUnderTooltip = (page: Page) =>
         )
       })
       .map((one) => one.getAttribute('aria-label') ?? (one as HTMLElement).innerText)
+  })
+
+/** Whether the tooltip showing now is level with a control, beside it or beside the panel: its middle within the control's height. */
+const levelWith = (control: Locator) =>
+  control.evaluate((el) => {
+    const tip = document.querySelector('[role="tooltip"]')?.parentElement
+    if (!tip) return false
+    const [t, r] = [tip.getBoundingClientRect(), el.getBoundingClientRect()]
+    const middle = (t.top + t.bottom) / 2
+    return middle >= r.top && middle <= r.bottom
   })
 
 /** How far the tooltip showing now lies from a control, along whichever way they are apart, in pixels. */
@@ -342,7 +352,8 @@ test("a locked layer's bar is Locked, Unlock and Position; its Position greys th
     // Only its own tooltip shows: the one before has gone with the pointer.
     await expect(tip, id).toHaveCount(1)
     expect(await controlsUnderTooltip(page), id).toEqual([])
-    expect(await tooltipFrom(page, greyed), id).toBeLessThanOrEqual(NEAR)
+    // Beside the control, or beside the panel level with it, never past its grid.
+    expect(await levelWith(greyed), id).toBe(true)
     await greyed.click({ force: true })
     await expect(tip, id).toHaveText('The layer is locked')
   }

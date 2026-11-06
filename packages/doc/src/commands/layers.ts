@@ -55,7 +55,7 @@ export const nodeCreate = defineCommand({
   },
 })
 
-/** Sets properties of layers. Their linked copies in other frames stay as they are. */
+/** Sets properties of layers, those that change. Their linked copies in other frames stay as they are. */
 export const nodeUpdate = defineCommand({
   name: 'node.update',
   input: z.object({ ids: NodeId.array().min(1), patch: z.record(z.string(), z.unknown()) }),
@@ -79,7 +79,8 @@ export const nodeUpdate = defineCommand({
     for (const id of ids) {
       if ('width' in patch || 'height' in patch) keepDrawnIn(r, design, id)
       const props = r.nodes.get(id)?.get('props') as Y.Map<unknown>
-      for (const [path, value] of Object.entries(patch)) props.set(path, value)
+      // A value the layer already has is left as it is, so a change to nothing writes nothing and adds no undo step.
+      for (const [path, value] of Object.entries(patch)) if (!sameValue(props.get(path), value)) props.set(path, value)
     }
   },
 })
@@ -215,3 +216,14 @@ export const nodeMask = defineCommand({
     }
   },
 })
+
+/** Whether two property values are the same, as plain data: numbers, strings, arrays and objects. */
+function sameValue(a: unknown, b: unknown): boolean {
+  if (Object.is(a, b)) return true
+  if (typeof a !== 'object' || typeof b !== 'object' || a === null || b === null) return false
+  if (Array.isArray(a) !== Array.isArray(b)) return false
+  const [one, other] = [a as Record<string, unknown>, b as Record<string, unknown>]
+  const keys = Object.keys(one).filter((key) => one[key] !== undefined)
+  if (keys.length !== Object.keys(other).filter((key) => other[key] !== undefined).length) return false
+  return keys.every((key) => sameValue(one[key], other[key]))
+}

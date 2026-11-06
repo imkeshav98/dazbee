@@ -193,3 +193,37 @@ test('another design bound to the brand colour opens in its current value', asyn
   await expect.poll(() => boxColor(page)).toEqual([31, 157, 85])
   await context.close()
 })
+
+test('the colour tiles are targets 8 px apart, across and down, at every screen size', async ({ browser }) => {
+  const brandId = await newBrand('e2e brand tiles')
+  await putKit(brandId, {
+    colors: ['#FF3D6EFF', '#2A140AFF', '#FBF1E1FF', '#2E9E5BFF', '#3D9BFFFF', '#FFC83DFF', '#6B2E8AFF'].map(
+      (value, i) => ({ token: `c${i}`, name: `Colour ${i + 1}`, value }),
+    ),
+  })
+  const { page, errors } = await openStage(browser, design(), { brandId })
+  for (const size of [
+    { width: 1280, height: 760 },
+    { width: 820, height: 1180 },
+    { width: 390, height: 844 },
+  ]) {
+    await page.setViewportSize(size)
+    if (!(await page.getByTestId('brand-kit').isVisible())) await page.locator('[data-panel="brand"]').click()
+    const tiles = page.getByTestId('brand-kit').locator('[data-token] > button')
+    await expect(tiles.first()).toBeVisible()
+    const boxes = await tiles.evaluateAll((all) => all.map((one) => one.getBoundingClientRect().toJSON() as DOMRect))
+    const gaps = boxes.flatMap((box, i) =>
+      boxes
+        .slice(i + 1)
+        .map((other) => {
+          const across = Math.max(other.left - box.right, box.left - other.right)
+          const down = Math.max(other.top - box.bottom, box.top - other.bottom)
+          // Neighbours in a row overlap down, in a column across.
+          return down < 0 ? across : across < 0 ? down : Infinity
+        })
+        .filter(Number.isFinite),
+    )
+    expect(Math.min(...gaps), `${size.width}×${size.height}`).toBeGreaterThanOrEqual(8)
+  }
+  expect(errors).toEqual([])
+})

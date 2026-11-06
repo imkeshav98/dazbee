@@ -5,10 +5,10 @@
 // segments.
 import { type CSSProperties, type ReactNode, useRef, useState } from 'react'
 
-import { type Editor, shortcutFor } from '@dazbee/editor'
+import type { Editor } from '@dazbee/editor'
 import { alphaOf } from '@dazbee/schema'
 
-import { NumberInput, useNumberInput } from '@/components/editor/number-input.tsx'
+import { NumberInput, numberKeyDown, useNumberInput } from '@/components/editor/number-input.tsx'
 import {
   FACE_SIZE,
   FIELD,
@@ -82,6 +82,7 @@ export function NumberField({
   min: least,
   max: most,
   fillRange,
+  line = true,
   scale = 1,
   unit = '',
   placeholder,
@@ -101,6 +102,8 @@ export function NumberField({
   max?: number | undefined
   /** The range the fill shows the value in, where it differs from `min` and `max`. */
   fillRange?: readonly [number, number]
+  /** Whether a line marks the value at the fill's end; a field too narrow for it beside its digits has none. */
+  line?: boolean
   /** Shown as the value times this, such as 100 for a percentage. */
   scale?: number
   /** Shown after the value: %, ° or px. */
@@ -173,7 +176,7 @@ export function NumberField({
     <div
       data-scrub={name}
       title={format(t.editor.props.scrub, { name })}
-      data-ranged={fill.at === null ? undefined : ''}
+      data-ranged={fill.at === null || !line ? undefined : ''}
       style={
         { '--fill-from': `${fill.from}%`, '--fill': `${fill.width}%`, '--fill-at': `${fill.at ?? 0}%` } as CSSProperties
       }
@@ -199,33 +202,16 @@ export function NumberField({
         onBlur={(event) => {
           if (typedNow.current !== null) commit(event.target.value)
         }}
-        onKeyDown={(event) => {
-          // Undo and redo are the design's while nothing is being typed; once something is, the
-          // field's own, taking back what was typed.
-          const action = shortcutFor(event.nativeEvent)
-          if (editor && typedNow.current === null && (action === 'undo' || action === 'redo')) {
-            event.preventDefault()
-            editor.perform(action)
-          } else if (event.key === 'Enter') commit(event.currentTarget.value)
-          else if (event.key === 'Escape') {
-            // What was typed is thrown away and the field keeps the focus, its value chosen again;
-            // with nothing typed, the field lets go of the focus.
-            const typed = typedNow.current !== null
-            setDraft(null)
-            if (typed) entry.reselect()
-            else event.currentTarget.blur()
-          } else if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
-            event.preventDefault()
-            setDraft(null)
-            shift(((event.key === 'ArrowUp' ? 1 : -1) * stepOf(event)) / scale)
-          } else if ((event.key === 'Home' || event.key === 'End') && hasEnds && draft === null) {
-            // A range's ends, as a slider's; while a value is being typed they move the caret.
-            event.preventDefault()
-            onSet(event.key === 'Home' ? min : max)
-          } else return
-          // Keys typed into a field are the field's, not the stage's.
-          event.stopPropagation()
-        }}
+        onKeyDown={(event) =>
+          numberKeyDown(event, entry, {
+            editor,
+            typed: typedNow.current !== null,
+            commit,
+            discard: () => setDraft(null),
+            step: (sign, keys) => shift((sign * stepOf(keys)) / scale),
+            ends: hasEnds && draft === null ? { home: () => onSet(min), end: () => onSet(max) } : undefined,
+          })
+        }
       />
       {unit && (shown !== '' || !!draft) && (
         // Against the digits: back over the gap, and over the input's room for the caret where that
@@ -302,23 +288,57 @@ export function ColorField({
         }}
         className={cn(FIELD, 'uppercase')}
       />
-      <div className="w-[4.5rem] shrink-0">
-        <NumberField
-          label=""
-          name={format(p.alpha, { name })}
-          value={opacity}
-          scale={100}
-          min={0}
-          max={1}
-          unit="%"
-          editor={editor}
-          testId="colour-opacity"
-          onSet={(to) => opacity !== undefined && onSet(alphaChange(to))}
-          onShift={(by) =>
-            opacity !== undefined && onSet((now) => alphaChange(clamp(percents(now || '#000000') + by, 0, 1))(now))
-          }
-        />
-      </div>
+      <OpacityField
+        name={format(p.alpha, { name })}
+        value={opacity}
+        editor={editor}
+        testId="colour-opacity"
+        onSet={(to) => opacity !== undefined && onSet(alphaChange(to))}
+        onShift={(by) =>
+          opacity !== undefined && onSet((now) => alphaChange(clamp(percents(now || '#000000') + by, 0, 1))(now))
+        }
+      />
+    </div>
+  )
+}
+
+/**
+ * An opacity as a percentage, its digits then %: a colour's beside its hex, and a paint's in its
+ * row of the fill list. `value` runs from 0 to 1. Its fill shows the value with no line at its end,
+ * which in a field this narrow would cross the digits.
+ */
+export function OpacityField({
+  name,
+  value,
+  editor,
+  testId,
+  onSet,
+  onShift,
+}: {
+  name: string
+  value: number | 'mixed' | undefined
+  editor?: Editor | undefined
+  testId?: string
+  onSet: (value: number) => void
+  onShift: (by: number) => void
+}) {
+  // On a touch screen a little narrower, so a row's 44 px swatch target leaves its hex whole.
+  return (
+    <div className="w-[4.5rem] shrink-0 [@media(hover:none)]:w-[4rem]">
+      <NumberField
+        label=""
+        name={name}
+        value={value}
+        scale={100}
+        min={0}
+        max={1}
+        unit="%"
+        line={false}
+        editor={editor}
+        {...(testId ? { testId } : {})}
+        onSet={onSet}
+        onShift={onShift}
+      />
     </div>
   )
 }

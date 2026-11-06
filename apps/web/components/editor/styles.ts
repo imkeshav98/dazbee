@@ -34,29 +34,33 @@ export const dockTool = (on: boolean) => `${DOCK_BUTTON} w-10 ${on ? DOCK_ON : D
 
 /**
  * What a swatch-like control's target is, the box a pointer or finger hits: as big as what it draws,
- * and on a phone 44 px across, a touch target a finger can hit, with the pressed tint showing round
+ * and on a phone or a touch screen 44 px across, a touch target a finger can hit, with the pressed tint showing round
  * its drawing while pressed. What holds it keeps it TOUCH_GAP from the next target.
  */
 const SWATCH_HIT =
-  'group/swatch grid shrink-0 cursor-pointer place-items-center transition-colors duration-[var(--chrome-fast)] max-sm:size-[44px] max-sm:rounded-row max-sm:active:bg-pressed'
+  'group/swatch grid shrink-0 cursor-pointer place-items-center transition-colors duration-[var(--chrome-fast)] max-sm:size-[44px] [@media(hover:none)]:size-[44px] max-sm:rounded-row [@media(hover:none)]:rounded-row max-sm:active:bg-pressed [@media(hover:none)]:active:bg-pressed'
 /** A round swatch's target. A row of them is a SWATCH_ROW. */
 export const SWATCH_TARGET = `${SWATCH_HIT} rounded-full`
 /** A square swatch's target: a paint's swatch in its row, a colour field's box beside its hex. */
 export const SQUARE_SWATCH_TARGET = `${SWATCH_HIT} rounded-[7px]`
-/** How big a swatch target draws what it holds on a phone; off a phone that size is the caller's. */
-export const FACE_SIZE = 'shrink-0 max-sm:size-[32px]'
-/** What a round swatch target draws: round, as big as its caller says, and 32 px on a phone. */
+/** How big a swatch target draws what it holds on a phone or a touch screen; elsewhere that size is the caller's. */
+export const FACE_SIZE = 'shrink-0 max-sm:size-[32px] [@media(hover:none)]:size-[32px]'
+/** What a round swatch target draws: round, as big as its caller says, and 32 px on a phone or a touch screen. */
 export const SWATCH_FACE = `${FACE_SIZE} rounded-full`
 /** A round colour swatch, drawn in a SWATCH_TARGET; its size off a phone is the caller's. */
 export const SWATCH = `${SWATCH_FACE} border border-swatch-ring transition-transform duration-[var(--chrome-fast)] group-hover/swatch:scale-110`
-/** A row of swatch targets, wrapping onto more lines; on a phone TOUCH_GAP apart. */
-export const SWATCH_ROW = `flex flex-wrap items-center ${TOUCH_GAP}`
+/**
+ * A row of swatch targets, wrapping onto more lines; on a phone or a touch screen TOUCH_GAP apart at
+ * the least, spread across the row in columns of 44 px targets, each line lined up with the one above.
+ */
+export const SWATCH_ROW = `flex flex-wrap items-center ${TOUCH_GAP} max-sm:grid max-sm:grid-cols-[repeat(auto-fill,44px)] max-sm:justify-between [@media(hover:none)]:grid [@media(hover:none)]:grid-cols-[repeat(auto-fill,44px)] [@media(hover:none)]:justify-between`
 /**
  * A touch area for a control drawn smaller than a finger, such as a gradient's stop: an empty element
- * inside the control, shown only on a phone, 44 px across and centred on it, so a press anywhere in
+ * inside the control, shown only on a phone or a touch screen, 44 px across and centred on it, so a press anywhere in
  * it lands on the control.
  */
-export const TOUCH_AREA = 'absolute top-1/2 left-1/2 hidden size-[44px] -translate-1/2 max-sm:block'
+export const TOUCH_AREA =
+  'absolute top-1/2 left-1/2 hidden size-[44px] -translate-1/2 max-sm:block [@media(hover:none)]:block'
 
 /** Colours a click away when the brand's kit has none; the hex fields take any colour. */
 export const SWATCHES = [
@@ -105,7 +109,7 @@ export const LAYER_PICTURE = 'border border-line bg-surface'
 export const FIELD_LABEL = 'text-xs font-semibold text-muted'
 
 /** A dropdown field's box, as tall as a knob. */
-export const SELECT = `h-8 ${TOUCH_FIELD} w-full bg-surface px-1.5 text-[12px]`
+export const SELECT = 'h-8 w-full bg-surface px-1.5 text-[12px]'
 /**
  * A number you drag sideways, as in the mock: its label at the start, its value in mono at the end,
  * and a soft fill behind them showing where the value sits in its range: from `--fill-from`, `--fill` wide,
@@ -113,7 +117,7 @@ export const SELECT = `h-8 ${TOUCH_FIELD} w-full bg-surface px-1.5 text-[12px]`
  * typed in (`data-typing`) its edge is the accent, under the pointer too; while it is dragged
  * (`data-scrubbing`) the fill keeps up with the pointer. On a phone or a touch screen it is 44 px tall.
  */
-export const KNOB = `relative flex h-8 min-w-0 cursor-ew-resize touch-pan-y select-none items-center gap-2 overflow-hidden rounded-row border border-line bg-surface px-2.5 text-[12px] font-semibold text-muted transition-colors duration-[var(--chrome-fast)] hover:border-line-strong data-typing:border-accent ${TOUCH_FIELD} data-scrubbing:before:transition-none before:pointer-events-none before:absolute before:inset-y-0 before:start-[var(--fill-from,0%)] before:w-[var(--fill,0%)] before:bg-accent-soft before:transition-[width] before:duration-75 data-ranged:after:pointer-events-none data-ranged:after:absolute data-ranged:after:inset-y-1.5 data-ranged:after:start-[clamp(4px,var(--fill-at),calc(100%-6px))] data-ranged:after:w-0.5 data-ranged:after:-translate-x-1/2 data-ranged:after:rounded-full data-ranged:after:bg-accent data-ranged:after:shadow-[0_0_8px_rgb(255_72_176/0.7)] rtl:data-ranged:after:translate-x-1/2`
+export const KNOB = `relative flex h-8 min-w-0 cursor-ew-resize touch-pan-y select-none items-center gap-2 overflow-hidden rounded-row border border-line bg-surface px-2.5 text-[12px] font-semibold text-muted transition-colors duration-[var(--chrome-fast)] hover:border-line-strong data-typing:border-accent ${TOUCH_FIELD} data-scrubbing:before:transition-none before:pointer-events-none before:absolute before:inset-y-0 before:start-[var(--fill-from,0%)] before:w-[var(--fill,0%)] before:bg-accent-soft before:transition-[width] before:duration-75 data-ranged:after:pointer-events-none data-ranged:after:absolute data-ranged:after:inset-y-1.5 data-ranged:after:start-[clamp(3px,var(--fill-at),calc(100%-3px))] data-ranged:after:w-0.5 data-ranged:after:-translate-x-1/2 data-ranged:after:rounded-full data-ranged:after:bg-accent data-ranged:after:shadow-[0_0_8px_rgb(255_72_176/0.7)] rtl:data-ranged:after:translate-x-1/2`
 /** Knobs two to a row, 8 px apart on a phone or a touch screen; a lone last one takes the whole row. */
 export const KNOBS = `grid grid-cols-2 gap-1.5 ${TOUCH_GAP} [&>:last-child:nth-child(odd)]:col-span-2`
 
@@ -151,6 +155,9 @@ export const BAR_ROW = 'top-[90px] max-sm:top-[72px]'
  * into, each of 44 px targets, so the bar never covers the design as fitted.
  */
 export const BAR_ROW_HEIGHT = 'h-[38px] max-sm:h-[106px]'
+/** On a phone, a row of bar buttons (the top bar's, the small menu's) makes each a 44 px target, 8 px from the next. */
+export const BAR_TOUCH =
+  'max-sm:gap-[8px] max-sm:[&_[data-bar-item]]:h-[44px] max-sm:[&_[data-bar-item]]:min-w-[44px] max-sm:[&_[data-bar-item]]:px-[6px]'
 /** One button of the bar: words or an icon, lit by the hover tint while its popover is open and by the pressed tint while pressed. */
 export const BAR_BUTTON = `flex h-[30px] min-w-[30px] shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-row px-2 text-[12px] font-semibold whitespace-nowrap text-text transition-colors duration-[var(--chrome-fast)] hover:bg-hover active:bg-pressed aria-expanded:bg-hover aria-expanded:active:bg-pressed ${FOCUS_RING}`
 /** A button of the bar that turns something on or off, such as bold: on a pink tint while it is on, its icon in the text colour. */

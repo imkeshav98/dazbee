@@ -8,7 +8,7 @@ import { crc32, deflateSync } from 'node:zlib'
 import { AssetSummary, type DesignInput } from '@dazbee/schema'
 
 import { reloads, screenPoint, writeOutput } from '../../support/editor.ts'
-import { API_URL, DEV_BRAND, frameDesign } from '../../support/seed.ts'
+import { API_URL, DEV_BRAND, frameDesign, SHORT_ID } from '../../support/seed.ts'
 import { openStage, read } from '../../support/stage.ts'
 import { expect, type Page, test } from '../../support/test.ts'
 
@@ -127,7 +127,8 @@ test('uploads two images with progress, tags one, finds it by its tag and drags 
   await expect(item(beach)).toBeVisible({ timeout: 30_000 })
   await expect(item(mountain)).toBeVisible({ timeout: 30_000 })
   await expect(library.getByTestId('asset-uploads')).toHaveCount(0)
-  for (const name of [beach, mountain]) await expect(item(name)).toHaveAttribute('data-asset', /^[0-9a-z]{12}$/)
+  for (const name of [beach, mountain])
+    await expect(item(name)).toHaveAttribute('data-asset', new RegExp(`^${SHORT_ID}$`))
   await cdp.send('Network.emulateNetworkConditions', {
     offline: false,
     latency: 0,

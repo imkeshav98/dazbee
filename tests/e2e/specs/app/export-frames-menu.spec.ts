@@ -1,9 +1,11 @@
 // Export lists frames, from a picked frame's ⋯: Export there opens the Export form with that frame
 // ticked alone, by mouse and by keyboard, and Esc gives the focus back to the ⋯; and while the form
 // is open, from there or from Share, Share shows it open and the form has its heading.
+import { editorPath } from '../../support/editor.ts'
 import { expectNode, openExport, runExport } from '../../support/export.ts'
-import { openSized, rows } from '../../support/export-frames.ts'
+import { design, openSized, rows } from '../../support/export-frames.ts'
 import { clickLabel, picked, tabToBar } from '../../support/frames-on-canvas.ts'
+import { seed } from '../../support/seed.ts'
 import { expect, type Page, test } from '../../support/test.ts'
 import { barMenu } from '../../support/top-bar.ts'
 
@@ -116,4 +118,24 @@ test('while Export is open, from Share or a picked frame’s ⋯, Share shows it
     })
     .toBe(true)
   expect(errors).toEqual([])
+})
+
+test('on a touch tablet the Export form’s file name, type, quality and Export are 44 px targets, as every field there', async ({
+  browser,
+}) => {
+  const designId = await seed(design())
+  const context = await browser.newContext({ viewport: { width: 820, height: 1180 }, hasTouch: true, isMobile: true })
+  const page = await context.newPage()
+  await page.goto(editorPath(designId))
+  await expect(page.getByTestId('status')).toHaveAttribute('data-ready', '', { timeout: 60_000 })
+  const dialog = await openExport(page)
+  await dialog.locator('[data-type="jpg"]').tap()
+  const targets = {
+    name: dialog.getByTestId('export-name'),
+    quality: dialog.locator('[data-scrub]', { has: page.getByTestId('export-quality') }),
+    type: dialog.locator('[data-type="png"]'),
+    export: dialog.getByTestId('export-run'),
+  }
+  for (const [id, target] of Object.entries(targets)) expect((await target.boundingBox())?.height, id).toBe(44)
+  await context.close()
 })

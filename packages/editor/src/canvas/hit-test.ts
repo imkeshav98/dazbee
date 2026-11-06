@@ -1,5 +1,6 @@
 // The layer a click or a hover picks: the topmost one that shows under the point. A shape counts
-// inside its outline, as the renderer draws it, and on its strokes; a text on its laid-out lines.
+// inside its outline, as the renderer draws it, and on its strokes; a text on its laid-out lines, or
+// anywhere in its box while it frosts what lies behind.
 // Where a layer is drawn under 10% opaque, its own opacity, its groups', its mask's and its paint's
 // there multiplied, it shows nothing, and the click passes to the layer beneath.
 import type { CanvasKit, Path } from '@dazbee/canvaskit'
@@ -40,6 +41,7 @@ type Rgba = readonly [number, number, number, number]
 
 /** How near a line or a path's stroke a click picks it, in design pixels, beyond half the stroke. */
 const LINE_REACH = 4
+
 /** How opaque a layer must be drawn under the point to be picked there; below it the click passes on. */
 const SEE_THROUGH = 0.1
 
@@ -166,6 +168,8 @@ function layerAt(layer: SceneLayer, p: Point, looks: Looks, options: HitOptions,
       if (!shows(looks, layer, q, fade)) return null
       return shapeUnder(looks, layer.children, q, options.pickable ?? everything) ?? layer
     case 'text':
+      // Frosted text frosts its whole box, so it is picked anywhere there; else only on its lines.
+      if (frosted(layer) && fade >= SEE_THROUGH && inBox(q, layer.props)) return layer
       return shown * textShade(layer.props, false) >= SEE_THROUGH && onLines(looks, layer, q) ? layer : null
     case 'graphic':
       return shows(looks, layer, q, fade) ? layer : null
@@ -262,11 +266,13 @@ function paintAt(looks: Looks, layer: Painted, q: Point, need: number, luminance
       : strokeReach(props.strokes, 'outside')
   if (!inBox(q, props, reach)) return null
   const strokes = () => over(looks, strokePaints(props.strokes), props, q, luminance)
+  // With no fill, a closed outline shows all over inside it, so an empty box is easy to grab; an
+  // open path shows only along its line, so with no fill showing only its kept band is read.
+  const open = kind === 'path' && opens(layer)
+  if (open && props.fills.every((f) => f.visible === false))
+    return reach > 0 && nearOutline(looks, layer, q, reach) ? strokes() : null
   if (!looks.outline(layer).contains(q.x, q.y))
     return reach > 0 && nearOutline(looks, layer, q, reach) ? strokes() : null
-  // With no fill, a closed outline shows all over inside it, so an empty box is easy to grab; an
-  // open path shows only along its line.
-  const open = layer.type === 'graphic' && layer.props.shape.kind === 'path' && !closesEvery(layer.props.shape.d)
   const fill = over(looks, props.fills, props, q, luminance) ?? (open ? null : 1)
   if (fill !== null && fill >= need) return fill
   // Where the fill is clear or an open path has none, the strokes still show along the outline.
@@ -299,9 +305,10 @@ function nearOutline(looks: Looks, layer: SceneLayer, q: Point, reach: number) {
   return looks.band(layer, reach)?.contains(q.x, q.y) ?? false
 }
 
-/** Whether path data closes every contour it starts, so its outline holds an area with no fill. */
-function closesEvery(d: string) {
-  return d.split(/(?=[Mm])/).every((contour) => contour.trim() === '' || /[Zz]\s*$/.test(contour))
+/** Whether a path layer leaves a contour open, its outline holding no area of its own. */
+function opens(layer: Painted) {
+  const d = layer.type === 'graphic' && layer.props.shape.kind === 'path' ? layer.props.shape.d : ''
+  return !d.split(/(?=[Mm])/).every((contour) => contour.trim() === '' || /[Zz]\s*$/.test(contour))
 }
 
 /**

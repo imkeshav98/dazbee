@@ -10,7 +10,7 @@ import { cn } from '@/lib/cn.ts'
 import { useLocale } from '@/lib/i18n/client.tsx'
 import { dirOf } from '@/lib/i18n/index.ts'
 import { usePhone } from '@/lib/phone.ts'
-import { type Box, type TooltipPlace, tooltipPlace } from '@/lib/tooltip-place.ts'
+import { type Box, type TipScreen, type TooltipPlace, tooltipPlace } from '@/lib/tooltip-place.ts'
 
 /** What a greyed control's tooltip keeps clear of: each open popover's content, the edit panel and the top bar. */
 const HOLDERS =
@@ -58,20 +58,20 @@ export function GreyedButton({
 /**
  * The tooltip of a greyed control, saying `why` it has nothing to do: under the pointer, on
  * keyboard focus and on a tap or click, placed as it shows so it covers no row of any open menu
- * or control of the edit panel, its own menu's or panel's included, and on a phone just above the control's menu, clear of the finger. The
- * ref and `tap` go on the control, and `tooltip` on the Tooltip around it.
+ * or control of the edit panel, its own menu's or panel's included, and on a phone just above the
+ * control's menu, clear of the finger. The ref and `tap` go on the control, and `tooltip` on the
+ * Tooltip around it.
  */
 export function useWhyTip<T extends HTMLElement>(why: string | null) {
   const [told, setTold] = useState(false)
-  const rtl = dirOf(useLocale()) === 'rtl'
-  const phone = usePhone()
-  const [place, setPlace] = useState<TooltipPlace>({ side: rtl ? 'left' : 'right', align: 'center', offset: 8 })
+  const screen: TipScreen = { rtl: dirOf(useLocale()) === 'rtl', phone: usePhone() }
+  const [place, setPlace] = useState<TooltipPlace>({ side: screen.rtl ? 'left' : 'right', align: 'center', offset: 8 })
   const ref = useRef<T>(null)
   /** Hides this one, as another greyed control's tooltip shows. */
   const hide = useRef(() => setTold(false))
   /** Shows or hides why, placed clear of every open menu's rows as it shows; one shows at a time. */
   const tell = (open: boolean) => {
-    if (open && ref.current && why) setPlace(placeFor(ref.current, why, rtl, phone))
+    if (open && ref.current && why) setPlace(placeFor(ref.current, why, screen))
     if (open && shownTip !== hide.current) {
       shownTip?.()
       shownTip = hide.current
@@ -105,15 +105,17 @@ export function useWhyTip<T extends HTMLElement>(why: string | null) {
 }
 
 /**
- * Where a row's tooltip goes: beside it when there is room, otherwise past the top or bottom of its
- * menu (in the edit panel, of its grid), or on a phone just above its menu or grid, clear of every row that shows in the open menus, measured
- * as it is about to show.
+ * Where a row's tooltip goes: beside it when there is room, in the edit panel beside the panel level
+ * with it, otherwise past the top or bottom of its menu (in the edit panel, of its grid), or on a
+ * phone just above its menu or grid, clear of every row that shows in the open menus, measured as it
+ * is about to show.
  */
-function placeFor(row: HTMLElement, label: string, rtl: boolean, phone: boolean): TooltipPlace {
+function placeFor(row: HTMLElement, label: string, screen: TipScreen): TooltipPlace {
   // In the edit panel a control sits in a grid of its own (the numbers, Order, Line up): the
-  // tooltip goes past that grid, near the control, rather than past the whole panel.
-  const inPanel = row.closest('#edit-panel') !== null
-  const own = (inPanel ? row.parentElement : row.closest('[role="dialog"], [role="menu"]')) ?? row
+  // tooltip goes beside the panel level with the control, or past that grid near the control, rather
+  // than past the whole panel.
+  const panel = row.closest('#edit-panel')
+  const own = (panel ? row.parentElement : row.closest('[role="dialog"], [role="menu"]')) ?? row
   const rows = [...document.querySelectorAll(`${HOLDERS} :is(button, [data-scrub])`)].filter((one) =>
     one.checkVisibility(),
   )
@@ -123,9 +125,8 @@ function placeFor(row: HTMLElement, label: string, rtl: boolean, phone: boolean)
     own: boxOf(own),
     rows: rows.map(boxOf),
     room: { width: document.documentElement.clientWidth, height: window.innerHeight },
-    rtl,
-    phone,
-    nearer: inPanel,
+    screen,
+    ...(panel && { panel: boxOf(panel) }),
   })
 }
 

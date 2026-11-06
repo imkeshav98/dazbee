@@ -178,7 +178,9 @@ export function editorSelectPress({
       if (!(locked && insideEntered(locked))) selection.enter(null)
       return { kind: 'marquee', from, to: from, base }
     } else if (!e.shiftKey) {
-      clickedAlone = ''
+      // Inside the selection's box on no layer, a click picks the frame there; on a locked layer that
+      // shows through a selected one, as through a round layer's corner, it keeps the selection.
+      clickedAlone = locked ? null : ''
     }
     // The frame pressed in is dragged, when it holds selected layers, else the first one's; the
     // selected layers of the other frames go with it.

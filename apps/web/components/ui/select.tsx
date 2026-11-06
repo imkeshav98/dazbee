@@ -10,7 +10,7 @@ import { createPortal } from 'react-dom'
 
 import { cn } from '@/lib/cn.ts'
 
-import { TOUCH_ROW } from './looks.ts'
+import { TOUCH_FIELD, TOUCH_ROW } from './looks.ts'
 import { useOverlayScroll } from './overlay-scroll.ts'
 
 export interface SelectOption {
@@ -42,7 +42,7 @@ export function Select({
   /** Shown while no option is picked, such as "Mixed" or "Add effect". */
   placeholder?: string
   disabled?: boolean
-  /** The field's size and look; it comes with a border, the label and a caret. */
+  /** The field's size and look; it comes with a border, the label and a caret, and is 44 px tall on a phone or a touch screen. */
   className?: string
   testId?: string
 }) {
@@ -179,6 +179,7 @@ export function Select({
         className={cn(
           'flex min-w-0 cursor-pointer items-center gap-1 rounded-row border border-line text-start text-text outline-none transition-colors duration-[var(--chrome-fast)] hover:border-line-strong focus-visible:border-accent disabled:cursor-default disabled:opacity-60 aria-expanded:border-accent',
           className,
+          TOUCH_FIELD,
         )}
       >
         <span className={cn('min-w-0 flex-1 truncate', !current && 'text-muted')}>{current?.label ?? placeholder}</span>

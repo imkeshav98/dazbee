@@ -131,6 +131,17 @@ describe('editorTransformDrag', () => {
       expect(drag.handleUnder({ x: 300, y: 300 })).toBeNull()
     })
 
+    it('finds the resize handles across frames, but no zone that turns, as a turn would leave the other copies', () => {
+      const { drag, session, selection, frame } = harness()
+      const wide = pageFrames(session.design(), 'p1').frames[1] as Frame
+      selection.selectAcross([
+        { id: 'a', frameId: frame.id },
+        { id: 'wide-a', frameId: wide.id },
+      ])
+      expect(drag.handleUnder({ x: 202, y: 198 })).toEqual({ kind: 'resize', handle: 'se' })
+      expect(drag.handleUnder({ x: 215, y: 215 })).toBeNull()
+    })
+
     it('finds none on a selection locked in place', () => {
       const { drag, selection, frame } = harness()
       selection.select(['pin'], frame.id)
@@ -153,6 +164,31 @@ describe('editorTransformDrag', () => {
       drag.release(resize)
       session.undo()
       expect(boxOf('a')).toMatchObject({ x: 100, width: 100 })
+    })
+
+    it('resizes the selected copies of other frames by the same amount, in the same undo step', () => {
+      const { drag, session, selection, frame, log, boxOf, pressSelection } = harness()
+      const wide = pageFrames(session.design(), 'p1').frames[1] as Frame
+      selection.selectAcross([
+        { id: 'a', frameId: frame.id },
+        { id: 'wide-a', frameId: wide.id },
+      ])
+      const resize = pressSelection({ x: 200, y: 150 })
+      expect(resize).toMatchObject({ kind: 'resize', handle: 'e', roots: ['a'] })
+      drag.drag(resize, { x: 250, y: 150 }, false, false, false)
+      expect(boxOf('a')).toMatchObject({ x: 100, y: 100, width: 150, height: 100 })
+      expect(boxOf('wide-a')).toMatchObject({ x: 100, y: 100, width: 150, height: 100 })
+      // From the centre both sides of each copy move by the same amount.
+      drag.drag(resize, { x: 250, y: 150 }, false, true, false)
+      expect(boxOf('a')).toMatchObject({ x: 50, width: 200 })
+      expect(boxOf('wide-a')).toMatchObject({ x: 50, width: 200 })
+      drag.release(resize)
+      expect(log).toEqual(['hug a,wide-a'])
+      session.undo()
+      expect([boxOf('a'), boxOf('wide-a')]).toMatchObject([
+        { x: 100, width: 100 },
+        { x: 100, width: 100 },
+      ])
     })
 
     it('keeps the shape with Shift on a corner', () => {

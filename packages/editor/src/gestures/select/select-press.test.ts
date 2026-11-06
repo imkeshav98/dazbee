@@ -38,6 +38,19 @@ const DESIGN: DesignInput = {
     pin: { ...rect('sq', 'a2', { x: 600, y: 700, width: 10, height: 10 }), link: 'pin', lock: { move: true } },
   },
 }
+/** The design with a round layer over the pin, its box's corner on the pin, where the round doesn't show. */
+const ROUND_OVER_PIN: DesignInput = {
+  ...DESIGN,
+  nodes: {
+    ...DESIGN.nodes,
+    pin: { ...rect('sq', 'a2', { x: 580, y: 680, width: 10, height: 10 }), link: 'pin', lock: { move: true } },
+    round: {
+      ...rect('sq', 'a3', { x: 580, y: 680, width: 100, height: 100 }),
+      props: { rotation: 0, x: 580, y: 680, width: 100, height: 100, shape: { kind: 'ellipse' as const } },
+      link: 'round',
+    },
+  },
+}
 const SQUARE: Frame = { id: 'sq', pageId: 'p1', name: 'Square', x: 0, y: 0, width: 1080, height: 1080 }
 /** The design with a second frame beside the square, holding a linked copy of the square's box and a layer of its own. */
 const LINKED: DesignInput = {
@@ -324,6 +337,14 @@ describe('editorSelectPress', () => {
       marquee.to = { x: 900, y: 900 }
       select.release(marquee)
       expect(selection.pickedFrame()).toBeNull()
+    })
+
+    it('keeps the selection after a click on a selected layer’s see-through part over a locked layer', () => {
+      const { select, selection, press } = harness(null, ROUND_OVER_PIN)
+      selection.select(['round'], SQUARE.id)
+      press({ x: 583, y: 683 })
+      select.release(null)
+      expect(selection.current()).toEqual(pairsIn('sq', ['round']))
     })
 
     it('picks the frame under a click in the selection box on no layer', () => {

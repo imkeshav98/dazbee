@@ -83,6 +83,11 @@ export interface LinkedMenu {
    * inside it, is locked against deleting, here only or in every frame.
    */
   delete: 'ready' | 'selectionLocked' | 'deleteLocked'
+  /**
+   * Select copies (Ctrl+Alt+A): no linked copy on the page, every copy selected already, or the
+   * ones left are locked, which it leaves out as select all does.
+   */
+  select: 'ready' | 'noCopies' | 'everySelected' | 'copiesLocked'
 }
 
 export interface LinkedCopiesDeps {
@@ -293,7 +298,16 @@ export function linkedMenu(design: Design, ids: readonly string[], copied: Layer
     lock: targets.every((id) => LOCK_FLAGS.every((flag) => design.nodes[id]?.lock?.[flag])) ? 'unlock' : 'lock',
     hide: targets.every((id) => design.nodes[id]?.props.visible === false) ? 'show' : 'hide',
     delete: deleteReadiness(design, live, targets),
+    select: selectReadiness(design, live),
   }
+}
+
+/** Whether Select copies has linked copies of the layers to add to them: ones not selected and not locked. */
+function selectReadiness(design: Design, ids: readonly string[]): LinkedMenu['select'] {
+  const left = everyCopy(design, ids).filter((id) => !ids.includes(id))
+  if (left.length > 0)
+    return left.some((id) => !Object.values(design.nodes[id]?.lock ?? {}).some(Boolean)) ? 'ready' : 'copiesLocked'
+  return ids.some((id) => copiesOf(design, id).length > 0) ? 'everySelected' : 'noCopies'
 }
 
 /** The layers and each one's linked copies on its page. */

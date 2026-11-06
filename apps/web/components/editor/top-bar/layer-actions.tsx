@@ -8,7 +8,7 @@
 // item that never applies is left out; one with nothing to do is greyed, its tooltip saying why, as
 // Ungroup is while the group or box is locked or auto layout would move what it holds. How the
 // layers sit (order, line up, the turn, text direction) is in the Position panel and the text's Align.
-import { useState } from 'react'
+import { useMemo } from 'react'
 
 import { childrenOf } from '@dazbee/doc'
 import type { Editor, ShortcutAction, UngroupState } from '@dazbee/editor'
@@ -16,6 +16,7 @@ import type { Design } from '@dazbee/schema'
 
 import { keyOf } from '@/components/editor/arrange-actions.ts'
 import { useTarget } from '@/components/editor/edit-panel/target.ts'
+import { useLiveDesign } from '@/components/editor/use-live-design.ts'
 import { MenuDivider, MenuItem, MenuSub } from '@/components/ui/menu.tsx'
 import { useMessages } from '@/lib/i18n/client.tsx'
 import { format, type Messages } from '@/lib/i18n/index.ts'
@@ -57,8 +58,10 @@ export function LayerActions({ editor, ids, onDone }: { editor: Editor; ids: str
   const t = useMessages()
   const b = t.editor.bar
   const selected = useTarget(editor, ids)
-  // Asked once as the menu opens: it tries the ungroup on a copy of the design.
-  const [ungroup] = useState(() => editor.ungroupState())
+  // Asked as the menu opens and again whenever the design changes: it tries the ungroup on a copy of it.
+  const { version } = useLiveDesign(editor)
+  const key = ids.join(' ')
+  const ungroup = useMemo(() => (key ? editor.ungroupState() : 'none'), [editor, version, key])
   if (!selected) return null
   const { target, design } = selected
   const run = (action: ShortcutAction) => {
@@ -145,6 +148,13 @@ export function LayerActions({ editor, ids, onDone }: { editor: Editor; ids: str
           {linked.text !== 'hidden' && actionRow('textToLinked', l.text, whyOf(linked.text))}
           {actionRow('layerToLinked', l.layer, whyOf(linked.layer))}
         </MenuSub>
+      )}
+      {actionRow(
+        'selectLinkedCopies',
+        l.selectCopies,
+        linked.select === 'ready'
+          ? null
+          : l.why[linked.select === 'copiesLocked' ? 'copiesLockedApart' : linked.select],
       )}
       <MenuDivider />
       {row('boxSelection', b.putInBox)}

@@ -1,6 +1,6 @@
 // Selecting across frames, in Chromium: Ctrl+Alt+A selects a layer's linked copies in every frame
 // of the page and Shift with a click adds or takes one out; a top bar or panel change sets each
-// copy, showing Mixed where they differ; a drag and the arrow keys move every copy by the same
+// copy, showing Mixed where they differ; a drag, a resize and the arrow keys change every copy by the same
 // amount; typing happens in the copy double-clicked. Each change is one undo step and reaches a
 // second tab live. Over every layer type, inside a group and an auto layout box, with a copy hidden
 // or locked in one frame, and text in each box mode.
@@ -35,6 +35,12 @@ async function placeOf(page: Page, id: string) {
 const placesOf = async (page: Page, ids: string[]) => Promise.all(ids.map((id) => placeOf(page, id)))
 /** A text layer's font size as the design holds it. */
 const sizeOf = async (page: Page, id: string) => ((await node(page, id))?.props.style as { fontSize: number }).fontSize
+/** Whether the top bar's font size shows Mixed, the word whole in its field. */
+const sizeShowsMixed = (page: Page) =>
+  page.getByTestId('bar-size-field').evaluate((input: HTMLInputElement) => {
+    const knob = input.closest('[data-knob]')
+    return input.value === '' && input.placeholder === 'Mixed' && !!knob && knob.scrollWidth <= knob.clientWidth
+  })
 /** The middle of a layer on screen, as it is drawn in its frame. */
 async function middleOf(page: Page, id: string, frameId: string) {
   const box = await page.evaluate((one) => window.dazbee?.boxOf(one), id)
@@ -88,8 +94,9 @@ test('Ctrl+Alt+A selects the linked copies of each layer type in every linked fr
     await expect(page.locator('.stage-overlay .selection')).toHaveAttribute('data-frame', 'sq')
     await expect(page.locator('.stage-overlay .selection-copy')).toHaveCount(2)
     await expect(page.locator('.stage-overlay .linked-copy')).toHaveCount(0)
-    // Across frames there are no handles: a move, the arrows and the panels change every copy alike.
-    await expect(page.locator('.stage-overlay .handle')).toHaveCount(0)
+    // The handles are on the first one's box alone, and a resize there changes every copy alike.
+    await expect(page.locator('.stage-overlay .handle').first()).toBeVisible()
+    await expect(page.locator('.stage-overlay .selection-copy .handle')).toHaveCount(0)
     await expect(page.locator('.stage-overlay .frame-label[data-active]')).toHaveCount(3)
   }
   // Layers several at once: each one's copies join it.
@@ -166,7 +173,7 @@ test('a top bar and a panel change sets each copy, Mixed where they differ, as o
   await selectCopies(page, 'headline')
   // The square and the story have 110, the landscape 72: the size shows none of them.
   const size = page.getByTestId('bar-size-field')
-  await expect(size).toHaveValue('')
+  await expect.poll(() => sizeShowsMixed(page)).toBe(true)
   await enter(size, '90')
   await expect.poll(async () => Promise.all(everyCopy('headline').map((id) => sizeOf(page, id)))).toEqual([90, 90, 90])
   await expect(size).toHaveValue('90')
@@ -229,6 +236,32 @@ test('a drag moves every copy by the same amount as the pointer, and the arrow k
   await undo(page)
   expect((await placesOf(page, everyCopy('badge'))).map((p, i) => p.x - (before[i]?.x ?? 0))).toEqual([2, 2, 2])
   expect((await placesOf(page, everyCopy('badge'))).map((p, i) => p.y - (before[i]?.y ?? 0))).toEqual([0, 0, 0])
+  expect(errors).toEqual([])
+})
+
+test('a resize from a handle changes every copy by the same amount, as one undo step', async ({ browser }) => {
+  const { page, errors } = await open(browser)
+  await selectCopies(page, 'badge')
+  const sizes = async () =>
+    (await Promise.all(everyCopy('badge').map((id) => node(page, id)))).map((one) => one?.props.width as number)
+  const before = await sizes()
+  const handle = await page.locator('.stage-overlay .selection .handle[data-handle="e"]').boundingBox()
+  if (!handle) throw new Error('no handle')
+  const zoom = (await page.evaluate(() => window.dazbee?.camera().zoom)) ?? 1
+  const at = { x: handle.x + handle.width / 2, y: handle.y + handle.height / 2 }
+  await page.mouse.move(at.x, at.y)
+  await page.mouse.down()
+  for (let step = 1; step <= 10; step++) await page.mouse.move(at.x + step * 4, at.y)
+  await page.mouse.up()
+  await drawn(page)
+  const after = await sizes()
+  const grown = after.map((width, i) => width - (before[i] ?? 0))
+  expect(Math.abs((grown[0] ?? 0) - 40 / zoom)).toBeLessThanOrEqual(1)
+  expect(grown.every((by) => by === grown[0])).toBe(true)
+  await undo(page)
+  expect(await sizes()).toEqual(before)
+  await redo(page)
+  expect(await sizes()).toEqual(after)
   expect(errors).toEqual([])
 })
 
@@ -371,7 +404,7 @@ for (const [width, height] of SCREEN_SIZES) {
   }) => {
     const { page, errors } = await openAt(browser, width, height)
     await selectTwoFrames(page)
-    await expect(page.getByTestId('bar-size-field')).toHaveValue('')
+    await expect.poll(() => sizeShowsMixed(page)).toBe(true)
     await nextFrame(page)
     expect(await layoutProblems(page, { pieces: PIECES, uncut: UNCUT })).toEqual([])
     const x = (await openCard(page, 'layout-card')).getByRole('spinbutton', { name: 'X position' })

@@ -18,6 +18,7 @@ import {
   SWATCH_KIT,
   SWATCH_PANELS,
   type SwatchControl,
+  type SwatchPanel,
   swatchTouches,
   type Touch,
 } from '../../support/swatches.ts'
@@ -170,6 +171,52 @@ test.describe('found by review', () => {
         await page.keyboard.press('Escape')
         await expect(shown).toBeHidden()
       }
+      await page.keyboard.press('Escape')
+      await expect(page.locator('#edit-panel')).toHaveCount(0)
+    }
+    expect(errors).toEqual([])
+  })
+
+  test('on a phone a row of swatches spreads across its row, its first and last targets at its two ends', async ({
+    browser,
+  }) => {
+    const brandId = await newBrand('e2e phone swatch rows')
+    await putKit(brandId, SWATCH_KIT)
+    const { page, errors } = await openSized(browser, { width: 390, height: 844 }, { brandId })
+    const panel = await (SWATCH_PANELS[0] as SwatchPanel).open(page)
+    const row = panel.getByTestId('brand-colours').getByRole('group').first()
+    const ends = await row.evaluate((el) => {
+      const box = el.getBoundingClientRect()
+      const targets = [...el.children].map((one) => one.getBoundingClientRect())
+      const firstLine = targets.filter((one) => Math.abs(one.top - (targets[0]?.top ?? 0)) < 1)
+      return {
+        start: (firstLine[0]?.left ?? 0) - box.left,
+        end: box.right - (firstLine.at(-1)?.right ?? 0),
+        wraps: firstLine.length < targets.length,
+      }
+    })
+    expect(ends.wraps).toBe(true)
+    expect(ends.start).toBeLessThanOrEqual(1)
+    expect(ends.end).toBeLessThanOrEqual(1)
+    expect(errors).toEqual([])
+  })
+
+  test('at 820×1180 on a touch screen every swatch-like control is a 44 px target 8 px from the next, as on a phone', async ({
+    browser,
+  }) => {
+    const brandId = await newBrand('e2e tablet swatches')
+    await putKit(brandId, SWATCH_KIT)
+    const { page, errors } = await openSized(
+      browser,
+      { width: 820, height: 1180 },
+      { brandId, touch: true, mobile: true },
+    )
+    for (const { name, open, controls } of SWATCH_PANELS) {
+      const panel = await open(page)
+      const room = await panel.boundingBox()
+      if (!room) throw new Error(`${name} has no box`)
+      for (const control of controls)
+        expectTouchTargets(await swatchTouches(panel, control), `${name}, ${control.control}`, room)
       await page.keyboard.press('Escape')
       await expect(page.locator('#edit-panel')).toHaveCount(0)
     }

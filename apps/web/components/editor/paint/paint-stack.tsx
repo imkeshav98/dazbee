@@ -13,7 +13,7 @@ import { type Paint, withAlpha } from '@dazbee/schema'
 
 import { useBrandKit } from '@/components/brand-kit/use-brand-kit.ts'
 import { useBesidePanel } from '@/components/editor/beside-panel.ts'
-import { Choice, clamp, ColorField, NumberField } from '@/components/editor/edit-panel/fields.tsx'
+import { Choice, clamp, ColorField, NumberField, OpacityField } from '@/components/editor/edit-panel/fields.tsx'
 import type { P } from '@/components/editor/edit-panel/target.ts'
 import { ImagePickerButton } from '@/components/editor/image-tool.tsx'
 import { CHIP, FACE_SIZE, ICON_BUTTON, KNOBS, SQUARE_SWATCH_TARGET, SWATCH_ROW } from '@/components/editor/styles.ts'
@@ -159,19 +159,13 @@ export function PaintRow({
       ) : (
         <>
           <span className="min-w-0 flex-1 truncate text-xs text-muted">{p.paint[paint.type]}</span>
-          <div className="w-[4.5rem] shrink-0">
-            <NumberField
-              label="%"
-              name={format(p.alpha, { name })}
-              value={paint.opacity ?? 1}
-              scale={100}
-              min={0}
-              max={1}
-              editor={editor}
-              onSet={(v) => onSet((now) => ({ ...now, opacity: tidy(v) }))}
-              onShift={(by) => onSet((now) => ({ ...now, opacity: tidy(clamp((now.opacity ?? 1) + by, 0, 1)) }))}
-            />
-          </div>
+          <OpacityField
+            name={format(p.alpha, { name })}
+            value={paint.opacity ?? 1}
+            editor={editor}
+            onSet={(v) => onSet((now) => ({ ...now, opacity: tidy(v) }))}
+            onShift={(by) => onSet((now) => ({ ...now, opacity: tidy(clamp((now.opacity ?? 1) + by, 0, 1)) }))}
+          />
         </>
       )}
       <button

@@ -6,7 +6,7 @@ import { type DesignInput, DesignSummary, TemplateSummary } from '@dazbee/schema
 import { editorPath, writeOutput } from '../../support/editor.ts'
 import { rowHeights } from '../../support/layout.ts'
 import { TILE_MENU } from '../../support/menu-rows.ts'
-import { API_URL, DEV_BRAND, frameDesign, seed } from '../../support/seed.ts'
+import { API_URL, DEV_BRAND, frameDesign, seed, SHORT_ID } from '../../support/seed.ts'
 import { expect, test } from '../../support/test.ts'
 
 test.describe.configure({ timeout: 120_000 })
@@ -40,7 +40,7 @@ test('a design tile renames, duplicates and deletes its design', async ({ page }
   await renamed.getByRole('button', { name: `More for Autumn ${run}` }).click()
   await page.getByRole('menuitem', { name: 'Duplicate' }).click()
   await expect(page.getByTestId('design-tile').filter({ hasText: `Autumn ${run} copy` })).toBeVisible()
-  expect((await designs()).find((d) => d.name === `Autumn ${run} copy`)?.id).toMatch(/^[0-9a-z]{12}$/)
+  expect((await designs()).find((d) => d.name === `Autumn ${run} copy`)?.id).toMatch(new RegExp(`^${SHORT_ID}$`))
 
   // Delete asks first; Cancel keeps it, Delete takes it.
   await renamed.hover()

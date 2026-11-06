@@ -11,6 +11,7 @@
 // beside them lands on the knob around it.
 import {
   type ComponentProps,
+  type KeyboardEvent,
   type MouseEvent,
   type PointerEvent,
   type RefObject,
@@ -19,7 +20,7 @@ import {
   useState,
 } from 'react'
 
-import type { Editor } from '@dazbee/editor'
+import { type Editor, shortcutFor } from '@dazbee/editor'
 
 import { NUMBER_SELECTED, NUMBER_SELECTED_STRONG, NUMBER_TEXT } from '@/components/editor/styles.ts'
 import { cn } from '@/lib/cn.ts'
@@ -36,6 +37,20 @@ export interface NumberScrub {
   field: (width: number) => ScrubField
   onStart: () => void
   onScrub: (by: number) => void
+}
+
+/**
+ * What a field does with the keys its number input takes: the editor whose undo and redo they reach
+ * while nothing is `typed`, how to `commit` what is typed and `discard` it, how to `step` the value
+ * one way, and where Home and End go (`ends`), while they go somewhere.
+ */
+export interface NumberKeys {
+  editor?: Editor | undefined
+  typed: boolean
+  commit: (text: string) => void
+  discard: () => void
+  step: (sign: 1 | -1, event: KeyboardEvent<HTMLInputElement>) => void
+  ends?: { home: () => void; end: () => void } | undefined
 }
 
 /** What `useNumberInput` gives a number input: its input's ref, the knob's props and the input's. */
@@ -56,6 +71,36 @@ interface Press {
 
 /** How far a press moves, in px, before it is a drag. */
 const DRAG_START = 3
+
+/**
+ * What a key does in a number input, the same in every field. Undo and redo are the design's while
+ * nothing is typed; once something is, the field's own, taking back what was typed. Enter commits
+ * what is typed. Esc throws it away and selects the value again while the field keeps the focus, or
+ * with nothing typed lets go of the focus. The up and down arrows step the value, and Home and End
+ * go to its ends. The keys it takes are the field's, not the stage's.
+ */
+export function numberKeyDown(event: KeyboardEvent<HTMLInputElement>, entry: NumberEntry, keys: NumberKeys) {
+  const action = shortcutFor(event.nativeEvent)
+  if (keys.editor && !keys.typed && (action === 'undo' || action === 'redo')) {
+    event.preventDefault()
+    keys.editor.perform(action)
+  } else if (event.key === 'Enter') keys.commit(event.currentTarget.value)
+  else if (event.key === 'Escape') {
+    keys.discard()
+    if (keys.typed) entry.reselect()
+    else event.currentTarget.blur()
+  } else if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
+    event.preventDefault()
+    keys.discard()
+    keys.step(event.key === 'ArrowUp' ? 1 : -1, event)
+  } else if ((event.key === 'Home' || event.key === 'End') && keys.ends) {
+    // A range's ends, as a slider's; while a value is being typed they move the caret.
+    event.preventDefault()
+    if (event.key === 'Home') keys.ends.home()
+    else keys.ends.end()
+  } else return
+  event.stopPropagation()
+}
 
 /**
  * The input's ref, the props for a number input's knob (`knob`, the element pressed, and dragged

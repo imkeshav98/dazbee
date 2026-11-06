@@ -8,14 +8,24 @@ import { parseDesign } from '@dazbee/schema'
 
 import { designOf, editorPath, openTabs, reloads, settle, writeOutput } from '../../support/editor.ts'
 import { expectNode, openExport, runExport } from '../../support/export.ts'
-import { storeDesign } from '../../support/local-servers.ts'
+import { query } from '../../support/local-servers.ts'
 import { nameOf, TILE_MENU } from '../../support/menu-rows.ts'
-import { DEV_BRAND, liveDesign } from '../../support/seed.ts'
+import { DEV_BRAND, frameDesign, liveDesign, seed, SHORT_ID } from '../../support/seed.ts'
 import { expect, type Page, test } from '../../support/test.ts'
 
 test.describe.configure({ timeout: 120_000 })
 
-const SHORT = '[0-9a-z]{12}'
+/**
+ * Stores a design in a brand's workspace under the id given, with its Yjs state, straight into the
+ * sync server's database (packages/db's designs and design_states), as the API stores one it makes.
+ */
+function storeDesign(id: string, brandId: string, name: string, state: Uint8Array) {
+  const text = (value: string) => `'${value.replace(/'/g, "''")}'`
+  query(
+    `insert into designs (id, workspace_id, brand_id, name) select ${text(id)}, workspace_id, id, ${text(name)} from brands where id = ${text(brandId)}; ` +
+      `insert into design_states (design_id, state) values (${text(id)}, decode('${Buffer.from(state).toString('hex')}', 'hex'))`,
+  )
+}
 
 /** The ids of the frames in the tab's design. */
 const framesOf = async (page: Page) => Object.keys(JSON.parse(await designOf(page)).frames as object)
@@ -58,12 +68,12 @@ test('a design made in a new brand opens at a link of two short ids, its edits r
   await brands.getByRole('button', { name: 'New brand' }).click()
   await brands.getByRole('textbox', { name: 'Website or name' }).fill(brandName)
   await brands.getByRole('button', { name: 'Create' }).click()
-  await expect(page).toHaveURL(new RegExp(`/brands/${SHORT}$`))
+  await expect(page).toHaveURL(new RegExp(`/brands/${SHORT_ID}$`))
   const brandId = new URL(page.url()).pathname.split('/')[2] ?? ''
 
   await page.getByLabel('Brief').fill(name)
   await page.getByRole('button', { name: 'Make drafts' }).click()
-  await expect(page).toHaveURL(new RegExp(`/brands/${brandId}/designs/${SHORT}$`), { timeout: 20_000 })
+  await expect(page).toHaveURL(new RegExp(`/brands/${brandId}/designs/${SHORT_ID}$`), { timeout: 20_000 })
   await expect(page.getByTestId('status')).toHaveAttribute('data-ready', '', { timeout: 30_000 })
   const designId = new URL(page.url()).pathname.split('/')[4] ?? ''
   writeOutput('short-ids-1-editor.png', await page.screenshot())
@@ -87,7 +97,7 @@ test('a design made in a new brand opens at a link of two short ids, its edits r
   // The tile's menu opens over the page, outside the tile.
   await page.getByRole('menuitem', { name: nameOf(TILE_MENU, 'duplicate') }).click()
   const copy = page.getByTestId('design-tile').filter({ hasText: `${name} copy` })
-  await expect(copy).toHaveAttribute('data-design', new RegExp(`^${SHORT}$`))
+  await expect(copy).toHaveAttribute('data-design', new RegExp(`^${SHORT_ID}$`))
   const copyId = (await copy.getAttribute('data-design')) ?? ''
   expect(copyId).not.toBe(designId)
   await page.goto(editorPath(copyId, { brandId }))
@@ -117,4 +127,12 @@ test('a design whose id is a UUID still opens, syncs to a second tab and exports
   const got = await runExport(a)
   await expectNode(a, { frameIds, type: 'png' }, got)
   expect(errors).toEqual([])
+})
+
+test('a design link typed in upper case opens the design at its lower-case link', async ({ page }) => {
+  const id = await seed(frameDesign({ name: 'Typed in capitals' }))
+  await page.goto(editorPath(id.toUpperCase(), { brandId: DEV_BRAND.toUpperCase() }))
+  await expect(page).toHaveURL(new RegExp(`${editorPath(id)}$`))
+  await expect(page.getByTestId('status')).toHaveAttribute('data-ready', '', { timeout: 30_000 })
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Typed in capitals')
 })

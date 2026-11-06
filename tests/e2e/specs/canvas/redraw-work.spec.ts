@@ -124,7 +124,8 @@ async function redraws(page: Page, steps: Steps) {
     }
     const dragging: Redraw[] = []
     const end = editor.session.beginGesture()
-    for (let i = 0; i < 65; i++) {
+    // Each step moves the layer from where it is: an update that changes nothing writes nothing and draws nothing.
+    for (let i = 1; i <= 65; i++) {
       dragging.push(
         await redraw(() => editor.session.run('node.update', { ids: [dragId], patch: { x: 100 + i * 3, y: 100 + i } })),
       )

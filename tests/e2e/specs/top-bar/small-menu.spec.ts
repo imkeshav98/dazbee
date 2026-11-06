@@ -1,7 +1,7 @@
 // The small menu by the selection in Chromium: it sits by the selection after the view moves;
 // lock, duplicate, delete and hide act on the layer in its own frame only, by mouse and by key,
 // each one undo step; Delete is greyed on a locked layer; and its ⋯ shows its focus ring inside it.
-import { holders, node, open, redo, undo } from '../../support/linked-menu.ts'
+import { holders, node, open, PHONE, redo, undo } from '../../support/linked-menu.ts'
 import { copyIn } from '../../support/seed.ts'
 import { drawn, fitSettled, nextFrame, perform, selectLayers } from '../../support/stage.ts'
 import { expect, type Page, test } from '../../support/test.ts'
@@ -161,6 +161,46 @@ test.describe('the small menu', () => {
     })
     expect(ring.visible).toBe(true)
     expect(ring.inside).toBeGreaterThanOrEqual(1)
+    expect(errors).toEqual([])
+  })
+
+  test('on a phone its buttons are 44 px targets, 8 px apart', async ({ browser }) => {
+    const { page, errors } = await open(browser)
+    await page.setViewportSize(PHONE)
+    await fitSettled(page)
+    await selectLayers(page, ['headline'])
+    await expect(page.getByTestId('small-menu')).toBeVisible()
+    await expect.poll(() => byTheSelection(page)).not.toBeNull()
+    const boxes = await page
+      .getByTestId('small-menu')
+      .locator('button')
+      .evaluateAll((all) => all.map((one) => one.getBoundingClientRect().toJSON() as DOMRect))
+    expect(boxes.length).toBeGreaterThanOrEqual(5)
+    for (const box of boxes) expect([box.width, box.height]).toEqual([44, 44])
+    for (const [i, box] of boxes.slice(1).entries())
+      expect(Math.round(box.left - (boxes[i] as DOMRect).right)).toBeGreaterThanOrEqual(8)
+    expect(errors).toEqual([])
+  })
+
+  test('the wheel over it pans the stage, and Ctrl with the wheel zooms it, as over the canvas', async ({
+    browser,
+  }) => {
+    const { page, errors } = await open(browser)
+    await page.setViewportSize({ width: 1280, height: 760 })
+    await fitSettled(page)
+    await selectLayers(page, ['headline'])
+    await expect.poll(() => byTheSelection(page)).not.toBeNull()
+    const camera = () => page.evaluate(() => window.dazbee?.camera())
+    const before = await camera()
+    const menu = await page.getByTestId('small-menu').boundingBox()
+    await page.mouse.move((menu?.x ?? 0) + 6, (menu?.y ?? 0) + (menu?.height ?? 0) / 2)
+    await page.mouse.wheel(0, 80)
+    await expect.poll(async () => (await camera())?.y).toBe((before?.y ?? 0) - 80)
+    expect((await camera())?.x).toBe(before?.x)
+    await page.keyboard.down('Control')
+    await page.mouse.wheel(0, -60)
+    await page.keyboard.up('Control')
+    await expect.poll(async () => (await camera())?.zoom).toBeGreaterThan(before?.zoom ?? 0)
     expect(errors).toEqual([])
   })
 })

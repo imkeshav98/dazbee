@@ -24,6 +24,7 @@ export const FULL_MENU: readonly (Row & { group?: true })[] = [
   { id: 'more-paste', name: 'Paste', reads: 'Paste' },
   { id: 'duplicate', name: 'Duplicate', reads: 'DuplicateCtrl+D' },
   { id: 'more-copy-to-frames', name: 'Copy to other frames', reads: 'Copy to other frames' },
+  { id: 'selectLinkedCopies', name: 'Select copies', reads: 'Select copiesCtrl+Alt+A' },
   { id: 'boxSelection', name: 'Put in a box', reads: 'Put in a boxCtrl+Alt+G' },
   { id: 'ungroup', name: 'Ungroup', reads: 'UngroupCtrl+Shift+G', group: true },
   { id: 'mask', name: 'Use as mask', reads: 'Use as maskCtrl+Alt+M' },

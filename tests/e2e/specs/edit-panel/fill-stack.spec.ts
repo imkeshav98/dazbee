@@ -12,10 +12,18 @@ import { AssetLink, type DesignInput } from '@dazbee/schema'
 
 import { api, photo, upload } from '../../support/assets.ts'
 import { designOf, exportHashOf, screenPoint, writeOutput } from '../../support/editor.ts'
+import { enter } from '../../support/fields.ts'
 import { openSized } from '../../support/frames-on-canvas.ts'
-import { frameDesign } from '../../support/seed.ts'
+import { frameDesign, newBrand, putKit } from '../../support/seed.ts'
 import { click, openStage, press, read } from '../../support/stage.ts'
-import { GRADIENT_STOPS, TOUCH_TARGET, touchOf } from '../../support/swatches.ts'
+import {
+  GRADIENT_STOPS,
+  SWATCH_KIT,
+  SWATCH_PANELS,
+  type SwatchPanel,
+  TOUCH_TARGET,
+  touchOf,
+} from '../../support/swatches.ts'
 import { type Browser, expect, type Locator, type Page, test } from '../../support/test.ts'
 import { barMenu, fillList, openCard, strokeList } from '../../support/top-bar.ts'
 
@@ -175,6 +183,47 @@ test('a gradient over a photo: added on top, a stop edited, the two reordered, o
   // Each change was one undo step: show, hide, the two moves, the stop added, the colour, the gradient, the add.
   for (let i = 0; i < 9; i++) await press(page, 'undo')
   expect(await fillsOf(page)).toEqual([{ type: 'image', assetId: asset.id, fit: 'fill', opacity: 1 }])
+  expect(errors).toEqual([])
+})
+
+test('every fill row’s opacity reads its percent after its digits, the fill’s line never across its digits or %', async ({
+  browser,
+}) => {
+  const brandId = await newBrand('e2e fill opacity')
+  await putKit(brandId, SWATCH_KIT)
+  const { page, errors } = await openSized(browser, { width: 1280, height: 760 }, { brandId })
+  const panel = await (SWATCH_PANELS[0] as SwatchPanel).open(page)
+  // The first fill a line gradient, the second a solid colour, each at 100%.
+  const picker = panel.getByTestId('colour-picker')
+  await picker.getByRole('radio', { name: 'Line gradient' }).click()
+  const opacities = panel.getByTestId('fill-list').locator('[data-scrub]')
+  await expect(opacities).toHaveCount(2)
+  for (const [at, knob] of [...(await opacities.all()), ...(await opacities.all())].entries()) {
+    // Each at 100%, then each typed down to 75%, where a line at the fill's end would cross the digits.
+    const value = at < 2 ? '100' : '75'
+    if (value === '75') {
+      await enter(knob.getByRole('spinbutton'), '75')
+      await expect(knob.getByRole('spinbutton')).toHaveValue('75')
+    }
+    const read = await knob.evaluate((el) => {
+      const input = el.querySelector('input') as HTMLInputElement
+      const unit = [...el.querySelectorAll('span')].find((one) => one.textContent === '%')
+      const [box, digits, sign] = [
+        el.getBoundingClientRect(),
+        input.getBoundingClientRect(),
+        unit?.getBoundingClientRect(),
+      ]
+      const marker = getComputedStyle(el, '::after')
+      const line = box.left + Number.parseFloat(marker.insetInlineStart) - Number.parseFloat(marker.width) / 2
+      // The digits end inside the input's 2 px of room for the caret, where the % starts.
+      return {
+        value: input.value,
+        after: !!sign && sign.left >= digits.right - 3,
+        clear: !el.hasAttribute('data-ranged') || line - (sign?.right ?? 0) >= 3 || line < digits.left - 3,
+      }
+    })
+    expect(read).toEqual({ value, after: true, clear: true })
+  }
   expect(errors).toEqual([])
 })
 

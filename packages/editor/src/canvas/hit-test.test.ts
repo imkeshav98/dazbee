@@ -1,55 +1,12 @@
 import { describe, expect, it } from 'vitest'
 
 import type { SceneLayer } from '@dazbee/renderer'
-import { loadCanvasKit } from '@dazbee/renderer/node'
 import { LAYER_PROPS, type LayerType, type TextProps } from '@dazbee/schema'
 
 import { hitTest, type Looks } from './hit-test.ts'
+import { CUT_OUT, FAINT, HALF } from './test-images.ts'
 import { testLooks } from './test-looks.ts'
 
-const ck = await loadCanvasKit()
-
-/** An image drawn with CanvasKit: `paint` draws on a clear canvas of its size. */
-const drawImage = (
-  width: number,
-  height: number,
-  paint: (fill: (rect: Float32Array, alpha: number) => void) => void,
-) => {
-  const surface = ck.MakeSurface(width, height)
-  if (!surface) throw new Error('no surface')
-  const canvas = surface.getCanvas()
-  canvas.clear(ck.TRANSPARENT)
-  paint((rect, alpha) => {
-    const p = new ck.Paint()
-    p.setColor(ck.Color(200, 40, 40, alpha))
-    canvas.drawRect(rect, p)
-    p.delete()
-  })
-  const image = surface.makeImageSnapshot()
-  surface.delete()
-  return image
-}
-/** A 200 × 100 image: its left half opaque, its right half clear. */
-const HALF = drawImage(200, 100, (fill) => fill(ck.XYWHRect(0, 0, 100, 100), 1))
-/** A 200 × 100 image: its left half 5% opaque, its right half 20%. */
-const FAINT = drawImage(200, 100, (fill) => {
-  fill(ck.XYWHRect(0, 0, 100, 100), 0.05)
-  fill(ck.XYWHRect(100, 0, 100, 100), 0.2)
-})
-/** A 3000 × 2000 cut-out: a disc filling it, its corners clear. */
-const CUT_OUT = (() => {
-  const surface = ck.MakeSurface(3000, 2000)
-  if (!surface) throw new Error('no surface')
-  const canvas = surface.getCanvas()
-  canvas.clear(ck.TRANSPARENT)
-  const p = new ck.Paint()
-  p.setColor(ck.Color(20, 120, 220, 1))
-  canvas.drawOval(ck.XYWHRect(0, 0, 3000, 2000), p)
-  p.delete()
-  const image = surface.makeImageSnapshot()
-  surface.delete()
-  return image
-})()
 /** What the hit test reads: the alpha maps of the images above, and text laid out with the shipped fonts. */
 const looks = testLooks({ half: HALF, faint: FAINT, cutout: CUT_OUT })
 /** The same, with no alpha map yet: every image still loading. */
@@ -352,6 +309,25 @@ describe('hitTest', () => {
     expect(idAt([under, locked], 160, 160)).toBe('child')
   })
 
+  it('reads an open path with no fill by its kept band alone, never its outline, as a hover over many does', () => {
+    const arc = shape(
+      'arc',
+      { kind: 'path', d: 'M0 0 C100 400 300 400 400 0' },
+      { x: 0, y: 0, width: 400, height: 400 },
+      [],
+    )
+    const stroked = layer('arc', 'graphic', { ...arc.props, strokes: [OUTLINE] })
+    const read: string[] = []
+    const counting: Looks = {
+      ...looks,
+      outline: (one) => (read.push('outline'), looks.outline(one)),
+      band: (one, reach) => (read.push('band'), looks.band(one, reach)),
+    }
+    expect(hitTest([stroked], { x: 200, y: 100 }, counting, {})).toBeNull()
+    expect(hitTest([stroked], { x: 200, y: 299 }, counting, {})?.id).toBe('arc')
+    expect(read).toEqual(['band', 'band'])
+  })
+
   it('picks a line near it, however thin its box, and a boolean by the shapes inside it (#44)', () => {
     const line = layer('line', 'graphic', {
       x: 0,
@@ -520,6 +496,16 @@ describe('hitTest', () => {
     expect(idAt(over(faded('pane', { ...glass, opacity: 0 })), 50, 50)).toBe('pane')
     // Its group's opacity fades the glass with the rest.
     expect(idAt(over(layer('group', 'group', { ...SQUARE, opacity: 0 }, [faded('pane', glass)])), 50, 50)).toBe('under')
+  })
+
+  it('picks frosted text anywhere in its box, which it frosts whole, not only on its lines', () => {
+    const glass = { effects: [{ type: 'backgroundBlur', radius: 20 }] }
+    const words = text('words', 'Hi', { x: 0, y: 0, width: 600, height: 300 }, glass)
+    const layers = [rect('under', 0, 0, 800, 400), words]
+    expect(idAt(layers, 15, 25)).toBe('words')
+    expect(idAt(layers, 300, 25)).toBe('words')
+    expect(idAt(layers, 15, 250)).toBe('words')
+    expect(idAt(layers, 700, 350)).toBe('under')
   })
 
   it('picks a selected layer that shows nothing anywhere in its box, and a visible one only where it shows', () => {

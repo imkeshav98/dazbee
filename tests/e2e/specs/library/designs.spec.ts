@@ -1,5 +1,6 @@
 // Designs per brand (#33): made from the brand's home (#84), opened from the API, kept across reloads.
 import { writeOutput } from '../../support/editor.ts'
+import { frameDesign, newBrand, seed, SHORT_ID } from '../../support/seed.ts'
 import { expect, test } from '../../support/test.ts'
 
 test('a design made from the brand list opens in the editor and is there after a reload', async ({ page }) => {
@@ -17,7 +18,7 @@ test('a design made from the brand list opens in the editor and is there after a
 
   await page.getByLabel('Brief').fill(name)
   await page.getByRole('button', { name: 'Make drafts' }).click()
-  await expect(page).toHaveURL(/\/brands\/dev-brand-coffee\/designs\/[0-9a-z]{12}$/)
+  await expect(page).toHaveURL(new RegExp(`/brands/dev-brand-coffee/designs/${SHORT_ID}$`))
   await expect(page.getByRole('heading', { level: 1 })).toHaveText(name)
   await expect(page.getByTestId('status')).toHaveAttribute('data-ready', '', { timeout: 30_000 })
   const design = await page.evaluate(() => window.dazbee?.design())
@@ -52,4 +53,18 @@ test('a design id from another brand is not found', async ({ page, allowProblems
   const designId = page.url().split('/').pop()
   const response = await page.goto(`/brands/dev-brand-coffee/designs/${designId}`)
   expect(response?.status()).toBe(404)
+})
+
+test('a brand with one design counts it in the singular', async ({ page }) => {
+  const name = `Single Origin ${crypto.randomUUID().slice(0, 4)}`
+  const brandId = await newBrand(name)
+  await seed(frameDesign({ name: 'Only one' }), { brandId })
+
+  await page.goto(`/brands/${brandId}/designs`)
+  await expect(page.getByRole('main')).toContainText('1 design')
+  await expect(page.getByRole('main')).not.toContainText('1 designs')
+  await page.goto('/')
+  await expect(
+    page.getByRole('list', { name: 'Brands' }).getByRole('link', { name: new RegExp(`^${name}`) }),
+  ).toContainText(/1 design$/)
 })

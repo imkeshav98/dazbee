@@ -6,9 +6,6 @@
 // from the moment it goes down or up: the value reached stays, and the rest of the drag goes at the
 // new speed. Values are as the field shows them, after its scale.
 
-/** Screen pixels a drag moves a field without a fill by for each step it shows. */
-export const PX_PER_STEP = 2
-
 /** A field as a scrub sees it, in the value as shown. */
 export interface ScrubField {
   /** One step of the value. */
@@ -39,6 +36,9 @@ export interface Scrub {
   /** The value the drag has reached. */
   value: number
 }
+
+/** Screen pixels a drag moves a field without a fill by for each step it shows. */
+export const PX_PER_STEP = 2
 
 /**
  * A field as a scrub sees it, from the field's own numbers: its step as shown, its limits and its

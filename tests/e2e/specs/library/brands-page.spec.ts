@@ -1,6 +1,7 @@
 // The Brands page (ADR-0011, ADR-0013) as in the final mock: a card per brand in its kit's colours,
 // with how many designs it has, and a last card that adds a brand and opens its home.
 import { writeOutput } from '../../support/editor.ts'
+import { SHORT_ID } from '../../support/seed.ts'
 import { expect, test } from '../../support/test.ts'
 
 test('each brand has a card with its design count, and New brand adds one', async ({ page }) => {
@@ -25,7 +26,7 @@ test('each brand has a card with its design count, and New brand adds one', asyn
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('What are we making today?')
   await expect(page.getByTestId('brand-switcher')).toContainText(name)
   // A new brand's link holds its short id.
-  await expect(page).toHaveURL(/\/brands\/[0-9a-z]{12}$/)
+  await expect(page).toHaveURL(new RegExp(`/brands/${SHORT_ID}$`))
 
   await page.goto('/')
   await expect(clients.getByRole('link', { name: new RegExp(`^${name}`) })).toContainText('No designs yet')

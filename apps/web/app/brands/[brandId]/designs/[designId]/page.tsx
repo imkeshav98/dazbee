@@ -1,5 +1,5 @@
 import { cookies } from 'next/headers'
-import { notFound } from 'next/navigation'
+import { notFound, redirect } from 'next/navigation'
 
 import { AccountMenu } from '@/components/library/account-menu.tsx'
 import { brandWords } from '@/lib/i18n/index.ts'
@@ -13,6 +13,9 @@ export const metadata = { title: 'Dazbee editor' }
 
 export default async function EditPage({ params }: { params: Promise<{ brandId: string; designId: string }> }) {
   const { brandId, designId } = await params
+  // Ids are lower case, so a link typed or pasted in upper case opens the same design.
+  if (brandId !== brandId.toLowerCase() || designId !== designId.toLowerCase())
+    redirect(`/brands/${brandId.toLowerCase()}/designs/${designId.toLowerCase()}`)
   const [found, workspace, t, jar] = await Promise.all([
     findDesign(brandId, designId),
     getWorkspace(),

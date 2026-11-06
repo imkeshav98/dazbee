@@ -73,6 +73,8 @@ const SIZE_LABEL_WIDTH = 120
 const SIZE_CLEARANCE = 72
 /** The room the selection's size label takes, in screen pixels. */
 const SIZE_LABEL_HEIGHT = 20
+/** Pixels the size label keeps from a frame's label it moves off. */
+const LABEL_GAP = 4
 /** Screen pixels the selection's size label keeps inside the stage's sides. */
 const SIZE_LABEL_INSET = 8
 
@@ -159,13 +161,11 @@ export function editorOverlay({
     const top = Math.min(...ys)
     const bottom = Math.max(...ys)
     const { height } = view.viewport()
-    const chrome = view.insets()
     const below = bottom + 8
     const above = top - 26
     if (bottom <= 0) return Math.min(below, -SIZE_LABEL_HEIGHT)
     if (top >= height) return Math.max(above, height)
-    const floor = height - Math.max(SIZE_CLEARANCE, chrome.bottom) - 24
-    const ceiling = Math.max(SIZE_LABEL_INSET, chrome.top)
+    const { floor, ceiling } = sizeLabelRoom()
     if (below <= floor) return Math.max(below, ceiling)
     if (above >= ceiling) return Math.max(ceiling, Math.min(above, floor))
     return Math.max(ceiling, floor)
@@ -261,10 +261,21 @@ export function editorOverlay({
     return { parts, size: { el: size, span: { left: Math.min(...xs), right: Math.max(...xs) } } }
   }
 
+  /** The highest and lowest top the size label takes on the stage, clear of the chrome along its top and bottom. */
+  function sizeLabelRoom() {
+    const { height } = view.viewport()
+    const chrome = view.insets()
+    return {
+      floor: height - Math.max(SIZE_CLEARANCE, chrome.bottom) - 24,
+      ceiling: Math.max(SIZE_LABEL_INSET, chrome.top),
+    }
+  }
+
   /**
    * Puts the size label centred under the selection's span across the stage, kept SIZE_LABEL_INSET
    * inside the stage's sides and clear of the chrome along them, at the left when there is no room
-   * for both. A selection wholly off the stage takes it wholly off the stage with it. Measured once
+   * for both, then off every frame's label: above the one it would cover while there is room, else
+   * below it. A selection wholly off the stage takes it wholly off the stage with it. Measured once
    * it is drawn.
    */
   function placeSizeLabel(size: HTMLElement, span: Span) {
@@ -277,6 +288,22 @@ export function editorOverlay({
     if (span.right <= 0) size.style.left = px(Math.min(centred, -width))
     else if (span.left >= room) size.style.left = px(Math.max(centred, room))
     else size.style.left = px(Math.max(low, Math.min(centred, high)))
+    const labels = view.inView().flatMap((frame) => labelBox(frame, view.camera()) ?? [])
+    const { floor, ceiling } = sizeLabelRoom()
+    const left = Number.parseFloat(size.style.left)
+    for (let tries = 0; tries < labels.length; tries++) {
+      const top = Number.parseFloat(size.style.top)
+      const under = labels.find(
+        (box) =>
+          left < box.x + box.width &&
+          box.x < left + width &&
+          top < box.y + box.height &&
+          box.y < top + SIZE_LABEL_HEIGHT,
+      )
+      if (!under) return
+      const above = under.y - SIZE_LABEL_HEIGHT - LABEL_GAP
+      size.style.top = px(above >= ceiling ? above : Math.min(floor, under.y + under.height + LABEL_GAP))
+    }
   }
 
   function drawOverlay() {

@@ -61,7 +61,7 @@ const withCorner = () => {
 
 /**
  * What covers what: the small menu over each frame label it meets, and the size label's reach past
- * the screen or over the chrome.
+ * the screen, over a frame's label or over the chrome.
  */
 const problems = (page: Page) =>
   page.evaluate((chrome) => {
@@ -80,7 +80,12 @@ const problems = (page: Page) =>
     if (!size) found.push('no size label')
     else if (size.left < 0 || size.right > width || size.top < 0 || size.bottom > window.innerHeight)
       found.push(`the size label (${Math.round(size.left)}–${Math.round(size.right)}) runs off the screen (${width})`)
-    else
+    else {
+      for (const label of document.querySelectorAll<HTMLElement>('.stage-overlay .frame-label')) {
+        const box = label.getBoundingClientRect()
+        if (size.left < box.right && box.left < size.right && size.top < box.bottom && box.top < size.bottom)
+          found.push(`the size label covers the ${label.dataset.frame} label`)
+      }
       for (const piece of chrome)
         for (const el of document.querySelectorAll(piece)) {
           const box = el.getBoundingClientRect()
@@ -93,6 +98,7 @@ const problems = (page: Page) =>
           )
             found.push(`the size label is under ${piece}`)
         }
+    }
     return found
   }, CHROME)
 
@@ -125,13 +131,16 @@ async function openCase(page: Page, one: (typeof CASES)[number]) {
 
 for (const [width, height] of SCREEN_SIZES) {
   for (const one of CASES) {
-    test(`at ${width}×${height} with a layer ${one.name}, the small menu keeps off the frames’ labels and the size stays on the screen`, async ({
+    test(`at ${width}×${height} with a layer ${one.name}, the small menu keeps off the frames’ labels, the size stays on the screen, and no tooltip shows`, async ({
       browser,
     }) => {
       const { page, errors } = await openSized(browser, { width, height }, { input: withCorner() })
       await openCase(page, one)
       await expect(page.getByTestId('small-menu')).toBeVisible()
       await expect.poll(() => problems(page)).toEqual([])
+      // With nothing hovered no tooltip shows, the top bar's Position's included.
+      await nextFrame(page)
+      await expect(page.getByRole('tooltip')).toHaveCount(0)
       expect(errors).toEqual([])
     })
   }

@@ -24,6 +24,18 @@ import { openCard } from '../../support/top-bar.ts'
 
 test.describe.configure({ timeout: 120_000 })
 
+/** One of the shared field's fields, as a number input to open: the box selected, its card open. */
+const fieldInput = (field: (typeof FIELDS)[keyof typeof FIELDS]): NumberInput => ({
+  name: field.name,
+  value: '',
+  open: async (page) => {
+    await selectLayers(page, ['box'], { card: field.card })
+    const input = (await openCard(page, field.card)).getByRole('spinbutton', { name: field.name, exact: true })
+    await input.scrollIntoViewIfNeeded()
+    return input
+  },
+})
+
 /** Whether an element's edge is drawn in the accent, as the theme has it. */
 const edgeIsAccent = (edge: Locator) =>
   edge.evaluate((el) => {
@@ -34,6 +46,33 @@ const edgeIsAccent = (edge: Locator) =>
     probe.remove()
     return getComputedStyle(el).borderTopColor === accent
   })
+
+/**
+ * The middle of the field, and a press just before the first digit drawn: 4 px with a mouse; 6 px
+ * with a finger, a tap a phone's browser moves onto the input, or half way from the field's edge
+ * where the room is narrower, as between the font size's − and its digits. The digits end at the
+ * input's content edge, as wide as the text they draw.
+ */
+async function pointsOf(screen: FieldScreen, field: Locator, input: Locator) {
+  const f = await field.boundingBox()
+  if (!f) throw new Error('no number input on screen')
+  const first = await input.evaluate((el: HTMLInputElement) => {
+    const probe = document.createElement('canvas').getContext('2d')
+    if (!probe) throw new Error('no canvas')
+    const style = getComputedStyle(el)
+    probe.font = `${style.fontSize} ${style.fontFamily}`
+    const box = el.getBoundingClientRect()
+    return (
+      box.right -
+      parseFloat(style.paddingRight) -
+      parseFloat(style.borderRightWidth) -
+      probe.measureText(el.value).width
+    )
+  })
+  const y = f.y + f.height / 2
+  const beside = screen.touch ? Math.max(first - 6, (f.x + first) / 2) : first - 4
+  return { middle: { x: f.x + f.width / 2, y }, beside: { x: beside, y } }
+}
 
 /** Opens the design at a screen size in a theme. */
 async function openScreen(
@@ -71,49 +110,10 @@ async function openInput(
   return { page, errors, input, field, edge: number.edge?.(page) ?? field }
 }
 
-/** One of the shared field's fields, as a number input to open: the box selected, its card open. */
-const fieldInput = (field: (typeof FIELDS)[keyof typeof FIELDS]): NumberInput => ({
-  name: field.name,
-  value: '',
-  open: async (page) => {
-    await selectLayers(page, ['box'], { card: field.card })
-    const input = (await openCard(page, field.card)).getByRole('spinbutton', { name: field.name, exact: true })
-    await input.scrollIntoViewIfNeeded()
-    return input
-  },
-})
-
 /** Presses a point as the screen takes it: a tap on a touch screen, else a click. */
 async function press(page: Page, screen: FieldScreen, at: { x: number; y: number }) {
   if (screen.touch) await page.touchscreen.tap(at.x, at.y)
   else await page.mouse.click(at.x, at.y)
-}
-
-/**
- * The middle of the field, and a press just before the first digit drawn: 4 px with a mouse; 6 px
- * with a finger, a tap a phone's browser moves onto the input, or half way from the field's edge
- * where the room is narrower, as between the font size's − and its digits. The digits end at the
- * input's content edge, as wide as the text they draw.
- */
-async function pointsOf(screen: FieldScreen, field: Locator, input: Locator) {
-  const f = await field.boundingBox()
-  if (!f) throw new Error('no number input on screen')
-  const first = await input.evaluate((el: HTMLInputElement) => {
-    const probe = document.createElement('canvas').getContext('2d')
-    if (!probe) throw new Error('no canvas')
-    const style = getComputedStyle(el)
-    probe.font = `${style.fontSize} ${style.fontFamily}`
-    const box = el.getBoundingClientRect()
-    return (
-      box.right -
-      parseFloat(style.paddingRight) -
-      parseFloat(style.borderRightWidth) -
-      probe.measureText(el.value).width
-    )
-  })
-  const y = f.y + f.height / 2
-  const beside = screen.touch ? Math.max(first - 6, (f.x + first) / 2) : first - 4
-  return { middle: { x: f.x + f.width / 2, y }, beside: { x: beside, y } }
 }
 
 for (const screen of FIELD_SCREENS) {

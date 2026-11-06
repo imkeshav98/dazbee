@@ -6,20 +6,11 @@ import type { Point, Rect, RunStyle } from '@dazbee/schema'
 
 import { type Camera, toScreen, toWorld } from '../../canvas/camera.ts'
 import { type Frame, frameAt, intersects } from '../../canvas/frames.ts'
-import { px } from '../../canvas/rulers.ts'
 import type { FrameScenes } from '../../canvas/scenes.ts'
 import { inFlow } from '../../layers/auto-layout.ts'
 import type { EditorBoxes, SelectionBox } from '../../layers/boxes.ts'
 import { resizedBoxes, scalingTexts, switchSizing } from '../../layers/resize.ts'
-import {
-  type Gap,
-  type Guide,
-  SNAP_DISTANCE,
-  snapMove,
-  snapResize,
-  snapTargets,
-  type Targets,
-} from '../../layers/snap.ts'
+import { SNAP_DISTANCE, snapMove, snapResize, snapTargets, type Targets } from '../../layers/snap.ts'
 import {
   angleOf,
   boundsOf,
@@ -43,6 +34,7 @@ import { runQuietly } from '../../run-quietly.ts'
 import type { EditorSelection, Selection } from '../../selection.ts'
 import type { EditorTyping } from '../../text/typing.ts'
 import { HANDLE_REACH, HANDLE_SIZE } from '../press.ts'
+import { dragParts, type Snapped } from './drag-parts.ts'
 
 /** The selected layers of one frame a move carries, inside their containers there, and their boxes as the drag began. */
 export interface MovePart {
@@ -63,22 +55,33 @@ export interface MoveDrag extends MovePart {
   copies: MovePart[]
   end: () => void
 }
-/** A drag of one of the selection's handles, from the press until it ends: one undo step. */
-export interface ResizeDrag {
-  kind: 'resize'
+/**
+ * The selected layers of one frame a resize changes, inside their containers there: their box and
+ * each one's as the drag began, and the text a corner scales, with its sizes as the drag began, how
+ * much, and the least it may.
+ */
+export interface ResizePart {
   frame: Frame
   around: Box[]
-  handle: Handle
   outer: Box
-  grab: Point
   roots: string[]
   boxes: Map<string, Box>
-  targets: Targets | null
-  switched: boolean
-  /** The text a corner scales, with its sizes as the drag began; how much, and the least it may. */
   texts: Map<string, ScaledText>
   factor: number
   floor: number
+}
+/**
+ * A drag of one of the selection's handles, from the press until it ends: one undo step. The frame
+ * whose box shows the handles is resized and snaps; `copies` holds the selected layers of the other
+ * frames, their boxes changed by the same amount.
+ */
+export interface ResizeDrag extends ResizePart {
+  kind: 'resize'
+  handle: Handle
+  grab: Point
+  targets: Targets | null
+  switched: boolean
+  copies: ResizePart[]
   end: () => void
 }
 /** A drag turning the selection from outside one of its corners, from the press until it ends: one undo step. */
@@ -110,7 +113,18 @@ export interface TransformDragDeps {
   scenes: Pick<FrameScenes, 'scene'>
   selection: Pick<EditorSelection, 'current' | 'pathEditing' | 'selectKeepingModes'>
   typing: Pick<EditorTyping, 'editing' | 'fitText'>
-  boxes: Pick<EditorBoxes, 'boxIn' | 'startBoxes' | 'pickable' | 'roots' | 'selectionBox' | 'handlesFor' | 'snapBoxes'>
+  boxes: Pick<
+    EditorBoxes,
+    | 'boxIn'
+    | 'startBoxes'
+    | 'pickable'
+    | 'roots'
+    | 'rootsByFrame'
+    | 'selectionBox'
+    | 'selectionBoxes'
+    | 'handlesFor'
+    | 'snapBoxes'
+  >
   camera: () => Camera
   /** The shown page's frames as last drawn. */
   frames: () => Frame[]
@@ -168,7 +182,7 @@ export function editorTransformDrag({
   scenes,
   selection,
   typing,
-  boxes: { boxIn, startBoxes, pickable, roots, selectionBox, handlesFor, snapBoxes },
+  boxes: { boxIn, startBoxes, pickable, roots, rootsByFrame, selectionBox, selectionBoxes, handlesFor, snapBoxes },
   camera,
   frames,
   hug,
@@ -176,7 +190,7 @@ export function editorTransformDrag({
   placeBox,
 }: TransformDragDeps): EditorTransformDrag {
   /** What the drag in progress snapped to, shown as guides and equal gaps (#42). */
-  let snapped: { frame: Frame; guides: Guide[]; gaps: Gap[] } | null = null
+  let snapped: Snapped | null = null
   /** Snapping's work since the editor opened: drags that gathered targets, moves that snapped, the last drag's targets. */
   const snapWork = { gathered: 0, moves: 0, targets: 0 }
   /** What each gesture has written so far, by its start boxes: `<id>|<property>`. */
@@ -197,7 +211,8 @@ export function editorTransformDrag({
   /** The handle under a screen point: one to resize by, or the zone outside a corner to turn by. */
   function handleUnder(screen: Point): Grab | null {
     const outer = selectionBox()
-    // A selection with no handles, locked in place or across frames, has no turning zones either.
+    // A selection with no handles, locked in place, has no turning zones either; across frames it
+    // has only its resize handles, so a turn never leaves the other copies as they were.
     if (!outer || typing.editing() || selection.pathEditing() || handlesFor().length === 0) return null
     const { frame, drawn: box } = outer
     const onScreen = (p: Point) => toScreen(camera(), { x: frame.x + p.x, y: frame.y + p.y })
@@ -216,62 +231,13 @@ export function editorTransformDrag({
     const world = toWorld(camera(), screen)
     const local = turn({ x: world.x - frame.x, y: world.y - frame.y }, c, -box.rotation)
     const inside = local.x >= box.x && local.x <= box.x + box.width && local.y >= box.y && local.y <= box.y + box.height
-    if (inside) return null
+    if (inside || selectionBoxes().length > 1) return null
     const corner = cornersOf(box).findIndex((p) => dist(onScreen(p)) <= ROTATE_REACH)
     return corner === -1 ? null : { kind: 'rotate', corner }
   }
   /** The marquee being dragged, then the snap guides and equal gaps of the drag in progress. */
-  function dragParts(marquee: MarqueeDrag | null) {
-    const parts: HTMLElement[] = []
-    if (marquee) {
-      const el = document.createElement('div')
-      el.className = 'marquee'
-      const from = toScreen(camera(), marquee.from)
-      const to = toScreen(camera(), marquee.to)
-      Object.assign(el.style, {
-        left: px(Math.min(from.x, to.x)),
-        top: px(Math.min(from.y, to.y)),
-        width: px(Math.abs(to.x - from.x)),
-        height: px(Math.abs(to.y - from.y)),
-      })
-      parts.push(el)
-    }
-    if (snapped) parts.push(...snapParts(snapped))
-    return parts
-  }
-  /** Snap guides as lines across the frame, and equal gaps as marked spans with their size. */
-  function snapParts({ frame, guides, gaps }: NonNullable<typeof snapped>) {
-    const parts: HTMLElement[] = []
-    for (const g of guides) {
-      const line = document.createElement('div')
-      line.className = 'guide'
-      line.dataset.axis = g.axis
-      placeBox(
-        line,
-        frame,
-        g.axis === 'x'
-          ? { x: g.at, y: g.from, width: 0, height: g.to - g.from }
-          : { x: g.from, y: g.at, width: g.to - g.from, height: 0 },
-      )
-      parts.push(line)
-    }
-    for (const g of gaps) {
-      const span = document.createElement('div')
-      span.className = 'gap'
-      span.dataset.axis = g.axis
-      placeBox(
-        span,
-        frame,
-        g.axis === 'x'
-          ? { x: g.from, y: g.at, width: g.to - g.from, height: 0 }
-          : { x: g.at, y: g.from, width: 0, height: g.to - g.from },
-      )
-      const size = document.createElement('span')
-      size.textContent = String(round(g.to - g.from, 0))
-      span.append(size)
-      parts.push(span)
-    }
-    return parts
+  function shownParts(marquee: MarqueeDrag | null) {
+    return dragParts(marquee, snapped, camera(), placeBox)
   }
 
   /** Lets the guides of the drag that snapped go, as every press ends. */
@@ -281,30 +247,25 @@ export function editorTransformDrag({
   /** A press on one of the selection's handles: a drag that resizes or turns it, one undo step. */
   function pressHandle(e: PointerEvent, screen: Point, grabbed: Grab, outer: SelectionBox): ResizeDrag | RotateDrag {
     canvas.setPointerCapture(e.pointerId)
-    const ids = roots()
+    const parts = rootsByFrame()
+    const ids = parts.find((part) => part.frame.id === outer.frame.id)?.ids ?? roots()
     const boxes = startBoxes(outer.frame, ids)
     const end = session.beginGesture()
     const world = toWorld(camera(), screen)
     const { around } = outer
     const grab = localTo({ x: world.x - outer.frame.x, y: world.y - outer.frame.y }, around)
     if (grabbed.kind === 'resize') {
-      const texts = scalingTexts(session.design(), ids, grabbed.handle)
-      // Scaled down, the smallest size anywhere in the text stops at 1 px.
-      const floor = Math.max(0, ...[...texts.values()].map((t) => 1 / smallestSize(t)))
+      const others = selectionBoxes().filter((other) => other.frame.id !== outer.frame.id)
       return {
         kind: 'resize',
-        frame: outer.frame,
-        around,
+        ...resizePart(outer, ids, grabbed.handle),
         handle: grabbed.handle,
-        outer: outer.box,
         grab,
-        roots: ids,
-        boxes,
         targets: targetsFor(outer.frame, ids, around),
         switched: false,
-        texts,
-        factor: 1,
-        floor,
+        copies: others.map((other) =>
+          resizePart(other, parts.find((part) => part.frame.id === other.frame.id)?.ids ?? [], grabbed.handle),
+        ),
         end,
       }
     }
@@ -318,6 +279,14 @@ export function editorTransformDrag({
       boxes,
       end,
     }
+  }
+  /** The layers of a frame's selection box a resize from `handle` changes, as the drag begins. */
+  function resizePart(outer: SelectionBox, ids: string[], handle: Handle): ResizePart {
+    const texts = scalingTexts(session.design(), ids, handle)
+    // Scaled down, the smallest size anywhere in the text stops at 1 px.
+    const floor = Math.max(0, ...[...texts.values()].map((t) => 1 / smallestSize(t)))
+    const { frame, around, box } = outer
+    return { frame, around, outer: box, roots: ids, boxes: startBoxes(frame, ids), texts, factor: 1, floor }
   }
   /** A press that moves the selection: a drag of the layers no flow places, one undo step. */
   function pressMove(
@@ -403,12 +372,7 @@ export function editorTransformDrag({
   /** Resizes the layers by the handle dragged, snapping its edges, scaling the text a corner scales. */
   function resizeTo(g: ResizeDrag, p: Point, keepRatio: boolean, fromCentre: boolean, snap: boolean) {
     // The handle follows the pointer from where it was grabbed, so a press off its centre doesn't jump.
-    const at = handleAt(g.handle)
-    const handle = turn(
-      { x: g.outer.x + at.x * g.outer.width, y: g.outer.y + at.y * g.outer.height },
-      centreOf(g.outer),
-      g.outer.rotation,
-    )
+    const handle = handleOf(g.outer, g.handle)
     const to = { x: handle.x + p.x - g.grab.x, y: handle.y + p.y - g.grab.y }
     // A corner that scales text keeps the box's shape, so the text scales as one.
     const scales = g.texts.size > 0
@@ -432,23 +396,42 @@ export function editorTransformDrag({
         outer = resizeBox(g.outer, g.handle, { x: to.x + s.dx, y: to.y + s.dy }, { keepRatio: ratio, fromCentre })
       snapped = { frame: g.frame, guides: s.guides, gaps: [] }
     }
-    if (scales) {
-      g.factor =
-        g.outer.width > 0 ? outer.width / g.outer.width : g.outer.height > 0 ? outer.height / g.outer.height : 1
-      if (g.factor < g.floor) {
-        g.factor = g.floor
-        outer = boxAt(g.outer, g.handle, g.factor, fromCentre)
+    if (!g.switched) {
+      g.switched = true
+      const now = session.design()
+      for (const part of [g, ...g.copies]) switchSizing(session, part.roots, g.handle, now, part.texts)
+    }
+    outer = resizePartTo(g, outer, g.handle, fromCentre)
+    // The other frames' boxes change by the same amount: each one's handle moves as far, along its own sides.
+    const moved = handleOf(outer, g.handle)
+    const from = handleOf(g.outer, g.handle)
+    const along = turn({ x: moved.x - from.x, y: moved.y - from.y }, { x: 0, y: 0 }, -g.outer.rotation)
+    for (const copy of g.copies) {
+      const start = handleOf(copy.outer, g.handle)
+      const by = turn(along, { x: 0, y: 0 }, copy.outer.rotation)
+      const to = { x: start.x + by.x, y: start.y + by.y }
+      resizePartTo(copy, resizeBox(copy.outer, g.handle, to, { keepRatio: ratio, fromCentre }), g.handle, fromCentre)
+    }
+  }
+  /**
+   * Resizes the layers of one frame from their box as the drag began to `to`, scaling the text a
+   * corner scales by as much, no less than it may; gives the box they take.
+   */
+  function resizePartTo(part: ResizePart, to: Box, handle: Handle, fromCentre: boolean) {
+    let outer = to
+    if (part.texts.size > 0) {
+      const start = part.outer
+      part.factor = start.width > 0 ? outer.width / start.width : start.height > 0 ? outer.height / start.height : 1
+      if (part.factor < part.floor) {
+        part.factor = part.floor
+        outer = boxAt(start, handle, part.factor, fromCentre)
       }
     }
     const now = session.design()
-    if (!g.switched) {
-      g.switched = true
-      switchSizing(session, g.roots, g.handle, now, g.texts)
-    }
-    const next = resizedBoxes(now, g.roots, g.boxes, g.outer, outer)
+    const next = resizedBoxes(now, part.roots, part.boxes, part.outer, outer)
     writeBoxes(
-      g.frame,
-      g.boxes,
+      part.frame,
+      part.boxes,
       new Map(
         [...next].map(([id, b]) => [
           id,
@@ -458,8 +441,8 @@ export function editorTransformDrag({
     )
     // The text a corner scales takes its sizes scaled from where they were: its style's, and each
     // of its own runs' on that run's characters.
-    for (const [id, start] of g.texts) {
-      const { runs, ...sized } = scaleText(start, g.factor)
+    for (const [id, start] of part.texts) {
+      const { runs, ...sized } = scaleText(start, part.factor)
       runQuietly(() => session.run('node.update', { ids: [id], patch: sized }))
       for (const run of runs) {
         const style = sizesOf(run.style)
@@ -470,8 +453,9 @@ export function editorTransformDrag({
       }
     }
     // Text that grows with its words takes the size its new width and sizes give it.
-    for (const id of new Set([...g.roots.filter((root) => now.nodes[root]?.type === 'text'), ...g.texts.keys()]))
+    for (const id of new Set([...part.roots.filter((root) => now.nodes[root]?.type === 'text'), ...part.texts.keys()]))
       typing.fitText(id)
+    return outer
   }
   /** Turns the layers about the selection's centre by the angle the pointer has turned through. */
   function rotateTo(g: RotateDrag, p: Point, snap: boolean) {
@@ -554,14 +538,14 @@ export function editorTransformDrag({
   }
   /** Ends a move, resize or turn: the groups around the layers fit them again, closing its undo step. */
   function release(g: TransformDrag) {
-    hug(g.kind === 'move' ? [g.roots, ...g.copies.map((copy) => copy.roots)].flat() : g.roots)
+    hug(g.kind === 'rotate' ? g.roots : [g.roots, ...g.copies.map((copy) => copy.roots)].flat())
     g.end()
   }
 
   return {
     snapWork: snapWorkSoFar,
     handleUnder,
-    parts: dragParts,
+    parts: shownParts,
     pressHandle,
     pressMove,
     drag,
@@ -570,6 +554,12 @@ export function editorTransformDrag({
     release,
     clearGuides,
   }
+}
+
+/** Where a handle of a box is, turned with it. */
+function handleOf(box: Box, handle: Handle): Point {
+  const at = handleAt(handle)
+  return turn({ x: box.x + at.x * box.width, y: box.y + at.y * box.height }, centreOf(box), box.rotation)
 }
 
 /** The frame and the layers a move, resize or turn carries, which may reach past the frame's edge; null for any other gesture. */
