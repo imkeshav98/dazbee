@@ -221,3 +221,26 @@ test('Esc that closes a menu goes no further: the full menu and the right-click 
   await expect.poll(selection).toEqual([])
   expect(errors).toEqual([])
 })
+
+test('a row the pointer moves onto is lit and never ringed, in a menu beside a row too; the keyboard rings it', async ({
+  browser,
+}) => {
+  const { page, errors } = await openAt(browser)
+  await selectLayers(page, ['headline'])
+  await page.getByTestId('bar-more').click()
+  await page.getByTestId('more-paste').click()
+  const sub = page.getByTestId('more-paste-menu')
+  await expect(sub).toBeVisible()
+  await entered(sub)
+  const outline = (id: string) =>
+    sub.locator(`[data-action="${id}"]`).evaluate((row) => getComputedStyle(row).outlineStyle)
+  for (const id of ['paste', 'pasteStyle']) {
+    await sub.locator(`[data-action="${id}"]`).hover()
+    await expect(sub.locator(`[data-action="${id}"]`)).toBeFocused()
+    expect(await outline(id), id).toBe('none')
+  }
+  await page.keyboard.press('ArrowUp')
+  await expect(sub.locator('[data-action="paste"]')).toBeFocused()
+  expect(await outline('paste')).toBe('solid')
+  expect(errors).toEqual([])
+})
