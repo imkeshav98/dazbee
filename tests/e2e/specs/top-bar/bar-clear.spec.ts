@@ -143,35 +143,46 @@ test('on a phone a press that selects a layer and drags it is not followed by a 
   const touch = await page.context().newCDPSession(page)
   const touchAt = (type: 'touchStart' | 'touchMove' | 'touchEnd', at?: { x: number; y: number }) =>
     touch.send('Input.dispatchTouchEvent', { type, touchPoints: at ? [at] : [] })
-  for (const id of ['card', 'star', 'photo']) {
+  // Long drags, and one just past what the stage takes for a drag, in 1 px moves.
+  for (const [id, zoom, steps, by] of [
+    ['card', 0.5, 10, 4],
+    ['star', 0.5, 10, 4],
+    ['photo', 0.5, 10, 4],
+    ['headline', 1, 4, 1],
+  ] as const) {
     await selectLayers(page, [])
-    // The layer's top 100 px down the screen at 50%, under where the bar's rows will be, pressed a
-    // little below its top.
-    const { at, before, camera } = await page.evaluate((id) => {
-      const editor = window.dazbee
-      const box = editor?.boxOf(id)
-      if (!editor || !box) throw new Error(`no ${id}`)
-      editor.setCamera({ ...editor.camera(), zoom: 0.5 })
-      const now = editor.camera()
-      const was = editor.screenPoint(box.x + box.width / 2, box.y)
-      editor.setCamera({ ...now, x: now.x + 195 - was.x, y: now.y + 100 - was.y })
-      return { at: { x: 195, y: 100 + Math.min(20, (box.height * 0.5) / 2) }, before: box, camera: editor.camera() }
-    }, id)
+    // The layer's top 100 px down the screen, under where the bar's rows will be, pressed a little
+    // below its top.
+    const { at, before, camera } = await page.evaluate(
+      ({ id, zoom }) => {
+        const editor = window.dazbee
+        const box = editor?.boxOf(id)
+        if (!editor || !box) throw new Error(`no ${id}`)
+        editor.setCamera({ ...editor.camera(), zoom })
+        const now = editor.camera()
+        const was = editor.screenPoint(box.x + box.width / 2, box.y)
+        editor.setCamera({ ...now, x: now.x + 195 - was.x, y: now.y + 100 - was.y })
+        return { at: { x: 195, y: 100 + Math.min(20, (box.height * zoom) / 2) }, before: box, camera: editor.camera() }
+      },
+      { id, zoom },
+    )
     await nextFrame(page)
     await touchAt('touchStart', at)
-    for (let step = 1; step <= 10; step++) await touchAt('touchMove', { x: at.x, y: at.y + step * 4 })
+    for (let step = 1; step <= steps; step++) await touchAt('touchMove', { x: at.x, y: at.y + step * by })
     await touchAt('touchEnd')
     await page.waitForTimeout(800)
     expect(await page.evaluate(() => window.dazbee?.selection()), id).toEqual([id])
     expect(await page.evaluate(() => window.dazbee?.camera()), `${id}: no move after the drag`).toEqual(camera)
     const after = await page.evaluate((id) => window.dazbee?.boxOf(id), id)
-    expect((after?.y ?? 0) - before.y, `${id}: moved with the finger`).toBeGreaterThan(60)
+    expect((after?.y ?? 0) - before.y, `${id}: moved with the finger`).toBeGreaterThan((steps * by) / zoom / 2)
   }
   expect(errors).toEqual([])
   await page.context().close()
 })
 
-test('on a phone a double tap on a text where the bar will show types in it', async ({ browser }) => {
+test('on a phone a double tap on a text where the bar will show types in it, the text brought clear under the bar', async ({
+  browser,
+}) => {
   const { page, errors } = await openPhone(browser, designId)
   const touch = await page.context().newCDPSession(page)
   for (const [zoom, top, gap] of [
@@ -206,6 +217,18 @@ test('on a phone a double tap on a text where the bar will show types in it', as
     }
     await expect(page.locator('.caret'), what).toBeVisible()
     expect(await page.evaluate(() => window.dazbee?.selection()), what).toEqual(['headline'])
+    // Once the double tap is done, the stage brings the text being typed in clear under the bar.
+    const caretClear = () =>
+      page.evaluate(() => {
+        const caret = document.querySelector('.caret')?.getBoundingClientRect()
+        const rows = ['top-bar-row', 'top-bar-overflow'].flatMap((row) => {
+          const el = document.querySelector(`[data-testid="${row}"]`)
+          return el?.checkVisibility({ visibilityProperty: true }) ? [el.getBoundingClientRect().bottom] : []
+        })
+        return caret !== undefined && rows.length > 0 && rows.every((bottom) => caret.top >= bottom)
+      })
+    await expect.poll(caretClear, what).toBe(true)
+    await expect(page.locator('.caret'), what).toBeVisible()
   }
   expect(errors).toEqual([])
   await page.context().close()
