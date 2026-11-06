@@ -75,6 +75,19 @@ async function inkRows(knob: Locator, parts: Locator[]) {
   return all
 }
 
+/** The knob of `field` in its open card, scrolled into view, and its input. */
+async function fieldIn(page: Page, field: Field) {
+  const knob = (await openCard(page, field.card)).locator(`[data-scrub="${field.name}"]`)
+  await knob.scrollIntoViewIfNeeded()
+  return { knob, input: knob.getByRole('spinbutton') }
+}
+/** A knob's box on screen, with its middle and its start. */
+async function middleOf(knob: Locator) {
+  const box = await knob.boundingBox()
+  if (!box) throw new Error('no field on screen')
+  return { ...box, x: box.x + box.width / 2, y: box.y + box.height / 2, left: box.x }
+}
+
 /** Presses the mouse at a point and moves it sideways by `by` px, 2 px at a time, as a hand would. */
 async function pressAndMove(page: Page, at: { x: number; y: number }, by: number) {
   await page.mouse.move(at.x, at.y)
@@ -106,16 +119,6 @@ async function openField(
   await fitSettled(page)
   await selectLayers(page, ['box'], { card: field.card })
   return { page, errors, ...(await fieldIn(page, field)) }
-}
-async function fieldIn(page: Page, field: Field) {
-  const knob = (await openCard(page, field.card)).locator(`[data-scrub="${field.name}"]`)
-  await knob.scrollIntoViewIfNeeded()
-  return { knob, input: knob.getByRole('spinbutton') }
-}
-async function middleOf(knob: Locator) {
-  const box = await knob.boundingBox()
-  if (!box) throw new Error('no field on screen')
-  return { ...box, x: box.x + box.width / 2, y: box.y + box.height / 2, left: box.x }
 }
 
 for (const screen of FIELD_SCREENS) {
