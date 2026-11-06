@@ -1,6 +1,6 @@
 // Selecting across frames, in Chromium: Ctrl+Alt+A selects a layer's linked copies in every frame
 // of the page and Shift with a click adds or takes one out; a top bar or panel change sets each
-// copy, showing Mixed where they differ; a drag and the arrow keys move every copy by the same
+// copy, showing Mixed where they differ; a drag, a resize and the arrow keys change every copy by the same
 // amount; typing happens in the copy double-clicked. Each change is one undo step and reaches a
 // second tab live. Over every layer type, inside a group and an auto layout box, with a copy hidden
 // or locked in one frame, and text in each box mode.
@@ -94,8 +94,9 @@ test('Ctrl+Alt+A selects the linked copies of each layer type in every linked fr
     await expect(page.locator('.stage-overlay .selection')).toHaveAttribute('data-frame', 'sq')
     await expect(page.locator('.stage-overlay .selection-copy')).toHaveCount(2)
     await expect(page.locator('.stage-overlay .linked-copy')).toHaveCount(0)
-    // Across frames there are no handles: a move, the arrows and the panels change every copy alike.
-    await expect(page.locator('.stage-overlay .handle')).toHaveCount(0)
+    // The handles are on the first one's box alone, and a resize there changes every copy alike.
+    await expect(page.locator('.stage-overlay .handle').first()).toBeVisible()
+    await expect(page.locator('.stage-overlay .selection-copy .handle')).toHaveCount(0)
     await expect(page.locator('.stage-overlay .frame-label[data-active]')).toHaveCount(3)
   }
   // Layers several at once: each one's copies join it.
@@ -235,6 +236,32 @@ test('a drag moves every copy by the same amount as the pointer, and the arrow k
   await undo(page)
   expect((await placesOf(page, everyCopy('badge'))).map((p, i) => p.x - (before[i]?.x ?? 0))).toEqual([2, 2, 2])
   expect((await placesOf(page, everyCopy('badge'))).map((p, i) => p.y - (before[i]?.y ?? 0))).toEqual([0, 0, 0])
+  expect(errors).toEqual([])
+})
+
+test('a resize from a handle changes every copy by the same amount, as one undo step', async ({ browser }) => {
+  const { page, errors } = await open(browser)
+  await selectCopies(page, 'badge')
+  const sizes = async () =>
+    (await Promise.all(everyCopy('badge').map((id) => node(page, id)))).map((one) => one?.props.width as number)
+  const before = await sizes()
+  const handle = await page.locator('.stage-overlay .selection .handle[data-handle="e"]').boundingBox()
+  if (!handle) throw new Error('no handle')
+  const zoom = (await page.evaluate(() => window.dazbee?.camera().zoom)) ?? 1
+  const at = { x: handle.x + handle.width / 2, y: handle.y + handle.height / 2 }
+  await page.mouse.move(at.x, at.y)
+  await page.mouse.down()
+  for (let step = 1; step <= 10; step++) await page.mouse.move(at.x + step * 4, at.y)
+  await page.mouse.up()
+  await drawn(page)
+  const after = await sizes()
+  const grown = after.map((width, i) => width - (before[i] ?? 0))
+  expect(Math.abs((grown[0] ?? 0) - 40 / zoom)).toBeLessThanOrEqual(1)
+  expect(grown.every((by) => by === grown[0])).toBe(true)
+  await undo(page)
+  expect(await sizes()).toEqual(before)
+  await redo(page)
+  expect(await sizes()).toEqual(after)
   expect(errors).toEqual([])
 })
 
