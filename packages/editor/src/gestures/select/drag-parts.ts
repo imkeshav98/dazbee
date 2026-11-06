@@ -8,7 +8,7 @@ import { px } from '../../canvas/rulers.ts'
 import type { Gap, Guide } from '../../layers/snap.ts'
 import { round } from '../../layers/transform.ts'
 
-/** What a drag in progress snapped to, in a frame: guides and equal gaps (#42). */
+/** What a drag in progress snapped to, in a frame: guides and equal gaps. */
 export interface Snapped {
   frame: Frame
   guides: Guide[]

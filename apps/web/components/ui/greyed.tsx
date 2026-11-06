@@ -59,8 +59,8 @@ export function GreyedButton({
  * The tooltip of a greyed control, saying `why` it has nothing to do: under the pointer, on
  * keyboard focus and on a tap or click, placed as it shows so it covers no row of any open menu
  * or control of the edit panel, its own menu's or panel's included, and on a phone just above the
- * control's menu, clear of the finger. The
- * ref and `tap` go on the control, and `tooltip` on the Tooltip around it.
+ * control's menu, clear of the finger. The ref and `tap` go on the control, and `tooltip` on the
+ * Tooltip around it.
  */
 export function useWhyTip<T extends HTMLElement>(why: string | null) {
   const [told, setTold] = useState(false)

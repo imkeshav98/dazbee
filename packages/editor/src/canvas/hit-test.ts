@@ -47,9 +47,6 @@ const SEE_THROUGH = 0.1
 
 const everything = () => true
 
-/** Whether each path layer leaves a contour open, by layer: an unchanged layer is the same object between scenes. */
-const openPaths = new WeakMap<SceneLayer, boolean>()
-
 /**
  * The topmost layer that shows under a page point. Inside a group, box or boolean it is the child
  * there, so a click can move single layers; a clipping box hides what lies outside its outline. A
@@ -308,18 +305,10 @@ function nearOutline(looks: Looks, layer: SceneLayer, q: Point, reach: number) {
   return looks.band(layer, reach)?.contains(q.x, q.y) ?? false
 }
 
-/**
- * Whether a path layer leaves a contour open, its outline holding no area of its own: worked out
- * once for each layer, as its outline and band are kept.
- */
+/** Whether a path layer leaves a contour open, its outline holding no area of its own. */
 function opens(layer: Painted) {
-  let open = openPaths.get(layer)
-  if (open === undefined) {
-    const d = layer.type === 'graphic' && layer.props.shape.kind === 'path' ? layer.props.shape.d : ''
-    open = !d.split(/(?=[Mm])/).every((contour) => contour.trim() === '' || /[Zz]\s*$/.test(contour))
-    openPaths.set(layer, open)
-  }
-  return open
+  const d = layer.type === 'graphic' && layer.props.shape.kind === 'path' ? layer.props.shape.d : ''
+  return !d.split(/(?=[Mm])/).every((contour) => contour.trim() === '' || /[Zz]\s*$/.test(contour))
 }
 
 /**
