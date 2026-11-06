@@ -13,7 +13,7 @@
 import { CaretDownIcon } from '@phosphor-icons/react'
 import { type MouseEvent, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 
-import type { Camera, Editor } from '@dazbee/editor'
+import { type Camera, CLICK_SLOP, type Editor } from '@dazbee/editor'
 import type { Design } from '@dazbee/schema'
 
 import { type Target, useTarget } from '@/components/editor/edit-panel/target.ts'
@@ -65,15 +65,13 @@ const TOP_BAR =
 
 /** Room kept between the bar and a selection the stage moves clear of it, its handles' reach included, in pixels. */
 const CLEAR = 12
-/** How far a press moves before it is a drag, in pixels. */
-const SLOP = 8
 /** How long after a tap a second tap still makes a double tap, in milliseconds. */
 const DOUBLE_TAP = 400
 
 /**
- * When the last press on the page went down and where, whether it is held and has moved past the
- * slop, when it went up, and how many presses, drags, wheel turns and keys the page has heard, as window listeners
- * keep them.
+ * When the last press on the page went down and where, whether it is held and has moved as far as
+ * a drag, when it went up, and how many presses, drags, wheel turns and keys the page has heard, as
+ * window listeners keep them; a double tap's second press is not counted, being the same tap's.
  */
 const press = { at: 0, x: 0, y: 0, held: false, dragged: false, upAt: 0, acts: 0 }
 
@@ -114,11 +112,15 @@ function sidesOf(el: Element, ...names: string[]) {
 function usePressWatch() {
   useEffect(() => {
     const down = (event: PointerEvent) => {
+      // A press soon after a tap that didn't drag is that tap's second, as a double tap's is.
+      const second = !press.held && !press.dragged && doubleTapLeft() > 0
       Object.assign(press, { at: performance.now(), x: event.clientX, y: event.clientY, held: true, dragged: false })
-      press.acts++
+      if (!second) press.acts++
     }
     const move = (event: PointerEvent) => {
-      if (!press.held || press.dragged || Math.hypot(event.clientX - press.x, event.clientY - press.y) <= SLOP) return
+      // As far as the stage lets a press wander before it drags.
+      if (!press.held || press.dragged || Math.hypot(event.clientX - press.x, event.clientY - press.y) < CLICK_SLOP)
+        return
       press.dragged = true
       press.acts++
     }
@@ -187,13 +189,13 @@ function doubleTapLeft() {
  * On a phone, before the stage is next drawn, moves the stage so the selection lies clear under the
  * bar, when it sits under it: the bar takes two rows there and must never cover what it acts on.
  * For a selection made by a press, it waits until the press has ended and a second tap can no
- * longer make it a double tap. When the bar's bottom moves for the same selection, as when a
- * selection that grows gives the bar a row, it works the move out again from the view the selection
- * was made in, so a row the bar measures for a moment leaves the stage where the settled bar needs
- * it. Nothing moves once the person has acted since the selection was made, with a press, a drag
- * (the press that made it moving past the slop too), a wheel or a key, or the view has moved since
- * the last move left it, so a zoom, a pan, a drag or typing is never followed by a move it didn't
- * ask for. The move never takes the selection under an open flyout or sheet: where it can't clear
+ * longer make it a double tap, so a text double-tapped to type in comes clear once typing has
+ * started. When the bar's bottom moves for the same selection, as when a selection that grows gives
+ * the bar a row, it works the move out again from the view the selection was made in, so a row the
+ * bar measures for a moment leaves the stage where the settled bar needs it. Nothing moves once the
+ * person has acted since the selection was made, with another press, a drag (the press that made it
+ * dragging too), a wheel or a key, or the view has moved since the last move left it, so a zoom, a
+ * pan, a drag or typing is never followed by a move it didn't ask for. The move never takes the selection under an open flyout or sheet: where it can't clear
  * both, it stops short of them, and the frame's label, or the selection's top, stays under the bar.
  */
 function useSelectionClear(editor: Editor, ids: string[], phone: boolean) {
