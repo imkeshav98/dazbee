@@ -185,7 +185,7 @@ test('a gradient over a photo: added on top, a stop edited, the two reordered, o
   expect(errors).toEqual([])
 })
 
-test('every fill row’s opacity reads its percent after its digits, the fill’s line clear of the % at 100%', async ({
+test('every fill row’s opacity reads its percent after its digits, the fill’s line 3 px clear of the % at 100%', async ({
   browser,
 }) => {
   const brandId = await newBrand('e2e fill opacity')
@@ -208,10 +208,11 @@ test('every fill row’s opacity reads its percent after its digits, the fill’
       ]
       const marker = getComputedStyle(el, '::after')
       const line = box.left + Number.parseFloat(marker.insetInlineStart) - Number.parseFloat(marker.width) / 2
+      // The digits end inside the input's 2 px of room for the caret, where the % starts.
       return {
         value: input.value,
-        after: !!sign && sign.left >= digits.right - 1,
-        clear: !el.hasAttribute('data-ranged') || line - (sign?.right ?? 0) >= 6,
+        after: !!sign && sign.left >= digits.right - 3,
+        clear: !el.hasAttribute('data-ranged') || line - (sign?.right ?? 0) >= 3,
       }
     })
     expect(read).toEqual({ value: '100', after: true, clear: true })
