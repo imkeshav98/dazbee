@@ -48,8 +48,6 @@ type Made = {
   base: Camera
   /** How far above its top the labels of its frames reach, in pixels. */
   labels: number
-  /** Where its layers were, in design pixels, as JSON, to tell when they have been dragged. */
-  boxes: string
   /** The view as the last move left it, as JSON. */
   left: string
 }
@@ -71,9 +69,10 @@ const CLEAR = 12
 const DOUBLE_TAP = 400
 
 /**
- * When the last press on the page went down and where, whether it is held, has moved or is a double
- * tap's second, when it went up, and how many presses, wheel turns and keys the page has heard, as
- * window listeners keep them; a double tap's second press is not counted, being the same tap's.
+ * When the last press on the page went down and where, whether it is held, has moved (the stage
+ * drags a layer at its first move) or is a double tap's second, when it went up, and how many
+ * presses, drags, wheel turns and keys the page has heard, as window listeners keep them; a double
+ * tap's second press is not counted as a press, being the same tap's.
  */
 const press = { at: 0, x: 0, y: 0, held: false, dragged: false, second: false, upAt: 0, acts: 0 }
 
@@ -129,6 +128,7 @@ function usePressWatch() {
     const move = (event: PointerEvent) => {
       if (!press.held || press.dragged || (event.clientX === press.x && event.clientY === press.y)) return
       press.dragged = true
+      press.acts++
     }
     const up = () => {
       press.held = false
@@ -169,7 +169,7 @@ function floorOf(overlay: HTMLElement) {
  * selection's top the labels of its frames reach. The overlay lights the label of each frame with a
  * selected layer and places it in the stage's pixels, as the selection's box is.
  */
-function madeNow(editor: Editor, ids: string[]): Made {
+function madeNow(editor: Editor): Made {
   const camera = editor.camera()
   const rect = editor.selectionRect()
   const labels = [...document.querySelectorAll<HTMLElement>('.stage-overlay .frame-label[data-active]')]
@@ -179,14 +179,8 @@ function madeNow(editor: Editor, ids: string[]): Made {
     byPress: press.held,
     base: camera,
     labels: rect ? rect.y - top : 0,
-    boxes: boxesOf(editor, ids),
     left: JSON.stringify(camera),
   }
-}
-
-/** Where the layers are, in design pixels, as JSON. */
-function boxesOf(editor: Editor, ids: string[]) {
-  return JSON.stringify(ids.map((id) => editor.boxOf(id)))
 }
 
 /**
@@ -207,24 +201,23 @@ function doubleTapLeft() {
  * selection, as when a selection that grows gives the bar a row, it works the move out again from
  * the view the selection was made in, so a row the bar measures for a moment leaves the stage where
  * the settled bar needs it. Nothing moves once the person has acted since the selection was made,
- * with another press, a wheel or a key, once its layers have moved or changed size (the press that
- * made it dragging them too), or once the view has moved since the last move left it, so a zoom, a
- * pan, a drag or typing is never followed by a move it didn't ask for. The move never takes the
- * selection under an open flyout or sheet: where it can't clear both, it stops short of them, and
- * the frame's label, or the selection's top, stays under the bar.
+ * with another press, a drag (the press that made it, or a double tap's second, dragging too), a
+ * wheel or a key, or once the view has moved since the last move left it, so a zoom, a pan, a drag
+ * or typing is never followed by a move it didn't ask for. The move never takes the selection under
+ * an open flyout or sheet: where it can't clear both, it stops short of them, and the frame's label,
+ * or the selection's top, stays under the bar.
  */
 function useSelectionClear(editor: Editor, ids: string[], phone: boolean) {
   const key = ids.join(' ')
   const { barBottom } = useEditState()
   // The selection as it was made: the acts the page had heard by then, the view it was made in, how
-  // far the labels of its frames reach above it, where its layers were, and the view as the last
-  // move left it.
+  // far the labels of its frames reach above it, and the view as the last move left it.
   const made = useRef<Made | null>(null)
   useEffect(() => {
-    const mark = (ids: string[]) => {
-      made.current = madeNow(editor, ids)
+    const mark = () => {
+      made.current = madeNow(editor)
     }
-    mark(editor.selection())
+    mark()
     const stop = editor.onSelection(mark)
     return () => {
       stop()
@@ -234,7 +227,7 @@ function useSelectionClear(editor: Editor, ids: string[], phone: boolean) {
     const was = made.current
     const overlay = document.querySelector<HTMLElement>('.stage-overlay')
     if (!was || !overlay || press.held || press.acts !== was.acts || (was.byPress && doubleTapLeft() > 0)) return
-    if (JSON.stringify(editor.camera()) !== was.left || boxesOf(editor, editor.selection()) !== was.boxes) return
+    if (JSON.stringify(editor.camera()) !== was.left) return
     const { base } = was
     editor.setCamera(base)
     const rect = editor.selectionRect()
