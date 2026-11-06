@@ -13,7 +13,7 @@
 import { CaretDownIcon } from '@phosphor-icons/react'
 import { type MouseEvent, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 
-import { type Camera, CLICK_SLOP, type Editor } from '@dazbee/editor'
+import type { Camera, Editor } from '@dazbee/editor'
 import type { Design } from '@dazbee/schema'
 
 import { type Target, useTarget } from '@/components/editor/edit-panel/target.ts'
@@ -48,6 +48,8 @@ type Made = {
   base: Camera
   /** How far above its top the labels of its frames reach, in pixels. */
   labels: number
+  /** Where its layers were, in design pixels, as JSON, to tell when they have been dragged. */
+  boxes: string
   /** The view as the last move left it, as JSON. */
   left: string
 }
@@ -69,11 +71,11 @@ const CLEAR = 12
 const DOUBLE_TAP = 400
 
 /**
- * When the last press on the page went down and where, whether it is held and has moved as far as
- * a drag, when it went up, and how many presses, drags, wheel turns and keys the page has heard, as
+ * When the last press on the page went down and where, whether it is held, has moved or is a double
+ * tap's second, when it went up, and how many presses, wheel turns and keys the page has heard, as
  * window listeners keep them; a double tap's second press is not counted, being the same tap's.
  */
-const press = { at: 0, x: 0, y: 0, held: false, dragged: false, upAt: 0, acts: 0 }
+const press = { at: 0, x: 0, y: 0, held: false, dragged: false, second: false, upAt: 0, acts: 0 }
 
 /** An element's width with its margins, in pixels. */
 function outerWidth(el: Element | null) {
@@ -113,16 +115,20 @@ function usePressWatch() {
   useEffect(() => {
     const down = (event: PointerEvent) => {
       // A press soon after a tap that didn't drag is that tap's second, as a double tap's is.
-      const second = !press.held && !press.dragged && doubleTapLeft() > 0
-      Object.assign(press, { at: performance.now(), x: event.clientX, y: event.clientY, held: true, dragged: false })
+      const second = !press.held && !press.dragged && !press.second && doubleTapLeft() > 0
+      Object.assign(press, {
+        at: performance.now(),
+        x: event.clientX,
+        y: event.clientY,
+        held: true,
+        dragged: false,
+        second,
+      })
       if (!second) press.acts++
     }
     const move = (event: PointerEvent) => {
-      // As far as the stage lets a press wander before it drags.
-      if (!press.held || press.dragged || Math.hypot(event.clientX - press.x, event.clientY - press.y) < CLICK_SLOP)
-        return
+      if (!press.held || press.dragged || (event.clientX === press.x && event.clientY === press.y)) return
       press.dragged = true
-      press.acts++
     }
     const up = () => {
       press.held = false
@@ -163,7 +169,7 @@ function floorOf(overlay: HTMLElement) {
  * selection's top the labels of its frames reach. The overlay lights the label of each frame with a
  * selected layer and places it in the stage's pixels, as the selection's box is.
  */
-function madeNow(editor: Editor): Made {
+function madeNow(editor: Editor, ids: string[]): Made {
   const camera = editor.camera()
   const rect = editor.selectionRect()
   const labels = [...document.querySelectorAll<HTMLElement>('.stage-overlay .frame-label[data-active]')]
@@ -173,42 +179,52 @@ function madeNow(editor: Editor): Made {
     byPress: press.held,
     base: camera,
     labels: rect ? rect.y - top : 0,
+    boxes: boxesOf(editor, ids),
     left: JSON.stringify(camera),
   }
 }
 
+/** Where the layers are, in design pixels, as JSON. */
+function boxesOf(editor: Editor, ids: string[]) {
+  return JSON.stringify(ids.map((id) => editor.boxOf(id)))
+}
+
 /**
- * How long until a second tap can no longer make the last press a double tap, in milliseconds;
- * the whole time while the press is held.
+ * How long until a second tap can no longer make the last press a double tap, in milliseconds:
+ * the whole time while the press is held, and none once a double tap's second press is up.
  */
 function doubleTapLeft() {
-  return press.held ? DOUBLE_TAP : Math.max(0, press.upAt + DOUBLE_TAP - performance.now())
+  if (press.held) return DOUBLE_TAP
+  return press.second ? 0 : Math.max(0, press.upAt + DOUBLE_TAP - performance.now())
 }
 
 /**
  * On a phone, before the stage is next drawn, moves the stage so the selection lies clear under the
  * bar, when it sits under it: the bar takes two rows there and must never cover what it acts on.
  * For a selection made by a press, it waits until the press has ended and a second tap can no
- * longer make it a double tap, so a text double-tapped to type in comes clear once typing has
- * started. When the bar's bottom moves for the same selection, as when a selection that grows gives
- * the bar a row, it works the move out again from the view the selection was made in, so a row the
- * bar measures for a moment leaves the stage where the settled bar needs it. Nothing moves once the
- * person has acted since the selection was made, with another press, a drag (the press that made it
- * dragging too), a wheel or a key, or the view has moved since the last move left it, so a zoom, a
- * pan, a drag or typing is never followed by a move it didn't ask for. The move never takes the selection under an open flyout or sheet: where it can't clear
- * both, it stops short of them, and the frame's label, or the selection's top, stays under the bar.
+ * longer make it a double tap, or until the stage has heard a double tap, so a text double-tapped
+ * to type in comes clear before anything is typed. When the bar's bottom moves for the same
+ * selection, as when a selection that grows gives the bar a row, it works the move out again from
+ * the view the selection was made in, so a row the bar measures for a moment leaves the stage where
+ * the settled bar needs it. Nothing moves once the person has acted since the selection was made,
+ * with another press, a wheel or a key, once its layers have moved or changed size (the press that
+ * made it dragging them too), or once the view has moved since the last move left it, so a zoom, a
+ * pan, a drag or typing is never followed by a move it didn't ask for. The move never takes the
+ * selection under an open flyout or sheet: where it can't clear both, it stops short of them, and
+ * the frame's label, or the selection's top, stays under the bar.
  */
 function useSelectionClear(editor: Editor, ids: string[], phone: boolean) {
   const key = ids.join(' ')
   const { barBottom } = useEditState()
   // The selection as it was made: the acts the page had heard by then, the view it was made in, how
-  // far the labels of its frames reach above it, and the view as the last move left it.
+  // far the labels of its frames reach above it, where its layers were, and the view as the last
+  // move left it.
   const made = useRef<Made | null>(null)
   useEffect(() => {
-    const mark = () => {
-      made.current = madeNow(editor)
+    const mark = (ids: string[]) => {
+      made.current = madeNow(editor, ids)
     }
-    mark()
+    mark(editor.selection())
     const stop = editor.onSelection(mark)
     return () => {
       stop()
@@ -218,7 +234,7 @@ function useSelectionClear(editor: Editor, ids: string[], phone: boolean) {
     const was = made.current
     const overlay = document.querySelector<HTMLElement>('.stage-overlay')
     if (!was || !overlay || press.held || press.acts !== was.acts || (was.byPress && doubleTapLeft() > 0)) return
-    if (JSON.stringify(editor.camera()) !== was.left) return
+    if (JSON.stringify(editor.camera()) !== was.left || boxesOf(editor, editor.selection()) !== was.boxes) return
     const { base } = was
     editor.setCamera(base)
     const rect = editor.selectionRect()
@@ -237,7 +253,7 @@ function useSelectionClear(editor: Editor, ids: string[], phone: boolean) {
   useLayoutEffect(() => {
     if (!phone || key === '' || !made.current?.byPress) return
     // Once a second tap can no longer make the press a double tap, so that tap lands where the
-    // first did.
+    // first did, or as soon as the stage has heard a double tap, before anything is typed.
     let timer = 0
     const later = () => {
       const left = doubleTapLeft()
@@ -246,8 +262,10 @@ function useSelectionClear(editor: Editor, ids: string[], phone: boolean) {
     }
     if (press.held) window.addEventListener('pointerup', later, { once: true })
     else later()
+    window.addEventListener('dblclick', clear)
     return () => {
       window.removeEventListener('pointerup', later)
+      window.removeEventListener('dblclick', clear)
       clearTimeout(timer)
     }
   }, [clear, key, phone])
@@ -426,27 +444,6 @@ function Bar({
   useLayoutEffect(() => {
     showing.current = { at: performance.now(), press: press.at }
   }, [selectionKey])
-  // On a phone, from the press that showed the bar until a second tap can no longer make it a double
-  // tap, a press goes through the bar to the stage, so a double tap on a layer the bar came over
-  // reaches the layer.
-  const [through, setThrough] = useState(false)
-  useLayoutEffect(() => {
-    if (!phone || doubleTapLeft() === 0) return
-    setThrough(true)
-    let timer = 0
-    const end = () => {
-      const left = doubleTapLeft()
-      if (left > 0) timer = window.setTimeout(end, left)
-      else setThrough(false)
-    }
-    if (press.held) window.addEventListener('pointerup', end, { once: true })
-    else end()
-    return () => {
-      window.removeEventListener('pointerup', end)
-      clearTimeout(timer)
-      setThrough(false)
-    }
-  }, [phone, selectionKey])
   const onClickCapture = (event: MouseEvent) => {
     // A pointer's click with no press since the bar showed, coming as that press ends.
     const fromThatPress = event.detail > 0 && press.at === showing.current.press && press.at < showing.current.at
@@ -505,11 +502,7 @@ function Bar({
         givesWay && 'invisible',
       )}
     >
-      <div
-        ref={setRow}
-        className={cn(TOP_BAR, 'max-w-full', through ? 'pointer-events-none' : 'pointer-events-auto')}
-        data-testid="top-bar-row"
-      >
+      <div ref={setRow} className={cn(TOP_BAR, 'pointer-events-auto max-w-full')} data-testid="top-bar-row">
         {first.slice(0, -tail).map(item)}
         {overflowing && !phone && (
           // A divider sets More controls apart, so it never reads as the caret of the item before it.
@@ -542,8 +535,7 @@ function Bar({
         data-testid="top-bar-overflow"
         className={cn(
           TOP_BAR,
-          'max-w-full flex-wrap justify-center',
-          through ? 'pointer-events-none' : 'pointer-events-auto',
+          'pointer-events-auto max-w-full flex-wrap justify-center',
           !overflowOpen && 'invisible absolute',
           !overflowing && 'hidden',
         )}
