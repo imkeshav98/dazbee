@@ -52,8 +52,11 @@ const TOP_BAR =
 /** Room kept between the bar and a selection the stage moves clear of it, its handles' reach included, in pixels. */
 const CLEAR = 12
 
-/** When the last press on the page went down, and whether a press is held, as a window listener keeps them. */
-const press = { at: 0, held: false }
+/**
+ * When the last press on the page went down, whether a press is held, and how many presses, wheel
+ * turns and keys the page has heard, as window listeners keep them.
+ */
+const press = { at: 0, held: false, acts: 0 }
 
 /** An element's width with its margins, in pixels. */
 function outerWidth(el: Element | null) {
@@ -85,23 +88,34 @@ function sidesOf(el: Element, ...names: string[]) {
   return names.reduce((sum, name) => sum + Number.parseFloat(style.getPropertyValue(name)), 0)
 }
 
-/** Keeps `press` as presses go down and up anywhere on the page, before anything else hears them. */
+/**
+ * Keeps `press` as presses go down and up, wheels turn and keys go down anywhere on the page, before
+ * anything else hears them.
+ */
 function usePressWatch() {
   useEffect(() => {
     const down = () => {
       press.at = performance.now()
       press.held = true
+      press.acts++
     }
     const up = () => {
       press.held = false
     }
+    const act = () => {
+      press.acts++
+    }
     window.addEventListener('pointerdown', down, true)
     window.addEventListener('pointerup', up, true)
     window.addEventListener('pointercancel', up, true)
+    window.addEventListener('wheel', act, true)
+    window.addEventListener('keydown', act, true)
     return () => {
       window.removeEventListener('pointerdown', down, true)
       window.removeEventListener('pointerup', up, true)
       window.removeEventListener('pointercancel', up, true)
+      window.removeEventListener('wheel', act, true)
+      window.removeEventListener('keydown', act, true)
     }
   }, [])
 }
@@ -117,22 +131,37 @@ function floorOf(overlay: HTMLElement) {
 }
 
 /**
- * On a phone, once no press is held, moves the stage so the selection lies clear under the bar,
- * when it sits under it: the bar takes two rows there and must never cover what it acts on. When
- * the bar's bottom moves for the same selection, as when a selection that grows gives the bar a row,
- * it looks again once the bar has settled into its rows, unless the view moved meanwhile. The move
- * never takes the selection under an open flyout or sheet: where it can't clear both, it stops
- * short of them, and the frame's label, or the selection's top, stays under the bar.
+ * On a phone, once the press that made the selection is up, moves the stage so the selection lies
+ * clear under the bar, when it sits under it: the bar takes two rows there and must never cover what
+ * it acts on. When the bar's bottom moves for the same selection, as when a selection that grows
+ * gives the bar a row, it looks again once the bar has settled into its rows. A look moves nothing
+ * once the person has acted since the selection was made, with a press, a wheel or a key, or the
+ * view has moved since it was made or last moved clear, so a zoom, a pan, a drag or typing is never
+ * followed by a move it didn't ask for. The move never takes the selection under an open flyout or
+ * sheet: where it can't clear both, it stops short of them, and the frame's label, or the
+ * selection's top, stays under the bar.
  */
 function useSelectionClear(editor: Editor, ids: string[], phone: boolean) {
   const key = ids.join(' ')
   const { barBottom } = useEditState()
-  // The camera as the last look left it, so a later look leaves a view moved since then be.
-  const looked = useRef('')
+  // The selection as it was made, or as the bar found it: the acts the page had heard by then, and
+  // the camera then or as the last move clear left it.
+  const made = useRef({ acts: 0, camera: '' })
+  useEffect(() => {
+    const mark = () => {
+      made.current = { acts: press.acts, camera: JSON.stringify(editor.camera()) }
+    }
+    mark()
+    const stop = editor.onSelection(mark)
+    return () => {
+      stop()
+    }
+  }, [editor])
   const clear = useCallback(() => {
     const rect = editor.selectionRect()
     const overlay = document.querySelector<HTMLElement>('.stage-overlay')
-    if (!rect || !overlay) return
+    const { acts, camera } = made.current
+    if (!rect || !overlay || press.held || press.acts !== acts || JSON.stringify(editor.camera()) !== camera) return
     // The labels of the selection's frames, lit while a layer in each is selected, are kept clear
     // too; the overlay places them in the stage's pixels.
     const labels = [...overlay.querySelectorAll<HTMLElement>('.frame-label[data-active]')]
@@ -147,8 +176,8 @@ function useSelectionClear(editor: Editor, ids: string[], phone: boolean) {
       const moved = editor.selectionRect()
       const past = moved ? moved.y + moved.height - (floorOf(overlay) - CLEAR) : 0
       if (past > 0) editor.setCamera({ ...camera, y: camera.y + Math.max(0, under - past) })
+      made.current = { acts, camera: JSON.stringify(editor.camera()) }
     }
-    looked.current = JSON.stringify(editor.camera())
   }, [editor])
   useEffect(() => {
     if (!phone || key === '') return
@@ -165,15 +194,13 @@ function useSelectionClear(editor: Editor, ids: string[], phone: boolean) {
     }
   }, [clear, key, phone])
   useEffect(() => {
-    if (!phone || key === '' || press.held) return
+    if (!phone || key === '') return
     // Two frames on, as the bar fitting its items into rows measures one row too many for a frame.
     let frame = requestAnimationFrame(() => {
-      frame = requestAnimationFrame(() => {
-        if (JSON.stringify(editor.camera()) === looked.current) clear()
-      })
+      frame = requestAnimationFrame(clear)
     })
     return () => cancelAnimationFrame(frame)
-  }, [barBottom, clear, editor, key, phone])
+  }, [barBottom, clear, key, phone])
 }
 
 /**
