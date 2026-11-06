@@ -62,13 +62,21 @@ for (const [width, height] of SCREEN_SIZES) {
     await page.evaluate(() => window.dazbee?.select([]))
     await fitSettled(page)
     await nextFrame(page)
-    const still = await camera(page)
+    let still = await camera(page)
     const problems: string[] = []
     const check = async (where: string) => {
       await nextFrame(page)
       for (const p of await layoutProblems(page, { pieces: PIECES, uncut: UNCUT })) problems.push(`${where}: ${p}`)
       for (const w of await wrapped(page)) problems.push(`${where}: "${w}" wraps`)
-      if (JSON.stringify(await camera(page)) !== JSON.stringify(still)) problems.push(`${where}: the canvas moved`)
+      const now = await camera(page)
+      // On a phone the stage may move up or down, and only that, to keep the selection clear of
+      // what opened (a sheet, a pop-up); elsewhere it stays still.
+      const moved =
+        width < 600
+          ? JSON.stringify({ ...now, y: 0 }) !== JSON.stringify({ ...still, y: 0 })
+          : JSON.stringify(now) !== JSON.stringify(still)
+      if (moved) problems.push(`${where}: the canvas moved`)
+      still = now
     }
     for (const [name, ids] of Object.entries(SELECTIONS)) {
       await selectLayers(page, ids)

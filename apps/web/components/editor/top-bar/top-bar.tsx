@@ -204,9 +204,9 @@ function doubleTapLeft() {
  * wheel or a key, or once the view has moved since the last move left it, so a zoom, a pan, a drag
  * or typing is never followed by a move it didn't ask for. The move never takes the selection under
  * an open flyout or sheet: where it can't clear both, it stops short of them, and the frame's label,
- * or the selection's top, stays under the bar. While an edit panel's sheet or a pop-up is open, it
- * moves the stage, once each has grown into place, so the selection lies in the room they and the
- * bar leave it, its top first where it can't fit whole.
+ * or the selection's top, stays under the bar. While an edit panel's sheet or a pop-up of the bar
+ * is open, it moves the stage, once each has grown into place, so the selection lies in the room
+ * they and the bar leave it, its top first where it can't fit whole.
  */
 function useSelectionClear(editor: Editor, ids: string[], phone: boolean) {
   const key = ids.join(' ')
@@ -267,7 +267,8 @@ function useSelectionClear(editor: Editor, ids: string[], phone: boolean) {
     if (phone && key !== '') clear()
   }, [barBottom, clear, key, phone])
   useEffect(() => {
-    if (!phone || key === '' || open === null) return
+    // The full menu's sheet runs an action and closes, so the view stays where it is for it.
+    if (!phone || key === '' || open === null || open === 'more') return
     const keep = () => {
       keepInRoom(editor, open)
       if (made.current) made.current.left = JSON.stringify(editor.camera())
