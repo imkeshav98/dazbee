@@ -28,7 +28,7 @@ import {
   useEditState,
 } from '@/components/editor/edit-store.ts'
 import { usePickedFrame, useSelection } from '@/components/editor/editor-hooks.ts'
-import { BAR_BUTTON, BAR_DIVIDER, BAR_ROW } from '@/components/editor/styles.ts'
+import { BAR_BUTTON, BAR_DIVIDER, BAR_ROW, BAR_TOUCH } from '@/components/editor/styles.ts'
 import { useLiveDesign } from '@/components/editor/use-live-design.ts'
 import { cn } from '@/lib/cn.ts'
 import { useMessages } from '@/lib/i18n/client.tsx'
@@ -60,8 +60,7 @@ const MORE = 30 + DIVIDER
  * The bar's look: a frosted pill of buttons, centred at the top of the stage under the header pill.
  * On a phone every item is a 44 px target, 8 px from the next.
  */
-const TOP_BAR =
-  'flex items-center gap-0.5 rounded-[14px] surface-frost p-1 max-sm:gap-[8px] max-sm:rounded-[18px] max-sm:p-[2px] max-sm:[&_[data-bar-item]]:h-[44px] max-sm:[&_[data-bar-item]]:min-w-[44px] max-sm:[&_[data-bar-item]]:px-[6px]'
+const TOP_BAR = `flex items-center gap-0.5 rounded-[14px] surface-frost p-1 max-sm:rounded-[18px] max-sm:p-[2px] ${BAR_TOUCH}`
 
 /** Room kept between the bar and a selection the stage moves clear of it, its handles' reach included, in pixels. */
 const CLEAR = 12

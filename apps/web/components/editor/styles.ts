@@ -151,6 +151,9 @@ export const BAR_ROW = 'top-[90px] max-sm:top-[72px]'
  * into, each of 44 px targets, so the bar never covers the design as fitted.
  */
 export const BAR_ROW_HEIGHT = 'h-[38px] max-sm:h-[106px]'
+/** On a phone, a row of bar buttons (the top bar's, the small menu's) makes each a 44 px target, 8 px from the next. */
+export const BAR_TOUCH =
+  'max-sm:gap-[8px] max-sm:[&_[data-bar-item]]:h-[44px] max-sm:[&_[data-bar-item]]:min-w-[44px] max-sm:[&_[data-bar-item]]:px-[6px]'
 /** One button of the bar: words or an icon, lit by the hover tint while its popover is open and by the pressed tint while pressed. */
 export const BAR_BUTTON = `flex h-[30px] min-w-[30px] shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-row px-2 text-[12px] font-semibold whitespace-nowrap text-text transition-colors duration-[var(--chrome-fast)] hover:bg-hover active:bg-pressed aria-expanded:bg-hover aria-expanded:active:bg-pressed ${FOCUS_RING}`
 /** A button of the bar that turns something on or off, such as bold: on a pink tint while it is on, its icon in the text colour. */

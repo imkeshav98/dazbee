@@ -9,7 +9,7 @@
 // flyout, the bottom controls and the frames' labels, and hides while a gesture runs, a top bar
 // pop-up or the right-click menu is open, or the selection is off the stage. ⋯ opens the full menu
 // beside it, clear of the rail and its flyout, or on a phone as the sheet at the bottom of the
-// screen, while the small menu hides.
+// screen, while the small menu hides. The wheel over it pans and zooms the stage, as over the canvas.
 import {
   CopyIcon,
   DotsThreeIcon,
@@ -27,7 +27,8 @@ import { keyOf } from '@/components/editor/arrange-actions.ts'
 import { useTarget } from '@/components/editor/edit-panel/target.ts'
 import { editState, isPanel, setOpen, useEditState } from '@/components/editor/edit-store.ts'
 import { useSelection } from '@/components/editor/editor-hooks.ts'
-import { BAR_BUTTON, BAR_TOGGLE } from '@/components/editor/styles.ts'
+import { BAR_BUTTON, BAR_TOGGLE, BAR_TOUCH } from '@/components/editor/styles.ts'
+import { useWheelThrough } from '@/components/editor/wheel-through.ts'
 import { MENU_ITEM_GREYED } from '@/components/ui/looks.ts'
 import { Menu, type MenuPlace, WIDE_MENU } from '@/components/ui/menu.tsx'
 import { Tooltip } from '@/components/ui/tooltip.tsx'
@@ -246,6 +247,7 @@ export function SmallMenu({ editor, rightClick }: { editor: Editor; rightClick: 
   const selected = useTarget(editor, ids)
   const [menu, setMenu] = useState<HTMLDivElement | null>(null)
   const place = usePlace(editor, menu, rightClick)
+  useWheelThrough(menu)
   const { open } = useEditState()
   const [more, setMore] = useState<HTMLButtonElement | null>(null)
   const rtl = dirOf(useLocale()) === 'rtl'
@@ -277,6 +279,7 @@ export function SmallMenu({ editor, rightClick }: { editor: Editor; rightClick: 
       style={place ? { left: place.left, top: place.top } : undefined}
       className={cn(
         'absolute z-20 flex items-center gap-0.5 rounded-full surface-frost p-1',
+        BAR_TOUCH,
         place && !sheet ? 'visible' : 'invisible',
       )}
     >
