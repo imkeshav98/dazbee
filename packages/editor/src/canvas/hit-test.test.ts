@@ -352,6 +352,25 @@ describe('hitTest', () => {
     expect(idAt([under, locked], 160, 160)).toBe('child')
   })
 
+  it('reads an open path with no fill by its kept band alone, never its outline, as a hover over many does', () => {
+    const arc = shape(
+      'arc',
+      { kind: 'path', d: 'M0 0 C100 400 300 400 400 0' },
+      { x: 0, y: 0, width: 400, height: 400 },
+      [],
+    )
+    const stroked = layer('arc', 'graphic', { ...arc.props, strokes: [OUTLINE] })
+    const read: string[] = []
+    const counting: Looks = {
+      ...looks,
+      outline: (one) => (read.push('outline'), looks.outline(one)),
+      band: (one, reach) => (read.push('band'), looks.band(one, reach)),
+    }
+    expect(hitTest([stroked], { x: 200, y: 100 }, counting, {})).toBeNull()
+    expect(hitTest([stroked], { x: 200, y: 299 }, counting, {})?.id).toBe('arc')
+    expect(read).toEqual(['band', 'band'])
+  })
+
   it('picks a line near it, however thin its box, and a boolean by the shapes inside it (#44)', () => {
     const line = layer('line', 'graphic', {
       x: 0,

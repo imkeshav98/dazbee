@@ -41,10 +41,14 @@ type Rgba = readonly [number, number, number, number]
 
 /** How near a line or a path's stroke a click picks it, in design pixels, beyond half the stroke. */
 const LINE_REACH = 4
+
 /** How opaque a layer must be drawn under the point to be picked there; below it the click passes on. */
 const SEE_THROUGH = 0.1
 
 const everything = () => true
+
+/** Whether each path layer leaves a contour open, by layer: an unchanged layer is the same object between scenes. */
+const openPaths = new WeakMap<SceneLayer, boolean>()
 
 /**
  * The topmost layer that shows under a page point. Inside a group, box or boolean it is the child
@@ -265,11 +269,13 @@ function paintAt(looks: Looks, layer: Painted, q: Point, need: number, luminance
       : strokeReach(props.strokes, 'outside')
   if (!inBox(q, props, reach)) return null
   const strokes = () => over(looks, strokePaints(props.strokes), props, q, luminance)
+  // With no fill, a closed outline shows all over inside it, so an empty box is easy to grab; an
+  // open path shows only along its line, so with no fill showing only its kept band is read.
+  const open = kind === 'path' && opens(layer)
+  if (open && props.fills.every((f) => f.visible === false))
+    return reach > 0 && nearOutline(looks, layer, q, reach) ? strokes() : null
   if (!looks.outline(layer).contains(q.x, q.y))
     return reach > 0 && nearOutline(looks, layer, q, reach) ? strokes() : null
-  // With no fill, a closed outline shows all over inside it, so an empty box is easy to grab; an
-  // open path shows only along its line.
-  const open = layer.type === 'graphic' && layer.props.shape.kind === 'path' && !closesEvery(layer.props.shape.d)
   const fill = over(looks, props.fills, props, q, luminance) ?? (open ? null : 1)
   if (fill !== null && fill >= need) return fill
   // Where the fill is clear or an open path has none, the strokes still show along the outline.
@@ -302,9 +308,18 @@ function nearOutline(looks: Looks, layer: SceneLayer, q: Point, reach: number) {
   return looks.band(layer, reach)?.contains(q.x, q.y) ?? false
 }
 
-/** Whether path data closes every contour it starts, so its outline holds an area with no fill. */
-function closesEvery(d: string) {
-  return d.split(/(?=[Mm])/).every((contour) => contour.trim() === '' || /[Zz]\s*$/.test(contour))
+/**
+ * Whether a path layer leaves a contour open, its outline holding no area of its own: worked out
+ * once for each layer, as its outline and band are kept.
+ */
+function opens(layer: Painted) {
+  let open = openPaths.get(layer)
+  if (open === undefined) {
+    const d = layer.type === 'graphic' && layer.props.shape.kind === 'path' ? layer.props.shape.d : ''
+    open = !d.split(/(?=[Mm])/).every((contour) => contour.trim() === '' || /[Zz]\s*$/.test(contour))
+    openPaths.set(layer, open)
+  }
+  return open
 }
 
 /**
