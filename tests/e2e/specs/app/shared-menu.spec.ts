@@ -4,13 +4,15 @@
 // first; a greyed row that stays in the arrow order and says why beside itself, never over another
 // row, and runs nothing; a menu beside its row on tablet and desktop, and on a phone in the menu's
 // place under a back row; and all of it mirrored in Arabic.
+import { photo, upload } from '../../support/assets.ts'
 import { setCookies } from '../../support/editor.ts'
 import { boxOf } from '../../support/layout.ts'
 import { open } from '../../support/linked-menu.ts'
 import { besideRows, fullMenuRows, rowName, rowsUnderTooltip } from '../../support/menu-rows.ts'
-import { fitSettled, selectLayers } from '../../support/stage.ts'
+import { fitSettled, openStage, selectLayers } from '../../support/stage.ts'
 import { expect, type Page, test } from '../../support/test.ts'
 import { entered } from '../../support/top-bar.ts'
+import { topBarDesign } from '../../support/top-bar-design.ts'
 
 test.describe.configure({ mode: 'parallel', timeout: 120_000 })
 
@@ -188,3 +190,24 @@ for (const arabic of [false, true])
     await expect.poll(() => focused(page)).toBe('bar-more')
     expect(errors).toEqual([])
   })
+
+test('on a phone a tap on ⋯ that its sheet then covers opens the menu and runs no row under the finger', async ({
+  browser,
+}) => {
+  const asset = await upload(photo)
+  const { page, errors } = await openStage(browser, topBarDesign(asset.id))
+  await page.setViewportSize({ width: 390, height: 600 })
+  await selectLayers(page, ['box'], { bar: true })
+  const before = await page.evaluate(() => JSON.stringify(window.dazbee?.design()))
+  const more = await page.getByTestId('bar-more').boundingBox()
+  if (!more) throw new Error('no ⋯')
+  await page.mouse.click(more.x + more.width / 2, more.y + more.height / 2)
+  const menu = page.getByTestId('bar-more-menu')
+  await expect(menu).toBeVisible()
+  await entered(menu)
+  // The whole sheet shows, and the finger let go where ⋯ was, over its Copy ▸ row, opened nothing.
+  await expect(menu.locator('[data-menu-in-place]')).toHaveCount(0)
+  await expect(menu.locator('[role^="menuitem"]')).toHaveCount(fullMenuRows({ group: true }).length)
+  expect(await page.evaluate(() => JSON.stringify(window.dazbee?.design()))).toBe(before)
+  expect(errors).toEqual([])
+})
