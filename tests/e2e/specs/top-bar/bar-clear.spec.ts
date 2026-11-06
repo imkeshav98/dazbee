@@ -1,6 +1,7 @@
 // On a phone, the move that brings a selection clear under the top bar happens once, for the
 // selection as it is made: a zoom, a pan or a drag the person starts straight after a tap or a
-// selection made another way is never followed, or interrupted, by a move they didn't ask for.
+// selection made another way is never followed, or interrupted, by a move they didn't ask for; and
+// the Position sheet and a text pop-up never cover the selection.
 import { photo, upload } from '../../support/assets.ts'
 import { editorPath, setCookies } from '../../support/editor.ts'
 import { seed } from '../../support/seed.ts'
@@ -311,4 +312,59 @@ test('on a phone a drag straight after a tap, one the layer does not follow incl
   }
   expect(errors).toEqual([])
   await page.context().close()
+})
+
+test('on a phone the Position sheet and a text pop-up never cover the selection: the stage moves it into the room they leave', async ({
+  browser,
+}) => {
+  const { page, errors } = await openPhone(browser, designId)
+  /** Puts a layer's top or bottom at a height on the screen, at 100%, its middle across the screen's. */
+  const placeAt = (id: string, edge: 'top' | 'bottom', y: number) =>
+    page.evaluate(
+      ({ id, edge, y }) => {
+        const editor = window.dazbee
+        const box = editor?.boxOf(id)
+        if (!editor || !box) throw new Error(`no ${id}`)
+        editor.setCamera({ ...editor.camera(), zoom: 1 })
+        const now = editor.camera()
+        const was = editor.screenPoint(box.x + box.width / 2, edge === 'top' ? box.y : box.y + box.height)
+        editor.setCamera({ ...now, x: now.x + 195 - was.x, y: now.y + y - was.y })
+      },
+      { id, edge, y },
+    )
+  const outline = async () => (await page.locator('.stage-overlay .selection').boundingBox()) ?? { y: 0, height: 0 }
+
+  // The box low on the screen, where Position's sheet comes up over it.
+  await selectLayers(page, ['box'], { bar: true })
+  await nextFrame(page)
+  await placeAt('box', 'bottom', 800)
+  await nextFrame(page)
+  await page.getByTestId('bar-position').tap()
+  const sheet = page.locator('#edit-panel')
+  await expect(sheet).toBeVisible()
+  await expect
+    .poll(async () => {
+      const [box, panel] = [await outline(), await sheet.boundingBox()]
+      return box.y + box.height <= (panel?.y ?? 0)
+    })
+    .toBe(true)
+  await page.keyboard.press('Escape')
+  await expect(sheet).toBeHidden()
+
+  // The headline just under the bar, where Align's pop-up opens over it.
+  await selectLayers(page, ['headline'], { bar: true })
+  await nextFrame(page)
+  const bar = await page.getByTestId('top-bar').boundingBox()
+  await placeAt('headline', 'top', (bar?.y ?? 0) + (bar?.height ?? 0) + 16)
+  await nextFrame(page)
+  await page.getByTestId('bar-align').tap()
+  const popup = page.getByTestId('bar-align-menu')
+  await expect(popup).toBeVisible()
+  await expect
+    .poll(async () => {
+      const [box, menu] = [await outline(), await popup.boundingBox()]
+      return box.y >= (menu?.y ?? 0) + (menu?.height ?? 0)
+    })
+    .toBe(true)
+  expect(errors).toEqual([])
 })

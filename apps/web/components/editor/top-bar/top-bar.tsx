@@ -204,11 +204,13 @@ function doubleTapLeft() {
  * wheel or a key, or once the view has moved since the last move left it, so a zoom, a pan, a drag
  * or typing is never followed by a move it didn't ask for. The move never takes the selection under
  * an open flyout or sheet: where it can't clear both, it stops short of them, and the frame's label,
- * or the selection's top, stays under the bar.
+ * or the selection's top, stays under the bar. While an edit panel's sheet or a pop-up is open, it
+ * moves the stage, once each has grown into place, so the selection lies in the room they and the
+ * bar leave it, its top first where it can't fit whole.
  */
 function useSelectionClear(editor: Editor, ids: string[], phone: boolean) {
   const key = ids.join(' ')
-  const { barBottom } = useEditState()
+  const { barBottom, open, sheetTop } = useEditState()
   // The selection as it was made: the acts the page had heard by then, the view it was made in, how
   // far the labels of its frames reach above it, and the view as the last move left it.
   const made = useRef<Made | null>(null)
@@ -264,6 +266,48 @@ function useSelectionClear(editor: Editor, ids: string[], phone: boolean) {
   useLayoutEffect(() => {
     if (phone && key !== '') clear()
   }, [barBottom, clear, key, phone])
+  useEffect(() => {
+    if (!phone || key === '' || open === null) return
+    const keep = () => {
+      keepInRoom(editor, open)
+      if (made.current) made.current.left = JSON.stringify(editor.camera())
+    }
+    // Once the sheet or pop-up shows, and again once its opening animation has ended.
+    const frame = requestAnimationFrame(keep)
+    const settled = setTimeout(keep, 260)
+    return () => {
+      cancelAnimationFrame(frame)
+      clearTimeout(settled)
+    }
+  }, [editor, key, open, phone, sheetTop])
+}
+
+/**
+ * Moves the stage so the selection lies between what covers the stage's top (the bar, a pop-up
+ * under it) and what covers its bottom (a sheet, a flyout, a pop-up there), CLEAR from each, its top
+ * first where it can't fit whole; leaves it be where it already does.
+ */
+function keepInRoom(editor: Editor, open: string) {
+  const overlay = document.querySelector<HTMLElement>('.stage-overlay')
+  const rect = editor.selectionRect()
+  if (!overlay || !rect) return
+  const stage = overlay.getBoundingClientRect()
+  let top = editState().barBottom + CLEAR
+  let floor = floorOf(overlay) - CLEAR
+  const popup = isPanel(open)
+    ? null
+    : document.querySelector(`[data-testid="bar-${open}-menu"]`)?.getBoundingClientRect()
+  if (popup && popup.height > 0) {
+    // A pop-up in the stage's upper half covers it from the top, one in its lower half from the bottom.
+    if (popup.top + popup.height / 2 < stage.top + stage.height / 2)
+      top = Math.max(top, popup.bottom - stage.top + CLEAR)
+    else floor = Math.min(floor, popup.top - stage.top - CLEAR)
+  }
+  const by = rect.y < top || rect.height > floor - top ? top - rect.y : Math.min(0, floor - (rect.y + rect.height))
+  if (by === 0) return
+  // The camera's offset is in screen pixels: adding to it moves the design down.
+  const camera = editor.camera()
+  editor.setCamera({ ...camera, y: camera.y + by })
 }
 
 /**
