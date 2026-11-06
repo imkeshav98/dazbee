@@ -240,6 +240,15 @@ describe('editorBoxes', () => {
       selection.select(['pin'], square.id)
       expect(boxes.handlesFor()).toEqual([])
     })
+
+    it('gives a text that grows with its words, selected with its copies in other frames, no top or bottom one either', () => {
+      const { selection, boxes, square, wide } = harness()
+      selection.selectAcross([
+        { id: 'label', frameId: square.id },
+        { id: 'wide-label', frameId: wide.id },
+      ])
+      expect(boxes.handlesFor()).toEqual(['nw', 'ne', 'e', 'se', 'sw', 'w'])
+    })
   })
 
   describe('snapBoxes', () => {

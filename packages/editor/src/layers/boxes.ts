@@ -180,7 +180,8 @@ export function editorBoxes({ session, scenes, resources, selection, drawn, fram
     const current = selection.current()
     const frame = frameOf(firstFrameOf(current))
     if (!current || !frame || lockedSelection()) return []
-    const ids = idsOf(current)
+    // The first frame's layers: its box shows the handles, and each copy is resized as they are.
+    const ids = current.filter((layer) => layer.frameId === frame.id).map((layer) => layer.id)
     const [only] = ids
     if (
       ids.length === 1 &&
